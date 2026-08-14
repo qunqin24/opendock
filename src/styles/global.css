@@ -1,0 +1,369 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+
+@custom-variant dark (&:is(.dark *));
+
+/* shadcn/ui neutral palette — light is the primary surface, dark is a
+   faithful inversion rather than a separate design. */
+:root {
+  --radius: 0.625rem;
+
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+
+  /* Semantic signal colours for health badges + rank movement. */
+  --ok: oklch(0.58 0.13 158);
+  --ok-bg: oklch(0.96 0.03 158);
+  --warn: oklch(0.6 0.13 70);
+  --warn-bg: oklch(0.97 0.04 80);
+  --danger: oklch(0.58 0.2 25);
+  --danger-bg: oklch(0.96 0.03 25);
+
+  /* Structural accent — port-crane amber, used only for wayfinding and
+     brand flourishes (hazard stripes, scanner brackets, the CTA band).
+     Never reused for health semantics; --warn already owns that meaning. */
+  --dock: oklch(0.72 0.16 78);
+  --dock-foreground: oklch(0.22 0.04 78);
+
+  /* Scrollbars. Quiet enough to read as chrome, dark enough to find. */
+  --scrollbar: oklch(0.86 0 0);
+  --scrollbar-hover: oklch(0.72 0 0);
+}
+
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.185 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.985 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.245 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.245 0 0);
+  --muted-foreground: oklch(0.678 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 12%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+
+  --ok: oklch(0.72 0.15 158);
+  --ok-bg: oklch(0.28 0.05 158);
+  --warn: oklch(0.78 0.14 75);
+  --warn-bg: oklch(0.3 0.05 75);
+  --danger: oklch(0.7 0.18 25);
+  --danger-bg: oklch(0.3 0.06 25);
+
+  --dock: oklch(0.78 0.15 78);
+  --dock-foreground: oklch(0.2 0.03 78);
+
+  --scrollbar: oklch(1 0 0 / 18%);
+  --scrollbar-hover: oklch(1 0 0 / 32%);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-ok: var(--ok);
+  --color-ok-bg: var(--ok-bg);
+  --color-warn: var(--warn);
+  --color-warn-bg: var(--warn-bg);
+  --color-danger: var(--danger);
+  --color-danger-bg: var(--danger-bg);
+  --color-dock: var(--dock);
+  --color-dock-foreground: var(--dock-foreground);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  /* No webfont is self-hosted yet, so these resolve to the system stack
+     (SF Pro / SF Mono on macOS). Swapping in a hosted face later is a
+     @font-face block plus a name at the front of one of these lists. */
+  --font-sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB',
+    'Microsoft YaHei', sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  html {
+    scroll-behavior: smooth;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* --- Scrollbars ----------------------------------------------------
+     One treatment for the page and for every inner scroller (code blocks,
+     README tables, the plugin sidebar, the command palette). Both syntaxes
+     are needed: the standard properties cover Firefox and current
+     Chrome/Safari, the -webkit- pseudo-elements cover older WebKit.
+
+     `scrollbar-color` inherits so the root carries it, but `scrollbar-width`
+     does not — inner scrollers need it applied directly. `.scrollbar-none`
+     lives in the utilities layer, which comes after base, so it still wins. */
+  :root {
+    scrollbar-color: var(--scrollbar) transparent;
+  }
+  *,
+  ::before,
+  ::after {
+    scrollbar-width: thin;
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    /* The transparent border + background-clip is what insets the thumb,
+       so it reads as a floating pill rather than a full-width bar. */
+    background-color: var(--scrollbar);
+    background-clip: content-box;
+    border: 2px solid transparent;
+    border-radius: 9999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: var(--scrollbar-hover);
+  }
+  ::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Numeric columns (stars, downloads, berth numbers) must not jitter. */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* --- Dock board language ------------------------------------------
+     Display type is monospace on purpose: every primitive in this domain
+     (package names, config, versions, semver) is already monospaced, so
+     setting headlines in it uses the subject's own voice. */
+  .display {
+    font-family: var(--font-mono);
+    font-weight: 500;
+    letter-spacing: -0.045em;
+    text-wrap: balance;
+  }
+
+  /* Small uppercase mono, used for column headers, edition lines and the
+     wordmark — the board's connective tissue. */
+  .meta {
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+}
+
+@layer components {
+  /* Health status lamp. This is the one piece of colour in an otherwise
+     achromatic system, because maintenance status is the thing this site
+     knows that a hand-written list doesn't. */
+  .lamp {
+    display: inline-block;
+    flex-shrink: 0;
+    width: 0.4375rem;
+    height: 0.4375rem;
+    border-radius: 9999px;
+  }
+  .lamp-ok {
+    background: var(--ok);
+    box-shadow: 0 0 0 3px color-mix(in oklch, var(--ok) 16%, transparent);
+  }
+  .lamp-warn {
+    background: var(--warn);
+    box-shadow: 0 0 0 3px color-mix(in oklch, var(--warn) 16%, transparent);
+  }
+  .lamp-danger {
+    background: var(--danger);
+    box-shadow: 0 0 0 3px color-mix(in oklch, var(--danger) 16%, transparent);
+  }
+
+  ::selection {
+    @apply bg-foreground/90 text-background;
+  }
+}
+
+@layer utilities {
+  .scrollbar-none {
+    scrollbar-width: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Sweeping highlight across the hero's health-distribution grid.
+     Purely decorative; disabled for reduced motion. */
+  .dock-sweep::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      100deg,
+      transparent 40%,
+      color-mix(in oklch, var(--foreground) 14%, transparent) 50%,
+      transparent 60%
+    );
+    background-size: 300% 100%;
+    animation: dock-sweep 7s ease-in-out infinite;
+    pointer-events: none;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .dock-sweep::after {
+      animation: none;
+      display: none;
+    }
+  }
+
+  .dock-cursor {
+    animation: dock-blink 1.1s step-end infinite;
+  }
+}
+
+@keyframes dock-sweep {
+  0%,
+  100% {
+    background-position: 200% 0;
+  }
+  50% {
+    background-position: -50% 0;
+  }
+}
+
+@keyframes dock-blink {
+  0%,
+  45% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+
+/* --- Rendered README ------------------------------------------------ */
+.prose-readme {
+  @apply text-[0.9375rem] leading-7 text-foreground/90;
+  /* READMEs are full of bare URLs and long paths; let them break rather
+     than widen the page on phones. */
+  overflow-wrap: break-word;
+}
+.prose-readme > :first-child {
+  margin-top: 0;
+}
+.prose-readme h1,
+.prose-readme h2,
+.prose-readme h3,
+.prose-readme h4 {
+  @apply mt-8 mb-3 scroll-mt-24 font-semibold tracking-tight text-foreground;
+}
+.prose-readme h1 {
+  @apply border-b border-border pb-2 text-2xl;
+}
+.prose-readme h2 {
+  @apply border-b border-border pb-2 text-xl;
+}
+.prose-readme h3 {
+  @apply text-lg;
+}
+.prose-readme p,
+.prose-readme ul,
+.prose-readme ol,
+.prose-readme blockquote {
+  @apply my-4;
+}
+.prose-readme ul {
+  @apply list-disc pl-6;
+}
+.prose-readme ol {
+  @apply list-decimal pl-6;
+}
+.prose-readme li {
+  @apply my-1;
+}
+.prose-readme a {
+  @apply font-medium underline decoration-border underline-offset-4 transition-colors hover:decoration-foreground;
+  /* Link text is frequently a bare path with no break opportunity at all. */
+  overflow-wrap: anywhere;
+}
+.prose-readme code {
+  @apply rounded-md border border-border bg-muted px-1.5 py-0.5 font-mono text-[0.85em];
+  /* Inline code often holds unbreakable paths (%USERPROFILE%\.config\…).
+     Without this they push the whole page wider on phones. */
+  overflow-wrap: anywhere;
+}
+.prose-readme pre {
+  @apply my-5 overflow-x-auto rounded-lg border border-border bg-muted p-4 text-[0.85rem] leading-6;
+}
+.prose-readme pre code {
+  @apply border-0 bg-transparent p-0 text-inherit;
+  /* Code blocks scroll instead — wrapping them would corrupt the listing. */
+  overflow-wrap: normal;
+}
+.prose-readme blockquote {
+  @apply border-l-2 border-border pl-4 text-muted-foreground italic;
+}
+.prose-readme img {
+  @apply my-4 inline-block max-w-full rounded-md;
+}
+.prose-readme table {
+  @apply my-5 block w-full overflow-x-auto border-collapse text-sm;
+}
+.prose-readme th,
+.prose-readme td {
+  @apply border border-border px-3 py-2 text-left;
+}
+.prose-readme th {
+  @apply bg-muted font-semibold;
+}
+.prose-readme hr {
+  @apply my-8 border-border;
+}

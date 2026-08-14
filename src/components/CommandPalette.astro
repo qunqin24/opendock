@@ -1,0 +1,402 @@
+---
+import { categories } from '../lib/plugins';
+
+/**
+ * Header search. Deliberately not a framework island: this renders in the
+ * header of all ~1500 pages, and mounting React here would put the whole
+ * client runtime (~70 KB gzip) on pages that otherwise ship no JS at all.
+ * The shell below is static markup; only the result rows are built in JS,
+ * and Fuse plus the search index load on first open.
+ */
+const categoryLabels = Object.fromEntries(categories.map((c) => [c.id, c.label]));
+---
+
+<!-- Desktop trigger -->
+<button
+  type="button"
+  data-cmdk-open
+  class="hidden items-center gap-2 rounded-md border border-border bg-background px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-secondary sm:inline-flex"
+  aria-label="搜索插件"
+>
+  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" class="size-3.5" aria-hidden="true">
+    <circle cx="7" cy="7" r="4.75"></circle>
+    <path d="m10.5 10.5 3.5 3.5" stroke-linecap="round"></path>
+  </svg>
+  <span>搜索插件</span>
+  <kbd
+    data-cmdk-hint
+    class="ml-3 rounded border border-border bg-muted px-1.5 py-px font-mono text-[0.625rem] text-muted-foreground"
+    >/</kbd
+  >
+</button>
+
+<!-- Phone trigger: the full bar doesn't fit, but search still should -->
+<button
+  type="button"
+  data-cmdk-open
+  class="grid size-9 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground sm:hidden"
+  aria-label="搜索插件"
+>
+  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" class="size-4" aria-hidden="true">
+    <circle cx="7" cy="7" r="4.75"></circle>
+    <path d="m10.5 10.5 3.5 3.5" stroke-linecap="round"></path>
+  </svg>
+</button>
+
+<!--
+  A native <dialog> opened with showModal(), not a fixed-position div: the
+  header sets `backdrop-blur-xl`, and any non-none backdrop-filter makes an
+  element the containing block for fixed descendants — an overlay here would
+  be clamped to the 56px header instead of covering the page. The top layer
+  ignores that, and we get focus trapping and inertness for free.
+-->
+<dialog
+  data-cmdk-dialog
+  data-categories={JSON.stringify(categoryLabels)}
+  aria-label="搜索插件"
+  class="m-0 h-full max-h-none w-full max-w-none border-0 bg-transparent p-0 backdrop:bg-transparent"
+>
+  <div data-cmdk-overlay class="h-full w-full overflow-y-auto bg-background/70 backdrop-blur-sm">
+    <div
+      data-cmdk-panel
+      class="mx-auto mt-[10vh] mb-8 flex max-h-[70vh] w-[calc(100%-2rem)] max-w-2xl flex-col overflow-hidden rounded-xl border border-border bg-popover shadow-2xl"
+    >
+    <div class="flex items-center gap-3 border-b border-border px-4">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" class="size-4 shrink-0 text-muted-foreground" aria-hidden="true">
+        <circle cx="7" cy="7" r="4.75"></circle>
+        <path d="m10.5 10.5 3.5 3.5" stroke-linecap="round"></path>
+      </svg>
+      <input
+        type="text"
+        data-cmdk-input
+        placeholder="搜索插件名、功能、作者…"
+        aria-label="搜索插件"
+        autocomplete="off"
+        class="h-12 min-w-0 flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
+      />
+      <button
+        type="button"
+        data-cmdk-close
+        class="shrink-0 rounded border border-border bg-muted px-1.5 py-px font-mono text-[0.625rem] text-muted-foreground transition-colors hover:text-foreground"
+        >esc</button
+      >
+    </div>
+
+    <div class="min-h-0 flex-1 overflow-y-auto">
+      <ul data-cmdk-list class="p-1.5"></ul>
+    </div>
+
+    <div class="flex items-center gap-4 border-t border-border px-4 py-2 font-mono text-[0.625rem] text-muted-foreground">
+      <span>↑↓ 选择</span>
+      <span>↵ 打开</span>
+      <span>esc 关闭</span>
+      <span data-cmdk-count class="tabular ml-auto"></span>
+      </div>
+    </div>
+  </div>
+</dialog>
+
+<script>
+  import { navigate } from 'astro:transitions/client';
+  import { compactNumber } from '../lib/utils';
+
+  /** Mirrors the short keys in src/pages/search-index.json.ts. */
+  interface Entry {
+    s: string;
+    t: string;
+    n: string;
+    d: string | null;
+    o: string | null;
+    k: string[];
+    c: string;
+    r: number;
+    h: 'ok' | 'warn' | 'danger';
+  }
+
+  const LIMIT = 8;
+  const LAMP = { ok: 'bg-ok', warn: 'bg-warn', danger: 'bg-danger' } as const;
+  const LAMP_TITLE = {
+    ok: '维护活跃',
+    warn: '需留意：长期未更新或缺少文档',
+    danger: '不建议使用：已归档或已废弃',
+  } as const;
+
+  // DOM refs are rebound on every soft navigation; the downloaded index and
+  // the built Fuse instance are module state, so they survive it and the
+  // palette stays instant after the first search of the session.
+  let dialog: HTMLDialogElement | null = null;
+  let overlay: HTMLElement | null = null;
+  let input: HTMLInputElement | null = null;
+  let list: HTMLUListElement | null = null;
+  let count: HTMLElement | null = null;
+  let labels: Record<string, string> = {};
+
+  let entries: Entry[] | null = null;
+  let fuse: any = null;
+  let loading = false;
+  let failed = false;
+  let results: Entry[] = [];
+  let active = 0;
+  let restore: HTMLElement | null = null;
+  let globalsBound = false;
+
+  function init() {
+    dialog = document.querySelector<HTMLDialogElement>('[data-cmdk-dialog]');
+    overlay = document.querySelector<HTMLElement>('[data-cmdk-overlay]');
+    input = document.querySelector<HTMLInputElement>('[data-cmdk-input]');
+    list = document.querySelector<HTMLUListElement>('[data-cmdk-list]');
+    count = document.querySelector<HTMLElement>('[data-cmdk-count]');
+    if (!dialog || !overlay || !input || !list) return;
+
+    labels = JSON.parse(dialog.dataset.categories ?? '{}');
+    active = 0;
+    results = [];
+
+    const hint = document.querySelector('[data-cmdk-hint]');
+    if (hint) hint.textContent = /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘K' : 'Ctrl K';
+    if (count && entries) count.textContent = `${entries.length} 个插件`;
+
+    // Neither the index nor Fuse is worth downloading until someone searches.
+    async function load() {
+      if (fuse || loading) return;
+      loading = true;
+      try {
+        const [{ default: Fuse }, res] = await Promise.all([import('fuse.js'), fetch('/search-index.json')]);
+        entries = (await res.json()) as Entry[];
+        fuse = new Fuse(entries, {
+          keys: [
+            { name: 't', weight: 3 },
+            { name: 'n', weight: 3 },
+            { name: 'd', weight: 2 },
+            { name: 'k', weight: 1.5 },
+            { name: 'o', weight: 1 },
+          ],
+          threshold: 0.35,
+          ignoreLocation: true,
+          minMatchCharLength: 2,
+          includeScore: true,
+        });
+        if (count) count.textContent = `${entries.length} 个插件`;
+      } catch {
+        failed = true;
+      } finally {
+        loading = false;
+        render();
+      }
+    }
+
+    function search(): Entry[] {
+      const q = input!.value.trim();
+      if (!entries) return [];
+      // No query yet: show the biggest plugins rather than an empty box.
+      if (!q) return entries.slice().sort((a, b) => b.r - a.r).slice(0, LIMIT);
+      // Fuse alone orders near-identical names arbitrarily, so nudge by
+      // popularity — log-scaled and capped small, so it only breaks ties
+      // rather than letting a big repo outrank an exact name match.
+      return fuse
+        .search(q, { limit: LIMIT * 4 })
+        .map((r: any) => ({ item: r.item, rank: (r.score ?? 1) - Math.min(Math.log10(r.item.r + 1) / 6, 0.08) }))
+        .sort((a: any, b: any) => a.rank - b.rank)
+        .slice(0, LIMIT)
+        .map((r: any) => r.item);
+    }
+
+    function seeAllHref() {
+      const q = input!.value.trim();
+      return q ? `/plugins?q=${encodeURIComponent(q)}` : '/plugins';
+    }
+
+    /** Rows are built with DOM APIs, never innerHTML — descriptions are npm text. */
+    function render() {
+      list!.replaceChildren();
+
+      if (loading && !entries) return list!.append(message('正在加载索引…'));
+      if (failed) return list!.append(message('索引加载失败，请重试。'));
+
+      results = search();
+      const q = input!.value.trim();
+
+      if (!q && results.length) {
+        const h = document.createElement('li');
+        h.className = 'meta px-2.5 pt-2 pb-1 text-muted-foreground';
+        h.textContent = '最热门';
+        list!.append(h);
+      }
+
+      results.forEach((p, i) => {
+        const a = document.createElement('a');
+        a.href = `/plugins/${p.s}`;
+        a.className =
+          'flex items-center gap-3 rounded-lg px-2.5 py-2 transition-colors ' +
+          (i === active ? 'bg-secondary' : 'hover:bg-secondary/50');
+        a.addEventListener('mousemove', () => {
+          if (active !== i) {
+            active = i;
+            paint();
+          }
+        });
+
+        const lamp = document.createElement('span');
+        lamp.className = `size-1.5 shrink-0 rounded-full ${LAMP[p.h] ?? 'bg-warn'}`;
+        lamp.title = LAMP_TITLE[p.h] ?? '';
+
+        const mid = document.createElement('span');
+        mid.className = 'min-w-0 flex-1';
+        const top = document.createElement('span');
+        top.className = 'flex items-baseline gap-2';
+        const title = document.createElement('span');
+        title.className = 'truncate text-sm font-medium tracking-tight';
+        title.textContent = p.t;
+        const name = document.createElement('span');
+        name.className = 'truncate font-mono text-[0.6875rem] text-muted-foreground';
+        name.textContent = p.n;
+        top.append(title, name);
+        mid.append(top);
+        if (p.d) {
+          const desc = document.createElement('span');
+          desc.className = 'mt-0.5 block truncate text-xs text-muted-foreground';
+          desc.textContent = p.d;
+          mid.append(desc);
+        }
+
+        const cat = document.createElement('span');
+        cat.className = 'hidden shrink-0 text-xs text-muted-foreground sm:block';
+        cat.textContent = labels[p.c] ?? '';
+
+        const stars = document.createElement('span');
+        stars.className = 'tabular w-12 shrink-0 text-right font-mono text-xs text-muted-foreground';
+        // A column of "0"s reads as broken, so unstarred packages stay blank.
+        stars.textContent = p.r > 0 ? compactNumber(p.r) : '';
+
+        a.append(lamp, mid, cat, stars);
+        const li = document.createElement('li');
+        li.append(a);
+        list!.append(li);
+      });
+
+      // Always reachable: the palette shows 8, /plugins shows all.
+      const tail = document.createElement('a');
+      tail.href = seeAllHref();
+      tail.className =
+        'flex items-center justify-between rounded-lg px-2.5 py-2 text-sm transition-colors ' +
+        (active === results.length ? 'bg-secondary' : 'hover:bg-secondary/50');
+      tail.addEventListener('mousemove', () => {
+        if (active !== results.length) {
+          active = results.length;
+          paint();
+        }
+      });
+      const tailText = document.createElement('span');
+      tailText.className = results.length ? 'text-muted-foreground' : 'text-foreground';
+      tailText.textContent = q ? `在全部插件中搜索「${q}」` : '浏览全部插件';
+      const arrow = document.createElement('span');
+      arrow.className = 'font-mono text-xs text-muted-foreground';
+      arrow.textContent = '→';
+      tail.append(tailText, arrow);
+      const tailLi = document.createElement('li');
+      tailLi.append(tail);
+      list!.append(tailLi);
+    }
+
+    function message(text: string) {
+      const li = document.createElement('li');
+      li.className = 'px-4 py-10 text-center text-sm text-muted-foreground';
+      li.textContent = text;
+      return li;
+    }
+
+    /** Moving the highlight shouldn't rebuild every row. */
+    function paint() {
+      const rows = list!.querySelectorAll<HTMLAnchorElement>('li > a');
+      rows.forEach((a, i) => {
+        a.classList.toggle('bg-secondary', i === active);
+        a.classList.toggle('hover:bg-secondary/50', i !== active);
+      });
+      rows[active]?.scrollIntoView({ block: 'nearest' });
+    }
+
+    function open() {
+      if (dialog!.open) return;
+      restore = document.activeElement as HTMLElement | null;
+      dialog!.showModal();
+      document.body.style.overflow = 'hidden';
+      input!.value = '';
+      active = 0;
+      render();
+      input!.focus();
+      void load();
+    }
+
+    function close() {
+      if (dialog!.open) dialog!.close();
+    }
+
+    // Fires for our close() and for the browser's own Esc handling alike.
+    dialog.addEventListener('close', () => {
+      document.body.style.overflow = '';
+      restore?.focus();
+    });
+
+    document.querySelectorAll('[data-cmdk-open]').forEach((b) => {
+      b.addEventListener('click', open);
+      b.addEventListener('mouseenter', () => void load());
+    });
+    document.querySelector('[data-cmdk-close]')?.addEventListener('click', close);
+    overlay.addEventListener('mousedown', (e) => e.target === overlay && close());
+
+    input.addEventListener('input', () => {
+      active = 0;
+      render();
+    });
+
+    input.addEventListener('keydown', (e) => {
+      const max = results.length; // The slot past the last row is "see all".
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        active = active >= max ? 0 : active + 1;
+        paint();
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        active = active <= 0 ? max : active - 1;
+        paint();
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        const href = active === max ? seeAllHref() : `/plugins/${results[active].s}`;
+        close();
+        navigate(href);
+      }
+    });
+
+    // `document` outlives every swap, so these must only ever bind once.
+    if (!globalsBound) {
+      globalsBound = true;
+
+      // ⌘K/Ctrl-K opens from anywhere; `/` defers to a page that has its own
+      // search field so the inline one keeps working.
+      document.addEventListener('keydown', (e) => {
+        if (!dialog) return;
+        const el = document.activeElement;
+        const typing = el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement;
+
+        if (e.key.toLowerCase() === 'k' && (e.metaKey || e.ctrlKey)) {
+          e.preventDefault();
+          dialog.open ? close() : open();
+        } else if (e.key === '/' && !e.metaKey && !e.ctrlKey && !typing && !dialog.open) {
+          const inline = document.querySelector<HTMLInputElement>('[data-plugin-search]');
+          e.preventDefault();
+          if (inline) inline.focus();
+          else open();
+        }
+      });
+
+      // A top-layer dialog would otherwise linger over the incoming page.
+      document.addEventListener('astro:before-swap', () => {
+        if (dialog?.open) dialog.close();
+        document.body.style.overflow = '';
+      });
+    }
+  }
+
+  // Fires on the initial load and after every soft navigation.
+  document.addEventListener('astro:page-load', init);
+</script>

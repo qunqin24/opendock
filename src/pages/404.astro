@@ -1,0 +1,27 @@
+---
+import Layout from '../layouts/Layout.astro';
+---
+
+<Layout title="页面不存在" noindex>
+  <div class="mx-auto flex min-h-[60vh] max-w-md flex-col items-center justify-center px-4 text-center">
+    <p class="tabular text-5xl font-semibold tracking-tight">404</p>
+    <h1 class="mt-4 text-xl font-semibold tracking-tight">找不到这个页面</h1>
+    <p class="mt-2 text-sm leading-6 text-muted-foreground">
+      插件可能已经从 npm 下架，或者链接拼错了。
+    </p>
+    <div class="mt-8 flex gap-2">
+      <a
+        href="/plugins"
+        class="rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90"
+      >
+        浏览全部插件
+      </a>
+      <a
+        href="/"
+        class="rounded-lg border border-border bg-card px-4 py-2.5 text-sm font-medium transition-colors hover:bg-secondary"
+      >
+        回到首页
+      </a>
+    </div>
+  </div>
+</Layout>

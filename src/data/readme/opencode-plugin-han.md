@@ -1,0 +1,95 @@
+# Han
+
+[![GitHub Release](https://img.shields.io/github/v/release/thebushidocollective/han)](https://github.com/thebushidocollective/han/releases)
+[![codecov](https://codecov.io/gh/thebushidocollective/han/graph/badge.svg)](https://codecov.io/gh/thebushidocollective/han)
+
+Ship-ready code from your AI coding agent. 340 plugins for quality gates, tooling, memory, and specialized agents, so your AI writes code that's ready to merge.
+
+## Getting Started
+
+Two commands. That's it.
+
+```bash
+# 1. Install the CLI
+curl -fsSL https://han.guru/install.sh | bash
+
+# 2. Auto-detect and install plugins for your project
+han plugin install --auto
+```
+
+Next time you use Claude Code, validation hooks run automatically when you finish a conversation.
+
+### Alternative Installation
+
+```bash
+# Homebrew (macOS/Linux)
+brew install thebushidocollective/tap/han
+```
+
+## How It Works
+
+1. **Install** - One command installs the CLI and auto-detects plugins for your stack
+2. **Code** - Claude writes code as usual. No workflow changes needed
+3. **Validate** - Stop hooks run automatically. Linters, formatters, type checkers, and tests are all verified
+4. **Learn** - Local metrics track success rates and calibrate confidence. Nothing leaves your machine
+
+## Plugin Categories
+
+340 plugins across nine categories:
+
+| Category | Description | Examples |
+|----------|-------------|----------|
+| **Core** | Essential infrastructure. Auto-installs the han binary, provides metrics and MCP servers | core, bushido |
+| **Language** | Deep knowledge of a programming language | TypeScript, Rust, Python, Go, Ruby |
+| **Framework** | Web, mobile, and backend framework expertise | React, Next.js, Django, Rails, Phoenix |
+| **Validation** | Linters, formatters, and static analysis | Biome, ESLint, RuboCop, ShellCheck |
+| **Tool** | Build systems, test runners, and dev utilities | Playwright, Jest, Pytest, Terraform |
+| **Integration** | MCP servers for external services | GitHub, GitLab, Linear, Sentry |
+| **Discipline** | Specialized AI agents for engineering domains | Security, accessibility, API design, architecture |
+| **Pattern** | Methodologies and workflow practices | TDD, BDD, AI-DLC, git worktrees |
+| **Specialized** | Domain-specific plugins that don't fit elsewhere | Android, iOS, embedded |
+
+Browse all plugins at [han.guru/plugins](https://han.guru/plugins/)
+
+## Why It Works
+
+- **Smart Caching** - Only runs validation when relevant files change. Native Rust hashing keeps it fast
+- **Local Metrics** - Tracks task success and confidence calibration. All data stays on your machine
+- **Zero Config** - Binary auto-installs on first session. `--auto` flag detects your stack automatically
+- **Any Stack** - TypeScript, Python, Rust, Go, Ruby, Elixir. If there's a linter, there's a plugin
+
+## CLI Commands
+
+```bash
+# Install plugins
+han plugin install              # Interactive mode
+han plugin install --auto       # Auto-detect your stack
+han plugin install <name>       # Install specific plugin
+
+# Manage plugins
+han plugin search <query>       # Search marketplace
+han plugin uninstall <name>     # Remove plugin
+
+# Run hooks manually
+han hook run <plugin> <hook>    # Run a specific hook
+han hook explain                # Show configured hooks
+
+# MCP server
+han mcp                         # Start MCP server for natural language hook execution
+```
+
+## Documentation
+
+Full documentation at [han.guru/docs](https://han.guru/docs/)
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for how to create new plugins.
+
+## License
+
+MIT License - see [LICENSE](LICENSE)
+
+---
+
+Built by [The Bushido Collective](https://thebushido.co)

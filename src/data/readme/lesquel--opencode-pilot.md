@@ -1,0 +1,353 @@
+# @lesquel/opencode-pilot
+
+> Remote control plugin for [OpenCode](https://opencode.ai) and [Codex CLI](https://github.com/openai/codex) — monitor sessions, send prompts, approve permissions, switch agents, and get notifications from your phone or any browser.
+
+[![npm version](https://img.shields.io/npm/v/@lesquel/opencode-pilot.svg)](https://www.npmjs.com/package/@lesquel/opencode-pilot)
+[![npm downloads](https://img.shields.io/npm/dm/@lesquel/opencode-pilot.svg)](https://www.npmjs.com/package/@lesquel/opencode-pilot)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![GitHub stars](https://img.shields.io/github/stars/lesquel/open-remote-control.svg?style=social)](https://github.com/lesquel/open-remote-control)
+
+---
+
+## What it does
+
+Spin up OpenCode locally, get a web dashboard you can open on your laptop or phone. From the dashboard you can:
+
+- See all your sessions across all your projects (multi-project tabs)
+- Send prompts and watch responses stream live
+- Approve / deny tool permissions remotely
+- Switch agents (build / plan / general / explore) per session
+- Track cost per session, per day, per week
+- Get sound, browser, push, and Telegram notifications when an agent finishes
+- Pin TODOs that survive across sessions
+- Diff view of all files changed
+- File browser with live filter
+- Connect from your phone via QR code (LAN or public tunnel)
+- **Monitor [Codex CLI](https://github.com/openai/codex) sessions too** via the `/codex/hooks/:event` HTTP bridge — same dashboard, same notifications, same permission flow (see [`docs/CODEX-INTEGRATION.md`](./docs/CODEX-INTEGRATION.md))
+
+All from one keyboard shortcut (`?` opens the command palette).
+
+---
+
+## Install once, use everywhere
+
+opencode-pilot installs **globally into your OpenCode config dir** (`~/.config/opencode` on Linux/macOS, `%APPDATA%\opencode` on Windows). One install and the plugin auto-loads every time you run `opencode` from **any project directory** — no per-project setup, no `.opencode/` folders to copy around, no duplicate configs.
+
+That's the whole point of running the installer: drop it in once, then just use `opencode` normally and the dashboard is always there.
+
+## Quick Start
+
+### One command (recommended)
+
+```bash
+npx @lesquel/opencode-pilot init
+# or
+bunx @lesquel/opencode-pilot init
+```
+
+That's it. The installer:
+1. Locates your OpenCode config dir (`~/.config/opencode` or your XDG path / `%APPDATA%`).
+2. Installs the plugin there (`@lesquel/opencode-pilot@latest` + `@opencode-ai/plugin@latest`).
+3. Adds `"@lesquel/opencode-pilot@latest"` to **both** `opencode.json::plugin` (for the dashboard server) and `tui.json::plugin` (for the slash commands). OpenCode uses two separate plugin loaders — one file each.
+4. Cleans up stale wrappers, cache entries, and legacy subpath specs left by earlier (<=1.12.x) installs.
+
+Fully close any running OpenCode sessions and reopen. A toast should appear:
+
+> **OpenCode Pilot** — Remote control plugin loaded. Use `/pilot` or `/pilot-token`.
+
+The banner also prints in the terminal with URL + token + QR. If the toast doesn't appear, see [Troubleshooting](#troubleshooting--slash-commands-dont-appear).
+
+> **Configuration is done from the dashboard** (gear icon → Plugin configuration). You do NOT need to create a `.env` — though you still can if you prefer.
+
+### Manual install (if you want to)
+
+```bash
+# 1. Install in your OpenCode config dir
+cd ~/.config/opencode    # or your XDG_CONFIG_HOME path
+bun add @lesquel/opencode-pilot@latest @opencode-ai/plugin@latest
+
+# 2. Add the spec to BOTH config files:
+#
+#    opencode.json  — registers the dashboard server plugin:
+#    {
+#      "plugin": ["@lesquel/opencode-pilot@latest"]
+#    }
+#
+#    tui.json  — registers the slash commands (create this file if missing):
+#    {
+#      "$schema": "https://opencode.ai/tui.json",
+#      "plugin": ["@lesquel/opencode-pilot@latest"]
+#    }
+```
+
+OpenCode runs **two separate plugin loaders**: the server loader reads `opencode.json::plugin` (for `server()` exports like the dashboard), and the TUI loader reads `tui.json::plugin` (for `tui()` exports like slash commands). A spec in only one of them gets you half the plugin. Do **not** add wrappers in `<config>/plugins/` — they conflict with the server loader's strict validation.
+
+Run `opencode` from any project directory. Banner prints with URL + token + QR.
+
+---
+
+> **Going deeper?** [`docs/INSTALL.md`](docs/INSTALL.md) explains OpenCode's two-loader plugin architecture, documents every gotcha we hit, and has a complete troubleshooting matrix. Read it if you're debugging, contributing, or publishing your own OpenCode plugin.
+
+## How to use it day-to-day
+
+Once installed and OpenCode restarted, you have four entry points:
+
+### 1. Slash commands from inside OpenCode TUI
+
+Type any of these at the prompt:
+
+| Command | What it does |
+|---------|--------------|
+| `/pilot` | Show the current dashboard URL + token |
+| `/pilot-token` | Rotate the auth token (invalidates any open dashboards/phones) |
+| `/dashboard` | Same as `/pilot` — alias |
+| `/remote` | Print connection info (host, port, tunnel URL if active) |
+| `/remote-control` | Full status block with all the above plus QR hint |
+
+### 2. Terminal banner at startup
+
+Every `opencode` launch prints a banner with the dashboard URL, a token, and a QR code. Open the URL in any browser on the same machine, or scan the QR with your phone (requires `PILOT_HOST=0.0.0.0` for LAN — see below).
+
+### 3. The web dashboard itself
+
+Open the URL. Then:
+
+- **`?`** opens the command palette — every action is reachable from there.
+- **Left sidebar**: sessions grouped by folder. Click one to switch. `+` creates a new session.
+- **Center pane**: the live transcript — user messages appear instantly, the assistant's response streams token by token, tool calls animate pending → running → completed with their inputs and outputs expandable inline.
+- **Right panel**: context usage, MCP servers, LSP status, project path, pinned TODOs.
+- **Tabs at the top**: open multiple projects in parallel (v1.11+).
+- **Gear icon (⚙)**: Settings UI — change port/host, enable tunnel, wire up Telegram bot, generate VAPID keys for Web Push. Everything is editable from here; you rarely need to touch `.env` files anymore.
+
+### 4. From your phone
+
+See [Connect from your phone](#connect-from-your-phone) below. Either same-WiFi (LAN) with `PILOT_HOST=0.0.0.0`, or anywhere with a Cloudflare / ngrok tunnel. The dashboard is mobile-friendly — bottom-sheet modals, 44px tap targets, swipe-to-close. Permissions approvals, prompt sending, session switching all work from the phone.
+
+## Troubleshooting — slash commands don't appear
+
+> **Other symptoms** (port conflicts, `/remote` says "server not running", dashboard 401s, push/telegram silent, wrong tab opens) are covered in [`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md). This section is specifically about the "I installed it but slash commands are missing" case.
+
+If the plugin loads (you see the banner in the terminal) but typing `/remo<Tab>` in the TUI doesn't autocomplete `/remote`, `/dashboard`, `/pilot`, `/pilot-token`, or `/remote-control`:
+
+1. **Check the canary toast**. On startup the TUI should toast "OpenCode Pilot — Remote control plugin loaded". No toast → the TUI plugin didn't register, even if the dashboard server did.
+
+2. **Inspect the latest log**:
+
+   ```bash
+   tail -200 $(ls -t ~/.local/share/opencode/log/*.log | head -1) | grep -iE "pilot|tui.plugin|error"
+   ```
+
+   - Windows: `%LOCALAPPDATA%\opencode\log\<timestamp>.log`
+   - macOS: `~/Library/Logs/opencode/<timestamp>.log`
+
+3. **Re-run init**. It cleans up stale wrappers and stale subpath entries left behind by 1.11.x–1.12.x:
+
+   ```bash
+   npx @lesquel/opencode-pilot@latest init
+   ```
+
+   Then **fully close all OpenCode sessions** (the plugin loader is cached per running process) and reopen.
+
+4. **Verify BOTH `opencode.json::plugin` AND `tui.json::plugin`** each have exactly one entry for the pilot:
+
+   ```json
+   "plugin": ["@lesquel/opencode-pilot@latest"]
+   ```
+
+   If `tui.json` is missing entirely, the TUI plugin was never registered and slash commands never appear — `init` in 1.13.1+ creates this file. If you see `"@lesquel/opencode-pilot/tui"` anywhere or wrapper paths in the array, the old install pattern got in — `npx init` in step 3 fixes that.
+
+5. **Verify no stale wrappers** in `~/.config/opencode/plugins/`. Safe to delete: `opencode-pilot.ts`, `opencode-pilot-tui.ts`. These were auto-generated by 1.11.x–1.12.x and are no longer needed. `init` does this cleanup automatically.
+
+---
+
+## Connect from your phone
+
+### Same WiFi (LAN access)
+
+1. Set `PILOT_HOST=0.0.0.0` in `.env`
+2. Restart OpenCode
+3. Click the phone icon in the dashboard header (`c` shortcut)
+4. Scan the QR from the "Local network" tab with your phone camera
+5. Done — same dashboard, on your phone
+
+### Anywhere (public tunnel)
+
+1. Install [cloudflared](https://github.com/cloudflare/cloudflared) (`brew install cloudflared` on Mac)
+2. Add `PILOT_TUNNEL=cloudflared` to your `.env`
+3. Restart OpenCode — it spawns the tunnel automatically
+4. Phone modal "Public tunnel" tab now has a QR with a public HTTPS URL
+5. Works from cellular, hotel WiFi, anywhere
+
+> 🔐 **Security note**: the tunnel URL contains your token. Treat it like a password. See [`docs/TUNNEL_TESTING.md`](docs/TUNNEL_TESTING.md) for security checklist.
+
+---
+
+## Features
+
+### Dashboard
+
+- **Sessions sidebar** with folder grouping and agent filter
+- **Multi-view** to watch multiple sessions side-by-side (desktop only)
+- **Project tabs** at the top — open multiple projects in parallel
+- **Right info panel** with Context, MCP servers, LSP clients, project path, instance version
+- **Pinned TODOs** survive across sessions and project switches
+- **Cost panel** with per-session, daily, and weekly totals + budget alerts
+- **Diff tab** showing all files changed in current session
+
+### Notifications
+
+| Type | Trigger | Setup |
+|------|---------|-------|
+| Sound | Page hidden + assistant turn complete | Toggle in Settings |
+| Browser notification | Page hidden + permission granted | Toggle, allow when prompted |
+| Push (Web Push) | Anywhere, even browser closed | VAPID keys in `.env` ([guide](docs/CONFIGURATION.md#web-push-optional)) |
+| Telegram | Permission requests + completions | Bot token in `.env` |
+
+### Mobile-friendly
+
+- Drawer sidebar with backdrop
+- Full-screen modals
+- Multi-view auto-hidden (use desktop for split view)
+- Right panel as bottom toggle
+- Live filter on file browser
+- 44×44 touch targets everywhere
+
+### Keyboard shortcuts
+
+Single-key (when no input focused):
+
+| Key | Action |
+|-----|--------|
+| `?` | Open command palette + show shortcuts |
+| `n` | New session |
+| `s` | Toggle sidebar |
+| `m` | Toggle multi-view (desktop only) |
+| `t` | Toggle theme |
+| `c` | Connect from phone modal |
+| `/` | Focus prompt input |
+| `Esc` | Close modal/picker/palette |
+
+Modifier:
+
+| Key | Action |
+|-----|--------|
+| `Cmd/Ctrl+K` | Command palette |
+| `Cmd/Ctrl+Enter` | Send prompt |
+| `Alt+I` | Toggle right info panel |
+
+---
+
+## Configuration — two ways
+
+Since **v1.12** you can configure the plugin two ways (or both):
+
+### Easy: the Settings UI
+
+1. Open the dashboard
+2. Click the gear icon (⚙) in the header
+3. Go to **Plugin configuration**
+4. Edit port, host, tunnel, Telegram token, VAPID keys, permission timeout,
+   and the glob opener toggle
+5. Click **Save** — values are written to `~/.opencode-pilot/config.json`
+   and survive restarts
+
+Some fields (port, host, tunnel, VAPID keys) require an OpenCode restart to take effect — the UI shows an inline warning for those. A **Generate VAPID keys** button calls the server to create a key pair in one click.
+
+Each field shows a small badge telling you where its current value comes from: `saved` (UI), `.env`, `shell`, or `default`. Fields set via shell env vars are locked from the UI — you must unset the shell var to override.
+
+### Power user: `.env` file
+
+Full env-var reference with example `.env` files for common scenarios lives in [`docs/CONFIGURATION.md`](docs/CONFIGURATION.md). Quick overview:
+
+| Variable | Default | What |
+|----------|---------|------|
+| `PILOT_PORT` | `4097` | HTTP server port |
+| `PILOT_HOST` | `127.0.0.1` | Bind address (`0.0.0.0` for LAN) |
+| `PILOT_TUNNEL` | (off) | `cloudflared` or `ngrok` for public access |
+| `PILOT_PERMISSION_TIMEOUT` | `300000` | Permission-request timeout in ms |
+| `PILOT_TELEGRAM_TOKEN` | (off) | Telegram bot token from @BotFather |
+| `PILOT_TELEGRAM_CHAT_ID` | (off) | Your Telegram chat ID |
+| `PILOT_VAPID_PUBLIC_KEY` | (off) | Web Push public key (`bunx web-push generate-vapid-keys`) |
+| `PILOT_VAPID_PRIVATE_KEY` | (off) | Web Push private key |
+| `PILOT_ENABLE_GLOB_OPENER` | `false` | Enable `/fs/glob` for the dashboard's glob search |
+| `PILOT_FETCH_TIMEOUT_MS` | `10000` | Timeout for outbound HTTP calls (Telegram, push) |
+
+### Priority (highest wins)
+
+```
+1. Shell env vars                         e.g. PILOT_PORT=5000 opencode
+2. ~/.opencode-pilot/config.json          written by the Settings UI
+3. .env file (process.cwd or plugin dir)  power-user file-based config
+4. Hardcoded defaults                     fallback
+```
+
+The `.env` file is searched in: (1) `process.cwd()/.env` then (2) the plugin's install dir. Shell env vars always win over both `.env` and the Settings UI.
+
+---
+
+## Documentation
+
+**For users**
+- [Troubleshooting runtime issues](docs/TROUBLESHOOTING.md) — start here if `/remote` says "server not running", the dashboard 401s, push/telegram isn't arriving, or the wrong tab opens
+- [Install deep-dive](docs/INSTALL.md) — how OpenCode's two-loader plugin architecture works, every trap we've hit getting a clean install, full troubleshooting matrix
+- [Configuration reference](docs/CONFIGURATION.md) — every env var, with example `.env` files for common scenarios
+- [Connect from phone](docs/CONFIGURATION.md#scenario-2-solo-dev-want-phone-access-in-same-wifi) — LAN + tunnel setup
+- [Tunnel testing](docs/TUNNEL_TESTING.md) — end-to-end verification guide
+
+**For contributors and AI agents**
+- [`AGENTS.md`](AGENTS.md) — strict workflow for AI agents and humans editing the repo (hard rules, release process, debugging playbook, Engram protocol)
+- [`CLAUDE.md`](CLAUDE.md) — codebase overview, file map, routes, event types
+- [Architecture](docs/ARCHITECTURE.md) — design decisions with rationale
+- [Release checklist](docs/RELEASE.md) — step-by-step execution guide for shipping a new version
+- [Publishing to npm](docs/PUBLISHING_TO_NPM.md) — one-time npm account setup and scope choice
+- [Cloud relay v2.0 design](docs/CLOUD_RELAY_v2_DESIGN.md) — architecture doc for a future centralized service
+- [Production readiness](docs/PRODUCTION_READINESS.md) — deployment-mode verdicts
+
+---
+
+## Architecture (one line)
+
+The plugin runs ONE HTTP+SSE server inside your OpenCode process. The dashboard is a vanilla ES-modules SPA served from the same origin. All API calls go through the SDK with `?directory=` for multi-project routing.
+
+If you want the deep version, see the [`docs/`](docs/) folder.
+
+---
+
+## Tech stack
+
+- **Server**: Bun + TypeScript (strict)
+- **Dashboard**: vanilla ES modules, plain CSS, ~9000 LOC. No React, no build step.
+- **Optional deps**: `cloudflared` / `ngrok` (tunnel), `@modelcontextprotocol/sdk` (MCP), `web-push` (push notifications)
+- **Tests**: 228 (Bun test runner), all green
+
+---
+
+## Contributing
+
+Issues are welcome. Pull requests are welcome **only after maintainer approval**.
+
+Please start with an issue first: bug report, feature request, or discussion. The maintainer will triage it and either:
+
+- fix it directly and comment on the issue,
+- ask you to send a PR, or
+- close it as out of scope / duplicate / needs more information.
+
+Read [`CONTRIBUTING.md`](CONTRIBUTING.md) for the full issue-first workflow, PR rules, review expectations, contributor credit, and local development setup.
+
+Maintainer notes for contributors:
+
+- One PR per approved issue.
+- Keep PRs small and reviewable.
+- Add tests for behavior changes.
+- Do not bump versions, edit `CHANGELOG.md`, or publish releases.
+- Follow [`AGENTS.md`](AGENTS.md) for codebase conventions: no `any`, no server `console.log`, factory functions, release safety rules.
+
+Security reports are private: see [`SECURITY.md`](SECURITY.md). Community expectations are in [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md).
+
+Shipping a new version is maintainer-only: follow [`docs/RELEASE.md`](docs/RELEASE.md). Pushing a `vX.Y.Z` tag is the only supported way to publish.
+
+---
+
+## License
+
+MIT © [lesquel](https://github.com/lesquel)

@@ -1,0 +1,23 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import PluginExplorer from '../../components/PluginExplorer';
+import { searchDocs, categories, plugins } from '../../lib/plugins';
+---
+
+<Layout
+  title="全部 opencode 插件"
+  description={`浏览、搜索并筛选 ${plugins.length} 个 opencode 插件。支持按综合评分、星标、下载量、本周飙升与更新时间排序。`}
+>
+  <div class="mx-auto max-w-6xl px-4 py-10 sm:px-6 sm:py-14">
+    <header class="mb-8">
+      <h1 class="text-3xl font-semibold tracking-tight sm:text-4xl">全部插件</h1>
+      <p class="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">
+        共收录 {plugins.length} 个 opencode 插件，数据每日自动同步。按 <kbd
+          class="rounded border border-border bg-muted px-1.5 py-px font-mono text-[0.6875rem]">/</kbd
+        > 快速聚焦搜索框，左侧可按分类与维护状态筛选。
+      </p>
+    </header>
+
+    <PluginExplorer client:load docs={searchDocs} categories={categories} />
+  </div>
+</Layout>

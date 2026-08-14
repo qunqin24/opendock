@@ -1,0 +1,556 @@
+# opencode-plugin-preload-skills
+
+> Smart skill loading for OpenCode — automatic, contextual, and budget-aware
+
+[![npm version](https://img.shields.io/npm/v/opencode-plugin-preload-skills.svg)](https://www.npmjs.com/package/opencode-plugin-preload-skills)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+[![GitHub](https://img.shields.io/github/stars/juhas96/opencode-plugin-preload-skills?style=social)](https://github.com/juhas96/opencode-plugin-preload-skills)
+
+A powerful plugin for [OpenCode](https://opencode.ai) that intelligently loads skills based on context — file types, directory patterns, agent type, conversation content, and more.
+
+---
+
+## Features
+
+| Feature | Description |
+|---------|-------------|
+| **Always-On Skills** | Load skills at session start |
+| **File-Type Triggers** | Load skills when touching `.py`, `.ts`, etc. |
+| **Agent-Specific** | Different skills for different agents |
+| **Path Patterns** | Glob patterns like `src/api/**` |
+| **Content Triggers** | Keywords in conversation trigger skills |
+| **Skill Groups** | Bundle skills together with `@group-name` |
+| **Conditional Loading** | Load only if dependency exists |
+| **Token Budget** | Cap total skill tokens to protect context |
+| **Summaries Mode** | Load compact summaries instead of full content |
+| **Content Minification** | Minify skill content before injection to save tokens |
+| **System Prompt Injection** | Inject skills into system prompt instead of messages |
+| **Toast Notifications** | Show TUI toast when skills are loaded |
+| **`loaded_skills` Tool** | LLM agent can query loaded skills (also shows toast to user) |
+| **Usage Analytics** | Track which skills are actually used |
+
+> **⚠️ Warning:** Preloaded skills consume context window tokens. Use `maxTokens` to set a budget, `useSummaries` for large skills, or `useMinification` to reduce token usage.
+
+---
+
+## Quick Start
+
+**1. Add to `opencode.json`:**
+
+```json
+{
+  "plugin": ["opencode-plugin-preload-skills"]
+}
+```
+
+**2. Create `.opencode/preload-skills.json`:**
+
+```json
+{
+  "skills": ["coding-standards"],
+  "fileTypeSkills": {
+    ".py": ["flask", "python-patterns"],
+    ".ts,.tsx": ["typescript-patterns"]
+  }
+}
+```
+
+**3. Create skill files in `.opencode/skills/<name>/SKILL.md`**
+
+---
+
+## Configuration Reference
+
+### All Options
+
+```json
+{
+  "skills": ["always-loaded-skill"],
+  "fileTypeSkills": {
+    ".py": ["flask"],
+    ".ts,.tsx": ["typescript"]
+  },
+  "agentSkills": {
+    "plan": ["planning-skill"],
+    "code": ["coding-skill"]
+  },
+  "pathPatterns": {
+    "src/api/**": ["api-design"],
+    "src/components/**": ["react-patterns"]
+  },
+  "contentTriggers": {
+    "database": ["sql-patterns"],
+    "authentication": ["auth-security"]
+  },
+  "triggerIgnoreTags": [
+    "session-history",
+    "session-history-since",
+    "compartment_examples_from_other_projects",
+    "compartment",
+    "project-memory",
+    "user-profile",
+    "draft"
+  ],
+  "groups": {
+    "frontend": ["react", "css", "testing"],
+    "backend": ["api-design", "database"]
+  },
+  "conditionalSkills": [
+    { "skill": "react", "if": { "packageHasDependency": "react" } },
+    { "skill": "prisma", "if": { "fileExists": "prisma/schema.prisma" } }
+  ],
+  "skillSettings": {
+    "large-skill": { "useSummary": true },
+    "critical-skill": { "useSummary": false }
+  },
+  "injectionMethod": "systemPrompt",
+  "maxTokens": 10000,
+  "useSummaries": false,
+  "useMinification": false,
+  "showToasts": false,
+  "enableTools": true,
+  "analytics": false,
+  "persistAfterCompaction": true,
+  "debug": false
+}
+```
+
+### Options Table
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `skills` | `string[]` | `[]` | Always load these skills |
+| `fileTypeSkills` | `Record<string, string[]>` | `{}` | Map file extensions to skills |
+| `agentSkills` | `Record<string, string[]>` | `{}` | Map agent names to skills |
+| `pathPatterns` | `Record<string, string[]>` | `{}` | Map glob patterns to skills |
+| `contentTriggers` | `Record<string, string[]>` | `{}` | Map keywords to skills |
+| `triggerIgnoreTags` | `string[]` | see [Trigger Ignore Tags](#trigger-ignore-tags) | XML tag names to strip before `contentTriggers` matching |
+| `groups` | `Record<string, string[]>` | `{}` | Define skill bundles |
+| `conditionalSkills` | `ConditionalSkill[]` | `[]` | Load if condition met |
+| `skillSettings` | `Record<string, SkillSettings>` | `{}` | Per-skill settings |
+| `injectionMethod` | `"chatMessage" \| "systemPrompt"` | `"systemPrompt"` | Where to inject skills |
+| `maxTokens` | `number` | `undefined` | Max tokens for all skills |
+| `useSummaries` | `boolean` | `false` | Use skill summaries (global) |
+| `useMinification` | `boolean \| "standard" \| "aggressive"` | `false` | Minify skill content (`true`/`"standard"` or `"aggressive"`) |
+| `showToasts` | `boolean` | `false` | Show TUI toast notifications when skills are loaded |
+| `enableTools` | `boolean` | `true` | Register `loaded_skills` tool for LLM agents |
+| `analytics` | `boolean` | `false` | Track skill usage |
+| `persistAfterCompaction` | `boolean` | `true` | Keep skills after compaction |
+| `debug` | `boolean` | `false` | Enable debug logs |
+
+---
+
+## Feature Details
+
+### File-Type Skills
+
+Load skills when agent touches files with specific extensions:
+
+```json
+{
+  "fileTypeSkills": {
+    ".py": ["flask", "python-best-practices"],
+    ".ts,.tsx": ["typescript-advanced-types"],
+    ".go": ["golang-patterns"]
+  }
+}
+```
+
+Triggers on: `read`, `edit`, `write`, `glob`, `grep` tools.
+
+### Agent-Specific Skills
+
+Load different skills for different OpenCode agents:
+
+```json
+{
+  "agentSkills": {
+    "plan": ["architecture-planning", "task-breakdown"],
+    "code": ["coding-standards", "testing-patterns"],
+    "review": ["code-review-checklist"]
+  }
+}
+```
+
+### Path Patterns
+
+Use glob patterns to match file paths:
+
+```json
+{
+  "pathPatterns": {
+    "src/api/**": ["api-design", "rest-patterns"],
+    "src/components/**/*.tsx": ["react-component-patterns"],
+    "tests/**": ["testing-best-practices"]
+  }
+}
+```
+
+### Content Triggers
+
+Load skills when keywords appear in conversation:
+
+```json
+{
+  "contentTriggers": {
+    "database": ["sql-patterns", "orm-usage"],
+    "authentication": ["auth-security", "jwt-patterns"],
+    "performance": ["optimization-tips"]
+  }
+}
+```
+
+> **Note:** Keywords are matched using case-insensitive substring matching against the full message text. If you use a context-injection plugin (e.g. one that prepends `<session-history>` summaries or `<project-memory>` blocks to each user message), those injected blocks are also scanned — which can cause false triggers when an injected historical summary happens to contain one of your keywords. See [Trigger Ignore Tags](#trigger-ignore-tags) below for how to prevent this.
+
+### Trigger Ignore Tags
+
+Strip plugin-injected XML blocks from message text **before** `contentTriggers` keyword matching, so that keywords appearing only inside injected context (historical summaries, project memory, user profile) do not false-fire skill loads.
+
+**Default value** (covers the most common context-injection plugins):
+
+```json
+{
+  "triggerIgnoreTags": [
+    "session-history",
+    "session-history-since",
+    "compartment_examples_from_other_projects",
+    "compartment",
+    "project-memory",
+    "user-profile",
+    "draft"
+  ]
+}
+```
+
+Each entry names an XML tag. For tag `foo`, the entire block `<foo ...>...</foo>` (including any attributes on the opening tag and all nested content, matched non-greedily) is removed from the message text before any `contentTriggers` keyword is tested.
+
+**Common use cases:**
+
+- **Keep defaults (recommended):** most users get correct behavior with no extra config. The defaults cover `@cortexkit/opencode-magic-context` and similar context plugins.
+- **Extend defaults:** add your own tags on top of the defaults by listing them all (the user list replaces the default entirely):
+
+```json
+{
+  "triggerIgnoreTags": [
+    "session-history",
+    "session-history-since",
+    "compartment_examples_from_other_projects",
+    "compartment",
+    "project-memory",
+    "user-profile",
+    "draft",
+    "my-custom-plugin-context"
+  ]
+}
+```
+
+- **Disable stripping entirely** (restore pre-1.9.0 behavior):
+
+```json
+{
+  "triggerIgnoreTags": []
+}
+```
+
+Tag names are treated literally (RegExp-escaped internally), so even unusual names like `compartment_examples_from_other_projects` are safe.
+
+### Skill Groups
+
+Bundle related skills and reference with `@`:
+
+```json
+{
+  "groups": {
+    "frontend": ["react", "css", "accessibility"],
+    "backend": ["api-design", "database", "caching"]
+  },
+  "skills": ["@frontend"]
+}
+```
+
+Use `@frontend` anywhere you'd use a skill name.
+
+### Conditional Skills
+
+Load skills only when conditions are met:
+
+```json
+{
+  "conditionalSkills": [
+    {
+      "skill": "react-patterns",
+      "if": { "packageHasDependency": "react" }
+    },
+    {
+      "skill": "prisma-guide",
+      "if": { "fileExists": "prisma/schema.prisma" }
+    },
+    {
+      "skill": "ci-patterns",
+      "if": { "envVar": "CI" }
+    }
+  ]
+}
+```
+
+**Condition types:**
+- `packageHasDependency` — Check package.json dependencies
+- `fileExists` — Check if file exists in project
+- `envVar` — Check if environment variable is set
+
+### Token Budget
+
+Limit total tokens to protect your context window:
+
+```json
+{
+  "maxTokens": 8000,
+  "skills": ["skill-a", "skill-b", "skill-c"]
+}
+```
+
+Skills load in order until budget is exhausted. Remaining skills are skipped.
+
+### Skill Summaries
+
+Add a `summary` field to your skill frontmatter for compact loading:
+
+```markdown
+---
+name: my-skill
+description: Full description
+summary: Brief one-liner for summary mode
+---
+```
+
+Enable with:
+
+```json
+{
+  "useSummaries": true
+}
+```
+
+If no `summary` field, auto-generates from first paragraph.
+
+### Content Minification
+
+Reduce token usage by minifying skill content before injection:
+
+```json
+{
+  "useMinification": true
+}
+```
+
+**Minification levels:**
+
+| Value | Description |
+|-------|-------------|
+| `true` or `"standard"` | Standard minification (safe, ~20% reduction) |
+| `"aggressive"` | Vercel-style compression (~50%+ reduction) |
+
+**Standard minification** (`true` or `"standard"`):
+- HTML/markdown comments removed
+- Frontmatter stripped
+- Multiple blank lines collapsed
+- Whitespace normalized
+
+**Aggressive minification** (`"aggressive"`):
+
+Inspired by [Vercel's AGENTS.md research](https://vercel.com/blog/agents-md-outperforms-skills-in-our-agent-evals), this mode achieves maximum compression:
+
+```json
+{
+  "useMinification": "aggressive"
+}
+```
+
+Transformations:
+- All standard minification, plus:
+- `# Headers` → `[HEADERS]` (uppercase, bracketed)
+- `**bold**` and `*italic*` → plain text
+- Code blocks → pipe-delimited single line
+- Lists → pipe-delimited (`- item` → `|item`)
+- Links → text only (URLs removed)
+- Skills wrapped as `[SKILL:name]|content|[END]`
+
+Example output:
+```
+[SKILL:api-patterns]|[API RULES]|MANDATORY: Use REST conventions|Endpoints:|/users|/orders|[END]
+```
+
+Works with both `systemPrompt` and `chatMessage` injection methods.
+
+### Toast Notifications
+
+Show a TUI toast notification whenever skills are loaded or triggered:
+
+```json
+{
+  "showToasts": true
+}
+```
+
+Toasts appear for:
+- **Initial skills** — when session-start skills are first injected
+- **Triggered skills** — when file-type, path, agent, or content triggers load new skills
+
+Each toast displays the skill names and how many were loaded, e.g. `Loaded 2 skills: react, typescript` or `Triggered skill: api-design`.
+
+### `loaded_skills` Tool
+
+Registers a custom tool that LLM agents can call to query skill state:
+
+```json
+{
+  "enableTools": true
+}
+```
+
+Enabled by default. When the agent calls `loaded_skills`, it:
+- Returns a list of all loaded skills with names, descriptions, and token counts
+- Shows a toast notification to the user with the same info (requires `showToasts: true`)
+
+Ask the agent "what skills are loaded?" and it will use this tool — you'll see the answer both in the conversation and as a toast. Disable with `"enableTools": false`.
+
+### Per-Skill Settings
+
+Override global settings for specific skills:
+
+```json
+{
+  "useSummaries": false,
+  "skillSettings": {
+    "large-reference": { "useSummary": true },
+    "critical-instructions": { "useSummary": false }
+  }
+}
+```
+
+**Available settings:**
+- `useSummary` — Override global `useSummaries` for this skill
+
+**Priority:** `skillSettings` > `useSummaries` (global)
+
+This lets you use full content for critical skills while summarizing large reference materials.
+
+### Injection Method
+
+Choose where skills are injected:
+
+```json
+{
+  "injectionMethod": "chatMessage"
+}
+```
+
+**Methods:**
+
+| Method | Description | Use Case |
+|--------|-------------|----------|
+| `systemPrompt` (default) | Injects into system prompt via `experimental.chat.system.transform` hook | Persistent across all LLM calls, invisible to user |
+| `chatMessage` | Injects skills into user messages | One-time injection, visible in conversation |
+
+**System prompt injection benefits (default):**
+- File-triggered skills available on next LLM step (same turn)
+- Skills persist automatically (no need for `persistAfterCompaction`)
+- Cleaner conversation history (skills not visible in messages)
+
+**Chat message injection benefits:**
+- Skills visible in conversation for debugging
+- Works with older OpenCode versions
+- More control over when skills appear
+
+### Usage Analytics
+
+Track which skills are loaded and how often:
+
+```json
+{
+  "analytics": true
+}
+```
+
+Saves to `.opencode/preload-skills-analytics.json`.
+
+---
+
+## Skill File Format
+
+```markdown
+---
+name: skill-name
+description: Brief description for logs
+summary: Optional one-liner for summary mode
+---
+
+# Skill Content
+
+Full instructions here...
+```
+
+### Locations (in priority order)
+
+1. `.opencode/skills/<name>/SKILL.md` (project)
+2. `.claude/skills/<name>/SKILL.md` (project)
+3. `~/.config/opencode/skills/<name>/SKILL.md` (global)
+4. `~/.claude/skills/<name>/SKILL.md` (global)
+
+---
+
+## How It Works
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                     SESSION START                        │
+├─────────────────────────────────────────────────────────┤
+│  1. Load `skills` + `conditionalSkills` (if met)        │
+│  2. Apply token budget if set                           │
+│  3. Inject on first message                             │
+├─────────────────────────────────────────────────────────┤
+│                   DURING SESSION                         │
+├─────────────────────────────────────────────────────────┤
+│  On file access:                                         │
+│    → Check fileTypeSkills (by extension)                │
+│    → Check pathPatterns (by glob match)                 │
+│                                                          │
+│  On message:                                             │
+│    → Check agentSkills (by agent name)                  │
+│    → Check contentTriggers (by keyword)                 │
+│    → Inject any pending skills                          │
+├─────────────────────────────────────────────────────────┤
+│                    COMPACTION                            │
+├─────────────────────────────────────────────────────────┤
+│  All loaded skills added to compaction context          │
+│  (if persistAfterCompaction: true)                      │
+└─────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Best Practices
+
+1. **Use `fileTypeSkills` over `skills`** — Only load what's needed
+2. **Set `maxTokens`** — Protect your context window
+3. **Use `groups`** — Organize related skills
+4. **Enable `analytics`** — Find unused skills
+5. **Write `summary` fields** — For large skills, enable `useSummaries`
+6. **Enable `useMinification`** — Strip unnecessary whitespace and comments to save tokens
+
+---
+
+## Troubleshooting
+
+| Problem | Solution |
+|---------|----------|
+| Skills not loading | Check config path, skill file exists, frontmatter valid |
+| Wrong skills loading | Check trigger conditions, enable `debug: true` |
+| Context too small | Reduce skills, set `maxTokens`, enable `useSummaries` or `useMinification` |
+| Skills lost after compaction | Ensure `persistAfterCompaction: true` |
+
+---
+
+## License
+
+MIT

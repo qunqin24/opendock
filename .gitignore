@@ -1,0 +1,34 @@
+# build output
+dist/
+# generated types
+.astro/
+
+# dependencies
+node_modules/
+
+# logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+
+# environment variables
+.env
+.env.production
+
+# macOS-specific files
+.DS_Store
+
+# jetbrains setting folder
+.idea/
+
+# vercel
+.vercel/
+
+# NOTE: src/data/ and data/history.json are generated but intentionally
+# COMMITTED — they are the data snapshot the site builds from, and the daily
+# refresh workflow diffs against them to compute star growth.
+
+# crawler cache (safe to delete; re-fetched on demand)
+.cache/

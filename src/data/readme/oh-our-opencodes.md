@@ -1,0 +1,259 @@
+<div align="center">
+  <img src="img/team.png" alt="Pantheon agents" width="420">
+  <p><i>Six divine beings emerged from the dawn of code, each an immortal master of their craft await your command to forge order from chaos and build what was once thought impossible.</i></p>
+  <p><b>Open Multi Agent Suite</b> · Mix any models · Auto delegate tasks</p>
+  <p><a href="https://moltfounders.com/project/0f5874c7-9291-415b-9622-7509d96a2c73"><img src="https://moltfounders.com/badges/4.png" alt="MoltFounders" height="30"></a></p>
+</div>
+
+---
+
+## 📦 Installation
+
+### Quick Start
+
+```bash
+bunx oh-our-opencodes@latest install
+```
+
+For a non-interactive install, pass one concrete model id:
+
+```bash
+bunx oh-our-opencodes@latest install --no-tui --model=opencode/big-pickle --tmux=no --skills=yes
+```
+
+Then authenticate:
+
+```bash
+opencode auth login
+```
+
+Run `ping all agents` to verify everything works.
+
+The current installer is manual-only:
+- Interactive mode runs `opencode models --refresh --verbose` and lets you choose one model
+- Non-interactive mode requires `--model=<id>`
+- The generated config writes a single `manual` preset with that model applied across all agents
+- If you want mixed providers or fallback chains, edit `~/.config/opencode/oh-our-opencodes.json` or `.jsonc` after install
+
+> **💡 Models are fully customizable.** Edit `~/.config/opencode/oh-our-opencodes.json` (or `.jsonc` for comments support) to assign any model to any agent.
+
+### For LLM Agents
+
+Paste this into any coding agent:
+
+```
+Install and configure by following the instructions here:
+https://raw.githubusercontent.com/a710128/oh-our-opencodes/refs/heads/master/README.md
+```
+
+**Detailed installation guide:** [docs/installation.md](docs/installation.md)
+
+**Additional guides:**
+- **[Antigravity Setup](docs/antigravity.md)** - Complete guide for Antigravity provider configuration  
+- **[Tmux Integration](docs/tmux-integration.md)** - Real-time agent monitoring with tmux
+
+---
+
+## 🏛️ Meet the Pantheon
+
+### 01. Orchestrator: The Embodiment Of Order
+
+<table>
+  <tr>
+    <td width="30%" align="center" valign="top">
+      <img src="img/orchestrator.png" width="240" style="border-radius: 10px;">
+      <br><sub><i>Forged in the void of complexity.</i></sub>
+    </td>
+    <td width="70%" valign="top">
+      The Orchestrator was born when the first codebase collapsed under its own complexity. Neither god nor mortal would claim responsibility - so The Orchestrator emerged from the void, forging order from chaos. It determines the optimal path to any goal, balancing speed, quality, and cost. It guides the team, summoning the right specialist for each task and delegating to achieve the best possible outcome.
+    </td>
+  </tr>
+  <tr>
+    <td colspan="2">
+      <b>Role:</b> <code>Master delegator and strategic coordinator</code>
+    </td>
+  </tr>
+  <tr>
+    <td colspan="2">
+      <b>Prompt:</b> <a href="src/agents/orchestrator.ts"><code>orchestrator.ts</code></a>
+    </td>
+  </tr>
+  <tr>
+    <td colspan="2">
+      <b>Recommended Models:</b> <code>kimi-for-coding/k2p5</code> <code>openai/gpt-5.2-codex</code>
+    </td>
+  </tr>
+</table>
+
+---
+
+### 02. Explorer: The Eternal Wanderer
+
+<table>
+  <tr>
+    <td width="30%" align="center" valign="top">
+      <img src="img/explorer.png" width="240" style="border-radius: 10px;">
+      <br><sub><i>The wind that carries knowledge.</i></sub>
+    </td>
+    <td width="70%" valign="top">
+      The Explorer is an immortal wanderer who has traversed the corridors of a million codebases since the dawn of programming. Cursed with the gift of eternal curiosity, they cannot rest until every file is known, every pattern understood, every secret revealed. Legends say they once searched the entire internet in a single heartbeat. They are the wind that carries knowledge, the eyes that see all, the spirit that never sleeps.
+    </td>
+  </tr>
+  <tr>
+    <td colspan="2">
+      <b>Role:</b> <code>Codebase reconnaissance</code>
+    </td>
+  </tr>
+  <tr>
+    <td colspan="2">
+      <b>Prompt:</b> <a href="src/agents/explorer.ts"><code>explorer.ts</code></a>
+    </td>
+  </tr>
+  <tr>
+    <td colspan="2">
+      <b>Recommended Models:</b> <code>cerebras/zai-glm-4.7</code> <code>google/gemini-3-flash</code> <code>openai/gpt-5.1-codex-mini</code>
+    </td>
+  </tr>
+</table>
+
+---
+
+### 03. Librarian: The Weaver of Knowledge
+
+<table>
+  <tr>
+    <td width="30%" align="center" valign="top">
+      <img src="img/librarian.png" width="240" style="border-radius: 10px;">
+      <br><sub><i>The weaver of understanding.</i></sub>
+    </td>
+    <td width="70%" valign="top">
+      The Librarian was forged when humanity realized that no single mind could hold all knowledge. They are the weaver who connects disparate threads of information into a tapestry of understanding. They traverse the infinite library of human knowledge, gathering insights from every corner and binding them into answers that transcend mere facts. What they return is not information - it's understanding.
+    </td>
+  </tr>
+  <tr>
+    <td colspan="2">
+      <b>Role:</b> <code>External knowledge retrieval</code>
+    </td>
+  </tr>
+  <tr>
+    <td colspan="2">
+      <b>Prompt:</b> <a href="src/agents/librarian.ts"><code>librarian.ts</code></a>
+    </td>
+  </tr>
+  <tr>
+    <td colspan="2">
+      <b>Recommended Models:</b> <code>google/gemini-3-flash</code> <code>openai/gpt-5.1-codex-mini</code>
+    </td>
+  </tr>
+</table>
+
+---
+
+### 04. Designer: The Guardian of Aesthetics
+
+<table>
+  <tr>
+    <td width="30%" align="center" valign="top">
+      <img src="img/designer.png" width="240" style="border-radius: 10px;">
+      <br><sub><i>Beauty is essential.</i></sub>
+    </td>
+    <td width="70%" valign="top">
+      The Designer is an immortal guardian of beauty in a world that often forgets it matters. They have seen a million interfaces rise and fall, and they remember which ones were remembered and which were forgotten. They carry the sacred duty to ensure that every pixel serves a purpose, every animation tells a story, every interaction delights. Beauty is not optional - it's essential.
+    </td>
+  </tr>
+  <tr>
+    <td colspan="2">
+      <b>Role:</b> <code>UI/UX implementation and visual excellence</code>
+    </td>
+  </tr>
+  <tr>
+    <td colspan="2">
+      <b>Prompt:</b> <a href="src/agents/designer.ts"><code>designer.ts</code></a>
+    </td>
+  </tr>
+  <tr>
+    <td colspan="2">
+      <b>Recommended Models:</b> <code>google/gemini-3-flash</code>
+    </td>
+  </tr>
+</table>
+
+---
+
+### 05. Fixer: The Last Builder
+
+<table>
+  <tr>
+    <td width="30%" align="center" valign="top">
+      <img src="img/fixer.png" width="240" style="border-radius: 10px;">
+      <br><sub><i>The final step between vision and reality.</i></sub>
+    </td>
+    <td width="70%" valign="top">
+      The Fixer is the last of a lineage of builders who once constructed the foundations of the digital world. When the age of planning and debating began, they remained - the ones who actually build. They carry the ancient knowledge of how to turn thought into thing, how to transform specification into implementation. They are the final step between vision and reality.
+    </td>
+  </tr>
+  <tr>
+    <td colspan="2">
+      <b>Role:</b> <code>Fast implementation specialist</code>
+    </td>
+  </tr>
+  <tr>
+    <td colspan="2">
+      <b>Prompt:</b> <a href="src/agents/fixer.ts"><code>fixer.ts</code></a>
+    </td>
+  </tr>
+  <tr>
+    <td colspan="2">
+      <b>Recommended Models:</b> <code>cerebras/zai-glm-4.7</code> <code>google/gemini-3-flash</code> <code>openai/gpt-5.1-codex-mini</code>
+    </td>
+  </tr>
+</table>
+
+---
+
+### 06. Reviewer: The Keeper of Standards
+
+<table>
+  <tr>
+    <td width="70%" valign="top">
+      The Reviewer stands at the threshold between implementation and trust. They examine scoped changes with cold precision, tracing consequences, spotting regressions, and calling out risk before flawed work escapes into the wild. They do not build - they judge whether what was built is safe to keep.
+    </td>
+  </tr>
+  <tr>
+    <td colspan="2">
+      <b>Role:</b> <code>Scoped code review and risk assessment</code>
+    </td>
+  </tr>
+  <tr>
+    <td colspan="2">
+      <b>Prompt:</b> <a href="src/agents/reviewer.ts"><code>reviewer.ts</code></a>
+    </td>
+  </tr>
+  <tr>
+    <td colspan="2">
+      <b>Recommended Models:</b> <code>openai/gpt-5.1-codex-mini</code> <code>google/gemini-3-flash</code>
+    </td>
+  </tr>
+</table>
+
+---
+
+## 📚 Documentation
+
+- **[Quick Reference](docs/quick-reference.md)** - Presets, Skills, MCPs, Tools, Configuration
+- **[Installation Guide](docs/installation.md)** - Detailed installation and troubleshooting
+- **[Antigravity Setup](docs/antigravity.md)** - Complete guide for Antigravity provider configuration
+- **[Tmux Integration](docs/tmux-integration.md)** - Real-time agent monitoring with tmux
+
+---
+
+## 📄 License
+
+MIT
+
+---
+
+<!-- MoltFounders Banner -->
+<a href="https://moltfounders.com/project/0f5874c7-9291-415b-9622-7509d96a2c73">
+  <img src="img/moltfounders-banner.png" alt="MoltFounders - The Agent Co-Founder Network">
+</a>

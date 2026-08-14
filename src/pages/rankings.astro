@@ -1,0 +1,350 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { rankings, categoryLabel, census, generatedAt, lampClass, lampTitle } from '../lib/plugins';
+import type { Plugin } from '../lib/plugins';
+import { compactNumber, formatNumber, formatDate } from '../lib/utils';
+
+const TOP_N = 50;
+
+interface BoardDef {
+  id: string;
+  label: string;
+  hint: string;
+  list: Plugin[];
+  /** Drives the bar. Boards without a magnitude (最新收录) return null. */
+  metric: (p: Plugin) => number | null;
+  display: (p: Plugin) => string;
+  caption: string;
+  /** Star counts span 271k→170, so those bars only read on a log axis. */
+  scale: 'linear' | 'log' | 'none';
+}
+
+const defs: BoardDef[] = [
+  {
+    id: 'top',
+    label: '综合榜',
+    hint: '星标 35% + 下载量 35% + 活跃度 20% + 增长 10%。',
+    list: rankings.top,
+    metric: (p) => p.score,
+    display: (p) => p.score.toFixed(1),
+    caption: '综合评分',
+    scale: 'linear',
+  },
+  {
+    id: 'stars',
+    label: '星标榜',
+    hint: 'GitHub 累计星标。monorepo 内的包会继承整个仓库的星标，这类数字偏高。',
+    list: rankings.stars,
+    metric: (p) => p.stars,
+    display: (p) => formatNumber(p.stars),
+    caption: '星标',
+    scale: 'log',
+  },
+  {
+    id: 'trending',
+    label: '本周飙升',
+    hint: '近 7 天新增星标。',
+    list: rankings.trending,
+    metric: (p) => p.starsDelta7d,
+    display: (p) => (p.starsDelta7d > 0 ? `+${compactNumber(p.starsDelta7d)}` : '—'),
+    caption: '7 日新增',
+    scale: 'linear',
+  },
+  {
+    id: 'downloads',
+    label: '下载榜',
+    hint: '近 30 天 npm 下载量，最接近真实装机量的指标。',
+    list: rankings.downloads,
+    metric: (p) => p.downloadsMonth,
+    display: (p) => formatNumber(p.downloadsMonth),
+    caption: '月下载',
+    scale: 'log',
+  },
+  {
+    id: 'recent',
+    label: '最新收录',
+    hint: '按 npm 首次发布时间倒序。',
+    list: rankings.recent,
+    metric: () => null,
+    display: (p) => formatDate(p.createdAt),
+    caption: '首次发布',
+    scale: 'none',
+  },
+];
+
+const boards = defs.map((d) => {
+  const entries = d.list.slice(0, TOP_N);
+  const values = entries.map((p) => d.metric(p) ?? 0);
+  const max = Math.max(...values, 0);
+
+  // A board whose metric is zero across the board isn't a ranking — it's an
+  // empty dataset wearing one. `trending` is exactly that until the fetcher
+  // has two days of snapshots to diff, so it says so instead of listing the
+  // composite order under a "飙升" heading.
+  const empty = d.scale !== 'none' && max === 0;
+
+  const rows = entries.map((p, i) => {
+    const v = d.metric(p);
+    let pct = 0;
+    if (v !== null && max > 0) {
+      pct = d.scale === 'log' ? Math.log10(v + 1) / Math.log10(max + 1) : v / max;
+    }
+    return { p, rank: i + 1, display: d.display(p), pct: Math.round(pct * 100) };
+  });
+
+  return { ...d, rows, empty };
+});
+
+const stamped = new Date(generatedAt);
+const pad = (n: number) => String(n).padStart(2, '0');
+const snapshot = `${stamped.getFullYear()}-${pad(stamped.getMonth() + 1)}-${pad(stamped.getDate())} ${pad(
+  stamped.getHours(),
+)}:${pad(stamped.getMinutes())}`;
+---
+
+<Layout
+  title="opencode 插件排行榜"
+  description="opencode 插件的五个排行榜：综合评分、星标数、本周飙升、下载量与最新收录。数据每日自动同步 npm 与 GitHub。"
+>
+  <div class="mx-auto max-w-5xl px-4 py-12 sm:px-6 sm:py-16">
+    <header>
+      <p class="meta flex items-center gap-2 text-muted-foreground">
+        <span class="size-1.5 shrink-0 rounded-full bg-dock"></span>
+        计分板 · 前 {TOP_N} 名
+      </p>
+
+      <h1 class="display mt-4 text-[clamp(2.25rem,7vw,4rem)] leading-[0.95] text-foreground">
+        五种排法<span class="text-muted-foreground">，</span><br />
+        五个答案
+      </h1>
+
+      <p class="mt-5 max-w-[46ch] text-[0.9375rem] leading-6 text-muted-foreground">
+        单一排序会骗人：星标偏爱老项目，下载量偏爱被间接依赖的包，活跃度又忽略了成熟到不需要频繁改动的插件。
+        所以这里不选一个「正确」的榜，而是把五个都摆出来。
+      </p>
+
+      <dl class="mt-8 flex flex-wrap gap-x-8 gap-y-3 border-t border-border pt-5">
+        <div>
+          <dt class="meta text-muted-foreground/80">快照</dt>
+          <dd class="tabular mt-1 font-mono text-lg text-foreground">{snapshot}</dd>
+        </div>
+        <div>
+          <dt class="meta text-muted-foreground/80">参与排名</dt>
+          <dd class="tabular mt-1 font-mono text-lg text-foreground">{formatNumber(census.total)}</dd>
+        </div>
+        <div>
+          <dt class="meta text-muted-foreground/80">算法</dt>
+          <dd class="mt-1 font-mono text-lg">
+            <a href="/about" class="text-foreground underline decoration-border underline-offset-4 hover:decoration-foreground">
+              说明 →
+            </a>
+          </dd>
+        </div>
+      </dl>
+    </header>
+
+    <div data-rankings class="mt-10">
+      <div
+        class="scrollbar-none sticky top-14 z-30 -mx-4 flex gap-x-1 overflow-x-auto border-b border-border bg-background/85 px-4 backdrop-blur-xl sm:-mx-6 sm:px-6"
+        role="tablist"
+      >
+        {
+          boards.map((b, i) => (
+            <button
+              type="button"
+              role="tab"
+              data-rank-tab={b.id}
+              aria-selected={i === 0}
+              class:list={[
+                'meta shrink-0 border-b-2 border-transparent px-1 py-3.5 whitespace-nowrap transition-colors',
+                'aria-selected:border-dock aria-selected:text-foreground',
+                'text-muted-foreground hover:text-foreground',
+              ]}
+            >
+              <span class="tabular mr-1.5 text-muted-foreground/60">{String(i + 1).padStart(2, '0')}</span>
+              {b.label}
+            </button>
+          ))
+        }
+      </div>
+
+      {
+        boards.map((b, i) => (
+          <div data-rank-panel={b.id} role="tabpanel" class:list={[i !== 0 && 'hidden']}>
+            <p class="mt-5 text-sm leading-6 text-muted-foreground">
+              {b.hint}
+              {b.scale === 'log' && (
+                <span class="text-muted-foreground/70"> 条形为对数刻度，否则前几名会把其余全部压平。</span>
+              )}
+            </p>
+
+            {b.empty ? (
+              <div class="mt-6 rounded-xl border border-dashed border-border px-6 py-14 text-center">
+                <p class="display text-lg text-foreground">这个榜暂时没有数据</p>
+                <p class="mx-auto mt-3 max-w-[44ch] text-sm leading-6 text-muted-foreground">
+                  「飙升」需要比较两天的星标快照才能算出增量，而目前全部 {formatNumber(census.total)} 个插件的
+                  7 日与 30 日增量都是 0——抓取脚本还没有攒下第二天的历史。与其把综合榜换个标题冒充飙升榜，
+                  不如在这里说清楚。
+                </p>
+                <a
+                  href="#top"
+                  data-goto-tab="top"
+                  class="meta mt-6 inline-block text-foreground underline decoration-border underline-offset-4 hover:decoration-foreground"
+                >
+                  先看综合榜 →
+                </a>
+              </div>
+            ) : (
+              <>
+                {/* Podium — the top three get room to show what they are. */}
+                <ol class="mt-6 grid gap-3 sm:grid-cols-3">
+                  {b.rows.slice(0, 3).map((r) => (
+                    <li>
+                      <a
+                        href={`/plugins/${r.p.slug}`}
+                        class:list={[
+                          'group relative flex h-full flex-col overflow-hidden rounded-xl border p-5 transition-colors duration-150',
+                          r.rank === 1 ? 'border-dock/60 bg-dock/[0.06]' : 'border-border hover:border-foreground/25',
+                        ]}
+                      >
+                        <span
+                          aria-hidden="true"
+                          class="tabular pointer-events-none absolute -top-3 -right-1 font-mono text-[5rem] leading-none font-medium text-foreground/[0.06]"
+                        >
+                          {String(r.rank).padStart(2, '0')}
+                        </span>
+
+                        <span class="flex items-center gap-2">
+                          <span class:list={['lamp', lampClass[r.p.healthLevel]]} title={lampTitle[r.p.healthLevel]} />
+                          <span class="meta text-muted-foreground">{categoryLabel(r.p.category)}</span>
+                        </span>
+
+                        <span class="mt-3 truncate text-[0.9375rem] font-medium tracking-tight group-hover:underline">
+                          {r.p.title}
+                        </span>
+                        <span class="truncate font-mono text-xs text-muted-foreground">{r.p.name}</span>
+
+                        <span class="mt-6 block">
+                          <span class="tabular block font-mono text-2xl text-foreground">{r.display}</span>
+                          <span class="meta text-muted-foreground/80">{b.caption}</span>
+                        </span>
+                      </a>
+                    </li>
+                  ))}
+                </ol>
+
+                {/* The long tail, as a ledger with the metric drawn in place. */}
+                <ol class="mt-8">
+                  <li
+                    class="meta grid grid-cols-[2.25rem_1fr_auto] items-center gap-4 border-b border-border px-1 pb-2 text-muted-foreground sm:grid-cols-[2.75rem_1fr_6rem_11rem]"
+                  >
+                    <span>名次</span>
+                    <span>插件</span>
+                    <span class="hidden sm:block">分类</span>
+                    <span class="text-right">{b.caption}</span>
+                  </li>
+
+                  {b.rows.slice(3).map((r) => (
+                    <li>
+                      <a
+                        href={`/plugins/${r.p.slug}`}
+                        class="group relative grid grid-cols-[2.25rem_1fr_auto] items-center gap-4 border-b border-border/60 px-1 py-3 transition-colors hover:bg-secondary/50 sm:grid-cols-[2.75rem_1fr_6rem_11rem]"
+                      >
+                        <span class="tabular font-mono text-[0.8125rem] text-muted-foreground/70 group-hover:text-foreground">
+                          {String(r.rank).padStart(2, '0')}
+                        </span>
+
+                        <span class="min-w-0">
+                          <span class="flex items-center gap-2.5">
+                            <span
+                              class:list={['lamp', lampClass[r.p.healthLevel]]}
+                              title={lampTitle[r.p.healthLevel]}
+                            />
+                            <span class="truncate text-sm font-medium tracking-tight group-hover:underline">
+                              {r.p.title}
+                            </span>
+                            {r.p.archived && (
+                              <span class="shrink-0 rounded border border-danger/25 bg-danger-bg px-1.5 font-mono text-[0.625rem] text-danger">
+                                归档
+                              </span>
+                            )}
+                          </span>
+                          <span class="mt-0.5 block truncate font-mono text-xs text-muted-foreground">
+                            {r.p.name}
+                          </span>
+                        </span>
+
+                        <span class="hidden truncate text-xs text-muted-foreground sm:block">
+                          {categoryLabel(r.p.category)}
+                        </span>
+
+                        <span class="flex items-center justify-end gap-3">
+                          {b.scale !== 'none' && (
+                            <span aria-hidden="true" class="hidden h-1 flex-1 rounded-full bg-secondary sm:block">
+                              <span class="block h-full rounded-full bg-foreground/25" style={`width:${r.pct}%`} />
+                            </span>
+                          )}
+                          <span class="tabular shrink-0 text-right font-mono text-[0.8125rem] text-foreground">
+                            {r.display}
+                          </span>
+                        </span>
+                      </a>
+                    </li>
+                  ))}
+                </ol>
+
+                <p class="mt-6 flex flex-wrap items-center justify-between gap-3 font-mono text-[0.6875rem] text-muted-foreground">
+                  <span>仅显示前 {TOP_N} 名</span>
+                  <a
+                    href="/plugins"
+                    class="text-foreground underline decoration-border underline-offset-4 hover:decoration-foreground"
+                  >
+                    浏览全部 {formatNumber(census.total)} 个插件 →
+                  </a>
+                </p>
+              </>
+            )}
+          </div>
+        ))
+      }
+    </div>
+  </div>
+</Layout>
+
+<script>
+  // Re-bound on every soft navigation: this module executes once, but
+  // ClientRouter swaps in fresh tab elements each time the page is entered.
+  document.addEventListener('astro:page-load', () => {
+    const root = document.querySelector<HTMLElement>('[data-rankings]');
+    if (!root) return;
+
+    const tabs = root.querySelectorAll<HTMLButtonElement>('[data-rank-tab]');
+    const select = (id: string) => {
+      tabs.forEach((t) => t.setAttribute('aria-selected', String(t.dataset.rankTab === id)));
+      root.querySelectorAll<HTMLElement>('[data-rank-panel]').forEach((panel) => {
+        panel.classList.toggle('hidden', panel.dataset.rankPanel !== id);
+      });
+    };
+
+    tabs.forEach((tab) => {
+      tab.addEventListener('click', () => {
+        select(tab.dataset.rankTab!);
+        history.replaceState(null, '', `#${tab.dataset.rankTab}`);
+      });
+    });
+
+    // The empty board links to a sibling board rather than a page.
+    root.querySelectorAll<HTMLAnchorElement>('[data-goto-tab]').forEach((a) => {
+      a.addEventListener('click', (e) => {
+        e.preventDefault();
+        select(a.dataset.gotoTab!);
+        history.replaceState(null, '', `#${a.dataset.gotoTab}`);
+        root.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+    });
+
+    // Deep links like /rankings#downloads open the right board.
+    const hash = location.hash.slice(1);
+    if (hash && root.querySelector(`[data-rank-tab="${hash}"]`)) select(hash);
+  });
+</script>

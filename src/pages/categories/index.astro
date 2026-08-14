@@ -1,0 +1,152 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import CategoryIcon from '../../components/CategoryIcon.astro';
+import { categories, byCategory, census, lampClass, lampTitle } from '../../lib/plugins';
+import { formatNumber } from '../../lib/utils';
+
+// Sorted by size so the count bars descend down the page, and enriched with
+// a health census — the split between maintained and stale differs sharply
+// between categories (97% vs 51%), and nothing else on the site shows it.
+const cats = categories
+  .map((c) => {
+    const list = byCategory(c.id);
+    const ok = list.filter((p) => p.healthLevel === 'ok').length;
+    const warn = list.filter((p) => p.healthLevel === 'warn').length;
+    const danger = list.length - ok - warn;
+    return { ...c, top: list.slice(0, 3), ok, warn, danger };
+  })
+  .sort((a, b) => b.count - a.count);
+
+const maxCount = Math.max(...cats.map((c) => c.count));
+const healthiest = [...cats].sort((a, b) => b.ok / b.count - a.ok / a.count)[0];
+const pct = (n: number, total: number) => (total > 0 ? (n / total) * 100 : 0);
+---
+
+<Layout
+  title="按分类浏览 opencode 插件"
+  description="按功能分类浏览 opencode 插件：记忆与上下文、MCP 集成、智能体编排、代码智能、可观测性、模型接入等。"
+>
+  <div class="mx-auto max-w-6xl px-4 py-12 sm:px-6 sm:py-16">
+    <header>
+      <p class="meta flex items-center gap-2 text-muted-foreground">
+        <span class="size-1.5 shrink-0 rounded-full bg-dock"></span>
+        分类图谱 · {categories.length} 个方向
+      </p>
+
+      <h1 class="display mt-4 text-[clamp(2.25rem,7vw,4rem)] leading-[0.95] text-foreground">
+        插件都在<br />做些什么
+      </h1>
+
+      <p class="mt-5 max-w-[46ch] text-[0.9375rem] leading-6 text-muted-foreground">
+        分类由描述、关键词与仓库 topic 自动推断，没有人工编排。每个方向都标出了它的维护状况——
+        有的方向几乎全员活跃，有的一半已经停更。
+      </p>
+
+      <dl class="mt-8 flex flex-wrap gap-x-8 gap-y-3 border-t border-border pt-5">
+        <div>
+          <dt class="meta text-muted-foreground/80">收录</dt>
+          <dd class="tabular mt-1 font-mono text-lg text-foreground">{formatNumber(census.total)}</dd>
+        </div>
+        <div>
+          <dt class="meta text-muted-foreground/80">最大方向</dt>
+          <dd class="mt-1 font-mono text-lg text-foreground">{cats[0].label}</dd>
+        </div>
+        <div>
+          <dt class="meta text-muted-foreground/80">最健康</dt>
+          <dd class="mt-1 font-mono text-lg text-foreground">
+            {healthiest.label}{' '}
+            <span class="tabular text-muted-foreground">
+              {Math.round(pct(healthiest.ok, healthiest.count))}%
+            </span>
+          </dd>
+        </div>
+      </dl>
+    </header>
+
+    <ul class="mt-12 grid gap-4 lg:grid-cols-2">
+      {
+        cats.map((c) => (
+          <li id={c.id} class="scroll-mt-24">
+            <section class="flex h-full flex-col rounded-xl border border-border p-5 transition-colors duration-150 hover:border-foreground/25">
+              <div class="flex items-start justify-between gap-4">
+                <div class="flex min-w-0 items-start gap-3">
+                  <CategoryIcon name={c.icon} class="mt-0.5 size-5 shrink-0 text-muted-foreground" />
+                  <div class="min-w-0">
+                    <h2 class="truncate text-[0.9375rem] font-medium tracking-tight">
+                      <a href={`/categories/${c.id}`} class="hover:underline">
+                        {c.label}
+                      </a>
+                    </h2>
+                    <p class="meta truncate text-muted-foreground">{c.labelEn}</p>
+                  </div>
+                </div>
+                <span class="tabular shrink-0 font-mono text-2xl leading-none text-foreground">{c.count}</span>
+              </div>
+
+              {/* Size relative to the largest category, so the page reads as a
+                  descending shape rather than fourteen equal blocks. */}
+              <span aria-hidden="true" class="mt-4 block h-0.5 w-full rounded-full bg-secondary">
+                <span
+                  class="block h-full rounded-full bg-foreground/30"
+                  style={`width:${pct(c.count, maxCount)}%`}
+                />
+              </span>
+
+              <p class="mt-3 line-clamp-2 min-h-[2.5rem] text-xs leading-5 text-muted-foreground">
+                {c.description}
+              </p>
+
+              {/* Maintenance split — the one thing this page knows that the
+                  homepage's category tiles don't. */}
+              <div class="mt-4">
+                <span
+                  class="flex h-1.5 w-full overflow-hidden rounded-full bg-secondary"
+                  role="img"
+                  aria-label={`活跃 ${c.ok}，停更 ${c.warn}，归档 ${c.danger}`}
+                >
+                  <span class="block bg-ok" style={`width:${pct(c.ok, c.count)}%`} />
+                  <span class="block bg-warn" style={`width:${pct(c.warn, c.count)}%`} />
+                  <span class="block bg-danger" style={`width:${pct(c.danger, c.count)}%`} />
+                </span>
+                <p class="mt-2 flex flex-wrap gap-x-4 gap-y-1 font-mono text-[0.6875rem] text-muted-foreground">
+                  <span class="text-foreground">{Math.round(pct(c.ok, c.count))}% 活跃</span>
+                  <span>停更 {c.warn}</span>
+                  {c.danger > 0 && <span>归档 {c.danger}</span>}
+                </p>
+              </div>
+
+              <ol class="mt-4 border-t border-border pt-1">
+                {c.top.map((p, i) => (
+                  <li>
+                    <a
+                      href={`/plugins/${p.slug}`}
+                      class="group grid grid-cols-[1.5rem_1fr_auto] items-center gap-3 py-2 transition-colors hover:bg-secondary/50"
+                    >
+                      <span class="tabular font-mono text-[0.6875rem] text-muted-foreground/70">
+                        {String(i + 1).padStart(2, '0')}
+                      </span>
+                      <span class="flex min-w-0 items-center gap-2">
+                        <span class:list={['lamp', lampClass[p.healthLevel]]} title={lampTitle[p.healthLevel]} />
+                        <span class="truncate text-[0.8125rem] group-hover:underline">{p.title}</span>
+                      </span>
+                      <span class="tabular shrink-0 font-mono text-[0.6875rem] text-muted-foreground">
+                        {p.score.toFixed(0)}
+                      </span>
+                    </a>
+                  </li>
+                ))}
+              </ol>
+
+              <a
+                href={`/categories/${c.id}`}
+                class="meta mt-auto block border-t border-border pt-3 text-muted-foreground transition-colors hover:text-foreground"
+              >
+                查看全部 {c.count} 个 →
+              </a>
+            </section>
+          </li>
+        ))
+      }
+    </ul>
+  </div>
+</Layout>

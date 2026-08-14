@@ -1,0 +1,18 @@
+{
+  "$comment": "人工精选层。自动抓取负责广度，这个文件负责质量：首页精选、垃圾包过滤、分类纠错。",
+
+  "featured": [
+    "oh-my-opencode-slim",
+    "opencode-poe-auth",
+    "opencode-gitlab-auth"
+  ],
+
+  "include": [],
+
+  "blocklist": [
+    "opencode-plugin-test",
+    "test-opencode-plugin"
+  ],
+
+  "overrides": {}
+}

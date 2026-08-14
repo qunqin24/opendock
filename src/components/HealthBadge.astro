@@ -1,0 +1,37 @@
+---
+import type { HealthSignal } from '../lib/plugins';
+
+interface Props {
+  signals: HealthSignal[];
+  /** `compact` shows only the single most severe signal. */
+  compact?: boolean;
+  class?: string;
+}
+const { signals, compact = false, class: className = '' } = Astro.props;
+
+const order = { danger: 0, warn: 1, ok: 2 } as const;
+const sorted = [...signals].sort((a, b) => order[a.level] - order[b.level]);
+const shown = compact ? sorted.slice(0, 1) : sorted;
+
+const styles: Record<string, string> = {
+  ok: 'border-ok/25 bg-ok-bg text-ok',
+  warn: 'border-warn/25 bg-warn-bg text-warn',
+  danger: 'border-danger/25 bg-danger-bg text-danger',
+};
+---
+
+<span class:list={['inline-flex flex-wrap items-center gap-1.5', className]}>
+  {
+    shown.map((s) => (
+      <span
+        class:list={[
+          'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[0.6875rem] leading-4 font-medium whitespace-nowrap',
+          styles[s.level],
+        ]}
+      >
+        <span class="size-1.5 rounded-full bg-current" />
+        {s.label}
+      </span>
+    ))
+  }
+</span>

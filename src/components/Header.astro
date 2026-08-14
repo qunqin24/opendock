@@ -1,0 +1,106 @@
+---
+import Logo from './Logo.astro';
+import ThemeToggle from './ThemeToggle.astro';
+import CommandPalette from './CommandPalette.astro';
+
+const path = Astro.url.pathname;
+const links = [
+  { href: '/plugins', label: '全部插件' },
+  { href: '/categories', label: '分类' },
+  { href: '/rankings', label: '排行榜' },
+  { href: '/submit', label: '提交插件' },
+];
+const isActive = (href: string) => path === href || path.startsWith(`${href}/`);
+---
+
+<header
+  class="sticky top-0 z-50 w-full border-b border-border bg-background/80 backdrop-blur-xl supports-[backdrop-filter]:bg-background/65"
+>
+  <div class="mx-auto flex h-14 max-w-6xl items-center gap-6 px-4 sm:px-6">
+    <a href="/" class="group/logo shrink-0" aria-label="OpenDock 首页">
+      <Logo />
+    </a>
+
+    <nav class="scrollbar-none hidden items-center gap-1 overflow-x-auto md:flex" aria-label="主导航">
+      {
+        links.map((l) => (
+          <a
+            href={l.href}
+            class:list={[
+              'rounded-md px-3 py-1.5 text-sm transition-colors',
+              isActive(l.href)
+                ? 'bg-secondary font-medium text-foreground'
+                : 'text-muted-foreground hover:bg-secondary/60 hover:text-foreground',
+            ]}
+          >
+            {l.label}
+          </a>
+        ))
+      }
+    </nav>
+
+    <div class="ml-auto flex items-center gap-1.5">
+      <CommandPalette />
+
+      <a
+        href="https://github.com/opencode-ai/opencode"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="grid size-9 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+        aria-label="GitHub"
+      >
+        <svg viewBox="0 0 16 16" fill="currentColor" class="size-4" aria-hidden="true">
+          <path
+            d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"
+          ></path>
+        </svg>
+      </a>
+
+      <ThemeToggle />
+
+      <button
+        type="button"
+        id="mobile-menu-btn"
+        class="grid size-9 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-secondary md:hidden"
+        aria-label="打开菜单"
+        aria-expanded="false"
+      >
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" class="size-4">
+          <path d="M2 4h12M2 8h12M2 12h12"></path>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <nav id="mobile-menu" class="hidden border-t border-border px-4 py-2 md:hidden" aria-label="移动导航">
+    {
+      links.map((l) => (
+        <a
+          href={l.href}
+          class:list={[
+            'block rounded-md px-3 py-2 text-sm transition-colors',
+            isActive(l.href) ? 'bg-secondary font-medium' : 'text-muted-foreground hover:bg-secondary/60',
+          ]}
+        >
+          {l.label}
+        </a>
+      ))
+    }
+  </nav>
+</header>
+
+<script>
+  // Re-bound after every soft navigation: this module runs once, but the
+  // header markup it reaches into is replaced on each swap.
+  document.addEventListener('astro:page-load', () => {
+    const btn = document.getElementById('mobile-menu-btn');
+    const menu = document.getElementById('mobile-menu');
+    btn?.addEventListener('click', () => {
+      const open = menu?.classList.toggle('hidden') === false;
+      btn.setAttribute('aria-expanded', String(open));
+    });
+  });
+
+  // `/` and ⌘K are handled by CommandPalette — it needs to know whether the
+  // current page has its own search field before deciding what `/` does.
+</script>

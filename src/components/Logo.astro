@@ -1,0 +1,32 @@
+---
+interface Props {
+  class?: string;
+  /** Renders the wordmark next to the glyph. */
+  withText?: boolean;
+}
+const { class: className = '', withText = true } = Astro.props;
+---
+
+<span class:list={['inline-flex items-center gap-2.5', className]}>
+  <span
+    class="grid size-8 shrink-0 place-items-center rounded-lg bg-foreground text-background transition-transform duration-200 group-hover/logo:scale-105"
+  >
+    <!-- opencode mark -->
+    <svg
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      fill-rule="evenodd"
+      class="size-[18px]"
+      aria-hidden="true"
+    >
+      <path d="M16 6H8v12h8V6zm4 16H4V2h16v20z"></path>
+    </svg>
+  </span>
+  {
+    withText && (
+      <span class="text-[0.9375rem] font-semibold tracking-tight">
+        Open<span class="text-muted-foreground">Dock</span>
+      </span>
+    )
+  }
+</span>

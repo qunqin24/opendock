@@ -1,0 +1,186 @@
+# Nowledge Community
+
+<div align="center">
+
+<img src="https://github.com/user-attachments/assets/fbf6f921-ff0a-40dc-be43-8f9b0d66cb09" width="200" alt="Nowledge Community Logo">
+
+**Community integrations for [Nowledge Mem](https://mem.nowledge.co)**
+
+
+[![Discord](https://img.shields.io/badge/Discord-Join%20Community-5865F2?style=flat&logo=discord&logoColor=white)](https://nowled.ge/discord)
+[![Docs](https://img.shields.io/badge/Docs-Read-orange?style=flat&logo=readthedocs&logoColor=white)](https://nowled.ge/mem-docs)
+
+---
+
+</div>
+
+## Registry
+
+The canonical source of truth for all integrations is [`integrations.json`](integrations.json). Capabilities, install commands, transport, tool naming, thread save methods, and the user-facing autonomy contract are tracked there. Update the registry first when adding or modifying integrations.
+
+The autonomy contract uses one shared language across integrations:
+
+- `automatic`: the host/plugin enforces it through hooks or lifecycle wiring
+- `guided`: the package/rules/skills strongly teach it, but the model still decides
+- `manual`: it only happens when the user or agent asks directly
+
+This keeps one critical distinction honest for fresh users: having tools available is not the same thing as getting autonomous memory behavior.
+
+For behavioral guidance (when to read Context Bundle, use Working Memory fallback, search, save, and route ambient spaces), see [`shared/behavioral-guidance.md`](shared/behavioral-guidance.md). For plugin authoring rules, see [`docs/PLUGIN_DEVELOPMENT_GUIDE.md`](docs/PLUGIN_DEVELOPMENT_GUIDE.md).
+
+For end-user customization that survives updates, see [`docs/USER_OVERRIDE_GUIDE.md`](docs/USER_OVERRIDE_GUIDE.md). The short version: do not edit installed plugin files; use the host's own instruction files when that host supports them.
+
+For multi-agent orchestrators that launch Codex, Claude Code, OpenCode, or other
+child CLIs, set `NMEM_AGENT_ID=<agent-slug>` in each child process. Add
+`NMEM_SPACE=<space>` only when that run should override the AI Identity's
+default space. `NMEM_HOST_AGENT_ID` is for advanced external aliases, not a
+second required identity variable. The child plugin still reports its real
+runtime as `source_app`; the env var selects the right Nowledge AI Identity
+through Context Bundle.
+
+## Integrations
+
+Each directory is a standalone integration. Pick the one that matches your tool.
+
+| Integration | Install | What it does |
+|-------------|---------|--------------|
+| **[Universal Agent Plugin](nowledge-mem-agent-plugin)** | Install this source directory from an Agent Plugins-compatible client | Standards-compatible fallback for clients that support Agent Plugins but do not have a dedicated Nowledge connector yet. Provides skills plus local MCP; does not claim automatic full-thread capture. |
+| **[Skills](nowledge-mem-npx-skills)** | `npx skills add nowledge-co/community/nowledge-mem-npx-skills` | Reusable workflow package for Context Bundle / Working Memory startup context, routed recall, resumable handoffs, and distillation. Prefer native packages when your tool has one. |
+| **[Claude Code Plugin](nowledge-mem-claude-code-plugin)** | `claude plugin marketplace add https://github.com/nowledge-co/community` then `claude plugin install nowledge-mem@nowledge-community` | Claude Code native plugin with hooks for Context Bundle / Working Memory startup context, routed recall, automatic session capture, and pre-compaction transcript save. |
+| **[Grok Build Plugin](nowledge-mem-claude-code-plugin)** | `grok plugin install nowledge-co/community#nowledge-mem-claude-code-plugin --trust` | Grok loads the shared Claude-compatible package, with Grok-aware Context Bundle startup and `nmem t save --from grok` session capture. |
+| **[Copilot CLI Plugin](nowledge-mem-copilot-cli-plugin)** | `copilot plugin marketplace add nowledge-co/community` then `copilot plugin install nowledge-mem@nowledge-community` | GitHub Copilot CLI plugin with startup context guidance, routed recall, incremental session capture, and pre-compaction transcript save. |
+| **[Droid Plugin](nowledge-mem-droid-plugin)** | `droid plugin marketplace add https://github.com/nowledge-co/community` then `droid plugin install nowledge-mem@nowledge-community` | Factory Droid plugin with Context Bundle / Working Memory startup context, routed recall, distillation, and honest `save-handoff` semantics. |
+| **[Gemini CLI](https://github.com/nowledge-co/nowledge-mem-gemini-cli)** | Search `Nowledge Mem` in the [Gemini CLI Extensions Gallery](https://geminicli.com/extensions/?name=nowledge-co/nowledge-mem-gemini-cli) and install | Gemini-native context, bundled MCP, hooks, commands, and skills for Context Bundle / Working Memory startup context, routed recall, real thread save before compression or exit, and handoff summaries. |
+| **[Google Antigravity Plugin](https://github.com/nowledge-co/nowledge-mem-google-antigravity)** | `mkdir -p ~/.gemini/config/plugins && git clone --depth 1 https://github.com/nowledge-co/nowledge-mem-google-antigravity.git ~/.gemini/config/plugins/nowledge-mem` | Native Antigravity plugin contributed by abn: Context Bundle / Working Memory startup context, bundled MCP, skills, lifecycle hooks, offline retry, and automatic transcript capture as `source=antigravity`. |
+| **[Antigravity Trajectory Extractor](https://github.com/jijiamoer/antigravity-trajectory-extractor)** | Current sessions: prefer the Google Antigravity plugin or `nmem t sync --from antigravity`; older cache-only sessions: clone the extractor | Fallback extraction for old Antigravity local caches that do not have the documented `transcript.jsonl` file. |
+| **[Windsurf Trajectory Extractor](https://github.com/jijiamoer/windsurf-trajectory-extractor)** | `git clone https://github.com/jijiamoer/windsurf-trajectory-extractor.git` | Offline protobuf extraction for Windsurf Cascade conversation history. |
+| **[Cursor Plugin](nowledge-mem-cursor-plugin)** | Link `nowledge-mem-cursor-plugin` into `~/.cursor/plugins/local/nowledge-mem-cursor` | Cursor-native plugin with session-start context, MCP recall, exact-session transcript capture, manual `save-thread`, and summary-only `save-handoff`. |
+| **[Codex Plugin](nowledge-mem-codex-plugin)** | `codex plugin marketplace add nowledge-co/community --sparse .agents --sparse nowledge-mem-codex-plugin` then `codex plugin add nowledge-mem@nowledge-community`; enable `plugins` and `hooks`, run setup, then trust the hooks when Codex asks | Native startup context and memory routing, bundled MCP retrieval and writes, plus Stop-hook capture of real Codex sessions. Coexists cleanly with Codex local Memory. |
+| **Raft (formerly Slock)** | Configure per-worker environment variables in Raft runtime config | Install the child runtime connector, set `NMEM_AGENT_ID=<agent-slug>` per worker, and use Mem skills/MCP inside Raft. Raft-managed Codex rollouts are execution traces and are excluded from Codex Thread capture. |
+| **Lody** | Configure the child runtime in Lody Agent Config | Runtime launcher setup: install the child runtime connector first; set `NMEM_AGENT_ID=<agent-slug>` only when that Agent Config represents a stable role. |
+| **Multica** | Configure the Multica agent MCP settings and custom environment | Multi-agent orchestrator setup: install the child runtime connector first; for Claude Code agents, save the Mem MCP config on the Multica agent; then set `NMEM_AGENT_ID=<agent-slug>` in custom env. |
+| **Cumora** | Configure the child runtime plus each teammate persona | AI teammate workspace setup: connect Mem at the runtime/daemon boundary, then use a per-persona Context Bundle instruction unless Cumora exposes per-agent runtime environment variables. |
+| **Paseo** | Configure the child runtime that Paseo launches | Multi-agent orchestration setup: install the connector for Codex, Claude Code, OpenCode, Pi, or OMP first for automatic new-thread capture; use `nmem t sync --from paseo --all-projects --apply` to import supported child-session history from Paseo's registry without creating duplicate child threads; set `NMEM_AGENT_ID=<agent-slug>` only for durable Paseo agent roles. |
+| **[Cindy](nowledge-mem-cindy-connector)** | `nmem config mcp show --host cindy` | Cindy host setup: add Mem as a Cindy MCP server and shared guide/skills for memory behavior. For exact transcript capture, install the dedicated connector for the runtime Cindy launches, such as Codex, Claude Code, Pi, or OMP. |
+| **[OpenClaw Plugin](nowledge-mem-openclaw-plugin)** | `openclaw plugins install clawhub:@nowledge/openclaw-nowledge-mem` | Full memory lifecycle with memory tools, thread tools, automatic capture, and distillation. |
+| **[Alma Plugin](nowledge-mem-alma-plugin)** | Search Nowledge in Alma official Plugin marketplace | Alma-native plugin with startup context, thread-aware recall, structured saves, and optional auto-capture. |
+| **[Bub Plugin](nowledge-mem-bub-plugin)** | `pip install nowledge-mem-bub` | Bub-native plugin: cross-tool knowledge, auto-capture via save_state, startup context, and graph exploration. |
+| **[Pi Package](nowledge-mem-pi-package)** | `pi install npm:nowledge-mem-pi` | Pi-native package with startup Context Bundle / Working Memory injection, automatic conversation capture, and bundled memory skills. |
+| **[OMP Plugin](nowledge-mem-omp-plugin)** | `omp plugin install nowledge-mem-omp` | OMP-native plugin with startup Context Bundle / Working Memory injection, automatic conversation capture, and bundled memory skills. |
+| **[OpenCode Plugin](nowledge-mem-opencode-plugin)** | Add `"opencode-nowledge-mem"` to `opencode.json` plugins | Native OpenCode plugin with Context Bundle, Working Memory, search/save tools, idle-event automatic thread capture, pre-compaction flush, handoff, and status. |
+| **[Amp Plugin](nowledge-mem-amp-plugin)** | `bash nowledge-mem-amp-plugin/scripts/install.sh` | Native Amp plugin with Context Bundle, Working Memory, search/save tools, `agent.end` automatic thread capture, handoff, status, and an Amp skill. |
+| **[Craft Agent Connector](nowledge-mem-craft-agent-connector)** | `nmem config mcp show --host craft-agent` | Craft workspace source + guide setup: MCP memory tools inside Craft Agent, plus `nmem t sync --from craft-agent` for real local session import from Craft `session.jsonl` files. |
+| **[WorkBuddy Plugin](nowledge-mem-workbuddy-plugin)** | In WorkBuddy: `/plugin marketplace add https://raw.githubusercontent.com/nowledge-co/community/main/.workbuddy-plugin/marketplace.json --name nowledge-community`, then `/plugin install nowledge-mem@nowledge-community` | WorkBuddy-native setup through the CodeBuddy-compatible plugin abstraction: startup context, bundled MCP, slash commands, lifecycle hooks, and real WorkBuddy thread capture through `nmem` using WorkBuddy's `transcript_path`. |
+| **[CodeBuddy Plugin](nowledge-mem-codebuddy-plugin)** | `codebuddy plugin marketplace add nowledge-co/community` then `codebuddy plugin install nowledge-mem@nowledge-community` | CodeBuddy-native plugin with startup context, bundled MCP, slash commands, lifecycle hooks, and real CodeBuddy thread capture through `nmem` using CodeBuddy's `transcript_path`. |
+| **[Kimi Code Plugin](nowledge-mem-kimi-code-plugin)** | In Kimi Code, run `/plugins install https://github.com/nowledge-co/community/tree/main`, then `/reload` | Kimi-native plugin metadata, session-start skill, native lifecycle hooks, slash commands, user-owned MCP config via `nmem config mcp show --host kimi-code`, and real Kimi Code thread capture through `nmem`. |
+| **[Kimi Work Connector](nowledge-mem-kimi-work-connector)** | `python3 ~/.cache/nowledge-community/nowledge-mem-kimi-work-connector/scripts/install_kimi_work_plugin.py` | Kimi Work desktop connector for its embedded Kimi Code runtime: session-start skill, bundled local MCP, and explicit `nmem t sync --from kimi-work` session import. |
+| **[ZCode Plugin](https://github.com/nowledge-co/zcode-plugin)** | In ZCode, add `https://github.com/nowledge-co/zcode-plugin` from **Settings → Plugins → Create → Add marketplace**, then install `nowledge-mem-zcode` | ZCode-native plugin with bundled MCP, Skills, commands, startup/recall hooks, and Stop-hook transcript capture through `nmem`. Verify one short session after install because hook support depends on the active ZCode build. |
+| **[DeepSeek Harness Plugin](nowledge-mem-deepseek-harness-plugin)** | `dsh plugin --profile web add github:nowledge-co/nowledge-mem-deepseek-harness` | Community DSH bundle with native Context Bundle injection, prompt-time recall, Mem MCP tools, and `session/event` turn-end transcript capture through `nmem`. The standalone repo is tagged `dsh-plugin` for DeepSeek Harness ecosystem discovery. |
+| **[Hermes Agent](nowledge-mem-hermes)** | `bash <(curl -sL https://raw.githubusercontent.com/nowledge-co/community/main/nowledge-mem-hermes/setup.sh)` | Native Hermes memory provider with Context Bundle / Working Memory startup context, pre-turn recall, clean `nmem_` tools, and session-end transcript capture into Mem threads. MCP remains available as a fallback mode. |
+| **[Proma Plugin](nowledge-mem-proma-plugin)** | Manual setup with MCP, hooks, and skills; see [Proma guide](https://mem.nowledge.co/docs/integrations/proma) | Proma desktop agent setup with startup context, Stop-hook thread capture, MCP memory tools, and standard Nowledge Mem skills. |
+| **[Cradle](https://github.com/wibus-wee/cradle-app/tree/main/plugins/nowledge-mem)** | Enable the bundled Nowledge Mem plugin in Cradle's Plugin Marketplace | Cradle's official adapter provides guided Working Memory, Context Bundle, memory, and thread operations, with optional direct MCP registration. Automatic recall and session capture await Cradle lifecycle hooks. |
+| **[Arkloop](https://arkloop.io/zh/docs/features/memory)** | Settings > Memory > Enable > select Nowledge | Arkloop's official Memory provider injects Working Memory and relevant recall, keeps Arkloop threads in Mem, and can automatically triage and distill completed conversations. |
+| **[OpticLM](https://github.com/OpticLM/nmem)** | Enable Nowledge Mem from Optic's Extension settings | Optic's official integration uses its own `@opticlm/nmem` SDK for Mem spaces and thread continuity. Add Mem MCP separately when you also want agent-facing Working Memory and recall tools. |
+| **[Raycast Extension](nowledge-mem-raycast)** | Search Nowledge in Raycast Extension Store | Search memories from Raycast launcher. |
+| **[Claude Desktop](https://github.com/nowledge-co/claude-dxt)** | Download from [nowled.ge/claude-dxt](https://nowled.ge/claude-dxt), double-click `.mcpb` file | One-click extension for Claude Desktop with memory search, save, and update. |
+| **[Browser Extension](https://chromewebstore.google.com/detail/nowledge-memory-exchange/kjgpkgodplgakbeanoifnlpkphemcbmh)** | Install from Chrome Web Store | Side-panel capture for ChatGPT, Claude, Gemini, Perplexity, and other web AI surfaces. |
+| **[MCP](#direct-mcp)** | For tools without a dedicated Nowledge package, use [direct MCP](#direct-mcp). | Standard memory and thread tools exposed through one shared MCP server. |
+
+## Direct MCP
+
+Add to your tool's MCP settings:
+
+```json
+{
+  "mcpServers": {
+    "nowledge-mem": {
+      "url": "http://127.0.0.1:14242/mcp/",
+      "type": "streamableHttp"
+    }
+  }
+}
+```
+
+See [mcp.json](mcp.json) for the reference config.
+
+For remote Mem, configure this machine once with `nmem config client set url ...` and `nmem config client set api-key ...`, then generate the exact host config:
+
+```bash
+nmem config mcp show --host cursor
+nmem config mcp show --host codex
+nmem config mcp show --host gemini-cli
+nmem config mcp show --host craft-agent
+nmem config mcp show --host codebuddy
+nmem config mcp show --host cindy
+nmem config mcp show --host zcode
+nmem config mcp show --host deepseek-harness
+```
+
+Direct MCP clients do not read `~/.nowledge-mem/config.json` automatically; paste the generated block into the host's own MCP settings.
+
+## Requirements
+
+- [Nowledge Mem](https://mem.nowledge.co) running locally
+- `nmem` CLI on your PATH: if Mem is running on the same machine, install it from **Settings > Preferences > Developer Tools > Install CLI** in the app, use `pip install nmem-cli` for a standalone setup, or on Arch Linux install the [`nmem-cli` AUR package](https://aur.archlinux.org/packages/nmem-cli) with `yay -S nmem-cli` or `paru -S nmem-cli`
+
+```bash
+nmem status   # verify Nowledge Mem is running
+```
+
+## Spaces
+
+Spaces are optional. Most integrations can stay on `Default` and never mention them.
+
+If a host already has its own profile or provider config, choose the lane there first:
+
+- plugin/provider setting such as `space = "Research Agent"`
+- a derived mapping such as `spaceTemplate = "agent-${AGENT_NAME}"`
+- an exact identity map such as `space_by_identity = {"research":"Research Agent"}`
+
+Use `NMEM_SPACE="Research Agent"` only for CLI-first hosts or runtimes that do not expose a better config surface. HTTP- or MCP-based integrations should pass `space_id` explicitly when their host/runtime can do so. The storage boundary is still one hidden shared key, but humans and agents should normally work with the space name instead. Legacy `NMEM_SPACE_ID` still works for older setups.
+
+For agent harnesses, the rule is simple:
+
+- If the host can only promise one lane per process or profile, support one fixed ambient space.
+- If the host exposes a stable identity or workspace signal, support a derived mapping (`spaceTemplate` or exact identity mapping).
+- If the host does not expose identity cleanly, do not fake per-agent routing.
+
+### Space behavior by integration
+
+Use one ambient space only when the host already has a real lane, such as one AI Identity, one project, or one workspace.
+
+| Integration | Ambient space today | Best user setup |
+|-------------|---------------------|-----------------|
+| Claude Code, Grok, Codex, Droid, Pi, Gemini CLI, DeepSeek Harness | Full ambient lane through `NMEM_SPACE` or per-command `--space` | Set one `NMEM_SPACE` only when the whole session truly belongs to one lane. Otherwise stay on `Default`. |
+| Hermes | Full ambient lane through provider `space`, `space_by_identity`, `space_template`, or fallback `NMEM_SPACE` | Use `space` for one stable lane, `space_by_identity` for a small explicit map, `space_template` for one lane per Hermes identity. |
+| Alma | Full ambient lane through plugin `nowledgeMem.space`, plugin `nowledgeMem.spaceTemplate`, or fallback `NMEM_SPACE` | Use `space` for one Alma profile per lane. Use `spaceTemplate` only when your launcher already exports a trustworthy lane variable. |
+| Bub | Full ambient lane through `NMEM_SPACE` | Treat Bub as one process-wide lane. If you need separate lanes, run separate Bub processes or profiles. |
+| OpenClaw | Full ambient lane through plugin `space`, plugin `spaceTemplate`, or fallback `NMEM_SPACE`, preserved across CLI memory calls and API-backed thread/feed paths | Use `space` for one stable profile. Use `spaceTemplate` only when the launcher already exports the lane signal. Do not fake per-agent routing if the runtime does not expose identity. |
+| OpenCode | Full ambient lane through `NMEM_SPACE`, preserved across CLI memory calls and HTTP session save | Set one `NMEM_SPACE` when the OpenCode process belongs to one real lane. |
+| Craft Agent | Partial today | MCP source calls use the configured Mem endpoint. `nmem t save/sync --from craft-agent` can use `--space` or `NMEM_SPACE` for imports; keep one lane only when the Craft workspace represents one real lane. |
+| Cursor | Partial today | `sessionStart` and handoff flows can follow `NMEM_SPACE`, but MCP tool calls still need Cursor/runtime support to forward `space_id`. |
+| Raycast | One fixed lane through Raycast preferences or shared config | Use one named space when that launcher profile always belongs to one lane. Leave it empty to stay on `Default`. |
+| Browser extension | One fixed lane through extension settings | Use one named space when that browser profile always belongs to one lane. Leave it empty to stay on `Default`. |
+| Generic MCP-only hosts | Usually default lane only today | Keep using `Default` unless the host can explicitly pass `space_id`. |
+
+What the space profile means is the same everywhere:
+
+- **When this space searches** decides how far automatic recall expands before the agent starts answering.
+- **Also search these spaces** adds reusable context lanes for retrieval only. It does not move or merge records.
+- **Agent guidance** is read by AI Now and built-in/background agents working in that lane. It changes retrieval and explanation style, not storage.
+
+## Links
+
+- [Documentation](https://mem.nowledge.co/docs)
+- [Blog](https://www.nowledge-labs.ai/blog/nowledge-mem)
+- [Report a Bug](https://github.com/nowledge-co/community/issues/new?template=bug_report.md)
+- [Request a Feature](https://github.com/nowledge-co/community/issues/new?template=feature_request.md)
+- [hello@nowledge-labs.ai](mailto:hello@nowledge-labs.ai)
+
+---
+
+<div align="center">
+
+**Built by [Nowledge Labs](https://nowledge-labs.ai)**
+
+</div>

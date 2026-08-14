@@ -1,0 +1,39 @@
+---
+---
+
+<button
+  type="button"
+  id="theme-toggle"
+  class="grid size-9 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+  aria-label="切换主题"
+>
+  <svg viewBox="0 0 16 16" fill="currentColor" class="size-4 dark:hidden" aria-hidden="true">
+    <path
+      d="M8 0a.75.75 0 0 1 .75.75v1.5a.75.75 0 0 1-1.5 0V.75A.75.75 0 0 1 8 0Zm0 12a.75.75 0 0 1 .75.75v1.5a.75.75 0 0 1-1.5 0v-1.5A.75.75 0 0 1 8 12Zm8-4a.75.75 0 0 1-.75.75h-1.5a.75.75 0 0 1 0-1.5h1.5A.75.75 0 0 1 16 8ZM4 8a.75.75 0 0 1-.75.75h-1.5a.75.75 0 0 1 0-1.5h1.5A.75.75 0 0 1 4 8Zm9.657-5.657a.75.75 0 0 1 0 1.06l-1.06 1.061a.75.75 0 1 1-1.061-1.06l1.06-1.061a.75.75 0 0 1 1.061 0ZM4.464 11.536a.75.75 0 0 1 0 1.06l-1.06 1.061a.75.75 0 0 1-1.061-1.06l1.06-1.061a.75.75 0 0 1 1.061 0Zm9.193 2.121a.75.75 0 0 1-1.06 0l-1.061-1.06a.75.75 0 1 1 1.06-1.061l1.061 1.06a.75.75 0 0 1 0 1.061ZM4.464 4.464a.75.75 0 0 1-1.06 0L2.343 3.404a.75.75 0 0 1 1.06-1.061l1.061 1.06a.75.75 0 0 1 0 1.061ZM8 4.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7Z"
+    ></path>
+  </svg>
+  <svg viewBox="0 0 16 16" fill="currentColor" class="hidden size-4 dark:block" aria-hidden="true">
+    <path
+      d="M9.598 1.591a.749.749 0 0 1 .785-.175 7.001 7.001 0 1 1-8.967 8.967.75.75 0 0 1 .961-.96 5.5 5.5 0 0 0 7.046-7.046.75.75 0 0 1 .175-.786Z"
+    ></path>
+  </svg>
+</button>
+
+<script is:inline>
+  // Applied before paint via the inline script in Layout.astro; this only
+  // handles the toggle interaction itself.
+  //
+  // Delegated from `document` rather than bound to the button: soft navigation
+  // swaps in a new button, and inline scripts re-run on some swaps but not
+  // others. Delegation survives both, and the flag keeps a re-run from
+  // stacking duplicate listeners.
+  if (!window.__themeToggleBound) {
+    window.__themeToggleBound = true;
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('#theme-toggle')) return;
+      const isDark = document.documentElement.classList.toggle('dark');
+      localStorage.setItem('theme', isDark ? 'dark' : 'light');
+      document.documentElement.style.colorScheme = isDark ? 'dark' : 'light';
+    });
+  }
+</script>

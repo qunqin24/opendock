@@ -1,0 +1,81 @@
+---
+import Logo from './Logo.astro';
+import { generatedAt, totals, plugins } from '../lib/plugins';
+import { formatNumber } from '../lib/utils';
+
+const updated = new Date(generatedAt);
+const stamp = `${updated.getFullYear()}-${String(updated.getMonth() + 1).padStart(2, '0')}-${String(
+  updated.getDate(),
+).padStart(2, '0')} ${String(updated.getHours()).padStart(2, '0')}:${String(updated.getMinutes()).padStart(2, '0')}`;
+
+const columns = [
+  {
+    title: '浏览',
+    links: [
+      { href: '/plugins', label: '全部插件' },
+      { href: '/categories', label: '按分类浏览' },
+      { href: '/rankings', label: '排行榜' },
+    ],
+  },
+  {
+    title: 'opencode',
+    links: [
+      { href: 'https://opencode.ai', label: '官网' },
+      { href: 'https://opencode.ai/docs/plugins/', label: '插件开发文档' },
+      { href: 'https://github.com/opencode-ai/opencode', label: 'GitHub 仓库' },
+    ],
+  },
+  {
+    title: '关于',
+    links: [
+      { href: '/submit', label: '提交插件' },
+      { href: '/about', label: '排名算法说明' },
+    ],
+  },
+];
+---
+
+<footer class="mt-24 border-t border-border">
+  <div class="mx-auto max-w-6xl px-4 py-12 sm:px-6">
+    <div class="grid gap-10 sm:grid-cols-2 lg:grid-cols-[1.5fr_1fr_1fr_1fr]">
+      <div>
+        <Logo />
+        <p class="mt-3 max-w-xs text-sm leading-6 text-muted-foreground">
+          自动收录并排名 opencode 插件生态。数据每日从 npm 与 GitHub 同步，不靠人工维护列表。
+        </p>
+        <p class="tabular mt-4 text-xs text-muted-foreground">
+          收录 {formatNumber(plugins.length)} 个插件 · 累计 {formatNumber(totals.stars)} 星标
+        </p>
+      </div>
+
+      {
+        columns.map((col) => (
+          <div>
+            <h3 class="text-xs font-semibold tracking-wide text-foreground uppercase">{col.title}</h3>
+            <ul class="mt-4 space-y-2.5">
+              {col.links.map((l) => (
+                <li>
+                  <a
+                    href={l.href}
+                    target={l.href.startsWith('http') ? '_blank' : undefined}
+                    rel={l.href.startsWith('http') ? 'noopener noreferrer' : undefined}
+                    class="text-sm text-muted-foreground transition-colors hover:text-foreground"
+                  >
+                    {l.label}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))
+      }
+    </div>
+
+    <div
+      class="mt-10 flex flex-col gap-2 border-t border-border pt-6 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between"
+    >
+      <p>© {new Date().getFullYear()} OpenDock · 与 opencode 官方无隶属关系</p>
+      <p class="tabular">数据更新于 {stamp}</p>
+    </div>
+  </div>
+</footer>

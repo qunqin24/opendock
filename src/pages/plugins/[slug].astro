@@ -1,0 +1,288 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import HealthBadge from '../../components/HealthBadge.astro';
+import InstallSnippet from '../../components/InstallSnippet.astro';
+import PluginCard from '../../components/PluginCard.astro';
+import { plugins, related, categoryLabel, loadReadme, type Plugin } from '../../lib/plugins';
+import { renderReadme, readmeExcerpt } from '../../lib/readme';
+import { compactNumber, formatNumber, timeAgo, formatDate } from '../../lib/utils';
+
+export function getStaticPaths() {
+  return plugins.map((plugin) => ({ params: { slug: plugin.slug }, props: { plugin } }));
+}
+
+interface Props {
+  plugin: Plugin;
+}
+const { plugin: p } = Astro.props;
+
+const markdown = p.hasReadme ? await loadReadme(p.slug) : null;
+const readmeHtml = markdown ? await renderReadme(markdown, { repoSlug: p.repoSlug }) : null;
+
+const description =
+  p.description ?? (markdown ? readmeExcerpt(markdown) : null) ?? `${p.title} —— 一个 opencode 插件。`;
+
+const siblings = related(p, 3);
+
+const stats = [
+  { label: 'GitHub 星标', value: formatNumber(p.stars), sub: p.starsDelta30d > 0 ? `近 30 天 +${compactNumber(p.starsDelta30d)}` : null },
+  { label: '月下载量', value: formatNumber(p.downloadsMonth), sub: p.downloadsWeek > 0 ? `周 ${compactNumber(p.downloadsWeek)}` : null },
+  { label: '综合评分', value: p.score.toFixed(1), sub: '满分 100' },
+  { label: '最近提交', value: timeAgo(p.pushedAt), sub: formatDate(p.pushedAt) },
+];
+
+const meta: { label: string; value: string; href?: string; external?: boolean }[] = [
+  { label: '最新版本', value: p.version ?? '—' },
+  { label: '开源协议', value: p.license ?? '未声明' },
+  { label: '分类', value: categoryLabel(p.category), href: `/categories/${p.category}` },
+  { label: '首次发布', value: formatDate(p.createdAt) },
+  { label: 'Fork 数', value: formatNumber(p.forks) },
+  { label: '开放 Issue', value: formatNumber(p.openIssues) },
+  ...(p.owner
+    ? [{ label: '作者', value: p.owner, href: `https://github.com/${p.owner}`, external: true }]
+    : []),
+];
+
+// Rich result eligibility for "<plugin name> opencode" searches.
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'SoftwareApplication',
+  name: p.title,
+  alternateName: p.name,
+  description,
+  applicationCategory: 'DeveloperApplication',
+  operatingSystem: 'Cross-platform',
+  softwareVersion: p.version ?? undefined,
+  license: p.license ?? undefined,
+  codeRepository: p.repoUrl ?? undefined,
+  downloadUrl: p.npmUrl,
+  author: p.owner ? { '@type': 'Person', name: p.owner } : undefined,
+  offers: { '@type': 'Offer', price: 0, priceCurrency: 'USD' },
+};
+---
+
+<Layout title={`${p.title} — opencode 插件`} description={description}>
+  <script is:inline type="application/ld+json" slot="head" set:html={JSON.stringify(jsonLd)} />
+
+  <div class="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-12">
+    <!-- breadcrumb -->
+    <nav class="mb-6 flex items-center gap-1.5 text-xs text-muted-foreground" aria-label="面包屑">
+      <a href="/" class="transition-colors hover:text-foreground">首页</a>
+      <span>/</span>
+      <a href="/plugins" class="transition-colors hover:text-foreground">插件</a>
+      <span>/</span>
+      <a href={`/categories/${p.category}`} class="transition-colors hover:text-foreground">
+        {categoryLabel(p.category)}
+      </a>
+      <span>/</span>
+      <span class="truncate text-foreground">{p.title}</span>
+    </nav>
+
+    <!-- header -->
+    <header class="flex flex-col gap-6 border-b border-border pb-8 lg:flex-row lg:items-start lg:justify-between">
+      <div class="min-w-0 flex-1">
+        <div class="flex flex-wrap items-center gap-3">
+          {
+            p.ownerAvatar && (
+              <img
+                src={p.ownerAvatar}
+                alt={p.owner ?? ''}
+                width="40"
+                height="40"
+                loading="eager"
+                class="size-10 shrink-0 rounded-lg border border-border"
+              />
+            )
+          }
+          <div class="min-w-0">
+            <h1 class="text-2xl font-semibold tracking-tight text-balance sm:text-3xl">{p.title}</h1>
+            <p class="mt-0.5 truncate font-mono text-sm text-muted-foreground">{p.name}</p>
+          </div>
+          {
+            p.featured && (
+              <span class="rounded-md border border-border bg-secondary px-2 py-1 text-xs font-medium">
+                精选
+              </span>
+            )
+          }
+        </div>
+
+        {/* npm descriptions often contain long snake_case tool names with no
+            break opportunity, which overflow the page on phones. */}
+        <p class="mt-4 max-w-2xl text-[0.9375rem] leading-7 wrap-break-word text-pretty text-muted-foreground">
+          {description}
+        </p>
+
+        <HealthBadge signals={p.health} class="mt-4" />
+
+        {
+          p.keywords.length > 0 && (
+            <div class="mt-4 flex flex-wrap gap-1.5">
+              {p.keywords.slice(0, 8).map((k) => (
+                <a
+                  href={`/plugins?q=${encodeURIComponent(k)}`}
+                  class="rounded-md border border-border bg-card px-2 py-0.5 font-mono text-[0.6875rem] text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                >
+                  {k}
+                </a>
+              ))}
+            </div>
+          )
+        }
+      </div>
+
+      <div class="flex shrink-0 flex-wrap gap-2">
+        {
+          p.repoUrl && (
+            <a
+              href={p.repoUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              class="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90"
+            >
+              <svg viewBox="0 0 16 16" fill="currentColor" class="size-4" aria-hidden="true">
+                <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z" />
+              </svg>
+              源码仓库
+            </a>
+          )
+        }
+        <a
+          href={p.npmUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          class="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-2.5 text-sm font-medium transition-colors hover:bg-secondary"
+        >
+          npm
+        </a>
+        {
+          p.homepage && p.homepage !== p.repoUrl && (
+            <a
+              href={p.homepage}
+              target="_blank"
+              rel="noopener noreferrer"
+              class="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-2.5 text-sm font-medium transition-colors hover:bg-secondary"
+            >
+              主页
+            </a>
+          )
+        }
+      </div>
+    </header>
+
+    <!-- stats -->
+    <!-- One card, no internal rules: the hairline grid this used to be drew
+         five lines to separate four numbers. Spacing does that job. -->
+    <dl
+      class="mt-8 grid grid-cols-2 gap-x-8 gap-y-6 rounded-xl border border-border bg-card p-5 sm:grid-cols-4 sm:p-6"
+    >
+      {
+        stats.map((s) => (
+          <div>
+            <dt class="meta text-muted-foreground">{s.label}</dt>
+            <dd class="tabular mt-2 font-mono text-xl tracking-tight text-foreground">{s.value}</dd>
+            {s.sub && <dd class="tabular mt-1 font-mono text-[0.6875rem] text-muted-foreground">{s.sub}</dd>}
+          </div>
+        ))
+      }
+    </dl>
+
+    <div class="mt-10 grid gap-10 lg:grid-cols-[minmax(0,1fr)_20rem]">
+      <!-- main column -->
+      <div class="min-w-0">
+        <section>
+          <h2 class="mb-4 text-lg font-semibold tracking-tight">安装</h2>
+          <InstallSnippet plugin={p} />
+          <p class="mt-3 text-xs leading-5 text-muted-foreground">
+            opencode 启动时会用 Bun 自动安装 npm 插件并缓存到 <code
+              class="rounded border border-border bg-muted px-1 py-0.5 font-mono">~/.cache/opencode/node_modules/</code
+            >，无需手动 install。
+          </p>
+        </section>
+
+        <section class="mt-12">
+          <h2 class="mb-4 text-lg font-semibold tracking-tight">说明文档</h2>
+          {
+            readmeHtml ? (
+              <div class="prose-readme rounded-xl border border-border bg-card p-6">
+                <Fragment set:html={readmeHtml} />
+              </div>
+            ) : (
+              <div class="rounded-xl border border-dashed border-border px-6 py-12 text-center">
+                <p class="text-sm font-medium">这个插件没有提供 README</p>
+                <p class="mt-1.5 text-sm text-muted-foreground">
+                  缺少文档通常意味着它还不适合直接用在生产项目里。
+                </p>
+                {p.repoUrl && (
+                  <a
+                    href={p.repoUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="mt-5 inline-block rounded-lg border border-border bg-card px-4 py-2 text-sm font-medium transition-colors hover:bg-secondary"
+                  >
+                    去仓库看看
+                  </a>
+                )}
+              </div>
+            )
+          }
+        </section>
+      </div>
+
+      <!-- sidebar -->
+      {/* min-w-0 matters on phones: the grid collapses to one column, and a
+          grid item defaults to its min-content width — a long package name in
+          a related-plugin card would otherwise widen the track for both. */}
+      {/* The sidebar is usually taller than the viewport, and a pinned sticky
+          element can't be scrolled — its lower half (相关插件) stayed unreachable
+          until the whole README had been scrolled past. Giving it its own
+          max-height + scroll lets it move independently of the article. */}
+      <aside
+        class="min-w-0 space-y-12 lg:sticky lg:top-20 lg:max-h-[calc(100vh-6rem)] lg:self-start lg:overflow-y-auto lg:pr-1"
+      >
+        <!-- Card kept, internal rules dropped: seven hairlines to separate
+             seven short values is more structure than the content needs.
+             Alignment and the mono/sans contrast do the separating. -->
+        <div class="rounded-xl border border-border bg-card p-5">
+          <h2 class="meta text-muted-foreground">基本信息</h2>
+          <dl class="mt-4 grid grid-cols-[auto_1fr] items-baseline gap-x-6 gap-y-3 text-sm">
+            {
+              meta.map((m) => (
+                <>
+                  <dt class="text-muted-foreground">{m.label}</dt>
+                  <dd class="tabular truncate text-right font-mono text-[0.8125rem] text-foreground">
+                    {m.href ? (
+                      <a
+                        href={m.href}
+                        target={m.external ? '_blank' : undefined}
+                        rel={m.external ? 'noopener noreferrer' : undefined}
+                        class="underline decoration-border underline-offset-4 transition-colors hover:decoration-foreground"
+                      >
+                        {m.value}
+                      </a>
+                    ) : (
+                      m.value
+                    )}
+                  </dd>
+                </>
+              ))
+            }
+          </dl>
+        </div>
+
+        {
+          siblings.length > 0 && (
+            <div>
+              <h2 class="meta text-muted-foreground">相关插件</h2>
+              <div class="mt-4 space-y-3">
+                {siblings.map((s) => (
+                  <PluginCard plugin={s} />
+                ))}
+              </div>
+            </div>
+          )
+        }
+      </aside>
+    </div>
+  </div>
+</Layout>

@@ -1,0 +1,97 @@
+---
+import '../styles/global.css';
+import { ClientRouter } from 'astro:transitions';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+
+interface Props {
+  title?: string;
+  description?: string;
+  /** Path-only canonical override; defaults to the current URL. */
+  canonical?: string;
+  noindex?: boolean;
+}
+
+const {
+  title = 'OpenDock — opencode 插件目录与排行榜',
+  description = '收录并排名 opencode 生态的全部插件。按星标、下载量、活跃度综合排序，附健康度提示与一键安装配置。数据每日自动同步。',
+  canonical,
+  noindex = false,
+} = Astro.props;
+
+const site = Astro.site ?? new URL('https://opendock.dev');
+const canonicalURL = new URL(canonical ?? Astro.url.pathname, site);
+const fullTitle = title.includes('OpenDock') ? title : `${title} · OpenDock`;
+---
+
+<!doctype html>
+<html lang="zh-CN" class="scroll-pt-20">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{fullTitle}</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonicalURL} />
+    {noindex && <meta name="robots" content="noindex" />}
+
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="sitemap" href="/sitemap-index.xml" />
+    <link rel="alternate" type="application/rss+xml" title="OpenDock 新插件" href="/rss.xml" />
+
+    {/* Soft navigation between pages. Component scripts only execute once,
+        so anything that binds to the DOM re-initialises on astro:page-load. */}
+    <ClientRouter />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="OpenDock" />
+    <meta property="og:title" content={fullTitle} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonicalURL} />
+    <meta property="og:image" content={new URL('/og.png', site)} />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={fullTitle} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={new URL('/og.png', site)} />
+
+    <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#252525" media="(prefers-color-scheme: dark)" />
+
+    <script is:inline>
+      // Runs before first paint so the theme never flashes.
+      (() => {
+        const apply = () => {
+          const stored = localStorage.getItem('theme');
+          const dark = stored ? stored === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches;
+          document.documentElement.classList.toggle('dark', dark);
+          document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
+        };
+        apply();
+
+        // Soft navigation restores <html> from the prerendered markup, which
+        // carries no `dark` class — without this the theme snaps back to light
+        // on every page change. after-swap runs before paint, so it can't flash.
+        if (!window.__themeSwapBound) {
+          window.__themeSwapBound = true;
+          document.addEventListener('astro:after-swap', apply);
+        }
+      })();
+    </script>
+
+    <slot name="head" />
+  </head>
+
+  <body class="min-h-screen bg-background font-sans">
+    <a
+      href="#main"
+      class="sr-only focus:not-sr-only focus:absolute focus:top-3 focus:left-3 focus:z-[60] focus:rounded-md focus:bg-foreground focus:px-3 focus:py-2 focus:text-sm focus:text-background"
+    >
+      跳到主要内容
+    </a>
+
+    <Header />
+    <main id="main">
+      <slot />
+    </main>
+    <Footer />
+  </body>
+</html>

@@ -1,0 +1,63 @@
+name: Refresh plugin data
+
+# The whole point of the site is that nobody maintains the list by hand:
+# this job re-crawls npm + GitHub daily and commits the new snapshot, which
+# in turn triggers a Vercel deploy.
+on:
+  schedule:
+    - cron: '0 3 * * *' # 03:00 UTC ≈ 11:00 Asia/Shanghai
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: refresh-data
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # Not required for correctness — entries expire after 20h — but it makes
+      # a re-run after a failed job cheap instead of a full re-crawl.
+      - name: Restore crawler cache
+        uses: actions/cache@v4
+        with:
+          path: .cache
+          key: crawler-${{ github.run_id }}
+          restore-keys: crawler-
+
+      - name: Crawl npm + GitHub
+        env:
+          # Default token is enough: 5000 GraphQL points/hour vs ~50 needed.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: pnpm data
+
+      - name: Verify the site still builds with the new data
+        run: pnpm build
+
+      - name: Commit snapshot
+        run: |
+          git config user.name  'opendock-bot'
+          git config user.email 'bot@users.noreply.github.com'
+          git add src/data data/history.json
+          if git diff --staged --quiet; then
+            echo 'No data changes.'
+            exit 0
+          fi
+          git commit -m "chore(data): refresh plugin snapshot $(date -u +%F)"
+          git push

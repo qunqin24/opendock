@@ -1,0 +1,128 @@
+---
+import type { Plugin } from '../lib/plugins';
+
+interface Props {
+  plugin: Plugin;
+}
+const { plugin: p } = Astro.props;
+
+const spec = p.version ? `${p.name}@${p.version}` : p.name;
+
+const tabs = [
+  {
+    id: 'project',
+    label: '项目级',
+    hint: '写入当前项目的 opencode.json，只对这个仓库生效。',
+    file: 'opencode.json',
+    code: `{
+  "$schema": "https://opencode.ai/config.json",
+  "plugin": ["${spec}"]
+}`,
+  },
+  {
+    id: 'global',
+    label: '全局',
+    hint: '写入 ~/.config/opencode/opencode.json，对所有项目生效。',
+    file: '~/.config/opencode/opencode.json',
+    code: `{
+  "$schema": "https://opencode.ai/config.json",
+  "plugin": ["${spec}"]
+}`,
+  },
+  {
+    id: 'npm',
+    label: '手动安装',
+    hint: '若你要在本地改造这个插件，先装到项目里再从本地路径引用。',
+    file: 'shell',
+    code: `pnpm add -D ${p.name}`,
+  },
+];
+---
+
+<div
+  class="overflow-hidden rounded-xl border border-border bg-card"
+  data-install
+>
+  <!-- The tab strip's fill already separates it from the panel; a rule on
+       top of that is redundant structure. -->
+  <div class="flex items-center gap-1 bg-secondary/50 px-2 py-1.5">
+    {
+      tabs.map((t, i) => (
+        <button
+          type="button"
+          data-install-tab={t.id}
+          aria-selected={i === 0}
+          class:list={[
+            'rounded-md px-3 py-1 text-xs font-medium transition-colors',
+            'aria-selected:bg-card aria-selected:text-foreground aria-selected:shadow-sm',
+            'text-muted-foreground hover:text-foreground',
+          ]}
+        >
+          {t.label}
+        </button>
+      ))
+    }
+  </div>
+
+  {
+    tabs.map((t, i) => (
+      <div data-install-panel={t.id} class:list={[i !== 0 && 'hidden']}>
+        {/* Hint, filename and copy button share one row instead of stacking
+            three separately-ruled bands inside the card. */}
+        <div class="px-4 pt-3.5">
+          <div class="flex items-start justify-between gap-3">
+            <p class="text-xs leading-5 text-muted-foreground">{t.hint}</p>
+            <button
+              type="button"
+              data-copy={t.code}
+              class="-mt-1 inline-flex shrink-0 items-center gap-1.5 rounded-md px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+            >
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" class="size-3.5">
+                <rect x="5.75" y="5.75" width="8.5" height="8.5" rx="1.5" />
+                <path d="M10.25 3.75v-1a1.5 1.5 0 0 0-1.5-1.5h-5.5a1.5 1.5 0 0 0-1.5 1.5v5.5a1.5 1.5 0 0 0 1.5 1.5h1" />
+              </svg>
+              <span data-copy-label>复制</span>
+            </button>
+          </div>
+        </div>
+
+        {/* The code sits in a filled well rather than between two rules. */}
+        <div class="px-4 pt-3 pb-4">
+          <div class="rounded-lg bg-muted px-3.5 py-3">
+            <p class="mb-2 font-mono text-[0.625rem] text-muted-foreground">{t.file}</p>
+            <pre class="overflow-x-auto font-mono text-[0.8125rem] leading-6"><code>{t.code}</code></pre>
+          </div>
+        </div>
+      </div>
+    ))
+  }
+</div>
+
+<script>
+  document.querySelectorAll<HTMLElement>('[data-install]').forEach((root) => {
+    const tabs = root.querySelectorAll<HTMLButtonElement>('[data-install-tab]');
+    tabs.forEach((tab) => {
+      tab.addEventListener('click', () => {
+        tabs.forEach((t) => t.setAttribute('aria-selected', String(t === tab)));
+        root.querySelectorAll<HTMLElement>('[data-install-panel]').forEach((panel) => {
+          panel.classList.toggle('hidden', panel.dataset.installPanel !== tab.dataset.installTab);
+        });
+      });
+    });
+  });
+
+  document.querySelectorAll<HTMLButtonElement>('[data-copy]').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const label = btn.querySelector('[data-copy-label]');
+      try {
+        await navigator.clipboard.writeText(btn.dataset.copy ?? '');
+        if (label) {
+          label.textContent = '已复制';
+          setTimeout(() => (label.textContent = '复制'), 1600);
+        }
+      } catch {
+        if (label) label.textContent = '复制失败';
+      }
+    });
+  });
+</script>
