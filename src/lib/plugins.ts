@@ -1,9 +1,23 @@
 import data from '../data/plugins.json';
+import { DEFAULT_LOCALE, type Locale } from './i18n';
 
 export type HealthLevel = 'ok' | 'warn' | 'danger';
 
+/** Mirrors the ids emitted by scripts/lib/score.mjs. Keeping it a union means
+ *  a signal without a translation fails the type check instead of rendering
+ *  its raw id. */
+export type HealthSignalId =
+  | 'healthy'
+  | 'archived'
+  | 'deprecated'
+  | 'stale-year'
+  | 'stale'
+  | 'no-repo'
+  | 'no-readme'
+  | 'no-license';
+
 export interface HealthSignal {
-  id: string;
+  id: HealthSignalId;
   level: HealthLevel;
   label: string;
 }
@@ -52,6 +66,7 @@ export interface Category {
   label: string;
   labelEn: string;
   description: string;
+  descriptionEn: string;
   icon: string;
   count: number;
 }
@@ -73,8 +88,16 @@ export const generatedAt = dataset.generatedAt;
 
 export const categoryMap = new Map(categories.map((c) => [c.id, c]));
 
-export function categoryLabel(id: string): string {
-  return categoryMap.get(id)?.label ?? '其他';
+export function categoryLabel(id: string, lang: Locale = DEFAULT_LOCALE): string {
+  const c = categoryMap.get(id);
+  if (!c) return lang === 'zh' ? '其他' : 'Other';
+  return lang === 'zh' ? c.label : c.labelEn;
+}
+
+export function categoryDescription(id: string, lang: Locale = DEFAULT_LOCALE): string {
+  const c = categoryMap.get(id);
+  if (!c) return '';
+  return lang === 'zh' ? c.description : c.descriptionEn;
 }
 
 /** Ranking views. Each answers a different question, so none is "the" order. */
@@ -113,12 +136,6 @@ export const lampClass: Record<HealthLevel, string> = {
   danger: 'lamp-danger',
 };
 
-export const lampTitle: Record<HealthLevel, string> = {
-  ok: '维护活跃',
-  warn: '需要留意：长期未更新或缺少文档',
-  danger: '不建议使用：已归档或已废弃',
-};
-
 export function byCategory(id: string): Plugin[] {
   return plugins.filter((p) => p.category === id).sort((a, b) => b.score - a.score);
 }
@@ -127,7 +144,7 @@ export function bySlug(slug: string): Plugin | undefined {
   return plugins.find((p) => p.slug === slug);
 }
 
-/** Same category first, then closest by score — used for "相关插件". */
+/** Same category first, then closest by score — used for related plugins. */
 export function related(plugin: Plugin, limit = 6): Plugin[] {
   const tags = new Set([...plugin.keywords, ...plugin.topics].map((t) => t.toLowerCase()));
   return plugins

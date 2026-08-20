@@ -1,6 +1,6 @@
 ---
-import PluginDetail from '../../views/PluginDetail.astro';
-import { plugins } from '../../lib/plugins';
+import PluginDetail from '../../../views/PluginDetail.astro';
+import { plugins } from '../../../lib/plugins';
 
 export function getStaticPaths() {
   return plugins.map((plugin) => ({ params: { slug: plugin.slug }, props: { plugin } }));

@@ -1,6 +1,6 @@
 ---
-import CategoryDetail from '../../views/CategoryDetail.astro';
-import { categories } from '../../lib/plugins';
+import CategoryDetail from '../../../views/CategoryDetail.astro';
+import { categories } from '../../../lib/plugins';
 
 export function getStaticPaths() {
   return categories.map((category) => ({ params: { id: category.id }, props: { category } }));

@@ -1,5 +1,6 @@
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import type { Locale } from './i18n';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -21,21 +22,25 @@ export function formatNumber(n: number): string {
   return new Intl.NumberFormat('en-US').format(n ?? 0);
 }
 
-/** Relative time in Chinese, e.g. "3 天前". */
-export function timeAgo(iso: string | null | undefined): string {
-  if (!iso) return '未知';
+/** Relative time, e.g. "3 days ago" / "3 天前". */
+export function timeAgo(iso: string | null | undefined, lang: Locale = 'en'): string {
+  const zh = lang === 'zh';
+  if (!iso) return zh ? '未知' : 'unknown';
   const diff = Date.now() - new Date(iso).getTime();
-  if (Number.isNaN(diff)) return '未知';
+  if (Number.isNaN(diff)) return zh ? '未知' : 'unknown';
+
+  const plural = (n: number, unit: string) => `${n} ${unit}${n === 1 ? '' : 's'} ago`;
 
   const mins = Math.floor(diff / 60_000);
-  if (mins < 60) return mins <= 1 ? '刚刚' : `${mins} 分钟前`;
+  if (mins < 60) return mins <= 1 ? (zh ? '刚刚' : 'just now') : zh ? `${mins} 分钟前` : plural(mins, 'minute');
   const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours} 小时前`;
+  if (hours < 24) return zh ? `${hours} 小时前` : plural(hours, 'hour');
   const days = Math.floor(hours / 24);
-  if (days < 30) return `${days} 天前`;
+  if (days < 30) return zh ? `${days} 天前` : plural(days, 'day');
   const months = Math.floor(days / 30);
-  if (months < 12) return `${months} 个月前`;
-  return `${Math.floor(months / 12)} 年前`;
+  if (months < 12) return zh ? `${months} 个月前` : plural(months, 'month');
+  const years = Math.floor(months / 12);
+  return zh ? `${years} 年前` : plural(years, 'year');
 }
 
 /**
@@ -65,10 +70,10 @@ export function seededShuffle<T>(items: T[], seed = 1): T[] {
   return out;
 }
 
-export function formatDate(iso: string | null | undefined): string {
-  if (!iso) return '未知';
+export function formatDate(iso: string | null | undefined, lang: Locale = 'en'): string {
+  if (!iso) return lang === 'zh' ? '未知' : 'unknown';
   const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '未知';
+  if (Number.isNaN(d.getTime())) return lang === 'zh' ? '未知' : 'unknown';
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 

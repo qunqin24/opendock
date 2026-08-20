@@ -1,0 +1,148 @@
+---
+import Layout from '../layouts/Layout.astro';
+import PluginExplorer from '../components/PluginExplorer';
+import CategoryIcon from '../components/CategoryIcon.astro';
+import { categories, searchDocs, byCategory, categoryLabel, categoryDescription, type Category } from '../lib/plugins';
+import { formatNumber } from '../lib/utils';
+import { localeFromPath, localePath, useTranslations } from '../lib/i18n';
+
+interface Props {
+  category: Category;
+}
+const { category } = Astro.props;
+
+const lang = localeFromPath(Astro.url.pathname);
+const t = useTranslations(lang);
+const label = categoryLabel(category.id, lang);
+const description = categoryDescription(category.id, lang);
+
+// The explorer keeps its own category chips, so scope the dataset here and
+// let it filter within the category rather than across everything.
+const docs = searchDocs.filter((d) => d.category === category.id);
+
+// Same maintenance census the index page shows, so a category keeps its
+// identity when you drill into it.
+const list = byCategory(category.id);
+const ok = list.filter((p) => p.healthLevel === 'ok').length;
+const warn = list.filter((p) => p.healthLevel === 'warn').length;
+const danger = list.length - ok - warn;
+const stars = list.reduce((sum, p) => sum + p.stars, 0);
+const pct = (n: number) => (category.count > 0 ? (n / category.count) * 100 : 0);
+
+const siblings = categories.filter((c) => c.id !== category.id).sort((a, b) => b.count - a.count);
+
+const site = Astro.site ?? new URL('https://opendock.dev');
+const abs = (path: string) => new URL(localePath(lang, path), site).href;
+
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@graph': [
+    {
+      '@type': 'BreadcrumbList',
+      itemListElement: [
+        { '@type': 'ListItem', position: 1, name: t('categories.breadcrumbHome'), item: abs('/') },
+        { '@type': 'ListItem', position: 2, name: t('categories.breadcrumb'), item: abs('/categories') },
+        { '@type': 'ListItem', position: 3, name: label },
+      ],
+    },
+    {
+      '@type': 'ItemList',
+      name: label,
+      description,
+      numberOfItems: category.count,
+      itemListElement: list.slice(0, 20).map((p, i) => ({
+        '@type': 'ListItem',
+        position: i + 1,
+        name: p.title,
+        url: abs(`/plugins/${p.slug}`),
+      })),
+    },
+  ],
+};
+---
+
+<Layout
+  title={t('categories.detailTitle', { label })}
+  description={t('categories.detailDescription', { description, count: category.count })}
+>
+  <script is:inline type="application/ld+json" slot="head" set:html={JSON.stringify(jsonLd)} />
+
+  <div class="mx-auto max-w-6xl px-4 py-10 sm:px-6 sm:py-14">
+    <nav class="mb-6 flex items-center gap-1.5 text-xs text-muted-foreground" aria-label={t('plugin.breadcrumbAria')}>
+      <a href={localePath(lang, '/')} class="transition-colors hover:text-foreground">
+        {t('categories.breadcrumbHome')}
+      </a>
+      <span>/</span>
+      <a href={localePath(lang, '/categories')} class="transition-colors hover:text-foreground">
+        {t('categories.breadcrumb')}
+      </a>
+      <span>/</span>
+      <span class="text-foreground">{label}</span>
+    </nav>
+
+    <header class="mb-10">
+      <p class="meta flex items-center gap-2 text-muted-foreground">
+        <CategoryIcon name={category.icon} class="size-3.5" />
+        {category.labelEn}
+      </p>
+
+      <h1 class="display mt-3 text-[clamp(2rem,6vw,3.5rem)] leading-[0.95] text-foreground">
+        {label}
+      </h1>
+
+      <p class="mt-4 max-w-[46ch] text-[0.9375rem] leading-6 text-muted-foreground">{description}</p>
+
+      <dl class="mt-8 flex flex-wrap gap-x-8 gap-y-3 border-t border-border pt-5">
+        <div>
+          <dt class="meta text-muted-foreground/80">{t('categories.statPlugins')}</dt>
+          <dd class="tabular mt-1 font-mono text-lg text-foreground">{formatNumber(category.count)}</dd>
+        </div>
+        <div>
+          <dt class="meta text-muted-foreground/80">{t('categories.statStars')}</dt>
+          <dd class="tabular mt-1 font-mono text-lg text-foreground">{formatNumber(stars)}</dd>
+        </div>
+        <div class="min-w-[10rem] flex-1">
+          <dt class="meta text-muted-foreground/80">{t('categories.statHealth')}</dt>
+          <dd class="mt-2">
+            <span
+              class="flex h-1.5 w-full max-w-xs overflow-hidden rounded-full bg-secondary"
+              role="img"
+              aria-label={t('categories.healthAria', { ok, warn, danger })}
+            >
+              <span class="block bg-ok" style={`width:${pct(ok)}%`}></span>
+              <span class="block bg-warn" style={`width:${pct(warn)}%`}></span>
+              <span class="block bg-danger" style={`width:${pct(danger)}%`}></span>
+            </span>
+            <span class="mt-2 flex flex-wrap gap-x-4 font-mono text-[0.6875rem] text-muted-foreground">
+              <span class="text-foreground">{t('categories.activePct', { n: Math.round(pct(ok)) })}</span>
+              <span>{t('categories.stale', { n: warn })}</span>
+              {danger > 0 && <span>{t('categories.archived', { n: danger })}</span>}
+            </span>
+          </dd>
+        </div>
+      </dl>
+    </header>
+
+    <PluginExplorer client:load docs={docs} categories={[]} lang={lang} />
+
+    <nav class="mt-16 border-t border-border pt-8">
+      <p class="meta mb-4 text-muted-foreground">{t('categories.otherAreas')}</p>
+      <ul class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+        {
+          siblings.map((c) => (
+            <li>
+              <a
+                href={localePath(lang, `/categories/${c.id}`)}
+                class="group flex items-center gap-3 rounded-lg border border-border px-3.5 py-2.5 transition-colors hover:border-foreground/25 hover:bg-secondary/50"
+              >
+                <CategoryIcon name={c.icon} class="size-4 shrink-0 text-muted-foreground" />
+                <span class="min-w-0 flex-1 truncate text-[0.8125rem] group-hover:underline">{categoryLabel(c.id, lang)}</span>
+                <span class="tabular shrink-0 font-mono text-xs text-muted-foreground">{c.count}</span>
+              </a>
+            </li>
+          ))
+        }
+      </ul>
+    </nav>
+  </div>
+</Layout>

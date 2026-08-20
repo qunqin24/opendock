@@ -1,7 +1,8 @@
 ---
 import type { Plugin } from '../lib/plugins';
-import { categoryLabel, lampClass, lampTitle } from '../lib/plugins';
+import { categoryLabel, lampClass } from '../lib/plugins';
 import { avatarUrl, compactNumber, timeAgo } from '../lib/utils';
+import { localeFromPath, localePath, useTranslations } from '../lib/i18n';
 
 interface Board {
   id: string;
@@ -16,36 +17,38 @@ interface Props {
   boards: Board[];
 }
 const { boards } = Astro.props;
+const lang = localeFromPath(Astro.url.pathname);
+const t = useTranslations(lang);
 
 function metricOf(p: Plugin, metric: Board['metric']) {
   switch (metric) {
     case 'trending':
       return {
-        label: '7日新增',
+        label: t('board.metric.trending'),
         value: p.starsDelta7d > 0 ? `+${compactNumber(p.starsDelta7d)}` : '—',
         accent: p.starsDelta7d > 0,
       };
     case 'downloads':
       return {
-        label: '月装机',
+        label: t('board.metric.downloads'),
         value: compactNumber(p.downloadsMonth),
         accent: false,
       };
     case 'recent':
       return {
-        label: '收录时间',
-        value: timeAgo(p.createdAt),
+        label: t('board.metric.recent'),
+        value: timeAgo(p.createdAt, lang),
         accent: false,
       };
     case 'top':
       return {
-        label: '综合评分',
+        label: t('board.metric.top'),
         value: p.score.toFixed(0),
         accent: true,
       };
     default:
       return {
-        label: '星标',
+        label: t('board.metric.stars'),
         value: compactNumber(p.stars),
         accent: false,
       };
@@ -84,7 +87,7 @@ function metricOf(p: Plugin, metric: Board['metric']) {
       <div data-panel={b.id} role="tabpanel" class:list={[i !== 0 && 'hidden', 'p-4 sm:p-6']}>
         <div class="mb-4 flex items-center justify-between">
           <p class="text-xs text-muted-foreground">{b.hint}</p>
-          <span class="font-mono text-[0.6875rem] text-muted-foreground">TOP {b.plugins.length}</span>
+          <span class="font-mono text-[0.6875rem] text-muted-foreground">{t('board.top3', { n: b.plugins.length })}</span>
         </div>
 
         <div class="space-y-2">
@@ -96,7 +99,7 @@ function metricOf(p: Plugin, metric: Board['metric']) {
 
             return (
               <a
-                href={`/plugins/${p.slug}`}
+                href={localePath(lang, `/plugins/${p.slug}`)}
                 class="group flex flex-col gap-2 rounded-xl border border-transparent p-3 transition-all hover:border-border/80 hover:bg-secondary/40 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
               >
                 {/* Left: Rank index, Avatar with health lamp, & Identity */}
@@ -140,7 +143,7 @@ function metricOf(p: Plugin, metric: Board['metric']) {
                         'lamp absolute -top-0.5 -right-0.5 z-10 ring-2 ring-card',
                         lampClass[p.healthLevel],
                       ]}
-                      title={lampTitle[p.healthLevel]}
+                      title={t(`health.tip.${p.healthLevel}` as const)}
                     />
                   </div>
 
@@ -150,7 +153,7 @@ function metricOf(p: Plugin, metric: Board['metric']) {
                         {p.title}
                       </span>
                       <span class="hidden rounded border border-border/60 bg-muted/60 px-1.5 py-px text-[0.625rem] text-muted-foreground md:inline-block">
-                        {categoryLabel(p.category)}
+                        {categoryLabel(p.category, lang)}
                       </span>
                     </div>
                     <p class="truncate text-xs text-muted-foreground">
@@ -162,13 +165,13 @@ function metricOf(p: Plugin, metric: Board['metric']) {
                 {/* Right: Metrics */}
                 <div class="flex shrink-0 items-center justify-between gap-4 self-end pl-17 font-mono text-xs text-muted-foreground sm:self-center sm:pl-0">
                   <div class="hidden items-center gap-3 lg:flex">
-                    <span class="tabular inline-flex items-center gap-1" title="Stars">
+                    <span class="tabular inline-flex items-center gap-1" title={t('common.stars')}>
                       <svg viewBox="0 0 16 16" fill="currentColor" class="size-3.5 text-amber-500" aria-hidden="true">
                         <path d="M8 .25a.75.75 0 0 1 .673.418l1.882 3.815 4.21.612a.75.75 0 0 1 .416 1.279l-3.046 2.97.719 4.192a.75.75 0 0 1-1.088.791L8 12.347l-3.766 1.98a.75.75 0 0 1-1.088-.79l.72-4.194L.818 6.374a.75.75 0 0 1 .416-1.28l4.21-.611L7.327.668A.75.75 0 0 1 8 .25Z" />
                       </svg>
                       <span class="font-medium text-foreground">{compactNumber(p.stars)}</span>
                     </span>
-                    <span class="tabular inline-flex items-center gap-1" title="月装机">
+                    <span class="tabular inline-flex items-center gap-1" title={t('common.downloads')}>
                       <svg viewBox="0 0 16 16" fill="currentColor" class="size-3.5 text-muted-foreground/70" aria-hidden="true">
                         <path d="M7.25 1.75a.75.75 0 0 1 1.5 0v6.44l2.22-2.22a.75.75 0 1 1 1.06 1.06l-3.5 3.5a.75.75 0 0 1-1.06 0l-3.5-3.5a.75.75 0 0 1 1.06-1.06l2.22 2.22V1.75ZM2.5 11a.75.75 0 0 1 .75.75v1.5h9.5v-1.5a.75.75 0 0 1 1.5 0v2.25a.75.75 0 0 1-.75.75H2.5a.75.75 0 0 1-.75-.75v-2.25A.75.75 0 0 1 2.5 11Z" />
                       </svg>

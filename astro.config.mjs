@@ -11,7 +11,21 @@ export default defineConfig({
   // the sitemap and the RSS feed are all derived from it.
   site: 'https://opendock.dev',
 
-  integrations: [react(), sitemap()],
+  // English owns the bare paths; Chinese lives under /zh/. The plugin data
+  // itself is English (npm descriptions, GitHub READMEs), so the English
+  // build is the one that matches its own content.
+  i18n: {
+    locales: ['en', 'zh'],
+    defaultLocale: 'en',
+    routing: { prefixDefaultLocale: false },
+  },
+
+  integrations: [
+    react(),
+    sitemap({
+      i18n: { defaultLocale: 'en', locales: { en: 'en', zh: 'zh-CN' } },
+    }),
+  ],
 
   build: {
     // Plugin pages are the SEO surface; clean URLs keep them link-stable.

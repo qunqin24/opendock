@@ -1,0 +1,150 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import { plugins, categories, generatedAt } from '../../lib/plugins';
+import { formatDate } from '../../lib/utils';
+---
+
+<Layout
+  title="排名算法与数据说明"
+  description="OpenDock 的数据来源、综合评分算法、分类规则与健康度判定标准，全部公开。"
+>
+  <div class="mx-auto max-w-3xl px-4 py-10 sm:px-6 sm:py-14">
+    <header class="mb-10">
+      <h1 class="text-3xl font-semibold tracking-tight sm:text-4xl">数据与排名说明</h1>
+      <p class="mt-3 text-sm leading-6 text-muted-foreground">
+        排名会影响开发者的选择，所以算法必须公开可查。这一页说明数据从哪来、分数怎么算、哪些插件会被排除。
+      </p>
+    </header>
+
+    <div class="prose-readme">
+      <h2>数据从哪来</h2>
+      <p>三个来源，全部自动抓取，没有人工录入环节：</p>
+      <ul>
+        <li>
+          <strong>npm registry</strong> —— 抓取所有带 <code>opencode-plugin</code> 关键词的包，取得包名、版本、描述、协议、废弃状态与仓库地址。
+        </li>
+        <li>
+          <strong>GitHub GraphQL API</strong> —— 按仓库批量拉取星标数、Fork 数、开放 Issue、最后提交时间、归档状态、topic 与 README。
+        </li>
+        <li>
+          <strong>npm downloads API</strong> —— 取近 7 天与近 30 天的下载量。
+        </li>
+      </ul>
+      <p>
+        每天重新抓取一次并重建整站。当前数据快照生成于 <strong>{formatDate(generatedAt)}</strong>，
+        共收录 <strong>{plugins.length}</strong> 个插件、<strong>{categories.length}</strong> 个分类。
+      </p>
+
+      <h2>综合评分怎么算</h2>
+      <p>
+        只按星标排名有个根本问题：星标是<strong>累积量</strong>，永远偏向发布得早的项目。
+        一个上周发布、每天涨 50 星的插件，在总榜上可能连前 100 都进不去。所以综合评分混合了四个信号：
+      </p>
+      <pre><code>score = 0.35 × 计入星标（对数归一）
+      + 0.35 × 月下载量（对数归一）
+      + 0.20 × 活跃度（最后提交时间衰减）
+      + 0.10 × 增长速度（近 30 天新增星标，按体量归一）
+
+已归档的仓库最终得分 × 0.35
+
+计入星标 = min(仓库星标, max(月下载量 × 8, 1000))</code></pre>
+      <p>几个设计上的取舍：</p>
+      <ul>
+        <li>
+          <strong>用对数而不是线性。</strong> 10 万星和 1 万星的实际差距，远没有数字差距那么大；线性归一会让头部项目碾压一切。
+        </li>
+        <li>
+          <strong>下载量和星标同权重。</strong> 星标是「我觉得这个不错」，下载量是「我真的在用」。后者更难刷，但会被间接依赖污染，所以两者互相制衡。
+        </li>
+        <li>
+          <strong>增长按体量归一。</strong> 一个 100 星的项目涨 50 星，比一个 5000 星的项目涨 50 星更值得注意。
+        </li>
+        <li>
+          <strong>归档不等于删除。</strong> 归档项目仍然可能是当下最好的选择，只是没人维护了，所以是降权而非剔除。
+        </li>
+      </ul>
+
+      <h2>为什么星标要打折</h2>
+      <p>
+        <strong>星标属于仓库，下载量属于包。</strong>
+        一个插件如果发布自某个大型项目的 monorepo，它会继承整个仓库的星标数 ——
+        <code>@mem0/opencode-plugin</code> 显示 6.3 万星，不是因为这个插件多受欢迎，
+        而是因为 <code>mem0ai/mem0</code> 这个仓库有 6.3 万星。
+      </p>
+      <p>
+        不修正的话，榜首会被一批月下载量只有几十次的包占据 —— 我们第一次跑全量数据时，
+        排第一的包顶着 27 万星、月下载 49 次。
+      </p>
+      <p>
+        所以星标只按该包自身的装机量所能支撑的程度计入。真正有人用的插件轻松越过这条上限，
+        只是恰好躺在一个著名 README 旁边的包则不行。下限 1000 是为了不让刚发布、还没有下载量的新插件直接归零。
+      </p>
+      <p>
+        目前 <strong>18</strong> 个包触发了这条修正。它们的星标数会照实显示，但标一个
+        <code>*</code>，鼠标悬停能看到实际计入的数值。
+      </p>
+
+      <h2>其余已知偏差</h2>
+      <ul>
+        <li>
+          <strong>「本周飙升」需要历史数据。</strong> 增长指标靠对比每日快照计算，站点刚上线时这一栏几乎是空的，运行几天后才有意义。
+        </li>
+        <li>
+          <strong>只收录发布到 npm 的插件。</strong> 纯本地插件（放在 <code>.opencode/plugins/</code> 里的脚本）无法被自动发现。
+        </li>
+        <li>
+          <strong>下载量会被间接依赖污染。</strong> 如果一个插件被另一个流行的包依赖，它的下载量会包含并非直接使用者的部分。
+        </li>
+      </ul>
+
+      <h2>分类怎么定的</h2>
+      <p>
+        按包名、描述、npm 关键词与 GitHub topic 做规则匹配，命中的第一个分类生效，所以分类列表是有优先级顺序的。
+        自动分类必然有误判 —— 分错了可以通过人工覆盖层修正，见<a href="/zh/submit">提交页面</a>。
+      </p>
+
+      <h2>健康度徽章的判定</h2>
+      <table>
+        <thead>
+          <tr><th>徽章</th><th>触发条件</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>仓库已归档</td><td>GitHub 仓库被标记为 archived</td></tr>
+          <tr><td>npm 已标记废弃</td><td>最新版本带 deprecated 字段</td></tr>
+          <tr><td>超过一年未更新</td><td>最后提交距今 &gt; 365 天</td></tr>
+          <tr><td>半年未更新</td><td>最后提交距今 &gt; 180 天</td></tr>
+          <tr><td>未提供源码仓库</td><td>npm 元数据里没有可解析的仓库地址</td></tr>
+          <tr><td>缺少文档</td><td>README 不存在或短于 200 字符</td></tr>
+          <tr><td>未声明开源协议</td><td>npm 与 GitHub 均无 license 信息</td></tr>
+          <tr><td>维护活跃</td><td>以上均未触发</td></tr>
+        </tbody>
+      </table>
+
+      <h2>哪些包会被排除</h2>
+      <p>
+        一个包必须至少满足以下一条才会被收录：有描述、有 README、有星标、月下载量超过 50、或被人工标为精选。
+        这条规则会滤掉相当数量的空包和测试发布。此外还有一份人工黑名单，用于处理明显的占位包与滥发。
+      </p>
+
+      <h2>关于本站</h2>
+      <p>
+        OpenDock 与 opencode 官方没有隶属关系，是一个独立的社区目录。
+        所有插件数据都来自公开 API，站点本身是纯静态的。
+      </p>
+
+      <h2>访问统计与隐私</h2>
+      <p>
+        本站使用<strong>自建的 Umami</strong>（<code>umami.qunqin.org</code>）统计访问量，并按 15% 的比例录制匿名会话回放，
+        用来了解大家实际在找哪些插件、哪些页面没做好。没有广告、没有第三方追踪脚本，数据不会出售或共享给任何人。
+      </p>
+      <p>
+        这些脚本<strong>在你点击「允许」之前不会加载</strong>。首次访问时右下角会出现一个选择框；
+        选择结果存在浏览器本地，清除站点数据即可重新选择。选择「拒绝」后不会加载任何统计脚本，也不会有使用数据离开你的浏览器。
+      </p>
+      <p>
+        有一点「拒绝」拦不住：插件作者头像由 GitHub 自己的 CDN（<code>avatars.githubusercontent.com</code>）提供，
+        只要页面上有插件列表，浏览器就会去请求这些图片。这是显示头像本身带来的，GitHub 看到的请求与你直接访问对应仓库时没有区别。
+      </p>
+    </div>
+  </div>
+</Layout>

@@ -1,0 +1,237 @@
+---
+import Layout from '../layouts/Layout.astro';
+import CategoryIcon from '../components/CategoryIcon.astro';
+import { categories, byCategory, census, lampClass, categoryLabel, categoryDescription } from '../lib/plugins';
+import { avatarUrl, formatNumber } from '../lib/utils';
+import { localeFromPath, localePath, useTranslations } from '../lib/i18n';
+
+const lang = localeFromPath(Astro.url.pathname);
+const t = useTranslations(lang);
+
+// Sorted by size so the count bars descend down the page, and enriched with
+// a health census — the split between maintained and stale differs sharply
+// between categories (97% vs 51%), and nothing else on the site shows it.
+const cats = categories
+  .map((c) => {
+    const list = byCategory(c.id);
+    const ok = list.filter((p) => p.healthLevel === 'ok').length;
+    const warn = list.filter((p) => p.healthLevel === 'warn').length;
+    const danger = list.length - ok - warn;
+    return { ...c, top: list.slice(0, 3), ok, warn, danger };
+  })
+  .sort((a, b) => b.count - a.count);
+
+const maxCount = Math.max(...cats.map((c) => c.count));
+const healthiest = [...cats].sort((a, b) => b.ok / b.count - a.ok / a.count)[0];
+const pct = (n: number, total: number) => (total > 0 ? (n / total) * 100 : 0);
+---
+
+<Layout title={t('categories.title')} description={t('categories.metaDescription')}>
+  <div class="mx-auto max-w-6xl px-4 py-10 sm:px-6 sm:py-14">
+    <!-- Header Section -->
+    <header class="mx-auto max-w-3xl text-center">
+      <div class="inline-flex items-center gap-2 rounded-full border border-border bg-card/80 px-3.5 py-1 text-xs text-muted-foreground shadow-xs">
+        <span class="size-1.5 rounded-full bg-dock"></span>
+        <span class="font-medium text-foreground">{t('nav.categories')}</span>
+        <span class="text-border">|</span>
+        <span>{t('categories.eyebrow', { n: categories.length })}</span>
+      </div>
+
+      <h1 class="mt-5 text-balance text-3xl font-extrabold tracking-tight text-foreground sm:text-4xl lg:text-5xl">
+        {t('categories.heading')}
+      </h1>
+
+      <p class="mt-3 text-balance text-sm leading-relaxed text-muted-foreground sm:text-base">
+        {t('categories.intro')}
+      </p>
+
+      <!-- Bento Metric Strip -->
+      <div class="mt-8 grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <div class="rounded-2xl border border-border/80 bg-card p-4 text-center">
+          <p class="text-xs font-medium text-muted-foreground">{t('categories.totalIndexed')}</p>
+          <p class="tabular mt-1 font-mono text-2xl font-bold text-foreground">
+            {formatNumber(census.total)}
+          </p>
+        </div>
+
+        <div class="rounded-2xl border border-border/80 bg-card p-4 text-center">
+          <p class="text-xs font-medium text-muted-foreground">{t('categories.biggest')}</p>
+          <p class="mt-1 font-semibold text-foreground">
+            {categoryLabel(cats[0].id, lang)}{' '}
+            <span class="tabular font-mono text-xs text-muted-foreground">
+              ({t('categories.countUnit', { n: cats[0].count })})
+            </span>
+          </p>
+        </div>
+
+        <div class="rounded-2xl border border-border/80 bg-card p-4 text-center">
+          <p class="text-xs font-medium text-muted-foreground">{t('categories.healthiest')}</p>
+          <p class="mt-1 font-semibold text-ok">
+            {categoryLabel(healthiest.id, lang)}{' '}
+            <span class="tabular font-mono text-xs text-ok/80">
+              ({t('categories.activePct', { n: Math.round(pct(healthiest.ok, healthiest.count)) })})
+            </span>
+          </p>
+        </div>
+      </div>
+    </header>
+
+    <!-- Categories Bento Cards Grid -->
+    <div class="mt-12 grid gap-5 lg:grid-cols-2">
+      {
+        cats.map((c) => (
+          <div id={c.id} class="scroll-mt-24">
+            <div class="group flex h-full flex-col justify-between rounded-3xl border border-border/80 bg-card p-6 transition-all duration-200 hover:border-foreground/30 hover:shadow-xs">
+              <div>
+                {/* Card Top: Icon + Titles + Count Badge */}
+                <div class="flex items-start justify-between gap-4">
+                  <div class="flex min-w-0 items-center gap-3.5">
+                    <div class="grid size-11 place-items-center rounded-2xl bg-secondary text-foreground/80 transition-colors group-hover:bg-foreground group-hover:text-background">
+                      <CategoryIcon name={c.icon} class="size-5" />
+                    </div>
+                    <div class="min-w-0">
+                      <h2 class="truncate text-lg font-bold tracking-tight text-foreground">
+                        <a href={localePath(lang, `/categories/${c.id}`)} class="hover:underline">
+                          {categoryLabel(c.id, lang)}
+                        </a>
+                      </h2>
+                      <p class="font-mono text-xs text-muted-foreground">{c.labelEn}</p>
+                    </div>
+                  </div>
+
+                  <span class="tabular rounded-xl bg-secondary px-3 py-1 font-mono text-sm font-bold text-foreground">
+                    {t('categories.countUnit', { n: c.count })}
+                  </span>
+                </div>
+
+                {/* Relative Volume Bar */}
+                <div class="mt-4">
+                  <div class="h-1 w-full overflow-hidden rounded-full bg-secondary">
+                    <div
+                      class="h-full rounded-full bg-foreground/25 transition-all duration-500"
+                      style={`width:${pct(c.count, maxCount)}%`}
+                    />
+                  </div>
+                </div>
+
+                {/* Description */}
+                <p class="mt-3.5 line-clamp-2 text-xs leading-relaxed text-muted-foreground">
+                  {categoryDescription(c.id, lang)}
+                </p>
+
+                {/* Health Distribution Split Bar */}
+                <div class="mt-4 rounded-xl border border-border/60 bg-muted/30 p-3">
+                  <div class="flex items-center justify-between text-[0.6875rem] font-mono text-muted-foreground mb-2">
+                    <span class="font-semibold text-foreground/80">{t('categories.healthSplit')}</span>
+                    <span class="tabular font-medium text-ok">
+                      {t('categories.activePct', { n: Math.round(pct(c.ok, c.count)) })}
+                    </span>
+                  </div>
+
+                  <div
+                    class="flex h-1.5 w-full overflow-hidden rounded-full bg-secondary"
+                    role="img"
+                    aria-label={t('categories.healthAria', { ok: c.ok, warn: c.warn, danger: c.danger })}
+                  >
+                    <span class="block bg-ok" style={`width:${pct(c.ok, c.count)}%`} />
+                    <span class="block bg-warn" style={`width:${pct(c.warn, c.count)}%`} />
+                    <span class="block bg-danger" style={`width:${pct(c.danger, c.count)}%`} />
+                  </div>
+
+                  <div class="mt-2 flex items-center justify-between text-[0.6875rem] font-mono text-muted-foreground">
+                    <span class="inline-flex items-center gap-1">
+                      <span class="size-1.5 rounded-full bg-ok" />
+                      {t('home.pulse.ok')} <strong class="tabular text-foreground">{c.ok}</strong>
+                    </span>
+                    <span class="inline-flex items-center gap-1">
+                      <span class="size-1.5 rounded-full bg-warn" />
+                      {t('home.pulse.warn')} <strong class="tabular text-foreground">{c.warn}</strong>
+                    </span>
+                    {c.danger > 0 && (
+                      <span class="inline-flex items-center gap-1">
+                        <span class="size-1.5 rounded-full bg-danger" />
+                        {t('home.pulse.danger')} <strong class="tabular text-foreground">{c.danger}</strong>
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Top 3 Benchmark Plugins Showcase */}
+                <div class="mt-5">
+                  <p class="text-[0.6875rem] font-bold tracking-wider text-muted-foreground uppercase mb-2">
+                    {t('categories.benchmarks')}
+                  </p>
+
+                  <div class="space-y-1.5">
+                    {c.top.map((p, i) => (
+                      <a
+                        href={localePath(lang, `/plugins/${p.slug}`)}
+                        class="group/item flex items-center justify-between gap-3 rounded-xl border border-transparent p-2 transition-colors hover:border-border hover:bg-secondary/40"
+                      >
+                        <div class="flex items-center gap-2.5 min-w-0">
+                          <span class="tabular font-mono text-xs font-bold text-muted-foreground/70">
+                            0{i + 1}
+                          </span>
+
+                          {/* Avatar with status indicator */}
+                          <div class="relative size-7 shrink-0">
+                            <div class="size-full overflow-hidden rounded-md border border-border/80 bg-secondary/50">
+                              {p.ownerAvatar ? (
+                                <img
+                                  src={avatarUrl(p.ownerAvatar, 28)}
+                                  alt={p.owner ?? p.name}
+                                  width="28"
+                                  height="28"
+                                  class="size-full object-cover"
+                                  loading="lazy"
+                                  decoding="async"
+                                />
+                              ) : (
+                                <div class="flex size-full items-center justify-center font-mono text-[0.6875rem] font-bold text-foreground/70">
+                                  {(p.owner ?? p.name).charAt(0).toUpperCase()}
+                                </div>
+                              )}
+                            </div>
+                            <span
+                              class:list={[
+                                'lamp absolute -top-0.5 -right-0.5 z-10 ring-2 ring-card size-1.5',
+                                lampClass[p.healthLevel],
+                              ]}
+                              title={t(`health.tip.${p.healthLevel}` as const)}
+                            />
+                          </div>
+
+                          <span class="truncate text-xs font-medium text-foreground group-hover/item:underline">
+                            {p.title}
+                          </span>
+                        </div>
+
+                        <span class="tabular font-mono text-xs font-semibold text-muted-foreground">
+                          {t('categories.scoreUnit', { n: p.score.toFixed(0) })}
+                        </span>
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Bottom Action Footer */}
+              <div class="mt-6 border-t border-border/60 pt-4 flex items-center justify-between text-xs">
+                <span class="text-muted-foreground font-mono text-[0.6875rem]">
+                  {t('categories.indexedCount', { n: c.count })}
+                </span>
+                <a
+                  href={localePath(lang, `/categories/${c.id}`)}
+                  class="font-semibold text-foreground transition-transform group-hover:translate-x-0.5 hover:underline inline-flex items-center gap-1"
+                >
+                  <span>{t('categories.enter')}</span>
+                  <span>→</span>
+                </a>
+              </div>
+            </div>
+          </div>
+        ))
+      }
+    </div>
+  </div>
+</Layout>

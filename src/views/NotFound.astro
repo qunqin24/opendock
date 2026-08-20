@@ -1,0 +1,29 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { localeFromPath, localePath, useTranslations } from '../lib/i18n';
+
+const lang = localeFromPath(Astro.url.pathname);
+const t = useTranslations(lang);
+---
+
+<Layout title={t('notfound.title')} noindex>
+  <div class="mx-auto flex min-h-[60vh] max-w-md flex-col items-center justify-center px-4 text-center">
+    <p class="tabular text-5xl font-semibold tracking-tight">404</p>
+    <h1 class="mt-4 text-xl font-semibold tracking-tight">{t('notfound.heading')}</h1>
+    <p class="mt-2 text-sm leading-6 text-muted-foreground">{t('notfound.body')}</p>
+    <div class="mt-8 flex gap-2">
+      <a
+        href={localePath(lang, '/plugins')}
+        class="rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90"
+      >
+        {t('notfound.browse')}
+      </a>
+      <a
+        href={localePath(lang, '/')}
+        class="rounded-lg border border-border bg-card px-4 py-2.5 text-sm font-medium transition-colors hover:bg-secondary"
+      >
+        {t('notfound.home')}
+      </a>
+    </div>
+  </div>
+</Layout>

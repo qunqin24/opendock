@@ -1,0 +1,26 @@
+---
+import { HTML_LANG, LOCALES, LOCALE_NAME, localeFromPath, localePath, stripLocale, useTranslations } from '../lib/i18n';
+
+const lang = localeFromPath(Astro.url.pathname);
+const t = useTranslations(lang);
+// Same page, other locale — never a blanket link to the home page, which is
+// the usual way language switchers lose your place.
+const barePath = stripLocale(Astro.url.pathname);
+const other = LOCALES.filter((l) => l !== lang);
+---
+
+<div class="flex items-center rounded-md border border-border/80 p-0.5" role="group" aria-label={t('a11y.switchLanguage')}>
+  <span class="rounded px-1.5 py-0.5 text-xs font-semibold text-foreground">{LOCALE_NAME[lang]}</span>
+  {
+    other.map((l) => (
+      <a
+        href={localePath(l, barePath)}
+        hreflang={HTML_LANG[l]}
+        lang={HTML_LANG[l]}
+        class="rounded px-1.5 py-0.5 text-xs text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+      >
+        {LOCALE_NAME[l]}
+      </a>
+    ))
+  }
+</div>

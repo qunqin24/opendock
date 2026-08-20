@@ -1,13 +1,16 @@
 ---
 import type { Plugin } from '../lib/plugins';
-import { categoryLabel, lampClass, lampTitle } from '../lib/plugins';
+import { categoryLabel, lampClass } from '../lib/plugins';
 import { avatarUrl, compactNumber } from '../lib/utils';
+import { localeFromPath, localePath, useTranslations } from '../lib/i18n';
 
 interface Props {
   plugins: Plugin[];
 }
 
 const { plugins } = Astro.props;
+const lang = localeFromPath(Astro.url.pathname);
+const t = useTranslations(lang);
 ---
 
 <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -16,7 +19,7 @@ const { plugins } = Astro.props;
       const isTop = idx === 0;
       return (
         <a
-          href={`/plugins/${p.slug}`}
+          href={localePath(lang, `/plugins/${p.slug}`)}
           class:list={[
             'group relative flex flex-col justify-between overflow-hidden rounded-2xl border border-border/80 bg-card p-5.5 transition-all duration-300',
             'hover:-translate-y-1 hover:border-foreground/30 hover:shadow-[0_8px_30px_rgb(0,0,0,0.06)]',
@@ -51,7 +54,7 @@ const { plugins } = Astro.props;
 
                 {p.featured && (
                   <span class="rounded-md bg-foreground px-1.5 py-0.5 text-[0.625rem] font-semibold text-background">
-                    精选
+                    {t('common.featured')}
                   </span>
                 )}
               </div>
@@ -59,11 +62,11 @@ const { plugins } = Astro.props;
               <div class="flex items-center gap-1.5">
                 <span
                   class:list={['lamp', lampClass[p.healthLevel]]}
-                  title={lampTitle[p.healthLevel]}
+                  title={t(`health.tip.${p.healthLevel}` as const)}
                 />
                 <span
                   class="tabular rounded-md border border-border/60 bg-muted/60 px-1.5 py-0.5 font-mono text-[0.6875rem] font-semibold text-foreground"
-                  title="综合评分"
+                  title={t('common.score')}
                 >
                   {p.score.toFixed(0)}
                 </span>
@@ -100,7 +103,7 @@ const { plugins } = Astro.props;
               </p>
 
               <p class="mt-3 line-clamp-2 text-sm leading-relaxed text-muted-foreground">
-                {p.description ?? '暂无描述信息'}
+                {p.description ?? t('common.noDescription')}
               </p>
             </div>
 
@@ -119,7 +122,7 @@ const { plugins } = Astro.props;
           {/* Bottom stats row */}
           <div class="mt-5 flex items-center justify-between border-t border-border/60 pt-3.5 text-xs text-muted-foreground">
             <div class="flex items-center gap-3.5 font-mono">
-              <span class="inline-flex items-center gap-1" title="GitHub Stars">
+              <span class="inline-flex items-center gap-1" title={t('common.stars')}>
                 <svg viewBox="0 0 16 16" fill="currentColor" class="size-3.5 text-amber-500" aria-hidden="true">
                   <path d="M8 .25a.75.75 0 0 1 .673.418l1.882 3.815 4.21.612a.75.75 0 0 1 .416 1.279l-3.046 2.97.719 4.192a.75.75 0 0 1-1.088.791L8 12.347l-3.766 1.98a.75.75 0 0 1-1.088-.79l.72-4.194L.818 6.374a.75.75 0 0 1 .416-1.28l4.21-.611L7.327.668A.75.75 0 0 1 8 .25Z" />
                 </svg>
@@ -127,12 +130,12 @@ const { plugins } = Astro.props;
               </span>
 
               {p.starsDelta7d > 0 && (
-                <span class="tabular font-medium text-ok" title="近 7 天新增星标">
+                <span class="tabular font-medium text-ok" title={t('explorer.starsDelta')}>
                   +{compactNumber(p.starsDelta7d)}
                 </span>
               )}
 
-              <span class="inline-flex items-center gap-1" title="近 30 天下载量">
+              <span class="inline-flex items-center gap-1" title={t('explorer.downloadsTitle')}>
                 <svg viewBox="0 0 16 16" fill="currentColor" class="size-3.5 text-muted-foreground/70" aria-hidden="true">
                   <path d="M7.25 1.75a.75.75 0 0 1 1.5 0v6.44l2.22-2.22a.75.75 0 1 1 1.06 1.06l-3.5 3.5a.75.75 0 0 1-1.06 0l-3.5-3.5a.75.75 0 0 1 1.06-1.06l2.22 2.22V1.75ZM2.5 11a.75.75 0 0 1 .75.75v1.5h9.5v-1.5a.75.75 0 0 1 1.5 0v2.25a.75.75 0 0 1-.75.75H2.5a.75.75 0 0 1-.75-.75v-2.25A.75.75 0 0 1 2.5 11Z" />
                 </svg>
@@ -141,7 +144,7 @@ const { plugins } = Astro.props;
             </div>
 
             <span class="text-[0.6875rem] font-medium text-foreground/80 group-hover:text-dock group-hover:translate-x-0.5 transition-all">
-              详情 →
+              {t('home.taxonomy.explore')} →
             </span>
           </div>
         </a>

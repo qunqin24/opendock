@@ -2,27 +2,17 @@ import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } f
 import Fuse from 'fuse.js';
 import type { Category, SearchDoc } from '../lib/plugins';
 import { avatarUrl, cn, compactNumber, timeAgo } from '../lib/utils';
+import { DEFAULT_LOCALE, localePath, useTranslations, type Locale } from '../lib/i18n';
 
 const PAGE_SIZE = 60;
 
-const SORTS = [
-  { id: 'score', label: '综合评分', hint: '星标 + 下载 + 活跃度 + 增长' },
-  { id: 'stars', label: 'GitHub 星标', hint: 'GitHub 累计星标' },
-  { id: 'trending', label: '本周飙升', hint: '近 7 天新增星标' },
-  { id: 'downloads', label: '月装机量', hint: '近 30 天 npm 下载' },
-  { id: 'recent', label: '最新发布', hint: '按首次发布时间' },
-  { id: 'updated', label: '最近更新', hint: '按最后提交时间' },
-] as const;
+const SORTS = ['score', 'stars', 'trending', 'downloads', 'recent', 'updated'] as const;
 
-type SortId = (typeof SORTS)[number]['id'];
+type SortId = (typeof SORTS)[number];
 
-const HEALTH_FILTERS = [
-  { id: 'all', label: '全部', hint: '不过滤维护状态' },
-  { id: 'healthy', label: '维护活跃', hint: '排除已归档、已废弃与长期停更' },
-  { id: 'has-repo', label: '有源码仓库', hint: '排除找不到公开仓库的包' },
-] as const;
+const HEALTH_FILTERS = ['all', 'healthy', 'has-repo'] as const;
 
-type HealthId = (typeof HEALTH_FILTERS)[number]['id'];
+type HealthId = (typeof HEALTH_FILTERS)[number];
 type ViewId = 'list' | 'grid';
 
 interface Props {
@@ -31,6 +21,7 @@ interface Props {
   /** Preselects a category, e.g. when embedded on a category page. */
   initialCategory?: string;
   initialSort?: SortId;
+  lang?: Locale;
 }
 
 const time = (iso: string | null) => (iso ? new Date(iso).getTime() : 0);
@@ -48,7 +39,14 @@ function param(key: string): string | null {
   return new URLSearchParams(window.location.search).get(key);
 }
 
-export default function PluginExplorer({ docs, categories, initialCategory = 'all', initialSort = 'score' }: Props) {
+export default function PluginExplorer({
+  docs,
+  categories,
+  initialCategory = 'all',
+  initialSort = 'score',
+  lang = DEFAULT_LOCALE,
+}: Props) {
+  const t = useTranslations(lang);
   // These start at their defaults so the first client render matches the
   // server's. Reading the URL or localStorage in a lazy initialiser instead
   // would make `/plugins?q=x` hydrate with different text than was rendered,
@@ -170,9 +168,9 @@ export default function PluginExplorer({ docs, categories, initialCategory = 'al
   const filterPanel = (
     <>
       {hasCategories && (
-        <FilterGroup title="分类领域">
+        <FilterGroup title={t('explorer.groupCategory')}>
           <FilterItem active={category === 'all'} count={docs.length} onClick={() => setCategory('all')}>
-            全部分类
+            {t('explorer.allCategories')}
           </FilterItem>
           {categories.map((c) => (
             <FilterItem
@@ -188,10 +186,15 @@ export default function PluginExplorer({ docs, categories, initialCategory = 'al
         </FilterGroup>
       )}
 
-      <FilterGroup title="维护状态">
-        {HEALTH_FILTERS.map((h) => (
-          <FilterItem key={h.id} active={health === h.id} title={h.hint} onClick={() => setHealth(h.id)}>
-            {h.label}
+      <FilterGroup title={t('explorer.groupHealth')}>
+        {HEALTH_FILTERS.map((id) => (
+          <FilterItem
+            key={id}
+            active={health === id}
+            title={t(`explorer.health.${id}.hint` as const)}
+            onClick={() => setHealth(id)}
+          >
+            {t(`explorer.health.${id}` as const)}
           </FilterItem>
         ))}
       </FilterGroup>
@@ -233,8 +236,8 @@ export default function PluginExplorer({ docs, categories, initialCategory = 'al
                 type="search"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="搜索插件名、功能、作者、关键词 (按 / 聚焦)..."
-                aria-label="搜索插件"
+                placeholder={t('explorer.searchPlaceholder')}
+                aria-label={t('explorer.searchAria')}
                 className={cn(
                   'h-10 w-full rounded-xl border border-input bg-card pr-14 pl-10 text-sm text-foreground transition-all',
                   'placeholder:text-muted-foreground/70 focus:border-foreground/80 focus:ring-4 focus:ring-foreground/5 focus:outline-none',
@@ -250,7 +253,7 @@ export default function PluginExplorer({ docs, categories, initialCategory = 'al
                       inputRef.current?.focus();
                     }}
                     className="grid size-5 place-items-center rounded-full bg-muted text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-                    title="清空搜索"
+                    title={t('explorer.clearSearch')}
                   >
                     <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" className="size-2.5">
                       <path d="M4 4l8 8M12 4l-8 8" strokeLinecap="round" />
@@ -277,7 +280,7 @@ export default function PluginExplorer({ docs, categories, initialCategory = 'al
                   : 'border-input bg-card hover:bg-secondary',
               )}
             >
-              筛选
+              {t('explorer.filters')}
               {activeFilters - (searching ? 1 : 0) > 0 && (
                 <span className="tabular ml-1.5 rounded-full bg-dock px-1.5 py-0.5 text-[0.625rem] font-bold text-dock-foreground">
                   {activeFilters - (searching ? 1 : 0)}
@@ -290,18 +293,18 @@ export default function PluginExplorer({ docs, categories, initialCategory = 'al
               <select
                 value={sort}
                 onChange={(e) => setSort(e.target.value as SortId)}
-                aria-label="排序方式"
+                aria-label={t('explorer.sortAria')}
                 disabled={searching}
-                title={searching ? '搜索时按相关度排序' : SORTS.find((s) => s.id === sort)?.hint}
+                title={searching ? t('explorer.sortWhileSearching') : t(`explorer.sort.${sort}.hint` as const)}
                 className={cn(
                   'h-10 cursor-pointer appearance-none rounded-xl border border-input bg-card pr-8 pl-3 text-xs font-medium text-foreground transition-all sm:text-sm',
                   'focus:border-foreground/80 focus:ring-4 focus:ring-foreground/5 focus:outline-none hover:border-foreground/30',
                   'disabled:cursor-not-allowed disabled:opacity-50',
                 )}
               >
-                {SORTS.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.label}
+                {SORTS.map((id) => (
+                  <option key={id} value={id}>
+                    {t(`explorer.sort.${id}` as const)}
                   </option>
                 ))}
               </select>
@@ -318,10 +321,10 @@ export default function PluginExplorer({ docs, categories, initialCategory = 'al
 
             {/* View Mode Switcher */}
             <div className="hidden shrink-0 items-center rounded-xl border border-input bg-card p-1 sm:flex">
-              <ViewButton active={view === 'list'} onClick={() => setView('list')} label="列表视图">
+              <ViewButton active={view === 'list'} onClick={() => setView('list')} label={t('explorer.viewList')}>
                 <path d="M2 4h12M2 8h12M2 12h12" />
               </ViewButton>
-              <ViewButton active={view === 'grid'} onClick={() => setView('grid')} label="卡片视图">
+              <ViewButton active={view === 'grid'} onClick={() => setView('grid')} label={t('explorer.viewGrid')}>
                 <path d="M2.5 2.5h4.5v4.5H2.5zM9 2.5h4.5v4.5H9zM2.5 9h4.5v4.5H2.5zM9 9h4.5v4.5H9z" />
               </ViewButton>
             </div>
@@ -329,28 +332,29 @@ export default function PluginExplorer({ docs, categories, initialCategory = 'al
 
           {/* Quick Health Status Pills (Visible on all screen sizes) */}
           <div className="mt-2.5 flex flex-wrap items-center gap-1.5 text-xs">
-            <span className="font-mono text-[0.6875rem] text-muted-foreground mr-1">快速过滤:</span>
-            {HEALTH_FILTERS.map((h) => (
+            <span className="font-mono text-[0.6875rem] text-muted-foreground mr-1">{t('explorer.quickFilter')}</span>
+            {HEALTH_FILTERS.map((id) => (
               <button
-                key={h.id}
+                key={id}
                 type="button"
-                onClick={() => setHealth(h.id)}
+                onClick={() => setHealth(id)}
+                title={t(`explorer.health.${id}.hint` as const)}
                 className={cn(
                   'inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-medium transition-all',
-                  health === h.id
+                  health === id
                     ? 'border-foreground bg-foreground text-background shadow-xs'
                     : 'border-border/80 bg-card text-muted-foreground hover:border-foreground/30 hover:text-foreground',
                 )}
               >
-                {h.id === 'healthy' && (
-                  <span className={cn('size-1.5 rounded-full', health === h.id ? 'bg-background' : 'bg-ok')} />
+                {id === 'healthy' && (
+                  <span className={cn('size-1.5 rounded-full', health === id ? 'bg-background' : 'bg-ok')} />
                 )}
-                {h.id === 'has-repo' && (
+                {id === 'has-repo' && (
                   <svg viewBox="0 0 16 16" fill="currentColor" className="size-3">
                     <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z" />
                   </svg>
                 )}
-                {h.label}
+                {t(`explorer.health.${id}` as const)}
               </button>
             ))}
           </div>
@@ -366,16 +370,12 @@ export default function PluginExplorer({ docs, categories, initialCategory = 'al
         {/* ---- Result Meta Bar ---- */}
         <div className="flex items-center justify-between gap-3 py-4 text-xs sm:text-sm text-muted-foreground">
           <p className="tabular">
-            {results.length === docs.length ? (
-              <>
-                共收录 <span className="font-bold text-foreground">{docs.length}</span> 款插件
-              </>
-            ) : (
-              <>
-                找到 <span className="font-bold text-foreground">{results.length}</span> 个匹配结果
-              </>
+            {results.length === docs.length
+              ? t('explorer.total', { n: docs.length })
+              : t('explorer.matches', { n: results.length })}
+            {searching && (
+              <span className="ml-2 rounded bg-secondary px-1.5 py-0.5 text-[0.6875rem]">{t('explorer.byRelevance')}</span>
             )}
-            {searching && <span className="ml-2 rounded bg-secondary px-1.5 py-0.5 text-[0.6875rem]">按相关度排序</span>}
           </p>
 
           {activeFilters > 0 && (
@@ -386,7 +386,7 @@ export default function PluginExplorer({ docs, categories, initialCategory = 'al
               <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" className="size-2.5">
                 <path d="M4 4l8 8M12 4l-8 8" strokeLinecap="round" />
               </svg>
-              <span>清除筛选</span>
+              <span>{t('explorer.clearFilters')}</span>
             </button>
           )}
         </div>
@@ -399,22 +399,22 @@ export default function PluginExplorer({ docs, categories, initialCategory = 'al
                 <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
               </svg>
             </div>
-            <p className="mt-4 text-base font-semibold text-foreground">没有找到匹配的插件</p>
+            <p className="mt-4 text-base font-semibold text-foreground">{t('explorer.emptyTitle')}</p>
             <p className="mx-auto mt-1.5 max-w-sm text-xs leading-5 text-muted-foreground">
-              试试更简短的关键词，或重置分类与健康维护筛选条件。
+              {t('explorer.emptyBody')}
             </p>
             <button
               onClick={reset}
               className="mt-5 inline-flex items-center rounded-xl bg-foreground px-4 py-2 text-xs font-semibold text-background transition-opacity hover:opacity-90 shadow-sm"
             >
-              重置所有筛选
+              {t('explorer.emptyReset')}
             </button>
           </div>
         ) : view === 'grid' ? (
           <ul className="grid gap-3.5 sm:grid-cols-2 xl:grid-cols-3">
             {results.slice(0, visible).map((p, i) => (
               <li key={p.slug}>
-                <Card doc={p} rank={ranked ? i + 1 : undefined} categoryLabel={categoryLabels.get(p.category)} />
+                <Card doc={p} rank={ranked ? i + 1 : undefined} categoryLabel={categoryLabels.get(p.category)} lang={lang} />
               </li>
             ))}
           </ul>
@@ -428,6 +428,7 @@ export default function PluginExplorer({ docs, categories, initialCategory = 'al
                 ranked={ranked}
                 categoryLabel={hasCategories ? (categoryLabels.get(p.category) ?? '') : undefined}
                 onSelectCategory={(catId) => setCategory(catId)}
+                lang={lang}
               />
             ))}
           </div>
@@ -440,7 +441,7 @@ export default function PluginExplorer({ docs, categories, initialCategory = 'al
               onClick={() => setVisible((v) => v + PAGE_SIZE)}
               className="rounded-xl border border-border/80 bg-card px-6 py-2.5 text-xs font-semibold text-foreground transition-all hover:bg-secondary hover:shadow-xs"
             >
-              加载更多（剩余 {results.length - visible} 个）
+              {t('explorer.loadMore', { n: results.length - visible })}
             </button>
           </div>
         )}
@@ -545,11 +546,7 @@ const HEALTH_DOT: Record<string, string> = {
   danger: 'bg-danger',
 };
 
-const HEALTH_TITLE: Record<string, string> = {
-  ok: '维护活跃 · 近期有提交维护',
-  warn: '需要留意 · 长期未更新或缺少文档',
-  danger: '不建议使用 · 仓库已归档或已废弃',
-};
+
 
 /** Redesigned modern row component */
 function Row({
@@ -558,6 +555,7 @@ function Row({
   ranked,
   categoryLabel,
   onSelectCategory,
+  lang,
 }: {
   doc: SearchDoc;
   rank: number;
@@ -565,7 +563,9 @@ function Row({
   ranked: boolean;
   categoryLabel?: string;
   onSelectCategory?: (catId: string) => void;
+  lang: Locale;
 }) {
+  const t = useTranslations(lang);
   const isTop1 = ranked && rank === 1;
   const isTop2 = ranked && rank === 2;
   const isTop3 = ranked && rank === 3;
@@ -581,7 +581,7 @@ function Row({
           one, and a <button> inside an <a> is not valid HTML. So the link is
           an overlay and the chip sits on a layer above it. */}
       <a
-        href={`/plugins/${p.slug}`}
+        href={localePath(lang, `/plugins/${p.slug}`)}
         aria-label={p.title}
         className="absolute inset-0 z-10 rounded-2xl focus-visible:ring-2 focus-visible:ring-foreground/40 focus-visible:outline-none"
       />
@@ -624,7 +624,7 @@ function Row({
           </div>
           <span
             className={cn('lamp absolute -top-0.5 -right-0.5 z-10 ring-2 ring-card', HEALTH_DOT[p.healthLevel])}
-            title={HEALTH_TITLE[p.healthLevel]}
+            title={t(`health.tip.${p.healthLevel}` as const)}
           />
         </div>
 
@@ -637,7 +637,7 @@ function Row({
 
             {p.featured && (
               <span className="rounded bg-foreground px-1.5 py-0.5 text-[0.625rem] font-bold text-background">
-                精选
+                {t('common.featured')}
               </span>
             )}
 
@@ -646,7 +646,7 @@ function Row({
                 type="button"
                 onClick={() => onSelectCategory?.(p.category)}
                 className="relative z-20 rounded-md border border-border/60 bg-secondary/70 px-2 py-0.5 text-[0.6875rem] font-medium text-foreground/80 transition-colors hover:border-foreground/40 hover:bg-secondary"
-                title={`筛选 ${categoryLabel} 分类`}
+                title={t('explorer.filterBy', { category: categoryLabel ?? '' })}
               >
                 {categoryLabel}
               </button>
@@ -655,7 +655,7 @@ function Row({
 
           <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">
             <span className="font-mono text-foreground/60 mr-2">{p.name}</span>
-            {p.description ?? '暂无描述'}
+            {p.description ?? t('common.noDescription')}
           </p>
         </div>
       </div>
@@ -663,20 +663,20 @@ function Row({
       {/* Right Pod: Metrics & Score */}
       <div className="flex shrink-0 items-center justify-between gap-4 self-end pl-10 font-mono text-xs text-muted-foreground sm:self-center sm:pl-0">
         {/* Stars */}
-        <span className="tabular inline-flex items-center gap-1" title="GitHub Stars">
+        <span className="tabular inline-flex items-center gap-1" title={t('common.stars')}>
           <svg viewBox="0 0 16 16" fill="currentColor" className="size-3.5 text-amber-500" aria-hidden="true">
             <path d="M8 .25a.75.75 0 0 1 .673.418l1.882 3.815 4.21.612a.75.75 0 0 1 .416 1.279l-3.046 2.97.719 4.192a.75.75 0 0 1-1.088.791L8 12.347l-3.766 1.98a.75.75 0 0 1-1.088-.79l.72-4.194L.818 6.374a.75.75 0 0 1 .416-1.28l4.21-.611L7.327.668A.75.75 0 0 1 8 .25Z" />
           </svg>
           <span className="font-medium text-foreground">{compactNumber(p.stars)}</span>
           {p.starsDelta7d > 0 && (
-            <span className="text-[0.6875rem] font-bold text-ok" title="近 7 天新增星标">
+            <span className="text-[0.6875rem] font-bold text-ok" title={t('explorer.starsDelta')}>
               +{compactNumber(p.starsDelta7d)}
             </span>
           )}
         </span>
 
         {/* Downloads */}
-        <span className="tabular hidden items-center gap-1 sm:inline-flex" title="近 30 天 npm 下载量">
+        <span className="tabular hidden items-center gap-1 sm:inline-flex" title={t('explorer.downloadsTitle')}>
           <svg viewBox="0 0 16 16" fill="currentColor" className="size-3.5 text-muted-foreground/70" aria-hidden="true">
             <path d="M7.25 1.75a.75.75 0 0 1 1.5 0v6.44l2.22-2.22a.75.75 0 1 1 1.06 1.06l-3.5 3.5a.75.75 0 0 1-1.06 0l-3.5-3.5a.75.75 0 0 1 1.06-1.06l2.22 2.22V1.75ZM2.5 11a.75.75 0 0 1 .75.75v1.5h9.5v-1.5a.75.75 0 0 1 1.5 0v2.25a.75.75 0 0 1-.75.75H2.5a.75.75 0 0 1-.75-.75v-2.25A.75.75 0 0 1 2.5 11Z" />
           </svg>
@@ -684,14 +684,14 @@ function Row({
         </span>
 
         {/* Updated Time */}
-        <span className="hidden truncate text-[0.6875rem] text-muted-foreground/80 md:inline-block" title="最近更新">
-          {timeAgo(p.pushedAt)}
+        <span className="hidden truncate text-[0.6875rem] text-muted-foreground/80 md:inline-block" title={t('common.updated')}>
+          {timeAgo(p.pushedAt, lang)}
         </span>
 
         {/* Score Badge */}
         <span
           className="tabular rounded-md border border-border/70 bg-secondary px-2 py-0.5 text-xs font-semibold text-foreground"
-          title="综合评分"
+          title={t('common.score')}
         >
           {p.score.toFixed(0)}
         </span>
@@ -706,10 +706,21 @@ function Row({
 }
 
 /** Redesigned modern card component */
-function Card({ doc: p, rank, categoryLabel }: { doc: SearchDoc; rank?: number; categoryLabel?: string }) {
+function Card({
+  doc: p,
+  rank,
+  categoryLabel,
+  lang,
+}: {
+  doc: SearchDoc;
+  rank?: number;
+  categoryLabel?: string;
+  lang: Locale;
+}) {
+  const t = useTranslations(lang);
   return (
     <a
-      href={`/plugins/${p.slug}`}
+      href={localePath(lang, `/plugins/${p.slug}`)}
       className={cn(
         'group flex h-full flex-col justify-between overflow-hidden rounded-2xl border border-border/80 bg-card p-5 transition-all duration-200',
         'hover:-translate-y-1 hover:border-foreground/30 hover:shadow-[0_8px_30px_rgb(0,0,0,0.06)]',
@@ -740,7 +751,7 @@ function Card({ doc: p, rank, categoryLabel }: { doc: SearchDoc; rank?: number; 
               </div>
               <span
                 className={cn('lamp absolute -top-0.5 -right-0.5 z-10 ring-2 ring-card', HEALTH_DOT[p.healthLevel])}
-                title={HEALTH_TITLE[p.healthLevel]}
+                title={t(`health.tip.${p.healthLevel}` as const)}
               />
             </div>
 
@@ -759,14 +770,14 @@ function Card({ doc: p, rank, categoryLabel }: { doc: SearchDoc; rank?: number; 
 
           <span
             className="tabular shrink-0 rounded-md border border-border/70 bg-secondary px-2 py-0.5 text-xs font-semibold text-foreground"
-            title="综合评分"
+            title={t('common.score')}
           >
             {p.score.toFixed(0)}
           </span>
         </div>
 
         <p className="mt-3.5 line-clamp-2 min-h-[2.5rem] text-xs leading-relaxed text-muted-foreground">
-          {p.description ?? '暂无描述信息'}
+          {p.description ?? t('common.noDescription')}
         </p>
 
         {/* Category Pill & Keywords */}
@@ -787,14 +798,14 @@ function Card({ doc: p, rank, categoryLabel }: { doc: SearchDoc; rank?: number; 
       {/* Bottom stats */}
       <div className="mt-5 flex items-center justify-between border-t border-border/60 pt-3 text-xs text-muted-foreground font-mono">
         <div className="flex items-center gap-3">
-          <span className="inline-flex items-center gap-1" title="GitHub Stars">
+          <span className="inline-flex items-center gap-1" title={t('common.stars')}>
             <svg viewBox="0 0 16 16" fill="currentColor" className="size-3.5 text-amber-500" aria-hidden="true">
               <path d="M8 .25a.75.75 0 0 1 .673.418l1.882 3.815 4.21.612a.75.75 0 0 1 .416 1.279l-3.046 2.97.719 4.192a.75.75 0 0 1-1.088.791L8 12.347l-3.766 1.98a.75.75 0 0 1-1.088-.79l.72-4.194L.818 6.374a.75.75 0 0 1 .416-1.28l4.21-.611L7.327.668A.75.75 0 0 1 8 .25Z" />
             </svg>
             <span className="tabular font-medium text-foreground">{compactNumber(p.stars)}</span>
           </span>
 
-          <span className="inline-flex items-center gap-1" title="近 30 天下载量">
+          <span className="inline-flex items-center gap-1" title={t('explorer.downloadsTitle')}>
             <svg viewBox="0 0 16 16" fill="currentColor" className="size-3.5 text-muted-foreground/70" aria-hidden="true">
               <path d="M7.25 1.75a.75.75 0 0 1 1.5 0v6.44l2.22-2.22a.75.75 0 1 1 1.06 1.06l-3.5 3.5a.75.75 0 0 1-1.06 0l-3.5-3.5a.75.75 0 0 1 1.06-1.06l2.22 2.22V1.75ZM2.5 11a.75.75 0 0 1 .75.75v1.5h9.5v-1.5a.75.75 0 0 1 1.5 0v2.25a.75.75 0 0 1-.75.75H2.5a.75.75 0 0 1-.75-.75v-2.25A.75.75 0 0 1 2.5 11Z" />
             </svg>
@@ -803,7 +814,7 @@ function Card({ doc: p, rank, categoryLabel }: { doc: SearchDoc; rank?: number; 
         </div>
 
         <span className="text-[0.6875rem] text-muted-foreground/75 font-sans">
-          {timeAgo(p.pushedAt)}
+          {timeAgo(p.pushedAt, lang)}
         </span>
       </div>
     </a>

@@ -1,5 +1,9 @@
 ---
-import { categories } from '../lib/plugins';
+import { categories, categoryLabel } from '../lib/plugins';
+import { localeFromPath, useTranslations } from '../lib/i18n';
+
+const lang = localeFromPath(Astro.url.pathname);
+const t = useTranslations(lang);
 
 /**
  * Header search. Deliberately not a framework island: this renders in the
@@ -8,7 +12,7 @@ import { categories } from '../lib/plugins';
  * The shell below is static markup; only the result rows are built in JS,
  * and Fuse plus the search index load on first open.
  */
-const categoryLabels = Object.fromEntries(categories.map((c) => [c.id, c.label]));
+const categoryLabels = Object.fromEntries(categories.map((c) => [c.id, categoryLabel(c.id, lang)]));
 ---
 
 <!-- Desktop trigger -->
@@ -16,13 +20,13 @@ const categoryLabels = Object.fromEntries(categories.map((c) => [c.id, c.label])
   type="button"
   data-cmdk-open
   class="hidden items-center gap-2 rounded-md border border-border bg-background px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-secondary sm:inline-flex"
-  aria-label="搜索插件"
+  aria-label={t('explorer.searchAria')}
 >
   <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" class="size-3.5" aria-hidden="true">
     <circle cx="7" cy="7" r="4.75"></circle>
     <path d="m10.5 10.5 3.5 3.5" stroke-linecap="round"></path>
   </svg>
-  <span>搜索插件</span>
+  <span>{t('palette.open')}</span>
   <kbd
     data-cmdk-hint
     class="ml-3 rounded border border-border bg-muted px-1.5 py-px font-mono text-[0.625rem] text-muted-foreground"
@@ -35,7 +39,7 @@ const categoryLabels = Object.fromEntries(categories.map((c) => [c.id, c.label])
   type="button"
   data-cmdk-open
   class="grid size-9 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground sm:hidden"
-  aria-label="搜索插件"
+  aria-label={t('explorer.searchAria')}
 >
   <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" class="size-4" aria-hidden="true">
     <circle cx="7" cy="7" r="4.75"></circle>
@@ -53,7 +57,7 @@ const categoryLabels = Object.fromEntries(categories.map((c) => [c.id, c.label])
 <dialog
   data-cmdk-dialog
   data-categories={JSON.stringify(categoryLabels)}
-  aria-label="搜索插件"
+  aria-label={t('explorer.searchAria')}
   class="m-0 h-full max-h-none w-full max-w-none border-0 bg-transparent p-0 backdrop:bg-transparent"
 >
   <div data-cmdk-overlay class="h-full w-full overflow-y-auto bg-background/70 backdrop-blur-sm">
@@ -69,8 +73,8 @@ const categoryLabels = Object.fromEntries(categories.map((c) => [c.id, c.label])
       <input
         type="text"
         data-cmdk-input
-        placeholder="搜索插件名、功能、作者…"
-        aria-label="搜索插件"
+        placeholder={t('palette.placeholder')}
+        aria-label={t('explorer.searchAria')}
         autocomplete="off"
         class="h-12 min-w-0 flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
       />
@@ -87,9 +91,9 @@ const categoryLabels = Object.fromEntries(categories.map((c) => [c.id, c.label])
     </div>
 
     <div class="flex items-center gap-4 border-t border-border px-4 py-2 font-mono text-[0.625rem] text-muted-foreground">
-      <span>↑↓ 选择</span>
-      <span>↵ 打开</span>
-      <span>esc 关闭</span>
+      <span>{t('palette.select')}</span>
+      <span>{t('palette.enter')}</span>
+      <span>{t('palette.esc')}</span>
       <span data-cmdk-count class="tabular ml-auto"></span>
       </div>
     </div>
@@ -99,6 +103,11 @@ const categoryLabels = Object.fromEntries(categories.map((c) => [c.id, c.label])
 <script>
   import { navigate } from 'astro:transitions/client';
   import { compactNumber } from '../lib/utils';
+  import { localeFromPath, localePath, useTranslations } from '../lib/i18n';
+
+  // Resolved per call rather than once: this module survives soft navigation,
+  // so the locale can change underneath it.
+  const tr = () => useTranslations(localeFromPath(location.pathname));
 
   /** Mirrors the short keys in src/pages/search-index.json.ts. */
   interface Entry {
@@ -115,11 +124,7 @@ const categoryLabels = Object.fromEntries(categories.map((c) => [c.id, c.label])
 
   const LIMIT = 8;
   const LAMP = { ok: 'bg-ok', warn: 'bg-warn', danger: 'bg-danger' } as const;
-  const LAMP_TITLE = {
-    ok: '维护活跃',
-    warn: '需留意：长期未更新或缺少文档',
-    danger: '不建议使用：已归档或已废弃',
-  } as const;
+
 
   // DOM refs are rebound on every soft navigation; the downloaded index and
   // the built Fuse instance are module state, so they survive it and the
@@ -154,7 +159,7 @@ const categoryLabels = Object.fromEntries(categories.map((c) => [c.id, c.label])
 
     const hint = document.querySelector('[data-cmdk-hint]');
     if (hint) hint.textContent = /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘K' : 'Ctrl K';
-    if (count && entries) count.textContent = `${entries.length} 个插件`;
+    if (count && entries) count.textContent = tr()('palette.count', { n: entries.length });
 
     // Neither the index nor Fuse is worth downloading until someone searches.
     async function load() {
@@ -176,7 +181,7 @@ const categoryLabels = Object.fromEntries(categories.map((c) => [c.id, c.label])
           minMatchCharLength: 2,
           includeScore: true,
         });
-        if (count) count.textContent = `${entries.length} 个插件`;
+        if (count) count.textContent = tr()('palette.count', { n: entries.length });
       } catch {
         failed = true;
       } finally {
@@ -203,15 +208,16 @@ const categoryLabels = Object.fromEntries(categories.map((c) => [c.id, c.label])
 
     function seeAllHref() {
       const q = input!.value.trim();
-      return q ? `/plugins?q=${encodeURIComponent(q)}` : '/plugins';
+      const lang = localeFromPath(location.pathname);
+      return localePath(lang, q ? `/plugins?q=${encodeURIComponent(q)}` : '/plugins');
     }
 
     /** Rows are built with DOM APIs, never innerHTML — descriptions are npm text. */
     function render() {
       list!.replaceChildren();
 
-      if (loading && !entries) return list!.append(message('正在加载索引…'));
-      if (failed) return list!.append(message('索引加载失败，请重试。'));
+      if (loading && !entries) return list!.append(message(tr()('palette.loading')));
+      if (failed) return list!.append(message(tr()('palette.failed')));
 
       results = search();
       const q = input!.value.trim();
@@ -219,13 +225,13 @@ const categoryLabels = Object.fromEntries(categories.map((c) => [c.id, c.label])
       if (!q && results.length) {
         const h = document.createElement('li');
         h.className = 'meta px-2.5 pt-2 pb-1 text-muted-foreground';
-        h.textContent = '最热门';
+        h.textContent = tr()('palette.popular');
         list!.append(h);
       }
 
       results.forEach((p, i) => {
         const a = document.createElement('a');
-        a.href = `/plugins/${p.s}`;
+        a.href = localePath(localeFromPath(location.pathname), `/plugins/${p.s}`);
         a.className =
           'flex items-center gap-3 rounded-lg px-2.5 py-2 transition-colors ' +
           (i === active ? 'bg-secondary' : 'hover:bg-secondary/50');
@@ -238,7 +244,7 @@ const categoryLabels = Object.fromEntries(categories.map((c) => [c.id, c.label])
 
         const lamp = document.createElement('span');
         lamp.className = `size-1.5 shrink-0 rounded-full ${LAMP[p.h] ?? 'bg-warn'}`;
-        lamp.title = LAMP_TITLE[p.h] ?? '';
+        lamp.title = tr()(`health.tip.${p.h}` as const);
 
         const mid = document.createElement('span');
         mid.className = 'min-w-0 flex-1';
@@ -288,7 +294,7 @@ const categoryLabels = Object.fromEntries(categories.map((c) => [c.id, c.label])
       });
       const tailText = document.createElement('span');
       tailText.className = results.length ? 'text-muted-foreground' : 'text-foreground';
-      tailText.textContent = q ? `在全部插件中搜索「${q}」` : '浏览全部插件';
+      tailText.textContent = q ? tr()('palette.searchAll', { q }) : tr()('palette.browseAll');
       const arrow = document.createElement('span');
       arrow.className = 'font-mono text-xs text-muted-foreground';
       arrow.textContent = '→';
@@ -361,7 +367,10 @@ const categoryLabels = Object.fromEntries(categories.map((c) => [c.id, c.label])
         paint();
       } else if (e.key === 'Enter') {
         e.preventDefault();
-        const href = active === max ? seeAllHref() : `/plugins/${results[active].s}`;
+        const href =
+          active === max
+            ? seeAllHref()
+            : localePath(localeFromPath(location.pathname), `/plugins/${results[active].s}`);
         close();
         navigate(href);
       }

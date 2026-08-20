@@ -1,19 +1,19 @@
 ---
-import Layout from '../layouts/Layout.astro';
+import Layout from '../../layouts/Layout.astro';
 
 const steps = [
   {
     n: '01',
-    title: 'Publish to npm',
-    body: 'The plugin has to be a public npm package. Private packages, and repositories that only exist on GitHub, cannot be discovered automatically.',
+    title: '发布到 npm',
+    body: '插件必须是一个公开的 npm 包。私有包和仅存在于 GitHub 的仓库无法被自动发现。',
   },
   {
     n: '02',
-    title: 'Add the opencode-plugin keyword',
-    body: 'Put opencode-plugin in the keywords array of your package.json. That is the only listing requirement, and the entry point for the whole crawler.',
+    title: '加上 opencode-plugin 关键词',
+    body: '在 package.json 的 keywords 数组里加入 opencode-plugin。这是唯一的收录条件，也是整个抓取管线的入口。',
     code: `{
   "name": "opencode-your-plugin",
-  "description": "One line on the problem it solves",
+  "description": "一句话说清楚它解决什么问题",
   "keywords": ["opencode", "opencode-plugin"],
   "repository": "github:you/your-plugin",
   "license": "MIT"
@@ -21,27 +21,27 @@ const steps = [
   },
   {
     n: '03',
-    title: 'Fill in the metadata',
-    body: 'Description, repository, licence, README \u2014 those four decide your health badges and your search ranking. Each one missing adds a warning flag.',
+    title: '填好元数据',
+    body: '描述、仓库地址、协议、README —— 这四项直接决定你的健康度徽章和搜索排名。缺一项就会挂上一个警告标签。',
   },
   {
     n: '04',
-    title: 'Wait a day',
-    body: 'The crawl runs once daily. Your plugin appears the day after you publish. No pull request, no form.',
+    title: '等一天',
+    body: '抓取任务每天跑一次。发布后次日你的插件就会出现在列表里，无需提交 PR 或填表。',
   },
 ];
 ---
 
 <Layout
-  title="Submit your opencode plugin"
-  description="OpenDock indexes every npm package tagged opencode-plugin automatically. The listing requirements, the metadata that matters, and how to get something corrected."
+  title="提交你的 opencode 插件"
+  description="OpenDock 自动收录带 opencode-plugin 关键词的 npm 包。了解收录条件、元数据要求与纠错方式。"
 >
   <div class="mx-auto max-w-3xl px-4 py-10 sm:px-6 sm:py-14">
     <header class="mb-10">
-      <h1 class="text-3xl font-semibold tracking-tight sm:text-4xl">Submit a plugin</h1>
+      <h1 class="text-3xl font-semibold tracking-tight sm:text-4xl">提交插件</h1>
       <p class="mt-3 text-base leading-7 text-muted-foreground">
-        Good news: <strong class="text-foreground">there is nothing to submit.</strong>
-        Publish to npm with the right keyword and you are listed the next day.
+        好消息：<strong class="text-foreground">你不需要提交任何东西。</strong>
+        只要把插件发布到 npm 并带上正确的关键词，我们次日就会自动收录。
       </p>
     </header>
 
@@ -62,7 +62,7 @@ const steps = [
                       data-copy={s.code}
                       class="rounded px-2 py-0.5 text-xs text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
                     >
-                      <span data-copy-label>Copy</span>
+                      <span data-copy-label>复制</span>
                     </button>
                   </div>
                   <pre class="overflow-x-auto px-4 py-3 font-mono text-[0.8125rem] leading-6"><code>{s.code}</code></pre>
@@ -75,10 +75,10 @@ const steps = [
     </ol>
 
     <section class="mt-14 rounded-xl border border-border bg-card p-6">
-      <h2 class="text-base font-semibold tracking-tight">Wrong data? Wrong category?</h2>
+      <h2 class="text-base font-semibold tracking-tight">数据不对？分类错了？</h2>
       <p class="mt-2 text-sm leading-6 text-muted-foreground">
-        Automatic categorisation gets things wrong, and star counts read high for packages living inside a monorepo.
-        Both are fixable through a manual override layer \u2014 open an issue with the package name and what should change.
+        自动分类会出错，星标数在 monorepo 场景下也可能虚高。这些都可以通过人工覆盖层修正 ——
+        在仓库里提一个 issue，说明包名和期望的修改即可。
       </p>
       <div class="mt-5 flex flex-wrap gap-2">
         <a
@@ -87,22 +87,22 @@ const steps = [
           rel="noopener noreferrer"
           class="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90"
         >
-          Open a correction issue
+          提交纠错 issue
         </a>
         <a
-          href="/about"
+          href="/zh/about"
           class="rounded-lg border border-border bg-card px-4 py-2 text-sm font-medium transition-colors hover:bg-secondary"
         >
-          How ranking works
+          查看排名算法
         </a>
       </div>
     </section>
 
     <section class="mt-8 rounded-xl border border-dashed border-border p-6">
-      <h2 class="text-base font-semibold tracking-tight">Want to be removed?</h2>
+      <h2 class="text-base font-semibold tracking-tight">不想被收录？</h2>
       <p class="mt-2 text-sm leading-6 text-muted-foreground">
-        Drop the <code class="rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-xs">opencode-plugin</code>
-        keyword from your package.json, or open an issue asking to be blocklisted. Either way the next crawl removes it.
+        从 package.json 里移除 <code class="rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-xs">opencode-plugin</code>
+        关键词，或提一个 issue 要求加入黑名单，下次抓取时就会移除。
       </p>
     </section>
   </div>

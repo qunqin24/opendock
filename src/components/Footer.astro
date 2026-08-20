@@ -2,6 +2,10 @@
 import Logo from './Logo.astro';
 import { generatedAt, totals, plugins } from '../lib/plugins';
 import { formatNumber } from '../lib/utils';
+import { localeFromPath, localePath, useTranslations } from '../lib/i18n';
+
+const lang = localeFromPath(Astro.url.pathname);
+const t = useTranslations(lang);
 
 const updated = new Date(generatedAt);
 const stamp = `${updated.getFullYear()}-${String(updated.getMonth() + 1).padStart(2, '0')}-${String(
@@ -10,26 +14,26 @@ const stamp = `${updated.getFullYear()}-${String(updated.getMonth() + 1).padStar
 
 const columns = [
   {
-    title: '浏览',
+    title: t('footer.browse'),
     links: [
-      { href: '/plugins', label: '全部插件' },
-      { href: '/categories', label: '按分类浏览' },
-      { href: '/rankings', label: '排行榜' },
+      { href: localePath(lang, '/plugins'), label: t('footer.allPlugins') },
+      { href: localePath(lang, '/categories'), label: t('footer.byCategory') },
+      { href: localePath(lang, '/rankings'), label: t('footer.rankings') },
     ],
   },
   {
     title: 'opencode',
     links: [
-      { href: 'https://opencode.ai', label: '官网' },
-      { href: 'https://opencode.ai/docs/plugins/', label: '插件开发文档' },
-      { href: 'https://github.com/opencode-ai/opencode', label: 'GitHub 仓库' },
+      { href: 'https://opencode.ai', label: t('footer.official') },
+      { href: 'https://opencode.ai/docs/plugins/', label: t('footer.pluginDocs') },
+      { href: 'https://github.com/opencode-ai/opencode', label: t('footer.repo') },
     ],
   },
   {
-    title: '关于',
+    title: t('footer.about'),
     links: [
-      { href: '/submit', label: '提交插件' },
-      { href: '/about', label: '排名算法说明' },
+      { href: localePath(lang, '/submit'), label: t('footer.submit') },
+      { href: localePath(lang, '/about'), label: t('footer.algorithm') },
     ],
   },
 ];
@@ -41,10 +45,10 @@ const columns = [
       <div>
         <Logo />
         <p class="mt-3 max-w-xs text-sm leading-6 text-muted-foreground">
-          自动收录并排名 opencode 插件生态。数据每日从 npm 与 GitHub 同步，不靠人工维护列表。
+          {t('footer.tagline')}
         </p>
         <p class="tabular mt-4 text-xs text-muted-foreground">
-          收录 {formatNumber(plugins.length)} 个插件 · 累计 {formatNumber(totals.stars)} 星标
+          {t('footer.stats', { plugins: formatNumber(plugins.length), stars: formatNumber(totals.stars) })}
         </p>
       </div>
 
@@ -74,8 +78,8 @@ const columns = [
     <div
       class="mt-10 flex flex-col gap-2 border-t border-border pt-6 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between"
     >
-      <p>© {new Date().getFullYear()} OpenDock · 与 opencode 官方无隶属关系</p>
-      <p class="tabular">数据更新于 {stamp}</p>
+      <p>{t('footer.disclaimer', { year: new Date().getFullYear() })}</p>
+      <p class="tabular">{t('footer.updated', { stamp })}</p>
     </div>
   </div>
 </footer>

@@ -1,0 +1,446 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { rankings, categoryLabel, census, generatedAt, lampClass } from '../lib/plugins';
+import type { Plugin } from '../lib/plugins';
+import { compactNumber, formatNumber, formatDate } from '../lib/utils';
+import { localeFromPath, localePath, useTranslations } from '../lib/i18n';
+
+const lang = localeFromPath(Astro.url.pathname);
+const t = useTranslations(lang);
+
+const TOP_N = 50;
+
+interface BoardDef {
+  id: string;
+  label: string;
+  hint: string;
+  list: Plugin[];
+  /** Drives the bar. Boards without a magnitude (newest) return null. */
+  metric: (p: Plugin) => number | null;
+  display: (p: Plugin) => string;
+  caption: string;
+  /** Star counts span 271k→170, so those bars only read on a log axis. */
+  scale: 'linear' | 'log' | 'none';
+}
+
+const defs: BoardDef[] = [
+  {
+    id: 'top',
+    label: t('rankings.board.top'),
+    hint: t('rankings.board.top.hint'),
+    list: rankings.top,
+    metric: (p) => p.score,
+    display: (p) => p.score.toFixed(1),
+    caption: t('rankings.caption.top'),
+    scale: 'linear',
+  },
+  {
+    id: 'stars',
+    label: t('rankings.board.stars'),
+    hint: t('rankings.board.stars.hint'),
+    list: rankings.stars,
+    metric: (p) => p.stars,
+    display: (p) => formatNumber(p.stars),
+    caption: t('rankings.caption.stars'),
+    scale: 'log',
+  },
+  {
+    id: 'trending',
+    label: t('rankings.board.trending'),
+    hint: t('rankings.board.trending.hint'),
+    list: rankings.trending,
+    metric: (p) => p.starsDelta7d,
+    display: (p) => (p.starsDelta7d > 0 ? `+${compactNumber(p.starsDelta7d)}` : '—'),
+    caption: t('rankings.caption.trending'),
+    scale: 'linear',
+  },
+  {
+    id: 'downloads',
+    label: t('rankings.board.downloads'),
+    hint: t('rankings.board.downloads.hint'),
+    list: rankings.downloads,
+    metric: (p) => p.downloadsMonth,
+    display: (p) => formatNumber(p.downloadsMonth),
+    caption: t('rankings.caption.downloads'),
+    scale: 'log',
+  },
+  {
+    id: 'recent',
+    label: t('rankings.board.recent'),
+    hint: t('rankings.board.recent.hint'),
+    list: rankings.recent,
+    metric: () => null,
+    display: (p) => formatDate(p.createdAt, lang),
+    caption: t('rankings.caption.recent'),
+    scale: 'none',
+  },
+];
+
+const boards = defs.map((d) => {
+  const entries = d.list.slice(0, TOP_N);
+  const values = entries.map((p) => d.metric(p) ?? 0);
+  const max = Math.max(...values, 0);
+  const empty = d.scale !== 'none' && max === 0;
+
+  const rows = entries.map((p, i) => {
+    const v = d.metric(p);
+    let pct = 0;
+    if (v !== null && max > 0) {
+      pct = d.scale === 'log' ? Math.log10(v + 1) / Math.log10(max + 1) : v / max;
+    }
+    return { p, rank: i + 1, display: d.display(p), pct: Math.round(pct * 100) };
+  });
+
+  return { ...d, rows, empty };
+});
+
+const stamped = new Date(generatedAt);
+const pad = (n: number) => String(n).padStart(2, '0');
+const snapshot = `${stamped.getFullYear()}-${pad(stamped.getMonth() + 1)}-${pad(stamped.getDate())} ${pad(
+  stamped.getHours(),
+)}:${pad(stamped.getMinutes())}`;
+---
+
+<Layout title={t('rankings.title')} description={t('rankings.metaDescription')}>
+  <div class="mx-auto max-w-6xl px-4 py-10 sm:px-6 sm:py-14">
+    <!-- Header Section -->
+    <header class="mx-auto max-w-3xl text-center">
+      <div class="inline-flex items-center gap-2 rounded-full border border-border bg-card/80 px-3.5 py-1 text-xs text-muted-foreground shadow-xs">
+        <span class="size-1.5 rounded-full bg-dock"></span>
+        <span class="font-medium text-foreground">{t('rankings.eyebrow')}</span>
+        <span class="text-border">|</span>
+        <span>{t('rankings.topN', { n: TOP_N })}</span>
+      </div>
+
+      <h1 class="mt-5 text-balance text-3xl font-extrabold tracking-tight text-foreground sm:text-4xl lg:text-5xl">
+        {t('rankings.heading')}
+      </h1>
+
+      <p class="mt-3 text-balance text-sm leading-relaxed text-muted-foreground sm:text-base">
+        {t('rankings.intro')}
+      </p>
+
+      <!-- Bento Header Metric Strip -->
+      <div class="mt-8 grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <div class="rounded-2xl border border-border/80 bg-card p-4 text-center">
+          <p class="text-xs font-medium text-muted-foreground">{t('rankings.snapshot')}</p>
+          <p class="tabular mt-1 font-mono text-sm font-bold text-foreground">
+            {snapshot}
+          </p>
+        </div>
+
+        <div class="rounded-2xl border border-border/80 bg-card p-4 text-center">
+          <p class="text-xs font-medium text-muted-foreground">{t('rankings.counted')}</p>
+          <p class="tabular mt-1 font-mono text-xl font-bold text-foreground">
+            {t('rankings.countedUnit', { n: formatNumber(census.total) })}
+          </p>
+        </div>
+
+        <div class="rounded-2xl border border-border/80 bg-card p-4 text-center">
+          <p class="text-xs font-medium text-muted-foreground">{t('rankings.algorithm')}</p>
+          <p class="mt-1 text-sm font-semibold">
+            <a href={localePath(lang, "/about")} class="text-foreground hover:underline inline-flex items-center gap-1">
+              <span>{t('rankings.algorithmLink')}</span>
+              <span>→</span>
+            </a>
+          </p>
+        </div>
+      </div>
+    </header>
+
+    <!-- Leaderboard Container -->
+    <div data-rankings class="mt-12">
+      <!-- Tabs Switcher -->
+      <div
+        class="scrollbar-none sticky top-14 z-30 -mx-4 flex gap-2 overflow-x-auto border-b border-border/80 bg-background/90 px-4 py-3 backdrop-blur-xl sm:-mx-6 sm:px-6"
+        role="tablist"
+      >
+        {
+          boards.map((b, i) => (
+            <button
+              type="button"
+              role="tab"
+              data-rank-tab={b.id}
+              aria-selected={i === 0}
+              class:list={[
+                'shrink-0 rounded-xl px-4 py-2 text-xs font-semibold whitespace-nowrap transition-all sm:text-sm',
+                'aria-selected:bg-foreground aria-selected:text-background aria-selected:shadow-xs',
+                'border border-border/80 bg-card text-muted-foreground hover:border-foreground/30 hover:text-foreground',
+              ]}
+            >
+              <span class="tabular mr-1.5 font-mono text-[0.6875rem] opacity-70">0{i + 1}</span>
+              {b.label}
+            </button>
+          ))
+        }
+      </div>
+
+      <!-- Tab Panels -->
+      {
+        boards.map((b, i) => (
+          <div data-rank-panel={b.id} role="tabpanel" class:list={[i !== 0 && 'hidden', 'mt-6']}>
+            <div class="mb-6 flex items-center justify-between">
+              <p class="text-xs sm:text-sm text-muted-foreground">
+                {b.hint}
+                {b.scale === 'log' && (
+                  <span class="text-muted-foreground/80 font-mono text-xs">{t('rankings.logScale')}</span>
+                )}
+              </p>
+              <span class="font-mono text-xs text-muted-foreground">TOP {TOP_N}</span>
+            </div>
+
+            {b.empty ? (
+              <div class="rounded-3xl border border-dashed border-border/80 bg-card/40 px-6 py-16 text-center">
+                <p class="text-base font-bold text-foreground">{t('rankings.emptyTitle')}</p>
+                <p class="mx-auto mt-2 max-w-md text-xs leading-relaxed text-muted-foreground">
+                  {t('rankings.emptyBody')}
+                </p>
+                <a
+                  href="#top"
+                  data-goto-tab="top"
+                  class="mt-5 inline-flex items-center gap-1 rounded-xl bg-foreground px-4 py-2 text-xs font-semibold text-background shadow-xs hover:opacity-90"
+                >
+                  <span>{t('rankings.emptyCta')}</span>
+                  <span>→</span>
+                </a>
+              </div>
+            ) : (
+              <>
+                {/* Podium Top 3 Cards */}
+                <div class="grid gap-4 sm:grid-cols-3">
+                  {b.rows.slice(0, 3).map((r) => {
+                    const isGold = r.rank === 1;
+                    const isSilver = r.rank === 2;
+
+                    return (
+                      <a
+                        href={localePath(lang, `/plugins/${r.p.slug}`)}
+                        class:list={[
+                          'group relative flex flex-col justify-between overflow-hidden rounded-3xl border p-6 transition-all duration-200 hover:-translate-y-1 hover:shadow-xs',
+                          isGold
+                            ? 'border-amber-500/30 bg-gradient-to-b from-amber-500/10 via-card to-card'
+                            : isSilver
+                              ? 'border-slate-400/30 bg-gradient-to-b from-slate-400/10 via-card to-card'
+                              : 'border-orange-600/30 bg-gradient-to-b from-orange-600/10 via-card to-card',
+                        ]}
+                      >
+                        {/* Background Giant Rank Watermark */}
+                        <span
+                          aria-hidden="true"
+                          class="tabular pointer-events-none absolute -top-4 -right-2 font-mono text-[6rem] leading-none font-black text-foreground/[0.04]"
+                        >
+                          0{r.rank}
+                        </span>
+
+                        <div>
+                          {/* Rank Badge & Category */}
+                          <div class="flex items-center justify-between">
+                            <span
+                              class:list={[
+                                'tabular flex size-7 items-center justify-center rounded-xl font-mono text-xs font-extrabold shadow-xs',
+                                isGold
+                                  ? 'bg-amber-500 text-white dark:text-black'
+                                  : isSilver
+                                    ? 'bg-slate-400 text-white dark:text-black'
+                                    : 'bg-orange-600 text-white',
+                              ]}
+                            >
+                              0{r.rank}
+                            </span>
+
+                            <span class="rounded-md border border-border/60 bg-secondary/80 px-2 py-0.5 text-xs font-medium text-foreground/80">
+                              {categoryLabel(r.p.category, lang)}
+                            </span>
+                          </div>
+
+                          {/* Avatar & Titles */}
+                          <div class="mt-4 flex items-center gap-3">
+                            <div class="relative size-10 shrink-0">
+                              <div class="size-full overflow-hidden rounded-xl border border-border/80 bg-secondary/50 shadow-2xs">
+                                {r.p.ownerAvatar ? (
+                                  <img
+                                    src={r.p.ownerAvatar}
+                                    alt={r.p.owner ?? r.p.name}
+                                    width="40"
+                                    height="40"
+                                    class="size-full object-cover"
+                                    loading="lazy"
+                                  />
+                                ) : (
+                                  <div class="flex size-full items-center justify-center font-mono text-xs font-bold text-foreground/70">
+                                    {(r.p.owner ?? r.p.name).charAt(0).toUpperCase()}
+                                  </div>
+                                )}
+                              </div>
+                              <span
+                                class:list={[
+                                  'lamp absolute -top-0.5 -right-0.5 z-10 ring-2 ring-card',
+                                  lampClass[r.p.healthLevel],
+                                ]}
+                                title={t(`health.tip.${r.p.healthLevel}` as const)}
+                              />
+                            </div>
+
+                            <div class="min-w-0 flex-1">
+                              <h3 class="truncate text-base font-bold tracking-tight text-foreground transition-colors group-hover:underline">
+                                {r.p.title}
+                              </h3>
+                              <p class="truncate font-mono text-xs text-muted-foreground">
+                                {r.p.name}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Metric Block */}
+                        <div class="mt-6 border-t border-border/60 pt-4">
+                          <span class="tabular block font-mono text-3xl font-extrabold tracking-tight text-foreground">
+                            {r.display}
+                          </span>
+                          <span class="text-xs font-medium text-muted-foreground/80 mt-0.5 block">
+                            {b.caption}
+                          </span>
+                        </div>
+                      </a>
+                    );
+                  })}
+                </div>
+
+                {/* Long Tail Table Rows (4..50) */}
+                <div class="mt-8 overflow-hidden rounded-3xl border border-border/80 bg-card p-4 sm:p-6 shadow-xs">
+                  <div class="space-y-2">
+                    {b.rows.slice(3).map((r) => (
+                      <a
+                        href={localePath(lang, `/plugins/${r.p.slug}`)}
+                        class="group flex flex-col gap-2 rounded-2xl border border-transparent p-3 transition-all hover:border-border hover:bg-secondary/40 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
+                      >
+                        {/* Rank + Avatar + Titles */}
+                        <div class="flex items-center gap-3.5 min-w-0 flex-1">
+                          <span class="tabular flex size-6 shrink-0 items-center justify-center font-mono text-xs font-bold text-muted-foreground/70">
+                            {String(r.rank).padStart(2, '0')}
+                          </span>
+
+                          <div class="relative size-8 shrink-0">
+                            <div class="size-full overflow-hidden rounded-lg border border-border/80 bg-secondary/50 shadow-2xs">
+                              {r.p.ownerAvatar ? (
+                                <img
+                                  src={r.p.ownerAvatar}
+                                  alt={r.p.owner ?? r.p.name}
+                                  width="32"
+                                  height="32"
+                                  class="size-full object-cover"
+                                  loading="lazy"
+                                />
+                              ) : (
+                                <div class="flex size-full items-center justify-center font-mono text-xs font-bold text-foreground/70">
+                                  {(r.p.owner ?? r.p.name).charAt(0).toUpperCase()}
+                                </div>
+                              )}
+                            </div>
+                            <span
+                              class:list={[
+                                'lamp absolute -top-0.5 -right-0.5 z-10 ring-2 ring-card',
+                                lampClass[r.p.healthLevel],
+                              ]}
+                              title={t(`health.tip.${r.p.healthLevel}` as const)}
+                            />
+                          </div>
+
+                          <div class="min-w-0 flex-1">
+                            <div class="flex items-center gap-2">
+                              <span class="truncate text-sm font-semibold tracking-tight text-foreground transition-colors group-hover:underline">
+                                {r.p.title}
+                              </span>
+                              {r.p.archived && (
+                                <span class="shrink-0 rounded border border-danger/25 bg-danger-bg px-1.5 font-mono text-[0.625rem] text-danger">
+                                  {t('rankings.archived')}
+                                </span>
+                              )}
+                            </div>
+                            <p class="truncate font-mono text-xs text-muted-foreground">
+                              {r.p.name}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Category + Metric Bar + Value */}
+                        <div class="flex shrink-0 items-center justify-between gap-4 self-end pl-10 sm:self-center sm:pl-0">
+                          <span class="hidden rounded-md border border-border/60 bg-secondary/60 px-2 py-0.5 text-xs text-muted-foreground lg:inline-block">
+                            {categoryLabel(r.p.category, lang)}
+                          </span>
+
+                          {b.scale !== 'none' && (
+                            <div class="hidden w-28 h-1.5 overflow-hidden rounded-full bg-secondary sm:block">
+                              <div
+                                class="h-full rounded-full bg-foreground/30"
+                                style={`width:${r.pct}%`}
+                              />
+                            </div>
+                          )}
+
+                          <span class="tabular font-mono text-sm font-bold text-foreground text-right min-w-[5rem]">
+                            {r.display}
+                          </span>
+
+                          <span class="text-xs text-muted-foreground group-hover:text-foreground group-hover:translate-x-0.5 transition-all">
+                            →
+                          </span>
+                        </div>
+                      </a>
+                    ))}
+                  </div>
+
+                  <div class="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-border/60 pt-4 font-mono text-xs text-muted-foreground">
+                    <span>{t('rankings.onlyTop', { n: TOP_N })}</span>
+                    <a
+                      href={localePath(lang, "/plugins")}
+                      class="text-foreground hover:underline inline-flex items-center gap-1"
+                    >
+                      <span>{t('rankings.seeAll', { n: formatNumber(census.total) })}</span>
+                      <span>→</span>
+                    </a>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        ))
+      }
+    </div>
+  </div>
+</Layout>
+
+<script>
+  document.addEventListener('astro:page-load', () => {
+    const root = document.querySelector<HTMLElement>('[data-rankings]');
+    if (!root) return;
+
+    const tabs = root.querySelectorAll<HTMLButtonElement>('[data-rank-tab]');
+    const select = (id: string) => {
+      tabs.forEach((t) => t.setAttribute('aria-selected', String(t.dataset.rankTab === id)));
+      root.querySelectorAll<HTMLElement>('[data-rank-panel]').forEach((panel) => {
+        panel.classList.toggle('hidden', panel.dataset.rankPanel !== id);
+      });
+    };
+
+    tabs.forEach((tab) => {
+      tab.addEventListener('click', () => {
+        select(tab.dataset.rankTab!);
+        // Keep ClientRouter's state on the entry — see PluginExplorer.
+        history.replaceState(history.state, '', `#${tab.dataset.rankTab}`);
+      });
+    });
+
+    root.querySelectorAll<HTMLAnchorElement>('[data-goto-tab]').forEach((a) => {
+      a.addEventListener('click', (e) => {
+        e.preventDefault();
+        select(a.dataset.gotoTab!);
+        history.replaceState(history.state, '', `#${a.dataset.gotoTab}`);
+        root.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+    });
+
+    const hash = location.hash.slice(1);
+    if (hash && root.querySelector(`[data-rank-tab="${hash}"]`)) select(hash);
+  });
+</script>

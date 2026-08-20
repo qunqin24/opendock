@@ -1,6 +1,10 @@
 ---
 import { census, totals } from '../lib/plugins';
 import { compactNumber, formatNumber, seededShuffle } from '../lib/utils';
+import { localeFromPath, localePath, useTranslations } from '../lib/i18n';
+
+const lang = localeFromPath(Astro.url.pathname);
+const t = useTranslations(lang);
 
 const activeRate = Math.round((census.active / Math.max(census.total, 1)) * 100);
 
@@ -31,13 +35,13 @@ const cellTone: Record<string, string> = {
 };
 
 const quickTags = [
-  { label: '智能体编排', href: '/categories/agents' },
-  { label: 'MCP 集成', href: '/categories/mcp' },
-  { label: '记忆与上下文', href: '/categories/memory' },
-  { label: '代码智能', href: '/categories/lsp' },
-  { label: 'Git 工作流', href: '/categories/git' },
-  { label: '本周飙升', href: '/rankings#trending' },
-];
+  { key: 'agents', href: '/categories/agents' },
+  { key: 'mcp', href: '/categories/mcp' },
+  { key: 'memory', href: '/categories/memory' },
+  { key: 'lsp', href: '/categories/lsp' },
+  { key: 'git', href: '/categories/git' },
+  { key: 'trending', href: '/rankings#trending' },
+] as const;
 ---
 
 <section class="relative overflow-hidden border-b border-border/80 bg-gradient-to-b from-secondary/40 via-background to-background pt-12 pb-16 sm:pt-18 sm:pb-20">
@@ -55,15 +59,18 @@ const quickTags = [
     <!-- Hero Header: Headline & Subtitle -->
     <div class="mx-auto max-w-3xl text-center">
       <h1 class="text-balance text-4xl font-extrabold tracking-tight text-foreground sm:text-5xl lg:text-6xl">
-        探索 <span class="bg-gradient-to-r from-foreground via-foreground/90 to-muted-foreground bg-clip-text text-transparent">opencode</span> 插件生态全景
+        {t('home.hero.title.before')}<span
+          class="bg-gradient-to-r from-foreground via-foreground/90 to-muted-foreground bg-clip-text text-transparent"
+          >opencode</span
+        >{t('home.hero.title.after')}
       </h1>
 
       <p class="mt-4 text-balance text-base text-muted-foreground sm:text-lg sm:leading-8">
-        全量收录 <span class="font-semibold text-foreground">{formatNumber(census.total)}</span> 款生态插件，不仅看星标，更结合装机量、活跃度与状态灯实时点检，告别停更与已废弃插件。
+        {t('home.hero.subtitle', { total: formatNumber(census.total) })}
       </p>
 
       <!-- Central Search Box -->
-      <form action="/plugins" method="get" class="relative mx-auto mt-8 max-w-xl">
+      <form action={localePath(lang, '/plugins')} method="get" class="relative mx-auto mt-8 max-w-xl">
         <div class="group relative flex items-center rounded-2xl border-2 border-border bg-card p-1.5 shadow-lg shadow-foreground/[0.03] transition-all focus-within:border-foreground/80 focus-within:ring-4 focus-within:ring-foreground/5 hover:border-foreground/40">
           <div class="grid size-10 place-items-center text-muted-foreground">
             <svg viewBox="0 0 20 20" fill="currentColor" class="size-5" aria-hidden="true">
@@ -75,8 +82,8 @@ const quickTags = [
             type="search"
             name="q"
             data-plugin-search
-            placeholder="搜索插件名、功能、关键词或作者 (按 / 聚焦)..."
-            aria-label="搜索插件"
+            placeholder={t('home.hero.searchPlaceholder')}
+            aria-label={t('explorer.searchAria')}
             class="min-w-0 flex-1 bg-transparent px-2 text-sm text-foreground placeholder:text-muted-foreground/70 focus:outline-none"
           />
 
@@ -88,7 +95,7 @@ const quickTags = [
               type="submit"
               class="inline-flex items-center justify-center rounded-xl bg-foreground px-4 py-2 text-xs font-semibold text-background transition-opacity hover:opacity-90 active:scale-95"
             >
-              查找
+              {t('home.hero.search')}
             </button>
           </div>
         </div>
@@ -96,14 +103,14 @@ const quickTags = [
 
       <!-- Quick Chips -->
       <div class="mt-4 flex flex-wrap items-center justify-center gap-1.5 text-xs">
-        <span class="text-muted-foreground/80 mr-1 font-mono text-[0.6875rem]">热门探索:</span>
+        <span class="text-muted-foreground/80 mr-1 font-mono text-[0.6875rem]">{t('home.hero.popular')}</span>
         {
           quickTags.map((tag) => (
             <a
-              href={tag.href}
+              href={localePath(lang, tag.href)}
               class="rounded-full border border-border/80 bg-card/60 px-2.5 py-1 text-xs text-muted-foreground transition-all hover:border-foreground/40 hover:bg-secondary hover:text-foreground"
             >
-              {tag.label}
+              {t(`home.tag.${tag.key}` as const)}
             </a>
           ))
         }
@@ -115,22 +122,22 @@ const quickTags = [
       <!-- 4 Metric Cards (8 cols) -->
       <div class="grid grid-cols-2 gap-4 lg:col-span-8">
         <div class="rounded-2xl border border-border/80 bg-card p-5 transition-colors hover:border-border">
-          <p class="text-xs font-medium text-muted-foreground">收录插件 (坞位)</p>
+          <p class="text-xs font-medium text-muted-foreground">{t('home.metric.indexed')}</p>
           <div class="mt-2 flex items-baseline gap-2">
             <span class="tabular font-mono text-3xl font-extrabold tracking-tight text-foreground sm:text-4xl">
               {formatNumber(census.total)}
             </span>
             <span class="rounded bg-dock/15 px-1.5 py-0.5 font-mono text-[0.6875rem] font-bold text-dock">
-              全量
+              {t('home.metric.indexedTag')}
             </span>
           </div>
           <p class="mt-2 text-xs text-muted-foreground/80">
-            自动抓取 npm 生态带标签包
+            {t('home.metric.indexedHint')}
           </p>
         </div>
 
         <div class="rounded-2xl border border-border/80 bg-card p-5 transition-colors hover:border-border">
-          <p class="text-xs font-medium text-muted-foreground">累计 GitHub 星标</p>
+          <p class="text-xs font-medium text-muted-foreground">{t('home.metric.stars')}</p>
           <div class="mt-2 flex items-baseline gap-2">
             <span class="tabular font-mono text-3xl font-extrabold tracking-tight text-foreground sm:text-4xl">
               {compactNumber(totals.stars)}
@@ -142,12 +149,12 @@ const quickTags = [
             </span>
           </div>
           <p class="mt-2 text-xs text-muted-foreground/80">
-            实时拉取仓库最新星标变化
+            {t('home.metric.starsHint')}
           </p>
         </div>
 
         <div class="rounded-2xl border border-border/80 bg-card p-5 transition-colors hover:border-border">
-          <p class="text-xs font-medium text-muted-foreground">月度装机量</p>
+          <p class="text-xs font-medium text-muted-foreground">{t('home.metric.downloads')}</p>
           <div class="mt-2 flex items-baseline gap-2">
             <span class="tabular font-mono text-3xl font-extrabold tracking-tight text-foreground sm:text-4xl">
               {compactNumber(totals.downloadsMonth)}
@@ -157,12 +164,12 @@ const quickTags = [
             </span>
           </div>
           <p class="mt-2 text-xs text-muted-foreground/80">
-            npm 近 30 天真实下载统计
+            {t('home.metric.downloadsHint')}
           </p>
         </div>
 
         <div class="rounded-2xl border border-border/80 bg-card p-5 transition-colors hover:border-border">
-          <p class="text-xs font-medium text-muted-foreground">健康活跃率</p>
+          <p class="text-xs font-medium text-muted-foreground">{t('home.metric.active')}</p>
           <div class="mt-2 flex items-baseline gap-2">
             <span class="tabular font-mono text-3xl font-extrabold tracking-tight text-ok sm:text-4xl">
               {activeRate}%
@@ -172,7 +179,7 @@ const quickTags = [
             </span>
           </div>
           <p class="mt-2 text-xs text-muted-foreground/80">
-            {formatNumber(census.active)} 个项目近期持续维护
+            {t('home.metric.activeHint', { n: formatNumber(census.active) })}
           </p>
         </div>
       </div>
@@ -182,10 +189,10 @@ const quickTags = [
         <div>
           <div class="flex items-center justify-between">
             <p class="text-xs font-semibold tracking-wide text-foreground uppercase">
-              生态健康度矩阵
+              {t('home.pulse.title')}
             </p>
             <span class="tabular font-mono text-xs text-muted-foreground">
-              {CELLS} 样本 / {formatNumber(census.total)} 全量
+              {t('home.pulse.sample', { cells: CELLS, total: formatNumber(census.total) })}
             </span>
           </div>
 
@@ -193,7 +200,7 @@ const quickTags = [
           <div
             class="dock-sweep relative mt-3 overflow-hidden rounded-xl border border-border/60 bg-muted/40 p-2.5"
             role="img"
-            aria-label={`健康度占比：${activeRate}% 活跃`}
+            aria-label={t('home.pulse.aria', { rate: activeRate })}
           >
             <div class="grid grid-cols-[repeat(15,minmax(0,1fr))] gap-[3px]">
               {grid.map((level) => (
@@ -207,15 +214,15 @@ const quickTags = [
         <div class="mt-4 flex items-center justify-between border-t border-border/60 pt-3 text-[0.6875rem] font-mono text-muted-foreground">
           <span class="flex items-center gap-1.5">
             <span class="lamp lamp-ok" />
-            活跃 <strong class="tabular text-foreground">{census.active}</strong>
+            {t('home.pulse.ok')} <strong class="tabular text-foreground">{census.active}</strong>
           </span>
           <span class="flex items-center gap-1.5">
             <span class="lamp lamp-warn" />
-            停更 <strong class="tabular text-foreground">{census.ailing}</strong>
+            {t('home.pulse.warn')} <strong class="tabular text-foreground">{census.ailing}</strong>
           </span>
           <span class="flex items-center gap-1.5">
             <span class="lamp lamp-danger" />
-            归档 <strong class="tabular text-foreground">{census.abandoned}</strong>
+            {t('home.pulse.danger')} <strong class="tabular text-foreground">{census.abandoned}</strong>
           </span>
         </div>
       </div>

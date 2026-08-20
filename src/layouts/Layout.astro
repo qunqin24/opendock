@@ -3,6 +3,11 @@ import '../styles/global.css';
 import { ClientRouter } from 'astro:transitions';
 import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
+import ConsentBanner from '../components/ConsentBanner.astro';
+import {
+  DEFAULT_LOCALE, HTML_LANG, LOCALES, OG_LOCALE,
+  localeFromPath, localePath, stripLocale, useTranslations,
+} from '../lib/i18n';
 
 interface Props {
   title?: string;
@@ -12,9 +17,21 @@ interface Props {
   noindex?: boolean;
 }
 
+const lang = localeFromPath(Astro.url.pathname);
+const t = useTranslations(lang);
+
+const DEFAULT_TITLE = {
+  en: 'OpenDock — the opencode plugin directory and leaderboard',
+  zh: 'OpenDock — opencode 插件目录与排行榜',
+};
+const DEFAULT_DESCRIPTION = {
+  en: 'Every opencode plugin, indexed and ranked. Sorted by stars, downloads and activity, with maintenance health flags and copy-paste install config. Synced daily from npm and GitHub.',
+  zh: '收录并排名 opencode 生态的全部插件。按星标、下载量、活跃度综合排序，附健康度提示与一键安装配置。数据每日自动同步。',
+};
+
 const {
-  title = 'OpenDock — opencode 插件目录与排行榜',
-  description = '收录并排名 opencode 生态的全部插件。按星标、下载量、活跃度综合排序，附健康度提示与一键安装配置。数据每日自动同步。',
+  title = DEFAULT_TITLE[lang],
+  description = DEFAULT_DESCRIPTION[lang],
   canonical,
   noindex = false,
 } = Astro.props;
@@ -22,17 +39,71 @@ const {
 const site = Astro.site ?? new URL('https://opendock.dev');
 const canonicalURL = new URL(canonical ?? Astro.url.pathname, site);
 const fullTitle = title.includes('OpenDock') ? title : `${title} · OpenDock`;
+
+// Every page exists in both locales at a derivable path, so hreflang can be
+// emitted from the current path alone. x-default points at English, which is
+// what an unmatched visitor should land on.
+const barePath = stripLocale(Astro.url.pathname);
+
+// Site-level schema, emitted once per locale on the home page. The
+// SearchAction is what makes a sitelinks search box eligible.
+const isHome = barePath === '/';
+const siteSchema = {
+  '@context': 'https://schema.org',
+  '@graph': [
+    {
+      '@type': 'WebSite',
+      '@id': `${site.origin}/#website`,
+      url: new URL(localePath(lang, '/'), site).href,
+      name: 'OpenDock',
+      description: DEFAULT_DESCRIPTION[lang],
+      inLanguage: HTML_LANG[lang],
+      publisher: { '@id': `${site.origin}/#org` },
+      potentialAction: {
+        '@type': 'SearchAction',
+        target: {
+          '@type': 'EntryPoint',
+          urlTemplate: new URL(localePath(lang, '/plugins?q={search_term_string}'), site).href,
+        },
+        'query-input': 'required name=search_term_string',
+      },
+    },
+    {
+      '@type': 'Organization',
+      '@id': `${site.origin}/#org`,
+      name: 'OpenDock',
+      url: site.origin,
+      logo: new URL('/og.png', site).href,
+    },
+  ],
+};
+const alternates = LOCALES.map((l) => ({
+  lang: HTML_LANG[l],
+  href: new URL(localePath(l, barePath), site).href,
+}));
+const xDefault = new URL(localePath(DEFAULT_LOCALE, barePath), site).href;
 ---
 
 <!doctype html>
-<html lang="zh-CN" class="scroll-pt-20">
+<html lang={HTML_LANG[lang]} class="scroll-pt-20">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{fullTitle}</title>
     <meta name="description" content={description} />
     <link rel="canonical" href={canonicalURL} />
-    {noindex && <meta name="robots" content="noindex" />}
+    {noindex && <meta name="robots" content="noindex, follow" />}
+
+    {
+      !noindex && (
+        <>
+          {alternates.map((a) => (
+            <link rel="alternate" hreflang={a.lang} href={a.href} />
+          ))}
+          <link rel="alternate" hreflang="x-default" href={xDefault} />
+        </>
+      )
+    }
 
     {/* SVG first for browsers that take it; the .ico is the fallback every
         crawler and older browser fetches from the root regardless. */}
@@ -40,13 +111,14 @@ const fullTitle = title.includes('OpenDock') ? title : `${title} · OpenDock`;
     <link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="sitemap" href="/sitemap-index.xml" />
-    <link rel="alternate" type="application/rss+xml" title="OpenDock 新插件" href="/rss.xml" />
+    <link rel="alternate" type="application/rss+xml" title="OpenDock — new plugins" href="/rss.xml" />
 
     {/* Soft navigation between pages. Component scripts only execute once,
         so anything that binds to the DOM re-initialises on astro:page-load. */}
     <ClientRouter />
 
     <meta property="og:type" content="website" />
+    <meta property="og:locale" content={OG_LOCALE[lang]} />
     <meta property="og:site_name" content="OpenDock" />
     <meta property="og:title" content={fullTitle} />
     <meta property="og:description" content={description} />
@@ -81,6 +153,8 @@ const fullTitle = title.includes('OpenDock') ? title : `${title} · OpenDock`;
       })();
     </script>
 
+    {isHome && !noindex && <script is:inline type="application/ld+json" set:html={JSON.stringify(siteSchema)} />}
+
     <slot name="head" />
   </head>
 
@@ -89,7 +163,7 @@ const fullTitle = title.includes('OpenDock') ? title : `${title} · OpenDock`;
       href="#main"
       class="sr-only focus:not-sr-only focus:absolute focus:top-3 focus:left-3 focus:z-[60] focus:rounded-md focus:bg-foreground focus:px-3 focus:py-2 focus:text-sm focus:text-background"
     >
-      跳到主要内容
+      {t('a11y.skipToContent')}
     </a>
 
     <Header />
@@ -97,6 +171,7 @@ const fullTitle = title.includes('OpenDock') ? title : `${title} · OpenDock`;
       <slot />
     </main>
     <Footer />
+    <ConsentBanner />
 
     <script>
       // Smooth scrolling is opt-in per click rather than a standing rule on

@@ -12,10 +12,10 @@ export const GET: APIRoute = ({ site }) => {
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
-    <title>OpenDock — 新收录的 opencode 插件</title>
+    <title>OpenDock — newly indexed opencode plugins</title>
     <link>${base}</link>
-    <description>最新发布并被 OpenDock 收录的 opencode 插件。</description>
-    <language>zh-CN</language>
+    <description>Recently published opencode plugins, as indexed by OpenDock.</description>
+    <language>en</language>
     <lastBuildDate>${new Date().toUTCString()}</lastBuildDate>
     <atom:link href="${new URL('/rss.xml', base)}" rel="self" type="application/rss+xml" />
 ${items

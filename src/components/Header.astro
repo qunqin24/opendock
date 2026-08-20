@@ -2,13 +2,17 @@
 import Logo from './Logo.astro';
 import ThemeToggle from './ThemeToggle.astro';
 import CommandPalette from './CommandPalette.astro';
+import LanguageSwitcher from './LanguageSwitcher.astro';
+import { localeFromPath, localePath, stripLocale, useTranslations } from '../lib/i18n';
 
-const path = Astro.url.pathname;
+const lang = localeFromPath(Astro.url.pathname);
+const t = useTranslations(lang);
+const path = stripLocale(Astro.url.pathname);
 const links = [
-  { href: '/plugins', label: '全部插件' },
-  { href: '/categories', label: '分类' },
-  { href: '/rankings', label: '排行榜' },
-  { href: '/submit', label: '提交插件' },
+  { href: '/plugins', label: t('nav.plugins') },
+  { href: '/categories', label: t('nav.categories') },
+  { href: '/rankings', label: t('nav.rankings') },
+  { href: '/submit', label: t('nav.submit') },
 ];
 const isActive = (href: string) => path === href || path.startsWith(`${href}/`);
 ---
@@ -17,15 +21,15 @@ const isActive = (href: string) => path === href || path.startsWith(`${href}/`);
   class="sticky top-0 z-50 w-full border-b border-border bg-background/80 backdrop-blur-xl supports-[backdrop-filter]:bg-background/65"
 >
   <div class="mx-auto flex h-14 max-w-6xl items-center gap-6 px-4 sm:px-6">
-    <a href="/" class="group/logo shrink-0" aria-label="OpenDock 首页">
+    <a href={localePath(lang, '/')} class="group/logo shrink-0" aria-label={t('a11y.home')}>
       <Logo />
     </a>
 
-    <nav class="scrollbar-none hidden items-center gap-1 overflow-x-auto md:flex" aria-label="主导航">
+    <nav class="scrollbar-none hidden items-center gap-1 overflow-x-auto md:flex" aria-label={t('a11y.mainNav')}>
       {
         links.map((l) => (
           <a
-            href={l.href}
+            href={localePath(lang, l.href)}
             class:list={[
               'rounded-md px-3 py-1.5 text-sm transition-colors',
               isActive(l.href)
@@ -41,6 +45,7 @@ const isActive = (href: string) => path === href || path.startsWith(`${href}/`);
 
     <div class="ml-auto flex items-center gap-1.5">
       <CommandPalette />
+      <LanguageSwitcher />
 
       <a
         href="https://github.com/opencode-ai/opencode"
@@ -62,7 +67,7 @@ const isActive = (href: string) => path === href || path.startsWith(`${href}/`);
         type="button"
         id="mobile-menu-btn"
         class="grid size-9 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-secondary md:hidden"
-        aria-label="打开菜单"
+        aria-label={t('a11y.openMenu')}
         aria-expanded="false"
       >
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" class="size-4">
@@ -72,11 +77,11 @@ const isActive = (href: string) => path === href || path.startsWith(`${href}/`);
     </div>
   </div>
 
-  <nav id="mobile-menu" class="hidden border-t border-border px-4 py-2 md:hidden" aria-label="移动导航">
+  <nav id="mobile-menu" class="hidden border-t border-border px-4 py-2 md:hidden" aria-label={t('a11y.mobileNav')}>
     {
       links.map((l) => (
         <a
-          href={l.href}
+          href={localePath(lang, l.href)}
           class:list={[
             'block rounded-md px-3 py-2 text-sm transition-colors',
             isActive(l.href) ? 'bg-secondary font-medium' : 'text-muted-foreground hover:bg-secondary/60',
