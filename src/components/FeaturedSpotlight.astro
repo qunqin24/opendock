@@ -1,0 +1,151 @@
+---
+import type { Plugin } from '../lib/plugins';
+import { categoryLabel, lampClass, lampTitle } from '../lib/plugins';
+import { avatarUrl, compactNumber } from '../lib/utils';
+
+interface Props {
+  plugins: Plugin[];
+}
+
+const { plugins } = Astro.props;
+---
+
+<div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+  {
+    plugins.map((p, idx) => {
+      const isTop = idx === 0;
+      return (
+        <a
+          href={`/plugins/${p.slug}`}
+          class:list={[
+            'group relative flex flex-col justify-between overflow-hidden rounded-2xl border border-border/80 bg-card p-5.5 transition-all duration-300',
+            'hover:-translate-y-1 hover:border-foreground/30 hover:shadow-[0_8px_30px_rgb(0,0,0,0.06)]',
+            'dark:hover:shadow-[0_8px_30px_rgb(0,0,0,0.35)]',
+            isTop ? 'md:col-span-2 lg:col-span-1 bg-gradient-to-br from-card via-card to-secondary/30' : '',
+          ]}
+        >
+          {/* Subtle accent corner highlight */}
+          <div
+            class="pointer-events-none absolute -top-12 -right-12 size-28 rounded-full bg-dock/10 blur-2xl transition-opacity duration-300 group-hover:bg-dock/20"
+            aria-hidden="true"
+          />
+
+          <div>
+            {/* Top header: badges, status & score */}
+            <div class="flex items-center justify-between gap-2">
+              <div class="flex items-center gap-2">
+                <span
+                  class:list={[
+                    'tabular flex size-5.5 items-center justify-center rounded-md text-[0.6875rem] font-bold',
+                    idx === 0
+                      ? 'bg-dock text-dock-foreground shadow-xs'
+                      : 'bg-muted text-muted-foreground',
+                  ]}
+                >
+                  {idx + 1}
+                </span>
+
+                <span class="rounded-md border border-border/70 bg-secondary/70 px-2 py-0.5 text-[0.6875rem] font-medium text-foreground/80">
+                  {categoryLabel(p.category)}
+                </span>
+
+                {p.featured && (
+                  <span class="rounded-md bg-foreground px-1.5 py-0.5 text-[0.625rem] font-semibold text-background">
+                    精选
+                  </span>
+                )}
+              </div>
+
+              <div class="flex items-center gap-1.5">
+                <span
+                  class:list={['lamp', lampClass[p.healthLevel]]}
+                  title={lampTitle[p.healthLevel]}
+                />
+                <span
+                  class="tabular rounded-md border border-border/60 bg-muted/60 px-1.5 py-0.5 font-mono text-[0.6875rem] font-semibold text-foreground"
+                  title="综合评分"
+                >
+                  {p.score.toFixed(0)}
+                </span>
+              </div>
+            </div>
+
+            {/* Plugin identity & description */}
+            <div class="mt-4">
+              <div class="flex items-center gap-2.5">
+                <div class="size-6 shrink-0 overflow-hidden rounded-full border border-border/80 bg-secondary">
+                  {p.ownerAvatar ? (
+                    <img
+                      src={avatarUrl(p.ownerAvatar, 24)}
+                      alt={p.owner ?? 'author'}
+                      width="24"
+                      height="24"
+                      class="size-full object-cover"
+                      loading="lazy"
+                      decoding="async"
+                    />
+                  ) : (
+                    <div class="flex size-full items-center justify-center font-mono text-[0.6875rem] font-semibold text-foreground/70">
+                      {(p.owner ?? p.name).charAt(0).toUpperCase()}
+                    </div>
+                  )}
+                </div>
+                <h3 class="truncate text-base font-semibold tracking-tight text-foreground transition-colors group-hover:text-foreground">
+                  {p.title}
+                </h3>
+              </div>
+
+              <p class="mt-1 font-mono text-xs text-muted-foreground/80 truncate">
+                {p.name}
+              </p>
+
+              <p class="mt-3 line-clamp-2 text-sm leading-relaxed text-muted-foreground">
+                {p.description ?? '暂无描述信息'}
+              </p>
+            </div>
+
+            {/* Topic / Keyword chips if available */}
+            {p.keywords && p.keywords.length > 0 && (
+              <div class="mt-3.5 flex flex-wrap gap-1">
+                {p.keywords.slice(0, isTop ? 4 : 2).map((k) => (
+                  <span class="rounded border border-border/40 bg-secondary/40 px-1.5 py-0.5 font-mono text-[0.625rem] text-muted-foreground">
+                    #{k}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Bottom stats row */}
+          <div class="mt-5 flex items-center justify-between border-t border-border/60 pt-3.5 text-xs text-muted-foreground">
+            <div class="flex items-center gap-3.5 font-mono">
+              <span class="inline-flex items-center gap-1" title="GitHub Stars">
+                <svg viewBox="0 0 16 16" fill="currentColor" class="size-3.5 text-amber-500" aria-hidden="true">
+                  <path d="M8 .25a.75.75 0 0 1 .673.418l1.882 3.815 4.21.612a.75.75 0 0 1 .416 1.279l-3.046 2.97.719 4.192a.75.75 0 0 1-1.088.791L8 12.347l-3.766 1.98a.75.75 0 0 1-1.088-.79l.72-4.194L.818 6.374a.75.75 0 0 1 .416-1.28l4.21-.611L7.327.668A.75.75 0 0 1 8 .25Z" />
+                </svg>
+                <span class="tabular font-medium text-foreground">{compactNumber(p.stars)}</span>
+              </span>
+
+              {p.starsDelta7d > 0 && (
+                <span class="tabular font-medium text-ok" title="近 7 天新增星标">
+                  +{compactNumber(p.starsDelta7d)}
+                </span>
+              )}
+
+              <span class="inline-flex items-center gap-1" title="近 30 天下载量">
+                <svg viewBox="0 0 16 16" fill="currentColor" class="size-3.5 text-muted-foreground/70" aria-hidden="true">
+                  <path d="M7.25 1.75a.75.75 0 0 1 1.5 0v6.44l2.22-2.22a.75.75 0 1 1 1.06 1.06l-3.5 3.5a.75.75 0 0 1-1.06 0l-3.5-3.5a.75.75 0 0 1 1.06-1.06l2.22 2.22V1.75ZM2.5 11a.75.75 0 0 1 .75.75v1.5h9.5v-1.5a.75.75 0 0 1 1.5 0v2.25a.75.75 0 0 1-.75.75H2.5a.75.75 0 0 1-.75-.75v-2.25A.75.75 0 0 1 2.5 11Z" />
+                </svg>
+                <span class="tabular">{compactNumber(p.downloadsMonth)}</span>
+              </span>
+            </div>
+
+            <span class="text-[0.6875rem] font-medium text-foreground/80 group-hover:text-dock group-hover:translate-x-0.5 transition-all">
+              详情 →
+            </span>
+          </div>
+        </a>
+      );
+    })
+  }
+</div>

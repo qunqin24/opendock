@@ -162,6 +162,7 @@ export interface SearchDoc {
   title: string;
   description: string | null;
   owner: string | null;
+  ownerAvatar: string | null;
   category: string;
   keywords: string[];
   stars: number;
@@ -183,6 +184,7 @@ export const searchDocs: SearchDoc[] = plugins.map((p) => ({
   title: p.title,
   description: p.description,
   owner: p.owner,
+  ownerAvatar: p.ownerAvatar,
   category: p.category,
   keywords: p.keywords.slice(0, 8),
   stars: p.stars,

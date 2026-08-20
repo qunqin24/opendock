@@ -1,7 +1,7 @@
 ---
 import type { Plugin } from '../lib/plugins';
-import { lampClass, lampTitle } from '../lib/plugins';
-import { compactNumber, timeAgo } from '../lib/utils';
+import { categoryLabel, lampClass, lampTitle } from '../lib/plugins';
+import { avatarUrl, compactNumber, timeAgo } from '../lib/utils';
 
 interface Board {
   id: string;
@@ -9,7 +9,7 @@ interface Board {
   hint: string;
   plugins: Plugin[];
   /** Which figure earns the right-hand column on this board. */
-  metric: 'stars' | 'trending' | 'downloads' | 'recent';
+  metric: 'stars' | 'trending' | 'downloads' | 'recent' | 'top';
 }
 
 interface Props {
@@ -20,19 +20,42 @@ const { boards } = Astro.props;
 function metricOf(p: Plugin, metric: Board['metric']) {
   switch (metric) {
     case 'trending':
-      return { value: p.starsDelta7d > 0 ? `+${compactNumber(p.starsDelta7d)}` : '—', accent: p.starsDelta7d > 0 };
+      return {
+        label: '7日新增',
+        value: p.starsDelta7d > 0 ? `+${compactNumber(p.starsDelta7d)}` : '—',
+        accent: p.starsDelta7d > 0,
+      };
     case 'downloads':
-      return { value: compactNumber(p.downloadsMonth), accent: false };
+      return {
+        label: '月装机',
+        value: compactNumber(p.downloadsMonth),
+        accent: false,
+      };
     case 'recent':
-      return { value: timeAgo(p.createdAt), accent: false };
+      return {
+        label: '收录时间',
+        value: timeAgo(p.createdAt),
+        accent: false,
+      };
+    case 'top':
+      return {
+        label: '综合评分',
+        value: p.score.toFixed(0),
+        accent: true,
+      };
     default:
-      return { value: compactNumber(p.stars), accent: false };
+      return {
+        label: '星标',
+        value: compactNumber(p.stars),
+        accent: false,
+      };
   }
 }
 ---
 
-<div data-rankboard>
-  <div class="flex flex-wrap gap-x-1 border-b border-border" role="tablist">
+<div class="overflow-hidden rounded-2xl border border-border/80 bg-card shadow-xs" data-rankboard>
+  {/* Tab headers */}
+  <div class="flex flex-wrap items-center gap-2 border-b border-border/80 bg-secondary/30 p-2 sm:px-4" role="tablist">
     {
       boards.map((b, i) => (
         <button
@@ -41,69 +64,146 @@ function metricOf(p: Plugin, metric: Board['metric']) {
           data-tab={b.id}
           aria-selected={i === 0}
           class:list={[
-            'meta border-b-2 border-transparent px-1 pb-3 transition-colors',
-            'aria-selected:border-dock aria-selected:text-foreground',
-            'text-muted-foreground hover:text-foreground',
+            'group flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-semibold transition-all',
+            'aria-selected:bg-card aria-selected:text-foreground aria-selected:shadow-xs',
+            'text-muted-foreground hover:bg-secondary/60 hover:text-foreground',
           ]}
         >
-          <span class="tabular mr-1.5 text-muted-foreground/60">{String(i + 1).padStart(2, '0')}</span>
-          {b.label}
+          <span>{b.label}</span>
+          <span class="rounded-md bg-muted/80 px-1.5 py-0.5 font-mono text-[0.625rem] text-muted-foreground group-aria-selected:bg-secondary group-aria-selected:text-foreground">
+            {b.plugins.length}
+          </span>
         </button>
       ))
     }
   </div>
 
+  {/* Tab panels */}
   {
     boards.map((b, i) => (
-      <div data-panel={b.id} role="tabpanel" class:list={[i !== 0 && 'hidden']}>
-        <p class="px-1 py-3.5 text-sm text-muted-foreground">{b.hint}</p>
+      <div data-panel={b.id} role="tabpanel" class:list={[i !== 0 && 'hidden', 'p-4 sm:p-6']}>
+        <div class="mb-4 flex items-center justify-between">
+          <p class="text-xs text-muted-foreground">{b.hint}</p>
+          <span class="font-mono text-[0.6875rem] text-muted-foreground">TOP {b.plugins.length}</span>
+        </div>
 
-        <ol>
+        <div class="space-y-2">
           {b.plugins.map((p, idx) => {
             const m = metricOf(p, b.metric);
+            const isTop1 = idx === 0;
+            const isTop2 = idx === 1;
+            const isTop3 = idx === 2;
+
             return (
-              <li>
-                <a
-                  href={`/plugins/${p.slug}`}
-                  class="group relative grid grid-cols-[2rem_1fr_auto] items-center gap-4 border-t border-border/60 px-1 py-3 transition-[background-color,transform] duration-200 hover:translate-x-1 hover:bg-secondary/50"
-                >
-                  <span class="tabular font-mono text-[0.8125rem] text-muted-foreground/70">
-                    {String(idx + 1).padStart(2, '0')}
-                  </span>
-
-                  <span class="min-w-0">
-                    <span class="flex items-center gap-2.5">
-                      <span class:list={['lamp', lampClass[p.healthLevel]]} title={lampTitle[p.healthLevel]} />
-                      <span class="truncate text-sm font-medium tracking-tight group-hover:underline">
-                        {p.title}
-                      </span>
-                    </span>
-                    <span class="mt-0.5 block truncate text-xs text-muted-foreground">
-                      {p.description ?? p.name}
-                    </span>
-                  </span>
-
+              <a
+                href={`/plugins/${p.slug}`}
+                class="group flex flex-col gap-2 rounded-xl border border-transparent p-3 transition-all hover:border-border/80 hover:bg-secondary/40 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
+              >
+                {/* Left: Rank index, Avatar with health lamp, & Identity */}
+                <div class="flex items-center gap-3 min-w-0">
                   <span
                     class:list={[
-                      'tabular shrink-0 text-right font-mono text-[0.8125rem]',
-                      m.accent ? 'text-ok' : 'text-foreground',
+                      'tabular flex size-6 shrink-0 items-center justify-center rounded-lg font-mono text-xs font-bold',
+                      isTop1
+                        ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
+                        : isTop2
+                          ? 'bg-slate-400/15 text-slate-600 dark:text-slate-300'
+                          : isTop3
+                            ? 'bg-orange-600/15 text-orange-600 dark:text-orange-400'
+                            : 'bg-muted/70 text-muted-foreground',
                     ]}
                   >
-                    {m.value}
+                    {idx + 1}
                   </span>
-                </a>
-              </li>
+
+                  {/* Plugin Author Avatar with Health Status Badge */}
+                  <div class="relative size-8 shrink-0">
+                    <div class="size-full overflow-hidden rounded-lg border border-border/80 bg-secondary/50">
+                      {p.ownerAvatar ? (
+                        <img
+                          src={avatarUrl(p.ownerAvatar, 32)}
+                          alt={p.owner ?? p.name}
+                          width="32"
+                          height="32"
+                          class="size-full object-cover"
+                          loading="lazy"
+                          decoding="async"
+                        />
+                      ) : (
+                        <div class="flex size-full items-center justify-center font-mono text-xs font-bold text-foreground/70">
+                          {(p.owner ?? p.name).charAt(0).toUpperCase()}
+                        </div>
+                      )}
+                    </div>
+                    <span
+                      class:list={[
+                        'lamp absolute -top-0.5 -right-0.5 z-10 ring-2 ring-card',
+                        lampClass[p.healthLevel],
+                      ]}
+                      title={lampTitle[p.healthLevel]}
+                    />
+                  </div>
+
+                  <div class="min-w-0">
+                    <div class="flex items-center gap-2">
+                      <span class="truncate text-sm font-semibold tracking-tight text-foreground transition-colors group-hover:text-foreground">
+                        {p.title}
+                      </span>
+                      <span class="hidden rounded border border-border/60 bg-muted/60 px-1.5 py-px text-[0.625rem] text-muted-foreground md:inline-block">
+                        {categoryLabel(p.category)}
+                      </span>
+                    </div>
+                    <p class="truncate text-xs text-muted-foreground">
+                      {p.description ?? p.name}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Right: Metrics */}
+                <div class="flex shrink-0 items-center justify-between gap-4 self-end pl-17 font-mono text-xs text-muted-foreground sm:self-center sm:pl-0">
+                  <div class="hidden items-center gap-3 lg:flex">
+                    <span class="tabular inline-flex items-center gap-1" title="Stars">
+                      <svg viewBox="0 0 16 16" fill="currentColor" class="size-3.5 text-amber-500" aria-hidden="true">
+                        <path d="M8 .25a.75.75 0 0 1 .673.418l1.882 3.815 4.21.612a.75.75 0 0 1 .416 1.279l-3.046 2.97.719 4.192a.75.75 0 0 1-1.088.791L8 12.347l-3.766 1.98a.75.75 0 0 1-1.088-.79l.72-4.194L.818 6.374a.75.75 0 0 1 .416-1.28l4.21-.611L7.327.668A.75.75 0 0 1 8 .25Z" />
+                      </svg>
+                      <span class="font-medium text-foreground">{compactNumber(p.stars)}</span>
+                    </span>
+                    <span class="tabular inline-flex items-center gap-1" title="月装机">
+                      <svg viewBox="0 0 16 16" fill="currentColor" class="size-3.5 text-muted-foreground/70" aria-hidden="true">
+                        <path d="M7.25 1.75a.75.75 0 0 1 1.5 0v6.44l2.22-2.22a.75.75 0 1 1 1.06 1.06l-3.5 3.5a.75.75 0 0 1-1.06 0l-3.5-3.5a.75.75 0 0 1 1.06-1.06l2.22 2.22V1.75ZM2.5 11a.75.75 0 0 1 .75.75v1.5h9.5v-1.5a.75.75 0 0 1 1.5 0v2.25a.75.75 0 0 1-.75.75H2.5a.75.75 0 0 1-.75-.75v-2.25A.75.75 0 0 1 2.5 11Z" />
+                      </svg>
+                      <span>{compactNumber(p.downloadsMonth)}</span>
+                    </span>
+                  </div>
+
+                  <div class="text-right">
+                    <span class="text-[0.625rem] text-muted-foreground/70 uppercase block font-sans font-medium">
+                      {m.label}
+                    </span>
+                    <span
+                      class:list={[
+                        'tabular font-mono text-sm font-semibold',
+                        m.accent ? 'text-ok' : 'text-foreground',
+                      ]}
+                    >
+                      {m.value}
+                    </span>
+                  </div>
+
+                  <span class="text-xs text-muted-foreground group-hover:text-foreground group-hover:translate-x-0.5 transition-all">
+                    →
+                  </span>
+                </div>
+              </a>
             );
           })}
-        </ol>
+        </div>
       </div>
     ))
   }
 </div>
 
 <script>
-  // Re-bound after every soft navigation — the module only executes once,
-  // but returning to this page swaps in fresh tab elements.
   document.addEventListener('astro:page-load', () => {
     document.querySelectorAll<HTMLElement>('[data-rankboard]').forEach((root) => {
       const tabs = root.querySelectorAll<HTMLButtonElement>('[data-tab]');

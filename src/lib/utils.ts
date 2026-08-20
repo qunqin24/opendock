@@ -71,3 +71,12 @@ export function formatDate(iso: string | null | undefined): string {
   if (Number.isNaN(d.getTime())) return '未知';
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
+
+/**
+ * GitHub serves avatars at ~460px by default, which is ten times the size any
+ * slot on this site renders them at. `s=` is honoured on every avatar URL the
+ * crawler stores, and a list page paints 60 of them at once.
+ */
+export function avatarUrl(url: string, size: number): string {
+  return `${url}${url.includes('?') ? '&' : '?'}s=${size * 2}`;
+}

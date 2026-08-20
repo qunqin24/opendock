@@ -1,15 +1,15 @@
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import Fuse from 'fuse.js';
 import type { Category, SearchDoc } from '../lib/plugins';
-import { cn, compactNumber, timeAgo } from '../lib/utils';
+import { avatarUrl, cn, compactNumber, timeAgo } from '../lib/utils';
 
 const PAGE_SIZE = 60;
 
 const SORTS = [
   { id: 'score', label: '综合评分', hint: '星标 + 下载 + 活跃度 + 增长' },
-  { id: 'stars', label: '星标数', hint: 'GitHub 累计星标' },
+  { id: 'stars', label: 'GitHub 星标', hint: 'GitHub 累计星标' },
   { id: 'trending', label: '本周飙升', hint: '近 7 天新增星标' },
-  { id: 'downloads', label: '下载量', hint: '近 30 天 npm 下载' },
+  { id: 'downloads', label: '月装机量', hint: '近 30 天 npm 下载' },
   { id: 'recent', label: '最新发布', hint: '按首次发布时间' },
   { id: 'updated', label: '最近更新', hint: '按最后提交时间' },
 ] as const;
@@ -18,7 +18,7 @@ type SortId = (typeof SORTS)[number]['id'];
 
 const HEALTH_FILTERS = [
   { id: 'all', label: '全部', hint: '不过滤维护状态' },
-  { id: 'healthy', label: '仅维护活跃', hint: '排除已归档、已废弃与长期停更' },
+  { id: 'healthy', label: '维护活跃', hint: '排除已归档、已废弃与长期停更' },
   { id: 'has-repo', label: '有源码仓库', hint: '排除找不到公开仓库的包' },
 ] as const;
 
@@ -89,7 +89,11 @@ export default function PluginExplorer({ docs, categories, initialCategory = 'al
     if (category !== 'all') params.set('category', category);
     if (sort !== initialSort) params.set('sort', sort);
     const qs = params.toString();
-    window.history.replaceState(null, '', qs ? `?${qs}` : window.location.pathname);
+    // Pass the existing state through. ClientRouter keeps its own {index,
+    // scrollX, scrollY} on every entry and reads it back on popstate —
+    // replacing it with null leaves the entry unmanaged, so going back to
+    // this page changes the URL without ever swapping the document.
+    window.history.replaceState(window.history.state, '', qs ? `?${qs}` : window.location.pathname);
   }, [query, category, sort, initialSort, restored]);
 
   useEffect(() => {
@@ -107,7 +111,12 @@ export default function PluginExplorer({ docs, categories, initialCategory = 'al
           { name: 'keywords', weight: 1.5 },
           { name: 'owner', weight: 1 },
         ],
-        threshold: 0.35,
+        // 0.35 is one step over a cliff: Fuse allows floor(threshold * query
+        // length) errors, so at 0.35 a 3-letter query like "git" is allowed
+        // one edit anywhere in any field and matches 1479 of 1481 plugins.
+        // 0.3 keeps a one-character typo working for longer queries while
+        // "git" drops to 112 real hits.
+        threshold: 0.3,
         ignoreLocation: true,
         minMatchCharLength: 2,
       }),
@@ -150,22 +159,20 @@ export default function PluginExplorer({ docs, categories, initialCategory = 'al
   }, [initialCategory, initialSort]);
 
   const searching = Boolean(deferredQuery.trim());
+  // Fuse orders by relevance and the two date sorts order by time, so the
+  // position number means nothing there — show it as a plain row index
+  // instead of a medal, which reads as "#1 in the ecosystem".
+  const ranked = !searching && sort !== 'recent' && sort !== 'updated';
   const activeFilters = (category !== initialCategory ? 1 : 0) + (health !== 'all' ? 1 : 0) + (searching ? 1 : 0);
 
   const categoryLabels = useMemo(() => new Map(categories.map((c) => [c.id, c.label])), [categories]);
 
-  // Header and rows must share one track definition or the columns drift.
-  // Category pages drop the 分类 column — every row would say the same thing.
-  const gridCols = hasCategories
-    ? 'grid-cols-[2.25rem_1fr_4.5rem] sm:grid-cols-[2.5rem_1fr_4.5rem_4.5rem] lg:grid-cols-[2.5rem_1fr_6rem_4.5rem_4.5rem_4.5rem]'
-    : 'grid-cols-[2.25rem_1fr_4.5rem] sm:grid-cols-[2.5rem_1fr_4.5rem_4.5rem] lg:grid-cols-[2.5rem_1fr_4.5rem_4.5rem_4.5rem]';
-
   const filterPanel = (
     <>
       {hasCategories && (
-        <FilterGroup title="分类">
+        <FilterGroup title="分类领域">
           <FilterItem active={category === 'all'} count={docs.length} onClick={() => setCategory('all')}>
-            全部
+            全部分类
           </FilterItem>
           {categories.map((c) => (
             <FilterItem
@@ -192,29 +199,33 @@ export default function PluginExplorer({ docs, categories, initialCategory = 'al
   );
 
   return (
-    <div className={cn(hasCategories && 'lg:grid lg:grid-cols-[13rem_1fr] lg:gap-10')}>
+    <div className={cn(hasCategories && 'lg:grid lg:grid-cols-[14rem_1fr] lg:gap-8')}>
       {/* ---- sidebar (desktop) ---- */}
       {hasCategories && (
         <aside className="hidden lg:block">
-          <div className="sticky top-32 space-y-7 pb-10">{filterPanel}</div>
+          <div className="sticky top-28 space-y-7 rounded-2xl border border-border/80 bg-card p-4 shadow-xs">
+            {filterPanel}
+          </div>
         </aside>
       )}
 
       <div className="min-w-0">
-        {/* ---- toolbar ---- */}
-        <div className="sticky top-14 z-30 -mx-4 border-b border-border bg-background/85 px-4 py-3 backdrop-blur-xl sm:-mx-6 sm:px-6">
-          <div className="flex gap-2">
-            <div className="relative flex-1">
+        {/* ---- Top Toolbar ---- */}
+        <div className="sticky top-14 z-30 -mx-4 border-b border-border/80 bg-background/90 px-4 py-3 backdrop-blur-xl sm:-mx-6 sm:px-6">
+          <div className="flex flex-wrap items-center gap-2.5">
+            {/* Search Input Box */}
+            <div className="relative min-w-[200px] flex-1">
               <svg
-                viewBox="0 0 16 16"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.6"
-                className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+                className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground"
                 aria-hidden="true"
               >
-                <circle cx="7" cy="7" r="4.75" />
-                <path d="m10.5 10.5 3.5 3.5" strokeLinecap="round" />
+                <path
+                  fillRule="evenodd"
+                  d="M9 3.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11ZM2 9a7 7 0 1 1 12.452 4.391l3.328 3.329a.75.75 0 1 1-1.06 1.06l-3.329-3.328A7 7 0 0 1 2 9Z"
+                  clipRule="evenodd"
+                />
               </svg>
               <input
                 ref={inputRef}
@@ -222,25 +233,44 @@ export default function PluginExplorer({ docs, categories, initialCategory = 'al
                 type="search"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="搜索插件名、功能、作者…"
+                placeholder="搜索插件名、功能、作者、关键词 (按 / 聚焦)..."
                 aria-label="搜索插件"
                 className={cn(
-                  'h-10 w-full rounded-lg border border-input bg-card pr-3 pl-9 text-sm',
-                  'placeholder:text-muted-foreground focus:border-ring focus:ring-2 focus:ring-ring/25 focus:outline-none',
+                  'h-10 w-full rounded-xl border border-input bg-card pr-14 pl-10 text-sm text-foreground transition-all',
+                  'placeholder:text-muted-foreground/70 focus:border-foreground/80 focus:ring-4 focus:ring-foreground/5 focus:outline-none',
                   '[&::-webkit-search-cancel-button]:hidden',
                 )}
               />
+              <div className="absolute top-1/2 right-2.5 -translate-y-1/2 flex items-center gap-1">
+                {query ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setQuery('');
+                      inputRef.current?.focus();
+                    }}
+                    className="grid size-5 place-items-center rounded-full bg-muted text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                    title="清空搜索"
+                  >
+                    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" className="size-2.5">
+                      <path d="M4 4l8 8M12 4l-8 8" strokeLinecap="round" />
+                    </svg>
+                  </button>
+                ) : (
+                  <kbd className="hidden rounded-md border border-border bg-muted/80 px-1.5 py-0.5 font-mono text-[0.625rem] text-muted-foreground sm:inline-block">
+                    /
+                  </kbd>
+                )}
+              </div>
             </div>
 
-            {/* Filters live in the sidebar on desktop; on narrow screens they
-                fold into this toggle instead of a chip strip that scrolls
-                half of them off the edge. */}
+            {/* Mobile Filter Trigger Button */}
             <button
               type="button"
               onClick={() => setFiltersOpen((o) => !o)}
               aria-expanded={filtersOpen}
               className={cn(
-                'h-10 shrink-0 rounded-lg border px-3 text-sm transition-colors',
+                'h-10 shrink-0 rounded-xl border px-3 text-xs font-semibold transition-all sm:text-sm',
                 hasCategories ? 'lg:hidden' : 'hidden',
                 activeFilters > 0 && !searching
                   ? 'border-foreground bg-foreground text-background'
@@ -249,30 +279,45 @@ export default function PluginExplorer({ docs, categories, initialCategory = 'al
             >
               筛选
               {activeFilters - (searching ? 1 : 0) > 0 && (
-                <span className="tabular ml-1.5">{activeFilters - (searching ? 1 : 0)}</span>
+                <span className="tabular ml-1.5 rounded-full bg-dock px-1.5 py-0.5 text-[0.625rem] font-bold text-dock-foreground">
+                  {activeFilters - (searching ? 1 : 0)}
+                </span>
               )}
             </button>
 
-            <select
-              value={sort}
-              onChange={(e) => setSort(e.target.value as SortId)}
-              aria-label="排序方式"
-              disabled={searching}
-              title={searching ? '搜索时按相关度排序' : SORTS.find((s) => s.id === sort)?.hint}
-              className={cn(
-                'h-10 shrink-0 rounded-lg border border-input bg-card px-3 text-sm',
-                'focus:border-ring focus:ring-2 focus:ring-ring/25 focus:outline-none',
-                'disabled:cursor-not-allowed disabled:opacity-50',
-              )}
-            >
-              {SORTS.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.label}
-                </option>
-              ))}
-            </select>
+            {/* Sort Dropdown */}
+            <div className="relative shrink-0">
+              <select
+                value={sort}
+                onChange={(e) => setSort(e.target.value as SortId)}
+                aria-label="排序方式"
+                disabled={searching}
+                title={searching ? '搜索时按相关度排序' : SORTS.find((s) => s.id === sort)?.hint}
+                className={cn(
+                  'h-10 cursor-pointer appearance-none rounded-xl border border-input bg-card pr-8 pl-3 text-xs font-medium text-foreground transition-all sm:text-sm',
+                  'focus:border-foreground/80 focus:ring-4 focus:ring-foreground/5 focus:outline-none hover:border-foreground/30',
+                  'disabled:cursor-not-allowed disabled:opacity-50',
+                )}
+              >
+                {SORTS.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.label}
+                  </option>
+                ))}
+              </select>
+              <div className="pointer-events-none absolute top-1/2 right-2.5 -translate-y-1/2 text-muted-foreground">
+                <svg viewBox="0 0 20 20" fill="currentColor" className="size-4">
+                  <path
+                    fillRule="evenodd"
+                    d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+              </div>
+            </div>
 
-            <div className="hidden shrink-0 items-center rounded-lg border border-input bg-card p-0.5 sm:flex">
+            {/* View Mode Switcher */}
+            <div className="hidden shrink-0 items-center rounded-xl border border-input bg-card p-1 sm:flex">
               <ViewButton active={view === 'list'} onClick={() => setView('list')} label="列表视图">
                 <path d="M2 4h12M2 8h12M2 12h12" />
               </ViewButton>
@@ -282,102 +327,120 @@ export default function PluginExplorer({ docs, categories, initialCategory = 'al
             </div>
           </div>
 
-          {/* Capped height: the full list is taller than a phone screen, and
-              it lives inside the sticky bar so the page can't scroll it. */}
+          {/* Quick Health Status Pills (Visible on all screen sizes) */}
+          <div className="mt-2.5 flex flex-wrap items-center gap-1.5 text-xs">
+            <span className="font-mono text-[0.6875rem] text-muted-foreground mr-1">快速过滤:</span>
+            {HEALTH_FILTERS.map((h) => (
+              <button
+                key={h.id}
+                type="button"
+                onClick={() => setHealth(h.id)}
+                className={cn(
+                  'inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-medium transition-all',
+                  health === h.id
+                    ? 'border-foreground bg-foreground text-background shadow-xs'
+                    : 'border-border/80 bg-card text-muted-foreground hover:border-foreground/30 hover:text-foreground',
+                )}
+              >
+                {h.id === 'healthy' && (
+                  <span className={cn('size-1.5 rounded-full', health === h.id ? 'bg-background' : 'bg-ok')} />
+                )}
+                {h.id === 'has-repo' && (
+                  <svg viewBox="0 0 16 16" fill="currentColor" className="size-3">
+                    <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z" />
+                  </svg>
+                )}
+                {h.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Mobile Collapsible Filter Drawer */}
           {filtersOpen && hasCategories && (
-            <div className="mt-3 max-h-[60vh] space-y-6 overflow-y-auto border-t border-border pt-4 lg:hidden">
+            <div className="mt-3 max-h-[60vh] space-y-6 overflow-y-auto rounded-xl border border-border bg-card p-4 shadow-lg lg:hidden">
               {filterPanel}
             </div>
           )}
         </div>
 
-        {/* ---- result meta ---- */}
-        <div className="flex items-center justify-between gap-3 py-4 text-sm text-muted-foreground">
+        {/* ---- Result Meta Bar ---- */}
+        <div className="flex items-center justify-between gap-3 py-4 text-xs sm:text-sm text-muted-foreground">
           <p className="tabular">
             {results.length === docs.length ? (
               <>
-                共 <span className="font-medium text-foreground">{docs.length}</span> 个插件
+                共收录 <span className="font-bold text-foreground">{docs.length}</span> 款插件
               </>
             ) : (
               <>
-                找到 <span className="font-medium text-foreground">{results.length}</span> 个结果
+                找到 <span className="font-bold text-foreground">{results.length}</span> 个匹配结果
               </>
             )}
-            {searching && <span className="ml-2 text-xs">按相关度排序</span>}
+            {searching && <span className="ml-2 rounded bg-secondary px-1.5 py-0.5 text-[0.6875rem]">按相关度排序</span>}
           </p>
+
           {activeFilters > 0 && (
             <button
               onClick={reset}
-              className="rounded-md px-2 py-1 text-xs transition-colors hover:bg-secondary hover:text-foreground"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
             >
-              清除筛选
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" className="size-2.5">
+                <path d="M4 4l8 8M12 4l-8 8" strokeLinecap="round" />
+              </svg>
+              <span>清除筛选</span>
             </button>
           )}
         </div>
 
-        {/* ---- results ---- */}
+        {/* ---- Results List / Grid ---- */}
         {results.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-border px-6 py-20 text-center">
-            <p className="text-sm font-medium">没有匹配的插件</p>
-            <p className="mt-1.5 text-sm text-muted-foreground">试试更宽泛的关键词，或清除筛选条件。</p>
+          <div className="rounded-2xl border border-dashed border-border/80 bg-card/40 px-6 py-20 text-center">
+            <div className="mx-auto grid size-12 place-items-center rounded-2xl bg-secondary text-muted-foreground">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="size-6">
+                <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+              </svg>
+            </div>
+            <p className="mt-4 text-base font-semibold text-foreground">没有找到匹配的插件</p>
+            <p className="mx-auto mt-1.5 max-w-sm text-xs leading-5 text-muted-foreground">
+              试试更简短的关键词，或重置分类与健康维护筛选条件。
+            </p>
             <button
               onClick={reset}
-              className="mt-5 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90"
+              className="mt-5 inline-flex items-center rounded-xl bg-foreground px-4 py-2 text-xs font-semibold text-background transition-opacity hover:opacity-90 shadow-sm"
             >
-              重置
+              重置所有筛选
             </button>
           </div>
         ) : view === 'grid' ? (
-          <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          <ul className="grid gap-3.5 sm:grid-cols-2 xl:grid-cols-3">
             {results.slice(0, visible).map((p, i) => (
               <li key={p.slug}>
-                <Card doc={p} rank={!searching && sort !== 'recent' ? i + 1 : undefined} />
+                <Card doc={p} rank={ranked ? i + 1 : undefined} categoryLabel={categoryLabels.get(p.category)} />
               </li>
             ))}
           </ul>
         ) : (
-          <div>
-            {/* Sits directly under the sticky toolbar (56px header + 65px bar)
-                so the numeric columns stay labelled however far you scroll. */}
-            <div
-              className={cn(
-                'meta sticky top-[7.625rem] z-20 grid gap-3 border-b border-border bg-background/85 px-1 py-2 text-muted-foreground backdrop-blur-xl',
-                gridCols,
-              )}
-            >
-              <span>{searching ? '#' : '排名'}</span>
-              <span>插件</span>
-              {hasCategories && <span className="hidden lg:block">分类</span>}
-              <span className={cn('text-right', sort === 'stars' && 'text-foreground')}>星标</span>
-              <span className={cn('hidden text-right sm:block', sort === 'downloads' && 'text-foreground')}>
-                月装机
-              </span>
-              <span className={cn('hidden text-right lg:block', sort === 'updated' && 'text-foreground')}>更新</span>
-            </div>
-
-            <ul>
-              {results.slice(0, visible).map((p, i) => (
-                <li key={p.slug}>
-                  <Row
-                    doc={p}
-                    rank={i + 1}
-                    sort={sort}
-                    gridCols={gridCols}
-                    categoryLabel={hasCategories ? (categoryLabels.get(p.category) ?? '') : undefined}
-                  />
-                </li>
-              ))}
-            </ul>
+          <div className="space-y-2.5">
+            {results.slice(0, visible).map((p, i) => (
+              <Row
+                key={p.slug}
+                doc={p}
+                rank={i + 1}
+                ranked={ranked}
+                categoryLabel={hasCategories ? (categoryLabels.get(p.category) ?? '') : undefined}
+                onSelectCategory={(catId) => setCategory(catId)}
+              />
+            ))}
           </div>
         )}
 
+        {/* ---- Load More Sentinel ---- */}
         {visible < results.length && (
-          <div ref={sentinelRef} className="mt-8 flex justify-center">
+          <div ref={sentinelRef} className="mt-8 flex justify-center pb-8">
             <button
               onClick={() => setVisible((v) => v + PAGE_SIZE)}
-              className="rounded-lg border border-border bg-card px-5 py-2.5 text-sm font-medium transition-colors hover:bg-secondary"
+              className="rounded-xl border border-border/80 bg-card px-6 py-2.5 text-xs font-semibold text-foreground transition-all hover:bg-secondary hover:shadow-xs"
             >
-              加载更多（还有 {results.length - visible} 个）
+              加载更多（剩余 {results.length - visible} 个）
             </button>
           </div>
         )}
@@ -389,8 +452,8 @@ export default function PluginExplorer({ docs, categories, initialCategory = 'al
 function FilterGroup({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div>
-      <h3 className="meta mb-2 px-2 text-muted-foreground">{title}</h3>
-      <ul className="space-y-px">{children}</ul>
+      <h3 className="mb-2 px-2 text-[0.6875rem] font-bold tracking-wider text-muted-foreground uppercase">{title}</h3>
+      <ul className="space-y-0.5">{children}</ul>
     </div>
   );
 }
@@ -416,13 +479,23 @@ function FilterItem({
         title={title}
         aria-pressed={active}
         className={cn(
-          'relative flex w-full items-center gap-2 rounded-md py-1.5 pr-2 pl-3 text-left text-sm transition-colors',
-          active ? 'bg-secondary font-medium text-foreground' : 'text-muted-foreground hover:text-foreground',
+          'group relative flex w-full items-center justify-between gap-2 rounded-xl py-1.5 pr-2.5 pl-3 text-left text-xs transition-all',
+          active
+            ? 'bg-foreground font-semibold text-background shadow-xs'
+            : 'text-muted-foreground hover:bg-secondary/70 hover:text-foreground',
         )}
       >
-        {active && <span className="absolute top-1.5 bottom-1.5 left-0 w-0.5 rounded-full bg-dock" />}
         <span className="min-w-0 flex-1 truncate">{children}</span>
-        {count !== undefined && <span className="tabular shrink-0 text-xs opacity-50">{count}</span>}
+        {count !== undefined && (
+          <span
+            className={cn(
+              'tabular font-mono text-[0.6875rem]',
+              active ? 'text-background/80' : 'text-muted-foreground/60 group-hover:text-muted-foreground',
+            )}
+          >
+            {count}
+          </span>
+        )}
       </button>
     </li>
   );
@@ -447,8 +520,8 @@ function ViewButton({
       aria-pressed={active}
       title={label}
       className={cn(
-        'rounded-md p-1.5 transition-colors',
-        active ? 'bg-secondary text-foreground' : 'text-muted-foreground hover:text-foreground',
+        'rounded-lg p-1.5 transition-all',
+        active ? 'bg-secondary text-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground',
       )}
     >
       <svg
@@ -473,154 +546,263 @@ const HEALTH_DOT: Record<string, string> = {
 };
 
 const HEALTH_TITLE: Record<string, string> = {
-  ok: '维护活跃',
-  warn: '需留意：长期未更新或缺少文档',
-  danger: '不建议使用：已归档或已废弃',
+  ok: '维护活跃 · 近期有提交维护',
+  warn: '需要留意 · 长期未更新或缺少文档',
+  danger: '不建议使用 · 仓库已归档或已废弃',
 };
 
-/** Compact row — the default view, tuned for scanning hundreds at a time. */
+/** Redesigned modern row component */
 function Row({
   doc: p,
   rank,
-  sort,
-  gridCols,
+  ranked,
   categoryLabel,
+  onSelectCategory,
 }: {
   doc: SearchDoc;
   rank: number;
-  sort: SortId;
-  gridCols: string;
-  /** Undefined drops the column entirely — see `gridCols` in the parent. */
+  /** False when the order isn't a ranking — see `ranked` in the parent. */
+  ranked: boolean;
   categoryLabel?: string;
+  onSelectCategory?: (catId: string) => void;
 }) {
+  const isTop1 = ranked && rank === 1;
+  const isTop2 = ranked && rank === 2;
+  const isTop3 = ranked && rank === 3;
+
   return (
-    <a
-      href={`/plugins/${p.slug}`}
+    <div
       className={cn(
-        'group relative grid items-center gap-3 border-b border-border/60 px-1 py-2.5',
-        'transition-[background-color,transform] duration-200 hover:translate-x-1 hover:bg-secondary/50',
-        gridCols,
+        'group relative flex flex-col justify-between gap-3 rounded-2xl border border-border/80 bg-card p-4 transition-all duration-200',
+        'hover:-translate-x-0.5 hover:border-foreground/30 hover:bg-secondary/35 hover:shadow-xs sm:flex-row sm:items-center sm:gap-4',
       )}
     >
-      <span
-        className="pointer-events-none absolute top-0 left-0 h-full w-0.5 scale-y-0 bg-dock transition-transform duration-200 group-hover:scale-y-100"
-        aria-hidden="true"
+      {/* The whole row is one click target, but the category chip is a second
+          one, and a <button> inside an <a> is not valid HTML. So the link is
+          an overlay and the chip sits on a layer above it. */}
+      <a
+        href={`/plugins/${p.slug}`}
+        aria-label={p.title}
+        className="absolute inset-0 z-10 rounded-2xl focus-visible:ring-2 focus-visible:ring-foreground/40 focus-visible:outline-none"
       />
+      {/* Left Pod: Rank + Avatar + Plugin Identity */}
+      <div className="flex items-center gap-3.5 min-w-0 flex-1">
+        {/* Rank Badge */}
+        <span
+          className={cn(
+            'tabular flex size-7 shrink-0 items-center justify-center rounded-xl font-mono text-xs font-bold shadow-2xs',
+            isTop1
+              ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
+              : isTop2
+                ? 'bg-slate-400/15 text-slate-600 dark:text-slate-300'
+                : isTop3
+                  ? 'bg-orange-600/15 text-orange-600 dark:text-orange-400'
+                  : 'bg-muted/80 text-muted-foreground',
+          )}
+        >
+          {String(rank).padStart(2, '0')}
+        </span>
 
-      <span className="tabular font-mono text-[0.8125rem] text-muted-foreground/70 group-hover:text-foreground">
-        {String(rank).padStart(2, '0')}
-      </span>
-
-      <span className="min-w-0">
-        <span className="flex items-center gap-2">
+        {/* Plugin Avatar with Health Status indicator */}
+        <div className="relative size-9 shrink-0">
+          <div className="size-full overflow-hidden rounded-xl border border-border/80 bg-secondary/50 shadow-2xs">
+            {p.ownerAvatar ? (
+              <img
+                src={avatarUrl(p.ownerAvatar, 36)}
+                alt={p.owner ?? p.name}
+                width={36}
+                height={36}
+                className="size-full object-cover"
+                loading="lazy"
+                decoding="async"
+              />
+            ) : (
+              <div className="flex size-full items-center justify-center font-mono text-xs font-bold text-foreground/70">
+                {(p.owner ?? p.name).charAt(0).toUpperCase()}
+              </div>
+            )}
+          </div>
           <span
-            className={cn('size-1.5 shrink-0 rounded-full', HEALTH_DOT[p.healthLevel])}
+            className={cn('lamp absolute -top-0.5 -right-0.5 z-10 ring-2 ring-card', HEALTH_DOT[p.healthLevel])}
             title={HEALTH_TITLE[p.healthLevel]}
           />
-          <span className="truncate text-sm font-medium tracking-tight group-hover:underline">{p.title}</span>
+        </div>
+
+        {/* Core details */}
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="truncate text-sm font-semibold tracking-tight text-foreground transition-colors group-hover:text-foreground">
+              {p.title}
+            </span>
+
+            {p.featured && (
+              <span className="rounded bg-foreground px-1.5 py-0.5 text-[0.625rem] font-bold text-background">
+                精选
+              </span>
+            )}
+
+            {categoryLabel && (
+              <button
+                type="button"
+                onClick={() => onSelectCategory?.(p.category)}
+                className="relative z-20 rounded-md border border-border/60 bg-secondary/70 px-2 py-0.5 text-[0.6875rem] font-medium text-foreground/80 transition-colors hover:border-foreground/40 hover:bg-secondary"
+                title={`筛选 ${categoryLabel} 分类`}
+              >
+                {categoryLabel}
+              </button>
+            )}
+          </div>
+
+          <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">
+            <span className="font-mono text-foreground/60 mr-2">{p.name}</span>
+            {p.description ?? '暂无描述'}
+          </p>
+        </div>
+      </div>
+
+      {/* Right Pod: Metrics & Score */}
+      <div className="flex shrink-0 items-center justify-between gap-4 self-end pl-10 font-mono text-xs text-muted-foreground sm:self-center sm:pl-0">
+        {/* Stars */}
+        <span className="tabular inline-flex items-center gap-1" title="GitHub Stars">
+          <svg viewBox="0 0 16 16" fill="currentColor" className="size-3.5 text-amber-500" aria-hidden="true">
+            <path d="M8 .25a.75.75 0 0 1 .673.418l1.882 3.815 4.21.612a.75.75 0 0 1 .416 1.279l-3.046 2.97.719 4.192a.75.75 0 0 1-1.088.791L8 12.347l-3.766 1.98a.75.75 0 0 1-1.088-.79l.72-4.194L.818 6.374a.75.75 0 0 1 .416-1.28l4.21-.611L7.327.668A.75.75 0 0 1 8 .25Z" />
+          </svg>
+          <span className="font-medium text-foreground">{compactNumber(p.stars)}</span>
           {p.starsDelta7d > 0 && (
-            <span className="tabular shrink-0 font-mono text-[0.6875rem] text-ok" title="近 7 天新增星标">
+            <span className="text-[0.6875rem] font-bold text-ok" title="近 7 天新增星标">
               +{compactNumber(p.starsDelta7d)}
             </span>
           )}
         </span>
-        <span className="mt-0.5 block truncate text-xs text-muted-foreground">{p.description ?? p.name}</span>
-      </span>
 
-      {categoryLabel !== undefined && (
-        <span className="hidden truncate text-xs text-muted-foreground lg:block">{categoryLabel}</span>
-      )}
+        {/* Downloads */}
+        <span className="tabular hidden items-center gap-1 sm:inline-flex" title="近 30 天 npm 下载量">
+          <svg viewBox="0 0 16 16" fill="currentColor" className="size-3.5 text-muted-foreground/70" aria-hidden="true">
+            <path d="M7.25 1.75a.75.75 0 0 1 1.5 0v6.44l2.22-2.22a.75.75 0 1 1 1.06 1.06l-3.5 3.5a.75.75 0 0 1-1.06 0l-3.5-3.5a.75.75 0 0 1 1.06-1.06l2.22 2.22V1.75ZM2.5 11a.75.75 0 0 1 .75.75v1.5h9.5v-1.5a.75.75 0 0 1 1.5 0v2.25a.75.75 0 0 1-.75.75H2.5a.75.75 0 0 1-.75-.75v-2.25A.75.75 0 0 1 2.5 11Z" />
+          </svg>
+          <span>{compactNumber(p.downloadsMonth)}</span>
+        </span>
 
-      <span
-        className={cn(
-          'tabular text-right font-mono text-[0.8125rem]',
-          sort === 'stars' ? 'text-foreground' : 'text-muted-foreground',
-        )}
-      >
-        {compactNumber(p.stars)}
-      </span>
+        {/* Updated Time */}
+        <span className="hidden truncate text-[0.6875rem] text-muted-foreground/80 md:inline-block" title="最近更新">
+          {timeAgo(p.pushedAt)}
+        </span>
 
-      <span
-        className={cn(
-          'tabular hidden text-right font-mono text-[0.8125rem] sm:block',
-          sort === 'downloads' ? 'text-foreground' : 'text-muted-foreground',
-        )}
-      >
-        {compactNumber(p.downloadsMonth)}
-      </span>
-
-      <span
-        className={cn(
-          'tabular hidden truncate text-right font-mono text-[0.6875rem] lg:block',
-          sort === 'updated' ? 'text-foreground' : 'text-muted-foreground',
-        )}
-      >
-        {timeAgo(p.pushedAt)}
-      </span>
-    </a>
-  );
-}
-
-function Card({ doc: p, rank }: { doc: SearchDoc; rank?: number }) {
-  return (
-    <a
-      href={`/plugins/${p.slug}`}
-      className={cn(
-        'group flex h-full flex-col rounded-xl border border-border bg-card p-5',
-        // Matches PluginCard.astro: tight contact shadow, no transform.
-        'transition-[box-shadow,border-color] duration-150',
-        'hover:border-foreground/25',
-        'hover:shadow-[0_1px_2px_rgb(0_0_0/0.05),0_2px_5px_-3px_rgb(0_0_0/0.08)]',
-        'dark:hover:shadow-[0_1px_2px_rgb(0_0_0/0.35),0_2px_5px_-3px_rgb(0_0_0/0.45)]',
-      )}
-    >
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            {rank !== undefined && (
-              <span className="tabular shrink-0 text-xs font-semibold text-muted-foreground/70">
-                {String(rank).padStart(2, '0')}
-              </span>
-            )}
-            <h3 className="truncate text-[0.9375rem] font-semibold tracking-tight">{p.title}</h3>
-            <span
-              className={cn('size-1.5 shrink-0 rounded-full', HEALTH_DOT[p.healthLevel])}
-              title={HEALTH_TITLE[p.healthLevel]}
-            />
-          </div>
-          <p className="mt-1 truncate font-mono text-xs text-muted-foreground">{p.name}</p>
-        </div>
+        {/* Score Badge */}
         <span
-          className="tabular shrink-0 rounded-md border border-border bg-secondary px-2 py-1 text-xs font-semibold"
+          className="tabular rounded-md border border-border/70 bg-secondary px-2 py-0.5 text-xs font-semibold text-foreground"
           title="综合评分"
         >
           {p.score.toFixed(0)}
         </span>
+
+        {/* Arrow */}
+        <span className="text-xs text-muted-foreground group-hover:text-foreground group-hover:translate-x-0.5 transition-all">
+          →
+        </span>
+      </div>
+    </div>
+  );
+}
+
+/** Redesigned modern card component */
+function Card({ doc: p, rank, categoryLabel }: { doc: SearchDoc; rank?: number; categoryLabel?: string }) {
+  return (
+    <a
+      href={`/plugins/${p.slug}`}
+      className={cn(
+        'group flex h-full flex-col justify-between overflow-hidden rounded-2xl border border-border/80 bg-card p-5 transition-all duration-200',
+        'hover:-translate-y-1 hover:border-foreground/30 hover:shadow-[0_8px_30px_rgb(0,0,0,0.06)]',
+        'dark:hover:shadow-[0_8px_30px_rgb(0,0,0,0.35)]',
+      )}
+    >
+      <div>
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0 flex-1">
+            {/* Avatar with health status */}
+            <div className="relative size-10 shrink-0">
+              <div className="size-full overflow-hidden rounded-xl border border-border/80 bg-secondary/50 shadow-2xs">
+                {p.ownerAvatar ? (
+                  <img
+                    src={avatarUrl(p.ownerAvatar, 40)}
+                    alt={p.owner ?? p.name}
+                    width={40}
+                    height={40}
+                    className="size-full object-cover"
+                    loading="lazy"
+                    decoding="async"
+                  />
+                ) : (
+                  <div className="flex size-full items-center justify-center font-mono text-xs font-bold text-foreground/70">
+                    {(p.owner ?? p.name).charAt(0).toUpperCase()}
+                  </div>
+                )}
+              </div>
+              <span
+                className={cn('lamp absolute -top-0.5 -right-0.5 z-10 ring-2 ring-card', HEALTH_DOT[p.healthLevel])}
+                title={HEALTH_TITLE[p.healthLevel]}
+              />
+            </div>
+
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-1.5">
+                {rank !== undefined && (
+                  <span className="tabular shrink-0 font-mono text-xs font-bold text-muted-foreground/70">
+                    #{String(rank).padStart(2, '0')}
+                  </span>
+                )}
+                <h3 className="truncate text-sm font-semibold tracking-tight text-foreground">{p.title}</h3>
+              </div>
+              <p className="mt-0.5 truncate font-mono text-xs text-muted-foreground">{p.name}</p>
+            </div>
+          </div>
+
+          <span
+            className="tabular shrink-0 rounded-md border border-border/70 bg-secondary px-2 py-0.5 text-xs font-semibold text-foreground"
+            title="综合评分"
+          >
+            {p.score.toFixed(0)}
+          </span>
+        </div>
+
+        <p className="mt-3.5 line-clamp-2 min-h-[2.5rem] text-xs leading-relaxed text-muted-foreground">
+          {p.description ?? '暂无描述信息'}
+        </p>
+
+        {/* Category Pill & Keywords */}
+        <div className="mt-3.5 flex flex-wrap items-center gap-1.5">
+          {categoryLabel && (
+            <span className="rounded-md border border-border/60 bg-secondary/70 px-2 py-0.5 text-[0.6875rem] font-medium text-foreground/80">
+              {categoryLabel}
+            </span>
+          )}
+          {p.keywords && p.keywords.slice(0, 2).map((k) => (
+            <span key={k} className="rounded border border-border/40 bg-secondary/40 px-1.5 py-0.5 font-mono text-[0.625rem] text-muted-foreground">
+              #{k}
+            </span>
+          ))}
+        </div>
       </div>
 
-      <p className="mt-3 line-clamp-2 min-h-[2.5rem] text-sm leading-5 text-muted-foreground">
-        {p.description ?? '暂无描述'}
-      </p>
-
-      <div className="mt-4 flex items-center gap-3 border-t border-border pt-3 text-xs text-muted-foreground">
-        <span className="tabular inline-flex items-center gap-1" title="GitHub 星标">
-          <svg viewBox="0 0 16 16" fill="currentColor" className="size-3.5" aria-hidden="true">
-            <path d="M8 .25a.75.75 0 0 1 .673.418l1.882 3.815 4.21.612a.75.75 0 0 1 .416 1.279l-3.046 2.97.719 4.192a.75.75 0 0 1-1.088.791L8 12.347l-3.766 1.98a.75.75 0 0 1-1.088-.79l.72-4.194L.818 6.374a.75.75 0 0 1 .416-1.28l4.21-.611L7.327.668A.75.75 0 0 1 8 .25Z" />
-          </svg>
-          {compactNumber(p.stars)}
-        </span>
-        {p.starsDelta7d > 0 && (
-          <span className="tabular font-medium text-ok" title="近 7 天新增星标">
-            +{compactNumber(p.starsDelta7d)}
+      {/* Bottom stats */}
+      <div className="mt-5 flex items-center justify-between border-t border-border/60 pt-3 text-xs text-muted-foreground font-mono">
+        <div className="flex items-center gap-3">
+          <span className="inline-flex items-center gap-1" title="GitHub Stars">
+            <svg viewBox="0 0 16 16" fill="currentColor" className="size-3.5 text-amber-500" aria-hidden="true">
+              <path d="M8 .25a.75.75 0 0 1 .673.418l1.882 3.815 4.21.612a.75.75 0 0 1 .416 1.279l-3.046 2.97.719 4.192a.75.75 0 0 1-1.088.791L8 12.347l-3.766 1.98a.75.75 0 0 1-1.088-.79l.72-4.194L.818 6.374a.75.75 0 0 1 .416-1.28l4.21-.611L7.327.668A.75.75 0 0 1 8 .25Z" />
+            </svg>
+            <span className="tabular font-medium text-foreground">{compactNumber(p.stars)}</span>
           </span>
-        )}
-        <span className="tabular inline-flex items-center gap-1" title="近 30 天下载量">
-          <svg viewBox="0 0 16 16" fill="currentColor" className="size-3.5" aria-hidden="true">
-            <path d="M7.25 1.75a.75.75 0 0 1 1.5 0v6.44l2.22-2.22a.75.75 0 1 1 1.06 1.06l-3.5 3.5a.75.75 0 0 1-1.06 0l-3.5-3.5a.75.75 0 0 1 1.06-1.06l2.22 2.22V1.75ZM2.5 11a.75.75 0 0 1 .75.75v1.5h9.5v-1.5a.75.75 0 0 1 1.5 0v2.25a.75.75 0 0 1-.75.75H2.5a.75.75 0 0 1-.75-.75v-2.25A.75.75 0 0 1 2.5 11Z" />
-          </svg>
-          {compactNumber(p.downloadsMonth)}
-        </span>
-        <span className="ml-auto truncate" title="最近提交">
+
+          <span className="inline-flex items-center gap-1" title="近 30 天下载量">
+            <svg viewBox="0 0 16 16" fill="currentColor" className="size-3.5 text-muted-foreground/70" aria-hidden="true">
+              <path d="M7.25 1.75a.75.75 0 0 1 1.5 0v6.44l2.22-2.22a.75.75 0 1 1 1.06 1.06l-3.5 3.5a.75.75 0 0 1-1.06 0l-3.5-3.5a.75.75 0 0 1 1.06-1.06l2.22 2.22V1.75ZM2.5 11a.75.75 0 0 1 .75.75v1.5h9.5v-1.5a.75.75 0 0 1 1.5 0v2.25a.75.75 0 0 1-.75.75H2.5a.75.75 0 0 1-.75-.75v-2.25A.75.75 0 0 1 2.5 11Z" />
+            </svg>
+            <span className="tabular">{compactNumber(p.downloadsMonth)}</span>
+          </span>
+        </div>
+
+        <span className="text-[0.6875rem] text-muted-foreground/75 font-sans">
           {timeAgo(p.pushedAt)}
         </span>
       </div>

@@ -1,170 +1,308 @@
 ---
 import Layout from '../layouts/Layout.astro';
 import Hero from '../components/Hero.astro';
+import FeaturedSpotlight from '../components/FeaturedSpotlight.astro';
 import RankBoard from '../components/RankBoard.astro';
 import CategoryIcon from '../components/CategoryIcon.astro';
-import { rankings, categories, census } from '../lib/plugins';
+import { rankings, categories, census, featured } from '../lib/plugins';
 import { formatNumber } from '../lib/utils';
 
-// The hero already carries the composite ranking, so these are the views it
-// can't show — the ones that answer a different question.
+// Curation first, then the composite board tops it up. Falling back to
+// `rankings.top` wholesale would silently drop the featured picks whenever
+// there are fewer than four of them.
+const spotlightPlugins = [...featured, ...rankings.top.filter((p) => !featured.includes(p))].slice(0, 4);
+
+// The hero already carries the composite ranking, so these boards are the
+// views it can't show — the ones that answer a different question.
 const boards = [
   {
     id: 'trending',
     label: '本周飙升',
-    hint: '近 7 天新增星标最多的插件。总榜偏爱发布得早的项目，这里才看得到新势力。',
-    plugins: rankings.trending.slice(0, 10),
+    hint: '近 7 天新增星标最多的黑马插件。总榜偏爱发布早的项目，这里看得到真正的新生力量。',
+    plugins: rankings.trending.slice(0, 8),
     metric: 'trending' as const,
   },
   {
     id: 'downloads',
-    label: '装机量',
-    hint: '近 30 天 npm 下载量。比星标更难刷，最接近真实使用情况。',
-    plugins: rankings.downloads.slice(0, 10),
+    label: '装机量榜',
+    hint: '近 30 天 npm 真实装机量。比星标更难刷，最能反映开发者的实际生产使用情况。',
+    plugins: rankings.downloads.slice(0, 8),
     metric: 'downloads' as const,
+  },
+  {
+    id: 'top',
+    label: '综合推荐',
+    hint: '结合装机规模、近期增长率、GitHub 星标及仓库活跃周期的多维评分榜。',
+    plugins: rankings.top.slice(0, 8),
+    metric: 'top' as const,
   },
   {
     id: 'recent',
     label: '最新收录',
-    hint: '最近发布到 npm 的 opencode 插件，按首次发布时间倒序。',
-    plugins: rankings.recent.slice(0, 10),
+    hint: '最新发布到 npm 的 opencode 插件，按首次发布时间倒序排列。',
+    plugins: rankings.recent.slice(0, 8),
     metric: 'recent' as const,
   },
 ];
 
-const stalePct = Math.round(((census.ailing + census.abandoned) / Math.max(census.total, 1)) * 100);
-
-// Biggest categories earn the biggest tiles — the bento layout mirrors the
-// real distribution instead of a neutral alphabetical grid.
+// Sort categories by plugin counts
 const sortedCategories = [...categories].sort((a, b) => b.count - a.count);
 
-const theses = [
+const features = [
   {
-    n: '01',
-    title: '全量而非精选',
-    body: '每天从 npm 抓取所有标注 opencode-plugin 的包，再从 GitHub 拉星标与提交记录。手工维护的列表会过时，这个不会。',
+    tag: '自动化普查',
+    title: '全量同步，而非静态精选',
+    desc: '每天自动从 npm 检索所有标注 opencode-plugin 关键词的包，并拉取 GitHub 提交历史与星标趋势。人工维护的列表会过时，OpenDock 永远与生态同频。',
+    icon: 'refresh',
   },
   {
-    n: '02',
-    title: '排名不只看星标',
-    body: '星标是累积量，永远偏向发布得早的项目。综合评分把装机量、维护活跃度和增长速度也算进去，让上周发布的好插件也有出头机会。',
+    tag: '算法透明',
+    title: '科学评分打破早鸟壁垒',
+    desc: '累积星标偏向发布更早的项目。综合评分融合了 30 天下载量、7 天星标增速与近期提交热度，让上周刚发布的优秀插件也有出头机会。',
+    icon: 'chart',
   },
   {
-    n: '03',
-    title: '标出该避开的',
-    body: `收录的 ${formatNumber(census.total)} 个插件里有 ${stalePct}% 已归档或长期停更。每个坞位挂一盏状态灯，不用点进去才发现。`,
+    tag: '安全选型',
+    title: '健康状态实时点灯避坑',
+    desc: `全量收录的 ${formatNumber(census.total)} 款插件中实时标出维护状态。对于长期停更、已归档或已废弃的项目悬挂警示灯，无需点进仓库才发现。`,
+    icon: 'lamp',
+  },
+  {
+    tag: '开放接入',
+    title: '零门槛次日自动收录',
+    desc: '开发者只需在 npm package.json 的 keywords 中加入 opencode-plugin，港口普查程序将在次日自动入库并生成专属主页，无需提 PR 审核。',
+    icon: 'bolt',
   },
 ];
 ---
 
 <Layout>
+  <!-- 1. Hero Section ------------------------------------------------ -->
   <Hero />
 
-  <!-- Other views ---------------------------------------------------- -->
-  <section class="mx-auto max-w-6xl px-4 py-14 sm:px-6">
-    <div class="mb-6 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
-      <h2 class="display text-xl text-foreground sm:text-2xl">换个角度排</h2>
+  <!-- 2. Featured Spotlight Section ----------------------------------- -->
+  <section class="mx-auto max-w-6xl px-4 py-12 sm:px-6 sm:py-16">
+    <div class="mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+      <div>
+        <div class="inline-flex items-center gap-1.5 rounded-md bg-secondary px-2 py-0.5 font-mono text-[0.6875rem] font-semibold text-foreground/80">
+          SPOTLIGHT
+        </div>
+        <h2 class="mt-2 text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+          社区标杆与高光插件
+        </h2>
+        <p class="mt-1 text-sm text-muted-foreground">
+          综合评分最高、生态适配成熟的焦点工具与智能体扩展
+        </p>
+      </div>
+
       <a
-        href="/rankings"
-        class="meta text-muted-foreground transition-colors hover:text-foreground"
+        href="/plugins"
+        class="inline-flex items-center gap-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
       >
-        完整榜单 →
+        浏览全部 {formatNumber(census.total)} 款插件 <span aria-hidden="true">→</span>
       </a>
     </div>
 
-    <RankBoard boards={boards} />
+    <FeaturedSpotlight plugins={spotlightPlugins} />
   </section>
 
-  <!-- Categories ------------------------------------------------------ -->
-  <section class="border-t border-border">
-    <div class="mx-auto max-w-6xl px-4 py-14 sm:px-6">
-      <div class="mb-6 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
-        <h2 class="display text-xl text-foreground sm:text-2xl">按需求找</h2>
-        <span class="meta text-muted-foreground">{categories.length} 个分类</span>
-      </div>
-
-      <ul class="grid grid-flow-dense grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-        {
-          sortedCategories.map((c, i) => (
-            <li class:list={[i < 2 && 'col-span-2']}>
-              <a
-                href={`/categories/${c.id}`}
-                class="group relative flex h-full flex-col justify-between gap-6 overflow-hidden rounded-xl border border-border p-5 transition-colors duration-200 hover:border-foreground hover:bg-foreground hover:text-background"
-              >
-                <div class="flex items-start justify-between">
-                  <CategoryIcon
-                    name={c.icon}
-                    class="size-6 text-muted-foreground transition-colors group-hover:text-background/70"
-                  />
-                  <span class="tabular font-mono text-2xl font-medium text-foreground/90 group-hover:text-background">
-                    {c.count}
-                  </span>
-                </div>
-
-                <div>
-                  <p class="truncate text-sm font-medium tracking-tight">{c.label}</p>
-                  <p class="meta mt-1 truncate text-muted-foreground group-hover:text-background/60">
-                    {c.labelEn}
-                  </p>
-                </div>
-              </a>
-            </li>
-          ))
-        }
-      </ul>
-    </div>
-  </section>
-
-  <!-- The argument, as a deliberate colour break ----------------------- -->
-  <section class="border-t border-border bg-foreground text-background">
-    <div class="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-20">
-      <h2 class="display max-w-[22ch] text-[clamp(1.75rem,4.5vw,2.75rem)] leading-[1.05]">
-        为什么不是<br />又一份 awesome 列表
-      </h2>
-
-      <dl class="mt-12 grid gap-x-10 gap-y-10 sm:grid-cols-3">
-        {
-          theses.map((t) => (
-            <div class="border-t border-background/20 pt-5">
-              <dt class="flex items-baseline gap-3">
-                <span class="tabular font-mono text-sm text-dock">{t.n}</span>
-                <span class="meta text-background/70">{t.title}</span>
-              </dt>
-              <dd class="mt-3 text-sm leading-6 text-background/75">{t.body}</dd>
-            </div>
-          ))
-        }
-      </dl>
-    </div>
-  </section>
-
-  <!-- Submit CTA -------------------------------------------------------- -->
-  <section class="border-t border-border">
-    <div class="mx-auto max-w-6xl px-4 py-14 sm:px-6">
-      <div class="flex flex-wrap items-end justify-between gap-8">
-        <div class="max-w-[38ch]">
-          <p class="meta text-muted-foreground">收录规则</p>
-          <p class="display mt-2 text-xl leading-snug text-foreground sm:text-2xl">写了插件？次日自动收录。</p>
-          <p class="mt-3 text-sm leading-6 text-muted-foreground">
-            发布到 npm 并带上
-            <code class="rounded border border-border bg-muted px-1 py-0.5 font-mono text-xs">opencode-plugin</code>
-            关键词，接下来的每日普查会自动把它拉进港口——不用提 PR，不用等审核。
+  <!-- 3. Multi-dimensional Rankings Section -------------------------- -->
+  <section class="border-t border-border/80 bg-secondary/20 py-12 sm:py-16">
+    <div class="mx-auto max-w-6xl px-4 sm:px-6">
+      <div class="mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+        <div>
+          <div class="inline-flex items-center gap-1.5 rounded-md bg-secondary px-2 py-0.5 font-mono text-[0.6875rem] font-semibold text-foreground/80">
+            LEADERBOARD
+          </div>
+          <h2 class="mt-2 text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+            多维度生态排行榜
+          </h2>
+          <p class="mt-1 text-sm text-muted-foreground">
+            换个视角看生态：从本周黑马增量、真实装机规模到最新上线
           </p>
         </div>
 
-        <div class="flex shrink-0 flex-wrap gap-3">
-          <a
-            href="/submit"
-            class="inline-flex items-center gap-2 rounded-lg border-2 border-foreground bg-foreground px-5 py-2.5 text-sm font-medium text-background transition-opacity hover:opacity-85"
-          >
-            查看收录规则 →
-          </a>
-          <a
-            href="/about"
-            class="inline-flex items-center gap-2 rounded-lg border-2 border-border px-5 py-2.5 text-sm font-medium text-foreground transition-colors hover:border-foreground"
-          >
-            排名算法
-          </a>
+        <a
+          href="/rankings"
+          class="inline-flex items-center gap-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+        >
+          查看完整排行总榜 <span aria-hidden="true">→</span>
+        </a>
+      </div>
+
+      <RankBoard boards={boards} />
+    </div>
+  </section>
+
+  <!-- 4. Category Grid Section --------------------------------------- -->
+  <section class="border-t border-border/80 py-12 sm:py-16">
+    <div class="mx-auto max-w-6xl px-4 sm:px-6">
+      <div class="mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+        <div>
+          <div class="inline-flex items-center gap-1.5 rounded-md bg-secondary px-2 py-0.5 font-mono text-[0.6875rem] font-semibold text-foreground/80">
+            TAXONOMY
+          </div>
+          <h2 class="mt-2 text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+            按使用场景精准寻找
+          </h2>
+          <p class="mt-1 text-sm text-muted-foreground">
+            涵盖 {categories.length} 个核心领域，精准匹配你的 AI 辅助开发需求
+          </p>
+        </div>
+
+        <a
+          href="/categories"
+          class="inline-flex items-center gap-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+        >
+          全部分类索引 <span aria-hidden="true">→</span>
+        </a>
+      </div>
+
+      <div class="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        {
+          sortedCategories.map((c) => (
+            <a
+              href={`/categories/${c.id}`}
+              class="group relative flex flex-col justify-between rounded-2xl border border-border/80 bg-card p-5 transition-all duration-200 hover:-translate-y-0.5 hover:border-foreground/30 hover:bg-secondary/40 hover:shadow-xs"
+            >
+              <div>
+                <div class="flex items-center justify-between">
+                  <div class="grid size-10 place-items-center rounded-xl bg-secondary text-foreground/80 transition-colors group-hover:bg-foreground group-hover:text-background">
+                    <CategoryIcon name={c.icon} class="size-5" />
+                  </div>
+                  <span class="tabular rounded-full bg-secondary/80 px-2 py-0.5 font-mono text-xs font-semibold text-muted-foreground group-hover:text-foreground">
+                    {c.count} 款
+                  </span>
+                </div>
+
+                <div class="mt-4">
+                  <h3 class="text-base font-semibold tracking-tight text-foreground group-hover:text-foreground">
+                    {c.label}
+                  </h3>
+                  <p class="font-mono text-[0.6875rem] text-muted-foreground/70">
+                    {c.labelEn}
+                  </p>
+                  <p class="mt-2 line-clamp-2 text-xs leading-relaxed text-muted-foreground">
+                    {c.description}
+                  </p>
+                </div>
+              </div>
+
+              <div class="mt-4 flex items-center justify-end text-xs font-medium text-muted-foreground group-hover:text-foreground">
+                <span class="group-hover:translate-x-0.5 transition-transform">探索分类 →</span>
+              </div>
+            </a>
+          ))
+        }
+      </div>
+    </div>
+  </section>
+
+  <!-- 5. OpenDock Philosophy / Bento Feature Section ------------------ -->
+  <section class="border-t border-border/80 bg-secondary/30 py-16 sm:py-20">
+    <div class="mx-auto max-w-6xl px-4 sm:px-6">
+      <div class="mx-auto max-w-2xl text-center">
+        <div class="inline-flex items-center gap-1.5 rounded-md bg-secondary px-2.5 py-1 font-mono text-xs font-semibold text-foreground/80">
+          PHILOSOPHY
+        </div>
+        <h2 class="mt-3 text-3xl font-extrabold tracking-tight text-foreground sm:text-4xl">
+          为什么不是又一份静态 Awesome 列表？
+        </h2>
+        <p class="mt-3 text-sm text-muted-foreground sm:text-base">
+          静态清单会因作者精力而停更，OpenDock 致力于用自动化流水线构建透明、客观的插件港口。
+        </p>
+      </div>
+
+      <div class="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-2">
+        {
+          features.map((f, i) => (
+            <div class="relative overflow-hidden rounded-2xl border border-border/80 bg-card p-7 transition-all hover:border-foreground/20 hover:shadow-xs">
+              <div class="flex items-center justify-between">
+                <span class="rounded-md border border-border/60 bg-secondary/70 px-2 py-0.5 font-mono text-[0.6875rem] font-semibold text-foreground/80">
+                  {f.tag}
+                </span>
+                <span class="tabular font-mono text-xs font-bold text-dock">
+                  0{i + 1}
+                </span>
+              </div>
+
+              <h3 class="mt-4 text-lg font-bold tracking-tight text-foreground">
+                {f.title}
+              </h3>
+
+              <p class="mt-2.5 text-sm leading-relaxed text-muted-foreground">
+                {f.desc}
+              </p>
+            </div>
+          ))
+        }
+      </div>
+    </div>
+  </section>
+
+  <!-- 6. Developer Quick-Start & Submit CTA --------------------------- -->
+  <section class="border-t border-border/80 py-14 sm:py-18">
+    <div class="mx-auto max-w-6xl px-4 sm:px-6">
+      <div class="relative overflow-hidden rounded-3xl border border-border bg-gradient-to-br from-card via-card to-secondary/40 p-8 sm:p-12 shadow-sm">
+        {/* Glow accent */}
+        <div class="pointer-events-none absolute -right-20 -bottom-20 size-72 rounded-full bg-dock/15 blur-3xl" aria-hidden="true" />
+
+        <div class="grid gap-8 lg:grid-cols-12 lg:items-center">
+          <!-- Left CTA content -->
+          <div class="lg:col-span-7">
+            <div class="inline-flex items-center gap-1.5 rounded-full border border-dock/30 bg-dock/10 px-3 py-0.5 text-xs font-medium text-dock">
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" class="size-3.5">
+                <path d="m3.5 12.5 1.5-4 4-1.5 4.5-4.5c.8-.8 2-.8 2.8 0s.8 2 0 2.8l-4.5 4.5-1.5 4-4 1.5-.8-.8 1.5-1.5-.7-.7-1.5 1.5-.8-.8Z" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+              <span>开发者入驻</span>
+            </div>
+
+            <h2 class="mt-4 text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+              为 opencode 编写了插件？次日全自动收录
+            </h2>
+
+            <p class="mt-3 text-sm leading-relaxed text-muted-foreground sm:text-base">
+              只需将你的包发布至 npm，并在 <code class="rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-xs text-foreground font-semibold">package.json</code> 的 keywords 中添加 <code class="rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-xs text-foreground font-semibold">opencode-plugin</code>。次日普查将自动抓取、生成独立主页并点亮健康灯——无需提交 PR，更无需等待人工审核。
+            </p>
+
+            <div class="mt-6 flex flex-wrap items-center gap-3">
+              <a
+                href="/submit"
+                class="inline-flex items-center gap-2 rounded-xl bg-foreground px-5 py-2.5 text-sm font-semibold text-background transition-opacity hover:opacity-90 shadow-sm"
+              >
+                查看完整收录规则 →
+              </a>
+              <a
+                href="/about"
+                class="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-5 py-2.5 text-sm font-semibold text-foreground transition-colors hover:bg-secondary"
+              >
+                了解排名算法
+              </a>
+            </div>
+          </div>
+
+          <!-- Right: Code snippet illustration -->
+          <div class="lg:col-span-5">
+            <div class="rounded-2xl border border-border bg-muted/60 p-4 font-mono text-xs shadow-inner">
+              <div class="mb-3 flex items-center justify-between border-b border-border/60 pb-2.5 text-[0.6875rem] text-muted-foreground">
+                <span class="flex items-center gap-1.5">
+                  <span class="size-2.5 rounded-full bg-red-400/80"></span>
+                  <span class="size-2.5 rounded-full bg-amber-400/80"></span>
+                  <span class="size-2.5 rounded-full bg-green-400/80"></span>
+                  <span class="ml-1 font-semibold text-foreground/80">package.json</span>
+                </span>
+                <span>npm keyword</span>
+              </div>
+              <pre class="overflow-x-auto text-[0.8125rem] leading-relaxed text-foreground/90"><code>&#123;
+  <span class="text-amber-500">"name"</span>: <span class="text-ok">"opencode-my-plugin"</span>,
+  <span class="text-amber-500">"keywords"</span>: [
+    <span class="text-ok font-semibold">"opencode-plugin"</span>,
+    <span class="text-ok">"agent"</span>,
+    <span class="text-ok">"workflow"</span>
+  ]
+&#125;</code></pre>
+            </div>
+          </div>
         </div>
       </div>
     </div>

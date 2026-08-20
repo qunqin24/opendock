@@ -3,9 +3,9 @@ import Layout from '../../layouts/Layout.astro';
 import HealthBadge from '../../components/HealthBadge.astro';
 import InstallSnippet from '../../components/InstallSnippet.astro';
 import PluginCard from '../../components/PluginCard.astro';
-import { plugins, related, categoryLabel, loadReadme, type Plugin } from '../../lib/plugins';
+import { plugins, related, categoryLabel, loadReadme, lampClass, lampTitle, type Plugin } from '../../lib/plugins';
 import { renderReadme, readmeExcerpt } from '../../lib/readme';
-import { compactNumber, formatNumber, timeAgo, formatDate } from '../../lib/utils';
+import { avatarUrl, compactNumber, formatNumber, timeAgo, formatDate } from '../../lib/utils';
 
 export function getStaticPaths() {
   return plugins.map((plugin) => ({ params: { slug: plugin.slug }, props: { plugin } }));
@@ -25,21 +25,41 @@ const description =
 const siblings = related(p, 3);
 
 const stats = [
-  { label: 'GitHub 星标', value: formatNumber(p.stars), sub: p.starsDelta30d > 0 ? `近 30 天 +${compactNumber(p.starsDelta30d)}` : null },
-  { label: '月下载量', value: formatNumber(p.downloadsMonth), sub: p.downloadsWeek > 0 ? `周 ${compactNumber(p.downloadsWeek)}` : null },
-  { label: '综合评分', value: p.score.toFixed(1), sub: '满分 100' },
-  { label: '最近提交', value: timeAgo(p.pushedAt), sub: formatDate(p.pushedAt) },
+  {
+    label: 'GitHub 星标',
+    value: formatNumber(p.stars),
+    sub: p.starsDelta30d > 0 ? `近 30 天 +${compactNumber(p.starsDelta30d)}` : null,
+    icon: 'star',
+  },
+  {
+    label: '月装机量',
+    value: formatNumber(p.downloadsMonth),
+    sub: p.downloadsWeek > 0 ? `近 7 天 ${compactNumber(p.downloadsWeek)}` : null,
+    icon: 'download',
+  },
+  {
+    label: '综合评分',
+    value: p.score.toFixed(1),
+    sub: '生态多维模型',
+    icon: 'score',
+  },
+  {
+    label: '最近提交',
+    value: timeAgo(p.pushedAt),
+    sub: formatDate(p.pushedAt),
+    icon: 'clock',
+  },
 ];
 
 const meta: { label: string; value: string; href?: string; external?: boolean }[] = [
   { label: '最新版本', value: p.version ?? '—' },
   { label: '开源协议', value: p.license ?? '未声明' },
-  { label: '分类', value: categoryLabel(p.category), href: `/categories/${p.category}` },
+  { label: '所属分类', value: categoryLabel(p.category), href: `/categories/${p.category}` },
   { label: '首次发布', value: formatDate(p.createdAt) },
-  { label: 'Fork 数', value: formatNumber(p.forks) },
-  { label: '开放 Issue', value: formatNumber(p.openIssues) },
+  { label: 'Fork 数量', value: formatNumber(p.forks) },
+  { label: '未解决 Issue', value: formatNumber(p.openIssues) },
   ...(p.owner
-    ? [{ label: '作者', value: p.owner, href: `https://github.com/${p.owner}`, external: true }]
+    ? [{ label: '维护作者', value: p.owner, href: `https://github.com/${p.owner}`, external: true }]
     : []),
 ];
 
@@ -61,196 +81,323 @@ const jsonLd = {
 };
 ---
 
-<Layout title={`${p.title} — opencode 插件`} description={description}>
+<Layout title={`${p.title} — opencode 插件详情`} description={description}>
   <script is:inline type="application/ld+json" slot="head" set:html={JSON.stringify(jsonLd)} />
 
   <div class="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-12">
-    <!-- breadcrumb -->
-    <nav class="mb-6 flex items-center gap-1.5 text-xs text-muted-foreground" aria-label="面包屑">
+    <!-- Breadcrumb Navigation -->
+    <nav class="mb-6 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground" aria-label="面包屑">
       <a href="/" class="transition-colors hover:text-foreground">首页</a>
-      <span>/</span>
-      <a href="/plugins" class="transition-colors hover:text-foreground">插件</a>
-      <span>/</span>
+      <span class="text-border">/</span>
+      <a href="/plugins" class="transition-colors hover:text-foreground">全部插件</a>
+      <span class="text-border">/</span>
       <a href={`/categories/${p.category}`} class="transition-colors hover:text-foreground">
         {categoryLabel(p.category)}
       </a>
-      <span>/</span>
-      <span class="truncate text-foreground">{p.title}</span>
+      <span class="text-border">/</span>
+      <span class="truncate font-medium text-foreground">{p.title}</span>
     </nav>
 
-    <!-- header -->
-    <header class="flex flex-col gap-6 border-b border-border pb-8 lg:flex-row lg:items-start lg:justify-between">
-      <div class="min-w-0 flex-1">
-        <div class="flex flex-wrap items-center gap-3">
-          {
-            p.ownerAvatar && (
-              <img
-                src={p.ownerAvatar}
-                alt={p.owner ?? ''}
-                width="40"
-                height="40"
-                loading="eager"
-                class="size-10 shrink-0 rounded-lg border border-border"
+    <!-- Header Section -->
+    <header class="rounded-3xl border border-border/80 bg-gradient-to-br from-card via-card to-secondary/30 p-6 sm:p-8 shadow-xs">
+      <div class="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+        <!-- Left: Avatar + Title + Badges + Description -->
+        <div class="min-w-0 flex-1">
+          <div class="flex items-start gap-4">
+            <!-- Author / Plugin Avatar with Health Status Badge -->
+            <div class="relative size-14 shrink-0">
+              <div class="size-full overflow-hidden rounded-2xl border border-border/80 bg-secondary/50 shadow-xs">
+                {
+                  p.ownerAvatar ? (
+                    <img
+                      src={avatarUrl(p.ownerAvatar, 56)}
+                      alt={p.owner ?? p.name}
+                      width="56"
+                      height="56"
+                      loading="eager"
+                      decoding="async"
+                      class="size-full object-cover"
+                    />
+                  ) : (
+                    <div class="flex size-full items-center justify-center font-mono text-lg font-bold text-foreground/70">
+                      {(p.owner ?? p.name).charAt(0).toUpperCase()}
+                    </div>
+                  )
+                }
+              </div>
+              <span
+                class:list={[
+                  'lamp absolute -top-1 -right-1 z-10 scale-125 ring-3 ring-card',
+                  lampClass[p.healthLevel],
+                ]}
+                title={lampTitle[p.healthLevel]}
               />
+            </div>
+
+            <!-- Title & Meta Badges -->
+            <div class="min-w-0 flex-1">
+              <div class="flex flex-wrap items-center gap-2">
+                <h1 class="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+                  {p.title}
+                </h1>
+
+                {
+                  p.version && (
+                    <span class="rounded-md border border-border/60 bg-secondary px-2 py-0.5 font-mono text-xs font-semibold text-foreground/80">
+                      v{p.version}
+                    </span>
+                  )
+                }
+
+                {
+                  p.featured && (
+                    <span class="rounded-md bg-foreground px-2 py-0.5 text-xs font-bold text-background">
+                      精选
+                    </span>
+                  )
+                }
+
+                <a
+                  href={`/categories/${p.category}`}
+                  class="rounded-md border border-border/60 bg-secondary/60 px-2 py-0.5 text-xs font-medium text-muted-foreground transition-colors hover:border-foreground/40 hover:text-foreground"
+                >
+                  {categoryLabel(p.category)}
+                </a>
+              </div>
+
+              <!-- Package Name + One-Click Copy -->
+              <div class="mt-2 flex items-center gap-2">
+                <code class="rounded-md border border-border/60 bg-muted/60 px-2 py-0.5 font-mono text-xs text-foreground/90">
+                  {p.name}
+                </code>
+                <button
+                  type="button"
+                  data-copy={p.name}
+                  class="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                  title="复制包名"
+                >
+                  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" class="size-3">
+                    <rect x="5.75" y="5.75" width="8.5" height="8.5" rx="1.5" />
+                    <path d="M10.25 3.75v-1a1.5 1.5 0 0 0-1.5-1.5h-5.5a1.5 1.5 0 0 0-1.5 1.5v5.5a1.5 1.5 0 0 0 1.5 1.5h1" />
+                  </svg>
+                  <span data-copy-label>复制</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Description -->
+          <p class="mt-4 max-w-3xl text-sm leading-relaxed text-muted-foreground sm:text-base">
+            {description}
+          </p>
+
+          <!-- Health Signals + Keywords -->
+          <div class="mt-4 flex flex-wrap items-center gap-2">
+            <HealthBadge signals={p.health} />
+
+            {
+              p.keywords.length > 0 && (
+                <div class="flex flex-wrap gap-1">
+                  {p.keywords.slice(0, 6).map((k) => (
+                    <a
+                      href={`/plugins?q=${encodeURIComponent(k)}`}
+                      class="rounded-md border border-border/60 bg-card/80 px-2 py-0.5 font-mono text-[0.6875rem] text-muted-foreground transition-colors hover:border-foreground/30 hover:bg-secondary hover:text-foreground"
+                    >
+                      #{k}
+                    </a>
+                  ))}
+                </div>
+              )
+            }
+          </div>
+        </div>
+
+        <!-- Right: Action Buttons Group -->
+        <div class="flex shrink-0 flex-wrap gap-2.5 lg:flex-col">
+          {
+            p.repoUrl && (
+              <a
+                href={p.repoUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                class="inline-flex items-center justify-center gap-2 rounded-xl bg-foreground px-4 py-2.5 text-xs font-semibold text-background transition-opacity hover:opacity-90 shadow-sm"
+              >
+                <svg viewBox="0 0 16 16" fill="currentColor" class="size-4" aria-hidden="true">
+                  <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z" />
+                </svg>
+                <span>GitHub 仓库</span>
+              </a>
             )
           }
-          <div class="min-w-0">
-            <h1 class="text-2xl font-semibold tracking-tight text-balance sm:text-3xl">{p.title}</h1>
-            <p class="mt-0.5 truncate font-mono text-sm text-muted-foreground">{p.name}</p>
-          </div>
+
+          <a
+            href={p.npmUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            class="inline-flex items-center justify-center gap-2 rounded-xl border border-border/80 bg-card px-4 py-2.5 text-xs font-semibold text-foreground transition-colors hover:bg-secondary"
+          >
+            {/* npm mark. The counter is knocked out by winding direction, so
+                this must stay a single path — splitting it fills the square. */}
+            <svg viewBox="0 0 24 24" fill="currentColor" class="size-4 text-[#cb3837]" aria-hidden="true">
+              <path d="M1.763 0C.786 0 0 .786 0 1.763v20.474C0 23.214.786 24 1.763 24h20.474c.977 0 1.763-.786 1.763-1.763V1.763C24 .786 23.214 0 22.237 0zM5.13 5.323l13.837.019-.009 13.836h-3.464l.01-10.382h-3.456L12.04 19.17H5.113z" />
+            </svg>
+            <span>npm 页面</span>
+          </a>
+
           {
-            p.featured && (
-              <span class="rounded-md border border-border bg-secondary px-2 py-1 text-xs font-medium">
-                精选
-              </span>
+            p.homepage && p.homepage !== p.repoUrl && (
+              <a
+                href={p.homepage}
+                target="_blank"
+                rel="noopener noreferrer"
+                class="inline-flex items-center justify-center gap-2 rounded-xl border border-border/80 bg-card px-4 py-2.5 text-xs font-semibold text-foreground transition-colors hover:bg-secondary"
+              >
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" class="size-4">
+                  <circle cx="8" cy="8" r="6.25" />
+                  <path d="M1.75 8h12.5M8 1.75a10.5 10.5 0 0 1 2.5 6.25 10.5 10.5 0 0 1-2.5 6.25 10.5 10.5 0 0 1-2.5-6.25A10.5 10.5 0 0 1 8 1.75Z" />
+                </svg>
+                <span>官方主页</span>
+              </a>
             )
           }
         </div>
-
-        {/* npm descriptions often contain long snake_case tool names with no
-            break opportunity, which overflow the page on phones. */}
-        <p class="mt-4 max-w-2xl text-[0.9375rem] leading-7 wrap-break-word text-pretty text-muted-foreground">
-          {description}
-        </p>
-
-        <HealthBadge signals={p.health} class="mt-4" />
-
-        {
-          p.keywords.length > 0 && (
-            <div class="mt-4 flex flex-wrap gap-1.5">
-              {p.keywords.slice(0, 8).map((k) => (
-                <a
-                  href={`/plugins?q=${encodeURIComponent(k)}`}
-                  class="rounded-md border border-border bg-card px-2 py-0.5 font-mono text-[0.6875rem] text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-                >
-                  {k}
-                </a>
-              ))}
-            </div>
-          )
-        }
-      </div>
-
-      <div class="flex shrink-0 flex-wrap gap-2">
-        {
-          p.repoUrl && (
-            <a
-              href={p.repoUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              class="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90"
-            >
-              <svg viewBox="0 0 16 16" fill="currentColor" class="size-4" aria-hidden="true">
-                <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z" />
-              </svg>
-              源码仓库
-            </a>
-          )
-        }
-        <a
-          href={p.npmUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          class="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-2.5 text-sm font-medium transition-colors hover:bg-secondary"
-        >
-          npm
-        </a>
-        {
-          p.homepage && p.homepage !== p.repoUrl && (
-            <a
-              href={p.homepage}
-              target="_blank"
-              rel="noopener noreferrer"
-              class="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-2.5 text-sm font-medium transition-colors hover:bg-secondary"
-            >
-              主页
-            </a>
-          )
-        }
       </div>
     </header>
 
-    <!-- stats -->
-    <!-- One card, no internal rules: the hairline grid this used to be drew
-         five lines to separate four numbers. Spacing does that job. -->
-    <dl
-      class="mt-8 grid grid-cols-2 gap-x-8 gap-y-6 rounded-xl border border-border bg-card p-5 sm:grid-cols-4 sm:p-6"
-    >
+    <!-- Bento Stats Strip -->
+    <div class="mt-6 grid grid-cols-2 gap-3.5 sm:grid-cols-4">
       {
         stats.map((s) => (
-          <div>
-            <dt class="meta text-muted-foreground">{s.label}</dt>
-            <dd class="tabular mt-2 font-mono text-xl tracking-tight text-foreground">{s.value}</dd>
-            {s.sub && <dd class="tabular mt-1 font-mono text-[0.6875rem] text-muted-foreground">{s.sub}</dd>}
+          <div class="rounded-2xl border border-border/80 bg-card p-4 sm:p-5 transition-all hover:border-foreground/20 hover:shadow-xs">
+            <div class="flex items-center justify-between text-muted-foreground">
+              <span class="text-xs font-medium">{s.label}</span>
+              {s.icon === 'star' && (
+                <svg viewBox="0 0 16 16" fill="currentColor" class="size-4 text-amber-500" aria-hidden="true">
+                  <path d="M8 .25a.75.75 0 0 1 .673.418l1.882 3.815 4.21.612a.75.75 0 0 1 .416 1.279l-3.046 2.97.719 4.192a.75.75 0 0 1-1.088.791L8 12.347l-3.766 1.98a.75.75 0 0 1-1.088-.79l.72-4.194L.818 6.374a.75.75 0 0 1 .416-1.28l4.21-.611L7.327.668A.75.75 0 0 1 8 .25Z" />
+                </svg>
+              )}
+              {s.icon === 'download' && (
+                <svg viewBox="0 0 16 16" fill="currentColor" class="size-4 text-muted-foreground/70" aria-hidden="true">
+                  <path d="M7.25 1.75a.75.75 0 0 1 1.5 0v6.44l2.22-2.22a.75.75 0 1 1 1.06 1.06l-3.5 3.5a.75.75 0 0 1-1.06 0l-3.5-3.5a.75.75 0 0 1 1.06-1.06l2.22 2.22V1.75ZM2.5 11a.75.75 0 0 1 .75.75v1.5h9.5v-1.5a.75.75 0 0 1 1.5 0v2.25a.75.75 0 0 1-.75.75H2.5a.75.75 0 0 1-.75-.75v-2.25A.75.75 0 0 1 2.5 11Z" />
+                </svg>
+              )}
+              {s.icon === 'score' && (
+                <span class="rounded bg-dock/15 px-1.5 py-0.5 font-mono text-[0.625rem] font-bold text-dock">
+                  SCORE
+                </span>
+              )}
+              {s.icon === 'clock' && (
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" class="size-4 text-muted-foreground/70">
+                  <circle cx="8" cy="8" r="6.25" />
+                  <path d="M8 4.25v3.75l2.5 1.5" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+              )}
+            </div>
+            <p class="tabular mt-2 font-mono text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+              {s.value}
+            </p>
+            {s.sub && (
+              <p class="tabular mt-1 font-mono text-xs text-muted-foreground">
+                {s.sub}
+              </p>
+            )}
           </div>
         ))
       }
-    </dl>
+    </div>
 
-    <div class="mt-10 grid gap-10 lg:grid-cols-[minmax(0,1fr)_20rem]">
-      <!-- main column -->
-      <div class="min-w-0">
-        <section>
-          <h2 class="mb-4 text-lg font-semibold tracking-tight">安装</h2>
+    <!-- Main Content & Sidebar Grid -->
+    <div class="mt-8 grid gap-8 lg:grid-cols-[minmax(0,1fr)_20rem]">
+      <!-- Main Content Column -->
+      <div class="min-w-0 space-y-8">
+        <!-- Installation Section -->
+        <section class="rounded-3xl border border-border/80 bg-card p-6 sm:p-7 shadow-xs">
+          <div class="mb-4 flex items-center justify-between">
+            <h2 class="text-base font-bold tracking-tight text-foreground">快速安装与配置</h2>
+            <span class="font-mono text-xs text-muted-foreground">opencode.json</span>
+          </div>
           <InstallSnippet plugin={p} />
-          <p class="mt-3 text-xs leading-5 text-muted-foreground">
-            opencode 启动时会用 Bun 自动安装 npm 插件并缓存到 <code
-              class="rounded border border-border bg-muted px-1 py-0.5 font-mono">~/.cache/opencode/node_modules/</code
-            >，无需手动 install。
+          <p class="mt-3.5 text-xs leading-relaxed text-muted-foreground">
+            opencode 启动时会通过内嵌运行时自动加载 npm 依赖并缓存至本地目录，无需手动在全局环境执行安装。
           </p>
         </section>
 
-        <section class="mt-12">
-          <h2 class="mb-4 text-lg font-semibold tracking-tight">说明文档</h2>
-          {
-            readmeHtml ? (
-              <div class="prose-readme rounded-xl border border-border bg-card p-6">
-                <Fragment set:html={readmeHtml} />
-              </div>
-            ) : (
-              <div class="rounded-xl border border-dashed border-border px-6 py-12 text-center">
-                <p class="text-sm font-medium">这个插件没有提供 README</p>
-                <p class="mt-1.5 text-sm text-muted-foreground">
-                  缺少文档通常意味着它还不适合直接用在生产项目里。
-                </p>
-                {p.repoUrl && (
-                  <a
-                    href={p.repoUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    class="mt-5 inline-block rounded-lg border border-border bg-card px-4 py-2 text-sm font-medium transition-colors hover:bg-secondary"
-                  >
-                    去仓库看看
-                  </a>
-                )}
-              </div>
-            )
-          }
+        <!-- Documentation Section -->
+        <section class="overflow-hidden rounded-3xl border border-border/80 bg-card shadow-xs">
+          <!-- Window Header Bar -->
+          <div class="flex items-center justify-between border-b border-border/80 bg-secondary/35 px-4 py-3 sm:px-6">
+            <div class="flex items-center gap-2 font-mono text-xs text-muted-foreground">
+              <span class="flex items-center gap-1.5">
+                <span class="size-2.5 rounded-full bg-red-400/80"></span>
+                <span class="size-2.5 rounded-full bg-amber-400/80"></span>
+                <span class="size-2.5 rounded-full bg-green-400/80"></span>
+              </span>
+              <span class="ml-2 font-semibold text-foreground/80">README.md</span>
+            </div>
+
+            {
+              p.repoUrl && (
+                <a
+                  href={p.repoUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="inline-flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
+                >
+                  <span>查看原始文件</span>
+                  <span>→</span>
+                </a>
+              )
+            }
+          </div>
+
+          <!-- Documentation Content -->
+          <div class="p-6 sm:p-8">
+            {
+              readmeHtml ? (
+                <div class="prose-readme">
+                  <Fragment set:html={readmeHtml} />
+                </div>
+              ) : (
+                <div class="rounded-2xl border border-dashed border-border/80 px-6 py-14 text-center">
+                  <div class="mx-auto grid size-12 place-items-center rounded-2xl bg-secondary text-muted-foreground">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="size-6">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
+                    </svg>
+                  </div>
+                  <p class="mt-4 text-sm font-semibold text-foreground">该插件暂未提供 README 文档</p>
+                  <p class="mx-auto mt-1.5 max-w-sm text-xs leading-relaxed text-muted-foreground">
+                    缺少文档通常代表该项目仍在开发初期。建议前往其源码仓库查看详细实现。
+                  </p>
+                  {
+                    p.repoUrl && (
+                      <a
+                        href={p.repoUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="mt-5 inline-flex items-center gap-1.5 rounded-xl border border-border bg-card px-4 py-2 text-xs font-semibold text-foreground transition-colors hover:bg-secondary"
+                      >
+                        前往 GitHub 仓库查看 →
+                      </a>
+                    )
+                  }
+                </div>
+              )
+            }
+          </div>
         </section>
       </div>
 
-      <!-- sidebar -->
-      {/* min-w-0 matters on phones: the grid collapses to one column, and a
-          grid item defaults to its min-content width — a long package name in
-          a related-plugin card would otherwise widen the track for both. */}
-      {/* The sidebar is usually taller than the viewport, and a pinned sticky
-          element can't be scrolled — its lower half (相关插件) stayed unreachable
-          until the whole README had been scrolled past. Giving it its own
-          max-height + scroll lets it move independently of the article. */}
-      <aside
-        class="min-w-0 space-y-12 lg:sticky lg:top-20 lg:max-h-[calc(100vh-6rem)] lg:self-start lg:overflow-y-auto lg:pr-1"
-      >
-        <!-- Card kept, internal rules dropped: seven hairlines to separate
-             seven short values is more structure than the content needs.
-             Alignment and the mono/sans contrast do the separating. -->
-        <div class="rounded-xl border border-border bg-card p-5">
-          <h2 class="meta text-muted-foreground">基本信息</h2>
-          <dl class="mt-4 grid grid-cols-[auto_1fr] items-baseline gap-x-6 gap-y-3 text-sm">
+      <!-- Sidebar Column -->
+      <aside class="min-w-0 space-y-6 lg:sticky lg:top-20 lg:max-h-[calc(100vh-6rem)] lg:self-start lg:overflow-y-auto">
+        <!-- Metadata Card -->
+        <div class="rounded-3xl border border-border/80 bg-card p-5 sm:p-6 shadow-xs">
+          <h2 class="text-xs font-bold tracking-wider text-muted-foreground uppercase">插件基本属性</h2>
+          <dl class="mt-4 space-y-3 text-xs">
             {
               meta.map((m) => (
-                <>
+                <div class="flex items-center justify-between gap-3 border-b border-border/40 pb-2.5 last:border-0 last:pb-0">
                   <dt class="text-muted-foreground">{m.label}</dt>
-                  <dd class="tabular truncate text-right font-mono text-[0.8125rem] text-foreground">
+                  <dd class="tabular truncate font-mono font-medium text-foreground">
                     {m.href ? (
                       <a
                         href={m.href}
@@ -264,16 +411,47 @@ const jsonLd = {
                       m.value
                     )}
                   </dd>
-                </>
+                </div>
               ))
             }
           </dl>
         </div>
 
+        <!-- Health Diagnostic Card -->
+        <div class="rounded-3xl border border-border/80 bg-card p-5 sm:p-6 shadow-xs">
+          <div class="flex items-center justify-between">
+            <h2 class="text-xs font-bold tracking-wider text-muted-foreground uppercase">健康维护诊断</h2>
+            <span class:list={['lamp', lampClass[p.healthLevel]]} title={lampTitle[p.healthLevel]} />
+          </div>
+
+          <div class="mt-4">
+            <div class="rounded-xl border border-border/60 bg-secondary/40 p-3">
+              <p class="text-xs font-medium text-foreground">
+                {p.healthLevel === 'ok' ? '维护活跃' : p.healthLevel === 'warn' ? '需要留意' : '已归档/废弃'}
+              </p>
+              <p class="mt-1 text-[0.6875rem] leading-relaxed text-muted-foreground">
+                {lampTitle[p.healthLevel]}
+              </p>
+            </div>
+
+            <ul class="mt-3 space-y-1.5">
+              {
+                p.health.map((h) => (
+                  <li class="flex items-center gap-2 text-xs text-muted-foreground">
+                    <span class:list={['size-1.5 rounded-full', h.level === 'ok' ? 'bg-ok' : h.level === 'warn' ? 'bg-warn' : 'bg-danger']} />
+                    <span>{h.label}</span>
+                  </li>
+                ))
+              }
+            </ul>
+          </div>
+        </div>
+
+        <!-- Related Plugins Recommendations -->
         {
           siblings.length > 0 && (
-            <div>
-              <h2 class="meta text-muted-foreground">相关插件</h2>
+            <div class="rounded-3xl border border-border/80 bg-card p-5 sm:p-6 shadow-xs">
+              <h2 class="text-xs font-bold tracking-wider text-muted-foreground uppercase">同类生态推荐</h2>
               <div class="mt-4 space-y-3">
                 {siblings.map((s) => (
                   <PluginCard plugin={s} />
