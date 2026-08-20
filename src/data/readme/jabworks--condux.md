@@ -9,7 +9,7 @@ Personal collection of agentic coding skills. Compatible with Claude Code, Codex
 
 ## Contents
 
-- [Install](#install) — [ask an agent](#ask-an-agent-to-install-it) · [conflicts](#compatibility-with-other-skill-libraries) · [Claude Code](#claude-code--plugin-marketplace) · [Codex](#codex--plugin-manifests) · [OpenCode](#opencode--condux-plugin--merged-trigger-skill-variants) · [manual](#manual-fallback)
+- [Install](#install) — [ask an agent](#ask-an-agent-to-install-it) · [conflicts](#compatibility-with-other-skill-libraries) · [Claude Code](#claude-code--plugin-marketplace) · [Codex](#codex--plugin-manifests) · [OpenCode](#opencode--condux-plugin--merged-trigger-skill-variants) · [Cursor](#cursor--merged-trigger-skill-variants) · [manual](#manual-fallback)
 - [Skills](#skills) — the standalone skills table
   - [Condux](#condux) — the agentic workflow bundle
   - [Concord](#concord) — continuous memory for Codex
@@ -18,7 +18,7 @@ Personal collection of agentic coding skills. Compatible with Claude Code, Codex
 - [Where artifacts land](#where-artifacts-land) — what gets written to your project, and where
 - [Evals](#evals) — how trigger routing is measured
 - [Acknowledgments](#acknowledgments)
-- [Structure](#structure) — repo layout and the three distribution channels
+- [Structure](#structure) — repo layout and the four distribution channels
 
 ## Install
 
@@ -123,7 +123,7 @@ codex plugin add toolkit-ops@jabworks-agentic-toolkit
 ### OpenCode — condux plugin + merged-trigger skill variants
 
 For the **condux** workflow, one plugin line is the whole install. The
-[`@jabworks/condux`](packages/condux-opencode/) plugin bundles the 13 condux
+[`@jabworks/condux`](packages/condux-opencode/) plugin bundles the 15 condux
 skills, injects the specialist agents (coder / explorer / planner / researcher),
 and wires an opt-in plan-review listener:
 
@@ -150,6 +150,53 @@ npx skills add https://github.com/jabworks/agentic-toolkit/tree/main/dist/openco
 This copies skills into `~/.config/opencode/skills/`. It also includes the
 condux skills, but the plugin already provides those — OpenCode dedupes by name,
 so installing both is harmless.
+
+### Cursor — merged-trigger skill variants
+
+Cursor loads SKILL.md natively (since Cursor 2.4) but surfaces only
+`description` when deciding which skill to load — it never reads
+`when_to_use`. Install the Cursor-facing variants, which fold the trigger
+conditions in (same transform as the OpenCode tree):
+
+```bash
+npx skills add https://github.com/jabworks/agentic-toolkit/tree/main/dist/cursor/skills -a cursor
+```
+
+Run it in your project — skills land in `.agents/skills/`, which Cursor picks
+up per-project. Prefer project installs over `--global`: the CLI currently
+writes global skills to `~/.agents/skills/` against its own docs
+([vercel-labs/skills#421](https://github.com/vercel-labs/skills/issues/421)),
+and on a WSL setup that's the WSL home while Windows-side Cursor reads
+`C:\Users\<you>\.agents\skills\` — the install silently vanishes.
+
+Every plugin is also a spec-conformant [Agent Plugin](https://agent-plugins.org)
+(root `plugin.json`, flat `skills/`, docket MCP via spec `mcp.json`) — Cursor
+loads them directly. To try one without a marketplace: copy
+`dist/plugins/<name>` into `~/.cursor/plugins/local/<name>` and fully restart
+Cursor. Plugin installs ship raw skill frontmatter, so the trigger-quality
+caveat below applies; the `dist/cursor/skills/` install remains the best path
+for auto-triggering.
+
+Verified end-to-end 2026-08-14 (Cursor on Windows, WSL remote):
+
+| | Status |
+| --- | --- |
+| Skills install, list, and invoke (`/workflow` etc.) | ✅ works — project scope, from `dist/cursor/skills/` |
+| Plugins load as Agent Plugins (root `plugin.json`, flat `skills/`) | ✅ works — verified via `~/.cursor/plugins/local` |
+| Docket MCP server | ✅ works — auto-imported from an existing Claude Code plugin install, or manually via `.cursor/mcp.json` (see [docket INSTALL.md](dist/plugins/docket/server/INSTALL.md)) |
+| Docket CLI fallback | ✅ works as-is (dependency-free) |
+| Condux `/workflow` routing | ⚠️ degrades — no SessionStart hook on Cursor, so routing relies on the skill descriptions instead of the injected routing rule |
+| plan-review auto-capture, named agents (explorer/researcher/planner/coder) | ❌ absent — Cursor has no ExitPlanMode/Stop hook or custom-subagent surface |
+
+Bonus: if Claude Code is installed on the same machine, Cursor picks up its
+plugin ecosystem by itself — already-installed plugins (skills and MCP
+servers, docket included) just appear, and registered marketplaces surface
+in Cursor's Customize panel with one-click Add. Marketplace installs ship
+the raw SKILL.md, whose `when_to_use` Cursor ignores — fine for MCP-bearing
+plugins like docket, but for reliable skill triggering prefer the
+`dist/cursor/skills/` install above. Cursor reads the marketplace clone on
+its own side of a WSL split, which can lag — update the marketplace in
+Claude Code if the listing looks stale.
 
 ### Manual fallback
 
@@ -179,6 +226,7 @@ cp -r /tmp/agentic-toolkit/skills/<name> <skills-directory>/
 | [adapting-skills](./skills/adapting-skills/) | Stack and style priors for adapting skills to the jabworks conventions _(opinionated — fork the priors for your own stack)_ |
 | [git-commit](./skills/git-commit/) | Conventional-commit message from the diff, run safely — review before staging, no blind `git add .` |
 | [git-operations](./skills/git-operations/) | Decision router for git — pick the right operation (undo/discard/stash/merge/push) with an undo path |
+| [git-worktree](./skills/git-worktree/) | Decision router for git worktrees — isolated workspaces, native-first, with cleanup and recovery paths |
 | [spec-browser](./skills/spec-browser/) | Catalog and browse a specs/ tree — markdown index + folder-grouped doc site |
 | [release](./skills/release/) | Cut releases safely — machinery detection (changesets/toolkit/GitHub), dry-run first, rollback paths |
 | [coding-directive](./skills/coding-directive/) | House style for @jabworks repos — TypeScript, React, formatting, imports, naming, CSS _(personal)_ |
@@ -277,6 +325,7 @@ opt-in at checkpoints or justified by genuinely parallel work.
 |---|---|
 | [/workflow](./skills/workflow/) | Tier router — infer Small/Medium/Large, confirm with user, load only the skills the tier needs |
 | [/discovery](./skills/discovery/) | Design gate — goal-round questions, alternatives, then a post-approach detail round (contracts, mappings, edge cases); sign-off saves the design doc and, default-on, a structured tech spec |
+| [/blueprint](./skills/blueprint/) | Design-time visual clarity — grayscale HTML wireframes for UI surfaces, inline-SVG diagrams (data models, flows, architecture, state machines) for backend work; dependency-free, structure not styling |
 | [/draft-plan](./skills/draft-plan/) | Lean task-card plan (what/why/gotchas/deps), Markdown, LARGE tasks only |
 | [/test-first-development](./skills/test-first-development/) | Opt-in tests-first — one upfront consent, then red-green-refactor; asks before editing existing specs |
 | [/subagent-execution](./skills/subagent-execution/) | Named specialist agents for LARGE plans, only when justified, never to fill time |
@@ -400,12 +449,13 @@ The **plan-review** skill is inspired by [Plannotator](https://github.com/backno
 skills/<name>/          # Editable source — also what `npx skills add` installs
 dist/plugins/<name>/    # Built plugin dirs — the plugin-marketplace install source
 dist/opencode/skills/   # OpenCode-facing variants (when_to_use folded into description)
+dist/cursor/skills/     # Cursor-facing variants (same fold, separate tree)
 packages/condux-opencode/ # OpenCode plugin (npm) — bundles condux skills + agents + plan-review listener
 .claude-plugin/
   marketplace.json      # Plugin registry (Claude Code / Codex marketplace channel)
 ```
 
-Three distribution channels read different trees:
+Four distribution channels read different trees:
 
 - **`npx skills add`** (`vercel-labs/skills`, 68+ agents) scans the top-level
   `skills/<name>/SKILL.md` layout — it installs straight from **`skills/`** and
@@ -418,6 +468,10 @@ Three distribution channels read different trees:
   agents; the rest of the toolkit installs from **`dist/opencode/skills/`** (see
   the OpenCode install section). Both trees are generated by
   `scripts/build-opencode.mjs`, which `scripts/sync.sh` runs automatically.
+- **Cursor** installs from **`dist/cursor/skills/`** (see the Cursor install
+  section) — generated by `scripts/build-cursor.mjs`, which reuses the
+  OpenCode fold transform; the trees are byte-identical today but kept
+  separate so the channels can drift deliberately.
 
 `dist/` is a build artifact mirrored from `skills/` via `scripts/sync.sh` — never
 edit it by hand; `node --test` (run in CI) fails if it drifts from source. After

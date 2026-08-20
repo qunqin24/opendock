@@ -69,7 +69,7 @@ Requirements:
 | Runtime | Version |
 | --- | --- |
 | Node.js | `>=22.12.0` |
-| OpenCode | `>=1.3.8` |
+| OpenCode | `>=1.3.8` (Tested with 1.18.18) |
 
 ## Configuration Files
 
@@ -109,7 +109,8 @@ The default retention is 30 days. Checkpoints are deleted when OpenCode emits `s
   "enabled": true,
   "providers": {
     "openai": {
-      "compactModel": "gpt-5.4"
+      "compactModel": null,
+      "compactReasoningEffort": null
     }
   },
   "headers": {
@@ -142,7 +143,7 @@ The default retention is 30 days. Checkpoints are deleted when OpenCode emits `s
 | Field | Type | Default | Description |
 | --- | --- | --- | --- |
 | `enabled` | `boolean` | `true` | Enables or disables the plugin. |
-| `providers` | `object` | `{ "openai": { "compactModel": "gpt-5.4" } }` | Provider ids to wrap, keyed by OpenCode provider id. |
+| `providers` | `object` | `{ "openai": { "compactModel": null, "compactReasoningEffort": null } }` | Provider ids to wrap, keyed by OpenCode provider id. |
 | `headers` | `object` | see below | Internal header names. |
 | `responses` | `object` | see below | Responses endpoint path settings. |
 | `compactBodyKeys` | `string[]` | see example | Request body keys copied into compact calls. |
@@ -158,9 +159,14 @@ The default retention is 30 days. Checkpoints are deleted when OpenCode emits `s
 
 ### `providers`
 
-| Field | Type | Description |
-| --- | --- | --- |
-| `providers.<id>.compactModel` | `string` | Model sent to the `/responses` compaction v2 request for this provider. |
+| Field | Type | Default | Description |
+| --- | --- | --- | --- |
+| `providers.<id>.compactModel` | `string \| null` | `null` | Model sent to the `/responses` compaction v2 request. `null` follows the model used by the latest conversation part for both automatic and manual compaction. |
+| `providers.<id>.compactReasoningEffort` | `"none" \| "minimal" \| "low" \| "medium" \| "high" \| "xhigh" \| "max" \| null` | `null` | Reasoning effort sent to compaction. `null` follows the current conversation selection. Supported levels vary by model. |
+
+**Priority: explicit setting > latest conversation part > OpenCode's original compaction request.**
+
+`null` uses the next available value in that order.
 
 ### `responses`
 

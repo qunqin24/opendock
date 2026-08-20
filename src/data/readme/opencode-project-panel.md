@@ -1,5 +1,7 @@
 # opencode-project-panel
 
+[Traditional Chinese](README.zh-TW.md)
+
 OpenCode TUI plugin that adds a bottom bar with:
 
 - a project file manager with Markdown/code preview and editing;
@@ -52,17 +54,55 @@ automatically downloads npm plugins into its own cache at
 The plugin uses the current project configuration (`opencode.json` or
 `opencode.jsonc`) when editing permissions and MCP settings.
 
-### Refreshing a cached version
+### Upgrading
 
-Only remove this plugin's cache directory when you need to force a fresh
-download. The command below targets this package only:
+Alternatively, specify the version in the `tui.json` plugin spec. OpenCode
+automatically downloads and loads the specified version when it starts:
+
+```jsonc
+{
+  "$schema": "https://opencode.ai/tui.json",
+  "plugin": ["opencode-project-panel@0.1.9"]
+}
+```
+
+Change `@<version>` to the version you want and restart OpenCode to upgrade;
+you do not need to clear the cache manually.
+
+For a project installation, run this command from the project's `.opencode/`
+directory:
+
+```sh
+bun add opencode-project-panel@latest
+```
+
+For a global installation, remove this plugin's cache so OpenCode downloads the
+latest version from npm:
 
 ```sh
 cache="$HOME/.cache/opencode/packages/opencode-project-panel"
 if [ -d "$cache" ]; then rm -rf -- "$cache"; fi
 ```
 
-Restart OpenCode after changing `tui.json` or clearing the package cache.
+Restart OpenCode after upgrading, changing `tui.json`, or clearing the package
+cache.
+
+## If you are an agent
+
+When installing or upgrading this plugin:
+
+1. Treat it as an OpenCode TUI plugin. Update the project
+   `.opencode/tui.json` or global `~/.config/opencode/tui.json`, not
+   `opencode.json`.
+2. Preserve existing `plugin` entries and avoid duplicates.
+3. If a specific version is requested, use
+   `"opencode-project-panel@<version>"` in the `plugin` array. OpenCode will
+   download and load that version on startup.
+4. For a project dependency upgrade, run `bun add opencode-project-panel@latest`
+   from the project's `.opencode/` directory.
+5. Restart OpenCode after changing `tui.json`. For a global cached installation,
+   remove only this plugin's cache directory if a fresh download is needed.
+6. Do not load the npm package and a local `dist/index.js` copy at the same time.
 
 ## Shortcuts
 
@@ -85,6 +125,10 @@ bun run build
 The package entry point is the generated `dist/index.js` file. Runtime UI
 dependencies remain external in the bundle and are declared in `dependencies`
 so OpenCode's Bun-based plugin loader can resolve them.
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for the release history.
 
 ## License
 

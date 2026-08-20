@@ -1,16 +1,17 @@
 # opencode-okf
 
-An [OpenCode](https://opencode.ai/) plugin for creating, maintaining, and validating [Open Knowledge Format (OKF) v0.1](https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md) bundles.
+An [OpenCode](https://opencode.ai/) plugin for creating, maintaining, upgrading, and validating [Open Knowledge Format (OKF)](https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md) bundles.
 
 The authoring commands make OpenCode inspect repository evidence before it writes knowledge. The bundled validator checks the actual format, so conformance does not depend on the model remembering every rule.
 
 ## Features
 
 - `/okf-init` inspects a repository and creates an evidence-backed OKF bundle.
-- `/okf-update [session|diff]` updates concepts and indexes from full repo (no arg), git diff, or the current session.
-- `/okf-validate` reports conformance errors and quality warnings, with opt-in fixes.
+- `/okf-update [session|diff]` fetches the current spec, updates concepts and indexes from full repo (no arg), git diff, or the current session, and recommends an explicit upgrade for older bundles.
+- `/okf-upgrade` fetches the authoritative current spec and migrates the entire bundle to it.
+- `/okf-validate` reports v0.2 conformance errors and metadata quality warnings, with opt-in fixes.
 - `/okf-compact [all]` prunes logs, or the whole bundle (concepts, indexes, logs) with `all`.
-- `okf_inspect`, `okf_init`, `okf_validate`, `okf_capture`, and `okf_diff` give agents deterministic OKF and git-diff tools.
+- `okf_spec`, `okf_inspect`, `okf_init`, `okf_validate`, `okf_capture`, and `okf_diff` give agents deterministic spec, OKF, and git-diff tools.
 - A command hook supplies the exact UTC timestamp to OKF workflows.
 - A debounced file-event hook warns when edits make the bundle nonconformant.
 - Configurable capture moments: toast nudges or automatic `/okf-update session` when the session goes idle, and OKF preservation context before compaction.
@@ -70,6 +71,13 @@ Add the published plugin to `opencode.json`:
 
 Quit and restart OpenCode after changing plugin configuration. OpenCode installs npm plugins with Bun at startup.
 
+The package root only exports the plugin so it remains compatible with OpenCode's legacy plugin loader. Reusable helpers and constants are available from the `opencode-okf/lib` subpath:
+
+```ts
+import OKFPlugin from "opencode-okf"
+import { OKF_SPEC_URL, fetchOKFSpec, validateBundle } from "opencode-okf/lib"
+```
+
 For local development, build this package and reference its compiled entry point with an absolute file URL:
 
 ```json
@@ -103,6 +111,15 @@ Update an existing bundle (hard source mode on the first arg):
 | *(none)* or free-form focus | Full repository evidence |
 | `diff [ref] [focus…]` | Git changes via `okf_diff` (default HEAD) |
 | `session [focus…]` | This conversation + work — concepts/indexes first, not log-only |
+
+Upgrade an existing bundle to the latest authoritative specification:
+
+```text
+/okf-upgrade
+/okf-upgrade preserve legacy citations that cannot be mapped safely
+```
+
+The upgrade command fetches the specification from `https://raw.githubusercontent.com/GoogleCloudPlatform/knowledge-catalog/refs/heads/main/okf/SPEC.md`, migrates the whole bundle, updates the root `okf_version`, and validates the result. It requires network access to `raw.githubusercontent.com`.
 
 Validate without editing:
 
@@ -174,9 +191,12 @@ Capture moments act at most once per stretch of user activity, only when the bun
 
 ## Validation
 
-The validator follows OKF v0.1 conformance rules:
+The validator follows OKF v0.2 conformance and field-shape rules while tolerating v0.1 metadata with migration warnings:
 
 - Every non-reserved Markdown file must have parseable YAML frontmatter with a non-empty string `type`.
+- v0.2 `sources`, `usage_window`, `generated`, `verified`, `status`, and `stale_after` shapes are checked as non-blocking warnings.
+- `Attested Computation` documents require `runtime`; `parameters`, `executor`, and `attester` shapes are checked.
+- Legacy `timestamp` remains accepted but produces a migration warning in place of `generated`.
 - `index.md` files must provide progressive-disclosure headings and linked entries. Only the root index may have frontmatter, where it declares `okf_version`.
 - `log.md` files must contain newest-first `## YYYY-MM-DD` groups with list entries.
 - Documents must decode as UTF-8.
@@ -198,8 +218,8 @@ Pushing a version tag publishes to npm via [trusted publishing](https://docs.npm
 
 ```sh
 # bump "version" in package.json first, then:
-git tag v0.6.1
-git push origin v0.6.1
+git tag v0.7.1
+git push origin v0.7.1
 ```
 
 The workflow fails if the tag does not match the `version` field in `package.json`.

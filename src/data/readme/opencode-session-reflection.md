@@ -38,12 +38,6 @@ Add the plugin to your OpenCode config:
 
 Restart OpenCode after changing the config.
 
-If your OpenCode setup does not automatically install npm plugins by name, install the package first:
-
-```sh
-npm install -g opencode-session-reflection
-```
-
 ## Quick Start
 
 After restarting OpenCode, ask the agent to call the `session_reflection` tool.
@@ -66,17 +60,27 @@ Review by session title:
 Call session_reflection with action=collect and sessionName="npm whoami ENEEDAUTH".
 ```
 
+Review sessions from a time range:
+
+```text
+Call session_reflection with action=collect and period="thisWeek".
+```
+
+`period` accepts `today`, `yesterday`, `last3days`, `last7days`, `last30days`, `thisWeek`, `lastWeek`, `thisMonth`, or `lastMonth`. `today`/`yesterday`/`this*`/`last*` are calendar-anchored in the local timezone; `lastNd` covers the last N calendar days including today; weeks start on Monday. Pass `since` with an ISO date or datetime (for example `"2026-08-10"`) instead of `period` for an arbitrary start. `period` and `since` are mutually exclusive and both only apply when neither `sessionID` nor `sessionName` is given.
+
 Save a generated report:
 
 ```text
 Call session_reflection with action=save, runID=<run-id>, and analysis=<final report markdown>.
 ```
 
-Saved reports are written under:
+Saving requires the run ID returned by the corresponding collect action. Every save creates an immutable Markdown report and a same-base-name JSON sidecar. Their globally unique names include the run ID, a timestamp, and random entropy, so concurrent processes never share a report path. Both files are written under:
 
 ```text
-~/.config/opencode/session-reflections/reports/
+${XDG_CONFIG_HOME}/opencode/session-reflections/reports/
 ```
+
+`XDG_CONFIG_HOME` is honored only when it is an absolute path. If it is unset, empty, or relative, storage falls back to `~/.config/opencode/session-reflections/`.
 
 ## Optional Slash Command
 
@@ -104,13 +108,18 @@ The generated prompt asks the current model to review session evidence across se
 | Workflow opportunities | repeated prompts, recurring checklists, missing slash commands, missing custom tools |
 | Reuse check | whether OpenCode, community plugins, npm, GitHub, or existing skills already solve the problem |
 
+The report header records the run ID, the active OpenCode agent, and the actual number of sessions in the validated manifest snapshot. A shortened, illustrative result might look like:
+
+```text
+1. Missing success criteria repeatedly caused verification ambiguity. [session_id: example-1]
+2. A reusable pre-completion checklist is feasible and high-value. [session_id: example-2]
+```
+
 ## Privacy And Local Data
 
-The plugin does not upload session content to any external service on its own. It returns the collected reflection prompt inside the current OpenCode session. Whether that prompt is sent to a model depends on the provider configured in your OpenCode session.
+The plugin does not upload session content to a separate service on its own. It returns selected transcript evidence to the current OpenCode session, where it may be sent to the model provider configured for that session. The generated analysis prompt also asks the agent to perform external prior-art research when tools and network access are available.
 
-Session transcripts are read through the OpenCode SDK.
-
-In v0.2.0, session title search can also query the local OpenCode SQLite database at `~/.local/share/opencode/opencode.db` through the `sqlite3` CLI when available. This is used only to find matching session metadata across projects. If the database or `sqlite3` is unavailable, the plugin falls back to API-based session listing.
+Session metadata and transcripts are read through OpenCode APIs. Implicit discovery uses `/experimental/session` cursor pagination across projects; the plugin does not read OpenCode's SQLite storage.
 
 Audit logs are metadata-only by default. They are written locally under:
 
@@ -121,9 +130,23 @@ Audit logs are metadata-only by default. They are written locally under:
 └── events.jsonl
 ```
 
-The default logs do not store raw user prompts, assistant responses, tool outputs, full transcripts, full directory paths, secrets, or the full generated prompt. Directory paths and prompts are represented by SHA-256 hashes.
+Audit directories are created with mode `0700`, and manifests, events, reports, and report sidecars with mode `0600`. Run manifests contain redacted collect metadata such as session IDs, counts, hashed directory paths, prompt hashes, and skip reasons. They omit session titles, raw transcripts, tool output, and the generated prompt, but metadata should still be treated as private and is not guaranteed to be secret-free.
+
+Collect manifests are immutable after creation and are never updated when a report is saved. Each report sidecar self-associates its report with the run by recording the run ID, report path, save time, reviewed-session count, and a hash of the exact manifest snapshot used to build the report.
+
+The plugin rejects symbolic links at the `runs`, `reports`, manifest-target, and event-log boundaries, and rejects non-regular or hard-linked event logs. Files are fully written and permissioned as private temporary files before exclusive publication that cannot overwrite an existing target. A crash can leave a dot-prefixed temporary file, but a published report is complete and identifies its run without requiring a manifest update. Cross-process saves use distinct immutable report/sidecar pairs and no process-local lock.
+
+Saved Markdown reports contain the supplied analysis and may include sensitive excerpts copied by the model. You are responsible for retention and deletion of both reports and audit metadata.
 
 ## Release And Update History
+
+### v0.3.0
+
+- Replaced SQLite lookup and offset listing with OpenCode `1.17.11+` experimental cursor pagination.
+- Added nested/flattened timestamp compatibility, current-session exclusion, deduplication, and bounded evidence collection.
+- Required validated collect run IDs for report saving, immutable report sidecars, and hardened local audit permissions and redaction.
+- Added `period` (`today`, `yesterday`, `last3days`, `last7days`, `last30days`, `thisWeek`, `lastWeek`, `thisMonth`, `lastMonth`) and `since` (ISO date) time-range filters for session collection.
+- Migrated to the V1 plugin module format (`id` + `server`) so the plugin loads correctly on OpenCode `1.18.x`, where the legacy loader treated every exported function as a plugin.
 
 ### v0.2.0
 
@@ -150,11 +173,17 @@ This is expected for normal npm plugin installation. Use the `session_reflection
 
 ### Search by session name misses sessions from other projects
 
-Install `sqlite3` so v0.2.0 can search the local OpenCode database across projects. If `sqlite3` is not available, the plugin falls back to OpenCode API listing.
+Use OpenCode `1.17.11` or later. Name lookup uses the cross-project `/experimental/session` endpoint and forwards the title query through its `search` parameter.
+
+### Saving says the run ID is invalid or unknown
+
+Run `action=collect` first, then pass the exact returned `runID` to `action=save`. Reports cannot be saved without a matching local run manifest.
 
 ### The report is empty or too small
 
 Try increasing `limit`, selecting a specific `sessionID`, or searching by `sessionName`. Empty sessions and sessions without reviewable transcript content are skipped.
+
+The collected evidence is capped at 48,000 characters by default. Pass `evidenceBudget` to `collect` to override it per call, or set the `SESSION_REFLECTION_EVIDENCE_BUDGET` environment variable as a persistent default. When content does not fit, each selected session remains represented and explicit omission markers identify excluded transcript items.
 
 ## Development
 

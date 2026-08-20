@@ -7,7 +7,7 @@
 [![Tests](https://img.shields.io/github/actions/workflow/status/godaravikas/opencode-vacuum/ci.yml?label=tests)](https://github.com/godaravikas/opencode-vacuum/actions)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 
-An [OpenCode](https://opencode.ai) plugin for bulk session management. List all your sessions globally, select multiple with keyboard navigation, and delete them in one shot.
+Supercharge [OpenCode](https://opencode.ai) session management with global session discovery, intuitive keyboard and mouse multi-selection, and effortless bulk deletion.
 
 ## Requirements
 

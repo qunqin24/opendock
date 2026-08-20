@@ -66,7 +66,8 @@ Adds to project's `.opencode/opencode.json` — only available in that project.
 
 **OpenDesign daemon MUST be running** for sync operations:
 
-- **Desktop**: Open the OpenDesign app (starts daemon on `http://127.0.0.1:7456`)
+- **Desktop**: open the Open Design app. It starts the daemon on a **random high port** — not the
+  documented `7456` — so any `od` command needs `--daemon-url http://127.0.0.1:<port>` or `OD_DAEMON_URL`.
 - **Server/CLI**: `pnpm tools-dev` (from OpenDesign repo)
 
 The plugin auto-detects MCP connectivity and falls back to `od` CLI if needed.

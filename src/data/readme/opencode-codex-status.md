@@ -6,13 +6,25 @@ It reads your usage from the Codex CLI's own endpoint using credentials that ope
 
 ## Installation
 
-Install the plugin into your global OpenCode TUI config:
+Install the plugin with OpenCode's native installer:
+
+```sh
+opencode plugin opencode-codex-status --global
+```
+
+Or via npx:
 
 ```sh
 npx opencode-codex-status install
 ```
 
-For project-local testing, install it into `./.opencode/tui.json` instead:
+For project-local testing, use OpenCode's project scope:
+
+```sh
+opencode plugin opencode-codex-status
+```
+
+Or via npx:
 
 ```sh
 npx opencode-codex-status install --project
@@ -22,7 +34,7 @@ Restart OpenCode after installing.
 
 ## Usage
 
-It reads the OpenAI auth token from opencode's default auth file (`~/.local/share/opencode/auth.json` on Linux/macOS, `%APPDATA%/opencode/auth.json` on Windows). No extra auth setup is needed.
+It uses the OpenAI credentials OpenCode already stores. No extra auth setup is needed.
 
 Once loaded, the quota display appears in the TUI sidebar. Run `/codex-status` to force a refresh, or `/codex-status-toggle` to show/hide the display on the fly.
 

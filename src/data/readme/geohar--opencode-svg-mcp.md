@@ -166,8 +166,9 @@ See [`DESIGN.md`](./DESIGN.md) for the full architecture and the
 
 ## Status
 
-The full inkex catalog is mapped through to **117 MCP tools** (see
-[`INKEX_PRIMITIVES.md`](./INKEX_PRIMITIVES.md)), with ruff/mypy clean and the test suite green.
+The full inkex catalog is mapped through to **181 MCP tools** (see
+[`INKEX_PRIMITIVES.md`](./INKEX_PRIMITIVES.md)), plus the theme system and the declarative
+facade families (diagrams, charts, annotations), with ruff/mypy clean and the test suite green.
 
 - **Document model** (inkex-backed, multi-document with an active-document default): shapes,
   paths (+ arc/star factories and path-data ops), text + tspan runs + text-on-path + flowed
@@ -207,6 +208,43 @@ The full inkex catalog is mapped through to **117 MCP tools** (see
   gradients, patterns, markers, **clip + mask**, and **filters** (blur, drop-shadow,
   color-matrix/overlay, blend, morphology, component-transfer, turbulence, displacement, plus a
   raw filter-graph builder).
+- **Themes** — a document-wide design language authored as real CSS (`.svg-mcp/themes/`):
+  tokens as custom properties (resolved server-side; emitted CSS is var-free), namespaced
+  classes, per-theme **variants** (dark mode in ten lines), prose guidance returned to the
+  agent on load. Themes are a **role-routed set** (boxes from one theme, text from another);
+  nodes hook in automatically by category/primitive/role, and the precedence rule is one
+  sentence: *if you typed it, it sticks; if the theme supplied it, it stays linked.* See
+  [`docs/themes.md`](./docs/themes.md).
+- **Box-arrow diagrams** — declare, don't draw: `add_diagram_node(kind, label)` (theme picks
+  the shape, label sizes the box), id-parametric edges with side auto-selection, port fan-out
+  and rounded orthogonal routing, containers drawn behind their members, explicit `reflow()`
+  after moves, and `layout_diagram` (layered/tree/grid) for zero-coordinate authoring. See
+  [`docs/diagrams.md`](./docs/diagrams.md).
+- **Graph ingest** (`add_diagram_graph`) — hand it a whole `{nodes, edges}` graph, in the shape
+  code-graph/dependency exports already emit (`from`/`to`, extra keys ignored), and get boxes,
+  arrows and a layout in one call: self-edges dropped and counted, parallel edges merged with
+  their weights summed, unknown endpoints refused rather than invented. You say what the picture
+  is about — `collapse` groups, `include`/`exclude` globs, `size_field` scaling a box by area —
+  because no centrality score knows which nodes deserve one.
+- **Edge router** — `layout_diagram` reserves a **lane** per rank-spanning edge (dummy nodes in
+  the ranking) so long edges travel between the boxes instead of over them, routes sharing a
+  corridor fan apart instead of drawing on top of each other, and a label is scored onto the
+  cheapest segment long enough to hold it — charged for the boxes, routes and labels it would
+  land on. When the router's choice isn't yours, `waypoints` pins an edge's middle through every
+  later reflow and layout, and `pinned` keeps a node where you put it while the layout packs
+  the drawing around it.
+- **Charts** — seven data-parametric kinds (`bar`, `line`, `donut`, `scatter`, `histogram`,
+  `sparkline`, `radar`) with nice-number ticks and margins measured from the actual tick labels;
+  an `axes=` spec for pinned (and clipped) limits, tick counts or explicit ticks,
+  percent/currency/SI labels, gridlines, minor ticks, tick direction, rotated/inverted axes, a
+  zero spine, reference lines and log scales; plus waterfalls with a total bar, normalized
+  stacks, marker glyphs (open, `markevery`, bubbles by area), series bands, and step-mid lines.
+  `edit_chart` re-derives the picture from new data. Deliberately not a plotting library (no
+  density/KDE, secondary axes or colormaps — `import_svg` matplotlib output for that).
+- **Annotations** — `add_legend()` generated from what the document uses (swatches wear the
+  real theme classes), `add_callout` cards whose leader lines point at node **ids** and
+  survive `reflow`, `add_table` with measured columns, `add_callout_card` with kind-colored
+  accents.
 - **Composable effect stack** — Photoshop-style layer effects that **stack** on one node (each
   `apply_*` appends; `replace=true` starts fresh), each bounded by a `size`/falloff so the
   interior fill stays intact: `apply_drop_shadow`, `apply_inner_shadow`, `apply_outer_glow`,
@@ -244,6 +282,36 @@ per-session document stores), a **document-operations** tier (inkex-facing const
 read-only introspection, and the document model), and a **rendering & output** tier (pure-Python
 typesetting, the render/export backends, and SVG serialization). See [`DESIGN.md`](./DESIGN.md)
 for the full layering rationale.
+
+## Design language & declarative facades
+
+State what things **are** — kinds, roles, connections, data — and geometry and paint are
+derived. Everything below was authored with zero coordinates inside the facades, styled by
+the bundled default theme, and stays editable (`edit_chart` swaps the data and re-derives;
+`translate_node` + `reflow()` re-routes; `set_theme_variant("dark")` reskins in one call).
+
+<p align="center">
+  <img src="./docs/img/facade-diagram.png" alt="declarative diagram" width="760">
+</p>
+<p align="center">
+  <img src="./docs/img/facade-charts.png" alt="chart facades" width="720">
+</p>
+<p align="center">
+  <img src="./docs/img/facade-annotate.png" alt="annotation facades" width="760">
+</p>
+
+And the same idea applied to a graph you already have: the self-portrait below is svg-mcp's own
+module graph handed to `add_diagram_graph` in **one call** — a code-index export, seven `collapse`
+groups, boxes scaled by symbol count, laid out and routed with no coordinates anywhere.
+
+<p align="center">
+  <img src="./docs/img/facade-architecture.png" alt="the project's own module graph, ingested in one call" width="620">
+</p>
+
+Guides: [`docs/themes.md`](./docs/themes.md) (authoring a design language as CSS — tokens,
+variants, residency, precedence) and [`docs/diagrams.md`](./docs/diagrams.md) (diagram,
+chart, and annotation facades). Regenerate the images with
+[`examples/generate.py`](./examples/generate.py).
 
 ## Install as a Claude Code plugin
 
@@ -287,6 +355,21 @@ It registers svg-mcp as a `type: "remote"` MCP endpoint (`:7731`) and keeps one 
 server behind it. Full options (`port`, `gracePeriod`, `dev`, `manage`, …) are in the
 plugin's [README](https://github.com/georgeharker/svg-mcp/blob/main/plugins/opencode/README.md). The same `MCP_COMBINER` /
 `MCP_COMBINER_SERVES_SVG_MCP` switch below applies — the OpenCode plugin honours it too.
+
+## Install as a Pi extension
+
+[Pi](https://pi.dev) has no MCP of its own, so it needs **[`pi-mcp-adapter`](https://pi.dev/packages/pi-mcp-adapter)**
+(`pi install npm:pi-mcp-adapter`) plus the `@geohar/pi-svg-mcp` extension in
+[`plugins/pi`](https://github.com/georgeharker/svg-mcp/tree/main/plugins/pi). The extension runs the same warm
+`sharedserver`-managed server (same `uvx svg-mcp@<version>` pin) and injects the
+diagram-authoring directive on `before_agent_start`; point the adapter at svg-mcp with a
+one-line `mcp.json` ([`plugins/pi/mcp.json.example`](https://github.com/georgeharker/svg-mcp/tree/main/plugins/pi/mcp.json.example)).
+Load the extension by symlink into `~/.pi/agent/extensions/`, a local path under
+`settings.json` `extensions`, or the published package under `packages`. Full options
+(`SVG_MCP_PORT` / `_VERSION` / `_DEV`, `PI_SVG_MCP_*`) are in the plugin's
+[README](https://github.com/georgeharker/svg-mcp/blob/main/plugins/pi/README.md). The same `MCP_COMBINER` /
+`MCP_COMBINER_SERVES_SVG_MCP` stand-down applies — when combiner-served the extension
+injects the directive only (no `mcp.json` needed; you register the combiner instead).
 
 ### If a combiner already serves svg-mcp
 
@@ -421,11 +504,23 @@ All settings are env vars prefixed `SVG_MCP_` (or a `.env` file):
 | `SVG_MCP_RENDER_TIMEOUT_S` | `30` | Per-render subprocess timeout |
 | `SVG_MCP_TRANSPORT` | `stdio` | Server transport: `stdio` · `http` · `streamable-http` · `sse` |
 | `SVG_MCP_HOST` / `SVG_MCP_PORT` | `127.0.0.1` / `8000` | Bind address for the http transports |
+| `SVG_MCP_AUTH_TOKEN` | unset | Optional inbound bearer token for the http `/mcp` endpoint (see [Authentication](#authentication)) |
 | `SVG_MCP_PREVIEW` | unset | Auto-start the [live preview](#live-preview) web server on boot (`1`/`true`) |
 | `SVG_MCP_PREVIEW_HOST` / `SVG_MCP_PREVIEW_PORT` | `127.0.0.1` / `8808` | Bind address for the live preview |
 
 Transport, host, and port can also be set with CLI flags (which take precedence over the env
 vars): `svg-mcp --transport streamable-http --host 127.0.0.1 --port 7731`.
+
+### Authentication
+
+The http `/mcp` endpoint is **unauthenticated by default** — fine on loopback, but open the
+moment you bind beyond `127.0.0.1`. Set **`SVG_MCP_AUTH_TOKEN`** and every request to `/mcp`
+must present `Authorization: Bearer <token>`; a missing/wrong token gets a plain `401` (no
+`WWW-Authenticate`, so standards clients don't drift into OAuth). Unset ⇒ open (unchanged);
+`/health` stays open. When svg-mcp runs behind the
+[mcp-combiner](https://github.com/georgeharker/mcp-companion), give the combiner the token in
+this server's `servers.json` entry: `{"auth": {"bearer": "${SVG_MCP_AUTH_TOKEN}"}}`. (The gate
+is `inbound_auth.py`, vendored byte-identical from the combiner.)
 
 ## Develop
 
@@ -549,10 +644,14 @@ export_svg()                    # final SVG source string
   `set_active_document`. Call `current_context()` to re-anchor (active id, open docs, outline).
 - **Targets by id or name.** Every `target`/`parent`/`content` arg takes a node's returned id
   **or** the friendly `name` you gave it. Name things you'll revisit; reason via `find(name=…)`
-  and `outline`. **Names should be unique** — a name matching several nodes is rejected (no silent
-  guess); disambiguate with a hierarchy path `ancestor/name` (each segment an id or name) or the
-  id. Each chat/connection has its own isolated set of documents (`current_context` reports the
-  `session_id`).
+  and `outline`. A bare handle is an **id**, else an **exact name** — never a hierarchy query, so
+  a name containing `/` (graph imports name nodes `src/ops/x.py`) just works. Be explicit when you
+  must: `id:x`, `name:x` (verbatim, slashes and all), or `path:ancestor/name` for the
+  ancestor-chain query (each segment an id or name, gaps allowed) that disambiguates a duplicated
+  name; the prefix is stripped once, so any literal name is expressible (`name:name:foo`).
+  **Names should be unique** — a name matching several nodes is rejected (no silent guess), and
+  the error lists a handle per candidate. Each chat/connection has its own isolated set of
+  documents (`current_context` reports the `session_id`).
 - **Stacking.** Later siblings paint on top. Restack relative to a sibling with
   `reparent(target, above=<node>)` / `below=<node>` instead of counting child indices.
 - **Coordinates.** User units, origin top-left, y increases downward.

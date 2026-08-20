@@ -10,7 +10,8 @@ This plugin solves that by:
 
 - Fetching `/v1/models` and `/api/combos` **at OpenCode startup, in Node.js** — no CORS, no WebView restrictions
 - Emitting the provider block **dynamically** in the plugin's `config`/`provider` hook — so `opencode.json` only needs the plugin entry, not a static `provider.omniroute`
-- Re-fetching on a configurable TTL (default 5 min) **and** background auto-discovery while OpenCode is running (`autoSyncIntervalMs`, default 5 min), so new models / combo changes appear without restarting OpenCode
+- Re-fetching on a configurable TTL (default 5 min) so new models / combo changes appear without restarting OpenCode
+- Running a **one-shot startup sync** that refreshes the cache + disk snapshot only when `/v1/models` returns a catalog that differs from the previous one (in-memory cache or disk snapshot). No periodic background timer — the TTL on-demand refresh covers mid-session changes.
 - Exposing a force-refresh path (`omniroute_sync_models` tool + `/omni-sync` command template) equivalent to Pi `/omni sync`
 - Computing `limit.context` for combos as `min(member.context_length)` from the live catalog (no more `null` values that cause 4K-token truncation)
 - **Auto-pickup of `interleaved` capability** for thinking models (merged via PR #3138)
@@ -74,9 +75,9 @@ Peer dep: `@opencode-ai/plugin` (managed by your OpenCode install).
       {
         "providerId": "omniroute",
         "baseURL": "https://or.example.com",
-        // Background re-discovery while OpenCode is running (Pi parity).
-        // Default 300000 (5 min). Minimum 60000. Set 0 to disable.
-        "autoSyncIntervalMs": 300000,
+        // TTL on-demand refresh; the one-shot startup sync only writes
+        // when the catalog actually changed. Default 300000 (5 min).
+        "modelCacheTtl": 300000,
       },
     ],
   ],
@@ -99,14 +100,15 @@ While OpenCode is running, the plugin keeps the model catalog fresh in two ways:
 | Mechanism | Default | What it does |
 | --- | --- | --- |
 | `modelCacheTtl` | `300000` (5 min) | On-demand TTL: next provider/models hook after expiry re-fetches `/v1/models` |
-| `autoSyncIntervalMs` | `300000` (5 min) | Background timer: proactively invalidates + re-fetches while the harness is running. Min `60000`. Set `0` to disable background polling (TTL still applies) |
+| Startup sync (one-shot) | n/a | At plugin init, fetch `/v1/models` once and only update cache + disk snapshot when the catalog has new models compared to the previous one. No periodic timer. |
+| `autoSyncIntervalMs` | `300000` (5 min) | **Legacy** — accepted by the schema for backward compat but ignored at runtime. Background polling was removed; use `modelCacheTtl` for on-demand refreshes and `/omni-sync` for explicit force-refresh. |
 
 **Force sync now** (Pi `/omni sync` equivalent) — OpenCode has no Pi-style slash-command registration API, so the plugin wires both a tool and command templates:
 
 1. **Tool:** `omniroute_sync_models` — invalidates in-memory + disk caches, re-fetches `GET /v1/models` (and combos/enrichment when enabled), returns `{ ok, count, ... }`.
 2. **Command templates** (type these in OpenCode):
    - `/omni-sync` — asks the agent to call `omniroute_sync_models` and report the result
-   - `/omni-autosync` — asks the agent to report current `autoSyncIntervalMs` / `modelCacheTtl` status
+   - `/omni-autosync` — asks the agent to report current startup-sync / `modelCacheTtl` status
 
 ```text
 /omni-sync
@@ -196,6 +198,7 @@ npm install --prefix ~/.config/opencode/plugins/omniroute-opencode-plugin-prepro
 | Compression pipeline tags                   | Combo names get tagged with their compression pipeline (e.g. `Combo: claude-primary [rtk🟡 → caveman🟠]`) when `features.compressionMetadata: true`. Intensity tokens render as a traffic-light emoji: 🟢 lite/minimal · 🟡 standard · 🟠 aggressive/full · 🔴 ultra                                                                                                                                        | both hooks                   |
 | Provider-tag prefix                         | Prepend short upstream-provider label to enriched names (e.g. `Claude - Claude Opus 4.7` vs `Kiro - Claude Opus 4.7`, `GHM - GPT 5`) so same-id models routed via different upstream connections group visibly in the picker (default-on, opt-out via `features.providerTag: false`)                                                                                                                        | both hooks                   |
 | Usable-only filter                          | Filter to providers with at least one healthy connection in `/api/providers` (opt-in via `features.usableOnly`)                                                                                                                                                                                                                                                                                             | both hooks                   |
+| Enabled-only filter                         | Filter to providers with `isActive: true` in `/api/providers` regardless of `testStatus` (opt-in via `features.enabledOnly`)                                                                                                                                                                                                                                                                            | both hooks                   |
 | Disk-cache fallback                         | Last-known-good catalog persisted to disk; hydrates on a cold start when `/v1/models` is unreachable (default-on, opt-out via `features.diskCache: false`)                                                                                                                                                                                                                                                  | `config`                     |
 | Bearer injection + suffix-spoof guard       | Adds `Authorization` on baseURL-matched requests only                                                                                                                                                                                                                                                                                                                                                       | `auth.loader.fetch`          |
 | Gemini schema sanitization                  | Strips `$schema`/`$ref`/`additionalProperties` for `gemini-*`/`google-vertex-gemini/*`                                                                                                                                                                                                                                                                                                                      | `auth.loader.fetch` wrap     |
@@ -226,6 +229,7 @@ Every field is optional. Defaults mirror v0.1.0 behaviour so existing `opencode.
 | `compressionMetadata` | `boolean` | `false` | Pull `/api/context/combos` so combo names get tagged with their compression pipeline, e.g. `Combo: claude-primary [rtk🟡 → caveman🟠]`. Intensity tokens render as traffic-light emoji (🟢 lite/minimal · 🟡 standard · 🟠 aggressive/full · 🔴 ultra) so the picker advertises "how compressed" each combo is at a glance.                                                                                                                                                                                                                                          |
 | `providerTag`         | `boolean` | `true`  | Prepend a short upstream-provider label to the enriched display name with `" - "` separator, so `cc/claude-opus-4-7 → Claude - Claude Opus 4.7` differs visibly from `kr/claude-opus-4-7 → Kiro - Claude Opus 4.7` in the OC TUI model picker. Label resolution: use `/api/pricing/models[<alias>].name` verbatim when ≤8 chars (e.g. `Claude`, `Kiro`, `Codex`, `Qwen`), otherwise fall back to `UPPER(alias)` (e.g. `GitHub Models` → `GHM`, `Gemini` → `GEMINI`). Idempotent. Combos intentionally skipped (the `Combo:` prefix already conveys multi-upstream). |
 | `usableOnly`          | `boolean` | `false` | Read `/api/providers` and filter the catalog to providers that have at least one connection with `isActive: true` AND `testStatus: 'active'`. Subtract-filter semantics: providers unknown to BOTH the pricing-models catalog AND the connection table pass through (so synthetic prefixes like `agentrouter/*` survive). On fetch failure the filter is disabled for the refresh — never hides the whole catalog.                                                                                                                                                   |
+| `enabledOnly`         | `boolean` | `false` | Read `/api/providers` and filter the catalog to providers whose connections have `isActive: true`. Unlike `usableOnly`, this **ignores `testStatus` entirely** — providers that are enabled but failing connection tests still surface their models. Use this when you want the picker to mirror the OmniRoute dashboard `isActive` toggle rather than transient health-check state. Subtract-filter semantics; soft-fail on fetch error; combos always pass through (they have no enable/disable in OmniRoute's dashboard). |
 | `diskCache`           | `boolean` | `true`  | Persist the last successful `/v1/models` + `/api/combos` + enrichment + connections + compression snapshot to `${OPENCODE_DATA_DIR ?? ~/.local/share/opencode}/plugins/omniroute-<providerId>.json`. On a subsequent cold start where `/v1/models` throws (network down / IP whitelist drop / 5xx) the static block hydrates from the snapshot so OC's model picker survives offline. Soft-fail on read/write — never blocks publishing.                                                                                                                             |
 | `geminiSanitization`  | `boolean` | `true`  | Strip `$schema`/`$ref`/`additionalProperties` from tool params when the model id matches `gemini`                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | `mcpAutoEmit`         | `boolean` | `false` | Auto-write an `mcp.<providerId>` remote entry into the OC config pointing at `<baseURL>/api/mcp/stream` with the resolved Bearer token                                                                                                                                                                                                                                                                                                                                                                                                                               |
@@ -297,6 +301,28 @@ If you want a narrower-scoped Bearer for MCP (different from the chat/inference 
 - `diskCache: true` (default) writes a snapshot to `${OPENCODE_DATA_DIR}/plugins/omniroute-<providerId>.json` on every healthy refresh. On a cold start where `/v1/models` is unreachable (laptop offline, IP whitelist drop), the snapshot hydrates the static block so OC still shows the catalog instead of a stub.
 - `compressionMetadata: true` annotates combo display names with their pipeline using traffic-light emoji for intensity (e.g. `Combo: claude-primary [rtk🟡 → caveman🟠]`) so the picker advertises which compression each combo applies and how heavy it is at a glance. Palette: 🟢 lite/minimal · 🟡 standard · 🟠 aggressive/full · 🔴 ultra. Unknown intensities fall through to raw text (`[rtk:custom-thing]`) so the plugin never hides a value OmniRoute knows but the plugin doesn't.
 - `providerTag: true` (default) prepends a short upstream-provider label so the picker shows `Claude - Claude Opus 4.7` for `cc/claude-opus-4-7`, `Kiro - Claude Opus 4.7` for `kr/claude-opus-4-7`, and `GHM - GPT 5` for `ghm/gpt-5` (slot.name `GitHub Models` > 8 chars → abbreviated). Critical when the same model id is sold through multiple upstream connections with different cost/auth/rate-limit profiles. Set to `false` to keep the pre-v3.8.3 unsuffixed format.
+
+#### Example — enabled-only picker (dashboard toggle, ignores connection health)
+
+```jsonc
+{
+  "plugin": [
+    [
+      "@omniroute/opencode-plugin",
+      {
+        "providerId": "omniroute",
+        "features": {
+          "combos": true,
+          "enabledOnly": true,
+        },
+      },
+    ],
+  ],
+}
+```
+
+- `enabledOnly: true` mirrors the **OmniRoute dashboard `isActive` toggle** per provider. Unlike `usableOnly`, it does NOT check `testStatus` — providers you've enabled in the dashboard stay in the picker even when their connection tests are momentarily failing (e.g. rate-limited, in-flight token refresh). Use this when the dashboard switch is your source-of-truth; use `usableOnly` when transient health matters more.
+- Combos (`auto/best-coding`, `combo/claude-primary`, custom combos) always pass through regardless of provider state — OmniRoute's dashboard has no enable/disable for combos. The picker shows every combo that `features.combos !== false` already exposes.
 
 ## Comparison vs `@omniroute/opencode-provider`
 

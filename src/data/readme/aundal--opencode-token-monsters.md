@@ -46,7 +46,9 @@ Install the OpenCode plugin @aundal/opencode-token-monsters@latest into my globa
 
 Token Monsters appears in the session sidebar.
 
-Use `/tokenmonster` to hide or show the sidebar panel.
+Use `/tokenmonster` to fold or unfold the sidebar panel.
+
+You can also click the Token Monsters header to fold or unfold it with the mouse.
 
 ## Views
 
@@ -59,6 +61,8 @@ Use `/tokenmonster` to hide or show the sidebar panel.
 
 The package exports one OpenCode plugin module with both server and TUI hooks. The server hook writes token capture data, and the TUI hook renders the sidebar.
 
+End users only install the npm package in `opencode.json` and `tui.json`. No build step is needed for end users. The published package ships the compiled files.
+
 ## Development
 
 ```sh
@@ -70,6 +74,8 @@ npm pack
 ## Publish
 
 ```sh
+bun run build
+npm pack
 npm publish --access public
 ```
 

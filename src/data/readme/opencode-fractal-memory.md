@@ -78,6 +78,7 @@ if you find bugs or if you just want to suggest improvements
 - **Error input pruning** — after 4 turns, replaces errored tool call input strings with `[<tool_name> call failed]` placeholder to reclaim context tokens without losing the failure signal. Config via `errorPruning` flag (default: off)
 - **Structured memory injection** — injected memories formatted as XML-tagged `<memory_context label="..." type="..." importance="...">` blocks with structured metadata instead of raw text, improving LLM parsing of injected context
 - **Stored context structured summaries** — `storedcontext` nodes (from compaction) now include a YAML header with `tools_used:`, `files_modified:`, `key_errors:`, `token_usage:`, and `turn_count:` fields for efficient cross-session scanning
+- **Bounded compaction capture** — prevents the recursive middle-term blowup (opencode RSS 9+ GB): fallback cache fill excludes `middle-term:`/`storedcontext:` labels, middle-term capture is capped at 12 KB total / 2 KB per entry, `session.messages` fetch is limited to 20 messages with 2 KB text slices, and storedcontext nodes are created without ONNX embeddings (no in-process model inference during compaction). Working-cache content is capped at 8 KB per entry. Giant-node cleanup: `bun run scripts/cleanup-giant-nodes.ts --dry-run|--force`
 - **Cross-session context injection** — on new sessions, searches `storedcontext` nodes via `searchText` and injects structured summaries of prior sessions as `<system_reminder type="info">` blocks. 60s throttle between fetches
 - **Injection visibility** — every injection surface emits `[memory-plugin:<feature>]` inline markers + a per-turn digest summary message, and persists to `injection_metrics` (so previously-silent injections — re-read, compression, graph-context — appear in the management live feed). Config: `injectionVisibility {enabled, markers, digest}` (all default true). Impl: `src/application/injection-visibility.ts`
 - **Adaptive rule selection** — scores each rule against the current user message via keyword-overlap similarity. Mandatory rules always inject; standard/suggestion/info need ≥0.15 relevance threshold. Logged with injected/total counts
@@ -311,7 +312,7 @@ Create `~/.config/opencode/opencode-mem.json` to customize (optional — all def
 | `highContextThreshold` | float | `0.6` | Token usage ratio for high context warning |
 | `criticalContextThreshold` | float | `0.8` | Token usage ratio for critical warning |
 | `defaultTtlDays` | int | `0` | Default TTL for new nodes (0 = no expiry) |
-| `enableMiddleTermCapture` | bool | `true` | Save middle-term snapshots before compression |
+| `enableMiddleTermCapture` | bool | `true` | Save middle-term snapshots before compression (capture capped at 12 KB total / 2 KB per entry) |
 | `management.enabled` | bool | `false` | Auto-start the management web UI on plugin init |
 | `management.port` | int | `8787` | Port for the management server |
 | `journal.enabled` | bool | `false` | Enable append-only searchable journal entries |
@@ -829,7 +830,8 @@ The plugin hooks into the OpenCode agent via the Plugin SDK. Here's the exact pe
 │    recording          Logs memory tool calls to store +            │
 │                       predictive rating                            │
 │    working-cache      Feeds memory results into in-memory          │
-│                       working cache (used during compaction)      │
+│                       working cache (8 KB cap per entry, used      │
+│                       during compaction)                            │
 └─────────────────────────────────────────────────────────────────────┘
         │
         ▼
@@ -844,7 +846,7 @@ The plugin hooks into the OpenCode agent via the Plugin SDK. Here's the exact pe
 
 | Hook | Handler | What it does |
 |---|---|---|
-| `experimental.session.compacting` | compaction | Captures working cache → middle-term context node. Archives full conversation history → storedcontext node (with embedding for semantic recall). Records per-turn token usage stats |
+| `experimental.session.compacting` | compaction | Captures working cache → middle-term context node (capped 12 KB total / 2 KB per entry, snapshot labels excluded from fallback fill). Archives conversation history → storedcontext node (no embedding — skipped in the hook). Records per-turn token usage stats |
 | `experimental.compaction.autocontinue` | compaction | Forces `output.enabled = true` so the agent auto-resumes after compaction |
 | `event('session.idle')` | events | Auto-distill (LLM extracts rules from lessons) + auto-consolidation + score decay + incremental graph rebuild |
 | `event('session.compacted')` | events | Cleanup middle-term captures + score decay + auto-consolidation |
@@ -900,7 +902,10 @@ bun run typecheck
 ### Testing
 
 ```bash
-bun test
+bun test                # essential suite — fast by default (~6s). Slow benchmark evals (search.loco, search.swecontext) are excluded via bunfig.toml pathIgnorePatterns
+bun run test:full       # full suite — everything including slow benchmark evals (~9min)
+bun run test:slow       # benchmark evals only (LoCoMo ~5min, SWE-ContextBench ~4min)
+bun run test:coverage   # coverage run
 ```
 
 ### Installing locally (development)

@@ -123,6 +123,8 @@ Pause and resume:
 /goal resume
 ```
 
+When a Goal is paused, a short explicit continuation message such as `devam et`, `continue`, or `resume` also resumes it through the same lifecycle control chain. Other normal chat does not silently reactivate a paused Goal.
+
 Queue future Goals:
 
 ```text
@@ -188,19 +190,15 @@ For queued Goals:
 
 Separate sessions have separate persisted Goal snapshots. They can therefore run distinct Goals in the same project directory, although normal workspace conflicts are still possible if both sessions edit the same project files.
 
-## Pause vs. normal chat: why `devam et` is not `/goal resume`
+## Pause vs. normal chat: explicit continuation and arbitrary chat
 
-`/goal pause` changes persisted Goal state to `paused`. A normal user message such as `devam et`, `continue`, or another chat instruction does **not** change that persisted status back to `active`.
+`/goal pause` changes persisted Goal state to `paused`. `/goal resume` remains the explicit lifecycle command for reactivating it.
 
-A user message may give the model one foreground turn, but autonomous Goal continuation remains paused. To restart the Goal state machine, use:
+For convenience, a narrow set of short, unambiguous continuation messages — for example `devam et`, `continue`, `kaldığın yerden devam et`, or `resume` — is treated as resume intent while a Goal is paused. The plugin routes that intent through the same `/goal resume` command/ownership chain rather than directly rewriting Goal state.
 
-```text
-/goal resume
-```
+Other foreground chat stays ordinary conversation and does **not** silently reactivate the Goal. This keeps arbitrary chat from becoming lifecycle control while letting a clear “continue” instruction do what the user expects.
 
-This is intentional: arbitrary chat text should not silently change explicit lifecycle state.
-
-The same rule applies after a fail-closed verifier outage. If completion verification times out and the Goal is persisted as `paused`, wait until the verifier/provider is usable and run `/goal resume` to retry completion.
+The same resume path can be used after a fail-closed verifier outage. A timeout-class verifier failure first receives one fresh bounded automatic retry; if that retry also fails and the Goal is persisted as `paused`, wait until the verifier/provider is usable and then use `/goal resume` or a short explicit continuation message to retry completion.
 
 ## Goal Contracts
 
@@ -265,17 +263,19 @@ Completion is an audit pipeline:
 
 If verification is unavailable, incomplete, stale, ambiguous, or races with a lifecycle change, completion **fails closed**.
 
-### Verifier timeout / Goal stays paused
+### Verifier timeout / bounded retry / Goal stays paused
 
-If the executor has finished the work but semantic verification times out, the Goal is persisted as `paused` instead of automatically retrying forever.
+If the executor has finished the work but independent semantic verification hits a timeout-class infrastructure failure, the plugin aborts and cleans up that verifier child and automatically retries **once** in a fresh verifier session. The retry is capped at 60 seconds, or at the configured verifier timeout when that is lower. There is no third automatic verifier attempt.
 
-This prevents an endless completion retry from wedging later commands in `QUEUED` state. Existing host evidence remains persisted.
+Non-timeout provider or transport failures are not automatically retried. If the bounded timeout retry also fails, the Goal is persisted as `paused` instead of entering an endless completion retry loop. Existing host evidence remains persisted.
 
 When the verifier/provider is healthy again:
 
 ```text
 /goal resume
 ```
+
+A short explicit continuation message such as `continue` or `devam et` uses the same resume path.
 
 A verifier outage never marks an unproven Goal completed.
 
@@ -322,7 +322,7 @@ Check:
 /goal audit
 ```
 
-If the stop reason is verifier infrastructure/timeout and the workspace is already correct, do not manually repeat the requested mutations. Use `/goal resume` to retry the completion path.
+If the stop reason is verifier infrastructure/timeout after the bounded automatic retry and the workspace is already correct, do not manually repeat the requested mutations. Use `/goal resume` or a short explicit continuation message to retry the completion path.
 
 ### I cannot start another Goal in the same session
 

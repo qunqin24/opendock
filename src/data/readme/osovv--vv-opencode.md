@@ -146,7 +146,7 @@ OpenCode is a strong, flexible base for agentic coding, but it intentionally lea
 - **Review-driven execution** — keep implementation, spec review, and code review as separate steps instead of one agent silently doing everything
 - **Portable model choices** — use roles like `vv-role:smart` and `vv-role:fast` in shared agents, then map those roles per machine or project
 - **Long-run safety** — Guardian auto-approves routine low-risk permission requests, leaves risky ones to OpenCode's manual approval flow, and secrets redaction reduces accidental leakage
-- **Safer edits** — hashline-backed `edit` ties changes to fresh `read` output so agents are less likely to write against stale line numbers
+- **Safer edits** — per-model edit routing gives each model its native editing tool: hashline-anchored edits, exact oldString/newString replace, or the DeepSeek `str_replace_editor`, all tied to fresh `read` output so agents rarely write against stale content
 
 ---
 
@@ -166,21 +166,24 @@ OpenCode is a strong, flexible base for agentic coding, but it intentionally lea
 | **Workflow Tracking** | Replace free-form multi-agent chaos with explicit work items, bounded review rounds, reviewer result collection, and hard stops when more context is needed |
 | **Unified Web Tools** | Replace provider-specific search and reader schemas with the canonical `web_search` and `web_fetch` tools, configurable for Exa, Brave, native retrieval, or Spider extraction |
 | **Context Inspector** | Run `/context` in an active OpenCode TUI session for Overview, Tools, and MCP tabs with provider-reported usage, approximate context-window percentages, active post-compaction tool history, and deterministic source attribution |
+| **Cache Analytics** | Watch a live per-session `cache NN%` indicator in the TUI and compare cache hit rates across vvoc releases, OpenCode versions, models, and projects with `vvoc analytics cache-hit-rate` |
 
 ---
 
-## The Eight Plugins
+## The Ten Plugins
 
 | Plugin | What it helps you do |
 |---|---|
 | **WorkflowPlugin** | Keep multi-agent work structured with explicit work items, bounded implementation/review loops, reviewer result collection, and safe stops when more context is needed. |
 | **ModelRolesPlugin** | Use semantic model roles instead of hardcoded model IDs in OpenCode agents, subagents, and command configs — e.g. `vv-role:smart`, `vv-role:fast` — then map those roles per machine or project. |
 | **GuardianPlugin** | Keep long or AFK agent runs moving by auto-approving routine low-risk permission requests. If something looks risky, Guardian does not auto-approve it and leaves the decision to OpenCode's normal manual approval flow. |
-| **HashlineEditPlugin** | Make agent edits safer by tying changes to fresh `read` output, reducing wrong-line and stale-context edits. |
+| **HashlineEditPlugin** | Route each model to its native editing tool (hashline anchors, exact replace, or DeepSeek `str_replace_editor`), tying changes to fresh `read` output to reduce wrong-line and stale-context edits. |
 | **SystemContextInjectionPlugin** | Inject universal primary guidance plus one startup-resolved orchestration policy into vv-controller, with skill discovery and subagent-only explore worker prompts. |
 | **SecretsRedactionPlugin** | Reduce accidental secret leakage by redacting tokens, keys, emails, and other sensitive values before messages are sent to the model. |
 | **WebToolsPlugin** | Register the provider-neutral `web_search` and `web_fetch` tools, return direct image/PDF attachments, and hide OpenCode's built-in web tools at runtime unless the user explicitly configured their permissions. |
 | **ContextTuiPlugin** | Add a native scrollable `/context` dialog with measured usage plus detailed observable per-tool and per-MCP schema/history estimates, explicitly marking data that OpenCode does not expose. |
+| **ToolHistoryCompactionPlugin** | Shrink the replayed conversation context non-destructively by compacting old tool outputs in the model replay (old reads to `[Read <file>, lines X-Y]`, over-budget ephemeral outputs pruned), while retaining web/search/skill knowledge results. |
+| **AnalyticsPlugin** | Persist per-step token and cache telemetry with vvoc/OpenCode version attribution, show a live `cache NN%` indicator next to the session prompt plus a combined OpenCode/vvoc version line in the sidebar footer, and answer "did my cache optimizations help?" via `vvoc analytics cache-hit-rate`. |
 
 Workflow work items are opened with explicit intent. For implementation loops, controllers use:
 
@@ -198,6 +201,89 @@ Workflow work items are opened with explicit intent. For implementation loops, c
 ```
 
 For review-only reports, use `"mode": "review_only"`. In review-only mode, reviewer `FAIL` is a completed finding result: required reviewers are collected independently, parallel `spec` and `code` reviewers may both return `FAIL`, and the item does not route to `vv-implementer` unless the user explicitly requests fixes.
+
+### Edit Format Routing
+
+`HashlineEditPlugin` resolves an edit mode per session model and exposes only the matching edit tool to that model:
+
+- `hashline` — the `hashline_edit` tool with `LINE#HASH#ANCHOR` references and anchored read output (default for unmatched models).
+- `replace` — the `edit` tool with exact `oldString`/`newString` replacement, prior-read enforcement, and visible unicode/trailing-whitespace fallbacks.
+- `str_replace_editor` — the DeepSeek dsh contract (`view`/`create`/`str_replace`/`insert`) with exact-verbatim matching.
+- `passthrough` — no vvoc edit tool is exposed; the host-provided editing path stays in charge.
+
+The default routing table sends `deepseek` to `str_replace_editor`, `kimi`, `qwen`, and `glm` to `replace`, and `gpt`/`codex` to `passthrough`; everything else stays on `hashline`. Patterns match case-insensitively against the session `providerID` first, then `modelID`; the first matching rule wins.
+
+`vvoc sync` and `vvoc init` write this default table into `vvoc.json` so it is visible and editable. Materialization is conservative: a routing value you have changed is never overwritten; the table is only filled in where it is missing.
+
+Override routing in `vvoc.json` (schema v3). The `plugins["hashline-edit"]` entry accepts a boolean or an object:
+
+```json
+"plugins": {
+  "hashline-edit": {
+    "enabled": true,
+    "routing": {
+      "default": "hashline",
+      "rules": { "qwen": "hashline", "deepseek": "str_replace_editor" }
+    }
+  }
+}
+```
+Routing changes require an OpenCode restart, like other runtime plugin settings.
+
+### Tool History Compaction
+
+`ToolHistoryCompactionPlugin` shrinks the context replayed to the model on every turn without touching on-disk storage. It rewrites only the in-memory message copy through the `experimental.chat.messages.transform` hook, and only the `output` of old completed tool parts — `input` and part structure (callID/type/order) are never changed, so provider tool_use/tool_result stitching stays intact.
+
+The **recent working context is never touched**: the newest message and the last `protectRecentMessages` messages (default 8, measured by message recency time with array-order fallback) are always replayed verbatim, regardless of call count, output size, tool class, or parallel batching. Compaction only applies to messages older than that window.
+
+Compaction is tool-classified, not blanket:
+
+- **Retained (never compacted):** results that stay relevant for the whole session — `webfetch`/`web_fetch`/web readers, web/search tools, `skill`, and subagent (`task`/`agent`) outputs. Retained tools also never consume the per-call protection budget.
+- **Old reads** collapse to `[Read <file>, lines X-Y]` (range recovered from the line-numbered output; missing file or range falls back to head/tail pruning, never a fabricated summary).
+- **Other ephemeral outputs** (`bash`, `grep`, `glob`, …) past `outputMaxChars` are pruned to `headChars` + a fixed marker + `tailChars`, DeepSeek-Harness style. With `savePrunedOutput` (default on), the full output is written once to `$XDG_DATA_HOME/vvoc/tool-output/tool-<callID>.txt` and the marker embeds `Full output saved to: <path>`, so the model can re-read the full content instead of reconstructing it from fragments.
+
+Outside the window, the last `protectLastCalls` completed calls are also protected; error parts and parts already compacted by OpenCode are skipped. Rewrites are deterministic and idempotent (each part is rewritten at most once, and the saved path is deterministic per callID), and a `minSavingsChars` guard skips rewrites that would churn the prompt cache for a tiny gain.
+
+Config lives in `vvoc.json` under `plugins["tool-history-compaction"]` (boolean or object) and is conservatively materialized by `vvoc sync`/`init`:
+
+```json
+"plugins": {
+  "tool-history-compaction": {
+    "enabled": true,
+    "protectLastCalls": 3,
+    "protectRecentMessages": 8,
+    "savePrunedOutput": true,
+    "minSavingsChars": 2000,
+    "outputMaxChars": 2048,
+    "headChars": 1200,
+    "tailChars": 400,
+    "readSlim": true,
+    "retainTools": ["webfetch", "web_fetch", "web-reader", "webreader", "search", "brave", "skill", "task", "agent"]
+  }
+}
+```
+
+Set `outputMaxChars` to `0` to disable pruning, `protectRecentMessages` to `0` to disable the message window (only the newest message stays protected), `savePrunedOutput` to `false` to skip disk persistence, or `"enabled": false` to disable the plugin entirely. Changes require an OpenCode restart.
+
+### Cache Hit Rate Analytics
+
+`AnalyticsPlugin` records one line per completed model step — fresh input, cache read, cache write, output, reasoning, recorded cost — to `$XDG_DATA_HOME/vvoc/analytics/usage-YYYY-MM.jsonl`, attributed with the vvoc version, the OpenCode version (from session telemetry), project, provider, model, and agent. Telemetry never leaves the machine; disable collection with `"plugins": { "analytics": false }` and delete old monthly files freely.
+
+In the TUI you get a live `cache NN%` indicator next to the session prompt (green at 80%+, yellow at 50%+, red below, muted `n/a` before the first cache-eligible step) and a combined footer line `• OpenCode <version> · vvoc vX.Y.Z` in the sidebar (the stock version line, extended with the vvoc version). The indicator is per-session and computed in memory.
+
+Retrospective analysis lives in the CLI:
+
+```bash
+vvoc analytics cache-hit-rate --group-by day                       # daily trend
+vvoc analytics cache-hit-rate --group-by vvoc --since 30d         # compare vvoc releases
+vvoc analytics cache-hit-rate --group-by opencode --since 30d     # compare OpenCode upgrades
+vvoc analytics cache-hit-rate --group-by session|model|provider|project|week|month
+vvoc analytics cache-hit-rate --project my-repo --order hit-rate --limit 10 --json
+```
+
+The hit rate is token-weighted: `cacheRead / (cacheRead + cacheWrite + input)` over cache-eligible steps; `COVERAGE` shows the share of steps whose provider reported cache tokens at all, so providers without prompt caching read as `n/a` instead of a misleading `0%`. `--since`/`--until` accept `Nd`/`Nw`/`Nm` or `YYYY-MM-DD`.
+
+Agents can run this analysis conversationally too: the managed `vvoc-usage-analytics` skill answers usage, cache, and cost questions inside a session — including historical comparisons from `opencode.db` that predate the analytics plugin (see Managed Skills).
 
 ### Web Tools
 
@@ -279,6 +365,7 @@ The `context` vvoc plugin toggle defaults to enabled. Disable it with `vvoc plug
 | `vvoc patch-provider stepfun-ai\|codex\|deepseek\|kimi\|alibaba\|all` | Patch OpenCode providers; `codex` adds subscription-safe OpenAI aliases (also accepts `openai`), `deepseek`/`kimi`/`alibaba` add vv- reasoning-effort aliases, `all` patches every provider at once |
 | `vvoc completion` | Install shell completions |
 | `vvoc upgrade` | Upgrade global package and run follow-up sync; sync failure is reported as a partial upgrade |
+| `vvoc analytics cache-hit-rate` | Aggregate persisted cache hit rate by day, week, month, session, model, provider, project, vvoc version, or OpenCode version |
 | `vvoc version` | Print installed version |
 
 Guardian duration overrides use positive whole milliseconds. Both `--timeout-ms` and
@@ -415,6 +502,7 @@ Spec documents           → ./.vvoc/specs/YYYY-MM-DD-<slug>/spec.xml
 Optional design context  → ./.vvoc/specs/YYYY-MM-DD-<slug>/design-context.xml
 Implementation plans     → ./.vvoc/specs/YYYY-MM-DD-<slug>/plan.xml
 Persisted data           → $XDG_DATA_HOME/vvoc/
+Usage analytics          → $XDG_DATA_HOME/vvoc/analytics/usage-YYYY-MM.jsonl  (local-only cache telemetry)
 Repository memory       → ./.vvoc/lessons/*.xml              (lazy vv-reflect fallback)
                            ./.vvoc/runbooks/*.xml             (lazy vv-reflect fallback)
 Session handoff notes   → ./.vvoc/handoff/YYYY-MM-DD-<session-slug>/handoff.xml
@@ -486,7 +574,7 @@ All prompt files are scaffolded by `vvoc install` / `vvoc sync`:
 
 ## Managed Skills
 
-Six workflow skills are scaffolded alongside agents:
+Managed skills come in two families: `vv-*` skills guide the work protocol (spec, plan, execute, review, reflect, handoff), while `vvoc-*` skills operate and observe the vvoc/OpenCode tooling itself. Seven skills are scaffolded alongside agents:
 
 | Skill | When to use it | What it gives you |
 |---|---|---|
@@ -496,6 +584,7 @@ Six workflow skills are scaffolded alongside agents:
 | `vv-review` | You want findings, not fixes | A review-only workflow that reports spec/code issues and stops before implementation |
 | `vv-reflect` | A long development, debugging, ops, or investigation session produced reusable knowledge | Durable notes in existing docs or `.vvoc/lessons` / `.vvoc/runbooks` for future agents |
 | `vv-handoff` | You are ending a session and want the visible context preserved for a future session | A redacted XML note at `.vvoc/handoff/YYYY-MM-DD-<session-slug>/handoff.xml`, without running new checks or collecting fresh context |
+| `vvoc-usage-analytics` | You ask about token usage, cache hit rate, costs, or whether a vvoc/OpenCode upgrade changed caching | An agent-run read-only analysis across `vvoc analytics`, the analytics JSONL, and historical `opencode.db` data (validated SQL snippets included) |
 
 Spec and plan artifacts stay XML so requirements, tasks, acceptance criteria, and dependencies remain easy to grep and review.
 

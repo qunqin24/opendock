@@ -25,9 +25,9 @@
 
 ## What It Does
 
-TokenMeter registers a `sidebar_content` slot (`order: 95`) that renders a collapsible panel for the active session and its delegated descendants, updated in real time. The panel repaints when events arrive: each refresh event invalidates the affected session and schedules a debounced reconcile that rehydrates from the authoritative client messages (replace, never merge) — a stale in-memory mirror can never win over fresh data.
+TokenMeter registers a `sidebar_content` slot (`order: 95`) that renders a collapsible panel for the active session and its delegated descendants, plus a `session_prompt_right` slot that renders a compact metrics line inline at the right end of the host's single native prompt row (the prompt is NOT replaced and no second status row is appended — the host prompt keeps its own native usage/status row) for the visible session only. Both repaint from the same cumulative high-water accounting when events arrive: each refresh event invalidates the affected session and schedules a debounced reconcile that rehydrates from the authoritative client messages (replace, never merge) — a stale in-memory mirror can never win over fresh data.
 
-- **Session** — the active session and every delegated descendant: headline token spend (each session's complete CUMULATIVE spend — `Σ input + Σ output + Σ reasoning + Σ cache.read + Σ cache.write` across ALL assistant messages, exactly reconstructing the provider's billed `tokens.total`, with every component kept as a per-field high-water so compaction never lowers it), thinking, cost, the input · output real · cache R/W breakdown, and a per-agent group list (`↳ agent · N task`) ordered by spend weight, with a 6-row scrollbox when 3+ groups exist. The `Subagents ▶` row toggles the delegation list; the panel starts collapsed.
+- **Session** — the active session and every delegated descendant: a primary token+cost line (each session's complete CUMULATIVE spend — `Σ input + Σ output + Σ reasoning + Σ cache.read + Σ cache.write` across ALL assistant messages, exactly reconstructing the provider's billed `tokens.total`, with every component kept as a per-field high-water so compaction never lowers it) plus labeled secondary rows for input, output, reason, and cache, and a per-agent group list (`↳ agent (N tasks)`) ordered by spend weight. The panel starts with the master row expanded; the `Subagents` section appears automatically with the first delegated group and toggles from its heading.
 - **Project** — all-time usage across directories/worktrees: the authoritative live `session.list` total (fetched with an explicit 10_000-session limit — the SDK default of 100 would silently undercount) plus one deleted-session aggregate per project, persisted in a plugin-owned SQLite store (`tokenmeter.sqlite` under the host state directory — never `api.kv`, whose whole-file read-modify-write would be clobbered by concurrent TUIs). Deleting a session records its final usage into that aggregate atomically and exactly once (tombstone admission), so duplicates, cascades and concurrent TUIs never inflate totals; a truncated list (at the cap) fails closed with the stable error line instead of showing a partial total; a ~2 s polling timer keeps the sidebar fresh when another OpenCode process works in the same project.
 
 **Before**: you approximate spend from provider dashboards, and delegation spread is invisible.
@@ -42,64 +42,53 @@ Each section answers a different question. **Project already includes the active
 | --- | --- | --- |
 | **Project** | All-time usage for the current OpenCode project across directories and worktrees, including deleted sessions | Sum of every live principal-session tree plus the persisted deleted-tree aggregate. Each session ID contributes exactly once; totals survive deletion and restart. |
 | **Session** | The active principal session and its complete recursive delegation tree | Active root session spend + every child, grandchild, and deeper delegated session exactly once. Switching the active route switches this scope. |
+| **Footer** | The currently visible session only; every delegated child and descendant is excluded | That session's cumulative per-field high-water values. Input and output are enabled by default; each metric and the footer itself can be toggled in `TokenMeter: Settings`. |
 | **Subagents** | Delegated descendants of the active Session; the principal/root session is excluded | `agents` counts distinct resolved agent types; `task` counts descendant sessions. Expanded rows group descendants by agent type and sum every run in that group. |
-| **Agent group** | All delegated runs resolved to one agent type, such as `general` or `sdd-apply` | Sum of the cumulative spend, thinking, cost, input, output, and cache for that group's descendant sessions. Groups are ordered by token spend. |
+| **Agent group** | All delegated runs resolved to one agent type, such as `general` or `sdd-apply` | Sum of the cumulative spend, reasoning, cost, input, output, and cache for that group's descendant sessions. Groups are ordered by token spend. |
 
 For every scope, cumulative token spend uses the same formula: `Σ input + Σ output + Σ reasoning + Σ cache.read + Σ cache.write`.
 
 ### Displayed metrics
 
-The sidebar uses Nerd Font glyphs (PUA codepoints — a Nerd Font must be active in the terminal). GitHub Markdown cannot render private-use glyphs, so each icon below is a repo-owned SVG image (`docs/assets/icons/`) whose outlines were extracted from the official Nerd Fonts source font; the exact codepoints and source icon names are documented in [docs/assets/icons/README.md](docs/assets/icons/README.md). Colors are the exact DESIGN.md reference values for the runtime theme roles — the sidebar itself stays theme-driven.
+The sidebar renders plain Unicode disclosure glyphs (`▶`/`▼`/`↳`) — no Nerd Font is required. Colors are semantic roles resolved from the host theme at runtime: section headings (`Project`, `Session`, `Subagents`) render in the semantic yellow `theme().warning`; agent names in `theme().info` (cyan); only the `$amount` on the primary line is light red (`theme().error`); secondary metric rows and task counts use a dimmer background-relative detail tone.
 
 <table>
   <thead>
-    <tr><th>Icon</th><th>Metric</th><th>Displayed value</th></tr>
+    <tr><th>Row</th><th>Rendered</th></tr>
   </thead>
   <tbody>
     <tr>
-      <td align="center"><img src="docs/assets/icons/fa-coins.svg" alt="fa-coins icon" title="fa-coins" width="16" height="16"></td>
-      <td>Cumulative token spend</td>
-      <td><code>Σ input + Σ output + Σ reasoning + Σ cache.read + Σ cache.write</code>; rendered in fixed coin gold <code>#D4AF37</code></td>
+      <td>Primary token+cost</td>
+      <td><code>&lt;total&gt; tokens · $&lt;spend&gt;</code> — main text tone; only the <code>$amount</code> is light red (<code>theme().error</code>); the word <code>spent</code> is never rendered</td>
     </tr>
     <tr>
-      <td align="center"><img src="docs/assets/icons/reasoning.svg" alt="reasoning icon" title="reasoning" width="16" height="16"></td>
-      <td>Thinking</td>
-      <td>Cumulative reasoning tokens; also included once in real output and total spend</td>
+      <td>Secondary rows</td>
+      <td><code>&lt;input&gt; input · &lt;output&gt; output</code> and <code>&lt;reason&gt; reason · &lt;cache&gt; cache</code> — the reasoning label is exactly <code>reason</code>; real output = raw output + raw reasoning</td>
     </tr>
     <tr>
-      <td align="center"><img src="docs/assets/icons/md-fire.svg" alt="md-fire icon" title="md-fire" width="16" height="16"></td>
+      <td>Numbers modes</td>
+      <td>Compact = 3 rows (primary + paired input/output + paired reason/cache); Precise = 5 independent rows (tokens+cost, input, output, reason, cache)</td>
+    </tr>
+    <tr>
+      <td>Cache</td>
+      <td>Combined single value, or separated <code>R&lt;read&gt;|W&lt;write&gt;</code> with zero sides omitted and both-zero rendering <code>0</code></td>
+    </tr>
+    <tr>
       <td>Cost</td>
-      <td>USD cost calculated by OpenCode from the model's input/output/cache rates</td>
+      <td>USD cost calculated by OpenCode from the model's input/output/cache rates, always <code>$</code>-prefixed with exactly two decimals</td>
     </tr>
     <tr>
-      <td align="center"><span style="color:#64748B">↑</span></td>
-      <td>Input</td>
-      <td>Cumulative non-cached input tokens</td>
+      <td>Footer</td>
+      <td>Single truncated line for the visible session only; independently configurable <code>total</code>, <code>in</code>, <code>out</code>, <code>reason</code>, and combined <code>cache</code> metrics</td>
     </tr>
     <tr>
-      <td align="center"><span style="color:#64748B">↓</span></td>
-      <td>Real output</td>
-      <td>Cumulative visible output + reasoning tokens</td>
-    </tr>
-    <tr>
-      <td align="center"><img src="docs/assets/icons/oct-database.svg" alt="oct-database icon" title="oct-database" width="16" height="16"></td>
-      <td>Prompt cache</td>
-      <td><code>R&lt;read&gt;|W&lt;write&gt;</code>; zero sides are omitted and both-zero renders <code>0</code></td>
-    </tr>
-    <tr>
-      <td align="center"><img src="docs/assets/icons/md-robot.svg" alt="md-robot icon" title="md-robot" width="16" height="16"></td>
-      <td>Agents</td>
-      <td>Distinct delegated agent types and each group identity</td>
-    </tr>
-    <tr>
-      <td align="center"><img src="docs/assets/icons/tasks.svg" alt="tasks icon" title="tasks" width="16" height="16"></td>
-      <td>Delegations/runs</td>
-      <td>Recursive delegated session count or runs in an agent group</td>
+      <td>Collapsed Subagents</td>
+      <td><code>Subagents (N agents · M tasks)</code> — the aggregate counts render only while the section is collapsed</td>
     </tr>
   </tbody>
 </table>
 
-Every functional glyph has exactly two visible spaces before its value. Project and Session use the same metric contract; expanded Subagent groups repeat it per agent.
+Project and Session use the same metric contract; expanded agent groups repeat it per agent under `↳ name (N tasks) ▶` (closed) / `↳ name (N tasks) ▼` (open), with the per-agent chevron trailing the header.
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for the full event → invalidation → reconcile flow.
 
@@ -118,7 +107,7 @@ Add the plugin to your TUI config (`~/.config/opencode/tui.json` user-level, `.o
 }
 ```
 
-OpenCode resolves npm package names for TUI plugins and installs them automatically — there is no `npm install` step. The plugin registers the `sidebar_content` slot with `order: 95` on load — no manual slot configuration is needed. **Restart OpenCode** after changing a TUI plugin or its `tui.json` entry.
+OpenCode resolves npm package names for TUI plugins and installs them automatically — there is no `npm install` step. The plugin registers the `sidebar_content` and `session_prompt_right` slots on load — no manual slot configuration is needed. **Restart OpenCode** after changing a TUI plugin or its `tui.json` entry.
 
 ### Updating
 
@@ -146,9 +135,7 @@ Point at the built artifact (run `bun run build` first):
 
 ### 2. Verify
 
-Open a session and check the right sidebar: a `TokenMeter 1.0.1` panel with `Project` and `Session` metric rows appears. The `Subagents ▶` row expands the delegation list; the panel starts collapsed.
-
-<img src="docs/assets/brand/tokenmeter-sidebar.png" alt="TokenMeter sidebar screenshot" width="378">
+Open a session and check the right sidebar: a `▶ TokenMeter` panel appears with `Project`, `Session` and — once delegations exist — `Subagents` headings (semantic yellow) above their compact summary rows. The `Subagents` section appears automatically with the first delegated group. A muted line directly below the message input shows the visible session's own input and output tokens without delegated usage. Run `TokenMeter: Settings` from the command palette to toggle footer metrics and adjust other preferences, or press `Ctrl+E` (configurable in Settings) to expand/collapse all three sections together.
 
 ---
 
@@ -175,7 +162,7 @@ bun install          # frozen lockfile preferred after first install
 | `bun run hooks:install` | Install the repo-local Lefthook pre-commit hook |
 | `bun run pack:dry-run` | Inspect the tarball contents before publishing |
 
-The suite runs **99 tests / 0 failures across 3 files** (899 `expect` calls) on Bun 1.3.11. `test` and `test:dist` are distinct on purpose: the unit suite never needs a build, and the dist test is never silently skipped — it fails hard if `dist/tui.js` is missing or non-reactive.
+The suite runs **224 tests / 0 failures across 7 files** (7,820 `expect` calls) on Bun 1.3.11. `test` and `test:dist` are distinct on purpose: the unit suite never needs a build, and the dist test is never silently skipped — it fails hard if `dist/tui.js` is missing or non-reactive.
 
 ### The build guard
 

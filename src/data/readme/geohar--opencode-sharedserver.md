@@ -1,6 +1,14 @@
-# sharedserver
+<p align="center">
+  <img src="docs/images/sharedserver-logo@2x.png" alt="sharedserver logo" width="200">
+</p>
 
-[![crates][crates]](https://crates.io/crates/sharedserver)
+<h1 align="center">sharedserver</h1>
+
+<p align="center"><em>one warm server process, shared across every client — reference-counted, with grace periods and dead-client detection</em></p>
+
+<p align="center">
+  <a href="https://crates.io/crates/sharedserver"><img src="https://img.shields.io/crates/v/sharedserver.svg" alt="crates.io"></a>
+</p>
 
 A shared process manager with reference counting, grace periods, and dead-client detection. Use it standalone from the command line or integrate it with Neovim for automatic server lifecycle management.
 
@@ -114,6 +122,9 @@ sharedserver unuse webserver  # server stays alive if others need it
 |---------|-------------|
 | `use <name> [-- <cmd> [args...]]` | Attach to server (starts if needed) |
 | `unuse <name>` | Detach from server |
+| `up --profile <p> [--pid <pid>]` | Bring up every server in a profile (see [Profiles](#profiles)) |
+| `down --profile <p> [--pid <pid>]` | Release every server in a profile |
+| `config <register\|unregister\|lookup\|list\|show\|validate\|profile>` | Edit/inspect server defs & profiles (see [Self-define](#self-define)) |
 | `list` | Show all managed servers |
 | `info <name> [--json]` | Server details (formatted or JSON) |
 | `check <name>` | Test if server exists (exit: 0=active, 1=grace, 2=stopped, 3=defunct) |
@@ -136,6 +147,80 @@ See [Stopping a server](#stopping-a-server-stop-vs-stop---force-vs-kill) for whe
 **PID behavior:**
 - User commands (`use`, `unuse`): `--pid` defaults to parent process (the caller)
 - Admin commands: `--pid` defaults to current process
+
+### Profiles
+
+A **profile** names a set of servers, so one config can serve several callers and
+each brings up only its own slice. A *host* identity — `claude`, `opencode`,
+`pi`, `neovim` — is just a reserved profile name; there is no separate host axis.
+
+```jsonc
+// ~/.config/sharedserver/servers.json
+{
+  "servers": {
+    "chroma":   { "command": "chroma", "args": ["run"] },
+    "pi-thing": { "command": "pi-thing" },
+    "watchman": { "lazy": true }
+  },
+  "profiles": {
+    "opencode": ["chroma"],
+    "pi":       ["pi-thing"]
+  }
+}
+```
+
+`up` brings a profile up as one unit and `down` releases it; the binary resolves
+each def from the config and fans out to `use`/`unuse`:
+
+```bash
+sharedserver up   --profile opencode --pid $$   # starts chroma + watchman
+sharedserver down --profile opencode --pid $$   # releases them
+```
+
+- **Universal servers.** A server named by *no* profile (`watchman` above) comes
+  up for *every* profile. A config with no `profiles` at all therefore behaves
+  exactly as before — every server is universal, so any caller brings up
+  everything. Adding `profiles` is opt-in and backward compatible.
+- **Deterministic.** `down` re-resolves the same selection, so it releases
+  precisely what `up` started — no state is tracked between them.
+- **`up` honours `lazy`** (attach-only, never starts) and **`skipIfEnv`** (skip
+  when another host already launched the server), and tolerates a single server
+  failing without aborting the rest.
+- **`--profile-optional`.** By default `up`/`down` warn when the named profile
+  doesn't exist. Pass `--profile-optional` to treat a missing profile as normal
+  (bring up only universal servers, no warning) — for a program asking for its
+  own host profile that the user may not have defined.
+
+### Self-define
+
+Rather than hand-editing `servers.json`, a program (or you) can register server
+defs into it as scoped, atomic JSON edits — so a plugin in any repo can define
+the servers it needs and tag them into its host profile:
+
+```bash
+# Define a server owned by a scope and tag it into a profile — one atomic edit.
+sharedserver config register --scope my-plugin chroma --profile opencode -- chroma run
+
+# Coordination pattern: check first, define only if nobody has (still tags the profile).
+sharedserver config lookup chroma --json
+sharedserver config register --scope my-plugin chroma --if-absent --profile opencode -- chroma run
+
+# Tag an existing server into a profile without redefining it.
+sharedserver config profile add opencode watchman
+
+# Withdraw everything a scope registered (cascades out of every profile).
+sharedserver config unregister --scope my-plugin
+```
+
+- **Scoped & attributable.** Each entry is stamped with its `--scope`. A name
+  already owned by a *different* scope is a **hard error** — `lookup` then
+  `register --if-absent` is how well-behaved plugins cooperatively avoid it.
+- **Atomic & lossless.** Edits are JSON operations on the single `servers.json`
+  under a lock; keys the tool doesn't model are preserved.
+- **Profiles union.** Many callers may add the same server to the same profile
+  without clashing; `unregister` cascades a removed server out of every profile.
+- `config lookup` / `list` / `show` (add `--json`) inspect; `config validate`
+  flags dangling profile members.
 
 ### Shell Completions
 
@@ -282,11 +367,17 @@ the locations listed.
 On `VimEnter`:
 - Non-lazy servers: checks if running → attaches (incref) or starts
 - Lazy servers: attaches if running, otherwise does nothing
+- If a `profile` is configured, also runs `sharedserver up --profile <name>`
 
 On `VimLeave`:
 - Automatically decrements refcount for all attached servers
+- Runs `sharedserver down --profile <name>` if a `profile` is configured
 
 This means multiple Neovim instances share the same server process, and the server survives editor restarts within the grace period.
+
+Neovim is a **hybrid**: its inline `servers` table is self-driven in-process,
+and it can *additionally* opt into a shared [profile](#profiles) — the same
+config-file profiles the Claude/OpenCode/Pi hosts use — via `setup{ profile = "neovim" }`. See [Profiles](#profiles).
 
 ### Server Configuration
 
@@ -324,6 +415,8 @@ require("sharedserver").setup({
 | `:ServerStatus [name]` | Show status in floating window |
 | `:ServerList` | List all registered servers |
 | `:ServerStopAll` | Stop all servers |
+| `:ServerUp [profile]` | Bring up a [profile](#profiles) (defaults to the configured `profile`) |
+| `:ServerDown [profile]` | Release a profile |
 
 `:ServerStatus` shows a floating window with status indicators:
 - `●` Running (active or in grace period)
@@ -374,7 +467,9 @@ when the last session leaves. Both live here as plain in-tree directories under
 
 Their per-server config (`command`, `args`, `env`, `gracePeriod`, `logFile`,
 `metadata`, `lazy`) is intentionally compatible — a `servers` map copies across
-OpenCode, Claude Code, and the Neovim config without changes.
+OpenCode, Claude Code, and the Neovim config without changes. An optional
+top-level `profiles` map groups servers so a caller can bring up just its own
+slice with `up`/`down` — see [Profiles](#profiles).
 
 ```jsonc
 // OpenCode — ~/.config/opencode/config.json
@@ -477,5 +572,3 @@ See [DEBUGGING.md](docs/DEBUGGING.md) for the full troubleshooting guide, and [E
 ## License
 
 MIT
-
-[crates]: https://img.shields.io/crates/v/sharedserver.svg

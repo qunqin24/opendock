@@ -216,6 +216,40 @@ This file is separate from `opencode.json`. Your normal OpenCode config remains 
 
 See `docs/CONFIG.md` for the complete config reference and `agent-variants.example.jsonc` for a fully commented starter file.
 
+Tip: add `"$schema": "https://unpkg.com/@mirrowel/opencode-agent-variants/schema.json"` as the first key of `agent-variants.jsonc` to get validation and autocomplete in your editor.
+
+## Profiles
+
+Profiles are conditional overlays applied **on top of the global default**, activated manually or automatically by the primary session's selected model. They answer questions like "when I'm on the flagship model, my explore agent should use a stronger model; when I'm on a budget model, everything downgrades".
+
+```jsonc
+{
+  routing: { /* activeProfile: "sol-heavy" (optional manual pin) */ },
+  profiles: {
+    "sol-heavy": {
+      match: { model: "zai/glm-5.3", variant: ["high", "max"] }, // omitted variant = any
+      agents: {
+        general: {
+          parent: { model: "zai/glm-5.3", variant: "max" },   // base calls + inherited default
+          variants: { deep: { temperature: 0.9 } },            // specific variant overrides
+        },
+      },
+    },
+  },
+}
+```
+
+Rules:
+
+- A profile field **replaces** the global default for that field; unset fields fall through. Variant-level still wins over parent-level, exactly like the default layer.
+- Profiles may only edit **hot-reload fields** (model, variant, temperature, top_p, prompt, prompt_prepend/append, options). Structural changes — adding, deleting, disabling variants, description, color — are global-default only and cannot be conditional.
+- Activation: `match.model` (+ optional `variant` string or array) is checked against the primary session's current model; when several profiles match, the **last one wins**. A manual `routing.activeProfile` pin always wins over matching. `"default"` in a variant filter matches sessions without a variant selected. A profile without a `match` rule is **manual only** — it never activates automatically.
+- Profiles apply per task call (hot) — no restart needed to switch, edit, add, or remove one.
+
+### Editing lens (wizard)
+
+The wizard's **Profile context** row (top of the main menu) switches which layer the editors write to: the global default or a named profile. In a profile context, field rows show the overlaid value (with a `from profile` hint), edits write the profile override, and structural rows gray out with an explanation — the pop-up itself only selects, adds, renames, and deletes profiles; match rules and the runtime pin live in **Profiles**. The context resets to the global default on every wizard open, and switching it never changes what live sessions use.
+
 ## Example
 
 ```jsonc

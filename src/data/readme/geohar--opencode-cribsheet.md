@@ -109,6 +109,16 @@ your `opencode.json`:
 Full options are in the plugin's [README](https://github.com/georgeharker/cribsheet/blob/main/plugins/opencode/README.md); the
 `MCP_COMBINER` switch below applies to it too.
 
+**On Pi?** [Pi](https://pi.dev) needs **[`pi-mcp-adapter`](https://pi.dev/packages/pi-mcp-adapter)**
+(`pi install npm:pi-mcp-adapter`) plus the `@geohar/pi-cribsheet` extension in
+[`plugins/pi`](https://github.com/georgeharker/cribsheet/tree/main/plugins/pi), which does the same three things
+(MCP server on `:7732`, `/crib` command, reach-for-crib directive). Point the adapter at
+crib with a one-line `mcp.json` ([`plugins/pi/mcp.json.example`](https://github.com/georgeharker/cribsheet/tree/main/plugins/pi/mcp.json.example))
+and load the extension via `~/.pi/agent/extensions/` or `settings.json`. Full options
+(`PI_CRIBSHEET_*`) are in the plugin's [README](https://github.com/georgeharker/cribsheet/blob/main/plugins/pi/README.md);
+the `MCP_COMBINER` switch below applies to it too (combiner-served → directive + `/crib`
+only).
+
 **The plugin writes to your user-scope MCP config** (`claude mcp add|remove`) rather
 than declaring a server in its manifest — that is what lets one plugin serve both
 deployments, and it means crib appears in `claude mcp list` as a user server you can
@@ -233,6 +243,23 @@ runs), so it's fast; `--no-daemon` runs in-process, `--json` gives machine outpu
   Language-server and generation-provider examples:
   [`docs/lsp.json.example`](docs/lsp.json.example),
   [`docs/generate.toml.example`](docs/generate.toml.example).
+
+## Authentication (optional)
+
+When crib runs as an **HTTP daemon** (`crib serve --http` / behind a bridge) its
+`/mcp` endpoint is **unauthenticated by default** — fine on loopback, but open the
+moment you bind beyond `127.0.0.1`, or on a shared machine. Set
+**`CRIBSHEET_AUTH_TOKEN`** and every request to `/mcp` must present
+`Authorization: Bearer <token>`; a missing/wrong token gets a plain `401` (no
+`WWW-Authenticate`, so standards clients don't drift into OAuth). Unset ⇒ open
+(unchanged); `/health` stays open.
+
+The `crib` CLI presents the same token automatically when it's set, so nothing
+changes for local use. When crib runs behind the
+[mcp-combiner](https://github.com/georgeharker/mcp-companion), give the combiner
+the token in crib's `servers.json` entry:
+`{"auth": {"bearer": "${CRIBSHEET_AUTH_TOKEN}"}}`. (The gate is
+`crib/inbound_auth.py`, vendored byte-identical from the combiner.)
 
 ## How it works
 

@@ -28,7 +28,16 @@ Schedule opencode commands like cron—auto-fix bugs every 30 minutes, push code
 
 ## Installation
 
-**Method 1: npm install (recommended for new versions)**
+**Method 1: npm install (recommended)**
+
+Since **v1.3.0** the package ships a compiled JS entry (`scheduled-commands.js`), so you can load it
+directly as a remote plugin in `opencode.jsonc`:
+
+```jsonc
+"plugin": ["opencode-scheduled-commands"]
+```
+
+Or, if you prefer to vendor the file into the project:
 
 ```bash
 npm install opencode-scheduled-commands
@@ -45,6 +54,13 @@ cp scheduled-commands.ts .opencode/plugins/
 ```
 
 Restart opencode to take effect (no restart needed for config changes). The plugin is auto-discovered and loaded on startup.
+
+> **Note for v1.2.0 and earlier:** the package entry was a TypeScript source file (`scheduled-commands.ts`).
+> opencode Desktop (Electron/Node) cannot import `.ts` files inside `node_modules`
+> (`Stripping types is currently unsupported for files under node_modules`), so
+> `"plugin": ["opencode-scheduled-commands"]` failed silently on Desktop. If you use an old version,
+> copy the file into `.opencode/plugins/` and let opencode auto-discover it. (opencode CLI, which runs
+> on Bun, could always load the `.ts` entry directly.)
 
 ## Quick Start
 
@@ -133,6 +149,26 @@ See [examples/schedules.example.json](examples/schedules.example.json) and the f
 2. **Model costs**: Scheduled tasks consume real model tokens; set frequency reasonably
 3. **Missing commands**: Execution returns error and records to state file, doesn't affect other tasks
 4. **Plugin changes require restart**; config changes don't require restart
+
+## Debugging & Troubleshooting
+
+Jobs not running? Enable debug logging to see the scheduler's per-tick decisions:
+
+```bash
+SCHEDULED_COMMANDS_DEBUG=1 opencode
+```
+
+Debug mode (`level: debug`) outputs:
+
+- **Each tick**: number of jobs loaded, currently running jobs, each job's next run time and skip reason (not due / still running / no schedule configured / `enabled: false`)
+- **Lock details**: lock file path, PID that acquired it
+- **Missing config**: explicit hint when `schedules.json` does not exist
+
+Common issues:
+
+- **Stale lock file blocks the scheduler**: a scheduler instance lock lives at `.opencode/.scheduled-lock` (containing the owner PID). If the process crashed or was killed (Docker restart, Desktop relaunch, etc.), the stale lock is **auto-detected by probing the owner PID and recovered** — no manual cleanup needed. If the log says "Scheduler already running ... held by PID x" and that process is genuinely alive, delete the lock file and restart opencode
+- **Read-only directory**: the plugin needs to create the lock and state files under the project directory; read-only directories (sandbox/read-only mounts) fail startup, with a clear "Failed to start scheduler" error including permission hints
+- **Logs not visible**: errors and warnings are mirrored to the console (stderr) as well as the opencode log service, so they are never silently dropped even if the SDK log channel is unavailable
 
 ## Example Commands
 

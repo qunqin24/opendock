@@ -2,7 +2,7 @@
 
 A tiny OpenCode TUI plugin that keeps Git context drift and AI-generated changes visible while coding.
 
-OpenCode already shows your current branch. This plugin focuses on whether the branch context changed during the current AI Coding session.
+OpenCode tells you which branch you're on. This plugin tells you when the session's branch context has changed.
 
 ## What It Does
 
@@ -24,6 +24,12 @@ feature branch + session changes
 branch changed
 -> warning: branch changed
 ```
+
+## In Action
+
+The prompt-right status shows an unacknowledged branch-context change alongside the current session's file and line summary.
+
+![OpenCode TUI showing a branch changed warning and session change summary](docs/images/tui-status.png)
 
 ## Scope
 

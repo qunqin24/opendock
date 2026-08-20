@@ -261,6 +261,7 @@ Most of these also run as a **direct CLI** with no agent/model involvement (no t
 - token refresh is queued to avoid refresh races
 - unsupported-model handling is strict by default, with opt-in fallback controls
 - TUI quota status follows the account/workspace used by the latest request
+- Business workspace memberships and Personal accounts keep separate usage and quota windows. Business members sharing one workspace are distinguished by their member/seat identity, so their usage is not collapsed into one row.
 
 ---
 
@@ -293,9 +294,11 @@ Primary config files:
 
 ### Route models to preferred accounts
 
-Use `modelAccountPools` to assign one or more preferred ChatGPT accounts to a
-model. Account references use stable account IDs, so adding, removing, or
-reordering accounts does not silently change a model's routing.
+Use `modelAccountPools` to assign one or more preferred ChatGPT accounts or Business seats to a
+model. Account references use stable account or Business-seat identities, so
+adding, removing, or reordering accounts does not silently change a model's
+routing. A Business membership and a Personal account remain separate pool and
+usage identities even when they belong to the same login.
 
 ```json
 {

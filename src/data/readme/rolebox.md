@@ -5,7 +5,7 @@
 # rolebox
 
 <p align="center">
-  An <a href="https://github.com/sst/opencode">opencode</a> plugin
+  An agent-harness plugin — for <a href="https://github.com/sst/opencode">opencode</a>, <a href="https://pi.dev">pi</a>, and <a href="https://www.npmjs.com/package/@deepseek-ai/dsh">dsh</a> —
   with persistent memory, multi-agent dispatch, LSP integration, and engineering-team workflows.
 </p>
 
@@ -31,13 +31,31 @@
 
 ---
 
-## Quick Start
+## Supported harnesses
+
+rolebox runs on three agent harnesses. Each resolves its own config tree — roles, skills, and runtime state live under the harness's home directory:
+
+| Harness | Config directory | Roles directory | Global skills | Env override |
+|---|---|---|---|---|
+| [opencode](https://github.com/sst/opencode) | `~/.config/opencode` | `~/.config/opencode/rolebox` | `~/.config/opencode/skills` | `XDG_CONFIG_HOME` |
+| [pi](https://pi.dev) | `~/.pi/agent` | `~/.pi/agent/rolebox` | `~/.pi/agent/skills` | `PI_CODING_AGENT_DIR` |
+| [dsh](https://www.npmjs.com/package/@deepseek-ai/dsh) | `~/.dsh` | `~/.dsh/rolebox` | `~/.dsh/skills` | `DSH_HOME` |
+
+On every harness, a `rolebox/` directory in the **current working directory** takes precedence over the global roles directory — handy for project-local role definitions. Registry roles installed with `rolebox install <name>` are deployed to a harness with `rolebox sync <opencode|pi|dsh>`.
+
+Jump to setup: [opencode](#quick-start-opencode) · [pi](#running-as-a-pi-extension) · [dsh](#running-as-a-dsh-plugin)
+
+---
+
+## Quick Start (opencode)
+
+Install the plugin into opencode's config directory:
 
 ```bash
 cd ~/.config/opencode && npm install rolebox
 ```
 
-Add to `opencode.jsonc`:
+Register it in `opencode.jsonc`:
 
 ```jsonc
 {
@@ -48,16 +66,192 @@ Add to `opencode.jsonc`:
 Create your first role:
 
 ```bash
-rolebox init my-agent -y
+mkdir -p ~/.config/opencode/rolebox
+cd ~/.config/opencode/rolebox && rolebox init my-agent -y
 ```
 
 A ready-to-use role directory is created in `~/.config/opencode/rolebox/my-agent/`. Restart opencode and pick the agent from your agent list.
 
-To install the Emperor orchestrator:
+To install a pre-built role from the registry (e.g. the Emperor orchestrator):
 
 ```bash
 rolebox install emperor
+rolebox sync opencode
 ```
+
+`sync` symlinks each installed role into `~/.config/opencode/rolebox/{roleId}`. Verify with `rolebox status`, which also checks that the plugin is registered in `opencode.jsonc` and that skill symlinks are intact.
+
+### Directory layout
+
+| Path | Purpose |
+|---|---|
+| `~/.config/opencode/rolebox/` | Role definitions (`{roleId}/role.yaml`) |
+| `~/.config/opencode/skills/` | Global skills (referenced via `opencode_skills:`) |
+| `~/.config/opencode/role_config.yaml` | [Model alias mappings](#model-alias-configuration) |
+| `~/.config/opencode/opencode.jsonc` | opencode config — plugin registration + provider/model list |
+| `{project}/.rolebox/` | Per-workspace runtime state (memory DB, engine state, event logs) |
+
+`XDG_CONFIG_HOME` relocates the whole `~/.config/opencode` tree.
+
+---
+
+## Running as a Pi extension
+
+rolebox ships a [pi](https://pi.dev) extension (`rolebox/pi` → `dist/pi-extension.js`) that boots the full runtime on pi's ExtensionAPI: role discovery, agent registration, the shared tool surface (memory, hashline, graph engine, LSP, web, session tools), skill resources, and dispatch. The package declares it under the `pi.extensions` key in `package.json`, so pi's package manager picks it up automatically.
+
+### Install
+
+```bash
+pi install npm:rolebox
+```
+
+This writes the package into `~/.pi/agent/settings.json` (`packages` array) and installs it under `~/.pi/agent/npm/`. Use `pi install -l npm:rolebox` for a project-local install (`.pi/settings.json`, shareable with your team). Restart pi — the extension logs discovered roles at startup.
+
+Alternatively, for a from-source checkout, point `settings.json` at the built extension directly:
+
+```json
+{
+  "extensions": ["/path/to/rolebox/dist/pi-extension.js"]
+}
+```
+
+### Add roles
+
+Roles load from `{cwd}/rolebox` when present, otherwise from `~/.pi/agent/rolebox`:
+
+```bash
+mkdir -p ~/.pi/agent/rolebox
+cd ~/.pi/agent/rolebox && rolebox init my-agent -y
+```
+
+Or deploy registry roles:
+
+```bash
+rolebox install emperor
+rolebox sync pi
+```
+
+`sync pi` symlinks each installed role into `~/.pi/agent/rolebox/{roleId}`.
+
+### Directory layout
+
+| Path | Purpose |
+|---|---|
+| `~/.pi/agent/rolebox/` | Role definitions (`{roleId}/role.yaml`) |
+| `~/.pi/agent/skills/` | Global skills (referenced via `opencode_skills:`) |
+| `~/.pi/agent/role_config.yaml` | [Model alias mappings](#model-alias-configuration) |
+| `{project}/.rolebox/` | Per-workspace runtime state (memory DB, engine state, event logs) |
+
+`PI_CODING_AGENT_DIR` relocates the whole `~/.pi/agent` tree (pi's own config-directory override — rolebox follows it).
+
+### Platform notes
+
+- The full shared opencode tool surface is registered on pi (parity is enforced by `tests/pi-parity.test.ts`) — see the matrix in [docs/compatibility.md](docs/compatibility.md).
+- Hot reload (`asset_hot_reload`), the extension loader, the crash-recovery engine, and the TUI are opencode-only — see [docs/limitations.md](docs/limitations.md).
+
+---
+
+## Running as a dsh plugin
+
+rolebox can also run inside [DeepSeek Harness](https://www.npmjs.com/package/@deepseek-ai/dsh) (`dsh`) — a Cordis-based agent harness. The package ships a Cordis plugin entry (`rolebox/dsh`) that boots the full rolebox runtime on dsh's services: role discovery, tool registration, graph dispatch, and loop mode. The entry is delivered as a **dsh profile bundle** (a `dsh.bundle` declaration in `package.json` plus a `cordis.patch.yml` layer), per the contract in [docs/dsh-plugin-contract.md](docs/dsh-plugin-contract.md).
+
+### Install into a profile
+
+```bash
+dsh plugin --profile <name> add rolebox
+```
+
+`dsh plugin add` forwards to pnpm inside the profile directory and reconciles the profile's `dsh.profile.bundles` list — rolebox's bundle layer is appended and its plugin row (`id: rolebox`, `name: rolebox/dsh`) is inserted into the composed entry tree on the next boot. The plugin waits for dsh's `tools`, `sessions`, and `subagents` services (its `inject` list), so it activates only after dsh-base's bundle rows mount them — which the default profile template already provides.
+
+### Add roles
+
+Roles load from `{cwd}/rolebox` when present, otherwise from `{dsh home}/rolebox` (`$DSH_HOME` when set, else `~/.dsh`):
+
+```bash
+mkdir -p ~/.dsh/rolebox
+cd ~/.dsh/rolebox && rolebox init my-agent -y
+```
+
+Or deploy registry roles:
+
+```bash
+rolebox install emperor
+rolebox sync dsh
+```
+
+`sync dsh` symlinks each installed role into `~/.dsh/rolebox/{roleId}`.
+
+### Directory layout
+
+| Path | Purpose |
+|---|---|
+| `~/.dsh/rolebox/` | Role definitions (`{roleId}/role.yaml`) — overridable via the `roleboxDir` config option |
+| `~/.dsh/skills/` | Global skills — overridable via the `skillsDir` config option |
+| `~/.dsh/role_config.yaml` | [Model alias mappings](#model-alias-configuration) |
+| `{project}/.rolebox/` | Per-workspace runtime state (memory DB, engine state, event logs) |
+
+`DSH_HOME` relocates the whole `~/.dsh` tree (blank values are treated as unset).
+
+### Config
+
+All options are optional; the plugin activates with the dsh-home defaults alone:
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `roleboxDir` | `string` | `{dsh home}/rolebox` | Directory containing `role.yaml` files (override the default under `$DSH_HOME`) |
+| `skillsDir` | `string` | `{dsh home}/skills` | Global skills directory |
+| `defaultRole` | `string` | — | Role id (directory name) promoted to primary mode |
+| `enabledNamespaces` | `string[]` | all | Tool allow-list: exact tool names or namespace prefixes (e.g. `hashline`, `graph`); `"*"` or absent registers every tool |
+
+Set them by patching the rolebox row's `config` from your profile's own `cordis.patch.yml` (applied after every bundle layer):
+
+```yaml
+# ~/.dsh/profiles/<name>/cordis.patch.yml
+- id: rolebox
+  config:
+    roleboxDir: /absolute/path/to/roles
+    enabledNamespaces: ["asset", "graph", "hashline", "loop", "memory", "reference", "session", "signal"]
+```
+
+> **Warning — config is replaced, not merged.** An `id`-targeted patch replaces the
+> row's `config` wholesale (dsh's `applyEntryPatches` assigns per-key, no deep
+> merge). If your profile patch overrides the rolebox row's `config` for any
+> option, the bundle layer's own config keys are lost unless re-declared in the
+> same patch. Only the last `- id: rolebox` patch in the file takes effect for each key.
+
+> **Note (verified at boot):** the dsh base profile already registers a global `web_search` / `web_fetch` tool (via `@deepseek-ai/dsh-tool-web`). dsh's tool registry rejects duplicate global tool names, so if rolebox registers its own `web_search`/`web_fetch`/`web_read` on top, the boot fails with `tool "web_search" is already registered`. Exclude the colliding `web` namespace from rolebox's set in the profile patch (as above) and let dsh's own web tools serve — or register rolebox's tools under another allow-list that avoids the overlap.
+
+### Role-switch UI in the dsh web app
+
+The `web` profile auto-mounts the role-switch dock — **no extra config needed**. The package ships a `dsh.client` slot plugin (`package.json` `dsh.client`, `platform: "web"`) that the web app's client-module registry picks up automatically and mounts into the `conversation.input.dock` slot (the list/session-scoped row above the composer). The dock is a collapsible role-list panel: a header carrying the current status, one row per role (name plus `description · model · mode` metadata, with a current-role indicator), a **Return to base agent** row that appears only while a role is active, and a **Retry** row after a failed switch or clear. Clicking a row switches to that role; on mount (and on session change) the dock hydrates the session's persisted active role so the highlight survives a reload. All requests go to rolebox's REST surface over same-origin relative paths.
+
+The `/rolebox` host route is **served by dsh's own web server**: during `apply()`, the plugin probes for the optional `webServer` service (`ctx.get("webServer")`) and registers a `prefix` route for `/rolebox` on it. The API under the prefix:
+
+| Endpoint | Method | Description |
+|---|---|---|
+| `/rolebox/roles` | GET | JSON array of switchable roles (`id` / `name` / `description` / `model` / `mode`, primary roles only) |
+| `/rolebox/roles/active` | GET | `{ session, role }` — the active role id for the session, or `null` for the base agent |
+| `/rolebox/roles/switch` | POST | Body `{ role: string, session?: string }` — switch the session's active role |
+| `/rolebox/roles/active` | DELETE | Clear the active role for the session (back to the base agent) |
+
+The `session` key is optional everywhere: an explicit session wins, otherwise the most recently active session in the store is used. Every non-2xx response is JSON with the stable shape `{ "ok": false, "error": string }` (`400` / `404` / `405` / `413` / `500`).
+
+**Headless profiles simply skip route registration.** The `webServer` service only exists when the web profile is active; without it, the plugin skips the `/rolebox` registration with a debug log and keeps running normally — there is no bind host or port on this plugin, and no web surface to configure.
+
+**What switching a role does.** A switch is per-session and takes effect on the next model turn. The active role's system prompt is injected into the model-facing prompt through dsh's system-prompt registry — rolebox contributes a `rolebox:role` section (the active role's full system prompt) and a `rolebox:context` context entry (its available-functions block), both resolved per session so a web-UI switch reaches the running session. Headless profiles have no prompt registry and degrade with a warning. Spawned subagents inherit the active role too: the dsh agent registrar prepends its system prompt to the spawn request and applies its model override at spawn time. The dock's clear/retry/hydrate behaviors close the loop — **Return to base agent** clears the active role, a failed switch or clear keeps the previous state and offers **Retry**, and a reload hydrates the persisted active role. See [docs/dsh-plugin-contract.md](docs/dsh-plugin-contract.md) §4.4/§4.5 for the web-UI route and system-prompt deep material, and [examples/dsh/cordis.patch.yml](examples/dsh/cordis.patch.yml) for a fully configured profile patch.
+
+### Plain-entry fallback (no bundle)
+
+If you installed rolebox as a plain dependency and want to activate it manually, insert the entry row yourself in the profile's `cordis.patch.yml`:
+
+```yaml
+- insert:
+    - id: rolebox
+      name: rolebox/dsh
+      config: {}
+```
+
+`name` is the package subpath export `rolebox/dsh` (→ `dist/dsh-plugin.js`), which default-exports the Cordis object plugin `{ name, inject, Config, apply }`. The package root (`main` → `dist/index.js`) is the opencode plugin and is **not** a Cordis plugin — always reference the `rolebox/dsh` subpath. See [examples/dsh/cordis.patch.yml](examples/dsh/cordis.patch.yml) for a fully configured example and [docs/dsh-plugin-contract.md](docs/dsh-plugin-contract.md) §5 for the bundle/patch semantics.
 
 ---
 
@@ -157,10 +351,11 @@ Run the same task across fresh sessions and iterate automatically — useful for
 | Command | Description |
 |---|---|
 | `rolebox init <name>` | Scaffold a new role directory |
-| `rolebox install <name>` | Install a role from the registry |
+| `rolebox install [name]` | Install a role from the registry (interactive picker when omitted) |
 | `rolebox status` | List all installed roles and their status |
-| `rolebox info <name>` | Detailed role inspection |
-| `rolebox sync` | Sync installed roles with registry |
+| `rolebox info [name]` | Detailed role inspection (interactive picker when omitted) |
+| `rolebox sync <target>` | Deploy installed roles to a harness (`opencode` / `pi` / `dsh`) |
+| `rolebox config [name]` | Configure models for a role (interactive picker when omitted) |
 | `rolebox monitor` | Live dispatch metrics dashboard (TUI) |
 | `rolebox memory search <query>` | Full-text search across persistent memory |
 | `rolebox --version` | Show version |
@@ -188,7 +383,7 @@ Install any role with `rolebox install <name>` and restart opencode.
 
 Roles published on the [oh-my-role registry](https://github.com/EricMoin/oh-my-role) often use placeholder model names (e.g. `PLACEHOLDER`, `YOUR_MODEL_HERE`) instead of real provider/model identifiers. Rather than editing each role's `role.yaml` manually, you can define local alias mappings once.
 
-Create or edit `~/.config/opencode/role_config.yaml` (same directory as your `opencode.jsonc`):
+Create or edit `role_config.yaml` in your harness's config directory — `~/.config/opencode/role_config.yaml` on opencode (same directory as `opencode.jsonc`), `~/.pi/agent/role_config.yaml` on pi, `~/.dsh/role_config.yaml` on dsh:
 
 ```yaml
 model_aliases:
@@ -244,6 +439,7 @@ Edits to `role_config.yaml` take effect on the next hot-reload cycle or role boo
 | Error Handling | [docs/error-handling.md](docs/error-handling.md) |
 | Limitations | [docs/limitations.md](docs/limitations.md) |
 | Compatibility | [docs/compatibility.md](docs/compatibility.md) |
+| dsh Plugin Contract | [docs/dsh-plugin-contract.md](docs/dsh-plugin-contract.md) |
 
 ---
 

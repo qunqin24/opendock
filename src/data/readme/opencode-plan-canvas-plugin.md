@@ -16,6 +16,29 @@ CDN, and no build step.
 The generator is deterministic: the same plan produces byte-identical HTML on
 every run.
 
+## Screenshots
+
+The canvas below is generated from the bundled synthetic plan
+(`test/fixtures/golden-plan.md`) — hero, critical path, execution waves with
+category badges, and the reverse "message the agent" prompt bar (shown in watch
+mode with `--enable-messaging`). It ships both dark and light themes:
+
+![opencode-plan-canvas — dark and light themes, showing the hero, critical path, waves, and the message-the-agent prompt bar](docs/assets/canvas-split.webp)
+
+<details>
+<summary>Full page — dark theme</summary>
+
+![Full canvas in dark theme](docs/assets/canvas-full-dark.webp)
+
+</details>
+
+<details>
+<summary>Full page — light theme</summary>
+
+![Full canvas in light theme](docs/assets/canvas-full-light.webp)
+
+</details>
+
 ## Install
 
 ### From npm (Node or Bun)
@@ -143,7 +166,12 @@ Recognized sections:
   fenced code block (```` ``` ````) holding an ASCII-tree wave layout. A wave
   header looks like `Wave 1-2 (description):`; entries look like
   `├── T1: [x] Title (note)` or `└── T7: [ ] Title`. A `Critical Path: ...` line
-  inside the fence, before any wave header, is captured too.
+  inside the fence, before any wave header, is captured too. A trailing
+  `(depends: 1, 9)` note on an entry is parsed as that task's dependencies and
+  shown as a subtle `Needs …` line on the card (ids may be `1`, `T2`, or
+  `T-WIDGET-CORE`; a `depends:` note is consumed, so it is not also shown as a
+  plain note). The reverse `Blocks …` line is derived automatically — if task 3
+  depends on task 1, task 1's card shows `Blocks 3`.
 - **Decisions Needed / Defaults Applied**: bold-label entries, either as list
   items (`- **Name (status)**: body`) or paragraphs (`**RESOLVED**: body`). A
   trailing `(status)` parenthetical drives the badge; `RESOLVED`, `OPEN`, and
@@ -235,7 +263,8 @@ its own over Server-Sent Events (SSE).
 ```sh
 bun run src/cli.ts watch <plan.md>            # serves http://127.0.0.1:4499, live-reloads on edit
 bun run src/cli.ts watch <plan.md> --port 4500 --no-open --out out.html
-bun run src/cli.ts watch <plan.md> --enable-actions   # guarded two-way controls (default OFF)
+bun run src/cli.ts watch <plan.md> --enable-actions     # guarded two-way controls (default OFF)
+bun run src/cli.ts watch <plan.md> --enable-messaging   # send prompts back to the agent (default OFF)
 ```
 
 The server prints its URL to stdout and, unless you pass `--no-open`, opens your
@@ -250,6 +279,8 @@ Watch flags:
   this path on every regen, so you always have a shareable file on disk.
 - `--enable-actions`: opt in to the guarded two-way controls. Default **off**.
   See below.
+- `--enable-messaging`: opt in to the served-only prompt box that queues messages
+  for the opencode plugin to relay to the agent. Default **off**. See below.
 
 How the server behaves:
 
@@ -259,6 +290,9 @@ How the server behaves:
   the injected client calls `location.reload()`.
 - `POST /refresh` is a localhost-only, no-payload nudge that forces an immediate
   re-read and regen (handy for the optional adapter below). It returns `204`.
+- `POST /prompt` exists only under `--enable-messaging`. It accepts a small JSON
+  body `{ text, taskId? }`, validates it, and queues it as a file for the plugin
+  to deliver (see below). It returns `202` on success, `400` on invalid input.
 
 The watcher is `fs.watch`-based and debounced, and it keeps the last good render
 if a save momentarily produces an empty or unparseable file, so a mid-write
@@ -281,6 +315,56 @@ exactly two actions and neither mutates the plan or any file:
 
 There is no endpoint that edits the plan. `--enable-actions` cannot write back
 to disk.
+
+### Message the agent (`--enable-messaging`, guarded stretch)
+
+`--enable-messaging` is a guarded, default-**off** stretch feature that adds a
+reverse channel from the canvas back to the opencode agent. Like
+`--enable-actions`, it is served-only: the UI exists only while the page is
+served by the watch server, never in the static `--out` artifact. It requires
+the [optional opencode plugin adapter](#optional-opencode-plugin-adapter) to
+actually reach the agent — without the plugin loaded, messages are queued on
+disk but nothing relays them.
+
+What you get in the served page:
+
+- **A prompt bar** at the top of the canvas. Type anything (for example, "add a
+  task to do xyz") and send it to the agent. `Cmd`/`Ctrl`+`Enter` also sends.
+- **A per-task "send message" button** on each expandable task card. It opens a
+  small composer scoped to that task, so the delivered prompt is prefixed with
+  the task id for context.
+
+How it flows:
+
+1. The browser POSTs `{ text, taskId? }` to `POST /prompt`.
+2. The server validates the text (trimmed, non-empty, ≤ 8000 chars) and writes
+   one JSON file per message, atomically, into `<root>/.sisyphus/outbox/`. The
+   plan normally lives at `<root>/.sisyphus/plans/<name>.md`, so the outbox is
+   the sibling `<root>/.sisyphus/outbox`. Nothing about the plan file is
+   modified.
+3. The opencode plugin adapter watches that outbox directory. For each message
+   it picks the most recently active opencode session and forwards the text as a
+   user prompt (via the SDK's `session.promptAsync`), then deletes the file. A
+   message is only removed after a successful send, so delivery is at-least-once;
+   if no session is available yet, the message stays queued until one is.
+
+The server never edits the plan and never runs the message itself — it only
+writes a bounded text file that the plugin relays. Filenames are
+server-generated; the optional `taskId` is stored for context only and is never
+used as a filesystem path.
+
+A couple of guarantees worth knowing:
+
+- **Layout requirement.** The relay only works when the plan lives under a
+  `.sisyphus/` tree (the normal case inside opencode), because the plugin only
+  watches `<root>/.sisyphus/outbox`. If you run `watch ./plan.md
+  --enable-messaging` on a plan outside a `.sisyphus/` directory, the server
+  still accepts and queues messages, but the plugin has nowhere to pick them up,
+  so they will not be delivered.
+- **Freshness.** The plugin drops messages older than ~10 minutes rather than
+  relaying them, so a message you queued in a previous, unrelated session never
+  gets injected into a fresh one. Delivery is best-effort: a `202` from
+  `POST /prompt` means "queued," not "delivered."
 
 ### Optional opencode plugin adapter
 

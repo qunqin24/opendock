@@ -695,6 +695,7 @@ Both `agents.*` and `categories.*` accept either shape:
 | `json-error-recovery` | Enabled | Appends recovery instructions when tool output contains JSON parse errors. |
 | `fsync-skip-warning` | Enabled | Appends drained fsync skip warnings from the fsync tracker. |
 | `tool-output-truncator` | Enabled | Truncates very large selected tool outputs. |
+| `history-cache-mitigation` | Disabled | Optional cache workaround that truncates older completed tool outputs in configured model histories before model-message conversion. Prefer OpenCode's native `tool_output` truncation for stable prefixes. |
 | `todo-description-override` | Enabled | Overrides the `todowrite` tool description with ocmm’s structured todo format. |
 | `commit-guard-injector` | Enabled | Injects the no-autonomous-git-write constraint into the system prompt. |
 | `subagent-git-guard` | Enabled | Blocks git write commands in subagent sessions except allowed temp-repo cases. |
@@ -716,6 +717,23 @@ Both `agents.*` and `categories.*` accept either shape:
 | Latest GLM / DeepSeek | Built-in defaults normalize low/medium-style local variants to canonical high/max controls where the provider family supports them; non-review explicit user config or request variants are left as written. |
 | Category defaults | `quick` stays lightweight. Built-in category defaults from `coding` upward resolve to `max`; explicit user category config or input variants are respected as written. |
 | Kimi / MiniMax / unknown | Uses the existing temperature shaping fallback when no better family-specific knob exists. |
+
+### History cache mitigation
+
+`historyCacheMitigation` is disabled by default. It is an opt-in workaround for existing long OpenCode histories where large completed tool outputs were already persisted before OpenCode's native `tool_output` truncation limits were configured. It uses OpenCode's `experimental.chat.messages.transform` hook to truncate older completed tool outputs before history is converted to model messages, while preserving recent tool results intact.
+
+```jsonc
+{
+  "historyCacheMitigation": {
+    "enabled": false,
+    "models": ["gpt-5.6-sol"],
+    "maxToolOutputChars": 16000,
+    "preserveRecentToolResults": 24
+  }
+}
+```
+
+Enable it explicitly with `"historyCacheMitigation": { "enabled": true }` only when native `tool_output` truncation and compaction pruning are insufficient for old long sessions. Increase `preserveRecentToolResults` or `maxToolOutputChars` if a workflow depends on large older tool outputs staying verbatim in model history.
 
 ## Built-in agents
 

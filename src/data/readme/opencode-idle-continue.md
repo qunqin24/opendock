@@ -11,6 +11,9 @@ OpenCode plugin that automatically sends prompts to continue processing when idl
 - **Hot Reload**: Automatically reloads prompt files when modified without restarting the plugin
 - **File Change Monitoring**: Maintains a list of files to monitor for content/timestamp changes
 - **Wait State Management**: Enters wait state when sent prompts don't change monitored files, with interval backoff mechanism
+- **User Input Detection**: Detects user typing activity even if the input is later deleted without sending
+- **Page Scroll Detection**: Detects when users are scrolling through page content and pauses idle detection
+- **AI Stuck Detection & Recovery**: Monitors AI response activity and automatically recovers from stuck states
 - **Two Working Modes**:
   - **Traditional Mode**: Direct prompt delivery with file monitoring and interval backoff
   - **Subagent Mode**: Triggers OpenCode's native Task tool to launch sub-agents with automatic session management
@@ -87,6 +90,9 @@ If no prompt file is found, the behavior depends on `enable_default_prompt`:
 | `subagent_agent_type` | string | `"explore"` | Subagent type (only when subagent_enabled=true) |
 | `subagent_delay_ms` | number | `60_000` | Subagent trigger delay in milliseconds (only when subagent_enabled=true) |
 | `debounce_delay_ms` | number | `5000` | Idle debounce confirmation delay in milliseconds (default 5s) |
+| `stuck_threshold_minutes` | number | `20` | AI stuck detection threshold in minutes (default 20min) |
+| `ai_stuck_action` | string | `"ignore"` | AI stuck recovery action: `"ignore"`, `"abort"`, or `"abort_and_retry"` |
+| `ai_stuck_retry_prompt` | string | `"continue"` | Prompt text for retry when ai_stuck_action is `"abort_and_retry"` |
 
 ### Example `idle-continue.json`
 
@@ -96,7 +102,10 @@ If no prompt file is found, the behavior depends on `enable_default_prompt`:
   "watch_files": ["task.md", "wish-list.md"],
   "check_interval_minutes": 30,
   "max_idle_cycles": 5,
-  "enabled": true
+  "enabled": true,
+  "stuck_threshold_minutes": 20,
+  "ai_stuck_action": "abort_and_retry",
+  "ai_stuck_retry_prompt": "continue"
 }
 ```
 
@@ -105,15 +114,26 @@ If no prompt file is found, the behavior depends on `enable_default_prompt`:
 ### Mode 1: Traditional Mode (Default)
 
 1. **Idle Detection**: Monitors system idle status. Triggers when OpenCode is idle.
-2. **Send Prompt**: Reads prompt content from specified markdown file and sends to OpenCode for continued processing. If prompt file doesn't exist:
+2. **User Activity Detection**: 
+   - **Input Detection**: Detects user typing activity in real-time, even if input is later deleted without sending
+   - **Scroll Detection**: Detects page scrolling and pauses idle detection while user is navigating content
+   - Idle detection is skipped when user is actively typing or scrolling
+3. **Send Prompt**: Reads prompt content from specified markdown file and sends to OpenCode for continued processing. If prompt file doesn't exist:
    - When `enable_default_prompt` is `false` (default), no message is sent
    - When `enable_default_prompt` is `true`, sends built-in default prompt
-3. **Prompt Hot Reload**: Checks if prompt file has been modified each time `prompt_file` is used. Uses cached content if unchanged, reloads and updates cache if modified, no need to restart plugin.
-4. **File Change Monitoring**: Maintains a list of files to monitor for content/timestamp changes.
-5. **Wait State**: If no changes in monitored files after sending prompt, enters wait state. Wait state requires:
+4. **AI Stuck Detection & Recovery**:
+   - Monitors AI response activity through heartbeat events (message updates, part updates, deltas)
+   - Detects stuck state when session is busy but no activity for configured threshold (default 20 minutes)
+   - Configurable recovery actions:
+     - `"ignore"` - Do nothing (default)
+     - `"abort"` - Abort the stuck session
+     - `"abort_and_retry"` - Abort session, wait 30 seconds, then send retry prompt
+5. **Prompt Hot Reload**: Checks if prompt file has been modified each time `prompt_file` is used. Uses cached content if unchanged, reloads and updates cache if modified, no need to restart plugin.
+6. **File Change Monitoring**: Maintains a list of files to monitor for content/timestamp changes.
+7. **Wait State**: If no changes in monitored files after sending prompt, enters wait state. Wait state requires:
    - Continuous system idle
    - No changes in monitored files
-6. **Interval Backoff**: During wait state, sends prompt every interval (default 30 minutes). If 5 consecutive checks still idle (files unchanged), next wait interval doubles.
+8. **Interval Backoff**: During wait state, sends prompt every interval (default 30 minutes). If 5 consecutive checks still idle (files unchanged), next wait interval doubles.
 
 ### Mode 2: Subagent Mode
 
@@ -175,7 +195,7 @@ node tools/build.mjs
 
 Output:
 - `dist/index.js` — Plugin entry (same as `src/index.js`)
-- `dist/opencode-true-idle-detector.js` — Idle detection module
+- `dist/opencode-true-idle-detector.js` — Idle detection module with user activity and stuck detection
 - `dist/subagent-trigger.js` — Subagent trigger module
 - `dist/wait-state.js` — Wait state module
 - `dist/file-utils.js` — File utility module

@@ -126,6 +126,21 @@ over its control API.
   `:MCPRestart!`. `restart-server <name>`, by contrast, only bounces that one
   upstream and never the combiner.
 
+  `restart` is the **sanctioned** restart, and it carries session state across:
+  before stopping, it arms a one-shot **handover** (`POST /handover/prepare`) —
+  the dying combiner parks its per-chat isolated upstream sessions *without
+  terminating them* (the backing servers keep running and keep their state)
+  and writes token filters, nvim binds, and per-token upstream session ids to
+  a mode-600 file that the successor consumes via `--restore` (deleted on
+  consume; refused if stale). A reconnecting chat that presents its grouping
+  token then resumes its exact upstream sessions — a stateful server like
+  `svg-mcp` still has the chat's documents, mid-conversation. Only this path
+  gets the handover: crashes and `sharedserver admin kill` boot fresh (config
+  + supervisor re-assertion), and a combiner too wedged to answer the prepare
+  call restarts restore-less. Tokenless chats always come back fresh — their
+  wire session id died with the old process (see
+  [Chat identity](#chat-identity--grouping-tokens)).
+
 `start`/`restart` accept `--config` (default: `$MCP_COMBINER_CONFIG`,
 `$CLAUDE_MCP_COMBINER_CONFIG`, then standard locations), `--name` (sharedserver
 name, default `mcp-combiner`), `--port`/`--host`, `--grace-period`, `--pid`
@@ -134,10 +149,13 @@ name, default `mcp-combiner`), `--port`/`--host`, `--grace-period`, `--pid`
 extra serve flags after `--`, e.g.
 `mcp-combiner start --config … -- --no-output-validation`.
 
-> **WIP:** the session filter verbs (`enable`/`disable`/`allow`/`clear`) are a
-> work in progress — CLI invocations are transient sessions, and
-> token-addressed filters are recorded but not yet applied while the
-> session-addressing rework lands. `session status` is fully functional.
+The session filter verbs (`enable`/`disable`/`allow`/`clear`) address a chat
+by its grouping token and apply **live**: the token-keyed filter store is
+canonical, enforcement reads through to it on the chat's next request, and the
+state survives reconnects and `mcp-combiner restart` (it rides the handover).
+With the Claude plugin's tokens this means any Claude chat is controllable
+from the CLI — or from another chat — by its `cc-<session-id>` token (see
+`/sessions/map` for the live roster).
 
 The read/drive verbs (`status`, `health`, `enable`, …) accept `--host`/`--port`
 (default `127.0.0.1:9741`) or `--url`, and `--json` for scripting.
@@ -163,13 +181,13 @@ curl -X POST http://127.0.0.1:9741/mcp \
   -d '{"jsonrpc":"2.0","method":"tools/list","id":1}'
 ```
 
-### Plugins (standalone Claude Code & OpenCode)
+### Plugins (standalone Claude Code, OpenCode & Pi)
 
 Outside CodeCompanion, install a plugin so your agent runs and registers the
-combiner itself (one refcounted process shared across clients). Both plugins live
+combiner itself (one refcounted process shared across clients). All three plugins live
 in this repo — **[`plugins/`](https://github.com/georgeharker/mcp-companion/blob/main/plugins/README.md)**.
 
-Prerequisites (once, for either plugin): [`uv`](https://docs.astral.sh/uv/),
+Prerequisites (once, for any plugin): [`uv`](https://docs.astral.sh/uv/),
 `cargo install sharedserver`, and a `servers.json` at
 `~/.config/mcp-combiner/servers.json` (see [MCP Server Config](#mcp-server-config)).
 
@@ -181,6 +199,10 @@ pinned release from PyPI on demand. Then:
   with `/mcp` (an `mcp-combiner` server with prefixed tools).
 - **OpenCode:** add `"@geohar/opencode-mcp-combiner@latest"` to your `opencode.json`
   `plugin` list.
+- **Pi:** `pi install npm:pi-mcp-adapter` (Pi's MCP client), drop the combiner into
+  its `mcp.json` ([`plugins/pi/mcp.json.example`](https://github.com/georgeharker/mcp-companion/tree/main/plugins/pi/mcp.json.example)),
+  and load the `@geohar/pi-mcp-combiner` extension (symlink into
+  `~/.pi/agent/extensions/`, or list it under `settings.json` `packages`).
 
 See **[plugins/README.md](https://github.com/georgeharker/mcp-companion/blob/main/plugins/README.md)** for the full walkthrough (config discovery order, env
 knobs, troubleshooting) and the host-owned (`MCP_COMPANION_COMBINER_URL`)
@@ -254,9 +276,65 @@ then sees all chats as the same session, so two concurrent chats clash.
 Set `"isolate": true` on such a server and the combiner opens a **separate
 upstream session per chat** (still one upstream server *instance*, shared
 transport). The server is handed a distinct, stable `Mcp-Session-Id` per chat
-and partitions its per-session state automatically — no clash. The session is
-torn down when the chat ends; an abandoned one is just an idle upstream session
-the server can expire.
+and partitions its per-session state automatically — no clash.
+
+> **stdio servers cannot be isolated.** `isolate` is **HTTP/SSE-only**: a stdio
+> server is one subprocess with a single MCP session, so `"isolate": true` on a
+> stdio entry is **ignored** (with a startup warning) and *all chats share its one
+> session* — a stateful stdio server therefore leaks state across chats (one
+> global "current document" for everyone). True per-chat isolation would require
+> spawning **a subprocess per chat**, which the combiner deliberately does not do
+> (unbounded processes for a marginal case). If you need per-chat state, run the
+> server over **HTTP/SSE** and set `isolate: true` there — which is exactly why the
+> stateful sibling servers (svg-mcp, cribsheet) are HTTP, not stdio.
+
+#### Chat identity — grouping tokens
+
+"Per chat" is keyed by the chat's **grouping token** (the
+`X-MCP-Combiner-Session` header, or a `/mcp/<token>` URL path — the URL form
+wins when both are present). Tokens are minted *outside* the combiner by
+whoever owns the chat, which is what makes them stable across combiner
+restarts:
+
+- **Neovim / CodeCompanion** mints a token per chat and manages its bindings.
+- **The Claude Code plugin** presents the Claude session id as the token (a
+  `SessionStart` hook + `headersHelper` bridge), so every Claude chat is
+  individually addressable — including through the `/sessions/token/<token>`
+  control routes (per-chat filters and, over a restart, continuity).
+- **The OpenCode plugin** registers a per-instance token on its URL (all of an
+  OpenCode instance's sessions share one MCP connection, so per-instance is
+  its natural granularity).
+- **The Pi extension** carries a per-instance token on its `mcp.json` URL path
+  (`/mcp/<token>`), via `pi-mcp-adapter` — the same per-instance granularity as
+  OpenCode. (Owning the connection directly, for per-chat identity keyed on Pi's
+  durable session id, is a documented future option — see `plugins/pi`.)
+
+A connection with **no token** falls back to its wire `Mcp-Session-Id` as the
+grouping key — fine within one combiner lifetime, but that id is minted by the
+combiner and dies with it, so tokenless chats do not survive a restart.
+
+#### Session lifecycle
+
+A chat's isolated upstream session moves through three tiers, driven by pure
+timers (configure via a top-level `"isolation"` section):
+
+- **live** — a downstream session bearing the token is connected, or the last
+  one dropped less than `grace_seconds` (default 300) ago; quick reconnects
+  reattach instantly. An explicit session DELETE from the client skips the
+  grace and parks immediately.
+- **parked** — disconnected *without terminating* the upstream session; only
+  `token → (Mcp-Session-Id, protocolVersion)` is kept. The token's next
+  appearance resumes the same upstream session (state intact), falling back to
+  a fresh one if the server expired it.
+- **forgotten** — parked past `park_ttl_seconds` (default 3600): the entry is
+  dropped and a best-effort DELETE releases the server's session state.
+
+```jsonc
+"isolation": { "grace_seconds": 300, "park_ttl_seconds": 3600 }
+```
+
+`GET /sessions/map` on the combiner shows every correlation live: tokens,
+their downstream sessions, nvim binds, and the isolated live/parked tiers.
 
 `isolate` is tri-state:
 
@@ -607,6 +685,40 @@ require("mcp_companion").setup({
 
 When you change the encryption key, existing cached tokens become unreadable and you'll
 need to re-authenticate with OAuth servers.
+
+### Inbound authentication (locking down `/mcp`)
+
+The above is backend auth (combiner → upstream servers). Separately, the combiner's
+own `/mcp` endpoint is **unauthenticated by default** — fine on loopback, but open
+the moment you bind beyond `127.0.0.1`. Set an inbound **bearer token** and every
+client must present `Authorization: Bearer <token>`:
+
+- **Combiner**: `MCP_COMBINER_AUTH_TOKEN` env, or `--auth-token-file PATH` (the file
+  wins). Unset ⇒ open (default; nothing changes). Gates `/mcp` **and** the control
+  routes that mutate the server (`/sessions*`, `/handover*`); `/health` stays open.
+  A missing/wrong token gets a plain `401` — no OAuth challenge advertised. (The
+  `mcp-combiner` ctl and the Neovim host present the token automatically.)
+- **Neovim**: set `combiner.auth_token` (or export `MCP_COMBINER_AUTH_TOKEN`) — it is
+  passed to the spawned combiner AND presented by the plugin's own HTTP client:
+
+  ```lua
+  require("mcp_companion").setup({
+      combiner = { auth_token = "…" },  -- or read from your own secret store
+  })
+  ```
+
+- **Claude Code / OpenCode / Pi**: each reads the same `MCP_COMBINER_AUTH_TOKEN`
+  from its environment and sends the bearer automatically (Pi via the
+  `/mcp-combiner install-config` command). See the combiner and per-plugin READMEs.
+
+**Backends behind the combiner** (`cribsheet`, `svg-mcp`, …) are their own loopback
+HTTP servers, so the combiner's bearer does **not** cover a local process hitting
+them directly. Each can gate its own `/mcp` by vendoring the combiner's
+`inbound_auth.py` (self-contained) and naming its own env var — `CRIBSHEET_AUTH_TOKEN`,
+`SVG_MCP_AUTH_TOKEN` (set them to the same value for one shared secret, or distinct
+for isolation). The combiner then presents that token via the backend's `servers.json`
+entry: `{"auth": {"bearer": "${CRIBSHEET_AUTH_TOKEN}"}}`. See the combiner README's
+[Reusing the gate](combiner/README.md#reusing-the-gate-on-other-fastmcp-servers).
 
 ---
 

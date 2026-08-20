@@ -20,7 +20,7 @@ Requirements: Node.js 22.6 or newer, npm, and OpenCode.
 
 Guides: [日本語](docs/guide-ja.md) · [简体中文](docs/guide-zh-CN.md) · [CLI testing](docs/cli-testing.md)
 
-Release: [v0.4.9](https://github.com/zufall-upon/Sortie-dogs/releases/tag/v0.4.9)
+Release: [v0.5.2](https://github.com/zufall-upon/Sortie-dogs/releases/tag/v0.5.2)
 
 ## Quick start
 
@@ -62,7 +62,7 @@ to the `plugin` array of the OpenCode configuration the agents run under —
 Restart OpenCode afterwards. A `plugin` entry must name the package, not a
 subpath: `sortie-dogs/plugin` is an import specifier, not a plugin specifier.
 
-`dog-coordinator` defaults to `openai/gpt-5.6-terra` with the `medium` variant; `dog-scout` defaults to
+`dog-coordinator` defaults to `openai/gpt-5.6-luna` with the `max` variant; `dog-scout` defaults to
 `openai/gpt-5.6-luna`. To pin either role to another model, save this
 as `.opencode/sortie-dogs.json`:
 
@@ -203,12 +203,14 @@ global file for durable global settings.
 
 - **Focused when invited, invisible otherwise.** Activate it with `/sortie` or
   select `dog-coordinator`; ordinary OpenCode sessions remain unchanged.
-- **Evidence gathering without uncontrolled fan-out.** One bounded scout runs only
-  when a concrete manifest, validation, or ownership gap exists before implementation.
+- **Evidence gathering without arbitrary dispatch ceilings.** A bounded scout resolves
+  each concrete manifest, validation, or ownership gap whenever it appears; unchanged
+  requests are not repeated.
 - **Writes stay inside the assignment.** Exact source or operation manifests
   gate edits and handoffs.
-- **One bounded implementation unit.** A normal turn permits one worker; explicit
-  backlog drain advances later independent units one at a time across continuations.
+- **Autonomous sequential implementation.** A normal request may use as many sequential
+  workers as its accepted scope requires. Concurrent fan-out still needs the explicit
+  parallel contract.
 - **Runtime overlap protection.** Active equal or ancestor write scopes are rejected
   before mutation, and full validation waits until every parallel unit joins.
 - **Evidence before completion.** Canonical validation, risk-based review, and
@@ -288,13 +290,13 @@ untouched.
 ## Model routing
 
 Default routes split work by required capability and repeated-context cost.
-Sortie-dogs keeps retrieval on Luna, coordinator state and routing on Terra,
-and independent review on Sol unless the host declares another target.
+Sortie-dogs keeps retrieval and coordinator routing on Luna, and independent
+review on Sol unless the host declares another target.
 
-`dog-coordinator` defaults to `openai/gpt-5.6-terra` with the `medium` variant. Coordinator work repeatedly
-processes the root context but is primarily state management and routing, so
-Terra is the cost-conscious middle tier between Luna and Sol. Project or global
-`modelRouting` can override this default. If the host proves Terra unavailable,
+`dog-coordinator` defaults to `openai/gpt-5.6-luna` with the `max` variant. Coordinator work repeatedly
+processes the root context, so Luna Max keeps deliberation high without paying
+Terra rates for every cached turn. Project or global `modelRouting` can override
+this default. If the host proves Luna unavailable,
 the existing availability policy uses a configured free-tier fallback when present
 and otherwise preserves the session model.
 
@@ -332,7 +334,7 @@ actually serve.
 {
   "modelRouting": {
     "dog-coordinator": {
-      "preferred": { "model": "openai/gpt-5.6-terra", "variant": "medium" }
+      "preferred": { "model": "openai/gpt-5.6-luna", "variant": "max" }
     },
     "dog-scout": {
       "preferred": { "model": "openai/gpt-5.6-luna", "variant": "high" }
@@ -347,7 +349,6 @@ actually serve.
   },
   "modelCatalog": {
     "project": [
-      { "model": "openai/gpt-5.6-terra", "variants": ["medium"] },
       { "model": "openai/gpt-5.6-sol", "variants": ["medium", "xhigh"] },
       { "model": "openai/gpt-5.6-luna", "variants": ["max", "high"] },
       { "model": "anthropic/claude-opus-5" }

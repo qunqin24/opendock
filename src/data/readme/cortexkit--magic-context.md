@@ -111,6 +111,8 @@ If you cannot run the wizard, add this to `opencode.jsonc`:
 }
 ```
 
+> **Plugin updates:** A bare plugin entry is pinned to the downloaded exact version before restart so OpenCode does not remove the active package mid-session. To deliberately keep it unpinned after removing a version, write `@latest` explicitly.
+
 Then create `magic-context.jsonc` with the one setting the historian needs:
 
 ```jsonc

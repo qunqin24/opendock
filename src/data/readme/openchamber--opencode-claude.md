@@ -6,21 +6,27 @@
 [![Discord](https://img.shields.io/badge/Discord-join.svg?style=flat&labelColor=100F0F&color=8B7EC8&logo=discord&logoColor=FFFCF0)](https://discord.gg/ZYRSdnwwKA)
 [![License](https://img.shields.io/badge/license-MIT-black?style=flat&labelColor=100F0F&color=EC8B49)](LICENSE)
 
-## Claude Code in OpenCode. Subscription OAuth. Agent SDK.
+## Claude Code in OpenCode. Local CLI auth. Agent SDK.
 
 **opencode-claude is the OpenCode plugin for running Claude models — Fable, Opus, Sonnet, and Haiku — from a Claude Pro/Max subscription, with effort variants, tools, attachments, and auto-compact.**
 
-Use Claude from [OpenCode](https://opencode.ai) and [OpenChamber](https://github.com/openchamber/openchamber) without an Anthropic API key. The plugin authenticates with Claude Pro/Max OAuth, runs the Anthropic Agent SDK plus the local `claude` CLI, and proxies an OpenAI-compatible `/v1/chat/completions` surface into OpenCode.
+Use Claude from [OpenCode](https://opencode.ai) and [OpenChamber](https://github.com/openchamber/openchamber) without an Anthropic API key. The plugin runs the official Anthropic Agent SDK plus the local `claude` CLI and proxies an OpenAI-compatible `/v1/chat/completions` surface into OpenCode. Claude Code owns authentication; the plugin never reads, copies, refreshes, or sends your credentials itself.
+
+### Official Claude runtime
+
+**Built on Anthropic's official Agent SDK and Claude Code authentication flow. Designed for local, user-operated Claude Code usage.**
+
+No OAuth tokens are extracted, copied, stored, injected, or sent by this plugin. All authentication and model access are performed internally by the official Claude Code runtime. The plugin does not call Anthropic inference endpoints directly and does not impersonate Anthropic API clients.
 
 Sibling plugins: [@openchamber/opencode-cursor](https://github.com/openchamber/opencode-cursor) and [@openchamber/opencode-commandcode](https://github.com/openchamber/opencode-commandcode).
 
-![opencode-claude — Claude Code in OpenCode, subscription OAuth, Agent SDK](docs/header.svg)
+![opencode-claude — Claude Code in OpenCode, local CLI auth, Agent SDK](docs/header.svg)
 
 ## What you can do
 
-### Sign in with Claude Pro/Max, not an API key
+### Use your local Claude Code login
 
-`opencode auth login --provider claude-code` syncs credentials from the Claude Code CLI or opens a Pro/Max browser OAuth flow. API keys are stripped from the child environment so billing stays on the subscription.
+The OpenCode/OpenChamber sign-in action launches `claude auth login --claudeai` and relays it: the CLI's own sign-in page opens from the host, and the code Claude shows is pasted back into the host, not a separate terminal. The official CLI performs the OAuth exchange and stores its own credentials. The plugin stores no credentials or connection markers in OpenCode; every inference request, including title and summary generation, runs through the Agent SDK.
 
 ### Pick models and thinking effort
 
@@ -75,14 +81,9 @@ Add (or merge) this into `~/.config/opencode/opencode.json`:
 ### 3. Authenticate
 
 ```bash
-# Option A — sync from Claude Code CLI (recommended)
 claude auth login
 opencode auth login --provider claude-code
-# pick "Use Claude Code CLI login"
-
-# Option B — browser OAuth (Pro/Max)
-opencode auth login --provider claude-code
-# pick "Login with Claude Pro/Max"
+# pick "Sign in with Claude Code CLI"
 ```
 
 ### 4. Run a Claude model
@@ -106,26 +107,30 @@ opencode plugin file://$PWD
 
 | Step | What happens |
 | --- | --- |
-| `claude auth login` then `opencode auth login --provider claude-code` | Syncs the Claude Code CLI grant (recommended) |
-| Or pick **Login with Claude Pro/Max** | Browser OAuth for a Pro/Max subscription |
-| Plugin stores credentials | OpenCode `auth.json`; CLI-synced chains stay owned by the CLI |
-| Access expires | Plugin-owned tokens refresh with single-flight rotation; CLI-synced tokens are never rotated by the plugin |
+| **Sign in with Claude Code CLI** | Shown when the CLI is installed: launches the official CLI login and opens the sign-in page the CLI asked for |
+| **Install Claude Code CLI and sign in** | Shown only when the CLI is missing: runs the official installer (`npm i -g @anthropic-ai/claude-code`, official install script as fallback), then continues with the sign-in relay |
+| Paste the code from the Claude page | Goes straight to the CLI's stdin; the CLI does the token exchange and owns the result |
+| `claude auth login --claudeai` | Terminal alternative, always called out in the instructions — also the offered fallback when the CLI is missing (with the install command alongside) |
+| Successful verification | Completes without writing to OpenCode's auth store |
+| Access expires | Claude Code refreshes its own credentials |
 
-API keys are not used. Subscription OAuth is the supported path.
+Signing in is either the link and its code or the terminal command — the sign-in page the CLI asks for is the only URL the plugin ever hands to the host.
+
+The plugin does not implement OAuth, inspect Claude credential files, inject tokens, or call Anthropic inference endpoints directly.
 
 ## Architecture
 
 ```text
 OpenCode
   └─ /v1/chat/completions
-       └─ Bun.serve proxy (ephemeral port; published via auth loader)
+       └─ Bun.serve proxy (ephemeral port; configured by the plugin)
             └─ Claude Agent SDK query()
                  └─ claude CLI (subscription OAuth)
 ```
 
 | Layer | Responsibility |
 | --- | --- |
-| **Plugin hooks** | OAuth, provider config, model catalog, effort headers |
+| **Plugin hooks** | Provider config, model catalog, effort headers |
 | **Proxy** | OpenAI ↔ Agent SDK protocol, tool parking, compact, rate-limit gate |
 | **CLI** | Subscription credentials and the Claude Code harness |
 
@@ -137,14 +142,14 @@ The proxy records Agent SDK `rate_limit_event` telemetry and hard session-limit 
 
 - `GET /v1/rate-limit` → `{ limited, status, rateLimitType, utilization, resetsAt, resetsAtISO, resetInSeconds, message, updatedAt }` — poll this for a "limits reset in …" countdown. `utilization` is only present when the latest SDK event reported it — it is never carried over from an earlier limit window.
 - `GET /health` includes a compact `rateLimit` summary.
-- While a confirmed hard limit is active, new chat turns return HTTP **429** with `Retry-After` + `x-claude-rate-limit-reset` headers and an `error.type = "rate_limit_error"` body (title/summary meta requests are never gated). The block lifts automatically at reset time; the next turn resumes the same Claude session.
+- While a confirmed hard limit is active, new turns return HTTP **429** with `Retry-After` + `x-claude-rate-limit-reset` headers and an `error.type = "rate_limit_error"` body. The block lifts automatically at reset time; the next turn resumes the same Claude session.
 - `OPENCODE_CLAUDE_RATE_LIMIT_FAST_FAIL=0` disables the 429 gate (turns are attempted and error normally).
 
 ## Requirements
 
 - [OpenCode](https://opencode.ai)
-- [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code) on `PATH`
-- Claude Pro/Max subscription (or CLI OAuth credentials)
+- [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code) — on `PATH` or installed via the provider's install action (npm is used, or the official install script); the plugin also checks `~/.local/bin` and the npm global bin for a CLI the server PATH cannot see
+- Claude plan supported by Claude Code
 - Bun (plugin runtime) · Node.js ≥ 18
 
 ## Development
@@ -159,9 +164,8 @@ Debug logging: `OPENCODE_CLAUDE_DEBUG=1`.
 
 Optional knobs:
 
-- `OPENCODE_CLAUDE_PROXY_PORT` — optional pinned proxy port (default: ephemeral / OS-assigned; live URL is published to OpenCode via config + auth loader)
+- `OPENCODE_CLAUDE_PROXY_PORT` — optional pinned proxy port (default: ephemeral / OS-assigned; live URL is published to OpenCode via plugin config)
 - `OPENCODE_CLAUDE_CWD` — working directory passed to the Agent SDK
-- `CLAUDE_CODE_OAUTH_TOKEN` — inject a subscription token (CI / headless)
 - `OPENCODE_CLAUDE_RATE_LIMIT_FAST_FAIL` — `0` disables the 429 rate-limit gate
 - `OPENCODE_CLAUDE_RATE_LIMIT_STORE` — override the rate-limit store path (tests)
 - `OPENCODE_CLAUDE_HISTORY_MAX_CHARS` — budget for transferred conversation history when a Claude session cannot be resumed (default `400000`; newest messages are kept, `0` disables transfer)
@@ -172,7 +176,7 @@ Optional knobs:
 | --- | --- |
 | Unknown provider `claude-code` | Install `@openchamber/opencode-claude` and restart OpenCode |
 | Claude Code missing from provider list | Confirm `plugin` includes `@openchamber/opencode-claude` and restart OpenCode |
-| Auth / revoked grant | Re-run `claude auth login` then `opencode auth login --provider claude-code`. Do not share one OAuth chain between the plugin and the stock Anthropic provider |
+| Authentication error | Run `claude auth login`, verify `claude auth status --json`, then restart OpenCode |
 | 429 / rate-limit | Poll `GET /v1/rate-limit` or wait until `resetsAt`; the next turn resumes the same session |
 | Tools hang or invent output | Update to the latest plugin — park/resume MCP bridging is required |
 | Attachments ignored | Use a current build; image/PDF parts are converted to Claude blocks |

@@ -45,26 +45,24 @@ The agent also triggers the query automatically when the conversation mentions s
 
 ## Log location
 
-The `skill-usage.log` file is written to the opencode config directory, independent of where the plugin is installed:
+The `skill-usage.jsonl` file is written to the opencode config directory, independent of where the plugin is installed:
 
-- `~/.config/opencode/skill-usage.log`
+- `~/.config/opencode/skill-usage.jsonl`
 
-Because the log lives outside the plugin package directory, upgrading or reinstalling the plugin never deletes it.
+Because the log lives outside the plugin package directory, upgrading or reinstalling the plugin never deletes it. On upgrade from older versions, a legacy TSV `skill-usage.log` is converted to JSONL once at plugin startup, then removed.
 
-Each line is TSV with 4 columns:
+Each line is one JSON object (JSONL):
 
 ```
-timestamp	skill name	project directory	call_type
-[2026/08/10 23:28:22]	tech-briefing	/Users/showlotus/Desktop/MyCode/xxx	manual
+{"timestamp":"2026/08/10 23:28:22","skill":"tech-briefing","directory":"/Users/showlotus/Desktop/MyCode/xxx","call_type":"manual"}
 ```
 
-The timestamp is local time in `[YYYY/MM/DD HH:MM:SS]` format. The call_type is manual (user slash-command) or auto (agent-initiated).
+The timestamp is local time in `YYYY/MM/DD HH:MM:SS` format. The call_type is manual (user slash-command) or auto (agent-initiated).
 
 ## Manual aggregation
 
 ```bash
-# Count calls per skill name, highest first
-cut -f2 ~/.config/opencode/skill-usage.log | sort | uniq -c | sort -rn
+node -e 'const r=require("fs").readFileSync(process.env.HOME+"/.config/opencode/skill-usage.jsonl","utf8").trim().split("\n").filter(Boolean).map(JSON.parse),c={};r.forEach(x=>c[x.skill]=(c[x.skill]||0)+1);console.log(Object.entries(c).sort((a,b)=>b[1]-a[1]).map(([k,v])=>v+"\t"+k).join("\n"))'
 ```
 
 ## How it works
@@ -77,7 +75,7 @@ plugin loaded → config hook fires
 registers /skill-usage command (template = bundled SKILL.md body)
         ↓
 tool.execute.before / command.execute.before hooks
-append TSV rows to skill-usage.log on every skill invocation
+append JSONL lines to skill-usage.jsonl on every skill invocation
 ```
 
 The `config` hook works because Command init runs after Plugin config hooks (the Command layer depends on the Skill layer, which finishes before Command starts).
