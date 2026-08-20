@@ -99,30 +99,19 @@ const tabs = [
 </div>
 
 <script>
-  document.querySelectorAll<HTMLElement>('[data-install]').forEach((root) => {
-    const tabs = root.querySelectorAll<HTMLButtonElement>('[data-install-tab]');
-    tabs.forEach((tab) => {
-      tab.addEventListener('click', () => {
-        tabs.forEach((t) => t.setAttribute('aria-selected', String(t === tab)));
-        root.querySelectorAll<HTMLElement>('[data-install-panel]').forEach((panel) => {
-          panel.classList.toggle('hidden', panel.dataset.installPanel !== tab.dataset.installTab);
+  // Re-bound after every soft navigation: the module itself only executes
+  // once, but ClientRouter swaps in a fresh set of elements each time.
+  document.addEventListener('astro:page-load', () => {
+    document.querySelectorAll<HTMLElement>('[data-install]').forEach((root) => {
+      const tabs = root.querySelectorAll<HTMLButtonElement>('[data-install-tab]');
+      tabs.forEach((tab) => {
+        tab.addEventListener('click', () => {
+          tabs.forEach((t) => t.setAttribute('aria-selected', String(t === tab)));
+          root.querySelectorAll<HTMLElement>('[data-install-panel]').forEach((panel) => {
+            panel.classList.toggle('hidden', panel.dataset.installPanel !== tab.dataset.installTab);
+          });
         });
       });
-    });
-  });
-
-  document.querySelectorAll<HTMLButtonElement>('[data-copy]').forEach((btn) => {
-    btn.addEventListener('click', async () => {
-      const label = btn.querySelector('[data-copy-label]');
-      try {
-        await navigator.clipboard.writeText(btn.dataset.copy ?? '');
-        if (label) {
-          label.textContent = '已复制';
-          setTimeout(() => (label.textContent = '复制'), 1600);
-        }
-      } catch {
-        if (label) label.textContent = '复制失败';
-      }
     });
   });
 </script>

@@ -126,8 +126,20 @@
     @apply border-border outline-ring/50;
   }
 
+  img,
+  svg,
+  video,
+  canvas {
+    display: block;
+    max-width: 100%;
+  }
+
+  /* Deliberately NOT `scroll-behavior: smooth` here. ClientRouter restores
+     the previous offset on back/forward with a bare `scrollTo(x, y)`, which
+     inherits the root's behaviour — with smooth on, returning to a page you
+     had scrolled 2600px down animates the entire way down instead of landing
+     there. Anchor clicks opt into smooth individually; see Layout.astro. */
   html {
-    scroll-behavior: smooth;
     -webkit-tap-highlight-color: transparent;
   }
 

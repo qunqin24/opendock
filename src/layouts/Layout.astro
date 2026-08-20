@@ -93,5 +93,40 @@ const fullTitle = title.includes('OpenDock') ? title : `${title} · OpenDock`;
       <slot />
     </main>
     <Footer />
+
+    <script>
+      // Smooth scrolling is opt-in per click rather than a standing rule on
+      // the root: the router's back/forward scroll restore inherits whatever
+      // the root says, so a global `scroll-behavior: smooth` turns every
+      // "return to where I was" into a long animated scroll down the page.
+      // Scoping it to real anchor clicks keeps the nicety without that.
+      document.addEventListener('click', (event) => {
+        const target = event.target as HTMLElement | null;
+        if (!target?.closest('a[href^="#"]')) return;
+        const root = document.documentElement;
+        root.style.scrollBehavior = 'smooth';
+        setTimeout(() => root.style.removeProperty('scroll-behavior'), 1000);
+      });
+
+      // One-click copy for every `data-copy` element on the site. Delegated
+      // from `document`, which survives soft navigation — a per-element
+      // binding would go stale the moment ClientRouter swaps the page.
+      document.addEventListener('click', async (event) => {
+        const target = event.target as HTMLElement | null;
+        const btn = target?.closest<HTMLElement>('[data-copy]');
+        if (!btn) return;
+
+        const label = btn.querySelector('[data-copy-label]');
+        try {
+          await navigator.clipboard.writeText(btn.dataset.copy ?? '');
+          if (label) {
+            label.textContent = '已复制';
+            setTimeout(() => (label.textContent = '复制'), 1600);
+          }
+        } catch {
+          if (label) label.textContent = '复制失败';
+        }
+      });
+    </script>
   </body>
 </html>
