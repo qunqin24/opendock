@@ -34,7 +34,11 @@ const fullTitle = title.includes('OpenDock') ? title : `${title} · OpenDock`;
     <link rel="canonical" href={canonicalURL} />
     {noindex && <meta name="robots" content="noindex" />}
 
+    {/* SVG first for browsers that take it; the .ico is the fallback every
+        crawler and older browser fetches from the root regardless. */}
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="sitemap" href="/sitemap-index.xml" />
     <link rel="alternate" type="application/rss+xml" title="OpenDock 新插件" href="/rss.xml" />
 

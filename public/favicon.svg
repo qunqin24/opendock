@@ -1,4 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
   <rect width="24" height="24" rx="5" fill="#171717"/>
-  <path d="M15 8H9v8h6V8zm3 11H6V5h12v14z" fill="#fff" fill-rule="evenodd"/>
+  <path d="M16 6H8v12h8V6zm4 16H4V2h16v20z" fill="#fff" fill-rule="evenodd"
+        transform="translate(12 12) scale(0.82) translate(-12 -12)"/>
 </svg>
