@@ -81,9 +81,11 @@ const jsonLd = {
     </nav>
 
     <header class="mb-10">
+      {/* The eyebrow is the latin name above the Chinese headline. In English
+          that would just repeat the h1, so it becomes the section label. */}
       <p class="meta flex items-center gap-2 text-muted-foreground">
         <CategoryIcon name={category.icon} class="size-3.5" />
-        {category.labelEn}
+        {lang === 'zh' ? category.labelEn : t('categories.breadcrumb')}
       </p>
 
       <h1 class="display mt-3 text-[clamp(2rem,6vw,3.5rem)] leading-[0.95] text-foreground">

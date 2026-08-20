@@ -95,7 +95,7 @@ const pct = (n: number, total: number) => (total > 0 ? (n / total) * 100 : 0);
                           {categoryLabel(c.id, lang)}
                         </a>
                       </h2>
-                      <p class="font-mono text-xs text-muted-foreground">{c.labelEn}</p>
+                      {lang === 'zh' && <p class="font-mono text-xs text-muted-foreground">{c.labelEn}</p>}
                     </div>
                   </div>
 

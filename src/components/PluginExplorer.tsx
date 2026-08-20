@@ -163,7 +163,14 @@ export default function PluginExplorer({
   const ranked = !searching && sort !== 'recent' && sort !== 'updated';
   const activeFilters = (category !== initialCategory ? 1 : 0) + (health !== 'all' ? 1 : 0) + (searching ? 1 : 0);
 
-  const categoryLabels = useMemo(() => new Map(categories.map((c) => [c.id, c.label])), [categories]);
+  // The dataset carries both languages on every category; pick per locale
+  // rather than rendering the raw (Chinese) `label` field.
+  const catLabel = (c: Category) => (lang === 'zh' ? c.label : c.labelEn);
+  const catDescription = (c: Category) => (lang === 'zh' ? c.description : c.descriptionEn);
+  const categoryLabels = useMemo(
+    () => new Map(categories.map((c) => [c.id, lang === 'zh' ? c.label : c.labelEn])),
+    [categories, lang],
+  );
 
   const filterPanel = (
     <>
@@ -177,10 +184,10 @@ export default function PluginExplorer({
               key={c.id}
               active={category === c.id}
               count={c.count}
-              title={c.description}
+              title={catDescription(c)}
               onClick={() => setCategory(c.id)}
             >
-              {c.label}
+              {catLabel(c)}
             </FilterItem>
           ))}
         </FilterGroup>

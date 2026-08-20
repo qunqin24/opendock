@@ -121,7 +121,7 @@ const { plugin: p, rank, class: className = '' } = Astro.props;
   </div>
 
   <div class="mt-4 flex items-center justify-between gap-2 border-t border-border pt-3">
-    <span class="truncate text-xs text-muted-foreground">{categoryLabel(p.category)}</span>
+    <span class="truncate text-xs text-muted-foreground">{categoryLabel(p.category, lang)}</span>
     <HealthBadge signals={p.health} compact />
   </div>
 </a>

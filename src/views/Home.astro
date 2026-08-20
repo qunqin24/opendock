@@ -162,9 +162,9 @@ const features = ([1, 2, 3, 4] as const).map((n) => ({
                   <h3 class="text-base font-semibold tracking-tight text-foreground group-hover:text-foreground">
                     {categoryLabel(c.id, lang)}
                   </h3>
-                  <p class="font-mono text-[0.6875rem] text-muted-foreground/70">
-                    {c.labelEn}
-                  </p>
+                  {lang === 'zh' && (
+                    <p class="font-mono text-[0.6875rem] text-muted-foreground/70">{c.labelEn}</p>
+                  )}
                   <p class="mt-2 line-clamp-2 text-xs leading-relaxed text-muted-foreground">
                     {categoryDescription(c.id, lang)}
                   </p>

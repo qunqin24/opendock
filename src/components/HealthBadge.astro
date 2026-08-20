@@ -1,5 +1,6 @@
 ---
 import type { HealthSignal } from '../lib/plugins';
+import { localeFromPath, useTranslations } from '../lib/i18n';
 
 interface Props {
   signals: HealthSignal[];
@@ -8,6 +9,9 @@ interface Props {
   class?: string;
 }
 const { signals, compact = false, class: className = '' } = Astro.props;
+
+const lang = localeFromPath(Astro.url.pathname);
+const t = useTranslations(lang);
 
 const order = { danger: 0, warn: 1, ok: 2 } as const;
 const sorted = [...signals].sort((a, b) => order[a.level] - order[b.level]);
@@ -30,7 +34,7 @@ const styles: Record<string, string> = {
         ]}
       >
         <span class="size-1.5 rounded-full bg-current" />
-        {s.label}
+        {t(`health.${s.id}` as const)}
       </span>
     ))
   }
