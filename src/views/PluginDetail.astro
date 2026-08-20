@@ -68,8 +68,9 @@ const meta: { label: string; value: string; href?: string; external?: boolean }[
 ];
 
 // Rich result eligibility for "<plugin name> opencode" searches.
-const site = Astro.site ?? new URL('https://opendock.dev');
-const abs = (path: string) => new URL(localePath(lang, path), site).href;
+const site = Astro.site ?? new URL('https://www.opendock.net');
+// Trailing slash to match the canonical URL — build.format is 'directory'.
+const abs = (path: string) => new URL(`${localePath(lang, path).replace(/\/$/, '')}/`, site).href;
 
 const jsonLd = {
   '@context': 'https://schema.org',

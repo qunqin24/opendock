@@ -36,7 +36,7 @@ const {
   noindex = false,
 } = Astro.props;
 
-const site = Astro.site ?? new URL('https://opendock.dev');
+const site = Astro.site ?? new URL('https://www.opendock.net');
 const canonicalURL = new URL(canonical ?? Astro.url.pathname, site);
 const fullTitle = title.includes('OpenDock') ? title : `${title} · OpenDock`;
 

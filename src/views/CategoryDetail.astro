@@ -31,8 +31,9 @@ const pct = (n: number) => (category.count > 0 ? (n / category.count) * 100 : 0)
 
 const siblings = categories.filter((c) => c.id !== category.id).sort((a, b) => b.count - a.count);
 
-const site = Astro.site ?? new URL('https://opendock.dev');
-const abs = (path: string) => new URL(localePath(lang, path), site).href;
+const site = Astro.site ?? new URL('https://www.opendock.net');
+// Trailing slash to match the canonical URL — build.format is 'directory'.
+const abs = (path: string) => new URL(`${localePath(lang, path).replace(/\/$/, '')}/`, site).href;
 
 const jsonLd = {
   '@context': 'https://schema.org',

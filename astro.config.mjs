@@ -7,9 +7,9 @@ import tailwindcss from '@tailwindcss/vite';
 
 // https://astro.build/config
 export default defineConfig({
-  // Update this to the real domain before the first deploy — canonical URLs,
-  // the sitemap and the RSS feed are all derived from it.
-  site: 'https://opendock.dev',
+  // Canonical URLs, hreflang, the sitemap, the RSS feed and every absolute
+  // URL in the JSON-LD are derived from this. Changing it moves all of them.
+  site: 'https://www.opendock.net',
 
   // English owns the bare paths; Chinese lives under /zh/. The plugin data
   // itself is English (npm descriptions, GitHub READMEs), so the English

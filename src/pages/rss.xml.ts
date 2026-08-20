@@ -6,7 +6,7 @@ const escape = (s: string) =>
 
 /** Feed of newly-indexed plugins — the low-effort way for people to follow the ecosystem. */
 export const GET: APIRoute = ({ site }) => {
-  const base = site ?? new URL('https://opendock.dev');
+  const base = site ?? new URL('https://www.opendock.net');
   const items = rankings.recent.slice(0, 50);
 
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
@@ -22,8 +22,8 @@ ${items
   .map(
     (p) => `    <item>
       <title>${escape(p.title)}</title>
-      <link>${new URL(`/plugins/${p.slug}`, base)}</link>
-      <guid isPermaLink="true">${new URL(`/plugins/${p.slug}`, base)}</guid>
+      <link>${new URL(`/plugins/${p.slug}/`, base)}</link>
+      <guid isPermaLink="true">${new URL(`/plugins/${p.slug}/`, base)}</guid>
       <description>${escape(p.description ?? p.name)}</description>
       <category>${escape(p.category)}</category>
       ${p.createdAt ? `<pubDate>${new Date(p.createdAt).toUTCString()}</pubDate>` : ''}
