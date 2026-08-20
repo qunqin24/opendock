@@ -21,11 +21,13 @@ jobs:
     timeout-minutes: 45
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
+      # Version comes from the "packageManager" field in package.json —
+      # keep the two in sync, the action hard-fails when it is missing.
       - uses: pnpm/action-setup@v4
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: pnpm
@@ -60,4 +62,7 @@ jobs:
             exit 0
           fi
           git commit -m "chore(data): refresh plugin snapshot $(date -u +%F)"
-          git push
+          # Rebase first: a manual push during the crawl would otherwise
+          # reject this one and lose a day of history.
+          git pull --rebase origin "${GITHUB_REF_NAME}"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
