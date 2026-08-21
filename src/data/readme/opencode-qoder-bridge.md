@@ -18,23 +18,31 @@ A ground-up rewrite focused on reliability, performance, and first-class usage/c
 - **Reliable lifecycle** — proper abort propagation, idempotent cleanup, and external-abort vs. internal-error distinction so cancellations don't surface as errors.
 - **Image input** — multimodal prompts are passed through the SDK's async-iterable path (base64, data URLs, `file://`, `~/`, and absolute paths).
 
-## Prerequisites
+## Quick start
 
-1. Use Node.js 22.18 or newer.
+1. Use Node.js 22.22.2 or newer, or Node.js 24.15.0 or newer.
 
-2. Install and log in to the Qoder CLI:
+2. Install OpenCode and this plugin:
+
+   ```bash
+   npm install -g opencode-ai
+   npm install opencode-qoder-bridge
+   ```
+
+3. Authenticate with a Qoder PAT (recommended):
+
+   ```bash
+   export QODER_PERSONAL_ACCESS_TOKEN="pt-..."
+   ```
+
+   Or use the Qoder CLI login flow:
 
    ```bash
    qoder login
    ```
 
-   Credentials are stored under `~/.qoder/.auth/user`.
-
-3. Install opencode:
-
-   ```bash
-   npm install -g opencode-ai
-   ```
+PAT authentication uses the SDK's worker runtime when available and does not
+require a local `qoder login`. CLI authentication remains supported.
 
 ## Install
 
@@ -74,8 +82,7 @@ opencode -m qoder/performance               # interactive
 
 ### Usage & cost
 
-Run `/qoder-usage` in OpenCode (it uses the free `qoder/lite` model), run
-`qoder-usage` in a terminal for the same live report, or add the statusline
+Run `qoder-usage` in a terminal for the live report, or add the statusline
 binary to your OpenCode statusline config:
 
 ```bash
@@ -111,8 +118,14 @@ The ledger accumulates across sessions. Delete `~/.config/opencode-qoder-bridge/
 ## Models
 
 The bridge discovers the available catalog at startup through the SDK's
-`getAvailableModels()` API. The following is the complete enabled catalog
-returned by a live query on **2026-07-25**:
+`getAvailableModels()` API. Availability is account-, region-, rollout-, and
+SDK-version-dependent. A live query on **2026-08-20** returned:
+
+| Model ID | Name | Credit multiplier | Vision | Reasoning | Max input | Max output |
+|----------|------|-------------------|--------|-----------|-----------|------------|
+
+The following are known or historical model IDs. Some may be obsolete or
+unavailable for a particular account and are not an availability guarantee:
 
 | Model ID | Name | Credit multiplier | Vision | Reasoning | Max input | Max output |
 |----------|------|-------------------|--------|-----------|-----------|------------|
@@ -123,6 +136,7 @@ returned by a live query on **2026-07-25**:
 | `lite` | Lite | 0.00x | ✗ | ✗ | 180K | 32K |
 | `cmodel` | Cantus | 1.60x | ✓ | ✓ | 180K | 32K |
 | `qmodel_preview` | Qwen3.8-Max-Preview | 0.01x promo | ✓ | ✓ | 180K | 32K |
+| `qmodel_38max` | Qwen3.8-Max | 0.25x | ✓ | ✓ | 180K | 32K |
 | `qmodel_latest` | Qwen3.7-Max | 0.10x promo | ✓ | ✗ | 1M | 32K |
 | `qmodel` | Qwen3.7-Plus | 0.04x promo | ✓ | ✗ | 1M | 32K |
 | `kmodel_latest` | Kimi-K3 | 0.80x | ✓ | ✗ | 180K | 32K |
@@ -136,6 +150,11 @@ This table is a snapshot, not a hard-coded allowlist. Qoder can vary model
 availability by account, plan, CLI version, or staged rollout. Promotional
 multipliers are time-dependent; the SDK's current `priceFactor` is
 authoritative. Restart OpenCode to refresh the bridge's in-process model cache.
+
+Run `opencode models qoder` to inspect the models currently registered with
+OpenCode. The `qoder_models` tool also exposes capabilities, context limits,
+and price multipliers to the agent. Model discovery is cached and refreshed in
+the background so network or authentication latency does not block startup.
 
 ## Configuration
 
@@ -155,6 +174,50 @@ Bridge opencode MCP servers into the SDK by passing provider options:
 
 `config.mcp` servers are bridged into the SDK's `mcpServers` automatically.
 
+### Persistent sessions and permissions
+
+Session persistence is opt-in. Give a provider configuration a stable
+`sessionKey` and enable `sessionPersistence`:
+
+```json
+{
+  "provider": {
+    "qoder": {
+      "options": {
+        "sessionPersistence": true,
+        "sessionKey": "my-project-main"
+      }
+    }
+  }
+}
+```
+
+Mappings are stored in
+`~/.config/opencode-qoder-bridge/sessions.json` with restrictive file
+permissions. Use the `qoder_session_reset` tool to forget the mapping. A new
+session is created automatically if the mapping does not exist; existing
+sessions are resumed through the Qoder SDK.
+
+The bridge uses the SDK's safer permission policy by default. To explicitly
+allow all Qoder tools in a trusted local environment, configure for example:
+
+```json
+{
+  "provider": {
+    "qoder": {
+      "options": {
+        "permissionMode": "default",
+        "allowedTools": ["Read", "Glob", "Grep"]
+      }
+    }
+  }
+}
+```
+
+Available permission modes are `default`, `acceptEdits`, and
+`bypassPermissions`. Only explicitly configure `bypassPermissions` when the
+host environment is trusted.
+
 ## Troubleshooting
 
 | Problem | Solution |
@@ -170,7 +233,15 @@ npm install
 npm run build      # compile to dist/
 npm run typecheck  # type-check only
 npm test           # build and run the test suite
+npm run test:e2e   # authenticated real-CLI test; requires QODER_E2E=1
 npm run check      # full pre-publish verification
+```
+
+The end-to-end test is intentionally opt-in because it starts Qoder and may
+consume account quota. Run it only after `qoder login`:
+
+```bash
+QODER_E2E=1 npm run test:e2e
 ```
 
 ## Security

@@ -1,25 +1,57 @@
-# Auto Mode Gate
+<p align="center">
+  <img src="https://yivas.github.io/auto-mode-gate/favicon.svg" width="96" height="96" alt="Auto Mode Gate logo">
+</p>
 
-Auto Mode Gate is a host-neutral permission gate for OpenCode and Pi. It applies deterministic
-policy before Bash tool calls execute. Version 0.3.0 keeps global and project policy under each
-host, with migration from the shared `0.2.0` paths. Current source adds global Pi preferences for
-Auto, the judge model, and thinking without changing the primary conversation model. Version 0.1.0
-remains the deterministic-only release.
+<h1 align="center">Auto Mode Gate</h1>
+
+<p align="center">
+  Deterministic-first permission control for OpenCode and Pi.
+</p>
+
+<p align="center">
+  <a href="https://github.com/Yivas/auto-mode-gate/actions/workflows/ci.yml"><img src="https://github.com/Yivas/auto-mode-gate/actions/workflows/ci.yml/badge.svg" alt="CI status"></a>
+  <a href="https://www.npmjs.com/package/auto-mode-gate"><img src="https://img.shields.io/npm/v/auto-mode-gate?label=npm" alt="npm version"></a>
+  <a href="https://github.com/Yivas/auto-mode-gate/blob/main/LICENSE"><img src="https://img.shields.io/github/license/Yivas/auto-mode-gate" alt="MIT license"></a>
+</p>
+
+<p align="center">
+  <a href="https://yivas.github.io/auto-mode-gate/">Documentation</a> ·
+  <a href="#install-from-npm">Install</a> ·
+  <a href="https://github.com/Yivas/auto-mode-gate/releases/latest">Releases</a> ·
+  <a href="https://github.com/Yivas/auto-mode-gate/blob/main/CONTRIBUTING.md">Contributing</a>
+</p>
+
+Auto Mode Gate reviews Bash tool calls before they execute. It resolves deterministic policy first,
+then sends only eligible unresolved cases to the selected Pi judge. Deterministic denials always
+win, and missing or invalid evidence fails closed.
+
+## Highlights
+
+- Apply deterministic policy before any model-assisted permission decision.
+- Allow only narrow read-only commands with an exact trusted executable path; unknown or missing
+  evidence fails closed.
+- Keep OpenCode and Pi policy under separate host-owned global and project paths, with safe migration
+  from the shared 0.2.0 files.
+- Persist Pi Auto, judge model, thinking, and shortcuts without changing the primary conversation
+  model.
+- Record optional sanitized decision metadata without commands, arguments, prompts, secrets,
+  session IDs, or telemetry.
 
 ## Status
 
 The core, OpenCode plugin, Pi extension, file-based configuration, sanitized JSONL logs, and
-installation flows are implemented and tested. Version 0.3.0 separates policy by host and migrates
-valid shared configuration without overwriting or deleting it. The unreleased Pi controls persist
-preferences in the Pi configuration root and restore them for new sessions. Version 0.3.0 is
-published on [npm](https://www.npmjs.com/package/auto-mode-gate) and
-[GitHub](https://github.com/Yivas/auto-mode-gate/releases/tag/v0.3.0). Read the
-[public documentation](https://yivas.github.io/auto-mode-gate/) for the guided installation and
-configuration reference. It supports only the validated baselines:
+installation flows are implemented and tested. Version 0.4.1 refreshes package presentation and
+metadata without changing the runtime behavior introduced in 0.4.0. That runtime persists Pi judge
+preferences in the Pi configuration root and restores them for new sessions while preserving
+project restrictions. Version 0.3.0 introduced host-owned policy paths and safe migration; version
+0.1.0 remains the available deterministic-only line. Version 0.4.1 is published on
+[npm](https://www.npmjs.com/package/auto-mode-gate) and
+[GitHub](https://github.com/Yivas/auto-mode-gate/releases/tag/v0.4.1). Read the
+[public documentation](https://yivas.github.io/auto-mode-gate/) for guided installation,
+configuration, migration, and Pi controls. It supports only the validated baselines:
 
 - OpenCode 1.18.18;
-- Pi 0.84.1 for the published deterministic adapter;
-- Pi 0.84.2 for the researched and isolated judge transport;
+- Pi 0.84.2 for the persistent controls and isolated judge transport;
 - Node 24.9.0 for the test suite.
 
 ## Decision flow
@@ -60,7 +92,7 @@ The recommended setup is to declare the package in the `plugin` array of your pr
 ```json
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugin": ["auto-mode-gate@0.3.0"]
+  "plugin": ["auto-mode-gate@0.4.1"]
 }
 ```
 
@@ -70,7 +102,7 @@ OpenCode resolves configured npm plugins when it starts.
 Alternatively, install it for the current project:
 
 ```text
-opencode plugin auto-mode-gate@0.3.0
+opencode plugin auto-mode-gate@0.4.1
 ```
 
 Add `--global` to install it for every project.
@@ -86,7 +118,7 @@ opencode debug config
 Install globally:
 
 ```text
-pi install npm:auto-mode-gate@0.3.0
+pi install npm:auto-mode-gate@0.4.1
 ```
 
 Add `-l` for a project-local installation. Verify the package entry:
@@ -169,13 +201,14 @@ if ($scope -eq "project") {
 }
 ```
 
-Pi 0.84.1 does not list auto-discovered extension files in `pi list`; that command lists installed
-packages from settings.
+The isolated source-loader check used Pi 0.84.1. That version does not list auto-discovered
+extension files in `pi list`; the command lists installed packages from settings. Version 0.4.1
+requires Pi 0.84.2 for persistent judge controls, as first documented for 0.4.0.
 
 ## Configure
 
-Version `0.3.0` keeps policy under the host that loads it. Auto Mode Gate reads configuration when
-an adapter starts; restart or reload that host after a change.
+Version `0.3.0` and later keep policy under the host that loads it. Auto Mode Gate reads
+configuration when an adapter starts; restart or reload that host after a change.
 
 | Scope | OpenCode | Pi |
 |-|-|-|
@@ -253,7 +286,7 @@ Modes behave as follows:
 
 `shadow` is an observation mode, not a security control.
 
-### Pi judge preferences in current source
+### Pi judge preferences
 
 Pi stores user choices in `$PI_CODING_AGENT_DIR/auto-mode-gate-preferences.json` or
 `~/.pi/agent/auto-mode-gate-preferences.json`. This file does not authorize the judge and has no
@@ -301,8 +334,8 @@ blocks with `AMG_DENY_INTERNAL_ERROR`. Logging is disabled when `logPath` is abs
 ## Operation
 
 OpenCode and Pi activate independently through their package entries or source loader files.
-Removing one installation leaves the other host unchanged. In current source, `/amg-judge` opens
-the Pi control menu in TUI mode. Direct commands remain available:
+Removing one installation leaves the other host unchanged. Introduced in 0.4.0 and unchanged in
+0.4.1, `/amg-judge` opens the Pi control menu in TUI mode. Direct commands remain available:
 
 ```text
 /amg-judge status
@@ -321,7 +354,8 @@ judge command or model transport and blocks eligible cases as unavailable.
 
 Both hosts enforce only calls to their built-in `bash` tool. Other tools remain under native host
 permissions. A child process must load its own adapter. See
-[`docs/compatibility.md`](docs/compatibility.md) for parity and coverage limits.
+[compatibility reference](https://github.com/Yivas/auto-mode-gate/blob/main/docs/compatibility.md)
+for parity and coverage limits.
 
 ## Remove
 
@@ -358,21 +392,25 @@ conformance tests with:
 npm test
 ```
 
-The strict TypeScript check requires external compiler and Node type-definition paths; the exact
-versions, flags, and command used for the validated baseline are recorded in the private project
-evidence. No broader Node or host compatibility is claimed.
+The strict TypeScript baseline uses TypeScript 5.9.3 and `@types/node` 22.19.19 with `strict`,
+`noEmit`, `allowImportingTsExtensions`, and NodeNext module and resolution settings across `src/*.ts`
+and `tests/*.test.ts`. That tooling remains external to the package. No broader Node or host
+compatibility is claimed.
 
 `npm pack --dry-run` previews package contents without creating a tarball. Release artifacts must be
 built from the tagged release commit and inspected before publication.
 
 ## License
 
-Auto Mode Gate is distributed under the [MIT License](LICENSE).
+Auto Mode Gate is distributed under the
+[MIT License](https://github.com/Yivas/auto-mode-gate/blob/main/LICENSE).
 
 ## Participation
 
-Auto Mode Gate is maintained under MIT. Read the [contribution policy](CONTRIBUTING.md) and
-[Code of Conduct](CODE_OF_CONDUCT.md) before participating. Report reproducible bugs through
+Auto Mode Gate is maintained under MIT. Read the
+[contribution policy](https://github.com/Yivas/auto-mode-gate/blob/main/CONTRIBUTING.md) and
+[Code of Conduct](https://github.com/Yivas/auto-mode-gate/blob/main/CODE_OF_CONDUCT.md) before
+participating. Report reproducible bugs through
 [GitHub Issues](https://github.com/Yivas/auto-mode-gate/issues). Report vulnerabilities through
 [GitHub private vulnerability reporting](https://github.com/Yivas/auto-mode-gate/security/advisories/new).
 Pull requests are not currently accepted.

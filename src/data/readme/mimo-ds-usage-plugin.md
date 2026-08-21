@@ -44,7 +44,7 @@ npm install -g mimo-ds-usage-plugin-mimocode
 ## 功能
 
 - **MiMo Token Plan 用量** — 显示本月和总套餐的进度条、已用/总量
-- **DeepSeek 余额** — 显示总额、赠金、充值金额
+- **DeepSeek 余额** — 显示总额、赠金、充值金额，并标注当前价格时段（峰时"梁文峰价"/谷时"梁文谷价"）
 - 自动刷新（每 60 秒）
 - 根据当前使用的 provider 自动显示对应面板
 - 无套餐时显示"当前未订阅套餐"

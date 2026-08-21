@@ -2,7 +2,7 @@
 
 [![release](https://img.shields.io/github/v/release/hueyexe/opencode-auto-permissions.svg)](https://github.com/hueyexe/opencode-auto-permissions/releases)
 [![npm](https://img.shields.io/npm/v/opencode-auto-permissions.svg)](https://www.npmjs.com/package/opencode-auto-permissions)
-[![tests](https://img.shields.io/badge/tests-88%20passing-brightgreen.svg)](./test)
+[![tests](https://img.shields.io/badge/tests-91%20passing-brightgreen.svg)](./test)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-blue.svg)](./tsconfig.json)
 [![OpenCode](https://img.shields.io/badge/OpenCode-stable%20%2B%20V2-blue.svg)](./docs/COMPATIBILITY_SPIKE.md)
 [![license](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
@@ -24,7 +24,7 @@ That is the complete plugin installation. You do not need to clone this reposito
 OpenCode downloads the package, detects its separate server and TUI targets, and adds `opencode-auto-permissions` to:
 
 - `~/.config/opencode/opencode.json` for the server integration.
-- `~/.config/opencode/tui.json` for the V2 TUI integration.
+- `~/.config/opencode/cli.json` for the V2 TUI integration.
 
 Quit and restart OpenCode after installation because configuration is loaded at startup. Auto Permissions automatically uses the model and variant selected by the session that requested the action. It also detects whether the server or TUI integration owns permission review, so only one reviewer handles each request.
 
@@ -68,10 +68,10 @@ Restart OpenCode after updating. If you use an advanced options tuple, confirm t
 
 ## Uninstall
 
-The current OpenCode CLI does not provide a plugin removal subcommand. Remove the `opencode-auto-permissions` string or tuple from the `plugin` arrays in both files, then restart OpenCode:
+Remove `opencode-auto-permissions` with `opencode2 plugin remove opencode-auto-permissions`, or remove its entry from the plugin arrays in both files, then restart OpenCode:
 
 - `~/.config/opencode/opencode.json`
-- `~/.config/opencode/tui.json`
+- `~/.config/opencode/cli.json`
 
 Remove only this package's entries; leave other plugins and configuration unchanged.
 
@@ -128,7 +128,7 @@ The plugin tuple accepts these options:
 | --- | --- | --- |
 | `model` | Requesting session model | Optional dedicated reviewer model in `provider/model` form. |
 | `variant` | Selected model's default | Optional reviewer-only model variant. Use `"low"` when supported for faster decisions. |
-| `sessionApprovals` | `true` | Allow guarded, pattern-specific approvals for the current OpenCode session. Set `false` for one-time approvals only. |
+| `sessionApprovals` | `true` | Reuse guarded, pattern-specific approvals immediately for the current session. Set `false` for one-time approvals only. |
 | `timeoutMs` | `30000` | Review timeout from 100 to 30,000 milliseconds. The default accommodates a cold reviewer startup. |
 | `userMessageCount` | `8` | Recent user messages included in review context, from 1 to 20. |
 | `shadow` | `false` | Evaluate and record decisions without replying to permission requests. |
@@ -146,13 +146,15 @@ No configuration tuple is required. To override the automatic session-model sele
 ]
 ```
 
-Keep the entries in `~/.config/opencode/opencode.json` and `~/.config/opencode/tui.json` synchronized. A fast, reliable model that follows JSON instructions works best; deep reasoning adds unnecessary latency for permission review. Restart OpenCode after changing either file.
+Keep the entries in `~/.config/opencode/opencode.json` and `~/.config/opencode/cli.json` synchronized. A fast, reliable model that follows JSON instructions works best; deep reasoning adds unnecessary latency for permission review. Restart OpenCode after changing either file.
 
 With `debug: true`, diagnostics are written to `$XDG_STATE_HOME/opencode/auto-permissions/decisions.jsonl` (normally `~/.local/state/opencode/auto-permissions/decisions.jsonl`). Records include action type, timing, verdict, reason, reply result, and failure category. Commands, paths, tool inputs, and conversation text are not logged.
 
 Access to this bounded diagnostics file is deterministically allowed by the plugin so troubleshooting cannot be blocked by speculative sensitivity concerns. This exception applies only to Auto Permissions' own `decisions.jsonl` path.
 
 Reviewer sessions are standalone rather than children of the active coding session. This keeps reviewer model and variant state isolated from the main agent and its displayed reasoning level.
+
+Concurrent identical requests share one model review. Once a narrow, non-sensitive session pattern is approved, later matching requests in the same root session are approved without another model call. Destructive operations, pushes, publishing, deployments, credential access, and broad wildcard patterns remain one-time decisions.
 
 The plugin does not force a universal reasoning level because variant names differ by provider. Omitting `variant` uses the selected model's variant. Avoid high or maximum reasoning for permission review unless your policy requires unusually complex analysis.
 
@@ -161,7 +163,7 @@ The plugin does not force a universal reasoning level because variant names diff
 The compatibility baseline was acceptance-tested in the real TUI with:
 
 - OpenCode stable `1.18.12`
-- OpenCode V2 `0.0.0-beta-202608040144`
+- OpenCode V2 `0.0.0-beta-202608110357`
 
 The runtime protocol is detected automatically; stable permission events are handled by the server adapter and V2 events by the TUI adapter. See the [compatibility notes](docs/COMPATIBILITY_SPIKE.md) for implementation evidence and known protocol differences.
 

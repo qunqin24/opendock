@@ -37,7 +37,8 @@ Add to `opencode.json`:
     [
       "opencode-session-correlation",
       {
-        "providers": ["example-gateway"]
+        "providers": ["example-gateway"],
+        "collapseToRootSession": true
       }
     ]
   ]
@@ -52,7 +53,8 @@ Using a local checkout instead of the npm package? Point at the directory instea
     [
       "/absolute/path/to/opencode-session-correlation",
       {
-        "providers": ["example-gateway"]
+        "providers": ["example-gateway"],
+        "collapseToRootSession": true
       }
     ]
   ]

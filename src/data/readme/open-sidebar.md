@@ -5,6 +5,12 @@ Sidebar customization plugin for OpenCode.
 
 <img src=".res/scr/1.png" width="300">
 
+## Install
+
+```powershell
+opencode plugin -g open-sidebar
+```
+
 ## Features
 
 ### Header buttons
@@ -40,12 +46,3 @@ Quickly run or reference project scripts. Left-click a script to run it, right-c
 Browse files right in the sidebar. Folders expand on left-click. Left-click a file, or right-click anything, to paste its quoted path into chat. Current directory tries to auto-set based on how the OpenCode session was started, but this can also be manually entered by clicking on the files header.
 
 Built in search leverages Everything by Void Tools to quickly search files/folders in your active OpenCode session directory.
-
-
-## Install
-
-```powershell
-opencode plugin -g open-sidebar
-```
-
-Restart OpenCode.

@@ -81,14 +81,14 @@ Or with options:
       "@christiangalsterer/opencode-requesty-plugin@1.0.0",
       {
         "refreshIntervalMs": 300000,
+        "warningThreshold": 0.6,
+        "errorThreshold": 0.85
         "sidebar": {
           "enabled": true,
           "maxModels": 5,
           "showTokens": true,
           "order": 50
-        },
-        "warningThreshold": 0.6,
-        "errorThreshold": 0.85
+        }
       }
     ]
   ]
@@ -225,6 +225,8 @@ Example for enabling key identification:
       "@christiangalsterer/opencode-requesty-plugin",
       {
         "refreshIntervalMs": 300000,
+        "warningThreshold": 0.7,
+        "errorThreshold": 0.9,
         "sidebar": {
           "enabled": true,
           "maxModels": 5,
@@ -232,8 +234,6 @@ Example for enabling key identification:
           "showKeyName": true,
           "order": 50
         },
-        "warningThreshold": 0.7,
-        "errorThreshold": 0.9,
         "prompt": {
           "enabled": true,
           "budgetIndicator": true,
@@ -276,8 +276,9 @@ All amounts are in USD and dates are evaluated in UTC.
 
 ```bash
 bun install
+bun run format:fix
 bun run typecheck
-bun test
+bun run test
 bun run build
 ```
 

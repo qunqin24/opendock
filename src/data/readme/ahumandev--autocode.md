@@ -2,11 +2,11 @@
 
 ![Autocode](docs/logo.webp)
 
-AutoCode is an OpenCode plugin that turns rough conceptual ideas into completed solutions by means of structured workflow phases and optional review gates.
+AutoCode is an OpenCode plugin that turns rough concepts into durable designs and completed solutions.
 
 Run jobs autonomously with **Auto mode**, or stay in control with **Assist mode**, where AutoCode does the safe hard work and separates dangerous operations into guided manual steps.
 
-No special UI required. AutoCode runs in OpenCode, keeps progress in version-controllable text files, and lets you track multiple jobs across their full lifecycle making it the ideal solution for remote development or server administration.
+No special UI required. AutoCode runs in OpenCode and keeps concepts and durable design workspaces in version-controllable text files, making it suited to remote development or server administration.
 
 ---
 
@@ -15,8 +15,8 @@ No special UI required. AutoCode runs in OpenCode, keeps progress in version-con
 ### Implementation Modes
 
 - 💡 **Advise mode** — *guidance*: agent researches topics, answers questions, and guides manual implementation.
-- 🧑‍💻 **Assist mode** — *interactive*: you make decisions, agent orchestration do the work, manage job lifecycle and suggest next steps.
-- 🤖 **Auto mode** — *autonomous*: agent oversee full lifecycle of structured jobs until completion.
+- 🧑‍💻 **Assist mode** — *interactive*: you make decisions while agent orchestration does the work and suggests next steps.
+- 🤖 **Auto mode** — *autonomous*: agent executes structured design work until completion.
 
 ### Workflow Optimizations
 
@@ -95,50 +95,35 @@ At startup, AutoCode detects OS. Agents use CMD on Windows and Bash on Linux. Wi
 | 🤖   | `auto`     | **Autonomously** solve problems.        |
 | 🧑‍💻   | `assist`   | Assist **interactively** with problems. |
 
-### Autonomous Job Workflow
+### Concept, Design, and Execution Workflow
 
 ```mermaid
 flowchart TD
-  Advise([💡 advise guidance]) --📐 design--> Drafts[.agents/jobs/drafts]
-  Concepts[ .agents/jobs/concepts] --📐 design--> Drafts
-  Drafts --🤖 auto --> Executing[.agents/jobs/executing]
-  Executing --> Review[.agents/jobs/review]
-  Review --> Shelved
-  Executing -.blocked.-> Facilitate[.agents/jobs/facilitate]
-  Facilitate -.unblocked.-> Executing
+  Concepts([.agents/concepts])
+  Concepts -- 📐 design --> Design[.agents/job/.../design.md]
+  
+  Design -- 💡 advise --> Advise([manual execution])
+  Design -- 🧑‍💻 assist --> Assist([interactive execution])
+  Design -- 🤖 auto --> Auto([autonomous execution])
+  
 ```
 
-1. 💡 Use `advise` to research possibilities, answer questions, or create concept md document in `.agents/jobs/concepts`.
-2. Run `/job-design` to investigate feasibility, design best approach and draft solution plan in `.agents/jobs/drafts/{job_name}/plan.md`.
-3. Revise draft `plan.md` before autonomous handover.
-4. Run `/job-execute` to execute `plan.md` fully autonomously.
-5. The job will move automatically to `.agents/jobs/executing` while busy, `.agents/jobs/facilitate` if blocked and then to `.agents/jobs/review` when done.
-6. When done, do manual testing, then:
-   - *Reject* job with `/job-shelve` to shelve (clean up files) job or
-   - *Accept* job with `/commit` to commit to git and shelve.
-
-### Assisted Workflow
-
-```mermaid
-flowchart TD
-  Advise([💡 advise guidance]) --📐 design--> Drafts[.agents/jobs/drafts]
-  Concepts[ .agents/jobs/concepts] --📐 design--> Drafts
-  Drafts --🧑‍💻 assist --> Facilitate[.agents/jobs/facilitate]
-  Facilitate -.completed.-> Shelved[.agents/jobs/shelved]
-```
-
-1. 💡 Use `advise` to research possibilities, answer questions, or create concept md document in `.agents/jobs/concepts`.
-2. Run `/job-design` to investigate feasibility, design best approach and draft solution plan in `.agents/jobs/drafts/{job_name}/plan.md`.
-3. Run `/job-facilitate` to execute `plan.md` semi-autonomously with assistant (you make decisions, assistant do work).
-4. When done, do manual testing, then:
-   - *Reject* job with `/job-shelve` to shelve (clean up files) job or
-   - *Accept* job with `/commit` to commit to git and shelve.
+1. Use `/job-concepts` to save an early idea under `.agents/concepts`, then run `/job-design` to investigate and select a solution.
+2. `autocode_design_write` saves the selected design at `.agents/jobs/YYYY-MM-DD_hh-mm-ss_{title}/design.md`; timestamp is UTC and workspace remains in place.
+3. `autocode_design_read` reads a design by `job_name` or current session title and selects newest matching timestamped workspace.
+4. Select `/job-execute` for `auto` execution or `/job-facilitate` for `assist` execution. `/job-facilitate` is an assist-mode selector, not a workspace state.
 
 ### Hybrid Workflow
 
-Combinations of Autonomous and Assisted Workflows are also possible as you can switch any time between `auto` and `assist` agents.
+Switch between `auto` and `assist` when work needs a different autonomy level; workspace path does not change.
 
-For example you may start in `assist` mode and then later when you get busy, switch to `auto` mode so that agent can continue with your plan without your presence or vice versa.
+### Session Design Fallback
+
+`autocode_session_create` uses explicit nonblank `prompt` input directly. With blank input, it derives a slug from current title, loads newest matching timestamped `design.md`, and uses that content as prompt. If no matching design exists, it returns a retriable error that asks for a nonblank `prompt`.
+
+### Root Session Heading
+
+Only `advise`, `assist`, and `auto` assistant turns can update root session title. First eligible text line must be `# {emoji} {title}`. Generated parenthesized title postfix is replaced; otherwise heading appends as postfix. Title-update failure is advisory and does not interrupt work.
 
 ## Reference
 
