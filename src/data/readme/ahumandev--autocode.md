@@ -4,7 +4,7 @@
 
 AutoCode is an OpenCode plugin that turns rough concepts into durable designs and completed solutions.
 
-Run jobs autonomously with **Auto mode**, or stay in control with **Assist mode**, where AutoCode does the safe hard work and separates dangerous operations into guided manual steps.
+Run jobs autonomously with **Auto mode**, or stay in control with **Assist mode**, or receive guided tutorials with **Advise mode**.
 
 No special UI required. AutoCode runs in OpenCode and keeps concepts and durable design workspaces in version-controllable text files, making it suited to remote development or server administration.
 
@@ -109,9 +109,7 @@ flowchart TD
 ```
 
 1. Use `/job-concepts` to save an early idea under `.agents/concepts`, then run `/job-design` to investigate and select a solution.
-2. `autocode_design_write` saves the selected design at `.agents/jobs/YYYY-MM-DD_hh-mm-ss_{title}/design.md`; timestamp is UTC and workspace remains in place.
-3. `autocode_design_read` reads a design by `job_name` or current session title and selects newest matching timestamped workspace.
-4. Select `/job-execute` for `auto` execution or `/job-facilitate` for `assist` execution. `/job-facilitate` is an assist-mode selector, not a workspace state.
+2. Select `/job-execute` for `auto` execution or `/job-facilitate` for `assist` execution. `/job-facilitate` is an assist-mode selector, not a workspace state.
 
 ### Hybrid Workflow
 

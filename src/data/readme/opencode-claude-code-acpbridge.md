@@ -135,7 +135,9 @@ Todas se resuelven primero desde `options` y luego desde la variable de entorno 
 
 ### `claudeCode` — control del ecosistema de Claude Code
 
-Por defecto el agente arranca aislado (sin tus skills/hooks/agents/MCP). Puedes ajustarlo:
+Por defecto el agente arranca con el "cerebro limpio" (sin tus skills/hooks/agents/MCP),
+pero **usando tu configuración de Claude Code** (`~/.claude`) para que las sesiones sean
+reanudables. Puedes ajustarlo:
 
 | Campo | Tipo | Por defecto | Descripción |
 |---|---|---|---|
@@ -149,13 +151,14 @@ Por defecto el agente arranca aislado (sin tus skills/hooks/agents/MCP). Puedes 
 | `mode` | `"default"\|"plan"\|"acceptEdits"\|"bypassPermissions"\|…` | — | **Modo de sesión ACP**, aplicado en caliente con `setSessionMode`. P. ej. `"plan"` (planifica) o `"bypassPermissions"` (deja que OpenCode sea la única autoridad de permisos). Configurable por agente vía `providerOptions.acp.mode`. |
 | `permissionMode` | `"default"\|"acceptEdits"\|…` | resuelto por el agente | (Heredado; el ACP lo ignora para el modo de sesión — usa `mode`.) |
 | `systemPromptMode` | `"preset"\|"append"\|"replace"` | **`"preset"`** | Cómo se traslada el system prompt de OpenCode (ver "System prompt y facturación"). **`preset` (default) = consume de tu suscripción; `append`/`replace` = extra usage.** |
-| `configDir` | `string \| "isolated" \| false` | `"isolated"` | `"isolated"`: dir limpio con tus credenciales enlazadas. Ruta: úsala como `CLAUDE_CONFIG_DIR`. `false`: hereda tu `~/.claude`. |
+| `configDir` | `string \| "isolated" \| false` | **`false`** | `false` (default): hereda tu `~/.claude`, así las sesiones iniciadas en OpenCode **se retoman con `claude --resume <id>`** (ver "Retomar la sesión en Claude Code"). No reintroduce tu ecosistema: eso lo siguen mandando `settingSources`/`tools`/`strictMcpConfig`. `"isolated"`: dir limpio con tus credenciales enlazadas (sesiones invisibles para `claude --resume`). Ruta: úsala tal cual como `CLAUDE_CONFIG_DIR`. |
+| `forwardEnvContext` | `boolean` | **`true`** | Reenvía la parte **factual** del system prompt de OpenCode (bloque `<env>`: directorio de trabajo, raíz del workspace, git, plataforma, fecha; y `<available_references>`) como contexto de usuario. Con `systemPromptMode: "preset"` el system nunca llega al agente, así que sin esto trabaja sin saber dónde está. Solo viajan bloques factuales — nunca las instrucciones de OpenCode — así que la sesión sigue en suscripción. Se manda completo una vez por sesión y luego solo el delta. |
 | `settingSources` | `("user"\|"project"\|"local")[]` | `[]` | Settings de Claude Code a cargar (hooks/agents). |
 | `tools` | `string[]` | `[]` | Herramientas **nativas** del agente a habilitar. `[]` = ninguna. |
 | `disallowedTools` | `string[]` | — | Herramientas nativas a prohibir. |
 | `strictMcpConfig` | `boolean` | **`true`** | Usa **solo** el host de tools de OpenCode e ignora todo lo demás: el `.claude.json` y los **connectors de tu cuenta claude.ai** (Gmail, Drive, Supabase, Notion…). `false` para dejar pasar esos connectors. |
 | `allowedTools` | `string[]` | — | Tools auto-aprobadas (sin `requestPermission`). Con el **puente de permisos** activo se usa `["mcp__opencode"]` para que las tools de OpenCode no pidan doble permiso (ver "Puente de permisos"). |
-| `nativeTools` | `string[]` | — | Tools **nativas** de Claude que OpenCode no cubre (p. ej. `["NotebookEdit"]`). Se añaden a `tools`. |
+| `nativeTools` | `string[]` | — | Tools **nativas** de Claude que OpenCode no cubre. Los agentes inyectados usan `["NotebookEdit", "Read", "ExitPlanMode", "WebSearch"]`: `ExitPlanMode` es lo que permite **salir** del modo plan, y `WebSearch` cubre que OpenCode no registre su `websearch` cuando `providerId` no es `"opencode"`. Se añaden a `tools`. |
 | `resourceSearch` | `boolean` | — | Habilita `ListMcpResources`/`ReadMcpResource` (búsqueda de recursos MCP, superior a OpenCode). |
 | `nativeSubagents` | `boolean \| Record` | — | Subagentes nativos (`Task`). `true` añade un subagente "general" que **delega la ejecución a OpenCode**; un `Record` define subagentes a medida. |
 | `nativeSkills` | `boolean \| string[]` | — | Skills de Claude Code. `string[]` precarga solo esos (`settings.skills`, menor riesgo billing); `true` carga `~/.claude/skills` (`settingSources:"user"`, mayor riesgo). Añade la tool `Skill`. |
@@ -271,6 +274,49 @@ Lo que el agente acepta en el prompt lo anuncia en `promptCapabilities` (míralo
 
 Las URLs remotas (sin datos embebidos) se omiten — el agente recibe solo adjuntos con bytes (base64).
 
+## Retomar la sesión en Claude Code
+
+Por defecto (`configDir: false`) el agente usa **tu** `~/.claude`, así que toda conversación
+iniciada desde OpenCode queda en `~/.claude/projects/<proyecto>/<id>.jsonl` y se puede
+continuar en la terminal:
+
+```bash
+# el provider imprime el id al crear cada sesión, sin necesidad de ACP_DEBUG:
+#   [acp] session 1c66e017-… — retomable con: claude --resume 1c66e017-…
+claude --resume 1c66e017-4536-4157-80aa-e451420520e0
+```
+
+Debe ejecutarse en el **mismo directorio de trabajo**: Claude Code indexa las sesiones por
+`cwd`. Si prefieres el aislamiento anterior (sesiones fuera de tu `~/.claude` y por tanto
+invisibles para `--resume`), pon `"configDir": "isolated"`.
+
+Que se herede el directorio de configuración **no** significa que el agente cargue tu
+ecosistema: eso lo siguen decidiendo `settingSources` (por defecto `[]`), `tools` y
+`strictMcpConfig`. `configDir` solo decide **dónde vive el estado**.
+
+---
+
+## Continuidad de sesión y coste de tokens
+
+El prompt cache de Claude vive y muere **con la sesión del agente**, así que el bridge está
+diseñado para recrearla lo menos posible:
+
+- **Cambiar de agente no rompe nada.** Puedes empezar en `claude-code-plan`, aprobar el plan
+  y seguir en build o en `claude-code` sobre la **misma** sesión ACP: el cambio de modo se
+  aplica en caliente con `setSessionMode`. Los dos agentes comparten el mismo perfil de tools
+  y permisos y difieren solo en el modo inicial.
+- **Cambiar el set de tools tampoco.** Se propaga en caliente a la sesión viva
+  (`notifications/tools/list_changed`).
+- **Solo se envía lo que el agente no ha visto.** Sus propias tool-calls y resultados no se
+  reenvían: ya los tiene. Los de un agente intercalado sí, resumidos.
+- **Revertir mensajes y compactar sí crean sesión nueva**, porque el agente no puede
+  "desrecordar" — pero se parte del historial ya truncado, no del original.
+
+Con `ACP_DEBUG=1` puedes comprobarlo: durante una conversación normal debes ver
+`reuse session <id>` en cada turno y un `cacheR` alto en `usage(turn)`.
+
+---
+
 ## Diagnóstico
 
 Activa logs con `ACP_DEBUG=1` (verás `[acp-orchestrator]` y `[acp-mcp-host]` en stderr; con `opencode run … --print-logs`).
@@ -283,6 +329,11 @@ Activa logs con `ACP_DEBUG=1` (verás `[acp-orchestrator]` y `[acp-mcp-host]` en
 | `Authentication required` | El `CLAUDE_CONFIG_DIR` aislado no tiene credenciales. El provider enlaza `~/.claude/.credentials.json` automáticamente; asegúrate de que `claude` esté autenticado. |
 | El agente dice que no tiene `read` / no usa las tools | El runtime del MCP server debe ejecutarse con `node` (en el `PATH`). El provider ya usa `node` por defecto; overridea con `ACP_RUNTIME_NODE` si hace falta. |
 | Cuelgues > 60 s al aprobar permisos | Sube `streamCloseTimeoutMs` (por defecto ya 600000). |
+| Gasto de tokens desbocado / `cacheR` a 0 | Con `ACP_DEBUG=1` busca líneas `dropping session … —` en cada turno: si aparecen, algo está invalidando la identidad de sesión (mira el motivo que indica). Ver [Continuidad de sesión](#continuidad-de-sesión-y-coste-de-tokens). |
+| El contexto crece sin que OpenCode compacte | Los modelos `[1m]` declaran 1M de ventana a propósito, y OpenCode no compacta hasta acercarse a ese umbral. Usa la variante normal si quieres compactación temprana. |
+| No se ve el bloque de razonamiento | Comprueba que `thinking` no esté en `display:"omitted"`/`disabled` y que no aparezca `aviso: no se pudo aplicar effort=…` en stderr. |
+| El agente no pregunta, asume | Debe usar `mcp__opencode__question`. Esa tool solo la registra OpenCode en TUI (`client: "cli"`) o con `enableQuestionTool`. |
+| El agente no busca en la web | OpenCode solo registra su `websearch` con `providerId: "opencode"` o con exa/parallel activos. El perfil por defecto ya incluye la `WebSearch` **nativa** para cubrirlo. |
 | Lento con muchas tools | Con cientos de tools el agente tarda ~1 min por paso. Reduce las tools expuestas con el `permission` del agente en tu `opencode.json`. |
 
 Comando de mantenimiento:

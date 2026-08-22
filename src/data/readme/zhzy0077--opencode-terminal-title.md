@@ -19,6 +19,7 @@ opencode plugin add file:///path/to/opencode-terminal-title
 - Updates terminal title with session status
 - Shows current working state with icons
 - Truncates long titles automatically
+- **Herdr support:** when `HERDR_ENV=1`, also renames the Herdr pane and publishes `pane.report-metadata` (`--title` / `--display-agent`) so the Herdr sidebar matches the outer terminal title
 
 ## States
 

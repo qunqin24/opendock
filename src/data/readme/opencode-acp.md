@@ -123,8 +123,8 @@ stateDiagram-v2
 - **T1** fires when raw context exceeds the configured limit. The model sees
   compressible ranges and writes a detailed summary preserving file paths,
   signatures, decisions, and rationale.
-- **T2** fires when T1 summary tokens reach `nudgeGrowthTokens` (default 5% of
-  context window). The model distills old T1 blocks — keeping decisions and
+- **T2** fires when T1 summary tokens reach `nudgeGrowthTokens` (fixed default
+  50000). The model distills old T1 blocks — keeping decisions and
   outcomes, dropping verbose process details.
 - **T3** fires when T2 summary tokens reach the same threshold. The model
   condenses to bare facts (shipped releases, key bugs, architecture decisions).
@@ -278,11 +278,15 @@ Each level overrides the previous, so project settings take priority over global
     "$schema": "https://raw.githubusercontent.com/ranxianglei/opencode-acp/master/dcp.schema.json",
     // Enable or disable the plugin
     "enabled": true,
-    // Automatically update npm-installed ACP when a newer npm latest is available.
+    // Automatically update npm-installed ACP when a newer version is available
+    // on the installed dist-tag/spec (@stable follows stable, @latest follows latest).
     // Version-locked plugin specs are not updated.
     "autoUpdate": true,
-    // Enable INFO/DEBUG logging + per-request snapshots to ~/.config/opencode/logs/acp/
-    // (WARN/ERROR are always logged to daily/<date>.log)
+    // File log verbosity: "debug" | "info" | "warn" | "error" | "silent".
+    // Default "info" writes decision-level events (nudges, transforms, updates)
+    // to ~/.config/opencode/logs/acp/daily/<date>.log
+    "logLevel": "info",
+    // Enable full DEBUG logging + per-request snapshots (overrides logLevel)
     "debug": false,
     // Notification display: "off", "minimal", or "detailed"
     "pruneNotification": "off",

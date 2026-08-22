@@ -7,7 +7,7 @@
 
 # 🚀 OmniRoute — The Free AI Gateway
 
-<img src="./docs/diagrams/readme-hero.svg" width="100%" alt="OmniRoute — Never stop coding. Every AI tool → 346 providers — 90+ free — through one endpoint. Claude Code, Codex, Cursor, Cline, Copilot & Antigravity into FREE Claude / GPT / Gemini with auto-fallback. RTK + Caveman stacked compression saves 15–95% tokens (~89% avg) — never hit limits. 346 AI providers · 90+ free tiers · ~1.51B free tokens/mo · 19 routing strategies · $0 to start."/>
+<img src="./docs/diagrams/readme-hero.svg" width="100%" alt="OmniRoute — Never stop coding. Every AI tool → 348 providers — 90+ free — through one endpoint. Claude Code, Codex, Cursor, Cline, Copilot & Antigravity into FREE Claude / GPT / Gemini with auto-fallback. RTK + Caveman stacked compression saves 15–95% tokens (~89% avg) — never hit limits. 348 AI providers · 90+ free tiers · ~1.51B free tokens/mo · 19 routing strategies · $0 to start."/>
 
 </div>
 
@@ -101,7 +101,7 @@
   <tr>
     <td align="right"><b>⚙️ Features</b></td>
     <td align="center"><a href="#-combos--the-flagship">🎯 Combos</a></td>
-    <td align="center"><a href="#-346-ai-providers--90-free">🌐 Providers</a></td>
+    <td align="center"><a href="#-348-ai-providers--90-free">🌐 Providers</a></td>
     <td align="center"><a href="#-full-cli--a2a--mcp">🔌 CLI &amp; MCP</a></td>
   </tr>
   <tr>
@@ -210,7 +210,7 @@ curl http://localhost:20128/v1/chat/completions \
 
 </div>
 
-<img src="./docs/diagrams/promise-pillars.svg" width="100%" alt="The Promise — One endpoint. 346 providers. Never stop building — OmniRoute picks the cheapest one that works. Six pillars: Never hit limits (auto-fallback across 346 providers in milliseconds, zero downtime) · Save up to 95% tokens (RTK + Caveman stacked compression cuts 15–95%, ~89% avg on tool-heavy sessions) · $0 to start (90+ free tiers, 57 free forever — no card needed) · Every tool works (33 coding agents through one config) · One endpoint (OpenAI ↔ Claude ↔ Gemini ↔ Responses API at /v1) · Production-grade (circuit breakers, TLS stealth, MCP 109 tools, A2A, memory, guardrails, evals — 25,000+ tests)."/>
+<img src="./docs/diagrams/promise-pillars.svg" width="100%" alt="The Promise — One endpoint. 348 providers. Never stop building — OmniRoute picks the cheapest one that works. Six pillars: Never hit limits (auto-fallback across 348 providers in milliseconds, zero downtime) · Save up to 95% tokens (RTK + Caveman stacked compression cuts 15–95%, ~89% avg on tool-heavy sessions) · $0 to start (90+ free tiers, 57 free forever — no card needed) · Every tool works (33 coding agents through one config) · One endpoint (OpenAI ↔ Claude ↔ Gemini ↔ Responses API at /v1) · Production-grade (circuit breakers, TLS stealth, MCP 110 tools, A2A, memory, guardrails, evals — 25,000+ tests)."/>
 
 <br/>
 <br/>
@@ -461,7 +461,7 @@ All **19** strategies — mix & match per combo step:
 
 </div>
 
-<img src="./docs/diagrams/comparison-table.svg" width="100%" alt="What sets OmniRoute apart — comparison table vs 9router, OpenRouter, CLIProxyAPI and LiteLLM across 13 capabilities. OmniRoute: 346 providers, 90+ free providers built-in, 19 routing strategies, 12-engine token compression, built-in MCP server with 109 tools, A2A agent protocol, persistent memory, guardrails, cloud agents, TLS fingerprint stealth, Desktop/Termux/PWA, 43 i18n UI locales, 100% MIT self-hosted. OmniRoute is the only one with the full set; competitors show a mix of checks, partials and crosses. Verified from each project&apos;s docs."/>
+<img src="./docs/diagrams/comparison-table.svg" width="100%" alt="What sets OmniRoute apart — comparison table vs 9router, OpenRouter, CLIProxyAPI and LiteLLM across 13 capabilities. OmniRoute: 348 providers, 90+ free providers built-in, 19 routing strategies, 12-engine token compression, built-in MCP server with 110 tools, A2A agent protocol, persistent memory, guardrails, cloud agents, TLS fingerprint stealth, Desktop/Termux/PWA, 43 i18n UI locales, 100% MIT self-hosted. OmniRoute is the only one with the full set; competitors show a mix of checks, partials and crosses. Verified from each project&apos;s docs."/>
 
 <sub>📊 Full methodology &amp; per-feature detail vs 9router, OpenRouter, CLIProxyAPI &amp; LiteLLM → [`docs/comparison/OMNIROUTE_VS_ALTERNATIVES.md`](docs/comparison/OMNIROUTE_VS_ALTERNATIVES.md)</sub>
 
@@ -559,7 +559,7 @@ the current catalog at **[radar.omniroute.online/planos](https://radar.omniroute
 - **🖼️ New endpoints** — `/v1/ocr` (Mistral OCR) and `/v1/audio/translations` (Whisper-style) round out the media surface. → [API Reference](docs/reference/API_REFERENCE.md)
 - **🎨 Image / video / audio generation** — one API for media: xAI Grok Imagine & Novita AI video, ComfyUI, Freepik, Adobe Firefly, Microsoft Designer, Segmind, EdgeTTS. → [API Reference](docs/reference/API_REFERENCE.md)
 - **🌍 Deployment & ops** — reverse-proxy `basePath`, browser-language auto-detect, per-key device tracking, root-less MITM trust, zh-TW localization. → [Environment](docs/reference/ENVIRONMENT.md)
-- **🤝 More providers & agents** — Cursor Cloud Agent, Grok Build (xAI) with browser + OAuth login, Ollama first-class card, Claude Opus 5 & Sonnet 5, Kimi official partnership (Code/Web/Moonshot), Zed, Requesty, SenseNova, Yuanbao, Agnes AI… and a refreshed **346-provider catalog**. → [Providers](docs/reference/PROVIDER_REFERENCE.md)
+- **🤝 More providers & agents** — Cursor Cloud Agent, Grok Build (xAI) with browser + OAuth login, Ollama first-class card, Claude Opus 5 & Sonnet 5, Kimi official partnership (Code/Web/Moonshot), Zed, Requesty, SenseNova, Yuanbao, Agnes AI… and a refreshed **348-provider catalog**. → [Providers](docs/reference/PROVIDER_REFERENCE.md)
 - **📡 Routing transparency** — every response carries an `X-OmniRoute-Decision` header naming the strategy/provider/latency that served it, a new `cache-optimized` combo strategy + Auto-Combo `cacheAffinity` factor route repeat requests back to the connection holding the cached prefix, and a read-only `/v1/auto-combo/{channel}/candidates` endpoint exposes an `auto/*` channel's live candidate pool. → [Auto-Combo](docs/routing/AUTO-COMBO.md)
 - **⚡ Local performance & infra** — one-click local Redis, Cloudflare Workers / Deno Deploy relay deployers, Bifrost & Mux as supervised embedded services. → [Embedded Services](docs/frameworks/EMBEDDED-SERVICES.md)
 
@@ -642,11 +642,11 @@ of your shell history. → [CLI Integrations](docs/guides/CLI-INTEGRATIONS.md)
 
 <div align="center">
 
-## 🌐 346 AI Providers — 90+ Free
+## 🌐 348 AI Providers — 90+ Free
 
 </div>
 
-> The most complete catalog of any open-source router: **346 providers**, **90+ with a free tier**, **57 free forever**.
+> The most complete catalog of any open-source router: **348 providers**, **90+ with a free tier**, **57 free forever**.
 
 <div align="center">
 
@@ -821,7 +821,7 @@ Expose OmniRoute over **MCP**, **A2A**, a **REST API**, **webhooks** or a **remo
 <table>
   <tr><th align="left">Interface</th><th align="left">Endpoint / command</th><th align="left">Use it for</th></tr>
   <tr><td align="left" nowrap>🧰 <b>MCP (stdio)</b></td><td align="left" nowrap><code>omniroute --mcp</code></td><td align="left">Plug into Claude Desktop, Cursor, any MCP client</td></tr>
-  <tr><td align="left" nowrap>🌊 <b>MCP (HTTP)</b></td><td align="left" nowrap><code>/api/mcp/stream</code></td><td align="left">Remote MCP — <b>109 tools</b>, 33 scopes, full audit trail</td></tr>
+  <tr><td align="left" nowrap>🌊 <b>MCP (HTTP)</b></td><td align="left" nowrap><code>/api/mcp/stream</code></td><td align="left">Remote MCP — <b>110 tools</b>, 33 scopes, full audit trail</td></tr>
   <tr><td align="left" nowrap>📡 <b>MCP (SSE)</b></td><td align="left" nowrap><code>/api/mcp/sse</code></td><td align="left">Streaming MCP transport</td></tr>
   <tr><td align="left" nowrap>🤝 <b>A2A</b></td><td align="left" nowrap><code>/.well-known/agent.json</code></td><td align="left">Agent-to-agent, <b>JSON-RPC 2.0</b> + SSE, 6 skills</td></tr>
   <tr><td align="left" nowrap>🌐 <b>REST API</b></td><td align="left" nowrap><code>/v1/*</code></td><td align="left">OpenAI-compatible — chat, embeddings, images, audio, OCR</td></tr>
@@ -988,13 +988,39 @@ docker run -d --name omniroute --restart unless-stopped --stop-timeout 40 \
   -p 127.0.0.1:20128:20128 -v omniroute-data:/app/data diegosouzapw/omniroute:latest
 ```
 
-`:latest` follows the highest **published** stable SemVer. It does not track git `main`. Pin `:X.Y.Z` for GitOps. See [Docker Release Channels](docs/guides/DOCKER_GUIDE.md#release-channels).
+`:latest` follows the highest **published** stable SemVer. It does not track git `main`. Pin `:X.Y.Z` for GitOps. See [Docker Release Channels](docs/guides/DOCKER_GUIDE.md#release-channels).The image pins **`OMNIROUTE_MEMORY_MB=1024`**. That is enough for the dashboard and a light chat. **Coding agents** (`POST /v1/responses` from Claude Code, Codex, Grok, …) need a much larger V8 heap or the process `FATAL ERROR`s at ~12 GiB under two overlapping long contexts. Size the container above the heap (native buffers sit outside V8):
 
+| Workload | Heap (`-e OMNIROUTE_MEMORY_MB`) | Container (`--memory`) |
+| --- | --- | --- |
+| Dashboard / light chat | `1024` (image default) | ≥2 g |
+| One coding agent | `8192` | ≥10 g |
+| Two concurrent long `/v1/responses` | `10240`–`12288` | ≥12–16 g |
+
+```bash
+docker run -d --name omniroute --restart unless-stopped --stop-timeout 40 \
+  -e OMNIROUTE_MEMORY_MB=8192 --memory=10g \
+  -p 127.0.0.1:20128:20128 -v omniroute-data:/app/data diegosouzapw/omniroute:latest
+```
+
+Full table: [Docker Guide — runtime RAM](docs/guides/DOCKER_GUIDE.md#runtime-ram-for-coding-agents).
 > **Pre-release Docker channel:** `diegosouzapw/omniroute:next` and
 > `diegosouzapw/omniroute:next-web` follow the current default `release/v*`
 > branch. These mutable tags are intended only for testing unreleased fixes and
 > are **not supported for production**. See
 > [Docker Release Channels](docs/guides/DOCKER_GUIDE.md#release-channels).
+
+**🥟 Bun**
+
+Standard `bun install` and global installation (`bun install -g omniroute`) are supported via Bun runtime detection:
+- **Built-in `bun:sqlite`**: OmniRoute uses Bun's built-in `bun:sqlite` driver when running under Bun, falling back to `better-sqlite3` on Node.js or `sql.js`.
+- **Automatic Webpack bundler selection**: Development (`bun run dev`) and production builds (`bun run build`) automatically detect Bun and disable Turbopack in favor of Webpack to prevent native V8 binding incompatibilities.
+- **Dedicated Bun Dockerfile**: Multi-stage `Dockerfile.bun` for native Bun production deployments (`docker build -f Dockerfile.bun -t omniroute:bun .`).
+
+```bash
+# Install and run with Bun
+bun install
+bun run dev
+```
 
 **🛠️ From source**
 
@@ -1497,7 +1523,7 @@ OmniRoute stands on the shoulders of giants. It started as a fork of **[9router]
 <table>
   <tr><th align="left">Project</th><th align="center">⭐</th><th align="left">How it inspired OmniRoute</th></tr>
   <tr><td nowrap><b><a href="https://github.com/toon-format/toon">TOON</a></b></td><td align="center">24.9k</td><td>Token-Oriented Object Notation — its columnar, header-plus-rows model shaped our tabular compaction stage.</td></tr>
-  <tr><td nowrap><b><a href="https://github.com/blackwell-systems/gcf">GCF – Graph Compact Format</a></b></td><td align="center">22</td><td>First inspired our tabular compaction stage; now its zero-dependency, lossless generic-profile encoder is <b>vendored directly</b> as the Headroom codec (MIT, SPDX-marked), current with GCF spec v3.2.</td></tr>
+  <tr><td nowrap><b><a href="https://github.com/blackwell-systems/gcf">GCF – Graph Compact Format</a></b></td><td align="center">22</td><td>First inspired our tabular compaction stage; now its zero-dependency, lossless generic-profile encoder is <b>vendored directly</b> as the Headroom codec (MIT, SPDX-marked), with later numeric-domain and count-mismatch correctness fixes.</td></tr>
   <tr><td nowrap><b><a href="https://github.com/ooples/token-optimizer-mcp">token-optimizer-mcp</a></b></td><td align="center">444</td><td>Brotli/SQLite cache + per-session context-delta — inspired our <code>session-dedup</code> engine.</td></tr>
   <tr><td nowrap><b><a href="https://github.com/Mibayy/token-savior">token-savior</a></b></td><td align="center">1.1k</td><td>Bash-output compaction + MCP profiles — inspired our compression bail-out discipline and MCP tool-manifest reduction.</td></tr>
   <tr><td nowrap><b><a href="https://github.com/ppgranger/token-saver">token-saver</a></b></td><td align="center">117</td><td>Content-aware, per-file-type output compression with failure-aware bail-out — validated our per-type dispatch and minimum-gain skip.</td></tr>

@@ -10,6 +10,8 @@
 [![node](https://img.shields.io/badge/node-%E2%89%A522-70b6fd)](package.json)
 [![MCP](https://img.shields.io/badge/protocol-MCP-cab049)](https://modelcontextprotocol.io)
 
+<a href="https://www.producthunt.com/products/knowl?embed=true&amp;utm_source=badge-featured&amp;utm_medium=badge&amp;utm_campaign=badge-knowl" target="_blank" rel="noopener noreferrer"><img alt="Knowl - Agent memory that knows when to forget | Product Hunt" width="250" height="54" src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1228671&amp;theme=light&amp;t=1787366617137"></a>
+
 <p align="center">
   <a href="#the-idea-memory-that-retires-itself"><picture><source media="(prefers-color-scheme: light)" srcset="docs/assets/chips/light/stat-supersession.svg"><img src="docs/assets/chips/stat-supersession.svg" alt="Scores 90 on MemoryAgentBench FactConsolidation single-hop at 262K" height="38" /></picture></a>
   <a href="#quick-start"><picture><source media="(prefers-color-scheme: light)" srcset="docs/assets/chips/light/stat-nokeys.svg"><img src="docs/assets/chips/stat-nokeys.svg" alt="0 API keys needed" height="38" /></picture></a>
@@ -40,6 +42,12 @@ replaces the old, it leaves both active and hands you the `knowl supersede` comm
 
 Turn that off and retrieval drops from 98% to 47%. End to end, 90 to 73.
 [How it was measured ↓](#the-idea-memory-that-retires-itself)
+
+Forty seconds, one decision, three agents:
+
+<div align="center">
+<img src="docs/assets/knowl-showcase.webp" alt="Claude Code answers which database the project uses from memory, records the move to Postgres and retires the MySQL decision; Codex answers the same question from that memory in a second terminal; the Claude app answers from the same store over the hosted connector" width="88%" />
+</div>
 
 ## Quick start
 

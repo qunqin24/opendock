@@ -18,13 +18,13 @@ The npm `latest` release is the supported version.
 For local development, build and add a shim:
 
 ```js
-export { default, ContextGoblin } from "file:///absolute/path/to/context-goblin/dist/src/index.js"
+export { default } from "file:///absolute/path/to/context-goblin/dist/src/index.js"
 ```
 
 Optional local TUI experiment shim:
 
 ```js
-export { tui } from "file:///absolute/path/to/context-goblin/dist/src/tui.js"
+export { default } from "file:///absolute/path/to/context-goblin/dist/src/tui.js"
 ```
 
 Shim locations:
