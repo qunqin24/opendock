@@ -36,19 +36,9 @@ The sidebar gives a quick, at-a-glance view of your current month's Requesty usa
 
 You can disable the sidebar entirely with `"sidebar": { "enabled": false }`.
 
-### Detail dialog
-
-![Detail dialog](docs/images/detail-dialog.png)
-
-Open the dialog with `/requesty` or by picking *Requesty: show usage* from the command palette for the full breakdown:
-
-- KPI row: spent, limit, remaining, End of Month projection with a colored pace arrow, and last month's spend with a colored trend chevron
-- *Budget Overview* card: wide progress bar, budget-health badge, days-to-exhaustion estimate based on your 7-day average, and today/daily avg/7d/30d averages
-- *Model Breakdown (Current Month)* card: per-model table with spend, share of total spend, tokens, request count, and output/input ratio
-
 ### Prompt indicator
 
-![Prompt indicator](docs/images/prompt-indicator.png)
+![Prompt indicator](docs/images/session-prompt.png)
 
 A compact readout on the right side of the session prompt shows:
 
@@ -57,6 +47,17 @@ A compact readout on the right side of the session prompt shows:
 - Optional month-end projection (`~$X EOM ↑`) when `prompt.monthlyProjection` is enabled
 
 Disable the readout with `"prompt": { "budgetIndicator": false }`.
+
+
+### Detail dialog
+
+![Detail dialog](docs/images/dialog.png)
+
+Open the dialog with `/requesty` from the command palette for the full breakdown:
+
+- KPI row: spent, limit, remaining, End of Month projection with a colored pace arrow, and last month's spend with a colored trend chevron
+- *Budget Overview* card: wide progress bar, budget-health badge, days-to-exhaustion estimate based on your 7-day average, and today/daily avg/7d/30d averages
+- *Model Breakdown (Current Month)* card: per-model table with spend, share of total spend, tokens, request count, and output/input ratio
 
 Data comes from the [Requesty Management API](https://docs.requesty.ai/api-reference/management-apis) (`apikey/self` + `apikey/self/usage` grouped by `model_used`, current calendar month).
 

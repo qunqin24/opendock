@@ -18,10 +18,11 @@ Linux, macOS, and Windows. Use **0.1.1 or later** — 0.1.0 does not load.
 | Session error | `opencode error` |
 | Agent finished (`session.status` idle) | `opencode idle` |
 | ESC / `MessageAbortedError` | none |
+| Subagent / child-session events | none unless `notifySubagents` |
 
 A request popup already on screen is retracted when `permission.replied` arrives (Linux and Windows). macOS Notification Center cannot dismiss a posted banner from a script.
 
-Clicking a notification focuses the running Zed window (`zed://`). Zed has no URL to switch to an existing ACP thread — `zed://agent` would start a new one, so this plugin does not send it. Override with `clickCommand` if you need a different handler.
+Clicking a notification focuses running Zed (`zed://`), else a running OpenCode TUI. It does not start Zed and does not send `zed://agent`. Override with `clickCommand` if you need a different handler.
 
 The package ships TypeScript. OpenCode loads it with Bun; there is no `dist/` build.
 
@@ -33,7 +34,7 @@ Add the plugin to `~/.config/opencode/opencode.json` or `opencode.jsonc`:
 
 ```jsonc
 {
-  "plugin": ["opencode-smart-notify@0.2.0"]
+  "plugin": ["opencode-smart-notify@0.3.1"]
 }
 ```
 
@@ -43,7 +44,7 @@ With options:
 
 ```jsonc
 {
-  "plugin": [["opencode-smart-notify@0.2.0", { "notifyErrors": false }]]
+  "plugin": [["opencode-smart-notify@0.3.1", { "notifyErrors": false }]]
 }
 ```
 
@@ -55,7 +56,7 @@ Do not run this alongside `opencode-notify` or you will get duplicate popups.
 
 ```jsonc
 {
-  "plugin": ["github:gabparrot/opencode-smart-notify#v0.2.0"]
+  "plugin": ["github:gabparrot/opencode-smart-notify#v0.3.1"]
 }
 ```
 
@@ -76,7 +77,8 @@ Do not copy only `src/index.ts` into `~/.config/opencode/plugins/` — the plugi
 3. If the timer fires, the request is still waiting on you, so a notification is sent.
 4. `MessageAbortedError` is ignored. It is not an `opencode error` popup.
 5. After a user message or `session.status` busy, `session.status` idle / `session.idle` sends `opencode idle`. ESC, a real error, or an idle with no prior turn stays silent. Title or background work does not retract that popup or send a second one. A new user message starts the next turn.
-6. Clicking a popup focuses Zed (`zed://`), using the GNOME/Wayland activation token when the compositor sends one. It does not open `zed://agent`, which would start a new thread.
+6. Child sessions (`Session.parentID` set, Task metadata, or a `(@… subagent)` title) are skipped by default. Existing children are hydrated from the session list on start. Parent idle still notifies when the parent finishes.
+7. Clicking a popup focuses running Zed (`zed://`), else a running OpenCode TUI. The GNOME/Wayland activation token is used when the compositor sends one; TUI raise is compositor best-effort (hyprctl / sway / niri / DBusActivatable terminal / wmctrl). It does not start Zed and does not open `zed://agent`.
 
 That covers `opencode --auto`, the TUI auto-approve toggle, and any other path that replies before you need to look.
 
@@ -91,12 +93,13 @@ Optional `~/.config/opencode/opencode-smart-notify.json`. Plugin tuple options i
 | `notifyQuestions` | `true` | `askuserquestion` |
 | `notifyErrors` | `true` | Session errors (not cancel) |
 | `notifyIdle` | `true` | Agent finished (`session.status` idle) |
+| `notifySubagents` | `false` | Task / child-session events |
 | `urgency` | `"critical"` | `low`, `normal`, or `critical` |
-| `clickCommand` | *(auto)* | Argv run on click. `{sessionId}` is substituted. Default: focus Zed (`zed://`) |
+| `clickCommand` | *(auto)* | Argv run on click. `{sessionId}` is substituted. Default: focus Zed if running, else focus OpenCode TUI |
 
 ```jsonc
 {
-  "plugin": [["opencode-smart-notify@0.2.0", { "notifyErrors": false }]]
+  "plugin": [["opencode-smart-notify@0.3.1", { "notifyErrors": false }]]
 }
 ```
 

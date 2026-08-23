@@ -1,6 +1,6 @@
 # oc-usage-limits-plugin
 
-OpenCode TUI plugin that shows Codex, ZAI, Synthetic, MiniMax Token Plan, and Qwen usage limits in the sidebar and prompt footer.
+OpenCode TUI plugin that shows Codex, OpenCode GO, ZAI, Synthetic, MiniMax Token Plan, and Qwen usage limits in the sidebar and prompt footer.
 
 ## Features
 
@@ -10,22 +10,14 @@ OpenCode TUI plugin that shows Codex, ZAI, Synthetic, MiniMax Token Plan, and Qw
 - Shows current Synthetic rolling 5-hour and weekly windows.
 - Shows current MiniMax Token Plan rolling 5-hour and weekly windows.
 - Shows current Qwen Token Plan windows from the local `qwencloud` CLI.
-- Adds compact prompt-footer usage when the current session uses an OpenAI, ZAI Coding Plan, Synthetic, or MiniMax Token Plan model.
+- Shows current OpenCode GO rolling, weekly, and monthly windows.
+- Adds compact prompt-footer usage when the current session uses an OpenAI, OpenCode GO, ZAI Coding Plan, Synthetic, or MiniMax Token Plan model.
 - Providers are toggled from `~/.config/opencode/usage-limits.jsonc`.
 - Reads OpenCode-connected credentials first, then falls back to explicit config/env credentials.
 
 ## Install
 
-Add the TUI plugin to `~/.config/opencode/tui.json`:
-
-```jsonc
-{
-  "$schema": "https://opencode.ai/tui.json",
-  "plugin": ["oc-usage-limits-plugin"],
-}
-```
-
-Or install via the CLI, which writes the config for you:
+Standard OpenCode uses the stable package from npm's `latest` dist-tag. Install it globally with:
 
 ```bash
 opencode plugin oc-usage-limits-plugin -g
@@ -35,14 +27,79 @@ opencode plugin oc-usage-limits-plugin -g
 - Without `-g`, installs locally to `<project>/.opencode/tui.json` (requires a git worktree).
 - `--force` replaces an existing pinned version.
 
+The CLI installs the `latest` package and updates the TUI plugin config for you. The package entrypoint is `oc-usage-limits-plugin/tui`.
+
+OpenCode v2 uses the preview package from npm's `next` dist-tag. Install it globally with OpenCode v2 only:
+
+```bash
+opencode plugin oc-usage-limits-plugin@next -g
+```
+
+The v2 package is built and released from the `opencode-v2` branch. It is preview/beta software until validation against the v2 host is complete. Do not use `@next` with standard OpenCode, and do not use the stable package with OpenCode v2.
+
+To configure it manually instead, add the plugin to `~/.config/opencode/tui.json`:
+
+```jsonc
+{
+  "$schema": "https://opencode.ai/tui.json",
+  "plugin": ["oc-usage-limits-plugin"],
+}
+```
+
 OpenCode TUI plugins are configured in `tui.json`, not `opencode.jsonc`.
 
 Restart OpenCode after changing TUI plugin config.
 
 ### Troubleshooting
 
-- **Dependency conflicts involving `@opencode-ai/plugin`** usually mean OpenCode's package cache contains an older plugin API package. Update OpenCode, then retry the install. This package does not publish OpenCode runtime packages as peer dependencies.
+#### Reinstall or refresh the cached plugin
+
+If the plugin is stale, broken, or needs a clean reinstall, quit OpenCode and remove the cache for the lane you installed. OpenCode caches immutable package versions, so clearing the cache is required when a `tui.json` entry still resolves to an older version.
+
+For standard OpenCode (`@latest`):
+
+PowerShell:
+
+```powershell
+Remove-Item -LiteralPath "$HOME\.cache\opencode\packages\oc-usage-limits-plugin@latest" -Recurse -Force
+```
+
+macOS/Linux:
+
+```bash
+rm -rf ~/.cache/opencode/packages/oc-usage-limits-plugin@latest
+```
+
+For OpenCode v2 (`@next`):
+
+PowerShell:
+
+```powershell
+Remove-Item -LiteralPath "$HOME\.cache\opencode\packages\oc-usage-limits-plugin@next" -Recurse -Force
+```
+
+macOS/Linux:
+
+```bash
+rm -rf ~/.cache/opencode/packages/oc-usage-limits-plugin@next
+```
+
+Start OpenCode again and it will reinstall the plugin from the existing `tui.json` entry. If the plugin is no longer configured, run the install command again:
+
+```bash
+opencode plugin oc-usage-limits-plugin -g
+```
+
+- **Dependency conflicts involving `@opencode-ai/plugin`** usually mean OpenCode's package cache contains an older plugin API package. Update OpenCode, clear the cached plugin as above, then retry the install. This package does not publish OpenCode runtime packages as peer dependencies.
 - **`No versions available`** right after a release means a supply-chain cooldown policy (e.g. `min-release-age`) is blocking the fresh version. Wait for the cooldown window to pass, or install a previously vetted version instead.
+
+## Release Lanes
+
+- Stable releases come from `main`, use the `latest` npm dist-tag, and are intended for standard OpenCode.
+- OpenCode v2 previews come from `opencode-v2`, use the `next` npm dist-tag, and are intended only for OpenCode v2.
+- Both lanes use the same package name and `oc-usage-limits-plugin/tui` entrypoint.
+- Releases are staged on npm for manual approval before publication. Stable releases create normal GitHub releases; v2 previews create GitHub prerelease tags/releases.
+- The v2 lane remains preview/beta until the package has been validated against the v2 host.
 
 ## Usage Config
 
@@ -112,6 +169,7 @@ Disabled providers are hidden:
 | `synthetic` | Synthetic quotas | `OC_SYNTHETIC_API_KEY` | Bearer | `https://api.synthetic.new` |
 | `minimax` | MiniMax Token Plan | `OC_MINIMAX_TOKEN_PLAN_KEY` | Bearer | `https://www.minimax.io` |
 | `qwen` | Qwen Token Plan | `qwencloud` CLI | CLI | — |
+| `opencode-go` | OpenCode GO usage | `OPENCODE_API_KEY` | Bearer | `https://opencode.ai/zen/go/v1` |
 
 Synthetic always uses `Bearer` auth and ignores `authorizationScheme`.
 
@@ -177,6 +235,7 @@ Provider mapping:
 - OpenCode provider `synthetic` -> Synthetic usage.
 - OpenCode provider `minimax-coding-plan` -> MiniMax Token Plan usage (prompt footer); `minimax` is also accepted as an alias.
 - OpenCode provider `qwen` -> Qwen Token Plan usage.
+- OpenCode provider `opencode-go` -> OpenCode GO usage.
 
 ## Development
 

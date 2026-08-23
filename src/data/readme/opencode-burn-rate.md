@@ -54,13 +54,17 @@ The elapsed window runs from session creation to the last time the total cost wa
 
 `(total USD cost) / active-elapsed * 3_600_000`
 
-The active-elapsed window is the union of every span where the assistant was generating a message or a tool call was in-flight (for the root session), plus the `[created, updated]` window for each subagent session. Idle gaps between activity bursts are excluded automatically.
+The active-elapsed window is the union of every assistant-message or tool-part activity span for the root session, plus the `[created, updated]` window for each subagent session. Idle gaps between activity bursts are excluded automatically.
+
+Time spent waiting on the user, including tool permission prompts and agent questions, is subtracted from that union when the wait belongs to the current session tree. These waits are tracked live from opencode's event stream while the plugin is open, and abandoned waits are closed during the periodic refresh when opencode no longer reports them as pending. The session avg is unaffected.
 
 ## Limits
 
 The subagent tree walk is capped at depth 5 and 100 total sessions. Deeper or wider trees are silently truncated. The plugin requires an opencode version whose server exposes `GET /session/:id/children` and `GET /session/:id/messages` (roughly >= 1.18).
 
 Subagent active time uses the session's `[created, updated]` window rather than detailed message activity. When opencode's experimental backgrounded-subagent feature detaches a subagent to keep running after the parent tool call returns, this coarse window may under- or over-count that subagent's active time.
+
+Waits that began before the plugin loaded are not excluded because pending requests do not include their start time. If two sessions work concurrently, a wait in one may slightly under-count the other's simultaneous work.
 
 ## Local development
 

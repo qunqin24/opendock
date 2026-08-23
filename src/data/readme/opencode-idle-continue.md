@@ -11,8 +11,8 @@ OpenCode plugin that automatically sends prompts to continue processing when idl
 - **Hot Reload**: Automatically reloads prompt files when modified without restarting the plugin
 - **File Change Monitoring**: Maintains a list of files to monitor for content/timestamp changes
 - **Wait State Management**: Enters wait state when sent prompts don't change monitored files, with interval backoff mechanism
-- **User Input Detection**: Detects user typing activity even if the input is later deleted without sending
-- **Page Scroll Detection**: Detects when users are scrolling through page content and pauses idle detection
+- **User Activity Suppression**: After user sends a message, idle detection is suppressed for configurable period (default 5 minutes)
+- **Initial Idle Delay**: Waits specified time (default 10 minutes) after plugin startup before first idle detection
 - **AI Stuck Detection & Recovery**: Monitors AI response activity and automatically recovers from stuck states
 - **Two Working Modes**:
   - **Traditional Mode**: Direct prompt delivery with file monitoring and interval backoff
@@ -84,12 +84,14 @@ If no prompt file is found, the behavior depends on `enable_default_prompt`:
 | `check_interval_minutes` | number | `30` | Check interval during wait state (minutes) |
 | `max_idle_cycles` | number | `5` | Max consecutive idle cycles before interval doubling |
 | `enabled` | boolean | `true` | Whether the plugin is enabled |
-| `log_enabled` | boolean | `false` | Whether to enable logging |
+| `log_level` | string | `"none"` | Log level: `"debug"` (detailed info), `"warn"` (warnings and errors), `"error"` (errors only), `"none"` (no logging) |
 | `enable_default_prompt` | boolean | `false` | Whether to use built-in default prompt when prompt file doesn't exist |
 | `subagent_enabled` | boolean | `false` | Whether to enable subagent mode |
 | `subagent_agent_type` | string | `"explore"` | Subagent type (only when subagent_enabled=true) |
 | `subagent_delay_ms` | number | `60_000` | Subagent trigger delay in milliseconds (only when subagent_enabled=true) |
-| `debounce_delay_ms` | number | `5000` | Idle debounce confirmation delay in milliseconds (default 5s) |
+| `debounce_delay_ms` | number | `60000` | Idle debounce confirmation delay in milliseconds (default 1 minute) |
+| `initial_idle_delay_minutes` | number | `10` | Initial idle delay before first idle detection (minutes, default 10) |
+| `user_activity_suppress_seconds` | number | `300` | User activity suppression period after user input (seconds, default 5 minutes) |
 | `stuck_threshold_minutes` | number | `20` | AI stuck detection threshold in minutes (default 20min) |
 | `ai_stuck_action` | string | `"ignore"` | AI stuck recovery action: `"ignore"`, `"abort"`, or `"abort_and_retry"` |
 | `ai_stuck_retry_prompt` | string | `"continue"` | Prompt text for retry when ai_stuck_action is `"abort_and_retry"` |
@@ -103,6 +105,9 @@ If no prompt file is found, the behavior depends on `enable_default_prompt`:
   "check_interval_minutes": 30,
   "max_idle_cycles": 5,
   "enabled": true,
+  "debounce_delay_ms": 60000,
+  "initial_idle_delay_minutes": 10,
+  "user_activity_suppress_seconds": 300,
   "stuck_threshold_minutes": 20,
   "ai_stuck_action": "abort_and_retry",
   "ai_stuck_retry_prompt": "continue"
@@ -115,24 +120,25 @@ If no prompt file is found, the behavior depends on `enable_default_prompt`:
 
 1. **Idle Detection**: Monitors system idle status. Triggers when OpenCode is idle.
 2. **User Activity Detection**: 
-   - **Input Detection**: Detects user typing activity in real-time, even if input is later deleted without sending
-   - **Scroll Detection**: Detects page scrolling and pauses idle detection while user is navigating content
-   - Idle detection is skipped when user is actively typing or scrolling
+    - **Message Detection**: Detects when user sends messages (via `chat.message` hook)
+    - **Activity Suppression**: After user activity, idle detection is suppressed for configurable period (default 5 minutes)
+    - **Initial Idle Delay**: Waits specified time (default 10 minutes) after plugin startup before first idle detection
+    - **Debounce Delay**: Confirms idle status with configurable debounce delay (default 1 minute)
 3. **Send Prompt**: Reads prompt content from specified markdown file and sends to OpenCode for continued processing. If prompt file doesn't exist:
-   - When `enable_default_prompt` is `false` (default), no message is sent
-   - When `enable_default_prompt` is `true`, sends built-in default prompt
+    - When `enable_default_prompt` is `false` (default), no message is sent
+    - When `enable_default_prompt` is `true`, sends built-in default prompt
 4. **AI Stuck Detection & Recovery**:
-   - Monitors AI response activity through heartbeat events (message updates, part updates, deltas)
-   - Detects stuck state when session is busy but no activity for configured threshold (default 20 minutes)
-   - Configurable recovery actions:
-     - `"ignore"` - Do nothing (default)
-     - `"abort"` - Abort the stuck session
-     - `"abort_and_retry"` - Abort session, wait 30 seconds, then send retry prompt
+    - Monitors AI response activity through heartbeat events (message updates, part updates, deltas)
+    - Detects stuck state when session is busy but no activity for configured threshold (default 20 minutes)
+    - Configurable recovery actions:
+      - `"ignore"` - Do nothing (default)
+      - `"abort"` - Abort the stuck session
+      - `"abort_and_retry"` - Abort session, wait 30 seconds, then send retry prompt
 5. **Prompt Hot Reload**: Checks if prompt file has been modified each time `prompt_file` is used. Uses cached content if unchanged, reloads and updates cache if modified, no need to restart plugin.
 6. **File Change Monitoring**: Maintains a list of files to monitor for content/timestamp changes.
 7. **Wait State**: If no changes in monitored files after sending prompt, enters wait state. Wait state requires:
-   - Continuous system idle
-   - No changes in monitored files
+    - Continuous system idle
+    - No changes in monitored files
 8. **Interval Backoff**: During wait state, sends prompt every interval (default 30 minutes). If 5 consecutive checks still idle (files unchanged), next wait interval doubles.
 
 ### Mode 2: Subagent Mode

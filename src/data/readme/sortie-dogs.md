@@ -20,7 +20,7 @@ Requirements: Node.js 22.6 or newer, npm, and OpenCode.
 
 Guides: [日本語](docs/guide-ja.md) · [简体中文](docs/guide-zh-CN.md) · [CLI testing](docs/cli-testing.md)
 
-Release: [v0.5.4](https://github.com/zufall-upon/Sortie-dogs/releases/tag/v0.5.4)
+Release: [v0.5.8](https://github.com/zufall-upon/Sortie-dogs/releases/tag/v0.5.8)
 
 ## Quick start
 
@@ -62,7 +62,7 @@ to the `plugin` array of the OpenCode configuration the agents run under —
 Restart OpenCode afterwards. A `plugin` entry must name the package, not a
 subpath: `sortie-dogs/plugin` is an import specifier, not a plugin specifier.
 
-`dog-coordinator` defaults to `openai/gpt-5.6-luna` with the `max` variant; `dog-scout` defaults to
+`dog-coordinator` defaults to `openai/gpt-5.6-terra` with the `high` variant; `dog-scout` defaults to
 `openai/gpt-5.6-luna`. To pin either role to another model, save this
 as `.opencode/sortie-dogs.json`:
 
@@ -290,13 +290,13 @@ untouched.
 ## Model routing
 
 Default routes split work by required capability and repeated-context cost.
-Sortie-dogs keeps retrieval and coordinator routing on Luna, and independent
+Sortie-dogs keeps retrieval on Luna, coordinator routing on Terra, and independent
 review on Sol unless the host declares another target.
 
-`dog-coordinator` defaults to `openai/gpt-5.6-luna` with the `max` variant. Coordinator work repeatedly
-processes the root context, so Luna Max keeps deliberation high without paying
-Terra rates for every cached turn. Project or global `modelRouting` can override
-this default. If the host proves Luna unavailable,
+`dog-coordinator` defaults to `openai/gpt-5.6-terra` with the `high` variant. Coordinator quality controls
+planning and forward progress, so Terra High is the default balance between capability and cost.
+Project or global `modelRouting` can override
+this default. If the host proves Terra unavailable,
 the existing availability policy uses a configured free-tier fallback when present
 and otherwise preserves the session model.
 

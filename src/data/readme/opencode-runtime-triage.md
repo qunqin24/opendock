@@ -2,7 +2,7 @@
 
 Runtime-only model rerouting for OpenCode agents. The plugin adds two TUI commands:
 
-- `/rt-model`: assign a predefined provider/model pair to one agent.
+- `/rt-model`: assign any available provider/model pair to one agent.
 - `/rt-provider`: replace a provider across agents using exact model-ID intersection.
 
 Overrides are held in a PID-owned temporary file, applied when the current OpenCode instance reloads, and removed when the TUI exits. Stale state is ignored when its owning process is no longer running.
@@ -26,7 +26,7 @@ This makes provider replacement safe when the target has a smaller or partially 
 
 ## Presets
 
-The package does not ship provider-specific presets. Configure the provider/model pairs available to `/rt-model` with a tuple entry in `tui.json`:
+`/rt-model` lists every model available in OpenCode, matching `/models`. Presets are optional and can customize a model's label and description or add a native `opencode/...` model that is not yet in the TUI provider state. Configure them with a tuple entry in `tui.json`:
 
 ```json
 {
