@@ -1,15 +1,3 @@
-***The workflow engine for traceable autonomous job execution***
-
-![Autocode](docs/logo.webp)
-
-AutoCode is an OpenCode plugin that turns rough concepts into durable designs and completed solutions.
-
-Run jobs autonomously with **Auto mode**, or stay in control with **Assist mode**, or receive guided tutorials with **Advise mode**.
-
-No special UI required. AutoCode runs in OpenCode and keeps concepts and durable design workspaces in version-controllable text files, making it suited to remote development or server administration.
-
----
-
 ## Features
 
 ### Implementation Modes
@@ -31,9 +19,10 @@ No special UI required. AutoCode runs in OpenCode and keeps concepts and durable
 
 - 🗄️ **Read-only database inspection** — discover configured database tables and read one table at a time without write access.
 - 🌐 **HTTP REST client** — simulate API calls for troubleshooting.
-- 🧪 **Sandbox isolation** — agents automatically manage and experiment in their own isolated sandboxes.
-- 🔐 **SSH tools** — run remote commands and manage files through environment-keyed tools.
 - 🔀 **Git tools** — inspect changes and commit updates to Git repositories.
+- 🔐 **SSH tools** — run remote commands and manage files through environment-keyed tools.
+- 🧪 **Sandbox isolation** — agents automatically manage and experiment in their own isolated sandboxes.
+- 🛠️ **Self-building tools** — agents create durable per-job Node `.mjs` tools, reconcile dependencies, run finite scripts, and manage long-running services.
 
 As well as [OpenCode bundled tools](https://opencode.ai/docs/tools/).
 
@@ -77,7 +66,7 @@ Use [human installation guide](docs/index.md#installation-for-humans).
 Windows route uses native CMD. Linux route uses Bash and includes optional Bubblewrap setup. Both install the public plugin with:
 
 ```text
-opencode plugin -g @ahumandev/autocode@latest
+opencode plugin @ahumandev/autocode@latest -g -f
 ```
 
 ## Usage
@@ -95,7 +84,17 @@ At startup, AutoCode detects OS. Agents use CMD on Windows and Bash on Linux. Wi
 | 🤖   | `auto`     | **Autonomously** solve problems.        |
 | 🧑‍💻   | `assist`   | Assist **interactively** with problems. |
 
-### Concept, Design, and Execution Workflow
+### Behavioural Differences
+
+| Agent         | Investigations | Next Action     | Apply Changes |
+| ------------- | -------------- | --------------- | ------------- |
+| 💡 advise     | Autonomous     | Interactive     | Human         |
+| 🧑‍💻 assist     | Autonomous     | Interactive     | AI*           |
+| 🤖 auto       | Autonomous     | Autonomous      | AI*           |
+
+*Except dangerous tasks.
+
+### Typical Workflow
 
 ```mermaid
 flowchart TD
@@ -108,20 +107,7 @@ flowchart TD
   
 ```
 
-1. Use `/job-concepts` to save an early idea under `.agents/concepts`, then run `/job-design` to investigate and select a solution.
-2. Select `/job-execute` for `auto` execution or `/job-facilitate` for `assist` execution. `/job-facilitate` is an assist-mode selector, not a workspace state.
-
-### Hybrid Workflow
-
-Switch between `auto` and `assist` when work needs a different autonomy level; workspace path does not change.
-
-### Session Design Fallback
-
-`autocode_session_create` uses explicit nonblank `prompt` input directly. With blank input, it derives a slug from current title, loads newest matching timestamped `design.md`, and uses that content as prompt. If no matching design exists, it returns a retriable error that asks for a nonblank `prompt`.
-
-### Root Session Heading
-
-Only `advise`, `assist`, and `auto` assistant turns can update root session title. First eligible text line must be `# {emoji} {title}`. Generated parenthesized title postfix is replaced; otherwise heading appends as postfix. Title-update failure is advisory and does not interrupt work.
+Switch any time between `💡 advise` and `🧑‍💻 assist` and `🤖 auto` when work needs a different autonomy level.
 
 ## Reference
 

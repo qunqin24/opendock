@@ -20,7 +20,7 @@ Requirements: Node.js 22.6 or newer, npm, and OpenCode.
 
 Guides: [日本語](docs/guide-ja.md) · [简体中文](docs/guide-zh-CN.md) · [CLI testing](docs/cli-testing.md)
 
-Release: [v0.5.8](https://github.com/zufall-upon/Sortie-dogs/releases/tag/v0.5.8)
+Release: [v0.5.11](https://github.com/zufall-upon/Sortie-dogs/releases/tag/v0.5.11)
 
 ## Quick start
 

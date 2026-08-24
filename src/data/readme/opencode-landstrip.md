@@ -6,7 +6,7 @@ Seatbelt on macOS, and AppContainer or restricted users on Windows.
 ## Install
 
 ```sh
-npm install --save-dev @landstrip/landstrip
+npm install --save-dev @landstrip/landstrip-api
 npx landstrip run -p policy.json -- cargo test
 ```
 
@@ -22,7 +22,7 @@ landstrip policy resolve -p policy.json
 landstrip doctor
 ```
 
-Run `landstrip --help` or see [landstrip(1)](man/man1/landstrip.1) for the full
+Run `landstrip --help` or see [landstrip(1)](packages/landstrip/man/man1/landstrip.1) for the full
 command reference.
 
 ## Agent extensions
@@ -60,7 +60,9 @@ make ci
 
 ## Licensing
 
-`landstrip` uses [LGPL-2.1+](LICENSE-LGPL-2.1).
-
-The JavaScript wrapper and agent extensions use
-[Apache 2.0](LICENSE-APACHE-2.0).
+| Package                    | License    |
+| -------------------------- | ---------- |
+| `landstrip`                | LGPL 2.1+  |
+| `@landstrip/landstrip-api` | Apache 2.0 |
+| `opencode-landstrip`       | Apache 2.0 |
+| `pi-landstrip`             | Apache 2.0 |

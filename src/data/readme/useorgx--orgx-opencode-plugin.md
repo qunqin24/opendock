@@ -34,6 +34,34 @@ Set `ORGX_BASE_URL` only when testing against a non-production OrgX API. Until
 the npm package is updated, use the direct peer command below from a checked-out
 copy of this repository.
 
+### Automatic run receipts
+
+When the OrgX Wizard capture hook is installed, the native plugin forwards an
+allowlisted lifecycle shape into the shared durable session-summary queue.
+`session.idle` becomes `RunEnd`, so one completed agent response can issue one
+run receipt without pretending the multi-turn OpenCode conversation ended.
+`session.deleted` remains the whole-session terminal boundary.
+
+The adapter observes session, user-message, permission, and tool lifecycle
+events. It never forwards message bodies, prompts, tool arguments or results,
+error text, transcripts, credentials, or model content. The Wizard owns queue
+durability, acknowledgement, retry, privacy normalization, and AWR delivery.
+If the Wizard hook is absent or incompatible, the plugin records that capture
+is unavailable and continues without inventing a receipt.
+
+Set `ORGX_SESSION_SUMMARY_AUTO_FLUSH=off` for a deliberately offline run. The
+adapter and Wizard retain the capture without starting a delivery worker;
+`orgx-wizard hooks flush` can replay it later with server acknowledgement.
+
+### V2 beta canary
+
+The production plugin stays on OpenCode's stable plugin contract. Set
+`ORGX_OPENCODE_V2_CANARY=1` only in a canary process and call
+`inspectOpenCodeV2Canary(context)` to inspect the beta context. The canary is
+`ready` only when session hooks, tool hooks, and the public event stream are all
+present; otherwise it returns an explicit `unsupported` state. Package-export
+availability alone is not treated as runtime parity.
+
 ### Resumable questions
 
 OpenCode's native `question.asked` event can be routed to the same OrgX
@@ -67,7 +95,7 @@ orgx-opencode-plugin
 Or programmatic:
 
 ```ts
-import { startPeer } from '@useorgx/orgx-opencode-plugin';
+import { startPeer } from '@useorgx/orgx-opencode-plugin/sdk';
 
 const peer = await startPeer({
   apiKey: process.env.ORGX_API_KEY!,

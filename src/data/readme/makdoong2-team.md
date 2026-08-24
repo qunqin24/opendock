@@ -121,25 +121,74 @@ makdoong2-team doctor            # 설치 진단
 
 ### 모델 정책
 
-빌트인 primary 허용 목록은 `github-copilot/*` 와 `local/*` 브랜드 40개다 (전체 목록: `src/model-fallback-policy.ts` 의 `DEFAULT_ALLOWED_PRIMARIES`). fallback 은 **항상 primary 보다 낮은 tier** 여야 한다 (`low < medium < high < max`).
+체인 하나는 `primary` 1개와 **tier 가 더 낮은** `fallbacks` 로 이뤄진다. 7개 에이전트 전부 아래 빌트인 기본값을 쓴다.
+
+```jsonc
+// src/model-fallback-policy.ts 의 POLICIES — 7개 에이전트가 모두 동일하다
+"makdoong2-engineer": {
+  "primary":   { "id": "github-copilot/gpt-5.6-luna",     "variant": "xhigh", "tier": "medium" },
+  "fallbacks": [{ "id": "github-copilot/claude-haiku-4.5",                    "tier": "low"    }]
+}
+```
+
+| 필드 | 의미 | 설정 키 |
+|---|---|---|
+| `id` | `provider/model`. primary 는 허용 목록 안이어야 한다 — 빌트인 `github-copilot/*` · `local/*` 40개 (`DEFAULT_ALLOWED_PRIMARIES`) + `allowed_primaries` 확장분 | `agents.<agent>.model`, `fallback_models[].id` |
+| `variant` | 추론 강도 `low` · `medium` · `high` · `xhigh` · `max`. **primary 에만** 쓰이고 opencode agent 설정으로 그대로 주입된다 | `agents.<agent>.variant` |
+| `tier` | 폴백 순서 invariant 전용 등급 (`low < medium < high < max`). fallback 은 **항상 primary 보다 낮아야** 한다 | `fallback_models[].tier` |
+
+primary 의 `tier` 는 설정으로 바꿀 수 없다 — 빌트인 값이 유지되고, 빌트인에 없는 새 에이전트는 `medium` 이 된다.
+
+오버라이드 예시:
 
 ```jsonc
 {
   "model_policy": {
+    // 빌트인 허용 목록에 없는 primary 를 쓸 때만 필요하다 (추가 전용 — 빈 배열은 "추가 없음")
     "allowed_primaries": ["custom-provider/custom-model"]
   },
   "agents": {
+    // primary · variant · fallback 을 모두 지정
     "makdoong2-engineer": {
       "model": "github-copilot/claude-opus-4.8",
+      "variant": "high",
       "fallback_models": [
         { "id": "github-copilot/claude-haiku-4.5", "tier": "low" }
       ]
-    }
+    },
+
+    // model 만 적으면 variant 와 fallback 체인은 빌트인 값을 승계한다
+    "makdoong2-planner": { "model": "github-copilot/gpt-5.6-sol" },
+
+    // variant 만 낮추고 싶어도 model 은 반드시 함께 적는다 — model 없는 항목은 통째로 무시된다
+    "makdoong2-verifier": { "model": "github-copilot/gpt-5.6-luna", "variant": "medium" }
   }
 }
 ```
 
-`makdoong2-team validate` 로 위반 여부와 최종 체인을 미리 확인할 수 있다. 위반 시 플러그인은 defaults 로 롤백하고 stderr 에 경고만 남긴다 — 설정 오류로 워크플로우가 죽지 않는다.
+`makdoong2-team validate` 로 위반 여부와 최종 체인을 미리 확인할 수 있다. 위 설정의 실제 출력이다.
+
+```console
+$ makdoong2-team validate
+[makdoong2-team] validate — ~/.config/opencode/makdoong2-team.json
+  ✓ JSON parses
+  ✓ policy invariants pass (primary allow-list + fallback tier ordering)
+  ✓ overrides applied for: makdoong2-engineer, makdoong2-planner, makdoong2-verifier
+  ✓ extra allowed primaries: custom-provider/custom-model
+
+Resolved chain (primary → fallbacks):
+  makdoong2-team-leader      github-copilot/gpt-5.6-luna (medium) → github-copilot/claude-haiku-4.5 (low)
+  makdoong2-analyzer         github-copilot/gpt-5.6-luna (medium) → github-copilot/claude-haiku-4.5 (low)
+  makdoong2-researcher       github-copilot/gpt-5.6-luna (medium) → github-copilot/claude-haiku-4.5 (low)
+  makdoong2-planner          github-copilot/gpt-5.6-sol (medium) → github-copilot/claude-haiku-4.5 (low)
+  makdoong2-engineer         github-copilot/claude-opus-4.8 (medium) → github-copilot/claude-haiku-4.5 (low)
+  makdoong2-publisher        github-copilot/gpt-5.6-luna (medium) → github-copilot/claude-haiku-4.5 (low)
+  makdoong2-verifier         github-copilot/gpt-5.6-luna (medium) → github-copilot/claude-haiku-4.5 (low)
+
+[makdoong2-team] validate: OK ✓
+```
+
+위반 시 플러그인은 defaults 로 롤백하고 stderr 에 경고만 남긴다 — 설정 오류로 워크플로우가 죽지 않는다.
 
 ### 로깅
 
@@ -180,7 +229,7 @@ makdoong2-team doctor            # 설치 진단
 2. `src/opencode-plugin.ts` — `STAGE_ORDER` 배열에 삽입
 3. `stages/NN-<name>.md` — 신규 spec 작성
 4. `agents/makdoong2-<role>.md` + `gates/verify.sh` (+ 전용 `stage*-verify.sh`)
-5. README 매핑표 · `AGENTS.md` sealed workflow 규약 갱신
+5. README 매핑표 · `CLAUDE.md` sealed workflow 규약 갱신
 
 이후 `makdoong2-team validate` → `npm test` 로 회귀를 확인한다.
 
@@ -231,7 +280,7 @@ npm run release:major   # 1.3.1 → 2.0.0  (breaking)
 |---|---|
 | [ARCHITECTURE.md](./ARCHITECTURE.md) | **어떻게 동작하는가** — 모듈, 툴 API, state 스키마, 훅, 런타임 방어, 실패 모드 |
 | [DESIGN.md](./DESIGN.md) | **왜 이렇게 만들었는가** — 하네스 4기둥 (Constrain / Inform / Verify / Correct) 과 트레이드오프 |
-| [AGENTS.md](./AGENTS.md) | **개발 규약** — git commit, npm 배포, sealed workflow, state.sh 하드룰 |
+| [CLAUDE.md](./CLAUDE.md) | **개발 규약** — git commit, npm 배포, sealed workflow, state.sh 하드룰 |
 
 ## 라이선스
 

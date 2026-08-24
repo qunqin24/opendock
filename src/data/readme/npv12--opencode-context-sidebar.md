@@ -1,27 +1,38 @@
 # @npv12/opencode-context-sidebar
 
-OpenCode TUI sidebar plugin that displays context window usage, token counts, and session cost as a progress bar.
+OpenCode **V2** TUI sidebar plugin that displays context window usage, token counts, and session cost as a progress bar.
+
+Rendered as the first element of the sidebar at all times — the plugin prepends to `sidebar.content`, so it sits above every section the host appends.
 
 ## Features
 
 - Visual progress bar showing context window usage percentage
-- Color-coded bar (accent → warning → error as usage increases)
+- Color-coded bar (success → warning → error as usage increases)
 - Displays token count, context window limit, and session cost
-- Updates in real-time as the conversation progresses
+- Mirrors the host's context math: last assistant step after the most recent compaction, respecting reverts
+- Updates in real-time via the reactive V2 data layer
 
 ## Installation
 
 ```bash
-opencode plugin add @npv12/opencode-context-sidebar
+opencode2 plugin add @npv12/opencode-context-sidebar
 ```
 
-Or add to your `opencode.json`:
+Or add to your `cli.json`:
 
 ```json
 {
-  "plugins": {
-    "@npv12/opencode-context-sidebar": {}
-  }
+  "plugins": ["@npv12/opencode-context-sidebar/tui"]
+}
+```
+
+Requires OpenCode `0.0.0-beta-17963` or compatible. Not compatible with V1.
+
+To avoid duplicating the built-in Context section, disable it:
+
+```json
+{
+  "plugins": ["@npv12/opencode-context-sidebar/tui", "-opencode.sidebar.context"]
 }
 ```
 

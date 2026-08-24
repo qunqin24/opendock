@@ -1,16 +1,18 @@
 # opencode-plugin-resumator
 
-Automated context compression and project tree mapping plugin for OpenCode.
+Automated project context injection and technical state retention for OpenCode.
 
 ## Features
 
-- **Automatic Context Compression:** Triggers context summarization at 30% capacity.
-- **Dynamic File Tree:** Injects a real-time bounded project structure into the system prompt, respecting the project's `.gitignore` (plus `node_modules`, `dist`, `build`, `coverage`, `.cache`) so compiled files and large local folders never leak into the tree.
-- **State Retention:** Preserves modified files and key technical decisions across compressions.
-- **Smart Git Status Awareness:** Injects the current branch, staged/modified/untracked files, and recent commits into the system prompt. Omitted automatically when not in a git repo.
-- **Advanced Project Mapping:** Injects the runtime and key dependencies from the manifest (`package.json`, `pyproject.toml`, or `Cargo.toml`), plus a static block pointing to where tests and docs live so the agent knows how to run verifications without listing every route.
-- **Manual State Reset:** The `/resumator-clear` command (registered automatically by the plugin) zeroes the saved modified files and recorded decisions when the conversation changes focus.
-- **Disk Persistence:** Technical state is saved in compact TOON format (Token-Oriented Object Notation, token-efficient for LLMs) to `.opencode/resumator-state.toon` in the project root and reloaded on startup, so plugin memory survives closing and reopening the terminal. Legacy `.json` state is migrated automatically.
+- **Per-turn context injection:** Injects a bounded project tree, git status, runtime/deps metadata, tests/docs map, and session technical state into the system prompt via `experimental.chat.system.transform`.
+- **Dynamic File Tree:** Real-time bounded project structure, respecting the project's `.gitignore` (plus `node_modules`, `dist`, `build`, `coverage`, `.cache`).
+- **State Retention:** Tracks modified files and key technical decisions from session messages (`experimental.chat.messages.transform`) and surfaces them across turns.
+- **Native compaction enrich:** On OpenCode session compaction, injects technical state (and optional metadata) through `experimental.session.compacting` so memory survives summarization. History compression itself is handled by OpenCode — this plugin does not rewrite the session transcript.
+- **Smart Git Status Awareness:** Branch, staged/modified/untracked files, and recent commits. Omitted when not in a git repo.
+- **Advanced Project Mapping:** Runtime and key dependencies from `package.json`, `pyproject.toml`, or `Cargo.toml`, plus where tests and docs live.
+- **Manual State Reset:** `/resumator-clear` zeroes saved modified files and recorded decisions when focus changes.
+- **Manual Context Injection:** `/resumator-context` injects the full project context on demand.
+- **Disk Persistence:** Technical state saved in compact TOON format to `.opencode/resumator-state.toon` and reloaded on startup. Legacy `.json` is migrated automatically.
 
 ## Installation
 
@@ -18,11 +20,31 @@ Automated context compression and project tree mapping plugin for OpenCode.
 npm install opencode-plugin-resumator
 ```
 
+Add to your OpenCode config (`opencode.json` / `~/.config/opencode/opencode.jsonc`):
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugin": ["opencode-plugin-resumator"]
+}
+```
+
+Restart OpenCode after installing or upgrading — plugins are not hot-reloaded.
+
 ## Development
 
 ```bash
 npm install   # installs tiktoken + ignore + smol-toml + @toon-format/toon
 npm test      # runs node --test on *.test.js
+npm run release  # tags and pushes the version from package.json (triggers CI publish)
+```
+
+Local path (without publishing):
+
+```json
+{
+  "plugin": ["file:///absolute/path/to/opencode-plugin-resumator/index.js"]
+}
 ```
 
 ## Configuration
@@ -40,7 +62,16 @@ Optional settings under the `contextCompressor` key in `opencode.json` at the pr
 }
 ```
 
+- `totalModelLimit`: used to report approximate context usage % in the injected block (default `128000`).
+- `triggerPercentage`: retained for metrics/display compatibility (default `0.3`). Compaction is owned by OpenCode.
 - `enableDependencies`: toggle the runtime/dependency metadata block (default `true`).
 - `enableTestsDocs`: toggle the tests/docs block (default `true`).
 
 Token usage is counted with `tiktoken` (`cl100k_base` encoding), falling back to a char/4 heuristic if the library cannot be loaded.
+
+## Commands
+
+| Command | Description |
+| --- | --- |
+| `/resumator-clear` | Reset saved modified files and recorded decisions |
+| `/resumator-context` | Inject the full project context block into the prompt |
