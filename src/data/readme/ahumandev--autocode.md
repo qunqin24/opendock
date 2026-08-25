@@ -1,3 +1,15 @@
+***The workflow engine for traceable autonomous job execution***
+
+![Autocode](docs/logo.webp)
+
+AutoCode is an OpenCode plugin that turns rough concepts into durable designs and completed solutions.
+
+Run jobs autonomously with **Auto mode**, or stay in control with **Assist mode**, or receive guided tutorials with **Advise mode**.
+
+No special UI required. AutoCode runs in OpenCode and keeps concepts and durable design workspaces in version-controllable text files, making it suited to remote development or server administration.
+
+---
+
 ## Features
 
 ### Implementation Modes

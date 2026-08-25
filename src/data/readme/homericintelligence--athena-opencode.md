@@ -92,18 +92,7 @@ sequentially with the current agent.
 ## Develop
 
 Prerequisites are Git, uv, Just, and Python 3.13 for repository validation only.
-
-```bash
-git clone https://github.com/HomericIntelligence/Athena
-cd Athena
-just bootstrap
-just all
-```
-
-`just all` validates skills and manifests, runs executable unit tests, enforces at least 80% branch
-coverage for every repository and skill-local executable script, runs Ruff and strict mypy over the
-same tooling, lints public documentation and workflows, and builds a deterministic plugin archive
-with a SHA-256 checksum. It never builds Python distribution artifacts.
+[Full environment setup lives in CONTRIBUTING.md](CONTRIBUTING.md#environment-setup).
 
 ## Layout
 

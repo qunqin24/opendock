@@ -3,7 +3,7 @@
 English | [中文](./README.zh-CN.md)
 
 > [!IMPORTANT]
-> Magic Compact development has been paused in favor of [Operator Memory](https://github.com/aerovato/operator-memory), its successor. Magic Compact focuses on context compression; Operator already provides durable memory and documentation, and will gain context-management features over time. Install and follow Operator for future development.
+> Magic Compact development has been paused in favor of [Operator Memory](https://github.com/aerovato/operator-memory), its successor. Magic Compact focuses on context compression; Operator already provides durable memory and documentation, and will gain context-management features over time. Install and follow Operator for future development; a Claude Code plugin will be added soon. Magic Compact remains fully functional.
 
 Lossless context compression for OpenCode and Claude Code.
 

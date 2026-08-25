@@ -20,7 +20,7 @@ Requirements: Node.js 22.6 or newer, npm, and OpenCode.
 
 Guides: [日本語](docs/guide-ja.md) · [简体中文](docs/guide-zh-CN.md) · [CLI testing](docs/cli-testing.md)
 
-Release: [v0.5.11](https://github.com/zufall-upon/Sortie-dogs/releases/tag/v0.5.11)
+Release: [v0.5.12](https://github.com/zufall-upon/Sortie-dogs/releases/tag/v0.5.12)
 
 ## Quick start
 
@@ -171,6 +171,12 @@ global file for durable global settings.
   opened at the parent workspace. For operational work the coordinator creates
   that valid handoff before dispatch and sends its exact absolute path; the
   binding child must use the built-in Read tool on it immediately before bind.
+  New coordinator contracts are emitted under the candidate-relative
+  `.sortie-dogs/contracts/` directory as `handoff.<id>.json` and
+  `<id>.operation-manifest.json`. The directory is ignored by this repository's
+  `.gitignore`; legacy root/scoped paths and configured custom paths remain
+  readable and preflight-compatible, but are never moved or deleted.
+  Remove the directory only when no Sortie run is active.
 - `readOnlyTools` adds host-specific tool names that never change files, such as
   MCP tools. Unknown tools are denied for a bound session by default.
 - `dedicatedWorkerModel` selects the single model every worker role resolves to.

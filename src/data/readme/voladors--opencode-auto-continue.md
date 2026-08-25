@@ -1,5 +1,17 @@
 # opencode-auto-continue
 
+> [!IMPORTANT]
+> **This is a community fork** of [`@dracondev/opencode-auto-continue`](https://github.com/DraconDev/opencode-auto-continue) (v7.21.0), maintained at [`volador/opencode-auto-continue`](https://github.com/volador/opencode-auto-continue).
+>
+> **Behavioral differences from upstream:**
+> 1. **Questions are never auto-answered.** Upstream blindly replies to `question.asked` popups with the first option — this fork suspends stall recovery / nudging until the user answers (configurable via status file `question.pending`). The `autoAnswerQuestions` option is accepted but inert.
+> 2. **No nudge after natural stop.** When a turn ends with `reason=stop` (model finished normally and is waiting for you), todo nudges are suppressed. Set `nudgeOnNaturalStop: true` to restore upstream behavior.
+> 3. **Truncation auto-resume.** Turns ending with `reason=length`/`unknown` trigger an automatic "resume exactly where you were cut off" continue on idle.
+> 4. **Directory-scoped status queries** (`session.status({ query: { directory } })`) — correct behavior in multi-project opencode setups.
+> 5. **Resume-exact-point continue prompts** — recovery messages instruct the model to continue mid-sentence instead of restarting work.
+>
+> Fixes are upstreamed selectively; see commits marked `PATCH:`.
+
 The ultimate OpenCode plugin for session management. **One plugin replaces three**: auto-recovery, todo-reminders, and review-on-completion — all with zero conflicts.
 
 
@@ -12,7 +24,7 @@ The ultimate OpenCode plugin for session management. **One plugin replaces three
 | **Review on Completion** | `opencode-auto-review-completed-todos` | Sends review prompt when all todos are done |
 | **Nudger** | Nothing — unique feature | Gentle reminders for idle sessions with open todos |
 | **4-Layer Compaction** | Nothing — unique feature | Opportunistic/Proactive/Hard/Emergency — all with token reduction |
-| **Question Auto-Answer** | Nothing — unique feature | Auto-replies to AI multi-choice questions with recommended option |
+| **Question Guard (fork)** | Nothing — fork change | Question popups **wait for the user** — never auto-answered; recovery/nudge/stall-scan suspend while a question is pending |
 | **Plan-Aware Continue** | Nothing — unique feature | Detects planning phase and uses `continueWithPlanMessage` when recovering |
 | **Tool-Text Recovery** | Nothing — unique feature | Detects XML tool calls in reasoning, sends recovery prompt |
 | **Hallucination Loop Detection** | Nothing — unique feature | Breaks infinite loops with abort+resume |
@@ -33,7 +45,7 @@ The ultimate OpenCode plugin for session management. **One plugin replaces three
 ## Quick Start
 
 ```bash
-npm install @dracondev/opencode-auto-continue
+npm install @voladors/opencode-auto-continue
 ```
 
 ### Plugin Registration
@@ -42,7 +54,7 @@ Add to your OpenCode `config.json`:
 
 ```json
 {
-  "plugins": ["@dracondev/opencode-auto-continue"]
+  "plugins": ["@voladors/opencode-auto-continue"]
 }
 ```
 
@@ -51,7 +63,7 @@ Or with options:
 ```json
 {
   "plugins": [
-    ["@dracondev/opencode-auto-continue", {
+    ["@voladors/opencode-auto-continue", {
       "preset": "balanced"
     }]
   ]
@@ -69,7 +81,7 @@ See [docs/configuration.md](docs/configuration.md) for all 50+ options.
 | **Todo Context** | Fetches open todos, includes them in recovery messages |
 | **Review on Completion** | Sends review prompt when all todos are done |
 | **Nudger** | Gentle reminders for idle sessions with open todos |
-| **Question Auto-Answer** | Auto-replies to AI multi-choice questions |
+| **Question Guard (fork)** | Question popups wait for the user, never auto-answered |
 | **Plan-Aware Continue** | Detects planning phase, uses appropriate recovery message |
 | **Tool-Text Recovery** | Detects XML tool calls in reasoning |
 | **Hallucination Loop Detection** | Breaks infinite loops with abort+resume |

@@ -20,7 +20,7 @@ opencode plugin -g open-sidebar
 
 **`> model`** : brings up the 'select model' menu. the label shows the current model
 
-**`> weight`** : toggle through model weight / variant options
+**`> reasoning`** : toggle through model reasoning / variant options
 
 ### Usage Meter
 

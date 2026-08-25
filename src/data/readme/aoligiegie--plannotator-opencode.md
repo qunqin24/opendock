@@ -181,24 +181,24 @@ Sharing can be disabled entirely with `PLANNOTATOR_SHARE=disabled`.
 
 ## Install
 
-One installer covers almost every agent. It installs the `plannotator` binary, auto-detects your installed agents, and configures hooks, skills, and slash commands for each:
+This fork installs the `plannotator` binary from [GitHub Releases on this repo](https://github.com/eightHundreds/plannotator/releases), not from plannotator.ai. One installer covers almost every agent. It installs the binary, auto-detects your installed agents, and configures hooks, skills, and slash commands for each:
 
 ```bash
 # macOS / Linux / WSL
-curl -fsSL https://plannotator.ai/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/eightHundreds/plannotator/main/scripts/install.sh | bash
 ```
 
 ```powershell
 # Windows PowerShell
-irm https://plannotator.ai/install.ps1 | iex
+irm https://raw.githubusercontent.com/eightHundreds/plannotator/main/scripts/install.ps1 | iex
 ```
 
-The installer downloads the binary from GitHub Releases. A full install can also contact GitHub for release resolution and agent files, Ataraxy-Labs/sem for the optional `sem` sidecar, and npm for Pi, selected extra skills, or the managed agent-terminal runtime. Pinning `--version` skips only GitHub API release resolution, not the release download. See the [privacy policy](https://plannotator.ai/privacy) for the complete network boundaries.
+The installer downloads the binary from [eightHundreds/plannotator releases](https://github.com/eightHundreds/plannotator/releases). A full install can also contact GitHub for release resolution and agent files, Ataraxy-Labs/sem for the optional `sem` sidecar, and npm for Pi, selected extra skills, or the managed agent-terminal runtime. Pinning `--version` skips only GitHub API release resolution, not the release download.
 
 Want just the binary and nothing else? Pass `--minimal` (or export `PLANNOTATOR_MINIMAL=1`) to install only the `plannotator` binary to `~/.local/bin`, skipping every skill, hook, slash command, and per-agent config:
 
 ```bash
-curl -fsSL https://plannotator.ai/install.sh | bash -s -- --minimal
+curl -fsSL https://raw.githubusercontent.com/eightHundreds/plannotator/main/scripts/install.sh | bash -s -- --minimal
 ```
 
 Then finish the step for your agent:
@@ -300,11 +300,11 @@ Add to `~/.claude/settings.json`:
 <summary>Pin a specific version</summary>
 
 ```bash
-curl -fsSL https://plannotator.ai/install.sh | bash -s -- --version vX.Y.Z
+curl -fsSL https://raw.githubusercontent.com/eightHundreds/plannotator/main/scripts/install.sh | bash -s -- --version vX.Y.Z
 ```
 
 ```powershell
-& ([scriptblock]::Create((irm https://plannotator.ai/install.ps1))) -Version vX.Y.Z
+& ([scriptblock]::Create((irm https://raw.githubusercontent.com/eightHundreds/plannotator/main/scripts/install.ps1))) -Version vX.Y.Z
 ```
 
 </details>
@@ -418,19 +418,7 @@ gh attestation verify /tmp/plannotator-release-verify/plannotator-linux-x64 \
 
 These are separate claims over the same artifact digest: provenance identifies its builder/source/workflow, while the CycloneDX predicate describes the release-wide inventory. The release runbook also canonicalizes the downloaded SBOM and attested predicate with `jq -S` and compares them.
 
-To verify on install:
-
-```bash
-curl -fsSL https://plannotator.ai/install.sh | bash -s -- --verify-attestation
-```
-
-Requires the `gh` CLI, but no login: the installer fetches the attestation bundle from GitHub's public attestations API and verifies it with `gh attestation verify --bundle` (the extraction needs node, python3, or jq on PATH; gh's authenticated fetch is the fallback). Can also be set persistently in `~/.plannotator/config.json`:
-
-```json
-{ "verifyAttestation": true }
-```
-
-Installer verification remains opt-in and verifies SLSA build provenance; normal installation does not require `gh`. See the [canonical installation docs](https://docs.plannotator.ai/open-source/start/installation#pin-or-verify-a-release) for details.
+Upstream can verify SLSA attestations on install with `--verify-attestation`. This fork's GitHub Releases are locally compiled binaries without Sigstore attestations, so that flag will not succeed here.
 
 ---
 

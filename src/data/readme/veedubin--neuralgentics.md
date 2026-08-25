@@ -178,6 +178,27 @@ If any required tools are missing, the installer prints the install commands and
 | `--yes` | Skip all prompts (use defaults) |
 | `--target <dir>` | Override install target directory |
 | `--dry-run` | Print what would happen without writing anything |
+| `--reset-mcp` | Clean polluted MCP config (see below) |
+
+## Cleaning Up Polluted MCP Configs
+
+Versions before **v0.16.7** shipped a developer's personal `.opencode/opencode.json` inside the npm tarball, and the installer merged it into your project — adding 5+ unneeded MCP servers (github-mcp, playwright, searxng, markitdown, videre) whose tool schemas inflate every LLM request by ~10–20K tokens. The add-only merge meant these entries were never removed on update.
+
+If your project was installed with an affected version, run:
+
+```bash
+npx @veedubin/neuralgentics --reset-mcp --dry-run   # preview only
+npx @veedubin/neuralgentics --reset-mcp             # apply (backs up first)
+```
+
+The cleanup:
+- **Replaces** known neuralgentics-shipped servers with the current minimal template (exactly one enabled server: `memini-ai-dev`)
+- **Drops** homedir-only server names that don't belong in project configs
+- **Strips** personal plugins (`@franlol/*`)
+- **Preserves** any MCP servers you added yourself (unknown names are untouched)
+- **Backs up** your original config with a timestamp suffix before writing
+
+Run it once per affected project. New installs (v0.16.7+) generate a clean minimal config and can't be polluted.
 
 ## MCP Servers
 

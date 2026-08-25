@@ -11,13 +11,14 @@ cost, and outcome references required by `ExecutionResult`.
 
 ## Install
 
-OpenCode can load the peer as a native plugin from `opencode.json` once
-`@useorgx/orgx-opencode-plugin@0.1.0-alpha.2` or newer is published to npm:
+OpenCode can load the current prerelease peer as a native plugin from
+`opencode.json`. Select the `alpha` distribution tag explicitly so a fresh
+install resolves the newest tested prerelease instead of npm's default tag:
 
 ```json
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugin": ["@useorgx/orgx-opencode-plugin"]
+  "plugin": ["@useorgx/orgx-opencode-plugin@alpha"]
 }
 ```
 
@@ -43,9 +44,11 @@ run receipt without pretending the multi-turn OpenCode conversation ended.
 `session.deleted` remains the whole-session terminal boundary.
 
 The adapter observes session, user-message, permission, and tool lifecycle
-events. It never forwards message bodies, prompts, tool arguments or results,
-error text, transcripts, credentials, or model content. The Wizard owns queue
-durability, acknowledgement, retry, privacy normalization, and AWR delivery.
+events. It sends each non-synthetic user message to the local Wizard hook for
+bounded Work Episode capture: at most 12 redacted excerpts, 600 characters
+each. It does not send tool arguments, tool results, error text, transcripts,
+credentials, or model output. The Wizard owns queue durability,
+acknowledgement, retry, privacy normalization, and AWR delivery.
 If the Wizard hook is absent or incompatible, the plugin records that capture
 is unavailable and continues without inventing a receipt.
 
@@ -84,8 +87,8 @@ claimed as resumed until a client applies it again.
 You can also run the peer directly:
 
 ```bash
-npm install -g @useorgx/orgx-opencode-plugin
-# or pnpm: pnpm add -g @useorgx/orgx-opencode-plugin
+npm install -g @useorgx/orgx-opencode-plugin@alpha
+# or pnpm: pnpm add -g @useorgx/orgx-opencode-plugin@alpha
 
 export ORGX_API_KEY=oxk_...
 export ORGX_WORKSPACE_ID=<uuid>

@@ -1,6 +1,6 @@
 # pr-monitor
 
-A GitHub PR monitor for coding agents, available as both an [opencode](https://opencode.ai) plugin and a [Claude Code](https://code.claude.com) plugin. It watches pull requests in the background and delivers factual `[PR Monitor]` reports into the session that started the watch — so an agent (or you) can raise a PR, keep working, and get told when something actually happened.
+A GitHub PR monitor for coding agents, available for [OpenCode](https://opencode.ai), [Claude Code](https://code.claude.com), [Pi](https://github.com/earendil-works/pi), and [Oh My Pi](https://omp.sh). It watches pull requests in the background and delivers factual `[PR Monitor]` reports into the session that started the watch — so an agent (or you) can raise a PR, keep working, and get told when something actually happened.
 
 ## What it does
 
@@ -12,6 +12,7 @@ A GitHub PR monitor for coding agents, available as both an [opencode](https://o
 - **CI hold**: a due report is held while a check suite is still running (bounded by `maxCiWaitMinutes`), so you get one report with the CI verdict instead of two.
 - Reports are **facts only** — counts, authors, check names. No advice, no comment bodies.
 - Monitors are **per-session and in-memory**: they stop automatically when the PR is merged/closed, and they do not survive a host restart.
+- The monitor owns polling and delivers reports automatically. Agents must not create sleeps, scheduled checks, background polling loops, repeated `gh pr checks`, or routine `status`/`flush` calls while waiting.
 
 ### Example report
 
@@ -28,7 +29,9 @@ A GitHub PR monitor for coding agents, available as both an [opencode](https://o
 
 - [GitHub CLI](https://cli.github.com) (`gh`) installed and authenticated (`gh auth status`).
 - For Claude Code: Node.js >= 18 on `PATH` (runs the bundled MCP server), macOS or Linux.
-- For opencode: opencode >= 1.17.
+- For OpenCode: OpenCode >= 1.17.
+- For Pi: Pi >= 0.84.2 and Node.js >= 22.19.
+- For OMP: OMP >= 18.0.3.
 
 ## Claude Code
 
@@ -56,7 +59,7 @@ The bundled `monitor-pr` skill turns reports into work, so the normal path needs
 
 1. Claude opens a PR and starts a monitor for it straight away.
 2. Every report is acted on — review comments via the repo's `address-pr-comments` skill, failing CI by fixing the cause, conflicts by merging the base branch in.
-3. When CI is green, no review threads are unresolved, no requested reviewer is still pending and nothing is left unanswered, Claude calls `mark_ready` — the PR gets the configured `readyLabel` (default `ready-for-human-review`) and it is your turn.
+3. When CI is green, no review threads are unresolved, no requested reviewer is still pending and nothing is left unanswered, Claude calls `mark_ready`. Only a confirmed label success is a handoff; failure leaves keep-alive armed for diagnosis and retry.
 4. If a human then comments, the next report takes the PR back: Claude withdraws the label, works the feedback, and hands off again.
 
 ### How reports arrive (and how that differs from opencode)
@@ -67,7 +70,7 @@ Claude Code has no way for a background process to push a message into a session
 - when you submit a prompt (`UserPromptSubmit`),
 - when Claude tries to end its turn (`Stop`) — a pending report holds the turn open so Claude addresses it before going idle.
 
-That alone still leaves a gap: a report landing while the session sits idle waits until your next message. **Keep-alive** closes it. While a monitored PR has not been handed off with `mark_ready`, the `Stop` hook refuses turn-end and points Claude at `claude-code/hooks/await-activity.mjs`, a small script that blocks until the next report is spooled. Claude waits inside a single tool call instead of going idle, and wakes the moment something happens — one model round trip per real event rather than one per polling tick.
+That alone still leaves a gap: a report landing while the session sits idle waits until your next message. **Keep-alive** closes it. While a monitored PR has not been handed off with `mark_ready`, the `Stop` hook supplies an exact `claude-code/hooks/await-activity.mjs` command that blocks until a report is spooled. That hook-issued command is the only waiting mechanism Claude should run; it must never invent a delay or polling job after starting the monitor.
 
 Bounds, so a loop can never run away:
 
@@ -81,7 +84,7 @@ Prefer being told out of band instead? Set `desktopNotifications: true` for an O
 Further behavior notes for the Claude Code shell:
 
 - Monitors belong to the Claude Code process. They survive `/clear` (the new conversation keeps receiving reports) and die with the process; they do not survive quitting Claude Code or `claude --resume` into a new process. If the MCP server is restarted while Claude Code keeps running (e.g. `/reload-plugins`), each active monitor delivers a `Monitor stopped` notice; when Claude Code itself exits, monitors simply die with it (no notice — there is no session left to deliver to).
-- Config lives in `.claude/pr-monitor.json` (falling back to `.opencode/pr-monitor.json`, so a repo configured for the opencode plugin works as-is).
+- Config first uses repository `.pr-monitor.json`, then falls back to `.claude/pr-monitor.json` and `.opencode/pr-monitor.json`.
 
 ## opencode
 
@@ -96,13 +99,31 @@ Add the plugin to your project's `opencode.json` (committed — the whole team g
 }
 ```
 
-opencode installs npm plugins and their dependencies into its package cache on startup. To make upgrades explicit, pin a version such as `@sesori/pr-monitor-opencode@0.2.1` and bump it deliberately. Quit and restart opencode after changing the plugin configuration.
+opencode installs npm plugins and their dependencies into its package cache on startup. To make upgrades explicit, pin a version such as `@sesori/pr-monitor-opencode@0.3.0` and bump it deliberately. Quit and restart opencode after changing the plugin configuration.
 
 Reports arrive in the owning session as messages starting with `[PR Monitor]`. Monitors stop when the owning session is deleted. On graceful opencode shutdown, a no-reply stop notice is persisted to each owning session before the plugin is disposed, so it is present in history when opencode starts again.
 
+The package injects its `monitor-pr` skill through OpenCode's skill-path config, so the agent learns the complete ownership loop without a consuming repository copying the skill.
+
+## Pi and OMP
+
+Install the shared package in Pi:
+
+```sh
+pi install npm:@sesori/pr-monitor-pi
+```
+
+Or in OMP:
+
+```sh
+omp plugin install @sesori/pr-monitor-pi
+```
+
+The package selects the correct entry automatically and supplies one `monitor-pr` skill to each host. Reports use native custom-message delivery with steering and idle turn triggering, so agents end the turn while waiting and wake only for real activity. Pi clears watches after successful session replacement/reload shutdown; OMP clears them on its post-success session-switch event. Canceled transitions retain the active watch.
+
 ## The `pr_monitor` tool
 
-Both shells register the same tool:
+All four harnesses register the same tool:
 
 | Action   | `pr` argument                          | Effect |
 | -------- | -------------------------------------- | ------ |
@@ -115,7 +136,7 @@ Both shells register the same tool:
 
 ## Configuration
 
-Optional, per project: `.claude/pr-monitor.json` for Claude Code (with `.opencode/pr-monitor.json` as fallback), `.opencode/pr-monitor.json` for opencode.
+Optional, per project: use `.pr-monitor.json` for every host. Claude Code falls back to `.claude/pr-monitor.json` then `.opencode/pr-monitor.json`; OpenCode falls back to `.opencode/pr-monitor.json`; Pi/OMP use their `CONFIG_DIR_NAME` (`.pi`/`.omp`) before `.opencode/pr-monitor.json`. Pi reads project-local config only after project trust.
 
 ```json
 {
@@ -159,46 +180,77 @@ Optional, per project: `.claude/pr-monitor.json` for Claude Code (with `.opencod
 
 ```sh
 npm install
-npm test            # shared-core and OpenCode-shell regression tests
-npm run typecheck   # core + both shells
-npm run build       # bundle the Claude Code MCP server to claude-code/dist/mcp-server.mjs
-npm run pack:check  # inspect the OpenCode npm package without creating a tarball
+npm test             # core, shared runtime, and adapter regression tests
+npm run typecheck    # core + runtime + all adapters
+npm run build        # OpenCode/Pi publish bundles + committed Claude MCP bundle
+npm run version:check
+npm run pack:check   # inspect/install/import both npm artifacts
+npm run host:check   # load the Pi and OMP bundles through their real loaders
+npm run clean        # remove ephemeral OpenCode/Pi build and generated skill output
 ```
 
-Layout — one directory per target, plus the shared core:
+Layout — one directory per target, plus shared core/runtime layers:
 
 ```
-core/            shell-agnostic core: config, polling, activity detection, PrWatch, report rendering
-opencode/        opencode shell — index.ts is the plugin entry
+core/            per-PR state, config, GitHub normalization, activity, reports
+runtime/         session registry/actions/timers, Node gh runner, shared tool contract
+skills/          canonical monitor-pr skill for push-capable hosts
+opencode/        OpenCode adapter and npm workspace
+pi/              shared Pi/OMP adapter entries and npm workspace
 claude-code/     Claude Code shell — this directory is the plugin root (${CLAUDE_PLUGIN_ROOT})
 .claude-plugin/  marketplace.json, which stays at the repo root and points at ./claude-code
 ```
 
-`core/` never imports from a shell, so a shell is only wiring: transport, delivery, and config paths. opencode executes TypeScript directly (no build step), and the loader invokes every export of the entry module as a plugin, so `PrMonitorPlugin` must remain the sole export of `opencode/index.ts`. The `@sesori/pr-monitor-opencode` npm artifact is allowlisted to `core/` and `opencode/`; it does not contain the Claude Code distribution. The Claude Code shell is bundled with esbuild into the committed `claude-code/dist/mcp-server.mjs`, since plugin installs run no build step; `claude-code/hooks/drain-spool.mjs` is the dependency-free hook that injects spooled reports and runs the keep-alive loop, and `claude-code/hooks/await-activity.mjs` is the blocking waiter it hands to the session; `claude-code/skills/monitor-pr/` is the behavior — when to start a monitor, what to do with each report, when to hand off; `claude-code/.mcp.json` declares the MCP server (plugin-root convention — an inline `mcpServers` field in plugin.json is not picked up).
+Dependency flows adapter → `runtime/` → `core/`; core imports no host SDK and runtime owns common session orchestration. The root is a private npm workspace coordinator. OpenCode source stays in `opencode/`, but publication bundles it with private core/runtime into `opencode/dist/index.js`; both `.` and `./server` resolve to that sole-export bundle. Its tarball contains only the bundle and declaration, target README/license, and manifest; generated OpenCode output stays uncommitted. The Claude Code shell is bundled with esbuild into the committed `claude-code/dist/mcp-server.mjs`, since Git plugin installs run no build step; `claude-code/hooks/drain-spool.mjs` is the dependency-free hook that injects spooled reports and runs the keep-alive loop, and `claude-code/hooks/await-activity.mjs` is the blocking waiter it hands to the session; `claude-code/skills/monitor-pr/` is the behavior — when to start a monitor, what to do with each report, when to hand off; `claude-code/.mcp.json` declares the MCP server (plugin-root convention — an inline `mcpServers` field in plugin.json is not picked up).
+
+## Regression coverage
+
+Durable acceptance criteria live in [`docs/regression/`](docs/regression/README.md):
+
+- [`pull-request-monitoring.md`](docs/regression/pull-request-monitoring.md) covers shared watch semantics,
+  ready-label handoff, autonomous delivery, host lifecycle, and configuration.
+- [`plugin-installation.md`](docs/regression/plugin-installation.md) covers exact npm/Claude artifacts, host floors,
+  skill discovery, loader compatibility, and lockstep release metadata.
+
+The catalogs distinguish automated, adapter, actual-host, and packaged/external proof. Do not treat a source import
+or fake adapter as proof of a packed host integration.
 
 ## Releasing
 
-A release uses one version for both targets: the annotated `vX.Y.Z` Git tag releases the Claude Code plugin, and the root package publishes the OpenCode target as `@sesori/pr-monitor-opencode`. There is no separate GitHub Release step. Update `package.json`, `package-lock.json`, `claude-code/.claude-plugin/plugin.json`, and `CHANGELOG.md`, then run:
+A release uses one version for all targets. The OpenCode workspace publishes `@sesori/pr-monitor-opencode`; the
+Pi workspace publishes the shared Pi/OMP package `@sesori/pr-monitor-pi`; and the annotated `vX.Y.Z` tag marks the
+Claude Code Git-plugin release. The private root cannot be published, and there is no separate GitHub Release step.
+
+Update both workspace manifests and lock entries, `claude-code/.claude-plugin/plugin.json`, the MCP server version,
+and `CHANGELOG.md`. From a clean candidate commit, complete the full matrix before publishing:
 
 ```sh
 npm ci
-npm test
-npm run typecheck
-npm run build
-npm run pack:check
+npm run release:check # tests, types, builds, versions, exact packs, Pi floor, OMP floor
+OPENCODE_CLI="$(command -v opencode)" npm run host:check:opencode
+OMP_VERSION=18.0.4 npm run host:check:omp
+# Also complete the live Claude release-host row documented in docs/regression/plugin-installation.md.
 git diff --exit-code -- claude-code/dist/mcp-server.mjs
 ```
 
-Commit any rebuilt bundle and the release metadata. From the clean release commit on `main`, publish before creating and pushing the tag; if npm rejects the package, there is no stale tag to announce a partial release:
+Use the current supported OpenCode/OMP versions for the two current-host rows; CI records Linux/macOS coverage while
+Windows runs the required package/loader smoke. After the candidate PR merges, use a clean checkout of that exact
+`main` commit. Publish both npm artifacts before creating the Claude tag, so an npm rejection cannot leave a stale
+cross-harness release marker:
 
 ```sh
-git push origin main
-npm publish
+npm whoami
+npm publish --workspace @sesori/pr-monitor-opencode --access public
+npm publish --workspace @sesori/pr-monitor-pi --access public
+npm view @sesori/pr-monitor-opencode@X.Y.Z version
+npm view @sesori/pr-monitor-pi@X.Y.Z version
 git tag -a vX.Y.Z -m "vX.Y.Z — summary"
 git push origin vX.Y.Z
 ```
 
-The first publication requires an npm account with permission to create public packages in the `@sesori` scope (`npm login`). `publishConfig` already fixes the registry to npmjs.org and the access level to public. npm versions are immutable, so verify the package name, version, and `npm run pack:check` output before publishing.
+The first Pi/OMP publication requires permission to create public packages in the `@sesori` scope (`npm login` if
+needed). `publishConfig` already fixes npmjs.org and public access. npm versions are immutable: never tag Claude or
+retry a changed tarball under the same version until both npm registry checks above succeed.
 
 ## License
 
