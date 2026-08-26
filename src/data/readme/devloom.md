@@ -393,13 +393,18 @@ All agents on DeepSeek V4 Flash for maximum throughput at minimum cost:
 Uses only OpenCode Free models (zero cost). The profile auto-picks the best
 available free model per agent role using a candidate chain.
 
-The orchestrator uses `deepseek-v4-flash-free` (cheap, high-volume routing).
-Role fallback order:
-- **orchestration / implementation / verification**: deepseek-v4-flash-free →
-  mimo-v2.5-free → nemotron-3-ultra-free → big-pickle → north-mini-code-free
-- **planning / documentation**: nemotron-3-ultra-free → mimo-v2.5-free →
-  deepseek-v4-flash-free → big-pickle → north-mini-code-free
-- **vision**: mimo-v2.5-free → go multimodal fallbacks
+The orchestrator leads with `x-preview-f-free` (stealth preview, strong agentic
+routing). Role fallback order:
+- **orchestration**: x-preview-f-free → big-pickle → nemotron-3-ultra-free →
+  mimo-v2.5-free → hy3-free → muse-spark-1.2-contributor-free → nemotron-3.5-lightning-free
+- **implementation / verification**: big-pickle → x-preview-f-free →
+  nemotron-3-ultra-free → nemotron-3.5-lightning-free → hy3-free → mimo-v2.5-free
+- **planning**: nemotron-3-ultra-free → muse-spark-1.2-contributor-free →
+  x-preview-f-free → big-pickle → hy3-free → nemotron-3.5-lightning-free
+- **documentation**: muse-spark-1.2-contributor-free → nemotron-3-ultra-free →
+  x-preview-f-free → hy3-free → mimo-v2.5-free
+- **vision** (vision-capable models only): mimo-v2.5-free → go multimodal fallbacks
+  (mimo-v2.5-pro, minimax-m3, deepseek-v4-flash-vision-exp)
 
 ### Model-routing table (go)
 
@@ -458,7 +463,7 @@ source first so the cache never receives stale compiled code.
   refreshed plugin.
 - The sidebar header shows the active profile (`DevLoom - free`,
   `DevLoom - go`, ...) and every agent row shows its resolved model
-  (`orchestrator: opencode/deepseek-v4-flash-free`, ...). The orchestrator
+  (`orchestrator: opencode/x-preview-f-free`, ...). The orchestrator
   agent description also carries the profile label:
   `DevLoom Orchestrator: autonomous multi-agent delivery (profile: go-flash)`,
   extended to `(profile: go, tier: senior)` with a senior tier override.

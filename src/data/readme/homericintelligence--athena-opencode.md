@@ -5,16 +5,26 @@
 [![Latest release](https://img.shields.io/github/v/release/HomericIntelligence/Athena)](https://github.com/HomericIntelligence/Athena/releases)
 [![License: BSD-3-Clause](https://img.shields.io/badge/license-BSD--3--Clause-blue.svg)](LICENSE)
 
-Portable, architecture-first repository-review, development, and orchestration skills for coding
-harnesses. They give every harness the same trusted, evidence-based workflow without requiring a
-host-specific runtime.
+Athena supplies portable, architecture-first skills for repository review, development, and
+orchestration. It gives each coding harness the same trusted, evidence-based workflow. It does not
+require a host-specific runtime.
 
-Athena is distributed only as a coding-harness skill and plugin package. It does not publish a
-Python wheel, source distribution, or runtime library.
+Athena is available only as a coding-harness skill and plugin package. It does not publish a Python
+wheel, a source distribution, or a runtime library.
+
+## Technical English
+
+All Athena English technical prose must follow the
+[ASD-STE100 technical-English policy](skills/TECHNICAL_ENGLISH.md). This rule applies to skill sources
+and to prose that a skill produces. The engineering principles catalog and literal text do not have
+to follow this rule.
+
+The current official ASD-STE100 standard is the complete authority. Athena checks do not certify
+conformance to the standard.
 
 ## Required repositories
 
-Athena has two hard dependencies:
+Athena has two required repositories:
 
 | Purpose | Default | Owner override | Checkout |
 | --- | --- | --- | --- |
@@ -22,28 +32,29 @@ Athena has two hard dependencies:
 | Automation | `HomericIntelligence/Hephaestus` | `HOMERIC_INTELLIGENCE_HEPHAESTUS_OWNER` | `$HOME/.agent_brain/automation` |
 
 Athena resolves a trusted, current dependency checkout under the
-[`dependency-resolution` contract](docs/dependency-resolution.md); invalid overrides, trust or
-authentication failures, checkout mismatches, and update failures are fatal. The knowledge backend
-is mandatory. For a verified, non-duplicate lesson with direct write authority, `learn` uses an
-isolated worktree and pull request; otherwise it reports without mutation.
+[`dependency-resolution` contract](docs/dependency-resolution.md). An invalid override, a trust or
+authentication failure, a checkout mismatch, or an update failure is fatal. The knowledge backend
+is mandatory. If `learn` has a verified, non-duplicate lesson and direct write authority, it uses an
+isolated worktree and a pull request. In all other conditions, it reports without a mutation.
 
-Script-backed skills require Git and Python 3.13 on the host. Dependency resolution and the
-GitHub pull-request helper route additionally require authenticated GitHub CLI (`gh`) access. GitHub
-issue and repository routes require the authenticated GitHub capability selected by their own skill.
-GitLab issue, merge-request, and epic routes instead require an authenticated GitLab capability
-supplied by the host; they must not fall back to GitHub CLI. Skills that do not select a forge route
-do not require a forge client. Athena ships scripts as plugin resources; it does not install a Python
-package or third-party runtime library.
+Script-backed skills require Git and Python 3.13 on the host. Dependency resolution and the GitHub
+pull-request route also require authenticated GitHub CLI (`gh`) access. GitHub issue and repository
+routes require the authenticated GitHub capability that their skill selects.
+
+GitLab issue, merge-request, and epic routes require an authenticated GitLab capability from the
+host. They must not fall back to GitHub CLI. A skill does not require a forge client when it does not
+select a forge route. Athena ships scripts as plugin resources. It does not install a Python package
+or a third-party runtime library.
 
 ## Install
 
-Install Athena through your coding harness's documented skill or plugin mechanism using the
+Use the documented skill or plugin mechanism of your coding harness to install Athena. Use the
 [Git-backed Athena source](https://github.com/HomericIntelligence/Athena). Prefer an immutable
-commit or supported release tag, then restart or reload the harness so its skill catalog recognizes
-Athena.
+commit or a supported release tag. Then, restart or reload the harness so that it can find the Athena
+skills.
 
-opencode installs Athena as the scoped npm plugin `@homericintelligence/athena-opencode`. Add it to the `plugin` array of your
-`opencode.json`:
+opencode installs Athena as the scoped npm plugin `@homericintelligence/athena-opencode`. Add this
+plugin to the `plugin` array of your `opencode.json`:
 
 ```json
 {
@@ -52,14 +63,15 @@ opencode installs Athena as the scoped npm plugin `@homericintelligence/athena-o
 }
 ```
 
-Then quit and restart opencode. On startup, the plugin installs the canonical skill corpus under
-`$XDG_CONFIG_HOME/opencode/skills/athena/` (`~/.config/opencode/skills/athena/` by default), where
-opencode discovers it natively. The plugin only writes inside that `athena/` namespace; see
-[`npm/athena-opencode/README.md`](npm/athena-opencode/README.md) for details and uninstall steps.
+Then, quit and restart opencode. At startup, the plugin installs the canonical skill corpus in
+`$XDG_CONFIG_HOME/opencode/skills/athena/`. The default path is
+`~/.config/opencode/skills/athena/`. opencode finds the skills in that location. The plugin writes
+only in its `athena/` namespace. See
+[`npm/athena-opencode/README.md`](npm/athena-opencode/README.md) for details and removal steps.
 
-Invoke skills through the harness's native skill-invocation mechanism; for example, ask the harness
-to use the `repo-review` skill. Update or remove Athena by managing the configured Git-backed source
-or npm plugin through that same mechanism.
+Invoke skills through the native skill mechanism of the harness. For example, ask the harness to use
+the `repo-review` skill. Use the same mechanism to update or remove the configured Git-backed source
+or npm plugin.
 
 Some workflows optionally need delegation or explicitly scoped web access. When those capabilities
 are unavailable, Athena uses sequential work where supported or reports the capability gap. Install
@@ -72,11 +84,25 @@ not copied into or represented as coding-harness packages.
 ## Release archives
 
 Coding harnesses install Athena from the Git-backed skill or plugin source above. Each GitHub release
-also provides a checksummed portable archive for offline distribution and provenance; it is not a
-Python package and does not replace source-based installation. The archive contains only
-harness-consumed skills, host metadata, runtime documentation, assets, and notices. It excludes tests,
-repository scripts, development lockfiles, task-runner files, CI configuration, and generated
-development output.
+also provides a checksummed portable archive for offline distribution and provenance. The archive is
+not a Python package. It does not replace an installation from source.
+
+The archive contains only these items:
+
+- skills that coding harnesses use;
+- host metadata;
+- runtime documentation;
+- assets; and
+- notices.
+
+The archive excludes these items:
+
+- tests;
+- repository scripts;
+- development lockfiles;
+- task-runner files;
+- continuous integration configuration; and
+- generated development output.
 
 ## Skills
 

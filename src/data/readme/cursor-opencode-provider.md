@@ -372,7 +372,7 @@ bun run generate:pricing  # refresh src/pricing-data.ts from Cursor docs
 bun run check:pricing     # fixture coverage for known model ids
 ```
 
-Before any version bump or `v*` tag, run `generate:pricing` and `check:pricing` and commit mapping/`pricing-data.ts` updates. Publish CI regenerates rates from the live docs; an unmapped Cursor display name fails the job.
+**HARD STOP before any version bump or `v*` tag:** run `generate:pricing` and `check:pricing` in the same session, fix any unmapped Cursor display names, and commit mapping/`pricing-data.ts` updates **before** touching `"version"` or creating the tag. Publish CI regenerates rates from the live docs and will fail the release on an unmapped name — that is a last line of defense, not the primary check. See `AGENTS.md`.
 
 ## Architecture
 

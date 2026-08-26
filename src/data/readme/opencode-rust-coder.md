@@ -27,7 +27,7 @@ documentation.
 ## Install
 
 ```bash
-opencode2 plugin add opencode-rust-coder@0.1.2
+opencode2 plugin add opencode-rust-coder@0.2.0
 opencode2 plugin list
 ```
 
@@ -43,7 +43,7 @@ with the object form:
   "$schema": "https://opencode.ai/config.json",
   "plugins": [
     {
-      "package": "opencode-rust-coder@0.1.2",
+      "package": "opencode-rust-coder@0.2.0",
       "options": {
         "maxTokens": 900,
         "autoLsp": false,
@@ -80,8 +80,10 @@ with the object form:
 | `rust.refactor` | List code actions without executing commands or edits |
 | `rust.docs` | Read version-pinned rustdoc or docs.rs content |
 
-If a `rust-coder` agent already exists, the plugin augments its description and
-system instructions. The plugin API cannot create that agent.
+The plugin does not create or modify an agent. At runtime it registers the
+autoinvoked `opencode-rust-coder` skill through the OpenCode Skill API. The skill
+first requires an explicit Rust request or Cargo/Rust workspace evidence, then
+guides the active agent through the available `rust.*` tools.
 
 ## Defaults And Safety
 
@@ -92,6 +94,8 @@ system instructions. The plugin API cannot create that agent.
 - Rename/refactor tools never modify files or run server-returned commands.
 - Workspace and symlink escapes are rejected. Rustdoc cache lives outside the
   workspace.
+- `rust.check` and `rust.audit` require absolute project directories; a targeted
+  audit path must remain relative to its requested directory.
 - All injected guidance is advisory. Compiler and test output remain the source
   of truth, and failures remain fail-open.
 

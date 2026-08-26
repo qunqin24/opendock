@@ -27,8 +27,8 @@ every agent, every skill, every rule is static markdown.
 
 ## See the evidence
 
-A closed mission leaves a report you can actually read. This is the exact
-format `mugiwara run mission-report.sh` produces:
+A closed mission leaves a closure report you can actually read. This is the
+shape of `.mugiwara/results/<mission>/06-closure.md`:
 
     # Mission: invitation-accepted-flow . 2026-08-11
 
@@ -98,7 +98,7 @@ load.
 npx @ionivetech/mugiwara@latest install --target all --yes
 ```
 
-First run: run `mugiwara onboard` in your terminal for guided setup (zero-LLM wizard). Then ask something non-trivial:
+First run: install writes `.mugiwara/config` with defaults — edit it anytime (mode, coverage, depths). Then ask something non-trivial:
 
 ```
 > add role-based access control: admin, editor, viewer
@@ -117,14 +117,14 @@ pipeline config to write.**
 | You say                                        | What happens                                                                                                                                                                             |
 | ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `add search bar to products page`              | Luffy triages → Nami plans 3 tasks → Zoro executes TDD → Chopper audits → Sanji runs quality → Franky gates → Robin reviews → code pushed, PR summary ready                              |
-| `split payment system: gateway, ledger, fraud` | Nami interviews team → writes initiative plan with sub-missions + assignees → each dev works in own branch → the plan's sub-mission table shows progress → all done → initiative closure |
+| `split payment system: gateway, ledger, fraud` | Nami interviews → writes one plan split into sub-missions, each with its own branch and done-criteria → each dev resumes only their own sub-mission → all mergeable at the end |
 | `Brook, fix the failing login test`            | Healer reads failure ledger, root-cause fixes, proves fix ≤3 cycles                                                                                                                      |
 | `Jinbe, audit auth middleware`                 | STRIDE + OWASP + dependency audit. Read-only — never touches code                                                                                                                        |
 | `/mugiwara auto`                               | Switches to full autonomy — all flow stages run without asking, from the next flow stage |
 
 - **Full pipeline** when the task is big or direction is unclear
 - **Direct agent** when you know exactly what you need — say the name
-- **Slash commands** when you want to drive: `/mugiwara-plan`, `/mugiwara-review`, `/mugiwara-security`, `/mugiwara-ship`, `/mugiwara onboard`
+- **Slash commands** when you want to drive: `/mugiwara`, `/mugiwara-continue`, `/mugiwara-review`, `/mugiwara-security`
 
 → [Full walkthrough](docs/getting-started.md) · [Full workflow walkthrough](docs/concepts/workflow.md)
 
@@ -141,7 +141,7 @@ pipeline config to write.**
 | **Resume from anywhere** | Session lost? Rebuilds from `.mugiwara/state/<mission>/` + machine-written `continue/<mission>/`. Continues, never restarts. Auto surfaces in-flight work (lists when ambiguous). |
 | **12 platforms**         | Claude Code, opencode, Copilot, Gemini, Codex, Cursor, Kimi, Pi, Antigravity + CLI.             |
 
-→ All 28 features, with how-to-use + scenarios: [Every feature](docs/concepts/features.md) · [Team collaboration](docs/concepts/collaboration.md) · [Full pipeline](docs/concepts/workflow.md) · [Lanes](docs/concepts/lanes.md) · [Modes](docs/concepts/modes.md) · [Config](docs/concepts/config.md) · [Audit trail](docs/concepts/audit-trail.md) · [Cost](docs/concepts/cost.md)
+→ All features, with how-to-use + scenarios: [Every feature](docs/concepts/features.md) · [Full pipeline](docs/concepts/workflow.md) · [Lanes](docs/concepts/lanes.md) · [Modes](docs/concepts/modes.md) · [Config](docs/concepts/config.md) · [Audit trail](docs/concepts/audit-trail.md) · [Cost](docs/concepts/cost.md)
 
 ## The pipeline
 
@@ -168,7 +168,7 @@ and reviewers are read-only. Call them by name or let the pipeline auto-route.
 | -------------------- | --------------------------------------------------------------------------------------- | :-----------: |
 | `luffy-orchestrator` | Captain — triage, check-ins, closure                                                    |       —       |
 | `usopp-brainstorm`   | Critical friend — interrogates, researches, recommends                                  |       —       |
-| `nami-planner`       | Planner — interviews, full scan, scaled plans, team initiatives                         |       —       |
+| `nami-planner`       | Planner — interviews, full scan, scaled plans                                            |       —       |
 | `zoro-execution`     | Executor — TDD per task, evidence per commit                                            |       —       |
 | `chopper-checkpoint` | Auditor — re-runs criteria, failure ledger                                              | **read-only** |
 | `sanji-quality`      | Quality — format, lint, test, duplication, complexity, maintainability, code attributes |       —       |
@@ -206,26 +206,23 @@ colliding, and one engineer can juggle several missions.
 Quick start for a team:
 
 ```bash
-# Nami writes one plan with a ## Sub-missions table (assignee + branch per member)
-/mugiwara-plan                          # guided/semi asks "Solo or team?"
+# Nami writes one plan; very-large scopes get a ## Mission split with a
+# sub-mission per part, each with its own branch and done-criteria.
 
-# Each member works on their own branch, resume only their own work
+# Each member works on their own branch, resumes only their own work
 /mugiwara continue                      # list every in-flight mission for YOU
 /mugiwara continue payment-gateway      # solo → resume; team → list members
 /mugiwara continue payment-gateway patty # resume exactly patty's work
 
 # Coordination radar
-mugiwara initiative status plans/<mission>.md          # who's where
-mugiwara initiative conflict-check plans/<mission>.md  # shared-file overlap
-# In an installed project: read the sub-mission table in the plan doc, and
-# `mugiwara status` for computed per-mission position.
+mugiwara status   # computed per-mission position: flow stage, tasks, lane, blockers
 ```
 
 Auto mode runs every flow stage autonomously — and never downgrades to guided
 mid-mission. In a team plan, auto covers **your member scope only**: resuming
 your sub-mission runs it to ship, never the other members'.
 
-→ [Full collaboration guide with a worked example](docs/concepts/collaboration.md) · [Multi-actor reference](references/multi-actor.md)
+→ [Multi-actor reference](references/multi-actor.md)
 
 ## When not to use Mugiwara
 
@@ -255,7 +252,7 @@ Switch mode any time: `/mugiwara guided | semi | auto`. Or edit `.mugiwara/confi
 | `heal_max_cycles`   | 3                               | Max heal-loop cycles before human escalation    |
 | `verbosity`         | normal                          | normal / full — how much the crew echoes. `normal` hides investigation steps (reads, greps) and file contents; edits, results, decisions stay visible. `full` echoes everything. Never suppresses decisions, questions, blockers, or lane rises |
 
-Set via `mugiwara onboard` or edit directly. Unknown keys ignored. Project
+Set via edit directly (`.mugiwara/config`). Unknown keys ignored. Project
 config (`.mugiwara/config`) overrides global (`~/.mugiwara/config`).
 
 **How much does the crew ask you?**
@@ -276,12 +273,8 @@ mid-mission. Only a genuine blocker or the heal halt pauses.
 
 | Need                    | Command / Doc                            |
 | ----------------------- | ---------------------------------------- |
-| First-time setup        | `mugiwara onboard` (terminal) or `/mugiwara onboard` |
-| Plan a feature          | `/mugiwara-plan` or just describe it     |
 | Review a PR diff        | `/mugiwara-review` or "review this PR"   |
 | Security audit          | `/mugiwara-security` or "Jinbe, audit X" |
-| Ship gate check         | `/mugiwara-ship`                         |
-| See initiative progress | `mugiwara initiative status <plan>` |
 | Resume a mission        | `/mugiwara continue <mission> [member]` or "where were we?" |
 | See mission position    | `mugiwara status` (flow stage, tasks, lane, blockers, budget) |
 | Switch mode             | `/mugiwara guided\|semi\|auto`           |
@@ -418,7 +411,7 @@ Uninstall: `mugiwara uninstall`
 
 </details>
 
-All platforms get the full crew — 11 agents (+3 internal), 26 skills.
+All platforms get the full crew — 11 agents (+3 internal), 21 skills.
 Enforcement depth varies by harness; see the [harness matrix](docs/reference/harness-matrix.md).
 
 → [How the skills stay small: three-layer disclosure](docs/reference/skill-anatomy.md)

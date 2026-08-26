@@ -67,7 +67,7 @@ Inspect/control background tmux windows for the current session.
 | `kill` | `window` | kill a window |
 | `wait` | `window` | block until the window completes |
 
-`window` is a tmux window id like `@123`. All windows are scoped to the current opencode session.
+`window` accepts a tmux window id like `@123` or a stable job id like `a1b2c3d4`. Job ids are preferred: tmux window ids are recycled once the server restarts, while job ids are unique per run and are included in every background notice and notification. All windows are scoped to the current opencode session.
 
 ### Interactive workflows
 
@@ -84,7 +84,13 @@ Run that in the background (`background: true` or let it time out to background)
 
 When a backgrounded command finishes, the plugin sends a message to its session via the opencode client and triggers a new turn — you don't need to poll. The message contains the exit code, the command, and the output tail.
 
+A pending window that disappears **without** writing its exit-code file (killed externally, pane crash, tmux server restart) is also reported, as *"ended without recording an exit code"*, together with whatever output was captured up to that point.
+
 > The notification is delivered immediately on completion. If the agent is mid-turn, the message is queued by opencode's normal session handling.
+
+## tmux session lifetime
+
+Each opencode session maps to one tmux session. Sessions are created with `exit-empty off`, so they survive their last window closing — this keeps the tmux server alive and window ids monotonic (`@0`, `@1`, …) instead of restarting from `@0` after every command, which previously made ids ambiguous across runs.
 
 ## Configuration
 
