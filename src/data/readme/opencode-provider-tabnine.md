@@ -1,53 +1,36 @@
 # opencode-provider-tabnine
 
-OpenCode plugin that exposes Tabnine Agentic models as provider `tabnine`.
+> [!WARNING]
+> This unofficial project is deprecated and no longer maintained. Tabnine now
+> provides an official plugin for OpenCode.
 
-## Install
+- [Official repository](https://github.com/codota/tabnine-opencode-public)
+- [Official documentation](https://docs.tabnine.com/main/getting-started/tabnine-plugin-for-opencode)
 
-Install OpenCode, then install the provider plugin from npm:
+## Uninstall
 
-```bash
-opencode plugin -g opencode-provider-tabnine
-opencode auth login --provider tabnine
+OpenCode does not currently provide a plugin uninstall command. Open each
+existing global config file:
+
+```sh
+config_dir="${XDG_CONFIG_HOME:-$HOME/.config}/opencode"
+for config in "$config_dir/opencode.json" \
+  "$config_dir/opencode.jsonc" \
+  "$config_dir/config.json"; do
+  [ ! -f "$config" ] || "${EDITOR:-vi}" "$config"
+done
 ```
 
-Enter your Tabnine tenant URL when prompted, then choose browser or manual login. `TABNINE_HOST` configures normal provider operation but is not used to prefill the interactive login prompt.
+Remove every `plugin` entry for `opencode-provider-tabnine`, including a
+version suffix such as `opencode-provider-tabnine@0.1.5`. Then optionally remove
+OpenCode's downloaded copies:
 
-## Use From Source
-
-Add the plugin to an OpenCode config:
-
-```json
-{
-  "plugin": ["file:///absolute/path/to/opencode-tabnine"]
-}
+```sh
+cache="${XDG_CACHE_HOME:-$HOME/.cache}/opencode/packages"
+[ ! -d "$cache" ] || find "$cache" -maxdepth 1 -type d \
+  \( -name 'opencode-provider-tabnine' -o \
+  -name 'opencode-provider-tabnine@*' \) \
+  -exec rm -rf -- {} +
 ```
 
-Then authenticate:
-
-```bash
-opencode auth login tabnine
-```
-
-For normal provider operation, set `TABNINE_HOST` or make sure Tabnine CLI has `~/.tabnine/agent/settings.json` with `general.tabnineHost`. Use your Tabnine tenant URL:
-
-```bash
-export TABNINE_HOST=https://tabnine.example.com
-```
-
-Browser login starts a local callback server and opens Tabnine's custom-token login page. The plugin also honors `TABNINE_TOKEN`, `TABNINE_JWT`, and `TABNINE_REFRESH_TOKEN` for non-interactive configuration.
-
-After the first login, restart OpenCode so the config hook can load the persisted Tabnine host and refresh token, then choose provider `tabnine`.
-
-## Models
-
-When credentials are available, the plugin calls `GET /chat/v2/models`, filters to models with the `agent` capability, and registers the live list. Model IDs are tenant-specific, so the plugin does not bundle a fallback catalog.
-
-## Development
-
-```bash
-bun install
-bun run check
-bun run clean && bun run build
-npm pack --dry-run
-```
+No further fixes or releases are planned for this package.

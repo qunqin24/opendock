@@ -166,6 +166,11 @@ the agent picks up its guidance, and it will query and write memory on its own.
 Neovim and Kiro work the same way as Zed and JetBrains, through `knowl acp`. Cline needs one
 line pointing it at the shipped plugin. Any other MCP client works with no integration at all.
 
+Running agents in parallel? Every **git worktree** resolves to the main checkout's store —
+[Conductor](https://conductor.build) workspaces, Claude Code's `isolation: "worktree"`, or your
+own scripts all share one memory, with nothing to configure.
+[How that works, and its one limit →](docs/hosts.md#parallel-agents-and-git-worktrees)
+
 → [Every host, and what each one can do](docs/hosts.md) · [How agents use it](#how-agents-use-it) · [MCP tools and resources](docs/reference.md#mcp-tools-and-resources)
 
 ## The idea: memory that retires itself
@@ -573,7 +578,12 @@ knowl doctor                           # setup, retrieval, and registration
   from any directory, any number of times later. `knowl resume <key>`
 - **Optional transcript search** — off by default, and off means nothing exists on disk. Turn it on
   and past session prose becomes searchable, so a memory miss degrades to a slower lookup instead
-  of amnesia.
+  of amnesia. Keyword indexing keeps up on its own; semantic coverage is filled by
+  `knowl reindex --transcripts`, because an embedding model does not belong in a per-turn hook.
+- **The recall gap** — how often an agent edited a file this store already knew something about
+  without ever retrieving it. Invisible from inside a session, because an agent that never
+  retrieved an atom cannot notice the atom exists. Counted on every tool call, shown to nobody but
+  you, in `knowl status`.
 
 → [Tasks, sessions, and lifecycle](docs/reference.md#tasks-sessions-and-agent-lifecycle)
 

@@ -27,7 +27,7 @@ documentation.
 ## Install
 
 ```bash
-opencode2 plugin add opencode-rust-coder@0.2.0
+opencode2 plugin add opencode-rust-coder@0.2.2
 opencode2 plugin list
 ```
 
@@ -43,7 +43,7 @@ with the object form:
   "$schema": "https://opencode.ai/config.json",
   "plugins": [
     {
-      "package": "opencode-rust-coder@0.2.0",
+      "package": "opencode-rust-coder@0.2.2",
       "options": {
         "maxTokens": 900,
         "autoLsp": false,
@@ -94,6 +94,9 @@ guides the active agent through the available `rust.*` tools.
 - Rename/refactor tools never modify files or run server-returned commands.
 - Workspace and symlink escapes are rejected. Rustdoc cache lives outside the
   workspace.
+- Linked Git worktrees are isolated at their nearest `.git` root. Parent-project
+  detection ignores hidden nested worktrees, and Cargo commands pin and report the
+  selected `Cargo.toml` with `--manifest-path`.
 - `rust.check` and `rust.audit` require absolute project directories; a targeted
   audit path must remain relative to its requested directory.
 - All injected guidance is advisory. Compiler and test output remain the source

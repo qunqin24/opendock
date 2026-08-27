@@ -228,6 +228,11 @@ printed in the injected session-start block (`## throughline vX.Y.Z`) the same w
 it is on Claude Code and Codex - if it lags this repo's releases, your install is
 stale.
 
+Publishing to npm is tag-triggered: pushing a `vX.Y.Z` tag runs a GitHub Actions
+workflow that publishes `@dynamicagency/throughline-opencode` via npm Trusted
+Publishing (OIDC), with no long-lived npm token and an automatic provenance
+attestation on the published package.
+
 **Local-path install (testing unreleased changes).** Point `opencode.json` at a
 checkout of this repo instead of the package name:
 

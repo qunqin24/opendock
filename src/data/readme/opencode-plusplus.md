@@ -17,6 +17,15 @@ OpenCode++ is not another chat application and it is not a replacement model. It
 - evaluating policy, freshness, regression, hallucination, and convergence gates;
 - explaining whether the next action is repair, repack, human review, or finalize.
 
+The control flow is deliberately layered:
+
+```text
+Context Registry -> Retrieval -> Guard -> Evidence -> Intervention / Decision
+       guidance       selection    boundaries   proof       explanation
+```
+
+Context Registry entries and annotations help the model find relevant code and understand API or version differences. Retrieval selects and explains files, but does not grant permission. Guards block unsafe commands, protected paths, stale Context, and boundary violations. Evidence evaluates command or CI results against the current working tree. Intervention records what OpenCode++ observed, prevented, requested, repaired, verified, or left for human review.
+
 ## What It Can Do Now
 
 The Windows installer adds one selectable OpenCode primary mode named **OpenCode++**. Select it from the mode picker shown at the bottom of the prompt box, then describe the coding task normally. There are no OpenCode++ Slash Commands to remember.
@@ -26,6 +35,8 @@ The Windows installer adds one selectable OpenCode primary mode named **OpenCode
 When the mode is selected, its prompt instructs the current OpenCode model to use the in-process plugin tools. The plugin does not start a second model or a CLI process. It runs inside OpenCode Desktop and writes auditable runtime artifacts into the repository's `.agent-context/` directory.
 
 The EXE installer is per-user, works on Windows x64, and does not require Administrator permission.
+
+By default the plugin works offline: it does not fetch remote Context sources and does not call a second model. A configured remote source or feedback transport must be explicitly enabled. The active OpenCode model remains responsible for reading, editing, and running commands; OpenCode++ supplies deterministic tools and gates around that work.
 
 ## Install And Use
 
@@ -39,7 +50,8 @@ The EXE installer is per-user, works on Windows x64, and does not require Admini
 5. Select **OpenCode++** in the mode picker.
 6. Enter a normal request, such as `Fix the login timeout and add a regression test`.
 7. Let the selected mode call `prepare`, `retrieve`, `evaluate`, and `next` while it works. Do not switch back to Build for a task that needs the Harness gates.
-8. Inspect `.agent-context/` when you need the trace, findings, required commands, or final report.
+8. Inspect the returned **Harness Dashboard** after `evaluate`, or call `opencode_plusplus_dashboard`, to see stage progress, selected and rejected files, decision basis, evidence freshness, interventions, and the final summary.
+9. Inspect `.agent-context/` when you need the trace, findings, required commands, or final report.
 
 The installer writes only these OpenCode configuration files:
 
@@ -60,8 +72,29 @@ Runtime evidence is local to each repository:
 - `.agent-context/runs/` contains task context and edit boundaries;
 - `.agent-context/loops/` contains decisions and convergence state;
 - `.agent-context/sidecar/latest.md` contains the latest verification summary.
+- `.agent-context/sidecar/visualization.json` contains the latest structured Harness Dashboard snapshot.
 
 The plugin is not an operating-system sandbox. It cannot stop another application from editing a file, prove business semantics from an exit code, or guarantee that an opaque tool argument is correctly classified. A passing command is evidence, not a complete correctness proof. Blocking results require the selected mode to repair or request human review.
+
+### What The User Sees
+
+The Desktop tool result includes a visible Harness Dashboard. It shows `Plan -> Prepare -> Retrieve -> Execute -> Collect -> Evaluate -> Decide -> Persist -> Finalize`, with completed, active, blocked, and pending stages. It also shows the current decision, required commands, current working-tree hash capture, evidence status, intervention counts, selected/rejected files, and a concise final summary.
+
+The dashboard exposes recorded system facts and decision inputs. It does not expose hidden model chain-of-thought. This keeps the view useful for debugging and review without presenting private internal reasoning as an auditable fact.
+
+The Desktop result and `.agent-context/sidecar/latest.md` distinguish four questions:
+
+- **Intervened files:** files selected for inspection, edited within the boundary, or rejected with a reason;
+- **Blocked risks:** unsafe commands, protected paths, stale Context, missing tests, policy violations, or unresolved regressions;
+- **Suggested fixes:** requested actions or executor-reported edits that still need evidence;
+- **Verified fixes:** repairs followed by fresh command or CI evidence for the current working tree;
+- **Human work:** unresolved findings, repeated no-progress states, or semantic decisions the Harness cannot prove.
+
+`verified fix` is therefore narrower than `suggested fix`. An annotation, Context document, manual claim, successful earlier test, or source edit cannot become verified merely because it looks plausible. External Context is untrusted guidance, and annotation is local knowledge, not policy.
+
+Context cache and registry usage are stored under `.agent-context/cache/` and `.agent-context/context-registry/usage/`. Local feedback is stored under `.agent-context/context-registry/feedback/`, annotations under `.agent-context/knowledge/annotations/`, and intervention records under `.agent-context/interventions/`. These are local runtime artifacts and should normally remain uncommitted.
+
+On Windows, paths with spaces and non-ASCII characters are supported, but the plugin still depends on the active user's permissions, the repository being writable, and OpenCode Desktop loading the configured plugin directory. Antivirus locks, read-only folders, unavailable network sources, invalid registry content, and permission failures are reported as diagnostics or human-review states; they are not converted into successful verification.
 
 ## Customize Your Own Harness
 

@@ -14,6 +14,9 @@ OpenCode's own TUI, and most frontends, already collapse or fold long tool
 output themselves. This plugin is for the ones that do not — for example Zed,
 which renders tool output raw and leaves it expanded by default.
 
+<img width="535" height="270" alt="image" src="https://github.com/user-attachments/assets/0df6cd9b-d840-4e1e-988c-938d3bb5f5e6" />
+
+
 ## What it does
 
 1. **Session baseline** — diagnostics already reported in a previous round are

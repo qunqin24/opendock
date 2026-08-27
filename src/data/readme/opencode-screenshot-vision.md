@@ -28,6 +28,7 @@ This is a parallel project built for learning, not a competitor claiming to repl
 - Single `vision` tool — one call, no new workflow to learn.
 - Reads screenshots from three sources: the latest browser screenshot, a pasted/dropped image in the conversation, or a file on disk.
 - Automatic fallback across three backends: a local OpenAI-compatible runtime, then OpenCode Zen free, then Zen paid.
+- Auto-description: after a browser screenshot or a pasted/dropped image, its text description is injected automatically (appended by default), so a text-only model never has to be told to read it. Configurable via `OPENCODE_VISION_AUTO_MODE`.
 - Direct HTTP calls to the vision backends, rather than opencode's model path: in testing, an image attached through opencode did not reach the local Ollama model, while a direct HTTP call to Ollama did.
 - Built-in safety: prompt-injection defense, path containment, MIME sniffing, a 10 MB size limit, and a 2,048-token output cap.
 
@@ -151,6 +152,7 @@ Only the settings below are configurable, via optional environment variables. Ev
 | `OPENCODE_VISION_CLOUD_TIMEOUT_MS` | `45000` | Zen request timeout, milliseconds |
 | `OPENCODE_VISION_MAX_IMAGE_BYTES` | `10485760` (10 MB) | Max image size for path-based loads |
 | `OPENCODE_VISION_USER_AGENT` | Chrome 126 UA | `User-Agent` header sent to Zen |
+| `OPENCODE_VISION_AUTO_MODE` | `append` | Auto-describe browser screenshots and pasted images: `append` (add description after the image), `replace` (description replaces the image), `off` (manual `vision` only) |
 | `OPENCODE_VISION_ALLOWED_ROOTS` | *(empty)* | Extra directories readable via `path`, separated by the OS path delimiter |
 | `OPENCODE_API_KEY` | *(from auth.json)* | Overrides the Zen API key |
 | `OPENCODE_AUTH_CONTENT` | *(unset)* | `auth.json` contents provided as an environment string |

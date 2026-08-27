@@ -44,7 +44,7 @@ makdoong2-team doctor            # 설치 진단
 
 ## 2. 에이전트와 단계
 
-에이전트 **7개**. 권한이 좁을수록 사고 반경이 좁다는 원칙으로 나눴다.
+워크플로우 에이전트 **7개** + 사용자 전용 유틸리티 에이전트 1개. 권한이 좁을수록 사고 반경이 좁다는 원칙으로 나눴다.
 
 | 에이전트 | 담당 | 권한 |
 |---|---|---|
@@ -55,6 +55,7 @@ makdoong2-team doctor            # 설치 진단
 | `makdoong2-publisher` | 3_delivery 3단계 | **git add/commit/push 직접 실행** + bitbucket MCP |
 | `makdoong2-verifier` | 메타 검증 | 읽기 전용 |
 | `makdoong2-researcher` | 리서치 fan-out 워커 | 읽기 전용 + 리서치 MCP — 소스 1개 전담 |
+| `makdoong2-issue-reporter` | 플러그인 오류 GitHub 이슈 등록 | **전권 (bash/write allow)** — 사용자 직접 호출 전용 |
 
 > **Publisher 는 직접 실행자다.** commit·pr·review 모두 publisher 가 worktree 에서 직접 git 명령과 MCP 를 호출한다. 부장님은 git 권한이 아예 없고 dispatch 와 verdict 수신만 한다. (구버전의 "spec 계산 → 부장님 실행" 하이브리드 모델은 폐기됐다.)
 
@@ -93,6 +94,19 @@ makdoong2-team doctor            # 설치 진단
 - 한 소스가 실패해도 나머지 결과는 그대로 남는다 (부분 성공이 정상)
 
 결과는 `.makdoong2-team/<이슈>/research-findings.json` 으로 병합된다. 상세: ARCHITECTURE.md §3.6
+
+### 오류 이슈 등록 — `/makdoong2-issue-reporter`
+
+플러그인이 오작동했을 때(행 걸림, 잘못된 프롬프트 injection, 단계 실패 반복 등) 다음 커맨드로 GitHub 이슈를 등록한다:
+
+```
+/makdoong2-issue-reporter [증상 한 줄 설명(선택)]
+```
+
+- 커맨드가 **전용 full-permission 에이전트**(`makdoong2-issue-reporter`)로 라우팅되어, 호출 시점 이전의 로그·프롬프트·세션 컨텍스트를 스스로 수집해 이상 지점을 포착하고 [y00njinuk/makdoong2-team issues](https://github.com/y00njinuk/makdoong2-team/issues) 에 등록한다.
+- **사용자 직접 호출이 유일한 트리거**다. 부장님·막둥이가 실패를 관측했다고 자율적으로 이슈를 만들지 않는다 (훅이 차단).
+- 저장소가 public 이므로 사내 정보는 마스킹 후 첨부되며, **전송 전 마스킹 요약에 대한 사용자 최종 승인**을 반드시 거친다.
+- PAT 는 `~/.config/opencode/.github` 파일에서 읽는다. 상세: ARCHITECTURE.md §4.6
 
 ---
 

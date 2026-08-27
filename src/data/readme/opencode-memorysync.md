@@ -43,7 +43,7 @@ tests/live-local.md                     # model-visible verification runbook
 ## Release flow (public distribution)
 
 Distribution happens from the dedicated PUBLIC repo
-**`Rafay121/memorysync-plugins`** (renamed from `memorysync-claude` —
+**`memorysyncio/memorysync-plugins`** (renamed from `memorysync-claude` —
 GitHub redirects the old name, so existing Claude installs keep
 updating). Its content is exactly this folder minus `tests/`:
 
@@ -55,12 +55,12 @@ updating). Its content is exactly this folder minus `tests/`:
    `marketplace.json`, `plugins/`, `examples/` and this README to the
    public repo checkout; commit and push to `main`.
 3. Installs:
-   - Claude Code: `/plugin marketplace add Rafay121/memorysync-plugins`
+   - Claude Code: `/plugin marketplace add memorysyncio/memorysync-plugins`
      → `/plugin install memorysync@memorysync`
    - Cursor: team marketplace import of the repo, or local
      `~/.cursor/plugins/local/memorysync`; official listing via
      cursor.com/marketplace/publish (manual review)
-   - Codex: `codex plugin marketplace add Rafay121/memorysync-plugins`
+   - Codex: `codex plugin marketplace add memorysyncio/memorysync-plugins`
      → `codex plugin add memorysync@memorysync`
    - Devin CLI: copy `examples/devin/hooks.v1.json` to
      `~/.config/devin/hooks.v1.json` (or a repo's `.devin/`), point the
@@ -69,12 +69,12 @@ updating). Its content is exactly this folder minus `tests/`:
      `examples/devin/rules/memorysync.md` → `.devin/rules/`. MCP:
      `npx memorysync-mcp-install --client devin-desktop`. Devin's
      closed-beta plugin system loads Claude-format plugins, so
-     `devin plugins install Rafay121/memorysync-plugins` is expected to
+     `devin plugins install memorysyncio/memorysync-plugins` is expected to
      work as access opens up.
    - Google Antigravity: the `antigravity/` folder is a complete plugin
      bundle (plugin.json + mcp_config.json + hooks.json + skills +
      rule + script copies). Install:
-     `npx degit Rafay121/memorysync-plugins/antigravity ~/.gemini/config/plugins/memorysync`.
+     `npx degit memorysyncio/memorysync-plugins/antigravity ~/.gemini/config/plugins/memorysync`.
      The bundle's `scripts/` are byte-copies of `plugins/memorysync/scripts/`
      — a CI test enforces they never drift.
 

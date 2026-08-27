@@ -15,9 +15,9 @@ wheel, a source distribution, or a runtime library.
 ## Technical English
 
 All Athena English technical prose must follow the
-[ASD-STE100 technical-English policy](skills/TECHNICAL_ENGLISH.md). This rule applies to skill sources
-and to prose that a skill produces. The engineering principles catalog and literal text do not have
-to follow this rule.
+[ASD-STE100 technical-English policy](skills/TECHNICAL_ENGLISH.md). This rule is for skill sources,
+the engineering principles catalog, and prose that a skill produces. Literal text does not have to
+obey this rule.
 
 The current official ASD-STE100 standard is the complete authority. Athena checks do not certify
 conformance to the standard.

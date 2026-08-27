@@ -93,6 +93,12 @@ mv ~/.cache/opencode/packages/opencode-status-bar@latest ~/.Trash/
     "alert": 0.9      // ≥ 此值 → 红色 + 呼吸
   },
 
+  // ── 子代理监控 ──
+  "subagent": {
+    "ttlDays": 3      // 记录保留天数（0 = 永久）；记录持久化到 KV，
+                      // 跨视图切换 / 插件重载 / 重启均存活，访问会话自动续期
+  },
+
   // ── 余额查询（见下文 Provider 脚本格式）──
   "balances": [ /* ... */ ]
 }

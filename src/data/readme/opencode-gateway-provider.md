@@ -18,24 +18,93 @@ plugin can fill in `provider.<id>.models`:
 2. Fetch the gateway's model list from `{baseURL}/v1/models` (or
    `{baseURL}/models` when the configured baseURL already ends in `/v1`),
    authenticated with a bearer key from an environment variable.
-3. Ask opencode 1.18.15's SDK for its internal models.dev-backed Catalog via
-   `client.v2.model.list()` (`GET /api/model`). The plugin reuses opencode's
-   authenticated in-process transport, so it performs no models.dev network
-    request and reads no cache file. Map each gateway model id using the lookup
-    strategy:
-    exact bare-id match → substring match → `-free` tier fallback, with a
-    deterministic provider preference when several Catalog rows share an id.
-    Reverse-substring matches must cover at least half of the gateway slug so
-    generic ids such as `auto` cannot capture `codex-auto-review`.
-4. Build the config-shape model entries with generous defaults for unknown
-   models and models.dev overrides where the catalog is authoritative.
+3. Identify the native host from the directory header already configured on
+   `PluginInput.client` (`x-opencode-directory`, `x-kilo-directory`, or
+   `x-mimocode-directory`) and read the exact catalog file used by that host.
+   OCP's explicit `OPENCODE_COMPAT_HOST` setting is honored first. OpenCode,
+   Kilo, and MiMo model-path and model-URL overrides are mirrored exactly;
+   `XDG_CACHE_HOME` and MiMo's self-contained `MIMOCODE_HOME` layout are also
+   respected. The plugin reads only that one existing file. It performs no
+   catalog download, subprocess, directory probing, or alternate-source
+   fallback.
+4. Match the complete gateway model ID against the provider rows; suffixes such
+   as `-free` remain part of the ID. If exactly one distinct provider exposes
+   that exact full ID, use it. A qualified ID such as
+   `poolside/laguna-s-2.1-free` is not the same ID as
+   `laguna-s-2.1-free`. If several providers expose the exact ID, use only the
+   provider whose ID is identified as the native namespace by other catalog IDs—for example,
+   reseller IDs named `moonshotai/kimi-k3` identify `moonshotai` as the native
+   owner of `kimi-k3`. Self-prefixed reseller IDs are not native evidence. If
+   there is no single native owner, emit defaults. There is no provider order,
+   variant consensus, fuzzy match, or model-family fallback.
+5. Build the config-shape model entries with generous defaults for unknown
+   models and models.dev overrides where the native catalog entry is
+   authoritative. Reasoning variant names come only from explicit string values
+   in models.dev `reasoning_options` entries of type `effort`; toggle and token
+   budget labels are not invented. Variants are emitted as translated labels
+   (`None`, `Low`, `Medium`, `High`, `Extra High`, `Max`, plus `Default`/`Minimal`
+   when the catalog lists them) with disabled tombstones for the raw effort keys
+   so OpenCode's merge drops the raw `xhigh`/`none`/… entries. `null` effort
+   values are normalized to `none`. Unknown effort tokens are passed through
+   verbatim without Responses-only fields. For `@ai-sdk/openai` the selected
+   variant also sets `reasoningSummary: "auto"` and
+   `include: ["reasoning.encrypted_content"]` when the effort is greater than
+   `low`; `@ai-sdk/openai-compatible` keeps `reasoningEffort` only. Provider-
+   specific catalog request headers and bodies are deliberately not inherited, so
+   an Anthropic or other native row cannot change the gateway's OpenAI request
+   shape.
 
 The gateway slug is always kept verbatim as the model id — it is what the
-gateway expects on chat requests. `-free` gateway aliases get a ` Free` suffix
-on the display name and never inherit the paid native rate.
+gateway expects on chat requests. `-free` models are looked up using that full
+ID, get a ` Free` display suffix when needed, and never inherit the paid native
+rate.
 
 Models you declare explicitly in `opencode.json` are respected and never
 overwritten; discovery only fills the gap.
+
+OpenCode 1.18.x filters and clears reasoning metadata while building
+`/api/model`, while `/provider` depends on the same config hook completing.
+The `/path` and `/file/content` routes are also instance-scoped: calling either
+from a `config` hook can re-enter instance bootstrap and wait on the plugin
+which made the call. Reading the one host-resolved catalog file in-process
+avoids all three lifecycle paths.
+For example, `litellm/kimi-k3` resolves to the native `moonshotai/kimi-k3`
+metadata and inherits its explicit `low`, `high`, and `max` effort values while
+chat requests still use LiteLLM's OpenAI-compatible endpoint. If the cache is
+unavailable, every gateway model is still emitted with defaults.
+
+The native cache resolution rules are:
+
+| Host | Exact file override | Custom source | Default cache file |
+| --- | --- | --- | --- |
+| OpenCode | `OPENCODE_MODELS_PATH` | `OPENCODE_MODELS_URL` | `${XDG_CACHE_HOME:-~/.cache}/opencode/models.json` |
+| Kilo | `KILO_MODELS_PATH` | `KILO_MODELS_URL` | `${XDG_CACHE_HOME:-~/.cache}/kilo/models.json` |
+| MiMo | `MIMOCODE_MODELS_PATH` | `MIMOCODE_MODELS_URL` | `${XDG_CACHE_HOME:-~/.cache}/mimocode/models.json`, or `$MIMOCODE_HOME/cache/models.json` |
+
+A custom source uses the same `models-<sha1(source)>.json` filename as the
+native host. An exact file override wins over every cache convention, just as
+it does in the host source. The plugin never downloads or writes a catalog file.
+
+Optional per-model patches live in the same host cache directory:
+
+`${XDG_CACHE_HOME:-~/.cache}/opencode/gateway-model-overrides.json`
+
+Kilo and MiMo use their cache roots the same way. Set
+`GATEWAY_MODEL_OVERRIDES` to use an explicit file. Missing files are ignored.
+
+```json
+{
+  "models": {
+    "gpt-5.6-luna": {
+      "name": "GPT-5.6 Luna",
+      "provider": "openai",
+      "context_size": 1050000,
+      "pricing": { "input": 0.2, "output": 1.2, "cache_read": 0.02, "cache_write": 0.25 },
+      "variants": ["none", "low", "medium", "high", "xhigh", "max"]
+    }
+  }
+}
+```
 
 ## Setup
 

@@ -6,7 +6,7 @@ Experimental code review agent and TUI review ledger plugin for OpenCode.
 
 ## Requirements
 
-- OpenCode
+- OpenCode 1.18.23 or newer
 - A git repository to review
 
 ## Install
@@ -70,8 +70,8 @@ Use a local source path in your OpenCode TUI config:
 ```json
 {
   "$schema": "https://opencode.ai/tui.json",
-  "plugin": ["file:///Users/you/opencode-plugins/opencode-ledger/src/tui.tsx"]
+  "plugin": ["file:///absolute/path/to/opencode-ledger/src/tui.tsx"]
 }
 ```
 
-Replace `/Users/you` with your actual path. Restart OpenCode after changing the config.
+Replace `/absolute/path/to/opencode-ledger` with the absolute path to your checkout. Restart OpenCode after changing the config.
