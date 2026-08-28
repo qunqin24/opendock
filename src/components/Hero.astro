@@ -44,35 +44,22 @@ const quickTags = [
 ] as const;
 ---
 
-<section class="relative overflow-hidden border-b border-border/80 bg-gradient-to-b from-secondary/40 via-background to-background pt-12 pb-16 sm:pt-18 sm:pb-20">
-  {/* Ambient background glow accents */}
-  <div
-    class="pointer-events-none absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 size-[650px] rounded-full bg-gradient-to-tr from-dock/15 via-amber-500/10 to-transparent blur-3xl"
-    aria-hidden="true"
-  />
-  <div
-    class="pointer-events-none absolute -bottom-20 right-0 size-[400px] rounded-full bg-ok/5 blur-3xl"
-    aria-hidden="true"
-  />
-
-  <div class="relative mx-auto max-w-6xl px-4 sm:px-6">
+<section class="border-b border-border/80 pt-14 pb-16 sm:pt-20 sm:pb-20">
+  <div class="mx-auto max-w-6xl px-4 sm:px-6">
     <!-- Hero Header: Headline & Subtitle -->
     <div class="mx-auto max-w-3xl text-center">
-      <h1 class="text-balance text-4xl font-extrabold tracking-tight text-foreground sm:text-5xl lg:text-6xl">
-        {t('home.hero.title.before')}<span
-          class="bg-gradient-to-r from-foreground via-foreground/90 to-muted-foreground bg-clip-text text-transparent"
-          >opencode</span
-        >{t('home.hero.title.after')}
+      <h1 class="text-balance text-4xl font-semibold tracking-tight text-foreground sm:text-5xl">
+        {t('home.hero.title.before')}<span class="font-mono">OpenCode</span>{t('home.hero.title.after')}
       </h1>
 
-      <p class="mt-4 text-balance text-base text-muted-foreground sm:text-lg sm:leading-8">
+      <p class="mx-auto mt-4 max-w-xl text-balance text-base text-muted-foreground sm:leading-7">
         {t('home.hero.subtitle', { total: formatNumber(census.total) })}
       </p>
 
       <!-- Central Search Box -->
       <form action={localePath(lang, '/plugins')} method="get" class="relative mx-auto mt-8 max-w-xl">
-        <div class="group relative flex items-center rounded-2xl border-2 border-border bg-card p-1.5 shadow-lg shadow-foreground/[0.03] transition-all focus-within:border-foreground/80 focus-within:ring-4 focus-within:ring-foreground/5 hover:border-foreground/40">
-          <div class="grid size-10 place-items-center text-muted-foreground">
+        <div class="flex items-center rounded-lg border border-border bg-card p-1 transition-colors focus-within:border-foreground/50 hover:border-foreground/30">
+          <div class="grid size-10 shrink-0 place-items-center text-muted-foreground">
             <svg viewBox="0 0 20 20" fill="currentColor" class="size-5" aria-hidden="true">
               <path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11ZM2 9a7 7 0 1 1 12.452 4.391l3.328 3.329a.75.75 0 1 1-1.06 1.06l-3.329-3.328A7 7 0 0 1 2 9Z" clip-rule="evenodd" />
             </svg>
@@ -87,13 +74,13 @@ const quickTags = [
             class="min-w-0 flex-1 bg-transparent px-2 text-sm text-foreground placeholder:text-muted-foreground/70 focus:outline-none"
           />
 
-          <div class="flex items-center gap-1.5 pr-2">
+          <div class="flex items-center gap-1.5 pr-1.5">
             <kbd class="hidden rounded-md border border-border bg-muted px-2 py-0.5 font-mono text-[0.6875rem] font-medium text-muted-foreground sm:inline-block">
               /
             </kbd>
             <button
               type="submit"
-              class="inline-flex items-center justify-center rounded-xl bg-foreground px-4 py-2 text-xs font-semibold text-background transition-opacity hover:opacity-90 active:scale-95"
+              class="inline-flex items-center justify-center rounded-md bg-foreground px-4 py-2 text-xs font-medium text-background transition-opacity hover:opacity-85"
             >
               {t('home.hero.search')}
             </button>
@@ -102,13 +89,13 @@ const quickTags = [
       </form>
 
       <!-- Quick Chips -->
-      <div class="mt-4 flex flex-wrap items-center justify-center gap-1.5 text-xs">
+      <div class="mt-5 flex flex-wrap items-center justify-center gap-x-1 gap-y-2 text-xs">
         <span class="text-muted-foreground/80 mr-1 font-mono text-[0.6875rem]">{t('home.hero.popular')}</span>
         {
           quickTags.map((tag) => (
             <a
               href={localePath(lang, tag.href)}
-              class="rounded-full border border-border/80 bg-card/60 px-2.5 py-1 text-xs text-muted-foreground transition-all hover:border-foreground/40 hover:bg-secondary hover:text-foreground"
+              class="rounded-md px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
             >
               {t(`home.tag.${tag.key}` as const)}
             </a>
@@ -117,17 +104,17 @@ const quickTags = [
       </div>
     </div>
 
-    <!-- Bento Metrics & Health Pulse Grid -->
-    <div class="mt-14 grid gap-4 sm:grid-cols-2 lg:grid-cols-12">
+    <!-- Metrics & Health Distribution -->
+    <div class="mt-14 grid gap-px overflow-hidden rounded-lg border border-border/80 bg-border/80 sm:grid-cols-2 lg:grid-cols-12">
       <!-- 4 Metric Cards (8 cols) -->
-      <div class="grid grid-cols-2 gap-4 lg:col-span-8">
-        <div class="rounded-2xl border border-border/80 bg-card p-5 transition-colors hover:border-border">
-          <p class="text-xs font-medium text-muted-foreground">{t('home.metric.indexed')}</p>
+      <div class="grid grid-cols-2 gap-px bg-border/80 lg:col-span-8">
+        <div class="bg-card p-5">
+          <p class="text-xs text-muted-foreground">{t('home.metric.indexed')}</p>
           <div class="mt-2 flex items-baseline gap-2">
-            <span class="tabular font-mono text-3xl font-extrabold tracking-tight text-foreground sm:text-4xl">
+            <span class="tabular font-mono text-3xl font-medium tracking-tight text-foreground">
               {formatNumber(census.total)}
             </span>
-            <span class="rounded bg-dock/15 px-1.5 py-0.5 font-mono text-[0.6875rem] font-bold text-dock">
+            <span class="rounded border border-border/70 px-1.5 py-0.5 font-mono text-[0.6875rem] text-muted-foreground">
               {t('home.metric.indexedTag')}
             </span>
           </div>
@@ -136,10 +123,10 @@ const quickTags = [
           </p>
         </div>
 
-        <div class="rounded-2xl border border-border/80 bg-card p-5 transition-colors hover:border-border">
-          <p class="text-xs font-medium text-muted-foreground">{t('home.metric.stars')}</p>
+        <div class="bg-card p-5">
+          <p class="text-xs text-muted-foreground">{t('home.metric.stars')}</p>
           <div class="mt-2 flex items-baseline gap-2">
-            <span class="tabular font-mono text-3xl font-extrabold tracking-tight text-foreground sm:text-4xl">
+            <span class="tabular font-mono text-3xl font-medium tracking-tight text-foreground">
               {compactNumber(totals.stars)}
             </span>
             <span class="inline-flex items-center text-amber-500">
@@ -153,13 +140,13 @@ const quickTags = [
           </p>
         </div>
 
-        <div class="rounded-2xl border border-border/80 bg-card p-5 transition-colors hover:border-border">
-          <p class="text-xs font-medium text-muted-foreground">{t('home.metric.downloads')}</p>
+        <div class="bg-card p-5">
+          <p class="text-xs text-muted-foreground">{t('home.metric.downloads')}</p>
           <div class="mt-2 flex items-baseline gap-2">
-            <span class="tabular font-mono text-3xl font-extrabold tracking-tight text-foreground sm:text-4xl">
+            <span class="tabular font-mono text-3xl font-medium tracking-tight text-foreground">
               {compactNumber(totals.downloadsMonth)}
             </span>
-            <span class="text-xs font-medium text-muted-foreground font-mono">
+            <span class="text-xs text-muted-foreground font-mono">
               /mo
             </span>
           </div>
@@ -168,13 +155,13 @@ const quickTags = [
           </p>
         </div>
 
-        <div class="rounded-2xl border border-border/80 bg-card p-5 transition-colors hover:border-border">
-          <p class="text-xs font-medium text-muted-foreground">{t('home.metric.active')}</p>
+        <div class="bg-card p-5">
+          <p class="text-xs text-muted-foreground">{t('home.metric.active')}</p>
           <div class="mt-2 flex items-baseline gap-2">
-            <span class="tabular font-mono text-3xl font-extrabold tracking-tight text-ok sm:text-4xl">
+            <span class="tabular font-mono text-3xl font-medium tracking-tight text-ok">
               {activeRate}%
             </span>
-            <span class="rounded bg-ok-bg px-1.5 py-0.5 font-mono text-[0.6875rem] font-bold text-ok">
+            <span class="rounded border border-border/70 px-1.5 py-0.5 font-mono text-[0.6875rem] text-muted-foreground">
               ACTIVE
             </span>
           </div>
@@ -184,27 +171,27 @@ const quickTags = [
         </div>
       </div>
 
-      <!-- Health Distribution Pulse (4 cols) -->
-      <div class="flex flex-col justify-between rounded-2xl border border-border/80 bg-card p-5 lg:col-span-4">
+      <!-- Health Distribution (4 cols) -->
+      <div class="flex flex-col justify-between bg-card p-5 lg:col-span-4">
         <div>
           <div class="flex items-center justify-between">
-            <p class="text-xs font-semibold tracking-wide text-foreground uppercase">
+            <p class="text-xs font-medium text-foreground">
               {t('home.pulse.title')}
             </p>
-            <span class="tabular font-mono text-xs text-muted-foreground">
+            <span class="tabular font-mono text-[0.6875rem] text-muted-foreground">
               {t('home.pulse.sample', { cells: CELLS, total: formatNumber(census.total) })}
             </span>
           </div>
 
           <!-- Sampling Dot Grid -->
           <div
-            class="dock-sweep relative mt-3 overflow-hidden rounded-xl border border-border/60 bg-muted/40 p-2.5"
+            class="mt-3 rounded-md border border-border/60 bg-muted/40 p-2.5"
             role="img"
             aria-label={t('home.pulse.aria', { rate: activeRate })}
           >
             <div class="grid grid-cols-[repeat(15,minmax(0,1fr))] gap-[3px]">
               {grid.map((level) => (
-                <span class={`aspect-square rounded-[2px] transition-transform hover:scale-125 ${cellTone[level]}`} />
+                <span class={`aspect-square rounded-[2px] ${cellTone[level]}`} />
               ))}
             </div>
           </div>

@@ -6,21 +6,91 @@ const t = useTranslations(lang);
 // Same page, other locale — never a blanket link to the home page, which is
 // the usual way language switchers lose your place.
 const barePath = stripLocale(Astro.url.pathname);
-const other = LOCALES.filter((l) => l !== lang);
 ---
 
-<div class="flex items-center rounded-md border border-border/80 p-0.5" role="group" aria-label={t('a11y.switchLanguage')}>
-  <span class="rounded px-1.5 py-0.5 text-xs font-semibold text-foreground">{LOCALE_NAME[lang]}</span>
-  {
-    other.map((l) => (
-      <a
-        href={localePath(l, barePath)}
-        hreflang={HTML_LANG[l]}
-        lang={HTML_LANG[l]}
-        class="rounded px-1.5 py-0.5 text-xs text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-      >
-        {LOCALE_NAME[l]}
-      </a>
-    ))
-  }
+<div class="relative" data-language-switcher>
+  <button
+    type="button"
+    class="flex h-9 items-center gap-1 rounded-md px-2.5 text-sm text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+    aria-label={t('a11y.switchLanguage')}
+    aria-haspopup="menu"
+    aria-expanded="false"
+    data-switcher-button
+  >
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" class="size-4" aria-hidden="true">
+      <path d="M2.5 3h5M5 3v-.5M7 3c-.5 2.5-2.5 4.5-4.5 5.5M4 5.5C4.7 7 6.2 8.2 8 8.8M8.5 13.5l2.7-6.5 2.7 6.5M9.5 11.3h3.4"></path>
+    </svg>
+    <span class="text-xs font-medium">{LOCALE_NAME[lang]}</span>
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" class="size-3 transition-transform" aria-hidden="true" data-switcher-chevron>
+      <path d="M4 6l4 4 4-4"></path>
+    </svg>
+  </button>
+
+  <div
+    class="invisible absolute right-0 top-full z-50 mt-1.5 min-w-32 rounded-md border border-border bg-popover p-1 opacity-0 shadow-md transition-[opacity,transform] duration-100 data-[open]:visible data-[open]:opacity-100"
+    role="menu"
+    data-switcher-menu
+  >
+    {
+      LOCALES.map((l) => (
+        <a
+          href={localePath(l, barePath)}
+          hreflang={HTML_LANG[l]}
+          lang={HTML_LANG[l]}
+          role="menuitem"
+          aria-current={l === lang ? 'true' : undefined}
+          class:list={[
+            'flex items-center justify-between gap-3 rounded px-2.5 py-1.5 text-sm transition-colors',
+            l === lang
+              ? 'bg-secondary font-medium text-foreground'
+              : 'text-muted-foreground hover:bg-secondary/60 hover:text-foreground',
+          ]}
+        >
+          {LOCALE_NAME[l]}
+          {l === lang && (
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" class="size-3.5" aria-hidden="true">
+              <path d="M3 8.5 6.5 12 13 4.5"></path>
+            </svg>
+          )}
+        </a>
+      ))
+    }
+  </div>
 </div>
+
+<script>
+  // Re-bound after every soft navigation: this module runs once, but the
+  // switcher markup it reaches into is replaced on each swap.
+  document.addEventListener('astro:page-load', () => {
+    for (const root of document.querySelectorAll('[data-language-switcher]')) {
+      const btn = root.querySelector<HTMLButtonElement>('[data-switcher-button]');
+      const menu = root.querySelector<HTMLElement>('[data-switcher-menu]');
+      const chevron = root.querySelector<HTMLElement>('[data-switcher-chevron]');
+      if (!btn || !menu) continue;
+
+      const setOpen = (open: boolean) => {
+        menu.toggleAttribute('data-open', open);
+        btn.setAttribute('aria-expanded', String(open));
+        chevron?.classList.toggle('rotate-180', open);
+      };
+
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        setOpen(!menu.hasAttribute('data-open'));
+      });
+
+      menu.addEventListener('click', () => setOpen(false));
+
+      document.addEventListener('click', (e) => {
+        if (menu.hasAttribute('data-open') && !root.contains(e.target as Node)) setOpen(false);
+      });
+
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && menu.hasAttribute('data-open')) {
+          setOpen(false);
+          btn.focus();
+        }
+      });
+    }
+  });
+</script>

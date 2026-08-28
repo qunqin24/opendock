@@ -1,0 +1,35 @@
+name: 网站 Bug
+description: 页面渲染、搜索、导航等站点功能问题
+title: "[Bug] "
+labels: [bug]
+body:
+  - type: input
+    id: url
+    attributes:
+      label: 出问题的页面
+      placeholder: https://www.opendock.net/plugins/...
+    validations:
+      required: true
+
+  - type: textarea
+    id: what
+    attributes:
+      label: 发生了什么
+      description: 实际看到的现象；有截图更好
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: 期望的行为
+    validations:
+      required: true
+
+  - type: input
+    id: env
+    attributes:
+      label: 浏览器与设备
+      placeholder: 例如 Safari 26 / macOS，或 Chrome / Android
+    validations:
+      required: false

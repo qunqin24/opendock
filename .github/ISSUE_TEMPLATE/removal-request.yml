@@ -1,0 +1,40 @@
+name: 下架 / 黑名单请求
+description: 要求停止收录某个包，或举报恶意、侵权的包
+title: "[下架] "
+labels: [removal]
+body:
+  - type: input
+    id: package
+    attributes:
+      label: 包名
+      description: npm 上的完整包名
+      placeholder: opencode-your-plugin
+    validations:
+      required: true
+
+  - type: dropdown
+    id: reason
+    attributes:
+      label: 原因
+      options:
+        - 我是作者，要求下架自己的包
+        - 恶意软件 / 钓鱼
+        - 侵权
+        - 其他
+    validations:
+      required: true
+
+  - type: textarea
+    id: detail
+    attributes:
+      label: 说明
+      description: 作者下架请说明如何验证身份（如包仓库链接）；举报请给出证据
+    validations:
+      required: true
+
+  - type: markdown
+    attributes:
+      value: |
+        ---
+        提示：如果你只是想下架**自己的**包，从 package.json 的 keywords 里移除
+        `opencode-plugin` 即可，次日抓取后就会自动消失，无需提 issue。

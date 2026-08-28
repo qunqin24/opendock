@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: 收录与排名规则
+    url: https://www.opendock.net/about
+    about: 评分算法、健康度判定与数据来源的说明，提 issue 前可以先看这里

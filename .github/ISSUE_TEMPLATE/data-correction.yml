@@ -1,0 +1,41 @@
+name: 数据纠错
+description: 分类错误、星标/下载量异常、标题或描述需要人工修正
+title: "[纠错] "
+labels: [data]
+body:
+  - type: input
+    id: package
+    attributes:
+      label: 包名
+      description: npm 上的完整包名
+      placeholder: opencode-your-plugin
+    validations:
+      required: true
+
+  - type: dropdown
+    id: kind
+    attributes:
+      label: 问题类型
+      options:
+        - 分类错误
+        - 星标 / 下载量异常（如 monorepo 虚高）
+        - 标题或描述修正
+        - 申请首页精选
+        - 其他
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: 期望的修改
+      description: 写清楚应该改成什么。分类修改请注明期望的分类名；精选申请请简述理由
+      placeholder: 例如：分类应从 tools 改为 memory
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: 补充说明
+      description: 可选。相关链接、截图等

@@ -157,10 +157,6 @@ export default function PluginExplorer({
   }, [initialCategory, initialSort]);
 
   const searching = Boolean(deferredQuery.trim());
-  // Fuse orders by relevance and the two date sorts order by time, so the
-  // position number means nothing there — show it as a plain row index
-  // instead of a medal, which reads as "#1 in the ecosystem".
-  const ranked = !searching && sort !== 'recent' && sort !== 'updated';
   const activeFilters = (category !== initialCategory ? 1 : 0) + (health !== 'all' ? 1 : 0) + (searching ? 1 : 0);
 
   // The dataset carries both languages on every category; pick per locale
@@ -213,22 +209,20 @@ export default function PluginExplorer({
       {/* ---- sidebar (desktop) ---- */}
       {hasCategories && (
         <aside className="hidden lg:block">
-          <div className="sticky top-28 space-y-7 rounded-2xl border border-border/80 bg-card p-4 shadow-xs">
-            {filterPanel}
-          </div>
+          <div className="sticky top-32 space-y-7">{filterPanel}</div>
         </aside>
       )}
 
       <div className="min-w-0">
         {/* ---- Top Toolbar ---- */}
         <div className="sticky top-14 z-30 -mx-4 border-b border-border/80 bg-background/90 px-4 py-3 backdrop-blur-xl sm:-mx-6 sm:px-6">
-          <div className="flex flex-wrap items-center gap-2.5">
+          <div className="flex flex-wrap items-center gap-2">
             {/* Search Input Box */}
             <div className="relative min-w-[200px] flex-1">
               <svg
                 viewBox="0 0 20 20"
                 fill="currentColor"
-                className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground"
+                className="pointer-events-none absolute top-1/2 left-3 size-3.5 -translate-y-1/2 text-muted-foreground"
                 aria-hidden="true"
               >
                 <path
@@ -246,12 +240,12 @@ export default function PluginExplorer({
                 placeholder={t('explorer.searchPlaceholder')}
                 aria-label={t('explorer.searchAria')}
                 className={cn(
-                  'h-10 w-full rounded-xl border border-input bg-card pr-14 pl-10 text-sm text-foreground transition-all',
-                  'placeholder:text-muted-foreground/70 focus:border-foreground/80 focus:ring-4 focus:ring-foreground/5 focus:outline-none',
+                  'h-9 w-full rounded-md border border-input bg-card pr-12 pl-9 text-sm text-foreground transition-colors',
+                  'placeholder:text-muted-foreground/70 focus:border-foreground/50 focus:outline-none',
                   '[&::-webkit-search-cancel-button]:hidden',
                 )}
               />
-              <div className="absolute top-1/2 right-2.5 -translate-y-1/2 flex items-center gap-1">
+              <div className="absolute top-1/2 right-2 -translate-y-1/2 flex items-center gap-1">
                 {query ? (
                   <button
                     type="button"
@@ -267,7 +261,7 @@ export default function PluginExplorer({
                     </svg>
                   </button>
                 ) : (
-                  <kbd className="hidden rounded-md border border-border bg-muted/80 px-1.5 py-0.5 font-mono text-[0.625rem] text-muted-foreground sm:inline-block">
+                  <kbd className="hidden rounded border border-border bg-muted/80 px-1.5 py-0.5 font-mono text-[0.625rem] text-muted-foreground sm:inline-block">
                     /
                   </kbd>
                 )}
@@ -280,16 +274,16 @@ export default function PluginExplorer({
               onClick={() => setFiltersOpen((o) => !o)}
               aria-expanded={filtersOpen}
               className={cn(
-                'h-10 shrink-0 rounded-xl border px-3 text-xs font-semibold transition-all sm:text-sm',
+                'h-9 shrink-0 rounded-md border px-3 text-xs font-medium transition-colors',
                 hasCategories ? 'lg:hidden' : 'hidden',
                 activeFilters > 0 && !searching
-                  ? 'border-foreground bg-foreground text-background'
-                  : 'border-input bg-card hover:bg-secondary',
+                  ? 'border-foreground/40 bg-secondary text-foreground'
+                  : 'border-input bg-card text-muted-foreground hover:text-foreground',
               )}
             >
               {t('explorer.filters')}
               {activeFilters - (searching ? 1 : 0) > 0 && (
-                <span className="tabular ml-1.5 rounded-full bg-dock px-1.5 py-0.5 text-[0.625rem] font-bold text-dock-foreground">
+                <span className="tabular ml-1.5 font-mono text-[0.625rem] opacity-80">
                   {activeFilters - (searching ? 1 : 0)}
                 </span>
               )}
@@ -304,8 +298,8 @@ export default function PluginExplorer({
                 disabled={searching}
                 title={searching ? t('explorer.sortWhileSearching') : t(`explorer.sort.${sort}.hint` as const)}
                 className={cn(
-                  'h-10 cursor-pointer appearance-none rounded-xl border border-input bg-card pr-8 pl-3 text-xs font-medium text-foreground transition-all sm:text-sm',
-                  'focus:border-foreground/80 focus:ring-4 focus:ring-foreground/5 focus:outline-none hover:border-foreground/30',
+                  'h-9 cursor-pointer appearance-none rounded-md border border-input bg-card pr-8 pl-3 text-xs font-medium text-foreground transition-colors',
+                  'focus:border-foreground/50 focus:outline-none hover:border-foreground/30',
                   'disabled:cursor-not-allowed disabled:opacity-50',
                 )}
               >
@@ -316,7 +310,7 @@ export default function PluginExplorer({
                 ))}
               </select>
               <div className="pointer-events-none absolute top-1/2 right-2.5 -translate-y-1/2 text-muted-foreground">
-                <svg viewBox="0 0 20 20" fill="currentColor" className="size-4">
+                <svg viewBox="0 0 20 20" fill="currentColor" className="size-3.5">
                   <path
                     fillRule="evenodd"
                     d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z"
@@ -327,7 +321,7 @@ export default function PluginExplorer({
             </div>
 
             {/* View Mode Switcher */}
-            <div className="hidden shrink-0 items-center rounded-xl border border-input bg-card p-1 sm:flex">
+            <div className="hidden shrink-0 items-center rounded-md border border-input bg-card p-0.5 sm:flex">
               <ViewButton active={view === 'list'} onClick={() => setView('list')} label={t('explorer.viewList')}>
                 <path d="M2 4h12M2 8h12M2 12h12" />
               </ViewButton>
@@ -337,58 +331,29 @@ export default function PluginExplorer({
             </div>
           </div>
 
-          {/* Quick Health Status Pills (Visible on all screen sizes) */}
-          <div className="mt-2.5 flex flex-wrap items-center gap-1.5 text-xs">
-            <span className="font-mono text-[0.6875rem] text-muted-foreground mr-1">{t('explorer.quickFilter')}</span>
-            {HEALTH_FILTERS.map((id) => (
-              <button
-                key={id}
-                type="button"
-                onClick={() => setHealth(id)}
-                title={t(`explorer.health.${id}.hint` as const)}
-                className={cn(
-                  'inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-medium transition-all',
-                  health === id
-                    ? 'border-foreground bg-foreground text-background shadow-xs'
-                    : 'border-border/80 bg-card text-muted-foreground hover:border-foreground/30 hover:text-foreground',
-                )}
-              >
-                {id === 'healthy' && (
-                  <span className={cn('size-1.5 rounded-full', health === id ? 'bg-background' : 'bg-ok')} />
-                )}
-                {id === 'has-repo' && (
-                  <svg viewBox="0 0 16 16" fill="currentColor" className="size-3">
-                    <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z" />
-                  </svg>
-                )}
-                {t(`explorer.health.${id}` as const)}
-              </button>
-            ))}
-          </div>
-
           {/* Mobile Collapsible Filter Drawer */}
           {filtersOpen && hasCategories && (
-            <div className="mt-3 max-h-[60vh] space-y-6 overflow-y-auto rounded-xl border border-border bg-card p-4 shadow-lg lg:hidden">
+            <div className="mt-3 max-h-[60vh] space-y-6 overflow-y-auto rounded-lg border border-border bg-card p-4 lg:hidden">
               {filterPanel}
             </div>
           )}
         </div>
 
         {/* ---- Result Meta Bar ---- */}
-        <div className="flex items-center justify-between gap-3 py-4 text-xs sm:text-sm text-muted-foreground">
+        <div className="flex items-center justify-between gap-3 py-3 font-mono text-xs text-muted-foreground">
           <p className="tabular">
             {results.length === docs.length
               ? t('explorer.total', { n: docs.length })
               : t('explorer.matches', { n: results.length })}
             {searching && (
-              <span className="ml-2 rounded bg-secondary px-1.5 py-0.5 text-[0.6875rem]">{t('explorer.byRelevance')}</span>
+              <span className="ml-2 rounded border border-border/70 px-1.5 py-0.5 text-[0.6875rem]">{t('explorer.byRelevance')}</span>
             )}
           </p>
 
           {activeFilters > 0 && (
             <button
               onClick={reset}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+              className="inline-flex items-center gap-1.5 text-muted-foreground transition-colors hover:text-foreground"
             >
               <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" className="size-2.5">
                 <path d="M4 4l8 8M12 4l-8 8" strokeLinecap="round" />
@@ -400,44 +365,57 @@ export default function PluginExplorer({
 
         {/* ---- Results List / Grid ---- */}
         {results.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-border/80 bg-card/40 px-6 py-20 text-center">
-            <div className="mx-auto grid size-12 place-items-center rounded-2xl bg-secondary text-muted-foreground">
+          <div className="rounded-lg border border-dashed border-border/80 px-6 py-20 text-center">
+            <div className="mx-auto grid size-12 place-items-center rounded-lg bg-secondary text-muted-foreground">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="size-6">
                 <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
               </svg>
             </div>
-            <p className="mt-4 text-base font-semibold text-foreground">{t('explorer.emptyTitle')}</p>
+            <p className="mt-4 text-base font-medium text-foreground">{t('explorer.emptyTitle')}</p>
             <p className="mx-auto mt-1.5 max-w-sm text-xs leading-5 text-muted-foreground">
               {t('explorer.emptyBody')}
             </p>
             <button
               onClick={reset}
-              className="mt-5 inline-flex items-center rounded-xl bg-foreground px-4 py-2 text-xs font-semibold text-background transition-opacity hover:opacity-90 shadow-sm"
+              className="mt-5 inline-flex items-center rounded-md bg-foreground px-4 py-2 text-xs font-medium text-background transition-opacity hover:opacity-85"
             >
               {t('explorer.emptyReset')}
             </button>
           </div>
         ) : view === 'grid' ? (
-          <ul className="grid gap-3.5 sm:grid-cols-2 xl:grid-cols-3">
+          <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {results.slice(0, visible).map((p, i) => (
               <li key={p.slug}>
-                <Card doc={p} rank={ranked ? i + 1 : undefined} categoryLabel={categoryLabels.get(p.category)} lang={lang} />
+                <Card doc={p} rank={i + 1} categoryLabel={categoryLabels.get(p.category)} lang={lang} />
               </li>
             ))}
           </ul>
         ) : (
-          <div className="space-y-2.5">
-            {results.slice(0, visible).map((p, i) => (
-              <Row
-                key={p.slug}
-                doc={p}
-                rank={i + 1}
-                ranked={ranked}
-                categoryLabel={hasCategories ? (categoryLabels.get(p.category) ?? '') : undefined}
-                onSelectCategory={(catId) => setCategory(catId)}
-                lang={lang}
-              />
-            ))}
+          <div className="overflow-hidden rounded-lg border border-border/80 bg-card">
+            {/* Column header — mirrors the row's fixed column widths */}
+            <div className="meta hidden items-center gap-3 border-b border-border/80 bg-secondary/40 px-4 py-2 text-muted-foreground sm:flex">
+              <span className="w-6 shrink-0">#</span>
+              <span className="min-w-0 flex-1">{t('explorer.col.plugin')}</span>
+              {hasCategories && (
+                <span className="hidden w-28 shrink-0 lg:block">{t('explorer.col.category')}</span>
+              )}
+              <span className="w-20 shrink-0 text-right">{t('explorer.col.stars')}</span>
+              <span className="hidden w-20 shrink-0 text-right md:block">{t('explorer.col.downloads')}</span>
+              <span className="hidden w-24 shrink-0 text-right lg:block">{t('explorer.col.updated')}</span>
+            </div>
+            <ul className="divide-y divide-border/70">
+              {results.slice(0, visible).map((p, i) => (
+                <li key={p.slug}>
+                  <Row
+                    doc={p}
+                    rank={i + 1}
+                    categoryLabel={hasCategories ? (categoryLabels.get(p.category) ?? '') : undefined}
+                    onSelectCategory={(catId) => setCategory(catId)}
+                    lang={lang}
+                  />
+                </li>
+              ))}
+            </ul>
           </div>
         )}
 
@@ -446,7 +424,7 @@ export default function PluginExplorer({
           <div ref={sentinelRef} className="mt-8 flex justify-center pb-8">
             <button
               onClick={() => setVisible((v) => v + PAGE_SIZE)}
-              className="rounded-xl border border-border/80 bg-card px-6 py-2.5 text-xs font-semibold text-foreground transition-all hover:bg-secondary hover:shadow-xs"
+              className="rounded-md border border-border/80 px-6 py-2 text-xs font-medium text-foreground transition-colors hover:bg-secondary"
             >
               {t('explorer.loadMore', { n: results.length - visible })}
             </button>
@@ -460,7 +438,7 @@ export default function PluginExplorer({
 function FilterGroup({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div>
-      <h3 className="mb-2 px-2 text-[0.6875rem] font-bold tracking-wider text-muted-foreground uppercase">{title}</h3>
+      <h3 className="meta mb-2 px-2 text-muted-foreground">{title}</h3>
       <ul className="space-y-0.5">{children}</ul>
     </div>
   );
@@ -487,22 +465,15 @@ function FilterItem({
         title={title}
         aria-pressed={active}
         className={cn(
-          'group relative flex w-full items-center justify-between gap-2 rounded-xl py-1.5 pr-2.5 pl-3 text-left text-xs transition-all',
+          'group relative flex w-full items-center justify-between gap-2 rounded-md py-1.5 pr-2.5 pl-3 text-left text-xs transition-colors',
           active
-            ? 'bg-foreground font-semibold text-background shadow-xs'
-            : 'text-muted-foreground hover:bg-secondary/70 hover:text-foreground',
+            ? 'bg-secondary font-medium text-foreground'
+            : 'text-muted-foreground hover:bg-secondary/60 hover:text-foreground',
         )}
       >
         <span className="min-w-0 flex-1 truncate">{children}</span>
         {count !== undefined && (
-          <span
-            className={cn(
-              'tabular font-mono text-[0.6875rem]',
-              active ? 'text-background/80' : 'text-muted-foreground/60 group-hover:text-muted-foreground',
-            )}
-          >
-            {count}
-          </span>
+          <span className="tabular font-mono text-[0.6875rem] text-muted-foreground/70">{count}</span>
         )}
       </button>
     </li>
@@ -527,10 +498,10 @@ function ViewButton({
       aria-label={label}
       aria-pressed={active}
       title={label}
-      className={cn(
-        'rounded-lg p-1.5 transition-all',
-        active ? 'bg-secondary text-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground',
-      )}
+        className={cn(
+          'rounded-[0.25rem] p-1.5 transition-colors',
+          active ? 'bg-secondary text-foreground' : 'text-muted-foreground hover:text-foreground',
+        )}
     >
       <svg
         viewBox="0 0 16 16"
@@ -555,164 +526,124 @@ const HEALTH_DOT: Record<string, string> = {
 
 
 
-/** Redesigned modern row component */
+/** One line in the registry table — index, identity, then aligned metrics. */
 function Row({
   doc: p,
   rank,
-  ranked,
   categoryLabel,
   onSelectCategory,
   lang,
 }: {
   doc: SearchDoc;
   rank: number;
-  /** False when the order isn't a ranking — see `ranked` in the parent. */
-  ranked: boolean;
   categoryLabel?: string;
   onSelectCategory?: (catId: string) => void;
   lang: Locale;
 }) {
   const t = useTranslations(lang);
-  const isTop1 = ranked && rank === 1;
-  const isTop2 = ranked && rank === 2;
-  const isTop3 = ranked && rank === 3;
 
   return (
-    <div
-      className={cn(
-        'group relative flex flex-col justify-between gap-3 rounded-2xl border border-border/80 bg-card p-4 transition-all duration-200',
-        'hover:-translate-x-0.5 hover:border-foreground/30 hover:bg-secondary/35 hover:shadow-xs sm:flex-row sm:items-center sm:gap-4',
-      )}
-    >
-      {/* The whole row is one click target, but the category chip is a second
+    <div className="group relative flex items-center gap-3 px-3 py-3 transition-colors hover:bg-secondary/50 sm:px-4">
+      {/* The whole row is one click target, but the category cell is a second
           one, and a <button> inside an <a> is not valid HTML. So the link is
-          an overlay and the chip sits on a layer above it. */}
+          an overlay and the category button sits on a layer above it. */}
       <a
         href={localePath(lang, `/plugins/${p.slug}`)}
         aria-label={p.title}
-        className="absolute inset-0 z-10 rounded-2xl focus-visible:ring-2 focus-visible:ring-foreground/40 focus-visible:outline-none"
+        className="absolute inset-0 z-10 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-foreground/40 focus-visible:outline-none"
       />
-      {/* Left Pod: Rank + Avatar + Plugin Identity */}
-      <div className="flex items-center gap-3.5 min-w-0 flex-1">
-        {/* Rank Badge */}
-        <span
-          className={cn(
-            'tabular flex size-7 shrink-0 items-center justify-center rounded-xl font-mono text-xs font-bold shadow-2xs',
-            isTop1
-              ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
-              : isTop2
-                ? 'bg-slate-400/15 text-slate-600 dark:text-slate-300'
-                : isTop3
-                  ? 'bg-orange-600/15 text-orange-600 dark:text-orange-400'
-                  : 'bg-muted/80 text-muted-foreground',
+
+      <span className="tabular hidden w-6 shrink-0 font-mono text-xs text-muted-foreground/60 sm:block">
+        {rank}
+      </span>
+
+      {/* Avatar with maintenance lamp */}
+      <div className="relative size-8 shrink-0">
+        <div className="size-full overflow-hidden rounded-md border border-border/80 bg-secondary/50">
+          {p.ownerAvatar ? (
+            <img
+              src={avatarUrl(p.ownerAvatar, 32)}
+              alt={p.owner ?? p.name}
+              width={32}
+              height={32}
+              className="size-full object-cover"
+              loading="lazy"
+              decoding="async"
+            />
+          ) : (
+            <div className="flex size-full items-center justify-center font-mono text-xs text-foreground/70">
+              {(p.owner ?? p.name).charAt(0).toUpperCase()}
+            </div>
           )}
-        >
-          {String(rank).padStart(2, '0')}
-        </span>
-
-        {/* Plugin Avatar with Health Status indicator */}
-        <div className="relative size-9 shrink-0">
-          <div className="size-full overflow-hidden rounded-xl border border-border/80 bg-secondary/50 shadow-2xs">
-            {p.ownerAvatar ? (
-              <img
-                src={avatarUrl(p.ownerAvatar, 36)}
-                alt={p.owner ?? p.name}
-                width={36}
-                height={36}
-                className="size-full object-cover"
-                loading="lazy"
-                decoding="async"
-              />
-            ) : (
-              <div className="flex size-full items-center justify-center font-mono text-xs font-bold text-foreground/70">
-                {(p.owner ?? p.name).charAt(0).toUpperCase()}
-              </div>
-            )}
-          </div>
-          <span
-            className={cn('lamp absolute -top-0.5 -right-0.5 z-10 ring-2 ring-card', HEALTH_DOT[p.healthLevel])}
-            title={t(`health.tip.${p.healthLevel}` as const)}
-          />
         </div>
-
-        {/* Core details */}
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="truncate text-sm font-semibold tracking-tight text-foreground transition-colors group-hover:text-foreground">
-              {p.title}
-            </span>
-
-            {p.featured && (
-              <span className="rounded bg-foreground px-1.5 py-0.5 text-[0.625rem] font-bold text-background">
-                {t('common.featured')}
-              </span>
-            )}
-
-            {categoryLabel && (
-              <button
-                type="button"
-                onClick={() => onSelectCategory?.(p.category)}
-                className="relative z-20 rounded-md border border-border/60 bg-secondary/70 px-2 py-0.5 text-[0.6875rem] font-medium text-foreground/80 transition-colors hover:border-foreground/40 hover:bg-secondary"
-                title={t('explorer.filterBy', { category: categoryLabel ?? '' })}
-              >
-                {categoryLabel}
-              </button>
-            )}
-          </div>
-
-          <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">
-            <span className="font-mono text-foreground/60 mr-2">{p.name}</span>
-            {p.description ?? t('common.noDescription')}
-          </p>
-        </div>
+        <span
+          className={cn('lamp absolute -top-0.5 -right-0.5 z-10 ring-2 ring-card', HEALTH_DOT[p.healthLevel])}
+          title={t(`health.tip.${p.healthLevel}` as const)}
+        />
       </div>
 
-      {/* Right Pod: Metrics & Score */}
-      <div className="flex shrink-0 items-center justify-between gap-4 self-end pl-10 font-mono text-xs text-muted-foreground sm:self-center sm:pl-0">
-        {/* Stars */}
-        <span className="tabular inline-flex items-center gap-1" title={t('common.stars')}>
-          <svg viewBox="0 0 16 16" fill="currentColor" className="size-3.5 text-amber-500" aria-hidden="true">
-            <path d="M8 .25a.75.75 0 0 1 .673.418l1.882 3.815 4.21.612a.75.75 0 0 1 .416 1.279l-3.046 2.97.719 4.192a.75.75 0 0 1-1.088.791L8 12.347l-3.766 1.98a.75.75 0 0 1-1.088-.79l.72-4.194L.818 6.374a.75.75 0 0 1 .416-1.28l4.21-.611L7.327.668A.75.75 0 0 1 8 .25Z" />
-          </svg>
-          <span className="font-medium text-foreground">{compactNumber(p.stars)}</span>
-          {p.starsDelta7d > 0 && (
-            <span className="text-[0.6875rem] font-bold text-ok" title={t('explorer.starsDelta')}>
-              +{compactNumber(p.starsDelta7d)}
+      {/* Identity */}
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <span className="truncate text-sm font-medium text-foreground">{p.title}</span>
+          {p.featured && (
+            <span className="shrink-0 font-mono text-[0.625rem] tracking-[0.08em] text-amber-600 uppercase dark:text-amber-500">
+              {t('common.featured')}
             </span>
           )}
-        </span>
-
-        {/* Downloads */}
-        <span className="tabular hidden items-center gap-1 sm:inline-flex" title={t('explorer.downloadsTitle')}>
-          <svg viewBox="0 0 16 16" fill="currentColor" className="size-3.5 text-muted-foreground/70" aria-hidden="true">
-            <path d="M7.25 1.75a.75.75 0 0 1 1.5 0v6.44l2.22-2.22a.75.75 0 1 1 1.06 1.06l-3.5 3.5a.75.75 0 0 1-1.06 0l-3.5-3.5a.75.75 0 0 1 1.06-1.06l2.22 2.22V1.75ZM2.5 11a.75.75 0 0 1 .75.75v1.5h9.5v-1.5a.75.75 0 0 1 1.5 0v2.25a.75.75 0 0 1-.75.75H2.5a.75.75 0 0 1-.75-.75v-2.25A.75.75 0 0 1 2.5 11Z" />
-          </svg>
-          <span>{compactNumber(p.downloadsMonth)}</span>
-        </span>
-
-        {/* Updated Time */}
-        <span className="hidden truncate text-[0.6875rem] text-muted-foreground/80 md:inline-block" title={t('common.updated')}>
-          {timeAgo(p.pushedAt, lang)}
-        </span>
-
-        {/* Score Badge */}
-        <span
-          className="tabular rounded-md border border-border/70 bg-secondary px-2 py-0.5 text-xs font-semibold text-foreground"
-          title={t('common.score')}
-        >
-          {p.score.toFixed(0)}
-        </span>
-
-        {/* Arrow */}
-        <span className="text-xs text-muted-foreground group-hover:text-foreground group-hover:translate-x-0.5 transition-all">
-          →
-        </span>
+        </div>
+        <p className="mt-0.5 truncate text-xs text-muted-foreground">
+          <span className="mr-2 font-mono text-foreground/50">{p.name}</span>
+          {p.description ?? t('common.noDescription')}
+        </p>
       </div>
+
+      {/* Category (plain text, click to filter) */}
+      {categoryLabel !== undefined && (
+        <button
+          type="button"
+          onClick={() => onSelectCategory?.(p.category)}
+          className="relative z-20 hidden w-28 shrink-0 truncate text-left text-xs text-muted-foreground transition-colors hover:text-foreground lg:block"
+          title={t('explorer.filterBy', { category: categoryLabel })}
+        >
+          {categoryLabel}
+        </button>
+      )}
+
+      {/* Metrics — fixed widths, aligned with the column header */}
+      <span
+        className="tabular flex w-20 shrink-0 items-center justify-end gap-1 font-mono text-xs"
+        title={t('common.stars')}
+      >
+        <svg viewBox="0 0 16 16" fill="currentColor" className="size-3 text-amber-500" aria-hidden="true">
+          <path d="M8 .25a.75.75 0 0 1 .673.418l1.882 3.815 4.21.612a.75.75 0 0 1 .416 1.279l-3.046 2.97.719 4.192a.75.75 0 0 1-1.088.791L8 12.347l-3.766 1.98a.75.75 0 0 1-1.088-.79l.72-4.194L.818 6.374a.75.75 0 0 1 .416-1.28l4.21-.611L7.327.668A.75.75 0 0 1 8 .25Z" />
+        </svg>
+        <span className="font-medium text-foreground">{compactNumber(p.stars)}</span>
+        {p.starsDelta7d > 0 && (
+          <span className="text-[0.6875rem] text-ok" title={t('explorer.starsDelta')}>
+            +{compactNumber(p.starsDelta7d)}
+          </span>
+        )}
+      </span>
+
+      <span
+        className="tabular hidden w-20 shrink-0 text-right font-mono text-xs text-muted-foreground md:block"
+        title={t('explorer.downloadsTitle')}
+      >
+        {compactNumber(p.downloadsMonth)}
+      </span>
+
+      <span
+        className="hidden w-24 shrink-0 text-right text-xs text-muted-foreground/80 lg:block"
+        title={t('common.updated')}
+      >
+        {timeAgo(p.pushedAt, lang)}
+      </span>
     </div>
   );
 }
 
-/** Redesigned modern card component */
+/** Card for the grid view — same content hierarchy as the table row. */
 function Card({
   doc: p,
   rank,
@@ -728,100 +659,67 @@ function Card({
   return (
     <a
       href={localePath(lang, `/plugins/${p.slug}`)}
-      className={cn(
-        'group flex h-full flex-col justify-between overflow-hidden rounded-2xl border border-border/80 bg-card p-5 transition-all duration-200',
-        'hover:-translate-y-1 hover:border-foreground/30 hover:shadow-[0_8px_30px_rgb(0,0,0,0.06)]',
-        'dark:hover:shadow-[0_8px_30px_rgb(0,0,0,0.35)]',
-      )}
+      className="group flex h-full flex-col rounded-lg border border-border/80 bg-card p-4 transition-colors hover:border-foreground/25"
     >
-      <div>
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex items-center gap-3 min-w-0 flex-1">
-            {/* Avatar with health status */}
-            <div className="relative size-10 shrink-0">
-              <div className="size-full overflow-hidden rounded-xl border border-border/80 bg-secondary/50 shadow-2xs">
-                {p.ownerAvatar ? (
-                  <img
-                    src={avatarUrl(p.ownerAvatar, 40)}
-                    alt={p.owner ?? p.name}
-                    width={40}
-                    height={40}
-                    className="size-full object-cover"
-                    loading="lazy"
-                    decoding="async"
-                  />
-                ) : (
-                  <div className="flex size-full items-center justify-center font-mono text-xs font-bold text-foreground/70">
-                    {(p.owner ?? p.name).charAt(0).toUpperCase()}
-                  </div>
-                )}
-              </div>
-              <span
-                className={cn('lamp absolute -top-0.5 -right-0.5 z-10 ring-2 ring-card', HEALTH_DOT[p.healthLevel])}
-                title={t(`health.tip.${p.healthLevel}` as const)}
+      <div className="flex items-center gap-3">
+        {/* Avatar with maintenance lamp */}
+        <div className="relative size-9 shrink-0">
+          <div className="size-full overflow-hidden rounded-md border border-border/80 bg-secondary/50">
+            {p.ownerAvatar ? (
+              <img
+                src={avatarUrl(p.ownerAvatar, 36)}
+                alt={p.owner ?? p.name}
+                width={36}
+                height={36}
+                className="size-full object-cover"
+                loading="lazy"
+                decoding="async"
               />
-            </div>
-
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-1.5">
-                {rank !== undefined && (
-                  <span className="tabular shrink-0 font-mono text-xs font-bold text-muted-foreground/70">
-                    #{String(rank).padStart(2, '0')}
-                  </span>
-                )}
-                <h3 className="truncate text-sm font-semibold tracking-tight text-foreground">{p.title}</h3>
+            ) : (
+              <div className="flex size-full items-center justify-center font-mono text-xs text-foreground/70">
+                {(p.owner ?? p.name).charAt(0).toUpperCase()}
               </div>
-              <p className="mt-0.5 truncate font-mono text-xs text-muted-foreground">{p.name}</p>
-            </div>
+            )}
           </div>
-
           <span
-            className="tabular shrink-0 rounded-md border border-border/70 bg-secondary px-2 py-0.5 text-xs font-semibold text-foreground"
-            title={t('common.score')}
-          >
-            {p.score.toFixed(0)}
-          </span>
+            className={cn('lamp absolute -top-0.5 -right-0.5 z-10 ring-2 ring-card', HEALTH_DOT[p.healthLevel])}
+            title={t(`health.tip.${p.healthLevel}` as const)}
+          />
         </div>
 
-        <p className="mt-3.5 line-clamp-2 min-h-[2.5rem] text-xs leading-relaxed text-muted-foreground">
-          {p.description ?? t('common.noDescription')}
-        </p>
-
-        {/* Category Pill & Keywords */}
-        <div className="mt-3.5 flex flex-wrap items-center gap-1.5">
-          {categoryLabel && (
-            <span className="rounded-md border border-border/60 bg-secondary/70 px-2 py-0.5 text-[0.6875rem] font-medium text-foreground/80">
-              {categoryLabel}
-            </span>
-          )}
-          {p.keywords && p.keywords.slice(0, 2).map((k) => (
-            <span key={k} className="rounded border border-border/40 bg-secondary/40 px-1.5 py-0.5 font-mono text-[0.625rem] text-muted-foreground">
-              #{k}
-            </span>
-          ))}
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <h3 className="truncate text-sm font-medium text-foreground">{p.title}</h3>
+            {p.featured && (
+              <span className="shrink-0 font-mono text-[0.625rem] tracking-[0.08em] text-amber-600 uppercase dark:text-amber-500">
+                {t('common.featured')}
+              </span>
+            )}
+          </div>
+          <p className="mt-0.5 truncate font-mono text-xs text-muted-foreground">{p.name}</p>
         </div>
+
+        {rank !== undefined && (
+          <span className="tabular shrink-0 font-mono text-xs text-muted-foreground/60">#{rank}</span>
+        )}
       </div>
 
-      {/* Bottom stats */}
-      <div className="mt-5 flex items-center justify-between border-t border-border/60 pt-3 text-xs text-muted-foreground font-mono">
-        <div className="flex items-center gap-3">
-          <span className="inline-flex items-center gap-1" title={t('common.stars')}>
-            <svg viewBox="0 0 16 16" fill="currentColor" className="size-3.5 text-amber-500" aria-hidden="true">
+      <p className="mt-3 line-clamp-2 min-h-[2.5rem] text-xs leading-5 text-muted-foreground">
+        {p.description ?? t('common.noDescription')}
+      </p>
+
+      <div className="mt-4 flex items-center justify-between gap-3 border-t border-border/60 pt-3 font-mono text-xs text-muted-foreground">
+        <span className="truncate font-sans text-[0.6875rem]">{categoryLabel ?? ''}</span>
+        <span className="flex shrink-0 items-center gap-3">
+          <span className="tabular inline-flex items-center gap-1" title={t('common.stars')}>
+            <svg viewBox="0 0 16 16" fill="currentColor" className="size-3 text-amber-500" aria-hidden="true">
               <path d="M8 .25a.75.75 0 0 1 .673.418l1.882 3.815 4.21.612a.75.75 0 0 1 .416 1.279l-3.046 2.97.719 4.192a.75.75 0 0 1-1.088.791L8 12.347l-3.766 1.98a.75.75 0 0 1-1.088-.79l.72-4.194L.818 6.374a.75.75 0 0 1 .416-1.28l4.21-.611L7.327.668A.75.75 0 0 1 8 .25Z" />
             </svg>
-            <span className="tabular font-medium text-foreground">{compactNumber(p.stars)}</span>
+            <span className="font-medium text-foreground">{compactNumber(p.stars)}</span>
           </span>
-
-          <span className="inline-flex items-center gap-1" title={t('explorer.downloadsTitle')}>
-            <svg viewBox="0 0 16 16" fill="currentColor" className="size-3.5 text-muted-foreground/70" aria-hidden="true">
-              <path d="M7.25 1.75a.75.75 0 0 1 1.5 0v6.44l2.22-2.22a.75.75 0 1 1 1.06 1.06l-3.5 3.5a.75.75 0 0 1-1.06 0l-3.5-3.5a.75.75 0 0 1 1.06-1.06l2.22 2.22V1.75ZM2.5 11a.75.75 0 0 1 .75.75v1.5h9.5v-1.5a.75.75 0 0 1 1.5 0v2.25a.75.75 0 0 1-.75.75H2.5a.75.75 0 0 1-.75-.75v-2.25A.75.75 0 0 1 2.5 11Z" />
-            </svg>
-            <span className="tabular">{compactNumber(p.downloadsMonth)}</span>
+          <span className="tabular" title={t('explorer.downloadsTitle')}>
+            {compactNumber(p.downloadsMonth)}
           </span>
-        </div>
-
-        <span className="text-[0.6875rem] text-muted-foreground/75 font-sans">
-          {timeAgo(p.pushedAt, lang)}
         </span>
       </div>
     </a>

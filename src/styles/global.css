@@ -251,54 +251,6 @@
   .scrollbar-none::-webkit-scrollbar {
     display: none;
   }
-
-  /* Sweeping highlight across the hero's health-distribution grid.
-     Purely decorative; disabled for reduced motion. */
-  .dock-sweep::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(
-      100deg,
-      transparent 40%,
-      color-mix(in oklch, var(--foreground) 14%, transparent) 50%,
-      transparent 60%
-    );
-    background-size: 300% 100%;
-    animation: dock-sweep 7s ease-in-out infinite;
-    pointer-events: none;
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .dock-sweep::after {
-      animation: none;
-      display: none;
-    }
-  }
-
-  .dock-cursor {
-    animation: dock-blink 1.1s step-end infinite;
-  }
-}
-
-@keyframes dock-sweep {
-  0%,
-  100% {
-    background-position: 200% 0;
-  }
-  50% {
-    background-position: -50% 0;
-  }
-}
-
-@keyframes dock-blink {
-  0%,
-  45% {
-    opacity: 1;
-  }
-  50%,
-  100% {
-    opacity: 0;
-  }
 }
 
 /* --- Rendered README ------------------------------------------------ */
