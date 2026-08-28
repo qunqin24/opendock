@@ -27,5 +27,11 @@ export const GET: APIRoute = () =>
         h: p.healthLevel,
       })),
     ),
-    { headers: { 'content-type': 'application/json; charset=utf-8' } },
+    {
+      headers: {
+        'content-type': 'application/json; charset=utf-8',
+        'cache-control': 'public, max-age=0, s-maxage=86400, stale-while-revalidate=3600',
+        'x-robots-tag': 'noindex',
+      },
+    },
   );

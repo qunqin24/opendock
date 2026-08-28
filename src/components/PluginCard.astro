@@ -2,7 +2,7 @@
 import type { Plugin } from '../lib/plugins';
 import { categoryLabel } from '../lib/plugins';
 import { avatarUrl, compactNumber, timeAgo } from '../lib/utils';
-import { localeFromPath, useTranslations } from '../lib/i18n';
+import { localeFromPath, localePath, useTranslations } from '../lib/i18n';
 
 const lang = localeFromPath(Astro.url.pathname);
 const t = useTranslations(lang);
@@ -18,7 +18,7 @@ const { plugin: p, rank, class: className = '' } = Astro.props;
 ---
 
 <a
-  href={`/plugins/${p.slug}`}
+  href={localePath(lang, `/plugins/${p.slug}`)}
   class:list={[
     'group relative flex h-full flex-col rounded-xl border border-border bg-card p-5',
     // Deliberately not an elevation shadow: no transform, no wide soft

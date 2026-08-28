@@ -2,10 +2,10 @@
 import Layout from '../layouts/Layout.astro';
 import InstallSnippet from '../components/InstallSnippet.astro';
 import PluginCard from '../components/PluginCard.astro';
-import { related, categoryLabel, loadReadme, lampClass, type Plugin } from '../lib/plugins';
+import { plugins, related, categoryLabel, loadReadme, lampClass, type Plugin } from '../lib/plugins';
 import { renderReadme, readmeExcerpt } from '../lib/readme';
 import { avatarUrl, compactNumber, formatNumber, timeAgo, formatDate } from '../lib/utils';
-import { HTML_LANG, localeFromPath, localePath, useTranslations } from '../lib/i18n';
+import { localeFromPath, localePath, useTranslations } from '../lib/i18n';
 
 interface Props {
   plugin: Plugin;
@@ -20,6 +20,11 @@ const readmeHtml = markdown ? await renderReadme(markdown, { repoSlug: p.repoSlu
 
 const description =
   p.description ?? (markdown ? readmeExcerpt(markdown) : null) ?? t('plugin.fallbackDescription', { title: p.title });
+const metaDescription = description.length > 160
+  ? `${description.slice(0, 157).trimEnd()}...`
+  : description;
+const duplicateTitle = plugins.some((candidate) => candidate.slug !== p.slug && candidate.title === p.title);
+const metaTitle = duplicateTitle ? `${p.title} (${p.name})` : p.title;
 
 const siblings = related(p, 3);
 
@@ -70,6 +75,7 @@ const meta: { label: string; value: string; href?: string; external?: boolean }[
 const site = Astro.site ?? new URL('https://www.opendock.net');
 // Trailing slash to match the canonical URL — build.format is 'directory'.
 const abs = (path: string) => new URL(`${localePath(lang, path).replace(/\/$/, '')}/`, site).href;
+const canonicalPluginUrl = new URL(localePath('en', `/plugins/${p.slug}`), site).href;
 
 const jsonLd = {
   '@context': 'https://schema.org',
@@ -79,7 +85,7 @@ const jsonLd = {
       name: p.title,
       alternateName: p.name,
       description,
-      url: abs(`/plugins/${p.slug}`),
+      url: canonicalPluginUrl,
       applicationCategory: 'DeveloperApplication',
       operatingSystem: 'Cross-platform',
       softwareVersion: p.version ?? undefined,
@@ -88,7 +94,6 @@ const jsonLd = {
       downloadUrl: p.npmUrl,
       datePublished: p.createdAt ?? undefined,
       dateModified: p.pushedAt ?? undefined,
-      inLanguage: HTML_LANG[lang],
       isAccessibleForFree: true,
       author: p.owner ? { '@type': 'Person', name: p.owner, url: `https://github.com/${p.owner}` } : undefined,
       offers: { '@type': 'Offer', price: 0, priceCurrency: 'USD' },
@@ -111,7 +116,12 @@ const jsonLd = {
 };
 ---
 
-<Layout title={t('plugin.metaTitle', { title: p.title })} description={description}>
+<Layout
+  title={t('plugin.metaTitle', { title: metaTitle })}
+  description={metaDescription}
+  canonical={lang === 'zh' ? `/plugins/${p.slug}` : undefined}
+  localized={false}
+>
   <script is:inline type="application/ld+json" slot="head" set:html={JSON.stringify(jsonLd)} />
 
   <div class="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-12">
@@ -223,6 +233,7 @@ const jsonLd = {
                 {p.keywords.slice(0, 6).map((k) => (
                   <a
                     href={localePath(lang, `/plugins?q=${encodeURIComponent(k)}`)}
+                    rel="nofollow"
                     class="font-mono text-xs text-muted-foreground transition-colors hover:text-foreground"
                   >
                     #{k}

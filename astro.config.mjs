@@ -24,8 +24,13 @@ export default defineConfig({
     react(),
     sitemap({
       i18n: { defaultLocale: 'en', locales: { en: 'en', zh: 'zh-CN' } },
+      // Plugin descriptions and READMEs are source-language content. Keep the
+      // Chinese UI routes available, but index only the English detail pages.
+      filter: (page) => !/^\/zh\/plugins\/[^/]+\/$/.test(new URL(page).pathname),
     }),
   ],
+
+  trailingSlash: 'always',
 
   build: {
     // Plugin pages are the SEO surface; clean URLs keep them link-stable.

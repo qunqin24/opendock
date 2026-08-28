@@ -17,14 +17,23 @@ export const HTML_LANG: Record<Locale, string> = { en: 'en', zh: 'zh-CN' };
 export const OG_LOCALE: Record<Locale, string> = { en: 'en_US', zh: 'zh_CN' };
 export const LOCALE_NAME: Record<Locale, string> = { en: 'English', zh: '中文' };
 
+/** Keeps page URLs aligned with Astro's directory output and the sitemap. */
+export function normalizePagePath(path: string): string {
+  const match = path.match(/^([^?#]*)([?#].*)?$/);
+  const pathname = match?.[1] || '/';
+  const suffix = match?.[2] ?? '';
+  const normalized = pathname === '/' || pathname.endsWith('/') ? pathname : `${pathname}/`;
+  return `${normalized}${suffix}`;
+}
+
 /**
  * English owns the bare paths (`prefixDefaultLocale: false`), so only Chinese
  * carries a prefix. Every internal link goes through this.
  */
 export function localePath(lang: Locale, path: string): string {
-  const clean = path.startsWith('/') ? path : `/${path}`;
+  const clean = normalizePagePath(path.startsWith('/') ? path : `/${path}`);
   if (lang === DEFAULT_LOCALE) return clean;
-  return clean === '/' ? '/zh' : `/zh${clean}`;
+  return clean === '/' ? '/zh/' : `/zh${clean}`;
 }
 
 /** Strips the locale prefix, giving the path as the default locale sees it. */

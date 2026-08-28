@@ -49,6 +49,13 @@ export async function renderReadme(
     },
     allowedSchemes: ['http', 'https', 'mailto'],
     transformTags: {
+      // The page owns the H1. Shift README headings down so imported content
+      // cannot create a second page-level heading.
+      h1: 'h2',
+      h2: 'h3',
+      h3: 'h4',
+      h4: 'h5',
+      h5: 'h6',
       // Every README link leaves the site, so harden the target.
       a: (tagName, attribs) => ({
         tagName,
