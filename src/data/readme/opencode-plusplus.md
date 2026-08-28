@@ -4,6 +4,8 @@
 
 **A Windows-first Harness plugin for the official OpenCode Desktop application.**
 
+OpenCode++ makes the work around an AI-generated diff visible and reviewable: what it inspected, what it blocked, what it asked to run, and what current evidence actually verified.
+
 ## What Problem It Solves
 
 An AI coding session can produce a plausible diff while reading the wrong files, editing outside the intended scope, running an unrelated command, or declaring success without fresh test evidence. OpenCode++ adds a verification control plane around OpenCode Desktop so the model has to work from repository context, explicit edit boundaries, traceable evidence, and a final decision.
@@ -17,14 +19,21 @@ OpenCode++ is not another chat application and it is not a replacement model. It
 - evaluating policy, freshness, regression, hallucination, and convergence gates;
 - explaining whether the next action is repair, repack, human review, or finalize.
 
-The control flow is deliberately layered:
+## System Architecture
 
-```text
-Context Registry -> Retrieval -> Guard -> Evidence -> Intervention / Decision
-       guidance       selection    boundaries   proof       explanation
-```
+![OpenCode++ system architecture](docs/images/opencode-plusplus-architecture.svg)
 
-Context Registry entries and annotations help the model find relevant code and understand API or version differences. Retrieval selects and explains files, but does not grant permission. Guards block unsafe commands, protected paths, stale Context, and boundary violations. Evidence evaluates command or CI results against the current working tree. Intervention records what OpenCode++ observed, prevented, requested, repaired, verified, or left for human review.
+The important boundary is simple: OpenCode still reads files, edits code, and runs commands. OpenCode++ supplies deterministic context, boundaries, evidence checks, and decisions around that work.
+
+| Layer                        | What OpenCode++ does                                                                                    | What it does not claim                                                  |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| Context Registry + Retrieval | Finds relevant packs, files, symbols, versions, and dependencies; explains selected and rejected files. | Context is guidance, not permission or proof.                           |
+| Guard + Policy               | Checks commands, protected paths, contracts, freshness, regression, and required actions.               | It is not an operating-system sandbox.                                  |
+| Evidence                     | Matches command or CI results to the current working-tree hash and active evidence policy.              | A passing command alone does not prove business correctness.            |
+| Intervention Ledger          | Records observed, prevented, requested, repaired, verified, unresolved, and human-review states.        | Prevention or suggestion is not a verified fix.                         |
+| Decision + Dashboard         | Returns the next allowed action and shows the recorded facts in the Desktop result and local artifacts. | It does not expose hidden model chain-of-thought or call another model. |
+
+The normal Desktop path uses one current OpenCode model and one in-process plugin. CLI and MCP remain developer/compatibility surfaces; they are not required for installation or daily use.
 
 ## What It Can Do Now
 
@@ -78,11 +87,11 @@ The plugin is not an operating-system sandbox. It cannot stop another applicatio
 
 ### What The User Sees
 
-The Desktop tool result includes a visible Harness Dashboard. It shows `Plan -> Prepare -> Retrieve -> Execute -> Collect -> Evaluate -> Decide -> Persist -> Finalize`, with completed, active, blocked, and pending stages. It also shows the current decision, required commands, current working-tree hash capture, evidence status, intervention counts, selected/rejected files, and a concise final summary.
+The Desktop tool result includes a visible `OpenCode++ action summary` and Harness Dashboard. The summary directly lists `observed`, `prevented`, `requested`, `repaired`, `verified`, and `unresolved` items. The Dashboard shows `Plan -> Prepare -> Retrieve -> Execute -> Collect -> Evaluate -> Decide -> Persist -> Finalize`, with completed, active, blocked, and pending stages. It also shows the current decision, required commands, current working-tree hash capture, evidence status, intervention counts, selected/rejected files, and a concise final summary.
 
 The dashboard exposes recorded system facts and decision inputs. It does not expose hidden model chain-of-thought. This keeps the view useful for debugging and review without presenting private internal reasoning as an auditable fact.
 
-The Desktop result and `.agent-context/sidecar/latest.md` distinguish four questions:
+The Desktop result and `.agent-context/sidecar/latest.md` distinguish these questions:
 
 - **Intervened files:** files selected for inspection, edited within the boundary, or rejected with a reason;
 - **Blocked risks:** unsafe commands, protected paths, stale Context, missing tests, policy violations, or unresolved regressions;
@@ -90,7 +99,7 @@ The Desktop result and `.agent-context/sidecar/latest.md` distinguish four quest
 - **Verified fixes:** repairs followed by fresh command or CI evidence for the current working tree;
 - **Human work:** unresolved findings, repeated no-progress states, or semantic decisions the Harness cannot prove.
 
-`verified fix` is therefore narrower than `suggested fix`. An annotation, Context document, manual claim, successful earlier test, or source edit cannot become verified merely because it looks plausible. External Context is untrusted guidance, and annotation is local knowledge, not policy.
+`verified fix` is therefore narrower than `suggested fix`. An annotation, Context document, manual claim, successful earlier test, source edit, commit list, or model-generated summary cannot become verified merely because it looks plausible. External Context is untrusted guidance, and annotation is local knowledge, not policy. When the result says `human-review`, read the exact missing evidence in `actionSummary.evidence`; it is not a request to repeat the task.
 
 Context cache and registry usage are stored under `.agent-context/cache/` and `.agent-context/context-registry/usage/`. Local feedback is stored under `.agent-context/context-registry/feedback/`, annotations under `.agent-context/knowledge/annotations/`, and intervention records under `.agent-context/interventions/`. These are local runtime artifacts and should normally remain uncommitted.
 

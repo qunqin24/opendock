@@ -104,7 +104,7 @@ Optional upstream: `/prd` (PM / requester brainstorms a PRD; shipped separately 
 - **`/exec`** — **Three-agent isolated execution**, the core anti-cheat design.
   - *Test* agent reads spec rules only, writes failing tests (Red)
   - *Impl* agent **never sees the spec**, only the tests + function list, so it can't quietly "teach to intent"; new third-party libs capped by the plan's approved list
-  - *Review* agent checks against the spec, read-only
+  - *Review* agent checks against the spec plus a robustness/security pass, read-only
   - Progress written to `PROGRESS.md` after every step — **token-exhausted runs resume losslessly**
 
 - **`/test-webview`** — **Web-interaction acceptance** for frontend / web projects.
@@ -120,8 +120,11 @@ Optional upstream: `/prd` (PM / requester brainstorms a PRD; shipped separately 
   - App side ships **two images**: test image carries `/test/*` routes + `ENV TESTAPI=1`; production image **physically excludes** `/test/*` source; `/test/healthz` probe gates the run, no fallback
 
 - **`/review`** — Workflow-orchestrated, **adversarially verified** local PR review.
-  - Phase 1 fans out **6 finders in parallel**: code quality / security / simplicity / robustness / doc-sync / **Codex cross-model independent** review, schema-enforced
-  - Phase 2 every 🔴/🟡 re-judged by **3 independent skeptic lenses** (importance / root-cause / risk-if-unfixed), majority vote
+  - Phase 1 slices the diff (≤1500 lines per slice), writes each slice's diff to disk once, and fans out **3 finders per slice in parallel**: defect (security / robustness / correctness) / design (quality / simplicity / doc-sync) / **Codex cross-model independent** review, schema-enforced
+  - Phase 2 **one skeptic verifier per slice** judges every 🔴/🟡 in that slice on three lenses (importance / root-cause / risk-if-unfixed), majority vote
+  - Phase 3 **one sweeper per slice** hunts sibling sites of every confirmed defect class inside that slice; each class is handed to `/revise` as one fix; NITs can be cleared in one batch
+  - Every phase dispatches per slice, so cost scales at ~300 tokens per diff line (a 15k-line diff ≈ 50 agents / 5M tokens)
+  - Once fixes land, the fix diff gets **one automatic re-review**; the report is persisted under `.bb-spec/.cache/review/` so the next run flags recurrences and skips already-rejected items
   - Read-only — never auto-edits; requires Claude Code ≥ 2.1.154
 
 - **`/revise`** — The exception handler, callable anytime.
@@ -135,11 +138,11 @@ Optional upstream: `/prd` (PM / requester brainstorms a PRD; shipped separately 
 - **`/doc-update`** — Whole-repo spec / doc / code **consistency sweep**.
   - Six drift classes: spec-stale / doc-stale / code-violation / spec-conflict / orphan-index / uncovered-rule
   - **Code is the truth; spec / docs are mirrored to it**; only obvious hard-constraint violations stop and ask, then route to `/revise` for TDD
-  - Clear boundaries against `/revise` (single point) and the `/review` `review-doc-sync` finder (PR-diff scope)
+  - Clear boundaries against `/revise` (single point) and the `/review` `review-design` finder (doc-sync lens) (PR-diff scope)
 
 **Ships with**
 
-- **11 orchestration subagents** driven by the stages above: `test-engineer` / `impl-engineer` / `spec-reviewer` / `webview-test-runner` / `review-code-quality` / `review-security` / `review-simplicity` / `review-robustness` / `review-doc-sync` / `review-codex` / `pre-reviewer`
+- **8 orchestration subagents** driven by the stages above: `test-engineer` / `impl-engineer` / `spec-reviewer` / `webview-test-runner` / `review-defect` / `review-design` / `review-codex` / `pre-reviewer`
 - **4 passive hooks** (automatic): block npm/yarn, block main commit, dependency version self-check, Stop four-point self-check
 
 ---

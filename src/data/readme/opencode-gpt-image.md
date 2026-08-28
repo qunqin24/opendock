@@ -4,17 +4,7 @@ Image **generation** and **editing** tools for [opencode](https://opencode.ai), 
 
 Add one line to your config and any agent can create and edit images.
 
-<!--
-  VIDEO: drag-and-drop your screen recording into this README on GitHub
-  (edit the file in the browser). GitHub uploads it and replaces the cursor
-  with a https://github.com/user-attachments/assets/... link. Paste that link
-  below, or use the <video> tag form:
-
-  https://github.com/user-attachments/assets/XXXXXXXX
--->
-
-> [!NOTE]
-> Demo video coming soon.
+![image_generate and image_edit called from an opencode agent, both authenticated via a ChatGPT subscription](.github/assets/demo.png)
 
 ## Install
 

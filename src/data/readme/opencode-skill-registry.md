@@ -42,7 +42,7 @@ Each skill entry includes name, trigger text, and full `SKILL.md` path. Project 
 - Retry failed startup generation at most three times per session.
 - Read local skill metadata only; send no project data over the network.
 
-The package has no runtime npm dependencies and exports only `./server`.
+The package has no runtime npm dependencies. Its root and `./server` entrypoints load the same server plugin.
 
 ## Update or remove
 

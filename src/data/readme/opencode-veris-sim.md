@@ -13,7 +13,7 @@ Three commands an engineer invokes with a task, plus the `veris` MCP server.
 
 | command | what it does | not done until |
 |---|---|---|
-| `setup` | wires the repository to an environment, once: credential, environment, transport (proxy+docker, or `--direct` where the app's config carries the base URLs) | a smoke run's receipt — or, direct tier, the twin's trace — names the service |
+| `setup` | wires the repository to an environment, once: credential, environment, transport (proxy+docker, or `--direct` where the app's config carries the base URLs), and — when the app works with files — the world they live in, promoted with a yes | a smoke run's receipt — or, direct tier, the twin's trace — names the service |
 | `build <issue link \| prompt>` | measures every vendor claim the task rests on against the twin before designing, implements, exercises the change through `veris-proxy` | every claim measured before the first source edit; a receipt from the changed flow; a PR stating what was verified and what is assumed |
 | `fix <issue link \| prompt>` | reproduces the failure the issue describes through the repository's own code before designing, fixes it, proves the same failure closed | the failure reproduced before the first source edit; the same failure re-run green with a receipt; the PR as above |
 
@@ -105,6 +105,23 @@ it is set. The skill writes the key nowhere; the MCP server reads the
 environment at session start, so restart the agent after setting it.
 
 ### Versions
+
+0.6.5 — files. Bytes go in through `POST {control_url}/veris/files`, never
+`/veris/data`; rows first (the owner the files hang off), files second;
+a file's row shows the SHA-256 of its bytes, which is how an upload is
+checked. `setup` gains step 7: when the app works with files, seed the
+world once, ask, and promote, so no task loads the files again. `build`
+and `fix` still never promote.
+
+0.6.4 — the manual is not a coverage catalogue: `build` and `fix` said it
+listed what a service does not implement, and named one service's refusal
+code as if every service used it, so an agent read a short manual as an
+absence. `/veris/operations` leaves both gates — no service publishes one.
+A refusal that names itself unsupported settles the question; an ordinary
+`400` or `404` does not, and is reported as uncertainty. Discovery runs
+cheapest-first (manual, the bare `/veris/data` census, one projected table),
+trace reads name their tier, and fault rows gain path templates, GraphQL
+selectors and frozen clock mode.
 
 0.4.3 — `build` and `fix` seed the world before they measure: neither command
 named the write side of `/veris/data`, so the rows a code path needs were

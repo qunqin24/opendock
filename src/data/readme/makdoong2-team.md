@@ -104,9 +104,9 @@ makdoong2-team doctor            # 설치 진단
 ```
 
 - 커맨드가 **전용 full-permission 에이전트**(`makdoong2-issue-reporter`)로 라우팅되어, 호출 시점 이전의 로그·프롬프트·세션 컨텍스트를 스스로 수집해 이상 지점을 포착하고 [y00njinuk/makdoong2-team issues](https://github.com/y00njinuk/makdoong2-team/issues) 에 등록한다.
-- **사용자 직접 호출이 유일한 트리거**다. 부장님·막둥이가 실패를 관측했다고 자율적으로 이슈를 만들지 않는다 (훅이 차단).
-- 저장소가 public 이므로 사내 정보는 마스킹 후 첨부되며, **전송 전 마스킹 요약에 대한 사용자 최종 승인**을 반드시 거친다.
-- PAT 는 `~/.config/opencode/.github` 파일에서 읽는다. 상세: ARCHITECTURE.md §4.6
+- **사용자 직접 호출이 유일한 트리거**다. 부장님·막둥이가 실패를 관측했다고 자율적으로 이슈를 만들지 않는다 (훅이 차단). 이 에이전트는 **선택 가능한 에이전트 목록에도, `@` 멘션 목록에도 뜨지 않으며**, `task` 툴로 spawn 하는 것도 차단된다 — 진입점은 위 커맨드 하나뿐이다.
+- 저장소가 public 이므로 사내 정보는 마스킹 후 첨부되며, **전송 전 승인을 세션 안에서 묻는다**: 에이전트가 게시될 원문 전체를 `cat` 으로 표시하면 훅이 그 sha256 을 기록하고, 전송용 curl 호출 시 opencode 가 게시 여부를 묻는다(yes/no). 표시하지 않았거나 표시 후 내용이 바뀌면 전송이 차단된다 (승인은 사용자가 본 원문에 바인딩, 1회용). 승인 프롬프트에서는 **"Allow once"** 를 고른다 — "always" 는 남은 세션의 승인 질문을 없앤다.
+- PAT 는 `~/.config/opencode/.github` 파일에서 읽는다. **파일이 없거나 토큰을 찾지 못하면 중단하지 않고, 발급 URL 과 최소 권한(fine-grained: Issues Read/write, classic: `public_repo`)을 안내해 사용자에게 발급을 요청한 뒤 대기**한다. 401/403 도 같은 재발급 경로를 탄다. 상세: ARCHITECTURE.md §4.6
 
 ---
 

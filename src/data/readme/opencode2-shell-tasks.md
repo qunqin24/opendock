@@ -6,6 +6,8 @@
 
 An [OpenCode 2](https://opencode.ai/v2/docs/) plugin for Claude Code-style background shell jobs, built on the **V2 plugin API** (`Plugin.define`, `ctx.tool.transform`, `ctx.session.hook`). It lets the Agent start a long command without blocking the current turn, continue other work, inspect status and logs, stop a task, and manage everything from a native TUI panel.
 
+> This project is not built by the OpenCode team and is not affiliated with OpenCode in any way.
+
 > This is the OpenCode 2 port of [`opencode-shell-tasks`](https://github.com/madcpt/opencode-shell-tasks), which targets OpenCode 1.x. The two plugins target different plugin API generations and are not interchangeable.
 
 ## Features

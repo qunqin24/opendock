@@ -69,7 +69,7 @@ Requirements:
 | Runtime | Version |
 | --- | --- |
 | Node.js | `>=22.12.0` |
-| OpenCode | `>=1.3.8` (Tested with 1.18.18) |
+| OpenCode | `>=1.18.7` (Tested with 1.18.23) |
 
 ## Configuration Files
 
@@ -99,7 +99,11 @@ Runtime checkpoints are stored in SQLite at:
 ~/.config/opencode/openai-compact/checkpoints.db
 ```
 
-The default retention is 30 days. Checkpoints are deleted when OpenCode emits `session.deleted`.
+The database stores checkpoints and the message IDs of OpenCode's internal post-compaction control turns. Tracking IDs keeps those turns out of future requests even if OpenCode changes their text, metadata, or position.
+
+When a forked OpenCode session first runs after compaction, checkpoints and control turns before the fork point are copied to the new session with their regenerated message IDs.
+
+The default retention is 30 days. Checkpoints and control-message records are deleted when OpenCode emits `session.deleted`.
 
 ## Example Configuration
 

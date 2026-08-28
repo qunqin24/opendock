@@ -23,7 +23,7 @@ Go Usage
 opencode plugin --global @davidaayers/opencode-go-usage-plugin
 ```
 
-or from inside OpenCode: press `ctrl+p` → "Install Plugin" → `@davidaayers/opencode-go-usage-plugin`. Restart OpenCode and the block appears in the sidebar once the session uses an `opencode-go` model.
+Or from inside OpenCode: press `ctrl+p` → "Install Plugin" → `@davidaayers/opencode-go-usage-plugin`. Restart OpenCode and the block appears in the sidebar once the session uses an `opencode-go` model.
 
 ### From source
 
@@ -38,7 +38,7 @@ OpenCode TUI plugins load from the `plugin` array in **`~/.config/opencode/tui.j
 }
 ```
 
-## How it works
+## How It Works
 
 - **Usage windows**: polls the official endpoint (Bearer auth with the `opencode-go` key from `~/.local/share/opencode/auth.json`) every 60s and on message/session events. Each window reports `percent` (0–100), `status` (`ok` / `rate-limited`), and `resetsAt`.
 - **Rendering**: SolidJS JSX via `@opentui/solid`, registered into the `sidebar_content` and `session_prompt_right` slots through [`@opencode-ai/plugin/tui`](https://www.npmjs.com/package/@opencode-ai/plugin). Colors come from the active OpenCode theme.
@@ -53,6 +53,10 @@ bun scratch-repro.tsx   # headless render capture
 ```
 
 Single-file plugin: everything lives in [`src/go-usage.tsx`](src/go-usage.tsx).
+
+## Roadmap
+
+Cross-repository follow-up work is tracked in the [OpenCode Plugins project](https://github.com/users/davidaayers/projects/1).
 
 ## License
 

@@ -33,6 +33,7 @@ The sidebar gives a quick, at-a-glance view of your current month's Requesty usa
 - Optional input/output token breakdown for each spend metric (`sidebar.showTokens`)
 - API key name in the header, linking to the Requesty analytics dashboard filtered by that key
 - Top models for the current month (up to `sidebar.maxModels`), each with spend, total tokens, and input (↑) / output (↓) breakdown; click the header to collapse or expand the list
+- Session cost for the current session: today's spend and spend since the session started (from the session's creation timestamp, falling back to a rolling 90-day window when unavailable), each with request count and token breakdown; click the header to collapse or expand (`sidebar.showSessionInfo`). Shows a "loading…" placeholder until the active session's data has been fetched, so it never displays an incorrect zero while loading.
 
 You can disable the sidebar entirely with `"sidebar": { "enabled": false }`.
 
@@ -187,6 +188,7 @@ If no key is found, the widget shows a short setup hint instead of failing.
 | `sidebar.maxModels`       | number  | `5`                          | Number of models shown in the compact sidebar list |
 | `sidebar.showTokens`      | boolean | `true`                       | Show input/output token breakdown alongside spend in the sidebar averages block |
 | `sidebar.showKeyName`      | boolean | `false`                      | Show the API key nickname in the sidebar header |
+| `sidebar.showSessionInfo`  | boolean | `true`                       | Show the per-session cost collapsible section (today + since session start) |
 | `sidebar.order`           | number  | `50`                         | Slot order for the sidebar widget; lower numbers appear first |
 | `prompt.enabled`          | boolean | `true`                       | Show the prompt widget |
 | `prompt.budgetIndicator`  | boolean | `true`                       | Show spend/limit readout on the right side of the session prompt |
@@ -267,6 +269,7 @@ All amounts are in USD and dates are evaluated in UTC.
 - **7d avg** — average spend and tokens over the previous 7 completed calendar days (excluding today). Days without usage count as `$0` / `0` tokens. Uses a rolling window to ensure accuracy across month boundaries.
 - **30d avg** — average spend and tokens over the previous 30 completed calendar days (excluding today). Days without usage count as `$0` / `0` tokens. Uses a rolling window to ensure accuracy across month boundaries.
 - **End of Month projection** — current spend projected forward at the current daily run rate through the end of the month.
+- **Session cost** — spend, request count, and tokens for the currently active opencode session: **Today** and **Since <session start date>**. The window starts at the session's creation timestamp; if that is unavailable it falls back to the last 90 days. Attribution uses Requesty's `extra.X-Session-Affinity` metadata, so values are exact per session (not estimates). While a session's data is still loading the section shows a "…" placeholder rather than a misleading zero.
 
 ## Requirements
 

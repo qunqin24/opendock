@@ -1,4 +1,4 @@
-# opencode-context-tui-plugin
+# opencode-context-gauge-plugin
 
 An [OpenCode](https://opencode.ai) TUI sidebar plugin that shows a live context-window usage gauge for the active session.
 
@@ -18,12 +18,10 @@ An [OpenCode](https://opencode.ai) TUI sidebar plugin that shows a live context-
 ## Install
 
 ```sh
-opencode plugin --global @davidaayers/opencode-context-tui-plugin
+opencode plugin --global @davidaayers/opencode-context-gauge-plugin
 ```
 
-or from inside OpenCode: press `ctrl+p` → "Install Plugin" → `@davidaayers/opencode-context-tui-plugin`. The command patches `tui.json` for you; restart OpenCode and the gauge appears in the sidebar once the session has a completed assistant response.
-
-OpenCode also ships a built-in context section in the sidebar. If you'd rather only see this one, press `ctrl+p` → **Plugins** and toggle the built-in context plugin off — the choice persists across restarts.
+Or from inside OpenCode: press `ctrl+p` → "Install Plugin" → `@davidaayers/opencode-context-gauge-plugin`. The command patches `tui.json` for you; restart OpenCode and the gauge appears in the sidebar once the session has a completed assistant response.
 
 ### From source
 
@@ -33,10 +31,14 @@ OpenCode TUI plugins load from the `plugin` array in **`~/.config/opencode/tui.j
 // ~/.config/opencode/tui.json
 {
   "plugin": [
-    "file:///absolute/path/to/opencode-context-tui-plugin/src/context-gauge.tsx"
+    "file:///absolute/path/to/opencode-context-gauge-plugin/src/context-gauge.tsx"
   ]
 }
 ```
+
+## Notes
+
+OpenCode also ships a built-in context section in the sidebar. If you'd rather only see this one, press `ctrl+p` → **Plugins** and toggle the built-in context plugin off. The choice persists across restarts.
 
 ## Configuration
 
@@ -46,7 +48,7 @@ Pass options using the `[spec, options]` tuple form (spec being the npm package 
 {
   "plugin": [
     [
-      "@davidaayers/opencode-context-tui-plugin",
+      "@davidaayers/opencode-context-gauge-plugin",
       {
         "label": "Context",
         "barWidth": 20,
@@ -67,7 +69,7 @@ Pass options using the `[spec, options]` tuple form (spec being the npm package 
 | `dangerAt`| `number`          | `90`       | Percent at which the bar switches to the danger color (clamped > `warnAt`) |
 | `showCost`| `boolean`         | `true`     | Show session cost after token counts                               |
 
-## How it works
+## How It Works
 
 - **Used tokens**: the most recent assistant message with output tokens provides `input + output + reasoning + cache.read + cache.write`; before any responses exist, session-level token/cost aggregates are used.
 - **Context window**: resolved from the message's (or session's) provider/model via `provider.models[modelID].limit.context`. The widget hides itself if no context limit is known.
@@ -81,6 +83,10 @@ bun run typecheck
 ```
 
 Single-file plugin: everything lives in [`src/context-gauge.tsx`](src/context-gauge.tsx).
+
+## Roadmap
+
+Cross-repository follow-up work is tracked in the [OpenCode Plugins project](https://github.com/users/davidaayers/projects/1).
 
 ## Credits
 
