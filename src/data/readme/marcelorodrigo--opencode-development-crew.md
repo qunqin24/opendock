@@ -40,7 +40,7 @@ Installation differs by harness. If you use more than one, install Development C
 - Verify:
 
   ```bash
-  /skill rubber-duck
+  /development-crew:rubber-duck
   ```
 
 ### Codex CLI
@@ -66,7 +66,50 @@ $rubber-duck
 
 ### OpenCode
 
-Add to your `opencode.json` (global or project-level):
+Install the latest release globally:
+
+```bash
+opencode plugin @marcelorodrigo/opencode-development-crew@latest --global
+```
+
+Or add the package to the `plugin` array in your global or project-level
+`opencode.json`:
+
+```json
+{
+  "plugin": ["@marcelorodrigo/opencode-development-crew@latest"]
+}
+```
+
+OpenCode installs the published npm package from this entry. Restart OpenCode
+after adding or changing the plugin configuration.
+
+The `@latest` tag resolves to the latest published release. The plugin also
+performs a best-effort update check in the background. For an eligible floating
+npm wrapper, it checks npm, installs and reifies the exact newer release, and
+then shows a toast asking you to restart OpenCode. Before updating, the plugin
+snapshots the skills outside the mutable package wrapper so OpenCode can still
+discover and read `SKILL.md` files safely.
+
+Exact-pinned, local, and Git installs are not auto-updated. Restart OpenCode to
+activate newly installed code. Update failures are non-fatal and do not prevent
+the plugin from starting.
+
+If an older destructive updater left a stale `@latest` wrapper, install the
+fixed release explicitly through OpenCode's plugin manager, using the same
+scope as the original entry, then restart OpenCode:
+
+```bash
+opencode plugin @marcelorodrigo/opencode-development-crew@<fixed-version> --global --force
+```
+
+Replace `<fixed-version>` with the first release containing this updater fix.
+For a project-level entry, omit `--global` and run the command from that
+project. This temporarily pins the plugin; change its config entry back to
+`@latest` afterward if you want future automatic updates. Do not remove
+arbitrary cache or package paths manually.
+
+To use the repository directly instead of npm:
 
 ```json
 {
@@ -77,7 +120,7 @@ Add to your `opencode.json` (global or project-level):
 Or fetch install instructions:
 
 ```
-Fetch and follow instructions from https://raw.githubusercontent.com/marcelorodrigo/development-crew/master/.opencode/INSTALL.md
+Fetch and follow instructions from https://raw.githubusercontent.com/marcelorodrigo/development-crew/master/OPENCODE_INSTALL.md
 ```
 
 ### Cursor
@@ -127,12 +170,25 @@ gemini extensions install https://github.com/marcelorodrigo/development-crew
 - Verify:
 
   ```bash
-  /skill rubber-duck
+  /skill:rubber-duck
   ```
 
 ## The Pipeline
 
-Use OpenCode's native `skill` tool (or `skill: name` in any harness):
+Use OpenCode's native `skill` tool. In current OpenCode versions, discovered
+skills are also exposed as slash entries when no existing command has the same
+name:
+
+```text
+/rubber-duck
+/architect
+/implementer
+/code-reviewer
+```
+
+The slash entries come from OpenCode's skill discovery; this plugin does not
+register custom commands. If a slash entry is unavailable, use the native
+`skill` tool:
 
 1. **rubber-duck** - Activates before writing code. Challenges assumptions, explores alternatives, asks the questions nobody else will. Produces a structured **Brainstorm Brief**.
 
@@ -182,14 +238,12 @@ Use OpenCode's native `skill` tool (or `skill: name` in any harness):
 - **Gemini:** `gemini extensions update https://github.com/marcelorodrigo/development-crew`
 - **oh-my-pi:** `omp plugin upgrade development-crew@development-crew-plugin`
 
-- **OpenCode (latest):** Restart OpenCode — it fetches the latest from `master` automatically.
-- **OpenCode (pinned):** Bump the git tag in your `opencode.json`:
-
-  ```json
-  {
-    "plugin": ["development-crew@git+https://github.com/marcelorodrigo/development-crew.git#v0.11.0"]
-  }
-  ```
+- **OpenCode:** The `@latest` npm plugin entry checks npm in the background and
+  installs the exact newer release into the eligible floating wrapper. Skills
+  are snapshotted outside the mutable wrapper before the update. Restart
+  OpenCode after the notification to activate the new code. Exact-pinned,
+  local, and Git installs are not auto-updated, and update failures are
+  non-fatal.
 
 ## License
 

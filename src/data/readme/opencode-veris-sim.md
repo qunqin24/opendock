@@ -13,7 +13,7 @@ Three commands an engineer invokes with a task, plus the `veris` MCP server.
 
 | command | what it does | not done until |
 |---|---|---|
-| `setup` | wires the repository to an environment, once: credential, environment, transport (proxy+docker, or `--direct` where the app's config carries the base URLs), and — when the app works with files — the world they live in, promoted with a yes | a smoke run's receipt — or, direct tier, the twin's trace — names the service |
+| `setup` | wires the repository to an environment, once: credential, environment, transport (proxy+docker, or `--direct` where the app's config carries the base URLs), and — when the app works with files — the state they live in, promoted with a yes | a smoke run's receipt — or, direct tier, the twin's trace — names the service |
 | `build <issue link \| prompt>` | measures every vendor claim the task rests on against the twin before designing, implements, exercises the change through `veris-proxy` | every claim measured before the first source edit; a receipt from the changed flow; a PR stating what was verified and what is assumed |
 | `fix <issue link \| prompt>` | reproduces the failure the issue describes through the repository's own code before designing, fixes it, proves the same failure closed | the failure reproduced before the first source edit; the same failure re-run green with a receipt; the PR as above |
 
@@ -106,11 +106,16 @@ environment at session start, so restart the agent after setting it.
 
 ### Versions
 
+0.6.7 — the word *world* is gone: `veris-reference/worlds.md` is `state.md`,
+and the commands say *state*. The team uses *world* for the twin plus the
+actor service; the plugin used it for what a sandbox holds, so one word
+carried two referents. Same steps, same endpoints, one file renamed.
+
 0.6.5 — files. Bytes go in through `POST {control_url}/veris/files`, never
 `/veris/data`; rows first (the owner the files hang off), files second;
 a file's row shows the SHA-256 of its bytes, which is how an upload is
 checked. `setup` gains step 7: when the app works with files, seed the
-world once, ask, and promote, so no task loads the files again. `build`
+state once, ask, and promote, so no task loads the files again. `build`
 and `fix` still never promote.
 
 0.6.4 — the manual is not a coverage catalogue: `build` and `fix` said it

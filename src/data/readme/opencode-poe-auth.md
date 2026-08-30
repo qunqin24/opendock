@@ -261,6 +261,77 @@ console.log(identity.name, identity.handle);
 
 Uses `POE_API_KEY` or the stored credential and honors `POE_BASE_URL`. Throws an API error when Poe rejects the credential.
 
+### Shared filesystem foundation
+
+`poe-code@12.0.7` publishes the Node.js foundation at `poe-code/safe-fs`
+and shared filesystem integration for the SafeJS SDK and both CLIs.
+The installed release was verified on Node 18.18.2, 18.20.8, 20.20.0,
+22.22.2 and 24.14.0, including public runtime and TypeScript consumers.
+`@poe-code/safe-fs` is the private workspace name, not a public npm import.
+
+The implemented foundation contains memory, host-directory, S3 and WebDAV
+adapters; mount, read-only and overlay wrappers; and the shared `FileSystem`,
+`FsError` and `createNodeFsBridge` APIs:
+
+```typescript
+import { MemoryFileSystem } from "poe-code/safe-fs";
+
+const filesystem = new MemoryFileSystem();
+await filesystem.writeFile("/note", new TextEncoder().encode("hello"));
+```
+
+SafeJS accepts these adapters through `makeFsModule({ adapter, root?, cwd?, signal? })`
+from `poe-code/safejs`. Both `poe-safejs` and `poe-code harness run` accept
+`--fs-config <path>` for explicit memory or host-directory configuration; the
+legacy `--fs` and `--fs-root` options retain their Node-backed behavior.
+
+The default public entries target Node.js. Full browser runtime support, safe-bash runtime migration,
+removal of legacy adapter copies and the `safe-js` rename remain pending.
+The host-directory adapter is not race-proof OS isolation. See the
+[foundation documentation](packages/safe-fs/README.md) for configuration,
+capabilities and backend limitations.
+
+#### Verified filesystem-only browser release
+
+Release C (`poe-code@12.0.7`) adds a portable browser build of `poe-code/safe-fs` and
+`poe-code/safe-fs/core`. Under the browser condition, both routes share one
+implementation, including `FsError`, authority registries and `createFsBridge`.
+The portable bridge requires an explicit host codec; this milestone adds no
+codec dependency. Default Node exports and the Node.js `>=18.18` baseline stay
+unchanged, including genuine Buffer results from `createNodeFsBridge`.
+Memory, read-only, mount, overlay and WebDAV adapters are portable; real host
+storage, S3/transports and Node configuration helpers remain Node-only.
+
+The Node host entry `poe-code/safe-fs/node` and the still-Node-only
+`poe-code/safejs`, `poe-code/safejs/core` and `poe-code/safejs/cli` are deliberately
+unavailable at runtime under the browser condition and expose empty browser
+declarations. Their Node exports remain available. This is an exact route
+boundary, not removal of the SDK or its Node capabilities.
+
+The published artifact passed 17 public filesystem checks in Chromium
+149.0.7827.55. Firefox and WebKit verification remains pending; these checks do
+not establish full browser SafeJS support.
+
+Full browser SafeJS SDK/runtime support remains pending. Guest codec integration,
+portable SDK declaration closure and shared host-call policy/replay metadata
+require separate integration; a browser filesystem build does not prove them.
+
+## Building from Source
+
+Run `npm run build` to compile the workspace and generate the published bundles.
+SafeJS compilation clears its previous TypeScript output, so deleted sources do
+not leave stale JavaScript or declarations behind. Bundling validates the output
+graph and stages complete files before publishing dependencies and then entry
+points; obsolete JavaScript chunks and their source maps are removed afterward.
+`npm run dev -- <command>` also reruns bundling after cached workspace builds.
+
+Output-path guards reject unresolved symbolic links and paths escaping the
+package. Bundle cleanup preserves unrelated files. The bundle step does not
+overwrite existing outputs if compilation fails, but a full build is not atomic
+across the whole package. Do not run concurrent builds against the same output
+directories. See the [artifact cleanup plan](docs/plans/safejs-artifact-cleanup.md)
+for fault-injection coverage and verification steps.
+
 ## Research Preview
 
 These features are available but subject to breaking changes.

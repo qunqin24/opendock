@@ -25,5 +25,13 @@ Restart OpenCode after saving.
 
 ## Which skills it picks up
 
-`.agents/skills` in every directory from the session directory up to the worktree root, then `~/.agents/skills`. Project directories come first, so a project skill shadows a global one of the same name — the same precedence OpenCode uses. The walk stops at the worktree root, so nothing above your repo leaks in.
+Parity with OpenCode's runtime (`~/.opencode/bin/opencode` `SkillDiscovery`):
+
+- `~/.agents/skills/**/SKILL.md` and `~/.claude/skills/**/SKILL.md` (global, `dot:true`, `symlink:true`)
+- `<session-dir>/.agents/skills/**/SKILL.md` and `<session-dir>/.claude/skills/**/SKILL.md` walked up to the worktree root (`**` recursive, dot + symlink, cycle-safe via `realpath`)
+- `opencode.jsonc: skills.paths` (each entry scanned `**/SKILL.md`; `~/` expanded, relative resolved against worktree)
+
+Project bases come first (nearest dir → worktree → global), `.agents` before `.claude` at each level, so a nearer or `.agents` skill shadows a farther / `.claude` one. A duplicate name is registered **once** (`config.command[name]` first-wins, same dedup as OpenCode's `duplicate skill name` warning). The walk stops at the worktree root, so nothing above your repo leaks in.
+
+Not mirrored (require live fetch / plugin host): `skills.urls` and plugin-provided `{skill,skills}/**/SKILL.md` directories.
 

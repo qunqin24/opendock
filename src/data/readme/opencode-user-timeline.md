@@ -21,8 +21,10 @@ opencode2 plugin add opencode-user-timeline
 ```
 ◆ 用户节点 (3)
 ────────────────
+── 08-29 ──
 14:02 ─ 那之前的那个400多行的脚本移…
 14:15 ─ 清理过程中发现 pnpm 缓存…
+── 08-30 ──
 14:31 ━ 桌面快捷方式仍指向补丁版…
 ```
 
@@ -43,6 +45,7 @@ opencode2 plugin add opencode-user-timeline
   遮盖层用 slot + 绝对定位自绘，
   不走 dialog（宿主滚动命令会关闭 dialog）
 - 被点击节点显示 `●` 高亮
+- **按日期分组**：跨日会话以日期标题分隔，节点行只显示当天的时分
 - 监听服务端 message/session 事件实时更新，另有 20 秒低频本地轮询兜底
 - 节点标记统一为 `─`，点击选中的那条显示 `●` 高亮
 - 面板显隐状态持久化（`context.storage.store`），重启 TUI 后保留

@@ -479,7 +479,7 @@ Schema (Zod-validated; unknown object keys are stripped). Declared invalid field
     "dispatch": true,
     "maxAttempts": 3,
     "cooldownSeconds": 60,
-    "retryOnStatusCodes": [429, 500, 502, 503, 504],
+    "retryOnStatusCodes": [402, 429, 500, 502, 503, 504],
     "retryOnPatterns": [
       "rate.?limit",
       "too.?many.?requests",
@@ -1018,13 +1018,15 @@ The CLI reads/writes the **user** config file at `~/.config/opencode/ocmm.json[c
 
 ## Runtime fallback
 
-When a model call falls through to generic runtime fallback (HTTP 429/5xx, or a message matching `retryOnPatterns`), ocmm:
+When a model call falls through to generic runtime fallback (a configured HTTP status, or a message matching `retryOnPatterns`), ocmm:
 
 1. Resolves the failing agent's `ModelRequirement` (user config -> built-in defaults).
 2. Marks the just-failed model as failed with a timestamp.
 3. Finds the next entry in the fallback chain that is not in cooldown (default 60s).
 4. Dispatches a new `client.session.prompt` call with the next model, reusing the latest contiguous user-message block.
 5. Aborts the original session first (best-effort).
+
+The default status list is `402`, `429`, `500`, `502`, `503`, and `504`. A name-based provider `AbortError` or `DOMException` carrying status `402` may use this fallback path; an explicit user abort remains terminal and never dispatches a fallback prompt.
 
 ### Subagent 429 recovery
 
@@ -1042,7 +1044,7 @@ While a dedicated dispatch is active, the first queued provider outcome takes pr
   "dispatch": true,
   "maxAttempts": 3,
   "cooldownSeconds": 60,
-  "retryOnStatusCodes": [429, 500, 502, 503, 504],
+  "retryOnStatusCodes": [402, 429, 500, 502, 503, 504],
   "retryOnPatterns": [
     "rate.?limit",
     "too.?many.?requests",
@@ -1085,7 +1087,7 @@ While a dedicated dispatch is active, the first queued provider outcome takes pr
 }
 ```
 
-Abort errors are never retried. Deduplication is enforced via an in-flight `Set<sessionID>`.
+Explicit user aborts are never retried. Name-based provider `AbortError` and `DOMException` events remain terminal except for the configured status-`402` recovery path described above. Generic retries acquire a lifecycle-generation, route-snapshot, and target-model reservation before prompt I/O; accepted or possibly accepted prompts remain pending until explicit target evidence or lifecycle cleanup, while the dispatcher retains an in-flight `Set<sessionID>` for the active prompt call.
 
 ### Subagent interruption recovery
 

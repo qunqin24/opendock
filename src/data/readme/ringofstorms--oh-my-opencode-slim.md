@@ -132,6 +132,25 @@ bun install
 bun run build
 ```
 
+### OpenCode v2 (`opencode2`)
+
+The same package runs on both OpenCode v1 and v2. On v2 you get the full
+agent pantheon, delegation through the host `subagent` tool (bridged into the
+background job board), all built-in tools and slash commands, auto-registered
+MCPs, `/preset` in the TUI, webfetch secondary-model summaries, and
+rate-limit model fallback. Multiplexer panes and the orchestrator-wake
+scheduler stay v1-only by design (v2 renders and notifies subagents natively).
+
+v2 auto-refreshes unpinned plugins on startup, so pin an exact version while
+both v2 and this adapter evolve quickly:
+
+```json
+{ "plugin": ["oh-my-opencode-slim@2.2.17"] }
+```
+
+Details, the feature matrix, and per-feature minimum v2 builds:
+[OpenCode v2 Compatibility](docs/opencode-v2-compatibility.md).
+
 ### Getting Started
 
 The installer generates both OpenAI and OpenCode Go presets, with OpenAI active by default.
@@ -661,6 +680,7 @@ Use this section as a map: start with installation, then jump to features, confi
 | Doc | What it covers |
 |-----|----------------|
 | **[Installation Guide](docs/installation.md)** | Install the plugin, use CLI flags, reset config, and troubleshoot setup |
+| **[OpenCode v2 Compatibility](docs/opencode-v2-compatibility.md)** | Run the same plugin on `opencode2`: feature matrix, minimum v2 builds, version pinning |
 | **[Configuration](docs/configuration.md)** | Config file locations, JSONC support, prompt overrides, and full option reference |
 | **[Project Customization](docs/project-local-customization.md)** | Repository-specific custom agents, prompt overrides, per-agent skills, and precedence |
 | **[Background Orchestration](docs/background-orchestration.md)** | Scheduler-first orchestrator model built around native background subagents |

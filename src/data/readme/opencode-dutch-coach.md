@@ -8,13 +8,20 @@ level is unclear.
 
 ## Installation
 
-Install the package from npm in an OpenCode project:
+Install the plugin globally with the OpenCode CLI:
 
 ```sh
-pnpm add --save-dev opencode-dutch-coach
+opencode plugin opencode-dutch-coach --global
 ```
 
-Add the plugin to that project's `opencode.json`:
+This installs the npm package and adds it to OpenCode's global configuration. To
+install it for the current project only, omit `--global`:
+
+```sh
+opencode plugin opencode-dutch-coach
+```
+
+You can also add the plugin to `opencode.json` manually:
 
 ```json
 {
@@ -22,6 +29,10 @@ Add the plugin to that project's `opencode.json`:
   "plugin": ["opencode-dutch-coach"]
 }
 ```
+
+OpenCode installs npm plugins automatically at startup and caches them in its
+OpenCode data directory. Quit and restart OpenCode after installing the plugin
+or changing its configuration.
 
 ## Local Testing
 
@@ -61,6 +72,17 @@ resolution outside the fixture:
 ```
 
 Quit and restart OpenCode after changing the plugin or its configuration.
+
+## Automatic Updates
+
+When OpenCode starts, npm installations that use `latest` or a version range are
+checked for a newer Dutch Coach release. If one is available, the plugin clears
+OpenCode's cached package copy and shows a notification asking you to restart
+OpenCode to finish the update.
+
+Pinned versions, local paths, and Git-based installations are not changed. Update
+checks and notifications fail silently, so they never prevent the Dutch coaching
+skills or `/dutch` command from loading.
 
 ## Usage
 

@@ -1,6 +1,6 @@
 # opencode-status-bar
 
-> OpenCode TUI 插件 — 侧边栏配额仪表盘：时间 / 电量 / 缓存命中率 / 多供应商 API 余额 / 子代理监控。
+> OpenCode TUI 插件 — 侧边栏配额仪表盘：时间 / 电量 / 缓存命中率 / 多供应商 API 余额 / 子代理监控 / 模型用量统计。
 
 [![npm version](https://img.shields.io/npm/v/opencode-status-bar.svg)](https://www.npmjs.com/package/opencode-status-bar)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -16,6 +16,7 @@
 • 跑路哥                     $964.56
 • MiniMax  19% ▰▱▱▱▱ 27% ▰▰▱▱▱ · 2h46m ← 双窗（5h/7d）单行压缩
 • Kimi      6% ▰▱▱▱▱ 57% ▰▰▰▱▱ · !28m  ← ≥90% 告急行呼吸告警
+∑ 用量                    今日 1.2M tok  ← 用量行（点击开统计弹窗）
 ◆ task   ⠋ 2 run · 1 done · 8.2k tok    ← 子代理行（有活动才显示）
 
 折叠态：▶ 21:15 · ●●●●● · ⇄87% · ⧗2run   ← 健康星座摘要
@@ -59,7 +60,9 @@ mv ~/.cache/opencode/packages/opencode-status-bar@latest ~/.Trash/
 | 操作 | 效果 |
 |------|------|
 | 点击 `▼ 21:15` | 折叠 / 展开面板 |
-| 点击 `⇄ 87%` | 缓存详情弹窗（命中率 / token 分项 / 节省估算） |
+| 点击 `⇄ 87%` | 缓存详情弹窗（命中率 / token 分项 / 节省估算，中文标签） |
+| 点击 `∑ 用量` 行 | 用量统计弹窗（指标区 + 模型明细，时间范围可切换） |
+| **弹窗内点击时间范围** | 切换 今天 / 7天 / 30天 筛选（默认今天） |
 | 点击 `◆ task` 行 | 子代理列表弹窗（状态 / token / 耗时） |
 | **弹窗内点击子代理行** | **直接进入该子代理执行页面** |
 | 点击余额行 | 手动刷新该行（spinner 反馈） |
@@ -76,7 +79,8 @@ mv ~/.cache/opencode/packages/opencode-status-bar@latest ~/.Trash/
     "clock": true,      // 标题行时间（冒号脉动）
     "battery": true,    // 电量微条 + 百分比
     "cache": true,      // ⇄ 缓存命中率（点击弹窗）
-    "subagent": true    // ◆ 子代理监控行
+    "subagent": true,   // ◆ 子代理监控行
+    "usage": true       // ∑ 用量统计行（点击弹窗）
   },
 
   // ── 动效（全部可独立关闭；intervalMs = 闪烁/脉动周期毫秒）──
@@ -99,10 +103,27 @@ mv ~/.cache/opencode/packages/opencode-status-bar@latest ~/.Trash/
                       // 跨视图切换 / 插件重载 / 重启均存活，访问会话自动续期
   },
 
+  // ── 用量统计 ──
+  "usage": {
+    // "dbPath": "/path/to/opencode.db"   // 可选；默认自动探测
+    //                                        OPENCODE_DB 环境变量 > XDG_DATA_HOME
+    //                                        > ~/.local/share/opencode/opencode.db
+  },
+
   // ── 余额查询（见下文 Provider 脚本格式）──
   "balances": [ /* ... */ ]
 }
 ```
+
+## 用量统计说明
+
+`∑ 用量` 行实时读取 opencode 本地数据库（只读，不影响运行中的 opencode），统计**所有历史会话**的模型用量：
+
+- **指标区域**：总消耗 token、总输入、总输出、缓存命中、缓存命中率（口径与 `⇄` 缓存按钮一致）
+- **明细区域**：按模型聚合的请求数与 Token 数，按总量降序展示 Top 12
+- **时间范围**：今天 / 7 天 / 30 天（默认今天）
+- **性能**：数据库文件 mtime 变化才重查（含 WAL 文件）；统计口径与 cc-switch 一致——只计已完成的 assistant 消息，进行中的半截消息不计入
+- **托底**：数据库缺失 / 运行时不支持 SQLite / 查询失败时，入口行显示 `--`，弹窗内给出原因与配置指引，不影响面板其他功能
 
 ## Provider 脚本格式
 

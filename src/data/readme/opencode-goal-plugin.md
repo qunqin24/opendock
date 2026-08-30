@@ -31,13 +31,14 @@ This project is independently implemented for OpenCode. Product names used elsew
 | Operating systems | Filesystem-sensitive lifecycle tests run on Linux, macOS, and Windows |
 | Package entrypoint | Installed-tarball contracts verify both export paths, consumer TypeScript resolution, hooks, and all 11 tools |
 | Provider/backend quirks | Strict-template backends require the goal block to merge into the primary `system` message; covered by regression tests |
+| OpenCode 2 | Not supported and not yet tested; the peer/engine pin is `>=1.17.15 <2`. See the [OpenCode 2 section](docs/compatibility.md#opencode-2) |
 
 See the [compatibility policy](docs/compatibility.md) for the supported public
 surface and versioning expectations.
 
 ### OpenCode version compatibility
 
-Tested against real OpenCode 1.17.15 processes with live provider credentials and no mocked plugin hooks. State, ledger entries, and workspace files were checked independently of terminal or model prose:
+Tested against real OpenCode 1.17.15 and 1.18.25 processes with live provider credentials and no mocked plugin hooks. State, ledger entries, and workspace files were checked independently of terminal or model prose:
 
 | OpenCode Version | Provider Tested | `/goal status` | Auto-continue | Evidence-gated completion | Historical custom-command presentation (v0.6.6) |
 |---|---|---|---|---|---|
@@ -45,6 +46,7 @@ Tested against real OpenCode 1.17.15 processes with live provider credentials an
 | 1.17.15 | opencode-go (`qwen3.7-plus`) | ✅ | ✅ | ✅ Self-corrected after one rejection (bare `[goal:complete]` with no evidence), then completed cleanly | ⚠️ Not displayed |
 | 1.17.15 | opencode-go (`glm-5.2`) | ✅ | ✅ | ✅ Clean `[goal:evidence]` + `[goal:complete]` on the first attempt | ⚠️ Not displayed |
 | 1.17.15 | deepseek (`deepseek-chat`) | ✅ | ✅ | ✅ Clean `[goal:evidence]` + `[goal:complete]` on the first attempt; also verified end-to-end via the [demo](demo/) — autonomously fixed a real bug and reported evidence-backed completion | ⚠️ Not displayed |
+| 1.18.25 | opencode (`nemotron-3.5-lightning-free`) | ✅ | ✅ Held correctly under the Plan agent (`stopped: true`, zero auto-continues) | ✅ Clean `[goal:evidence]` + `[goal:complete]` | ⚠️ Not displayed; command text routed to model |
 
 `/goal status` and auto-continue are graded on **state correctness** (verified directly against persisted state: correct limits, turn/stop accounting, completion state, and file effects), not on terminal rendering. The `deepseek-v4-flash-free` canary suite additionally covers pause/resume across processes, blocker/restart, hard-process recovery, real host compaction, and stale-history clear enforcement. See [`docs/providers.md`](docs/providers.md) for the complete lifecycle matrix and session evidence.
 
@@ -400,6 +402,62 @@ await GoalPlugin(
 ```
 
 `timeoutMs` caps how long the built-in child-session auditor waits for a verdict. `failurePolicy` defaults to `reject`: an unavailable API, missing child-session ID, provider error, or timeout rejects the audit and pauses the goal for review. Set it to `approve` only as an explicit compatibility escape hatch; an actual negative or malformed verifier verdict still rejects. `auditorOptions` is ignored when a custom `auditor` function is supplied.
+
+## Status indicator
+
+Unattended runs are easier to trust when you can see the goal is still alive. Set `sessionTitleStatus: true` and the plugin mirrors live goal status into the OpenCode session title, which the TUI renders persistently:
+
+```
+▶ ship the release · 3/10 · 2m · 45k/200k
+```
+
+Status icon, objective, auto-continues used / limit, elapsed time, and context tokens / budget. The icon distinguishes running (`▶`), paused (`⏸`), and blocked (`⛔`) — blocked outranks paused because it needs you, not just a resume. A paused goal freezes its elapsed clock rather than running on.
+
+```json
+{
+  "plugin": [
+    ["opencode-goal-plugin", { "sessionTitleStatus": true }]
+  ]
+}
+```
+
+The option is **off by default** because it overwrites a user-visible field. When enabled, the session's original title is captured before the first overwrite and restored by `/goal clear`. A render identical to the last one skips the API call, so `/goal status` and other read-only commands cost nothing. Title updates are cosmetic: a failure is logged at debug level and never interrupts the goal loop.
+
+The indicator refreshes on goal commands and on idle, compaction, and interruption events — **not** on the `message.updated` events that stream during an assistant turn. Streaming refreshes would put an API round-trip in the response path for a cosmetic update, and idle is the cadence a human actually reads the indicator at.
+
+The captured original title lives in memory only, so a hard process kill leaves the last status line on the session. The plugin recognizes its own status lines and will not mistake one for your title, so `/goal clear` after a restart leaves the host's title alone rather than restoring stale goal status — but it cannot recover the title the session had before the goal started. Rename the session if you want it back.
+
+This needs no TUI plugin entrypoint, no `@opentui` dependencies, and no build step.
+
+## Plan-mode safety
+
+A planning-only agent is never driven into execution by the goal loop. OpenCode's built-in `plan` agent is restricted by default:
+
+- A goal set while `plan` is active is **recorded but held**, with stop reason `plan agent active`. The objective and its budget survive, so nothing is lost — the goal simply does not start.
+- The routed confirmation text for a held goal **omits the "start working" instruction** and is sent as a read-only control turn. This matters because command text reaches the model as a normal turn on current OpenCode builds (see [Limitations](#limitations)).
+- Auto-continue stays suppressed on **every idle** while a restricted agent is active, so switching into `plan` mid-goal pauses the loop.
+- Continuations retain the agent that started the goal, so the loop cannot drift into a different agent.
+
+The active agent is read from the execution context the host reports, falling back to the session record. That fallback matters: OpenCode runs `command.execute.before` before any `chat.message`/`chat.params` for the turn, so the context is empty for the first command in a session — the exact case a freshly opened Plan-mode session hits.
+
+**What this does and does not prevent.** The restriction stops the *goal loop*: a held goal sends zero auto-continues, so no unattended work happens. It cannot stop a model from acting on the single routed command turn, because OpenCode's `command.execute.before` does not fully intercept command text (see [Limitations](#limitations)). A held goal's routed text explicitly tells the model not to begin work and is sent as a read-only control turn, but a non-compliant model may still act on that one turn. Verified against OpenCode 1.18.25: a goal set under Plan records `stopped: true`, `stopReason: plan agent active`, and `turnCount: 0`.
+
+Run `/goal resume` after switching back to an executing agent to start the work.
+
+| Option | Default | Controls |
+|---|---|---|
+| `restrictedAgents` | `["plan"]` | Agent names treated as planning-only (case-insensitive). Pass `[]` to release the restriction. |
+| `allowGoalExecutionFromPlan` | `false` | Set `true` to allow goal creation and auto-continue while a restricted agent is active. |
+
+```json
+{
+  "plugin": [
+    ["opencode-goal-plugin", { "restrictedAgents": ["plan", "review"] }]
+  ]
+}
+```
+
+The restriction being on by default is pinned by the mutation contract: hardcoding `allowGoalExecutionFromPlan` to `true` fails the suite.
 
 ## Prompt safety
 
