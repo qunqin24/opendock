@@ -17,8 +17,8 @@ comes back with garbage. Melts down at 80 % context. You go back to the cloud.
 It turns a modest local model into a workflow-driven team. A long-living
 **primary** that coordinates and **never blocks** — keep steering,
 course-correct mid-flight, or fan out subagents in parallel while the first one
-runs. One-shot subagents do exactly one job in their own lean context, reply,
-and disappear. The framework guards your model's most precious resource — its
+runs. By default a subagent does exactly one job in its own lean context, replies,
+and disappears; with retention on its session is held so the orchestrator can `reuse` it later. The framework guards your model's most precious resource — its
 context window — at every layer.
 
 The difference between *"interesting demo"* and *"this just shipped feature X."*
@@ -34,12 +34,30 @@ That is the whole setup. The installer wires both halves of the plugin
 Chromium for the `pw` browser CLI, and writes a `.bak` of every config file it
 touches. Restart opencode. Done.
 
-Manual fallback: add `"opencode-agent-intercom"` to your project's
+### Global wiring (active everywhere)
+
+For the plugin to load in every project, without per-project config, add the
+absolute path to both halves of the user-global opencode config:
+
+- `~/.config/opencode/opencode.json` — `"plugin": ["/absolute/path/to/opencode-agent-intercom"]` (server half)
+- `~/.config/opencode/tui.json` — `"plugin": ["/absolute/path/to/opencode-agent-intercom"]` (TUI half; `tui.jsonc` also accepted)
+
+opencode honours `${XDG_CONFIG_HOME:-$HOME/.config}/opencode/opencode.json`
+and `${XDG_CONFIG_HOME:-$HOME/.config}/opencode/tui.json` for the global
+config. Global and project plugin entries merge rather than replace — a later
+entry of the same identity wins, and an absolute path works identically from
+either place. With both global entries present the plugin loads in any
+directory, with no `opencode.json` and no `.opencode/` needed.
+
+### Manual fallback (project-scoped)
+
+Add `"opencode-agent-intercom"` to your project's
 `opencode.json` `plugin` array and `"opencode-agent-intercom-tui"` to
 `~/.config/opencode/tui.json` (user-global, **not** the project file). The TUI
 plugin does **not** resolve from a directory path — for a local checkout,
 point at the built file directly (`/path/to/.../tui/dist/tui.js`, after
 `npm run build` in `tui/`).
+
 
 ### How you actually see it
 
@@ -64,7 +82,9 @@ After restarting opencode, two things still have to happen before the
    value and `off` for a ceiling of `0`; stepping a type's own value below
    zero drops the entry so it falls back to the inherited ceiling again),
    plus the selected type's reuse ceiling as `reuse Token(k)` (the same
-   own-versus-inherited marker; `0` means never reused),
+   own-versus-inherited marker; `0` means never reused), plus the selected
+   type's reply ceiling as `result Token` (whole tokens rather than
+   thousands, stepped in 500s; `0` means that type's reply is never cut),
    and the orchestrator's system prompt also carries a `Limits` block with headroom per agent type — each entry lists the budget, the fixed overhead (subagent guides, PROJECT.md, the project snapshot prepended to every spawn, AGENTS.md where that type keeps it) and the headroom left for the orchestrator's prompt and the subagent's work, in the form `coder 100.0k (−12.4k fixed → 87.6k)`. The fixed overhead occupies part of every budget before the orchestrator's words do; the limits block names it so the orchestrator can see why its own prompt has less room than the bare budget suggests. The work-package size gate below measures the package against the same budget the headroom was computed from. The same block names `off` for any type whose budget is disabled. The sidebar itself also exposes collapsed `TUI settings` / `LLM params` / `Prompts` sections.
    SDK's `layout` field is `"auto" | "stretch"` and marked deprecated with
    "Always uses stretch layout", and `tui.json` has no `sidebar` block,
@@ -97,8 +117,8 @@ second line.
   primary is yours, always.
 
 - **A primary that lasts dozens of turns.** Hard tool-gating on the
-  orchestrator (it coordinates only — no edits, no shells), an 8 KB cap on
-  subagent replies, and a live snapshot of running work injected each turn
+  orchestrator (it coordinates only — no edits, no shells), a per-type token
+  ceiling on subagent replies, and a live snapshot of running work injected each turn
   instead of a status-poll tool. Its context stays clean for the long haul.
   When the orchestrator's context does approach the limit, the plugin hands
   the session off to a fresh orchestrator — the threshold is configurable
@@ -185,14 +205,17 @@ The primary never blocks. You stay in the driver's seat the entire time.
 | `forum_search(query, keywords?, numResults?)` | Discussion-forum search (Exa + searxng with forum-only engine bangs). Use for lived user experience; `web_search` for docs/releases/official facts. | `researcher` only |
 | `outline(path)` | Top-level declarations of a source file via universal-ctags. ~100 languages, ~95 % token savings vs `read`. | Subagents (except `designer`/`gitter`) |
 
-Subagents are one-shot: **spawn → run → reply → destroyed.** The primary is
-woken automatically with the full (capped) result on completion. No
-status-poll tool by design — small LLMs would call it in a loop.
+By default a subagent runs once and is destroyed: **spawn → run → reply →
+deleted.** The primary is woken automatically with the full (capped) result on
+completion. No status-poll tool by design — small LLMs would call it in a
+loop.
 
 A finished subagent's session can also be **held** — kept alive after its
 result has been delivered, so the orchestrator can address it later. Holding
 is gated on `maxRetainedSubagents > 0` and is off by default; with retention
-off the one-shot line above is byte-identical to what it has always been.
+off the default description above is the whole story, and the orchestrator
+loses the `reuse` tool.
+
 With retention on, every clean, top-level subagent whose context fits under
 the reuse ceiling is held for `retainedSubagentTtlMs` after it finishes, the
 oldest entry is evicted when the capacity is reached, and a held session is
@@ -462,6 +485,14 @@ exposes every runtime knob:
   `"reuseContext": { "<agent>": tokens }` and inherits the flat
   `maxReuseContext` (env `OPENCODE_AGENT_INTERCOM_MAX_REUSE_CONTEXT`,
   default `70000`) wherever the map has no entry.
+- **`result Token`** — the selected type's reply ceiling, the maximum number
+  of tokens of that type's final reply forwarded to the orchestrator.
+  Everything past it is cut out of the wake notice and written to a file the
+  notice names. The same agent cycler edits it; `★` marks an own value, the
+  row shows `off` at `0`. Writes `"resultTokens": { "<agent>": tokens }` and
+  inherits the flat `maxResultTokens` (env
+  `OPENCODE_AGENT_INTERCOM_MAX_RESULT_TOKENS`, default `2000`) wherever the
+  map has no entry. Stepped in 500s (the other two rows step in thousands).
 - **`retained subs [-N+]`** — how many finished subagents the process holds
   at once; `0` switches retention off and the sidebar then has no held
   rows. Writes `"maxRetainedSubagents"`.
@@ -496,12 +527,34 @@ exposes every runtime knob:
 - **Per-agent model** — `model [<name>]` cycles the models this opencode
   instance has configured (`/config/providers`, i.e. config + auth +
   `opencode.json` overrides), with a `not set` slot in front of the first
-  entry that hands the agent back to opencode's own model. Writes
-  `~/.config/opencode/llm-models.json` as
-  `{"<agent>": {"providerID": "…", "modelID": "…"}}`; the `chat.message` hook
-  applies it by setting `output.message.model`. Its own file, because the
-  sampling params file is a number-valued map whose unknown keys are
-  forwarded to the provider.
+  entry that hands the agent back to opencode's own model. Two ASCII
+  capability columns follow the `★` slot: `V` for vision
+  (`capabilities.input.image`) and `R` for reasoning
+  (`capabilities.reasoning`), `-` when the model is on the pick list but
+  lacks the capability, `?` when it is not in the pick list, and a blank
+  when nothing is resolved. Writes `~/.config/opencode/llm-models.json` as
+  `{"<agent>": {"providerID": "…", "modelID": "…", "variant": "…"}}` (the
+  `variant` key is optional and absent for the plain pair); the
+  `chat.message` hook applies it by setting `output.message.model`. Its
+  own file, because the sampling params file is a number-valued map whose
+  unknown keys are forwarded to the provider.
+  An `effort [<value>]` row sits directly under the model row and sets
+  the reasoning effort for that agent over a fixed ladder
+  `default → low → medium → high`. `default` is the absence of a stored
+  value; `low`/`medium`/`high` write the entry's optional `variant` key.
+  The row is inert and muted where the resolved model has no reasoning
+  capability, where the model is not on the pick list, or where no model
+  is resolved. Setting an effort pins the model at the same time
+  (`{providerID, modelID, variant}`); changing the model clears the
+  effort. The effort is applied per request through the `chat.params`
+  hook, which translates the value into the provider family's own option
+  key — `reasoningEffort` for `@ai-sdk/openai` / `@ai-sdk/openai-compatible`
+  / `@ai-sdk/azure` / `@ai-sdk/xai`; `effort` for `@ai-sdk/anthropic` /
+  `@ai-sdk/google-vertex-anthropic`; `thinkingConfig.thinkingLevel`
+  (with `includeThoughts: true`) for `@ai-sdk/google` /
+  `@ai-sdk/google-vertex`; `reasoning.effort` for
+  `@openrouter/ai-sdk-provider`; nothing for any other family. Keys
+  already set in `llm-params.json` win over the ladder.
   The choice is applied by two hooks that share the same stored pair. The
   `config` hook writes it into `config.agent[<name>].model` (the
   `providerID/modelID` form opencode resolves an agent's model from), so
@@ -577,9 +630,11 @@ All optional. The subagent and context caps usually live in
 `~/.config/opencode/agent-intercom.json` (written by the TUI panel); that file
 also takes `"maxRetainedSubagents"`, `"retainedSubagentTtlMs"`,
 `"maxReuseContext"` and the per-agent-type `"reuseContext"` map for the
-`reuse`/retention feature, `"searxngUrl"` and `"exaApiKey"` (each overriding its
-environment variable), and `"forumBangs"` (no env var — the array REPLACES the
-built-in set rather than extending it). Everything else is environment-variable-driven:
+`reuse`/retention feature, `"maxResultTokens"` and the per-agent-type
+`"resultTokens"` map for the reply ceiling, `"searxngUrl"` and `"exaApiKey"`
+(each overriding its environment variable), and `"forumBangs"` (no env var —
+the array REPLACES the built-in set rather than extending it). Everything else
+is environment-variable-driven:
 
 `forumBangs` defaults to `["!st", "!ubuntu", "!su", "!hn", "!lo"]` — Stack Overflow, Ask Ubuntu, Super User, Hacker News, lobste.rs. A non-empty `"forumBangs"` array in the file replaces this set entirely; an empty, missing, or non-array value leaves the defaults in effect. The key exists so a project whose topic lives on a product Discourse instance — `!dpy`, `!caddy`, `!pi` and the like — can list those engines once for the plugin to use.
 
@@ -593,14 +648,14 @@ built-in set rather than extending it). Everything else is environment-variable-
 | `OPENCODE_AGENT_INTERCOM_MAX_RETAINED_SUBAGENTS` | `0` | How many finished subagents may be held as retained sessions in this process. `"0"` switches retention off — every subagent's session is deleted the moment its result is delivered, the one-shot behaviour. Recommended non-zero value: `3`. TUI file overrides. **Enabling retention needs an opencode restart** — the tool surface is resolved at plugin load, so the `reuse` tool only appears once the next instance boots with this set. Disabling takes effect at once. |
 | `OPENCODE_AGENT_INTERCOM_RETAINED_SUBAGENT_TTL_MS` | `3600000` | Retention window per held subagent, in ms. Clamped to a floor of `1`. The TUI's row steps in whole minutes with a one-minute floor. |
 | `OPENCODE_AGENT_INTERCOM_MAX_REUSE_CONTEXT` | `70000` | Reuse ceiling for every agent type the `reuseContext` map does not name. `"0"` means that type is never reused at all. The TUI panel shows and edits the per-type map; the flat key is only what an untouched type inherits. |
-| `OPENCODE_AGENT_INTERCOM_RESULT_CHARS` | `8000` | Cap on a subagent's final reply forwarded to the primary. `"0"` disables. |
+| `OPENCODE_AGENT_INTERCOM_MAX_RESULT_TOKENS` | `2000` | Per-type token ceiling on a subagent's final reply forwarded to the primary. `"0"` disables — that type's reply is never cut. The TUI panel shows and edits the per-type `resultTokens` map; the flat key is only what an untouched type inherits. Everything past the ceiling is cut out of the wake notice and written to a file under `~/.cache/opencode-agent-intercom/results/` (mode `0600`, pruned after 7 days) — the orchestrator receives the path, and only a subagent can read the file. |
 | `OPENCODE_AGENT_INTERCOM_PROJECT_CONTEXT` | on | `"0"` skips the project snapshot prepended to spawn prompts |
 | `OPENCODE_AGENT_INTERCOM_RESPECT_TASK_PERMS` | on | `"0"` ignores `permission.task` allowlist in `spawn` |
 | `OPENCODE_AGENT_INTERCOM_DISABLE_WEBSEARCH` / `_DISABLE_OUTLINE` / `_DISABLE_FORUM_SEARCH` | off | `"1"` skips that tool |
 | `OPENCODE_AGENT_INTERCOM_SKIP_CTAGS` / `_SKIP_CHROMIUM` | off | Installer-only: skip ctags build / Chromium download |
 | `EXA_API_KEY` | — | If set, `web_search` uses Exa's paid tier. File key `exaApiKey` overrides. |
 | `POLLINATIONS_TOKEN` | — | If set, the `gen` Pollinations fallback uses your account |
-| `OPENCODE_AGENT_INTERCOM_ENDLESS_MODE` | off | `"1"` arms endless mode — replaces the orchestrator when its context reaches `endlessContext`, after saving its open points to the project's todo file. `"0"` switches it off. TUI file overrides. |
+| `OPENCODE_AGENT_INTERCOM_ENDLESS_MODE` | on | `"1"` arms endless mode — replaces the orchestrator when its context reaches `endlessContext`, after saving its open points to the project's todo file. `"0"` switches it off. TUI file overrides. |
 | `OPENCODE_AGENT_INTERCOM_ENDLESS_CONTEXT` | `250000` | Orchestrator context threshold (tokens) while endless mode is on. Displaces the plain handoff threshold. `"0"` disables. TUI file overrides. |
 | `OPENCODE_AGENT_INTERCOM_ENDLESS_QUIESCE_TIMEOUT_MS` | `600000` | How long (ms) one endless cycle waits for the last subagent to finish before abandoning. |
 | `OPENCODE_AGENT_INTERCOM_ENDLESS_MAX_CYCLES` | `10` | Cycle ceiling per opencode process. At the ceiling endless mode writes itself off. `"0"` arms no ceiling. |
@@ -608,8 +663,8 @@ built-in set rather than extending it). Everything else is environment-variable-
 
 ## Endless mode
 
-Endless mode turns the orchestrator handoff into a self-restarting loop. With
-the switch on, the orchestrator's context is watched against
+Endless mode is on by default and turns the orchestrator handoff into a
+self-restarting loop. With the switch on, the orchestrator's context is watched against
 `OPENCODE_AGENT_INTERCOM_ENDLESS_CONTEXT` (default 250 000 tokens) — a higher
 ceiling than the plain handoff threshold (`OPENCODE_AGENT_INTERCOM_MAX_PRIMARY_CONTEXT`,
 default 80 000 tokens), and the one in effect while endless mode is on. When
@@ -645,19 +700,28 @@ A cycle runs in this order:
 
 ### What bounds the loop
 
-Endless mode is a loop, so it switches itself off rather than waiting for
-someone to watch it:
+Endless mode is a loop, so it stops itself rather than waiting for someone to
+watch it. A self-stop **pauses** the mode for the orchestrator session in hand:
+it never writes `endlessMode: false`, because the mode is on by default and the
+key is the user's own switch. A paused session gets no further cycle — it is
+told so in its own limits block — but it is still relieved of its context: the
+threshold falls back to `maxPrimaryContext` and the plain orchestrator handoff
+owns it, exactly as in a session with the mode switched off. The pause dies with
+the session it was set on, so the next orchestrator starts with the mode
+available again.
 
 - **Nothing left to do.** When the orchestrator reports no new open points
-  *and* the todo file has no open tasks, the mode writes itself off instead
-  of starting a session that would have nothing to work on.
+  *and* the todo file has no open tasks, the mode pauses instead of starting
+  a session that would have nothing to work on.
 - **No progress.** If the open-task count has not fallen after
-  `ENDLESS_MAX_STALLED_CYCLES` (2) consecutive cycles, the mode writes
-  itself off — the bound against an orchestrator that saves the same points
-  every cycle and never finishes one.
+  `ENDLESS_MAX_STALLED_CYCLES` (2) consecutive cycles, the mode pauses — the
+  bound against an orchestrator that saves the same points every cycle and
+  never finishes one. This one fires after the replacement, so the pause goes
+  on the new orchestrator, which is the session that would otherwise carry the
+  loop on.
 - **Cycle ceiling.** `OPENCODE_AGENT_INTERCOM_ENDLESS_MAX_CYCLES` (default
-  10) cycles per opencode process. At the ceiling the mode writes itself
-  off with a warning toast.
+  10) cycles per opencode process. At the ceiling the mode pauses with a
+  warning toast.
 - **Failed-cycle cooldown.** A cycle that abandoned (quiesce timeout, save
   failure, handoff failure) arms a cooldown on that orchestrator so an
   already-over-threshold turn cannot retry on its next message; the cooldown
@@ -668,9 +732,9 @@ someone to watch it:
   it has written to the todo file and must not leave the orchestrator
   half-replaced.
 
-Every one of these stops writes `endlessMode: false` back to the settings
-file (or leaves it alone); none of them deletes a session, aborts a subagent
-or removes a task.
+Only the sidebar toggle (or the env var) writes `endlessMode`; none of these
+stops touches the settings file, deletes a session, aborts a subagent or
+removes a task.
 
 ## Under the hood
 
@@ -711,7 +775,9 @@ removing every "do it yourself" tool from the primary is the enforcement lever.
 
 - **Abort is best-effort.** `session.abort` is cooperative; the
   `tool.execute.before` hard-deny is the backstop.
-- **No mid-flight subagent steering** — by design. Subagents are one-shot.
+- **No mid-flight subagent steering** — by design. A subagent runs
+  through to its reply and is not steered from the outside; only its
+  held session may be re-prompted through `reuse` after it finishes.
   A subagent that ran into a problem its prompt did not cover hands the
   decision up via a `Blocked:` wake notice; you handle it, not the live
   subagent. Continue by spawning a fresh one with a clearer prompt.

@@ -74,12 +74,14 @@ for the pattern all non-native hosts share).
 | Package | Description |
 |---------|-------------|
 | `@guyghost/swarm-dao-core` | Pure business logic + shared `host-tools` handlers |
-| `@guyghost/swarm-dao-mcp` | Swarm DAO as a stdio MCP server (23 tools) |
+| `@guyghost/swarm-dao-mcp` | Swarm DAO as a stdio MCP server (24 tools) |
 | `@guyghost/swarm-dao-copilot-adapter` | GitHub Copilot plugin (MCP + instructions) |
 | `@guyghost/swarm-dao-claude-adapter` | Claude Code plugin (MCP + slash commands) |
 | `@guyghost/swarm-dao-codex-adapter` | OpenAI Codex plugin (MCP + AGENTS.md) |
 | `@guyghost/swarm-dao-pi-adapter` | Bridge to Pi coding agent |
 | `@guyghost/swarm-dao-opencode-adapter` | Bridge to OpenCode |
+| `@guyghost/swarm-dao-tmux-adapter` | tmux host — one watchable pane per agent (swarm-forge model) |
+| `@guyghost/swarm-dao-herdr-adapter` | herdr host — each agent is a real coding agent in a herdr workspace |
 | `@guyghost/swarm-dao-cli` | Standalone CLI (`swarm-dao`) |
 
 ## 4-Layer Governance
@@ -242,15 +244,97 @@ Per-project config in `.dao/config.json`:
   "agentOverrides": {
     "researcher": { "enabled": false },
     "critic": { "weight": 5 }
+  },
+  "execution": {
+    "isolation": "worktree",
+    "worktreeRoot": ".dao/worktrees",
+    "baseBranch": "main"
   }
 }
 ```
 
 `mode` declares intent (`opt-in` *(default)*, `suggest`, `enforce`) and
-`criticalPaths` declares the paths that matter — today only `agentOverrides`
-is actively applied (agents are filtered/overridden on every `dao_deliberate`
-call). `mode`-based edit blocking and path-based suggestions are not wired
-into any host yet; treat them as reserved schema for now.
+`criticalPaths` declares the paths that matter. `agentOverrides` filters
+and overrides agents on every `dao_deliberate` call; `mode` and
+`criticalPaths` are enforced through the **edit gate** — agents call
+`dao_check_edit` with the files they are about to touch before editing:
+
+- **opt-in**: everything is allowed; critical paths are flagged
+  informationally.
+- **suggest**: everything is allowed; uncovered critical paths produce a
+  non-blocking nudge toward `dao_propose`.
+- **enforce**: a critical path is only editable when an `approved`,
+  `controlled`, or `executed` proposal declares it in `affectedPaths`;
+  otherwise the gate blocks the edit and explains how to get approval.
+
+Paths are lexically normalized before matching (absolute paths,
+  backslashes, `./` prefixes, and `a/../b` segments are refused or
+  resolved), so the gate cannot be evaded by spelling variants — an
+  unmatchable path is refused in every mode. Requests over 200 paths are
+  rejected outright.
+
+`dao_check_edit` is exposed on every agent-facing host (MCP and the
+Copilot/Claude/Codex adapters, Pi, OpenCode). It is a deterministic,
+read-only decision — the gate never edits files and never transitions
+proposal state.
+
+### Ship audit challenge (AUDIT_REQUIRED)
+
+Opt-in, per project:
+
+```json
+{ "ship": { "auditChallenge": true } }
+```
+
+The swarm-forge `AUDIT_REQUIRED` pattern adapted to shipping: the first
+`dao_ship` / `swarm-dao ship` call for a proposal does **not** execute — it
+returns `AUDIT_REQUIRED` and records the decision fingerprint (votes, gates,
+scope). Only a second, **unchanged** call executes; any change re-issues the
+challenge. `--force` / `force=true` is an explicit, audited human bypass.
+Snapshots persist in `.dao/ship-audits/`. No AI role exists in the model —
+confirmation is deterministic ([models/ship-audit.md](models/ship-audit.md)).
+
+### Execution isolation (worktrees)
+
+When `execution.isolation` is `"worktree"` (default `"none"`), executing or
+shipping a proposal first carves an isolated git worktree — branch
+`dao/<id>-<slug>` checked out under `execution.worktreeRoot` (default
+`.dao/worktrees`, gitignored with the rest of `.dao/`). The pattern comes
+from swarm-forge: concurrent executions never step on each other in the
+shared checkout, work happens on a dedicated branch, and merging back stays
+a deliberate action (via the existing GitHub PR flow or a plain `git merge`).
+
+Preparation is idempotent (re-running `dao_execute` reattaches to the
+existing branch), and a failed preparation leaves the proposal `controlled`
+— no state transition happens without the workspace. The execution snapshot
+and audit entry record the real branch. Available on every host surface:
+`dao_execute` (Pi, OpenCode, MCP hosts) and `swarm-dao ship` (CLI).
+
+## Sequential (Pipeline) Deliberation (advanced, opt-in)
+
+By default the swarm deliberates in parallel — every agent analyzes the
+proposal independently, which maximizes vote independence. Projects that
+prefer deeper deliberation can opt into the swarm-forge-style pipeline:
+
+```json
+{
+  "deliberation": {
+    "strategy": "sequential",
+    "charsPerAgent": 1500
+  }
+}
+```
+
+Agents run **in order, one at a time** (registry order: strategist →
+researcher → architect → critic → prioritizer → spec-writer → delivery), and
+each agent receives a `## Prior Analyses` section built from the agents
+before it — **analyses only, never votes or reasoning** (`extractAnalysis`
+strips everything from the `## Vote` heading on, and each excerpt is capped
+at `charsPerAgent` characters). The deterministic tally is unchanged and
+stays independent: this is orchestration, not authority — no proposal state,
+transition, or AI boundary moves. Manual hosts (MCP, OpenCode) receive the
+pipeline protocol in their dispatch plan and feed analyses forward the same
+way before recording all outputs together.
 
 ## Delegated Facet Investigation (advanced, opt-in)
 
@@ -361,10 +445,11 @@ Auto-generated for every approved proposal:
 
 ## GitHub Integration
 
-Available via the CLI (see above) and the MCP tools (`dao_config_github`,
+Available on every host surface: the CLI (`swarm-dao github-config` /
+`github-branch` / `github-pr`), the MCP tools (`dao_config_github`,
 `dao_github_create_branch`, `dao_github_open_pr` — exposed by
-`@guyghost/swarm-dao-mcp` and the Copilot/Claude/Codex adapters). **Not**
-currently exposed as tools on the Pi extension or the OpenCode plugin.
+`@guyghost/swarm-dao-mcp` and the Copilot/Claude/Codex adapters), and the
+Pi extension and OpenCode plugin (registered as native tools).
 
 ```bash
 # Via an MCP host (Claude, Codex, Copilot, or a generic MCP client)
@@ -385,6 +470,36 @@ DAO state stored in `.dao/`:
 - `config.json` — per-project configuration
 
 Previously each proposal was also mirrored in `.dao/proposals/NNN.json` "sidecar" files; that redundant copy has been removed. On the first load after upgrading, any existing sidecars are imported into `state.json` and the `proposals/` directory is removed.
+
+## herdr Host (real coding agents in herdr workspaces)
+
+Each deliberation agent runs as a **real coding agent** (pi, claude, codex,
+grok, opencode…) inside an isolated [herdr](https://herdr.dev) workspace —
+herdr tracks its lifecycle, you can attach to any agent pane live, and a
+**blocked** agent (approval/question UI) surfaces as an error output, never
+as a vote.
+
+```typescript
+import { createHerdrHostAdapter } from "@guyghost/swarm-dao-herdr-adapter";
+const adapter = createHerdrHostAdapter({ workDir: process.cwd(), kind: "pi" });
+```
+
+Prerequisites: `herdr` installed and its server running. See
+[packages/herdr-adapter](packages/herdr-adapter/README.md).
+
+## tmux Host (one watchable pane per agent)
+
+The swarm-forge execution model for deliberation: each agent runs as its own
+detached tmux pane — watch it live with `tmux attach`, inspect scrollback
+after the fact. Configure the agent CLI in `.dao/config.json`:
+
+```json
+{ "tmux": { "command": "claude -p \"$PROMPT\"", "timeoutMs": 300000 } }
+```
+
+`$PROMPT` carries the deliberation prompt; stdout is harvested as the
+agent's output and feeds the same deterministic tally as every other host.
+See [packages/tmux-adapter](packages/tmux-adapter/README.md).
 
 ## Adding a New Host
 

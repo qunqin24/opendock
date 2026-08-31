@@ -4,6 +4,8 @@ OpenCode TUI plugin that force-submits the current prompt with `Ctrl+Enter`.
 
 It interrupts the active OpenCode run first, then submits the prompt so the message does not sit behind the current generation queue.
 
+For OpenCode v2, use the implementation in the [opencode-plugins repository](https://github.com/mynameistito/opencode-plugins/tree/main/packages/opencode-force-input).
+
 ## Install
 
 Add the plugin package to `~/.config/opencode/tui.json`:

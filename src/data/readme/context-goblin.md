@@ -94,9 +94,11 @@ If the slash command does not appear:
 
 ## Tool Output Compaction
 
-Context Goblin also reduces wasted LLM context from oversized tool outputs. By default, it compacts only large `bash`, `grep`, and `glob` outputs over 12,000 characters. It keeps the beginning and end, records the omitted size in metadata, and tells the agent to rerun a focused command if exact omitted output is required.
+Context Goblin can also reduce wasted LLM context from oversized tool outputs. This behavior is opt-in so the plugin does not change OpenCode's native tool results unless explicitly requested. When enabled, it compacts only large `bash`, `grep`, and `glob` outputs over 12,000 characters. It keeps the beginning and end, records the omitted size in metadata, and tells the agent to rerun a focused command if exact omitted output is required.
 
 It does not compact exact file reads by default, because code content is often needed for correctness.
+
+Enable output compaction explicitly with `compactToolOutputs: true`. Existing configurations that already set it to `true` keep the same behavior.
 
 Configuration:
 

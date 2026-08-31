@@ -2,8 +2,12 @@
 
 **Give OpenCode a task; get a bounded, validated implementation loop instead of an open-ended agent run.**
 
-> **Project status: Experimental / unsupported.** No stability, compatibility,
-> or support guarantees are provided. Mk2A2 remains the canonical internal workflow.
+Sortie-dogs is an execution harness for OpenCode, applying harness-engineering
+principles through mechanical write boundaries, validation, review, and bounded
+orchestration.
+
+> **Project status: Beta.** Stable in regular use. As a pre-1.0 release,
+> configuration and runtime assets may still change between releases.
 
 [![npm](https://img.shields.io/npm/v/sortie-dogs)](https://www.npmjs.com/package/sortie-dogs)
 [![license](https://img.shields.io/npm/l/sortie-dogs)](LICENSE)
@@ -20,7 +24,7 @@ Requirements: Node.js 22.6 or newer, npm, and OpenCode.
 
 Guides: [日本語](docs/guide-ja.md) · [简体中文](docs/guide-zh-CN.md) · [CLI testing](docs/cli-testing.md)
 
-Release: [v0.6.0](https://github.com/zufall-upon/Sortie-dogs/releases/tag/v0.6.0)
+Release: [v0.6.1](https://github.com/zufall-upon/Sortie-dogs/releases/tag/v0.6.1)
 
 ## Quick start
 
@@ -151,7 +155,8 @@ Optional settings in `.opencode/sortie-dogs.json`:
   "continuation": { "enabled": true, "maxAutoContinues": 10 },
   "reflection": {
     "enabled": false,
-    "layers": { "run": true, "project": true, "global": false }
+    "layers": { "run": true, "project": true, "global": false },
+    "maxInjectedTokens": 500
   }
 }
 ```
@@ -201,6 +206,10 @@ global file for durable global settings.
   to enabled after opt-in; the cross-project global storage layer remains
   disabled unless explicitly enabled. Child and non-coordinator sessions fail
   closed, and `SORTIE_REFLECTION=0` is an immediate kill switch. The coordinator
+  injects the governing `REFLECTION_POLICY` only while reflection is enabled.
+  `maxInjectedTokens` budgets the dynamic `SORTIE_PROCESS_REFLECTIONS` heading
+  and persisted entry lines; the policy is outside that entry budget.
+  The coordinator
   evaluates it only after a resolved blocker/review defect and at a terminal
   unit, with a maximum of three records per run; routine bugs and external
   failures are never journaled.

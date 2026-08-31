@@ -169,6 +169,8 @@ poe-code models --search claude
 
 ## SDK
 
+The isolated `poe-code/safe-bash` entrypoint and its public subpaths require Node.js 22 or newer. They expose the private workspace package `virtual-bash` through `poe-code`; the existing root entrypoints retain their current Node.js requirement and do not load this feature.
+
 Use `poe-code` programmatically in your own code:
 
 ```typescript
@@ -263,9 +265,9 @@ Uses `POE_API_KEY` or the stored credential and honors `POE_BASE_URL`. Throws an
 
 ### Shared filesystem foundation
 
-`poe-code@12.0.7` publishes the Node.js foundation at `poe-code/safe-fs`
+`poe-code@13.0.0` publishes the Node.js foundation at `poe-code/safe-fs`
 and shared filesystem integration for the SafeJS SDK and both CLIs.
-The installed release was verified on Node 18.18.2, 18.20.8, 20.20.0,
+The installed release was verified on Node 18.18.2, 18.20.8, 20.19.2, 20.20.0,
 22.22.2 and 24.14.0, including public runtime and TypeScript consumers.
 `@poe-code/safe-fs` is the private workspace name, not a public npm import.
 
@@ -280,13 +282,17 @@ const filesystem = new MemoryFileSystem();
 await filesystem.writeFile("/note", new TextEncoder().encode("hello"));
 ```
 
-SafeJS accepts these adapters through `makeFsModule({ adapter, root?, cwd?, signal? })`
-from `poe-code/safejs`. Both `poe-safejs` and `poe-code harness run` accept
+Canonical SafeJS names shipped in `poe-code@12.0.8` and were reverified in
+`13.0.0`. SafeJS accepts these adapters through
+`makeFsModule({ adapter, root?, cwd?, signal? })`
+from `poe-code/safe-js`. The legacy `poe-code/safejs` routes and `poe-safejs` binary
+remain aliases to the identical canonical artifacts. Both `poe-safe-js` and `poe-code harness run` accept
 `--fs-config <path>` for explicit memory or host-directory configuration; the
 legacy `--fs` and `--fs-root` options retain their Node-backed behavior.
 
-The default public entries target Node.js. Full browser runtime support, safe-bash runtime migration,
-removal of legacy adapter copies and the `safe-js` rename remain pending.
+The default public entries target Node.js. Full browser runtime support,
+safe-bash runtime migration and removal of legacy adapter copies remain pending. Canonical and legacy
+SafeJS names share the same published artifacts.
 The host-directory adapter is not race-proof OS isolation. See the
 [foundation documentation](packages/safe-fs/README.md) for configuration,
 capabilities and backend limitations.
@@ -303,18 +309,70 @@ Memory, read-only, mount, overlay and WebDAV adapters are portable; real host
 storage, S3/transports and Node configuration helpers remain Node-only.
 
 The Node host entry `poe-code/safe-fs/node` and the still-Node-only
-`poe-code/safejs`, `poe-code/safejs/core` and `poe-code/safejs/cli` are deliberately
+`poe-code/safe-js`, `poe-code/safe-js/core` and `poe-code/safe-js/cli` are deliberately
 unavailable at runtime under the browser condition and expose empty browser
 declarations. Their Node exports remain available. This is an exact route
-boundary, not removal of the SDK or its Node capabilities.
+boundary, not removal of the SDK or its Node capabilities. All three legacy
+`poe-code/safejs` aliases retain the same conditions.
 
-The published artifact passed 17 public filesystem checks in Chromium
-149.0.7827.55. Firefox and WebKit verification remains pending; these checks do
-not establish full browser SafeJS support.
+The integrity-verified published C artifact passed 17 public filesystem checks
+in both pages and module workers on Chromium 149.0.7827.55, Firefox 150.0.2 and
+Playwright WebKit 26.4: 102 checks total, plus 11 negative browser-graph cases
+and 20 strict browser type profiles. This is FS-only coverage, not Safari
+certification, browser SafeJS execution or coverage of unreleased guest codecs.
+Those earlier checks did not establish WebDAV request-stream transport support.
+
+#### WebDAV streaming migration in 13.0.0
+
+Custom or bound Fetch functions must now declare `requestStreamSupport`:
+`"native"` for faithful current-realm native delegation, `true` for a trusted
+custom transport that preserves and consumes stream bodies, or `false` to
+disable streaming. Exact `globalThis.fetch` is probed automatically. Unknown
+transports reject with `ENOTSUP` before source acquisition or any DAV I/O;
+ordinary byte writes are unchanged. This is a programmatic adapter option,
+not a new environment variable, CLI flag or JSON configuration field. `true`
+is a host assertion, not protection against a dishonest transport.
+
+The actual `13.0.0` registry artifact passed 50 native Node HTTP controls and
+390 browser assertions across Chromium, Firefox and WebKit pages and workers,
+including 134 zero-source/no-I/O cases. Native Firefox/WebKit streaming safely
+rejects; genuine Chromium HTTP/2 streaming passes in the exercised deployment.
+Native Chromium HTTP/1 streaming remains unsupported. These are bounded FS
+transport results, not certification of every server or a browser SafeJS SDK.
+See the [WebDAV contract](packages/safe-fs/README.md#breaking-change-declare-custom-request-stream-support)
+and [release record](docs/plans/webdav-stream-capability-fix.md#verified-1300-publication--august-30-2026).
 
 Full browser SafeJS SDK/runtime support remains pending. Guest codec integration,
 portable SDK declaration closure and shared host-call policy/replay metadata
 require separate integration; a browser filesystem build does not prove them.
+
+#### Host-operation recovery policy
+
+The Node SafeJS SDK selects recovery policy when a host call is issued:
+`declareHostOperation(function, policy)` takes precedence, otherwise the exact
+journaled module/operation pair registered with `registerPendingHostCallPolicy`
+supplies the default, otherwise the call is `re-issue`. Named registration is not
+limited to legacy snapshot reconciliation. Caller bindings use module ID
+`<bindings>`. Registration affects subsequent calls, not previously captured
+history; a changed policy on replay fails closed rather than downgrading a
+captured side effect.
+
+A restored invocation identity conflict rejects with the actual
+`HostCallResumabilityError` class and `action: "reset"`. Native engine errors
+retain their identity across synchronous and asynchronous host-error paths;
+guest catch/finally handlers cannot turn them into successful recovery. Names,
+action fields and copied prototypes do not grant engine-error identity. Ordinary
+guest/host errors and cancellation retain their separate conversion rules.
+
+Recorded outcomes are reused. A pending `read-side-effect` call requires a
+matching external reconciliation proof and is not blindly invoked again;
+`re-issue` permits another invocation. Neither registration nor checkpointing
+makes arbitrary external effects exactly-once. Shared function aliases retain
+their existing canonical journal identity, so declare the function itself when
+its aliases must share an effect policy. See the
+[host-policy contract](packages/safe-js/CHECKPOINT_REPLAY.md#host-operation-policy-selection)
+for registration lifetime, naming and reconciliation requirements. This changes
+no CLI flags and adds no browser SafeJS runtime support.
 
 ## Building from Source
 

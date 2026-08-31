@@ -68,7 +68,7 @@ Startup failures may retry up to three times during the same session. Retries re
 - Store generated state under project-local `.ai/atl/`.
 - Hash the exact rendered Markdown and repair a missing or corrupted registry.
 - Publish the registry and hash through same-directory temporary files.
-- Add `.ai/` to Git's local info exclude without editing tracked `.gitignore`.
+- Leave Git exclusion of `.ai/` to the surrounding harness or installer.
 - Keep a stable startup snapshot; restart OpenCode to include skills added during a session.
 - Query only the local OpenCode client; do not fetch configured skill URLs independently.
 

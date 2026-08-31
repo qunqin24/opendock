@@ -106,6 +106,16 @@ environment at session start, so restart the agent after setting it.
 
 ### Versions
 
+0.6.8 — the coverage catalogue is the first door, not the last. 0.6.4 read
+`/veris/operations` as unpublished and sent agents to arm a fault per
+operation instead; every service had opted in the day before, so the slow
+door was the documented one. `GET {control_url}/veris/operations` now leads,
+answers on every service, and reports every surface — `?surface=rest`,
+`?surface=graphql` or `?surface=mcp`, with `mcp` naming the tools a service
+actually resolves, which the vendor's verbatim `tools/list` cannot show.
+Arming a fault stays what it is, a way to make a call fail; it is no longer
+how coverage is looked up.
+
 0.6.7 — the word *world* is gone: `veris-reference/worlds.md` is `state.md`,
 and the commands say *state*. The team uses *world* for the twin plus the
 actor service; the plugin used it for what a sandbox holds, so one word

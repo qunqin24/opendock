@@ -346,8 +346,8 @@ mugiwara reset --keep-logs                    # wipe state, keep lessons
 
 | Claim | Status |
 |---|---|
-| Retrieval routing rank-1 | **94.3%**, 150 probes, offline, in CI |
-| Reference pointers resolve | **66/66**, 3 tiers, in CI |
+| Retrieval routing rank-1 | **95.9%**, 216 probes, offline, in CI |
+| Reference pointers resolve | **294/294**, 9 targets, in CI |
 | Index size published vs measured | **doc-gated** — validator fails on drift, in CI |
 | Lane constants match content load | **verified**, in CI |
 | Write-scope enforcement | **opencode only** — rules-based elsewhere |

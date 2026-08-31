@@ -250,7 +250,52 @@ Resolved chain (primary → fallbacks):
 
 ---
 
-## 5. 테스트
+## 5. 개발 환경과 빌드
+
+이 저장소에는 **소스 파일만 커밋한다.** 손으로 쓴 JavaScript 도, 커밋된 빌드
+산출물도 없다 — 구현은 TypeScript(`.ts`/`.mts`)와 셸(`.sh`)이고, `.js`/`.mjs`
+와 `dist/` 는 소스에서 생성되며 `.gitignore` 대상이다.
+
+### 요구 도구
+
+| 도구 | 버전 | 용도 |
+|---|---|---|
+| **Node.js** | **≥ 22.18** | 진입점·테스트 실행 (네이티브 type-stripping). 클라이언트 환경은 node 24. |
+| npm | Node 동봉 | 스크립트·의존성 |
+| TypeScript | `devDependencies` 고정 (5.9.x) | 플러그인·진입점 빌드, 타입 검사 |
+| jq, git | 시스템 | 런타임(state.sh·게이트) |
+| tmux | ≥ 3.0 | 서브에이전트 pane (선택) |
+| docker | 선택 | 비-Linux 호스트의 Ubuntu 교차 검증 |
+
+> **왜 node ≥ 22.18 인가.** 개발 중에는 CLI(`bin/cli.ts`)·`postinstall.mts`·
+> 테스트(`test/*.test.ts`)를 컴파일하지 않고 `node`가 확장자를 보고 타입을 지워
+> 소스를 바로 실행한다(22.18/23.6부터 기본 활성). 배포된 패키지는 `node_modules`
+> 안에서 실행되는데 node 는 거기서는 type-stripping 을 하지 않으므로, `bin`·
+> `postinstall`은 배포 시 빌드된 `.js`가 실행된다. 플러그인 런타임은 opencode(Bun)가
+> `dist/`를 로드하므로 이 하한과 무관하다.
+
+### 빌드 — 개발엔 불필요, 배포 시 자동
+
+```bash
+npm run build        # src/**  →  dist/**   (opencode 플러그인. tsc)
+npm run build:entry  # 진입점 4개  →  bin/cli.js · postinstall.mjs · scripts/{install-lib,model-policy}.mjs
+npm run typecheck    # 타입 검사만 (noEmit)
+npm run clean        # dist/ 제거
+```
+
+**개발 중에는 빌드가 필요 없다** — 소스를 직접 실행한다:
+
+```bash
+node bin/cli.ts doctor
+node scripts/run-tests.mts
+```
+
+빌드 산출물은 커밋하지 않는다. 배포(`npm publish`) 시 `prepack`이 `build` +
+`build:entry`를 돌려 tarball에만 담는다. 근거·경계는 ARCHITECTURE.md §12.6.
+
+---
+
+## 6. 테스트
 
 ```bash
 npm test               # 전체
@@ -267,7 +312,7 @@ MAKDOONG2_SKIP_LINUX_CHECK=1 git push   # 그 push 는 Linux 검증 없이 나�
 
 ---
 
-## 6. 배포 (Maintainer)
+## 7. 배포 (Maintainer)
 
 두 경로 모두 **승인 게이트 2회**를 통과해야 배포된다.
 
@@ -289,7 +334,7 @@ npm run release:major   # 1.3.1 → 2.0.0  (breaking)
 
 ---
 
-## 7. 문서
+## 8. 문서
 
 | 문서 | 내용 |
 |---|---|
