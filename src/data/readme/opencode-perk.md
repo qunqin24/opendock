@@ -39,7 +39,7 @@ perk is a single tool.
 
 | Tool | What it does |
 | --- | --- |
-| `bash_background({ command })` | Run a shell command as a detached fire-and-forget job. Returns *immediately* (does not block) with the job's `pgid` and a capture path expression (`<job-dir>/{out,err,drip,exit}`). When the job finishes, perk injects a turn reporting the exit code and the byte sizes of the captured output. A still-running job can also push interim turns by appending to `$PERK_DRIP` (see [Streaming](#example-stream-interim-events-while-running)). |
+| `bash_background({ command, coalesce_seconds? })` | Run a shell command as a detached fire-and-forget job. Returns *immediately* (does not block) with the job's `pgid` and a capture path expression (`<job-dir>/{out,err,drip,exit}`). When the job finishes, perk injects a turn reporting the exit code and the byte sizes of the captured output. A still-running job can also push interim turns by appending to `$PERK_DRIP` (see [Streaming](#example-stream-interim-events-while-running)); `coalesce_seconds` controls its quiet-gap interval (default `1.0`, values below `0.3` are clamped). |
 
 That's the whole surface.
 
@@ -70,7 +70,7 @@ job that appends to it (`echo ... >> "$PERK_DRIP"`) pushes interim turns back to
 the agent without ever re-arming a new `bash_background`. perk tails the drip
 file with the same poll loop and performs **temporal summation**: it withholds
 while the file is still growing, and once it settles for one refractory window
-(one poll interval) it fires the accumulated bytes as a single turn (a
+it fires the accumulated bytes as a single turn (a
 **spike**). Writes within a window coalesce into one spike; writes spaced
 further apart fire as separate spikes. The quiet gap *is* the message
 delimiter, so the job needs no framing protocol: to send two separate spikes,
@@ -126,7 +126,7 @@ auto-discovers it:
 ```bash
 mkdir -p .opencode/plugin
 curl -o .opencode/plugin/perk.js \
-  https://unpkg.com/opencode-perk@0.3.0/dist/perk.js
+  https://unpkg.com/opencode-perk@0.4.0/dist/perk.js
 ```
 
 Use `~/.config/opencode/plugin/` instead for a global install. Either way, boot
@@ -198,11 +198,15 @@ continuous incoming stream: zero or more spikes while it runs, then one exit
 turn.
 
 The delivery rule is **coalescing by quiet gap** (temporal summation): a burst
-of appends that goes quiet for one poll interval is delivered as *one* spike;
+of appends that goes quiet for the configured interval is delivered as *one* spike;
 appends spaced further apart arrive separately. You therefore control
 segmentation purely by timing, with no delimiter protocol: write a multi-line
-block in one breath and it lands as one spike; `sleep` half a second between
-events you want delivered separately. Inspect what the agent will receive at any
+block in one breath and it lands as one spike. The interval defaults to one
+second and can be set per call with `coalesce_seconds` (values below `0.3` are
+clamped), for
+example `bash_background({ command: "watch-build", coalesce_seconds: 5 })` for
+slower phase reports. Sleep longer than the selected interval between events you
+want delivered separately. Inspect what the agent will receive at any
 time with `tail -f <job-dir>/drip`, using the directory returned by the tool.
 Write UTF-8 by appending only. Whitespace-only appends do not fire; replacing or
 truncating the file is a contract violation that produces a diagnostic spike and

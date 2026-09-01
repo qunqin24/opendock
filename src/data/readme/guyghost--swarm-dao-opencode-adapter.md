@@ -160,7 +160,16 @@ swarm-dao status
 
 # View configuration
 swarm-dao config
+
+# Run an improvement loop series (any project; gates in a bounded container)
+REF=$(echo -n "$(git rev-parse HEAD)" | shasum -a 256 | cut -d' ' -f1)
+swarm-dao improve init --series-id s1 --scope ci-health --reference-hash "$REF"
+swarm-dao improve once --series-id s1 --sandbox container --image node:22-bookworm
+swarm-dao improve status --series-id s1
 ```
+
+Full CLI reference — installation, configuration, every command and flag — in
+[`packages/cli/README.md`](packages/cli/README.md).
 
 ## Pi Usage
 

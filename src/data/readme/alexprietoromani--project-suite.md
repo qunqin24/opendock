@@ -61,7 +61,63 @@ flowchart LR
 4. **`auditar-coherencia`** detecta cuando el código se desvía de `architecture.md`/`diseno_db.md`. **`bitacora`** registra incidentes para no repetir el mismo bug dos veces.
 5. Todo commit pasa por `semantic-commit`; todo PR, por `pull-request` — nunca push directo, nunca `--no-verify` sin permiso explícito.
 
-Los documentos viven en `docs/` dentro de tu repo (auditables), en el idioma que elijas (`es | en`). Los archivos de trabajo (`docs/task/`, `docs/plan/`, `docs/logs/`, `CLAUDE.md`, `AGENTS.md`) quedan **locales por defecto** — no se versionan salvo que lo pidas al iniciar.
+Los documentos viven en `docs/` dentro de tu repo (auditables), en el idioma que elijas (`es | en`). Los archivos de trabajo (`docs/task/`, `docs/plan/`, `docs/logs/`, `CLAUDE.md`, `AGENTS.md`) quedan **locales por defecto** — no se versionan salvo que lo pidas al iniciar. Por eso una worktree los recibe por copia y los devuelve con `tablero.py --sync`, no por merge.
+
+
+## Varios planes en un mismo repo (tracks)
+
+Un repo puede tener **varios planes con propósitos distintos** —un pipeline por cartilla, un servicio
+por dominio—, cada uno con su propia Fase 0. Cada plan es un **track**.
+
+**Un solo plan** (el caso por defecto, sin ninguna configuración):
+
+```
+docs/plan/plan_maestro.md
+docs/task/tareas.md          ← portada + índice
+docs/task/fases/F00-*.md     ← una Fase por archivo
+```
+
+**Varios planes** — una carpeta por track:
+
+```
+docs/plan/<track>/plan_maestro.md
+docs/task/<track>/tareas.md
+docs/task/<track>/fases/F00-*.md
+```
+
+Los tracks **son** los directorios bajo `docs/plan/` que contienen un `plan_maestro.md`: no hay
+registro que pueda quedar desincronizado del disco. El activo se persiste en `.project-suite/track`.
+
+### El tablero va partido
+
+`tareas.md` es portada e índice; **cada Fase vive en su propio archivo** bajo `fases/`. Un tablero
+monolítico llega a decenas de miles de líneas, y entonces abrirlo para mirar una Sub fase carga todo
+y dos sesiones que lo editan se pisan. `scripts/tablero.py` mantiene la estructura:
+
+| Flag | Qué hace |
+|---|---|
+| `--rutas` | Imprime en JSON las rutas del track activo. Es la única fuente de verdad de dónde vive cada cosa. |
+| `--tracks` | Lista los tracks del repo. |
+| `--indice` | Regenera el índice de la portada leyendo `fases/`. |
+| `--verificar` | Sale con 1 si el índice quedó viejo (lo consume `verificar-dod`). |
+| `--partir` | Migra un tablero monolítico existente a `fases/`, dejando un `.bak`. |
+| `--worktree FNN` | Crea rama y worktree para esa Fase, con los documentos del plan copiados adentro. |
+| `--sync` | Devuelve esos documentos al repo principal, sin pisar lo que haya cambiado ahí. |
+
+### Worktree por Fase
+
+`docs/plan/` y `docs/task/` están gitignorados a propósito, así que **git no los lleva** a una
+worktree: `/fase F7` los copia, y solo los de esa Fase. Al cerrar cada Sub fase, `--sync` los
+devuelve al repo principal — el plan vuelve a main por sync, no por merge, para que una rama larga
+no deje a main con un plan mentiroso.
+
+### El plan se corrige solo
+
+Al cerrar cada Sub fase, `construir` contrasta lo aprendido contra las Sub fases pendientes de la
+misma Fase y las reescribe si hace falta, insertando las Tareas correctivas **dentro de la Fase en
+curso** —nunca como una Fase nueva al final— y marcando cada bloque tocado con
+`> ⟳ Ajustado en SF{x.y} — <motivo>`. Siempre avisa; solo pide permiso si el ajuste cambiaría el
+entregable global de la Fase.
 
 ## Comandos
 
@@ -70,6 +126,8 @@ Los documentos viven en `docs/` dentro de tu repo (auditables), en el idioma que
 | `/init [idea]` | Arranca un proyecto: entrevista de diseño → `docs/` → reglas → `.gitignore` → autoría. |
 | `/nueva-fase [cambio]` | Gate spec-driven: evalúa si un cambio amerita una nueva Fase y la redacta **antes** de codear. |
 | `/modo [estricto/relajado/off]` | Cambia o consulta la intensidad del recordatorio ambiental. |
+| `/track [slug \| nuevo <slug>]` | Lista, cambia o crea los planes (tracks) del repo. |
+| `/fase <FNN>` | Abre worktree y rama para una Fase, con el plan copiado adentro. |
 | `/review [commit]` | Revisa el diff actual contra el plan: detecta código sin planificar o que contradice la spec. |
 | `/audit` | Audita TODO el repo contra `architecture.md` y `diseno_db.md`: detecta drift global. |
 | `/help` | Referencia rápida de comandos y skills. |
@@ -112,7 +170,7 @@ Pregunta al instalar: idioma de documentación por defecto (`es | en`) y si vers
 El repo trae un árbol generado desde la misma fuente:
 
 - `.opencode/skills/` — las 20 skills (SKILL.md nativo de opencode)
-- `.opencode/command/` — `/init`, `/nueva-fase`, `/modo`, `/review`, `/audit`, `/help`
+- `.opencode/command/` — `/init`, `/nueva-fase`, `/modo`, `/track`, `/fase`, `/review`, `/audit`, `/help`
 - `.opencode/plugins/project-suite.mjs` — plugin que registra comandos, skills y el system prompt
 - `opencode.json` — el server `codegraphcontext`
 
@@ -126,7 +184,7 @@ Abre opencode dentro del repo (lee `.opencode/` + `opencode.json`), o copia `.op
 gemini extensions install https://github.com/AlexPrietoRomani/project-suite
 ```
 
-Carga las reglas como contexto siempre activo cada sesión y registra los comandos `/init`, `/nueva-fase`, `/modo`, `/review`, `/audit`, `/help`. Las skills se cargan cuando la tarea lo requiere. El adaptador de Gemini no incluye un `hooks/hooks.json` raíz: Gemini auto-carga esa ruta, y los hooks de lifecycle de project-suite usan los nombres de eventos de Claude Code.
+Carga las reglas como contexto siempre activo cada sesión y registra los comandos `/init`, `/nueva-fase`, `/modo`, `/track`, `/fase`, `/review`, `/audit`, `/help`. Las skills se cargan cuando la tarea lo requiere. El adaptador de Gemini no incluye un `hooks/hooks.json` raíz: Gemini auto-carga esa ruta, y los hooks de lifecycle de project-suite usan los nombres de eventos de Claude Code.
 
 ### Antigravity CLI
 

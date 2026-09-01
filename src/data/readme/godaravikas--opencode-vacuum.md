@@ -60,15 +60,28 @@ Session manager screen — current project filter active, two sessions selected:
  2 selected  ↑↓/jk move · Space select · Ctrl+A all · f filter · d delete · Esc close
 ```
 
-Confirmation dialog before bulk delete:
+Confirmation dialog when selected sessions does not include subagents:
 
 ```text
  ┌──────────────────────────────────────┐
  │  Delete 2 sessions?                  │
+ │  2 sessions will be deleted.         │
  │  This cannot be undone.              │
  │                                      │
  │           < Cancel >  < Confirm >    │
  └──────────────────────────────────────┘
+```
+
+Confirmation dialog when selected sessions include subagents:
+
+```text
+ ┌──────────────────────────────────────────────────┐
+ │  Delete 2 sessions and their subagents?          │
+ │  5 sessions will be deleted.                     │
+ │  This cannot be undone.                          │
+ │                                                  │
+ │                 < Cancel >  < Confirm >          │
+ └──────────────────────────────────────────────────┘
 ```
 
 Project filter picker:
@@ -88,6 +101,14 @@ Project filter picker:
 - Sessions are listed globally across all projects — fetched via the OpenCode SDK, read only direct database access.
 - A confirmation dialog is shown before any deletion executes.
 - When all sessions in a filtered view are deleted, automatically falls back to showing all sessions.
+
+## How to upgrade
+
+Clear the plugin cache and OpenCode will fetch the latest version automatically on next startup:
+
+```bash
+rm -rf ~/.cache/opencode/packages/@godaravikas
+```
 
 ## Contributing
 

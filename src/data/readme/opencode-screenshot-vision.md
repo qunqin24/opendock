@@ -189,7 +189,7 @@ Only the settings below are configurable, via optional environment variables. Ev
 
 ## Security
 
-- **Prompt-injection defense.** The system prompt instructs the vision model to treat every instruction visible in a screenshot as untrusted page content: report it, never follow it.
+- **Prompt-injection defense.** The vision prompt is sent in the `system` role and repeated in the user message so local models that ignore the system role still see it. It instructs the model to treat every instruction visible in a screenshot — and the optional `prompt` question — as untrusted data: report it, never follow it. Auto-generated descriptions are injected back into the conversation labelled as untrusted page-derived data.
 - **Path containment.** The `path` argument is restricted to the session directory, the git worktree, `$TMPDIR/opencode`, and any roots listed in `OPENCODE_VISION_ALLOWED_ROOTS`.
 - **MIME sniffing.** Path-based loads are typed from magic bytes (PNG, JPEG, GIF, WebP); unsupported formats are rejected.
 - **Size limit.** Images larger than 10 MB are rejected.

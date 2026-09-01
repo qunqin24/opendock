@@ -35,15 +35,7 @@ Add to your opencode config (`~/.config/opencode/opencode.json` or project `open
 
 opencode installs and loads the npm package automatically via Bun at startup, no other steps needed.
 
-Use the tuple form to pass options:
-
-```json
-{
-  "plugin": [
-    ["opencode-switchman", { "billingWindow": { "glmPeakHours": [14, 18] } }]
-  ]
-}
-```
+> **Nothing else goes into your opencode config**: all plugin configuration (water levels, billing, peaks, thresholds, banner, matrix, custom lanes, etc.) lives in the standalone `opencode-switchman.jsonc` file (see below) — auto-generated on first start with inline comments. The legacy tuple-options form (`["opencode-switchman", {...}]`) is deprecated and kept compatible for one release (explicit values still win; `/switchman-doctor` flags them as SWM044 and suggests migrating).
 
 ### Option 2: from source
 
@@ -72,34 +64,54 @@ The plugin loads the repo's `dist` bundle directly; after `git pull`, re-run `bu
 
 > **Upgrading from the pre-rename plugin (switchman.js)**: delete the old `~/.config/opencode/plugins/switchman.js` to avoid double injection. The state directory has moved to `~/.config/opencode/opencode-switchman/` (the old one can be removed; all state self-heals).
 
+### Configuration: opencode-switchman.jsonc
+
+**Apart from the plugin registration itself (the `plugin` array in your opencode config), every plugin setting lives in the standalone `opencode-switchman.jsonc`** — auto-created on first startup in the OpenCode config directory (`OPENCODE_CONFIG_DIR`, then `$XDG_CONFIG_HOME/opencode`, then `~/.config/opencode`) with a `$schema` for editor hints and per-key comments; invalid values fail open to defaults. Edit the file and re-run config (or restart opencode) to apply; `/switchman-doctor` produces a local, credential-free diagnostic report.
+
+**providers — per-provider policy**: it ships with the stable provider keys `deepseek`, `zhipuai-coding-plan`, and `github-copilot` (matching OpenCode's own official provider IDs), but **any opencode official or custom provider key is legal** — unknown keys are treated as custom providers (routed with generic defaults; near-miss spellings of the built-in keys get a doctor warning). `observe` controls quota lookup/banner display; `enabled` independently opts a provider into routing water-level, peak, and exhaustion rules (both default to `true`/`false` respectively). `billing` declares the cost structure — `subscription` (score boost 1.0) or `api` (0.85, sinks within its capability tier); it is the only source of billing priority (never inferred from models.dev or auth). `peak` ranges use ISO weekdays (`1`–`7`) and `[start,end)` `HH:mm` ranges; defaults are GLM weekdays 14:00–18:00 and DeepSeek weekdays 09:00–12:00 plus 14:00–18:00.
+
+**Behavior sections** (`quota` / `cost` / `capability` / `matrix` / `banner` / `rules` / `lanes`): see the Options table below — same file, nowhere else.
+
 ### Verify the installation
 
 After starting opencode, every system prompt of the primary model carries a live four-line banner (the dispatcher's ground truth):
 
 ```
-[路由] economy: glm-53f-low→ds-v4fv-off | mechanical: glm-53f-high→ds-v4fv-off | main: glm-53-high→ds-v4p-high | ...
+[路由] economy: glm-53-low→claude5-low→gem31pro-low | mechanical: claude5-medium→gem31pro-medium→gem37f-medium | main: glm-53-high→ds-v4p-high→claude5-high | ...
 [水位] GLM 5h 20% weekly 7% (refreshed 09-04 10:00) | Copilot unlimited credits, used 3885 (since 2026-09-01) | advice: ...
-[限制] down: none | retired: 0 models | reviewer must be hetero-family (producer family ≠ shell family) | DeepSeek tail-only fallback
+[限制] down: none | retired: 0 models | reviewer must be hetero-family (producer family ≠ shell family) | api-billed & unknown models sink by coefficient (billing=subscription takes priority)
 [更新] new version available: /switchman-update or /switchman-ignore
 ```
 
-The log also shows `[opencode-switchman] injected N model shells (agents)` — N varies dynamically with the model surface of credentialed providers.
+The log also shows `[opencode-switchman] injected N model shells (agents)` — N varies dynamically with the model surface of credentialed providers. Lane candidates are generated algorithmically from capability score × effort affinity × billing/unknown coefficients, with vision/review structural gates and no vendor-specific seats; runtime health, quota, and cost rules then select the current first candidate.
 
-### Options
+### Sidebar status panel (TUI plugin, optional)
 
-| Option | Default | Description |
+All non-banner runtime notices (matrix refresh, model retirement, breaker trips, probe results, etc.) that used to spam `stderr` and cover the input box are now written to a 20-entry ring buffer and rendered in a dedicated `switchman` panel at the bottom of the TUI sidebar (polling every 2s, showing the last 4 lines) — the input box stays clean. This is a separate TUI Slot plugin (`src/tui.tsx`, exported at `opencode-switchman/tui`) with its own registration path, independent of the server-side hook plugin above.
+
+Since TUI plugins have no directory auto-discovery, add the same package spec to your **`tui.jsonc`/`tui.json`** `plugin` array (npm install and `opencode plugin <spec>` do this automatically; only needed manually if you hand-edit config or use `mode:local`/`mode:prod` from source):
+
+```json
+{
+  "plugin": ["opencode-switchman"]
+}
+```
+
+### Options (opencode-switchman.jsonc)
+
+| Key | Default | Description |
 |---|---|---|
-| `quota.glm / quota.deepseek / quota.copilot.enabled` | `true` | Per-pool quota probing switches (skipped without credentials) |
-| `quota.glm.fiveHourReservePct` | `90` | GLM 5-hour window reserve water level (%): hard-block GLM shells once reached (avoid 429); weekly still only blocks at 100% |
-| `quota.deepseek.lowBalanceWarnCny` | `10` | DeepSeek balance warning threshold (CNY): banner [水位] warns below it (warning only, no hard block) |
+| `providers.<id>.enabled / observe / billing / peak` | `false / true / factory / factory` | Provider policy: routing participation, quota observation, cost structure (subscription=1.0 / api=0.85), peak windows (see above) |
+| `quota.glmFiveHourReservePct` | `90` | GLM 5-hour window reserve water level (%): hard-block GLM shells once reached (avoid 429); weekly still only blocks at 100% |
+| `quota.deepseekLowBalanceWarnCny` | `10` | DeepSeek balance warning threshold (CNY): the banner water-level line warns below it (warning only, no hard block, pay-as-you-go) |
 | `cost.enabled` | `true` | models.dev pricing snapshot as one coefficient in weighted model scoring |
-| `billingWindow.glmPeakHours / dsPeakRanges` | GLM weekdays 14–18 | Peak window definitions (affect pool ordering) |
-| `providers.glm / providers.deepseek` | `["zhipuai-coding-plan","glm","zai"]` / `["deepseek"]` | Provider-id lists per pool (for credential collection) |
-| `matrix.mode` | `auto` | Dynamic activation mode: `auto` by host (desktop = visible models / CLI/TUI = favorites), `app`/`tui` force a mode, `legacy` restores the static matrix |
-| `matrix.watch` | `true` | Bidirectionally sync desktop visible models and TUI favorites; any surface change recomputes the active matrix and triggers a full probe refresh |
+| `capability.enabled / source / apiKey / tierThresholds / lmarenaCheck` | `true / auto / – / built-in quantile / false` | Dynamic capability tiers: `auto` = Artificial Analysis first when apiKey present, otherwise OpenRouter; key may also come from `ARTIFICIAL_ANALYSIS_API_KEY` env |
+| `matrix.mode / watch` | `auto / true` | Activation matrix: `auto` by host (desktop = visible models / CLI/TUI = favorites), `app`/`tui` force a mode, `legacy` restores the static matrix; `watch` recomputes and fully refreshes probes on surface changes (mode/watch are startup-level; restart to apply) |
 | `banner.enabled` | `true` | Four-line banner injection |
 | `rules.enabled` | `true` | Bundled dispatcher rules (AGENTS.md) injection |
-| `lanes` | built-in chains | Custom per-lane shell chains (override built-in preference order) |
+| `lanes` | built-in chains | Custom per-lane shell chains (override built-in preference order); keys = economy/mechanical/main/hard/vision/review |
+
+> **Migrating legacy tuple options**: `quota.*.enabled` → `providers.<id>.observe` (SWM042), `billingWindow.*` → `providers.<id>.peak` (SWM043), and the remaining behavior sections (`quota` thresholds / `cost` / `capability` / `matrix` / `banner` / `rules` / `lanes`) → same-named jsonc sections (SWM044); `providers.glm/deepseek` (credential-collection lists) never took effect and have been removed. Explicit tuple values stay honored for one compatibility release, then will be dropped.
 
 ## Dynamic Activation Matrix
 
@@ -116,7 +128,7 @@ The shell matrix is no longer a static list — it is built at runtime and updat
 Routing is now an explicit, traceable score rather than a hidden preference list:
 
 - **Base capability dominates**: curated S/A/B/C capability grades are matched by exact model id → prefix → family → global fallback, and the match route is recorded for audit. Tier groups are irreversible: a lower tier can never outrank a higher tier.
-- **Weighted coefficients**: final score multiplies `effortFit × health × water × costBias × peak`. Health is `ok=1.0` / `strained=0.6`; water uses the tighter of the two windows and can boost Copilot when surplus credits are near expiry; cost bias is `subscription=1.0`, metered pools `0.7`, idle DeepSeek `0.85`; GLM peak only applies `×0.93` as a same-tier yield and never ejects a stronger model across capability tiers.
+- **Weighted coefficients**: final score multiplies `effortFit × health × water × costBias × peak × billingBoost × unknownPenalty`. Health is `ok=1.0` / `strained=0.6`; water uses the tighter of the two windows and can boost Copilot when surplus credits are near expiry; peak applies `×0.93` to any provider whose configured peak window is active, as a same-tier yield that never ejects a stronger model across capability tiers. `billingBoost` is driven solely by the explicit `billing` field in `opencode-switchman.jsonc` (`subscription=1.0`, `api=0.85`) — no vendor is hardcoded in the routing rules. `unknownPenalty=0.75` applies to models that miss the whole classification cascade (exact → prefix → family), sinking them behind known models within the same tier.
 - **Hard gates do not score**: down, breaker-open, pool-exhausted, retired, and real-dispatch-isolated combos are removed before scoring. `immediate` urgency sorts by probe latency instead of economics.
 - **Decision log**: every banner rebuild writes lane candidates and the six-factor score breakdown to `state/routing-decisions.jsonl` as a 200-line ring buffer.
 
@@ -152,7 +164,7 @@ opencode-switchman splits orchestration into three layers:
 | vision | observer image reading | vision-capable models |
 | review | reviewer / expert panel | **forced hetero-family** (against same-family blind spots) |
 
-Water levels only affect ordering (use it, don't waste it); the only hard block is "this call cannot possibly succeed" (quota definitively exhausted or hard gate hit). DeepSeek pay-as-you-go stays at the fallback tail for auto routing, with a lower metered-pool score unless it is the explicitly nominated choice.
+Water levels only affect ordering (use it, don't waste it); the only hard block is "this call cannot possibly succeed" (quota definitively exhausted or hard gate hit). Pay-as-you-go (`billing: "api"`) providers are never denied for auto routing — they sink within their capability tier via the 0.85 coefficient, and unknown-provider models sink via the 0.75 penalty, so no vendor-specific tail-seat or deny rule is needed.
 
 ## How It Works
 
@@ -189,7 +201,7 @@ On every subagent dispatch, the plugin runs deterministic checks before the task
 | 3 Breaker / isolation | ≥2 failures within 600s or real-dispatch isolation active | "tripping, auto-recovers in ~10 min" / "isolated after real dispatch failure" |
 | 4 Pool exhausted | quota says the call must fail | human-readable reason (GLM 100% / Copilot definitively out / DS overdrawn) |
 | 5 Protocol | ROUTE_META missing / illegal | deny with sample & legal values |
-| 6 Semantics | same-family review / rw→ro shell / image→non-vision / auto picking paid fallback | "review needs a hetero-family lens", etc. |
+| 6 Semantics | same-family review / rw→ro shell / image→non-vision | "review needs a hetero-family lens", etc. |
 
 ROUTE_META is a single-line protocol embedded in the delegation prompt, six keys, validated field by field:
 
@@ -217,7 +229,9 @@ ROUTE_META {"lane":"main","role":"programmer","producer_family":"glm","capabilit
 
 By default (`matrix.mode=auto`) the matrix is built at runtime: desktop visible models and TUI favorites synchronize automatically, session models fill the gap, and any surface change triggers a full probe recomputation — zero upkeep. Temporary model outages self-heal via probes (10-minute background refresh, automatic degradation/breaking), while repeated 404s retire vanished models until the surface changes again.
 
-The bundled static matrix serves only `legacy` mode and runtime metadata fallback. To customize that legacy surface:
+The superset floor is **opencode's built-in free models** (OpenCode Zen: models under the models.dev `opencode` provider with the `-free` suffix plus the `big-pickle` exception, excluding those marked `status=deprecated` — i.e. the "available today" set), rolling with the catalog every 24h — no manual upkeep. If the catalog is unreachable (offline cold start), it fail-opens back to the bundled static list.
+
+The bundled static matrix serves only `legacy` mode and the offline fallback. To customize that legacy surface:
 
 ```bash
 # 1. Sync the authoritative enabled surface (models visible in opencode model management, one provider/model-id per line)
@@ -231,7 +245,7 @@ bun run gen:shells
 
 ```bash
 bun install
-bun test            # 124 behavioral contract fixtures (META / gates / chains / scoring / breaker / quota / update)
+bun test            # 174 behavioral contract fixtures (META / gates / chains / scoring / breaker / quota / update)
 bunx tsc --noEmit   # type check
 bun run build       # regenerate matrix and bundle the single-file build
 ```
@@ -242,6 +256,8 @@ For local plugin development versus the published package, use the idempotent mo
 bun run mode:local  # build + point opencode at this repository
 bun run mode:prod   # use the npm package; refuses if not installed and prints the install command
 ```
+
+Both commands also sync `tui.jsonc`'s `plugin` array to the matching spec (creating the file if missing), so the sidebar status panel switches sources together with the hook plugin — no separate manual edit needed.
 
 ## Documentation
 

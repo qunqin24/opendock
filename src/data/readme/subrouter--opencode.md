@@ -26,7 +26,7 @@ Run only the login commands for subscriptions you have. **One subscription is en
 npx @subrouter/cli login anthropic
 npx @subrouter/cli login openai
 npx @subrouter/cli login xai
-npx @subrouter/cli login opencode
+npx @subrouter/cli login opencode-go
 npx @subrouter/cli login github-copilot
 npx @subrouter/cli login poe
 npx @subrouter/cli login minimax
@@ -93,7 +93,7 @@ A preset is an ordered list of `provider/model` candidates. Subrouter walks that
                            v
               for each candidate in order
               (default preset: 1.anthropic
-               2.openai 3.xai 4.opencode
+                2.openai 3.xai 4.opencode-go
                5.github-copilot 6.poe 7.minimax
                8.kimi 9.zai 10.alibaba)
                            │
@@ -112,16 +112,16 @@ A preset is an ordered list of `provider/model` candidates. Subrouter walks that
 
 ### Accounts
 
-Accounts live in `~/.subrouter/accounts.json`. Log in **multiple times to the same provider** to build a rotation pool.
+Accounts live in `~/.subrouter/config.json`. Log in **multiple times to the same provider** to build a rotation pool.
 
 ### Cooldowns
 
-Cooldowns are **global per machine** (`~/.subrouter/state.json`). Once an account is rate limited, every session and every harness skips it until the cooldown expires.
+Cooldowns are **global per machine** (`~/.subrouter/config.json`). Once an account is rate limited, every session and every harness skips it until the cooldown expires.
 
-| Response                | Cooldown                                |
-| ----------------------- | --------------------------------------- |
-| `429` rate limited      | `retry-after` header, minimum 5 minutes |
-| `402` balance exhausted | 6 hours                                 |
+| Response                | Cooldown                                                          |
+| ----------------------- | ----------------------------------------------------------------- |
+| `429` rate limited      | `retry-after` / `retry-after-ms` when present, otherwise 5 minutes |
+| `402` balance exhausted | 6 hours                                                           |
 
 ### Presets
 
@@ -168,7 +168,7 @@ This narrow scope keeps **Subrouter much smaller and simpler**. It does not need
 | `anthropic`      | Claude Pro / Max                   | OAuth (browser, PKCE)               |
 | `openai`         | ChatGPT Plus / Pro (Codex backend) | Browser OAuth (PKCE) or device code |
 | `xai`            | SuperGrok / Grok Build             | Device code                         |
-| `opencode`       | opencode Go                        | API key from console.opencode.ai    |
+| `opencode-go`    | opencode Go                        | API key from opencode.ai/auth       |
 | `github-copilot` | GitHub Copilot                     | GitHub device code                  |
 | `poe`            | Poe subscription points            | Browser OAuth (PKCE)                |
 | `minimax`        | MiniMax Token Plan                 | Subscription key                    |
@@ -190,21 +190,26 @@ npm i -g @subrouter/cli
 
 ```bash
 npx @subrouter/cli login [provider] [--input value] # add a subscription to the pool
-npx @subrouter/cli logout <provider> [--force]      # remove all accounts for a provider
+npx @subrouter/cli logout [provider] [--force]      # remove all accounts for a provider
 npx @subrouter/cli account list [--json]     # accounts + cooldown status
 npx @subrouter/cli account status [provider] # exits 1 until login completes
-npx @subrouter/cli account remove <provider> <n|email> [--force]
+npx @subrouter/cli account remove [provider] [n|email] [--force]
+npx @subrouter/cli account order --provider anthropic work@x.com personal@x.com
 ```
 
-`account list` numbers accounts from 1. Run `login` again with the same provider to add another account to its rotation pool.
+`account list` numbers accounts from 1. Run `login` again with the same provider to add another account to its rotation pool. In a terminal, `login` with no provider shows a list to pick from.
+
+`account order` sets the fallback order inside one provider. Pass **every** account email. The first email is tried first.
+
+State lives in **`~/.subrouter/config.json`**. The file includes a `$schema` URL so editors can autocomplete fields: [schema.json](https://subrouter.org/schema.json).
 
 ### Presets
 
 ```bash
 npx @subrouter/cli preset create <name> --models 'anthropic/claude-opus-4-6,xai/grok-4.6' [--force]
 npx @subrouter/cli preset list
-npx @subrouter/cli preset show <name>       # includes currently usable candidates
-npx @subrouter/cli preset remove <name> [--force]
+npx @subrouter/cli preset show [name]       # includes currently usable candidates
+npx @subrouter/cli preset remove [name] [--force]
 ```
 
 The order passed to `--models` is the fallback order. Every preset appears in both harnesses as `subrouter/<name>`.
@@ -222,7 +227,33 @@ npx @subrouter/cli cooldown clear [--force] # retry every account now
 npx @subrouter/cli account status anthropic
 ```
 
+`account status` exits **1 while a login is still running**, even when older accounts are already stored, so polling it never mistakes yesterday's expired token for today's login.
+
 API-key providers accept `--input` in non-interactive shells. Destructive commands ask for confirmation in a terminal and require `--force` elsewhere.
+
+### Replaying the redirect URL
+
+Browser logins finish on a **localhost callback server** owned by the running login process. Anthropic uses port `53692`, OpenAI uses `1455`, and Poe prints a random port chosen for that login. When the browser cannot reach the server, copy the final redirect URL and replay it on the machine that started the login:
+
+```bash
+curl 'http://localhost:53692/callback?code=...&state=...'
+# Authentication successful. You can close this window.
+```
+
+The server accepts any `GET`, so this is the same request the browser would have made.
+
+> [!IMPORTANT]
+> The redirect URL contains a **one-time credential**. Run the curl command on the machine that started the login. Do not paste the URL into a shared chat or issue.
+
+```diagram
+subrouter login anthropic
+        │
+        ├──> daemon listens on 127.0.0.1:53692  <── curl replay works here
+        │
+        └──> 30 min timeout ──> server closes ──> replay gets connection refused
+```
+
+The window is **30 minutes**. After that the callback server closes and curl replay stops working, so run `login` again. In an interactive terminal with the browser on another machine, set `SUBROUTER_MANUAL_OAUTH=1`; Subrouter prints the authorize URL, then asks for the final redirect URL.
 
 The `default` preset is built in. It uses the newest model from each provider in the order shown above, filtered to subscriptions with stored accounts. Create a preset named `default` to override it.
 
@@ -237,6 +268,74 @@ The `default` preset is built in. It uses the newest model from each provider in
 ```
 
 Then pick `subrouter/default` (or any `subrouter/<preset>`) as the model. Presets created after opencode Go starts appear on the next opencode Go restart.
+
+### Use cases
+
+**Rotate when credits run out.** Log in more than one account. When the first subscription hits a rate limit or spends its quota, Subrouter cools it down and sends the next request to the next account. You keep working.
+
+```bash
+npx @subrouter/cli login anthropic
+npx @subrouter/cli login anthropic   # second Claude account
+npx @subrouter/cli login openai
+```
+
+Pick `subrouter/default` as the session model. The next request after a 429 or 402 goes to the next account in the preset.
+
+**One model for every agent.** Point the session and every agent at a **subrouter preset**. You log in once per subscription. You do not re-login inside OpenCode when a provider dies. You do not change 100 agent files to swap `anthropic/...` for `openai/...`.
+
+```json
+{
+  "model": "subrouter/default",
+  "agent": {
+    "explore": { "model": "subrouter/default" },
+    "plan": { "model": "subrouter/default" }
+  }
+}
+```
+
+When Claude is out, ChatGPT takes over. When that one is out, Grok takes over. The model id in config stays `subrouter/default`.
+
+**Tasks and subagents.** OpenCode primary sessions launch specialized agents through the Task tool. **Explore** is the usual case: a fast, read-only agent that searches the repo.
+
+Those agents often pin a **specific model**. When that model hits a rate limit or runs out of credits, the task fails. The parent session then stops with an error, even when other subscriptions still have quota.
+
+Set the agent model to a **subrouter preset**. Subrouter rotates to the next subscription, so the task continues.
+
+```json
+{
+  "agent": {
+    "explore": {
+      "model": "subrouter/default"
+    }
+  }
+}
+```
+
+The same field works in markdown agents under `~/.config/opencode/agents/`:
+
+```yaml
+---
+description: Fast read-only codebase search
+mode: subagent
+model: subrouter/default
+---
+```
+
+Any other Task subagent works the same way: set `model` to `subrouter/<preset>` instead of a single provider model.
+
+```diagram
+                 parent session
+                       │
+                       v
+                    Task tool
+                       │
+                       v
+      explore agent (model: subrouter/default)
+                       │
+                       ├──> first subscription 429 ──> cooldown
+                       │
+                       └──> next subscription ──> task continues
+```
 
 ## Pi plugin
 
@@ -300,7 +399,7 @@ The e2e tests boot real opencode Go and Pi harness runtimes, point every adapter
 | `SUBROUTER_OPENAI_BASE_URL`               | Override the Codex API base URL (tests)                  |
 | `SUBROUTER_OPENAI_ISSUER_URL`             | Override the OpenAI auth host (tests)                    |
 | `SUBROUTER_XAI_BASE_URL`                  | Override the xAI API base URL (tests)                    |
-| `SUBROUTER_OPENCODE_BASE_URL`             | Override the opencode Go base URL (tests)                |
+| `SUBROUTER_OPENCODE_GO_BASE_URL`          | Override the OpenCode Go base URL (tests)                |
 | `SUBROUTER_GITHUB_COPILOT_BASE_URL`       | Override the GitHub Copilot API base URL (tests)         |
 | `SUBROUTER_GITHUB_COPILOT_GITHUB_URL`     | Override the GitHub OAuth host (tests)                   |
 | `SUBROUTER_GITHUB_COPILOT_GITHUB_API_URL` | Override the GitHub API host (tests)                     |
