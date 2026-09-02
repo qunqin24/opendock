@@ -77,7 +77,7 @@ The CLI command reference below covers account management, custom presets, coold
 
 ## How it works
 
-A preset is an ordered list of `provider/model` candidates. Subrouter walks that list, skips anything in cooldown, and retries on the next account or the next provider.
+A preset is an ordered list of `provider/model` candidates. Subrouter walks that list, skips anything in cooldown, and retries on the next account or the next provider. After a candidate accepts a user message, tool follow-ups stay on that provider, model, and account until the agent settles. The next user message starts from the preset ranking again.
 
 ```diagram
                 opencode Go / Pi
@@ -220,6 +220,8 @@ The order passed to `--models` is the fallback order. Every preset appears in bo
 npx @subrouter/cli status                   # everything at a glance
 npx @subrouter/cli cooldown clear [--force] # retry every account now
 ```
+
+**Clear cooldowns after you manually upgrade, renew, or reset a subscription plan.** Subrouter cannot detect that the provider restored your quota, so `cooldown clear` removes every provider and account cooldown and lets the next request retry them immediately. Use `--force` in a non-interactive shell.
 
 **Browser and device login runs in the background** when an agent or non-interactive shell starts it. Approve the URL, then poll for completion:
 

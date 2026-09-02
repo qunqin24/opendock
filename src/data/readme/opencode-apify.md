@@ -1,8 +1,8 @@
-# Apify for Open Code
+# Apify for OpenCode
 
-Official Apify plugin for [Open Code](https://opencode.ai) — adds the Apify MCP server, one `apify` routing agent, and five bundled skills for the main Apify workflows: using existing Actors, building and deploying your own Actors, actorizing existing projects, generating Actor output schemas, and integrating Apify into existing applications.
+Official Apify plugin for [OpenCode](https://opencode.ai). It adds the Apify MCP server, one `apify` routing agent, and five bundled skills for the main Apify workflows: using existing Actors, building and deploying your own Actors, actorizing existing projects, generating Actor output schemas, and integrating Apify into existing applications.
 
-> **Apify** is a platform of thousands of serverless cloud programs called **Actors** for web scraping, browser automation, and data extraction. Learn more at [apify.com](https://apify.com).
+> **Apify** is the largest marketplace of tools for AI: ready-made **Actors** you can run, or build your own. Find your Actor at [Apify Store](https://apify.com/store).
 
 ## What you get
 
@@ -19,7 +19,7 @@ Official Apify plugin for [Open Code](https://opencode.ai) — adds the Apify MC
 
 ## Prerequisites
 
-- **Open Code** CLI installed ([opencode.ai](https://opencode.ai)).
+- **OpenCode** CLI installed ([opencode.ai](https://opencode.ai)).
 
 ## First-run setup
 
@@ -27,7 +27,7 @@ The plugin uses **three setup paths** depending on what you're doing. The `apify
 
 ### Path 1 — Using existing Actors through MCP
 
-Uses **OAuth**. The first time the agent calls a tool that needs auth (for example `call-actor` or `get-dataset-items`), Open Code opens `console.apify.com` in your browser and asks you to sign in. Read-only tools such as `search-actors`, `fetch-actor-details`, `search-apify-docs`, and `fetch-apify-docs` work without auth.
+Uses **OAuth**. The first time the agent calls a tool that needs auth (for example `call-actor` or `get-dataset-items`), OpenCode opens `console.apify.com` in your browser and asks you to sign in. Read-only tools such as `search-actors`, `fetch-actor-details`, `search-apify-docs`, and `fetch-apify-docs` work without auth.
 
 ### Path 2 — CLI workflows for Actor development, actorization, or scraper runs
 
@@ -104,15 +104,15 @@ If everything is working, you should see the `apify` agent, the five skills, and
 
 ### Working in headless / SSH environments (no browser)
 
-The MCP OAuth flow needs a browser. If you're running Open Code over SSH or in any environment without a browser, you have these options:
+The MCP OAuth flow needs a browser. If you're running OpenCode over SSH or in any environment without a browser, you have these options:
 
-1. **Authenticate locally first.** Run Open Code once on your laptop so the OAuth refresh token is stored, then reconnect remotely.
+1. **Authenticate locally first.** Run OpenCode once on your laptop so the OAuth refresh token is stored, then reconnect remotely.
 2. **Use the CLI-based skills.** `apify-actor-development`, `apify-actorization`, and `apify-ultimate-scraper` can work in headless environments when the `apify` CLI is installed and `APIFY_TOKEN` is exported.
 3. **Use the SDK integration skill.** `apify-sdk-integration` uses `apify-client` and only needs `APIFY_TOKEN`.
 
 ## How to use it
 
-Start an Open Code session and describe what you need. The `apify` agent reads the request, chooses between MCP, CLI, or SDK-based workflows, and dispatches to the right skill or tool.
+Start an OpenCode session and describe what you need. The `apify` agent reads the request, chooses between MCP, CLI, or SDK-based workflows, and dispatches to the right skill or tool.
 
 ```
 find me 5 well-rated coffee shops in Seattle and export to CSV
@@ -149,7 +149,7 @@ Route 1 uses the MCP server, Route 2 relies on the local `apify` CLI, and Route 
 
 **`apify` CLI not found.** Install it with `npm install -g apify-cli` before using `apify-actor-development`, `apify-actorization`, or `apify-ultimate-scraper`.
 
-**`APIFY_TOKEN` not found.** Export `APIFY_TOKEN` in your shell before starting Open Code when using headless CLI auth or the `apify-sdk-integration` skill.
+**`APIFY_TOKEN` not found.** Export `APIFY_TOKEN` in your shell before starting OpenCode when using headless CLI auth or the `apify-sdk-integration` skill.
 
 **The wrong skill keeps getting picked.** The five bundled skills are routed through the `apify` agent. If routing looks wrong, describe the goal more explicitly: use existing Actors, build an Actor, actorize a project, generate output schemas, or integrate Apify into an app.
 

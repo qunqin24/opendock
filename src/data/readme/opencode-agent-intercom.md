@@ -203,6 +203,7 @@ The primary never blocks. You stay in the driver's seat the entire time.
 | `todo_add(title, accept?)` / `todo_edit(id, …)` / `todo_done(id)` | Add / refine / remove a task in `TODO.md`. `todo_done` deletes the completed task — usually the wake-hook does it for you. | The six deliverable roles |
 | `web_search(query, numResults?)` | Anonymous web search via Exa (no key, 150/day; an Exa key lifts the cap). | `researcher` only |
 | `forum_search(query, keywords?, numResults?)` | Discussion-forum search (Exa + searxng with forum-only engine bangs). Use for lived user experience; `web_search` for docs/releases/official facts. | `researcher` only |
+| `grounded_search(query, max_sources?)` | One call to Google's Gemini with Search grounding on, on the fixed model `gemini-3.7-flash` and no other. Returns a written answer plus the numbered sources it was grounded in (`max_sources` 1–20, default 8). | `grounder` only |
 | `outline(path)` | Top-level declarations of a source file via universal-ctags. ~100 languages, ~95 % token savings vs `read`. | Subagents (except `designer`/`gitter`) |
 
 By default a subagent runs once and is destroyed: **spawn → run → reply →
@@ -258,18 +259,28 @@ A blocked report carries no `DONE: <id>` marker by design, so the matching
 `TODO.md` entry stays open until you decide.
 
 The delegating subagents (`planner`/`coder`/`debugger`/`reviewer`/`documenter`)
-also carry `spawn`, but it is gated to the single target `researcher` and
-the call **blocks** until that researcher replies: there is no wake, no
-second ask, and the researcher's reply comes back as the result of the
-`spawn` call. The spawn prompt sent in this path carries no `T<n>:` prefix
-and no `DONE:` marker is expected. A per-run quota
-(`maxNestedSpawns`, default `2`, env
-`OPENCODE_AGENT_INTERCOM_MAX_NESTED_SPAWNS`, `0` disables) bounds how many
-such nested runs one subagent may start; the messages hook appends a per-turn
-notice to the last user message naming what is left. `researcher`, `designer` and
-`gitter` are denied
-`spawn` outright. `abort`, `list` and `task` are denied for every
-subagent.
+also carry `spawn`, but each is gated to a single target — `researcher` — and the
+call **blocks** until that researcher replies: there is no wake, no second ask,
+and the researcher's reply comes back as the result of the `spawn` call. The
+`researcher` carries `spawn` too, gated to the single target `grounder` — the
+second, independent search path (Google Search grounding) the researcher's own
+tools do not give it. A refusal names the caller's own allowed set, e.g.
+`a "researcher" may spawn "grounder" and nothing else — you asked for a "coder"`,
+or `a "gitter" may spawn nothing at all`. The spawn prompt sent on either path
+carries no `T<n>:` prefix and no `DONE:` marker is expected. A per-run quota
+(`maxNestedSpawns`, default `2`, env `OPENCODE_AGENT_INTERCOM_MAX_NESTED_SPAWNS`,
+`0` disables) bounds how many such nested runs one subagent may start; the
+messages hook appends a per-turn notice to the last user message naming what
+is left. `grounder`, `designer` and `gitter` are denied `spawn` outright.
+`abort`, `list` and `task` are denied for every subagent.
+
+Grounded search is not automatic: the `researcher` spawns a `grounder` only
+where the briefing the orchestrator writes asks for a grounded search, and
+only then does it fold the sources that come back into its own answer beside
+what it found itself. Without that instruction in the briefing the
+`researcher` searches exactly as before and spawns nothing. The orchestrator
+can also spawn a `grounder` directly — for a plain factual question that
+needs no researcher at all.
 
 ### Work-package size gate
 
@@ -290,11 +301,11 @@ A budget of `0` for a type disables the gate for that type: no refusal, no
 warning. The limits block the orchestrator sees lists `off` for a
 disabled type.
 
-A `spawn` may name one of the plugin's own eight subagent roles and
+A `spawn` may name one of the plugin's own nine subagent roles and
 nothing else. Any other name is refused — including an agent the project
 declares in its `config.agent` map and opencode's own `general`/`explore` —
 and the refusal states why that particular name is not a target and lists
-the eight. The same closed list is what the limits block shows.
+the nine. The same closed list is what the limits block shows.
 
 When a subagent finishes, the completion notice carries a `run-size` line
 that reports the tokens the whole run consumed against the same budget,
@@ -343,9 +354,12 @@ Nine roles injected by the `config` hook — no per-project
 | `debugger` | Diagnoses build/test/runtime errors. | Bash for repro, no `edit`/`write`, no web — fix goes back to `coder`. May spawn a `researcher` for web lookups. |
 | `reviewer` | Reviews staged work into `reviews/`, iterates on it. | No `bash`, no web. Convention: no source-code edits. May spawn a `researcher` for web lookups. |
 | `documenter` | Writes/iterates user docs in place (README, `docs/`, changelog). | No `bash`, no web. Convention: no source-code edits. May spawn a `researcher` for web lookups. |
-| `researcher` | Web research via `web_search` + `forum_search` + `webfetch`. | The only role with web access. No `edit`/`write`/`bash`. `spawn` denied — names needed lookups in the final reply instead. |
+
+Each delegating role maps to exactly one target: the five above reach `researcher` (the call blocks and the reply is the tool result); `researcher` reaches `grounder` for a grounded search only when its briefing asks for one; every other role may spawn nothing. The refusal text names the caller's own allowed set — e.g. `a "researcher" may spawn "grounder" and nothing else — you asked for a "coder"`, or `a "gitter" may spawn nothing at all` — so the model has somewhere to go instead of retrying.
+| `researcher` | Web research via `web_search` + `forum_search` + `webfetch`. | The only role with Exa/searxng search and full-page fetches. No `edit`/`write`/`bash`. May spawn a `grounder` for a grounded search, but only where the orchestrator's briefing asks for one; without it, searches as before and spawns nothing. |
+| `grounder` | Web research through Google Search grounding via `grounded_search`. | The only role that uses Search grounding. Pick over `researcher` for a plain factual question; pick `researcher` when the work needs forum threads, a named page fetched in full, or a choice between sources. No `edit`/`write`/`bash`. `spawn` denied — may spawn nothing at all. |
 | `designer` | Generates images via [`gen`](#gen--image-generation-no-api-key). | No `outline`, no web. Convention: no source-code edits. `spawn` denied — requests visual references in the final reply instead. |
-| `gitter` | Repo operations matching project's git style. | No `edit`/`write`/`webfetch`/`web_search`/`forum_search`. `spawn` denied. |
+| `gitter` | Repo operations matching project's git style. | No `edit`/`write`/`webfetch`/`web_search`/`forum_search`/`grounded_search`. `spawn` denied. |
 
 A project can override any role by defining one of the same name — either
 through `.opencode/agent/<name>.md` (a markdown agent file opencode loads
@@ -643,7 +657,7 @@ is environment-variable-driven:
 | `OPENCODE_AGENT_INTERCOM_DEBUG` | on | `"0"` disables logging to `~/.cache/opencode-agent-intercom/debug.log` |
 | `OPENCODE_AGENT_INTERCOM_LOG_REQUESTS` | off | `"1"` writes per-LLM-call JSONL to `~/.cache/opencode-agent-intercom/requests.jsonl` (path override: `_LOG_REQUESTS_FILE`) |
 | `OPENCODE_AGENT_INTERCOM_MAX_SUBAGENTS` | `1` | Concurrent subagents per primary. `"0"` disables. TUI file overrides. |
-| `OPENCODE_AGENT_INTERCOM_MAX_NESTED_SPAWNS` | `2` | Nested `spawn` calls a single subagent run may start (always targeting `researcher`). `"0"` disables — the subagent must do the work itself. TUI file overrides via `"maxNestedSpawns"`. |
+| `OPENCODE_AGENT_INTERCOM_MAX_NESTED_SPAWNS` | `2` | Nested `spawn` calls a single subagent run may start (the caller's one allowed target — `researcher` for the five non-web roles, `grounder` for `researcher`). `"0"` disables — the subagent must do the work itself. TUI file overrides via `"maxNestedSpawns"`. |
 | `OPENCODE_AGENT_INTERCOM_MAX_CONTEXT` | `100000` | Subagent context budget (tokens). `"0"` disables. TUI file overrides. |
 | `OPENCODE_AGENT_INTERCOM_MAX_RETAINED_SUBAGENTS` | `0` | How many finished subagents may be held as retained sessions in this process. `"0"` switches retention off — every subagent's session is deleted the moment its result is delivered, the one-shot behaviour. Recommended non-zero value: `3`. TUI file overrides. **Enabling retention needs an opencode restart** — the tool surface is resolved at plugin load, so the `reuse` tool only appears once the next instance boots with this set. Disabling takes effect at once. |
 | `OPENCODE_AGENT_INTERCOM_RETAINED_SUBAGENT_TTL_MS` | `3600000` | Retention window per held subagent, in ms. Clamped to a floor of `1`. The TUI's row steps in whole minutes with a one-minute floor. |
@@ -651,9 +665,11 @@ is environment-variable-driven:
 | `OPENCODE_AGENT_INTERCOM_MAX_RESULT_TOKENS` | `2000` | Per-type token ceiling on a subagent's final reply forwarded to the primary. `"0"` disables — that type's reply is never cut. The TUI panel shows and edits the per-type `resultTokens` map; the flat key is only what an untouched type inherits. Everything past the ceiling is cut out of the wake notice and written to a file under `~/.cache/opencode-agent-intercom/results/` (mode `0600`, pruned after 7 days) — the orchestrator receives the path, and only a subagent can read the file. |
 | `OPENCODE_AGENT_INTERCOM_PROJECT_CONTEXT` | on | `"0"` skips the project snapshot prepended to spawn prompts |
 | `OPENCODE_AGENT_INTERCOM_RESPECT_TASK_PERMS` | on | `"0"` ignores `permission.task` allowlist in `spawn` |
-| `OPENCODE_AGENT_INTERCOM_DISABLE_WEBSEARCH` / `_DISABLE_OUTLINE` / `_DISABLE_FORUM_SEARCH` | off | `"1"` skips that tool |
+| `OPENCODE_AGENT_INTERCOM_DISABLE_WEBSEARCH` / `_DISABLE_OUTLINE` / `_DISABLE_FORUM_SEARCH` / `_DISABLE_GROUNDED_SEARCH` | off | `"1"` skips that tool |
 | `OPENCODE_AGENT_INTERCOM_SKIP_CTAGS` / `_SKIP_CHROMIUM` | off | Installer-only: skip ctags build / Chromium download |
+| `OPENCODE_AGENT_INTERCOM_GROUNDING_TIMEOUT_MS` | `90000` | Per-request ceiling (ms) for `grounded_search`. |
 | `EXA_API_KEY` | — | If set, `web_search` uses Exa's paid tier. File key `exaApiKey` overrides. |
+| `OPENCODE_AGENT_INTERCOM_GOOGLE_API_KEY` / `GEMINI_API_KEY` / `GOOGLE_API_KEY` | — | API key for `grounded_search` (consulted in that order). Falls back to the `google.key` field of `${XDG_DATA_HOME:-$HOME/.local/share}/opencode/auth.json`, where `opencode auth login` writes a Gemini key. |
 | `POLLINATIONS_TOKEN` | — | If set, the `gen` Pollinations fallback uses your account |
 | `OPENCODE_AGENT_INTERCOM_ENDLESS_MODE` | on | `"1"` arms endless mode — replaces the orchestrator when its context reaches `endlessContext`, after saving its open points to the project's todo file. `"0"` switches it off. TUI file overrides. |
 | `OPENCODE_AGENT_INTERCOM_ENDLESS_CONTEXT` | `250000` | Orchestrator context threshold (tokens) while endless mode is on. Displaces the plain handoff threshold. `"0"` disables. TUI file overrides. |

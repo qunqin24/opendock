@@ -92,7 +92,7 @@ Layered (deep-merged; later layers override earlier): `~/.config/opencode/okf.js
 // .opencode/okf.jsonc
 {
   "enabled": true,
-  "scan":   { "enabled": true, "maxDepth": 4, "ignore": [] },
+  "scan":   { "enabled": true, "maxDepth": 4 },
   "bundles": [{ "path": "docs/knowledge", "name": "project-kb" }],
   "disclosure": { "injectManifest": true, "maxManifestChars": 2000 },
   "unload": {
@@ -107,11 +107,13 @@ Layered (deep-merged; later layers override earlier): `~/.config/opencode/okf.js
 }
 ```
 
+Auto-scan skips build/VCS directories (`node_modules`, `dist`, `.git`, …) and hidden directories — with one exception: **`.opencode` is scanned**, so bundles placed there (e.g. `.opencode/skill/`) are discovered automatically.
+
 ## Development
 
 ```bash
 bun install
-bun test            # 106 tests
+bun test            # 114 tests
 bunx tsc --noEmit   # type-check
 ```
 

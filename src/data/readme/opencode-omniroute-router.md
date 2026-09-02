@@ -21,15 +21,15 @@ you → opencode → smart-orchestrator (classifies) → 1 worker → OmniRoute 
 
 ### Tiers
 
-| Tier | Worker | Kind of work |
-| --- | --- | --- |
-| Free | `free-worker` | Informational: explanations, docs lookups, reading code |
-| Fast | `smart-fast` | Mechanical, behavior-preserving (typos, renames, formatting) |
-| Standard | `smart-standard` | Features, known bugs, endpoints, tests |
-| Strong | `smart-strong` | High ambiguity, cross-system, risky |
-| Expert | `expert` | Critical: concurrency, memory leaks, security, repeated failures |
+| Tier | Worker | Kind of work | Execution |
+| --- | --- | --- | --- |
+| Free | `free-worker` | Informational: explanations, docs lookups, reading code | read-only |
+| Fast | `smart-fast` | Mechanical, behavior-preserving (typos, renames, formatting) | editor |
+| Standard | `smart-standard` | Features, known bugs, endpoints, tests | editor |
+| Strong | `smart-strong` | High ambiguity, cross-system, risky | editor |
+| Expert | `expert` | Critical: concurrency, memory leaks, security, repeated failures | editor |
 
-Workers may **read the repository** and run a strict allowlist of verification commands (tests, build, lint, read-only git). They can never edit files — the primary OpenCode agent owns the working tree.
+Workers may **read the repository**, run a strict allowlist of commands, and — except for the free tier — **edit files, create feature branches and commit**. After changes they must run verification (tests/build/lint) and report real output. They can never push, rebase or run destructive git commands — final review and push always belong to you.
 
 When a request reports a symptom with an unknown/intermittent cause, the orchestrator first runs **one read-only exploration** with the built-in `explore` agent, then delegates.
 
@@ -150,6 +150,6 @@ npm test
 
 Tú describes la tarea; un orquestador ligero la clasifica con reglas estáticas y un plugin de dispatch la delega a exactamente un worker — sin elegir modelos a mano y gastando la cuota premium sólo cuando hace falta.
 
-Los workers pueden leer el repositorio y ejecutar una allowlist estricta de comandos de verificación (tests, build, lint, git de lectura); nunca editan archivos. Ante síntomas de causa desconocida, el orquestador lanza antes una exploración read-only.
+Los workers pueden leer y editar el repositorio, crear ramas y hacer commit (salvo el tier gratuito, de solo lectura), con una allowlist estricta de comandos: nunca hacen push, rebase ni operaciones destructivas — la revisión final y el push son tuyos. Ante síntomas de causa desconocida, el orquestador lanza antes una exploración read-only.
 
 Instalación: `npm i -g omniroute && omniroute serve` (conecta proveedores en el dashboard), luego `omniroute setup-opencode` para enlazar OpenCode, y `npx opencode-omniroute-router init` (+ `--global` para todos tus proyectos). Historial en `~/.smart-opencode/history.jsonl`, estadísticas con `npx opencode-omniroute-router stats`.

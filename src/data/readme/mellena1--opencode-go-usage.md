@@ -23,6 +23,9 @@ mo  94%  ███████████░ 3d
   90%+ (relative to the **highest** of the three windows).
 - When a refresh fails the last known values stay visible, with a short note
   and one toast per failure episode.
+- A request that stalls — no response, or a response body that never finishes —
+  is abandoned after 15 seconds and treated like any other refresh failure, so
+  the widget never sits on "Loading…" forever.
 - If OpenCode Go isn't configured on this machine (no key in `options`, the
   `OPENCODE_API_KEY` env var, or auth.json), the widget **hides itself**
   entirely instead of showing an error.
@@ -141,3 +144,9 @@ straight at the TypeScript sources, so there is no build step.
 - **Unofficial endpoint**: `/zen/go/v1/usage` is not (yet) in the public Go
   docs. It is the endpoint the console uses, but if opencode changes it the
   plugin will need a small update.
+- **Host repaint bug on packaged CLI builds**: on some betas the packaged TUI
+  renders a plugin's initial frame but never repaints its signal updates
+  (separate reactive graphs — see `anomalyco/opencode#39986`). The widget
+  sidesteps this by remounting itself with a fresh snapshot whenever data
+  changes, instead of relying on reactive updates. Remounts are limited to
+  actual changes so the sidebar layout is never churned.

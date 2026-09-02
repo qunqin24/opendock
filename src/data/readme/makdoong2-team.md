@@ -54,7 +54,6 @@ makdoong2-team doctor            # 설치 진단
 | `makdoong2-engineer` | dev / test | edit·write 허용, commit/push deny |
 | `makdoong2-publisher` | 3_delivery 3단계 | **git add/commit/push 직접 실행** + bitbucket MCP |
 | `makdoong2-verifier` | 메타 검증 | 읽기 전용 |
-| `makdoong2-researcher` | 리서치 fan-out 워커 | 읽기 전용 + 리서치 MCP — 소스 1개 전담 |
 | `makdoong2-issue-reporter` | 플러그인 오류 GitHub 이슈 등록 | **전권 (bash/write allow)** — 사용자 직접 호출 전용 |
 
 > **Publisher 는 직접 실행자다.** commit·pr·review 모두 publisher 가 worktree 에서 직접 git 명령과 MCP 를 호출한다. 부장님은 git 권한이 아예 없고 dispatch 와 verdict 수신만 한다. (구버전의 "spec 계산 → 부장님 실행" 하이브리드 모델은 폐기됐다.)
@@ -65,7 +64,6 @@ makdoong2-team doctor            # 설치 진단
 |---|---|---|---|
 | `1_planning.jira` | planner | `stages/01-planning.md` | `verify.sh` |
 | `1_planning.requirements` | planner | `stages/02-requirements.md` | `stage2-requirements-verify.sh` |
-| `1_planning.scope` | planner | `stages/03-scope.md` | `stage3-scope-verify.sh` |
 | `2_implementation.analysis` | analyzer | `stages/04-analysis.md` | `stage-analysis-verify.sh` |
 | `2_implementation.dev` | engineer | `stages/05-worktree-dev.md` | `stage4-dev-verify.sh` |
 | `2_implementation.test` | engineer | `stages/06-test.md` | `stage5-test-verify.sh` + coverage |
@@ -79,7 +77,7 @@ makdoong2-team doctor            # 설치 진단
 
 ### 작업 범주화
 
-`1_planning.requirements` 가 작업을 `.policy.category` (`minor` | `major`) 로 분류한다. `1_planning.scope` 는 minor → major 상향만 허용한다.
+`1_planning.requirements` 가 작업을 `.policy.category` (`minor` | `major`) 로 분류한다. 같은 substage 의 개발 범위 확정 단계에서 실제 범위가 드러나면 minor → major **상향만** 허용한다.
 
 **두 범주 모두 기본은 무인 진행**이다. 실제 승인 여부는 `.policy.auto_approve.<substage>` 마커가 결정하고 기본값이 전 substage `true` 이기 때문이다. `category` 는 위험도 라벨이자 향후 opt-in 훅의 스위치로 남겨둔 값이다. HITL 이 필요하면 planner 가 특정 substage 를 `false` 로 내리고, 그때만 `change-report.md` + 사용자 승인이 요구된다.
 
@@ -87,13 +85,10 @@ makdoong2-team doctor            # 설치 진단
 
 ### 다출처 병렬 조사
 
-`1_planning.requirements` 의 교차 조사는 `dispatch_research` 툴 **1회 호출**로 Jira · Confluence · Bitbucket (필요 시 GitHub OSS) 을 **동시에** 조사한다. 플러그인이 소스마다 별도 세션을 띄우므로:
+`1_planning.requirements` 의 교차 조사는 **planner 자신의 세션에서** Jira · Bitbucket (필요 시 Confluence · GitHub OSS) 을 순서대로 조사한다. 소스마다 `skill(name=...)` 로 스킬을 로드한 뒤 그 스킬의 MCP 를 호출한다.
 
-- 대기 시간이 **가장 느린 소스 하나**로 수렴한다 (직렬 합이 아니다)
-- 각 소스의 원자료가 planner 컨텍스트를 잠식하지 않는다
-- 한 소스가 실패해도 나머지 결과는 그대로 남는다 (부분 성공이 정상)
-
-결과는 `.makdoong2-team/<이슈>/research-findings.json` 으로 병합된다. 상세: ARCHITECTURE.md §3.6
+- 소스당 최대 5회 호출. 응답하지 않는 소스는 포기하고 미확인 항목으로 남긴다 — 부분 조사가 정상 종료다.
+- 결과는 별도 파일이 아니라 `requirements-draft.md` 의 `## 수집된 정보` 에 정리한다.
 
 ### 오류 이슈 등록 — `/makdoong2-issue-reporter`
 
@@ -123,8 +118,6 @@ makdoong2-team doctor            # 설치 진단
 | `timeout.substage_minutes` | 서브에이전트 1회 실행 상한 (기본 30분) |
 | `timeout.per_agent` | 에이전트별 상한 override (기본 seed: engineer 60분) |
 | `timeout.stall_escalate_threshold` | substage 누적 hang 상한 (기본 5). 초과 시 dispatch 차단 후 사용자 에스컬레이션 |
-| `research.max_parallel` | 동시 리서치 세션 수 (기본 3, 상한 6) |
-| `research.timeout_minutes` | 리서치 소스 1개당 상한 (기본 10분) |
 | `tmux` | 막둥이 pane 모니터. 코드 기본값은 off, seed 되는 설정 파일은 `enabled: true` |
 | `worktree.extra_exclude` | worktree 동기화 추가 제외 패턴 |
 | `logging` | `level` / `mode` / `path` / `max_bytes` |
@@ -194,7 +187,6 @@ $ makdoong2-team validate
 Resolved chain (primary → fallbacks):
   makdoong2-team-leader      github-copilot/gpt-5.6-luna (medium) → github-copilot/claude-haiku-4.5 (low)
   makdoong2-analyzer         github-copilot/gpt-5.6-luna (medium) → github-copilot/claude-haiku-4.5 (low)
-  makdoong2-researcher       github-copilot/gpt-5.6-luna (medium) → github-copilot/claude-haiku-4.5 (low)
   makdoong2-planner          github-copilot/gpt-5.6-sol (medium) → github-copilot/claude-haiku-4.5 (low)
   makdoong2-engineer         github-copilot/claude-opus-4.8 (medium) → github-copilot/claude-haiku-4.5 (low)
   makdoong2-publisher        github-copilot/gpt-5.6-luna (medium) → github-copilot/claude-haiku-4.5 (low)

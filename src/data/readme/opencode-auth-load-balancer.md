@@ -12,10 +12,12 @@ Selection is **not** round-robin. It is weighted primarily by **weekly** usage, 
 - **Weekly-usage-weighted scheduling** — `urgency = weeklyRemaining / daysUntilWeeklyReset`. A sooner reset (e.g. 3 days) outranks a later one (7 days) at equal headroom; perishable quota is drained progressively, never crammed into the final hour.
 - **Automatic rotation** — on `429`/auth errors an account is cooled down and the next-best is tried; `retry-after` is honored.
 - **Model-tier fallback ladder (Fable, Opus, …)** — Claude Max accounts have *separate* weekly caps per premium model tier. When one is exhausted (a 429 whose `representative-claim` names a tier window, e.g. `seven_day_fable` / `seven_day_opus`), the balancer records a **per-tier** cooldown instead of cooling the whole account down (which used to cascade every account into a false "cooldown" and block *every* model on it). Requests for that tier then **steer to an account with tier headroom** — keeping the model you asked for — and only when the *whole pool* is tier-limited does the request descend **one rung down the fallback ladder**: the next model family in `fable → opus → sonnet → haiku` (order configurable via `OPENCODE_AUTH_LB_ANTHROPIC_FAMILY_ORDER`), picking the **highest-versioned model your provider config actually has** (a capped `claude-fable-5` prefers `claude-opus-4-9` over `claude-opus-4-8`). If that tier is capped too, it descends again (`fable → opus → sonnet`), each step toasted, preferably on the session's pinned account (keeping its prompt cache). Pin a fixed target or disable entirely via `OPENCODE_AUTH_LB_ANTHROPIC_OPUS_FALLBACK_MODEL`.
+- **Durable provider pending** — after model fallback and account rotation are exhausted, a session-bound turn whose whole provider is blocked by account-wide quota stays pending without sending a guaranteed `429`. It resumes when capacity returns, survives an opencode restart as the same user message, and is removed immediately when you cancel with `Esc`. Sessions wait and resume independently; there is no provider-wide FIFO.
+- **Self-updating Claude Code version** — Anthropic gates new models on the client version the request claims, so a pinned version stops working the day a model ships (`Claude Code 2.1.87 does not support this model; version 2.1.251 or newer is required`). The plugin discovers the current version from npm instead, caches it for a day, and never regresses below a version known to work. See [Claude Code version](#claude-code-version).
 - **Session affinity** — a conversation stays pinned to one account so you keep its prompt cache and don't re-send context on every turn.
 - **Proactive migration** — leaves an account at a configurable soft threshold (~95%) instead of waiting for a hard 100% wall (which can break in-flight subagents).
 - **Single-use refresh-token safety** — per-account singleflight refresh; rotated tokens are persisted immediately.
-- **Visibility** — a toast when the in-use account switches, an on-demand `auth_lb_status` tool, and a `bun run status` CLI dashboard.
+- **Visibility** — toasts for account switches, model fallback, pending/recovery, and restart restoration; an on-demand `auth_lb_status` tool; and a `bun run status` CLI dashboard.
 
 ---
 
@@ -92,6 +94,10 @@ The pool lives in a JSON file you can inspect/edit (e.g. to rename labels):
 
 opencode resolves its data dir via `xdg-basedir`, which is platform-agnostic — it does **not** use `%LOCALAPPDATA%` on Windows or `Application Support` on macOS (verified with `opencode debug paths`).
 
+Durable turn references live beside the pool as `auth-load-balancer-pending.json`. This file contains only workspace/provider/session/message ids and scheduling timestamps — never prompt text, request bodies, attachments, headers, OAuth tokens, or provider responses. Both files use atomic writes and cross-process locks.
+
+A third file, `auth-load-balancer-cc-version.json`, caches the discovered Claude Code version (`{"version","fetchedAt"}` — see [Claude Code version](#claude-code-version)). It holds no account data and is safe to delete; it is rebuilt on the next start.
+
 > **OpenAI/Codex note:** the OpenAI path assumes opencode is configured to use the **Responses API** (the standard ChatGPT/Codex setup); `/responses` requests are routed to the Codex backend.
 
 ---
@@ -118,6 +124,14 @@ Claude — in use: claude-personal
 Codex — in use: chatgpt-plus
   #  account            weekly   5h   resets   state
   1  ▶ chatgpt-plus       20%    5%   3d18h  in use
+```
+
+The workspace-aware `auth_lb_status` tool also appends durable waits; the standalone TUI layout remains unchanged:
+
+```text
+Pending turns
+  Claude  2 sessions · nearest recovery 3h0m
+  Codex   1 session · checking again 5m
 ```
 
 `▶` marks the in-use account; `#` is the rank the scheduler would pick next.
@@ -157,7 +171,7 @@ Then register the entry in `~/.config/opencode/tui.json` (this is how opencode l
 }
 ```
 
-> **Why this shape (it matters):** TUI plugins load from the `plugin` array in `tui.json`, **not** from the server's plugins-dir glob. The server *separately* globs `{plugin,plugins}/*.{ts,js}` and loads every match as a **server** plugin — so a TUI entry dropped in `plugins/` is also loaded by the server, rejected (`must default export … server()`), and logs an error on **every** launch (and a stray scoring `.ts` there would be mis-loaded as a plugin and break provider resolution). Keeping the four files OUTSIDE `plugins/` and registering only via `tui.json` avoids that. The split into a `.ts` **entry** that **lazily imports** a `.tsx` **view** is still required because opencode's runtime SolidJS JSX transform (`@opentui/solid`) only matches `*.{tsx,jsx}` — a `.ts` cannot itself contain JSX, and the lazy import keeps the server plugin worker (which never runs `tui()`) from evaluating the SolidJS module graph. Developed against opencode / `@opencode-ai/plugin` `>=1.17.13` + `@opentui/solid` `0.4.2` (the versions currently pinned in `package.json`). The `.tsx` view **is** typechecked (`tsconfig.tui.json`) and linted here — its JSX deps (`solid-js` + `@opentui/*`) are installed as devDependencies pinned to those versions — so type/import/prop breaks are caught in CI; only its runtime rendering still needs a live opencode TUI to verify. The toast + `auth_lb_status` tool + `bun run status` CLI cover the same information regardless. (`auth-load-balancer-tui.logic.ts` has no JSX and no TUI-runtime dependency, so it is directly unit-tested rather than only typechecked.)
+> **Why this shape (it matters):** TUI plugins load from the `plugin` array in `tui.json`, **not** from the server's plugins-dir glob. The server *separately* globs `{plugin,plugins}/*.{ts,js}` and loads every match as a **server** plugin — so a TUI entry dropped in `plugins/` is also loaded by the server, rejected (`must default export … server()`), and logs an error on **every** launch (and a stray scoring `.ts` there would be mis-loaded as a plugin and break provider resolution). Keeping the four files OUTSIDE `plugins/` and registering only via `tui.json` avoids that. The split into a `.ts` **entry** that **lazily imports** a `.tsx` **view** is still required because opencode's runtime SolidJS JSX transform (`@opentui/solid`) only matches `*.{tsx,jsx}` — a `.ts` cannot itself contain JSX, and the lazy import keeps the server plugin worker (which never runs `tui()`) from evaluating the SolidJS module graph. Developed against opencode / `@opencode-ai/plugin` `>=1.18.26` + `@opentui/solid` `0.5.10` (the versions currently pinned in `package.json`). The `.tsx` view **is** typechecked (`tsconfig.tui.json`) and linted here — its JSX deps (`solid-js` + `@opentui/*`) are installed as devDependencies pinned to those versions — so type/import/prop breaks are caught in CI; only its runtime rendering still needs a live opencode TUI to verify. The toast + `auth_lb_status` tool + `bun run status` CLI cover the same information regardless. (`auth-load-balancer-tui.logic.ts` has no JSX and no TUI-runtime dependency, so it is directly unit-tested rather than only typechecked.)
 
 ---
 
@@ -177,12 +191,33 @@ All knobs are environment variables with sane defaults.
 | `OPENCODE_AUTH_LB_DRAIN_MIGRATE` | `false` | Allow switching a healthy session to drain another account whose weekly window is about to reset. |
 | `OPENCODE_AUTH_LB_DRAIN_MIGRATE_MARGIN` | `1.5` | Urgency factor required to justify a drain switch. |
 | `OPENCODE_AUTH_LB_SESSION_TTL_MS` | `21600000` | Session→account assignments older than this are pruned. |
-| `OPENCODE_AUTH_LB_MAX_WAIT_MS` | `305000` | When **every** account is rate-limited (a `429`/`402` cooldown), how long a single request may **block** waiting for the soonest account's cooldown to expire (honoring `Retry-After`) before auto-retrying — instead of failing the turn abruptly. A client abort (cancelling the turn) interrupts the wait immediately. Must exceed the 5-min account cooldown to cover a `429` with no `Retry-After`. `0` disables waiting (fail fast). Auth (`401`/`403`) errors are never waited on. |
+| `OPENCODE_AUTH_LB_MAX_WAIT_MS` | `305000` | Bounded wait for requests that do **not** carry both an opencode session id and user-message id (provider-internal or external fetches). Session-bound user turns use durable pending instead and wait until provider quota recovers or the user cancels. Auth (`401`/`403`), disabled/re-login accounts, and network failures are never converted into quota waits. `0` makes anonymous requests fail fast. |
 | `OPENCODE_AUTH_LB_ANTHROPIC_OPUS_FALLBACK_MODEL` | *(unset — ladder mode)* | Claude Max accounts have **separate weekly caps per premium model tier** (Fable, Opus, …). When one is exhausted, that tier's requests 429 (`anthropic-ratelimit-unified-representative-claim: seven_day_fable` / `seven_day_opus` / …) even though the account's aggregate 5h/7d windows still have headroom and every other model works. Instead of cooling the **whole account** down (which cascaded every account into "cooldown"), the balancer records a **per-tier** cooldown: requests for that tier steer to accounts with tier headroom, and once the whole pool is tier-limited they descend the **fallback ladder** (next family down, best version in your provider's model list; toasted, never silent). **Unset** = ladder mode (recommended). Set to a **model id** to pin a fixed downgrade target (bypassing the ladder). Set to an **empty string** to disable (revert to the account-wide cooldown). The env name keeps `OPUS` for compatibility but applies to **every** tier. |
 | `OPENCODE_AUTH_LB_ANTHROPIC_FAMILY_ORDER` | `fable,opus,sonnet,haiku` | The fallback ladder's model families, **best first**. A tier-capped request downgrades to the highest-versioned configured model of the next family below the capped one (e.g. capped `fable` → newest `opus`; capped `opus` → newest `sonnet`). A family not in the list (a future top tier) is treated as above the first entry — so when Anthropic ships a new premium tier, a config tweak (or nothing at all, if it slots on top) keeps the ladder correct without a code change. |
+| `OPENCODE_AUTH_LB_ANTHROPIC_CLAUDE_CODE_VERSION` | *(unset — auto)* | Pin the Claude Code version the plugin claims to be, bypassing both the npm lookup and the built-in floor. Anthropic **gates new models on this version** — asking for a model newer than the version you report is rejected with `claude_code_version_too_old` — so by default the plugin resolves it automatically (see [Claude Code version](#claude-code-version)). Set this only to pin **forward** (a version npm hasn't tagged `latest` yet) or **back** (to reproduce a failure, or if a future release changes the request fingerprint and the newest version starts failing). Must be a plain `x.y.z`; anything else is ignored. |
 | `OPENCODE_AUTH_LB_DIR` | — | Override the pool-file directory (handy for tests). |
 | `OPENCODE_AUTH_LB_DEBUG` | — | `1`/`true` logs each selection to stderr. |
 | `ANTHROPIC_BASE_URL` | — | Route Anthropic requests through a custom base URL. |
+
+### Claude Code version
+
+Anthropic only accepts OAuth (subscription) requests that look like they came from Claude Code, so the plugin reports a version in the `claude-cli/<version>` User-Agent and in the `cc_version=` billing fingerprint. **That version is a gate, not decoration:** requesting a model newer than the version you claim is rejected outright.
+
+```json
+{"type":"error","error":{"type":"invalid_request_error",
+ "message":"Claude Code 2.1.87 does not support this model; version 2.1.251 or newer is required.",
+ "details":{"error_code":"claude_code_version_too_old"}}}
+```
+
+A hard-coded version therefore breaks on *every* model launch, so the plugin resolves it, best-first:
+
+1. **`OPENCODE_AUTH_LB_ANTHROPIC_CLAUDE_CODE_VERSION`** — an explicit pin. Skips the lookup entirely.
+2. **npm** — the `latest` dist-tag of [`@anthropic-ai/claude-code`](https://www.npmjs.com/package/@anthropic-ai/claude-code), cached in the data dir for 24 h.
+3. **A built-in floor** — a version verified to work, used offline and on a cold first run.
+
+The resolved version only ever moves **up**, so a registry blip or a rolled-back `latest` can never drag the plugin below a version already known to work; use the env pin to go down deliberately. The lookup is a single ~56-byte request fired at startup: the loader awaits only the local cache read, never the network, so neither opencode's startup nor your first request waits on npm — and a registry outage just leaves the previous version in place.
+
+> Only the version *string* is discovered. The request fingerprint's salt is still compiled in, so if Anthropic ever changes that algorithm, pin a known-good version with the env var and open an issue.
 
 ---
 
@@ -243,6 +278,7 @@ src/
   notify.ts             # toast on account switch
   usage-refresh.ts      # cold-start usage seeding via the usage endpoint
   prime.ts              # point the in-use marker at the top-ranked account at startup
+  pending/              # recovery classifier, reference store, per-turn lease, restart coordinator
   scheduler/            # config, score-core (shared scorer), select
   pool/                 # data-dir resolution + atomic, serialized pool store
   providers/            # ProviderAdapter contract + headers
@@ -263,21 +299,25 @@ tui/
 
 opencode lets an auth plugin's `loader` return a custom `fetch` that **every** request for a provider flows through. That single choke point ([`src/fetch.ts`](src/fetch.ts)) is where the magic happens, per request:
 
-1. derive a session key (from opencode's session id, or a hash of the request prefix);
+1. capture opencode's session and user-message ids, then derive the session-affinity key;
 2. pick the session's pinned account — or, if it's unavailable / over the soft threshold, the highest **weekly-urgency** account ([`src/scheduler/select.ts`](src/scheduler/select.ts));
 3. refresh the OAuth token if needed (singleflight, rotated token persisted);
 4. apply provider-specific auth + request transforms (Claude Code identity / Codex Responses quirks);
 5. send the request, then record usage from the response headers;
-6. on `429`/auth errors, cool the account down and try the next; on success, re-pin the session and toast if the account changed.
+6. on a model-tier `429`, steer across accounts and descend the configured model-family fallback ladder before considering provider pending;
+7. on an account-wide `429`/`402`, cool that account and rotate through the remaining accounts;
+8. only when every usable account is provider-quota blocked, persist the turn reference before waiting — known exhaustion sends no speculative provider request;
+9. on recovery, retry selection; on `Esc`, delete the reference; on restart, reconcile OpenCode's persisted message/history and resume the same message id without duplicating its prompt parts.
 
-The pool is its own JSON file (opencode's native auth store holds only one credential per provider), written atomically and serialized by an in-process mutex.
+The account pool and durable pending references are separate JSON files (opencode's native auth store holds only one credential per provider). Writes are atomic and serialized both in-process and across processes. No daemon runs while opencode is closed; restoration begins only when opencode starts again.
 
 ---
 
 ## Limitations
 
-- **Bottom status bar** ([`tui/auth-load-balancer-tui.ts`](tui/auth-load-balancer-tui.ts) + [`.view.tsx`](tui/auth-load-balancer-tui.view.tsx) + [`.logic.ts`](tui/auth-load-balancer-tui.logic.ts) + [`auth-load-balancer-scoring.ts`](tui/auth-load-balancer-scoring.ts)) is a SolidJS TUI artifact compiled by opencode (its JSX deps — `solid-js` + `@opentui/*` — are installed as devDependencies, so the `.tsx` view **is** typechecked via `tsconfig.tui.json` and linted, though not render-tested here since that needs a live opencode TUI; its scorer is a byte-identical copy of the unit-tested [`src/scheduler/score-core.ts`](src/scheduler/score-core.ts), enforced by a sync test). It is written against opencode `>=1.17.13` internals (the `app_bottom` slot + the `subagent-footer` usage computation, verified against source); confirm it renders in your opencode build. The toast/tool/CLI cover the account info regardless.
+- **Bottom status bar** ([`tui/auth-load-balancer-tui.ts`](tui/auth-load-balancer-tui.ts) + [`.view.tsx`](tui/auth-load-balancer-tui.view.tsx) + [`.logic.ts`](tui/auth-load-balancer-tui.logic.ts) + [`auth-load-balancer-scoring.ts`](tui/auth-load-balancer-scoring.ts)) is a SolidJS TUI artifact compiled by opencode (its JSX deps — `solid-js` + `@opentui/*` — are installed as devDependencies, so the `.tsx` view **is** typechecked via `tsconfig.tui.json` and linted, though not render-tested here since that needs a live opencode TUI; its scorer is a byte-identical copy of the unit-tested [`src/scheduler/score-core.ts`](src/scheduler/score-core.ts), enforced by a sync test). It is written against opencode `>=1.18.26` internals (the `app_bottom` slot + the `subagent-footer` usage computation, verified against source); confirm it renders in your opencode build. The toast/tool/CLI cover the account info regardless.
 - **OpenAI/Codex** assumes the Responses API; chat-completions → responses conversion is out of scope.
+- **Plugin reloads require restart**: opencode loads server plugins once at process startup. After installing a new build, restart the running opencode process once; durable turns are restored on that next start and are never sent while opencode is closed.
 - **Cross-process refresh**: per-process singleflight protects token rotation within one opencode instance. Running two opencode instances at once could still race the single-use refresh token.
 - **TUI pool writes**: the TUI sidebar's Rename / Delete actions write the pool file atomically (temp + rename) but WITHOUT the cross-process file lock the server uses around its own read-modify-write — so a server usage / cooldown / session / `tokenGen` update committed between the TUI's `readFileSync` and `renameSync` can be silently overwritten. Impact is bounded: the next request re-records usage from response headers, so the window is one cycle of staleness on the affected account; correctness recovers on its own.
 - Live OAuth/login and real-account end-to-end behavior should be smoke-tested in your environment; the test suite mocks the network.

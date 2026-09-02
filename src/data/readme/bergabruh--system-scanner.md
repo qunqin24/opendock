@@ -98,14 +98,28 @@ claude plugin marketplace add https://github.com/BergaBruh/mnogovid
 
 ### OpenCode
 
-OpenCode uses an MCP configuration rather than this marketplace format. Clone
-this repository and merge one or both `opencode.json.example` files into the
-project config, setting each `cwd` to the matching absolute plugin path.
+Register either published package as a local MCP server; `npx` downloads it and
+starts the bundled Python bridge automatically:
 
-To use native OpenCode agents and commands, copy both `agents/` and `commands/`
-from each plugin's `adapters/opencode/.opencode/` directory into the target
-workspace’s `.opencode/`, then restart OpenCode. Both MCP servers and all four
-agents were smoke-tested against OpenCode locally.
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "mnogovid-code-scanner": {
+      "type": "local",
+      "command": ["npx", "--yes", "@bergabruh/code-scanner"]
+    },
+    "mnogovid-system-scanner": {
+      "type": "local",
+      "command": ["npx", "--yes", "@bergabruh/system-scanner"]
+    }
+  }
+}
+```
+
+No absolute paths or copied `.opencode` assets are needed.
+The user still needs `python3` and any desired scanner executables installed
+locally; the packages never install system software.
 
 ## Repository layout
 
