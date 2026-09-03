@@ -49,6 +49,9 @@ Manual install also works: add the package to the `plugin` array in `tui.json` (
 }
 ```
 
+> [!IMPORTANT]
+> **The first OpenCode load after installing this plugin may be slow.** That's OpenCode downloading the plugin's packages and managed tools into its cache — it happens once. Every subsequent start is fast.
+
 | Key | Action |
 | --- | --- |
 | `j` / `k` or arrows | Move the cursor |

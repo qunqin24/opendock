@@ -17,6 +17,59 @@ Works on Claude Code, opencode, Copilot, Gemini, and 8 more platforms.
 
 ---
 
+## The problem
+
+An AI agent can write 400 lines in five minutes. It says "tests pass" — and
+leaves nothing you can open, read, or attach to a PR. Review becomes a
+formality, and a formality is worse than no review, because it launders the
+change through a human name.
+
+Mugiwara makes the work provable: every change carries a trail a human can
+review, and the process sizes itself to the work.
+
+## What you get back
+
+Every mission closes with one file. This is what your reviewer reads:
+
+```markdown
+# Mission: invitation-accepted-flow
+2026-09-03 · farid · branch `feature/MKR-412` · lane **full** · mode guided
+
+## Verdict
+**GO** — all gates passed. 1 finding deferred with an owner.
+
+## What changed
+11 files, +340 / -82.
+Sensitive paths touched: `src/auth/invitation.ts`, `migrations/004.sql`
+
+## Gates
+| Gate | Verdict | Evidence |
+|---|---|---|
+| Checkpoint (Flow 4) | PASS | `flows/04-audit.md` |
+| Quality (Flow 5) | PASS | `flows/05-quality.md` |
+| Coverage (Flow 6) | PASS | new 94% / modified 87% |
+| Security (Flow 7) | PASS | STRIDE, 0 high -> `review/security.md` |
+
+## Cost
+Used **8,781** of 12,000 tokens (73%). Lane `lean`. 1 heal cycle.
+```
+
+*Generated from fixture `test/fixtures/report-sample.md` — 2026-09-03.*
+
+## The process fits the work
+
+| Your change | Lane | What runs |
+|---|---|---|
+| Typo, one file | **Direct** | nothing — just fix it |
+| Small bug | **Lean** | execute -> quality |
+| A feature | **Standard** | plan -> execute -> audit -> quality -> review |
+| Touches `auth/`, `payments/`, migrations | **Full** | all 9 flow stages + security review |
+| Requirements still fuzzy | **Spike** | brainstorm first, then re-size |
+
+The lane is computed from `git diff` — never guessed by the model — and it only
+ever rises. Once a mission touches a sensitive path it cannot drop back, even if
+that file is reverted.
+
 ## What is Mugiwara? (30 seconds)
 
 AI agents are fast. They're also **unverified** — no audit trail, no review, no
@@ -130,65 +183,17 @@ sequential. Inline stays the default.
 
 ---
 
-## See the evidence
-
-A closed mission leaves a report you can actually read — and after
-`mugiwara archive <mission>`, the whole trail folds INTO it. This is the shape
-of `.mugiwara/missions/<mission>/report.md`:
-
-    # Mission: invitation-accepted-flow . 2026-08-11
-
-    **Lane** full . **Mode** guided . **Actor** john . **Branch** feature/MKR-412
-
-    ## What changed
-    11 files, +340 LOC. Sensitive paths: src/auth/
-
-    ## Flow stages
-    Execute (Flow 3)  PASS   · Checkpoint (Flow 4)  PASS   · Quality (Flow 5)  PASS
-    Gates (Flow 6)    PASS   · Healing (Flow 8)     PASS   · Closure (Flow 9)  GO
-
-    ## Review & blockers
-    Review + security: 3 findings · Blocker ledger: 1 row
-
-    ## State
-    Flow 9 · 6/6 tasks · 0 blockers · 1 heal · 14,200 / 20,000 tokens
-
----
-
 ## What Mugiwara does
 
-**Every day, on every repo:**
-
-| Feature | What you get |
+| Feature | One line |
 |---|---|
-| **Lane sizing** | Work auto-sized from `git diff`. Typo = instant fix. Auth migration = full pipeline. |
-| **Evidence trail** | `.mugiwara/` workspace: plans, audit reports, quality reports, review findings, blocker ledger. |
-| **Adaptive execution** | Picks an execution posture from evidence at each flow boundary — cost-aware, never a mode flip. |
-| **Live slop governor** | Flags wasted cost live and attributes it per crew member. `mugiwara cost` shows it. |
-| **Closure integrity** | Archive fails on dangling links, secrets in the trail, or missing evidence. |
-| **Provenance** | Per-commit attribution — agent, model, lane, evidence. `mugiwara blame`. |
-| **Rollback map** | Executable `rollback.sh` per mission: exact revert commands. Human runs it. |
-| **Staleness guard** | Resume warns when main moved past the mission's base. |
+| **Lane sizing** | Work auto-sized from `git diff` — typo instant, auth full pipeline |
+| **Evidence gates** | Every flow stage re-runs checks with evidence; archive fails on missing |
+| **Team split** | One plan, per-(mission, member) state + resume, zero collisions |
+| **Resume** | Rebuilds from `.mugiwara/` state — continues, never restarts |
+| **12 platforms** | Claude, opencode, Copilot, Gemini, Codex, Cursor, Kimi, Pi, and 5 more |
 
-**When a team scales it up:**
-
-| Feature | What you get |
-|---|---|
-| **Policy as code** | `mugiwara.policy.yml`: force lanes up, raise coverage gates, flag paths for human approval. |
-| **Signed attestation** | Optional signing of the report — evidence that cannot be edited after the fact. |
-| **Handoff** | `mugiwara handoff`: engineer-to-engineer report from computed state. |
-| **Context budget** | Trail size measured at closure; optional ceiling fails the archive like a test. |
-| **Team collaboration** | One shared plan, per-(mission, member) state + resume. Zero collisions. |
-
-**Always on, under the surface:**
-
-| Feature | What you get |
-|---|---|
-| **Self-healing** | Brook reads all failures at once, fixes root causes, re-runs verification. ≤3 cycles. |
-| **Resume from anywhere** | Rebuilds from `.mugiwara/` state. Continues, never restarts. |
-| **12 platforms** | Claude Code, opencode, Copilot, Gemini, Codex, Cursor, Kimi, Pi, Antigravity + CLI. |
-
-→ All features, with how-to-use + scenarios: [Every feature](docs/concepts/features.md)
+→ All 29 features: [Every feature](docs/concepts/features.md)
 
 ---
 
@@ -347,7 +352,7 @@ mugiwara reset --keep-logs                    # wipe state, keep lessons
 | Claim | Status |
 |---|---|
 | Retrieval routing rank-1 | **95.9%**, 216 probes, offline, in CI |
-| Reference pointers resolve | **312/312**, 9 targets, in CI |
+| Reference pointers resolve | **320/320**, 9 targets, in CI |
 | Index size published vs measured | **doc-gated** — validator fails on drift, in CI |
 | Lane constants match content load | **verified**, in CI |
 | Write-scope enforcement | **opencode only** — rules-based elsewhere |

@@ -47,19 +47,16 @@ and that trust is wired — and it cannot pass by accident, because outside the
 tunnel that host has no listener. It runs again on every `receipt()`, so a
 receipt is never reported from a sandbox whose egress cannot be vouched for.
 
-**CA trust**, which is subtler here than it looks. A MITM gateway presents a
-certificate it forged for the vendor hostname, and whoever validates it must
-trust the signing CA. On Daytona there are *two* proxies in the chain and the
-client's TLS peer is the near one: Daytona terminates TLS with a certificate
-signed by its own CA, already trusted in the image, and re-originates to the
-gateway. The Veris CA is therefore not in the client's validation path today.
-
-It is installed regardless. If Daytona tunnels `CONNECT` end-to-end instead —
-the ordinary behaviour for an HTTP proxy — the gateway's certificate reaches the
-client directly and nothing works without it. A bundle is assembled inside the
-sandbox from the distribution's public roots plus ours, requiring nothing of the
-image, and the trust variables Daytona does not itself set (`PIP_CERT`,
-`CARGO_HTTP_CAINFO`, `DENO_CERT` and a dozen more) point at it.
+**CA trust.** The gateway presents a certificate it forged for the vendor
+hostname, signed by the Veris CA, and that certificate reaches the client
+directly: Daytona tunnels the `CONNECT` end to end rather than terminating TLS
+itself (measured: the leaf a sandbox sees for `api.stripe.com` is issued by
+`Veris Gateway CA`). So the Veris CA is load-bearing. A bundle is assembled
+inside the sandbox from the distribution's public roots plus ours, requiring
+nothing of the image, and the trust variables Daytona does not itself set
+(`PIP_CERT`, `CARGO_HTTP_CAINFO`, `DENO_CERT` and a dozen more) point at it.
+Daytona sets `SSL_CERT_FILE`, `REQUESTS_CA_BUNDLE`, `CURL_CA_BUNDLE` and
+`NODE_EXTRA_CA_CERTS` to its own bundle, which also validates the chain.
 
 **On `socks_address`.** The egress credential also carries a SOCKS endpoint,
 which is what `@veris-ai/e2b` uses. Daytona cannot: it accepts only
@@ -70,10 +67,26 @@ listener.
 
 - **Requires a Veris control plane that serves an HTTP CONNECT gateway.**
   Without one, `create()` fails at `credential-mint` saying so.
-- **Interception depends on Daytona intercepting TLS itself.** The client's
-  certificate chain terminates at Daytona's CA, not ours. If that changes, the
-  Veris CA becomes load-bearing — it is already installed for that reason, but
-  that path is untested.
+- **The canary probe and CA install need `curl` and a POSIX shell in the
+  image.** A `python:3.12-slim`-style image fails at `create()` with
+  `curl: not found` in the `canary` phase.
+- **Python 3.13+ needs a gateway that mints strict-verifier-safe leaves.**
+  Newer Python verifies with `VERIFY_X509_STRICT` and rejects a forged leaf
+  without an Authority Key Identifier; the control plane fix is
+  services-sandbox#1044. Until it is deployed, `requests` and `urllib` fail
+  with `Missing Authority Key Identifier` while `curl` and Node succeed.
+- **Proxy-aware clients terminate at Daytona's CA; proxy-unaware ones at
+  ours.** curl, Python and the rest honour `HTTPS_PROXY`, reach Daytona's
+  proxy, and validate its CA. Node ignores that variable, is forwarded end to
+  end, and validates the Veris CA. Daytona overwrites `NODE_EXTRA_CA_CERTS`
+  and `SSL_CERT_FILE` with its own CA file, so Node is pointed at OpenSSL's
+  store instead (`NODE_OPTIONS=--use-openssl-ca`), which includes the system
+  certificate directory the Veris CA is installed into. That install needs
+  passwordless sudo and `update-ca-certificates` in the image; Daytona's
+  default image has both, and Daytona's own CA file is read-only, so there is
+  no other route for Node. Other proxy-unaware
+  runtimes (a JVM with no proxy settings, say) are on the same path and rely
+  on the best-effort store install.
 - **Git sync into the sandbox can fail** with `Host key verification failed`.
   Inherited from upstream `@daytona/opencode`; the agent works, but local
   changes are not pushed in. Setting `DAYTONA_SSH_KNOWN_HOSTS` is the likely fix.

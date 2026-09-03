@@ -109,7 +109,7 @@ Install also writes user-level guidance for the harnesses it detects: Claude Cod
 
 ## What you get
 
-**Solve it in Codex. Claude remembers.** Twenty-one coding agents write every conversation
+**Solve it in Codex. Claude remembers.** Twenty-two coding agents write every conversation
 to local files, and deja turns those files into one memory layer all of them read.
 
 | | |
@@ -135,7 +135,9 @@ to local files, and deja turns those files into one memory layer all of them rea
 ### Your own work, wrapped
 
 `deja stats --card` draws it in the terminal; give it a filename and it writes an
-SVG for a profile README.
+SVG for a profile README. To post it anywhere else, [turn it into a
+PNG](https://vshulcz.github.io/deja-vu/card/) — that page converts it in your own
+browser.
 
 <p align="center"><img src="docs/assets/stats-card-demo.svg" width="760" alt="deja stats card: a year of agent sessions as a heatmap, the agents they came from, and the longest one"></p>
 
@@ -238,7 +240,7 @@ anything already wired to them.
 ## Supported harnesses
 
 <!-- matrix:start -->
-aider &middot; Antigravity &middot; Claude Code &middot; Cline &middot; Codex CLI &middot; Copilot CLI &middot; Cursor &middot; DeepSeek Harness &middot; Gemini CLI &middot; Goose &middot; Grok Build &middot; Hermes &middot; Kimi Code &middot; omp (Oh My Pi) &middot; OpenClaw &middot; opencode &middot; pi &middot; prime-agent (PrimeIntellect) &middot; Qwen Code &middot; Roo Code &middot; Zed.
+aider &middot; Amp &middot; Antigravity &middot; Claude Code &middot; Cline &middot; Codex CLI &middot; Copilot CLI &middot; Cursor &middot; DeepSeek Harness &middot; Gemini CLI &middot; Goose &middot; Grok Build &middot; Hermes &middot; Kimi Code &middot; omp (Oh My Pi) &middot; OpenClaw &middot; opencode &middot; pi &middot; prime-agent (PrimeIntellect) &middot; Qwen Code &middot; Roo Code &middot; Zed.
 
 <details>
 <summary>What each one supports</summary>
@@ -246,6 +248,7 @@ aider &middot; Antigravity &middot; Claude Code &middot; Cline &middot; Codex CL
 | Harness | MCP recall | Auto-recall | Skill | Command | Resume | Handoff | Needs |
 | --- | :-: | :-: | :-: | :-: | :-: | :-: | --- |
 | aider | ⚠ | ✅ | ✕ | ⚠ | ✕ | ✅ | deja aider |
+| Amp | — | — | — | — | ? | paste | — |
 | Antigravity | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | Claude Code | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | Cline | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
@@ -262,7 +265,7 @@ aider &middot; Antigravity &middot; Claude Code &middot; Cline &middot; Codex CL
 | OpenClaw | ✅ | ✅ | ✅ | ✅ | ✅ | paste | — |
 | opencode | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | sqlite3 |
 | pi | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
-| prime-agent (PrimeIntellect) | — | — | — | — | ? | paste | — |
+| prime-agent (PrimeIntellect) | — | — | — | — | — | paste | — |
 | Qwen Code | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | Roo Code | ✅ | ⚠ | ✅ | ✅ | ✕ | paste | — |
 | Zed | ✅ | ✕ | ✅ | ✅ | ✕ | paste | sqlite3 + zstd |
@@ -280,7 +283,7 @@ keeping those descriptions checked against the parsers.
 
 ### Harnesses with a package of their own
 
-`deja install --auto` wires all five of these like every other harness, and
+`deja install --auto` wires all six of these like every other harness, and
 that stays the shortest path. They also have a package in their own ecosystem,
 for people who install extensions there rather than from a CLI:
 
@@ -299,6 +302,16 @@ contribute only what is missing, and in Zed both halves use one server id, so
 there is nothing to have twice whichever order you install in.
 
 Each uses the deja you already have; the copy it bundles is only the fallback.
+
+The same search is also a skill, for any agent that loads a `SKILL.md`:
+
+```sh
+npx skills add https://github.com/vshulcz/deja-vu --skill deja-search   # skills CLI: Claude Code, Cursor, Goose, Copilot…
+openclaw skills install @vshulcz/deja-search                            # ClawHub
+hermes skills install vshulcz/deja-vu/skills/deja-search                # Hermes
+```
+
+The skill drives the `deja` binary from the install step above; it does not bundle one.
 
 ## Semantic recall (optional)
 
@@ -427,6 +440,17 @@ record-forward tools and worth your time if that model fits you; it still starts
 knows only what an agent chose to save. The
 [full comparison](https://vshulcz.github.io/deja-vu/guide/compare.html) covers eleven of them.
 
+**Where is Claude Code session history stored, and can I search it?** Under
+`~/.claude/projects`, one JSONL file per session; Codex keeps `~/.codex/sessions`, Cursor a
+SQLite `state.vscdb`. `deja search` reads them all in place, `deja last` lists the recent
+sessions of every agent, and `deja view` opens the whole history as one local page. Paths
+for each agent: [where sessions are stored](https://vshulcz.github.io/deja-vu/guide/where-sessions-are-stored.html).
+
+**My Claude Code session history disappeared. Is it gone?** Claude Code deletes transcripts
+older than 30 days (`cleanupPeriodDays` in `~/.claude/settings.json`), and `claude --resume` lists
+only what is left. A session deja indexed before the cleanup stays searchable after the
+file is gone. Details: [session files on disk](https://vshulcz.github.io/deja-vu/guide/session-files-on-disk.html).
+
 **What about Windows?** Builds exist and CI runs the suite there. macOS and Linux are the
 battle-tested paths. Field reports welcome in [#9](https://github.com/vshulcz/deja-vu/issues/9).
 
@@ -451,7 +475,7 @@ Written for the situation rather than the feature:
 - [Why agents forget between sessions](https://vshulcz.github.io/deja-vu/guide/forgetting.html) · [Where each agent keeps its history](https://vshulcz.github.io/deja-vu/guide/where-sessions-are-stored.html)
 - [What compaction drops](https://vshulcz.github.io/deja-vu/guide/after-compaction.html) · [Switching agents](https://vshulcz.github.io/deja-vu/guide/switching-agents.html) · [Auditing an agent](https://vshulcz.github.io/deja-vu/guide/auditing-agents.html) · [Exporting a conversation](https://vshulcz.github.io/deja-vu/guide/export-conversations.html) · [Across machines](https://vshulcz.github.io/deja-vu/guide/sync-across-machines.html) · [What memory costs](https://vshulcz.github.io/deja-vu/guide/token-cost.html)
 
-Per harness: [opencode](https://vshulcz.github.io/deja-vu/guide/memory-for-opencode.html) · [DeepSeek Harness](https://vshulcz.github.io/deja-vu/guide/memory-for-dsh.html) · [Kimi Code](https://vshulcz.github.io/deja-vu/guide/memory-for-kimi.html) · [Zed](https://vshulcz.github.io/deja-vu/guide/memory-for-zed.html) · [Grok Build](https://vshulcz.github.io/deja-vu/guide/memory-for-grok.html) · [Gemini CLI](https://vshulcz.github.io/deja-vu/guide/memory-for-gemini.html) · [Qwen Code](https://vshulcz.github.io/deja-vu/guide/memory-for-qwen.html)
+Per harness: [opencode](https://vshulcz.github.io/deja-vu/guide/memory-for-opencode.html) · [DeepSeek Harness](https://vshulcz.github.io/deja-vu/guide/memory-for-dsh.html) · [Kimi Code](https://vshulcz.github.io/deja-vu/guide/memory-for-kimi.html) · [Zed](https://vshulcz.github.io/deja-vu/guide/memory-for-zed.html) · [Grok Build](https://vshulcz.github.io/deja-vu/guide/memory-for-grok.html) · [Gemini CLI](https://vshulcz.github.io/deja-vu/guide/memory-for-gemini.html) · [Qwen Code](https://vshulcz.github.io/deja-vu/guide/memory-for-qwen.html) · [OpenClaw](https://vshulcz.github.io/deja-vu/guide/memory-for-openclaw.html) · [Goose](https://vshulcz.github.io/deja-vu/guide/memory-for-goose.html) · [Cline](https://vshulcz.github.io/deja-vu/guide/memory-for-cline.html) · [pi and omp](https://vshulcz.github.io/deja-vu/guide/memory-for-pi.html) · [Hermes](https://vshulcz.github.io/deja-vu/guide/memory-for-hermes.html)
 
 ## Try it on your own history
 

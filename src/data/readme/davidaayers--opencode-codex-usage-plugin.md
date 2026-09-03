@@ -71,6 +71,10 @@ The published plugin entrypoint is [`dist/tui.js`](dist/tui.js), generated from 
 
 Cross-repository follow-up work is tracked in the [OpenCode Plugins project](https://github.com/users/davidaayers/projects/1).
 
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for release history.
+
 ## Credits
 
 The Codex integration is forked from [zaniluca/opencode-codex-usage-plugin](https://github.com/zaniluca/opencode-codex-usage-plugin). The gauge presentation is inspired by [@davidaayers/opencode-go-usage-plugin](https://github.com/davidaayers/opencode-go-usage-plugin) and [@davidaayers/opencode-context-gauge-plugin](https://github.com/davidaayers/opencode-context-gauge-plugin).

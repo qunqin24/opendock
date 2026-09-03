@@ -7,6 +7,7 @@ Follows whichever provider the current session is using, so the numbers you see
 are the ones that matter right now — refreshed before you start a query.
 
 - **opencode-go** — rolling 5h / weekly / monthly usage limits as thin colored bars
+- **github-copilot** — monthly premium requests / chat / completions quota from `api.github.com`
 - **deepseek** — remaining API credit
 - **openrouter** — remaining credit balance
 - **openai** — remaining API credit balance
@@ -94,21 +95,23 @@ Keys resolve automatically from what opencode itself uses, in order:
 So if you've already connected a provider in opencode (`opencode auth login` or
 `/connect`), no extra configuration is needed.
 
-| Provider    | env var               |
-| ----------- | --------------------- |
-| opencode-go | `OPENCODE_API_KEY`    |
-| deepseek    | `DEEPSEEK_API_KEY`    |
-| openrouter  | `OPENROUTER_API_KEY`  |
-| openai      | `OPENAI_API_KEY`      |
+| Provider       | env var                  |
+| -------------- | ------------------------ |
+| opencode-go    | `OPENCODE_API_KEY`       |
+| github-copilot | `GITHUB_TOKEN` (`GH_TOKEN` also) |
+| deepseek       | `DEEPSEEK_API_KEY`       |
+| openrouter     | `OPENROUTER_API_KEY`     |
+| openai         | `OPENAI_API_KEY`         |
 
 ## Providers
 
-| Provider    | Source                                                         | Display                          |
-| ----------- | -------------------------------------------------------------- | -------------------------------- |
-| opencode-go | `https://opencode.ai/zen/go/v1/usage`                          | 5h/week/month windows + bars     |
-| deepseek    | `https://api.deepseek.com/user/balance`                        | remaining credit                 |
-| openrouter  | `https://openrouter.ai/api/v1/credits`                         | remaining credit (credits − usage) |
-| openai      | `https://api.openai.com/v1/dashboard/billing/credit_grants`    | remaining credit (org admin key) |
+| Provider       | Source                                                         | Display                          |
+| -------------- | -------------------------------------------------------------- | -------------------------------- |
+| opencode-go    | `https://opencode.ai/zen/go/v1/usage`                          | 5h/week/month windows + bars     |
+| github-copilot | `https://api.github.com/copilot_internal/user`                 | premium/chat/completions + bars  |
+| deepseek       | `https://api.deepseek.com/user/balance`                        | remaining credit                 |
+| openrouter     | `https://openrouter.ai/api/v1/credits`                         | remaining credit (credits − usage) |
+| openai         | `https://api.openai.com/v1/dashboard/billing/credit_grants`    | remaining credit (org admin key) |
 
 Adding a provider is one new file in `src/providers/` implementing the `Provider`
 interface (key resolution + a `fetchUsage`) and adding it to the `providers` array

@@ -5,6 +5,18 @@
 [![license](https://img.shields.io/npm/l/gutchapa-opencode-telegram)](LICENSE)
 [![GitHub stars](https://img.shields.io/github/stars/gutchapa/opencode-telegram)](https://github.com/gutchapa/opencode-telegram)
 
+## Install
+
+One line, ready to go:
+
+```bash
+npm install gutchapa-opencode-telegram
+```
+
+It ships a CLI (`opencode-telegram-bot`) plus an opencode plugin. Set your bot
+token and allowed users, then run it (see the setup section below for the full
+walkthrough — standalone, launchd/systemd, or Docker).
+
 A Telegram bot for [opencode](https://opencode.ai). Chat with your local AI
 assistant from Telegram — run commands, read/search/list files, and control the
 agent with 70+ slash commands (`/reset`, `/status`, `/model`,
@@ -88,7 +100,7 @@ For 24/7 availability, run it under launchd/systemd (see
 | --- | --- | --- |
 | `TELEGRAM_BOT_TOKEN` | _(required)_ | Bot token from BotFather |
 | `TELEGRAM_PLUGIN_ENABLED` | _(unset)_ | Set to `1` to enable Telegram polling when running as an opencode plugin |
-| `ALLOWED_TELEGRAM_USERS` | `791865934` | Comma-separated numeric Telegram user IDs allowed to run shell commands and agentic replies |
+| `ALLOWED_TELEGRAM_USERS` | `<your_telegram_user_id>` | Comma-separated numeric Telegram user IDs allowed to run shell commands and agentic replies |
 | `OPENCODE_BIN` | `opencode` | Path to the `opencode` binary (standalone mode) |
 | `OPENCODE_CWD` | `~/.opencode-bot-ws` | Working directory for agentic runs / sessions |
 | `OPENCODE_TIMEOUT_MS` | `180000` | Agentic timeout |

@@ -105,24 +105,24 @@ rm -rf ~/.cache/opencode/packages/opencode-glm-vistatus
 
 ## 斜杠命令
 
-| 命令           | 功能              |
-| -------------- | ----------------- |
-| `/glm-refresh` | 立即刷新额度数据  |
-| `/glm-lang`    | 切换中 / 英文显示 |
-| `/glm-section` | 开关面板边框显隐  |
-| `/glm-config`      | 查看当前配置      |
-| `/glm-mcp-install`  | 安装 GLM MCP 服务器 |
+| 命令              | 功能                                                  |
+| ----------------- | ----------------------------------------------------- |
+| `/glm-refresh`    | 立即刷新额度数据                                      |
+| `/glm-lang`       | 切换中 / 英文显示                                     |
+| `/glm-section`    | 开关面板边框显隐                                      |
+| `/glm-config`     | 查看当前配置                                          |
+| `/glm-mcp-manage` | 安装 / 卸载 GLM MCP 服务器（别名 `/glm-mcp-install`） |
 
 语言与边框偏好会持久化保存（插件 KV），重启后保留。
 
-`/glm-mcp-install` 支持交互式选择安装范围（Local 项目 / Global 全局）和服务器列表，将 MCP 配置写入对应的 `opencode.json`。可安装的服务器：
+`/glm-mcp-manage`（别名 `/glm-mcp-install`）支持交互式选择操作（安装 / 卸载）、范围（Local 项目 / Global 全局）和服务器列表，将 MCP 配置写入对应的 `opencode.json` 或从中移除。可管理的服务器：
 
-| 服务器            | 类型   | 说明                             |
-| ----------------- | ------ | -------------------------------- |
-| github-read       | Remote | GitHub 仓库知识与代码阅读       |
-| glm-web-reader    | Remote | 网页内容提取与结构化数据获取     |
-| glm-web-search    | Remote | 网络搜索与实时信息获取           |
-| glm-vision        | Local  | 图像分析与视频理解 (GLM-4.6V)   |
+| 服务器         | 类型   | 说明                          |
+| -------------- | ------ | ----------------------------- |
+| github-read    | Remote | GitHub 仓库知识与代码阅读     |
+| glm-web-reader | Remote | 网页内容提取与结构化数据获取  |
+| glm-web-search | Remote | 网络搜索与实时信息获取        |
+| glm-vision     | Local  | 图像分析与视频理解 (GLM-4.6V) |
 
 ## 面板布局
 

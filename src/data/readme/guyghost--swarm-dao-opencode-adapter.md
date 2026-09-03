@@ -116,6 +116,10 @@ open ──► deliberating ──► approved ──► controlled ──► ex
 ## CLI Usage
 
 ```bash
+# Install (Homebrew or npm)
+brew install guyghost/tap/swarm-dao
+npm install -g @guyghost/swarm-dao-cli
+
 # Initialize DAO storage
 swarm-dao init
 

@@ -58,6 +58,10 @@ Single-file plugin: everything lives in [`src/go-usage.tsx`](src/go-usage.tsx).
 
 Cross-repository follow-up work is tracked in the [OpenCode Plugins project](https://github.com/users/davidaayers/projects/1).
 
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for release history.
+
 ## License
 
 [MIT](LICENSE) © 2026 David Ayers

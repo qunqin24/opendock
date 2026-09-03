@@ -123,6 +123,25 @@ Since TUI plugins have no directory auto-discovery, add the same package spec to
 }
 ```
 
+## Manual overrides: /poolConfig and /modelRank (new in v0.2.5)
+
+Two interactive commands let your configuration beat system defaults. All state is persisted to editable files with mtime hot-reload and instant effect — edits trigger an immediate banner/sidebar refresh via a directory watcher:
+
+### /poolConfig — per-lane model assignment
+
+- **TUI**: a native select dialog (same interaction as the model/thinking-level pickers) — pick a task pool (economy / mechanical / main / hard / vision / review), then toggle models up and down the list: select to include, select again to exclude, with a capability tier shown per model. Changes are written through immediately with a toast receipt.
+- **Non-TUI / in-session**: the same command name drives a conversational flow — it injects a per-pool assignment overview (use a pool name to get the full `[x]/[ ]` list); reply "main: keep only 3 5" or "economy: add 1, drop 2" and the agent calls the bundled `switchman-config.js` CLI to persist.
+- **Semantics**: assignment = making each task pool's candidate models **deliberately different** (e.g. lightweight models only for economy, heavy thinkers only for hard) — a pool's manual list **overrides the system default candidate set**, and models inside it are still recommended by capability level; **the same model may join multiple pools**; pools without a configured (or with an empty) list keep the system default. "Clear config" restores the system default for that pool.
+- **Config file**: `~/.config/opencode/opencode-switchman/pool-config.json` (key = task pool name, value = array of participating modelIds).
+
+### /modelRank — model capability ranking
+
+- **TUI**: a dialog listing models by effective capability; select a model to pin it to top, move it up/down, or remove it from the ranking.
+- **Semantics**: manual ranking **takes priority over the base capability score** (realtime index → bundled snapshot → curated table all yield) — matched models (including their prefix variants) get a rank-position score and S/A/B/C tier: rankings with ≤4 entries map positions to S/A/B/C in order; ≥5 entries use quantile buckets (top 20% S / next 20% A / next 20% B / rest C, same semantics as the OpenRouter rank source); within a tier, the linear rank position breaks ties. Unranked models are unaffected. The ranking feeds every decision surface: lane chains, effort affinity, capability-level gates, and deny hints.
+- **Config file**: `~/.config/opencode/opencode-switchman/capability-rank.json` (`models` array order = strongest first).
+
+Both commands can also be driven directly via the bundled CLI: `node <pkg>/dist/switchman-config.js pool list|add|remove|set|clear` (pool name = economy/mechanical/main/hard/vision/review) / `rank list|set|add|remove|clear` (numbers refer to the `list` output). The `[限制]` banner line reports active overrides ("manual rank: N models / task-pool assignment: M pools").
+
 ## What's New in v0.2.0
 
 v0.2.0 evolves switchman from a fixed multi-provider dispatcher into a live, capability-aware orchestration layer.
@@ -196,12 +215,14 @@ opencode-switchman splits orchestration into three layers:
 
 | Lane | Typical roles | Uses |
 |---|---|---|
-| economy | clerk / scouter scanning | cheapest lightweight model, low effort |
-| mechanical | tester / ops regression & scripts | lightweight model, high effort |
-| main | programmer / uiux / data-analyst | workhorse model, normal effort |
-| hard | planner, core architecture | strongest model, max effort |
-| vision | observer image reading | vision-capable models |
-| review | reviewer / expert panel | **forced hetero-family** (against same-family blind spots) |
+| economy | clerk / scouter scanning | cheapest lightweight model, low→medium→high effort |
+| mechanical | tester / ops regression & scripts | lightweight model, medium→high→xhigh→max effort |
+| main | programmer / uiux / data-analyst | workhorse model, medium→high→xhigh→max effort |
+| hard | planner, core architecture | strongest model, high→xhigh→max effort |
+| vision | observer image reading | vision-capable models, medium→high→xhigh→max effort |
+| review | reviewer / expert panel | **forced hetero-family** (against same-family blind spots), high→xhigh→max effort |
+
+Effort preference is a routing layer of its own: each lane prefers the thinking levels listed above (first supported level is the default), and `off`-effort shells serve only as lane-level fallback — they enter a chain only when no thinking-level candidate is available (e.g. models that only support on/off), never ahead of one. Shells are likewise partitioned by capability face before ranking: the review lane draws only from `ro` (read-only) shells, all other lanes only from `rw` shells, with cross-face fallback only when a lane's own pool is empty.
 
 Water levels only affect ordering (use it, don't waste it); the only hard block is "this call cannot possibly succeed" (quota definitively exhausted or hard gate hit). Pay-as-you-go (`billing: "api"`) providers are never denied for auto routing — they sink within their capability tier via the 0.85 coefficient, and unknown-provider models sink via the 0.75 penalty, so no vendor-specific tail-seat or deny rule is needed.
 

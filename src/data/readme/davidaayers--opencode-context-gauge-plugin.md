@@ -88,6 +88,21 @@ Single-file plugin: everything lives in [`src/context-gauge.tsx`](src/context-ga
 
 Cross-repository follow-up work is tracked in the [OpenCode Plugins project](https://github.com/users/davidaayers/projects/1).
 
+## Releases
+
+Releases are managed by [Release Please](https://github.com/googleapis/release-please) from Conventional Commit messages. Merging a Release Please pull request bumps the version, updates `CHANGELOG.md`, creates the GitHub release and tag, and publishes the package to npm.
+
+See [CHANGELOG.md](CHANGELOG.md) for release history.
+
+Before the first automated release, configure npm Trusted Publishing for `@davidaayers/opencode-context-gauge-plugin` with:
+
+- GitHub organization or user: `davidaayers`
+- Repository: `opencode-context-gauge-plugin`
+- Workflow filename: `release-please.yml`
+- Environment: leave empty
+
+The `v0.1.1` baseline tag is already in place at commit `65f68a753babf7f12fe1618ff01ac14c20b5a77f`.
+
 ## Credits
 
 Inspired by [streetturtle/opencode-better-sidebar](https://github.com/streetturtle/opencode-better-sidebar) — a great collection of OpenCode sidebar plugins; its `context-progress` plugin planted the seed for this one.
