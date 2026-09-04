@@ -72,21 +72,24 @@ listener.
   `curl: not found` in the `canary` phase.
 - **Python 3.13+ needs a gateway that mints strict-verifier-safe leaves.**
   Newer Python verifies with `VERIFY_X509_STRICT` and rejects a forged leaf
-  without an Authority Key Identifier; the control plane fix is
-  services-sandbox#1044. Until it is deployed, `requests` and `urllib` fail
-  with `Missing Authority Key Identifier` while `curl` and Node succeed.
-- **Proxy-aware clients terminate at Daytona's CA; proxy-unaware ones at
-  ours.** curl, Python and the rest honour `HTTPS_PROXY`, reach Daytona's
-  proxy, and validate its CA. Node ignores that variable, is forwarded end to
-  end, and validates the Veris CA. Daytona overwrites `NODE_EXTRA_CA_CERTS`
-  and `SSL_CERT_FILE` with its own CA file, so Node is pointed at OpenSSL's
-  store instead (`NODE_OPTIONS=--use-openssl-ca`), which includes the system
-  certificate directory the Veris CA is installed into. That install needs
-  passwordless sudo and `update-ca-certificates` in the image; Daytona's
-  default image has both, and Daytona's own CA file is read-only, so there is
-  no other route for Node. Other proxy-unaware
-  runtimes (a JVM with no proxy settings, say) are on the same path and rely
-  on the best-effort store install.
+  without an Authority Key Identifier. The control plane fix is
+  services-sandbox#1044; a control plane without it fails Python with
+  `Missing Authority Key Identifier` while `curl` and Node succeed.
+- **Daytona overwrites the CA variables, and its own CA file cannot verify
+  the gateway's leaf.** Inside the sandbox `SSL_CERT_FILE`, `REQUESTS_CA_BUNDLE`,
+  `CURL_CA_BUNDLE` and `NODE_EXTRA_CA_CERTS` all point at Daytona's file, which
+  lacks the Veris CA and is root-owned on a read-only mount. Measured with
+  Python's `requests`: `unable to get local issuer certificate` with the
+  inherited value, 200 with `REQUESTS_CA_BUNDLE=/tmp/veris-ca-bundle.crt`. So
+  every runtime that reads one of those variables as its only trust source
+  needs the Veris bundle exported per command. `veris-daytona run` does that;
+  a command run any other way (the OpenCode plugin's bash tool, `daytona ssh`)
+  inherits Daytona's value. Node is handled at create time instead
+  (`NODE_OPTIONS=--use-openssl-ca`, which Daytona leaves alone, reading the
+  system certificate directory the Veris CA is installed into; that install
+  needs passwordless sudo and `update-ca-certificates`, both in Daytona's
+  default image). curl returns 200 under the inherited value; it consults the
+  system directory as well.
 - **Git sync into the sandbox can fail** with `Host key verification failed`.
   Inherited from upstream `@daytona/opencode`; the agent works, but local
   changes are not pushed in. Setting `DAYTONA_SSH_KNOWN_HOSTS` is the likely fix.

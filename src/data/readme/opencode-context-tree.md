@@ -10,7 +10,10 @@ elsewhere — timing, inspector) in one screen.
 Branch, jump, labels, filters, search, crop + undo, squash/discard/tournament merge with a
 `$EDITOR` gate, the timeline lanes, inspector and consumers views, the gauge, and the headless
 `/ctree` commands all work against OpenCode 1.18 and are covered by pty-driven e2e tests
-(`bun run test:e2e`). Read [DESIGN.md](./DESIGN.md) — it contains the research
+(`bun run test:e2e`). Pressing `⏎` on an earlier message is Pi's fork flow whole — one
+question with Pi's three answers (no summary · summarize everything below that point ·
+summarize with your own prompt), and the summary covers exactly the turns the move leaves
+behind. Read [DESIGN.md](./DESIGN.md) — it contains the research
 (Pi, `pi-context-tree`, OpenCode plugin/SDK surface, existing plugins, DSH
 trajectory), the end-user flows, the combined tree + trajectory mockup, the data
 model, architecture, edge cases, and the roadmap.
@@ -49,6 +52,10 @@ opencode plugin opencode-context-tree@0.2.0 -g --force     # or without -g for t
 
 or delete `~/.cache/opencode/packages/opencode-context-tree@latest` and restart. `?` in `/tree`
 and `/ctree status` show the version you are running.
+
+**Cost of the plugin itself:** `/tree` opens in about 35 ms whether the session has 57 or 467
+messages, the crop transform adds under a millisecond to each model request, and the TUI grows by
+about 37 MB (measured; see [docs/USAGE.md](docs/USAGE.md#performance)).
 
 Options go in either file: `[["opencode-context-tree", { "storage": "global", "jumpSummary": "never" }]]`
 (see [docs/USAGE.md](docs/USAGE.md)). To hack on it from a checkout, see "Try it from source" below.
@@ -111,6 +118,13 @@ into entries you can crop in place; `D` renders the decision records; `?` opens 
 | ![consumers](docs/screenshots/consumers.png) | ![decisions](docs/screenshots/decisions.png) |
 | ![help](docs/screenshots/help.png) | ![merge picker](docs/screenshots/merge-picker.png) |
 
+The gauge on the prompt line, here on a caching provider: the context of the next prompt (the same
+figure OpenCode's own sidebar shows), its band, and how much of that prompt the provider served
+from its cache. The bar's dim cells are the cached part; `0% cached` right after a crop, merge or
+fork means the cache was reset.
+
+![gauge with the cache share](docs/screenshots/gauge-cache.png)
+
 ## Try it from source
 
 ```sh
@@ -123,7 +137,7 @@ Keys inside `/tree` (vim-aligned): `j k` `ctrl+d ctrl+u` `gg G` move · `[ ]` ho
 branches · `h l` `Tab` fold/unfold · `⏎` go (the footer says what it will do for the selected row)
 · `b` branch · `m` merge · `c` crop mode (`space` mark, `a` auto, `t` result⇄turn, `⏎` apply) ·
 `u` undo (`x` too) · `/` live search, `n N` next/prev · `f` filter picker · `i` inspector ·
-`1 2 3` lanes, `0` off · `s` what's filling the context · `D` decisions · `L` label · `y` copy ·
+`1 2` lanes, `0` off · `s` what's filling the context · `D` decisions · `L` label · `y` copy ·
 `?` help · `q`.
 
 ## Commands

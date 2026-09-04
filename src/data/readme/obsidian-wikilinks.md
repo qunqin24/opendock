@@ -1,5 +1,12 @@
 # obsidian-wikilinks
 
+[![Claude Code](https://img.shields.io/badge/Claude_Code-supported-D97757?logo=claude&logoColor=white)](#install-in-claude-code)
+[![Codex](https://img.shields.io/badge/Codex-supported-000000?logoColor=white)](#install-in-codex)
+[![OpenCode](https://img.shields.io/badge/OpenCode-supported-FBBF24?logo=opencode&logoColor=white)](#install-in-opencode)
+[![npm](https://img.shields.io/npm/v/obsidian-wikilinks?logo=npm&logoColor=white&color=CB3837)](https://www.npmjs.com/package/obsidian-wikilinks)
+[![CI](https://github.com/DepickereSven/obsidian-wikilinks/actions/workflows/ci.yml/badge.svg)](https://github.com/DepickereSven/obsidian-wikilinks/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue)](LICENSE)
+
 Resolve `[[wikilinks]]` typed in a Codex, Claude Code, or OpenCode prompt to
 absolute paths in your Obsidian vault, and inject them as context so the agent
 reads the right notes.
@@ -57,9 +64,6 @@ That installs the package and adds it to your config. Or add it by hand:
 
 Use `~/.config/opencode/opencode.json` for every project, or `opencode.json` in
 a repo for that project only.
-
-> The package is not on npm yet. Until it is published, use one of the local
-> options below, or publish it yourself from a checkout with `npm publish`.
 
 ### From a local checkout
 
@@ -166,42 +170,44 @@ npm run test:bun  # same tests on Bun, the runtime OpenCode uses
 No dependencies to install: the plugin uses Node/Bun built-ins and the resolver
 is standard-library Python.
 
-## Releasing
+### Releasing
 
-CI runs the test suite on Node 20/22/24 and on Bun for every push and pull
-request, and checks that the packed tarball ships both `plugin/` and `hooks/`.
+Two workflows, chained.
 
-To cut a release:
+`.github/workflows/ci.yml` runs the smoke tests on Node 20/22/24 and on Bun, and
+checks the packed tarball ships both `plugin/` and `hooks/`. It runs on pull
+requests and on pushes to `main` — not on every branch, so a pull request is
+never tested twice.
+
+`.github/workflows/publish.yml` starts only when a CI run on `main` finishes
+successfully, checks out that exact commit, and asks npm whether the version in
+`package.json` already exists:
+
+- **Already on npm** — nothing is released. This is what an ordinary push to
+  `main` does.
+- **Not on npm** — it publishes with provenance, tags the commit, and opens a
+  GitHub release with notes generated from the merged commits.
+
+So a version bump landing on `main` *is* the release, and it can only happen
+after CI has gone green on that commit.
+
+To cut one:
 
 ```bash
-npm version patch     # or minor / major
-git push --follow-tags
-gh release create "v$(node -p 'require("./package.json").version')" --generate-notes
+npm version patch --no-git-tag-version   # or minor / major
+git commit -am "Release $(node -p 'require("./package.json").version')"
+git push
 ```
 
-`npm version` also rewrites the Claude Code and Codex manifests through
-`scripts/sync-versions.mjs`, so all three stay on one version. Publishing the
-GitHub release triggers `.github/workflows/publish.yml`, which re-runs the
-tests, verifies the tag matches `package.json`, refuses to overwrite a version
-already on npm, and publishes with provenance.
+`--no-git-tag-version` matters: the workflow creates the tag, so creating one
+locally would collide. The bump still runs `scripts/sync-versions.mjs`, keeping
+the Claude Code and Codex manifests on the same version as `package.json` — CI
+fails the build if they ever drift.
 
-The workflow authenticates through **npm trusted publishing** (OIDC), so no
-token is stored in the repository. One-time setup: on npmjs.com, open the
-package's *Settings -> Trusted publishers*, and add this repository with
-workflow `publish.yml`.
+Use the publish workflow's manual trigger (`workflow_dispatch`) with *dry run*
+enabled to rehearse a publish without releasing anything.
 
-Trusted-publisher settings live on the package, so they can only be configured
-once the package exists. Do the **first** publish by hand from a checkout with
-`npm publish --access public`, then wire up the trusted publisher and let the
-workflow handle every release after that.
-
-To use a granular access token instead, save it as the `NPM_TOKEN` secret and
-uncomment the `NODE_AUTH_TOKEN` block in the workflow.
-
-Use the workflow's manual trigger (`workflow_dispatch`) with *dry run* enabled
-to rehearse a publish without releasing anything.
-
-## Requirements
+### Requirements
 
 - `python3` on PATH (standard-library only; no pip installs).
 - OpenCode only: no extra dependencies — the plugin uses Node/Bun built-ins.

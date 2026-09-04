@@ -125,18 +125,19 @@ Since TUI plugins have no directory auto-discovery, add the same package spec to
 
 ## Manual overrides: /poolConfig and /modelRank (new in v0.2.5)
 
-Two interactive commands let your configuration beat system defaults. All state is persisted to editable files with mtime hot-reload and instant effect — edits trigger an immediate banner/sidebar refresh via a directory watcher:
+Two manual commands let your configuration beat system defaults. All state is persisted to editable files with mtime hot-reload and instant effect — edits trigger an immediate banner/sidebar refresh via a directory watcher. The conversational (AI-driven) variants are the same names with a `-chat` suffix:
 
-### /poolConfig — per-lane model assignment
+### /poolConfig — per-lane model assignment (manual dialog; conversational: /poolConfig-chat)
 
-- **TUI**: a native select dialog (same interaction as the model/thinking-level pickers) — pick a task pool (economy / mechanical / main / hard / vision / review), then toggle models up and down the list: select to include, select again to exclude, with a capability tier shown per model. Changes are written through immediately with a toast receipt.
-- **Non-TUI / in-session**: the same command name drives a conversational flow — it injects a per-pool assignment overview (use a pool name to get the full `[x]/[ ]` list); reply "main: keep only 3 5" or "economy: add 1, drop 2" and the agent calls the bundled `switchman-config.js` CLI to persist.
+- **TUI (/poolConfig)**: a native select dialog (same interaction as the model/thinking-level pickers) — pick a task pool (economy / mechanical / main / hard / vision / review), then toggle models up and down the list: select to include, select again to exclude, with a capability tier shown per model. Changes are written through immediately with a toast receipt.
+- **Non-TUI / in-session (/poolConfig-chat)**: a conversational flow — it injects a per-pool assignment overview (use a pool name to get the full `[x]/[ ]` list); reply "main: keep only 3 5" or "economy: add 1, drop 2" and the agent calls the bundled `switchman-config.js` CLI to persist.
 - **Semantics**: assignment = making each task pool's candidate models **deliberately different** (e.g. lightweight models only for economy, heavy thinkers only for hard) — a pool's manual list **overrides the system default candidate set**, and models inside it are still recommended by capability level; **the same model may join multiple pools**; pools without a configured (or with an empty) list keep the system default. "Clear config" restores the system default for that pool.
 - **Config file**: `~/.config/opencode/opencode-switchman/pool-config.json` (key = task pool name, value = array of participating modelIds).
 
-### /modelRank — model capability ranking
+### /modelRank — model capability ranking (manual dialog; conversational: /modelRank-chat)
 
-- **TUI**: a dialog listing models by effective capability; select a model to pin it to top, move it up/down, or remove it from the ranking.
+- **TUI (/modelRank)**: a dialog listing models by effective capability; select a model to pin it to top, move it up/down, or remove it from the ranking.
+- **Non-TUI / in-session (/modelRank-chat)**: a conversational flow — it injects the current ranking and a reference ordering; reply "pin glm-5.3 to top" or "clear the ranking" and the agent translates that into `rank` CLI calls to persist.
 - **Semantics**: manual ranking **takes priority over the base capability score** (realtime index → bundled snapshot → curated table all yield) — matched models (including their prefix variants) get a rank-position score and S/A/B/C tier: rankings with ≤4 entries map positions to S/A/B/C in order; ≥5 entries use quantile buckets (top 20% S / next 20% A / next 20% B / rest C, same semantics as the OpenRouter rank source); within a tier, the linear rank position breaks ties. Unranked models are unaffected. The ranking feeds every decision surface: lane chains, effort affinity, capability-level gates, and deny hints.
 - **Config file**: `~/.config/opencode/opencode-switchman/capability-rank.json` (`models` array order = strongest first).
 
@@ -151,7 +152,7 @@ v0.2.0 evolves switchman from a fixed multi-provider dispatcher into a live, cap
 - **Capability-aware routing**: dynamically classifies models into capability tiers, keeps stronger tiers ahead of weaker tiers, then uses effort fit, health, water level, peak timing, explicit billing, and unknown-model confidence as transparent tie-breakers.
 - **Provider-neutral policy**: any official or custom OpenCode provider can participate. Explicit `billing: "subscription" | "api"` replaces vendor-specific routing preferences.
 - **Safer live operations**: real-dispatch isolation, retirement of repeatedly missing models, route-decision audit logs, and clearer restart/update guidance make routing failures observable and self-healing.
-- **Simpler configuration and upgrades**: all plugin settings now live in generated `opencode-switchman.jsonc`; legacy tuple options are diagnosed and supported for one compatibility release. `/handover` preserves the active model, agent, and reasoning setting in a new compact session.
+- **Simpler configuration and upgrades**: all plugin settings now live in generated `opencode-switchman.jsonc`; legacy tuple options are diagnosed and supported for one compatibility release. `/handover` runs directly (no AI round-trip): it forks the full current session into a `[backup]`-titled backup and compacts the current session in place, staying in the same session (unlike the built-in `/fork`, which switches to the forked session). Crossing the force watermark also fires it automatically (`context.autoHandover`, default on), letting an unfinished task continue on the compacted context.
 
 See the complete, user-facing release notes and migration guide in [CHANGELOG.md](./CHANGELOG.md).
 
@@ -166,7 +167,10 @@ See the complete, user-facing release notes and migration guide in [CHANGELOG.md
 | `capability.enabled / source / apiKey / tierThresholds / lmarenaCheck` | `true / auto / – / built-in quantile / false` | Dynamic capability tiers: `auto` = Artificial Analysis first when apiKey present, otherwise OpenRouter; key may also come from `ARTIFICIAL_ANALYSIS_API_KEY` env |
 | `matrix.mode / watch` | `auto / true` | Activation matrix: `auto` by host (desktop = visible models / CLI/TUI = favorites), `app`/`tui` force a mode, `legacy` restores the static matrix; `watch` recomputes and fully refreshes probes on surface changes (mode/watch are startup-level; restart to apply) |
 | `banner.enabled` | `true` | Four-line banner injection |
-| `rules.enabled` | `true` | Bundled dispatcher rules (AGENTS.md) injection |
+| `rules.enabled / delegationFloor` | `true / 3000` | Bundled dispatcher rules (AGENTS.md) injection; `delegationFloor` is the self-do token floor interpolated into the rules (dispatch by default below it is a violation) |
+| `context.gates / softTokens / hardTokens / forceTokens / autoHandover` | `true / 60000 / 80000 / 100000 / true` | **Measured session watermark gate**: the plugin tracks each main session's context size from message token usage and injects a live `[水位·会话]` line every turn. Past `softTokens`, read-class tools (read/glob/grep/list/bash) get a one-time deny nudge pointing at the economy chain head; past `hardTokens` they are denied outright (bash only lets verification and delivery commands through: git, test/lint/typecheck, build); past `forceTokens` the banner demands immediate compaction. With `autoHandover: true` (default), crossing `forceTokens` also triggers `/handover` automatically after the next tool completes: full fork backup + compaction of the current session, and the running task continues automatically on the summarized context (host loop re-reads compacted messages each step). Shell subagent sessions are exempt |
+| `builtinAgents.mode` | `deny` | Built-in `explore`/`general` subagents compete with shell routing and were previously fail-open; `deny` blocks them with an economy/main re-dispatch hint (the task-tool description from opencode core actively advertises them), `allow` restores the old pass-through |
+| `injection.mode` | `chain` | Shell injection face: `chain` = six lane chains ∪ favorites/visible models (saves ~6-10k tokens of task-tool description per session; naming an off-chain model gets a `denyUninjected` hint to enable it in model management), `all` = every usable model (old behavior). Startup-level: restart to apply |
 | `lanes` | built-in chains | Custom per-lane shell chains (override built-in preference order); keys = economy/mechanical/main/hard/vision/review |
 
 > **Migrating legacy tuple options**: `quota.*.enabled` → `providers.<id>.observe` (SWM042), `billingWindow.*` → `providers.<id>.peak` (SWM043), and the remaining behavior sections (`quota` thresholds / `cost` / `capability` / `matrix` / `banner` / `rules` / `lanes`) → same-named jsonc sections (SWM044); `providers.glm/deepseek` (credential-collection lists) never took effect and have been removed. Explicit tuple values stay honored for one compatibility release, then will be dropped.

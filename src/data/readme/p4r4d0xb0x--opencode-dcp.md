@@ -1,9 +1,10 @@
-# Dynamic Context Pruning Plugin
+# Dynamic Context Pruning Plugin (OpenCode 2)
 
-[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/dansmolsky)
-[![npm version](https://img.shields.io/npm/v/@tarquinen/opencode-dcp.svg)](https://www.npmjs.com/package/@tarquinen/opencode-dcp)
+[![npm version](https://img.shields.io/npm/v/@p4r4d0xb0x/opencode-dcp.svg)](https://www.npmjs.com/package/@p4r4d0xb0x/opencode-dcp)
 
 Automatically reduces token usage in OpenCode by managing conversation context.
+
+`@p4r4d0xb0x/opencode-dcp` is a fork of [`@tarquinen/opencode-dcp`](https://github.com/Opencode-DCP/opencode-dynamic-context-pruning) ported to the **OpenCode 2** plugin API (`opencode2`). It tracks upstream and keeps the same configuration file, commands, and pruning behavior. For OpenCode 1 keep using the upstream package.
 
 ![DCP in action](assets/images/dcp-demo9.png)
 
@@ -12,10 +13,37 @@ Automatically reduces token usage in OpenCode by managing conversation context.
 Install from the CLI:
 
 ```bash
-opencode plugin @tarquinen/opencode-dcp@latest --global
+opencode2 plugin add @p4r4d0xb0x/opencode-dcp@latest
 ```
 
-This installs the package and adds it to your global OpenCode config.
+Or add it to `plugins` in your global `~/.config/opencode/opencode.json(c)`:
+
+```jsonc
+{
+    "plugins": ["@p4r4d0xb0x/opencode-dcp"],
+}
+```
+
+Restart the background service (`opencode2 service restart`) after installing or updating.
+
+### OpenCode 2 notes
+
+- **Permissions.** The `compress` tool declares the `compress` permission action. A rule such as `{ "action": "compress", "resource": "*", "effect": "deny" }` (globally or under `agents.<id>.permissions`) removes the tool for that agent, exactly like `permission.compress: "deny"` did in OpenCode 1. OpenCode 2 (beta) cannot prompt for plugin tools, so `compress.permission: "ask"` behaves like `"allow"`.
+- **Subagents.** The tool is hidden from subagent sessions unless `experimental.allowSubAgents` is enabled; OpenCode 2's `subagent` tool is treated like OpenCode 1's `task` tool for protection and result expansion.
+- **Notifications.** `pruneNotificationType: "chat"` posts a synthetic message that is shown in the session but never sent to the model. `"toast"` requires the DCP TUI plugin (loaded automatically with the package) and is delivered through the plugin RPC channel.
+- **Prefill guard.** DCP guarantees every request it touches ends with a user or tool message, so models without assistant prefill support (Claude Opus 4.5+) never fail with `This model does not support assistant message prefill`.
+- **Auto-update.** `autoUpdate` checks npm for a newer version; when found, the cached install is cleared so the next start picks it up. `opencode2 plugin update @p4r4d0xb0x/opencode-dcp` does the same on demand.
+
+## Project Status
+
+Development on DCP has slowed because most new context-management work has moved to [Sleev](https://sleev.ai) and the `sleev` CLI. Sleev is a local proxy for Claude Code, Codex, and OpenCode that builds on DCP's core ideas with newer context-management features and will work with any harness/client.
+
+DCP remains available for OpenCode plugin users, but new features are landing in Sleev first. If you are starting fresh, we recommend trying Sleev:
+
+```bash
+npm i -g sleev
+sleev
+```
 
 ## How It Works
 
@@ -61,7 +89,7 @@ Each level overrides the previous, so project settings take priority over global
 
 ```jsonc
 {
-    "$schema": "https://raw.githubusercontent.com/Opencode-DCP/opencode-dynamic-context-pruning/master/dcp.schema.json",
+    "$schema": "https://raw.githubusercontent.com/p4r4d0xb0x/opencode-dcp/master/dcp.schema.json",
     // Enable or disable the plugin
     "enabled": true,
     // Automatically update npm-installed DCP when a newer npm latest is available.
@@ -176,16 +204,11 @@ Each level overrides the previous, so project settings take priority over global
 
 ### Commands
 
-DCP provides a `/dcp` slash command:
+DCP provides a TUI panel plus server-side slash commands (available in every client):
 
-- `/dcp` — Shows available DCP commands
-- `/dcp context` — Shows a breakdown of your current session's token usage by category (system, user, assistant, tools, etc.) and how much has been saved through pruning.
-- `/dcp stats` — Shows cumulative pruning statistics across all sessions.
-- `/dcp sweep` — Prunes all tools since the last user message. Accepts an optional count: `/dcp sweep 10` prunes the last 10 tools. Respects `commands.protectedTools`.
-- `/dcp manual [on|off]` — Toggle manual mode or set explicit state. When on, the AI will not autonomously use context management tools.
-- `/dcp compress [focus]` — Trigger a single compress tool execution. Optional focus text directs what content to compress, following the active `compress.mode`.
-- `/dcp decompress <n>` — Restore a specific active compression by ID (for example `/dcp decompress 2`). Running without an argument shows available compression IDs, token sizes, and topics.
-- `/dcp recompress <n>` — Re-apply a user-decompressed compression by ID (for example `/dcp recompress 2`). Running without an argument shows recompressible IDs, token sizes, and topics.
+- `/dcp` — Opens the DCP panel with context, stats, and manual-mode controls (TUI).
+- `/dcp <context|stats|sweep [n]|manual [on|off]|decompress <n>|recompress <n>|help>` — Runs the matching DCP command and posts the result in the session.
+- `/dcp-compress [focus]` — Asks the model to run one compression pass. Optional focus text directs what content to compress, following the active `compress.mode`.
 
 ### Prompt Overrides
 
@@ -209,11 +232,11 @@ To reset an override, delete the matching file from your overrides directory.
 ### Protected Tools
 
 By default, these tools are always protected from pruning:
-`task`, `skill`, `todowrite`, `todoread`, `compress`, `batch`, `plan_enter`, `plan_exit`, `write`, `edit`
+`task`, `subagent`, `skill`, `todowrite`, `todoread`, `compress`, `batch`, `plan_enter`, `plan_exit`, `write`, `edit`
 
 The `protectedTools` arrays in `commands` and `strategies` add to this default list.
 
-For the `compress` tool, `compress.protectedTools` ensures specific tool outputs are appended to the compressed summary. By default it includes `task`, `skill`, `todowrite`, and `todoread`.
+For the `compress` tool, `compress.protectedTools` ensures specific tool outputs are appended to the compressed summary. By default it includes `task`, `subagent`, `skill`, `todowrite`, and `todoread`.
 
 ## Impact on Prompt Caching
 
@@ -226,7 +249,7 @@ LLM providers cache prompts based on exact prefix matching. When DCP prunes cont
 
 **No impact for:**
 
-- **Request-based billing** — Providers like GitHub Copilot that charge per request, not tokens.
+- **Request-based billing** — Some providers charge per request, not tokens.
 - **Uniform token pricing** — Providers like Cerebras that bill cached and uncached tokens at the same rate.
 
 ## License

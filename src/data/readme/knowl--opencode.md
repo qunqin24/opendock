@@ -94,68 +94,74 @@ works.
 
 <table>
 <tr>
-<td align="center" width="16%">
+<td align="center" width="14%">
 <a href="https://claude.com/product/claude-code"><img src="docs/assets/logos/anthropic.svg" alt="Claude Code" width="40" height="40" /></a><br/>
 <strong>Claude Code</strong><br/>
 <sub>MCP · lifecycle · gate</sub>
 </td>
-<td align="center" width="16%">
+<td align="center" width="14%">
 <a href="https://github.com/openai/codex"><img src="docs/assets/logos/openai.svg" alt="Codex" width="40" height="40" /></a><br/>
 <strong>Codex</strong><br/>
 <sub>MCP · lifecycle · gate</sub>
 </td>
-<td align="center" width="16%">
+<td align="center" width="14%">
+<a href="https://hermes-agent.nousresearch.com"><img src="docs/assets/logos/hermes.png" alt="Hermes Agent" width="40" height="40" /></a><br/>
+<strong>Hermes</strong><br/>
+<sub>MCP · lifecycle · gate</sub>
+</td>
+<td align="center" width="14%">
 <a href="https://github.com/features/copilot"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/logos/githubcopilot-dark.svg" /><img src="docs/assets/logos/githubcopilot.svg" alt="Copilot" width="40" height="40" /></picture></a><br/>
 <strong>Copilot</strong><br/>
 <sub>MCP · lifecycle · gate</sub>
 </td>
-<td align="center" width="16%">
+<td align="center" width="14%">
 <a href="https://cursor.com"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/logos/cursor-dark.svg" /><img src="docs/assets/logos/cursor.svg" alt="Cursor" width="40" height="40" /></picture></a><br/>
 <strong>Cursor</strong><br/>
 <sub>MCP · lifecycle · gate</sub>
 </td>
-<td align="center" width="16%">
+<td align="center" width="14%">
 <a href="https://openhands.dev"><img src="docs/assets/logos/openhands.svg" alt="OpenHands" width="40" height="40" /></a><br/>
 <strong>OpenHands</strong><br/>
 <sub>MCP · lifecycle · gate</sub>
 </td>
-<td align="center" width="16%">
+<td align="center" width="14%">
 <a href="https://antigravity.google"><img src="docs/assets/logos/antigravity.svg" alt="Antigravity" width="40" height="40" /></a><br/>
 <strong>Antigravity</strong><br/>
 <sub>MCP · lifecycle · gate</sub>
 </td>
 </tr>
 <tr>
-<td align="center" width="16%">
+<td align="center" width="14%">
 <a href="https://windsurf.com"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/logos/windsurf-dark.svg" /><img src="docs/assets/logos/windsurf.svg" alt="Windsurf" width="40" height="40" /></picture></a><br/>
 <strong>Windsurf</strong><br/>
 <sub>MCP · lifecycle · gate</sub>
 </td>
-<td align="center" width="16%">
+<td align="center" width="14%">
 <a href="https://github.com/cline/cline"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/logos/cline-dark.svg" /><img src="docs/assets/logos/cline.svg" alt="Cline" width="40" height="40" /></picture></a><br/>
 <strong>Cline</strong><br/>
 <sub>MCP · lifecycle · plugin</sub>
 </td>
-<td align="center" width="16%">
+<td align="center" width="14%">
 <a href="https://zed.dev"><img src="docs/assets/logos/zed.svg" alt="Zed" width="40" height="40" /></a><br/>
 <strong>Zed</strong><br/>
 <sub>MCP · capture · ACP</sub>
 </td>
-<td align="center" width="16%">
+<td align="center" width="14%">
 <a href="https://www.jetbrains.com"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/logos/jetbrains-dark.svg" /><img src="docs/assets/logos/jetbrains.svg" alt="JetBrains" width="40" height="40" /></picture></a><br/>
 <strong>JetBrains</strong><br/>
 <sub>MCP · capture · ACP</sub>
 </td>
-<td align="center" width="16%">
+<td align="center" width="14%">
 <a href="https://github.com/anomalyco/opencode"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/logos/opencode-dark.svg" /><img src="docs/assets/logos/opencode.svg" alt="OpenCode" width="40" height="40" /></picture></a><br/>
 <strong>OpenCode</strong><br/>
 <sub>MCP · manual loop</sub>
 </td>
-<td align="center" width="16%">
+<td align="center" width="14%">
 <a href="https://claude.ai/download"><img src="docs/assets/logos/anthropic.svg" alt="Claude Desktop" width="40" height="40" /></a><br/>
 <strong>Claude Desktop</strong><br/>
 <sub>MCP · manual loop</sub>
 </td>
+<td align="center" width="14%"></td>
 </tr>
 </table>
 
@@ -164,7 +170,9 @@ the agent picks up its guidance, and it will query and write memory on its own.
 
 **gate** means Knowl can refuse an edit that invalidates code another session is holding.
 Neovim and Kiro work the same way as Zed and JetBrains, through `knowl acp`. Cline needs one
-line pointing it at the shipped plugin. Any other MCP client works with no integration at all.
+line pointing it at the shipped plugin. Hermes Agent gets a Python plugin, installed for you,
+that works in the terminal and in Hermes Desktop alike. Any other MCP client works with
+no integration at all.
 
 Running agents in parallel? Every **git worktree** resolves to the main checkout's store —
 [Conductor](https://conductor.build) workspaces, Claude Code's `isolation: "worktree"`, or your
@@ -357,6 +365,7 @@ which the code cannot tell it, because rejected alternatives leave no trace in a
 | Windsurf | Yes | Yes | Yes | Yes | Nudge rides MCP; no stop hook |
 | Cursor | Yes | Yes | Yes | Yes | Finalizes per turn |
 | Cline | Yes | Yes | No | Yes | Lifecycle via the shipped plugin |
+| Hermes Agent | Yes | Yes | Yes | Yes | Python plugin, incl. Hermes Desktop; nudge via `pre_verify` on edit turns |
 | Zed, JetBrains, Neovim, Kiro | Yes | Yes | No | Yes | Via `knowl acp --` |
 | Claude Desktop, OpenCode, Roo, … | Yes | No | No | Yes | MCP plus the manual work loop |
 
@@ -769,6 +778,25 @@ privacy boundary: do not put it behind a public proxy or tunnel.
 
 → [Local viewer](docs/reference.md#local-viewer)
 
+### Memory that is true of you, not of a repository
+
+Some things belong to no repository: that you prefer pnpm, that this machine's driver breaks on
+CUDA 12, that every project here uses conventional commits. Knowl keeps those in a machine-wide
+store at `~/.knowl/global.db`, separate from any project's memory.
+
+```bash
+knowl link global        # this project may read and write it; reversible with --off
+knowl store "I prefer pnpm over npm" --title "Package manager" --category constraint --namespace global
+```
+
+**Your project always answers first.** Linking never changes what a repository says about itself —
+global entries sit behind the project's own, and can never crowd them out. And a session with no
+repository at all, such as a Hermes Desktop window with no folder open, reads the global store
+alone rather than having no memory. A project that exists but fails to open stays an error: global
+is personal defaults, never a fallback for a broken store.
+
+→ [Memory namespaces and the global layer](docs/reference.md#memory-namespaces-and-the-global-layer)
+
 ### Everything else
 
 <!-- generated:tool-count -->
@@ -795,10 +823,11 @@ adds to `.gitignore`:
 | `.knowl/skills/` | File-backed skill packages |
 
 A little lives beside your home directory instead, under `~/.knowl/`, because it is true of the
-machine rather than of any one repository: resume keys, the fleet's record of the sessions running
-right now, your cloud credential, and the local mirror of a cloud workspace. Workspace manifests
-live outside member repositories for the same reason — their checkout paths are machine-local.
-Exports and snapshots are written only when you ask for them.
+machine rather than of any one repository: the machine-wide personal-defaults store
+(`~/.knowl/global.db`), resume keys, the fleet's record of the sessions running right now, your cloud
+credential, and the local mirror of a cloud workspace. Workspace manifests live outside member
+repositories for the same reason — their checkout paths are machine-local. Exports and snapshots are
+written only when you ask for them.
 
 ## Documentation
 

@@ -20,8 +20,8 @@ Three commands an engineer invokes with a task, plus the `veris` MCP server.
 The reference set lives once, in `veris-reference/` — a directory with a
 `SKILL.md` nobody can invoke, so both installers copy it — and is read only
 when a command names a file. `setup` also carries `scripts/preflight.sh`
-and its own `reference/transport.md`. The sandbox API is
-called directly — the `veris` MCP tools for lifecycle, `curl` against
+and its own `reference/transport.md`. The sandbox API is called directly —
+the `veris` MCP tools for lifecycle and clock control, `curl` against
 `/veris/*` for the rest — with the exact calls in the references.
 
 ### Install
@@ -105,6 +105,11 @@ it is set. The skill writes the key nowhere; the MCP server reads the
 environment at session start, so restart the agent after setting it.
 
 ### Versions
+
+0.6.9 — the clock is sandbox state, not a service choice. The reference uses
+`set_sandbox_clock` or the authenticated sandbox clock REST resource instead
+of asking an agent to pick one service's `control_url` to move time for all of
+them.
 
 0.6.8 — the coverage catalogue is the first door, not the last. 0.6.4 read
 `/veris/operations` as unpublished and sent agents to arm a fault per

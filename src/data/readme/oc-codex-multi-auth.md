@@ -5,7 +5,7 @@
 [![CI](https://github.com/ndycode/oc-codex-multi-auth/actions/workflows/ci.yml/badge.svg)](https://github.com/ndycode/oc-codex-multi-auth/actions/workflows/ci.yml)
 [![MIT license](https://img.shields.io/npm/l/oc-codex-multi-auth.svg)](LICENSE)
 
-`oc-codex-multi-auth` is an OpenCode plugin for ChatGPT Plus/Pro OAuth, Codex and GPT-5 model routing (including GPT-5.6 Sol/Terra/Luna), multi-account rotation, account switching, health checks, quota visibility, diagnostics, and recovery tools. It installs the OpenCode provider/TUI configuration, registers a 24-tool `codex-*` command toolkit, and routes OpenCode OpenAI SDK requests through the ChatGPT-backed Codex flow with local account state.
+`oc-codex-multi-auth` is an OpenCode plugin for ChatGPT Plus/Pro OAuth, Codex and GPT-5/GPT-6 model routing (including GPT-6 Astra, the Daybreak cyber tiers, and GPT-5.6 Sol/Terra/Luna), multi-account rotation, account switching, health checks, quota visibility, diagnostics, and recovery tools. It installs the OpenCode provider/TUI configuration, registers a 24-tool `codex-*` command toolkit, and routes OpenCode OpenAI SDK requests through the ChatGPT-backed Codex flow with local account state.
 
 Use it when you want OpenCode to run Codex-style coding workflows from your own ChatGPT subscription while keeping accounts visible, switchable, health-checked, and recoverable from the terminal.
 
@@ -20,8 +20,9 @@ Use it when you want OpenCode to run Codex-style coding workflows from your own 
 ## What You Get
 
 - OpenCode plugin support for ChatGPT Plus/Pro OAuth and Codex/GPT-5 coding workflows
-- GPT-5.6 Sol, Terra, and Luna (responses-lite path) plus GPT-5.5, GPT-5.5 Fast, GPT-5.4 Mini, GPT-5.4 Nano, GPT-5.1, and Codex model templates
-- Compact modern OpenCode config with 12 base families and 53 variant presets; explicit legacy selector IDs when needed
+- GPT-6 Astra and GPT-5.6 Sol/Terra/Luna (responses-lite path) plus GPT-5.5, GPT-5.5 Fast, GPT-5.4 Mini, GPT-5.4 Nano, GPT-5.1, and Codex model templates
+- Routing for the Daybreak-gated cyber tiers (`gpt-daybreak-blue-latest`, `gpt-daybreak-red-latest`, `gpt-5.6-cyber`), deliberately kept out of the shipped templates since they need program approval
+- Compact modern OpenCode config with 13 base families and 59 variant presets; explicit legacy selector IDs when needed
 - Stateless Codex-compatible request handling with `store: false` and `reasoning.encrypted_content`
 - Multi-account rotation with hybrid health scoring, cooldowns, automatic token refresh, and failover
 - Explicit saved-account listing, account switching, labeling, tagging, notes, health checks, and diagnostics
@@ -89,8 +90,8 @@ Installer flags:
 | Flag | Effect |
 | --- | --- |
 | (default) / `--plugin-only` | Register the plugin and TUI integration without changing `provider.openai` |
-| `--modern` | Install compact modern catalog: 12 bases, 53 variants |
-| `--full` | Compact bases plus 53 explicit selector IDs |
+| `--modern` | Install compact modern catalog: 13 bases, 59 variants |
+| `--full` | Compact bases plus 59 explicit selector IDs |
 | `--legacy` | Explicit-only catalog for older OpenCode |
 | `--dry-run` | Show changed config paths without values or writes |
 | `--no-cache-clear` | Skip clearing the OpenCode plugin cache |
@@ -190,7 +191,7 @@ Run a prompt with compact modern selectors:
 ```bash
 opencode run "Summarize the failing test and suggest a fix" --model=openai/gpt-5.5 --variant=medium
 opencode run "Summarize the failing test and suggest a fix" --model=openai/gpt-5.5-fast --variant=medium
-opencode run "Plan the refactor" --model=openai/gpt-5.6-sol --variant=high
+opencode run "Plan the refactor" --model=openai/gpt-6-astra --variant=high
 ```
 
 Use Codex-focused routing:
@@ -255,8 +256,9 @@ Most of these also run as a **direct CLI** with no agent/model involvement (no t
 
 - stateless request handling forces `store: false`
 - `reasoning.encrypted_content` is preserved for multi-turn continuity
-- GPT-5.6 tiers use the responses-lite request shape and default client identity `opencode`; other models default to `codex_cli_rs`
+- GPT-6 Astra, the Daybreak tiers and the GPT-5.6 tiers use the responses-lite request shape and default client identity `opencode`; other models default to `codex_cli_rs`
 - account rotation is health-aware (`rotationStrategy` default `hybrid`) and avoids repeatedly selecting cooling accounts
+- The quota guard checks each enabled account at a bounded interval (30 minutes by default). When it finds a fully spent 5-hour or weekly subscription quota, rotation skips that account until its reported reset instead of drawing from paid Credits. `codex-limits` applies the same guard immediately when run manually. After running standalone `limits`, restart an already-running OpenCode instance or wait for its next quota poll to reload the updated account state.
 - same-host OpenCode processes sharing an account file serialize refresh-token exchange and commit so one current single-use token is exchanged once
 - 5xx bursts, network failures, and quota responses penalize account health
 - token refresh is queued to avoid refresh races
@@ -297,10 +299,12 @@ Primary config files:
 
 ### Desktop quota notifications
 
-Quota notifications are an optional macOS-only feature. While the plugin is
-running, it checks all enabled accounts and alerts through Notification Center
-when the best remaining 5-hour or weekly pool quota crosses 25%, 10%, or 0%.
-The feature is disabled by default.
+Quota notifications are an optional macOS-only feature. Separately, the quota
+guard checks enabled accounts every 30 minutes by default and prevents rotation
+from drawing paid Credits after the backend reports a fully spent subscription
+window. While notifications are enabled, the same poll also alerts through
+Notification Center when the best remaining 5-hour or weekly pool quota crosses
+25%, 10%, or 0%. Alerts are disabled by default; the quota guard is enabled.
 
 Each line reports the enabled account with the most headroom in that window,
 together with that same account's reset time, so the pair always describes a
@@ -318,6 +322,7 @@ Weekly: 72% | resets 22:30 on Aug 30
 {
   "quotaNotifications": {
     "enabled": true,
+    "autoProtectCredits": true,
     "intervalMs": 1800000,
     "notifyEveryCheck": false,
     "thresholds": [25, 10, 0]
@@ -334,8 +339,8 @@ ignored on Windows and Linux.
 Set `"notifyEveryCheck": true` to show the aggregate quota notification after
 every successful poll interval instead of only when a configured threshold is
 crossed. Set `"thresholds": []` to turn threshold alerts off entirely; pair it
-with `"notifyEveryCheck": true` or the monitor has nothing to deliver and stops
-polling.
+with `"notifyEveryCheck": true` to keep receiving alerts. The quota guard keeps
+polling unless `"autoProtectCredits": false` is set.
 
 Delivery state lives beside the accounts file the alerts are computed from, so
 OpenCode processes working in the same account scope show only one alert per

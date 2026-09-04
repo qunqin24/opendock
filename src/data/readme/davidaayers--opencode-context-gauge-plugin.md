@@ -10,7 +10,7 @@ An [OpenCode](https://opencode.ai) TUI sidebar plugin that shows a live context-
 ## Features
 
 - **Context gauge** — eighth-block progress bar showing used tokens vs. the active model's context window
-- **Token accounting** — sums `input + output + reasoning + cache.read + cache.write` from the latest completed assistant message, falling back to session aggregates
+- **Token accounting** — uses the authoritative `total` from the latest assistant message, falling back to component totals and session aggregates
 - **Cost display** — session spend alongside token counts (optional)
 - **Threshold colors** — bar turns warning/danger colored as you approach the window limit (theme-aware)
 - **Configurable** — label, bar width, thresholds, cost visibility
@@ -22,6 +22,8 @@ opencode plugin --global @davidaayers/opencode-context-gauge-plugin
 ```
 
 Or from inside OpenCode: press `ctrl+p` → "Install Plugin" → `@davidaayers/opencode-context-gauge-plugin`. The command patches `tui.json` for you; restart OpenCode and the gauge appears in the sidebar once the session has a completed assistant response.
+
+> **Version 0.1.2 warning:** npm `0.1.2` can overstate context when cache counters are added to an already-aggregated total. Upgrade to the latest release for the fix.
 
 ### From source
 
@@ -71,7 +73,7 @@ Pass options using the `[spec, options]` tuple form (spec being the npm package 
 
 ## How It Works
 
-- **Used tokens**: the most recent assistant message with output tokens provides `input + output + reasoning + cache.read + cache.write`; before any responses exist, session-level token/cost aggregates are used.
+- **Used tokens**: the most recent assistant message's `tokens.total` provides the authoritative current context occupancy. If unavailable, the gauge falls back to `input + output + reasoning`; cache counters are not added separately because they are already represented by `total`. Before any responses exist, session-level token/cost aggregates are used.
 - **Context window**: resolved from the message's (or session's) provider/model via `provider.models[modelID].limit.context`. The widget hides itself if no context limit is known.
 - **Rendering**: SolidJS JSX via `@opentui/solid`, registered into the `sidebar_content` slot through [`@opencode-ai/plugin/tui`](https://www.npmjs.com/package/@opencode-ai/plugin). Colors come from the active OpenCode theme (`accent` / `warning` / `error`).
 

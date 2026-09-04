@@ -118,6 +118,7 @@ makdoong2-team doctor            # 설치 진단
 | `timeout.substage_minutes` | 서브에이전트 1회 실행 상한 (기본 30분) |
 | `timeout.per_agent` | 에이전트별 상한 override (기본 seed: engineer 60분) |
 | `timeout.stall_escalate_threshold` | substage 누적 hang 상한 (기본 5). 초과 시 dispatch 차단 후 사용자 에스컬레이션 |
+| `timeout.permission_corrections_per_session` | 스코프 밖 경로 요청을 abort 없이 피드백 거부(툴 오류)로 되돌려 주는 세션당 횟수 (기본 3, 0 이면 첫 위반에서 abort) |
 | `tmux` | 막둥이 pane 모니터. 코드 기본값은 off, seed 되는 설정 파일은 `enabled: true` |
 | `worktree.extra_exclude` | worktree 동기화 추가 제외 패턴 |
 | `logging` | `level` / `mode` / `path` / `max_bytes` |

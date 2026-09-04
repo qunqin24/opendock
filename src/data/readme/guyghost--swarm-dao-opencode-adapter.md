@@ -23,7 +23,7 @@ pi
 
 Inside Pi:
 ```
-> dao_setup          # Initialize with 7 default agents
+> dao_setup          # Initialize with 8 default agents
 > dao_propose        # Create a proposal
 > dao_deliberate     # Run swarm deliberation
 > dao_check          # Quality gates
@@ -93,7 +93,7 @@ for the pattern all non-native hosts share).
 | **L3 Delivery** | Convert decisions into execution | Plans, tasks, execution, verification, artefacts |
 | **L4 Control** | Reduce risk before publication | Quality gates, audit trail, checklists |
 
-## The 7 Default Agents
+## The 8 Default Agents
 
 | Agent | Weight | Role |
 |-------|--------|------|
@@ -104,6 +104,7 @@ for the pattern all non-native hosts share).
 | Prioritization Agent | 2 | Impact/cost/risk scoring, roadmap fit |
 | Spec Writer | 1 | PRD, user stories, acceptance criteria |
 | Delivery Agent | 1 | Implementation plan, tasks, CI/CD |
+| UX/UI Designer | 2 | UX/UI critique, design directions, accessibility |
 
 ## Proposal Lifecycle
 
@@ -146,8 +147,8 @@ swarm-dao ship 1
 swarm-dao ship 1 --cascade   # also ship unexecuted dependencies first
 swarm-dao ship 1 --force     # skip dependency checks
 
-# Configure GitHub integration
-swarm-dao github-config --token <github-token> --owner myorg --repo myrepo
+# Configure GitHub integration (auth via the gh CLI; --issues tracks proposals as GitHub issues)
+swarm-dao github-config --owner myorg --repo myrepo
 
 # Create a branch for a proposal
 swarm-dao github-branch 1
@@ -464,9 +465,13 @@ Available on every host surface: the CLI (`swarm-dao github-config` /
 `@guyghost/swarm-dao-mcp` and the Copilot/Claude/Codex adapters), and the
 Pi extension and OpenCode plugin (registered as native tools).
 
+Authentication is delegated to the GitHub CLI: run `gh auth login` once and
+Swarm DAO never stores or transmits tokens. Pass `issues=true` if you want
+proposal modifications tracked as GitHub issues.
+
 ```bash
 # Via an MCP host (Claude, Codex, Copilot, or a generic MCP client)
-> dao_config_github token="ghp_..." owner="myorg" repo="myrepo" enabled=true
+> dao_config_github owner="myorg" repo="myrepo" issues=true
 
 # Create branch
 > dao_github_create_branch proposalId=1

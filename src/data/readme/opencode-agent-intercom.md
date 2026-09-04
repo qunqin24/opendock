@@ -76,16 +76,19 @@ After restarting opencode, two things still have to happen before the
    and the right sidebar (its own column beside the content, not an
    overlay) shows `Subagents (N)` with `● N running · ✓ M done · ◆ K retained`
    counters (`◆ K retained` only when something is held), agent rows with an
-   `x` abort control and an age, plus `max subagents`
-   and a per-agent-type context ceiling: an agent cycler and the selected
-   type's ceiling in k tokens (with `★` marking a type that has its own
-   value and `off` for a ceiling of `0`; stepping a type's own value below
-   zero drops the entry so it falls back to the inherited ceiling again),
-   plus the selected type's reuse ceiling as `reuse Token(k)` (the same
-   own-versus-inherited marker; `0` means never reused), plus the selected
-   type's reply ceiling as `result Token` (whole tokens rather than
-   thousands, stepped in 500s; `0` means that type's reply is never cut),
-   and the orchestrator's system prompt also carries a `Limits` block with headroom per agent type — each entry lists the budget, the fixed overhead (subagent guides, PROJECT.md, the project snapshot prepended to every spawn, AGENTS.md where that type keeps it) and the headroom left for the orchestrator's prompt and the subagent's work, in the form `coder 100.0k (−12.4k fixed → 87.6k)`. The fixed overhead occupies part of every budget before the orchestrator's words do; the limits block names it so the orchestrator can see why its own prompt has less room than the bare budget suggests. The work-package size gate below measures the package against the same budget the headroom was computed from. The same block names `off` for any type whose budget is disabled. The sidebar itself also exposes collapsed `TUI settings` / `LLM params` / `Prompts` sections.
+   `x` abort control and an age, plus `max subagents` and the flat retention
+   rows `retained subs` and `retain (min)`. The sidebar also exposes collapsed
+   `TUI settings` / `LLM params` / `Prompts` sections — the LLM params section
+   carries the per-agent-type context ceiling, the per-agent-type reuse
+   ceiling, and the per-agent-type reply ceiling behind a single agent cycler
+   that walks the full role list (orchestrator included); the three rows are
+   `max Token(k)` / `reuse Token(k)` / `result Token`, directly after the
+   `effort` row and before `[reset current agent]`, with `★` marking a type
+   that has its own value, `off` for a ceiling of `0`, and a value stepped
+   below zero dropping the entry so the type falls back to the inherited
+   ceiling again. `result Token` is stepped in 500 whole tokens rather than
+   thousands. `[reset current agent]` does not touch these three rows.
+   The orchestrator's system prompt also carries a `Limits` block with headroom per agent type — each entry lists the budget, the fixed overhead (subagent guides, PROJECT.md, the project snapshot prepended to every spawn, AGENTS.md where that type keeps it) and the headroom left for the orchestrator's prompt and the subagent's work, in the form `coder 100.0k (−12.4k fixed → 87.6k)`. The fixed overhead occupies part of every budget before the orchestrator's words do; the limits block names it so the orchestrator can see why its own prompt has less room than the bare budget suggests. The work-package size gate below measures the package against the same budget the headroom was computed from. The same block names `off` for any type whose budget is disabled.
    SDK's `layout` field is `"auto" | "stretch"` and marked deprecated with
    "Always uses stretch layout", and `tui.json` has no `sidebar` block,
    no width, no position. The column takes its width from the content
@@ -95,19 +98,20 @@ The plugin manager (toggle the plugin on/off, install updates) lives at
 `Ctrl+P` → `Plugins` → `Enter`. Inside the panel, `Alt+A` focuses the
 subagent list; `j`/`k` move, `Enter` opens a session, `x` aborts.
 
-Each live row is labelled `handle · topic (Model)` — for example
-`coder#1 · Searching fo… (Luna)` — with the `↳ <age> · <k> ctx` line
-unchanged beneath it. The **topic** is the opencode session title: the
-spawn tool sets it from the `description` argument, and where the caller
-gave none the title falls back to the opening characters of the task
-prompt with a redundant `<agent>: ` prefix stripped before display. The
-**model** is the agent's own entry in `~/.config/opencode/llm-models.json`,
-shortened to its display name before any parenthesis; an agent with no
-configured model renders the row without that parenthesised part at all.
-The parts are sized against the panel's actual laid-out width: the
-handle is kept whole, the model next, and the topic takes the remainder
-and is dropped below a minimum rather than wrapping the row onto a
-second line.
+Each live row is labelled `agent type · topic (Model)` — for example
+`coder · Searching fo… (Luna)` — with the ` · <age> · <k> ctx` line
+beneath it. The **agent type** is the role name; the internal handle (such as
+`coder#1`) remains available for addressing but is not rendered. The **topic**
+is the opencode session title: the spawn tool sets it from the `description`
+argument, and where the caller gave none the title falls back to the opening
+characters of the task prompt with a redundant `<agent>: ` prefix stripped
+before display. The **model** is the agent's own entry in
+`~/.config/opencode/llm-models.json`, shortened to its display name before any
+parenthesis; an agent with no configured model renders the row without that
+parenthesised part at all. The parts are sized against the panel's actual
+laid-out width: the agent type is kept whole where the budget allows, the
+model next, and the topic takes the remainder and is dropped below a minimum rather than wrapping the
+row onto a second line.
 
 ## What this gives you that stock opencode doesn't
 
@@ -240,9 +244,13 @@ decision, never through the one that stopped).
 
 At every opencode restart the plugin also runs a one-shot **bootstrap sweep**
 of its own opencode sessions — anything left over from an earlier process
-whose title is this plugin's marker and that has been idle for longer than
-twice the retention window is deleted, so a retention that survived a
-process crash or a manual restart does not leak into the new instance.
+whose title carries this plugin's marker, that is not its parent's parent,
+that this process knows nothing about, and that has been idle for longer
+than `ORPHAN_SWEEP_TTL_FACTOR * retainedSubagentTtlMs` (with a ten-minute
+floor) is deleted. The marker identifies the session as one this plugin
+created; sessions that cannot be attributed with certainty are left standing.
+The sweep runs at the shipped default too, so a leaked session from a crashed
+plugin or opencode process does not linger.
 
 When a subagent hits a problem its spawn prompt did not cover — a blocker, a
 missing precondition, an ambiguity, a tool that keeps failing, a decision
@@ -482,34 +490,37 @@ installed by the command above. Surfaces the live subagent snapshot and
 exposes every runtime knob:
 
 - **Subagent list** — open-session, abort (✕), keyboard navigation.
-- **`max subagents [-N+]`** and a per-agent-type context ceiling —
-  an agent cycler plus the selected type's ceiling in k tokens, with `★`
-  marking a type with its own value and `off` for a ceiling of `0`.
-  Writes `~/.config/opencode/agent-intercom.json` as
-  `"agentContext": { "<agent>": tokens }`, picked up within ~2 s.
-  A type with no entry of its own falls back to the flat legacy
-  `maxContext` key in the same file, then to the env var
-  `OPENCODE_AGENT_INTERCOM_MAX_CONTEXT`, then to a built-in per-type
-  default, then to 100 000. `0` is a real value at every level and means
-  the budget is disabled for that type.
-- **`reuse Token(k)`** — the selected type's reuse ceiling, the maximum
-  context under which a held subagent of that type may be re-prompted. The
-  same agent cycler edits it; the same `★` marks an own value, `0` means
-  that type is never reused. Writes
-  `"reuseContext": { "<agent>": tokens }` and inherits the flat
-  `maxReuseContext` (env `OPENCODE_AGENT_INTERCOM_MAX_REUSE_CONTEXT`,
-  default `70000`) wherever the map has no entry.
-- **`result Token`** — the selected type's reply ceiling, the maximum number
-  of tokens of that type's final reply forwarded to the orchestrator.
-  Everything past it is cut out of the wake notice and written to a file the
-  notice names. The same agent cycler edits it; `★` marks an own value, the
-  row shows `off` at `0`. Writes `"resultTokens": { "<agent>": tokens }` and
-  inherits the flat `maxResultTokens` (env
-  `OPENCODE_AGENT_INTERCOM_MAX_RESULT_TOKENS`, default `2000`) wherever the
-  map has no entry. Stepped in 500s (the other two rows step in thousands).
+- **`max subagents [-N+]`** — the concurrent subagent cap; `0` switches
+  the gate off. Writes `"maxSubagents"`.
 - **`retained subs [-N+]`** — how many finished subagents the process holds
   at once; `0` switches retention off and the sidebar then has no held
   rows. Writes `"maxRetainedSubagents"`.
+- **`max Token(k) [-N+]`**, **`reuse Token(k) [-N+]`**, **`result Token
+  [-N+]`** — the per-agent-type context ceiling, reuse ceiling, and reply
+  ceiling. All three rows sit in the LLM params section, directly after
+  the `effort` row and before `[reset current agent]`, and share one
+  agent cycler that walks the full role list (`AGENT_NAMES`,
+  orchestrator included). `★` marks a type that has its own value,
+  `off` for a ceiling of `0`, and a value stepped below zero drops the
+  entry so the type falls back to the inherited ceiling again. `result
+  Token` is stepped in 500 whole tokens; the other two step in
+  thousands.
+  - `max Token(k)` writes `"agentContext": { "<agent>": tokens }`. A type
+    with no entry of its own falls back to the flat `maxContext` key, then
+    to the env var `OPENCODE_AGENT_INTERCOM_MAX_CONTEXT`, then to a
+    built-in per-type default, then to 100 000. `0` is a real value at
+    every level and means the budget is disabled for that type.
+  - `reuse Token(k)` writes `"reuseContext": { "<agent>": tokens }` and
+    inherits the flat `maxReuseContext` (env
+    `OPENCODE_AGENT_INTERCOM_MAX_REUSE_CONTEXT`, default `70000`)
+    wherever the map has no entry. `0` means that type is never reused.
+  - `result Token` writes `"resultTokens": { "<agent>": tokens }` and
+    inherits the flat `maxResultTokens` (env
+    `OPENCODE_AGENT_INTERCOM_MAX_RESULT_TOKENS`, default `2000`)
+    wherever the map has no entry. `0` means that type's reply is never
+    cut. Everything past the ceiling is cut out of the wake notice and
+    written to a file the notice names. `[reset current agent]` does not
+    touch any of these three rows.
 - **`retain (min)`** — the retention window in whole minutes, the unit the
   row is shown and stepped in. Writes `"retainedSubagentTtlMs"` in ms; the
   row's floor is one whole minute. A `0` typed by hand into the file
@@ -521,18 +532,25 @@ exposes every runtime knob:
   [on/off]`**, opencode's built-in visibility toggles, plus **`show agentcom
   [on/off]`**, which decides whether the plugin's own notices (subagent
   completion messages, handoff kickoffs, doc-summary prompts) appear in the
-  transcript. With it off, the text part the plugin posts is stamped
-  `synthetic: true`, which opencode's TUI does not render; the model still
-  receives the text unchanged, so the orchestrator keeps being woken and keeps
-  receiving its subagent results. The task prompt sent to a subagent stays
-  visible whatever the switch says — it is the subagent's entire instruction,
-  not chatter — and tool results stay under opencode's own
-  `tool_details_visibility`. Writes
+  transcript. The switch is retroactive: with it off, notice text parts are
+  stamped `synthetic: true`, which opencode's TUI does not render; with it on,
+  the same parts are PATCHed back to `synthetic: false` and reappear. The
+  switch finds its own notices by `metadata.agentIntercom === true` and mutates
+  the `synthetic` field through opencode's part route, which the drawn TUI
+  picks up at once; a missing or refused route leaves the notices as they
+  were. The model still receives the text unchanged either way, so the
+  orchestrator keeps being woken and keeps receiving its subagent results.
+  The task prompt sent to a subagent stays visible whatever the switch says —
+  it is the subagent's entire instruction, not chatter — and tool results stay
+  under opencode's own `tool_details_visibility`. Writes
   `~/.config/opencode/agent-intercom.json` as `"showAgentcom": true|false`,
   picked up within ~2 s; env var `OPENCODE_AGENT_INTERCOM_SHOW_AGENTCOM`
   resolves with `1`/`0`. Default `true`. With the switch off, the transcript
   no longer shows why the orchestrator continues — the orchestrator is told
-  to relay the substance itself.
+  to relay the substance itself. The part route the switch relies on is
+  annotated experimental in opencode; a server that does not answer it, or
+  refuses the PATCH, costs the retroactive rewrite on that flip and the
+  notices stay exactly as they were posted.
 - **Per-agent LLM sampling** — temperature, top-p/top-k, max-tokens, plus
   llama.cpp keys (`min_p`, `repeat_penalty`, `chat_template_kwargs`) routed
   through `output.options`. Writes `~/.config/opencode/llm-params.json`.
