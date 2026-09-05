@@ -49,6 +49,7 @@ claude plugin install obsidian-wikilinks@depickeresven-obsidian-wikilinks
 
 ### From npm (recommended)
 
+If you want it local in one project
 ```bash
 opencode plugin obsidian-wikilinks
 ```
@@ -64,6 +65,12 @@ That installs the package and adds it to your config. Or add it by hand:
 
 Use `~/.config/opencode/opencode.json` for every project, or `opencode.json` in
 a repo for that project only.
+
+Or you want it installed global:
+```bash
+opencode plugin obsidian-wikilinks --global
+```
+
 
 ### From a local checkout
 

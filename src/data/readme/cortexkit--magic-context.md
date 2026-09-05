@@ -154,10 +154,16 @@ per-harness **after** form for all new configuration.
     "pi": {
       "model": "provider/model-id",
       "thinking_level": "medium"
+    },
+    "omp": {
+      "model": "opencode/provider-model-id",
+      "thinking_level": "auto"
     }
   }
 }
 ```
+
+OMP uses Pi-native `thinking_level` qualifiers. If `historian.omp` or `dreamer.omp` is absent, OMP falls back to the matching `pi` block, so existing Pi-compatible configurations need no migration. An explicit OMP block is authoritative even when it omits a model.
 
 User-level config is `~/.config/cortexkit/magic-context.jsonc` on macOS/Linux and `%USERPROFILE%\.config\cortexkit\magic-context.jsonc` on Windows (or `$XDG_CONFIG_HOME/cortexkit/magic-context.jsonc` when set). OpenCode Desktop users can use the dashboard's config editor or hand-edit that file; Desktop does not include the CLI setup wizard.
 
@@ -323,9 +329,9 @@ It reads directly from Magic Context's SQLite database. No extra server, no API.
 
 ## Configuration
 
-Settings live in `magic-context.jsonc`. Most settings have sensible defaults, but the active harness's historian model (`historian.opencode.model` or `historian.pi.model`) is required for history compacting; project config merges on top of user-wide settings. For the full reference — cache TTL tuning, per-model execute thresholds, historian and dreamer model selection, embedding providers, memory settings, and prompt-surface presets (`full`/`light`) — see **[CONFIGURATION.md](./CONFIGURATION.md)** or the **[configuration reference on docs.cortexkit.io](https://docs.cortexkit.io/magic-context/reference/configuration/)**.
+Settings live in `magic-context.jsonc`. Most settings have sensible defaults, but the active harness's historian model (`historian.opencode.model`, `historian.pi.model`, or `historian.omp.model`) is required for history compacting; project config merges on top of user-wide settings. For the full reference — cache TTL tuning, per-model execute thresholds, historian and dreamer model selection, embedding providers, memory settings, and prompt-surface presets (`full`/`light`) — see **[CONFIGURATION.md](./CONFIGURATION.md)** or the **[configuration reference on docs.cortexkit.io](https://docs.cortexkit.io/magic-context/reference/configuration/)**.
 
-> **Note on per-model settings (OpenCode/Pi):** settings that route per model — like `prompt_surface.models` — apply to the injected guidance block. Tool descriptions are registered once per process by the current (v1) plugin API and follow the default preset; per-model tool descriptions arrive with the OpenCode v2 plugin API once the SDK stabilizes ([#260](https://github.com/cortexkit/magic-context/issues/260)).
+> **Note on per-model settings (OpenCode/Pi/OMP):** settings that route per model — like `prompt_surface.models` — apply to the injected guidance block. Tool descriptions are registered once per process by the current (v1) plugin API and follow the default preset; per-model tool descriptions arrive with the OpenCode v2 plugin API once the SDK stabilizes ([#260](https://github.com/cortexkit/magic-context/issues/260)).
 
 **Config locations** (one shared CortexKit location, project overrides user):
 1. `<project-root>/.cortexkit/magic-context.jsonc`
@@ -351,7 +357,7 @@ If your personal repositories use one hidden-agent model set and work repositori
 { "profile": "work" }
 ```
 
-This is the work-repositories-versus-personal-repositories setup requested by kagbodji. Profiles overlay only hidden-agent model selection, preserve base settings that they do not mention, and are defined only in user config. A project can select a known user profile but cannot supply its contents. See [CONFIGURATION.md](./CONFIGURATION.md#per-repository-model-profiles) for the full OpenCode/Pi example, fallback behavior, and trust boundary.
+This is the work-repositories-versus-personal-repositories setup requested by kagbodji. Profiles overlay only hidden-agent model selection, preserve base settings that they do not mention, and are defined only in user config. A project can select a known user profile but cannot supply its contents. See [CONFIGURATION.md](./CONFIGURATION.md#per-repository-model-profiles) for the full OpenCode/Pi/OMP example, fallback behavior, and trust boundary.
 
 ---
 

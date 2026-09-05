@@ -171,7 +171,8 @@ the agent picks up its guidance, and it will query and write memory on its own.
 **gate** means Knowl can refuse an edit that invalidates code another session is holding.
 Neovim and Kiro work the same way as Zed and JetBrains, through `knowl acp`. Cline needs one
 line pointing it at the shipped plugin. Hermes Agent gets a Python plugin, installed for you,
-that works in the terminal and in Hermes Desktop alike. Any other MCP client works with
+that works in the terminal and in Hermes Desktop alike, and can additionally be picked as
+Hermes' memory provider. Any other MCP client works with
 no integration at all.
 
 Running agents in parallel? Every **git worktree** resolves to the main checkout's store —
@@ -560,7 +561,7 @@ knowl doctor                           # setup, retrieval, and registration
   `knowl status` dates those instead, by how long since anyone last *restated* them, and names the
   ones furthest past their own category's cadence. It ranks rather than flags: for prose there is
   no evidence a claim became false, only the absence of anyone reaffirming it.
-- **Code intelligence** — incremental Tree-sitter index over `.ts` / `.tsx` / `.js` / `.jsx`, so
+- **Code intelligence** — incremental Tree-sitter index over TypeScript, JavaScript, Python and Go, so
   evidence can point at `symbol://` locators, not just line numbers. `knowl index-code`
 - **Secret-safe writes** — every write is screened for detected secrets, sensitive paths, and
   oversized content before it lands. Long-lived memory is the last place a credential should end up.
@@ -704,6 +705,15 @@ is refused as before. Either way a repo's private knowledge stays private until 
 
 - **File-backed skills** — package a procedure with its scripts under `.knowl/skills/`, then
   inspect it before it ever runs. `knowl skill list` · `read` · `run`
+- **Global playbooks** — a procedure that is the same everywhere lives once at `~/.knowl/skills/`,
+  and each repository supplies its own commands and paths through a binding in `.knowl/config.json`.
+  A playbook and a binding are two keys: neither runs anything alone, an unbound playbook lists and
+  reads but refuses to run, and a project skill of the same name shadows the global one.
+- **What runs is shown before it runs** — a manifest declares its `inputs`, its `capabilities` and
+  fail-closed `preconditions` (`clean_worktree`, `on_branch:`, `command_exists:`), an unrecognised
+  precondition refuses rather than passing, and the run banner prints the fully resolved command.
+  Approval is per set of bytes and re-checked every run; a repository cannot ship a skill and its
+  own approval. Capabilities are declarations, not a sandbox, and say so.
 - **Deterministic synthesis** — roll several atoms into one architecture summary with no AI
   provider involved: `knowl synthesize --scope storage`
 
@@ -794,6 +804,18 @@ global entries sit behind the project's own, and can never crowd them out. And a
 repository at all, such as a Hermes Desktop window with no folder open, reads the global store
 alone rather than having no memory. A project that exists but fails to open stays an error: global
 is personal defaults, never a fallback for a broken store.
+
+**It follows you to another machine.** The machine store syncs to a cloud workspace the same way a
+project does — it is not a project, but it is addressed like one:
+
+```bash
+knowl cloud connect --global   # then push and pull with --global
+```
+
+Run any `knowl cloud` command outside a repository and it uses the machine store on its own,
+saying so. That inference is narrow on purpose: only when there is no project above the directory
+at all. A project whose config will not parse is an error about that project, never quietly
+answered from your personal defaults.
 
 → [Memory namespaces and the global layer](docs/reference.md#memory-namespaces-and-the-global-layer)
 

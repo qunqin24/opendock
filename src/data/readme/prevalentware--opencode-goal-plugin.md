@@ -16,9 +16,9 @@ Links:
 
 The OpenCode Goal Plugin adds:
 
-- `/goal <objective>` as an OpenCode command for TUI, desktop, and web.
+- `/goal <objective>`, `/pause_goal`, and `/resume_goal` as OpenCode commands for TUI, desktop, web, and remote integrations that expose the server command catalog.
 - A sidebar goal indicator with status, elapsed time, and objective.
-- Agent tools: `get_goal`, `get_goal_history`, `list_all_goals`, `create_goal`, `set_goal`, `update_goal_objective`, `update_goal`, and `clear_goal`.
+- Agent tools: `get_goal`, `get_goal_history`, `list_all_goals`, `create_goal`, `set_goal`, `update_goal_objective`, `update_goal_status`, `update_goal`, and `clear_goal`.
 - Goal close evidence: `complete` requires verified evidence, and `unmet` requires a concrete blocker.
 - Persistent per-session goal state with history, checkpoints, budgets, and owner-only file permissions.
 - Optional automatic continuation on `session.idle` / `session.status`, with no-progress pause and budget wrap-up safeguards.
@@ -128,7 +128,8 @@ In OpenCode 1, server options use the package-and-options tuple in `opencode.jso
         "no_progress_token_threshold": 50,
         "max_no_progress_turns": 2,
         "restricted_agents": ["plan"],
-        "allow_goal_execution_from_plan": false
+        "allow_goal_execution_from_plan": false,
+        "max_objective_chars": 100000
       }
     ]
   ]
@@ -165,10 +166,14 @@ Defaults:
 - `max_goal_duration_seconds`: unset by default; when set, new goals inherit this elapsed-time safety limit.
 - `no_progress_token_threshold`: `50`; output-token floor used to judge whether a goal continuation turn made progress.
 - `max_no_progress_turns`: `2`; consecutive low-progress goal continuation turns before pausing. Only turns produced by a reserved goal continuation count — ordinary low-output assistant messages (for example short tool-call-only turns from PTY or status checks) never increment this counter.
-- `register_command`: `true`
-- `command_name`: `"goal"`
+- `register_command`: `true`; registers `/goal`, `/pause_goal`, and `/resume_goal`.
+- `command_name`: `"goal"`; renames the main goal command only. The reserved names `pause_goal` and `resume_goal` fall back to `goal` so the standalone controls remain available.
 - `restricted_agents`: `["plan"]`; agents (matched case-insensitively) treated as planning-only for goal execution.
 - `allow_goal_execution_from_plan`: `false`; when `true`, disables Plan-mode goal restrictions entirely.
+- `max_objective_chars`: `100000`; maximum Unicode code-point length of the submitted goal objective, completion evidence,
+  and blocker text. The previous 4000-character cap was a defect, not a compatibility constraint. The same limit is
+  advertised on V1 and V2 tool schemas and enforced at runtime, independently per plugin instance. Accepted values are
+  trimmed before persistence. Large objectives are echoed into continuation and compaction prompts.
 
 ## Goal Workflow
 
@@ -178,7 +183,7 @@ Use `/goal <objective>` in a fresh OpenCode chat to create a long-running goal:
 /goal review the frontend and translate visible English UI text to Spanish
 ```
 
-Bare `/goal` reports the current goal state. `/goal history` reports lifecycle history and recent checkpoints. `/goal edit <objective>` updates the current objective. `/goal pause` pauses the goal without clearing it, and `/goal resume` resumes it. `/goal clear` clears the goal; `/goal stop`, `/goal off`, `/goal reset`, `/goal none`, and `/goal cancel` are clear aliases. The TUI also includes a `Goal` command-palette entry for viewing, refreshing, pausing, resuming, showing history, or clearing the current goal state without creating a new goal.
+Bare `/goal` reports the current goal state. `/goal history` reports lifecycle history and recent checkpoints. `/goal edit <objective>` updates the current objective. `/goal pause` pauses the goal without clearing it, and `/goal resume` resumes it. The standalone `/pause_goal` and `/resume_goal` controls are discoverable by remote integrations that expose OpenCode's server command catalog. Their arguments and resolved attachments are removed before composing the goal-control prompt, although OpenCode V1 may evaluate its own command syntax before plugin hooks run. `/pause_goal` persists the pause before its acknowledgement turn starts, preventing a later idle event from starting another continuation. It cannot cancel a continuation that was already delivered or whose delivery was already in flight when the pause was committed. Pausing a goal that is already `budgetLimited` or `usageLimited` preserves that safety status; resuming a closed `complete` or `unmet` goal is rejected. `/goal clear` clears the goal; `/goal stop`, `/goal off`, `/goal reset`, `/goal none`, and `/goal cancel` are clear aliases. The TUI also includes a `Goal` command-palette entry for viewing, refreshing, pausing, resuming, showing history, or clearing the current goal state without creating a new goal.
 
 You can also ask the agent to formulate the objective and call `set_goal` itself, for example: "set your own goal to finish this refactor safely." The tool uses the agent-written objective but still only creates a goal when explicitly requested.
 
@@ -230,6 +235,8 @@ The state file is written atomically through a same-directory temp file: the fin
 Ordinary fsync improves crash consistency but is not `F_FULLFSYNC`, so sudden power loss on macOS/APFS is not an absolute durability guarantee; where the platform cannot fsync the parent directory, a crash may leave the old or the new state file (both valid), never a partially-written one. Existing active goals recover from disk with their full objective, budget, history, and checkpoint metadata.
 
 If the rename succeeds but syncing the parent directory reports a genuine I/O error, the mutation reports a write failure even though the new valid state may already be present. This avoids claiming durability that the filesystem did not confirm.
+
+If a non-empty state file contains only whitespace, a UTF-8 BOM, or NUL bytes after an interrupted write, the next mutation preserves its exact contents beside the state file as `goals.json.corrupt-<timestamp>-<uuid>` before writing recovered state. If another process replaces the state during recovery, the mutation refuses to overwrite that newer content. If the quarantine copy itself cannot be created, the plugin reports the failure and continues recovery rather than making every prompt fail indefinitely. OpenCode 1 also records the quarantine outcome and path through its application log so the data-loss event remains discoverable.
 
 ## Credits
 

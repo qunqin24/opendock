@@ -298,12 +298,12 @@ blackboard reserved for oversized output:
   architect → implementer → tester → reviewer(s); unknown external tech →
   researcher first. Pipelines have fixed minimums: a product change routed
   below 3 dispatches is a routing bug, and splitting one request into
-  sub-3-dispatch pieces to dodge the gate is a protocol violation.
-- **Approval gate (count-based):** ≥3 planned dispatches → the lead
+  sub-2-dispatch pieces to dodge the gate is a protocol violation.
+- **Approval gate (count-based):** ≥2 planned dispatches → the lead
   researches (reading the repo itself; a researcher dispatch only for
   unknown external tech), presents a ≤30-line plan, and **waits for your
-  approval** before executing anything. 0-2 dispatches run with a 1-2 line
-  notice. A task that grows a third dispatch mid-run pauses for approval.
+  approval** before executing anything. 0-1 dispatches run with a 1-2 line
+  notice. A task that grows a second dispatch mid-run pauses for approval.
   Blocking uncertainties are batched and asked immediately — never guessed,
   never drip-fed.
 - **Adaptive review:** default is ONE reviewer dispatch (correctness);
@@ -326,8 +326,15 @@ blackboard reserved for oversized output:
 - **Verbatim contracts (kept):** parallel implementers that must
   interoperate get the exact data contract (endpoints, field names, types)
   pasted verbatim into every affected dispatch.
-- **CHANGELOG care (kept):** delivered changes append an entry to the
-  project's CHANGELOG.md (Keep a Changelog style) when one exists.
+- **Docs sync (CHANGELOG + AGENTS.md):** delivered changes append a
+  CHANGELOG.md entry when one exists, and update AGENTS.md when the change
+  alters what it records (build/test commands, conventions, structure,
+  agent instructions); either file is offered for creation when missing.
+  Reading is deduplicated: the lead reads the README itself (the host does
+  not inject it), uses the host-injected AGENTS.md/CLAUDE.md copy already
+  in context and opens those files only when genuinely absent — and
+  specialists never re-open these docs, since conventions arrive
+  distilled inside their dispatches.
 
 ### Triage — questions don't become code edits
 

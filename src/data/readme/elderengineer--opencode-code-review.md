@@ -136,18 +136,28 @@ effect.
 
 1. `/code-review` calls the `code_review_prompt` tool with your raw arguments.
 2. The tool compiles the full instruction prompt: preamble (level fallbacks) →
-   target clause → fleet hint → level cell → flag appendices.
+   target clause → heavy-shape note (when the diff is large) → fleet hint →
+   level cell → flag appendices.
 3. The model follows it: gathers the diff (**Phase 0**), spawns
    `reviewer-<level>` finder subagents — one per lens (**Phase 1**), runs one
    verifier per candidate (**Phase 2**), optionally sweeps for gaps
    (**Phase 3**, max), emits ranked JSON findings.
 4. `--fix` applies them; `--comment` posts them.
 
+## Updates
+
+The plugin checks npm once a day for a newer published version and, when one
+exists, the next review mentions it with that version's release notes and the
+update command. It talks only to `registry.npmjs.org` and `api.github.com`
+(read-only; nothing is sent), prompts once per version, and is disabled by
+setting `CODE_REVIEW_NO_UPDATE_CHECK`.
+
 **Scope:** the diff under review is `git diff @{upstream}...HEAD` (or
 `main...HEAD` / `HEAD~1`) **plus working-tree changes** (`git diff HEAD`).
 Untracked files that were never `git add`ed are invisible to every diff —
 stage them first. A single sandboxed `git diff --numstat` sizes the fleet hint
-(high+: `clamp(ceil(lines/150), 2, 8)` finders) and gates path-scoped lenses.
+(high+: `clamp(ceil(lines/150), 2, 8)` finders), fires the heavy-shape note,
+and gates path-scoped lenses.
 
 ## Fleet lenses
 
@@ -199,7 +209,14 @@ You are reviewing the Android app (Kotlin, Compose, coroutines)…
 
 - Gated lenses that don't match the diff fall back to built-in text.
 - Fleet math: medium/high run 8 + N finders, max runs 10 + N (N = active
-  new-name project lenses); `low` never spawns.
+  new-name project lenses); `low` never spawns. Spawning is unthrottled — on a
+  rate-limit rejection the orchestrator waits, re-issues, and halves its
+  in-flight subagents until the provider recovers; a repeat failure on the same
+  spawn falls back to inline sequential work, so congestion degrades the review
+  instead of aborting it. A heavy shape — a diff of 2,500+ lines, or 800+
+  lines with two or more active project lenses — adds a one-line heads-up to
+  the review prompt suggesting a narrower target, which shrinks the diff and
+  changes which project lenses activate.
 - Every new-name project lens (not a built-in replacement) gets its own
   `reviewer-lens-<name>` finder agent, registered at plugin load with its
   `model:`/`variant:` pins (restart after adding one; lens text and `paths:`

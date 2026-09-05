@@ -22,20 +22,26 @@ obey this rule.
 The current official ASD-STE100 standard is the complete authority. Athena checks do not certify
 conformance to the standard.
 
-## Required repositories
+## Repository integrations
 
-Athena has two required repositories:
+Athena has two repository integrations:
 
 | Purpose | Default | Owner override | Checkout |
 | --- | --- | --- | --- |
 | Knowledge | `HomericIntelligence/Mnemosyne` | `HOMERIC_INTELLIGENCE_MNEMOSYNE_OWNER` | `$HOME/.agent_brain/knowledge` |
 | Automation | `HomericIntelligence/Hephaestus` | `HOMERIC_INTELLIGENCE_HEPHAESTUS_OWNER` | `$HOME/.agent_brain/automation` |
 
-Athena resolves a trusted, current dependency checkout under the
-[`dependency-resolution` contract](docs/dependency-resolution.md). An invalid override, a trust or
-authentication failure, a checkout mismatch, or an update failure is fatal. The knowledge backend
-is mandatory. If `learn` has a verified, non-duplicate lesson and direct write authority, it uses an
-isolated worktree and a pull request. In all other conditions, it reports without a mutation.
+Read-only Mnemosyne use is local-first under the
+[`dependency-resolution` contract](docs/dependency-resolution.md). An available stale checkout can
+supply best-effort guidance when Athena reports its revision and limits. Athena does not require the
+installed plugin and the knowledge checkout to have the newest or matching revisions. Missing local
+knowledge, authentication failure, and update failure do not stop the primary task.
+
+Mnemosyne delivery and Hephaestus execution use trusted, current dependency checkouts. At these
+boundaries, an invalid override, a trust or authentication failure, a checkout mismatch, or an
+update failure is fatal. If `learn` has an evidence-backed, non-duplicate lesson and direct write
+authority, it uses an isolated worktree and a pull request. In all other conditions, it reports
+without a mutation.
 
 Script-backed skills require Git and Python 3.13 on the host. Dependency resolution and the GitHub
 pull-request route also require authenticated GitHub CLI (`gh`) access. GitHub issue and repository
@@ -78,7 +84,7 @@ are unavailable, Athena uses sequential work where supported or reports the capa
 any required third-party extensions through the harness's own package mechanism and review their
 source before installing them.
 
-Mnemosyne and Hephaestus remain Athena's repository dependencies under the contract above. They are
+Mnemosyne and Hephaestus remain Athena's repository integrations under the contract above. They are
 not copied into or represented as coding-harness packages.
 
 ## Release archives

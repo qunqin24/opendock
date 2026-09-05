@@ -37,6 +37,7 @@ Shim locations:
 ## Tools
 
 ```txt
+context_goblin_get
 context_goblin_status
 context_goblin_refresh
 context_goblin_read
@@ -71,23 +72,27 @@ After adding the plugin config:
 
 ```txt
 1. Restart OpenCode.
-2. Type /context-goblin-stats.
-3. Type /context-goblin-usage to inspect local token usage rollups.
-4. If the cache is missing or stale, ask the agent to run context_goblin_refresh.
-5. Ask the agent to use Context Goblin before broad repo discovery.
+2. Ask the agent to call context_goblin_get before broad repo discovery.
+3. Type /context-goblin-stats only when you need cache diagnostics.
+4. Type /context-goblin-usage to inspect local token usage rollups.
 ```
 
 Recommended prompt:
 
 ```txt
-Use Context Goblin before broad repository discovery. Check status, refresh if missing or stale, read the cache, show a short stats summary, then inspect only task-specific files that are still needed.
+Use Context Goblin before broad repository discovery. Call context_goblin_get once, then inspect only task-specific files that are still needed. Do not call separate Context Goblin diagnostics unless I ask for them.
 ```
+
+`context_goblin_get` is the recommended task flow: it checks freshness, refreshes only
+when necessary, and returns the safe cache in one tool call. The separate `status`,
+`refresh`, `read`, and `stats` tools remain available for diagnostics and backward
+compatibility.
 
 If the slash command does not appear:
 
 ```txt
 1. Confirm config includes "context-goblin".
-2. Confirm npm latest is 0.1.15 or newer.
+2. Confirm npm latest is 0.1.21 or newer.
 3. Fully restart OpenCode after changing config.
 4. Check project config is not overriding global plugin config.
 ```
@@ -187,38 +192,37 @@ npm run test
 npm run build
 npm run check:reports
 npm run smoke:opencode
+npm run smoke:opencode:live
+npm run benchmark:stable
 npm run check:models:general
 npm run check:tokens
 ```
 
-## Token Usage Evidence
+`smoke:opencode:live` runs a real headless OpenCode model session and requires configured provider credentials. Override its defaults with `OPENCODE_MODEL` or `OPENCODE_BIN`.
 
-Run the current coding-model token comparison:
+## Latest A/B Evidence
+
+### How results are judged
+
+- **Compatibility `pass`** means both arms completed, Context Goblin used the required
+  tools correctly, answer quality met the benchmark, the cache stayed within its size
+  limit, and no secret leakage was detected.
+- **Overall efficiency `pass`** means all three measured efficiency signals improved:
+  direct file reads, uncached input tokens, and total event tokens.
+- **Overall efficiency `fail`** means any measured efficiency signal regressed. A
+  negative reduction is an increase in usage and can never be reported as a pass.
+- **Overall efficiency `mixed`** is reserved for evidence that does not regress but is
+  flat or unavailable on at least one signal.
+- We do not claim guaranteed token savings from one-shot results. Repeatable savings
+  require a completed multi-run stability benchmark.
+
+Run the current coding-model comparison:
 
 ```bash
 OPENCODE_MODELS="openai/gpt-5.5 openai/gpt-5.6-sol" npm run check:tokens
 ```
 
-Report:
-
-```txt
-examples/token-usage-ab-report.md
-```
-
-Latest real comparison on OpenCode `1.17.18` with Context Goblin `0.1.15`:
-
-| Model | Baseline Input | Goblin Input | Input Saved | Baseline Total | Goblin Total | Total Saved | Baseline Reads | Goblin Reads | File Saved | Quality | Result |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
-| openai/gpt-5.5 | 19,815 | 7,056 | 64% | 38,930 | 45,954 | -18% | 16 | 8 | 50% | 6/6 | mixed |
-| openai/gpt-5.6-sol | 24,917 | 7,272 | 71% | 148,523 | 37,747 | 75% | 16 | 9 | 44% | 6/6 | pass |
-
-In this token-focused run, Context Goblin reduced direct input tokens and file reads for both models while preserving quality. `gpt-5.6-sol` produced the strongest total-token result: 71% fewer input tokens, 75% fewer total event tokens, and 44% fewer file reads. `gpt-5.5` used 64% fewer input tokens and 50% fewer file reads, but its total event tokens increased by 18%, so its result remains `mixed`.
-
-Total event tokens include provider/OpenCode cache-read, reasoning, output, and multi-step records. This is token usage evidence, not a guaranteed billing or total token-cost reduction claim.
-
-## Latest A/B Result
-
-Run the same coding-model comparison for the general A/B benchmark:
+The general A/B form is also available:
 
 ```bash
 OPENCODE_MODELS="openai/gpt-5.5 openai/gpt-5.6-sol" npm run check:models:general
@@ -231,24 +235,44 @@ MODEL_GROUP=free npm run check:models:general
 MODEL_GROUP=all npm run check:models:general
 ```
 
-Report:
+Both reports use the same fresh-fixture A/B protocol. The token report emphasizes
+accounting; the general report emphasizes completion and quality. Each arm denies
+`task`, `bash`, and `edit`, and the Goblin arm uses the single low-overhead
+`context_goblin_get` call before focused reads.
 
-```txt
-examples/model-general-ab-report.md
-```
+Latest comparison on OpenCode `1.18.20` with Context Goblin `0.1.21`:
 
-The benchmark compares a normal OpenCode run against a Context Goblin run on the same synthetic React/Vite cart/catalog app. Each arm receives a fresh fixture. The `task`, `bash`, and `edit` tools are denied so repository reads remain visible and comparable in the parent event stream. Both arms may use direct `read`, `glob`, and `grep`; the Context Goblin arm must call `context_goblin_status`, `context_goblin_refresh`, and `context_goblin_read` before inspecting missing implementation details.
+| Model | Baseline Reads | Goblin Reads | File Reduction | Input Token Reduction | Total Token Reduction | Quality | Cache Size | Compatibility | Overall Efficiency |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- |
+| openai/gpt-5.5 | 16 | 9 | 44% | 28% | 47% | 6/6 | 2,587 bytes | pass | pass |
+| openai/gpt-5.6-sol | 17 | 11 | 35% | 45% | 35% | 6/6 | 2,587 bytes | pass | pass |
 
-Latest results on OpenCode `1.17.18` with Context Goblin `0.1.15`:
+Both models passed compatibility and overall efficiency with quality `6/6`, no secret
+leakage, and positive reductions across all measured signals:
 
-| Model | Baseline Reads | Goblin Reads | File Reduction | Input Token Reduction | Total Token Reduction | Quality | Cache Size | Result |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
-| openai/gpt-5.5 | 15 | 8 | 47% | 58% | 6% | 6/6 | 2,596 bytes | pass |
-| openai/gpt-5.6-sol | 17 | 14 | 18% | -2% | -30% | 6/6 | 2,596 bytes | pass |
+- `gpt-5.5`: files `−44%`, input `−28%`, total `−47%`.
+- `gpt-5.6-sol`: files `−35%`, input `−45%`, total `−35%`.
 
-In the general run, both models completed successfully with quality `6/6` and no detected secret leakage. `gpt-5.5` showed the larger efficiency gain in this sample. `gpt-5.6-sol` still reduced file reads by 18%, but used 2% more input tokens and 30% more total event tokens.
+Detailed reports: [general A/B](./examples/model-general-ab-report.md) and
+[token usage](./examples/token-usage-ab-report.md). Total event tokens include
+provider/OpenCode cache-read, reasoning, output, and multi-step records; this is
+evidence, not a guaranteed billing invoice.
 
-These are single runs per model and arm, so model behavior and provider accounting can vary. Negative reduction means the Context Goblin arm used more than the baseline. Raw OpenCode event logs and metadata are ignored by git; the generated Markdown reports are committed.
+These are single runs per model and arm. Any future negative reduction is reported as
+`fail`, never as a successful efficiency result. Raw OpenCode event logs and metadata
+are ignored by git; the generated Markdown reports are committed.
+
+## Repeated Stability Evidence
+
+The repeated runner is available as `npm run benchmark:stable`. It uses fresh fixture
+copies, alternating execution order, one cold-cache refresh control, and warm-cache
+rounds. It fails closed rather than turning provider/session timeouts into metrics.
+
+The current report is [examples/model-stability-ab-report.md](./examples/model-stability-ab-report.md).
+The short live smoke and one-shot A/B evidence are valid and documented above; the
+longer repeated agentic protocol is currently deferred because OpenCode stalled before
+its first event on both tested models. Therefore no repeatable multi-run savings claim
+is made yet.
 
 ## License
 

@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="logo.png" alt="opencode-usage-widget" width="128" height="128">
+</p>
+
 # opencode-usage-widget
 
 **English** | [中文](README.zh.md)

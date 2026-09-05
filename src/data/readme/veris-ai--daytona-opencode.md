@@ -17,17 +17,39 @@ And every run ends with a **receipt** of what the vendor actually received.
 Each has its own README with installation and usage. This page is about how they
 work and how to develop them.
 
+`@veris-ai/daytona` also installs a `veris-daytona` executable, and it has five
+verbs. `run` does the whole job in one command — box up, code in, suite run,
+receipt read, everything down. The other four are that job cut into the pieces a
+caller drives itself: `provision` wires a box on a twin you already have and
+stops there, `push` puts code in it, `exec` runs a command in it with the trust
+variables applied, `teardown` deletes it. The three middle ones exist because
+Daytona's own CLI has no upload command and no way to set a variable on a
+command it runs; whoever calls them still decides what the receipt proved. The
+Veris-shaped half is identical either way and belongs here —
+the egress credential, the 20-domain allowlist, the outbound proxy, the CA
+bundle, the canary, the trust variables. The "did this run prove anything" half
+belongs to the `veris` CLI, which already owns what a receipt means, what
+`--require-service` means and what the exit codes mean.
+
 ## How it works
 
 Every sandbox is created with two Daytona parameters:
 
 - **`domainAllowList`** — the vendor hostnames the twin answers for, the gateway
-  itself, the twin's data planes, and package registries. Nothing else leaves.
+  itself, the twin's data planes, the twin's own host where a service can only
+  be reached there, and package registries. Nothing else leaves.
 - **`outboundProxyUrl`** — the Veris gateway, over HTTP CONNECT.
 
 Daytona chains them: sandbox traffic reaches Daytona's own proxy, which drops
 anything not allowlisted and forwards the rest to the gateway, which answers
 vendor hostnames from the twin. This is the same tier `@veris-ai/e2b` uses.
+
+**Daytona caps that list at 20 domains**, and a large environment fills it: nine
+vendor hostnames plus the gateway leave room for half the default registry list.
+Everything the twin cannot work without is kept, the registries are trimmed from
+the tail of `DEFAULT_REGISTRY_HOSTS`, and what was dropped is printed. If the
+required hosts alone exceed 20, `create()` refuses and says so rather than
+letting Daytona answer "Domain allow list cannot contain more than 20 domains".
 
 Nothing of ours runs inside the sandbox, so any image works — there is no
 snapshot to register, no `NET_ADMIN` to request, and no environment to thread
@@ -55,8 +77,21 @@ itself (measured: the leaf a sandbox sees for `api.stripe.com` is issued by
 inside the sandbox from the distribution's public roots plus ours, requiring
 nothing of the image, and the trust variables Daytona does not itself set
 (`PIP_CERT`, `CARGO_HTTP_CAINFO`, `DENO_CERT` and a dozen more) point at it.
-Daytona sets `SSL_CERT_FILE`, `REQUESTS_CA_BUNDLE`, `CURL_CA_BUNDLE` and
-`NODE_EXTRA_CA_CERTS` to its own bundle, which also validates the chain.
+Daytona then overwrites `SSL_CERT_FILE`, `REQUESTS_CA_BUNDLE`, `CURL_CA_BUNDLE`
+and `NODE_EXTRA_CA_CERTS` with its own bundle, which does **not** carry the
+Veris CA and so cannot validate the chain — see the Limitations entry below for
+what that breaks and how each runtime gets the right value back.
+
+**Bundled CAs.** An SDK that ships its own CA file and loads it by path reads
+none of those variables: stripe-python passes `verify=stripe.ca_bundle_path`,
+and its first call fails with "Could not verify Stripe's SSL certificate" in a
+sandbox where `curl`, Node and `requests` all succeed. `sbx.veris
+.patchBundledCas()` appends the Veris CA to the known ones (certifi, pip's
+vendored certifi, botocore, stripe, httplib2) — the Daytona-shaped version of
+the veris CLI's `--patch-bundled-cas`. Run it after installing dependencies;
+`veris-daytona run` does. Every sandbox also carries the same patcher as a
+script at `/tmp/veris-patch-bundled-cas.sh`, which is how a `provision`ed box
+gets patched by whoever installed the dependencies in it.
 
 **On `socks_address`.** The egress credential also carries a SOCKS endpoint,
 which is what `@veris-ai/e2b` uses. Daytona cannot: it accepts only
@@ -84,12 +119,37 @@ listener.
   every runtime that reads one of those variables as its only trust source
   needs the Veris bundle exported per command. `veris-daytona run` does that;
   a command run any other way (the OpenCode plugin's bash tool, `daytona ssh`)
-  inherits Daytona's value. Node is handled at create time instead
+  inherits Daytona's value. The SDK serves the right values two ways for
+  whoever runs the command: `sbx.veris.getTrustEnv()` when you can hand the
+  process an env map, and `sbx.veris.trustPrelude()` — one line of shell
+  `export`s — when all you can do is prefix a command line. Node is handled at
+  create time instead
   (`NODE_OPTIONS=--use-openssl-ca`, which Daytona leaves alone, reading the
   system certificate directory the Veris CA is installed into; that install
   needs passwordless sudo and `update-ca-certificates`, both in Daytona's
   default image). curl returns 200 under the inherited value; it consults the
   system directory as well.
+- **An SDK that bundles its own CA reads no variable at all.** stripe-python
+  passes `verify=stripe.ca_bundle_path`, so the trust variables never reach it
+  and the first Stripe call fails with "Could not verify Stripe's SSL
+  certificate". `sbx.veris.patchBundledCas()` appends the Veris CA to the
+  bundles listed above; run it after installing dependencies, because that is
+  when they arrive. `veris-daytona run` calls it between `--setup` and the
+  command. An SDK outside that list still fails, and its own error names the
+  file to add.
+- **`github.com` is not on the default allowlist.** The platform's route table
+  maps it to the `github` twin, and the gateway resolves that table for every
+  sandbox rather than only the services the environment deployed — so in an
+  environment without a github twin the gateway forges a leaf for `github.com`
+  (it verifies) and then dials a backend pod that does not exist, and every
+  request gets an empty reply. Measured: `uv` could not fetch a CPython the
+  image lacked. `codeload.github.com` and `raw.githubusercontent.com` are
+  unaffected and remain allowed; an environment that *does* have the github
+  twin gets `github.com` from its vendor routes, which is where it belongs.
+- **A very long run's receipt is a floor, not a count.** The twin's log is read
+  in pages of 1000 up to a budget; past that the count prints as `≥N` and
+  `entry.capped` is true. Below the budget it is exact — the count used to stop
+  silently at the server's default of 50.
 - **Git sync into the sandbox can fail** with `Host key verification failed`.
   Inherited from upstream `@daytona/opencode`; the agent works, but local
   changes are not pushed in. Setting `DAYTONA_SSH_KNOWN_HOSTS` is the likely fix.

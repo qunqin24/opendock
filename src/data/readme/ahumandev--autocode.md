@@ -89,20 +89,23 @@ At startup, AutoCode detects OS. Agents use CMD on Windows and Bash on Linux. Wi
 
 ### Primary Agents
 
-|      | Agent      | Purpose                                 |
-| ---- | ---------- | --------------------------------------- |
-| 💡   | `advise`   | Research topics, answer questions, and guide manual work. |
-| 📐   | `design`   | Design and propose solutions.           |
-| 🤖   | `auto`     | **Autonomously** solve problems.        |
-| 🧑‍💻   | `assist`   | Assist **interactively** with problems. |
+Agent availability uses final configured AutoCode tier: `spy` requires an explicit `spy` tier; `auto` requires an explicit `smart` tier. `balanced` does not enable `spy`.
+
+|     | Agent    | Purpose                                                   |
+| --- | -------- | --------------------------------------------------------- |
+| 💡   | `advise` | Research topics, answer questions, and guide manual work. |
+| 📐   | `design` | Design and propose solutions.                             |
+| 🤖   | `auto`   | **Autonomously** solve problems.                          |
+| 🧑‍💻   | `assist` | Assist **interactively** with problems.                   |
+| 🕵️   | `spy`    | Primary, visible, read-only safety review and guidance.   |
 
 ### Behavioural Differences
 
-| Agent         | Investigations | Next Action     | Apply Changes |
-| ------------- | -------------- | --------------- | ------------- |
-| 💡 advise     | Autonomous     | Interactive     | Human         |
-| 🧑‍💻 assist     | Autonomous     | Interactive     | AI*           |
-| 🤖 auto       | Autonomous     | Autonomous      | AI*           |
+| Agent    | Investigations | Next Action | Apply Changes |
+| -------- | -------------- | ----------- | ------------- |
+| 💡 advise | Autonomous     | Interactive | Human         |
+| 🧑‍💻 assist | Autonomous     | Interactive | AI*           |
+| 🤖 auto   | Autonomous     | Autonomous  | AI*           |
 
 *Except dangerous tasks.
 
@@ -112,14 +115,13 @@ At startup, AutoCode detects OS. Agents use CMD on Windows and Bash on Linux. Wi
 flowchart TD
   Concepts([.agents/concepts])
   Concepts -- 📐 design --> Design[.agents/job/.../design.md]
-  
+
   Design -- 💡 advise --> Advise([manual execution])
   Design -- 🧑‍💻 assist --> Assist([interactive execution])
   Design -- 🤖 auto --> Auto([autonomous execution])
-  
 ```
 
-Switch any time between `💡 advise` and `🧑‍💻 assist` and `🤖 auto` when work needs a different autonomy level.
+Switch any time between `💡 advise` and `🧑‍💻 assist` and `🤖 auto` when work needs a different autonomy level. `🕵️ spy` cannot receive session handoff, used for special cases where private info needs to be inspected. 
 
 ## Reference
 

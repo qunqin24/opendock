@@ -225,8 +225,13 @@ With retention on, every clean, top-level subagent whose context fits under
 the reuse ceiling is held for `retainedSubagentTtlMs` after it finishes, the
 oldest entry is evicted when the capacity is reached, and a held session is
 reaped once its window runs out — none of which changes what the orchestrator
-receives at wake time. `list()` renders the held ones in a `RETAINED` section,
-the per-turn snapshot does the same, and the next tool addresses them.
+receives at wake time. A held session can also be deleted from outside the
+plugin (the TUI's `x` on a held row, or the user removing that session in
+opencode); the plugin drops the entry and tells the orchestrator the handle is
+gone, naming the held subagent and saying `reuse(...)` will not reach it — only
+a fresh `spawn` with a full briefing is left. `list()` renders the held ones in
+a `RETAINED` section, the per-turn snapshot does the same, and the next tool
+addresses them.
 
 The reuse tool:
 
@@ -571,22 +576,45 @@ exposes every runtime knob:
   own file, because the sampling params file is a number-valued map whose
   unknown keys are forwarded to the provider.
   An `effort [<value>]` row sits directly under the model row and sets
-  the reasoning effort for that agent over a fixed ladder
-  `default → low → medium → high`. `default` is the absence of a stored
-  value; `low`/`medium`/`high` write the entry's optional `variant` key.
-  The row is inert and muted where the resolved model has no reasoning
-  capability, where the model is not on the pick list, or where no model
-  is resolved. Setting an effort pins the model at the same time
+  the reasoning effort for that agent over a per-model ladder
+  `default → low → medium → high → xhigh`. The ladder offered for the
+  selected model is built from the key list of that model's `variants`
+  map as `client.config.providers()` reports it: each of `low`,
+  `medium`, `high`, `xhigh` is offered only when the model names it as a
+  key. A model that reports no `variants` map at all is taken to offer
+  `low`/`medium`/`high`; a model that reports an empty `variants` map,
+  or one without `capabilities.reasoning === true`, makes the row
+  inert. `default` is the absence of a stored value; any other step
+  writes the entry's optional `variant` key. The row is inert and muted
+  where the resolved model has no reasoning capability, where the model
+  is not on the pick list, or where no model is resolved. Setting an
+  effort pins the model at the same time
   (`{providerID, modelID, variant}`); changing the model clears the
-  effort. The effort is applied per request through the `chat.params`
-  hook, which translates the value into the provider family's own option
-  key — `reasoningEffort` for `@ai-sdk/openai` / `@ai-sdk/openai-compatible`
-  / `@ai-sdk/azure` / `@ai-sdk/xai`; `effort` for `@ai-sdk/anthropic` /
-  `@ai-sdk/google-vertex-anthropic`; `thinkingConfig.thinkingLevel`
-  (with `includeThoughts: true`) for `@ai-sdk/google` /
-  `@ai-sdk/google-vertex`; `reasoning.effort` for
-  `@openrouter/ai-sdk-provider`; nothing for any other family. Keys
-  already set in `llm-params.json` win over the ladder.
+  effort. The effort travels three ways from the stored `variant`:
+  `applyModelChoices` (`src/llmmodel.js`) writes it into
+  `config.agent[<name>].variant`, which is what actually reaches the
+  provider for the families opencode's own `variants` map covers;
+  `chatParamsHook` (`src/llmparams.js`) translates the value into the
+  provider family's own option key and writes it through `output.options`
+  — `reasoningEffort` for `@ai-sdk/openai` /
+  `@ai-sdk/openai-compatible` / `@ai-sdk/azure` / `@ai-sdk/xai`; `effort`
+  for `@ai-sdk/anthropic` / `@ai-sdk/google-vertex-anthropic`;
+  `reasoning.effort` for `@openrouter/ai-sdk-provider`. The
+  `thinkingConfig.thinkingLevel` family of `@ai-sdk/google` /
+  `@ai-sdk/google-vertex` takes only `low`/`medium`/`high` (with
+  `includeThoughts: true`) and emits nothing for `xhigh`; nothing is
+  written for any other family. Keys already set in `llm-params.json`
+  win over the ladder; and `applyModelChoices` additionally seeds
+  opencode's own variant store at
+  `${XDG_STATE_HOME:-$HOME/.local/state}/opencode/model.json` under its
+  `variant` map, keyed `"<providerID>/<modelID>"`, so opencode's TUI
+  shows the active variant in a freshly started session. That store is
+  keyed per model, so its entry takes the effort of the visible primary
+  agent (`mode === "primary"` and not `hidden`; `default_agent` wins
+  where two share a model); a `default`, absent or out-of-ladder effort
+  writes `"default"`. Writes are atomic; a store that does not parse is
+  left untouched; every failure is swallowed so the plugin cannot break
+  on load.
   The choice is applied by two hooks that share the same stored pair. The
   `config` hook writes it into `config.agent[<name>].model` (the
   `providerID/modelID` form opencode resolves an agent's model from), so

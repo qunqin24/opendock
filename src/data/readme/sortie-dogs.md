@@ -24,7 +24,7 @@ Requirements: Node.js 22.6 or newer, npm, and OpenCode.
 
 Guides: [日本語](docs/guide-ja.md) · [简体中文](docs/guide-zh-CN.md) · [CLI testing](docs/cli-testing.md)
 
-Release: [v0.7.1](https://github.com/zufall-upon/Sortie-dogs/releases/tag/v0.7.1)
+Release: [v0.8.2](https://github.com/zufall-upon/Sortie-dogs/releases/tag/v0.8.2)
 
 ## Quick start
 
@@ -184,10 +184,14 @@ global file for durable global settings.
   Remove the directory only when no Sortie run is active.
 - `readOnlyTools` adds host-specific tool names that never change files, such as
   MCP tools. Unknown tools are denied for a bound session by default.
-- `dedicatedWorkerModel` selects the single model every worker role resolves to.
-  It defaults to `openai/gpt-5.6-luna` with variant `max`; declare your own when
-  that model is unavailable or when you want a different worker effort. Worker
-  roles always resolve to this one target and cannot be routed per role.
+- `dedicatedWorkerModel` selects the serial implementation target used by
+  `implementation`, `remediation`, `blocker-resolution`, `sol-worker-mk2a2`, and
+  `dog-worker`. It defaults to `openai/gpt-5.6-sol` with variant `medium`.
+  The installed `dog-luna-worker` fabric route remains fixed to
+  `openai/gpt-5.6-luna` with variant `max`; pointing the serial target at that
+  Luna model is invalid because it would collapse the two route identities. The
+  coordinator dispatches this role only for a ready descriptor of a prepared
+  `luna-fabric` run; a `sol-serial` run keeps `dog-worker`.
 - `continuation` bounds the batch loop. After a terminal unit and its checkpoint,
   `dog-coordinator` calls `sortie_compact_and_continue`, which compacts the run
   and resumes the same root session on the next independent unit. Only a root
@@ -223,9 +227,9 @@ global file for durable global settings.
   requests are not repeated.
 - **Writes stay inside the assignment.** Exact source or operation manifests
   gate edits and handoffs.
-- **Autonomous sequential implementation.** A normal request may use as many sequential
-  workers as its accepted scope requires. Concurrent fan-out still needs the explicit
-  parallel contract.
+- **Autonomous implementation routing.** An accepted scope with at least two safe independent
+  units defaults to Luna fabric without opt-in. An explicit serial/no-parallel request wins;
+  other work uses sequential workers. The separate parallel contract remains explicit.
 - **Runtime overlap protection.** Active equal or ancestor write scopes are rejected
   before mutation, and full validation waits until every parallel unit joins.
 - **Evidence before completion.** Canonical validation, risk-based review, and
@@ -321,29 +325,40 @@ where the curve gives the most per unit of cost. Nobody selects a model for a
 session the loop spawns, which is why delegated roles carry defaults and the
 coordinator does not. Project-local routing can override this default.
 
-The `implementation`, `remediation`, `blocker-resolution`, and `dog-worker`
-roles always use the dedicated worker target, `openai/gpt-5.6-luna` with the
-`max` variant. Worker effort stays at the top of that model's range while review
-effort stays above it on a stronger model, which is what mandatory source review
-is for. Declare `dedicatedWorkerModel` as `openai/gpt-5.6-sol` when you would
-rather pay for the stronger worker model up front; that target stays in the
-built-in catalog for exactly this reason. `modelRouting`
-cannot replace those routes, and only `dedicatedWorkerModel` moves them. For other explicitly
-routed roles, resolution is deterministic: Sortie-dogs tries the preferred
-target, then ordered fallbacks. Roles without either a built-in default or an
-explicit route keep OpenCode's already selected model.
+The `implementation`, `remediation`, `blocker-resolution`, `sol-worker-mk2a2`,
+and `dog-worker` roles always use the stable serial target,
+`openai/gpt-5.6-sol` with the `medium` variant. `dedicatedWorkerModel` may move
+that serial target when a host cannot serve it. The installed `dog-luna-worker`
+route is separately fixed to `openai/gpt-5.6-luna` with the `max` variant. Its
+shared worker contract requires one validated fabric descriptor: the coordinator
+admits a v0.8 DAG contract with `sortie_admit_luna_fabric`, prepares it with
+`sortie_prepare_luna_fabric`, and materializes only the current ready wave, with
+at most five distinct Luna units. The complete DAG may contain up to 64 units.
+After every active artifact is verified, `sortie_advance_luna_fabric_wave`
+integrates them into a runtime-owned hidden candidate, cleans those worktrees,
+and creates fresh worktrees from that exact snapshot. After the final wave,
+`sortie_validate_luna_fabric_candidate` runs canonical validation once and
+`sortie_accept_luna_fabric_candidate` records review before one target CAS.
+Declared shared-path ownership serializes overlapping units
+across waves; unowned overlap or any admission defect routes the whole job back
+to one `dog-worker`. The fabric never duplicates one unit across lanes.
+`modelRouting` cannot replace either fixed
+route, and a serial override naming the Luna fabric model is invalid rather than
+silently collapsing both identities. Version 0.7.0 routed `dog-worker` to Luna
+Max; v0.8 intentionally preserves that history while splitting stable Sol and
+fabric Luna roles. Other explicit routes try the preferred target, then ordered
+fallbacks. Roles without a built-in default or explicit route keep OpenCode's
+already selected model.
 
 `dog-reviewer` and `dog-advisor` must never inherit the caller's model, because
 review and strategy lose their value when they run on the model that produced
 the candidate. Both default to `anthropic/claude-opus-5` when the catalog
 declares it, and otherwise fall back to `openai/gpt-5.6-sol` with the `xhigh`
-variant. That fallback stays on the stronger model rather than matching the
-worker target, because review has to be able to reject work the worker just
-produced. A host that redeclares
-`dedicatedWorkerModel` keeps that target as its first fallback, since such a
-host may not serve the shipped model at all. Nothing here requires a particular
-vendor: both roles stay fully configurable, so declare whichever model you can
-actually serve.
+variant. That fallback uses higher effort than the Sol Medium worker because
+review has to be able to reject work the worker just produced. Moving
+`dedicatedWorkerModel` does not change consultation policy. Nothing here requires
+a particular vendor: both roles stay fully configurable, so declare whichever
+model you can actually serve.
 
 ```json
 {
@@ -392,6 +407,9 @@ After replacing the dependency with a newer release asset, run:
 ```sh
 npx sortie-dogs init .
 ```
+
+After initialization, fully restart the OpenCode host before resuming a coordinator or opening a
+fresh session. Plugin modules are process-scoped, so a new session alone cannot load the update.
 
 `init` is idempotent. It updates files owned by Sortie-dogs, migrates recognized
 older runtime files, and records the installed version in
