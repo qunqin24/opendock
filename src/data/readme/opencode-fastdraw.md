@@ -71,11 +71,21 @@ The engine ships on PyPI as **`aihr`** (import package `hr`, console script `hr`
 # Python engine (add [vision] only if you need the vision item generators)
 pip install "aihr[vision]"
 
-# OpenCode plugins — both in one command
-npm install -g opencode-hr-agent opencode-fastdraw
+# OpenCode plugins — recommended: set up a user-level npm prefix first, so a
+# global install never needs root (skip these two lines if you use nvm; its
+# prefix is already user-level):
+npm config set prefix ~/.npm-global
+export PATH="$HOME/.npm-global/bin:$PATH"
+# then install both plugins with an exact version pin (quotes: zsh @-safety):
+npm install -g "opencode-hr-agent@0.2.1" "opencode-fastdraw"
 ```
 
 `opencode-fastdraw` is a standalone model/role-switching plugin and can be installed on its own. `opencode-hr-agent` bridges the OpenCode tool surface to the `hr` CLI, so it requires the Python engine above. Wheel artifacts are also attached to each [GitHub Release](https://github.com/TachikomaGundam/AIHR/releases).
+
+- **Why the user-level prefix:** without one, a bare `-g` install fails with `EACCES` and invites copy-pasted sudo escalation; the prefix route avoids that path entirely.
+- **Why the exact pin:** a floating `-g` install auto-updates silently and can pull unpublished code to run against your `~/.npmrc` and `HR_HOME`; an exact pin keeps the installed surface auditable.
+
+Security model & trust assumptions: docs/PLUGIN_SECURITY.md
 
 Installing from this repository (source/editable) works identically:
 

@@ -12,7 +12,7 @@ This is a maintained fork of [zaniluca/opencode-codex-usage-plugin](https://gith
 
 ## Features
 
-- **Quota gauges** — compact eighth-block gauges for the 5-hour and weekly Codex limits
+- **Quota gauges** — compact eighth-block gauges for the available 5-hour and weekly Codex limits
 - **Proximity colors** — gauge and percentage use the active theme: `success` <50% → `accent` 50–74% → `warning` 75–89% → `error` ≥90%
 - **Reset countdowns** — short reset times appear beneath each available window
 - **Compact prompt line** — identifies the most constrained window when the sidebar is hidden

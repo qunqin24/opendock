@@ -49,12 +49,20 @@ claude plugin install obsidian-wikilinks@depickeresven-obsidian-wikilinks
 
 ### From npm (recommended)
 
-If you want it local in one project
+The `opencode plugin` command installs the package and adds it to your config.
+For every project:
+
+```bash
+opencode plugin obsidian-wikilinks --global
+```
+
+For one project only, run it without the flag inside that repo:
+
 ```bash
 opencode plugin obsidian-wikilinks
 ```
 
-That installs the package and adds it to your config. Or add it by hand:
+You can also add it by hand:
 
 ```json
 {
@@ -65,12 +73,6 @@ That installs the package and adds it to your config. Or add it by hand:
 
 Use `~/.config/opencode/opencode.json` for every project, or `opencode.json` in
 a repo for that project only.
-
-Or you want it installed global:
-```bash
-opencode plugin obsidian-wikilinks --global
-```
-
 
 ### From a local checkout
 
@@ -86,7 +88,7 @@ ln -s ~/.config/opencode/obsidian-wikilinks/plugin/obsidian-wikilinks.js ~/.conf
 Use `.opencode/plugin/` instead of `~/.config/opencode/plugin/` to enable it for
 a single project only.
 
-Alternatively, reference the checkout from your config instead of symlinking —
+Alternatively, reference the checkout from your config instead of symlinking.
 `plugin` entries accept `file://` URLs and paths relative to the config file:
 
 ```json
@@ -131,6 +133,30 @@ Review the notes in [[Meetings]] and prepare a weekly summary.
 When a name is ambiguous, the plugin provides up to three candidate paths. If
 there is no match, it says so instead of guessing.
 
+### What the agent receives
+
+The injected context is plain text, one line per distinct wikilink:
+
+```text
+Obsidian wikilink resolution (vault: /Users/you/Documents/Obsidian):
+[[Website Redesign]] -> /Users/you/Documents/Obsidian/Projects/Website Redesign.md
+[[Meetings]] -> /Users/you/Documents/Obsidian/Meetings/
+[[Notes]] -> ambiguous, candidates: /path/Notes.md, /path/Old/Notes.md
+[[Nope]] -> no match found in vault /Users/you/Documents/Obsidian
+Read the resolved file(s) when their content is relevant to the request.
+```
+
+Folder matches end in a path separator. Repeated wikilinks are resolved once.
+
+### What gets indexed
+
+The whole vault is walked, notes and folders alike, with two exclusions:
+
+- Anything whose name starts with a dot.
+- The folders `.obsidian`, `.trash`, `.git`, and `.vault-meta`.
+
+A note inside a hidden folder will therefore never resolve.
+
 ## Vault selection
 
 Vault path resolution order:
@@ -142,8 +168,8 @@ Vault path resolution order:
      (or `$OPENCODE_CONFIG_DIR` / `$XDG_CONFIG_HOME` when set)
 2. The other hosts' config files, as a compatibility fallback
 3. `$OBSIDIAN_VAULT` environment variable
-4. Obsidian's vault registry — auto-detected (prefers the open vault, else most
-   recently opened). Cross-platform (macOS / Windows / Linux).
+4. Obsidian's vault registry, auto-detected (prefers the open vault, else the
+   most recently opened). Cross-platform (macOS / Windows / Linux).
 5. `~/Documents/Obsidian` (default fallback)
 
 You only need an explicit override if you have **multiple vaults** and want to
@@ -153,19 +179,53 @@ pin a specific one. Create the config file for your host with:
 { "vault": "/Users/you/Documents/Obsidian" }
 ```
 
-The plugin itself is identical on every device. Update Claude Code with
-`claude plugin update obsidian-wikilinks`. Re-run the Codex `plugin add` command
-to install an updated version there. For OpenCode, re-run `opencode plugin
-obsidian-wikilinks`, or `git pull` in the checkout.
+## Updating
+
+The plugin itself is identical on every device.
+
+- Claude Code: `claude plugin update obsidian-wikilinks`
+- Codex: re-run the `codex plugin add` command to install a newer version.
+- OpenCode: re-run `opencode plugin obsidian-wikilinks`, or `git pull` in the
+  checkout.
 
 ## Environment variables
 
-| Variable                        | Purpose                                                      |
-|---------------------------------|--------------------------------------------------------------|
-| `OBSIDIAN_VAULT`                | Vault path, used when no host config file sets one           |
-| `OBSIDIAN_WIKILINKS_RESOLVER`   | Path to `wikilink-resolver.py` (OpenCode only)               |
-| `OBSIDIAN_WIKILINKS_PYTHON`     | Python interpreter to use (default `python3`, OpenCode only) |
-| `OBSIDIAN_WIKILINKS_TIMEOUT_MS` | Resolver timeout in ms (default `10000`, OpenCode only)      |
+| Variable                        | Purpose                                                                                                                             |
+|---------------------------------|-------------------------------------------------------------------------------------------------------------------------------------|
+| `OBSIDIAN_VAULT`                | Vault path, used when no host config file sets one                                                                                  |
+| `OBSIDIAN_WIKILINKS_HOST`       | Force the host the resolver assumes: `codex`, `claude`, `opencode`. Normally auto-detected, and the OpenCode plugin sets it for you |
+| `OBSIDIAN_WIKILINKS_RESOLVER`   | Path to `wikilink-resolver.py` (OpenCode only)                                                                                      |
+| `OBSIDIAN_WIKILINKS_PYTHON`     | Python interpreter to use (default `python3`, OpenCode only)                                                                        |
+| `OBSIDIAN_WIKILINKS_TIMEOUT_MS` | Resolver timeout in ms (default `10000`, OpenCode only)                                                                             |
+
+## Troubleshooting
+
+The resolver is deliberately silent: on any problem it exits without output and
+your prompt is passed through untouched. That makes the failure modes below look
+identical from the outside, so work through them in order.
+
+**Nothing is injected at all.**
+
+- Check `python3 --version` in the same shell the agent runs in. No `python3` on
+  PATH means no resolution. On OpenCode, point `OBSIDIAN_WIKILINKS_PYTHON` at
+  your interpreter.
+- On Codex, run `/hooks` in a new thread and confirm the plugin's
+  `UserPromptSubmit` hook is trusted. Untrusted hooks never execute.
+- Confirm the vault directory actually exists. The resolver exits early when the
+  resolved path is not a directory, including for the `~/Documents/Obsidian`
+  fallback.
+
+**The wrong vault is used.** Run through the resolution order above. A stale
+config file for *another* host wins over `$OBSIDIAN_VAULT`, because step 2 comes
+first. Delete it, or set an explicit override for your own host.
+
+**A note resolves to `no match found`.** Check that it is not inside a hidden
+folder (see [What gets indexed](#what-gets-indexed)), and that the vault in the
+output line is the one you expect.
+
+**Resolution is slow or times out on OpenCode.** The vault is walked on every
+prompt containing a wikilink. On a very large vault, raise
+`OBSIDIAN_WIKILINKS_TIMEOUT_MS` above its `10000` default.
 
 ## Development
 
@@ -183,16 +243,16 @@ Two workflows, chained.
 
 `.github/workflows/ci.yml` runs the smoke tests on Node 20/22/24 and on Bun, and
 checks the packed tarball ships both `plugin/` and `hooks/`. It runs on pull
-requests and on pushes to `main` — not on every branch, so a pull request is
+requests and on pushes to `main`, not on every branch, so a pull request is
 never tested twice.
 
 `.github/workflows/publish.yml` starts only when a CI run on `main` finishes
 successfully, checks out that exact commit, and asks npm whether the version in
 `package.json` already exists:
 
-- **Already on npm** — nothing is released. This is what an ordinary push to
+- **Already on npm**: nothing is released. This is what an ordinary push to
   `main` does.
-- **Not on npm** — it publishes with provenance, tags the commit, and opens a
+- **Not on npm**: it publishes with provenance, tags the commit, and opens a
   GitHub release with notes generated from the merged commits.
 
 So a version bump landing on `main` *is* the release, and it can only happen
@@ -208,13 +268,17 @@ git push
 
 `--no-git-tag-version` matters: the workflow creates the tag, so creating one
 locally would collide. The bump still runs `scripts/sync-versions.mjs`, keeping
-the Claude Code and Codex manifests on the same version as `package.json` — CI
+the Claude Code and Codex manifests on the same version as `package.json`. CI
 fails the build if they ever drift.
 
 Use the publish workflow's manual trigger (`workflow_dispatch`) with *dry run*
-enabled to rehearse a publish without releasing anything.
+enabled to rehearse a publication without releasing anything.
 
-### Requirements
+## Requirements
 
-- `python3` on PATH (standard-library only; no pip installs).
-- OpenCode only: no extra dependencies — the plugin uses Node/Bun built-ins.
+- `python3` on PATH. Standard library only, no pip installs.
+- OpenCode only: no extra dependencies, the plugin uses Node/Bun built-ins.
+
+## License
+
+[MIT](LICENSE) © Sven Depickere

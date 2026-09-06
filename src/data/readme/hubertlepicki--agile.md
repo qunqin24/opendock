@@ -142,13 +142,13 @@ Long sessions drift. Agents slide back to code-first the moment the ruleset fall
 
 | Host | Mechanism | Anti-drift |
 |---|---|---|
-| **Claude Code** | `SessionStart` + `UserPromptSubmit` + `SubagentStart` hooks | **Full** — the ruleset is re-injected on *every turn*, and into every subagent |
+| **Claude Code** | `SessionStart` (also after compaction/clear) + `UserPromptSubmit` + `SubagentStart` hooks | **Full** — the full ruleset returns after every compaction or clear, a short reminder holds the line every turn in between, and every subagent gets the full ruleset |
 | **Codex** | the same three hooks, same file, same event names | **Full** — identical to Claude Code |
 | **OpenCode** | `experimental.chat.system.transform` on every turn | **Full** — the ruleset is re-injected on *every turn* |
 | **Grok Build** | plugin skill + auto-invoke from its description | **Partial** — skill-tier; Grok hooks cannot inject instructions |
 | **Antigravity** | `AGENTS.md` as always-on context | **Partial** — instruction-tier only |
 
-Be aware of the last two rows: **Grok Build and Antigravity do not re-inject the ruleset every turn.** Grok loads `/agile` as a skill (and can auto-invoke it on coding tasks); Antigravity loads `AGENTS.md` once as persistent context. How well the discipline holds over a long session is up to how the host keeps that in the prompt. This plugin cannot add per-turn injection there.
+Be aware of the last two rows: **Grok Build and Antigravity have no mechanism to recover the ruleset once it falls out of context.** Grok loads `/agile` as a skill (and can auto-invoke it on coding tasks); Antigravity loads `AGENTS.md` once as persistent context. How well the discipline holds over a long session is up to how the host keeps that in the prompt. This plugin cannot add per-turn injection there.
 
 On OpenCode, `/agile off` is what persists the off flag. Saying "stop agile" as ordinary chat is honored for that turn; the next turn injects again unless you used the command.
 

@@ -295,8 +295,8 @@ When Sisyphus delegates to a subagent, it doesn't pick a model. It picks a **cat
 
 | Category             | What it's for                      |
 | :------------------- | :--------------------------------- |
-| `visual-engineering` | Frontend, UI/UX, design            |
-| `deep`               | Autonomous research + execution    |
+| `visual-engineering` | Visual design, UI/UX, frontend     |
+| `deep`               | Deep work across visual and technical domains |
 | `quick`              | Single-file changes, typos         |
 | `ultrabrain`         | Hard logic, architecture decisions |
 

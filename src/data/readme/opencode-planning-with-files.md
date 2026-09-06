@@ -354,6 +354,7 @@ One hook fire measures 289ms wall-clock since the v3.6.0 optimization, down from
 
 | Version | Highlights |
 |---------|------------|
+| **v3.16.1** | Attached Codex, Hermes and Pi sessions require an explicit plan when several tasks share an armed project. Standalone hooks deliver model context through the proper event fields, preserve native session identity and throttle progress reminders. Packages include the loop template and Stop dependencies; recovery and security guidance state the selected-plan and trust boundaries. |
 | **v3.16.0** | **The PostToolUse progress reminder was shown to you and never to Claude** (closes #239, reported by @sortakool). It was emitted as `systemMessage`, which Claude Code delivers to the user, so a sentence addressed to the model reached the person instead, after every `Write`, `Edit` and `Bash` call for a whole session. Both the plugin dispatcher and the Codex adapter now emit `hookSpecificOutput.additionalContext`, the shape the session-start path in the same file already used. The reminder is also throttled to once per turn instead of once per tool call, and `Bash` is off the PostToolUse matchers so `ls` and `git status` stop tripping a "record what you changed" nudge. PreToolUse keeps `Bash`. Fixing this surfaced one more copy of the #237 fallback in the plugin dispatcher, now closed. |
 | **v3.15.0** | **A mistyped `PLAN_ID` used to attest and inject a different plan, and a slug plan could switch off the project's own policy** (closes #237 and #238, both reported by @sortakool). An explicit `PLAN_ID` is now a binding in every resolver, shell, PowerShell, Hermes, OpenCode and Pi: it resolves or it stops, and every consumer that reads or writes the selected plan says which selector refused instead of quietly using the root plan. A project's root `.mode` is now a floor rather than a default that slug scope replaces, so creating a plan can no longer drop a committed attestation requirement or completion gate; a slug may raise strictness, never lower it. Also fixes `plan-doctor.sh` reporting `PASS injection: emits plan context` on a state where nothing was injected at all (closes #236): classification branches on the `===BEGIN-PWF-DATA` framing rather than substring-matching control strings against the plan body, so a plan quoting one of them no longer trips a false tamper warning and a reworded banner degrades to a warning instead of a silent PASS. 30 new tests, each with its own control arm. |
 | **v3.14.0** | **OpenCode becomes a first-class host through its own plugin system** (closes #235, reported by @luyanfeng). New npm plugin `opencode-planning-with-files`: `chat.message` injects the framed plan on every turn, `tool.execute.after` reminds after writes, `experimental.session.compacting` keeps the plan pointer and attestation in the summary, and `session.idle` runs the completion gate in gated mode by re-prompting the session (Tier 2). Tools `pwf_init`, `pwf_status`, `pwf_check`; commands `/pwf`, `/pwf-status`. Same resolver, ambiguity rule, gate table and frame format as the shell route, 22 Vitest tests, verified live in OpenCode 1.18.21. `docs/opencode.md` now names the real install path (`npx skills add -g` lands in `~/.agents/skills/`, which OpenCode reads) and the tier tables stop crediting OpenCode with hooks it never ran. |
@@ -507,13 +508,13 @@ Hermes' own `skills-guard` scanner rates the Hermes bundle `SAFE`; the canonical
 ## Multi-agent runs: orchestrators, workers and subagents
 
 > [!NOTE]
-> **Markdown on disk is the shared state between agents.** One orchestrator owns `task_plan.md`, every worker appends to its own ledger, and the hooks resolve the right plan for each thread. No message bus, no runtime-only state, nothing that dies with a process.
+> **Markdown on disk is the shared state between agents.** One orchestrator owns `task_plan.md` and the shared summaries; every worker appends to its own ledger or assigned file. Pin each independent task with `PLAN_ID` before starting its host, or use separate worktrees.
 
 - **Run ledger per agent.** Workers append one JSON line per event to `.planning/<id>/ledger-<agent>.jsonl` (`ledger-append.sh`); `ledger-summary.sh` synthesizes a fixed-shape, KV-cache-stable block from all ledgers that replaces the raw `progress.md` tail in autonomous and gated mode. No free text from disk reaches the model through that block.
 - **Plan isolation per task.** `init-session.sh "<name>"` gives each parallel task its own `.planning/YYYY-MM-DD-<slug>/` directory; `PLAN_ID` pins a terminal to one of them, `set-active-plan.sh` switches the shared pointer.
 - **Threads whose cwd is a shared parent.** `PWF_PLAN_ROOT=<absolute path>` binds an agent thread to the project that owns the plan; an ambiguous cwd, where a nested project carries its own planning state, injects nothing rather than guessing.
-- **Session attachment.** On Codex and Hermes a project can opt into `.planning/sessions/<id>.attached`, so only attached sessions receive plan context in a shared working directory.
-- **Parallel-write guard.** When two sessions write the same plan, the next turn reports how much checked progress was lost instead of silently continuing on the clobbered file.
+- **Session attachment.** An `.attached` marker authorizes context but does not select a task. In the Codex, Hermes, Pi, and standalone hook routes, armed isolation with multiple plans requires `PLAN_ID`; otherwise context is refused. A project-root pin alone cannot distinguish tasks within that root.
+- **Parallel-write guard.** The next turn warns if checked items or completed phases decrease. This is an advisory check after the write, not a lock or merge mechanism. It does not detect every overwritten plan, `progress.md`, or `findings.md`.
 - **Stall-aware gate.** The completion gate reads the ledger, not `progress.md` mtime, so a worker that stopped producing events releases the stop instead of looping.
 - **One plan, many hosts.** Claude Code, Codex, Pi, Hermes and OpenCode read the same files, the same `.attestation` and the same gate counters, so a plan can be handed from one agent to another mid-run.
 
@@ -766,7 +767,7 @@ planning-with-files/
 └── README.md
 ```
 
-Every release maintains 18 tracked parity targets plus the gitignored ClawHub upload stage when it is present. `scripts/bump-version.py` updates every available target, and CI fails if a tracked variant lags.
+Every release maintains 19 tracked parity targets plus the gitignored ClawHub upload stage when it is present. `scripts/bump-version.py` updates every available target, and CI fails if a tracked variant lags.
 
 </details>
 

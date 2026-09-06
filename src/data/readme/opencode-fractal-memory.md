@@ -53,7 +53,7 @@ No manual `tui.json` edit, no `postinstall` — `src/plugin/install.ts: patchPlu
 
 **Local dev** (this repo): `bun run dev-install` (build + sync cache + ensure `tui.json` npm spec + platform binaries for `sqlite-vec`).
 
-Published `0.8.3` (`sqlite-vec v0.1.9` brute-force, `oc-plugin`).
+Published `0.8.4` (`sqlite-vec v0.1.9` brute-force, `oc-plugin`, compress router + squeez).
 
 ## Features
 
@@ -77,7 +77,7 @@ Published `0.8.3` (`sqlite-vec v0.1.9` brute-force, `oc-plugin`).
 - **Predictive rating** — adjusts memory usefulness scores over time based on usage patterns
 - **Cache system** — in-memory LRU cache for frequently accessed nodes with configurable TTL
 - **Consolidation** — extracts semantic facts from episodic node clusters on session idle
-- **Command compression** — zero-dependency compression of bash tool output via a registry-driven pipeline (`pipeline.ts` + 12-entry strategy registry: ls, test, grep, git-status, git-log, git-diff, git-quick, git pull, truncate + generic fallback). Tiered gates (verbatim pass-through, net-win, benign-aware threshold). Optional Ollama extraction via small local model as last-resort. Stats tracked in `compression_stats` table. View via management app Compress tab
+- **Command compression** — zero-dependency compression of bash tool output via content-type router (`output-types/` detecting coverage-log/compiler-diagnostics/test-output etc) **before** a registry-driven pipeline (`pipeline.ts` + 12-entry strategy registry: ls, test, grep, git-status, git-log, git-diff, git-quick, git pull, truncate + generic fallback). Tiered gates (verbatim pass-through, net-win, benign-aware threshold). Per-tool budgets (`perTool`: test→2500 error-first, ls→800 names, grep→1200, git diff→2000) via longest-prefix matching. Error-first for any failing bash (before signal gate). Optional **Squeez** (`KRLabsOrg/squeez-2b`, 0.86 recall @92% vs BM25 0.22) `POST /extract → relevant_lines[]` task-conditioned verbatim extraction (fails-open, empty→`[squeez-negative]`) + Ollama extraction as last-resort. Stats tracked in `compression_stats` table. View via management app Compress tab
 - **Context dashboard** — new management app tab showing memory node count/tokens by level, active rules, compression stats, recent injection history, and estimated total context usage with overhead breakdown
 - **Structural shape detection** — automatically detects output shape (JSON, CSV, stack-trace, tree, table, compiler-diagnostics, test-output, npm-install, coverage-log) and applies tailored compressors (e.g., JSON → `Object(12 keys)`, stack-trace → error + unique frame count, compiler-diagnostics → errors grouped by file with codes). Falls through to generic if shape is unknown
 - **SmartFilter** — noise-stripping preprocessor in shape detection: removes separator lines, progress bars, repeated punctuation, and leading/trailing blank lines before shape classification. Logged as `shape-json`, `shape-csv`, etc. with noise counts
@@ -271,7 +271,9 @@ Create `~/.config/opencode/opencode-mem.json` to customize (optional — all def
     "enabled": true,
     "maxLines": 50,
     "excludeCommands": ["curl", "wget"],
-    "alwaysFullOnFailure": true
+    "alwaysFullOnFailure": true,
+    "perTool": { "test": { "maxTokens": 2500, "strategy": "error-first" } },
+    "squeezExtraction": { "enabled": false, "baseUrl": "http://localhost:8000", "model": "KRLabsOrg/squeez-2b", "deferToIdle": true }
   },
   "sessionLog": {
     "enabled": false
@@ -341,6 +343,10 @@ Create `~/.config/opencode/opencode-mem.json` to customize (optional — all def
 | `commandCompression.maxLines` | int | `50` | Max lines for generic truncation |
 | `commandCompression.excludeCommands` | string[] | `["curl","wget"]` | Commands to never compress |
 | `commandCompression.alwaysFullOnFailure` | bool | `true` | Preserve full output on non-zero exit |
+| `commandCompression.perTool` | map | `test→2500 error-first` etc | Per-tool budgets + strategy (longest-prefix, grep 1200, ls 800 names) |
+| `commandCompression.squeezExtraction.enabled` | bool | `false` | Squeez KRLabsOrg/squeez-2b verbatim extraction |
+| `commandCompression.squeezExtraction.baseUrl` | string | `http://localhost:8000` | Squeez vLLM/Ollama URL (`POST /extract`) |
+| `commandCompression.squeezExtraction.deferToIdle` | bool | `true` | Defer to idle (false = sync in `tool.after`) |
 | `sessionLog.enabled` | bool | `false` | Log session events to separate file |
 | `toolDedup` | bool | `true` | Deduplicate repeated identical tool calls within a turn |
 | `errorPruning` | bool | `false` | Replace errored tool call inputs with placeholders after 4 turns |

@@ -55,45 +55,21 @@ Instead of one agent trying to do everything, you get:
 
 ### Install TeamMode
 
-**Option A — One-line installer (recommended):**
+**Option A — One-line installer:**
 
 macOS / Linux (bash):
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Te-River/Opencode-TeamMode/main/scripts/install.sh | bash
+curl -fsSL https://ghproxy.net/https://raw.githubusercontent.com/Te-River/Opencode-TeamMode/main/scripts/install.sh | bash
 ```
 
 Windows (PowerShell):
 ```powershell
-irm https://raw.githubusercontent.com/Te-River/Opencode-TeamMode/main/scripts/install.ps1 | iex
+irm https://ghproxy.net/https://raw.githubusercontent.com/Te-River/Opencode-TeamMode/main/scripts/install.ps1 | iex
 ```
 
-These scripts install the npm package and automatically register the plugin in your `opencode.jsonc`.
+**Option B — Manual config:**
 
-**Option B — Manual npm install:**
-
-```bash
-# 1. Install the plugin package
-npm install -g @te-river/opencode-team-mode
-
-# 2. Add the plugin to your opencode.jsonc
-#    (see "Configuration" below)
-```
-
-**Option C — Local dev install (from this repo):**
-
-```bash
-git clone https://github.com/Te-River/Opencode-TeamMode.git
-cd Opencode-TeamMode
-npm install
-npm run build
-npm link
-```
-
----
-
-## ⚙️ Configuration
-
-After installing, add the plugin to your `opencode.jsonc`:
+Add the plugin to your `opencode.jsonc`:
 
 ```jsonc
 {
@@ -104,9 +80,15 @@ After installing, add the plugin to your `opencode.jsonc`:
 }
 ```
 
-That's it. The plugin automatically injects all team agents and commands when OpenCode starts. **No need to manually copy agent files or command definitions.**
+OpenCode will automatically install the plugin on startup.
 
-> 💡 **Tip:** After modifying `opencode.json`, **restart OpenCode Desktop** for changes to take effect.
+> **Tip:** After modifying `opencode.json`, **restart OpenCode Desktop** for changes to take effect.
+
+---
+
+## ⚙️ Configuration
+
+The plugin automatically injects all team agents and commands when OpenCode starts. **No need to manually copy agent files or command definitions.**
 
 > ⚠️ **Model choice matters.** Every judgment in the workflow — triage,
 > decomposition, dispatch briefs, synthesis, review-loop verdicts — flows
