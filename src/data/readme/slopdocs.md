@@ -12,7 +12,7 @@ Add to your `opencode.json`:
 }
 ```
 
-Restart OpenCode. The `slopdocs` skill is now available and will be loaded automatically when the agent is writing or deciding whether to create documentation.
+Restart OpenCode. The `slopdocs` skill is now available and will be loaded automatically when the agent is writing or deciding whether to create documentation. Requires OpenCode 1.18.29 or newer.
 
 To track an unreleased version directly from the repo, install from git instead:
 

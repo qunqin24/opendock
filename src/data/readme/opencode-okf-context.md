@@ -21,7 +21,7 @@ L1 index (on demand, small) ─────────────────�
         │ okf_read  /  okf_search
 L2 full text (on demand, large, has a lifetime)
    the concept's full markdown enters context
-        │ after N user turns (default 2)  ·  or  okf_unload
+        │ after N user turns (default 4)  ·  or  okf_unload
 unload: full text → placeholder
    "[OKF] concept tables/customers unloaded — ~3.2k chars freed.
     Summary retained: customers [BigQuery Table] — Customer master table…
@@ -32,8 +32,8 @@ Three mechanisms:
 
 | mechanism | what happens |
 |---|---|
-| **deterministic unload** | a loaded concept's `okf_read` output becomes a compact placeholder (title + type + description) after enough turns, or on explicit `okf_unload`. No LLM call. |
-| **deduplication** | the same concept read twice keeps only the latest full text; earlier reads collapse to a "deduplicated" placeholder. |
+| **deterministic unload** | a loaded concept's `okf_read` output becomes a compact placeholder (title + type + description) after enough turns, or on explicit `okf_unload`. No LLM call. Stale `okf_search` results age out the same way (the most recent search is kept). |
+| **deduplication** | the same concept read twice keeps only the latest full text; earlier reads collapse to a "deduplicated" placeholder. Repeated searches for the same term keep only the latest results. |
 | **soft nudge** | when retained OKF content exceeds a threshold, a one-line reminder is anchored onto the last user message (never a new message). |
 
 Protection: the `keepRecent` most recent reads and `protectedConcepts` globs are never auto-unloaded; explicit `okf_unload` always wins. All rewriting is outbound-only — the real history is never mutated.
@@ -61,6 +61,26 @@ Protection: the `keepRecent` most recent reads and `protectedConcepts` globs are
 ```
 
 Checks: frontmatter `type`/`title`/`description`/`tags` + body (concept-level); `okf_version`, `log.md`, and broken cross-links (bundle-level, via `all:true`). Malformed YAML in a concept no longer breaks discovery — it loads with empty frontmatter and surfaces as a `yaml-error`.
+
+## CLI: `okf` (other agents, humans, CI)
+
+The package also ships a standalone **`okf`** binary — the same operations as the tools above, for environments the plugin can't reach: other coding agents (via their shell tool), humans, and CI.
+
+> **Plugin install ≠ CLI on PATH.** `opencode plugin …` only fetches the plugin entry — it does not run npm's bin linking. The CLI comes from an npm install of the same package: `npm install -g opencode-okf-context` (or one-off `npx -p opencode-okf-context okf …`). Keep plugin and CLI on the same version; `okf version` self-reports which build you have.
+
+```bash
+okf list                                     # browse a bundle index
+okf search customer churn                    # metadata-first search
+okf read tables/customers                    # full text
+okf read reference/api_schema --section Authentication --max-chars 2000
+okf validate --all                           # repo gate: exit 1 on validation errors
+okf manifest                                 # rule-file snippet for non-opencode agents
+```
+
+- **Read intake control** is the CLI's context lever (there is no auto-unload outside opencode): `--fields` (metadata only), `--section <heading>`, `--max-chars <n>` — load less instead of unload later.
+- **Read-only by default**: `write`/`update`/`delete` require `--write` (or `write.enabled: true` in `.okf.jsonc`). Pass long bodies via `--body-file <path|->` (stdin).
+- Config: `<project>/.okf.jsonc` (same schema as the plugin config); `--root <path>` targets a bundle directly, `--bundle <name>` picks one.
+- Exit codes `0`/`1`/`2` (ok / error / usage) — CI-friendly.
 
 ## Install
 
@@ -96,11 +116,11 @@ Layered (deep-merged; later layers override earlier): `~/.config/opencode/okf.js
   "bundles": [{ "path": "docs/knowledge", "name": "project-kb" }],
   "disclosure": { "injectManifest": true, "maxManifestChars": 2000 },
   "unload": {
-    "afterTurns": 2,          // unload after 2 user turns
-    "keepRecent": 1,          // never auto-unload the most recent read
+    "afterTurns": 4,          // unload after 4 user turns (tuned for large context windows)
+    "keepRecent": 2,          // never auto-unload the 2 most recent reads
     "placeholder": "description"
   },
-  "nudge":   { "threshold": 6000, "frequency": 3, "force": "soft" },
+  "nudge":   { "threshold": 25000, "frequency": 3, "force": "soft" },
   "write":   { "enabled": true, "updateIndex": true, "appendLog": true },
   "protectedConcepts": ["tables/*"],
   "debug": false
@@ -113,7 +133,7 @@ Auto-scan skips build/VCS directories (`node_modules`, `dist`, `.git`, …) and 
 
 ```bash
 bun install
-bun test            # 114 tests
+bun test            # 146 tests
 bunx tsc --noEmit   # type-check
 ```
 

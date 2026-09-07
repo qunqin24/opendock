@@ -5,11 +5,11 @@
   </picture>
 </p>
 
-<p align="center"><b>Memory for coding agents, starting with the history you already have.</b></p>
+<p align="center"><b>The one memory your coding agents share, built from the history already on your disk.</b></p>
 
-<p align="center">Your agent is about to re-debug something you fixed in March. deja indexes the
-sessions Claude Code, Codex, Cursor and every other agent on this machine already wrote to
-disk, and hands the right one back when it is needed.</p>
+<p align="center">Your agent is about to re-debug something you fixed in March — in a different agent.
+deja indexes the sessions Claude Code, Codex, Cursor and every other agent on this machine
+already wrote to disk, and hands the right one back in whichever agent asks.</p>
 
 <p align="center"><img src="assets/demo.gif" width="720" alt="The same question put to the same agent twice: without memory it has no record of it, with deja it answers with the decision from eight months earlier"></p>
 
@@ -103,13 +103,13 @@ harness supports, aider's read-only context file, and the Windows `cmd /c deja m
 <details>
 <summary>What gets written into each agent's own guidance file</summary>
 
-Install also writes user-level guidance for the harnesses it detects: Claude Code, Codex, opencode, Gemini CLI, Antigravity, Qwen, Kimi Code, pi, Copilot, Cursor, Goose, OpenClaw, Hermes, Roo Code, omp, DeepSeek Harness and Zed each get it in their own guidance file (or under the configured `XDG_CONFIG_HOME`). Re-run rewrites deja's skill or marked block without changing surrounding user content. Use `deja install --all --no-guidance` to opt out; Grok Build gets the shared skill in `~/.agents/skills`, which is what it reads; the `~/.grok/GROK.md` written beside it is for the unrelated community CLI that shares that directory. Cursor has no user-level instructions file, so it gets a skill at `~/.cursor/skills/` instead, read only when something looks relevant rather than every session.
+Install also writes user-level guidance for the harnesses it detects: Claude Code, Codex, opencode, Gemini CLI, Antigravity, Qwen, Kimi Code, pi, Copilot, VS Code Copilot Chat, Cursor, Goose, OpenClaw, Hermes, Roo Code, omp, Amp, DeepSeek Harness and Zed each get it in their own guidance file (or under the configured `XDG_CONFIG_HOME`). Re-run rewrites deja's skill or marked block without changing surrounding user content. Use `deja install --all --no-guidance` to opt out; Grok Build gets the shared skill in `~/.agents/skills`, which is what it reads; the `~/.grok/GROK.md` written beside it is for the unrelated community CLI that shares that directory. Cursor has no user-level instructions file, so it gets a skill at `~/.cursor/skills/` instead, read only when something looks relevant rather than every session.
 
 </details>
 
 ## What you get
 
-**Solve it in Codex. Claude remembers.** Twenty-two coding agents write every conversation
+**Solve it in Codex. Claude remembers.** Twenty-three coding agents write every conversation
 to local files, and deja turns those files into one memory layer all of them read.
 
 | | |
@@ -240,7 +240,7 @@ anything already wired to them.
 ## Supported harnesses
 
 <!-- matrix:start -->
-aider &middot; Amp &middot; Antigravity &middot; Claude Code &middot; Cline &middot; Codex CLI &middot; Copilot CLI &middot; Cursor &middot; DeepSeek Harness &middot; Gemini CLI &middot; Goose &middot; Grok Build &middot; Hermes &middot; Kimi Code &middot; omp (Oh My Pi) &middot; OpenClaw &middot; opencode &middot; pi &middot; prime-agent (PrimeIntellect) &middot; Qwen Code &middot; Roo Code &middot; Zed.
+aider &middot; Amp &middot; Antigravity &middot; Claude Code &middot; Cline &middot; Codex CLI &middot; Copilot CLI &middot; VS Code Copilot Chat &middot; Cursor &middot; DeepSeek Harness &middot; Gemini CLI &middot; Goose &middot; Grok Build &middot; Hermes &middot; Kimi Code &middot; omp (Oh My Pi) &middot; OpenClaw &middot; opencode &middot; pi &middot; prime-agent (PrimeIntellect) &middot; Qwen Code &middot; Roo Code &middot; Zed.
 
 <details>
 <summary>What each one supports</summary>
@@ -248,12 +248,13 @@ aider &middot; Amp &middot; Antigravity &middot; Claude Code &middot; Cline &mid
 | Harness | MCP recall | Auto-recall | Skill | Command | Resume | Handoff | Needs |
 | --- | :-: | :-: | :-: | :-: | :-: | :-: | --- |
 | aider | ⚠ | ✅ | ✕ | ⚠ | ✕ | ✅ | deja aider |
-| Amp | — | — | — | — | ? | paste | — |
+| Amp | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | Antigravity | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | Claude Code | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | Cline | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | Codex CLI | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | Copilot CLI | ✅ | ✕ | ✅ | ✅ | ✅ | ✅ | — |
+| VS Code Copilot Chat | ✅ | ✕ | ✅ | — | ✕ | paste | — |
 | Cursor | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | sqlite3 (IDE chats) |
 | DeepSeek Harness | ✅ | ✅ | ✅ | ✅ | ✕ | paste | zstd |
 | Gemini CLI | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |

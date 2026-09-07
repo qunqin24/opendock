@@ -54,6 +54,18 @@ Review one known session:
 Call session_reflection with action=collect and sessionID=<session-id>.
 ```
 
+Analyze the system prompt and context composition for the current session:
+
+```text
+Call session_reflection with action=analyze_prompts.
+```
+
+Analyze context growth trend across all requests in the current session:
+
+```text
+Call session_reflection with action=analyze_prompts and mode=trend.
+```
+
 Review by session title:
 
 ```text
@@ -81,6 +93,35 @@ ${XDG_CONFIG_HOME}/opencode/session-reflections/reports/
 ```
 
 `XDG_CONFIG_HOME` is honored only when it is an absolute path. If it is unset, empty, or relative, storage falls back to `~/.config/opencode/session-reflections/`.
+
+## Context Analysis (`analyze_prompts`)
+
+The plugin automatically captures the full system prompt on every LLM request and stores it in a local SQLite database (`reflection.db` inside the session-reflections directory). This requires Node.js 22.5 or later.
+
+Use `action=analyze_prompts` to analyze the context composition of the current session:
+
+```text
+Call session_reflection with action=analyze_prompts.
+```
+
+This produces a structured prompt for the LLM covering:
+
+- **Token budget**: total input, output, and cache tokens for the session.
+- **Largest tool outputs**: the top 5 tool results by character count, to identify what is consuming context.
+- **System prompt content**: the full system prompt from the most recent LLM request, segmented for review.
+- **Optimization suggestions**: specific items to remove or shorten, with estimated token savings.
+
+Use `mode=trend` to analyze how system prompt size grew across all requests in the session:
+
+```text
+Call session_reflection with action=analyze_prompts and mode=trend.
+```
+
+Prompt dump data is stored at:
+
+```text
+${XDG_CONFIG_HOME}/opencode/session-reflections/reflection.db
+```
 
 ## Optional Slash Command
 

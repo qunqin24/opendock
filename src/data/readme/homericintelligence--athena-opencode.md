@@ -32,10 +32,11 @@ Athena has two repository integrations:
 | Automation | `HomericIntelligence/Hephaestus` | `HOMERIC_INTELLIGENCE_HEPHAESTUS_OWNER` | `$HOME/.agent_brain/automation` |
 
 Read-only Mnemosyne use is local-first under the
-[`dependency-resolution` contract](docs/dependency-resolution.md). An available stale checkout can
-supply best-effort guidance when Athena reports its revision and limits. Athena does not require the
-installed plugin and the knowledge checkout to have the newest or matching revisions. Missing local
-knowledge, authentication failure, and update failure do not stop the primary task.
+[`dependency-resolution` contract](docs/dependency-resolution.md). Athena validates the local
+checkout first, reports the revision and limits, and can refresh it when `gh`, authentication, and
+network access are available. If refresh cannot run or fails, Athena keeps the validated local
+revision and reports the freshness limit. Missing local knowledge, authentication failure, network
+failure, and update failure do not stop the primary task.
 
 Mnemosyne delivery and Hephaestus execution use trusted, current dependency checkouts. At these
 boundaries, an invalid override, a trust or authentication failure, a checkout mismatch, or an
@@ -124,7 +125,10 @@ sequentially with the current agent.
 
 ## Develop
 
-Prerequisites are Git, uv, Just, and Python 3.13 for repository validation only.
+Prerequisites are Git, uv, Just, and Python 3.13 for repository validation only. The checked-in
+`.python-version` file pins the default repository-tooling interpreter to the remediated Python 3.13
+patch. Set `UV_PYTHON` to another interpreter within the `>=3.13,<3.14` contract for compatibility
+tests.
 [Full environment setup lives in CONTRIBUTING.md](CONTRIBUTING.md#environment-setup).
 
 ## Layout

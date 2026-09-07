@@ -1,7 +1,7 @@
 # opencode-overclock
 
-Power-ups for [opencode](https://opencode.ai): background tasks, cron-style scheduling,
-sandboxed bash, quality-gate hooks, cost telemetry, checkpoints — and an ASCII pet.
+The modular workflow suite and power-ups for [opencode](https://opencode.ai): background
+tasks, cron-style scheduling, quality-gate hooks, cost telemetry — and an ASCII companion.
 
 Everything is a separate module you can turn off individually, so you can take one feature and
 ignore the rest. When opencode ships a native equivalent, the matching module goes away.
@@ -13,18 +13,18 @@ opencode plugin -g opencode-overclock    # every project
 
 ## What you get
 
-| Module        | What it does                                                                                                                                          | Tools it adds                                              |
-| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
-| `tasks`       | Run shell commands in the background. The agent gets the result posted back into the session when they finish, and a nudge if one blocks on a prompt. | `task_run` `task_status` `task_output` `task_kill`         |
-| `sched`       | Recurring prompts on a cron expression or an interval (`"5m"`). Survives restarts; an interval on the current session makes a loop.                   | `schedule_create` `schedule_list` `schedule_delete`        |
-| `guard`       | Your own quality gates: run a command after the agent edits files, and feed failures back to it once the session goes idle.                           | —                                                          |
-| `usage`       | Per-day and per-session cost and token totals, collected from the event bus.                                                                          | `usage_report`                                             |
-| `checkpoints` | Rewind a session to any earlier message, files included, on top of opencode's own snapshots. Reverting asks for permission first.                     | `checkpoint_list` `checkpoint_revert` `checkpoint_restore` |
-| `sandbox`     | Wrap every bash call in bwrap: read-only `/`, writable project and `/tmp`, network off by default. Off unless you enable it.                          | `bash_unsandboxed` (escape hatch)                          |
-| `buddy`       | An ASCII pet next to the prompt that reacts to what the session is doing. Purely cosmetic.                                                            | —                                                          |
+| Module      | What it does                                                                                                                                                  | Tools it adds                                       |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
+| `tasks`     | Run shell commands in the background. The agent gets the result posted back into the session when they finish, and a nudge if one blocks on a prompt.         | `task_run` `task_status` `task_output` `task_kill`  |
+| `sched`     | Recurring prompts on a cron expression or an interval (`"5m"`). Survives restarts; an interval on the current session makes a loop.                           | `schedule_create` `schedule_list` `schedule_delete` |
+| `guard`     | Your own quality gates: run a command after the agent edits files, and feed failures back to it once the session goes idle. Built-in recipes & edit recovery. | —                                                   |
+| `recovery`  | Automatically heal provider errors (missing tool results, thinking block sequencing, context limit) and auto-resume sessions.                                 | —                                                   |
+| `truncator` | Context-protecting smart output truncation for high-volume tools (`task_output`, `bash`, `grep`, `glob`, `webfetch`) preserving header & tail diagnostics.    | —                                                   |
+| `usage`     | Per-day and per-session cost and token totals, collected from the event bus (accessible via TUI `/oc-usage`).                                                 | —                                                   |
+| `buddy`     | An ASCII pet next to the prompt that reacts to what the session is doing. Purely cosmetic.                                                                    | —                                                   |
 
 On top of the tools, the TUI side adds desktop notifications when a turn finishes or the agent
-needs you, plus `/oc-tasks`, `/oc-usage`, `/oc-schedules` and `/oc-buddy`.
+needs you, plus `/oc-tasks`, `/oc-usage`, `/oc-schedules`, `/oc-buddy` (pet), `/oc-buddy-switch` (choose species), and `/oc-buddy-cycle` (next species).
 
 **Please read this before installing:** overclock gives the agent the ability to run shell
 commands in the background (`task_run`) and to schedule recurring prompts (`schedule_create`).
@@ -54,142 +54,239 @@ a plugin's `dispose` hook, without which this plugin's timers and watchers are n
 
 ## Configuration
 
-Everything is optional. With no config file you get every module except `sandbox`, and `guard`
-sits inert until you give it hooks — so the one thing worth configuring on day one is a quality
-gate. A reasonable `.opencode/overclock.json` to start from:
+Everything is optional. With no options configured, overclock runs with sensible defaults: background
+tasks, cron-style scheduling, quality gates, usage telemetry, and the buddy are active immediately.
 
-```json
+Configure options directly in your project or global `opencode.json`:
+
+```jsonc
 {
-  "features": {
-    "guard": {
-      "hooks": [
-        {
-          "name": "typecheck",
-          "tools": ["edit", "write"],
-          "run": "npm run typecheck",
-          "pathFilter": "src/**/*.ts"
-        }
-      ]
-    },
-    "tasks": { "killOnExit": true }
-  }
+  "plugin": [
+    [
+      "opencode-overclock",
+      {
+        "tasks": { "killOnExit": true },
+        "guard": { "auto": true },
+      },
+    ],
+  ],
 }
 ```
 
-That gives you a typecheck after every edit (reported back to the agent when the session goes
-idle), background tasks that don't outlive the session, plus scheduling, telemetry, checkpoints
-and the buddy on their defaults. Swap `run` for whatever your project uses.
+To turn an individual feature off:
 
-Each entry is `true`, `false`, or an object of options (which also means "on"). To turn
-something off:
-
-```json
-{ "features": { "buddy": false } }
+```jsonc
+{
+  "plugin": [
+    [
+      "opencode-overclock",
+      {
+        "buddy": false,
+      },
+    ],
+  ],
+}
 ```
 
-| Module                          | Options                                                                                         |
-| ------------------------------- | ----------------------------------------------------------------------------------------------- |
-| `tasks`                         | `killOnExit` bool · `stallDetection` bool · `stallThresholdMs` num · `stallCheckIntervalMs` num |
-| `sched`                         | `skipIfBusy` bool                                                                               |
-| `sandbox`                       | `net` bool                                                                                      |
-| `guard`                         | `hooks` array                                                                                   |
-| `usage`, `checkpoints`, `buddy` | —                                                                                               |
+| Module           | Options                                                                                                          |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `tasks`          | `killOnExit` bool · `stallDetection` bool · `stallThresholdMs` num · `stallCheckIntervalMs` num · `tmux` bool    |
+| `sched`          | `skipIfBusy` bool                                                                                                |
+| `guard`          | `hooks` array · `recipes` array (`["tsc", "eslint", "cargo", "ruff", "go"]`) · `auto` bool · `editRecovery` bool |
+| `recovery`       | `maxAttempts` num · `cooldownMs` num · `autoResume` bool                                                         |
+| `truncator`      | `maxChars` num · `tools` array · `headLines` num · `tailLines` num                                               |
+| `usage`, `buddy` | —                                                                                                                |
 
-Typos are reported at startup with a "did you mean", because a misspelled key like
-`killOnExist` would otherwise read as "not set" and quietly run the default. A bad config never
-takes the plugin down; the affected setting falls back to its default.
+### Quality gates (`guard`)
 
-### Quality gate options (`guard`)
+Quality gates let you define automated feedback loops. Whenever the agent modifies code with `edit`
+or `write`, the guard runs your project's verification command in the background. If the command fails,
+the error output is automatically fed back into the session once the agent finishes its turn, prompting
+it to self-correct.
 
-Each hook runs a command after the agent uses one of the tools it watches, and reports failures
-back to the agent. `name`, `tools` and `run` are required. Also available: `pathFilter` (glob), `mode` (`inject`,
-the default, waits for the session to be idle before reporting; `append` reports immediately),
-`debounceMs` (2000), `timeoutMs` (60000), `onSuccess` (`silent` or `notify`), and `maxDeferMs`
-(300000, how long `inject` waits for an idle session before reporting anyway).
+Because verification commands vary by language and repository, configure hooks in your project's
+local `opencode.json`:
 
-### Restricting tool names
+#### Stack recipes
+
+##### TypeScript / JavaScript
+
+```jsonc
+{
+  "guard": {
+    "hooks": [
+      {
+        "name": "typecheck",
+        "tools": ["edit", "write"],
+        "pathFilter": "src/**/*.ts",
+        "run": "npm run typecheck",
+      },
+    ],
+  },
+}
+```
+
+##### Python (Ruff / Pytest)
+
+```jsonc
+{
+  "guard": {
+    "hooks": [
+      {
+        "name": "lint",
+        "tools": ["edit", "write"],
+        "pathFilter": "**/*.py",
+        "run": "ruff check .",
+      },
+    ],
+  },
+}
+```
+
+##### Rust (Cargo)
+
+```jsonc
+{
+  "guard": {
+    "hooks": [
+      {
+        "name": "cargo-check",
+        "tools": ["edit", "write"],
+        "pathFilter": "**/*.rs",
+        "run": "cargo check",
+      },
+    ],
+  },
+}
+```
+
+##### Go
+
+```jsonc
+{
+  "guard": {
+    "hooks": [
+      {
+        "name": "go-test",
+        "tools": ["edit", "write"],
+        "pathFilter": "**/*.go",
+        "run": "go test ./...",
+      },
+    ],
+  },
+}
+```
+
+##### Generic / Make
+
+```jsonc
+{
+  "guard": {
+    "hooks": [
+      {
+        "name": "check",
+        "tools": ["edit", "write"],
+        "run": "make check",
+      },
+    ],
+  },
+}
+```
+
+#### Hook options
+
+| Field        | Default     | Description                                                                   |
+| ------------ | ----------- | ----------------------------------------------------------------------------- |
+| `name`       | _required_  | Identifier displayed in failure reports                                       |
+| `tools`      | _required_  | Tools to trigger on, e.g. `["edit", "write"]`                                 |
+| `run`        | _required_  | Shell command to execute (receives `$GUARD_TOOL` and `$GUARD_FILE` in env)    |
+| `pathFilter` | `undefined` | Optional glob pattern to limit triggers to relevant files (e.g. `**/*.py`)    |
+| `mode`       | `"inject"`  | `"inject"` waits for the session to go idle; `"append"` reports immediately   |
+| `debounceMs` | `2000`      | Debounce duration for rapid successive edits                                  |
+| `timeoutMs`  | `60000`     | Execution timeout before killing the command                                  |
+| `maxDeferMs` | `300000`    | Maximum time `"inject"` will wait for an idle session before reporting anyway |
+| `onSuccess`  | `"silent"`  | `"silent"` or `"notify"`                                                      |
+
+### Restricting and remapping tool names
 
 If your setup only accepts certain tool names, list them in `toolAllowlist`. Any tool whose
-name isn't permitted is withheld from the model rather than offered and refused, since a single
-unrecognised name can fail an entire request.
+name isn't permitted is withheld from the model rather than offered and refused:
 
-```json
+```jsonc
 {
-  "toolAllowlist": ["TaskCreate", "TaskList", "TaskOutput", "TaskStop", "MyExtraTool"],
-  "toolNames": { "task_run": "TaskCreate", "task_status": "TaskList" }
+  "plugin": [
+    [
+      "opencode-overclock",
+      {
+        "toolAllowlist": ["task_run", "task_status", "schedule_create"],
+      },
+    ],
+  ],
 }
 ```
 
-`toolNames` maps this plugin's tools onto names you allow. Keys are declared names (the table
-under [What you get](#what-you-get)); values are what the model sees.
+`toolNames` maps this plugin's tools onto custom names you want the model to see:
 
-Startup tells you exactly where you stand: what was renamed, what was withheld and which of
-your allowed names are still free to use for it, and any name that collides with an opencode
-built-in (`bash`, `task`, …) or differs from one only by capitalisation — the first replaces
-that built-in, the second reads as a duplicate to anything matching case-insensitively.
-Descriptions mentioning a renamed tool are rewritten too, so the agent never gets instructions
-naming a tool it wasn't given. Permission ids keep their declared names, so existing permission
-config still applies.
-
-#### Named lists
-
-`toolAllowlist` entries can also name a bundled list, which expands to every name it permits.
-Mix and match freely — `["claude-code", "MyExtraTool"]` is a bundled list plus one of your own.
-
-`claude-code` is the tool set Claude Code registers. opencode's ids are snake_case and Claude
-Code's are PascalCase, so the two vocabularies don't overlap and these names are free to use.
-A bundled list also supplies default names for tools where it contains the same operation:
-
-| Module  | Declared          | Sent as      |
-| ------- | ----------------- | ------------ |
-| `tasks` | `task_run`        | `TaskCreate` |
-| `tasks` | `task_status`     | `TaskList`   |
-| `tasks` | `task_output`     | `TaskOutput` |
-| `tasks` | `task_kill`       | `TaskStop`   |
-| `sched` | `schedule_create` | `CronCreate` |
-| `sched` | `schedule_list`   | `CronList`   |
-| `sched` | `schedule_delete` | `CronDelete` |
-
-That's the whole table, and it stops there on purpose. Nothing in the `claude-code` set means
-"revert a session checkpoint" or "report token spend", so `checkpoints`, `usage` and
-`bash_unsandboxed` get no default name: handing them an unrelated one would tell the model the
-wrong thing about what they do. They're withheld until you choose a name yourself, and startup
-says which names are free:
-
-```json
+```jsonc
 {
-  "toolAllowlist": "claude-code",
-  "toolNames": { "usage_report": "StructuredOutput" }
+  "plugin": [
+    [
+      "opencode-overclock",
+      {
+        "toolNames": { "task_run": "run_background_task" },
+      },
+    ],
+  ],
 }
 ```
 
-`toolNames` overrides any row above too, if a different name reads better for you. The table is
-checked against the source by a test, so the two can't drift apart.
+### Running OpenCode V2 plugins on OpenCode V1
+
+OpenCode V1 distributions cannot natively load V2 plugins (which export `{ id, setup }` or `{ id, effect }` instead of a server function). Overclock provides an embedded V2 host engine that runs V2 plugins side-by-side with V1 tools:
+
+```jsonc
+{
+  "plugin": [
+    [
+      "opencode-overclock",
+      {
+        "plugins": ["./plugins/custom-agent.ts", ["opencode-plugin-review", { "strict": true }]],
+      },
+    ],
+  ],
+}
+```
+
+Overclock synthesizes a spec-compliant `PluginContext`, adapting V2 domain transforms (`agent`, `command`, `catalog`, `reference`, `skill`, `aisdk`) to live V1 config and chat hooks while keeping all V1 power tools active.
+
+Startup tells you what was renamed, what was withheld, and warns on collisions with opencode
+built-in tools. Descriptions mentioning a renamed tool are rewritten automatically.
 
 ## Notes on the TUI surface
 
 The TUI plugin sends a desktop notification (with sound) when a turn completes or the agent
 needs permission, asks a question, or errors — each individually switchable through plugin
-options. Its slash commands read the state files under `.opencode/overclock/`, so they work
+options (`notifyIdle`, `notifyPermission`, `notifyQuestion`, `notifyError`, `buddy` in `tui.json`).
+Its slash commands read the state files under `.opencode/overclock/`, so they work
 without going through the model.
 
 The buddy hatches once per install with a random species, rarity and name, persists in the
 TUI's key-value store, hides itself below 100 columns, and needs `@opentui/solid` resolvable at
 runtime. If it isn't, the buddy quietly sits out and the rest of the TUI plugin still loads.
+Switch buddy on demand via `/oc-buddy-switch` (opens an interactive species picker or rolls a fresh companion)
+or `/oc-buddy-cycle` (advances directly to the next species in rotation).
 
 ## Contributing
 
 ```
 src/
-  index.ts          entry: load config, init modules, merge hooks
+  index.ts          entry: init enabled modules, merge hooks, hybrid V1/V2 export
   tui.ts            TUI plugin (notifications + slash commands), separate export
-  types.ts          FeatureModule contract
-  config.ts         config loader
-  merge.ts          hook composition (many modules, same hook -> sequential)
-  tools.ts          gateway tool policy: alias presets, allowlists, rename/withhold
-  validate.ts       overclock.json checks + startup summary
-  lib/              state dir + json, session inject + toast
-  features/         one file per module + registry
+  core/             types, lifecycle/hook merging, tool policy, capability summary, bridge
+  platform/         host adapters: process (exec/tmux), session (busy/inject/notify), storage (state/store), probe
+  buddy/            ASCII companion state, sprites, and TUI slot integration
+  v2/               embedded V2 plugin host, synthetic context, and dynamic loader
+  features/         feature modules (tasks, sched, guard, recovery, truncator, usage, buddy)
 test/               bun test
 ```
 
@@ -197,8 +294,6 @@ Adding a feature:
 
 1. Write `src/features/<name>.ts` exporting a `FeatureModule`.
 2. Register it in `src/features/index.ts`.
-3. If it adds tools, add each one to the `claude-code` table in `src/tools.ts`. A test fails
-   otherwise, since an unmapped tool is invisible behind a whitelisting gateway.
 
 Background reading:
 [docs/opencode-plugin-surface.md](docs/opencode-plugin-surface.md) maps opencode's
@@ -243,7 +338,7 @@ somewhere else.
 ### Headless end-to-end
 
 ```sh
-timeout 90 opencode run -m anthropic/claude-sonnet-5 "Use task_run to run 'echo hi' ..." < /dev/null
+timeout 90 opencode run -m <provider>/<model> "Use task_run to run 'echo hi' ..." < /dev/null
 ```
 
 - `< /dev/null` is required; an open stdin hangs.

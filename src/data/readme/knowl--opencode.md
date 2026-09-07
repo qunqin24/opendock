@@ -10,7 +10,7 @@
 [![node](https://img.shields.io/badge/node-%E2%89%A522-70b6fd)](package.json)
 [![MCP](https://img.shields.io/badge/protocol-MCP-cab049)](https://modelcontextprotocol.io)
 
-<a href="https://www.producthunt.com/products/knowl?embed=true&amp;utm_source=badge-featured&amp;utm_medium=badge&amp;utm_campaign=badge-knowl" target="_blank" rel="noopener noreferrer"><img alt="Knowl - Agent memory that knows when to forget | Product Hunt" width="250" height="54" src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1228671&amp;theme=light&amp;t=1787366617137"></a>
+<a href="https://discord.gg/YrWbHe8FBB"><img src="https://img.shields.io/badge/Discord-Join%20the%20server-5865F2?logo=discord&logoColor=white&style=for-the-badge" alt="Join the Knowl Discord" height="40" /></a>
 
 <p align="center">
   <a href="#the-idea-memory-that-retires-itself"><picture><source media="(prefers-color-scheme: light)" srcset="docs/assets/chips/light/stat-supersession.svg"><img src="docs/assets/chips/stat-supersession.svg" alt="Scores 90 on MemoryAgentBench FactConsolidation single-hop at 262K" height="38" /></picture></a>
@@ -110,6 +110,11 @@ works.
 <sub>MCP · lifecycle · gate</sub>
 </td>
 <td align="center" width="14%">
+<a href="https://github.com/openclaw/openclaw"><img src="docs/assets/logos/openclaw.svg" alt="OpenClaw" width="40" height="40" /></a><br/>
+<strong>OpenClaw</strong><br/>
+<sub>in-process · plugin · gate</sub>
+</td>
+<td align="center" width="14%">
 <a href="https://github.com/features/copilot"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/logos/githubcopilot-dark.svg" /><img src="docs/assets/logos/githubcopilot.svg" alt="Copilot" width="40" height="40" /></picture></a><br/>
 <strong>Copilot</strong><br/>
 <sub>MCP · lifecycle · gate</sub>
@@ -124,13 +129,13 @@ works.
 <strong>OpenHands</strong><br/>
 <sub>MCP · lifecycle · gate</sub>
 </td>
+</tr>
+<tr>
 <td align="center" width="14%">
 <a href="https://antigravity.google"><img src="docs/assets/logos/antigravity.svg" alt="Antigravity" width="40" height="40" /></a><br/>
 <strong>Antigravity</strong><br/>
 <sub>MCP · lifecycle · gate</sub>
 </td>
-</tr>
-<tr>
 <td align="center" width="14%">
 <a href="https://windsurf.com"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/logos/windsurf-dark.svg" /><img src="docs/assets/logos/windsurf.svg" alt="Windsurf" width="40" height="40" /></picture></a><br/>
 <strong>Windsurf</strong><br/>
@@ -161,7 +166,6 @@ works.
 <strong>Claude Desktop</strong><br/>
 <sub>MCP · manual loop</sub>
 </td>
-<td align="center" width="14%"></td>
 </tr>
 </table>
 
@@ -172,7 +176,9 @@ the agent picks up its guidance, and it will query and write memory on its own.
 Neovim and Kiro work the same way as Zed and JetBrains, through `knowl acp`. Cline needs one
 line pointing it at the shipped plugin. Hermes Agent gets a Python plugin, installed for you,
 that works in the terminal and in Hermes Desktop alike, and can additionally be picked as
-Hermes' memory provider. Any other MCP client works with
+Hermes' memory provider. OpenClaw runs in-process inside its gateway via an extension plugin,
+evaluating write gates without subprocess overhead — `knowl init openclaw` copies it and prints
+the two commands that register it. Any other MCP client works with
 no integration at all.
 
 Running agents in parallel? Every **git worktree** resolves to the main checkout's store —
