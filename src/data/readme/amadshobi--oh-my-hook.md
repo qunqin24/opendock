@@ -410,7 +410,8 @@ Action: Action forbidden. Ask user for manual execution if needed.
 
 ### Key Highlights:
 
-- **100% Pure Markdown**: Human-readable, zero-overhead storage directly editable with standard text editors.
+- **100% Pure Markdown & Flattened Tree**: Human-readable, zero-overhead storage directly editable with standard text editors. Project memories use a clean, flat slug structure (`projects/<slug>/MEMORY.md`) avoiding deep directory nesting.
+- **Fast Heuristic Gating & Anti-Redundancy**: In-process regex classifier drops casual banter before invoking background review, and bullet deduplication prevents duplicate memory accumulation.
 - **Autonomous Agent Tool (`memory`)**: Exposes a native OpenCode tool supporting single actions and **Hermes atomic batch operations** (`operations: [...]`):
   - `add`: Saves a new memory bullet (guarded against credential leaks).
   - `replace`: Updates existing memory via **substring matching** (`old_text`).

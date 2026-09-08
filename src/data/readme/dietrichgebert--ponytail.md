@@ -44,6 +44,17 @@
   <a href="https://ponytail.dev/soon"><img src="assets/waitlist-banner.png" alt="Something's coming, join the waitlist" width="760"></a>
 </p>
 
+## Already built with Ponytail
+
+<a href="https://theretriever.app">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/retriever-logo-dark.svg">
+    <img src="assets/retriever-logo-light.svg" height="128" alt="Retriever">
+  </picture>
+</a>
+
+---
+
 You know him. Long ponytail. Oval glasses. Has been at the company longer than the version control. You show him fifty lines; he looks at them, says nothing, and replaces them with one.
 
 Ponytail puts him inside your AI agent.

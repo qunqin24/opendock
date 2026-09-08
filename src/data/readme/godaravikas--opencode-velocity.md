@@ -42,6 +42,7 @@ Type `/velocity` in the OpenCode TUI. Press **Esc** to return to chat, or press 
 | `Esc` | Close the report and return to the same session in OpenCode |
 | `d` | Download the HTML report in current directory|
 | `c` | Configure the dollars-per-credit rate |
+| `f` | Open the calendar to filter the report by a start/end date range |
 
 ## Preview
 
@@ -139,11 +140,12 @@ The downloaded HTML report includes summary cards, project and model charts, gro
 ## How it works
 
 - The native `/velocity` reads all discovered OpenCode projects and sessions and display the report. When you exit, you’ll return to the same session. 
+- Press `f` in the report to open the date filter calendar and limit the report to an inclusive local-day range, from `00:00:00` at the start of the first selected day through `23:59:59.999` at the end of the last selected day. Without a selected range, the report shows all available data.
 - The local opencode SQLite database is used for reporting.
 - Parent sessions and subagent sessions are shown separately. Subagent rows are indented beneath their parent where the relationship is available.
 - Project and top-level session counts include parent sessions only. User Turns also sum parent sessions only; token, cost, message, model, and tool totals include subagent activity.
 - Reports count only projects having at least one session; projects with no sessions are excluded from the project count.
-- The HTML report is self-contained and can be opened offline after it is downloaded.
+- The downloaded HTML report is self-contained, can be opened offline, and reflects any date range filter applied when it was generated.
 - Credit conversion defaults to `$0.01 = 1 credit` and can be changed with `c` in the dashboard or `--dollars-per-credit` in the TUI.
 
 ### How effort is calculated

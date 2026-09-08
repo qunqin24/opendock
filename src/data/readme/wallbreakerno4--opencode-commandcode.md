@@ -2,9 +2,20 @@
 
 OpenCode provider 插件：把 Command Code Go plan 专用的 `/alpha/generate` 网关桥接成 OpenCode 原生 provider。安装插件即完成全部配置——provider（`commandcode-go`）、模型清单与认证方式由插件自举，无需手写任何 provider 定义。
 
+> ⚠️ **避坑**：GLM 系列模型的缓存命中率不稳定，额度消耗明显更快，建议优先选用 deepseek 系列模型。详见[已知问题](docs/guide/known-issues.md)。
+
 ## 安装
 
 > 前置：Command Code Go plan 订阅，并在 [Studio → API Keys](https://commandcode.ai/docs/studio) 生成 API key（与 CLI 同一把）。
+
+### For Humans（推荐）
+
+把下面这段 prompt 粘贴进 OpenCode（v1 或 v2 beta）会话，agent 会按 [安装指南](docs/guide/installation.md) 自主完成安装；装完按它的提示重启宿主、输入 `/connect` 认证即可：
+
+```
+按照这份指南安装 @wallbreakerno4/opencode-commandcode 插件：
+https://raw.githubusercontent.com/WallBreakerNO4/opencode-commandcode-provider/main/docs/guide/installation.md
+```
 
 ### OpenCode v2（beta）
 
@@ -52,3 +63,7 @@ opencode run  --model commandcode-go/deepseek/deepseek-v4-pro "hi"   # v1
 ```
 
 注意：`opencode2 models` 不加载插件，不能用来判断安装是否成功。
+
+## 免责声明
+
+本项目为社区开发的第三方插件，与 Command Code 官方无关。插件桥接的 `/alpha/generate` 端点无公开文档，行为可能随官方更新而变动，使用产生的账号风险请自行评估。仅供学习交流。

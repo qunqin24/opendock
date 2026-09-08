@@ -14,7 +14,9 @@ MCP panels — nothing on the home screen):
 ![Screenshot: 5h / 1W / 1M usage bars in the OpenCode session sidebar](docs/screenshot.png)
 
 Data comes from the local [`arkcli`](https://www.npmjs.com/package/@volcengine/ark-cli)
-— the plugin never calls the Ark API or handles auth.
+— the plugin never calls the Ark API or handles auth. Data auto-refreshes every
+60s; press **`ctrl+alt+r`** (or click the `↻` line under the bars) to refresh
+immediately.
 
 ## Install
 
@@ -57,6 +59,7 @@ Options are passed as the second element of the `plugin` entry:
 | `pollMs`        | `60000`        | Data refetch interval (ms)          |
 | `barWidth`      | `14`           | Progress-bar track width in cells   |
 | `showCountdown` | `true`         | Show the per-window reset countdown |
+| `refreshKey`    | `"ctrl+alt+r"` | Hotkey for an immediate refresh     |
 
 ```json
 {

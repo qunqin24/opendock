@@ -30,15 +30,24 @@ The plugin hooks into OpenCode's plugin system. When OpenCode launches, it start
 
 **1. Install the plugin**
 
+With npm:
+
 ```bash
 npm install -g opencode-with-claude
+```
+
+Or with [Homebrew](https://brew.sh) (macOS/Linux), which keeps the plugin
+updated through `brew upgrade` instead of `npm update -g`:
+
+```bash
+brew install ianjwhite99/tap/opencode-with-claude
 ```
 
 **2. Authenticate with Claude (one-time)**
 
 ```bash
-npm install -g @anthropic-ai/claude-code
-claude auth login 
+npm install -g @anthropic-ai/claude-code   # or: brew install --cask claude-code
+claude auth login
 ```
 
 **3. Add to your `opencode.json`**
@@ -60,11 +69,31 @@ Global (`~/.config/opencode/opencode.json`) or project-level:
 }
 ```
 
-**3. Run OpenCode**
+If you installed with Homebrew, point the `plugin` entry at the installed
+file instead of the package name (the path is stable across upgrades, and
+`brew info opencode-with-claude` prints it):
+
+```json
+"plugin": ["file:///opt/homebrew/opt/opencode-with-claude/libexec/lib/node_modules/opencode-with-claude/dist/index.js"]
+```
+
+On Linux or Intel macOS replace `/opt/homebrew` with your Homebrew prefix
+(`brew --prefix`, usually `/home/linuxbrew/.linuxbrew` or `/usr/local`).
+
+**4. Run OpenCode**
 
 ```bash
 opencode
 ```
+
+## Updating
+
+- **Homebrew:** `brew upgrade opencode-with-claude`. The release workflow
+  bumps the formula in [`ianjwhite99/homebrew-tap`](https://github.com/ianjwhite99/homebrew-tap)
+  after every npm publish, so `brew update && brew upgrade` tracks new releases.
+- **npm:** `npm update -g opencode-with-claude`. Note that OpenCode caches
+  plugins it installs by package name; if a new version is not picked up,
+  clear `~/.cache/opencode/node_modules/opencode-with-claude` and restart.
 
 ## Profiles and SDK features
 
@@ -203,6 +232,8 @@ opencode-with-claude/
 ├── test/
 │   ├── run.sh             # Test runner
 │   └── opencode.json      # Test config
+├── scripts/
+│   └── update-homebrew-formula.sh # Bumps the Homebrew formula (in ianjwhite99/homebrew-tap) after an npm release
 ├── package.json
 └── tsconfig.json
 ```

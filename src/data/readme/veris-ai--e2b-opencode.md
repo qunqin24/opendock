@@ -11,6 +11,33 @@ Two packages, one repo, because they move together.
 | [`@veris-ai/e2b`](./e2b) | The SDK. A drop-in subclass of E2B's `Sandbox` whose `create()` also provisions the twin, points the sandbox's egress at the Veris gateway and installs the interception CA — and whose `kill()` deletes the twin with it. |
 | [`@veris-ai/e2b-opencode`](./e2b-opencode) | An OpenCode plugin. One line in `opencode.json` and every session in that repo runs in a Veris-intercepted sandbox. |
 
+`@veris-ai/e2b@0.1.1` is SDK-only. This PR adds no CLI;
+[CLI draft #22](https://github.com/veris-ai/veris-e2b/pull/22) is separate and
+requires a future npm release before its commands can be used.
+
+## Shared skills in OpenCode
+
+Use the canonical `@veris-ai/veris-opencode` skills package plus **one** sandbox
+plugin after the pending skills 0.7.3 and provider 0.2.0 releases are published:
+
+```json
+{
+  "plugin": [
+    "@veris-ai/veris-opencode@latest",
+    "@veris-ai/e2b-opencode@latest"
+  ]
+}
+```
+
+The commands are `/veris:setup`, `/veris:build <request>` and `/veris:fix <request>`.
+`verisSkill` reads installed skill resources on the host; application file/bash
+tools remain remote. `verisTwin` identifies the plugin-owned session and controls,
+and `verisReceipt` takes an explicit pre-execution baseline. Skills reuse this
+session automatically. Record and pin the resolved published npm versions.
+See [e2b-opencode/README.md](e2b-opencode/README.md) for the capability
+contract, separate network/TLS/persistence/sync behavior and release prerequisites.
+
+
 ## The SDK
 
 ```ts

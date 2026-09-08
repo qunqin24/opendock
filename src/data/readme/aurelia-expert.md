@@ -71,7 +71,7 @@ The `aurelia-expert` router classifies the prompt as `resolve` and hands off to 
 Use resolve(IFoo) as the default value:
 constructor(private readonly userService: IUserService = resolve(IUserService)) {}
 Tests inject mocks through the constructor.
-@inject is gone in v2 — never write it.
+@inject is deprecated in v2 — resolve() is the idiom.
 ```
 
 ### 🏗️ Scaffold a foundation
@@ -126,7 +126,7 @@ Run this table once per file (reference/v1-removals.md):
   configureRouter(config)             →  @route([...])
   <router-view>                       →  <au-viewport>
   <compose viewModel="...">           →  <au-compose component.bind="...">
-  .delegate on a custom event         →  .trigger (throws AUR0713 at compile time)
+  .delegate on any event              →  .trigger (removed; throws AUR0713 at compile time)
   activate() / deactivate()           →  canLoad / loading / canUnload / unloading
   inline style="width: ${value}%"     →  width.style="value + '%'"
 ```

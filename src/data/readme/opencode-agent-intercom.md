@@ -76,8 +76,9 @@ After restarting opencode, two things still have to happen before the
    and the right sidebar (its own column beside the content, not an
    overlay) shows `Subagents (N)` with `● N running · ✓ M done · ◆ K retained`
    counters (`◆ K retained` only when something is held), agent rows with an
-   `x` abort control and an age, plus `max subagents` and the flat retention
-   rows `retained subs` and `retain (min)`. The sidebar also exposes collapsed
+   `x` abort control and an age, plus `max subagents`, the flat retention
+   rows `retained subs` and `retain (min)`, and the two watchdog rows
+   `silence (s)` and `in tool (min)`. The sidebar also exposes collapsed
    `TUI settings` / `LLM params` / `Prompts` sections — the LLM params section
    carries the per-agent-type context ceiling, the per-agent-type reuse
    ceiling, and the per-agent-type reply ceiling behind a single agent cycler
@@ -531,8 +532,31 @@ exposes every runtime knob:
   row's floor is one whole minute. A `0` typed by hand into the file
   resolves to `1` ms at the plugin, since nothing else ever deletes a
   subagent session.
+- **`silence (s) [-N+]`** — how long a subagent may be silent with no tool
+  call in flight before the watchdog aborts it, frees its slot and wakes the
+  orchestrator with a timeout notice. Shown and stepped in whole seconds, 15
+  at a step; writes `"maxSubagentAgeMs"` in ms. `0` shows as `off` and
+  switches that watchdog off entirely — with it off the orphan sweep in
+  `src/teardown.js`, whose window is a multiple of this one, stops running
+  too. Default 90 s.
+- **`in tool (min) [-N+]`** — the same watchdog's window for a subagent that
+  is WORKING: one with a tool call in flight, from the moment the call starts
+  until its result comes back. opencode publishes nothing between the part that
+  announces a tool call and the part that reports its result, so such a
+  subagent is silent by construction and the row above says nothing about it.
+  Counted from the START of the call, so it is a ceiling on the call rather
+  than a lease the events arriving during it keep renewing. Shown and stepped in
+  whole minutes; writes `"maxSubagentToolCallMs"` in ms. `0` shows as `off`
+  and means no ceiling at all while a subagent works — the silence window
+  still governs every subagent that is not working. Default 11 min, which
+  clears the 600 000 ms ceiling opencode's own bash tool allows plus a minute
+  for the kill and one sweep tick.
 - **`endless mode [on/off]`** / **`endless (k)`** — arms the self-restarting
-  orchestrator loop and sets its context threshold.
+  orchestrator loop and sets its context threshold. The row has a third
+  state `[paused]`, set when endless mode has stopped itself for the
+  current session: the stop's cause is written on the line beneath.
+  The pause is per session, is not written to the settings file, and
+  is cleared by switching the row off and on again.
 - Under **`TUI settings`**: **`thinking [on/off]`** and **`tool details
   [on/off]`**, opencode's built-in visibility toggles, plus **`show agentcom
   [on/off]`**, which decides whether the plugin's own notices (subagent
@@ -705,6 +729,8 @@ is environment-variable-driven:
 | `OPENCODE_AGENT_INTERCOM_MAX_SUBAGENTS` | `1` | Concurrent subagents per primary. `"0"` disables. TUI file overrides. |
 | `OPENCODE_AGENT_INTERCOM_MAX_NESTED_SPAWNS` | `2` | Nested `spawn` calls a single subagent run may start (the caller's one allowed target — `researcher` for the five non-web roles, `grounder` for `researcher`). `"0"` disables — the subagent must do the work itself. TUI file overrides via `"maxNestedSpawns"`. |
 | `OPENCODE_AGENT_INTERCOM_MAX_CONTEXT` | `100000` | Subagent context budget (tokens). `"0"` disables. TUI file overrides. |
+| `OPENCODE_AGENT_INTERCOM_MAX_SUBAGENT_AGE_MS` | `90000` | Watchdog window (ms) for a subagent with nothing in flight. `"0"` switches the inactivity watchdog off, and with it the orphan sweep whose window is a multiple of this one. TUI file overrides via `"maxSubagentAgeMs"`; the TUI's `silence (s)` row steps it in whole seconds. |
+| `OPENCODE_AGENT_INTERCOM_MAX_SUBAGENT_TOOL_CALL_MS` | `660000` | The same watchdog's window (ms) for a subagent with a tool call in flight, counted from the start of that call. `"0"` means no ceiling while it works; the silence window still applies to every subagent that is not working. TUI file overrides via `"maxSubagentToolCallMs"`; the TUI's `in tool (min)` row steps it in whole minutes. |
 | `OPENCODE_AGENT_INTERCOM_MAX_RETAINED_SUBAGENTS` | `0` | How many finished subagents may be held as retained sessions in this process. `"0"` switches retention off — every subagent's session is deleted the moment its result is delivered, the one-shot behaviour. Recommended non-zero value: `3`. TUI file overrides. **Enabling retention needs an opencode restart** — the tool surface is resolved at plugin load, so the `reuse` tool only appears once the next instance boots with this set. Disabling takes effect at once. |
 | `OPENCODE_AGENT_INTERCOM_RETAINED_SUBAGENT_TTL_MS` | `3600000` | Retention window per held subagent, in ms. Clamped to a floor of `1`. The TUI's row steps in whole minutes with a one-minute floor. |
 | `OPENCODE_AGENT_INTERCOM_MAX_REUSE_CONTEXT` | `70000` | Reuse ceiling for every agent type the `reuseContext` map does not name. `"0"` means that type is never reused at all. The TUI panel shows and edits the per-type map; the flat key is only what an untouched type inherits. |
@@ -717,9 +743,10 @@ is environment-variable-driven:
 | `EXA_API_KEY` | — | If set, `web_search` uses Exa's paid tier. File key `exaApiKey` overrides. |
 | `OPENCODE_AGENT_INTERCOM_GOOGLE_API_KEY` / `GEMINI_API_KEY` / `GOOGLE_API_KEY` | — | API key for `grounded_search` (consulted in that order). Falls back to the `google.key` field of `${XDG_DATA_HOME:-$HOME/.local/share}/opencode/auth.json`, where `opencode auth login` writes a Gemini key. |
 | `POLLINATIONS_TOKEN` | — | If set, the `gen` Pollinations fallback uses your account |
-| `OPENCODE_AGENT_INTERCOM_ENDLESS_MODE` | on | `"1"` arms endless mode — replaces the orchestrator when its context reaches `endlessContext`, after saving its open points to the project's todo file. `"0"` switches it off. TUI file overrides. |
+| `OPENCODE_AGENT_INTERCOM_ENDLESS_MODE` | on | `"1"` arms endless mode — replaces the orchestrator when its context reaches `endlessContext`, after a permitted `planner` subagent has rewritten the project's todo file. `"0"` switches it off. TUI file overrides. |
 | `OPENCODE_AGENT_INTERCOM_ENDLESS_CONTEXT` | `250000` | Orchestrator context threshold (tokens) while endless mode is on. Displaces the plain handoff threshold. `"0"` disables. TUI file overrides. |
 | `OPENCODE_AGENT_INTERCOM_ENDLESS_QUIESCE_TIMEOUT_MS` | `600000` | How long (ms) one endless cycle waits for the last subagent to finish before abandoning. |
+| `OPENCODE_AGENT_INTERCOM_ENDLESS_WIND_DOWN_TIMEOUT_MS` | `900000` | How long (ms) the cycle waits for the permitted wind-down subagent to rewrite the todo file before abandoning. Not shown in the sidebar. |
 | `OPENCODE_AGENT_INTERCOM_ENDLESS_MAX_CYCLES` | `10` | Cycle ceiling per opencode process. At the ceiling endless mode writes itself off. `"0"` arms no ceiling. |
 | `OPENCODE_AGENT_INTERCOM_SHOW_AGENTCOM` | on | `"0"` hides the plugin's own postings — subagent notices, handoff kickoff, doc-summary prompts — from the transcript. Their text still reaches the model unchanged. `"1"` shows them. TUI file overrides. |
 
@@ -732,7 +759,10 @@ ceiling than the plain handoff threshold (`OPENCODE_AGENT_INTERCOM_MAX_PRIMARY_C
 default 80 000 tokens), and the one in effect while endless mode is on. When
 the ceiling is reached the orchestrator is replaced by a fresh orchestrator
 session, which is told to work the project's todo file off; that fresh session
-reaches the ceiling in turn and is replaced again, and so on.
+reaches the ceiling in turn and is replaced again, and so on. A successor keeps
+its predecessor's session title unchanged, so the title carries no handoff marker
+or session id. The cycle-completion log records the new session id, while the
+sidebar context counter starts at zero for the fresh session.
 
 A cycle runs in this order:
 
@@ -745,16 +775,22 @@ A cycle runs in this order:
    `OPENCODE_AGENT_INTERCOM_ENDLESS_QUIESCE_TIMEOUT_MS` (default 10 minutes).
    A timeout abandons the cycle rather than aborting a working subagent —
    killing real work to save context is the loss the mode exists to prevent.
-3. **Save.** The orchestrator is asked to state its open points in plain text;
-   the plugin parses the reply and writes one task per point into the
-   project's todo file (`TODO.md` / `todos.md`), then reads the file back and
-   confirms every id it just wrote is there. The orchestrator itself has no
-   file-writing tool (`PRIMARY_TOOLS` is `spawn` / `abort` / `list`), so the
-   plugin does the writing on its behalf. Any failure here abandons the cycle
-   without replacing the session — replacing the orchestrator after failing
-   to save its open points is the data loss the mode exists to prevent.
+3. **Wind-down.** The orchestrator is asked to spawn a single `planner`
+   subagent through a one-time permit — the sole exception to the spawn
+   freeze. That subagent is handed the orchestrator's open work and rewrites
+   the project's todo file (`TODO.md` / `todos.md`) itself with the todo
+   tools, inside a machine-owned `## Intercom tasks` section the plugin fences
+   off. The orchestrator has no file-writing tool of its own (`PRIMARY_TOOLS`
+   is `spawn` / `abort` / `list`); the permitted subagent does the writing.
+   When it has finished, the plugin verifies the file it left — one regular
+   file, still parsing, nothing outside the machine section moved except whole
+   migrated task blocks — and restores the exact pre-write bytes if any check
+   fails, bounded by `OPENCODE_AGENT_INTERCOM_ENDLESS_WIND_DOWN_TIMEOUT_MS`
+   (default 15 minutes). Any failure here abandons the cycle without replacing
+   the session; if the orchestrator never spawns the subagent, the plugin
+   starts it itself as a fallback.
 4. **Replace.** The plain orchestrator handoff runs with an additional kickoff
-   block naming the todo file and the confirmed task ids; the old orchestrator
+   block carrying the todo file's name and its own text; the old orchestrator
    is archived, the new one starts with the instruction to work the file off.
 5. **Work off.** The new orchestrator runs normally — it spawns subagents, the
    wake-hook ticks tasks off via the existing `DONE: T<n>` marker path, its
@@ -772,15 +808,17 @@ owns it, exactly as in a session with the mode switched off. The pause dies with
 the session it was set on, so the next orchestrator starts with the mode
 available again.
 
-- **Nothing left to do.** When the orchestrator reports no new open points
-  *and* the todo file has no open tasks, the mode pauses instead of starting
-  a session that would have nothing to work on.
-- **No progress.** If the open-task count has not fallen after
-  `ENDLESS_MAX_STALLED_CYCLES` (2) consecutive cycles, the mode pauses — the
-  bound against an orchestrator that saves the same points every cycle and
-  never finishes one. This one fires after the replacement, so the pause goes
-  on the new orchestrator, which is the session that would otherwise carry the
-  loop on.
+- **Nothing left to do.** When the wind-down subagent reports
+  `## WIND-DOWN DONE — nothing open` *and* the todo file parses to no open
+  tasks, the mode pauses instead of starting a session that would have nothing
+  to work on.
+- **No progress.** If none of the previous cycle's open task ids has cleared
+  after `ENDLESS_MAX_STALLED_CYCLES` (2) consecutive cycles, the mode pauses —
+  the bound against an orchestrator that keeps the same work open every cycle
+  and never finishes one. Ids are monotone (an id watermark stops one being
+  reused), so a rephrased list cannot read as progress that did not happen.
+  This one fires after the replacement, so the pause goes on the new
+  orchestrator, which is the session that would otherwise carry the loop on.
 - **Cycle ceiling.** `OPENCODE_AGENT_INTERCOM_ENDLESS_MAX_CYCLES` (default
   10) cycles per opencode process. At the ceiling the mode pauses with a
   warning toast.
@@ -789,10 +827,12 @@ available again.
   already-over-threshold turn cannot retry on its next message; the cooldown
   lifts on its own.
 - **The switch.** Turning the toggle off in the sidebar (or
-  `OPENCODE_AGENT_INTERCOM_ENDLESS_MODE=0`) drops the latch at the next
-  settings read; a cycle already past the save step still completes, because
-  it has written to the todo file and must not leave the orchestrator
-  half-replaced.
+  `OPENCODE_AGENT_INTERCOM_ENDLESS_MODE=0`) drops the latch and the freeze at
+  the next settings read; a cycle that has already armed the wind-down permit
+  still runs through to its confirm or its abandon, because the permitted
+  subagent may already be rewriting the file and the cycle must not leave the
+  orchestrator half-replaced. The switch-off takes effect from the next
+  schedule.
 
 Only the sidebar toggle (or the env var) writes `endlessMode`; none of these
 stops touches the settings file, deletes a session, aborts a subagent or

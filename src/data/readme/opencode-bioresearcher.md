@@ -1,0 +1,140 @@
+# bioresearcher-skills
+
+[![skills.sh](https://www.skills.sh/b/yeyuan98/bioresearcher-skills)](https://www.skills.sh/yeyuan98/bioresearcher-skills)
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](./LICENSE)
+
+Agent Skills ([agentskills.io](https://agentskills.io) open standard) for
+**biomedical research with the [biomcp-ts](https://github.com/yeyuan98/biomcp-ts)
+MCP server** — deep multi-aspect research with citations, PubMed weekly
+update processing, uv Python environment bootstrap, and automated local
+runtime onboarding. Works in opencode, Claude Code, Codex, Cursor, Gemini CLI,
+and every harness that reads `SKILL.md`.
+
+## Skills
+
+| Skill | What it does |
+|---|---|
+| [`bioresearcher-onboard`](./skills/bioresearcher-onboard/SKILL.md) | Bootstraps a project-local biomcp MCP server runtime in `.bioresearcher-runtime/`: downloads portable Node.js 22 (if missing), vendors biomcp with fast mirror support (official or npmmirror), configures optional features (R, Biowasm, SQLite), and registers the server in OpenCode, Claude Code, Cursor, ZCode, Pi, CodeBuddy, or WorkBuddy. |
+| [`bioresearcher-plot-making`](./skills/bioresearcher-plot-making/SKILL.md) | Biomedical visualization router and plotting engine: classifies research data and produces publication-ready scientific figures (structural protein-binder complexes, conformational dynamics, literature method summaries, developmental case registers, and evidence tables) with built-in QA gates. |
+| [`bioresearcher-deep-research`](./skills/bioresearcher-deep-research/SKILL.md) | Orchestrates multi-aspect biomedical research (literature, trials, genes, variants, drugs, diseases, patents, omics) through biomcp-ts: interview → decompose → parallel-or-sequential research → cited Markdown + HTML report. 18 domain reference guides included. |
+| [`bioresearcher-pubmed-weekly`](./skills/bioresearcher-pubmed-weekly/SKILL.md) | Downloads the past week's PubMed updatefiles from NCBI and parses them (pure-Python streaming parser, handles `<PubmedArticle>` **and** `<DeleteCitation>`) into one Excel workbook. |
+| [`bioresearcher-python-setup-uv`](./skills/bioresearcher-python-setup-uv/SKILL.md) | Bootstraps a project-local uv-managed Python environment (official or China mirror). |
+
+## Install
+
+Requires the biomcp-ts MCP server — either bootstrap it automatically with
+the [`bioresearcher-onboard`](./skills/bioresearcher-onboard/SKILL.md) skill, or
+see [docs/biomcp-ts-setup.md](./docs/biomcp-ts-setup.md) for manual wiring.
+
+**Any harness (skills CLI):**
+
+```bash
+npx skills add yeyuan98/bioresearcher-skills
+```
+
+To run onboarding immediately:
+
+```bash
+npx skills add yeyuan98/bioresearcher-skills --skill bioresearcher-onboard
+```
+
+**Claude Code (plugin marketplace):**
+
+```
+/plugin marketplace add yeyuan98/bioresearcher-skills
+/plugin install bioresearcher@bioresearcher-skills
+```
+
+Installing the plugin also bundles the pinned **core-only** biomcp MCP server
+(`.claude-plugin/mcp.json`): it auto-starts with the plugin — no manual
+`.mcp.json` — and its tools surface as `mcp__plugin_bioresearcher_biomcp__*`.
+Requires Node.js >= 22.13 with `npx` on PATH (the first tool call pays the
+npx download). The plugin also ships the `bioresearcher-dr-worker` subagent
+used by the deep-research skill's parallel fan-out. Manual wiring is only
+needed for other harnesses or the all-features server variant — and a manual
+registration does not deduplicate against the bundled one (commands differ),
+so disable one of them via `/mcp`. See
+[docs/biomcp-ts-setup.md](./docs/biomcp-ts-setup.md) for the permission model.
+
+**Plain git clone** (pick the directory your harness reads):
+`.opencode/skills/`, `.claude/skills/`, `.agents/skills/`, `.codex/skills/`,
+or `.gemini/skills/`:
+
+```bash
+git clone https://github.com/yeyuan98/bioresearcher-skills .opencode/skills/bioresearcher-skills
+```
+
+Gemini CLI: `gemini skills install https://github.com/yeyuan98/bioresearcher-skills` (skills install is currently a preview-channel command).
+
+**WorkBuddy (connector market):** the same server + skills ship as a
+WorkBuddy connector — see [docs/connector-workbuddy.md](./docs/connector-workbuddy.md).
+Releases from v1.3.0 on carry a `bioresearcher-connector_workbuddy-v*.tar.gz`
+bundle for market submission.
+
+**OpenCode (plugin / connector):** the same server + skills + subagent ship as an
+OpenCode plugin — see [docs/connector-opencode.md](./docs/connector-opencode.md).
+Published to npm as `opencode-bioresearcher` (`"plugin": ["opencode-bioresearcher"]`
+in `opencode.json` or `opencode plugin opencode-bioresearcher`). Releases also carry
+a `bioresearcher-connector_opencode-v*.tar.gz` bundle for local or offline installation.
+
+**DeepSeek Harness (plugin / connector):** the same server + skills + subagent ship as a
+DeepSeek Harness (dsh) plugin — see [docs/connector-dsh.md](./docs/connector-dsh.md).
+Releases carry a `bioresearcher-connector_dsh-v*.tar.gz` bundle for profile
+or overlay patch installation (`dsh plugin --profile web add ./bioresearcher`).
+
+## Development
+
+```bash
+node scripts/ci/lint-frontmatter.mjs   # strict-6 Agent Skills conformance
+node scripts/ci/lint-agents.mjs        # plugin subagent frontmatter + manifest agreement
+node scripts/ci/check-drift.mjs        # skills.json <-> metadata <-> CHANGELOG + VERSION slots
+node scripts/ci/check-links.mjs        # links + duplicate headings
+bash scripts/ci/check-bundle.sh        # <=1000 files / <=10 MiB per skill
+bash scripts/ci/check-legacy-names.sh  # no retired biomcp-python tool names
+node scripts/ci/check-tool-names.mjs   # biomcp tool refs match pinned registry
+node scripts/ci/check-marketplace.mjs  # .claude-plugin validation
+node scripts/ci/build-connector-workbuddy.mjs  # WorkBuddy connector bundle -> dist/
+node scripts/ci/build-connector-opencode.mjs   # OpenCode connector bundle -> dist/
+node scripts/ci/build-connector-dsh.mjs        # DeepSeek Harness connector bundle -> dist/
+```
+
+CI (`.github/workflows/ci.yml`) runs all of the above plus the official
+`skills-ref` validator and a local `npx skills add ./ --list` discovery
+smoke. Releases are cut automatically on push to `main` when `VERSION`
+changes (notes extracted from `CHANGELOG.md`).
+
+### Empirical agent tests
+
+`agent-test/` holds a unified, **manually-run** test suite that drives the
+real opencode CLI against these skills and a live keyless biomcp-ts MCP
+server (costs LLM tokens; never run in CI):
+
+```bash
+node agent-test/run.mjs --list
+node agent-test/run.mjs --only skills-q01-discovery
+node agent-test/run.mjs            # all cases
+```
+
+See [agent-test/README.md](./agent-test/README.md) for the case schema and
+the 12 mechanical check types. Sibling plugin test suites:
+- [Claude Code plugin tests](./agent-test/claude-plugin-specific/README.md)
+- [OpenCode plugin tests](./agent-test/opencode-plugin-specific/README.md)
+- [DeepSeek Harness plugin tests](./agent-test/dsh-plugin-specific/README.md)
+
+## Docs
+
+- [biomcp-ts MCP setup](./docs/biomcp-ts-setup.md) — wiring, auth, rate limits
+- [Migration from the opencode plugin](./docs/migration-from-plugin.md) — tool-name map + openFDA downgrades
+- [Exposure checklist](./docs/exposure.md) — directory submission mechanics
+- [Demos & partner docs](./demos/README.md) — bilingual (zh/en) Agent + MCP
+  publication documents with true-run demo artifacts and a self-contained
+  replay runner (`node demos/run-demo.mjs --list`); the same material powers
+  the [GitHub Pages showroom](https://yeyuan98.github.io/bioresearcher-skills/)
+  (source: `demos/website/`, built by `pages.yml` — enable Pages → Source:
+  GitHub Actions once)
+
+## License
+
+Apache-2.0. Extracted and retargeted from
+[opencode-bioresearcher-plugin](https://github.com/yeyuan98/opencode-bioresearcher-plugin) v1.7.2
+(personal project of the same author).

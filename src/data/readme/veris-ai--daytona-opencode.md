@@ -17,6 +17,9 @@ And every run ends with a **receipt** of what the vendor actually received.
 Each has its own README with installation and usage. This page is about how they
 work and how to develop them.
 
+**Release status:** published 0.2.1 has no CLI. The prepared 0.3.0 release
+contains the executable described below; wait for that npm release to use it.
+
 `@veris-ai/daytona` also installs a `veris-daytona` executable, and it has five
 verbs. `run` does the whole job in one command — box up, code in, suite run,
 receipt read, everything down. The other four are that job cut into the pieces a
@@ -26,41 +29,71 @@ variables applied, `teardown` deletes it. The three middle ones exist because
 Daytona's own CLI has no upload command and no way to set a variable on a
 command it runs; whoever calls them still decides what the receipt proved. The
 Veris-shaped half is identical either way and belongs here —
-the egress credential, the 20-domain allowlist, the outbound proxy, the CA
+the egress credential, the gateway pin, the outbound proxy, the CA
 bundle, the canary, the trust variables. The "did this run prove anything" half
 belongs to the `veris` CLI, which already owns what a receipt means, what
 `--require-service` means and what the exit codes mean.
+
+
+## Shared skills in OpenCode
+
+Use the canonical `@veris-ai/veris-opencode` skills package plus **one** sandbox
+plugin after the pending skills 0.7.3 and provider 0.3.0 releases are published:
+
+```json
+{
+  "plugin": [
+    "@veris-ai/veris-opencode@latest",
+    "@veris-ai/daytona-opencode@latest"
+  ]
+}
+```
+
+The commands are `/veris:setup`, `/veris:build <request>` and `/veris:fix <request>`.
+`verisSkill` reads installed skill resources on the host; application file/bash
+tools remain remote. `verisTwin` identifies the plugin-owned session and controls,
+and `verisReceipt` takes an explicit pre-execution baseline. Skills reuse this
+session automatically. Record and pin the resolved published npm versions.
+See [daytona-opencode/README.md](daytona-opencode/README.md) for the capability
+contract, separate network/TLS/persistence/sync behavior and release prerequisites.
 
 ## How it works
 
 Every sandbox is created with two Daytona parameters:
 
-- **`domainAllowList`** — the vendor hostnames the twin answers for, the gateway
-  itself, the twin's data planes, the twin's own host where a service can only
-  be reached there, and package registries. Nothing else leaves.
+- **`networkAllowList`** — the Veris gateway's IPv4 address, as one `/32`, and
+  nothing else. Daytona enforces it at the network layer: a process that
+  ignores the proxy variables cannot dial out at all.
 - **`outboundProxyUrl`** — the Veris gateway, over HTTP CONNECT.
 
-Daytona chains them: sandbox traffic reaches Daytona's own proxy, which drops
-anything not allowlisted and forwards the rest to the gateway, which answers
-vendor hostnames from the twin. This is the same tier `@veris-ai/e2b` uses.
+Daytona chains them: sandbox traffic reaches Daytona's own proxy, which forwards
+it to the gateway, which answers vendor hostnames from the twin and passes
+public hosts — package registries, git — through untouched. This is the same
+tier `@veris-ai/e2b` uses.
 
-**Daytona caps that list at 20 domains**, and a large environment fills it: nine
-vendor hostnames plus the gateway leave room for half the default registry list.
-Everything the twin cannot work without is kept, the registries are trimmed from
-the tail of `DEFAULT_REGISTRY_HOSTS`, and what was dropped is printed. If the
-required hosts alone exceed 20, `create()` refuses and says so rather than
-letting Daytona answer "Domain allow list cannot contain more than 20 domains".
+**Why an address and not a hostname list.** Measured on Daytona: a
+`domainAllowList` set beside `outboundProxyUrl` switches Daytona's egress proxy
+into TLS inspection. The client is shown a leaf signed by Daytona's own
+ephemeral CA, Daytona opens a second TLS session to the gateway, rejects the
+Veris-signed leaf it gets back, and every vendor call ends as `502 could not
+reach upstream host` — whatever the sandbox trusts, because the trust decision
+that fails is Daytona's, not the client's. `networkAllowList` beside the same
+proxy URL leaves the tunnel untouched, so the client verifies the Veris leaf
+itself. The address comes from the control plane (`gateway_ips` in the egress
+credential); an older control plane gets one DNS lookup of the proxy host.
+Pinning to the gateway also retires Daytona's 20-domain cap: nothing is
+trimmed, and there is no `allowOut`.
 
 Nothing of ours runs inside the sandbox, so any image works — there is no
 snapshot to register, no `NET_ADMIN` to request, and no environment to thread
 through individual commands.
 
-**Why allowlisting vendor hostnames is not a leak.** It reads backwards, but the
-allowlist is not what stands between the sandbox and the real vendor — the
-gateway is. A vendor host that is *absent* never reaches the gateway and so
-never reaches the twin; it is simply blocked. And Daytona's enforcement is not a
-convention a client can opt out of: stripping every proxy variable does not let
-a process reach an allowlisted host directly.
+**Why this is not a leak.** The gateway, not the allowlist, stands between the
+sandbox and the real vendor: a vendor hostname is intercepted there and answered
+from the twin, and a process that bypasses the proxy is blocked by Daytona
+rather than let out — stripping every proxy variable gets a connection reset,
+not the real vendor. What the gateway passes through is public hosts with their
+own certificates.
 
 **The canary.** Before `create()` resolves, a probe dials a reserved hostname
 only the gateway answers, whose body carries the twin id. It proves in one
@@ -127,8 +160,10 @@ listener.
   (`NODE_OPTIONS=--use-openssl-ca`, which Daytona leaves alone, reading the
   system certificate directory the Veris CA is installed into; that install
   needs passwordless sudo and `update-ca-certificates`, both in Daytona's
-  default image). curl returns 200 under the inherited value; it consults the
-  system directory as well.
+  default image). curl and Python's own `ssl` return 200 under the inherited
+  value; both consult the system directory as well. Node also needs
+  `NODE_USE_ENV_PROXY=1`, set at create time: Node ignores the proxy variables
+  otherwise, and Daytona blocks a direct dial.
 - **An SDK that bundles its own CA reads no variable at all.** stripe-python
   passes `verify=stripe.ca_bundle_path`, so the trust variables never reach it
   and the first Stripe call fails with "Could not verify Stripe's SSL
@@ -137,15 +172,15 @@ listener.
   when they arrive. `veris-daytona run` calls it between `--setup` and the
   command. An SDK outside that list still fails, and its own error names the
   file to add.
-- **`github.com` is not on the default allowlist.** The platform's route table
-  maps it to the `github` twin, and the gateway resolves that table for every
-  sandbox rather than only the services the environment deployed — so in an
-  environment without a github twin the gateway forges a leaf for `github.com`
-  (it verifies) and then dials a backend pod that does not exist, and every
-  request gets an empty reply. Measured: `uv` could not fetch a CPython the
-  image lacked. `codeload.github.com` and `raw.githubusercontent.com` are
-  unaffected and remain allowed; an environment that *does* have the github
-  twin gets `github.com` from its vendor routes, which is where it belongs.
+- **`github.com` gets an empty reply in an environment without a github twin.**
+  The platform's route table maps it to the `github` twin, and the gateway
+  resolves that table for every sandbox rather than only the services the
+  environment deployed — so the gateway forges a leaf for `github.com` (it
+  verifies) and then dials a backend pod that does not exist. Measured: `uv`
+  could not fetch a CPython the image lacked. `codeload.github.com` and
+  `raw.githubusercontent.com` pass through unaffected; an environment that
+  *does* have the github twin gets the real route. The fix belongs in the
+  gateway (intercept only what the sandbox's environment deployed).
 - **A very long run's receipt is a floor, not a count.** The twin's log is read
   in pages of 1000 up to a budget; past that the count prints as `≥N` and
   `entry.capped` is true. Below the budget it is exact — the count used to stop
@@ -190,7 +225,7 @@ Never write "sandbox" bare in a log line, error, or doc here.
 ```
 
 in `daytona/core/session-manager.ts`. That one line carries twin provisioning,
-the egress credential, the allowlist, the outbound proxy, CA trust and the
+the egress credential, the gateway pin, the outbound proxy, CA trust and the
 canary — because all of it lives inside `create()`. Twin teardown rides along
 too: `@veris-ai/daytona` wraps `delete()` on the sandbox it returns, so the
 plugin's existing `sandbox.delete()` removes the twin with no plugin change at

@@ -49,7 +49,7 @@ Omit `-g` to install for the current project only. You can also install from
 the TUI Plugins dialog (`shift+i`). Fully quit and relaunch opencode afterwards.
 
 That writes a `tui.json` entry like `["opencode-usage-widget", { "order": 600 }]`.
-Pin a version with `opencode plug opencode-usage-widget@0.1.1 -g`. Re-run with
+Pin a version with `opencode plug opencode-usage-widget@0.1.2 -g`. Re-run with
 `--force` to replace an existing entry.
 
 ## Install from source (local)

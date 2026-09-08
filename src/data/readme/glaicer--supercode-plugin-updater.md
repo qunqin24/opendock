@@ -13,10 +13,10 @@ OpenCode installs npm plugins and managed tools (prettier, pyright, bash-languag
 
 ## What it does
 
-Once a day (on startup, 24h between checks), it compares the installed version of every plugin and managed tool against `latest` on the npm registry:
+It compares the installed version of every plugin and managed tool against `latest` on the npm registry — once a day on startup (24h between checks), and freshly every time you open `/plugin-updates`:
 
 - If it finds updates, you get a toast: `N OpenCode updates available. Run /plugin-updates to review them.`
-- `/plugin-updates` (command palette or slash command) opens a screen with three groups (Plugins, Managed tools, Skipped) showing `installed → latest` per package.
+- `/plugin-updates` (command palette or slash command) opens a screen with three groups (Plugins, Managed tools, Skipped) showing `installed → latest` per package. Opening the screen always re-checks now (ignoring the 24h timer), so the list is never stale.
 - Select what you want (Space / `A`), press `U`, confirm, and OpenCode installs the fresh versions itself on the next restart.
 
 The plugin never installs or deletes anything directly. Confirming marks the stale cache entries for removal; when OpenCode exits, they're cleaned up and the built-in resolver installs fresh versions on the next start. Until you restart, nothing on disk changes.
@@ -59,7 +59,7 @@ Manual install also works: add the package to the `plugin` array in `tui.json` (
 | Space | Toggle the package under the cursor |
 | `A` | Select every selectable package |
 | `U` | Prepare updates for the selection (confirm dialog first) |
-| `R` | Re-check now (ignores the 24h timer, no toast) |
+| `R` | Re-check again (opening the screen already re-checks; no toast) |
 | Esc | Close |
 
 Pinned, unknown, and skipped rows are shown for information but can never be selected. Confirming shows a pending-restart banner: the marked cache entries are removed when OpenCode exits, and the next start installs the new versions.

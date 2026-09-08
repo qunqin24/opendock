@@ -28,13 +28,16 @@ In `opencode.json`:
 { "plugin": ["@pfoundation/ocinsights"] }
 ```
 
-Restart OpenCode, then open `http://127.0.0.1:4173/`.
+Restart OpenCode, then open `http://127.0.0.1:4173/`. The package has no runtime dependencies, so the first install is just this tarball (no minutes-long dependency download).
+
+On opencode 1.x this loads the v1 surface (HTTP deck + edit ledger + auto-contribute); the TUI commands, RPC methods and agent tool need opencode2.
 
 ## Usage
 
 - First request runs the extract (~15 s), then caches it for 5 minutes. `POST /refresh` forces a re-run; `GET /data.json` is the raw payload for scripting; `GET /health` reports status.
 - TUI: `/insights` (or `ctrl+alt+i`) opens the deck, `/contribute` manages sharing.
 - Agent tool: `insights_contribute` with `status | enable | disable | send` — "disable contributions" just works.
+- Diagnostics: the plugin never prints into the terminal; logs live in `~/.local/share/ocInsights/logs/plugin.log` (`%USERPROFILE%\.local\share\ocInsights\logs\plugin.log` on Windows), one JSON record per line, rotated at 1 MiB with one backup. Set `OC_INSIGHTS_LOG_LEVEL` to `debug`, `info` (default), `warn`, `error`, or `off`.
 
 ## Configuration
 
@@ -63,11 +66,12 @@ Opt out any of: `/contribute` toggle, deck Contribute panel, `OC_INSIGHTS_CONTRI
 <details>
 <summary>Exactly what leaves your machine</summary>
 
-One row per top-level cycle, 21 fields:
+One row per top-level cycle, 26 fields:
 
 ```
 cycle_key day model prov role pm pp bm bp
 u a tedits tpaths teerr tcost tship thrs tver tabort latmed tshipe
+variant pv bv harness hversion
 ```
 
 `cycle_key` is an opaque hash, not a session id. Never sent: session ids, file paths, worktree or project names, prompts, hostnames, usernames, token counts, commit data. Your install is a random UUID in `~/.local/share/ocInsights/contributor.json`, generated on first use.
@@ -95,6 +99,10 @@ These are the judgment calls. They are printed on the relevant cards too, so a r
 **Active hours (heartbeat).** Messages are ordered per session; each message credits `min(gap to previous message, 10 min)` and the first message credits 60 s. Only `user` and `assistant` messages count. This is an estimate of attention, not wall clock: a session left open overnight contributes nothing for the idle span.
 
 **Attribution to a model.** A session belongs to the model that produced most of its assistant messages. 96% of sessions have one model at 80% or more, so this loses little. Model ids are canonicalised first (`claude-opus-4-6`, `claude-opus-4.6`, `anthropic/claude-opus-4.6` and `claude-opus-46` are one model) — that is dedup, not grouping; nothing is ever bucketed as "other".
+
+**Effort (variant).** Every assistant message also records the reasoning effort it ran at (`default`, `high`, `max`, `xhigh`, `medium`, `thinking`), and sessions do switch mid-way, so the effort is counted per message like the model and the dominant one wins each session, phase and cycle. The *model + effort* grouping ranks each model once per effort it ran at — a model used at two efforts is two entries — and keeps the family colours. The dominant model/provider pair is summed over efforts first, so turning efforts on never moves a model between pairs.
+
+**Harness version.** Each session records the opencode version that ran it; the deck buckets releases to minor (`1.18`) and groups `0.0.0-beta-N` builds as `beta`, with the raw strings one hover away. The header chip shows the newest session's version; sessions inherit nothing, cycles inherit their session's.
 
 **Output = file edits.** Every `edit`, `write` or `patch` tool call, parsed from message content. It is the one output signal recorded consistently across every opencode version. Line counts (`summary_additions`) stopped being written after 1.15.13 on 2026-06-05 and appear only as a supplementary column, capped at 10,000 lines per session.
 
@@ -138,7 +146,7 @@ Selection bias: heavy models get hard tasks, cheap models get lookups. Models we
 
 ## Requirements & notes
 
-- OpenCode 1.18+ (v2 plugin API), with `bun` and `git` available.
+- OpenCode with either plugin API: v2 (opencode2, full features) or v1 (1.x, verified on 1.18.21; HTTP deck + ledger + auto-contribute only) — plus `bun` and `git`.
 - The database is opened read-only; nothing here writes to OpenCode.
 - The server listens on loopback by default; `0.0.0.0` is opt-in and unauthenticated.
 - The deck shows cost figures and project paths — think before sharing a snapshot with a different audience.
@@ -175,7 +183,7 @@ make serve            # HTTP server without OpenCode (same port)
 make publish-npm      # typecheck, pack dry-run, npm publish
 ```
 
-Verify needs node with Playwright (it falls back to `~/dev/datastudio/node_modules/playwright` if none is installed here). Publishing to npm needs `npm login` (and `NPM_TOKEN` on the GitHub repo for the tag workflow).
+Verify needs node with Playwright (it falls back to `~/dev/datastudio/node_modules/playwright` if none is installed here). Publishing to npm locally needs `npm login` (with 2FA if the package disallows tokens); the tag workflow authenticates via the npm trusted publisher instead (no secret).
 
 </details>
 

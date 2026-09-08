@@ -23,6 +23,11 @@ pending waits remain compatible and continue using the original data directory.
 
 ## Install
 
+Version 0.2.1 targets OpenCode V2 `0.0.0-beta-19242`. Its plugin SDK, Effect,
+and OpenTUI versions are pinned together. Older plugin versions can fail to
+load after an OpenCode upgrade with `scope.state.finalizers.set`; update the
+plugin rather than changing credentials or deleting pending waits.
+
 The plugin has two halves and needs an entry in **two** config files. The TUI
 half provides the commands; the server half owns the timers so a wait still
 fires once the TUI is closed.
@@ -65,7 +70,7 @@ With options:
 ### Compatibility
 
 The V2 plugin API is beta. This release is built and verified against
-`@opencode-ai/plugin@0.0.0-beta-17595` (`opencode2 --version` → `v0.0.0-beta-17595`).
+`@opencode-ai/plugin@0.0.0-beta-19242` (`opencode2 --version` → `v0.0.0-beta-19242`).
 If your OpenCode is on a different beta build, check for a matching release of
 this plugin.
 
@@ -162,11 +167,18 @@ bun install
 bun run check   # typecheck + lint + test
 ```
 
-To run it against a local checkout, point a config entry at the file:
+To run it against a local checkout, add a local plugin directory with an
+`index.ts` that re-exports the checkout's server entrypoint:
+
+```ts
+export { default } from "/absolute/path/to/opencode2-waits/src/index.ts"
+```
+
+Then configure that local plugin directory:
 
 ```jsonc
 {
-  "plugins": ["/absolute/path/to/opencode2-waits/src/index.ts"],
+  "plugins": ["/absolute/path/to/local-plugin"],
 }
 ```
 
