@@ -17,23 +17,14 @@ And every run ends with a **receipt** of what the vendor actually received.
 Each has its own README with installation and usage. This page is about how they
 work and how to develop them.
 
-**Release status:** published 0.2.1 has no CLI. The prepared 0.3.0 release
-contains the executable described below; wait for that npm release to use it.
-
-`@veris-ai/daytona` also installs a `veris-daytona` executable, and it has five
-verbs. `run` does the whole job in one command — box up, code in, suite run,
-receipt read, everything down. The other four are that job cut into the pieces a
-caller drives itself: `provision` wires a box on a twin you already have and
-stops there, `push` puts code in it, `exec` runs a command in it with the trust
-variables applied, `teardown` deletes it. The three middle ones exist because
-Daytona's own CLI has no upload command and no way to set a variable on a
-command it runs; whoever calls them still decides what the receipt proved. The
-Veris-shaped half is identical either way and belongs here —
-the egress credential, the gateway pin, the outbound proxy, the CA
-bundle, the canary, the trust variables. The "did this run prove anything" half
-belongs to the `veris` CLI, which already owns what a receipt means, what
-`--require-service` means and what the exit codes mean.
-
+`@veris-ai/daytona` is a library and nothing else: no executable, no runner.
+It re-exports `@daytona/sdk` and replaces one class, `Daytona`, so that every
+sandbox it creates comes up with a twin answering its vendor calls — the
+egress credential, the gateway pin, the outbound proxy, the CA bundle, the
+canary and the trust variables all live inside `create()`. Getting code in,
+running commands and reading a receipt are the Daytona SDK's own calls
+(`fs.uploadFile`, `process.executeCommand`) plus `sbx.veris`. Which run proved
+what is the `veris` CLI's business, which already owns what a receipt means.
 
 ## Shared skills in OpenCode
 
@@ -121,10 +112,10 @@ and its first call fails with "Could not verify Stripe's SSL certificate" in a
 sandbox where `curl`, Node and `requests` all succeed. `sbx.veris
 .patchBundledCas()` appends the Veris CA to the known ones (certifi, pip's
 vendored certifi, botocore, stripe, httplib2) — the Daytona-shaped version of
-the veris CLI's `--patch-bundled-cas`. Run it after installing dependencies;
-`veris-daytona run` does. Every sandbox also carries the same patcher as a
-script at `/tmp/veris-patch-bundled-cas.sh`, which is how a `provision`ed box
-gets patched by whoever installed the dependencies in it.
+the veris CLI's `--patch-bundled-cas`. Run it after installing dependencies.
+Every sandbox also carries the same patcher as a script at
+`/tmp/veris-patch-bundled-cas.sh`, so whoever installed the dependencies can
+run it with no SDK in hand.
 
 **On `socks_address`.** The egress credential also carries a SOCKS endpoint,
 which is what `@veris-ai/e2b` uses. Daytona cannot: it accepts only
@@ -150,9 +141,8 @@ listener.
   Python's `requests`: `unable to get local issuer certificate` with the
   inherited value, 200 with `REQUESTS_CA_BUNDLE=/tmp/veris-ca-bundle.crt`. So
   every runtime that reads one of those variables as its only trust source
-  needs the Veris bundle exported per command. `veris-daytona run` does that;
-  a command run any other way (the OpenCode plugin's bash tool, `daytona ssh`)
-  inherits Daytona's value. The SDK serves the right values two ways for
+  needs the Veris bundle exported per command; a command run without it (the
+  OpenCode plugin's bash tool, `daytona ssh`) inherits Daytona's value. The SDK serves the right values two ways for
   whoever runs the command: `sbx.veris.getTrustEnv()` when you can hand the
   process an env map, and `sbx.veris.trustPrelude()` — one line of shell
   `export`s — when all you can do is prefix a command line. Node is handled at
@@ -164,14 +154,26 @@ listener.
   value; both consult the system directory as well. Node also needs
   `NODE_USE_ENV_PROXY=1`, set at create time: Node ignores the proxy variables
   otherwise, and Daytona blocks a direct dial.
+- **Node SDKs that build their own agent.** `NODE_USE_ENV_PROXY` reaches only
+  Node's global agents and the global `fetch` dispatcher. An SDK that
+  constructs its own `http(s).Agent` for keep-alive pooling (stripe-node, the
+  AWS SDK's Node handler, Twilio's client) never sees the proxy, resolves the
+  vendor host itself, and dies on the blocked egress with `EAI_AGAIN`. Measured
+  with stripe-node 15: the global agent 200, its own agent `EAI_AGAIN`, its own
+  agent with `proxyEnv: process.env` 200. So every sandbox carries
+  `/tmp/veris-node-proxy.cjs`, a preload that subclasses both Agent classes to
+  default `proxyEnv` to the process environment, and `NODE_OPTIONS` names it
+  with `--require` beside `--use-openssl-ca`. Both flags are appended to a
+  caller's own `NODE_OPTIONS`, never replacing them; `verisNodeOptions()`
+  builds the value for a command of your own. Clients built on undici `Pool`
+  or `Client` hold their own dispatcher and are not covered.
 - **An SDK that bundles its own CA reads no variable at all.** stripe-python
   passes `verify=stripe.ca_bundle_path`, so the trust variables never reach it
   and the first Stripe call fails with "Could not verify Stripe's SSL
   certificate". `sbx.veris.patchBundledCas()` appends the Veris CA to the
   bundles listed above; run it after installing dependencies, because that is
-  when they arrive. `veris-daytona run` calls it between `--setup` and the
-  command. An SDK outside that list still fails, and its own error names the
-  file to add.
+  when they arrive. An SDK outside that list still fails, and its own error
+  names the file to add.
 - **`github.com` gets an empty reply in an environment without a github twin.**
   The platform's route table maps it to the `github` twin, and the gateway
   resolves that table for every sandbox rather than only the services the

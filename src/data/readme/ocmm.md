@@ -899,12 +899,15 @@ An alias containing a colon uses first-colon grammar, `<profile>:<agent>`. For e
 
 The import is requirement-only: it copies the normalized `ModelRequirement` — `fallbackChain`; its requirement-level native `variant`; each fallback entry's `providers`, `model`, native `variant`, and model-control metadata; and `requiresModel`, `requiresAnyModel`, and `requiresProvider`. Agent-level logical review `variants` remain local and are not imported. Permissions, prompts, tools, description, other agent controls, and profile-wide fields also stay on the source agent.
 
+When a profile agent specifies `alias` without a direct `model`, `models`, `fallbackModels`, or `requirement`, the alias replaces inherited model selectors and inherited requirement-level `reasoning`/`variant` from the base agent. An explicit `reasoning` or `variant` beside the alias overrides the imported requirement default (`reasoning` wins when both are present); entry-local controls inside the imported fallback chain remain unchanged. Other inherited and profile-local controls remain merged normally. If the same profile agent explicitly supplies both an alias and a direct selector, the existing direct-selector precedence is preserved and the alias is not materialized.
+
 ### Profile merge semantics
 
 | Field type                                          | Behavior under profile overlay                 |
 | --------------------------------------------------- | ---------------------------------------------- |
 | Scalars (`debug`, `workflow`, ...)                  | Replaced                                       |
 | Objects (`agents`, `categories`, `runtimeFallback`, `subagent`) | Deep-merged (profile field wins per-key)       |
+| Alias-only `agents.<name>` entries                  | Replace inherited model selectors and requirement-level intensity; retain other controls |
 | Nested `agents.*.models`, `categories.*.models`     | **Replaced** (the overlay owns the complete canonical chain; no index merge or union) |
 | `fallbackModels`, `disabledAgents`                  | **Replaced** (profile fully owns these arrays) |
 | Other arrays (`retryOnStatusCodes`, ...)            | Replaced                                       |

@@ -74,23 +74,23 @@ pip install "aihr[vision]"
 hr setup
 ```
 
-`hr setup` installs the pinned plugin pair globally with npm, then delegates registration to the `opencode-hr` CLI that ships inside `opencode-hr-agent`. It never needs elevated privileges (a non-writable npm global directory gets pointed at the user-level prefix recipe below; configs with comments are never rewritten — it prints the exact lines to paste), re-running it is safe, and `opencode-hr status` shows what is registered. Restart opencode, then verify: ask for `hr_status` / `fastdraw_list` (agent tools) and `/fastdraw` (TUI command).
+`hr setup` installs the plugin pair globally with npm at `@latest`, then delegates registration to the `opencode-hr` CLI that ships inside `opencode-hr-agent`. It never needs elevated privileges (a non-writable npm global directory gets pointed at the user-level prefix recipe below; configs with comments are never rewritten — it prints the exact lines to paste), re-running it is safe, and `opencode-hr status` shows what is registered. After the npm install it prints the concrete versions `@latest` resolved to (via `npm ls -g`) so the run stays auditable after the fact. Restart opencode, then verify: ask for `hr_status` / `fastdraw_list` (agent tools) and `/fastdraw` (TUI command).
 
-Manual registration (fallback — e.g. no npm on PATH, or you prefer config-only): opencode loads plugins **only from its config files' `"plugin"` arrays** (and its plugin directories), downloading and caching npm entries itself at startup. The global npm prefix is never scanned, so a bare `npm install -g` is invisible to opencode. Declare exact versions in **both** files:
+Manual registration (fallback — e.g. no npm on PATH, or you prefer config-only): opencode loads plugins **only from its config files' `"plugin"` arrays** (and its plugin directories), downloading and caching npm entries itself at startup. The global npm prefix is never scanned, so a bare `npm install -g` is invisible to opencode. Declare the plugins in **both** files:
 
 ```jsonc
 // ~/.config/opencode/opencode.json (or .jsonc) — server half: hr_* / fastdraw_* agent tools
-{ "plugin": ["opencode-hr-agent@0.2.2", "opencode-fastdraw@1.1.1"] }
+{ "plugin": ["opencode-hr-agent@latest", "opencode-fastdraw@latest"] }
 ```
 
 ```json
 // ~/.config/opencode/tui.json — FastDraw TUI half: /fastdraw command + <leader>m keybind
-{ "plugin": ["opencode-fastdraw@1.1.1"] }
+{ "plugin": ["opencode-fastdraw@latest"] }
 ```
 
 `opencode-fastdraw` is a standalone model/role-switching plugin and can be declared on its own. `opencode-hr-agent` bridges the OpenCode tool surface to the `hr` CLI, so it requires the Python engine above. Wheel artifacts are also attached to each [GitHub Release](https://github.com/TachikomaGundam/AIHR/releases).
 
-- **Why the exact pins:** the `"plugin"` array also accepts `@latest` and semver ranges, but a floating spec makes every opencode startup download and execute new code with access to your `~/.npmrc` and `HR_HOME`; exact pins keep the running surface auditable and reproducible.
+- **Why `@latest` by default:** one-click setup must never ship a stale pin — a hardcoded version silently rots and was the source of real version-drift pain on fresh-machine deploys. `@latest` always resolves to the newest published release, and `hr setup` prints the exact versions it landed on so a run is still auditable after the fact. If you would rather freeze the running surface (each opencode startup re-resolving `@latest` can pull new code with access to your `~/.npmrc` and `HR_HOME`), replace `@latest` with an exact version in both files above.
 - **Why two files:** with only the `opencode.json` entry the agent tools work but `/fastdraw` and `<leader>m` silently vanish; with only `tui.json` it is the mirror image. `fastdraw/install.sh` registers both automatically.
 - **Optional HR-workflow layer:** the `/hr-workflow` slash skill and the `hr` sub-agent are config files, not plugin code — they are versioned under `opencode-config/` and install by copying:
   ```bash

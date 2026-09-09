@@ -4,15 +4,13 @@ Transparent automatic backgrounding for OpenCode subagents. Zero API changes —
 
 ## What it does
 
-Four features on the `event` hook:
+Three features on the `event` hook:
 
 1. **Auto-background** (`session.created`) — when architect spawns a child subagent, this plugin polls until the child is busy, then calls `POST /experimental/session/<parentID>/background`. The parent goes idle immediately and the turn returns to the user. No more "delegating task..." hanging.
 
 2. **Wake safety net** (`session.idle` / `session.status` on a child) — in ~3% of cases the native OpenCode wake fails to deliver the `<task_result>` back to the parent, or delivers it but the parent turn dies silently. This watchdog verifies the parent actually completed a turn after delivery (not just delivery), then re-wakes via the sync `/session/:id/message` route with the parent's previous model to preserve prompt cache. **Silence-discriminator**: completed children stop producing messages; silence >= 90s at deadline with settled status is the completion signal (upstream 1.18.x returns null for both mid-work and completed sessions).
 
-3. **Hang rescue sweep** (5-min interval over spawned-children registry) — if a child is silent >= 15 minutes with no tool in flight and no result delivered, the sweep POSTs `/api/session/{id}/interrupt` to break a possible hang, then steers the parent with "finish and deliver". Stateless: each child is checked independently with attempt cap (3), multi-layer guards (no result, no prior rescue, silence re-checks), and interrupt-first semantics (non-fatal on failure). Opt-out via `AUTO_BG_SWEEP=0`.
-
-4. **TODO-sync nudge** (`session.idle` on a TOP-LEVEL architect session) — reads the real TODO via `GET /session/{id}/todo` and, if any task is still `in_progress` when the session goes idle, injects a reminder to sync it. Guarded: no nudge while a subagent delegation is in flight (in_progress is legit then), and no nudge if the last turn already called `todowrite` (convergence). A 2-min cooldown prevents loops.
+3. **TODO-sync nudge** (`session.idle` on a TOP-LEVEL architect session) — reads the real TODO via `GET /session/{id}/todo` and, if any task is still `in_progress` when the session goes idle, injects a reminder to sync it. Guarded: no nudge while a subagent delegation is in flight (in_progress is legit then), and no nudge if the last turn already called `todowrite` (convergence). A 2-min cooldown prevents loops.
 
 ## Install
 
@@ -57,8 +55,7 @@ Or via `opencode.jsonc` agent config:
 |---|---|---|
 | `OPENCODE_AUTO_BACKGROUND` | `true` | When `false`, preserve native foreground delegation (opt-out). |
 | `OPENCODE_PORT` | `4097` | OpenCode server port. |
-| `AUTO_BG_PARENT_AGENTS` | `architect` | Comma-separated list of parent agent names that trigger background + wake + sweep. |
-| `AUTO_BG_SWEEP` | `enabled (opt-out 0)` | Set to `0` to disable the hang rescue sweep. |
+| `AUTO_BG_PARENT_AGENTS` | `architect` | Comma-separated list of parent agent names that trigger background + wake. |
 | `OPENCODE_INSTANCE_ROLE` | `fleet` | Set to `worktree` for per-worktree instances that should not run cross-session machinery. |
 
 ## Requirements
@@ -70,12 +67,11 @@ Or via `opencode.jsonc` agent config:
 
 - `session.created` → polls child status every 200ms up to 10s. When the child becomes "busy", backgrounds the parent (default; opt out with `OPENCODE_AUTO_BACKGROUND=false`).
 - `session.idle` / `session.status` on a child → watches the parent for 5 minutes. If the parent stays idle without processing the task result, sends a wake message reusing the parent's last model to preserve prompt cache. At deadline, uses silence-discriminator (90s silence + settled status) to rescue the ~3% cases where native wake fails.
-- Every 5 minutes → sweeps all tracked children. If a child is silent >= 15 min with no tool in flight and no result, interrupts it and steers the parent.
 - `session.idle` (top-level architect) → reads `/session/{id}/todo`; if any task is `in_progress` (and no child delegation is busy, and the last turn didn't already call `todowrite`), injects a synthetic nudge via /message (same model-preservation rule).
 
 ## Why?
 
-OpenCode's native subagent delegation keeps the parent in foreground until the child completes. The built-in background API exists but has to be called manually. This plugin makes it automatic and handles edge cases the native wake misses — including hangs, silent failures, and stale state.
+OpenCode's native subagent delegation keeps the parent in foreground until the child completes. The built-in background API exists but has to be called manually. This plugin makes it automatic and handles the missed-native-wake case without polling historical child sessions or interrupting quiet work.
 
 ## License
 

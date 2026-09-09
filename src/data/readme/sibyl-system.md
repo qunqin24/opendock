@@ -34,11 +34,10 @@ Alternatively, register a local checkout by path. One registration line in
     [
       "/abs/path/to/sibyl-system/src/index.ts",
       {
-        "options": {
-          "modelPool": {
-            "default": { "providerID": "your-provider", "modelID": "your-model" }
-          }
-        }
+        "modelPool": {
+          "default": { "providerID": "your-provider", "modelID": "your-model" }
+        },
+        "concurrencyK": 4
       }
     ]
   ]
@@ -46,9 +45,12 @@ Alternatively, register a local checkout by path. One registration line in
 ```
 
 Registering the TS entry directly is supported (opencode transpiles plugin
-sources with Bun). The `options` object is the **only** config surface — there
-are no other config files (the `SIBYL_STATE_FILE` env var exists solely as a
-test/CI isolation seam, see State).
+sources with Bun). The tuple's second element is passed **verbatim** as the
+options object, so option fields sit at its **top level** (as in the example);
+unknown keys are rejected loudly, never silently ignored. The options object is
+the **only** config surface — there are no other config files (the
+`SIBYL_STATE_FILE` env var exists solely as a test/CI isolation seam, see
+State).
 
 Invalid options never crash the host: the plugin prints
 `[sibyl] SIBYL plugin DISABLED — fix options (no sibyl_* tools registered)` to
@@ -66,8 +68,10 @@ stderr, registers nothing, and returns empty hooks.
 
 All keys optional; a type error or a missing required entry (such as
 `modelPool.default`) disables the plugin with per-field `[sibyl] config error: …`
-lines. Unknown keys are ignored for forward-compatibility — so a typo'd option
-key runs on defaults.
+lines. Unknown keys are rejected the same loud way — so a typo'd option key or a
+misplaced nesting level (e.g. wrapping everything in `{ "options": { … } }`)
+disables the plugin with a named-key error instead of silently running on
+defaults.
 
 | Key | Default | Meaning |
 |-----|---------|---------|
@@ -81,8 +85,13 @@ key runs on defaults.
 
 ## State layout
 
-- **Runs file**: `<repo>/.state/sibyl/runs.json` — one record per run (id, kind,
-  status, verdict tally, operator notes). Written atomically (tmp + rename).
+- **Runs file**: `~/.sibyl/runs.json` (Windows: `%USERPROFILE%\.sibyl\runs.json`) —
+  one record per run (id, kind, status, verdict tally, operator notes), co-located
+  with `spaces/` under the one `~/.sibyl` state root, so npm upgrades (which ship a
+  fresh, versioned package directory) never wipe your run history. Written
+  atomically (tmp + rename; the parent directory is created on demand).
+  *Note: 1.0.x-era runs recorded under the old package-local `<repo>/.state` path
+  are not migrated (pre-adoption by design) — the store starts empty.*
 - **Per-run space**: `~/.sibyl/spaces/<runId>/` (Windows: `%USERPROFILE%\.sibyl\spaces`) — full voter replies
   (`MELCHIOR.md`, …) for consults, worker drafts (`<workerId>.draft.md`) for swarms.
 - **Test seam**: `SIBYL_STATE_FILE` env var overrides the runs-file path.
@@ -163,7 +172,7 @@ Shared inspiration is Evangelion's MAGI trinity; implementations are unrelated.
 
 ```bash
 npm run typecheck   # tsc --noEmit, strict + noUncheckedIndexedAccess + exactOptionalPropertyTypes
-npm run test        # 255 unit tests, fully offline (no network, no LLM)
+npm run test        # 259 unit tests, fully offline (no network, no LLM)
 npm run build       # esbuild bundle → dist/index.js (ESM)
 node smoke/run-smoke.mjs   # offline smoke of the shipped surface (see smoke/README.md)
 ```

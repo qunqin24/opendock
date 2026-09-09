@@ -56,11 +56,14 @@ Commands appear as `/loopyourself:init`, `/loopyourself:start`, `/loopyourself:s
 ### OpenCode
 
 ```sh
-opencode plugin @boringlink/opencode-plugin
+opencode plugin @boringlink/loopyourself
 ```
 
 Commands appear as `/loopyourself/init` … `/loopyourself/reorder`; the loop
-continues automatically on `session.idle` while it is running.
+continues automatically on `session.idle` while it is running. The plugin is
+registered in `.opencode/opencode.json` (local scope) and auto-installed on
+next startup — see [adapters/opencode](./adapters/opencode/) for requirements
+and registry-mirror notes.
 
 ### Any other agent framework
 
@@ -117,5 +120,4 @@ loop state) is gitignored automatically.
 
 ## License
 
-MIT — see [LICENSE](./LICENSE). Free for personal use; commercial licensing
-available on request.
+MIT — see [LICENSE](./LICENSE).

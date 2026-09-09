@@ -37,7 +37,17 @@ Only real booleans count (`true` / `false`, no quotes).
 
 ## Install
 
-Add it to `plugin` in your `opencode.json` — OpenCode installs npm plugins automatically at startup:
+Install with the OpenCode CLI:
+
+```bash
+opencode plugin @glaicer/supercode-autoinvoke-skill-gate --global
+```
+
+- `--global` installs into the global config (`~/.config/opencode`); default is local (`.opencode` in the current project).
+- `--force` replaces an already-installed version.
+- Restart OpenCode after installing.
+
+Manual install also works: add the package to the `plugin` array in `opencode.json`:
 
 ```json
 {

@@ -10,17 +10,6 @@ OpenCode does register your skills as commands, but the TUI hides them from the 
 
 This plugin re-registers each skill as an ordinary command, so it shows up in the popup like everything else. Same name, same behaviour, no duplicates — a real command simply wins over the skill entry of the same name.
 
-## Install
-
-Add it to `plugin` in your `opencode.json` — OpenCode installs npm plugins automatically at startup:
-
-```json
-{
-  "$schema": "https://opencode.ai/config.json",
-  "plugin": ["@glaicer/supercode-skill-commands"]
-}
-```
-
 Restart OpenCode after saving.
 
 ## Which skills it picks up
@@ -35,3 +24,23 @@ Project bases come first (nearest dir → worktree → global), `.agents` before
 
 Not mirrored (require live fetch / plugin host): `skills.urls` and plugin-provided `{skill,skills}/**/SKILL.md` directories.
 
+## Install
+
+Install with the OpenCode CLI:
+
+```bash
+opencode plugin @glaicer/supercode-skill-commands --global
+```
+
+- `--global` installs into the global config (`~/.config/opencode`); default is local (`.opencode` in the current project).
+- `--force` replaces an already-installed version.
+- Restart OpenCode after installing.
+
+Manual install also works: add the package to the `plugin` array in `opencode.json`:
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugin": ["@glaicer/supercode-skill-commands"]
+}
+```
