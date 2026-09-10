@@ -137,9 +137,11 @@ bun run build
 The same package runs on both OpenCode v1 and v2. On v2 you get the full
 agent pantheon, delegation through the host `subagent` tool (bridged into the
 background job board), all built-in tools and slash commands, auto-registered
-MCPs, `/preset` in the TUI, webfetch secondary-model summaries, and
-rate-limit model fallback. Multiplexer panes and the orchestrator-wake
-scheduler stay v1-only by design (v2 renders and notifies subagents natively).
+MCPs, `/preset` in the TUI, webfetch secondary-model summaries, rate-limit
+model fallback, and the orchestrator-wake scheduler in children-driven
+degraded mode (a periodic watchdog over stuck background children and
+unreconciled jobs). Multiplexer panes stay v1-only by design (v2 renders and
+notifies subagents natively).
 
 v2 auto-refreshes unpinned plugins on startup, so pin an exact version while
 both v2 and this adapter evolve quickly:
@@ -698,7 +700,7 @@ Use this section as a map: start with installation, then jump to features, confi
   <p><sub>Every merged contribution leaves a mark on the realm.</sub></p>
 
   <!-- ALL-CONTRIBUTORS-BADGE:START - Do not remove or modify this section -->
-[![All Contributors](https://img.shields.io/badge/all_contributors-110-orange.svg?style=flat-square)](#contributors-)
+[![All Contributors](https://img.shields.io/badge/all_contributors-111-orange.svg?style=flat-square)](#contributors-)
 <!-- ALL-CONTRIBUTORS-BADGE:END -->
 </div>
 
@@ -856,6 +858,7 @@ Use this section as a map: start with installation, then jump to features, confi
     <tr>
       <td align="center" valign="top" width="16.66%"><a href="https://github.com/xiaolf0813"><img src="https://avatars.githubusercontent.com/u/314566924?v=4?s=100" width="100px;" alt="xiaolf0813"/><br /><sub><b>xiaolf0813</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=xiaolf0813" title="Code">💻</a></td>
       <td align="center" valign="top" width="16.66%"><a href="https://github.com/BaconDroid"><img src="https://avatars.githubusercontent.com/u/11067111?v=4?s=100" width="100px;" alt="BaconDroid"/><br /><sub><b>BaconDroid</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=BaconDroid" title="Code">💻</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="https://sprightly-strudel-e1f939.netlify.app/"><img src="https://avatars.githubusercontent.com/u/277080233?v=4?s=100" width="100px;" alt="Enoch"/><br /><sub><b>Enoch</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=bferanmi806-sketch" title="Code">💻</a></td>
     </tr>
   </tbody>
 </table>

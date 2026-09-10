@@ -12,6 +12,11 @@ SSH access plugin for OpenCode — secure remote command execution with command 
 - 📤 **File Transfer** — Upload and download files via SCP/SFTP
 - 🎯 **Command Safety Checker** — Preview command safety before execution
 - ⚙️ **Configurable Policies** — Add custom blocklist/allowlist patterns
+- 🛤️ **Proxy Support** — `ProxyJump` and `ProxyCommand` from your ssh config
+- 🛡️ **Host Key Verification** — optional `strict_host_key` MITM protection via `known_hosts`
+- ⏳ **Rate Limiting** — per-host command rate limit and cooldown
+- 🔁 **Auto-Reconnect** — dropped sessions reconnect automatically on the next command
+- 🔐 **Credential Hygiene** — passwords are cleared from memory after a successful handshake
 
 ## Installation
 
@@ -48,15 +53,21 @@ Or with configuration:
 | `audit_enabled` | boolean | `true` | Enable audit logging |
 | `blocklist_extra` | string[] | `[]` | Additional regex patterns to block |
 | `allowlist` | string[] | `[]` | Additional allowed patterns (restricted mode) |
-| `ssh_config_path` | string | `~/.ssh/config` | Path to the SSH config file used to resolve host aliases, defaults, and auto-connect targets |
-| `auto_connect` | boolean | `false` | Connect automatically at startup to every `Host` entry in the ssh config that has a `HostName` |
+| `ssh_config_path` | string | `~/.ssh/config` | Path to the SSH config file used to resolve host aliases, defaults, proxies, and auto-connect targets |
+| `auto_connect` | boolean | `false` | Connect automatically at startup to every `Host` entry in the ssh config that has a `HostName` (with retry/backoff) |
+| `auto_reconnect` | boolean | `true` | Reconnect a dropped session automatically before the next `ssh.exec`/`ssh.upload`/`ssh.download` (key-authenticated sessions) |
+| `strict_host_key` | boolean | `false` | Reject connections whose host key is not an exact match in `~/.ssh/known_hosts` (MITM protection) |
+| `rate_limit_per_minute` | number | `120` | Max commands allowed per host per minute |
+| `cooldown_seconds` | number | `0` | Minimum delay (seconds) between commands on the same host |
 
 ## SSH Config Integration
 
 The plugin can reuse your existing `~/.ssh/config` (or a custom path via `ssh_config_path`):
 
 - **Host resolution** — `ssh.connect(host="myalias")` resolves the alias to its `HostName`, and automatically applies the `User`, `Port` and `IdentityFile` from the config. `username`, `port` and `auth_method`/`key_path` become optional when configured.
-- **Auto-connect** — with `"auto_connect": true`, the plugin connects at startup to every `Host` entry that has a `HostName`, using the configured key (or `~/.ssh/id_rsa`). Unreachable hosts are skipped without blocking startup.
+- **ProxyJump / ProxyCommand** — `ProxyJump` and `ProxyCommand` directives in the ssh config are honored, so connections route through bastion/jump hosts transparently.
+- **Auto-connect** — with `"auto_connect": true`, the plugin connects at startup to every `Host` entry that has a `HostName`, using the configured key (or `~/.ssh/id_rsa`). Unreachable hosts are retried with backoff and skipped without blocking startup.
+- **Missing file alert** — if `ssh_config_path` points to a file that does not exist, the plugin warns on connect instead of silently ignoring the setting.
 
 Example ssh config:
 
@@ -66,9 +77,13 @@ Host prod-web
     User deploy
     Port 2222
     IdentityFile ~/.ssh/prod_key
+
+Host prod-db
+    HostName 10.0.0.50
+    ProxyJump jumpuser@bastion:2200
 ```
 
-With `ssh.connect(host="prod-web")` the plugin connects to `deploy@10.0.0.10:2222` using `~/.ssh/prod_key`.
+With `ssh.connect(host="prod-web")` the plugin connects to `deploy@10.0.0.10:2222` using `~/.ssh/prod_key`. `prod-db` is reached tunneled through `bastion`.
 
 ## Security Modes
 
@@ -157,6 +172,12 @@ ssh.audit_log(session_id="prod-server", command_filter="docker")
 
 ## Security
 
+### Host Key Verification
+With `"strict_host_key": true` the plugin verifies the remote server's host key against `~/.ssh/known_hosts` before completing the handshake:
+- a **matching** key → connection allowed;
+- a **changed** key (possible MITM) → connection refused;
+- an **unknown** host → connection refused (add the host key to `known_hosts` first, e.g. via `ssh-keyscan host >> ~/.ssh/known_hosts`).
+
 ### Destructive Commands (100% Blocked)
 These commands are **permanently blocked** with no exceptions:
 
@@ -183,7 +204,8 @@ These commands require your explicit approval each time:
 ### Credential Safety
 - Passwords and SSH keys are **never** stored in logs or output
 - Session info only contains host, username, and port
-- Credentials are held in memory only during the session
+- Passwords are cleared from memory right after a successful handshake
+- For this reason password-authenticated sessions do **not** auto-reconnect (re-issue `ssh.connect`); key-authenticated sessions reconnect automatically from the on-disk key
 - All sessions are destroyed when the plugin is disposed
 
 ## Audit Log

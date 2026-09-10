@@ -557,6 +557,39 @@ exposes every runtime knob:
   current session: the stop's cause is written on the line beneath.
   The pause is per session, is not written to the settings file, and
   is cleared by switching the row off and on again.
+- **`mode [orchestrator|solo]`** — the agent mode the plugin runs the
+  primary in. `orchestrator` is the delegation pattern this plugin
+  enforces — the primary delegates, the nine subagent roles do the
+  work; `solo` runs the primary as a single agent that does the work
+  itself, with no second agent of any kind starting. In solo mode none
+  of `spawn`/`abort`/`list`/`reuse` is registered, opencode's native
+  `task` stays denied, the plugin's own subagent roles are disabled in
+  the registry (`disable: true` and `hidden: true` written from
+  `installAgents`, `src/agents.js`), opencode's hidden `title` and
+  `summary` agents are switched off and `compaction.auto` is set to
+  false (`suppressBuiltinAgentTurns`, `src/agents.js`), endless mode
+  counts as off (`endlessModeInEffect`, `src/settings.js`), and the
+  orchestration guide and the `Limits` block are not injected into the
+  primary's system prompt — the primary's role prompt and description
+  (`rolePrompt` / `roleDescription`, `src/agents.js`) say so. The row
+  uses a two-step arm-and-confirm: the first click arms it, the note
+  beneath names the opencode restart and asks for confirmation, and the
+  second click writes the flip of the file's current value; the
+  arming falls away on its own after four seconds, on Escape, and on
+  the next interaction elsewhere in the sidebar
+  (`tui/src/agent-mode.ts`). The value is LATCHED at plugin load, so
+  a change needs an opencode restart before it takes effect, and then
+  holds across every further restart until it is switched back.
+  Writes `~/.config/opencode/agent-intercom.json` as
+  `"agentMode": "orchestrator" | "solo"`, picked up at the next opencode
+  instance; env var `OPENCODE_AGENT_INTERCOM_AGENT_MODE` resolves with
+  the same two strings, and its value overrides the file. Default
+  `orchestrator`. With `compaction.auto:false` in solo mode opencode's
+  own context relief is gone — the plugin's own primary handoff replaces
+  it, but a solo user who sets `maxPrimaryContext: 0` gets a
+  `ContextOverflowError` instead of a compaction. Solo mode exists
+  for a local model server running with `parallel 1`, where any second
+  agent competes with the primary for the only slot.
 - Under **`TUI settings`**: **`thinking [on/off]`** and **`tool details
   [on/off]`**, opencode's built-in visibility toggles, plus **`show agentcom
   [on/off]`**, which decides whether the plugin's own notices (subagent
@@ -749,6 +782,7 @@ is environment-variable-driven:
 | `OPENCODE_AGENT_INTERCOM_ENDLESS_WIND_DOWN_TIMEOUT_MS` | `900000` | How long (ms) the cycle waits for the permitted wind-down subagent to rewrite the todo file before abandoning. Not shown in the sidebar. |
 | `OPENCODE_AGENT_INTERCOM_ENDLESS_MAX_CYCLES` | `10` | Cycle ceiling per opencode process. At the ceiling endless mode writes itself off. `"0"` arms no ceiling. |
 | `OPENCODE_AGENT_INTERCOM_SHOW_AGENTCOM` | on | `"0"` hides the plugin's own postings — subagent notices, handoff kickoff, doc-summary prompts — from the transcript. Their text still reaches the model unchanged. `"1"` shows them. TUI file overrides. |
+| `OPENCODE_AGENT_INTERCOM_AGENT_MODE` | `orchestrator` | `"orchestrator"` (default) runs the primary as the delegation pattern this plugin enforces; `"solo"` runs the primary as a single agent that does the work itself, with no second agent of any kind starting — none of `spawn`/`abort`/`list`/`reuse`, opencode's native `task` denied, the plugin's subagent roles disabled in the registry, opencode's hidden `title` and `summary` agents switched off and `compaction.auto` set to false, endless mode counting as off, and the orchestration guide and the limits block not injected into the primary. Latched at plugin load — a change needs an opencode restart and then holds across every further restart until it is switched back. TUI file overrides via `"agentMode"` in `~/.config/opencode/agent-intercom.json`; the `mode` row in the sidebar's TUI settings block steps through the two values with a two-step arm-and-confirm. With `compaction.auto:false` in solo mode opencode's own context relief is gone — the plugin's own primary handoff replaces it, but a solo user who sets `maxPrimaryContext: 0` gets a `ContextOverflowError` instead of a compaction. Solo mode exists for a local model server running with `parallel 1`, where any second agent competes with the primary for the only slot. |
 
 ## Endless mode
 

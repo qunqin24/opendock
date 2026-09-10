@@ -5,7 +5,13 @@
 [![npm](https://img.shields.io/npm/v/opencode-redact)](https://www.npmjs.com/package/opencode-redact)
 [![license](https://img.shields.io/npm/l/opencode-redact)](LICENSE)
 
-OpenCode plugin with **112 built-in detection rules** covering GitHub PAT, AWS keys, OpenAI/Anthropic API keys, Stripe tokens, JWT, Slack webhooks, private keys, and more.
+OpenCode dual-target plugin (v1 + v2) with **112 built-in detection rules** covering GitHub PAT, AWS keys, OpenAI/Anthropic API keys, Stripe tokens, JWT, Slack webhooks, private keys, and more.
+
+## Requirements
+
+- **OpenCode v2** — `plugins` config / `opencode2 plugin add`
+- **OpenCode v1 ≥ 1.18.29** — `plugin` config; v1 reads the `server()` export
+- Older v1 function-style hosts can import the named `RedactPlugin` export
 
 ## Quick Start
 
@@ -33,26 +39,42 @@ Then add the dependency and install:
 
 ```bash
 cd ~/.config/opencode
-echo '{"dependencies":{"opencode-redact":"^1.0.0"}}' >> package.json
+echo '{"dependencies":{"opencode-redact":"^2.0.0"}}' > package.json
 bun install
 ```
 
 ## Features
 
 - **Zero config** — works out of the box with 112 built-in patterns
-- **Automatic detection** — keyword pre-filter + regex matching, catches secrets you forgot about
+- **Automatic detection** — keyword pre-filter + regex matching
 - **Invisible Unicode stripping** — removes Unicode Tags block characters (anti-prompt-injection)
-- **Deep traversal** — recursively scans objects, arrays, preserves image/base64 data
+- **Deep traversal** — recursively scans objects/arrays, preserves image/base64 data
 - **Path-based redaction** — optional: redact specific fields like `token`, `credentials.password`
+- **Hot-path optimized** — shared string cache across hooks, single-pass lowercasing, copy-on-write deep walk
 
 ## Hooks
 
-The plugin intercepts data at every stage before it reaches the LLM:
+### OpenCode v2
 
 ```
-User message  →  [chat.message]  →  redacted
-Tool call     →  [tool.execute.before]  →  args redacted
-Tool result   →  [tool.execute.after]  →  output redacted
+User prompt  →  session.prompt         →  prompt text / attachments redacted
+LLM context  →  session.context        →  system + full message history redacted
+               session.compaction
+               session.generate
+               session.title
+Tool call    →  tool.execute.before    →  args redacted
+Tool result  →  tool.execute.after     →  output / content / metadata redacted
+Command      →  /redact:toggle         →  enable / disable at runtime
+```
+
+`session.context` is the primary gate: every model request (including compaction and title generation) passes through it.
+
+### OpenCode v1
+
+```
+User message  →  [chat.message]                          →  parts redacted
+Tool call     →  [tool.execute.before]                   →  args redacted
+Tool result   →  [tool.execute.after]                    →  output redacted
 Full history  →  [experimental.chat.messages.transform]  →  all messages redacted
 ```
 
@@ -114,6 +136,33 @@ npx opencode-redact install              # one-command setup
 npx opencode-redact uninstall            # remove
 npx opencode-redact status               # check
 npx opencode-redact install --local ./   # from local clone
+```
+
+## Plugin API shape
+
+```ts
+// Dual-target default export
+export default {
+  // OpenCode v2
+  id: "opencode-redact",
+  setup: async (ctx) => {
+    await ctx.session.hook("context", (event) => {
+      // redact event.system / event.messages
+    })
+  },
+
+  // OpenCode v1 (>= 1.18.29)
+  server: async (input, options) => {
+    return {
+      "experimental.chat.messages.transform": async (_input, output) => {
+        // redact output.messages
+      },
+    }
+  },
+}
+
+// Older v1 hosts
+export const RedactPlugin = async (input, options) => plugin.server(input, options)
 ```
 
 ## License

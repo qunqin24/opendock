@@ -8,8 +8,14 @@ Useful when a single Bedrock account keeps hitting `ThrottlingException` /
 `Too many tokens, please wait before trying again` and you have several accounts
 to spread the load across.
 
-It works with the released `opencode` binary — **no rebuild required**. The
-plugin injects a wrapping `fetch` into the provider via the auth `loader` hook.
+It works with the released `opencode` binaries — **no rebuild required** — and
+supports both hosts from the same package:
+
+- **opencode V1** (`opencode`): the plugin injects a wrapping `fetch` into the
+  provider via the auth `loader` hook and fails over inside a single request.
+- **opencode V2** (`opencode2`): an `http.request` session hook round-robins the
+  token per request, and a `retry` hook turns a throttled attempt into an
+  immediate retry (which then picks up the next token).
 
 ## How it works
 
@@ -18,17 +24,30 @@ plugin injects a wrapping `fetch` into the provider via the auth `loader` hook.
 - When a response is throttling (`HTTP 429`, `ThrottlingException`,
   `ServiceQuotaExceededException`, `too many tokens`, `too many requests`,
   `rate exceeded`), it retries the same request with the next token before
-  failing.
+  failing. (In V2 the loop is bounded by opencode's built-in maximum attempt
+  count.)
 - Rotates the token into whichever auth header the SDK uses:
-  `Authorization: Bearer` for `@ai-sdk/amazon-bedrock` (native runtime) or
-  `x-api-key` for `@ai-sdk/anthropic` (Bedrock Mantle Anthropic path).
+  `Authorization: Bearer` for `@ai-sdk/amazon-bedrock` (native runtime and
+  Mantle) or `x-api-key` for `@ai-sdk/anthropic` (Bedrock Mantle Anthropic
+  path). In V2 it never touches a SigV4 `Authorization` header — the SDK must
+  already be on bearer auth (set `AWS_BEARER_TOKEN_BEDROCK`, or connect the
+  provider with an API key).
 
 ## Install
 
+opencode V1 (`opencode.json`):
+
 ```json
-// opencode.json
 {
   "plugin": ["opencode-bedrock-rotate"]
+}
+```
+
+opencode V2 (`opencode.json`):
+
+```json
+{
+  "plugins": ["opencode-bedrock-rotate"]
 }
 ```
 
@@ -41,10 +60,10 @@ export AWS_BEARER_TOKENS_BEDROCK="ABSK...token1,ABSK...token2,ABSK...token3"
 > Each token is an [Amazon Bedrock API key](https://docs.aws.amazon.com/bedrock/latest/userguide/api-keys.html)
 > (the `AWS_BEARER_TOKEN_BEDROCK` value) from a different AWS account.
 
-### Required: stored auth for the provider
+### Required (V1 only): stored auth for the provider
 
-opencode only runs the plugin's `loader` when there is a **stored credential**
-for the target provider. Register one once:
+opencode V1 only runs the plugin's `loader` when there is a **stored
+credential** for the target provider. Register one once:
 
 ```sh
 opencode auth login amazon-bedrock
@@ -55,7 +74,7 @@ per-request token anyway.)
 
 ## Configuration
 
-Pass options as `[name, options]`:
+V1 passes options as `[name, options]`; V2 uses `{ "package", "options" }`:
 
 ```json
 {
@@ -64,6 +83,20 @@ Pass options as `[name, options]`:
       "provider": "amazon-bedrock",
       "tokensEnv": "AWS_BEARER_TOKENS_BEDROCK"
     }]
+  ]
+}
+```
+
+```json
+{
+  "plugins": [
+    {
+      "package": "opencode-bedrock-rotate",
+      "options": {
+        "provider": "amazon-bedrock",
+        "tokensEnv": "AWS_BEARER_TOKENS_BEDROCK"
+      }
+    }
   ]
 }
 ```
@@ -94,7 +127,7 @@ plugin once per provider:
 
 ## Troubleshooting
 
-### `JSON Parse error: Unexpected identifier "undefined"` on startup / `opencode models`
+### `JSON Parse error: Unexpected identifier "undefined"` on startup / `opencode models` (V1)
 
 opencode fails to list providers with something like:
 

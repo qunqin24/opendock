@@ -109,7 +109,7 @@ The Anthropic OAuth usage endpoint, the Grok billing endpoint, and the ChatGPT `
 
 ## Compatibility
 
-Built for the OpenCode v2 plugin API. Tested with OpenCode 1.18.21 and `@opencode-ai/plugin` `0.0.0-beta-18743`.
+Built for the OpenCode v2 plugin API. Tested with OpenCode 0.0.0-beta-19398 and `@opencode/plugin` `0.0.0-beta-19398`.
 
 ## Development
 

@@ -90,12 +90,21 @@ The LSP, MCP, and formatter registrations only apply if you haven't already defi
 
 The plugin ships a dark, gold-accented Sema theme (`themes/sema.json`) and declares it via the `oc-themes` manifest field, so on OpenCode versions that support plugin-contributed themes it is registered automatically once the plugin is listed in your config — OpenCode resolves the correct themes directory for your OS (honoring `XDG_CONFIG_HOME`). Then select `sema` as your theme in OpenCode.
 
-If your OpenCode version doesn't auto-register plugin themes, copy it in manually:
+If your OpenCode version doesn't auto-register plugin themes, install the package with npm and run this from the project that has it installed:
 
 ```bash
-cp themes/sema.json ~/.config/opencode/themes/sema.json
-# or, if XDG_CONFIG_HOME is set:
-cp themes/sema.json "$XDG_CONFIG_HOME/opencode/themes/sema.json"
+theme_source="$(node -p "require.resolve('@sema-lang/opencode-sema/theme')")"
+config_home="${XDG_CONFIG_HOME:-"$HOME/.config"}"
+mkdir -p "$config_home/opencode/themes"
+cp "$theme_source" "$config_home/opencode/themes/sema.json"
+```
+
+For a source checkout of this repository, use `themes/sema.json` as the source instead:
+
+```bash
+config_home="${XDG_CONFIG_HOME:-"$HOME/.config"}"
+mkdir -p "$config_home/opencode/themes"
+cp themes/sema.json "$config_home/opencode/themes/sema.json"
 ```
 
 > **Note:** A `postinstall` script also copies the theme on a direct `npm install` (skip it with `OPENCODE_NO_THEME_COPY=1`), but OpenCode's own auto-install runs through Bun, which **blocks** dependency lifecycle scripts by default — so don't rely on it; the `oc-themes` registration and the manual `cp` above are the supported paths.

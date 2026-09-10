@@ -18,6 +18,7 @@ Lost an important AI chat? Can't find that session from last week? Sessions pili
 ## Features
 
 - 📌 **Pin / unpin** — protect the sessions that matter; pinned ones are never auto-deleted.
+- 🛡️ **Pinned Guarantee** — pinned-session backups are refreshed automatically, and a vanished pinned session is restored from its backup on the next maintenance run.
 - 💾 **Back up** — one session or all pinned; survives reinstalls and machine moves.
 - ♻️ **Restore** — bring a session back from a backup in one phrase.
 - 🧹 **Auto-cleanup** — old non-pinned sessions get backed up, then deleted (pinned always safe).

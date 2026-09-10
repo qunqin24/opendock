@@ -7,7 +7,7 @@
     <em>One test. One verdict. Move on.</em>
   </p>
   <p align="center">
-    <img src="https://img.shields.io/github/v/release/dsolisp/gavel?style=flat-square&label=release" alt="Release">
+    <a href="https://github.com/dsolisp/gavel/tags"><img src="https://img.shields.io/github/v/tag/dsolisp/gavel?style=flat-square&label=release" alt="Release"></a>
     <img src="https://github.com/dsolisp/gavel/actions/workflows/gavel-verify.yml/badge.svg" alt="CI">
     <img src="https://img.shields.io/badge/works%20with-20%2B%20IDEs-blue?style=flat-square" alt="Works with 20+ IDEs">
     <img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="MIT license">
@@ -33,7 +33,7 @@ node scripts/cli.js audit ../your-automation-repo --with-self-check --audit-form
 Or gate CI with **SARIF 2.1.0** (no LLM required):
 
 ```bash
-npx --yes @dsolisp/gavel@0.12.0 audit --format sarif > gavel.sarif
+npx --yes @dsolisp/gavel@0.12.1 audit --format sarif > gavel.sarif
 ```
 
 Copy the GitHub Actions recipe from [templates/github-actions/gavel-audit-sarif.yml](templates/github-actions/gavel-audit-sarif.yml). Enterprise trust criteria, Sonar import, and exit codes: [docs/ENTERPRISE.md](docs/ENTERPRISE.md).
@@ -61,6 +61,8 @@ Seven complete example projects under `fixtures/sample-repos/` — **Playwright*
 | Track deferred test decisions | `/gavel-debt` | Ledger of `gavel:` comments |
 | See suite health at a glance | `/gavel-gain` | Pass rate, flake count, LOC per test |
 | Check CI safety before merge | `/gavel-ci-check` | Diff-based env var / secret / dep audit |
+| Complement strict audit with architecture review | `/gavel-architect-review` | Separate deterministic and evidence-based findings |
+| Review Azure DevOps PRs in shadow mode | `gavel ado-pr-review` | Schema-validated, redacted review artifact |
 
 Run `gavel companion --help` for optional companion workflows (CI migration, env setup, hub credentials, issue closure — not in default install).
 
@@ -81,6 +83,8 @@ Run `gavel companion --help` for optional companion workflows (CI migration, env
 | `/gavel-pr-prep` | Automated PR preparation |
 | `/gavel-help` | Quick reference |
 
+CLI-wide options added in `0.12.1`: `--version` / `-v` / `version`, `--format json`, `--out <path>`, and focused `--rule <id>` / `--file <relative-path>` filters. See [docs/CLI_MATRIX.md](docs/CLI_MATRIX.md) for executable versus agent-only surfaces.
+
 ## Feature grid
 
 | Area | What Gavel enforces |
@@ -89,6 +93,7 @@ Run `gavel companion --help` for optional companion workflows (CI migration, env
 | **Locators** | Semantic/accessibility first; no raw selector chains outside locator classes |
 | **Waits** | Native retry assertions; no arbitrary sleeps |
 | **DI** | Fixtures over `new PageObject(page)` in specs |
+| **Sensitive data** | [Redacted detection](docs/rules/hardcoded-sensitive-data.md) of hardcoded personal and financial identifiers in test specs |
 | **Suite health** | Dead POMs/locators/factories, skip markers, bare `test.fail()` |
 | **Suppression** | Tag-scoped `@gavel-ignore(TICKET-123)` — unreasoned suppressions flagged |
 | **SARIF export** | Valid SARIF 2.1.0 output for GitHub Code Scanning & CI dashboards |

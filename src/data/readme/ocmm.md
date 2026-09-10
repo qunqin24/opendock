@@ -11,7 +11,7 @@ Concepts (model tiering, per-model specialized prompts, intent gating, proactive
 | `config`                             | Registers 11 agents + 10 category-subagents with their preferred provider/model, shared skill paths, and slash commands. Attaches functional agent prompts plus workflow/model-family deepwork prompts to built-in agents, and category prompts to category subagents. User config can add, override, or disable any of them. |
 | `chat.params`                        | Resolves the variant for the active agent/model (4-tier priority: user-config -> agent-default -> category-default -> input-variant), respects explicit user choices, and applies only the model-family parameters ocmm supports for that model. Built-in defaults normalize category work to model-appropriate high/max reasoning where supported and avoid implicit Opus 4.7+ thinking budgets.                  |
 | `chat.message`                       | v1 workflow: queues superpowers skills content on the first message per session. Also expands bare ocmm slash commands in noninteractive `opencode run` input so `/ralph-loop ...` and shared-skill commands get command context even when the TUI slash parser is bypassed. |
-| `experimental.chat.system.transform` | Prepends queued v1 skill content and one-shot slash command context to `output.system`. omo workflow only uses this hook when a bare slash command was expanded by `chat.message`.                                                                                                               |
+| `experimental.chat.system.transform` | Prepends queued v1 skill content and one-shot slash-command context to `output.system`.                                                                                                               |
 | `event`                              | Cleans up per-session state on `session.deleted` / `session.idle`. On `session.error`: classifies the error, and if retryable, dispatches the next model in the agent's fallback chain via `client.session.prompt`. When `idleContinuation.enabled` is true, on `session.idle` with unfinished todos and no prior ESC abort, re-prompts the model to continue. ESC aborts (detected via abort errors on `session.error`) suppress continuation. |
 | `command.execute.before`            | Handles the `/idle-continuation` slash command to toggle idle auto-continuation per session (`on` / `off` / `status`). Session overrides win over global `idleContinuation.enabled` config. |
 
@@ -19,11 +19,9 @@ The plugin **does not** change the model on a per-call basis via `chat.params`. 
 
 ## Workflows
 
-ocmm supports two workflows, switchable via the `workflow` config field:
+OpenCode uses the skill-driven **`v1`** workflow by default. The config/path label stays `v1`, but model-facing prompt text calls it `deepwork`. The default prompt is a concise local controller, and skills are injected on the first message per session through `chat.message` + `system.transform`.
 
-**`omo`** (default) — Upstream oh-my-opencode system prompts. Aggressive tone (CODE RED, ABSOLUTE CERTAINTY). Prompts are attached declaratively to agents at config time based on model family.
-
-**`v1`** — Skill-driven deepwork workflow. The config/path label stays `v1`, but model-facing prompt text calls it `deepwork`. The default prompt is a concise local controller; GPT/Gemini/GLM/Codex/planner variants stay close to upstream omo model-specific prompt style with local tool/agent/path adaptation. Skills are injected on the first message per session via `chat.message` + `system.transform` hooks.
+The Codex adapter is a separate generated surface. It packages Codex-native prompts, skills, agents, and MCP configuration without changing the OpenCode runtime.
 
 ```jsonc
 { "workflow": "v1" }
@@ -402,7 +400,7 @@ Schema (Zod-validated; unknown object keys are stripped). Declared invalid field
 
 ```jsonc
 {
-  "workflow": "omo", // "omo" (default) or "v1"
+  "workflow": "v1", // OpenCode default
 
   "disabledAgents": ["media-reader"],
   "disabledSkills": ["debugging"],
@@ -785,18 +783,16 @@ These diagnostics are read-only. `target.provider[*].models` is observation evid
 
 ## Prompt architecture
 
-Prompts are organized by workflow:
+OpenCode sources and the independent Codex adapter are organized separately:
 
 ```
 prompts/
-  omo/                              # upstream omo prompts
+  v1/                               # OpenCode deepwork prompts
     deepwork/{default,gpt,gpt-5.6,gemini,glm,codex,planner}.md
     agents/{orchestrator,reviewer,planner,clarifier,plan-critic}.md
     category/*.md (10 files)
-  v1/                               # superpowers-style prompts
-    deepwork/{default,gpt,gpt-5.6,gemini,glm,codex,planner}.md
-    agents/{orchestrator,reviewer,planner,clarifier,plan-critic}.md
-    category/*.md (10 files)
+  codex/                            # Codex adapter sources
+    deepwork/ agents/ category/
 skills/
   ast-grep/                          # shared skills registered as OpenCode skills + slash commands
   coding-agent-sessions/             # local session-history finder shared skill
@@ -823,7 +819,7 @@ Model-family variant selection (`pickDeepworkVariantForAgent`):
 
 Variant is selected at config time using the final selected agent model after explicit user configuration, inherited aliases, and catalog-confirmed upgrades are considered. For built-in functional agents, ocmm composes `agents/<name>.md` with the selected `deepwork/<variant>.md`; the role prompt is authoritative for that agent's scope and the deepwork prompt supplies workflow/model calibration. Categories receive only their category prompt. No runtime keyword detection — prompts are attached declaratively.
 
-For v1 workflow, superpowers skills are injected on the first message per session via `chat.message` (queue) + `system.transform` (prepend). For omo workflow, prompts are attached declaratively at config time; `chat.message` and `system.transform` only participate when a bare noninteractive slash command needs compatibility expansion.
+For OpenCode, v1 skills are injected on the first message per session via `chat.message` (queue) + `system.transform` (prepend).
 
 ## Slash Commands
 
@@ -835,7 +831,7 @@ ocmm registers OpenCode `config.command` entries for:
 
 Interactive OpenCode uses its native slash-command parser. For noninteractive `opencode run "/command args"` calls, OpenCode 1.17.9 passes the first message directly and does not parse project commands; ocmm compensates by expanding bare ocmm command text during `chat.message` and injecting the expanded command once through `system.transform`.
 
-The loop commands are command-template entry points only. The full upstream omo idle continuation engine, verifier orchestration, Boulder/Atlas state, and cancel/stop hooks are not yet migrated; the templates explicitly tell the model to run the loop inside the current session and not claim hidden auto-continuation. The Ralph Loop runtime and related hooks are tracked as follow-up work in `docs/kb/omo-features/loops.md`.
+The loop commands are command-template entry points only. They explicitly tell the model to run the loop in the current session and not claim hidden auto-continuation. The Ralph Loop runtime and related hooks are tracked as follow-up work in `docs/kb/omo-features/loops.md`.
 
 ocmm does not ship a separate `/lsp-setup` command. OpenCode already provides LSP setup guidance, while ocmm's responsibility is to register and distribute the default `lsp` MCP backed by `ocmm-lsp`. Configure external language servers through `.opencode/ocmm-lsp.json`, `.opencode/lsp.json`, or `.codex/lsp-client.json` when overrides are needed.
 
@@ -1182,4 +1178,4 @@ SPDX identifier: `LicenseRef-AAAPL`.
 
 For design rationale, hook flow, the 4-tier variant resolution pipeline, two-layer fallback system, and config schema overview, see [`docs/architecture.md`](./docs/architecture.md).
 
-Authoritative agent and category definitions live in `src/data/agents.ts` and `src/data/categories.ts`. For prompt provenance, see [`docs/v1-maintenance.md`](./docs/v1-maintenance.md) (v1/deepwork) and [`docs/prompt-sync.md`](./docs/prompt-sync.md) (omo).
+Authoritative agent and category definitions live in `src/data/agents.ts` and `src/data/categories.ts`. For OpenCode deepwork prompt and skill provenance, see [`docs/v1-maintenance.md`](./docs/v1-maintenance.md).
