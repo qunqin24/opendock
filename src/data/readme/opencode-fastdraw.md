@@ -133,10 +133,10 @@ Generated artifacts (bench exports, calibration reports, sweep dumps, …) NEVER
 
 ### Configuration
 
-Copy the example `hr.toml` if you need the DB / Wiki.js knobs:
+Copy the example `hr.toml` (repository root) if you need the DB / Wiki.js knobs:
 
 ```bash
-cp configs/hr.toml.example hr.toml
+cp hr.toml.example hr.toml
 ```
 
 There is no single "source of truth" file — configuration is split by concern across `configs/`, plus the runtime opencode config:
@@ -167,14 +167,14 @@ The per-file split:
 - `configs/fleet.yaml` — OPTIONAL overrides for the dynamic fleet: `wire_overrides`, `scope_excludes`, and `gateway_urls` (base URLs for registry-only providers).
 - `configs/seats.yaml` — seat definitions, per-seat `primary_capabilities`, and the stage-0 `calibration_anchors`.
 - `configs/deployable.yaml` — `extra_deployable`: models served outside the opencode config (the only hand-maintained model list).
-- `configs/hr.toml.example` — template for the root `hr.toml` (DB connection + optional Wiki.js publish target). Secrets are NEVER stored here: they come from the environment (`HR_DSN`, `HR_DB_PASSWORD`, provider keys).
+- `hr.toml.example` — repository-root template for the local `hr.toml` (DB connection + optional Wiki.js publish target). Secrets are NEVER stored here: they come from the environment (`HR_DSN`, `HR_DB_PASSWORD`) or the db env file written by `hr db-up`.
 
 The model fleet itself is not declared in this repo: it is derived at runtime from the opencode config (`opencode.jsonc` provider blocks) and merged with the `deployable.yaml` extras — see Universality below.
 
 ### Quick start
 
 ```bash
-cp configs/hr.toml.example hr.toml   # point the DB knobs at your PostgreSQL
+cp hr.toml.example hr.toml           # point the DB knobs at your PostgreSQL (or just run: hr db-up)
 hr seed                              # create/upgrade the schema + canonical seats
 hr status                            # sweeps + latest-sweep capability means
 ```
@@ -256,7 +256,8 @@ The first loads the `fastdraw_*` agent tools; the second loads `/fastdraw` and t
 
 ```
 harness/hr/               # repo root (pip install -e .)
-  configs/                # YAML config: deployable.yaml, fleet.yaml, hr.toml.example, knowledge.yaml, models.yaml, seats.yaml, thresholds.yaml (+ gitignored *.local.yaml overlays)
+  configs/                # YAML config: deployable.yaml, fleet.yaml, knowledge.yaml, models.yaml, seats.yaml, thresholds.yaml (+ gitignored *.local.yaml overlays)
+  docker/                 # turnkey database: docker-compose.yml for the AIHR postgres:16-alpine container (`hr db-up`)
   docs/                   # bilingual documentation (en/, zh-CN/)
   exports/                # generated artifacts (gitignored)
   fastdraw/               # npm subpackage: FastDraw server, TUI, preset management
@@ -273,6 +274,7 @@ harness/hr/               # repo root (pip install -e .)
   scripts/                # operational scripts (check_universal.sh, register_livebench_batteries.py, spread_probe.py, ...)
   tests/                  # pytest test suite
   pyproject.toml          # package manifest with CLI entry point
+  hr.toml.example         # template for the gitignored root hr.toml (single source of truth)
 ```
 
 ## Tests

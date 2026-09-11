@@ -6,7 +6,8 @@ before the command runs. Denials throw into the calling session, so the agent se
 command was blocked.
 
 The judge session is created lazily as a child of the calling session's root, titled "Shield Bash"
-— one judge per root session, shared by that root's subagent sessions. That
+— one judge per root session, shared by that root's subagent sessions. Judge prompts are
+serialized, so parallel bash calls are judged one at a time. That placement
 matters for more than bookkeeping: it is reachable with the TUI's child-session navigation,
 stays out of the roots-only session list, is deleted with its parent, and is never
 auto-shared. The judge transcript doubles as the audit trail.

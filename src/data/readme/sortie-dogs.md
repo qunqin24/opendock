@@ -1,13 +1,13 @@
 # Sortie-dogs
 
-**Give OpenCode a task; get a bounded, validated implementation loop instead of an open-ended agent run.**
+**Add a bounded, cost-aware execution loop to OpenCode without taking OpenCode over.**
 
-Sortie-dogs is an execution harness for OpenCode, applying harness-engineering
-principles through mechanical write boundaries, validation, review, and bounded
-orchestration.
+Sortie-dogs is an opt-in overlay, not a replacement. It stays passive until you
+invoke `/sortie` or select `dog-coordinator`. Standard OpenCode agents and
+unrelated sessions remain available and unchanged.
 
-> **Project status: Beta.** Stable in regular use. As a pre-1.0 release,
-> configuration and runtime assets may still change between releases.
+> **Project status: Beta.** v0.9.x is under active stabilization. Runtime
+> behavior, configuration, and runtime assets may still change before 1.0.
 
 [![npm](https://img.shields.io/npm/v/sortie-dogs)](https://www.npmjs.com/package/sortie-dogs)
 [![license](https://img.shields.io/npm/l/sortie-dogs)](LICENSE)
@@ -15,16 +15,47 @@ orchestration.
 
 ![Sortie-dogs coordinating a bounded implementation workflow](https://raw.githubusercontent.com/zufall-upon/Sortie-dogs/main/docs/assets/sortie-workflow.gif)
 
-Sortie-dogs is an opt-in OpenCode orchestration plugin. It turns a task into a
-scoped plan, optional evidence gathering, one bounded implementation unit, canonical
-validation, and evidence-backed completion—while preserving standard OpenCode
-agents and settings.
+Sortie-dogs turns selected work into a scoped plan, optional evidence gathering,
+bounded implementation, canonical validation, and evidence-backed completion.
 
 Requirements: Node.js 22.6 or newer, npm, and OpenCode.
 
 Guides: [日本語](docs/guide-ja.md) · [简体中文](docs/guide-zh-CN.md) · [CLI testing](docs/cli-testing.md)
 
-Release: [v0.9.4](https://github.com/zufall-upon/Sortie-dogs/releases/tag/v0.9.4)
+Release: [v0.9.8](https://github.com/zufall-upon/Sortie-dogs/releases/tag/v0.9.8)
+
+## Why Sortie-dogs?
+
+### Invisible until invited
+
+Use normal OpenCode normally. Sortie activates only for `/sortie` or
+`dog-coordinator`; it does not disable or replace OpenCode's standard agents.
+
+### Spend strong models only where they matter
+
+Lower-cost models handle bounded retrieval and parallel volume work. Stronger
+models are reserved for implementation, escalation, and independent review.
+
+### Return with proof
+
+Writes stay scoped, and completion requires validation evidence. Every completed
+run can return a concise Speed / Cost / Proof debrief.
+
+## Designed to coexist with OpenCode
+
+Sortie-dogs adds a workflow to your existing setup rather than replacing it.
+
+- It does not disable OpenCode's native agents or replace standard roles such as
+  `build`, `plan`, `explore`, or `general`.
+- Ordinary sessions are not automatically converted into Sortie workflows.
+- Project-local initialization is the recommended setup and does not change
+  user settings.
+- Global runtime availability and cross-project reflection require separate,
+  explicit opt-in. Reflection is disabled by default.
+- Unknown or user-owned runtime files are preserved rather than overwritten.
+- Manual removal targets only known Sortie-owned runtime assets.
+
+Use OpenCode normally. Invoke the pack only when you want it.
 
 ## Quick start
 
@@ -36,26 +67,11 @@ npm install --save-dev sortie-dogs
 npx sortie-dogs init .
 ```
 
-Alternatively, install the CLI globally and initialize OpenCode's global
-configuration:
-
-```sh
-npm install --global sortie-dogs
-sortie-dogs init --global
-```
-
-This installs the canonical runtime assets in OpenCode's global configuration,
-so `dog-coordinator` can be selected from other projects without project-local
-initialization. Global initialization and project-local initialization are
-separate: `sortie-dogs init .` still writes runtime files only into that
-project. Project-local configuration and the plugin bridge below remain
-available when a project needs its own settings or dependency.
+This is the recommended setup. Runtime assets stay project-local.
 
 Installing the runtime assets does not load the plugin, and without the plugin
 every role runs on whichever model the caller happened to use. Add the package
-to the `plugin` array of the OpenCode configuration the agents run under —
-`~/.config/opencode/opencode.json` for the global assets, or the project's
-`.opencode/opencode.json`:
+to the `plugin` array in the project's `.opencode/opencode.json`:
 
 ```json
 {
@@ -217,25 +233,6 @@ global file for durable global settings.
   evaluates it only after a resolved blocker/review defect and at a terminal
   unit, with a maximum of three records per run; routine bugs and external
   failures are never journaled.
-
-## Why Sortie-dogs
-
-- **Focused when invited, invisible otherwise.** Activate it with `/sortie` or
-  select `dog-coordinator`; ordinary OpenCode sessions remain unchanged.
-- **Evidence gathering without arbitrary dispatch ceilings.** A bounded scout resolves
-  each concrete manifest, validation, or ownership gap whenever it appears; unchanged
-  requests are not repeated.
-- **Writes stay inside the assignment.** Exact source or operation manifests
-  gate edits and handoffs.
-- **Autonomous implementation routing.** An accepted scope with at least two safe independent
-  units defaults to Luna fabric without opt-in. An explicit serial/no-parallel request wins;
-  other work uses sequential workers. The separate parallel contract remains explicit.
-- **Runtime overlap protection.** Active equal or ancestor write scopes are rejected
-  before mutation, and full validation waits until every parallel unit joins.
-- **Evidence before completion.** Canonical validation, risk-based review, and
-  terminal evidence gate coordinator-owned completion and commits.
-- **Long work can recover.** Restart recovery and bounded compaction continue
-  from retained handoff context rather than silently starting over.
 
 ## Example run
 
@@ -400,6 +397,29 @@ coordinator. `dog-reviewer` independently checks high-risk candidates after
 canonical validation. Neither role implements, stages, commits, or acts as a
 user-facing worker.
 
+## Optional global availability
+
+If you intentionally want the Sortie roles available across projects, install
+the CLI and runtime assets globally:
+
+```sh
+npm install --global sortie-dogs
+sortie-dogs init --global
+```
+
+This writes canonical Sortie runtime assets to OpenCode's global configuration;
+it does not make project-local initialization global. Load the plugin from the
+global `~/.config/opencode/opencode.json` when using these assets:
+
+```json
+{
+  "plugin": ["sortie-dogs"]
+}
+```
+
+Project-local configuration and plugin loading remain available when a project
+needs its own settings or dependency.
+
 ## Updates and migration
 
 After replacing the dependency with a newer release asset, run:
@@ -416,6 +436,11 @@ older runtime files, and records the installed version in
 `.opencode/sortie-dogs.version`. Conflicting or unrecognized files remain
 untouched and initialization stops safely. User-owned configuration—including
 `.opencode/sortie-dogs.json`—and standard OpenCode files are preserved.
+
+## Maintainer releases
+
+The [release batch guide](docs/release-batch.md) covers fixed-tarball CLI verification,
+global application, resumable GitHub publication, and manual npm publication checks.
 
 ## Safe manual removal
 

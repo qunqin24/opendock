@@ -41,6 +41,19 @@ This brings two concrete effects:
 
 ---
 
+## Which do I need?
+
+Pick by your client:
+
+| Client | Use |
+|---|---|
+| **pi** | [`billion-context-pi`](https://github.com/ranxianglei/billion-context-pi) (in-process extension) |
+| **opencode** | [`opencode-acp`](https://github.com/ranxianglei/opencode-acp) (in-process extension) |
+| **omp** | [`billion-context`](https://github.com/ranxianglei/billion-context) via `bili omp` (built-in plugin) |
+| **everything else** (no context hook) | [`billion-context`](https://github.com/ranxianglei/billion-context) — `bili <client>` (launcher, preferred) or `/bili/` prefix |
+
+---
+
 ## Proven at scale
 
 Real engineering context, in practice.
@@ -423,6 +436,21 @@ Each level overrides the previous, so project settings take priority over global
                 // L2 fails (combined with rougeF1 via AND) when below this.
                 "layer2MaxTop20Recall": 0.20,
             },
+        },
+    },
+    // Message filters — strip/deduplicate third-party plugin injections
+    // (e.g. oh-my-opencode system reminders) from visible context before
+    // ACP processes them. Filtered content is never counted toward context
+    // usage. Five built-in OMO filters are on by default (v1.14.8+);
+    // per-filter reference and examples: CONFIGURATION.md → messageFilters
+    "messageFilters": {
+        "enabled": true,
+        "filters": {
+            "omo-system-reminder": { "enabled": true },
+            "omo-context": { "enabled": true },
+            "omo-task-directive": { "enabled": true },
+            "omo-todo-continuation": { "enabled": true },
+            "omo-mode-injection": { "enabled": true },
         },
     },
 }

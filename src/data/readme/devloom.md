@@ -352,7 +352,7 @@ Uses the strongest OpenCode Go models per role.
 
 ### deepseek profile
 
-Uses only DeepSeek models for consistent provider affinity:
+Uses only DeepSeek models for consistent provider affinity (vision uses cheapest vision-capable DeepSeek model):
 
 ```json
 {
@@ -364,7 +364,7 @@ Uses only DeepSeek models for consistent provider affinity:
     "verifier": "opencode-go/deepseek-v4-flash",
     "security": "opencode-go/deepseek-v4-pro",
     "documenter": "opencode-go/deepseek-v4-flash",
-    "vision": "opencode-go/qwen3.6-plus"
+    "vision": "opencode-go/deepseek-v4-flash-vision-exp"
   }
 }
 ```
@@ -393,18 +393,17 @@ All agents on DeepSeek V4 Flash for maximum throughput at minimum cost:
 Uses only OpenCode Free models (zero cost). The profile auto-picks the best
 available free model per agent role using a candidate chain.
 
-The orchestrator leads with `x-preview-f-free` (stealth preview, strong agentic
-routing). Role fallback order:
-- **orchestration**: x-preview-f-free → big-pickle → nemotron-3-ultra-free →
-  mimo-v2.5-free → hy3-free → muse-spark-1.2-contributor-free → nemotron-3.5-lightning-free
-- **implementation / verification**: big-pickle → x-preview-f-free →
-  nemotron-3-ultra-free → nemotron-3.5-lightning-free → hy3-free → mimo-v2.5-free
-- **planning**: nemotron-3-ultra-free → muse-spark-1.2-contributor-free →
-  x-preview-f-free → big-pickle → hy3-free → nemotron-3.5-lightning-free
-- **documentation**: muse-spark-1.2-contributor-free → nemotron-3-ultra-free →
-  x-preview-f-free → hy3-free → mimo-v2.5-free
+The orchestrator leads with `big-pickle` (strong free-tier routing). Role fallback order:
+- **orchestration**: big-pickle → nemotron-3-ultra-free →
+  mimo-v2.5-free → muse-spark-1.3-contributor-free → muse-spark-1.2-contributor-free → nemotron-3.5-lightning-free → ling-3.0-flash-fin-free
+- **implementation / verification**: big-pickle →
+  nemotron-3-ultra-free → nemotron-3.5-lightning-free → mimo-v2.5-free → ling-3.0-flash-fin-free
+- **planning**: nemotron-3-ultra-free → muse-spark-1.3-contributor-free → muse-spark-1.2-contributor-free →
+  big-pickle → nemotron-3.5-lightning-free → ling-3.0-flash-fin-free
+- **documentation**: muse-spark-1.3-contributor-free → muse-spark-1.2-contributor-free → nemotron-3-ultra-free →
+  mimo-v2.5-free → ling-3.0-flash-fin-free
 - **vision** (vision-capable models only): mimo-v2.5-free → go multimodal fallbacks
-  (mimo-v2.5-pro, minimax-m3, deepseek-v4-flash-vision-exp)
+  (deepseek-v4-flash-vision-exp, minimax-m3, mimo-v2.5-pro — ordered by cost, cheapest first)
 
 ### Model-routing table (go)
 
@@ -414,7 +413,7 @@ Each of the 8 agents is assigned a model optimized for its role:
 |---|---|---|---|
 | `orchestrator` | Triage, routing, state, gate | `deepseek-v4-flash` | `deepseek-v4-flash` |
 | `planner` | Requirements + CleanArch plan | `qwen3.7-max` | `glm-5.2` |
-| `developer` | Implementation + root-cause fixes | `kimi-k2.7-code` | `kimi-k3` |
+| `developer` | Implementation + root-cause fixes | `glm-5.3-flash` | `kimi-k3` |
 | `qa` | Tests, lint, code review, regression | `v4-flash` | `v4-pro` |
 | `verifier` | Runtime app checks + peer review | `v4-flash` | `v4-pro` |
 | `security` | CRUD/exposure forensic review | `v4-flash` | `glm-5.2` |
@@ -463,7 +462,7 @@ source first so the cache never receives stale compiled code.
   refreshed plugin.
 - The sidebar header shows the active profile (`DevLoom - free`,
   `DevLoom - go`, ...) and every agent row shows its resolved model
-  (`orchestrator: opencode/x-preview-f-free`, ...). The orchestrator
+  (`orchestrator: opencode/big-pickle`, ...). The orchestrator
   agent description also carries the profile label:
   `DevLoom Orchestrator: autonomous multi-agent delivery (profile: go-flash)`,
   extended to `(profile: go, tier: senior)` with a senior tier override.

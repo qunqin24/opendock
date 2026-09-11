@@ -299,6 +299,8 @@ Model-agnostic: any OpenCode provider that exposes assistant `tokens` / `cost` o
 
 **Requires** OpenCode with TUI plugin slots (`@opencode-ai/plugin` ≥ 1.14). Works alongside visual-cache; no extra dependencies at runtime beyond peers in [package.json](package.json).
 
+**Terminal width:** OpenCode auto-shows the sidebar only when the TUI is **wider than 120 columns** (121+). Below that, the sidebar component never mounts, so `sidebar_content` plugins — this one included — render **nothing at all**: no panel, no placeholder, no error, while the plugin still loads normally. On a terminal below 121 columns, open it with `session.sidebar.toggle` (default `<leader>b`); it then appears as a full-screen overlay. `tui.json` cannot force the sidebar on — its state is only `auto` or `hide`.
+
 ## Documentation
 
 | Audience | English | 中文 |

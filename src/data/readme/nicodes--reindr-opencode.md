@@ -12,11 +12,13 @@ packages/claude/     self-contained Claude Code marketplace plugin
 
 ## Prototype Status
 
-The OpenCode adapter is version [`0.0.2`](https://www.npmjs.com/package/@nicodes/reindr-opencode). [`@nicodes/reindr-core`](https://www.npmjs.com/package/@nicodes/reindr-core) and the `nicodes/reindr` Claude Code marketplace plugin remain at `0.0.1`.
+The OpenCode adapter is version [`0.0.3`](https://www.npmjs.com/package/@nicodes/reindr-opencode). [`@nicodes/reindr-core`](https://www.npmjs.com/package/@nicodes/reindr-core) and the `nicodes/reindr` Claude Code marketplace plugin are version `0.0.2`.
 
 The prototype targets OpenCode `1.18.22`, Claude Code marketplace plugins, and Chromium desktop.
 
 OpenCode `0.0.2` adds multiple named canvas tabs in the main header and independent host-owned agent controls. Saved canvases render automatically. Claude's single-canvas workflow is unchanged.
+
+OpenCode `0.0.3` and Claude `0.0.2` default to port `7676` and try consecutive ports if occupied. Explicitly configured ports never fall back; explicit `0` requests an OS-assigned port.
 
 ## Install For OpenCode
 
@@ -210,7 +212,7 @@ Secure defaults require no configuration.
 
 | Environment variable | Default | Meaning |
 |---|---:|---|
-| `REINDR_PORT` | `4917` | Preferred panel port. Use `0` for a dynamic port. An occupied preferred port falls back automatically. |
+| `REINDR_PORT` | `7676` | Without a valid explicit setting, try `7676`, then increment by one on `EADDRINUSE` until free (never past `65535`). An explicit environment or plugin port never increments or falls back; an occupied port reports an error. Use explicit `0` for an OS-assigned port. Other startup errors fail without retry. Applies to OpenCode and Claude. |
 | `REINDR_AUTORAISE` | `1` | Set to `0` to disable automatic browser opening. |
 | `REINDR_BROWSER` | platform default | Browser command. Use `{url}` where the panel URL should be inserted. |
 | `REINDR_DIRECTORY` | `$XDG_DATA_HOME/reindr/sessions` | Directory containing per-session HTML files. Relative overrides resolve from the project worktree. |
@@ -227,7 +229,7 @@ The npm package also accepts plugin options:
     [
       "@nicodes/reindr-opencode",
       {
-        "port": 4917,
+        "port": 7676,
         "autoOpen": true,
         "browser": "chromium --app={url}",
         "canvasDirectory": "~/.local/share/reindr/sessions",

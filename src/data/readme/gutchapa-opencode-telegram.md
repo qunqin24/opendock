@@ -104,12 +104,11 @@ For 24/7 availability, run it under launchd/systemd (see
 | `OPENCODE_BIN` | `opencode` | Path to the `opencode` binary (standalone mode) |
 | `OPENCODE_CWD` | `~/.opencode-bot-ws` | Working directory for agentic runs / sessions |
 | `OPENCODE_TIMEOUT_MS` | `180000` | Agentic timeout |
-| `LLM_ENDPOINT` | `http://127.0.0.1:8095/v1/chat/completions` | Fallback LLM endpoint used when the agentic path fails |
-| `LLM_MODEL` | `qwen3.5-9b` | Fallback model name |
-| `LLM_TIMEOUT_MS` | `60000` | Fallback LLM timeout |
+| `OPENCODE_MODEL` | _(unset)_ | Model for all replies (e.g. `opencode/muse-spark-1.3-contributor-free`); unset inherits the opencode-config default. Switch live with `/model <id>` |
 
-The fallback LLM path talks to an OpenAI-compatible endpoint (e.g. llama.cpp)
-so the bot still answers even without an opencode agent available.
+Every conversational message goes through `opencode run` on the configured
+model. There is no local-LLM fallback: if the run fails, the bot says so
+plainly instead of answering from a weaker model.
 
 ## Commands
 

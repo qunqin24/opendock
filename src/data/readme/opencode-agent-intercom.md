@@ -634,12 +634,15 @@ exposes every runtime knob:
   unknown keys are forwarded to the provider.
   An `effort [<value>]` row sits directly under the model row and sets
   the reasoning effort for that agent over a per-model ladder
-  `default → low → medium → high → xhigh`. The ladder offered for the
-  selected model is built from the key list of that model's `variants`
-  map as `client.config.providers()` reports it: each of `low`,
-  `medium`, `high`, `xhigh` is offered only when the model names it as a
+  `default → low → medium → high → xhigh → off`. `off` is not an amount
+  of thinking but its absence — the step that switches thinking off
+  entirely. The ladder offered for the selected model is built from the
+  key list of that model's `variants` map as
+  `client.config.providers()` reports it: each of `low`, `medium`,
+  `high`, `xhigh`, `off` is offered only when the model names it as a
   key. A model that reports no `variants` map at all is taken to offer
-  `low`/`medium`/`high`; a model that reports an empty `variants` map,
+  `low`/`medium`/`high` — `xhigh` and `off` are never assumed; a model
+  that reports an empty `variants` map,
   or one without `capabilities.reasoning === true`, makes the row
   inert. `default` is the absence of a stored value; any other step
   writes the entry's optional `variant` key. The row is inert and muted
@@ -660,7 +663,13 @@ exposes every runtime knob:
   `thinkingConfig.thinkingLevel` family of `@ai-sdk/google` /
   `@ai-sdk/google-vertex` takes only `low`/`medium`/`high` (with
   `includeThoughts: true`) and emits nothing for `xhigh`; nothing is
-  written for any other family. Keys already set in `llm-params.json`
+  written for any other family. `off` is the one step that is not an
+  effort string: `@ai-sdk/openai-compatible` gets
+  `chat_template_kwargs: {"enable_thinking": false}` and no
+  `reasoningEffort` — a top-level effort of `none` does not switch
+  llama-server's thinking off, the chat-template switch does — and every
+  other family writes nothing for it, so there `off` travels by
+  `config.agent[<name>].variant` alone. Keys already set in `llm-params.json`
   win over the ladder; and `applyModelChoices` additionally seeds
   opencode's own variant store at
   `${XDG_STATE_HOME:-$HOME/.local/state}/opencode/model.json` under its
@@ -668,7 +677,8 @@ exposes every runtime knob:
   shows the active variant in a freshly started session. That store is
   keyed per model, so its entry takes the effort of the visible primary
   agent (`mode === "primary"` and not `hidden`; `default_agent` wins
-  where two share a model); a `default`, absent or out-of-ladder effort
+  where two share a model); every ladder step goes in under its own
+  name, `off` included, and a `default`, absent or out-of-ladder effort
   writes `"default"`. Writes are atomic; a store that does not parse is
   left untouched; every failure is swallowed so the plugin cannot break
   on load.

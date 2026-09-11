@@ -114,6 +114,7 @@ Layered (deep-merged; later layers override earlier): `~/.config/opencode/okf.js
   "enabled": true,
   "scan":   { "enabled": true, "maxDepth": 4 },
   "bundles": [{ "path": "docs/knowledge", "name": "project-kb" }],
+  "remotes": [{ "url": "https://git.example.com/team/wiki-kb.git", "name": "team-wiki" }],
   "disclosure": { "injectManifest": true, "maxManifestChars": 2000 },
   "unload": {
     "afterTurns": 4,          // unload after 4 user turns (tuned for large context windows)
@@ -129,11 +130,31 @@ Layered (deep-merged; later layers override earlier): `~/.config/opencode/okf.js
 
 Auto-scan skips build/VCS directories (`node_modules`, `dist`, `.git`, …) and hidden directories — with one exception: **`.opencode` is scanned**, so bundles placed there (e.g. `.opencode/skill/`) are discovered automatically.
 
+### Remote knowledge sources (git)
+
+`remotes` points at git-hosted knowledge bases — the team-distribution channel: the KB author pushes to git, every agent pulls. Before discovery, each remote is cloned/updated (`--depth 1` shallow + `reset --hard`) into a **shared cache** (`~/.cache/opencode-okf/remotes/<hash(url+ref)>`, override with `$OKF_REMOTE_CACHE`), and the OKF bundles found inside the checkout are registered like local ones — same L0/L1/L2 disclosure, same unload semantics.
+
+```jsonc
+"remotes": [
+  { "url": "https://git.example.com/team/wiki-kb.git", "name": "team-wiki" },
+  { "url": "https://git.example.com/team/glossary.git", "ref": "v1.2", "subdir": "kb" },
+  { "url": "https://git.example.com/private/ops-kb.git", "auth": "env:GIT_TOKEN" }
+]
+```
+
+- **Failures never break the session**: an unreachable origin degrades to the existing cache with a stderr warning; a first-clone failure just skips that remote.
+- **Sync log**: every sync appends a line to `~/.cache/opencode-okf/sync.log` (override `$OKF_SYNC_LOG`) — status, duration, pulled commit, registered bundles — success included. Lines never contain the remote URL (ssh URLs embed `user@host`), only the display name and cache-dir hash; `debug: true` additionally mirrors them to stderr.
+- **Read-only by design**: `okf_write` refuses remote bundles — the next sync would `reset --hard` local edits away. The git repo is the source of truth; this plugin stays a knowledge *access* layer, not a write-back sync.
+- **Auth**: `auth: "env:VARNAME"` reads the token from the environment at sync time (GitLab/GitHub PAT style, `authUser` defaults to `oauth2`) — tokens never live in the committed okf.jsonc. ssh URLs use your ssh agent as-is.
+- **Naming**: a repo with a single bundle takes `name` as-is; a multi-bundle repo registers one bundle per root, named `name/<leaf>`.
+- **Self-repository aware**: configuring the current project's own git origin as a remote is detected (protocol/`git@`/`.git`-insensitive URL comparison) and skipped — no redundant clone, no duplicate bundle; `okf sync` reports it as `skipped`.
+- **CLI parity**: `okf sync` force-updates all remotes (exit 1 if any fails — usable as a CI gate); other `okf` commands clone on first use and then work from the cache (`--sync` / `--no-sync` to override).
+
 ## Development
 
 ```bash
 bun install
-bun test            # 146 tests
+bun test            # 168 tests
 bunx tsc --noEmit   # type-check
 ```
 

@@ -62,6 +62,12 @@ On a headless machine (or when your browser is on another computer), choose
 browser, approve there, and paste the redirect URL it lands on (it will
 fail to load — that's expected) back into OpenCode.
 
+Before your first login, `/models` shows a single LunaRoute entry —
+**Log in to load models**. That placeholder is intentional: it keeps
+LunaRoute visible in `/connect` (OpenCode hides providers that have no
+models). Selecting it before logging in just fails with a 401; log in via
+`/connect` and it is replaced by the real catalog.
+
 ## LunaRoute MCP tools
 
 When you are logged in, the extension registers the hosted LunaRoute MCP
@@ -111,6 +117,13 @@ key validation) — one effective URL for all of them.
 
 ## Troubleshooting
 
+- **`/connect` doesn't list LunaRoute**: with the plugin installed it
+  always should (a placeholder model keeps the provider listed before
+  first login). If you're re-authenticating after a **revoked key**
+  (shape-valid credential, gateway 401), `/connect` may not list
+  LunaRoute — use the CLI instead:
+  `opencode providers login --provider lunaroute` opens the same
+  login-method picker.
 - **No models appear after login**: the gateway may be unreachable, or the
   key may be stale. Re-run `/connect`.
 - **Key rotation**: re-run `/connect` — the new key replaces the old one, and

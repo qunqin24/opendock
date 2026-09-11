@@ -22,14 +22,16 @@ See the OpenCode configuration below.
 
 ## veris
 
-Three commands an engineer invokes with a task. The skills keep the same
-measurement and evidence gates across CLI-owned and plugin-managed execution.
+Three commands an engineer invokes with a task. The skills use Veris during normal
+development across CLI-owned and plugin-managed execution. A relevant application
+test and its existing receipt can establish the change; there is no fixed run quota
+or separate proof phase.
 
-| command | what it does | not done until |
+| command | what it does | completion |
 |---|---|---|
 | `setup` | verifies the current session or wires a CLI-owned workflow, identifies vendors, and proves one application run reaches the twin | evidence attributable to that run shows the required vendor calls and expected responses/state |
-| `build <issue link \| prompt>` | measures every vendor claim the task rests on against the twin before designing, implements, proves the changed application flow against the twin | every claim measured before the first source edit; a receipt from the changed flow; a PR stating what was verified and what is assumed |
-| `fix <issue link \| prompt>` | reproduces the failure the issue describes through the repository's own code before designing, fixes it, proves the same failure closed | the failure reproduced before the first source edit; the same failure re-run green with a receipt; the PR as above |
+| `build <issue link \| prompt>` | answers relevant service questions and tests the new application behavior | applicable assertions pass through the intended caller, with current-run twin evidence and a concise result |
+| `fix <issue link \| prompt>` | investigates the reported defect and tests the changed application behavior | applicable assertions pass through the affected caller, with current-run twin evidence and a concise result |
 
 The reference set lives once in `veris/skills/veris-reference/`. Claude and Codex
 ship that canonical tree; the OpenCode npm package bundles it and exposes its
@@ -143,6 +145,17 @@ These entries describe the source plugin history. The old
 `@veris-ai/veris-sim-opencode` npm 0.7.0 tarball predates the CLI migration below;
 matching version numbers across that old distribution and this source do not
 establish matching content.
+
+0.8.0 — use Veris in the normal development loop. `build` and `fix` reuse a
+relevant application test and its receipt instead of requiring a separate proof
+phase. Extra probes, fault cases and repeated calls answer task-specific questions;
+there is no mandatory two-run check, per-measurement falsifier or prompt hook.
+Record/ledger helpers remain available for requested investigations, with the
+existing full-SHA `--base` interface; optional recorded runs gain a timestamp.
+Setup no longer requires staging those helpers, preserves artifact preferences,
+and reuses an execution of the exact saved command. Provider identity, routing,
+trust and current-run evidence requirements remain. Reduced instruction overhead
+does not by itself establish faster tasks or unchanged correctness.
 
 0.7.4 (unreleased) — the Daytona recipe is written around the `@veris-ai/daytona`
 SDK as shipped (0.3.1 and later): the run is a sequence of SDK calls the

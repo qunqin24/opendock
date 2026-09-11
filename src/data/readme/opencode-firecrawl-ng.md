@@ -2,7 +2,10 @@
 
 OpenCode plugin that provides tool calls for Firecrawl.
 
-Currently, only `firecrawl-search` is implemented.
+Currently, [`firecrawl-search`](https://www.firecrawl.dev/search), [`firecrawl-developer`](https://www.firecrawl.dev/developer-index), and [`firecrawl-scrape`](https://www.firecrawl.dev/scrape) are implemented.
+
+> [!Note]
+> LLM disclaimer: Most of the code was generated with large language models.
 
 ## Installation
 

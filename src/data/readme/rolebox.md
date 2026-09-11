@@ -27,7 +27,7 @@
 
 ---
 
-> **Upgrading from 0.x.x?** rolebox 1.x replaced the 0.x execution model. In 0.x, workflows were declared in `role.yaml` (`collaboration:` block with built-in topologies like `pipeline`, `review-loop`, `star`) and routed automatically by the v1 graph machinery. In 1.x, workflows are **imperatively built and run on a graph execution engine** — you call `graph_create` → `graph_add_node` / `graph_add_edge` → `graph_run` and observe results with `graph_status`. The v1 collaboration auto-advance machinery was decommissioned (the legacy task-query surface survives as a thin `task_*` compatibility layer). See [Graph execution engine](#graph-execution-engine) and [docs/graph-legacy-v1-decommission.md](docs/graph-legacy-v1-decommission.md).
+> **Upgrading from 0.x.x?** rolebox 1.x replaced the 0.x execution model. In 0.x, multi-agent workflows were declared in `role.yaml` and routed automatically by the v1 graph machinery. In 1.x, workflows are **imperatively built and run on a graph execution engine** — you call `graph_create` → `graph_add_node` / `graph_add_edge` → `graph_run` and observe results with `graph_status`. The declarative auto-advance machinery was decommissioned, and the declarative workflow/termination vocabulary was later removed entirely (the legacy task-query surface survives as a thin `task_*` compatibility layer). See [Graph execution engine](#graph-execution-engine).
 
 ---
 
@@ -311,7 +311,7 @@ graph_add_node(graph_id="review-workflow", id="finalize",
 graph_approve(graph_id="review-workflow", node_id="finalize", action="approve")
 ```
 
-See [docs/graph-engine-architecture.md](docs/graph-engine-architecture.md) for the full engine architecture map and [docs/graph-legacy-v1-decommission.md](docs/graph-legacy-v1-decommission.md) for how the v1 subsystem was replaced.
+See [docs/graph-engine-architecture.md](docs/graph-engine-architecture.md) for the full engine architecture map.
 
 ---
 
@@ -360,7 +360,7 @@ Run the same task across fresh sessions and iterate automatically — useful for
 | `rolebox status` | List all installed roles and their status |
 | `rolebox info [name]` | Detailed role inspection (interactive picker when omitted) |
 | `rolebox sync <target>` | Deploy installed roles to a harness (`opencode` / `pi` / `dsh`) |
-| `rolebox config [name]` | Configure models for a role (interactive picker when omitted) |
+| `rolebox config [name]` | Configure models for a role (interactive picker when omitted; `--target` selects `opencode` / `pi` / `dsh`) |
 | `rolebox monitor` | Runtime dashboard (TUI): loops, graph workflows, dispatch summary — reads `.rolebox/state/` |
 | `rolebox memory search <query>` | Full-text search across persistent memory |
 | `rolebox --version` | Show version |
@@ -380,7 +380,7 @@ Pre-built roles available from the [oh-my-role registry](https://github.com/Eric
 | **tauri** | Desktop app development with Tauri v2 — IPC, plugins, window management, system tray |
 | **dart-flutter** | Cross-platform mobile and desktop Flutter development with full gate review pipeline |
 
-Install any role with `rolebox install <name>` and restart opencode.
+Install any role with `rolebox install <name>` and restart your harness.
 
 ---
 
@@ -392,7 +392,7 @@ Create or edit `role_config.yaml` in your harness's config directory — `~/.con
 
 ```yaml
 model_aliases:
-  PLACEHOLDER: hfai/deepseek-v4-pro-max
+  PLACEHOLDER: openrouter/anthropic/claude-sonnet-4
   YOUR_MODEL_HERE: anthropic/claude-opus-4
   # key = placeholder string from role.yaml
   # value = provider/model_id for your actual model
@@ -432,9 +432,7 @@ Edits to `role_config.yaml` take effect on the next hot-reload cycle or role boo
 | Skills | [docs/skills.md](docs/skills.md) |
 | References | [docs/references.md](docs/references.md) |
 | Subagents | [docs/subagents.md](docs/subagents.md) |
-| Collaboration Graph | [docs/collaboration-graph.md](docs/collaboration-graph.md) |
 | Graph Engine Architecture | [docs/graph-engine-architecture.md](docs/graph-engine-architecture.md) |
-| Graph v1 Decommission | [docs/graph-legacy-v1-decommission.md](docs/graph-legacy-v1-decommission.md) |
 | Memory Strategy | [docs/memory-strategy.md](docs/memory-strategy.md) |
 | CLI | [docs/cli.md](docs/cli.md) |
 | Session Tools | [docs/session-tools-strategy.md](docs/session-tools-strategy.md) |

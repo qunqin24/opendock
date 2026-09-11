@@ -11,6 +11,7 @@ Instead of checking the web dashboard, you get quota toasts directly in OpenCode
 ## What it does
 
 - Shows Codex quota status as OpenCode toasts.
+- Registers a `codex_usage` tool so the assistant can answer Codex quota and reset questions.
 - Runs a background check on startup and every 10 minutes.
 - Keeps noise low: background checks only notify when quota reaches the configured threshold (`warn` by default, so `warn`/`critical`/`error`).
 - Includes JSON output mode for scripts and debugging.
@@ -100,6 +101,12 @@ The installer updates both OpenCode's server plugin config and TUI plugin config
 
 The TUI plugin registers a `/codex-usage` slash command.
 This means quota checks run locally and the command shows a toast without an assistant turn.
+
+The server plugin also registers a `codex_usage` tool. OpenCode can call it during an assistant
+turn when you ask questions such as "How much Codex usage do I have left?" or "When does my
+Codex quota reset?" Asking about "ChatGPT usage" also invokes the probe. The tool reports Codex
+quota for the connected ChatGPT plan; it does not report general ChatGPT message limits or
+OpenAI API billing.
 
 You can still run `opencode-codex-usage` directly when you want an immediate quota refresh from a shell.
 
