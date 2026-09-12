@@ -96,7 +96,7 @@ irm https://raw.githubusercontent.com/cortexkit/magic-context/master/scripts/ins
 npx @cortexkit/magic-context@latest setup
 ```
 
-The wizard auto-detects which harnesses you have (OpenCode, Pi, OMP, or any combination), adds the plugin, disables built-in compaction, helps you pick models for the historian, dreamer, and sidekick, and resolves conflicts with other context-management plugins. Target one with `--harness opencode`, `--harness pi`, or `--harness omp`.
+The wizard auto-detects which harnesses you have (OpenCode, Pi, OMP, or any combination), adds the plugin, disables built-in compaction, helps you pick models for the historian and dreamer, and resolves conflicts with other context-management plugins. Target one with `--harness opencode`, `--harness pi`, or `--harness omp`.
 
 > **Why disable built-in compaction?** Magic Context manages context itself. The host's compaction would interfere with its cache-aware deferred operations and double-compress.
 
@@ -125,7 +125,7 @@ Then create `magic-context.jsonc` with the OpenCode historian setting:
 ```
 
 - **Required:** `historian.opencode.model` must be a real `provider/model-id`. Without it, the plugin loads but historian runs fail, older history is not summarized, and repeated failures show a `Magic Context — history comparting needs attention` notice.
-- **Optional:** `dreamer` and `sidekick` model/disable blocks. Omit them to leave periodic memory consolidation and `/ctx-aug` off.
+- **Optional:** the `dreamer` model/disable block. Omit it to leave periodic memory consolidation off.
 - **Optional:** `embedding`. Omit it to use the local `Xenova/all-MiniLM-L6-v2`; turning embeddings off removes semantic/embedding-backed search, but keyword search and context management continue.
 
 ### Flat model-config migration (before/after)
@@ -302,7 +302,6 @@ Recall works **across sessions** (a new session inherits everything) and **acros
 | `/ctx-recomp` | Rebuild compartments from raw history (accepts a `start-end` range). Use when stored state seems wrong |
 | `/ctx-wrapup [messages_to_keep]` | Compact older live history while keeping the newest N messages raw; queued compaction materializes on the next model message |
 | `/ctx-session-upgrade` | Upgrade this session to the latest history format: rebuild compartments and migrate project memories |
-| `/ctx-aug` | Run sidekick augmentation on a prompt: retrieve relevant memories via a separate model |
 | `/ctx-dream` | Run dreamer maintenance on demand: maintain memory, docs, smart notes, and user-profile review |
 | `/ctx-embed` | Embedding status, or start/pause history compartment embedding (`start` \| `pause`) |
 
@@ -406,6 +405,25 @@ Dream execution requires a live OpenCode server (the dreamer creates ephemeral c
 
 ---
 
+### Cache-bust sentinel
+
+`packages/plugin/scripts/cache-bust-sentinel.ts` audits recent OpenCode and Pi/OMP provider requests for cache busts that are not explained by Magic Context's fold, refresh, reduction, flush, force-band, or provider/system-prompt contracts. It joins each provider request to MC's nearest pass record from 30 seconds before through five seconds after the request from `transform_decisions`/`scheduler_history` in `context.db` and the rust-mode `mc_pass_trace`/decision mirror in `store.db`; requests without a matching pass are reported as `no_mc_pass_row`. It opens both databases, OpenCode's database, auth-plugin dumps, Pi/OMP JSONL, and `.pi/pi-llm-debugging`/served-array artifacts read-only. Its only local write is the high-water/dedup state file at `~/.local/share/cortexkit/magic-context/cache-bust-sentinel-state.json` (or the resolved `MAGIC_CONTEXT_STORAGE_DIR`).
+
+Run a single dry pass from the repository root; each new unaccounted bust window is printed as one JSON line:
+
+```sh
+bun packages/plugin/scripts/cache-bust-sentinel.ts --once
+```
+
+Omit `--once` for the built-in one-minute loop, or invoke `--once` from cron/launchd every 1–5 minutes. The template at `packages/plugin/scripts/launchd/com.cortexkit.magic-context.cache-bust-sentinel.plist` uses a five-minute cadence, deliberately has `RunAtLoad=false`, and is not installed automatically. Replace its `__BUN_PATH__`, `__REPO_ROOT__`, and `__LOG_DIR__` placeholders before loading it. A cron equivalent is:
+
+```cron
+*/5 * * * * cd /path/to/magic-context && /path/to/bun packages/plugin/scripts/cache-bust-sentinel.ts --once >> /path/to/cache-bust-sentinel.jsonl 2>> /path/to/cache-bust-sentinel.log
+```
+
+`--send` switches from JSON-line dry-run output to the `prefrontal` module's `wake.event_record` subc operation. Do not enable it until that operation is deployed. Known dispositions (`accepted`, `unowned_session`, `dedup`, and `superseded`) are counted and logged; malformed replies fail the run. Use `--connection-file`, `--wake-module-id`, `--state-file`, `--db`, or `--rust-store` only when the corresponding runtime location is non-default.
+
+---
 ## Contributing
 
 Bug reports and pull requests are welcome. For larger changes, open an issue first to discuss the approach. Run `bun run format` before submitting; CI rejects unformatted code.

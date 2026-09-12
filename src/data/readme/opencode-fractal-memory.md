@@ -991,6 +991,12 @@ Unified SQLite database with `project_name` discriminator:
 |---|---|
 | `~/.config/opencode/memory.db` | Global rules, persona, preferences (scope=global) + project-specific memory, nodes, playbooks (scope=project, discriminated by `project_name`) |
 
+## Changelog
+
+- **2026-09-06** `feat(hub): crystallized project_hub — position is central (5-step: search+network→pick parent→set)` `e4b0142` + `feat(hub): backfilled hub summaries/keywords BM25×2 (11 L1 fine-grained, 3 decisions repositioned as L2)` + `feat(memory): mandatory summary+keywords v38 (BM25×2, auto TF fallback)` `1a5c6a2` + `feat(project-hub): dedicated tool` `9ca0214` (see AGENTS.md Changelog for detail)
+- **2026-09-06** `feat(svelte): SvelteKit 5.56 + Skeleton 5.0.1 parallel frontend at :8788 + brain exact parity + GLBLoader + laplacian smoothing` `a5dfd73` (merged `feat/svelte-parallel-mgmt`)
+- **2026-09-06** `feat(memory): keywords field + project_hub network` — hub now crystal-clear fine-grained via `project_hub` tool, summaries/keywords mandatory
+
 ## License
 
 MIT

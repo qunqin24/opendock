@@ -114,6 +114,7 @@ The archive excludes these items:
 ## Skills
 
 - Architecture-first review: `change-review`, `repo-review`, and `pr-review`.
+- Review support: `review-exchange`.
 - Issue planning, review, and finalization: `plan-issue`, `issue-review`, and `finalize-plan`.
 - Engineering: `brainstorm`, `realign`, `simplify`, `systematic-debugging`, and
   `test-driven-development`.

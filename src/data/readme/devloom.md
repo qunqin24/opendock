@@ -394,10 +394,10 @@ Uses only OpenCode Free models (zero cost). The profile auto-picks the best
 available free model per agent role using a candidate chain.
 
 The orchestrator leads with `big-pickle` (strong free-tier routing). Role fallback order:
-- **orchestration**: big-pickle → nemotron-3-ultra-free →
-  mimo-v2.5-free → muse-spark-1.3-contributor-free → muse-spark-1.2-contributor-free → nemotron-3.5-lightning-free → ling-3.0-flash-fin-free
-- **implementation / verification**: big-pickle →
-  nemotron-3-ultra-free → nemotron-3.5-lightning-free → mimo-v2.5-free → ling-3.0-flash-fin-free
+- **orchestration**: big-pickle → muse-spark-1.3-contributor-free →
+  mimo-v2.5-free → muse-spark-1.2-contributor-free → nemotron-3.5-lightning-free → nemotron-3-ultra-free → ling-3.0-flash-fin-free
+- **implementation / verification**: big-pickle → muse-spark-1.3-contributor-free →
+  nemotron-3.5-lightning-free → mimo-v2.5-free → nemotron-3-ultra-free → ling-3.0-flash-fin-free
 - **planning**: nemotron-3-ultra-free → muse-spark-1.3-contributor-free → muse-spark-1.2-contributor-free →
   big-pickle → nemotron-3.5-lightning-free → ling-3.0-flash-fin-free
 - **documentation**: muse-spark-1.3-contributor-free → muse-spark-1.2-contributor-free → nemotron-3-ultra-free →

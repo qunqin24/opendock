@@ -110,6 +110,26 @@ Every conversational message goes through `opencode run` on the configured
 model. There is no local-LLM fallback: if the run fails, the bot says so
 plainly instead of answering from a weaker model.
 
+## Daily digest (bundled, on by default)
+
+The bot ships a morning briefing — AI news, trending repos, your tracked
+repos, each judged for fit — formatted by your configured model and sent to
+your chat. First run starts with an empty memory: verdicts are verified live
+(`ls`, `which`, `brew list`) and anything unverifiable is marked as such, so
+early briefings under-claim rather than over-claim. Confirmed stable tools
+accumulate in `deployed.json`; review it occasionally, it is yours to curate.
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `DIGEST_ENABLED` | `1` | Set to `0` to disable (or `/digest off`) |
+| `DIGEST_TIME` | `07:30` | Daily send time (24h, local) |
+| `DIGEST_CHAT_ID` | _(active chat)_ | Override delivery target |
+| `DIGEST_HOME` | `~/.config/github-digest` | Config, manifest, sent archive |
+| `DIGEST_CONTEXT` | _(generic)_ | Who the fitment judges for |
+| `GITHUB_TOKEN` | _(unset)_ | Optional, raises API rate limits |
+
+`/digest` sends one now, `/digest on|off|status` controls the scheduler.
+
 ## Commands
 
 Type `/` in Telegram to see the command menu (synced automatically at startup,

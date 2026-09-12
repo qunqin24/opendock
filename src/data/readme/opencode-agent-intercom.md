@@ -114,6 +114,15 @@ laid-out width: the agent type is kept whole where the budget allows, the
 model next, and the topic takes the remainder and is dropped below a minimum rather than wrapping the
 row onto a second line.
 
+The line beneath a row also carries what the subagent has on the **mid-run
+channel**: `asking` where it has stopped on a question of its own and is
+waiting for the orchestrator to answer it with `message()`, and `msgs:N` for
+the messages the orchestrator has sent it this run — the same two columns the
+`list()` tool shows on a running row. Both come off the session title, where
+the plugin publishes them: a subagent blocked inside `ask` is `busy` to
+opencode and writes nothing, so without the marker it is indistinguishable
+from one that has hung.
+
 ## What this gives you that stock opencode doesn't
 
 - **The primary never blocks. Ever.** opencode's native `task` is blocking —
@@ -156,6 +165,15 @@ row onto a second line.
   → architecture → milestones → tasks → implementation → review. State lives
   in `AGENTS.md`, so your project is resumable across restarts. Zero
   per-project prompt engineering.
+
+- **Compaction under your control, off by default.** opencode compacts a
+  session on one global switch with no per-agent form. The plugin writes
+  that switch off in every agent mode and takes the ON side itself: the
+  sidebar's `compaction` row arms it per role, and an armed agent is
+  compacted by the plugin at the context threshold that role already has —
+  the primary's `maxPrimaryContext`, a subagent's own context budget. The
+  row is live; no opencode restart. With it off for the primary, the plain
+  handoff or endless mode is what relieves the session.
 
 - **Graceful context-limit handling.** When a subagent runs out of context, it
   does not die and it does not hallucinate. The plugin tells *the parent*
@@ -201,8 +219,10 @@ The primary never blocks. You stay in the driver's seat the entire time.
 | Tool | Purpose | Who |
 |---|---|---|
 | `spawn(agent, prompt, description?)` | Start a subagent non-blocking. Returns a handle (`researcher#1`). Sizes the work package against the agent's context budget — refused over 40 %, warned over 20 %, gated off when the type's budget is `0`. Unknown agent types are refused and the refusal lists the accepted set. | Orchestrator |
+| `message(subagent, text)` | Say something to a subagent that is STILL RUNNING — a correction, a fact it is missing, or the answer to a question it asked. Queued into that session with `noReply: true`, so it starts no second turn and is read at the subagent's next step. Refused for a subagent that is no longer running, for a foreign or unknown handle, over `maxMessageTokens`, where the target is already at its own context budget and the text would put it over, and while `midRunMessaging` is off. | Orchestrator |
+| `ask(question)` | Put ONE question to the caller that briefed you and block on the answer. The answer is the result of the call; on expiry the result says no answer came and the run goes on. Refused to a NESTED subagent (its caller is itself blocked and could not answer), to a session that is no tracked subagent at all, while a question is already open, over `maxMessageTokens`, and while `midRunMessaging` is off. | Subagents |
 | `abort(subagent)` | Cooperatively abort and hard-deny further tool calls. User-requested stops. | Orchestrator |
-| `list()` | List active subagents. | Orchestrator |
+| `list()` | List active subagents. A running row carries `msgs:N` and `asking` where a question is open. | Orchestrator |
 | `task` | Denied everywhere. opencode's native tool is blocking; the schema strip hides it. | — |
 | `todos_open()` | List open tasks from `TODO.md` with their stable id (`T5`) and `accept:` criterion. | All agents |
 | `todo_add(title, accept?)` / `todo_edit(id, …)` / `todo_done(id)` | Add / refine / remove a task in `TODO.md`. `todo_done` deletes the completed task — usually the wake-hook does it for you. | The six deliverable roles |
@@ -211,16 +231,21 @@ The primary never blocks. You stay in the driver's seat the entire time.
 | `grounded_search(query, max_sources?)` | One call to Google's Gemini with Search grounding on, on the fixed model `gemini-3.7-flash` and no other. Returns a written answer plus the numbered sources it was grounded in (`max_sources` 1–20, default 8). | `grounder` only |
 | `outline(path)` | Top-level declarations of a source file via universal-ctags. ~100 languages, ~95 % token savings vs `read`. | Subagents (except `designer`/`gitter`) |
 
-By default a subagent runs once and is destroyed: **spawn → run → reply →
+A subagent answers exactly once and is then destroyed: **spawn → run → reply →
 deleted.** The primary is woken automatically with the full (capped) result on
 completion. No status-poll tool by design — small LLMs would call it in a
 loop.
 
+One reply is not the same as being out of reach. For the length of that run
+the subagent is a correspondent: the orchestrator steers it with `message`,
+the subagent puts a question back with `ask`, and both are described under
+[The mid-run channel](#the-mid-run-channel) below.
+
 A finished subagent's session can also be **held** — kept alive after its
 result has been delivered, so the orchestrator can address it later. Holding
-is gated on `maxRetainedSubagents > 0` and is off by default; with retention
-off the default description above is the whole story, and the orchestrator
-loses the `reuse` tool.
+is gated on `maxRetainedSubagents > 0`, which ships at `2`; set it to `0` and
+the description above is the whole story, and the orchestrator loses the
+`reuse` tool.
 
 With retention on, every clean, top-level subagent whose context fits under
 the reuse ceiling is held for `retainedSubagentTtlMs` after it finishes, the
@@ -247,6 +272,48 @@ re-reading. Reach for `spawn` instead for work that is new, for work the held
 session's own history would push the wrong way, and after a `Blocked:`
 report (a blocked task continues through a FRESH subagent carrying the
 decision, never through the one that stopped).
+
+### The mid-run channel
+
+While a subagent runs, the two directions between it and its caller are open.
+
+**Down — `message(subagent, text)`.** The text is framed by the plugin (never
+sent bare: what arrives in the subagent's session is a user message, and an
+unframed paragraph reads as a fresh task) and queued with opencode's
+`noReply: true`, which persists the message without starting a turn. opencode's
+own runner drains the queue at each STEP boundary, so the subagent reads it as
+soon as the tool call it is inside returns — not at the next turn, and never
+inside a call. The message is a persisted part of the subagent's session, so it
+is visible in that session's transcript in the order it landed. Where the
+subagent has a question open, the same call is read as the ANSWER to it: the
+blocked `ask` returns the text and nothing is written to the session.
+
+**Up — `ask(question)`.** The subagent's call blocks on a promise — nothing
+polls, no tokens are spent while it waits — and the question goes to the caller
+as a notice opening `❓ agent-intercom: your subagent "<handle>" … asks you:`,
+through the same routed path the completion notice takes, so a question
+survives an orchestrator handoff. The wait is bounded by `answerWaitMs`
+(default 5 minutes, `0` = do not wait) and is additionally clamped against the
+watchdog window the blocked call is measured on, so a subagent can never be
+reaped inside its own wait. On expiry the tool result says so and the run
+carries on. `ask` is refused to a nested subagent, whose caller is itself
+blocked inside its `spawn` call and could not answer.
+
+Every ending settles an open question — idle, watchdog timeout, abort, teardown
+and a state reset alike — so no `ask` outlives its session.
+
+The wake notice at the end of the run reports the traffic:
+`📨 exchange: 2 messages down, 1 question answered, 1 unanswered`. A message
+that was queued but never read is named explicitly, because the orchestrator
+was told it had been queued and would otherwise believe a correction landed
+that never did.
+
+The channel has its own, much smaller ceiling in both directions
+(`maxMessageTokens`, default 1000 tokens) and no overflow file behind it: a
+question or a correction that does not fit is the wrong instrument, and the
+refusal says so. `midRunMessaging: false` switches the whole channel off; unlike
+retention it is read live, so it needs no opencode restart. In solo mode neither
+tool is registered.
 
 At every opencode restart the plugin also runs a one-shot **bootstrap sweep**
 of its own opencode sessions — anything left over from an earlier process
@@ -527,6 +594,25 @@ exposes every runtime knob:
     cut. Everything past the ceiling is cut out of the wake notice and
     written to a file the notice names. `[reset current agent]` does not
     touch any of these three rows.
+- **`compaction [on/off]`** — automatic compaction for the agent type the
+  same cycler has selected, last of its rows and directly above
+  `[reset current agent]`. Writes `"agentCompaction": { "<agent>": true |
+  false }` and inherits the flat `"compaction"` key (env
+  `OPENCODE_AGENT_INTERCOM_COMPACTION`, default `false`) wherever the map
+  has no entry; `★` marks a type that has its own value, and flipping back
+  to the inherited value deletes the entry again. opencode's own automatic
+  compaction is switched off for the whole process
+  (`applyCompactionPolicy`, `src/compaction.js`), so this row is the only
+  thing that compacts anything: an agent switched on is compacted by the
+  plugin through `client.session.summarize` at the context threshold that
+  agent already has — `maxPrimaryContext` for the primary, the type's own
+  context budget for a subagent. The row is LIVE and carries no restart
+  note, because the global write reads no setting. The line under it says
+  when the cell cannot take effect: `no threshold armed — compaction never
+  fires` for an `on` with a threshold of `0`, `endless mode owns the
+  primary threshold` for an `on` primary while the cycle is in effect, and
+  `no context relief armed — the session will overflow` for an `off`
+  primary with no handoff threshold and no cycle either.
 - **`retain (min)`** — the retention window in whole minutes, the unit the
   row is shown and stepped in. Writes `"retainedSubagentTtlMs"` in ms; the
   row's floor is one whole minute. A `0` typed by hand into the file
@@ -566,12 +652,12 @@ exposes every runtime knob:
   `task` stays denied, the plugin's own subagent roles are disabled in
   the registry (`disable: true` and `hidden: true` written from
   `installAgents`, `src/agents.js`), opencode's hidden `title` and
-  `summary` agents are switched off and `compaction.auto` is set to
-  false (`suppressBuiltinAgentTurns`, `src/agents.js`), endless mode
-  counts as off (`endlessModeInEffect`, `src/settings.js`), and the
-  orchestration guide and the `Limits` block are not injected into the
-  primary's system prompt — the primary's role prompt and description
-  (`rolePrompt` / `roleDescription`, `src/agents.js`) say so. The row
+  `summary` agents are switched off (`suppressBuiltinAgentTurns`,
+  `src/agents.js`), endless mode counts as off (`endlessModeInEffect`,
+  `src/settings.js`), and the orchestration guide and the `Limits` block
+  are not injected into the primary's system prompt — the primary's role
+  prompt and description (`rolePrompt` / `roleDescription`, `src/agents.js`)
+  say so. The row
   uses a two-step arm-and-confirm: the first click arms it, the note
   beneath names the opencode restart and asks for confirmation, and the
   second click writes the flip of the file's current value; the
@@ -584,12 +670,13 @@ exposes every runtime knob:
   `"agentMode": "orchestrator" | "solo"`, picked up at the next opencode
   instance; env var `OPENCODE_AGENT_INTERCOM_AGENT_MODE` resolves with
   the same two strings, and its value overrides the file. Default
-  `orchestrator`. With `compaction.auto:false` in solo mode opencode's
-  own context relief is gone — the plugin's own primary handoff replaces
-  it, but a solo user who sets `maxPrimaryContext: 0` gets a
-  `ContextOverflowError` instead of a compaction. Solo mode exists
-  for a local model server running with `parallel 1`, where any second
-  agent competes with the primary for the only slot.
+  `orchestrator`. With `compaction.auto:false` written in every mode by
+  `applyCompactionPolicy` (`src/compaction.js`), opencode's own context
+  relief is gone — the plugin's own primary handoff replaces it, but a
+  user who sets `maxPrimaryContext: 0` gets a `ContextOverflowError`
+  instead of a compaction. Solo mode exists for a local model server
+  running with `parallel 1`, where any second agent competes with the
+  primary for the only slot.
 - Under **`TUI settings`**: **`thinking [on/off]`** and **`tool details
   [on/off]`**, opencode's built-in visibility toggles, plus **`show agentcom
   [on/off]`**, which decides whether the plugin's own notices (subagent
@@ -757,8 +844,11 @@ All optional. The subagent and context caps usually live in
 `~/.config/opencode/agent-intercom.json` (written by the TUI panel); that file
 also takes `"maxRetainedSubagents"`, `"retainedSubagentTtlMs"`,
 `"maxReuseContext"` and the per-agent-type `"reuseContext"` map for the
-`reuse`/retention feature, `"maxResultTokens"` and the per-agent-type
-`"resultTokens"` map for the reply ceiling, `"searxngUrl"` and `"exaApiKey"`
+`reuse`/retention feature, `"midRunMessaging"`, `"answerWaitMs"` and
+`"maxMessageTokens"` for the mid-run channel, `"maxResultTokens"` and the per-agent-type
+`"resultTokens"` map for the reply ceiling, `"compaction"` and the
+per-agent-type `"agentCompaction"` map for automatic compaction,
+`"searxngUrl"` and `"exaApiKey"`
 (each overriding its environment variable), and `"forumBangs"` (no env var —
 the array REPLACES the built-in set rather than extending it). Everything else
 is environment-variable-driven:
@@ -774,7 +864,10 @@ is environment-variable-driven:
 | `OPENCODE_AGENT_INTERCOM_MAX_CONTEXT` | `100000` | Subagent context budget (tokens). `"0"` disables. TUI file overrides. |
 | `OPENCODE_AGENT_INTERCOM_MAX_SUBAGENT_AGE_MS` | `90000` | Watchdog window (ms) for a subagent with nothing in flight. `"0"` switches the inactivity watchdog off, and with it the orphan sweep whose window is a multiple of this one. TUI file overrides via `"maxSubagentAgeMs"`; the TUI's `silence (s)` row steps it in whole seconds. |
 | `OPENCODE_AGENT_INTERCOM_MAX_SUBAGENT_TOOL_CALL_MS` | `660000` | The same watchdog's window (ms) for a subagent with a tool call in flight, counted from the start of that call. `"0"` means no ceiling while it works; the silence window still applies to every subagent that is not working. TUI file overrides via `"maxSubagentToolCallMs"`; the TUI's `in tool (min)` row steps it in whole minutes. |
-| `OPENCODE_AGENT_INTERCOM_MAX_RETAINED_SUBAGENTS` | `0` | How many finished subagents may be held as retained sessions in this process. `"0"` switches retention off — every subagent's session is deleted the moment its result is delivered, the one-shot behaviour. Recommended non-zero value: `3`. TUI file overrides. **Enabling retention needs an opencode restart** — the tool surface is resolved at plugin load, so the `reuse` tool only appears once the next instance boots with this set. Disabling takes effect at once. |
+| `OPENCODE_AGENT_INTERCOM_MAX_RETAINED_SUBAGENTS` | `2` | How many finished subagents may be held as retained sessions in this process. `"0"` switches retention off — every subagent's session is deleted the moment its result is delivered. TUI file overrides. **Enabling retention needs an opencode restart** — the tool surface is resolved at plugin load, so the `reuse` tool only appears once the next instance boots with this set. Disabling takes effect at once. |
+| `OPENCODE_AGENT_INTERCOM_MID_RUN_MESSAGING` | on | `"0"` switches the mid-run channel off: `message` and `ask` stay registered and both refuse, naming the switch. Read LIVE, not latched — unlike retention it needs no opencode restart. TUI file overrides via `"midRunMessaging"`. |
+| `OPENCODE_AGENT_INTERCOM_ANSWER_WAIT_MS` | `300000` | How long a subagent's `ask` blocks on its caller's answer before the tool hands it back "no answer came" and the run carries on. `"0"` means do not wait at all — the question is delivered and the tool returns at once. Clamped against the tool-call watchdog window, so the wait can never outlive the reap. TUI file overrides via `"answerWaitMs"`. |
+| `OPENCODE_AGENT_INTERCOM_MAX_MESSAGE_TOKENS` | `1000` | Ceiling (estimated tokens) on ONE mid-run message in either direction. No overflow file behind it: an over-long message or question is refused, naming the figure. TUI file overrides via `"maxMessageTokens"`. |
 | `OPENCODE_AGENT_INTERCOM_RETAINED_SUBAGENT_TTL_MS` | `3600000` | Retention window per held subagent, in ms. Clamped to a floor of `1`. The TUI's row steps in whole minutes with a one-minute floor. |
 | `OPENCODE_AGENT_INTERCOM_MAX_REUSE_CONTEXT` | `70000` | Reuse ceiling for every agent type the `reuseContext` map does not name. `"0"` means that type is never reused at all. The TUI panel shows and edits the per-type map; the flat key is only what an untouched type inherits. |
 | `OPENCODE_AGENT_INTERCOM_MAX_RESULT_TOKENS` | `2000` | Per-type token ceiling on a subagent's final reply forwarded to the primary. `"0"` disables — that type's reply is never cut. The TUI panel shows and edits the per-type `resultTokens` map; the flat key is only what an untouched type inherits. Everything past the ceiling is cut out of the wake notice and written to a file under `~/.cache/opencode-agent-intercom/results/` (mode `0600`, pruned after 7 days) — the orchestrator receives the path, and only a subagent can read the file. |
@@ -792,7 +885,8 @@ is environment-variable-driven:
 | `OPENCODE_AGENT_INTERCOM_ENDLESS_WIND_DOWN_TIMEOUT_MS` | `900000` | How long (ms) the cycle waits for the permitted wind-down subagent to rewrite the todo file before abandoning. Not shown in the sidebar. |
 | `OPENCODE_AGENT_INTERCOM_ENDLESS_MAX_CYCLES` | `10` | Cycle ceiling per opencode process. At the ceiling endless mode writes itself off. `"0"` arms no ceiling. |
 | `OPENCODE_AGENT_INTERCOM_SHOW_AGENTCOM` | on | `"0"` hides the plugin's own postings — subagent notices, handoff kickoff, doc-summary prompts — from the transcript. Their text still reaches the model unchanged. `"1"` shows them. TUI file overrides. |
-| `OPENCODE_AGENT_INTERCOM_AGENT_MODE` | `orchestrator` | `"orchestrator"` (default) runs the primary as the delegation pattern this plugin enforces; `"solo"` runs the primary as a single agent that does the work itself, with no second agent of any kind starting — none of `spawn`/`abort`/`list`/`reuse`, opencode's native `task` denied, the plugin's subagent roles disabled in the registry, opencode's hidden `title` and `summary` agents switched off and `compaction.auto` set to false, endless mode counting as off, and the orchestration guide and the limits block not injected into the primary. Latched at plugin load — a change needs an opencode restart and then holds across every further restart until it is switched back. TUI file overrides via `"agentMode"` in `~/.config/opencode/agent-intercom.json`; the `mode` row in the sidebar's TUI settings block steps through the two values with a two-step arm-and-confirm. With `compaction.auto:false` in solo mode opencode's own context relief is gone — the plugin's own primary handoff replaces it, but a solo user who sets `maxPrimaryContext: 0` gets a `ContextOverflowError` instead of a compaction. Solo mode exists for a local model server running with `parallel 1`, where any second agent competes with the primary for the only slot. |
+| `OPENCODE_AGENT_INTERCOM_COMPACTION` | off | Automatic compaction for every agent type the `agentCompaction` map does not name. `"1"` on, `"0"` off. opencode's own `compaction.auto` is written `false` in every agent mode by `applyCompactionPolicy` (`src/compaction.js`), so the ON side is the plugin's own: it compacts that agent's session through `client.session.summarize` at the threshold that agent already has — `maxPrimaryContext` for the primary (endless mode wins over it where the cycle is in effect), the type's own context budget for a subagent, capped at three compactions per subagent run. Read LIVE at every crossing, not latched. TUI file overrides via `"compaction"` and the per-agent-type `"agentCompaction"` map; the sidebar's `compaction` row edits it per role. |
+| `OPENCODE_AGENT_INTERCOM_AGENT_MODE` | `orchestrator` | `"orchestrator"` (default) runs the primary as the delegation pattern this plugin enforces; `"solo"` runs the primary as a single agent that does the work itself, with no second agent of any kind starting — none of `spawn`/`abort`/`list`/`reuse`, opencode's native `task` denied, the plugin's subagent roles disabled in the registry, opencode's hidden `title` and `summary` agents switched off, endless mode counting as off, and the orchestration guide and the limits block not injected into the primary. Latched at plugin load — a change needs an opencode restart and then holds across every further restart until it is switched back. TUI file overrides via `"agentMode"` in `~/.config/opencode/agent-intercom.json`; the `mode` row in the sidebar's TUI settings block steps through the two values with a two-step arm-and-confirm. `compaction.auto` is set to `false` in every mode by `applyCompactionPolicy` (`src/compaction.js`), so opencode's own context relief is gone — the plugin's own primary handoff replaces it, but a user who sets `maxPrimaryContext: 0` gets a `ContextOverflowError` instead of a compaction. Solo mode exists for a local model server running with `parallel 1`, where any second agent competes with the primary for the only slot. |
 
 ## Endless mode
 
@@ -940,8 +1034,17 @@ removing every "do it yourself" tool from the primary is the enforcement lever.
   re-pinned text visible in the diff. Two things stay uncovered: guide
   text outside those four elements, and a maintainer who re-pins a real
   contract change without bumping.
+- **Compaction is per session upstream, not per agent.** opencode's
+  `compaction.auto` is one global key, its agent schema carries no
+  compaction entry, and no hook can veto a compaction once started. So the
+  per-agent row here is the plugin's own: the global switch is written
+  `false` and an agent that is switched on is compacted by a
+  `client.session.summarize` call the plugin makes at its own threshold.
+  Setting `compaction.auto: true` in a project's `opencode.json` does not
+  survive — the plugin's write wins, or the row would say something that is
+  not in effect.
 - **Solo-maintainer surface area.** `pw` daemon, `gen` CLI, Exa SSE parser,
-  ctags subprocess, four opencode hooks. 1046 unit tests, no CI against real
+  ctags subprocess, four opencode hooks. 2189 unit tests, no CI against real
   opencode. Bugs are addressed at hobby-project pace.
 
 ## Development

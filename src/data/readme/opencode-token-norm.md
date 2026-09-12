@@ -1,67 +1,61 @@
 # opencode-token-norm
 
 [![npm version](https://img.shields.io/npm/v/opencode-token-norm)](https://www.npmjs.com/package/opencode-token-norm)
-[![npm downloads](https://img.shields.io/npm/dm/opencode-token-norm)](https://www.npmjs.com/package/opencode-token-norm)
-[![license](https://img.shields.io/npm/l/opencode-token-norm)](https://github.com/salitaba/opencode-token-norm/blob/main/LICENSE)
-[![GitHub stars](https://img.shields.io/github/stars/salitaba/opencode-token-norm?style=social)](https://github.com/salitaba/opencode-token-norm)
-[![GitHub release](https://img.shields.io/github/v/release/salitaba/opencode-token-norm)](https://github.com/salitaba/opencode-token-norm/releases/latest)
-[![release workflow](https://github.com/salitaba/opencode-token-norm/actions/workflows/release.yml/badge.svg)](https://github.com/salitaba/opencode-token-norm/actions/workflows/release.yml)
 [![test](https://github.com/salitaba/opencode-token-norm/actions/workflows/test.yml/badge.svg)](https://github.com/salitaba/opencode-token-norm/actions/workflows/test.yml)
+[![license](https://img.shields.io/npm/l/opencode-token-norm)](https://github.com/salitaba/opencode-token-norm/blob/main/LICENSE)
 
-**Your token rules are advice. This makes them mechanical.**
+### Your token rules are advice. This makes them mechanical.
+
+Runtime guardrails for [OpenCode](https://opencode.ai) coding agents. A long
+session drifts: a new task inherits the last one's "do everything" override, the
+audit you told it to run never happens, and you find out at 184 tool calls.
+Token Norm counts the spend and staples the checkpoint onto output the agent is
+already reading.
+
+```sh
+npx opencode-token-norm
+```
 
 ![token-norm demo: the agent gets counted, audited, and handed off](https://raw.githubusercontent.com/salitaba/opencode-token-norm/main/docs/assets/token-norm-demo.gif)
 
-*Demo (18s at 2x): the plugin counts calls and staples the audit onto tool output, then the agent calls `handoff` and lands in a fresh session with the note pre-filled. [Full-speed MP4](https://raw.githubusercontent.com/salitaba/opencode-token-norm/main/docs/assets/token-norm-demo.mp4).*
+*([full-speed demo MP4](https://raw.githubusercontent.com/salitaba/opencode-token-norm/main/docs/assets/token-norm-demo.mp4))*
 
-**Observed on real sessions:** 74 `handoff` calls; **90%** ended the old session
-within 5 minutes. ([how that was measured](https://github.com/salitaba/opencode-token-norm/blob/main/docs/evaluation.md))
+## What you get
 
-An [OpenCode](https://opencode.ai) plugin that counts budgeted tool calls,
-staples reminders onto the output it is already reading, runs the token audit on
-its behalf, and collapses the session split into one tool call.
-
-## Contents
-
-- [What it does](#what-it-does)
-- [Install](#install)
-- [Why add Token Norm?](#why-add-token-norm)
-- [How it works](#how-it-works)
-- [Observed behavior](#observed-behavior)
-- [Configuration](#configuration)
-- [Run the audit yourself](#run-the-audit-yourself)
-- [Further reading](#further-reading)
-- [License](#license)
-
-## What it does
-
-- **Counts budgeted tool calls and marks task boundaries.** Past `BOUNDARY_AT` calls
-  (default 40), a new user message revokes any stale "do everything" override —
-  the failure no dashboard can see.
-- **Demands the cost statement at 25 calls**, once per session, at the first
-  moment the task is provably big.
-- **Runs the usage audit itself every 60 calls** and staples the numbers to tool
-  output, so auditing is a fact to report rather than a step to defer.
-- **Ships a `handoff` tool** that persists a structured note, opens a fresh
-  session, and pre-fills the prompt in one call.
-
-The default enforcement is behavioral: it puts the rule directly in the agent's
-execution path; opt-in `block` mode adds mechanical refusal. Every threshold is
-logged, configurable, and independently disableable.
-
-**Before / after:**
+- **Cost statement at 25 calls** — once per session, before the bulk of the spend.
+- **Task-boundary detection at 40** — a new user message revokes the stale
+  "do everything" override it would otherwise inherit.
+- **The audit run for you every 60 calls** — read-only, numbers stapled on, no
+  command left for the agent to defer.
+- **One-call session handoff** — persists a structured note, opens a fresh
+  session, pre-fills and submits the prompt.
+- **Context, cost and token pressure** — measured against the real model window;
+  never guessed when it cannot be resolved.
+- **`token_norm_status`** — the same accounting on demand, as machine-readable JSON.
 
 ```text
-Without Token Norm
-  Task A ─────────────────────────────┐
-  Task B ─────────────────────────────┘   one context, and B inherits
-                                          A's stale "do everything"
-
-With Token Norm
-  Task A ──→ boundary @40 ──→ audit @60 ──→ handoff ──→ Task B
-             stale override    numbers      note         fresh context,
-             revoked           in-band      written      pre-filled
+Without Token Norm          With Token Norm
+  task A                      task A
+    ↓ 184 tool calls            ↓ 25 calls  ⚠ cost checkpoint
+    ↓ task B inherits           ↓ 40 calls  ⚠ task boundary: override expired
+      A's override              ↓ 60 calls  ⚠ audit, already run
+    ↓                           ↓           🧭 handoff at the pause
+  3.0M effective tokens       task B in a fresh session
 ```
+
+## Enforcement modes
+
+An adoption ladder, not a switch. `TOKEN_NORM_MODE`, default `warn`:
+
+| Mode | What it does |
+|---|---|
+| `observe` | Measures and logs. Injects nothing. |
+| `warn` | Injects the checkpoint into tool output. **Default.** |
+| `handoff` | Adds a session-split recommendation, but only at a pause. |
+| `block` | Refuses non-cheap tool calls past a hard limit. Opt-in. |
+
+Only `block` can fail a tool call, and only on a limit you set — pressure alone
+never strands a session. Cheap tools and `handoff` stay open as the exit.
 
 ## Install
 
@@ -71,11 +65,28 @@ npx opencode-token-norm
 
 Restart OpenCode. The command copies a self-contained build into
 `~/.config/opencode/plugins/` and the audit script into
-`~/.config/opencode/scripts/`; uninstall with `npx opencode-token-norm uninstall`.
-Requires Node ≥ 22 and an OpenCode build with plugin support; `python3` is
-optional, used for the audit checkpoint only. Requirements, verification, and
-troubleshooting are in the
+`~/.config/opencode/scripts/` — nothing outside `~/.config/opencode` is touched.
+Two commands make that checkable rather than trusted:
+
+```sh
+npx opencode-token-norm --dry-run   # every path it would write, writes nothing
+npx opencode-token-norm doctor      # is it installed, current, and configured?
+```
+
+`doctor` exits non-zero only when the plugin is not working; a missing `python3`
+is a warning, because audits are optional and nothing else depends on it. It also
+hashes the installed file against the one in the package, which is the only way to
+tell a current install from a stale copy. Uninstall with
+`npx opencode-token-norm uninstall`. Requires Node ≥ 22 and an OpenCode build with
+plugin support. Requirements, verification, and troubleshooting are in the
 [install notes](https://github.com/salitaba/opencode-token-norm/blob/main/docs/install.md).
+
+| Node | OpenCode | `@opencode-ai/plugin` | Token Norm |
+|---|---|---|---|
+| ≥ 22 | V1 plugin API, verified on 1.18.30 | ≥ 1.15.12 | 0.10.x |
+
+The V2 plugin API is not targeted yet. Verified builds, per-release, are in the
+[compatibility notes](https://github.com/salitaba/opencode-token-norm/blob/main/docs/compatibility.md).
 
 ## Why add Token Norm?
 
@@ -142,20 +153,55 @@ into `AGENTS.md`, in context for the whole session, and then 184 tool calls and
   session, pre-fills and submits the prompt; refused for subagents.
   [design decisions](https://github.com/salitaba/opencode-token-norm/blob/main/docs/design.md#handoff-design-decisions)
 - **On-demand status.** `token_norm_status` returns tool calls, context, cost and
-  effective-token usage plus the current `continue | warn | handoff | block`
-  recommendation, as read-only JSON.
+  effective-token usage plus `policy.current` (severity now), `policy.peak`
+  (severity ever), `policy.driver` (which axis) and the
+  `continue | warn | handoff | block` recommendation, as read-only JSON. The
+  payload is a **public interface**: stable field names within a major version,
+  `peak` never below `current`, and reading it never changes it.
+  [payload and fields](https://github.com/salitaba/opencode-token-norm/blob/main/docs/how-it-works.md#the-payload)
+
+**Two call counts, on purpose.** Raw per-session calls drive the behavioral
+checkpoints (25 / 40 / 60); weighted session-tree calls drive
+`TOKEN_NORM_MAX_TOOL_CALLS` and `budget.toolCalls`. So a header reading
+`calls 37` next to `budget.toolCalls: 52` is correct, not a bug — subagents
+count toward the tree, and weights scale the budget number only, never the
+thresholds.
+[weighted vs. raw](https://github.com/salitaba/opencode-token-norm/blob/main/docs/how-it-works.md#weighted-vs-raw-calls)
+
+**Process-local by design.** Counters live in memory, not on disk: restarting
+OpenCode resets runtime enforcement state, and the guardrails then undercount
+rather than re-firing on spend already made. The limits are not durable session
+policy.
+[why](https://github.com/salitaba/opencode-token-norm/blob/main/docs/design.md#session-state-and-process-boundaries)
 
 Full mechanism descriptions, with the exact reminder text and audit output:
 [how it works](https://github.com/salitaba/opencode-token-norm/blob/main/docs/how-it-works.md).
 
-## Observed behavior
+## Evidence
 
-On one real machine since 2026-09-08: 205 sessions, 227 cost-statement
-reminders, 69 audits, 583 boundaries, 74 handoffs. After a handoff, **64 of 71
-(90%)** matched sessions stopped within 5 minutes (median 4 seconds), and **none
-continued past an hour**. On spend the data is honest but weak — a single user,
-no control group — and **we do not claim the plugin reduced tokens**. Method and
-limitations: [evaluation notes](https://github.com/salitaba/opencode-token-norm/blob/main/docs/evaluation.md).
+Kept in three separate buckets, because they carry very different weight:
+
+**Observed in real usage.** On one machine since 2026-09-08: 205 sessions, 227
+cost-statement reminders, 69 audits, 583 boundaries, 74 handoffs. After a
+handoff, **64 of 71 (90%)** matched sessions stopped within 5 minutes (median 4
+seconds), and **none continued past an hour**. Single user, no control group.
+
+**Benchmark result.** n=20 per arm. Plugin load costs
+**0.158 s → 0.278 s**; the wall-time difference is **+2.6 s, p = 0.83** — i.e.
+not distinguishable from noise. An earlier run reported a wall-time effect; that
+was a harness artifact and the finding was retracted rather than kept.
+
+**Hypothesis, not yet demonstrated.** That the checkpoints reduce total spend.
+The behavioral data above is consistent with it and does not establish it —
+**we do not claim the plugin reduced tokens.** Method, protocol and limitations:
+[evaluation notes](https://github.com/salitaba/opencode-token-norm/blob/main/docs/evaluation.md)
+· [benchmark](https://github.com/salitaba/opencode-token-norm/blob/main/docs/benchmark.md).
+
+> **`effective fresh tokens` ≠ total tokens the model processed.** It is
+> cost-weighted input — `input + 0.1·cache_read + 1.25·cache_write` — which
+> estimates newly-paid-for context, so sessions are comparable across cache hit
+> rates. Do not expect it to match a provider dashboard's token total.
+> [the metric](https://github.com/salitaba/opencode-token-norm/blob/main/docs/design.md#the-effective-fresh-metric)
 
 ## Configuration
 
