@@ -130,6 +130,12 @@ accumulate in `deployed.json`; review it occasionally, it is yours to curate.
 
 `/digest` sends one now, `/digest on|off|status` controls the scheduler.
 
+Pick ONE scheduler: the bundled in-bot scheduler (default on) or an
+external cron/launchd job calling the digest entrypoint — never both, or the
+briefing sends twice. Using external scheduling? Set `DIGEST_ENABLED=0`
+(or `/digest off`) to silence the built-in one. The once-per-day claim file
+(`digest-claim-<date>` in the state dir) also guards twin bot processes.
+
 ## Commands
 
 Type `/` in Telegram to see the command menu (synced automatically at startup,

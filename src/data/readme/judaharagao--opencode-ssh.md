@@ -52,7 +52,7 @@ Or with configuration:
 | `default_timeout` | number | `30` | Default command timeout in seconds |
 | `audit_enabled` | boolean | `true` | Enable audit logging |
 | `blocklist_extra` | string[] | `[]` | Additional regex patterns to block |
-| `allowlist` | string[] | `[]` | Additional allowed patterns (restricted mode) |
+| `allowlist` | string[] | `[]` | Additional allowed patterns (restricted/read_only mode) — merged with the per-project allowlist from `ssh.security_policy` |
 | `ssh_config_path` | string | `~/.ssh/config` | Path to the SSH config file used to resolve host aliases, defaults, proxies, and auto-connect targets |
 | `auto_connect` | boolean | `false` | Connect automatically at startup to every `Host` entry in the ssh config that has a `HostName` (with retry/backoff) |
 | `auto_reconnect` | boolean | `true` | Reconnect a dropped session automatically before the next `ssh.exec`/`ssh.upload`/`ssh.download` (key-authenticated sessions) |
@@ -95,6 +95,27 @@ Only commands in the allowlist + read-only commands are allowed. Risky and destr
 
 ### Read-Only Mode
 Only read-only commands (ls, cat, grep, docker ps, etc.) are allowed. No write operations.
+
+## Custom Allowlist
+
+Restricted and read-only modes respect allowlist patterns from **both** sources (merged, deduped):
+
+1. **Plugin config** — in your `opencode.json`:
+
+   ```json
+   ["@judaharagao/opencode-ssh", {
+     "mode": "restricted",
+     "allowlist": ["docker stop .*", "docker rm .*"]
+   }]
+   ```
+
+2. **Per-project policy** — at runtime via `ssh.security_policy`:
+
+   ```
+   ssh.security_policy(action="add_allowlist", pattern="docker stop .*")
+   ```
+
+   Patterns persist in `<project>/.opencode-ssh/policy.json` and are merged with the config patterns on every execution. Either source alone is enough to permit a matching command in restricted/read_only mode. The destructive blocklist always wins over any allowlist entry.
 
 ## Commands (Tools)
 
@@ -160,6 +181,8 @@ View or modify the security policy.
 ```
 ssh.security_policy(action="view")
 ssh.security_policy(action="add_blocklist", pattern="custom-dangerous-.*")
+ssh.security_policy(action="add_allowlist", pattern="docker stop .*")
+ssh.security_policy(action="remove_allowlist", pattern="docker stop .*")
 ```
 
 ### `ssh.audit_log`

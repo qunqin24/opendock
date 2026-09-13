@@ -41,7 +41,9 @@ server but still talks to it over the protocol.
 | Area | Location |
 | --- | --- |
 | Desktop product host | [`crates/trouve-app`](crates/trouve-app) |
-| Shared Lit desktop/PWA frontend | [`web/app-ui`](web/app-ui) |
+| Shared Lit desktop/PWA frontend | [`web/apps/app-ui`](web/apps/app-ui) |
+| Self-hosted code review frontend | [`web/apps/review-ui`](web/apps/review-ui) |
+| Shared web packages (UI foundation, protocol, content rendering, transcript) | [`web/packages`](web/packages) |
 | Protocol server and harness engine | [`crates/trouve-server`](crates/trouve-server), [`crates/trouve-core`](crates/trouve-core) |
 | Provider and vendor-agent integrations | [`crates/trouve-providers`](crates/trouve-providers), [`crates/trouve-agents`](crates/trouve-agents) |
 | Published semantic code search | [`crates/trouve-search`](crates/trouve-search/README.md) |
@@ -58,8 +60,8 @@ system dependencies required by Wry on your platform.
 Start the frontend development server:
 
 ```bash
-npm --prefix web/app-ui ci
-npm --prefix web/app-ui run dev
+npm --prefix web ci
+npm --prefix web/apps/app-ui run dev
 ```
 
 Then launch the desktop host from another shell:
@@ -71,9 +73,9 @@ TROUVE_APP_UI_DEV_URL=http://127.0.0.1:5173 cargo run -p trouve-app
 To build a release binary with the desktop assets embedded:
 
 ```bash
-npm --prefix web/app-ui ci
-npm --prefix web/app-ui run build
-TROUVE_APP_UI_DIST="$PWD/web/app-ui/dist/desktop" \
+npm --prefix web ci
+npm --prefix web/apps/app-ui run build
+TROUVE_APP_UI_DIST="$PWD/web/apps/app-ui/dist/desktop" \
   cargo build --release -p trouve-app
 ```
 
@@ -85,10 +87,10 @@ The main workspace checks are:
 cargo fmt --all --check
 cargo clippy --all-targets -- -D warnings
 cargo test --workspace
-npm --prefix web/app-ui run format:check
-npm --prefix web/app-ui run lint
-npm --prefix web/app-ui test
-npm --prefix web/app-ui run build
+npm --prefix web run format:check
+npm --prefix web run lint
+npm --prefix web test
+npm --prefix web/apps/app-ui run build
 ```
 
 Model-downloading and network tests stay ignored unless their documented

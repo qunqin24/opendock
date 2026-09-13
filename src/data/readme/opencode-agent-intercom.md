@@ -699,7 +699,10 @@ exposes every runtime knob:
   to relay the substance itself. The part route the switch relies on is
   annotated experimental in opencode; a server that does not answer it, or
   refuses the PATCH, costs the retroactive rewrite on that flip and the
-  notices stay exactly as they were posted.
+  notices stay exactly as they were posted. Each parent notice is durable
+  through `src/noticejournal.js`: it is journalled before the post, confirmed
+  by a delivery id read back from the session tail, replayed at the next
+  plugin load, and reported as `notice delivery LOST` where it never lands.
 - **Per-agent LLM sampling** — temperature, top-p/top-k, max-tokens, plus
   llama.cpp keys (`min_p`, `repeat_penalty`, `chat_template_kwargs`) routed
   through `output.options`. Writes `~/.config/opencode/llm-params.json`.
@@ -870,7 +873,7 @@ is environment-variable-driven:
 | `OPENCODE_AGENT_INTERCOM_MAX_MESSAGE_TOKENS` | `1000` | Ceiling (estimated tokens) on ONE mid-run message in either direction. No overflow file behind it: an over-long message or question is refused, naming the figure. TUI file overrides via `"maxMessageTokens"`. |
 | `OPENCODE_AGENT_INTERCOM_RETAINED_SUBAGENT_TTL_MS` | `3600000` | Retention window per held subagent, in ms. Clamped to a floor of `1`. The TUI's row steps in whole minutes with a one-minute floor. |
 | `OPENCODE_AGENT_INTERCOM_MAX_REUSE_CONTEXT` | `70000` | Reuse ceiling for every agent type the `reuseContext` map does not name. `"0"` means that type is never reused at all. The TUI panel shows and edits the per-type map; the flat key is only what an untouched type inherits. |
-| `OPENCODE_AGENT_INTERCOM_MAX_RESULT_TOKENS` | `2000` | Per-type token ceiling on a subagent's final reply forwarded to the primary. `"0"` disables — that type's reply is never cut. The TUI panel shows and edits the per-type `resultTokens` map; the flat key is only what an untouched type inherits. Everything past the ceiling is cut out of the wake notice and written to a file under `~/.cache/opencode-agent-intercom/results/` (mode `0600`, pruned after 7 days) — the orchestrator receives the path, and only a subagent can read the file. |
+| `OPENCODE_AGENT_INTERCOM_MAX_RESULT_TOKENS` | `2000` | Per-type token ceiling on a subagent's final reply forwarded to the primary. `"0"` disables — that type's reply is never cut. The TUI panel shows and edits the per-type `resultTokens` map; the flat key is only what an untouched type inherits. Everything past the ceiling is cut out of the wake notice and written to `<entry.directory>/work/agent-intercom-result-<handle>-<sessionID>[-runN].md` (mode `0600`) where the subagent's directory is absolute — the project owns the file, and only a subagent can read it. Where the subagent has no absolute project directory, the overflow file falls back to `~/.cache/opencode-agent-intercom/results/` (mode `0700`); project files are not pruned, only the cache fallback is reaped after 7 days. If the write fails the session is HELD, not deleted — the opencode session is the only remaining copy of the cut text and is collected by the orphan sweep at the next plugin load. |
 | `OPENCODE_AGENT_INTERCOM_PROJECT_CONTEXT` | on | `"0"` skips the project snapshot prepended to spawn prompts |
 | `OPENCODE_AGENT_INTERCOM_RESPECT_TASK_PERMS` | on | `"0"` ignores `permission.task` allowlist in `spawn` |
 | `OPENCODE_AGENT_INTERCOM_DISABLE_WEBSEARCH` / `_DISABLE_OUTLINE` / `_DISABLE_FORUM_SEARCH` / `_DISABLE_GROUNDED_SEARCH` | off | `"1"` skips that tool |
@@ -1044,7 +1047,7 @@ removing every "do it yourself" tool from the primary is the enforcement lever.
   survive — the plugin's write wins, or the row would say something that is
   not in effect.
 - **Solo-maintainer surface area.** `pw` daemon, `gen` CLI, Exa SSE parser,
-  ctags subprocess, four opencode hooks. 2189 unit tests, no CI against real
+  ctags subprocess, four opencode hooks. 2305 unit tests, no CI against real
   opencode. Bugs are addressed at hobby-project pace.
 
 ## Development

@@ -2,7 +2,7 @@
 
 ![用户节点面板](docs/screenshot.png)
 
-OpenCode 2 TUI 插件：在**会话侧边栏**显示当前会话的用户消息节点列表（类似对话时间线/大纲）。
+OpenCode 2 TUI 插件：在**会话侧边栏**显示当前会话的用户消息节点列表（类似对话时间线/大纲）。已适配 OpenCode **2.0.2**（正式版渠道）。
 
 > English: an OpenCode 2 TUI plugin that lists your messages of the current session
 > in the sidebar — scroll through full history and click any node to jump to that
@@ -96,13 +96,14 @@ bun mask-test.tsx  # 离线渲染测试：验证全屏遮盖层布局（bunfig.t
 
 ## 已知限制
 
-- **翻页的正确姿势（beta-18269 实测）**：`GET /api/session/{id}/message` 的 cursor
+- **翻页的正确姿势（2.0.2 实测）**：`GET /api/session/{id}/message` 的 cursor
   内部已编码 order——首页带 `order=desc&limit=200`，后续页**只能单独带 cursor**；
-  重复带 order 会导致服务端静默返回空列表。插件照此实现，任意长度会话全量拉取。
+  重复带 order 服务端会报 `InvalidCursorError`（"Cursor cannot be combined with
+  order"，旧 beta 是静默返回空列表）。插件照此实现，任意长度会话全量拉取。
 - v2 插槽 API 无法在对话流内部逐条消息旁注入 UI，所以节点面板位于侧边栏而不是截图那样的消息左侧行内轨道。
 - 未加载节点会通过宿主分页数据层按需加载。插件会优先使用当前 v2 运行时的
   `message.loadMore`；旧宿主没有该能力时才回退到 `session.first` 命令。
-- beta-18269 的 `session.first` 会异步递归加载到最早页，最后再执行置顶；目标消息
+- beta-18269 → 2.0.2 的 `session.first` 都会异步递归加载到最早页，最后再执行置顶；目标消息
   中途进入缓存不代表命令已经结束。未加载节点的主路径因此不再用该命令触发分页，
   避免它的最终置顶覆盖插件落点。
 - 点击跳转复用宿主的"上一条用户消息"命令逐步回退定位；空白文本（纯附件）的消息

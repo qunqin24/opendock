@@ -2,7 +2,7 @@
 
 [![release](https://img.shields.io/github/v/release/hueyexe/opencode-auto-permissions.svg)](https://github.com/hueyexe/opencode-auto-permissions/releases)
 [![npm](https://img.shields.io/npm/v/opencode-auto-permissions.svg)](https://www.npmjs.com/package/opencode-auto-permissions)
-[![tests](https://img.shields.io/badge/tests-91%20passing-brightgreen.svg)](./test)
+[![tests](https://img.shields.io/badge/tests-94%20passing-brightgreen.svg)](./test)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-blue.svg)](./tsconfig.json)
 [![OpenCode](https://img.shields.io/badge/OpenCode-stable%20%2B%20V2-blue.svg)](./docs/COMPATIBILITY_SPIKE.md)
 [![license](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
@@ -16,15 +16,14 @@ The plugin supports stable and V2 OpenCode permission protocols automatically. I
 Install the published npm package globally with OpenCode's built-in plugin installer:
 
 ```bash
-opencode plugin -g opencode-auto-permissions
+opencode plugin add opencode-auto-permissions
 ```
+
+Older stable builds use `opencode plugin -g opencode-auto-permissions` instead.
 
 That is the complete plugin installation. You do not need to clone this repository, install Bun, run `npm install`, choose a reviewer model, or edit plugin entries manually.
 
-OpenCode downloads the package, detects its separate server and TUI targets, and adds `opencode-auto-permissions` to:
-
-- `~/.config/opencode/opencode.json` for the server integration.
-- `~/.config/opencode/cli.json` for the V2 TUI integration.
+OpenCode downloads the package, detects its separate server and TUI targets, and registers `opencode-auto-permissions` in your global plugin configuration (`~/.config/opencode/opencode.json` on current builds; older V2 betas also added a TUI entry to `~/.config/opencode/cli.json`).
 
 Quit and restart OpenCode after installation because configuration is loaded at startup. Auto Permissions automatically uses the model and variant selected by the session that requested the action. It also detects whether the server or TUI integration owns permission review, so only one reviewer handles each request.
 
@@ -58,20 +57,19 @@ To confirm installation, restart OpenCode and inspect both global files for the 
 
 ## Update
 
-Install the latest published version over the existing global entry:
+Update the package plugin to the latest published version:
 
 ```bash
-opencode plugin -g --force opencode-auto-permissions@latest
+opencode plugin update opencode-auto-permissions
 ```
+
+If your configuration entry pins a version (for example `opencode-auto-permissions@0.2.10`), remove the pin or repoint it first; the updater treats a satisfied version pin as current. Older stable builds use `opencode plugin -g --force opencode-auto-permissions@latest` instead.
 
 Restart OpenCode after updating. If you use an advanced options tuple, confirm that the server and TUI entries still contain the same options after the update.
 
 ## Uninstall
 
-Remove `opencode-auto-permissions` with `opencode2 plugin remove opencode-auto-permissions`, or remove its entry from the plugin arrays in both files, then restart OpenCode:
-
-- `~/.config/opencode/opencode.json`
-- `~/.config/opencode/cli.json`
+Remove `opencode-auto-permissions` with `opencode plugin remove opencode-auto-permissions`, or remove its entry from the plugin array in `~/.config/opencode/opencode.json` (and from `~/.config/opencode/cli.json` on older V2 betas), then restart OpenCode.
 
 Remove only this package's entries; leave other plugins and configuration unchanged.
 
@@ -146,7 +144,7 @@ No configuration tuple is required. To override the automatic session-model sele
 ]
 ```
 
-Keep the entries in `~/.config/opencode/opencode.json` and `~/.config/opencode/cli.json` synchronized. A fast, reliable model that follows JSON instructions works best; deep reasoning adds unnecessary latency for permission review. Restart OpenCode after changing either file.
+Keep the entries in `~/.config/opencode/opencode.json` and, on older V2 betas that use it, `~/.config/opencode/cli.json` synchronized. A fast, reliable model that follows JSON instructions works best; deep reasoning adds unnecessary latency for permission review. Restart OpenCode after changing either file.
 
 With `debug: true`, diagnostics are written to `$XDG_STATE_HOME/opencode/auto-permissions/decisions.jsonl` (normally `~/.local/state/opencode/auto-permissions/decisions.jsonl`). Records include action type, timing, verdict, reason, reply result, and failure category. Commands, paths, tool inputs, and conversation text are not logged.
 
@@ -165,7 +163,7 @@ The compatibility baseline was acceptance-tested in the real TUI with:
 - OpenCode stable `1.18.12`
 - OpenCode V2 `0.0.0-beta-202608110357`
 
-The runtime protocol is detected automatically; stable permission events are handled by the server adapter and V2 events by the TUI adapter. See the [compatibility notes](docs/COMPATIBILITY_SPIKE.md) for implementation evidence and known protocol differences.
+Newer V2 builds (September 2026 and later) renamed the permission event payloads (`permission.v2.asked` back to `permission.asked`, and the reusable-pattern field from `always` to `save`); the plugin accepts both shapes. The runtime protocol is detected automatically; stable permission events are handled by the server adapter and V2 events by the TUI adapter. See the [compatibility notes](docs/COMPATIBILITY_SPIKE.md) for implementation evidence and known protocol differences.
 
 ## Development
 

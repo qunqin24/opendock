@@ -45,6 +45,22 @@ cache 12.34k  ·  in 45.67k  ·  out 8.90k  ·  reason 1.20k  ·  avg 42.3 t/s  
     cache          4.1k    $0.0000
     input         30.0k    $0.0090
     output         6.0k    $0.0144
+
+  ▸ Subagents                  $0.0031
+    in 9.4k · out 3.1k · c 6.2k
+```
+
+Expanding **Subagents** lists each child session with its own `in/out/c` (reasoning folded into `out`):
+
+```
+  ▾ Subagents                  $0.0031
+    in 9.4k · out 3.1k · c 6.2k
+    explore: find the…         $0.0022
+      in 5.0k · out 2.0k · c 4.0k
+    general: run tests…        $0.0009
+      in 4.4k · out 1.1k · c 2.2k
+
+  Total                        $0.0185
 ```
 
 ## Features
@@ -53,6 +69,8 @@ cache 12.34k  ·  in 45.67k  ·  out 8.90k  ·  reason 1.20k  ·  avg 42.3 t/s  
 - **Cost panel** — per-model totals, the catalog rates (`In` / `Out` / `C`), and per-category tokens with estimated cost. Click a model name to expand `output` and `reason` separately; collapsed, they are combined.
 - **Full-session accuracy** — totals are read from the whole session through the SDK, not just the recent window the TUI keeps in memory, so counts do not shrink when you reopen a session.
 - **DeepSeek peak/off-peak pricing** — peak usage is shown as its own `‹model› (peak)` entry priced at 2× the listed off-peak rates (peak = 01:00–04:00 and 06:00–10:00 UTC, Mon–Fri).
+- **Subagents** — a collapsible **Subagents** section shows the cumulative `in/out/c` token usage and cost of every subagent (child) session, and expands to a per-subagent breakdown (`subagent_type: description`), each with its own `in/out/c`. Reasoning is folded into `out`.
+- **Session total** — a **Total** line adds the active session's models plus all subagents, so you can see the real session spend at a glance.
 - **Zero config, no build step** — opencode's runtime transpiles the TSX and provides `solid-js` / `@opentui`.
 
 ## Requirements
@@ -91,6 +109,7 @@ Copy `tps-monitor.tsx` into `~/.config/opencode/tui/` and reference it by path:
 - The status line is centered within the chat column so it never runs under the sidebar.
 - The Cost panel renders in the right sidebar. Click the **Cost** header to collapse or expand the whole panel.
 - Click a model name to toggle its `output`/`reason` breakdown.
+- The **Subagents** section appears when a session has spawned subagents — it shows their cumulative cost and expands to a per-subagent breakdown.
 - Prices come from [models.dev](https://models.dev) — the same catalog opencode uses.
 
 State is kept in opencode's KV store:
@@ -99,12 +118,14 @@ State is kept in opencode's KV store:
 | --- | --- | --- |
 | `token-cost-tracker.cost_expanded` | `true` | Cost panel expanded |
 | `token-cost-tracker.model.<provider>/<model>` | `false` | Per-model expanded (add `#peak` for peak entries) |
+| `token-cost-tracker.subagents_expanded` | `false` | Subagents section expanded |
 
 ## How it works
 
 - Totals are computed from `session.messages` (no limit) via the SDK and cached per session. The live TUI store is merged on top so streaming stays real-time.
 - Average `t/s` = Σ(output + reasoning) ÷ Σ(turn span), where a turn's span runs from its first streamed text/reasoning token to completion (the in-progress turn uses "now").
 - Cost = tokens × catalog rate ÷ 1,000,000. Reasoning is billed at the output rate when no dedicated rate exists. DeepSeek peak turns are priced at 2×.
+- Subagent (child) sessions are discovered from the parent's `task` tool parts, so their tokens and cost are attributed to the subagent that produced them, recursively.
 - No build step: opencode's Bun runtime transpiles the TSX and injects `solid-js` / `@opentui`.
 
 ## Limitations
@@ -112,6 +133,7 @@ State is kept in opencode's KV store:
 - Costs are **estimates** and can differ from your provider invoice (tiered `>200k` context pricing, cache-write pricing, promos, rounding).
 - Peak/off-peak is decided from each turn's **start** time, so a turn that crosses a boundary is classified by its start.
 - Cache **write** tokens are not included; most providers bill those separately.
+- Subagent usage refreshes with the history poll (every 30 s), so it can lag the live parent numbers.
 
 ## Troubleshooting
 

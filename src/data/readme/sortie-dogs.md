@@ -20,9 +20,42 @@ bounded implementation, canonical validation, and evidence-backed completion.
 
 Requirements: Node.js 22.6 or newer, npm, and OpenCode.
 
-Guides: [日本語](docs/guide-ja.md) · [简体中文](docs/guide-zh-CN.md) · [CLI testing](docs/cli-testing.md)
+Guides: [日本語](docs/guide-ja.md) · [简体中文](docs/guide-zh-CN.md) · [テスト実行](docs/testing.md) · [CLI testing](docs/cli-testing.md)
 
-Release: [v0.9.10](https://github.com/zufall-upon/Sortie-dogs/releases/tag/v0.9.10)
+Release: [v0.9.12](https://github.com/zufall-upon/Sortie-dogs/releases/tag/v0.9.12)
+
+## Provisional quality–cost position
+
+**Reference values, not a successful benchmark claim.** Quality and end-to-end completion
+problems remain. The latest completed qualification attempt ended at `IN_PROGRESS`, so its official
+verifier was not run. Further benchmarks are frozen while completion defects are repaired.
+
+The last complete measured **Bare OpenCode vs Sortie** pair below used one frozen task,
+`datacurve/anko-typed-variable-bindings`, on 2026-09-10. It used Sortie **v0.9.5**, not the
+current release. Both candidates failed the official verifier.
+
+| Metric · one task, one trial per arm | Bare OpenCode | Sortie v0.9.5 |
+| --- | ---: | ---: |
+| Verified PASS | 0/1 | 0/1 |
+| Task-check completion · F2P | 55.6% · 5/9 | 88.9% · 8/9 |
+| Retained checks · P2P | 94/94 | 93/94 |
+| Estimated API-equivalent total cost | $5.42 | $1.46 |
+| Median agent wall · n=1 | 28.7 min | 10.0 min |
+| Premium-model token share · Sol | 100% | 20.1% |
+
+Later Sortie-only evidence is weaker: the v0.9.9 recovery candidate passed **5/9** task
+checks with **0/1 Verified PASS**; `0.9.11-bench.2` did not reach a gradeable completion.
+Those attempts are not pooled into the historical pair above.
+
+![Historical quality–cost reference: Bare at $5.42 and 55.6% task-check completion; Sortie v0.9.5 at $1.46 and 88.9%. Neither achieved Verified PASS.](docs/assets/quality-cost-reference.svg)
+
+The goal is **higher OpenCode task success with selective use of premium models**.
+These reference observations do not yet establish that success-rate claim: Sortie missed
+one task check and regressed one retained check. Codex, Pi, and Oh My OpenCode belong to
+separate methodologies and are not assigned comparable positions on this chart.
+
+[Definitions, frozen inputs, current failure status, and limitations](docs/benchmark-reference.md)
+· [Machine-readable reference values](docs/benchmarks/provisional-reference.json)
 
 ## Why Sortie-dogs?
 
@@ -40,6 +73,15 @@ models are reserved for implementation, escalation, and independent review.
 
 Writes stay scoped, and completion requires validation evidence. Every completed
 run can return a concise Speed / Cost / Proof debrief.
+
+### Use only as much harness as the task needs
+
+Small changes can skip Scout and independent review when one worker and targeted
+validation are sufficient. Larger work can be decomposed into multiple units;
+units that are safely independent can use a Luna fabric DAG for bounded parallel
+execution. Higher-risk candidates add independent review, while full-suite and
+package verification are reserved for release work. Not every task pays the
+cost of the heaviest workflow.
 
 ## Designed to coexist with OpenCode
 
@@ -265,6 +307,18 @@ dog-coordinator: completion evidence accepted
 7. **Bounded continuation** — restart recovery and compaction handoffs preserve
    progress; repeated batches remain bounded rather than becoming endless
    delegation.
+
+## Built to work on itself
+
+Self-improvement keeps the same scoped manifests, worker ownership, validation,
+and review gates as other work. A loaded plugin is not treated as hot-reloadable:
+source changes are validated first, then packaged into an isolated `_testenv`
+fixture and exercised through the real OpenCode CLI. Continuation and compaction
+changes must demonstrate same-session recovery and terminal completion there.
+
+`npm run test:full` is reserved for explicit release validation; ordinary
+changes run targeted tests and `npm test`. The control plane coordinating a run
+is not replaced while that run is in flight.
 
 ## A visual walkthrough
 

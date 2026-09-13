@@ -1,6 +1,6 @@
 <div align="center">
   <a href="https://github.com/alvinunreal/oh-my-opencode-slim/stargazers">
-    <img src="img/v2.jpg" alt="oh-my-opencode-slim V2 Release" style="border-radius: 10px;">
+    <img src="img/v3-beta.webp" alt="oh-my-opencode-slim V3 Beta Release" style="border-radius: 10px;">
   </a>
   <h3>✨ oh-my-opencode-slim ✨</h3>
 
@@ -52,15 +52,6 @@ The main idea is simple: instead of forcing one model to do everything, the plug
 - **[Fully customizable](docs/configuration.md)** - custom agents, prompt
   overrides, per-agent skill/MCP permissions, and
   [project-local customization](docs/project-local-customization.md).
-
-### OpenAI GPT-5.6
-
-<p align="center">
-  <img src="img/openai-gpt-5-6-pantheon.jpeg" alt="OpenAI GPT-5.6 Pantheon: Terra, Sol, and Luna" width="100%">
-</p>
-
-The default [OpenAI preset](docs/openai-preset.md) maps Terra to Orchestrator,
-Sol to Oracle, and Luna to the fast specialist lanes.
 
 ### What Users Say
 
@@ -132,27 +123,6 @@ bun install
 bun run build
 ```
 
-### OpenCode v2 (`opencode2`)
-
-The same package runs on both OpenCode v1 and v2. On v2 you get the full
-agent pantheon, delegation through the host `subagent` tool (bridged into the
-background job board), all built-in tools and slash commands, auto-registered
-MCPs, `/preset` in the TUI, webfetch secondary-model summaries, rate-limit
-model fallback, and the orchestrator-wake scheduler in children-driven
-degraded mode (a periodic watchdog over stuck background children and
-unreconciled jobs). Multiplexer panes stay v1-only by design (v2 renders and
-notifies subagents natively).
-
-v2 auto-refreshes unpinned plugins on startup, so pin an exact version while
-both v2 and this adapter evolve quickly:
-
-```json
-{ "plugin": ["oh-my-opencode-slim@2.2.17"] }
-```
-
-Details, the feature matrix, and per-feature minimum v2 builds:
-[OpenCode v2 Compatibility](docs/opencode-v2-compatibility.md).
-
 ### Getting Started
 
 The installer generates both OpenAI and OpenCode Go presets, with OpenAI active by default.
@@ -199,21 +169,14 @@ The default generated configuration includes both `openai` and `opencode-go` pre
       "explorer": { "model": "openai/gpt-5.6-luna", "variant": "low", "skills": [], "mcps": [] },
       "designer": { "model": "openai/gpt-5.6-luna", "variant": "medium", "skills": [], "mcps": [] },
       "fixer": { "model": "openai/gpt-5.6-luna", "variant": "high", "skills": [], "mcps": [] }
-    },
-    "opencode-go": {
-      "orchestrator": { "model": "opencode-go/minimax-m3", "variant": "thinking" },
-      "oracle": { "model": "opencode-go/qwen3.7-max", "variant": "max" },
-      "librarian": { "model": "opencode-go/deepseek-v4-flash", "variant": "high" },
-      "explorer": { "model": "opencode-go/deepseek-v4-flash", "variant": "high" },
-      "designer": { "model": "opencode-go/kimi-k2.7-code" },
-      "fixer": { "model": "opencode-go/deepseek-v4-flash", "variant": "high" },
-      "observer": { "model": "opencode-go/mimo-v2.5" }
     }
   }
 }
 ```
 
 ### Preset Docs
+
+Consider presets as guidelines as they are often outdated.
 
 - **[OpenAI Preset](docs/openai-preset.md)** — the default generated preset; runs all agents on OpenAI models.
 - **[OpenCode Go Preset](docs/opencode-go-preset.md)** — runs the agents on OpenCode Go models; enables the Observer agent for visual analysis since its orchestrator model isn't multimodal.
@@ -700,7 +663,7 @@ Use this section as a map: start with installation, then jump to features, confi
   <p><sub>Every merged contribution leaves a mark on the realm.</sub></p>
 
   <!-- ALL-CONTRIBUTORS-BADGE:START - Do not remove or modify this section -->
-[![All Contributors](https://img.shields.io/badge/all_contributors-111-orange.svg?style=flat-square)](#contributors-)
+[![All Contributors](https://img.shields.io/badge/all_contributors-112-orange.svg?style=flat-square)](#contributors-)
 <!-- ALL-CONTRIBUTORS-BADGE:END -->
 </div>
 
@@ -859,6 +822,7 @@ Use this section as a map: start with installation, then jump to features, confi
       <td align="center" valign="top" width="16.66%"><a href="https://github.com/xiaolf0813"><img src="https://avatars.githubusercontent.com/u/314566924?v=4?s=100" width="100px;" alt="xiaolf0813"/><br /><sub><b>xiaolf0813</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=xiaolf0813" title="Code">💻</a></td>
       <td align="center" valign="top" width="16.66%"><a href="https://github.com/BaconDroid"><img src="https://avatars.githubusercontent.com/u/11067111?v=4?s=100" width="100px;" alt="BaconDroid"/><br /><sub><b>BaconDroid</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=BaconDroid" title="Code">💻</a></td>
       <td align="center" valign="top" width="16.66%"><a href="https://sprightly-strudel-e1f939.netlify.app/"><img src="https://avatars.githubusercontent.com/u/277080233?v=4?s=100" width="100px;" alt="Enoch"/><br /><sub><b>Enoch</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=bferanmi806-sketch" title="Code">💻</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="https://github.com/mxalbert1996"><img src="https://avatars.githubusercontent.com/u/9391933?v=4?s=100" width="100px;" alt="Albert Chang"/><br /><sub><b>Albert Chang</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=mxalbert1996" title="Code">💻</a></td>
     </tr>
   </tbody>
 </table>
