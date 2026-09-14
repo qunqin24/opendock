@@ -356,6 +356,7 @@ One hook fire measures 289ms wall-clock since the v3.6.0 optimization, down from
 
 | Version | Highlights |
 |---------|------------|
+| **v3.18.0** | Lists saved plans and phase counts with `--list` or PowerShell `-List` (#242). Supports the shipped translated templates, checks project containment, and delivers the canonical helpers across IDE bundles. |
 | **v3.17.2** | Fixes #241: the native Codex manifest disables legacy command migration, removing 13 redundant `source-command-*` skills from plugin installs. The canonical planning skill, Codex hooks, and Claude commands remain available. |
 | **v3.17.1** | Fixes #240: two named plans in the same project now require `PLAN_ID`, even without `.planning/sessions/`. A shared pointer or newest-plan guess cannot redirect a Codex session across compaction. Ambiguous hooks inject no plan and Stop does not gate against a guessed plan. |
 | **v3.17.0** | **Every Claude Code hook fire forked about 130 processes, and under Git Bash on Windows that took 7 to 12 seconds against the 10 second hook timeout.** Claude Code discarded the plan context ("UserPromptSubmit hook timed out after 10s") and every Bash, Read, Grep and Edit call waited 5 more seconds in PreToolUse before it ran. Linux and macOS never showed it because a fork costs milliseconds there. The events now run in one Python process, `scripts/inject-plan.py`, a byte-identical twin of the shell chain proven by a parity suite on all three CI legs, with the shell chain kept as the reference and as the fallback for hosts without Python: 0.3 s per prompt and per tool call on the reporting machine. Hook interpreters now start in isolated mode, so a repository's own `secrets.py` or `hashlib.py` is never imported by a hook. `PWF_FAST_PATH=0` forces the shell chain. |
@@ -516,7 +517,7 @@ Hermes' own `skills-guard` scanner rates the Hermes bundle `SAFE`; the canonical
 > **Markdown on disk is the shared state between agents.** One orchestrator owns `task_plan.md` and the shared summaries; every worker appends to its own ledger or assigned file. Pin each independent task with `PLAN_ID` before starting its host, or use separate worktrees.
 
 - **Run ledger per agent.** Workers append one JSON line per event to `.planning/<id>/ledger-<agent>.jsonl` (`ledger-append.sh`); `ledger-summary.sh` synthesizes a fixed-shape, KV-cache-stable block from all ledgers that replaces the raw `progress.md` tail in autonomous and gated mode. No free text from disk reaches the model through that block.
-- **Plan isolation per task.** `init-session.sh "<name>"` gives each parallel task its own `.planning/YYYY-MM-DD-<slug>/` directory; `PLAN_ID` pins a terminal to one of them, `set-active-plan.sh` switches the shared pointer.
+- **Plan isolation per task.** `init-session.sh "<name>"` gives each parallel task its own `.planning/YYYY-MM-DD-<slug>/` directory; `PLAN_ID` pins a terminal to one of them, `set-active-plan.sh --list` shows available plans and phase counts, and `set-active-plan.sh <id>` switches the shared pointer.
 - **Threads whose cwd is a shared parent.** `PWF_PLAN_ROOT=<absolute path>` binds an agent thread to the project that owns the plan; an ambiguous cwd, where a nested project carries its own planning state, injects nothing rather than guessing.
 - **Session attachment.** An `.attached` marker authorizes context but does not select a task. In the Codex, Hermes, Pi, and standalone hook routes, armed isolation with multiple plans requires `PLAN_ID`; otherwise context is refused. A project-root pin alone cannot distinguish tasks within that root.
 - **Parallel-write guard.** The next turn warns if checked items or completed phases decrease. This is an advisory check after the write, not a lock or merge mechanism. It does not detect every overwritten plan, `progress.md`, or `findings.md`.
@@ -524,6 +525,8 @@ Hermes' own `skills-guard` scanner rates the Hermes bundle `SAFE`; the canonical
 - **One plan, many hosts.** Claude Code, Codex, Pi, Hermes and OpenCode read the same files, the same `.attestation` and the same gate counters, so a plan can be handed from one agent to another mid-run.
 
 The contract and the `.mode` tokens are specified in the skill itself ([SKILL.md, Autonomous and Gated Modes](skills/planning-with-files/SKILL.md#autonomous-and-gated-modes-v3)) and in [docs/long-running-agent-tasks.md](docs/long-running-agent-tasks.md).
+
+To find a saved plan, run the installed `scripts/set-active-plan.sh --list` helper from your project directory, or `scripts/set-active-plan.ps1 -List` in PowerShell. It lists named plans under that project's `.planning/` directory, with phase counts for the shipped English and translated templates. `[active]` marks the shared default pointer. Listing does not select a plan or attach a session; use the displayed ID as `PLAN_ID` before starting a concurrent task. Kiro's separate `.kiro/plan` layout is not part of this inventory.
 
 ## How It Works
 

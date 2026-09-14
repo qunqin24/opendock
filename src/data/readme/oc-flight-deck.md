@@ -59,6 +59,7 @@ learn. The panel appears beside an open session and starts reading.
 | `reasoning` | Reasoning tokens, when the model emits them. Available, off by default. |
 | `turns` | How many prompts you have sent this session. Available, off by default. |
 | `total` | The family total and subagent count on a row of its own. Adding it makes `cost` show the session figure alone. Available, off by default. |
+| `guard` | Harness status from oc-harness-guard. Available, off by default. |
 
 `project` matches on the host's **project id**, not on a directory, so a worktree
 counts as part of the same project. A host that reports no project id leaves
@@ -143,6 +144,18 @@ growing rows as the session produces data.
 Set `"persist": false` to restore omission: rows with no data are then left out
 entirely, which is also how a narrow rail stays shortest.
 
+### guard pairs with oc-harness-guard
+
+The guard row is opt-in: add it to sidebar.rows and the panel polls harness
+status about every ten seconds, plus right away when the rendered session
+changes. It shows the worst signal first, then falls back to ok when every
+source reports available and quiet. A source that reports unavailable reads as
+unknown, and no data renders the placeholder like any other row.
+
+It only appears when oc-harness-guard is installed and answering. Without it
+the row stays on the placeholder, and the panel never installs or requires the
+other plugin. Each side works alone.
+
 ## Configuration
 
 **You don't need any.** Install it and the panel works. But every knob is
@@ -198,15 +211,17 @@ toast naming the key to fix.
 
 Flight Deck shows what OpenCode already knows.
 
-- **No network calls.** Nothing is fetched, nothing is sent.
+- **No network calls while the opt-in `guard` row stays off.** Nothing is fetched, nothing is sent. When the `guard` row is enabled, the panel polls the local guard RPC (same machine, no telemetry) about every ten seconds, plus right away on session change.
 - **No telemetry.** Nothing is collected or phoned home.
 - **Nothing on disk.** The one thing it writes is an animation counter in the
   host's in-memory plugin state, so the spinner and `elapsed` keep moving
   between turns. It is scoped to this plugin and dies with the TUI; it is never
   persisted, and `"refresh": 0` removes even that.
-- **No polling of your session** — cost, tokens, and permissions update from the
+- **No polling of your session while the opt-in `guard` row stays off** — cost, tokens, and permissions update from the
   host's own events. The timer only re-reads state the host already holds in
-  memory, and only so the clock-derived rows keep moving.
+  memory, and only so the clock-derived rows keep moving. When the `guard` row
+  is enabled, the panel additionally polls the local guard RPC on its own
+  ten-second cadence.
 - **Theme-native.** Every line uses your active theme's text tokens, so it blends
   with whatever look you already run.
 

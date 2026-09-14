@@ -14,8 +14,9 @@ Context
 ━━━━━━━━━━━━━━━━━ 69%
 138K / 200K tokens
 $0.04 spent
-▍c40K ▍p90K ▍t5K ▍o3K ▍r6K ▍f62K
+62.4 TPS · avg 48.1 · 23s
 ```
+
 
 One color-coded legend row follows the bar — `▍` marker in the segment's color,
 then a muted letter + count. Colors follow the active theme:
@@ -65,6 +66,25 @@ always reaches full width. A very small segment may not fill a single bar cell
 (e.g. 137 tokens in a 200K window is 0.07% of the bar) — its exact count is
 always visible in the legend. Percent is colored like the usage plugin: green
 `<50%`, amber `50–74%`, orange `75–99%`, red `100%`.
+
+## Throughput (TPS)
+
+While the assistant streams, a live tokens-per-second line is appended below the
+totals:
+
+```
+62.4 TPS · avg 48.1 · 23s
+```
+
+- **instant** — smoothed rate over a 1s rolling window, colored by speed: red
+  `<10`, amber `10–49`, green `≥50`. Shown only while tokens are arriving.
+- **avg** — tokens / active generation span (first → last token), so idle time
+  doesn't drag it down. Shown once the stream goes quiet.
+- **elapsed** — active generation span.
+
+Counts come from `session.text.delta` / `session.reasoning.delta`, estimated with
+the same chars/4 heuristic used elsewhere (sub-token deltas are carried over), so
+it tracks the live stream rather than the provider's final totals.
 
 ## Configuration
 

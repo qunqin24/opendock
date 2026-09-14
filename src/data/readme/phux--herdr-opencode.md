@@ -159,5 +159,4 @@ their ordering.
 
 ## License
 
-MIT — built by the [phux](https://github.com/no-phux/phux) contributors for
-the Herdr community.
+MIT — published by [no-phux](https://github.com/no-phux) for the Herdr community.

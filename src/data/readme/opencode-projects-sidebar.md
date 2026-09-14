@@ -37,8 +37,7 @@ To use custom options, use the tuple form:
       "opencode-projects-sidebar",
       {
         "width": 36,
-        "limit": 50,
-        "keybind": "ctrl+shift+s"
+        "limit": 500
       }
     ]
   ]
@@ -47,23 +46,19 @@ To use custom options, use the tuple form:
 
 ## Usage
 
-- `ctrl+s` toggles the sidebar. This fallback works in terminals that drop
-  Shift from `ctrl+shift+s`.
-- `ctrl+shift+s` is the configured default binding.
+- The project and session list is always rendered inside OpenCode's standard
+  session sidebar below the native LSP section.
+- The list includes sessions from all local projects known to OpenCode and
+  refreshes every five seconds.
 - Click a project header to collapse or expand its sessions.
 - Click a session to open it.
-- Use the refresh button to reload sessions.
-
-On first run, the sidebar opens automatically when the terminal is at least
-128 columns wide. The choice is persisted in OpenCode's KV storage.
 
 ## Options
 
 | Option | Default | Description |
 | --- | ---: | --- |
-| `width` | `36` | Sidebar content width, clamped to 20-60 columns |
-| `limit` | `50` | Maximum number of sessions to request |
-| `keybind` | `ctrl+shift+s` | Main toggle key binding |
+| `width` | `36` | Maximum text width used for names, clamped to 20-60 columns |
+| `limit` | `500` | Maximum number of local sessions to request |
 
 ## Development
 

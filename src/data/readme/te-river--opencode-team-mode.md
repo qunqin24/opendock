@@ -10,6 +10,8 @@
 >
 > Six specialized agents — a Lead, an Architect, an Implementer, a Reviewer, a Tester and a Researcher — with governed tools, structured handoffs, and a plan-first approval gate. One plugin, zero config files to copy.
 
+> 💡 **Best for medium-to-large projects.** The governance layer (approval gate, context offload, tool allowlists) is an asset once a codebase has real surface area — and mostly overhead on tiny scripts and one-off questions. Use it where the work is.
+
 ---
 
 ## TL;DR — skip the docs
@@ -52,6 +54,9 @@ you approve before ≥2 dispatches execute, structured `STATUS/CHANGES/FINDINGS/
 EVIDENCE/HANDOFF` replies between agents, and static verification (build /
 typecheck / tests) instead of vibes.
 
+That discipline is also why the recommendation is **medium-to-large
+projects**: on a two-file script the team simply has less to govern.
+
 ---
 
 ## 👥 The team
@@ -62,7 +67,7 @@ typecheck / tests) instead of vibes.
 | 🏗️ **Architect** | System designer | Design docs, module structure, API contracts |
 | 💻 **Implementer** | Code writer | Building features, writing production code |
 | 🔍 **Reviewer** | Dimension-focused auditor | Single-dimension review by default; 3 in parallel only for high-risk changes |
-| 🧪 **Tester** | Test engineer | Tests with real edge cases; static verification (build / typecheck / lint) |
+| 🧪 **Tester** | Test engineer | Tests with real edge cases; static verification (build / typecheck / lint); governed UI verification via `tm_browser` |
 | 🔎 **Researcher** | Knowledge finder | Local repo first, then the web — one of the two network roles (with the Lead) |
 
 Out of the box, **Team is your default agent** — new chats open straight into the
@@ -79,6 +84,8 @@ Copy this into any coding agent — it will edit your config, restart-remind you
 ```text
 Install the OpenCode plugin @te-river/opencode-team-mode following
 https://raw.githubusercontent.com/Te-River/Opencode-TeamMode/main/docs/installation.md
+(If that URL is unreachable — common on mainland-China networks — retry with
+the mirror prefix: https://ghproxy.net/ + the same path.)
 Then verify the install using the checks in that guide.
 ```
 
@@ -118,14 +125,14 @@ OpenCode installs the plugin on next startup.
 ### ⚠️ Read this once, save yourself an hour later
 
 - **Restart to activate.** After touching `opencode.json`, fully quit and restart OpenCode (Desktop: quit from tray, not just the window).
-- **Plugin updates are manual.** OpenCode caches plugins by spec string and does NOT re-resolve `@latest` when a new version publishes (upstream limitation). To update: delete the cache dir and restart —
+- **Plugin updates: re-run the installer.** It is idempotent — a re-run re-patches the config (no-op when present), purges the stale plugin cache, and re-resolves any npm-installed copy. This exists because OpenCode caches plugins by spec string and does NOT re-resolve `@latest` when a new version publishes (upstream limitation). Manual recipe, if you prefer:
 
   | OS | Cache location |
   |---|---|
   | macOS / Linux | `rm -rf ~/.cache/opencode/packages/@te_river+opencode-team-mode@latest` |
   | Windows | `Remove-Item -Recurse -Force "$env:LOCALAPPDATA\opencode\cache\packages\@te_river+opencode-team-mode@latest"` |
 
-  If you also npm-installed the plugin into `~/.config/opencode`, its package-lock pins the version — run `npm install @te-river/opencode-team-mode@latest` there too. Full recipe: [installation guide, Updating](./docs/installation.md).
+  If you also npm-installed the plugin into `~/.config/opencode`, its package-lock pins the version — run `npm install @te-river/opencode-team-mode@latest` there too. Full recipe (including an agent-driven update prompt): [installation guide, Updating](./docs/installation.md).
 - **Prerequisites:** [OpenCode](https://opencode.ai) (Desktop or CLI) and Node ≥ 18.
 
 ### Verify
@@ -206,7 +213,7 @@ genuinely needs the payload.
 | `tm_ptc_run` | Batch orchestration: one program, N governed calls, zero LLM round-trips | all six agents |
 | `tm_search` | Multi-engine web search with extracted, deduplicated hit lists | Lead + Researcher |
 | `tm_webfetch` | Single governed GET of an allowlisted page (search pages auto-extracted) | Lead + Researcher |
-| `tm_browser` | Interactive browser session (headful CDP): open / navigate / read / screenshot / close | Lead + Researcher |
+| `tm_browser` | Interactive browser session (CDP, **your default browser**): open / navigate / read / screenshot / close | Lead + Researcher + Tester (UI verification) |
 
 > **Fixed tool priority ladder (every task): ① TeamMode governed tools
 > (`tm_*`) → ② user MCP/plugin tools → ③ the model's own reasoning.**
@@ -255,10 +262,11 @@ sees raw SERP chrome.
 | `sogou` / `so` (360) | CN-native engines, good for CJK content |
 | `baidu` | flakiest (anti-bot) but sometimes the only CN-specific index; failures name alternatives |
 | `bilibili` | video search |
+| `moegirl` | MediaWiki search API — entry titles + snippets, structured |
 | `npm` | registry search → name@version + description, structured |
 | `github` | repo search API → stars + description, structured |
 
-All eight engines are reachable from mainland China **without API keys**, and
+All nine engines are reachable from mainland China **without API keys**, and
 every one of them sits on the seeded domain allowlist. On an empty result
 (an anti-bot shell), the error names the alternative engines instead of
 leaving the agent stuck. Two more channels complete the surface:
@@ -266,17 +274,44 @@ leaving the agent stuck. Two more channels complete the surface:
 - `tm_webfetch` — a known URL, one governed GET. Search-engine pages it
   fetches are auto-extracted to hit lists too. JSON endpoints like
   `registry.npmjs.org/<pkg>/latest` pass through untouched.
-- `tm_browser` — JS-rendered pages: your own Chromium-family browser, headful
-  via CDP pipe, isolated temp profile, **domain allowlist enforced at the
-  network layer** per request (`Fetch.requestPaused` → non-allowlisted hosts
-  get `BlockedByClient`).
+- `tm_browser` — JS-rendered pages: **your DEFAULT browser** (Windows
+  registry / Linux `xdg-settings`; Chromium-family only — Firefox falls back
+  to the Edge/Chrome probe order because CDP is Chromium-proprietary;
+  `TM_BROWSER_PATH` overrides), headful via CDP pipe, isolated temp profile,
+  **domain allowlist enforced at the network layer** per request
+  (`Fetch.requestPaused` → non-allowlisted hosts get `BlockedByClient`).
 
-Seeded allowlist (both tools): `mobile.moegirl.org.cn`, `search.bilibili.com`,
-`cn.bing.com`, `www.bing.com`, `www.baidu.com`, `www.sogou.com`, `www.so.com`,
-`registry.npmjs.org`, `api.github.com` — extend via
-`TM_WEBFETCH_ALLOWED_DOMAINS` (`"*"` opens every host). The other four agents
-(architect / implementer / reviewer / tester) have NO network grant — web
-questions come back as a reported gap, never simulated.
+When a fetch still returns **403 after the real-Chrome headers**, the error
+is a DIRECTIVE: the gate is JS-challenge / TLS-fingerprint based and only a
+real browser passes — the agent is told to call `tm_browser`
+(`action:"open"` → `action:"read"`) for that URL. Search hit lists also
+filter known noise: engine-internal wrappers (`so.com/link?`, `ai.so.com`)
+and same-name-different-site domains (`maimai.cn` 脉脉 vs the maimai DX
+game) never ride along — extend the hit blacklist with `TM_HIT_BLACKLIST`.
+
+Seeded allowlist (both tools; 21 hosts — baidu/moegirl/bilibili are PARENT
+domains, so every sibling subdomain — baike.baidu.com, mzh.moegirl.org.cn,
+space.bilibili.com — is covered):
+`baidu.com`, `moegirl.org.cn`, `bilibili.com`, `www.sogou.com`, `www.so.com`,
+`cn.bing.com`, `www.bing.com`, `zhihu.com`, `juejin.cn`, `csdn.net`,
+`cnblogs.com`, `gitee.com`, `github.com`, `api.github.com`,
+`raw.githubusercontent.com`, `gist.githubusercontent.com`, `ghproxy.net`
+(mainland mirror for github raw), `stackoverflow.com`, `npmjs.org`,
+`pypi.org`, `learn.microsoft.com` — extend via
+`TM_WEBFETCH_ALLOWED_DOMAINS` (`"*"` opens every host). Architect /
+implementer / reviewer have NO network grant — web questions come back as a
+reported gap, never simulated. The tester carries `tm_browser` ONLY, for
+governed UI verification of the project (local dev servers, preview routes);
+open web fetching stays with the two network roles.
+
+**Out-of-allowlist targets are a gate, not a wall.** When a fetch / search /
+browser-open points at a host outside the allowlist, the tool hands the URL
+to OpenCode's **official confirmation dialog** — you decide, once per
+target (an unanswered dialog is auto-rejected on the usual 10-minute timer,
+and the plugin still never self-allows). Every dialog also fires a
+**system toast notification**, so you know something is waiting even when
+you're not staring at the screen. Env-file URLs and non-http(s) schemes
+remain hard-rejected with no dialog — R6 red lines are never consentable.
 
 ### Security: the R6 + R2 approval gate
 
@@ -363,10 +398,11 @@ for overrides, extra agents and disabling roles.
 | `TM_BLACKBOARD_DIR` / `TM_TRAJECTORY_DIR` | `<repo>/.git/opencode-team/…` | offload store / trajectory ledger (tmpdir fallback; explicit = absolute or project-relative) |
 | `TM_BLACKBOARD_TTL` | `7` | store retention (days) |
 | `TM_BASH_READONLY_ALLOWED` | built-in table | tm_bash allowlist |
-| `TM_WEBFETCH_ALLOWED_DOMAINS` | the nine seeded hosts | tm_webfetch / tm_search / tm_browser allowlist (`"*"` opens all; empty = deny all) |
-| `TM_BROWSER_PATH` | auto-detect | tm_browser executable override (Edge/Chrome/Chromium per OS) |
+| `TM_WEBFETCH_ALLOWED_DOMAINS` | the 21 seeded hosts | tm_webfetch / tm_search / tm_browser allowlist (`"*"` opens all; empty = deny all) |
+| `TM_BROWSER_PATH` | auto-detect | tm_browser executable override (default: your DEFAULT browser when Chromium-family, else Edge/Chrome probes) |
 | `TM_BROWSER_HEADLESS` | `auto` | `1` headless (CI) / `0` headful / `auto` (headless only on display-less Linux) |
 | `TM_MEMORY_GLOBAL_DIR` | `~/.opencode-team/memories/global/` | tm_memory GLOBAL scope store |
+| `TM_HIT_BLACKLIST` | `maimai.cn` | extra domains never listed as search hits (comma/semicolon separated; same-name-different-site noise like 脉脉) |
 | `TM_PTC_MAX_PROGRAM_CHARS` | `4000` | PTC program source cap |
 | `TM_PTC_MAX_CALLS` | `20` | PTC per-run bridge-call budget (1–200) |
 | `TM_PTC_MAX_ERRORS` | `3` | PTC per-run error budget (1–50) |
@@ -444,15 +480,20 @@ exist because a five-agent pipeline naively bolted onto one context window
 *would* eat your tokens. The governance is the token-saver.
 
 **Is the web access safe?**
-It's the most guarded surface in the plugin: two roles only, domain
-allowlist, redirects re-checked per hop, network-layer enforcement in the
-browser, env-file URL refusal, and every payload rides the same offload
-governance. No allowlisted page can bounce the fetch off-site.
+It's the most guarded surface in the plugin: two full web roles plus a
+browser-only tester grant, a domain
+allowlist with dialog-gated escapes (you approve any out-of-allowlist
+target in OpenCode's official dialog, with a toast notification), redirects
+re-checked per hop, network-layer enforcement in the browser, env-file URL
+refusal, and every payload rides the same offload governance. No allowlisted
+page can bounce the fetch off-site.
 
 **Why doesn't the plugin auto-update?**
 OpenCode caches plugins by spec string and never re-resolves `@latest`
-(upstream limitation, not ours). Delete the cache dir and restart — recipe
-above and in the [installation guide](./docs/installation.md).
+(upstream limitation, not ours). **Re-run the installer — that IS the
+update** (it purges the cache and re-resolves npm copies); or delete the
+cache dir by hand. Recipe above and in the
+[installation guide](./docs/installation.md).
 
 **Can agents run tools in parallel?**
 Yes — and they're *engineered* for it: parallel `tm_search` / `tm_webfetch` /

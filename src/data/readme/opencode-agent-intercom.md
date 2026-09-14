@@ -77,8 +77,8 @@ After restarting opencode, two things still have to happen before the
    overlay) shows `Subagents (N)` with `● N running · ✓ M done · ◆ K retained`
    counters (`◆ K retained` only when something is held), agent rows with an
    `x` abort control and an age, plus `max subagents`, the flat retention
-   rows `retained subs` and `retain (min)`, and the two watchdog rows
-   `silence (s)` and `in tool (min)`. The sidebar also exposes collapsed
+   rows `retained subs` and `retain (min)`, and the three watchdog rows
+   `silence (s)`, `in tool (min)` and `run (min)`. The sidebar also exposes collapsed
    `TUI settings` / `LLM params` / `Prompts` sections — the LLM params section
    carries the per-agent-type context ceiling, the per-agent-type reuse
    ceiling, and the per-agent-type reply ceiling behind a single agent cycler
@@ -637,6 +637,22 @@ exposes every runtime knob:
   still governs every subagent that is not working. Default 11 min, which
   clears the 600 000 ms ceiling opencode's own bash tool allows plus a minute
   for the kill and one sweep tick.
+- **`run (min) [-N+]`** — the watchdog's third window, the wall-clock ceiling
+  on ONE RUN of a subagent, whatever it is doing. Counted from
+  `entry.runStartedAt` (seeded on spawn, re-seeded on every accepted reuse) and
+  not moved by any tool call, wait or message from the caller — unlike
+  `lastActivityAt`, which the two rows above also count from and which
+  restarts on every event. At 75 % of the ceiling the wrap-up band fires
+  (`RUN_WRAP_UP` in `src/settings.js`): no denial, the room left in minutes is
+  named, and the subagent is told its two moves — hand back NOW with a
+  `Blocked:` message naming what it is waiting for and what it already has,
+  or `ask(...)` its caller whether to keep waiting. At the ceiling the watchdog
+  cuts the run off where it stands (the session is aborted and deleted). Shown
+  and stepped in whole minutes; writes `"maxSubagentRunMs"` in ms. `0` shows
+  as `off` and means NO run ceiling — not the `0` of the two windows next to
+  it, which switches the inactivity watchdog off entirely. The per-role
+  `agentRunMs` map overrides the flat key; `0` at that level means no ceiling
+  for that type only. Default 44 min.
 - **`endless mode [on/off]`** / **`endless (k)`** — arms the self-restarting
   orchestrator loop and sets its context threshold. The row has a third
   state `[paused]`, set when endless mode has stopped itself for the
@@ -867,6 +883,7 @@ is environment-variable-driven:
 | `OPENCODE_AGENT_INTERCOM_MAX_CONTEXT` | `100000` | Subagent context budget (tokens). `"0"` disables. TUI file overrides. |
 | `OPENCODE_AGENT_INTERCOM_MAX_SUBAGENT_AGE_MS` | `90000` | Watchdog window (ms) for a subagent with nothing in flight. `"0"` switches the inactivity watchdog off, and with it the orphan sweep whose window is a multiple of this one. TUI file overrides via `"maxSubagentAgeMs"`; the TUI's `silence (s)` row steps it in whole seconds. |
 | `OPENCODE_AGENT_INTERCOM_MAX_SUBAGENT_TOOL_CALL_MS` | `660000` | The same watchdog's window (ms) for a subagent with a tool call in flight, counted from the start of that call. `"0"` means no ceiling while it works; the silence window still applies to every subagent that is not working. TUI file overrides via `"maxSubagentToolCallMs"`; the TUI's `in tool (min)` row steps it in whole minutes. |
+| `OPENCODE_AGENT_INTERCOM_MAX_SUBAGENT_RUN_MS` | `2640000` | The watchdog's third window (ms), the wall-clock ceiling on ONE RUN of a subagent, counted from `entry.runStartedAt` and not moved by activity. At `RUN_WRAP_UP = 0.75` of the ceiling the wrap-up band fires and names the room left; at the ceiling the watchdog cuts the run off. `"0"` disables — no run ceiling, not the `0` of the two windows above. TUI file overrides via `"maxSubagentRunMs"` (and per-role `"agentRunMs"`); the TUI's `run (min)` row steps it in whole minutes. |
 | `OPENCODE_AGENT_INTERCOM_MAX_RETAINED_SUBAGENTS` | `2` | How many finished subagents may be held as retained sessions in this process. `"0"` switches retention off — every subagent's session is deleted the moment its result is delivered. TUI file overrides. **Enabling retention needs an opencode restart** — the tool surface is resolved at plugin load, so the `reuse` tool only appears once the next instance boots with this set. Disabling takes effect at once. |
 | `OPENCODE_AGENT_INTERCOM_MID_RUN_MESSAGING` | on | `"0"` switches the mid-run channel off: `message` and `ask` stay registered and both refuse, naming the switch. Read LIVE, not latched — unlike retention it needs no opencode restart. TUI file overrides via `"midRunMessaging"`. |
 | `OPENCODE_AGENT_INTERCOM_ANSWER_WAIT_MS` | `300000` | How long a subagent's `ask` blocks on its caller's answer before the tool hands it back "no answer came" and the run carries on. `"0"` means do not wait at all — the question is delivered and the tool returns at once. Clamped against the tool-call watchdog window, so the wait can never outlive the reap. TUI file overrides via `"answerWaitMs"`. |

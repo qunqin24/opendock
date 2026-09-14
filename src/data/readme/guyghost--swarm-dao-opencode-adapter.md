@@ -74,7 +74,7 @@ for the pattern all non-native hosts share).
 | Package | Description |
 |---------|-------------|
 | `@guyghost/swarm-dao-core` | Pure business logic + shared `host-tools` handlers |
-| `@guyghost/swarm-dao-mcp` | Swarm DAO as a stdio MCP server (24 tools) |
+| `@guyghost/swarm-dao-mcp` | Swarm DAO as a stdio MCP server (32 tools) |
 | `@guyghost/swarm-dao-copilot-adapter` | GitHub Copilot plugin (MCP + instructions) |
 | `@guyghost/swarm-dao-claude-adapter` | Claude Code plugin (MCP + slash commands) |
 | `@guyghost/swarm-dao-codex-adapter` | OpenAI Codex plugin (MCP + AGENTS.md) |
@@ -89,7 +89,7 @@ for the pattern all non-native hosts share).
 | Layer | Purpose | Key Concepts |
 |-------|---------|--------------|
 | **L1 Governance** | Decide what enters the roadmap | Proposals, voting, quorum, state machine, amendments |
-| **L2 Intelligence** | Produce analysis and recommendations | 7 specialized agents, parallel deliberation, synthesis |
+| **L2 Intelligence** | Produce analysis and recommendations | 8 specialized agents, parallel deliberation, synthesis |
 | **L3 Delivery** | Convert decisions into execution | Plans, tasks, execution, verification, artefacts |
 | **L4 Control** | Reduce risk before publication | Quality gates, audit trail, checklists |
 
@@ -139,8 +139,11 @@ swarm-dao list --type security-change
 # Show proposal details
 swarm-dao show 1
 
-# Cast a vote
-swarm-dao vote 1 --position for --reasoning "Low risk, high impact" --weight 3
+# Cast a vote (weight defaults to the council agent's registry weight)
+swarm-dao vote 1 --position for --reasoning "Low risk, high impact" --agent critic
+
+# Run quality gates (required before ship)
+swarm-dao control 1
 
 # Ship (execute) a proposal
 swarm-dao ship 1
@@ -340,7 +343,8 @@ prefer deeper deliberation can opt into the swarm-forge-style pipeline:
 ```
 
 Agents run **in order, one at a time** (registry order: strategist →
-researcher → architect → critic → prioritizer → spec-writer → delivery), and
+researcher → architect → critic → prioritizer → spec-writer → delivery →
+designer), and
 each agent receives a `## Prior Analyses` section built from the agents
 before it — **analyses only, never votes or reasoning** (`extractAnalysis`
 strips everything from the `## Vote` heading on, and each excerpt is capped
@@ -445,7 +449,7 @@ bun run improvement:regression
 
 ## Artefacts
 
-Auto-generated for every approved proposal:
+Generated on demand via `dao_artefacts` / the artefacts host tool:
 
 | Artefact | Description |
 |----------|-------------|

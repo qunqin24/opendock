@@ -73,7 +73,7 @@ Pass options using the `[spec, options]` tuple form (spec being the npm package 
 
 ## How It Works
 
-- **Used tokens**: the most recent assistant message's `tokens.total` provides the authoritative current context occupancy. If unavailable, the gauge falls back to `input + output + reasoning`; cache counters are not added separately because they are already represented by `total`. Before any responses exist, session-level token/cost aggregates are used.
+- **Used tokens**: matches OpenCode's built-in context section: the most recent assistant message with output uses `input + output + reasoning + cache.read + cache.write`. Before any responses exist, session-level token/cost aggregates are used.
 - **Context window**: resolved from the message's (or session's) provider/model via `provider.models[modelID].limit.context`. The widget hides itself if no context limit is known.
 - **Rendering**: SolidJS JSX via `@opentui/solid`, registered into the `sidebar_content` slot through [`@opencode-ai/plugin/tui`](https://www.npmjs.com/package/@opencode-ai/plugin). Colors come from the active OpenCode theme (`accent` / `warning` / `error`).
 

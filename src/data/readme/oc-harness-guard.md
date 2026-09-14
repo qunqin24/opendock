@@ -146,8 +146,12 @@ those numbers on a sidebar. See `src/rpc.ts` for the contract.
 | `warden` | `{ available, children, budgets, breaches, orphans }` |
 | `flightPlan` | `{ available, goalPresent, planPresent, logPresent, blockChars }` |
 
-`available` is `false` when the module is disabled or its read failed, so
-a monitor never renders a false all-clear. `warden.orphans` counts
+`available` is `false` when the module is disabled, its read failed, or (for
+warden) the bounded storage scan truncated, so a monitor never renders a
+false all-clear. Warden scans are bounded at 10,000 records per prefix
+(100 pages × 100 entries); when the store holds more, counts would be
+partial, so warden reports `available: false` rather than a truncated
+figure. `warden.orphans` counts
 orphaned children (operational): still-running tracked children reported
 as orphaned for the session. It is an operational count, with no claim of
 parity with any other tool's counts.
@@ -158,10 +162,12 @@ aggregates by design — local, read-only, no free text, no session IDs, no
 paths. `sessionID` is a selection key within one authenticated server
 principal, not a per-session ACL — the real boundary is the OpenCode
 server credential plus loopback binding. A malformed `sessionID` fails
-closed with `refused`. When `ctx.session.get` is available, an unknown or
-ended session also fails closed with `refused` (checked before any
-summaries are collected); when the getter is unavailable, the handler
-proceeds best-effort.
+closed with `refused`. When `ctx.session.get` is present, existence is
+confirmed only when the returned `id` matches the requested id; any other
+outcome — null/undefined/non-matching id, or a throw/rejection — fails
+closed with `refused` (checked before any summaries are collected, and
+without sniffing the error shape). When the getter is entirely absent
+(non-conforming host fallback), the handler proceeds best-effort.
 
 ### Adapting to your harness
 

@@ -1,10 +1,56 @@
 # Sortie-dogs
 
-**Add a bounded, cost-aware execution loop to OpenCode without taking OpenCode over.**
+**A goal-preserving, adaptive execution harness for OpenCode
+that optimizes cost, time, and proof without taking your setup over.**
 
-Sortie-dogs is an opt-in overlay, not a replacement. It stays passive until you
-invoke `/sortie` or select `dog-coordinator`. Standard OpenCode agents and
-unrelated sessions remain available and unchanged.
+Use OpenCode normally. Invoke Sortie only when you want
+scoped implementation, validation, review, and model routing.
+
+### Four design pillars
+
+- **Goal invariance** — Accepted outcomes and proof requirements survive delegation, continuation, and remediation. A child agent cannot silently weaken the job to make it easier to finish.
+- **Adaptive execution** — Small work stays small. Parallel workers, stronger models, and independent review are added only when task shape and risk justify them.
+- **Coexistence and portability** — Sortie activates only when invited, preserves normal OpenCode agents and settings, and keeps project-local setup as the default.
+- **Cost, time, and proof** — The objective is not maximum agent count. It is the lowest practical cost and effort for a verified outcome, with explicit evidence when work does or does not pass.
+
+### Direction for v0.10.x
+
+The v0.10.x line is being developed around an **Astra operator / Terra dogs** split. Astra is the
+top-level decision authority that protects the accepted goal, quality bar, escalation decisions,
+and final acceptance. Because Astra is expensive, it should do only the small amount of work that
+requires that level of judgment. Terra-based dogs handle most bounded planning, coordination, and
+execution. The intended result is Astra-level judgment with Terra-level operating cost.
+
+This is an architectural direction under active validation, not a demonstrated benchmark result.
+Goal and quality authority remain centralized; implementation volume does not.
+
+## Try it
+
+Requirements: Node.js 22.6 or newer, npm, and OpenCode.
+Start in your project directory. This block covers all four steps;
+the JSON belongs in the configuration file, and `/sortie` runs inside OpenCode.
+If the configuration already exists, add `sortie-dogs` to its `plugin` array
+while keeping existing entries and settings.
+
+```text
+1. Install — run in your terminal
+   npm install --save-dev sortie-dogs
+   npx sortie-dogs init .
+
+2. Add plugin — save or merge into .opencode/opencode.json
+   {
+     "plugin": ["sortie-dogs"]
+   }
+
+3. Restart OpenCode
+
+4. Start a task — enter in OpenCode
+   /sortie <task>
+```
+
+Project-local setup is recommended. `init` installs runtime assets;
+the plugin entry enables the plugin, including model routing.
+See [configuration details](#configuration) for model selection and other setup options.
 
 > **Project status: Beta.** v0.9.x is under active stabilization. Runtime
 > behavior, configuration, and runtime assets may still change before 1.0.
@@ -18,70 +64,99 @@ unrelated sessions remain available and unchanged.
 Sortie-dogs turns selected work into a scoped plan, optional evidence gathering,
 bounded implementation, canonical validation, and evidence-backed completion.
 
-Requirements: Node.js 22.6 or newer, npm, and OpenCode.
-
 Guides: [日本語](docs/guide-ja.md) · [简体中文](docs/guide-zh-CN.md) · [テスト実行](docs/testing.md) · [CLI testing](docs/cli-testing.md)
 
 Release: [v0.9.12](https://github.com/zufall-upon/Sortie-dogs/releases/tag/v0.9.12)
 
-## Provisional quality–cost position
+## Latest local benchmark case study
 
-**Reference values, not a successful benchmark claim.** Quality and end-to-end completion
-problems remain. The latest completed qualification attempt ended at `IN_PROGRESS`, so its official
-verifier was not run. Further benchmarks are frozen while completion defects are repaired.
+**Completion-filtered reference values, not a successful benchmark or leaderboard claim.**
+On 2026-09-14, Bare OpenCode and Sortie-dogs v0.9.12 each collected three completed runs of the
+same frozen task, `datacurve/anko-typed-variable-bindings`. Bare needed three attempts; Sortie
+needed five because two attempts returned `INTERRUPTED`. These were separate local trial batches,
+not three matched pairs. Docker and Runta were intentionally unused.
 
-The last complete measured **Bare OpenCode vs Sortie** pair below used one frozen task,
-`datacurve/anko-typed-variable-bindings`, on 2026-09-10. It used Sortie **v0.9.5**, not the
-current release. Both candidates failed the official verifier.
+Run configuration was fixed per product configuration:
 
-| Metric · one task, one trial per arm | Bare OpenCode | Sortie v0.9.5 |
+- **Bare OpenCode:** standard `build` agent, `openai/gpt-5.6-sol` / `high`, with no Sortie plugin
+  or Sortie runtime assets in the effective configuration.
+- **Sortie v0.9.12:** `dog-coordinator` on `openai/gpt-5.6-terra` / `high`; observed implementation
+  children on `openai/gpt-5.6-sol` / `medium`, with the pinned Sortie package and runtime assets.
+  No Luna, Astra, or Opus messages were observed in these trials.
+
+| Metric · one task, three completed runs | Bare OpenCode | Sortie v0.9.12 |
 | --- | ---: | ---: |
-| Verified PASS | 0/1 | 0/1 |
-| Task-check completion · F2P | 55.6% · 5/9 | 88.9% · 8/9 |
-| Retained checks · P2P | 94/94 | 93/94 |
-| Estimated API-equivalent total cost | $5.42 | $1.46 |
-| Median agent wall · n=1 | 28.7 min | 10.0 min |
-| Premium-model token share · Sol | 100% | 20.1% |
+| Attempts needed | 3 | 5 |
+| Completed runs compared | 3 | 3 |
+| Verified PASS | 0/3 | 0/3 |
+| Task checks · F2P | 11.1% · 3/27 | 85.2% · 23/27 |
+| Retained checks · P2P | 282/282 | 282/282 |
+| Median agent wall | 24.5 min | 25.7 min |
+| Median model steps | 43 | 39 |
+| Implementation child sessions · total | 0 | 13 |
+| Estimated API-equivalent cost · median completed run | $3.53 | $2.85 |
+| Estimated cost · three completed runs | $10.69 | $9.74 |
+| Additional interrupted-attempt cost | $0 | $6.20 |
+| Total cost to acquire three completed runs | $10.69 | $15.94 |
 
-Later Sortie-only evidence is weaker: the v0.9.9 recovery candidate passed **5/9** task
-checks with **0/1 Verified PASS**; `0.9.11-bench.2` did not reach a gradeable completion.
-Those attempts are not pooled into the historical pair above.
+All three Bare runs passed 1/9 task checks. The three completed Sortie runs passed 7/9, 8/9,
+and 8/9. Every compared candidate retained 94/94 prior checks, but every official verifier still
+returned reward 0. The two interrupted Sortie attempts are excluded from completed-run quality,
+time, and cost aggregates; their attempt count and estimated cost remain visible above.
 
-![Historical quality–cost reference: Bare at $5.42 and 55.6% task-check completion; Sortie v0.9.5 at $1.46 and 88.9%. Neither achieved Verified PASS.](docs/assets/quality-cost-reference.svg)
+![Latest local case study: Bare completed 11.1 percent of task checks at a median estimated API-equivalent cost of $3.53; Sortie completed 85.2 percent at $2.85. Sortie needed five attempts and $15.94 to collect three completed runs. Neither configuration achieved a Verified PASS.](docs/assets/quality-cost-reference.svg)
 
-The goal is **higher OpenCode task success with selective use of premium models**.
-These reference observations do not yet establish that success-rate claim: Sortie missed
-one task check and regressed one retained check. Codex, Pi, and Oh My OpenCode belong to
-separate methodologies and are not assigned comparable positions on this chart.
+Cost uses exported root and child session tokens, grouped by the model that produced each message,
+with a fixed standard short-context rate schedule. Completed-run cost shows execution efficiency;
+total acquisition cost includes the two interrupted Sortie attempts and shows reliability overhead.
+These are API-equivalent estimates, not invoices.
+
+The product objective is **more verified outcomes per unit of cost and time without weakening the
+accepted goal**. This small, single-task local case study does not establish that claim, isolate
+orchestration from model quality, or establish a cost advantage. Codex, Pi, and Oh My OpenCode use
+separate methodologies and are not assigned quantitative positions from these observations.
 
 [Definitions, frozen inputs, current failure status, and limitations](docs/benchmark-reference.md)
 · [Machine-readable reference values](docs/benchmarks/provisional-reference.json)
 
-## Why Sortie-dogs?
+## How the design is enforced
 
-### Invisible until invited
+The four pillars above become operational constraints rather than a second set
+of product promises:
+
+### 1. Keep the goal invariant
+
+Sortie turns the requested outcome into explicit acceptance criteria and carries
+them through planning, delegation, continuation, validation, and remediation.
+Workers receive bounded units, but unit boundaries do not redefine success. A
+child result, local process limit, or convenient partial implementation cannot
+silently remove an unmet criterion. Only an explicit user-authorized revision
+changes the accepted goal.
+
+### 2. Adapt execution to the work
+
+Small changes can use one worker and targeted validation without paying for Scout,
+parallel coordination, independent review, or a full-suite run. Larger work can be
+split into bounded units; safely independent units may use a Luna fabric DAG.
+Higher-risk candidates add stronger implementation or independent review. The
+harness expands because the task requires it, not because more agents look better.
+
+### 3. Coexist with OpenCode
 
 Use normal OpenCode normally. Sortie activates only for `/sortie` or
-`dog-coordinator`; it does not disable or replace OpenCode's standard agents.
+`dog-coordinator`; it does not disable or replace standard agents. Project-local
+installation is the default, existing settings remain authoritative, and unknown
+user-owned runtime files are preserved. The same package can move with a project
+without requiring users to surrender their global OpenCode environment.
 
-### Spend strong models only where they matter
+### 4. Optimize cost, time, and proof together
 
-Lower-cost models handle bounded retrieval and parallel volume work. Stronger
-models are reserved for implementation, escalation, and independent review.
-
-### Return with proof
-
-Writes stay scoped, and completion requires validation evidence. Every completed
-run can return a concise Speed / Cost / Proof debrief.
-
-### Use only as much harness as the task needs
-
-Small changes can skip Scout and independent review when one worker and targeted
-validation are sufficient. Larger work can be decomposed into multiple units;
-units that are safely independent can use a Luna fabric DAG for bounded parallel
-execution. Higher-risk candidates add independent review, while full-suite and
-package verification are reserved for release work. Not every task pays the
-cost of the heaviest workflow.
+Lower-cost models handle bounded retrieval and parallel volume work; stronger
+models are reserved for implementation, escalation, and independent review where
+their capability can change the outcome. Writes remain scoped, and completion
+requires validation evidence rather than agent confidence. The returned Speed /
+Cost / Proof debrief makes incomplete and failed outcomes visible too. Agent count
+is an implementation detail, not the optimization target.
 
 ## Designed to coexist with OpenCode
 
@@ -99,17 +174,11 @@ Sortie-dogs adds a workflow to your existing setup rather than replacing it.
 
 Use OpenCode normally. Invoke the pack only when you want it.
 
-## Quick start
+## Configuration
 
-Install the public npm package in the project and generate the project-local
-OpenCode runtime files:
-
-```sh
-npm install --save-dev sortie-dogs
-npx sortie-dogs init .
-```
-
-This is the recommended setup. Runtime assets stay project-local.
+The [Try it](#try-it) steps above are the recommended project-local installation.
+Runtime assets stay with the project. This section covers plugin behavior, model
+selection, and alternative loading after installation.
 
 Installing the runtime assets does not load the plugin, and without the plugin
 every role runs on whichever model the caller happened to use. Add the package
@@ -130,6 +199,10 @@ as `.opencode/sortie-dogs.json`:
 
 ```json
 {
+  "dedicatedWorkerModel": {
+    "model": "openai/gpt-5.6-sol",
+    "variant": "medium"
+  },
   "modelRouting": {
     "dog-coordinator": {
       "preferred": { "model": "provider/model" }
@@ -292,18 +365,18 @@ dog-coordinator: completion evidence accepted
 
 ## The workflow
 
-1. **Brief and plan** — `dog-coordinator` turns the request into acceptance
-   criteria, a write manifest, and validation requirements.
+1. **Freeze the goal and plan** — `dog-coordinator` turns the request into invariant
+   acceptance criteria, a write manifest, and validation requirements.
 2. **Optional scout** — one bounded, read-only investigation runs only for a
    concrete pre-worker evidence gap.
-3. **Dedicated worker** — the dedicated worker implements only the approved
-   manifest and also owns scoped remediation or blocker resolution.
+3. **Adaptive execution** — the coordinator selects one worker or bounded parallel
+   units according to task shape; workers implement only their approved manifests.
 4. **Canonical validation** — the declared test or build command must produce
    acceptable evidence.
 5. **Risk-based review** — high-risk candidates receive independent review;
    low-risk candidates can skip that extra pass after validation.
-6. **Coordinator completion** — only the coordinator closes the loop and owns
-   any commit after manifest, validation, review, and evidence gates pass.
+6. **Goal-level completion** — only the coordinator closes the loop after every
+   accepted criterion has manifest, validation, review, and evidence coverage.
 7. **Bounded continuation** — restart recovery and compaction handoffs preserve
    progress; repeated batches remain bounded rather than becoming endless
    delegation.
@@ -413,6 +486,10 @@ model you can actually serve.
 
 ```json
 {
+  "dedicatedWorkerModel": {
+    "model": "openai/gpt-5.6-sol",
+    "variant": "medium"
+  },
   "modelRouting": {
     "dog-coordinator": {
       "preferred": { "model": "openai/gpt-5.6-luna", "variant": "max" }
@@ -437,6 +514,10 @@ model you can actually serve.
   }
 }
 ```
+
+`dog-worker` intentionally has no `modelRouting` entry. It uses
+`dedicatedWorkerModel`, shared with the other stable serial implementation roles.
+`dog-luna-worker` remains a separate fixed fabric route.
 
 Save project configuration as `.opencode/sortie-dogs.json`. `modelCatalog`
 declares provider models and named variants that are actually available;
