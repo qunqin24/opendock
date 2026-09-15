@@ -21,7 +21,7 @@ A community fork of `opencode-github-sync` 3.0.1 for moving OpenCode configurati
 
 ## Requirements
 
-Node.js 22.13+ (24 LTS recommended), Git, GitHub CLI (`gh`), and an initialized OpenCode installation. The plugin dependency is pinned to the OpenCode 1.18.30 SDK. Other OpenCode schema versions require testing; unsupported columns fail closed rather than being silently dropped.
+Node.js 22.13+ (24 LTS recommended), Git, GitHub CLI (`gh`), and an initialized OpenCode installation. The plugin dependency is pinned to the OpenCode 1.18.31 SDK; the 1.18.30 database schema remains covered by regression tests. Other OpenCode schema versions require testing; unsupported columns fail closed rather than being silently dropped.
 
 The source-code repository is public. Your **separate sync-data repository must be private**. Do not point the tool at this source-code repository.
 
@@ -33,13 +33,13 @@ cd opencode-multidevice-sync
 npm ci
 npm run check
 npm pack
-npm install -g ./opencode-multidevice-sync-0.1.0.tgz
+npm install -g ./opencode-multidevice-sync-0.1.1.tgz
 omds --version
 ```
 
 On Windows PowerShell with script execution disabled, use `npm.cmd` and `omds.cmd`. Changing execution policy is not required.
 
-This repository does not imply an npm registry release. Until a registry release is announced, install the locally built tarball or the reviewed GitHub release asset.
+The package is also published on npm. For a reviewed release, pin the exact version instead of installing an unbounded tag.
 
 ## First device
 
@@ -78,6 +78,10 @@ npm root -g
 Add its absolute file URL to the OpenCode `plugin` array, for example `file:///C:/Users/YOU/AppData/Roaming/npm/node_modules/opencode-multidevice-sync/dist/plugin/index.js`. Do not paste this example without adapting the path. Do not run the upstream sync plugin or its old safe-wrapper alongside this plugin.
 
 `autoPullOnStartup` checks for incoming changes at startup. `autoPushOnIdle` is opt-in and waits for a successful initial pull; errors are logged and surfaced as notifications. Restart OpenCode after changes to imported configuration or sessions. Wait for a successful push before switching computers; closing the app or losing the network can interrupt a sync.
+
+## Session visibility in Desktop
+
+OpenCode Desktop scopes the visible chat list to the currently opened project directory. A successful import can therefore leave chats hidden when Desktop is still opened in another directory. `omds sessions locations` lists root/child sessions by directory, and `omds doctor` compares them with the Desktop `lastProject` state when that state can be read. The check is diagnostic only: OMDS does **not** rewrite OpenCode Desktop UI state automatically. Open the reported directory in Desktop to see those chats.
 
 ## Recovery
 

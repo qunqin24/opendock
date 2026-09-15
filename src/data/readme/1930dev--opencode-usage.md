@@ -119,6 +119,7 @@ Restart opencode after a rebuild: the bundle is read once at start.
 Normalized percentage of budget consumed per provider, from these sources (in priority):
 
 1. **Live quota** — provider-reported usage:
+   - `amd`: daily spend ceiling (USD/day)
    - `github-copilot`: premium requests entitlement (7000/mo)
    - `opencode-go` (Zen): rolling 5h / weekly / monthly % (binding window)
    - `openrouter`: credits used / total credits

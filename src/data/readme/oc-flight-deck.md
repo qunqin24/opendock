@@ -162,8 +162,23 @@ other plugin. Each side works alone.
 available in a commented JSONC file.
 
 Copy [`flight-deck.example.jsonc`](./flight-deck.example.jsonc) to
-`flight-deck.jsonc` at your project root, or to `.opencode/flight-deck.jsonc`,
-then edit. Comments and trailing commas are fine.
+`~/.config/opencode/flight-deck.jsonc`, then edit. Comments and trailing commas
+are fine.
+
+There is **one** config file, global to your user, so the same values apply to
+every project. Flight Deck does not read a `flight-deck.jsonc` from a project
+root or from a project's `.opencode/` directory — a copy left there configures
+nothing. If `$XDG_CONFIG_HOME` is set, the path is
+`$XDG_CONFIG_HOME/opencode/flight-deck.jsonc` instead. A `.json` name works too;
+the `.jsonc` name is tried first.
+
+The file is optional, and a missing file is normal and silent: with no file at
+all you get exactly the defaults written out below.
+
+> **Upgrading from 0.4.0 — the config file moved.** The per-project search is
+> gone. A `flight-deck.jsonc` in a project root or in `.opencode/` is no longer
+> read; move it to `~/.config/opencode/flight-deck.jsonc` (or the
+> `$XDG_CONFIG_HOME` path above) to keep your settings.
 
 ```jsonc
 {
@@ -230,7 +245,7 @@ Delete the plugin and the stock sidebar is back, exactly as it was.
 ## Uninstall
 
 Remove the entry from `opencode.jsonc`, restart, done. Delete your
-`flight-deck.jsonc` too if you made one.
+`~/.config/opencode/flight-deck.jsonc` too if you made one.
 
 ## Development
 

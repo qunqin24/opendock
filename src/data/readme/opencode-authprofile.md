@@ -2,6 +2,8 @@
 
 Save and switch named authentication profiles with `/switchauthprofile` in the [OpenCode](https://opencode.ai) terminal interface.
 
+![opencode-authprofile terminal menu](assets/opencode-authprofile-post.png)
+
 ```text
 Auth profiles — personal
 

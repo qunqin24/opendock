@@ -1,10 +1,8 @@
 # opencode-subagent-throttle
 
-[![npm](https://img.shields.io/npm/v/@beremaran/opencode-subagent-throttle.svg)](https://www.npmjs.com/package/@beremaran/opencode-subagent-throttle)
-[![License](https://img.shields.io/npm/l/@beremaran/opencode-subagent-throttle.svg)](LICENSE)
 [![CI](https://github.com/beremaran/opencode-subagent-throttle/actions/workflows/ci.yml/badge.svg)](https://github.com/beremaran/opencode-subagent-throttle/actions/workflows/ci.yml)
 
-An OpenCode plugin that limits how many `task` tool calls run concurrently. Excess calls remain queued as pending in FIFO order; they are never rejected or silently dropped.
+An OpenCode plugin that limits concurrent `task` and `subagent` tool calls. Excess calls remain queued in FIFO order; they are never rejected or silently dropped.
 
 ## Why Queue Instead of Reject
 
@@ -12,87 +10,81 @@ Queuing preserves the parent agent's intent. Every requested task can still run 
 
 ## Installation
 
-Add the plugin to `opencode.json`. The plugin entry file is TypeScript source and is loaded natively by OpenCode:
+OpenCode 2 can install the plugin directly from GitHub:
 
-```json
-{
-  "$schema": "https://opencode.ai/config.json",
-  "plugin": [
-    ["/absolute/path/to/opencode-subagent-throttle/src/index.ts", { "maxParallel": 2, "mode": "session" }]
-  ]
-}
+```bash
+opencode plugin add github:beremaran/opencode-subagent-throttle
 ```
 
-For OpenCode 1, if the plugin is published to npm, the string form works too,
-including options in the tuple:
-
-```json
-{
-  "plugin": [
-    ["@beremaran/opencode-subagent-throttle", { "maxParallel": 2, "mode": "session" }]
-  ]
-}
-```
-
-OpenCode 2 uses the plural `plugins` field and the package root's `{ id, setup }`
-entrypoint:
+For project-local configuration or options, add an object to `opencode.json` or
+`opencode.jsonc`:
 
 ```json
 {
   "$schema": "https://opencode.ai/config.json",
   "plugins": [
     {
-      "package": "@beremaran/opencode-subagent-throttle",
+      "package": "github:beremaran/opencode-subagent-throttle",
       "options": { "maxParallel": 2, "mode": "session" }
     }
   ]
 }
 ```
 
-For a local OpenCode 2 plugin, use `"./src/v2.ts"`. The legacy OpenCode 1
-entrypoint remains `"./src/index.ts"` (or the package's `./server` export).
+For a local checkout, replace the GitHub spec with the checkout's absolute path,
+for example `/absolute/path/to/opencode-subagent-throttle/index.ts`. The root
+`index.ts` loads the OpenCode 2 adapter. Relative paths resolve from the config
+file. The legacy OpenCode 1 callable adapter remains available through the
+package's `./server` export.
 
-Restart OpenCode after adding the plugin because configuration is loaded at startup.
+`opencode plugin add` updates the global plugin configuration. Project-local
+entries live in the project's config. Restart OpenCode after changing an
+unwatched local dependency.
 
 ## Configuration
 
-Options are provided as the second item in the plugin tuple.
+Options are provided in the `options` object for the corresponding `plugins`
+entry.
 
 | Option | Type | Default | Description |
 | --- | --- | --- | --- |
-| `maxParallel` | number | `2` | Maximum number of subagent tasks that may run at once. |
-| `mode` | string | `"session"` | `"session"` creates a separate throttle pool per session. `"global"` shares one pool across the whole OpenCode instance. |
-| `maxWaitMs` | number | `3600000` | Watchdog backstop in milliseconds. A task holding a slot longer than this is force-released with a warning log. The default is 60 minutes. |
-| `notifyQueue` | boolean | `false` | When enabled, injects a status line into the session transcript when a task is queued (`⏳ Task queued — position 3 of 5 (2 running)`) and when it starts (`▶ Task started`). |
+| `maxParallel` | number | `2` | Maximum number of task/subagent calls that may run at once. |
+| `mode` | string | `"session"` | `"session"` creates a separate throttle pool per session. `"global"` shares one pool within the plugin instance. |
+| `maxWaitMs` | number | `3600000` | Watchdog backstop in milliseconds. A call holding a slot longer than this is force-released with a warning log. The default is 60 minutes. |
+| `notifyQueue` | boolean | `false` | OpenCode 1 compatibility only: injects status lines when a task is queued or starts. OpenCode 2 skips transcript insertion and logs a warning. |
 
 The common `"session"` mode is useful for one agent's fan-out. In `"global"` mode, all sessions share the same pool.
 
-## How It Works
+## Usage
 
-The plugin hooks `tool.execute.before` for the `task` tool and awaits a semaphore slot before allowing the task to proceed. When all `maxParallel` slots are busy, additional calls wait in a FIFO queue and start in order as slots become available. For example, with `maxParallel: 2` and five tasks, two start immediately and three wait; each completed task allows the next queued task to start.
+The OpenCode 2 adapter hooks `execute.before` and `execute.after` for the `task`
+and `subagent` tools. It awaits a semaphore slot before allowing a call to
+proceed. When all `maxParallel` slots are busy, additional calls wait in a FIFO
+queue and start in order as slots become available. With `maxParallel: 2` and
+five calls, two start immediately and three wait.
 
-Foreground tasks are the default. The `task` tool blocks until its subagent finishes, so the slot is freed exactly when the subagent completes.
+Foreground calls are the default, and release their slots when the tool
+completes. Background calls keep their slots until the child session emits an
+idle event. The watchdog releases a slot after `maxWaitMs` as a final backstop
+and logs a warning.
 
-For background tasks (`background: true`), enable the experimental OpenCode flag:
+If your OpenCode build gates background subagents behind its experimental
+setting, enable it before using `background: true`:
 
 ```sh
-OPENCODE_EXPERIMENTAL_BACKGROUND_SUBAGENTS=true
+OPENCODE_EXPERIMENTAL_BACKGROUND_SUBAGENTS=true opencode
 ```
 
-Because a background `task` call returns immediately, its slot remains held until the subagent session actually finishes, detected through the `session.idle` bus event.
-
-If a task call errors, for example because of a depth limit, unknown agent, or permission denial, the slot is released through the tool-error event. The `maxWaitMs` watchdog is the final backstop, ensuring an unforeseen leak such as an aborted or interrupted tool call cannot permanently deadlock the queue.
+Tool errors release slots immediately. The legacy OpenCode 1 adapter uses the
+same queue behavior for `task` calls through its `tool.execute.before` and
+`tool.execute.after` hooks.
 
 ## Queue Notifications
 
-Set `notifyQueue: true` to make the throttle visible in the OpenCode 1
-transcript. When a task has to wait for a slot, the plugin posts a synthetic
-line into the parent session via the OpenCode API. The line shows the task's
-FIFO position, how many tasks are running, and the total in the pool. When the
-queued task finally gets a slot, a second line announces that it started. Lines
-for background tasks include `, background`. OpenCode 2 does not currently
-expose the ignored/no-reply transcript insertion used by this option, so it is
-skipped there with a warning.
+`notifyQueue` is supported only by the legacy OpenCode 1 adapter. Set it to
+`true` to add informational queued/started lines to the parent transcript.
+OpenCode 2 skips this option and logs a warning because its plugin API does not
+provide the same transcript insertion.
 
 These notes are sent with `noReply: true`, so the agent loop is not triggered; they are purely informational. They are also sent with `ignored: true`, so they show in the TUI but are excluded from the model's context and never consume tokens or influence the agent.
 
@@ -100,17 +92,27 @@ Each queued task can add up to two transcript lines, so heavy fan-out produces t
 
 ## Caveats
 
-- Queued task calls appear as a running tool call in the UI while they wait. The model's tool output does not expose queue status.
+- Queued calls appear as running tool calls in the UI while they wait. The tool output does not expose queue status.
 - With `notifyQueue: true` on OpenCode 1, queue status appears as
   user-message-style lines in the transcript rather than inside the tool
   call's own UI box. The plugin cannot repaint a running tool call's status;
   see Queue Notifications above.
-- `"session"` mode throttles per session. A parent agent and each subagent have their own pool.
+- `"session"` mode gives each session its own pool. A parent agent and each subagent can therefore have separate pools.
+- `"global"` mode shares one pool within a plugin instance.
 - This throttles concurrency, not rate. It limits how many tasks run simultaneously, not how many tasks can be created over time.
-- The plugin throttles only the `task` tool, not other tools.
+- The OpenCode 2 adapter throttles only `task` and `subagent`; other tools are unaffected.
+- If the watchdog fires, the slot is available again even if the underlying call is still running.
+
+## Runtime
+
+The package root targets OpenCode 2.x and is loaded as raw TypeScript by
+OpenCode's Bun runtime. Node.js `22.6` or newer is required only for the local
+development checks, whose test command uses Node's native TypeScript stripping.
+The legacy `./server` export is retained for compatible OpenCode 1 installs.
 
 ## Project Structure
 
+- `index.ts` — OpenCode 2 package loader.
 - `src/index.ts` — OpenCode 1 plugin factory and hooks.
 - `src/v2.ts` — OpenCode 2 `{ id, setup }` adapter.
 - `src/v1.ts` — OpenCode 1 package entrypoint.
@@ -121,19 +123,19 @@ Each queued task can add up to two transcript lines, so heavy fan-out produces t
 ## Development
 
 ```sh
-npm install
+npm ci
 npm run check
 ```
 
 `npm run check` runs typecheck (`tsc --noEmit`), lint (Biome), and the tests.
-Tests use the built-in Node test runner (`node --test`) with Node's native
-TypeScript type stripping.
+Tests use Node's built-in test runner with native TypeScript type stripping.
+There is no build step: OpenCode loads the TypeScript entrypoints directly.
 
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for getting started, manual testing,
-and test guidance. [RELEASING.md](RELEASING.md) documents the tag-triggered
-release flow, and [SECURITY.md](SECURITY.md) covers the security policy.
+and test guidance. [RELEASING.md](RELEASING.md) documents the GitHub release
+flow, and [SECURITY.md](SECURITY.md) covers the security policy.
 
 ## Related
 
@@ -141,5 +143,3 @@ release flow, and [SECURITY.md](SECURITY.md) covers the security policy.
   force opencode to act as an orchestrator that delegates every task to
   subagents. This throttle is a good companion: cap fan-out so orchestrator
   delegation does not run away.
-- [pi-task-graph](https://github.com/beremaran/pi-task-graph) — a task manager
-  for Pi, the companion CLI.

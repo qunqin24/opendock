@@ -1,8 +1,7 @@
 # OpenCode Goal
 
 [![CI](https://github.com/beremaran/opencode-goal/actions/workflows/ci.yml/badge.svg)](https://github.com/beremaran/opencode-goal/actions/workflows/ci.yml)
-[![npm](https://img.shields.io/npm/v/@beremaran/opencode-goal)](https://www.npmjs.com/package/@beremaran/opencode-goal)
-[![license](https://img.shields.io/npm/l/@beremaran/opencode-goal)](LICENSE)
+[![license](https://img.shields.io/github/license/beremaran/opencode-goal)](LICENSE)
 
 A persistent `/goal` workflow for [OpenCode](https://opencode.ai): define a
 completion condition once, let OpenCode work across turns, and stop only when
@@ -15,74 +14,51 @@ The plugin combines:
 - Codex-style session persistence, token accounting, pause/resume controls,
   model tools, and idle continuation.
 
-Requires OpenCode 1.18 or newer, or the OpenCode 2 beta.
+Requires OpenCode 2.0.0 or newer. The package root is the OpenCode 2
+`{ id, setup }` plugin; a legacy OpenCode 1 server adapter remains available
+under the explicit `./server` export.
 
 ## Install
 
-Install both the server workflow and TUI integration with OpenCode's plugin
-installer:
+Install the package directly from GitHub with the current OpenCode CLI:
 
 ```bash
-opencode plugin @beremaran/opencode-goal
+opencode plugin add github:beremaran/opencode-goal
 ```
 
-The installer detects the package's server and TUI entrypoints and updates both
-configuration files. Restart OpenCode after installation.
-
-### OpenCode 2
-
-OpenCode 2 uses the native `plugins` configuration field and installs plugins
-with `opencode2`:
-
-```bash
-opencode2 plugin add @beremaran/opencode-goal
-```
-
-The package's default entrypoint is dual-runtime: it exposes the OpenCode 1
-`server` function and OpenCode 2's `id`/`setup` API. The package also exposes an
-explicit V2 entrypoint for beta builds that require a separate object module:
+For project-local configuration or plugin options, add the package to
+`opencode.json`:
 
 ```json
 {
     "$schema": "https://opencode.ai/config.json",
-    "plugins": ["@beremaran/opencode-goal/v2"]
+    "plugins": [
+        {
+            "package": "github:beremaran/opencode-goal",
+            "options": {
+                "evaluatorModel": "anthropic/claude-haiku-4-5"
+            }
+        }
+    ]
 }
 ```
 
-OpenCode 2's terminal client loads the sidebar and `/goal` slash command from
-the package's TUI entrypoint. Add that entrypoint to
-`~/.config/opencode/cli.json`:
+The package also exports `./tui`. OpenCode's CLI loads that export automatically
+when the package is configured in `opencode.json`, so the sidebar and `/goal`
+command do not need a separate CLI package entry.
+
+For a local checkout, replace the GitHub spec with its absolute path:
 
 ```json
 {
     "$schema": "https://opencode.ai/config.json",
-    "plugins": ["@beremaran/opencode-goal/tui"]
+    "plugins": ["/absolute/path/to/opencode-goal"]
 }
 ```
 
-For V2 plugin options, use `{ "package": "...", "options": { ... } }`
-entries in `plugins`. The terminal client's configuration is stored in
-`~/.config/opencode/cli.json`, rather than `tui.json`.
-
-For manual installation, add the package to `opencode.json`:
-
-```json
-{
-    "$schema": "https://opencode.ai/config.json",
-    "plugin": ["@beremaran/opencode-goal"]
-}
-```
-
-Then add the same package to `tui.json` to enable the sidebar:
-
-```json
-{
-    "$schema": "https://opencode.ai/tui.json",
-    "plugin": ["@beremaran/opencode-goal"]
-}
-```
-
-OpenCode installs npm plugins automatically when it starts.
+OpenCode installs missing package plugins in the background. Configuration
+changes under watched directories reload automatically; restart if a local
+source change is not picked up.
 
 ## Usage
 
@@ -98,6 +74,7 @@ Control the current session goal with:
 /goal pause    Pause automatic continuation
 /goal resume   Resume work immediately
 /goal clear    Remove the session goal
+/goal cancel   Alias for clear
 /goal help     Show command syntax
 ```
 
@@ -122,19 +99,17 @@ The section disappears when the session has no goal.
 
 ## How it works
 
-1. The config hook registers `/goal`.
-2. The command hook stores a per-session goal and turns the command into the
-   first work prompt.
-3. When the parent session becomes idle, the plugin reads the goal-period
-   transcript and accounts for input, output, and reasoning tokens. Cache
-   tokens are excluded.
-4. A temporary child session evaluates the completion condition with tools
-   disabled. The evaluator model is selected in this order:
-    - Plugin option `evaluatorModel`
-    - OpenCode `small_model`
-    - The parent session model
-5. A negative decision and its reason are injected through
-   `session.promptAsync()`, starting the next turn.
+1. The V2 server plugin registers the model tools and session context hook.
+2. The `./tui` export registers the sidebar and `/goal` keymap command. The
+   command stores a per-session goal and starts the first work prompt.
+3. When the parent session becomes idle, the plugin reconstructs the goal-period
+   transcript and accounts for input, output, and reasoning tokens. Cache tokens
+   are excluded.
+4. A temporary child session evaluates the completion condition from transcript
+   evidence. The evaluator model is selected from `evaluatorModel`, then the
+   parent session model.
+5. A negative decision and its reason are sent through `session.prompt()`,
+   starting the next turn.
 6. A positive decision marks the durable goal complete and stops continuation.
 
 The plugin also exposes three model tools:
@@ -145,45 +120,36 @@ The plugin also exposes three model tools:
 - `update_goal` records a completion claim for independent evaluation, or marks
   a genuinely repeated blocker after at least three goal turns.
 
-Active goal context is re-injected into system prompts and compaction context.
-Interrupting an OpenCode response pauses the goal so pressing Escape does not
-immediately restart it.
-
-On OpenCode 2, the same tools are registered through the V2 tool API. Goal
-transcripts are reconstructed from the V2 event stream, and the active goal is
-injected through the V2 session context hook.
-
-The current OpenCode 2 beta does not expose evaluator-session deletion through
-the plugin session API, so V2 evaluator sessions may remain in the session list
-even when `deleteEvaluatorSessions` is enabled.
+Active goal context is injected through the V2 session context hook. Interrupting
+an OpenCode response pauses the goal so pressing Escape does not immediately
+restart it.
 
 ## Configuration
 
-Plugin options can be supplied in an OpenCode plugin entry:
+Plugin options can be supplied in an OpenCode 2 plugin entry:
 
 ```json
 {
-    "plugin": [
-        [
-            "@beremaran/opencode-goal",
-            {
+    "plugins": [
+        {
+            "package": "github:beremaran/opencode-goal",
+            "options": {
                 "evaluatorModel": "anthropic/claude-haiku-4-5",
+                "evaluatorAgent": "build",
                 "maxTranscriptChars": 48000,
                 "continuationDelayMs": 250,
                 "deleteEvaluatorSessions": true,
                 "stateDirectory": "/custom/state/root"
             }
-        ]
+        }
     ]
 }
 ```
 
-All options are optional. Evaluator sessions are deleted after use by default.
-
-If manual server and TUI configuration uses a custom `stateDirectory`, provide
-the same value in both OpenCode 1 config files (`opencode.json` and `tui.json`)
-or in the matching OpenCode 2 server and terminal-client plugin entries so the
-sidebar reads the server's state.
+All options are optional. `maxTranscriptChars` defaults to `48000`,
+`continuationDelayMs` to `0`, and `deleteEvaluatorSessions` to `true`.
+`evaluatorModel` accepts a `provider/model` reference; when omitted, the parent
+session's model is used. `evaluatorAgent` selects the evaluator agent when set.
 
 State is stored outside the repository under:
 
@@ -194,21 +160,18 @@ $XDG_STATE_HOME/opencode-goal/<project-id>/<session-id>.json
 When `XDG_STATE_HOME` is unset, the root is
 `~/.local/state/opencode-goal`.
 
-## Limitations
+## Runtime and limitations
 
-- The stable OpenCode 1 server plugin API can register a prompt-backed slash
-  command, so status and control commands each create a normal OpenCode turn.
-- OpenCode 2 provides the slash command from its terminal-client keymap and
-  uses the V2 server tools for agent-created goals. Other OpenCode 2 clients
-  can use the model tools directly.
+- The slash command and sidebar are available in OpenCode's terminal CLI. Other
+  OpenCode clients can use the model tools directly.
 - Evaluators can judge only transcript evidence. If work happened but the
   agent did not surface it, the evaluator should ask for stronger evidence and
   continue.
 - This plugin cannot bypass provider rate, usage, trust, or permission limits.
 - A provider or model failure pauses the goal instead of risking an unverified
   runaway loop. The goal remains persisted and can be resumed.
-- The sidebar entrypoint is specific to OpenCode's terminal TUI. Other OpenCode
-  clients can use `/goal` for status.
+- The V2 API does not expose evaluator-session deletion, so evaluator sessions
+  may remain in the session list even when `deleteEvaluatorSessions` is enabled.
 
 ## Local development
 
@@ -219,27 +182,29 @@ bun install
 bun run check
 ```
 
-To load the checkout directly, add its absolute path to `opencode.json`:
+To load the checkout directly in OpenCode 2, add its absolute path to
+`opencode.json`:
 
 ```json
 {
     "$schema": "https://opencode.ai/config.json",
-    "plugin": ["/absolute/path/to/opencode-goal"]
+    "plugins": ["/absolute/path/to/opencode-goal"]
 }
 ```
 
-Run `bun run build` and restart OpenCode after changing the plugin.
+OpenCode loads the TypeScript source through the package exports. Restart it if
+a local source change is not picked up.
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for the contribution workflow and
-[RELEASING.md](RELEASING.md) for maintainer release instructions.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the contribution workflow.
 
 ## License
 
 [MIT](LICENSE)
 
 The design follows OpenCode's documented
-[plugin hooks](https://opencode.ai/docs/plugins/) and
-[custom commands](https://opencode.ai/docs/commands/). Completion behavior is
-modeled on Claude Code's documented
+[plugin configuration](https://opencode.ai/v2/docs/plugins/),
+[server plugin API](https://opencode.ai/v2/docs/build/plugins/), and
+[CLI plugin API](https://opencode.ai/v2/docs/build/plugins/cli). Completion
+behavior is modeled on Claude Code's documented
 [`/goal` loop](https://code.claude.com/docs/en/goal), while persistence follows
 Codex's goal lifecycle.

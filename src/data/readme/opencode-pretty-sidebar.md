@@ -4,6 +4,8 @@ A focused sidebar for the OpenCode TUI. It keeps the session title at the top,
 puts tasks first, surfaces active subagents and skills, provides common session
 actions, and makes every MCP server clickable directly in the sidebar.
 
+![OpenCode Pretty Sidebar](https://raw.githubusercontent.com/St1ggy/opencode-pretty-sidebar/main/screenshots/01-hero-sidebar.png)
+
 ## Features
 
 - Theme-aware session title and activity indicator
@@ -19,6 +21,7 @@ actions, and makes every MCP server clickable directly in the sidebar.
 - Show or hide each sidebar section independently
 - Configure visible sections from the sidebar settings button
 - Save the current visibility and expansion layout as the default for new sessions
+- Focus the sidebar with `Ctrl+Shift+F`, then navigate with arrows or `j`/`k`
 - Toggle the sidebar with `Ctrl+Shift+B`
 - Keep OpenCode's compact project path and branch footer
 
@@ -26,8 +29,8 @@ Todo starts expanded. Subagents, skills, quick actions, LSP, and MCP start
 collapsed. Use `Save current layout as default` in sidebar settings to reuse the
 current visible/hidden and expanded/collapsed states in new sessions.
 
-Requires OpenCode 1.18.30 or newer. LSP icons require a Nerd Fonts 3 compatible
-terminal font.
+Requires OpenCode 1.18.30 or newer. The default LSP icons require a terminal font
+patched with Nerd Fonts v3 glyphs.
 
 ## Installation
 
@@ -56,8 +59,7 @@ duplicating sidebar sections, also disable the overlapping built-in plugins:
     "internal:sidebar-context": false,
     "internal:sidebar-mcp": false,
     "internal:sidebar-lsp": false,
-    "internal:sidebar-todo": false,
-    "internal:sidebar-files": false
+    "internal:sidebar-todo": false
   }
 }
 ```
@@ -83,7 +85,7 @@ plugin or `tui.json`.
 On first launch, a short setup guide explains the sidebar controls and lets you
 choose which sections to show. The guide is shown once and can be opened again
 later from the sidebar settings button. The settings dialog also controls MCP
-state persistence, LSP icon style, and the sidebar shortcut without a restart.
+state persistence, LSP icon style, and the sidebar shortcuts without a restart.
 
 ## Options
 
@@ -98,6 +100,7 @@ Pass configured defaults with a tuple entry:
       {
         "persist_mcp": true,
         "lsp_icon_style": "nerd",
+        "focus_key": "ctrl+shift+f",
         "toggle_key": "ctrl+shift+b",
         "sections": {
           "todo": true,
@@ -117,9 +120,11 @@ Pass configured defaults with a tuple entry:
   `true`.
 - `toggle_key`: sidebar shortcut. Defaults to `ctrl+shift+b`. Try `alt+s` if
   your terminal does not distinguish `Ctrl+Shift+B` from `Ctrl+B`.
-- `lsp_icon_style`: uses Nerd Font icons when set to `nerd` (the default). Set
+- `focus_key`: moves keyboard focus into the sidebar. Defaults to
+  `ctrl+shift+f`.
+- `lsp_icon_style`: uses Nerd Fonts v3 glyphs when set to `nerd` (the default). Set
   it to `text` for compact letter badges when your terminal font does not
-  support Nerd Fonts. Known servers use icons or badges; unknown servers keep
+  include those glyphs. Known servers use icons or badges; unknown servers keep
   their full ID.
 - `sections`: controls whether each section is rendered. Every section defaults
   to `true`; set any of `todo`, `subagents`, `skills`, `quick_actions`, `lsp`, or
@@ -129,9 +134,21 @@ Every option is also available from the sidebar gear button. Settings are split
 into `Sections`, `Behavior`, and `Defaults & help`. Behavior changes apply
 immediately and are stored as overrides of the configured defaults. Use
 `Restore configured behavior` to remove those overrides. Section visibility and
-expansion remain session-local until `Save current layout as default` is
-selected; `Restore configured layout` removes that saved layout. Section
-controls are also available in the first-run setup guide.
+expansion remain in-memory for the current OpenCode process until
+`Save current layout as default` is selected; `Restore configured layout`
+removes that saved layout. Section controls are also available in the first-run
+setup guide.
+
+## Keyboard controls
+
+Press `Ctrl+Shift+F` to focus the sidebar. Use `Up`/`Down` or `k`/`j` to move,
+`Enter` to activate the selected row, `Escape` to return to the previous focus,
+and `?` to open the keyboard help. When a Skills or MCP filter owns focus,
+typing edits the query and the first `Escape` returns to sidebar navigation.
+
+The command palette also exposes `Focus sidebar` and direct commands for Todo,
+Subagents, Skills, Quick Actions, LSP, and MCP. Both sidebar shortcuts can be
+changed at runtime in settings.
 
 OpenCode initializes enabled MCP servers before TUI plugins. A server remembered
 as disabled can therefore connect briefly during startup before this plugin
@@ -150,9 +167,12 @@ commands and display the active keybindings from your configuration.
 ## Scripts
 
 ```sh
-bun test
+bun run test
+bun run test:e2e
 bun run typecheck
+bun run lint
 bun run build
+bun run bundle:size
 bun run check
 ```
 

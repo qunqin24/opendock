@@ -1,16 +1,17 @@
 # opencode-discord-noti
 
-Discord webhook notifications for **OpenCode v1**: know when a response finishes, a permission needs attention, or the agent asks a question.
+Discord webhook notifications for **OpenCode v2**: know when a response finishes, a permission needs attention, or the agent asks a question.
 
 ## Features
 
 - **Response completed** (green): final assistant text, session title, directory, model, and token information.
-- **Permission required** (orange): permission type, title, and patterns. Skips permissions already marked `allow` when the hook runs; auto-denied permissions include their status.
-- **Question asked** (blue): questions, answer options, tool name, and call ID.
-- Completion notifications skip subagent sessions. Directories under your home folder use `~`.
-- Notification failures do not interrupt OpenCode. Webhook requests time out after 10 seconds.
+- **Permission required** (orange): the pending permission's action, message, and resources. Automatically allowed or denied permissions do not generate alerts.
+- **Question asked** (blue): question-form fields, answer options, and tool call ID when available.
+- **Subagent idle and completion never send notifications.** Subagent permissions and questions still request attention. Directories under your home folder use `~`.
+- Location filtering prevents notifications from being repeated by plugin instances in other projects or workspaces.
+- Notification failures do not interrupt OpenCode. Webhook requests time out after 10 seconds; unloading the plugin aborts its subscription and in-flight webhook requests.
 
-This package uses the v1 `@opencode-ai/plugin` API and is typechecked against **1.14.28**. It does not target OpenCode v2.
+Version **1.0.0** uses the v2 `@opencode/plugin` API and depends on **2.0.3**. Its stable plugin ID is `opencode-discord-noti`. OpenCode v1 users should stay on package version `0.2.0`.
 
 ## Install and configure
 
@@ -19,23 +20,23 @@ Create a webhook in your Discord channel under **Edit Channel â†’ Integrations â
 ```json
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugin": [
-    [
-      "opencode-discord-noti@0.2.0",
-      {
+  "plugins": [
+    {
+      "package": "opencode-discord-noti@1.0.0",
+      "options": {
         "enabled": true,
         "webhookUrl": "{env:DISCORD_WEBHOOK_URL}",
         "username": "OpenCode Notifier",
         "avatarUrl": "https://opencode.ai/logo.png"
       }
-    ]
+    }
   ]
 }
 ```
 
 Set `DISCORD_WEBHOOK_URL` in the environment used to launch OpenCode, or replace `{env:DISCORD_WEBHOOK_URL}` with your webhook URL directly. OpenCode resolves environment substitutions before passing options to the plugin; an unset variable becomes an empty string and disables notifications.
 
-OpenCode installs the npm package automatically. If you already have plugins configured, append the `[package, options]` entry to the existing array.
+OpenCode installs the npm package automatically. If you already have plugins configured, append the `{ "package": "...", "options": { ... } }` entry to the existing `plugins` array.
 
 ### Options
 
@@ -46,33 +47,48 @@ OpenCode installs the npm package automatically. If you already have plugins con
 | `username` | string | `OpenCode Notifier` | Display name for webhook messages. |
 | `avatarUrl` | string | none | Optional avatar URL. |
 
-Keep the webhook URL private: it allows messages to be posted to your channel. Notifications include session content, question options, and permission patterns.
+Keep the webhook URL private: it allows messages to be posted to your channel. Notifications include session content, question options, and permission resources.
 
-Options are captured when the plugin initializes. Missing/invalid `enabled` or `webhookUrl` values disable notifications; invalid optional display settings use their defaults. The plugin uses only the second-argument options object and does not read a separate configuration file or `project.config`.
+Options are captured from `ctx.options` when the plugin initializes. Missing/invalid `enabled` or `webhookUrl` values disable notifications without starting a subscription; invalid optional display settings use their defaults. The plugin does not read a separate configuration file or `project.config`.
 
-**Quit and restart OpenCode after installing the plugin or changing its options.**
+**Quit and restart OpenCode after installing the plugin or changing its options.** If you use a persistent v2 background server, restart that server too so the server plugin is reloaded.
 
-### Migrate from 0.1.0 or the local plugin
+### Migrate from 0.2.0 (OpenCode v1)
 
-Version **0.2.0 changes the configuration format**. Replace the old string entry with the `["opencode-discord-noti@0.2.0", { ...options }]` tuple above. Move `enabled`, `webhookUrl`, `username`, and `avatarUrl` from `~/.config/opencode/discord-notification-config.json` into that options object. The old file is no longer used. Use only one plugin entry to avoid duplicate notifications.
+1. Upgrade OpenCode to v2 and this package to `1.0.0`.
+2. Rename `plugin` to `plugins` and replace the `[package, options]` tuple with the object shown above. Keep the same four option names.
+3. Remove the old plugin entry or local v1 implementation to avoid duplicate loading.
+4. Quit and restart OpenCode, including its background server when applicable.
 
-### OpenCode v1 API references
+Behavior changes:
 
-- [Official configuration schema](https://opencode.ai/config.json): `Config.properties.plugin.items` accepts either a package string or a two-element `[string, object]` tuple.
-- [v1.14.28 plugin types](https://github.com/anomalyco/opencode/blob/v1.14.28/packages/plugin/src/index.ts): `Plugin = (input: PluginInput, options?: PluginOptions) => Promise<Hooks>`, where `PluginOptions = Record<string, unknown>`.
-- [v1.14.28 plugin loader](https://github.com/anomalyco/opencode/blob/v1.14.28/packages/opencode/src/plugin/index.ts): the loader calls each plugin with `(input, load.options)`.
-- [Configuration variables](https://opencode.ai/docs/config/#env-vars): `{env:VARIABLE_NAME}` substitution is handled by OpenCode.
-- [Plugin installation guide](https://opencode.ai/docs/plugins/#from-npm): npm plugins are installed automatically at startup. The guide's examples show string entries; the schema and v1 source above specify the options tuple.
+- Completion uses `session.execution.succeeded`, not the deprecated `session.idle`. Failed or interrupted executions do not generate success notifications. The old 1.5-second delay is removed.
+- Permissions use `permission.asked`, which represents an actual pending decision. Auto-denied permission notifications are removed.
+- Questions use `form.created` with `metadata.kind === "question"`. Tool-name heuristics such as `ask` or `mcp_Question` are removed; arbitrary tools do not imply an interactive question form.
+- Token fields use native v2 metrics described below.
+- If the session lookup fails, the event is skipped and a redacted error is logged. The plugin does not guess ownership and risk sending another location's notification.
+
+For version `0.1.0` or older local installations, move the four options from `~/.config/opencode/discord-notification-config.json` into the new options object. That file is no longer read.
+
+### OpenCode v2 API references
+
+- [V1 migration guide](https://opencode.ai/v2/docs/build/plugins/migrate-v1)
+- [Plugin API](https://opencode.ai/v2/docs/build/plugins)
+- [V2 configuration](https://opencode.ai/v2/docs/config#plugins)
+
+The v2 guide and source define the `plugins` object format above. At migration time, the shared `config.json` URL still advertised the v1 plugin field, so an editor using that schema may lag behind the v2 implementation.
 
 TypeScript consumers can import `DiscordNotificationOptions` from `opencode-discord-noti`.
 
 ### Token information
 
-The completion embed preserves the original plugin's calculation: `Total Tokens` is the largest assistant-message sum of input, output, and cache-read tokens in the session, rather than a cumulative billing total. Context percentage is available only when the session response includes the model's context limit; otherwise it displays `N/A`.
+- **Session Tokens** is the cumulative usage reported by `session.tokens`, including input, output, reasoning, cache-read, and cache-write tokens.
+- **Context Usage** uses the latest completed assistant message with token information after the most recent completed compaction, divided by that model's context limit from the catalog. This follows v2's context-meter calculation; it is not a cumulative percentage. Missing usage or limits display `N/A`.
+- Completion text comes from the latest completed assistant message in `session.context()`. This API exposes retained model-context history, not the entire transcript. Only text content is sent, excluding reasoning and tool output.
 
 ## Development
 
-Requires Bun and Node.js (CI uses Node 24).
+Requires Bun and Node.js 24 for the package verification workflow (CI uses Node 24).
 
 ```sh
 bun install
@@ -84,9 +100,9 @@ bun run build
 bun run test:package
 ```
 
-`test:package` packs the release, checks its exact file list, installs it into an isolated consumer, and verifies that its v1 hooks use the supplied options in Node. Notification tests mock Discord and cover options isolation, defaults, invalid values, and removal of the legacy configuration fallback.
+`test:package` packs the release, checks its exact file list, installs it into an isolated consumer, and runs its v2 setup and event subscription in Node against a real local HTTP receiver. It exercises all three notification types, verifies subagent completion/idle suppression and cleanup, and typechecks the installed public declaration. Unit tests cover native event shapes, options isolation, location filtering, token metrics, failures, and cancellation.
 
-For local OpenCode testing, build and replace the package string inside the options tuple with `file:///absolute/path/to/opencode-discord-noti/dist/index.js`, then restart OpenCode.
+For local OpenCode testing, build and set the entry's `package` to `/absolute/path/to/opencode-discord-noti/dist` (the directory containing `index.js`), then restart OpenCode. In the active plugin list, confirm ID `opencode-discord-noti` and the local source. Exercise a root-session completion, a pending permission, and a question; a subagent completion must remain silent. Reload or remove the plugin to verify cleanup.
 
 ## Publishing
 

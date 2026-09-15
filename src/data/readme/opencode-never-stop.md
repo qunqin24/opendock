@@ -6,16 +6,33 @@ Your agent finishes a task and just sits there — tokens idle, deep thoughts un
 
 ## Install
 
-```bash
-# npm
-opencode plugin opencode-never-stop -g
+opencode does **not** install slash commands from plugin packages — and this
+plugin is switched on by its commands. So install the plugin *and* the commands,
+either with the installer script (does both) or via npm plus a manual copy.
 
-# or locally, straight from this repo
-./scripts/install.sh   # macOS / Linux
+### From a repo checkout (recommended)
+
+```bash
+./scripts/install.sh                                            # macOS / Linux
 powershell -ExecutionPolicy Bypass -File .\scripts\install.ps1  # Windows
 ```
 
-Restart opencode. Done.
+This copies the plugin to `~/.config/opencode/plugins/`, the commands to
+`~/.config/opencode/commands/`, and writes a default config. Re-run it after
+pulling updates.
+
+### Via npm
+
+```bash
+opencode plugin opencode-never-stop -g
+cp ~/.cache/opencode/node_modules/opencode-never-stop/commands/*.md ~/.config/opencode/commands/
+```
+
+`opencode plugin` only installs the module and registers it in your config, so
+the second step is required: without the commands the plugin loads but can never
+be turned on.
+
+Restart opencode afterwards.
 
 ## Usage
 
@@ -34,6 +51,9 @@ Create `~/.config/opencode/opencode-never-stop.json`:
   "message": "Have you done all your assignments? If anything is left, continue — or spend some more time double-checking your work."
 }
 ```
+
+Two other locations are checked first, in order: the `OPENCODE_NEVER_STOP_CONFIG`
+environment variable (a path), then `<project>/.opencode/opencode-never-stop.json`.
 
 | Field                  | Default          | Description                              |
 | ---------------------- | ---------------- | ---------------------------------------- |
