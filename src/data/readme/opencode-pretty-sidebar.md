@@ -11,23 +11,25 @@ actions, and makes every MCP server clickable directly in the sidebar.
 - Theme-aware session title and activity indicator
 - First-run setup guide with interactive section settings
 - Collapsible Todo section with progress and priority indicators
-- Active subagent list with live statuses and click-to-open navigation
-- Compact, searchable workspace skill list with click-to-confirm slash commands
+- Active subagent list with live statuses and click-to-open navigation, including dev-team workers running on separate local OpenCode servers
+- Compact, searchable workspace skill list with user-wide favorites and click-to-confirm slash commands
 - Quick actions for rename, timeline, transcript copy, export, and compaction
 - Live LSP connection status with compact inline server icons and click-to-reveal names
 - Searchable MCP section with live radio-style connection controls
 - Click any MCP row to connect or disconnect it
-- Persist enabled and disabled MCP server states per worktree and reapply them between sessions
+- Connect or disconnect every eligible MCP server with per-server progress and failed-only retry
+- Save named MCP state presets and apply them from the MCP section heading
+- Persist enabled and disabled MCP server states globally or per worktree and reapply them between sessions
 - Show or hide each sidebar section independently
-- Configure visible sections from the sidebar settings button
-- Save the current visibility and expansion layout as the default for new sessions
+- Configure section visibility and order from the sidebar settings button
+- Save visibility, expansion, and order globally or for the current worktree
 - Focus the sidebar with `Ctrl+Shift+F`, then navigate with arrows or `j`/`k`
 - Toggle the sidebar with `Ctrl+Shift+B`
 - Keep OpenCode's compact project path and branch footer
 
 Todo starts expanded. Subagents, skills, quick actions, LSP, and MCP start
 collapsed. Use `Save current layout as default` in sidebar settings to reuse the
-current visible/hidden and expanded/collapsed states in new sessions.
+current visible/hidden, expanded/collapsed, and ordering states in new sessions.
 
 Requires OpenCode 1.18.30 or newer. The default LSP icons require a terminal font
 patched with Nerd Fonts v3 glyphs.
@@ -84,8 +86,12 @@ plugin or `tui.json`.
 
 On first launch, a short setup guide explains the sidebar controls and lets you
 choose which sections to show. The guide is shown once and can be opened again
-later from the sidebar settings button. The settings dialog also controls MCP
-state persistence, LSP icon style, and the sidebar shortcuts without a restart.
+later from the sidebar settings button. The settings dialog also selects global
+or current-worktree scope, manages named layout presets, and controls section
+order, MCP state persistence, LSP icon style, and the sidebar shortcuts without
+a restart. Settings are grouped into tabs; use `Tab` and `Shift+Tab` to switch
+tabs. In the Sections tab, use `Left`/`Right` or `Shift+Up`/`Shift+Down` to
+reorder the selected section.
 
 ## Options
 
@@ -102,6 +108,7 @@ Pass configured defaults with a tuple entry:
         "lsp_icon_style": "nerd",
         "focus_key": "ctrl+shift+f",
         "toggle_key": "ctrl+shift+b",
+        "section_order": ["todo", "subagents", "skills", "quick_actions", "lsp", "mcp"],
         "sections": {
           "todo": true,
           "subagents": true,
@@ -129,15 +136,21 @@ Pass configured defaults with a tuple entry:
 - `sections`: controls whether each section is rendered. Every section defaults
   to `true`; set any of `todo`, `subagents`, `skills`, `quick_actions`, `lsp`, or
   `mcp` to `false` to hide it.
+- `section_order`: sets the configured section order. Missing and duplicate
+  entries are normalized so every section appears exactly once.
 
-Every option is also available from the sidebar gear button. Settings are split
-into `Sections`, `Behavior`, and `Defaults & help`. Behavior changes apply
-immediately and are stored as overrides of the configured defaults. Use
-`Restore configured behavior` to remove those overrides. Section visibility and
-expansion remain in-memory for the current OpenCode process until
-`Save current layout as default` is selected; `Restore configured layout`
-removes that saved layout. Section controls are also available in the first-run
-setup guide.
+Every option is also available from the sidebar gear button. Choose `Global` or
+`Current worktree` before editing. Values resolve in configured-default, global,
+worktree, then current-session order. Behavior changes apply immediately in the
+selected scope. Section visibility, expansion, and order remain in memory until
+`Save current layout as default` is selected. The layout, behavior, and
+remembered MCP-state resets remove only the selected scope's overrides, exposing
+inherited values again. Skill-confirmation choices, favorite skills, and MCP
+presets remain user-wide. Preferences
+are stored in one unversioned, validated file under OpenCode's state directory.
+The initial layout-preset list is empty. `Save as…` captures current visibility,
+expansion, and section order; saved presets can be applied to the selected scope,
+updated from the current layout, renamed, or deleted.
 
 ## Keyboard controls
 
@@ -153,7 +166,15 @@ changed at runtime in settings.
 OpenCode initializes enabled MCP servers before TUI plugins. A server remembered
 as disabled can therefore connect briefly during startup before this plugin
 disconnects it. Servers remembered as enabled are connected after the plugin
-initializes.
+initializes. `Connect all` and `Disconnect all` run eligible server changes in
+parallel, retain successful results when some servers fail, and offer a retry for
+only the failed servers.
+
+Use the `Preset` selector in the MCP heading to save the current enabled/disabled
+state, apply a preset, update it from the current scope, rename it, or delete it.
+Preset application runs only the necessary server changes and keeps per-server
+progress and failed-only retry behavior. Servers in a preset that are not present
+in the current scope are retained as desired state but skipped at application time.
 
 Todo priorities are read-only because OpenCode does not expose a Todo mutation
 API to TUI plugins.
@@ -161,7 +182,8 @@ API to TUI plugins.
 Selecting a skill opens its description with Accept and Cancel controls before
 appending its `/<name>` command to the current prompt. Select "Don't show again
 for this skill" to skip that confirmation later. The sidebar settings dialog
-can restore skipped confirmations. Quick actions invoke OpenCode's built-in
+can restore skipped confirmations. Select the star beside a skill to keep it
+ahead of non-favorite skills in every workspace. Quick actions invoke OpenCode's built-in
 commands and display the active keybindings from your configuration.
 
 ## Scripts

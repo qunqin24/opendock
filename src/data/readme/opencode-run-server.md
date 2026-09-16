@@ -1,9 +1,13 @@
 # opencode-run-server
 
-**OpenCode v2, with the existing 0.1.x HTTP API preserved.** Version **0.2.0**
+**OpenCode v2, with the existing 0.1.x HTTP API preserved.** Version **0.3.0**
 keeps `/run`, `/status`, `/health`, port `4097`, bearer authentication, request
 fields, and response formats. Runs use native v2 session APIs behind a supervised
 compatibility listener. Native plugin RPC is also available.
+
+The listener now stays available for the whole life of the OpenCode service
+process: OpenCode evicts idle location instances after an hour, and 0.2.0 let
+that eviction take the listener down until the next time a project was opened.
 
 This is compatibility for **old HTTP callers on OpenCode v2**, not support for
 loading the plugin in OpenCode v1.
@@ -21,7 +25,7 @@ Existing configuration can keep the old spelling and tuple:
 {
   "$schema": "https://opencode.ai/config.json",
   "plugin": [
-    ["opencode-run-server@0.2.0", { "port": 4097, "token": "your-token" }]
+    ["opencode-run-server@0.3.0", { "port": 4097, "token": "your-token" }]
   ]
 }
 ```
@@ -32,7 +36,7 @@ OpenCode v2 normalizes that configuration. Its current spelling also works:
 {
   "$schema": "https://opencode.ai/config.json",
   "plugins": [
-    { "package": "opencode-run-server@0.2.0", "options": { "port": 4097, "token": "your-token" } }
+    { "package": "opencode-run-server@0.3.0", "options": { "port": 4097, "token": "your-token" } }
   ]
 }
 ```
@@ -99,7 +103,7 @@ attachments durably; no temporary upload directory is needed.
 
 ```json
 {
-  "version": "0.2.0", "uptimeMs": 1000,
+  "version": "0.3.0", "uptimeMs": 1000,
   "bind": { "host": "100.64.1.2", "port": 4097 },
   "mainServer": { "url": "http://127.0.0.1:49374", "healthy": true, "lastCheckAt": 1789386000000 },
   "opencodePath": "/path/to/opencode",
@@ -110,6 +114,10 @@ attachments durably; no temporary upload directory is needed.
 The compatibility listener has **one queue across all requested directories**.
 Its counters reset when the listener restarts. Native RPC has its own
 location-scoped queues and counters.
+
+`mainServer.healthy` reports backend **transport** health. A slow answer from a
+busy service still counts as reachable; only a connection-level failure reports
+`false`, and either way `/run` keeps accepting work.
 
 ### Errors
 
@@ -144,13 +152,13 @@ All documented 0.1.x option names remain accepted.
 | `dangerouslySkipPermissions` | `false` |
 | `attach.username`, `attach.password` | Override environment/service credentials used for backend requests |
 | `runtime` | `auto`: Bun if available, otherwise Node; `bun` and `node` force a runtime |
-| `healthCheck.intervalMs` | `5000` |
-| `healthCheck.timeoutMs` | `2000` |
-| `healthCheck.failureThreshold` | `3` consecutive transport failures |
-| `restart.maxRetries` | `10` |
+| `healthCheck.intervalMs` | `5000`; also the re-check interval for discovery, port ownership, and adopted listeners |
+| `healthCheck.timeoutMs` | `2000`; exceeding it marks the service busy, not lost |
+| `healthCheck.failureThreshold` | `3` consecutive connection failures before the log reports the backend unavailable |
+| `restart.maxRetries` | `10` per window, and the event-stream reconnect budget |
 | `restart.baseDelayMs` | `500` |
 | `restart.maxDelayMs` | `30000` |
-| `restart.windowMs` | `60000` |
+| `restart.windowMs` | `60000`; also the pause after the budget is spent |
 | `shutdownGraceMs` | `2000` before force-terminating the companion process group |
 | `opencodePath` | `process.execPath`; retained as compatibility/status metadata, not invoked for runs |
 | `log.file` | `${XDG_STATE_HOME:-~/.local/state}/opencode-run-server/server.log` |
@@ -170,15 +178,33 @@ discovered v2 service rather than another CLI process.
 
 ## Supervision and headless execution
 
-Location instances sharing the same bind/port share the listener. The last
-owning instance's cleanup terminates it. An occupied port produces the existing
-skip behavior instead of a restart loop. Unexpected child exits are restarted
-with bounded exponential backoff while the backend remains alive.
+Location instances sharing the same bind/port share one listener, and the
+listener's lifetime follows the **host OpenCode process**, not those instances.
+Unloading an instance — including OpenCode's hourly eviction of idle locations —
+leaves it serving; runs for a directory whose services were evicted boot them
+again through the service. Changing the plugin's options restarts it with the new
+configuration. A clean host shutdown terminates it, and a host that dies without
+one is detected by the listener's own owner check.
 
-The listener monitors backend transport health and its owning process. Any HTTP
-response, including 401, proves transport liveness. Lost event streams also
-trigger shutdown. Cleanup stops admission, discards pending jobs, interrupts
-native sessions, and exits within the configured grace period.
+The running listener records `pid`, owner, bind, port, and an options fingerprint
+in `${XDG_STATE_HOME:-~/.local/state}/opencode-run-server/listener-<bind>-<port>.json`.
+A starting supervisor confirms the recorded address still answers before trusting
+it, then **adopts** a matching listener this process already owns, **reclaims**
+one whose owner is gone or whose options changed, discards a registration that no
+longer answers, and keeps skipping a port owned by a different live OpenCode
+process. Port contention, failed
+discovery, an unreachable backend, and a spent restart budget all re-check on the
+configured interval rather than giving up, so the endpoint recovers without
+restarting OpenCode.
+
+The listener treats only definitive signals as fatal. Any HTTP response,
+including 401, proves transport liveness, and a probe that exceeds
+`healthCheck.timeoutMs` means the service is busy. A dropped event stream is
+resubscribed with bounded backoff, and missed inbox deliveries are reconciled on
+reconnect so accepted runs are not abandoned. Exhausting the reconnect budget or
+losing the owning process shuts the listener down: admission stops, pending jobs
+are discarded, native sessions are interrupted, and it exits within the
+configured grace period.
 
 Permission asks are rejected and interrupt a headless run by default. With
 `dangerouslySkipPermissions`, pending asks are approved once. Explicit configured
@@ -232,5 +258,6 @@ The suite enforces 95% coverage. Package verification installs a real tarball,
 checks consumer declarations, and uses an isolated v2 server and local fixture
 model. It exercises native RPC and the legacy HTTP API with **both Node and Bun
 companion runtimes**, including old config normalization, continuation, forking,
-commands, attachments, authentication, queue limits, permissions, timeouts, and
-unload. CI runs the checks on macOS and Linux.
+commands, attachments, authentication, queue limits, permissions, timeouts, runs
+accepted while transport probes stall, and unload. CI runs the checks on macOS
+and Linux.

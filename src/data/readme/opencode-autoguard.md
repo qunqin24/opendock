@@ -124,6 +124,80 @@ Windows 路径可写成 `C:/absolute/path/to/autoguard/index.ts`。
 
 修改插件或配置后应完全重启 OpenCode。`permission: "ask"` 决定 OpenCode 是否产生待审批请求；`auto` 决定 AutoGuard 是否接管该 action。权限自动审核需要两者同时满足。
 
+## Google Antigravity (AGY) 接入
+
+AutoGuard 原生支持作为 Google Antigravity (AGY) 的 Lifecycle Plugin / Hook 运行，保护 `run_command`、`write_to_file` 与 `replace_file_content`。
+
+### 核心特性
+
+- **直接复用 AGY 模型额度**：无需配置外部第三方 API Key，默认使用后台常驻的 AGY 守护进程调用 `Gemini 3.8 Flash (High)`，平均响应仅 **~3 秒**。
+- **三级防御体系**：
+  - **Tier A（秒过，<1ms）**：原生只读工具（`view_file`、`list_dir`、`grep_search` 等）及 `fastAllow` 常见开发命令（`npm test`、`git status`、`ls` 等）零延迟放行。
+  - **Tier C（硬阻断/留人工）**：高危 shell 命令（`rm -rf /`、`git push --force` 等）、常见凭据文件（`.env`、私钥）及提权载体路径（`.git/hooks`、shell rc、`authorized_keys` 等）本地规则直接拦截或弹窗确认。
+  - **Tier B（LLM Judge）**：其余不确定命令/写操作由 Gemini 3.8 Flash (High) 审查；发生异常或超时自动 Fail-Closed 留人工。
+- **后台常驻与自动休眠**：支持后台持续复用 `stream-json` 长连接；空闲超过 30 分钟自动退出，无需担心资源泄漏。
+
+### 一键安装
+
+#### 方式 1：AGY 原生插件安装（推荐）
+
+在 Antigravity 环境下直接执行：
+
+```sh
+agy plugin install <path/to/opencode-autoguard>
+```
+
+或从 Git 仓库安装：
+
+```sh
+git clone git@github.com:APLaS-Plus/opencode-autoguard.git
+agy plugin install ./opencode-autoguard
+```
+
+#### 方式 2：npm 一键配置脚本
+
+```sh
+npm run setup:agy
+```
+
+该脚本会自动检测当前系统的 `agy` CLI，校验插件完整性，并将 `PreToolUse` 钩子配置就绪。如果要在当前工作区（项目级）安装，可附加 `--workspace`：
+
+```sh
+npm run setup:agy -- --workspace
+```
+
+#### 方式 3：手动配置 `.agents/hooks.json`
+
+在项目的 `.agents/hooks.json`（或全局 `~/.agents/hooks.json`）中添加：
+
+```json
+{
+  "autoguard": {
+    "PreToolUse": [
+      {
+        "matcher": "run_command|write_to_file|replace_file_content",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node --no-warnings --experimental-strip-types /path/to/autoguard/src/agy-hook.ts"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+### 守护进程管理
+
+Hook 触发时若发现后台服务未启动，会自动在后台静默拉起。你也可以手动管理：
+
+```sh
+npm run daemon:agy start     # 启动后台守护进程
+npm run daemon:agy status    # 查看守护进程运行状态与端口
+npm run daemon:agy stop      # 停止守护进程
+```
+
 ## 行为与安全约束
 
 权限请求按 **Tier C → Tier A → Tier B** 三级分流：先拦住明确危险项（C），再秒放明确安全项（A），最后把其余不确定请求交给模型（B）。这个顺序确保凭据与高危规则先于白名单生效，同时只为不确定请求调用网络 judge。

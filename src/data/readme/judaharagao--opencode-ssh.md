@@ -185,6 +185,12 @@ ssh.security_policy(action="add_allowlist", pattern="docker stop .*")
 ssh.security_policy(action="remove_allowlist", pattern="docker stop .*")
 ```
 
+> **User confirmation required:** Viewing the policy is read-only and does not
+> prompt. Every **mutation** (`add_allowlist`, `remove_allowlist`,
+> `add_blocklist`, `remove_blocklist`) triggers opencode's permission prompt
+> and is re-confirmed by the user **every single time** — the LLM can never
+> self-grant an allowlist entry without explicit user approval.
+
 ### `ssh.audit_log`
 View the command audit trail.
 
@@ -244,6 +250,19 @@ All commands are logged in `.opencode-ssh/audit.jsonl` with:
 - Matched security rule (if any)
 
 View the audit log with `ssh.audit_log`.
+
+## Development
+
+### Versioning
+
+`package.json` is the single source of truth for the plugin version. It is
+propagated automatically by `scripts/sync-version.cjs` to:
+
+- `src/version.ts` — `PLUGIN_VERSION` (between `GENERATED` markers)
+- `marketplace.json` — `version`
+
+Bump the version in `package.json`, then run `bun run version:sync` (or just
+`bun run build`, which runs the sync first).
 
 ## License
 

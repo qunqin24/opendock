@@ -2,9 +2,28 @@
 
 OpenCode plugin dat een willekeurig geluid afspeelt en push notificaties stuurt van de legendarische [Probleemwijken/Derkolk soundboard](https://www.derkolk.nl/probleemwijken/) wanneer een sessie klaar is.
 
+Werkt op **OpenCode 2** én **OpenCode 1** (1.18.29 of nieuwer) — één package, beide versies.
+
 ## Installatie
 
-Voeg de plugin toe aan je `opencode.json`:
+### OpenCode 2
+
+Let op: de config-key heet in v2 `plugins` (meervoud), niet `plugin`.
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugins": ["opencode-probleemwijken"]
+}
+```
+
+Of via de CLI:
+
+```sh
+opencode plugin add opencode-probleemwijken
+```
+
+### OpenCode 1 (1.18.29+)
 
 ```json
 {
@@ -18,15 +37,25 @@ Herstart OpenCode en je bent klaar!
 
 ```json
 {
-  "plugin": ["opencode-probleemwijken@1.0.0"]
+  "plugins": ["opencode-probleemwijken@2.0.0"]
 }
 ```
 
 ## Wat doet het?
 
-Elke keer als OpenCode klaar is met een taak (`session.idle`) of een error krijgt (`session.error`):
-- Speelt een willekeurig geluid af uit de collectie van 36 klassieke Derkolk soundboard fragmenten
+Elke keer als OpenCode klaar is met een taak, om permissie vraagt, of een error krijgt:
+- Speelt een willekeurig geluid af uit de collectie van 62 klassieke Derkolk soundboard fragmenten
 - Stuurt een push notificatie naar je desktop
+
+Welke events daarvoor gebruikt worden verschilt per OpenCode-versie:
+
+| Trigger | OpenCode 1 | OpenCode 2 |
+|---------|------------|------------|
+| Sessie klaar | `session.idle` | `session.status` (idle) + `session.idle` |
+| Error | `session.error` | `session.execution.failed` |
+| Permissie | `permission.asked` | `permission.asked` |
+
+In OpenCode 2 is `session.idle` afgeschaft ten gunste van `session.status`. De plugin luistert naar allebei en ontdubbelt intern, dus je hoort nooit twee geluiden voor dezelfde sessie.
 
 ## Geluiden
 
@@ -40,7 +69,7 @@ Elke keer als OpenCode klaar is met een taak (`session.idle`) of een error krijg
 - "Tetete"
 - "Kakwijk"
 - "Doei Henk"
-- ... en nog 26 meer!
+- ... en nog 52 meer!
 
 ## Platform ondersteuning
 
@@ -51,6 +80,34 @@ Elke keer als OpenCode klaar is met een taak (`session.idle`) of een error krijg
 | Windows | Windows Media Player | Windows Toast Notifications |
 
 ## Configuratie (optioneel)
+
+Er zijn twee manieren om te configureren. Ze worden over elkaar heen gelegd, waarbij de laatste wint:
+
+1. ingebouwde defaults
+2. `~/.config/opencode/probleemwijken.json`
+3. plugin-options in je `opencode.json` (alleen OpenCode 2)
+
+### Via opencode.json (OpenCode 2)
+
+Gebruik de object-vorm met `package` en `options`:
+
+```json
+{
+  "plugins": [
+    {
+      "package": "opencode-probleemwijken",
+      "options": {
+        "messages": { "complete": "Hoppa!" },
+        "events": { "subagent_complete": true }
+      }
+    }
+  ]
+}
+```
+
+De options accepteren exact dezelfde keys als het JSON-bestand hieronder. Wat je niet opgeeft valt terug op je `probleemwijken.json` en daarna op de defaults — je bestaande config blijft dus gewoon werken.
+
+### Via probleemwijken.json (alle versies)
 
 Maak `~/.config/opencode/probleemwijken.json`:
 

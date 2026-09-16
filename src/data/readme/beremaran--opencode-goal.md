@@ -15,8 +15,7 @@ The plugin combines:
   model tools, and idle continuation.
 
 Requires OpenCode 2.0.0 or newer. The package root is the OpenCode 2
-`{ id, setup }` plugin; a legacy OpenCode 1 server adapter remains available
-under the explicit `./server` export.
+`{ id, setup }` plugin.
 
 ## Install
 

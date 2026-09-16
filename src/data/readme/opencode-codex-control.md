@@ -28,8 +28,8 @@ nothing until the first tool call.
   `click`, `type_text`, `press_key`, `paste`, `scroll`, `drag`, `select_text`,
   `set_value`, `perform_secondary_action`.
 - `chrome.*` — the real Chrome: `list_tabs`, `new_tab`, `navigate`, `page_info`,
-  `read_page`, `read_dom`, `click`, `type_text`, `press_key`, `scroll`,
-  `set_value`, `select_text`, `perform_secondary_action`, `drag`,
+  `read_page`, `read_dom`, `screenshot`, `click`, `type_text`, `press_key`,
+  `scroll`, `set_value`, `select_text`, `perform_secondary_action`, `drag`,
   `find_elements`, `go_back`, `go_forward`, `reload`, `close_tab`,
   `export_content`.
 
@@ -118,10 +118,12 @@ install and will launch apps or open browser tabs), so it is not part of CI.
 index.ts                    # entrypoint the OpenCode loader imports
 src/plugin.ts               # plugin definition + tool registration
 src/controller.ts           # connection lifecycle; call -> result
+src/lifecycle.ts            # turn-end release of Codex sessions
 src/codex/appserver.ts      # codex app-server child + JSON-RPC client
 src/codex/install.ts        # CLI/install discovery
 src/codex/permissions.ts    # macOS TCC denial -> setup instructions
 src/codex/repl.ts           # safe argument encoding + JSON result wrapper
+src/codex/turn-tracker.ts   # turn-id bookkeeping for session release
 src/tools/computer-use.ts
 src/tools/chrome.ts
 ```

@@ -356,6 +356,7 @@ One hook fire measures 289ms wall-clock since the v3.6.0 optimization, down from
 
 | Version | Highlights |
 |---------|------------|
+| **v3.18.1** | Fixes active-plan display and listing for UTF-8 BOM-prefixed pointers from Windows editors and PowerShell workflows across the canonical shell helpers (#243). |
 | **v3.18.0** | Lists saved plans and phase counts with `--list` or PowerShell `-List` (#242). Supports the shipped translated templates, checks project containment, and delivers the canonical helpers across IDE bundles. |
 | **v3.17.2** | Fixes #241: the native Codex manifest disables legacy command migration, removing 13 redundant `source-command-*` skills from plugin installs. The canonical planning skill, Codex hooks, and Claude commands remain available. |
 | **v3.17.1** | Fixes #240: two named plans in the same project now require `PLAN_ID`, even without `.planning/sessions/`. A shared pointer or newest-plan guess cannot redirect a Codex session across compaction. Ambiguous hooks inject no plan and Stop does not gate against a guessed plan. |

@@ -2,60 +2,121 @@
 
 # PlanWeft
 
-PlanWeft 把编程 Agent 的任务计划、调查发现和验证记录保存在项目中。会话中断或换人后，可以从这些文件继续工作，而不必依赖聊天记录。
+让编程 Agent 的任务在会话结束后仍然有可读、可接续、可核验的项目记录。
 
-当前源码版本为 **0.5.1（已发布至 `next` 和 `latest`）**。它基于固定的 planning-with-files（PWF）v3.17.0，并由 `project-docs` Skill 管理文档交接及可选的文档职责映射；Hook 仍只读提示交接状态。正式 promotion 记录见 [REP-0015](docs/reproduction/0015-planweft-0.5.1-formal-promotion.md)。
+PlanWeft 把任务计划、调查发现和验证结果保存到项目文件中。后续会话或协作者可以从这些记录继续工作，而不依赖旧聊天。
 
-## 快速开始
+## 为什么需要 PlanWeft
 
-需要 Node.js 22 或更高版本。下面的例子为 Codex 安装完整集成，并检查安装状态：
+Agent 的对话上下文会结束，但任务不会因此结束。PlanWeft 提供一套由项目文件承载的工作记录：Skill 指导 Agent 如何使用这些记录，Hook 在宿主支持的生命周期事件中读取状态或提供提醒，项目文件保存真正需要接续的内容。
+
+## 安装
+
+需要 Node.js 22 或更高版本。以 Codex 完整集成为例：
 
 ```bash
 npx planweft@0.5.1 add -a codex --global
 npx planweft@0.5.1 doctor -a codex --global
 ```
 
-新会话中显式调用 `$project-docs`，确认 Agent 实际读取了 Skill。其他宿主的 scope、信任和加载方式见[安装指南](docs/installation.md)。
+安装后创建新会话，显式调用 `$project-docs`，再确认宿主已发现并启用了相应资源。其他宿主、scope 和 Skill-only 用法见[安装指南](docs/installation.md)。
 
-## 它保存什么
+## 一次任务怎么使用
 
-复杂任务通常使用三份工作文件：
+例如，在新的 Codex 会话中：
 
-| 文件 | 内容 |
-| --- | --- |
-| `task_plan.md` | 目标、阶段、下一步和阻塞项 |
-| `findings.md` | 调研结果、来源、假设和待定事项 |
-| `progress.md` | 已执行操作、错误和测试结果 |
+```text
+$project-docs
+修复 CSV 导入空行导致的崩溃，补回归测试，并更新受影响的使用说明。
+```
 
-稳定的需求、设计决定和复现材料继续保存在项目已有的 specs、ADR 和 reproduction 文档中。PlanWeft 不要求为每个小改动创建一整套文档，也不会把宿主聊天历史当作默认恢复来源。
+对于需要持续规划的复杂任务，PlanWeft 会选择已有计划或在授权范围内初始化任务记录。命名计划通常位于：
 
-已有的文档索引可以可选地加入一个 Markdown `Documentation Map`，说明文档职责、实际位置、更新触发条件和生成来源。它只帮助 Skill 在授权范围内导航：不要求迁移目录、不解析为状态、不读取配置或环境文件，也不影响 Hook。完整约定见随 Skill 分发的 `references/documentation-map.md` 与 [SPEC-0007](docs/specs/0007-document-role-map.md)。
+```text
+your-project/
+└── .planning/
+    └── <date>-fix-csv-import/
+        ├── task_plan.md
+        ├── findings.md
+        └── progress.md
+```
 
-## 0.5.x 验证范围
+Agent 在任务过程中维护这些记录；后续会话或协作者可以从目标、当前阶段、调查结果、实际验证和下一步继续工作。只读请求和简单修改不要求创建新计划。
 
-| 能力 | 状态 |
-| --- | --- |
-| 可重建包、安装包静态检查、Hook 逻辑、Skill/Hook 关联与文档交接 marker | 每个 0.5.x 版本的必需验证 |
-| 独立源码审查与只接收项目文件的冷读 | 每个 0.5.x 版本的必需验证 |
-| 0.4.0 发布验收 | 历史证据，适用范围不自动延伸至 0.5.x |
+## 安装后 Agent 得到什么
 
-未执行验证不会写成 Passed。文档交接默认 advisory；只有用户明确启用 gated 且原 PWF 条件已满足时才复用既有 block 预算。0.4.0 的历史限制保留在其历史记录中。完整边界见 [SPEC-0006](docs/specs/0006-skill-hook-document-handoff.md)。
+各宿主的目录略有不同，下面是自包含插件包的简化示意：
 
-## 使用边界
+```text
+planweft/
+├── skills/
+│   └── project-docs/
+│       ├── SKILL.md              # 核心工作规则
+│       ├── references/           # 按需读取的详细规则
+│       ├── scripts/              # 计划选择、检查和交接辅助脚本
+│       └── templates/            # 任务记录模板
+├── hooks/                        # 宿主生命周期适配
+├── extensions/ or commands/      # 宿主原生入口（如适用）
+└── package metadata              # 宿主发现和版本信息
+```
 
-- 默认模式提供提醒，不会自动保证任务完成。autonomous/gated 必须显式启用，并受宿主能力限制。
-- attestation 检查文件内容是否变化，不代表人工批准；完成门禁检查计划状态，不代表实现正确。
-- 模型范围遵循是公开评测结果，不是安全隔离保证。文件权限和命令授权仍由宿主负责。
-- 同一会话只应启用一套规划执行 hooks。安装器会报告可检测的重复来源，但不会自动删除其他插件。
-- 更新或卸载插件不会回退或删除项目计划、用户笔记、specs、ADR 和 reproduction。
+这棵树说明包的组成，不证明某台机器已经安装、信任、启用插件，也不证明模型已经读取 Skill。
 
-## 文档
+## Skill、Hook 和项目记录如何串起来
+
+```mermaid
+flowchart LR
+    U[用户任务] --> A[Agent 宿主]
+    S[project-docs Skill] --> A
+    H[生命周期 Hook] --> A
+    A --> P[task_plan.md]
+    A --> F[findings.md]
+    A --> G[progress.md]
+    P --> N[后续会话或协作者]
+    F --> N
+    G --> N
+    H -. 读取状态 / 提醒 .-> P
+```
+
+Skill 决定 Agent 如何在授权范围内工作和维护记录；Hook 只能在宿主实际支持且启用的事件中读取状态、注入上下文或返回宿主允许的控制结果；三份项目记录保存任务的持久状态。
+
+## 关键文件的职责
+
+| 文件或组件 | Agent 什么时候接触 | 作用 |
+| --- | --- | --- |
+| `skills/project-docs/SKILL.md` | 宿主选中 Skill 后 | 指导计划、调查、实施、验证和交接 |
+| `references/*.md` | Skill 按任务需要 | 提供计划选择、证据、控制和文档导航细则 |
+| `scripts/resolve-plan-dir.*` | 开始或恢复复杂任务时 | 定位当前任务的计划目录 |
+| `scripts/init-session.*` | 需要建立新任务记录时 | 初始化 `task_plan.md`、`findings.md` 和 `progress.md` |
+| `templates/*.md` | 初始化或扩展记录时 | 提供记录结构，不代表一定会被复制 |
+| 宿主 Hook 或原生扩展 | 会话、提示词、工具、压缩或结束事件 | 读取计划状态并提供上下文或提醒 |
+| `task_plan.md` | 任务全生命周期 | 保存目标、阶段、下一步、阻塞和交接判断 |
+| `findings.md` | 调查和设计阶段 | 保存来源、观察、假设和候选决定 |
+| `progress.md` | 实施和验证阶段 | 保存实际动作、错误和 `Passed` / `Failed` / `Not Run` |
+
+## 一个任务会留下什么
+
+复杂任务通常会在项目中留下三份记录。它们属于用户项目，不属于插件安装目录；更新或卸载 PlanWeft 不会删除它们。已有的需求、设计和复现文档仍由项目自己的目录管理。
+
+```text
+your-project/
+├── <selected task directory>/
+│   ├── task_plan.md
+│   ├── findings.md
+│   └── progress.md
+└── <existing project documents>/
+```
+
+Skill、Hook 和文档都不会绕过项目规则、用户授权或宿主权限。
+
+## 支持的宿主
+
+当前 npm 包包含 15 个宿主分发目标。其中 `codex`、`claude`、`pi`、`opencode` 和 `dsh` 是主要支持集成，其余目标目前按实验性适配处理。分发存在不等于宿主已经加载或模型已经使用；事件、原生入口和能力边界见[宿主说明](docs/hosts.md)。
+
+## 文档入口
 
 - [安装、更新、回退与卸载](docs/installation.md)
-- [平台支持和已知限制](docs/platforms.md)
-- [开发与生成约定](docs/development.md)
-- [发布与证据维护](docs/releasing.md)
-- [测试入口](tests/README.md)
-- [设计来源台账](docs/design-references.md)
+- [架构、生命周期与文件职责](docs/architecture.md)
+- [宿主分发与能力边界](docs/hosts.md)
 
-项目通过一个 `planweft` npm 包分发。0.4.0 的发布附件、准确归档摘要和验收记录仍见 [v0.4.0 GitHub Release](https://github.com/psiQAQ/planweft/releases/tag/v0.4.0)。
+维护者资料： [开发与生成约定](docs/development.md) · [发布与证据维护](docs/releasing.md)。历史计划、复现、审查和参考资料从[文档导航](docs/README.md)进入。

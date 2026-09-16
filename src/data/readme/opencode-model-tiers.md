@@ -12,13 +12,22 @@ To install and create a registry interactively, run:
 npx opencode-model-tiers init
 ```
 
+When testing a local checkout, run the initializer with `--local` from the
+target project. This writes a `file:///.../index.js` plugin entry instead of
+installing the published npm package:
+
+```bash
+cd /path/to/project
+node /path/to/opencode-model-tiers/cli.js init --local
+```
+
 Or add the plugin to `opencode.json` manually:
 
 ```jsonc
 {
   "$schema": "https://opencode.ai/config.json",
   "plugin": [
-    "opencode-model-tiers"
+    "opencode-model-tiers@0.1.10"
   ]
 }
 ```
@@ -29,7 +38,11 @@ Start OpenCode:
 opencode
 ```
 
-OpenCode installs npm plugins automatically at startup.
+OpenCode installs npm plugins automatically at startup. Pin the plugin to a
+specific version in `opencode.json` to avoid loading a newer version
+implicitly. The initializer writes the current package version when it creates
+a config or adds the plugin to an existing config. It leaves existing plugin
+entries unchanged, including entries pinned to another version.
 
 ## Configure tiers
 
@@ -85,16 +98,19 @@ Create a registry as `./.opencode/model-tiers.json` for one project:
 }
 ```
 
-For a global registry, use
-`$XDG_CONFIG_HOME/opencode/model-tiers.json`. When
+For a profile registry, use `$OPENCODE_CONFIG_DIR/model-tiers.json`. For a
+global registry, use `$XDG_CONFIG_HOME/opencode/model-tiers.json`. When
 `XDG_CONFIG_HOME` is unset, use `~/.config/opencode/model-tiers.json`.
 
-The project registry takes precedence when it exists. The plugin doesn't fall
-back to the global registry if an existing project registry is malformed.
+Lookup order is project, then `OPENCODE_CONFIG_DIR`, then the XDG global
+registry. The first existing file wins. The plugin doesn't fall back if that
+file is malformed.
 
-The initializer uses the same migration flow for both destinations. It updates
-the OpenCode config and agent files in the selected config directory; only the
-registry and config directory location changes.
+The initializer writes the registry and installs the plugin in the selected
+config directory. When existing model fields or agent files are present, it
+asks whether to keep each model or replace it with a selected tier. Applying
+the changes updates selected JSON or JSONC model fields and Markdown agent
+frontmatter to use `tier:<NAME>`.
 
 Existing flat registries remain supported for compatibility:
 
@@ -184,7 +200,8 @@ visible.
 
 Check these conditions:
 
-- The registry path matches the project or global path described above.
+- The registry path matches the project, `OPENCODE_CONFIG_DIR`, or global path
+  described above.
 - The tier name has the same case as the registry key.
 - The registry policy contains a string `model` value.
 - A project registry isn't shadowing the global registry.

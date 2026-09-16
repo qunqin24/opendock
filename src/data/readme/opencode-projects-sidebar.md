@@ -9,7 +9,6 @@ and lets you open a session directly from the sidebar.
 ## Requirements
 
 - OpenCode 1.18.27 or a compatible release with TUI plugin slots
-- A terminal with at least 128 columns for automatic first-time opening
 
 The plugin currently renders in the native session sidebar. It is not shown
 on the home screen because OpenCode does not expose a home-screen sidebar slot.
@@ -52,6 +51,9 @@ To use custom options, use the tuple form:
   refreshes every five seconds.
 - Click a project header to collapse or expand its sessions.
 - Click a session to open it.
+- Hover a project header to create a clean session in its directory or rename
+  the project.
+- Hover a session to rename it.
 
 ## Options
 
