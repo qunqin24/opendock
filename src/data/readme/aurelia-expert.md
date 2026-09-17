@@ -158,7 +158,7 @@ bunx aurelia-expert status
 bunx aurelia-expert uninstall --scope local
 ```
 
-Non-interactive by design — no prompts, CI-friendly. The CLI writes a `.version` marker under `skills/aurelia-expert/` so subsequent runs are no-ops.
+Non-interactive by design — no prompts, CI-friendly. The CLI writes an install manifest (`aurelia-expert.manifest.json`) with per-file sha256 hashes, so subsequent runs are zero-write no-ops unless the package version drifts or a file is missing. Consumer-modified installed files are skipped unless `--force` is passed.
 
 ### 2. Cross-agent install via skills.sh
 
@@ -179,7 +179,7 @@ Add `aurelia-expert` to your `opencode.json` `plugin` array:
 }
 ```
 
-OpenCode installs the package on next session start, then `plugin.ts#config()` auto-copies the eight skills into `.opencode/skills/` (idempotent — checks `.version` marker).
+OpenCode installs the package on next session start, then `plugin.ts#config()` runs a scope-aware, manifest-gated install: it detects where the plugin is registered (global config, `.opencode/opencode.json`, or a root `opencode.json` — with `name` ≡ `name@latest` ≡ `name@x.y.z` semantic matching) and ensures the skills only in the detected scope(s). Detection is read-only; the hook never edits `plugin` arrays, never touches a root `opencode.json`, refuses to rewrite unparseable configs, and is a zero-write no-op when the manifest already matches. If the plugin is not registered in any scope, a one-shot advisory is logged per session.
 
 For local development against a checkout of this repo, reference the directory directly:
 

@@ -2,9 +2,9 @@
 
 [![npm version](https://img.shields.io/npm/v/opencode-plugin-comment-judge)](https://www.npmjs.com/package/opencode-plugin-comment-judge) [![npm provenance](https://img.shields.io/badge/provenance-SLSA_v1-blue?logo=npm)](https://www.npmjs.com/package/opencode-plugin-comment-judge) [![license](https://img.shields.io/npm/l/opencode-plugin-comment-judge)](LICENSE)
 
-An [opencode](https://opencode.ai) plugin that puts a model between your agent and the comments it writes. Every comment an edit adds is judged: the ones that restate the code or tell the story of the change are removed or rewritten before the file is touched, and the ones that explain something the code cannot say stay.
+An [opencode](https://opencode.ai) plugin, and a [Claude Code](#claude-code) hook, that puts a model between your agent and the comments it writes. Every comment an edit adds is judged: the ones that restate the code or tell the story of the change are removed or rewritten before the file is touched, and the ones that explain something the code cannot say stay.
 
-> **Status:** pre-1.0, verified against opencode 1.18.30. Verdicts, messages and options may change between minor versions.
+> **Status:** pre-1.0. The e2e test runs it inside opencode 1.18.31. Verdicts, messages and options may change between minor versions.
 
 ## Why
 
@@ -38,23 +38,31 @@ The judge answered `rewrite`, because the comment "frames it around the specific
 
 ## Install
 
-Add the plugin to `opencode.json`. opencode installs npm plugins itself when it starts.
+Add the plugin to `opencode.json`, pinned to a version. opencode installs npm plugins itself when it starts. See [Updating](#updating) for why the version is pinned.
+
+<!-- x-release-please-start-version -->
 
 ```json
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugin": ["opencode-plugin-comment-judge"],
+  "plugin": ["opencode-plugin-comment-judge@0.3.0"],
   "small_model": "anthropic/claude-haiku-4-5"
 }
 ```
 
+<!-- x-release-please-end -->
+
 ## Configuration
+
+<!-- x-release-please-start-version -->
 
 ```json
 {
-  "plugin": [["opencode-plugin-comment-judge", { "model": "anthropic/claude-haiku-4-5", "timeoutMs": 20000 }]]
+  "plugin": [["opencode-plugin-comment-judge@0.3.0", { "model": "anthropic/claude-haiku-4-5", "timeoutMs": 20000 }]]
 }
 ```
+
+<!-- x-release-please-end -->
 
 | Option | Default | Meaning |
 | --- | --- | --- |
@@ -65,6 +73,44 @@ Add the plugin to `opencode.json`. opencode installs npm plugins itself when it 
 Diagnostics always go to opencode's own log under the `comment-judge` service.
 
 To read a `log` file as numbers, run `mise run stats -- path/to/log.jsonl` (add `--json` for machine output) from a checkout of this repository: verdict counts and rates, rejections, unjudged edits, judge latency, cost and the most common reasons. The script is not part of the npm package.
+
+## Updating
+
+opencode installs an npm plugin once and keeps using that copy. It installs each entry into its own directory named after the entry, under `~/.cache/opencode/packages/` on macOS and Linux (`$XDG_CACHE_HOME/opencode/packages/` when `XDG_CACHE_HOME` is set), and skips the install whenever that directory already has the package. Nothing refreshes it later.
+
+A bare `"opencode-plugin-comment-judge"` entry resolves `latest` on first install and stays on that version from then on. To update it, remove its cache directory, `opencode-plugin-comment-judge@latest`, and `opencode-plugin-comment-judge` if it exists too, then restart opencode:
+
+```sh
+rm -rf "${XDG_CACHE_HOME:-$HOME/.cache}/opencode/packages/opencode-plugin-comment-judge@latest" "${XDG_CACHE_HOME:-$HOME/.cache}/opencode/packages/opencode-plugin-comment-judge"
+```
+
+<!-- x-release-please-start-version -->
+
+A pinned entry such as `"opencode-plugin-comment-judge@0.3.0"` gets a directory of its own, so changing the version installs the new one on the next start, and changing it back rolls back. Pinning is the recommended setup: every machine runs the same version, and an update is a one-line change you choose to make.
+
+<!-- x-release-please-end -->
+
+What changed in each version is in the [GitHub releases](https://github.com/Automaat/opencode-plugin-comment-judge/releases) and in [CHANGELOG.md](CHANGELOG.md).
+
+## Judging a whole branch
+
+Comments already on a branch, written before the plugin was installed or by people, never went through an edit the plugin saw. Run `/judge-comments` in opencode to have them judged:
+
+```text
+/judge-comments
+/judge-comments origin/release-2.0
+/judge-comments main src/api
+```
+
+The command asks the agent to call the plugin's `judge_comments` tool and then apply what it returns with edits that change only those comment lines. A git ref among the arguments is the base; paths limit the review to those files or directories. The command is not added when your config already defines a command named `judge-comments`.
+
+The tool can also be called on its own, by you or the agent:
+
+- **What is judged:** every comment the diff between the base and the working tree adds, so committed, uncommitted and untracked files all count. Deleted and binary files are skipped, a renamed file is read under its new name, and a comment moved within a file counts as kept. Docstrings, `{/* */}` and `<!-- -->` are read from the whole file, so one the branch only changed a line of is judged as a whole.
+- **Base:** the merge base of `HEAD` with `origin/HEAD`, or with `main`, `master`, `origin/main` or `origin/master` when that does not exist. A `base` argument uses the merge base of `HEAD` with that ref instead.
+- **Calls:** comments go to the judge in batches of 20, up to three calls at a time, each under `timeoutMs` and the repository rules. A batch that fails or times out is listed as not judged, and the rest are still reported.
+- **Answer:** a count of keep, remove and rewrite verdicts, then per file each comment to remove or rewrite with its `path:line`, its first line, the reason, and the lines to delete or the replacement lines in the file's comment syntax and indentation. Kept comments are only counted. The tool does not edit files.
+- **Applying:** an edit that writes a suggested comment exactly as the tool gave it, in the same session, is not judged again. Any other comment in that edit is.
 
 ## What the judge keeps, removes and rewrites
 
@@ -103,14 +149,68 @@ One model call per edit that adds comments, and none otherwise. Each call carrie
 - Docstrings, `{/* */}` and `<!-- -->` are seen only when they take whole lines, open and close inside the edit, and have nothing but whitespace after them on the closing line. One after code on the same line, such as `<p>text</p> <!-- note -->`, is not seen.
 - A docstring, `{/* */}` or `<!-- -->` that the edit adds or changes is judged, rewritten and removed as a whole, including lines the file already had. A rewrite breaks up `"""`, `*/` and `-->` in the model's text, and every `--` in XML, so it cannot end the comment early.
 - Removing a docstring that is the only statement of its function or class would leave an empty body, so that verdict rejects the edit and the agent decides what goes in its place. The body counts as empty when nothing indented under the definition follows the docstring in the edit, even if the file has more.
-- "Added" means lines in the new text that are not in the old text, counted as a multiset, so a moved comment counts as kept.
+- "Added" means lines in the new text that are not in the old text, counted as a multiset, so a moved comment counts as kept. `judge_comments` takes added lines from `git diff` instead, and counts a comment as moved only when the diff removes the same lines in the same file.
+- `judge_comments` needs `git` on the `PATH` and runs in the directory opencode runs in. It is opencode only; the Claude Code hook has no equivalent.
 - The judge is prompted as opencode's `build` agent, so it carries that agent's system prompt, and anything that attributes spend by agent sees `build`. Its session also runs other plugins' chat hooks.
 - Verdicts are not deterministic: the same comment can be worded differently on another run.
 - It relies on opencode behaviour that is not a documented contract: structured output through `format`, tool arguments being mutable in `tool.execute.before`, and the `apply_patch` format.
 
+## Claude Code
+
+The same package ships `comment-judge-claude`, a command for Claude Code's `PreToolUse` and `PostToolUse` [hooks](https://code.claude.com/docs/en/hooks). It finds the comments an `Edit`, `Write` or `MultiEdit` call adds, asks `claude -p` on a cheap model for the same verdicts, and returns the rewritten tool input before the file is touched. Its rules, messages and `.comment-judge.md` handling are the opencode plugin's.
+
+Install it once so each edit does not pay for `npx` resolving the package:
+
+```sh
+npm install -g opencode-plugin-comment-judge
+```
+
+Then add the hooks to `.claude/settings.json` in a project, or to `~/.claude/settings.json` for every project:
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [
+      { "matcher": "Edit|Write|MultiEdit", "hooks": [{ "type": "command", "command": "comment-judge-claude", "timeout": 60 }] }
+    ],
+    "PostToolUse": [
+      { "matcher": "Edit|Write|MultiEdit", "hooks": [{ "type": "command", "command": "comment-judge-claude", "timeout": 10 }] }
+    ]
+  }
+}
+```
+
+Without a global install, use `"command": "npx -y -p opencode-plugin-comment-judge comment-judge-claude"` in both places.
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `COMMENT_JUDGE_MODEL` | `haiku` | Model alias or full name passed to `claude -p --model` |
+| `COMMENT_JUDGE_TIMEOUT_MS` | `30000` | How long an edit waits for a verdict before it is written unjudged. Keep it below the hook's `timeout`, which is in seconds |
+
+Set them in your shell, or under `env` in the same settings file.
+
+What each hook call does:
+
+- **Every verdict applies in place:** the `PreToolUse` hook returns `updatedInput` with the comments rewritten, and no permission decision, so your permission mode and rules still decide whether the edit runs, and a permission prompt shows the rewritten edit. The `PostToolUse` hook then gives Claude the note about what the file holds as `additionalContext`.
+- **A verdict cannot apply in place, or an `Edit` would be left with only removed comments:** the hook denies the call, and Claude reads the suggestions as the reason. The same comments sent again go through, with the suggestions attached after the tool runs.
+- **The judge fails or times out:** the edit runs as sent, and the warning is shown to you as a `systemMessage`.
+
+The judge runs `claude -p --model haiku --system-prompt <instructions> --output-format json --json-schema <schema> --tools "" --strict-mcp-config --setting-sources "" --safe-mode --disable-slash-commands --no-session-persistence` from the system temp directory, with stdin closed. It has no tools, MCP servers, settings files, hooks, plugins or CLAUDE.md, and saves no session. It runs with `MAX_THINKING_TOKENS=0`, since extended thinking made a verdict take four times as long in testing, and `CLAUDE_CODE_DISABLE_TERMINAL_TITLE=1`, which skips the extra model request for a session title. It also runs with `COMMENT_JUDGE_ACTIVE=1`, and the hook exits at once when it sees that variable, so the judge can never judge itself.
+
+Limitations on top of the ones above:
+
+- Needs Claude Code 2.1.169 or later, for `--safe-mode`; verified against 2.1.274. On an older version every judge call fails and edits are written unjudged, with the warning.
+- Each judged edit is a `claude -p` call billed to the account Claude Code is logged in with. With `haiku`, a call took about 5 seconds and cost under a cent in testing.
+- The task the judge sees is the latest prompt, read from the session transcript, whose format Claude Code does not document. When it cannot be read, the judge sees no task.
+- Rules are read from `.comment-judge.md` in `$CLAUDE_PROJECT_DIR`, or the hook's working directory when that is unset, on every judged edit.
+- Notes and rejected comments are kept between hook calls in `comment-judge-claude-<uid>` under the system temp directory, one file each, and removed a day after a session last wrote there.
+- `MultiEdit` is not in the current Claude Code tool list; its input is handled for versions that still have it. Edits made through `Bash`, `NotebookEdit` or MCP tools are not judged.
+- If another `PreToolUse` hook also returns `updatedInput` for the same call, only one of them takes effect.
+- Not tested on Windows.
+
 ## Reporting a wrong verdict
 
-Open an issue with the [wrong verdict](https://github.com/Automaat/opencode-plugin-comment-judge/issues/new?template=wrong-verdict.yml) template: the comment, the code around it, what the judge did and what it should have done. These reports become the cases the instructions are tuned against.
+Open an issue with the [wrong verdict](https://github.com/Automaat/opencode-plugin-comment-judge/issues/new?template=wrong-verdict.yml) template: the comment, the code around it, what the judge did and what it should have done. These reports become cases in [`eval/cases/`](eval/cases), which `mise run eval` replays against real models before the instructions change; see [CONTRIBUTING.md](CONTRIBUTING.md#replaying-the-eval-cases).
 
 ## Trying a working copy
 

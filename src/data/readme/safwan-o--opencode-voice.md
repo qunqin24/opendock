@@ -9,13 +9,20 @@
 </p>
 <p align="center">Local speech-to-text for the OpenCode TUI.</p>
 <p align="center">
+  <a href="https://github.com/safwan-o/opencode-voice/actions/workflows/release-check.yml"><img alt="CI" src="https://github.com/safwan-o/opencode-voice/actions/workflows/release-check.yml/badge.svg" /></a>
+  <img alt="opencode" src="https://img.shields.io/badge/OpenCode-V2_TUI_plugin-black?style=flat-square" />
   <img alt="status" src="https://img.shields.io/badge/status-mvp-orange?style=flat-square" />
   <a href="https://www.npmjs.com/package/@safwan-o/opencode-voice"><img alt="npm version" src="https://img.shields.io/npm/v/@safwan-o/opencode-voice?style=flat-square" /></a>
   <a href="https://www.npmjs.com/package/@safwan-o/opencode-voice"><img alt="npm downloads" src="https://img.shields.io/npm/dm/@safwan-o/opencode-voice?style=flat-square" /></a>
   <img alt="license" src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" />
-  <img alt="opencode" src="https://img.shields.io/badge/opencode-%3E%3D1.17.4-black?style=flat-square" />
   <img alt="stt" src="https://img.shields.io/badge/STT-local_whisper.cpp-purple?style=flat-square" />
 </p>
+
+> [!IMPORTANT]
+> This is an **OpenCode V2 TUI plugin** (`Plugin.define`, `./tui` entry). It does
+> not work on OpenCode V1, and it must **not** be installed with
+> `opencode plugin add` (that registers *server* plugins, which this package is
+> not). Follow the `cli.json` install below.
 
 <p align="center">
   <a href="README.md">English</a> |
@@ -28,19 +35,24 @@
 
 ## Install
 
-One command through OpenCode:
-
-```bash
-opencode plugin @safwan-o/opencode-voice
-```
-
-Restart OpenCode after installing. For OpenCode 2.x the plugin loads from `cli.json`:
+OpenCode 2.x loads TUI plugins from `cli.json` (`~/.config/opencode/cli.json`):
 
 ```json
 {
   "plugins": ["@safwan-o/opencode-voice"]
 }
-``` On first launch, choose a model. The plugin downloads its required local runtime and model weights automatically. Audio and transcription stay on your machine.
+```
+
+Then fully quit the TUI and reopen it twice: the first boot downloads and
+installs the package in the background, the second boot runs it. (`/restart`
+only restarts the session — plugin code loads at TUI startup.)
+
+> [!NOTE]
+> `tui.json` is legacy and ignored by OpenCode 2.x — do not list the plugin
+> there. Do not use `opencode plugin add` either: that registers server-side
+> plugins and this package is CLI-only, so it would report a load failure.
+
+On first launch, choose a model. The plugin downloads its required local runtime and model weights automatically. Audio and transcription stay on your machine.
 
 Optional CLI installer. It runs the same OpenCode plugin install command and pre-downloads the managed engine:
 
@@ -88,21 +100,33 @@ npx @safwan-o/opencode-voice engine status transcribe-cpp
 
 Commands:
 
-- `/voice` - toggle recording and append transcription
-- `/voice-submit` - toggle recording, append transcription, and submit
+- `/voice` - toggle recording; transcription goes to the clipboard, or submits when auto-submit is on
+- `/voice-submit` - toggle recording and submit after transcription, even with auto-submit off
 - `/voice-stop` - cancel active recording or transcription
 - `/voice-settings` - open model, hotkey, microphone, and diagnostics settings
 
 Default hotkey:
 
 ```txt
-ctrl+r -> start recording
-ctrl+r -> stop, transcribe, and append
+ctrl+space -> start recording
+ctrl+space -> stop, transcribe, and copy (or submit)
 ```
 
-In `/voice-settings` -> **Recording**, choose one **Record key**. Toggle recording starts on the first press and transcribes on the second. Hold-to-talk is shown as unavailable until OpenCode exposes terminal key-release events to TUI plugins.
+In `/voice-settings` -> **Recording**, choose one **Record key**. Toggle recording starts on the first press and transcribes on the second. (`ctrl+r` is intentionally not the default: OpenCode binds it to session rename.) Hold-to-talk is shown as unavailable until OpenCode exposes terminal key-release events to TUI plugins.
 
-Settings also let you select a microphone, language, model, download location, and whether `/voice` submits the prompt after transcription.
+**Delivery:** with auto-submit off (default), the transcription is copied to the OS clipboard (`wl-copy` / `pbcopy` / `clip` / `xclip` / `xsel`, first available wins) and a toast confirms — paste it into the main textbox with Ctrl+V, where images can also be attached. There is no composer-append API in OpenCode V2, so the clipboard is the edit path. With auto-submit on (or via `/voice-submit`), the text is sent as a user message immediately.
+
+Settings also let you select a microphone, language, model, download location, voice cleanup, and auto-submit.
+
+## Voice cleanup
+
+Recording settings include an optional algorithmic cleanup chain (on by default):
+
+```
+highpass=f=120, adeclick, dynaudnorm, alimiter
+```
+
+It strips rumble/hum, mic pops, and levels volume before transcription, for every recorder backend. Disable it per-machine with the **Voice cleanup** toggle; tune the **Rumble filter** cutoff (40–500 Hz, default 120 Hz) if a specific room needs it. Details and measurements: `docs/voice-cleanup.md`.
 
 ## Models
 
@@ -146,7 +170,9 @@ npx @safwan-o/opencode-voice doctor
 
 - `Engine not found in registry: transcribe-cpp`: the installed plugin expects a release registry that does not yet include the sidecar. Update the plugin after its matching Engine Release is published, or locally import a built sidecar with `opencode-voice engine import transcribe-cpp <path>`.
 - `Could not start recorder` on Windows: open `/voice-settings` and select the enumerated microphone rather than relying on the system default. The error includes the exact `ffmpeg` command and stderr for diagnosis.
-- Hold-to-talk is unavailable: current OpenCode releases do not expose terminal key-release events to TUI plugins. Use the default `ctrl+r` toggle mode instead.
+- Hold-to-talk is unavailable: current OpenCode releases do not expose terminal key-release events to TUI plugins. Use the default `ctrl+space` toggle mode instead.
+- `Plugin failed` in the TUI: you installed a V1-shaped package or used `opencode plugin add` (server-side). This package is CLI-only — load it from `cli.json` as shown above, never from `tui.json` or `opencode.json` `plugins`.
+- Empty transcriptions on noisy mics: enable **Voice cleanup** in Recording settings (on by default); if a specific room defeats it, raise the Rumble filter cutoff.
 
 ## Platform Status
 
@@ -158,25 +184,35 @@ npx @safwan-o/opencode-voice doctor
 
 ## Architecture
 
-The package follows the public OpenCode TUI plugin shape used by community plugins.
+This is an OpenCode V2 CLI plugin (`Plugin.define({ id, setup })` from
+`@opencode/plugin/tui`, `./tui` entry). Requires OpenCode 2.x (`engines.opencode`). The V1 `{ id, tui() }` entry in
+`index.js` is retained on a best-effort basis for old hosts — untested, unsupported.
 
-- npm package exports `./tui`
-- local development can point `tui.json` at an absolute path
-- published install uses `opencode plugin @safwan-o/opencode-voice`
-- runtime settings live in OpenCode TUI plugin storage
+- V2 entry: `src/tui.ts` (setup, keymap layer, delivery)
+- `src/voice.ts` — record/transcribe controller with single-flight phase lock
+- `src/dialogs.ts` — settings pickers on promise dialog APIs
+- `src/settings.ts` — normalization, defaults, legacy hotkey migration
+- `src/clipboard.ts` — OS clipboard writers (wl-copy/pbcopy/clip/xclip/xsel)
+- `src/enhance.ts` — voice-cleanup chain builder (canonical logic in `lib/enhance.js`)
+- `src/formatters.ts`, `src/languages.ts` — display helpers, Whisper language list
+- runtime settings live in OpenCode TUI plugin storage (`ctx.storage.store`)
 
 Files:
 
-- `index.js` - TUI plugin entrypoint, commands, dialogs, keymap layer
+- `src/tui.ts` - V2 plugin entrypoint, commands, keymap layer, delivery
+- `index.js` - legacy V1 entrypoint (kept for compatibility, not the load path on V2)
 - `lib/models.js` - model registry, cache paths, default settings
 - `lib/download.js` - resumable model download and SHA256 verification
-- `lib/engine.js` - recorder selection, managed Windows recorder install, and runtime-routed transcription
+- `lib/engine.js` - recorder selection, managed Windows recorder install, runtime-routed transcription, pre-transcribe cleanup
+- `lib/enhance.js` - cleanup filter chain builder + cutoff normalization
 - `lib/engines.js` - managed native engine download, status, import, and removal
 - `lib/handy-model-catalog.js` - pinned Handy GGUF model metadata
+- `test/` - hermetic unit tests plus binary-gated fixture/integration tests (`test/fixtures/` is generated, gitignored)
+- `docs/` - design notes and measurements (`voice-cleanup.md`, `v2-inventory.md`, loader notes)
 - `bin/opencode-voice.js` - install wrapper and diagnostics CLI
 - `sidecar/` - Rust `transcribe-cpp` command-line runtime for GGUF models
 
-Voice input needs native audio and STT binaries. The JS plugin manages OpenCode UI, settings, model downloads, and prompt insertion. The managed Rust sidecar provides the `transcribe.cpp` runtime for supported GGUF model families.
+Voice input needs native audio and STT binaries. The JS plugin manages OpenCode UI, settings, model downloads, and delivery (clipboard or direct submit). The managed Rust sidecar provides the `transcribe.cpp` runtime for supported GGUF model families.
 
 ## Roadmap
 
@@ -196,13 +232,18 @@ cargo check --manifest-path sidecar/Cargo.toml
 
 The JavaScript plugin has no frontend build step. The optional GGUF runtime is a Rust sidecar built by the Engine Release workflow.
 
-Use the current checkout in OpenCode:
+Local development cannot point the v2.0.1 TUI at a checkout (file specs are
+silently ignored by its loader) — verify through the hermetic test suite and
+`npm pack --dry-run` instead:
 
 ```bash
 git clone https://github.com/safwan-o/opencode-voice.git opencode-voice
 cd opencode-voice
-opencode plugin "$(pwd)"
+npm install
+npm run check
 ```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the full workflow.
 
 ## Project Status
 

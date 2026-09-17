@@ -4,25 +4,31 @@ An [OpenCode](https://opencode.ai) plugin for CommandCode.
 
 ## Install
 
-Add the plugin to your `opencode.json`:
+Install the plugin globally with the OpenCode CLI:
 
-```json
-{
-  "$schema": "https://opencode.ai/config.json",
-  "plugin": ["@falentio/opencode-commandcode"]
-}
+```bash
+opencode plugin -g @falentio/opencode-commandcode
 ```
 
-OpenCode installs npm plugins automatically with Bun at startup.
+The `-g` flag enables the plugin for every project. OpenCode installs the npm
+package automatically.
 
 ## What it does
 
-- Logs plugin initialization and session-idle events via `client.app.log`.
-- Registers a `commandcode` tool that OpenCode can call.
+- Adds Command Code as an OpenCode provider.
+- Loads the current model catalog from Command Code at startup.
+- Adds reasoning-effort variants that OpenCode cycles with `Ctrl+T`.
+- Uses a checked-in `models.dev` snapshot for missing model metadata.
+- Translates OpenCode requests to Command Code's alpha streaming API.
+- Translates Command Code's NDJSON stream to OpenAI-compatible SSE.
 
-```
-commandcode: <command> (<directory>)
-```
+After installing the plugin, run `/connect` in OpenCode and choose **Command Code**.
+Enter your Command Code API key when prompted.
+
+Choose a model with the `commandcode/<model-id>` provider prefix.
+
+OpenCode cycles supported reasoning efforts with `Ctrl+T`. The selected effort
+is sent to Command Code as `params.reasoning_effort`.
 
 ## Development
 
@@ -37,6 +43,16 @@ pnpm build      # vp pack
 ```
 
 Build output goes to `dist/` (ESM + type declarations) via `vp pack` (tsdown).
+
+### Refresh model metadata
+
+`src/models-dev.generated.ts` contains the static metadata used at runtime. Refresh it from local snapshots when the model catalog changes:
+
+```bash
+pnpm models:refresh -- --models-dev /path/to/models-api.json --commandcode /path/to/commandcode-models.json
+```
+
+The package does not fetch `models.dev` while it loads.
 
 ### Project layout
 

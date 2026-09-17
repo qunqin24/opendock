@@ -45,6 +45,7 @@ A compact readout on the right side of the session prompt shows:
 
 - Today's spend
 - Spend vs. limit with percentage and API key name, colored by the same thresholds as the sidebar
+- Optional total session spend (`S $X`, including sub-agents) to the left of today's spend when `prompt.showSessionInfo` is enabled
 - Optional month-end projection (`~$X EOM ↑`) when `prompt.monthlyProjection` is enabled
 
 Disable the readout with `"prompt": { "budgetIndicator": false }`.
@@ -198,6 +199,7 @@ If no key is found, the widget shows a short setup hint instead of failing.
 | `prompt."30dAvg"`         | boolean | `false`                      | Show the 30-day average (`30d $X`) in the prompt averages block |
 | `prompt.showTokens`       | boolean | `true`                       | Show today's input/output token breakdown (`↑X↓Y`) next to today's spend in the session prompt |
 | `prompt.showKeyName`      | boolean | `false`                      | Show the API key nickname in the session prompt readout |
+| `prompt.showSessionInfo`  | boolean | `true`                       | Show total session spend (`S $X`, incl. sub-agents) left of today's spend in the prompt averages block |
 | `prompt.monthlyProjection`| boolean | `true`                       | Show a month-end projection (`~$X EOM ↑`) in the session prompt, red when the estimated spend exceeds the budget |
 | `prompt.order`            | number  | `50`                         | Slot order for the prompt indicator; lower numbers appear first |
 | `dialog.showKeyName`      | boolean | `false`                      | Show the API key nickname in the detail dialog title |
@@ -246,6 +248,7 @@ Example for enabling key identification:
           "30dAvg": false,
           "showTokens": true,
           "showKeyName": true,
+          "showSessionInfo": true,
           "monthlyProjection": true,
           "order": 50
         },

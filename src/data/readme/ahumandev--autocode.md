@@ -114,14 +114,14 @@ Agent availability uses final configured AutoCode tier: `spy` requires an explic
 ```mermaid
 flowchart TD
   Concepts([.agents/concepts])
-  Concepts -- 📐 design --> Design[.agents/job/.../design.md]
+  Concepts -- 📐 design --> Design
 
   Design -- 💡 advise --> Advise([manual execution])
   Design -- 🧑‍💻 assist --> Assist([interactive execution])
   Design -- 🤖 auto --> Auto([autonomous execution])
 ```
 
-Switch any time between `💡 advise` and `🧑‍💻 assist` and `🤖 auto` when work needs a different autonomy level. `🕵️ spy` cannot receive session handoff, used for special cases where private info needs to be inspected. 
+Switch any time between `💡 advise` and `🧑‍💻 assist` and `🤖 auto` when work needs a different autonomy level. 
 
 ## Reference
 

@@ -7,6 +7,9 @@
 
 Copy the latest agent, user, or user-agent exchange from your current OpenCode session directly to the clipboard.
 
+> [!IMPORTANT]
+> Check OpenCode's built-in options before installing this plugin: **Copy last assistant message** copies the latest assistant response, while **Copy session transcript** copies the entire conversation. If either option covers your needs, you do not need this plugin. Use this plugin when you want command-based selection of user messages, multiple assistant messages, or complete user-assistant pairs.
+
 ![Demo](./assets/demo.gif)
 
 ## Why?
@@ -132,3 +135,11 @@ Multiple copied items are separated with a Markdown horizontal rule:
 The plugin registers the `/copy-last` command with OpenCode and intercepts it before it reaches the LLM. It reads the current session, selects the requested messages, formats them as Markdown, copies the result to the clipboard, and shows a toast.
 
 Because the command is handled locally by the plugin, running `/copy-last` does not send a new prompt to the model.
+
+For `pair`, the plugin uses the last visible agent response before the next user message. This avoids copying an intermediate response produced while tools or subagents are still running. Reasoning, tool output, synthetic text, ignored text, and child-session messages are not included.
+
+## OpenCode Built-ins
+
+OpenCode already provides **Copy last assistant message** for copying the latest assistant response and **Copy session transcript** for copying the entire conversation. These are built-in features and require no plugin.
+
+This plugin is useful when you want command-based selection of recent assistant messages, user prompts, or complete user-assistant pairs; a count such as the last two responses; `all`; or normalized Markdown output ready to paste elsewhere.

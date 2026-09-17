@@ -319,6 +319,13 @@ Run your own script when something happens. Use `{event}`, `{message}`, `{sessio
 - `args` - Arguments to pass, can use `{event}`, `{message}`, `{sessionTitle}`, `{agentName}`, `{projectName}`, `{timestamp}`, and `{turn}` tokens
 - `minDuration` - Skip if response was quick, avoids spam (seconds)
 
+Token values are passed as argv values and are not shell-escaped for use inside
+script source. Do not put `{message}`, `{sessionTitle}`, or other dynamic tokens
+inside a `sh -c`, `bash -c`, `powershell -Command`, or similar script string.
+Use a wrapper script and pass the tokens as separate arguments instead.
+Custom commands run with the same user permissions as OpenCode, so only enable
+scripts you trust.
+
 #### Example: Log events to a file
 
 ```json
@@ -328,7 +335,10 @@ Run your own script when something happens. Use `{event}`, `{message}`, `{sessio
     "path": "/bin/bash",
     "args": [
       "-c",
-      "echo '[{event}] {message}' >> /tmp/opencode.log"
+      "printf '[%s] %s\\n' \"$1\" \"$2\" >> /tmp/opencode.log",
+      "opencode-notifier",
+      "{event}",
+      "{message}"
     ]
   }
 }
@@ -574,6 +584,18 @@ Manual pinning bypasses heuristic window matching and should activate that exact
 **Windows WSL notifications not working?**
 WSL doesn't have a native notification daemon. Use PowerShell commands instead:
 
+Save this wrapper as `C:\Users\YourName\bin\opencode-notifier-popup.ps1`:
+
+```powershell
+param(
+  [string]$Message,
+  [string]$Event
+)
+
+$wshell = New-Object -ComObject Wscript.Shell
+$wshell.Popup($Message, 5, ("OpenCode - {0}" -f $Event), 0+64)
+```
+
 ```json
 {
   "notification": false,
@@ -582,8 +604,11 @@ WSL doesn't have a native notification daemon. Use PowerShell commands instead:
     "enabled": true,
     "path": "powershell.exe",
     "args": [
-      "-Command",
-      "$wshell = New-Object -ComObject Wscript.Shell; $wshell.Popup('{message}', 5, 'OpenCode - {event}', 0+64)"
+      "-NoProfile",
+      "-File",
+      "C:\\Users\\YourName\\bin\\opencode-notifier-popup.ps1",
+      "{message}",
+      "{event}"
     ]
   }
 }
@@ -600,8 +625,11 @@ This is a known Bun issue on Windows. Disable native notifications and use Power
     "enabled": true,
     "path": "powershell.exe",
     "args": [
-      "-Command",
-      "$wshell = New-Object -ComObject Wscript.Shell; $wshell.Popup('{message}', 5, 'OpenCode - {event}', 0+64)"
+      "-NoProfile",
+      "-File",
+      "C:\\Users\\YourName\\bin\\opencode-notifier-popup.ps1",
+      "{message}",
+      "{event}"
     ]
   }
 }

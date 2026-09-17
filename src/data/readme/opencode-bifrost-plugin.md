@@ -2,15 +2,19 @@
 
 An [opencode](https://opencode.ai) plugin that registers a self-hosted [Bifrost](https://github.com/maximhq/bifrost) gateway as an LLM provider, with automatic model and context-window discovery from Bifrost's `/v1/models` endpoint — no per-model configuration required.
 
+Works with both opencode v2 and opencode v1 from the same package.
+
 ## Setup
 
 1. Add the plugin to your `opencode.json`:
 
    ```json
    {
-     "plugin": ["opencode-bifrost-plugin"]
+     "plugins": ["opencode-bifrost-plugin"]
    }
    ```
+
+   On opencode v1 the key is `plugin` (singular) instead. opencode v2 normalizes a v1 `plugin` key for you, so an existing config keeps working.
 
 2. Set your Bifrost connection via environment variables:
 
@@ -23,11 +27,21 @@ An [opencode](https://opencode.ai) plugin that registers a self-hosted [Bifrost]
 
 ### Why environment variables instead of `opencode auth login`?
 
-opencode plugins get one hook that runs early enough to inject a fully-formed provider before opencode reads its config (`config`), but that hook has no way to read back a credential stored via opencode's interactive `/connect`/auth flow — the plugin SDK client only exposes `auth.set`, never `auth.get`. Environment variables are therefore the recommended way for this plugin to discover models automatically. If neither `BIFROST_BASE_URL` nor `BIFROST_API_KEY` is set, the plugin does nothing and leaves your config untouched.
+Discovery has to run before opencode presents a model list, which is earlier than any credential the interactive auth flow stores becomes readable back to the plugin. On v1 the only hook early enough (`config`) could call `auth.set` but never `auth.get`; on v2 the provider inventory is contributed during plugin `setup`, before any integration connection for this gateway exists. Environment variables are therefore the recommended way for this plugin to discover models automatically. If neither `BIFROST_BASE_URL` nor `BIFROST_API_KEY` is set, the plugin does nothing and leaves your providers untouched.
 
 ### Alternative: `baseUrl`/`apiKey` plugin options
 
-If you can't set environment variables for your opencode setup, you can instead pass `baseUrl` and `apiKey` via the plugin's array form in `opencode.json`:
+If you can't set environment variables for your opencode setup, you can instead pass `baseUrl` and `apiKey` as plugin options in `opencode.json`:
+
+```json
+{
+  "plugins": [
+    { "package": "opencode-bifrost-plugin", "options": { "baseUrl": "https://bifrost.example.com", "apiKey": "your-virtual-key" } }
+  ]
+}
+```
+
+On opencode v1, options use the array form instead:
 
 ```json
 {
@@ -41,7 +55,7 @@ These are only used as a fallback for whichever of `BIFROST_BASE_URL`/`BIFROST_A
 
 ### Discovery cadence
 
-This plugin discovers models **once per opencode startup/config load**, since that's when the `config` hook runs. Restart opencode (or reload its config) to pick up newly added or removed Bifrost models.
+This plugin discovers models **once per plugin load** — v2 `setup`, v1 `config`. Restart opencode (or reload its config) to pick up newly added or removed Bifrost models.
 
 ## Context size resolution
 
@@ -53,15 +67,17 @@ Not every Bifrost provider reports `context_length`/`max_input_tokens` (its Open
 4. **A `contextSizeOverrides` plugin option** — your own correction, keyed by exact model id (e.g. `"ollama/llama3.1"`) or provider prefix (e.g. `"ollama"`), value in tokens.
 5. **A conservative default** (4096) if none of the above resolve.
 
-To set overrides, use the plugin's array form in `opencode.json`:
+To set overrides, pass them as plugin options in `opencode.json`:
 
 ```json
 {
-  "plugin": [
-    ["opencode-bifrost-plugin", { "contextSizeOverrides": { "ollama": 8192, "ollama/llama3.1": 16384 } }]
+  "plugins": [
+    { "package": "opencode-bifrost-plugin", "options": { "contextSizeOverrides": { "ollama": 8192, "ollama/llama3.1": 16384 } } }
   ]
 }
 ```
+
+On opencode v1, use the array form (`["opencode-bifrost-plugin", { "contextSizeOverrides": { ... } }]`).
 
 ## Development
 
@@ -71,7 +87,19 @@ npm run build   # or: npm run watch
 npm test
 ```
 
-To try local changes against a real opencode install before publishing, point `opencode.json`'s `plugin` entry at this directory instead of the npm package name (see opencode's [plugin docs](https://opencode.ai/docs/plugins/) for the local-plugin path syntax).
+To try local changes against a real opencode install before publishing, run `npm run build` and point `opencode.json` at this directory instead of the npm package name — `{ "plugins": ["/path/to/opencode-bifrost-plugin"] }` on v2, `{ "plugin": ["/path/to/opencode-bifrost-plugin"] }` on v1. See opencode's plugin docs ([v2](https://opencode.ai/v2/docs/plugins/), [v1](https://opencode.ai/docs/plugins/)).
+
+### Supporting two opencode versions
+
+`src/index.ts` default-exports one object carrying both APIs: `setup()` (v2) and `server()` (v1). opencode v2 reads `id` + `setup` and ignores `server`; opencode v1 calls `server()` and uses the hooks it returns. The two share connection handling (`connection.ts`), discovery (`bifrostClient.ts`), and context-size resolution (`modelMapping.ts`), then diverge only in how a provider is described:
+
+| | opencode v1 | opencode v2 |
+| --- | --- | --- |
+| Entry | `server()` → `config` hook | `setup(ctx)` |
+| Registration | mutate `cfg.provider.bifrost` | `ctx.provider.transform(editor => editor.add(...))` |
+| Provider package | `npm: "@ai-sdk/openai-compatible"` | `package: "@opencode/ai/providers/openai-compatible"` |
+| Connection | `options: { baseURL, apiKey }` | `settings: { baseURL, apiKey }` |
+| Model shape | `tool_call` / `attachment` / `modalities` | `capabilities: { tools, input, output }` |
 
 Releases are published to npm automatically on version tags — see [.github/PUBLISHING.md](.github/PUBLISHING.md) for the release process and one-time trusted-publishing bootstrap.
 

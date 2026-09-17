@@ -1,6 +1,6 @@
 # opencode-run-server
 
-**OpenCode v2, with the existing 0.1.x HTTP API preserved.** Version **0.3.0**
+**OpenCode v2, with the existing 0.1.x HTTP API preserved.** Version **0.3.1**
 keeps `/run`, `/status`, `/health`, port `4097`, bearer authentication, request
 fields, and response formats. Runs use native v2 session APIs behind a supervised
 compatibility listener. Native plugin RPC is also available.
@@ -25,7 +25,7 @@ Existing configuration can keep the old spelling and tuple:
 {
   "$schema": "https://opencode.ai/config.json",
   "plugin": [
-    ["opencode-run-server@0.3.0", { "port": 4097, "token": "your-token" }]
+    ["opencode-run-server@0.3.1", { "port": 4097, "token": "your-token" }]
   ]
 }
 ```
@@ -36,12 +36,12 @@ OpenCode v2 normalizes that configuration. Its current spelling also works:
 {
   "$schema": "https://opencode.ai/config.json",
   "plugins": [
-    { "package": "opencode-run-server@0.3.0", "options": { "port": 4097, "token": "your-token" } }
+    { "package": "opencode-run-server@0.3.1", "options": { "port": 4097, "token": "your-token" } }
   ]
 }
 ```
 
-The plugin targets `@opencode/plugin@2.0.3`. Configure it globally to make it
+The plugin targets `@opencode/plugin@2.0.4`. Configure it globally to make it
 available across projects. For a local checkout, run `bun install` and
 `bun run build`, then use its absolute **directory** path as `package`.
 
@@ -103,7 +103,7 @@ attachments durably; no temporary upload directory is needed.
 
 ```json
 {
-  "version": "0.3.0", "uptimeMs": 1000,
+  "version": "0.3.1", "uptimeMs": 1000,
   "bind": { "host": "100.64.1.2", "port": 4097 },
   "mainServer": { "url": "http://127.0.0.1:49374", "healthy": true, "lastCheckAt": 1789386000000 },
   "opencodePath": "/path/to/opencode",

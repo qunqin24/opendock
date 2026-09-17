@@ -1,7 +1,7 @@
 # memorylake-harness
 
 Client-side harnesses that connect coding agents to
-[Memory Lake](https://memorylake.ai) — cross-device long-term memory.
+[MemoryLake](https://memorylake.ai) — cross-device long-term memory.
 (Two deployments, separate accounts: [memorylake.ai](https://memorylake.ai)
 international, [memorylake.cn](https://memorylake.cn) China; the CLI defaults
 to the international endpoint.)
@@ -12,6 +12,7 @@ to the international endpoint.)
 | [`codex-plugin/`](codex-plugin/) | Codex | working — recall skill, per-turn memory sync, session status |
 | [`dsh-plugin/`](dsh-plugin/) | DeepSeek Harness (dsh) | working — memory tools, prompt guidance, session status; published as `@memorylake/dsh-plugin` |
 | [`opencode-plugin/`](opencode-plugin/) | opencode | working — memory tools, prompt guidance, compaction guidance; published as `@memorylake/opencode-plugin` |
+| [`qwenpaw-plugin/`](qwenpaw-plugin/) | QwenPaw | working — memory backend plugin: automatic recall, memory tools, Console form, `/memorylake-status`; installs from a zip |
 
 All harnesses share one identity and data tree (`~/.memorylake/harness/`):
 configure once, use from every client.
@@ -58,3 +59,13 @@ set up memorylake
 
 The last line is typed in a session; machines already set up for another
 harness can skip it. See [`opencode-plugin/README.md`](opencode-plugin/README.md).
+
+## QwenPaw
+
+```
+qwenpaw plugin install https://github.com/memorylake-ai/memorylake-harness/releases/download/qwenpaw-plugin-v0.2.0/memory-memorylake-0.2.0.zip
+```
+
+Then, per Agent, in the Console: Agent settings → Memory backend → Memory
+Lake. On a machine already set up for another harness the form can stay
+empty. See [`qwenpaw-plugin/README.md`](qwenpaw-plugin/README.md).

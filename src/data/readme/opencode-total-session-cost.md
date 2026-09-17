@@ -24,9 +24,35 @@ Without tracking these sub-sessions, you might see a main session cost of a few 
 - **Mouse Click Interaction**: Left-clicking on the cost bar in the prompt header right panel triggers the same detailed breakdown popup.
 
 ## Installation
-Once published, you can install it globally with:
+Install it globally with:
 ```bash
 opencode plugin opencode-total-session-cost -g
+```
+
+## Cost categories
+The breakdown separates costs into three buckets:
+- **Session**: the cost of the active/root session.
+- **Task**: child sessions spawned through the Task tool by the `explore` and `general` agents.
+- **Sub-agent**: any other child session.
+
+Costs that are not present in the session messages (for example archived or compacted
+messages) are still attributed to the session's configured provider/model, so the totals
+always match the real spending reported by Opencode.
+
+Example `/total_cost` output:
+```
+By session
+Session:   $0.12
+Task:      $0.34
+Sub-agent: $0.08
+---------------
+Total:     $0.54
+
+By provider/model
+anthropic/claude-sonnet-4: $0.40
+openai/gpt-5:              $0.14
+------------------------------
+Total:                     $0.54
 ```
 
 ## How it works
@@ -34,6 +60,13 @@ The plugin runs inside Opencode's TUI framework, recursively fetching session da
 1. It reads the core cost of your active session.
 2. It recursively queries all child sub-sessions spawned by sub-agents.
 3. It displays the combined sum dynamically in the TUI.
+
+## Development
+```bash
+npm install
+npm run typecheck
+npm test
+```
 
 ## License
 MIT

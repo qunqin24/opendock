@@ -8,10 +8,10 @@ Discord webhook notifications for **OpenCode v2**: know when a response finishes
 - **Permission required** (orange): the pending permission's action, message, and resources. Automatically allowed or denied permissions do not generate alerts.
 - **Question asked** (blue): question-form fields, answer options, and tool call ID when available.
 - **Subagent idle and completion never send notifications.** Subagent permissions and questions still request attention. Directories under your home folder use `~`.
-- Location filtering prevents notifications from being repeated by plugin instances in other projects or workspaces.
+- Location filtering prevents notifications from being repeated by plugin instances in other directories.
 - Notification failures do not interrupt OpenCode. Webhook requests time out after 10 seconds; unloading the plugin aborts its subscription and in-flight webhook requests.
 
-Version **1.0.0** uses the v2 `@opencode/plugin` API and depends on **2.0.3**. Its stable plugin ID is `opencode-discord-noti`. OpenCode v1 users should stay on package version `0.2.0`.
+Version **1.0.1** uses the v2 `@opencode/plugin` API and depends on **2.0.4**. Its stable plugin ID is `opencode-discord-noti`. OpenCode v1 users should stay on package version `0.2.0`.
 
 ## Install and configure
 
@@ -22,7 +22,7 @@ Create a webhook in your Discord channel under **Edit Channel â†’ Integrations â
   "$schema": "https://opencode.ai/config.json",
   "plugins": [
     {
-      "package": "opencode-discord-noti@1.0.0",
+      "package": "opencode-discord-noti@1.0.1",
       "options": {
         "enabled": true,
         "webhookUrl": "{env:DISCORD_WEBHOOK_URL}",
@@ -55,7 +55,7 @@ Options are captured from `ctx.options` when the plugin initializes. Missing/inv
 
 ### Migrate from 0.2.0 (OpenCode v1)
 
-1. Upgrade OpenCode to v2 and this package to `1.0.0`.
+1. Upgrade OpenCode to v2 and this package to `1.0.1`.
 2. Rename `plugin` to `plugins` and replace the `[package, options]` tuple with the object shown above. Keep the same four option names.
 3. Remove the old plugin entry or local v1 implementation to avoid duplicate loading.
 4. Quit and restart OpenCode, including its background server when applicable.

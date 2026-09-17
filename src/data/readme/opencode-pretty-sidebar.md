@@ -10,10 +10,10 @@ actions, and makes every MCP server clickable directly in the sidebar.
 
 - Theme-aware session title and activity indicator
 - First-run setup guide with interactive section settings
-- Collapsible Todo section with progress and priority indicators
-- Active subagent list with live statuses and click-to-open navigation, including dev-team workers running on separate local OpenCode servers
-- Compact, searchable workspace skill list with user-wide favorites and click-to-confirm slash commands
-- Quick actions for rename, timeline, transcript copy, export, and compaction
+- Collapsible Todo section with status filters, grouped tasks, progress and priority indicators
+- Active subagent list with live statuses and click-to-open navigation, including dev-team workers running in separate local processes
+- Compact, searchable workspace skill list with user-wide favorites, recent skills, source details, and click-to-confirm slash commands
+- Configurable quick actions for rename, timeline, transcript copy, export, and compaction
 - Live LSP connection status with compact inline server icons and click-to-reveal names
 - Searchable MCP section with live radio-style connection controls
 - Click any MCP row to connect or disconnect it
@@ -93,6 +93,22 @@ a restart. Settings are grouped into tabs; use `Tab` and `Shift+Tab` to switch
 tabs. In the Sections tab, use `Left`/`Right` or `Shift+Up`/`Shift+Down` to
 reorder the selected section.
 
+The Sections tab combines visibility, ordering, and the number of visible items
+for each section. Click `Items: All` / `Items: N`, or press `L` on the selected
+section, to edit its item limit. Enter toggles visibility; the arrow controls
+change section order.
+Every section defaults to `All` (`0`). A positive limit reveals `Show all (N more)`;
+`Show less` restores the configured limit. Limits count items, not wrapped terminal
+lines, and apply after filtering and sorting. Temporary expansion resets when the
+target, filter, or limit changes. MCP bulk actions still operate on the full server
+list. Limit changes persist immediately in the selected Global or Current worktree
+scope; Restore configured behavior removes that scope's limit overrides.
+
+On the Quick Actions row, click `Actions` or press `A` to choose individual
+actions and their order. Enter toggles visibility; Left/Right or Shift+Up/Down
+reorders the selected action. Changes save in the selected Global or Current
+worktree scope. Escape returns to the Quick Actions row in Sections.
+
 ## Options
 
 Pass configured defaults with a tuple entry:
@@ -109,6 +125,9 @@ Pass configured defaults with a tuple entry:
         "focus_key": "ctrl+shift+f",
         "toggle_key": "ctrl+shift+b",
         "section_order": ["todo", "subagents", "skills", "quick_actions", "lsp", "mcp"],
+        "section_item_limits": { "todo": 0, "subagents": 0, "skills": 5, "mcp": 5 },
+        "quick_action_order": ["session.rename", "session.timeline", "session.copy", "session.export", "session.compact"],
+        "quick_action_visibility": { "session.export": false },
         "sections": {
           "todo": true,
           "subagents": true,
@@ -138,6 +157,14 @@ Pass configured defaults with a tuple entry:
   `mcp` to `false` to hide it.
 - `section_order`: sets the configured section order. Missing and duplicate
   entries are normalized so every section appears exactly once.
+- `section_item_limits`: non-negative integer limits for `todo`, `subagents`,
+  `skills`, `quick_actions`, `lsp`, and `mcp`. Missing values default to `0` (All).
+  Worktree overrides inherit each unspecified section from Global independently.
+- `quick_action_order`: command IDs of the five built-in quick actions in display
+  order. Missing actions are appended; unknown and duplicate IDs are ignored.
+- `quick_action_visibility`: visibility by command ID. Actions default to visible;
+  unspecified worktree values inherit the global setting. Restore configured
+  behavior resets action overrides as well as the other behavior settings.
 
 Every option is also available from the sidebar gear button. Choose `Global` or
 `Current worktree` before editing. Values resolve in configured-default, global,
@@ -179,11 +206,29 @@ in the current scope are retained as desired state but skipped at application ti
 Todo priorities are read-only because OpenCode does not expose a Todo mutation
 API to TUI plugins.
 
+Todo offers `All`, `Active`, and `Finished` views with counts. Active shows running
+tasks before pending tasks. Finished contains separate Completed and Cancelled
+groups. The selected view is temporary and resets to All when changing sessions.
+The header always reports completed tasks against the full task count.
+
+Subagents show observed run duration, retry countdowns, and execution errors.
+An already-running child discovered by the sidebar uses `≥` because its exact
+start time is unknown. Recent keeps the last 10 observed finished runs per parent
+session in memory across navigation, until OpenCode exits. An idle transition is
+labelled Finished, not a guarantee of successful task completion; errors and
+cancellations retain their own labels. A worker timeout displays status
+unavailability and does not mark its last confirmed active run as finished.
+Active runs precede Recent under the shared Subagents item limit.
+
 Selecting a skill opens its description with Accept and Cancel controls before
 appending its `/<name>` command to the current prompt. Select "Don't show again
 for this skill" to skip that confirmation later. The sidebar settings dialog
 can restore skipped confirmations. Select the star beside a skill to keep it
-ahead of non-favorite skills in every workspace. Quick actions invoke OpenCode's built-in
+ahead of non-favorite skills in every workspace. The last 10 successfully inserted
+skills are remembered user-wide by source location and appear after favorites,
+most recent first, marked `◷`. Other skills remain alphabetical. The `i` control
+opens the description and full source location even when confirmation is skipped.
+Quick actions invoke OpenCode's built-in
 commands and display the active keybindings from your configuration.
 
 ## Scripts

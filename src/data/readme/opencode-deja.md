@@ -109,7 +109,7 @@ Install also writes user-level guidance for the harnesses it detects: Claude Cod
 
 ## What you get
 
-**Solve it in Codex. Claude remembers.** Twenty-five coding agents write every conversation
+**Solve it in Codex. Claude remembers.** Thirty-three coding agents write every conversation
 to local files, and deja turns those files into one memory layer all of them read.
 
 | | |
@@ -253,7 +253,7 @@ recovery](docs/compaction.md) for what is read, what is stored and where the
 limits are.
 
 <!-- matrix:start -->
-aider &middot; Amp &middot; Antigravity &middot; Claude Code &middot; Cline &middot; Codex CLI &middot; Copilot CLI &middot; VS Code Copilot Chat &middot; Cursor &middot; DeepSeek Harness &middot; Gemini CLI &middot; Goose &middot; Grok Build &middot; Hermes &middot; Kimi Code &middot; omp (Oh My Pi) &middot; OpenClaw &middot; opencode &middot; Continue &middot; Crush &middot; pi &middot; prime-agent (PrimeIntellect) &middot; Qwen Code &middot; Roo Code &middot; Zed.
+aider &middot; Amp &middot; Antigravity &middot; Claude Code &middot; Cline &middot; Codex CLI &middot; Copilot CLI &middot; VS Code Copilot Chat &middot; Cursor &middot; DeepSeek Harness &middot; Gemini CLI &middot; Goose &middot; Grok Build &middot; Hermes &middot; Kimi Code &middot; omp (Oh My Pi) &middot; OpenClaw &middot; opencode &middot; Continue &middot; Crush &middot; pi &middot; prime-agent (PrimeIntellect) &middot; Qwen Code &middot; Cherry Studio &middot; Senpi &middot; gajae-code &middot; Kimchi Coding &middot; Command Code &middot; ZCode &middot; Kiro &middot; Kilo Code &middot; Roo Code &middot; Zed.
 
 <details>
 <summary>What each one supports</summary>
@@ -267,7 +267,7 @@ aider &middot; Amp &middot; Antigravity &middot; Claude Code &middot; Cline &mid
 | Cline | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | Codex CLI | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | Copilot CLI | ✅ | ✕ | ✅ | ✅ | ✅ | ✅ | — |
-| VS Code Copilot Chat | ✅ | ✕ | ✅ | — | ✕ | paste | — |
+| VS Code Copilot Chat | ✅ | ✕ | ✅ | ✅ | ✕ | paste | — |
 | Cursor | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | sqlite3 (IDE chats) |
 | DeepSeek Harness | ✅ | ✅ | ✅ | ✅ | ✕ | paste | zstd |
 | Gemini CLI | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
@@ -278,11 +278,19 @@ aider &middot; Amp &middot; Antigravity &middot; Claude Code &middot; Cline &mid
 | omp (Oh My Pi) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | OpenClaw | ✅ | ✅ | ✅ | ✅ | ✅ | paste | — |
 | opencode | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | sqlite3 |
-| Continue | ✅ | ⚠ | ✅ | ✅ | — | paste | — |
+| Continue | ✅ | ⚠ | ✅ | ✅ | ✅ | paste | — |
 | Crush | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | sqlite3 |
 | pi | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | prime-agent (PrimeIntellect) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | Qwen Code | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
+| Cherry Studio | ✅ | ✕ | ✅ | ✕ | ✕ | paste | import the server once in Settings -> MCP; enable the skill for the agent |
+| Senpi | ? | ? | ? | ? | ? | paste | none |
+| gajae-code | ✅ | — | ✅ | ✅ | ✅ | paste | none |
+| Kimchi Coding | ✅ | ⚠ | ⚠ | ⚠ | ✅ | paste | none |
+| Command Code | ✅ | ✅ | ✅ | ✅ | ? | paste | none |
+| ZCode | ✅ | ✅ | ? | ? | — | paste | none |
+| Kiro | ✅ | — | ✕ | ? | ✅ | paste | none |
+| Kilo Code | ✅ | ⚠ | ✅ | ✅ | ✅ | paste | sqlite3 for the CLI store |
 | Roo Code | ✅ | ⚠ | ✅ | ✅ | ✅ | paste | roo CLI (editor tasks reopen in the editor) |
 | Zed | ✅ | ✕ | ✅ | ✅ | ✕ | paste | sqlite3 + zstd |
 

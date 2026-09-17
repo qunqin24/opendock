@@ -1,9 +1,15 @@
-# opencode-goal-plugin
+# @yaoguai_xh/opencode-goal-plugin
 
-[![npm version](https://img.shields.io/npm/v/opencode-goal-plugin)](https://www.npmjs.com/package/opencode-goal-plugin)
-[![npm downloads](https://img.shields.io/npm/dm/opencode-goal-plugin)](https://www.npmjs.com/package/opencode-goal-plugin)
-[![CI](https://github.com/william-ricchiuti/OpenCode-goal-plugin/actions/workflows/ci.yml/badge.svg)](https://github.com/william-ricchiuti/OpenCode-goal-plugin/actions/workflows/ci.yml)
-[![CodeQL](https://github.com/william-ricchiuti/OpenCode-goal-plugin/actions/workflows/codeql.yml/badge.svg)](https://github.com/william-ricchiuti/OpenCode-goal-plugin/actions/workflows/codeql.yml)
+> **Fork notice**: This package is a fork of [willytop8/OpenCode-goal-plugin](https://github.com/willytop8/OpenCode-goal-plugin) by [willytop8](https://github.com/willytop8), published under the MIT license. The original project and its author retain full copyright of the upstream code.
+>
+> **Changes in this fork**:
+> - Added an OpenCode 1 TUI sidebar entrypoint (`./tui` export) that renders the live goal status, elapsed time, auto-continue count, token usage, and objective.
+> - The sidebar reads the same project-local per-session state shards the server plugin writes (`<project>/.opencode/goals/state.json.sessions/…`), so it stays aligned with the session-title indicator without extra tool calls.
+> - Fixed the sidebar state-update issue inherited from the prevalentWare reference implementation: the sidebar now re-reads goal state reactively on `message.part.updated`, `message.updated`, `session.status`, and `session.idle` events instead of reading once at render time.
+> - `@opentui/solid` and `solid-js` are declared as peer dependencies so the TUI resolves them consistently with the OpenCode host.
+> - The server plugin (goal workflow, commands, tools, persistence, title indicator) is unchanged from upstream.
+
+[![npm version](https://img.shields.io/npm/v/@yaoguai_xh/opencode-goal-plugin)](https://www.npmjs.com/package/@yaoguai_xh/opencode-goal-plugin)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 A session-scoped `/goal` workflow for [OpenCode](https://opencode.ai/).
@@ -19,6 +25,7 @@ Compatibility: this plugin relies on experimental OpenCode hooks. Re-test agains
 - Project-local restart recovery backed by persisted state and a bounded lifecycle ledger.
 - Evidence-gated completion with an optional independent, fail-closed verifier.
 - Explicit `active`, `paused`, and `blocked` status plus transition-only lifecycle notices.
+- Optional OpenCode 1 TUI sidebar with live status, elapsed time, auto-continue count, token usage, and checkpoints.
 - Canonical agent tools, collision-safe goal/verifier agents, multiple goals, and ordered goal sequences.
 
 This project is independently implemented for OpenCode. Product names used elsewhere identify their respective owners; no feature-parity or endorsement claim is implied.
@@ -29,7 +36,7 @@ This project is independently implemented for OpenCode. Product names used elsew
 |---|---|
 | Node.js | Declared support: `>=18`; CI covers Node 18, 20, 22, and 24 |
 | Operating systems | Filesystem-sensitive lifecycle tests run on Linux, macOS, and Windows |
-| Package entrypoint | Installed-tarball contracts verify both export paths, consumer TypeScript resolution, hooks, and all 11 tools |
+| Package entrypoint | Installed-tarball contracts verify server exports, consumer TypeScript resolution, hooks, and all 11 tools; the OpenCode 1 TUI export is packaged separately |
 | Provider/backend quirks | Strict-template backends require the goal block to merge into the primary `system` message; covered by regression tests |
 | OpenCode 2 | Not supported and not yet tested; the peer/engine pin is `>=1.17.15 <2`. See the [OpenCode 2 section](docs/compatibility.md#opencode-2) |
 
@@ -63,7 +70,7 @@ OpenCode installs npm plugins itself from your config, so there is nothing to `n
 
 ```json
 {
-  "plugin": ["opencode-goal-plugin@0.10.0"],
+  "plugin": ["@yaoguai_xh/opencode-goal-plugin@latest"],
   "command": {
     "goal": {
       "description": "Set a session-scoped goal and auto-continue until complete.",
@@ -74,19 +81,36 @@ OpenCode installs npm plugins itself from your config, so there is nothing to `n
 }
 ```
 
+To show the live Goal indicator in the OpenCode 1 TUI sidebar, add the same
+package to `tui.json` (the user config at `~/.config/opencode/tui.json`, or a
+project-local `tui.json`):
+
+```json
+{
+  "$schema": "https://opencode.ai/tui.json",
+  "plugin": ["@yaoguai_xh/opencode-goal-plugin@latest"]
+}
+```
+
+The sidebar reads the same project-local per-session state that the server
+plugin writes, so its status, auto-continue count, token usage, elapsed time,
+and checkpoints stay aligned with `/goal status`. If `stateFilePath` or
+`OPENCODE_GOAL_STATE_PATH` is customized, pass the same value to the TUI plugin
+tuple in `tui.json`.
+
 Or let the CLI add the plugin entry for you and then add the `command` block by hand:
 
 ```sh
-opencode plugin opencode-goal-plugin@0.10.0 --global
+opencode plugin @yaoguai_xh/opencode-goal-plugin@latest --global
 ```
 
-Restart OpenCode after editing the config. The options form `["opencode-goal-plugin@0.10.0", { ... }]` (see [Options](#options)) pins the same way.
+Restart OpenCode after editing the config. The options form `["@yaoguai_xh/opencode-goal-plugin@latest", { ... }]` (see [Options](#options)) pins the same way.
 
 ### Upgrading
 
-**Pin the version.** OpenCode resolves an unpinned `"opencode-goal-plugin"` entry to `@latest` exactly once, installs it under its package cache (`~/.cache/opencode/packages/opencode-goal-plugin@latest/` by default; `opencode debug paths` prints the cache root), and never re-resolves `latest` while that directory exists. An unpinned entry therefore stays on whichever version was first installed, indefinitely, and new releases on npm are never picked up — a bug fixed months ago can still be running locally.
+**Pin the version.** OpenCode resolves an unpinned `"@yaoguai_xh/opencode-goal-plugin"` entry to `@latest` exactly once, installs it under its package cache (`~/.cache/opencode/packages/@yaoguai_xh/opencode-goal-plugin@latest/` by default; `opencode debug paths` prints the cache root), and never re-resolves `latest` while that directory exists. An unpinned entry therefore stays on whichever version was first installed, indefinitely, and new releases on npm are never picked up — a bug fixed months ago can still be running locally.
 
-To upgrade, bump the pin (for example to `opencode-goal-plugin@0.10.0`) and restart OpenCode; every pinned version gets its own cache directory. If you kept an unpinned entry, delete the `opencode-goal-plugin*` directories under the cache `packages/` folder and restart. `npx opencode-goal-plugin` runs the bundled verification script, which warns when the cached copy lags the package.
+To upgrade, bump the pin (for example to `@yaoguai_xh/opencode-goal-plugin@latest`) and restart OpenCode; every pinned version gets its own cache directory. If you kept an unpinned entry, delete the `@yaoguai_xh/opencode-goal-plugin*` directories under the cache `packages/` folder and restart. `npx @yaoguai_xh/opencode-goal-plugin` runs the bundled verification script, which warns when the cached copy lags the package.
 
 ## Usage
 
@@ -328,7 +352,7 @@ Pass options when registering the plugin to change the defaults for all goals. T
 {
   "plugin": [
     [
-      "opencode-goal-plugin",
+      "@yaoguai_xh/opencode-goal-plugin",
       {
         "maxTurns": 10,
         "maxDurationMs": 900000,
@@ -377,7 +401,7 @@ Additional plugin-level options:
 
 ## Agent tools
 
-In addition to the `/goal` command, the plugin registers the same workflow as callable model tools by default, so the agent can inspect and manage the goal itself. A normal `opencode-goal-plugin` install includes the schema dependency needed for these definitions; no separate OpenCode helper package is required. Disable the tool surface explicitly with `registerTools: false`.
+In addition to the `/goal` command, the plugin registers the same workflow as callable model tools by default, so the agent can inspect and manage the goal itself. A normal `@yaoguai_xh/opencode-goal-plugin` install includes the schema dependency needed for these definitions; no separate OpenCode helper package is required. Disable the tool surface explicitly with `registerTools: false`.
 
 Registered tools:
 
@@ -443,7 +467,7 @@ Status icon, objective, auto-continues used / limit, elapsed time, and context t
 ```json
 {
   "plugin": [
-    ["opencode-goal-plugin", { "sessionTitleStatus": true }]
+    ["@yaoguai_xh/opencode-goal-plugin", { "sessionTitleStatus": true }]
   ]
 }
 ```
@@ -454,7 +478,36 @@ The indicator refreshes on goal commands and on idle, compaction, and interrupti
 
 The captured original title lives in memory only, so a hard process kill leaves the last status line on the session. The plugin recognizes its own status lines and will not mistake one for your title, so `/goal clear` after a restart leaves the host's title alone rather than restoring stale goal status — but it cannot recover the title the session had before the goal started. Rename the session if you want it back.
 
-This needs no TUI plugin entrypoint, no `@opentui` dependencies, and no build step.
+## TUI sidebar
+
+The OpenCode 1 TUI entrypoint renders a persistent sidebar for the current
+session. It follows the session's completed Goal tool results and refreshes on
+OpenCode message and session events, so changes to status, elapsed time,
+auto-continue count, token usage, and the latest checkpoint appear without
+requiring another `/goal status` command. The project-local state shard remains
+the restart and migration fallback.
+
+The sidebar supports the active, paused, blocked, and completed states. It is
+read-only: Goal mutations continue to go through the server plugin's commands
+and tools.
+
+When the server uses a custom `stateFilePath` plugin option, use the same option
+in the TUI plugin entry:
+
+```json
+{
+  "$schema": "https://opencode.ai/tui.json",
+  "plugin": [
+    [
+      "@yaoguai_xh/opencode-goal-plugin@latest",
+      { "stateFilePath": "/absolute/path/to/state.json" }
+    ]
+  ]
+}
+```
+
+The session-title indicator needs no TUI plugin entrypoint. The optional sidebar
+requires the OpenCode 1 TUI entrypoint shown in the installation section.
 
 ## Plan-mode safety
 
@@ -481,7 +534,7 @@ Run `/goal resume` after switching back to an executing agent to start the work.
 ```json
 {
   "plugin": [
-    ["opencode-goal-plugin", { "restrictedAgents": ["plan", "review"] }]
+    ["@yaoguai_xh/opencode-goal-plugin", { "restrictedAgents": ["plan", "review"] }]
   ]
 }
 ```

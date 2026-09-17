@@ -52,7 +52,11 @@ Project-local setup is recommended. `init` installs runtime assets;
 the plugin entry enables the plugin, including model routing.
 See [configuration details](#configuration) for model selection and other setup options.
 
-> **Project status: Beta.** v0.9.x is under active stabilization. Runtime
+> **v0.10.x migration:** Give workflow instructions to **`dog-operator`**, not
+> `dog-coordinator`. `dog-operator` is the user-facing authority in v0.10.x;
+> coordinator roles are internal delegates and are not the task entry point.
+
+> **Project status: Beta.** v0.10.x is under active stabilization. Runtime
 > behavior, configuration, and runtime assets may still change before 1.0.
 
 [![npm](https://img.shields.io/npm/v/sortie-dogs)](https://www.npmjs.com/package/sortie-dogs)
@@ -66,7 +70,7 @@ bounded implementation, canonical validation, and evidence-backed completion.
 
 Guides: [日本語](docs/guide-ja.md) · [简体中文](docs/guide-zh-CN.md) · [テスト実行](docs/testing.md) · [CLI testing](docs/cli-testing.md)
 
-Release: [v0.9.12](https://github.com/zufall-upon/Sortie-dogs/releases/tag/v0.9.12)
+Release: [v0.10.0](https://github.com/zufall-upon/Sortie-dogs/releases/tag/v0.10.0)
 
 ## Latest local benchmark case study
 
@@ -84,25 +88,31 @@ Run configuration was fixed per product configuration:
   children on `openai/gpt-5.6-sol` / `medium`, with the pinned Sortie package and runtime assets.
   No Luna, Astra, or Opus messages were observed in these trials.
 
-| Metric · one task, three completed runs | Bare OpenCode | Sortie v0.9.12 |
-| --- | ---: | ---: |
-| Attempts needed | 3 | 5 |
-| Completed runs compared | 3 | 3 |
-| Verified PASS | 0/3 | 0/3 |
-| Task checks · F2P | 11.1% · 3/27 | 85.2% · 23/27 |
-| Retained checks · P2P | 282/282 | 282/282 |
-| Median agent wall | 24.5 min | 25.7 min |
-| Median model steps | 43 | 39 |
-| Implementation child sessions · total | 0 | 13 |
-| Estimated API-equivalent cost · median completed run | $3.53 | $2.85 |
-| Estimated cost · three completed runs | $10.69 | $9.74 |
-| Additional interrupted-attempt cost | $0 | $6.20 |
-| Total cost to acquire three completed runs | $10.69 | $15.94 |
+| Metric · one frozen task | Bare OpenCode | Sortie v0.9.12 | Sortie v0.10.0 clean qualification |
+| --- | ---: | ---: | ---: |
+| Attempts needed | 3 | 5 | 1 |
+| Completed runs compared | 3 | 3 | 1 |
+| Verified PASS | 0/3 | 0/3 | 0/1 |
+| Task checks · F2P | 11.1% · 3/27 | 85.2% · 23/27 | 88.9% · 8/9 |
+| Retained checks · P2P | 282/282 | 282/282 | 94/94 |
+| Median agent wall | 24.5 min | 25.7 min | 29.9 min · n=1 |
+| Median model steps | 43 | 39 | 33 · CLI stream only |
+| Implementation child sessions · total | 0 | 13 | 4 |
+| Estimated API-equivalent cost · median completed run | $3.53 | $2.85 | **$3.94** · n=1 |
+| Estimated cost · completed runs | $10.69 | $9.74 | **$3.94** |
+| Additional interrupted-attempt cost | $0 | $6.20 | $0 |
+| Total cost to acquire completed runs | $10.69 | $15.94 | **$3.94** |
 
 All three Bare runs passed 1/9 task checks. The three completed Sortie runs passed 7/9, 8/9,
 and 8/9. Every compared candidate retained 94/94 prior checks, but every official verifier still
 returned reward 0. The two interrupted Sortie attempts are excluded from completed-run quality,
 time, and cost aggregates; their attempt count and estimated cost remain visible above.
+
+The v0.10 value is a standalone qualification-only reference, not a fourth matched run or a
+FrontierHarness leaderboard result. It used no fresh Bare control and a localized Docker-free
+verifier. Its estimated API-equivalent cost is **$3.94**: $3.26 from Sol and $0.68 from Terra,
+calculated from the root and descendant session tokens with 100% pricing coverage. A preceding
+debug run returned reward 1 (F2P 9/9, P2P 94/94), so that pass is not presented as reproducible.
 
 ![Latest local case study: Bare completed 11.1 percent of task checks at a median estimated API-equivalent cost of $3.53; Sortie completed 85.2 percent at $2.85. Sortie needed five attempts and $15.94 to collect three completed runs. Neither configuration achieved a Verified PASS.](docs/assets/quality-cost-reference.svg)
 

@@ -206,6 +206,13 @@ When a session is bound to a worktree (path `W`, repo root `R`):
 
 When a bound session spawns subagents via `task()`, the subagent's session automatically inherits the worktree binding. This is done via lazy parent-chain traversal: on the subagent's first tool call, the plugin walks the `parentID` chain to find an ancestor with a binding, then copies that binding to the subagent.
 
+Inherited bindings have a full lifecycle (they never become zombies, issue #7):
+
+- **Released on completion**: the plugin subscribes to `session.idle` / `session.deleted` events; when a sub-agent session finishes, its inherited binding is released immediately (audited as `binding_released`).
+- **Self-healing**: if a released sub-agent session resumes later, lazy inheritance re-binds it on its next tool call — no state is lost.
+- **Never block the owner**: inherited bindings are, by construction, descendants of the session that created the worktree. `worktree_merge` / `worktree_cleanup` only refuse when an *independent* session holds a binding for the same worktree; inherited child bindings are released along with the worktree (cascade-clear + audit).
+- **Merged/cleaned cascade**: after a worktree is removed, every binding pointing at it is cleared, so completed background tasks can never leave residue in the state file.
+
 ### Windows Support
 
 - Path comparisons are case-insensitive with separator normalization
@@ -215,7 +222,7 @@ When a bound session spawns subagents via `task()`, the subagent's session autom
 ## Limitations
 
 - **No TUI indicator**: opencode 1.18's plugin API doesn't support dynamic session title/metadata updates, so the worktree branch isn't visible in the status bar. The agent's responses will mention the worktree context.
-- **One worktree per session, many sessions per repo**: A single session can be bound to one worktree at a time, but multiple sessions can run in parallel against different worktrees of the same repo. The plugin guards against dangling references: cleanup/merge refuse to delete a worktree that's still bound by another session.
+- **One worktree per session, many sessions per repo**: A single session can be bound to one worktree at a time, but multiple sessions can run in parallel against different worktrees of the same repo. The plugin guards against dangling references: cleanup/merge refuse to delete a worktree that's still bound by another *independent* session. Inherited sub-agent bindings (created automatically via `task()`) never block the owner's merge/cleanup — they are released with the worktree. Removing a worktree while a background sub-agent is still running will drop that sub-agent back to the main checkout on its next tool call, so collect background task results before merging.
 - **Bash path replacement is string-based**: Complex command strings with unusual path formats (8.3 short names, mixed separators) may not be fully rewritten. The plugin blocks commands where residual repo-root paths are detected after replacement.
 - **`strictGitOps` is regex-based**: Only commands starting directly with `git` are recognized. Compound commands like `cd x && git merge` bypass the check. This is documented as "raising the bar" rather than absolute defense (matches zcode-worktree-guard's behavior).
 - **`git-common` state location**: Requires `git rev-parse --git-common-dir` to succeed. Bare repos and unusual worktree configurations may fail; fall back to `"external"` if so.

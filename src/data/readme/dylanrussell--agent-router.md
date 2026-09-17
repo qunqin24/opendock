@@ -81,6 +81,8 @@ npx -y @dylanrussell/agent-router init
 
 Then **restart opencode** so it picks up the plugin.
 
+`@opencode-ai/plugin` is a required peer dependency: the server bundle imports it at runtime. npm installs it on a clean install; do not omit peer dependencies when installing the plugin.
+
 ## Quickstart
 
 ```bash
@@ -171,7 +173,7 @@ Duplicate/concurrent error events advance only once per user turn. Selection and
 
 **Verified boundary:** inspected opencode **v1.17.15** `packages/opencode/src/session/prompt.ts`: `chat.message` mutates the message before `sessions.updateMessage(info)` and the legacy session loop resolves `lastUser.model`. A deterministic in-process provider harness tests those hook semantics, explicit next-turn continuation, variant selection, and no replay/persistent writes. This is **not a real-server end-to-end provider test** and does not prove that every new v2 execution path invokes these legacy hooks. Hosts that bypass them receive no failover. There is no transparent same-turn continuation guarantee, no automatic recovery of a failed `task` invocation, and no guarantee that an LLM will not choose to repeat a tool when explicitly asked to continue.
 
-The installed SDK exposes `/v2` `client.v2.session.switchModel` for subsequent turns, but no atomic compare-and-switch/retry contract was verified. Router deliberately does **not** call it: an asynchronous model write could race a manual selection or cancellation. No direct SDK dependency is needed; plugin hooks are the integration boundary. The TUI model picker and router status still display stack/primary assignments, not session-local runtime candidates.
+The installed SDK exposes `/v2` `client.v2.session.switchModel` for subsequent turns, but no atomic compare-and-switch/retry contract was verified. Router deliberately does **not** call it: an asynchronous model write could race a manual selection or cancellation. No direct SDK dependency is needed; plugin hooks are the integration boundary. The sidebar displays configured primary and fallback chains; the TUI model picker and router status display primary assignments. None of these indicate session-local runtime candidates.
 
 ### Install This Checkout
 
@@ -202,7 +204,8 @@ The plugin exposes six tools the agent (or you, by asking it) can call:
 
 On opencode ≥ 1.17 the plugin also ships a TUI half (loaded from `tui.json`, wired up by `init`):
 
-- **Sidebar panel** — shows the active stack, the stack count, and a `⟳ restart required` badge after any switch. Updates live (≤1.5s) when the CLI or agent switches stacks underneath the TUI.
+- **Sidebar panel** — lists available stacks with the active one checked. Under **Current Stack → Configured routing**, each agent has an indented **Primary** model and ordered **Fallback 1**, **Fallback 2**, … rows. Explicit variants appear in brackets; agents without fallbacks show only their primary. Model IDs are kept in full. A `⟳ restart required` badge appears when the active stack differs from the one at TUI startup. Updates live (≤1.5s), including fallback-only and variant-only edits.
+- **Configuration, not live failover** — sidebar chains come from the active stack file, not session-local routing or the applied `state.json.fallbackAgents` snapshot. Editing a stack changes this preview but does not apply it: use the stack and restart opencode to activate changes. A fallback row is a configured candidate, not a claim that failover is enabled or that the model is currently running.
 - **Commands** — type `/` or open the command palette:
 
 | command | what it does |

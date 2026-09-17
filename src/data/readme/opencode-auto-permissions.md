@@ -2,7 +2,7 @@
 
 [![release](https://img.shields.io/github/v/release/hueyexe/opencode-auto-permissions.svg)](https://github.com/hueyexe/opencode-auto-permissions/releases)
 [![npm](https://img.shields.io/npm/v/opencode-auto-permissions.svg)](https://www.npmjs.com/package/opencode-auto-permissions)
-[![tests](https://img.shields.io/badge/tests-94%20passing-brightgreen.svg)](./test)
+[![tests](https://img.shields.io/badge/tests-108%20passing-brightgreen.svg)](./test)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-blue.svg)](./tsconfig.json)
 [![OpenCode](https://img.shields.io/badge/OpenCode-stable%20%2B%20V2-blue.svg)](./docs/COMPATIBILITY_SPIKE.md)
 [![license](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
@@ -83,7 +83,7 @@ For each supported permission request, Auto Permissions combines deterministic s
 - External-directory boundaries are not treated as sensitive by default: ordinary project, tool, cache, log, state, temporary, and worktree paths are approved unless the target or operation presents a concrete hazard.
 - Broad boundary globs such as `/tmp/*` are not treated as the requested scope when the tool input identifies a precise target; the reviewer evaluates the actual operation and latest user request.
 - The reviewer is tuned for unattended agents: it defaults to approval when an action reasonably serves the task and uses `ask` only as a last resort.
-- Reviewer failures and timeouts fail closed: the request is rejected automatically and the main agent receives guidance to continue with a narrower or lower-risk step.
+- If a dedicated reviewer model times out, errors, or returns an invalid decision, the plugin tries the requesting session's model once, preserving that session model's variant. It does not retry the same provider/model, and a valid denial never triggers fallback. If no fallback is available or both attempts fail, the request is rejected automatically and the main agent receives guidance to continue with a narrower or lower-risk step.
 - Reviewer sessions are hidden, have no tools, and deny all permissions.
 - Only a small, recent window of relevant user context is sent for review.
 - Plugin-authored denial continuations are excluded from that context so an earlier verdict cannot become a self-reinforcing human instruction.
@@ -127,7 +127,7 @@ The plugin tuple accepts these options:
 | `model` | Requesting session model | Optional dedicated reviewer model in `provider/model` form. |
 | `variant` | Selected model's default | Optional reviewer-only model variant. Use `"low"` when supported for faster decisions. |
 | `sessionApprovals` | `true` | Reuse guarded, pattern-specific approvals immediately for the current session. Set `false` for one-time approvals only. |
-| `timeoutMs` | `30000` | Review timeout from 100 to 30,000 milliseconds. The default accommodates a cold reviewer startup. |
+| `timeoutMs` | `30000` | Per-model timeout from 100 to 30,000 milliseconds. A fallback gets its own budget, so two model attempts can take up to 60 seconds at the default (plus context/reply overhead). |
 | `userMessageCount` | `8` | Recent user messages included in review context, from 1 to 20. |
 | `shadow` | `false` | Evaluate and record decisions without replying to permission requests. |
 | `runtime` | `"auto"` | Diagnostics override: `"auto"`, `"stable"`, or `"v2"`. Leave this on `"auto"` in normal use. |
