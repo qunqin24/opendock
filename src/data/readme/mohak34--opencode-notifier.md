@@ -4,13 +4,15 @@ OpenCode plugin that plays sounds and sends system notifications when permission
 
 ## Quick Start
 
-Add this to your `opencode.json`:
+Install the plugin via the CLI: `opencode plug -g @mohak34/opencode-notifier`.
 
-```json
-{
-  "plugin": ["@mohak34/opencode-notifier@latest"]
-}
-```
+Or add manually to your `opencode.json`:
+
+  ```json
+  {
+    "plugin": ["@mohak34/opencode-notifier@latest"]
+  }
+  ```
 
 Restart OpenCode. Done.
 
@@ -435,11 +437,13 @@ This is independent of `command.minDuration`, which only controls whether the cu
 | Linux Wayland (Niri)                     | `niri msg --json focused-window`       | None                  | Tested                         |
 | Linux Wayland (Sway)                     | `swaymsg -t get_tree`                  | None                  | Untested                       |
 | Linux Wayland (KDE)                      | `kdotool`                              | `kdotool` installed | Tested                         |
-| Linux Wayland (GNOME)                    | Not supported                            | -                     | Falls back to always notifying |
+| Linux Wayland (GNOME)                    | AT-SPI (`gdbus` on the `org.a11y.Bus`) | `gdbus` installed   | Tested (Ubuntu 26.04.1 LTS + GNOME Shell 50.1 + Ghostty 1.3.0) |
 | Linux Wayland (river, dwl, Cosmic, etc.) | Not supported                            | -                     | Falls back to always notifying |
 | Windows                                  | `GetForegroundWindow()` via PowerShell | None                  | Untested                       |
 
-**Unsupported compositors**: Wayland has no standard protocol for querying the focused window. Each compositor has its own IPC, and GNOME intentionally doesn't expose focus information. Unsupported compositors fall back to always notifying.
+**GNOME Wayland**: GNOME exposes no compositor API for the focused window (`Introspect.GetWindows` and `Eval` are access-denied) and XWayland tools like `xdotool` cannot see native Wayland windows, so focus is read from the accessibility bus instead: the active terminal window is the one whose AT-SPI `ACTIVE` state bit is set. Ghostty is matched by its `/com/mitchellh/ghostty` AT-SPI path, other terminals by app name (including the `gnome-terminal-server` AT-SPI alias). Window identity is `bus@path` since AT-SPI paths repeat across processes. Implemented and verified on Ubuntu 26.04.1 LTS + GNOME Shell 50.1 + Ghostty 1.3.0. With several terminal windows open, suppression compares against the window that was active at startup. Set `OPENCODE_NOTIFIER_DEBUG=1` to log the focus backend decision.
+
+**Unsupported compositors**: Wayland has no standard protocol for querying the focused window. Each compositor has its own IPC. Compositors without a backend (river, dwl, Cosmic, etc.) fall back to always notifying.
 
 **tmux/screen**: When running inside tmux, focus detection uses tmux pane state (`session_attached`, `window_active`, `pane_active`) via `tmux display-message`. This keeps suppression accurate when switching panes/windows/sessions. On Linux setups where window focus cannot be detected at all, tmux pane state is also used as a best-effort fallback. GNU Screen is not currently handled (falls back to always notifying).
 

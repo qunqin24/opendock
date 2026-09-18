@@ -39,7 +39,7 @@ perk is a single tool.
 
 | Tool | What it does |
 | --- | --- |
-| `bash_background({ command, coalesce_seconds? })` | Run a shell command as a detached fire-and-forget job. Returns *immediately* (does not block) with the job's `pgid` and a capture path expression (`<job-dir>/{out,err,drip,exit}`). When the job finishes, perk injects a turn reporting the exit code and the byte sizes of the captured output. A still-running job can also push interim turns by appending to `$PERK_DRIP` (see [Streaming](#example-stream-interim-events-while-running)); `coalesce_seconds` controls its quiet-gap interval (default `1.0`, values below `0.3` are clamped). |
+| `bash_background({ command, label?, expected_seconds?, coalesce_seconds? })` | Run a shell command as a detached fire-and-forget job. Returns *immediately* (does not block) with the job's `pgid` and sidecar directory. `label` and `expected_seconds` are optional display hints, not execution controls. When the job finishes, perk injects a turn reporting the exit code and captured-output sizes. A still-running job can push interim turns by appending to `$PERK_DRIP`; `coalesce_seconds` controls its quiet-gap interval. |
 
 That's the whole surface.
 
@@ -150,10 +150,12 @@ hand-rolled backgrounding. In particular, stderr is not excerpted automatically:
 the byte count tells you whether the local `err` file is worth inspecting without
 disclosing its possibly sensitive contents to the conversation.
 
-Output and the exit code land under `os.tmpdir()/opencode/perk/` (normally
+The immutable `launch.json`, output, progress, cancellation request, and exit
+code land under `os.tmpdir()/opencode/perk/` (normally
 `$TMPDIR/opencode/perk/` on macOS), which opencode allows its file tools to
 access without an external-directory prompt. Each job gets a short random
-directory containing `out`, `err`, `drip`, and atomic completion gate `exit`.
+directory containing `launch.json`, `out`, `err`, `drip`, optional `cancel`, and
+atomic completion gate `exit`.
 Nothing is written into the project. Completed job directories expire after 24
 hours.
 Runtime logging is off by default; set `PERK_LOG=1` before starting opencode to
@@ -233,6 +235,11 @@ handle instead of an unstoppable orphan. The wrapper catches cooperative
 as `cancelled:TERM`. Interactive listeners receive a cancellation turn, and a
 foreground waiter on `exit` resolves. `SIGKILL` cannot be caught and therefore
 cannot provide this guarantee.
+
+An observer may also create the job's private `cancel` marker. The owning perk
+runtime notices it, signals only the process group in its live listener map, and
+leaves `exit` as the authoritative terminal record. This is how the optional
+OpenChamber panel requests cancellation without trusting a stale pgid from disk.
 
 Jobs also **die with opencode on a graceful shutdown.** The plugin tracks every
 running job and group-kills the survivors in its `dispose` hook, which opencode

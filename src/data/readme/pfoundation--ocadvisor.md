@@ -51,6 +51,7 @@ transcript cap.
 | `variant` | `max` | Reasoning-effort variant; `null` or `"none"` pins no variant |
 | `timeoutMs` | `300000` | Per-consultation generation timeout, in milliseconds |
 | `maxTranscriptChars` | `0` | Cap on transcript size (`0` = unlimited); the most recent tail is kept |
+| `agentEffort` | `false` | Let the agent pick effort per call: `true` allows `high`, `xhigh`, `max`; an array or comma string sets an explicit allow-list |
 
 Set them as plugin options in `opencode.json`. Because a plugin loaded from
 the auto-discovered `plugin/` directory cannot receive options, list it
@@ -67,10 +68,30 @@ explicitly in the `plugins` array:
 }
 ```
 
+To let the calling agent choose the reasoning effort per consultation:
+
+```jsonc
+{
+  "plugins": [
+    {
+      "package": "@pfoundation/ocadvisor",
+      "options": { "agentEffort": true }
+    }
+  ]
+}
+```
+
+With `agentEffort` enabled the tool accepts an optional `effort` argument
+(one of the allowed levels); when the agent omits it, the configured
+`variant` is used. A requested effort that is not a variant of the advisor
+model fails the call with an `invalid_effort` error instead of silently
+falling back.
+
 Environment variables work for any install and take
 lower precedence than plugin options: `OCADVISOR_MODEL` (accepts
 `provider/model#variant`), `OCADVISOR_PROVIDER`, `OCADVISOR_VARIANT`,
-`OCADVISOR_TIMEOUT_MS`, `OCADVISOR_MAX_TRANSCRIPT_CHARS`.
+`OCADVISOR_TIMEOUT_MS`, `OCADVISOR_MAX_TRANSCRIPT_CHARS`,
+`OCADVISOR_AGENT_EFFORT` (`true`, `false`, or a comma-separated allow-list).
 
 The "already the advisor model" skip is still keyed to Fable
 (`anthropic/claude-fable-*`); if you point the advisor at a different model,
@@ -101,6 +122,8 @@ Rules enforced by the tool description and an injected session instruction:
   confirmation call.
 - The tool is hidden in `anthropic/claude-fable-*` sessions (the current
   model is already Fable); calls there return a disabled notice.
+- When the `agentEffort` plugin option is enabled, an optional `effort`
+  argument selects the reasoning effort for that consultation.
 
 ## How it works
 
@@ -129,7 +152,9 @@ Rules enforced by the tool description and an injected session instruction:
   `session.switchModel` once, then `session.generate` per call. Transient
   generations do not mutate session history, so the advisor session stays
   empty while its stats attribute advisor spend. Title discovery also
-  accepts the pre-rename `ocAdvisor` session title.
+  accepts the pre-rename `ocAdvisor` session title. When the agent requests
+  a different effort, the session is re-pinned to that variant first
+  (a no-op when it already matches).
 - The generation timeout wraps only the model call, not the time a call
   spends queued behind another consultation. Oversized transcripts are
   capped to the configured `maxTranscriptChars` (keeping the recent tail)
@@ -151,9 +176,9 @@ Rules enforced by the tool description and an injected session instruction:
 
 Every invocation appends one JSON line to
 `~/.local/share/opencode/ocAdvisor-metrics.jsonl` with timestamp, session,
-caller model/agent, mode, trigger, outcome (`advisor_response`,
+caller model/agent, mode, trigger, effective effort, outcome (`advisor_response`,
 `skipped_fable`, `error`, `no_transcript`, `no_session`), error type
-(`provider_unavailable`, `model_unavailable`, `auth`, …), latency,
+(`provider_unavailable`, `model_unavailable`, `invalid_effort`, `auth`, …), latency,
 transcript size, prior-consultation count, and transport (`via`).
 Token usage is `null`: OpenCode generation returns text only.
 Logging is best-effort and never breaks a call.

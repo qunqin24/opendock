@@ -1,10 +1,15 @@
 # opencode-discord-notifier
 
+> **This branch/version (2.x) targets OpenCode v2 (`opencode2`) only.**
+> For OpenCode v1, use version `0.1.x` (npm dist-tag `legacy`) or the
+> [`oc-v1`](../../tree/oc-v1) branch — the v1 and v2 plugin APIs are
+> different enough that they don't share one codebase.
+
 An OpenCode plugin that sends a Discord message when a running `opencode`
-CLI session needs you — a permission request, a pending question, or the
-session going idle after finishing work — and lets you answer a pending
-permission request directly from Discord with **Once / Always / Reject**
-buttons, without touching the keyboard.
+CLI session needs you — a permission request, a pending form, or the
+session finishing a turn — and lets you answer a pending permission
+request directly from Discord with **Once / Always / Reject** buttons,
+without touching the keyboard.
 
 Both notify-only and the interactive buttons are built and live-tested.
 
@@ -13,12 +18,16 @@ Both notify-only and the interactive buttons are built and live-tested.
 - **Permission requests** (`permission.asked`) — e.g. a bash command
   needing approval. Carries **Once / Always / Reject** buttons — click
   one to answer it from Discord.
-- **Session idle** (`session.idle`) — the session finished and is waiting
-  for you.
-- **Pending questions** (OpenCode's built-in `question` tool) — notify
-  only, permanently. There is no API to answer these from outside the
-  OpenCode process (confirmed by live testing, not assumed), so this one
-  always has to be answered from the keyboard.
+- **Turn finished** (`session.execution.succeeded`) — the agent finished
+  responding and is waiting for you. (v2 doesn't appear to emit v1's
+  `session.idle` at all — confirmed live: 45+ seconds of genuine
+  post-response idle, no `session.idle` ever arrived — so this fires at
+  the same moment that notification was meant to catch.)
+- **Pending forms** (`form.created` — v2's formalized version of v1's ad
+  hoc "question" tool) — notify only, permanently. There is no API to
+  answer these from outside the OpenCode process (confirmed by live
+  testing, not assumed), so this one always has to be answered from the
+  keyboard.
 
 ## Prerequisites
 
@@ -104,6 +113,27 @@ token, or a channel the bot can't see will show up there as a clear error
 line, tagged with this plugin's name. A misconfigured install doesn't
 crash or block the rest of OpenCode — it just logs the problem and
 disables itself.
+
+**This log check is only reliable for `opencode run`, not the interactive
+TUI** — confirmed live: this plugin's own console output never reached
+either the terminal or the log file when running inside the TUI's server
+subprocess, but did show up correctly under `opencode run --standalone
+--print-logs`. If you're debugging a silent failure in the interactive
+TUI specifically, reproduce it with `opencode run --standalone
+--print-logs --log-level debug "<prompt>"` instead and read the output
+directly.
+
+**Getting two Discord messages for one event, or a stray "permission not
+found" on a button click that should have worked?** v2 boots a separate
+plugin instance per directory ("location") a client connects from —
+confirmed live: one `opencode` invocation can produce both a
+project-directory location and a bare-home-directory location, and a
+globally-configured plugin gets `setup()` called once per location. This
+plugin guards against that with a module-level singleton (only the first
+location to load actually connects to Discord), so this shouldn't happen
+on a normal install — if it does anyway, it likely means two separate
+plugin processes are running (e.g. a leftover background service from
+before an update — restart it).
 
 ## Developing locally (not installing from npm)
 

@@ -24,6 +24,16 @@
 > `opencode plugin add` (that registers *server* plugins, which this package is
 > not). Follow the `cli.json` install below.
 
+## Demo
+
+<video src="https://github.com/user-attachments/assets/2edc713c-7a5e-46b7-8e66-3caeab4ab396" width="100%" controls></video>
+
+
+| Slash commands | Voice settings | Model picker |
+|---|---|---|
+| ![slash commands](https://github.com/safwan-o/opencode-voice/releases/download/v0.4.0/voice-slash-commands.png) | ![voice settings](https://github.com/safwan-o/opencode-voice/releases/download/v0.4.0/voice-settings.png) | ![model picker](https://github.com/safwan-o/opencode-voice/releases/download/v0.4.0/voice-model-picker.png) |
+| `/voice`, `/voice-submit`, `/voice-stop`, `/voice-settings` | Record key, transcription, audio & system | 87 local models with size and engine at a glance |
+
 <p align="center">
   <a href="README.md">English</a> |
   <a href="docs/README.ru.md">Русский</a> |
@@ -71,7 +81,7 @@ Add `--global` if the plugin was installed in OpenCode's global configuration.
 Do not clone the repo unless you want to develop the plugin.
 
 > [!TIP]
-> First launch opens a model picker. Choose a local model, let it download, then use `ctrl+space` to dictate into the prompt (change it in `/voice-settings`).
+> First launch opens a model picker. Choose a local model, let it download, then use `ctrl+space` to dictate (change it in `/voice-settings`). With auto-submit off, transcriptions land in your clipboard for pasting.
 
 ## What It Installs
 

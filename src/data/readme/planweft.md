@@ -15,8 +15,8 @@ Agent 的对话上下文会结束，但任务不会因此结束。PlanWeft 提�
 需要 Node.js 22 或更高版本。以 Codex 完整集成为例：
 
 ```bash
-npx planweft@0.5.1 add -a codex --global
-npx planweft@0.5.1 doctor -a codex --global
+npx planweft@0.7.0 add -a codex --global
+npx planweft@0.7.0 doctor -a codex --global
 ```
 
 安装后创建新会话，显式调用 `$project-docs`，再确认宿主已发现并启用了相应资源。其他宿主、scope 和 Skill-only 用法见[安装指南](docs/installation.md)。

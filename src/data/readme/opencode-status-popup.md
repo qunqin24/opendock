@@ -117,13 +117,24 @@ All options are optional. Defaults shown.
 | `enabled` | `boolean` | `true` | Turn the plugin off without uninstalling it. |
 | `mode` | `"window" \| "tray"` | `"window"` | Which renderer to use. The `/popup-*` commands override it until `/popup-reset`. |
 | `word` | `string` | `"opencode"` | Word that types itself out. Max 24 characters. |
-| `typeMs` | `number` | `140` | Milliseconds per typed character (40–2000). |
+| `typeMs` | `number` | `140` | Milliseconds per typed character in the pill (40–2000). The tray icon ignores it: its tick is a fixed 250 ms. |
 | `position` | `"bottom-right" \| "bottom-left" \| "top-right" \| "top-left"` | `"bottom-right"` | Where the pill is placed on its first show, and where `Reset position` sends it back to. Dragging is remembered separately; changing the option applies on the next placement. |
 | `freshSeconds` | `number` | `20` | How long presence data counts as fresh (5–600). |
 | `idleSeconds` | `number` | `25` | How long the host waits without any live instance before exiting (5–3600). |
 | `errorHoldSeconds` | `number` | `90` | How long a failed execution keeps the pill red (0–3600). Use `0` to keep it until the session works again. |
 | `mark` | `boolean` | `false` | Draw the small o mark before the word in the pill. Off by default: the window is just the word, the mark belongs to the tray icon. |
 | `shellPath` | `string` | `null` | Force a specific PowerShell executable. |
+
+Options are read when the plugin sets up, and OpenCode reloads plugins automatically when a watched config file changes (a local dependency outside the watched directories may still need an OpenCode restart). After that reload:
+
+| Option | Effect |
+|---|---|
+| `word`, `freshSeconds`, `idleSeconds` | **restart the host** within a few seconds, because it renders them at launch |
+| `typeMs`, `mark` | restart a `window` host, which renders them; the tray ignores both |
+| `position` | **does not restart it**: the corner is resolved when the pill is placed (first show, or `Reset position`), so a change applies there and never moves a pill you already dragged |
+| `mode` | replaced immediately by the `/popup-*` commands; the option is only the fallback after `reset` |
+| `shellPath` | applies the next time a host starts; a live host keeps the interpreter it was launched with |
+| `enabled`, `errorHoldSeconds` | need no host restart: `enabled` loads or unloads the plugin, and `errorHoldSeconds` is read by the plugin |
 
 ```jsonc
 {
@@ -167,7 +178,7 @@ popup_mode({ mode: "window" | "tray" | "toggle" | "reset" })
 - the **`/` autocomplete** lists the same names from the server, so typing `/popup` is enough; the prompt sends the command to the server, and the server commands are also what makes them work through the API and from other clients:
 
 ```sh
-opencode api post /api/session/<sessionID>/command --data '{"command":"popup-toggle","text":""}'
+opencode api post /api/session/<sessionID>/command --data '{"name":"popup-toggle","text":""}'
 ```
 
 > The prompt commands run on the server and apply the change directly. The palette and the popup menu leave a request file next to the presence data instead, and every server instance watches it — same outcome, one path per surface. The TUI entrypoint stays palette-only on purpose: the client appends every server command to the `/` list, so giving the client commands a slash name too would show each one twice.
@@ -191,8 +202,8 @@ OpenCode server
 
 - **Busy detection** uses the public event stream: `session.status` (`busy`/`retry`/`idle`), `session.execution.started/succeeded/failed/interrupted`, `session.idle`, streaming deltas and tool activity. Permission prompts come from `permission.asked` / `permission.replied`. Every event is matched against the plugin's own location, so a busy session in another project does not light up your pill.
 - **Multiple instances** (several OpenCode windows, several projects on one server) each write their own presence file. The host shows the union and the tray tooltip lists the project names.
-- **State directory**: next to the presence files it holds `host.json` (the running host: pid, renderer and the settings it renders, rewritten as a heartbeat), `mode.json` (the renderer chosen at runtime, shared by every instance), `mode.request` (a switch waiting for the next server tick), `position.json` (the configured corner the host applies when it places the pill), `window.json` (where the pill was last placed) and the two logs, `plugin.log` and `host.log`. The preview harness adds a fake `state\preview.json` of its own while it runs.
-- **Crash safety**: presence files expire after `freshSeconds`, a session that sends no event for 45 minutes is dropped, and the host exits by itself when nothing is fresh. The plugin also restarts the host if it died or if the options changed.
+- **State directory**: next to the presence files it holds `host.json` (the running host: pid, renderer and the settings it renders, rewritten as a heartbeat), `mode.json` (the renderer chosen at runtime, shared by every instance), `mode.request` (a switch waiting for the next server tick), `position.json` (the configured corner the host applies when it places the pill), `window.json` (where the pill was last placed) and the two logs, `plugin.log` and `host.log` — each rotates to a `.1` copy at its cap (512 KiB and 256 KiB), so the newest lines are the ones kept. The preview harness adds a fake `state\preview.json` of its own while it runs.
+- **Crash safety**: presence files expire after `freshSeconds`, a session that sends no event for 45 minutes is dropped, and the host exits by itself when nothing is fresh. The plugin also restarts the host if it died or if the options changed. Files a killed instance left behind are reaped on the next setup and again before the last instance decides to stop the host.
 - **Tray identity**: the icon is registered through `Shell_NotifyIcon` with a fixed GUID (see `host/TrayIcon.cs`), so the shell remembers the place you dragged it to across restarts, unlike the executable-plus-uid slot that every PowerShell tray icon shares.
 
 ## Development
@@ -245,6 +256,8 @@ $env:OPENCODE_STATUS_POPUP_DEBUG = "1"; opencode
 ```
 
 The host side logs to `%TEMP%\opencode-status-popup\host.log` (see below).
+
+`OPENCODE_STATUS_POPUP_DIR` points both entrypoints at another state directory — the test suite uses it to keep its runs isolated from the popup you are actually using.
 
 `npm run docs:images` re-renders `docs/*.png` from the real XAML (off screen, so no screen capture and no desktop in the images) and dumps the raw frames; `npm run docs:gif` turns those frames into `docs/typing.gif` and `docs/tray.gif`.
 

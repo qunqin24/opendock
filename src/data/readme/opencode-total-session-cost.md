@@ -20,8 +20,9 @@ Without tracking these sub-sessions, you might see a main session cost of a few 
 - **Sidebar-Independent**: The cost indicator stays visible even when the Opencode sidebar is closed.
 - **Recursive Sub-Agent Tracking**: Automatically detects and sums up the costs of all child tasks spawned during your session.
 - **Detailed Cost Breakdown**: Offers a `/total_cost` slash command to show a detailed popup separating your active session cost from child task and sub-agent costs.
+- **Session List Cost View**: Offers a `/sessions_cost` command that opens a dialog with the sessions of the last 7 days grouped by day, showing the total cost (including sub-agents) of each session and of each day.
 - **Provider & Model Breakdown**: Displays the exact costs accumulated per model across all session hierarchy levels.
-- **Mouse Click Interaction**: Left-clicking on the cost bar in the prompt header right panel triggers the same detailed breakdown popup.
+- **Mouse Click Interaction**: Left-clicking on the cost bar in the prompt header right panel triggers the same detailed breakdown popup, while right-clicking opens the session costs list.
 
 ## Installation
 Install it globally with:
@@ -53,6 +54,22 @@ anthropic/claude-sonnet-4: $0.40
 openai/gpt-5:              $0.14
 ------------------------------
 Total:                     $0.54
+```
+
+## Session list costs
+Run `/sessions_cost` (or `/session_costs`) to open a centered, read-only dialog with
+the sessions of the last 7 days grouped by day. Each day header shows the total of its
+sessions and each session row shows its recursive total (session plus every child
+sub-session). Use the up/down arrows to move the selection and `enter` to open a
+session; `esc` closes the dialog.
+
+```
+Session Costs                                  last 7 days
+Today                                              $0.54
+  Refactor the parser                              $0.41
+  Add integration tests                            $0.13
+Wed Sep 16 2026                                    $0.22
+  Fix flaky test                                    $0.22
 ```
 
 ## How it works

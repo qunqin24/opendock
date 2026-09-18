@@ -13,17 +13,6 @@ scoped implementation, validation, review, and model routing.
 - **Coexistence and portability** — Sortie activates only when invited, preserves normal OpenCode agents and settings, and keeps project-local setup as the default.
 - **Cost, time, and proof** — The objective is not maximum agent count. It is the lowest practical cost and effort for a verified outcome, with explicit evidence when work does or does not pass.
 
-### Direction for v0.10.x
-
-The v0.10.x line is being developed around an **Astra operator / Terra dogs** split. Astra is the
-top-level decision authority that protects the accepted goal, quality bar, escalation decisions,
-and final acceptance. Because Astra is expensive, it should do only the small amount of work that
-requires that level of judgment. Terra-based dogs handle most bounded planning, coordination, and
-execution. The intended result is Astra-level judgment with Terra-level operating cost.
-
-This is an architectural direction under active validation, not a demonstrated benchmark result.
-Goal and quality authority remain centralized; implementation volume does not.
-
 ## Try it
 
 Requirements: Node.js 22.6 or newer, npm, and OpenCode.
@@ -59,9 +48,13 @@ See [configuration details](#configuration) for model selection and other setup 
 > **Project status: Beta.** v0.10.x is under active stabilization. Runtime
 > behavior, configuration, and runtime assets may still change before 1.0.
 
-[![npm](https://img.shields.io/npm/v/sortie-dogs)](https://www.npmjs.com/package/sortie-dogs)
-[![license](https://img.shields.io/npm/l/sortie-dogs)](LICENSE)
+[![GitHub Release](https://img.shields.io/github/v/release/zufall-upon/Sortie-dogs)](https://github.com/zufall-upon/Sortie-dogs/releases/latest)
+[![npm](https://img.shields.io/npm/v/sortie-dogs?label=npm)](https://www.npmjs.com/package/sortie-dogs)
+[![Tests](https://github.com/zufall-upon/Sortie-dogs/actions/workflows/test.yml/badge.svg)](https://github.com/zufall-upon/Sortie-dogs/actions/workflows/test.yml)
+[![OpenCode Plugin](https://img.shields.io/badge/OpenCode-Plugin-5C5CFF)](https://opencode.ai/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Node.js](https://img.shields.io/node/v/sortie-dogs)](https://www.npmjs.com/package/sortie-dogs)
+[![MIT License](https://img.shields.io/npm/l/sortie-dogs)](LICENSE)
 
 ![Sortie-dogs coordinating a bounded implementation workflow](https://raw.githubusercontent.com/zufall-upon/Sortie-dogs/main/docs/assets/sortie-workflow.gif)
 
@@ -70,56 +63,103 @@ bounded implementation, canonical validation, and evidence-backed completion.
 
 Guides: [日本語](docs/guide-ja.md) · [简体中文](docs/guide-zh-CN.md) · [テスト実行](docs/testing.md) · [CLI testing](docs/cli-testing.md)
 
-Release: [v0.10.0](https://github.com/zufall-upon/Sortie-dogs/releases/tag/v0.10.0)
+Release: [v0.10.5](https://github.com/zufall-upon/Sortie-dogs/releases/tag/v0.10.5)
+
+### Direction for v0.10.x
+
+The v0.10.x line is focused on one outcome: **verified work at the lowest practical cost without
+giving up quality or acceptable speed.**
+
+Sortie-dogs does not assume that the strongest model should do every step. Lower-cost models should
+handle as much bounded execution as they can. Stronger models, independent review, and rescue paths
+are added only when task shape, observed failure, or risk provides evidence that the extra capability
+is worth the cost.
+
+The goal is not to minimize any one metric in isolation. It is to preserve the accepted goal and
+quality bar while balancing **cost, quality, and wall time**. Execution depth and model strength
+should adapt to the work: cheaper models first when they are sufficient, escalation only when
+evidence says it is needed, and no silent weakening of acceptance criteria to make a run cheaper or
+faster.
+
+v0.10.x is still being validated against that objective. The direction is simple: **keep it cheap
+enough to run often, good enough to trust, and fast enough to stay practical.**
 
 ## Latest local benchmark case study
 
 **Completion-filtered reference values, not a successful benchmark or leaderboard claim.**
-On 2026-09-14, Bare OpenCode and Sortie-dogs v0.9.12 each collected three completed runs of the
-same frozen task, `datacurve/anko-typed-variable-bindings`. Bare needed three attempts; Sortie
-needed five because two attempts returned `INTERRUPTED`. These were separate local trial batches,
-not three matched pairs. Docker and Runta were intentionally unused.
+Every column below runs the same frozen task, `datacurve/anko-typed-variable-bindings`, with pinned
+official inputs and a localized Docker-free official verifier, recorded between 2026-09-14 and
+2026-09-18. They are separate local trial batches, not matched pairs. Docker and Runta were
+intentionally unused.
 
 Run configuration was fixed per product configuration:
 
 - **Bare OpenCode:** standard `build` agent, `openai/gpt-5.6-sol` / `high`, with no Sortie plugin
   or Sortie runtime assets in the effective configuration.
-- **Sortie v0.9.12:** `dog-coordinator` on `openai/gpt-5.6-terra` / `high`; observed implementation
-  children on `openai/gpt-5.6-sol` / `medium`, with the pinned Sortie package and runtime assets.
-  No Luna, Astra, or Opus messages were observed in these trials.
+- **Sortie v0.9.12:** `dog-coordinator` on `openai/gpt-5.6-terra` / `high`; implementation children
+  on `openai/gpt-5.6-sol` / `medium`.
+- **Sortie v0.10.3:** `dog-operator` on `openai/gpt-5.6-terra` / `xhigh`; implementation children on
+  `openai/gpt-5.6-sol` / `low`.
+- **Sortie v0.10.5:** `dog-operator` on `openai/gpt-5.6-terra` / `xhigh`; implementation children on
+  `openai/gpt-5.6-luna-fast` / `max`.
 
-| Metric · one frozen task | Bare OpenCode | Sortie v0.9.12 | Sortie v0.10.0 clean qualification |
-| --- | ---: | ---: | ---: |
-| Attempts needed | 3 | 5 | 1 |
-| Completed runs compared | 3 | 3 | 1 |
-| Verified PASS | 0/3 | 0/3 | 0/1 |
-| Task checks · F2P | 11.1% · 3/27 | 85.2% · 23/27 | 88.9% · 8/9 |
-| Retained checks · P2P | 282/282 | 282/282 | 94/94 |
-| Median agent wall | 24.5 min | 25.7 min | 29.9 min · n=1 |
-| Median model steps | 43 | 39 | 33 · CLI stream only |
-| Implementation child sessions · total | 0 | 13 | 4 |
-| Estimated API-equivalent cost · median completed run | $3.53 | $2.85 | **$3.94** · n=1 |
-| Estimated cost · completed runs | $10.69 | $9.74 | **$3.94** |
-| Additional interrupted-attempt cost | $0 | $6.20 | $0 |
-| Total cost to acquire completed runs | $10.69 | $15.94 | **$3.94** |
+| Metric · one frozen task | Bare OpenCode | Sortie v0.9.12 | Sortie v0.10.3 | Sortie v0.10.5 |
+| --- | ---: | ---: | ---: | ---: |
+| Verified PASS | 0/3 | 0/3 | 0/1 | **1/1** |
+| Task checks · F2P | 11.1% · 3/27 | 85.2% · 23/27 | 77.8% · 7/9 | **100% · 9/9** |
+| Median agent wall | 24.5 min | 25.7 min | 22.7 min | 43.8 min |
+| Median model steps | 43 | 39 | 36 | 39 |
+| Estimated API-equivalent cost · median completed run | $3.53 | $2.85 | $3.79 | **$2.58** |
 
-All three Bare runs passed 1/9 task checks. The three completed Sortie runs passed 7/9, 8/9,
-and 8/9. Every compared candidate retained 94/94 prior checks, but every official verifier still
-returned reward 0. The two interrupted Sortie attempts are excluded from completed-run quality,
-time, and cost aggregates; their attempt count and estimated cost remain visible above.
+Sample sizes differ and the columns are not interchangeable. Bare and v0.9.12 are three completed
+runs each; v0.10.3 and v0.10.5 are one-shot qualifications with no fresh Bare control. Bare needed
+three attempts, v0.9.12 needed five because two returned `INTERRUPTED`, and those two interrupted
+attempts add **$6.20** on top of the **$9.74** spent on its three completed runs. Every candidate in
+every column retained all prior checks — 282/282 for the three-run columns, 94/94 for the one-shot
+columns — so no column bought task checks by breaking existing behavior.
 
-The v0.10 value is a standalone qualification-only reference, not a fourth matched run or a
-FrontierHarness leaderboard result. It used no fresh Bare control and a localized Docker-free
-verifier. Its estimated API-equivalent cost is **$3.94**: $3.26 from Sol and $0.68 from Terra,
-calculated from the root and descendant session tokens with 100% pricing coverage. A preceding
-debug run returned reward 1 (F2P 9/9, P2P 94/94), so that pass is not presented as reproducible.
+**v0.10.5** is the first configuration here to reach a Verified PASS. It reached `DONE`, and the
+official verifier returned reward **1**, F2P **9/9**, and P2P **94/94**. Its full
+root-plus-ten-descendant audit covers 123 assistant requests and 9,227,381 tokens at **$2.576731**
+API-equivalent cost: **$2.033098** for Terra/xhigh and **$0.543633** for Luna-fast/max. The measured
+package is a candidate source snapshot built before the version bump and reports package metadata
+`0.10.4`, so it is a source-snapshot reference rather than a released-package measurement. One
+verified success is not a success rate.
 
-![Latest local case study: Bare completed 11.1 percent of task checks at a median estimated API-equivalent cost of $3.53; Sortie completed 85.2 percent at $2.85. Sortie needed five attempts and $15.94 to collect three completed runs. Neither configuration achieved a Verified PASS.](docs/assets/quality-cost-reference.svg)
+**v0.10.5 is also the slowest column, and that is orchestration rather than the worker model.** A
+matched probe on the same snapshot, changing only the worker route to `openai/gpt-5.6-luna` / `max`,
+also returned reward **1**, in 43.1 min at **$1.72**. Against it, Luna-fast/max cut worker model step
+time from **29.3 min** to **19.5 min** and raised output-plus-reasoning throughput from **39.4** to
+**63.0** tokens per second on comparable worker load — 70 requests and 6,544,422 tokens against 72
+requests and 5,825,953 tokens. Wall still rose 1.8%, because every non-worker session runs Terra/xhigh
+on the serial critical path: Terra/xhigh requests rose from 36 to 51 and root-only wall outside all
+child sessions rose from **7.9 min** to **15.0 min**, with five reviewer sessions against none. The
+same split explains the cost. Of the **$0.86** increase, **$0.60** is additional Terra/xhigh
+orchestration and **$0.26** is the worker model at twice the unit price. At n=1 against n=1 that
+orchestration difference is not attributed to the worker model, and neither the wall nor the cost cell
+ranks the two worker models against each other.
 
-Cost uses exported root and child session tokens, grouped by the model that produced each message,
-with a fixed standard short-context rate schedule. Completed-run cost shows execution efficiency;
-total acquisition cost includes the two interrupted Sortie attempts and shows reliability overhead.
-These are API-equivalent estimates, not invoices.
+`gpt-5.6-luna-fast` has no published model page. Its rates are the resolved host model catalog entry:
+$0.40 input, $0.04 cached input, and $2.40 output per million tokens, exactly twice the Luna Standard
+schedule. No request in the measured run crossed the 272,000-token long-context threshold, so no band
+multiplier applies.
+
+v0.10.4 is not shown as a column but repeated the v0.10.3 qualification twice at F2P **5/9** and
+**8/9**, so the single v0.10.3 observation of 7/9 sits inside that spread: the pre-v0.10.5 releases do
+not solve this task, and their per-run differences are run-to-run variance rather than measured
+quality changes. The v0.10.4 payload was a prompt-cache correctness fix, and it is measured directly
+instead of through whole-run cost: the v0.10.3 proposal child reused a median **0.065** of the
+previous prompt and was the only flagged session in its run, while both v0.10.4 runs reuse **0.957**
+and **0.986** and flag none, cutting that child's uncached input from **406,202** tokens to
+**213,115** and **285,060**.
+
+![Historical local case study: Bare completed 11.1 percent of task checks at a median estimated API-equivalent cost of $3.53; Sortie v0.9.12 completed 85.2 percent at $2.85. The one-shot v0.10.3 Terra/xhigh qualification completed 77.8 percent at $3.79. Neither configuration achieved a Verified PASS.](docs/assets/quality-cost-reference.svg)
+
+Cost audits use deduplicated root and descendant session tokens, grouped by the model that produced
+each message, and price cached input and reasoning per request. Bare and v0.9.12 retain their frozen
+2026-07-30 short-context schedule, so their cost cells are not same-rate comparisons with the v0.10
+columns, which use the product's 2026-09-14 per-request schedule. The observed host cost field was
+zero and is not used as cost evidence. These are API-equivalent estimates, not invoices.
 
 The product objective is **more verified outcomes per unit of cost and time without weakening the
 accepted goal**. This small, single-task local case study does not establish that claim, isolate

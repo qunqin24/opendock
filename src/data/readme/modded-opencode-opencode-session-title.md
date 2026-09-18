@@ -1,7 +1,7 @@
 <div align="center">
   <h1>⚡ Modded OpenCode</h1>
   <p>Requires OpenCode — Desktop, Terminal and the CLI all read the same config.</p>
-  <p><strong>105 skills · 13 agents · 19 commands · 7 plugins — everything ready at launch</strong></p>
+  <p><strong>105 skills · 13 agents · 19 commands · 6 plugins — everything ready at launch</strong></p>
   <p>
     <a href="README.tr.md">🇹🇷 Türkçe</a> ·
     <a href="README.ru.md">🇷🇺 Русский</a>
@@ -12,6 +12,10 @@
     <a href="https://opencode.ai"><img src="https://img.shields.io/badge/OpenCode-v2.3%2B-blue?style=flat-square" alt="OpenCode"/></a>
   </p>
 </div>
+
+<p align="center">
+  <img src="docs/assets/hero.svg" alt="Modded OpenCode — Run your own AI inside OpenCode" width="100%"/>
+</p>
 
 ---
 
@@ -36,7 +40,7 @@ chmod +x setup.sh scripts/*.sh
 
 ---
 
-## 🔌 Plugins (7 total, installed from npm)
+## 🔌 Plugins (6 built-in, installed from npm)
 
 | Plugin | What it does |
 |--------|-------------|
@@ -46,7 +50,6 @@ chmod +x setup.sh scripts/*.sh
 | **update-checker** | Checks GitHub for new releases on startup |
 | **notify** | Cross-platform desktop notifications on task completion |
 | **session-title** | Auto-generates session titles from the first user message |
-| **env-guard** | Blocks reading `.env` files and writes containing detected secrets |
 
 Auto-continue config (`<project>/.opencode/auto-continue.json`):
 
@@ -191,11 +194,11 @@ Lightweight helper that syncs local model catalogs — does **not** create rules
 
 The language you pick sets the agent's conversation language in `rules.md`.
 
-> 🔑 **Key safety:** API keys stored in `.env.local` (mode `0600`), never written to shell RC files.
+> 🔑 **Key safety:** Never written to shell RC files. On macOS/Linux, stored in `.env.local` (mode `0600`). On Windows, stored as user environment variables via `setx` (persists in registry until manually removed).
 
-| OS | `.env.local` location |
-|----|----------------------|
-| **Windows** | `%USERPROFILE%\.config\opencode\local-setup\.env.local` |
+| OS | Storage method |
+|----|----------------|
+| **Windows** | User environment variables via `setx` (e.g. `GITHUB_API_KEY`, `BRAVE_API_KEY`) |
 | **macOS** | `~/Library/Application Support/opencode/local-setup/.env.local` |
 | **Linux** | `~/.config/opencode/local-setup/.env.local` |
 

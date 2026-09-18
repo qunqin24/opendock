@@ -4,16 +4,16 @@ TypeScript packages for OpenCode and Pi: shared macOS media controls, Vim-style 
 
 ## Packages
 
-| Package                                                                      | Purpose                                           | Platform and host support                 |
-| ---------------------------------------------------------------------------- | ------------------------------------------------- | ----------------------------------------- |
-| [`@naxodev/music-core`](packages/music-core/README.md)                       | Shared music-session client, daemon, and APIs     | Cross-platform APIs; macOS media provider |
-| [`@naxodev/opencode-music-player`](packages/opencode-music-player/README.md) | OpenCode Now Playing sidebar and controls         | macOS; OpenCode 2.0.3                     |
-| [`@naxodev/pi-music-dock`](packages/pi-music-dock/README.md)                 | Pi Now Playing status, panel, and controls        | macOS; Pi 0.83.x or 0.84.x                |
-| [`@naxodev/opencode-vim`](packages/opencode-vim/README.md)                   | Vim-style modal editing for OpenCode prompts      | macOS, Linux, and Windows; OpenCode 2.0.3 |
-| [`@naxodev/apnea`](packages/apnea/README.md)                                 | Host-neutral multi-role workflow engine and CLI   | Bun 1.3.7+; Herdr and an agent CLI        |
-| [`@naxodev/pi-apnea`](packages/pi-apnea/README.md)                           | Pi commands, tools, skills, and prompts for Apnea | Pi 0.83.x or 0.84.x                       |
+| Package                                                                      | Purpose                                           | Platform and host support                             |
+| ---------------------------------------------------------------------------- | ------------------------------------------------- | ----------------------------------------------------- |
+| [`@naxodev/music-core`](packages/music-core/README.md)                       | Shared music-session client, daemon, and APIs     | Cross-platform APIs; macOS media provider             |
+| [`@naxodev/opencode-music-player`](packages/opencode-music-player/README.md) | OpenCode Now Playing sidebar and controls         | macOS; exact tested OpenCode host                     |
+| [`@naxodev/pi-music-dock`](packages/pi-music-dock/README.md)                 | Pi Now Playing status, panel, and controls        | macOS; declared Pi peer ranges                        |
+| [`@naxodev/opencode-vim`](packages/opencode-vim/README.md)                   | Vim-style modal editing for OpenCode prompts      | macOS, Linux, and Windows; exact tested OpenCode host |
+| [`@naxodev/apnea`](packages/apnea/README.md)                                 | Host-neutral multi-role workflow engine and CLI   | Bun; Herdr and an agent CLI                           |
+| [`@naxodev/pi-apnea`](packages/pi-apnea/README.md)                           | Pi commands, tools, skills, and prompts for Apnea | Declared Pi peer range                                |
 
-All packages are pre-1.0. Breaking host APIs may require coordinated minor releases. See each package README for exact installation and compatibility details.
+All packages are pre-1.0. Breaking host APIs may require coordinated minor releases. See the [validated compatibility metadata](docs/package-compatibility.md) for declared runtimes, peer ranges, core requirements, and exact tested host dependencies. Declared ranges and platform support statements are distinct from executable test evidence. See each package README for installation details.
 
 ## Music Session
 

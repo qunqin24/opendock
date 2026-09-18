@@ -14,6 +14,8 @@
 [![OpenCode Plugin](https://img.shields.io/badge/OpenCode-Plugin-blue?link=https://opencode.ai)](https://opencode.ai)
 [![npm version](https://img.shields.io/npm/v/opencode-gemiterm-skills?label=npm)](https://www.npmjs.com/package/opencode-gemiterm-skills)
 [![MIT License](https://img.shields.io/badge/License-MIT-green?link=LICENSE)](LICENSE)
+[![Bun](https://img.shields.io/badge/runtime-Bun-f472b6?logo=bun&logoColor=white)](https://bun.sh)
+[![Platforms](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-blue)](https://bun.sh)
 
 [Quick Start](#quick-start) · [Skills](#bundled-skills) · [Examples](#examples) · [Requirements](#requirements) · [Contributing](CONTRIBUTING.md)
 

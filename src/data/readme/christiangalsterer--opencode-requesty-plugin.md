@@ -70,7 +70,7 @@ Add the plugin to your `tui.json` (project root or `~/.config/opencode/tui.json`
 ```json
 {
   $schema": "https://opencode.ai/tui.json",
-  "plugin": ["@christiangalsterer/opencode-requesty-plugin@1.0.0"]
+  "plugin": ["@christiangalsterer/opencode-requesty-plugin@1.2.0"]
 }
 ```
 
@@ -81,7 +81,7 @@ Or with options:
   $schema": "https://opencode.ai/tui.json",
   "plugin": [
     [
-      "@christiangalsterer/opencode-requesty-plugin@1.0.0",
+      "@christiangalsterer/opencode-requesty-plugin@1.2.0",
       {
         "refreshIntervalMs": 300000,
         "warningThreshold": 0.6,
