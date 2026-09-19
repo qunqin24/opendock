@@ -58,6 +58,10 @@ opencode-usage usage --pct              # add the % BUDGET column (--by provider
 opencode-usage providers
 opencode-usage providers --no-net       # cached only
 
+# What the providers themselves answer about their budget
+opencode-usage probe                    # one free-model call per provider
+opencode-usage probe --json
+
 # Model ranking by intelligence per blended dollar
 opencode-usage top
 opencode-usage top --limit 10 --json
@@ -123,7 +127,12 @@ Normalized percentage of budget consumed per provider, from these sources (in pr
    - `github-copilot`: premium requests entitlement (7000/mo)
    - `opencode-go` (Zen): rolling 5h / weekly / monthly % (binding window)
    - `openrouter`: credits used / total credits
-   - `zai`: coding plan quota
+   - `orcarouter`: spend since top-up; a per-key credit cap turns into a %
+   - `zai`: coding plan quota when the key has an active GLM plan; otherwise the
+     wallet balance (fallback)
+   - `snowflake-cortex`: tokens in the last 30d from the account usage views
+     (SQL API); the percentage comes from a `snowflake-cortex` line in
+     `budgets.json`
 
 2. **Documented limits** — published quotas, used when the provider reports none.
    Each one is read against the period it resets on: a daily limit against today,
@@ -138,10 +147,11 @@ Normalized percentage of budget consumed per provider, from these sources (in pr
    records tokens and requests; a credit and a neuron are the provider's own
    unit, derived from the model and the request by a rule it does not record.
    Give them a line in `budgets.json` to get a percentage in USD instead.
-   - `cloudflare-workers-ai`: 100k neurons/day (free tier)
-   - `nvidia`: 1000 credits/month (free tier)
-   - `orcarouter`: undocumented
-   - `snowflake-cortex`: 100 credits/month (paid)
+   - `cloudflare-workers-ai`: 10k neurons/day (free tier, resets 00:00 UTC)
+   - `nvidia`: credit allowance retired — the trial is rate-limited per model
+   - `opencode`: no spend API for API keys
+   - `zai`: a key without a coding plan shows its wallet balance (live), and the
+     percentage comes from a `zai` line in `budgets.json`
 
 3. **budgets.json** — your monthly USD per provider, read against what the
    provider cost so far this calendar month:
@@ -154,6 +164,23 @@ Normalized percentage of budget consumed per provider, from these sources (in pr
    Place at `~/.config/opencode-usage/budgets.json`.
 
 Providers without any source show `—`.
+
+## Free-model probe (`probe`)
+
+`probe` sends one minimal request against a free model per connected provider
+and reports what the answer reveals about the budget: a rate-limit header, a
+"no credits" error, or the meter itself (`usage.neurons` for Cloudflare). It
+reads the key from opencode's auth store and never prints it. Providers covered:
+
+- `cloudflare-workers-ai` — the response carries neurons per request (the free
+  tier's unit), so the probe answers whether the account can still run
+- `nvidia` — an HTTP 200 means the free per-model allowance still works
+- `orcarouter` — the `free` model answers `rate_limit_error` with a
+  `retry-after`, and credits raise the cap
+- `zai` — an HTTP 429 with `code 1113` means the balance is empty
+
+`opencode` exposes no chat API for keys and `snowflake-cortex` is read through
+its SQL quota, so both are skipped.
 
 ## Ranking (`top`)
 

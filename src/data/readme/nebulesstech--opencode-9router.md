@@ -77,6 +77,7 @@ See `agents/security-reviewer/README.md` for full details.
 ## Configuration Examples
 
 - **Thinking Levels Variants** (`thinking-variants config/thinking-levels-opencode.json`) – OpenCode configuration with model variants for Ctrl+T thinking level switching.
+- **9Router GPT-Only Presets** ([`9router-gpt-only/`](9router-gpt-only/README.md)) – Portable OpenCode and OMO routes, setup workflow, and contract checker for dynamic 9Router thinking variants.
 
 ---
 

@@ -44,7 +44,7 @@ chmod +x setup.sh scripts/*.sh
 
 | Plugin | What it does |
 |--------|-------------|
-| **agents-opencode** | Compaction context injection, sensitive file blocking, version env var |
+| **agents-opencode** | Compaction context injection, version env var |
 | **auto-continue** | Auto-resume idle/disconnected sessions (on by default) |
 | **openai-system-merge** | Fixes multi-system-message error for strict OpenAI-compatible providers |
 | **update-checker** | Checks GitHub for new releases on startup |
@@ -186,7 +186,6 @@ Both wizards ask the same questions and produce the complete config:
 | 3️⃣ Addressing | How should the agent call you? | default |
 | 4️⃣ GitHub API key(s) | For GitHub MCP | skipped, MCP disabled |
 | 5️⃣ Brave API key | For web search | skipped, search disabled |
-| 6️⃣ Extra integrations | Custom provider menu | skip |
 
 ### Secondary: `scripts/install.sh` (provider sync only)
 
@@ -202,11 +201,15 @@ The language you pick sets the agent's conversation language in `rules.md`.
 | **macOS** | `~/Library/Application Support/opencode/local-setup/.env.local` |
 | **Linux** | `~/.config/opencode/local-setup/.env.local` |
 
+> **Note on `.env` access:** Agents have broad read permissions (`"read": "allow"` in `opencode.jsonc`) so they can read `.env` files when you ask them to work with your configuration. There is no automatic blocking of sensitive files — this is by design. If you need stricter controls, configure `"read": "ask"` and add deny rules for specific patterns in your `opencode.jsonc`.
+
 ---
 
 ## 📜 rules.md
 
 Agent persona layer loaded through OpenCode's instruction system. Sets identity, voice, and working style. Language + addressing configured at setup time.
+
+When you choose **local persona** (default), the built-in [`DEFAULT_PERSONA`](https://github.com/tealaxdevelopers/Modded-OpenCode/blob/main/scripts/build-config.mjs) from `build-config.mjs` is used as Article 2 of `rules.md`. This persona works offline with no external dependencies. You can read and edit it directly — it's a plain Markdown prompt baked into the setup script.
 
 ---
 

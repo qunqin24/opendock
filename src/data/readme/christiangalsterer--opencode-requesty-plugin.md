@@ -16,6 +16,11 @@
 
 An [opencode](https://opencode.ai) TUI plugin that shows your [Requesty.ai](https://www.requesty.ai) budget, current monthly spend, and per-model cost distribution right in the session prompt, in the session sidebar, plus a detail dialog via the `/requesty` slash command.
 
+## Requirements
+
+- opencode ≥ 1.18
+- A Requesty API key — create one at [app.requesty.ai/api-keys](https://app.requesty.ai/api-keys)
+
 ## Features
 
 The plugin surfaces your Requesty.ai budget and usage in three places, each optimized for the space it occupies: a compact sidebar, a full detail dialog, and a minimal prompt-area readout.
@@ -50,7 +55,6 @@ A compact readout on the right side of the session prompt shows:
 
 Disable the readout with `"prompt": { "budgetIndicator": false }`.
 
-
 ### Detail dialog
 
 ![Detail dialog](docs/images/dialog.png)
@@ -65,27 +69,50 @@ Data comes from the [Requesty Management API](https://docs.requesty.ai/api-refer
 
 ## Installation
 
-Add the plugin to your `tui.json` (project root or `~/.config/opencode/tui.json`). Update the version number to the latest release.
+### Global Installation
 
-```json
-{
-  $schema": "https://opencode.ai/tui.json",
-  "plugin": ["@christiangalsterer/opencode-requesty-plugin@1.2.0"]
-}
+To install the plugin globally run the following command
+
+```sh
+opencode plugin -g @christiangalsterer/opencode-requesty-plugin
 ```
 
-Or with options:
+### Project Installation
+
+To install the plugin for the current project run the following command
+
+```sh
+opencode plugin @christiangalsterer/opencode-requesty-plugin
+```
+
+## Update
+
+To update the plugin please run the following command.
+
+```sh
+opencode plugin -f @christiangalsterer/opencode-requesty-plugin
+```
+
+OpenCode does not currently support plugin updates reliably. See OpenCode PRs #35777, #32822, and #37300. To force OpenCode to download the configured plugin versions, clear its plugin cache:
+
+```shell
+rm -rf ~/.cache/opencode/packages/@christiangalsterer/opencode-requesty-plugin*
+```
+
+## Configuration
+
+To the configure the plugin add/modify the configuration in either the project `.opencode/tui.json` or global `~/.config/opencode/tui.json` file.
 
 ```json
 {
   $schema": "https://opencode.ai/tui.json",
   "plugin": [
     [
-      "@christiangalsterer/opencode-requesty-plugin@1.2.0",
+      "@christiangalsterer/opencode-requesty-plugin",
       {
         "refreshIntervalMs": 300000,
         "warningThreshold": 0.6,
-        "errorThreshold": 0.85
+        "errorThreshold": 0.85,
         "sidebar": {
           "enabled": true,
           "maxModels": 5,
@@ -98,85 +125,7 @@ Or with options:
 }
 ```
 
-Plugin options must be the second item in the nested plugin entry. The same format is used for local plugins; use the generated `dist/tui.tsx` file as the plugin path:
-
-```json
-{
-  "$schema": "https://opencode.ai/tui.json",
-  "plugin": [
-    [
-      "/absolute/path/to/opencode-requesty-sidebar-plugin/dist/tui.tsx",
-      {
-        "sidebar": { "showKeyName": true },
-        "prompt": { "showKeyName": true },
-        "dialog": { "showKeyName": true }
-      }
-    ]
-  ]
-}
-```
-
-Restart opencode after changing the config — plugins are loaded at startup.
-
-### Local development install
-
-Point at a local checkout instead:
-
-```json
-{
-  "$schema": "https://opencode.ai/tui.json",
-  "plugin": [
-    [
-      "file:///absolute/path/to/opencode-requesty-plugin/dist/tui.tsx",
-      {
-        "sidebar": { "showKeyName": true },
-        "prompt": { "showKeyName": true },
-        "dialog": { "showKeyName": true }
-      }
-    ]
-  ]
-}
-```
-
-Run `bun install && bun run build` in the checkout first.
-
-## Update
-
-OpenCode does not currently support plugin updates reliably. See OpenCode PRs #35777, #32822, and #37300. To force OpenCode to download the configured plugin versions, clear its plugin cache:
-
-```shell
-rm -rf ~/.cache/opencode/packages/@christiangalsterer/opencode-requesty-plugin*
-```
-
-## API key detection
-
-The plugin reads your Requesty API key from the opencode provider config: `provider.requesty.options.apiKey` in `opencode.json`, including `{env:VAR}` interpolation.
-
-```json
-{
-  "provider": {
-    "requesty": {
-      "options": { "apiKey": "sk-..." }
-    }
-  }
-}
-```
-
-Or via an environment variable:
-
-```json
-{
-  "provider": {
-    "requesty": {
-      "options": { "apiKey": "{env:REQUESTY_API_KEY}" }
-    }
-  }
-}
-```
-
-If no key is found, the widget shows a short setup hint instead of failing.
-
-## Configuration
+Restart opencode after changing the config.
 
 ### Configuration options
 
@@ -274,12 +223,55 @@ All amounts are in USD and dates are evaluated in UTC.
 - **End of Month projection** — current spend projected forward at the current daily run rate through the end of the month.
 - **Session cost** — spend, request count, and tokens for the currently active opencode session: **Today** and **Since <session start date>**. The window starts at the session's creation timestamp; if that is unavailable it falls back to the last 90 days. Attribution uses Requesty's `extra.X-Session-Affinity` metadata, so values are exact per session (not estimates). While a session's data is still loading the section shows a "…" placeholder rather than a misleading zero; a previously-loaded session is served from a per-session cache so its figures appear immediately on revisit.
 
-## Requirements
+## API key detection
 
-- opencode ≥ 1.18 (TUI plugin API with slots)
-- A Requesty API key — create one at [app.requesty.ai/api-keys](https://app.requesty.ai/api-keys)
+The plugin reads your Requesty API key from the opencode provider config: `provider.requesty.options.apiKey` in `opencode.json`, including `{env:VAR}` interpolation.
+
+```json
+{
+  "provider": {
+    "requesty": {
+      "options": { "apiKey": "sk-..." }
+    }
+  }
+}
+```
+
+Or via an environment variable:
+
+```json
+{
+  "provider": {
+    "requesty": {
+      "options": { "apiKey": "{env:REQUESTY_API_KEY}" }
+    }
+  }
+}
+```
+
+If no key is found, the widget shows a short setup hint instead of failing.
 
 ## Development
+
+### Local development install
+
+Point at a local checkout instead:
+
+```json
+{
+  "$schema": "https://opencode.ai/tui.json",
+  "plugin": [
+    [
+      "file:///absolute/path/to/opencode-requesty-plugin/dist/tui.tsx",
+      {
+        "sidebar": { "showKeyName": true },
+        "prompt": { "showKeyName": true },
+        "dialog": { "showKeyName": true }
+      }
+    ]
+  ]
+}
+```
 
 ```bash
 bun install

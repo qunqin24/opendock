@@ -76,6 +76,14 @@ Authorization: Bearer <token>
 
 This is a community plugin, not affiliated with Z.AI or OpenCode.
 
+## Freeze guard (v1.0.2)
+
+When the Z.AI provider kills a stream with `Weekly/Monthly Limit Exhausted`, the
+turn used to hang in the TUI (looking frozen). The plugin now listens for the
+`session.error` event, shows an error toast with the reset time, refreshes the
+gauges, and **aborts the stuck turn automatically** so the UI unfreezes
+immediately. Switch model with `/models` to keep working until the reset.
+
 ## License
 
 MIT

@@ -46,8 +46,9 @@ TeamMode's answer to each:
 |---|---|
 | 🔥 **Context flooding** | Every governed tool output over its content-class offload threshold (prose 4000 / data 2000 tokens, CJK-aware) is offloaded to a local run store and replaced by an 80-token preview + an HMAC handle. The agent pages through what it needs — the window never drowns. |
 | 🐌 **Round-trip overhead** | `tm_ptc_run`: the agent writes ONE program that makes N governed calls in a single turn. Zero LLM round-trips during the run. |
-| 🕳️ **Silent side effects** | R6/R2 approval gate: env-var reads and dangerous ops route through OpenCode's official confirmation dialog, auto-rejected after 10 unanswered minutes. The plugin never approves on its own — it only ever rejects. |
+| 🕳️ **Silent side effects** | R6/R2 approval gate: env-var reads and dangerous ops route through OpenCode's official confirmation dialog, auto-rejected after 1 unanswered minute (default). The plugin never approves on its own — it only ever rejects. |
 | 🌫️ **Hallucinated research** | Web access is a two-role grant with an allowlisted, governed tool chain. A fact that couldn't be fetched is reported as a gap — never fabricated. |
+| 🧭 **Walls of text** | Replies are steered into the shape the host renders fastest: a markdown table for per-file / per-case / per-finding results, fenced code for diffs and configs, a browser screenshot attached as an inline image only when you ask for one. The host does not draw mermaid, so no agent pretends it does. |
 
 And the workflow discipline underneath: deterministic routing, a ≤30-line plan
 you approve before ≥2 dispatches execute, structured `STATUS/CHANGES/FINDINGS/
@@ -218,7 +219,9 @@ through with `tm_fetch` when it genuinely needs the payload.
 | `tm_ptc_run` | Batch orchestration: one program, N governed calls, zero LLM round-trips; web roles also get `tm.search` / `tm.webfetch` inside the program | all six agents |
 | `tm_search` | Multi-engine web search with extracted, deduplicated, RRF-fused hit lists | Lead + Researcher |
 | `tm_webfetch` | Single governed GET of an allowlisted page (search pages auto-extracted) | Lead + Researcher |
-| `tm_browser` | Interactive browser session (**your default browser**): 16 Playwright verbs (snapshot-first `take_snapshot` → uid-addressed `click`/`fill`/`drag`/…) + 5 legacy compat verbs (open/navigate/read/screenshot/close); Playwright engine needs Node ≥ 20, below that (or on any import failure) it auto-degrades to the legacy CDP engine | Lead + Researcher + Tester (UI verification) |
+| `tm_dispatch` / `tm_join` | **Async sub-agent dispatch**: `tm_dispatch` starts a specialist in its own child session and returns the id immediately (the built-in `task` tool blocks you until it finishes), `tm_join` collects — status snapshot, bounded `waitMs`, `cancel:true` to abort a runaway child; collected replies ride the offload pipeline, so five fat reports arrive as handles + previews instead of multiplying your context. Lead-only, and a child never dispatches | Lead only |
+| `tm_pty` | **Non-blocking command execution** on the host's own terminal sessions (`start`/`status`/`list`/`kill`) — independent builds and test suites overlap instead of queueing behind one 120 s bash call. Captures no output (the command tees its own log; read it with `tm_read`), and every start passes the R6 classifier, the R2 danger-face globs **and** the official confirmation dialog before a process exists | Lead only |
+| `tm_browser` | Interactive browser session (**your default browser**): 16 Playwright verbs (snapshot-first `take_snapshot` → uid-addressed `click`/`fill`/`drag`/…) + 5 legacy compat verbs (open/navigate/read/screenshot/close); Playwright engine needs Node ≥ 20, below that (or on any import failure) it auto-degrades to the legacy CDP engine. It drives YOUR default browser channel (an Edge Beta default opens Edge Beta), stays headful unless the operator sets `TM_BROWSER_HEADLESS`, loads a page's own images/CSS/JS via the `same-site` subresource policy, and `take_screenshot { image:true }` attaches a JPEG so the model can actually see the screen | Lead + Researcher + Tester (UI verification) |
 
 > **Fixed tool priority ladder (every task): ① TeamMode governed tools
 > (`tm_*`) → ② user MCP/plugin tools → ③ the model's own reasoning.**
@@ -285,7 +288,7 @@ sees raw SERP chrome.
 
 | Engine | Notes |
 |---|---|
-| `auto` (default) | Classifies the query, fans out to 2–3 engines **in parallel**, dedupes by host+path and fuses with weighted RRF (stackoverflow/bing 0.4, others 0.2) into a top-10 list tagged with each hit's source engine(s). Routing: errors / camelCase APIs → `stackoverflow`+`github`+`bing`; dev-ecosystem (releases, frameworks, open source) → `hn`+`github`+`npm`; Chinese / general → `bing`. Pin another default via `TM_SEARCH_DEFAULT_ENGINE` |
+| `auto` (default) | Classifies the query, fans the matching engines out **in parallel** (every route has ≥2 legs), dedupes by host+path and fuses them with weighted RRF into a top-10 list tagged with each hit's source engine(s).  Ranking is scaled by real query-token overlap (floor `TM_SEARCH_RELEVANCE_FLOOR`), so a trusted engine's off-topic junk no longer outranks another engine's best hit. Routing: errors / camelCase APIs → `stackoverflow`+`github`+`bing`; dev-ecosystem (releases, frameworks, open source) → `hn`+`github`+`npm`; Chinese → `bing`+`moegirl`+`stackoverflow`+`hn`; other → `bing`+`stackoverflow`+`hn`+`github`. Pin another default via `TM_SEARCH_DEFAULT_ENGINE` |
 | `bing` | cn.bing.com — the only live CN HTML SERP; multi-word CJK queries get their phrase boundary protected (quoted) so markup shuffle can't split the result list |
 | `stackoverflow` | api.stackexchange.com question search (no key, 300/day/IP) → numbered questions with composite snippets; `auto` tracks the quota and swaps in `bing` once spent |
 | `hn` | Hacker News via Algolia API (no key) → story titles + snippets with direct article URLs |
@@ -469,6 +472,22 @@ for overrides, extra agents and disabling roles.
 | `TM_BROWSER_HEADLESS` | `auto` | `1` headless (CI) / `0` headful / `auto` (headless only on display-less Linux) |
 | `TM_BROWSER_ENGINE` | `playwright` | `playwright` (needs Node ≥ 20; any import failure auto-degrades) / `cdp-legacy` (zero-dep CDP pipe, core verbs only) |
 | `TM_BROWSER_SNAPSHOT_MAX_TOKENS` | `1200` | hard cap on `take_snapshot` payloads |
+| `TM_BROWSER_SUBRESOURCE` | `same-site` | what a page may load after its navigation was allowed: `same-site` = images/media/fonts/stylesheets always, scripts/XHR only for a site this session actually opened; `passive` = only the passive types; `off` = the legacy every-request gate. Blocked requests surface as a "N 个子资源请求被拦截" note on the next snapshot |
+| `TM_BROWSER_IDLE_MS` | `180000` | an untouched browser session closes itself after this many ms (0 disables) and tells the user — a window nobody owns is a user-facing bug |
+| `TM_BROWSER_IMAGE_MAX_BYTES` | `400000` | ceiling on the JPEG `take_screenshot { image:true }` inlines into the model's context (above it the reply stays path-only and says why) |
+| `TM_SEARCH_WEIGHTS` | unset | per-engine fusion weight overrides, e.g. `bing=0.3,hn=0.25`; anything unset keeps the built-in table |
+| `TM_SEARCH_RELEVANCE_FLOOR` | `0.35` | weight fraction kept by a hit that shares no query token with its title/snippet/host (demotes junk without deleting an engine) |
+| `TM_SEARCH_MAX_HITS` | `10` | hits kept per engine leg and in the fused list |
+| `TM_SEARCH_DISABLED_ENGINES` | unset | engines removed from the roster AND from every `auto` route (`sogou,baidu` style) |
+| `TM_BASH_TIMEOUT_PROBE_MS` | `60000` | ceiling forced onto a `timeout` the model set for a read-only probe command (0 disables) |
+| `TM_BASH_TIMEOUT_MAX_MS` | `0` | optional global ceiling for every other bash command — off by default so a real build keeps the timeout it asked for |
+| `TM_PTY_MAX` | `4` | concurrent `tm_pty` terminal sessions this plugin may keep running at once |
+| `TM_TOOL_HINTS` | `on` | append TeamMode's call-site discipline to the built-in `bash` / `task` tool DESCRIPTIONS via `tool.definition` (append-only, idempotent — the host text is never replaced) |
+| `TM_AGENT_TEMPERATURE` | `off` | `on` applies a per-role sampling table (architect 0.35 / researcher 0.3 / reviewer 0.1 / rest 0.2) via `chat.params`; or give it `reviewer=0.05;team=0.4`. Off = the documented "all agents at 0.2" invariant stands |
+| `TM_COMPACTION_CONTEXT` | `on` | on the host's pre-compaction hook, add the must-survive list (reply skeleton, offload handles, dispatched child session ids, provenance, board paths). Additive — the host's own summarizer prompt is never replaced |
+| `TM_COMPACTION_AUTOCONTINUE` | `on` | `off` stops the host from silently resuming the turn after a compaction, so a human re-reads state first |
+| `TM_SHELL_NO_COLOR` | `on` | inject `NO_COLOR`/`TERM=dumb` into every child shell via `shell.env` (ANSI progress bars are pure context tax). Never overwrites a value the host already set |
+| `TM_SHELL_ENV` | — | explicit `KEY=VALUE;KEY2=VALUE2` passthrough into child shells — deliberately allowlisted, so this hook can't become a side channel for the parent environment |
 | `TM_BROWSER_USER_DATA_DIR` | — (isolated temp profile) | explicit persistent profile dir — the ONLY way logins survive between sessions |
 | `TM_MEMORY_GLOBAL_DIR` | `~/.opencode-team/memories/global/` | tm_memory GLOBAL tier store |
 | `TM_MEMORY_SESSION_TTL_MIN` | `240` | session-tier entry TTL (lazy + boot sweep) |

@@ -108,6 +108,20 @@ Sub-agents run in their own child sessions with the project's tools and
 permissions. When one of them is blocked on a permission or a question, the
 workflow views flag it and let you answer without leaving the screen.
 
+For unattended runs you can have the plugin approve sub-agent permission
+prompts automatically. This is off by default and controlled by an environment
+variable when you start opencode:
+
+```sh
+ULTRACODE_AUTO_ALLOW=1 opencode            # approve every permission sub-agents ask for
+ULTRACODE_AUTO_ALLOW=bash,edit opencode    # approve only these permission types
+```
+
+Only workflow sessions are affected: the sub-agent sessions themselves and any
+session they open in turn. Your chat session and the plan
+approval prompt still ask as usual, and questions from sub-agents are still
+routed to you. Every auto-approval is written to the opencode log.
+
 If opencode exits while a run is in progress, the run is not lost. Every
 completed agent is journaled, so resuming replays those results and only runs
 the remaining agents again.

@@ -6,9 +6,28 @@ Version 1.0.0 replaces the V1 plugin API; OpenCode V1 users should stay on 0.1.1
 - `/rt-model`: choose an agent, then any available model or model variant. Includes built-in and file-defined agents.
 - `/rt-provider`: replace a provider for agents whose exact model ID and optional variant exist under the target provider.
 
-The server uses an agent transform and location-scoped plugin RPC. No configuration files are changed by either command. Overrides affect the agent registry for subsequent model resolution; an existing session's explicit model selection still takes precedence.
+The server uses an agent transform and location-scoped plugin RPC. No configuration files are changed by either command. Overrides update the active session's selected model as well as the agent registry. Other sessions adopt the override for their agent when their next prompt is submitted. An already running model request is unaffected.
 
-Each terminal owns a separate override layer. The latest selection wins for an agent. **Restore model** removes that terminal's layer, revealing another terminal's override or the configured model. Overrides are shared by sessions using that location on the connected server. They disappear when the server plugin unloads or restarts. Clean terminal exit releases its layers; if the terminal crashes or disconnects, they expire after 90 seconds without a heartbeat (checked every 15 seconds). This also works with remote servers; no shared filesystem or local PID assumptions are required.
+### Desktop commands
+
+Desktop currently does not render OpenCode's session-form API. Use arguments in Desktop: `/rt-model <agent> <provider/model#variant|restore>` or `/rt-provider <source> <target>` (and `/rt-provider restore`). The TUI commands remain interactive and list every available model, variant, and compatible provider. Unsupported no-argument Desktop commands now return an actionable error instead of creating an invisible form.
+
+The plugin connects through local service discovery and verifies that the discovered endpoint belongs to the same plugin instance. Standalone servers without service discovery support the argument commands below. Form creation requires the client SDK because OpenCode 2.0.6's plugin context does not expose it directly.
+
+Commands also accept arguments:
+
+```text
+/rt-model build openai/gpt-5.6-terra#medium
+/rt-model build restore
+/rt-provider source-provider target-provider
+/rt-provider restore
+```
+
+Use an agent ID and a model available in your connected server's catalog. The terminal retains its interactive pickers. Desktop command overrides belong to the invoking session and remain until restored or the server plugin restarts; `/rt-provider restore` removes all command overrides owned by that session.
+
+Each terminal owns a separate override layer. The latest selection wins for an agent. **Restore model** removes that terminal's layer, revealing another owner's override or the configured model. Clean terminal exit releases its layers; if the terminal crashes or disconnects, they expire after 90 seconds without a heartbeat (checked every 15 seconds). This also works with remote servers; no shared filesystem or local PID assumptions are required.
+
+Removing an override restores the session's previous model if the plugin still owns its selection. A later manual model change is preserved during cleanup. Sessions without an explicit previous model restore to the default resolved when the override was applied. OpenCode persists session selections: an abrupt server shutdown loses the plugin's restoration records, so the last selected session model can remain after restart.
 
 ## Install
 

@@ -5,8 +5,8 @@
 
 Fork the session. Keep the cache warm. **opencode-fork-lane** is an [OpenCode](https://opencode.ai) plugin that forks your session into a [lane](https://lane.lukeed.com/)-style **copy-on-write git worktree**: a new branch, a new folder, and every git-ignored path (`node_modules`, `target/`, `.env`) cloned **by reference** with reflink — so the new tree starts with warm caches instead of a reinstall and a cold build.
 
-- **TUI:** `/fork-lane` (or `ctrl+f`) asks what to fork (full session or a specific prompt, like native fork), asks for a lane name, creates the worktree, forks the session with history, moves the fork into the new worktree, and navigates to it.
-- **Agent:** the `fork_lane` tool lets the model isolate risky, experimental, or parallel work by itself — no human shell commands needed.
+- **TUI:** `/fork-lane` (alias `/lane`, or `ctrl+f`) asks what to fork (full session or a specific prompt, like native fork), asks for a lane name, creates the worktree, forks the session with history, moves the fork into the new worktree, and navigates to it.
+- **Agent:** the `fork_lane` tool (alias `lane`) lets the model isolate risky, experimental, or parallel work by itself — no human shell commands needed. Say "lane", "fork lane", "fork-lane", or "worktree" and the agent should call `fork_lane` (or its `lane` alias).
 
 One lane name becomes the git branch, the worktree folder (`.lane/trees/<name>`), and the forked session title.
 
@@ -45,18 +45,20 @@ Requires: git, bun >= 1.1, opencode >= 1. Optional but recommended: [`lane`](htt
 
 ## Use
 
-### TUI — `/fork-lane`
+### TUI — `/fork-lane` (alias `/lane`)
 
 1. Open a session in a git repo.
-2. Run `/fork-lane` (or `ctrl+f`).
+2. Run `/fork-lane` (or `/lane`, or `ctrl+f`).
 3. Pick what to fork — **Full session** or a specific prompt (same choice native fork gives you).
 4. Enter a lane name, e.g. `fix-login` or `feat/login` ("/" creates a namespaced branch/folder; session shows "feat — login").
 5. You land in a forked session titled `fix-login`, rooted at `<gitRoot>/.lane/trees/fix-login` on branch `fix-login`, with history up to your fork point.
 
-### Agent — `fork_lane`
+### Agent — `fork_lane` (alias `lane`)
 
 ```
 fork_lane(name="fix-login", task="Make verify constant-time, keep signature")
+# same thing:
+lane(name="fix-login", task="Make verify constant-time, keep signature")
 ```
 
 - `name` (required): branch + folder + session title (slugified, min 2 chars).

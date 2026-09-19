@@ -23,27 +23,29 @@
 
 ## 安装
 
-### 方式一：OpenCode 命令安装（推荐）
+### 方式一：OpenCode 命令面板安装（推荐，V1 / V2 通用）
 
-在 OpenCode 中按 **`Ctrl + P`** 打开命令面板，搜索 **`install plugin`**，输入：
+在 OpenCode 中按 **`Ctrl + P`** 打开命令面板，找到 **`plugin`**（Install Plugin），输入：
 
 ```
 opencode-glm-vistatus
 ```
 
-回车即可完成安装与配置。
+回车即可完成安装与配置。宿主会自动写入对应版本的配置文件（V2 → `cli.json`，V1 → `tui.jsonc`）并从 npm 拉取插件，无需手动编辑任何文件。
 
-### 方式二：npx 一键安装
+### 方式二：手动配置（备用）
 
-```bash
-npx opencode-glm-vistatus
+仅当宿主没有内置安装命令时才需要。
+
+V2（opencode 2.x）在配置目录的 `cli.json` 中添加：
+
+```jsonc
+{
+  "plugins": [{ "package": "opencode-glm-vistatus" }]
+}
 ```
 
-安装脚本会自动写入跨平台 OpenCode 配置目录下的 `tui.jsonc`（必要时同步到 `opencode.jsonc`），注册插件。插件名为 `opencode-glm-vistatus`，不带 `@latest`。
-
-### 方式三：手动配置
-
-在配置目录的 `tui.jsonc` 中添加：
+V1（opencode 1.x）在配置目录的 `tui.jsonc` 中添加：
 
 ```jsonc
 {
@@ -65,9 +67,17 @@ npx opencode-glm-vistatus
 
 **1. 移除插件配置**
 
-从 `tui.jsonc`（及 `opencode.jsonc`，若存在）的 `plugin` 数组中删除 `"opencode-glm-vistatus"`：
+从 `cli.json`（V2，`plugins` 数组）和/或 `tui.jsonc`（V1，`plugin` 数组）中删除 `"opencode-glm-vistatus"`：
 
 ```jsonc
+// cli.json（V2）
+{
+  "plugins": [] // 删除 { "package": "opencode-glm-vistatus" } 这一项
+}
+```
+
+```jsonc
+// tui.jsonc（V1）
 {
   "$schema": "https://opencode.ai/tui.json",
   "plugin": [], // 删除 "opencode-glm-vistatus" 这一项
@@ -152,15 +162,15 @@ MCP                     0/1,000
 ## 构建
 
 ```bash
-npm install          # 安装依赖（peer deps 由 OpenCode 宿主提供）
+npm install          # 安装开发依赖（运行时依赖由 OpenCode 宿主提供，发布包零依赖）
 npm run build        # tsc 产物 + esbuild 打包 → dist/tui.js
 npm run typecheck    # tsc --noEmit
 ```
 
 构建产物：
 
-- `dist/tui.js` — SolidJS 打包的 TUI 插件（实际加载的插件）
-- `dist/server.js` — 兼容用的空 Server 插件壳
+- `dist/tui.js` — 双格式 TUI 插件包（`{ id, tui, setup }`，即 `./tui` 导出目标）：
+  V1 宿主读 `tui` 字段，V2 宿主读 `setup` 字段
 
 ## 技术架构
 

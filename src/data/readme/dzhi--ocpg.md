@@ -2,7 +2,7 @@
 
 Postgres-backed persistent memory plugin for [OpenCode](https://opencode.ai).
 
-Uses the `memories` table (`content`, `tags`, `session_id`, `project`, `created_at`, `search_vector`, `memory_type`, `access_count`, `last_accessed_at`, `updated_at`) and the `pg_trgm` extension. Injects the memories most relevant to what you're currently asking into the system prompt, captures deliberate "remember that..." prompts verbatim, and exposes `memory_recall` / `memory_remember` / `memory_forget` / `memory_update` tools.
+Uses the `memories` table (`content`, `tags`, `session_id`, `project`, `created_at`, `search_vector`, `embedding`, `memory_type`, `access_count`, `last_accessed_at`, `updated_at`) and the `pg_trgm` + `vector` extensions. Injects the memories most relevant to what you're currently asking into the system prompt, captures deliberate "remember that..." prompts verbatim, and exposes `memory_recall` / `memory_remember` / `memory_forget` / `memory_update` tools.
 
 ## Install
 
@@ -39,6 +39,10 @@ export OCPG_SSL="disable"
 | `OCPG_DB`       | `ocpg`       |
 | `OCPG_SSL`      | `disable`    |
 | `OCPG_INJECTION`| `relevance`  |
+| `OCPG_OLLAMA_HOST` | `localhost` |
+| `OCPG_OLLAMA_PORT` | `11434`    |
+| `OCPG_EMBED_MODEL` | `bge-m3`    |
+| `OCPG_JUDGE_MODEL` | `qwen3:4b`  |
 
 `OCPG_SSL` accepts `disable`, `prefer`, `require`, `verify-ca`, or `verify-full` (anything else falls back to `disable`). It defaults to `disable` for the usual localhost setup - **set it to `require` or stricter whenever `OCPG_HOST` is not local**, otherwise the password handshake crosses the network in plaintext.
 
@@ -75,14 +79,16 @@ By default the block is **relevance-ranked, not recency-ranked**: the user's lat
 
 Set `OCPG_INJECTION=recency` to restore the old blind-last-5 behavior instead: no prompt-matching, just the most recent visible memories (preferences first).
 
-This is keyword relevance, not embedding-based semantic search - close phrasing wins, paraphrases may not. (An internal benchmark measures this explicitly: paraphrase-only queries currently score ~0 recall regardless of ranking strategy tried, which is the known gap and the number that would justify adding semantic search later.) Note the OR ranking: common words in a prompt surface more rows; the ranking favors rows matching more distinctive terms.
+Retrieval is **hybrid**: the prompt runs through keyword full-text search and, when Ollama is reachable, through embedding search (bge-m3, pgvector HNSW, cosine) - the two ranked lists merge with 2 reserved embedding slots plus reciprocal rank fusion for the rest (bench-verified: R=2 recovers half the real-corpus paraphrase gap at zero synthetic cost), so exact-word hits and said-differently paraphrase hits both surface. The internal benchmark shows hybrid recall never worse than either half alone at 485/5k/50k rows ([`bench/README.md`](./bench/README.md)). Writes are embedded fire-and-forget; rows from before this feature carry no embedding until `bun run backfill` fills them (deploy/README.md).
+
+If Ollama is unreachable - or the database predates the embedding column - search silently degrades to keyword-only; nothing breaks. A cold model load is ~2-3s (over the 1s injection deadline), so the plugin warms the model at session start and pins it with `keep_alive`; a warm embed is ~20ms and runs concurrently with the keyword query.
 
 ## Tools
 
 Five agent tools are registered: `memory_remember` (store), `memory_recall` (search), `memory_forget` (delete by id), `memory_update` (rewrite an existing memory, keeping its original learned date), and `memory_consolidate` (remove near-duplicates on demand). The agent reads their usage rules from the tool schemas - as the user, the things worth knowing are:
 
 - Visibility follows the type (see the table above); `memory_recall` takes `global: true` to also search other projects' `project_fact` memories (global types are always searched regardless of this flag).
-- Duplicate writes are **never rejected** - they land, the injection block collapses them, and `memory_consolidate` cleans them up when you ask: it keeps the newest of each >=80%-similar group and reports the removed texts so the agent can merge any unique fact back.
+- Duplicate writes are **never rejected** - but with a judge model available they may be **skipped as duplicates** or **merged into the existing memory** (the result always says which). Whatever slips through still lands, the injection block collapses near-dupes, and `memory_consolidate` cleans them up when you ask: it keeps the newest of each >=80%-similar group and reports the removed texts so the agent can merge any unique fact back.
 
 Writes are capped at 4000 characters of content, 10 tags, and 64 characters per tag; oversized writes are rejected with the actual size rather than silently truncated. Memories carry a `type` (`preference`, `project_fact` default, `stack_fact`, or `episodic` - see the visibility table above); `preference` memories are surfaced first when browsing without a search query.
 
@@ -91,6 +97,14 @@ Writes are capped at 4000 characters of content, 10 tags, and 64 characters per 
 Saying "remember this/that", "remember to ...", "don't forget ...", or "keep in mind ..." in a prompt stores the text following the phrase verbatim, tagged `user-requested` - matched by a fixed pattern, not an LLM call, so it's deterministic and auditable. Questions using the trigger phrase ("remember when the pool broke?") are deliberately not captured, since they're asking about the past, not asking to store something new - only imperative uses ("remember that when X happens, do Y") trigger it.
 
 This runs alongside the model's own judgment to call `memory_remember` - it doesn't replace it, it's a safety net for the cases where you explicitly signal "this matters" and want it captured regardless of whether the model separately decides to store it.
+
+A third path runs at **session compaction**: when a session's context is summarized, a small judge model reads the transcript and extracts 0-3 durable facts (decisions, root causes, stated preferences, environment facts - never plans, progress, or anything the code already states), each written through the normal write path and tagged `auto`. A trivial session stores nothing, and every judge failure just skips the capture. Compaction itself never waits on this.
+
+### Smart writes (judge model)
+
+Before a `memory_remember` lands, an embedding-similarity prefilter looks for existing memories that might overlap (top 3, cosine >= 0.7 - nothing close means an instant plain insert). On a hit, a small cheap model classifies the write as **new** (insert), **update** (merged into the existing memory, which keeps its learned date), or **duplicate** (skipped). The tool result always says which happened - never a bare success for a write that didn't insert. The judge **never deletes** and never rejects outright: any failure, timeout, or malformed answer falls back to storing normally.
+
+`OCPG_JUDGE_MODEL` picks the judge: a bare name (default `qwen3:4b`) hits the same Ollama as embeddings - pull it alongside bge-m3 (`ollama pull qwen3:4b`); a `provider/model` ref routes through OpenCode's own stack against a model you configured (that spends your provider credits); `"off"` disables smart writes and compaction capture entirely. Without any reachable judge these features silently skip - writes then behave exactly as before.
 
 ### Duplicates
 

@@ -115,7 +115,7 @@ All options are optional. Defaults shown.
 | Option | Type | Default | Description |
 |---|---|---|---|
 | `enabled` | `boolean` | `true` | Turn the plugin off without uninstalling it. |
-| `mode` | `"window" \| "tray"` | `"window"` | Which renderer to use. The `/popup-*` commands override it until `/popup-reset`. |
+| `mode` | `"window" \| "tray"` | `"window"` | Which renderer to use. The renderer commands (`/popup-window`, `/popup-tray`, `/popup-toggle`) override it until `/popup-reset`. |
 | `word` | `string` | `"opencode"` | Word that types itself out. Max 24 characters. |
 | `typeMs` | `number` | `140` | Milliseconds per typed character in the pill (40–2000). The tray icon ignores it: its tick is a fixed 250 ms. |
 | `position` | `"bottom-right" \| "bottom-left" \| "top-right" \| "top-left"` | `"bottom-right"` | Where the pill is placed on its first show, and where `Reset position` sends it back to. Dragging is remembered separately; changing the option applies on the next placement. |
@@ -123,6 +123,7 @@ All options are optional. Defaults shown.
 | `idleSeconds` | `number` | `25` | How long the host waits without any live instance before exiting (5–3600). |
 | `errorHoldSeconds` | `number` | `90` | How long a failed execution keeps the pill red (0–3600). Use `0` to keep it until the session works again. |
 | `mark` | `boolean` | `false` | Draw the small o mark before the word in the pill. Off by default: the window is just the word, the mark belongs to the tray icon. |
+| `trayIdleStatic` | `boolean` | `false` | Keep the tray icon still while idle: the full blue o, no blink. The working, retry, error and permission states keep their animations. `/popup-static` toggles it at runtime. |
 | `shellPath` | `string` | `null` | Force a specific PowerShell executable. |
 
 Options are read when the plugin sets up, and OpenCode reloads plugins automatically when a watched config file changes (a local dependency outside the watched directories may still need an OpenCode restart). After that reload:
@@ -131,8 +132,9 @@ Options are read when the plugin sets up, and OpenCode reloads plugins automatic
 |---|---|
 | `word`, `freshSeconds`, `idleSeconds` | **restart the host** within a few seconds, because it renders them at launch |
 | `typeMs`, `mark` | restart a `window` host, which renders them; the tray ignores both |
+| `trayIdleStatic` | restart a `tray` host, which renders it; the `window` host ignores it. Once `/popup-static` has been used, the runtime choice overrides the option until `reset` |
 | `position` | **does not restart it**: the corner is resolved when the pill is placed (first show, or `Reset position`), so a change applies there and never moves a pill you already dragged |
-| `mode` | replaced immediately by the `/popup-*` commands; the option is only the fallback after `reset` |
+| `mode` | replaced immediately by the renderer commands (`/popup-window`, `/popup-tray`, `/popup-toggle`); the option is only the fallback after `reset` |
 | `shellPath` | applies the next time a host starts; a live host keeps the interpreter it was launched with |
 | `enabled`, `errorHoldSeconds` | need no host restart: `enabled` loads or unloads the plugin, and `errorHoldSeconds` is read by the plugin |
 
@@ -160,7 +162,7 @@ Options are read when the plugin sets up, and OpenCode reloads plugins automatic
 - The window never appears in the taskbar or the Alt+Tab list, and it does not activate itself when it appears.
 - The tray icon keeps a **constant tooltip** (`opencode-status-popup`) on purpose: Windows uses the tooltip as part of the icon identity and hides an icon whose tooltip changes. The live state is in the balloon behind `Show details`.
 
-## Switching the renderer
+## Switching at runtime
 
 Three ways, none of them needs a config edit or a restart. The choice is kept in the plugin storage and mirrored to `mode.json` so every instance agrees, and the running host is replaced immediately, with the pill coming back where it was.
 
@@ -172,9 +174,9 @@ Three ways, none of them needs a config edit or a restart. The choice is kept in
 popup_mode({ mode: "window" | "tray" | "toggle" | "reset" })
 ```
 
-**Commands.** `/popup-window`, `/popup-tray`, `/popup-toggle` and `/popup-reset` work from both surfaces, each command exactly once:
+**Commands.** `/popup-window`, `/popup-tray`, `/popup-toggle`, `/popup-reset` and `/popup-static` work from both surfaces, each command exactly once:
 
-- the **command palette** (`ctrl+p`) lists the four entries registered by `tui.ts`; they run in the client and answer immediately.
+- the **command palette** (`ctrl+p`) lists the five entries registered by `tui.ts`; they run in the client and answer immediately.
 - the **`/` autocomplete** lists the same names from the server, so typing `/popup` is enough; the prompt sends the command to the server, and the server commands are also what makes them work through the API and from other clients:
 
 ```sh
@@ -183,7 +185,9 @@ opencode api post /api/session/<sessionID>/command --data '{"name":"popup-toggle
 
 > The prompt commands run on the server and apply the change directly. The palette and the popup menu leave a request file next to the presence data instead, and every server instance watches it — same outcome, one path per surface. The TUI entrypoint stays palette-only on purpose: the client appends every server command to the `/` list, so giving the client commands a slash name too would show each one twice.
 
-`reset` (or `/popup-reset`) forgets the choice and goes back to the `mode` of the config.
+`reset` (or `/popup-reset`) forgets the runtime choices — the mode and the tray idle — and goes back to the config.
+
+**The tray idle** has its own toggle: `/popup-static`, or the `Popup: tray idle static` palette entry, flips `trayIdleStatic` between the static letter and the blinking one. The choice is shared by every instance and remembered like the mode.
 
 In tray mode the icon may start inside the hidden icons area (`^`) the first time — drag it onto the taskbar once and it stays there.
 
@@ -202,7 +206,7 @@ OpenCode server
 
 - **Busy detection** uses the public event stream: `session.status` (`busy`/`retry`/`idle`), `session.execution.started/succeeded/failed/interrupted`, `session.idle`, streaming deltas and tool activity. Permission prompts come from `permission.asked` / `permission.replied`. Every event is matched against the plugin's own location, so a busy session in another project does not light up your pill.
 - **Multiple instances** (several OpenCode windows, several projects on one server) each write their own presence file. The host shows the union and the tray tooltip lists the project names.
-- **State directory**: next to the presence files it holds `host.json` (the running host: pid, renderer and the settings it renders, rewritten as a heartbeat), `mode.json` (the renderer chosen at runtime, shared by every instance), `mode.request` (a switch waiting for the next server tick), `position.json` (the configured corner the host applies when it places the pill), `window.json` (where the pill was last placed) and the two logs, `plugin.log` and `host.log` — each rotates to a `.1` copy at its cap (512 KiB and 256 KiB), so the newest lines are the ones kept. The preview harness adds a fake `state\preview.json` of its own while it runs.
+- **State directory**: next to the presence files it holds `host.json` (the running host: pid, renderer and the settings it renders, rewritten as a heartbeat), `mode.json` (the renderer chosen at runtime, shared by every instance), `mode.request` (a switch waiting for the next server tick), `idle-static.json` (the tray idle chosen at runtime, shared by every instance), `idle-static.request` (a toggle waiting for the next server tick), `position.json` (the configured corner the host applies when it places the pill), `window.json` (where the pill was last placed) and the two logs, `plugin.log` and `host.log` — each rotates to a `.1` copy at its cap (512 KiB and 256 KiB), so the newest lines are the ones kept. The preview harness adds a fake `state\preview.json` of its own while it runs.
 - **Crash safety**: presence files expire after `freshSeconds`, a session that sends no event for 45 minutes is dropped, and the host exits by itself when nothing is fresh. The plugin also restarts the host if it died or if the options changed. Files a killed instance left behind are reaped on the next setup and again before the last instance decides to stop the host.
 - **Tray identity**: the icon is registered through `Shell_NotifyIcon` with a fixed GUID (see `host/TrayIcon.cs`), so the shell remembers the place you dragged it to across restarts, unlike the executable-plus-uid slot that every PowerShell tray icon shares.
 
@@ -242,6 +246,7 @@ npm run preview:tray -- --keep
 - `--watch` — cycle every 6 seconds.
 - `--detail '<text>'` — what the balloon reports.
 - `--word <text>` / `--type <ms>` — the word and the typing speed.
+- `--idle-static` — pin the tray idle icon: the full blue o, no blink.
 - `--seconds N` — stop by itself after N seconds.
 - `--keep` — leave the host running when the preview exits.
 

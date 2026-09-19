@@ -7,6 +7,18 @@ date, and openai-compatible reasoning `variants`) — so a gateway in
 `opencode.json` behaves like a first-class provider without hand-listing every
 model.
 
+## Compatibility
+
+One package with version-specific entrypoints. Use the entrypoint for your
+OpenCode major version:
+
+| Host | Entrypoint |
+| --- | --- |
+| **OpenCode 1.x** | `opencode-gateway-provider` (classic `plugin`) |
+| **OpenCode 2.0** | `opencode-gateway-provider/plugin/opencode2` (`./server` resolves to the same module) |
+
+Do not load the 1.x and 2.0 entrypoints in the same host.
+
 ## How it works
 
 The plugin registers a `config` hook (the same mechanism
@@ -62,15 +74,20 @@ rate.
 Models you declare explicitly in `opencode.json` are respected and never
 overwritten; discovery only fills the gap.
 
+Works with any OpenAI-compatible gateway. If the gateway is LiteLLM (provider
+id `litellm`), the plugin also sends the current OpenCode session ID as
+`x-litellm-session-id` on each request for per-conversation logs and spend
+records. Other gateways are unaffected.
+
 OpenCode 1.18.x filters and clears reasoning metadata while building
 `/api/model`, while `/provider` depends on the same config hook completing.
 The `/path` and `/file/content` routes are also instance-scoped: calling either
 from a `config` hook can re-enter instance bootstrap and wait on the plugin
 which made the call. Reading the one host-resolved catalog file in-process
 avoids all three lifecycle paths.
-For example, `litellm/kimi-k3` resolves to the native `moonshotai/kimi-k3`
+For example, `gateway/kimi-k3` resolves to the native `moonshotai/kimi-k3`
 metadata and inherits its explicit `low`, `high`, and `max` effort values while
-chat requests still use LiteLLM's OpenAI-compatible endpoint. If the cache is
+chat requests still use the gateway's OpenAI-compatible endpoint. If the cache is
 unavailable, every gateway model is still emitted with defaults.
 
 The native cache resolution rules are:
@@ -108,7 +125,9 @@ Kilo and MiMo use their cache roots the same way. Set
 
 ## Setup
 
-### From npm
+### OpenCode 1.x
+
+#### From npm
 
 Add the package to your opencode config. OpenCode installs npm plugins with
 Bun at startup (cached under `~/.cache/opencode/node_modules/`):
@@ -118,25 +137,25 @@ Bun at startup (cached under `~/.cache/opencode/node_modules/`):
   "$schema": "https://opencode.ai/config.json",
   "plugin": ["opencode-gateway-provider"],
   "provider": {
-    "litellm": {
+    "gateway": {
       "npm": "@ai-sdk/openai-compatible",
       "options": { "baseURL": "https://gateway.example.com/v1" },
-      "env": ["LITELLM_API_KEY"]
+      "env": ["GATEWAY_API_KEY"]
     }
   }
 }
 ```
 
-Pin a version if you want: `"opencode-gateway-provider@0.1.0"`.
+Pin a version if you want: `"opencode-gateway-provider@0.1.4"`.
 
-You can also install it yourself first:
+You can also install it yourself first (manual install):
 
 ```sh
 npm install opencode-gateway-provider
 # or: bun add opencode-gateway-provider
 ```
 
-### From a local clone
+#### From a local clone
 
 ```sh
 git clone https://github.com/oakimov/opencode-gateway-provider.git
@@ -150,10 +169,10 @@ Point opencode at the built entry with an absolute `file://` URL:
 {
   "plugin": ["file:///absolute/path/to/opencode-gateway-provider/dist/index.js"],
   "provider": {
-    "litellm": {
+    "gateway": {
       "npm": "@ai-sdk/openai-compatible",
       "options": { "baseURL": "https://gateway.example.com/v1" },
-      "env": ["LITELLM_API_KEY"]
+      "env": ["GATEWAY_API_KEY"]
     }
   }
 }
@@ -164,10 +183,78 @@ Point opencode at the built entry with an absolute `file://` URL:
 > what makes opencode send the key on actual chat calls — keep it in sync with
 > the env var below.
 
+### OpenCode 2.0
+
+OpenCode 2 loads `./server` before the package root. The root export stays
+the 1.x plugin, so 1.18 keeps using `"opencode-gateway-provider"`. Point
+OpenCode 2 at the 2.0 entry only:
+
+#### From npm
+
+```json
+{
+  "plugin": ["opencode-gateway-provider/plugin/opencode2"],
+  "providers": {
+    "gateway": {
+      "package": "@opencode/ai/providers/openai-compatible",
+      "settings": { "baseURL": "https://gateway.example.com/v1" },
+      "env": ["GATEWAY_API_KEY"]
+    }
+  }
+}
+```
+
+Pin a version if you want: `"opencode-gateway-provider@0.1.4/plugin/opencode2"`.
+
+You can also install it yourself first (manual install):
+
+```sh
+npm install opencode-gateway-provider
+# or: bun add opencode-gateway-provider
+```
+
+Prefer a dedicated `OPENCODE_CONFIG_DIR` so 1.x `plugin` / `provider`
+entries and 2.0 plugins do not share one file:
+
+```sh
+export OPENCODE_CONFIG_DIR=~/.config/opencode2
+```
+
+#### From a local clone
+
+```sh
+git clone https://github.com/oakimov/opencode-gateway-provider.git
+cd opencode-gateway-provider
+bun install && bun run build
+```
+
+A local checkout must be the package directory (so `./server` resolves), not
+`dist/index.js`:
+
+```json
+{ "plugin": ["file:///absolute/path/to/opencode-gateway-provider"] }
+```
+
+OpenCode does not install dependencies for a copied-out plugin file. Load the
+plugin from inside the clone so dependencies resolve. Rebuild
+(`bun run build`) after every change; the host reads `dist/`, not `src/`.
+
+Existing `provider` blocks are still read. `settings.apiKeyEnv` and
+`settings.autoDiscover` only control discovery — put the chat credential in
+`env`. OpenCode's config plugin may copy those keys back onto provider
+settings after this plugin runs; the native OpenAI path does not send them.
+Discovered models use effort ids (`low`, `high`, …) with `reasoningEffort`,
+not the 1.x labels. The models.dev catalog is read from OpenCode's database
+(`models-dev:catalog`); it is not downloaded. Providers that already list
+`models` are left alone, and an empty gateway response does not clear the
+last good inventory.
+
+### API key
+
 Set the API key environment variable:
 
 ```sh
-export LITELLM_API_KEY="..."
+export GATEWAY_API_KEY="..."
 ```
 
 The plugin checks `options.apiKeyEnv`, then the provider's `env` names, then
@@ -176,7 +263,7 @@ The plugin checks `options.apiKeyEnv`, then the provider's `env` names, then
 ```json
 {
   "provider": {
-    "litellm": {
+    "gateway": {
       "options": { "baseURL": "https://gateway.example.com/v1", "apiKeyEnv": "MY_GATEWAY_KEY" }
     }
   }
@@ -186,8 +273,11 @@ The plugin checks `options.apiKeyEnv`, then the provider's `env` names, then
 Verify with:
 
 ```sh
-opencode models litellm
+opencode models gateway
 ```
+
+On OpenCode 2.0, discovered models appear in the picker from the in-memory
+inventory — filter by provider **gateway** if the global list looks empty.
 
 ## Configuration reference
 

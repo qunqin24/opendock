@@ -5,6 +5,12 @@
 [![license](https://img.shields.io/npm/l/gutchapa-opencode-telegram)](LICENSE)
 [![GitHub stars](https://img.shields.io/github/stars/gutchapa/opencode-telegram)](https://github.com/gutchapa/opencode-telegram)
 
+## Demo
+
+![Telegram demo](docs/demo.gif)
+
+> Telegram → `/status` → agent reply → file tool. Real session, ~30 seconds.
+
 ## Install
 
 One line, ready to go:

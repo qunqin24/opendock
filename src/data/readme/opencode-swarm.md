@@ -1064,10 +1064,18 @@ The `plan_cursor` config compresses the plan that is injected into the LLM conte
 ```
 
 - **enabled** – When `true` (default) Swarm injects a compact plan cursor instead of the full `plan.md`.
-- **max_tokens** – Upper bound on the number of tokens emitted for the cursor (default 1500). The cursor contains the current phase summary, the full current task, and up to `lookahead_tasks` upcoming tasks. Earlier phases are reduced to one‑line summaries.
-- **lookahead_tasks** – Number of future tasks to include in full detail (default 2). Set to `0` to show only the current task.
+- **max_tokens** – Upper bound on the number of tokens emitted for the cursor (default 1500). The cursor contains the current phase summary, the full current task, and up to `lookahead_tasks` upcoming tasks. Earlier phases are reduced to one‑line summaries.
+- **lookahead_tasks** – Number of future tasks to include in full detail (default 2). Set to `0` to show only the current task.
 
-Disabling (`"enabled": false`) falls back to the pre‑v6.13 behavior of injecting the entire plan text.
+All three controls are honored on both context‑injection paths (the default
+injection path and the opt‑in `context_budget.scoring` ranking path) and in the
+context‑budget report's token accounting (issue #2580). Disabling
+(`"enabled": false`) suppresses the cursor block; the remaining injections are
+unchanged — on the default path that is the phase header line, and on the
+scoring path the phase and current‑task context candidates. The full plan text
+is never injected in its place. When the cursor exceeds `max_tokens` and the
+compact rebuild kicks in, lookahead is reduced to one task and earlier phases
+collapse to one‑line summaries.
 
 ## Tool Output Truncation (v6.13)
 

@@ -36,10 +36,6 @@ The breakdown separates costs into three buckets:
 - **Task**: child sessions spawned through the Task tool by the `explore` and `general` agents.
 - **Sub-agent**: any other child session.
 
-Costs that are not present in the session messages (for example archived or compacted
-messages) are still attributed to the session's configured provider/model, so the totals
-always match the real spending reported by Opencode.
-
 Example `/total_cost` output:
 ```
 By session

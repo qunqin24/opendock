@@ -7,20 +7,18 @@
 
 **Superpowers for [OpenCode](https://opencode.ai) — take all of them, or just the one you need.**
 
+**[Documentation →](https://codestz.github.io/opencode-cockpit/)**  ·  [Install](https://codestz.github.io/opencode-cockpit/start/install/)  ·  [Shell](https://codestz.github.io/opencode-cockpit/shell/overview/)  ·  [Configuration](https://codestz.github.io/opencode-cockpit/configuration/)  ·  [Changelog](CHANGELOG.md)
+
 Coding agents are stuck in a one-command-at-a-time world: they run something, wait for it to
 finish, and paste the whole log back into their context. Cockpit gives your agent the things a
 developer actually has — long-running terminals, a way to wait for "ready", and output it can read
 without drowning in it — and gives *you* a live view of all of it, inside OpenCode.
 
-```
-────────────────────────────────────────────────────────────────────────────────────────
- Shells   ⠹ RUN  dev server    FAIL  unit tests   ▸ 3 more      ctrl+x i console · ctrl+x o hide
-  VITE v7.3.1  ready in 431 ms
-  ➜  Local:   http://localhost:5173/
-  ✓ 142 modules transformed
- 2m14s  sh_k4tq8b2p · $ npm run dev
-────────────────────────────────────────────────────────────────────────────────────────
-```
+![The shells panel: a dev server running under the conversation](media/dock.gif)
+
+*A real recording — every demo here is generated from a live OpenCode session by
+[`bun run record`](CONTRIBUTING.md), and re-run on release, so none of them can drift from what
+ships.*
 
 ## Features
 
@@ -164,13 +162,15 @@ restarts, and why one session can look at a shell another session started.
 Each shell's output feeds three views at once: a normalized **log** for the agent, an emulated
 **screen** for you, and a raw ring buffer so a panel opened late can catch up.
 
-| Package | Role |
-|---|---|
-| [`opencode-cockpit`](packages/opencode) | All features in one plugin |
-| [`@opencode-cockpit/shell`](packages/shell) | Shell feature |
-| [`@opencode-cockpit/daemon`](packages/daemon) | `cockpitd`, the shared process host |
-| [`@opencode-cockpit/client`](packages/client) | Typed, auto-spawning client and plugin helpers |
-| [`@opencode-cockpit/protocol`](packages/protocol) | Wire contracts |
+### Packages
+
+| Package | What it is | Docs |
+|---|---|---|
+| [`opencode-cockpit`](packages/opencode) | The bundle: every bay, each switchable | [README](packages/opencode/README.md) |
+| [`@opencode-cockpit/shell`](packages/shell) | Bay 01 — background terminals | [README](packages/shell/README.md) · [docs](https://codestz.github.io/opencode-cockpit/shell/overview/) |
+| [`@opencode-cockpit/daemon`](packages/daemon) | `cockpitd`, the shared process host | [README](packages/daemon/README.md) |
+| [`@opencode-cockpit/client`](packages/client) | Typed, auto-spawning client | [README](packages/client/README.md) |
+| [`@opencode-cockpit/protocol`](packages/protocol) | Wire contracts and schemas | [README](packages/protocol/README.md) |
 
 ## Roadmap
 

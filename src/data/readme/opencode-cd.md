@@ -4,6 +4,33 @@ OpenCode TUI plugin that moves the current session to another existing
 directory without losing its conversation. Moving between projects preserves
 the conversation in a verified replacement session.
 
+## Why this exists
+
+An OpenCode session is tied to its working directory and project. During a
+task, you may need to continue working in another directory, switch to a
+worktree, or move from one project to another. Without this plugin, the usual
+workaround is to start a new session and manually restore the context.
+
+`opencode-cd` lets you keep the current conversation while changing the
+directory used by the session. This preserves the decisions, investigation,
+and session history that have already accumulated.
+
+For moves within the same OpenCode project, the plugin uses OpenCode's native
+session move API. For moves to another project, it creates a verified
+replacement session, transfers the conversation and child sessions, and
+removes the original only after the destination has been checked.
+
+This plugin moves the session context, not the files on disk. Uncommitted
+changes remain in the source directory and are never copied automatically.
+
+### Typical use case
+
+You start a session in a repository and investigate a problem. Later, you
+realize that the work belongs in another repository or a different worktree.
+Instead of opening a new session and explaining the entire context again, use
+`/session-cd` or `Ctrl+Shift+D` to continue the same conversation in the
+destination directory.
+
 ## Features
 
 - Command palette entry: `Change session directory`.

@@ -139,6 +139,25 @@ orchestration and **$0.26** is the worker model at twice the unit price. At n=1 
 orchestration difference is not attributed to the worker model, and neither the wall nor the cost cell
 ranks the two worker models against each other.
 
+### All-Luna control-plane stress probe
+
+A separate one-shot stress probe routed the measured operator, coordinator, implementation workers,
+and reviewer through `openai/gpt-5.6-luna-fast` / `max`. Despite the weaker control plane, it still
+reached `DONE` with official reward **1**, F2P **9/9**, P2P **94/94**, and zero event errors.
+
+The result was much noisier than the v0.10.5 Luna/max reference: agent wall rose from **43.1 min** to
+**53.7 min** (+24.6%), CLI model steps from **25** to **65**, implementation children from **3** to
+**8**, audited assistant requests from **106** to **221**, and audited tokens from **8.83M** to
+**19.25M**. Estimated API-equivalent cost moved only from **$1.719999** to **$1.6348** (-5.0%).
+The roughly five-times cheaper unit price was therefore almost completely consumed by roughly
+2.2-times more work.
+
+This is not evidence that an all-Luna control plane should be the default. The run showed materially
+more replanning and review churn before converging. It is instead a **harness stress result**: even
+with a substantially cheaper and noisier decision layer, the same acceptance and verification gates
+were able to drive the run to a verified result rather than silently weaken the goal. As with the
+other v0.10 probes, this is **n=1**, not a reliability or success-rate claim.
+
 `gpt-5.6-luna-fast` has no published model page. Its rates are the resolved host model catalog entry:
 $0.40 input, $0.04 cached input, and $2.40 output per million tokens, exactly twice the Luna Standard
 schedule. No request in the measured run crossed the 272,000-token long-context threshold, so no band

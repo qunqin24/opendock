@@ -18,8 +18,8 @@ instead of requiring a host-specific Cursor provider.
 
 | Coding agent | How this package runs |
 |---|---|
-| **OpenCode** | Native plugin and AI SDK provider |
-| **OpenCode 2.0** | Native dedicated `cursor-opencode-provider/plugin/opencode2` entrypoint |
+| **OpenCode** | Native plugin and AI SDK provider — [OpenCode 1.x setup](docs/opencode-1.md) |
+| **OpenCode 2.0** | Native `cursor-opencode-provider/plugin/opencode2` — [OpenCode 2.0 setup](docs/opencode-2.md) |
 | **Kilo Code** | Unchanged through OCP's OpenCode-clone compatibility layer |
 | **MiMo Code** | Unchanged through OCP's OpenCode-clone compatibility layer |
 | **pi** | Unchanged through `@opencode-compat/pi-bridge` and pi's provider extension API |
@@ -48,7 +48,7 @@ OpenCode driving a Cursor-routed Grok model through this provider:
 - **Model discovery** — fetches available models from Cursor's API and caches them locally
 - **Image input** — advertises vision only for supported models and forwards OpenCode image attachments to Cursor
 - **Streaming** — bidirectional Connect-RPC Runs with stale-session rotation, health checks, semantic/read-idle deadlines, bounded replay-safe recovery, and activity-aware held tool continuations
-- **Tool calls** — maps Cursor exec-server messages to AI SDK / OpenCode tool-call parts, including catalog-aware native subagent execution: exact advertised custom agents win, `unspecified` / `generalPurpose` select `general`, read-oriented `bugbot` / `security-review` select `explore`, and `cursor-guide` selects enabled Kilo `scout` before `explore`; MiMo `actor` is used instead of its work-item `task` tool when advertised. The bridge also covers the Pi read/bash/edit/write/grep/find/ls request/result range, enforces the exact current OpenCode tool catalog, mirrors finalized display-only todo/plan state, and strips OpenCode's `read` XML envelope before returning content to Cursor.
+- **Tool calls** — maps Cursor exec-server messages to AI SDK / OpenCode tool-call parts using only the advertised canonical catalog. Exact advertised subagent names win; standard Cursor roles select compatible OpenCode agents, and native Task maps to OpenCode 1.x `task` or OpenCode 2.0 `subagent`. OCP translates any alternate host vocabulary before it reaches this package. The bridge also covers Cursor's typed read/bash/edit/write/grep/find/ls request/result range, mirrors finalized display-only todo/plan state, and strips OpenCode 1.x and OpenCode 2 read envelopes before returning content to Cursor.
 - **Thinking / reasoning** — surfaces extended-thinking deltas where the model supports it
 
 ## Requirements
@@ -59,34 +59,34 @@ OpenCode driving a Cursor-routed Grok model through this provider:
 
 ## Installation
 
-### From npm
+This package is one plugin with host-specific entrypoints. Use the guide for your OpenCode major version:
 
-Add the package to OpenCode config. OpenCode installs npm plugins with Bun at startup (cached under `~/.cache/opencode/node_modules/`):
+| Host | Guide |
+|------|--------|
+| **OpenCode 1.x** | [docs/opencode-1.md](docs/opencode-1.md) — classic `plugin` plus optional 1.18 `plugin/v2` |
+| **OpenCode 2.0** | [docs/opencode-2.md](docs/opencode-2.md) — `plugin/opencode2` only, including [safe transition](docs/opencode-2.md#safe-transition) off `ctx.catalog` and the deprecated `opencode.json` catalog dump |
+| **Other agents** | [Coding-agent compatibility](#coding-agent-compatibility) |
+
+Do not load the 1.x and 2.0 entrypoints in the same host.
+
+OpenCode 1.x (`~/.config/opencode/opencode.json`):
 
 ```json
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugin": ["cursor-opencode-provider"],
-  "provider": {
-    "cursor": {
-      "npm": "cursor-opencode-provider",
-      "name": "Cursor",
-      "models": {}
-    }
-  }
+  "plugin": ["cursor-opencode-provider"]
 }
 ```
 
-Pin a version if you want: `"cursor-opencode-provider@0.4.1"`.
+OpenCode 2.0 (prefer a dedicated `OPENCODE_CONFIG_DIR`):
 
-You can also install it yourself first:
-
-```bash
-npm install cursor-opencode-provider
-# or: bun add cursor-opencode-provider
+```json
+{
+  "plugin": ["cursor-opencode-provider/plugin/opencode2"]
+}
 ```
 
-### From a local clone
+Local clones, 1.18 `plugin/v2`, config isolation, and leftover `providers.cursor` cleanup are in the host guides. Shared catalog behavior (variants, 1M, Fast, images, Max Mode) is under [Select a model](#select-a-model).
 
 ```bash
 git clone https://github.com/oakimov/cursor-opencode-provider.git
@@ -95,148 +95,20 @@ bun install
 bun run build
 ```
 
-Point classic OpenCode config at the built files with absolute `file://` URLs:
-
-```json
-{
-  "plugin": ["file:///absolute/path/to/cursor-opencode-provider/dist/plugin.js"],
-  "provider": {
-    "cursor": {
-      "npm": "file:///absolute/path/to/cursor-opencode-provider/dist/index.js",
-      "name": "Cursor",
-      "models": {}
-    }
-  }
-}
-```
-
-For **OpenCode 2.0** local development, prefer the plugin path plus `CURSOR_OPENCODE2_DEV_ENTRY` — see [OpenCode 2.0 beta](#opencode-20-beta-opencode2).
+You can also install from npm (`npm install cursor-opencode-provider` or `bun add cursor-opencode-provider`). Pin a version in host config if you want, for example `cursor-opencode-provider@0.4.1`.
 
 ## OpenCode setup
 
-If the `cursor` provider block is omitted, the classic plugin auto-registers it on startup (as **Cursor Integration**) using this package's entry. Model entries come from the local cache, which is filled after auth and again on startup when the cache is empty but credentials remain.
-
-For OpenCode builds that use the Effect/Promise **v2** plugin API (`plugins` field), also load:
-
-```json
-{
-  "plugins": ["cursor-opencode-provider/plugin/v2"]
-}
-```
-
-Local clone equivalent: `"file:///absolute/path/to/cursor-opencode-provider/dist/plugin-v2.js"`.
-
-That entry registers the provider via `ctx.aisdk.sdk` / `ctx.aisdk.language`. Keep the classic `plugin` entry for auth **and** plugin tools (notably `cursor_image_save` / `custom_websearch`): the 1.18 `/v2/promise` API has no `tool` domain, so a v2-only load silently disables Cursor image generation.
-
-### OpenCode 2.0 beta (`opencode2`)
-
-OpenCode 2.0 uses a different plugin API from the 1.18 `/v2/promise` one above — they
-are source-incompatible, so this package ships a **separate** entrypoint for it.
-Everything is registered by that one plugin. You do **not** need a `providers` entry,
-and there is no `enabled` flag. Do not also load `./plugin/v2` or the classic `plugin`
-entry under `opencode2`; they target the older APIs.
-
-Authenticate with `/connect` inside `opencode2`, choose **Cursor**, then either
-browser login or an API key. `CURSOR_API_KEY` is also picked up automatically.
-
-#### From npm
-
-```json
-{
-  "plugins": ["cursor-opencode-provider/plugin/opencode2"]
-}
-```
-
-Pin a version if you want: `"cursor-opencode-provider@0.4.1/plugin/opencode2"`.
-
-OpenCode 2.0 installs the published package into its host cache and loads the AI SDK
-entry from there (`aisdk:cursor-opencode-provider`). No extra env vars are required.
-
-#### From a local clone (`CURSOR_OPENCODE2_DEV_ENTRY`)
-
-Loading only the local plugin file is not enough for end-to-end local testing: OpenCode
-2.0's catalog still resolves the AI SDK package through `npm install` into
-`<host-cache>/packages/…` unless you override it. Point
-`CURSOR_OPENCODE2_DEV_ENTRY` at the built provider entry (`dist/index.js`, which exports
-`createCursor`) so the host imports that file directly.
-
-```bash
-cd /absolute/path/to/cursor-opencode-provider
-bun install && bun run build
-
-export CURSOR_OPENCODE2_DEV_ENTRY=/absolute/path/to/cursor-opencode-provider/dist/index.js
-# optional while debugging:
-# export CURSOR_PROVIDER_DEBUG=1
-```
-
-Example OpenCode 2.0 config (for example `~/.config/opencode/opencode.json` or a
-project `opencode.json`) that loads the built local plugin:
-
-```json
-{
-  "plugins": [
-    "/absolute/path/to/cursor-opencode-provider/dist/plugin-opencode2.js"
-  ]
-}
-```
-
-Equivalent forms for the same plugin entry:
-
-- `"file:///absolute/path/to/cursor-opencode-provider/dist/plugin-opencode2.js"`
-- `"../cursor-opencode-provider/dist/plugin-opencode2.js"` (relative to the config file; must start with `./` or `../`)
-
-You can also drop a symlink into `.opencode/plugins/` (or `~/.config/opencode/plugins/`),
-which OpenCode scans automatically:
-
-```bash
-mkdir -p .opencode/plugins
-ln -s /absolute/path/to/cursor-opencode-provider/dist/plugin-opencode2.js \
-      .opencode/plugins/cursor.js
-```
-
-Important for local 2.0 development:
-
-- **Export the env var before starting the daemon.** `opencode2 serve --service` inherits
-  env only at start time. After changing `CURSOR_OPENCODE2_DEV_ENTRY` or rebuilding
-  `dist/`, restart the service:
-
-  ```bash
-  opencode2 service stop
-  export CURSOR_OPENCODE2_DEV_ENTRY=/absolute/path/to/cursor-opencode-provider/dist/index.js
-  opencode2 service start
-  ```
-
-  `opencode2 service set` does **not** accept arbitrary env var names.
-- **Unset `CURSOR_OPENCODE2_DEV_ENTRY` in production** so the catalog uses the published
-  `aisdk:cursor-opencode-provider` package again.
-- **OpenCode does not install dependencies for local plugin files.** Keep the clone's
-  `bun install` intact and load the plugin from inside the clone (a copied-out file will
-  not resolve `protobufjs`).
-- **Rebuild after every change** (`bun run build`). The daemon reads `dist/`, not `src/`.
-
-Feature parity with the classic plugin, and the two places 2.0 differs:
-
-| Classic plugin | OpenCode 2.0 plugin |
-|---|---|
-| `config` hook registers provider + models | `ctx.catalog.transform` |
-| `auth` hook (OAuth + API key) | `ctx.integration.transform` + `/connect` |
-| `tool` hook (`custom_websearch`) | `ctx.tool.transform` |
-| `event` hook (session activity) | `ctx.event.subscribe` |
-| `tool.execute.before` / `.after` | `ctx.tool.hook(...)` |
-| `shell.env` injects the timeout wrapper | **No `shell.env` in 2.0** — the bash command is rewritten to call the wrapper file instead (same behavior, different mechanism) |
-| `chat.params` flags compaction turns | **No `chat.params` in 2.0** — the compaction agent is detected in `ctx.session.hook("context")` and correlated by session id |
-
-> **Beta.** OpenCode 2.0 and its plugin API are both beta and still changing. This
-> entrypoint is built against `@opencode-ai/plugin@next` (`0.0.0-next-17155`) and is
-> guarded by a compile-time conformance check, but expect churn.
+Host config, auth commands, and local-clone wiring differ by major version — follow [OpenCode 1.x](docs/opencode-1.md) or [OpenCode 2.0](docs/opencode-2.md).
 
 ### Authenticate
 
-```bash
-opencode auth login
-```
+| Host | How |
+|------|-----|
+| **OpenCode 1.x** | `opencode auth login` → **cursor** ([details](docs/opencode-1.md#authenticate)) |
+| **OpenCode 2.0** | `/connect` → **Cursor** ([details](docs/opencode-2.md#authenticate)). `CURSOR_API_KEY` is also picked up automatically. |
 
-Choose the **cursor** provider, then one of:
+Then choose a method:
 
 | Method | Description |
 |--------|-------------|
@@ -359,12 +231,9 @@ Pass either `accessToken` (JWT from OAuth or key exchange) or `apiKey` (raw `crs
 | `CURSOR_GET_SERVER_CONFIG_TELEMETRY` | Set to `1` or `true` to opt the `GetServerConfig` lookup into telemetry in OpenCode/plugin usage |
 | `CURSOR_PROVIDER_DEBUG` | Set to `1` or `true` to enable wire-level debug logging |
 | `CURSOR_PROVIDER_DEBUG_FILE` | Debug log path (default: `debug-<pid>.log` under `$TMPDIR/cursor-provider-logs-<uid>/`) |
-| `CURSOR_OPENCODE2_DEV_ENTRY` | **Local OpenCode 2.0 only.** Absolute path to a built entry file (usually `dist/index.js`). Rewrites the catalog's AI SDK package to `aisdk:file://…` so the daemon imports your local build instead of `npm install`-ing the published package. Export it **before** `opencode2 service start`, then restart after rebuilds. Unset in production. |
-| `XDG_CACHE_HOME` | Base for host cache dirs (`$XDG_CACHE_HOME/opencode/`, `…/mimocode/`, `…/kilo/`, or OMP's migrated `…/omp/`) when no explicit `cacheDir` / OCP detect override |
-| `PI_CODING_AGENT_DIR` | Custom Pi/OMP agent root; provider stores its private cache below `<agent-root>/cache/cursor-opencode/` |
-| `PI_CONFIG_DIR` | Custom Pi/OMP config root name used when deriving the default agent root |
-| `MIMOCODE_HOME` | When set, host cache is `$MIMOCODE_HOME/cache` (MiMo) |
-| `KILO_CONFIG_DIR` | When set, host cache is `$XDG_CACHE_HOME/kilo` |
+| `CURSOR_OPENCODE2_DEV_ENTRY` | **Local OpenCode 2.0 only.** Absolute path to a built entry file (usually `dist/index.js`). Rewrites the AI SDK package to `aisdk:file://…` so the daemon imports your local build instead of `npm install`-ing the published package. Export it **before** `opencode2 service start`, then restart after rebuilds. Unset in production. See [OpenCode 2.0 local clone](docs/opencode-2.md#from-a-local-clone-cursor_opencode2_dev_entry). |
+| `CURSOR_OPENCODE2_TODOS` | **OpenCode 2.0 only.** Set to `1` or `true` to register plugin-owned `todowrite`/`todoread` (in-memory; no TUI sidebar). Off by default. OpenCode 1.x still uses the host builtin. |
+| `XDG_CACHE_HOME` | Base for native OpenCode cache (`$XDG_CACHE_HOME/opencode/`) when no explicit `cacheDir` or structural host path bridge is installed |
 | `XDG_DATA_HOME` | When set, OpenCode `auth.json` is read from `$XDG_DATA_HOME/opencode/` instead of `~/.local/share/opencode/` |
 
 `createCursor({ agentBaseURL })` overrides the agent Run host. When unset, the provider resolves the host from Cursor's `GetServerConfig` API (`agentUrlConfig.agentnUrl`, region-specific — e.g. `agentn.us.api5.cursor.sh`, `agent-gcpp-uswest.api5.cursor.sh`) once per process and holds it in memory (never written to disk), so a held-open Run stream is never repointed mid-session. Explicit agent overrides and GetServerConfig results are validated as HTTPS `*.cursor.sh` hosts (Cursor's agent hostnames vary and may change); non-`cursor.sh` hosts are rejected. Shared HTTP/2 connections are rotated before they become server-aged, while existing Runs may finish on their original connection. The lookup sends `{ "telem_enabled": false }` by default; set `telemetryEnabled: true` in provider config, or `CURSOR_GET_SERVER_CONFIG_TELEMETRY=1` for OpenCode/plugin usage, to opt in. If the lookup fails or does not return a valid Cursor agent host, the model call fails clearly instead of falling back to `agentn.global.api5.cursor.sh`.
@@ -399,8 +268,8 @@ OpenCode
 |--------|------|
 | `src/plugin.ts` | Classic OpenCode hooks: provider registration, OAuth, API key exchange, token refresh |
 | `src/plugin-v2.ts` | OpenCode 1.18 Effect/Promise v2 plugin (`ctx.aisdk.*`); load via `./plugin/v2` only |
-| `src/plugin-opencode2.ts` | OpenCode 2.0 beta plugin (catalog, integration, tools, aisdk); load via `./plugin/opencode2` only |
-| `src/opencode2/` | 2.0-only catalog mapping, integration/auth, and local API types |
+| `src/plugin-opencode2.ts` | OpenCode 2.0 plugin (`provider.transform`, integration, tools, aisdk, `shell.create.before`, `websearch`, plan kickoff); load via `./plugin/opencode2` or `./server` |
+| `src/opencode2/` | 2.0-only provider inventory, integration/auth, and local API types |
 | `src/plugin-core.ts` | Host-neutral SDK factory, package matching, API base/telemetry resolution |
 | `src/model-config.ts` | Cursor model → OpenCode model mapping shared by every plugin surface |
 | `src/image-input.ts` | AI SDK image attachment validation, decoding, and size limits |
@@ -419,9 +288,9 @@ OpenCode
 
 ### Injected system guidance
 
-The provider adds OpenCode-specific system guidance to normal tool-capable conversations, including tool availability, canonical workspace-path grounding, preferring OpenCode `todowrite` / `todoread` over Cursor TodoWrite without inviting catalog-comparison narration, and preferring `edit` / `write` (or `apply_patch`, when the host advertises that instead) over shell-based file mutation when those tools are available. Compaction keeps its dedicated prompt unchanged.
+The provider adds OpenCode-specific system guidance to normal tool-capable conversations, including tool availability, canonical workspace-path grounding, preferring OpenCode `todowrite` / `todoread` over Cursor TodoWrite when those tools are advertised without inviting catalog-comparison narration, and preferring `edit` / `write` (or `apply_patch`, when the host advertises that instead) over shell-based file mutation when those tools are available. Compaction keeps its dedicated prompt unchanged.
 
-Native Cursor todo display updates (`update_todos_tool_call` / `read_todos_tool_call`) are mirrored into `todowrite` / `todoread` when those host tools are advertised. The provider retains the last known full list per OpenCode session — refreshed by bridged writes, direct host `todowrite` calls, and `todoread` results, surviving Run close, checkpoint resume, and later turns — so `merge: true` updates that omit Cursor's completed list still become a host replace-all snapshot (matched by id, then by content across id spaces). This snapshot is in-memory only and never enters the prompt, RequestContext, or persisted restart state, so Cursor's prompt-cache prefix is unaffected; a provider process restart clears it until the next write/read (intentional — see `tasks/lessons.md`).
+Native Cursor todo display updates (`update_todos_tool_call` / `read_todos_tool_call`) are mirrored into `todowrite` / `todoread` when those host tools are advertised. OpenCode 2 dropped the host builtins; set `CURSOR_OPENCODE2_TODOS=1` (or `true`) to register the same canonical names when the catalog omits them (in-memory per session, cleared on `session.deleted` and process restart). With the flag unset, the plugin registers no todo tools. Enabled plugin tools are **direct** catalog tools (`options.codemode: false` plus an `output` schema), not Code Mode helpers. The provider retains the last known full list per OpenCode session — refreshed by bridged writes, direct host `todowrite` calls, and `todoread` results, surviving Run close, checkpoint resume, and later turns — so `merge: true` updates that omit Cursor's completed list still become a host replace-all snapshot (matched by id, then by content across id spaces). This snapshot is in-memory only and never enters the prompt, RequestContext, or persisted restart state, so Cursor's prompt-cache prefix is unaffected; a provider process restart clears it until the next write/read (intentional — see `tasks/lessons.md`).
 
 If this guidance causes issues, update `buildOpenCodeInteractionGuidance` in [`src/language-model.ts`](src/language-model.ts) and its focused coverage in [`test/prompt-history.test.ts`](test/prompt-history.test.ts).
 
@@ -443,15 +312,14 @@ OpenCode 2.0 does not perform this substitution, so the path is 1.x-only in prac
 
 ### Native subagent routing
 
-The provider reads the permission-filtered subagent catalog from the current host `task` or `actor` definition and advertises those recipients to Cursor as custom subagents. Exact configured names are preserved; unknown future Cursor subtype strings fall back to `general`. If a complete catalog omits every compatible recipient, the request fails on Cursor's typed subagent channel instead of selecting an arbitrary specialist.
+The provider reads the permission-filtered subagent catalog from the current host `task` or `subagent` definition and advertises those recipients to Cursor as custom subagents. Native Cursor Task exec remaps onto `task` when advertised, otherwise onto OpenCode 2 `subagent` (`agent` / `sessionID` / `background`). Exact configured names are preserved; unknown future Cursor subtype strings fall back to `general`. If a complete catalog omits every compatible recipient, the request fails on Cursor's typed subagent channel instead of selecting an arbitrary specialist.
 
-| Host | Default recipients | Optional recipients |
-|------|--------------------|---------------------|
-| OpenCode | `general`, `explore` | Add `agent/*.md` or `agents/*.md` with `mode: subagent` or `all` |
-| Kilo | `general`, `explore` | Enable `scout` with `KILO_EXPERIMENTAL_SCOUT=true` (or `KILO_EXPERIMENTAL=true`); add `.kilo/agent/*.md` custom agents with `mode: subagent` or `all` |
-| MiMo | `general`, `explore` | Add `.mimocode/agent/*.md` with `mode: subagent` |
+| Host | Executor | Recipients |
+|------|----------|------------|
+| OpenCode 1.x | `task` | Permission-filtered builtins such as `general` / `explore`, plus configured subagents |
+| OpenCode 2.0 | `subagent` | The permission-filtered names listed by the host's tool definition |
 
-Kilo `scout` is reserved for external documentation, dependency repositories, and upstream source. Local workspace discovery continues to use `explore`. Primary modes and hidden/internal agents are never selected unless the host explicitly exposes them as spawnable.
+Primary modes and hidden/internal agents are never selected unless OpenCode explicitly exposes them as spawnable. Alternate-host agents and schemas are OCP responsibilities; see its host guides under [Coding-agent compatibility](#coding-agent-compatibility).
 
 ## Package exports
 
@@ -460,7 +328,8 @@ Kilo `scout` is reserved for external documentation, dependency repositories, an
 | `cursor-opencode-provider` | `createCursor`, `CursorPlugin` (named + default) |
 | `cursor-opencode-provider/plugin` | `CursorPlugin` (classic Hooks — auth) |
 | `cursor-opencode-provider/plugin/v2` | OpenCode 1.18 Effect/Promise v2 plugin (`ctx.aisdk.*`) |
-| `cursor-opencode-provider/plugin/opencode2` | OpenCode 2.0 beta plugin (self-registering: catalog + auth + tools) |
+| `cursor-opencode-provider/plugin/opencode2` | OpenCode 2.0 plugin (self-registering: models + auth + tools) |
+| `cursor-opencode-provider/server` | Same OpenCode 2.0 entry; OpenCode 2 Host.resolve and OpenCode 1.18 `exports["./server"]` |
 | `cursor-opencode-provider/errors` | Structured provider error classes |
 | `cursor-opencode-provider/image-save` | Host-neutral `executeCursorImageSave` (pi-bridge / non-plugin hosts) |
 
@@ -470,11 +339,12 @@ The package root intentionally stays plugin-safe for OpenCode's classic loader. 
 
 | Problem | What to try |
 |---------|-------------|
-| No Cursor models in the picker | Confirm Cursor auth (`opencode auth login` → **cursor**, or `/connect` in `opencode2`). Restart OpenCode — if auth is present and the cache is empty, models are fetched on startup. Confirm `provider.cursor.npm` is the package name (or a built `file://…/dist/index.js`). |
+| No Cursor models in the picker (OpenCode 1.x) | Confirm Cursor auth (`opencode auth login` → **cursor**). Restart OpenCode — if auth is present and the cache is empty, models are fetched on startup. Confirm `provider.cursor.npm` is the package name (or a built `file://…/dist/index.js`). See [OpenCode 1.x troubleshooting](docs/opencode-1.md#troubleshooting). |
+| No Cursor models in the picker (`opencode2`) | Confirm `/connect` → **Cursor** (or shared `auth.json`). Use a dedicated `OPENCODE_CONFIG_DIR` (not mixed with 1.x). Ensure `$OPENCODE_CONFIG_DIR/plugins/cursor/` is a package directory re-exporting `plugin/opencode2` (not a bare `.js`). After auth, Cursor models appear in the picker from the in-memory inventory — no `opencode.json` model list is required. Filter by provider **Cursor** (`time.released` is `0`, so models sort last). Leftover `providers.cursor` fights that inventory — [safe transition](docs/opencode-2.md#safe-transition). |
 | Auth / 401 errors mid-session | Re-login. OAuth and exchanged API-key JWTs refresh automatically when near expiry; a revoked refresh token needs a fresh login. |
-| Local OpenCode 2.0 still runs the published package | Set `CURSOR_OPENCODE2_DEV_ENTRY` to an absolute `…/dist/index.js` path **before** starting the daemon, rebuild (`bun run build`), then `opencode2 service stop && opencode2 service start`. Loading only `dist/plugin-opencode2.js` is not enough — without the env var, 2.0 still `npm install`s the published package into the host cache. |
+| Local OpenCode 2.0 still runs the published package | Set `CURSOR_OPENCODE2_DEV_ENTRY` to an absolute `…/dist/index.js` path **before** starting the daemon, persist it with `opencode2 service set env CURSOR_OPENCODE2_DEV_ENTRY …`, rebuild (`bun run build`), then `opencode2 service restart`. Loading only `dist/plugin-opencode2.js` is not enough — without the env var, 2.0 still `npm install`s the published package into the host cache. |
 | “Too many connections from different devices” | Device IDs are derived from stable OS identifiers (same approach as the Cursor CLI). Avoid running multiple clients that invent different machine fingerprints for the same account. |
-| Empty or stale model list | Delete `<host-cache>/cursor-models.json` (default `~/.cache/opencode/`, or MiMo/Kilo host cache) and restart OpenCode. Existing Cursor auth is enough to refill the cache; re-login only if auth itself is broken. Cache TTL is 24h; a failed background refresh keeps serving the previous cache. |
+| Empty or stale model list | Delete `<host-cache>/cursor-models.json` (native default `~/.cache/opencode/`) and restart OpenCode. A compatibility layer may supply a different host-cache root through the structural path bridge. Existing Cursor auth is enough to refill the cache; re-login only if auth itself is broken. Cache TTL is 24h; a failed background refresh keeps serving the previous cache. |
 | Stream hangs or HTTP/2 errors | The provider keeps Cursor's Run open across OpenCode tool calls, rotates aged shared connections, resumes transient interruptions from the latest eligible Cursor checkpoint, and falls back to a fresh-history rebase only before stateful output when no checkpoint exists. Repeated interruption is surfaced as an error instead of a false successful stop; retry the turn after checking connectivity. With debug logging enabled, look for `Run interrupted`, `resuming … checkpoint`, or `rebasing fresh Run`. Restart OpenCode after rebuilding a local `file://` install. |
 | No response / silent 200 + close | HTTP 200 alone is not a successful agent turn: the provider now requires Cursor's explicit `turn_ended`, captures HTTP/2 trailers/GOAWAY, and recovers once from bare EOF. The Run host still comes from in-memory `GetServerConfig` resolution; set `CURSOR_PROVIDER_DEBUG=1` to confirm the host and termination reason. |
 | Visible `<shell_metadata>` timeout text | Rebuild and restart a local install. Cursor's shell timeout is carried on its exec request; the provider now removes OpenCode's internal timeout envelope before it is rendered or stored, then returns Cursor's typed timeout or background-handoff event instead of treating the text as successful stdout. |
@@ -497,19 +367,19 @@ Project `instructions` may reference absolute or `~/` paths (OpenCode parity). S
 - **Display completions are notifications, not execution requests** — Cursor `tool_call_*` frames use a typed `ToolCall` oneof. The provider decodes them for diagnostics but only mirrors finalized todo/plan state (`update_todos_tool_call` → `todowrite`, `read_todos_tool_call` → `todoread`, `create_plan_tool_call` → `todowrite`); the completed payload already contains the authoritative final list. Interactive, data-returning, and side-effecting completions are never replayed as new tools because their result could not be returned to Cursor. Exec-backed native subagent/Task and Pi read/bash/edit/write/grep/find/ls calls use their typed request/result fields instead. Unknown display variants are logged. All 37 Cursor CLI exec request/result pairs are inventoried by field and name. Known-but-unsupported variants are soft-denied on the held Run with a populated typed error/`rejected`/`allowlisted:false` result (or `throw` when the CLI has no typed error shape) so the turn continues; unknown future request fields still fail the Run explicitly rather than receiving a guessed response that could deadlock it.
 - **Progress-only fragments can get one continuation** — if a real tool-enabled turn ends with a short progress fragment ("Checking the workspace", "Looking into it now") and no host tool call, the provider opens one follow-up Run with a synthetic user nudge so the model can call a listed tool or finish the answer. Complete answers that merely start with those verbs are not continued. Title/compaction turns (`allowTools=false`) never continue. If the continuation fails, the original `turn_ended` is still reported as a successful stop.
 - **Tool availability is per OpenCode agent** — Cursor can request native capabilities such as Task even when a child or restricted OpenCode agent did not advertise the corresponding host tool. The provider prompts Cursor with the exact current catalog and checks every decoded host-tool exec request against it. An unavailable request is answered on Cursor's correlated typed result channel and is never emitted as OpenCode's `invalid` tool.
-- **Host web tools use collision-safe aliases** — Cursor sees `custom_websearch` / `custom_webfetch`, and the held Run maps each alias back to an executable OpenCode tool with its schema, permission check, and correlated result intact. The plugin registers its search fallback directly as `custom_websearch`, avoiding OpenCode's reserved `websearch` id filter for third-party providers and taking precedence over MCP search providers such as Brave without host environment configuration. Exact host `webfetch` is translated the same way. Cursor's UI-bound native web interactions stay disabled because their approval replies cannot carry OpenCode tool results.
+- **Host web tools use collision-safe aliases** — Cursor sees `custom_websearch` / `custom_webfetch`, and the held Run maps each alias back to an executable OpenCode tool with its schema, permission check, and correlated result intact. OpenCode 2 ships `websearch` as a direct, permission-gated catalog tool; this plugin supplies it an Exa provider through `ctx.websearch.transform` and aliases the host tool for Cursor. It does not add a second direct fallback because OpenCode 2's public plugin tool context cannot raise the host permission prompt. Classic 1.x still registers `custom_websearch` through its permission-aware tool API to avoid OpenCode's reserved `websearch` id filter. Exact host `webfetch` is translated the same way. Cursor's UI-bound native web interactions stay disabled because their approval replies cannot carry OpenCode tool results.
 - **MCP resource tools (`list_mcp_resources` / `read_mcp_resource`) also use collision-safe aliases, and Cursor's native resource exec is always answered** — OpenCode's resource tools (advertised only when a connected MCP server declares `capabilities.resources`) share bare names with two of Cursor's own native tool-call variants. Left unaliased, Cursor's client can route a call onto its native exec channel instead of the ordinary MCP tool path, which this provider does not translate — confirmed live: reading a resource was dispatched natively and killed the Run before this fix. The provider now aliases both names to `custom_list_mcp_resources` / `custom_read_mcp_resource` (same mechanism as web search/fetch) so normal calls execute through OpenCode's tools, and separately answers Cursor's native resource-exec fields directly on the protocol floor — an empty list, or a "server not found" error for read — so an unsolicited native request from Cursor can never fail the Run. Downloads (`download_path`) have no OpenCode equivalent and are always refused; binary resource content is subject to the same [50 KB / attachment-type limits](#known-limitations) as other tool results.
 - **Background shells are non-interactive** — Cursor's native background-shell spawn and soft-background shell-stream timeouts are bridged through OpenCode's foreground-only `bash` tool. With bash/zsh, the classic plugin keeps the original permission/UI command and executes the wrapper through `shell.env` (`BASH_ENV` / `ZDOTDIR`); OpenCode's non-interactive sh/dash argv ignores those startup variables, so the plugin uses a short `exec /bin/sh '<wrapper-file>'` command backed by the same private wrapper. Native background-spawn requests also carry a self-contained marker-producing fallback when the classic hooks are absent. Spawn/soft-bg wrappers detach with `nohup`, redirect output under `${TMPDIR:-/tmp}/cursor-opencode-{bg,shell}.*`, and return the real PID (or typed timeout/exit) to Cursor. Private markers and OpenCode's `<shell_metadata>` envelope are stripped before storage/render, with a short still-running / started / timed-out status line left for the bash bubble. Requests that require `write_shell_stdin` are rejected explicitly because OpenCode does not expose an interactive background-process lifecycle through its AI SDK tool interface. The POSIX wrap path is not implemented for native Windows PowerShell/`cmd`.
 - **Cursor-native AskQuestion reaches you through OpenCode's question tool** — when Cursor asks a clarifying question, the provider translates the interaction into the host `question` tool, so the prompt appears in OpenCode with its real options and your answer is mapped back to Cursor's option ids (an answer you type yourself becomes Cursor's freeform text). Questions Cursor marks as non-blocking are acknowledged immediately and answered later, matching Cursor CLI. If the current agent does not offer `question` — most subagents deny it, and compaction turns have no tools — the request is declined with that reason and the model asks in its reply instead.
-- **Cursor-native SwitchMode reaches you through OpenCode plan enter/exit** — when Cursor raises `switch_mode_request_query`, the provider translates it into the host `plan_enter` or `plan_exit` tool (when advertised) and keeps Cursor waiting until you approve or reject, matching Cursor CLI. `plan`/`spec` enter plan mode; every other non-empty target (including `agent`, `build`, `chat`, `debug`, `edit`, `background`, `multitask`, `triage`, `project`, and unknowns) leaves plan via `plan_exit`. After approval, the provider injects a Cursor CLI-shaped `<system_reminder>` for that mode on later turns so the agent gets the same behavioral instructions the CLI would send.
-- **Cursor image generation saves through OpenCode's permission** — Cursor generates the image on its servers and then writes it to you like any other file. Because that write carries raw bytes, which OpenCode's text `write` tool cannot represent, the provider holds the bytes and asks OpenCode for the same permissions a normal write uses — the external-directory prompt when the target sits outside your project, then `edit` — naming the target file. Approve it and the image is written byte-for-byte to its path; deny it and nothing reaches disk — Cursor is told the write was denied, using its own permission-denied result, so the model knows the file is not there. Generation is only approved when the save path is available, so Cursor quota is never spent on an image that could not be saved. By default images land in the Cursor project folder under `assets/`, kept out of your git tree as agent artifacts. Ask for a specific path and the image is saved there instead. Editing an existing image with `reference_image_paths` is not supported yet. The approach is adapted from [`jkalasas/opencode-antigravity-image`](https://github.com/jkalasas/opencode-antigravity-image) (MIT) by jkalasas, which established writing image bytes from inside an OpenCode plugin tool.
+- **Cursor-native SwitchMode follows each OpenCode generation's planning model** — on OpenCode 1.x, advertised `plan_enter` / `plan_exit` tools remain authoritative and Cursor waits for their approve/reject result. OpenCode 2.0 replaced those tools with vendor-maintained primary `plan` / `build` agents, so its plugin applies an approved Cursor mode change through `session.switchAgent` after the owning Run is terminal; leaving plan still uses the advertised `question` gate when no `plan_exit` tool exists. Direct host UI agent switches are also observed. Any real host-agent or stable system-prompt change rotates and reseeds the Cursor conversation instead of resuming an incompatible checkpoint, while title/generation lifecycle prompts remain ephemeral and do not evict the primary cache. Provider-owned Cursor reminders remain the fallback when a host cannot switch agents.
+- **Cursor image generation saves through OpenCode's permission where the host API exposes it** — Cursor generates the image on its servers and then writes it like any other file. On the classic plugin/OCP surfaces, the provider holds raw bytes and asks for the same permissions as a normal write (`external_directory`, then `edit`) before saving byte-for-byte. OpenCode 2.0's public plugin `ToolContext` does not expose a permission-request method, so its entrypoint deliberately does not advertise `cursor_image_save`; generation and binary writes are refused before staging instead of bypassing permissions or exposing an always-failing tool. By default supported-host images land in the Cursor project folder under `assets/`, kept out of the git tree as agent artifacts. Editing an existing image with `reference_image_paths` is not supported yet. The classic implementation is adapted from [`jkalasas/opencode-antigravity-image`](https://github.com/jkalasas/opencode-antigravity-image) (MIT) by jkalasas.
 - **Cursor-native CreatePlan writes a host plan file, then asks before executing it** — when Cursor raises `create_plan_request_query`, the provider writes plain markdown to your host's own plans directory (`<hostGlobalDataDir>/plans/`, never your repository and never Cursor's `~/.cursor/plans`), with no Cursor YAML frontmatter. Writing the plan does not ask; running it does. If you are in plan mode, the provider prints the plan into the conversation — Cursor sends it over a side channel that would otherwise never display it — and then asks *"Plan at &lt;path&gt; is complete. Would you like to switch to the build agent and start implementing?"* — the same prompt OpenCode's own `plan_exit` uses — and keeps Cursor waiting for your answer. Answer **Yes** and the plan is reported as approved and implementation begins; answer **No** (or dismiss it) and Cursor is told the plan was not accepted, so the model refines it and proposes again instead of starting work. Hosts that advertise their own plan-staging tool run their native review UI instead, and it reports the same approve/refine outcome. Empty args still get the CLI empty-`plan_uri` success ack. Display `create_plan_tool_call` continues to mirror into `todowrite` separately.
 - **Other Cursor-native interaction queries remain headless** — remaining UI/approval *queries* (as distinct from display tool calls and the AskQuestion / SwitchMode / CreatePlan / GenerateImage bridges) still cannot be surfaced through the AI SDK provider interface. The normal system prompt redirects available web capabilities to executable host tools (`custom_websearch`, `custom_webfetch`); native web/PR/MCP/SCM requests are declined so they remain behind host tool permissions. Compaction prompts are unchanged. Unknown future interaction variants fail the turn explicitly instead of hanging the Run stream.
 - **Compaction resets Cursor conversation state without resetting stable workspace context** — the classic plugin marks OpenCode's `compaction` agent explicitly. On those turns the provider mints an isolated Cursor `conversation_id`, drops the prior checkpoint + KV blobs, preserves real tool outputs as OpenCode-host observations in the seed history, and re-advertises the session's last tool catalog while refusing execution during the summary itself. The first normal turn then rebases once more onto a fresh conversation seeded with OpenCode's compacted prompt and normal system instructions, so the summary-agent checkpoint cannot suppress later tool calls. Across both id rotations, the frozen workspace/rules/environment base and its prior encoded-context comparison seed are transferred instead of rebuilt; tools, skills, agents, plugins, and MCP state are still rediscovered, and the complete context is reused only when its bytes remain identical. Ordinary no-tool / `toolChoice:none` calls do not reset conversation state. Debug logs include system-prompt and encoded RequestContext hashes for cache-prefix verification.
-- **Conversation bindings survive provider restarts** — after each successful `TurnEnded`, the OpenCode-session binding, latest checkpoint, checkpoint-reachable KV blob graph, frozen request-context base, last real tool catalog, and pending post-compaction rebase marker are atomically replaced in that session's private `<host-cache>/cursor-conversations/*.pb.gz` snapshot. The protobuf stores checkpoints, blob ids/data, and request context as bytes without JSON/base64 expansion, then gzip compresses the complete record. A checkpoint alone is insufficient: Cursor requests its referenced hashes through `get_blob` when the next Run starts. Reachability follows Cursor CLI's export traversal (turns, messages, steps, images, summaries, todos, prompts, and nested subagents), pruning superseded blobs; decode failure or a missing referenced hash conservatively retains the complete blob set. The stable OpenCode session id selects the file; Cursor conversation ids may rotate during compaction and remain inside the snapshot. Independent files prevent concurrent OpenCode processes from losing unrelated sessions by replacing a shared aggregate cache. Startup restores records updated within 24 hours and safely flushes older ones without deleting a concurrently published fresh replacement. Experimental legacy JSON snapshots are discarded rather than migrated. Debug logs report hydration as `restored`, `missing`, `invalid`, or `expired`, plus the compressed and protobuf snapshot sizes. The restored catalog is a fallback only for lifecycle turns such as compaction; an ordinary restricted/no-tool turn never resurrects it. Process-global bindings and compaction catalogs still use a 256-session LRU bound; memory eviction drops the live checkpoint, blobs, and frozen context, which can be rehydrated from the restart cache on later use.
+- **Conversation bindings survive provider restarts** — after each successful `TurnEnded`, the OpenCode-session binding, latest checkpoint, checkpoint-reachable KV blob graph, frozen request-context base, last real tool catalog, host agent, stable system-prompt hash, and pending post-compaction rebase marker are atomically replaced in that session's private `<host-cache>/cursor-conversations/*.pb.gz` snapshot. The protobuf stores checkpoints, blob ids/data, and request context as bytes without JSON/base64 expansion, then gzip compresses the complete record. A checkpoint alone is insufficient: Cursor requests its referenced hashes through `get_blob` when the next Run starts. Reachability follows Cursor CLI's export traversal (turns, messages, steps, images, summaries, todos, prompts, and nested subagents), pruning superseded blobs; decode failure or a missing referenced hash conservatively retains the complete blob set. The stable OpenCode session id selects the file; Cursor conversation ids may rotate during compaction, agent switches, or prompt changes and remain inside the snapshot. Independent files prevent concurrent OpenCode processes from losing unrelated sessions by replacing a shared aggregate cache. Startup restores records updated within 24 hours and safely flushes older ones without deleting a concurrently published fresh replacement. Experimental legacy JSON snapshots are discarded rather than migrated. Debug logs report hydration as `restored`, `missing`, `invalid`, or `expired`, plus the compressed and protobuf snapshot sizes. The restored catalog is a fallback only for lifecycle turns such as compaction; an ordinary restricted/no-tool turn never resurrects it. Process-global bindings and prompt/catalog state still use a 256-session LRU bound; memory eviction drops the live checkpoint, blobs, and frozen context, which can be rehydrated from the restart cache on later use.
 - **Oversized checkpoint graphs rebase instead of flooding the Run stream** — before reusing a checkpoint, the provider measures its reachable KV graph. State above 100 MiB, or an incomplete graph with a missing/undecodable reference, rotates to a fresh Cursor conversation seeded from OpenCode's authoritative history. KV, request-context, MCP-state, interaction, and heartbeat writes are ordered per Run and await HTTP/2 drain, so a large blob reply cannot create an unbounded queue later misreported as heartbeat backpressure. Debug logs distinguish checkpoint-envelope bytes, reachable blob bytes, seed size, and encoded Run-request estimate; raw blob bytes are never presented as tokens.
 - **Interrupted Runs resume from checkpoints** — a remote EOF, Connect end-stream, or trailer error is never emitted as a successful `stop`. When the failed Run produced an eligible checkpoint, the provider opens a new RPC for the same conversation and sends that state with `ResumeAction`, so completed text and tool work are not replayed. Before any stateful output, an interruption without a checkpoint can still rebase from OpenCode history. Stateful interruptions without a checkpoint are surfaced because replay would be ambiguous; retry exhaustion remains explicit. A transport closure after `turn_ended` is treated as successful completion.
-- **Large reads are capped at 50 KB by OpenCode, and the cap is reported** — OpenCode's `read` tool stops at `MAX_BYTES = 50 * 1024`, cutting on a whole-line boundary, and appends `(Output capped at 50 KB. Showing lines X-Y. Use offset=N to continue.)`. The provider strips that envelope before returning content to Cursor so the model cannot echo wrappers into a later write, but it re-states the cap: a capped native read appends a `[Partial read: …]` marker after the content, a capped MCP read gets a separate notice content item, and a Pi read carries structured `PiReadExecSuccess.truncation`. The structured `truncated` flag alone is not enough — verified against live `gpt-5.4-mini` and `grok-4.5` sessions, both of which asserted "highly confident" that partial content was the whole file until the textual marker was added. Deliberately paged reads (explicit `offset`/`limit`) are not marked. Whole-file writes and overwriting `Add File` patches that echo the marker are rejected before OpenCode executes them; targeted edits remain possible, including edits to source that quotes the warning text. Cursor's private legacy-edit read is handled separately as described above, so an edit can operate on a workspace file larger than 50 KB without turning the capped preview into a replacement. The cap is hardcoded in OpenCode's read tool — it is not the configurable `tool_output.max_bytes`, which governs `Truncate.Service` and not read's line accumulation — so ordinary model reads still require paging with `offset`.
+- **Large reads are capped by OpenCode, and the cap is reported** — OpenCode 1.x `read` stops at `MAX_BYTES = 50 * 1024` and appends `(Output capped at 50 KB. Showing lines X-Y. Use offset=N to continue.)`. OpenCode 2 prints `Read file <path>, lines <start>-<end>` with `N: ` prefixes and, when the page ends before EOF, `[Output truncated. Continue reading with offset: N]` (50 KB or 2,000 lines); it also shortens each individual line after 2,000 characters. The provider strips either envelope before returning content to Cursor so the model cannot echo wrappers into a later write, but it re-states every partial result: a native read appends a `[Partial read: …]` marker after the content, an MCP read gets a separate notice content item, and a Pi read carries structured `PiReadExecSuccess.truncation`. Relative grep, glob, and directory entries are resolved against the workspace root. Shell stdout absolutizes only relative path tokens, not prose. Checkpointed turns, which do not resend the system prompt, get that same root on the user message. The structured `truncated` flag alone is not enough — verified against live `gpt-5.4-mini` and `grok-4.5` sessions, both of which asserted "highly confident" that partial content was the whole file until the textual marker was added. Deliberately paged reads (explicit `offset`/`limit`) are not marked unless the host also hits the byte cap or character-truncates a line. Whole-file writes and overwriting `Add File` patches that echo the marker are rejected before OpenCode executes them; targeted edits remain possible, including edits to source that quotes the warning text. Cursor's private legacy-edit read is handled separately as described above, so an edit can operate on a workspace file larger than 50 KB without turning the capped preview into a replacement. The cap is hardcoded in OpenCode's read tool — it is not the configurable `tool_output.max_bytes`, which governs `Truncate.Service` and not read's line accumulation — so ordinary model reads still require paging with `offset`.
 - **No fallback models** — if Cursor’s `AvailableModels` API is unreachable and there is no local cache, the provider exposes no models.
 
 ## License

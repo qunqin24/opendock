@@ -4,12 +4,13 @@ Veris interception for [E2B](https://e2b.dev): vendor API calls made inside an
 E2B sandbox are answered by a stateful Veris twin, and every run ends with a
 receipt of what the vendor actually received.
 
-Two packages, one repo, because they move together.
+Three packages, one repo, because they move together.
 
 | package | what it is |
 |---|---|
 | [`@veris-ai/e2b`](./e2b) | The SDK. A drop-in subclass of E2B's `Sandbox` whose `create()` also provisions the twin, points the sandbox's egress at the Veris gateway and installs the interception CA — and whose `kill()` deletes the twin with it. |
 | [`@veris-ai/e2b-opencode`](./e2b-opencode) | An OpenCode plugin. One line in `opencode.json` and every session in that repo runs in a Veris-intercepted sandbox. |
+| [`veris-e2b`](./python) | The same SDK in Python — `Sandbox` and `AsyncSandbox` subclassing e2b's, with the same options in snake_case. Gateway mode only; [what differs](./python/README.md#differences-from-the-typescript-sdk). |
 
 `@veris-ai/e2b@0.1.1` is SDK-only. This PR adds no CLI;
 [CLI draft #22](https://github.com/veris-ai/veris-e2b/pull/22) is separate and
@@ -66,11 +67,26 @@ key. Adds a `verisReceipt` tool, because an agent that fabricated an API respons
 and one that really called it produce identical transcripts. They produce
 different receipts. See [`e2b-opencode/README.md`](./e2b-opencode/README.md).
 
+## The Python SDK
+
+```python
+from veris_e2b import Sandbox, VerisOpts
+
+sbx = Sandbox.create(veris=VerisOpts(environment_id="env_…", snapshot_id="snap_…"))
+sbx.commands.run("curl -sS https://api.stripe.com/v1/customers -u sk_test_veris:")
+sbx.veris.assert_touched("stripe")
+sbx.kill()
+```
+
+`AsyncSandbox` is the same thing for callers already inside an event loop. Details
+in [`python/README.md`](./python/README.md).
+
 ## Install
 
 ```sh
 npm i @veris-ai/e2b              # the SDK
 npm i @veris-ai/e2b-opencode     # the OpenCode plugin (pulls the SDK with it)
+uv add veris-e2b                 # the Python SDK
 ```
 
 Both packages version together, so a given plugin version always resolves the
@@ -79,12 +95,17 @@ SDK it was built against.
 ## Working in this repo
 
 ```sh
-npm install          # links both workspaces
+npm install          # links both node workspaces
 npm run build        # must come first, see CONTRIBUTING.md
 npm run typecheck
-npm test             # unit tests for both packages
+npm test             # unit tests for both node packages
 npm run test:live    # SDK only; needs E2B_API_KEY, VERIS_API_KEY, VERIS_ENVIRONMENT_ID
+
+cd python && uv sync && uv run pytest    # the Python package, independently
 ```
+
+The Python package is its own uv project rather than a workspace member: it
+shares the control-plane contract with the TypeScript SDK, not a toolchain.
 
 Releases are cut from the Actions tab — see
 [CONTRIBUTING.md](CONTRIBUTING.md#releasing).
