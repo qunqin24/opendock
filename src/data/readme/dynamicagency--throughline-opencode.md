@@ -1,6 +1,6 @@
 # throughline
 
-**Continuous, state-aware session memory for Claude Code, Codex CLI, and OpenCode.**
+**Continuous, state-aware session memory for Claude Code, Codex CLI, OpenCode, and OMP.**
 Captures what you *did* and what *is* - commands, file changes, decisions, live git/PR
 state - then hands it off with judgment when the session wraps. Your artifacts stay
 readable, editable, and yours.
@@ -58,7 +58,7 @@ does the full orientation pass (open PRs/issues, deep read) on demand.
 <details>
 <summary>Per-harness mechanism (click to expand)</summary>
 
-| Capture point | Claude Code / Codex CLI | OpenCode |
+| Capture point | Claude Code / Codex CLI / OMP | OpenCode |
 |---|---|---|
 | Session start | `SessionStart` hook | `session.created` event + `experimental.chat.system.transform` |
 | User intent | `UserPromptSubmit` hook | `chat.message` hook |
@@ -66,8 +66,12 @@ does the full orientation pass (open PRs/issues, deep read) on demand.
 | Compaction boundary | `PreCompact` hook, then `SessionStart` re-fires with `source=compact` | `session.compacted` event, which queues the recovery block for the next context injection |
 | Session end | `SessionEnd` hook | `session.idle` event (fires after every turn, not once at exit - see [docs/INSTALL.md#opencode](docs/INSTALL.md#opencode)) |
 
-Claude Code and Codex CLI share the identical shell hook scripts; OpenCode's plugin
-is a TypeScript port of the same logic against OpenCode's own API.
+Claude Code and Codex CLI share the identical shell hook scripts. OMP's hooks are
+in-process TypeScript event handlers rather than subprocess hooks, but a thin shim
+(`hooks/post/throughline.ts`) registers the same five capture points against OMP's
+own event bus and shells out to the identical `hooks/*.sh` scripts underneath, so
+there is nothing to keep in sync. OpenCode's plugin is a full TypeScript port of the
+same logic against OpenCode's own API.
 
 </details>
 
@@ -120,17 +124,17 @@ rest of the walkthrough.
 Every harness reads and writes the same `.claude/throughline/` data format, so a
 project's history stays readable and continuable no matter which one you install into.
 Claude Code has the most native integration (it binds into Claude's own memory
-system); Codex CLI and OpenCode both get full automatic capture through their own
-hook/plugin APIs. Capabilities differ in the details below - see the table for the
+system); Codex CLI, OpenCode, and OMP all get full automatic capture through their
+own hook/plugin APIs. Capabilities differ in the details below - see the table for the
 honest comparison, then jump to the section for your harness.
 
-| | [Claude Code](#claude-code) | [Codex CLI](#codex-cli) | [OpenCode](#opencode) | [npx skills](#npx-skills) |
-|---|---|---|---|---|
-| Skills (`handoff`, `onboard`, `consolidate`, `consolidate-memory`) | yes | yes | separate install (see below - broadly auto-discovered) | yes |
-| Automatic capture | yes - 5 hooks | yes - 5 hooks, one-time trust step (see below) | yes - 5 hooks | no |
-| Compaction survival | yes | yes | yes | no |
-| Native memory binding | yes (Claude's `/memory`) | no | no | no |
-| Requires `jq` | yes | yes | no | n/a - skills only |
+| | [Claude Code](#claude-code) | [Codex CLI](#codex-cli) | [OpenCode](#opencode) | [OMP](#omp) | [npx skills](#npx-skills) |
+|---|---|---|---|---|---|
+| Skills (`handoff`, `onboard`, `consolidate`, `consolidate-memory`) | yes | yes | separate install (see below - broadly auto-discovered) | yes (auto-discovered) | yes |
+| Automatic capture | yes - 5 hooks | yes - 5 hooks, one-time trust step (see below) | yes - 5 hooks | yes - 6 events (compaction is 2 events, not 1) | no |
+| Compaction survival | yes | yes | yes | yes | no |
+| Native memory binding | yes (Claude's `/memory`) | no | no | no | no |
+| Requires `jq` | yes | yes | no | yes | n/a - skills only |
 
 ### Claude Code
 
@@ -163,6 +167,17 @@ trust dialog on first use - see [docs/INSTALL.md](docs/INSTALL.md#codex-cli).
 Add to `opencode.json` and restart; Bun installs it automatically. Requires
 Node.js 18+, no `jq`. Hooks only - see
 [docs/INSTALL.md](docs/INSTALL.md#opencode) for skills and the local-path install.
+
+### OMP
+
+```sh
+git clone https://github.com/dynamic/throughline && cd throughline
+omp plugin link .omp-plugin
+```
+
+Requires `git`, `jq`, and [Bun](https://bun.sh) on your `PATH` (OMP's own runtime).
+Restart your OMP session afterward. See
+[docs/INSTALL.md](docs/INSTALL.md#omp) for what the link install gives you.
 
 ### npx skills
 

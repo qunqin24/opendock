@@ -345,6 +345,9 @@ mynd service status          Show background service status
 mynd matrix login            Log into a Matrix account (once); session saved to OS keyring
 mynd matrix run               Run the Matrix bot daemon
 mynd matrix status            Show Matrix bot login/sync/session state
+mynd discord login           Log into a Discord bot account (once); token saved to OS keyring
+mynd discord run              Run the Discord bot daemon
+mynd discord status           Show Discord bot login/sync/session state
 mynd dashboard --open        Open the dashboard (requires server running)
 ```
 
@@ -468,6 +471,12 @@ api_key = ""           # gateway-issued key, or sqld auth token
 interval_seconds = 300
 sync_on_store = true
 sync_on_startup = true
+
+[update]
+enabled = true                 # check GitHub releases for a newer version
+check_interval_seconds = 600
+allow_apply_from_api = true    # let the dashboard's Update button run `cargo binstall` + restart;
+                               # set false to require `mynd update apply` on the CLI
 ```
 
 `$XDG_CONFIG_HOME/mynd/config.toml` is used instead if `XDG_CONFIG_HOME` is set.
@@ -477,6 +486,8 @@ sync_on_startup = true
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `MYND_DB_PATH` | `~/.local/share/mynd/memories.db` (or `$XDG_DATA_HOME/mynd/memories.db`) | Path to the SQLite database |
+| `MYND_SYNC_API_KEY` | – | Overrides `[sync] api_key`, so the token never has to be written to `config.toml` |
+| `MYND_ORG_SYNC_API_KEY` | – | Overrides `[org_sync] api_key` |
 
 Databases from versions before 0.3.x lived at `~/.hivemind/memories.db`; run `mynd migrate` to move them.
 
@@ -502,6 +513,8 @@ Two `remote_url` targets are supported:
 |-------|------------------------|-----------|
 | **Self-hosted** | Your own [sqld](https://github.com/tursodatabase/libsql/tree/main/libsql-server) server | sqld auth token; leave empty if sqld has no auth configured |
 | **Oxhive hosted** *(coming soon)* | `https://sync.oxhive.dev` | Your Oxhive account key |
+
+`api_key` is a credential: `mynd init` creates `config.toml` owner-only (`0600`), and `mynd` warns at startup if the file holds a key but is readable by other users. On shared machines prefer the `MYND_SYNC_API_KEY` / `MYND_ORG_SYNC_API_KEY` environment variables and leave `api_key` empty.
 
 `api_key` is never sent to Claude or the dashboard. It is only used during replication.
 
@@ -558,7 +571,7 @@ Add room mappings and the DM allowlist to `~/.config/mynd/config.toml`:
 [matrix]
 homeserver_url = "https://matrix.org"      # written automatically by `matrix login`
 user_id = "@mynd-bot:matrix.org"       # written automatically by `matrix login`
-allowed_users = ["@you:matrix.org"]        # required for DMs — anyone else is ignored
+allowed_users = ["@you:matrix.org"]        # required — DMs, room mentions and invites from anyone else are ignored
 
 [[matrix.rooms]]
 room_id = "!abc123:matrix.org"
@@ -569,6 +582,11 @@ base_tags = ["project:mynd"]
 Rooms the bot is in but not listed here still work — memories land in the `workspace`
 layer tagged `room:<id-or-alias>` + `source:matrix` instead of your configured
 `base_tags`. DMs always use the `personal` layer.
+
+`allowed_users` is the only authorization the bot has. It applies everywhere: the
+bot only joins rooms it is invited to by an allowed user, and in a room it only
+acts on mentions from allowed users. Listing a room under `[[matrix.rooms]]`
+sets tags; it does not grant anyone in that room access to your memories.
 
 Then run it:
 
@@ -595,6 +613,85 @@ per-invocation MCP tool allowlist, so you must pre-create a restricted agent pro
 named `mynd-bot` in your `opencode.json`, scoped to the mynd MCP tools — the
 bot spawns `opencode run --agent mynd-bot`, it doesn't configure that profile for
 you.
+
+---
+
+## Discord chat interface (optional)
+
+Capture and recall Mynd memories from a Discord channel or DM — mention the bot in a
+channel, use the `/hm` slash command, or DM it directly. Same headless-agent mechanism as
+Matrix and the dashboard's suggest flow: no bespoke NLU, no local model.
+
+This is a separate process from `mynd up` and doesn't depend on it being started —
+each message/command spawns a short-lived agent turn that talks to Mynd the same way
+any other MCP client does.
+
+### Setup
+
+Create a bot application in the [Discord Developer Portal](https://discord.com/developers/applications),
+enable the **Message Content Intent** under Bot settings, and invite it to your server with
+the `bot` and `applications.commands` OAuth scopes. Then:
+
+```sh
+mynd discord login
+```
+
+Prompts for the bot token. The token is validated against Discord once, then persisted to
+your OS keyring (Secret Service/kwallet on Linux, Keychain on macOS) — the same storage
+Matrix uses.
+
+> **Headless Linux servers:** `keyring` needs a functioning Secret Service (D-Bus). A
+> bare VPS with no login session running may not have one available; `mynd discord
+> login` will fail with an actionable message if so. Install/start a Secret Service
+> provider (e.g. `gnome-keyring`) first.
+
+Add channel mappings and the DM allowlist to `~/.config/mynd/config.toml`:
+
+```toml
+[discord]
+application_id = "123456789012345678"      # written automatically by `discord login`
+allowed_users = ["111111111111111111"]     # required for DMs — anyone else is ignored
+permission_gate = "manage_guild"           # optional; restricts who can invoke /hm in a guild
+
+[[discord.channels]]
+channel_id = "222222222222222222"
+alias = "mynd-project"                     # optional, for `mynd discord status`
+base_tags = ["project:mynd"]
+```
+
+Channels the bot is in but not listed here still work — memories land in the `workspace`
+layer tagged `channel:<id-or-alias>` + `source:discord` instead of your configured
+`base_tags`. DMs always use the `personal` layer.
+
+> **Trust boundary:** `permission_gate` only restricts the `/hm` slash command. Freeform
+> @mention chat in a guild channel is open to any member of that guild who can see the
+> channel: it's gated by Discord's own channel permissions, not by `permission_gate` or
+> `allowed_users` (`allowed_users` only gates DMs). This mirrors Matrix's trust model,
+> where room membership is the boundary, but Discord guilds are typically much larger
+> than Matrix rooms, so make sure you're comfortable with everyone in a guild before
+> inviting the bot to it.
+
+Then run it:
+
+```sh
+mynd discord run
+```
+
+Or install it as a background service alongside `mynd up` — `mynd service
+install --discord` adds a unit once `[discord]` is configured.
+
+### Using it
+
+- Mention the bot in a channel, or message it directly in a DM, for freeform chat.
+- `/hm store text:<text>` — direct write, skips the agent (fast, no interpretation).
+- `/hm reset` — starts a fresh conversation in that channel (drops continuity, not memory).
+- `/hm help` — lists these commands.
+- `mynd discord status` — shows login state, sync status, and per-channel session
+  activity.
+
+### Agent compatibility
+
+Same as Matrix — see [Agent compatibility](#agent-compatibility) above.
 
 ---
 
@@ -700,7 +797,7 @@ No. Memories stored with `layer = "personal"` follow you, not the repo. Only `la
 
 **Is the MCP connection authenticated?**
 
-The MCP endpoint (`/mcp`) and the REST API (`/api/v1/*`) are unauthenticated and bind to `127.0.0.1` by default, so only processes on your local machine can reach them. The `api_key` under `[sync]` is your auth token for the remote sync target (sqld token for self-hosted, account key for Oxhive hosted); it is used only during replication and has nothing to do with Claude's connection to Mynd.
+The MCP endpoint (`/mcp`) and the REST API (`/api/v1/*`) are unauthenticated and bind to `127.0.0.1` by default, so only processes on your local machine can reach them. To keep web pages from riding along on that trust, the server also rejects requests whose `Host` header is not loopback (or your configured `[server] host` / `[dashboard] api_url`), which blocks DNS-rebinding attacks, and rejects state-changing requests whose `Origin` is not the dashboard's (or another loopback origin), which blocks cross-site request forgery. Non-browser clients (the CLI, curl, MCP clients) send neither header and are unaffected. The `api_key` under `[sync]` is your auth token for the remote sync target (sqld token for self-hosted, account key for Oxhive hosted); it is used only during replication and has nothing to do with Claude's connection to Mynd.
 
 **Can I use Mynd with agents other than Claude Code?**
 

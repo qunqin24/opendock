@@ -505,7 +505,7 @@ Configure via:
 }
 ```
 
-> **Note:** Some configuration fields (`max_trajectory_lines`, `escalation_enabled`) are defined in schema but not yet enforced at runtime.
+> **Note:** Both `max_trajectory_lines` and `escalation_enabled` are enforced at runtime. `max_trajectory_lines` is the one knob bounding the session trajectory store — the cold-session read, the append-path compaction, and denied-call recording all use it; `escalation_enabled` gates the escalation ladder (advisory → hard stop). Terminal/cooldown semantics live in `docs/configuration.md` (Hard-stop episode state machine).
 
 ### Persistent Memory
 
@@ -565,11 +565,12 @@ The Context Budget Guard monitors how full the model's context window is getting
 ### Default Behavior
 
 - **Enabled automatically** — No setup required. Swarm starts tracking context usage right away.
-- **What it measures** — The estimated total tokens across **all** messages in the conversation (every text part of every message — your prompts, the model's responses, and injected content alike), divided by the model's context window. It does **not** measure only swarm-injected content, and it does **not** read `max_injection_tokens`.
+- **What it measures** — The total tokens across **all** messages in the conversation (every text part of every message — your prompts, the model's responses, and injected content alike), divided by the model's context window. It does **not** measure only swarm-injected content, and it does **not** read `max_injection_tokens`. Token counts come from one canonical estimator, `estimateTokens` in `src/hooks/utils.ts` (flat ~0.33 tokens/char), unless provider-reported usage is available for the turn, which stays authoritative.
 - **Where the window comes from** — Your **live model**, not a constant. Resolution order: an explicit `context_budget.model_limits` entry (`"<provider>/<model>"`, then `"<model>"`, then `"default"`) → the context window the OpenCode host reports for the model you are running (`model.limit.context`, already provider-specific, so a Copilot entry and a first-party entry for the same model resolve differently) → a static fallback table → `128000` as a last resort when nothing else is known. Set a `model_limits` entry only if you want a **smaller working budget** than your model's real window.
-- **Warning threshold (0.7 ratio)** — When total conversation tokens reach 70% of the model context window (e.g. ~89,600 on a 128k model, ~700,000 on a 1M model), the architect receives a one-time advisory warning. This is informational — execution continues normally.
-- **Critical threshold (0.9 ratio)** — When total conversation tokens reach 90% of the model context window (e.g. ~115,200 on a 128k model, ~900,000 on a 1M model), the architect receives a critical alert with a recommendation to run `/swarm handoff`. This is also one-time only.
-- **Non-nagging** — Alerts fire once per session, not repeatedly. You won't be pestered every turn.
+- **Warning threshold (0.7 ratio)** — When total conversation tokens reach 70% of the model context window (e.g. ~89,600 on a 128k model, ~700,000 on a 1M model), the architect receives an advisory warning recommending a summary offload to `.swarm/context.md`. This is informational by itself — execution continues normally.
+- **Critical threshold (0.9 ratio)** — When total conversation tokens reach 90% of the model context window (e.g. ~115,200 on a 128k model, ~900,000 on a 1M model), the architect receives a critical alert recommending `/swarm handoff` — and, when `enforce` is `true` (the default), the guard also prunes the outgoing request (see the next bullet).
+- **Hard enforcement (default on)** — With `enforce: true` (default), crossing the critical threshold masks eligible completed tool outputs (those older than `recent_window` turns OR longer than `tool_output_mask_threshold` characters, in turns not protected by `preserve_last_n_turns`) and prunes lower-priority messages toward `prune_target` of the window (best-effort: pruning stops at the target or when no eligible removable message remains, whichever comes first). All of this happens **in the outgoing request only** — the current turn's message array as sent to the provider. Your **persisted history** is never rewritten: stored conversation, `.swarm/` artifacts, and tool results on disk are untouched. External data — provider-reported usage and the live model limit — is read, never written.
+- **Warnings repeat while above threshold** — The warning text is prepended to the current user message on every turn above the threshold; there is no once-per-session suppression. Pruning and masking likewise re-apply each turn while usage stays above the critical threshold.
 - **Who sees warnings** — Only the architect receives these warnings. Other agents are unaware of the budget.
 
 To disable entirely, set `context_budget.enabled: false` in your swarm config.
@@ -737,15 +738,15 @@ Every candidate passes a 3-gate pipeline before entering quarantine:
 | `context_budget.max_injection_tokens` | number | `4000` | Separate per-turn cap on system-enhancer injection. It is NOT the guard's budget — the guard measures total conversation tokens against `model_limits`, not this value |
 | `context_budget.warn_threshold` | number | `0.7` | Ratio (0.0-1.0) of the model context window at which total conversation tokens trigger a warning advisory |
 | `context_budget.critical_threshold` | number | `0.9` | Ratio (0.0-1.0) of the model context window at which total conversation tokens trigger a critical alert with handoff recommendation |
-| `context_budget.enforce` | boolean | `true` | When true, enforces budget limits and may trigger handoffs |
-| `context_budget.prune_target` | number | `0.7` | Ratio (0.0-1.0) of context to preserve when pruning occurs |
-| `context_budget.preserve_last_n_turns` | number | `4` | Number of recent turns to preserve when pruning |
-| `context_budget.recent_window` | number | `10` | Number of turns to consider as "recent" for scoring |
+| `context_budget.enforce` | boolean | `true` | When true (default), crossing the critical threshold masks large completed tool outputs and prunes lower-priority messages in the **outgoing request** toward `prune_target`. Execution is never blocked or aborted |
+| `context_budget.prune_target` | number | `0.7` | Ratio (0.0-1.0) of the context window the outgoing request is pruned toward when enforcement runs |
+| `context_budget.preserve_last_n_turns` | number | `4` | Number of recent turns protected from pruning |
+| `context_budget.recent_window` | number | `10` | Age (in turns) beyond which a completed tool output becomes eligible for masking during enforcement; the latest `preserve_last_n_turns` turns are always protected |
 | `context_budget.tracked_agents` | string[] | `['architect']` | Agents to track for context budget warnings |
 | `context_budget.enforce_on_agent_switch` | boolean | `true` | Enforce budget limits when switching agents |
 | `context_budget.model_limits` | record | `{}` | Per-model token limit **overrides**, keyed by `"<provider>/<model>"`, `"<model>"`, or `"default"`. Empty by default so the live model's own context window is used; set an entry only to impose a smaller working budget |
 | `context_budget.unified_injection_tokens` | number | `undefined` | Opt-in unified ceiling (tokens) for combined system-enhancer + knowledge-injector injection per turn. When set, both hooks share this budget with proportional split |
-| `context_budget.tool_output_mask_threshold` | number | `2000` | Threshold for masking tool outputs (chars) |
+| `context_budget.tool_output_mask_threshold` | number | `2000` | Character threshold (chars, not tokens): during enforcement, a completed tool output in a non-protected turn is masked when it is **older than `recent_window` turns OR longer than this many characters** (either condition) |
 | `skills.enabled` | boolean | `false` | Gates the 7 skill-management tools (`skill_generate`, `skill_list`, `skill_apply`, `skill_inspect`, `skill_regenerate`, `skill_retire`, `skill_improve`) behind an opt-in flag. When `false` (default), these tools are host-denied for every agent except `skill_improver` — genuinely unreachable at request time (issue #2528). |
 | `skill_opt.enabled` | boolean | `false` | Master opt-in for the governed skill optimizer (`/swarm skill-opt`). `run` also requires `--confirm`; `plan`/`status`/`diff`/`history` are always available. See `docs/skill-optimizer.md`. |
 | `skill_opt.deadband` | number | `0` | Promotion policy deadband forwarded to the evaluation substrate. |
@@ -753,9 +754,9 @@ Every candidate passes a 3-gate pipeline before entering quarantine:
 | `skill_opt.max_transient_retries` | number | `5` | Max transient-infra retries before an infra failure becomes inconclusive. |
 | `context_budget.scoring.enabled` | boolean | `false` | Enable context scoring/ranking |
 | `context_budget.scoring.max_candidates` | number | `100` | Maximum items to score (10-500) |
-| `context_budget.scoring.weights` | object | `{ recency: 0.3, ... }` | Scoring weights for priority |
-| `context_budget.scoring.decision_decay` | object | `{ mode: 'exponential', half_life_hours: 24 }` | Decision relevance decay |
-| `context_budget.scoring.token_ratios` | object | `{ prose: 0.25, code: 0.4, ... }` | Token cost multipliers |
+| `context_budget.scoring.weights` | object | `{ phase: 1.0, current_task: 2.0, blocked_task: 1.5, recent_failure: 2.5, recent_success: 0.5, evidence_presence: 1.0, decision_recency: 1.5, dependency_proximity: 1.0 }` | Per-signal priority weights (each 0-5). Only these eight keys are read |
+| `context_budget.scoring.decision_decay` | object | `{ mode: 'exponential', half_life_hours: 24 }` | Decision relevance decay (`mode`: linear or exponential; `half_life_hours` 1-168) |
+| `context_budget.scoring.token_ratios` | object | `{ prose: 0.25, code: 0.4, markdown: 0.3, json: 0.35 }` | Accepted for backward compatibility only; deprecated and inert at runtime — never read. Token costs always use the canonical flat estimator (`estimateTokens`, ~0.33 tokens/char), never per-content ratios |
 
 ### Example Configurations
 
@@ -787,13 +788,13 @@ Every candidate passes a 3-gate pipeline before entering quarantine:
     "scoring": {
       "enabled": false,
       "max_candidates": 100,
-      "weights": { "recency": 0.3, "relevance": 0.4, "importance": 0.3 },
-      "decision_decay": { "mode": "exponential", "half_life_hours": 24 },
-      "token_ratios": { "prose": 0.25, "code": 0.4, "json": 0.6, "logs": 0.1 }
+      "decision_decay": { "mode": "exponential", "half_life_hours": 24 }
     }
   }
 }
 ```
+
+(Omitted keys — `weights` above — take the schema defaults listed in the table; only the eight documented weight keys are read.)
 
 **Aggressive (for long-running sessions):**
 ```json
@@ -814,21 +815,22 @@ Every candidate passes a 3-gate pipeline before entering quarantine:
     "scoring": {
       "enabled": true,
       "max_candidates": 50,
-      "weights": { "recency": 0.5, "relevance": 0.3, "importance": 0.2 },
-      "decision_decay": { "mode": "linear", "half_life_hours": 12 },
-      "token_ratios": { "prose": 0.2, "code": 0.35, "json": 0.5, "logs": 0.05 }
+      "weights": { "phase": 1.5, "current_task": 3.0, "recent_failure": 3.0, "recent_success": 0.3, "decision_recency": 2.0 },
+      "decision_decay": { "mode": "linear", "half_life_hours": 12 }
     }
   }
 }
 ```
 
+> **Note on `scoring.token_ratios`:** the key is still accepted by the config schema for backward compatibility, but it is deprecated and inert — no runtime code reads it, and per-content token ratios are deliberately not used. Token costs for both normal and scoring accounting always come from the one canonical estimator (`estimateTokens` in `src/hooks/utils.ts`, flat ~0.33 tokens/char); when the provider reports token usage, that figure stays authoritative.
+
 ### What This Does NOT Do
 
-- **Does NOT prune chat history** — Your conversation with the model is untouched
-- **Does NOT modify tool outputs** — What tools return is unchanged
-- **Does NOT block execution** — The guard is advisory only; it warns but never stops the pipeline
-- **Does NOT interact with compaction.auto** — Separate feature with separate configuration
-- **Only measures swarm's injected context** — Not the full context window, just what Swarm adds
+- **Does NOT block execution** — The guard never aborts or stops the pipeline. Enforcement trims the request, not the run.
+- **Does NOT modify persisted history** — Masking and pruning mutate only the **outgoing request** for the current turn (the message array sent to the provider). Stored conversation, `.swarm/` artifacts, and tool results on disk are untouched.
+- **Does NOT rewrite tool results** — A masked tool output is a placeholder in the current request; the tool's stored result is unchanged.
+- **Does NOT interact with compaction.auto** — Separate feature with separate configuration.
+- **Does NOT measure only swarm-injected context** — It measures the whole conversation against the model's context window, using provider-reported usage when available and the canonical flat estimator (`estimateTokens`, ~0.33 tokens/char) otherwise.
 
 </details>
 

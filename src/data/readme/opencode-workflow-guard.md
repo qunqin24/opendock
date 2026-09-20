@@ -14,14 +14,17 @@ Workflow Guard is deliberately **not an agent harness**: it can constrain action
 
 ### 1. Installation
 
-Install the current published version globally with OpenCode's plugin installer:
+Install the current published version globally:
 
 ```bash
 VERSION=$(npm view opencode-workflow-guard version)
-opencode plugin "opencode-workflow-guard@$VERSION" --global --force
+opencode plugin add "opencode-workflow-guard@$VERSION"   # OpenCode 2.x
+opencode plugin "opencode-workflow-guard@$VERSION" --global --force   # OpenCode 1.x
 ```
 
 *Requires OpenCode >= 1.18.* OpenCode detects the package's server and TUI targets and updates both global configs. Use the same command after a release to upgrade; the explicit version gives OpenCode a fresh package-cache key. Restart OpenCode after installation. See [docs/installation.md](docs/installation.md) for details and links to the OpenCode plugin documentation.
+
+The plugin supports both generations from one package: **OpenCode 1.x** loads the `server()` entrypoint, and **OpenCode 2.x** loads the `setup()` entrypoint (`@opencode/plugin`). Policies, tools, and configuration behave the same on both; V2 load tests run against a real OpenCode 2 binary in `npm run test:install`.
 
 For the optional TUI badge, configure `"opencode-workflow-guard"` in `tui.json`. OpenCode resolves the package's exported `./tui` entrypoint automatically for TUI plugins. The companion keeps a static `Workflow Guard` shield in the prompt bar; warning toasts provide block details without changing agent behavior. Do not place the TUI module under the server `plugins/` directory.
 

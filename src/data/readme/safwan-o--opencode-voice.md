@@ -13,7 +13,8 @@
   <img alt="opencode" src="https://img.shields.io/badge/OpenCode-V2_TUI_plugin-black?style=flat-square" />
   <img alt="status" src="https://img.shields.io/badge/status-mvp-orange?style=flat-square" />
   <a href="https://www.npmjs.com/package/@safwan-o/opencode-voice"><img alt="npm version" src="https://img.shields.io/npm/v/@safwan-o/opencode-voice?style=flat-square" /></a>
-  <a href="https://www.npmjs.com/package/@safwan-o/opencode-voice"><img alt="npm downloads" src="https://img.shields.io/npm/dm/@safwan-o/opencode-voice?style=flat-square" /></a>
+  <a href="https://www.npmjs.com/package/@safwan-o/opencode-voice"><img alt="npm downloads (monthly)" src="https://img.shields.io/npm/dm/@safwan-o/opencode-voice?style=flat-square" /></a>
+  <a href="https://www.npmjs.com/package/@safwan-o/opencode-voice"><img alt="npm downloads (total)" src="https://img.shields.io/npm/dt/@safwan-o/opencode-voice?style=flat-square" /></a>
   <img alt="license" src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" />
   <img alt="stt" src="https://img.shields.io/badge/STT-local_whisper.cpp-purple?style=flat-square" />
 </p>

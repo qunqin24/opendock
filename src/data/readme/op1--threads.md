@@ -1,6 +1,6 @@
 # @op1/threads
 
-Managed top-level worker sessions for OpenCode 2.0.3. The server entrypoint is `index.ts`; the terminal entrypoint is `tui.ts`.
+Managed top-level worker sessions for OpenCode 2.0.7. The server entrypoint is `index.ts`; the terminal entrypoint is `tui.ts`.
 
 ## Install
 
@@ -58,7 +58,7 @@ All fields are strings except `evidence`, which is an array of strings. Verdicts
 
 `directory` must exist and be absolute. Without `agent`, the worker inherits the coordinator's active agent and resolved model, with agent permissions followed by session permissions.
 
-Set `agent` to use a configured profile, such as `agent: "vera-core"` for a VERA workstream or `agent: "vera-auditor-readonly"` for an independent review. The plugin resolves the profile in the assigned directory. OpenCode supplies its system prompt and step limit. The profile's model and variant take precedence; a profile without a model inherits the coordinator's resolved model. Explicit selection supports `primary`, `all`, and `subagent` profiles on OpenCode 2.0.3.
+Set `agent` to use a configured profile, such as `agent: "vera-core"` for a VERA workstream or `agent: "vera-auditor-readonly"` for an independent review. The plugin resolves the profile in the assigned directory. OpenCode supplies its system prompt and step limit. The profile's model and variant take precedence; a profile without a model inherits the coordinator's resolved model. Explicit selection supports `primary`, `all`, and `subagent` profiles on OpenCode 2.0.7.
 
 Explicit selection requires the caller's ordered agent and session rules to allow `subagent` for that exact agent ID. A matching `deny` or `ask` rejects the request before creation. OpenCode's plugin API cannot request approval for an input-dependent agent ID.
 
@@ -115,7 +115,7 @@ The input accepts at most 100 coordinator IDs. Raw HTTP RPC requests wrap the in
 
 ## Verification and limits
 
-Run `bun run typecheck`, `bun test`, and `bun run verify:live`. The live check requires OpenCode 2.0.3, Python, and `uv`. It starts a separate local server, a deterministic model endpoint, and a terminal process with isolated configuration and data. It verifies actual tool calls, durable messages, permission restrictions, worker limits, deleted-worker cleanup, restart behavior, and native tab visibility, busy state, and focus.
+Run `bun run typecheck`, `bun test`, and `bun run verify:live`. The live check requires OpenCode 2.0.7, Python, and `uv`. It starts a separate local server, a deterministic model endpoint, and a terminal process with isolated configuration and data. It verifies actual tool calls, durable messages, permission restrictions, worker limits, deleted-worker cleanup, restart behavior, and native tab visibility, busy state, and focus.
 
 Run `bun run verify:tabs` to verify project grouping across real git worktrees, activity-based ordering, permission prompts, completed and resumed workers, focus preservation, and TUI reopening.
 

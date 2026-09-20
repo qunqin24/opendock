@@ -112,7 +112,14 @@ parenthesis; an agent with no configured model renders the row without that
 parenthesised part at all. The parts are sized against the panel's actual
 laid-out width: the agent type is kept whole where the budget allows, the
 model next, and the topic takes the remainder and is dropped below a minimum rather than wrapping the
-row onto a second line.
+row onto a second line. The `<k> ctx` figure is the session's context as the
+plugin measures it against every threshold: `input + output + reasoning +
+cache.read + cache.write` of the newest assistant message with a non-zero
+output — `latestContextTokens` (`src/context-figure.js`), the one computation
+both halves of the plugin share, so the panel row, the `list()` column and the
+wake notice cannot disagree. A step still in flight (no output recorded yet)
+is walked past, and the walk stops at a compaction message, where the figure
+reads as no figure until the next real turn.
 
 The line beneath a row also carries what the subagent has on the **mid-run
 channel**: `asking` where it has stopped on a question of its own and is
@@ -902,6 +909,7 @@ is environment-variable-driven:
 | `OPENCODE_AGENT_INTERCOM_ENDLESS_MODE` | on | `"1"` arms endless mode — replaces the orchestrator when its context reaches `endlessContext`, after a permitted `planner` subagent has rewritten the project's todo file. `"0"` switches it off. TUI file overrides. |
 | `OPENCODE_AGENT_INTERCOM_ENDLESS_CONTEXT` | `250000` | Orchestrator context threshold (tokens) while endless mode is on. Displaces the plain handoff threshold. `"0"` disables. TUI file overrides. |
 | `OPENCODE_AGENT_INTERCOM_ENDLESS_QUIESCE_TIMEOUT_MS` | `600000` | How long (ms) one endless cycle waits for the last subagent to finish before abandoning. |
+| `OPENCODE_AGENT_INTERCOM_ENDLESS_QUIESCE_EXTENSION_MS` | `600000` | How long (ms) the quiesce window re-arms each time the primary's subagents are seen to advance. `"0"` switches the extension off: the first deadline abandons. |
 | `OPENCODE_AGENT_INTERCOM_ENDLESS_WIND_DOWN_TIMEOUT_MS` | `900000` | How long (ms) the cycle waits for the permitted wind-down subagent to rewrite the todo file before abandoning. Not shown in the sidebar. |
 | `OPENCODE_AGENT_INTERCOM_ENDLESS_MAX_CYCLES` | `10` | Cycle ceiling per opencode process. At the ceiling endless mode writes itself off. `"0"` arms no ceiling. |
 | `OPENCODE_AGENT_INTERCOM_SHOW_AGENTCOM` | on | `"0"` hides the plugin's own postings — subagent notices, handoff kickoff, doc-summary prompts — from the transcript. Their text still reaches the model unchanged. `"1"` shows them. TUI file overrides. |
@@ -931,8 +939,11 @@ A cycle runs in this order:
 2. **Quiesce.** On the orchestrator's `session.idle`, the cycle waits for every
    running subagent in the process to finish, bounded by
    `OPENCODE_AGENT_INTERCOM_ENDLESS_QUIESCE_TIMEOUT_MS` (default 10 minutes).
-   A timeout abandons the cycle rather than aborting a working subagent —
-   killing real work to save context is the loss the mode exists to prevent.
+   While the primary's subagents are seen to advance, the window re-arms at
+   `OPENCODE_AGENT_INTERCOM_ENDLESS_QUIESCE_EXTENSION_MS` (default 10 minutes
+   per advancing poll). A window that ends with no progress abandons the cycle
+   rather than aborting a working subagent — killing real work to save context
+   is the loss the mode exists to prevent.
 3. **Wind-down.** The orchestrator is asked to spawn a single `planner`
    subagent through a one-time permit — the sole exception to the spawn
    freeze. That subagent is handed the orchestrator's open work and rewrites
@@ -946,7 +957,13 @@ A cycle runs in this order:
    fails, bounded by `OPENCODE_AGENT_INTERCOM_ENDLESS_WIND_DOWN_TIMEOUT_MS`
    (default 15 minutes). Any failure here abandons the cycle without replacing
    the session; if the orchestrator never spawns the subagent, the plugin
-   starts it itself as a fallback.
+   starts it itself as a fallback. A file the disk shows unchanged beside a
+   reply that claims plain open work gets ONE bounded re-ask with a fresh
+   permit token: a second result that changes the file completes normally, a
+   byte-equal second file whose reply says `## WIND-DOWN DONE — no change` is
+   believed, a re-ask answering `nothing open` with a zero-task parse ends in
+   the no-open-points stop, and anything else restores the snapshot and
+   abandons with the rejected bytes filed.
 4. **Replace.** The plain orchestrator handoff runs with an additional kickoff
    block carrying the todo file's name and its own text; the old orchestrator
    is archived, the new one starts with the instruction to work the file off.

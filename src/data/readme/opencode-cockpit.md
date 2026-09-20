@@ -3,29 +3,57 @@
 [![CI](https://github.com/Codestz/opencode-cockpit/actions/workflows/ci.yml/badge.svg)](https://github.com/Codestz/opencode-cockpit/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/opencode-cockpit?color=%23cb3837&label=opencode-cockpit)](https://www.npmjs.com/package/opencode-cockpit)
 [![npm](https://img.shields.io/npm/v/@opencode-cockpit/shell?color=%23cb3837&label=%40opencode-cockpit%2Fshell)](https://www.npmjs.com/package/@opencode-cockpit/shell)
+[![npm](https://img.shields.io/npm/v/@opencode-cockpit/status?color=%23cb3837&label=%40opencode-cockpit%2Fstatus)](https://www.npmjs.com/package/@opencode-cockpit/status)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-**Superpowers for [OpenCode](https://opencode.ai) — take all of them, or just the one you need.**
+**Give [OpenCode](https://opencode.ai) the instruments it does not ship with.**
 
-**[Documentation →](https://codestz.github.io/opencode-cockpit/)**  ·  [Install](https://codestz.github.io/opencode-cockpit/start/install/)  ·  [Shell](https://codestz.github.io/opencode-cockpit/shell/overview/)  ·  [Configuration](https://codestz.github.io/opencode-cockpit/configuration/)  ·  [Changelog](CHANGELOG.md)
+**[Documentation →](https://codestz.github.io/opencode-cockpit/)**  ·  [Install](https://codestz.github.io/opencode-cockpit/start/install/)  ·  [Shell](https://codestz.github.io/opencode-cockpit/shell/overview/)  ·  [Statusline](https://codestz.github.io/opencode-cockpit/status/overview/)  ·  [Changelog](CHANGELOG.md)
 
-Coding agents are stuck in a one-command-at-a-time world: they run something, wait for it to
-finish, and paste the whole log back into their context. Cockpit gives your agent the things a
-developer actually has — long-running terminals, a way to wait for "ready", and output it can read
-without drowning in it — and gives *you* a live view of all of it, inside OpenCode.
+A tool call has to finish. A dev server does not, and neither does the context window filling up
+behind you. Cockpit is the instrument panel: things your agent can use, and things that tell you
+what it is doing.
+
+```sh
+opencode plugin opencode-cockpit --global
+```
+
+---
+
+### 🖥️  Shell — terminals that keep running
+
+Your agent starts a dev server and the tool call blocks until you kill it. It backgrounds one
+instead and loses the output. **Shell** gives it terminals with a real PTY that outlive the turn,
+wait for a port or a pattern, and hand back the part that matters — and gives you a panel where
+every one of them reports its own health.
 
 ![The shells panel: a dev server running under the conversation](media/dock.gif)
 
-*A real recording — every demo here is generated from a live OpenCode session by
-[`bun run record`](CONTRIBUTING.md), and re-run on release, so none of them can drift from what
+*A real recording. Every demo here is generated from a live OpenCode session by
+[`bun run record`](CONTRIBUTING.md) and re-run on release, so none of them can drift from what
 ships.*
 
-## Features
+**9 agent tools · 35 watch presets · [docs](https://codestz.github.io/opencode-cockpit/shell/overview/) · [`@opencode-cockpit/shell`](packages/shell)**
 
-| Feature | What your agent gains | Package |
-|---|---|---|
-| **Shell** | Background terminals it starts, waits on, reads and types into — dev servers, watchers, test suites, REPLs | [`@opencode-cockpit/shell`](packages/shell) |
-| **Agents** *(next)* | A live, keyboard-first view of every subagent, without leaving your chat | `@opencode-cockpit/agents` |
+---
+
+### 📊  Statusline — what the session is costing you
+
+How full is the context? Where did the tokens go? What has changed? OpenCode answers the first in a
+corner and the rest not at all. **Statusline** answers them where you are already looking.
+
+![The statusline under an OpenCode conversation: a context bar at 40%, the token total with its cache, input and output parts, the session diff, elapsed time and todo progress](media/statusline.png)
+
+*The default line — no configuration written at all. Every part is a segment you can reshape,
+recolour or remove, or write yourself in TypeScript. Your Claude Code statusline script runs here
+unchanged, colours and all.*
+
+**14 segments · 2 surfaces · [docs](https://codestz.github.io/opencode-cockpit/status/overview/) · [`@opencode-cockpit/status`](packages/status)**
+
+---
+
+Each bay is its own npm package with a switch in config. They share the daemon, the config file and
+the keys, so the second costs nothing and moving between them changes nothing you already set up.
 
 ## Shell, by example
 
@@ -168,15 +196,26 @@ Each shell's output feeds three views at once: a normalized **log** for the agen
 |---|---|---|
 | [`opencode-cockpit`](packages/opencode) | The bundle: every bay, each switchable | [README](packages/opencode/README.md) |
 | [`@opencode-cockpit/shell`](packages/shell) | Bay 01 — background terminals | [README](packages/shell/README.md) · [docs](https://codestz.github.io/opencode-cockpit/shell/overview/) |
+| [`@opencode-cockpit/status`](packages/status) | Bay 02 — the statusline | [README](packages/status/README.md) · [docs](https://codestz.github.io/opencode-cockpit/status/overview/) |
 | [`@opencode-cockpit/daemon`](packages/daemon) | `cockpitd`, the shared process host | [README](packages/daemon/README.md) |
 | [`@opencode-cockpit/client`](packages/client) | Typed, auto-spawning client | [README](packages/client/README.md) |
 | [`@opencode-cockpit/protocol`](packages/protocol) | Wire contracts and schemas | [README](packages/protocol/README.md) |
 
-## Roadmap
+## What is being worked on
 
-- **Agents** — live subagent tree with a peek overlay.
-- **Doctor** — one command that checks your setup and tells you how to fix it.
-- Shell groups in the sidebar, if the five-row cap ever stops being enough.
+Not a roadmap of promises — the next thing, and why it is next.
+
+**Review — a pull request, in the terminal.** A turn ends and you read the whole diff at once, or
+you read none of it and hope. GitHub solved the reading part years ago: comment on a line, comment
+on a file, mark a file read, suggest the change instead of describing it — and nothing reaches the
+author until you press *submit review*. The same shape fits here, with the review going to the chat
+as one message instead of six interruptions.
+
+OpenCode already exposes what it needs: `session.diff` returns each file's `before` and `after` in
+full, `session.revert` undoes a single message or part, and a plugin can write to the prompt. What
+is missing is the view and the keys.
+
+**Doctor.** One command that checks your setup and says how to fix it.
 
 ## Contributing
 

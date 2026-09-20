@@ -12,7 +12,7 @@ Every `bash` tool invocation is wrapped with OS-level filesystem and network res
 |----------|-----------|
 | **macOS** | `sandbox-exec` (Seatbelt profiles) |
 | **Linux** | `bubblewrap` (namespace isolation) |
-| **Windows** | Not currently supported by OpenCode's command-string hook (commands pass through) |
+| **Windows** | Not currently supported by OpenCode's command-string hook (commands pass through in `permissive` mode and are blocked in `enforce` mode) |
 
 ## Install
 
@@ -104,8 +104,9 @@ $ curl https://registry.npmjs.org
 
 **Filesystem (deny-read)**:
 - `~/.ssh`, `~/.gnupg`
-- `~/.aws/credentials`, `~/.config/gcloud`
-- `~/.npmrc`, `~/.env`
+- `~/.aws/credentials`, `~/.azure`, `~/.config/gcloud`, `~/.config/gh`
+- `~/.kube`, `~/.docker/config.json`
+- `~/.npmrc`, `~/.netrc`, `~/.env`
 
 **Filesystem (allow-read)**:
 - Empty by default
@@ -118,9 +119,9 @@ $ curl https://registry.npmjs.org
 **Network (allow-only)**:
 - `registry.npmjs.org`, `*.npmjs.org`
 - `registry.yarnpkg.com`
-- `pypi.org`, `crates.io`
+- `pypi.org`, `*.pypi.org`, `crates.io`, `*.crates.io`
 - `github.com`, `*.github.com`
-- `gitlab.com`, `*.gitlab.com`
+- `gitlab.com`, `*.gitlab.com`, `bitbucket.org`, `*.bitbucket.org`
 - `api.openai.com`, `api.anthropic.com`
 - `*.googleapis.com`
 
@@ -148,6 +149,7 @@ If `XDG_CONFIG_HOME` is set, it is used instead of `~/.config`.
 ```json
 // ~/.config/opencode-sandbox/config.json
 {
+  "mode": "enforce",
   "filesystem": {
     "denyRead": ["~/.ssh", "~/.aws/credentials"],
     "allowRead": ["~/.ssh/id_ed25519.pub"],
@@ -224,6 +226,18 @@ Example allowing only the SSH public key to be read:
 OPENCODE_SANDBOX_CONFIG='{"filesystem":{"denyRead":["~/.ssh","~/.gnupg","~/.aws/credentials","~/.azure","~/.config/gcloud","~/.config/gh","~/.kube","~/.docker/config.json","~/.npmrc","~/.netrc","~/.env"],"allowRead":["~/.ssh/id_ed25519.pub"]}}' opencode
 ```
 
+### Enforcement mode
+
+The default mode is `permissive`: if the sandbox cannot initialize or wrap a command, the command runs without sandboxing.
+
+Set `mode` to `enforce` to block `bash` commands whenever sandboxing cannot be applied, including on unsupported platforms:
+
+```json
+{
+  "mode": "enforce"
+}
+```
+
 ### Disable
 
 ```bash
@@ -243,7 +257,9 @@ Or in any config file:
 The plugin uses two OpenCode hooks:
 
 1. **`tool.execute.before`** — Intercepts bash commands and wraps them with `SandboxManager.wrapWithSandbox()` before execution
-2. **`tool.execute.after`** — Restores the original command in the UI (hides the bwrap wrapper)
+2. **`tool.execute.after`** — Restores the original command on the tool arguments after execution
+
+It also listens to OpenCode events to restore the original command in persisted tool history and clean up sandbox resources when commands finish or are interrupted.
 
 ```
 Agent → bash tool → [plugin wraps command] → sandboxed execution → [plugin restores UI] → Agent
@@ -255,15 +271,11 @@ Sandbox initialization is deferred until the first `bash` command, so the plugin
 
 ### Windows status
 
-`@anthropic-ai/sandbox-runtime` supports Windows through an argv-and-environment API, while OpenCode currently exposes this plugin's `bash` hook as a command string. Until those interfaces can be connected safely, this plugin leaves Windows commands unsandboxed rather than claiming protection it cannot enforce.
+`@anthropic-ai/sandbox-runtime` supports Windows through an argv-and-environment API, while OpenCode currently exposes this plugin's `bash` hook as a command string. Until those interfaces can be connected safely, the plugin leaves Windows commands unsandboxed in `permissive` mode and blocks `bash` commands in `enforce` mode.
 
-### Fail-open design
+### Failure behavior
 
-If anything goes wrong (sandbox init fails, wrapping fails, platform unsupported), commands run normally without sandbox. The plugin never breaks your workflow.
-
-## Contributing
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, architecture, and guidelines.
+In the default `permissive` mode, commands run normally if sandbox initialization or wrapping fails. In `enforce` mode, the affected `bash` command is blocked instead.
 
 ## Related
 

@@ -6,12 +6,26 @@
 一个运行在 OpenCode TUI 侧边栏的实时面板,让你**亲眼看见**每次对话的 Token 消耗、缓存命中率与响应性能:
 A live sidebar dashboard for the OpenCode TUI that lets you **see** your token consumption, cache hit rate and response performance in real time:
 
+> 🔔 **更新提示（重要）**
+> `0.2.2` 起插件会自动检查 npm 新版本（Toast + 侧边栏 + 一键升级）。
+> 若你装的是 **`≤ 0.2.1`，收不到任何自动提示**，请先手动升级一次：
+> ```sh
+> rm -rf ~/.cache/opencode/packages/opencode-token-board@latest
+> ```
+> 然后重启 OpenCode；或把配置写成 `"opencode-token-board@0.2.2"`。详见 [更新插件](#更新插件)。
+>
+> 🔔 **Update notice (important)**
+> Since `0.2.2` the plugin auto-checks for updates. If you're on **`≤ 0.2.1`** you won't
+> be notified — update once manually via the command above, or pin `"opencode-token-board@0.2.2"`.
+
 - 📊 **实时 Token 统计** — 输入/输出/推理 Token、成本,随对话滚动更新 / Real-time input/output/reasoning tokens & cost
 - ⚡ **缓存命中率** — 上下文缓存命中可视化,帮你判断 prompt 复用效果 / Visual cache-hit rate to gauge prompt reuse
 - 🚀 **性能指标** — TTFT / TPS / 延迟,追踪模型响应速度 / TTFT, TPS and latency tracking
 - 📈 **报告导出** — HTML / JSON / Markdown 一键生成,数据落盘 `~/.opencode/reports/` / One-click HTML/JSON/Markdown reports
 - 💰 **Go 余额查询** — 查询 OpenCode Go 套餐余量 / Check your OpenCode Go plan balance
-- 🖥️ **Windows 桌面权限弹窗** — AI 请求权限时右下角弹窗,可远程批准/拒绝 / Native Windows permission toast with allow/deny buttons
+- 🔔 **版本更新提示** — 启动时检查 npm 新版本，侧边栏 + Toast 提示并可一键升级 / Update check with in-TUI upgrade
+- 🖥️ **桌面权限弹窗（跨平台）** — AI 请求权限时右下角弹窗,可远程批准/拒绝（Windows WinForms / macOS AppleScript / Linux 通知兜底）/ Cross-platform permission toast with allow/deny buttons
+- ⚡ **事件驱动,零轮询** — 权限批准用 `fs.watch`、配置变更用进程内发布订阅、历史消息用事件 + 有界退避重试,不再有常驻定时器 / Event-driven, no polling timers
 - 🧩 **兼容 OpenCode 与 Mimo Code** — 同一插件,双端可用 / Works with both OpenCode and Mimo Code
 
 本项目基于 [opencode-token-watch](https://github.com/Howardzhangdqs/opencode-token-watch) 修改而来,特此鸣谢原项目作者。
@@ -64,10 +78,51 @@ npm install opencode-token-board
 
 ## 配置 OpenCode Go 套餐余量查询
 
+> 新版已不再依赖浏览器 Cookie / Workspace ID。opencode.ai 改版后旧页面
+> （`/workspace/wrk_xxx/go`）与 Cookie 方案已失效，插件改为直接调用与推理 API
+> 同源的用量接口 `GET https://opencode.ai/zen/go/v1/usage`（`Authorization: Bearer <Go API Key>`）。
+
+**默认零配置**：插件会按以下顺序自动解析 Go API Key：
+
+1. `~/.local/share/opencode/auth.json` 中的 `opencode-go`（其次 `opencode`）
+2. `~/.config/opencode/opencode.json[c]` 中 `provider.go.options.apiKey`
+3. 插件内手动配置（`/usage` → **Go 配置** → **设置 Go API Key**）
+
+只要本机已用 OpenCode 登录/配置过 Go，侧边栏会自动显示滚动 / 本周 / 本月用量，无需任何操作。
+
+如自动解析失败（例如使用独立 API Key），可手动填入：
+
 1. 输入 `/usage`，点击 **Go 配置**
-2. 打开用量查询页面 <https://opencode.ai/workspace/wrk_xxx/go>，将 `wrk_xxx` 填入 **Workspace**
-3. 按 `F12` 打开开发者工具 → **应用程序** → **Cookie**，找到 `auth`，复制整段文本填入 **Cookie**
-4. 点击完成后重启 TUI
+2. 选择 **设置 Go API Key**，粘贴 `sk-...` 开头的 Key（留空则恢复自动解析）
+3. 完成后重启 TUI
+
+## 更新插件
+
+opencode **不会自动更新 npm 插件**：它把纯包名解析为 `<name>@latest` 后安装到
+`~/.cache/opencode/packages/<name>@latest/`，但只要该目录里已有 `node_modules/<name>`
+就直接复用、**不再访问 registry**。因此本插件内置了版本检查来主动提示：
+
+- **启动检查**：插件启动约 1.5s 后请求 `https://registry.npmjs.org/opencode-token-board/latest`，
+  每 6 小时最多检查一次（结果缓存于 `api.kv`）。
+- **提示方式**：有新版本时弹出 Toast，并在侧边栏底部常驻一行 `⬆ 新版本 vX · /usage`（可点击）。
+- **一键升级**：`/usage` → **检查更新** → **立即更新**，会调用 `api.plugins.install("<pkg>@<新版本>")`，
+  装到带版本号的新缓存目录并改写配置，重启 TUI 生效。
+- **忽略版本**：可选“忽略此版本”，不再对该版本提示。
+
+> ⚠️ **冷启动说明**：内置提示是 0.2.2 才加入的。因此 **0.2.0 / 0.2.1 的用户收不到任何提示**，
+> 需要手动升级一次到 `0.2.2+`；此后新版本才会自动提示。
+
+手动更新（任一即可）：
+
+```sh
+# 方式 A：清掉缓存目录后重启（会重新解析 @latest）
+rm -rf ~/.cache/opencode/packages/opencode-token-board@latest
+
+# 方式 B：配置里写明确版本，重启后装到新目录
+#   "plugin": ["opencode-token-board@0.2.2"]
+```
+
+本地路径开发模式无需更新机制：`npm run build` 后重启即最新。
 
 ## 数据文件
 
@@ -81,12 +136,53 @@ npm install opencode-token-board
 
 - OpenCode CLI（支持 `opencode db` 命令）
 - Node.js 18+
+- 操作系统：Windows / macOS / Linux
+
+## 跨平台支持
+
+| 能力 | Windows | macOS | Linux |
+|------|---------|-------|-------|
+| 侧边栏面板 / 报告 / Go 用量 | ✅ | ✅ | ✅ |
+| 浏览器打开报告 | ✅ `start` | ✅ `open` | ✅ `xdg-open` |
+| 会话结束桌面提示 | ✅ WinForms | ✅ `osascript display notification` | ✅ `notify-send` |
+| 权限弹窗（可批准/拒绝） | ✅ WinForms 三按钮 | ✅ `osascript display dialog` 三按钮 | ✅ `zenity` 三按钮（缺 zenity 时退化为通知） |
+
+说明：
+
+- **凭据/配置路径全平台一致**：opencode 在三大平台都按 XDG 约定读取
+  `~/.local/share/opencode/auth.json` 与 `~/.config/opencode/opencode.json[c]`
+  （除非显式设置了 `XDG_DATA_HOME` / `XDG_CONFIG_HOME`），插件据此自动发现 Go API Key。
+- **macOS 权限弹窗**：通过 `osascript` 弹出系统对话框，点按后由 AppleScript 写入与
+  Windows 完全相同的批准标记文件（`~/.opencode/tokenwatch-approvals/<id>.<reply>`），
+  因此批准链路无需额外改动。
+- **Linux 权限弹窗**：通过 `zenity --question --switch` + 三个 `--extra-button` 提供三按钮，
+  点按的按钮文案由 stdout 返回、据此写入批准标记；未安装 zenity 时退化为 `notify-send`
+  通知，直接在 TUI 内回复即可。
+
+> 在 Windows 上无法执行 `osascript` / `notify-send`，因此 macOS/Linux 分支通过
+> 「生成脚本字符串 + 断言」的方式做单元校验（`npm run test:popup` 覆盖 AppleScript
+> 生成、转义、按钮顺序与标记路径），并配合 `tsc` 类型检查；真机行为仍需在对应系统上冒烟。
+
+## 性能设计
+
+插件刻意避免常驻轮询与同步阻塞 I/O：
+
+- **权限批准**：`fs.watch` 监听批准目录（仅在有待审批请求时开启），取代旧的 300ms 轮询。
+- **配置变更**：进程内发布订阅（`config-store.ts`），取代旧的 500ms kv 版本轮询。
+- **历史消息加载**：打开会话时立即读一次，为空则按 250/500/1000/2000/3000ms 有界退避重试，
+  并在 `message.updated` / `session.idle` 事件到达时提前结束；取代旧的 200ms×50 轮询。
+- **会话性能统计**：改为异步读 JSONL（`fs/promises` + mtime 缓存），不再在切换会话时同步
+  读取整个日志文件阻塞 UI。
+- **持久化统计**：内存维护单份统计，写入防抖合并（≤800ms 一次），不再每条消息都同步读写整个文件。
+- **渲染节流**：流式期间 `message.part.updated` 高频触发，面板重算节流为最多约 4 次/秒；
+  分位数只在生成报告时计算，侧边栏渲染不再对全量样本排序。
 
 ## 构建
 
 ```sh
 npm install
 npm run build
+npm run test:popup   # 弹窗脚本 + 跨平台脚本生成断言
 ```
 
 ## 插件安装、更新与排障指南（经验文档）
@@ -195,7 +291,7 @@ OpenCode/MiMoCode 的插件 spec 判定逻辑（`Jq()`）只认三种"本地路�
    ```
 3. 检查缓存包是否包含期望的新逻辑（如权限弹窗函数）：
    ```sh
-   grep -c "notifyPermissionWindows" ~/.cache/opencode/packages/opencode-token-board@latest/node_modules/opencode-token-board/dist/tui.js
+   grep -c "macPermissionScript" ~/.cache/opencode/packages/opencode-token-board@latest/node_modules/opencode-token-board/dist/tui.js
    ```
 
 #### 解决方案
@@ -221,10 +317,10 @@ OpenCode/MiMoCode 的插件 spec 判定逻辑（`Jq()`）只认三种"本地路�
 ```
 AI 请求权限 → OpenCode 发出 permission.asked 事件
   → TUI 插件 api.event.on("permission.asked") 捕获
-  → notify.ts 通过 wscript 拉起独立 PowerShell WinForms 弹窗（右下角）
+  → notify.ts 拉起独立桌面弹窗（Windows: wscript+PowerShell WinForms / macOS: osascript display dialog）
   → 用户点击"允许一次/总是允许/拒绝"
-  → 写入 ~/.opencode/tokenwatch-approvals/<requestID>.<reply> 标记文件
-  → 插件轮询目录 → api.client.permission.reply() 放行/拒绝
+  → 弹窗进程写入 ~/.opencode/tokenwatch-approvals/<requestID>.<reply> 标记文件
+  → 插件用 fs.watch 监听该目录（仅在有待审批请求时开启）→ api.client.permission.reply() 放行/拒绝
 ```
 
 #### 1. 事件名：`permission.asked` 是对的
@@ -330,7 +426,7 @@ MiMoCode 的插件加载机制与 OpenCode 完全一致（缓存目录为
 4. 验证缓存版本与内容：
    ```sh
    grep '"version"' ~/.cache/mimocode/packages/opencode-token-board@latest/node_modules/opencode-token-board/package.json
-   grep -c "notifyPermissionWindows" ~/.cache/mimocode/packages/opencode-token-board@latest/node_modules/opencode-token-board/dist/tui.js
+   grep -c "macPermissionScript" ~/.cache/mimocode/packages/opencode-token-board@latest/node_modules/opencode-token-board/dist/tui.js
    ```
 5. 重启 MiMoCode 生效。
 
@@ -355,6 +451,11 @@ MiMoCode 的插件加载机制与 OpenCode 完全一致（缓存目录为
 4. **权限自动 allow 时不会触发弹窗**，测弹窗前先确认权限处于"询问"状态。
 5. **npm 2FA 账号发布**：用带 bypass 2FA 的 granular token + 临时 `.npmrc`，最省事。
 6. **升级版本号用 `npm version x.y.z --no-git-tag-version`**，避免自动提交干扰。
+7. **npm 插件不会自动更新**：加载时把纯包名解析为 `<name>@latest`，但 `Npm.add`
+   先检查缓存目录 `node_modules/<name>` 是否存在，存在就直接复用、**不再访问 registry**。
+   更新需主动处理其一：① 删除 `~/.cache/<agent>/packages/<name>@latest/` 后重启；
+   ② 配置里写明确版本 `opencode-token-board@0.2.1`（目录名变化触发新装）；
+   ③ 改用本地路径（每次启动直读本地 `dist/`，`npm run build` 后重启即最新）。
 
 
 

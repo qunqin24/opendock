@@ -60,8 +60,8 @@ upgrades and works from read-only installs.
 
 ### NixOS / Nix
 
-This repo is a flake. Bun and the native embedding runtime are bundled, so no
-global `npm install` or `bun` on PATH is required.
+This repo is a flake. The package bundles Bun and the native embedding
+runtime, so you need no global `npm install` and no `bun` on PATH.
 
 Try it without installing:
 
@@ -69,23 +69,24 @@ Try it without installing:
 nix run github:sysread/thatch -- --version
 ```
 
-Install system-wide via the NixOS module (in your flake `configuration.nix`):
+Install options:
 
-```nix
-{
-  inputs.thatch.url = "github:sysread/thatch";
+- **NixOS module** (system-wide, all users):
 
-  # in your NixOS system's modules:
-  imports = [ inputs.thatch.nixosModules.default ];
-  programs.thatch.enable = true;   # puts `thatch` on PATH for every user
-}
-```
+  ```nix
+  {
+    inputs.thatch.url = "github:sysread/thatch";
 
-Or add the package yourself with the overlay
-(`nixpkgs.overlays = [ inputs.thatch.overlays.default ];` then
-`environment.systemPackages = [ pkgs.thatch ];`), or drop
-`inputs.thatch.packages.${system}.default` into a `home.packages` /
-`environment.systemPackages` list directly.
+    # in your NixOS system's modules:
+    imports = [ inputs.thatch.nixosModules.default ];
+    programs.thatch.enable = true;   # puts `thatch` on PATH for every user
+  }
+  ```
+
+- **Overlay**: add `nixpkgs.overlays = [ inputs.thatch.overlays.default ];`,
+  then `environment.systemPackages = [ pkgs.thatch ];`
+- **Package directly**: add `inputs.thatch.packages.${system}.default` to a
+  `home.packages` or `environment.systemPackages` list
 
 Once `thatch` is on PATH, wire it into your editor as usual:
 
@@ -94,10 +95,9 @@ cd /path/to/your/project
 thatch setup --claude --global   # or --cursor
 ```
 
-The embedding model still downloads once at first use and is cached in the
-platform's per-user cache dir (the per-platform paths above; override with
-`THATCH_MODEL_CACHE`), so it survives upgrades and works from the read-only
-Nix store.
+The embedding model still downloads once at first use. Its cache lives in the
+per-user cache dir described above, outside the read-only Nix store, so it
+survives upgrades. `THATCH_MODEL_CACHE` overrides the location.
 
 ### Other MCP-compatible harnesses
 
@@ -110,7 +110,7 @@ Nix store.
 ```
 
 Include thatch's instructions in your agent's system prompt manually; see
-[docs/dev/mcp-parity.md](docs/dev/mcp-parity.md) for the prompt text.
+[MCP parity](https://github.com/sysread/thatch/wiki/Mcp-Parity) for the prompt text.
 
 ## What's inside
 
@@ -179,7 +179,7 @@ review, review response, change and feature walkthroughs, memory verification,
 knowledge export, and writing tasks
 (PR descriptions, tickets, PR splitting).
 
-See the [user guide](docs/user/README.md) for the full tool list, CLI
+See the [user guide](https://github.com/sysread/thatch/wiki/Guide%3A-Overview) for the full tool list, CLI
 commands, configuration, environment variables, and detailed setup for each
 host.
 
@@ -230,11 +230,11 @@ embeddings, no network.
 
 ## Docs
 
-- [User guide](docs/user/README.md) -- setup, tools, configuration, CLI
-- [Development](docs/dev/README.md) -- architecture, module responsibilities
-- [MCP parity](docs/dev/mcp-parity.md) -- OpenCode plugin vs MCP feature comparison
-- [QA tests](tests/qa/) -- executable use cases (auto/ and live/ subdirs)
-- [Design docs](docs/plans/) -- design-decision snapshots and in-progress plans
+- [User guide](https://github.com/sysread/thatch/wiki/Guide%3A-Overview) -- setup, tools, configuration, CLI
+- [Development](https://github.com/sysread/thatch/wiki/Developer-Guide) -- architecture, module responsibilities
+- [MCP parity](https://github.com/sysread/thatch/wiki/Mcp-Parity) -- OpenCode plugin vs MCP feature comparison
+- [QA tests](https://github.com/sysread/thatch/tree/main/tests/qa) -- executable use cases (auto/ and live/ subdirs)
+- [Design docs](https://github.com/sysread/thatch/tree/main/docs/plans) -- design-decision snapshots and in-progress plans
 
 ## License
 

@@ -25,11 +25,11 @@ formality, and a formality launders the change through a human name.
 
 ## What you get back
 
-Every mission closes with one file. This is what your reviewer reads:
+Every mission closes with one file your reviewer reads:
 
 ```markdown
 # Mission: invitation-accepted-flow
-2026-09-03 · farid · branch `feature/MKR-412` · lane **full** · mode guided
+2026-09-03 · you · branch `feature/invitation-flow` · lane **full** · mode guided
 
 ## Verdict
 **GO** — all gates passed. 1 finding deferred with an owner.
@@ -62,8 +62,7 @@ Used **8,781** of 12,000 tokens (73%). Lane `lean`. 1 heal cycle.
 
 ### With Mugiwara
 
-One file, attached to the PR: which files changed, which gates passed and where
-their evidence lives, who decided what and why, plus **what was not verified**.
+One file per PR: files changed, gates passed with evidence locations, decisions made, plus **what was not verified**.
 
 ## The process fits the work
 
@@ -92,11 +91,11 @@ Three things it does for you:
 |---|---|
 | **Evidence, not claims** | Every flow stage re-runs checks and shows output. "Done" = proof. |
 | **Process that sizes itself** | A typo costs nothing. An auth migration gets the full pipeline. |
-| **Visible cost** | Per-lane budgets, a live [slop](docs/reference/glossary.md) governor, and a `mugiwara cost` ledger. |
+| **Visible cost** | Per-lane budgets, a live [slop](docs/concepts/cost.md) governor, and a `mugiwara cost` ledger. |
 
 It runs **inline in your chat**.
 
-→ [Why mugiwara vs asking unaided](docs/concepts/comparison.md)
+→ [Why mugiwara vs asking unaided](docs/concepts/features.md#outcome-honesty-including-what-is-missing)
 
 ---
 
@@ -171,14 +170,15 @@ nine stages.
 ### 4. Cost Governor: what is safe to spend
 Per-lane budgets, a **live slop governor** that flags wasted cost and
 attributes it to the crew member that caused it, and a `mugiwara cost` ledger.
+Native names: anti-fluff (terse writing); just-enough (minimal-code ladder, YAGNI-first); anti-slop (waste detection); have-adhd (scannable rendering).
 
 → [Cost model](docs/concepts/cost.md)
 
 ### Adaptive execution
-[Control mode](docs/reference/glossary.md), [execution posture](docs/reference/glossary.md), and [Cost Governor](docs/reference/glossary.md) stay **independent**. The
+[Control mode](docs/concepts/modes.md), [execution posture](docs/concepts/workflow.md), and [Cost Governor](docs/concepts/cost.md) stay **independent**. The
 crew picks the posture from evidence at each flow boundary. Inline is the default.
 
-→ [Adaptive execution](docs/concepts/execution-model.md)
+→ [Adaptive execution](docs/concepts/workflow.md)
 
 ---
 
@@ -210,7 +210,7 @@ Solo by default (`team=off`); the first shared mission flips it on at Flow 0.
 mugiwara status                         # computed per-mission position
 ```
 
-Auto mode runs your **member scope only**: your sub-mission ships, never the other members'.
+Auto mode runs your **member scope only**: your sub-mission ships alone.
 
 → [Multi-actor reference](references/multi-actor.md) · [Adoption guide](docs/reference/adoption-guide.md)
 
@@ -341,11 +341,11 @@ mugiwara reset --keep-logs                    # wipe state, keep lessons
 
 ## Docs
 
-**Start here:** [Getting started](docs/getting-started.md) · [What mugiwara replaces](docs/concepts/comparison.md)
+**Start here:** [Getting started](docs/getting-started.md) · [What mugiwara replaces](docs/concepts/features.md#outcome-honesty-including-what-is-missing)
 
-**Concepts:** [Workflow](docs/concepts/workflow.md) · [Lanes](docs/concepts/lanes.md) · [Modes](docs/concepts/modes.md) · [Execution model](docs/concepts/execution-model.md) · [Git strategy](docs/concepts/git-strategy.md) · [Config](docs/concepts/config.md) · [Cost](docs/concepts/cost.md) · [Audit trail](docs/concepts/audit-trail.md) · [Security](docs/concepts/security.md) · [Provenance](docs/concepts/provenance.md) · [Policy as code](docs/concepts/policy-as-code.md) · [Closure tools](docs/concepts/closure-tools.md) · [Permissions](docs/concepts/permissions.md)
+**Concepts:** [Workflow](docs/concepts/workflow.md) · [Lanes](docs/concepts/lanes.md) · [Modes](docs/concepts/modes.md) · [Git strategy](docs/concepts/git-strategy.md) · [Config](docs/concepts/config.md) · [Cost](docs/concepts/cost.md) · [Audit trail](docs/concepts/audit-trail.md) · [Security](docs/concepts/security.md) · [Provenance](docs/concepts/provenance.md) · [Policy as code](docs/concepts/policy-as-code.md) · [Closure tools](docs/concepts/closure-tools.md) · [Permissions](docs/concepts/permissions.md) · [Memory](docs/concepts/memory.md)
 
-**Crew:** [Agents](docs/concepts/agents.md) · [Skills](docs/concepts/skills.md) · [Adaptive execution](docs/concepts/execution-model.md)
+**Crew:** [Agents](docs/concepts/agents.md) · [Skills](docs/concepts/skills.md) · [Adaptive execution](docs/concepts/workflow.md)
 
 **Reference:** [Adoption guide](docs/reference/adoption-guide.md) · [Glossary](docs/reference/glossary.md) · [Harness matrix](docs/reference/harness-matrix.md) · [Compliance matrix](docs/reference/compliance-matrix.md)
 
@@ -353,16 +353,14 @@ mugiwara reset --keep-logs                    # wipe state, keep lessons
 
 **Runbooks:** [Solo mission](docs/runbooks/solo-mission.md) · [Team mission](docs/runbooks/team-mission.md) · [Joining mid-mission](docs/runbooks/joining-a-mission.md) · [Resume after crash](docs/runbooks/resume-after-crash.md) · [Monorepo](docs/runbooks/monorepo.md) · [Signing](docs/runbooks/signing-and-attestation.md) · [Policy](docs/runbooks/policy-for-a-team.md) · [Troubleshooting](docs/runbooks/troubleshooting.md)
 
-**Troubleshooting:** [Common problems](docs/troubleshooting.md)
-
 ---
 
 ## What is measured, and what is not
 
 | Claim | Status |
 |---|---|
-| Retrieval routing rank-1 | **95.4%**, 221 probes (174 positive, 83 negative), in CI |
-| Reference pointers resolve | **342/342**, 9 targets, in CI |
+| Retrieval routing rank-1 | **95.5%**, 227 probes (174 positive, 83 negative), in CI |
+| Reference pointers resolve | **160/160**, 9 targets, in CI |
 | Index size published vs measured | **doc-gated**: validator fails on drift, in CI |
 | Lane constants match content load | **verified**, in CI |
 | Slop verdicts | in `mugiwara cost` and the closing report: [Cost](docs/concepts/cost.md) |

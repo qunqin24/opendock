@@ -2,7 +2,47 @@
 
 Postgres-backed persistent memory plugin for [OpenCode](https://opencode.ai).
 
-Uses the `memories` table (`content`, `tags`, `session_id`, `project`, `created_at`, `search_vector`, `embedding`, `memory_type`, `access_count`, `last_accessed_at`, `updated_at`) and the `pg_trgm` + `vector` extensions. Injects the memories most relevant to what you're currently asking into the system prompt, captures deliberate "remember that..." prompts verbatim, and exposes `memory_recall` / `memory_remember` / `memory_forget` / `memory_update` tools.
+## What it does
+
+ocpg gives your OpenCode agent memory that survives across sessions and projects. Every memory is a row in one Postgres `memories` table. Three things happen around it:
+
+**1. Memories get in - three ways**
+- The agent calls `memory_remember` when it decides something is worth keeping.
+- You say "remember that…", "don't forget…", or "keep in mind…" in a prompt, and the text after the phrase is stored verbatim. This is a fixed regex, not a model call - deterministic and auditable. Questions ("remember when X broke?") are deliberately skipped.
+- On write, the row is embedded (bge-m3 via Ollama) fire-and-forget, so a slow or dead embedder never delays the write confirmation.
+
+**2. Memories come back - automatically, ranked by relevance to what you just asked.**
+Before every model request, ocpg reads your latest message and runs two searches at once:
+- **Keyword search** - your prompt becomes an OR-of-stemmed-words Postgres full-text query.
+- **Embedding search** - the same prompt is embedded and compared by cosine similarity (pgvector HNSW).
+
+The two ranked lists merge: the vector list's **top 2 rows are reserved unconditionally**, and the rest is filled by reciprocal rank fusion (RRF, k=60). This is why phrasing something differently than you originally stored it still finds the memory - the keyword half alone can't do that. Near-duplicates are collapsed out, the top 5 survive, and they're injected into the system prompt as a `<persistent-project-memory>` block.
+
+If Ollama is unreachable, the vector half is skipped and search silently degrades to keyword-only. If the database is unreachable, injection is skipped entirely. Neither ever blocks or fails a model request - the injection query has a hard 1s deadline.
+
+**3. Duplicates get cleaned up - on demand, never automatically.**
+Writes are never rejected. `memory_consolidate` is the cleanup tool, and you (or the agent) run it when you want. It makes two passes - trigram wording similarity, then embedding meaning similarity - keeps the newest of each duplicate group, and **returns the text of everything it deleted** so nothing is lost silently.
+
+### Scoping: the one concept worth understanding
+
+Every memory has a **type**, and the type decides who can see it:
+
+- `stack_fact` - about your tooling, portable across every project using the same stack ("our Terraform RDS module needs `ignore_changes`"). Visible everywhere.
+- `project_fact` (the default) - true about this specific project/customer only ("customer A's staging DNS is flaky"). Visible **only from its origin project**.
+
+The test when storing something: *would this help in a different customer's repo using the same tools?* Yes → `stack_fact`. No → `project_fact`.
+
+### Using it well
+
+- **Let the agent store things, but say "remember that…" when it matters.** The keyword trigger is a guarantee; the agent's own judgment is not.
+- **Get the type right.** A `project_fact` that should have been a `stack_fact` is invisible in every other project - that's the most common way a useful memory goes missing.
+- **Run `memory_consolidate` occasionally**, not constantly. It's cheap and it shows you what it removed before you lose anything.
+- **Phrase recall queries naturally.** Hybrid search means you don't have to remember your original wording - meaning-based matching covers the gap.
+- **Keep memories self-contained.** "Use jose, not jsonwebtoken, for Edge compatibility" survives out of context; "we decided on the second option" does not.
+
+---
+
+Uses the `memories` table (`content`, `tags`, `session_id`, `project`, `created_at`, `search_vector`, `embedding`, `memory_type`, `access_count`, `last_accessed_at`, `updated_at`) and the `pg_trgm` + `vector` extensions, and exposes `memory_recall` / `memory_remember` / `memory_forget` / `memory_update` / `memory_consolidate` tools.
 
 ## Install
 
@@ -18,7 +58,7 @@ In `opencode.json`:
 
 ## Connecting to the database
 
-Need a Postgres instance? The [`deploy/`](./deploy) directory ships a hardened Docker Compose setup (localhost-only, `memories` schema auto-created on first boot) - see [`deploy/README.md`](./deploy/README.md).
+Need a Postgres instance? The [`deploy/`](./deploy) directory ships a hardened Docker Compose setup (localhost-only, `memories` schema auto-created on first boot, plus an optional Ollama service as the embedding backend) - see [`deploy/README.md`](./deploy/README.md).
 
 Configure the connection via shell environment variables:
 
@@ -42,21 +82,12 @@ export OCPG_SSL="disable"
 | `OCPG_OLLAMA_HOST` | `localhost` |
 | `OCPG_OLLAMA_PORT` | `11434`    |
 | `OCPG_EMBED_MODEL` | `bge-m3`    |
-| `OCPG_JUDGE_MODEL` | `qwen3:4b`  |
+
+`OCPG_PASSWORD` is **env-only** by design - never read from plugin options, and the plugin spawns no processes to fetch it from a secret manager.
 
 `OCPG_SSL` accepts `disable`, `prefer`, `require`, `verify-ca`, or `verify-full` (anything else falls back to `disable`). It defaults to `disable` for the usual localhost setup - **set it to `require` or stricter whenever `OCPG_HOST` is not local**, otherwise the password handshake crosses the network in plaintext.
 
-<!--
-FIXME before merging: the `memories_type_check` CHECK constraint in
-deploy/init/01-init.sh (and mirrored in bench/generate.ts) currently allows
-only ('preference', 'project_fact', 'episodic') - it does NOT include
-'stack_fact'. This README documents stack_fact as a fully working type
-below. Either:
-  (a) ship the migration adding 'stack_fact' to the constraint first, or
-  (b) mark stack_fact as "not yet released" in the table below.
-Whichever it is, the "Tools" section's type list further down must match
-the visibility table exactly - right now they disagree with each other.
--->
+Anything under `"options"` in `opencode.json` is ignored - configuration is env-only.
 
 ## How memory works
 
@@ -64,22 +95,21 @@ Visibility is **type-based**:
 
 | Type           | Visibility                    | What it's for                                  |
 | -------------- | ------------------------------ | ---------------------------------------------- |
-| `preference`   | Global                         | Personal to the operator, not about any codebase |
 | `stack_fact`   | Global                         | True about the tooling/stack itself - portable to any project using the same stack (a Terraform module quirk, a Helm convention) |
 | `project_fact` | Origin project only (default)  | True about this specific project/customer only; pass `global: true` on `memory_recall` to reach across projects |
 | `episodic`     | Reserved, unused                | -                                              |
 
-`memory_forget` / `memory_update` follow the same rule: a foreign project's `project_fact` is off-limits (the call fails and names the owning project); global types (`preference`, `stack_fact`) are maintainable from any project.
+`memory_forget` / `memory_update` follow the same rule: a foreign project's `project_fact` is off-limits (the call fails and names the owning project); the global type (`stack_fact`) is maintainable from any project.
 
 `access_count` and `last_accessed_at` are updated on every `memory_recall` read but nothing currently ranks by them - they're collected as data for possible future use, not consumed by any ranking today. (An access-frequency ranking was tried and reverted: bumping exactly the returned top-5 created a rich-get-richer loop where a few rows pinned the top slot after a handful of runs.)
 
 ## How injection picks memories
 
-By default the block is **relevance-ranked, not recency-ranked**: the user's latest prompt is turned into a full-text query (OR of stemmed words) over every **visible** memory (global types from anywhere, `project_fact` from its origin project), ranked by relevance with a small same-project tiebreak, top 5 injected - each line labeled with its origin project. When nothing matches the prompt, it falls back to the latest visible memories (preferences first, then most recent). Near-duplicate memories (>=80% content similarity) are collapsed out of this block automatically before the top 5 are chosen, so five near-identical restatements of one fact won't crowd out everything else.
+By default the block is **relevance-ranked, not recency-ranked**: the user's latest prompt is turned into a full-text query (OR of stemmed words) over every **visible** memory (global types from anywhere, `project_fact` from its origin project), ranked by relevance with a small same-project tiebreak, top 5 injected - each line labeled with its origin project. When neither search half matches the prompt, it falls back to the latest visible memories, newest first. Near-duplicate memories (>=80% trigram content similarity) are collapsed out of this block automatically before the top 5 are chosen, so five near-identical restatements of one fact won't crowd out everything else. Injected content is truncated to 600 characters per memory.
 
-Set `OCPG_INJECTION=recency` to restore the old blind-last-5 behavior instead: no prompt-matching, just the most recent visible memories (preferences first).
+Set `OCPG_INJECTION=recency` to restore the old blind-last-5 behavior instead: no prompt-matching, just the most recent visible memories.
 
-Retrieval is **hybrid**: the prompt runs through keyword full-text search and, when Ollama is reachable, through embedding search (bge-m3, pgvector HNSW, cosine) - the two ranked lists merge with 2 reserved embedding slots plus reciprocal rank fusion for the rest (bench-verified: R=2 recovers half the real-corpus paraphrase gap at zero synthetic cost), so exact-word hits and said-differently paraphrase hits both surface. The internal benchmark shows hybrid recall never worse than either half alone at 485/5k/50k rows ([`bench/README.md`](./bench/README.md)). Writes are embedded fire-and-forget; rows from before this feature carry no embedding until `bun run backfill` fills them (deploy/README.md).
+Retrieval is **hybrid**: the prompt runs through keyword full-text search and, when Ollama is reachable, through embedding search (bge-m3, pgvector HNSW, cosine) - the two ranked lists merge with 2 reserved embedding slots plus reciprocal rank fusion (k=60) for the rest (bench-verified: R=2 recovers half the real-corpus paraphrase gap at zero synthetic cost), so exact-word hits and said-differently paraphrase hits both surface. The internal benchmark shows hybrid recall never worse than either half alone at 485/5k/50k rows ([`bench/README.md`](./bench/README.md)). Writes are embedded fire-and-forget; rows from before this feature carry no embedding until `bun run backfill` fills them (see [`deploy/README.md`](./deploy/README.md)).
 
 If Ollama is unreachable - or the database predates the embedding column - search silently degrades to keyword-only; nothing breaks. A cold model load is ~2-3s (over the 1s injection deadline), so the plugin warms the model at session start and pins it with `keep_alive`; a warm embed is ~20ms and runs concurrently with the keyword query.
 
@@ -87,10 +117,10 @@ If Ollama is unreachable - or the database predates the embedding column - searc
 
 Five agent tools are registered: `memory_remember` (store), `memory_recall` (search), `memory_forget` (delete by id), `memory_update` (rewrite an existing memory, keeping its original learned date), and `memory_consolidate` (remove near-duplicates on demand). The agent reads their usage rules from the tool schemas - as the user, the things worth knowing are:
 
-- Visibility follows the type (see the table above); `memory_recall` takes `global: true` to also search other projects' `project_fact` memories (global types are always searched regardless of this flag).
-- Duplicate writes are **never rejected** - but with a judge model available they may be **skipped as duplicates** or **merged into the existing memory** (the result always says which). Whatever slips through still lands, the injection block collapses near-dupes, and `memory_consolidate` cleans them up when you ask: it keeps the newest of each >=80%-similar group and reports the removed texts so the agent can merge any unique fact back.
+- Visibility follows the type (see the table above); `memory_recall` takes `global: true` to also search other projects' `project_fact` memories (`stack_fact` is always searched regardless of this flag).
+- Duplicate writes are **never rejected** - `memory_remember` is a plain store. Near-duplicates are collapsed out of the injected block automatically, and `memory_consolidate` cleans them up when you ask.
 
-Writes are capped at 4000 characters of content, 10 tags, and 64 characters per tag; oversized writes are rejected with the actual size rather than silently truncated. Memories carry a `type` (`preference`, `project_fact` default, `stack_fact`, or `episodic` - see the visibility table above); `preference` memories are surfaced first when browsing without a search query.
+Writes are capped at 4000 characters of content, 10 tags, and 64 characters per tag; oversized writes are rejected with the actual size rather than silently truncated. Memories carry a `type` (`stack_fact`, `project_fact` default, or `episodic` - see the visibility table above).
 
 ### Automatic capture
 
@@ -98,17 +128,14 @@ Saying "remember this/that", "remember to ...", "don't forget ...", or "keep in 
 
 This runs alongside the model's own judgment to call `memory_remember` - it doesn't replace it, it's a safety net for the cases where you explicitly signal "this matters" and want it captured regardless of whether the model separately decides to store it.
 
-A third path runs at **session compaction**: when a session's context is summarized, a small judge model reads the transcript and extracts 0-3 durable facts (decisions, root causes, stated preferences, environment facts - never plans, progress, or anything the code already states), each written through the normal write path and tagged `auto`. A trivial session stores nothing, and every judge failure just skips the capture. Compaction itself never waits on this.
-
-### Smart writes (judge model)
-
-Before a `memory_remember` lands, an embedding-similarity prefilter looks for existing memories that might overlap (top 3, cosine >= 0.7 - nothing close means an instant plain insert). On a hit, a small cheap model classifies the write as **new** (insert), **update** (merged into the existing memory, which keeps its learned date), or **duplicate** (skipped). The tool result always says which happened - never a bare success for a write that didn't insert. The judge **never deletes** and never rejects outright: any failure, timeout, or malformed answer falls back to storing normally.
-
-`OCPG_JUDGE_MODEL` picks the judge: a bare name (default `qwen3:4b`) hits the same Ollama as embeddings - pull it alongside bge-m3 (`ollama pull qwen3:4b`); a `provider/model` ref routes through OpenCode's own stack against a model you configured (that spends your provider credits); `"off"` disables smart writes and compaction capture entirely. Without any reachable judge these features silently skip - writes then behave exactly as before.
-
 ### Duplicates
 
-Writes are never rejected for duplicates. Near-duplicates (>=80% content similarity, measured on the real corpus - the old FTS-on-first-60-chars rule missed 28 pairs) are collapsed out of the injected block automatically, and `memory_consolidate` removes them on demand (keeps the newest of each group, reports removed texts for the agent to merge back). Needs the trgm index; fresh installs from [`deploy/`](./deploy) get it automatically, existing databases run the upgrade block in [`deploy/README.md`](./deploy/README.md).
+Writes are never rejected for duplicates - cleanup is `memory_consolidate`'s job, run on demand. It runs two passes and reports which one found each removed group:
+
+- **`[wording]`** - trigram content similarity (>=80%): catches restatements that share most of their wording (the old FTS-on-first-60-chars rule missed 28 such pairs on the real corpus).
+- **`[meaning]`** - embedding cosine similarity (bge-m3, >=0.83): catches the same fact stated in completely different words, which trigram similarity structurally cannot reach. Only memories that have an embedding participate, and templated auto-generated content (background-task status logs, session-compaction summaries, per-app checklist entries) is excluded - real-corpus testing found that boilerplate sentence shapes drive cosine similarity high between genuinely different facts (different task IDs, sessions, apps).
+
+Both passes keep the newest of every group and delete the rest (capped at 25 groups per pass per run), returning the removed texts so the agent can merge back any unique detail with `memory_update`. The meaning pass also refuses to cluster across a project boundary that `memory_forget`/`memory_update` already won't cross. Near-duplicates are also collapsed out of the injected block automatically between consolidations. The wording pass needs the trgm index; fresh installs from [`deploy/`](./deploy) get it automatically, existing databases run the upgrade block in [`deploy/README.md`](./deploy/README.md). The meaning pass needs the `embedding` column populated - rows Ollama never reached simply aren't candidates for it.
 
 If the database is unreachable, memory injection is skipped and the tools return a generic error - a slow or dead database never blocks a model request.
 
@@ -127,6 +154,6 @@ Enable the commit hooks once per clone ([pre-commit](https://pre-commit.com)):
 pre-commit install
 ```
 
-It runs lint and typecheck on commits that touch `.ts` files. `bun test` is left out of the hook because it writes to a real database — CI runs it against a throwaway Postgres service container instead.
+It runs lint and typecheck on commits that touch `.ts` files. `bun test` is left out of the hook because it writes to a real database - CI runs it against a throwaway Postgres service container instead.
 
 There's also a retrieval benchmark (`bench/`) that measures recall/latency of candidate retrieval strategies against synthetic data with known ground truth - see [`bench/README.md`](./bench/README.md) if you're evaluating a ranking or retrieval change.

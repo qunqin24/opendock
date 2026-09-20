@@ -11,59 +11,44 @@ OpenCode sidebar plugin that displays subscription usage for:
 Providers are opt-in. If none are configured, the sidebar shows a short setup
 message and the plugin makes no usage requests.
 
-Install from npm as
-[`opencode-multi-usage`](https://www.npmjs.com/package/opencode-multi-usage):
+Install from npm as [`opencode-multi-usage`](https://www.npmjs.com/package/opencode-multi-usage):
 
 ```sh
-# OpenCode v1
-opencode plugin opencode-multi-usage --global
-
-# OpenCode v2
-opencode2 plugin add opencode-multi-usage
+opencode plugin add opencode-multi-usage --global
 ```
 
 Then enable providers as shown below.
 
 <br clear="both" />
 
-## OpenCode v1
-
-> [!WARNING]
-> Support for OpenCode v1 may be dropped at any moment following the official
-> stable release of OpenCode v2. Prefer the v2 setup for new installs.
-
-Requires OpenCode 1.18.29 or newer. Add the package and options to
-`~/.config/opencode/tui.json`:
+This package provides a terminal sidebar, so add it and its options to the
+global `cli.json`:
 
 ```json
 {
-  "$schema": "https://opencode.ai/tui.json",
-  "plugin": [["opencode-multi-usage", { "providers": ["codex", "opencode-go", "commandcode"] }]]
-}
-```
-
-Restart OpenCode after changing v1 TUI configuration.
-
-## OpenCode v2
-
-Add the package and options to `opencode.jsonc`:
-
-```jsonc
-{
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://opencode.ai/v2/cli.json",
   "plugins": [
     {
       "package": "opencode-multi-usage",
       "options": {
-        "providers": ["codex", "opencode-go", "commandcode"],
-      },
-    },
-  ],
+        "providers": ["codex", "opencode-go", "commandcode"]
+      }
+    }
+  ]
 }
 ```
 
-The package exports both the v2 server entrypoint and its `./tui` CLI
-entrypoint. OpenCode loads the CLI entrypoint automatically.
+When developing locally from this repository, point `package` at the built
+directory instead:
+
+```json
+{
+  "package": "file:///home/me/src/opencode-multi-usage/dist",
+  "options": {
+    "providers": ["codex"]
+  }
+}
+```
 
 ## Options
 
@@ -105,9 +90,17 @@ Checked in this order:
 
 Checked in this order:
 
-1. `COMMANDCODE_API_KEY` or `COMMAND_CODE_API_KEY`.
-2. OpenCode's `auth.json` `commandcode` entry.
+1. `COMMANDCODE_USAGE_API_KEY` (an explicit usage credential).
+2. `COMMANDCODE_API_KEY`, `COMMAND_CODE_API_KEY`, or `CMD_API_KEY`.
 3. `~/.commandcode/auth.json`.
+4. `OPENCODE_AUTH_CONTENT` or OpenCode's `auth.json` `commandcode` entry.
+
+The plugin tries the next credential when CommandCode rejects one for the
+private `/alpha/*` billing API. This matters when `/connect` contains a
+Provider-only Studio key: it can call `/provider/v1/*`, but may not be allowed
+to read subscription usage. Run `cmd auth login` to populate
+`~/.commandcode/auth.json`, or set `COMMANDCODE_USAGE_API_KEY` to explicitly
+choose a usage-capable key. Do not put API keys directly in `cli.json`.
 
 `COMMANDCODE_API_URL` overrides the CommandCode API base URL.
 

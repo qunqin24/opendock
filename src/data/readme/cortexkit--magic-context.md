@@ -428,7 +428,7 @@ Omit `--once` for the built-in one-minute loop, or invoke `--once` from cron/lau
 ---
 ## Contributing
 
-Bug reports and pull requests are welcome. For larger changes, open an issue first to discuss the approach. Run `bun run format` before submitting; CI rejects unformatted code.
+Bug reports and pull requests are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) for the approved-issue and harness-coverage rules before starting.
 
 ---
 
