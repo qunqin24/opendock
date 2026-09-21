@@ -1,8 +1,20 @@
 # opencode-qoder-bridge
 
+[![CI](https://github.com/naoufalelbani/opencode-qoder-bridge/actions/workflows/ci.yml/badge.svg)](https://github.com/naoufalelbani/opencode-qoder-bridge/actions/workflows/ci.yml)
+[![npm version](https://img.shields.io/npm/v/opencode-qoder-bridge?logo=npm)](https://www.npmjs.com/package/opencode-qoder-bridge)
+[![npm downloads](https://img.shields.io/npm/dm/opencode-qoder-bridge?logo=npm)](https://www.npmjs.com/package/opencode-qoder-bridge)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
+[![Node.js](https://img.shields.io/badge/node-%3E%3D22.22.2-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
+
 An [opencode](https://opencode.ai) plugin that bridges **Qoder AI** models into your terminal via the official [`@qoder-ai/qoder-agent-sdk`](https://www.npmjs.com/package/@qoder-ai/qoder-agent-sdk).
 
 A ground-up rewrite focused on reliability, performance, and first-class usage/cost visibility.
+
+![OpenCode Qoder Bridge architecture](./architecture.svg)
+
+OpenCode owns the host tools and user experience; this bridge translates prompts,
+stream events, tool calls, session state, quota, and usage metadata to and from
+the official Qoder SDK.
 
 > [!IMPORTANT]
 > This is an independent community project. It is not affiliated with,
@@ -104,6 +116,18 @@ npm run build
 Then use the `file:///.../dist/index.js` plugin entry shown above. This avoids
 OpenCode loading an older cached copy of the package.
 
+### Authenticated E2E tests
+
+The authenticated E2E test is opt-in because it consumes Qoder quota:
+
+```bash
+QODER_E2E=1 npm run test:e2e
+```
+
+The GitHub Actions `Authenticated Qoder E2E` workflow can be started manually
+after adding a `QODER_PERSONAL_ACCESS_TOKEN` repository secret. Normal pushes
+and pull requests never run this quota-consuming job.
+
 ## Usage
 
 ```bash
@@ -185,8 +209,16 @@ Bridge opencode MCP servers into the SDK by passing provider options:
 Flag names may be written with or without the leading `--`.
 
 `config.mcp` servers are bridged into the SDK's `mcpServers` automatically.
-Chat turns have a 30-minute bridge timeout by default; set `options.timeoutMs`
-to a positive value to use a shorter or longer bounded timeout (up to 24 hours).
+Chat turns have a 30-minute bridge inactivity timeout by default; the watchdog
+resets whenever Qoder emits a stream or tool message, so long active coding
+turns are not killed solely because they cross 30 minutes. Set
+`options.timeoutMs` to a positive value to use a shorter or longer bounded
+inactivity timeout (up to 24 hours).
+The bridge also enforces a two-hour absolute wall-clock limit by default so a
+noisy or non-terminating SDK stream cannot run forever. Set
+`options.maxDurationMs` to change it (up to seven days). These are transport
+safety limits; OpenCode remains responsible for retries, cancellation UX, and
+host session orchestration.
 Control operations such as MCP status and OAuth use the SDK's
 `controlRequestTimeoutMs` (default 60 seconds, bounded to 5 minutes), while
 runtime shutdown uses `closeGraceMs` (default 2 seconds). These options tune
@@ -464,11 +496,12 @@ The plugin registers several built-in OpenCode tools:
 | Qoder runtime unavailable | Authenticate with `qoder login` or set `QODER_PERSONAL_ACCESS_TOKEN`; the bridge uses the SDK's bundled Worker runtime for model discovery and can fall back to an installed CLI automatically |
 | Qoder says it cannot read or edit files | Upgrade to the current bridge, rebuild it if using a checkout, confirm the plugin points at `dist/index.js`, and restart OpenCode. Do not add `Read`, `Write`, `Edit`, or `Bash` to `disallowedTools` unless you intend to block them |
 | `invalid JSON for tool read/write` | Use a current bridge build and restart OpenCode so an old cached plugin is not reused. Recent versions normalize Qoder's streamed empty-input prefix before forwarding the complete tool payload |
+| `Quota: 0/0` or quota is not visible | Qoder reports an exhausted account as `total: 0` with `isQuotaExceeded: true`; use `/qoder_usage` or `qoder-usage` to see the explicit exhausted state and upgrade link. This is an account quota condition, not a stream/parser error |
 | Edits work but the response is not in a code box | Tool execution and response formatting are separate. Ask for fenced Markdown in the response and use the repository's formatter for written files |
 | Model not found | Run `opencode models qoder` or `/qoder_models`; model IDs are account- and scene-specific |
 | Missing models in the model list | Restart OpenCode; the bridge performs a live catalog lookup automatically and falls back to the last scoped catalog plus the built-ins (`lite`, `auto`, `performance`) when offline. If your account serves models in a different Qoder scene, set `QODER_SCENE` before launching OpenCode |
 
-The SDK package currently used by this bridge (`1.0.44` or newer) bundles its
+The SDK package currently used by this bridge (`1.0.45` or newer) bundles its
 own qodercli runtime. If the bridge discovers a
 separately installed qodercli first, update that CLI through its normal Qoder
 CLI installer too so the MCP OAuth and oversized-image compaction fixes are

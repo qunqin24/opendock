@@ -49,9 +49,10 @@ npm run build
 | `timeoutAction` | `"background"` \| `"kill"` | `"background"` | What happens on foreground timeout |
 | `name` | string | first token of `command` | tmux window name (display only) |
 
-- Foreground: output streams to the TUI live (via `ctx.metadata`), exactly like native bash. On completion the exit code and tail output are returned; truncation follows the native format (`...output truncated...\n\nFull output saved to: <path>`).
+- Foreground: output streams to the TUI live (via `ctx.metadata`), exactly like native bash. On completion the exit code and output are returned. When the output exceeds `maxOutputBytes` the middle is elided and both ends are kept, followed by a footer with the shown/total size and the full-output path: `[truncated: showing first/last 1.9 KB of 23.8 KB - full output at: <path>]`.
 - On `timeoutAction: "background"`: returns with the window id and output-file path when the timeout is reached. When the command finishes, a completion message is delivered to the session and a new turn is triggered.
 - On `background: true`: waits up to `backgroundInitialWaitMs` for fast commands. If the command finishes, the result says `already finished` and includes its output; otherwise it returns with the window id and output-file path and notifies the session on completion.
+- Commands that produce no output report `(empty output)`.
 - On `timeoutAction: "kill"`: matches native behaviour (kill + timeout error).
 - Abort (`ctx.abort`) kills the window.
 
@@ -63,11 +64,12 @@ Inspect/control background tmux windows for the current session.
 |---|---|---|
 | `list` | — | list this session's background windows |
 | `peek` | `window` | tail of a window's output |
-| `raw` | `window` *or* `path` | unfiltered output (path must be inside the output dir) |
 | `kill` | `window` | kill a window |
 | `wait` | `window` | block until the window completes |
 
 `window` accepts a tmux window id like `@123` or a stable job id like `a1b2c3d4`. Job ids are preferred: tmux window ids are recycled once the server restarts, while job ids are unique per run and are included in every background notice and notification. All windows are scoped to the current opencode session.
+
+The full output file path is printed in truncated results and in every background notice — read it directly (with the normal file-read tool) when you need the untruncated output.
 
 ### Interactive workflows
 
@@ -78,11 +80,11 @@ mkfifo /tmp/repl.in
 tail -f /tmp/repl.in | your-interactive-program
 ```
 
-Run that in the background (`background: true` or let it time out to background), write to `/tmp/repl.in` with another `bash` call, and inspect output via `bg_jobs peek`/`raw`. For long-running sessions use `timeoutAction: "background"`.
+Run that in the background (`background: true` or let it time out to background), write to `/tmp/repl.in` with another `bash` call, and inspect output via `bg_jobs peek`. For long-running sessions use `timeoutAction: "background"`.
 
 ## Completion notification
 
-When a backgrounded command finishes, the plugin sends a message to its session via the opencode client and triggers a new turn — you don't need to poll. The message contains the exit code, the command, and the output tail.
+When a backgrounded command finishes, the plugin sends a message to its session via the opencode client and triggers a new turn — you don't need to poll. The message contains the exit code, the command, and the output (with both ends kept when truncated).
 
 A pending window that disappears **without** writing its exit-code file (killed externally, pane crash, tmux server restart) is also reported, as *"ended without recording an exit code"*, together with whatever output was captured up to that point.
 
@@ -107,7 +109,7 @@ All options are optional. Passed as the plugin's options object:
     "backgroundInitialWaitMs": 5000,
     "bashToolName": "bash",
     "bgJobsToolName": "bg_jobs",
-    "tmuxEnabledActions": ["list", "peek", "raw", "kill", "wait"],
+    "tmuxEnabledActions": ["list", "peek", "kill", "wait"],
     "bashContextLines": 50,
     "maxOutputBytes": 512000,
     "autoCloseWindowsOnCompletion": true,
@@ -130,8 +132,8 @@ All options are optional. Passed as the plugin's options object:
 | `bashToolName` | `"bash"` | override the registered tool name |
 | `bgJobsToolName` | `"bg_jobs"` | override the registered tool name |
 | `tmuxEnabledActions` | all five | restrict the `bg_jobs` actions |
-| `bashContextLines` | `50` | tail lines kept in live/background completion output |
-| `maxOutputBytes` | `512000` | tail byte cap before truncation |
+| `bashContextLines` | `50` | tail lines kept in live output and non-truncated messages |
+| `maxOutputBytes` | `512000` | byte budget for tool-result output; beyond it the middle is elided and both ends kept |
 | `autoCloseWindowsOnCompletion` | `true` | close the tmux window after a successful background finish |
 | `preserveOutputFiles` | `true` | keep run dir on dispose |
 | `allowNonGitDirectories` | `true` | operate outside git repos (uses the cwd) |

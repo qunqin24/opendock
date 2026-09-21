@@ -12,7 +12,7 @@ When an AI coding agent works on a task in your repository, it needs to write fi
 
 ## The Solution
 
-This plugin uses opencode's `tool.execute.before` hook to **transparently rewrite file paths** at the tool layer. When a session is bound to a worktree, every `write`/`edit`/`read`/`glob`/`grep`/`bash` call is automatically routed to the worktree directory. The agent doesn't need to remember anything — the plugin handles it.
+This plugin uses opencode's tool-execution interception to **transparently rewrite file paths** at the tool layer. When a session is bound to a worktree, every `write`/`edit`/`read`/`glob`/`grep`/`bash` call (named `shell` in opencode v2) is automatically routed to the worktree directory. The agent doesn't need to remember anything — the plugin handles it.
 
 ### Dual-Layer Defense
 
@@ -26,42 +26,38 @@ This combines the best of both worlds: the agent's primary behavior is correct (
 
 ### Requirements
 
-- [opencode](https://opencode.ai) v1.18+
+- opencode v1.18.29+ or opencode v2 (both are supported from a single package)
 - git 2.5+
 - Node.js 20+ or Bun
 
+> opencode v1 hosts older than 1.18.29 only support function-shaped plugin exports; stay on plugin version 0.4.x if you cannot upgrade the host.
+
 ### Setup
 
-**Option A: Git URL (recommended — auto-installs on opencode startup)**
+**opencode v2 (recommended)**
 
-Add the plugin to your `opencode.json` (project-level or global `~/.config/opencode/opencode.json`):
+Add the plugin to the `plugins` array in your `opencode.json(c)` (project-level or global `~/.config/opencode/opencode.json`):
+
+```jsonc
+{
+    "$schema": "https://opencode.ai/config.json",
+    "plugins": [
+        "opencode-worktree-isolation"
+    ]
+}
+```
+
+Local development checkouts must be referenced by their **root directory** (the repo ships a root `index.js` that re-exports the compiled entry): `"plugins": ["../opencode-worktree-isolation"]`. OpenCode v2 resolves a directory entry to `<dir>/server.*` or `<dir>/index.*` and does not read package.json `main`, so pointing at `dist/index.js` directly is rejected. Files placed under `.opencode/plugins/` are discovered automatically under the same rule.
+
+**opencode v1**
+
+Use the legacy singular `plugin` field:
 
 ```json
 {
     "$schema": "https://opencode.ai/config.json",
     "plugin": [
         "opencode-worktree-isolation@git+https://github.com/earneet/opencode-worktree-isolation.git"
-    ]
-}
-```
-
-opencode automatically clones the repo and installs dependencies on startup. No manual steps needed.
-
-**Option B: Local clone**
-
-```bash
-git clone https://github.com/earneet/opencode-worktree-isolation.git
-cd opencode-worktree-isolation
-npm install
-```
-
-Then register with an absolute path:
-
-```json
-{
-    "$schema": "https://opencode.ai/config.json",
-    "plugin": [
-        "/absolute/path/to/opencode-worktree-isolation/dist/index.js"
     ]
 }
 ```
@@ -80,7 +76,7 @@ This creates a git worktree, binds the current session to it, and from this poin
 
 ### Work normally
 
-After `worktree_prepare`, just use file tools as usual. Writes, edits, reads, globs, greps, and bash commands all land in the worktree automatically. The agent knows it's in the worktree (via system prompt) and generates correct paths.
+After `worktree_prepare`, just use file tools as usual. Writes, edits, reads, globs, greps, and bash/shell commands all land in the worktree automatically. The agent knows it's in the worktree (via system prompt) and generates correct paths.
 
 ### Merge your work
 
@@ -185,7 +181,7 @@ Enable strict modes when you want to enforce worktree discipline:
 
 **`strictWrites=true`** — Write/Edit tools targeting the main checkout without a binding throw an error. The agent must call `worktree_prepare` first, or the path must match `mainWriteWhitelist`, or a temporary `worktree_allow` entry must cover it. Read is never blocked.
 
-**`strictGitOps=true`** — The bash hook recognizes (via regex) `git push`, `git merge`, `git rebase`, `git pull`, `git checkout`, `git switch`, `git branch -d/-D` and blocks operations on protected branches. `master` and `main` are always treated as protected (hardcoded safety net), plus any branches in `protectedBranches`.
+**`strictGitOps=true`** — The bash/shell hook recognizes (via regex) `git push`, `git merge`, `git rebase`, `git pull`, `git checkout`, `git switch`, `git branch -d/-D` and blocks operations on protected branches. `master` and `main` are always treated as protected (hardcoded safety net), plus any branches in `protectedBranches`.
 
 > ⚠️ **Known limitation**: only commands starting directly with `git` are recognized. Compound commands like `cd x && git merge` bypass the check. This matches zcode-worktree-guard's behavior and is documented as "raising the bar" rather than absolute defense.
 
@@ -197,14 +193,15 @@ When a session is bound to a worktree (path `W`, repo root `R`):
 
 | Tool | Behavior |
 |------|----------|
-| `write` / `edit` / `read` | Absolute paths under `R` are rewritten to `W`. Paths under `R/.git` are blocked. |
+| `write` / `edit` / `read` | Absolute paths under `R` are rewritten to `W`. Paths under `R/.git` are blocked. v1 tools carry the target in `filePath`; v2 tools use `path` — both are handled. |
 | `glob` / `grep` | Missing `path` is set to `W`. Paths under `R` are rewritten to `W`. |
-| `bash` | Missing `workdir` is set to `W`. Repo-root paths in the command string are replaced with `W`. |
-| `task` (subagents) | Subagent sessions inherit the binding via parent-chain traversal. |
+| `bash` (v1) / `shell` (v2) | Missing `workdir` is set to `W`. Repo-root paths in the command string are replaced with `W`. |
+| `patch` (v2 only) | Denied while a worktree is bound (multi-file patchText cannot be rewritten safely); use `edit`/`write` instead. Also denied without a binding in `strictWrites` mode. |
+| `task` / `subagent` | Subagent sessions inherit the binding via parent-chain traversal. |
 
 ### Subagent Inheritance
 
-When a bound session spawns subagents via `task()`, the subagent's session automatically inherits the worktree binding. This is done via lazy parent-chain traversal: on the subagent's first tool call, the plugin walks the `parentID` chain to find an ancestor with a binding, then copies that binding to the subagent.
+When a bound session spawns subagents via `task()` (v1) or `subagent()` (v2), the subagent's session automatically inherits the worktree binding. This is done via lazy parent-chain traversal: on the subagent's first tool call, the plugin walks the `parentID` chain to find an ancestor with a binding, then copies that binding to the subagent.
 
 Inherited bindings have a full lifecycle (they never become zombies, issue #7):
 
@@ -221,8 +218,13 @@ Inherited bindings have a full lifecycle (they never become zombies, issue #7):
 
 ## Limitations
 
-- **No TUI indicator**: opencode 1.18's plugin API doesn't support dynamic session title/metadata updates, so the worktree branch isn't visible in the status bar. The agent's responses will mention the worktree context.
-- **One worktree per session, many sessions per repo**: A single session can be bound to one worktree at a time, but multiple sessions can run in parallel against different worktrees of the same repo. The plugin guards against dangling references: cleanup/merge refuse to delete a worktree that's still bound by another *independent* session. Inherited sub-agent bindings (created automatically via `task()`) never block the owner's merge/cleanup — they are released with the worktree. Removing a worktree while a background sub-agent is still running will drop that sub-agent back to the main checkout on its next tool call, so collect background task results before merging.
+- **v2 tool calls are anchored to the plugin's location directory**: in v1, each tool invocation uses the per-call working directory from the tool context; v2's tool context has no directory, so all calls resolve against the directory the plugin was loaded for. For the normal one-project-per-checkout setup these are identical.
+- **v2 session titles only**: `worktree_prepare` renames the session via `ctx.session.update`; the branch/path metadata that v1 attached to the session has no v2 equivalent.
+- **No TUI indicator**: the v1 plugin API doesn't support dynamic session title/metadata updates, so the worktree branch isn't visible in the v1 status bar. The agent's responses will mention the worktree context.
+- **`patch` tool (v2) is blocked, not rewritten**: v2 exposes a multi-file `patch` tool for some models; because its patchText embeds repo-relative paths, it is denied while a worktree is bound rather than silently mis-targeted. Use `edit`/`write` (which are rewritten transparently).
+- **Code Mode `execute` (v2) not yet verified**: whether nested tool calls issued from Code Mode trigger the interception hook has not been confirmed against a live v2 host; if they don't, file edits made through `execute` bypass the rewrite. Verify in your environment before relying on isolation for Code Mode workflows.
+- **One worktree per session, many sessions per repo**: A single session can be bound to one worktree at a time, but multiple sessions can run in parallel against different worktrees of the same repo. The plugin guards against dangling references: cleanup/merge refuse to delete a worktree that's still bound by another *independent* session. Inherited sub-agent bindings (created automatically via `task()`/`subagent`) never block the owner's merge/cleanup — they are released with the worktree. Forked sessions (v2) also carry a parent ID and inherit bindings, which is usually the desired behavior. Removing a worktree while a background sub-agent is still running will drop that sub-agent back to the main checkout on its next tool call, so collect background task results before merging.
+- **v2 has a native worktree subsystem**: opencode v2 ships built-in worktree management (`worktree.directory` config, `/worktree` flows). This plugin's value on v2 is the tool-layer path-drift interception, strict modes, allowlist, and audit trail — the creation/merge convenience tools overlap with the native feature set. Use both together or rely on the plugin alone, as you prefer.
 - **Bash path replacement is string-based**: Complex command strings with unusual path formats (8.3 short names, mixed separators) may not be fully rewritten. The plugin blocks commands where residual repo-root paths are detected after replacement.
 - **`strictGitOps` is regex-based**: Only commands starting directly with `git` are recognized. Compound commands like `cd x && git merge` bypass the check. This is documented as "raising the bar" rather than absolute defense (matches zcode-worktree-guard's behavior).
 - **`git-common` state location**: Requires `git rev-parse --git-common-dir` to succeed. Bare repos and unusual worktree configurations may fail; fall back to `"external"` if so.
@@ -237,8 +239,8 @@ npm install
 npm test
 ```
 
-- **Unit tests** (`test/unit.test.js`): path normalization/containment/rewriting, branch-name validation (option/path-traversal injection), slugify, and the `applyInterception` logic for every intercepted tool (write/edit/read/glob/grep/bash), including `.git` blocking and bash repo-root replacement.
-- **Integration tests** (`test/lifecycle.test.js`): full lifecycle against a real temporary git repo — prepare → interception → merge preview/apply → cleanup — with state and worktree directories isolated via `OC_WT_STATE_DIR` / `OC_WT_ROOT` env vars.
+- **Unit tests** (`test/unit.test.js`): path normalization/containment/rewriting, branch-name validation (option/path-traversal injection), slugify, and the `applyInterception` logic for every intercepted tool (write/edit/read/glob/grep/bash/shell/patch), including `.git` blocking, the v1 `filePath` / v2 `path` field duality, and bash repo-root replacement.
+- **Integration tests** (`test/lifecycle.test.js`): full lifecycle against a real temporary git repo — prepare → interception → merge preview/apply → cleanup — with state and worktree directories isolated via `OC_WT_STATE_DIR` / `OC_WT_ROOT` env vars. The complete lifecycle runs twice, once through the v1 entry (`.server()` with v1 hook shapes) and once through the v2 entry (`.setup()` with a mocked v2 plugin context), plus dedicated tests for v2-specific behavior (session title updates, event location filtering, subscription cleanup).
 
 ## TypeScript
 

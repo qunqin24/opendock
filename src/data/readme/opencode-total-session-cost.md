@@ -52,6 +52,10 @@ openai/gpt-5:              $0.14
 Total:                     $0.54
 ```
 
+Cost that cannot be tied to a model (for example spend recorded in the session
+total without a matching step or message) is reported as `unknown/unknown`
+instead of being guessed onto the currently selected model.
+
 ## Session list costs
 Run `/sessions_cost` (or `/session_costs`) to open a centered, read-only dialog with
 the sessions of the last 7 days grouped by day. Each day header shows the total of its

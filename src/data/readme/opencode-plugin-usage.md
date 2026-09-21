@@ -25,17 +25,29 @@ red `100%`. Credit balances show in green while the account is usable, red when 
 
 ## Requirements
 
-- OpenCode `>= 1.18.0`
+- OpenCode `>= 2.0.0` (V2 plugin API)
 
 ## Install
 
-From npm:
-
 ```sh
-opencode plugin opencode-plugin-usage --global --force
+opencode plugin add opencode-plugin-usage
 ```
 
-That's it — keys are picked up automatically (see [API keys](#api-keys)).
+That installs the TUI plugin and registers it in `~/.config/opencode/cli.json`.
+Keys are picked up automatically (see [API keys](#api-keys)).
+
+Any options go in the `cli.json` entry:
+
+```jsonc
+{
+  "plugins": [
+    {
+      "package": "opencode-plugin-usage",
+      "options": { "providers": { "opencode-go": { "enabled": true } } }
+    }
+  ]
+}
+```
 
 ### Local development
 
@@ -43,36 +55,41 @@ That's it — keys are picked up automatically (see [API keys](#api-keys)).
 git clone https://github.com/lhw/opencode-plugin-usage
 cd opencode-plugin-usage
 npm install
-npm run dev:install   # builds dist/tui.js and copies it into ~/.config/opencode/usage-limits/
+npm run typecheck    # tsc --noEmit
+npm test             # parser self-checks (node, no deps)
+npm run build        # esbuild → dist/tui.js
 ```
 
-Then register it in `~/.config/opencode/tui.json` and restart OpenCode:
+OpenCode loads CLI plugins as packages from `cli.json`, so to try a local build
+publish a prerelease (or serve `npm pack` output from a local registry) and run
+`opencode plugin add opencode-plugin-usage`.
 
-```jsonc
-{
-  "$schema": "https://opencode.ai/tui.json",
-  "plugin": [["./usage-limits/tui.js", { "providers": { "opencode-go": { "enabled": true } } }]]
-}
-```
-
-> The plugin must NOT live in the auto-discovered `~/.config/opencode/plugins/`
-> directory — that is scanned for **server** plugins, and opencode rejects this
-> TUI-only module there. TUI plugins are only loaded via `tui.json`.
+> The plugin must NOT live in `~/.config/opencode/plugins/` — that directory is
+> scanned for **server** plugins, and opencode rejects this TUI-only module
+> there. TUI plugins are loaded from `cli.json`.
 
 ## Configuration
 
-All options are optional. Plugin entry in `tui.json`:
+All options are optional. They go in the `options` object of the plugin's
+`cli.json` entry:
 
 ```jsonc
 {
-  "refreshMs": 300000,       // how often to re-fetch usage (ms)
-  "minRefreshMs": 30000,     // minimum interval between extra refreshes (ms)
-  "timeoutMs": 10000,        // per-request timeout (ms)
-  "default": "opencode-go",  // provider shown when the active provider has no usage source
-  "providers": {
-    "opencode-go": { "enabled": true },              // apiKey is optional, see below
-    "deepseek": { "enabled": true, "apiKey": "sk-…" }
-  }
+  "plugins": [
+    {
+      "package": "opencode-plugin-usage",
+      "options": {
+        "refreshMs": 300000,       // how often to re-fetch usage (ms)
+        "minRefreshMs": 30000,     // minimum interval between extra refreshes (ms)
+        "timeoutMs": 10000,        // per-request timeout (ms)
+        "default": "opencode-go",  // provider shown when the active provider has no usage source
+        "providers": {
+          "opencode-go": { "enabled": true },              // apiKey is optional, see below
+          "deepseek": { "enabled": true, "apiKey": "sk-…" }
+        }
+      }
+    }
+  ]
 }
 ```
 
@@ -119,13 +136,14 @@ in `src/tui.ts`.
 
 ## How it works
 
-- Renders into the `sidebar_content` slot (order `60`) via `@opentui/solid`.
-- Detects the active provider from the last assistant message's `providerID`,
-  falling back to the configured default model's provider.
-- Refreshes before you query: on startup, on new session, when a query goes
-  `busy`, on active-provider change, on `session.idle`, and every `refreshMs`.
-  Extra triggers are throttled to at most one fetch per `minRefreshMs`, so
-  balance/usage is fresh without hammering the APIs.
+- A `Plugin.define` TUI plugin (`@opencode/plugin/tui`) that renders into the
+  `sidebar.content` slot via `@opentui/solid`.
+- Detects the active provider from the last assistant message's
+  `model.providerID`, falling back to opencode's configured default model.
+- Refreshes before you query: on startup, on new session, when a session goes
+  `busy`, on `session.idle`, and every `refreshMs`. Extra triggers are throttled
+  to at most one fetch per `minRefreshMs`, so balance/usage stays fresh without
+  hammering the APIs.
 - Self-heals if data is missing (e.g. after loading an existing session): a
   signal-driven repaint + a 5-second check re-fetch until data is shown.
 
@@ -135,7 +153,6 @@ in `src/tui.ts`.
 npm run typecheck    # tsc --noEmit
 npm test             # parser self-checks (node, no deps)
 npm run build        # esbuild → dist/tui.js
-npm run dev:install  # build + install into ~/.config/opencode/usage-limits/
 npm publish          # runs typecheck + build + test first
 ```
 

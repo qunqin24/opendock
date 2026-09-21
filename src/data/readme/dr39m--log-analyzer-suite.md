@@ -1,5 +1,7 @@
 # Log Analyzer Suite
 
+статья про эти скилы - https://t.me/agentic_madness/5
+
 [English version](README.en.md)
 
 Монорепозиторий инструментов для анализа логов с использованием AI. Самое актуальное и наиболее протестированное направление — [log-analyzer-skill](log-analyzer-skill/), содержащее best practices и поддерживаемое в двух форматах (standalone и opencode plugin). Также включает экспериментальные и исторические версии.

@@ -1,4 +1,4 @@
-# Feature Books (Codex + Claude Code + OpenCode plugin)
+# Feature Books (Antigravity + Codex + Claude Code + OpenCode plugin)
 
 A knowledge graph of business logic and each feature's code "fence", stored as an Obsidian vault
 in every project at `.feature-books/`. It lets the AI read the relevant context before editing
@@ -8,7 +8,7 @@ code and warns about the blast radius to reduce regression bugs.
 because every script resolves the vault from the current working directory (cwd) upward — not from
 where the plugin is installed.
 
-**Language:** feature book content defaults to **English**, configurable per project. Ask Codex to
+**Language:** feature book content defaults to **English**, configurable per project. Ask Antigravity or Codex to
 set the Feature Books language, use `/fb-config set <language>` in Claude Code, or call the
 `fb-config` tool in OpenCode. The setting lives in `.feature-books/.fbconfig.json`, applies from the
 next run onward, and does not retranslate existing books.
@@ -16,14 +16,15 @@ next run onward, and does not retranslate existing books.
 ## What you get
 
 - **Skill** `feature-books` — teaches the AI to load a feature book 1 hop before editing, respect the fence, and update the Change Log
+- **Rules** (`rules/AGENTS.md`) — automatically loaded in Antigravity to ensure the agent consults Feature Books before code changes and reconciles them afterward
 - **Workflows**: initialize, fix, version, create, impact, sync, configure, learn from PR reviews,
-  claim, task, and triage — invoke `$feature-books` or ask naturally in Codex, use `/<command>` in
+  claim, task, and triage — invoke `$feature-books` or ask naturally in Antigravity or Codex, use `/<command>` in
   Claude Code, or `use <tool>` in OpenCode
 - **Hooks** (all plain deterministic scripts — no AI/LLM call in any of them):
-  - `SessionStart` — `fb-version-check` compares the vault's stamped version against the installed plugin, every time work starts in a repo
-  - `PreToolUse` on Edit/Write/MultiEdit — `fence-check` warns when about to edit a file outside a feature's fence
-  - `PostToolUse` on Edit/Write/MultiEdit — `fb-staleness-check` reports which feature's fence (or which tasks/ stage) the just-edited file belongs to, so keeping Feature Books current after an edit doesn't rely on the model remembering to check
-  - `Stop` (Codex + Claude Code) — `fb-autobook` continues the turn if changed code isn't reflected in its owning Feature Book (stale Change Log or a new, unclaimed feature); loop-guarded, disable with `FB_AUTOBOOK=0`
+  - `SessionStart` (Claude/Codex) / `PreInvocation` (Antigravity) — `fb-version-check` compares the vault's stamped version against the installed plugin, and `fb-autobook --snapshot` snapshots clean files
+  - `PreToolUse` on Edit/Write/MultiEdit (Claude) or replace_file_content/write_to_file (Antigravity) — `fence-check` warns when about to edit a file outside a feature's fence
+  - `PostToolUse` — `fb-staleness-check` reports which feature's fence the just-edited file belongs to, so keeping Feature Books current after an edit doesn't rely on the model remembering to check
+  - `Stop` (Antigravity, Claude Code, and Codex) — `fb-autobook` continues the turn if changed code isn't reflected in its owning Feature Book (stale Change Log or a new, unclaimed feature); loop-guarded, disable with `FB_AUTOBOOK=0`
 - **Scripts**: `graph-lint`, `diff-impact`, `fence-check`, `fb-init`, `fb-fix`, `fb-new`,
   `fb-learn-pr`, `fb-claim`, `fb-autobook`, `fb-version-check`, `fb-staleness-check`,
   `fb-tasks-list`, `fb-tasks-lint` (Node ≥ 16, no dependencies)

@@ -49,6 +49,7 @@ TeamMode's answer to each:
 | 🕳️ **Silent side effects** | R6/R2 approval gate: env-var reads and dangerous ops route through OpenCode's official confirmation dialog, auto-rejected after 1 unanswered minute (default). The plugin never approves on its own — it only ever rejects. |
 | 🌫️ **Hallucinated research** | Web access is a two-role grant with an allowlisted, governed tool chain. A fact that couldn't be fetched is reported as a gap — never fabricated. |
 | 🧭 **Walls of text** | Replies are steered into the shape the host renders fastest: a markdown table for per-file / per-case / per-finding results, fenced code for diffs and configs, a browser screenshot attached as an inline image only when you ask for one. The host does not draw mermaid, so no agent pretends it does. |
+| 🎯 **Goal drift** | The lead opens with `GOAL:` in your own words plus checkable `ACCEPTANCE:` criteria, and the run does not end while a criterion lacks evidence — the only legitimate stops are named (blocked on you, or provably unachievable). When a round settles with items still open on the host's todo list, `tm_join` says 目标未达成 and lists them, and the goal is carried through context compaction so a summarized transcript cannot redefine it. |
 
 And the workflow discipline underneath: deterministic routing, a ≤30-line plan
 you approve before ≥2 dispatches execute, structured `STATUS/CHANGES/FINDINGS/
@@ -219,15 +220,46 @@ through with `tm_fetch` when it genuinely needs the payload.
 | `tm_ptc_run` | Batch orchestration: one program, N governed calls, zero LLM round-trips; web roles also get `tm.search` / `tm.webfetch` inside the program | all six agents |
 | `tm_search` | Multi-engine web search with extracted, deduplicated, RRF-fused hit lists | Lead + Researcher |
 | `tm_webfetch` | Single governed GET of an allowlisted page (search pages auto-extracted) | Lead + Researcher |
-| `tm_dispatch` / `tm_join` | **Async sub-agent dispatch**: `tm_dispatch` starts a specialist in its own child session and returns the id immediately (the built-in `task` tool blocks you until it finishes), `tm_join` collects — status snapshot, bounded `waitMs`, `cancel:true` to abort a runaway child; collected replies ride the offload pipeline, so five fat reports arrive as handles + previews instead of multiplying your context. Lead-only, and a child never dispatches | Lead only |
+| `tm_dispatch` / `tm_join` | **Async sub-agent dispatch**: `tm_dispatch` starts a specialist in its own child session and returns the id immediately (the built-in `task` tool blocks you until it finishes), `tm_join` collects — status snapshot, bounded `waitMs`, `cancel:true` to abort a runaway child; collected replies ride the offload pipeline, so five fat reports arrive as handles + previews instead of multiplying your context. Lead-only, and a child never dispatches. Each child is a real session the user can open from the session tree (titled `<description> (@<agent> subagent ·tm)`) and one toast names it — because the tool card itself is not expandable | Lead only |
 | `tm_pty` | **Non-blocking command execution** on the host's own terminal sessions (`start`/`status`/`list`/`kill`) — independent builds and test suites overlap instead of queueing behind one 120 s bash call. Captures no output (the command tees its own log; read it with `tm_read`), and every start passes the R6 classifier, the R2 danger-face globs **and** the official confirmation dialog before a process exists | Lead only |
-| `tm_stats` | **The plugin reads its own trajectory back**: tokens kept out of the context window by offloading (net of the preview that arrived), seconds saved by dispatch overlap (serial cost minus the wall window the children actually used), PTC internals, governance counts (blocked subresources, refused `tm_pty` starts, clamped bash timeouts, cache hits, redactions) — plus the **host capability matrix** (`已验证/存在未用/待观察/缺失/需人眼` per host surface). Read-only over files this plugin wrote; run it first after an OpenCode upgrade | All agents |
+| `tm_stats` | **The plugin reads its own trajectory back**: tokens kept out of the context window by offloading (net of the preview that arrived), seconds saved by dispatch overlap (serial cost minus the wall window the children actually used), PTC internals, governance counts (blocked subresources, refused `tm_pty` starts, clamped bash timeouts, cache hits, redactions) — plus the **host capability matrix** (`已验证/存在未用/待观察/缺失/需人眼` per host surface). Read-only over files this plugin wrote; run it first after an OpenCode upgrade. `{ recent: 20 }` appends a call-by-call recap — handle + payload path for every offloaded result, which is how you see what a governed tool actually returned (the host gives plugin tools no expandable card) | All agents |
 | `tm_browser` | Interactive browser session (**your default browser**): 16 Playwright verbs (snapshot-first `take_snapshot` → uid-addressed `click`/`fill`/`drag`/…) + 5 legacy compat verbs (open/navigate/read/screenshot/close); Playwright engine needs Node ≥ 20, below that (or on any import failure) it auto-degrades to the legacy CDP engine. It drives YOUR default browser channel (an Edge Beta default opens Edge Beta), stays headful unless the operator sets `TM_BROWSER_HEADLESS`, loads a page's own images/CSS/JS via the `same-site` subresource policy, and `take_screenshot { image:true }` attaches a JPEG so the model can actually see the screen | Lead + Researcher + Tester (UI verification) |
 
-> **Fixed tool priority ladder (every task): ① TeamMode governed tools
-> (`tm_*`) → ② user MCP/plugin tools → ③ the model's own reasoning.**
-> It doubles as the fallback chain: when a governed tool errors (no browser
-> on this host, blocked host), the agent says so and drops to the next rung.
+> **Fixed tool priority ladder (every task): ① the user's own MCP/plugin
+> tools → ② TeamMode governed tools (`tm_*`) → ③ the model's own reasoning.**
+> It doubles as the fallback chain: when a tool errors (no browser on this
+> host, blocked host), the agent says so and drops to the next rung — and
+> rung ③ is where a missing capability gets reported, never fabricated.
+> One stated exception: on the **web** channel `tm_search` / `tm_webfetch` /
+> `tm_browser` come first, because that path is the only one carrying the
+> domain allowlist, the per-request confirmation dialog and the R6 red lines.
+
+> **What the host UI cannot show you.** OpenCode renders a *plugin* tool call
+> as a one-line card with no expandable body — its tool-renderer registry
+> holds only the built-in tool names, and an extension cannot add to it. The
+> governed output still exists: anything over the offload boundary is written
+> to disk as a handle, and `tm_stats { recent: 20 }` prints the call-by-call
+> recap with those handles and file paths, which you can open. Ask your agent
+> for it — "what did that tool actually return?"
+
+> **Two ways to delegate, and which to want.** OpenCode's own `task` tool is the
+> only sub-agent the interface can SHOW you: its card links to the live child
+> session. Add `background: true` and it is also non-blocking — the host wakes
+> your lead when the child finishes. That flag is experimental, so you turn it
+> on yourself:
+>
+> ```
+> OPENCODE_EXPERIMENTAL_BACKGROUND_SUBAGENTS=true
+> ```
+>
+> (set it for the app process — `setx` on Windows, or launch from a shell that
+> exports it — then restart OpenCode). TeamMode then keeps that channel inside
+> your token budget: the injected full reply is replaced by a preview plus a
+> pointer, and nothing is copied to disk (`TM_TASK_OFFLOAD=off` restores the
+> host's verbatim text). `tm_dispatch` / `tm_join` remains the batch path —
+> several children at once, structured skeletons instead of full text, `cancel`,
+> and recovery after a restart. Cost of the host path, stated plainly: each
+> finished background task wakes the lead and costs a turn.
 
 All governed tools are **parallel-safe**: the host may run a batch of
 `tm_search` / `tm_webfetch` / `tm_fetch` calls concurrently — each call gets
@@ -485,6 +517,12 @@ for overrides, extra agents and disabling roles.
 | `TM_BASH_TIMEOUT_PROBE_MS` | `60000` | ceiling forced onto a `timeout` the model set for a read-only probe command (0 disables) |
 | `TM_BASH_TIMEOUT_MAX_MS` | `0` | optional global ceiling for every other bash command — off by default so a real build keeps the timeout it asked for |
 | `TM_PTY_MAX` | `4` | concurrent `tm_pty` terminal sessions this plugin may keep running at once |
+| `TM_DISPATCH_ASK` | `on` | `tm_dispatch` opens the official confirmation dialog before spawning a sub-agent — the same gate the built-in `task` tool applies (`ctx.ask` per sub-agent type), so a plugin-side dispatcher is not a way around the user's rules. No ask bridge ⇒ refused. `off` skips it (the lead-only lock still applies) |
+| `TM_SUBAGENT_DEPTH` | `1` | nesting ceiling for dispatched children, same 口径 as the host's `subagent_depth` (1 = sub-agents never spawn sub-agents). Enforced plugin-side because that check lives in the task tool, not in the session API |
+| `TM_PARALLEL_DISPATCH` | `on` | whether the lead may have more than one sub-agent running at a time. `off` refuses a second `tm_dispatch` while any child is still live (the refusal names the running children, and happens before the confirmation dialog), so the team works serially: dispatch → `tm_join` → next. For a machine or provider quota that cannot carry N sessions at once |
+| `TM_DISPATCH_MAX` | `4` | how many children ONE lead may have running at a time (1..8). Refused before the confirmation dialog, and the refusal names what is already live. Measured reason: six concurrent researchers ran 19+ minutes with nothing settled |
+| `TM_JOIN_MAX_WAIT_MS` | `60000` | ceiling on `tm_join { waitMs }`. Was 300 000, and a lead parked in it twice in a row (19 min of nothing) while its children worked — waiting is not parallelism, so the default now says "check, then work". A second consecutive wait after nothing settled is cut to 10 s and answered with what to do instead |
+| `TM_TASK_OFFLOAD` | `on` | keep the HOST's background sub-agent inside the context budget: when `task { background: true }` finishes, the host injects the child's full reply into your session; this replaces an oversized body with a preview + a `tm_fetch`-style pointer (`tm_join { ids: [...] }`), touching ONLY synthetic parts that carry the host's own `<task id=… state="completed">` envelope and exceed the text offload threshold. Nothing is copied to disk — the text stays where it was written (the child session). `off` restores the host's verbatim injection |
 | `TM_TOOL_HINTS` | `on` | append TeamMode's call-site discipline to the built-in `bash` / `task` tool DESCRIPTIONS via `tool.definition` (append-only, idempotent — the host text is never replaced) |
 | `TM_AGENT_TEMPERATURE` | `off` | `on` applies a per-role sampling table (architect 0.35 / researcher 0.3 / reviewer 0.1 / rest 0.2) via `chat.params`; or give it `reviewer=0.05;team=0.4`. Off = the documented "all agents at 0.2" invariant stands |
 | `TM_COMPACTION_CONTEXT` | `on` | on the host's pre-compaction hook, add the must-survive list (reply skeleton, offload handles, dispatched child session ids, provenance, board paths). Additive — the host's own summarizer prompt is never replaced |

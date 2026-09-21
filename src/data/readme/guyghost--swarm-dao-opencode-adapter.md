@@ -127,9 +127,11 @@ swarm-dao init
 # Setup with default agents
 swarm-dao setup
 
-# Create proposal
+# Create proposal (acceptance criteria are repeatable and feed the control gate)
 swarm-dao propose --title "Add dark mode" --type product-feature \
-  --description "Implement dark theme for the app"
+  --description "Implement dark theme for the app" \
+  --acceptance-criteria "Theme switch persists across reloads" \
+  --acceptance-criteria "Contrast meets WCAG AA"
 
 # List proposals
 swarm-dao list
@@ -141,6 +143,9 @@ swarm-dao show 1
 
 # Cast a vote (weight defaults to the council agent's registry weight)
 swarm-dao vote 1 --position for --reasoning "Low risk, high impact" --agent critic
+
+# Record the dry-run a red-zone proposal needs before control can pass
+swarm-dao dry-run 1
 
 # Run quality gates (required before ship)
 swarm-dao control 1

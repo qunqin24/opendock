@@ -10,7 +10,7 @@
 <p align="center">Local speech-to-text for the OpenCode TUI.</p>
 <p align="center">
   <a href="https://github.com/safwan-o/opencode-voice/actions/workflows/release-check.yml"><img alt="CI" src="https://github.com/safwan-o/opencode-voice/actions/workflows/release-check.yml/badge.svg" /></a>
-  <img alt="opencode" src="https://img.shields.io/badge/OpenCode-V2_TUI_plugin-black?style=flat-square" />
+  <img alt="opencode" src="https://img.shields.io/badge/OpenCode-V1+V2_TUI_plugin-black?style=flat-square" />
   <img alt="status" src="https://img.shields.io/badge/status-mvp-orange?style=flat-square" />
   <a href="https://www.npmjs.com/package/@safwan-o/opencode-voice"><img alt="npm version" src="https://img.shields.io/npm/v/@safwan-o/opencode-voice?style=flat-square" /></a>
   <a href="https://www.npmjs.com/package/@safwan-o/opencode-voice"><img alt="npm downloads (monthly)" src="https://img.shields.io/npm/dm/@safwan-o/opencode-voice?style=flat-square" /></a>
@@ -20,10 +20,11 @@
 </p>
 
 > [!IMPORTANT]
-> This is an **OpenCode V2 TUI plugin** (`Plugin.define`, `./tui` entry). It does
-> not work on OpenCode V1, and it must **not** be installed with
-> `opencode plugin add` (that registers *server* plugins, which this package is
-> not). Follow the `cli.json` install below.
+> This is a **dual-version TUI plugin**: OpenCode V2 loads it via
+> `Plugin.define` (`./tui` entry, `cli.json`), OpenCode V1 via `{id, tui}`
+> (`main` entry, `opencode plugin` command). On 2.x it must **not** be
+> installed with `opencode plugin add` (that registers *server* plugins,
+> which this package is not). Follow the per-version install below.
 
 ## Demo
 
@@ -46,6 +47,8 @@
 
 ## Install
 
+### OpenCode 2.x
+
 OpenCode 2.x loads TUI plugins from `cli.json` (`~/.config/opencode/cli.json`):
 
 ```json
@@ -62,6 +65,31 @@ only restarts the session — plugin code loads at TUI startup.)
 > `tui.json` is legacy and ignored by OpenCode 2.x — do not list the plugin
 > there. Do not use `opencode plugin add` either: that registers server-side
 > plugins and this package is CLI-only, so it would report a load failure.
+
+### OpenCode 1.x
+
+OpenCode 1.x manages TUI plugins through the `opencode plugin` command:
+
+```bash
+opencode plugin @safwan-o/opencode-voice
+```
+
+Then restart OpenCode. (Adding the spec to the `plugin` array in the global
+config manually has the same effect.)
+
+### Version differences
+
+| Area                | OpenCode 1.x                                               | OpenCode 2.x                                               |
+| ------------------- | ---------------------------------------------------------- | ---------------------------------------------------------- |
+| Install             | `opencode plugin @safwan-o/opencode-voice`                 | `cli.json` `plugins` array                                 |
+| Entry point         | `main` → `./index.js` (`{id, tui}`)                        | `./tui` → `src/tui.ts` (`Plugin.define`)                   |
+| Transcription lands | appended into the prompt for in-place review               | clipboard for pasting, or submitted via `/voice-submit`    |
+| Submit key          | extra `submitHotkey` binding available                     | slash command only                                         |
+
+Shared on both versions: models, engines, cleanup + cutoff, `ctrl+space`
+default, and the four user-facing commands (V1 additionally exposes two
+hidden hold-to-talk commands). Only picker row format and diagnostics text
+differ cosmetically.
 
 On first launch, choose a model. The plugin downloads its required local runtime and model weights automatically. Audio and transcription stay on your machine.
 
@@ -82,7 +110,7 @@ Add `--global` if the plugin was installed in OpenCode's global configuration.
 Do not clone the repo unless you want to develop the plugin.
 
 > [!TIP]
-> First launch opens a model picker. Choose a local model, let it download, then use `ctrl+space` to dictate (change it in `/voice-settings`). With auto-submit off, transcriptions land in your clipboard for pasting.
+> First launch opens a model picker. Choose a local model, let it download, then use `ctrl+space` to dictate (change it in `/voice-settings`). On 2.x with auto-submit off, transcriptions land in your clipboard for pasting; on 1.x they are appended into the prompt for in-place review.
 
 ## What It Installs
 
@@ -111,7 +139,7 @@ npx @safwan-o/opencode-voice engine status transcribe-cpp
 
 Commands:
 
-- `/voice` - toggle recording; transcription goes to the clipboard, or submits when auto-submit is on
+- `/voice` - toggle recording; transcription is delivered for review (clipboard on 2.x, appended into the prompt on 1.x), or submits when auto-submit is on
 - `/voice-submit` - toggle recording and submit after transcription, even with auto-submit off
 - `/voice-stop` - cancel active recording or transcription
 - `/voice-settings` - open model, hotkey, microphone, and diagnostics settings
@@ -120,12 +148,12 @@ Default hotkey:
 
 ```txt
 ctrl+space -> start recording
-ctrl+space -> stop, transcribe, and copy (or submit)
+ctrl+space -> stop, transcribe, and deliver (or submit)
 ```
 
 In `/voice-settings` -> **Recording**, choose one **Record key**. Toggle recording starts on the first press and transcribes on the second. (`ctrl+r` is intentionally not the default: OpenCode binds it to session rename.) Hold-to-talk is shown as unavailable until OpenCode exposes terminal key-release events to TUI plugins.
 
-**Delivery:** with auto-submit off (default), the transcription is copied to the OS clipboard (`wl-copy` / `pbcopy` / `clip` / `xclip` / `xsel`, first available wins) and a toast confirms — paste it into the main textbox with Ctrl+V, where images can also be attached. There is no composer-append API in OpenCode V2, so the clipboard is the edit path. With auto-submit on (or via `/voice-submit`), the text is sent as a user message immediately.
+**Delivery:** with auto-submit off (default), the transcription goes out for review and a toast confirms. On 2.x it is copied to the OS clipboard (`wl-copy` / `pbcopy` / `clip` / `xclip` / `xsel`, first available wins) — paste it into the main textbox with Ctrl+V, where images can also be attached. There is no composer-append API in OpenCode V2, so the clipboard is the edit path. On 1.x it is appended into the prompt for in-place review instead. With auto-submit on (or via `/voice-submit`), the text is sent as a user message immediately on both versions.
 
 Settings also let you select a microphone, language, model, download location, voice cleanup, and auto-submit.
 
@@ -182,7 +210,7 @@ npx @safwan-o/opencode-voice doctor
 - `Engine not found in registry: transcribe-cpp`: the installed plugin expects a release registry that does not yet include the sidecar. Update the plugin after its matching Engine Release is published, or locally import a built sidecar with `opencode-voice engine import transcribe-cpp <path>`.
 - `Could not start recorder` on Windows: open `/voice-settings` and select the enumerated microphone rather than relying on the system default. The error includes the exact `ffmpeg` command and stderr for diagnosis.
 - Hold-to-talk is unavailable: current OpenCode releases do not expose terminal key-release events to TUI plugins. Use the default `ctrl+space` toggle mode instead.
-- `Plugin failed` in the TUI: you installed a V1-shaped package or used `opencode plugin add` (server-side). This package is CLI-only — load it from `cli.json` as shown above, never from `tui.json` or `opencode.json` `plugins`.
+- `Plugin failed` in the TUI: version/entry mismatch. On 2.x, load it from `cli.json` as shown above — never from `tui.json`, and never via `opencode plugin add` (that registers *server* plugins; this package is CLI-only). On 1.x, install with `opencode plugin @safwan-o/opencode-voice`.
 - Empty transcriptions on noisy mics: enable **Voice cleanup** in Recording settings (on by default); if a specific room defeats it, raise the Rumble filter cutoff.
 
 ## Platform Status
@@ -195,23 +223,26 @@ npx @safwan-o/opencode-voice doctor
 
 ## Architecture
 
-This is an OpenCode V2 CLI plugin (`Plugin.define({ id, setup })` from
-`@opencode/plugin/tui`, `./tui` entry). Requires OpenCode 2.x (`engines.opencode`). The V1 `{ id, tui() }` entry in
-`index.js` is retained on a best-effort basis for old hosts — untested, unsupported.
+This is a dual-version TUI plugin: OpenCode V2 loads `Plugin.define({ id, setup })`
+(`@opencode/plugin/tui`, `./tui` entry); OpenCode V1 loads `{ id, tui() }`
+(`main` entry, `index.js`). Requires Node 22+ and OpenCode >= 1.17.4
+(`engines`). Shared logic lives in `lib/` as plain JS consumed by both adapters.
 
 - V2 entry: `src/tui.ts` (setup, keymap layer, delivery)
-- `src/voice.ts` — record/transcribe controller with single-flight phase lock
+- `src/voice.ts` — V2 typed facade over the shared controller (`lib/voice-controller.js`)
 - `src/dialogs.ts` — settings pickers on promise dialog APIs
-- `src/settings.ts` — normalization, defaults, legacy hotkey migration
+- `src/settings.ts` — V2 types + re-export of shared settings (`lib/settings.js`)
 - `src/clipboard.ts` — OS clipboard writers (wl-copy/pbcopy/clip/xclip/xsel)
 - `src/enhance.ts` — voice-cleanup chain builder (canonical logic in `lib/enhance.js`)
 - `src/formatters.ts`, `src/languages.ts` — display helpers, Whisper language list
-- runtime settings live in OpenCode TUI plugin storage (`ctx.storage.store`)
+- runtime settings live in TUI plugin storage (`ctx.storage.store` on V2, `api.kv` on V1)
 
 Files:
 
 - `src/tui.ts` - V2 plugin entrypoint, commands, keymap layer, delivery
-- `index.js` - legacy V1 entrypoint (kept for compatibility, not the load path on V2)
+- `index.js` - V1 plugin entrypoint, commands, dialogs, keymap layer, delivery (live load path on OpenCode 1.x)
+- `lib/settings.js` - shared settings normalization, hotkey migration, cutoff parsing
+- `lib/voice-controller.js` - shared record/transcribe controller with single-flight phase lock
 - `lib/models.js` - model registry, cache paths, default settings
 - `lib/download.js` - resumable model download and SHA256 verification
 - `lib/engine.js` - recorder selection, managed Windows recorder install, runtime-routed transcription, pre-transcribe cleanup
@@ -223,7 +254,7 @@ Files:
 - `bin/opencode-voice.js` - install wrapper and diagnostics CLI
 - `sidecar/` - Rust `transcribe-cpp` command-line runtime for GGUF models
 
-Voice input needs native audio and STT binaries. The JS plugin manages OpenCode UI, settings, model downloads, and delivery (clipboard or direct submit). The managed Rust sidecar provides the `transcribe.cpp` runtime for supported GGUF model families.
+Voice input needs native audio and STT binaries. The JS plugin manages OpenCode UI, settings, model downloads, and delivery (clipboard/submit on V2, in-place append/submit on V1). The managed Rust sidecar provides the `transcribe.cpp` runtime for supported GGUF model families.
 
 ## Roadmap
 

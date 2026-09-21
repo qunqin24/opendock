@@ -1,90 +1,65 @@
-<div align="center">
-
 # chezmoi-guard
 
-**Stop opencode agents from editing chezmoi-managed files out-of-band.**
-Intercepts `edit` / `write` / `apply_patch`, redirects to the chezmoi source, then syncs.
+Native OpenCode V2 guard for chezmoi-managed files. **Managed target mutations are blocked; automatic redirection and apply are disabled.**
 
-[![npm version](https://img.shields.io/npm/v/@dylanrussell/chezmoi-guard.svg?color=06b6d4&label=npm&logo=npm&logoColor=white&style=flat-square)](https://www.npmjs.com/package/@dylanrussell/chezmoi-guard)
-[![license](https://img.shields.io/npm/l/@dylanrussell/chezmoi-guard.svg?color=06b6d4&style=flat-square)](./LICENSE)
-[![node](https://img.shields.io/node/v/@dylanrussell/chezmoi-guard.svg?color=06b6d4&logo=node.js&logoColor=white&style=flat-square)](https://nodejs.org)
-[![types: TypeScript](https://img.shields.io/badge/types-TypeScript-3178C6.svg?logo=typescript&logoColor=white&style=flat-square)](https://www.typescriptlang.org)
-[![tested with vitest](https://img.shields.io/badge/tested%20with-vitest-FCC72B.svg?logo=vitest&logoColor=black&style=flat-square)](https://vitest.dev)
+## Compatibility and installation
 
-</div>
-
----
-
-## What it does
-
-When an opencode agent edits a file that lives under your chezmoi source, the edit lands on the rendered **target** — not the source. The next `chezmoi apply` silently reverts it. This plugin fixes that transparently:
-
-- Intercepts `edit`, `write`, and `apply_patch` tool calls.
-- Asks `chezmoi managed` whether the target is chezmoi-managed.
-- If it is, rewrites the tool args to operate on the **source** file.
-- After the tool runs, executes `chezmoi apply --no-tty <target>` to sync the target from the freshly-edited source.
-- Advises `read` calls: reading a target whose source is a template, `modify_` script, or encrypted entry prepends guidance pointing at the editable source — **without** rewriting the read or hiding the real on-disk content.
-- Emits a TUI toast on every redirect, warning, or block.
-
-## Install
+Version 2.0.0 targets OpenCode **2.0.8**, verified against that release's plugin types and tool-execution source. V1 users should stay on 1.1.2.
 
 ```jsonc
-// ~/.config/opencode/opencode.json
 {
-  "plugin": [
-    "@dylanrussell/chezmoi-guard"
-  ]
+  "plugins": ["@dylanrussell/chezmoi-guard@2.0.0"]
 }
 ```
 
-Requires the `chezmoi` CLI on `PATH`. The plugin silently no-ops when chezmoi is missing.
+For local integration, use a default-exporting entry in a discovered `.opencode/plugins/` definition directory that re-exports `dist/plugin.js`. Do not rely on `file:` plugin URLs for the installed 2.0.8 loader.
 
-## Source-type handling
+Requires a working `chezmoi` CLI and configuration. Missing CLI, configuration errors, malformed inventories and lookup failures **block mutations**. A successful inventory with no matching path leaves ordinary unmanaged files and explicit source edits unchanged for normal host permission checks.
 
-| Source prefix / suffix | Behaviour |
-| --- | --- |
-| `dot_` / `private_` / `executable_` / `empty_` (normal) | Redirect to source, `chezmoi apply` after |
-| `exact_` (directory attribute) | Files *inside* an `exact_` dir redirect normally — `exact_` only prunes absent target entries, it does not make files structural. Directories are excluded upstream by `chezmoi managed --include=files,symlinks`. |
-| `.tmpl` (template) | `edit` → redirect to source + guidance; `write` → warn (hits rendered target, lost on apply) |
-| `symlink_` | Read the link target, redirect to the actual file, `chezmoi apply` after |
-| `modify_` | Passthrough with warning (partial file manager; target edits may be overwritten) |
-| `encrypted_` / `.age` / `.asc` | **BLOCKED** with guidance (use `chezmoi edit` instead) |
-| `run_` / directories | Skipped (scripts / structural markers) |
+## Authorization boundary
 
-## Read advisory
+OpenCode 2.0.8 executes tool before-hooks **before** its built-in tools check permissions. Rewriting a denied target to an allowed source loses the original target's authorization check. Running `chezmoi apply` in an after-hook would also write the target outside the tool permission system.
 
-`read` is never redirected — the agent always sees the real on-disk target bytes. But for three source kinds, a guidance block is prepended to the read output because a naive follow-up edit would misfire:
+The published plugin permission domain exposes pending-request `list/get/reply` and an evaluation hook, but no authorization-request/assert API. The guard therefore uses the conservative fallback:
 
-| Source kind | Why reads need an advisory |
-| --- | --- |
-| `.tmpl` (template) | Rendered target bytes ≠ source bytes. An `edit` `oldString` built from the rendered content will not match the source file the guard redirects to. The advisory says: read the source first. |
-| `modify_` | The target is script-managed state; persistent changes belong in the modify script, so the advisory points at it. |
-| `encrypted_` / `.age` / `.asc` | Reading the plaintext target is fine, but edits are blocked — the advisory pre-empts a doomed edit plan with `chezmoi edit`. |
+- Never rewrites tool input or invokes `chezmoi apply`.
+- Blocks `edit`, `write`, `patch` and compatible `apply_patch` calls addressing managed targets, including templates, modify scripts and managed symlinks.
+- Inspects every Add/Update/Delete/Move patch header before execution; a managed path blocks the whole patch.
+- Checks existing filesystem aliases and symlinked ancestors against the managed inventory.
+- Preserves original input for unmanaged operations and explicit source edits so native host permissions remain authoritative.
+- Makes no permission decisions that grant access, auto-approves nothing, and provides no option to re-enable unverified redirection/apply.
 
-Reads of `normal`/`symlink` targets stay silent: their edits are transparently redirected anyway, and a banner on every dotfile read would be pure context noise.
+When blocked, read the indicated source, then explicitly edit it through normal permission-checked tools. Symlink sources contain link definitions: inspect the definition and explicitly address the referent. Have the user review and synchronize the target separately. This release deliberately does **not** preserve V1 automatic redirect/apply parity.
 
-## Sync semantics
+See [SECURITY.md](SECURITY.md) for the exact 2.0.8 audit evidence and verification limits.
 
-The guard edits the **source** before the target is touched, so the normal `chezmoi apply` is non-interactive (the target is clean). The `--no-tty` flag is added so that if the target has drifted out-of-band (`MM` status — a prior manual edit, or a template/modify passthrough), `chezmoi apply` **fails safe**: it exits non-zero and leaves the user's out-of-band edit intact, instead of hanging on a TTY prompt or silently discarding changes with `--force`.
+## Read advisories
 
-## Debug
+Reads remain unchanged. Template, modify-script and encrypted-source advisories are prepended to successful read results while preserving structured content, output and metadata. Advisory lookup is best-effort; mutation lookup uses a separate fresh, validated inventory and fails closed.
 
-```sh
-CHEZMOI_GUARD_DEBUG=1 opencode
-```
+## Scope and TUI support
 
-Emits `[chezmoi-guard] ...` lines to stderr for every redirect, skip, warn, and block.
+Shell commands and arbitrary custom mutation tools are outside this plugin's interception scope. This is a guard for the named file tools, not a filesystem sandbox.
 
-## Development
+The package includes a native OpenCode 2.0.8 CLI companion through `./tui` (and `tui.mjs` for local directory discovery). Its mounted `app` slot observes the current session's cached messages and shows read-only toasts for guard tool failures and successful reads carrying guard advisories. It subscribes to native session events and checks the cache once per second to catch navigation and delayed cache updates. It makes no network polling requests and needs no Solid runtime.
+
+Notifications are deduplicated by session, message and tool-call identity for the lifetime of the companion. Opening a session can show previously recorded guard results once; multiple newly observed results are summarized in one toast. Background sessions are inspected only when opened. Full guidance stays in the tool result; paths and file contents are not copied into toasts. Unloading unsubscribes, stops the timer, unregisters the slot and clears the identity cache.
+
+There are no apply/approve controls, pending-change state, or filesystem operations in the companion. It consumes projected tool results rather than server-side V1 toast calls. Recognition is limited to the guard's failure prefix and exact boxed advisory headers; ordinary assistant/user text and unrelated tool failures are ignored. This is a notification convenience, not an authenticated provenance signal for tool output.
+
+## Development and verification
 
 ```sh
-npm install
-npm run build        # tsup → dist/plugin.js + dist/plugin.d.ts
-npm test             # vitest run --coverage
-npm run lint         # biome check
-npm run typecheck    # tsc --noEmit
+npm run lint
+npm run typecheck
+npm test
+npm run build
+npm run test:integration
+python3 scripts/native-tui-smoke.py
 ```
 
-## License
+Unit tests use a mocked V2 hook context. `test:integration` uses real isolated chezmoi files/processes and the built package, but a **mocked OpenCode host**. Its source-allowed/target-denied permission-order test remains a deterministic simulation, not a real-host permission-policy matrix.
+
+TUI regressions cover native message shapes, read advisories, per-session deduplication, delayed results, event batching, navigation, remounting and cleanup with a mocked cache/event host. `scripts/native-tui-smoke.py` additionally runs an isolated real OpenCode 2.0.8 server and terminal with a scripted loopback model. It verifies a native patch is blocked, the refusal reaches the model, exactly one guard error toast renders, source/target bytes remain unchanged, and the companion and processes shut down cleanly. No real model credentials or user dotfiles are used. Set `TMPDIR` to select the fixture/evidence directory.
 
 MIT © Dylan Russell

@@ -22,7 +22,7 @@ before a file is edited or a command runs, and after one fails. Keys and tokens 
 the index is built, so what reaches the model is safe to send.</p>
 
 <p align="center">
-<b>85.3% hit@1</b> on LongMemEval-S &middot; <b>69.7%</b> on LoCoMo &middot; <b>millisecond</b> lookups over gigabytes of history<br>
+<b>85.3% hit@1</b> on LongMemEval-S &middot; <b>69.7% retrieval hit@1</b> on LoCoMo &middot; <b>millisecond</b> lookups over gigabytes of history<br>
 <sub>Both harnesses ship in this repo and run on the public datasets in minutes &middot;
 <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">check the numbers yourself</a></sub>
 </p>
@@ -36,7 +36,8 @@ the index is built, so what reaches the model is safe to send.</p>
 
 <p align="center">English | <a href="README.zh.md">中文</a></p>
 
-<p align="center"><a href="https://vshulcz.github.io/deja-vu/">Docs</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">Benchmarks</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/compare.html">How it compares</a></p>
+<p align="center"><a href="https://vshulcz.github.io/deja-vu/">Docs</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">Benchmarks</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/compare.html">How it compares</a> &middot; <a href="docs/INTEGRATING.md">Building it into your tool</a></p>
+<p align="center"><sub>Found it useful? <a href="https://github.com/vshulcz/deja-vu">Star deja-vu on GitHub</a> so other developers can find it.</sub></p>
 
 ## Install
 
@@ -109,7 +110,7 @@ Install also writes user-level guidance for the harnesses it detects: Claude Cod
 
 ## What you get
 
-**Solve it in Codex. Claude remembers.** Thirty-three coding agents write every conversation
+**Solve it in Codex. Claude remembers.** Thirty-four coding agents write every conversation
 to local files, and deja turns those files into one memory layer all of them read.
 
 | | |
@@ -182,7 +183,7 @@ $ deja "jwt refresh token"
 | `deja <query>` | Search every history. Multi-word is AND and quoted phrases require contiguous text; a query with no exact match then tries word forms and close spellings, which is where a substring reaches its word (`code` finds `opencode`). |
 | `deja` | With an index and a terminal: today's sessions, recalls served, a question you asked in more than one session, and a wall your agents keep hitting. |
 | `deja wip` | What the last session in this directory was doing: the task, what it settled, the files in flight, the last command and whether it failed — derived from the transcript, not from a note someone remembered to write. |
-| `deja blame <path>[:line]` | Which sessions discussed a file, what was decided, and why. With a line: the commit that last changed it, and the session that wrote the text that commit replaced. |
+| `deja blame <path>[:line]` | Which sessions discussed a file, what was decided, and why. With a line: the commit that last changed it, and the session that wrote that line or the text the commit replaced. `--attribution` prints the line answer alone, as JSON with `--json`, and `--git-note` records it in `refs/notes/deja`. |
 | `deja files <topic>` | The other direction: which files the work on a subject actually touched. |
 | `deja how <tool>` | How this machine actually runs a thing, with the real flags, from what agents ran before. |
 | `deja fix <error>` | What this machine ran after that same error before, when the error did not come back. |
@@ -254,7 +255,7 @@ recovery](docs/compaction.md) for what is read, what is stored and where the
 limits are.
 
 <!-- matrix:start -->
-aider &middot; Amp &middot; Antigravity &middot; Claude Code &middot; Cline &middot; Codex CLI &middot; Copilot CLI &middot; VS Code Copilot Chat &middot; Cursor &middot; DeepSeek Harness &middot; Gemini CLI &middot; Goose &middot; Grok Build &middot; Hermes &middot; Kimi Code &middot; omp (Oh My Pi) &middot; OpenClaw &middot; opencode &middot; Continue &middot; Crush &middot; pi &middot; prime-agent (PrimeIntellect) &middot; Qwen Code &middot; Cherry Studio &middot; Senpi &middot; gajae-code &middot; Kimchi Coding &middot; Command Code &middot; ZCode &middot; Kiro &middot; Kilo Code &middot; Roo Code &middot; Zed.
+aider &middot; Amp &middot; Antigravity &middot; Claude Code &middot; Cline &middot; Codex CLI &middot; Copilot CLI &middot; VS Code Copilot Chat &middot; Cursor &middot; DeepSeek Harness &middot; Gemini CLI &middot; Goose &middot; Grok Build &middot; Hermes &middot; Kimi Code &middot; omp (Oh My Pi) &middot; OpenClaw &middot; opencode &middot; Continue &middot; Crush &middot; pi &middot; prime-agent (PrimeIntellect) &middot; Qwen Code &middot; Cherry Studio &middot; Senpi &middot; gajae-code &middot; Kimchi Coding &middot; Command Code &middot; ZCode &middot; Kiro &middot; Kilo Code &middot; Roo Code &middot; Zed &middot; CodeWhale.
 
 <details>
 <summary>What each one supports</summary>
@@ -294,6 +295,7 @@ aider &middot; Amp &middot; Antigravity &middot; Claude Code &middot; Cline &mid
 | Kilo Code | ✅ | ⚠ | ✅ | ✅ | ✅ | paste | sqlite3 for the CLI store |
 | Roo Code | ✅ | ⚠ | ✅ | ✅ | ✅ | paste | roo CLI (editor tasks reopen in the editor) |
 | Zed | ✅ | ✕ | ✅ | ✅ | ✕ | paste | sqlite3 + zstd |
+| CodeWhale | — | — | ? | ? | ✅ | paste | none |
 
 ✅ works &middot; — possible, not built yet &middot; ✕ the harness has no such mechanism &middot; ⚠ blocked by an upstream bug &middot; ? not investigated
 
@@ -525,6 +527,14 @@ you installed this.
 `make build test lint`, then [CONTRIBUTING.md](CONTRIBUTING.md). Adding a harness starts in
 the [parser registry](docs/ARCHITECTURE.md#source-parsers). Priorities and non-goals are in
 [ROADMAP.md](ROADMAP.md). Good first issues are labeled.
+
+## Support
+
+Bugs and questions go to [issues](https://github.com/vshulcz/deja-vu/issues).
+Anything you think is exploitable goes through the private advisory link in
+[SECURITY.md](SECURITY.md) instead. What deja reads, what it never sends
+anywhere, and how to exclude a project or forget a session is under
+[Privacy](#privacy).
 
 ## License
 

@@ -257,12 +257,21 @@ The initial layout-preset list is empty. `Save as…` captures current visibilit
 expansion, and section order; saved presets can be applied to the selected scope,
 updated from the current layout, renamed, or deleted.
 
+Choose **Preview & apply** in a saved layout preset's menu to review visibility,
+expansion, and position changes before applying it. Changed sections appear first,
+with their destination positions. Opening the preview does not change the layout;
+select **Apply** to confirm or **Cancel** / `Escape` to return to the preset menu.
+Applying a preset updates the in-memory layout for the selected scope. Use
+`Save current layout as default` to persist it.
+
 ## Keyboard controls
 
 Press `Ctrl+Shift+F` to focus the sidebar. Use `Up`/`Down` or `k`/`j` to move,
 `Enter` to activate the selected row, `Escape` to return to the previous focus,
 and `?` to open the keyboard help. When a Skills or MCP filter owns focus,
 typing edits the query and the first `Escape` returns to sidebar navigation.
+The filter icon, placeholder, entered text, clear control, and cursor use the same
+contrasting focus palette; the field follows actual input focus and blur.
 
 The command palette also exposes `Focus sidebar` and direct commands for Todo,
 Subagents, Skills, Quick Actions, LSP, and MCP. Both sidebar shortcuts can be
@@ -302,9 +311,21 @@ only the failed servers.
 
 Use the `Preset` selector in the MCP heading to save the current enabled/disabled
 state, apply a preset, update it from the current scope, rename it, or delete it.
+**Preview & apply** refreshes the current server states and shows the planned
+connections, disconnections, unchanged servers, and unavailable or missing servers
+that will be skipped. Changes appear first. The preview updates when the preset or
+server state changes; `Ctrl+R` refreshes it again. Applying is disabled while states
+are loading, a refresh has failed, or another MCP mutation is running.
+
+Use `Up` / `Down` to scroll a preview, `Tab` or `Left` / `Right` to select its
+buttons, and `Enter` to confirm. Buttons also support mouse activation. Changing
+the target scope/workspace closes the preview, and deleting the preset disables
+its Apply action.
+
 Preset application runs only the necessary server changes and keeps per-server
 progress and failed-only retry behavior. Servers in a preset that are not present
-in the current scope are retained as desired state but skipped at application time.
+in the current scope are skipped at application time; their desired states are
+retained when MCP state persistence is enabled.
 
 The MCP bookmark control saves favorites user-wide by server name. Favorites appear
 first, alphabetically within each group, with a blank separator before other
@@ -382,7 +403,7 @@ bun run check
 ```
 
 `bun run check` runs the tests, TypeScript, ESLint, bundle-size guard, and formatting
-check. The unminified TUI bundle is limited to 320,000 bytes.
+check. The unminified TUI bundle is limited to 345,000 bytes.
 Font generation is a separate development task: `bun run font:build` and
 `bun run font:check` use `uv` and the pinned FontTools dependency. Users install
 the already generated font; Python and FontTools are not needed at runtime.

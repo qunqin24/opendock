@@ -4,24 +4,29 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Node](https://img.shields.io/badge/Node.js-18%2B-green.svg)](https://nodejs.org/)
 
-OpenCode plugin that records skill invocations and auto-registers a `/skill-usage` slash command for querying the stats.
+OpenCode plugin (v1 and v2) that records skill invocations and auto-registers a `/skill-usage` slash command for querying the stats.
 
-- **Write**: `tool.execute.before` + `command.execute.before` hooks record every skill invocation — both agent-initiated calls and user slash-commands.
-- **Query**: a `config` hook auto-registers the bundled `skill-usage` command so it is available as `/skill-usage` with zero extra configuration.
+- **Write**: skill invocations are recorded to JSONL — both agent-initiated calls (`auto`) and user slash-invocations (`manual`).
+- **Query**: the plugin auto-registers the bundled `skill-usage` command so it is available as `/skill-usage` with zero extra configuration.
 
-Zero runtime dependencies, plain JavaScript ESM.
+Zero runtime dependencies, plain JavaScript ESM. One package supports both plugin APIs:
+
+- **opencode 1.x** — `server()` hooks: `config`, `tool.execute.before`, `command.execute.before`
+- **opencode 2.x** — `setup()` domain APIs: `command.transform`, `tool.hook("execute.before")`, `session.hook("prompt")`
 
 ## Install
 
-Add the plugin to `~/.config/opencode/opencode.json`:
+Add the plugin to `~/.config/opencode/opencode.json`.
+
+OpenCode 2.x uses the `plugins` array:
 
 ```jsonc
 {
-  "plugin": ["file:///absolute/path/to/opencode-skill-usage"]
+  "plugins": ["opencode-skill-usage"]
 }
 ```
 
-For npm installs:
+OpenCode 1.x uses the singular `plugin` array:
 
 ```jsonc
 {
@@ -29,7 +34,20 @@ For npm installs:
 }
 ```
 
-Restart OpenCode. The `/skill-usage` command is registered automatically by the plugin's `config` hook — no `skills.paths` or manual skill setup needed.
+For local installs, point at the package directory instead:
+
+```jsonc
+// v2
+{
+  "plugins": ["file:///absolute/path/to/opencode-skill-usage"]
+}
+// v1
+{
+  "plugin": ["file:///absolute/path/to/opencode-skill-usage"]
+}
+```
+
+Restart OpenCode. The `/skill-usage` command is registered automatically by the plugin — no `skills.paths` or manual skill setup needed.
 
 ## Usage
 
@@ -68,17 +86,19 @@ node -e 'const r=require("fs").readFileSync(process.env.HOME+"/.config/opencode/
 ## How it works
 
 ```
-opencode.json plugin entry
+opencode.json plugin/plugins entry
         ↓
-plugin loaded → config hook fires
+plugin loaded
         ↓
-registers /skill-usage command (template = bundled SKILL.md body)
+v1: config hook registers /skill-usage (template = bundled SKILL.md body)
+v2: setup() registers /skill-usage via ctx.command.transform
         ↓
-tool.execute.before / command.execute.before hooks
+v1: tool.execute.before / command.execute.before hooks
+v2: ctx.tool.hook("execute.before") + command executor + session prompt hook
 append JSONL lines to skill-usage.jsonl on every skill invocation
 ```
 
-The `config` hook works because Command init runs after Plugin config hooks (the Command layer depends on the Skill layer, which finishes before Command starts).
+On v1 the `config` hook works because Command init runs after Plugin config hooks (the Command layer depends on the Skill layer, which finishes before Command starts). On v2, `setup()` registers the command through `ctx.command.transform`, records agent-initiated skill tool calls (skill input is now `{ id }`), records the `/skill-usage` command itself, and records skills selected via slash through the session prompt hook.
 
 ## Project layout
 
@@ -86,7 +106,7 @@ The `config` hook works because Command init runs after Plugin config hooks (the
 opencode-skill-usage/
 ├── package.json          # npm manifest, files includes plugin/ and skills/
 ├── plugin/
-│   └── index.js          # config hook (register command) + tool/command execute hooks (write log)
+│   └── index.js          # dual entry: v1 server() hooks + v2 setup() registrations, JSONL writer
 ├── skills/
 │   └── skill-usage/
 │       └── SKILL.md      # query templates, used as the command template

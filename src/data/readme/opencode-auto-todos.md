@@ -36,12 +36,14 @@ Create an `auto-todos.json` file in your project root or inside `.opencode/`:
     {
       "content": "Version bump - update version in package.json",
       "priority": "medium",
-      "match": "version bump"
+      "match": "version bump",
+      "order": "first"
     },
     {
       "content": "Create branch, commit changes, open PR",
       "priority": "medium",
-      "match": "github"
+      "match": "github",
+      "order": 2
     }
   ],
   "always": false,
@@ -64,6 +66,7 @@ Create an `auto-todos.json` file in your project root or inside `.opencode/`:
 | `content` | `string` | **yes** | The todo text to display |
 | `priority` | `"high" \| "medium" \| "low"` | no | Priority level (default: `"medium"`) |
 | `match` | `string` | no | Substring to match against existing todos for deduplication. If omitted, `content` is used. |
+| `order` | `"first" \| "last" \| number` | no | Position where the todo is inserted (default: `"last"`). `"first"` = beginning, `"last"` = end, `number` = 1-based index (e.g., `1` = first, `2` = second). |
 
 ## How It Works
 
@@ -79,6 +82,7 @@ With this config:
 ```json
 {
   "todos": [
+    { "content": "Read CLAUDE.md or project docs", "order": "first" },
     { "content": "Version bump", "match": "version" },
     { "content": "Create branch, commit, open PR", "match": "github" }
   ]
@@ -89,6 +93,7 @@ Every time you start a new feature, the agent's todo list will automatically inc
 
 ```
 ✓ [your feature-specific todos]
+☐ Read CLAUDE.md or project docs
 ☐ Version bump
 ☐ Create branch, commit, open PR
 ```

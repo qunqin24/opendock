@@ -40,23 +40,28 @@ Only real booleans count (`true` / `false`, no quotes).
 Install with the OpenCode CLI:
 
 ```bash
-opencode plugin @glaicer/supercode-autoinvoke-skill-gate --global
+opencode plugin add @glaicer/supercode-autoinvoke-skill-gate
 ```
 
 - `--global` installs into the global config (`~/.config/opencode`); default is local (`.opencode` in the current project).
 - `--force` replaces an already-installed version.
 - Restart OpenCode after installing.
 
-Manual install also works: add the package to the `plugin` array in `opencode.json`:
+Manual install also works: add the package to the `plugins` array in `opencode.json`
+(OpenCode v1 uses the `plugin` array instead):
 
 ```json
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugin": ["@glaicer/supercode-autoinvoke-skill-gate"]
+  "plugins": ["@glaicer/supercode-autoinvoke-skill-gate"]
 }
 ```
 
 Restart OpenCode after saving.
 
-> Put it **last** in your `plugin` list so no later plugin re-adds the filtered skills.
+> Put it **last** in your `plugins` (or v1 `plugin`) list so no later plugin re-adds the filtered skills.
+
+On OpenCode v2 the plugin sets the native `autoinvoke: false` flag on
+Explicit-only skills instead of patching the system prompt; on v1 it filters
+`<available_skills>` via the `experimental.chat.system.transform` hook.
 

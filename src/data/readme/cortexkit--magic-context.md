@@ -301,7 +301,6 @@ Recall works **across sessions** (a new session inherits everything) and **acros
 | `/ctx-flush` | Force all queued operations immediately, bypassing cache TTL |
 | `/ctx-recomp` | Rebuild compartments from raw history (accepts a `start-end` range). Use when stored state seems wrong |
 | `/ctx-wrapup [messages_to_keep]` | Compact older live history while keeping the newest N messages raw; queued compaction materializes on the next model message |
-| `/ctx-session-upgrade` | Upgrade this session to the latest history format: rebuild compartments and migrate project memories |
 | `/ctx-dream` | Run dreamer maintenance on demand: maintain memory, docs, smart notes, and user-profile review |
 | `/ctx-embed` | Embedding status, or start/pause history compartment embedding (`start` \| `pause`) |
 
@@ -417,13 +416,13 @@ Run a single dry pass from the repository root; each new unaccounted bust window
 bun packages/plugin/scripts/cache-bust-sentinel.ts --once
 ```
 
-Omit `--once` for the built-in one-minute loop, or invoke `--once` from cron/launchd every 1–5 minutes. The template at `packages/plugin/scripts/launchd/com.cortexkit.magic-context.cache-bust-sentinel.plist` uses a five-minute cadence, deliberately has `RunAtLoad=false`, and is not installed automatically. Replace its `__BUN_PATH__`, `__REPO_ROOT__`, and `__LOG_DIR__` placeholders before loading it. A cron equivalent is:
+Omit `--once` for the built-in one-minute loop, or invoke `--once` from cron/launchd every 1–5 minutes. The template at `packages/plugin/scripts/launchd/com.cortexkit.magic-context.cache-bust-sentinel.plist` uses a five-minute cadence, enables `--send`, deliberately has `RunAtLoad=false`, and is not installed automatically. Replace its `__BUN_PATH__`, `__REPO_ROOT__`, and `__LOG_DIR__` placeholders before loading it. A cron equivalent is:
 
 ```cron
-*/5 * * * * cd /path/to/magic-context && /path/to/bun packages/plugin/scripts/cache-bust-sentinel.ts --once >> /path/to/cache-bust-sentinel.jsonl 2>> /path/to/cache-bust-sentinel.log
+*/5 * * * * cd /path/to/magic-context && /path/to/bun packages/plugin/scripts/cache-bust-sentinel.ts --once --send >> /path/to/cache-bust-sentinel.jsonl 2>> /path/to/cache-bust-sentinel.log
 ```
 
-`--send` switches from JSON-line dry-run output to the `prefrontal` module's `wake.event_record` subc operation. Do not enable it until that operation is deployed. Known dispositions (`accepted`, `unowned_session`, `dedup`, and `superseded`) are counted and logged; malformed replies fail the run. Use `--connection-file`, `--wake-module-id`, `--state-file`, `--db`, or `--rust-store` only when the corresponding runtime location is non-default.
+`--send` switches from JSON-line dry-run output to the `prefrontal-core` module's `agent.deliver` subc operation. It sends a high-urgency registry peer message to `agent_b613e5cf2ee55b8c` from the rendered name `mc-cache-bust-sentinel` by default; the request also stamps the sender as session `health-sentinel-mc` on harness `magic-context`. Use `--wake-agent-id` or `--wake-from-agent` to select another target or rendered sender name. Delivered and queued dispositions are counted as accepted, while a repeated committed order for the same delivery id is counted as deduplicated; sender refusals are counted without retrying the delivery id, and malformed replies or idempotency conflicts fail the run. Use `--connection-file`, `--wake-module-id`, `--wake-agent-id`, `--wake-from-agent`, `--state-file`, `--db`, or `--rust-store` only when the corresponding runtime location is non-default.
 
 ---
 ## Contributing

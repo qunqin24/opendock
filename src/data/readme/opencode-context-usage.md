@@ -82,24 +82,26 @@ This plugin makes both scopes explicit and shows the arithmetic behind each numb
 - How much of the prompt is served from cache, and how much of the cost is cache vs fresh tokens?
 - How much did the subagents I delegated work to consume? (OpenCode tracks each subagent — `task` calls — in its own child session, excluded from the parent's totals. The plugin walks the delegation tree and shows the combined total.)
 
-It reads the already-synced TUI state (`api.state.session`), so it is instant, never calls an LLM and has **zero runtime dependencies**.
+It reads the already-synced TUI state (`context.data.session`), so it is instant, never calls an LLM and has **zero runtime dependencies**.
 
 ## Install
+
+Add it to your global OpenCode 2 CLI config (`~/.config/opencode/cli.json`):
+
+```json
+{
+  "$schema": "https://opencode.ai/v2/cli.json",
+  "plugins": ["opencode-context-usage"]
+}
+```
+
+Or let the CLI do it:
 
 ```bash
 opencode plugin opencode-context-usage
 ```
 
-OpenCode installs the package and adds it to your `tui.json`. Or add it manually (global `~/.config/opencode/tui.json` or project `.opencode/tui.json`):
-
-```json
-{
-  "$schema": "https://opencode.ai/tui.json",
-  "plugin": ["opencode-context-usage"]
-}
-```
-
-Restart OpenCode after changing `tui.json` (TUI plugins load at startup).
+CLI plugin configuration is global (there is no project-local `cli.json`), and valid edits reload while the TUI is running.
 
 ## Usage
 
@@ -113,11 +115,12 @@ Alias: `/ctx`. Close the dialog with `Esc` or `Ctrl+C`.
 
 ### Command name
 
-The command defaults to `/context`. If another command already uses that slash name (for example a future built-in `/context`), the plugin automatically registers as `/context-usage` instead. You can also set the name explicitly:
+The command registers as `/context`, with `/ctx` as an alias. You can change the name explicitly:
 
 ```json
 {
-  "plugin": [["opencode-context-usage", { "slash": "usage" }]]
+  "$schema": "https://opencode.ai/v2/cli.json",
+  "plugins": [{ "package": "opencode-context-usage", "options": { "slash": "usage" } }]
 }
 ```
 
@@ -142,9 +145,9 @@ Session totals come from the authoritative session aggregate that OpenCode store
 
 ## Compatibility
 
-- OpenCode `>= 1.18.0 < 2` (TUI plugins via `tui.json`).
-- Subagent totals use the session children endpoint. If your build does not expose it, the plugin simply hides the subagents and combined blocks.
-- The TUI plugin API is young and may change between OpenCode versions. If something breaks, please open an issue with your OpenCode version.
+- OpenCode `>= 2.0.0` (CLI plugins via `cli.json`, using `@opencode/plugin/tui`).
+- Session and subagent totals come from the synced session state (`context.data.session`); the plugin never calls the server directly and never calls an LLM.
+- The CLI plugin API is still evolving during the OpenCode 2 beta. If something breaks, please open an issue with your OpenCode version.
 
 ## Development
 
@@ -155,13 +158,18 @@ npm test        # builds dist/ and runs the unit tests
 npm run build
 ```
 
-To try a local checkout in OpenCode, point `tui.json` at the built file:
+To try a local checkout in OpenCode 2, use the plugin discovery directory. Create
+`<global-config>/plugins/context-usage/tui.ts` (for example
+`~/.config/opencode/plugins/context-usage/tui.ts`) that re-exports the built plugin:
 
-```json
-{
-  "plugin": ["/absolute/path/to/opencode-context-usage/dist/tui.js"]
-}
+```ts
+export { default } from "/absolute/path/to/opencode-context-usage/dist/tui.js"
 ```
+
+OpenCode discovers it automatically at startup — no `cli.json` entry is needed. Run
+`opencode plugin list` to confirm it is loaded. (Listing the package path directly in
+`cli.json` `plugins` is also documented, but an npm-installable package name is the
+reliable form once published.)
 
 ## License
 

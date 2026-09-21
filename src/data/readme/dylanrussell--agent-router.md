@@ -68,6 +68,8 @@ Stacks are config, history is state — point `stacksDir` somewhere dotfile-mana
 
 ## Install
 
+Version 2 targets **OpenCode 2.0.8**. Version 1 remains the legacy OpenCode release. See [release notes and operational limits](./CHANGELOG.md).
+
 ```bash
 npx -y @dylanrussell/agent-router init
 ```
@@ -75,13 +77,13 @@ npx -y @dylanrussell/agent-router init
 `init` will:
 
 1. Capture your agents' current models into a first stack (`default`) and mark it active.
-2. Add `@dylanrussell/agent-router@latest` to the `plugin` array in `opencode.json` (backing it up first).
-3. Add the same entry to `tui.json` — this loads the sidebar + `/agent-*` commands (opencode ≥ 1.17).
+2. Add `@dylanrussell/agent-router@latest` to the `plugins` array in `opencode.json` (backing it up first).
+3. Add the same entry to `cli.json` — this loads the sidebar + `/agent-*` commands.
 4. Remove the legacy `@dylanrussell/omo-router` plugin entry if present.
 
 Then **restart opencode** so it picks up the plugin.
 
-`@opencode-ai/plugin` is a required peer dependency: the server bundle imports it at runtime. npm installs it on a clean install; do not omit peer dependencies when installing the plugin.
+The API peer is pinned to `@opencode/plugin@2.0.8`. OpenCode provides the terminal renderer at runtime. Both package entrypoints default-export V2 plugin definitions.
 
 ## Quickstart
 
@@ -94,7 +96,7 @@ agent-router current                  # print the agent → model mapping in fro
 agent-router status                   # print active stack name
 agent-router show cheap               # print a stack's JSON
 agent-router edit cheap               # open a stack in $EDITOR
-agent-router validate --all           # check every stack against `opencode models`
+agent-router validate --all           # check model IDs and variants against the V2 catalog
 agent-router history                  # list recent switches
 agent-router import my-mix <file>     # import a stack from a file
 agent-router export my-mix <file>     # export a stack to a file
@@ -125,7 +127,7 @@ A stack file needs one thing: an `agents` record whose entries carry a `model` s
 - Reserved opencode framework keys (`description`, `mode`, `permission`, `tools`, `prompt`, `steps`, `color`, `name`) are never transcribed — a stack entry can't clobber them.
 - Option values serialize to a single frontmatter line: scalars bare (quoted only when needed), objects/arrays as JSON flow. Block-style values an apply replaces are collapsed to flow; `capture` parses them back into typed JSON.
 
-`use` is strict by design: if a stack references an agent file that doesn't exist, or one without a `model:` line, the switch fails **before anything is written** — your suite is never left half-switched. It also validates every model ID against `opencode models` first (skip with `--no-validate`, override with `--force-invalid`).
+`use` is strict by design: if a stack references an agent file that doesn't exist, or one without a `model:` line, the switch fails **before anything is written**. It validates model IDs and variants against the V2 catalog first (skip with `--no-validate`, override with `--force-invalid`).
 
 `capture` is the inverse: it reads the current `model:` line and option keys of every agent file (files without a `model:` line are skipped) and writes a stack. There are no bundled seed stacks — your real setup is the seed.
 
@@ -154,36 +156,40 @@ Model IDs and variants above are illustrative; use models and variants supported
 - `fallbacks` is optional, or an array of 0 to 8 objects. Each object contains only `model` (non-whitespace `provider/model`) and optional `variant` (nonempty string). `null`, bare strings, unknown candidate fields, and longer chains are rejected.
 - Candidate order is preserved. Exact `(model, variant)` duplicates, including the primary, are skipped at runtime. An omitted fallback variant clears the previous candidate's variant.
 - Only model and variant change at runtime. Agent prompts, permissions, tools, and other provider options remain unchanged; ensure those options are compatible with every candidate.
-- Validation checks every primary and fallback ID, reporting paths such as `agents.oracle.fallbacks.0.model`. It checks catalogue membership through `opencode models`, not live provider health, credentials, quota, or variant support. `validate --active` includes applied fallback metadata when its primary still matches frontmatter.
+- Validation checks every primary and fallback ID and variant, reporting paths such as `agents.oracle.fallbacks.0.variant`. Server tools use the connected host catalog; the standalone CLI uses `opencode api model.list`. Catalog membership does not prove live provider health or quota. `validate --active` includes applied fallback metadata when its primary still matches frontmatter.
 - Failover does not rewrite frontmatter, stacks, history, or router state. `use` stores the applied chains in optional `state.json.fallbackAgents`. Old state files without that field remain valid and have no enabled chains until the stack is reapplied.
 - `capture` and displaced-history snapshots merge those applied chains with live frontmatter only when primary model and variant still match. Editing a stack alone does not alter applied metadata. Applying a stack without chains clears the applied chains, including agents omitted from that stack.
 - `back` retains its existing semantics: reapply a previous **named stack as it exists now**, not restore historical snapshot bytes. Runtime failover never adds a history entry.
 
 ### Runtime Behavior And Limits
 
-The plugin watches correlated assistant `message.updated` errors, requiring the current user-message parent ID, agent, and selected provider/model. It stages the next candidate only for structured `APIError` with `isRetryable: true` and HTTP **429, 500, 502, 503, or 504**. Native opencode retries may occur before the terminal error reaches this hook. Router does not change their policy or timing.
+The V2 plugin watches `retry` hooks correlated with the admitted user turn, agent and selected model. A retryable HTTP **429, 500, 502, 503, or 504** stages the next candidate and vetoes the same-turn retry. Only primary model requests participate.
 
 Authentication/permission errors, context overflow, content filtering, output-length errors, unknown errors, transport errors without an HTTP status, and ambiguous `session.error` notifications do not advance the chain. Router never classifies errors by substring matching.
 
-After a qualifying failure a 15-second warning toast (or log fallback) names the next model and asks for an explicit retry/continue instruction. Every notice is also logged under `agent-router`. **Review partial output and completed tools before continuing.** The mutable `chat.message` hook selects the fallback when the next prompt is admitted; no prompt is submitted by this plugin. The successful fallback stays selected for subsequent turns. Chains advance monotonically with at most eight transitions per agent/session; exhaustion produces a notice, never wraps to the primary. There are no timers, background retries, or automatic failback.
+After a qualifying failure a server log names the next model and asks for an explicit retry/continue instruction. **Review partial output and completed tools before continuing.** The next `prompt` admission hook calls `session.switchModel`; it never submits a prompt. Chains advance monotonically, never wrap, and never replay prompts or tools.
 
-Observed cancellation (`MessageAbortedError`), explicit model/agent switch events, and an incoming model/variant different from both the configured primary and current candidate disable routing for that session until restart. A switch to the same model is distinguishable only when the host emits its switch event. Hosts/UI paths that omit both the event and a changed selection cannot expose that manual intent to this plugin. Switching stacks with router tools disables running failover immediately; external CLI/TUI state changes disable it at the next prompt admission. Restart to activate the newly applied stack.
+Observed interruption, explicit model/agent selection events, and an unexpected incoming model disable routing for that session. Router state changes disable startup routing at the next prompt admission. Restart to activate a newly applied stack.
 
-Duplicate/concurrent error events advance only once per user turn. Selection and bookkeeping run synchronously before notification awaits, so delayed notices cannot overwrite cancellation/manual selection. Sessions and per-agent budgets are isolated; deleted/disabled sessions remain tombstones to prevent rearming. After 1,024 tracked sessions in one plugin instance, additional sessions receive no automatic routing until restart. Untracked sessions and subagents that bypass `chat.message` are deliberately left alone.
+Duplicate failures advance only once per admitted user turn. Routing budgets are isolated by session and agent and bounded to 1,024 sessions. Subagents without user prompt admission are left alone.
 
-**Verified boundary:** inspected opencode **v1.17.15** `packages/opencode/src/session/prompt.ts`: `chat.message` mutates the message before `sessions.updateMessage(info)` and the legacy session loop resolves `lastUser.model`. A deterministic in-process provider harness tests those hook semantics, explicit next-turn continuation, variant selection, and no replay/persistent writes. This is **not a real-server end-to-end provider test** and does not prove that every new v2 execution path invokes these legacy hooks. Hosts that bypass them receive no failover. There is no transparent same-turn continuation guarantee, no automatic recovery of a failed `task` invocation, and no guarantee that an LLM will not choose to repeat a tool when explicitly asked to continue.
+**Verified boundary:** compiled against the published **2.0.8** API types. Deterministic adapter tests cover next-turn selection, retry veto, auxiliary-request exclusion, variants, and no replay or persistent agent writes. These are not real-provider end-to-end tests. An LLM may choose to repeat a tool when explicitly asked to continue.
 
-The installed SDK exposes `/v2` `client.v2.session.switchModel` for subsequent turns, but no atomic compare-and-switch/retry contract was verified. Router deliberately does **not** call it: an asynchronous model write could race a manual selection or cancellation. No direct SDK dependency is needed; plugin hooks are the integration boundary. The sidebar displays configured primary and fallback chains; the TUI model picker and router status display primary assignments. None of these indicate session-local runtime candidates.
+OpenCode 2.0.8 exposes no atomic compare-and-switch in the prompt hook and no request kind in the retry hook. Concurrent manual selections/admissions or auxiliary requests remain host API limitations. The sidebar displays configured routing and highlights the current session selection, not pending fallback state. Terminal stack operations require local filesystem access; remote server filesystem management is not supported.
 
 ### Install This Checkout
 
-Ordered fallbacks require agent-router **1.1.0 or later**. To test a local checkout instead of the published package, run `npm run typecheck`, `npm test`, and `npm run build` using the installed dependencies (a fresh checkout uses `pnpm install --frozen-lockfile`). Replace `/absolute/path/to/agent-router` below with your checkout path, then replace the registry router entry in the **server** `opencode.json` plugin array with:
+To test a local V2 checkout, run `npm run typecheck`, `npm test`, and `npm run build` (a fresh checkout uses `pnpm install --frozen-lockfile`). Replace the registry entry in the server `opencode.json` **plugins** array with the package directory:
 
 ```json
-"file:///absolute/path/to/agent-router/dist/plugin.js"
+"file:///absolute/path/to/agent-router"
 ```
 
-Do not load both registry and local server plugins. If using the router TUI plugin, also replace its registry entry in `tui.json` with `file:///absolute/path/to/agent-router/dist/tui.js`. Use the checkout's CLI too: older router builds strictly validate state and cannot read the new `fallbackAgents` field. Add a chain to your stack and run `node /absolute/path/to/agent-router/dist/cli.js use <stack-name>`, then quit and restart opencode. These installation/configuration steps are instructions only; implementation and tests do not modify your live agent configuration. Start a new session, and confirm you see the explicit next-turn notice after a qualifying terminal error. Headless clients must inspect the `agent-router` log.
+Use the same package directory in `cli.json` **plugins** when explicitly registering the terminal half. Do not load both registry and local copies. The local CLI is `node /absolute/path/to/agent-router/dist/cli.js`. Applying a stack still requires restarting OpenCode; inspect server logs for next-turn fallback notices.
+
+OpenCode 2.0.8 ignores package exports for local directories. Root `index.ts` and `tui.ts` wrappers load the built files; run `npm run build` before using the source directory.
+
+`npm run test:integration` starts an isolated real OpenCode 2.0.8 server, initializes its location, verifies router activation and terminal discovery, and exercises a disposable RPC probe with absent, null, and invalid input. It uses temporary HOME/XDG/router directories and never modifies live configuration. Set `AGENT_ROUTER_TEST_PACKAGE` to an unpacked tarball directory to test release contents. Router itself exposes tools, not RPC methods.
 
 ## Inside opencode
 
@@ -202,10 +208,10 @@ The plugin exposes six tools the agent (or you, by asking it) can call:
 
 ## In the TUI
 
-On opencode ≥ 1.17 the plugin also ships a TUI half (loaded from `tui.json`, wired up by `init`):
+The V2 terminal half loads from the package's `./tui` export (`cli.json`, wired up by `init`):
 
-- **Sidebar panel** — lists available stacks with the active one checked. Under **Current Stack → Configured routing**, each agent has an indented **Primary** model and ordered **Fallback 1**, **Fallback 2**, … rows. Explicit variants appear in brackets; agents without fallbacks show only their primary. Model IDs are kept in full. A `⟳ restart required` badge appears when the active stack differs from the one at TUI startup. Updates live (≤1.5s), including fallback-only and variant-only edits.
-- **Configuration, not live failover** — sidebar chains come from the active stack file, not session-local routing or the applied `state.json.fallbackAgents` snapshot. Editing a stack changes this preview but does not apply it: use the stack and restart opencode to activate changes. A fallback row is a configured candidate, not a claim that failover is enabled or that the model is currently running.
+- **Sidebar panel** — lists available stacks with the active one checked. Under **Current Stack**, each agent has one indented model per line, in precedence order, without Primary/Fallback labels. Explicit variants appear in brackets; full model IDs wrap rather than truncate. A `⟳ restart required` badge appears when the active stack differs from the one at TUI startup. File changes update live (≤1.5s).
+- **Current selection** — the live session's agent/model is highlighted in color and bold with `●`; out-of-chain selections get a separate Current row. Other agents are not presented as live selections. Configured chains still come from the active stack file, not the applied `state.json.fallbackAgents` snapshot. Editing a stack changes the preview but does not apply it: use the stack and restart opencode to activate changes. The marker reflects session selection, not proof that a request is running or that failover is enabled.
 - **Commands** — type `/` or open the command palette:
 
 | command | what it does |
@@ -244,7 +250,7 @@ Paths resolve in this order: explicit option → `config.json` → env var → d
 
 - **Restart required.** opencode reads agent files once at startup. After every `agent-router use`, restart opencode for the new models to take effect. The CLI reminds you.
 - **Hand-edits to frontmatter are not auto-saved into stacks.** If you hand-tune a model or option and want to keep it, `capture` it (or `capture <active> --force`). The next `use` that touches that agent overwrites the hand-edit for keys the stack names; keys the stack omits are preserved (set an option to `null` in a stack entry to clear it).
-- **Validation is auth-state-dependent.** `agent-router validate` runs `opencode models`, which only lists models reachable through your current auth. If you revoke a key, previously-valid stacks may suddenly be invalid.
+- **Validation is catalog-dependent.** `agent-router validate` uses the active V2 model catalog, including variants. Catalog membership does not guarantee provider health, valid credentials, or available quota.
 
 ## FAQ
 

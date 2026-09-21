@@ -34,27 +34,25 @@ Open Ledger from the command palette or with `/ledger`. Press `?` inside Ledger 
 
 Ledger lists changed files, lets you inspect each diff hunk, asks your OpenCode model for explanations, and tracks which blocks you have approved locally.
 
-Ledger opens in **Branch vs main** mode by default. It shows the net committed changes from the common ancestor of main and your branch to `HEAD`, equivalent to:
+Ledger opens in **Branch + local vs main** mode by default. It shows the combined net changes from the common ancestor (merge base) of main and your branch to a snapshot of the current working state. This includes committed branch changes, staged and unstaged edits, and non-ignored untracked files.
 
-```sh
-git diff main...HEAD
-```
+This is one net comparison, not a concatenation of committed and local diffs. Changes that cancel each other out disappear: for example, a local edit that undoes a committed branch change back to the merge-base content leaves no diff for that change. Changes made only on main are not included.
 
-Uncommitted edits, staged changes, and untracked files are excluded from this view. File contents are read from the same commit as the diff, so local edits cannot change the displayed context. Changes made only on main are not included.
+Branch-mode diffs and file contents come from the same tree snapshot built with a temporary Git index, rather than independently reading live working-copy files. The snapshot leaves your actual index unchanged, but writes Git objects to the repository.
 
-Press `b` to switch between **Branch vs main** and **Uncommitted**. The header shows the active branch and comparison base, or `Uncommitted`. Every newly opened Ledger starts in branch mode.
+Press `b` to switch between **Branch + local vs main** and **Uncommitted Only**. The branch-mode header shows `<branch> + local vs <base>`; the other mode is labeled `Uncommitted Only` and retains the existing local-only comparison. Every newly opened Ledger starts in branch mode.
 
 - Local `main` is preferred; `origin/main` is used only if local main is absent. Ledger does not fetch or update either ref. Fetch/update your base yourself when needed.
-- If neither ref exists, Ledger shows an error instead of falling back to uncommitted changes. An empty branch comparison stays empty, including when reviewing main itself.
-- Branch refs are checked every two seconds while branch mode is open. Press `r` to explicitly refresh either view.
+- If neither ref exists, Ledger shows an error instead of falling back to uncommitted changes. A branch comparison is empty only when the snapshot has no net changes from the merge base; reviewing main itself can still show local changes.
+- Branch refs and local edits are checked every two seconds while branch mode is open. Press `r` to explicitly refresh either view.
 - Approvals, comments, and explanations are separate for each branch/base and for the uncommitted view. Unchanged hunks retain their reviews as the branch advances. Existing uncommitted reviews remain available.
-- `m` generates a message for the selected changeset: a squash-commit message in branch mode, or a commit message for local changes in uncommitted mode.
-- `e` opens the working-copy file, not a historical checkout. Local edits may mean its line numbers differ from the reviewed commit.
+- `m` generates a message for the selected changeset: a squash-commit message covering the combined net branch and local changes in branch mode, or a commit message for local changes in uncommitted-only mode.
+- `e` opens the live working-copy file, not the reviewed snapshot. Edits made since the snapshot may mean its line numbers differ from the reviewed content.
 - The session-prompt `ledger local` count continues to refer to uncommitted files needing approval.
 
 ## Important keys
 
-- `b`: toggle branch vs main / uncommitted changes
+- `b`: toggle branch + local / uncommitted only
 - `r`: refresh the selected Git comparison
 - `j` / `k`: move selection or diff cursor
 - `J` / `K`: next or previous block
@@ -82,7 +80,7 @@ Press `b` to switch between **Branch vs main** and **Uncommitted**. The header s
 
 - If Ledger does not appear, restart OpenCode and check that `@shivambaku/opencode-ledger` is listed in your `tui.json` `plugin` array.
 - If you already have plugins configured, add `@shivambaku/opencode-ledger` to the existing `plugin` array instead of replacing it.
-- If branch mode has no files, check that the branch has committed changes since it diverged from main. Press `b` to review local changes instead.
+- If branch mode has no files, the current snapshot has no net changes from the merge base. Committed and local changes may have canceled each other out. Press `r` to refresh, or `b` to inspect uncommitted changes separately.
 - If the comparison base is missing, create local `main` or fetch `origin/main`, then press `r`. Shallow clones may need more history to find the common ancestor.
 - Branch comparisons run Git locally and require the reviewed checkout to be accessible to the TUI process.
 

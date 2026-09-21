@@ -88,12 +88,17 @@ it tracks the live stream rather than the provider's final totals.
 
 ## Configuration
 
-All options are optional. Plugin entry in `tui.json`:
+All options are optional. Plugin entry in `~/.config/opencode/cli.json`:
 
 ```jsonc
 {
-  "plugin_enabled": { "internal:sidebar-context": false },
-  "plugin": [["./context/tui.js", { "estimate": true, "exclude": ["system", "cached"] }]]
+  "plugins": [
+    "-opencode.sidebar.context",
+    {
+      "package": "opencode-plugin-context",
+      "options": { "estimate": true, "exclude": ["system", "cached"] }
+    }
+  ]
 }
 ```
 
@@ -107,25 +112,28 @@ percent lines still report the real totals.
 
 ## Requirements
 
-- OpenCode `>= 1.18.0`
+- OpenCode `>= 2.0.0`
+
+This plugin uses the OpenCode **V2** TUI plugin API (a `{ id, setup }` TUI
+module + the `sidebar.content` slot). It does not load on OpenCode 1.x.
 
 ## Install
 
 From npm:
 
 ```sh
-opencode plugin opencode-plugin-context --global --force
+opencode plugin add opencode-plugin-context
 ```
 
 The command installs the plugin **and registers it in
-`~/.config/opencode/tui.json`** — no manual `plugin` entry needed.
+`~/.config/opencode/cli.json`** — no manual entry needed.
 
-Then disable the built-in block it replaces (it renders above yours) by adding
-to `~/.config/opencode/tui.json`:
+Then disable the built-in context block it replaces (the built-in id is
+`opencode.sidebar.context`); in `~/.config/opencode/cli.json`:
 
 ```jsonc
 {
-  "plugin_enabled": { "internal:sidebar-context": false }
+  "plugins": ["-opencode.sidebar.context"]
 }
 ```
 
@@ -140,33 +148,36 @@ npm install
 npm run dev:install   # builds dist/tui.js and copies it into ~/.config/opencode/context/
 ```
 
-Then register it in `~/.config/opencode/tui.json` and restart OpenCode:
+Then register the directory in `~/.config/opencode/cli.json` and restart
+OpenCode:
 
 ```jsonc
 {
-  "plugin_enabled": { "internal:sidebar-context": false },
-  "plugin": [["./context/tui.js", {}]]
+  "plugins": ["-opencode.sidebar.context", "./context"]
 }
 ```
 
 > The plugin must NOT live in the auto-discovered `~/.config/opencode/plugins/`
 > directory — that is scanned for **server** plugins, and opencode rejects this
-> TUI-only module there. TUI plugins are only loaded via `tui.json`.
+> TUI-only module there. CLI/TUI plugins are loaded via
+> `~/.config/opencode/cli.json`.
 
 ## How it works
 
-- Renders into the `sidebar_content` slot (order `60`) via `@opentui/solid`.
+- Exports an OpenCode **V2** TUI module (`{ id, setup }`) and claims the
+  `sidebar.content` slot, rendering with `@opentui/solid`.
 - Reads the latest resolved assistant turn's token buckets
-  (`tokens.input/output/reasoning/cache.{read,write}`) and the model's
-  `limit.context` / `limit.output` from `api.state.provider` — the same source
-  the built-in block uses.
+  (`tokens.input/output/reasoning/cache.{read,write}`) from
+  `data.session.message.list()` and the model's `limit.context` / `limit.output`
+  from `data.location.model.list()` — the same source the built-in block uses.
 - **used** = input + output + reasoning + cache.read + cache.write (opencode's
   own total). Segments are never double-counted; `cache.write` folds into the
   prompt bucket, and **reserved output** shrinks as actual output grows.
 - With `estimate: true`, the prompt bucket is split into `u`/`m`/`s` from
-  visible message parts; `s` is the remainder.
-- Cost comes from `session.cost`, falling back to summing assistant `cost`.
-- Repaints on `message.*` / `session.*` events plus a 2-second self-heal timer.
+  visible message content; `s` is the remainder.
+- Cost comes from `data.session.cost(sessionID)`.
+- Repaints reactively on subscription-store changes plus `session.text.delta` /
+  `session.reasoning.delta` (for the live TPS line), throttled to ~20 fps.
 
 ## What it deliberately does *not* show
 

@@ -55,6 +55,34 @@ Add the npm package to your global OpenCode configuration at:
 
 OpenCode installs npm plugins and their dependencies automatically with Bun. Quit and restart OpenCode after changing the configuration.
 
+The plugin does not create the three primary agents itself. To make `luna`,
+`terra`, and `sol` available in every project, install their agent definitions
+globally in:
+
+```text
+~/.config/opencode/agents/
+```
+
+Copy the files from this repository's `.opencode/agents/luna.md`,
+`.opencode/agents/terra.md`, and `.opencode/agents/sol.md` into that directory.
+If the definitions exist only under a project's `.opencode/agents/` directory,
+the agents and routing notifications are visible only in that project.
+
+Disable OpenCode's built-in `plan` and `build` agents in the same global
+configuration so the selector exposes only the routing ring:
+
+```jsonc
+{
+  "agent": {
+    "plan": { "disable": true },
+    "build": { "disable": true }
+  }
+}
+```
+
+Do not load the plugin a second time through a project-local
+`.opencode/plugins/` wrapper when it is already configured globally.
+
 For local development, replace the npm package name with an absolute file URL to the checked-out entry point:
 
 ```jsonc

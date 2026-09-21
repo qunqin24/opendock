@@ -206,7 +206,6 @@ Example `.opencode/sortie-dogs-v010.json`:
   },
   "continuation": {
     "enabled": true,
-    "maxAutoContinues": 10,
     "taskWatchdogMilliseconds": 300000
   }
 }
@@ -233,7 +232,8 @@ not invent, probe, or translate variant names.
   default `1` and `maxArtifactBytes` default/maximum `30720`. Unavailable review
   blocks only when review is required.
 - `continuation.enabled`: default `true`.
-- `continuation.maxAutoContinues`: positive integer, default and maximum `10`.
+- Automatic continuation has no turn-count ceiling. The legacy positive-integer
+  `continuation.maxAutoContinues` setting is accepted but ignored.
 - `continuation.taskWatchdogMilliseconds`: root inactivity while an implementation
   Task is outstanding; default `300000`, valid range `10..1800000`.
 - `continuation.summarizeModel`: optional explicit compaction model; omission

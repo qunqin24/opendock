@@ -53,6 +53,10 @@ installer or edit the config file directly:
 
 Valid values: `"en"` or `"pt"`.
 
+## Contributing / Releasing
+
+See [RELEASING.md](./RELEASING.md) for the release workflow and maintenance playbook.
+
 ## License
 
 MIT

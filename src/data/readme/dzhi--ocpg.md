@@ -42,7 +42,7 @@ The test when storing something: *would this help in a different customer's repo
 
 ---
 
-Uses the `memories` table (`content`, `tags`, `session_id`, `project`, `created_at`, `search_vector`, `embedding`, `memory_type`, `access_count`, `last_accessed_at`, `updated_at`) and the `pg_trgm` + `vector` extensions, and exposes `memory_recall` / `memory_remember` / `memory_forget` / `memory_update` / `memory_consolidate` tools.
+Uses the `memories` table (`content`, `tags`, `session_id`, `project`, `created_at`, `search_vector`, `embedding`, `memory_type`, `access_count`, `last_accessed_at`, `updated_at`) plus a `memory_recalls` table (which sessions have recalled a memory, feeding a small ranking tiebreak) and the `pg_trgm` + `vector` extensions, and exposes `memory_recall` / `memory_remember` / `memory_forget` / `memory_update` / `memory_consolidate` tools.
 
 ## Install
 
@@ -102,6 +102,8 @@ Visibility is **type-based**:
 `memory_forget` / `memory_update` follow the same rule: a foreign project's `project_fact` is off-limits (the call fails and names the owning project); the global type (`stack_fact`) is maintainable from any project.
 
 `access_count` and `last_accessed_at` are updated on every `memory_recall` read but nothing currently ranks by them - they're collected as data for possible future use, not consumed by any ranking today. (An access-frequency ranking was tried and reverted: bumping exactly the returned top-5 created a rich-get-richer loop where a few rows pinned the top slot after a handful of runs.)
+
+`memory_recall` also records which session did the recalling in a separate `memory_recalls` table - a memory recalled from several distinct sessions gets a small ranking tiebreak (capped, weighed well below the same-project boost). Recalling it many times from the *same* session doesn't compound the count, which is the deliberate difference from `access_count`'s reverted attempt above.
 
 ## How injection picks memories
 

@@ -1,0 +1,397 @@
+# OpenCode TUI Usage Plugin
+
+OpenCode TUI 插件，在侧边栏显示用量和额度信息，支持多额度 provider。
+
+![preview](./preview.png)
+
+## 🤖 Agent 快速安装
+
+把下面这段提示词发给你的 AI 编码代理（OpenCode 等），即可自动完成安装和配置：
+
+> 给用户安装 opencode-tui-usage 插件（@yinxe/opencode-tui-usage）。
+> 
+> 步骤：
+> 1. 在 `~/.config/opencode/tui.json` 的 `"plugin"` 数组中添加 `"@yinxe/opencode-tui-usage@latest"`
+> 2. 如果文件不存在，创建它：
+>    ```json
+>    {
+>      "$schema": "https://opencode.ai/tui.json",
+>      "plugin": ["@yinxe/opencode-tui-usage@latest"]
+>    }
+>    ```
+> 3. 根据用户使用的 AI provider 设置对应的环境变量（任选其一或多个）：
+>    - **DeepSeek**：`export DEEPSEEK_API_KEY="sk-xxxxx"`
+>    - **MiniMax**：`export MINIMAX_API_KEY="your-key"`
+>    - **OpenCode Go**：`export OPENCODE_GO_AUTH_COOKIE="cookie"` 和 `export OPENCODE_GO_WORKSPACE_ID="wrk_xxx"`
+> 4. 重启 OpenCode
+> 5. 打开一个会话，在侧边栏查看用量信息
+
+> **提示**：本插件已内置环境变量保底支持。即使不创建 `usage.provider.json` 配置文件，只要设置了上述约定的环境变量就能工作。
+
+## 功能特性
+
+- 📊 支持 plan 型与按量计费型两种 provider
+- 💰 余额展示（按量计费 provider，如 DeepSeek）
+- 📈 额度展示（plan 型 provider，进度条 + rolling/weekly/monthly）
+- 🎨 树线风格展示 Session / Token 用量信息
+- 🔄 自动根据当前会话的 provider 切换数据源
+- 🛠️ 支持扩展新的 provider 适配器
+
+## 安装
+
+在 `~/.config/opencode/tui.json` 中添加插件路径：
+
+```json
+{
+  "$schema": "https://opencode.ai/tui.json",
+  "plugin": ["@yinxe/opencode-tui-usage@latest"]
+}
+```
+
+重启 OpenCode 使插件生效。
+
+> 首次配置或修改插件版本后，下次重启 OpenCode 会花费一些时间从 npm 自动下载安装插件。
+
+## 配置额度 Provider
+
+插件支持多个额度 provider，会根据当前会话的 `providerID` 自动选择对应的适配器。
+
+### 环境变量引用
+
+配置值支持两种环境变量引用格式，从 `process.env` 读取实际值：
+
+| 格式 | 示例 | 说明 |
+|------|------|------|
+| `${VAR}` | `"apiKey": "${MY_KEY}"` | 旧写法（兼容） |
+| `{env:VAR}` | `"apiKey": "{env:MY_KEY}"` | 新写法 |
+
+> **保底支持**：每个 provider 都有约定的环境变量名称。即使 `usage.provider.json` 中未配置，只要设置了约定环境变量就能工作。
+
+| Provider | 保底环境变量 |
+|----------|-------------|
+| DeepSeek | `DEEPSEEK_API_KEY` |
+| MiniMax | `MINIMAX_API_KEY` |
+| OpenCode-Go | `OPENCODE_GO_AUTH_COOKIE` + `OPENCODE_GO_WORKSPACE_ID` |
+
+### MiniMax-CN
+
+适用于 `providerID` 为 `minimax-cn-coding-plan` 的会话。
+
+创建 `~/.config/opencode/usage.provider.json`：
+
+```json
+{
+  "providers": {
+    "minimax-cn-coding-plan": {
+      "apiKey": "${MINIMAX_API_KEY}"
+    }
+  }
+}
+```
+
+设置环境变量：
+
+```bash
+export MINIMAX_API_KEY="your-api-key-here"
+```
+
+### OpenCode-Go
+
+适用于 `providerID` 为 `opencode-go` 的会话。
+
+在 `~/.config/opencode/usage.provider.json` 中添加：
+
+```json
+{
+  "providers": {
+    "opencode-go": {
+      "cookie": "${OPENCODE_GO_AUTH_COOKIE}",
+      "workspaceId": "${OPENCODE_GO_WORKSPACE_ID}"
+    }
+  }
+}
+```
+
+设置环境变量：
+
+```bash
+export OPENCODE_GO_AUTH_COOKIE="your-cookie"
+export OPENCODE_GO_WORKSPACE_ID="wrk_xxxxxxxxxxxx"
+```
+
+### DeepSeek
+
+适用于 `providerID` 为 `deepseek` 的按量计费会话。
+
+在 `~/.config/opencode/usage.provider.json` 中添加：
+
+```json
+{
+  "providers": {
+    "deepseek": {
+      "apiKey": "{env:DEEPSEEK_API_KEY}"
+    }
+  }
+}
+```
+
+设置环境变量：
+
+```bash
+export DEEPSEEK_API_KEY="sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+```
+
+### 获取 OpenCode-Go 配置
+
+1. 登录 https://opencode.ai
+2. 打开浏览器开发者工具 → Network
+3. 访问 `/workspace/{workspaceId}/usage` 页面
+4. 找到 `_server` 请求，从 Request Headers 复制完整的 `cookie`
+5. workspaceId 从 URL 中获取（格式：`wrk_` 开头）
+
+## 开发
+
+```bash
+# 安装依赖
+npm install
+
+# 类型检查
+npm run lint
+
+# 构建输出到 dist/
+npm run build
+
+# 监听模式（开发时使用）
+npm run dev
+```
+
+## 目录结构
+
+```
+src/
+├── tui.tsx              # 插件入口，注册 sidebar_content slot
+├── formatters.ts        # 格式化工具
+├── components.tsx       # 可复用组件 (TreeItem, Collapsible, ProgressBar)
+├── balance-view.tsx     # 余额展示组件（按量计费）
+├── usage.tsx            # 额度展示组件（plan 型）
+├── session-info.tsx     # Session 组件（含 Context 合并）
+├── tokens-usage.tsx     # Token 统计组件（树线展示）
+├── index.ts             # 重新导出
+└── quota/               # 额度/余额服务
+    ├── types.ts         # QuotaData, BalanceData 类型定义
+    ├── provider.ts      # QuotaProvider + BalanceProvider 接口
+    ├── service.ts       # QuotaService 多 provider 管理
+    ├── config.ts        # 读取 usage.provider.json
+    └── providers/       # provider 适配器
+        ├── minimax.ts
+        ├── opencode-go.ts
+        └── deepseek.ts  # 按量计费（Balance + Quota 双接口）
+```
+
+## 添加新的 Provider 适配器
+
+支持两种类型的 provider：
+
+| 类型 | 接口 | 适用场景 | 展示组件 |
+|------|------|----------|----------|
+| **Quota (额度)** | `QuotaProvider` | plan 型（coding plan / token plan） | `UsageView`（进度条 + rolling/weekly/monthly） |
+| **Balance (余额)** | `BalanceProvider` | 按量计费（pay-as-you-go） | `BalanceView`（余额数值） |
+
+一个 provider 可以同时实现两个接口（如 DeepSeek 无 plan quota 但提供余额查询）。
+
+### 1. 抓包获取 API
+
+在浏览器中打开目标网站的额度页面（如 `https://example.com/workspace/xxx/usage`），打开开发者工具 → Network，找到获取额度数据的请求：
+
+- **Chrome/Edge**: 右键请求 → Copy → Copy as cURL
+- **Firefox**: 右键请求 → Copy Value → Copy as cURL
+
+### 2. 调试 curl，精简参数
+
+拿到 curl 后，在终端中反复调试，逐步移除不必要的 headers 和参数，直到找到最小可复现的请求。常用技巧：
+
+```bash
+# 逐步删除 headers，看哪些是必需的（通常是 Authorization/Cookie）
+# 移除浏览器特有的 headers：sec-fetch-*, user-agent, referer, accept-language 等
+# 保留核心：认证信息 + Content-Type
+
+# 调试过程中可以用 | jq 格式化响应，方便分析
+curl -s 'https://example.com/api/quota' \
+  -H 'Authorization: Bearer xxx' \
+  | jq .
+```
+
+目标：得到一个**稳定可复现**、**参数最少**的 curl 命令。
+
+### 3. 分析响应结构
+
+运行精简后的 curl，将响应字段映射到对应数据结构：
+
+**QuotaData（plan 型）：**
+
+| 响应字段 | QuotaData 字段 | 说明 |
+|----------|---------------|------|
+| `xxx.total` / `xxx.used` | `rolling.usage` | 计算百分比 |
+| `xxx.reset_time` | `rolling.reset` | 用 `formatDurationCompact()` 格式化 |
+
+**BalanceData（按量计费型）：**
+
+| 响应字段 | BalanceData 字段 | 说明 |
+|----------|-----------------|------|
+| `xxx.total_balance` | `totalBalance` | 总余额 |
+| `xxx.currency` | `currency` | 币种 |
+
+### 4. 编写适配器
+
+在 `src/quota/providers/` 创建 `{name}.ts`。
+
+**Plan 型（实现 `QuotaProvider`）：** 参考 `minimax.ts`、`opencode-go.ts`。
+
+```typescript
+import type { QuotaData, ProviderConfig } from "../types.js";
+import { QuotaProvider, resolveEnvVar } from "../provider.js";
+
+export class MyQuotaProvider implements QuotaProvider {
+  readonly name = "my-provider";
+  private apiKey: string | undefined;
+
+  init(config: ProviderConfig, _credentials: Record<string, unknown>): void {
+    this.apiKey = resolveEnvVar(config.apiKey as string | undefined);
+  }
+
+  async fetchQuota(): Promise<QuotaData | null> {
+    // 调用 API 并映射为 QuotaData（rolling/weekly/monthly）
+  }
+}
+```
+
+**按量计费型（实现 `BalanceProvider`）：** 参考 `deepseek.ts`。
+
+```typescript
+import type { BalanceData, QuotaData, ProviderConfig } from "../types.js";
+import { QuotaProvider, BalanceProvider, resolveEnvVar } from "../provider.js";
+
+export class MyBalanceProvider implements QuotaProvider, BalanceProvider {
+  readonly name = "my-provider";
+
+  init(config: ProviderConfig, _credentials: Record<string, unknown>): void {
+    this.apiKey = resolveEnvVar(config.apiKey as string | undefined);
+  }
+
+  // QuotaProvider：无 plan quota 时返回 null
+  async fetchQuota(): Promise<QuotaData | null> { return null; }
+
+  // BalanceProvider：返回余额数据
+  async fetchBalance(): Promise<BalanceData | null> {
+    // 调用 API 并映射为 BalanceData
+  }
+}
+```
+
+### 5. 注册到 QuotaService
+
+在 `src/quota/service.ts` 构造函数中注册：
+
+```typescript
+import { MyQuotaProvider } from "./providers/my-provider.js";
+this.registerProvider(new MyQuotaProvider());
+```
+
+### 6. 添加配置
+
+在 `~/.config/opencode/usage.provider.json` 中添加 provider 配置：
+
+```json
+{
+  "providers": {
+    "my-provider": {
+      "apiKey": "${MY_API_KEY}"
+    }
+  }
+}
+```
+
+### 7. 测试
+
+构建并重启 OpenCode，切换到对应 provider 的会话，检查侧边栏是否正常显示额度数据。
+
+## 调试
+
+查看插件日志：
+
+```bash
+cat ~/.local/share/opencode/log/$(ls -t ~/.local/share/opencode/log/ | head -1) | grep -i "tui.plugin\|error\|QuotaService\|DeepSeek"
+```
+
+常见问题：
+
+| 问题 | 原因 | 解决方案 |
+|------|------|----------|
+| 侧边栏无显示 | 缺少 `"oc-plugin": ["tui"]` | 检查 package.json |
+| JSX 报错 | 缺少 pragma | 每个 .tsx 顶部加 `/** @jsxImportSource @opentui/solid */` |
+| 显示 "No data" | provider 未注册或配置缺失 | 检查 usage.provider.json 和环境变量 |
+| opencode-go 500 错误 | cookie 过期或 headers 不对 | 重新抓包获取最新 cookie |
+
+## 技术栈
+
+- **Solid.js** - 响应式 UI 框架
+- **@opentui/solid** - TUI 组件库（`<box>`, `<text>` 等）
+- **TypeScript** - 类型安全
+
+## CI/CD 自动化发版
+
+本项目使用 GitHub Actions 实现自动化发版。推送 `v*` 格式的 tag 后，**同时发布到 npm 和 GitHub Packages**。
+
+### 发布流程
+
+使用 `npm version` 管理版本号（会自动创建 tag）：
+
+```bash
+# 更新版本并创建 tag
+npm version patch  # 0.0.1 → 0.0.2
+npm version minor  # 0.0.1 → 0.1.0
+npm version major  # 0.0.1 → 1.0.0
+
+# 推送 tag 触发 CI/CD
+git push origin v0.0.3
+```
+
+### 自动触发的工作流
+
+推送 tag 后，以下 job 会自动执行：
+
+```
+build → publish-npm + publish-github
+```
+
+| Job | 目标 | 依赖 |
+|-----|------|------|
+| `build` | 安装依赖、构建项目、运行测试 | - |
+| `publish-npm` | 发布到 [npm registry](https://www.npmjs.com/) | build |
+| `publish-github` | 发布到 [GitHub Packages](https://github.com/Yinxe/opencode-tui-usage/packages) | build |
+
+### 首次发版配置
+
+1. **GitHub Packages 认证**
+   - 无需额外配置，使用内置 `GITHUB_TOKEN`
+
+2. **npm 认证**（如需发布到 npm）
+   - 在 [npm.npmjs.com](https://www.npmjs.com/) 创建 Access Token
+   - 在 GitHub 仓库 Settings → Secrets and variables → Actions 添加 secret：
+     - Name: `npm_token`
+     - Secret: 你的 npm access token
+
+3. **scoped 包配置**
+   - 包名 `@yinxe/opencode-tui-usage` 已在 package.json 中配置
+   - `publishConfig.registry` 指定发布到哪个 registry
+
+### 发布地址
+
+| 平台 | 包名 | 地址 |
+|------|------|------|
+| npm | `@yinxe/opencode-tui-usage` | https://www.npmjs.com/package/@yinxe/opencode-tui-usage |
+| GitHub Packages | `@yinxe/opencode-tui-usage` | https://github.com/Yinxe/opencode-tui-usage/packages |
+
+## License
+
+MIT
