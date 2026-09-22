@@ -45,6 +45,7 @@ Most AI coding tools let one model write code and ask that same model whether th
 - 🎯 **Governed Skill Optimizer** — Manually-activated, single-skill optimizer (`/swarm skill-opt plan|run|status|diff|approve|reject|rollback|history`) that drives one allowlisted `SKILL.md` candidate at a time through deterministic draft → smoke → evaluation-substrate validation → manual approval → atomic activation/rollback. Bounded, restartable, reversible, and unable to mutate source/harness/security surfaces. Disabled by default (`skill_opt.enabled: false`); see [docs/skill-optimizer.md](docs/skill-optimizer.md).
 - 🔄 **Phase completion gates** — completion-verify and drift verifier gates enforced before phase completion
 - 🔁 **Resumable sessions** — all state saved to `.swarm/`; pick up any project any day
+- 🔀 **GitLab as a first-class forge** (#2733) — MR and issue URLs (`https://<gitlab-host>/owner/repo/-/merge_requests/N`, `/-/issues/N`) are accepted by `/swarm pr-review`, `pr-feedback`, `pr subscribe/unsubscribe`, `ci-monitor`, publication recording, and issue ingestion, with self-hosted instance hosts derived from the remote or `forge.base_url` (config `forge: { provider, base_url }`, default `auto`; ambiguous remotes fail closed). Every URL-security control (HTTPS-only, private/localhost rejection, IDN protection, credential stripping) applies identically to GitLab. The `glab` binary resolves through the same hardened resolver contract as `gh` (`OPENCODE_SWARM_GLAB_BINARY` env override). Honest capability reporting: GitLab does not synthesize GitHub's `statusCheckRollup`/`reviewDecision`/`mergeStateStatus` — those surface an explicit unavailable result instead of a fabricated value, and glab-backed live MR polling is tracked as follow-up issue [#2882](https://github.com/ZaxbyHub/opencode-swarm/issues/2882).
 - 🖥️ **PR Monitor** — GitHub PR subscription and background polling via `gh` CLI; delivers real-time CI, review, and merge status updates via the AutomationEventBus (FR-001, opt-in via `pr_monitor.enabled: true`). Subscribe with `/swarm pr subscribe <pr-url|owner/repo#N|N>`; unsubscribe with `/swarm pr unsubscribe <pr-url|owner/repo#N|N>`; check status with `/swarm pr status`. With `auto_pr_feedback: true`, CI failures and merge conflicts mechanically activate PR_FEEDBACK only when no other workflow owns the session; otherwise they are durably queued for a later round.
 - 🌐 **13 full language profiles** (TypeScript, JavaScript, Python, Go, Rust, Java, Kotlin, C/C++, C#, Ruby, Swift, Dart, PHP) with **tree-sitter parse validation across 20 grammars** (adds CSS, Bash, PowerShell, INI, Regex — and `.tsx` / `.c` aliases) — extending: see [docs/adding-a-language.md](docs/adding-a-language.md)
 - 🛡️ **Built-in security** — SAST, secrets scanning, dependency audit per task
@@ -1077,7 +1078,11 @@ unchanged — on the default path that is the phase header line, and on the
 scoring path the phase and current‑task context candidates. The full plan text
 is never injected in its place. When the cursor exceeds `max_tokens` and the
 compact rebuild kicks in, lookahead is reduced to one task and earlier phases
-collapse to one‑line summaries.
+collapse to one‑line summaries. A phase marked `[BLOCKED]` is surfaced as a
+one‑line `## Phase N [BLOCKED]` summary in both renders (issue #2841); its
+summary is reserved ahead of generic budget truncation, so it is never
+silently dropped within the configured `max_tokens` (only when even the
+summary cannot fit the bound does the bound win, as for every section).
 
 ## Tool Output Truncation (v6.13)
 

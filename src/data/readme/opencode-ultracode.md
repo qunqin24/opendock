@@ -122,9 +122,34 @@ session they open in turn. Your chat session and the plan
 approval prompt still ask as usual, and questions from sub-agents are still
 routed to you. Every auto-approval is written to the opencode log.
 
+### When an agent fails
+
+A failed agent does not silently hand `null` to the script. The run keeps
+going for everyone else, but the script waits for that one result while you
+decide in `/workflows`:
+
+- `R` **retries the agent in its own session**: the last error and an
+  optional note from you are appended as a follow-up message, so the agent
+  continues from where it was instead of starting over (a research agent that
+  made 100 tool calls keeps all of it).
+- `X` **skips it**: the script gets `null`, as before.
+
+You can also act on a healthy agent: `P` pauses just that agent (its session
+is kept) and resumes it, `X` stops it, and `R` on a running agent interrupts it
+and continues it with your note when it is heading the wrong way. The run-level
+`p`/`x` keys are unchanged.
+
+Automatic retries still happen first (a structured-output agent gets two
+attempts); every retry is a follow-up in the same session. To restore the old
+behaviour and have failures resolve to `null` immediately, start opencode
+with `ULTRACODE_HOLD_FAILED=0`.
+
 If opencode exits while a run is in progress, the run is not lost. Every
-completed agent is journaled, so resuming replays those results and only runs
-the remaining agents again.
+completed agent is journaled, so resuming replays those results; agents that
+were still running, paused or failed continue **in their own sessions** rather
+than from scratch. `R` on a failed agent of a stopped or even completed run
+resumes the run and continues that agent with your note; agents whose input
+changes as a result re-run, the rest replay.
 
 ### The `workflow` tool
 
@@ -135,6 +160,8 @@ the remaining agents again.
 | `name`        | Saved workflow from `.opencode/workflows/<name>.js`                 |
 | `args`        | Value exposed to the script as `args`                               |
 | `resumeRunId` | Resume a stopped run, or one whose engine died, by its run id       |
+| `retryAgentId`| With `resumeRunId`: one failed agent (e.g. `ag-002`) to continue in its session; also works on a completed run |
+| `retryNote`   | With `retryAgentId`: a note for that agent about what to fix       |
 
 ### Writing a script
 
@@ -176,7 +203,7 @@ return await agent(`Write the final report for these findings: ${JSON.stringify(
 
 | Primitive                    | What it does                                                                                                                                                         |
 |------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `agent(prompt, opts?)`       | Spawns a sub-agent in its own session. Resolves to the schema-validated object or the final text, `null` on failure or stop. `opts`: `label`, `phase`, `schema`, `model`. |
+| `agent(prompt, opts?)`       | Spawns a sub-agent in its own session. Resolves to the schema-validated object or the final text; `null` when the agent is stopped or when the user skips a failed agent (see above). `opts`: `label`, `phase`, `schema`, `model`. |
 | `parallel(thunks)`           | Runs `Array<() => Promise>` concurrently and waits for all of them. A throwing thunk becomes `null`.                                                                 |
 | `pipeline(items, ...stages)` | Runs each item through every stage independently, with no barrier between stages. The default choice.                                                               |
 | `phase(title)`               | Starts a display phase. Use the same titles as `meta.phases`.                                                                                                        |
@@ -194,8 +221,8 @@ Concurrency is capped at roughly `min(16, cpus - 2)` agents at a time and
 | Screen       | Keys                                                                                                                                              |
 |--------------|---------------------------------------------------------------------------------------------------------------------------------------------------|
 | Run list     | `↑↓` select · `⏎` open · `r` result · `x` stop · `p` pause / resume · `s` save script · `d` delete · `esc` back                                    |
-| Run view     | `↑↓` phase or agent · `←→` switch pane · `⏎` open · `r` result · `x` stop · `p` pause / resume · `s` save · `!` answer a pending permission         |
-| Agent detail | `↑↓` scroll · `←→` previous / next agent · `e` show tool and thinking previews · `p` expand prompt · `⏎` answer a permission or question           |
+| Run view     | `↑↓` phase or agent · `←→` switch pane · `⏎` open · `r` result · `x` stop · `p` pause / resume · `s` save · `!` answer a pending permission · on the selected agent: `R` retry · `P` pause / resume · `X` stop / skip |
+| Agent detail | `↑↓` scroll · `←→` previous / next agent · `e` show tool and thinking previews · `p` expand prompt · `⏎` answer a permission or question · `R` retry / steer · `P` pause / resume · `X` stop / skip |
 | Result view  | `↑↓` scroll · `g` top                                                                                                                             |
 
 The agent detail shows a **Live** feed while the agent runs (text, thinking
@@ -222,7 +249,8 @@ disabled the list holds tool calls only.
 | `<project>/.opencode/workflows/<name>.js`            | Saved workflows (`s` in the TUI). Project assets; commit them if you like.                                 |
 
 The TUI polls `state.json` and merges it fine-grained, so only changed cells
-redraw. Pause, resume and stop are written to `control.json` and picked up by
+redraw. Pause, resume and stop (for the run, or with an `agentId` and an
+optional `note` for one agent) are written to `control.json` and picked up by
 the engine.
 
 ## Requirements

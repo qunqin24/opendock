@@ -12,29 +12,57 @@ refreshing it in the background before it expires.
 
 ## Installation
 
-opencode resolves plugins named in the `plugin` array of `opencode.json` by fetching them
-from the public npm registry itself (via Bun, at startup, cached under
-`~/.cache/opencode/node_modules/`) — there's no `npm install` step for the end user, and no
-support for git URLs or local paths in that config array.
+opencode resolves package names in the plugin list of `opencode.json` by installing them
+from the public npm registry itself at startup — there's no `npm install` step for the end
+user. (An absolute path to a built checkout's `dist` directory also works, which is handy
+for testing a build before publishing: `["/path/to/opencode-oidc-plugin/dist", { ... }]`.)
 
-That means this package has to be published to npm before the config below will resolve:
+That means this package has to be published to npm before the config below will resolve.
+Releases are cut by `.github/workflows/release.yml` on every push to `main`, versioned by
+[svu](https://github.com/caarlos0/svu) from the [conventional commits](https://www.conventionalcommits.org/)
+since the last `v*` tag: `fix:` bumps the patch, `feat:` the minor, `feat!:` or a
+`BREAKING CHANGE:` footer the major. When a bump is due, the workflow pushes the tag, stamps
+the version into `package.json` for the tarball (the committed version is a placeholder),
+stages it on npm and creates a GitHub release. Pushes with only `docs:`, `chore:`, etc.
+publish nothing.
+
+The workflow authenticates with npm trusted publishing, so no token is stored in the repo,
+and it only ever runs `npm stage publish`: a release sits on the registry unpublished until
+a maintainer approves it with 2FA. The run's summary shows the commands:
 
 ```sh
-npm install
-npm run build
-npm publish --access public
+npm stage list opencode-oidc-plugin
+npm stage approve <stage-id>
 ```
 
+The trusted publisher is set up on npmjs.com under the package's *Settings → Trusted
+publishing* (GitHub Actions, repository `hauke-cloud/opencode-oidc-plugin`, workflow
+`release.yml`) with only stage publishing allowed — equivalently
+`npm trust github opencode-oidc-plugin --repo hauke-cloud/opencode-oidc-plugin --file release.yml --allow-stage-publish`.
+
 Once `opencode-oidc-plugin` exists on the registry, using it is just the `opencode.json`
-below — no separate install command. Bump `version` in `package.json` and re-run
-`npm publish` for updates; pin a version in the config (`"opencode-oidc-plugin@0.2.0"`)
+below — no separate install command. Pin a version in the config (`"opencode-oidc-plugin@1.0.0"`)
 if you don't want opencode picking up a new release automatically.
 
 ## How it fits together
 
-- opencode calls this plugin once per `[name, options]` entry in your `opencode.json` `plugin` array.
-- `options.provider` must exactly match the key of the provider it authenticates in the `provider` block of the same config.
-- Signing in (`opencode auth login`, pick the provider) drives the browser flow; afterwards opencode calls this plugin's `loader()` on every request, which refreshes the token when it's close to expiry and sets the header.
+This plugin targets the opencode **v2** plugin API (`@opencode/plugin`, opencode 2.x). For
+opencode 1.x, use `opencode-oidc-plugin@0.1`.
+
+- On load, the plugin registers an OAuth sign-in method on the integration named by
+  `options.provider`. opencode links a provider to the integration with the same id, so
+  `provider` must exactly match the key of the provider it authenticates in the `provider`
+  block of the same config.
+- Once registered, that provider only shows up as available after you've signed in.
+- Signing in (`opencode auth login llama-swap`) drives the browser flow; opencode stores the
+  resulting credential itself.
+- Whenever opencode resolves a model from that provider, it checks the stored token and asks
+  this plugin to refresh it if it expires within the next five minutes, then passes the
+  access token to the provider's SDK as its API key — `@ai-sdk/openai-compatible` sends that
+  as `Authorization: Bearer <token>`. Concurrent refreshes share a single `refresh_token`
+  grant, so IdPs that rotate refresh tokens (Keycloak does) don't kill the session.
+- opencode v2 refuses to load two plugins with the same id, so list this package **once**.
+  To authenticate several providers, pass them under a `providers` array (see below).
 
 ## Identity provider setup
 
@@ -73,7 +101,75 @@ Register a client on your OIDC issuer with:
 }
 ```
 
-Run `opencode auth login`, pick `llama-swap`, and finish the login in the browser tab that opens.
+Run `opencode auth login llama-swap` and finish the login in the browser tab that opens.
+`opencode auth list` shows the signed-in account.
+
+The `[name, options]` tuple form above is opencode 1.x syntax that opencode 2.x still accepts
+and migrates. The native 2.x form is:
+
+```jsonc
+{
+  "plugins": [
+    {
+      "package": "opencode-oidc-plugin",
+      "options": { "provider": "llama-swap", "issuer": "https://id.hauke.cloud/realms/cloud", "clientId": "prod-llama-swap-opencode" }
+    }
+  ]
+}
+```
+
+### Several providers
+
+```jsonc
+["opencode-oidc-plugin", {
+  "providers": [
+    { "provider": "llama-swap", "issuer": "https://id.hauke.cloud/realms/cloud", "clientId": "prod-llama-swap-opencode" },
+    { "provider": "other", "issuer": "https://auth.example.com", "clientId": "opencode", "callbackPort": 51122 }
+  ]
+}]
+```
+
+Each entry takes the options below.
+
+### Model discovery
+
+With `"discoverModels": true`, the plugin lists the provider's models from
+`<baseURL>/models` using the signed-in account's token and adds every model the config
+doesn't already define — so the `models` block can shrink to just the entries you want to
+adjust, or go away entirely:
+
+```jsonc
+"plugin": [
+  ["opencode-oidc-plugin", {
+    "provider": "llama-swap",
+    "issuer": "https://id.hauke.cloud/realms/cloud",
+    "clientId": "prod-llama-swap-opencode",
+    "discoverModels": true
+  }]
+],
+"provider": {
+  "llama-swap": {
+    "npm": "@ai-sdk/openai-compatible",
+    "options": { "baseURL": "https://llama.llm.hauke.cloud/v1" },
+    "models": {
+      // Only what the listing can't tell opencode.
+      "qwen3.8-27b-q4": { "limit": { "context": 196608, "output": 32768 } }
+    }
+  }
+}
+```
+
+- Names come from the listing's `name` field (llama-swap sends one), falling back to the id.
+- The listing carries no limits or modalities, so discovered models get opencode's defaults
+  (200K context, 32K output, text in and out, tool calling on). A same-named entry under the
+  provider's `models` is applied on top, which is how to correct limits or enable image input.
+- A config entry without a `name` (e.g. one that only sets `limit`) still gets the listed name.
+- Models the config defines stay listed even if the server doesn't report them.
+- Discovery runs at startup and when you sign in, sign out or switch accounts — not on token
+  refreshes. Discovered models belong to the account that listed them, so another account's
+  sign-in never shows the previous account's models.
+- If a listing fails (server down, 5xx), the last good list is kept and a warning goes to
+  stderr of opencode's server process.
 
 ## Plugin options
 
@@ -85,7 +181,8 @@ Run `opencode auth login`, pick `llama-swap`, and finish the login in the browse
 | `scope` | no | `"openid profile email offline_access"` | Space-separated. Drop `offline_access` only if you're fine re-authenticating whenever the access token expires. |
 | `callbackPort` | no | `51121` | Loopback port opencode's browser redirect lands on. Must match the client's registered redirect URI. |
 | `callbackPath` | no | `"/callback"` | Loopback path, same constraint. |
-| `refreshSkewSeconds` | no | `30` | How long before actual expiry `loader()` proactively refreshes. |
+| `loginTimeoutSeconds` | no | `300` | How long the browser login may take before the attempt is abandoned. |
+| `discoverModels` | no | `false` | Add the models `<baseURL>/models` lists for the signed-in account (see above). |
 
 ## Development
 
@@ -96,7 +193,7 @@ npm run typecheck   # tsc --noEmit
 npm test            # build, then node's built-in test runner
 ```
 
-No runtime dependencies — `@opencode-ai/plugin` is only used for its TypeScript types and is a
+No runtime dependencies — `@opencode/plugin` is only used for its TypeScript types and is a
 `devDependency`; everything else is Node built-ins (`node:http`, `node:crypto`) and the global
 `fetch`.
 

@@ -8,14 +8,14 @@
 
 **Give [OpenCode](https://opencode.ai) the instruments it does not ship with.**
 
-**[Documentation →](https://codestz.github.io/opencode-cockpit/)**  ·  [Install](https://codestz.github.io/opencode-cockpit/start/install/)  ·  [Shell](https://codestz.github.io/opencode-cockpit/shell/overview/)  ·  [Statusline](https://codestz.github.io/opencode-cockpit/status/overview/)  ·  [Changelog](CHANGELOG.md)
+**[Documentation →](https://codestz.github.io/opencode-cockpit/)**  ·  [Install](https://codestz.github.io/opencode-cockpit/start/install/)  ·  [Shell](https://codestz.github.io/opencode-cockpit/shell/overview/)  ·  [Review](https://codestz.github.io/opencode-cockpit/review/overview/)  ·  [Statusline](https://codestz.github.io/opencode-cockpit/status/overview/)  ·  [Changelog](CHANGELOG.md)
 
 A tool call has to finish. A dev server does not, and neither does the context window filling up
 behind you. Cockpit is the instrument panel: things your agent can use, and things that tell you
 what it is doing.
 
 ```sh
-opencode plugin opencode-cockpit --global
+opencode plugin opencode-cockpit@0.5.1 --global --force
 ```
 
 ---
@@ -37,18 +37,52 @@ ships.*
 
 ---
 
+### 🔍  Review — a pull request in the terminal
+
+Reviewing what your agent wrote means reading a diff in a chat log and describing your objection in
+prose. **Review** gives you the diff where the work happened, comments on the lines they are about,
+and an agent that can read them, answer them and mark them resolved — which a chat message cannot do.
+
+Comments live on the branch rather than in the chat, so they outlive the conversation. `s` hands them
+over; the agent fetches them with `review_list`, changes the code, and answers with
+`review_reply resolved=true`. That resolve is **checked against the file**: a thread remembers the
+lines it was written against, so "done" over an untouched file is recorded as a reply and the thread
+stays open for you.
+
+**3 agent tools · 12 filetypes · [docs](https://codestz.github.io/opencode-cockpit/review/overview/) · [`@opencode-cockpit/review`](packages/review)**
+
+---
+
 ### 📊  Statusline — what the session is costing you
 
 How full is the context? Where did the tokens go? What has changed? OpenCode answers the first in a
 corner and the rest not at all. **Statusline** answers them where you are already looking.
 
-![The statusline under an OpenCode conversation: a context bar at 40%, the token total with its cache, input and output parts, the session diff, elapsed time and todo progress](media/statusline.png)
+![The statusline under an OpenCode conversation: a context bar at 40%, the token total with its cache, input and output parts, what is uncommitted, elapsed time and todo progress](media/statusline.png)
 
 *The default line — no configuration written at all. Every part is a segment you can reshape,
 recolour or remove, or write yourself in TypeScript. Your Claude Code statusline script runs here
 unchanged, colours and all.*
 
 **14 segments · 2 surfaces · [docs](https://codestz.github.io/opencode-cockpit/status/overview/) · [`@opencode-cockpit/status`](packages/status)**
+
+---
+
+### 🔄  Updater — every plugin, and what it is really running
+
+OpenCode installs a plugin once and never resolves its spec again, so `@latest` quietly means *the
+release that was newest the day you installed it* — and nothing anywhere says which one that was.
+**Updater** lists every plugin you have, what is running beside what your config says and what is
+published, and updates the ones you pick. It pins an exact version through OpenCode's own
+`opencode plugin`, clears the stale cache, and reads every file back before calling it done.
+
+![The updater in OpenCode: a plugin frozen behind @latest at 1.2.3 and one pinned behind, reviewed, updated, and both confirmed on disk](media/updater.gif)
+
+`/plugins-update` inside OpenCode, or `npx opencode-cockpit@latest update` from a shell — which
+works whatever version you are stuck on, because it comes from npm rather than from the copy that
+cannot update itself.
+
+**Every plugin, not just this one · [`@opencode-cockpit/updater`](packages/updater)**
 
 ---
 
@@ -121,7 +155,7 @@ keeping line numbers and highlighting matches — and output keeps the colours t
 | `ctrl+x i` · `/shell` | Open the shell console |
 | `/shell-new` | Start a shell yourself |
 | `/shells-clear` | Remove finished shells |
-| `/cockpit-update` | Update the plugin when a newer release exists |
+| `/plugins-update` | Every plugin you have installed: what runs, what is published, and an update checked against disk |
 
 Status reads the same everywhere — `RUN` (with a spinner), `FAIL`, `STOP`, `DONE` — running shells
 and recent failures stay in view, the rest folds behind `▸ N more`. In the console: `i` types
@@ -133,13 +167,24 @@ switches between the live screen and the scrollback, `?` shows details.
 **Everything**
 
 ```sh
-opencode plugin opencode-cockpit --global
+opencode plugin opencode-cockpit@0.5.1 --global --force
 ```
 
 **Only what you want**
 
 ```sh
-opencode plugin @opencode-cockpit/shell --global
+opencode plugin @opencode-cockpit/shell@0.5.1 --global --force
+```
+
+The version is pinned on purpose. OpenCode resolves a plugin spec once and never again, so a
+bare `opencode-cockpit` or `@latest` stays on whatever it installed first. `--force` replaces an
+entry you already have, so the same line is also how you move to a newer release.
+
+**Stuck on an old version?** This runs outside OpenCode, from npm, so it works whatever you have
+installed — and shows every plugin you have, not just this one:
+
+```sh
+npx opencode-cockpit@latest update     # or: bunx opencode-cockpit@latest update
 ```
 
 Restart OpenCode. Requires OpenCode 1.18+ on macOS or Linux. Install a feature either through
@@ -197,6 +242,8 @@ Each shell's output feeds three views at once: a normalized **log** for the agen
 | [`opencode-cockpit`](packages/opencode) | The bundle: every bay, each switchable | [README](packages/opencode/README.md) |
 | [`@opencode-cockpit/shell`](packages/shell) | Bay 01 — background terminals | [README](packages/shell/README.md) · [docs](https://codestz.github.io/opencode-cockpit/shell/overview/) |
 | [`@opencode-cockpit/status`](packages/status) | Bay 02 — the statusline | [README](packages/status/README.md) · [docs](https://codestz.github.io/opencode-cockpit/status/overview/) |
+| [`@opencode-cockpit/review`](packages/review) | Bay 03 — a pull request in the terminal | [README](packages/review/README.md) · [docs](https://codestz.github.io/opencode-cockpit/review/overview/) |
+| [`@opencode-cockpit/updater`](packages/updater) | Bay 04 — every plugin, and an update checked against disk | [README](packages/updater/README.md) |
 | [`@opencode-cockpit/daemon`](packages/daemon) | `cockpitd`, the shared process host | [README](packages/daemon/README.md) |
 | [`@opencode-cockpit/client`](packages/client) | Typed, auto-spawning client | [README](packages/client/README.md) |
 | [`@opencode-cockpit/protocol`](packages/protocol) | Wire contracts and schemas | [README](packages/protocol/README.md) |
@@ -205,17 +252,8 @@ Each shell's output feeds three views at once: a normalized **log** for the agen
 
 Not a roadmap of promises — the next thing, and why it is next.
 
-**Review — a pull request, in the terminal.** A turn ends and you read the whole diff at once, or
-you read none of it and hope. GitHub solved the reading part years ago: comment on a line, comment
-on a file, mark a file read, suggest the change instead of describing it — and nothing reaches the
-author until you press *submit review*. The same shape fits here, with the review going to the chat
-as one message instead of six interruptions.
-
-OpenCode already exposes what it needs: `session.diff` returns each file's `before` and `after` in
-full, `session.revert` undoes a single message or part, and a plugin can write to the prompt. What
-is missing is the view and the keys.
-
-**Doctor.** One command that checks your setup and says how to fix it.
+**Doctor.** One command that checks your setup and says how to fix it: which halves are loaded,
+which keys collide, whether a daemon is running code older than the plugin talking to it.
 
 ## Contributing
 

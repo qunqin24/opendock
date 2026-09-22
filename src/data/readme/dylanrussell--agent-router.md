@@ -177,6 +177,175 @@ Duplicate failures advance only once per admitted user turn. Routing budgets are
 
 OpenCode 2.0.8 exposes no atomic compare-and-switch in the prompt hook and no request kind in the retry hook. Concurrent manual selections/admissions or auxiliary requests remain host API limitations. The sidebar displays configured routing and highlights the current session selection, not pending fallback state. Terminal stack operations require local filesystem access; remote server filesystem management is not supported.
 
+### Opt-in quota preflight (phase 1)
+
+The server plugin can consult the usage-tracker server's `direct-api-usage.query`
+RPC before each new explicit main-session prompt and each new native `subagent`
+start. Configure the server plugin using the object form:
+
+```jsonc
+{
+  "plugins": [
+    {
+      "package": "@dylanrussell/agent-router",
+      "options": {
+        "quotaPreflight": {
+          "enabled": true,
+          "allowPaidFallbacks": false
+        }
+      }
+    }
+  ]
+}
+```
+
+Both options default to `false`. Existing applied fallback chains supply candidate
+order; preflight never writes agent frontmatter, router state, or stacks. A staged
+reactive fallback has precedence on the next eligible admission, even when the
+primary has available or unknown quota. Preflight checks that backup and later
+candidates for known exhaustion. Otherwise, each eligible admission reconsiders
+the configured primary. Retry hooks and same-turn retry behavior are unchanged.
+
+- Only fresh, account-and-scope-matched `exhausted` evidence skips a candidate.
+  An available or unknown primary remains the primary. Expired observations,
+  reached resets, unavailable methods, malformed replies, and timeouts are unknown.
+- After earlier candidates are exhausted, an unknown backup with a service-proven
+  subscription binding may be tried. Without that binding, selecting a backup
+  requires explicit `allowPaidFallbacks: true`, which permits potentially paid
+  configured backups. If no eligible candidate remains, selection is unchanged.
+- The usage service owns shared caching, bounded stale refreshes, credential
+  resolution, explicit Headroom/Go account bindings, and model-specific OpenAI
+  scope matching. Router receives opaque references and quota decisions only;
+  it neither polls providers nor infers account equivalence from provider names.
+- Quota queries have a 3-second caller deadline and at most 16 outstanding calls,
+  including timed-out calls that ignore cancellation. Excess admissions use
+  unknown evidence rather than joining a queue. Admission ownership is bounded
+  to 1,024 sessions and concurrent main admission checks to 64.
+- Explicit initial model selections and observable manual selections take priority,
+  including selections equal to the configured primary. Native child overrides
+  are checked before model resolution in `tool.execute.before`; resumed children
+  are excluded. Main sessions whose agent is unresolved are left native.
+- Automatic selection ownership is in memory. After plugin restart, a stored
+  model is conservatively treated as pinned; explicit pins also persist in
+  plugin-scoped server storage. A second session read and observed
+  selection events guard asynchronous admission, but the host offers no atomic
+  compare-and-switch.
+
+**Explicit session controls:** with preflight or quota fallback enabled, the server exposes three
+additional tools. Pin/auto tools are for explicit user requests, under the host's
+normal tool-permission policy. They take no model or session arguments; their
+scope is the calling session.
+
+- `router_pin` freezes the current selection, resolving the native agent/default
+  model when no selection is stored. It disables quota preflight and same-turn quota fallback, and clears staged
+  reactive fallback for this session. The pin persists in server plugin storage.
+  Pins share one durable value capped at 1,024 sessions across restarts. Serialized
+  writes prevent lost updates; session deletion removes its durable pin, including
+  when deletion races a pin write. Plugin cleanup drains dispatched pin writes.
+- `router_auto` clears the explicit pin and authorizes automatic routing on the
+  **next explicit user turn**. It neither switches the model nor sends a prompt.
+  Automatic ownership is not restored across plugin restarts: use this control
+  again to opt an existing selected session back in.
+- `router_routing_status` reports `automatic`/`pinned`, the current model, and a
+  concise reason. Admissions and controls also write concise server-log notices
+  such as `primary_unknown`, `known_exhaustion_fallback`, and
+  `staged_reactive_fallback`.
+
+**Picker boundary:** OpenCode 2.0.8 treats selecting the already-active model as a
+no-op and emits no selection event. Selecting an automatic fallback again in the
+standard picker does **not** pin it. Explicitly request `router_pin` to freeze it;
+request `router_auto` when ready to resume automatic routing. Different-model
+picker selections remain observable and take priority.
+
+`npm run build && npm run test:quota` exercises the production router and a fake
+quota RPC on a private native 2.0.8 host, including true native child starts,
+fresh/exhausted/unknown/reset evidence, explicit pin/auto controls, staged 429/503
+precedence, timeout, recovery, and tool continuation without midtask switching.
+It explicitly reports the native same-model picker boundary.
+`scripts/probe-admission-v2.mjs` independently records
+native admission/provenance behavior. Neither script contacts real quota APIs.
+Set `USAGE_TRACKER_SOURCE` to the usage-tracker source directory to run the same
+native main/child checks with its actual RPC definition and quota implementation,
+using synthetic credentials and direct-provider response fixtures. Service-side
+account approvals belong in usage-tracker's `options.quotaBindings`, whose records
+use `{ providerID, source, models, connection: { type, id }, approval }` for saved
+credentials (`{ type: "env", name }` for environment connections). Router options
+do not contain credentials or binding attestations.
+
+### Opt-in same-turn quota fallback (phase 2, native 2.0.8)
+
+Configure this separately from `quotaPreflight` in the server plugin's `options`:
+
+```json
+{
+  "quotaFallback": {
+    "enabled": true,
+    "allowPaidFallbacks": true,
+    "maxSwitches": 8
+  }
+}
+```
+
+Both booleans default to **false**. Phase 2 requires explicit paid-fallback approval
+before switching, including when quota-service bindings exist. `maxSwitches` is an
+integer from 1 to 8 (default 8); only later entries in the configured chain are
+eligible. Each explicit main-session admission and each newly admitted automatic
+child gets its own budget, shared by all tool continuations in that turn. There is
+no wraparound. Confirmed, fresh, account-scoped exhausted backups are skipped;
+unknown or unavailable quota-service evidence does not block an approved backup.
+
+The router requests a **native same-session retry** only for a structured
+`provider.quota` failure with matching HTTP 402/429 rejection evidence. It never
+submits another prompt, starts a replacement child, or retries a partial stream.
+Authentication, timeouts, generic rate limits, 5xx, WebSockets, auxiliary requests,
+and unsupported endpoints are ineligible. Existing reactive next-turn handling
+continues to apply to its qualifying non-quota errors. Disabling phase 2 preserves
+the previous retry policy.
+
+Correlation is deliberately conservative: exact request-object identity,
+agent/model/variant and admission generation, configured base URL plus a recognized
+`/chat/completions`, `/responses`, or `/messages` operation, no URL credentials or
+query, single-use evidence, and a five-second monotonic expiry. Observations are
+bounded to 1,024 sessions and periodically pruned; no response bodies are read.
+Concurrent observations and any auxiliary traffic poison the admission, including
+an auxiliary HTTP 200 that may still be streaming. Capacity exhaustion fails closed.
+Expiry removes retry permission but retains an unresolved/ambiguous-request
+tombstone until the admission ends or a new admission replaces it. Quota RPC
+candidates contain only provider/model IDs; configured variants remain attached
+to the eventual model selection.
+
+Explicit main model selections, original child model overrides, and resumed child
+tasks are not claimed merely because their models match a chain. Automatic child
+ownership requires a fresh admission ticket, a unique running parent tool call,
+matching parent/agent/model, and a matching digest of the native child's initial
+user message. Parent tool metadata is checked when available. Tickets expire after
+five seconds; ambiguous concurrent child admissions are skipped. Neither prompt
+text nor response bodies are retained in this correlation state.
+Native metadata binding the child to a different parent call vetoes fingerprint
+matching. Ticket overflow disables new automatic child claims until plugin reload,
+including claims already awaiting host reads; dropping negative evidence cannot
+make a child eligible.
+
+**Accepted host limits:** native 2.0.8 retry hooks lack request ID, request kind,
+output-started, cancellation, and atomic switch-and-retry fields. Correlation and
+observable manual/cancel guards are therefore best effort, not transactional
+guarantees. Same-model picker no-ops remain unobservable; use `router_pin`.
+A later retry-hook veto can leave the backup selected without dispatching it.
+The router does not roll back that selection, which could overwrite a newer user
+choice. Status/log reasons distinguish
+`quota_fallback_selected_retry_requested_not_confirmed` from
+`quota_fallback_attempt_dispatched`; the latter observes the HTTP request hook,
+not provider acceptance or successful completion.
+
+After building, `npm run test:quota-fallback` runs the production router in a
+disposable native 2.0.8 host with synthetic local providers. Set
+`ROUTER_PREFLIGHT=1` to exercise both opt-ins together. The fixture verifies first
+quota rejection, main/child post-tool continuation with a durable counter of one,
+chain exhaustion, partial stream, explicit selections, manual/cancel/pin gates,
+compaction, attribution, and the accepted later-veto residual selection. Its
+timeout control vetoes native timeout retries only after recording router policy.
+No real inference or credentials are used.
+
 ### Install This Checkout
 
 To test a local V2 checkout, run `npm run typecheck`, `npm test`, and `npm run build` (a fresh checkout uses `pnpm install --frozen-lockfile`). Replace the registry entry in the server `opencode.json` **plugins** array with the package directory:
@@ -211,7 +380,8 @@ The plugin exposes six tools the agent (or you, by asking it) can call:
 The V2 terminal half loads from the package's `./tui` export (`cli.json`, wired up by `init`):
 
 - **Sidebar panel** — lists available stacks with the active one checked. Under **Current Stack**, each agent has one indented model per line, in precedence order, without Primary/Fallback labels. Explicit variants appear in brackets; full model IDs wrap rather than truncate. A `⟳ restart required` badge appears when the active stack differs from the one at TUI startup. File changes update live (≤1.5s).
-- **Current selection** — the live session's agent/model is highlighted in color and bold with `●`; out-of-chain selections get a separate Current row. Other agents are not presented as live selections. Configured chains still come from the active stack file, not the applied `state.json.fallbackAgents` snapshot. Editing a stack changes the preview but does not apply it: use the stack and restart opencode to activate changes. The marker reflects session selection, not proof that a request is running or that failover is enabled.
+- **Current selection** — every agent's selected model is highlighted in the warning/orange color at normal font weight with `●`. Headings show only the agent name. Selection prefers the viewed session, then running direct children at the same location, then the native agent default, then the stack default; conflicting active children retain multiple distinct selections. Out-of-chain selections are shown separately. Configured chains still come from the active stack file, not the applied `state.json.fallbackAgents` snapshot. Editing a stack changes the preview but does not apply it: use the stack and restart opencode to activate changes. Default highlights do not imply a running session or predict quota preflight.
+- **Routing visibility** — the native CLI has no connected routing-status transport yet, so mode/freshness are shown as unknown rather than inferred from model selection. Use `router_routing_status` for the current session's actual Automatic/Pinned state and reason.
 - **Commands** — type `/` or open the command palette:
 
 | command | what it does |

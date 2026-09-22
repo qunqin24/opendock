@@ -80,8 +80,9 @@ Only `--mode yolo` skips the agent's permission prompts, so keep it out of untru
 Codex `read` mode uses its Landlock compatibility sandbox on Linux to retain file and
 network restrictions on hosts that reject bubblewrap loopback setup. Streamed Codex
 sandbox initialization failures report compatibility guidance in the CLI and SDK.
-Workspace-write policies require a host that can enforce their sandbox; read-only
-commands do not change an existing session’s permission policy.
+If workspace-write sandbox startup fails, the agent can request approval for the exact
+command through the session’s existing reviewer; see the [sandbox recovery guidance](packages/agent-spawn/README.md#spawn-modes).
+Read-only commands do not change an existing session’s permission policy.
 
 #### Spawn against a GitHub repository
 
@@ -172,6 +173,8 @@ poe-code models --search claude
 ## SDK
 
 SafeJS, safe-bash, the SafeJS harness, and PowerPoint are workspace tools and are not included in the published `poe-code` package. The `bash` and `harness` commands, SafeJS binaries, sandbox SDK subpaths, and `poe-code/pptx` are unavailable in `poe-code`. Terminal automation is available through the separate `terminal-pilot` and `terminal-pilot-mcp` packages.
+
+CSV tools and spreadsheet conversion are available through `poe-code/csvkit` and `poe-code/ssconvert` on Node.js 22 or newer; see the [CSV](docs/csvkit/usage-draft.md) and [spreadsheet](docs/ssconvert/usage-draft.md) usage guides for configuration and supported limits.
 
 Use `poe-code` programmatically in your own code:
 

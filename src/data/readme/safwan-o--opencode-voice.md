@@ -68,20 +68,38 @@ only restarts the session — plugin code loads at TUI startup.)
 
 ### OpenCode 1.x
 
-OpenCode 1.x manages TUI plugins through the `opencode plugin` command:
+OpenCode 1.x manages TUI plugins through file entries in `tui.json` — npm
+specs only feed the *server* loader there, so the npm package name alone
+will **not** load the voice commands (you would see `must default export an
+object with server()` in the logs instead). Register a local entry:
 
 ```bash
-opencode plugin @safwan-o/opencode-voice
+mkdir -p ~/opencode-voice-v1
+cd ~/opencode-voice-v1
+ln -s ~/opencode-voice/index.js index.js
+ln -s ~/opencode-voice/lib lib
+printf '%s' '{"name":"@safwan-o/opencode-voice-v1-shim","version":"0.5.0","type":"module","main":"./index.js"}' > package.json
 ```
 
-Then restart OpenCode. (Adding the spec to the `plugin` array in the global
-config manually has the same effect.)
+(The minimal `package.json` is load-bearing: V1 silently skips file plugins
+whose `exports` map contains a `./tui` subpath, and symlinks keep the entry
+tracking this repo. Do not add an `exports` map to the shim.)
+
+Then, per project, register the entry (project-local, invisible to V2):
+
+```bash
+cd <project> && ocv1 plugin ~/opencode-voice-v1
+```
+
+Then restart the V1 TUI. If you change the shim's `version` without
+re-registering, V1 keeps the old verdict — re-run the `plugin` command
+(or bump + re-register) to refresh it.
 
 ### Version differences
 
 | Area                | OpenCode 1.x                                               | OpenCode 2.x                                               |
 | ------------------- | ---------------------------------------------------------- | ---------------------------------------------------------- |
-| Install             | `opencode plugin @safwan-o/opencode-voice`                 | `cli.json` `plugins` array                                 |
+| Install             | local file entry in `tui.json` (see below)                    | `cli.json` `plugins` array                                 |
 | Entry point         | `main` → `./index.js` (`{id, tui}`)                        | `./tui` → `src/tui.ts` (`Plugin.define`)                   |
 | Transcription lands | appended into the prompt for in-place review               | clipboard for pasting, or submitted via `/voice-submit`    |
 | Submit key          | extra `submitHotkey` binding available                     | slash command only                                         |

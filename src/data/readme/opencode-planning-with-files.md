@@ -347,6 +347,7 @@ One hook fire measures 289ms wall-clock since the v3.6.0 optimization, down from
 
 | Version | Highlights |
 |---------|------------|
+| **v3.20.5** | OpenCode replay tolerates malformed parts (#273). Initialization reports attestation failures accurately (#277), analytics plans include Next Step (#279), and PowerShell denied writes fail without activating an incomplete named plan (#280). |
 | **v3.20.4** | PowerShell route on OneDrive: an `.active_plan` pointer carrying the OneDrive Files On-Demand reparse attribute no longer counts as unsafe, so the Cursor hooks, the resolver and `set-active-plan.ps1` work in projects under OneDrive (#275). The session-catchup copy guard checks tracked copies only (#274). |
 | **v3.20.3** | A symlinked or junctioned directory under `.planning/` is never a plan on any route: the shell counters skip it (PR #271 by @ShaunLinTW, #270), and the selection paths of the shell family plus the Codex, OpenCode and DSH counters refuse it too, so one real plan next to a linked one no longer becomes an mtime guess. |
 | **v3.20.2** | Hermes plugin: Hermes 0.21.3 re-homes `TERMINAL_CWD` to the home directory on the first CLI turn, so the plan in the launch directory was skipped silently. The first turn now says why nothing was injected and names the `PWF_PLAN_ROOT` pin, `/pwf-status` and `/pwf` print the same diagnostic, and the slash commands honor the pin (#272, reported by @ericshunhinglee-cloud). |

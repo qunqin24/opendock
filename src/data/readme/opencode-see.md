@@ -5,6 +5,8 @@ It sends an image to a vision-capable LLM and returns a text description,
 falling back across three **free** providers — **Gemini**, **Groq**, and
 **Cerebras** — one at a time, in whatever order you configure.
 
+**Compatible with both OpenCode V1 and V2.**
+
 No merging of results: it tries provider #1, and only moves on to #2 if #1
 fails or isn't configured. Whichever one succeeds first wins.
 
@@ -36,10 +38,20 @@ skipped automatically.
 npm install opencode-see
 ```
 
-Then add it to `opencode.json`:
+Then add it to `opencode.json(c)`:
 
+**OpenCode V2:**
 ```json
 {
+  "$schema": "https://opencode.ai/config.json",
+  "plugins": ["opencode-see"]
+}
+```
+
+**OpenCode V1:**
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
   "plugin": ["opencode-see"]
 }
 ```
@@ -54,9 +66,36 @@ You can provide keys (and other settings) either via plugin options in
 `opencode.json` or via environment variables. Env vars are used as the
 fallback whenever an option isn't set.
 
-**Option A — `opencode.json` plugin options.** Register the plugin in tuple
-form and pass `apiKeys` (and optionally models, order, prompt):
+**Option A — `opencode.json(c)` plugin options.** Register the plugin and
+pass `apiKeys` (and optionally models, order, prompt):
 
+**OpenCode V2:**
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugins": [
+    {
+      "package": "opencode-see",
+      "options": {
+        "apiKeys": {
+          "gemini": "...",
+          "groq": "...",
+          "cerebras": "..."
+        },
+        "models": {
+          "gemini": ["gemini-3-flash-preview", "gemini-2.5-flash", "gemini-3.1-flash-lite"],
+          "groq": ["qwen/qwen3.6-27b"],
+          "cerebras": ["gemma-4-31b"]
+        },
+        "providerOrder": "cerebras,gemini,groq",
+        "defaultPrompt": "Describe this image in detail."
+      }
+    }
+  ]
+}
+```
+
+**OpenCode V1:**
 ```json
 {
   "$schema": "https://opencode.ai/config.json",

@@ -9,29 +9,33 @@ Like CachyOS Hello, the plugin does not check for a polkit agent up front:
 the request to whatever agent is currently registered. Without an agent,
 `pkexec` fails fast with `Error creating textual authentication agent`
 (no TTY); the plugin reports that as a clear denial. A hang (dialog never
-appears) is bounded by the bash tool's own timeout (default 2 min,
-configurable up to 10 min) and left untranslated — it cannot be told
+appears) is bounded by the shell tool's own timeout (default 2 min,
+configurable per call) and left untranslated — it cannot be told
 apart from a long-running command.
+
+Requires OpenCode >= 2.0 (the plugin uses the `@opencode/plugin` v2 API and
+is skipped by older versions).
 
 ## Install
 
 ```sh
-opencode plugin opencode-polkit
+opencode plugin add opencode-polkit
 ```
 
 Or add to `opencode.json` / `~/.config/opencode/opencode.jsonc`:
 
 ```json
 {
-  "plugin": ["opencode-polkit"]
+  "plugins": ["opencode-polkit"]
 }
 ```
 
-For local development, point opencode at the project directory instead:
+For local development, build once (`npm run build` — the local entrypoint
+re-exports `dist/`) and point opencode at the project directory instead:
 
 ```json
 {
-  "plugin": ["/path/to/opencode-polkit"]
+  "plugins": ["/path/to/opencode-polkit"]
 }
 ```
 
@@ -65,7 +69,7 @@ command is remembered so a retry is rejected without prompting again
 (cleared when opencode restarts): `Not authorized`, `Error executing
 command as another user`, `Error creating textual authentication agent`
 (no polkit agent + no TTY). A hang (dialog never appears) is bounded by
-the bash tool's own timeout (default 2 min, configurable up to 10 min)
+the shell tool's own timeout (default 2 min, configurable per call)
 and is left untranslated — it cannot be told apart from a long-running
 command.
 

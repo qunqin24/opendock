@@ -31,30 +31,120 @@ The optional Memory card can read an existing OptMem installation. novaSpace
 does not register memory tools; the independent `opencode-optmem` plugin owns
 that capability.
 
-Every card uses the same theme-derived subtle surface and hover transition.
+Cards use theme-derived subtle surfaces and rounded borders, with a scrollbar
+gutter. The main profile card stays visually still on hover. Its sync status is
+a colored dot; hovering the dot reveals its label and otherwise leaves room for
+the full account name. The small `✧` mark identifies **novaSpace settings**.
 
-The setup modal has a compact **Set up sync** entry, then mirrors the five layers
-on the card in the same order: Skills, Instructions, Plugins, MCP, and
-Subagents. Layers that share a source file are rendered together; for example,
-JSON-configured Plugins, MCP, and Subagents share one **OpenCode settings**
-section and one `opencode.json(c)` entry. Each section links to its detected
-folder and contributing files. Lists longer than five rows use a contrasting
-inset panel and scroll independently. The inner list consumes wheel input only
-while the pointer is inside it, leaving the outer modal available everywhere
-else. Files open through the operating system's default application.
+The settings modal shows each section's file or folder with one **Open** action.
+Shared configuration appears once: JSON-configured Plugins, MCP and Subagents
+share **OpenCode settings** and its `opencode.json(c)` link. Individual item lists
+and nested scroll areas have been removed. Files open in the operating system's
+default application. A single outer scrollbar is available on short terminals.
 
-**Set up sync** opens a separate four-step onboarding dialog. Its first step is
-a read-only standardization preflight that proposes compatibility-folder moves,
-flags machine-specific paths and possible literal secrets, lists local-only
-exclusions, and identifies project-specific configuration that remains owned
-by the project rather than the private global profile.
+Update status and keyboard hints stay visible. Use **Tab / Shift+Tab** to move
+between actions and **Enter** to activate one. **Appearance & preferences** links
+directly to `cli.json`.
+
+### Profile sync
+
+The sync screen has compact **Files**, **Repository** and **Sync** views. Choose
+groups and connect a private GitHub repository. **Connect & sync** or **Create &
+sync** prepares the profile, runs the first sync and enables automatic sync after
+success. It checks once a minute while an OpenCode TUI is open. **Details** is
+read-only and shows portable files and entries kept local; setup requires no
+path approvals or standardization review. Errors stay near the header.
+Enterprise-managed GitHub usernames with underscores are supported. Use the same repository
+on another machine to restore your profile and keep the selected groups in step.
+GitHub CLI (`gh auth login`) is required. Sync is bound to the account used when
+connecting; switching accounts pauses transfers until you reconnect or switch back.
+
+| Group | Included |
+| --- | --- |
+| OpenCode settings | Portable settings in global `opencode.json` and `opencode.jsonc`: configured default model, providers, plugins, MCP, permissions, inline agents and commands |
+| Appearance & preferences | `cli.json`: theme, keybindings, terminal preferences and novaSpace plugin options; global `themes/` files |
+| Skills | Global `skills/`, `~/.agents/skills/` and `~/.claude/skills/`, preserving their locations |
+| Instructions | Global `AGENTS.md` |
+| Agents & commands | Global `agents/` and `commands/` files |
+| Local plugin files | Global `plugins/` scripts, opt-in |
+
+Groups select their source files once, even when Plugins, MCP and Subagents share
+one configuration file. Preparation happens in a separate portable copy. Live
+files keep their locations, paths, comments and formatting. Preparation does not
+migrate a directory layout or rewrite working settings.
+
+For JSON/JSONC settings, top-level sections containing literal credentials,
+machine-specific paths, local executables or loopback endpoints stay local.
+Portable sections from that same file still sync. For example, a configured
+default model can sync while a local plugin checkout and private MCP credentials
+stay exactly as configured on each machine. Incoming portable settings are merged
+back into the original document without replacing its local-only sections.
+Comments remain on their original machine; the repository holds a canonical
+portable JSON representation.
+
+Linked sources and non-config files with detected machine-specific content or
+credentials are kept local automatically. If a skill or plugin bundle has a
+local-only dependency, the entire bundle stays local rather than exporting an
+incomplete copy. **Details** reports these exclusions without requesting action.
+Changing the selected groups preserves the connection's automatic/paused setting.
+
+Session history, the current session's model choice, sign-ins and OAuth tokens,
+environment variables, service settings, caches, project configuration, installed
+package caches and saved card drag positions stay local. Initial card layout
+options in `cli.json` can sync; drag positions in OpenCode's plugin storage cannot.
+Referenced files outside the listed roots are not copied.
+Package declarations travel with settings; OpenCode installs the packages on the
+destination machine. Source checkouts such as the novaSpace development repo do
+not need to exist on a consumer machine.
+
+Sync merges edits to different files and independent top-level configuration
+sections. Competing changes to the same portable setting or non-config file
+pause for a genuine conflict; setup never guesses which existing version to replace.
+Choose the local or repository versions explicitly in the sync screen.
+Remote revisions remain in GitHub history. Replaced and deleted local files are
+backed up under `~/.local/state/novaspace/backups/` before being applied. Restore
+writes are staged before any live replacement; a staging failure leaves existing
+files untouched. Failed applies roll back completed writes when possible, while
+preserving edits made concurrently by the user. Deletions
+propagate only after a file has been synced; existing files on a newly connected
+machine cause a conflict if their contents differ from the repository.
+
+The GitHub repository stores a versioned `.novaspace/profile.json` snapshot with
+base64 file contents (an `x:` prefix marks executable scripts). File ownership
+and other permission bits stay local. Base64 is **not encryption**; repository access controls
+protect the profile. Detected credentials and machine-specific values are kept
+local, without changing their original values to environment references. This
+detection is best-effort. Existing `{env:NAME}` references are portable; sign in
+independently on each machine. Symlinks and hard-linked files stay local; `.env`,
+`.git`, `node_modules` and backup directories are excluded. Profiles are limited
+to roughly 500 KB of file content and 1,000 files.
+
+State, selection, automation preference and backups are local to each machine,
+under `$XDG_STATE_HOME/novaspace` (default `~/.local/state/novaspace`). Global
+configuration follows `$XDG_CONFIG_HOME/opencode`. Multiple TUI windows share a
+cross-process lease; concurrent remote writes use GitHub's revision check and retry
+on the next sync. Offline failures keep local files and the last successful baseline.
+Restart OpenCode after restoring plugins or server settings that require a reload.
+
+Profile format **2** requires novaSpace **0.3.0 or later**. The new client can read
+older snapshots and prepares them automatically. Older clients stop before
+applying format 2, protecting their existing configuration. Update novaSpace on
+each syncing machine.
 
 The setup card always starts in a usable local state from OpenCode's cached
 inventory. GitHub identity lookup runs only as background enrichment. A missing
 GitHub CLI, sign-in, or private profile repository is the normal unconfigured
-state and reports `● Set up sync`; it never blocks local setup discovery. The
-profile model also reserves `syncing`, `synced`, `pending`, and `error` states
-for the planned settings synchronization feature.
+state and reports a muted dot with **Set up sync** on hover; it never blocks local setup discovery. The
+profile reports `syncing`, `synced`, `pending`, `paused`, `conflict`, and `error`
+from the local sync state.
+
+The signed-in account can change at any time, so the card re-reads it when the
+setup hub opens and whenever `gh` rewrites its configuration. It watches that
+file's change stamp rather than polling the GitHub API, so an idle sidebar
+spends no API calls and starts no processes.
+
+The hub also reports novaSpace's own version and, for a managed package
+install, offers an update when OpenCode reports one. See "Packaging".
 
 ## Arrange cards
 
@@ -73,7 +163,7 @@ for the planned settings synchronization feature.
   or drag sideways across the navigation row to switch pages. The selected page
   is a short neutral pill; other pages are muted dots. Navigation stays hidden
   when there is only one page.
-- **Manage settings** opens the compact setup hub and its configuration links.
+- **✧ novaSpace settings** opens the compact setup hub and its configuration links.
 
 Card titles and body text remain selectable, and buttons such as Refresh and
 Open in Zed retain their click actions. Only the grip starts a drag.
@@ -85,31 +175,16 @@ Long bottom cards scroll within a height cap so the middle area remains usable.
 
 ## Installation
 
-novaSpace is not published to npm yet. Until then, install the plugin from a
-pinned commit of this repository:
-
 ```sh
-opencode plugin add 'git+https://github.com/brnbtt/opencode-novaspace.git#<commit>'
+opencode plugin add opencode-novaspace
 ```
-
-> **Known limitation.** Git installs are currently degraded. OpenCode's managed
-> package cache runs a full install for a Git specifier, which pulls this
-> package's `devDependencies` (`solid-js`, `@opentui/*`) into an isolated tree.
-> The plugin then resolves its own copy of Solid instead of the host's, so the
-> sidebar renders its first frame and never updates: inventory counts, the
-> GitHub profile, and session context all stay frozen. Use the published npm
-> package instead:
->
-> ```sh
-> opencode plugin add opencode-novaspace@0.1.0
-> ```
->
-> The npm package declares its OpenTUI and Solid peers as optional
-> (`peerDependenciesMeta`) so installers do not materialize a second runtime in
-> the plugin's cache directory, and imports resolve against the host.
 
 Restart the TUI completely after installing. Reloading the service alone does
 not rebuild the already-mounted sidebar.
+
+Options are **CLI plugin options** and belong in `cli.json`; see
+"Configuration". The package ships compiled JavaScript rather than its `.tsx`
+sources, for the reason described under "Packaging".
 
 ## Configuration
 
@@ -177,8 +252,8 @@ Keep plugin source, development loading, and stable installation separate:
 - **Development host:** disable the exact stable IDs, then load a tiny wrapper
   with `novaspace.dev.*` IDs that imports the checkout. This avoids package
   deduplication while keeping mutable source confined to the dev workspace.
-- **Stable installation:** configure an exact npm version or complete Git commit
-  in the global profile. OpenCode owns its managed package cache; do not edit it.
+- **Stable installation:** configure `opencode-novaspace` in the global profile.
+  OpenCode owns its managed package cache; do not edit it.
 - **Config plugins:** reserve `~/.config/opencode/plugins/` for small personal
   scripts intentionally versioned with the profile, not cloned package repos.
 
@@ -198,31 +273,65 @@ Example development-host override (the relative path is resolved from this
 Card options for the development host go in `cli.json` like any other CLI
 plugin option, keyed by the same package path.
 
-Once published, the global profile should use a pinned stable package such as
-`opencode-novaspace@0.1.0`; active feature work should never be the globally
-installed copy.
+Keep the stable package entry unpinned to use the hub's update check. An explicit
+`@version` stays on that version and cannot offer later releases. Active feature
+work should use the development host.
+
+## Packaging
+
+An installed plugin always lands under `node_modules`, and that single fact
+decides how this package must be built.
+
+OpenCode shares its own Solid and OpenTUI runtime with a plugin by rewriting
+the import specifiers it finds in a module's **source text**. The Solid JSX
+transform that would normally produce those specifiers is skipped for anything
+under `node_modules`, so a published `.tsx` module never gets rewritten. It
+then fails one of two ways:
+
+- with peers optional, nothing resolves `@opentui/solid` and the TUI half fails
+  to load with `Cannot find package '@opentui/solid'`;
+- with peers materialized beside the plugin, they resolve to a **second** Solid
+  runtime, so the sidebar paints one frame and no reactive update ever lands —
+  inventory counts stay `0`, the profile stays `Local profile`, and session
+  context stays `—`.
+
+`bun run build` (`scripts/build.ts`) compiles `src/**` ahead of time using the
+same Babel pipeline `@opentui/solid` ships. The compiled modules carry literal
+`@opentui/solid`, `solid-js`, and `@opentui/core` imports, which is the form
+the host rewrite recognises, so an installed package binds the host's runtime
+exactly like a local checkout does. `package.json` therefore publishes `dist/`
+only, and peers stay optional in `peerDependenciesMeta` so no second runtime is
+ever installed.
+
+`tests/package.test.ts` guards this: the compiled output must contain literal
+runtime imports, no JSX, no surviving `@jsxImportSource` pragma, and only
+`.js`-suffixed relative specifiers.
+
+Local-path development is unaffected and still loads the `.tsx` sources
+directly through OpenCode's JSX loader.
 
 ## Releases
 
-Git commit installation is the stable channel until the first npm release, but
-it is a degraded one: see the limitation under "Installation". Peer
-dependencies must stay optional in `peerDependenciesMeta` so a managed install
-never materializes a second Solid/OpenTUI runtime beside the plugin.
+Peer dependencies must stay optional in `peerDependenciesMeta`, and the
+published tarball must contain compiled `dist/` output rather than `.tsx`
+sources. Both are covered by "Packaging" and enforced by the test suite.
 
 Before publishing `opencode-novaspace`:
 
-1. Verify CI, typecheck, tests, and `bun pm pack --dry-run`.
+1. Verify CI, typecheck, tests, `bun run build`, and `bun pm pack --dry-run`.
 2. Configure npm 2FA and GitHub trusted publishing for this repository.
    Publish from CI: a local `npm publish` can target a corporate registry proxy.
-3. Remove `private: true`, then tag the matching `vX.Y.Z` commit.
+3. Tag the matching `vX.Y.Z` commit.
 4. Publish with provenance and create release notes from the same tag.
-5. Update the global OpenCode profile from the prior full Git commit to the
-   exact npm version only after installation verification.
+5. Verify the managed installation and leave its package entry unpinned for
+   future updates.
 
 npm versions are immutable, so verify the install path with a `0.1.0-rc.N`
 prerelease on the `next` dist-tag before spending the `0.1.0` version. Confirm
-the managed cache no longer materializes `solid-js` or `@opentui/*` and that
-inventory counts, the GitHub profile, and session context update after mount.
+the managed cache does not materialize `solid-js` or `@opentui/*`, and that
+inventory counts, the GitHub profile, and session context update after mount —
+a populated count is the proof that a reactive update landed after the first
+frame.
 
 ## Project structure
 
@@ -233,11 +342,13 @@ file has a single owner.
 Entry points
 
 - `index.ts` / `tui.tsx` (repo root) — thin re-export facades named by the
-  `package.json` exports.
+  `package.json` exports. Published builds expose their compiled counterparts,
+  `dist/index.js` and `dist/tui.js`.
 - `src/index.ts` — minimal package entrypoint used to load the TUI extension;
   novaSpace registers no server tools.
 - `src/tui.tsx` — TUI plugin; mounts the sidebar, footer, and drag-overlay
   slots and composes cards through `RenderCard`.
+- `scripts/build.ts` — publish-time compilation into `dist/`; see "Packaging".
 
 Framework (`src/`)
 
@@ -268,11 +379,19 @@ Cards (`src/cards/`)
 ### Add a card
 
 1. Create `src/cards/<id>/index.tsx` that renders with the shared `Card`
-   primitives and default-exports `defineCard({ id, title, render })`.
+   primitives and default-exports `defineCard({ id, title, render })`. Start the
+   file with `/** @jsxImportSource @opentui/solid */`, like every other card.
 2. Add the id to `cardIDs` (and a `defaultPins` entry) in `src/config.ts`.
 3. Import it and add it to the card list in `src/cards/registry.tsx`.
+4. List the id in your `cli.json` `cards` option, then restart the TUI
+   completely — a reload does not remount an already-mounted sidebar.
 
 `CardID` and the layout stay type-safe because they derive from `cardIDs`.
+
+Keep reactive helpers on the `.tsx` path even when they contain no JSX; see the
+runtime note under "Host integration". New files need no build step while you
+develop against a local checkout, and are picked up automatically by
+`bun run build` when publishing.
 
 ### Publish a framework-only build
 
@@ -301,6 +420,8 @@ but ordinary `.ts` helpers resolve the local Solid package. Signals from that
 second runtime do not notify the rendered components. Keep reactive helpers on
 the `.tsx` path, even when they contain no JSX. Same-runtime headless tests alone
 do not catch this; the fix was checked with a cancelled gesture in the live TUI.
+These shims matter only for local-path development; `bun run build` compiles
+every module the same way, so it drops them from the published output.
 
 `card-preview.tsx` copies public box/text paint properties from the mounted card.
 JSX text comes from `textNode.gatherWithInheritedStyle`; `.chunks` only describes
@@ -317,6 +438,7 @@ modal sizes itself from terminal dimensions and applies dialog settings after
 bun install
 bun test
 bun run typecheck
+bun run build
 ```
 
 ## License

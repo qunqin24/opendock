@@ -12,14 +12,16 @@ Agent 的对话上下文会结束，但任务不会因此结束。PlanWeft 提�
 
 ## 安装
 
-需要 Node.js 22 或更高版本。以 Codex 完整集成为例：
+> `0.7.1-node.1` 是 Node 迁移预发布候选；使用下列 `npx` 命令前请先在 npm registry 确认该版本已发布。受支持入口已改为随包 Node 脚本，并通过静态与脚本测试；保留的历史 Python/Shell 文件不是注册或指令入口。未运行 Agent 客户端本地验证。
+
+需要 Node.js 22.13.0 或更高版本。以 Codex 完整集成为例：
 
 ```bash
-npx planweft@0.7.0 add -a codex --global
-npx planweft@0.7.0 doctor -a codex --global
+npx planweft@0.7.1-node.1 add -a codex --global
+npx planweft@0.7.1-node.1 doctor -a codex --global
 ```
 
-安装后创建新会话，显式调用 `$project-docs`，再确认宿主已发现并启用了相应资源。其他宿主、scope 和 Skill-only 用法见[安装指南](docs/installation.md)。
+实际使用时可显式调用 `$project-docs`；安装器的 `doctor` 只检查受管状态，不作为 Agent 客户端验证。其他宿主、scope 和 Skill-only 用法见[安装指南](docs/installation.md)。
 
 ## 一次任务怎么使用
 
@@ -41,7 +43,7 @@ your-project/
         └── progress.md
 ```
 
-Agent 在任务过程中维护这些记录；后续会话或协作者可以从目标、当前阶段、调查结果、实际验证和下一步继续工作。只读请求和简单修改不要求创建新计划。
+模型按 Skill 指令，在用户授权范围内使用文件工具维护这些记录；后续会话或协作者可以从目标、当前阶段、调查结果、实际验证和下一步继续工作。只读请求和简单修改不要求创建新计划。
 
 ## 安装后 Agent 得到什么
 
@@ -66,19 +68,21 @@ planweft/
 
 ```mermaid
 flowchart LR
-    U[用户任务] --> A[Agent 宿主]
-    S[project-docs Skill] --> A
-    H[生命周期 Hook] --> A
-    A --> P[task_plan.md]
-    A --> F[findings.md]
-    A --> G[progress.md]
+    U[用户任务] --> A[Codex、Pi 等工具]
+    A --> M[模型]
+    S[project-docs Skill 指令] -. 工具提供、模型读取 .-> M
+    H[生命周期 Hook] -. 事件上下文与提醒 .-> A
+    M --> T[文件与测试工具]
+    T --> P[task_plan.md]
+    T --> F[findings.md]
+    T --> G[progress.md]
     P --> N[后续会话或协作者]
     F --> N
     G --> N
-    H -. 读取状态 / 提醒 .-> P
+    P -. 只读状态查询 .-> H
 ```
 
-Skill 决定 Agent 如何在授权范围内工作和维护记录；Hook 只能在宿主实际支持且启用的事件中读取状态、注入上下文或返回宿主允许的控制结果；三份项目记录保存任务的持久状态。
+Skill 是模型读取的指令，模型决定如何在授权范围内工作并通过工具维护记录；Hook 只能在工具实际支持且启用的事件中读取状态、注入上下文或返回允许的控制结果；三份项目记录保存任务的持久状态。
 
 ## 关键文件的职责
 
@@ -86,8 +90,8 @@ Skill 决定 Agent 如何在授权范围内工作和维护记录；Hook 只能�
 | --- | --- | --- |
 | `skills/project-docs/SKILL.md` | 宿主选中 Skill 后 | 指导计划、调查、实施、验证和交接 |
 | `references/*.md` | Skill 按任务需要 | 提供计划选择、证据、控制和文档导航细则 |
-| `scripts/resolve-plan-dir.*` | 开始或恢复复杂任务时 | 定位当前任务的计划目录 |
-| `scripts/init-session.*` | 需要建立新任务记录时 | 初始化 `task_plan.md`、`findings.md` 和 `progress.md` |
+| `scripts/cli.mjs` | 模型显式运行辅助命令时 | Node 入口调度计划选择、初始化、检查和交接操作 |
+| `scripts/planweft-launch.json` | 安装器创建受管 Skill 副本时 | 记录本机绝对 Node 路径，供 Skill 示例命令定位入口；不是可执行程序 |
 | `templates/*.md` | 初始化或扩展记录时 | 提供记录结构，不代表一定会被复制 |
 | 宿主 Hook 或原生扩展 | 会话、提示词、工具、压缩或结束事件 | 读取计划状态并提供上下文或提醒 |
 | `task_plan.md` | 任务全生命周期 | 保存目标、阶段、下一步、阻塞和交接判断 |

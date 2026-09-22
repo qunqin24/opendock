@@ -1,6 +1,8 @@
-# OpenCode HUD
+# OpenCode Engine HUD
 
-Live local-inference stats pinned to the OpenCode sidebar.
+Live local-inference engine telemetry pinned to the OpenCode sidebar — reads
+the serving engine's own metrics, not a client-side estimate. For cost,
+context usage and cloud-model quota, see the note in [Roadmap](#roadmap).
 
 ```
 MTPLX  Qwen3.8-27B
@@ -29,7 +31,7 @@ carrying a stale reading.
 ### Via OpenCode
 
 ```bash
-opencode plugin @banburist/opencode-hud
+opencode plugin @banburist/opencode-engine-hud
 ```
 
 ### Via Download
@@ -42,7 +44,7 @@ Requires OpenCode ≥ 1.18.0. This is a **TUI plugin**, so it goes in
 {
   "$schema": "https://opencode.ai/tui.json",
   "plugin": [
-    ["@banburist/opencode-hud", { "omlxApiKey": "<your oMLX /v1 API key>" }]
+    ["@banburist/opencode-engine-hud", { "omlxApiKey": "<your oMLX /v1 API key>" }]
   ]
 }
 ```
@@ -302,6 +304,10 @@ line; any other id still works fully, with the universal layer only.
 
 ## Roadmap
 
+- **This plugin is engine telemetry only, deliberately** — no cost, context
+  usage, or cloud-model quota, none of which any engine endpoint can answer.
+  A broader plugin covering those, on OpenCode 2, is planned as a separate
+  project rather than scope creep here.
 - LM Studio enrichment — low value; see [Anything else](#anything-else).
 - **Ruled out** (universal layer only, no server-wide telemetry exists):
   **ExLlamaV3 / TabbyAPI** — no Prometheus endpoint. **lightning-mlx** — no telemetry endpoint.

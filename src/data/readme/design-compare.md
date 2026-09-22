@@ -64,6 +64,8 @@ image A / B のいずれかが一様と検出された場合、status / match_ra
 
 両画像のアスペクト比（幅/高さ）の大きい方と小さい方の比が 2.0 を超える場合も、16x16 への引き伸ばしで幾何が歪むため同じ `warnings` に `aspect ratio mismatch: ...` を追加します。status / match_rate は変えません。
 
+`ignore_region` 指定時に両画像のピクセル寸法が異なる場合も、同じ `x,y,w,h` が各画像自身の座標に当たるため `warnings` に注意を追加します（`details` の注記と同じ趣旨。範囲内なら `out_of_bounds_regions` は出ません）。
+
 `strict` モードでも、差分ピクセル数が 0 かつマスク後の両画像が単色ベタ塗りのとき（真っ白スクショ同士、`ignore_region` による全面マスクなど）、status / match_rate は変えず `warnings` に `degenerate comparison: both images are uniform; strict match may be vacuous (blank capture failure or over-broad ignore_region)` を付けます。透過は perceptual と同じ白背景合成で判定します。通常の明暗パターンを持つ同一ペアではこの警告は付きません。
 
 ---
@@ -100,7 +102,7 @@ image A / B のいずれかが一様と検出された場合、status / match_ra
 | `max_diff_pixels` | number | `strict` | 0 以上 | 0 | 許容される差分ピクセル数の上限。デフォルトの 0 は「1px でも差分があれば `mismatch`」を意味する。 |
 | `include_aa` | boolean | `strict` | true / false | false | `true` の場合、アンチエイリアス境界ピクセルも差分として数える（pixelmatch の IncludeAntiAlias）。既定 `false` は現行どおり AA 境界を差分カウントから除外する。 |
 | `ignore_nodes` | string | `layout_tree` / `layout_integrity` | — | 空 | 比較から除外する識別子のカンマ区切りリスト。`layout_tree` では Figma Node ID / Node Name / Web Selector、`layout_integrity` では Web Selector。末尾が `*` のエントリはプレフィックス一致（例: `.ad-*` は `.ad-banner` に一致）として扱われ、命名規則に従うグループを列挙なしで除外できる。どのノードにも一致しなかった除外エントリは `unmatched_ignores` として応答される（プレフィックスエントリは一致ノードが1つも無い場合のみ報告）。全ノードが除外されて比較ペアがなくなった場合は比較を実施せず、status は `skipped`（比較未実施）になる。 |
-| `ignore_region` | string | 全モード | — | 空 | 除外する矩形領域。`x,y,w,h`（px 単位、`x,y >= 0`・`w,h > 0`）をセミコロン区切りで列挙（例: `10,20,100,50;200,300,80,60`）。各値は小数可で、格納時に整数へ丸められる。`perceptual` / `strict` では比較前に両画像を白でマスクし、パースできた領域数は応答の `ignored_regions` に常に含まれる。画像と全く交差しない領域は `out_of_bounds_regions` として応答される。`perceptual` で両画像のサイズが異なる場合、同じ座標は各画像の絶対ピクセルとして適用され、`details` に注記が入る。`layout_tree` / `layout_integrity` では BoundingBox の中心点が領域内にあるノードを除外し（`layout_tree` では両側から、`layout_integrity` では Web ノードを）、除外数は `ignored_count` に加算される（全件除外時は `skipped`）。どのノード中心とも重ならない領域は `unmatched_ignore_regions` として応答される。 |
+| `ignore_region` | string | 全モード | — | 空 | 除外する矩形領域。`x,y,w,h`（px 単位、`x,y >= 0`・`w,h > 0`）をセミコロン区切りで列挙（例: `10,20,100,50;200,300,80,60`）。各値は小数可で、格納時に整数へ丸められる。`perceptual` / `strict` では比較前に両画像を白でマスクし、パースできた領域数は応答の `ignored_regions` に常に含まれる。画像と全く交差しない領域は `out_of_bounds_regions` として応答される。`perceptual` で両画像のサイズが異なる場合、同じ `x,y,w,h` は各画像自身のピクセル座標として適用されるため別の領域をマスクし得る（範囲内なら `out_of_bounds_regions` は出ない）。`details` に注記し、`warnings` にも同じ注意を付ける。`layout_tree` / `layout_integrity` では BoundingBox の中心点が領域内にあるノードを除外し（`layout_tree` では両側から、`layout_integrity` では Web ノードを）、除外数は `ignored_count` に加算される（全件除外時は `skipped`）。どのノード中心とも重ならない領域は `unmatched_ignore_regions` として応答される。 |
 | `viewport_preset` | string | `layout_integrity` | `ipad_portrait` / `ipad_landscape` | 未指定時は縦向き相当 | iPad 既定サイズ。`ipad_portrait` = 768×1024、`ipad_landscape` = 1024×768。 |
 | `viewport_width` | number | `layout_integrity` | 0 より大 | 768 | CSS ピクセルのビューポート幅。指定時は `viewport_preset` の幅を上書きする。 |
 | `viewport_height` | number | `layout_integrity` | 0 より大 | 1024 | CSS ピクセルのビューポート高さ。指定時は `viewport_preset` の高さを上書きする。 |
@@ -210,7 +212,7 @@ image A / B のいずれかが一様と検出された場合、status / match_ra
 | `diff_blocks` | number | ○ | 不一致セル数。 |
 | `image_size_a` / `image_size_b` | string | ○ | 各画像のピクセル寸法（例: `"800x600"`）。 |
 | `ignored_regions` | number | ○ | パースできた `ignore_region` の件数。 |
-| `warnings` | string[] | 非空時のみ | 一様画像・アスペクト比差など。`status` / `match_rate` は変えない。 |
+| `warnings` | string[] | 非空時のみ | 一様画像・アスペクト比差、および `ignore_region` 指定時の画像サイズ差など。`status` / `match_rate` は変えない。 |
 | `out_of_bounds_regions` | string[] | 非空時のみ | 画像と交差しない `ignore_region`。 |
 | `diff_cells` | object[] | 非空時のみ | 不一致セルの `{grid_x, grid_y}`（16x16、0–15）。 |
 
@@ -249,7 +251,7 @@ go build -o design-compare
 
 ### CLI ワンショット比較
 
-引数付きで起動すると MCP ハンドシェイクなしで `compare_design` を1回実行し、ツールと同じ応答 JSON を stdout に出して終了します（`0` = success / `2` = mismatch / `1` = エラー）。引数なし起動は従来どおり stdio MCP サーバーです。
+引数付きで起動すると MCP ハンドシェイクなしで `compare_design` を1回実行し、ツールと同じ応答 JSON を stdout に出して終了します（`0` = success / `2` = mismatch / `1` = エラー）。エラー（`1`）時のエラー本文は、stdout を JSON としてパースする呼び出し側を壊さないよう stderr に出ます。引数なし起動は従来どおり stdio MCP サーバーです。
 
 ```bash
 ./design-compare --mode strict --image-a a.png --image-b b.png

@@ -6,7 +6,8 @@
 
 An [opencode](https://opencode.ai) plugin that adds a `/usage` command (and a
 `usage_report` tool) showing the quota windows (5-hour, weekly, monthly) of your
-inference subscriptions — currently **Kimi Code** (`kimi-for-coding`) and
+inference subscriptions — currently **Kimi Code** (both regional plans:
+`kimi-code-plan-global` on kimi.ai and `kimi-code-plan-cn` on kimi.com) and
 **OpenCode Go** (`opencode-go`). It fetches from each provider's API, caches
 results on disk, and can fall back to a local estimate when the API is
 unreachable. It also emits background low-quota warnings in the TUI.
@@ -81,10 +82,13 @@ TUI options (tuple form): `providers`, `cacheTtlSeconds`, `thresholdPercent`,
 
 ## Commands
 
-- `/usage` — show every configured provider's quota windows.
-- `/usage kimi-for-coding` — filter to a single provider. The argument must match a
-  registered provider id **exactly** (`kimi-for-coding` or `opencode-go`); an
-  unknown id (e.g. `/usage kimi`) returns a helpful error listing the known ids.
+- `/usage` — show every configured provider's quota windows. Providers without a
+  resolved credential are skipped in this view.
+- `/usage kimi-code-plan-global` — filter to a single provider. The argument must
+  match a registered provider id **exactly** (`kimi-code-plan-global`,
+  `kimi-code-plan-cn` or `opencode-go`); an unknown id (e.g. `/usage kimi`)
+  returns a helpful error listing the known ids. An explicitly requested
+  provider with no credential is reported as an error row.
 - `/usage --json` — emit the raw `ProviderReport[]` JSON.
 - `/usage --refresh` — bypass the on-disk cache and fetch live.
 
@@ -116,7 +120,8 @@ per window until that window resets; it re-arms after usage drops below
 - Credential resolution order: `OPENCODE_USAGE_<ID>_KEY` env override, then
   `~/.local/share/opencode/auth.json` (`type: "api"` `.key`, or `type: "oauth"`
   `.access`). `$OPENCODE_DATA_HOME` overrides the data directory.
-- APIs: `https://api.kimi.com/coding/v1/usages` and
+- APIs: `https://api.kimi.ai/coding/v1/usages` (global plan),
+  `https://api.kimi.com/coding/v1/usages` (China plan) and
   `https://opencode.ai/zen/go/v1/usage` (custom `User-Agent` is required by the
   latter).
 - Cache and state live in `<data-home>/usage-report/` (TTL cache, session id,

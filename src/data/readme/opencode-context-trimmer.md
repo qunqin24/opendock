@@ -17,13 +17,70 @@ opencode 对模型是无状态的：每次请求都会把整段对话历史重�
 - 当活跃轮数超过 `threshold` 时触发裁剪：
   - 最近 `recentFullTurns` 轮**完整保留**（用户输入 + 工具循环 + 最终回答）；
   - 再往前的 `priorTrimmedTurns` 轮只保留**用户输入 + 助手最终文本**（丢弃工具循环）；
-  - 更早的全部**丢弃**。
+  - 更早的全部**丢弃**（但可保留面包屑，见下）。
 - 裁剪边界是**粘性的**：固定在 `c - (recentFullTurns + priorTrimmedTurns)`，
   随对话增长保持不动，使序列化后的前缀保持逐字节稳定，从而不破坏上游的 prompt 缓存。
   只有当活跃轮数再次超过 `threshold` 时，边界才会向前跳。
 
 裁剪后会在第一条保留的用户消息里合并一段提示，告诉模型较早的上下文已被裁剪，
 以及如何取回（见下方工具）。
+
+### 面包屑（保留被丢弃的用户消息摘要）
+
+> "面包屑" 这个名字来自童话《韩塞尔与格蕾特》：兄妹俩被带进森林前，沿路撒下面包屑，
+> 好顺着这串痕迹找到回家的路。这里的道理相同——完整历史被丢弃后，我们沿途留下每条旧
+> 用户消息的简短摘要（截断过的"碎屑"），让模型顺着线索回忆起"早先聊过什么"，而不至于断片。
+
+被丢弃区域里最近的若干条**用户消息**会被保留为简短"面包屑"，合并进那段提示里，
+让模型即便看不到完整历史也有一条回忆线索、不至于完全断片。
+
+- `breadcrumbUserMessages`：保留被丢弃区域中最近多少条用户消息（默认 `100`，`0` 关闭）。
+- `breadcrumbMaxTokens`：每条最多保留多少个 token，超出截断并加省略号（默认 `100`）。
+
+#### 截断规则
+
+每条面包屑按 **token** 数截断（按 1 token ≈ 3.5 个 UTF-8 字节估算，换算成字节预算），
+不依赖任何分词库：
+
+- 逐字符累加字节数，当加上某个字符会**超过**预算时，就在该字符之前停下。
+- **绝不切半个字符**：截断点始终落在字符边界上，一个多字节字符（如 3 字节的汉字、
+  或 emoji 这类代理对）要么整体保留、要么整体丢弃，结果始终是合法 UTF-8。
+- 发生截断时在末尾追加省略号 `…`。
+
+例如预算 3 token（≈10 字节）、内容 `帮我修复登录`（每字 3 字节）：留下 `帮我修`（9 字节），
+第 4 个字会到 12 字节超预算，于是截断为 `帮我修 …`。
+
+#### 组装后的完整提示词
+
+裁剪触发后，插件会把「面包屑块」和「裁剪提示」用一个空行拼接，作为一个合成文本段
+（`id: context-trimmer-notice`）插到**第一条保留用户消息**的最前面（不新增额外消息）。
+默认配置下、且确有更早消息被丢弃时，插入的完整文本形如：
+
+```text
+[context-trimmer] 以下是更早对话中被裁剪的用户消息摘要（每条已截断，仅供回忆线索）：
+  1. 帮我修复登录页面的报错，点击提交时报 500 …
+  2. 数据库连接池配置在哪个文件里 …
+  3. 把那个函数改成异步的，然后加上重试 …
+
+[context-trimmer] 较早的上下文已被裁剪，但完整历史仍完整保存，可随时检索。
+
+当你需要被裁剪掉的信息时，调用 context_recall 工具即可取回原文：
+  - query：要找的关键词，多个词用空格分隔（大小写不敏感，须全部命中）。
+  - scope：默认 "current"（只查本会话，最相关）；本会话查不到时用 "all"（跨全部会话，可覆盖 subagent 子会话）。
+
+无需人工确认路径或数据库位置——直接调用 context_recall 即可。
+```
+
+组成与边界情况：
+
+- **面包屑块**：一行标题 + 编号列表，每条是被丢弃用户消息的截断文本；最多列出
+  `breadcrumbUserMessages` 条（默认 100），每条截到 `breadcrumbMaxTokens`（默认 100）。
+  仅当有消息被丢弃且 `breadcrumbUserMessages > 0` 时出现。
+- **裁剪提示**：告知模型上下文已被裁剪，以及如何用 `context_recall` 取回。可用 `notice`
+  配置项自定义；设为 `""` 可关闭。
+- 若两者都为空，则不插入任何提示，消息保持原样。
+
+因为文案恒定，粘性边界稳定时序列化前缀保持逐字节稳定，不会破坏上游 prompt 缓存。
 
 ### 缓存感知门控
 
@@ -80,20 +137,24 @@ $XDG_CONFIG_HOME/opencode/context-trimmer.json
 ```json
 {
   "enabled": true,
-  "threshold": 10,
-  "recentFullTurns": 3,
-  "priorTrimmedTurns": 2,
-  "cacheAwareMinutes": 5
+  "threshold": 20,
+  "recentFullTurns": 5,
+  "priorTrimmedTurns": 5,
+  "cacheAwareMinutes": 5,
+  "breadcrumbUserMessages": 100,
+  "breadcrumbMaxTokens": 100
 }
 ```
 
 | 字段 | 默认值 | 含义 |
 |------|--------|------|
 | `enabled` | `true` | 总开关。`false` 时不改动任何请求。 |
-| `threshold` | `10` | 活跃轮数超过此值时（重新）触发裁剪。 |
-| `recentFullTurns` | `3` | 最近完整保留的轮数。 |
-| `priorTrimmedTurns` | `2` | 再往前只保留"用户输入 + 最终输出"的轮数。 |
+| `threshold` | `20` | 活跃轮数超过此值时（重新）触发裁剪。 |
+| `recentFullTurns` | `5` | 最近完整保留的轮数。 |
+| `priorTrimmedTurns` | `5` | 再往前只保留"用户输入 + 最终输出"的轮数。 |
 | `cacheAwareMinutes` | `5` | 会话空闲达到这么多分钟（缓存已过期）后才（重新）触发。`0` 关闭该门控。 |
+| `breadcrumbUserMessages` | `100` | 被丢弃区域中保留为面包屑的最近用户消息条数。`0` 关闭。 |
+| `breadcrumbMaxTokens` | `100` | 每条面包屑最多保留的 token 数（按 ≈3.5 字节/token 换算，在字符边界处截断）。 |
 
 改动在**下一次请求**即生效——无需重启（文件通过 mtime 缓存重新读取）。
 文件缺失或格式错误时回落到默认值；单个非法字段只回落该字段的默认值，不影响其余字段。
@@ -105,9 +166,9 @@ $XDG_CONFIG_HOME/opencode/context-trimmer.json
 ```json
 {
   "enabled": true,
-  "threshold": 20,
-  "recentFullTurns": 5,
-  "priorTrimmedTurns": 5,
+  "threshold": 30,
+  "recentFullTurns": 8,
+  "priorTrimmedTurns": 8,
   "cacheAwareMinutes": 5
 }
 ```

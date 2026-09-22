@@ -190,7 +190,6 @@ Consider presets as guidelines as they are often outdated.
 - **[OpenCode Go Preset](docs/opencode-go-preset.md)** — runs the agents on OpenCode Go models; enables the Observer agent for visual analysis since its orchestrator model isn't multimodal.
 - **[Author's Preset](docs/authors-preset.md)** — the exact config the author runs day to day, with third-party skills.
 - **[$30 Preset](docs/thirty-dollars-preset.md)** — a mixed-provider setup built around Codex Plus and GitHub Copilot Pro for about $30/month.
-- **[OpenCode Zen Free Preset](docs/opencode-zen-free-preset.md)** — every agent runs on an opencode free model; no usage cost.
 
 ### For Alternative Providers
 
@@ -639,7 +638,7 @@ Use this section as a map: start with installation, then jump to features, confi
 |-----|----------------|
 | **[Council](docs/council.md)** | Run multiple models in parallel and synthesize a single answer with `@council` |
 | **[Custom Agents](docs/configuration.md#custom-agents)** | Define your own specialists with custom prompts, models, MCP access, and Orchestrator delegation rules |
-| **[ACP Agents](docs/acp-agents.md)** | Connect external ACP-compatible agents such as Claude Code ACP or Gemini ACP as delegatable subagents |
+| **[ACP Agents](docs/acp-agents.md)** | Connect external ACP-compatible agents such as Claude Code ACP or Gemini ACP as delegatable subagents; tool and plan progress streams to the TUI while they work |
 | **[Multiplexer Integration](docs/multiplexer-integration.md)** | Watch agents work live in Tmux, Zellij, Herdr, cmux, or kitty panes |
 | **[Codemap](docs/codemap.md)** | Generate hierarchical codemaps to understand large codebases faster |
 | **[Clonedeps](docs/clonedeps.md)** | Clone selected dependency source into an ignored local workspace for inspection |
@@ -671,7 +670,7 @@ Use this section as a map: start with installation, then jump to features, confi
   <p><sub>Every merged contribution leaves a mark on the realm.</sub></p>
 
   <!-- ALL-CONTRIBUTORS-BADGE:START - Do not remove or modify this section -->
-[![All Contributors](https://img.shields.io/badge/all_contributors-116-orange.svg?style=flat-square)](#contributors-)
+[![All Contributors](https://img.shields.io/badge/all_contributors-118-orange.svg?style=flat-square)](#contributors-)
 <!-- ALL-CONTRIBUTORS-BADGE:END -->
 </div>
 
@@ -837,6 +836,8 @@ Use this section as a map: start with installation, then jump to features, confi
     <tr>
       <td align="center" valign="top" width="16.66%"><a href="https://github.com/kumar-shivang"><img src="https://avatars.githubusercontent.com/u/89011717?v=4?s=100" width="100px;" alt="Shivang Kumar"/><br /><sub><b>Shivang Kumar</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=kumar-shivang" title="Code">💻</a></td>
       <td align="center" valign="top" width="16.66%"><a href="https://github.com/ScoFan-official"><img src="https://avatars.githubusercontent.com/u/137064417?v=4?s=100" width="100px;" alt="ScoFan-official"/><br /><sub><b>ScoFan-official</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=ScoFan-official" title="Code">💻</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="https://www.littlelyon.com/"><img src="https://avatars.githubusercontent.com/u/6328186?v=4?s=100" width="100px;" alt="Haoliang Wu"/><br /><sub><b>Haoliang Wu</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=haoliangwu" title="Code">💻</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="https://guanbear.com/"><img src="https://avatars.githubusercontent.com/u/11829005?v=4?s=100" width="100px;" alt="GuanBear"/><br /><sub><b>GuanBear</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=guanbear" title="Code">💻</a></td>
     </tr>
   </tbody>
 </table>

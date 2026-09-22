@@ -81,6 +81,12 @@ Build `/commit #conventional-commits #project-context` for context-aware commits
 
 ## Installation
 
+Version 3.1.0 supports OpenCode V1 1.18.29 and V2 2.0.12 through separate server and terminal adapters in the same package. Releases use normal versions on `latest`.
+
+For V2, add `"opencode-snippets"` to `plugins` in `opencode.json`. Its terminal plugin loads automatically. For V1, use the command below or add it to `plugin` in both `opencode.json` and `tui.json`.
+
+V1 retains its autocomplete interface. The field dialog is available in V2; named arguments such as `#review(topic="API")` work in both versions.
+
 ```bash
 opencode plugin opencode-snippets -gf
 ```
@@ -170,7 +176,27 @@ https://github.com/user-attachments/assets/ebb303b5-d41b-4d87-8f08-eb1d730db5c8
 
 ## Where to Store Snippets
 
+The global config root is `OPENCODE_CONFIG_DIR` when set, otherwise
+`$XDG_CONFIG_HOME/opencode`, otherwise `~/.config/opencode`. The paths below
+show the default root. Snippet files, `snippet/config.jsonc`, and plugin logs
+all follow the selected root. The server and TUI resolve it in their own
+process environment; when attaching to another machine, keep the snippet
+collections in those roots in sync. An explicit `globalDirectory` plugin
+option still overrides the snippet directory.
+
 Snippets can be global (`~/.config/opencode/snippet/*.md` or `~/.config/opencode/snippets/*.md`) or project-specific (`.opencode/snippet/*.md` or `.opencode/snippets/*.md`). Both singular and plural directory names are loaded automatically. Project snippets override global ones with the same name, and `snippet/` wins over `snippets/` within the same scope.
+
+Project snippet directories are resolved against the canonical project root. A symlinked project snippet directory, including one that points outside the project, is rejected rather than loaded or modified.
+
+### V2 processing state
+
+New submissions read the current snippet files, including nested references and completed drafts. Changes made through TUI commands or an editor apply to the next submission. Replayed messages retain their original expansion and skill content.
+
+If snippet processing fails, V2 preserves the original message and logs a warning. Invalid arguments, templates, or old snippet references must not block new conversation turns. Validation completes before shell commands or snippet writes run; a validation failure discards the message's planned expansions and effects. Correct the snippet or its arguments and submit it again to expand it. Snippet failures in skill tool results also preserve the original result.
+
+V2 records a bounded amount of processing output so rebuilt request history and server restarts cannot repeat shell or management side effects. State lives under the user's private data directory (`$XDG_DATA_HOME/opencode/opencode-snippets/v2`, or `~/.local/share/opencode/opencode-snippets/v2`) rather than inside a project. Directories use mode `0700` and records use `0600`.
+
+Only hashed project/message identifiers, completion status, timestamps, and output needed for replay are retained; raw input prompts and project paths are not stored. Records older than 30 days are pruned, with additional limits of 100 sessions per project and 1,000 messages per session. Deleting an OpenCode session removes that session's records immediately.
 
 ## Features
 
@@ -199,6 +225,47 @@ aliases: safe
 ```
 
 You can also use JSON array style: `aliases: ["cp", "pick"]`
+
+### Fields and forms
+
+Snippets declare typed inputs in YAML frontmatter and reference answers with ordinary Handlebars variables:
+
+```markdown
+---
+fields:
+  app:
+    label: App name
+    required: true
+---
+MyApps (search for {{app}})
+```
+
+Accept a completion or type a space after an exact snippet name to fill its form. Confirming writes a readable reference such as `#myapps(app="Payroll")` into the composer; sending the message expands it. Cancel preserves the original reference. Use **Edit snippet fields** for the invocation under the cursor to change answers.
+
+Autocomplete marks snippets that open forms with `☷` after their name. Forms support text, multiline text, numbers, checkboxes, and selection lists, with defaults and validation. The action row is **OK · Cancel · Help**. Help reveals keyboard shortcuts and navigation instructions; these stay hidden by default. Tab/Shift+Tab move between fields and buttons, arrows select, Space toggles a checkbox, Ctrl+J inserts a newline, Enter confirms, and Escape cancels.
+
+```markdown
+---
+fields:
+  count:
+    label: Options
+    type: number
+    default: 5
+    min: 0
+    integer: true
+---
+{{#if (gt count 0)}}give me {{count}} {{plural count "option" "options"}} to choose from{{/if}}
+```
+
+Metadata does not print answers; body variables and conditions control the output. Conditions use typed answers; this example emits nothing for zero and uses singular wording for one. For a preset, put `#options(count=10)` in `ten-options.md`. An explicit outer answer such as `#ten-options(count=2)` overrides that default. Nested snippets share their parent's answers; separate invocations remain independent.
+
+The `fields` mapping determines input order and opts the body into Handlebars. Use `fields: {}` to render a body with no inputs of its own. Body references do not declare fields, and legacy snippets without their own mapping or an inline skill helper retain literal placeholders. Select options use YAML arrays, such as `options: [quick, normal, thorough]`.
+
+Arguments use named keys, JSON-quoted text, finite numbers, and `yes`/`no` booleans. Answers stay literal even when they contain hashtags, shell commands, or template syntax. Headless invocations use defaults and reject missing required answers before effects run.
+
+See [field authoring and natural-language examples](skill/snippets/references/fields-and-forms.md) for all field types, constraints, escaping, repeated values, and conditional prose. The [example templates](examples/forms/) include review, reword, and options presets. Review emits no directive for zero reviewers or zero cycles; one reviewer omits parallelism and one cycle omits repetition. Reword and options also omit their requests for zero.
+
+For inline skill content in a snippet, use `{{skill "review"}}`. Existing XML skill tags remain supported; `#skill(review)` continues to load hidden context with a visible marker.
 
 ### Shell Command Substitution
 
@@ -351,9 +418,7 @@ Or use the self-closing format:
 }
 ```
 
-Skills are loaded from OpenCode's standard skill directories:
-- **Global**: `~/.config/opencode/skill/<name>/SKILL.md`
-- **Project**: `.opencode/skill/<name>/SKILL.md`
+V2 uses OpenCode's native skill registry for both expansion and autocomplete. This includes skills discovered by OpenCode, configured skill sources, and skills supplied by plugins. Skill IDs and display names are accepted; autocomplete inserts the native ID to distinguish skills with the same display name.
 
 When a skill tag is found, it's replaced with the skill's content body (frontmatter stripped). Unknown skills leave the tag unchanged.
 
@@ -381,7 +446,9 @@ Quoted names are also supported:
 }
 ```
 
-When enabled, the user-visible message shows `↳ Loaded name`, while the model receives an injected OpenCode-style `<skill_content>` payload immediately after that message. Multiple `#skill(...)` calls in one message are injected in source order.
+When enabled, the user-visible message shows `↳ Loaded name`, while the model receives an injected OpenCode-style `<skill_content>` payload immediately after that message. Multiple `#skill(...)` calls in one message are injected in their final visible order, including loads introduced by recursive snippets and prepend/append blocks.
+
+XML skill tags render before hashtag expansion; `#skill(...)` loads resolve after recursive hashtag expansion; shell substitutions run last. Loaded skill bodies also expand snippet hashtags and shell substitutions. Within `<inject>` blocks, only hashtag references expand. Skill-tool results expand XML tags and recursive hashtags using the configured injection flag.
 
 Quick project-local demo in this repo:
 
@@ -467,7 +534,7 @@ A default config file is created automatically on first run.
 
 ```jsonc
 {
-  "$schema": "https://raw.githubusercontent.com/JosXa/opencode-snippets/v3.0.1/schema/config.schema.json",
+  "$schema": "https://raw.githubusercontent.com/JosXa/opencode-snippets/v3.1.0/schema/config.schema.json",
   "logging": {
     "debug": false // Enable debug logging (logs: ~/.config/opencode/logs/snippets/daily/)
   },
@@ -501,7 +568,29 @@ Logs are written to `~/.config/opencode/logs/snippets/daily/` when enabled.
 
 ## Contributing
 
-Contributions welcome! Please open an issue or PR on GitHub. 
+### Runtime tests for OpenCode 2
+
+Run the unit and renderer tests with `bun test`. To exercise the built plugin in
+real OpenCode 2 processes, install the CLI version matching `@opencode/plugin`
+in `package.json`, then run:
+
+```bash
+bun run test:v2
+```
+
+Set `OPENCODE2_BIN` to test a specific CLI executable. The runtime suite uses
+isolated home/config/data directories and a local deterministic model endpoint.
+It verifies saved messages and actual model requests across CLI submissions,
+native attachments, skill-tool calls, queued input, commands, restarts, forks,
+and project boundaries. Failed tests retain their temporary directory and print
+its path, including provider requests, session exports, and process logs.
+
+The CLI and native prompt API have separate coverage because `run` serializes
+multiword arguments with quotes and inlines text supplied by `--file`; native
+API files remain attachments. Update these explicit CLI compatibility assertions
+when the host changes that behavior.
+
+Contributions welcome! Please open an issue or PR on GitHub.
 👥 [Discord Forum](https://discord.com/channels/1391832426048651334/1463378026833379409)
 
 ## License

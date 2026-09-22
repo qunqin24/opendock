@@ -1,100 +1,98 @@
 # opencode-ledger
 
-Experimental code review agent and TUI review ledger plugin for OpenCode.
+A terminal code-review plugin for OpenCode. Browse Git changes, get AI explanations, add comments, and track which changes you have reviewed.
 
-> Note: opencode-ledger is an independent project and is not built by, affiliated with, or endorsed by the OpenCode team.
+Ledger is an independent, experimental project and is not affiliated with the OpenCode team.
 
 ## Requirements
 
-- OpenCode 1.18.23 or newer
-- Git 2.43 or newer on `PATH` for branch comparisons
-- A git repository to review
+- OpenCode V2, version 2.0.12 or newer
+- Git 2.43 or newer on `PATH`
+- A local Git checkout with at least one commit, accessible to the terminal running OpenCode
+- A configured OpenCode model provider for AI explanations and commit messages
 
 ## Install
 
-Add Ledger to your OpenCode TUI config:
+Add Ledger to `~/.config/opencode/cli.json` (or `$XDG_CONFIG_HOME/opencode/cli.json`):
 
 ```json
 {
-  "$schema": "https://opencode.ai/tui.json",
-  "plugin": ["@shivambaku/opencode-ledger"]
+  "$schema": "https://opencode.ai/v2/cli.json",
+  "plugins": ["@shivambaku/opencode-ledger"]
 }
 ```
 
-Use one of these config locations:
+If you already have plugins configured, append Ledger to the existing `plugins` array. Keep your other settings.
 
-- `~/.config/opencode/tui.json` for all projects
-- `.opencode/tui.json` inside one project
+Restart OpenCode. It installs the plugin automatically. OpenCode's CLI configuration applies to all projects.
 
-Restart OpenCode after changing config. OpenCode installs npm plugins automatically on startup.
+## Your first review
 
-Open Ledger from the command palette or with `/ledger`. Press `?` inside Ledger for help.
+1. Start OpenCode in the repository you want to review.
+2. Run `/ledger`, or select **Ledger** from the command palette.
+3. Press **B** (`Shift+B`) to choose a comparison base if you want something other than `main`.
+4. Select a file with `j` / `k`, then press `Enter` to inspect its changes.
+5. Press `a` for AI explanations and `Tab` to show them. Use `J` / `K` to move between change blocks.
+6. Press `Space` to mark a block reviewed, or `c` to leave a comment. Outside inspect mode, `Space` marks the selected file reviewed.
 
-## How it works
+Press `?` for the full keyboard reference, `Esc` to go back, and `q` to close Ledger.
 
-Ledger lists changed files, lets you inspect each diff hunk, asks your OpenCode model for explanations, and tracks which blocks you have approved locally.
+## Choose what to review
 
-Ledger opens in **Branch + local vs main** mode by default. It shows the combined net changes from the common ancestor (merge base) of main and your branch to a snapshot of the current working state. This includes committed branch changes, staged and unstaged edits, and non-ignored untracked files.
+Ledger starts in **Branch + local** mode: changes on your branch since its common ancestor with the base, combined with staged, unstaged, and non-ignored untracked changes. Changes that cancel each other out are omitted.
 
-This is one net comparison, not a concatenation of committed and local diffs. Changes that cancel each other out disappear: for example, a local edit that undoes a committed branch change back to the merge-base content leaves no diff for that change. Changes made only on main are not included.
+The default base is local `main`, falling back to `origin/main`. Press **B** to open a searchable picker of local and remote-tracking branches. The selected base appears in the header and stays selected through refreshes and view changes until you close Ledger. Reopening Ledger starts with the default base again.
 
-Branch-mode diffs and file contents come from the same tree snapshot built with a temporary Git index, rather than independently reading live working-copy files. The snapshot leaves your actual index unchanged, but writes Git objects to the repository.
+Press **b** to switch to **Uncommitted Only**, which shows staged, unstaged, and untracked changes. Choosing a base with **B** returns to the branch comparison. Press **r** to refresh; branch comparisons also refresh automatically.
 
-Press `b` to switch between **Branch + local vs main** and **Uncommitted Only**. The branch-mode header shows `<branch> + local vs <base>`; the other mode is labeled `Uncommitted Only` and retains the existing local-only comparison. Every newly opened Ledger starts in branch mode.
+Each branch/base comparison and the uncommitted view have separate approvals, comments, and explanations. Switching bases stops pending analysis. Selecting a base changes the comparison without checking out a branch or fetching remote updates.
 
-- Local `main` is preferred; `origin/main` is used only if local main is absent. Ledger does not fetch or update either ref. Fetch/update your base yourself when needed.
-- If neither ref exists, Ledger shows an error instead of falling back to uncommitted changes. A branch comparison is empty only when the snapshot has no net changes from the merge base; reviewing main itself can still show local changes.
-- Branch refs and local edits are checked every two seconds while branch mode is open. Press `r` to explicitly refresh either view.
-- Approvals, comments, and explanations are separate for each branch/base and for the uncommitted view. Unchanged hunks retain their reviews as the branch advances. Existing uncommitted reviews remain available.
-- `m` generates a message for the selected changeset: a squash-commit message covering the combined net branch and local changes in branch mode, or a commit message for local changes in uncommitted-only mode.
-- `e` opens the live working-copy file, not the reviewed snapshot. Edits made since the snapshot may mean its line numbers differ from the reviewed content.
-- The session-prompt `ledger local` count continues to refer to uncommitted files needing approval.
+## Keyboard shortcuts
 
-## Important keys
+| Key | Action |
+| --- | --- |
+| `B` | Choose the comparison base branch |
+| `b` | Toggle branch + local / uncommitted only |
+| `r` | Refresh changes |
+| `j` / `k` | Move the selection or diff cursor |
+| `]` / `[` | Next / previous file |
+| `J` / `K` or `n` / `N` | Next / previous change block |
+| `Enter` | Inspect a file or switch explanation focus |
+| `Space` | Toggle approval for the selected file or active block |
+| `a` / `A` | Analyze the selected file / all pending files |
+| `Tab` | Show or hide explanations |
+| `c` | Add or edit a block comment |
+| `y` / `Y` | Copy the active diff block / unresolved comments |
+| `m` | Generate and copy a commit message for the current comparison |
+| `e` | Open the working-copy file in your editor |
+| `x` | Stop analysis |
+| `?` | Show help |
+| `Esc` / `q` | Go back / close Ledger |
 
-- `b`: toggle branch + local / uncommitted only
-- `r`: refresh the selected Git comparison
-- `j` / `k`: move selection or diff cursor
-- `J` / `K`: next or previous block
-- `n` / `N`: next or previous block
-- `]` / `[`: next or previous file
-- `enter`: open file diff or switch explanation focus
-- `space`: approve selected file or active block
-- `a`: analyze selected file
-- `A`: analyze all pending files
-- `tab`: show or hide explanation
-- `c`: add or edit block comment
-- `m`: generate commit message
-- `esc`: back
-- `q`: close Ledger
+## Storage and AI
 
-## Privacy and storage
+Review state is saved locally in `.opencode/ledger/state.json`. Ledger adds `/ledger/` to `.opencode/.gitignore` to keep that state out of commits.
 
-- Ledger stores local review state in `.opencode/ledger/state.json` inside the reviewed repository.
-- Ledger writes `.opencode/.gitignore` with `/ledger/` so its state is not committed by default.
-- AI analysis sends the selected Git diff and relevant prior OpenCode edit context to your configured OpenCode model provider.
-- Analysis sessions are temporary and are deleted after analysis finishes or is stopped.
-- Set `LEDGER_DEBUG=1` to keep analysis request and response payloads under `.opencode/ledger/debug` for troubleshooting.
+AI analysis sends the selected diff and relevant prior OpenCode edit context to your configured model provider. Temporary analysis sessions are removed when analysis finishes or is stopped. Approvals and comments are local review notes; they do not stage or commit changes.
 
 ## Troubleshooting
 
-- If Ledger does not appear, restart OpenCode and check that `@shivambaku/opencode-ledger` is listed in your `tui.json` `plugin` array.
-- If you already have plugins configured, add `@shivambaku/opencode-ledger` to the existing `plugin` array instead of replacing it.
-- If branch mode has no files, the current snapshot has no net changes from the merge base. Committed and local changes may have canceled each other out. Press `r` to refresh, or `b` to inspect uncommitted changes separately.
-- If the comparison base is missing, create local `main` or fetch `origin/main`, then press `r`. Shallow clones may need more history to find the common ancestor.
-- Branch comparisons run Git locally and require the reviewed checkout to be accessible to the TUI process.
+- **Ledger does not appear:** check the `plugins` entry in your global `cli.json`, restart OpenCode, and inspect `/plugins` for errors.
+- **The base is missing or has no common ancestor:** press **B** and choose another branch. Fetch remote branches or more history if needed, then reopen the picker.
+- **The comparison is empty:** press `r` to refresh, `B` to check the base, or `b` to inspect uncommitted changes separately.
+- **Analysis fails:** check your OpenCode provider/model configuration. For diagnostics, start OpenCode with `LEDGER_DEBUG=1`; request and response payloads are saved under `.opencode/ledger/debug`.
 
 ## Local development
 
-Use a local source path in your OpenCode TUI config:
+Clone this repository and run `npm install`. Point OpenCode at the checkout's `src` directory:
 
 ```json
 {
-  "$schema": "https://opencode.ai/tui.json",
-  "plugin": ["file:///absolute/path/to/opencode-ledger/src/tui.tsx"]
+  "$schema": "https://opencode.ai/v2/cli.json",
+  "plugins": ["file:///absolute/path/to/opencode-ledger/src"]
 }
 ```
 
-Replace `/absolute/path/to/opencode-ledger` with the absolute path to your checkout. Restart OpenCode after changing the config.
+Replace the path with your checkout location and restart OpenCode. Use the local entry instead of the npm entry while developing.
 
-Run `npm run check` for TypeScript validation and `npm test` for Git-fixture regression tests (Node.js 22 or newer). Tests use temporary repositories and do not modify the project checkout.
+Run `npm run check` for TypeScript validation and `npm test` for tests (Node.js 22 or newer). Git tests use temporary repositories.

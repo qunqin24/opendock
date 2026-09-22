@@ -1,7 +1,7 @@
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="assets/logo-dark.svg">
-    <img src="assets/logo.svg" width="330" alt="deja-vu">
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/logo-dark.svg">
+    <img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/logo.svg" width="330" alt="deja-vu">
   </picture>
 </p>
 
@@ -11,18 +11,18 @@
 deja indexes the sessions Claude Code, Codex, Cursor and every other agent on this machine
 already wrote to disk, and hands the right one back in whichever agent asks.</p>
 
-<p align="center"><img src="assets/demo.gif" width="720" alt="The same question put to the same agent twice: without memory it has no record of it, with deja it answers with the decision from eight months earlier"></p>
+<p align="center"><img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif" width="720" alt="The same question put to the same agent twice: without memory it has no record of it, with deja it answers with the decision from eight months earlier"></p>
 
-<p align="center"><sub><em>Nobody searched anything — the agent called deja itself. Every line is quoted from two real sessions.</em></sub></p>
+<p align="center"><sub><em>Nobody searched anything — the agent called deja itself. Two genuine runs, a real model and a real tool call, against a synthetic corpus: nobody's history is published.</em></sub></p>
 
-<p align="center"><b>Every memory tool starts empty and records forward. deja starts full.</b></p>
+<p align="center"><b>deja starts full: the history 34 agents already wrote, searchable while it indexes, with no model and no capture step.</b></p>
 
 <p align="center">And nobody has to ask for it: recall arrives at session start, on every prompt,
 before a file is edited or a command runs, and after one fails. Keys and tokens are stripped as
 the index is built, so what reaches the model is safe to send.</p>
 
 <p align="center">
-<b>85.3% hit@1</b> on LongMemEval-S &middot; <b>69.7% retrieval hit@1</b> on LoCoMo &middot; <b>millisecond</b> lookups over gigabytes of history<br>
+<b>85.3% hit@1</b> on LongMemEval-S (470-question cleaned set) &middot; <b>69.7% retrieval hit@1</b> on LoCoMo &middot; <b>millisecond</b> lookups over gigabytes of history<br>
 <sub>Both harnesses ship in this repo and run on the public datasets in minutes &middot;
 <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">check the numbers yourself</a></sub>
 </p>
@@ -37,7 +37,7 @@ the index is built, so what reaches the model is safe to send.</p>
 <p align="center">English | <a href="README.zh.md">中文</a></p>
 
 <p align="center"><a href="https://vshulcz.github.io/deja-vu/">Docs</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">Benchmarks</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/compare.html">How it compares</a> &middot; <a href="docs/INTEGRATING.md">Building it into your tool</a></p>
-<p align="center"><sub>Found it useful? <a href="https://github.com/vshulcz/deja-vu">Star deja-vu on GitHub</a> so other developers can find it.</sub></p>
+<p align="center"><sub>Found it useful? <a href="https://github.com/vshulcz/deja-vu">Star deja-vu on GitHub</a>.</sub></p>
 
 ## Install
 
@@ -46,7 +46,7 @@ curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | s
 deja install --auto
 ```
 
-<p align="center"><img src="assets/banner.png" width="700" alt="What deja prints after the first index: the mark, the agents it found, and a query taken from your own history"></p>
+<p align="center"><img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/banner.png" width="700" alt="What deja prints after the first index: the mark, the agents it found, and a query taken from your own history"></p>
 
 Ten seconds to install, about ten to index, and it is useful. The second command wires MCP
 recall into every agent it finds, turns on session-start recall where the agent supports
@@ -116,7 +116,7 @@ to local files, and deja turns those files into one memory layer all of them rea
 | | |
 | --- | --- |
 | **Retroactive search** | `deja "connection pool exhausted"` over gigabytes, including everything from before you installed deja. Natural-language questions fall back to a relevance tier. Time is a hint, not a filter. |
-| **Cross-agent recall** | The MCP `recall` tool answers *"we fixed this three weeks ago"* in whichever agent asks, whoever solved it originally. |
+| **Cross-agent recall** | The MCP `deja` tool in `recall` mode answers *"we fixed this three weeks ago"* in whichever agent asks, whoever solved it originally. |
 | **It survives compaction** | Measured over 43 compactions: the summary keeps 77% of the decisions and 0.2% of the commands you ran. deja hands back the other 99.8% — and on Claude Code and Codex it captures the task, the files and the commands as the compaction starts, then returns them once in the next session. |
 | **Recall at the point of action** | Before an agent edits a file or runs a command, deja names that file's prior decision, that command's working invocation, or the program this machine does not have. When a command fails, a `PostToolUse` hook answers with what followed that same error here before — the pair an agent never thinks to ask for. |
 | **It indexes the work, not just the talk** | The files each turn opened, the commands that ran with their exit status, and the exact spans an edit replaced. That is the part every summary throws away. |
@@ -140,7 +140,7 @@ SVG for a profile README. To post it anywhere else, [turn it into a
 PNG](https://vshulcz.github.io/deja-vu/card/) — that page converts it in your own
 browser.
 
-<p align="center"><img src="docs/assets/stats-card-demo.svg" width="760" alt="deja stats card: a year of agent sessions as a heatmap, the agents they came from, and the longest one"></p>
+<p align="center"><img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/docs/assets/stats-card-demo.svg" width="760" alt="deja stats card: a year of agent sessions as a heatmap, the agents they came from, and the longest one"></p>
 
 The full feature reference lives in the [docs](https://vshulcz.github.io/deja-vu/).
 
@@ -207,7 +207,7 @@ $ deja "jwt refresh token"
 | Command | What it does |
 | --- | --- |
 | `deja sync export/import/ssh` | Move memory between machines. Watermarked, append-only, idempotent. |
-| `deja view` | Your whole memory as one local HTML file. No server, nothing leaves the machine. |
+| `deja view` | Your whole memory as one local HTML file. No server, and the file never leaves the machine. |
 | `deja stats` | Your agent work, wrapped. `--card` draws it in the terminal, `--card <file>.svg` writes one for a profile, `--html` a browsable timeline. |
 | `deja doctor [--deep]` | Self-diagnosis, and with `--deep`, proof of the index against the sources. |
 | `deja mcp` | The stdio MCP server, which is what `deja install` wires in. |
@@ -287,7 +287,7 @@ aider &middot; Amp &middot; Antigravity &middot; Claude Code &middot; Cline &mid
 | Qwen Code | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | Cherry Studio | ✅ | ✕ | ✅ | ✕ | ✕ | paste | import the server once in Settings -> MCP; enable the skill for the agent |
 | Senpi | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | none |
-| gajae-code | ✅ | — | ✅ | ✅ | ✅ | paste | none |
+| gajae-code | ✅ | ✅ | ✅ | ✅ | ✅ | paste | none |
 | Kimchi Coding | ✅ | ⚠ | ⚠ | ⚠ | ✅ | paste | none |
 | Command Code | ✅ | ✅ | ✅ | ✅ | ? | paste | none |
 | ZCode | ✅ | ✅ | ? | ? | ? | paste | sqlite3 for the CLI database |
@@ -426,10 +426,15 @@ transcripts:
 
 | Measurement | Result |
 | --- | --- |
-| Lookup, in process | **~0.7 ms** median (`deja bench recall`, 100 queries, half of them Russian), ~19 ms on the LongMemEval-S haystacks |
+| Lookup, in process | **0.7–0.8 ms** median (`deja bench recall`, 100 queries, half of them Russian), ~19 ms on the LongMemEval-S haystacks |
 | `deja <query>`, end to end | ~0.2 s median on that store: process start, the freshness check over every store, ranking, printing |
 | Freshness check alone | ~50 ms when nothing changed |
 | Index size | 200 MB, ~10% of corpus |
+
+The same store has since grown to 2,754 sessions, 358k messages and 5.7 GB.
+A cold full build over it takes 71 s and writes a 232 MB index — 4% of the
+corpus, because the share falls as transcripts repeat themselves — and the
+end-to-end median is unchanged at 0.25 s.
 
 The index is incremental. When a session file grows, only that file is re-read.
 
@@ -453,7 +458,7 @@ is not secret detection: a shape it does not know can pass through. See the
 [security model](docs/SECURITY-MODEL.md#redaction).
 
 **Will it slow my agent down?** A recall is a lexical lookup against a local index:
-~0.7 ms median, and nothing waits on a model. A hook adds the process start and a
+0.7–0.8 ms median, and nothing waits on a model. A hook adds the process start and a
 freshness check over your stores on top of that — tens of milliseconds on a store of
 a few gigabytes.
 

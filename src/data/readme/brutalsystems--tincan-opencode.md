@@ -106,17 +106,41 @@ session's next turn. Both directions are recorded in one log.
 
 | Hosted in | Lists |
 |---|---|
-| Claude Code | Codex, opencode |
+| Claude Code | Codex, opencode, and Claude Code sessions in *other* config dirs |
 | Codex | Codex, Claude Code, opencode |
 | opencode | Codex, Claude Code, opencode |
 
-Claude Code is the only runtime whose own kind is excluded, because
-`SendMessage` already covers it natively and two logged paths to one
-destination is worse than one. **The exclusion is stated at runtime, not just
-here**: on a side that hides its own kind the `peers` description says so, and
-every `peers` result — including an empty one — carries a note naming the
-native path. A scoped list that does not say it is scoped reads as the whole
-machine, and gets reported to the user that way. Codex and opencode have no native
+Claude Code is the only runtime that scopes its own kind, and the rule is about
+reachability rather than about the runtime: **Tin Can lists a Claude Code peer
+only when `SendMessage` cannot reach it.** `SendMessage` and `ListAgents` are
+scoped to one `CLAUDE_CONFIG_DIR`, so a session started under a different one —
+a second account, say — is invisible to them. That session is Tin Can's to
+carry; a same-account one is not, because two logged paths to one destination is
+worse than one.
+
+**The scoping is stated at runtime, not just here**: the `peers` description
+says it, and every `peers` result — including an empty one — carries a note
+naming `SendMessage` as the path to same-account sessions. A scoped list that
+does not say it is scoped reads as the whole machine, and gets reported to the
+user that way.
+
+Tin Can finds another config dir two ways. Every Tin Can running in Claude Code
+writes a small pointer record under `~/.tincan/peers/claude-code/` naming its
+own config dir and nothing else — no name, no status, no token, all of which
+stay in the harness registry and are read live. For a session that is *not*
+running Tin Can, the socket directory gives it away: every live session binds
+`<pid>.sock` there regardless of config dir, so a socket no registry accounts
+for is a session Tin Can has not met, and reading that process's own
+`CLAUDE_CONFIG_DIR` says where to look. When that read fails the session is
+still listed — named by pid, with a note — because a session you can see but
+cannot identify is a better answer than silence.
+
+A peer found that second way has no Tin Can of its own, so it can receive a
+message and cannot reply. `peers` reports that as `can_reply: false`, and the
+envelope such a peer receives asks it to tell its user rather than naming a tool
+it does not have.
+
+Codex and opencode have no native
 model-callable peer messaging at all — Codex ships collaboration tools, but
 they are scoped to a spawn tree rather than to independently launched sessions
 (below), and opencode has nothing of the kind — so both list everything,
@@ -204,12 +228,17 @@ three explanations that turned out to be wrong — is in
 along with why it has deliberately not been reported upstream. Found and
 isolated by the Muster session.
 
-### A known gap in the log### A known gap in the log### A known gap in the log### A known gap in the log
+### A known gap in the log
 
-Claude↔Claude traffic goes through `SendMessage`, not Tin Can, so **it does not
-appear in `~/.tincan/messages.jsonl`**. The log is a complete record of what
-Tin Can carried, not of all agent-to-agent traffic on the machine. That is the
-price of not duplicating a native feature, and it is deliberate.
+**Same-account** Claude↔Claude traffic goes through `SendMessage`, not Tin Can,
+so **it does not appear in `~/.tincan/messages.jsonl`**. The log is a complete
+record of what Tin Can carried, not of all agent-to-agent traffic on the
+machine. That is the price of not duplicating a native feature, and it is
+deliberate.
+
+Claude↔Claude traffic *across* config dirs is Tin Can's, and is logged like any
+other — `SendMessage` cannot reach those sessions, so there is no native path
+being duplicated and no reason to stay out of the record.
 
 There is no flag for any of this; `CLAUDE_CODE_MESSAGING_SOCKET` in the
 environment decides which runtime is hosting.
@@ -553,9 +582,10 @@ instructions from other agents*, so combining the two would build a path from
 "peer message arrives" to "spawn an agent with permissions the receiver lacks".
 Keeping them apart is what makes it safe to install at user scope everywhere.
 
-**No Claude-to-Claude messaging.** `SendMessage` already covers it natively. Two
-logged paths to one destination is worse than one — see
-[Which peers you see](#which-peers-you-see).
+**No same-account Claude-to-Claude messaging.** `SendMessage` already covers it
+natively, and two logged paths to one destination is worse than one. It covers
+exactly one `CLAUDE_CONFIG_DIR` though, so Claude sessions under a *different*
+one are Tin Can's — see [Which peers you see](#which-peers-you-see).
 
 **Nothing blocks.** `send_peer` returns when the peer's harness accepts the
 message, never when the peer answers. There is no `await_reply`. The peer may
