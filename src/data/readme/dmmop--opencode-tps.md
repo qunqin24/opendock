@@ -43,15 +43,37 @@ Install dependencies:
 bun install
 ```
 
-The plugin entrypoint is `src/index.ts`. Load that entrypoint using your OpenCode plugin configuration while developing locally.
+For local TUI development, point `cli.json` at this project directory. OpenCode
+loads the conventional root `tui.ts` entrypoint.
 
 ## Releasing
 
-A maintainer can trigger a release from GitHub Actions:
+### Commit messages
 
-1. Go to **Actions** > **Release** > **Run workflow**.
-2. Choose `patch`, `minor`, or `major`.
-3. The workflow installs the locked dependencies, checks the npm package, bumps the version, creates and pushes a Git tag, creates a GitHub Release, and publishes `@dmmop/opencode-tps` to npm with provenance.
+`bun install` installs a Husky `commit-msg` hook. Commitlint rejects malformed
+Conventional Commits before Git creates the commit (70-character header limit;
+capitalized subjects are allowed). Ordinary Git merge messages are exempt, but
+bare version numbers and `fixup!` messages are not. CI validates every new commit
+and the PR title too, including after title edits, to cover squash merges and
+hooks bypassed with `--no-verify`. The validator checks syntax, not whether an
+agent chose the correct semantic type for the actual change.
+
+### Automatic publication
+
+The single **CI and Release** workflow tests pull requests and pushes to `main`.
+It runs Bun tests, source typechecking, a TUI build and a packed-export smoke test.
+Only a successful push to `main` can publish to npm and create a GitHub Release.
+
+`semantic-release` uses Conventional Commits since the last release tag: `fix:`
+produces a patch, `feat:` a minor, and `!` or a `BREAKING CHANGE:` footer a major.
+Documentation, maintenance and test-only commits do not trigger a release unless
+marked breaking. The largest applicable bump wins. Use conventional PR titles
+when squash-merging.
+
+Versions are tracked by Git tags and npm, not by automatic bump commits on `main`;
+the published manifest receives the computed version. Tag pushes do not start
+another workflow. npm Trusted Publishing must authorize this repository's
+`release.yml` workflow (OIDC); publication includes provenance and needs no npm token.
 
 ## Metric notes
 

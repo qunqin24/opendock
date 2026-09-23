@@ -1,0 +1,206 @@
+![Artifact Server](./docs/assets/banner.webp)
+
+# Artifact Server
+
+**The open-source, self-hostable alternative to Claude Code artifacts.**
+
+Artifact Server gives people and agents one place to publish, review, comment on, version, and share the artifacts they create while building products. Its built-in MCP server gives agents direct access to the same work.
+
+Run it on a laptop for one developer. Deploy it for a private team on Cloudflare, one server, Kubernetes, AWS, or Google Cloud.
+
+<p align="center">
+  <a href="https://github.com/backnotprop/plannotator"><img src="./docs/images/star-plannotator.svg" alt="Artifact Server is created with Plannotator" width="395"></a>
+  &nbsp;&nbsp;&nbsp;&nbsp;
+  <a href="https://plannotator.ai/workspaces"><img src="./docs/images/plannotator-workspaces.svg" alt="Plannotator Workspaces is the planning layer for your software factory" width="395"></a>
+</p>
+
+## Contents
+
+- [Why Artifact Server](#why-artifact-server)
+- [Built for AI agents and team collaboration](#built-for-ai-agents-and-team-collaboration)
+- [Cloudflare and Artifact Server](#cloudflare-and-artifact-server)
+- [Deploy it for a team](#deploy-it-for-a-team)
+- [Run it locally](#run-it-locally)
+- [Usage](#usage)
+- [Security model](#security-model)
+- [Development and project records](#development-and-project-records)
+
+## Why Artifact Server
+
+Teams now use HTML, images, and video for plans, mockups, prototypes, code reviews, and other work created during product development. That work quickly becomes disorganized, and providers try to lock it inside their platforms.
+
+Artifact Server gives teams a self-hosted place to organize and collaborate on that work. Store artifacts by project, share them, comment on them, and keep control of the files and data.
+
+## Built for AI agents and team collaboration
+
+<p>
+  <img src="./apps/web/src/review/assets/agents/claude.svg" alt="Claude" width="30" height="30">
+  &nbsp;&nbsp;
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="./apps/web/src/review/assets/agents/codex-dark.svg">
+    <img src="./apps/web/src/review/assets/agents/codex-light.svg" alt="Codex" width="30" height="30">
+  </picture>
+  &nbsp;&nbsp;
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="./apps/web/src/review/assets/agents/cursor-dark.svg">
+    <img src="./apps/web/src/review/assets/agents/cursor-light.svg" alt="Cursor" width="27" height="30">
+  </picture>
+  &nbsp;&nbsp;
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="./apps/web/src/review/assets/agents/copilot-dark.svg">
+    <img src="./apps/web/src/review/assets/agents/copilot-light.svg" alt="GitHub Copilot" width="37" height="30">
+  </picture>
+  &nbsp;&nbsp;
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="./apps/web/src/review/assets/agents/pi.svg">
+    <img src="./apps/web/src/review/assets/agents/pi-light.svg" alt="Pi" width="30" height="30">
+  </picture>
+  &nbsp;&nbsp;
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="./apps/web/src/review/assets/agents/opencode-dark.svg">
+    <img src="./apps/web/src/review/assets/agents/opencode-light.svg" alt="OpenCode" width="24" height="30">
+  </picture>
+</p>
+
+<p align="center">
+  <a href="./docs/mcp.md"><img src="./docs/assets/agent-native-mcp.svg" alt="AI agents connect to Artifact Server through its built-in MCP server" width="395"></a>
+  &nbsp;&nbsp;
+  <img src="./docs/assets/team-collaboration.svg" alt="Team members add comments to exact artifact versions" width="395">
+</p>
+
+Artifact Server includes a built-in MCP server and a portable Agent Skill. Agents publish and update versioned artifacts. Teams review, comment on, and share the same work.
+
+Connect the agent and install the skill:
+
+```sh
+artifactserver connect
+npx skills add plannotator/artifact-server
+```
+
+Then ask:
+
+```text
+/artifact-server upload that HTML design doc
+```
+
+The agent returns the full-screen review link first. [Read the MCP guide](./docs/mcp.md) for source checkouts, remote servers, permissions, and supported operations.
+
+Live session delivery is available from source for Pi and Claude Code Channels. Claude Channels require its research-preview development flag and, on managed plans, the organization policy. The OpenCode adapter is not release-qualified; live-host verification and contributions are welcome.
+
+<p align="center">
+  <a href="./integrations/pi/README.md"><img src="./docs/assets/pi-live-feedback.svg" alt="Artifact Server has native Pi support for live integrated feedback" width="268"></a>
+  <a href="./integrations/claude-channel/README.md"><img src="./docs/assets/claude-channel-feedback.svg" alt="Artifact Server supports live feedback through the Claude Code Channels research preview" width="268"></a>
+  <a href="./integrations/opencode/README.md"><img src="./docs/assets/opencode-plugin-wanted.svg" alt="OpenCode live-host verification, features, and pull requests are welcome" width="268"></a>
+</p>
+
+## Cloudflare and Artifact Server
+
+Cloudflare is the main hosted deployment target. Cloudflare Artifacts can add private Git-backed history for selected projects. It is off by default and currently requires closed beta access.
+
+<p align="center">
+  <a href="./docs/cloudflare-artifacts.md"><img src="./docs/assets/cloudflare-artifacts-git-handoff.svg" alt="Cloudflare Artifacts provides optional Git-backed history" width="800"></a>
+</p>
+
+- [Deploy Artifact Server on Cloudflare](./deploy/cloudflare/README.md)
+- [Configure optional Git history](./docs/cloudflare-artifacts.md)
+- [Read the Cloudflare Artifacts documentation](https://developers.cloudflare.com/artifacts/)
+
+Cloudflare is optional. Artifact Server also runs locally, on Compose, on Kubernetes, on AWS, and on Google Cloud.
+
+[![Artifact Server supports Cloudflare, Docker Compose, Kubernetes, AWS, and Google Cloud](./docs/assets/supported-deployments.svg)](./docs/deployment.md)
+
+## Deploy it for a team
+
+Every remote deployment uses one trusted application origin and one isolated wildcard content domain.
+
+| Deployment | Data layer | Guide |
+| --- | --- | --- |
+| Cloudflare | D1 and R2 | [Cloudflare guide](./deploy/cloudflare/README.md) |
+| Compact Compose | SQLite and one file volume | [Compose guide](./packaging/compose/README.md) |
+| External-storage Compose | PostgreSQL and S3-compatible storage | [Compose guide](./packaging/compose/README.md) |
+| Kubernetes | PostgreSQL and object storage | [Helm guide](./packaging/helm/artifact-server/README.md) |
+| AWS | ECS, RDS, and S3 | [AWS Pulumi guide](./deploy/pulumi/aws/README.md) |
+| Google Cloud | Cloud Run, Cloud SQL, and Cloud Storage | [Google Cloud Pulumi guide](./deploy/pulumi/gcp/README.md) |
+
+Azure teams deploy through the Helm chart on AKS; there is no separate Azure installer. Azure Blob Storage is available as a preview adapter and has not passed live Azure qualification.
+
+[Read the deployment guide](./docs/deployment.md) for shared requirements, storage choices, authentication, and backups.
+
+## Run it locally
+
+Local mode stores metadata in SQLite and files on disk. It grants owner access only from the same loopback origin. Running from source requires Node.js 24.12 or newer and pnpm 10.34.3.
+
+```sh
+git clone https://github.com/plannotator/artifact-server.git
+cd artifact-server
+pnpm install
+pnpm dev
+```
+
+Open the printed URL. You can also download the portable Node.js package from the [latest GitHub release](https://github.com/plannotator/artifact-server/releases/latest). See [Get started locally](https://artifactserver.com/docs/get-started/) for package verification and startup instructions.
+
+## Usage
+
+Most artifacts are published by an agent through the [Artifact Server Skill](./skills/artifact-server/SKILL.md) or [MCP](./docs/mcp.md). For direct access, use the `artifactserver` CLI to publish files and directories, connect to remote servers, and create new versions. [Read the CLI guide](./docs/cli.md).
+
+## Security model
+
+Artifact Server serves untrusted artifact content from isolated version hosts, separate from the trusted application origin used for authentication, review, comments, API, and MCP. Private content uses version-scoped browser sessions, and untrusted paths cannot select storage locations.
+
+Read the [security model](./project/spec/decisions/0002-shared-identity-and-private-content.md) or [report a vulnerability](./SECURITY.md).
+
+Read about Artifact Server's [software supply-chain security](https://artifactserver.com/docs/security/).
+
+## Development and project records
+
+Install dependencies and run the focused development checks:
+
+```sh
+pnpm install
+pnpm check
+pnpm test:web
+```
+
+Run the complete iteration gate before a handoff:
+
+```sh
+pnpm verify:iteration
+```
+
+Repository engineering rules live in [AGENTS.md](./AGENTS.md).
+
+The [`project`](./project) directory contains specifications, conformance evidence, performance records, prototypes, and research. Start with:
+
+- [Product specification](./project/spec/artifact-server-product-spec.html)
+- [Conformance ledger](./project/spec/conformance.yml)
+- [MCP baseline](./project/spec/artifact-server-mcp-baseline.md)
+- [Performance findings](./project/performance/FINDINGS.md)
+- [Project records index](./project/README.md)
+
+Public guides live in the [documentation index](./docs/README.md).
+
+## License
+
+Artifact Server is dual-licensed under either of
+
+- [MIT License](./LICENSE-MIT)
+- [Apache License, Version 2.0](./LICENSE-APACHE)
+
+at your option, © 2026 backnotprop.
+
+Unless you explicitly state otherwise, any contribution intentionally
+submitted for inclusion in this project by you, as defined in the Apache-2.0
+license, shall be dual licensed as above, without any additional terms or
+conditions.
+
+---
+
+<p align="center">
+  <a href="https://github.com/backnotprop/plannotator"><img src="./docs/images/star-plannotator.svg" alt="Artifact Server is created with Plannotator" width="395"></a>
+  &nbsp;&nbsp;&nbsp;&nbsp;
+  <a href="https://plannotator.ai/workspaces"><img src="./docs/images/plannotator-workspaces.svg" alt="Plannotator Workspaces is the planning layer for your software factory" width="395"></a>
+</p>
+
+<p align="center">
+  created by <a href="https://x.com/backnotprop">backnotprop</a>
+</p>

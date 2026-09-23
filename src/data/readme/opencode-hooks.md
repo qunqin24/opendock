@@ -266,7 +266,7 @@ When the main agent delegates to a subagent, it doesn't pick a model. It picks a
 | `quick`              | Single-file changes, typos         |
 | `ultrabrain`         | Hard logic, architecture decisions |
 
-The agent says what kind of work it needs; the harness picks the right model. `ultrabrain` routes to GPT-6 Astra max and `deep` to GPT-6 Astra high (OpenAI / OpenAI Codex, then GitHub Copilot, then OpenCode); both fall back to GPT-5.6 Sol. You touch nothing.
+The agent says what kind of work it needs; the harness picks the right model. `ultrabrain` routes to GPT-6 Astra max (falling back to GPT-5.6 Sol), `deep-high` to GPT-6 Astra xhigh, and `deep-low` to GPT-6 Sol Fast medium (then GPT-6 Sol where the Fast tier is not served). You touch nothing.
 
 ### Claude Code Compatibility
 

@@ -33,6 +33,14 @@ codex plugin marketplace add reintersect/agent-plugins
 codex plugin add reintersect@reintersect
 ```
 
+Finish setup in Codex:
+
+1. Run `$reintersect:login` and choose your Reintersect workspace.
+2. Open `/hooks` in the Codex CLI and review and trust Reintersect's hooks. Codex requires this separately from installing the plugin; automatic recall and capture stay off until you do it.
+3. Start a new session and run `$reintersect:status` to verify the workspace, tools and capture. An enabled capture setting alone does not mean the hooks are running.
+
+Codex asks you to review hooks again if their definition changes.
+
 ### Cursor
 
 ```bash
@@ -58,7 +66,7 @@ Add the package and its MCP server to `opencode.json`, in the project or in `~/.
 
 ### Sign in
 
-Run `/reintersect:login` inside the agent (`/reintersect-login` in OpenCode). It opens your browser and prints the URL, so it works over SSH too. Pick a workspace on the consent page; that choice binds this machine. Cursor has no slash commands, so sign in from a terminal instead:
+Run `$reintersect:login` in Codex, `/reintersect:login` in Claude Code, or `/reintersect-login` in OpenCode. It opens your browser and prints the URL, so it works over SSH too. Pick a workspace on the consent page; that choice binds this machine. Cursor has no slash commands, so sign in from a terminal instead:
 
 ```bash
 node ~/.cursor/plugins/*/reintersect/dist/reintersect-agent.mjs login
@@ -89,7 +97,7 @@ As you work, the plugin records the session locally: your prompts, the agent's r
 
 Reintersect's tools ride along too. Mid-session the agent can search your team's conversations, read a decision and its rationale, or store something you asked it to remember.
 
-The slash commands live under `/reintersect:` (`/reintersect-` in OpenCode):
+Invoke the skills with `$reintersect:<name>` in Codex, `/reintersect:<name>` in Claude Code, or `/reintersect-<name>` in OpenCode:
 
 | Command | Does |
 | --- | --- |
@@ -120,7 +128,7 @@ Never sent:
 
 Everything is captured locally first, under `~/.reintersect/agent/`, and shipped in batches: after five completed exchanges, after 40,000 characters, before a compaction and at session end. If Reintersect is unreachable, batches wait on disk and retry at the next session start. They expire after seven days.
 
-`/reintersect:pause` turns capture off. The tools keep working while paused, and batches already captured stay on disk until capture resumes.
+The pause skill turns capture off. The tools keep working while paused, and batches already captured stay on disk until capture resumes.
 
 The plugin never writes to `CLAUDE.md`, `AGENTS.md` or any host settings file. Hooks always exit 0 and never block the host.
 
@@ -134,9 +142,11 @@ The plugin never writes to `CLAUDE.md`, `AGENTS.md` or any host settings file. H
 
 ## Troubleshooting
 
-**Nothing comes back at session start.** Run `/reintersect:status`. It says whether the machine is signed in, which workspace it's bound to and whether batches are still waiting. If the repository belongs to a different workspace, ask the agent to switch workspace once; it has a tool for that.
+**Nothing comes back at session start.** Run `$reintersect:status` in Codex or `/reintersect:status` in Claude Code. It says whether the machine is signed in, which workspace it's bound to and whether batches are still waiting. If the repository belongs to a different workspace, ask the agent to switch workspace once; it has a tool for that.
 
-**Sign-in expired.** Run `/reintersect:login` again. Tokens refresh on their own for 90 days; after that it's one more browser round trip.
+**Sign-in expired.** Run the login skill again. Tokens refresh on their own for 90 days; after that it's one more browser round trip.
+
+**Codex shows no repository-scoped results.** Codex starts the bundled MCP server from the plugin directory, so pass the active checkout's git remote as `owner/repo` in the tool's `repository` argument. The recall and remember skills do this for repository facts.
 
 **Cursor gets no context on prompts.** Cursor's prompt hook can't inject context, so there the plugin injects at session start and ships a rule that tells the agent to check Reintersect before assuming. Capture works the same as everywhere else.
 

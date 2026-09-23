@@ -37,6 +37,11 @@ opencode plugin add .
 
 - **Relay Manager** — `relay.json` at the workspace root holds `project_context`,
   `active_baton`, and a per-repo map. Per-repo snapshots live in `.code-relay/state.json`.
+- **Root discovery** — the plugin walks up from the current directory to the nearest
+  `relay.json`, but stops at the first project boundary: a `.git` directory, `$HOME`, or
+  the filesystem root. A repo without its own `relay.json` therefore fails fast instead of
+  silently adopting an ancestor's (e.g. a stray file in `$HOME`). Share a root on purpose
+  by running `relay init` at that level.
 - **Spec Sync** — deterministic diff of `specs/**/*.spec.md` (no LLM) compresses intent
   into the root state and powers the `relay close` consistency check.
 - **Context Injector** — renders a Resume Prompt from state + handover templates, injected

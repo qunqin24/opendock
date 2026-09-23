@@ -22,7 +22,7 @@ before a file is edited or a command runs, and after one fails. Keys and tokens 
 the index is built, so what reaches the model is safe to send.</p>
 
 <p align="center">
-<b>85.3% hit@1</b> on LongMemEval-S (470-question cleaned set) &middot; <b>69.7% retrieval hit@1</b> on LoCoMo &middot; <b>millisecond</b> lookups over gigabytes of history<br>
+<b>88.1% hit@1</b> on LongMemEval-S (470-question cleaned set) &middot; <b>70.5% retrieval hit@1</b> on LoCoMo &middot; <b>millisecond</b> lookups over gigabytes of history<br>
 <sub>Both harnesses ship in this repo and run on the public datasets in minutes &middot;
 <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">check the numbers yourself</a></sub>
 </p>
@@ -34,7 +34,7 @@ the index is built, so what reaches the model is safe to send.</p>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT License"></a>
 </p>
 
-<p align="center">English | <a href="README.zh.md">中文</a></p>
+<p align="center">English | <a href="README.zh.md">中文</a> | <a href="README.ja.md">日本語</a></p>
 
 <p align="center"><a href="https://vshulcz.github.io/deja-vu/">Docs</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">Benchmarks</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/compare.html">How it compares</a> &middot; <a href="docs/INTEGRATING.md">Building it into your tool</a></p>
 <p align="center"><sub>Found it useful? <a href="https://github.com/vshulcz/deja-vu">Star deja-vu on GitHub</a>.</sub></p>
@@ -147,7 +147,7 @@ The full feature reference lives in the [docs](https://vshulcz.github.io/deja-vu
 ## Privacy
 
 Indexing and search are local. The network is used only by `deja update`, `deja sync ssh`,
-and the version check in `deja doctor`.
+the version check in `deja doctor`, and `deja embed` against an endpoint you set.
 
 Credentials are redacted at index time: AWS keys, `api_key=` and `token=` assignments,
 bearer tokens and raw JWTs, PEM private key blocks, provider tokens, `scheme://user:pass@host`
@@ -155,6 +155,11 @@ URLs, high-entropy values for shapes no pattern knows, and a password stated in 
 "the admin password is …", where there is no delimiter for the other rules to find. The
 value becomes `[redacted:<kind>]` and the surrounding text stays searchable. `deja share` and
 `deja sync export` re-apply redaction on the way out.
+
+The source transcripts are not redacted: agents write command output there verbatim, so a
+`cat .env` or a pasted connection string stays in plaintext. `deja secrets` lists which
+sessions carry one and of what kind, from the markers redaction left; it never prints a
+value. One machine held 84 in 42 sessions ([credentials in transcripts](https://vshulcz.github.io/deja-vu/guide/credentials-in-transcripts.html)).
 
 `deja forget` removes sessions from a rebuilt index and writes tombstones, so a later
 `deja index` cannot restore them from the source history. `--unforget` lifts a tombstone.
@@ -209,6 +214,7 @@ $ deja "jwt refresh token"
 | `deja sync export/import/ssh` | Move memory between machines. Watermarked, append-only, idempotent. |
 | `deja view` | Your whole memory as one local HTML file. No server, and the file never leaves the machine. |
 | `deja stats` | Your agent work, wrapped. `--card` draws it in the terminal, `--card <file>.svg` writes one for a profile, `--html` a browsable timeline. |
+| `deja secrets` | Which sessions' source transcripts carry credentials, and what kind. Never prints a value. |
 | `deja doctor [--deep]` | Self-diagnosis, and with `--deep`, proof of the index against the sources. |
 | `deja mcp` | The stdio MCP server, which is what `deja install` wires in. |
 
@@ -451,7 +457,8 @@ sync all read that one index. Details in [docs/ARCHITECTURE.md](docs/ARCHITECTUR
 [data flows](docs/SECURITY-MODEL.md#data-flows).
 
 **What about secrets already in my logs?** They stay in the original harness files, which
-are your agent's data. Known shapes — AWS keys, `api_key=`/`token=` assignments, bearer
+are your agent's data; `deja secrets` names the sessions that carry them so you can rotate
+and delete. Known shapes — AWS keys, `api_key=`/`token=` assignments, bearer
 tokens and bare JWTs, PEM blocks, provider tokens, high-entropy values — are stripped as
 the index is built, so they do not reach digests, shares or sync exports. Pattern matching
 is not secret detection: a shape it does not know can pass through. See the

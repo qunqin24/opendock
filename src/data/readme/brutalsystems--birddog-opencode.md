@@ -23,9 +23,16 @@ lets them message each other, birddog watches them.
 ## Try it
 
 ```sh
+npm i -g @brutalsystems/birddog        # macOS, Apple silicon
+birddog discover                       # what can be watched
+birddog doctor                         # what can and cannot be observed
+```
+
+The package carries the compiled binary, so nothing is built at install time
+and no Go toolchain is needed. From a clone, or without npm:
+
+```sh
 go build -o birddog ./cmd/birddog
-./birddog discover                     # what can be watched
-./birddog doctor                       # what can and cannot be observed
 ```
 
 Then watch something. Take a `session_id` (and, for Claude Code, the `pid` and
@@ -33,10 +40,10 @@ Then watch something. Take a `session_id` (and, for Claude Code, the `pid` and
 [`examples/`](./examples/) — and start an instance:
 
 ```sh
-./birddog start --config birddog.json
-./birddog status --instance <id>
-./birddog events --instance <id> --after <cursor> --wait 30
-./birddog stop --instance <id>
+birddog start --config birddog.json
+birddog status --instance <id>
+birddog events --instance <id> --after <cursor> --wait 25
+birddog stop --instance <id>
 ```
 
 The instance keeps observing after the shell that started it is gone, and
@@ -80,10 +87,12 @@ threads as `notLoaded` to anyone who does not own them, which describes the
 asking process rather than the session — so birddog says it cannot see the
 state instead of guessing one.
 
-Nor will it tell you a worker is unblocked. No provider exposes permission
-requests to an outside observer today, so every target reports input-request
-visibility as `unavailable`. An absence of observation is never reported as
-evidence of absence — and a turn ending is not work finishing.
+Nor will it tell you a worker is unblocked. Where a permission request can be
+seen it is reported, and where it cannot birddog says `unavailable` rather than
+implying there is none — Claude Code's registry reports a waiting session and
+an instrumented opencode session reports the request itself, while Codex
+exposes neither. An absence of observation is never reported as evidence of
+absence, and a turn ending is not work finishing.
 
 ## Start here
 

@@ -1,5 +1,5 @@
 <div align="center">
-<img src="media/v3-banner-1400.jpg" alt="planning-with-files: task_plan.md, findings.md, and progress.md as three stone tablets" width="100%">
+<img src="media/pwf-banner-v5.webp" alt="PWF: Every task. Every step. Three planning files on a brass-inlaid base beneath an engraved arch" width="100%">
 </div>
 
 <h1 align="center">
@@ -22,8 +22,11 @@ Persistent file-based planning for AI coding agents and long-running agent tasks
 <p align="center">
   <a href="https://github.com/OthmanAdi/planning-with-files/stargazers"><img src="https://img.shields.io/github/stars/OthmanAdi/planning-with-files?style=flat&color=yellow" alt="Stars"></a>
   <a href="https://github.com/OthmanAdi/planning-with-files/releases"><img src="https://img.shields.io/github/v/release/OthmanAdi/planning-with-files?style=flat&label=release" alt="Latest release"></a>
+  <a href="https://skills.sh/othmanadi/planning-with-files"><img src="https://skills.sh/b/othmanadi/planning-with-files" alt="skills.sh installs"></a>
   <a href="https://skillsplayground.com/skills/othmanadi-planning-with-files-planning-with-files/"><img src="https://skillsplayground.com/badges/installs/othmanadi-planning-with-files-planning-with-files.svg" alt="Skills Playground installs"></a>
   <a href="https://skill-history.com/othmanadi/planning-with-files"><img src="https://skill-history.com/badge/othmanadi/planning-with-files.svg" alt="Downloads"></a>
+  <a href="https://github.com/OthmanAdi/planning-with-files/issues?q=is%3Aissue+is%3Aclosed"><img src="https://img.shields.io/github/issues-closed/OthmanAdi/planning-with-files?color=success" alt="Closed issues"></a>
+  <a href="https://github.com/OthmanAdi/planning-with-files/pulls?q=is%3Apr+is%3Aclosed"><img src="https://img.shields.io/github/issues-pr-closed/OthmanAdi/planning-with-files?color=success" alt="Closed PRs"></a>
 </p>
 
 <p align="center">
@@ -45,33 +48,24 @@ Persistent file-based planning for AI coding agents and long-running agent tasks
   <sub>Proof, comparisons and the repository reference are <a href="#reference">further down</a> · <a href="docs/installation.md">Full install guide</a></sub>
 </p>
 
+
+## Quick Install
+
+```bash
+npx skills add OthmanAdi/planning-with-files --skill planning-with-files -g
+```
+
+All install methods: [docs/installation.md](docs/installation.md).
+
 ---
 
 ## Before and after /clear
 
 Every coding agent loses its working memory when the context window resets. The plan does not have to die with it.
 
-### Without planning files
-
-<img src="media/terminal-without-plan.svg" alt="Terminal after /clear without planning files: the user types continue, the agent replies that it has no context from an earlier session and asks the user to describe the task and where they left off" width="560">
-
-The agent re-reads the repo, asks you to restate the goal, and rediscovers work it already finished.
-
----
-
-### With planning-with-files
-
-<img src="media/terminal-with-plan.svg" alt="Terminal after /clear with planning-with-files: the hook injects a plan data block showing Phase 2 complete and Phase 3 in progress, and the agent resumes Phase 3 by adding the expiry edge-case tests" width="560">
-
-The transcript is illustrative; the `===BEGIN PLAN DATA===` block is the skill's real injection format, written into context by the `UserPromptSubmit` hook from `task_plan.md` on disk. In the project's internal recovery benchmark, a fresh session with the files on disk resumed in 5.0 turns on average against 13.3 for a raw agent (internal v1, author-run; method and limits in [docs/evals.md](docs/evals.md)). That benchmark used the earlier default transcript-catchup behavior. Current automatic recovery uses project files only, so the figure is historical evidence rather than a fresh measurement of the current default.
-
-| At a glance | |
-|---|---:|
-| Plan files | **3** |
-| Agents covered | **60+** |
-| Pass rate (with skill) | **96.7%** |
-| Test suite | **1084 tests** |
-| Survives `/clear` | **yes** |
+<p align="center">
+  <a href="media/pwf-context-story-v1.mp4"><img src="media/pwf-context-story-v1.gif" alt="Illustrated workflow: planning files preserve the task state through a context reset" width="760"></a>
+</p>
 
 ## Built for long-running agent tasks
 
@@ -80,23 +74,8 @@ The transcript is illustrative; the `===BEGIN PLAN DATA===` block is the skill's
 >
 > That is the difference between an agent that forgets after `/clear`, compaction or a crash and one that resumes at the current phase. In the project's own measurements the plan on disk turned a 13.3-turn re-orientation into 5.0 turns, and the skill won 3 of 3 blind A/B comparisons ([numbers and limits](#benchmark-results)). Every mechanism below is a file on disk plus a hook, so it works the same on hour ten as on turn one.
 
-| What breaks long agent runs | What the skill does about it |
-|---|---|
-| The context window is wiped by `/clear`, compaction, or a crash | The plan is re-read from disk on the next turn; `SessionStart`, `UserPromptSubmit` and `PreCompact` hooks carry the current phase back in |
-| Goal drift after 50+ tool calls | The plan head is re-injected every turn; `PWF_INJECT=smart` keeps the goal, the next step and the active phase in the window late in a long plan |
-| The agent declares "done" early | Gated mode: the Stop gate holds the stop only while an `in_progress` phase remains, with a block cap and stall detection so an incomplete plan alone never traps a session |
-| The plan is silently rewritten by a tool result, a collaborator, or a bug | SHA-256 attestation: a plan body that no longer matches the approved hash is refused at injection with `[PLAN TAMPERED]` |
-| Two sessions overwrite each other's phases | The parallel-write guard reports when checked items or completed phases go down between turns |
-| Autonomous loops burn tokens on recitation | Autonomous mode drops the per-tool-call recitation and replaces the raw progress tail with a fixed-shape ledger summary; injection is KV-cache stable and one hook fire costs about 289 ms |
-| Hooks that quietly stop firing | `/plan-doctor` self-checks resolution, injection, attestation, install surfaces and per-fire latency |
 
-Everything in that table is opt-in per plan and byte-identical to the previous behavior when no mode marker is set. Details: [v3 Long-Running Agent Features](#v3-long-running-agent-features) and [docs/long-running-agent-tasks.md](docs/long-running-agent-tasks.md).
-
-<a id="the-problem"></a>
-<a id="the-solution-3-file-pattern"></a>
-<a id="the-core-principle"></a>
-<a id="why-this-skill"></a>
-<a id="the-manus-principles"></a>
+<div><a id="the-problem"></a><a id="the-solution-3-file-pattern"></a><a id="the-core-principle"></a><a id="why-this-skill"></a><a id="the-manus-principles"></a></div>
 
 ## The 3-file pattern
 
@@ -107,7 +86,7 @@ Filesystem = Disk (persistent, unlimited)
 → Anything important gets written to disk.
 ```
 
-For every complex task the skill keeps exactly this in your project, and nothing else:
+The skill keeps your plan, findings, and progress in your project:
 
 ```
 your-project/
@@ -123,85 +102,14 @@ The pattern is the one Manus described before [Meta acquired it for $2 billion o
 > "Markdown is my 'working memory' on disk. Since I process information iteratively and my active context has limits, Markdown files serve as scratch pads for notes, checkpoints for progress, building blocks for final deliverables."
 > — Manus AI
 
-| Principle | Implementation |
-|-----------|----------------|
-| Filesystem as memory | Store in files, not context |
-| Plan recitation | Re-read plan before decisions (hooks) |
-| Error persistence | Log failures in plan file |
-| Goal tracking | Checkboxes show progress |
-| Completion verification | Stop hook checks all phases |
 
-## Quick Install
+<a id="hermes-agent-first-class-support-cli-and-desktop"></a>
 
-**Claude Code, plugin route** (ships everything: skill, hooks, slash commands):
+## First-class hosts: native plugins
 
-```
-/plugin marketplace add OthmanAdi/planning-with-files
-/plugin install planning-with-files@planning-with-files
-```
+> [!TIP]
+> **On these hosts planning-with-files runs as a native plugin: per-turn plan injection, progress reminders, the completion gate, `/pwf` commands and model-callable tools, with no shell hooks to register.** Every other platform gets the skill through the Agent Skills standard and, where the host supports it, the frontmatter or config-file hooks listed in the [platform setup guides](#enhanced-support-per-ide-setup-guides).
 
-**Every other agent**, one line, 60+ agents via the [Agent Skills](https://agentskills.io) standard:
-
-```bash
-npx skills add OthmanAdi/planning-with-files --skill planning-with-files -g
-```
-
-**npm**, to pin an exact version into a project or vendor it:
-
-```bash
-npm install planning-with-files
-```
-
-The package carries `SKILL.md`, `scripts/` and `templates/`, so this is the route for locking a version into a repo's dependencies or copying the skill in yourself. It does not register hooks on its own.
-
-**Pi Coding Agent**, same npm package, wired up for you (skill, extension, status bar):
-
-```bash
-pi install npm:planning-with-files
-```
-
-**Hermes Agent** (Nous Research), native plugin plus skill bundle, CLI and Desktop:
-
-```bash
-hermes skills install OthmanAdi/planning-with-files/.hermes/skills/planning-with-files --yes
-hermes plugins install OthmanAdi/planning-with-files/.hermes/plugins/planning-with-files
-hermes plugins enable planning-with-files
-```
-
-**OpenCode**, native plugin plus the skill (the `npx skills add` command above lands in `~/.agents/skills/`, which OpenCode reads):
-
-```json
-{ "plugin": ["opencode-planning-with-files"] }
-```
-
-in `opencode.json` or `~/.config/opencode/opencode.json`; OpenCode installs it on the next start.
-
-**DeepSeek Harness (DSH)**, native plugin plus the skill (the `npx skills add` command above lands in `~/.agents/skills/`, which DSH reads):
-
-```bash
-dsh plugin --profile web add dsh-planning-with-files
-```
-
-then restart `dsh web`; the same command works for the `headless`, `sdk` and `acp` profiles.
-
-Under a minute. Safe to re-run. Trigger it by typing `/plan` (plugin) or asking the agent to "plan this task"; the skill also self-triggers on multi-step tasks.
-
-What each route actually ships:
-
-| Route | Skill + scripts + templates | Slash commands | Hooks |
-|---|---|---|---|
-| Claude Code plugin | yes | **yes** | **yes** |
-| `npx skills add` | yes | no | frontmatter hooks, see note |
-| `npm install` | yes, under `node_modules/` | no | no, copy the skill in yourself |
-| `pi install npm:` | yes | **yes**, Pi commands | **yes**, via the Pi extension |
-| `hermes plugins install` | yes, with the skill bundle | **yes**, `/pwf`, `/pwf-status` | **yes**, plugin hooks incl. the gate |
-| OpenCode `opencode.json` plugin | yes, with the skill | **yes**, `/pwf`, `/pwf-status` (two copied command files) | **yes**, plugin hooks incl. the gate |
-| DeepSeek Harness `dsh plugin add` | yes, with the skill | **yes**, `/pwf`, `/pwf-status` | **yes**, plugin hooks incl. the gate |
-| ClawHub / manual copy | yes | no | frontmatter hooks, see note |
-
-Skill-route installs can end up silently hook-less (project trust not accepted, or frontmatter hooks not registering on project-level installs). The hooks are the differentiating mechanism, so if they matter to you, use the plugin route, then verify with `/plan-doctor`. Full matrix and the two silent killers: [docs/installation.md](docs/installation.md#what-each-install-route-actually-ships).
-
-Install acting up? Open your agent and say: *"Read docs/installation.md and docs/troubleshooting.md from OthmanAdi/planning-with-files and fix my install."* Then run `/plan-doctor`.
 
 <details>
 <summary><strong>🌐 Available in 5 other languages</strong></summary>
@@ -239,24 +147,7 @@ They live under `skills/i18n/`, one directory deeper than the canonical skill. T
 
 </details>
 
-<details>
-<summary><strong>Prefer <code>/planning-with-files</code> with no prefix?</strong></summary>
-
-Copy the skill to your local folder:
-
-**macOS/Linux:**
-```bash
-cp -r ~/.claude/plugins/cache/planning-with-files/planning-with-files/*/skills/planning-with-files ~/.claude/skills/
-```
-
-**Windows (PowerShell):**
-```powershell
-Copy-Item -Recurse -Path "$env:USERPROFILE\.claude\plugins\cache\planning-with-files\planning-with-files\*\skills\planning-with-files" -Destination "$env:USERPROFILE\.claude\skills\"
-```
-
-</details>
-
-<details>
+<details id="enhanced-support-per-ide-setup-guides">
 <summary><strong>Enhanced Support: per-IDE setup guides</strong></summary>
 
 | IDE | Installation Guide | Integration |
@@ -475,7 +366,101 @@ Full list of everyone who made this project better: [CONTRIBUTORS.md](./CONTRIBU
 
 </details>
 
-All install methods: [docs/installation.md](docs/installation.md).
+
+<details id="full-reference">
+<summary><strong>📚 Commands, Multi-agent runs, Benchmarks &amp; more</strong> <code>[15 sections]</code></summary>
+
+### Long-run safeguards
+
+| What breaks long agent runs | What the skill does about it |
+|---|---|
+| The context window is wiped by `/clear`, compaction, or a crash | The plan is re-read from disk on the next turn; `SessionStart`, `UserPromptSubmit` and `PreCompact` hooks carry the current phase back in |
+| Goal drift after 50+ tool calls | The plan head is re-injected every turn; `PWF_INJECT=smart` keeps the goal, the next step and the active phase in the window late in a long plan |
+| The agent declares "done" early | Gated mode: the Stop gate holds the stop only while an `in_progress` phase remains, with a block cap and stall detection so an incomplete plan alone never traps a session |
+| The plan is silently rewritten by a tool result, a collaborator, or a bug | SHA-256 attestation: a plan body that no longer matches the approved hash is refused at injection with `[PLAN TAMPERED]` |
+| Two sessions overwrite each other's phases | The parallel-write guard reports when checked items or completed phases go down between turns |
+| Autonomous loops burn tokens on recitation | Autonomous mode drops the per-tool-call recitation and replaces the raw progress tail with a fixed-shape ledger summary; injection is KV-cache stable and one hook fire costs about 289 ms |
+| Hooks that quietly stop firing | `/plan-doctor` self-checks resolution, injection, attestation, install surfaces and per-fire latency |
+
+Everything in that table is opt-in per plan and byte-identical to the previous behavior when no mode marker is set. Details: [v3 Long-Running Agent Features](#v3-long-running-agent-features) and [docs/long-running-agent-tasks.md](docs/long-running-agent-tasks.md).
+
+### Installation routes
+
+
+**Claude Code, plugin route** (ships everything: skill, hooks, slash commands):
+
+```
+/plugin marketplace add OthmanAdi/planning-with-files
+/plugin install planning-with-files@planning-with-files
+```
+
+**Every other agent**, one line, 60+ agents via the [Agent Skills](https://agentskills.io) standard:
+
+```bash
+npx skills add OthmanAdi/planning-with-files --skill planning-with-files -g
+```
+
+**npm**, to pin an exact version into a project or vendor it:
+
+```bash
+npm install planning-with-files
+```
+
+The package carries `SKILL.md`, `scripts/` and `templates/`, so this is the route for locking a version into a repo's dependencies or copying the skill in yourself. It does not register hooks on its own.
+
+**Pi Coding Agent**, same npm package, wired up for you (skill, extension, status bar):
+
+```bash
+pi install npm:planning-with-files
+```
+
+**Hermes Agent** (Nous Research), native plugin plus skill bundle, CLI and Desktop:
+
+```bash
+hermes skills install OthmanAdi/planning-with-files/.hermes/skills/planning-with-files --yes
+hermes plugins install OthmanAdi/planning-with-files/.hermes/plugins/planning-with-files
+hermes plugins enable planning-with-files
+```
+
+**OpenCode**, native plugin plus the skill (the `npx skills add` command above lands in `~/.agents/skills/`, which OpenCode reads):
+
+```json
+{ "plugin": ["opencode-planning-with-files"] }
+```
+
+in `opencode.json` or `~/.config/opencode/opencode.json`; OpenCode installs it on the next start.
+
+**DeepSeek Harness (DSH)**, native plugin plus the skill (the `npx skills add` command above lands in `~/.agents/skills/`, which DSH reads):
+
+```bash
+dsh plugin --profile web add dsh-planning-with-files
+```
+
+then restart `dsh web`; the same command works for the `headless`, `sdk` and `acp` profiles.
+
+Under a minute. Safe to re-run. Trigger it by typing `/plan` (plugin) or asking the agent to "plan this task"; the skill also self-triggers on multi-step tasks.
+
+What each route actually ships:
+
+| Route | Skill + scripts + templates | Slash commands | Hooks |
+|---|---|---|---|
+| Claude Code plugin | yes | **yes** | **yes** |
+| `npx skills add` | yes | no | frontmatter hooks, see note |
+| `npm install` | yes, under `node_modules/` | no | no, copy the skill in yourself |
+| `pi install npm:` | yes | **yes**, Pi commands | **yes**, via the Pi extension |
+| `hermes plugins install` | yes, with the skill bundle | **yes**, `/pwf`, `/pwf-status` | **yes**, plugin hooks incl. the gate |
+| OpenCode `opencode.json` plugin | yes, with the skill | **yes**, `/pwf`, `/pwf-status` (two copied command files) | **yes**, plugin hooks incl. the gate |
+| DeepSeek Harness `dsh plugin add` | yes, with the skill | **yes**, `/pwf`, `/pwf-status` | **yes**, plugin hooks incl. the gate |
+| ClawHub / manual copy | yes | no | frontmatter hooks, see note |
+
+Skill-route installs can end up silently hook-less (project trust not accepted, or frontmatter hooks not registering on project-level installs). The hooks are the differentiating mechanism, so if they matter to you, use the plugin route, then verify with `/plan-doctor`. Full matrix and the two silent killers: [docs/installation.md](docs/installation.md#what-each-install-route-actually-ships).
+
+Install acting up? Open your agent and say: *"Read docs/installation.md and docs/troubleshooting.md from OthmanAdi/planning-with-files and fix my install."* Then run `/plan-doctor`.
+
+
+Hermes needs its skill bundle from `.hermes/skills/planning-with-files` (`hermes skills install OthmanAdi/planning-with-files/.hermes/skills/planning-with-files --yes`); OpenCode and DeepSeek Harness read the skill that `npx skills add ... -g` places in `~/.agents/skills/`. Each host's own `/plan` command is never shadowed.
+
+
 
 <a id="works-across-18-platforms"></a>
 
@@ -489,28 +474,12 @@ One skill, three integration tiers. Know what your agent gets before you install
 | **Standard Agent Skills** | Continue, Pi, OpenClaw, Autohand Code, Antigravity, Kilocode, AdaL CLI | SKILL.md discovery via `npx skills add`; the pattern without lifecycle hooks |
 | **Agent Skills standard path** (in-tree since v3.7.0) | Zed, Amp, Warp, Devin, Antigravity, Gemini CLI, Cursor | `.agents/skills/planning-with-files/` discovered from a plain `git clone`, no per-tool setup |
 
-Per-platform setup guides, discovery paths and sandbox runtimes are in the collapsible sections under [Quick Install](#quick-install).
+Per-platform setup guides, discovery paths and sandbox runtimes are in the collapsible sections below [First-class hosts: native plugins](#first-class-hosts-native-plugins).
 
-<a id="hermes-agent-first-class-support-cli-and-desktop"></a>
-
-## First-class hosts: native plugins
-
-> [!TIP]
-> **On these hosts planning-with-files runs as a native plugin: per-turn plan injection, progress reminders, the completion gate, `/pwf` commands and model-callable tools, with no shell hooks to register.** Every other platform gets the skill through the Agent Skills standard and, where the host supports it, the frontmatter or config-file hooks listed in the tables above.
-
-| Host | Install | What runs natively | Guide |
-|---|---|---|---|
-| Claude Code | `/plugin install planning-with-files@planning-with-files` | 6 lifecycle hooks, 13 slash commands, `/plan-doctor` | [docs/installation.md](docs/installation.md) |
-| Pi Coding Agent | `pi install npm:planning-with-files` | 8 Pi events via the bundled extension, `/plan-execute` approval gate, status bar | [docs/pi-agent.md](docs/pi-agent.md) |
-| Hermes Agent (CLI and Desktop) | `hermes plugins install OthmanAdi/planning-with-files/.hermes/plugins/planning-with-files` then `hermes plugins enable planning-with-files` | `pre_llm_call` injection, `post_tool_call` reminders, `pre_verify` gate, `/pwf`, tools | [docs/hermes.md](docs/hermes.md) |
-| OpenCode | `"plugin": ["opencode-planning-with-files"]` in `opencode.json` | `chat.message` injection, write reminders, compaction flush, `session.idle` gate, `/pwf`, `pwf_*` tools | [docs/opencode.md](docs/opencode.md) |
-| DeepSeek Harness | `dsh plugin --profile web add dsh-planning-with-files` | `agent/pre-step` injection, write reminders, post-compaction restore, `agent/turn-stopping` gate, `/pwf`, `pwf_*` tools | [docs/deepseek-harness.md](docs/deepseek-harness.md) |
-
-Hermes needs its skill bundle from `.hermes/skills/planning-with-files` (`hermes skills install OthmanAdi/planning-with-files/.hermes/skills/planning-with-files --yes`); OpenCode and DeepSeek Harness read the skill that `npx skills add ... -g` places in `~/.agents/skills/`. Each host's own `/plan` command is never shadowed.
 
 ## Multi-agent runs: orchestrators, workers and subagents
 
-> [!NOTE]
+> **NOTE**
 > **Markdown on disk is the shared state between agents.** One orchestrator owns `task_plan.md` and the shared summaries; every worker appends to its own ledger or assigned file. Pin each independent task with `PLAN_ID` before starting its host, or use separate worktrees.
 
 - **Run ledger per agent.** Workers append one JSON line per event to `.planning/<id>/ledger-<agent>.jsonl` (`ledger-append.sh`); `ledger-summary.sh` synthesizes a fixed-shape, KV-cache-stable block from all ledgers that replaces the raw `progress.md` tail in autonomous and gated mode. No free text from disk reaches the model through that block.
@@ -530,7 +499,7 @@ To find a saved plan, run the installed `scripts/set-active-plan.sh --list` help
 The agent stops at the first rung that applies:
 
 ```
-1. Task needs 3+ steps or 5+ tool calls?  → create the three files first
+1. Starting work with planning-with-files? → create the three files first
 2. Learned something?                     → append it to findings.md
 3. Did something?                         → log it in progress.md
 4. Phase done?                            → check it off in task_plan.md
@@ -582,8 +551,8 @@ Slash commands ship with the Claude Code plugin route (see the install matrix ab
 
 Typing `/plan` prefix-matches every `plan*` command in autocomplete; `/planning-with-files:status` autocompletes as `/status` (the older `/plan:status` label predates the rename).
 
-<details>
-<summary><strong>Pi, OpenCode, Hermes and DeepSeek Harness commands, and command names per host</strong></summary>
+
+### <strong>Pi, OpenCode, Hermes and DeepSeek Harness commands, and command names per host</strong>
 
 ### Pi extension commands
 
@@ -641,7 +610,7 @@ The DSH plugin registers these in-session commands, typed with no prefix. `/plan
 
 On the plugin route the model-invocable SKILL is `planning-with-files:planning-with-files`; the doubled form is the skill id, not a command you type. The five language variants live under `skills/i18n/`, which the plugin scan does not reach, so there is no `planning-with-files:planning-with-files-de` to invoke by name — reach a translation through its `/plan-ar`, `/plan-de`, `/plan-es`, `/plan-zh` or `/plan-zht` command, or install it as its own skill with `npx skills add OthmanAdi/planning-with-files --skill planning-with-files-de -g`, which registers it under its own name. There is no `/pwf-de` and no `/planning-with-files:planning-with-files-goal`; `/pwf` is just a short alias for `/plan`.
 
-</details>
+
 
 ## v3 Long-Running Agent Features
 
@@ -699,14 +668,6 @@ Pi runtime modes:
 3. **Log ALL Errors** — They help avoid repetition
 4. **Never Repeat Failures** — Track attempts, mutate approach
 
-## When to Use
-
-**Use this pattern for:**
-- Multi-step tasks (3+ steps)
-- Research tasks
-- Building/creating projects
-- Tasks spanning many tool calls
-- Long-running agent sessions that must survive `/clear` and compaction
 
 ## Acknowledgments
 
@@ -724,7 +685,7 @@ Pi runtime modes:
 
 ## Reference
 
-Everything below is the proof and the reference half: the benchmarks and their limits, what lands in your project and what the repository ships, and every guide in `docs/`. Release history and community projects sit in the collapsible sections under [Quick Install](#quick-install).
+Everything below is the proof and the reference half: the benchmarks and their limits, what lands in your project and what the repository ships, and every guide in `docs/`. Release history and community projects sit in the collapsible sections below [First-class hosts: native plugins](#first-class-hosts-native-plugins).
 
 | | |
 |---|---|
@@ -767,8 +728,8 @@ Protocol: the session is hard-stopped at roughly half done, and a fresh session 
 
 What the skill writes into your project is three markdown files (see [the 3-file pattern](#the-solution-3-file-pattern)). What the repository ships:
 
-<details>
-<summary><strong>Repository layout</strong></summary>
+
+### <strong>Repository layout</strong>
 
 ```
 planning-with-files/
@@ -792,7 +753,7 @@ planning-with-files/
 
 Every release maintains 19 tracked parity targets plus the gitignored ClawHub upload stage when it is present. `scripts/bump-version.py` updates every available target, and CI fails if a tracked variant lags.
 
-</details>
+
 
 
 ## Documentation
@@ -827,6 +788,12 @@ MIT License — feel free to use, modify, and distribute.
 
 **Author:** [Ahmad Othman Ammar Adi](https://github.com/OthmanAdi)
 
+</details>
+
 ## Star History
 
-<a href="https://repostars.dev/?repos=OthmanAdi%2Fplanning-with-files&theme=copper"><img src="https://repostars.dev/api/embed?repo=OthmanAdi%2Fplanning-with-files&theme=copper" width="100%" alt="Star History Chart" /></a>
+<a href="https://repostars.dev/?repos=OthmanAdi%2Fplanning-with-files&amp;theme=aurora"><img src="https://wsrv.nl/?url=https%3A%2F%2Frepostars.dev%2Fapi%2Fog%3Frepos%3DOthmanAdi%252Fplanning-with-files%26theme%3Daurora&amp;cy=228&amp;ch=334&amp;maxage=1d" width="100%" alt="Star History Chart" /></a>
+
+## ClawHub Downloads
+
+<a href="https://skill-history.com/othmanadi/planning-with-files"><img src="https://skill-history.com/chart/othmanadi/planning-with-files.svg" width="100%" alt="ClawHub Download History Chart" /></a>

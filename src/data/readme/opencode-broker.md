@@ -427,7 +427,7 @@ share records.
 | Piece | Role |
 |---|---|
 | `bin/opencode-broker` | The daemon and its CLI: `serve`, `status`, `selection`, `decisions [n]`, `rearm [target or provider:<id>]`, `quarantine provider:<id>`. |
-| `bin/opencode-broker-watch` | Run daily: refreshes opencode's model catalog, republishes the broker's inventory, and reports new models and newer releases of the ones you pin through `watch.notifyCommand`. |
+| `bin/opencode-broker-watch` | Run daily: refreshes opencode's model catalog and its resolver view (`opencode models --pure`, stored as `resolvable-models.json` in the routing state directory), republishes the broker's inventory, and reports new models and newer releases of the ones you pin through `watch.notifyCommand`. Catalog discovery admits only models present in that resolver view, so a catalog entry this host cannot address never becomes a routing target; until the first run writes the view, discovery admits nothing and every tier stays on its configured targets. |
 | `plugin/router.js` | Leases a model at `chat.message`, tracks each session's context size, reports usage and failures, enforces profile tool rules, waits out a busy or loading local model, and stops a turn the burn watch flags. |
 | `plugin/model-default.js`, `tui/` | Start new sessions on the model you last picked by hand. |
 | `plugin/compaction-guard.js` | Works around three compaction failures seen with opencode 1.18: a resumed summary parented to the wrong message (so the next turn resends the whole history), overflow and auto-compaction repeating without end, and a context-pruning plugin treating a cancelled compaction as a finished one. It uses only stock hooks and routes. |

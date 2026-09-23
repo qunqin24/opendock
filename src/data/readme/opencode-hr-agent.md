@@ -65,20 +65,41 @@ The database stores sweeps, runs, measurements, infra incidents, separations, an
 
 ## Install
 
-The engine ships on PyPI as **`aihr`** (import package `hr`, console script `hr`). Two commands bootstrap the whole stack — engine, npm plugins, and opencode registration:
+One command per OS. Zero sudo, zero prerequisites: the turnkey bundle ships its own engine and its own database. (Linux floor: glibc ≥ 2.28 — the vendored PostgreSQL baseline; nothing else.)
 
 ```bash
-# Python engine (add [vision] only if you need the vision item generators)
-pip install "aihr[vision]"
-# plugin pair via npm + opencode config registration, one shot, idempotent
-hr setup
+# Linux / macOS
+curl -fsSL https://raw.githubusercontent.com/TachikomaGundam/AIHR/main/scripts/install.sh | sh
+
+# Windows (PowerShell)
+powershell -c "irm https://raw.githubusercontent.com/TachikomaGundam/AIHR/main/scripts/install.ps1 | iex"
 ```
 
-`hr setup` installs the plugin pair globally with npm at `@latest`, then delegates registration to the `opencode-hr` CLI that ships inside `opencode-hr-agent`. It never needs elevated privileges (a non-writable npm global directory gets pointed at the user-level prefix recipe below; configs with comments are never rewritten — it prints the exact lines to paste), re-running it is safe, and `opencode-hr status` shows what is registered. After the npm install it prints the concrete versions `@latest` resolved to (via `npm ls -g`) so the run stays auditable after the fact. Restart opencode, then verify: ask for `hr_status` / `fastdraw_list` (agent tools) and `/fastdraw` (TUI command).
+Flags: `--version X.Y.Z` pins the release · `--bundle <path>` installs from a local bundle instead of downloading · `--port N` sets the database port · `--reinstall` re-runs over an existing install (idempotent: the data directory, database included, stays intact). Open a fresh shell so the `~/.aihr/bin` shim is on PATH, then `hr db-up && hr status`.
 
-`hr` itself lands in pip's scripts directory, which is NOT on PATH by default on Windows (`…\Scripts`) or for macOS user-site installs (`~/Library/Python/<version>/bin`) — typing `hr` there fails right after a successful `pip install aihr`. `hr setup` detects this and persists a single user-scope PATH entry: `HKCU\Environment` on Windows, a clearly-marked block in your existing shell rc files elsewhere. Never elevated, never system-wide, and opt-out with `hr setup --no-path`. To remove everything setup ever added — config registrations, the npm globals, opencode's cached plugin copies, the skill/agent config copies, and the PATH entry — run `hr setup --uninstall`, then `pip uninstall aihr` as the last step; a git-installed FastDraw layout (if any) is removed by its own `fastdraw/uninstall.sh`.
+Everything the installer places lives in ONE directory it owns: `~/.aihr` (Linux/macOS) or `%LOCALAPPDATA%\aihr` (Windows) — `app/` the bundled runtime (no Python needed on the target), `pg/` the vendored PostgreSQL, `bin/` the PATH shim, `data/pgdata` the database itself, `db.env` the first-boot random password written with `0600` permissions, `share/aihr` the packaged configuration, and `receipt.json` the record of every written path. Outside the owned directory the installer touches exactly two things: a clearly-marked block in your shell rc pointing PATH at the shim, and the two opencode config arrays it registers plugins into; all of it is on the receipt. npm is NOT an install step: the installer tail `hr install-post` registers the plugin packages in opencode's config arrays (the main `plugin` array in `opencode.jsonc`, plus `tui.json` for the FastDraw TUI half), and opencode/bun auto-fetches those npm packages at startup. `hr db-up` needs no Docker. It decides its backend automatically among the embedded vendored Postgres (the bundle default), a compose container (the existing lane, kept), or a BYO PostgreSQL described by `HR_DSN` / `hr.toml`; `hr db-status` reports which backend is live. The Docker-free turnkey install lands with **aihr 0.4.0 (2026-09)**; the 0.3.0 era in which `hr db-up` required a preinstalled Docker (the "docker not found" era) is superseded.
 
-Manual registration (fallback — e.g. no npm on PATH, or you prefer config-only): opencode loads plugins **only from its config files' `"plugin"` arrays** (and its plugin directories), downloading and caching npm entries itself at startup. The global npm prefix is never scanned, so a bare `npm install -g` is invisible to opencode. Declare the plugins in **both** files:
+### Uninstall
+
+```bash
+hr self-uninstall --yes
+```
+
+The reversal is receipt-driven: it removes everything the install placed, then prints a **residual manifest**, every path and setting it does NOT own, each with its exact removal command. The contract: uninstall removes ALL it placed or reports each residual; nothing survives silently. `hr install-post` is the idempotent counterpart (PATH shim, opencode config array registration, receipt); the installer runs it as its own tail and re-running it by hand is safe. On the developer channel, run `hr self-uninstall --yes` first to clear whatever install-post placed, then `pip uninstall aihr` as the last step.
+
+### Developer channel (pip / uv tool)
+
+The engine ships on PyPI as **`aihr`** (import package `hr`, console script `hr`). `pip install aihr` or `uv tool install aihr` is the **developer channel**; the turnkey one-command claim above belongs to the bundle, not to pip:
+
+```bash
+pip install aihr
+# add [vision] only if you need the vision item generators
+pip install "aihr[vision]"
+```
+
+The embedded Postgres ships with the bundle; on the pip channel `hr db-up` uses the compose container or your own PostgreSQL. Run `hr install-post` once after the pip install to get the PATH shim and the opencode config registration (idempotent, receipted). `hr` itself lands in pip's scripts directory, which is NOT on PATH by default on Windows (`…\Scripts`) or for macOS user-site installs (`~/Library/Python/<version>/bin`). `install-post` detects this and persists a single user-scope PATH entry: `HKCU\Environment` on Windows, a clearly-marked block in your existing shell rc files elsewhere. Never elevated, never system-wide.
+
+Manual registration (fallback, config-only): opencode loads plugins **only from its config files' `"plugin"` arrays** (and its plugin directories), downloading and caching npm entries itself at startup. The global npm prefix is never scanned, so a bare `npm install -g` is invisible to opencode. Declare the plugins in **both** files:
 
 ```jsonc
 // ~/.config/opencode/opencode.json (or .jsonc) — server half: hr_* / fastdraw_* agent tools
@@ -92,8 +113,8 @@ Manual registration (fallback — e.g. no npm on PATH, or you prefer config-only
 
 `opencode-fastdraw` is a standalone model/role-switching plugin and can be declared on its own. `opencode-hr-agent` bridges the OpenCode tool surface to the `hr` CLI, so it requires the Python engine above. Wheel artifacts are also attached to each [GitHub Release](https://github.com/TachikomaGundam/AIHR/releases).
 
-- **Why `@latest` by default:** one-click setup must never ship a stale pin — a hardcoded version silently rots and was the source of real version-drift pain on fresh-machine deploys. `@latest` always resolves to the newest published release, and `hr setup` prints the exact versions it landed on so a run is still auditable after the fact. If you would rather freeze the running surface (each opencode startup re-resolving `@latest` can pull new code with access to your `~/.npmrc` and `HR_HOME`), replace `@latest` with an exact version in both files above.
-- **Why two files:** with only the `opencode.json` entry the agent tools work but `/fastdraw` and `<leader>m` silently vanish; with only `tui.json` it is the mirror image. `fastdraw/install.sh` registers both automatically.
+- **Why `@latest` by default:** one-click setup must never ship a stale pin — a hardcoded version silently rots and was the source of real version-drift pain on fresh-machine deploys. `@latest` always resolves to the newest published release. If you would rather freeze the running surface (each opencode startup re-resolving `@latest` can pull new code with access to your `~/.npmrc` and `HR_HOME`), replace `@latest` with an exact version in both files above.
+- **Why two files:** with only the `opencode.json` entry the agent tools work but `/fastdraw` and `<leader>m` silently vanish; with only `tui.json` it is the mirror image. `hr install-post` registers both automatically.
 - **Optional HR-workflow layer:** the `/hr-workflow` slash skill and the `hr` sub-agent are config files, not plugin code — they are versioned under `opencode-config/` and install by copying:
   ```bash
   mkdir -p ~/.config/opencode/skills ~/.config/opencode/agents
@@ -167,7 +188,7 @@ The per-file split:
 - `configs/fleet.yaml` — OPTIONAL overrides for the dynamic fleet: `wire_overrides`, `scope_excludes`, and `gateway_urls` (base URLs for registry-only providers).
 - `configs/seats.yaml` — seat definitions, per-seat `primary_capabilities`, and the stage-0 `calibration_anchors`.
 - `configs/deployable.yaml` — `extra_deployable`: models served outside the opencode config (the only hand-maintained model list).
-- `hr.toml.example` — repository-root template for the local `hr.toml` (DB connection + optional Wiki.js publish target). Secrets are NEVER stored here: they come from the environment (`HR_DSN`, `HR_DB_PASSWORD`) or the db env file written by `hr db-up`.
+- `hr.toml.example` — repository-root template for the local `hr.toml` (DB connection + optional Wiki.js publish target). Secrets are NEVER stored here: they come from the environment (`HR_DSN`, `HR_DB_PASSWORD`) or the db env file written by `hr db-up` (`~/.aihr/db.env` for the embedded backend).
 
 The model fleet itself is not declared in this repo: it is derived at runtime from the opencode config (`opencode.jsonc` provider blocks) and merged with the `deployable.yaml` extras — see Universality below.
 
@@ -257,7 +278,7 @@ The first loads the `fastdraw_*` agent tools; the second loads `/fastdraw` and t
 ```
 harness/hr/               # repo root (pip install -e .)
   configs/                # YAML config: deployable.yaml, fleet.yaml, knowledge.yaml, models.yaml, seats.yaml, thresholds.yaml (+ gitignored *.local.yaml overlays)
-  docker/                 # turnkey database: docker-compose.yml for the AIHR postgres:16-alpine container (`hr db-up`)
+  docker/                 # compose backend for `hr db-up` (one of three; the bundle uses the embedded Postgres): docker-compose.yml for the aihr-db postgres:16-alpine container
   docs/                   # bilingual documentation (en/, zh-CN/)
   exports/                # generated artifacts (gitignored)
   fastdraw/               # npm subpackage: FastDraw server, TUI, preset management

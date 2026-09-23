@@ -206,8 +206,11 @@ Default port 8000. On CUDA, point `baseURL` at wherever it runs; on Apple
 Silicon, [vllm-metal](https://github.com/vllm-project/vllm-metal) runs
 upstream vLLM unchanged. Decode rate reuses OpenCode's own turn timing, not
 a vLLM histogram — there's no per-request duration histogram to read. TTFT
-*is* engine-reported, but it's a window average across however many
-requests landed since the last turn, labelled `(avg)`.
+*is* engine-reported. If other requests reached vLLM between two turns (a
+second client, a turn you interrupted, OpenCode's own title or compaction
+requests), the counters can't be split by request, so that turn shows the
+universal line with `engine data skipped: overlapping requests`. The same
+applies to every Prometheus engine below.
 
 <a id="sglang"></a>
 

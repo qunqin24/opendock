@@ -39,7 +39,7 @@ perk is a single tool.
 
 | Tool | What it does |
 | --- | --- |
-| `bash_background({ command, label?, expected_seconds?, coalesce_seconds? })` | Run a shell command as a detached fire-and-forget job. Returns *immediately* (does not block) with the job's `pgid` and sidecar directory. `label` and `expected_seconds` are optional display hints, not execution controls. When the job finishes, perk injects a turn reporting the exit code and captured-output sizes. A still-running job can push interim turns by appending to `$PERK_DRIP`; `coalesce_seconds` controls its quiet-gap interval. |
+| `bash_background({ command, timeout?, workdir?, label?, expected_ms?, coalesce_ms? })` | Run a shell command as a detached fire-and-forget job. Returns *immediately* (does not block) with the job's `pgid` and sidecar directory. `workdir` defaults to the session directory; `timeout` defaults to 3600000 ms because background work commonly outlives native `bash`'s two-minute foreground window. `label` and `expected_ms` are optional display hints. When the job finishes, perk injects a turn reporting the outcome and captured-output sizes. A still-running job can push interim turns by appending to `$PERK_DRIP`; `coalesce_ms` controls its quiet-gap interval. |
 
 That's the whole surface.
 
@@ -51,12 +51,12 @@ Two ingredients, both of which most harnesses already have:
    opencode's fire-and-forget `client.session.promptAsync`).
 2. **A sense organ** that watches the observable. perk uses a **stat-poll loop**
    over the files each running job produces: chiefly its *exit-code file*, which
-   the job's wrapper writes last, atomically, only when the job is truly done, so
-   its appearance is a sound completion signal; and optionally its *drip file*
+   the runtime writes atomically after receiving the shell result or finishing
+   a requested termination, so its appearance is a completion signal; and its *drip file*
    (below), tailed for interim events.
 
 When a job's exit file appears, perk injects a turn into the firing session
-describing the outcome (exit code or cancellation, captured-output byte sizes).
+describing the outcome (exit code, cancellation, or timeout, and captured-output byte sizes).
 The wake text is generated, not canned. Captured stderr content remains local in
 the reported file and is never copied automatically into the conversation. perk
 does not try to avoid landing a turn
@@ -150,16 +150,29 @@ hand-rolled backgrounding. In particular, stderr is not excerpted automatically:
 the byte count tells you whether the local `err` file is worth inspecting without
 disclosing its possibly sensitive contents to the conversation.
 
+As with native `bash`, `workdir` selects the command's working directory and
+defaults to the session directory. `timeout` is a positive integer in
+milliseconds. It defaults to `3600000` (one hour), reflecting the longer
+workloads this tool is for. On the first monitor pass at or after the deadline,
+the runtime sends TERM to the process group, then escalates to KILL after a
+1000 ms grace period if needed. Completion reports a timeout rather than a
+cancellation. Deadlines use a monotonic clock, unaffected by wall-clock changes.
+
 The immutable `launch.json`, output, progress, cancellation request, and exit
 code land under `os.tmpdir()/opencode/perk/` (normally
 `$TMPDIR/opencode/perk/` on macOS), which opencode allows its file tools to
 access without an external-directory prompt. Each job gets a short random
-directory containing `launch.json`, `out`, `err`, `drip`, optional `cancel`, and
-atomic completion gate `exit`.
+directory containing `launch.json`, `out`, `err`, `drip`, an optional `cancel`
+request, the shell's `result`, and the runtime's atomic completion gate `exit`.
 Nothing is written into the project. Completed job directories expire after 24
 hours.
 Runtime logging is off by default; set `PERK_LOG=1` before starting opencode to
 write the spool's `log` file, or set it to an explicit path.
+
+`launch.json` uses schema version 2 with millisecond duration fields. The
+OpenChamber observer also reads version 1, converting legacy `expectedSeconds`
+estimates to milliseconds and leaving unrecorded deadlines unspecified. Shared
+types, validation, and outcome wording live in `src/protocol.ts`.
 
 ## Example: wait on any observable
 
@@ -203,10 +216,9 @@ The delivery rule is **coalescing by quiet gap** (temporal summation): a burst
 of appends that goes quiet for the configured interval is delivered as *one* spike;
 appends spaced further apart arrive separately. You therefore control
 segmentation purely by timing, with no delimiter protocol: write a multi-line
-block in one breath and it lands as one spike. The interval defaults to one
-second and can be set per call with `coalesce_seconds` (values below `0.3` are
-clamped), for
-example `bash_background({ command: "watch-build", coalesce_seconds: 5 })` for
+block in one breath and it lands as one spike. The interval defaults to 1000 ms
+and can be set per call with `coalesce_ms` (values below `300` are clamped), for
+example `bash_background({ command: "watch-build", coalesce_ms: 5000 })` for
 slower phase reports. Sleep longer than the selected interval between events you
 want delivered separately. Inspect what the agent will receive at any
 time with `tail -f <job-dir>/drip`, using the directory returned by the tool.
@@ -220,31 +232,40 @@ killed with its pgid exactly as below.
 ## Killing a job, and "die with opencode"
 
 `bash_background` returns the job's **process-group id** (`pgid`). Because
-the job is spawned `detached` it is its own process-group leader, so a single
-signal to the negated pgid reaps the whole tree (the wrapper, the command, and
-anything the command spawned):
+the job is spawned `detached` it is its own process-group leader. A signal to
+the negated pgid reaches the wrapper, command, and descendants that remain in
+that group:
 
 ```bash
 kill -TERM -<pgid>      # leading minus = signal the whole process group
 ```
 
 This matters for long-lived jobs like preview/dev servers
-(`bash_background({ command: "npm run dev" })`): the agent gets a kill
+(`bash_background({ command: "npm run dev", timeout: 14400000 })`): the agent gets a kill
 handle instead of an unstoppable orphan. The wrapper catches cooperative
-`HUP`, `INT`, and `TERM` signals and atomically publishes a terminal marker such
-as `cancelled:TERM`. Interactive listeners receive a cancellation turn, and a
-foreground waiter on `exit` resolves. `SIGKILL` cannot be caught and therefore
-cannot provide this guarantee.
+`HUP`, `INT`, and `TERM` signals and reports a result such as `cancelled:TERM`.
+Once the runtime observes that report, it finishes process-group cleanup before
+publishing `exit`. Interactive listeners receive a cancellation turn, and a
+foreground waiter on `exit` resolves.
 
 An observer may also create the job's private `cancel` marker. The owning perk
-runtime notices it, signals only the process group in its live listener map, and
-leaves `exit` as the authoritative terminal record. This is how the optional
+runtime notices it and requests termination of its owned process group. This
+route also handles commands that ignore TERM: after 1000 ms it escalates to
+KILL, waits for group disappearance, and publishes `exit` itself. Timeout and
+shutdown use the same lifecycle. The first stop reason wins; a shell result
+already observed before the stop request retains its original outcome.
+This is how the optional
 OpenChamber panel requests cancellation without trusting a stale pgid from disk.
 
+The runtime is the only writer of `exit`. Its values are a numeric shell exit
+code, `cancelled:<signal>`, `timeout`, or `shutdown`. If a group disappears
+without a shell result or an owned stop request, it records `cancelled:unknown`.
+The panel and conversational messages interpret these values identically.
+
 Jobs also **die with opencode on a graceful shutdown.** The plugin tracks every
-running job and group-kills the survivors in its `dispose` hook, which opencode
-calls on teardown (verified: a `sleep 90` fired via `bash_background` is
-reaped when `opencode run` exits). The one case this cannot cover is a hard
+running job, including launches still reaching their spawn event, and awaits
+termination in its `dispose` hook, which opencode calls on teardown. The case
+this cannot cover is a hard
 crash or `kill -9` of opencode itself (uncatchable); the returned pgid is the
 manual remedy there.
 
@@ -267,10 +288,9 @@ session is still running after the agent stops.
   until [ -e <exit-file> ]; do sleep 0.3; done
   ```
 
-  That is the blocking wait, in plain bash, with no plugin machinery. The exit
-  file is written only when the job is truly done (output files are flushed
-  first, then the exit code is written atomically), so the loop is a correct
-  completion gate. When it returns, read the captured output.
+  This plain-shell wait keeps the host and its runtime alive to supervise the
+  job. The runtime publishes `exit` atomically after observing completion or
+  finishing termination. When the wait returns, read the captured output.
 
 When a job is stopped through the documented `kill -TERM -<pgid>` path, the same
 gate appears with `cancelled:TERM` rather than a numeric exit code, so this wait

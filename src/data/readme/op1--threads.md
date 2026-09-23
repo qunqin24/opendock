@@ -90,9 +90,13 @@ Plugin option `maxWorkers` defaults to 4 and accepts integers from 1 through 32.
 
 ## Terminal and RPC
 
-The terminal synchronizes workers before opening native tabs without changing focus. A TUI memory index survives plugin reloads and respects manually closed tabs. `/threads` explicitly reopens workers for open coordinator tabs. A new TUI recovers workers from durable storage. Closing the TUI does not interrupt workers.
+The terminal synchronizes workers before opening native tabs without changing focus. A TUI memory index survives plugin reloads and respects manually closed native tabs. Conversations closed through Activity stay dismissed across restarts. `/threads` explicitly reopens workers for open coordinator tabs, including workers dismissed through Activity. A new TUI recovers the other workers from durable storage. Closing the TUI does not interrupt workers.
 
-Managed tabs use saved title prefixes: `[Main]` for the coordinator and `[Worker]` for each managed worker. Labels appear when the TUI discovers the relationship, including existing threads. The rest of the title stays editable; renaming a managed conversation reapplies its role prefix. Unrelated sessions keep their titles. OpenCode's native tab API has no separate badge field, so the prefixes also appear in session history.
+Activity shows Main and Worker roles as row subtitles. It omits a leading `[Main] ` or `[Worker] ` from known managed titles, including closed history rows and prefixes reapplied by older clients. Managed identity comes from the worker RPC, including lookups for loaded history conversations whose workers are on older pages. Unrelated prefixed titles remain unchanged.
+
+For open managed tabs, the TUI also removes one legacy prefix from the fresh saved title. The remainder stays unchanged, and empty remainders are not saved. A durable client-storage marker makes this saved-title cleanup one-shot per session. Later intentional prefixed renames remain in saved history, while Activity omits the redundant role label from its display.
+
+When upgrading, restart all existing TUIs. Older 0.1.7 clients still write role prefixes and can reapply them after cleanup.
 
 Workers with `PASS` or `PASS WITH NOTES` reports hide automatically once idle. This also applies to reports saved before upgrading. Unreported workers and `FAIL` or `INCONCLUSIVE` reports stay visible. The selected tab, running workers, and tabs needing input stay open until they are inactive.
 
@@ -100,7 +104,7 @@ The coordinator can call `threads_hide` when a worker is no longer needed. Hidin
 
 Reports reach the coordinator through silent synthetic messages. They remain available through `threads_list` and the session history without adding a notification row to the conversation. Older report notification rows remain in native history.
 
-All open native root-session tabs are automatically grouped by OpenCode project ID, including sessions not managed by this plugin. Projects follow their first appearance in the current tab order. Worktrees with the same project ID stay together.
+With Activity disabled or unable to mount, open native root-session tabs are grouped by OpenCode project ID, including sessions not managed by this plugin. This includes horizontal, narrow, and unsupported-version fallback. Projects follow their first appearance in the current tab order. Worktrees with the same project ID stay together.
 
 Within each project, running sessions and sessions waiting for input come before idle sessions. Tabs with the same priority keep their relative order. Selecting an idle tab does not reorder it. Native tab order is shared between terminals in the same directory, so sorting by each terminal's selection would make them repeatedly undo each other's moves. Idle is a display priority, not a completion verdict. Each tab with unloaded project metadata stays in its own group until that metadata becomes available. Reconciliation moves only out-of-order tabs, without changing focus or closing and reopening them to reorder. Native tabs do not support divider rows.
 
@@ -113,11 +117,69 @@ result: { workers: WorkerView[] }
 
 The input accepts at most 100 coordinator IDs. Raw HTTP RPC requests wrap the input as `{ "input": { "coordinatorIDs": ["ses_..."] } }`. Each method declares `errors: {}` and the RPC declares `events: {}`. The TUI subscribes to native session events and reconciles at most one snapshot at a time, with a three-second missed-event refresh.
 
+## Activity sidebar
+
+Activity replaces the contents of the native left vertical tab rail on compatible OpenCode V2 layouts. Native tabs remain enabled and retain their layout reservation, resize handle, activity state, and session navigation. The prompt and transcript remain native OpenCode UI.
+
+Subtitles start with the project name or folder basename, followed by a distinct location or worktree basename when needed. Main and Worker labels appear only for known managed relationships; ordinary history rows show project and location without a role label.
+
+Rows are grouped in this order:
+
+- **Priority**: permission or form attention, then running work, then unread results or errors.
+- **Pinned**: pinned conversations without priority activity.
+- **Today**, **Yesterday**, recent weekdays, and older calendar dates, using the local timezone.
+
+Divider lines separate sections. Click a heading to collapse or expand its conversations; the arrow and count show its current state. Collapsed sections stay collapsed across reloads and restarts. This changes sidebar visibility without closing tabs, and `/activities` can still find conversations in collapsed sections.
+
+A session appears once. Priority takes precedence over pinning. Idle does not mean that a task passed. Open-tab status comes from the native tab API; closed history uses available native running and input-request state, without inventing a success status. Date groups use the last native execution's `time.idle`, falling back to `time.updated` for conversations without an execution. Title cleanup therefore does not move an older executed conversation into Today.
+
+Running rows use OpenCode's registered animated dot spinner. Input requests take precedence over the spinner, and it is removed when the session becomes idle.
+
+Colors follow the active theme: selected conversations and date headings use its accent, running indicators use its information color, and input requests use its warning color. Unread errors use the error color. Worker headings and pinned controls use purple, while project subtitles and inactive controls use subdued text. Blank lines separate section headings from conversations and give worker groups space above and below their heading. Long titles are truncated to keep the action buttons separate.
+
+Managed workers appear indented under their main conversation. The stack appears in **Priority** when any member is running, needs input, or has an unread result. Otherwise, a pin on any visible member places the stack in **Pinned**; date sections use the most recent member activity. Workers with an unavailable main conversation remain standalone rows.
+
+Each main conversation with workers has a **▾ Workers (N)** heading below its subtitle. Click the heading to collapse the worker list, or **▸ Workers (N)** to expand it. When the list is collapsed, the main row summarizes worker activity, with input requests taking precedence over running spinners. Collapsing keeps the workers running and their tabs open. Stack preferences survive reloads and restarts, and `/activities` still lists collapsed workers.
+
+Activity fetches the 100 most recent root sessions across projects and refreshes them in the background. Open and pinned sessions are merged into the list; older pins and known main conversations are resolved individually. Archived, deleted, and native child sessions are excluded. Closed managed workers are not reintroduced by fetched history. `/threads` restores their native tabs using the existing worker visibility rules.
+
+Left-click a row to open or focus its real session. Each row has one-click **[◇]** (pin), **[◆]** (unpin), and **[×]** (close from Activity) buttons beside its title. These controls work on both main and worker rows without selecting a background conversation. Closing removes the row and closes its native tab when open. Saved history and the pin preference remain intact. Dismissed rows stay hidden through refreshes, reloads, and restarts. Selecting a closed conversation in `/activities` restores it; `/threads` also restores dismissed managed workers. Reopening a conversation through native session navigation restores its Activity row. Right-click also opens the action menu. The mouse wheel scrolls the list, and the native rail edge remains draggable.
+
+| Command | Action |
+| --- | --- |
+| `/activity` | Toggle Activity and the native rail |
+| `/pin` | Pin or unpin the current conversation |
+| `/activities` | Choose a loaded conversation, including closed Activity rows, and restore it if needed |
+| `/activity-sections` | Choose a section to collapse or expand |
+| `/activity-threads` | Choose a managed worker stack to collapse or expand |
+| `/threads` | Restore managed worker tabs |
+
+The same actions are available in the command palette. **+ New session** dispatches OpenCode's registered `session.new` command. Pins use plugin client storage and survive TUI reloads and restarts.
+
+In `/activities`, **Ctrl+F** pins or unpins the highlighted conversation. The picker stays open and preserves your search and selection. This also works for conversations in **Priority**. **Enter** opens the highlighted conversation, and **Esc** closes the picker. The footer shows the current pin action. Configure `threads.activity.choose.pin` in `cli.json` to change the shortcut.
+
+Activity requires vertical tabs. To select the layout and disable Activity by default, configure the terminal plugin in `~/.config/opencode/cli.json`:
+
+```json
+{
+  "tabs": { "layout": "vertical" },
+  "plugins": [{ "package": "@op1/threads", "options": { "activity": false } }]
+}
+```
+
+Omit `activity` or set it to `true` to enable the sidebar. Keep the server plugin in `opencode.json`; server plugin options are not forwarded to the terminal entrypoint. For local development, replace the package name in both files with the clone's absolute path.
+
+The left rail has no public plugin slot in 2.0.7. `src/activity-rail.ts` is an internal compatibility adapter: it checks a bounded render-tree structure and unambiguous geometry, hides native children while remembering their visibility, and mounts only plugin-owned content. OpenTUI constructors are imported at the terminal entrypoint to preserve host identity. The adapter uses renderer pre-paint callbacks and resize events, not continuous tree polling or root monkeypatches. It restores native children on detach, toggle, and disposal. Compatibility depends on the detected rail structure and geometry, regardless of the OpenCode version string. Unrecognized rail structures, horizontal layouts, and narrow layouts fall back to native tabs. Activity never moves shared native tabs while mounted; native project and activity grouping resumes during fallback.
+
+`src/activity-theme.ts` accepts both `base`/`muted` and legacy `default`/`subdued` theme tokens. Missing colors use a valid fallback before reaching the renderer: assigning an undefined spinner color aborts the entire frame. Accent and worker colors follow the theme's foreground brightness rather than fixed light/dark shade numbers. If a hue lacks sufficient text contrast, Activity uses the theme's normal foreground. The `@opencode/theme` development dependency keeps the host theme types available to TypeScript. Renderer regression tests cover both token shapes and missing colors, including spinner construction and subsequent color updates.
+
 ## Verification and limits
 
-Run `bun run typecheck`, `bun test`, and `bun run verify:live`. The live check requires OpenCode 2.0.7, Python, and `uv`. It starts a separate local server, a deterministic model endpoint, and a terminal process with isolated configuration and data. It verifies actual tool calls, durable messages, permission restrictions, worker limits, deleted-worker cleanup, restart behavior, and native tab visibility, busy state, and focus.
+Run `bun run typecheck`, `bun test`, and `bun run verify:live`. The live check requires OpenCode V2, Python, and `uv`. It starts a separate local server, a deterministic model endpoint, and a terminal process with isolated configuration and data. It verifies actual tool calls, durable messages, permission restrictions, worker limits, deleted-worker cleanup, restart behavior, and native tab visibility, busy state, and focus.
 
 Run `bun run verify:tabs` to verify project grouping across real git worktrees, activity-based ordering, permission prompts, completed and resumed workers, focus preservation, and TUI reopening.
+
+Run `bun run verify:activity` to exercise Activity enabled against an isolated instance of the installed OpenCode version. The suite clears its own `.audit/activity` artifacts, uses the deterministic model fixture, and reads actual renderer bounds through the test-only TUI probe. It checks layout, click and keyboard navigation, one-click pin and close controls, and native prompt responses. It also covers section and worker-stack collapse, aggregated worker status, title cleanup, worker restoration, fallback layouts, reloads, and restart persistence. `verify:tabs` and `verify:idle-tabs` explicitly disable Activity to inspect native ordering.
 
 Run `bun run verify:roles` to verify named profiles against the native server and deterministic model endpoint. It checks actual system prompts, model variants, native delegation, read-only execution, reporting, and role-aware retries.
 

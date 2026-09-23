@@ -102,8 +102,10 @@ Both layouts share the same shape, so either works:
 | `hooksFile`            | `string`                 | `$OPENCODE_HOOKS_FILE`, else probed      | Explicit path to a hooks file.                                              |
 | `matchers`             | `string[]`               | `["startup", "resume", ""]`              | Matcher values to honour. An entry with no matcher always runs.              |
 | `skip`                 | `string[]`               | `[]`                                     | Substrings; a command containing any of them is not run.                    |
-| `timeoutMs`            | `number`                 | `20000`                                  | How long the first model call waits for the commands.                       |
+| `timeoutMs`            | `number`                 | `20000`                                  | How long the **first model call** waits for the commands as a whole.        |
+| `commandTimeoutMs`     | `number`                 | `120000`                                 | How long **one command** is waited for before moving on to the next.        |
 | `injectSystemMessages` | `boolean`                | `true`                                   | Whether `systemMessage` directives reach the system prompt.                  |
+| `reportFailures`       | `boolean`                | `true`                                   | Whether a failed command adds a one-line notice to the system prompt.        |
 | `env`                  | `Record<string, string>` | `{}`                                     | Extra environment variables exported to every command.                      |
 
 ## Behaviour
@@ -112,10 +114,20 @@ Both layouts share the same shape, so either works:
 add their full runtime to every launch. They are started and left to run; the first model call waits up to
 `timeoutMs` for their `systemMessage` output, and they keep going in the background past that.
 
-**Commands run sequentially,** in the order declared in the hooks file.
+**Commands run sequentially,** in the order declared in the hooks file. Each one is waited for up to
+`commandTimeoutMs`; past that the next command starts anyway, so one command that never returns cannot
+starve the rest. The two timeouts are easy to confuse: `commandTimeoutMs` bounds each command, `timeoutMs`
+bounds how long the first model call waits for all of them. Bun's shell exposes no way to kill a running
+command, so an overrunning one is left to finish on its own.
+
+**Commands get no stdin.** They run with stdin from `/dev/null`, so a hook that reads it by accident sees
+EOF instead of hanging.
 
 **Failures are soft.** A missing script, a non-zero exit, or a network timeout produces a log entry and the
-next command still runs. A broken hook never breaks your session. Inspect what happened with:
+next command still runs. A broken hook never breaks your session. The model is told too: each failed command
+adds a one-line notice to the system prompt, so it knows its context is incomplete rather than assuming it is
+whole. The notice names the command and how it failed, never its stderr, which stays in the log. Set
+`reportFailures: false` to keep failures in the log only. Inspect what happened with:
 
 ```sh
 opencode --print-logs --log-level DEBUG

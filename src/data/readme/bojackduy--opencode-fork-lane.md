@@ -96,7 +96,16 @@ Under `<gitRoot>/.lane/trees/<name>` on branch `<name>` — the same layout `lan
 Yes. The plugin reimplements the copy-on-write step: worktree plus reflink cloning of every git-ignored path.
 
 **What if moving the session fails?**
-The fork keeps full history in the old directory and the worktree is still ready — the tool response tells the agent to use absolute paths under the new tree, and TUI users can Move session manually.
+The fork keeps full history in the old directory and the worktree is still ready. The tool response now carries `moved`, `moveDetail`, plus a classified `moveKind` and `moveRemedy`:
+
+| `moveKind` | meaning | remedy |
+|---|---|---|
+| `unreachable` | the server tool couldn't reach the opencode server (all 0.2.3 moves failed this way — raw `fetch` to an unconnectable `serverUrl`) | 0.2.4 retries loopback variants (`0.0.0.0`/`localhost` → `127.0.0.1`); if it still fails, move via TUI |
+| `project-mismatch` | destination is outside the session's project | open opencode in the lane dir, or TUI → Move session → lane directory |
+| `apply-conflict` | uncommitted changes didn't apply cleanly | retry with `moveChanges: false`, move changes manually |
+| `not-found` / `not-git` / `http` | stale session, non-git dir, or server rejection | see `moveDetail`, or move via TUI |
+
+TUI `/fork-lane` uses the in-process client and moves correctly; on failure it now shows an error toast with the cause and remedy instead of a truncated warning.
 
 **Is lane's memory (`lane note` / `lane why`) supported?**
 Out of scope for v0.1 — but the layout is compatible, so you can `lane note` inside the lane normally.

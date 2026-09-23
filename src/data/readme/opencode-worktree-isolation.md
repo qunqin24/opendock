@@ -101,7 +101,7 @@ worktree_cleanup(action="apply", branch="wt/fix-auth") // remove a specific work
 worktree_cleanup(action="apply")                       // remove all merged worktrees
 ```
 
-Cleanup only removes worktrees whose branches are merged into the base branch (unless `force=true`).
+Cleanup only removes worktrees whose branches are merged into the base branch (unless `force=true`). `force=true` also authorizes removing a worktree whose uncommitted changes cannot be snapshotted (e.g. broken git config) — those changes are discarded, with a note in the output.
 
 ### Escape Hatches (strict modes only)
 
@@ -193,8 +193,8 @@ When a session is bound to a worktree (path `W`, repo root `R`):
 
 | Tool | Behavior |
 |------|----------|
-| `write` / `edit` / `read` | Absolute paths under `R` are rewritten to `W`. Paths under `R/.git` are blocked. v1 tools carry the target in `filePath`; v2 tools use `path` — both are handled. |
-| `glob` / `grep` | Missing `path` is set to `W`. Paths under `R` are rewritten to `W`. |
+| `write` / `edit` / `read` | Absolute paths under `R` and repo-relative paths (anchored at `R`, matching how the harness resolves them) are rewritten to `W`. Paths under `R/.git` are blocked. v1 tools carry the target in `filePath`; v2 tools use `path` — both are handled. |
+| `glob` / `grep` | Missing `path` is set to `W`. Paths under `R` (absolute or repo-relative) are rewritten to `W`. |
 | `bash` (v1) / `shell` (v2) | Missing `workdir` is set to `W`. Repo-root paths in the command string are replaced with `W`. |
 | `patch` (v2 only) | Denied while a worktree is bound (multi-file patchText cannot be rewritten safely); use `edit`/`write` instead. Also denied without a binding in `strictWrites` mode. |
 | `task` / `subagent` | Subagent sessions inherit the binding via parent-chain traversal. |
@@ -213,6 +213,7 @@ Inherited bindings have a full lifecycle (they never become zombies, issue #7):
 ### Windows Support
 
 - Path comparisons are case-insensitive with separator normalization
+- `\\?\` extended-length prefixed tool paths (write/edit/read/glob/grep) are normalized and rewritten like their plain forms; bash command strings still use plain-text replacement (see limitations)
 - `symlinkDirs` uses junctions on Windows (no admin privileges needed)
 - Hooks run via `cmd /d /c` on Windows, `bash -c` elsewhere
 

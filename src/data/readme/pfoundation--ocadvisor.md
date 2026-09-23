@@ -1,7 +1,7 @@
 # ocAdvisor
 
-OpenCode V2 plugin: consult Claude Fable as a senior advisor with your full
-session transcript (including parent sessions for subagents).
+OpenCode V2 plugin: consult Claude Opus 5.5 as a senior advisor with your
+full session transcript (including parent sessions for subagents).
 
 ## Installation
 
@@ -41,14 +41,15 @@ and the usage report accept both `advisor` and the pre-rename `ocAdvisor`.
 ## Configuration
 
 The advisor model and limits are configurable. Defaults:
-`anthropic/claude-fable-5-1#xhigh`, a 300 s generation timeout, no
+`anthropic/claude-opus-5-5#xhigh` (with one `opencode` retry when the
+Anthropic route is unavailable), a 300 s generation timeout, no
 transcript cap, TypeSafe screening on when a key is present, and
 model-capability evidence from a local Artificial Analysis snapshot when
 one is available.
 
 | Option | Default | Meaning |
 |---|---|---|
-| `model` | `claude-fable-5-1` | Model id, or a full `provider/model#variant` reference |
+| `model` | `claude-opus-5-5` | Model id, or a full `provider/model#variant` reference |
 | `provider` | `anthropic` | Provider id (overrides the provider in `model`) |
 | `variant` | `xhigh` | Reasoning-effort variant; `null` or `"none"` pins no variant |
 | `timeoutMs` | `300000` | Per-consultation generation timeout, in milliseconds |
@@ -140,10 +141,12 @@ lower precedence than plugin options: `OCADVISOR_MODEL` (accepts
 `OCADVISOR_BENCHMARKS_PATH`, `OCADVISOR_BENCHMARK_MAPPINGS_PATH`, and
 `OCADVISOR_BENCHMARKS_MATCH_ANY_PROVIDER` (`true`/`false`).
 
-The "already the advisor model" skip is still keyed to Fable
-(`anthropic/claude-fable-*`); if you point the advisor at a different model,
-that self-consultation guard no longer matches it. Fable sessions stay
-blocked even when they also appear in `disabledForModels`.
+The "already the advisor model" skip follows the configured advisor model:
+a session already running that model id — on any provider route, at any
+effort — cannot consult itself, so the tool is hidden there and direct
+calls return a disabled notice. Point the advisor at a different model and
+the guard follows it; list a model in `disabledForModels` to exclude callers
+that are not the advisor model.
 
 ## Usage policy (what agents are told)
 
@@ -171,8 +174,8 @@ Rules enforced by the tool description and an injected session instruction:
 - Give the advice serious weight; a passing self-test alone is not
   counter-evidence. Clear factual corrections do not need another
   confirmation call.
-- The tool is hidden in `anthropic/claude-fable-*` sessions (the current
-  model is already Fable) and in sessions whose caller model is listed in
+- The tool is hidden in sessions already running the advisor model (any
+  route, any effort) and in sessions whose caller model is listed in
   `disabledForModels`. Direct calls there return a disabled notice and do
   not run TypeSafe screening or advisor generation. Eligibility is
   reevaluated per request, so switching models mid-session takes effect
@@ -354,7 +357,10 @@ never fuzzy names, prefix stripping, or sibling substitution:
   survive refreshes and plugin upgrades.
 - Binding keys are exact `(providerID, modelID, variant)` tuples. A null
   variant covers unset variants only — it is never a wildcard. Variants are
-  independent: a `high` binding does not match an `xhigh` call.
+  independent: a `high` binding does not match an `xhigh` call. A requester
+  recorded with a `default` effort resolves through the null-variant
+  binding; the evaluated effort on the result describes the published
+  evaluation, not the effort the requester ran at.
 - Local bindings override bundled ones per tuple and can cover a newly
   released model with no plugin release:
 
@@ -404,15 +410,18 @@ maintaining a binding per route:
 }
 ```
 
-With it on, a request for `opencode/deepseek-v4.1-flash#max` resolves through
-the official `deepseek/deepseek-v4.1-flash#max` binding: exact provider
-bindings still win first, variants stay independent (`high` never borrows
-`max`), and the stable AA ID plus its published evaluated effort are
-preserved. If several providers define the same model and variant, local
-bindings win over bundled ones. Check the outcome before relying on it:
+With it on, a request for a routed model without its own binding resolves
+through another provider's binding for the same model and variant (for
+example `opencode/gpt-6-astra#xhigh` through the `openai/gpt-6-astra#xhigh`
+binding): exact provider bindings still win first (the bundled set already
+covers the common gateway routes explicitly), variants stay independent
+(`high` never borrows `max`), and the stable AA ID plus its published
+evaluated effort are preserved. If several providers define the same model
+and variant, local bindings win over bundled ones. Check the outcome before
+relying on it:
 
 ```sh
-ocadvisor benchmarks status --match-any-provider true --model opencode/deepseek-v4.1-flash#max
+ocadvisor benchmarks status --match-any-provider true --model opencode/gpt-6-astra#xhigh
 ```
 
 The equivalent environment variable is
@@ -439,14 +448,16 @@ The equivalent environment variable is
   TUI. As a direct tool, the TUI's tool log shows the call's `mode`,
   `trigger`, and `question` fields followed by `output:` with the answer.
   Direct calls also avoid Code Mode's output-size truncation. The `context`
-  hook can only hide the tool (Fable sessions and `disabledForModels`
+  hook can only hide the tool (advisor-model sessions and `disabledForModels`
   callers), never add one, and the selective-use instruction is injected
   only when the tool is available to the request.
 - Before each consultation it checks OpenCode for support of the configured
   advisor model: the provider is enabled (`provider.get`), the model is
   available (`model.list`, configured variant when listed), and a connection
   exists (`integration.connection.active`). The older `catalog.*` discovery
-  namespace remains as a compatibility fallback.
+  namespace remains as a compatibility fallback. When the configured
+  provider is `anthropic` and its route is unavailable, the check runs once
+  more against the `opencode` gateway for the same model before failing.
 - Benchmark snapshots and mapping overrides are read through one cached
   store per process. Before each gate-enabled consultation the store
   re-stats both files and reloads only when their identity changed, so CLI
@@ -455,7 +466,7 @@ The equivalent environment variable is
   instead of guessing.
 - Consultations run as transient generations on a dedicated, reusable
   `advisor` session pinned to the configured model (default
-  `anthropic/claude-fable-5-1#xhigh`) via `session.create` +
+  `anthropic/claude-opus-5-5#xhigh`) via `session.create` +
   `session.switchModel` once, then `session.generate` per call. Transient
   generations do not mutate session history, so the advisor session stays
   empty while its stats attribute advisor spend. Title discovery also
@@ -477,7 +488,7 @@ The equivalent environment variable is
   what is new since then.
 - Real failures (provider/model/connection issues, missing
   transcript/session) throw so OpenCode records them as errors instead of
-  silent `completed` results. Fable and configured-model skips still return
+  silent `completed` results. Self and configured-model skips still return
   a disabled notice without TypeSafe or advisor requests.
 
 ## Metrics
@@ -485,12 +496,16 @@ The equivalent environment variable is
 Every invocation appends one JSON line to
 `~/.local/share/opencode/ocAdvisor-metrics.jsonl` with timestamp, session,
 caller model/agent, mode, trigger, effective effort, outcome (`advisor_response`,
-`skipped_fable`, `skipped_model`, `skipped_typesafe`, `error`, `no_transcript`,
+`skipped_self`, `skipped_model`, `skipped_typesafe`, `error`, `no_transcript`,
 `no_session`), error type
 (`provider_unavailable`, `model_unavailable`, `invalid_effort`, `auth`, …), latency,
 transcript size, prior-consultation count, and transport (`via`).
 Token usage is `null`: OpenCode generation returns text only.
 Logging is best-effort and never breaks a call.
+Generated responses also record `advisorProvider`, the route that served
+them (`opencode` when the Anthropic fallback fired).
+Rows written before the advisor-model change use the legacy `skipped_fable`
+outcome for self-consultation skips; current rows use `skipped_self`.
 When the tool is hidden for the request, there is no invocation and no
 metrics row. A direct call that still reaches the executor for an excluded
 caller records one `skipped_model` line and no TypeSafe gate field.
@@ -543,8 +558,8 @@ bun src/cli.ts benchmarks status          # the shipped CLI, from source
 
 The report combines the metrics log with the session database and shows
 generated advice, skips, gate decisions, and caller results plus eligibility
-coverage (sessions with ≥10 non-Fable tool calls vs. sessions that received
-generated advice). That coverage figure is a non-Fable activity proxy, not a
+coverage (sessions with ≥10 non-advisor tool calls vs. sessions that received
+generated advice). That coverage figure is a non-advisor activity proxy, not a
 historical reconstruction of per-location `disabledForModels` settings.
 Database and metrics views are independent and must not be
 summed: a caller entry can fail while the plugin still recorded a generated

@@ -3,10 +3,11 @@
 <p align="center">A session-tree token usage monitor for OpenCode 2.</p>
 
 <p align="center">
-  <a href="https://www.npmjs.com/package/@chenlongapps/opencode-token-usage"><img alt="npm" src="https://img.shields.io/npm/v/%40chenlongapps%2Fopencode-token-usage?style=flat-square&logo=npm" /></a>
-  <a href="https://opencode.ai/"><img alt="OpenCode 2" src="https://img.shields.io/badge/OpenCode-2-5A67D8?style=flat-square" /></a>
-  <a href="https://github.com/chenlongapps/opencode-token-usage/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/chenlongapps/opencode-token-usage/ci.yml?style=flat-square&branch=main&label=ci" /></a>
-  <a href="LICENSE"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-yellow?style=flat-square" /></a>
+  <a href="https://www.npmjs.com/package/@chenlongapps/opencode-token-usage" target="_blank" rel="noopener noreferrer"><img alt="npm" src="https://img.shields.io/npm/v/%40chenlongapps%2Fopencode-token-usage?style=flat-square&logo=npm" /></a>
+  <a href="https://www.npmjs.com/package/@chenlongapps/opencode-token-usage" target="_blank" rel="noopener noreferrer"><img alt="npm downloads" src="https://img.shields.io/npm/dm/@chenlongapps/opencode-token-usage" /></a>
+  <a href="https://opencode.ai/" target="_blank" rel="noopener noreferrer"><img alt="OpenCode 2" src="https://img.shields.io/badge/OpenCode-2-5A67D8?style=flat-square" /></a>
+  <a href="https://github.com/chenlongapps/opencode-token-usage/actions/workflows/ci.yml" target="_blank" rel="noopener noreferrer"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/chenlongapps/opencode-token-usage/ci.yml?style=flat-square&branch=main&label=ci" /></a>
+  <a href="LICENSE" target="_blank" rel="noopener noreferrer"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-yellow?style=flat-square" /></a>
 </p>
 
 <p align="center">
@@ -49,7 +50,8 @@ For remote sessions, add the package name to `plugins` in your local `~/.config/
 | `Cache Rate` | `Cache Read ÷ (Input + Cache Read + Cache Write)` |
 | `Total` | Sum of all five token categories |
 | `Context` | Latest context usage after the most recent completed compaction in the viewed session; not aggregated across the subtree |
-| `Cost` | Estimated cost for the entire tree, recalculated using the viewed session's active model; not a provider bill |
+| `Steps` | Assistant message count across the session tree, including subagents; follows OpenCode's own stats definition, so compaction and user messages are not steps |
+| `Cost` | Estimated cost across the tree, pricing each assistant and compaction call with its actual model |
 | `TPS` | Generation throughput for `Output + Reasoning` across the tree; live estimates are marked with `~` |
 | `TTFT` | Average time to first token across measurable assistant steps in the tree |
 
@@ -58,7 +60,10 @@ For remote sessions, add the package name to `plugins` in your local `~/.config/
 - Usage includes server-reported assistant and compaction messages throughout the session tree, including unopened subagents. Token counts are never inferred from text length.
 - A fork is a separate session tree. Inherited message copies are attributed only to their original source to prevent double counting.
 - `Context` only searches messages after the most recent compaction with `status === "completed"` and is hidden when reliable usage or a model context limit is unavailable.
-- `Cost` applies the viewed session's active model to the whole tree. Missing applicable prices fall back to 0, matching OpenCode's behavior.
+- `Steps` counts every assistant message in the tree, whether or not it reported usage, and reuses the fork-copy de-duplication so inherited history is never counted twice.
+- `Cost` prices every message with its recorded model. A complete non-zero price resolved by OpenCode takes precedence. If OpenCode reports a complete zero price, a complete official snapshot price overrides it; incomplete prices fall back for the whole message without mixing rates.
+- Gateway models can use fallback prices through exact model IDs, documented aliases, and known wrappers. A terminal `-free` or `:free` is removed only for an exact base ID lookup; other suffixes are not stripped. The fallback excludes gateway markups, regional premiums, unlisted discounts, tool fees, and taxes, so Cost is an estimate rather than a provider bill.
+- Confirmed free usage displays `$0.00`; unavailable prices display `—`; known subtotals with unpriced messages are marked `partial`. See the [built-in price snapshot](docs/pricing.md) for coverage, sources, and limitations.
 - Initial read failures display `Unavailable`. Later failures retain the last complete snapshot, display `Not updated`, and retry automatically.
 
 ### Development
@@ -71,7 +76,7 @@ npm run build
 npm run test:smoke
 ```
 
-`test:smoke` packages the real artifact and validates loading, refreshes, subagent aggregation, model switching, TPS, and TTFT against an isolated OpenCode instance and a local mock provider. It requires Python 3, an available local port, and npm network access. It never modifies your existing OpenCode configuration or calls paid models.
+`test:smoke` packages the real artifact and validates loading, refreshes, subagent aggregation, per-message pricing, official-price fallback, model switching, TPS, and TTFT against an isolated OpenCode instance and a local mock provider. It requires Python 3, an available local port, and npm network access. It never modifies your existing OpenCode configuration or calls paid models.
 
 To load the plugin from source, build the project and add the repository's absolute path to `plugins` in the target project.
 

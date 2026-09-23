@@ -20,8 +20,14 @@ pi install git:github.com/alexeyco/tea@v0.1.0
 OpenCode:
 
 ```sh
-opencode2 plugin add @alexeyco/tea    # npm
-opencode2 plugin add github:alexeyco/tea
+opencode plugin add @alexeyco/tea     # npm
+opencode plugin add github:alexeyco/tea
+```
+
+Or set the `plugins` key in `opencode.json` / `opencode.jsonc`:
+
+```json
+{ "plugins": ["@alexeyco/tea"] }
 ```
 
 Without a plugin, point `skills` in `opencode.json` at the package, or copy
@@ -31,7 +37,8 @@ Without a plugin, point `skills` in `opencode.json` at the package, or copy
 { "skills": ["node_modules/@alexeyco/tea/skills/tea"] }
 ```
 
-Requires the `tea` CLI and a configured login (`tea login add`).
+Requires the `tea` CLI and a configured login (`tea login add`). The plugin
+requires OpenCode v2; v1 support is dropped.
 
 ## Usage
 

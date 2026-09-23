@@ -28,8 +28,6 @@ implementation, validation, review, and model routing.
 Guides: [日本語](docs/guide-ja.md) · [简体中文](docs/guide-zh-CN.md) ·
 [Testing](docs/testing.md) · [CLI testing](docs/cli-testing.md)
 
-Release: [v0.10.6](https://github.com/zufall-upon/Sortie-dogs/releases/tag/v0.10.6)
-
 > **Beta:** v0.10.x is under active stabilization. Runtime behavior,
 > configuration, and generated assets may still change before 1.0.
 
@@ -85,47 +83,23 @@ The v0.10 profile is serial by design. The stable profile's Luna fabric and
 parallel integration path are not exposed in this profile. More agents are not a
 goal; preserving quality while reducing unnecessary expensive work is.
 
-### SWE-bench policy from v0.10.6
+### SWE-bench evaluation
 
-Starting with v0.10.6, development proceeds alongside recurring SWE-bench
-measurement. This is a measurement policy, not a claim that an unrun suite passed.
+A frozen Sortie-dogs v0.10.14 build was evaluated on 23 fixed tasks.
 
-- Freeze the task input, package/source snapshot, model routes, budgets, tools,
-  and stop endpoint before comparing runs.
-- Freeze the candidate only after all writers stop, then grade a separate copy
-  with one pinned official verifier execution.
-- Record benchmark completion, official task correctness, and harness terminal
-  state independently. A Sortie `DONE` or review `PASS` is not an official
-  verifier reward.
-- Record agent-to-freeze and verifier time separately, plus root and descendant
-  tokens, model steps, children, cache behavior, estimated cost, and coverage.
-- Keep infrastructure failure distinct from scored failure. Small or unmatched
-  samples remain case studies, not leaderboard or general success-rate claims.
+- Official verifier PASS: 6 / 23
+- Scored FAIL: 17 / 23
+- Infrastructure blocked: 0 / 23
+- Total estimated model cost: $15.75
+- Median agent runtime: 15.2 min
 
-The pre-v0.10.6 local benchmark condition is closed historical evidence. New
-development decisions use SWE-bench measurements collected under the frozen
-contract in [Coding benchmark completion and correctness](docs/benchmark-completion-contract.md).
+The same Sortie-dogs candidate, model routes, budgets, tools, and verification
+procedure were held fixed for all tasks. This is one frozen evaluation, not a
+general success-rate claim.
 
-## Historical local case study
+Full methodology and per-task results: [benchmark details](docs/benchmark-v0.10.14-dev23.md)
 
-These are completion-filtered local references on one frozen DeepSWE task,
-`datacurve/anko-typed-variable-bindings`, collected from 2026-09-14 through
-2026-09-18. They are not matched pairs or a leaderboard result.
-
-- Bare OpenCode: Verified PASS `0/3`, F2P `3/27`, median agent wall `24.5 min`,
-  median completed-run API-equivalent cost `$3.53`.
-- Sortie v0.9.12: Verified PASS `0/3`, F2P `23/27`, median wall `25.7 min`,
-  median completed-run cost `$2.85`; two additional interrupted attempts cost
-  an estimated `$6.20`.
-- Sortie v0.10.3 one-shot: Verified PASS `0/1`, F2P `7/9`, wall `22.7 min`,
-  estimated cost `$3.79`.
-- Sortie v0.10.5 one-shot: Verified PASS `1/1`, F2P `9/9`, P2P `94/94`, wall
-  `43.8 min`, estimated cost `$2.58`.
-
-The v0.10.5 result is one verified success, not a success rate. Historical rate
-schedules and endpoints differ, and the host-reported zero cost is not treated as
-a bill. See [definitions, frozen inputs, and limitations](docs/benchmark-reference.md)
-and [machine-readable values](docs/benchmarks/provisional-reference.json).
+Historical qualification references remain in [benchmark reference](docs/benchmark-reference.md).
 
 ## How v0.10.6 works
 
@@ -224,7 +198,7 @@ not invent, probe, or translate variant names.
 - `freeTierFallbackModels`: ordered global last-resort model IDs. Default:
   `opencode/deepseek-v4-flash-free`; `[]` disables this fallback.
 - `dedicatedWorkerModel`: canonical stable serial target, default
-  `openai/gpt-5.6-sol` / `medium`. The v0.10 profile also supplies its explicit
+  `openai/gpt-6-sol` / `medium`. The v0.10 profile also supplies its explicit
   role routes below; do not infer the v0.10 worker route from this stable setting.
 - `consultation.strategy`: fixed advisor identity, optional `required`, and
   positive `maxCallsPerCandidate`; default one call and not required.
@@ -263,13 +237,13 @@ reuse the same evidence instead of spending the validation budget again.
 
 ### Default v0.10 routes
 
-- `dog-operator`: `openai/gpt-5.6-luna-fast` / `max`
-- `dogs-coordinator`: `openai/gpt-5.6-terra` / `xhigh`
-- `dog-worker-v010`: `openai/gpt-5.6-luna-fast` / `max`
-- `dog-scout-v010`: `openai/gpt-5.6-luna-fast` / `xhigh`
-- `dog-reviewer-v010`: `openai/gpt-5.6-terra` / `xhigh`
+- `dog-operator`: `openai/gpt-6-luna` / `max`
+- `dogs-coordinator`: `openai/gpt-6-sol` / `xhigh`
+- `dog-worker-v010`: `openai/gpt-6-luna` / `max`
+- `dog-scout-v010`: `openai/gpt-6-luna` / `xhigh`
+- `dog-reviewer-v010`: `openai/gpt-6-sol` / `xhigh`
 - `dog-advisor-v010`: preferred declared `anthropic/claude-opus-5`, otherwise
-  `openai/gpt-5.6-sol` / `xhigh`
+  `openai/gpt-6-sol` / `xhigh`
 
 An explicit model and variant selected in OpenCode remains authoritative for that
 session. Child role defaults fill absent native settings and may be overridden by
