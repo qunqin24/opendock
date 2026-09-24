@@ -103,5 +103,7 @@ absence, and a turn ending is not work finishing.
 
 ## Scope of the first version
 
-macOS. Claude Code, Codex and opencode. Terminal and programmatically launched
-sessions. Desktop apps are out of scope.
+macOS on Apple silicon — the package ships one prebuilt arm64 binary, so a
+global install refuses anything else rather than building from source. Claude
+Code, Codex and opencode. Terminal and programmatically launched sessions.
+Desktop apps are out of scope.

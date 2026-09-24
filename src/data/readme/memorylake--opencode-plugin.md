@@ -13,6 +13,7 @@ to the international endpoint.)
 | [`dsh-plugin/`](dsh-plugin/) | DeepSeek Harness (dsh) | working — memory tools, prompt guidance, session status; published as `@memorylake/dsh-plugin` |
 | [`opencode-plugin/`](opencode-plugin/) | opencode | working — memory tools, prompt guidance, compaction guidance; published as `@memorylake/opencode-plugin` |
 | [`qwenpaw-plugin/`](qwenpaw-plugin/) | QwenPaw | working — memory backend plugin: automatic recall, memory tools, Console form, `/memorylake-status`; installs from a zip |
+| [`workbuddy-plugin/`](workbuddy-plugin/) | WorkBuddy | working — search-first recall every turn (reminder + gate), per-turn conversation sync, session status; installs from this repo as a plugin marketplace |
 
 All harnesses share one identity and data tree (`~/.memorylake/harness/`):
 configure once, use from every client.
@@ -69,3 +70,15 @@ qwenpaw plugin install https://github.com/memorylake-ai/memorylake-harness/relea
 Then, per Agent, in the Console: Agent settings → Memory backend → Memory
 Lake. On a machine already set up for another harness the form can stay
 empty. See [`qwenpaw-plugin/README.md`](qwenpaw-plugin/README.md).
+
+## WorkBuddy
+
+In WorkBuddy: Skills → Plugins → **+** (add marketplace) →
+`memorylake-ai/memorylake-harness`, install **memorylake**, then in a session:
+
+```
+/memorylake:init
+```
+
+Machines already set up for another harness can skip the last step. See
+[`workbuddy-plugin/README.md`](workbuddy-plugin/README.md).

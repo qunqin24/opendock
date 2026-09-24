@@ -2,7 +2,7 @@
 
 [![npm version](https://img.shields.io/npm/v/opencode-graphify-init?logo=npm&label=npm)](https://www.npmjs.com/package/opencode-graphify-init)
 
-Keep existing [Graphify](https://github.com/Graphify-Labs/graphify) graphs fresh in the background. First indexing always requires an explicit `/graphify-index` decision; automatic sessions never start a token-spending first pass.
+Keep [Graphify](https://github.com/Graphify-Labs/graphify) code graphs fresh in the background. First indexing requires `/graphify-index` consent; authorized older graphs are automatically reconstructed once under the code-only policy.
 
 ## Install
 
@@ -19,36 +19,32 @@ Restart OpenCode, open a concrete project, then run:
 /graphify-index
 ```
 
-Choose **code-only** unless you need document indexing. Code-only is local and free; docs mode uses a configured LLM backend and can spend substantial tokens.
+Confirm the repository set and authorize local, free code-only indexing. Project documentation is not indexed or deleted; source comments and docstrings remain available to Graphify.
 
 ## Use
 
-1. Run `/graphify-index` for the first graph.
-2. Choose code-only or docs mode.
-3. Review the target repositories and confirm indexing.
-4. Let later OpenCode sessions refresh stale graphs automatically.
+1. Run `/graphify-index` and confirm the target repositories before their first indexing.
+2. Let later OpenCode sessions reconstruct legacy graphs once and refresh stale code graphs automatically.
 
-The plugin records the chosen mode under `.ai/graphify-out/`. Environment variables never replace that stored decision.
+Consent and successful code-only policy state are recorded under `.ai/graphify-out/`. Historical mode/backend settings cannot enable documentation extraction.
 
 ## Behavior
 
 | Project state | Result |
 | --- | --- |
-| No graph and no recorded mode | Show one hint; start nothing |
-| Missing or unreadable graph with a recorded mode | Rebuild in that mode |
-| Graph commit differs from Git `HEAD` | Refresh incrementally |
-| Graph is current | Do nothing |
+| No authorized graph or consent | Show one hint; start nothing |
+| Previously authorized graph without successful policy proof | Rebuild once from clean generated state, even when current at `HEAD` |
+| Graph commit differs from Git `HEAD` | Refresh incrementally with `--code-only` |
+| Graph/empty corpus is current | Keep local state; retry pending global work when enabled |
 
-Refreshes run in the background, share a multi-process lock, stop with OpenCode, and keep project state under `.ai/graphify-out/`. See [Graph lifecycle](docs/lifecycle.md) for state, mode changes, and recovery.
+Refreshes run in the background, use exclusive local and global locks, and keep project state under `.ai/graphify-out/`. Interrupted or uncertain work retains its lock until an operator confirms quiescence and removes only that lock. Global reconciliation is separately pending on opt-out or failure; the plugin verifies ownership before a scoped global mutation. See [Graph lifecycle](docs/lifecycle.md) for manual recovery and external-CLI race limitations.
 
 ## Configure
 
 | Variable | Effect |
 | --- | --- |
 | `OPENCODE_GRAPHIFY_AUTOINIT=0` | Disable refresh for this OpenCode process |
-| `OPENCODE_GRAPHIFY_GLOBAL=0` | Skip global-graph registration |
-| `OPENCODE_GRAPHIFY_DOCS=1` | Suggest docs mode; the command still asks |
-| `OPENCODE_GRAPHIFY_BACKEND=<name>` | Backend fallback for legacy docs graphs |
+| `OPENCODE_GRAPHIFY_GLOBAL=0` | Leave shared global data untouched; retry pending reconciliation when enabled |
 | `GRAPHIFY_OUT=.ai/graphify-out` | Keep Graphify CLI and MCP paths aligned |
 
 Use `GRAPHIFY_OUT=.ai/graphify-out` in shells and Graphify MCP configuration. Do not combine it with `--out`.

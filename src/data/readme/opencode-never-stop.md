@@ -41,6 +41,25 @@ Restart opencode afterwards.
 | `/opencode-never-stop`   | Start poking this session       |
 | `/opencode-stop`         | Stop poking                    |
 
+### Context threshold
+
+Keep an eye on context usage and get the agent to wrap up before the next
+compaction. Set a threshold and a message; the plugin nudges the agent once the
+session context crosses the threshold.
+
+| Command                  | Effect                          |
+| ------------------------ | ------------------------------- |
+| `/opencode-never-proceed-after [threshold] [message...]` | Nudge this session once its context crosses the threshold |
+| `/opencode-never-proceed-after-stop` | Disable the context watch for this session |
+
+A threshold below `100` is a percentage of the model's context window; `100`
+or more is an absolute token count, e.g.:
+
+```
+/opencode-never-proceed-after 120000 please stop whatever you're doing at the moment
+/opencode-never-proceed-after 60 pause your work, persist your progress, and note where you left off
+```
+
 ## Configure
 
 Create `~/.config/opencode/opencode-never-stop.json`:

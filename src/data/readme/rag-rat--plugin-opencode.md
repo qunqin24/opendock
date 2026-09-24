@@ -62,8 +62,9 @@ sequenceDiagram
 ## Quickstart
 
 For Claude Code, Codex, and opencode, install the plugin. It registers the MCP server, adds the
-hooks, and installs a version-matched `rag-rat` binary on first run (the Claude Code and Codex
-bundles also add the skills; on opencode add them with `npx @rag-rat/skills`):
+hooks, and fetches a version-matched `rag-rat` binary on first run, which the MCP server exposes as
+`~/.local/bin/rag-rat` when it starts — see [Running the CLI](#running-the-cli) (the Claude Code and
+Codex bundles also add the skills; on opencode add them with `npx @rag-rat/skills`):
 
 ```bash
 # Claude Code
@@ -83,7 +84,9 @@ approval step — nothing to do there):
 
 - **Claude Code** asks before each rag-rat MCP tool the first time it runs — choose "Yes, don't ask
   again," or pre-allow them in `~/.claude/settings.json` with
-  `"permissions": { "allow": ["mcp__rag-rat__*"] }`.
+  `"permissions": { "allow": ["mcp__plugin_rag-rat_rag-rat__*"] }` (plugin tools are named
+  `mcp__plugin_rag-rat_rag-rat__<tool>`; a server added by hand with `claude mcp add` uses
+  `mcp__rag-rat__*` instead).
 - **Codex** shows a **"Hooks need review"** prompt on the first `codex` session started *inside the
   repo* (the plugin ships grep-augmentation, clone-check, and session-digest hooks that run outside
   the sandbox). Choose **"Trust all and continue"** to enable them. For unattended commands such as
@@ -105,7 +108,8 @@ Then open the repository and ask:
 The `init-rag-rat` skill scans the repo, explains the material choices, previews `rag-rat.toml`,
 writes and indexes only after confirmation, and offers to set up the git hooks that keep the index
 fresh. The MCP server starts dormant in an unconfigured repo; when setup finishes, reconnect it so it
-restarts fully active against the new index.
+restarts fully active against the new index — in Claude Code run `/mcp` and reconnect `rag-rat`; in
+Codex and opencode, start a new session.
 
 Then put it to work — the loop rag-rat is built for is in [Try it](#try-it).
 
@@ -153,9 +157,12 @@ cd /path/to/your/repo
 rag-rat init
 ```
 
-`init` scans the repo, guides language and embedding choices, writes `rag-rat.toml`, and builds the
-initial index. Use `rag-rat init --dry-run` to preview without writing, or `--yes` for
-non-interactive defaults. Configuration reference: [`docs/config.md`](docs/config.md).
+`init` is an interactive terminal wizard: it scans the repo, guides language and embedding choices,
+writes `rag-rat.toml`, and builds the initial index. For a non-interactive setup use
+`rag-rat init --yes`, which takes the defaults **and installs the git maintenance hooks** (add
+`--no-hooks` to skip them; `--dry-run` previews the config without writing). `--yes` never replaces
+an existing `rag-rat.toml` unless you add `--force` — rerun the wizard to reconfigure instead.
+Configuration reference: [`docs/config.md`](docs/config.md).
 
 ### Add skills and connect MCP
 
@@ -327,11 +334,13 @@ stay unchanged. The ones you'll reach for most:
 - **`memory_create`** — record a source-anchored repo memory; **`dream`** surfaces the maintenance
   worklist that keeps them honest ([below](#self-maintaining-memories)).
 
-Beyond these: repo orientation (`repo_brief`, `repo_clusters`), git/GitHub rationale
-(`commit_search`, `git_history_for_*`, `papertrail_for_*`, `rationale_search`), the full memory
-graph (`memory_search`, `memory_edges`, `memory_rebind`, `memory_doctor`, …), graph-vs-compiler
-audit (`compare_graph_to_scip`), and index diagnostics (`index_status`, `llm_status`, `heal_index`)
-— all documented in [`docs/mcp-tools.md`](docs/mcp-tools.md).
+Beyond these: repo orientation (`repo_brief`, `repo_clusters`), history and rationale
+(`history_for` a symbol, path, chunk or commit; `history_search` over commits, issues and review
+discussion), memory recall (`memory_search`, `memory_for_*`) and index health (`index_status`).
+Maintenance and diagnostics — `dream`, `heal_index`, `memory_doctor`, graph-vs-compiler audits,
+the memory task graph — are in the opt-in `admin` and `graph` toolsets (`[mcp] toolsets`), so they
+stay out of every agent's tool list until wanted. All documented in
+[`docs/mcp-tools.md`](docs/mcp-tools.md).
 
 ## Repo memories
 
@@ -501,7 +510,7 @@ attached to each release and published to `@rag-rat/bin`, so `npx @rag-rat/bin` 
 SQLite is bundled (compiled from source via `rusqlite`), so there's no system-library prerequisite,
 but each platform needs a C toolchain: Linux ships one; on macOS install the Xcode Command Line
 Tools (`xcode-select --install`); on Windows install the Visual Studio Build Tools with the C++
-workload (MSVC). Requires **Rust 1.96+**; the workspace tracks that stable baseline for its
+workload (MSVC). Requires **Rust 1.98+**; the workspace tracks that stable baseline for its
 dependencies (the bundled SQLite build itself requires at least Rust 1.95 for `cfg_select!`).
 
 A few maintenance conveniences are Unix- or Linux-only by design and degrade quietly elsewhere — no
@@ -516,6 +525,32 @@ feature of the index, query, or MCP surface is affected:
   index, which works the same but without cross-call dedupe.
 
 ## Commands
+
+### Running the CLI
+
+Commands in this README and in `docs/` are written as `rag-rat <command>`.
+
+**With the plugin**, `rag-rat` is `~/.local/bin/rag-rat` (Windows:
+`%USERPROFILE%\.local\bin\rag-rat.cmd`): the MCP server keeps that shim pointing at the plugin's
+version-matched binary from its first start, and moves it forward when the plugin updates. Like
+Claude Code's installer, it does not edit your shell profile or PATH. If `rag-rat` is not found,
+`~/.local/bin` is not on your PATH — add `export PATH="$HOME/.local/bin:$PATH"` to your shell
+profile, or run `~/.local/bin/rag-rat doctor`, whose `cli` section gives the exact fix for your
+system. The shim never replaces a `rag-rat` there that it did not create; `RAG_RAT_NO_PATH_SHIM=1`
+turns it off.
+
+**Without the plugin**, install the CLI: `npm install -g @rag-rat/bin` or `cargo install rag-rat`.
+
+**Last resort**, with neither, run it through npx pinned to the version your MCP server runs (the
+`version` field of the `index_status` tool):
+
+```bash
+npx -y @rag-rat/bin@<version> <command>
+```
+
+Keep the version: an unpinned `npx @rag-rat/bin` runs the newest release, which migrates the index
+to a schema an older plugin's server then refuses to open. Git hooks pin themselves this way and
+follow plugin updates on their own.
 
 ```bash
 rag-rat init                       # guided first-run setup

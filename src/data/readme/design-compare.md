@@ -27,6 +27,7 @@
 - `diff_on_mismatch` を `true` に指定した場合、判定が `success` なら `diff_image` は空文字列、`mismatch` なら差分画像が返されます。
 - `diff_image_content` を `true` に指定し、かつ `diff_image` が空でない場合、MCP 応答の `content[0]`（JSON テキスト）の後に `image/png` の image コンテンツが付きます。既定は `false` で、既存クライアントは `content[0]` だけを読めば足ります。
 - 不一致セルがある場合、応答に機械可読な `diff_cells`（例: `[{"grid_x": 3, "grid_y": 4}]`）が付きます。座標は 16x16 グリッドの 0–15 で、行優先の決定論的順序です。セル `(x, y)` は画像の `[x/16, (x+1)/16) × [y/16, (y+1)/16)` に対応します（256x256 の `diff_image` では 16x16 ピクセルのブロック）。`generate_diff=false` でも返します。
+- 不一致セルがある場合、応答に `diff_region`（画像 A のピクセル座標 `"x,y,w,h"`。`ignore_region` と同じ書式）も付きます。不一致セル全体の bounding box で、セル `bx` は画素 `[bx*W/16, (bx+1)*W/16)` に対応します。不一致が無いときは省略します。
 
 ### 差分画像 (`diff_image`) の見方 (`strict` モード)
 
@@ -216,6 +217,7 @@ image A / B のいずれかが一様と検出された場合、status / match_ra
 | `warnings` | string[] | 非空時のみ | 一様画像・アスペクト比差、および `ignore_region` 指定時の画像サイズ差など。`status` / `match_rate` は変えない。 |
 | `out_of_bounds_regions` | string[] | 非空時のみ | 画像と交差しない `ignore_region`。 |
 | `diff_cells` | object[] | 非空時のみ | 不一致セルの `{grid_x, grid_y}`（16x16、0–15）。 |
+| `diff_region` | string | 非空時のみ | 不一致セルの bounding box（画像 A の `"x,y,w,h"`）。 |
 
 ### `strict`
 

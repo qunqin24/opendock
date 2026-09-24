@@ -6,16 +6,29 @@ the model can use to inspect, deploy and configure your applications.
 
 ## Install
 
-```sh
-opencode plugin add @skyvence/coolify-oc
-```
+The plugin is split in two halves:
 
-That installs the package and adds it to your global `opencode.json(c)`. The
-sidebar half loads automatically through the package's `./tui` entry, so it does
-not also go in `cli.json`.
+- **Server** — the tools, RPC and skills. Published to npm, no UI.
+- **Client** — the sidebar. Installed locally, because an npm-packaged TUI
+  plugin cannot repaint in the current OpenCode (upstream
+  [#33884](https://github.com/anomalyco/opencode/issues/33884)): plugins loaded
+  from `node_modules` are skipped by OpenCode's OpenTUI/Solid transform and
+  build against a renderer the host never provided. Local plugins live outside
+  `node_modules`, so the transform runs and the sidebar bridges to the host.
+
+```sh
+# 1. Server half (stable, npm)
+opencode plugin add @skyvence/coolify-oc
+
+# 2. Client half (sidebar) — copies the TUI source into
+#    ~/.config/opencode/plugins/coolify-client/, outside node_modules
+npx --yes --package @skyvence/coolify-oc coolify-install-tui
+```
 
 Restart the TUI (`opencode service restart`), run `/coolify`, choose
 **Set up instance**, and enter your Coolify URL and API token.
+
+Re-run `coolify-install-tui` after upgrading the package to refresh the client.
 
 <details>
 <summary>Per project instead</summary>
@@ -32,7 +45,9 @@ that project's `opencode.jsonc`:
 ```
 
 Use one or the other, not both. A global and a project entry share the same
-plugin id, and OpenCode loads both, so the plugin would run twice.
+plugin id, and OpenCode loads both, so the plugin would run twice. This entry
+configures the **server** half only; the sidebar is still installed with
+`coolify-install-tui` above.
 
 </details>
 
@@ -194,16 +209,27 @@ Coolify without entering the conversation.
 
 ## Development
 
+A Bun workspace with three packages:
+
+| Package | What it is |
+| --- | --- |
+| `packages/shared` | The RPC contract and the pieces both halves use: `rpc`, `options`, `skills`, `coolify/runtime`. Bundled into the server build. |
+| `packages/server` | `@skyvence/coolify-oc` — the published plugin: tools, RPC handlers, skills. Bundles `shared`; leaves `@opencode/*` external. |
+| `packages/client` | `@skyvence/coolify-oc-tui` — the sidebar. Source-only; installed locally by `packages/server/scripts/install-tui.mjs`. |
+
 ```sh
 bun install
-bun run check   # tsc --noEmit + vitest
+bun run check   # tsc --noEmit + vitest (210 tests)
 bun run test
+bun run build   # builds packages/server/dist and stages client/ + shared/ for the installer
 ```
 
-Opening OpenCode in this repository runs the working tree, not the published
-package. `.opencode/plugins/coolify-local/` re-exports `src/` under the ids
-`opencode.coolify.local` and `opencode.coolify.local.tui`, and `opencode.jsonc`
-turns off the global package for this project. Edits under `src/` hot-reload.
+The client is shipped as **source**, not a bundle: OpenCode transpiles local
+plugins with its OpenTUI/Solid transform, which is skipped for files inside
+`node_modules`. `install-tui.mjs` copies `client/` and `shared/` into
+`~/.config/opencode/plugins/coolify-client/`, rewrites the shared import to a
+relative path, and gives the local plugin the id `opencode.coolify.local.tui`
+so it is not disabled by the packaged TUI's `-opencode.coolify.tui` entry.
 
 ## Limitations
 

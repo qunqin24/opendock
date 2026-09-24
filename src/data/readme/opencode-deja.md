@@ -19,7 +19,8 @@ already wrote to disk, and hands the right one back in whichever agent asks.</p>
 
 <p align="center">And nobody has to ask for it: recall arrives at session start, on every prompt,
 before a file is edited or a command runs, and after one fails. Keys and tokens are stripped as
-the index is built, so what reaches the model is safe to send.</p>
+the index is built; <a href="docs/SECURITY-MODEL.md">the security model</a> says what that catches
+and what it cannot.</p>
 
 <p align="center">
 <b>88.1% hit@1</b> on LongMemEval-S (470-question cleaned set) &middot; <b>70.5% retrieval hit@1</b> on LoCoMo &middot; <b>millisecond</b> lookups over gigabytes of history<br>
@@ -235,16 +236,21 @@ anything already wired to them.
 
 | Tool | Arguments | Returns |
 | --- | --- | --- |
-| `deja` | `mode`, plus `query`, `path`, `error`, `what`, `text`, `tags?`, `harness?`, `project?`, `since?`, `limit?`, `offset?`, `all?` | Depends on the mode, below. |
+| `deja` | `mode`, `q`, `harness?`, `project?`, `limit?` | Depends on the mode, below. |
 
-| Mode | Arguments it reads | Returns |
-| --- | --- | --- |
-| `recall` | `query`, `harness?`, `limit?`, `offset?` | Dense matching snippets, capped at 4KB. |
-| `context` | `query`, `harness?` | Markdown digest of the best-matching session. |
-| `blame` | `path`, `harness?`, `project?`, `since?`, `limit?`, `all?` | Sessions that discussed a file. |
-| `fix` | `error`, `project?`, `limit?` | What this machine ran, or changed, after that same error before. |
-| `how` | `what`, `project?`, `limit?` | The real invocation, from what agents ran here. |
-| `remember` | `text`, `project?`, `tags?` | Stores a durable decision for later recall. |
+`q` carries whatever the mode asks about. The per-mode names below are still
+accepted; they are no longer declared, because the schema is read every turn
+whether or not the tool is called.
+
+| Mode | `q` is | Also reads | Returns |
+| --- | --- | --- | --- |
+| `recall` | the question, or an exact error string, name or flag | `harness?`, `limit?`, `offset?` | Dense matching snippets, capped at 4KB. |
+| `context` | the same as recall | `harness?` | Markdown digest of the best-matching session. |
+| `blame` | a file path | `harness?`, `project?`, `since?`, `limit?`, `all?` | Sessions that discussed a file. |
+| `fix` | the failing output, verbatim | `project?`, `limit?` | What this machine ran, or changed, after that same error before. |
+| `how` | the tool or target, e.g. `go test` | `project?`, `limit?` | The real invocation, from what agents ran here. |
+| `orient` | nothing — it asks about the project | `project?`, `limit?` | The commands past sessions ran here and the files they worked in. |
+| `remember` | one durable fact or decision | `project?`, `tags?` | Stores a durable decision for later recall. |
 
 </details>
 

@@ -20,7 +20,7 @@ Skills list, mirroring the built-in sidebar widgets.
   state: `✓ active`, `✗ failed`, `○ inactive`.
 - **LOCAL group** mixes registered plugins (`✓ … installed`) with workspace
   plugin projects discovered by scanning the workspace root for sibling
-  directories whose `package.json` depends on `@opencode-ai/plugin` (private
+  directories whose `package.json` depends on `@opencode/plugin` (private
   monorepo roots and shared libraries excluded) — those show dimmed with
   `○ … uninstalled` and a `[+]` to register them, same status column as
   everything else.

@@ -203,9 +203,9 @@ return await agent(`Write the final report for these findings: ${JSON.stringify(
 
 | Primitive                    | What it does                                                                                                                                                         |
 |------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `agent(prompt, opts?)`       | Spawns a sub-agent in its own session. Resolves to the schema-validated object or the final text; `null` when the agent is stopped or when the user skips a failed agent (see above). `opts`: `label`, `phase`, `schema`, `model`. |
+| `agent(prompt, opts?)`       | Spawns a sub-agent in its own session. Resolves to the schema-validated object or the final text; `null` when the agent is stopped or when the user skips a failed agent (see above). `opts`: `label`, `phase`, `schema`, `model`, `agentType` (an opencode agent such as `explore` or `general`). Sub-agents never get the `workflow` tool. |
 | `parallel(thunks)`           | Runs `Array<() => Promise>` concurrently and waits for all of them. A throwing thunk becomes `null`.                                                                 |
-| `pipeline(items, ...stages)` | Runs each item through every stage independently, with no barrier between stages. The default choice.                                                               |
+| `pipeline(items, ...stages)` | Runs each item through every stage independently, with no barrier between stages. When the concurrency cap is hit, later stages get free slots first, so items flow through end to end. The default choice. |
 | `phase(title)`               | Starts a display phase. Use the same titles as `meta.phases`.                                                                                                        |
 | `log(message)`               | Narrator line shown in the run view.                                                                                                                                 |
 | `args`                       | Whatever the tool call passed as `args`.                                                                                                                             |

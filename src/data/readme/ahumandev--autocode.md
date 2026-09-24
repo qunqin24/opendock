@@ -14,7 +14,7 @@ No special UI required. AutoCode runs in OpenCode and keeps concepts and durable
 
 ### Implementation Modes
 
-- 💡 **Advise mode** — *guidance*: agent researches topics, answers questions, and guides manual implementation.
+- 👨 **Advise mode** — *guidance*: agent researches topics, answers questions, and guides manual implementation.
 - 🧑‍💻 **Assist mode** — *interactive*: you make decisions while agent orchestration does the work and suggests next steps.
 - 🤖 **Auto mode** — *autonomous*: agent executes structured design work until completion.
 
@@ -36,7 +36,7 @@ No special UI required. AutoCode runs in OpenCode and keeps concepts and durable
 - 🧪 **Sandbox isolation** — agents automatically manage and experiment in their own isolated sandboxes.
 - 🛠️ **Self-building tools** — agents create durable per-job Node `.mjs` tools, reconcile dependencies, run finite scripts, and manage long-running services.
 
-As well as [OpenCode bundled tools](https://opencode.ai/docs/tools/).
+As well as [OpenCode V2 bundled tools](https://opencode.ai/v2/docs/tools/).
 
 ## Installation
 
@@ -78,7 +78,7 @@ Use [human installation guide](docs/index.md#installation-for-humans).
 Windows route uses native CMD. Linux route uses Bash and includes optional Bubblewrap setup. Both install the public plugin with:
 
 ```text
-opencode plugin @ahumandev/autocode@latest -g -f
+opencode plugin add @ahumandev/autocode@latest
 ```
 
 ## Usage
@@ -93,7 +93,7 @@ Agent availability uses final configured AutoCode tier: `spy` requires an explic
 
 |     | Agent    | Purpose                                                   |
 | --- | -------- | --------------------------------------------------------- |
-| 💡   | `advise` | Research topics, answer questions, and guide manual work. |
+| 👨   | `advise` | Research topics, answer questions, and guide manual work. |
 | 📐   | `design` | Design and propose solutions.                             |
 | 🤖   | `auto`   | **Autonomously** solve problems.                          |
 | 🧑‍💻   | `assist` | Assist **interactively** with problems.                   |
@@ -103,7 +103,7 @@ Agent availability uses final configured AutoCode tier: `spy` requires an explic
 
 | Agent    | Investigations | Next Action | Apply Changes |
 | -------- | -------------- | ----------- | ------------- |
-| 💡 advise | Autonomous     | Interactive | Human         |
+| 👨 advise | Autonomous     | Interactive | Human         |
 | 🧑‍💻 assist | Autonomous     | Interactive | AI*           |
 | 🤖 auto   | Autonomous     | Autonomous  | AI*           |
 
@@ -116,12 +116,12 @@ flowchart TD
   Concepts([.agents/concepts])
   Concepts -- 📐 design --> Design
 
-  Design -- 💡 advise --> Advise([manual execution])
+  Design -- 👨 advise --> Advise([manual execution])
   Design -- 🧑‍💻 assist --> Assist([interactive execution])
   Design -- 🤖 auto --> Auto([autonomous execution])
 ```
 
-Switch any time between `💡 advise` and `🧑‍💻 assist` and `🤖 auto` when work needs a different autonomy level. 
+Switch any time between `� advise` and `🧑‍💻 assist` and `🤖 auto` when work needs a different autonomy level. 
 
 ## Reference
 

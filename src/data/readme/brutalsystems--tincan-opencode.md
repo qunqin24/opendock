@@ -73,7 +73,7 @@ Send one a question — an unambiguous prefix is enough:
 
 ```jsonc
 // send_peer { "peer": "auth", "message": "Does verifyToken tolerate clock skew?" }
-{ "delivered": true, "method": "thread/queue/add", "peer_state": "idle",
+{ "outcome": "accepted", "method": "thread/queue/add", "peer_state": "idle",
   "message_id": "msg_825882f9aebd42dda4d71d15" }
 ```
 
@@ -96,9 +96,40 @@ session's next turn. Both directions are recorded in one log.
 
 | Tool | What it does |
 |---|---|
-| `peers` | Lists the live sessions you can reach (see [Which peers you see](#which-peers-you-see)): name, state (`idle` / `busy` / `unreachable`), cwd, and a durable id — `thread_id` for Codex, `session_id` for Claude Code. |
-| `send_peer` | Sends text to one peer. `{peer, message, in_reply_to?, expect_reply?, urgent?}`. |
+| `peers` | Lists the live sessions you can reach (see [Which peers you see](#which-peers-you-see)): name, state (`idle` / `busy` / `unreachable`), cwd, and a durable id — `thread_id` for Codex, `session_id` for Claude Code and opencode. |
+| `send_peer` | Sends text to one peer, or to several at once. `{peer?, peers?, message, in_reply_to?, expect_reply?, answers?, urgent?, expect_id?, idempotency_key?}` — exactly one of `peer` and `peers`. |
 | `message_log` | Reads back `~/.tincan/messages.jsonl`, filtered by peer or by reply chain. |
+
+`send_peer` returns an `outcome`: `accepted` (the peer's harness took the
+message — not that the peer has read it), `rejected` (nothing was sent and the
+call needs fixing; see `refusal`), or `failed` (attempted, and the peer or
+transport did not take it).
+
+### Sending to several peers at once
+
+Pass `peers` instead of `peer` — up to 8 recipients. Each recipient is told who
+else received the same message, so three agents handed the same task can divide
+it instead of all three doing it.
+
+It is all-or-nothing. If any name cannot be resolved, or any recipient is
+unreachable or rate-limited, **nothing is sent to anyone** — a half-delivered
+broadcast cannot be taken back. The result carries `requested` and `accepted`
+counts plus a `results` entry per recipient, rather than the single `outcome`
+above. Replies come back individually; this is not a group or a channel.
+
+### Sending exactly once, to exactly who you meant
+
+Two optional parameters guard the two ways a send goes wrong on its way out:
+
+- **`idempotency_key`** — your own id for this send. Reusing a key refuses the
+  second call and returns the first message's id instead of sending again. Use
+  one when you may retry: an interrupted turn, a call you are unsure landed.
+  Remembered for a few minutes, and forgotten if Tin Can restarts.
+- **`expect_id`** — the `thread_id` or `session_id` you saw in `peers`. Names
+  belong to processes and are reused: if the name now answers for a different
+  session, the send is refused rather than delivered to a stranger. Pass it
+  whenever you listed peers and then did something else first. It pins a single
+  session, so it cannot be combined with `peers`.
 
 ## Which peers you see
 
@@ -665,7 +696,14 @@ Three things worth knowing before you rely on them, none of them bugs:
 
 The message is written *before* delivery is attempted, so a crash mid-send still
 leaves a record. The outcome is a separate append; `message_log` folds it onto
-the message so you read one record with the true `delivered` value.
+the message so you read one record per message.
+
+The written `delivered` field is **not** what you read back. It is false at
+write time for every message and only means anything once an outcome is folded
+onto it, so `message_log` drops it and returns `outcome` instead: `accepted`,
+`failed`, or `indeterminate` — written out, with nothing ever observed about
+what happened next, which is what a crash mid-send leaves behind. Do not read
+`indeterminate` as either success or failure.
 
 `delivery` is `"queue"` or `"steer"` — the *effective* mode, not bare `urgent`
 intent. It reads `"steer"` only when `urgent` was set on a peer whose runtime
@@ -684,13 +722,48 @@ when the chain does not hold:
 
 ```json
 {"records":[…],
- "integrity":{"ok":false,"unparseable":1,"tampered":0,"broken":0,"unchained":0,
+ "integrity":{"ok":false,"unparseable":1,"tampered":0,"broken":0,"interleaved":0,
+              "unchained":0,
               "detail":"Log integrity: 1 line(s) could not be parsed …"}}
 ```
 
 The field is **absent when the log is healthy**, so its presence is the signal.
 Records are still returned either way — a damaged log must not become an empty
 one.
+
+**Interleaving is not damage, and is counted apart from it.** The log is
+machine-global: every live session's Tin Can appends to it, so a writer can
+chain onto a head that was current when it read it and stale by the time it
+wrote. The result is a record whose `prev` names an earlier record that is
+still right there in the file. Nothing is missing.
+
+`broken` therefore means what it says — a record names a predecessor that **is
+not in this log** — while `interleaved` counts the harmless case, and does not
+make `ok` false. Measured on a ten-session machine before the split: 79 of 79
+chain breaks were interleaving and none were damage, while the report called
+all 79 damage and told the reader the log "was edited" with `tampered` reading
+0 in the same object. A chain that cries wolf gets ignored, which costs exactly
+the detection it was built for.
+
+### History survives a rotation, and stays reachable
+
+The live log rotates once it passes 5 MiB. The **whole** file moves into
+`messages.archive.jsonl` and a new one starts with a checkpoint record, because
+keeping a tail would mean reading the live file and writing part of it back —
+and on a machine-global log with one writer per session, an append landing
+between that read and the rename is destroyed. Losing a message is not a price
+worth paying to keep recent history in one file.
+
+`message_log` reads across the seam. When a query cannot be satisfied from the
+live file alone, the archive's tail is read too, so a rotation does not make
+yesterday's conversation invisible. Two things stay true by design:
+
+- **The archive is never hashed.** Rotation exists to bound the read, and the
+  archive only grows. Archived records come back unverified; the live file is
+  still verified eagerly and in full.
+- **The archive read is capped.** If the cap bites, `rotated.complete` is
+  `false` — meaning a record missing from your result may simply be further
+  back, and "not found" is not "never sent".
 
 **What this is and is not.** The chain lives in the same file as the data, so
 anything that can rewrite the log can recompute it. This is integrity against
@@ -741,8 +814,8 @@ Expected if it has not been typed into yet — it is not advertised until its
 next activity. See [Known limits](#known-limits).
 
 **A message was delivered but the peer never answered.**
-Delivery is fire-and-forget by design — `delivered: true` means the peer's
-harness accepted it, not that anyone read it. The peer may be busy, gone,
+Delivery is fire-and-forget by design — `outcome: "accepted"` means the peer's
+harness took it, not that anyone read it. The peer may be busy, gone,
 attended by a human who has walked away, or unattended by design.
 `expect_reply` records that you are waiting; nothing blocks.
 

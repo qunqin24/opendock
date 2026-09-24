@@ -1,22 +1,97 @@
 # opencode-tinfoil
 
 `opencode-tinfoil` adds a Tinfoil-verified provider to
-[OpenCode](https://opencode.ai). It injects the verified `fetch` supplied by
-Tinfoil's [`SecureClient`](https://www.npmjs.com/package/tinfoil) into
-OpenCode's own version-matched OpenAI-compatible provider.
+[OpenCode](https://opencode.ai). The same package supports OpenCode V1
+(1.18.29 or later) and V2. It sends inference requests through Tinfoil's
+[`SecureClient`](https://www.npmjs.com/package/tinfoil), using each OpenCode
+version's own OpenAI-compatible protocol implementation.
 
 The plugin performs attestation before sending an inference body and uses
 Tinfoil's encrypted HTTP body protocol (EHBP) by default. Verification or
 transport failure aborts the request; there is no plaintext fallback.
 
-## Configure OpenCode
+## OpenCode V2
+
+```jsonc
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugins": ["opencode-tinfoil@0.3.0"],
+  "providers": {
+    "tinfoil": {
+      "package": "opencode-tinfoil/provider",
+      "settings": {
+        "baseURL": "https://inference.tinfoil.sh/v1/",
+        "tinfoil": { "baseURL": "https://inference.tinfoil.sh/v1/", "transport": "ehbp" }
+      }
+    }
+  }
+}
+```
+
+The `tinfoil` provider can retain V2's built-in model catalog and account
+connection. Use `/connect` to connect Tinfoil, then `/models` to select a
+model. The explicit `package` selects the verified provider runtime: the
+ordinary HTTP handler is never used for inference, even when attestation
+fails. The plugin also upgrades models marked for Tinfoil in V1-style
+configuration. Models marked on an unsupported provider package are removed
+rather than left on a plaintext route.
+
+To upgrade an additional OpenAI-compatible provider, mark its settings and
+provide its own endpoint and models. Use `defaultProvider: false` if you only
+want marked providers:
+
+```jsonc
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugins": [{ "package": "opencode-tinfoil@0.3.0", "options": { "defaultProvider": false } }],
+  "providers": {
+    "private-inference": {
+      "package": "opencode-tinfoil/provider",
+      "settings": {
+        "baseURL": "https://proxy.example/v1/",
+        "apiKey": "{env:PRIVATE_INFERENCE_KEY}",
+        "tinfoil": {
+          "baseURL": "https://proxy.example/v1/",
+          "attestationBundleURL": "https://proxy.example/attestation",
+          "transport": "ehbp"
+        }
+      },
+      "models": { "your-model-id": { "name": "Your model" } }
+    }
+  }
+}
+```
+
+The `tinfoil` settings object accepts the same `baseURL` as the provider
+settings (optional when the provider already sets it), plus
+`attestationBundleURL`, `enclaveURL`, `configRepo`,
+`transport` (`ehbp` by default), and `userCacheSecret`. The provider runtime
+checks that the endpoints match when both are given. The `apiKey` remains
+managed by OpenCode. Explicit `package` works without relying on plugin
+transform order. For migrated V1 config, the plugin instead upgrades each
+marked model's package after providers are registered, allowing the same
+provider definition on V1 (1.18.29+) and V2.
+
+V2 also normalizes a V1 `plugin` entry (including its package-and-options
+tuple) and V1 `provider` definitions, so a single remote configuration can
+serve both versions. For hand-authored V2-only configuration, prefer the
+`plugins` and `providers` forms shown above. Confirm the plugin is active and
+each marked model selects `opencode-tinfoil/provider`: without an active
+plugin, a V1-style marked provider may remain on the ordinary HTTP runtime.
+A service that uses this transport should reject plaintext inference
+independently of the client plugin.
+
+The published package installs its V2 provider-runtime dependencies alongside
+the plugin. You do not need to install `@opencode/ai` or `effect` separately.
+
+## OpenCode V1 (1.18.29+)
 
 Add the plugin to create the canonical Tinfoil provider:
 
 ```jsonc
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugin": ["opencode-tinfoil@0.2.0"]
+  "plugin": ["opencode-tinfoil@0.3.0"]
 }
 ```
 
@@ -45,7 +120,7 @@ provider and upgrades every marked provider:
 
 ```jsonc
 {
-  "plugin": ["opencode-tinfoil@0.2.0"],
+  "plugin": ["opencode-tinfoil@0.3.0"],
   "provider": {
     "private-inference": {
       "npm": "@ai-sdk/openai-compatible",
@@ -72,7 +147,7 @@ the one surviving plugin invocation still upgrades every marked provider in
 the merged provider map.
 
 A service that supplies only marked providers can suppress the default direct
-provider with `["opencode-tinfoil@0.2.0", { "defaultProvider": false }]`. This
+provider with `["opencode-tinfoil@0.3.0", { "defaultProvider": false }]`. This
 loader control is intended for generated service configuration; ordinary users
 should need only the bare plugin entry and provider definitions.
 

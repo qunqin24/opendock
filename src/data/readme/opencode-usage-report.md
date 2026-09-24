@@ -7,8 +7,9 @@
 An [opencode](https://opencode.ai) plugin that adds a `/usage` command (and a
 `usage_report` tool) showing the quota windows (5-hour, weekly, monthly) of your
 inference subscriptions — currently **Kimi Code** (both regional plans:
-`kimi-code-plan-global` on kimi.ai and `kimi-code-plan-cn` on kimi.com) and
-**OpenCode Go** (`opencode-go`). It fetches from each provider's API, caches
+`kimi-code-plan-global` on kimi.ai and `kimi-code-plan-cn` on kimi.com),
+**OpenCode Go** (`opencode-go`), **GitHub Copilot** (`github-copilot`) and
+**ChatGPT** (`openai`). It fetches from each provider's API, caches
 results on disk, and can fall back to a local estimate when the API is
 unreachable. It also emits background low-quota warnings in the TUI.
 
@@ -32,7 +33,7 @@ Add the plugin to `opencode.json` / `opencode.jsonc` and restart opencode:
 
 ```jsonc
 {
-  "plugin": ["opencode-usage-report"]
+  "plugin": ["opencode-usage-report"],
 }
 ```
 
@@ -42,7 +43,7 @@ options in the tuple form:
 
 ```jsonc
 {
-  "plugin": [["opencode-usage-report", { "thresholdPercent": 75 }]]
+  "plugin": [["opencode-usage-report", { "thresholdPercent": 75 }]],
 }
 ```
 
@@ -52,7 +53,7 @@ Add the plugin to `tui.json` and restart opencode:
 
 ```jsonc
 {
-  "plugin": ["opencode-usage-report"]
+  "plugin": ["opencode-usage-report"],
 }
 ```
 
@@ -79,14 +80,14 @@ and local estimates `(est)`.
 TUI options (tuple form): `providers`, `cacheTtlSeconds`, `thresholdPercent`,
 `refreshIntervalSeconds` (default `60`), `barWidth` (default `14`).
 
-
 ## Commands
 
 - `/usage` — show every configured provider's quota windows. Providers without a
   resolved credential are skipped in this view.
 - `/usage kimi-code-plan-global` — filter to a single provider. The argument must
   match a registered provider id **exactly** (`kimi-code-plan-global`,
-  `kimi-code-plan-cn` or `opencode-go`); an unknown id (e.g. `/usage kimi`)
+  `kimi-code-plan-cn`, `opencode-go`, `github-copilot` or `openai`); an unknown
+  id (e.g. `/usage kimi`)
   returns a helpful error listing the known ids. An explicitly requested
   provider with no credential is reported as an error row.
 - `/usage --json` — emit the raw `ProviderReport[]` JSON.
@@ -97,12 +98,12 @@ tool can also be invoked directly by an agent.
 
 ## Options
 
-| Option             | Type       | Default | Meaning                                                        |
-| ------------------ | ---------- | ------- | -------------------------------------------------------------- |
-| `thresholdPercent` | `number`   | `80`    | Warn when a window is at/above this percent used.              |
-| `cacheTtlSeconds`  | `number`   | `120`   | How long a cached API result is considered fresh.              |
-| `providers`        | `string[] \| null` | `null` | Providers to report; `null` = every registered adapter. |
-| `fallback`         | `boolean`  | `true`  | Use a local estimate when the API fails and no cache exists.   |
+| Option             | Type               | Default | Meaning                                                      |
+| ------------------ | ------------------ | ------- | ------------------------------------------------------------ |
+| `thresholdPercent` | `number`           | `80`    | Warn when a window is at/above this percent used.            |
+| `cacheTtlSeconds`  | `number`           | `120`   | How long a cached API result is considered fresh.            |
+| `providers`        | `string[] \| null` | `null`  | Providers to report; `null` = every registered adapter.      |
+| `fallback`         | `boolean`          | `true`  | Use a local estimate when the API fails and no cache exists. |
 
 Malformed option values are ignored and the defaults are kept.
 
@@ -117,13 +118,21 @@ per window until that window resets; it re-arms after usage drops below
 
 ## Data sources & privacy
 
-- Credential resolution order: `OPENCODE_USAGE_<ID>_KEY` env override, then
+- Credential resolution order: `OPENCODE_USAGE_<ID>_KEY` env override (optionally
+  paired with `OPENCODE_USAGE_<ID>_ACCOUNT_ID`, e.g.
+  `OPENCODE_USAGE_OPENAI_ACCOUNT_ID`, to supply the ChatGPT account id), then
   `~/.local/share/opencode/auth.json` (`type: "api"` `.key`, or `type: "oauth"`
-  `.access`). `$OPENCODE_DATA_HOME` overrides the data directory.
+  `.access`, falling back to `.refresh` for GitHub Copilot). For ChatGPT the
+  oauth entry's `.accountId` is read automatically. `$OPENCODE_DATA_HOME`
+  overrides the data directory.
 - APIs: `https://api.kimi.ai/coding/v1/usages` (global plan),
-  `https://api.kimi.com/coding/v1/usages` (China plan) and
+  `https://api.kimi.com/coding/v1/usages` (China plan),
   `https://opencode.ai/zen/go/v1/usage` (custom `User-Agent` is required by the
-  latter).
+  latter), `https://api.github.com/copilot_internal/user` (GitHub Copilot) and
+  `https://chatgpt.com/backend-api/wham/usage` (ChatGPT).
+- Auth: run `opencode auth login` and pick **GitHub Copilot** or **OpenAI
+  ChatGPT**. ChatGPT additionally needs the account id that login writes to
+  `auth.json`; the plugin reads it automatically.
 - Cache and state live in `<data-home>/usage-report/` (TTL cache, session id,
   warn state).
 - Local fallback reads `opencode.db` read-only.
@@ -147,13 +156,17 @@ Reference endpoints for future adapters (not built in v1):
 - **Claude**: `api.anthropic.com/api/oauth/usage` (requires
   `anthropic-beta: oauth-2025-04-20`, the claude-code User-Agent, and
   `~/.claude/.credentials.json`).
-- **Codex**: the ChatGPT backend usage endpoint.
 
 ## Development
 
 ```sh
+npm run lint                      # oxlint
+npm run lint:fix                  # oxlint --fix
+npm run format                    # oxfmt (write in place)
+npm run format:check              # oxfmt --check
 npm test                          # vitest, no network
 npm run typecheck                 # tsc --noEmit
+npm run check                     # lint + format:check + typecheck + test
 npm run smoke -- --yes-live       # manual live check (real keys; opt-in)
 ```
 

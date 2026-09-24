@@ -9,11 +9,21 @@
 > generated single-file bundle for drop-in installation. The pattern is not
 > specific to opencode. If you maintain a different agent harness, steal it.
 
+> **OpenCode V1 project.** Perk works with OpenCode V1, but we do not plan to
+> evolve this plugin for V2. OpenCode V2 already has native background shell
+> tasks, so it does not need perk's job runner. V2 does not yet have an
+> equivalent of perk's drip channel (or Claude Code's Monitor tool); that gap
+> would be better explored in a separate plugin built for V2's plugin
+> architecture. The associated OpenChamber background-jobs panel is likewise
+> a V1 companion: as OpenChamber adopts V2, a job visualization belongs to
+> OpenChamber's native job experience rather than to perk. We are using V2
+> before deciding whether or how to build that separate monitor.
+
 ## The idea in one sentence
 
-`perk` lets a model fire off a background job and get handed a conversational
-turn when that job finishes, so the model can react to the world instead of
-only responding to the human.
+`perk` lets an agent launch a background job without blocking the conversation,
+then receive progress drips when the job emits them and a final completion
+signal, each as a new conversational turn.
 
 ## The gap it fills
 
@@ -42,6 +52,13 @@ perk is a single tool.
 | `bash_background({ command, timeout?, workdir?, label?, expected_ms?, coalesce_ms? })` | Run a shell command as a detached fire-and-forget job. Returns *immediately* (does not block) with the job's `pgid` and sidecar directory. `workdir` defaults to the session directory; `timeout` defaults to 3600000 ms because background work commonly outlives native `bash`'s two-minute foreground window. `label` and `expected_ms` are optional display hints. When the job finishes, perk injects a turn reporting the outcome and captured-output sizes. A still-running job can push interim turns by appending to `$PERK_DRIP`; `coalesce_ms` controls its quiet-gap interval. |
 
 That's the whole surface.
+
+With the optional [OpenChamber companion panel](./openchamber-extension/README.md),
+those same jobs appear as cards with status, elapsed time, live output, and a
+stop control for running jobs. Here, several audio-processing jobs run side by
+side while the conversation stays responsive:
+
+<a href="./assets/openchamber-background-jobs.png"><img src="./assets/openchamber-background-jobs.png" alt="OpenChamber Background jobs panel showing completed and running jobs, live output, and a Stop control" width="440"></a>
 
 ## How it works (the pattern)
 
@@ -337,9 +354,9 @@ wrap a sub-agent run directly:
 bash_background({ command: "opencode run 'do the long research thing'" })
 ```
 
-If a harness grows native background tasks or event systems, perk consumes or
-defers to them and keeps its value as the general "react to any observable"
-mechanism.
+The general "react to any observable" pattern can outlive this implementation.
+OpenCode V2 already provides the background-task machinery, so extending this
+V1 runner into V2 would duplicate core behavior.
 
 ## Steal this
 

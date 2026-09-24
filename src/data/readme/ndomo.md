@@ -1,10 +1,10 @@
 # ndomo
 
-OpenCode multi-agent plugin. Taller de artesanos: 20 specialists under one Foreman, one Craftsman, and one Warden. Caveman-native. opencode-mem integrated. DCP peer optional.
+OpenCode multi-agent plugin. Taller de artesanos: 20 specialists under one Foreman, one Craftsman, and one Warden. Caveman-native. Embedded memory (bun:sqlite + FlexSearch). DCP peer optional.
 
 ## What is ndomo
 
-ndomo is a multi-agent orchestration plugin for [OpenCode](https://github.com/opencode-ai). It routes development tasks to 20 specialized agents (scout, scribe, painter, smith, sage, guild, stack-smiths, inspector, critic, chronicler, and ops agents) coordinated by 3 primaries: Foreman (planning), Craftsman (implementation), Warden (operations). All agents use the Caveman output protocol for token-efficient communication. Memory persistence across sessions is handled by opencode-mem. The optional DCP plugin provides additional context pruning for long sessions.
+ndomo is a multi-agent orchestration plugin for [OpenCode](https://github.com/opencode-ai). It routes development tasks to 20 specialized agents (scout, scribe, painter, smith, sage, guild, stack-smiths, inspector, critic, chronicler, and ops agents) coordinated by 3 primaries: Foreman (planning), Craftsman (implementation), Warden (operations). All agents use the Caveman output protocol for token-efficient communication. Memory persistence across sessions is handled by ndomo's embedded memory store (bun:sqlite + FlexSearch, one SQLite DB per project). The optional DCP plugin provides additional context pruning for long sessions.
 
 **Quality features (since 0.4.0):** execution gates enforcement, binary critic review, brainstorm workflow with design docs, cross-session continuity ledgers, and circuit breaker loop detection.
 
@@ -234,7 +234,7 @@ See [docs/configuration.md](docs/configuration.md) for full reference. Agent pre
 
 ## Skills
 
-ndomo bundles 7 skills under `skills/`:
+ndomo bundles 6 skills under `skills/`:
 
 | Skill | Description |
 |---|---|
@@ -244,11 +244,10 @@ ndomo bundles 7 skills under `skills/`:
 | `reflect` | Workflow friction analysis and reusable pattern extraction |
 | `worktrees` | Git worktree management for isolated coding lanes |
 | `dcp-integration` | Dynamic Context Pruning integration guide |
-| `mem-recall` | opencode-mem tool usage and memory retrieval patterns |
 
 ## Integrations
 
-- **opencode-mem** (required) — persistent memory with SQLite + USearch vector DB. Web UI at `:4747`. All agents compress memories before storage using caveman regex compression (0 LLM tokens).
+- **Embedded memory** (built-in) — persistent memory with bun:sqlite + FlexSearch. One SQLite DB per project at `~/.ndomo/mem/projects/<projectTag>.db` (WAL). Tools: `mem_add`, `mem_search`, `mem_list`, `mem_forget`, `mem_stats`, and `memory_compress` (regex caveman compression, 0 LLM tokens). Legacy memory shards can be migrated with `bun scripts/migrate-memory.ts`.
 - **DCP** (optional) — `@tarquinen/opencode-dcp` for dynamic context pruning. AGPL-3.0. Installed with `--with-dcp` flag.
 
 See [docs/integrations.md](docs/integrations.md) for details.
@@ -313,4 +312,3 @@ MIT
 
 - Repository: [https://github.com/nicosup98/ndomo-v2](https://github.com/nicosup98/ndomo-v2)
 - OpenCode: [https://github.com/opencode-ai](https://github.com/opencode-ai)
-- opencode-mem: [https://github.com/opencode-ai/opencode-mem](https://github.com/opencode-ai/opencode-mem)

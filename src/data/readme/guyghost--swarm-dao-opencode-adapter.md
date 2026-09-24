@@ -53,7 +53,7 @@ Inside Pi:
 │  └──────────────────────────────────────────────────────────────┘  │
 │                                 │                                     │
 │  ┌──────────────────────────────┴─────────────────────────────────┐  │
-│  │                Persistence (.dao/ local files)                │  │
+│  │     Persistence (ADR-007: ~/.swarm-dao/… or legacy .dao/)     │  │
 │  └──────────────────────────────────────────────────────────────┘  │
 └───────────────────────────────────────────────────────────────────────┘
 ```
@@ -491,10 +491,21 @@ proposal modifications tracked as GitHub issues.
 
 ## Persistence
 
-DAO state stored in `.dao/`:
+By default (ADR-007), DAO **runtime state** lives outside the repo:
+
+```
+~/.swarm-dao/<project-id>/branches/<branch-id>/
+```
+
+Override the home root with `SWARM_DAO_HOME`. An existing in-repo `.dao/` with real state still wins (legacy projects keep working). Migrate with `swarm-dao migrate --to home`.
+
+Inside the resolved state root:
 - `state.json` — monolithic state snapshot (single source of truth, including all proposals)
 - `decisions/NNN.json` — compact decision summaries
 - `config.json` — per-project configuration
+- `audit.jsonl` — append-only audit trail (ADR-005)
+
+Evidence roots for graph / product / improvement loops still default under the workspace (e.g. `.dao/graph-runs`). See [ADR-007](docs/ADR-007-external-dao-home.md).
 
 Previously each proposal was also mirrored in `.dao/proposals/NNN.json` "sidecar" files; that redundant copy has been removed. On the first load after upgrading, any existing sidecars are imported into `state.json` and the `proposals/` directory is removed.
 

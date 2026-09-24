@@ -10,12 +10,23 @@ the provider.
 
 
 ```
-MTPLX  arsis-dev-ukisai-swift-…
-38.1 tok/s  ttft 9.06s
-prefill 452 tok/s
-37 tok  10.03s
-MTP 3.70x 99/96/80%
+▾ MTPLX · last turn
+
+speed       34.4 tok/s
+ttft        17.19s
+prefill     460 tok/s
+tokens      1,233
+time        207.37s
+MTP         3.42x
+accepted    91/79/64%
+sub-agent   191 tok
+            23.91s
+
+▸ Session · 14 turns  48.2 tok/s
 ```
+
+Two boxes, each opened and closed by clicking its heading: the last turn,
+and the session so far.
 
 Requires [**OpenCode 2**](https://opencode.ai/v2/docs). For the v1 line
 (OpenCode 1.18.x), see
@@ -42,10 +53,6 @@ Restart OpenCode. The panel appears in the sidebar footer after the first
 turn. `opencode plugin list` shows what is installed; `plugin update` and
 `plugin remove` handle the rest.
 
-`npm install` does **not** work: it writes a `node_modules` OpenCode never
-reads. Installing has to go through OpenCode so the plugin lands in its own
-configuration.
-
 Equivalent, if you keep your config in version control:
 
 ```jsonc
@@ -59,22 +66,23 @@ Equivalent, if you keep your config in version control:
 
 | Key | Does |
 | --- | --- |
-| `ctrl+shift+m` | Collapse/expand the sidebar line. Clicking the line does the same. |
+| `ctrl+shift+m` | Collapse/expand the last-turn box. Clicking its heading does the same. |
 | `ctrl+shift+h` | Open/close the per-turn history panel. |
 
 Both are registered with stable command ids (`headsup.toggle`,
 `headsup.panel`), so they can be remapped from your own OpenCode keybind
 config and are reachable from the command palette.
 
-Collapsed, the line keeps one figure rather than becoming a bare label:
+The Session box has no key; click its heading. Collapsed, each box keeps
+one figure rather than becoming a bare label:
 
 ```
-▸ view metrics  ·  38.1 tok/s
+▸ MTPLX · last turn  34.4 tok/s
 ```
 
 ## Configuration
 
-One key, because one figure is genuinely a preference. Everything else
+Two keys, because two things are genuinely preferences. Everything else
 appears exactly when its underlying data exists and stays silent when it
 does not — there is nothing to choose.
 
@@ -83,7 +91,7 @@ does not — there is nothing to choose.
   "plugins": [
     {
       "package": "@banburist/opencode-headsup",
-      "options": { "showContext": false }
+      "options": { "showContext": false, "background": true }
     }
   ]
 }
@@ -95,6 +103,12 @@ Adds a `13% prompt/limit` line, computed as
 `tokens.input / ModelInfo.limit.context` based on the model's
 config in `opencode.json`. Labeled as `prompt/limit` rather than
 `context used`.
+
+**background** (default `true`)
+
+Puts your theme's offset panel shade behind each box. Turn it off for a
+theme or terminal with a transparent background, where the shade can
+disappear.
 
 ### Endpoints
 
@@ -154,8 +168,8 @@ plugin.
 - ✅ Provided by the engine
 - 🟡 Provided by OpenCode's universal layer, labelled `(host)` on the panel
 
-  Opencode's telemetry spans queue, network and event delivery as well as
-  prefill, so it is not the same measurement an engine reports,
+  OpenCode's telemetry spans queue, network and event delivery as well as
+  prefill, so it is not the same measurement an engine reports.
 - ❌ Not available
 
 ### Validated
@@ -384,15 +398,27 @@ Same shape for any OpenAI-compatible server:
 
 ## Important Notes
 
-### Decode rate, not whole-turn rate
+### tok/s is generation speed; the total is what you waited
 
-OpenCode's own status line divides tokens by the whole turn; this
-divides by the streaming window. On a turn with a long wait before the
-first token those differ by ~10x — measured: 38.1 tok/s over a 0.97s
-decode window against 3.7 over the same turn's 10.03s. Both are
-correct; the TTFT beside the rate is what reconciles them. A rate that
-genuinely *is* whole-turn (no stream window available) is labelled
-`overall`.
+`tok/s` is tokens over the time spent streaming after the first token —
+raw generation speed. OpenCode's own tok/s, in the footer under each turn,
+divides by each step's time from the request to the end of streaming: it
+leaves out time spent running tools, but includes prefill and the wait for
+the first token. On a turn with a long wait before the first token the two
+differ widely (measured: 38.1 tok/s over a 0.97s decode window against 3.7
+over the same turn's 10.03s; on MTPLX with a 17.6s prefill, 35.2 against
+OpenCode's 13.1). Both are correct; the TTFT
+beside the rate is what reconciles them. A turn that cannot be timed
+from its stream shows no rate rather than a whole-turn figure.
+
+A large prefill shows in TTFT, in the prefill rate where the engine
+reports one, and in the total — never in `tok/s`. The total runs from
+the request to the end of the turn, and names any retries OpenCode made:
+`60.00s (6 retries)`.
+
+A turn that calls tools is several requests, one per step. Its tokens,
+cost and cache reuse are summed over every step; its `tok/s` covers only
+the steps' own streaming, never the time spent running tools.
 
 ### Every figure is one turn, never a running total
 
@@ -402,14 +428,28 @@ counters, and `time.streamed` (which is stamped at the *end* of the
 stream, not the start, and is therefore not a TTFT). The per-turn
 figures here are differenced or measured accordingly.
 
-A counter difference is only one turn's when exactly one request reached
-the engine between the two readings. OpenCode's own background work (a new
-session's title, compaction), a turn you interrupted that kept generating,
-or another tab or client sharing the server all break that, and no engine
-here labels its counters by request or session to separate them again. So
-for the Prometheus engines, a turn that shared its window shows the
-universal line with `engine data skipped: overlapping requests` rather than
-figures that describe several requests at once.
+A counter difference is only one turn's when the requests that reached the
+engine between the two readings are this turn's own — one per step — and
+its token count equals OpenCode's for the turn. OpenCode's own background
+work (a new session's title, compaction), a turn you interrupted that kept
+generating, or another tab or client sharing the server all break that, and
+no engine here labels its counters by request or session to separate them
+again. So a turn that shared its window shows the universal line with
+`engine data skipped: overlapping requests` rather than figures that
+describe several requests at once. This applies to every engine that
+differences counters: the Prometheus engines, `llamacpp`, `llamafile`,
+`splash` and `omlx`, checked against the turn's tokens and, where the
+engine counts requests, against its steps. Verified live on vllm-mlx; the
+others are built from their live captures.
+
+`mtplx`, `koboldcpp` and `mlxserve` report only the engine's latest
+request, so they are read at the end of every step and the steps' receipts
+combined: tokens summed, the rate over every step's decode time, TTFT and
+prefill from the first step, the step that read the context. Each receipt
+must match OpenCode's count for its step, or the turn shows the universal
+line with the notice. Verified live on MTPLX; KoboldCpp and mlx-serve are
+built from their live captures but not yet run step by step against a live
+server.
 
 ### Absent is not zero
 
@@ -419,7 +459,6 @@ counter shows nothing rather than `0% accepted`.
 
 ## Roadmap
 
-- Session-level metrics
 - Zen/Go quota (`opencode.ai/zen/go/v1/usage`) — opt-in, needs a
   `PRIVACY.md`
 

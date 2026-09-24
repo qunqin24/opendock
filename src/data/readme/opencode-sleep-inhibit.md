@@ -8,21 +8,21 @@ It also covers subagents, retries, tool approvals, permissions, and questions wa
 
 ## Install
 
-You need Linux with systemd and OpenCode 1.18.5 or a newer 1.x release. Add the npm package to your project or global OpenCode configuration:
+You need Linux with systemd and OpenCode 2.0.14 or newer. Add the package to your project or global OpenCode configuration:
 
 ```json
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugin": [
-    [
-      "opencode-sleep-inhibit",
-      { "mode": "sleep", "cooldownMinutes": 0 }
-    ]
+  "plugins": [
+    {
+      "package": "opencode-sleep-inhibit",
+      "options": { "mode": "sleep", "cooldownMinutes": 0 }
+    }
   ]
 }
 ```
 
-OpenCode installs and caches the package automatically. No separate `npm install` is required.
+OpenCode installs and caches published packages automatically. Until the v2 release is published, use the path to a built checkout as `package` instead.
 
 ## Choose a Mode
 
@@ -46,7 +46,7 @@ Support for idle inhibition depends on your desktop environment.
 
 ## Keep It Awake After Work
 
-By default, the inhibitor is released as soon as all agent work becomes idle. Set `cooldownMinutes` to keep the laptop awake for a follow-up window:
+By default, the inhibitor is released as soon as all agent work becomes idle. Set `cooldownMinutes` to keep the computer awake for a follow-up window:
 
 ```json
 { "mode": "sleep", "cooldownMinutes": 60 }
@@ -62,7 +62,7 @@ While OpenCode is working, run:
 systemd-inhibit --list
 ```
 
-An `OpenCode` entry should appear while work is active and disappear when it finishes.
+An `OpenCode` entry should appear while work is active and disappear after it finishes (or after the configured cooldown).
 
 ## Development
 

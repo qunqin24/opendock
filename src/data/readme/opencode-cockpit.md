@@ -15,7 +15,7 @@ behind you. Cockpit is the instrument panel: things your agent can use, and thin
 what it is doing.
 
 ```sh
-opencode plugin opencode-cockpit@0.5.1 --global --force
+opencode plugin opencode-cockpit@0.5.2 --global --force
 ```
 
 ---
@@ -151,8 +151,9 @@ keeping line numbers and highlighting matches — and output keeps the colours t
 
 | Key / command | Does |
 |---|---|
-| `ctrl+x o` · `/shells` | Toggle the shells panel under the chat |
-| `ctrl+x i` · `/shell` | Open the shell console |
+| `/shells` | Every shell in view, plus "New shell": pick one to open its console |
+| `ctrl+x o` · `/shells-dock` | Toggle the shells panel under the chat |
+| `ctrl+x i` · `/shell` | Reopen the last shell's console |
 | `/shell-new` | Start a shell yourself |
 | `/shells-clear` | Remove finished shells |
 | `/plugins-update` | Every plugin you have installed: what runs, what is published, and an update checked against disk |
@@ -167,13 +168,13 @@ switches between the live screen and the scrollback, `?` shows details.
 **Everything**
 
 ```sh
-opencode plugin opencode-cockpit@0.5.1 --global --force
+opencode plugin opencode-cockpit@0.5.2 --global --force
 ```
 
 **Only what you want**
 
 ```sh
-opencode plugin @opencode-cockpit/shell@0.5.1 --global --force
+opencode plugin @opencode-cockpit/shell@0.5.2 --global --force
 ```
 
 The version is pinned on purpose. OpenCode resolves a plugin spec once and never again, so a

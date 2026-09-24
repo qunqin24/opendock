@@ -18,7 +18,7 @@ This plugin uses opencode's tool-execution interception to **transparently rewri
 
 1. **System prompt (primary)**: When a session enters a worktree, the plugin injects an authoritative system prompt telling the agent its working directory has changed. The agent naturally generates worktree-relative paths.
 
-2. **Path rewriting (safety net)**: If the agent occasionally generates a repo-root path out of habit, the `tool.execute.before` hook silently rewrites it to the worktree. The agent never notices.
+2. **Path rewriting (safety net)**: If the agent occasionally generates a repo-root path out of habit, the `tool.execute.before` hook rewrites it to the worktree. File-tool rewrites are transparent; a shell command-text rewrite additionally prepends a visible `[worktree]` notice to the command output (and writes an audit entry), so read/verify commands can never be silently misattributed to the wrong tree (issue #11).
 
 This combines the best of both worlds: the agent's primary behavior is correct (it knows it's in a worktree), and the rare mistakes are caught by hard enforcement.
 
@@ -195,7 +195,7 @@ When a session is bound to a worktree (path `W`, repo root `R`):
 |------|----------|
 | `write` / `edit` / `read` | Absolute paths under `R` and repo-relative paths (anchored at `R`, matching how the harness resolves them) are rewritten to `W`. Paths under `R/.git` are blocked. v1 tools carry the target in `filePath`; v2 tools use `path` — both are handled. |
 | `glob` / `grep` | Missing `path` is set to `W`. Paths under `R` (absolute or repo-relative) are rewritten to `W`. |
-| `bash` (v1) / `shell` (v2) | Missing `workdir` is set to `W`. Repo-root paths in the command string are replaced with `W`. |
+| `bash` (v1) / `shell` (v2) | Missing `workdir` is set to `W`. Repo-root paths in the command string are replaced with `W`. When a replacement happens, the plugin records a `shell_rewrite` audit entry and prepends a `[worktree] command rewritten ...` notice to the tool output via `tool.execute.after`, so the output is never misread as main-checkout state (issue #11). |
 | `patch` (v2 only) | Denied while a worktree is bound (multi-file patchText cannot be rewritten safely); use `edit`/`write` instead. Also denied without a binding in `strictWrites` mode. |
 | `task` / `subagent` | Subagent sessions inherit the binding via parent-chain traversal. |
 
@@ -240,7 +240,7 @@ npm install
 npm test
 ```
 
-- **Unit tests** (`test/unit.test.js`): path normalization/containment/rewriting, branch-name validation (option/path-traversal injection), slugify, and the `applyInterception` logic for every intercepted tool (write/edit/read/glob/grep/bash/shell/patch), including `.git` blocking, the v1 `filePath` / v2 `path` field duality, and bash repo-root replacement.
+- **Unit tests** (`test/unit.test.js`): path normalization/containment/rewriting, branch-name validation (option/path-traversal injection), slugify, and the `applyInterception` logic for every intercepted tool (write/edit/read/glob/grep/bash/shell/patch), including `.git` blocking, the v1 `filePath` / v2 `path` field duality, bash repo-root replacement, and the shell-rewrite notice construction/injection (issue #11).
 - **Integration tests** (`test/lifecycle.test.js`): full lifecycle against a real temporary git repo — prepare → interception → merge preview/apply → cleanup — with state and worktree directories isolated via `OC_WT_STATE_DIR` / `OC_WT_ROOT` env vars. The complete lifecycle runs twice, once through the v1 entry (`.server()` with v1 hook shapes) and once through the v2 entry (`.setup()` with a mocked v2 plugin context), plus dedicated tests for v2-specific behavior (session title updates, event location filtering, subscription cleanup).
 
 ## TypeScript

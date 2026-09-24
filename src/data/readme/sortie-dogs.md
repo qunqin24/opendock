@@ -1,301 +1,242 @@
 # Sortie-dogs
 
-**A goal-preserving, adaptive execution harness for OpenCode that optimizes cost,
-time, and proof without taking your setup over.**
+**A user-facing operator protects your intent and quality; a cheaper implementer does the work.**
 
-Use OpenCode normally. Invoke Sortie only when you want scoped investigation,
-implementation, validation, review, and model routing.
+Sortie-dogs v0.11 is a native OpenCode V2 plugin. Use OpenCode normally, then select
+Sortie to delegate investigation, implementation, testing and corrections while
+keeping the complete original request.
 
-- **Goal invariance**: accepted outcomes and proof requirements survive delegation,
-  continuation, remediation, and restart.
-- **Adaptive execution**: small work stays small; additional agents and stronger
-  models are used only when task shape or risk justifies them.
-- **Coexistence**: Sortie activates only when selected and preserves normal
-  OpenCode agents, settings, and user-owned files.
-- **Cost, time, and proof**: the objective is a verified result at the lowest
-  practical cost and wall time, not the largest agent count.
+**v0.11 qualification:** native execution and the common suite pass. After fixing
+validation and failure-coverage defects, all three selected dev23 cases passed on
+the same candidate, with no unmet outcomes or timeouts. PVlib used a predeclared
+NumPy-compatible scoring environment. The [qualification record](docs/v011-qualification.md)
+retains the earlier failures and exact conditions. Published package hashes and
+final-main verification are recorded in the [releases](https://github.com/zufall-upon/Sortie-dogs/releases).
 
 [![GitHub Release](https://img.shields.io/github/v/release/zufall-upon/Sortie-dogs)](https://github.com/zufall-upon/Sortie-dogs/releases/latest)
 [![npm](https://img.shields.io/npm/v/sortie-dogs?label=npm)](https://www.npmjs.com/package/sortie-dogs)
 [![Tests](https://github.com/zufall-upon/Sortie-dogs/actions/workflows/test.yml/badge.svg)](https://github.com/zufall-upon/Sortie-dogs/actions/workflows/test.yml)
-[![OpenCode Plugin](https://img.shields.io/badge/OpenCode-Plugin-5C5CFF)](https://opencode.ai/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![Node.js](https://img.shields.io/node/v/sortie-dogs)](https://www.npmjs.com/package/sortie-dogs)
 [![MIT License](https://img.shields.io/npm/l/sortie-dogs)](LICENSE)
-
-![Sortie-dogs coordinating a bounded implementation workflow](https://raw.githubusercontent.com/zufall-upon/Sortie-dogs/main/docs/assets/sortie-workflow.gif)
 
 Guides: [日本語](docs/guide-ja.md) · [简体中文](docs/guide-zh-CN.md) ·
 [Testing](docs/testing.md) · [CLI testing](docs/cli-testing.md)
 
-> **Beta:** v0.10.x is under active stabilization. Runtime behavior,
-> configuration, and generated assets may still change before 1.0.
+> Pre-1.0: runtime behavior, configuration and generated assets may change between minor versions.
 
 ## Quick start
 
-Requirements: Node.js 22.6 or newer, npm, and OpenCode.
-
-Run these commands in the target project:
+Requirements: Node.js 22.6+, npm, OpenCode V2 (qualified with 2.0.14), and access to
+`openai/gpt-6-sol` and `openai/gpt-6-luna-fast`.
 
 ```sh
 npm install --save-dev sortie-dogs
 npx sortie-dogs init .
 ```
 
-The beta package defaults to the v0.10 profile. Add the OpenCode V2 plugin and the required
-two-level subagent depth to `.opencode/opencode.json`, preserving existing values:
+`init` defaults to the **v011** runtime assets. Add the plugin to
+`.opencode/opencode.json(c)`, preserving existing settings:
 
-```json
+```jsonc
 {
+  "$schema": "https://opencode.ai/config.json",
   "plugins": ["sortie-dogs"],
-  "experimental": { "subagent_depth": 2 }
-}
-```
-
-Restart OpenCode, then run:
-
-```text
-/sortie-v010 <task>
-```
-
-Selecting `dog-operator` directly starts the same workflow. `dog-operator` is the
-only user-facing v0.10 authority. `dogs-coordinator` and every `*-v010` role are
-internal children and must not be selected as task entry points.
-
-`init` installs runtime assets; the `plugins` entry loads runtime enforcement and
-model routing. Both are required. A new session alone does not reload an updated
-plugin process, so restart OpenCode after installation or upgrade.
-
-## v0.10.x direction
-
-v0.10.x separates strategic authority from bounded operations:
-
-- `dog-operator` preserves the original request, acceptance criteria, scope,
-  review decision, and final acceptance.
-- Hidden `dogs-coordinator` investigates or advances an approved serial queue,
-  but cannot edit source, change acceptance, review, or publish.
-- `dog-worker-v010` implements one host-generated unit inside exact read, write,
-  and validation boundaries.
-- Scout, advisor, and reviewer roles are optional and bounded by an explicit
-  evidence gap, strategy trigger, or risk decision.
-
-The v0.10 profile is serial by design. The stable profile's Luna fabric and
-parallel integration path are not exposed in this profile. More agents are not a
-goal; preserving quality while reducing unnecessary expensive work is.
-
-### SWE-bench evaluation
-
-A frozen Sortie-dogs v0.10.14 build was evaluated on 23 fixed tasks.
-
-- Official verifier PASS: 6 / 23
-- Scored FAIL: 17 / 23
-- Infrastructure blocked: 0 / 23
-- Total estimated model cost: $15.75
-- Median agent runtime: 15.2 min
-
-The same Sortie-dogs candidate, model routes, budgets, tools, and verification
-procedure were held fixed for all tasks. This is one frozen evaluation, not a
-general success-rate claim.
-
-Full methodology and per-task results: [benchmark details](docs/benchmark-v0.10.14-dev23.md)
-
-Historical qualification references remain in [benchmark reference](docs/benchmark-reference.md).
-
-## How v0.10.6 works
-
-1. **Freeze intent**: `dog-operator` preserves the complete request as ordered
-   requirements, negative constraints, quality thresholds, references, and finite
-   proposal/execution budgets.
-2. **Investigate only when needed**: a nontrivial task can send one bounded,
-   read-only proposal investigation to `dogs-coordinator`. It cannot edit, run
-   shell commands, dispatch workers, or widen its approved read prefixes.
-3. **Approve an exact plan**: the root compares the proposal with the original
-   request and approves its exact revision and hash. Uncovered requirements or
-   widened scope fail closed. A simple task with a complete known contract can
-   use the direct worker fast path.
-4. **Generate controls**: the host creates and schema-validates the handoff,
-   operation manifest, acceptance ledger, and short task reference. Models do not
-   hand-authorize their own write scope.
-5. **Execute serial units**: one unit goes directly to `dog-worker-v010`; a
-   multi-unit plan is advanced serially by hidden `dogs-coordinator`. A worker
-   binds once and can modify only declared paths and run only declared validation.
-6. **Collect host evidence**: validation identity binds source snapshot,
-   candidate, command, environment, scope, and owner. Claims in prose do not
-   become proof.
-7. **Review by risk**: high-risk candidates receive independent SourceReview;
-   low-risk review may be explicitly skipped. The reviewer is tool-free and does
-   not implement fixes.
-8. **Remediate without weakening the goal**: acceptance failures and blocking
-   review findings create a same-goal replacement from the committed candidate,
-   retaining acceptance and cumulative budget. Scope growth still requires a
-   later explicit user decision.
-9. **Accept explicitly**: only the root's successful completion operation closes
-   the run. Terminal states remain `DONE`, `INTERRUPTED`, `BLOCKED`, and
-   `NEED_DECISION`; the host-generated return report uses observed evidence.
-
-Durable profile state and hash-bound task references support restart and
-compaction recovery without reconstructing criteria from summary prose. Stale,
-foreign-root, or changed references are rejected. An optional Git lifecycle can
-create one non-overwriting branch and one explicit-path commit; it never grants
-arbitrary Git, force push, release, or publication authority.
-
-## Configuration
-
-### Profile files and precedence
-
-The default package entry is the v0.10 profile:
-
-- Command: `/sortie-v010`
-- Primary agent: `dog-operator`
-- Project settings: `.opencode/sortie-dogs-v010.json`
-- Global settings: `~/.config/opencode/sortie-dogs-v010.json`
-- JSON environment override: `SORTIE_DOGS_V010_CONFIG`
-- Runtime state: `.sortie-dogs-v010/`
-- Installed asset marker: `.opencode/sortie-dogs-v010.version`
-
-Precedence is built-in defaults, global file, project file, environment JSON,
-then plugin factory options. Unknown properties or invalid types are rejected.
-Use external v0.10 role names such as `dog-operator`, `dogs-coordinator`, and
-`dog-reviewer-v010` in `modelRouting`; do not also declare their stable aliases.
-
-Example `.opencode/sortie-dogs-v010.json`:
-
-```json
-{
-  "validationProfile": "balanced",
-  "readOnlyTools": ["my_mcp_search"],
-  "freeTierFallbackModels": ["opencode/deepseek-v4-flash-free"],
-  "modelRouting": {
-    "dog-operator": {
-      "preferred": { "model": "provider/model", "variant": "high" }
-    },
-    "dogs-coordinator": {
-      "preferred": { "model": "provider/model", "variant": "deep" }
-    }
-  },
-  "modelCatalog": {
-    "project": [
-      { "model": "provider/model", "variants": ["high", "deep"] }
-    ]
-  },
-  "continuation": {
-    "enabled": true,
-    "taskWatchdogMilliseconds": 300000
+  "agents": {
+    "compaction": { "model": "openai/gpt-6-luna-fast#high" },
+    "title": { "model": "openai/gpt-6-luna-fast#high" }
   }
 }
 ```
 
-Declare only models and named variants the host actually provides. Sortie does
-not invent, probe, or translate variant names.
+The auxiliary settings select Luna6 Fast for summaries and titles. Keep any
+additional settings on those agents. Sortie permits SOL6 and Luna6 for its
+execution requests; reviewer/advisor model selections are independent.
 
-### Settings reference
+The package exposes a native `./tui` entry for the live work overview. If you use
+a local V2 wrapper, place `export { default } from "sortie-dogs/server";` in
+`.opencode/plugins/sortie-dogs/index.js` and register that directory. `init` installs
+its companion `tui.tsx` alongside it. For a global installation, use the same
+`plugins/sortie-dogs/` layout under the OpenCode global config directory.
 
-- `readOnlyTools`: additional host-specific tools known not to mutate project
-  files. Values accumulate across configuration layers. Unknown tools are denied
-  in a bound worker session.
-- `modelRouting`: preferred and ordered fallback targets by external profile role.
-- `modelCatalog`: available `project` and `global` model/variant declarations.
-- `freeTierFallbackModels`: ordered global last-resort model IDs. Default:
-  `opencode/deepseek-v4-flash-free`; `[]` disables this fallback.
-- `dedicatedWorkerModel`: canonical stable serial target, default
-  `openai/gpt-6-sol` / `medium`. The v0.10 profile also supplies its explicit
-  role routes below; do not infer the v0.10 worker route from this stable setting.
-- `consultation.strategy`: fixed advisor identity, optional `required`, and
-  positive `maxCallsPerCandidate`; default one call and not required.
-- `consultation.sourceReview`: risk-based review with `maxCallsPerCandidate`
-  default `1` and `maxArtifactBytes` default/maximum `30720`. Unavailable review
-  blocks only when review is required.
-- `continuation.enabled`: default `true`.
-- Automatic continuation has no turn-count ceiling. The legacy positive-integer
-  `continuation.maxAutoContinues` setting is accepted but ignored.
-- `continuation.taskWatchdogMilliseconds`: root inactivity while an implementation
-  Task is outstanding; default `300000`, valid range `10..1800000`.
-- `continuation.summarizeModel`: optional explicit compaction model; omission
-  reuses the latest observed root model.
-- `validationProfile`: `fast`, `balanced`, or `assurance`; default `balanced`.
-- `reflection`: accepted by the shared schema, but reflection writes are not
-  exposed by the serial v0.10 profile. Stable reflection remains opt-in and off by
-  default.
+Restart the OpenCode host after installing or updating the plugin, then run:
 
-The v0.10 host owns handoff and manifest controls under
-`.sortie-dogs-v010/contracts/`. Do not create a legacy root
-`operation-manifest.json` for this profile and do not edit generated controls.
-Delete `.sortie-dogs-v010/` only when no Sortie run is active.
+```text
+/sortie-v011 <your task>
+```
 
-### Validation policy
+Selecting **`dog-operator`** directly uses the same workflow. `dogs-coordinator`
+is an internal implementation child. The default V2 package export and
+`sortie-dogs/server` both load v0.11. This workflow uses one child level.
 
-`validationProfile` chooses non-canonical depth:
+## How v0.11 works
 
-- `fast`: static checks
-- `balanced`: targeted checks
-- `assurance`: related checks
+### Feedback and supervision
 
-Canonical proof remains canonical. Full-suite execution requires release context
-or explicit risk. Workers own static, targeted, and related checks; the root owns
-canonical and full-suite checks. An unchanged candidate, command, and environment
-reuse the same evidence instead of spending the validation budget again.
+Send corrections in the same conversation. The original request and subsequent
+instructions are retained across interruptions and compaction and are delivered
+to the same implementation child. The operator inspects real results before
+continuing or accepting the work. Native controller ledgers can keep long jobs
+running and return control to that operator when they finish.
 
-### Default v0.10 routes
+Progress checkpoints wait for a native response boundary; an in-flight provider
+response keeps its native timeout. A checkpoint does not mean the user's task is
+complete. Required checks, attempts and known/unknown costs remain cumulative.
+Feedback retention is per job: the v0.11 loop does not automatically apply the
+v0.10 reflection policy to future jobs. Reproducible product feedback is recorded
+in [the v0.11.2 dogfooding incident](docs/feedback/v0112-redispatch-loop.md).
 
-- `dog-operator`: `openai/gpt-6-luna` / `max`
-- `dogs-coordinator`: `openai/gpt-6-sol` / `xhigh`
-- `dog-worker-v010`: `openai/gpt-6-luna` / `max`
-- `dog-scout-v010`: `openai/gpt-6-luna` / `xhigh`
-- `dog-reviewer-v010`: `openai/gpt-6-sol` / `xhigh`
-- `dog-advisor-v010`: preferred declared `anthropic/claude-opus-5`, otherwise
-  `openai/gpt-6-sol` / `xhigh`
+1. **Keep the original request.** The host retains the user's words, attachments,
+   selected skills and subsequent instructions in durable plugin storage.
+2. **Delegate practical work.** The operator adds short guidance and dispatches
+   one host-generated native task. The implementer searches, reads, edits, builds,
+   tests and fixes ordinary problems within that invocation.
+3. **Collect real checks.** `sortie_v011_check` calls OpenCode's native shell
+   executor, retaining its permission checks, process ownership and cancellation.
+   It records actual exit status and source identity before and after execution.
+4. **Compare intent with results.** The operator inspects actual changes and
+   current check evidence against every original requirement, including negative
+   constraints. Relevant successful tests support this judgment; they do not replace it.
+5. **Correct or accept.** A revision returns feedback to the **same child session**.
+    Only the operator can accept. Acceptance rejects missing, failed, superseded or
+    stale selected checks and an outdated operator view of the request/source/evidence.
 
-An explicit model and variant selected in OpenCode remains authoritative for that
-session. Child role defaults fill absent native settings and may be overridden by
-valid profile routing. Review never silently inherits the implementation model.
+Every formal `check` remains a verification obligation: editing source or selecting an
+unrelated success cannot hide a failed check. Rerun it successfully on the final source.
+For a corrected/combined command, the operator can record an equivalent passing
+`check_replacements` link with a coverage explanation. `work_status(check_ids=[...])`
+exposes stored output for inspection. Exploratory diagnostics use ordinary shell tools.
+Unavailable required tests produce **blocked**, not succeeded, completion; `start_work`
+resumes that same job and child when the blocker can be resolved.
 
-## Stable compatibility profile
+The default workflow requires no proposal investigation, immutable whole-task
+execution plan, exact-file manifest, or model-authored proof mapping.
+Technical scope and useful verification commands are discovered while working.
+Project `AGENTS.md`, user instructions and native OpenCode permissions remain authoritative.
 
-The earlier parallel-capable runtime remains available explicitly:
+### Execution progress and bounded discovery
+
+The native child call publishes host-observed progress every five seconds: elapsed
+time, current inspection/command, last exit, command starts and edits. The same
+information is available through `sortie_v011_work_status`. Activity is never
+treated as completed work or an inferred benchmark score. Long jobs should reuse
+their existing controller and ledger, rather than rebuilding one before launch.
+
+By default, 12 inspection calls or three minutes without an executable step stop
+the child with a **blocked** reason. A running native shell/check keeps its own
+timeout. Resuming a discovery stall requires concrete next-step guidance; the same
+child, user instructions, failed checks and attempt budget are retained. Plugin
+options `maxDiscoveryCalls`, `maxPlanningMs` and `progressIntervalMs` configure these
+bounds. Interrupted outgoing tool calls receive an explicitly unverified error
+result when native history omitted one; stored history and check evidence are preserved.
+
+### Roles and models
+
+| Role | Model | Responsibility |
+| --- | --- | --- |
+| `dog-operator` | `openai/gpt-6-sol#xhigh` | User proxy, intent/quality comparison, feedback, final acceptance |
+| `dogs-coordinator` | `openai/gpt-6-luna-fast#max` | Investigation, implementation, tests, corrections and routine work |
+| `dog-reviewer-v010` / `dog-advisor-v010` | Existing configuration | Optional independent review or focused advice |
+
+**`gpt-6-luna-fast` is a real OpenCode catalog selector.** It sends API model
+`gpt-6-luna` with `body.service_tier: "priority"`, the documented Fast setting.
+Selecting it is sufficient; a second custom alias or manual tier setting is unnecessary.
+Fast is separate from the reasoning variant. Older auxiliary configurations selecting
+base Luna6 also receive a Fast tier overlay while used by Sortie.
+
+The cost report estimates completed requests using published per-request rates,
+including Fast's 2x multiplier and long-context/cache pricing. Provider-reported
+tiers are shown separately. The acceptance call's in-flight model response and
+later final answer are not yet included, so this is an estimate rather than a bill.
+Historical Terra-compatible pricing remains available for older reports.
+
+### Continuation, cancellation and budgets
+
+- Native OpenCode owns normal continuation and compaction. Original instructions,
+  feedback, attempts and validation receipts are durable; `work_status` restores them.
+- `start_work` resumes interrupted work with the same child and cumulative attempt
+  count. `cancel_work` stops the owned child and preserves existing files/evidence.
+- A completed/cancelled job is archived when a subsequent request starts. It does
+  not authorize or spend the next job's attempts.
+- The default is **six child invocations per job**, including revisions/resumptions.
+  This is not a six-tool-call limit. The implementer can investigate and correct
+  failures continuously inside one invocation. OpenCode controls context/turn budgets.
+- Configure `maxAttempts` (1–32) through native plugin options:
+
+```jsonc
+{
+  "plugins": [{ "package": "sortie-dogs", "options": { "maxAttempts": 6 } }]
+}
+```
+
+These are v0.11 options; `.opencode/sortie-dogs-v010.json` configures only the
+compatibility runtime. The v0.11 source identity covers tracked and nonignored
+working files (or regular workspace files outside Git), rather than dependency
+caches or external services. The operator selects meaningful checks for the task.
+
+## Upgrading from v0.10
+
+After replacing the dependency, run `npx sortie-dogs init .` or
+`sortie-dogs init --global` and restart OpenCode.
+
+- The v0.11 marker is `.opencode/sortie-dogs-v011.version` (without `.opencode/`
+  for global installation).
+- Existing v0.10 `dog-operator` and `dogs-coordinator` files are backed up under
+  `sortie-dogs-v011-backup/agent/` before their role definitions are replaced.
+- Existing reviewer/advisor definitions and user JSON/JSONC configuration are
+  preserved. Their settings can still be customized normally.
+- The plugin enforces the new SOL6 operator / Luna6 Fast implementer routes,
+  including sessions that retained an inverted v0.10 model selection.
+- A wrapper exporting the default from `sortie-dogs/server` uses v0.11.
+  Explicit `createSortieDogsV2Plugin()` wrappers select the older runtime;
+  change them to `export { default } from "sortie-dogs/server"` for v0.11.
+- Finish or cancel an active v0.10 job before switching runtimes. Its immutable
+  plans are not converted into v0.11 jobs. A fresh request starts the new workflow.
+
+`init` installs assets and is idempotent. Plugin registration is a separate config
+step. Unknown ownership or conflicting backup files stop initialization with rollback.
+
+## Compatibility runtimes
+
+The v0.10 serial runtime remains explicit:
 
 ```sh
-npx sortie-dogs init . --profile stable
+npx sortie-dogs init . --profile v010
 ```
 
-Load it through a project bridge instead of the default package plugin entry:
-
-```ts
-export { SortieDogsPlugin } from "sortie-dogs/plugin/stable";
+```js
+// .opencode/plugins/sortie-compat/index.js
+export { default } from "sortie-dogs/server/v010";
 ```
 
-The stable profile uses `/sortie`, `dog-coordinator`,
-`.opencode/sortie-dogs.json`, `SORTIE_DOGS_CONFIG`, and `.sortie-dogs/`. Do not
-register stable and v0.10 from the same package installation path in one host.
+The earlier stable parallel runtime uses `init --profile stable` and a V2 wrapper:
 
-## Global availability
+```js
+import { createSortieDogsV2Plugin } from "sortie-dogs/server";
+import { SortieDogsPlugin } from "sortie-dogs/plugin/stable";
+export default createSortieDogsV2Plugin(SortieDogsPlugin);
+```
 
-Project-local installation is recommended. To expose v0.10 assets globally:
+Register one runtime per installation. v0.10 and v0.11 share primary/implementation
+agent filenames. Legacy V1 entrypoints remain at `sortie-dogs/plugin` (v0.10) and
+`sortie-dogs/plugin/stable`; they are separate from the V2 default.
+
+## Verification and historical benchmarks
+
+The native qualification runs a frozen installed tarball with SOL6/Luna6 Fast, an
+initial failing oracle, native compaction, correction, explicit operator acceptance,
+and a second task in the same root session. It records outbound model/tier choices,
+protected-file hashes, actual exits and receipts. Run it with:
 
 ```sh
-npm install --global sortie-dogs
-sortie-dogs init --global --profile v010
+node scripts/user-proxy-smoke.mjs <candidate.tgz> <evidence-directory>
 ```
 
-Then add `sortie-dogs` and `experimental.subagent_depth: 2` to the global OpenCode config.
-Global initialization installs assets only; it does not silently change the
-default agent or merge user settings.
+This is functional qualification, not a representative cost or success-rate benchmark.
+SWE-bench is a separate optional evaluation. The earlier **v0.10.14** 23-task run
+scored 6 PASS / 17 FAIL at $15.75 estimated cost and 15.2 minutes median runtime;
+those are historical results, not v0.11 scores.
+[Historical methodology](docs/benchmark-v0.10.14-dev23.md).
+[v0.10 limitations and v0.11 direction](docs/v010-retrospective.md).
 
-## Updates and removal
-
-After replacing the dependency, rerun initialization and restart OpenCode:
-
-```sh
-npx sortie-dogs init .
-```
-
-`init` is idempotent. It updates recognized Sortie-owned assets, records the asset
-version, preserves user configuration, and stops safely on unknown ownership or
-conflicting files.
-
-There is no supported uninstall command. Remove the npm dependency separately,
-then follow the [safe manual removal guide](docs/uninstall.md). Delete only known
-Sortie-owned paths; never remove the whole `.opencode` directory or use broad
-wildcards.
-
-Maintainers: the [release batch guide](docs/release-batch.md) covers fixed-tarball
-validation, global application, GitHub publication, and manual npm publication.
+For global assets, use `npm install --global sortie-dogs` and
+`sortie-dogs init --global`, then register the package in the global OpenCode config.
+[Manual removal](docs/uninstall.md) · [Release batch guide](docs/release-batch.md).

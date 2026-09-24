@@ -166,6 +166,32 @@ The OpenCode log is typically located at:
 ~/.local/share/opencode/log/opencode.log
 ```
 
+## Development
+
+The repository uses [mise](https://mise.jdx.dev/) to pin Node.js, Bun, and the OpenCode CLI and to expose the supported development commands:
+
+```sh
+mise install
+mise run install
+mise tasks
+mise run ci
+```
+
+`mise run ci` performs the same type-check and offline test suite used by GitHub Actions.
+
+## Releases
+
+Conventional commits on `main` are collected by Release Please. It opens or updates a release pull request containing the version bump and changelog. Merging that reviewed pull request creates the matching `vX.Y.Z` GitHub release and publishes the package to npm with provenance through GitHub OIDC.
+
+Before merging the first release pull request, configure npm Trusted Publishing for package `opencode-plugin-variantizer` with:
+
+- GitHub owner: `Melivo`
+- Repository: `opencode-plugin-variantizer`
+- Workflow: `release.yml`
+- Environment: `npm`
+
+No long-lived `NPM_TOKEN` is required. Use `mise run release:status` to inspect pending release pull requests and workflow runs.
+
 ## Further documentation
 
 The complete configuration reference, privacy details, and OpenCode TUI synchronization notes are available in [`docs/typesafe-variant-router.md`](https://github.com/Melivo/opencode-plugin-variantizer/blob/main/docs/typesafe-variant-router.md).

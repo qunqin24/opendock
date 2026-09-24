@@ -47,7 +47,6 @@ Published on [npm](https://www.npmjs.com/package/opencode-skill-lister).
 npm install opencode-skill-lister
 ```
 
-
 Restart the TUI (or `opencode2 service restart`) after changing the config.
 
 ## Prerequisites

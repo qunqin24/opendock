@@ -67,7 +67,7 @@ Remove the plugin's entry from the `plugins` array in `opencode.json`.
 
 ## Compatibility
 
-Built against the OpenCode V2 plugin API (`@opencode-ai/plugin` `beta`). The plugin API is beta; see each release's notes for compatibility.
+Built against the OpenCode V2 plugin API (`@opencode/plugin`). See each release's notes for compatibility.
 
 ## License
 
