@@ -17,12 +17,14 @@ Install from npm as [`opencode-multi-usage`](https://www.npmjs.com/package/openc
 opencode plugin add opencode-multi-usage --global
 ```
 
-Then enable providers as shown below.
+The package ships two halves: a server plugin that resolves Codex credentials
+from OpenCode V2's credential store, and the terminal sidebar.
+`opencode plugin add` registers the server half; the sidebar half is configured
+separately in `cli.json`.
 
 <br clear="both" />
 
-This package provides a terminal sidebar, so add it and its options to the
-global `cli.json`:
+Add the sidebar and its options to the global `cli.json`:
 
 ```json
 {
@@ -38,15 +40,28 @@ global `cli.json`:
 }
 ```
 
-When developing locally from this repository, point `package` at the built
-directory instead:
+When developing locally from this repository, point both configurations at the
+built directory instead:
+
+```jsonc
+// ~/.config/opencode/opencode.jsonc
+{
+  "plugins": ["file:///home/me/src/opencode-multi-usage/dist"],
+}
+```
 
 ```json
+// ~/.config/opencode/cli.json
 {
-  "package": "file:///home/me/src/opencode-multi-usage/dist",
-  "options": {
-    "providers": ["codex"]
-  }
+  "$schema": "https://opencode.ai/v2/cli.json",
+  "plugins": [
+    {
+      "package": "file:///home/me/src/opencode-multi-usage/dist",
+      "options": {
+        "providers": ["codex"]
+      }
+    }
+  ]
 }
 ```
 
@@ -74,9 +89,17 @@ providers refresh every 5 minutes.
 
 Checked in this order:
 
-1. `CHATGPT_ACCESS_TOKEN`, with optional `CHATGPT_ACCOUNT_ID`.
-2. `OPENCODE_AUTH_CONTENT` containing OpenCode auth JSON.
-3. OpenCode's `auth.json` OpenAI OAuth entry.
+1. OpenCode's `openai` integration connection, resolved on the server by the
+   bundled server plugin. On OpenCode V2 this is the live credential store: the
+   ChatGPT login from `/connect` and its OAuth refreshes live there, not in
+   `auth.json`.
+2. `CHATGPT_ACCESS_TOKEN`, with optional `CHATGPT_ACCOUNT_ID`.
+3. `OPENCODE_AUTH_CONTENT` containing OpenCode auth JSON.
+4. OpenCode's legacy `auth.json` OpenAI OAuth entry.
+
+Credential sources 2-4 are only used when the server plugin is not registered or
+the RPC is unreachable. On V2, registering the server plugin (see above) is what
+keeps Codex usage working after the OAuth token refreshes.
 
 ### OpenCode Go
 
@@ -108,6 +131,8 @@ choose a usage-capable key. Do not put API keys directly in `cli.json`.
 
 The Codex integration calls the undocumented internal endpoint
 `https://chatgpt.com/backend-api/wham/usage`, which may change without notice.
+On OpenCode V2, ChatGPT credentials are read through the server plugin and the
+integration API, so reconnecting from `/connect` updates what the sidebar sees.
 Reconnect the affected provider when a saved credential is rejected.
 
 ## Development

@@ -50,23 +50,39 @@ same directory is also read):
   "logDir": "~/.config/opencode/statin",
   "maxLogBytes": 5242880,
   "ringSize": 5000,
-  "logPartUpdated": false
+  "logPartUpdated": false,
+  "eventLog": false,
+  "usageTtlDays": 7
 }
 ```
 
 | Field            | Default                       | Description                                                        |
 | ---------------- | ----------------------------- | ------------------------------------------------------------------ |
-| `logDir`         | `~/.config/opencode/statin`   | Directory for `events.jsonl`                                       |
+| `logDir`         | `~/.config/opencode/statin`   | Directory for `usage.json` (and `events.jsonl` when `eventLog` is on) |
 | `maxLogBytes`    | `5242880` (5 MiB)             | Rotate to `events.jsonl.1` once the log grows past this size        |
 | `ringSize`       | `5000`                        | In-memory ring buffer of recent events                             |
 | `logPartUpdated` | `false`                       | Also log `message.part.updated` (very noisy — streaming deltas)    |
+| `eventLog`       | `false`                       | Write the event telemetry log. Off by default since 0.2.0          |
+| `usageTtlDays`   | `7`                           | Prune `usage.json` entries not touched for this many days          |
+
+## Usage tracking
+
+Independently of the event log, the plugin counts `read` and `grep` tool calls
+and persists them to `usage.json` (same `logDir`). Each entry is
+`tool:argument -> { count, first, last }`, keyed by project (the working
+directory's basename), so the file can be kept per-machine and compared across
+machines. `read` paths are stored relative to the project root — use the counts
+to spot documentation gaps (files the agent keeps having to read, classes it
+keeps grepping for) and describe them in docs instead. Entries are pruned after
+`usageTtlDays` of inactivity. `/statin-events` shows the top entries and the
+file path.
 
 ## Privacy
 
-`events.jsonl` contains event payload summaries, including fragments of your
-conversations (titles, message roles, token counts, tool names, file paths).
-Treat it as sensitive data and keep it out of version control and shared
-backups.
+`events.jsonl` (when enabled) and `usage.json` contain event payload summaries and
+tool arguments, including fragments of your conversations (titles, message
+roles, token counts, tool names, file paths, grep patterns). Treat them as
+sensitive data and keep them out of version control and shared backups.
 
 ## Development
 

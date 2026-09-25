@@ -68,7 +68,7 @@ Stacks are config, history is state — point `stacksDir` somewhere dotfile-mana
 
 ## Install
 
-Version 2 targets **OpenCode 2.0.8**. Version 1 remains the legacy OpenCode release. See [release notes and operational limits](./CHANGELOG.md).
+Version 2 targets **OpenCode 2.x**, with **2.0.8** as its minimum supported host. Compatibility is exercised on native 2.0.8, 2.0.14, and 2.0.15 hosts; CI also tracks the newest 2.x release. Version 1 remains the legacy OpenCode release. See [release notes and operational limits](./CHANGELOG.md).
 
 ```bash
 npx -y @dylanrussell/agent-router init
@@ -83,7 +83,7 @@ npx -y @dylanrussell/agent-router init
 
 Then **restart opencode** so it picks up the plugin.
 
-The API peer is pinned to `@opencode/plugin@2.0.8`. OpenCode provides the terminal renderer at runtime. Both package entrypoints default-export V2 plugin definitions.
+The API peer accepts `@opencode/plugin@^2.0.8` (all 2.x releases from 2.0.8, excluding 3.x). The local development SDK is pinned to 2.0.14; CI typechecks against the matching SDK for its minimum, known, and latest-2.x host jobs. OpenCode provides the terminal renderer at runtime. Both package entrypoints default-export V2 plugin definitions.
 
 ## Quickstart
 
@@ -173,9 +173,9 @@ Observed interruption, explicit model/agent selection events, and an unexpected 
 
 Duplicate failures advance only once per admitted user turn. Routing budgets are isolated by session and agent and bounded to 1,024 sessions. Subagents without user prompt admission are left alone.
 
-**Verified boundary:** compiled against the published **2.0.8** API types. Deterministic adapter tests cover next-turn selection, retry veto, auxiliary-request exclusion, variants, and no replay or persistent agent writes. These are not real-provider end-to-end tests. An LLM may choose to repeat a tool when explicitly asked to continue.
+**Verified boundary:** the compatibility workflow compiles against each matrix SDK and runs the suite on native OpenCode **2.0.8, 2.0.14, and 2.0.15** hosts, plus the latest 2.x release. Deterministic adapter tests cover next-turn selection, retry veto, auxiliary-request exclusion, variants, and no replay or persistent agent writes. These are not real-provider end-to-end tests. An LLM may choose to repeat a tool when explicitly asked to continue.
 
-OpenCode 2.0.8 exposes no atomic compare-and-switch in the prompt hook and no request kind in the retry hook. Concurrent manual selections/admissions or auxiliary requests remain host API limitations. The sidebar displays configured routing and highlights the current session selection, not pending fallback state. Terminal stack operations require local filesystem access; remote server filesystem management is not supported.
+The tested OpenCode 2.0.8, 2.0.14, and 2.0.15 hosts expose no atomic compare-and-switch in the prompt hook and no request kind in the retry hook. Concurrent manual selections/admissions or auxiliary requests remain host API limitations. The sidebar displays configured routing and highlights the current session selection, not pending fallback state. Terminal stack operations require local filesystem access; remote server filesystem management is not supported.
 
 ### Opt-in quota preflight (phase 1)
 
@@ -251,14 +251,14 @@ scope is the calling session.
   such as `primary_unknown`, `known_exhaustion_fallback`, and
   `staged_reactive_fallback`.
 
-**Picker boundary:** OpenCode 2.0.8 treats selecting the already-active model as a
+**Picker boundary:** The tested OpenCode 2.0.8, 2.0.14, and 2.0.15 hosts treat selecting the already-active model as a
 no-op and emits no selection event. Selecting an automatic fallback again in the
 standard picker does **not** pin it. Explicitly request `router_pin` to freeze it;
 request `router_auto` when ready to resume automatic routing. Different-model
 picker selections remain observable and take priority.
 
-`npm run build && npm run test:quota` exercises the production router and a fake
-quota RPC on a private native 2.0.8 host, including true native child starts,
+`npm run bundle && npm run test:quota` exercises the production router and a fake
+quota RPC on a private native OpenCode 2.x host, including true native child starts,
 fresh/exhausted/unknown/reset evidence, explicit pin/auto controls, staged 429/503
 precedence, timeout, recovery, and tool continuation without midtask switching.
 It explicitly reports the native same-model picker boundary.
@@ -272,7 +272,7 @@ use `{ providerID, source, models, connection: { type, id }, approval }` for sav
 credentials (`{ type: "env", name }` for environment connections). Router options
 do not contain credentials or binding attestations.
 
-### Opt-in same-turn quota fallback (phase 2, native 2.0.8)
+### Opt-in same-turn quota fallback (phase 2, native OpenCode 2.x)
 
 Configure this separately from `quotaPreflight` in the server plugin's `options`:
 
@@ -302,17 +302,44 @@ and unsupported endpoints are ineligible. Existing reactive next-turn handling
 continues to apply to its qualifying non-quota errors. Disabling phase 2 preserves
 the previous retry policy.
 
-Correlation is deliberately conservative: exact request-object identity,
+Correlation is deliberately conservative: exact original request-object identity,
 agent/model/variant and admission generation, configured base URL plus a recognized
 `/chat/completions`, `/responses`, or `/messages` operation, no URL credentials or
 query, single-use evidence, and a five-second monotonic expiry. Observations are
 bounded to 1,024 sessions and periodically pruned; no response bodies are read.
-Concurrent observations and any auxiliary traffic poison the admission, including
-an auxiliary HTTP 200 that may still be streaming. Capacity exhaustion fails closed.
+Overlapping primary requests poison the admission. Auxiliary requests (including
+title generation) are isolated when their agent or model differs from the primary;
+they cannot overwrite its rejection evidence or consume it through an unrelated
+retry. Auxiliary traffic with the same agent **and** model still poisons the
+admission, including an HTTP 200 that may still be streaming. These auxiliary
+identities are retained until the admission ends. Capacity exhaustion fails closed.
 Expiry removes retry permission but retains an unresolved/ambiguous-request
 tombstone until the admission ends or a new admission replaces it. Quota RPC
 candidates contain only provider/model IDs; configured variants remain attached
 to the eventual model selection.
+
+#### Transport-rewrite cooperation
+
+A trusted in-process transport plugin that replaces a native HTTP `Request` must
+preserve its provenance for fallback correlation. Attach the original request to
+the replacement as an immutable, non-enumerable own data property:
+
+```js
+Object.defineProperty(replacement, Symbol.for("@dylanrussell/agent-router.original-request"), {
+  value: original,
+});
+event.request = replacement;
+```
+
+This works whether the transport hook runs before or after agent-router. The router
+validates the **original** endpoint and correlates responses using that exact
+original object, not URL equality. Untagged clones, malformed/cyclic provenance,
+and unrelated original requests remain ineligible. Chains are bounded to eight
+rewrites. The property is local metadata, never an HTTP header; network responses
+cannot assert it. Setting it is a trust assertion by the transport plugin that the
+replacement carries the same logical request and preserves upstream rejection
+semantics. Only use it for trusted, transparent transports—not synthesized quota
+responses. Request bodies and authentication headers are not read by the router.
 
 Explicit main model selections, original child model overrides, and resumed child
 tasks are not claimed merely because their models match a chain. Automatic child
@@ -326,7 +353,7 @@ matching. Ticket overflow disables new automatic child claims until plugin reloa
 including claims already awaiting host reads; dropping negative evidence cannot
 make a child eligible.
 
-**Accepted host limits:** native 2.0.8 retry hooks lack request ID, request kind,
+**Accepted host limits:** the tested native 2.0.8, 2.0.14, and 2.0.15 retry hooks lack request ID, request kind,
 output-started, cancellation, and atomic switch-and-retry fields. Correlation and
 observable manual/cancel guards are therefore best effort, not transactional
 guarantees. Same-model picker no-ops remain unobservable; use `router_pin`.
@@ -338,17 +365,21 @@ choice. Status/log reasons distinguish
 not provider acceptance or successful completion.
 
 After building, `npm run test:quota-fallback` runs the production router in a
-disposable native 2.0.8 host with synthetic local providers. Set
+disposable native OpenCode 2.x host with synthetic local providers. Set
 `ROUTER_PREFLIGHT=1` to exercise both opt-ins together. The fixture verifies first
 quota rejection, main/child post-tool continuation with a durable counter of one,
 chain exhaustion, partial stream, explicit selections, manual/cancel/pin gates,
 compaction, attribution, and the accepted later-veto residual selection. Its
 timeout control vetoes native timeout retries only after recording router policy.
-No real inference or credentials are used.
+No real inference or credentials are used. `npm run test:compat` runs the build,
+unit suite, and all native integration suites against the installed host (or the
+binary selected by `OPENCODE_TEST_BINARY`); use it when upgrading to another 2.x
+release. It rejects versions below 2.0.8 and major-version changes so compatibility
+drift is caught instead of silently claimed.
 
 ### Install This Checkout
 
-To test a local V2 checkout, run `npm run typecheck`, `npm test`, and `npm run build` (a fresh checkout uses `pnpm install --frozen-lockfile`). Replace the registry entry in the server `opencode.json` **plugins** array with the package directory:
+To test a local V2 checkout, run `npm run typecheck`, `npm test`, and `npm run bundle` (a fresh checkout uses `pnpm install --frozen-lockfile`). Replace the registry entry in the server `opencode.json` **plugins** array with the package directory:
 
 ```json
 "file:///absolute/path/to/agent-router"
@@ -356,9 +387,23 @@ To test a local V2 checkout, run `npm run typecheck`, `npm test`, and `npm run b
 
 Use the same package directory in `cli.json` **plugins** when explicitly registering the terminal half. Do not load both registry and local copies. The local CLI is `node /absolute/path/to/agent-router/dist/cli.js`. Applying a stack still requires restarting OpenCode; inspect server logs for next-turn fallback notices.
 
-OpenCode 2.0.8 ignores package exports for local directories. Root `index.ts` and `tui.ts` wrappers load the built files; run `npm run build` before using the source directory.
+Supported OpenCode 2.x hosts resolve local directories through the literal root
+`index.ts` and `tui.ts` wrappers; published packages use their exports. Run
+`npm run bundle` before using the source directory.
 
-`npm run test:integration` starts an isolated real OpenCode 2.0.8 server, initializes its location, verifies router activation and terminal discovery, and exercises a disposable RPC probe with absent, null, and invalid input. It uses temporary HOME/XDG/router directories and never modifies live configuration. Set `AGENT_ROUTER_TEST_PACKAGE` to an unpacked tarball directory to test release contents. Router itself exposes tools, not RPC methods.
+The GitHub plugin entry uses the committed `dist/` bundles so OpenCode can
+install the Git dependency without a nested preparation install. After changing
+runtime source, run `npm run bundle` and include updated `dist/` files in the
+same commit.
+
+`npm run test:integration` starts an isolated supported OpenCode 2.x server,
+initializes its location, verifies router activation and terminal discovery, and
+exercises a disposable RPC probe with absent, null, and invalid input. It uses
+temporary HOME/XDG/router directories and never modifies live configuration. Set
+`OPENCODE_TEST_BINARY` to test another installed 2.x binary, and set
+`AGENT_ROUTER_TEST_PACKAGE` to an unpacked tarball directory to test release
+contents. Stack management remains tool/local-filesystem based; the first-party
+TUI uses a narrow, location-scoped RPC for per-session routing status and controls.
 
 ## Inside opencode
 
@@ -381,7 +426,10 @@ The V2 terminal half loads from the package's `./tui` export (`cli.json`, wired 
 
 - **Sidebar panel** — lists available stacks with the active one checked. Under **Current Stack**, each agent has one indented model per line, in precedence order, without Primary/Fallback labels. Explicit variants appear in brackets; full model IDs wrap rather than truncate. A `⟳ restart required` badge appears when the active stack differs from the one at TUI startup. File changes update live (≤1.5s).
 - **Current selection** — every agent's selected model is highlighted in the warning/orange color at normal font weight with `●`. Headings show only the agent name. Selection prefers the viewed session, then running direct children at the same location, then the native agent default, then the stack default; conflicting active children retain multiple distinct selections. Out-of-chain selections are shown separately. Configured chains still come from the active stack file, not the applied `state.json.fallbackAgents` snapshot. Editing a stack changes the preview but does not apply it: use the stack and restart opencode to activate changes. Default highlights do not imply a running session or predict quota preflight.
-- **Routing visibility** — the native CLI has no connected routing-status transport yet, so mode/freshness are shown as unknown rather than inferred from model selection. Use `router_routing_status` for the current session's actual Automatic/Pinned state and reason.
+- **Routing visibility and control** — the native CLI polls the location-scoped `agent-router.status` RPC for the visible session's Automatic/Pinned mode and reason. `/agent-routing` opens a native TUI selector that reads status and calls the matching session-control RPC directly; it does not send a prompt to the LLM. The RPC and `router_routing_status` share the same reader. Session directory, workspace, and project must match the serving plugin's location; unavailable or foreign sessions return `null`.
+- **Quota observation** — “Last quota” is the service's actual `checkedAt`/`validUntil` observation used by routing, never the sidebar poll time. “Unexpired” describes that historical observation, not a fresh account check; expired observations say “stale”. Missing/unbound evidence says freshness unknown. Diagnostics are bounded, memory-only, cleared on session deletion/disposal, and freshness is cleared on observed integration/connection events. A reload loses observations. Status polling never fetches quota, generates text, changes routing ownership, or switches models.
+- **Fallback diagnostics** — “Fallback selected; retry requested” does not claim a request was sent: a later host hook can veto the retry. “Fallback attempt dispatched” requires the matching native primary HTTP request hook; it does not claim completion. Explicitly known paid-policy, switch-limit, and exhausted-chain skips are reported. Other unproven causes remain unknown.
+- **Polling lifecycle** — only the mounted, visible session is polled, with a three-second deadline and three-second interval after settlement. Navigation, location/client changes, unmount, and disposal abort and invalidate old requests. One physical request is allowed at a time, including transports that ignore cancellation; late results cannot replace the current session's status.
 - **Commands** — type `/` or open the command palette:
 
 | command | what it does |
@@ -392,6 +440,7 @@ The V2 terminal half loads from the package's `./tui` export (`cli.json`, wired 
 | `/agent-back` | confirm + revert to the previous stack |
 | `/agent-validate` | check a stack's model IDs against current auth |
 | `/agent-status` | toast the active stack + list |
+| `/agent-routing` | view or switch this session between Automatic and Pinned |
 
 Everything degrades gracefully: on older opencode versions (or if the TUI API changes) the sidebar and commands simply don't appear — the CLI and agent tools keep working.
 

@@ -262,7 +262,7 @@ Point at a local checkout instead:
   "$schema": "https://opencode.ai/tui.json",
   "plugin": [
     [
-      "file:///absolute/path/to/opencode-requesty-plugin/dist/tui.tsx",
+      "file:///absolute/path/to/opencode-requesty-plugin/dist/tui.js",
       {
         "sidebar": { "showKeyName": true },
         "prompt": { "showKeyName": true },
@@ -281,7 +281,7 @@ bun run test
 bun run build
 ```
 
-The project is fully typed TypeScript (`strict` mode). Sources live in `src/` (`.ts`/`.tsx`), tests in `test/`. The opencode host transforms TSX at load time via `@opentui/solid/preload` (Bun); no bundler is used.
+The project is fully typed TypeScript (`strict` mode). Sources live in `src/` (`.ts`/`.tsx`), tests in `test/`. The build pre-compiles `src/tui.tsx` to `dist/tui.js` with OpenTUI's Solid Babel plugin (`@opentui/solid/bun-plugin`) and emits declarations via `tsconfig.build.json`.
 
 ## License
 

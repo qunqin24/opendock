@@ -25,7 +25,7 @@
 
 | 包 | 用途 | 安装 |
 |---|---|---|
-| [**`dsh-hippo-memory`**](packages/dsh-hippo-memory/README.md) | **DSH（DeepSeek Runtime）插件** —— 工具 + 自动注入 + 使用纪律 + GUI 设置卡片 | **DSH 用这个**：`dsh plugin --profile web add dsh-hippo-memory` |
+| [**`dsh-hippo-memory`**](packages/dsh-hippo-memory/README.md) | **DSH（DeepSeek Runtime）插件** —— 工具 + 自动注入 + 使用纪律 + GUI 设置页 | **DSH 用这个**：`dsh plugin --profile web add dsh-hippo-memory` |
 | [**`hippo-memory-core`**](https://www.npmjs.com/package/hippo-memory-core) | 框架无关的记忆引擎（可用在任意 agent 框架；Node 与 Bun 都能跑） | `npm install hippo-memory-core` |
 | [**`opencode-hippo-memory`**](packages/opencode-hippo-memory/README.md) | **opencode 插件** —— 同样是 4 个工具 + 每轮注入 + 压缩保留，宿主换成 opencode | `opencode plugin -g opencode-hippo-memory` |
 
@@ -49,13 +49,15 @@
 >
 > **引擎 + 两个适配层 + 文档已就绪（215 项测试全绿：引擎 163 + DSH 35 + opencode 17）；0.3.0 已发布到 npm**（加性 schema 变更）。详见 [CHANGELOG](CHANGELOG.md) 与各专题节：[前提作用域](#前提作用域-scope换个条件就不是同一句话)、[重复怎么清](#重复从哪来怎么清)、[空结果给得出理由](#空结果一定给得出理由)、[并发写与可观测性](#并发写与可观测性)。
 
+> **0.3.1（2026-09-25，只有 `dsh-hippo-memory`）**：跟上 DSH 0.1.7 的新配置面（volatile `Config` + 插件页 `plugins.row.config`）。0.1.7 删了 `settings.register()`，旧版在 0.1.7 上会整机启动失败、四个记忆工具全没。DSH 适配层测试从 35 项涨到 53 项（仓库 233 项全绿；上面 0.3.0 一节的 215 项是当时的读数）。**引擎与 opencode 适配层没有跳号，仍在 0.3.0**；宿主不到 0.1.7 的 DSH 用户请停在 `dsh-hippo-memory@0.3.0`。详见 [该包 CHANGELOG](packages/dsh-hippo-memory/CHANGELOG.md)。
+
 ## 🆕 0.2.1 —— 引擎支持 Bun（可在 opencode 里直接用）
 
 > `hippo-memory-core` 0.2.1：SQLite 驱动改成**运行时探测**（Node 用 `node:sqlite`，Bun 用 `bun:sqlite`），导入不再因运行时不同而失败。
 > **实测**：在 opencode 1.18.31（内嵌 Bun 1.3.14）里 `import("hippo-memory-core")` → `driver=bun:sqlite`，remember / recall / verify / digest / diagnostics 全部正常，**无需打包、无需垫片**。
 > Node 侧行为与数据格式不变，测试全绿。详见 [CHANGELOG](CHANGELOG.md)。
 >
-> **配套 opencode 插件已发布**：[`opencode-hippo-memory`](packages/opencode-hippo-memory/README.md)（已发布 0.2.2；0.3.0 待发布）——
+> **配套 opencode 插件已发布**：[`opencode-hippo-memory`](packages/opencode-hippo-memory/README.md)（当前 0.3.0）——
 > `opencode plugin -g opencode-hippo-memory` 一条命令装上，即得 4 个记忆工具 + 每轮 digest 注入 + 压缩保留 + 使用纪律。
 > ⚠️ 装完**重启 opencode**，并且**用副作用验证**（跑一轮后看 store 目录有没有生成 `.db`），不要只看 `opencode debug info`：
 > 该命令只是配置回显，opencode 加载失败时日志里可以一个字都没有。详见该包 README 的"一个很容易踩的坑"。
@@ -542,7 +544,7 @@ mem.diagnostics().sibling_stores;
   - ✅ **门槛没过不再空白**（digest 标明身份给出最接近痕迹 + `coverage` 计数）；
   - ✅ **库分裂可见**（`sibling_stores` / `scope_rule` / `path_rule` / `emptyWhileSiblingsFull`）；
   - ⏳ **opencode 工具结果的清洗覆盖**：`list` / `history` / `recall` 命中仍出原文（digest 与本次新增的 duplicates / merge 已清洗），补齐后两家出口口径才真的一致；
-  - ⏳ GUI 记忆浏览器：设置卡片里的记忆清单 / 检索 / 删除；
+  - ⏳ GUI 记忆浏览器：设置页里的记忆清单 / 检索 / 删除；
   - ⏳ store 的 JSON 导出导入（备份与迁移）。
 - **v0.3（已落地并发布到 npm）**
   - ✅ **`scope` 字段（前提作用域）已落地**：为记忆声明"在什么条件下成立"（`population=` / `comparator=` / `release=`…），冲突检测不再把换口径的重测折成一条，`verify` 会答 `OUT_OF_SCOPE`；

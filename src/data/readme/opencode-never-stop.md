@@ -38,7 +38,7 @@ Restart opencode afterwards.
 
 | Command                  | Effect                          |
 | ------------------------ | ------------------------------- |
-| `/opencode-never-stop`   | Start poking this session       |
+| `/opencode-never-stop [message...]` | Start poking this session; optional text overrides the configured nudge message |
 | `/opencode-stop`         | Stop poking                    |
 
 ### Context threshold

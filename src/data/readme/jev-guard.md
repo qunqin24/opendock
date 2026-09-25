@@ -113,7 +113,7 @@ ask    if risk ≥ 1.5 or approval ≥ 0.75
 allow  otherwise
 ```
 
-Read-only tools (`Read`, `Grep`, `Glob`, `WebFetch`, …) are skipped without a call.
+Read-only tools (`Read`, `Grep`, `Glob`, `WebFetch`, …) are skipped without a call. So are `Skill`, `Task` and `Agent`: a skill's text is checked as an instruction file when it loads, and a sub-agent's own tool calls are judged one by one. Their results are still scanned.
 
 **Context** is what makes the last two questions answerable. Each session keeps a small file under `~/.jev-guard/sessions/` with the user's recent prompts, the agent's stated intent, the last decisions, and every flagged piece of untrusted content with an excerpt of the planted instruction. Prompts arrive through the hosts' prompt hooks (`UserPromptSubmit`, `BeforeAgent`, `beforeSubmitPrompt`, ACP `session/prompt`) or the session itself (pi, OpenCode, Claude Code's transcript). Nothing in a tool result ever counts as the user speaking.
 
@@ -166,6 +166,8 @@ Results shorter than 200 characters and results of local edit/search tools are s
 | `JEV_GUARD_FAIL_CLOSED` | unset | if set, an unreachable Jev **denies** instead of allowing |
 | `JEV_MODEL` | `jev-latest` / `typesafe-ai/jev` | model id for the direct API / the gateway |
 | `JEV_GUARD_CONFIG` | `~/.jev-guard/config.json` | where `jev-guard key` stores the key |
+
+Scores must lie in 0–3 and probabilities in 0–1; anything else falls back to the default.
 
 By default jev-guard fails **open** with a warning on stderr: a dead API must not freeze your agent. Flip it if you'd rather it did.
 

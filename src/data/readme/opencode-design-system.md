@@ -1,24 +1,46 @@
 # OpenCode Design System
 
-Plugin de **OpenCode v2** para crear, importar, mantener y aplicar Design Systems colaborativos, neutrales respecto al framework y legibles por agentes de IA.
+[![npm version](https://img.shields.io/npm/v/opencode-design-system)](https://www.npmjs.com/package/opencode-design-system)
+[![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/BraveOtter/opencode-design-system/blob/main/LICENSE)
+[![OpenCode v2](https://img.shields.io/badge/OpenCode-v2-6f42c1)](https://opencode.ai/v2/docs/)
 
-El Design System persistente es la memoria visual del proyecto: **Markdown + JSON**, con manifest indexado, preferencias explícitas, historial de decisiones y especificaciones de componentes/patrones. La preview es salida generada, no una fuente paralela.
+**A collaborative OpenCode v2 plugin for creating and evolving portable, framework-neutral design systems that AI agents can actually follow.**
 
-## Instalar
+[English](https://github.com/BraveOtter/opencode-design-system/blob/main/README.md) · [Español](https://github.com/BraveOtter/opencode-design-system/blob/main/README.es.md) · [Português (Brasil)](https://github.com/BraveOtter/opencode-design-system/blob/main/README.pt-BR.md)
 
-### Desde GitHub
+The design system becomes a project's durable visual memory: structured **Markdown and JSON** for semantic tokens, explicit preferences, design decisions, components, patterns, and screen briefs. A live HTML preview is generated from those sources; it is never a second source of truth.
 
-Con OpenCode v2, instala directamente desde el repositorio público:
+## Why this plugin?
+
+- **Start from a conversation, not a questionnaire.** Resolve only the important identity choices that are still unclear, and keep the user's preferences explicit.
+- **Document what already exists.** Bounded, read-only analysis can help formalize an existing UI without silently redesigning it.
+- **Give agents the relevant context.** Progressive loading supplies the tokens, components, patterns, and guidance relevant to a UI task instead of dumping the whole system into every prompt.
+- **Evolve the system coherently.** Track decisions, semantic token dependencies, affected components and patterns, status, and design-system version changes.
+- **Avoid framework lock-in.** The authoritative format is Markdown and JSON, not React, Vue, Tailwind, or a generated preview.
+- **Keep project files safe.** Analysis and checks are read-only. Design-system creation refuses to replace an existing `design-system/` directory, and existing `AGENTS.md` content outside the plugin-managed block is preserved.
+
+## Requirements
+
+- [OpenCode v2](https://opencode.ai/v2/docs/)
+- Node.js **22.19 or newer**
+
+## Install
+
+### Install the published npm package
+
+Install it globally with the OpenCode CLI:
 
 ```sh
-opencode plugin add github:BraveOtter/opencode-design-system
+opencode plugin add opencode-design-system
 ```
 
-Para fijar la versión inicial cuando esté publicada, usa `opencode plugin add github:BraveOtter/opencode-design-system#v0.1.0`.
+To pin the current release:
 
-### Paquete publicado
+```sh
+opencode plugin add opencode-design-system@1.0.1
+```
 
-Añade el paquete a `plugins` en `opencode.json` o `opencode.jsonc`:
+Or configure it for a project in `opencode.json` or `opencode.jsonc`:
 
 ```jsonc
 {
@@ -27,91 +49,93 @@ Añade el paquete a `plugins` en `opencode.json` o `opencode.jsonc`:
 }
 ```
 
-OpenCode cargará el plugin al iniciar el proyecto. Los commands y tools se registran mediante la API de plugin v2. El paquete apunta a `@opencode/plugin` y `Plugin.define`; no utiliza la API de plugins v1.
+OpenCode loads configured plugins at startup. If the plugin does not appear, restart OpenCode or the OpenCode service.
 
-### Desarrollo local o fork
+### Install directly from GitHub
 
-Requiere Node.js **22.19 o posterior** para el desarrollo local y el renderer portable.
+For the repository's latest default-branch version:
+
+```sh
+opencode plugin add github:BraveOtter/opencode-design-system
+```
+
+To pin a tagged release instead:
+
+```sh
+opencode plugin add github:BraveOtter/opencode-design-system#v1.0.1
+```
+
+### Use a local checkout
+
+Clone the repository, install its development dependencies, and build it:
 
 ```sh
 npm install
 npm run build
 ```
 
-Este checkout incluye `plugins/local/index.js` como entrypoint opcional para probar el build local; no se activa por defecto, para evitar cargar una copia local junto al paquete npm global. No forma parte del paquete publicado.
-
-Apunta OpenCode al directorio del paquete:
+Then point OpenCode to the checkout directory (adjust the relative path to your project):
 
 ```jsonc
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugins": ["./tools/opencode-design-system"]
+  "plugins": ["../opencode-design-system"]
 }
 ```
 
-También se puede referenciar una ruta absoluta o un directorio local siguiendo las formas de `plugins` documentadas por OpenCode.
+The repository also contains an optional local test entry point at `plugins/local/index.js`; it is not loaded automatically and is not part of the npm package.
+
+## Get started
+
+Create a system from a visual direction:
+
+```text
+/design-system A calm, compact workspace with muted greens, crisp surfaces, and no gradients.
+```
+
+If the project already has a UI, ask the agent to inspect it first. It will explain what it found and ask whether you want to document the existing identity or start fresh before creating anything:
+
+```text
+/design-system Analyze this app's UI and help me document its existing visual language.
+```
+
+To design a screen without asking the plugin to implement UI code:
+
+```text
+/design-screen User management with search, filters, invitations, and empty states.
+```
+
+You can also request a screen brief in natural language without invoking `/design-screen`. When a manifest exists, the plugin points the agent to the project's `AGENTS.md` and relevant design-system guidance.
 
 ## Commands
 
-| Command | Función |
+| Command | What it does |
 | --- | --- |
-| `/design-system [idea]` | Conversar para crear un sistema desde cero o analizar la interfaz existente antes de proponer su formalización. |
-| `/design-system/update [cambio]` | Interpretar un cambio, encontrar tokens y documentos dependientes, actualizar versiones/decisiones y regenerar preview. |
-| `/design-system/preview` | Regenerar la preview interactiva a partir de las fuentes estructuradas. |
-| `/design-system/check` | Inspección heurística y de solo lectura de estilos frente a los tokens. |
-| `/design-screen [pantalla]` | Diseñar y guardar una especificación de pantalla sin implementar código UI. |
+| `/design-system [idea]` | Collaboratively create a system from scratch or discuss documenting an existing UI. |
+| `/design-system/update [change]` | Apply a semantic, versioned change and identify dependent documentation. |
+| `/design-system/preview` | Regenerate the interactive preview from the structured files. |
+| `/design-system/check` | Run a read-only, heuristic check for UI styles that may drift from documented tokens. |
+| `/design-screen [screen]` | Save an implementation-ready screen brief without writing application UI code. |
 
-Ejemplos:
+The plugin also registers `design_system_create`, `design_system_read`, `design_system_analyze`, `design_system_update`, `design_system_preview`, `design_system_check`, and `design_system_screen_spec` tools for the agent to use as needed.
 
-```text
-/design-system Quiero una interfaz sobria, compacta, sin degradados y con verdes apagados.
-/design-system/update Los botones y las cards se ven demasiado redondeados.
-/design-screen Administración de usuarios con búsqueda, filtros e invitaciones.
-```
+## How it works
 
-También se puede pedir una pantalla en lenguaje natural, sin command. El plugin añade una instrucción breve al contexto del agente si existe `design-system/manifest.json`; el `AGENTS.md` generado conserva esta convención aunque el plugin no esté instalado.
+### A careful workflow for existing products
 
-### Conversación e identidad visual
+The `design_system_analyze` tool reads likely UI and style sources, recognized framework configuration, and declared dependencies. It summarizes evidence such as CSS variables, colors, radii, spacing, responsive breakpoints, and component candidates. The scan is bounded, skips dependency/build directories and symlinks, and does not modify the files it reads. Findings are clues—not proof that a difference is a mistake.
 
-El agente pregunta solamente por decisiones de identidad que falten: producto/audiencia, referencias, tono, preferencias de color/superficie, densidad, tipografía, plataformas, motion y accesibilidad cuando sean relevantes. Puede explicar alternativas con lenguaje sencillo. No convierte el proceso en un formulario ni toma decisiones importantes en nombre del usuario.
+The agent explains uncertainty and asks before normalizing important or ambiguous visual decisions. Analysis is not permission to redesign or edit application code.
 
-Las preferencias explícitas se guardan en `preferences.json`, `DECISIONS.md` y `AI-GUIDELINES.md`. El modelo puede explicar consecuencias y accesibilidad, pero no cambiar una preferencia sin consultarlo. Analizar una app existente es de solo lectura y no concede permiso para rediseñar o modificar código de aplicación.
+### Safe project ownership
 
-## Arquitectura del plugin
+Creating a system writes a new `design-system/` directory and adds or updates only the plugin-managed block in the root `AGENTS.md`. If `design-system/` already contains files, creation refuses to replace them. Updates are deliberate writes to design-system artifacts; the plugin's built-in analysis and check tools never edit application UI files.
 
-Implementación V2 basada en las APIs oficiales actuales:
+The managed `AGENTS.md` guidance is portable: it tells OpenCode and other coding agents how to find the framework-neutral sources and load only what a task needs. The plugin does not copy agents, commands, or skills into the project.
 
-- `Plugin.define({ id, setup })` para el entrypoint del paquete.
-- `ctx.command.transform` para commands.
-- `ctx.tool.transform` para herramientas de creación, lectura progresiva, análisis, actualización, preview, comprobación y especificaciones de pantalla.
-- `ctx.skill.transform` para anunciar la Skill de uso del sistema.
-- `ctx.session.hook("context", ...)` para indicar a los agentes que usen la Skill cuando ya exista un manifest, sin inyectar todos los archivos.
-- Markdown estándar bajo `.opencode/agents`, `.opencode/commands` y `.opencode/skills` para hacer que los artefactos sobrevivan a la desinstalación.
+### A portable source of truth
 
-No se ejecutan migraciones de componentes de la aplicación. El análisis del proyecto está acotado y solo lee archivos candidatos de UI/estilos, configuraciones conocidas y dependencias declaradas.
-
-### Agentes
-
-Al crear el sistema se generan agentes V2 estándar:
-
-- `design-system-designer`: diseñador UI/UX, arquitecto, especialista en accesibilidad e interlocutor para decisiones de identidad.
-- `screen-designer`: genera especificaciones de pantalla y mantiene separado el diseño de su implementación.
-
-Los agentes son subagentes Markdown descubiertos por OpenCode, no dependen de un formato privado del plugin. Los commands incluyen las instrucciones de trabajo necesarias desde la primera sesión, antes de que esos archivos existan.
-
-### Skill
-
-La Skill `design-system` dirige a cualquier agente a:
-
-1. Comprobar el manifest.
-2. Leer las reglas y preferencias.
-3. Cargar solo los tokens, componentes y patterns ligados a la tarea.
-4. Respetar decisiones explícitas y documentar cambios reutilizables.
-5. Tratar una especificación de pantalla como un artefacto distinto del código.
-
-No carga permanentemente todas las tablas, componentes y patrones en el contexto. El `manifest.json` sirve como índice para recuperación progresiva.
-
-## Formato generado
+The generated directory typically looks like this:
 
 ```text
 design-system/
@@ -124,39 +148,20 @@ design-system/
 ├── DECISIONS.md
 ├── CHANGELOG.md
 ├── schema/
-│   ├── manifest.schema.json
-│   └── tokens.schema.json
 ├── components/
-│   ├── button.md
-│   └── ...
 ├── patterns/
-│   ├── form.md
-│   └── ...
 ├── screens/
-│   └── user-management.md
 ├── preview/
 │   └── index.html
 └── tools/
     └── generate-preview.mjs
 
-AGENTS.md                         # Bloque administrado, conserva el contenido previo
-.opencode/
-├── agents/
-│   ├── design-system-designer.md
-│   └── screen-designer.md
-├── commands/
-│   ├── design-system.md
-│   ├── design-system/update.md
-│   ├── design-system/preview.md
-│   ├── design-system/check.md
-│   └── design-screen.md
-└── skills/
-    └── design-system/SKILL.md
+AGENTS.md  # Existing content is kept outside the managed block.
 ```
 
-`manifest.json` incluye versiones, estado, temas, archivos y referencias de tokens por componente/pattern. Los estados son `draft`, `review` y `stable`. El schema base usa `schemaVersion: "1.0.0"`; la versión del sistema comienza en `0.1.0`.
+The manifest indexes themes, versions, files, and the token references declared by each component and pattern. Systems begin at `0.1.0` with schema version `1.0.0`; their review status is `draft`, `review`, or `stable`.
 
-Los tokens son framework-neutrales y semánticos, por tema:
+Tokens use semantic paths and can define multiple themes:
 
 ```json
 {
@@ -176,61 +181,33 @@ Los tokens son framework-neutrales y semánticos, por tema:
 }
 ```
 
-El vocabulario puede ampliarse con tipografía, jerarquías, grids, layout, bordes, elevación, iconografía, motion, breakpoints, foco, estados y otros temas. Se recomiendan rutas semánticas como `color.text.secondary`; cualquier consumidor puede generar CSS variables, temas de framework u otros adaptadores sin que estos definan el sistema.
+The vocabulary can grow to include typography, layout, elevation, motion, breakpoints, focus, and states. Components describe purpose, variants, tokens, behavior, accessibility, responsive behavior, and relationships. Patterns document useful compositions such as forms, navigation, filters, tables, and empty states.
 
-### Componentes y patterns
+### Meaningful, versioned updates
 
-Cada archivo de componente documenta propósito, variantes, tamaños, tokens, estados, comportamiento, accesibilidad, responsive, cuándo usarlo/evitarlo y relaciones. Se crean los componentes útiles para el producto y se pueden ampliar más adelante; no se obliga a generar un catálogo innecesario.
+`/design-system/update` reads the manifest and relevant documents before changing the system. A semantic token update changes that path across themes by default; prefix a path with `themes.<name>.` for a theme-specific change. The update records the rationale, finds declared token dependents, updates relevant documentation, and regenerates the preview.
 
-Los patterns describen composiciones como formularios, navegación, búsquedas, filtros, acciones destructivas, tablas, errores, estados vacíos y onboarding. Sus referencias a componentes y tokens permiten mostrar dependencias al actualizar el sistema.
+Design-system version impact follows:
 
-## Crear desde una aplicación existente
+- **PATCH** — compatible fixes or documentation changes.
+- **MINOR** — compatible additions, such as a new token, component, or pattern.
+- **MAJOR** — changes that may break existing design contracts.
 
-El agente usa la herramienta `design_system_analyze`, que:
+These versions belong to the generated project design system, not the npm plugin package. Updated systems return to `draft` by default so a person can review them.
 
-- Busca CSS/SCSS/LESS, vistas y componentes habituales, y reconoce frameworks/librerías desde `package.json`.
-- Resume variables CSS, colores, radios, valores de spacing y candidatos de componentes.
-- Marca radios cercanos o muchas decisiones visuales como posibles inconsistencias, no como errores confirmados.
-- Limita directorios, número y tamaño de archivos; omite dependencias, builds y artefactos generados.
-- No escribe en los archivos analizados.
+## Interactive preview
 
-El agente explica las evidencias, incertidumbres y variaciones detectadas. Pregunta antes de normalizar decisiones ambiguas; conserva por defecto la identidad reconocible y distingue formalizar/normalizar de rediseñar. Solo después de la conversación crea `design-system/`.
+`design-system/preview/index.html` is generated from the manifest, tokens, and component/pattern specifications. It includes token samples, component examples, theme switching when multiple themes exist, and interactive examples. It supports visible keyboard focus and `prefers-reduced-motion`.
 
-## Modificar, dependencias y versiones
-
-`/design-system/update` lee el manifest, tokens y documentos relacionados antes de escoger un cambio. Las actualizaciones de token solo aceptan rutas existentes; por defecto una ruta semántica se actualiza coherentemente en todos los temas. Se puede limitar a un tema con una ruta como `themes.dark.color.accent.primary`.
-
-El plugin resuelve dependencias a partir de la lista de tokens declarada en cada componente/pattern. Registra el razonamiento en `DECISIONS.md`, actualiza `preferences.json`/`FOUNDATIONS.md` si corresponde, actualiza reglas, manifest, README y changelog, y regenera la preview. Clasificación inicial:
-
-- **PATCH** (`patch`): corrección o documentación sin cambio compatible de contrato.
-- **MINOR** (`minor`): nuevo comportamiento/token compatible.
-- **MAJOR** (`major`): cambio con posibilidad de alterar interfaces existentes.
-
-La expansión puede incorporar nuevos tokens (un valor por tema), componentes y patterns mediante la misma operación, sin reemplazar archivos existentes. Añadir un token/componente/pattern escala a `MINOR` como mínimo. El agente elige el impacto y comunica los consumidores afectados. Los cambios dejan el sistema en `draft` de forma predeterminada, hasta que el usuario lo revise.
-
-## Preview interactiva
-
-`preview/index.html` se genera desde tokens y especificaciones. Incluye navegación responsive, swatches y referencias de tokens, ejemplos de componentes, temas disponibles, tabs, switch, modal, toast, estados de inputs y tabla. La implementación respeta `prefers-reduced-motion` y ofrece foco visible.
-
-La preview embebida se regenera con `/design-system/preview`. Para trabajar **sin el plugin**, el archivo incluido puede ejecutarse desde la raíz del proyecto:
+Regenerate it in OpenCode with `/design-system/preview`, or without the plugin from the project root:
 
 ```sh
 node design-system/tools/generate-preview.mjs
 ```
 
-Este renderer no tiene dependencias externas; lee el manifest, los tokens y documentos actuales.
+The standalone renderer has no external dependencies. Edit the structured Markdown and JSON—not the generated HTML—to change the system.
 
-## Diseñar e implementar pantallas
-
-`/design-screen` crea únicamente `design-system/screens/<nombre>.md`. La especificación incluye propósito, layout, jerarquía, componentes/tokens, contenido/datos, estados/interacciones, responsive y accesibilidad. Otro agente de programación puede implementar ese brief después.
-
-Cuando un agente de código recibe una solicitud UI ordinaria, `AGENTS.md` y la Skill del proyecto le indican cómo detectar el sistema y cargar solo lo relevante. Este mecanismo también funciona sin el plugin: los tokens y documentación no dependen de React, Vue, Tailwind u OpenCode.
-
-## Comprobación
-
-`/design-system/check` realiza una exploración de solo lectura, compara literales de color, radios y algunas alturas de controles con los valores encontrados en tokens y presenta candidatos con ruta de archivo. Es heurística: informa la evidencia en lugar de cambiar estilos automáticamente. La arquitectura puede ampliarse con adaptadores y reglas específicas de cada framework sin cambiar el formato base.
-
-## Desarrollo
+## Develop and test
 
 ```sh
 npm install
@@ -239,13 +216,18 @@ npm test
 npm run build
 ```
 
-Los tests ejercitan un flujo integrado en un proyecto temporal: análisis de UI existente, creación y preservación de archivos, instrucción `AGENTS.md`, creación de especificación, propagación de token entre temas, dependencias, preview, checks y protección de rutas.
+Tests cover an integrated temporary-project workflow, including read-only analysis, creation and preservation of user files, managed `AGENTS.md` updates, screen briefs, multi-theme token updates, previews, checks, and path safety.
 
-## Documentación oficial de OpenCode v2
+## Documentation
 
-- [Plugins](https://opencode.ai/v2/docs/build/plugins)
-- [Commands](https://opencode.ai/v2/docs/commands)
-- [Agents](https://opencode.ai/v2/docs/agents)
-- [Skills](https://opencode.ai/v2/docs/skills)
-- [AGENTS.md / instructions](https://opencode.ai/v2/docs/instructions)
+- [OpenCode v2 plugin guide](https://opencode.ai/v2/docs/build/plugins)
+- [OpenCode plugin configuration](https://opencode.ai/v2/docs/plugins)
+- [OpenCode commands](https://opencode.ai/v2/docs/commands)
+- [OpenCode instructions and `AGENTS.md`](https://opencode.ai/v2/docs/instructions)
 - [Plugin API reference](https://opencode.ai/v2/docs/api)
+- [npm package](https://www.npmjs.com/package/opencode-design-system)
+- [Report an issue](https://github.com/BraveOtter/opencode-design-system/issues)
+
+## License
+
+This project is licensed under the [MIT License](https://github.com/BraveOtter/opencode-design-system/blob/main/LICENSE).

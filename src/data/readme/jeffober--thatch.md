@@ -21,7 +21,10 @@ everything runs on your machine.
 ```
 
 On next start, OpenCode npm-installs thatch and its tools are available
-immediately. For async extraction (child sessions run in the background):
+immediately. Works with both opencode 1.x and 2.x (the same package supports
+both plugin APIs). Until the next release ships, npm's `latest` still
+targets 1.x only. For async extraction (child sessions run in the
+background):
 
 ```bash
 export OPENCODE_EXPERIMENTAL_BACKGROUND_SUBAGENTS=true
@@ -29,6 +32,32 @@ export OPENCODE_EXPERIMENTAL_BACKGROUND_SUBAGENTS=true
 
 Without this env var, extraction still works - the child session runs
 synchronously (fire-and-forget) instead of asynchronously.
+
+### What works in opencode 2.x
+
+The v2 plugin API is missing a few surfaces the v1 API had. On 2.x:
+
+- **No toasts.** Toasts are dropped on v2 (no publish surface). The
+  model-facing nudges they accompanied - watcher and chat wake nudges -
+  still arrive; the extraction-result and other TUI-only toasts have no
+  replacement.
+- **Plugin state survives reloads.** Editing the plugin (or `opencode
+  plugin update`) reloads it, but extraction buffers, watcher
+  registrations, and armed wrap-ups are journaled and restored; a process
+  restart restores the state of a resumed (`-c`/`-s`) session and prunes
+  the rest.
+- **Extraction children are visible.** The fact-extractor child sessions are
+  top-level sessions the host cannot delete, so they accumulate in the
+  session picker, and "continue last session" (`-c`) can land in one after
+  any session that triggered extraction.
+- **`/thatch/compact` does not auto-compact.** The checklist and memory
+  flush run, but the compaction itself cannot be triggered from the plugin
+  API - run `/compact` yourself after the wrap-up completes. `/thatch/exit`
+  cannot auto-exit for the same reason.
+- **No `-c` session listing.** The chat resume listing degrades.
+
+Everything else - tools, memory, nudges, chat, watchers - behaves the same
+on both versions.
 
 Then **prime your project memory** by running `thatch prime` in your project directory.
 This launches an `opencode` session to build an initial map of the code base

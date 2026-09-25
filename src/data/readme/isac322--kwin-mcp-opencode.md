@@ -60,7 +60,18 @@ Automate kiosk interfaces and embedded Linux desktops running KDE Plasma or a ba
 
 > Requires KDE Plasma 6 on Wayland. See [System Requirements](#system-requirements) for details.
 
-**1. Install**
+> [!NOTE]
+> **Fixed in 0.8.0:** the published kwin-mcp 0.7.0 package on PyPI did not cap its `mcp` dependency, so a fresh install could resolve `mcp` 2.x and the server failed at startup with `ModuleNotFoundError: No module named 'mcp.server.fastmcp'`. Release 0.8.0 ships the `mcp>=1.0.0,<2` constraint in its package metadata. If you are still on 0.7.0, upgrade before following the steps below.
+
+**1. Install system and build dependencies**
+
+`uv tool install` and `uvx` always install kwin-mcp into an isolated Python environment, and `pip install` does the same when run inside a virtual environment. An isolated environment cannot reuse your distribution's `python3-gi` or `python3-dbus` packages, so PyGObject, pycairo, and dbus-python are built from source during installation and need a C compiler and development headers. Install the packages from [Installing System Dependencies](#installing-system-dependencies) first. On Debian 13 (Trixie):
+
+```bash
+sudo apt-get install -y --no-install-recommends build-essential pkg-config python3-dev libcairo2-dev libgirepository-2.0-dev libdbus-1-dev
+```
+
+**2. Install**
 
 ```bash
 # Using uv (recommended)
@@ -70,7 +81,7 @@ uv tool install kwin-mcp
 pip install kwin-mcp
 ```
 
-**2. Configure Claude Code**
+**3. Configure Claude Code**
 
 Add to your project's `.mcp.json`:
 
@@ -85,7 +96,7 @@ Add to your project's `.mcp.json`:
 }
 ```
 
-**3. Use it**
+**4. Use it**
 
 Ask Claude Code to launch and interact with any GUI application:
 
@@ -240,7 +251,7 @@ kwin-mcp-cli --default-live-session
 | `launch_app` | `command` `str`, `env?` `dict` | Launch an application inside the running session. Returns PID and log path. |
 | `list_windows` | _(none)_ | List all accessible application windows with per-window titles and active/focused state markers via AT-SPI2 |
 | `focus_window` | `app_name` `str` | Activate and raise a window by application name (case-insensitive match), via KWin scripting |
-| `window_geometry` | `app_name?` `str` | Report window frame and client rectangles in **global screen coordinates** via KWin scripting. Accessibility rectangles are surface-local, so add the reported client origin before passing them to `mouse_click` / `touch_tap`. |
+| `window_geometry` | `app_name?` `str` | Report window frame and client rectangles in **global screen coordinates** via KWin scripting — the same space `find_ui_elements` / `accessibility_tree` report and `mouse_click` / `touch_tap` take. |
 
 ### UI Polling (1 tool)
 
@@ -333,10 +344,11 @@ The AT-SPI2 accessibility bus within the isolated session is queried via PyGObje
 | **Python** | 3.12 or later |
 | **KWin** | `kwin_wayland` with `--virtual` flag support (KDE Plasma 6.x) |
 | **libei** | Usually bundled with KWin 6.x (EIS input emulation) |
-| **spectacle** | KDE screenshot tool (CLI mode) |
+| **spectacle** | KDE screenshot tool (CLI mode); packaged as `kde-spectacle` on Debian and Ubuntu |
 | **AT-SPI2** | `at-spi2-core` for accessibility tree support |
-| **PyGObject** | GObject introspection Python bindings |
-| **D-Bus** | `dbus-python` bindings |
+| **PyGObject** | GObject introspection Python bindings (built from source by uv/pip; see [build prerequisites](#build-prerequisites-for-uv-and-pip-installs)) |
+| **D-Bus** | `dbus-python` bindings (built from source by uv/pip; needs libdbus development files) |
+| **Build tools** | C compiler, `pkg-config`, Python headers, and cairo, GObject Introspection, and libdbus development files |
 
 **Optional dependencies:**
 
@@ -347,6 +359,36 @@ The AT-SPI2 accessibility bus within the isolated session is queried via PyGObje
 | `wayland-utils` (`wayland-info`) | `wayland_info` tool |
 
 ### Installing System Dependencies
+
+kwin-mcp needs two groups of system packages: runtime packages (KWin, Spectacle, AT-SPI2) and build prerequisites for the Python packages it installs from PyPI.
+
+#### Build Prerequisites for uv and pip Installs
+
+`uv tool install kwin-mcp` and `uvx kwin-mcp` always use an isolated Python environment, and `pip install kwin-mcp` does too when run inside a virtual environment. An isolated environment cannot see the system `gi` (PyGObject) or `dbus` modules installed by your distribution, so uv or pip builds [PyGObject](https://pypi.org/project/PyGObject/), [pycairo](https://pypi.org/project/pycairo/), and [dbus-python](https://pypi.org/project/dbus-python/) from source. These builds need a C compiler, `pkg-config`, the Python headers, and the cairo, GObject Introspection, and libdbus development files. Without them, installation fails while building those packages.
+
+On Debian 13 (Trixie):
+
+```bash
+sudo apt-get install -y --no-install-recommends build-essential pkg-config python3-dev libcairo2-dev libgirepository-2.0-dev libdbus-1-dev
+```
+
+For other distributions, follow the "Installing from PyPI with pip" build dependency steps in the [PyGObject Getting Started guide](https://pygobject.gnome.org/getting_started.html), and also install your distribution's libdbus development package (it provides the `dbus-1` pkg-config file that dbus-python needs).
+
+#### Runtime Packages
+
+<details>
+<summary><strong>Debian 13 (Trixie)</strong></summary>
+
+Debian packages Spectacle as `kde-spectacle`; there is no `spectacle` package. `gir1.2-atspi-2.0` provides the AT-SPI2 GObject Introspection typelib that PyGObject loads at runtime.
+
+```bash
+sudo apt-get install -y --no-install-recommends kwin-wayland kde-spectacle at-spi2-core gir1.2-atspi-2.0
+
+# Optional: for clipboard and Unicode input
+sudo apt-get install -y --no-install-recommends wl-clipboard wtype wayland-utils
+```
+
+</details>
 
 <details>
 <summary><strong>Arch Linux / Manjaro</strong></summary>
@@ -385,10 +427,12 @@ sudo zypper install wl-clipboard wtype wayland-utils
 </details>
 
 <details>
-<summary><strong>Kubuntu / KDE Neon</strong></summary>
+<summary><strong>Kubuntu / KDE Neon (Plasma 6 releases only)</strong></summary>
+
+Use a release that ships KDE Plasma 6 and Python 3.12 or later; older Kubuntu releases with Plasma 5 are not supported. Install the Debian build prerequisites above as well. Ubuntu packages Spectacle as `kde-spectacle`.
 
 ```bash
-sudo apt install kwin-wayland spectacle at-spi2-core python3-gi gir1.2-atspi-2.0 python3-dbus
+sudo apt install kwin-wayland kde-spectacle at-spi2-core python3-gi gir1.2-atspi-2.0 python3-dbus
 
 # Optional: for clipboard and Unicode input
 sudo apt install wl-clipboard wtype wayland-utils
@@ -398,11 +442,18 @@ sudo apt install wl-clipboard wtype wayland-utils
 
 ## Installation
 
+Install the [system and build dependencies](#installing-system-dependencies) before using any method below. The uv installs, pip installs into a virtual environment, and the from-source install build PyGObject, pycairo, and dbus-python from source and fail without them.
+
+> [!NOTE]
+> kwin-mcp 0.7.0 on PyPI did not cap its `mcp` dependency, so a fresh install could resolve `mcp` 2.x and the server failed at startup with `ModuleNotFoundError: No module named 'mcp.server.fastmcp'`. Release 0.8.0 ships the `mcp>=1.0.0,<2` constraint; install 0.8.0 or later.
+
 ### Using uv (recommended)
 
 ```bash
 uv tool install kwin-mcp
 ```
+
+uv also provides `uvx`, which the `.mcp.json` examples above use to run kwin-mcp. If the `kwin-mcp` command is not found after `uv tool install`, run `uv tool update-shell` and restart your shell so uv's tool directory is on `PATH`.
 
 ### Using pip
 
@@ -426,14 +477,14 @@ uv run kwin-mcp
 - **AT-SPI2 availability varies** -- Some applications may not fully expose their widget tree via AT-SPI2.
 - **Touch input is EIS-emulated** -- Touch events are emulated through KWin's EIS interface, not from a real touchscreen device. Most applications handle emulated touch correctly, but some may behave differently from physical touch.
 - **Clipboard requires opt-in** -- Clipboard tools (`clipboard_get`, `clipboard_set`) are disabled by default because `wl-copy` can hang in isolated sessions. Enable with `enable_clipboard=true` in `session_start`, and ensure `wl-clipboard` is installed.
-- **QMenu (native context menus) may not appear in AT-SPI2** -- Qt's AT-SPI2 bridge has incomplete support for popup menus on Wayland. Context menus may not be visible in `accessibility_tree` or `find_ui_elements`. Workaround: click by coordinates derived from the parent widget's rectangle plus the client origin from `window_geometry`.
+- **QMenu (native context menus) may not appear in AT-SPI2** -- Qt's AT-SPI2 bridge has incomplete support for popup menus on Wayland. Context menus may not be visible in `accessibility_tree` or `find_ui_elements`. Workaround: click by coordinates derived from the parent widget's reported screen rectangle.
 - **Screen edge triggers ignore EIS pointer events** -- Auto-hide panels and layer-shell strips do not react when the pointer reaches a screen edge through EIS. Use `dbus_call` to invoke KWin scripting or a keyboard shortcut instead of trying to hover the edge.
 - **KWin claims multi-finger touch gestures** -- Three- and four-finger swipes are consumed by the compositor as global gestures and never reach the application; use `fingers=2` when the target is the app itself.
-- **AT-SPI2 coordinates are surface-local, not screen-global** -- Wayland clients do not know their global screen position (by design). Coordinates returned by `find_ui_elements` and `accessibility_tree` are relative to the window's top-left corner, while `mouse_click` and `touch_tap` take screen coordinates. Convert them by adding the client origin from `window_geometry`: clicking a reported rectangle verbatim lands on whatever occupies that screen position instead.
+- **Element coordinates are screen-global, or unavailable** -- `find_ui_elements`, `accessibility_tree` and `wait_for_element` report rectangles in the same global screen coordinates `mouse_click` and `touch_tap` take (`@ screen (x, y, wxh)`). When the element's window cannot be matched to exactly one KWin window — an app that masks its real process id (e.g. a D-Bus proxy), several identical windows of one process, or a window set that changed mid-query — the element reports `@ unavailable (reason)` with no coordinates rather than a position that could click the wrong window.
 
 ## End-to-End Testing
 
-The Docker suite currently collects 99 tests against the packaged application, not an editable source checkout. `docker/e2e.Dockerfile` builds a wheel, installs it with the locked MCP 1.x dependency set into `/opt/kwin-mcp-venv`, and runs both `AutomationEngine` tests and the installed `kwin-mcp` console entry point. The MCP tests initialize a real client/server session over stdio JSON-RPC.
+The Docker suite currently collects 99 tests against the packaged application, not an editable source checkout. `docker/e2e.Dockerfile` builds a wheel and installs it into `/opt/kwin-mcp-venv` with standard `Requires-Dist` resolution: PyGObject, pycairo, and dbus-python compile from source in a builder-only stage, while `mcp`, Pillow, and the remaining dependencies resolve fresh from PyPI within the declared ranges. The suite runs both `AutomationEngine` tests and the installed `kwin-mcp` console entry point. The MCP tests initialize a real client/server session over stdio JSON-RPC.
 
 Run the complete suite from the repository root:
 

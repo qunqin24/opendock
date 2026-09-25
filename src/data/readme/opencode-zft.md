@@ -120,7 +120,13 @@ on every `.zft/**` edit. Every decision lands in `.zft/audit.log` and
 
 ```bash
 pip install zft                                              # Python 3.12+
-mkdir -p ~/.config/opencode/plugins                          # global scope
+
+# Install the gates — either from npm (versioned, auto-installed by opencode):
+bun add -D opencode-zft
+#   then add it to opencode.json:   { "plugin": ["opencode-zft"] }
+
+# …or copy the sources from this repo (global scope shown):
+mkdir -p ~/.config/opencode/plugins
 cp .opencode/plugins/zft-gate.ts .opencode/plugins/zft-lint-gate.js \
    ~/.config/opencode/plugins/
 mkdir -p ~/.config/opencode/skills/zft                       # the workflow skill
@@ -143,14 +149,17 @@ seams, so policy and audit trails stay identical across clients.
 designs/          # Architecture decision records and implementation plans.
 ```
 
-The seed contract (26 validated clause nodes) lives in
-[`.zft/specs/`](.zft/specs/) and is the working self-hosted example for every
-gate tier above.
+The seed contract — 43 validated clause nodes as of this release (`zft lint`
+reports the current count) — lives in [`.zft/specs/`](.zft/specs/) and is the
+working self-hosted example for every gate tier above.
 
 ## Design
 
 Full architecture, decision records (D1–D6), and the verification pipeline
 specification live in [`designs/ARCHITECTURE.md`](designs/ARCHITECTURE.md).
+Release notes are in [`CHANGELOG.md`](CHANGELOG.md); the framework landscape
+research is under [`docs/research/`](docs/research) and the positioning
+analysis in [`docs/POSITIONING.md`](docs/POSITIONING.md).
 
 ## License
 

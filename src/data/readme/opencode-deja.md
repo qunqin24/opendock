@@ -23,8 +23,10 @@ the index is built; <a href="docs/SECURITY-MODEL.md">the security model</a> says
 and what it cannot.</p>
 
 <p align="center">
-<b>88.1% hit@1</b> on LongMemEval-S (470-question cleaned set) &middot; <b>70.5% retrieval hit@1</b> on LoCoMo &middot; <b>millisecond</b> lookups over gigabytes of history<br>
-<sub>Both harnesses ship in this repo and run on the public datasets in minutes &middot;
+<b>58% fewer tokens</b> on a task this machine had already solved &middot; <b>88.1% hit@1</b> on LongMemEval-S (470-question cleaned set) &middot; <b>70.5% retrieval hit@1</b> on LoCoMo &middot; <b>millisecond</b> lookups over gigabytes of history<br>
+<sub>Eleven runs an arm: 53,558 tokens against 126,222 with nothing wired, and 71% off on a later run of the same stand &middot;
+<a href="https://vshulcz.github.io/deja-vu/guide/day-zero.html">what it costs to finish one task</a> &middot;
+both retrieval harnesses ship in this repo and run on the public datasets in minutes &middot;
 <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">check the numbers yourself</a></sub>
 </p>
 
@@ -35,7 +37,7 @@ and what it cannot.</p>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT License"></a>
 </p>
 
-<p align="center">English | <a href="README.zh.md">中文</a> | <a href="README.ja.md">日本語</a></p>
+<p align="center">English | <a href="docs/readme/README.zh.md">简体中文</a> | <a href="docs/readme/README.zh-TW.md">繁體中文</a> | <a href="docs/readme/README.ja.md">日本語</a> | <a href="docs/readme/README.ko.md">한국어</a> | <a href="docs/readme/README.es.md">Español</a> | <a href="docs/readme/README.pt.md">Português</a> | <a href="docs/readme/README.fr.md">Français</a> | <a href="docs/readme/README.de.md">Deutsch</a> | <a href="docs/readme/README.ru.md">Русский</a> | <a href="docs/readme/README.tr.md">Türkçe</a> | <a href="docs/readme/README.hi.md">हिन्दी</a></p>
 
 <p align="center"><a href="https://vshulcz.github.io/deja-vu/">Docs</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">Benchmarks</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/compare.html">How it compares</a> &middot; <a href="docs/INTEGRATING.md">Building it into your tool</a></p>
 <p align="center"><sub>Found it useful? <a href="https://github.com/vshulcz/deja-vu">Star deja-vu on GitHub</a>.</sub></p>
@@ -161,6 +163,10 @@ The source transcripts are not redacted: agents write command output there verba
 `cat .env` or a pasted connection string stays in plaintext. `deja secrets` lists which
 sessions carry one and of what kind, from the markers redaction left; it never prints a
 value. One machine held 84 in 42 sessions ([credentials in transcripts](https://vshulcz.github.io/deja-vu/guide/credentials-in-transcripts.html)).
+`deja secrets --scrub` rewrites the transcripts that still hold one, putting the same
+`[redacted:<kind>]` marker where the value was and keeping the original beside the file. It
+touches only the kinds the report names, refuses a session an agent is in, and says how many
+findings it could not reach: a store with no per-session file cannot be rewritten at all.
 
 `deja forget` removes sessions from a rebuilt index and writes tombstones, so a later
 `deja index` cannot restore them from the source history. `--unforget` lifts a tombstone.
@@ -215,7 +221,7 @@ $ deja "jwt refresh token"
 | `deja sync export/import/ssh` | Move memory between machines. Watermarked, append-only, idempotent. |
 | `deja view` | Your whole memory as one local HTML file. No server, and the file never leaves the machine. |
 | `deja stats` | Your agent work, wrapped. `--card` draws it in the terminal, `--card <file>.svg` writes one for a profile, `--html` a browsable timeline. |
-| `deja secrets` | Which sessions' source transcripts carry credentials, and what kind. Never prints a value. |
+| `deja secrets [--scrub]` | Which sessions' source transcripts carry credentials, and what kind. Never prints a value. `--scrub` rewrites the ones it can, original kept beside the file. |
 | `deja doctor [--deep]` | Self-diagnosis, and with `--deep`, proof of the index against the sources. |
 | `deja mcp` | The stdio MCP server, which is what `deja install` wires in. |
 
@@ -230,6 +236,13 @@ The server exposes one tool, `deja`, with a `mode`. `deja install` wires it in, 
 this is only needed to configure an agent by hand. The six older tool names
 (`recall`, `recall_context`, `blame`, `fix`, `how`, `remember`) still answer for
 anything already wired to them.
+
+One tool rather than seven is a cost, not a style choice. A wired-in MCP server
+ships its tool definitions with every request, so you pay for them each turn
+whether the agent calls anything or not: 477 tokens here, against 8,283 for the
+largest of the eight servers measured in
+[day zero](https://vshulcz.github.io/deja-vu/guide/day-zero.html). deja's own
+number was 828 until the schema was cut to one tool with modes.
 
 <details>
 <summary>Arguments and return shapes</summary>
@@ -322,7 +335,7 @@ keeping those descriptions checked against the parsers.
 
 ### Harnesses with a package of their own
 
-`deja install --auto` wires all six of these like every other harness, and
+`deja install --auto` wires every one of these like every other harness, and
 that stays the shortest path. They also have a package in their own ecosystem,
 for people who install extensions there rather than from a CLI:
 
@@ -334,10 +347,13 @@ for people who install extensions there rather than from a CLI:
 | Kimi Code | plugin `deja` | `/plugins install https://github.com/vshulcz/deja-vu` |
 | Codex CLI | plugin `deja-vu` | `codex plugin marketplace add https://github.com/vshulcz/deja-vu` then `codex plugin add deja-vu@deja-vu` |
 | Grok Build | plugin `deja` | `grok plugin marketplace add xai-org/plugin-marketplace` then `grok plugin install deja` |
+| OpenClaw | ClawHub and npm `@vshulcz/openclaw-deja` | `openclaw plugins install clawhub:@vshulcz/openclaw-deja` |
+| pi (and omp) | npm `@vshulcz/pi-deja` | `pi install npm:@vshulcz/pi-deja` |
 
-Either path is enough on its own, and having both is not a problem: the
-opencode, dsh, Kimi, Grok and Codex packages read what `deja install` wrote and
-contribute only what is missing, and in Zed both halves use one server id, so
+Either path is enough on its own, and having both is not a problem: every
+package reads what `deja install` wrote first. opencode, dsh and OpenClaw
+contribute only what is missing; Kimi, Grok, Codex and pi stand down where the
+installer already wired the harness; in Zed both halves use one server id. So
 there is nothing to have twice whichever order you install in.
 
 Each uses the deja you already have; the copy it bundles is only the fallback.
@@ -464,7 +480,7 @@ sync all read that one index. Details in [docs/ARCHITECTURE.md](docs/ARCHITECTUR
 
 **What about secrets already in my logs?** They stay in the original harness files, which
 are your agent's data; `deja secrets` names the sessions that carry them so you can rotate
-and delete. Known shapes — AWS keys, `api_key=`/`token=` assignments, bearer
+and delete, and `--scrub` rewrites the transcripts it can reach. Known shapes — AWS keys, `api_key=`/`token=` assignments, bearer
 tokens and bare JWTs, PEM blocks, provider tokens, high-entropy values — are stripped as
 the index is built, so they do not reach digests, shares or sync exports. Pattern matching
 is not secret detection: a shape it does not know can pass through. See the
@@ -490,7 +506,7 @@ auto-recall it already knows the project's prior decisions when the session open
 [engram](https://github.com/Gentleman-Programming/engram) is the strongest of the
 record-forward tools and worth your time if that model fits you; it still starts empty and
 knows only what an agent chose to save. The
-[full comparison](https://vshulcz.github.io/deja-vu/guide/compare.html) covers eleven of them.
+[full comparison](https://vshulcz.github.io/deja-vu/guide/compare.html) covers 15 of them.
 
 **Where is Claude Code session history stored, and can I search it?** Under
 `~/.claude/projects`, one JSONL file per session; Codex keeps `~/.codex/sessions`, Cursor a

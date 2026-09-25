@@ -17,6 +17,28 @@ The V1 entrypoint has been checked against **OpenCode 1.17.0 and 1.17.13** sourc
 
 ## Installation
 
+### Install with the CLI
+
+Register the plugin in the global OpenCode config under `XDG_CONFIG_HOME/opencode` (or `~/.config/opencode` when `XDG_CONFIG_HOME` is unset):
+
+```bash
+npx opencode-sweeper@latest install
+```
+
+New configs default to V1. To explicitly use V2:
+
+```bash
+npx opencode-sweeper@latest install --format v2
+```
+
+For an existing plugin entry, the CLI updates only its package version and keeps its options; it supports V1 tuples and V2 package/options objects, and preserves JSONC comments. It refuses duplicate or ambiguous entries rather than choosing one. A higher existing version pin is not downgraded.
+
+The plugin defaults to `dryRun: false` and `interval: "1h"`, so it can delete sessions automatically after loading. Before starting or restarting the OpenCode host, set `dryRun: true` in the installed config and review the reported candidates.
+
+V1 only: when OpenCode's `plugin_origins` identifies one unique config source, the plugin asynchronously checks npm and may update the version pin on disk. The change takes effect after restarting OpenCode; it does not hot-replace the running plugin. If the source cannot be identified uniquely or the check/update fails, it is skipped.
+
+For this plugin's V2 runtime, a background npm registry check is attempted only when `plugin.list` reports exactly one active server package for the current location and its `source.target` exactly matches the package spec in one unique, safe V2 `plugins` entry in the global or current-location config. If the registry's latest version is newer than both the running version and any exact version pin, the updater locks and rechecks the source/config before changing only that entry's version spec. Object options and JSONC formatting are preserved; restart OpenCode for the new version to take effect. This does not create config, install dependencies, or hot-reload the running plugin. Local `file://` plugins, untrusted or ambiguous sources/configs, unsupported specs, invalid options, and a plugin that is no longer installed are skipped. OpenCode's native `opencode plugin update` does not upgrade exact pins; this plugin's V2 background updater can advance a trusted config pin when those checks pass. You can still explicitly update through `npx opencode-sweeper@latest install --format v2`. This is a scoped update path for opencode-sweeper, not a promise that all V2 plugins update automatically.
+
 ### OpenCode V1
 
 V1 uses the `plugin` tuple format in `opencode.json`:
@@ -294,3 +316,7 @@ The unit tests cover the option parser, shared cleanup algorithm, V1 config hook
 2. Start/restart the V2 host. Verify the `sweep` tool and `/sweep` command are available; invoke `/sweep` and confirm the summary is returned.
 3. Check the host's console output for `opencode-sweeper timer sweep` or `opencode-sweeper timer error`. The minimum non-zero interval is `1m`; allow at least one interval for the first timer tick.
 4. V2 checks fresh pagination, active sessions, protected ancestors, and the candidate's complete subtree before each removal. These checks are not atomic with the server-side removal; a session may change after the checks. Unload/cancellation does not retract a DELETE already accepted by the server. Review dry-run output before setting `dryRun` to `false`.
+
+## Release
+
+发布流程由 Release Please 自动化（版本计算、Release PR、GitHub Release 与 npm 发布）。维护者请阅读 [RELEASING.md](./RELEASING.md)。

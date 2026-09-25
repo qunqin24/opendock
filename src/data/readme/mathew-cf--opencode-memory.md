@@ -22,10 +22,26 @@ LLM agents forget everything between sessions. That means rediscovering the same
 
 ### OpenCode
 
+The package root is the OpenCode v1 plugin. OpenCode v2 loads the package's
+`./server` export, which provides the v2 plugin. Both use the same tool definitions
+and search v1 and v2 OpenCode session history. The v1 entry adapts the tools and
+registers its hooks and config through the v1 plugin API.
+
+OpenCode v2:
+
 ```jsonc
 // opencode.jsonc
 {
-  "plugin": ["@mathew-cf/opencode-memory@1.2.1"]
+  "plugins": ["@mathew-cf/opencode-memory"]
+}
+```
+
+OpenCode v1:
+
+```jsonc
+// opencode.jsonc
+{
+  "plugin": ["@mathew-cf/opencode-memory@2.0.0"]
 }
 ```
 
@@ -47,12 +63,12 @@ The plugin also auto-registers (OpenCode only):
 
 `memory_search` combines two complementary signals:
 
-| Backend                | Package                     | Purpose                              |
-| ---------------------- | --------------------------- | ------------------------------------ |
-| **Keyword (ripgrep)**  | `@vscode/ripgrep`           | Exact-match + phrase lookup over files |
-| **Semantic (rag-cli)** | `@mathew-cf/rag-cli`        | Similarity search via local embeddings |
+| Signal | Command | Purpose |
+| ------ | ------- | ------- |
+| Keyword | `rag keyword` | Live text search over memory files |
+| Semantic | `rag search` | Similarity search via local embeddings |
 
-Both are declared as **required dependencies**: installing the plugin pulls in prebuilt binaries for your platform automatically (macOS ARM64/x64, Linux x64/ARM64; ripgrep additionally covers Windows and FreeBSD). No Rust toolchain, no `brew install`, no `$PATH` plumbing.
+Both commands come from the required `@mathew-cf/rag-cli` package, which installs a prebuilt binary on supported platforms. No Rust toolchain or `$PATH` setup is needed.
 
 Pre-cache the embedding model once (~90MB) to make the first semantic search instant:
 
@@ -60,7 +76,7 @@ Pre-cache the embedding model once (~90MB) to make the first semantic search ins
 rag download
 ```
 
-If either dependency fails to install (unusual — usually indicates an unsupported platform), the plugin transparently degrades. `memory_setup` reports which backends are resolvable and prints targeted install guidance for each.
+`memory_setup` reports whether the binary and its keyword command are available. Semantic search also needs an index and the cached embedding model.
 
 ## Usage
 
@@ -106,7 +122,7 @@ After writing or editing files, call `memory_save` — it runs `git add -A` + co
 ### Searching
 
 ```
-memory_search("retry jitter")             # compact hybrid rg + rag results (up to 5)
+memory_search("retry jitter")             # compact keyword + semantic results (up to 5)
 memory_search("auth", category="repos")   # filter to a category
 memory_read("repos/example.md")            # frontmatter + first 4,000 body chars
 memory_read("repos/example.md", heading="Build") # retrieve one heading section
@@ -152,7 +168,7 @@ Injects memory-specific preservation rules so references to saved files and sear
 ```bash
 bun install
 bun run typecheck    # tsc --noEmit
-bun test             # 118 tests across 7 files
+bun test
 bun run build        # bundle to dist/
 ```
 

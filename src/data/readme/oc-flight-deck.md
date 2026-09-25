@@ -37,11 +37,11 @@ cost       $0.245 · 2 subagents
 tokens     533k in · 91k out
 cache      98% hit · 32M read
 context    ██░░░░░░░░ 18%
-elapsed    2h 14m
+elapsed    2h 14m 37s
 tps        18 tok/s
 ```
 
-Every row is read from the open session at render time — except `caution`, which watches a clock rather than events (a hang emits none), and the opt-in `guard` row, which is polled from the local guard RPC.
+Every row is read from the open session at render time — except `caution`, which watches a clock rather than events (a hang emits none); `elapsed`, which is seeded once from the session's own recorded assistant turn spans and then accumulates the busy windows this run observes, rather than a value the session reports; and the opt-in `guard` row, which is polled from the local guard RPC.
 
 | Row | What it shows |
 |---|---|
@@ -57,8 +57,8 @@ Every row is read from the open session at render time — except `caution`, whi
 | `cache` | Hit rate first — the number that explains the bill — then cache reads |
 | `context` | A gauge of how full the window is |
 | `perms` | What is waiting for approval, not just how many |
-| `elapsed` | How long you've been at it |
-| `tps` | Current speed: output tokens in the last 60 s, divided by that window, subagents included. Idle longer than the window and it hides — the `status` row already says `idle`. On a host that exposes no per-message timestamps it falls back to the lifetime average, which does not hide while idle and reads lower than a peak per-turn rate. Fixed at 60 s, not configurable |
+| `elapsed` | Active time — the clock runs only while this session, a subagent in its tree, or one of its shells is working, and freezes when everything settles. It is seeded once from the assistant turn spans the host already recorded for that session, so it survives a restart instead of resetting to `—`; work observed live after that keeps counting in memory. It measures active time, not wall-clock since the session began |
+| `tps` | Average speed **while working**: output tokens divided by the time the assistant's turns actually ran, subagents included. Idle time between turns is never counted, so the figure freezes when everything settles instead of decaying or hiding; a turn still in flight counts up to now. On a host that exposes no per-message timestamps it falls back to the lifetime average, which includes idle and can therefore sag. Not configurable |
 | `spark` | Recent turn sizes as a shape · **off by default** |
 | `reasoning` | Reasoning tokens, when the model emits them · **off by default** |
 | `turns` | How many prompts you've sent this session · **off by default** |
@@ -106,19 +106,33 @@ The file is optional, and a missing file is normal and silent: with no file at a
 
 > **Upgrading from 0.4.0 — the config file moved.** The per-project search is gone. A `flight-deck.jsonc` in a project root or in `.opencode/` is no longer read; move it to `~/.config/opencode/flight-deck.jsonc` (or the `$XDG_CONFIG_HOME` path above) to keep your settings.
 
-`sidebar.rows` picks the rows and their order; `layout.labelWidth` fits your terminal. Everything else lives in the example file, documented inline — a typo is never fatal: the bad value is ignored, the default comes back, and you get a one-time toast naming the key to fix.
+`sidebar.rows` picks the rows and their order; `sidebar.maxLines` caps the whole rail (fixed lines plus rows, default 24, configurable from 1 to 24); `layout.labelWidth` fits your terminal; `format.duration` switches the `elapsed` row between `spaced` (`2h 14m 37s`, the default) and `compact` (`2h14m37s`).
+
+Optional styling lives under `style`: `style.lines` controls fixed branding/separator lines, `style.rows."*"` sets every live row, and `style.rows.cost` (or another row name) overrides one field while inheriting omitted values from the wildcard. Colors are theme roles - `default`, `subdued`, `warning`, `error`, `success`, `info` - and attributes are OpenTUI descriptors: `bold`, `dim`, `italic`, `underline`, `blink`, `inverse`, `hidden`, `strikethrough`. Defaults keep the existing theme-native look; no ANSI escapes or raw colors are needed. Invalid colors, attributes, and row names are reported and safely ignored.
+
+Everything else lives in the example file, documented inline - a typo is never fatal: the bad value is ignored, the default comes back, and you get a one-time toast naming the key to fix.
 
 ```jsonc
 // ~/.config/opencode/flight-deck.jsonc
 {
   "refresh": 100,
   "sidebar": {
+    "maxLines": 24,
     "rows": [
       "caution", "status", "agent", "model", "branch", "cost", "project",
       "tokens", "cache", "context", "perms", "elapsed", "tps"
     ]
   },
-  "caution": { "toast": false }
+  // spaced separates the units (2h 14m 37s, the default); "compact" hugs them (2h14m37s)
+  "format": { "duration": "spaced" },
+  "caution": { "toast": false },
+  "style": {
+    "lines": { "color": "default", "attributes": [] },
+    "rows": {
+      "*": { "color": "subdued", "attributes": [] },
+      "cost": { "color": "success", "attributes": ["bold"] }
+    }
+  }
 }
 ```
 
@@ -130,7 +144,7 @@ Flight Deck shows what OpenCode already knows.
 
 - **No network calls while the opt-in `guard` row stays off.** Nothing is fetched, nothing is sent. With `guard` enabled, the panel polls the local guard RPC — same machine, no telemetry — about every ten seconds, plus right away when the rendered session changes.
 - **No telemetry.** Nothing is collected or phoned home.
-- **Nothing on disk.** The one thing it normally writes is an animation counter in the host's in-memory plugin state, so the spinner and `elapsed` keep moving between turns. It is scoped to this plugin and dies with the TUI; it is never persisted, and `"refresh": 0` removes even that. With `guard` enabled there is a second in-memory write — that row's polled status — and `"refresh": 0` does not remove it; dropping `guard` from `sidebar.rows` does.
+- **Nothing on disk.** The one thing it normally writes is an animation counter in the host's in-memory plugin state, so the spinner and a running `elapsed` clock keep moving between host events. It is scoped to this plugin and dies with the TUI; it is never persisted, and `"refresh": 0` removes even that. With `"refresh": 0` the rail re-reads only on host events, so a busy stretch that produces few events can undercount `elapsed` — no unobserved gap bills beyond its bound, and a longer gap banks nothing. With `guard` enabled there is a second in-memory write — that row's polled status — and `"refresh": 0` does not remove it; dropping `guard` from `sidebar.rows` does.
 - **No polling of your session while `guard` stays off.** Cost, tokens, and permissions update from the host's own events. The timer only re-reads state the host already holds in memory, so the clock-derived rows keep moving.
 - **Theme-native.** Every line uses your active theme's text tokens, so it blends with whatever look you already run.
 
@@ -171,7 +185,7 @@ Built on the official [OpenCode V2 CLI plugin API](https://opencode.ai/v2/docs/b
 
 | | |
 |---|---|
-| Built against | `@opencode/plugin` `2.0.12` — pin a host version you've tested |
+| Built against | `@opencode/plugin` `2.0.16` — pin a host version you've tested |
 | Host | OpenCode V2 (`opencode2`) |
 | Building from source | Node ≥ 22 or Bun ≥ 1.4 |
 | Writes | In-memory counters only — the animation tick, plus the `guard` row's polled status when `guard` is on; nothing to disk |
@@ -180,7 +194,7 @@ Built on the official [OpenCode V2 CLI plugin API](https://opencode.ai/v2/docs/b
 
 <div align="center">
 
-Built against `@opencode/plugin` 2.0.12 · Node ≥ 22 / Bun ≥ 1.4 · OpenCode V2
+Built against `@opencode/plugin` 2.0.16 · Node ≥ 22 / Bun ≥ 1.4 · OpenCode V2
 
 **MIT © 2026 nathwn12** · For OpenCode. Free.
 

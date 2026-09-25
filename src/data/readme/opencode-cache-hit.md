@@ -147,6 +147,9 @@ The plugin requests main-session history directly with a limit of 10,000 message
 
 Per assistant turn → JSONL (tokens, cache, cost, TTFT, per-tool `toolDurations`, and `skippedForMetrics`). [docs/en/timeline.md](docs/en/timeline.md) · [中文](docs/zh-CN/timeline.md).
 
+> [!NOTE]
+> **A mounted sidebar is a prerequisite.** The collector runs inside the sidebar host, so when OpenCode does not render the sidebar (terminal ≤ 120 columns without `session.sidebar.toggle`, or any child-session view) **nothing is written at all** — no rows, no error, `timeline.enabled: true` notwithstanding. See § Compatibility.
+
 ```json
 "timeline": {
   "enabled": true,
@@ -299,7 +302,13 @@ Model-agnostic: any OpenCode provider that exposes assistant `tokens` / `cost` o
 
 **Requires** OpenCode with TUI plugin slots (`@opencode-ai/plugin` ≥ 1.14). Works alongside visual-cache; no extra dependencies at runtime beyond peers in [package.json](package.json).
 
-**Terminal width:** OpenCode auto-shows the sidebar only when the TUI is **wider than 120 columns** (121+). Below that, the sidebar component never mounts, so `sidebar_content` plugins — this one included — render **nothing at all**: no panel, no placeholder, no error, while the plugin still loads normally. On a terminal below 121 columns, open it with `session.sidebar.toggle` (default `<leader>b`); it then appears as a full-screen overlay. `tui.json` cannot force the sidebar on — its state is only `auto` or `hide`.
+**Sidebar not showing?** `sidebar_content` plugins — this one included — then render **nothing at all**: no panel, no placeholder, no error, while the plugin still loads normally. OpenCode's own sidebar is hidden by any of:
+
+- **Narrow terminal** — auto-shown only when the TUI is **wider than 120 columns** (121+, measured on 1.18.x). Below that `<Sidebar>` never mounts, so the slot is never called. Open it with `session.sidebar.toggle` (default `<leader>b`); it then appears as a full-screen overlay.
+- **Toggled off earlier** — that toggle persists (`sidebar: "hide"` in TUI state), so a sidebar hidden once stays hidden at any width until toggled back on.
+- **Sub-agent (child) session** — the sidebar is never rendered for a session with a `parentID`, and the toggle does not override it. Open the parent session to see the panel.
+
+`tui.json` cannot force the sidebar on — its state is only `auto` or `hide`. To give it a dedicated key, bind `keybinds.sidebar_toggle`.
 
 ## Documentation
 

@@ -164,7 +164,7 @@ testing). If it doesn't, run `opencode service restart` or restart the TUI.
 
   ```text
   ID                 VERSION  SOURCE
-  dynamic-workflows  0.1.0    @rphang/opencode-workflows
+  dynamic-workflows  0.2.0    @rphang/opencode-workflows
   ```
 
   The first `opencode` command after an install starts the background service, and `plugin list`
@@ -176,7 +176,7 @@ testing). If it doesn't, run `opencode service restart` or restart the TUI.
 
 | I want to… | Do this |
 |---|---|
-| Pin a version | `opencode plugin add @rphang/opencode-workflows@0.1.0`, or `"plugins": ["@rphang/opencode-workflows@0.1.0"]` |
+| Pin a version | `opencode plugin add @rphang/opencode-workflows@0.2.0`, or `"plugins": ["@rphang/opencode-workflows@0.2.0"]` |
 | Pass plugin options | `"plugins": [{ "package": "@rphang/opencode-workflows", "options": { "sizeGuideline": "small" } }]` (see [Configuration](#configuration)) |
 | Install for one project only | The same `plugins` entry in `<project>/opencode.json`. Worktree agents then need that config committed, so the global install is recommended. |
 | Update | Unpinned installs track `latest`. opencode checks for updates every 24 h; run `opencode plugin check`, then `opencode plugin update @rphang/opencode-workflows`. To update a pinned install, change the version in the config. |

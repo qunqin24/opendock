@@ -15,7 +15,7 @@ behind you. Cockpit is the instrument panel: things your agent can use, and thin
 what it is doing.
 
 ```sh
-opencode plugin opencode-cockpit@0.5.2 --global --force
+opencode plugin opencode-cockpit@0.6.0 --global --force
 ```
 
 ---
@@ -168,13 +168,13 @@ switches between the live screen and the scrollback, `?` shows details.
 **Everything**
 
 ```sh
-opencode plugin opencode-cockpit@0.5.2 --global --force
+opencode plugin opencode-cockpit@0.6.0 --global --force
 ```
 
 **Only what you want**
 
 ```sh
-opencode plugin @opencode-cockpit/shell@0.5.2 --global --force
+opencode plugin @opencode-cockpit/shell@0.6.0 --global --force
 ```
 
 The version is pinned on purpose. OpenCode resolves a plugin spec once and never again, so a
@@ -188,9 +188,23 @@ installed — and shows every plugin you have, not just this one:
 npx opencode-cockpit@latest update     # or: bunx opencode-cockpit@latest update
 ```
 
-Restart OpenCode. Requires OpenCode 1.18+ on macOS or Linux. Install a feature either through
+Restart OpenCode. Requires OpenCode 1.18+ or 2.0.15+ on macOS or Linux. Install a feature either through
 `opencode-cockpit` or on its own — if both are configured, the first one loaded is used and
 OpenCode warns you which entry to remove.
+
+**On OpenCode 2** the same packages load — one entry serves both versions. v2 reads `plugins` (not
+`plugin`) from `opencode.json` for the agent side and from `cli.json` for the interface, and passes
+options as an object:
+
+```json
+{
+  "plugins": [{ "package": "opencode-cockpit@0.6.0", "options": { "features": { "shell": true } } }]
+}
+```
+
+An existing v1 `opencode.json` with `plugin` is read by OpenCode 2 as well. To update there, change
+the version in that entry — `/plugins-update` and `npx opencode-cockpit update` edit OpenCode 1's
+files only.
 
 **Turn features off** (in both `opencode.json` and `tui.json`):
 
@@ -218,6 +232,26 @@ Later sources win key by key, and an invalid file is ignored rather than fatal. 
 your own commands, define watch rules, cap how long shells live, choose what may interrupt the
 agent, and trade context tokens for accuracy. Each feature's README documents its own settings:
 [Shell](packages/shell#configuration).
+
+## Troubleshooting
+
+```sh
+npx opencode-cockpit@latest doctor
+```
+
+checks OpenCode, its config, Cockpit's logs and the daemon, and prints the fix for anything wrong —
+on OpenCode 1 and 2, and when Cockpit will not load at all ([what it checks](https://codestz.github.io/opencode-cockpit/help/doctor/)).
+
+Everything Cockpit does inside OpenCode goes to one file — which OpenCode loaded which bay, and every
+error with its stack:
+
+```sh
+tail -50 ~/.cache/opencode-cockpit/cockpit.log
+```
+
+`COCKPIT_DEBUG=1 opencode` adds the detail. [Troubleshooting](https://codestz.github.io/opencode-cockpit/help/troubleshooting/) covers
+the failures people hit and what to attach to an issue; [OpenCode 1 and 2](https://codestz.github.io/opencode-cockpit/start/opencode-versions/)
+covers what differs between the two.
 
 ## How it works
 

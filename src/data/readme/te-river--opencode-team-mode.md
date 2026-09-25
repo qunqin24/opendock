@@ -51,6 +51,9 @@ TeamMode's answer to each:
 | 🧭 **Walls of text** | Replies are steered into the shape the host renders fastest: a markdown table for per-file / per-case / per-finding results, fenced code for diffs and configs, a browser screenshot attached as an inline image only when you ask for one. The host does not draw mermaid, so no agent pretends it does. |
 | 🎯 **Goal drift** | The lead opens with `GOAL:` in your own words plus checkable `ACCEPTANCE:` criteria, and the run does not end while a criterion lacks evidence — the only legitimate stops are named (blocked on you, or provably unachievable). When a round settles with items still open on the host's todo list, `tm_join` says 目标未达成 and lists them, and the goal is carried through context compaction so a summarized transcript cannot redefine it. |
 
+| 🗣️ **Replies in a language you never chose** | The governed tools answer in Chinese, and an agent left to its own devices mirrors that straight back at you. Every role now carries a reply-language rule: your own language wins, and a Chinese string is quoted verbatim only where it IS the evidence (a close verdict, a refusal line) — translating a verdict is how an unchecked claim starts looking checked. |
+| ⏱️ **Rounds spent for the sake of looking careful** | 效率至上 is written into the lead and all five specialists: one wide call instead of three narrow ones, independent calls in the same round, ≥3 probes collapsed into one `tm_ptc_run`, no re-running a check to watch it pass again — with the boundary stated too: efficiency never buys its way out of the evidence rule, because an unverified "done" costs you the round *and* the bug. |
+
 And the workflow discipline underneath: deterministic routing, a ≤30-line plan
 you approve before ≥2 dispatches execute, structured `STATUS/CHANGES/FINDINGS/
 EVIDENCE/HANDOFF` replies between agents, and static verification (build /
@@ -263,7 +266,7 @@ through with `tm_fetch` when it genuinely needs the payload.
 | `tm_board_write` | **The blackboard's write side**: places ONE new Markdown file at `<board-root>/<session-key>/<task-slug>/NN-<role>-<topic>[-rN].md` and chooses the name itself — a revision is a new round-suffixed file, never an overwrite, and the reply carries the path plus the byte count, never the content. It exists because the board used to need a file tool, and `architect` / `researcher` own none (no `write`, no `edit`, no `bash` even to stamp the session folder), so every oversized deliverable from those roles came back as `BLACKBOARD WRITE FAILED` plus the whole document pasted inline — the reply shape this team mandates was un-followable exactly where it mattered. Scope is enforced rather than asked: segments sanitized, target realpath-verified against the board root (a symlinked task dir is refused), the name always ends in `.md` so no `.env`/rc file can be produced, caps via `TM_BOARD_MAX_CHARS` + a per-session file limit | All six agents |
 | `tm_ptc_run` | Batch orchestration: one program, N governed calls, zero LLM round-trips; web roles also get `tm.search` / `tm.webfetch` inside the program | all six agents |
 | `tm_search` | Multi-engine web search with extracted, deduplicated, RRF-fused hit lists | Lead + Researcher |
-| `tm_webfetch` | Single governed GET of an allowlisted page (search pages auto-extracted) | Lead + Researcher |
+| `tm_webfetch` | Single governed GET of an allowlisted page (search pages auto-extracted). Manual redirects, re-checked per hop, and a refusal names the WHOLE chain (`跳转链: a → b（停在第 2 跳）`) — an allowlisted shortener that bounces off-site used to report only the off-site host, which read as "that site will not fetch" and sent the agent back to retry the entry URL it had just watched fail. A 429/503 carries its own `Retry-After` when the server sends delta-seconds (an HTTP-date is deliberately not laundered into a countdown), so "come back later" never looks like "no content here". The page GET also asks for Markdown first (`Accept: text/markdown,…`) — measured on `learn.microsoft.com`: 60,778 B of HTML becomes 11,449 B of Markdown, and every other host tried returns the same document either way, so the preference is free where it is ignored | Lead + Researcher |
 | `tm_join` | **Sub-agent collection** — there is no plugin-side dispatcher any more (`tm_dispatch` is removed: a child a plugin creates is a session the user can neither open nor stop from the interface). Delegation goes through the host's own `task` / `task { background: true }`, and `tm_join` is the read side: a status snapshot, a bounded `waitMs`, `cancel:true` to abort, and `claimNamedChild` so `tm_join { ids: ["ses_…"] }` pulls one child's WHOLE reply back through the offload pipeline (handle + ≤80-token preview) instead of kilotokens inline. It also rebuilds its registry from the host session tree after a restart, so leftover children are 接管 rather than lost | Lead only |
 | `tm_pty` | **Non-blocking command execution** on the host's own terminal sessions (`start`/`status`/`list`/`kill`) — independent builds and test suites overlap instead of queueing behind one 120 s bash call. Captures no output (the command tees its own log; read it with `tm_read`), and every start passes the R6 classifier, the R2 danger-face globs **and** the official confirmation dialog before a process exists | Lead only |
 | `tm_stats` | **The plugin reads its own trajectory back**: tokens kept out of the context window by offloading (net of the preview that arrived), seconds saved by dispatch overlap (serial cost minus the wall window the children actually used), PTC internals, governance counts (blocked subresources, refused `tm_pty` starts, clamped bash timeouts, cache hits, redactions) — plus the **host capability matrix** (`已验证/存在未用/待观察/缺失/需人眼` per host surface). Read-only over files this plugin wrote; run it first after an OpenCode upgrade. `{ recent: 20 }` appends a call-by-call recap — handle + payload path for every offloaded result, which is how you see what a governed tool actually returned (the host gives plugin tools no expandable card) | All agents |
@@ -418,7 +421,20 @@ Two more channels complete the surface:
   `npx playwright install` is not part of the user flow (the dependency
   itself resolves at npm install/publish time). Isolated temp profile by
   default: persistent logins only if you explicitly set
-  `TM_BROWSER_USER_DATA_DIR`.
+  `TM_BROWSER_USER_DATA_DIR`. No cookies by design — the agent opens a blank
+  profile, which is also why a risk-scored site (Baidu) may hand it a
+  verification wall your own window walks past. Want it logged in: point the
+  variable at a DEDICATED directory and log in once by hand. The browser's **own** site-permission bubble
+  ("…wants to access other apps and services on this device") is
+  auto-**denied** at launch: that modal is not our confirmation channel, it has
+  no timeout, and on a machine left running unattended it would hang the page
+  indefinitely. Nothing is ever auto-allowed — a page that truly needs such a
+  permission fails visibly at that feature instead of invisibly at a dialog. A
+  window an agent forgets is now **reported**, not merely reaped: `open` states
+  the close duty in its own reply (with the real idle seconds), the reply
+  contract requires the tool's close verdict in `EVIDENCE`, and `tm_join` tells
+  the lead `⚠ N 个浏览器还开着` when a sub-agent settled while still holding one
+  — so you are never the only one who notices.
 
 When a fetch still returns **403 after the real-Chrome headers**, the error
 is a DIRECTIVE: the gate is JS-challenge / TLS-fingerprint based and only a
@@ -484,7 +500,13 @@ silently allowed. The normal verification stack (`npm test`, `tsc`,
 > ⚠️ **When you approve a dialog, pick "once" — not "always".** Verified on
 > the live host, "always" records a far broader rule than the command you
 > saw: approving `Get-ChildItem env:PATH` with "always" stores `Get-ChildItem
-> *`, so every later `Get-ChildItem` runs with no dialog at all.
+> *`, so every later `Get-ChildItem` runs with no dialog at all. The web
+> channel has the same trap and it is easier to fall into: one "always" on a
+> host lets **every agent session in that project** open it, so the per-agent
+> browser consent never gets asked again. The reply now says which path let a
+> page in (static allowlist / the dialog you just answered / a saved rule that
+> answered in milliseconds), because an agent that cannot tell them apart
+> reports "no dialog" as "that site is allowed".
 
 > Deferral to the dialog is per-session: env reads only route to the dialog
 > in sessions running TeamMode's injected agents. In any other session the
@@ -557,7 +579,7 @@ for overrides, extra agents and disabling roles.
 | `TM_BOARD_MAX_FILES` | `200` | tm_board_write: markdown files allowed per session folder; the TTL sweeper is the only reclaim path, so the refusal names it and the `ttlDays` option |
 | `TM_BASH_READONLY_ALLOWED` | built-in table | tm_bash allowlist |
 | `TM_SEARCH_DEFAULT_ENGINE` | `auto` | tm_search engine when no `engine` arg is given (`auto` = classify + parallel fan-out + RRF fusion; any table name also pins a manual default) |
-| `TM_WEBFETCH_ALLOWED_DOMAINS` | the 24 seeded hosts | tm_webfetch / tm_search / tm_browser allowlist (`"*"` opens all; empty = deny all; a custom list REPLACES the seed — keep the engine hosts). A site's own asset CDN has to be seeded or `tm_browser` renders it blank — `bdimg.com` is there for exactly that reason; per-session gaps go through `tm_browser { action:"allow_host", host }` instead of an env edit |
+| `TM_WEBFETCH_ALLOWED_DOMAINS` | the 24 seeded hosts | tm_webfetch / tm_search / tm_browser allowlist (`"*"` opens all; empty = deny all; a custom list REPLACES the seed — keep the engine hosts). A site's own asset CDN has to be seeded or `tm_browser` renders it blank — `bdimg.com` is there for exactly that reason; per-session gaps go through `tm_browser { action:"allow_host", host }` instead of an env edit. `"*"` does **not** cover private space: loopback / RFC1918 / CGNAT / `.localhost` still need the dialog on every use, and non-routable ranges (169.254.0.0/16 metadata, 0.0.0.0/8, multicast, reserved, plus the IPv4-mapped and DNS64 spellings of the same target) are a hard red line no setting can open |
 | `TM_BROWSER_PATH` | auto-detect | tm_browser executable override (default: your DEFAULT browser when Chromium-family, else Edge/Chrome probes) |
 | `TM_BROWSER_HEADLESS` | `auto` | `1` headless (CI) / `0` headful / `auto` (headless only on display-less Linux) |
 | `TM_BROWSER_ENGINE` | `playwright` | `playwright` (needs Node ≥ 20; any import failure auto-degrades) / `cdp-legacy` (zero-dep CDP pipe, core verbs only) |
@@ -583,7 +605,7 @@ for overrides, extra agents and disabling roles.
 | `TM_COMPACTION_AUTOCONTINUE` | `on` | `off` stops the host from silently resuming the turn after a compaction, so a human re-reads state first |
 | `TM_SHELL_NO_COLOR` | `on` | inject `NO_COLOR`/`TERM=dumb` into every child shell via `shell.env` (ANSI progress bars are pure context tax). Never overwrites a value the host already set |
 | `TM_SHELL_ENV` | — | explicit `KEY=VALUE;KEY2=VALUE2` passthrough into child shells — deliberately allowlisted, so this hook can't become a side channel for the parent environment |
-| `TM_BROWSER_USER_DATA_DIR` | — (isolated temp profile) | explicit persistent profile dir — the ONLY way logins survive between sessions |
+| `TM_BROWSER_USER_DATA_DIR` | — (isolated temp profile) | explicit persistent profile dir — the ONLY way logins survive between sessions, and honored by BOTH engines (playwright and cdp-legacy). Use a DEDICATED directory (e.g. `D:\tm-browser-profile`) and log in by hand the first time; pointing it at your browser's own data dir (`…\Microsoft\Edge\User Data`, `google-chrome`, Firefox `Profiles`) is refused before anything spawns, because that would have the agent browse as you while a force-kill reaper owns the process |
 | `TM_MEMORY_GLOBAL_DIR` | `~/.opencode-team/memories/global/` | tm_memory GLOBAL tier store |
 | `TM_MEMORY_SESSION_TTL_MIN` | `240` | session-tier entry TTL (lazy + boot sweep) |
 | `TM_MEMORY_MAX_ENTRIES` | `200` | per-scope entry cap; over it `add` fails on purpose — run `compact` |

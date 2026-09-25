@@ -189,7 +189,7 @@ Image support is resolved in this order:
 2. The `Capabilities` column in Cursor's [`docs.md`](https://cursor.com/docs.md), generated alongside context and pricing metadata
 3. Text-only when neither source describes the model
 
-OpenCode image file parts are decoded from bytes, base64/data URLs, local file URLs, or HTTP(S) URLs and sent through Cursor's `UserMessage.selected_context.selected_images` field. On fresh or rebased Runs, the provider also harvests image `file-data` from tool results and `file` parts from assistant history; previously sent history images are deduplicated by content hash per OpenCode session. Held-open continuation results remain text-only because Cursor's exec-result channel has no image field. Attachments are limited to 20 MiB total, matching OpenCode's desktop attachment budget. PDF, audio, and video inputs are not advertised or silently discarded.
+OpenCode image file parts are decoded from bytes, base64/data URLs, local file URLs, or HTTP(S) URLs and sent through Cursor's `UserMessage.selected_context.selected_images` field. On fresh or rebased Runs, the provider also harvests image `file-data` from tool results and `file` parts from assistant and historical user messages (the trailing user message stays owned by last-user extraction); previously sent history images are deduplicated by content hash per OpenCode session. Held-open continuation results remain text-only because Cursor's exec-result channel has no image field. Attachments are limited to 20 MiB total, matching OpenCode's desktop attachment budget. PDF, audio, and video inputs are not advertised or silently discarded.
 
 #### Max mode
 

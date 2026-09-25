@@ -11,7 +11,7 @@ A complete multi-agent engineering team for OpenCode v2 — one orchestrator pri
 - **Delegation-first orchestration.** `drive` breaks work into parallel waves, gates each wave on a Definition-of-Done, and never falls back to "do it yourself" — subagents own the work end-to-end.
 - **10 role-tuned agents, role-scoped permission sets.** Each agent ships with the narrowest permission set it needs; no agent gets more than its role requires.
 - **Skills stay yours.** Shipped skill defaults are contract-only —
-  each agent loads exactly its own plugin skill and nothing else;
+  each agent may load exactly its own plugin skill and nothing else;
   install whatever you want and opt each agent in from `opencode.jsonc`.
 - **Coexists with stock `plan` / `build`** — the plugin no longer removes
   them; to disable them yourself:
@@ -53,8 +53,12 @@ OpenCode v2 native key is `plugins`; opencode installs the npm package automatic
 ## Tuning subagent skill access
 
 Shipped defaults are a **contract-only whitelist**: `drive` loads
-`workflow-driver`; every subagent loads the mandatory
-`workflow-subagent` contract — and nothing else. Any other skill,
+`workflow-driver`; every subagent runs under the mandatory
+`workflow-subagent` contract — and loads nothing else. The
+`workflow-subagent` contract body is injected into every subagent's
+system prompt by the plugin's session hook, so compliance is
+mechanical, not prompt-hoped
+([docs/skills.md](docs/skills.md#enforcement)). Any other skill,
 companion skills included, is purely opt-in: append one `allow` rule
 for it in the tail and `findLast` beats the plugin's deny-all.
 Full table and discovery paths: [docs/skills.md](docs/skills.md#default-state).
@@ -69,8 +73,8 @@ kept set must always include the mandatory `workflow-subagent`.
 Full worked example and more recipes: [docs/skills.md](docs/skills.md#recipe--set-an-explicit-skill-list-for-coder).
 
 > Keep `workflow-driver` allowed for `drive` and `workflow-subagent`
-> allowed for every subagent — the plugin's methodology breaks without
-> them; canonical warning: [docs/skills.md](docs/skills.md#recipe--give-drive-extra-skills).
+> allowed for every subagent; canonical warning:
+> [docs/skills.md](docs/skills.md#recipe--give-drive-extra-skills).
 
 ## Companion skills (optional)
 
@@ -103,6 +107,20 @@ one `allow` rule appended to the tail:
 Agents ship **unpinned** and inherit your default model. Recommended
 tier classes and the pin recipe:
 [docs/agents.md#model-guidance](docs/agents.md#model-guidance).
+
+### Per-agent model routing
+
+Pin a specific model for any agent in your `opencode.jsonc` — last
+match wins like skills:
+
+```jsonc
+{
+  "agents": {
+    "coder": { "model": "provider/model" },
+    "code-reviewer": { "model": "provider/model" },
+  },
+}
+```
 
 ## Adopting the plugin
 

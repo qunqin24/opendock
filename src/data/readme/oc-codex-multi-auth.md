@@ -9,6 +9,8 @@
 
 Use it when you want OpenCode to run Codex-style coding workflows from your own ChatGPT subscription while keeping accounts visible, switchable, health-checked, and recoverable from the terminal.
 
+**OpenCode V2 is supported (2.0.16+).** The V2 adapter uses the existing OAuth account pool and Codex routing pipeline; the V1 entrypoint remains available for OpenCode 1.18.29+. See [OpenCode V2 installation](#opencode-v2) for setup and login instructions.
+
 <img width="1227" height="702" alt="oc-codex-multi-auth OpenCode plugin dashboard for ChatGPT OAuth, Codex routing, and multi-account health" src="https://github.com/user-attachments/assets/b796eb2f-282e-468a-ba6a-acadf09d731b" />
 
 
@@ -73,6 +75,57 @@ The plugin does not replace OpenCode. OpenCode remains the host; this package in
 ---
 
 ## Installation
+
+### OpenCode V2
+
+The V2 compatibility adapter targets OpenCode **2.0.16 or newer** and reuses the
+existing OAuth account pool, refresh, rotation, retry, and Codex request pipeline.
+Register the package in `opencode.json(c)`:
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugins": ["oc-codex-multi-auth"]
+}
+```
+
+For a working checkout, use its absolute directory path in `plugins`, then run
+`npm install` and `npm run build` in that checkout. The V2 terminal automatically
+loads the package's quota UI through its `./tui` export.
+
+The installer also accepts `--v2` to register the plugin without rewriting the
+model catalog. It refuses to modify an existing `opencode.jsonc` or convert a
+config with V1 `plugin` entries: edit the JSONC `plugins` list directly, or keep
+separate V1 and V2 configurations so the V1 registration is not lost. Restart
+the background service after installing or rebuilding:
+
+```bash
+opencode service restart
+```
+
+Run `opencode auth login` from your project directory and select **OpenAI** →
+**Codex OAuth (Add account — ChatGPT Plus/Pro)**. Repeat for each account, using
+a private browser window or switching browser accounts to select a different login.
+The built-in **ChatGPT Pro/Plus (browser)** method does not run the plugin's add-account flow.
+The plugin's **Device Code**, **Open URL Manually**, and **Manual URL Paste**
+methods are also available through login or `/connect`. Each adds to the pool;
+logging into the same account updates its existing entry. Pools are per-project
+by default, so log in from the directory where you use OpenCode. Existing
+plugin accounts remain usable; V2's own credentials are managed through its
+integration API. Use the plugin's `codex-list` and `codex-switch` tools to manage
+its pool. V2 normalizes tool names, so these appear as `codex_list`, `codex_switch`,
+and so on. The **Codex accounts** sidebar section lists the pool and marks its
+active account. Use `/codex-accounts` or **Codex accounts** in the command palette
+to view the list even when the sidebar is hidden. The quota details command is
+also available in the command palette.
+
+Existing supported V1 provider/model config can remain in place. The adapter
+uses HTTP Responses through the existing plugin transport. V1's interactive
+multi-account login menu and session-repair client calls are replaced by the
+V2 connection UI and host session handling. The V1 entrypoint remains available
+for OpenCode **1.18.29+**.
+
+### OpenCode V1
 
 <details open>
 <summary><b>For Humans</b></summary>
@@ -244,7 +297,7 @@ If browser launch is blocked, use the alternate login paths in [docs/getting-sta
 | `codex-switch` | How do I move to a different saved account? |
 | `codex-warm` | How do I start every account's usage window now (stagger quota cooldowns)? |
 | `codex-status` | Which account, model family, and routing state are active? |
-| `codex-limits` | What quota or rate-limit state is visible now? |
+| `codex-limits` | What quota is visible now, per account and across the pool? |
 | `codex-reset` | Do I have a banked rate-limit reset credit, and how do I redeem it? |
 | `codex-dashboard` | What does a read-only snapshot of account eligibility, retry budgets, and refresh queue health show? |
 | `codex-pool` | Which accounts are preferred for each model, and how do I change them? |
@@ -288,6 +341,7 @@ Most of these also run as a **direct CLI** with no agent or model involvement, s
 - Business workspace memberships and Personal accounts keep separate usage and quota windows. Business members sharing one workspace are distinguished by their member/seat identity, so their usage is not collapsed into one row.
 - An account identifies itself by its own ChatGPT email and the last 6 characters of its account id, with the email masked when `maskEmail` is on. An account id names a ChatGPT workspace and every member of a Business workspace shares it, so a record that also carries a member/seat id prints a short excerpt of that as `seat:`. The excerpt is a 6-character tail where that is enough to tell the listed accounts apart. Where it is not, it widens, moves to where those ids first differ, or joins two short excerpts with `..` - real member ids are long, share a leading prefix, and differ in more than one place, so a tail alone often cannot separate them. Where no excerpt that short can separate them, `seat:` is instead an **opaque hash prefix** such as `719f78b5`: it identifies the seat and stays stable, but it is not part of the member id and cannot be matched against anything ChatGPT shows you. Whichever form it takes, two distinct seats never render the same `seat:` and a `seat:` is never longer than 32 characters. A record with no member id renders exactly as before. The OAuth id_token also lists the API-platform organizations the login belongs to; those are not ChatGPT workspaces and are never used to name an account, so logging in clears a label left behind by one. A label you set with `codex-label` is always kept.
 - The ChatGPT plan (`Free`, `Plus`, `Pro`, `Business`, `Business Premium`, `Enterprise`) is read from the access token, refreshed on every token refresh, and shown by `codex-list` and `codex-status`. `codex-limits` and the TUI read the plan live from the usage endpoint and name it the same way. An unrecognized plan is reported verbatim rather than renamed.
+- `codex-limits` and the standalone `limits` CLI name what one of that plan's seats is worth beside the others (`Plan: Pro (20x)`) and close with what the pool holds between them (`Pool: 93% used of 81x across 11 accounts`). The percentage is a **weighted** mean over exactly that `81x`, since a spent Pro seat costs the pool twenty times what a spent Plus seat does, and an account whose usage could not be read is left out of both figures. A plan that publishes no ratio carries no badge but still weighs one baseline seat. See [docs/tools-and-cli.md](docs/tools-and-cli.md#what-limits-reports) and [docs/plan-allotments.md](docs/plan-allotments.md).
 
 ---
 
@@ -413,9 +467,17 @@ does at 50%, so an unweighted average would describe a pool nobody has. The
 per-plan ratios are listed in [docs/plan-allotments.md](docs/plan-allotments.md),
 and `"allotment": true` shows what they add up to.
 
+For just that total and its recovery forecast, use `"layout": "total"`,
+`"recovery": "all"`, and `"allotment": false`. This reads, for example,
+`25% +1% in 3h, +12% in 3d, +5% in 4d`: each positive figure is incremental
+capacity returned in percentage points, even with `quotaDisplay: "used"`.
+See the [forecast semantics](docs/configuration.md#what-the-line-says).
+
 `mode` also accepts a list, and the line then alternates between those screens
-every `rotateMs` (default 5000). The third screen, `resets`, appears only once
-every account is spent and lists the banked reset credits worth redeeming,
+every `rotateMs` (default 5000). The third screen, `resets`, appears by default
+once every readable account is spent. Set `resetsMinUsedPercent` (0-100) to
+show it earlier, for example at 90% total weighted usage. It lists known
+applicable banked reset credits,
 latest reset first - redeeming one on an account that renews by itself tomorrow
 throws it away:
 
@@ -444,6 +506,8 @@ Add the object to `~/.opencode/openai-codex-auth-config.json`. It is read from
 that file only - a display preference belongs to a person, not to a shell - and
 the status line re-reads it while sessions are open, so an edit takes effect
 within a couple of seconds without a restart.
+New plugin code still needs a one-time process restart after an upgrade;
+subsequent changes to these settings reload live.
 
 ### Desktop quota notifications
 
