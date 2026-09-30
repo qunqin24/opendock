@@ -22,6 +22,7 @@ import { fileURLToPath } from 'node:url';
 
 import { getJSON, graphql, mapLimit } from './lib/http.mjs';
 import { JSONCache } from './lib/cache.mjs';
+import { fetchDownloads } from './lib/downloads.mjs';
 import { classify, ALL_CATEGORIES } from './lib/categories.mjs';
 import { computeScore, healthSignals, credibleStars } from './lib/score.mjs';
 
@@ -167,63 +168,6 @@ async function fetchRepos(slugs, cache) {
   return result;
 }
 
-// ------------------------------------------------------------ npm downloads
-
-/**
- * Downloads are an enrichment signal, not a hard requirement — a throttled
- * or failed call degrades that package to 0 rather than failing the build.
- */
-async function fetchDownloads(names, period, cache) {
-  const out = new Map();
-
-  const pending = [];
-  for (const name of names) {
-    const hit = cache.get(`${period}:${name}`);
-    if (hit !== undefined) out.set(name, hit);
-    else pending.push(name);
-  }
-  names = pending;
-
-  const scoped = names.filter((n) => n.startsWith('@'));
-  const plain = names.filter((n) => !n.startsWith('@'));
-
-  // The bulk endpoint accepts up to 128 unscoped packages per call.
-  for (let i = 0; i < plain.length; i += 100) {
-    const chunk = plain.slice(i, i + 100);
-    const data = await getJSON(`https://api.npmjs.org/downloads/point/${period}/${chunk.join(',')}`).catch(() => null);
-    for (const [name, v] of Object.entries(data ?? {})) {
-      if (v?.downloads != null) {
-        out.set(name, v.downloads);
-        cache.set(`${period}:${name}`, v.downloads);
-      }
-    }
-  }
-
-  // Scoped packages are not supported by the bulk endpoint, so they need one
-  // request each. api.npmjs.org sits behind Cloudflare and throttles on burst
-  // rate, so pace them: low concurrency, a small gap, and few retries — a
-  // package that stays throttled falls back to 0 rather than stalling the run.
-  let n = 0;
-  await mapLimit(scoped, 2, async (name) => {
-    const data = await getJSON(`https://api.npmjs.org/downloads/point/${period}/${name}`, { retries: 2 }).catch(
-      () => null,
-    );
-    if (data?.downloads != null) {
-      out.set(name, data.downloads);
-      cache.set(`${period}:${name}`, data.downloads);
-    }
-    if (++n % 100 === 0) {
-      process.stdout.write(`\r  ${period} scoped ${n}/${scoped.length}`);
-      await cache.save();
-    }
-    await new Promise((r) => setTimeout(r, 120));
-  });
-  if (scoped.length) process.stdout.write('\n');
-
-  await cache.save();
-  return out;
-}
-
 // ------------------------------------------------------------------ history
 
 async function loadJSON(file, fallback) {
@@ -361,8 +305,12 @@ async function main() {
 
   log('fetching npm downloads…');
   const names = records.map((r) => r.name);
-  const monthly = await fetchDownloads(names, 'last-month', dlCache);
-  const weekly = await fetchDownloads(names, 'last-week', dlCache);
+  // The committed snapshot survives expired/missing Actions caches. Never turn a
+  // temporary downloads outage into zero adoption scores for existing packages.
+  const previous = await loadJSON(OUT_FILE, { plugins: [] });
+  const fallback = (field) => new Map(previous.plugins.map((p) => [p.name, p[field]]));
+  const monthly = await fetchDownloads(names, 'last-month', dlCache, { fallback: fallback('downloadsMonth'), log });
+  const weekly = await fetchDownloads(names, 'last-week', dlCache, { fallback: fallback('downloadsWeek'), log });
 
   const history = trimHistory(await loadJSON(HISTORY_FILE, {}), today);
 

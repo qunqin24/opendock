@@ -39,6 +39,11 @@ export class JSONCache {
     return entry.v;
   }
 
+  /** Last successful value, even after TTL expiry; callers must still try refreshing. */
+  getStale(key) {
+    return this.#data[key]?.v;
+  }
+
   set(key, value) {
     this.#data[key] = { t: Date.now(), v: value };
     this.#dirty = true;
