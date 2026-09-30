@@ -5,7 +5,7 @@
 **Live session telemetry for your OpenCode terminal.**
 *The numbers where you're already looking — because your agent is spending money right now.*
 
-![npm](https://img.shields.io/npm/v/oc-flight-deck) ![license](https://img.shields.io/badge/license-MIT-blue) ![opencode](https://img.shields.io/badge/opencode-V2-compatible-8A2BE2) ![node](https://img.shields.io/badge/node-%E2%89%A522-green)
+![npm](https://img.shields.io/npm/v/oc-flight-deck) ![license](https://img.shields.io/badge/license-MIT-blue) ![node](https://img.shields.io/badge/node-%E2%89%A522-green) ![downloads](https://img.shields.io/npm/dm/oc-flight-deck) ![check](https://img.shields.io/github/actions/workflow/status/nathwn12/oc-flight-deck/check.yml)
 
 </div>
 
@@ -27,8 +27,6 @@ Restart OpenCode. **That's the whole setup.** No config file, no options, nothin
 ## 📊 The panel
 
 ```text
-✈ FLIGHT DECK
-──────────────────────────────
 status     ⠹ running
 agent      orchestrator
 model      deepseek-v4.1-flash · high
@@ -43,13 +41,15 @@ tps        18 tok/s
 
 Every row is read from the open session at render time — except `caution`, which watches a clock rather than events (a hang emits none); `elapsed`, which is seeded once from the session's own recorded assistant turn spans and then accumulates the busy windows this run observes, rather than a value the session reports; and the opt-in `guard` row, which is polled from the local guard RPC.
 
+The panel's only fixed text — `▸ FLIGHT DECK` over a separator — is **opt-in**. It renders in the sidebar footer slot, a separate host region **below** the rows: the top of the rail starts directly with the live rows. Since 0.8.1 the footer is empty by default, so a fresh install draws the live rows and nothing else; set `sidebar.footer.lines` to the pair to re-enable it (see ⚙️ Configure). The footer is independent of `sidebar.rows` and `sidebar.maxLines`.
+
 | Row | What it shows |
 |---|---|
-| `caution` | **The annunciator** — silent unless something stopped moving |
+| `caution` | **The annunciator** — silent unless something stopped moving · **off by default** |
 | `status` | A spinner while anything is working, a circle while it's idle |
 | `agent` | Which agent you're actually talking to |
 | `model` | The model **and its variant** — `high` behaves differently |
-| `branch` | The branch you're about to commit to |
+| `branch` | The branch you're about to commit to · **off by default** |
 | `cost` | This conversation **plus its subagents**, and the count that explains it; with `total` on the rail, the session figure alone |
 | `total` | The family total and subagent count on a row of its own · **off by default** |
 | `project` | Every session in this project, not just the one on screen |
@@ -63,10 +63,11 @@ Every row is read from the open session at render time — except `caution`, whi
 | `reasoning` | Reasoning tokens, when the model emits them · **off by default** |
 | `turns` | How many prompts you've sent this session · **off by default** |
 | `guard` | Harness status from oc-harness-guard · **off by default** |
+| `go` | Zen Go account usage — a dial and a whole-number percent for the **5h**, **1w**, and **1m** windows, in that fixed order; a window at 90% or more turns its dial and number red, and the reset hint appears only then · **off by default** |
 
 `project` matches on the host's **project id**, not on a directory, so a worktree counts as part of the same project. A host that reports no project id leaves nothing to match on, and the row then totals every session that host knows about.
 
-The rows marked **off by default** are available but not in the default rail: add any of them to `sidebar.rows`.
+The rows marked **off by default** — `caution`, `branch`, `total`, `spark`, `reasoning`, `turns`, `guard`, and `go` — are available but not in the default rail: add any of them to `sidebar.rows`. `caution` also needs `caution.enabled: true`; `go` needs `OPENCODE_GO_API_KEY` in the environment.
 
 Every field named in `sidebar.rows` renders exactly one row, in order. With `sidebar.persist` (the default), a row with no data yet shows the `sidebar.placeholder` value (default `—`) in the same label column as a live row — so the rail keeps a stable shape instead of growing rows as the session produces data. Set `"persist": false` to restore omission: rows with no data are left out entirely.
 
@@ -77,6 +78,8 @@ The `guard` row only appears when oc-harness-guard is installed and answering; w
 ## 🚨 `caution` — calibrated, not guessed
 
 A hang emits no events — its only signature is *absence*. So `caution` watches a clock, stays silent on healthy sessions, and when it speaks it reports what it saw, never what it means: `shell running 8m41s`, not "stuck".
+
+The annunciator ships **off by default** — it is the one row that runs a clock of its own, so an install that never asks for it spends nothing on it. To use it, add `caution` to `sidebar.rows` **and** set `caution.enabled: true`.
 
 > Measured over **54,218 real settled tool calls**: 0.57% ran past three minutes — with the exempt list, **0.20%** light the row. A ten-minute build is not a hang.
 
@@ -106,9 +109,22 @@ The file is optional, and a missing file is normal and silent: with no file at a
 
 > **Upgrading from 0.4.0 — the config file moved.** The per-project search is gone. A `flight-deck.jsonc` in a project root or in `.opencode/` is no longer read; move it to `~/.config/opencode/flight-deck.jsonc` (or the `$XDG_CONFIG_HOME` path above) to keep your settings.
 
+> **Upgrading from 0.7.0 — the branding moved.** The `▸ FLIGHT DECK` pair now renders in the sidebar footer slot, and `sidebar.lines` defaults to empty, so the top of the rail starts with the live rows. An explicit `sidebar.lines` is kept — it does not suppress the footer default; `sidebar.footer.lines: []` is the way to drop the footer entirely.
+
+> **Upgrading from 0.8.0 — the branding is opt-in since 0.8.1.** The footer slot no longer ships the `▸ FLIGHT DECK` pair by default: with `sidebar.footer.lines` empty (the new default) nothing renders below the rows and no footer slot is claimed. Set `sidebar.footer.lines` back to the pair to get the footer exactly as it was.
+
 `sidebar.rows` picks the rows and their order; `sidebar.maxLines` caps the whole rail (fixed lines plus rows, default 24, configurable from 1 to 24); `layout.labelWidth` fits your terminal; `format.duration` switches the `elapsed` row between `spaced` (`2h 14m 37s`, the default) and `compact` (`2h14m37s`).
 
-Optional styling lives under `style`: `style.lines` controls fixed branding/separator lines, `style.rows."*"` sets every live row, and `style.rows.cost` (or another row name) overrides one field while inheriting omitted values from the wildcard. Colors are theme roles - `default`, `subdued`, `warning`, `error`, `success`, `info` - and attributes are OpenTUI descriptors: `bold`, `dim`, `italic`, `underline`, `blink`, `inverse`, `hidden`, `strikethrough`. Defaults keep the existing theme-native look; no ANSI escapes or raw colors are needed. Invalid colors, attributes, and row names are reported and safely ignored.
+`sidebar.footer.lines` sets the fixed lines in the sidebar footer slot — empty by default since 0.8.1, in a region the host draws below the rows. Set it to the documented pair to re-enable the branding:
+
+```jsonc
+// inside "sidebar":
+"footer": { "lines": ["▸ FLIGHT DECK", "─────────────────"] }
+```
+
+It is independent of `sidebar.lines`: setting your own top lines does not turn the footer on, and an explicitly empty `"lines": []` inside `sidebar.footer` keeps the slot off entirely. The footer never counts against `sidebar.maxLines`.
+
+Optional styling lives under `style`: `style.lines` controls the fixed branding/separator lines (the opt-in footer pair when you set `sidebar.footer.lines`, or whatever `sidebar.lines` you set), `style.rows."*"` sets every live row, and `style.rows.cost` (or another row name) overrides one field while inheriting omitted values from the wildcard. Colors are theme roles - `default`, `subdued`, `warning`, `error`, `success`, `info` - and attributes are OpenTUI descriptors: `bold`, `dim`, `italic`, `underline`, `blink`, `inverse`, `hidden`, `strikethrough`. Defaults keep the existing theme-native look; no ANSI escapes or raw colors are needed. Invalid colors, attributes, and row names are reported and safely ignored.
 
 Everything else lives in the example file, documented inline - a typo is never fatal: the bad value is ignored, the default comes back, and you get a one-time toast naming the key to fix.
 
@@ -119,7 +135,7 @@ Everything else lives in the example file, documented inline - a typo is never f
   "sidebar": {
     "maxLines": 24,
     "rows": [
-      "caution", "status", "agent", "model", "branch", "cost", "project",
+      "status", "agent", "model", "cost", "project",
       "tokens", "cache", "context", "perms", "elapsed", "tps"
     ]
   },
@@ -185,7 +201,7 @@ Built on the official [OpenCode V2 CLI plugin API](https://opencode.ai/v2/docs/b
 
 | | |
 |---|---|
-| Built against | `@opencode/plugin` `2.0.16` — pin a host version you've tested |
+| Built against | `@opencode/plugin` `2.0.19` — pin a host version you've tested |
 | Host | OpenCode V2 (`opencode2`) |
 | Building from source | Node ≥ 22 or Bun ≥ 1.4 |
 | Writes | In-memory counters only — the animation tick, plus the `guard` row's polled status when `guard` is on; nothing to disk |
@@ -194,7 +210,7 @@ Built on the official [OpenCode V2 CLI plugin API](https://opencode.ai/v2/docs/b
 
 <div align="center">
 
-Built against `@opencode/plugin` 2.0.16 · Node ≥ 22 / Bun ≥ 1.4 · OpenCode V2
+Built against `@opencode/plugin` 2.0.19 · Node ≥ 22 / Bun ≥ 1.4 · OpenCode V2
 
 **MIT © 2026 nathwn12** · For OpenCode. Free.
 

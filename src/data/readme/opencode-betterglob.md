@@ -1,94 +1,129 @@
 # 🛠️ Better OpenCode Tools
 
-**Better OpenCode Tools** is a monorepo of standalone OpenCode plugins that
-replace the built-in `glob`, `grep`, and `read` tools with faster, stricter, and
-more predictable implementations.
+[![betterglob](https://img.shields.io/npm/v/opencode-betterglob?label=betterglob)](https://www.npmjs.com/package/opencode-betterglob)
+[![bettergrep](https://img.shields.io/npm/v/opencode-bettergrep?label=bettergrep)](https://www.npmjs.com/package/opencode-bettergrep)
+[![betterread](https://img.shields.io/npm/v/opencode-betterread?label=betterread)](https://www.npmjs.com/package/opencode-betterread)
+[![License: MIT](https://img.shields.io/github/license/dhaern/better-opencode-tools)](./LICENSE)
 
-The goal is simple: keep the familiar OpenCode tool IDs while improving the
-runtime behavior behind them.
+Three OpenCode plugins that replace the built-in `glob`, `grep` and `read` tools.
+They register under the same tool IDs and accept the arguments models already
+use, so prompts and agents keep working unchanged. Behind the call, output stays
+inside the host budget and says where to continue, search processes cannot hang,
+and results come back in the same order on every run.
 
-## ✨ What is included?
+Each plugin is published on its own. Install only the ones you want.
 
-| Plugin | Replaces | Main advantage |
+| Plugin | Replaces | What it does |
 | --- | --- | --- |
-| [`opencode-betterglob`](./packages/opencode-betterglob) | `glob` | Fast `ripgrep`-powered file discovery with safer limits and native-style output. |
-| [`opencode-bettergrep`](./packages/opencode-bettergrep) | `grep` | Advanced local search with `ripgrep`, fallback handling, rich filters, and hard-kill timeouts. |
-| [`opencode-betterread`](./packages/opencode-betterread) | `read` | Real plugin replacement for file/directory/notebook reading with stricter permissions and robust output budgeting. |
+| [`opencode-betterglob`](./packages/opencode-betterglob) | `glob` | File discovery on top of `rg --files`, with a default limit of 500 paths, mtime or path sorting and a hard deadline. |
+| [`opencode-bettergrep`](./packages/opencode-bettergrep) | `grep` | Content search on top of ripgrep, with a GNU grep fallback, the full ripgrep filter set and SIGTERM-then-SIGKILL timeouts. |
+| [`opencode-betterread`](./packages/opencode-betterread) | `read` | Text, directories, notebooks, images, PDFs and binaries, with its own permission checks and an output budget that follows your OpenCode config. |
 
-## 🆕 Release 0.3.1
+## 🎯 What you notice in use
 
-- `bettergrep`/`betterglob`: rg now runs with `--no-mmap`, so a search no longer aborts when a file is truncated while another process edits it. On many-small-files trees this is also cheaper than mmap; large single-file searches may be slightly slower.
+- `read` cuts its output at the host's `tool_output` budget and ends with the
+  offset to continue from, so the model resumes where it stopped and does not
+  re-read what it already has. A single line larger than the budget is reported
+  by number instead of being dropped.
+- Every search process has a deadline and is killed on timeout or cancellation.
+  `glob` launches `rg` directly in its own process group on POSIX and signals
+  the group: SIGTERM at the limit, SIGKILL after 250 ms if it has not closed.
+- Ordering does not depend on timing or locale. `grep` breaks mtime ties by raw
+  path bytes, and `read` sorts directory entries by UTF-16 code units. The same
+  tree gives the same listing on every runtime.
+- The GNU grep fallback runs with `LC_ALL=C.UTF-8` and an empty `LANGUAGE`, so
+  its output parses the same on a machine with a translated locale. If ripgrep
+  fails once, the plugin tries it again after 10 minutes instead of staying on
+  GNU grep for the rest of the session.
+- Startup is lighter. `effect` (in `read`) and `which` and `proper-lockfile` (in
+  `glob`) load on first use. Cold start of `read` dropped from about 260 ms to
+  about 70 ms.
 
-## 🆕 Release 0.3.0
+## ⏱️ Benchmark against the built-in tools
 
-- Security audit fixes across all three plugins (multi-round review): hardened process lifecycle and cleanup confirmation, atomic ripgrep cache publication under inter-process locks, fail-closed symlink traversal, strict ERE translation, byte-exact sorting, and preserved partial results with authoritative metadata.
-- `betterglob`: `follow_symlinks: true` is now explicitly rejected to avoid unsafe traversal races; supervised POSIX process groups with watchdog; `proper-lockfile` for cache installation.
-- `bettergrep`: deterministic top-K admission with context preservation, LF rejection in literal search, binary-match truncation, GNU grep fallback hardened under `LC_ALL=C.UTF-8`.
-- `betterread`: descriptor-safe reads with single-handle ownership and streaming-abort race fixes.
-- Codebase modularized per phase 3 review: oversized modules split into focused units with identical public surface.
-- All packages are aligned to OpenCode `1.18.29`.
+These are timings of the built-in `read`, `grep` and `glob` from the OpenCode
+1.18.32 source and of the three plugins at 1.1.0, measured on one machine over the
+same files. Times are in milliseconds and lower is better. Per-release notes are on
+the [Releases page](https://github.com/dhaern/better-opencode-tools/releases).
 
-## 🚀 Why use these instead of the native tools?
+How it was measured:
 
-### ⚡ Faster file operations
+- Each tool is called in process with the same arguments, with no model or UI in
+  between, so the numbers cover the tool itself.
+- The files are the OpenCode repository (about 6,600 files) and two generated
+  fixtures: a 13 MB log of 200,000 lines and a directory of 5,000 files.
+- The machine is a 4-core Arm Neoverse-N1 VM on Ubuntu 24.04 with ripgrep 15.2.0
+  on `PATH` and a warm file cache.
+- Every case makes 5 to 9 timed calls after a discarded first call, and each run
+  of the suite records their median. The tables show the median across runs: 5 runs
+  for the built-in tools and 4 for the plugins (Bun 1.4.2 and Bun 1.3.14, two runs
+  each). The two Bun versions differ by about 3 ms at most on any row.
+- The built-in `grep` and `glob` return at most 100 results, and the built-in
+  `glob` does not sort. The `grep` and `glob` tables therefore call the plugins
+  with `max_results: 100`, and `glob` also with `limit: 100` and
+  `sort_by: "none"`. The `read` table leaves the plugin on its default budget of
+  2,000 lines or 50 KiB, the same as the built-in. Output sizes are similar but not
+  identical, and differ by up to 2× on the single 300 KB line.
 
-`glob` and `grep` use `ripgrep` where possible, giving excellent performance on
-large repositories while still returning model-friendly output.
+### `read`
 
-### 🧯 Safer execution behavior
+| Case | Built-in | Plugin | Ratio |
+| --- | ---: | ---: | ---: |
+| Small file, 139 lines | 7.7 | 0.9 | 8.2× |
+| File of 2,000 lines | 7.6 | 1.9 | 4.1× |
+| 13 MB log, first window | 6.4 | 1.8 | 3.7× |
+| 13 MB log, 200 lines at offset 150,000 | 330 | 13 | 25.3× |
+| Single line of 300 KB | 3.8 | 0.6 | 6.2× |
+| Minified bundle, 160 KB | 5.5 | 1.8 | 3.1× |
+| Directory of 5,000 entries | 11 | 9.7 | 1.1× |
+| Missing file | 0.6 | 0.3 | 2.2× |
 
-The plugins include hardened timeout and process handling, bounded output
-budgets, safer path handling, and explicit behavior around partial results.
+The plugin is faster on every case. The gap is smallest on the 5,000-entry
+directory (1.1×) and largest when reading 200 lines deep into the 13 MB log.
 
-### 🧭 Better agent ergonomics
+### `grep`
 
-Outputs are formatted for AI agents: line numbers, continuation hints,
-structured metadata, and clear notes when results are partial, capped, or
-metadata-only.
+| Case | Built-in | Plugin | Ratio |
+| --- | ---: | ---: | ---: |
+| Rare literal, whole repository | 42 | 36 | 1.2× |
+| Common word in `*.ts` | 12 | 6.6 | 1.9× |
+| Regex in `*.ts` | 15 | 7.4 | 2.1× |
+| No match, whole repository | 41 | 34 | 1.2× |
+| 13 MB log, many hits | 20 | 7.1 | 2.8× |
+| 13 MB log, one hit | 24 | 7.6 | 3.2× |
 
-### 🧩 Drop-in OpenCode integration
+Both sides run ripgrep. A search that walks the whole repository takes 34 to 42 ms
+either way, and the plugin is about 1.2× faster there. On searches limited to
+`*.ts` it is 1.9× to 2.1× faster, and on the 13 MB log 2.8× to 3.2×.
 
-Each package registers using the same tool ID as the built-in tool it replaces:
-`glob`, `grep`, or `read`. No OpenCode core patching is required.
+### `glob`
 
-## 📦 Packages at a glance
+| Pattern | Built-in | Plugin, same limit | Plugin, defaults |
+| --- | ---: | ---: | ---: |
+| `**/*.ts` | 8.2 | 6.0 | 33 |
+| `**/*.test.ts` | 9.1 | 9.1 | 28 |
+| `**/*` | 9.0 | 7.4 | 49 |
+| `*.txt` in a directory of 5,000 files | 11 | 8.8 | 18 |
+| `src/tool/*.ts`, few matches | 14 | 13 | 25 |
+| No match | 15 | 13 | 25 |
 
-### 🔍 `opencode-betterglob`
+With the same limit and no sorting, the plugin takes the same time as the built-in
+tool or slightly less. The plugin defaults to 500 paths sorted by
+modification time, and that sort is what costs time. In a separate run on the
+repository, the sort added about 25 ms to `**/*.ts` and 40 ms to `**/*`, while
+raising the limit from 100 to 500 added about 1 ms. Pass `sort_by: "none"` when
+order does not matter.
 
-- Uses `rg --files` for fast file discovery.
-- Supports sorting, hidden files, symlink behavior, limits, and timeouts.
-- Keeps native-compatible plain path output.
-- Avoids returning enormous default result sets by using safer defaults.
+These figures come from one machine and one repository. They leave out the host
+and the model, which add their own latency in a real session.
 
-### ⚡ `opencode-bettergrep`
-
-- Uses `ripgrep` as the primary search backend.
-- Supports content search, count mode, files-with-matches, context, multiline,
-  PCRE2, file globs, sorting, and result limits.
-- Includes robust timeout handling with SIGTERM to SIGKILL escalation.
-- Provides fallback behavior for environments where `ripgrep` is unavailable.
-
-### 📖 `opencode-betterread`
-
-- Fully replaces the agent-facing `read` tool as a real plugin tool.
-- Handles text files, directories, notebooks, PDFs, images, binary files, and
-  missing-file suggestions.
-- Preserves numbered-line output and continuation hints.
-- Implements plugin-side read and external-directory permission checks.
-- Returns metadata/text for images and PDFs because the current OpenCode plugin
-  API does not expose built-in-style file attachments.
-
-## 📦 Recommended installation (npm)
-
-For normal installs, use npm and add only the packages you want:
+## 🚀 Install
 
 ```bash
-npm install opencode-betterglob
-npm install opencode-bettergrep
-npm install opencode-betterread
+npm install opencode-betterglob opencode-bettergrep opencode-betterread
 ```
 
-Then register the installed packages in your OpenCode config by package name:
+Then list the plugins in your OpenCode config by package name:
 
 ```json
 {
@@ -100,14 +135,8 @@ Then register the installed packages in your OpenCode config by package name:
 }
 ```
 
-Use only the packages you actually want to enable.
-
-## 🛠️ Manual installation from source (alternative)
-
-Use the source/file flow if you want to run the plugins directly from a local
-checkout or test local unpublished changes.
-
-Clone and build the monorepo:
+<details>
+<summary>Run from a local checkout instead</summary>
 
 ```bash
 git clone https://github.com/dhaern/better-opencode-tools.git
@@ -115,8 +144,6 @@ cd better-opencode-tools
 bun install
 bun run build
 ```
-
-Then add the packages you want to your OpenCode config:
 
 ```json
 {
@@ -128,59 +155,63 @@ Then add the packages you want to your OpenCode config:
 }
 ```
 
-Use only the packages you actually want to enable.
+</details>
+
+## ⚙️ Output budget
+
+`read` takes its limits from the `tool_output` block of your OpenCode config.
+Raise them if you want larger windows per call:
+
+```json
+{
+  "tool_output": {
+    "max_lines": 4000,
+    "max_bytes": 153600
+  }
+}
+```
+
+Missing or invalid values fall back to 2,000 lines and 51,200 bytes. `grep` and
+`glob` do not read this block. They are limited per call with `max_results` and
+`limit`.
+
+## ✅ Compatibility
+
+The plugins target the OpenCode 1.x plugin API and are built against
+`@opencode-ai/plugin` 1.18.32. Their entry points use the v1 module shape
+(`{ id, server }`). Loading them in an OpenCode v2 host has not been tested,
+because no v2 host was available.
+
+## ⚠️ Known limitations
+
+- Reading a file inside a subproject does not attach that subproject's nested
+  `AGENTS.md`. The native tool does, but the plugin API does not expose the host's
+  instruction resolver.
+- If several plugins register the same tool ID, OpenCode's plugin load order
+  decides which one wins.
+- The first search may download a managed ripgrep binary when none is on `PATH`,
+  so it needs network access once.
+- The plugins replace the agent-facing tool calls only. They do not patch OpenCode
+  internals.
 
 ## 🧪 Development
 
 ```bash
 bun install
+bun run check
 bun run typecheck
 bun test
 bun run build
-bun run check
 ```
 
-The root scripts run across all packages under `packages/*`.
+The root scripts run across every package under `packages/*`. Please run all of
+them before opening a PR, and keep changes inside the plugins unless a core
+change has been discussed first.
 
-## 📝 Issue reporting
+Bugs, feature requests and questions go through the issue forms. A small workflow
+adds the plugin label and asks for whatever is missing from an incomplete report.
 
-This repository uses GitHub issue forms for bug reports, feature requests, and
-questions. A lightweight issue triage workflow adds plugin labels and asks only
-for the minimum missing details when a report is incomplete.
-
-## ⚠️ Known limitations
-
-- `opencode-betterread` cannot return built-in-style image/PDF attachments
-  because the current public plugin API only supports text output and metadata.
-- The plugins are intended to replace the agent-facing tool calls. They do not
-  patch private OpenCode internals.
-- If multiple plugins replace the same tool ID, OpenCode plugin load order
-  determines which one wins.
-
-## 🤝 Contributing
-
-Contributions are welcome. Keep changes local to the plugins unless a core
-change is explicitly proposed and reviewed separately.
-
-### 🙏 Special thanks
-
-Special thanks to [`oh-my-opencode-slim`](https://github.com/alvinunreal/oh-my-opencode-slim)
-for pushing the OpenCode plugin ecosystem forward and for helping inspire parts
-of the standalone plugin direction taken here.
-
-If you want a broader day-to-day OpenCode plugin setup beyond the standalone
-tool replacements in this repository, it is also worth checking out and trying.
-
-Before opening a PR, run:
-
-```bash
-bun run typecheck
-bun test
-bun run build
-bun run check
-```
-
----
-
-Built for people who want OpenCode tools that stay familiar, but behave better
-under real-world repository pressure.
+Thanks to [`oh-my-opencode-slim`](https://github.com/alvinunreal/oh-my-opencode-slim)
+for pushing the OpenCode plugin ecosystem forward and inspiring part of the
+standalone direction taken here. It is worth trying if you want a broader plugin
+setup.

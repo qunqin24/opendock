@@ -327,6 +327,7 @@ for dev/staging via environment variables before starting OpenCode:
 | Variable | Default | Purpose |
 |---|---|---|
 | `LUNAROUTE_ROUTING_URL` | `https://gw.lunaroute.com/v1` | Gateway base URL (provider `baseURL` + `/models`) |
+| `LUNAROUTE_API` | `responses` | Wire format. Accepts `responses` or `completions` (case-insensitive; absent means `responses`). `responses` routes models through opencode's OpenAI Responses protocol (`@ai-sdk/openai`, `gw/v1/responses`); `completions` is the chat-completions kill switch (`@ai-sdk/openai-compatible`). An unrecognized value warns and falls back to `completions`. |
 | `LUNAROUTE_API_URL` | `https://api.lunaroute.com` | API host for `/v1/auth/exchange` |
 | `LUNAROUTE_FRONT_URL` | `https://app.lunaroute.com` | Web app host for `/device-auth/opencode` browser login |
 | `LUNAROUTE_MCP_URL` | `https://mcp.lunaroute.com/mcp` | Hosted MCP server URL registered in the live config |
@@ -334,6 +335,12 @@ for dev/staging via environment variables before starting OpenCode:
 Setting `provider.lunaroute.options.baseURL` in your OpenCode config takes
 precedence over `LUNAROUTE_ROUTING_URL` everywhere (chat, model catalog,
 key validation) — one effective URL for all of them.
+
+Setting `provider.lunaroute.npm` in your OpenCode config pins the wire
+format opencode routes every LunaRoute model on (opencode derives each
+model's routing npm from the provider-level value, so an explicit pin wins
+over `LUNAROUTE_API`); unset, the environment variable decides, and absent
+that the Responses default applies.
 
 ## Troubleshooting
 

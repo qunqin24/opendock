@@ -32,7 +32,7 @@ It queries the ChatGPT Codex rate-limit API and renders real-time remaining quot
   Plan     PLUS
   5h       95% (4h 38m)
   Weekly   4% (1d 11h)
-  Credits  $171.55
+  Credits  171.55
   Resets   3 available
 ```
 

@@ -4,42 +4,74 @@
 [![CI](https://github.com/kaanchinar/opencode-usage-report/actions/workflows/ci.yml/badge.svg)](https://github.com/kaanchinar/opencode-usage-report/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/npm/l/opencode-usage-report)](./LICENSE)
 
-An [opencode](https://opencode.ai) plugin that adds a `/usage` command (and a
-`usage_report` tool) showing the quota windows (5-hour, weekly, monthly) of your
-inference subscriptions — currently **Kimi Code** (both regional plans:
-`kimi-code-plan-global` on kimi.ai and `kimi-code-plan-cn` on kimi.com),
-**OpenCode Go** (`opencode-go`), **GitHub Copilot** (`github-copilot`) and
-**ChatGPT** (`openai`). It fetches from each provider's API, caches
-results on disk, and can fall back to a local estimate when the API is
-unreachable. It also emits background low-quota warnings in the TUI.
+An [opencode](https://opencode.ai) plugin that shows how much of your inference
+subscriptions you have left. It adds a `/usage` command and a `usage_report`
+tool covering both the **context window** of the current session and the
+**quota windows** (5-hour, weekly, monthly) of your provider plans —
+**Kimi Code** (`kimi-code-plan-global` on kimi.ai and `kimi-code-plan-cn` on
+kimi.com), **OpenCode Go** (`opencode-go`), **GitHub Copilot**
+(`github-copilot`) and **ChatGPT** (`openai`). Results are cached on disk, fall
+back to a local estimate when an API is unreachable, and raise background
+low-quota toasts in the TUI.
 
 ## Features
 
 - `/usage` command and `usage_report` tool for on-demand quota reports, with
-  JSON and single-provider filtering.
-- TUI sidebar panel with live progress bars, `NN%` usage, and reset countdowns
-  for each quota window.
-- On-disk caching with a configurable TTL, plus `--refresh` to bypass it.
-- Local fallback estimate when the provider API is unreachable and no cache
+  JSON output and single-provider filtering.
+- **Context usage panel** (new in 0.4.0) — the exact prompt-token total against
+  the model's context window, a cell grid that fills by category, the
+  auto-compaction point with live headroom, and session cost.
+- TUI sidebar panel with live progress bars, `NN%` usage and reset countdowns
+  for every quota window.
+- On-disk caching with a configurable TTL, plus an explicit refresh that
+  bypasses it.
+- Local fallback estimate when a provider API is unreachable and no cache
   exists.
-- Background low-quota TUI warnings on startup and `session.idle`.
+- Low-quota warnings on startup and on `session.idle`.
 - Privacy-first: API keys are never logged, cached, or rendered.
 
 ## Install
 
-### Server plugin (`/usage` command + warnings)
+The plugin exposes **two entrypoints** and opencode loads them from two
+different config files. Install both for the full experience:
 
-Add the plugin to `opencode.json` / `opencode.jsonc` and restart opencode:
+| Config          | Entrypoint    | Provides                                                |
+| --------------- | ------------- | ------------------------------------------------------- |
+| `opencode.json` | server plugin | `usage_report` tool, low-quota warnings, prompt capture |
+| `tui.json`      | TUI plugin    | `/usage` command, sidebar panel                         |
+
+The quickest path is opencode's own installer, which detects both entrypoints
+and writes both configs for you:
+
+```sh
+opencode plugin opencode-usage-report          # project scope (./.opencode)
+opencode plugin -g opencode-usage-report       # global scope
+```
+
+Or add the plugin manually to each file and restart opencode:
 
 ```jsonc
+// opencode.json — server plugin
 {
   "plugin": ["opencode-usage-report"],
 }
 ```
 
-Credentials are read from the same places your other opencode providers already
-use (see [Data sources & privacy](#data-sources--privacy)). Optionally pass
-options in the tuple form:
+```jsonc
+// tui.json — TUI plugin
+{
+  "plugin": ["opencode-usage-report"],
+}
+```
+
+> **Use the bare package name in both files.** opencode reads the package
+> `exports` map itself and resolves `exports["./tui"]` for the TUI and
+> `exports["./server"]` (or `main`) for the server. A subpath spec such as
+> `opencode-usage-report/tui` is **not** valid and will silently load nothing.
+> `opencode plugin opencode-usage-report` prints `Detected server + tui targets`
+> when the resolution works.
+
+Options can be passed in the tuple form, independently per entrypoint:
 
 ```jsonc
 {
@@ -47,21 +79,10 @@ options in the tuple form:
 }
 ```
 
-### TUI sidebar panel
+### Local development
 
-Add the plugin to `tui.json` and restart opencode:
-
-```jsonc
-{
-  "plugin": ["opencode-usage-report"],
-}
-```
-
-Use the bare package name — opencode resolves the `./tui` entrypoint from the
-package `exports` on its own. (`opencode-usage-report/tui` is **not** a valid
-spec and will silently not load.)
-
-For local development, point the configs at the source instead:
+Point the configs at the source instead of the published package. Config is read
+once at startup and is not hot-reloaded, so restart opencode after every edit:
 
 ```jsonc
 // opencode.json
@@ -70,33 +91,79 @@ For local development, point the configs at the source instead:
 { "plugin": ["file:///abs/path/to/opencode-usage-report/src/tui.tsx"] }
 ```
 
-The panel renders under opencode's native Context block in the session sidebar
-(order 150) and shows a colored progress bar per quota window, `NN%`, and a
-live reset countdown — refreshed every 60s, on `session.idle`, and on demand via
-the `Usage: refresh now` command (default binding `ctrl+shift+u`). It reuses the
-same cache/fallback pipeline as the command; stale results are marked `(stale)`
-and local estimates `(est)`.
-
-TUI options (tuple form): `providers`, `cacheTtlSeconds`, `thresholdPercent`,
-`refreshIntervalSeconds` (default `60`), `barWidth` (default `14`).
-
 ## Commands
 
-- `/usage` — show every configured provider's quota windows. Providers without a
-  resolved credential are skipped in this view.
-- `/usage kimi-code-plan-global` — filter to a single provider. The argument must
-  match a registered provider id **exactly** (`kimi-code-plan-global`,
-  `kimi-code-plan-cn`, `opencode-go`, `github-copilot` or `openai`); an unknown
-  id (e.g. `/usage kimi`)
-  returns a helpful error listing the known ids. An explicitly requested
-  provider with no credential is reported as an error row.
-- `/usage --json` — emit the raw `ProviderReport[]` JSON.
-- `/usage --refresh` — bypass the on-disk cache and fetch live.
+- `/usage` — open the report dialog: the context panel for the current session
+  on top, and every configured provider's quota windows below. This is a local
+  TUI command, so it costs no model tokens. Requires the TUI plugin. Providers
+  whose credential cannot be resolved are skipped in this view.
+- `/usage` dialog keys — `esc` close, `r` refresh now, `tab` cycle provider
+  scope (all → each provider), `j` toggle the raw JSON view.
+- `usage_report` tool — the same report for agents and headless runs. Takes
+  `provider` (exact id: `kimi-code-plan-global`, `kimi-code-plan-cn`,
+  `opencode-go`, `github-copilot` or `openai`; an unknown id returns an error
+  listing the known ids), `json` (raw `ProviderReport[]`) and `refresh` (bypass
+  the on-disk cache).
 
-The command simply calls the `usage_report` tool with those arguments, so the
-tool can also be invoked directly by an agent.
+> **Changed in 0.4.0.** `/usage` used to be an LLM-mediated prompt template that
+> routed through the model, and it accepted `--json` / `--refresh` / a provider
+> id as slash arguments. The TUI command now owns the name, so `/usage` reaches
+> no model and those capabilities moved to the dialog keys and the
+> `usage_report` tool arguments. Running `/usage --json` is no longer supported.
+
+## Context usage panel
+
+The top of the `/usage` dialog reports how full the model's context window is
+for the current session:
+
+```
+  Context
+  Kimi K2 (High) · 42,318 / 200,000 tokens (21.2%)
+
+  ████████████████████████████  ████████████████████████████████  ████████████  ░░░░░░░░░░░░░░
+  ████████████████████████████  ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  ░░░░░░░░░░░░░░  ░░░░░░░░░░░░░░
+  ░░░░░░░░░░░░░░░░░░░░░░░░░░░░  ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  ░░░░░░░░░░░░░░  ░░░░░░░░░░░░░░
+  ░░░░░░░░░░░░░░░░░░░░░░░░░░░░  ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  ░░░░░░░░░░░░░░  ░░░░░░░░░░░░░░
+  ░░░░░░░░░░░░░░░░░░░░░░░░░░░░  ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  ░░░░░░░░░░░░░░  ░░░░░░░░░░░░░░
+  ░░░░░░░░░░░░░░░░░░░░░░░░░░░░  ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  ░░░░░░░░░░░░░░  ░░░░░░░░░░░░░░
+
+  ● User messages      8,204   4.1%      ● System & tools    8,144   4.1%
+  ● Agent responses   11,650   5.8%      ● Free space     157,682  78.8%
+  ● Reasoning          2,140   1.1%
+  ● Tool calls        12,180   6.1%
+
+  Auto-compacts at 180,000 · 137,682 headroom        $0.42 spent
+```
+
+**What is exact.** The headline total, the percentage, free space, the
+compaction point, the cost and the number of pruned tool outputs all come from
+numbers the provider and opencode report. The total is the prompt size —
+`input + cache.read + cache.write` — which is what actually occupies the context
+window. opencode's own sidebar Context block sums five fields including the
+completion, so it reads slightly higher than this panel by design.
+
+**What is estimated.** The per-category rows. opencode records no token count
+per message or part, so each category is estimated with the same `characters / 4`
+heuristic opencode itself uses, then normalized so the rows agree with the exact
+total.
+
+**System & tools.** opencode assembles the system prompt and tool definitions on
+every request and never persists them. The server plugin measures the real
+system string through the `experimental.chat.system.transform` hook and stores
+only its size, so the row can be split into `system prompt` and
+`tools & framing`. That hook is undocumented, so it is treated as best-effort:
+if it stops firing, the sidecar goes stale, or anything fails to validate, the
+panel falls back to the derived residual and labels the row `(derived)`. The
+plugin never breaks a request over it.
+
+**Compaction headroom.** `Auto-compacts at N` mirrors opencode's own overflow
+check, including the configured `compaction.reserved` buffer. This is the point
+at which opencode automatically summarizes the session — a number opencode
+exposes nowhere else.
 
 ## Options
+
+Shared by both entrypoints:
 
 | Option             | Type               | Default | Meaning                                                      |
 | ------------------ | ------------------ | ------- | ------------------------------------------------------------ |
@@ -105,40 +172,76 @@ tool can also be invoked directly by an agent.
 | `providers`        | `string[] \| null` | `null`  | Providers to report; `null` = every registered adapter.      |
 | `fallback`         | `boolean`          | `true`  | Use a local estimate when the API fails and no cache exists. |
 
-Malformed option values are ignored and the defaults are kept.
+TUI only:
+
+| Option                   | Type     | Default | Meaning                                            |
+| ------------------------ | -------- | ------- | -------------------------------------------------- |
+| `refreshIntervalSeconds` | `number` | `60`    | Sidebar/dialog refresh cadence, clamped to 5–3600. |
+| `barWidth`               | `number` | `14`    | Progress-bar width in cells, clamped to 4–40.      |
+
+`fallback` is fixed at `true` for the TUI entrypoint. Malformed option values
+are ignored and the defaults are kept.
 
 ## Warnings
 
-On startup and again on `session.idle` (both throttled to at most once every 10
-minutes, sharing the same timer), the plugin checks the cached reports. Any
-window at or above `thresholdPercent`, or whose
-status is `rate-limited` / `frozen`, produces a TUI toast. A warning fires once
-per window until that window resets; it re-arms after usage drops below
-`thresholdPercent - 10`. Toast failures (headless/server mode) are swallowed.
+On startup and again on `session.idle` (both throttled to at most once every
+10 minutes, sharing one timer), the plugin checks the cached reports. Any window
+at or above `thresholdPercent`, or whose status is `rate-limited` / `frozen`,
+produces a TUI toast. A warning fires once per window until that window resets;
+it re-arms after usage drops below `thresholdPercent - 10`. Toast failures
+(headless/server mode) are swallowed.
 
 ## Data sources & privacy
 
-- Credential resolution order: `OPENCODE_USAGE_<ID>_KEY` env override (optionally
+- **Credential resolution order.** First `OPENCODE_USAGE_<ID>_KEY` (optionally
   paired with `OPENCODE_USAGE_<ID>_ACCOUNT_ID`, e.g.
   `OPENCODE_USAGE_OPENAI_ACCOUNT_ID`, to supply the ChatGPT account id), then
-  `~/.local/share/opencode/auth.json` (`type: "api"` `.key`, or `type: "oauth"`
-  `.access`, falling back to `.refresh` for GitHub Copilot). For ChatGPT the
-  oauth entry's `.accountId` is read automatically. `$OPENCODE_DATA_HOME`
-  overrides the data directory.
-- APIs: `https://api.kimi.ai/coding/v1/usages` (global plan),
+  `~/.local/share/opencode/auth.json`: a `type: "api"` entry's `.key`, or a
+  `type: "oauth"` entry's `.access` (falling back to `.refresh` for GitHub
+  Copilot, which stores its token there). For ChatGPT the oauth entry's
+  `.accountId` is read automatically. `$OPENCODE_DATA_HOME` overrides the data
+  directory.
+- **APIs.** `https://api.kimi.ai/coding/v1/usages` (global plan),
   `https://api.kimi.com/coding/v1/usages` (China plan),
-  `https://opencode.ai/zen/go/v1/usage` (custom `User-Agent` is required by the
-  latter), `https://api.github.com/copilot_internal/user` (GitHub Copilot) and
+  `https://opencode.ai/zen/go/v1/usage` (requires a custom `User-Agent`),
+  `https://api.github.com/copilot_internal/user` (GitHub Copilot) and
   `https://chatgpt.com/backend-api/wham/usage` (ChatGPT).
-- Auth: run `opencode auth login` and pick **GitHub Copilot** or **OpenAI
+- **Auth.** Run `opencode auth login` and pick **GitHub Copilot** or **OpenAI
   ChatGPT**. ChatGPT additionally needs the account id that login writes to
   `auth.json`; the plugin reads it automatically.
-- Cache and state live in `<data-home>/usage-report/` (TTL cache, session id,
-  warn state).
-- Local fallback reads `opencode.db` read-only.
+- **Cache and state** live in `<data-home>/usage-report/`: the TTL cache, the
+  session id, the warn state, and `context/<sessionID>.json` — the system-prompt
+  size sidecar, which holds counts only and never prompt text.
+- **Local fallback** reads `opencode.db` read-only.
 - **API keys are never logged, cached, or rendered.** Adapter errors are
   sanitized (key substrings replaced with `<redacted>`) before they reach any
   output, and the live smoke script never prints credentials.
+
+## Troubleshooting
+
+**`/usage` does not appear in the command list.**
+Both configs are required — the command comes from the TUI plugin, not the
+server plugin. Check that `tui.json` lists `"opencode-usage-report"` (bare name)
+and restart opencode; config is not hot-reloaded. To confirm the package exposes
+what opencode expects, run `opencode plugin opencode-usage-report` — it should
+print `Detected server + tui targets`.
+
+**The sidebar is empty and no providers are reported.**
+Every window belongs to a provider whose credential could not be resolved, so it
+is skipped. Run `opencode auth login`, or set
+`OPENCODE_USAGE_<ID>_KEY` for the provider in question.
+
+**An old version keeps loading after you upgrade.**
+opencode caches installed plugin packages under
+`~/.cache/opencode/packages/<name>@latest/` and re-resolves versions on install,
+not on every start. Re-run `opencode plugin opencode-usage-report`, or delete
+that cache directory, to force a refresh. This is the usual cause of "I
+published a new version but opencode still runs the old one".
+
+**Quota numbers look stale or marked `(stale)` / `(est)`.**
+`(stale)` means a cached result was served past its TTL without a successful
+refresh; `(est)` means the API was unreachable and a local estimate was used.
+Press `r` in the dialog (or `ctrl+shift+u` in the sidebar) to force a refetch.
 
 ## Extending
 
@@ -170,6 +273,35 @@ npm run check                     # lint + format:check + typecheck + test
 npm run smoke -- --yes-live       # manual live check (real keys; opt-in)
 ```
 
+## Releasing
+
+Releases are **staged**, not published directly. Pushing a `v*` tag triggers
+`.github/workflows/publish.yml`, which verifies that the tag matches
+`package.json`, runs `npm ci`, and uploads the tarball with
+`npm stage publish --provenance --access public` using npm Trusted Publishing
+(OIDC — no `NPM_TOKEN` secret). Nothing goes live until a maintainer approves
+the staged release with 2FA:
+
+```sh
+git tag v0.4.0 && git push origin main v0.4.0
+npm stage list                    # find the stage id
+npm stage approve <stage-id>      # 2FA prompt; or approve in the npm UI
+```
+
+`prepublishOnly` runs lint, format check, typecheck and tests before the upload,
+so a failing check blocks the stage.
+
+## Changelog
+
+- **0.4.0** — context usage panel (`/usage` now shows context breakdown, grid,
+  compaction headroom and cost); `/usage` became a local TUI command that costs
+  no model tokens; sidebar rendering extracted to `src/quota-lines.ts`.
+- **0.3.0** — GitHub Copilot and ChatGPT (OpenAI) adapters.
+- **0.2.0** — Kimi Code split into the kimi.ai (`kimi-code-plan-global`) and
+  kimi.com (`kimi-code-plan-cn`) plans.
+
 ## License
 
 MIT © [Kaan Chinar](https://github.com/kaanchinar)
+
+Security policy: [SECURITY.md](./SECURITY.md)

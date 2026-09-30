@@ -79,7 +79,7 @@ Before installing the plugin, make sure the following are available on your mach
 - **OpenCode 1.18.x or later** with plugin support.
 - **Ollama** installed and running locally.
 - An **Ollama-supported Qwen3.8 model**, such as `qwen3.8:27b-mlx` or a Qwen3.8 MTP variant.
-- **Bun 1.1.0 or later**. The plugin uses Bun to start the local proxy as a child process, and the configuration-generator script is also written for Bun.
+- **Bun 1.1.26 or later**. The plugin uses Bun to start the local proxy as a child process, and the configuration-generator script is also written for Bun. The proxy disables `Bun.serve`'s idle timeout so long generations are not cut off, and that option requires Bun 1.1.26; on older versions it is silently ignored.
 - **Git**, if installing directly from this GitHub repository.
 - A standard **JSON-formatted OpenCode configuration** if you plan to use the `generate:variants` utility. The generator does not currently parse JSONC comments or trailing commas.
 
@@ -118,7 +118,7 @@ Once published, the easiest installation is to add the package directly to your 
 {
   "$schema": "https://opencode.ai/config.json",
   "plugin": [
-    "opencode-ollama-qwen-thinking@0.1.0"
+    "opencode-ollama-qwen-thinking@0.1.2"
   ]
 }
 ```
@@ -376,6 +376,17 @@ http://127.0.0.1:11434/v1/chat/completions
 
 The proxy does not alter messages, tools, sampling parameters, streaming, or response bodies.
 
+### Streaming and long generations
+
+The proxy disables `Bun.serve`'s idle timeout. By default Bun closes a connection after
+10 seconds without data, and that timer also runs while a response is being streamed, so
+on a local model it can reset the connection in the middle of an answer — for example
+while Qwen is still thinking at `xhigh`, or while the model is being loaded into memory.
+Long pauses between tokens are normal and are not interrupted.
+
+The proxy listens on `127.0.0.1` only, and it already cancels the Ollama request when
+OpenCode disconnects, so disabling the timeout does not leave work running unnoticed.
+
 For `none`, the proxy sends `reasoning_effort: "none"`. This is important for Qwen3.8 because recent Ollama reports show that `think: false` can be intermittent through the OpenAI-compatible endpoint while `reasoning_effort: "none"` is reliable.
 
 ## Health check
@@ -389,8 +400,10 @@ curl http://127.0.0.1:11437/health
 Expected:
 
 ```json
-{"ok":true}
+{"ok":true,"service":"opencode-ollama-qwen-thinking","pid":1234,"upstream":"http://127.0.0.1:11434","idleTimeout":0}
 ```
+
+`idleTimeout` should be `0`. See [Debugging](#connection-reset-by-server-or-bunserve-timed-out-a-request-after-10-seconds) if it is not.
 
 List models through the proxy:
 
@@ -415,6 +428,32 @@ You should see entries similar to:
 ```
 
 This gives a direct way to verify that the thinking level is actually reaching Ollama.
+
+### "Connection reset by server" or "Bun.serve() timed out a request after 10 seconds"
+
+If the proxy logs
+
+```
+warn: Bun.serve() timed out a request after 10 seconds. Pass idleTimeout to configure.
+```
+
+then the running proxy is too old to disable that timer, and it is closing the connection
+whenever a generation pauses for more than 10 seconds. OpenCode reports this as
+`Error: Connection reset by server` and retries, hitting the same limit each time.
+
+This was fixed in **0.1.2**. Upgrade the plugin and restart OpenCode so the new proxy
+process starts. You can confirm the running version is current by checking that
+`/health` reports an `idleTimeout` of `0`:
+
+```bash
+curl http://127.0.0.1:11437/health
+```
+
+Expected:
+
+```json
+{"ok":true,"service":"opencode-ollama-qwen-thinking","pid":1234,"upstream":"http://127.0.0.1:11434","idleTimeout":0}
+```
 
 ## Requirements
 

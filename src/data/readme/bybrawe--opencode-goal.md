@@ -50,8 +50,9 @@ The installer:
 - installs/pins `@bybrawe/opencode-goal@<exact-version>` in the OpenCode plugin list;
 - upgrades old, bare, or `@latest` Goal plugin entries;
 - removes known duplicate legacy local Goal plugin copies;
-- installs a managed global `commands/goal.md` so `/goal` is discoverable;
-- preserves unrelated OpenCode settings and JSONC comments outside the managed plugin array.
+- on OpenCode 1.x, installs a managed global `commands/goal.md` so `/goal` is discoverable;
+- on OpenCode 2.x, writes the native `plugins` config and uses the plugin-native `/goal` command instead of the legacy command bridge;
+- preserves unrelated OpenCode settings, plugin registrations, and JSONC comments outside the Goal-owned entry.
 
 Default OpenCode locations:
 
@@ -59,17 +60,19 @@ macOS / Linux:
 
 ```text
 ~/.config/opencode/opencode.json or opencode.jsonc
-~/.config/opencode/commands/goal.md
+~/.config/opencode/commands/goal.md   # OpenCode 1.x bridge only
 ```
 
 Windows:
 
 ```text
 %USERPROFILE%\.config\opencode\opencode.json or opencode.jsonc
-%USERPROFILE%\.config\opencode\commands\goal.md
+%USERPROFILE%\.config\opencode\commands\goal.md   # OpenCode 1.x bridge only
 ```
 
-OpenCode loads the npm package through its dedicated `./server` entrypoint. The root export remains the public JavaScript API.
+OpenCode 2 loads the package root as the official `Plugin.define({ id, setup })` entrypoint; that same dual definition is also exposed through `./server` for host compatibility. Programmatic named APIs live at `@bybrawe/opencode-goal/api`, keeping the plugin root free of V1 runtime imports, while the explicit legacy V1 plugin function is isolated at `./v1`.
+
+OpenCode 2 uses the V2 lifecycle and autonomous coordinator by default. Native `plugins` entries may disable either layer with `{ "package": "@bybrawe/opencode-goal@<version>", "options": { "lifecycle": false, "autonomous": false } }`. The legacy `OPENCODE_GOAL_V2_DIRECT_LIFECYCLE` and `OPENCODE_GOAL_V2_AUTONOMOUS` environment variables remain higher-priority emergency kill switches: set either to `0`, `false`, `no`, or `off` to disable that V2 layer. Unknown explicit environment values fail closed. OpenCode 2-native prompt admission and tool-execution hooks are used directly where available, and long-running evidence/completion tools report progress through the host-native tool progress API.
 
 ## Why use OpenCode Goals?
 
@@ -212,6 +215,8 @@ Repeatable contract flags define success and hard boundaries:
 --check "..."
 --notify "command {reason} {goal}"
 --contains "file::required text"
+--unit "host command"
+--fresh-session-per-unit
 --max-turns <n>
 --max-tokens <n>
 --max-minutes <n>
@@ -229,6 +234,21 @@ Example:
 ```
 
 The full objective always remains a required semantic requirement. Narrow checks add proof obligations; they never replace the broader outcome.
+
+### OpenCode 2 bounded per-unit sessions
+
+For work naturally partitioned by a host-observable unit (for example a migration shard, package, tenant, or numbered batch), OpenCode 2 can rotate the same Goal into a fresh native session whenever that unit identity changes:
+
+```text
+/goal migrate all shards \
+  --unit "node scripts/current-shard.mjs" \
+  --fresh-session-per-unit \
+  --check "npm test"
+```
+
+Both flags are required together. The `--unit` command's stdout is **identity only**: it tells Goal which external unit is current, but it never proves completion or satisfies a requirement. Rotation happens only after a clean Goal-owned execution boundary. The handoff uses OpenCode 2 native `session.create` and a durable two-phase inbox transfer; the old session becomes terminal `handed_off` before the target becomes the autonomous owner.
+
+The Goal ID, revision, contract, evidence, cumulative usage, and budgets continue across the session chain. `/goal status` shows the current unit plus root/previous/next session links. Paused, waiting-user, blocked/limited, or completed Goals do not rotate, and final verified completion stops the chain instead of opening another session.
 
 `/goal edit` creates a new revision. Evidence from an older revision cannot silently prove the edited Goal.
 
@@ -318,13 +338,13 @@ npx -y @bybrawe/opencode-goal@latest
 
 Then:
 
-1. confirm the installer reports an exact package pin and a managed `/goal` command;
-2. confirm `commands/goal.md` exists in the global OpenCode config directory;
+1. confirm the installer reports an exact package pin;
+2. on OpenCode 1.x, confirm the managed `commands/goal.md` bridge exists; on OpenCode 2.x, confirm the package is registered in native `plugins` and no managed bridge is required;
 3. fully close every OpenCode CLI/TUI/Desktop process and reopen it;
 4. do not start OpenCode with `--pure`, which disables external plugins;
 5. inspect OpenCode config diagnostics for plugin-load errors.
 
-The installer does **not** overwrite a user-owned `commands/goal.md`.
+The installer does **not** overwrite a user-owned `commands/goal.md`; OpenCode 2 leaves such a legacy file untouched and uses the plugin-native command.
 
 ### Goal is paused after completion work finished
 

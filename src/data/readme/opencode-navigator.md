@@ -6,6 +6,8 @@ with a configurable sidebar.
 
 ![OpenCode Navigator](https://raw.githubusercontent.com/St1ggy/opencode-navigator/main/screenshots/01-hero-sidebar.png)
 
+See the [changelog](CHANGELOG.md) for release-by-release changes.
+
 ## Features
 
 - Theme-aware session title with the session creation date
@@ -31,13 +33,14 @@ with a configurable sidebar.
 - Copy the selected scope's layout and MCP states as versioned JSON, then validate and preview imports
 - Focus the sidebar with `Ctrl+Shift+F`, then navigate with arrows or `j`/`k`
 - Open sidebar shortcut mode with `Ctrl+Shift+B`; press `h` to toggle the panel
-- Keep OpenCode's compact project path and branch footer, followed in OpenCode 1.x by both host and Navigator versions with independent update indicators
+- Optionally open new sessions directly in an empty chat with the sidebar, skipping Home on startup and from New session
+- Keep OpenCode's compact footer while showing host and Navigator versions with independent update indicators; click a version label or its update icon to confirm an in-place update through the current installation method and scope
 
 Todo starts expanded. Subagents, skills, quick actions, LSP, and MCP start
 collapsed. Use `Save current layout as default` in sidebar settings to reuse the
 current visible/hidden, expanded/collapsed, and ordering states in new sessions.
 
-Supports OpenCode 1.18.30 and newer, including OpenCode 2.x. OpenCode 2.0.12 does
+Supports OpenCode 1.18.30 and newer, including OpenCode 2.x. OpenCode 2.0.16 does
 not expose Todo or LSP data to TUI plugins. Navigator keeps Todo visible with an
 explicit unsupported-host message and hides LSP on 2.x while retaining Subagents,
 Skills, Quick Actions, MCP, Search, settings, and presets. All interface icons use Nerd Font glyphs by
@@ -143,18 +146,26 @@ opencode plugin --global opencode-navigator
 
 ### OpenCode 2.x
 
-Add Navigator to the `plugins` array in the global `~/.config/opencode/cli.json`:
+Install Navigator through the OpenCode 2 plugin manager:
+
+```sh
+opencode plugin add opencode-navigator
+```
+
+This installs the package and adds it to the `plugins` array in the global
+`~/.config/opencode/cli.json`. The equivalent configuration is:
 
 ```json
 {
-  "$schema": "https://opencode.ai/cli.json",
+  "$schema": "https://opencode.ai/v2/cli.json",
   "plugins": ["opencode-navigator"]
 }
 ```
 
 OpenCode 2.x CLI plugins are global terminal settings; there is no project-local
 `cli.json`. Navigator replaces the `sidebar.content` slot, so no built-in sidebar
-plugin overrides are required.
+plugin overrides are required. OpenCode validates `cli.json` strictly, so keep it
+within the linked schema and restart OpenCode after changing it.
 
 ### Install the corner font
 
@@ -232,9 +243,11 @@ commands remain available as aliases for custom keybindings.
 
 ## Develop locally
 
-This repository already contains `.opencode/tui.json`, so starting OpenCode in
-the repository loads `src/tui.tsx` and disables the overlapping built-in
-sidebar blocks.
+OpenCode uses your configured global Navigator installation when opened in this
+repository. Local `.opencode/tui.json` and `.opencode/cli.json` files are ignored
+by Git; keep any host-specific preferences and plugin paths there if needed.
+Rebuilding `dist/tui.js` does not replace the global installation. The PTY
+smoke tests load the working build with isolated temporary configurations.
 
 ```sh
 bun install
@@ -307,6 +320,7 @@ Navigator plugin tuple:
     "focusKey": "ctrl+shift+f",
     "searchKey": "ctrl+shift+k",
     "persistMcp": true,
+    "startInChat": false,
     "cornerFont": true,
     "lspIconStyle": "nerd",
     "rowDensity": "compact",
@@ -342,13 +356,27 @@ For example, the schema-valid `opencode.json` entry is:
 }
 ```
 
-Behavior keys control shortcuts, MCP persistence, `nerd`/`text` icon style, row
+Behavior keys control the optional start-in-chat flow, shortcuts, MCP persistence, `nerd`/`text` icon style, row
 density, item limits, and Navigator's safe Quick Action allowlist. Unknown values,
 sections, actions, and MCP states are discarded. The previous snake_case tuple
-options (`toggle_key`, `focus_key`, `search_key`, `persist_mcp`, `corner_font`, `icon_style`,
+options (`toggle_key`, `focus_key`, `search_key`, `persist_mcp`, `start_in_chat`, `corner_font`, `icon_style`,
 `lsp_icon_style`, `row_density`, `section_item_limits`, `quick_action_order`,
 `quick_action_visibility`, `sections`, and `section_order`) remain compatible;
 canonical nested fields win when both forms are present.
+
+**Start new sessions in chat** is off by default. Turn it on under **Settings →
+Behavior** to open an empty session directly when starting OpenCode on Home or
+choosing New session. Opening an existing session or explicitly navigating Home
+is unaffected. The setting follows the selected Global or Current worktree scope.
+
+Navigator also records its last observed version in private preferences. On the
+first launch after an update, it shows the release notes between that version
+and the new installation from the bundled [changelog](CHANGELOG.md). Updates
+through Navigator save the previous version before installation; updates made
+outside OpenCode are detected on the next launch. Fresh installations show no
+upgrade dialog, and each updated version is shown once.
+When upgrading from an older version that did not record version history, the
+first launch establishes the baseline for subsequent updates.
 
 Configured files may define behavior, layout, desired MCP states, layout and MCP
 presets, workspace-profile links, and MCP groups. Navigator deliberately ignores

@@ -38,6 +38,20 @@ The plugin injects relevant memories from MemPalace into every prompt (via `expe
 
 Add this line to your `~/.config/opencode/opencode.json` and restart OpenCode.
 
+Works on **OpenCode v1 (>= 1.18.29) and v2** — the package ships a dual
+entrypoint (`server()` for v1, `Plugin.define({ id, setup })` for v2), so the
+same install works before and after you move to v2. One caveat on v2: the
+plugin runs in the server runtime, which has no `tui.showToast`, so TUI
+toasts are silent there — `hook.log`, `interactions.log`, `/memory-status`
+and `/memory-log` are unaffected.
+
+The transcript export reads **both** database layouts, so a v1 → v2
+migration never strands messages: v2 sessions (`session_v2` +
+`session_message`, human turn in `data.text`, replies in `data.content[]`)
+and v1 sessions (`session` + `message` + `part`) are unioned by session id,
+with v2 winning where both exist. Sessions still readable only in the v1
+tables (e.g. one created by v1 right before the switch) are exported too.
+
 ### 2. Identity (who you are)
 
 Create `~/.mempalace/identity.txt`:
@@ -213,6 +227,19 @@ Every turn (question + answer) is saved as a drawer in MemPalace. Mining runs wi
 
 Each opencode message is exported **exactly once ever**: exported message IDs are tracked in `sync_state.json` (retained 90 days / 200k entries) and skipped on later runs. This kills the main duplicate source mempalace's file-level dedup cannot catch — repeated boilerplate (e.g. system prompts re-sent every turn) landing in different export files. (`mempalace dedup` only compares drawers from the *same* source file, so it can't fix that either.)
 
+### The cursor means "exported", not "mined"
+
+The per-wing cursor advances **when an export file is written**, not when its mine succeeds. That distinction is the whole ballgame:
+
+- The export is cheap and idempotent — same content produces the same filename, so a re-export overwrites itself.
+- The mine is expensive and fails for reasons outside the plugin's control (palace lock held by another writer, killed at exit, OOM).
+
+An earlier version advanced the cursor only after a successful mine. A mine that never finished therefore pinned the cursor forever: every later export re-cut its window from the same stale point, and because the session kept growing, each file was a **superset** of the previous one. One long-running session produced 691 overlapping files, and mining them all multiplied every message by up to 691 — 628k drawers, 5 GB, with no error anywhere.
+
+With the cursor on write, windows are always disjoint: the next export starts where the last one stopped. A failed mine loses nothing — **the pending file *is* the queue**, and the next mine picks it up untouched.
+
+If the queue stops draining (mines blocked or too slow), `hook.log` gets a `WARNING: N exported files waiting to be mined` line, visible in `/memory-status`. Silence there is what hid the blow-up.
+
 ### Backfill existing sessions
 
 To mine the full opencode history once (e.g. on first install):
@@ -329,7 +356,8 @@ history on demand, never polluting session context:
   (plugin searches and model MCP calls) with what was asked plus a
   short answer preview. A startup toast shows the loaded build
   (`opencode-mempalace-persistence v2.x loaded`), so npm-cache vs
-  local build is never a mystery.
+  local build is never a mystery. *(Silent on OpenCode v2 — its server
+  runtime has no toast surface; use `/memory-log` there.)*
 - **`/memory-status`** — palace health in the transcript: drawers,
   KG stats, last sync, pending backlog, recent activity, errors with
   explanations, active config. Read-only.

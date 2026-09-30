@@ -2,45 +2,47 @@
 
 A [opencode](https://opencode.ai) plugin that keeps you in the loop on your opencode sessions from **Telegram**.
 
-It watches opencode sessions in real time and reports their lifecycle — started, busy, idle, retried, completed, failed or cancelled — plus token usage and cost, to a Telegram bot chat of your choice. The bot is read-only by default: since 2026-09-02, permission prompts can be answered with three inline buttons (Allow once / Allow always / Deny) straight from Telegram — only when you explicitly tap one. Questions and everything else are always handled in opencode itself; the plugin never answers on your behalf.
+It watches opencode sessions in real time and reports their lifecycle — started, busy, idle, retried, completed, failed or cancelled — plus token usage and cost, to a Telegram bot chat of your choice. The bot never acts on its own: permission prompts render three inline buttons (Allow once / Allow always / Deny) and question prompts render a stepped answer wizard, and both write back to opencode **only when you explicitly tap or submit something in Telegram**. Everything else stays in opencode.
 
 ## Features
 
 - **Session lifecycle notifications** — track sessions through `idle` / `busy` / `retry` states and `completed` / `failed` / `cancelled` outcomes, delivered straight to Telegram.
 - **Token usage & cost** — aggregated input / output / reasoning / cache tokens with estimated cost per session.
-- **Todo projection** — see the current session's todo list from Telegram.
 - **Project registry & inline menu** — a registry of monitored projects (`~/.otg/projects.json`) with an inline-keyboard menu (`/menu`) to manage them from the chat.
-- **Read-only by default, explicit TG replies for permissions** — since 2026-09-02 permission prompts render Allow once / Allow always / Deny buttons; tapping one writes your choice back to opencode. Questions and everything else stay in opencode — the plugin never answers on its own.
+- **Explicit Telegram replies for permissions and questions** — permission prompts render Allow once / Allow always / Deny buttons; question prompts render a stepped wizard (options, custom input, submit / cancel). A reply is written back to opencode only when you explicitly tap a button; the plugin never answers on its own.
 - **Cross-process poller lock** — when several opencode windows are open on the same machine, a file-based lock (`PollerLock`) guarantees only one instance polls Telegram at a time.
 - **Proxy support** — optional HTTP/HTTPS proxy (with auth and CONNECT tunneling) for reaching the Telegram Bot API.
 - **Resilient messaging** — long polling (`getUpdates`, 25 s interval), retries with backoff, message length clamping, and bot-token redaction in all logs.
 
 ## Requirements
 
-- Node.js (runtime for opencode plugins)
-- opencode `>= 1.18` (plugin targets `1.18.23`)
+- opencode **v2** — the plugin targets `2.0.15`. This release is v2-only: opencode v1 users should stay on the published `0.6.x` line.
 - A Telegram bot token (create one with [@BotFather](https://t.me/BotFather)) and your Telegram `chatId`
+- Only for a from-source build: Node.js ≥ 18 (declared in `engines`) and [Bun](https://bun.sh) on `PATH` (`scripts/build.mjs` invokes `bun build`)
 
 ## Installation
 
 ### From npm (recommended)
 
-The plugin is published as [`opencode-telegram-monitor`](https://www.npmjs.com/package/opencode-telegram-monitor) and can be loaded straight from the opencode config:
+The plugin is published as [`opencode-telegram-monitor`](https://www.npmjs.com/package/opencode-telegram-monitor) and is loaded from the opencode config as a **directory package** (a package name — not a file path):
 
-1. Add the plugin to `~/.config/opencode/opencode.json`. **Pin a concrete version** (not `@latest`) — a pinned version makes opencode load the cached copy directly, so the plugin's own self-update is the only thing that ever replaces the files:
+1. Add the plugin to `~/.config/opencode/opencode.json`. **Pin a concrete version** (not `@latest`) — a pinned version makes opencode install that exact package into its cache as a directory package, so the plugin's own self-update is the only thing that ever replaces the files:
 
    ```json
    {
      "$schema": "https://opencode.ai/config.json",
-     "plugin": ["opencode-telegram-monitor@0.6.0"]
+     "plugin": ["opencode-telegram-monitor@1.0.0"]
    }
    ```
 
-2. Restart opencode. The plugin is installed automatically into the opencode cache (`~/.cache/opencode/`) on first start.
+   opencode v2 accepts both the legacy `plugin` array and the v2 `plugins` key (string or `{package, options}`); entries that are bare package names are resolved from npm.
 
-3. If you previously installed a local copy, **remove it** to avoid double-loading the plugin (npm and local copies with the same name load side by side, which would run two pollers):
+2. Restart opencode. The package is installed automatically into the opencode cache (`~/.cache/opencode/`) on first start, and opencode loads the bundled `monitor.ts` from the package directory.
+
+3. If you previously installed a local copy, **remove it** to avoid double-loading the plugin (npm and local copies load side by side, which would run two plugin instances):
 
    ```bash
+   rm -f ~/.config/opencode/plugin/telegram-session-monitor.ts
    rm -f ~/.config/opencode/plugins/telegram-session-monitor.ts
    ```
 
@@ -48,15 +50,19 @@ The plugin is published as [`opencode-telegram-monitor`](https://www.npmjs.com/p
 
 ### From source (local file)
 
-1. Build the plugin into the single-file `monitor.ts` bundle, then copy that artifact into your opencode plugins directory:
+opencode v2 auto-discovers plugins in `<configDir>/plugin/` **and** `<configDir>/plugins/`: every `.ts`/`.js` file and every subdirectory there is loaded as a plugin, no config entry needed. Both directories are scanned — **pick one and keep the plugin there only** (the example below uses `plugin/`); don't keep copies in both, to avoid duplicate-loading confusion. Copy the single-file bundle in:
+
+1. Build the plugin into the single-file `monitor.ts` bundle, then copy that artifact into your opencode plugin directory:
 
    ```bash
-   mkdir -p ~/.config/opencode/plugins
-   node scripts/build.mjs
-   cp monitor.ts ~/.config/opencode/plugins/telegram-session-monitor.ts
+   node scripts/build.mjs   # requires Bun on PATH
+   mkdir -p ~/.config/opencode/plugin
+   cp monitor.ts ~/.config/opencode/plugin/telegram-session-monitor.ts
    ```
 
-2. Restart opencode. The plugin loads automatically from the plugins directory.
+2. Restart opencode. The plugin loads automatically from the plugin directory.
+
+Keep helper files out of `plugin/` and `plugins/` — every file there is treated as a plugin, and anything without a `{ id, setup }` default export fails to load. A config entry must point at a **directory** (a package directory with its own `package.json`): opencode v2 rejects absolute `.ts` file paths with `configured plugin path must be a directory`.
 
 ## Automatic updates
 
@@ -82,21 +88,21 @@ The workflow **refuses to publish** if the tag version does not match the versio
 
 The built `monitor.ts` never stores an editable version: `scripts/build.mjs` reads `package.json` and injects the version into the bundle (`bun build --define __PLUGIN_VERSION__`), so the artifact always reports the pinned version.
 
-For a **bugfix** (patch) release, bump only the lowest number — never the middle one (`0.5.0 → 0.5.1`, not `0.6.0`):
+For a **bugfix** (patch) release, bump only the lowest number — never the middle one (`1.0.0 → 1.0.1`, not `1.1.0`):
 
 ```bash
 # 1. set the new version (package.json + README.md; the bundle picks it up at build time)
-node scripts/set-version.mjs v0.5.1
+node scripts/set-version.mjs v1.0.1
 
 # 2. verify the tag you are about to create matches the pinned version (exits non-zero on mismatch)
-node scripts/check-version.mjs v0.5.1
+node scripts/check-version.mjs v1.0.1
 
 # 3. commit, tag, push — the workflow verifies again and publishes
 git add package.json README.md
 git commit -m "feat(monitor): ..."
-git tag v0.5.1
+git tag v1.0.1
 git push origin main
-git push origin v0.5.1
+git push origin v1.0.1
 ```
 
 ### Local tag guard (pre-push hook)
@@ -149,12 +155,11 @@ The plugin reads its configuration from `~/.otg/telegram.json`:
 | `/sessions`       | List active sessions.                              |
 | `/use <short-id>` | Select a session to inspect.                       |
 | `/status`         | Show the selected session's status.                |
-| `/todo`           | Show the selected session's todo list.             |
 | `/usage`          | Show the selected session's token usage and cost.  |
 
 ## How it works
 
-- The plugin subscribes to opencode's event stream through the `@opencode-ai/sdk` client and maintains an in-memory projection of every session: state, outcome, tools, todos, waiting prompts and token totals.
+- The plugin subscribes to opencode's event stream through `client.event.subscribe()` and maintains an in-memory projection of every session: state, outcome, tools, waiting prompts and token totals. All v2 types are defined locally — the plugin has **zero runtime `@opencode-ai/*` dependencies** and ships as one self-contained bundle.
 - A background poller talks to the Telegram Bot API (`getUpdates` long polling) so you can send commands from the chat; replies are sent back through the same channel with retries.
 - When several opencode processes share one machine, `PollerLock` (`~/.otg/`) elects a single poller to avoid duplicate `getUpdates` consumers.
 - A self-healing registrar re-asserts the current project into the registry every 5 minutes, so a project removed via `/menu` comes back as disabled while its window stays open.
@@ -170,7 +175,7 @@ The plugin reads its configuration from `~/.otg/telegram.json`:
 
 ## Security notes
 
-- The bot is **read-only by default** — the only way it acts on your behalf is when you explicitly tap an approval button on a permission prompt (2026-09-02+); it never answers questions or takes actions on its own.
+- The bot is **read-only by default** — the only way it acts on your behalf is when you explicitly tap an approval button on a permission prompt (2026-09-02+) or submit / cancel an answer in a question wizard. It never answers or takes actions on its own.
 - Messages are limited to the originating `chatId`; updates from any other chat are ignored.
 - The bot token is redacted (`[REDACTED]`) in all log output and diagnostics.
 - The plugin runs locally and talks to the public Telegram Bot API only.

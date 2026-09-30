@@ -56,3 +56,26 @@ For a project-local install (or to pin a version), add the package to the `plugi
 
 > [!IMPORTANT]
 > **The first OpenCode load after installing this plugin may be slow.** That's OpenCode downloading the plugin's packages and managed tools into its cache — it happens once. Every subsequent start is fast.
+
+## Install on OpenCode v1
+
+On OpenCode v1 install plugin version **0.1.0**. Pin the version in the spec below; a bare package name resolves to `latest`:
+
+```bash
+opencode plugin @glaicer/supercode-context-progress-bar@0.1.0 --global
+```
+
+- `--global` (`-g`) writes into the global config (`~/.config/opencode/opencode.json`); default is project-local (`.opencode/opencode.json`).
+
+- If the plugin is already configured without a version, rerun with `--force` (`-f`) to replace that entry with the pinned spec — otherwise the command reports `Already configured` and keeps the unpinned entry.
+
+Manual install also works: put the pinned spec in the `plugin` array (v1's key, not `plugins`) of `opencode.json`:
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugin": ["@glaicer/supercode-context-progress-bar@0.1.0"]
+}
+```
+
+v1 resolves the npm spec (including the version) and installs it automatically at startup — no `npm install` needed. Restart OpenCode after saving.

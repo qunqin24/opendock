@@ -318,6 +318,14 @@ tombstone until the admission ends or a new admission replaces it. Quota RPC
 candidates contain only provider/model IDs; configured variants remain attached
 to the eventual model selection.
 
+`router_quota_diagnostics` includes the main admission outcome and reason, whether
+the current selection was router-owned, the most recent Automatic/Pinned control
+and any later ownership-invalidating event. HTTP observations carry local numeric
+IDs; if one is cleared before its response or retry, the trace records the clear
+reason and the response's last-cleared observation. The trace is bounded to four
+attempts and 64 events per attempt and records no prompts, request/response bodies,
+headers, or credentials. These diagnostic callbacks do not change routing.
+
 #### Transport-rewrite cooperation
 
 A trusted in-process transport plugin that replaces a native HTTP `Request` must
@@ -501,7 +509,7 @@ git clone https://github.com/dylanrussellmd/agent-router.git
 cd agent-router
 pnpm install
 pnpm test
-pnpm build
+pnpm bundle
 ```
 
 ## License

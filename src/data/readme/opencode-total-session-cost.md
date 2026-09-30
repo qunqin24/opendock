@@ -60,8 +60,8 @@ instead of being guessed onto the currently selected model.
 Run `/sessions_cost` (or `/session_costs`) to open a centered, read-only dialog with
 the sessions of the last 7 days grouped by day. Each day header shows the total of its
 sessions and each session row shows its recursive total (session plus every child
-sub-session). Use the up/down arrows to move the selection and `enter` to open a
-session; `esc` closes the dialog.
+sub-session). Use the up/down arrows or mouse click to select a session and
+`enter` (or click) to display its detailed cost breakdown popup; `esc` closes the dialog.
 
 ```
 Session Costs                                  last 7 days

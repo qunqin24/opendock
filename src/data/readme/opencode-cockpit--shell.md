@@ -15,7 +15,7 @@ behind you. Cockpit is the instrument panel: things your agent can use, and thin
 what it is doing.
 
 ```sh
-opencode plugin opencode-cockpit@0.6.0 --global --force
+opencode plugin opencode-cockpit@0.7.1 --global --force
 ```
 
 ---
@@ -83,6 +83,24 @@ works whatever version you are stuck on, because it comes from npm rather than f
 cannot update itself.
 
 **Every plugin, not just this one · [`@opencode-cockpit/updater`](packages/updater)**
+
+---
+
+### 🛰️  Subagents — what they are doing, while they do it
+
+When the main agent hands work to a subagent you get one line in the chat and nothing about what it
+is doing. **Subagents** puts every subagent in the sidebar with what it is doing right now — `grep
+"session" src/auth/**  51s` — and a click opens its whole run in a pane: the task, its thinking, every
+shell command and file change as a box with its output, and the answer as it is written.
+
+Then it makes them reusable. Ask the main agent for a follow-up on a subagent's work and it continues
+*that* subagent — which already read the code — instead of starting a new one. Press `m` to message a
+subagent yourself: the main agent is told what it answered, without a turn being spent on it. `x`
+stops one (and tells the main agent why), `b` moves a blocking one to the background.
+
+![A subagent at work beside the conversation: its run in a pane, a question put to it from the pane, and the exchange added to the main conversation](media/subagents.gif)
+
+**Sidebar + pane · follow-ups keep context · OpenCode 1 and 2 · [docs](https://codestz.github.io/opencode-cockpit/subagents/overview/) · [`@opencode-cockpit/subagents`](packages/subagents)**
 
 ---
 
@@ -168,13 +186,13 @@ switches between the live screen and the scrollback, `?` shows details.
 **Everything**
 
 ```sh
-opencode plugin opencode-cockpit@0.6.0 --global --force
+opencode plugin opencode-cockpit@0.7.1 --global --force
 ```
 
 **Only what you want**
 
 ```sh
-opencode plugin @opencode-cockpit/shell@0.6.0 --global --force
+opencode plugin @opencode-cockpit/shell@0.7.1 --global --force
 ```
 
 The version is pinned on purpose. OpenCode resolves a plugin spec once and never again, so a
@@ -198,7 +216,7 @@ options as an object:
 
 ```json
 {
-  "plugins": [{ "package": "opencode-cockpit@0.6.0", "options": { "features": { "shell": true } } }]
+  "plugins": [{ "package": "opencode-cockpit@0.7.1", "options": { "features": { "shell": true } } }]
 }
 ```
 
@@ -279,6 +297,7 @@ Each shell's output feeds three views at once: a normalized **log** for the agen
 | [`@opencode-cockpit/status`](packages/status) | Bay 02 — the statusline | [README](packages/status/README.md) · [docs](https://codestz.github.io/opencode-cockpit/status/overview/) |
 | [`@opencode-cockpit/review`](packages/review) | Bay 03 — a pull request in the terminal | [README](packages/review/README.md) · [docs](https://codestz.github.io/opencode-cockpit/review/overview/) |
 | [`@opencode-cockpit/updater`](packages/updater) | Bay 04 — every plugin, and an update checked against disk | [README](packages/updater/README.md) |
+| [`@opencode-cockpit/subagents`](packages/subagents) | Bay 05 — every subagent visible, reachable and reused | [README](packages/subagents/README.md) · [docs](https://codestz.github.io/opencode-cockpit/subagents/overview/) |
 | [`@opencode-cockpit/daemon`](packages/daemon) | `cockpitd`, the shared process host | [README](packages/daemon/README.md) |
 | [`@opencode-cockpit/client`](packages/client) | Typed, auto-spawning client | [README](packages/client/README.md) |
 | [`@opencode-cockpit/protocol`](packages/protocol) | Wire contracts and schemas | [README](packages/protocol/README.md) |
@@ -287,8 +306,10 @@ Each shell's output feeds three views at once: a normalized **log** for the agen
 
 Not a roadmap of promises — the next thing, and why it is next.
 
-**Doctor.** One command that checks your setup and says how to fix it: which halves are loaded,
-which keys collide, whether a daemon is running code older than the plugin talking to it.
+**Review and the console in OpenCode 2's panel.** OpenCode 2 has a side panel of its own — with
+focus, a width that follows the window, and a full-screen toggle. Review and the full-screen console
+draw their own today; on OpenCode 2 they can live in the host's, and behave like the rest of its
+interface.
 
 ## Contributing
 

@@ -10,6 +10,7 @@ an interactive setup script.
 ## Features
 
 - Fetches `GET /v1/models` when the plugin loads.
+- Provides `/ocp-reload` to re-fetch models without restarting OpenCode.
 - Registers every enabled provider through `ctx.provider.transform`.
 - Preserves all enabled providers; it is not limited to a single provider.
 - Keeps API keys in OpenCode's `auth.json` and provider metadata in a separate
@@ -88,7 +89,8 @@ The setup script can list, add, edit, enable/disable, test, filter, and remove
 providers. It does not require the plugin to be loaded and OpenCode does not need
 to be running.
 
-After changing providers, restart OpenCode or reload its configuration.
+After changing providers, run `/ocp-reload` inside OpenCode to re-fetch
+`/v1/models` and reload providers without restarting. A full restart also works.
 
 ## Storage
 
@@ -142,9 +144,13 @@ At plugin setup OpenCode:
    `@opencode/ai/providers/openai-compatible`.
 6. Soft-fails an unreachable provider: it is logged and skipped without breaking
    OpenCode startup.
+7. Registers the `/ocp-reload` slash command. Running it re-reads
+   `ocp-providers.json`/`auth.json`, re-fetches `/v1/models`, and calls
+   `ctx.provider.reload()` (plus `ctx.model.reload()`) so new models and newly
+   added providers appear without restarting OpenCode.
 
-The current implementation loads once when the plugin is set up. It does not
-periodically poll or refresh models during the same OpenCode session.
+The plugin does not periodically poll models on its own; use `/ocp-reload` after
+changing providers or when the upstream catalog changes.
 
 ## Model mapping
 

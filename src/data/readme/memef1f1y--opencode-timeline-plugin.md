@@ -15,8 +15,8 @@ OpenCode TUI 对话历史导航：在侧边栏以时间线列出当前会话的�
 | 操作 | 效果 |
 | ---- | ---- |
 | 点击行 | 选中 + 跳转到该消息 |
+| 点击标题栏 | 展开 / 收起列表 |
 | `⤓ 回到底部` | 主会话视图滚到最新处 |
-| `Alt+U` | 显示 / 隐藏面板 |
 
 ## 安装
 
@@ -64,15 +64,20 @@ npm install
 ## 使用
 
 1. `opencode` 启动 TUI 并进入一个会话，侧边栏出现 `Timeline` 面板。
-2. 鼠标**点击某行**跳转到主视图对应消息；点 **`⤓ 回到底部`** 回到最新处；`Alt+U` 显示/隐藏。
+2. 侧边栏交互全走鼠标：**点击某行**跳转到主视图对应消息，点击**标题栏**展开/收起，点 **`⤓ 回到底部`** 回到最新处。面板常驻（开关已删）。
 3. 发一条新消息，列表自动置顶（最新在最上）。
+
+## macOS 说明
+
+- **点了标题没反应**：先确认终端鼠标上报是否打开——能**点击折叠原生侧边栏区块**（Context/LSP/Todo/Files 标题）即正常；若原生区块也点不动，是终端没开鼠标报告（iTerm2：Preferences → Profiles → Terminal → Enable mouse reporting），与插件无关。若原生能点、Timeline 标题点了没反应，提 issue（0.1.5 已在 toggle 后手动请求重绘）。
+- **显示 `暂无用户消息（会话共 N 条）`**：括号里就是原始消息总数。`共 0 条` = 宿主还没同步该会话历史（等几秒或重进会话）；`共 N 条（N>0）` = 有数据但无用户消息（该会话确实没发过言，或消息形态漂移，提 issue 请贴这行）。
 
 ## 环境要求
 
 - `opencode >= 1.0`（已验证 `1.18.30` ~ `1.18.32`）
 - Node 18+，npm 9+（或 bun 1.0+）
-- macOS / Linux / WSL 均可；Windows 原生终端注意 `Alt+U` 可能被终端占用
-- 鼠标点击需要终端开启鼠标支持（能点侧边栏标题折叠即正常）
+- macOS / Linux / WSL 均可
+- 侧边栏交互全走鼠标（需要终端开启鼠标支持）；键盘只保留确认、关闭
 
 ## 开发
 
@@ -88,7 +93,7 @@ npm run typecheck  # 期望：无输出即通过
 | 现象 | 检查 |
 | ---- | ---- |
 | 面板没出现 | 包是否装上（`opencode plugin` 列表里有没有）；文件写法下路径是否为**绝对路径**；启动日志有无 `loading tui config` / ERROR |
-| 点击没反应 | 终端鼠标是否可用；是否进了会话（home 页侧边栏没有 session 上下文） |
+| 点击没反应 | 先看原生侧边栏区块（Context/LSP/Todo/Files）点标题能否折叠：也不能=终端没开鼠标报告；能=提 issue（0.1.5 已加 toggle 后重绘） |
 | 跳转提示无滚动 API | 会话太老的消息可能不在本地渲染树里（TUI 只加载最近约 20 条分页），先 `⤓ 回到底部` 再试 |
 | `npm run build` 失败 | 预期行为，当前只有 `typecheck`，`build` 是占位脚本 |
 
@@ -107,7 +112,8 @@ npm run typecheck  # 期望：无输出即通过
     │   └── NodeItem.tsx      # 单节点行渲染 + 点击跳转
     ├── hooks/
     │   ├── useMessages.ts    # 快照/订阅/轮询/选中/跳转记账
-    │   └── useKeybind.ts     # Alt+U 图层注册与注销
+    │   ├── useKeybind.ts     # 开关/确认/关闭图层注册与注销（无方向键）
+    │   └── useMouseTap.ts    # down/up 双通道点按（macOS release-only 终端兜底）
     └── api/
         └── opencode.ts       # state/event/kv/toast/跳转封装
 ```
@@ -115,5 +121,5 @@ npm run typecheck  # 期望：无输出即通过
 ## 已知限制
 
 1. 跳转是 best-effort：优先官方 `api.state.scrollToMessage`（若宿主提供），否则走渲染树查找（`findDescendantById` → 包围的 ScrollBox → `scrollChildIntoView`，等价原生 `scrollBy(child.y - scroll.y - 1)`），再否则 toast + kv 兜底。TUI 本地只加载最近约 20 条分页，太老的消息可能无渲染节点（上游同款限制）。
-2. 键盘导航键（`↑/↓`/`Enter`）在输入框聚焦时归编辑器，到不了侧边栏——这是宿主 keymap 焦点优先级，预期行为；主交互是鼠标点击。
+2. 键盘只保留开关/确认/关闭，侧边栏选中与展开收起走鼠标点击——方向键在输入框有归属，抢过来会劫持输入历史，预期不注册。
 3. 树状视图：`TimelineNode.parentId/children` 已预留字段，UI 仍为线性。

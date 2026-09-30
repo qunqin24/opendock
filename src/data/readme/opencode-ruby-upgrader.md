@@ -76,11 +76,11 @@ Every run has a generated JSON record and Markdown companion under `.ruby-upgrad
 
 As an example, here is one such run rendered in the dashboard — per-hop summaries, test metrics, and citation links. The full process and per-hop detail live in the run reports themselves:
 
-![Example of the local evidence dashboard](docs/dashboard.png)
+![Example of the local evidence dashboard](https://raw.githubusercontent.com/lilla021/opencode-ruby-upgrader/main/docs/dashboard.png)
 
 The same reports open as a vault — each run is a Markdown note paired with its JSON record:
 
-![Example vault view: run reports as paired Markdown and JSON notes](docs/vault.png)
+![Example vault view: run reports as paired Markdown and JSON notes](https://raw.githubusercontent.com/lilla021/opencode-ruby-upgrader/main/docs/vault.png)
 
 Launch the local-only dashboard from the repository worktree:
 

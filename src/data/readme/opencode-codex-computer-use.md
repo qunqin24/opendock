@@ -59,8 +59,13 @@ Nothing in Codex has to be configured by hand. You need a working Computer Use i
 The ChatGPT app does not need to be open while you use OpenCode.
 
 **Windows and Linux (experimental):** Codex Computer Use also runs on Windows, and its runtime has a Linux target. The
-plugin itself is platform-neutral (it only talks to `codex app-server`), but it has only been tested on macOS. On
-other platforms, `codex` is found through `PATH` or the `codexPath` option, and OCR is not available yet.
+plugin itself is platform-neutral (it only talks to `codex app-server`), but it has only been tested with Computer Use
+running on macOS. When Computer Use runs on another platform, `codex` is found through `PATH` or the `codexPath`
+option, and OCR is not available there yet. These notes are about the machine that runs Computer Use; OpenCode itself
+can run on another machine, as the next paragraph explains.
+
+**OpenCode on another machine:** OpenCode can also run somewhere else, such as a Linux VM, and operate the apps on a Mac
+it reaches over SSH. See [Run Computer Use on another Mac (SSH)](#run-computer-use-on-another-mac-ssh).
 
 ## Install
 
@@ -116,7 +121,8 @@ In OpenCode, run the **`/computer-use-doctor`** command. It checks each requirem
 connected browsers, and says how to fix whatever is missing. The report is added to the session without starting a
 model turn.
 
-From a checkout, `bun run doctor` runs the same checks in a terminal (`bun scripts/smoke.ts --ocr` also tests OCR).
+From a checkout, `bun run doctor` runs the same checks in a terminal (`bun scripts/smoke.ts --ocr` also tests OCR,
+and `--ssh my-mac` checks a Mac over SSH).
 
 ```
 ## Codex Computer Use doctor: ready
@@ -161,7 +167,8 @@ Pass options with the object form of the plugin entry. Every option is optional;
 | `maxOutputKB`         | `128`                 | Maximum text one call returns. Longer output is cut, with a note telling the model to narrow its query. `0` disables the limit. Images are not counted.                                                                                                                                                                                                                                     |
 | `idleShutdownMinutes` | `0` (never)           | Stop the background Codex process after this many minutes without Computer Use calls. The default keeps it running until OpenCode stops, so work can wait indefinitely for you (for example, a login in a tab the agent handed over).                                                                                                                                                       |
 | `callTimeoutSeconds`  | `300`                 | Maximum time for one `computer_use` call.                                                                                                                                                                                                                                                                                                                                                   |
-| `codexPath`           | auto                  | Path to `codex`. Otherwise `$OPENCODE_CODEX_COMPUTER_USE_CODEX_PATH`, then (on macOS) the ChatGPT app, then the Codex app, then `PATH`.                                                                                                                                                                                                                                                     |
+| `codexPath`           | auto                  | Path to `codex`. Otherwise `$OPENCODE_CODEX_COMPUTER_USE_CODEX_PATH`, then (on macOS) the ChatGPT app, then the Codex app, then `PATH`. With `ssh`, a path on the Mac.                                                                                                                                                                                                                      |
+| `ssh`                 | none                  | Run Computer Use on another Mac, reached over SSH: a destination such as `"my-mac"` (a host from `~/.ssh/config`) or `"me@my-mac"`. See [Run Computer Use on another Mac (SSH)](#run-computer-use-on-another-mac-ssh).                                                                                                                                                                      |
 | `debug`               | `false`               | `true` (or a file path) writes every message exchanged with Codex to `~/.local/share/opencode/log/codex-computer-use.jsonl`, with screenshots replaced by their size. The log contains accessibility trees and page text, so it can hold sensitive data.                                                                                                                                    |
 
 ### App access
@@ -192,11 +199,69 @@ An `ask` rule is meant to prompt before every call, but OpenCode 2.0.16 does not
 plugins ([anomalyco/opencode#50652](https://github.com/anomalyco/opencode/issues/50652), fix in
 [#50657](https://github.com/anomalyco/opencode/pull/50657)); until that fix ships, `ask` behaves like `allow`.
 
+## Run Computer Use on another Mac (SSH)
+
+Use this when OpenCode runs on one machine, such as a Linux VM, a server or a dev container, and the apps and Chrome
+tabs the agent should operate are on a Mac you can reach over SSH. The plugin starts Codex on the Mac through `ssh` and
+does everything else there as well: finding `codex`, OCR and the doctor's checks.
+
+You need:
+
+- **SSH with a key that works without any prompt.** On the OpenCode machine, `ssh my-mac true` must return without
+  asking for a password, a passphrase or a host key confirmation. The plugin never answers prompts: a connection that
+  needs one fails. If your key is in `ssh-agent`, OpenCode has to see the same agent (`SSH_AUTH_SOCK`).
+- **A Mac that meets the normal [requirements](#requirements)**, logged in as the user you connect as, and awake.
+  Computer Use operates that user's desktop.
+
+Then set the option:
+
+```jsonc
+{
+  "plugins": [
+    {
+      "package": "opencode-codex-computer-use",
+      "options": { "ssh": "my-mac" },
+    },
+  ],
+}
+```
+
+`ssh` takes a destination the way the `ssh` command does: a host from `~/.ssh/config`, a host name, or `user@host`.
+Ports, keys, jump hosts and other settings belong in `~/.ssh/config`. Run `/computer-use-doctor` to check the result.
+
+What changes:
+
+- **`codexPath` is a path on the Mac.** Without it, the plugin looks for the ChatGPT and Codex apps in the Mac's
+  `/Applications`, then for `codex` on the `PATH` an SSH command gets there. `$OPENCODE_CODEX_COMPUTER_USE_CODEX_PATH`
+  is still read on the OpenCode machine and names a path on the Mac.
+- **Codex's working folder is your home folder on the Mac**, because the OpenCode project folder does not exist there.
+- **OCR and the doctor's checks run on the Mac.** For OCR, each screenshot is sent back to the Mac over SSH.
+- **The plugin adds these options to every `ssh` it runs:**
+  `-T -o BatchMode=yes -o ConnectTimeout=15 -o ServerAliveInterval=15 -o ServerAliveCountMax=4`. Everything else
+  comes from your SSH configuration. If the connection drops, the Codex process ends with it; the next call connects
+  again and tells the model its earlier variables are gone.
+- **Optional speed-up:** OCR and the doctor open a new SSH connection each time. Sharing one connection makes them
+  faster:
+
+  ```
+  Host my-mac
+    ControlMaster auto
+    ControlPath ~/.ssh/cm-%C
+    ControlPersist 10m
+  ```
+
+What stays different:
+
+- **The agent's shell and file tools still run on the OpenCode machine.** Files there are not visible on the Mac until
+  they are copied (for example with `scp`), and the tool description tells the model so.
+- **Handoffs need someone at the Mac.** A login or CAPTCHA the agent hands over waits on the Mac's screen, so you
+  complete it there (or through screen sharing).
+
 ## How it works
 
 ```
 OpenCode ── computer_use tool
-  └─ codex app-server  (hidden, started on first use, JSON-RPC over stdio)
+  └─ codex app-server  (hidden, started on first use, JSON-RPC over stdio; through ssh when it runs on another Mac)
       └─ one ephemeral Codex thread per OpenCode session
           └─ cua_repl (Codex's Computer Use runtime) ── Codex Computer Use engine ── your apps and tabs
 ```
@@ -209,6 +274,9 @@ OpenCode ── computer_use tool
   as Codex does for its own tool calls); the browser surface requires it. When an OpenCode turn finishes or is
   interrupted, the plugin tells Computer Use the turn ended, which also cleans up agent-created Chrome tabs. Deleting
   an OpenCode session closes its Codex thread.
+- **Another Mac:** with the `ssh` option, the plugin runs `ssh <destination> <codex> app-server --listen stdio://`
+  and speaks the same protocol over the connection. Nothing is installed on the Mac beyond what Computer Use already
+  needs.
 - **Lifetime:** the Codex process keeps running between calls, so JavaScript variables survive long waits. If it
   stops anyway (an optional `idleShutdownMinutes`, a crash, or a ChatGPT update), the next call starts it again and
   tells the model, before anything else, that its earlier variables are gone.
@@ -218,20 +286,22 @@ OpenCode ── computer_use tool
 Computer Use reads the UI and screenshots of the apps and pages it operates, and those are sent to **your OpenCode
 model provider** as tool results. In Chrome it works in your real profile, with your logged-in sessions. OpenAI's
 Computer Use component also sends its own usage telemetry to OpenAI, as it does inside ChatGPT; your ChatGPT settings
-govern that. With `screenshots: "ocr"` or `"off"`, no screenshot pixels leave your machine.
+govern that. With `screenshots: "ocr"` or `"off"`, no screenshot pixels leave your machine; with the `ssh` option,
+they only cross your SSH connection between the Mac and the OpenCode machine.
 
 ## Troubleshooting
 
 Start with `/computer-use-doctor`; it names the missing piece.
 
-| Symptom                                    | Fix                                                                                                                                                         |
-| ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Could not find the codex executable`      | Install the ChatGPT desktop app in `/Applications`, or set `codexPath`.                                                                                     |
-| `Codex has no cua_repl MCP server`         | Turn on Computer Use in the ChatGPT/Codex app, then run `/computer-use-doctor` again.                                                                       |
-| Permission errors from the engine          | Grant Accessibility and Screen Recording to _Codex Computer Use_, then retry.                                                                               |
-| The agent says an app needs permission     | Approve the app permanently in ChatGPT/Codex, or set `approval_policy = "never"`; see [App access](#app-access).                                            |
-| No browsers listed / Chrome tab calls fail | Install and connect the ChatGPT for Chrome extension from the ChatGPT/Codex app, keep Chrome running, then run `/computer-use-doctor`.                      |
-| Anything else                              | Plugin messages are prefixed `[codex-computer-use]` in `~/.local/share/opencode/log/opencode.log`; set `"debug": true` to log the full exchange with Codex. |
+| Symptom                                    | Fix                                                                                                                                                          |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `Could not find the codex executable`      | Install the ChatGPT desktop app in `/Applications`, or set `codexPath`.                                                                                      |
+| `Could not reach my-mac over SSH`          | On the OpenCode machine, `ssh my-mac true` must succeed without a prompt; see [Run Computer Use on another Mac (SSH)](#run-computer-use-on-another-mac-ssh). |
+| `Codex has no cua_repl MCP server`         | Turn on Computer Use in the ChatGPT/Codex app, then run `/computer-use-doctor` again.                                                                        |
+| Permission errors from the engine          | Grant Accessibility and Screen Recording to _Codex Computer Use_, then retry.                                                                                |
+| The agent says an app needs permission     | Approve the app permanently in ChatGPT/Codex, or set `approval_policy = "never"`; see [App access](#app-access).                                             |
+| No browsers listed / Chrome tab calls fail | Install and connect the ChatGPT for Chrome extension from the ChatGPT/Codex app, keep Chrome running, then run `/computer-use-doctor`.                       |
+| Anything else                              | Plugin messages are prefixed `[codex-computer-use]` in `~/.local/share/opencode/log/opencode.log`; set `"debug": true` to log the full exchange with Codex.  |
 
 ## Contributing
 

@@ -25,7 +25,7 @@ Requirements: OpenCode ≥ 1.14 and [kiro-cli](https://kiro.dev/cli).
    ```json
    {
      "$schema": "https://opencode.ai/config.json",
-     "plugin": ["opencode-kiro-provider@0.2.1"]
+     "plugin": ["opencode-kiro-provider@0.2.2"]
    }
    ```
    OpenCode installs it from npm on the next start. Remove any other Kiro plugin (such as `opencode-kiro-auth`) from the list, because both register the provider id `kiro`.

@@ -1,6 +1,6 @@
 <div align="center">
   <a href="https://github.com/alvinunreal/oh-my-opencode-slim/stargazers">
-    <img src="img/v3-beta.webp" alt="oh-my-opencode-slim V3 Beta Release" style="border-radius: 10px;">
+    <img src="img/v3.webp" alt="oh-my-opencode-slim V3 Beta Release" style="border-radius: 10px;">
   </a>
   <h3>✨ oh-my-opencode-slim ✨</h3>
 
@@ -54,6 +54,8 @@ The main idea is simple: instead of forcing one model to do everything, the plug
 - **[Fully customizable](docs/configuration.md)** - custom agents, prompt
   overrides, per-agent skill/MCP permissions, and
   [project-local customization](docs/project-local-customization.md).
+- **[Marketplace packages](docs/marketplace.md)** - install and manage community
+  agents; package changes apply only after reloading OpenCode.
 
 ### What Users Say
 
@@ -155,7 +157,7 @@ Then:
 > It's **recommended** to understand how background orchestration works. The **[Orchestrator prompt](https://github.com/alvinunreal/oh-my-opencode-slim/blob/master/src/agents/orchestrator.ts#L28)** contains the scheduler rules, specialist routing logic, and thresholds for when work should be assigned to background agents. You can always delegate manually by calling a subagent via: `@agentName <task>`
 
 > [!TIP]
-> Because background agents are now the default workflow, it is **highly recommended** to enable and configure **[Multiplexer Integration](docs/multiplexer-integration.md)**. It automatically opens each agent in a dedicated Tmux, Zellij, Herdr, cmux, or kitty pane, so you can watch specialists work live while the Orchestrator continues coordinating the session.
+> Because background agents are now the default workflow, it is **highly recommended** to enable and configure **[Multiplexer Integration](docs/multiplexer-integration.md)**. It automatically opens each agent in a dedicated Tmux, Zellij, Herdr, cmux, or kitty pane, so you can watch specialists work live while the Orchestrator continues coordinating the session. On OpenCode v2 hosts, panes work with the shared background service or an explicit `--server`; `--standalone` hosts cannot host panes (one diagnostic per process; use v2's native subagent surfaces instead).
 
 The default generated configuration includes both `openai` and `opencode-go` presets.
 
@@ -178,7 +180,12 @@ The default generated configuration includes both `openai` and `opencode-go` pre
 
 Presets can inherit from one base preset with `extends`: a `design` preset can
 extend `base` and override only its designer model. Changes are persisted by
-`/preset` and take effect after an OpenCode reload. See
+`/preset`. On v2 hosts the saved/applied preset's inference fields (`model`,
+`variant`, `temperature`, `options`) apply to new child dispatches (frozen for
+each child before its first request) and the sidebar once the server-side
+config watcher has refreshed them; a malformed config keeps the last-known-good
+state, and existing sessions plus prompt/tool/policy/skill/MCP changes stay
+frozen until a full reload; on v1 hosts reload OpenCode. See
 [Configuration](docs/configuration.md#preset-inheritance) for the inheritance
 example and precedence rules.
 
@@ -571,13 +578,10 @@ If any agent fails to respond, check your provider authentication and config fil
 Skills are prompt-based instructions injected into an agent's system prompt to
 guide decisions, workflows, and tool use. Unlike MCPs (which are running
 servers), a skill runs no process — it is a focused playbook an agent activates
-when the task calls for it. The installer bundles eight skills and keeps them
-updated on plugin auto-update; local customizations are preserved.
-
-> [!TIP]
-> To discard local bundled-skill customizations and receive package updates, run
-> `bunx oh-my-opencode-slim install --skills=force`. This deliberately replaces
-> installed bundled skills with the package versions.
+when the task calls for it. The plugin registers its eight bundled skills
+in-process at load — updates apply on restart, nothing is copied to disk. A
+same-named skill directory under `~/.config/opencode/skills/` overrides the
+bundled version.
 
 | Skill | Purpose | Default agent | How to invoke |
 |:-----:|---------|---------------|---------------|
@@ -654,6 +658,7 @@ Use this section as a map: start with installation, then jump to features, confi
 | **[Installation Guide](docs/installation.md)** | Install the plugin, use CLI flags, reset config, and troubleshoot setup |
 | **[OpenCode v2 Compatibility](docs/opencode-v2-compatibility.md)** | Run the same plugin on `opencode2`: feature matrix, v2.0.x compatibility baseline, version pinning |
 | **[Configuration](docs/configuration.md)** | Config file locations, JSONC support, prompt overrides, and full option reference |
+| **[Marketplace](docs/marketplace.md)** | Install, inspect, activate, and update marketplace agent packages |
 | **[Project Customization](docs/project-local-customization.md)** | Repository-specific custom agents, prompt overrides, per-agent skills, and precedence |
 | **[Background Orchestration](docs/background-orchestration.md)** | Scheduler-first orchestrator model built around native background subagents |
 | **[Maintainer Guide](docs/maintainers.md)** | Issue triage rules, label meanings, support routing, and repo maintenance workflow |
@@ -670,7 +675,7 @@ Use this section as a map: start with installation, then jump to features, confi
   <p><sub>Every merged contribution leaves a mark on the realm.</sub></p>
 
   <!-- ALL-CONTRIBUTORS-BADGE:START - Do not remove or modify this section -->
-[![All Contributors](https://img.shields.io/badge/all_contributors-120-orange.svg?style=flat-square)](#contributors-)
+[![All Contributors](https://img.shields.io/badge/all_contributors-124-orange.svg?style=flat-square)](#contributors-)
 <!-- ALL-CONTRIBUTORS-BADGE:END -->
 </div>
 
@@ -840,6 +845,12 @@ Use this section as a map: start with installation, then jump to features, confi
       <td align="center" valign="top" width="16.66%"><a href="https://guanbear.com/"><img src="https://avatars.githubusercontent.com/u/11829005?v=4?s=100" width="100px;" alt="GuanBear"/><br /><sub><b>GuanBear</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=guanbear" title="Code">💻</a></td>
       <td align="center" valign="top" width="16.66%"><a href="https://github.com/ShoelaceMan"><img src="https://avatars.githubusercontent.com/u/9676844?v=4?s=100" width="100px;" alt="Trent Arcuri"/><br /><sub><b>Trent Arcuri</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=ShoelaceMan" title="Code">💻</a></td>
       <td align="center" valign="top" width="16.66%"><a href="https://github.com/expnn"><img src="https://avatars.githubusercontent.com/u/18525479?v=4?s=100" width="100px;" alt="expnn"/><br /><sub><b>expnn</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=expnn" title="Code">💻</a></td>
+    </tr>
+    <tr>
+      <td align="center" valign="top" width="16.66%"><a href="https://github.com/wirsbf"><img src="https://avatars.githubusercontent.com/u/144008530?v=4?s=100" width="100px;" alt="wirsbf"/><br /><sub><b>wirsbf</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=wirsbf" title="Code">💻</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="https://github.com/maqifrnswa"><img src="https://avatars.githubusercontent.com/u/424153?v=4?s=100" width="100px;" alt="Scott Howard"/><br /><sub><b>Scott Howard</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=maqifrnswa" title="Code">💻</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="https://github.com/ananas-wonders"><img src="https://avatars.githubusercontent.com/u/7282452?v=4?s=100" width="100px;" alt="Ananas"/><br /><sub><b>Ananas</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=ananas-wonders" title="Code">💻</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="https://github.com/jaynis"><img src="https://avatars.githubusercontent.com/u/1553675?v=4?s=100" width="100px;" alt="jaynis"/><br /><sub><b>jaynis</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=jaynis" title="Code">💻</a></td>
     </tr>
   </tbody>
 </table>

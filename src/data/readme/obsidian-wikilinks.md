@@ -157,6 +157,49 @@ The whole vault is walked, notes and folders alike, with two exclusions:
 
 A note inside a hidden folder will therefore never resolve.
 
+## OpenCode sidebar: did the agent read my notes?
+
+Resolving a link only tells the agent where a note is. It does not prove the
+note was read. On OpenCode the plugin adds an **Obsidian notes** section to the
+session sidebar that answers that for every note you linked:
+
+```text
+▼ Obsidian notes  ✓ 2  ○ 1
+  ✓ Website Redesign
+  ○ Weekly
+  ✓ Meetings/ (2 read)
+  ✗ Nope (no match)
+  also read
+  · Research/AI Agents.md
+```
+
+- `✓` the agent read the note (for a folder link: at least one note inside it)
+- `○` linked, but not read yet
+- `✗` the link matched nothing in the vault
+- *also read*: vault files the agent read without you linking them
+
+Reads are taken from OpenCode's `read` tool calls. A note the agent only reaches
+through `bash` (`cat`, `grep`) or an MCP server is not detected. A read also
+proves the agent opened the note, not that it used it.
+
+OpenCode loads sidebar plugins from `tui.json`, separately from the `plugin`
+list in `opencode.json`. Add the package there too
+(`~/.config/opencode/tui.json`):
+
+```json
+{
+  "plugin": ["obsidian-wikilinks"]
+}
+```
+
+From a local checkout, list the checkout directory instead:
+`"file:/Users/you/src/obsidian-wikilinks"`.
+
+The section appears once a prompt in the session contains a wikilink. Each
+session's links and reads are logged to
+`~/.local/state/obsidian-wikilinks/sessions/<session>.ndjson`, which the sidebar
+watches.
+
 ## Vault selection
 
 Vault path resolution order:
@@ -197,6 +240,7 @@ The plugin itself is identical on every device.
 | `OBSIDIAN_WIKILINKS_RESOLVER`   | Path to `wikilink-resolver.py` (OpenCode only)                                                                                      |
 | `OBSIDIAN_WIKILINKS_PYTHON`     | Python interpreter to use (default `python3`, OpenCode only)                                                                        |
 | `OBSIDIAN_WIKILINKS_TIMEOUT_MS` | Resolver timeout in ms (default `10000`, OpenCode only)                                                                             |
+| `OBSIDIAN_WIKILINKS_STATE_DIR`  | Where the sidebar's per-session logs live (default `$XDG_STATE_HOME/obsidian-wikilinks/sessions`, OpenCode only)                    |
 
 ## Troubleshooting
 

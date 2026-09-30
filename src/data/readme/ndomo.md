@@ -1,10 +1,10 @@
 # ndomo
 
-OpenCode multi-agent plugin. Taller de artesanos: 20 specialists under one Foreman, one Craftsman, and one Warden. Caveman-native. Embedded memory (bun:sqlite + FlexSearch). DCP peer optional.
+OpenCode multi-agent plugin. Taller de artesanos: 23 agents — 4 primary (Foreman/Craftsman/Warden/Ranger) + 19 specialists. Caveman-native. Embedded memory (bun:sqlite + FlexSearch). Obsidian brain layer. DCP peer optional.
 
 ## What is ndomo
 
-ndomo is a multi-agent orchestration plugin for [OpenCode](https://github.com/opencode-ai). It routes development tasks to 20 specialized agents (scout, scribe, painter, smith, sage, guild, stack-smiths, inspector, critic, chronicler, and ops agents) coordinated by 3 primaries: Foreman (planning), Craftsman (implementation), Warden (operations). All agents use the Caveman output protocol for token-efficient communication. Memory persistence across sessions is handled by ndomo's embedded memory store (bun:sqlite + FlexSearch, one SQLite DB per project). The optional DCP plugin provides additional context pruning for long sessions.
+ndomo is a multi-agent orchestration plugin for [OpenCode](https://github.com/opencode-ai). It routes development tasks to 23 agents: 4 primaries (Foreman — planning, Craftsman — implementation, Warden — operations, Ranger — sensing and analysis) and 19 specialists (scout, scribe, painter, smith, go-smith, js-smith, python-smith, vue-smith, zig-smith, rust-smith, sage, guild, inspector, critic, chronicler, ci-smith, deploy-smith, release-smith, ops-scout). All agents use the Caveman output protocol for token-efficient communication. Memory persistence across sessions is handled by ndomo's embedded memory store (bun:sqlite + FlexSearch, one SQLite DB per project). Plans, tasks and sessions persist in a project-local state DB (SQLite + FTS5), and the Obsidian brain layer projects plans, tasks, designs and memories one-way to an external vault. The optional DCP plugin provides additional context pruning for long sessions.
 
 **Quality features (since 0.4.0):** execution gates enforcement, binary critic review, brainstorm workflow with design docs, cross-session continuity ledgers, and circuit breaker loop detection.
 
@@ -12,38 +12,40 @@ ndomo is a multi-agent orchestration plugin for [OpenCode](https://github.com/op
 
 | Agent | Role | Model (default preset) | Type |
 |---|---|---|---|
-| **foreman** | Master orchestrator and scheduler | minimax/MiniMax-M3 | primary |
-| **warden** | Ops custodian — CI/CD, deploy, releases, monitoring | opencode-go/deepseek-v4-flash | primary |
-| **scout** | Codebase reconnaissance | opencode-go/minimax-m2.7 | subagent |
-| **scribe** | External knowledge retrieval | opencode-go/minimax-m2.7 | subagent |
-| **painter** | UI/UX design and visual composition | opencode-go/kimi-k2.6 | subagent |
-| **smith** | Fast generic implementation | opencode-go/deepseek-v4-flash | subagent |
-| **go-smith** | Go implementation specialist | xiaomi/mimo-v2.5-pro | subagent |
-| **js-smith** | JS/TS implementation specialist | xiaomi/mimo-v2.5-pro | subagent |
-| **python-smith** | Python implementation specialist | xiaomi/mimo-v2.5-pro | subagent |
-| **vue-smith** | Vue 3 / Pinia implementation specialist | xiaomi/mimo-v2.5-pro | subagent |
-| **zig-smith** | Zig 0.16 implementation specialist | xiaomi/mimo-v2.5-pro | subagent |
-| **rust-smith** | Rust implementation specialist | opencode-go/mimo-v2.5-pro | subagent |
-| **sage** | Architecture advisor and debugger | opencode-go/deepseek-v4-pro | subagent |
-| **guild** | Multi-LLM consensus and debate | opencode-go/deepseek-v4-pro | subagent |
-| **inspector** | Code quality and security auditor | opencode-go/deepseek-v4-pro | subagent |
+| **foreman** | Master orchestrator and scheduler | streamlake/kat-coder-pro-v2.5 | primary |
+| **craftsman** | Disciplined implementer — ad-hoc or plan-driven bugs, features, scoped refactors | opencode-go/gpt-5.6-luna | primary |
+| **warden** | Ops custodian — CI/CD, deploy, releases, monitoring | opencode-go/gpt-5.6-luna | primary |
+| **ranger** | Analyst / cartographer / onboarding — senses and persists findings to `analyses`, no plans | minimax/MiniMax-M3 | primary |
+| **scout** | Codebase reconnaissance | opencode/mimo-v2.5-free | subagent |
+| **scribe** | External knowledge retrieval | opencode/mimo-v2.5-free | subagent |
+| **painter** | UI/UX design and visual composition | opencode-go/qwen3.7-plus | subagent |
+| **smith** | Fast generic implementation | opencode-go/mimo-v2.6-flash | subagent |
+| **go-smith** | Go implementation specialist | opencode-go/mimo-v2.6-flash | subagent |
+| **js-smith** | JS/TS implementation specialist | opencode-go/mimo-v2.6-flash | subagent |
+| **python-smith** | Python implementation specialist | opencode-go/mimo-v2.6-flash | subagent |
+| **vue-smith** | Vue 3 / Pinia implementation specialist | opencode-go/mimo-v2.6-flash | subagent |
+| **zig-smith** | Zig 0.16 implementation specialist | opencode-go/mimo-v2.6-flash | subagent |
+| **rust-smith** | Rust implementation specialist | opencode-go/mimo-v2.6-flash | subagent |
+| **sage** | Architecture advisor and debugger | opencode-go/kimi-k2.7-code | subagent |
+| **guild** | Multi-LLM consensus and debate | minimax/MiniMax-M3 | subagent |
+| **inspector** | Code quality and security auditor | opencode-go/kimi-k2.7-code | subagent |
 | **critic** | Binary diff reviewer — APPROVED/REJECTED | minimax/MiniMax-M3 | subagent |
 | **chronicler** | Technical documentation writer | opencode-go/deepseek-v4-flash | subagent |
-| **ci-smith** | CI/CD pipeline specialist | opencode-go/deepseek-v4-flash | subagent |
-| **deploy-smith** | Deployment automation specialist | opencode-go/deepseek-v4-flash | subagent |
-| **release-smith** | Release management specialist | opencode-go/deepseek-v4-flash | subagent |
+| **ci-smith** | CI/CD pipeline specialist | opencode-go/mimo-v2.6-flash | subagent |
+| **deploy-smith** | Deployment automation specialist | opencode-go/mimo-v2.6-flash | subagent |
+| **release-smith** | Release management specialist | opencode-go/mimo-v2.6-flash | subagent |
 | **ops-scout** | Infrastructure recon specialist (read-only) | opencode-go/deepseek-v4-flash | subagent |
 
-**Groups:** Orchestrator (foreman), Explorers (scout, scribe), Builders (painter, smith, go-smith, js-smith, python-smith, vue-smith, zig-smith, rust-smith), Advisors (sage, guild), Quality (inspector, chronicler), Operations (warden, ci-smith, deploy-smith, release-smith, ops-scout).
+**Groups:** Primaries (foreman, craftsman, warden, ranger), Explorers (scout, scribe), Builders (painter, smith, go-smith, js-smith, python-smith, vue-smith, zig-smith, rust-smith), Advisors (sage, guild), Quality (inspector, critic, chronicler), Operations (ci-smith, deploy-smith, release-smith, ops-scout).
 
 ## Quick Start
 
 ```bash
-# Quick install (interactive, will prompt for HTTP)
+# Quick install (interactive)
 bunx ndomo install
 
-# Non-interactive with preset + HTTP enabled
-bunx ndomo install --preset=budget --enable-http
+# Non-interactive with preset
+bunx ndomo install --preset=budget
 
 # With DCP
 bunx ndomo install --with-dcp
@@ -73,7 +75,7 @@ ping all agents
 Install via bunx (recommended):
 
 ```bash
-# Interactive install (will prompt for HTTP)
+# Interactive install
 bunx ndomo install
 
 # With provider preset (non-interactive)
@@ -96,7 +98,7 @@ bun run src/cli/install.ts --with-dcp          # include DCP plugin
 
 See [docs/installer.md](docs/installer.md) for detailed steps and full flag reference.
 
-> **Migration note:** `scripts/install.sh` is preserved in the published tarball as a **compat shim for users coming from `curl -fsSL ... | bash`** (the pre-0.2.0 install path). It is deprecated — new installs should use `bunx ndomo install`. The shim is not removed to avoid breaking legacy one-liners, but no new features will be added there.
+> **Migration note:** `scripts/install.sh` remains in the published tarball as a **compat shim for users coming from `curl -fsSL ... | bash`** (the pre-0.2.0 install path). It is deprecated — new installs should use `bunx ndomo install`. The shim is not removed to avoid breaking legacy one-liners, but no new features will be added there.
 
 **Flags:**
 
@@ -108,38 +110,37 @@ See [docs/installer.md](docs/installer.md) for detailed steps and full flag refe
 | `--with-dcp` | Install and configure the DCP plugin. |
 | `--dry-run` | Print planned changes without writing files. |
 | `--skip-deps` | Skip the `bun install` dependency step. |
-| `--enable-http` | Auto-enable HTTP server (writes http block to `ndomo.config.json`). |
-| `--disable-http` | Skip the HTTP auto-prompt entirely (default in non-TTY / CI). |
-| `--port=N` | HTTP server port (default: `4097`). |
-| `--cors-origins=CSV` | HTTP CORS origins, comma-separated (default: `*`). |
-| `--auth-required=BOOL` | HTTP auth requirement (default: `true`). |
 
 **Uninstall:** `bunx ndomo install --uninstall` or `./scripts/uninstall.sh [--keep-data]`
 
 ## Plans & Tasks DB
 
-ndomo persists plans, tasks, and sessions in a project-local SQLite database
+ndomo persists plans, tasks, sessions, analyses and ops records (incidents, deployments, releases, rollbacks) in a project-local SQLite database
 (`<project>/.ndomo/state.db`) with FTS5 search, audit trail, and auto-archive
-to markdown on completion. 17 tools exposed via OpenCode: `plan_create`,
-`plan_get`, `plan_list`, `plan_search`, `plan_approve`, `plan_update_status`,
-`task_create_batch`, `task_list`, `task_update_status`, `task_search`,
-`task_next_for_agent`, `task_verify`, `session_start`, `session_checkpoint`,
-`session_end`, `design_create`, `ledger_create`, `ledger_get`, `ledger_update`.
+to markdown on completion. 61 tools are exposed via OpenCode, grouped by domain:
 
-**New tools (since 0.4.0):**
-- `task_verify` — inspector-only verification gate for execution gates
-- `design_create` — persist brainstorm design docs (Phase 0)
-- `ledger_create` / `ledger_get` / `ledger_update` — cross-session continuity ledgers
+| Domain | Tools |
+|---|---|
+| Plans | `plan_create`, `plan_get`, `plan_list`, `plan_search`, `plan_approve`, `plan_delete`, `plan_update_status`, `plan_progress`, `plan_files_write` |
+| Tasks | `task_create_batch`, `task_list`, `task_update_status`, `task_verify`, `task_search`, `task_next_for_agent`, `task_peek_for_agent`, `task_dependency_resolver`, `task_add_artifact`, `task_review`, `task_escalate` |
+| Sessions & ledgers | `session_start`, `session_checkpoint`, `session_end`, `ledger_create`, `ledger_get`, `ledger_update` |
+| Routing & classification | `route`, `can_parallel`, `classify_intent`, `classify_tests`, `code_traffic_light`, `validate_task_dependencies` |
+| Dispatch & background | `dispatch`, `active_tasks`, `background_task_status`, `background_task_cancel` |
+| Worktrees | `worktree_create`, `worktree_list`, `worktree_remove`, `worktree_verify` |
+| Memory | `mem_add`, `mem_search`, `mem_list`, `mem_forget`, `mem_stats`, `memory_compress` |
+| Analyses | `analysis_create`, `analysis_get`, `analysis_list`, `analysis_search`, `analysis_update`, `analysis_archive`, `analysis_link_plan` |
+| Obsidian | `obsidian_export`, `obsidian_read_note` |
+| Ops | `incident_create`, `rollback_record` |
+| Design & review | `design_create`, `critic_review` |
+| Utility | `status`, `ndomo_write_unlock` |
+
+The foreman uses these to track work across agent dispatches; ranger writes `analyses` rows (linkable to plans via `analysis_link_plan`). See
+[docs/database.md](docs/database.md) for schema, tools, lifecycle, and
+auto-archive behavior.
 
 CLI write surface (since 0.3.0):
 - `ndomo plan create|list|show|update|approve|complete|delete`
 - `ndomo task create|list|show|update|reassign|complete|fail`
-
-HTTP write surface (since 0.3.0): 10 endpoints covering plan create/update/approve/status/delete and task create/update/status/reassign/delete (`src/http/routes/`).
-
-The foreman uses these to track work across agent dispatches. See
-[docs/database.md](docs/database.md) for schema, tools, lifecycle, and
-auto-archive behavior.
 
 ## Quality Features (since 0.4.0)
 
@@ -234,71 +235,57 @@ See [docs/configuration.md](docs/configuration.md) for full reference. Agent pre
 
 ## Skills
 
-ndomo bundles 6 skills under `skills/`:
+ndomo bundles 24 skills under `skills/`, grouped by family:
 
-| Skill | Description |
-|---|---|
-| `caveman` | Ultra-compressed communication mode (~75% token reduction) |
-| `cavecrew` | Caveman-style subagent presets (investigator, builder, reviewer) |
-| `deepwork` | Structured heavy coding with plan files and review gates |
-| `reflect` | Workflow friction analysis and reusable pattern extraction |
-| `worktrees` | Git worktree management for isolated coding lanes |
-| `dcp-integration` | Dynamic Context Pruning integration guide |
+**Caveman protocol**
+- `caveman` — ultra-compressed communication mode (~75% token reduction)
+- `cavecrew` — caveman-style subagent delegation (investigator, builder, reviewer)
+- `caveman-review` — ultra-compressed code review comments (location, problem, fix)
+
+**Workflow & quality**
+- `grill-me` — relentless interview to sharpen a plan or design
+- `find-skills` — discover and install additional agent skills
+- `frontend-design` — distinctive, non-templated UI design guidance
+- `security-review` — security checklist for auth, user input, secrets, payments
+- `api-security-best-practices` — secure API design patterns (authN/Z, validation, rate limiting)
+
+**Bash**
+- `bash-scripting` — production-ready shell scripts with defensive patterns
+
+**Bun / JS / TS**
+- `bun` — build, run, test and bundle JS/TS with Bun
+- `modern-javascript-patterns` — ES6+ idioms and functional patterns
+- `javascript-testing-patterns` — Jest, Vitest and Testing Library strategies
+
+**Vue**
+- `vue-best-practices` — Composition API, `<script setup>` and TypeScript
+- `vue-pinia-best-practices` — Pinia stores and reactivity patterns
+
+**Go**
+- `golang-patterns` — idiomatic Go patterns and conventions
+- `golang-security` — injection, crypto, filesystem and network safety
+- `golang-testing` — table-driven tests, subtests, benchmarks, fuzzing
+
+**Python**
+- `python-anti-patterns` — checklist of common anti-patterns to avoid
+- `python-design-patterns` — KISS, separation of concerns, composition over inheritance
+- `python-error-handling` — validation, exception hierarchies, partial failures
+- `python-testing-patterns` — pytest fixtures, mocking, TDD
+
+**Rust**
+- `rust-patterns` — ownership, error handling, traits, concurrency
+- `rust-testing` — unit, integration, async, property-based tests, coverage
+
+**Zig**
+- `zig-0.16` — Zig 0.16.0 API guidance and porting notes
 
 ## Integrations
 
 - **Embedded memory** (built-in) — persistent memory with bun:sqlite + FlexSearch. One SQLite DB per project at `~/.ndomo/mem/projects/<projectTag>.db` (WAL). Tools: `mem_add`, `mem_search`, `mem_list`, `mem_forget`, `mem_stats`, and `memory_compress` (regex caveman compression, 0 LLM tokens). Legacy memory shards can be migrated with `bun scripts/migrate-memory.ts`.
 - **DCP** (optional) — `@tarquinen/opencode-dcp` for dynamic context pruning. AGPL-3.0. Installed with `--with-dcp` flag.
+- **Obsidian Brain Layer** (built-in) — deterministic, one-way projection (repo → vault) of plans, tasks, designs and memories to an external Obsidian vault. Tools: `obsidian_export` (idempotent, SHA-256 skip) and `obsidian_read_note`. Requires the `obsidian` block in `ndomo.json`; no reverse sync, watchers or CLI. See [docs/obsidian.md](docs/obsidian.md).
 
 See [docs/integrations.md](docs/integrations.md) for details.
-
-## Web UI
-
-The HTTP server ships with a Vue 3 SPA for browsing **and editing** plans and tasks in the browser. Single-port topology — the same Elysia process serves both the API (`/api/*`) and the SPA (everything else, with hash-mode fallback). Web UI uses **Bulma 1.0** (no jQuery, CSS-only, ~250KB minified) plus custom daisyUI components for write forms. Status palette exposed as CSS custom properties in `web/src/styles/main.css`.
-
-Write UI features (since 0.3.0): create / edit / approve / complete / fail / archive plans; create / update / reassign / delete tasks. All writes go through `/api/*` write endpoints and surface `isLoading`/`error` refs to the components.
-
-See [docs/web-ui.md](docs/web-ui.md) for architecture, build pipeline, and extension guide.
-
-Quick start:
-
-```bash
-bun run web:build                                # build SPA -> src/http/web/
-NDOMO_HTTP_ENABLED=true OPENCODE_SERVER_PASSWORD=secret bun run src/cli/serve.ts
-# Open http://localhost:4097/
-```
-
-Vite dev mode (HMR):
-
-```bash
-# Terminal 1: server
-NDOMO_HTTP_ENABLED=true OPENCODE_SERVER_PASSWORD=secret bun run src/cli/serve.ts
-# Terminal 2: SPA dev
-bun run web:dev
-# Open http://localhost:5173/
-```
-
-## Optional HTTP server
-
-Expose ndomo's SQLite state and OpenCode SDK event stream over HTTP+SSE via an embedded Elysia server. Phase 1 ships read-only REST endpoints (`/api/plans`, `/api/tasks`, `/api/sessions`) and a live SSE relay (`/api/events`).
-
-**Recommended: use the installer flag to enable HTTP:**
-
-```bash
-bunx ndomo install --enable-http
-```
-
-Or set env vars manually and start the server:
-
-```bash
-export NDOMO_HTTP_ENABLED=true
-export OPENCODE_SERVER_PASSWORD='pick-a-strong-passphrase'
-bun run src/cli/serve.ts                       # binds 4097 by default
-```
-
-- **Default:** disabled (`NDOMO_HTTP_ENABLED=false`).
-- **Auth:** HTTP Basic via `OPENCODE_SERVER_PASSWORD` (timing-safe compare). `503 auth_not_configured` if password unset when required.
-- **Endpoints:** `GET /health` (public) + `/api/{plans,tasks,sessions,events}` (auth). See [docs/http-server.md](docs/http-server.md) for full API reference, CLI flags, CORS, security headers, and troubleshooting.
 
 ## Token Savings
 

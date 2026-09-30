@@ -128,6 +128,16 @@ Tested on macOS and Linux — CI runs the full test suite and a probe against
 the real opencode on both. Windows is untested: ocm installs components as
 symlinks, which Windows restricts.
 
+## Contributing
+
+Bug reports, marketplaces you'd like listed as examples, and PRs are welcome —
+see [CONTRIBUTING.md](CONTRIBUTING.md). Issues tagged
+[`good first issue`](https://github.com/wntic/ocm/labels/good%20first%20issue)
+are a good place to start.
+
+If ocm saves you copy-pasting skills between repos, a star helps others find
+it.
+
 ## License
 
 [MIT](LICENSE)

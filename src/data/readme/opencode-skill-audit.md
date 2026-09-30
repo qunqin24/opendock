@@ -16,17 +16,24 @@ On opencode it also renders live in the TUI sidebar, so the audit sits next to t
 with no command to run.
 
 ```text
-● Skill audit — f3a91c2e · ~/Dev/Web · 14:02→14:20 UTC
+● Skill audit — f3a91c2e · ~/Dev/Web · 14:02→16:40
 
-  14:02 ⚡ superpowers:brainstorming
-  14:05 ⚡ superpowers:test-driven-development
-  14:06 │  ✎ src/auth/token.ts  Edit
-  14:09 │  ✎ src/auth/token.test.ts  Write
-  14:20 ⚠ (no skill active)
-  14:20 │  ✎ src/index.ts  Edit
+  ⚡ superpowers:brainstorming
+  ⚡ superpowers:test-driven-development
+     14:00  (2)
+       14:06 ✎ src/auth/token.ts  Edit
+       14:09 ✎ src/auth/token.test.ts  Write
+     15:00  (1)
+       15:12 ✎ src/auth/session.ts  Edit
+  ⚠ (no skill active)
+     16:00  (1)
+       16:40 ✎ src/index.ts  Edit
 
-● 2 skill runs (2 distinct) · 3 files touched · ⚠ 1 edits outside skill context
+● 2 skill runs (2 distinct) · 4 files touched · ⚠ 1 edits outside skill context
 ```
+
+The skill leads each block; the hours beneath it show when its work actually happened. Times are
+your local clock — the log itself stays UTC, so a session stays readable across machines.
 
 ## Why
 
@@ -68,6 +75,15 @@ file event per path. On opencode a plugin does the same job through the `tool.ex
 Events are appended as NDJSON to `~/.claude/skill-audit/<session_id>.ndjson`. All three hosts
 write to that one directory on purpose, so any viewer can read any host's session. Override the
 location with `SKILL_AUDIT_DIR`.
+
+A skill run only claims the edits that keep arriving under it. Once 30 minutes pass with no
+activity the run closes, and later files are counted as `(no skill active)` rather than being
+attributed to whatever skill happened to run that morning. Tune the window with
+`SKILL_AUDIT_IDLE_MINUTES`.
+
+The opencode sidebar draws in fixed columns, so it defaults to icons that are always one terminal
+cell wide (`·` `✎` `!`); emoji such as `⚡` and `⚠` render two cells wide in most terminals and
+shift every row that carries them. Set `SKILL_AUDIT_ICONS=emoji` to use the emoji set anyway.
 
 ```text
 Claude Code / Codex ──hooks───▶ logger.sh ──┐

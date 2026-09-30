@@ -8,7 +8,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![CI](https://github.com/isac322/kwin-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/isac322/kwin-mcp/actions/workflows/ci.yml)
 
-A [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server that enables AI agents (Claude Code, Cursor, and other MCP clients) to launch, interact with, and observe any Wayland application in a fully isolated virtual KWin session -- without affecting the user's desktop. It also supports **live desktop automation** by connecting to an existing KWin session (real desktop or container) for collaborative workflows. With 31 MCP tools covering mouse, keyboard, touch, clipboard, accessibility tree inspection, screenshot capture, and window management, kwin-mcp provides everything needed for end-to-end GUI testing and desktop automation on Linux.
+A [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server that enables AI agents (Claude Code, Cursor, and other MCP clients) to launch, interact with, and observe any Wayland application in a fully isolated virtual KWin session -- without affecting the user's desktop. It also supports **live desktop automation** by connecting to an existing KWin session (real desktop or container) for collaborative workflows. With 33 MCP tools covering mouse, keyboard, touch, clipboard, accessibility tree inspection, screenshot capture, and window management, kwin-mcp provides everything needed for end-to-end GUI testing and desktop automation on Linux.
 
 ## Table of Contents
 
@@ -42,7 +42,7 @@ Run end-to-end GUI tests for KDE/Qt/GTK applications in headless isolated sessio
 
 ### AI-Driven Desktop Automation
 
-Let AI agents like Claude Code autonomously operate desktop applications. The agent reads the accessibility tree to understand the UI, performs actions through 31 MCP tools, and observes the results via screenshots -- creating a complete feedback loop for any Wayland application.
+Let AI agents like Claude Code autonomously operate desktop applications. The agent reads the accessibility tree to understand the UI, performs actions through 33 MCP tools, and observes the results via screenshots -- creating a complete feedback loop for any Wayland application.
 
 ### Live Desktop Collaboration
 
@@ -61,7 +61,7 @@ Automate kiosk interfaces and embedded Linux desktops running KDE Plasma or a ba
 > Requires KDE Plasma 6 on Wayland. See [System Requirements](#system-requirements) for details.
 
 > [!NOTE]
-> **Fixed in 0.8.0:** the published kwin-mcp 0.7.0 package on PyPI did not cap its `mcp` dependency, so a fresh install could resolve `mcp` 2.x and the server failed at startup with `ModuleNotFoundError: No module named 'mcp.server.fastmcp'`. Release 0.8.0 ships the `mcp>=1.0.0,<2` constraint in its package metadata. If you are still on 0.7.0, upgrade before following the steps below.
+> **0.7.0 only:** the published kwin-mcp 0.7.0 package on PyPI did not cap its `mcp` dependency, so a fresh install could resolve `mcp` 2.x and the server failed at startup with `ModuleNotFoundError: No module named 'mcp.server.fastmcp'`. Releases 0.8.0–0.9.x cap `mcp<2`, and the next release targets `mcp>=2.2.0,<3`. If you are still on 0.7.0, upgrade kwin-mcp before following the steps below.
 
 **1. Install system and build dependencies**
 
@@ -187,7 +187,35 @@ kwin-mcp-cli
 # Live session mode (default to real desktop instead of virtual)
 kwin-mcp --default-live-session
 kwin-mcp-cli --default-live-session
+
+# Attach captured screenshots to tool results as MCP image content
+kwin-mcp --screenshot-images
 ```
+
+### Screenshot Images in Tool Results (`--screenshot-images`)
+
+By default, `screenshot` and the `screenshot_after_ms` frame captures of action tools return only the PNG file paths, so the agent must read the files to look at them. Start the server with `--screenshot-images` to also attach each captured PNG to the tool result as MCP `image` content — the single `screenshot` frame and every `screenshot_after_ms` burst frame, in capture order. The text of the result and its `{"result": ...}` structured content are unchanged; image blocks are only appended, and only for tools that actually captured frames.
+
+Claude Code:
+
+```bash
+claude mcp add kwin-mcp -- uvx kwin-mcp --screenshot-images
+```
+
+Any JSON MCP config takes the flag as another argument:
+
+```json
+{
+  "mcpServers": {
+    "kwin-mcp": {
+      "command": "uvx",
+      "args": ["kwin-mcp", "--screenshot-images"]
+    }
+  }
+}
+```
+
+The flag is off by default because every attached frame is sent to the model and costs context tokens, and a `screenshot_after_ms` burst attaches all of its frames — there is no cap. In a live session (`session_connect` or `--default-live-session`) the images are your real desktop's pixels, so enabling the flag sends them to the model provider.
 
 ## Available Tools
 
@@ -195,15 +223,15 @@ kwin-mcp-cli --default-live-session
 
 | Tool | Parameters | Description |
 |------|-----------|-------------|
-| `session_start` | `app_command?` `str`, `screen_width?` `int` (1920), `screen_height?` `int` (1080), `enable_clipboard?` `bool` (false), `keep_screenshots?` `bool` (false), `isolate_home?` `bool` (false), `keep_home?` `bool` (false), `env?` `dict` | Start an isolated KWin Wayland session, optionally launching an app. Set `enable_clipboard=true` to enable clipboard tools (requires `wl-clipboard`). Set `keep_screenshots=true` to preserve screenshot files after `session_stop`. Set `isolate_home=true` to create a temporary HOME with isolated XDG directories (config, data, cache, state), preventing apps from reading/writing host user settings. Set `keep_home=true` to preserve the isolated home directory after `session_stop`. Pass extra environment variables via `env`. |
+| `session_start` | `app_command?` `str`, `screen_width?` `int` (1920), `screen_height?` `int` (1080), `enable_clipboard?` `bool` (false), `keep_screenshots?` `bool` (false), `isolate_home?` `bool` (false), `keep_home?` `bool` (false), `env?` `dict` | Start an isolated KWin Wayland session, optionally launching an app. Set `enable_clipboard=true` to enable clipboard tools (requires `wl-clipboard`). Set `keep_screenshots=true` to preserve screenshot files after `session_stop`. Set `isolate_home=true` to create a temporary HOME with isolated XDG directories (config, data, cache, state), preventing apps from reading/writing host user settings. Set `keep_home=true` to preserve the isolated home directory after `session_stop`. Pass extra environment variables via `env`. Startup is deadline-bounded: a failed handshake raises `RuntimeError` with the captured session stderr and stray stdout. |
 | `session_connect` | `dbus_address?` `str`, `wayland_display?` `str`, `keep_screenshots?` `bool` (false) | Connect to an existing KWin session (real desktop or container). Defaults to `$DBUS_SESSION_BUS_ADDRESS` and `$WAYLAND_DISPLAY`. Clipboard is always enabled. `session_stop` only disconnects without killing KWin or pre-existing apps. |
-| `session_stop` | _(none)_ | Stop the session and clean up. For virtual sessions: terminates KWin and all apps. For live sessions: disconnects without killing KWin or pre-existing apps. |
+| `session_stop` | _(none)_ | Stop the session and clean up. For virtual sessions: signals the whole session process group (`SIGTERM`, then `SIGKILL` for members that remain), so descendants still stop even if the session leader already exited. For live sessions: disconnects without killing KWin or pre-existing apps. |
 
 ### Observation (3 tools)
 
 | Tool | Parameters | Description |
 |------|-----------|-------------|
-| `screenshot` | `include_cursor?` `bool` (false) | Capture a screenshot of the virtual display (saved as PNG, returns file path) |
+| `screenshot` | `include_cursor?` `bool` (false) | Capture the whole workspace as a PNG. Returns the file path and a `Coordinate space` line with the image's logical origin, size, capture backend, and coverage. Image pixel `(px, py)` is the global logical point `(origin_x + px, origin_y + py)`, the same space `mouse_click` and `touch_tap` take. |
 | `accessibility_tree` | `app_name?` `str`, `max_depth?` `int` (15), `role?` `str` | Get the AT-SPI2 widget tree with roles, names, states, coordinates, the text content of editors and entries (`text='...'`, capped at 200 characters), and scrollbar/slider positions (`value=current/max`). Use `role` to filter to specific element types (e.g. `"button"`, `"check box"`). Non-matching elements are hidden but their children are still traversed. |
 | `find_ui_elements` | `query` `str`, `app_name?` `str`, `states?` `list[str]` | Search for UI elements by name, role, or description (case-insensitive); matches report their text content and scrollbar/slider value when they have one. Optionally filter by AT-SPI2 states (e.g. `["focused"]`, `["active", "visible"]`). `query` can be empty when filtering by states only. |
 
@@ -223,7 +251,7 @@ kwin-mcp-cli --default-live-session
 | Tool | Parameters | Description |
 |------|-----------|-------------|
 | `keyboard_type` | `text` `str`, `screenshot_after_ms?` `list[int]` | Type a string of text character by character (US QWERTY layout) |
-| `keyboard_type_unicode` | `text` `str`, `screenshot_after_ms?` `list[int]` | Type arbitrary Unicode text (Korean, CJK, etc.) via `wtype` or clipboard fallback (`wl-copy` + Ctrl+V). Requires `wtype` or `wl-clipboard` installed. |
+| `keyboard_type_unicode` | `text` `str`, `screenshot_after_ms?` `list[int]` | Type arbitrary Unicode text (Korean, CJK, etc.) via `wtype`, or, when `wtype` is unavailable or unsupported by the session, a temporary clipboard paste. The paste chord follows the focused window: Ctrl+Shift+V in terminals that paste on it (Konsole, GNOME Terminal, kitty, foot, and others), Ctrl+V in other apps. The previous clipboard content, in all its formats, is restored after the paste, and Klipper keeps the typed text out of its history. Reports failure if the clipboard cannot be taken, nothing reads the text after the paste chord, or the restore fails, and without pressing anything in recognized terminals that have no clipboard paste chord (see [Limitations](#limitations)). Does not need `enable_clipboard`. |
 | `keyboard_key` | `key` `str`, `screenshot_after_ms?` `list[int]` | Press a key or key combination (e.g., `Return`, `ctrl+c`, `alt+F4`, `shift+Tab`) |
 | `keyboard_key_down` | `key` `str` | Press and hold a key without releasing. Useful for holding modifiers across multiple actions (e.g., hold Ctrl while clicking items). |
 | `keyboard_key_up` | `key` `str` | Release a previously held key |
@@ -244,14 +272,16 @@ kwin-mcp-cli --default-live-session
 | `clipboard_get` | _(none)_ | Read the current clipboard text content. Requires `enable_clipboard=true` in `session_start` and `wl-clipboard` installed. |
 | `clipboard_set` | `text` `str` | Set the clipboard text content. Same requirements as `clipboard_get`. |
 
-### Window Management (4 tools)
+### Window Management (6 tools)
 
 | Tool | Parameters | Description |
 |------|-----------|-------------|
 | `launch_app` | `command` `str`, `env?` `dict` | Launch an application inside the running session. Returns PID and log path. |
 | `list_windows` | _(none)_ | List all accessible application windows with per-window titles and active/focused state markers via AT-SPI2 |
 | `focus_window` | `app_name` `str` | Activate and raise a window by application name (case-insensitive match), via KWin scripting |
-| `window_geometry` | `app_name?` `str` | Report window frame and client rectangles in **global screen coordinates** via KWin scripting — the same space `find_ui_elements` / `accessibility_tree` report and `mouse_click` / `touch_tap` take. |
+| `window_geometry` | `app_name?` `str`, `window_id?` `str` | Report each window's KWin id, an `[active]` marker, and frame and client rectangles in **global screen coordinates** via KWin scripting — the same space `find_ui_elements` / `accessibility_tree` report and `mouse_click` / `touch_tap` take. `window_id` filters to one window by exact id. |
+| `active_window` | _(none)_ | Report the window KWin currently treats as active (id, frame, client), e.g. to confirm `focus_window` |
+| `window_close` | `window_id` `str` | Ask exactly one window, addressed by the id from `window_geometry`, to close (like its titlebar button). Disabled in live sessions to protect unsaved work. |
 
 ### UI Polling (1 tool)
 
@@ -263,11 +293,13 @@ kwin-mcp-cli --default-live-session
 
 | Tool | Parameters | Description |
 |------|-----------|-------------|
-| `dbus_call` | `service` `str`, `path` `str`, `interface` `str`, `method` `str`, `args?` `list[str]` | Call any D-Bus method in the isolated session. Useful for controlling KWin scripting, app-specific D-Bus APIs, and system services. |
+| `dbus_call` | `service` `str`, `path` `str`, `interface` `str`, `method` `str`, `args?` `list[str \| dict]` | Call any D-Bus method in the isolated session. Useful for controlling KWin scripting, app-specific D-Bus APIs, and system services. Each argument is a dbus-send string (`"int32:42"`, `"dict:string:variant:k,string:v"`) or a typed-JSON object (`{"type": "int32", "value": 42}`). Malformed values, and arguments whose types or count fit none of the method's declared signatures, fail with `D-Bus call failed: ...` and nothing is sent. Replies are empty for void methods, the bare value for one basic value (`GetId` returns just the ID), and JSON otherwise. |
 | `read_app_log` | `pid` `int`, `last_n_lines?` `int` (50) | Read stdout/stderr output of a launched app by PID. Set `last_n_lines=0` for all output. |
 | `wayland_info` | `filter_protocol?` `str` | List Wayland protocols available in the session. Useful for verifying protocol access (e.g., `plasma_window_management`). |
 
-> **Frame capture:** Many action tools accept an optional `screenshot_after_ms` parameter (e.g., `[0, 50, 100, 200, 500]`) that captures screenshots at specified delays (in milliseconds) after the action completes. This is useful for observing transient UI states like hover effects, click animations, and menu transitions without extra MCP round-trips. Frame capture uses the fast KWin ScreenShot2 D-Bus interface (~30-70ms per frame).
+> **Frame capture:** Many action tools accept an optional `screenshot_after_ms` parameter (e.g., `[0, 50, 100, 200, 500]`) that captures screenshots at specified delays (in milliseconds) after the action completes. This is useful for observing transient UI states like hover effects, click animations, and menu transitions without extra MCP round-trips. Frame capture uses the fast KWin ScreenShot2 D-Bus interface (~30-70ms per frame). Each frame is followed by its own `Coordinate space` line in the same format as `screenshot`. A frame whose mapping cannot be proven — a topology change or a failed observation during the capture — still writes its PNG but reports `Coordinate space: unavailable (reason)`; that PNG holds the backend's raw unnormalized pixels, so only its timing observation is meaningful.
+
+> **Structured output:** `window_geometry`, `find_ui_elements`, `list_windows`, and `accessibility_tree` also return typed `structuredContent` described by their MCP `outputSchema`: window ids, the active flag, and frame/client rectangles; element role, name, states, and screen rectangle (or the reason it is unavailable); and applications with their windows. MCP clients that support structured tool output (spec 2025-06-18 and later) can read these fields directly instead of parsing text. The text result is unchanged; the other tools keep the `{"result": string}` output schema.
 
 ## How It Works
 
@@ -276,12 +308,12 @@ Claude Code / AI Agent
   |
   |  MCP (stdio)
   v
-kwin-mcp server  (31 tools)       kwin-mcp-cli (interactive REPL)
+kwin-mcp server  (33 tools)       kwin-mcp-cli (interactive REPL)
   |                                  |
   +--- both delegate to AutomationEngine (core.py) ---+
   |
   |-- session_start (virtual) ---> dbus-run-session
-  |                                 |-- at-spi-bus-launcher
+  |                                 |-- at-spi-bus-launcher (D-Bus activated)
   |                                 +-- kwin_wayland --virtual
   |                                       +-- [your app]
   |
@@ -298,17 +330,26 @@ kwin-mcp server  (31 tools)       kwin-mcp-cli (interactive REPL)
   |-- touch_* ------------------> KWin EIS D-Bus --> libei
   |    +-- screenshot_after_ms -> KWin ScreenShot2 D-Bus (fast frame capture)
   |
-  |-- keyboard_type_unicode ----> wtype / wl-copy + Ctrl+V
+  |-- keyboard_type_unicode ----> wtype, or temporary Wayland data-control clipboard owner + paste chord for the focused app
   |-- clipboard_* --------------> wl-copy / wl-paste (wl-clipboard)
   |
-  |-- launch_app / list_windows / focus_window
+  |-- launch_app / list_windows
   |                                |-- subprocess spawn
   |                                +-- AT-SPI2 (via PyGObject)
   |
-  |-- dbus_call -----------------> dbus-send (generic D-Bus)
+  |-- focus_window / window_geometry / active_window / window_close
+  |                                +-- KWin scripting (loadScript + D-Bus reply)
+  |
+  |-- dbus_call -----------------> dbus-python (in-process, introspected signature)
   |-- read_app_log --------------> log file read
   +-- wayland_info --------------> wayland-info
 ```
+
+### Tool Annotations and Progress Notifications
+
+Every tool publishes MCP tool annotations in `tools/list`, so clients can decide which calls need user confirmation. Observation tools such as `screenshot`, `accessibility_tree`, `find_ui_elements`, `wait_for_element`, `list_windows`, and `clipboard_get` are marked read-only. `window_close`, `session_stop`, `dbus_call`, and the mouse, keyboard, and touch input tools other than `mouse_move` are marked destructive: injected input can trigger any action in the focused app, such as deleting a file or sending a message. `session_start` and `launch_app` are marked destructive too: both run arbitrary commands. `mouse_move`, `focus_window`, `clipboard_set`, and `session_connect` change state but are not marked destructive. The annotations are hints for the client; kwin-mcp does not enforce them.
+
+Long-running tools send MCP progress notifications when the client includes a `progressToken` in the request: `session_start` and `session_connect` report their startup steps, `wait_for_element` reports polling, `screenshot_after_ms` bursts report captured frames, and long `mouse_click`/`touch_tap` holds, touch gestures, `mouse_drag`, and long `keyboard_type` strings report their progress. Clients that send no token receive no notifications, and tool results are the same either way.
 
 ### Triple Isolation (+ Optional Home Isolation)
 
@@ -323,14 +364,33 @@ kwin-mcp provides three layers of isolation from the host desktop:
 
 Mouse, keyboard, and touch events are injected through KWin's private `org.kde.KWin.EIS.RemoteDesktop` D-Bus interface. This returns a `libei` file descriptor that allows low-level input emulation without requiring the XDG RemoteDesktop portal (which would show a user authorization dialog). The connection uses:
 
-- **Absolute pointer positioning** for precise coordinate-based interaction
+- **Absolute pointer positioning** in KWin's global logical coordinates, the space `window_geometry`, element rectangles, and screenshot pixels (after adding the screenshot origin) share
 - **evdev keycodes** with full US QWERTY mapping for keyboard input
 - **Smooth drag interpolation** (10+ intermediate steps) for realistic drag operations
 - **EIS touch emulation** for multi-touch gestures (tap, swipe, pinch, multi-finger swipe)
 
 ### Screenshot Capture
 
-The normal Wayland capture path tries KWin's `org.kde.KWin.ScreenShot2` D-Bus interface first and uses the `spectacle` CLI as a fallback. Action tools with `screenshot_after_ms` use the same path for frame bursts, and Pillow converts ScreenShot2's raw ARGB pipe data to PNG. The Docker visual QA suite also has an explicit test-only X11 backend: when `KWIN_MCP_X11_SCREENSHOT=1` is set for a server connected to the nested KWin/Xvfb fixture, captures use `scrot`. Normal virtual and live Wayland sessions do not opt into this backend.
+The normal Wayland capture path tries KWin's `org.kde.KWin.ScreenShot2` D-Bus interface first and uses the `spectacle` CLI as a fallback. Both capture the whole workspace across all outputs. Action tools with `screenshot_after_ms` use the same path for frame bursts, and Pillow converts ScreenShot2's raw pipe frames (RGB32, ARGB32, or RGBX8888 depending on the KWin version) to PNG. The Docker visual QA suite also has an explicit test-only X11 backend: when `KWIN_MCP_X11_SCREENSHOT=1` is set for a server connected to the nested KWin/Xvfb fixture, captures use `scrot`. Normal virtual and live Wayland sessions do not opt into this backend.
+
+Each Spectacle capture has a deadline derived from the image Spectacle must produce, the workspace canvas at the output scale (on mixed-scale layouts, every output is upscaled to the next whole scale above the largest): 15 seconds plus 1 second per canvas megapixel, capped at 120 seconds. A 1920x1080 output gets 18 seconds; a mixed-scale 1.45 + 1.0 layout (a 6490x2160 canvas) gets 30 seconds. A capture that does not finish in time fails with `spectacle timed out after <N>s`.
+
+Saved PNGs are normalized to KWin's global logical coordinate space, so a screenshot taken on a fractionally scaled output has one image pixel per logical pixel. The result states the mapping, for example on two outputs where a 1280x1024 screen sits left of a 1920x1080 screen:
+
+```text
+Screenshot saved: <path> (<size> KB)
+Coordinate space: logical; origin (-1280, 0); size 3200x1080; backend screenshot2; coverage full; topology observed stable before/after capture
+```
+
+`origin` is the top-left of KWin's virtual screen geometry. It is negative when an output sits left of or above `(0, 0)`. To click image pixel `(px, py)`, pass `x = origin_x + px` and `y = origin_y + py` to `mouse_click`; no scale conversion is needed. On a single output at scale 1, the origin is `(0, 0)` and the size equals the screen size.
+
+Backends deliver different pixel spaces, and kwin-mcp normalizes each one:
+
+- **ScreenShot2** `CaptureWorkspace` already renders logical pixels for the whole virtual screen, including outputs at negative positions.
+- **Spectacle** captures device pixels, which kwin-mcp rescales to logical pixels. When all screens share one scale, Spectacle's composite clips outputs at negative logical positions. kwin-mcp cannot recreate those pixels: it leaves them transparent and reports `coverage partial` with the captured regions. With mixed scales, Spectacle releases before 6.7.90 (including all Gear-numbered releases such as 24.12) place each screen through OpenCV and abort (or distort the screen) when one lies outside their canvas, for example at a negative position. kwin-mcp detects that layout from the topology and does not start Spectacle; the screenshot fails with an error naming the output instead.
+- **X11/scrot** (test-only) captures the X root, where each KWin output is an X window of `logical size * scale` pixels. kwin-mcp locates those windows with `xwininfo` and rescales each one to logical pixels.
+
+kwin-mcp reads the output topology through KWin scripting immediately before and after each capture and checks the captured image against it, retrying once when the layout changed mid-capture. If the mapping still cannot be proven, `screenshot` fails with an error containing `coordinate mapping cannot be proven` rather than returning guessed coordinates; a burst frame keeps its raw PNG and reports `Coordinate space: unavailable (reason)` instead. Observed stability is not an atomicity guarantee: a topology change that reverted between the two observations can go unnoticed.
 
 ### Accessibility Tree
 
@@ -343,7 +403,8 @@ The AT-SPI2 accessibility bus within the isolated session is queried via PyGObje
 | **OS** | Linux with KDE Plasma 6 (Wayland session) |
 | **Python** | 3.12 or later |
 | **KWin** | `kwin_wayland` with `--virtual` flag support (KDE Plasma 6.x) |
-| **libei** | Usually bundled with KWin 6.x (EIS input emulation) |
+| **libei** | EIS input emulation client library. Not a `kwin-wayland` dependency on Debian/Ubuntu; install `libei1` (Arch's `kwin` package depends on it) |
+| **libwayland-client** | Used by the `keyboard_type_unicode` clipboard paste; already installed as a KWin dependency |
 | **spectacle** | KDE screenshot tool (CLI mode); packaged as `kde-spectacle` on Debian and Ubuntu |
 | **AT-SPI2** | `at-spi2-core` for accessibility tree support |
 | **PyGObject** | GObject introspection Python bindings (built from source by uv/pip; see [build prerequisites](#build-prerequisites-for-uv-and-pip-installs)) |
@@ -354,8 +415,8 @@ The AT-SPI2 accessibility bus within the isolated session is queried via PyGObje
 
 | Package | Required for |
 |---------|-------------|
-| `wl-clipboard` (`wl-copy`, `wl-paste`) | `clipboard_get`, `clipboard_set`, and `keyboard_type_unicode` clipboard fallback |
-| `wtype` | `keyboard_type_unicode` (preferred over clipboard fallback) |
+| `wl-clipboard` (`wl-copy`, `wl-paste`) | `clipboard_get` and `clipboard_set` |
+| `wtype` | `keyboard_type_unicode` direct typing, tried first; when it is unavailable or unsupported by the session, the built-in clipboard paste is used instead |
 | `wayland-utils` (`wayland-info`) | `wayland_info` tool |
 
 ### Installing System Dependencies
@@ -379,10 +440,10 @@ For other distributions, follow the "Installing from PyPI with pip" build depend
 <details>
 <summary><strong>Debian 13 (Trixie)</strong></summary>
 
-Debian packages Spectacle as `kde-spectacle`; there is no `spectacle` package. `gir1.2-atspi-2.0` provides the AT-SPI2 GObject Introspection typelib that PyGObject loads at runtime.
+Debian packages Spectacle as `kde-spectacle`; there is no `spectacle` package. `gir1.2-atspi-2.0` provides the AT-SPI2 GObject Introspection typelib that PyGObject loads at runtime. `libei1` provides the EIS client library used for input injection; `kwin-wayland` does not depend on it, so it must be installed explicitly.
 
 ```bash
-sudo apt-get install -y --no-install-recommends kwin-wayland kde-spectacle at-spi2-core gir1.2-atspi-2.0
+sudo apt-get install -y --no-install-recommends kwin-wayland kde-spectacle libei1 at-spi2-core gir1.2-atspi-2.0
 
 # Optional: for clipboard and Unicode input
 sudo apt-get install -y --no-install-recommends wl-clipboard wtype wayland-utils
@@ -432,7 +493,7 @@ sudo zypper install wl-clipboard wtype wayland-utils
 Use a release that ships KDE Plasma 6 and Python 3.12 or later; older Kubuntu releases with Plasma 5 are not supported. Install the Debian build prerequisites above as well. Ubuntu packages Spectacle as `kde-spectacle`.
 
 ```bash
-sudo apt install kwin-wayland kde-spectacle at-spi2-core python3-gi gir1.2-atspi-2.0 python3-dbus
+sudo apt install kwin-wayland kde-spectacle libei1 at-spi2-core python3-gi gir1.2-atspi-2.0 python3-dbus
 
 # Optional: for clipboard and Unicode input
 sudo apt install wl-clipboard wtype wayland-utils
@@ -445,7 +506,7 @@ sudo apt install wl-clipboard wtype wayland-utils
 Install the [system and build dependencies](#installing-system-dependencies) before using any method below. The uv installs, pip installs into a virtual environment, and the from-source install build PyGObject, pycairo, and dbus-python from source and fail without them.
 
 > [!NOTE]
-> kwin-mcp 0.7.0 on PyPI did not cap its `mcp` dependency, so a fresh install could resolve `mcp` 2.x and the server failed at startup with `ModuleNotFoundError: No module named 'mcp.server.fastmcp'`. Release 0.8.0 ships the `mcp>=1.0.0,<2` constraint; install 0.8.0 or later.
+> kwin-mcp 0.7.0 on PyPI did not cap its `mcp` dependency, so a fresh install could resolve `mcp` 2.x and the server failed at startup with `ModuleNotFoundError: No module named 'mcp.server.fastmcp'`. Releases 0.8.0–0.9.x cap `mcp<2`, and the next release targets `mcp>=2.2.0,<3`; upgrading kwin-mcp fixes the error.
 
 ### Using uv (recommended)
 
@@ -472,7 +533,9 @@ uv run kwin-mcp
 
 ## Limitations
 
-- **US QWERTY keyboard layout only** -- `keyboard_type` supports US QWERTY only. For non-ASCII text (Korean, CJK, etc.), use `keyboard_type_unicode`, which requires `wtype` or `wl-clipboard` installed.
+- **US QWERTY keyboard layout only** -- `keyboard_type` supports US QWERTY only. For non-ASCII text (Korean, CJK, etc.), use `keyboard_type_unicode`. Virtual sessions pin the compositor keymap to US, so the host's keyboard layout settings do not change what is typed; a live session attached with `session_connect` keeps the desktop's own keymap, so its active layout must be US for `keyboard_type` and `keyboard_key` to produce the expected characters.
+- **Unicode typing can paste through the clipboard** -- When `wtype` is unavailable or unsupported by the session, `keyboard_type_unicode` briefly puts the text on the clipboard, then restores the previous selection and keeps serving it until another copy replaces it, even after `session_stop` disconnects a live session. The restore is best-effort, not atomic: Wayland has no compare-and-swap for the selection, so a copy another client makes at the same moment as the restore can be overwritten. Wayland also does not tell the clipboard owner which client read the text, so a clipboard manager that reads it after the paste chord can be taken for the target app, and any client that read it keeps its copy. The `x-kde-passwordManagerHint` marker keeps the text out of Klipper's history, but clipboard managers that ignore the marker can still record it.
+- **Unicode typing into terminals is limited** -- Terminals do not paste on Ctrl+V, and one that does not bind it passes it to the program as `^V`, which changes the next key (a Return arrives as a literal CR). `keyboard_type_unicode` therefore checks KWin's active window first and sends Ctrl+Shift+V to terminals known to paste on it (Konsole, Yakuake, GNOME Terminal, GNOME Console, kitty, Alacritty, WezTerm, foot, Ghostty, st, Xfce Terminal, Tilix, Terminator). Window classes recognized as terminals but with no clipboard paste chord (xterm and urxvt, whose Shift+Insert pastes the primary selection) and windows KWin cannot identify get a failure result without any key being pressed; a terminal whose class is not recognized still gets Ctrl+V. Only Konsole is exercised by the test suite; the other chords follow each terminal's documented default bindings, so a remapped paste shortcut breaks delivery there.
 - **KDE Plasma 6+ required** -- Older KDE versions or other Wayland compositors (GNOME, Sway) are not supported.
 - **AT-SPI2 availability varies** -- Some applications may not fully expose their widget tree via AT-SPI2.
 - **Touch input is EIS-emulated** -- Touch events are emulated through KWin's EIS interface, not from a real touchscreen device. Most applications handle emulated touch correctly, but some may behave differently from physical touch.
@@ -481,10 +544,22 @@ uv run kwin-mcp
 - **Screen edge triggers ignore EIS pointer events** -- Auto-hide panels and layer-shell strips do not react when the pointer reaches a screen edge through EIS. Use `dbus_call` to invoke KWin scripting or a keyboard shortcut instead of trying to hover the edge.
 - **KWin claims multi-finger touch gestures** -- Three- and four-finger swipes are consumed by the compositor as global gestures and never reach the application; use `fingers=2` when the target is the app itself.
 - **Element coordinates are screen-global, or unavailable** -- `find_ui_elements`, `accessibility_tree` and `wait_for_element` report rectangles in the same global screen coordinates `mouse_click` and `touch_tap` take (`@ screen (x, y, wxh)`). When the element's window cannot be matched to exactly one KWin window — an app that masks its real process id (e.g. a D-Bus proxy), several identical windows of one process, or a window set that changed mid-query — the element reports `@ unavailable (reason)` with no coordinates rather than a position that could click the wrong window.
+- **Spectacle fallback can return partial screenshots or refuse a layout** -- When ScreenShot2 is unavailable and Spectacle composites several screens of one scale, Spectacle clips outputs at negative logical positions. Those regions stay transparent, and the `Coordinate space` line reports `coverage partial` with the regions that were captured. When the screens have mixed scales and one lies outside Spectacle's canvas (such as a screen at a negative position), Spectacle before 6.7.90 (including Gear-numbered releases such as 24.12) aborts inside OpenCV, so kwin-mcp reports a capture error without starting it. ScreenShot2 captures the whole workspace in both cases.
+- **`screenshot` captures the current virtual desktop's whole workspace only; no single-window capture exists** -- `screenshot` and `screenshot_after_ms` frames use KWin ScreenShot2 `CaptureWorkspace` (with a Spectacle fallback, or the opt-in X11/scrot backend enabled by `KWIN_MCP_X11_SCREENSHOT=1`): a window on another, inactive virtual desktop is not in the image, and no kwin-mcp tool captures a single window by id (#34). `dbus_call` cannot reach `org.kde.KWin.ScreenShot2.CaptureWindow` either, because it cannot pass the unix file descriptor the capture methods require. In a live session, KWin also refuses ScreenShot2 calls with `org.kde.KWin.ScreenShot2.Error.NoAuthorized` unless the caller's executable (`/proc/<pid>/exe`) matches the first token of `Exec=` in a `.desktop` file that declares `X-KDE-DBUS-Restricted-Interfaces=org.kde.KWin.ScreenShot2`. A user-level file under `~/.local/share/applications` is picked up after `kbuildsycoca6` with no KWin restart (kwin-mcp's own virtual sessions disable this check):
+
+  ```ini
+  [Desktop Entry]
+  Type=Application
+  Name=kwin-mcp ScreenShot2
+  Exec=/path/to/copies-venv/bin/python3
+  X-KDE-DBUS-Restricted-Interfaces=org.kde.KWin.ScreenShot2
+  ```
+
+  The grant applies to every process running that exact binary. For a Python program the authorized executable is the interpreter, so whitelisting `/usr/bin/python3` authorizes every Python process that runs on it; KWin compares canonical paths, so a default venv's `bin/python3` is a symlink that resolves to the system interpreter and grants it too. Only a venv created with `python -m venv --copies` has its own interpreter binary that can be whitelisted on its own. Even with the whitelist, a window on an inactive desktop stops redrawing, so `CaptureWindow` returns the last frame drawn while it was visible, not its live state; only KWin's screencast path (`zkde_screencast_unstable_v1` `stream_window`) keeps an off-screen window rendering, gated by the same authorization mechanism under `X-KDE-Wayland-Interfaces`. KWin scripts and QML `WindowThumbnail` cannot save a window's pixels.
 
 ## End-to-End Testing
 
-The Docker suite currently collects 99 tests against the packaged application, not an editable source checkout. `docker/e2e.Dockerfile` builds a wheel and installs it into `/opt/kwin-mcp-venv` with standard `Requires-Dist` resolution: PyGObject, pycairo, and dbus-python compile from source in a builder-only stage, while `mcp`, Pillow, and the remaining dependencies resolve fresh from PyPI within the declared ranges. The suite runs both `AutomationEngine` tests and the installed `kwin-mcp` console entry point. The MCP tests initialize a real client/server session over stdio JSON-RPC.
+The Docker suite collects every test under `tests/e2e` against the packaged application, not an editable source checkout. `docker/e2e.Dockerfile` builds a wheel and installs it into `/opt/kwin-mcp-venv` with standard `Requires-Dist` resolution: PyGObject, pycairo, and dbus-python compile from source in a builder-only stage, while `mcp`, Pillow, and the remaining dependencies resolve fresh from PyPI within the declared ranges. The suite runs both `AutomationEngine` tests and the installed `kwin-mcp` console entry point. The MCP tests initialize a real client/server session over stdio JSON-RPC.
 
 Run the complete suite from the repository root:
 
@@ -501,22 +576,26 @@ scripts/run-e2e-docker.sh -- -k "visual or screenshot" -v
 
 Coverage includes:
 
-- virtual KWin engine tests for session lifecycle, AT-SPI2 observation, window geometry and control, EIS pointer/keyboard/touch input, clipboard, cleanup, and error handling;
-- exact input-schema checks for all 31 registered tools, plus installed-server stdio calls through every MCP wrapper;
+- virtual KWin engine tests for session lifecycle, AT-SPI2 observation, window geometry and control, closing one window by id (including ids that contain a quote), EIS pointer/keyboard/touch input, clipboard, cleanup, and error handling;
+- failing-session lifecycle regressions that stub `kwin_wayland`/`dbus-run-session` on `PATH`: `session_start` must fail within its startup deadline and surface the captured session stderr plus stray stdout (including a newline-free partial line), and teardown must reap the entire owned process group even when the session leader was already reaped or a descendant ignores `SIGTERM`;
+- a KWin bus-name readiness regression whose `kwin_wayland` stub creates the Wayland socket before starting the real compositor: `session_start` must wait until `org.kde.KWin` has an owner before it sets up EIS input, and must fail with a clear error when KWin exits first or never takes the name;
+- an accessibility-bus check that `org.a11y.Bus` has an owner as soon as `session_start` returns, before any app or AT-SPI2 query could activate it, and that a failed activation (a `dbus-send` stub on `PATH`) is reported as a `Warning:` line in the `session_start` output;
+- exact input-schema checks for all 33 registered tools, plus installed-server stdio calls through every MCP wrapper;
 - nested visual tests that start Xvfb and a test-owned KWin compositor inside the container, connect the installed MCP server to it, and verify pixels as well as accessibility state;
 - KCalc before/after pixel transitions and a deterministic GUI probe for mouse hover, cursor inclusion, animation frame bursts, and CJK text (`GUI 검증 42`) rendered differently from a tofu control (`□□`);
+- screenshot coordinate mapping at output scales 1.0 and 1.45 (the fractional scale is set through `kscreen-doctor`): a probe button found by pixel color in the screenshot is clicked at origin plus pixel and must activate, and single screenshots and frame bursts report the logical workspace as their coordinate space;
 - screenshot retention and failure behavior, environment provenance, installed distribution metadata, console entry points, and process/socket cleanup.
 
-The container uses software rendering and needs no `--privileged`, `--cap-add`, GPU, or device flags. Its nested Xvfb server is part of the visual fixture; the host does not need an X server. CI runs the same image natively on both architectures:
+The container uses software rendering and needs no `--privileged`, `--cap-add`, GPU, or device flags. Its nested Xvfb server is part of the visual fixture; the host does not need an X server. CI runs the suite natively in four images: Debian trixie (`docker/e2e.Dockerfile`), Fedora 44 (`docker/e2e-fedora.Dockerfile`), openSUSE Tumbleweed (`docker/e2e-opensuse.Dockerfile`), and Arch Linux (`docker/e2e-arch.Dockerfile`, amd64 only). A failure in any of them fails the workflow.
 
-| Architecture | GitHub Actions runner |
+| Jobs | GitHub Actions runner |
 |---|---|
-| `amd64` | `ubuntu-24.04` |
-| `arm64` | `ubuntu-24.04-arm` |
+| `amd64`, `fedora-amd64`, `opensuse-amd64`, `archlinux-amd64` | `ubuntu-26.04` |
+| `arm64`, `fedora-arm64`, `opensuse-arm64` | `ubuntu-26.04-arm` |
 
 A completed run retains `environment.json`, `junit.xml`, `pytest.log`, nested-KWin/Xvfb/MCP logs, and visual PNG evidence below its artifact directory. Failed runs also collect Docker inspect, container log, and process-list diagnostics.
 
-One legacy success test for ScreenShot2 on KWin's exact `--virtual` backend remains intentionally skipped because that backend does not return capture data in this container. Error propagation for that path is tested at both engine and MCP stdio levels; screenshot success, cursor pixels, and frame bursts are tested through the explicit nested X11/scrot visual mode. See [docker/README.md](docker/README.md) for the process topology, complete test-file inventory, evidence layout, and targeted commands.
+One legacy success test for ScreenShot2 on KWin's exact `--virtual` backend remains intentionally skipped because that backend does not return capture data in this container. Error propagation for that path is tested at both engine and MCP stdio levels; screenshot success, cursor pixels, frame bursts, and fractional-scale coordinate mapping are tested through the explicit nested X11/scrot visual mode. Multi-output layouts, negative origins, ScreenShot2 `CaptureWorkspace` normalization, and Spectacle partial coverage are not part of the container suite. See [docker/README.md](docker/README.md) for the process topology, complete test-file inventory, evidence layout, and targeted commands.
 
 ## Contributing
 

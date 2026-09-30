@@ -99,12 +99,14 @@ Pass an options object as the second element of the plugin tuple:
 | ---------------- | ---------- | --------------------- | --------------------------------------------------------------------- |
 | `enabled`        | `boolean`  | `true`                | Initial state; `/suggest` toggles it at runtime (persisted).          |
 | `model`          | `string`   | session `small_model` | `provider/model`. Falls back to `small_model`, then the session model. |
+| `endpoint`       | `string`   | unset                 | Custom OpenAI-compatible or gateway endpoint (`baseURL` or `/chat/completions`). Enables stateless direct generation without creating OpenCode sessions. |
+| `apiKey`         | `string`   | unset                 | API key for `endpoint`, supporting `{file:...}`, `{env:...}`, or raw token. |
 | `acceptKeys`     | `string[]` | `["tab", "right"]`    | Key names as reported by the terminal (`tab`, `right`, ...).          |
 | `maxChars`       | `number`   | `120`                 | Maximum suggestion length.                                            |
 | `idleDelayMs`    | `number`   | `500`                 | Debounce after a turn finishes before generating.                     |
 | `recentMessages` | `number`   | `10`                  | How many recent messages feed the suggestion prompt.                  |
 | `system`         | `string`   | built-in              | Override the system prompt sent to the suggestion model.              |
-| `backOnEmptyLeft` | `boolean`  | `false`               | Return to the home screen with Left when the prompt is empty.         |
+| `backOnEmptyLeft` | `boolean`  | `true`                | Return to the home screen with Left when the prompt is empty.         |
 | `internalSessionMarkerDir` | `string` | unset       | Optional extra crash-recovery tracking. A configuration-free sweep already reaps leftover hidden sessions, so this is only an additional safety net. |
 | `argHints` | `Record<string, string[]>` | `{}` | Argument option lists per slash command, shown as `[a \| b \| c]` after a complete `/name ` and completed with Tab, e.g. `"/keepwarm": ["6h", "always", "off", "status"]`. Commands without an entry suggest no arguments. |
 
@@ -118,10 +120,12 @@ When enabling, a suggestion is generated immediately for the current session.
 
 - Listens for `session.idle`, debounces, and builds a short transcript from the
   session's recent messages.
-- Asks a model (your `small_model` by default) for one short next user message,
-  in a throwaway hidden session with tools disabled; the session is deleted
-  immediately afterwards. Every hidden-session call is scoped to the current
-  session's project directory, hidden sessions carry a metadata tag that
+- Asks a model (your `small_model` by default) for one short next user message.
+  When provider credentials or an `endpoint` are available, it generates suggestions
+  statelessly via direct HTTP fetch (zero server sessions created, zero cmux/session
+  hooks emitted). Otherwise, falls back to a throwaway hidden session with tools
+  disabled that is deleted immediately afterwards. Every hidden-session call is scoped
+  to the current session's project directory, hidden sessions carry a metadata tag that
   survives the server's automatic title generation, and a periodic sweep (plus
   shutdown cleanup) reaps any leftovers — including sessions orphaned by a
   crash — with no configuration required.

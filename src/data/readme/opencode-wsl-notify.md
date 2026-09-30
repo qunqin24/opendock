@@ -76,6 +76,7 @@ Options are passed through the object form of a plugin entry:
 | `wslOnly` | boolean | `true` | Only notify when running inside WSL. Set `false` to force on other platforms. |
 | `events` | object | see below | Per-event `enabled`, `title`, and `message`. |
 | `minDuration` | number | `0` | Skip `complete` notifications for sessions shorter than this many seconds. |
+| `permissionGraceMs` | number | `500` | Wait this many milliseconds for a permission request to be answered before toasting it; requests answered first are suppressed. `0` notifies immediately. |
 | `debug` | boolean | `false` | Log diagnostics to stderr. |
 
 ### Events
@@ -95,6 +96,19 @@ The toast title names the event; the body carries the project and session:
 | `error` | `Session error` | `{project}\n{session}` |
 | `permission` | `Waiting for permission` | `{project}\n{session}` |
 | `subagent_complete` | `Subagent finished` | `{project}` |
+
+Permission notifications are sent once per request: OpenCode can re-emit
+`permission.asked` for the same prompt, and the plugin coalesces those into a
+single toast.
+
+A request is only announced when it is actually still waiting. The plugin holds
+each request for `permissionGraceMs` and drops it if `permission.replied` arrives
+first. This is what keeps things quiet under OpenCode's **Auto Permissions**
+setting (`session.permissions: "autoaccept"` in `cli.json`): the TUI answers such
+requests the moment they appear, but OpenCode still emits `permission.asked`, so
+without the grace window the plugin would announce permissions that nothing is
+waiting on. Raise `permissionGraceMs` if the TUI is slow to auto-answer, or set it
+to `0` to notify the instant a request appears.
 
 ### Message placeholders
 
@@ -185,6 +199,26 @@ is disabled.
 Set `debug: true` to log which events are dispatched and which duplicates are
 skipped.
 
+**Permission toasts keep appearing even though nothing is waiting.**
+
+Some tool calls read files outside the project (for example a plugin's own files
+under `~/.cache/opencode/`), which OpenCode treats as `external_directory`
+permission requests. Under **Auto Permissions** those are answered silently, but
+the `permission.asked` event still fires. The plugin suppresses requests answered
+within `permissionGraceMs`, so auto-answered requests stop producing toasts.
+
+If you still see repeat prompts, no allow-list rule matches the path, and you'd
+rather not be prompted at all, add it to OpenCode's `permissions` so no request is
+raised. For example, to let the agent read plugin files freely:
+
+```jsonc title="~/.config/opencode/opencode.jsonc"
+{
+  "permissions": [
+    { "action": "external_directory", "resource": "~/.cache/opencode/**", "effect": "allow" }
+  ]
+}
+```
+
 **Toasts show "NtfyToast" instead of "OpenCode".**
 
 The `appID` is passed through to the toast binary, but Windows only honors an application name for an appID that is **registered** on the system. Without registration the label falls back to the toast vendor's name.
@@ -217,8 +251,9 @@ npm run typecheck
 ```
 
 The unit tests cover Windows path translation, event classification against real
-V2 event shapes, placeholder rendering, and completion coalescing. The
-end-to-end check exercises the real `setup()` and asserts on the toasts produced.
+V2 event shapes, placeholder rendering, completion coalescing, and permission
+deferral. The end-to-end check exercises the real `setup()` and asserts on the
+toasts produced.
 
 ---
 

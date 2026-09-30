@@ -33,7 +33,7 @@ The sidebar gives a quick, at-a-glance view of your current month's Requesty usa
 
 - Monthly spend and monthly limit, pulled from `GET /v1/manage/apikey/self`
 - A color-coded progress bar that turns yellow/red at configurable thresholds
-- Projected month-end spend at the current run rate (`~$X EOM`), with a pace marker: ↑ over pace, → on pace, ↓ under pace
+- Projected month-end spend (`~$X EOM`), extrapolated with a weekday-aware run rate (see [Month-end projection](#month-end-projection)), with a pace marker: ↑ over pace, → on pace, ↓ under pace
 - Daily spend trend: today · daily average · 7-day average · 30-day average
 - Optional input/output token breakdown for each spend metric (`sidebar.showTokens`)
 - API key name in the header, linking to the Requesty analytics dashboard filtered by that key
@@ -61,7 +61,7 @@ Disable the readout with `"prompt": { "budgetIndicator": false }`.
 
 Open the dialog with `/requesty` from the command palette for the full breakdown:
 
-- KPI row: spent, limit, remaining, End of Month projection with a colored pace arrow, and last month's spend with a colored trend chevron
+- KPI row: spent, limit, remaining, End of Month projection (labelled with the projection method actually used) with a colored pace arrow, and last month's spend with a colored trend chevron
 - *Budget Overview* card: wide progress bar, budget-health badge, days-to-exhaustion estimate based on your 7-day average, and today/daily avg/7d/30d averages
 - *Model Breakdown (Current Month)* card: per-model table with spend, share of total spend, tokens, request count, and output/input ratio
 
@@ -134,6 +134,8 @@ Restart opencode after changing the config.
 | `refreshIntervalMs`       | number  | `300000` (5 min)             | Periodic refresh interval (safety net) |
 | `warningThreshold`        | number  | `0.7` (70%)                  | Budget usage ratio at which the bar turns yellow (accepts 0–1 or 0–100) |
 | `errorThreshold`          | number  | `0.9` (90%)                  | Budget usage ratio at which the bar turns red (accepts 0–1 or 0–100) |
+| `projection.method`       | string  | `"weekday"`                  | How month-end spend is extrapolated: `"weekday"` (per-weekday profile from your usage history), `"workdays"` (Mon–Fri only), or `"calendar"` (every day weighs the same) |
+| `projection.historyDays`  | number  | `28`                         | Completed days of usage history sampled for the `"weekday"` method (7–84, whole days) |
 | `sidebar.enabled`         | boolean | `true`                       | Show the sidebar widget |
 | `sidebar.maxModels`       | number  | `5`                          | Number of models shown in the compact sidebar list |
 | `sidebar.showTokens`      | boolean | `true`                       | Show input/output token breakdown alongside spend in the sidebar averages block |
@@ -220,8 +222,32 @@ All amounts are in USD and dates are evaluated in UTC. The detail dialog's `Upda
 - **Daily avg** — current month's total spend and tokens divided by the number of days elapsed so far this month.
 - **7d avg** — average spend and tokens over the previous 7 completed calendar days (excluding today). Days without usage count as `$0` / `0` tokens. Uses a rolling window to ensure accuracy across month boundaries.
 - **30d avg** — average spend and tokens over the previous 30 completed calendar days (excluding today). Days without usage count as `$0` / `0` tokens. Uses a rolling window to ensure accuracy across month boundaries.
-- **End of Month projection** — current spend projected forward at the current daily run rate through the end of the month.
+- **End of Month projection** — current spend extrapolated to the end of the month, weighting the remaining days by how much you typically spend on each weekday. See [Month-end projection](#month-end-projection).
 - **Session cost** — spend, request count, and tokens for the currently active opencode session: **Today** and **Since <session start date>**. Figures cover the root session including all its sub-agents (viewing a sub-agent shows its root's aggregate). The window starts at the session's creation timestamp; if that is unavailable it falls back to the last 90 days. Attribution uses Requesty's `extra.X-Session-Affinity` metadata, so values are exact per session (not estimates). While a session's data is still loading the section shows a "…" placeholder rather than a misleading zero; a previously-loaded session is served from a per-session cache so its figures appear immediately on revisit.
+
+### Month-end projection
+
+Coding usage is rarely spread evenly across the week, so a plain "spend so far ÷ days so far × days in month" run rate over-projects when the month started on a busy stretch and under-projects when it started on a quiet weekend. The projection therefore assigns every day of the month a weight and extrapolates over weights instead of days:
+
+```
+projection = spend so far ÷ (weight of days 1…today) × (weight of all days in the month)
+```
+
+Three methods are available via `projection.method`:
+
+| Method | Weights | Use when |
+| ----- | ------- | -------- |
+| `"weekday"` (default) | Measured from your own usage: each weekday's average spend over the last `projection.historyDays` completed days | You want the projection to learn your actual rhythm |
+| `"workdays"`          | Mon–Fri count, Sat/Sun count as zero | You only work weekdays and have no usable history yet |
+| `"calendar"`          | Every day counts the same (the classic run rate) | You want the simple, unweighted estimate |
+
+Details:
+
+- Weights are normalized to an average of 1, so a weight of `1` means "an average day" and the `"calendar"` method reduces exactly to the plain run rate.
+- The `"weekday"` method needs at least 7 sampled days carrying some spend; with a shorter or empty history it silently falls back to `"calendar"`. The detail dialog's KPI label shows which method was actually used (`End of Month (weekday profile)`, `(workdays)` or `(calendar)`).
+- Days with no usage count as `$0`, which is what makes a consistently quiet weekend measurable. Today is excluded from the history sample because its spend is still incomplete.
+- The **pace marker** (↑/→/↓) and the *Budget Overview* **days-to-exhaustion** estimate use the same weights, so a weekend no longer looks like "under pace" and an exhaustion date no longer counts days you never spend on.
+- Choosing `projection.method: "weekday"` with a `historyDays` above 30 widens the usage request window accordingly; it stays within a single API request.
 
 ## API key detection
 

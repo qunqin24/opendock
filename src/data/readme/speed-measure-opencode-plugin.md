@@ -1,6 +1,6 @@
 # speed-measure-opencode-plugin
 
-OpenCode TUI のサイドバーに、現在のセッションにおける LLM 応答の Prefill（TTFT）速度と Decode 速度を表示する OpenCode プラグイン。
+OpenCode TUI のサイドバーに、現在のセッションにおける LLM 応答の Prefill（TTFT）速度と Decode 速度を表示する OpenCode プラグイン。OpenCode 2.x と 1.18.x の両方に対応しています。
 
 ## 表示例
 
@@ -56,7 +56,19 @@ npm install
 npm run build
 ```
 
-`npm run build` により `dist/index.js` が生成される。`~/.config/opencode/tui.jsonc` にそのパスを登録する。
+`npm run build` により `dist/index.js` が生成される。
+
+**OpenCode 2.x** の場合、TUI 設定は `~/.config/opencode/cli.json`（v2 に `tui.jsonc` は存在しない）の `plugins` に**リポジトリのディレクトリ**を登録する。v2 はローカルプラグインを `<ディレクトリ>/tui` というリテラルパスで解決するため、単一ファイル（`dist/index.js`）を直接指定しても無視される。リポジトリ直下の `tui.js` がこのエントリポイントであり、`dist/index.js` を再エクスポートする。
+
+```json
+{
+  "plugins": [
+    "/path/to/speed-measure-opencode-plugin"
+  ]
+}
+```
+
+**OpenCode 1.18.x** の場合は `~/.config/opencode/tui.jsonc` にビルド済みファイルのパスを登録する。
 
 ```jsonc
 {
@@ -70,7 +82,7 @@ npm run build
 
 ## 設定
 
-`~/.config/opencode/speed-measure.json` を作成すると表示をカスタマイズできる。ファイルが無い場合や不正な値の場合は既定値にフォールバックする。
+`~/.config/opencode/speed-measure.json` を作成すると表示をカスタマイズできる（`XDG_CONFIG_HOME` 設定時は `$XDG_CONFIG_HOME/opencode/speed-measure.json` を優先する）。ファイルが無い場合や不正な値の場合は既定値にフォールバックする。
 
 | キー | 型 | 既定値 | 説明 |
 |---|---|---|---|
@@ -78,7 +90,19 @@ npm run build
 | `showAverages` | boolean | `false` | セッション全体の平均値を表示するか |
 | `showCache` | boolean | `false` | キャッシュ関連の値を表示するか |
 | `liveIntervalMs` | number | `150` | ストリーミング中の live 更新間隔（ミリ秒） |
-| `order` | number | `150` | サイドバー内での表示順（builtin の `internal:sidebar-context` は `order=100`） |
+| `order` | number | `150` | サイドバー内での表示順（builtin の `internal:sidebar-context` は `order=100`）。1.18.x のみ有効。OpenCode 2.x では slot の配置順はプラグインの有効順に従うため無視される |
+
+## OpenCode 2.x での計測
+
+OpenCode 2.x では TUI プラグイン API が新しくなり、本プラグインは v2 のイベント（`session.step.*` / `session.text.*` / `session.reasoning.*` / `session.tool.*`）で計測します。1.18.x では従来どおり `session.next.*` を主経路とし、応答がなければ `message.part.*` にフォールバックします。
+
+- **TTFT** は `session.step.started` が持つリクエスト dispatch 時刻（`started`）を起点とするため、1.18.x で報告されていた「v2 経路で TTFT がほぼ 0 になる」問題は 2.x では発生しません
+- **Decode 速度**の分母は `session.step.streamed`（provider レスポンス本体の終了時刻）までの窓です。ツール実行はこの境界の後に決着するため、1.18.x 経路のようなツール実行時間の明示減算は不要になります。`step.streamed` が取れない場合は `step.ended` からツール実行区間を除く従来の計算にフォールバックします
+- ストリーミング完了から `step.ended` までの間はライブ表示が凍結されます（ツール決着待ちの時間が chars/s を希釈しないため）
+
+サイドバーへの配置は v2 の slot `sidebar.content` への追加であり、表示位置はプラグインの有効順に従います（`order` 設定は 2.x では無視されます）。平均値の保持には v2 の `storage.memory` を使います。
+
+なお OpenCode 2.x 自体にも、応答フッターに組込みの tok/s 表示（`session.tps` 設定、デフォルト ON）があります。これはステップ開始からの総時間（プリフィルを含む）で割ったターン全体の加重平均であり、本プラグインの Decode 速度（first token 以降の生成フェーズのみ）とは分母が異なるため、値は一致しません。
 
 ## 開発
 

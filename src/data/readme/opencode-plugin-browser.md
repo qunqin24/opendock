@@ -60,7 +60,7 @@ Restart the TUI (or `opencode2 service restart`) after changing the config.
 
 ## Prerequisites
 
-- OpenCode **V2** (plugin API is beta)
+- OpenCode **V2.0.3 or newer** (plugin API is beta). 2.0.3 is the floor: earlier 2.x releases ship no `./tui` subpath export, so the TUI entrypoint cannot resolve `@opencode/plugin/tui`.
 
 Placement: appends to `sidebar.content` (below **MCP**/**Skills**). If you use
 multiple sidebar plugins, order in `plugins` controls stacking.

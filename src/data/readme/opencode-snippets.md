@@ -81,40 +81,12 @@ Build `/commit #conventional-commits #project-context` for context-aware commits
 
 ## Installation
 
-Version 3.1.0 supports OpenCode V1 1.18.29 and V2 2.0.12 through separate server and terminal adapters in the same package. Releases use normal versions on `latest`.
-
-For V2, add `"opencode-snippets"` to `plugins` in `opencode.json`. Its terminal plugin loads automatically. For V1, use the command below or add it to `plugin` in both `opencode.json` and `tui.json`.
-
-V1 retains its autocomplete interface. The field dialog is available in V2; named arguments such as `#review(topic="API")` work in both versions.
-
-```bash
-opencode plugin opencode-snippets -gf
-```
-
-This installs the package and wires up both the server plugin and the TUI plugin for autocompletion automatically.
-
-
-
-<details>
-<summary>Manual Installation (or for AI agents)</summary>
-
-If you edit config manually, the configurations are separate, so you need both entries yourself.
-
-Required: add the package to your `opencode.json` plugins array:
+Add `"opencode-snippets"` to `plugins` in `opencode.json`. OpenCode loads the
+terminal plugin automatically, including autocomplete, field forms, and the library.
 
 ```json
 {
-  "plugin": [
-    "opencode-snippets"
-  ]
-}
-```
-
-Strongly recommended: add the same package to `tui.json` too:
-
-```json
-{
-  "plugin": [
+  "plugins": [
     "opencode-snippets"
   ]
 }
@@ -123,45 +95,26 @@ Strongly recommended: add the same package to `tui.json` too:
 <details>
 <summary>Local Development</summary>
 
-For local development with a `file:///` plugin path, point OpenCode at the package directory:
+Run `bun install` and `bun run build`. For local testing, add the built `dist`
+directory to `plugins` in both `opencode.json` and `cli.json`:
 
 ```json
 {
   "plugins": [
-    "file:///D:/projects/opencode-snippets"
+    "file:///absolute/path/to/opencode-snippets/dist"
   ]
 }
 ```
 
-Strongly recommended for local TUI testing too, wire the same package directory into `tui.json`:
-
-```json
-{
-  "plugin": [
-    "file:///D:/projects/opencode-snippets"
-  ]
-}
-```
-
-Using the directory lets OpenCode read the package manifest and discover both targets.
-
-</details>
+Rebuild after source changes to test the updated server and terminal entrypoints.
 
 </details>
 
 ## Quick Start
 
-**1. Create your global snippets directory:**
+**1. Open `/snippets`, choose New, name it `careful`, and select Global.**
 
-```bash
-mkdir -p ~/.config/opencode/snippet
-```
-
-The plugin also loads `~/.config/opencode/snippets/` if you already use the plural form.
-
-**2. Add your first snippet:**
-
-`~/.config/opencode/snippet/careful.md`:
+**2. Enter the source below and press Ctrl+S to save:**
 ```markdown
 ---
 aliases: safe
@@ -171,6 +124,8 @@ Ask clarifying questions if anything is ambiguous.
 ```
 
 **3. Use it anywhere:**
+
+Type `#careful` or its alias `#safe` in a message.
 
 https://github.com/user-attachments/assets/ebb303b5-d41b-4d87-8f08-eb1d730db5c8
 
@@ -188,13 +143,13 @@ Snippets can be global (`~/.config/opencode/snippet/*.md` or `~/.config/opencode
 
 Project snippet directories are resolved against the canonical project root. A symlinked project snippet directory, including one that points outside the project, is rejected rather than loaded or modified.
 
-### V2 processing state
+### Processing state
 
-New submissions read the current snippet files, including nested references and completed drafts. Changes made through TUI commands or an editor apply to the next submission. Replayed messages retain their original expansion and skill content.
+New submissions read the current snippet files, including nested references and completed drafts. Changes saved in the library or another editor apply to the next submission. Replayed messages retain their original expansion and skill content.
 
-If snippet processing fails, V2 preserves the original message and logs a warning. Invalid arguments, templates, or old snippet references must not block new conversation turns. Validation completes before shell commands or snippet writes run; a validation failure discards the message's planned expansions and effects. Correct the snippet or its arguments and submit it again to expand it. Snippet failures in skill tool results also preserve the original result.
+If snippet processing fails, the plugin preserves the original message and logs a warning. Invalid arguments, templates, or old snippet references must not block new conversation turns. Validation completes before shell commands run; a validation failure discards the message's planned expansions and effects. Correct the snippet or its arguments and submit it again to expand it. Snippet failures in skill tool results also preserve the original result.
 
-V2 records a bounded amount of processing output so rebuilt request history and server restarts cannot repeat shell or management side effects. State lives under the user's private data directory (`$XDG_DATA_HOME/opencode/opencode-snippets/v2`, or `~/.local/share/opencode/opencode-snippets/v2`) rather than inside a project. Directories use mode `0700` and records use `0600`.
+The plugin records a bounded amount of processing output so rebuilt request history and server restarts cannot repeat shell side effects. State lives under the user's private data directory (`$XDG_DATA_HOME/opencode/opencode-snippets/v2`, or `~/.local/share/opencode/opencode-snippets/v2`) rather than inside a project. Directories use mode `0700` and records use `0600`.
 
 Only hashed project/message identifiers, completion status, timestamps, and output needed for replay are retained; raw input prompts and project paths are not stored. Records older than 30 days are pruned, with additional limits of 100 sessions per project and 1,000 messages per session. Deleting an OpenCode session removes that session's records immediately.
 
@@ -242,7 +197,7 @@ MyApps (search for {{app}})
 
 Accept a completion or type a space after an exact snippet name to fill its form. Confirming writes a readable reference such as `#myapps(app="Payroll")` into the composer; sending the message expands it. Cancel preserves the original reference. Use **Edit snippet fields** for the invocation under the cursor to change answers.
 
-Autocomplete marks snippets that open forms with `☷` after their name. Forms support text, multiline text, numbers, checkboxes, and selection lists, with defaults and validation. The action row is **OK · Cancel · Help**. Help reveals keyboard shortcuts and navigation instructions; these stay hidden by default. Tab/Shift+Tab move between fields and buttons, arrows select, Space toggles a checkbox, Ctrl+J inserts a newline, Enter confirms, and Escape cancels.
+Autocomplete marks snippets that open forms with `☷` after their name. Forms support text, multiline text, numbers, checkboxes, and selection lists, with defaults and validation. The action row is **OK · Cancel · Help**. A short keyboard hint is always visible; Help reveals the full key list. Tab/Shift+Tab move between fields and buttons, arrows select, Space toggles a checkbox, Ctrl+J inserts a newline, Enter confirms, and Escape cancels.
 
 ```markdown
 ---
@@ -418,7 +373,7 @@ Or use the self-closing format:
 }
 ```
 
-V2 uses OpenCode's native skill registry for both expansion and autocomplete. This includes skills discovered by OpenCode, configured skill sources, and skills supplied by plugins. Skill IDs and display names are accepted; autocomplete inserts the native ID to distinguish skills with the same display name.
+The plugin uses OpenCode's native skill registry for both expansion and autocomplete. This includes skills discovered by OpenCode, configured skill sources, and skills supplied by plugins. Skill IDs and display names are accepted; autocomplete inserts the native ID to distinguish skills with the same display name.
 
 When a skill tag is found, it's replaced with the skill's content body (frontmatter stripped). Unknown skills leave the tag unchanged.
 
@@ -464,13 +419,43 @@ Or use the included snippet that expands into `#skill(...)`:
 
 Demo files live at `.opencode/skill/demo-voice/SKILL.md` and `.opencode/snippet/demo-skill.md`.
 
-## Commands
+## Snippet library
 
-- `/snippets add <name> [content]` creates a global snippet
-- `/snippets add --project <name>` creates a project snippet
-- `/snippets list` shows available snippets
-- `/snippets delete <name>` removes a snippet
-- `/snippets:reload` reloads snippet files from disk without restarting OpenCode
+Open `/snippets` to manage your project and global snippets.
+
+- **Enter** edits the Markdown source; **Ctrl+S** saves.
+- **Shift+Enter** opens the file in `VISUAL` or `EDITOR` and reloads it on return.
+- **More** or **:** opens actions: new, reload, duplicate, rename, move, delete, copy reference, and form testing.
+- **Escape** steps back; **q** closes from navigation and keeps drafts for reopening.
+
+The list and preview use Vim navigation. **F1** shows the key list.
+
+| Keys | Navigation |
+|------|------------|
+| `j` / `k`, arrows, `Ctrl+N` / `Ctrl+P` | Next / previous row; stop at the ends |
+| `gg` / `G`, Home / End | First / last row or preview line |
+| `3j`, `5G`, `5gg` | Repeat a motion or go to a numbered row or line |
+| `H` / `M` / `L` | Select the top / middle / bottom visible list row |
+| `Ctrl+D` / `Ctrl+U` | Half page down / up |
+| `Ctrl+F` / `Ctrl+B`, PageDown / PageUp | Full page down / up |
+| `Ctrl+E` / `Ctrl+Y` | Scroll down / up one line |
+| `zt` / `zz` / `zb` | Align the selected list row at the top / middle / bottom, where content permits |
+| `h` / `l`, Left / Right | Focus the list / preview |
+| `Ctrl+W`, then `h` / `k` or `l` / `j` | Focus the list or the detail pane |
+| `Ctrl+W`, then `w` | Switch panes |
+| `/` / `?`, then text and Enter | Filter forward / backward by name, alias, or description |
+| `n` / `N` | Next / previous filtered match, following / reversing the search direction; wraps |
+| `Ctrl+O` / `Ctrl+I` | Back / forward through reference, search, and boundary jumps; clears filters |
+| `Tab` / `Shift+Tab` | Visit every control; `j` / `k` also move between actions |
+| `i` / Enter | Open the selected source editor |
+
+Counts and incomplete key sequences appear in the footer; Escape cancels them.
+Navigation shortcuts apply while the list, preview, or an action has focus.
+Search fields accept ordinary text, and the source editor keeps its own keys.
+The detail pane contains the editor while editing. Terminals that encode Ctrl+I
+as Tab use it for focus traversal. Distinct Ctrl+I requires extended keyboard support.
+
+In the composer, **Ctrl+G** edits the fields of the invocation under the cursor.
 
 ## Example Snippets
 
@@ -534,9 +519,9 @@ A default config file is created automatically on first run.
 
 ```jsonc
 {
-  "$schema": "https://raw.githubusercontent.com/JosXa/opencode-snippets/v3.1.1/schema/config.schema.json",
+  "$schema": "https://raw.githubusercontent.com/JosXa/opencode-snippets/v3.3.1/schema/config.schema.json",
   "logging": {
-    "debug": false // Enable debug logging (logs: ~/.config/opencode/logs/snippets/daily/)
+    "debug": false // Enable debug logging (logs: $XDG_DATA_HOME/opencode/log/snippets/daily/)
   },
   "experimental": {
     "injectBlocks": false, // Enable <inject>...</inject> blocks for persistent context
@@ -551,7 +536,11 @@ All boolean settings accept: `true`, `false`, `"enabled"`, `"disabled"`
 
 ### Debug Logging
 
-Logs are written to `~/.config/opencode/logs/snippets/daily/` when enabled.
+Logs are written to `$XDG_DATA_HOME/opencode/log/snippets/daily/` (or
+`~/.local/share/opencode/log/snippets/daily/` when `XDG_DATA_HOME` is unset).
+Info, warning, and error messages are always written; `logging.debug` also
+enables debug messages. Keeping logs outside the OpenCode configuration
+directory prevents each append from reloading config and rebuilding skill watches.
 
 ## Behavior Notes
 

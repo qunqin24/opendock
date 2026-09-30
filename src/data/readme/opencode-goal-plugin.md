@@ -31,7 +31,7 @@ This project is independently implemented for OpenCode. Product names used elsew
 | Operating systems | Filesystem-sensitive lifecycle tests run on Linux, macOS, and Windows |
 | Package entrypoint | Installed-tarball contracts verify both export paths, consumer TypeScript resolution, hooks, and all 11 tools |
 | Provider/backend quirks | Strict-template backends require the goal block to merge into the primary `system` message; covered by regression tests |
-| OpenCode 2 | Not supported and not yet tested; the peer/engine pin is `>=1.17.15 <2`. See the [OpenCode 2 section](docs/compatibility.md#opencode-2) |
+| OpenCode 2 | Verified against 2.0.16: plugin load, `/goal`, native agents, Plan holds, restricted independent completion auditing, foreign-verifier rejection, and safe reload recovery. See the [OpenCode 2 section](docs/compatibility.md#opencode-2) |
 
 See the [compatibility policy](docs/compatibility.md) for the supported public
 surface and versioning expectations.
@@ -59,11 +59,21 @@ Separately, the lifecycle-feedback implementation included in v0.7.0 passed a re
 
 ## Install
 
-OpenCode installs npm plugins itself from your config, so there is nothing to `npm install`. Add the plugin **with a pinned version** and the `goal` command to `opencode.json` (the user config at `~/.config/opencode/opencode.json`, or a project-local `opencode.json`):
+OpenCode installs npm plugins itself from your config, so there is nothing to `npm install`. Add the plugin **with a pinned version** to `opencode.json` (the user config at `~/.config/opencode/opencode.json`, or a project-local `opencode.json`):
+
+**OpenCode 2** — the plugin registers its own command, so no `command` entry is needed:
 
 ```json
 {
-  "plugin": ["opencode-goal-plugin@0.10.0"],
+  "plugins": ["opencode-goal-plugin@0.11.0"]
+}
+```
+
+**OpenCode 1** — the same plugin also needs its `goal` command declared in config:
+
+```json
+{
+  "plugin": ["opencode-goal-plugin@0.11.0"],
   "command": {
     "goal": {
       "description": "Set a session-scoped goal and auto-continue until complete.",
@@ -74,19 +84,25 @@ OpenCode installs npm plugins itself from your config, so there is nothing to `n
 }
 ```
 
-Or let the CLI add the plugin entry for you and then add the `command` block by hand:
+A V1 config keeps working on OpenCode 2 (the `plugin` key is normalized to `plugins`), but its `command.goal` entry is registered *after* plugin commands on V2 and would shadow the plugin handler — remove it. The plugin detects the conflict, re-asserts its own registration, and logs a warning if a foreign definition still owns the name.
+
+Or let the CLI add the plugin entry for you:
 
 ```sh
-opencode plugin opencode-goal-plugin@0.10.0 --global
+opencode plugin opencode-goal-plugin@0.11.0 --global
 ```
 
-Restart OpenCode after editing the config. The options form `["opencode-goal-plugin@0.10.0", { ... }]` (see [Options](#options)) pins the same way.
+Restart OpenCode after editing the config. The options form `["opencode-goal-plugin@0.11.0", { ... }]` (see [Options](#options)) pins the same way.
 
 ### Upgrading
 
+For **0.11.0**, use the config for your OpenCode version above and restart OpenCode. When moving from OpenCode 1 to 2, remove the legacy `command.goal` entry so the plugin owns `/goal`. Upgrade every process sharing the same goal state before resuming work; recovered active goals load paused and require `/goal resume`.
+
+The release adds OpenCode 2 support and fixes Plan activation, stale completion approvals after objective edits, invalid completion evidence, and persistence on filesystems with capped timestamps or unsupported hard links. See the [changelog](CHANGELOG.md) for the full changes.
+
 **Pin the version.** OpenCode resolves an unpinned `"opencode-goal-plugin"` entry to `@latest` exactly once, installs it under its package cache (`~/.cache/opencode/packages/opencode-goal-plugin@latest/` by default; `opencode debug paths` prints the cache root), and never re-resolves `latest` while that directory exists. An unpinned entry therefore stays on whichever version was first installed, indefinitely, and new releases on npm are never picked up — a bug fixed months ago can still be running locally.
 
-To upgrade, bump the pin (for example to `opencode-goal-plugin@0.10.0`) and restart OpenCode; every pinned version gets its own cache directory. If you kept an unpinned entry, delete the `opencode-goal-plugin*` directories under the cache `packages/` folder and restart. `npx opencode-goal-plugin` runs the bundled verification script, which warns when the cached copy lags the package.
+To upgrade, bump the pin (for example to `opencode-goal-plugin@0.11.0`) and restart OpenCode; every pinned version gets its own cache directory. If you kept an unpinned entry, delete the `opencode-goal-plugin*` directories under the cache `packages/` folder and restart. `npx opencode-goal-plugin` runs the bundled verification script, which warns when the cached copy lags the package.
 
 ## Usage
 
@@ -288,7 +304,11 @@ Recovered active goals are loaded in a **paused** state with a recovery note, so
 
 Only one OpenCode process may own a given session shard at a time. If the same session is opened in a second process, that process enters **passive goal mode** instead of failing the whole session: ordinary chat and unrelated tools continue to work, but `/goal` commands and goal tools report that another process owns the workflow. Canonical goal tools return the stable envelope code `error: "session_owned_elsewhere"`. The passive process does not read, mutate, persist, or auto-continue that session's goal state. After the owner exits, retry an explicit goal command or goal tool; the process will acquire the shard and load any recovered active goal paused. To work concurrently without waiting, create a new session with `opencode --continue --fork` (or `opencode --session <id> --fork`).
 
-Lease ownership uses immutable per-process claim files so a delayed stale-lock cleanup or duplicate release cannot delete a newer owner's lease. The plugin publishes a complete regular-file compatibility guard atomically at `<shard>/state.json.lock`, then elects the current owner from claims in the sibling `<shard>/state.json.lock.claims-v2/` directory. That no-replace publication makes startup safe against older releases: either the older lock directory wins and the current plugin stays passive, or the guard file wins and the older release cannot reclaim it. Automatic ownership handoff requires the current release. Legacy, incomplete, tampered, or unsupported lease layouts fail closed instead of being rewritten online; filesystems must support regular-file hard links and preserve the guard's future timestamp. After confirming that every process using the session is closed and upgraded, either fork or remove only the affected shard's adjacent `.lock` file or legacy directory **and** `.lock.claims-v2` directory; keep its state and ledger.
+On OpenCode 2, same-process reloads for a location wait for the previous plugin instance to finish disposal before starting its replacement. This releases the old instance's claims and lets the replacement recover active work paused. A quiet live owner remains authoritative; claims are never reclaimed merely because time has passed.
+
+Known lease capability failures also enter passive goal mode: unsupported hard links (including `ENOSYS`), unsafe lease paths, or a filesystem that cannot preserve the guard timestamp. Goal tools return `error: "persistence_unavailable"` with repair guidance, rather than reporting another owner. Ordinary chat continues, but goal state is not loaded, changed, or auto-continued while passive. Close processes using the session before repairing the paths or moving persistence to a compatible filesystem, then explicitly retry a goal command or tool. Unexpected I/O errors still surface.
+
+Lease ownership uses immutable per-process claim files so a delayed stale-lock cleanup or duplicate release cannot delete a newer owner's lease. The plugin publishes a complete regular-file compatibility guard atomically at `<shard>/state.json.lock`, then elects the current owner from claims in the sibling `<shard>/state.json.lock.claims-v2/` directory. That no-replace publication makes startup safe against older releases: either the older lock directory wins and the current plugin stays passive, or the guard file wins and the older release cannot reclaim it. Automatic ownership handoff requires the current release. Legacy, incomplete, tampered, or unsupported lease layouts fail closed instead of being rewritten online; filesystems must support regular-file hard links and preserve the guard's future timestamp. New guards use January 1, 2038, within signed 32-bit timestamp limits; existing 2100 guards are accepted without rewriting. Guards within 30 seconds of their timestamp or already expired fail closed. Upgrade all processes sharing a session: earlier v2 releases may treat a new 2038 guard as incomplete and stay passive. After confirming that every process using the session is closed and upgraded, either fork or remove only the affected shard's adjacent `.lock` file or legacy directory **and** `.lock.claims-v2` directory; keep its state and ledger.
 
 `/goal resume` continues the same objective with a fresh local budget window. This lets you continue after pause, blocker, no-progress pause, rate-limit failures, or a limit stop without retyping the objective.
 
@@ -359,8 +379,8 @@ Additional plugin-level options:
 - `noInterruptOnUserMessage` — when `true`, a new human message no longer pauses an active goal ("user intervention"); the goal loop keeps running and the message steers the next continuation. Because typing a message no longer stops the loop, `/goal pause` and `/goal stop` become the way to halt it. Default `false`, which pauses for `/goal resume` as before.
 - `noContinueWhileChildrenActive` — when `true`, auto-continue is deferred while the session has active child sessions (subagents, background tasks): the goal stays running but does not prompt the orchestrator until the children finish. A child counts as active only while the host reports a non-idle status for it, and each deferral is reported in `/goal status` and the lifecycle history so a waiting goal is never mistaken for a hung one. Default `false`. Enabling it adds a `children` and a `status` call to each idle the goal loop evaluates. The gate fails open — continuation proceeds — for hosts that cannot report children/status, for sessions with more concurrent children than the plugin can track, and for children that run goals of their own. Note that the gate relies on the child's own idle event to resume, so a host that never emits one leaves the goal waiting; `/goal status` reports the deferral in that case.
 - `warnTurnsRemaining` / `warnDurationMsRemaining` / `warnTokensRemaining` — thresholds at which the auto-continue prompt appends a "limits are near" warning (default `3` turns, `60000` ms, `25000` context tokens). Lower them to warn closer to the limit, or raise them to warn earlier.
-- `commandName` — the slash command the plugin owns (default `goal`). Set it to e.g. `objective` to drive the workflow with `/objective` instead of `/goal`; a leading slash is tolerated. Remember to register the matching command name in your OpenCode `command` config. User-facing hints (`/goal status`, `/goal resume`, …) follow the configured name.
-- `registerCommand` — whether the plugin installs its `command.execute.before` hook at all (default `true`). Set it to `false` if you only want the auto-continue/persistence behavior driven programmatically and don't want the plugin to own a slash command.
+- `commandName` — the slash command the plugin owns (default `goal`). Set it to e.g. `objective` to drive the workflow with `/objective` instead of `/goal`; a leading slash is tolerated. On OpenCode 1, register the matching command name in your OpenCode `command` config; on OpenCode 2 the plugin registers the command itself and no config entry is needed (and a legacy entry with the same name is re-asserted so it cannot shadow the handler). User-facing hints (`/goal status`, `/goal resume`, …) follow the configured name.
+- `registerCommand` — whether the plugin owns its slash command at all (default `true`). On OpenCode 1 this installs the `command.execute.before` hook; on OpenCode 2 it registers the command through `ctx.command.transform`. Set it to `false` if you only want the auto-continue/persistence behavior driven programmatically.
 - `registerTools` — whether the plugin registers the agent-facing goal tools (default `true`). Set to `false` to omit the programmatic tool surface entirely. See [Agent tools](#agent-tools).
 - `agentGoalAuthority` — `"full"` (default) or `"status"`. In `"status"` mode the agent tools can report on a goal but cannot replace, edit, or clear one; see [Agent tools](#agent-tools).
 - `registerAgents` — whether the config hook adds native `goal` and `goal-verify` agents (default `true`). Existing agents with those names are preserved unchanged; the plugin never changes your default agent.
@@ -368,7 +388,7 @@ Additional plugin-level options:
 - `sdkShape` — OpenCode session-client argument shape: `legacy` (the default generated `PluginInput` client using `{ path, body, query }`) or `flat` (clients using `{ sessionID, ... }`). Read-only `messages`/`get` calls may probe the alternate shape after an argument/schema `TypeError`; mutating calls are never replayed, so set this option correctly for embedded clients.
 - `persistState` — whether to persist active goals and recent goal results to disk.
 - `stateFilePath` — root path for the persisted session-shard namespace. Overrides the default project-local path and the `OPENCODE_GOAL_STATE_PATH` env var. Useful if you want a fixed or ephemeral location. When unset, the default root is `<cwd>/.opencode/goals/state.json`; shards are written below `<stateFilePath>.sessions/` (see the persistence section above).
-- `ledgerFilePath` — override where the lifecycle ledger is written. By default each session shard keeps its ledger next to its state file as `<state.json>.ledger.jsonl`.
+- `ledgerFilePath` — override the legacy aggregate ledger read during migration. Runtime session shards keep their ledgers next to their state files as `<state.json>.ledger.jsonl`.
 - `ledgerMaxBytes` / `ledgerRetentionFiles` — bound the lifecycle ledger to 2 MiB per generation and three rotated generations by default. Set retention to `0` to discard the active ledger when it reaches the size ceiling.
 - `resultRetentionMs` — how long a completed goal summary remains available through `/goal status` after the goal leaves active memory.
 - `maxStoredResults` — maximum number of completed-goal summaries retained in process memory before the oldest ones are evicted.
@@ -465,9 +485,9 @@ A planning-only agent is never driven into execution by the goal loop. OpenCode'
 - Auto-continue stays suppressed on **every idle** while a restricted agent is active, so switching into `plan` mid-goal pauses the loop.
 - Continuations retain the agent that started the goal, so the loop cannot drift into a different agent.
 
-The active agent is read from the execution context the host reports for its turns. OpenCode runs `command.execute.before` before any `chat.message`/`chat.params` for the turn, and its session record carries no agent, so for the first command in a session the agent is unknown at creation time. The plugin therefore re-checks when the routed turn reaches `chat.message`, which does carry the agent, and holds the goal there — rewriting the turn into a read-only control turn and blocking tools for it — before the model is told to start.
+The active agent is read from the execution context the host reports for its turns. On OpenCode 1, `command.execute.before` runs before any `chat.message`/`chat.params` for the turn and its session record carries no agent, so for the first command in a session the agent is unknown at creation time. The plugin therefore re-checks when the routed turn reaches `chat.message`, which does carry the agent, and holds the goal there — rewriting the turn into a read-only control turn and blocking tools for it — before the model is told to start. On OpenCode 2 the session record does carry the selected agent, so the session-record fallback resolves it for the first command as well.
 
-**Command configuration matters.** OpenCode runs a custom command under the agent named in its config (`command.goal.agent`) and only falls back to the agent selected in the session when the command sets none. With the install snippet's `"agent": "build"`, the `/goal` turn itself always executes as `build`, so a hold can only come from a *previously* reported planning-only agent (the case verified in the TUI, where you switched to Plan and then typed `/goal`). To have Plan mode hold a goal even on a session's very first turn, omit `agent` from the `goal` command config so the command runs under the selected agent.
+**Command configuration matters (OpenCode 1).** OpenCode runs a custom command under the agent named in its config (`command.goal.agent`) and only falls back to the agent selected in the session when the command sets none. With the install snippet's `"agent": "build"`, the `/goal` turn itself always executes as `build`, so a hold can only come from a *previously* reported planning-only agent (the case verified in the TUI, where you switched to Plan and then typed `/goal`). To have Plan mode hold a goal even on a session's very first turn, omit `agent` from the `goal` command config so the command runs under the selected agent. On OpenCode 2 the plugin owns the command, so it runs under the session's selected agent and this trade-off does not apply.
 
 **What this does and does not prevent.** The restriction stops the *goal loop*: a held goal sends zero auto-continues, so no unattended work happens. It cannot stop a model from acting on the single routed command turn, because OpenCode's `command.execute.before` does not fully intercept command text (see [Limitations](#limitations)). A held goal's routed text explicitly tells the model not to begin work and is sent as a read-only control turn, but a non-compliant model may still act on that one turn. Verified against OpenCode 1.18.25: a goal set under Plan records `stopped: true`, `stopReason: plan agent active`, and `turnCount: 0`.
 
@@ -496,13 +516,15 @@ The goal text is wrapped in `<goal_objective>` tags and labeled as user-provided
 
 The assistant still signals candidate outcomes with `[goal:complete]` or `[goal:blocked]`. Completion can additionally be checked by a custom `auditor` callback or the built-in child-session auditor before the goal becomes terminal. Marker quality therefore remains model-dependent when auditing is disabled, and audit quality depends on the configured verifier model and evidence available in the session. The built-in verifier performs static inspection with `read`, `glob`, and `grep`; it cannot execute shell commands.
 
-OpenCode custom commands are prompts, not direct plugin-rendered TUI responses. After `command.execute.before` runs, OpenCode sends its retained command-parts array through a normal model turn. The plugin mutates that array in place so the model receives the deterministic plugin-generated result instead of the raw `/goal` argument. The model still produces the visible response and may summarize or paraphrase that result.
+OpenCode custom commands are prompts, not direct plugin-rendered TUI responses. On OpenCode 1, after `command.execute.before` runs, OpenCode sends its retained command-parts array through a normal model turn; the plugin mutates that array in place so the model receives the deterministic plugin-generated result instead of the raw `/goal` argument. On OpenCode 2 there is no interception hook, so the plugin registers the command itself and submits that same generated result as the prompt for the turn. Either way the model still produces the visible response and may summarize or paraphrase that result.
 
 Objective-bearing commands preserve file attachments. OpenCode may expand those files into synthetic Read/MCP text and file parts before `chat.message`; the plugin accepts that expansion only when it matches the one-shot command correlation, retained-file count, and generated message/session identity. Other mixed text is treated as a new human instruction and pauses an active loop. If OpenCode reports an attachment-read error during that expansion, the goal pauses with `attachment resolution error` while retaining the correct command provenance.
 
 For `/goal status`, `/goal history`, `/goal list`, `/goal pause`, and `/goal clear` (including aliases), the rewritten user turn carries an escaped control-result envelope with direct instructions to report the supplied data without treating it as new work. `tool.execute.before` rejects every tool call for that reporting turn, and the parent-correlated assistant response is excluded from checkpoint, completion, blocker, and stall analysis. These protections do not depend on the model following the reporting instruction.
 
 The plugin still registers `experimental.chat.system.transform` as defense in depth for hosts that invoke it. Real OpenCode 1.17.15 and 1.18.10 do not call that hook, so the command-control protections above are deliberately self-contained. Other OpenCode plugin hooks may change between versions.
+
+On OpenCode 2.0.16, independent completion auditing leaves its verifier child sessions retained: the host's plugin API does not expose session removal. The verifier remains restricted to read/glob/grep tools, and the parent completes only after its verdict. See [OpenCode 2 compatibility](docs/compatibility.md#opencode-2) for the tested host behavior.
 
 Distinct OpenCode sessions may own shards under the same `stateFilePath` concurrently. A second process using the same session shard remains usable in passive goal mode, but goal commands and tools are denied until it can acquire that shard. The passive process never falls back to an unpersisted copy of the same goal workflow, which avoids divergent state and last-writer-wins data loss. Use the owner, wait and retry an explicit goal control after it exits, or fork to a new session. A no-replace compatibility guard prevents an older release and the current release from both acquiring during startup; current immutable claims protect takeover and release among upgraded processes. Older processes cannot take over a guarded shard, so all processes participating in automatic same-session handoff must run the current release.
 

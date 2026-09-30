@@ -238,6 +238,8 @@ One hook fire measures 289ms wall-clock since the v3.6.0 optimization, down from
 
 | Version | Highlights |
 |---------|------------|
+| **v3.21.0** | Explicit root and named attestation targets preserve active selection and project containment (#296). PowerShell initialization retries the concurrent pointer pre-check race with bounded, validated attempts (#294). |
+| **v3.20.8** | Claude Code sessions without a plan no longer end every reply with a Stop notice (#288). Cursor hooks move to the current schema with `sessionStart` injection (#262), Gemini CLI hooks inject through `BeforeAgent` and `AfterTool` `hookSpecificOutput` (#292), and both adapters' hook scripts are now executable on macOS and Linux; the Cursor stop hook stays silent once every phase is complete. PowerShell pointer replacement recovers or removes only its own `ReplaceFile` backup (#254). |
 | **v3.20.7** | Fixes npm capability disclosure metadata and three unavailable contributor portrait endpoints. The npm package continues to ship the canonical skill and full repository README. |
 | **v3.20.6** | Phase-status writers claim one lock owner even with Windows-native `mkdir` (#282). OpenCode, DSH and Hermes safely replace linked active pointers (#283, #284). PowerShell named plans reject read-only pointers before creation (#285), work under bracketed paths (#286), and retry transient concurrent pointer writes and inspection races (#287). The remaining `ReplaceFile` artifact case stays open in #254. |
 | **v3.20.5** | OpenCode replay tolerates malformed parts (#273). Initialization reports attestation failures accurately (#277), analytics plans include Next Step (#279), and PowerShell denied writes fail without activating an incomplete named plan (#280). |
@@ -472,7 +474,7 @@ One skill, three integration tiers. Know what your agent gets before you install
 
 | Tier | Platforms | What you get |
 |------|-----------|--------------|
-| **Enhanced** (hooks + lifecycle automation) | Claude Code, Cursor, GitHub Copilot, Mastra Code, Gemini CLI, Kiro, Codex, Hermes Agent, CodeBuddy, Factory Droid, OpenCode, DeepSeek Harness | Plan injection every turn, progress reminders, completion check |
+| **Enhanced** (hooks + lifecycle automation) | Claude Code, Cursor, GitHub Copilot, Mastra Code, Gemini CLI, Kiro, Codex, Hermes Agent, CodeBuddy, Factory Droid, OpenCode, DeepSeek Harness | Plan injection every turn (Cursor: at session start), progress reminders, completion check |
 | **Standard Agent Skills** | Continue, Pi, OpenClaw, Autohand Code, Antigravity, Kilocode, AdaL CLI | SKILL.md discovery via `npx skills add`; the pattern without lifecycle hooks |
 | **Agent Skills standard path** (in-tree since v3.7.0) | Zed, Amp, Warp, Devin, Antigravity, Gemini CLI, Cursor | `.agents/skills/planning-with-files/` discovered from a plain `git clone`, no per-tool setup |
 
@@ -820,6 +822,8 @@ Code, documentation, and issue contributors. Select a portrait to open a GitHub 
   <a href="https://github.com/mvanhorn" title="@mvanhorn"><img src="https://github.com/mvanhorn.png?size=56" width="48" height="48" alt="@mvanhorn"></a>
   <a href="https://github.com/ebrevdo" title="@ebrevdo"><img src="https://github.com/ebrevdo.png?size=56" width="48" height="48" alt="@ebrevdo"></a>
   <a href="https://github.com/bailob" title="@bailob"><img src="https://github.com/bailob.png?size=56" width="48" height="48" alt="@bailob"></a>
+  <a href="https://github.com/SomSamantray" title="@SomSamantray"><img src="https://github.com/SomSamantray.png?size=56" width="48" height="48" alt="@SomSamantray"></a>
+  <a href="https://github.com/mmychu" title="@mmychu"><img src="https://github.com/mmychu.png?size=56" width="48" height="48" alt="@mmychu"></a>
   <a href="https://github.com/ericshunhinglee-cloud" title="@ericshunhinglee-cloud"><img src="https://github.com/ericshunhinglee-cloud.png?size=56" width="48" height="48" alt="@ericshunhinglee-cloud"></a>
   <a href="https://github.com/ShaunLinTW" title="@ShaunLinTW"><img src="https://github.com/ShaunLinTW.png?size=56" width="48" height="48" alt="@ShaunLinTW"></a>
   <a href="https://github.com/TayfurYldz" title="@TayfurYldz"><img src="https://github.com/TayfurYldz.png?size=56" width="48" height="48" alt="@TayfurYldz"></a>

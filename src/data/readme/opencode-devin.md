@@ -87,23 +87,85 @@ flowchart TD
 
 ## Troubleshooting
 
-- **No `devin/` models** — the credential is missing or the catalog fetch failed. Run `/connect` again.
-- **401 during chat** — the session token was revoked. Re-run `/connect`.
+- **No `devin/` models**: run `/connect` again. Failures are logged as `[opencode-devin] ...`; the log is at `~/.local/share/opencode/log/opencode.log`.
+- **A model is rejected even though `/models` lists it**: the account can see a uid it is not entitled to. The error names the tier.
+- **Costs look wrong or absent**: OpenCode reads cost from the pricing published to `/models`, not from the stream. Check the model has a non-zero price there.
+- **A 401 during chat**: the short-lived token is refreshed automatically. Reconnect only if the session token itself was revoked.
+- **`Plugin failed to load`**: rebuild and `opencode reload`. See the FAQ on atomic builds.
+- **A path in `plugins` is ignored**: only `name@file:<absolute-path>` links a local build.
 
 ## Development
 
 ```sh
 bun install
 npm run typecheck
-npm run build     # emits dist/
+bun test
+npm run build
 ```
 
-To test a local checkout without publishing, create a bridge file that re-exports the build:
+`build` is atomic, so the plugin can be reloaded while it runs. Publishing uses
+`build:clean`, which wipes `dist/` first.
 
-```ts
-// ~/.config/opencode/plugins/devin.ts
-export { default } from "file:///absolute/path/to/opencode-devin/dist/index.js"
+### Developing against a local build
+
+Edit `plugins` in `~/.config/opencode/opencode.json` to one of these, then run
+`npm run build && opencode reload`:
+
+```jsonc
+// this repository
+{ "plugins": ["opencode-devin@file:C:/path/to/opencode-devin"] }
+
+// the published package
+{ "plugins": ["opencode-devin"] }
 ```
+
+The path must be absolute, and the `name@file:` form is required: a bare path
+or a `file://` URL is ignored without an error.
+
+To confirm which copy the server loaded:
+
+```sh
+opencode api provider.list   # the devin provider's "package" field
+```
+
+### Testing against the real API
+
+`bun test` runs everything except the live suite, which skips itself without a
+credential:
+
+```sh
+DEVIN_LLM_API_KEY='devin-session-token$...' bun test test/live.test.ts
+```
+
+## FAQ
+
+**Why is `build` atomic?** OpenCode reloads a linked plugin the moment its
+entrypoint changes, and a failed load is not retried. Writing `dist/` in place
+lets a reload land mid-write and fail, which shows up as `ENOENT reading
+dist/index.js` or `Cannot find module '.../constants.js'`. `build` compiles to a
+staging directory and swaps it in.
+
+**Why a second protobuf implementation in the tests?** The suite encodes and
+decodes with the same module, which only proves the two halves agree — they
+could both be wrong. `wire-conformance.test.ts` checks the framing against
+`protobufjs`, which shares no code with this repository. It is a dev-only
+dependency.
+
+**What the tests cannot check.** The Cascade field numbers were recovered by
+reverse-engineering the Devin CLI. Only `test/live.test.ts`, which talks to
+Cognition, can notice them changing. All three RPCs have been exercised against
+the live API, but nothing guards a future upstream change; a committed capture of
+real responses would, and there is not one yet.
+
+**Why doesn't a missing model fail immediately?** Because the catalog is not
+guaranteed to list every uid Cascade accepts, and refusing one that works would
+be worse than a vague error. Disabled models are refused outright; unknown ones
+are warned about, and the likely reason is appended if the request fails.
+
+**Why is the session token in the provider registry?** It is passed as
+`settings.apiKey`, which is how the provider receives it. `opencode api
+provider.list` therefore returns it in clear text. Treat that output as a
+secret.
 
 ## Credits
 

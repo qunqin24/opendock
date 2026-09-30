@@ -8,7 +8,7 @@ Give text-only opencode orchestrators (GLM, DeepSeek, and similar models) eyes b
 
 When the orchestrator model is text-only and a task needs pixels — not just accessibility metadata — the plugin's `vision` skill detects the visual intent, extracts a task-specific JSON response template, delegates the task, and parses the structured findings back into the conversation.
 
-**Tool-first architecture.** Delegation targets a native plugin tool, `vision_analyze`, registered through the `@opencode-ai/plugin` `tool` hook. The tool runs the visual judgment in-process — it reads the listed image files and calls the configured vision model directly, so **no subagent nesting is required** and the tool works from any session, including subagent sessions. The skill calls `vision_analyze` first and falls back to spawning the `vision-agent` subagent only when the tool is unavailable in the session or the call fails with a provider/protocol/HTTP error. With the tool path, **`permission.task` configuration is not needed** for visual delegation.
+**Tool-first architecture.** Delegation targets a native plugin tool, `vision_analyze`, registered through the `@opencode-ai/plugin` `tool` hook. The tool runs the visual judgment in-process — it reads the listed image files and calls the configured vision model directly, so **no subagent nesting is required** and the tool works from any session, including subagent sessions. The skill calls `vision_analyze` first and falls back to spawning the `vision-agent` subagent only when the tool is unavailable in the session or the call fails with a provider/protocol/HTTP error. The `vision-agent` subagent also has an **advanced role**: an orchestrator may delegate a whole investigation (multi-image sweeps, deep zoom chains) to it — the subagent can call `vision_analyze`, including `region` crops, in its own loop before returning its single final JSON. With the tool path, **`permission.task` configuration is not needed** for visual delegation.
 
 ### About the v2 plugin architecture
 
@@ -62,7 +62,16 @@ Do not mix install methods for the same plugin id (`vision`) — they would doub
 
 ### Updating / uninstalling
 
-Re-run the install command **with `--force`** to replace the installed version (`opencode plugin opencode-vision-delegate --global --force`), then restart opencode.
+To upgrade to a newly published version, `--force` alone is NOT enough: the package store pins the exact version at first install and a forced reinstall reuses it (verified on 0.1.0 → 0.2.0). Delete the store directory (or directories) first, then reinstall:
+
+```bash
+# remove every store dir for the npm spec — note there may be TWO:
+# ~/.cache/opencode/packages/opencode-vision-delegate AND .../opencode-vision-delegate@latest
+# (the runtime loads the one your `opencode agent list` output references)
+opencode plugin opencode-vision-delegate --global
+```
+
+Then restart opencode and verify with `opencode agent list`.
 
 opencode 1.18 has **no built-in plugin uninstall command**. To uninstall manually (verified working):
 
@@ -149,7 +158,7 @@ The tool selects the HTTP request shape from the resolved endpoint URL: endpoint
 
 The plugin routes images based on the **handling model** of each request, not a single global toggle. The `vision-agent` subagent is always registered — regardless of the top-level `model` — so a text-only agent in a mixed config can always delegate.
 
-- **Multimodal (vision-capable) model.** Image `FilePart`s pass through untouched — the model sees images natively. A system transform injects a `[vision:native]` instruction telling the model to inspect images directly and NOT use the vision skill, call `vision_analyze`, or spawn a `vision-agent` subagent.
+- **Multimodal (vision-capable) model.** Image `FilePart`s pass through untouched — the model sees images natively. A system transform injects a `[vision:native]` instruction telling the model to inspect images directly and NOT to delegate plain reading to the vision skill or a `vision-*` subagent. One narrow exception: when small text or fine detail is beyond native resolution, the model MAY call `vision_analyze` WITH a `region` to zoom into that area of an image file on disk (the assist needs a file path — natively attached dropped images are not materialized, so it applies to tool-output screenshots and user-provided paths).
 - **Text-only model.** Image `FilePart`s are materialized under the plugin's temp dir (`<system-tmp>/opencode-vision-delegate/`) and rewritten to `[vision:dropped-image]` markers carrying the resulting path. The orchestrator then delegates via the `vision_analyze` tool, falling back to the `vision-agent` subagent only when the tool is unavailable or errors with a provider/protocol/HTTP failure.
 
 Capability is resolved per request: the messages transform checks the message's `info.model` first, then the agent's configured model, then the top-level config `model` as a final fallback. Provider/model ids match case-insensitively. To bypass the skill per task on a text-only model, prepend this to your prompt:
@@ -158,7 +167,9 @@ Capability is resolved per request: the messages transform checks the message's 
 
 ### The `vision_analyze` tool and permissions
 
-The tool's arguments are `images` (`[{id, path}]` — short contract ids plus local image paths), `question` (the exact visual question), `response_template` (JSON string defining the required response shape), and optional `response_rules`. The tool reads the images, calls the configured vision model, and returns exactly one JSON object matching the template.
+The tool's arguments are `images` (`[{id, path, region?}]` — short contract ids plus local image paths, each with an optional `region`), `question` (the exact visual question), `response_template` (JSON string defining the required response shape), and optional `response_rules`. The tool reads the images, calls the configured vision model, and returns exactly one JSON object matching the template.
+
+**Region crop (zoom).** Each `images` entry may carry `region: [x1, y1, x2, y2]` — integer pixel coordinates in the ORIGINAL image (`x2`/`y2` exclusive, clamped to bounds). PNG only, detected by file signature (a PNG named `.jpg` still crops; cropped entries are submitted as `image/png`). The crop happens in memory — no files are written — and keeps the region at full source resolution, so provider-side downsampling never applies. The tool appends a coordinate-mapping note to the request for cropped images, and the vision model reports coordinates in original-image pixel space. The zoom workflow: call on the full image first, then re-call with a `region` around whatever needs a closer look. Non-PNG images with a `region`, unsupported PNG variants (16-bit, interlaced), and empty regions return a `crop error` naming the image and the fix (re-call without `region`, or convert to PNG); the skill neither retries nor falls back on it.
 
 `vision_analyze` is auto-allowed: sessions — including subagent sessions — call it without permission prompts. An explicit user deny wins: set `permission.vision_analyze = "deny"` and the plugin never upgrades it.
 
@@ -173,6 +184,7 @@ To stop delegation entirely, set `disable: true` on `agent["vision-agent"]`. Thi
 - **Missing `vision-agent` subagent / `vision_analyze` tool:** no model is pre-configured — set one via the agent model override on `vision-agent`. Confirm the override is set and that `~/.cache/opencode/models.json` contains the provider. The tool is also absent when `disable: true` is set on `vision-agent`.
 - **`vision_analyze` returns "model not configured":** set `agent["vision-agent"].model` to a vision-capable provider/model from your configured providers; the skill does not fall back on this error.
 - **`vision_analyze` returns a provider error:** check the API key (`opencode auth login <provider>` / `auth.json` entry, or the provider's `*_API_KEY` env var) and the endpoint (`provider.<id>.options.baseURL` in config, else the catalog/built-in endpoint). The skill automatically falls back to the `vision-agent` subagent on provider/protocol/HTTP errors.
+- **`vision_analyze` returns a crop error:** `region` was used on an image that is not a PNG (by signature), an unsupported PNG variant (16-bit, interlaced, >40 MP), or an empty region. The error names the image and the fix: re-call without `region`, or convert the image to a standard 8-bit non-interlaced PNG. This category is deterministic and local — it never triggers the skill's retry or subagent fallback.
 - **A multimodal model still delegates to the vision skill / `vision_analyze`:** update the plugin. Before the keyless-provider fix, capability resolution only consulted providers that passed availability gating (config blocks / env keys / `auth.json`), so keyless providers like opencode Zen (`opencode/space-bunny-free`, `opencode/big-pickle`, …) were misjudged text-only and their images were rewritten to `[vision:dropped-image]` markers. Capability is now resolved from the full cached model catalog (`~/.cache/opencode/models.json`) plus config provider model overrides, independent of availability.
 
 ## License

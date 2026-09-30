@@ -201,7 +201,9 @@ Pass either `accessToken` (JWT from OAuth or key exchange) or `apiKey` (raw key)
 |----------|-------------|
 | `DEVIN_API_KEY` | Devin API key (sk-ws-01-..., cog_..., or devin-session-token$...) for auth without `/connect` |
 | `WINDSURF_API_KEY` | Alias for DEVIN_API_KEY (for Windsurf compatibility) |
-| `DEVIN_API_BASE_URL` | Override API base URL (default `https://api.devin.ai`) |
+| `DEVIN_API_BASE_URL` | Cascade host override (`https://server.codeium.com` when unset). Wins over `GetUserJwt` `customApiServerUrl`. Auth stays on `https://api.devin.ai` |
+| `WINDSURF_API_BASE_URL` | Legacy alias of `DEVIN_API_BASE_URL` |
+| `DEVIN_CLIENT_IDENTITY` | `cli` (default: Devin CLI / `chisel` `3000.6.2`) or `windsurf` (Desktop metadata `1.48.2` / `3.6.27`) |
 | `DEVIN_PROVIDER_SHOW_DISABLED` | Set to `1` / `true` to include plan-disabled cascade models in the catalog (useful for debugging Pro vs full lists) |
 | `DEVIN_PROVIDER_DEBUG` | Set to `1` or `true` to enable wire-level debug logging |
 | `DEVIN_PROVIDER_DEBUG_FILE` | Override debug log path (default: `$TMPDIR/devin-provider-logs-<uid>/debug-<pid>.log`) |
@@ -217,6 +219,8 @@ bun install          # install dependencies
 bun run build        # compile TypeScript → dist/
 bun run typecheck    # type-check without emit
 bun test             # run unit tests
+bun run test:watch   # unit tests in watch mode
+bun run check:pricing  # fixture coverage for known model ids (stub-safe today)
 ```
 
 ## Architecture
@@ -274,6 +278,8 @@ Project `instructions` may reference absolute or `~/` paths (OpenCode parity). S
 - **Personal use / ToS** — this provider speaks Devin's private agent protocol. Use only with an account you own; Devin may change or restrict the API without notice.
 - **Token usage tracking** — usage counts are extracted from Devin's protocol frames (`ModelUsageStats` / `ResponseStatistics`) and mapped to AI SDK `LanguageModelV3Usage`. Cache-read/write metrics are available when Devin provides them.
 - **Max vs Cursor Max Mode** — There is no Cursor-style Max Mode toggle; **Max** = high effort only. Longer context is a separate base id (`-1m`), not a Max Mode flag.
+- **Fusion pairings** — a router flag that also carries harness uids is omitted. The native client runs the lead locally; this provider does not.
+- **Plan credits** — per-turn credit fields and the seat snapshot are on `providerMetadata.devin` and in `DEVIN_PROVIDER_DEBUG` (`seat status:`, `turn credits:`). OpenCode has no plan-credit panel.
 
 ## License
 

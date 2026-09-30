@@ -154,6 +154,8 @@ DCP supports two compression modes:
 
 In `range` mode, when a new compression overlaps an earlier one, the earlier summary is nested inside the new one so information is preserved through layers of compression rather than diluted away. In both modes, protected tool outputs (such as subagents and skills) and protected file patterns are kept in compression summaries, ensuring that the most important information is never lost. You can also enable `protectUserMessages` to preserve your messages verbatim during compression, though note that large prompts (e.g. copy-pasting log files in the prompt) will then never be compressed away.
 
+DCP state is isolated per session, so parent and subagent sessions no longer share or reset each other's state. Task outputs are expanded only with the answer the subagent produced by the time that task call completed. Background launch placeholders remain unchanged because the result arrives in the completion notice.
+
 ### Deduplication
 
 Identifies repeated tool calls (same tool, same arguments) and keeps only the most recent output. Recalculated when the compress tool runs, so prompt cache is only impacted alongside compression.
@@ -329,6 +331,11 @@ next request; stored session history is never touched, and `/dcp unprune` revert
 /dcp prune --older-than 150                                       # completed + errored tools ≥150 LLM steps old
 /dcp prune --older-than 150 --tools serena_*,codebase-memory-*    # only these tool globs (overrides protection)
 /dcp prune --older-than 150 --dry-run                             # preview candidates + estimated savings
+/dcp prune --older-than 150 --reasoning                           # prune tools and eligible prior reasoning
+/dcp prune --older-than 150 --reasoning --dry-run                 # preview both; reasoning is all-or-nothing
+/dcp prune all                                                    # one-step: unprotected top 5 tools + all eligible reasoning (age ≥1)
+/dcp prune all --older-than 10 --top-3 --tools bash               # one-step with overrides
+/dcp prune all --dry-run                                          # preview only, marks selected tool rows
 /dcp unprune                                                      # revert the last prune batch
 /dcp unprune --all                                                # revert all manual prune batches
 ```
@@ -338,20 +345,24 @@ Preview matching calls first, then select from that preview by rank or index (th
 
 ```
 /dcp prune --older-than 1 --tools * --dry-run
-/dcp prune --older-than 1 --top-5                                # prune the preview's top five
+/dcp prune --older-than 1 --top-5                                # prune top five (preview optional)
 /dcp prune --older-than 1 --indexes 1,3-5                         # or prune these preview indexes
 ```
 
 Selection inherits the preview's `--tools` globs when omitted; an explicitly different `--tools`
 value is rejected. Its selected call IDs stay fixed even if eligible-call ranking changes, and
 the command rejects the selection if any ID is unavailable.
-Rerun `--dry-run` to update the preview. Pruning without an index selector remains supported.
+For `--top-N`, a matching saved preview is respected; otherwise current eligible rows are ranked fresh. `--indexes` always requires a saved preview. Rerun `--dry-run` to update the preview. Pruning without an index selector remains supported. `/dcp prune all` rejects `--indexes`.
+
+`/dcp prune all` selects tools as if `--tools '*'` were specified, so it ignores configured tool protections and the built-in `question`, `edit`, and `write` skips. An explicit `--tools <globs>` replaces that default. Use `/dcp prune --older-than N --top-5` for top-five selection that respects protections.
 
 Notes:
 
-- `question`, `edit`, and `write` outputs are skipped unless explicitly selected via `--tools`.
+- `question`, `edit`, and `write` outputs are skipped unless explicitly selected via `--tools`; `/dcp prune all` ignores these and configured tool protections.
 - Tools already inside active compression blocks, or already pruned, are skipped (reported).
 - Prune batches persist with the session state; undo survives restarts.
+- `--reasoning` selects every eligible old reasoning part as one oldest-first prefix; it ignores `--indexes`/`--top-N` row selection and never removes reasoning after the latest user message (active tool loop protection).
+- Reasoning pruning is one-way for the session: `/dcp unprune` cannot restore it. Dry-run always lists eligible reasoning with `step-finish` reasoning tokens split across each step's parts; when the provider count is zero or missing, it estimates from reasoning text (some Copilot paths report zero despite real content). This is potential savings and only helps models that retain prior-turn reasoning.
 
 ### Prompt Overrides
 

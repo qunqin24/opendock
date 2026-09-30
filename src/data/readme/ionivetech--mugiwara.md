@@ -41,8 +41,8 @@ Sensitive paths touched: `src/auth/invitation.ts`, `migrations/004.sql`
 ## Gates
 | Gate | Verdict | Evidence |
 |---|---|---|
-| Checkpoint (Flow 4) | PASS | `flows/04-audit.md` |
-| Quality (Flow 5) | PASS | `flows/05-quality.md` |
+| Checkpoint (Flow 4) | PASS | `flows/02-audit.md` |
+| Quality (Flow 5) | PASS | `flows/03-quality.md` |
 | Coverage (Flow 6) | PASS | new 94% / modified 87% |
 | Security (Flow 7) | PASS | STRIDE, 0 high -> `review/security.md` |
 
@@ -114,7 +114,7 @@ Add the plugin, then ask something non-trivial:
 npx @ionivetech/mugiwara@latest install --target all --yes
 ```
 
-First run writes `.mugiwara/config`. Then ask:
+First run writes `.mugiwara/config`. Then ask, in chat or `/mugiwara <request>`, never `@agent`:
 
 ```
 > add role-based access control: admin, editor, viewer
@@ -170,7 +170,7 @@ nine stages.
 ### 4. Cost Governor: what is safe to spend
 Per-lane budgets, a **live slop governor** that flags wasted cost and
 attributes it to the crew member that caused it, and a `mugiwara cost` ledger.
-Native names: anti-fluff (terse writing); just-enough (minimal-code ladder, YAGNI-first); anti-slop (waste detection); have-adhd (scannable rendering).
+Four host capabilities ride alongside, named for the job with the native name in brackets: terse-output [anti-stuff], minimal-diff [just-enough], waste-guard [anti-slop], scan-format [have-adhd]. They ship with the host, not here.
 
 → [Cost model](docs/concepts/cost.md)
 
@@ -268,16 +268,6 @@ investigation limits) stay off until set.
 
 ---
 
-## Try it in 60 seconds
-
-    npx @ionivetech/mugiwara@latest install --target claude --yes
-
-Then describe what you want:
-
-    "fix the typo in the header comment"        -> fixed immediately, no ceremony
-    "add pagination to the users endpoint"      -> plan, execute, audit, quality, review
-    "move auth to short-lived tokens"           -> all nine stages plus a security review
-
 ## Install
 
 <details>
@@ -287,6 +277,8 @@ Then describe what you want:
 /plugin marketplace add ionivetech/mugiwara && /plugin install mugiwara
 ```
 
+Full guide: [docs/install/claude.md](docs/install/claude.md).
+
 </details>
 
 <details>
@@ -294,12 +286,17 @@ Then describe what you want:
 
 Add `"plugin": ["@ionivetech/mugiwara"]` to `opencode.json` and restart.
 
+Full guide: [docs/install/opencode.md](docs/install/opencode.md).
+
 </details>
 
 <details>
 <summary><b>Gemini CLI / Codex / Copilot / Cursor / Antigravity / Kimi / Pi</b></summary>
 
-See [per-platform guides](docs/install/index.md).
+Each has its own guide: [Gemini](docs/install/gemini.md) ·
+[Codex](docs/install/codex.md) · [Copilot](docs/install/copilot.md) ·
+[Cursor](docs/install/cursor.md) · [Antigravity](docs/install/antigravity.md) ·
+[Kimi](docs/install/kimi.md) · [Pi](docs/install/pi.md).
 
 </details>
 
@@ -309,6 +306,8 @@ See [per-platform guides](docs/install/index.md).
 ```bash
 npx @ionivetech/mugiwara@latest install --target <id> --yes   # windsurf, cline, kilo, codex
 ```
+
+Full guide: [docs/install/cli.md](docs/install/cli.md).
 
 </details>
 
@@ -349,7 +348,7 @@ mugiwara reset --keep-logs                    # wipe state, keep lessons
 
 **Reference:** [Adoption guide](docs/reference/adoption-guide.md) · [Glossary](docs/reference/glossary.md) · [Harness matrix](docs/reference/harness-matrix.md) · [Compliance matrix](docs/reference/compliance-matrix.md)
 
-**Install:** [Overview](docs/install/index.md) · [Claude](docs/install/claude.md) · [opencode](docs/install/opencode.md) · [Gemini](docs/install/gemini.md) · [Codex](docs/install/codex.md) · [Copilot](docs/install/copilot.md) · [CLI targets](docs/install/cli.md)
+**Install:** [Overview](docs/install/index.md) · [Claude](docs/install/claude.md) · [opencode](docs/install/opencode.md) · [Gemini](docs/install/gemini.md) · [Codex](docs/install/codex.md) · [Copilot](docs/install/copilot.md) · [Cursor](docs/install/cursor.md) · [Antigravity](docs/install/antigravity.md) · [Kimi](docs/install/kimi.md) · [Pi](docs/install/pi.md) · [CLI targets](docs/install/cli.md)
 
 **Runbooks:** [Solo mission](docs/runbooks/solo-mission.md) · [Team mission](docs/runbooks/team-mission.md) · [Joining mid-mission](docs/runbooks/joining-a-mission.md) · [Resume after crash](docs/runbooks/resume-after-crash.md) · [Monorepo](docs/runbooks/monorepo.md) · [Signing](docs/runbooks/signing-and-attestation.md) · [Policy](docs/runbooks/policy-for-a-team.md) · [Troubleshooting](docs/runbooks/troubleshooting.md)
 
@@ -359,8 +358,8 @@ mugiwara reset --keep-logs                    # wipe state, keep lessons
 
 | Claim | Status |
 |---|---|
-| Retrieval routing rank-1 | **95.5%**, 227 probes (174 positive, 83 negative), in CI |
-| Reference pointers resolve | **160/160**, 9 targets, in CI |
+| Retrieval routing rank-1 | **95.6%**, 272 probes (180 positive, 86 negative, 6 no-skill), in CI |
+| Reference pointers resolve | **166/166**, 9 targets, in CI |
 | Index size published vs measured | **doc-gated**: validator fails on drift, in CI |
 | Lane constants match content load | **verified**, in CI |
 | Slop verdicts | in `mugiwara cost` and the closing report: [Cost](docs/concepts/cost.md) |

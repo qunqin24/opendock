@@ -24,7 +24,7 @@ npx oc2-memory uninstall   # removes the entry (leaves OpenCode's npm cache alon
 
 `install` adds the package spec to the **`plugins`** array of your global OpenCode config (`~/.config/opencode/opencode.json`) and lets OpenCode fetch it into its own cache under `~/.cache/opencode/`. The write is atomic and `0600`, and a config file that fails to parse is never overwritten. `opencode plugin add oc2-memory` does the same thing if you prefer the host CLI.
 
-That's it — the seven core tools (`memory_write`, `memory_forget`, `memory_restore`, `memory_read`, `scratchpad`, `memory_search`, `memory_status`) work with no other setup.
+The seven core tools (`memory_write`, `memory_forget`, `memory_restore`, `memory_read`, `scratchpad`, `memory_search`, `memory_status`) work with no other setup.
 
 ### Optional: enable search with qmd
 
@@ -82,7 +82,7 @@ If the first search doesn't find what you need, try rephrasing or switching mode
     <recovery-id>.json       # Complete payload and restore state for a memory_forget deletion
 ```
 
-**Where the files live.** The plugin uses `~/.pi/agent/memory/` when that directory exists, so it shares memory with an existing pi installation rather than starting empty. Only if the base directory is absent does it create and use `~/.oc2-memory/`. The check is on the base directory alone and runs once per session; an empty `~/.pi/agent/memory/` still counts as pi storage. `PI_MEMORY_DIR` overrides both.
+The plugin uses `~/.pi/agent/memory/` when that directory exists, so it shares memory with an existing pi installation rather than starting empty. Only if the base directory is absent does it create and use `~/.oc2-memory/`. The check is on the base directory alone and runs once per session; an empty `~/.pi/agent/memory/` still counts as pi storage. `PI_MEMORY_DIR` overrides both.
 
 ## How it works
 

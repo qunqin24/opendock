@@ -1,12 +1,14 @@
 # OpenCode Design System
 
 [![npm version](https://img.shields.io/npm/v/opencode-design-system)](https://www.npmjs.com/package/opencode-design-system)
-[![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/BraveOtter/opencode-design-system/blob/main/LICENSE)
+[![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/BraveOtter/opencode-design-system/blob/master/LICENSE)
 [![OpenCode v2](https://img.shields.io/badge/OpenCode-v2-6f42c1)](https://opencode.ai/v2/docs/)
 
 **A collaborative OpenCode v2 plugin for creating and evolving portable, framework-neutral design systems that AI agents can actually follow.**
 
-[English](https://github.com/BraveOtter/opencode-design-system/blob/main/README.md) · [Español](https://github.com/BraveOtter/opencode-design-system/blob/main/README.es.md) · [Português (Brasil)](https://github.com/BraveOtter/opencode-design-system/blob/main/README.pt-BR.md)
+[English](https://github.com/BraveOtter/opencode-design-system/blob/master/README.md) · [Español](https://github.com/BraveOtter/opencode-design-system/blob/master/README.es.md) · [Português (Brasil)](https://github.com/BraveOtter/opencode-design-system/blob/master/README.pt-BR.md) · [Deutsch](https://github.com/BraveOtter/opencode-design-system/blob/master/README.de.md) · [Français](https://github.com/BraveOtter/opencode-design-system/blob/master/README.fr.md) · [Italiano](https://github.com/BraveOtter/opencode-design-system/blob/master/README.it.md) · [简体中文](https://github.com/BraveOtter/opencode-design-system/blob/master/README.zh-CN.md) · [日本語](https://github.com/BraveOtter/opencode-design-system/blob/master/README.ja.md)
+
+> **Disclaimer:** This is an independent community project. It is not built by the OpenCode team and is not affiliated with OpenCode in any way.
 
 The design system becomes a project's durable visual memory: structured **Markdown and JSON** for semantic tokens, explicit preferences, design decisions, components, patterns, and screen briefs. A live HTML preview is generated from those sources; it is never a second source of truth.
 
@@ -34,10 +36,10 @@ Install it globally with the OpenCode CLI:
 opencode plugin add opencode-design-system
 ```
 
-To pin the current release:
+To pin a specific npm release, replace `<version>` with the version you want:
 
 ```sh
-opencode plugin add opencode-design-system@1.0.1
+opencode plugin add opencode-design-system@<version>
 ```
 
 Or configure it for a project in `opencode.json` or `opencode.jsonc`:
@@ -59,10 +61,10 @@ For the repository's latest default-branch version:
 opencode plugin add github:BraveOtter/opencode-design-system
 ```
 
-To pin a tagged release instead:
+To pin a tagged GitHub release, replace `<tag>` with the tag you want:
 
 ```sh
-opencode plugin add github:BraveOtter/opencode-design-system#v1.0.1
+opencode plugin add github:BraveOtter/opencode-design-system#<tag>
 ```
 
 ### Use a local checkout
@@ -114,6 +116,7 @@ You can also request a screen brief in natural language without invoking `/desig
 | `/design-system [idea]` | Collaboratively create a system from scratch or discuss documenting an existing UI. |
 | `/design-system/update [change]` | Apply a semantic, versioned change and identify dependent documentation. |
 | `/design-system/preview` | Regenerate the interactive preview from the structured files. |
+| `/design-system/review` | Open a local two-panel preview and conversation linked to the current OpenCode session, with contextual element selection. |
 | `/design-system/check` | Run a read-only, heuristic check for UI styles that may drift from documented tokens. |
 | `/design-screen [screen]` | Save an implementation-ready screen brief without writing application UI code. |
 
@@ -195,9 +198,59 @@ Design-system version impact follows:
 
 These versions belong to the generated project design system, not the npm plugin package. Updated systems return to `draft` by default so a person can review them.
 
+## Built-in design skills
+
+The plugin registers three adapted design skills internally through OpenCode v2. They are used together when creating or updating a Design System, choosing tokens, or writing screen briefs: visual direction, product-interface craft, and accessibility-aware token decisions. They guide the agent but do not replace the project's framework-neutral Markdown and JSON source of truth, and their skill files are **not written into user projects**.
+
+### Customize the built-in skills
+
+Use the plugin's `designSkills` option to disable all bundled skills, disable individual skills, or allow only selected IDs. Unspecified entries stay enabled when using an object:
+
+```jsonc
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugins": [
+    {
+      "package": "opencode-design-system",
+      "options": {
+        "designSkills": {
+          "opencode-design-visual-direction": false
+        }
+      }
+    }
+  ]
+}
+```
+
+Set `"designSkills": false` to disable all three, or provide an array of IDs to enable only those skills. To add a personal skill without changing the plugin, create a descriptive `SKILL.md` under `~/.config/opencode/skills/<your-skill-id>/`; OpenCode discovers it globally. Disable a bundled skill first if your custom one should take its place. To change a bundled skill itself, edit `skills/<skill-directory>/SKILL.md` in a local plugin checkout or fork, then load that checkout; retain its source credit and license. See [`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md) for the complete notices.
+
+### Credits
+
+- **Frontend Design** — Anthropic; original authors Prithvi Rajasekaran and Alexander Bricken. [Source](https://github.com/anthropics/claude-code/tree/main/plugins/frontend-design/skills/frontend-design) · Apache-2.0.
+- **Interface Design** — Dammyjay93 (Damola Akinleye). [Source](https://github.com/Dammyjay93/interface-design) · MIT.
+- **Design System Auditor** — Community-Access; copyright © Taylor Arndt. [Source](https://github.com/Community-Access/accessibility-agents/blob/main/skills/design-system-auditor/SKILL.md) · MIT.
+
 ## Interactive preview
 
-`design-system/preview/index.html` is generated from the manifest, tokens, and component/pattern specifications. It includes token samples, component examples, theme switching when multiple themes exist, and interactive examples. It supports visible keyboard focus and `prefers-reduced-motion`.
+The agent designs a product-specific showcase in `design-system/preview/source.html` instead of filling in a fixed dashboard template. `design-system/preview/index.html` is compiled from that source and the current tokens; Markdown/JSON remain the authoritative design specification. Put `<!-- opencode-design-system:theme-tokens -->` inside `<head>` and reference semantic CSS variables such as `var(--ds-color-accent)` (or `var(--ds-color-accent-primary)` for nested tokens). The compiler injects every theme; the authored page can switch themes with `document.documentElement.dataset.theme = 'dark'`. Keep the source self-contained, accessible, and free of network dependencies.
+
+`/design-system` can create the authored source along with the documentation; `/design-system/preview` can create it for an existing system. Refreshes preserve the source instead of replacing it with a generic dashboard. Without an authored source, the compatibility renderer is clearly labeled **provisional**. Edit `preview/source.html` to change the showcase, never the generated `index.html`.
+
+Use `/design-system/review` to open a local review workspace with the interactive preview beside the same OpenCode session. Messages sent from the right-hand panel go to that session; completed turns refresh the generated preview. Enable **Select element** to pick documented components, patterns, or semantic-token samples in the preview and attach up to eight verified references to a message. References use manifest names, source paths, and token paths—not DOM selectors—and are checked again before sending so stale selections cannot silently target a different item. The standalone HTML remains available and works without this workspace. The review server binds to a random port on `127.0.0.1`, stops when the plugin unloads, and does not expose OpenCode credentials to the browser. By default, the command posts a link into the conversation rather than opening a browser automatically.
+
+To open the system browser automatically when the review command runs, configure the plugin option:
+
+```jsonc
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugins": [
+    {
+      "package": "opencode-design-system",
+      "options": { "autoOpenReview": true }
+    }
+  ]
+}
+```
 
 Regenerate it in OpenCode with `/design-system/preview`, or without the plugin from the project root:
 
@@ -205,7 +258,7 @@ Regenerate it in OpenCode with `/design-system/preview`, or without the plugin f
 node design-system/tools/generate-preview.mjs
 ```
 
-The standalone renderer has no external dependencies. Edit the structured Markdown and JSON—not the generated HTML—to change the system.
+The standalone generator has no external dependencies. For older installations with an earlier `tools/generate-preview.mjs`, run `node design-system/tools/render-authored-preview.mjs` after first publishing an authored source; the plugin does not silently replace existing local tools. Edit Markdown/JSON to change the system, `preview/source.html` to change its demonstration, and never generated HTML.
 
 ## Develop and test
 
@@ -216,7 +269,18 @@ npm test
 npm run build
 ```
 
-Tests cover an integrated temporary-project workflow, including read-only analysis, creation and preservation of user files, managed `AGENTS.md` updates, screen briefs, multi-theme token updates, previews, checks, and path safety.
+Tests cover an integrated temporary-project workflow, including read-only analysis, creation and preservation of user files, managed `AGENTS.md` updates, screen briefs, multi-theme token updates, previews, the authenticated local review workspace and verified element references, checks, and path safety.
+
+## Publish a release
+
+The `Publish to npm` GitHub Actions workflow publishes when a `vX.Y.Z` tag is pushed, after checks pass and the tag matches the version in `package.json`. Before the first release, configure npm Trusted Publishing for the `BraveOtter/opencode-design-system` repository and the `publish.yml` workflow, and allow the direct `npm publish` action. The workflow uses OIDC, so no npm publish token needs to be stored in GitHub; npm also generates provenance automatically for this public repository.
+
+To bump the package version and push its commit and tag:
+
+```sh
+npm version patch # or minor / major
+git push --follow-tags
+```
 
 ## Documentation
 
@@ -230,4 +294,4 @@ Tests cover an integrated temporary-project workflow, including read-only analys
 
 ## License
 
-This project is licensed under the [MIT License](https://github.com/BraveOtter/opencode-design-system/blob/main/LICENSE).
+This project is licensed under the [MIT License](https://github.com/BraveOtter/opencode-design-system/blob/master/LICENSE).

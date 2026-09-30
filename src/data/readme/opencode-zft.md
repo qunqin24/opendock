@@ -50,30 +50,43 @@ the old codename.
 ## Install
 
 ```bash
-pip install zft
+pip install --pre zft
 ```
 
 Requires Python 3.12+ (the `zft` console script is the only entry point).
+Releases are PEP 440 pre-releases (`0.2.0aN`), hence pip's `--pre`.
 
 ## Quickstart
 
 All commands take an optional trailing `[root]` (defaults to the current
-directory) and exit non-zero on gate failure.
+directory) and exit non-zero on gate failure. A clause **binds** when a test
+carries a `# @trace("EXPORT-413")` comment on the line above it — that
+binding is what every gate below counts, and `zft extract` prints the
+bindings exactly as the gates see them. On a directory with no store yet,
+`zft lint` exits 1 with `no clause store found`; scaffold first, lint second.
 
 ```bash
-# L0: lint every clause node in .zft/specs/ (schema, hashes, duplicates)
-zft lint [root]
-
-# Scaffold a new DRAFT clause node
+# Scaffold a new DRAFT clause node (seeds .zft/specs/)
 zft create --alias EXPORT-413 --domain protocol \
   --title "Export size limit" \
   --statement "The export endpoint rejects payloads > 10 MB with 413" \
   --property "size > 10MB -> status == 413" --kind test
 
+# Bind it: add the comment above a test that exercises the clause
+#   # @trace("EXPORT-413")
+
+# L0: lint every clause node in .zft/specs/ (schema, hashes, duplicates)
+zft lint [root]
+
 # Fast verification stage: L0 + L2-fast + Gherkin fallback, JSON report
 zft check [root]
 
-# L2 merge gate: sandboxed mutation-testing campaign over a module + its tests
+# L2 merge gate: sandboxed mutation-testing campaign over a module + its tests.
+# The module must be importable the way the tests import it — a src-layout
+# package needs src/exports/__init__.py with tests doing
+# `from exports.exporter import …`. A module that exists only as a file path
+# red-baselines the sandbox; the verdict then carries "baseline_ok": false
+# and a hint on stderr (the kill counts behind it are not trustworthy).
 zft gate --module src/exports/exporter.py --tests tests/test_exporter.py \
   [--scope f1,f2] [--oracle path/to/oracle.py] [--conftest path/to/conftest.py] \
   [--sandbox .zft/sandbox] [--resume] [root]
@@ -92,17 +105,20 @@ zft export --format matrix [root]
 # Replay a recorded run from .zft/runs by run id
 zft repro <run_id> [root]
 
-# Run the contract negotiation state machine (CFP -> counter -> accept -> validate)
+# Run the contract negotiation state machine (CFP -> counter -> accept -> validate);
+# needs a contract manifest under .zft/contracts/
 zft negotiate [root]
 
 # Lineage: mechanically extract element -> clause bindings (JSON)
 zft extract [root]
 # Impact query: which clauses are affected by changed path[:symbol]
-zft impact src/exports/exporter.py:handle_export
+# (bindings resolve on traced test symbols)
+zft impact tests/test_exporter.py:test_oversize_payload_rejected_413
 
-# Pre/post subagent task gates
-zft task-gate before --subagent producer --description "implement export endpoint"
-zft task-gate after  --subagent producer --description "implement export endpoint"
+# Pre/post subagent task gates — the description must reference an existing
+# contract under .zft/contracts/ (a bare alias is refused)
+zft task-gate before --subagent producer --description "[contract: release-1] implement export endpoint"
+zft task-gate after  --subagent producer --description "[contract: release-1] implement export endpoint"
 ```
 
 ## Editor integration
@@ -119,7 +135,7 @@ on every `.zft/**` edit. Every decision lands in `.zft/audit.log` and
 `.zft/gates-hook/log.jsonl`.
 
 ```bash
-pip install zft                                              # Python 3.12+
+pip install --pre zft                                        # Python 3.12+
 
 # Install the gates — either from npm (versioned, auto-installed by opencode):
 bun add -D opencode-zft
@@ -149,7 +165,7 @@ seams, so policy and audit trails stay identical across clients.
 designs/          # Architecture decision records and implementation plans.
 ```
 
-The seed contract — 43 validated clause nodes as of this release (`zft lint`
+The seed contract — 45 validated clause nodes as of this release (`zft lint`
 reports the current count) — lives in [`.zft/specs/`](.zft/specs/) and is the
 working self-hosted example for every gate tier above.
 

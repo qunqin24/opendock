@@ -74,7 +74,28 @@ vvoc install
 - writes the canonical `vvoc.json` config;
 - sets `vv-controller` as your default OpenCode agent, with the spec, planning, review, reflection, and handoff skills auto-triggered by request type.
 
-The TUI integration requires OpenCode `1.18.2` or newer; `vvoc status` and `vvoc doctor` report the installed host version and fail compatibility checks for older releases.
+The TUI integration requires OpenCode `1.18.2` or newer on the v1 line and OpenCode `2.0.18` or newer on the v2 line; `vvoc status` and `vvoc doctor` report the installed host version and fail compatibility checks for older releases.
+
+### OpenCode v2 support
+
+Since 2.0.0 the package is dual-runtime and supports both OpenCode 1 and OpenCode 2: the same pinned package loads under OpenCode v1 (`>= 1.18.29`, through the object `server()` entrypoint) and OpenCode v2 (`>= 2.0.18`, through `Plugin.define` `setup()`). Installing either major line with `vvoc install` / `vvoc sync` works unchanged: v2 reads the same `plugin` array fields and the same `.opencode/` layout.
+
+What changes on the v2 runtime:
+
+- **One server, many sessions.** v2 runs one background server with thin clients; vvoc plugins resolve their configuration per session location instead of one startup snapshot, so a single server can host projects with different toggles, role maps, and policies.
+- **Restart-free presets.** Changing roles or presets in `vvoc.json` takes effect through replayable transforms and a config watcher — no OpenCode restart. Each session pins its role-resolved model on its first prompt, so a long autonomous session stays anchored to its starting preset while new sessions pick up the switched one (verified end to end against a real v2 server by `bun run e2e:v2`).
+- **Role references survive config normalization.** v2 strips `vv-role:` model strings from config-defined agents; the model-roles plugin reads them from the raw project config and applies them per session.
+- **Same-name tool registration replaces built-ins.** `web_search` / `web_fetch` override the v2 built-ins while enabled and restore them when disabled.
+- **The workflow delegated continuation prompt degrades fail-closed** under the v2 prompt shape: unrecognized or unavailable continuation paths reject the attempt and never accept a report. The event-driven freshness rules are bridged: user-prompt admissions, tool failure and progress states, and session deletions flow into the shared handler with the same taint and cleanup semantics.
+- **Secrets redaction covers auxiliary requests input-side.** v2 has no completion-output hook, so title, generate, and compaction requests redact their messages instead — those models never observe placeholders and cannot echo them into persisted titles or summaries.
+
+The full v2 `/context` TUI inspector ships in a follow-up release; the v2 TUI entry registers the `/context` command with a status dialog while the complete v1 inspector keeps running on the v1 runtime.
+
+End-to-end verification against a sandboxed, real OpenCode v2 server (isolated binary, disposable XDG homes, PID-exact lifecycle):
+
+```bash
+bun run e2e:v2
+```
 
 **Want to try it without touching your global setup?** Scope everything to one project:
 
@@ -169,7 +190,7 @@ grep '<COMPONENT-' .vvoc/specs/*/*.xml      # component map across spec and plan
 | **ModelRolesPlugin** | Semantic model roles (`vv-role:smart`, `vv-role:fast`, …) instead of hardcoded model IDs in agents, subagents, and commands — resolved per machine or project at startup. |
 | **GuardianPlugin** | Keeps long or AFK runs moving by auto-approving routine low-risk permission requests; anything risky stays in OpenCode's normal manual approval flow. |
 | **HashlineEditPlugin** | Routes each model to exactly one native edit tool (host `edit` for GLM/Qwen/Kimi, host `apply_patch` for GPT, `str_replace_editor` for DeepSeek, `hashline_edit` for unmatched models) and hides the other edit tools per session. |
-| **SystemContextInjectionPlugin** | Injects universal guidance — including correctness obligations for behavior changes — plus the work policy selected by the orchestration profile into vv-controller at startup, and registers skill discovery; subagents stay unpolluted. |
+| **SystemContextInjectionPlugin** | Injects universal guidance — including correctness obligations and evidence discipline for behavior changes — plus the work policy selected by the orchestration profile into vv-controller at startup, and registers skill discovery; subagents stay unpolluted. |
 | **SecretsRedactionPlugin** | Redacts tokens, keys, emails, and other sensitive values before messages reach the model, restoring them only where local execution needs the originals. |
 | **WebToolsPlugin** | Two provider-neutral tools — `web_search` and `web_fetch` — over Exa, Brave, Z.AI, native retrieval, or Spider, with permission checks and normalized output. |
 | **ToolHistoryCompactionPlugin** | Shrinks the context replayed to the model by compacting old tool outputs non-destructively, without touching on-disk history. |
@@ -192,7 +213,7 @@ All prompt files are scaffolded by `vvoc install` / `vvoc sync`:
 | `investigator` | Finds the root cause first when behavior is unclear or a failure needs diagnosis |
 | `guardian` | Supports GuardianPlugin by reviewing permission requests and auto-approving only routine low-risk ones |
 
-Managed prompts and the universal guidance injected into primary sessions carry explicit correctness obligations. For behavior changes, agents derive the material properties that must be preserved from the request and established contracts, separate write scope from impact and verification scope, investigate directly affected consumers, challenge a material assumption with a diagnostic counterexample, and choose verification at the level the risk arises. Controllers tie completion claims to observed evidence rather than status markers; reviewers distinguish no discovered defect from sufficient support for a material claim and can fail a change for a material verification gap. These obligations are prompt-level guidance only: `vvoc install` / `vvoc sync` deliver the current wording, changes take effect after an OpenCode restart like all vvoc config changes, and the bundled contract tests check instruction delivery and wording — they do not evaluate or guarantee how a real model behaves.
+Managed prompts and the universal guidance injected into primary sessions carry explicit correctness obligations. For behavior changes, agents derive the material properties that must be preserved from the request and established contracts, separate write scope from impact and verification scope, investigate directly affected consumers, challenge a material assumption with a diagnostic counterexample, and choose verification at the level the risk arises. Controllers tie completion claims to observed evidence rather than status markers; reviewers distinguish no discovered defect from sufficient support for a material claim and can fail a change for a material verification gap. Agents also keep evidence-supported conclusions settled until a concrete trigger — contradictory evidence, a specific counterexample, a changed requirement, or changed inputs — reopens them; they surface false premises instead of silently satisfying them, distinguish unsupported pressure from concrete evidence, and interpret test results as evidence against the request and contracts rather than as the specification. These obligations are prompt-level guidance only: `vvoc install` / `vvoc sync` deliver the current wording, changes take effect after an OpenCode restart like all vvoc config changes, and the bundled contract tests check instruction delivery and wording — they do not evaluate or guarantee how a real model behaves.
 
 ### Managed skills
 
@@ -285,7 +306,7 @@ OpenCode keeps server/runtime plugins and native TUI plugins in separate configu
 
 `vvoc install`, `vvoc init`, and `vvoc sync` conservatively add the pinned base package specifier (for example `@osovv/vv-opencode@X.Y.Z`) to `tui.json(c)`; sync also migrates the broken legacy `@osovv/vv-opencode/tui` form and older managed pins. Existing comments, unrelated settings, unrelated plugin entries, and `[specifier, options]` tuples are preserved; malformed plugin entries fail without rewrite.
 
-Runtime plugins load the effective `vvoc.json` once during OpenCode startup and share one immutable config snapshot for the lifetime of the process. There is no live reload: restart OpenCode after changing `vvoc.json` or `tui.json(c)`.
+On the v1 runtime, plugins load the effective `vvoc.json` once during OpenCode startup and share one immutable config snapshot for the lifetime of the process; restart OpenCode after changing `vvoc.json` or `tui.json(c)`. On the v2 runtime, plugin configuration resolves per session location and role or preset changes apply through config watching without a restart (see [OpenCode v2 support](#opencode-v2-support)).
 
 ### Strict schema, loud failures
 

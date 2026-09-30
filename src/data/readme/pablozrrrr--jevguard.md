@@ -52,6 +52,8 @@ JevGuard makes those questions versioned, scoped, and machine-actionable.
 
 severity: error
 scope: backend/**
+scope: !backend/generated/**
+evidence: code
 
 ### Rule
 
@@ -65,6 +67,15 @@ A controller performs domain decisions, calculations, or state mutations directl
 
 Validation, HTTP mapping and delegation to services.
 ```
+
+`scope:` may repeat. Each line adds an inclusion glob, and a leading `!` adds an
+exclusion, so a path is in scope when it matches at least one inclusion and no
+exclusion. `evidence:` chooses which files the rule is evaluated against — `code`
+(the default), `docs`, or `any`. Because the default is `code`, prose documentation
+(`.md`, `.mdx`, `.txt`) no longer participates in a rule's evidence unless the rule
+opts in with `evidence: docs` or `evidence: any`; this is intentional. Config and
+data formats (`.json`, `.yaml`, `.toml`, `.xml`, `.csv`, and others) stay in the
+`code` class, so config rules keep their coverage.
 
 The rule stays in the repository beside the code it governs. `Allowed` is a real
 exception, not a suggestion. JevGuard evaluates it as part of the same rule.
@@ -86,11 +97,18 @@ applicable rules
 one semantic judgment per rule
 ```
 
-If complete attributed evidence is unavailable, too large, invalid, or contains a
-blocked sensitive file, JevGuard marks the affected rule `UNAVAILABLE`. It never
-turns incomplete evidence into a reassuring verdict. Evidence problems are scoped
-to the rules they affect: a rule whose applicable files are all safe still runs
-even when another rule's evidence is blocked.
+If complete attributed evidence is unavailable, invalid, or contains a blocked
+sensitive file, JevGuard marks the affected rule `UNAVAILABLE`. It never turns
+incomplete evidence into a reassuring verdict. Evidence problems are scoped to the
+rules they affect: a rule whose applicable files are all safe still runs even when
+another rule's evidence is blocked.
+
+Oversized evidence is no longer refused outright. A scoped diff above
+`maxDiffLength` is split, in attributed file order, into one slice per file; an
+individually oversized file is split into its ordered unified-diff hunks with the file
+preamble repeated in every slice. Nothing is truncated, summarized, or dropped: an
+unparseable oversized file or an indivisible oversized hunk makes the whole rule
+`UNAVAILABLE/OVERSIZED_DIFF`.
 
 Some failures happen before any policy rule is evaluated. If the attributed diff
 cannot be built, the review is a single synthetic `UNAVAILABLE` entry with no rule
@@ -114,7 +132,15 @@ policy that translates it into an outcome.
 | `warning` | `< 60%` | `≥ 60%` | never |
 
 Those thresholds are per repository rule and locally configurable in
-`.jev/config.yaml`.
+`.jev/config.yaml`. Slicing does not change them: each slice is gated independently,
+the rule outcome is the highest slice outcome (`FAIL > WARN > PASS`), and the rule's
+`violationProbability` is the maximum across its slices. `PASS` requires every planned
+slice to pass. A rule may produce at most 16 slices, and slicing may add at most 32
+repository-rule Jev calls per turn beyond one per applicable rule; a rule that does not
+fit is `UNAVAILABLE/SLICE_LIMIT_EXCEEDED` with no Jev call and later rules still use the
+remaining budget. Any failed, blocked, or out-of-range slice makes the whole rule
+`UNAVAILABLE`, and no sibling probability is presented as a verdict. The built-ins do
+not slice.
 
 JevGuard also runs two product-owned built-ins on every attributed turn,
 `SCOPE-CREEP` and `COMPLEXITY`. Both receive the turn's complete, safe attributed
@@ -166,13 +192,18 @@ proposal request to a hidden `jevguard-proposer` subagent:
   `jevguard-proposer` subagent has wildcard-deny permissions and wildcard-disabled
   tools, so it cannot call a tool, edit a file, or produce a patch. It returns a
   strategy and one manual apply instruction only.
+- `remediation.model` is optional. When set in `.jev/config.yaml`, it selects the
+  proposer model; when it is absent, the proposer inherits the host's model.
 - A generic toast reports that the proposal is ready in the child session. It carries
   no rule, task, diff, finding, or credential.
 
 The plugin creates at most one proposal per evaluated turn, and the child session is
 excluded from review for the plugin lifetime, so a proposal can never recurse or
 trigger a second one. A host, model, or toast failure is contained and never changes
-the review.
+the review. A contained proposal failure — an invalid model specifier, a child-session
+failure, or a prompt failure — shows a generic error toast and writes one structured
+`error` log entry carrying only a typed reason code, never any task, diff, finding,
+path, or credential.
 
 The proposer is a strategy step, not an apply step: it never edits code, and nothing
 is applied automatically. You read the proposal, copy its manual apply instruction
@@ -187,30 +218,50 @@ or secret is logged.
 
 ## Install
 
-Once `@pablozrrrr/jevguard` is published to npm, the intended install is one line in
-`opencode.json`:
+Installing `@pablozrrrr/jevguard` does **not** register it with OpenCode by itself.
+OpenCode only loads plugins listed in `plugin: [...]` in `opencode.json`, so register
+the plugin from the installed CLI:
+
+```sh
+# global config: ~/.config/opencode/opencode.json
+jevguard install
+
+# project config: ./opencode.json
+jevguard install --project
+```
+
+The installer asks for confirmation, edits only the `plugin` array, and is
+idempotent. It only edits a `plugin` array of plain strings, so OpenCode's
+`[["pkg", { "options": {} }]]` tuple form is a known limitation: the installer leaves
+the file unchanged and prints the manual snippet instead. If `jevguard` is not on
+`PATH`, run it through `bunx`:
+
+```sh
+bunx --package @pablozrrrr/jevguard jevguard install
+```
+
+The manual alternative is one entry in `opencode.json`:
 
 ```json
 { "plugin": ["@pablozrrrr/jevguard"] }
 ```
 
-OpenCode then resolves the package from the npm registry or its cache and loads it
-on the next start. Adding the entry only loads the plugin; it does **not** put the
-`jevguard` CLI on `PATH` (see [Install the CLI](#install-the-cli)). Restart
-OpenCode after changing the plugin list.
+OpenCode resolves the package from the npm registry or its cache and loads it on the
+next start. Adding the entry only loads the plugin; it does **not** put the
+`jevguard` CLI on `PATH` (see [Install the CLI](#install-the-cli)). Restart OpenCode
+after changing the plugin list.
 
 > [!IMPORTANT]
-> `@pablozrrrr/jevguard` is **not published to npm yet**. The one-line entry above is
-> future behavior and will not resolve until the package is released. Before
-> publication, load the plugin as a local artifact plugin instead.
+> A bare plugin entry resolves only from the npm registry. To run an unreleased
+> local build, load the packed tarball as a local artifact plugin instead.
 
 ### Build the local artifact
 
 The artifact ships the plugin as a **locally packed tarball** that bundles the
 private `@jevguard/core` and `@jevguard/opencode-adapter` workspace code, so a
 clean consumer installs one tarball and never resolves a workspace link or a
-private registry package. It also packages the `jevguard-rules` skill and its
-private rule validator under `skills/jevguard-rules/`.
+private registry package. It also packages the `jevguard-rules` and `jev-init`
+skills and their private validators under `skills/<name>/`.
 
 Build the tarball from this repository:
 
@@ -229,12 +280,19 @@ The packed manifest depends only on public runtime packages
 the tarball therefore needs npm registry access for those packages; the artifact
 does not vendor them and does not promise an offline install.
 
-### Load the local plugin before publication
+### Load the plugin
 
 OpenCode `1.18.32` resolves a **bare** `opencode.json` `plugin` entry from the npm
-registry or its cache, not from the consumer's `node_modules`. Until the package is
-published, install the tarball into the project's `.opencode` directory and load it
-through a local plugin shim:
+registry or its cache:
+
+```json
+{
+  "plugin": ["@pablozrrrr/jevguard"]
+}
+```
+
+To run an unreleased local build instead, install the packed tarball into the
+project's `.opencode` directory and load it through a local plugin shim:
 
 ```sh
 cd /path/to/consumer/.opencode
@@ -248,8 +306,8 @@ export { JevGuardPlugin } from "@pablozrrrr/jevguard";
 
 OpenCode loads `.opencode/plugins/` with its bundled Bun runtime. The shim runs as
 a local plugin module and resolves `@pablozrrrr/jevguard` from
-`.opencode/node_modules`. Do **not** add `@pablozrrrr/jevguard` to the `opencode.json`
-`plugin` list before publication; that bare entry does not resolve locally.
+`.opencode/node_modules`. Use either the bare `plugin` entry or the local shim, not
+both.
 
 Remediation is built into the same server plugin: the `config` hook registers the
 hidden `jevguard-proposer` subagent, so no second entrypoint or shim is needed. The
@@ -258,11 +316,18 @@ fails — creates the proposal child session automatically.
 
 ### Author rules with the bundled skill
 
-The package ships a `jevguard-rules` OpenCode skill beside the plugin. On startup
-the plugin's `config` hook appends the installed skill directory to the host's
-`skills.paths`, so the skill is discovered without a manual `opencode.json` entry.
-Skill discovery is read at OpenCode startup: restart OpenCode after installing or
-updating the package so the skill appears.
+The package ships two OpenCode skills beside the plugin: `jevguard-rules` to author
+rules, and `jev-init` to bootstrap a policy where none exists. On startup the plugin's
+`config` hook appends the installed skill directories to the host's `skills.paths`, so
+the skills are discovered without a manual `opencode.json` entry. Skill discovery is
+read at OpenCode startup: restart OpenCode after installing or updating the package so
+the skills appear.
+
+`jev-init` runs only when neither `.jev/rules.md` nor `.jev/config.yaml` exists. It
+reads a bounded inventory of the repository, keeps rules only from the user's explicit
+constraints and strongly evidenced local conventions, records provenance in a preamble,
+and previews both candidate files before requiring explicit confirmation naming both
+exact paths. Once a policy exists, every rule change belongs to `jevguard-rules`.
 
 Policy content is different. `.jev/rules.md` and `.jev/config.yaml` are read once
 per attributed turn, so editing rule text takes effect on the next reviewed turn
@@ -273,8 +338,8 @@ Jev.
 
 ### Install the CLI
 
-Loading the plugin does not expose the `jevguard` binary on `PATH`. Once the
-package is published, run the login command without a global install:
+Loading the plugin does not expose the `jevguard` binary on `PATH`. Run the login
+command without a global install:
 
 ```sh
 bunx --package @pablozrrrr/jevguard jevguard login
@@ -287,7 +352,7 @@ bun install --global @pablozrrrr/jevguard
 jevguard login
 ```
 
-Until the package is published, install the local tarball globally instead:
+To run an unreleased local build, install the packed tarball globally instead:
 
 ```sh
 bun install --global /path/to/pablozrrrr-jevguard-<version>.tgz
@@ -296,8 +361,6 @@ jevguard login
 
 Known limitations:
 
-- `@pablozrrrr/jevguard` has no registry release yet, so the one-line `opencode.json`
-  plugin entry does not resolve until the package is published.
 - Target host is OpenCode `1.18.32`. Exact `1.18.32` runtime smoke is still
   pending; a local `1.18.28` run worked.
 - The plugin and CLI run on Bun, and the packed `jevguard` bin keeps a Bun
@@ -336,6 +399,34 @@ synthetic entry a review-level failure produces.
 rule had no applicable change to evaluate. `UNAVAILABLE` means JevGuard could not
 safely or completely evaluate that rule.
 
+## Review history
+
+JevGuard keeps a bounded, local, content-free history of your reviews so you can see
+how turns fared without grepping the host log. Every review appends the same safe
+structured-log projection plus an ISO 8601 timestamp to one JSON Lines file:
+
+```text
+<XDG_DATA_HOME or ~/.local/share>/jevguard/reviews.jsonl
+```
+
+The file holds the aggregate counts, each result's rule or check ID, its outcome, and
+its typed reason or raw probability — the same allowlist as the structured log. It
+never holds a task, diff, prompt, model output, credential, or environment value. It
+is local-only, bounded (it rewrites itself once it passes 5 MB, keeping the newest
+records), and safe to delete at any time; the next review recreates it.
+
+```sh
+# human-readable summary
+jevguard report
+
+# the same aggregation as JSON
+jevguard report --json
+```
+
+The report prints aggregated counts, rule IDs, check IDs, and reason codes only —
+never file paths, tasks, diffs, or credentials. A missing or empty history is a
+normal empty report, not an error.
+
 ## Implemented behavior
 
 The current release implements the full local review path:
@@ -346,10 +437,13 @@ The current release implements the full local review path:
 - Every `## <RULE-ID>` block in `.jev/rules.md` is parsed in source order. Each
   block is validated independently, so one invalid block does not suppress its
   valid siblings, and every occurrence of a duplicated ID is invalid.
-- Each valid rule is processed independently. It asks Jev at most once, and only
-  when the gate config is valid, the rule is applicable, and its scoped evidence is
-  complete and safe; it produces one typed violation probability or an operational
-  outcome.
+- Each valid rule is processed independently. Its complete scoped evidence is planned
+  locally, then every planned slice across all rules is dispatched through one batched
+  Jev entry that resolves the credential once and uses bounded concurrency; each slice
+  asks one Noul. The rule result is the deterministic maximum of its slice judgments,
+  and a fitting rule still issues exactly one call. The rule asks Jev only when the
+  gate config is valid, the rule is applicable, and its scoped evidence is complete and
+  safe; it produces one typed violation probability or an operational outcome.
 - A failure before rule evaluation — no attributed diff, unreadable policy files, or
   a missing `.jev/rules.md` — is reported by the rule lane as one synthetic
   `UNAVAILABLE` entry with no rule ID, not one result per declared rule. When the
@@ -364,12 +458,14 @@ The current release implements the full local review path:
 - Both built-ins are sent as one batch request with two independent named answers.
   One malformed or missing answer fails only its own check; the valid sibling still
   gates. A failed or malformed batch envelope makes both checks `UNAVAILABLE`.
-- The built-in batch runs concurrently with the sequential rule lane. One shared FIFO
-  concurrency limit allows at most two Jev requests in flight across the plugin
-  instance, counting the batch as one request. With no attributed patch a built-in is
-  `SKIPPED`; blocked or oversized evidence is `UNAVAILABLE`; a rule, policy-load, or
-  config failure never suppresses the batch, and one built-in's answer never
-  suppresses the other.
+- The built-in batch runs concurrently with the rule lane. The rule lane dispatches
+  one batched request for all of the turn's planned slices with a bounded adapter
+  concurrency cap of four; the built-in batch keeps its own single request. One shared
+  FIFO concurrency limit allows at most two Jev entries in flight across the plugin
+  instance, counting the rule batch and the built-in batch as one entry each. With no
+  attributed patch a built-in is `SKIPPED`; blocked or oversized evidence is
+  `UNAVAILABLE`; a rule, policy-load, or config failure never suppresses the batch, and
+  one built-in's answer never suppresses the other.
 - Reviews run in the background. The idle event resolves as soon as the serialized
   attribution step is scheduled, so policy reads, Jev calls, and presentation do not
   block the agent.
@@ -421,6 +517,11 @@ configuration asks the hidden `jevguard-proposer` subagent for a strategy in an
 isolated child session, and never applies a change. The `V0.6` entry remains the
 future, unattended corrective loop; the proposer is a bounded, strategy-only step, not
 that loop.
+
+The `V0.4` `jev-init` skill is implemented: when no policy exists it bootstraps
+`.jev/rules.md` and `.jev/config.yaml` from the user's explicit constraints and
+strongly evidenced local conventions, records each rule's provenance, and writes both
+files only after validating the confirmed candidates.
 
 CI and pull-request policy review come after V1, using the same versioned rules.
 

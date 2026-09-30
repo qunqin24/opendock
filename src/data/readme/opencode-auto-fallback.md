@@ -13,6 +13,31 @@ OpenCode plugin that automatically detects model errors and switches to a fallba
 - **Large context fallback**: automatically switches to a larger context model in-place when context fills up, then switches back after compaction with structured context preservation
 - **Auto-update toggle**: optional automatic update checks on startup (disabled by default)
 
+## OpenCode V1 & V2 Support
+
+The plugin ships a single package that supports **both** OpenCode V1 and V2 through one default export:
+
+- **OpenCode V1** (`>= 1.18.29`) loads the `server` field and gets the full feature set below.
+- **OpenCode V2** (`>= 2.0.x`) loads the `id` / `setup` fields and gets the V2 subset described in [V2 Feature Parity](#v2-feature-parity).
+
+> Older V1 releases (before object entrypoints) should import the named `AutoFallbackPlugin` export instead.
+
+### V2 Feature Parity
+
+OpenCode V2 does not expose `session.summarize`, `session.revert`, or `session.messages` to plugins, and it has no direct equivalent for the V1 `experimental.session.compacting` hook. As a result, some features are **V1-only** on the V2 runtime:
+
+| Feature                                                 | V1  | V2                                     |
+| ------------------------------------------------------- | --- | -------------------------------------- |
+| Error classification + retry with backoff               | ✅  | ✅                                     |
+| Fallback chain on immediate errors (401/402/403, quota) | ✅  | ✅                                     |
+| Per-model timed cooldown                                | ✅  | ✅                                     |
+| Fallback model params (temperature, topP, maxTokens)    | ✅  | ✅                                     |
+| Large context model switching                           | ✅  | ❌ needs `summarize` + message history |
+| Prefill-not-supported recovery                          | ✅  | ❌ needs `revert`                      |
+| Compaction prompt injection                             | ✅  | ❌ no V2 compaction hook               |
+
+The V2 adapter maps the V1 hooks as follows: `chat.params` → `ctx.session.hook("context", …)`, `event` → `ctx.event.subscribe()`, and error handling → `ctx.session.hook("retry", …)` with `ctx.session.switchModel` + `ctx.session.prompt` for fallback. All configuration, cooldown, and logging behavior is shared between both runtimes.
+
 ## Installation
 
 ### 1. Register in opencode config
@@ -81,16 +106,16 @@ On first run, a default config is auto-created at `~/.config/opencode/fallback.j
 
 Each entry in the `agents` map configures behavior for a specific agent. All fields are optional — omitted fields inherit from the top-level defaults.
 
-| Field               | Type              | Inherited From             | Description                                                                                                                 |
-| ------------------- | ----------------- | -------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| `fallback`          | `FallbackEntry[]` | `defaultFallback`          | Fallback model chain for this agent. Agent chain is tried first, then `defaultFallback` models not already tried (deduped). |
-| `largeContextModel` | `string \| false` | `defaultLargeContextModel` | Model to switch to when this agent's context fills up. Set `false` to explicitly disable even if a default exists.          |
-| `minContextRatio`   | `number`          | `defaultMinContextRatio`   | Minimum context window increase ratio for this agent. Overrides the default.                                                |
+| Field               | Type              | Inherited From             | Description                                                                                                        |
+| ------------------- | ----------------- | -------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `fallback`          | `FallbackEntry[]` | `defaultFallback`          | Fallback model chain for this agent. When set, it replaces `defaultFallback` for this agent.                       |
+| `largeContextModel` | `string \| false` | `defaultLargeContextModel` | Model to switch to when this agent's context fills up. Set `false` to explicitly disable even if a default exists. |
+| `minContextRatio`   | `number`          | `defaultMinContextRatio`   | Minimum context window increase ratio for this agent. Overrides the default.                                       |
 
 **Inheritance rule**:
 
 - `largeContextModel`, `minContextRatio`: per-agent field → top-level default → `false`/empty.
-- `fallback`: agent chain first, then `defaultFallback` models not already in the agent chain (deduped by `providerID/modelID`). If agent has no explicit `fallback`, uses `defaultFallback` only.
+- `fallback`: if the agent defines an explicit `fallback`, that chain is used; otherwise `defaultFallback` applies.
 
 #### Fallback Entry
 
@@ -137,6 +162,14 @@ Agent names in the `agents` map are matched **after normalization**: whitespace 
 
 When using agents from `oh-my-openagent`, use the name as it appears in OpenCode session logs.
 
+### Agent Registration
+
+Any agent listed in the `agents` map is **registered**, whether or not it has a `largeContextModel`:
+
+- **Fallback-only agents** (a `fallback` chain, no `largeContextModel`) are fully recognized: their chain is used, and fallback re-sends keep the original agent identity instead of switching to the server's default agent.
+- **Large-context eligibility** is separate: only agents with an effective `largeContextModel` (explicit or inherited `defaultLargeContextModel`, minus `largeContextModel: false` opt-outs) participate in large-context switching.
+- Native auto-compaction is disabled globally **only when at least one agent is large-context-eligible**. Fallback-only configs keep opencode's own compaction; in mixed configs, non-eligible agents fall back to a manual compaction safety net at the threshold.
+
 ### Auto Updates
 
 When `autoUpdate: true`, the plugin checks for updates on every startup:
@@ -149,7 +182,7 @@ If the update fails, a toast notification appears with the manual update command
 
 ### Large Context Fallback
 
-When a registered agent's context window fills up mid-task, the plugin automatically switches to a larger context model in the same session, continues work, then switches back after compaction. The switch triggers at **100% context usage** — the error handler catches the context overflow and switches immediately. The idle handler also checks at 100% as a safety net.
+When a large-context-**eligible** agent's context window fills up mid-task, the plugin automatically switches to a larger context model in the same session, continues work, then switches back after compaction. The switch triggers at **100% context usage** — the error handler catches the context overflow and switches immediately. The idle handler also checks at 100% as a safety net.
 
 **Setup**: Set `defaultLargeContextModel` or per-agent `largeContextModel` to a model with a larger context window than the agent's default model.
 
@@ -197,6 +230,11 @@ The `defaultMinContextRatio` (default `0.1` = 10%) prevents switching when the l
 - **Switch-Back via Compaction**: When work completes, the session compacts with the original model's context limit as guidance, then switches back.
 - **Cooldown Safety**: If the large context model is in cooldown (e.g., from a previous error), the fallback is skipped and normal compaction proceeds.
 
+#### Limitations
+
+- **Subagent (task tool) sessions**: Task-dispatched child sessions are recovered **without aborting** them, because aborting a child cancels the parent's task call. The child is only re-prompted after it is confirmed idle. Whether the parent's task call receives the child's completed fallback answer depends on OpenCode's task-tool behavior — validate with your OpenCode version before relying on it for automation.
+- **One-shot `opencode run` callers**: aborting the session at the context threshold terminates a one-shot CLI process, so a fire-and-forget continuation prompt cannot be delivered. For automated workloads that need large-context switching, call the HTTP API of a persistent `opencode serve` instance (`POST /session/:id/message`) instead of `opencode run`. Enable `logging: true` to capture diagnostics: the plugin logs `continuation lost — caller process likely exited (e.g. opencode run)` when it can still observe the session; a process that already exited cannot be logged.
+
 ## How It Works
 
 ### Error Classification
@@ -228,7 +266,7 @@ Immediate fallback errors (quota, auth) skip retries entirely and go straight to
 
 The plugin tries each model in the chain sequentially. Models in cooldown are automatically skipped. If all models are exhausted, the error is logged and a critical toast is shown.
 
-When an agent has its own `fallback` chain, the plugin tries all agent-specific models first, then continues with `defaultFallback` models that weren't already tried (deduped by `providerID/modelID`). This ensures no model is attempted twice while still leveraging the global fallback pool.
+When an agent has its own `fallback` chain, that chain is used as-is; `defaultFallback` applies only to agents without an explicit chain. Listing an agent in `agents` — even with only a `fallback` chain and no `largeContextModel` — is enough to activate its chain and keep its agent identity on re-sends.
 
 ### Compatibility with Other Fallback Plugins
 

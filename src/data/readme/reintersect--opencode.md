@@ -21,12 +21,16 @@ One sign-in covers every host on the machine, because they all run the same bina
 
 ### Claude Code
 
+Requires Claude Code 2.1.283 or later.
+
 ```bash
 claude plugin marketplace add reintersect/agent-plugins
 claude plugin install reintersect@reintersect
 ```
 
 ### Codex
+
+Requires Codex CLI 0.158.0 or later.
 
 ```bash
 codex plugin marketplace add reintersect/agent-plugins
@@ -76,20 +80,11 @@ If you'd rather use a key, set `REINTERSECT_API_KEY` to a `rei_…` key from Set
 
 ## What happens in a session
 
-The session starts warm. When it opens, and again on your first real prompt, the plugin asks Reintersect what's already known about this repository, the team and you, and hands that to the agent as context it's told to treat as its own:
+Claude Code and Codex recall relevant memory on every prompt, including short follow-ups. During tool work they refresh in the background at most once a minute. Foreground prompt hooks have a four-second deadline; failures leave the host free to continue.
 
-```text
-<reintersect_memory>
-Use this as if you already knew it; never say it was retrieved. Facts record what was true when written.
-Repository acme/api: A Bun monorepo. Tests need the leased Postgres, so they run through pnpm stack exec.
-Circle: Platform owns the API and the worker and ships behind feature flags.
-Facts:
-- Migrations are hand-written and replayed on Postgres 16 before a PR opens. (knowledge, Repository: acme/api, 12 May 2026, learned in "Fixing CI" https://app.reintersect.com/…, id memory_1)
-- No ORM in the worker; raw SQL through the shared client. (decision, Circle: Platform, 3 Jun 2026, learned in "Worker data layer" https://app.reintersect.com/…, id memory_2)
-Your preferences:
-- You prefer pnpm over npm and short commit subjects. (preference, personal, 12 May 2026, id memory_3)
-</reintersect_memory>
-```
+Each response contains at most 4,000 characters, with at most 1,000 used by personal and repository profiles. The plugin supplies new or changed facts, retires facts and profiles that are no longer current or accessible, and restores context after compaction, resume, clear and fork. Subagents have separate delivery records. Memories are dated evidence with provenance, not instructions that override your task.
+
+Cursor keeps its session-start injection. OpenCode keeps its session-start and first substantial prompt behavior. Both use the shared capture and upload fixes.
 
 Every fact says where it came from: the conversation it was learned in, the decision that settled it, the date it was true. It's team memory with receipts. A vector store of chat scraps can't tell you which conversation settled a question; this can.
 
@@ -126,11 +121,13 @@ Never sent:
 - the transcript file itself
 - anything matching the secret patterns: bearer tokens, API keys, access and refresh tokens, passwords, `sk-…` and `rei_…` keys, AWS, GitHub and Slack credentials. They're replaced with `[REDACTED]` before they're even written to disk.
 
-Everything is captured locally first, under `~/.reintersect/agent/`, and shipped in batches: after five completed exchanges, after 40,000 characters, before a compaction and at session end. If Reintersect is unreachable, batches wait on disk and retry at the next session start. They expire after seven days.
+Everything is captured locally first, under `~/.reintersect/agent/`. Completed turns queue an upload immediately; long-running tool work also queues at most once a minute, and compaction/session end flush remaining work. Messages are redacted in full, then split into ordered chunks without truncation. Batches snapshot their content and sequence numbers before sending, so retries remain identical while new work is captured. Undelivered batches remain on disk until delivered; they do not expire.
+
+Batches are bound to their backend and authenticated workspace/member. Changing accounts or repositories holds the original session rather than sending its history to another scope. Start a new agent session after a scope change. Records whose account cannot be established remain locally unassigned; status reports them for review. Re-signing in to the same account allows the current prompt and bound uploads to continue.
 
 The pause skill turns capture off. The tools keep working while paused, and batches already captured stay on disk until capture resumes.
 
-The plugin never writes to `CLAUDE.md`, `AGENTS.md` or any host settings file. Hooks always exit 0 and never block the host.
+The plugin never writes to `CLAUDE.md`, `AGENTS.md` or any host settings file. Hook failures do not veto agent work. Automatic recall and capture are both paused by the pause command; pending uploads remain held.
 
 ## Settings
 
@@ -152,9 +149,13 @@ The plugin never writes to `CLAUDE.md`, `AGENTS.md` or any host settings file. H
 
 **OpenCode shows no Reintersect tools.** Keep the explicit `mcp` entry from the install step. The plugin also registers the server from its config hook, and OpenCode 1.18 didn't pick that up in testing.
 
-**Something failed and nothing said so.** Failures land in `~/.reintersect/agent/errors.log`. The exact material that gets sent is in `~/.reintersect/agent/sessions/`, one file per session.
+**Something failed and nothing said so.** Automatic memory warns once for authentication failures, after three consecutive recall failures, or after captured work has waited five minutes to upload. Status reports the runtime version, observed hook activity, last recall attempt/success/output, duration, queue age and scope holds. A produced hook output is not proof the host consumed it. Safe error categories land in `~/.reintersect/agent/errors.log`. The exact material that gets sent is in `~/.reintersect/agent/sessions/`, one file per session.
 
 ## Development
+
+Deploy the backend recall contract before releasing these plugin bundles. The backend retains `context` and `memoryIds` for installed 0.2.0 clients; new clients also require structured items, revisions, scope and completeness. An older backend is reported as needing an upgrade.
+
+The freshness target is a few minutes during healthy, active sessions. Upload acceptance, extraction completion, hook output and host receipt are separate boundaries; a fake-backend test only proves the paths it exercises. See [validation](docs/validation.md) for checks and real-host smoke runs.
 
 `packages/cli/src` is the only source: a TypeScript CLI on Effect, bundled by `tsdown` into one dependency-free `dist/reintersect-agent.mjs` that `scripts/build.ts` copies into every plugin directory along with the skills rendered from `skills/`. The per-plugin `dist/` is committed, because hosts install plugins as plain git checkouts with no install step. `packages/opencode` is the npm package for OpenCode; the release builds its `dist/` before publishing.
 

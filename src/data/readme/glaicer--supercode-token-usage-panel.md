@@ -5,32 +5,69 @@
 </div>
 <br>
 
-An OpenCode plugin that adds a collapsible `Token Usage` section to the TUI session sidebar. This section shows what the session actually costs: total input/output/reasoning tokens, cache rate, spend, or speed.
+An OpenCode plugin that adds a collapsible `Token Usage` section to the TUI session sidebar. This section shows what the session actually costs: total input/output/reasoning tokens, cache rate, spend, speed, or how long the current turn has been running.
 
 Totals fold in the whole session family: the parent session plus all subagent descendants, from OpenCode's own `session.tokens` / `session.cost` aggregates. When descendants contribute, their usage sums up with parent agent usage.
 
+Requires OpenCode v2 (`>=2.0.0`). On OpenCode v1 stay on `@glaicer/supercode-token-usage-panel@0.1.4`.
+
 ## Install
 
-Install with the OpenCode CLI — it detects the TUI target and registers the plugin in `tui.json` for you:
+Install with the OpenCode CLI — it installs the package and registers the plugin in the global server configuration (`~/.config/opencode/opencode.jsonc`):
 
 ```bash
-opencode plugin @glaicer/supercode-token-usage-panel
+opencode plugin add @glaicer/supercode-token-usage-panel
 ```
 
-- `--global` installs into the global config (`~/.config/opencode`); default is local (`.opencode` in the current project).
-- `--force` replaces an already-installed version.
-- Restart OpenCode after installing.
-
-Manual install also works: add the package to the `plugin` array in `tui.json` (global `~/.config/opencode/tui.json` or local `<project>/.opencode/tui.json`):
-
-```jsonc
-{
-  "plugin": ["@glaicer/supercode-token-usage-panel"]
-}
-```
+Restart OpenCode after installing.
 
 > [!IMPORTANT]
 > **The first OpenCode load after installing this plugin may be slow.** That's OpenCode downloading the plugin's packages and managed tools into its cache — it happens once. Every subsequent start is fast.
+
+Manual install also works: add the package to the `plugins` array in `~/.config/opencode/opencode.jsonc`:
+
+```jsonc
+{
+  "plugins": ["@glaicer/supercode-token-usage-panel"]
+}
+```
+
+### Sidebar order
+
+The panel claims `after: "sidebar.content"`, and so do other plugins that extend the sidebar, so their relative order is the order in which they were registered. Entries in `opencode.jsonc` are always ordered before entries in `cli.json`, so register the panel here to place it relative to another sidebar plugin — for example, between `context-progress-bar` and `session-recap`:
+
+```jsonc
+{
+  "plugins": [
+    "@glaicer/supercode-context-progress-bar",
+    "@glaicer/supercode-token-usage-panel",
+    "@glaicer/supercode-session-recap"
+  ]
+}
+```
+
+The package ships a no-op server entry purely to make this possible: a `./tui`-only package can only be registered in `cli.json`, which always sorts last.
+
+## Install on OpenCode v1
+
+On OpenCode v1 install plugin version **0.1.4**. Pin the version in the spec below; a bare package name resolves to `latest`, which requires OpenCode v2:
+
+```bash
+opencode plugin @glaicer/supercode-token-usage-panel@0.1.4 --global
+```
+
+- `--global` (`-g`) writes into the global config (`~/.config/opencode/tui.json`); default is project-local (`.opencode/tui.json`).
+- If the plugin is already configured without a version, rerun with `--force` (`-f`) to replace that entry with the pinned spec — otherwise the command reports `Already configured` and keeps the unpinned entry.
+
+Manual install also works: put the pinned spec in the `plugin` array of `tui.json` (global `~/.config/opencode/tui.json` or local `<project>/.opencode/tui.json`):
+
+```jsonc
+{
+  "plugin": ["@glaicer/supercode-token-usage-panel@0.1.4"]
+}
+```
+
+v1 resolves the npm spec (including the version) and installs it automatically at startup — no `npm install` needed. Restart OpenCode after saving.
 
 ## Development
 

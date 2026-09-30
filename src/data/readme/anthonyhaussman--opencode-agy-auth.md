@@ -1,0 +1,172 @@
+# OpenCode Antigravity CLI Auth Plugin
+
+[![npm version](https://img.shields.io/npm/v/@anthonyhaussman/opencode-agy-auth)](https://www.npmjs.com/package/@anthonyhaussman/opencode-agy-auth)
+[![npm downloads](https://img.shields.io/npm/dw/@anthonyhaussman/opencode-agy-auth)](https://www.npmjs.com/package/@anthonyhaussman/opencode-agy-auth)
+[![CI](https://github.com/anthonyhaussman/opencode-agy-auth/actions/workflows/ci.yml/badge.svg)](https://github.com/anthonyhaussman/opencode-agy-auth/actions/workflows/ci.yml)
+[![License](https://img.shields.io/github/license/anthonyhaussman/opencode-agy-auth)](https://github.com/anthonyhaussman/opencode-agy-auth/blob/main/LICENSE)
+[![GitHub stars](https://img.shields.io/github/stars/anthonyhaussman/opencode-agy-auth?style=social)](https://github.com/anthonyhaussman/opencode-agy-auth)
+
+An [OpenCode](https://opencode.ai/) authentication plugin that enables seamless interaction with the Antigravity CLI (`agy`) by hooking into its authentication, quota retrieval, and dynamic model fetching layers.
+
+## Features
+
+- **OAuth 2.0 Integration**: Uses Antigravity's OAuth flows for authentication.
+- **Dynamic Model Retrieval**: Fetches available models based on user tier and current allocations.
+- **Quota Tracking**: Injects the `agy_quota` tool into OpenCode to check usage limits directly.
+- **Traffic Simulation**: Maintains background heartbeat with `agy` servers.
+
+## Installation
+
+Install the plugin from npm (or directly using local file configurations if developing):
+
+```bash
+npm install @anthonyhaussman/opencode-agy-auth
+```
+
+## Configuration
+
+Update your OpenCode configuration file (typically `opencode.json` at the root of your project or globally at `~/.config/opencode/opencode.json`) to register the plugin and specify your Google Cloud Project ID.
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugin": ["@anthonyhaussman/opencode-agy-auth"],
+  "provider": {
+    "google-agy": {
+      "options": {
+        "projectId": "your-google-cloud-project-id"
+      }
+    }
+  }
+}
+```
+
+By default, the plugin registers a specialized provider ID to interface with `agy`.
+You can switch your active OpenCode provider to `agy` or let the plugin inject authentication into your existing sessions.
+
+### Environment Variables
+
+If you are running OpenCode in environments with specific requirements for Antigravity, you can use the following environment variables:
+
+- `OPENCODE_AGY_PROJECT_ID`: Specify your Google Cloud Project ID manually.
+- `OPENCODE_AGY_AUTH_PROXY`: Define a proxy if accessing authentication endpoints behind a corporate firewall.
+- `OPENCODE_AGY_ENDPOINT`: Override the default internal `daily-cloudcode-pa.googleapis.com` API endpoint.
+- `OPENCODE_AGY_VERBOSE_LOGS`: Set to `"1"` to enable verbose diagnostic logs for API calls and responses.
+
+## Usage
+
+Once installed and configured, OpenCode will automatically authenticate against Antigravity CLI when interacting with eligible models. If no active session exists, you will be prompted to complete an OAuth login.
+
+Additionally, you can check your quota using slash commands directly in your OpenCode prompt:
+
+- `/agyquota` - Per-model detail view. Shows remaining tokens, progress bars, and reset timers for every model variant. Use when you need the full breakdown of individual buckets.
+- `/agyquotasummary` - High-level grouped view. Shows weekly and 5-hour limits aggregated by model family. Use when you want a quick overview of your allowance across all models.
+
+You can also ask naturally:
+> "What is my current agy quota?"
+> "Show me my quota summary"
+
+### Companion Plugin: `opencode-quota`
+
+This repository is compatible with [`opencode-quota`](https://github.com/slkiser/opencode-quota), an OpenCode plugin for displaying quota information directly in your status bar or interface.
+
+Follow the [Google AGY Quick Setup Guide](https://github.com/slkiser/opencode-quota/blob/main/docs/readme/providers.md#google-agy-quick-setup) to set them up together.
+
+To use both plugins side by side, register them in your `opencode.json`:
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugin": [
+    "@anthonyhaussman/opencode-agy-auth",
+    "opencode-quota"
+  ],
+  "provider": {
+    "google-agy": {
+      "options": {
+        "projectId": "your-google-cloud-project-id"
+      }
+    }
+  }
+}
+```
+
+When used together, `opencode-quota` seamlessly visualizes rate limits and quotas for models authenticated through `google-agy`.
+
+### Disk Persistence
+
+The plugin persists turn-state and retry-cooldown data to disk so that it survives OpenCode restarts. Files are stored under `~/.config/opencode/` (or `%APPDATA%\opencode\` on Windows):
+
+- `antigravity-turn-states.json` - tracks thinking/reasoning state across request turns, with a 24-hour TTL and 5-second throttled writes using atomic tmp+rename.
+- Retry cooldowns are persisted via `CooldownStore` with the same atomic-write pattern.
+
+Both stores initialize lazily at runtime - no filesystem reads occur at import time.
+
+#### `diskEnabled` Parameter
+
+`TurnStateTracker` accepts a `diskEnabled` constructor parameter (defaults to `true`):
+
+```ts
+import { TurnStateTracker } from "@anthonyhaussman/opencode-agy-auth/sdk/request/turn-state-tracker";
+
+// Disk persistence enabled (default)
+const tracker = new TurnStateTracker(true);
+
+// Memory-only mode - no filesystem reads or writes
+const tracker = new TurnStateTracker(false);
+```
+
+When `diskEnabled` is `false`, the tracker operates entirely in memory. All state is lost when the process exits. This is useful in restricted environments (containers, read-only filesystems) where disk access is unavailable or undesirable.
+
+If disk initialization fails at runtime (permission error, corrupt file, etc.), the plugin automatically falls back to memory-only mode and logs a warning. No configuration is needed for normal use - disk persistence works out of the box.
+
+## Local Testing
+
+To test and develop the plugin locally with OpenCode before publishing:
+
+1. **Build the plugin locally**:
+   Clone the repository, install dependencies, and build the source code:
+   ```bash
+   npm install
+   npm run build
+   ```
+
+2. **Configure OpenCode to use the local build**:
+   In the target project where you want to test the plugin, open your `opencode.json` (or `~/.config/opencode/opencode.json` for global testing) and add the absolute local path to the plugin:
+   ```json
+   {
+     "$schema": "https://opencode.ai/config.json",
+     "plugin": ["/absolute/path/to/opencode-agy-auth"]
+   }
+   ```
+   *Note: OpenCode also supports dropping plugin files directly into the `.opencode/plugins/` folder in your project.*
+
+3. **Verify the plugin**:
+   Launch OpenCode in your target project. OpenCode will automatically resolve and load your local plugin directory. You can test your changes by running `npm run build` in the plugin directory and restarting your OpenCode session.
+
+## Alpha Channel (Pre-release)
+
+To test bleeding-edge features, upcoming changes, or [OpenCode v2](https://opencode.ai/v2/docs) compatibility before official releases, configure the `@alpha` distribution tag:
+
+```bash
+npm install @anthonyhaussman/opencode-agy-auth@alpha
+```
+
+Or configure it directly in your `opencode.json`:
+
+```json
+{
+  "plugin": ["@anthonyhaussman/opencode-agy-auth@alpha"]
+}
+```
+
+### OpenCode v2 Compatibility
+
+The `@alpha` channel provides dual compatibility with both OpenCode v1 and [OpenCode v2](https://opencode.ai/v2/docs), supporting the new v2 plugin architecture, unified hooks, and OAuth credential handling while maintaining full backward compatibility.
+
+> [!WARNING]
+> **Instability Warning**: The `@alpha` release contains experimental features, active development builds, and potential breaking protocol changes. It may be unstable, break unexpectedly, or cause disruptions in session authentication and model requests. Use only for testing and development. For day-to-day work, use the stable release.
+
+## Star History & Support
+
+If this plugin saved you time or made using Antigravity models in OpenCode smoother, consider giving the repository a star on [GitHub](https://github.com/anthonyhaussman/opencode-agy-auth) - it helps others discover the project.

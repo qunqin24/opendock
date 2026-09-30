@@ -48,11 +48,12 @@ OpenCode TUI plugins load from the `plugin` array in **`~/.config/opencode/tui.j
 
 ```sh
 bun install
+bun run build           # compile src/go-usage.tsx -> dist/tui.js (run by prepack)
 bun run typecheck
 bun scratch-repro.tsx   # headless render capture
 ```
 
-Single-file plugin: everything lives in [`src/go-usage.tsx`](src/go-usage.tsx).
+Source lives in [`src/go-usage.tsx`](src/go-usage.tsx); the published entrypoint is the compiled `dist/tui.js`, built by [`build.mjs`](build.mjs). The build runs `@opentui/solid`'s Solid transform so JSX compiles to reactive bindings (not eager `jsx()` calls), leaves the host imports (`@opentui/core`, `@opentui/solid`, `solid-js`) external, and stays unminified so OpenCode's loader can rewrite them to its own copies.
 
 ## Roadmap
 

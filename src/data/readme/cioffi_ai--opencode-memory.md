@@ -29,8 +29,8 @@ WRITE → DREAM → SURFACE lifecycle:
   model-visible path (see [Privacy](#privacy) for the exact threat model)
 - Global and project-scoped memories with enforced per-directory isolation,
   cross-language semantic deduplication
-- Headless child-session consolidation running with **zero tools**
-  (allow-none), orphan GC and crash recovery
+- Tool-free internal generation for DREAM, dedup and reranking (V2), plus
+  allow-none headless helper sessions with orphan GC (V1)
 
 ## Project scope semantics
 
@@ -57,16 +57,26 @@ single policy in `src/core.ts` (`projectVisible`, `readableEntries`,
 ## Installation
 
 Add the package to your OpenCode configuration (`~/.config/opencode/opencode.json`
-or `opencode.jsonc`):
+or `opencode.jsonc`). OpenCode V2 uses `plugins`:
 
 ```json
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugin": [
+  "plugins": [
     "@cioffi_ai/opencode-memory"
   ]
 }
 ```
+
+OpenCode V1 uses the singular `plugin` key instead. The npm package exposes
+separate V1 and V2 runtime adapters from one entrypoint; both use the same
+store format and memory model. The V1 compatibility adapter requires OpenCode
+1.18.29 or newer. Version 1.7.0 adds V2 support and targets OpenCode 2.0.18+.
+Older V1 installations should upgrade OpenCode before upgrading this plugin.
+
+V2 exposes plugin tools through its Code Mode catalog by default (for example,
+`tools.memory_read(...)` inside `execute`). This is normal: the nine memory
+tools need not appear as nine standalone model tool definitions.
 
 OpenCode installs npm plugins automatically via Bun on startup and caches them
 in `~/.cache/opencode/node_modules/`. Restart OpenCode after adding the entry.
@@ -136,20 +146,71 @@ frequently-surfaced memory immortal under pruning. Negative feedback
 
 ## Configuration
 
-| Variable | Default | Effect |
-| --- | --- | --- |
-| `OPENCODE_MEMORY_OFF` | off | `1` disables the plugin. |
-| `OPENCODE_MEMORY_DIR` | `~/.local/share/opencode/memory` | Data directory (store/state/summary). |
-| `OPENCODE_MEMORY_DEBUG` | off | `1` enables trace logging. |
-| `OPENCODE_MEMORY_DELAY_MS` | 90000 | Debounce of consolidation after session idle (3s in tests). |
-| `OPENCODE_MEMORY_RERANK` | off | `1` enables the semantic reranking stage (headless LLM rerank of the candidate window; cached per query; may ABSTAIN; falls back to lexical order on timeout). |
-| `OPENCODE_MEMORY_RERANK_CANDIDATES` | 30 | Candidate window handed to the reranker. |
-| `OPENCODE_MEMORY_RERANK_TIMEOUT_MS` | 4000 | Rerank timeout before lexical fallback. |
-| `OPENCODE_MEMORY_RERANK_CACHE_MS` | 60000 | Per-query rerank cache lifetime. |
-| `OPENCODE_MEMORY_CORE_SLOT` | 3 | Core-tier entries always injected beyond relevance matches. |
-| `OPENCODE_MEMORY_SURFACE_REFRESH_MS` | 900000 | Min interval between two exposure-counter updates for the same entry. |
-| `OPENCODE_MEMORY_GC_CHILD_AGE_MS` | 600000 | Min age of an orphan child session before auto-removal. |
-| `OPENCODE_MEMORY_INPROGRESS_TIMEOUT_MS` | 600000 | Expiry of the `inProgress` marker (crash recovery). |
+In OpenCode V2, configure the plugin in `opencode.jsonc` with an object entry:
+
+```jsonc
+{
+  "plugins": [{
+    "package": "@cioffi_ai/opencode-memory",
+    "options": {
+      "dream": false,
+      "surface": false
+    }
+  }]
+}
+```
+
+OpenCode V1 1.18.29+ uses a package/options pair instead:
+
+```jsonc
+{
+  "plugin": [["@cioffi_ai/opencode-memory", {
+    "dream": false,
+    "surface": false
+  }]]
+}
+```
+
+Every setting below accepts a typed plugin option. An option takes precedence
+over its environment variable; otherwise the environment variable or default
+applies. Environment booleans use `1`/`0`, while JSONC options use `true`/`false`.
+Numeric options must be integers. Unknown or invalid options fail plugin setup
+with the offending name instead of silently falling back.
+
+| Option | Environment variable | Default | Effect |
+| --- | --- | --- | --- |
+| `off` | `OPENCODE_MEMORY_OFF` | false | Disable the entire plugin. |
+| `dream` | `OPENCODE_MEMORY_DREAM` | true | Automatic conversation consolidation and recovery sweep. |
+| `surface` | `OPENCODE_MEMORY_SURFACE` | true | Automatic memory injection and semantic reranking. |
+| `dir` | `OPENCODE_MEMORY_DIR` | `~/.local/share/opencode/memory` | Store, state and summary directory. |
+| `debug` | `OPENCODE_MEMORY_DEBUG` | false | Trace logging. |
+| `delayMs` | `OPENCODE_MEMORY_DELAY_MS` | 90000 | Idle debounce before DREAM. |
+| `maxEntries` | `OPENCODE_MEMORY_MAX_ENTRIES` | 400 | Maximum retained memories. |
+| `maxFacts` | `OPENCODE_MEMORY_MAX_FACTS` | 18 | Maximum relevance-ranked facts in a prompt. |
+| `maxChars` | `OPENCODE_MEMORY_MAX_CHARS` | 2400 | Maximum memory-block characters. |
+| `transcriptChars` | `OPENCODE_MEMORY_TRANSCRIPT_CHARS` | 12000 | Maximum transcript characters sent to DREAM. |
+| `sweepIntervalMs` | `OPENCODE_MEMORY_SWEEP_MS` | 600000 | Recovery sweep interval. |
+| `sweepStartMs` | `OPENCODE_MEMORY_SWEEP_START_MS` | 20000 | Delay before first recovery sweep. |
+| `sweepBatch` | `OPENCODE_MEMORY_SWEEP_BATCH` | 8 | Maximum sessions processed per sweep. |
+| `gcChildAgeMs` | `OPENCODE_MEMORY_GC_CHILD_AGE_MS` | 600000 | V1 orphan helper-session age; V2 creates no helper sessions. |
+| `inProgressTimeoutMs` | `OPENCODE_MEMORY_INPROGRESS_TIMEOUT_MS` | 600000 | Expiry of a DREAM in-progress marker. |
+| `rerank` | `OPENCODE_MEMORY_RERANK` | false | Optional model-based relevance reranking. |
+| `rerankCandidates` | `OPENCODE_MEMORY_RERANK_CANDIDATES` | 30 | Candidate window for reranking. |
+| `rerankTimeoutMs` | `OPENCODE_MEMORY_RERANK_TIMEOUT_MS` | 4000 | Rerank timeout before lexical fallback. |
+| `rerankCacheMs` | `OPENCODE_MEMORY_RERANK_CACHE_MS` | 60000 | Rerank cache lifetime. |
+| `coreSlot` | `OPENCODE_MEMORY_CORE_SLOT` | 3 | Core-tier entries injected beyond relevance matches. |
+| `surfaceRefreshMs` | `OPENCODE_MEMORY_SURFACE_REFRESH_MS` | 900000 | Minimum interval between persisted exposure updates. |
+
+Use an absolute `dir` path when overriding the store location. Each plugin
+instance uses its own resolved options and store path. Changing `dir` selects a
+different store; it does not move data from the old directory.
+
+Set `OPENCODE_MEMORY_DREAM=0` to stop automatic consolidation and its model calls. Set
+`OPENCODE_MEMORY_SURFACE=0` to stop automatic prompt injection; this also prevents
+semantic reranking even if `OPENCODE_MEMORY_RERANK=1`. Either setting leaves the
+explicit memory tools available. `OPENCODE_MEMORY_OFF=1` disables the entire plugin.
+These switches do not prevent OpenCode itself or explicit tool calls from sending
+conversation content to the configured model provider.
 
 ## Retrieval semantics (v1.6)
 
@@ -263,15 +324,18 @@ Two limitations remain, by architecture rather than by omission:
 
 ## DREAM containment
 
-Consolidation, semantic dedup and semantic rerank run in headless child
-sessions that process untrusted conversation text. Those sessions are created
-with a single wildcard tool denial (`tools: { "*": false }`), which — verified
-against the OpenCode server source (v1.18.0 through v1.18.20) — removes ALL
-tools from the model-visible toolset: shell execution, file editing, network
-fetch, MCP tools, subagents, memory tools, and tools contributed by any other
-plugin. The child receives only the textual prompt and returns text; it cannot
-execute side effects. Crash recovery (inProgress markers), orphan GC and
-at-least-once consolidation semantics are unaffected.
+On OpenCode V2, consolidation, semantic dedup and semantic rerank use
+`ctx.generate.text()`. The V2 API performs an isolated text generation without
+creating a session, exposing tools, or writing conversation history. There are
+therefore no helper sessions to hide or garbage-collect. A periodic recovery
+pass uses the durable two-phase `inProgress` journal to retry interrupted
+consolidations after the configured timeout.
+
+On OpenCode V1, the same jobs run in headless child sessions created with a
+single wildcard tool denial (`tools: { "*": false }`). This removes shell,
+file, network, MCP, subagent, memory and third-party plugin tools from the
+model-visible toolset. Crash recovery, orphan GC and at-least-once
+consolidation semantics remain enabled for V1.
 
 ## Roadmap
 
@@ -283,10 +347,26 @@ at-least-once consolidation semantics are unaffected.
 ```bash
 bun install
 bun run check           # typecheck + tests + build
-bun run verify:package  # build + pack + isolated install + tool assertion
+bun run verify:package  # pack + clean install + V1/V2 tool/runtime checks
 bun run bench           # retrieval benchmark
 npm pack --dry-run
 ```
+
+To check the actual packaged artifact in both CLI generations, point the check
+at existing CLI binaries (it never downloads or replaces a CLI):
+
+```bash
+OPENCODE_TEST_BIN_V1=/path/to/opencode-v1 \
+OPENCODE_TEST_BIN_V2=/path/to/opencode-v2 \
+  bun run verify:package
+```
+
+The runtime check uses separate temporary profiles and a deterministic model
+served on localhost; no AI credentials or paid model calls are needed. It checks
+loading, all nine tool registrations, write/read, context injection, automatic
+DREAM, store migration and local-only privacy. Logs and request evidence stay in
+the printed temporary directory. The default unit test suite does not replace
+these opt-in runtime checks.
 
 ## License
 

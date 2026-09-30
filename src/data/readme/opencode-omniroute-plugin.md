@@ -340,11 +340,65 @@ If you want a narrower-scoped Bearer for MCP (different from the chat/inference 
 
 Both can coexist; pick the one that fits your environment.
 
+## OpenCode V2 Desktop compatibility (v0.3.0+)
+
+The same package runs on **both** OpenCode V1 and V2 Desktop. The
+`dist/index.js` default export carries the two entrypoints side by side:
+
+- V1 hosts call `server()` (`@opencode-ai/plugin` auth + provider +
+  config + tool hooks) — behaviour unchanged.
+- V2 hosts call `setup(ctx)` (`@opencode/plugin` provider / integration /
+  tool / command / mcp transforms + session hooks) — the same live
+  catalog (variants, LCD combos, enrichment, filters, disk cache) is
+  registered through the V2 domains. No new runtime dependency was added.
+
+### V2 config (`plugins`, plural)
+
+```jsonc
+// opencode.jsonc (V2 Desktop)
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugins": [
+    {
+      "package": "./plugins/omniroute-opencode-plugin/dist/index.js",
+      "options": {
+        "providerId": "omniroute",
+        "baseURL": "https://or.example.com",
+        "modelCacheTtl": 300000,
+      },
+    },
+  ],
+}
+```
+
+Then connect the API key via the integration key method (same provider
+id as V1 `/connect`): the provider registers with `integrationID` set,
+so credentials resolve dynamically, and the catalog reloads
+automatically once connected. `OMNIROUTE_API_KEY` / `OMNIROUTE_BASE_URL`
+env vars work as a fallback when no integration connection exists.
+
+### V2 notes
+
+| Area | V1 | V2 |
+| --- | --- | --- |
+| Provider registration | `provider.models` hook | `ctx.provider.transform` (`@opencode/ai/providers/openai-compatible`) |
+| Auth | `auth` hook (`/connect`) | `ctx.integration` key method + `integrationID` linkage |
+| Force sync | `omniroute_sync_models` tool | same tool name via `ctx.tool.transform` |
+| Commands | `/omni-sync`, `/omni-autosync` templates | same names via `ctx.command.transform` (execute directly, no agent round-trip) |
+| MCP auto-emit | `config` hook | `ctx.mcp.transform` (operator overrides still win) |
+| Gemini sanitization | fetch-layer wrapper | `ctx.session` `context`/`compaction`/`generate` hooks (scoped to this provider) |
+| Provider id | auto-prefixed `opencode-<id>` (OC ≤1.17 gate) | bare `<id>` — V2 has no native-adapter gate |
+
+Multi-instance works the same way: one `plugins` entry per OmniRoute
+endpoint, each with its own `providerId` (`omniroute`,
+`omniroute-preprod`, …).
+
 ## Requirements
 
 - Node `>=22.22.3` (per `engines.node`); tested on Node 22 and 24.
-- OpenCode: verified end-to-end against `opencode@1.15.5` with `@opencode-ai/plugin@1.15.6`.
-- OC plugin peer (`@opencode-ai/plugin`) `>=1.14.49` for the full feature set (provider hook surfaces models in `/models`). On `<=1.14.48`, the plugin falls back to its `config` hook, writing a static catalog snapshot into `config.provider[id]` so models still appear.
+- OpenCode V1: verified end-to-end against `opencode@1.15.5` with `@opencode-ai/plugin@1.15.6`.
+- OpenCode V2 Desktop: `setup()` entrypoint against `@opencode/plugin@2.0.16` (optional peer — V1 installs don't need it).
+- OC plugin peer (`@opencode-ai/plugin`) `>=1.14.49` for the full V1 feature set (provider hook surfaces models in `/models`). On `<=1.14.48`, the plugin falls back to its `config` hook, writing a static catalog snapshot into `config.provider[id]` so models still appear.
 - The plugin uses the OC v1 plugin shape (`default: { id, server }`) — older OC releases that only walk named exports will reject it. Stay on OC ≥1.15.
 
 ## License

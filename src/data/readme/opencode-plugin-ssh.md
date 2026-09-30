@@ -61,10 +61,17 @@ All tools are registered under the `ssh` namespace:
 - `ssh_pty_send`: Send raw text or control characters (e.g. `\x03`) to the PTY.
 - `ssh_pty_read`: Retrieve recent buffer output from the PTY shell.
 
-### Filesystem (SFTP)
+### Filesystem (SFTP & SCP)
+- `ssh_scp`: Securely copy files or directories between local machine and remote host (`upload` / `download`), or stream directly between two remote sessions (`remote_to_remote`) with recursive and high-throughput chunked transfer support.
 - `ssh_read_file`: Read remote files with pagination and line numbering.
 - `ssh_write_file`: Write or overwrite remote files over SFTP.
 - `ssh_edit_file`: Find and replace exact substrings within remote files.
+- `ssh_list_dir`: Structured directory listing (name, size, mode, permissions, isDirectory, isSymlink, mtime).
+- `ssh_stat`: Inspect file/directory metadata or test for existence (size, permissions, timestamps, link targets).
+- `ssh_mkdir`: Create remote directory with optional recursive creation of parent directories (`-p`).
+- `ssh_rm`: Delete a remote file or folder with optional recursive directory removal.
+- `ssh_rename`: Move or rename remote files and directories over SFTP.
+- `ssh_chmod`: Change remote file/directory permissions via octal mode (e.g. `'0755'`, `'0644'`, `'0600'`).
 
 ### Background Jobs & Health
 - `ssh_system_inspect`: Inspect system metrics, listening ports, and installed runtimes.

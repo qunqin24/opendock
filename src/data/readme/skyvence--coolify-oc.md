@@ -76,10 +76,47 @@ working client. A typo is reported rather than quietly opening the picker.
 
 The sidebar shows the instance, the working directory it is answering for, and
 one row per application with a status light, a compact state and a refresh
-countdown. Clicking a row offers Deploy, Logs, Restart and Roll back. An
-unlinked project shows a `link` action beside it: the first click links with
+countdown. Applications are grouped under their Coolify environment name
+whenever the project defines more than one — even if only one environment has
+apps — so a repository that maps the same application per environment stays
+readable. Clicking a row offers Deploy, Logs, Restart and Roll back, plus a
+model-driven setup path for a project that is not configured yet.
+
+The list follows the height of the terminal: as many application and database
+rows as fit are shown, and the rest collapse behind a `+N more · show all` line
+that opens the full project list. Applications and databases draw from the same
+budget, so a tall terminal lists everything the server sent while a short one
+keeps the affordance visible.
+
+Sidebar state is cached per project directory and shared by every session in a
+workspace, so switching sessions — or re-opening the sidebar — reuses the last
+read instead of re-asking Coolify. The cache is keyed on the working directory
+as well as the instance endpoint, so a worktree with its own `coolify.json` is
+never shown its main checkout's state. A deployment in flight, a manual refresh,
+and a written or linked `coolify.json` all bypass the cache so a change is never
+hidden behind it.
+
+**Deploy** triggers the build directly and streams Coolify's own deployment log
+into a scrolling panel, so no model turn is spent and progress is visible as it
+happens. A failed deployment offers a read-only session that opens knowing the
+deployment UUID, so the failure can be investigated without being able to
+change anything. **Logs** opens in the same kind of scrolling panel, pinned to
+the newest lines.
+
+An unlinked project shows a `link` action beside it: the first click links with
 the model in a background tab, a second click opens a paste box for a
 `coolify.json` you supply yourself.
+
+Below the applications, a **databases** section lists the project's databases
+with the same status light, each followed by its Coolify environment in muted
+grey when it can be determined. Clicking one offers Restart, Start and Stop; a
+start or restart spins like an application restart until the container
+settles, while a stop is not followed by a spinner. When the section is
+truncated, `+N more · show all` opens the full database list. Rows come from two
+sources, merged and de-duplicated by UUID: the config's `databases` map (which
+supplies the key, name and path scope) and every database whose
+`environment_id` belongs to the project — the only project attribution the
+Coolify API exposes, so a database created in the Coolify UI is still shown.
 
 **Configure** is the entry point for linking a project and for fixing the
 instance, so it is hidden once the instance answers *and* the project is
@@ -237,7 +274,11 @@ so it is not disabled by the packaged TUI's `-opencode.coolify.tui` entry.
   applications and databases can be created.
 - `rollback`, `migrate_*`, `move_*` and the storage and backup verbs have not
   been exercised against a live instance — they are covered by mocked tests only.
-- `GET /databases` does not report a project or environment, so a database cannot
-  always be attributed to a project.
+- `GET /databases` does not report a project or environment, only the numeric
+  `environment_id`, so databases are attributed by joining that against the
+  project's environments. Database types Coolify never loads on
+  `GET /projects/{uuid}/{environment}` (keydb, dragonfly, clickhouse, sqlite)
+  are still found through the flat list. Tracked upstream as
+  [coollabsio/coolify#10449](https://github.com/coollabsio/coolify/issues/10449).
 - A Coolify API token's abilities are probed, not reported: nothing in the API
   exposes them, so `capabilities` shows the evidence for each verdict.

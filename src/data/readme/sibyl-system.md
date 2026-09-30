@@ -13,6 +13,24 @@ A standalone [opencode](https://opencode.ai) plugin with two capabilities:
 Zero coupling to team-mode or fleet orchestration: no `team_*` tools, no
 cross-agent message bus. Everything runs through plain opencode child sessions.
 
+## v1.1 — the review chamber (民主集中制)
+
+`sibyl_review` + `sibyl-chamber` is a GENERAL review apparatus: any artifact
+(doc, plan, code, agent-behavior exam pack) goes through broad evidence
+gathering -> blind PRO/CON clash with cross-critique -> an independently-drawn
+judge (E2 pool+seed committed before launch) -> exactly ONE conclusion spoken
+in ONE voice (APPROVE / REJECT / NEEDS_HUMAN). Internal dissent is preserved
+by path+hash in the sealed run dir, never dumped outward. All role sessions
+run isolated under /tmp (zero sessions in your main list); runs are
+spotcheckable (`sha256sum -c CHECKSUMS.txt`) and append-only-ledgered.
+Laws: docs/isolation-laws.md. Mechanism: docs/democratic-centralism.md.
+
+```
+node dist/cli.js run --target doc.md --goal "Is this sound?" --model local-qwen/qwen3.8-flash-next
+node dist/cli.js status --tail 5
+node dist/cli.js spotcheck <runId>
+```
+
 ## Install
 
 Register the published npm package by name (opencode resolves it from npm):
@@ -62,7 +80,8 @@ stderr, registers nothing, and returns empty hooks.
 |------|-----------|----------|
 | `sibyl_consult` | `{ artifact, goal }` | `artifact` is a file path or inline multi-line text (≤ 256 KiB). The three councilors audit it in parallel; each reply is parsed into a verdict (one in-session JSON-only repair shot per voter). Returns the tally, merged reasons/must-fix, run id, and per-voter reply file paths. |
 | `sibyl_swarm` | `{ artifact, goal, judge? }` | ARCHITECT decomposes goal + artifact into a strict-JSON workflow schema; workers are minted deterministically and dispatched in dependency waves; drafts land in the run's space dir. Verdict: `APPROVE` / `REJECT` / `EXHAUSTED`. With `judge: true`, one extra judge pass may replace the derived verdict — an unrecognized or failed judge reply keeps the derived one. |
-| `sibyl_status` | `{ runId? }` | Read-only. Lists all recorded runs (newest last), or shows one run's full record and space dir. |
+| `sibyl_status` | `{ runId? }` | Read-only. Lists all recorded runs (newest last) + the last chamber-ledger rows, or shows one run's full record and space dir. |
+| `sibyl_review` | `{ target, goal, seed?, maxRounds? }` | v1.1 general democratic-centralism chamber: launches the isolated evidence→clash→judge pipeline detached and returns a receipt (explicitly NOT a verdict); the single voice lands in the run record at terminal state. CLI twin: `sibyl-chamber`. |
 
 ## Options
 
@@ -134,45 +153,35 @@ index.ts            plugin entry: parse options → share one RunStore + client
 │                   roster) → dispatcher (dependency waves, stagger,
 │                   suspend-on-rate-limit, resume) → aggregate (report +
 │                   verdict derivation; full drafts never inlined)
+├── lane/           v1.1 E1/E4: isolated opencode-run launcher (L1 env pinning,
+│                   argv-only spawn, pidfile-only kill) + seating policy prefilter
+├── chamber/        v1.1 民主 protocol (evidence -> blind clash -> cross-critique
+│                   -> drawn judge, bounded rounds) + 集中 synthesis (ONE voice,
+│                   fail-closed, dissent sealed by path+hash)
+├── exam/           v1.1 E3: scenario-as-data behavioral exams, mechanical
+│                   transcript/disk signal grading, canary veto
+├── state/          RunStore + v1.1 chamber records: EOF-append ledger (A5),
+│                   face-last regeneration, CHECKSUMS + spotcheck (A4)
 ├── personas.ts     registry: 3 councilors + ARCHITECT, model slots
 ├── options.ts      zod v4 schema + parseOptions (never throws)
-└── tools/          sibyl_consult / sibyl_swarm / sibyl_status glue + shared
-                    helpers (model-slot chain, artifact reader)
+├── cli.ts          v1.1 sibyl-chamber bin: run | status | spotcheck | kill
+└── tools/          sibyl_consult / sibyl_swarm / sibyl_status / sibyl_review
+                    glue + shared helpers (model-slot chain, artifact reader)
 ```
 
 ## vs. swarm
 
 This is **not** the oh-my-openagent swarm. It has no `team_*` tools, no
 cross-agent message bus, and no fleet-orchestration dependency of any kind —
-it is a clean-room implementation (~2.1K lines of product code, comments excluded) that happens to
+it is a clean-room implementation (~3.5K lines of product code, comments excluded) that happens to
 share the problem space. `sibyl_swarm` is a single tool call driving a
 PLAN→MINT→DISPATCH→AGGREGATE pipeline over ordinary child sessions.
-
-## Related projects (name disambiguation)
-
-Several unrelated "MAGI" projects exist in the opencode/LLM space; none share
-code with this one:
-
-- **magi-ai/opencode-magi** — an OpenCode plugin for multi-model GitHub PR
-  review/merge with odd-number majority approval gating. MAGI (theirs) reviews
-  pull requests; ours votes on arbitrary artifacts/files with fail-closed REJECT.
-- **ladiossoop5star/open_magi** — an OpenCode plugin running three fixed
-  read-only EVA-named deliberators whose consensus gate precedes the main
-  agent's action; ours is a council-as-a-tool with on-disk provenance and a
-  separate dynamic-swarm executor.
-- **fshiori/magi** — a Python CLI where three LLMs debate to improve an answer,
-  continuing (fail-open) when voters error; ours treats any missing/erroring
-  vote as fail-closed against approval.
-- **a16z/magi** (LLM rollup), **ragavsachdeva/magi** (manga-page CV),
-  **itorr's MAGI** (EVA toy build) — name-noise only, nothing in common.
-
-Shared inspiration is Evangelion's MAGI trinity; implementations are unrelated.
 
 ## Development
 
 ```bash
 npm run typecheck   # tsc --noEmit, strict + noUncheckedIndexedAccess + exactOptionalPropertyTypes
-npm run test        # 259 unit tests, fully offline (no network, no LLM)
+npm run test        # 309 unit tests, fully offline (no network, no LLM)
 npm run build       # esbuild bundle → dist/index.js (ESM)
 node smoke/run-smoke.mjs   # offline smoke of the shipped surface (see smoke/README.md)
 ```

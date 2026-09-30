@@ -51,12 +51,16 @@ The optional `open-computer-use@0.3.5` package ships native runtimes for:
 - `linux-arm64`, `linux-x64`
 - `win32-arm64`, `win32-x64`
 
-The current project has been exercised against the Linux runtime contract. macOS
-and Windows support is provided by the upstream native packages, but live
-permission and desktop validation must still be run on those operating systems.
+The repository CI is configured to test the adapter headlessly on Linux, macOS,
+and Windows through a GitHub Actions matrix. The native package publishes binaries for the six targets
+above. Live accessibility, capture, focus, and input behavior still depends on
+the host desktop session and must be validated on each operating system.
 
 ### Validation status
 
+- The JavaScript adapter, MCP registration, sandbox, timeout recovery, setup,
+  packaging, and fake-native integration suite are designed to run on Linux,
+  macOS, and Windows without a graphical desktop.
 - Linux x64 native discovery, read-only app listing, MCP registration, and the
   persistent JavaScript session have passed local smoke tests.
 - The current Ubuntu/GNOME Wayland session exposed a Chrome pseudo-window whose
@@ -64,12 +68,14 @@ permission and desktop validation must still be run on those operating systems.
   coordinate and keyboard requests, but those synthetic events did not change
   that window. The adapter reports the native result rather than claiming that
   an unsupported input path worked.
-- macOS and Windows have not been live-tested in this environment. Their
-  accessibility, screen-capture, foreground, and OS permission behavior must be
-  verified on those operating systems.
+- macOS and Windows native desktop behavior has not been live-certified from
+  this development machine. Their accessibility, screen-capture, foreground,
+  and OS permission behavior must still be verified on real interactive hosts.
 
-The Codex-style surface is portable, but the native runtime's desktop
-capabilities remain OS and session dependent.
+The Codex-style surface is portable across the published x64/ARM64 desktop
+targets, but native desktop capabilities remain OS, permission, display-server,
+and session dependent. Other CPU/OS combinations fail with an explicit target
+diagnostic and can use a compatible custom backend.
 
 ## Requirements
 
@@ -114,6 +120,25 @@ Use `--dry-run` to inspect the action without changing files. Set
 `OPENCODE_COMPUTER_USE_SKIP_SETUP=1` to disable the postinstall hook. Setup also
 skips automatically when `CI=1` or `CI=true`. Restart OpenCode after a
 successful setup so the plugin is loaded.
+
+Starting with v0.1.5, desktop prerequisite onboarding is part of `postinstall` when lifecycle scripts are allowed.
+After OpenCode configuration, the installer runs `opencode-computer-use-permissions --install`:
+
+- macOS runs the native `doctor` check and opens the Open Computer Use onboarding/System Settings when Accessibility or Screen Recording is missing. Apple still requires the user to click the protected privacy toggles.
+- GNOME Linux best-effort enables `org.gnome.desktop.interface toolkit-accessibility` and then runs the native AT-SPI/session check. Other Linux desktops get diagnostics without changing desktop settings.
+- Windows runs the UI Automation/session check. Windows has no separate UI Automation permission toggle; it must run in the signed-in interactive desktop session.
+
+Rerun the guided check at any time:
+
+```sh
+npx opencode-computer-use-permissions --strict
+# or, from a pnpm project
+pnpm exec opencode-computer-use-permissions --strict
+```
+
+Set `OPENCODE_COMPUTER_USE_SKIP_PERMISSIONS=1` to skip install-time desktop onboarding.
+CI and package-development installs skip it automatically. The helper never bypasses macOS TCC,
+Windows secure desktops, or other OS permission boundaries.
 
 Recent pnpm releases may require explicit approval before running lifecycle
 scripts from dependencies. If pnpm reports `ERR_PNPM_IGNORED_BUILDS`, approve
@@ -335,7 +360,10 @@ npm run lint
 ```
 
 The adapter tests use a fake native MCP server and never require a real desktop.
-Live desktop validation must be run separately on each supported OS.
+The repository CI is configured to run them on Linux, macOS, and Windows across
+maintained Node lines. Live desktop validation remains a separate release check for native input,
+capture, focus, and accessibility behavior.
+Use `docs/NATIVE_VALIDATION.md` for the per-OS certification checklist.
 
 ## License and attribution
 

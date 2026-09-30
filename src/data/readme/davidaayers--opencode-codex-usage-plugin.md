@@ -16,7 +16,7 @@ This is a maintained fork of [zaniluca/opencode-codex-usage-plugin](https://gith
 - **Proximity colors** — gauge and percentage use the active theme: `success` <50% → `accent` 50–74% → `warning` 75–89% → `error` ≥90%
 - **Reset countdowns** — short reset times appear beneath each available window
 - **Compact prompt line** — identifies the most constrained window when the sidebar is hidden
-- **Codex App/CLI support** — reads usage through the Codex app-server protocol with command discovery and fallback handling
+- **Codex App/CLI support** — reads usage through the Codex app-server protocol, sharing a WebSocket-over-Unix server across OpenCode instances
 - **Live updates** — refreshes every 60 seconds and on message/session events
 - **Silent by design** — hidden for non-Codex sessions
 
@@ -54,7 +54,7 @@ export OPENCODE_CODEX_USAGE_COMMAND="/path/to/codex"
 
 - **Usage source**: the Codex app-server provides normalized 5-hour and weekly rate-limit windows.
 - **Rendering**: the plugin uses OpenTUI and the active OpenCode theme, with the gauge renderer kept separate from the Codex transport.
-- **Lifecycle**: the existing Effect-based service owns command discovery, socket reuse, stdio fallback, request timeouts, and cleanup.
+- **Lifecycle**: the Effect-based service reuses or starts a shared Codex app-server over a Unix socket, connects with WebSocket, and falls back to a dedicated stdio server when the shared path is unavailable. It owns request timeouts and connection cleanup.
 
 ## Development
 

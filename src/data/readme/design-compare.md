@@ -90,6 +90,8 @@ image A / B のいずれかが一様と検出された場合、status / match_ra
 | `web_layout` | string | `layout_tree` / `layout_integrity` | Web DOM ノードリストの JSON 文字列（インライン指定）。`web_layout_path` と排他で、どちらか一方が必須。 |
 | `web_layout_path` | string | `layout_tree` / `layout_integrity` | Web DOM ノードリスト JSON ファイルのローカルパス。`web_layout` と排他。 |
 
+画像の幅・高さはそれぞれ最大 8192px。超過時は自動リサイズされずエラーになるため、比較前にリサイズまたは切り出しが必要。あわせてフルデコード前に各辺 30,000px / 総ピクセル 50,000,000 の上限も検査し、超過時は展開せずエラーになる。
+
 ### 比較条件（閾値・除外・ビューポート）
 
 | パラメータ | 型 | 対象モード | 範囲 | デフォルト | 説明 |
@@ -201,6 +203,7 @@ image A / B のいずれかが一様と検出された場合、status / match_ra
 | `unmatched_ignore_regions` | string[] | 非空時のみ | どのノード中心とも重ならない `ignore_region`。 |
 | `extra_web_nodes` | string[] | 非空時のみ | 余分な Web ノードのセレクタ。 |
 | `mismatched_nodes` | object[] | 非空時のみ | tolerance 超過の不一致ペア。`figma_name` / `web_selector` / `diff` / `dx` / `dy` / `dw` / `dh`（`details` の幾何差分と同じ数値）。 |
+| `mismatched_pairs` | object[] | 非空時のみ | 不一致ペア（tolerance 超過と Web 候補枯渇の両方）。`figma_name` / `reason`（`exceeds_tolerance` \| `no_unused_web_elements`）。超過時は `web_selector` / `geometric_diff` / `tolerance` も付く。 |
 | `zero_geometry_warning` | string | 非空時のみ | 過半数ノードの `w`/`h` が 0 のときの誤用検出。 |
 | `unresolved_parent_refs` | string[] | 非空時のみ | 解決できない `parent` 参照。 |
 
@@ -351,7 +354,7 @@ pi remove npm:design-compare   # アンインストール
    Retinaディスプレイ環境と非Retina環境では、スクリーンショットの画素数や縮小処理時のブレンドピクセルが変化します。
 3. **GPUハードウェアアクセラレーションの差:**
    ブラウザのGPUレンダリングによって、グラデーションや色の境界部分で数カラー値の微差が生じることがあります。
-4. **巨大画像:** `perceptual` / `strict` はフルデコード前にヘッダ寸法を確認し、各辺 30,000px または総ピクセル 50,000,000 を超える入力は展開せずエラーにする（フルページ撮り直しミスなどによる OOM 防止）。超過時はリサイズまたは切り出しが必要。
+4. **巨大画像:** 画像入力の唯一の通過点で、PNG（IHDR）と GIF（Logical Screen Descriptor）の先頭バイトから各辺 8192px 超をデコード前に拒否する（JPEG・WebP はヘッダ解析が複雑なためこの段階では対象外。後段の `DecodeConfig` / 展開後チェックが担保する）。あわせてフルデコード前にヘッダ寸法を確認し、各辺 30,000px または総ピクセル 50,000,000 を超える入力は展開せずエラーにする（フルページ撮り直しミスなどによる OOM 防止）。超過時はリサイズまたは切り出しが必要。
 
 ---
 

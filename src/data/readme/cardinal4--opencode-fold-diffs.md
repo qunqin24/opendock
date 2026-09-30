@@ -1,8 +1,15 @@
 # opencode-fold-diffs
 
+> [!IMPORTANT]
+> **This is a fork, and it exists for one reason: OpenCode V2 support.**
+>
+> The original plugin is **[Tanner Bruhn](https://github.com/tannerbruhn)**'s [`tannerbruhn/opencode-fold-diffs`](https://github.com/tannerbruhn/opencode-fold-diffs) (npm: `opencode-fold-diffs`) — the **OpenCode V1** plugin, whose V1 implementation does not run in V2. This fork — [`cardin/opencode-fold-diffs`](https://github.com/cardin/opencode-fold-diffs), published as [`@cardinal4/opencode-fold-diffs`](https://www.npmjs.com/package/@cardinal4/opencode-fold-diffs) — ports it to **OpenCode V2** (the `@opencode/cli` 2.x line, `opencode v2.0.x`). Install this fork if you are on V2; install upstream if you are on V1.
+>
+> **All credit for the original plugin goes to [Tanner Bruhn](https://github.com/tannerbruhn).** This fork is unofficial and independent: Tanner has not reviewed it, does not maintain it, and does not endorse it. Report bugs in this fork here, not upstream.
+
 **Every `write` and `edit` dumps the whole file or the whole diff into your transcript, and stays there.** This plugin folds those blocks down to their header line — `# Wrote 40 lines · click to expand  src/app.ts` — and opens them again on click, or with a fold/unfold-all key if you configure one.
 
-This branch targets **OpenCode V2** (the `@opencode/cli` 2.x line, `opencode v2.0.x`). The V1 plugin implementation does not run in V2; see [Migrating from V1](#migrating-from-v1).
+The V2 port is not a re-host: it follows V2's new plugin API and render tree, so the V1 code cannot be reused. See [Migrating from V1](#migrating-from-v1) for what changed.
 
 ## What V2 already folds
 
@@ -121,7 +128,7 @@ Blocks are re-scanned on `message.part.updated` and `message.updated`, plus a 2 
 
 ## Migrating from V1
 
-V1 plugin implementations do not run in V2. This branch made these changes:
+V1 plugin implementations do not run in V2. The V2 port made these changes:
 
 - Entrypoint is a `{ id, setup(context) }` definition (`Plugin.define()` is an identity helper, so the shape is the same). `setup` returns the cleanup function instead of `api.lifecycle.onDispose`.
 - `api.renderer` → `context.renderer`; `api.route.current.name` → `context.ui.router.current().type`; `api.event.on` → `context.data.on`; `api.ui.toast` → `context.ui.toast.show`; `api.keymap.registerLayer` → `context.keymap.layer`.

@@ -20,6 +20,8 @@ Pi extension (extensions/index.ts) / OpenCode V2 plugin (index.ts) / Amp plugin 
 
 Jev selects from finite operations and compatible targets derived from the current page. TYPE values come from `values`; missing values return `input_required`. Password, token, and secret values are redacted from Jev requests, and a field that already holds the caller's value is not offered again, so a filled secret field is never retyped. The operation question states that PRESS Enter submits a filled form with no visible submit control, which keeps the model from stalling on search boxes that render no button.
 
+The action space also offers HOVER on relevant interactive controls, BACK/FORWARD history navigation, RELOAD, and a finite PRESS key list (Enter, Escape, Tab/Shift+Tab, Space, arrow and page navigation keys, Backspace, Delete, Control+a). It does not offer arbitrary keystrokes, drag-and-drop, uploads, or iframe switching.
+
 ## Install
 
 Install and provision the `agent-browser` runtime once, on the machine that runs the tool:
@@ -181,7 +183,7 @@ Precedence is OpenCode options (OpenCode only), environment variables, explicit/
 - Destructive or commitment actions return `needs_confirmation`; `allow_risky: true` authorizes execution.
 - Repeated actions and no-progress runs have small fixed budgets.
 - `DONE` or high `goal_completed` returns `done` with passing verifiers and `likely_done` otherwise.
-- Sessions close by default. `keep_session: true` returns a `session_id` that preserves cookies and page state for a follow-up call.
+- Sessions close by default, including after `input_required`, `ambiguous`, `needs_confirmation`, and `likely_done`. If a follow-up is likely, set `keep_session: true` on the first call. Reuse the returned `session_id` and handoff `url` (not necessarily the original starting URL) on the next call. Omit `keep_session` on the final call to close the resumed session; if no follow-up is needed, close it with `agent-browser --session <session_id> close`. Retained sessions have no automatic expiry.
 - Initial loads wait for DOM content, empty observations are retried briefly, and navigation-like actions receive a short settle delay.
 - Read-only verifiers may pass on the initial page; set `require_action: true` for goals that must click, switch, or submit before completion.
 - Development and tunneled environments can use `ignore_https_errors`, `ca_cert`, `proxy`, `proxy_bypass`, and structured `host_mappings`.

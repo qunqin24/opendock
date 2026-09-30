@@ -2,6 +2,15 @@
 
 TypeScript packages for OpenCode and Pi: shared macOS media controls, Vim-style prompt editing, and a multi-role development workflow. OpenCode plugins precompile JSX and use host-provided runtime libraries. Pi packages publish TypeScript source.
 
+<table>
+    <tr>
+      <td width="50%" align="center"><a href="packages/pi-music-dock/README.md"><img src="https://raw.githubusercontent.com/naxodev/ai/main/docs/media/pi-music-dock/preview.png" alt="Pi music panel with native album artwork, track metadata, waveform, and progress" width="480" /><br /><sub><b>@naxodev/pi-music-dock</b> — Now Playing panel and chip for Pi</sub></a></td>
+      <td width="50%" align="center"><a href="packages/opencode-music-player/README.md"><img src="https://raw.githubusercontent.com/naxodev/ai/main/docs/media/opencode-music-player/preview.png" alt="OpenCode sidebar with demo album artwork, seek bar, transport controls, and compact music row" width="480" /><br /><sub><b>@naxodev/opencode-music-player</b> — sidebar player for OpenCode</sub></a></td>
+    </tr>
+</table>
+
+[Screenshots and silent demos for all six packages](docs/media/README.md). Captures use isolated demo data; see the gallery for versions and verification scope.
+
 ## Packages
 
 | Package                                                                      | Purpose                                           | Platform and host support                             |

@@ -44,8 +44,11 @@ The v2 plugin API is missing a few surfaces the v1 API had. On 2.x:
 - **Plugin state survives reloads.** Editing the plugin (or `opencode
   plugin update`) reloads it, but extraction buffers, watcher
   registrations, and armed wrap-ups are journaled and restored; a process
-  restart restores the state of a resumed (`-c`/`-s`) session and prunes
-  the rest.
+  restart restores the state of a resumed (`-c`/`-s`) session. Other
+  sessions' watcher registrations survive as dormant definitions: resuming
+  such a session re-arms its watches on the first message (expired ones
+  are dropped and reported), and a live session in the same project gets a
+  one-line notice that a dead session's watch will re-arm if resumed.
 - **Extraction children are visible.** The fact-extractor child sessions are
   top-level sessions the host cannot delete, so they accumulate in the
   session picker, and "continue last session" (`-c`) can land in one after
@@ -56,8 +59,12 @@ The v2 plugin API is missing a few surfaces the v1 API had. On 2.x:
   cannot auto-exit for the same reason.
 - **No `-c` session listing.** The chat resume listing degrades.
 
-Everything else - tools, memory, nudges, chat, watchers - behaves the same
-on both versions.
+Everything else - tools, memory, nudges, chat, watchers - behaves the
+same on both versions, with one caveat: v2 has no turn-free delivery
+(noReply), so the features that lean on it - the chat transcript echo
+bubble, the session-start reminder, and the post-reload re-attach
+notice - do not render on 2.x. Their model-facing content still
+arrives; only the bubble rendering is lost.
 
 Then **prime your project memory** by running `thatch prime` in your project directory.
 This launches an `opencode` session to build an initial map of the code base
@@ -198,10 +205,13 @@ Thatch gives your agent:
   the agent lists them and nothing fires -- you decide when to retry.
 - **Notifications + user config** -- the agent can ping you out-of-band when a
   long-running outcome lands: a desktop banner, a spoken voice
-  announcement, or both (macOS and Linux). Preferences live in a
+  announcement, or both (macOS and Linux). On opencode, thatch also watches
+  the session and alerts you automatically when the LLM pauses for your
+  input (a question or permission prompt) or finishes a round of real work
+  -- bookkeeping rounds stay silent. Preferences live in a
   hand-editable config file (`~/.config/thatch/config.json`) that the agent
-  manages through `config_get`/`config_set` -- ask it to change your voice
-  or quiet notifications entirely.
+  manages through `config_get`/`config_set` -- ask it to change your voice,
+  quiet notifications entirely, or tune which alerts fire.
 
 Plus **skills** for memory workflows, structured multi-specialist code
 review, review response, plan refinement, change and feature walkthroughs,

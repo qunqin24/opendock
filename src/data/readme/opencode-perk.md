@@ -1,112 +1,143 @@
 # perk
 
-*A minimal mechanism for letting a harnessed model perk up at the outside world.*
+[![npm](https://img.shields.io/npm/v/opencode-perk)](https://www.npmjs.com/package/opencode-perk)
+[![publish](https://github.com/rndmcnlly/opencode-perk/actions/workflows/publish.yml/badge.svg)](https://github.com/rndmcnlly/opencode-perk/actions/workflows/publish.yml)
+[![downloads](https://img.shields.io/npm/dm/opencode-perk)](https://www.npmjs.com/package/opencode-perk)
 
-> **Proof of concept.** This repo demonstrates a general pattern: giving an
-> agent a controllable way to *speak out of turn*, woken by the world rather
-> than only by a human typing. The reference implementation is a small modular
-> plugin for [opencode](https://opencode.ai), verified against **1.18.3**, with a
-> generated single-file bundle for drop-in installation. The pattern is not
-> specific to opencode. If you maintain a different agent harness, steal it.
+*Background jobs for OpenCode agents that report back when they finish, or
+when they make important progress along the way.*
 
-> **OpenCode V1 project.** Perk works with OpenCode V1, but we do not plan to
-> evolve this plugin for V2. OpenCode V2 already has native background shell
-> tasks, so it does not need perk's job runner. V2 does not yet have an
-> equivalent of perk's drip channel (or Claude Code's Monitor tool); that gap
-> would be better explored in a separate plugin built for V2's plugin
-> architecture. The associated OpenChamber background-jobs panel is likewise
-> a V1 companion: as OpenChamber adopts V2, a job visualization belongs to
-> OpenChamber's native job experience rather than to perk. We are using V2
-> before deciding whether or how to build that separate monitor.
+When a coding agent runs a long build, a test suite, or a training run, it
+normally sits in a blocking shell call and you sit there with it. perk gives
+the agent a `bash_background` tool instead. The agent starts the command, ends
+its turn, and the conversation is yours again. When the job finishes, a new
+message lands in the conversation with the exit code and how much output it
+produced, and the agent picks up from there. A job that is still running can
+also send updates when it has something worth saying.
 
-## The idea in one sentence
+Most agent turns don't involve a long wait, but the few that do can take a
+very long time. Getting the conversation back during that wait is partly about
+time, and partly about what you can do with it. You can ask why the job is
+worth waiting for, whether it could be done differently or faster, or talk
+about something else while it cooks. Sometimes that side conversation shows
+the job should be cancelled.
 
-`perk` lets an agent launch a background job without blocking the conversation,
-then receive progress drips when the job emits them and a final completion
-signal, each as a new conversational turn.
+## Where this stands: OpenCode V1 and V2
 
-## The gap it fills
+Background shell jobs were a critical missing feature in OpenCode V1, and perk
+filled that gap as a plugin. OpenCode V2 made them a core feature, including
+the return path: a finished job notifies the conversation on its own. perk
+does not run on V2 at all, because V2's plugin architecture is incompatible
+with V1 plugins.
 
-A harnessed model today is purely reactive in one direction: the human speaks,
-the model answers, the model goes quiet. The only thing that produces the next
-turn is a person typing. The model cannot wait on anything, cannot be woken,
-cannot speak out of turn. Every "wait for X" is faked by burning a turn on a
-blocking call, which freezes the conversation (and the spend) until X resolves.
+The narrow thing V2 still lacks is incremental updates from a job that is
+still running (perk's `$PERK_DRIP`, described below). For V2, that piece
+lives in [opencode-monitor](https://github.com/rndmcnlly/opencode-monitor), a
+small plugin that adds a
+`monitor: true` flag to V2's native background shell, so each line the command
+prints arrives in the conversation while it runs. perk remains a working V1
+plugin, verified against OpenCode 1.18.3.
 
-`perk` adds the missing afferent channel. The model fires a background job, ends
-its turn normally, and goes idle. Later, when the job finishes, the harness
-injects a turn as if the world had spoken. The human and the world become peers:
-either can produce the next turn.
+## Where it came from
 
-The key realization: **there is no blocking wait to interrupt.**
-"User-interruptible waiting" dissolves into "two turn-producers feeding one
-serialized conversation." The human typing and the world finishing a job arrive
-through the same door.
+With my Computational Media MS student Ivan Martinez-Arias, I built
+[Live Coaches](https://escholarship.org/uc/item/2pb8x2jg): AI assistants that
+help players while they play, aware of what is happening in the game right
+now. Our custom harness fed incremental updates from the game into the
+assistant's conversation as they happened, so the assistant could respond to
+the world without waiting for the player to describe it. A few months later I
+wanted the same capability in my everyday coding agent, in a general form where
+any shell command could produce the next turn.
 
-## One primitive
+perk is that generalization. Claude Code had shipped a similar
+[Monitor tool](https://code.claude.com/docs/en/whats-new/2026-w15) in April
+2026, which I only learned about later. Two independent designs landing in the
+same place suggests this is a feature harnesses need.
 
-perk is a single tool.
+## What it does for you
 
-| Tool | What it does |
-| --- | --- |
-| `bash_background({ command, timeout?, workdir?, label?, expected_ms?, coalesce_ms? })` | Run a shell command as a detached fire-and-forget job. Returns *immediately* (does not block) with the job's `pgid` and sidecar directory. `workdir` defaults to the session directory; `timeout` defaults to 3600000 ms because background work commonly outlives native `bash`'s two-minute foreground window. `label` and `expected_ms` are optional display hints. When the job finishes, perk injects a turn reporting the outcome and captured-output sizes. A still-running job can push interim turns by appending to `$PERK_DRIP`; `coalesce_ms` controls its quiet-gap interval. |
+### Keep talking while a job runs
 
-That's the whole surface.
+```
+bash_background({ command: "make build" })
+```
 
-With the optional [OpenChamber companion panel](./openchamber-extension/README.md),
-those same jobs appear as cards with status, elapsed time, live output, and a
-stop control for running jobs. Here, several audio-processing jobs run side by
-side while the conversation stays responsive:
+The call returns immediately. stdout, stderr, and the exit code are captured to
+files in a private temp directory, and the tool tells the agent where they
+are. When the build exits, the agent gets a message like
+`Job 3fa18c2e exited 2: out 0 bytes, err 1843 bytes` and reads the output only
+if something is worth reading. stderr contents are never pasted into the
+conversation automatically.
 
-<a href="./assets/openchamber-background-jobs.png"><img src="./assets/openchamber-background-jobs.png" alt="OpenChamber Background jobs panel showing completed and running jobs, live output, and a Stop control" width="440"></a>
+`workdir` defaults to the session directory, as with the built-in `bash`.
+`timeout` defaults to one hour (the built-in `bash` stops at two minutes),
+after which perk stops the job and reports a timeout. `label` and
+`expected_ms` are optional hints for display.
 
-## How it works (the pattern)
+### Wait for anything you can express in shell
 
-Two ingredients, both of which most harnesses already have:
+Because a job is just a command, "tell me when X happens" is a command that
+exits when X happens:
 
-1. **A way to inject a turn into a session** out of band (here:
-   opencode's fire-and-forget `client.session.promptAsync`).
-2. **A sense organ** that watches the observable. perk uses a **stat-poll loop**
-   over the files each running job produces: chiefly its *exit-code file*, which
-   the runtime writes atomically after receiving the shell result or finishing
-   a requested termination, so its appearance is a completion signal; and its *drip file*
-   (below), tailed for interim events.
+```
+bash_background({ command: "until [ -e results.csv ]; do sleep 1; done" })
+```
 
-When a job's exit file appears, perk injects a turn into the firing session
-describing the outcome (exit code, cancellation, or timeout, and captured-output byte sizes).
-The wake text is generated, not canned. Captured stderr content remains local in
-the reported file and is never copied automatically into the conversation. perk
-does not try to avoid landing a turn
-mid-flight; an agent that cannot tolerate an interleaved notification should not
-be using perk.
+A file appearing, a port opening, a lock releasing, a remote job finishing:
+anything you can wait on in a shell loop can wake the agent.
 
-A second, optional sense organ makes one job a *stream* rather than a single
-end-of-job signal: each job also gets an append-only **drip file**
-(`<job-dir>/drip`), exposed to the command as `$PERK_DRIP`. A still-running
-job that appends to it (`echo ... >> "$PERK_DRIP"`) pushes interim turns back to
-the agent without ever re-arming a new `bash_background`. perk tails the drip
-file with the same poll loop and performs **temporal summation**: it withholds
-while the file is still growing, and once it settles for one refractory window
-it fires the accumulated bytes as a single turn (a
-**spike**). Writes within a window coalesce into one spike; writes spaced
-further apart fire as separate spikes. The quiet gap *is* the message
-delimiter, so the job needs no framing protocol: to send two separate spikes,
-sleep past the window between them. The drip is the stimulus, the spike is the
-response, and the two rates are deliberately decoupled by the coalescer, exactly
-as a neuron decouples input rate from firing rate. A streaming job's natural
-history is zero-or-more spikes, then one terminal exit turn (any unfired drip
-tail is flushed as a final spike first, so no byte is dropped). Every injected
-turn names its job, so interleaved streams from concurrent jobs stay
-disambiguable. A job that never touches `$PERK_DRIP` behaves exactly as the
-one-shot original. Drip input is UTF-8 and append-only. perk preserves characters
-whose bytes straddle poll reads; if it observes truncation or file replacement,
-it emits a diagnostic spike and restarts decoding from the new file. Empty and
-whitespace-only writes are retained in the artifact but do not produce turns.
+### Get progress updates from a running job
 
-## Install (opencode)
+Every job has `$PERK_DRIP` set to a file. Anything appended to it arrives in
+the conversation as its own message, while the job is still running:
 
-**From npm (recommended).** Add the `latest` npm dist-tag to the `plugin`
-array in your `opencode.json` (project or global):
+```
+bash_background({ command: '
+  for page in 1 2 3; do
+    build_page "$page"
+    echo "built page $page" >> "$PERK_DRIP"
+    sleep 2
+  done
+' })
+```
+
+The agent sees `Spike from job 3fa18c2e: built page 1`, then page 2, then
+page 3, then the usual exit message. Writes that land close together are
+grouped into one message, and a pause of more than a second separates
+messages. Pass `coalesce_ms` to change that interval (minimum 300 ms). Jobs
+that never touch `$PERK_DRIP` just report once, at the end.
+
+### Stop a job
+
+The tool returns the job's process-group id. `kill -TERM -<pgid>` (note the
+minus) stops the command and everything it started, and the agent gets a
+cancellation message. This makes long-lived jobs like dev servers safe to
+start:
+
+```
+bash_background({ command: "npm run dev", timeout: 14400000 })
+```
+
+Running jobs are also stopped when OpenCode shuts down normally. If OpenCode
+crashes or is killed with `kill -9`, use the pgid to clean up by hand.
+
+### Headless runs
+
+The return message depends on a live session to deliver it. In an interactive
+session, the agent should just end its turn. Under `opencode run`, ending the
+turn ends the process, so the agent should wait in the foreground on the exit
+file the tool returned:
+
+```bash
+until [ -e <exit-file> ]; do sleep 0.3; done
+```
+
+The exit file appears only after the job has finished (or been stopped) and
+its output is flushed.
+
+## Install
+
+Add perk to the `plugin` array in your `opencode.json` (project or global):
 
 ```json
 {
@@ -115,297 +146,80 @@ array in your `opencode.json` (project or global):
 }
 ```
 
-opencode installs it with Bun at startup and `bash_background` becomes available
-to the model. No build step on your end.
+OpenCode installs it at startup and `bash_background` becomes available to the
+model.
 
-### Updating the npm installation
-
-`@latest` expresses the intended update channel, but some OpenCode releases can
-retain an older resolved npm plugin in their per-plugin cache. When a new perk
-release is available, quit OpenCode, then remove only perk's cached resolution:
+Some OpenCode releases keep an older cached copy even with `@latest`. To pick
+up a new release, quit OpenCode, delete perk's cache entry, and restart:
 
 ```bash
 rm -rf "${XDG_CACHE_HOME:-$HOME/.cache}/opencode/packages/opencode-perk@latest"
 ```
 
-Restart OpenCode and it will install the current `latest` release. Maintainers
-working from this checkout can run the equivalent command with:
+(From this checkout, `npm run refresh:opencode` does the same.)
 
-```bash
-npm run refresh:opencode
-```
-
-**Drop-in single file (no config entry).** The npm package includes a generated
-single-file bundle with no runtime dependency beyond the OpenCode plugin SDK.
-Download a pinned release into your plugin directory, where opencode
-auto-discovers it:
+To skip the config entry, drop the single-file bundle into a plugin directory,
+where OpenCode finds it automatically:
 
 ```bash
 mkdir -p .opencode/plugin
 curl -o .opencode/plugin/perk.js \
-  https://unpkg.com/opencode-perk@0.4.0/dist/perk.js
+  https://unpkg.com/opencode-perk@latest/dist/perk.js
 ```
 
-Use `~/.config/opencode/plugin/` instead for a global install. Either way, boot
-opencode and the tool is live.
+Use `~/.config/opencode/plugin/` instead for a global install.
 
-## Example: a non-blocking background job
+## The OpenChamber panel
 
-The whole point of the afferent channel is to stop faking "wait for X" by
-blocking a turn. Hand `bash_background` a command and nothing else:
+If you use [OpenChamber](https://github.com/openchamber/openchamber), the
+optional [background-jobs panel](./openchamber-extension/README.md) shows each
+job as a card with its status, elapsed time, live output, and a stop button.
+Here several audio-processing jobs run side by side while the conversation
+stays free:
 
-```
-bash_background({ command: "make build" })
-```
+<a href="./assets/openchamber-background-jobs.png"><img src="./assets/openchamber-background-jobs.png" alt="OpenChamber Background jobs panel showing completed and running jobs, live output, and a Stop control" width="440"></a>
 
-It runs the command detached, returns immediately, and captures
-stdout/stderr/exit-code to files for you. You end your turn and go idle; when the
-build exits, perk hands you a turn reporting the exit code and the byte sizes
-of the captured output, so you read the output files only if there
-is something worth reading. No polling, no blocked turn, no paths to invent, no
-hand-rolled backgrounding. In particular, stderr is not excerpted automatically:
-the byte count tells you whether the local `err` file is worth inspecting without
-disclosing its possibly sensitive contents to the conversation.
+Messages from perk arrive with the `user` role, since that is how OpenCode
+injects a turn. Each one carries `metadata.source: "opencode-perk"` on its text
+part, so a client can tell them apart from messages a person typed and display
+them differently.
 
-As with native `bash`, `workdir` selects the command's working directory and
-defaults to the session directory. `timeout` is a positive integer in
-milliseconds. It defaults to `3600000` (one hour), reflecting the longer
-workloads this tool is for. On the first monitor pass at or after the deadline,
-the runtime sends TERM to the process group, then escalates to KILL after a
-1000 ms grace period if needed. Completion reports a timeout rather than a
-cancellation. Deadlines use a monotonic clock, unaffected by wall-clock changes.
+## For harness authors
 
-The immutable `launch.json`, output, progress, cancellation request, and exit
-code land under `os.tmpdir()/opencode/perk/` (normally
-`$TMPDIR/opencode/perk/` on macOS), which opencode allows its file tools to
-access without an external-directory prompt. Each job gets a short random
-directory containing `launch.json`, `out`, `err`, `drip`, an optional `cancel`
-request, the shell's `result`, and the runtime's atomic completion gate `exit`.
-Nothing is written into the project. Completed job directories expire after 24
-hours.
-Runtime logging is off by default; set `PERK_LOG=1` before starting opencode to
-write the spool's `log` file, or set it to an explicit path.
+Nothing here is conceptually specific to OpenCode. You need two things: a way to inject a
+turn into a live session, and something that watches for a job to finish. perk
+uses OpenCode's `session.promptAsync` and a loop that polls for each job's exit
+file. If your harness can do the first, you can build the rest.
 
-`launch.json` uses schema version 2 with millisecond duration fields. The
-OpenChamber observer also reads version 1, converting legacy `expectedSeconds`
-estimates to milliseconds and leaving unrecorded deadlines unspecified. Shared
-types, validation, and outcome wording live in `src/protocol.ts`.
+## Files and logs
 
-## Example: wait on any observable
+Each job gets a private directory under `os.tmpdir()/opencode/perk/` holding
+its launch record, `out`, `err`, `drip`, and `exit` files. Nothing is written
+into your project, and finished job directories are deleted after 24 hours.
+Logging is off by default. Set `PERK_LOG=1` before starting OpenCode to log to
+the spool's `log` file, or set it to a path.
 
-Because the job is an arbitrary shell command, "wait for X" is just a command
-that blocks until X happens, then exits. Anything you can express as a shell
-condition becomes something perk can wake you on:
+## Develop and test
 
-```
-bash_background({ command: "until [ -e some.file ]; do sleep 0.3; done" })
-```
-
-The poll loop lives inside the command, so perk needs exactly one sense organ (a
-job's exit-code file) yet covers any waitable condition: a file appearing, a port
-opening, a lock releasing, a sub-process settling.
-
-## Example: stream interim events while running
-
-Sometimes one job has *several* things to report over its lifetime, not just a
-final exit. A watcher, a long build with phases, a tail of a log: you want the
-job to talk back as it goes, without spawning a fresh `bash_background` per
-event. Append to `$PERK_DRIP` (set automatically inside every job) and perk
-delivers what you write as conversational turns:
-
-```
-bash_background({ command: '
-  for page in 1 2 3; do
-    sleep 2
-    build_page "$page"
-    echo "built page $page" >> "$PERK_DRIP"   # one spike per iteration
-  done
-' })
-```
-
-Each `echo` (with the `sleep` ensuring a quiet gap around it) arrives as its own
-**spike**: a turn reading `Spike from job 3fa18c2e: built page 2`.
-When the loop ends, the usual exit turn follows. So this single call becomes a
-continuous incoming stream: zero or more spikes while it runs, then one exit
-turn.
-
-The delivery rule is **coalescing by quiet gap** (temporal summation): a burst
-of appends that goes quiet for the configured interval is delivered as *one* spike;
-appends spaced further apart arrive separately. You therefore control
-segmentation purely by timing, with no delimiter protocol: write a multi-line
-block in one breath and it lands as one spike. The interval defaults to 1000 ms
-and can be set per call with `coalesce_ms` (values below `300` are clamped), for
-example `bash_background({ command: "watch-build", coalesce_ms: 5000 })` for
-slower phase reports. Sleep longer than the selected interval between events you
-want delivered separately. Inspect what the agent will receive at any
-time with `tail -f <job-dir>/drip`, using the directory returned by the tool.
-Write UTF-8 by appending only. Whitespace-only appends do not fire; replacing or
-truncating the file is a contract violation that produces a diagnostic spike and
-resets decoding if perk observes it.
-
-Tear-down is unchanged: a long-lived streaming job (a watcher, a dev server) is
-killed with its pgid exactly as below.
-
-## Killing a job, and "die with opencode"
-
-`bash_background` returns the job's **process-group id** (`pgid`). Because
-the job is spawned `detached` it is its own process-group leader. A signal to
-the negated pgid reaches the wrapper, command, and descendants that remain in
-that group:
+To run your working copy in sessions started in this repo:
 
 ```bash
-kill -TERM -<pgid>      # leading minus = signal the whole process group
-```
-
-This matters for long-lived jobs like preview/dev servers
-(`bash_background({ command: "npm run dev", timeout: 14400000 })`): the agent gets a kill
-handle instead of an unstoppable orphan. The wrapper catches cooperative
-`HUP`, `INT`, and `TERM` signals and reports a result such as `cancelled:TERM`.
-Once the runtime observes that report, it finishes process-group cleanup before
-publishing `exit`. Interactive listeners receive a cancellation turn, and a
-foreground waiter on `exit` resolves.
-
-An observer may also create the job's private `cancel` marker. The owning perk
-runtime notices it and requests termination of its owned process group. This
-route also handles commands that ignore TERM: after 1000 ms it escalates to
-KILL, waits for group disappearance, and publishes `exit` itself. Timeout and
-shutdown use the same lifecycle. The first stop reason wins; a shell result
-already observed before the stop request retains its original outcome.
-This is how the optional
-OpenChamber panel requests cancellation without trusting a stale pgid from disk.
-
-The runtime is the only writer of `exit`. Its values are a numeric shell exit
-code, `cancelled:<signal>`, `timeout`, or `shutdown`. If a group disappears
-without a shell result or an owned stop request, it records `cancelled:unknown`.
-The panel and conversational messages interpret these values identically.
-
-Jobs also **die with opencode on a graceful shutdown.** The plugin tracks every
-running job, including launches still reaching their spawn event, and awaits
-termination in its `dispose` hook, which opencode calls on teardown. The case
-this cannot cover is a hard
-crash or `kill -9` of opencode itself (uncatchable); the returned pgid is the
-manual remedy there.
-
-## Interactive vs. headless: end your turn, or block in foreground
-
-perk's wake works by *injecting a turn into a live session*. That assumes the
-session is still running after the agent stops.
-
-- **Human present (interactive TUI):** ending a turn means going idle, the
-  process keeps running, and the human typing or perk's injection both produce
-  the next turn. **Just end your turn.** No blocking, no wasted spend, woken for
-  free. This is strictly the right move.
-
-- **No human (headless, `opencode run`):** ending a turn means the **process
-  exits**, so there is no idle state to wake and the injected turn would arrive
-  into nothing. Instead, block in **foreground bash** on the exit-file path the
-  tool already handed you:
-
-  ```bash
-  until [ -e <exit-file> ]; do sleep 0.3; done
-  ```
-
-  This plain-shell wait keeps the host and its runtime alive to supervise the
-  job. The runtime publishes `exit` atomically after observing completion or
-  finishing termination. When the wait returns, read the captured output.
-
-When a job is stopped through the documented `kill -TERM -<pgid>` path, the same
-gate appears with `cancelled:TERM` rather than a numeric exit code, so this wait
-also resolves after cancellation.
-
-If an `opencode run` process itself was started inside a perk job, it inherits the
-outer job's environment. perk masks that inherited `$PERK_DRIP` from the nested
-harness's foreground shell calls; only a new `bash_background` wrapper exposes a
-job-local drip path. This prevents a nested agent from accidentally writing into
-its parent's stream.
-
-> **Caveat (poka-yoke gap):** the plugin cannot currently tell from its inputs
-> whether it is interactive or headless, so it cannot enforce this; it can only
-> advise via the tool description. Closing that gap (detecting run mode and
-> hard-steering the agent) is open work.
-
-## Why a dedicated tool and not a flag on `bash`
-
-An earlier design hooked the builtin `bash` and silently rewrote the agent's
-`command` into detach scaffolding before running it. Since the transcript is the
-agent's only memory, the agent would later read scaffolding it never typed and
-conclude it had erred (see issue #2). A separate tool records exactly what the
-agent typed; the scaffolding stays inside the implementation where it belongs.
-
-## Scope, and how perk relates to background-*agent* plugins
-
-perk is **the sense, not the plumbing**. It owns waking the agent; it does *not*
-own task durability, scheduling, result persistence, or workflow state. That
-single inversion is why this is a tiny plugin and not an orchestration platform,
-and why the conversational-interrupt problem disappears instead of needing
-machinery.
-
-This is the opposite end from delegation plugins like
-[`kdcokenny/opencode-background-agents`](https://github.com/kdcokenny/opencode-background-agents),
-which is the **efferent** side: delegate a *sub-agent*, persist its distilled
-result to markdown so it survives context compaction, and notify on completion.
-That plugin is about *what to run and how to remember its output*; perk is about
-*how the world gets a turn*. perk does not care what produced the signal: a
-build, a timer, a sub-agent, a webhook receiver writing a file. They compose
-cleanly: a delegation plugin could use perk as its wake mechanism, or perk can
-wrap a sub-agent run directly:
-
-```
-bash_background({ command: "opencode run 'do the long research thing'" })
-```
-
-The general "react to any observable" pattern can outlive this implementation.
-OpenCode V2 already provides the background-task machinery, so extending this
-V1 runner into V2 would duplicate core behavior.
-
-## Steal this
-
-The reference implementation targets one harness, but the pattern is portable.
-If your harness can inject a turn into a live session, you can build perk on top
-of it. The watcher can be anything that produces a signal; the filesystem is
-just the cheapest universal one.
-
-## Develop (and self-demo this repo)
-
-This repo is package source, not a perpetually-armed demo: it does not load perk
-on itself by default. To dogfood your working copy, opt in by symlinking the
-source into the local plugin directory (gitignored, so it never gets committed):
-
-```bash
-npm install                       # provides @opencode-ai/plugin for the import
+npm install
 mkdir -p .opencode/plugin
 ln -s ../../src/index.ts .opencode/plugin/perk.ts
 ```
 
-opencode auto-loads `.opencode/plugin/`, follows the symlink to `src/index.ts`,
-and resolves its sibling source modules, so `bash_background` goes live from
-this checkout. Because it is a symlink, edits take effect on the next opencode
-start with nothing to copy. This project-local plugin is discovered only when
-opencode starts in this worktree; sessions elsewhere continue using any npm
-version in the global config. Remove `.opencode/` to disarm local development.
+Edits take effect the next time OpenCode starts here. Sessions elsewhere keep
+using the npm version. Remove `.opencode/` to stop.
 
-## Try it / verify it
-
-Run the deterministic unit and process integration suite first:
-
-```bash
-npm test
-```
-
-`npm run check` builds both the normal npm modules and the generated drop-in
-bundle before running the suite. Generated output lives under `dist/`, is
-included by `npm pack` / `npm publish`, and is not committed.
-
-[`TESTING.md`](./TESTING.md) is a self-test written *for a perk-enabled agent*:
-it walks the model through firing background jobs with its own
-`bash_background`, blocking on the rendezvous file, and observing itself
-getting woken. Point your agent at it to confirm the primitive end to end (and
-to feel the round-trip from the inside).
+`npm test` runs the unit and process tests. `npm run check` also builds the npm
+modules and the single-file bundle first. [`TESTING.md`](./TESTING.md) is a
+live test written for a perk-enabled agent to run on itself: it fires jobs,
+goes idle, and checks that it gets woken.
 
 ## Name
 
-The agent perks up: ears lifting at a sound from outside. The tool prefix reads
-as the gesture.
+The agent perks up, like ears lifting at a sound from outside.
 
 ## License
 

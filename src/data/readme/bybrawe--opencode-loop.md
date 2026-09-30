@@ -1,10 +1,23 @@
 # OpenCode Loop
 
+## Native OpenCode 2 (0.6.2)
+
+The npm and local-file V2 entrypoints now use the official `@opencode/plugin` `Plugin.define()` contract. The local installer writes a discovered plugin package directory with the generated runtime as a supporting module, while explicit `--legacy-v1` remains a separate compatibility path.
+
+The installer now defaults to the standalone native V2 plugin. It needs no V1 SDK or legacy command files for a local installation. Existing npm registrations migrate from `plugin` to `plugins` without dropping object options. Use `--legacy-v1` explicitly for the compatibility installation.
+
+V2 prompt admission and durable inbox/execution/compaction events own scheduling. Core-generated user-role messages never authorize a session abort. An unfinished dedicated Goal reserves its session, including paused and handed-off states; Loop does not wake or replace that Goal. Soft iteration timeouts do not abort a native model/tool/compaction turn.
+
+Scheduled shell commands use Loop-managed bounded local child processes; the OpenCode 2 `ctx.shell` surface is a hook domain, not a command-execution API. Automatic compaction stays host-owned. **The public OpenCode 2 SessionDomain has no manual compaction action, so `/loop-compact`, `--compact`, and `--compact-every` are rejected before job creation instead of probing undocumented `session.compact` fields.** Use OpenCode's built-in manual/automatic compaction on V2.
+
+Prompt/command timers, watch and stop conditions, verification, preflight/postrun, notifications, checkpoints and diagnostic commands use the V2 runtime. Uncertain restart admissions pause for review rather than replaying potentially admitted work. The dedicated `@bybrawe/opencode-goal` plugin owns `/goal`; legacy Loop Goal records are preserved and are not silently reinterpreted as new Goal contracts.
+
+
 **Idle-safe auto-continue, scheduled OpenCode work, and background loops.**
 
 OpenCode Loop adds `/loop`, scheduled prompt/command/shell jobs, compact scheduling, verification/checkpoints, and the `opencode-loopd` background daemon.
 
-> **Current stable release: `0.5.38`.**
+> **Current stable release: `0.6.2`.**
 
 ## Install or update
 

@@ -8,7 +8,8 @@ a static catalog that says nothing about your key. You may see models your key
 cannot call, miss models it can, and get no context limits or capabilities for
 Zeldoc's own models. This plugin asks Zeldoc which models your key has and
 builds the model picker from that answer. When a model is removed from your key,
-it disappears from OpenCode on the next start.
+it disappears from OpenCode on the next start (OpenCode 1) or within minutes
+(OpenCode 2).
 
 ## How it works
 
@@ -16,7 +17,7 @@ it disappears from OpenCode on the next start.
 OpenCode starts
         │
         ▼
-opencode-zeldoc (provider.models hook for "zeldoc")
+opencode-zeldoc (the "zeldoc" provider's model list)
         │  • GET https://api.zeldoc.ai/v1/zeldoc/models with your API key
         │  • keeps the chat models your key may call
         │  • per model: context/output limits, your price per 1M tokens,
@@ -38,6 +39,8 @@ The plugin is resilient by design:
 
 ## Install
 
+Works with OpenCode 1 (1.18.29 and newer) and OpenCode 2.
+
 ### From npm (recommended)
 
 Add to your `opencode.json` (global or per-project):
@@ -49,7 +52,8 @@ Add to your `opencode.json` (global or per-project):
 }
 ```
 
-OpenCode installs the plugin automatically on next launch via Bun.
+OpenCode installs the plugin automatically on next launch. OpenCode 2 reads
+this `plugin` key too; its native name is `plugins`.
 
 ### From source (for development)
 
@@ -62,6 +66,11 @@ source:
   "plugin": ["./src/index.ts"]
 }
 ```
+
+That path is for OpenCode 1. OpenCode 2 only loads plugin directories and
+looks for a `server` or `index` file in them, but 2.0.18 skips a directory that
+has no `server` file. Point it at a directory holding a `server.ts` with
+`export { default } from "<repo>/src/index.ts"`.
 
 ## Configure
 
@@ -79,8 +88,10 @@ The plugin uses that key. Without a stored login it falls back to the
 | `opencode auth login`    | A Zeldoc API key is stored (preferred)      |
 | `ZELDOC_API_KEY`         | No stored key                               |
 
-The model list is fetched when OpenCode starts. After a change to your key's
-models, restart OpenCode to see it.
+OpenCode 1 fetches the model list when it starts; restart it after a change to
+your key's models. OpenCode 2 keeps a background service running between
+sessions, so there the plugin also refreshes the list every 5 minutes and as
+soon as you log in with a different key.
 
 ## Develop
 

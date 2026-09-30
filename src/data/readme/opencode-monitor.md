@@ -186,15 +186,17 @@ otherwise the command's exit code.
 
 ```sh
 npm install
-npm run build       # compile dist/tui.jsx (server.ts is loaded from source)
+npm run build       # compile dist/tui.js (server.ts is loaded from source)
 npm test            # node:test
 npm run typecheck
 ```
 
 ### Publish
 
-`prepack` runs the build automatically, so the published tarball always contains
-the compiled `dist/tui.jsx` — OpenCode installs plugins with scripts disabled, so
+`prepack` compiles the Solid JSX to plain JavaScript because OpenTUI does not
+transform JSX in installed npm packages. Renderer imports stay external so the
+plugin shares OpenCode's renderer and reactive state. The build runs automatically, so the published tarball always contains
+the compiled `dist/tui.js` — OpenCode installs plugins with scripts disabled, so
 the artifact must ship prebuilt rather than being built on the user's machine:
 
 ```sh
