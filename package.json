@@ -14,7 +14,8 @@
     "astro": "astro",
     "data": "node scripts/fetch-plugins.mjs",
     "data:dev": "node scripts/fetch-plugins.mjs --limit 120",
-    "check": "astro check"
+    "check": "astro check",
+    "test": "node --test scripts/test/*.test.mjs"
   },
   "dependencies": {
     "@astrojs/react": "^6.0.2",

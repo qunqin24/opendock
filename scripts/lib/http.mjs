@@ -1,4 +1,5 @@
 import { execSync } from 'node:child_process';
+import { setTimeout as delay } from 'node:timers/promises';
 
 const UA = 'OpenDock/1.0 (+https://github.com/opendock; opencode plugin directory)';
 
@@ -19,27 +20,45 @@ export function githubToken() {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-/** fetch + JSON with retry/backoff. Returns `null` on 404 instead of throwing. */
-export async function getJSON(url, { headers = {}, retries = 4, allow404 = true } = {}) {
+/** JSON fetch with bounded attempts (including body reads) and abortable backoff. */
+export async function getJSON(url, {
+  headers = {}, retries = 4, allow404 = true, timeoutMs = 20_000,
+  maxRetryDelayMs = 30_000, signal,
+} = {}) {
   let lastErr;
   for (let attempt = 0; attempt <= retries; attempt++) {
+    signal?.throwIfAborted();
+    let retryDelay = 400 * 2 ** attempt;
     try {
-      const res = await fetch(url, { headers: { 'user-agent': UA, ...headers } });
-      if (res.status === 404 && allow404) return null;
-      if (res.status === 429 || res.status >= 500) {
-        // api.npmjs.org sits behind Cloudflare and throttles hard (code 1015),
-        // so 429 needs a much longer cool-off than a transient 5xx.
-        const retryAfter = Number(res.headers.get('retry-after')) || 0;
-        const base = res.status === 429 ? 3000 : 500;
-        await sleep(retryAfter * 1000 || base * 2 ** attempt);
-        continue;
+      const attemptSignal = AbortSignal.timeout(timeoutMs);
+      const res = await fetch(url, {
+        headers: { 'user-agent': UA, ...headers },
+        signal: signal ? AbortSignal.any([signal, attemptSignal]) : attemptSignal,
+      });
+      if (res.status === 404 && allow404) {
+        await res.body?.cancel();
+        return null;
       }
-      if (!res.ok) throw new Error(`${res.status} ${res.statusText} for ${url}`);
-      return await res.json();
+      if (!res.ok) {
+        await res.body?.cancel();
+        const err = new Error(`${res.status} ${res.statusText} for ${url}`);
+        // Permanent client failures should not consume the retry budget.
+        if (res.status !== 429 && res.status < 500) throw Object.assign(err, { permanent: true });
+        lastErr = err;
+        const raw = res.headers.get('retry-after');
+        const seconds = raw === null ? NaN : Number(raw);
+        const retryAfter = Number.isFinite(seconds) ? seconds * 1000 : Date.parse(raw) - Date.now();
+        retryDelay = retryAfter > 0 ? retryAfter : (res.status === 429 ? 3000 : 500) * 2 ** attempt;
+      } else {
+        return await res.json();
+      }
     } catch (err) {
+      if (signal?.aborted) throw signal.reason;
+      if (err.permanent) throw err;
       lastErr = err;
-      await sleep(400 * 2 ** attempt);
     }
+    // No unnecessary sleep after the final failure; a stage abort interrupts sleep too.
+    if (attempt < retries) await delay(Math.min(retryDelay, maxRetryDelayMs), undefined, { signal });
   }
   throw lastErr ?? new Error(`failed: ${url}`);
 }

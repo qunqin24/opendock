@@ -37,17 +37,27 @@ jobs:
       # Not required for correctness — entries expire after 20h — but it makes
       # a re-run after a failed job cheap instead of a full re-crawl.
       - name: Restore crawler cache
-        uses: actions/cache@v4
+        id: crawler-cache
+        uses: actions/cache/restore@v4
         with:
           path: .cache
-          key: crawler-${{ github.run_id }}
+          key: crawler-${{ github.run_id }}-${{ github.run_attempt }}
           restore-keys: crawler-
 
       - name: Crawl npm + GitHub
+        timeout-minutes: 30
         env:
           # Default token is enough: 5000 GraphQL points/hour vs ~50 needed.
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: pnpm data
+
+      # Save even if crawling/building fails, before a later step can lose progress.
+      - name: Save crawler cache
+        if: always() && steps.crawler-cache.outcome == 'success'
+        uses: actions/cache/save@v4
+        with:
+          path: .cache
+          key: crawler-${{ github.run_id }}-${{ github.run_attempt }}
 
       - name: Verify the site still builds with the new data
         run: pnpm build
