@@ -111,6 +111,8 @@ Official SWE-bench Lite `dev` results on the same 23 public instances:
 | v0.12.16 (`9b05a34` release; `b1a6c0e` runner) | 4 / 23 (17.4%) | 5 | Fresh 23-task run; eight slots; 40-minute timeout | [Campaign](docs/swebench-v01216-dev23-2026-09-27.md) |
 | v0.12.19 (`24f5386` release; matched rerun) | 8 / 23 (34.8%) | 0 | Eight slots; effective $2/instance; 40-minute timeout; one inference timeout | [Official result and provenance](docs/benchmarks/swebench-v01220-operation-observability-2026-09-28.md) |
 | v0.12.20 (`628eb81` release) | 7 / 23 (30.4%) | 0 | Eight slots; effective $2/instance; 40-minute timeout | [Official result and caveat](docs/benchmarks/swebench-v01220-operation-observability-2026-09-28.md) |
+| v0.12.25 (`49eb1e4` release) | 7 / 23 (30.4%) | 0 | Eight slots; $2/instance; $30 total cap; 20-minute progress check / 40-minute hard maximum | [Comparison baseline](#v0131-dev23-2026-09-30) |
+| v0.13.1 (`d19e8be` release; 2026-09-30) | **8 / 23 (34.8%)** | 0 | Eight slots; $2/instance; $46 total cap; 20-minute progress check / 40-minute hard maximum; GPT-6.1 Sol + Luna Fast | [Run summary](#v0131-dev23-2026-09-30) |
 
 Every row has 23 submitted official predictions; an empty patch counts against
 the score, not as a missing evaluation. The v0.10.14 report does not separately
@@ -131,6 +133,39 @@ is not a same-condition comparison. The v0.12.20 run lost the
 single run-to-run difference does not establish causation.
 
 Historical qualification references remain in [benchmark reference](docs/benchmark-reference.md).
+
+#### v0.13.1 dev23 (2026-09-30)
+
+One fresh pass@1 run and one official SWE-bench harness evaluation resolved
+**8/23**, versus **7/23** for v0.12.25. The new resolution was
+`pylint-dev__astroid-1333`; all seven previously resolved IDs were retained.
+Resolved by repository: marshmallow **2/2**, pvlib **0/5**, pydicom **2/5**,
+astroid **3/5**, pyvista **0/1**, sqlfluff **1/5**.
+
+- The scored row is the user-requested fresh run after a host restart. The
+  interrupted initial run is excluded from this score; the fresh run made one
+  attempt per instance with no inference retry.
+- The dataset revision (`6ec7bb89b9342f664a54a6e0a6ea6501d3437cc2`), public rows,
+  and all 23 official evaluation image IDs match the v0.12.25 run. Both used
+  `official-image-testbed` and sequential official scoring.
+- Operator/Coordinator/Reviewer/Advisor defaults changed to
+  `openai/gpt-6.1-sol#xhigh`. Actual task Workers remained
+  `openai/gpt-6-luna-fast#max`, observed across all 23 instances. The harness and
+  total budget also changed, so the extra resolution cannot be attributed to
+  the model change alone.
+- Inference ended with 20 normal completions, two timeouts
+  (`pvlib__pvlib-python-1154`, `sqlfluff__sqlfluff-1763`) and one agent failure
+  (`pvlib__pvlib-python-1854`). All patches, including stopped attempts, were
+  officially scored: 23 completed evaluations, zero empty patches and zero
+  official evaluation errors or infrastructure failures.
+- Known estimated inference cost: **$17.73**; separate unknown-usage hold:
+  **$1.98**, not counted as known expense. Inference wall time was about
+  **81 minutes**, followed by **7.2 minutes** of official scoring.
+- Fixed release commit: `d19e8be0d21180cc23ad2ae4b853d846a18e77bc`;
+  package SHA-256: `99300ceec0c3eee4fa1f984fed50d15d58b2ff4455df0041850ecd63514b0a51`.
+  OpenCode **2.0.20**, official harness **5.0.2**. Local evidence is retained in
+  `_testenv/swebench-v0131-dev23-20260930-r2/result-summary.json`; generated
+  predictions, databases and raw logs are not committed.
 
 ## Mission tools
 

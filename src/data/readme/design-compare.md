@@ -83,8 +83,8 @@ image A / B のいずれかが一様と検出された場合、status / match_ra
 | :--- | :--- | :--- | :--- |
 | `image_path_a` | string | `perceptual` / `strict` | 参照画像 A（Figma 側）のローカルファイルパス。`image_a_base64` と排他で、どちらか一方が必須。対応フォーマット: PNG / JPEG / GIF / WebP（静止画。アニメーション WebP は非対応）。 |
 | `image_path_b` | string | `perceptual` / `strict` | 比較対象画像 B（Web 側）のローカルファイルパス。`image_b_base64` と排他で、どちらか一方が必須。対応フォーマット: PNG / JPEG / GIF / WebP（静止画。アニメーション WebP は非対応）。 |
-| `image_a_base64` | string | `perceptual` / `strict` | 参照画像 A の base64 エンコード文字列。`data:image/png;base64,...` 形式の data URI も受け付け（`;base64,` までのプレフィックスは自動で除去）。改行・スペース等の ASCII 空白はデコード前に除去する（MIME 76 文字折り返しなど）。`image_path_a` と排他。対応フォーマット: PNG / JPEG / GIF / WebP（静止画。アニメーション WebP は非対応）。 |
-| `image_b_base64` | string | `perceptual` / `strict` | 比較対象画像 B の base64 エンコード文字列。`data:image/png;base64,...` 形式の data URI も受け付け（`;base64,` までのプレフィックスは自動で除去）。改行・スペース等の ASCII 空白はデコード前に除去する（MIME 76 文字折り返しなど）。`image_path_b` と排他。対応フォーマット: PNG / JPEG / GIF / WebP（静止画。アニメーション WebP は非対応）。 |
+| `image_a_base64` | string | `perceptual` / `strict` | 参照画像 A の base64 エンコード文字列。`data:image/png;base64,...` 形式の data URI も受け付け（`;base64,` までのプレフィックスは自動で除去）。改行・スペース等の ASCII 空白はデコード前に除去する（MIME 76 文字折り返しなど）。標準 base64 のみ（URL-safe は不可）。末尾のパディング (`=`) は省略可。`image_path_a` と排他。対応フォーマット: PNG / JPEG / GIF / WebP（静止画。アニメーション WebP は非対応）。 |
+| `image_b_base64` | string | `perceptual` / `strict` | 比較対象画像 B の base64 エンコード文字列。`data:image/png;base64,...` 形式の data URI も受け付け（`;base64,` までのプレフィックスは自動で除去）。改行・スペース等の ASCII 空白はデコード前に除去する（MIME 76 文字折り返しなど）。標準 base64 のみ（URL-safe は不可）。末尾のパディング (`=`) は省略可。`image_path_b` と排他。対応フォーマット: PNG / JPEG / GIF / WebP（静止画。アニメーション WebP は非対応）。 |
 | `figma_layout` | string | `layout_tree` | Figma ノードリストの JSON 文字列（インライン指定）。`figma_layout_path` と排他で、どちらか一方が必須。 |
 | `figma_layout_path` | string | `layout_tree` | Figma ノードリスト JSON ファイルのローカルパス。`figma_layout` と排他。 |
 | `web_layout` | string | `layout_tree` / `layout_integrity` | Web DOM ノードリストの JSON 文字列（インライン指定）。`web_layout_path` と排他で、どちらか一方が必須。 |
@@ -156,7 +156,9 @@ image A / B のいずれかが一様と検出された場合、status / match_ra
 
 `parent` を持つノードは「親の BoundingBox に対する相対的な位置・サイズ（比率 0–1）」で比較され、レスポンシブなスケール差が吸収されます。親を持たないノード（および幅・高さが 0 の親を持つノード、解決できない `parent`）は絶対座標のまま比較され、比較ペアの片側でも絶対座標なら両側を生ピクセルにそろえます。このとき `threshold`（0.0–1.0、既定 0.15）は比率ではなく **px 差分** に対して適用されます。実比較されたペアのうち絶対座標空間で比較された件数は応答の `absolute_mode_pairs` に入り、`details` にも 1 行注記されます。`parent` が空でないのに解決できない参照は `status` を変えず `unresolved_parent_refs`（例: `Figma: '999'` / `Web: '.foo'`）として応答されます（`unmatched_ignores` と同様の誤用検出）。
 
-`width` / `height` など `w` / `h` 以外のキー名は Unmarshal 時に無視され、幾何値がすべて 0 のノードになります。Figma または Web のいずれかで過半数のノードが幅・高さともに 0 の場合、`status` は変えず応答に `zero_geometry_warning` を付けます（`unmatched_ignores` と同様の誤用検出）。
+`id` / `name`（Figma）と `selector`（Web）は空文字を拒否します。`x` / `y` / `w` / `h` はキー欠落を拒否します（明示的な `0` は許可）。欠落や空識別子はツール実行エラーになり、メッセージにノードインデックスとフィールド名が含まれます（例: `Figma layout node at index 1 is missing required field 'w'`）。
+
+必須キーは揃っているが Figma または Web のいずれかで過半数のノードが幅・高さともに 0 の場合、`status` は変えず応答に `zero_geometry_warning` を付けます（`unmatched_ignores` と同様の誤用検出）。
 
 ---
 

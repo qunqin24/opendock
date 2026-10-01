@@ -283,7 +283,7 @@ Releases are **staged**, not published directly. Pushing a `v*` tag triggers
 the staged release with 2FA:
 
 ```sh
-git tag v0.4.0 && git push origin main v0.4.0
+git tag v0.4.1 && git push origin main v0.4.1
 npm stage list                    # find the stage id
 npm stage approve <stage-id>      # 2FA prompt; or approve in the npm UI
 ```
@@ -293,6 +293,9 @@ so a failing check blocks the stage.
 
 ## Changelog
 
+- **0.4.1** — internal: shared provider HTTP plumbing (`src/providers/http.ts`)
+  replaces the copy-pasted fetch/retry/error code; context estimates simplified;
+  reset times render as `Wed, Sep 16`.
 - **0.4.0** — context usage panel (`/usage` now shows context breakdown, grid,
   compaction headroom and cost); `/usage` became a local TUI command that costs
   no model tokens; sidebar rendering extracted to `src/quota-lines.ts`.

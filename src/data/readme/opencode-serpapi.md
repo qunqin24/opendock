@@ -1,4 +1,4 @@
-# <img src="https://user-images.githubusercontent.com/307597/154772945-1b7dba5f-21cf-41d0-bb2e-65b6eff4aaaf.png" width="30" height="30"/> SerpApi Plugin for OpenCode
+# <img src="https://user-images.githubusercontent.com/307597/154772945-1b7dba5f-21cf-41d0-bb2e-65b6eff4aaaf.png" width="30" height="30"/> opencode-serpapi
 
 An [OpenCode plugin](https://opencode.ai/docs/plugins) that connects your agent to SerpApi's hosted MCP server for Google, Amazon, Walmart, eBay, YouTube, Google Maps, Google Scholar, and [100+ other engines](https://serpapi.com/search-engine-apis).
 
@@ -24,7 +24,7 @@ automatically installs npm plugins at startup:
 ```json
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugin": ["serpapi-opencode"]
+  "plugin": ["opencode-serpapi"]
 }
 ```
 
@@ -90,7 +90,7 @@ See the full, current list at [serpapi.com/search-engine-apis](https://serpapi.c
 
 ## Troubleshooting
 
-- **"Tool not showing up"** — confirm `serpapi-opencode` is listed under `plugin` in `opencode.json`, confirm `SERPAPI_API_KEY` is available to OpenCode, and restart OpenCode.
+- **"Tool not showing up"** — confirm `opencode-serpapi` is listed under `plugin` in `opencode.json`, confirm `SERPAPI_API_KEY` is available to OpenCode, and restart OpenCode.
 - **"Invalid API key"** — replace `SERPAPI_API_KEY` with the current key from the [SerpApi dashboard](https://serpapi.com/manage-api-key), then restart OpenCode so the MCP header is rebuilt.
 - **MCP connection problems** — run `opencode mcp list`; the `serpapi` entry should report `connected`.
 - **Native request failure** — the tool returns `SerpApi search failed: ...` with the configured key redacted.

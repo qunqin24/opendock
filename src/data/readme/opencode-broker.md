@@ -91,7 +91,7 @@ so nothing is ever spent on a provider you did not list.
 
 | Key | Meaning |
 |---|---|
-| `targets` | The models. Each has `providerID`, `modelID` and `kind` (`cloud` or `local`). Local targets add `capacity` (the server's `--parallel`), `context` (tokens per slot) and optionally `prepareCommand` (argv, run when the model is not loaded), `minContextTokens`, `outputReserve`, `contextHeadroom` and `modelCapacity`. Any target may add `fit` (per-tier preference weight) and `effort` (per-tier reasoning variant). |
+| `targets` | The models. Each has `providerID`, `modelID` and `kind` (`cloud` or `local`). Local targets add `capacity` (the server's `--parallel`), `context` (tokens per slot) and optionally `prepareCommand` (argv, run when the model is not loaded), `minContextTokens`, `outputReserve`, `contextHeadroom` and `modelCapacity`. Any target may add `fit` (per-tier preference weight), `effort` (per-tier reasoning variant), and `effortCeiling` (highest catalog-advertised reasoning level policy may select). |
 | `targets.*.modelCapacity` | For local targets that share one model (say a coder lane and a classifier lane on the same server model): how many leases the *model* may already carry, summed over every target that names it, for this target to take another. A second limit next to `capacity`, which still caps the target's own share. Set it below `--parallel` on one target to keep slots free for the others, or for callers that reach the model server without a lease. Unset: only `capacity` applies. |
 | `tiers` | Ordered target lists for `deep`, `smart`, `build`, `fast-build`, `review`, `worker` and `classifier`. |
 | `fallbacks` | Per tier, ordered groups consulted only when the tier's own list has nothing eligible. |
@@ -108,8 +108,9 @@ so nothing is ever spent on a provider you did not list.
 | `budgets` | Per provider, the subscription's `windows` (`id`, `periodMs`, `meter`: `requests` or `tokens`, `capacity`, optional `anchor`) and optionally `planUsage.type` (`anthropic-oauth`, `openai-oauth`, `bailian-cli`, or the generic `http`) to read exact usage from the provider. |
 | `deals` | Time-limited discounts (`providerID`, `multiplier`, optional `modelPrefix`, `daily`, `window`) the balancer leans into. |
 | `tierProviderWeights` | Per tier, a provider preference weight (>1 leans toward, <1 saves for other tiers). |
-| `trustedSubscriptionProviders` | Providers admitted without proving OAuth (flat-rate plans that use API keys). |
-| `modelVariants` | `"provider/model": ["low", "high", ...]` reasoning variants known to work, when the catalog does not advertise them. |
+| `trustedSubscriptionProviders` | Explicit operator attestation that an `api`-labelled provider is subscription-backed. Trusted providers may enumerate active catalog models, but trust does not bypass role, evidence, resolver, capability, probe, probation, rejection, or rollback gates. Unlisted `api` and unknown-auth providers stay quarantined. |
+| `modelRoles` | Provider-qualified role-policy overrides. Product roles cannot be removed; overrides may adjust validated matchers, tiers, fit, evidence domains, `effortCeiling`, and an optional `requiredReasoningMode`. |
+| `reconcile.apply` | Dormant runtime controls: `enabled` defaults to `false`. Enabling requires absolute `overlayPath`, `generationsRoot`, and `currentLinkPath`; incomplete configuration stays off with a visible error. Package 4 owns live activation. |
 | `localModelsUrl` | The local server's model list (llama.cpp router mode `/v1/models`), polled to see what is loaded. |
 | `localContextHeadroom` | Fraction of a local window the router will lease into (default 0.6) when a target declares no `outputReserve`. |
 | `workerLocalShareDenominator` | One in N `auto` worker assignments goes to a local target (default 4; 1 disables). |
@@ -313,7 +314,8 @@ refreshes both inputs -- opencode's models.dev cache and the resolver view
 (`resolvable-models.json`) -- republishes the broker's inventory, and notifies about anything a
 human still has to judge. **It remains the live publisher.**
 
-`opencode-broker-reconcile` is the review side of the same question, and it publishes nothing:
+`opencode-broker-reconcile` is the review and dormant apply surface. Its ordinary observation and
+projection commands do not alter routing, and every runtime command remains disabled by default:
 
 ```sh
 opencode-broker-reconcile dry-run [--json]         # refresh isolated inputs, record observations
@@ -324,16 +326,22 @@ opencode-broker-reconcile project [--json] [--dry-run]   # present proposals, re
 opencode-broker-reconcile approve <transitionID> [--note TEXT]
 opencode-broker-reconcile reject  <transitionID> [--note TEXT]
 opencode-broker-reconcile amend   <transitionID> --tiers a,b [--role provider:roleID]
+opencode-broker-reconcile apply   <transitionID> [--json] [--dry-run]
+opencode-broker-reconcile rollback <transitionID> --reason TEXT [--json] [--dry-run]
+opencode-broker-reconcile refresh [--json] [--dry-run]
+opencode-broker-reconcile recover [transitionID] [--json] [--dry-run]
 ```
 
 - **The ledger is the only thing it writes.** `dry-run` records candidate observations in
   `model-reconciliation.json` in the routing state directory (see
-  [docs/STATE.md](docs/STATE.md)), under an exclusive mkdir lock, and mutates nothing else.
-- **It does not publish inventory or alter routing.** It computes the inventory the broker
+  [docs/STATE.md](docs/STATE.md)), under an exclusive atomically published private lock, and
+  mutates nothing else.
+- **The default path does not publish inventory or alter routing.** It computes the inventory the broker
   *would* be handed, through the same pure builder live publication uses, and returns it for
   review. It posts nothing to the broker, changes no target's eligibility and runs no probe. An
-  approval records that a human said yes, in the ledger, and stops there -- probing, probation
-  and the deployment cutover are later packages, so nothing here can activate a model.
+  approval records that a human said yes in the ledger and stops there. Runtime commands return
+  `reconcile-apply-disabled` before source collection, broker calls, renderer execution, or
+  publication unless `reconcile.apply.enabled` is explicitly configured.
 - **Its refreshes are isolated.** `opencode models` is run against a scratch `XDG_CACHE_HOME`
   that is deleted afterwards, and `opencode models --pure` is parsed in memory, so neither the
   live models.dev cache nor `resolvable-models.json` is touched -- not their bytes, not their
@@ -347,6 +355,32 @@ opencode-broker-reconcile amend   <transitionID> --tiers a,b [--role provider:ro
 - **`reviewed-models.json` is left intact.** The dry run reads the watch job's ledger and
   reports which of its keys a future import would cover; the import and the deletion of that
   file happen in a later package.
+
+### Dormant model-promotion runtime
+
+Package 3 includes the runtime needed for a controlled model transition, but does not activate it.
+`reconcile.apply.enabled` is `false` by default, all live paths normalize to `null`, the existing
+watch remains the live inventory publisher, and no schedule invokes apply. Package 4 alone performs
+the generated-config cutover, enables live inventory and policy mutation, configures trusted
+providers, changes schedules, and retires the old publisher.
+
+When explicitly enabled against operator-supplied paths, an authorized transition is materialized
+as an append-only zero-cost resolver overlay and an immutable private generation. The plugin
+registers the exact generation manifest once at process startup; a missing, stale, forged, cleaned,
+or pre-restart token receives generation-0/base-only eligibility, so an old client remains on the
+incumbent instead of receiving a model its resolver never loaded. Policy holds preserve unrelated
+lanes, provider weighting, quota balancing, health circuits, context limits, profiles, and privacy
+boundaries while allowing only the governed role's active or eligible probation model.
+
+Compatibility probes use a fresh `bin/opencode-broker-probe-client` process. The broker authorizes
+one exact staged transition, the child redeems that launch while independently verifying the
+immutable generation, and all three probes use the ordinary authenticated loopback gateway model.
+The gateway consumes a one-shot nonce before leasing the exact target and releases it on every
+terminal path; no provider is called directly and no probe-only model name is advertised. After the
+normal, strict-tool, and reasoning probes pass, five distinct successful production leases promote
+the candidate. Two qualifying model failures within 15 minutes roll it back during probation or
+after promotion; old-generation traffic, abandoned leases, transient provider failures, and
+synthetic probes do not count.
 
 Exit codes: `0` the command completed (a report full of blocked candidates, and a projection that
 is switched off, are still completed runs), `1` corrupt state, unusable config, no readable source,
@@ -474,7 +508,14 @@ gateway reads it at all.)
   "profile": "auto",
   "providers": {                      // the lanes the gateway can forward to
     "llamacpp": { "baseUrl": "http://localhost:8080/v1", "timeoutMs": 15000 },
-    "deepseek": { "baseUrl": "https://api.deepseek.com/v1", "authRef": "deepseek" }
+    "deepseek": { "baseUrl": "https://api.deepseek.com/v1", "authRef": "deepseek" },
+    "anthropic-proxy": {
+      "baseUrl": "http://127.0.0.1:8791/anthropic/v1",
+      "chatApi": true,
+      "messagesApi": true,
+      "responsesApi": true,
+      "keyFile": "/run/user/1000/llm-auth-proxy-key"
+    }
   },
   "modelProfiles": {                  // model names a client may ask for
     "local-27b": { "profile": "local", "maxContextTokens": 32768, "timeoutMs": 60000 }
@@ -483,18 +524,31 @@ gateway reads it at all.)
 }
 ```
 
-`authRef` names an entry in opencode's `auth.json`; provider keys are read per
-request and never logged. Per provider you can also set `headers`,
+`authRef` names an entry in opencode's `auth.json` for an ordinary provider. A proxy provider can
+instead name `keyFile`: the gateway reads it per request, requires a non-empty regular file with no
+group or world permission bits, and sends its value only as `x-api-key`. This keeps the proxy key
+and provider OAuth state out of OpenCode's auth store. Provider keys are never logged. Per provider
+you can also set `headers`,
 `bodyExtras`, `dropBodyKeys` (for a lane that rejects a parameter the client
-sends), `streamIdleMs`, `streamUsage: false`, `jsonMode: "instruct"`, `responsesApi: true` and
+sends), `streamIdleMs`, `streamUsage: false`, `jsonMode: "instruct"`, `chatApi`, `messagesApi`, `responsesApi` and
 `mirrorTextFormat: true` (copy a /responses `text.format` into `response_format`,
 for llama.cpp, which enforces only the latter).
 
-It serves `POST /v1/chat/completions` and `POST /v1/responses` (the OpenAI
-Responses API, which the Vercel AI SDK's OpenAI provider uses by default).
-A /responses request is offered only to providers with `responsesApi: true`
-(llama.cpp serves it natively), and otherwise behaves like chat: same leasing,
-extras, failover and usage accounting.
+It serves `POST /v1/chat/completions`, `POST /v1/responses` (the OpenAI Responses API, which the
+Vercel AI SDK's OpenAI provider uses by default), and native Anthropic `POST /v1/messages`.
+Chat is offered to every provider except one with `chatApi: false`; Responses and Messages are
+offered only to providers with `responsesApi: true` and `messagesApi: true`, respectively. If no
+configured provider can serve the requested API, the gateway returns a capability-specific `502`
+without contacting the broker or an upstream.
+
+Native Messages rewrites only `model` and preserves all other request fields. The gateway accepts
+its caller key as either `Authorization: Bearer` or `x-api-key`, but forwards neither client header.
+Messages requests forward only `Content-Type`, `anthropic-version`, `anthropic-beta`, explicitly
+configured provider headers, and the proxy provider's own `x-api-key`. Buffered status, content type,
+and body pass through unchanged on successful upstream responses. Streaming relays Anthropic events
+verbatim through the terminal
+`message_stop`, never adds `[DONE]`, retries only before the first committed event, honors downstream
+backpressure, and reports input, output, cache-read, and cache-write usage.
 
 - **A client's `model` is a routing request, not an order.** A name listed in
   `modelProfiles` leases that profile; anything else routes on the configured

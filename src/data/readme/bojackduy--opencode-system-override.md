@@ -115,6 +115,16 @@ and mutates `output.system` **in place**:
 | Text between markers | system = that text |
 | Nothing/whitespace between markers | system = `[]` (pure LLM) |
 
+A second hook, `chat.headers`, keeps OpenCode Zen free-tier models working.
+Zen only serves anonymous free models to requests carrying the opencode
+client `User-Agent`, and now also requires a stable per-conversation
+`x-opencode-session` header — without them you get `must using opencode
+for opencode free endpoint` / `429 FreeUsageLimitError`. For `opencode`
+provider requests only, the plugin injects `User-Agent: opencode/<version>`
+(when absent or not already `opencode/*`) and `x-opencode-session:
+<sessionID>`, merging in place so other plugins' headers are preserved.
+Override the UA with `OPENCODE_USER_AGENT=opencode/x.y.z` if needed.
+
 ## Dev
 
 ```sh

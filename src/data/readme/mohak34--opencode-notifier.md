@@ -93,6 +93,7 @@ Create `~/.config/opencode/opencode-notifier.json` with this example configurati
   "notification": true,
   "bell": false,
   "timeout": 5,
+  "notificationTitle": null,
   "showProjectName": true,
   "showFullPath": false,
   "showSessionTitle": false,
@@ -174,6 +175,7 @@ Create `~/.config/opencode/opencode-notifier.json` with this example configurati
   "notification": true,
   "bell": false,
   "timeout": 5,
+  "notificationTitle": null,
   "showProjectName": true,
   "showFullPath": false,
   "showSessionTitle": false,
@@ -189,6 +191,7 @@ Create `~/.config/opencode/opencode-notifier.json` with this example configurati
 - `notification` - Default popup setting, overridden by per-event settings (default: true)
 - `bell` - Emit terminal BEL (`\x07`) on events (default: false). Behavior depends on your terminal/WM settings
 - `timeout` - Requested Linux popup duration and macOS `node-notifier` callback wait in seconds (default: 5). Popup expiry depends on the notification backend; AppleScript and Ghostty OSC ignore this setting
+- `notificationTitle` - Full popup title template (default: `null`, preserving `OpenCode (my-project)` or `OpenCode` when `showProjectName` is false). For example, `"{projectName}: {sessionTitle}"` replaces the entire title. Supports the same tokens as [Messages](#messages); `{sessionTitle}` requires `showSessionTitle: true`. A nonempty rendered title overrides `showProjectName`; omit `{projectName}` to exclude it. Empty or non-string values, and templates that become empty after interpolation, use the default title
 - `showProjectName` - Show folder name in notification title (default: true)
 - `showFullPath` - Show full absolute path instead of folder name in notification title and `{projectName}` token (default: false). When true, shows `OpenCode (/home/user/projects/myapp)` instead of `OpenCode (myapp)`
 - `showSessionTitle` - Include the session title in notification messages via `{sessionTitle}` placeholder (default: false)

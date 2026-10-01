@@ -65,7 +65,8 @@ rm -rf ~/.cache/opencode/packages/@stablekernel/opencode-cursor@latest
 rmdir /s /q "%LocalAppData%\opencode\cache\packages\@stablekernel\opencode-cursor@latest"
 ```
 
-Then restart opencode.
+Then restart opencode. (This cache layout is opencode v1's; on v2 run
+`opencode plugin update` — see [opencode v2](#opencode-v2).)
 
 Drop `@latest` (`"@stablekernel/opencode-cursor"`) or pin a version
 (`"@stablekernel/opencode-cursor@1.2.3"`) if you prefer deterministic installs.
@@ -81,11 +82,18 @@ opencode v2 uses a `plugins` key (plural) and loads the plugin's `setup()` entry
 ```json
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugins": ["@stablekernel/opencode-cursor@latest"]
+  "plugins": ["@stablekernel/opencode-cursor@next"]
 }
 ```
 
-Both generations load the same published package, so one install serves either.
+> v2 support is published under the `next` dist-tag (`0.10.0-next.1` or later)
+> until it is promoted to `latest`. `@latest` currently resolves to 0.9.0, a
+> v1-only build that opencode v2 rejects with "Plugin must export a default
+> definition with an id and an effect or setup function". Switch the spec back
+> to `@latest` once 0.10.0 is stable.
+
+From 0.10.0 onward both generations load the same published package, so one
+install serves either (0.9.x `@latest` is v1-only).
 Minimum versions: v1 >= 1.18.29 (object plugin entrypoint), v2 tested against 2.0.19.
 
 **Registry mirrors:** on v2 the provider package is installed at exactly the plugin's
@@ -246,7 +254,7 @@ See [SECURITY.md](./SECURITY.md) for the full threat model.
 | `apiKey` | `CURSOR_API_KEY` | Cursor API key |
 | `cwd` | `process.cwd()` | Directory the local agent operates in |
 | `mode` | `"agent"` | Default conversation mode (`"agent"` or `"plan"`) |
-| `params` | — | Default model params, e.g. `{ thinking: "high" }` |
+| `params` | — | Default model params, e.g. `{ effort: "high" }` (param ids are per model — see [Per-request controls](#per-request-controls-mode-thinking-level)) |
 | `settingSources` | — | Cursor settings layers to load: `["project","user","all",...]` — pulls in your Cursor skills, rules, and `.cursor/mcp.json` |
 | `sandbox` | — | Run the agent's tools in [Cursor's sandbox](https://cursor.com/docs/agent/sandbox) |
 | `autoReview` | `false` | Gate tool calls through Cursor's classifier-backed Auto review (best-effort, not a security boundary) |
@@ -306,12 +314,18 @@ variant to opt in, or set it per model under `options.params.fast` below.
 opencode's **plan agent** (`Tab`) maps to Cursor's plan mode automatically — no manual config
 needed.
 
+Param ids are **per model** — use the id the model actually advertises, or Cursor ignores the
+param and falls back to its own default (e.g. `high` effort). `grok-4.6` uses `effort`,
+`gpt-5.5` uses `reasoning`, `claude-opus-4-8` uses `effort` (plus a boolean `thinking`), and
+`composer-2.5` has only `fast`. Run `cursor_refresh_models` to list each model id
+with its param ids and accepted values.
+
 To set controls statically per model:
 
 ```json
 { "provider": { "cursor": { "models": {
-  "composer-2.5": { "options": { "params": { "thinking": "high" } } }
-} } } }
+  "grok-4.6": { "options": { "params": { "effort": "medium" } } } }
+} } }
 ```
 
 ## System prompt
@@ -560,7 +574,7 @@ non-session cwd — see [Skills limitations](#limitations)).
 | `prompt` | ✅ | The subtask to delegate |
 | `model` | ✅ | Cursor model id |
 | `mode` | — | `"agent"` or `"plan"` |
-| `thinking` | — | Thinking level (e.g. `"high"`) |
+| `thinking` | — | Sets the model's `thinking` param (`"true"`/`"false"`) — only on models that advertise it (e.g. `claude-opus-4-8`); models using `effort`/`reasoning`/`reasoning_effort` can't be set through this arg |
 | `cwd` | — | Working directory |
 | `sandbox` | — | Run in Cursor's sandbox |
 | `agentId` | — | Resume a specific Cursor agent |
@@ -577,7 +591,7 @@ open a PR.
 | `startingRef` | — | Branch/ref to start from |
 | `model` | — | Cursor model id |
 | `mode` | — | `"agent"` or `"plan"` |
-| `thinking` | — | Thinking level |
+| `thinking` | — | Sets the model's `thinking` param (`"true"`/`"false"`) — only on models that advertise it (e.g. `claude-opus-4-8`); models using `effort`/`reasoning`/`reasoning_effort` can't be set through this arg |
 | `autoCreatePR` | — | Open a PR when finished |
 | `workOnCurrentBranch` | — | Operate on the current branch instead of a new one |
 
@@ -699,8 +713,13 @@ watchdog (an empty string also disables, for backward compatibility).
   `PATH`).
 - **Plugin enabled but no `cursor` provider/models appear, or you see a stale-version warning.**
   opencode caches the `@latest` plugin install on first use and never refreshes it.
-  Exit opencode, delete `~/.cache/opencode/packages/@stablekernel/opencode-cursor@latest`
-  (or the pinned version directory), and restart.
+  On v1: exit opencode, delete `~/.cache/opencode/packages/@stablekernel/opencode-cursor@latest`
+  (or the pinned version directory), and restart. On v2: run `opencode plugin update`, or
+  exit opencode and delete `~/.cache/opencode/npm/@stablekernel/opencode-cursor@<spec>`
+  (e.g. `@next`), then restart. On v2 the spec must also resolve to a build with the v2
+  entrypoint (0.10.0-next.1 or later — see [opencode v2](#opencode-v2)): an `@latest`
+  install of 0.9.x makes opencode 2 report "Plugin must export a default definition
+  with an id and an effect or setup function".
 - **Only the four fallback models appear.** The live catalog loads after the first authenticated
   use. Restart opencode once after login, or run `cursor_refresh_models`.
 - **Invalid or expired key.** Validated on first use — that's where the error surfaces.

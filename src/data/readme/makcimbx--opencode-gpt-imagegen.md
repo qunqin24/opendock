@@ -1,8 +1,8 @@
 # @makcimbx/opencode-gpt-imagegen
 
-<p align="center"><img src="./ogp.png" alt="opencode-gpt-imagegen × gpt-image-2" /></p>
+<p align="center"><img src="./ogp.png" alt="opencode-gpt-imagegen" /></p>
 
-> Bring [**ChatGPT Images 2.0**](https://openai.com/index/introducing-chatgpt-images-2-0/) (`gpt-image-2`) to [OpenCode](https://opencode.ai). It uses your **ChatGPT/Codex OAuth** path first and can fall back to **OmniRoute** when Codex auth is unavailable.
+> Bring **image generation** to [OpenCode](https://opencode.ai). It uses your **ChatGPT/Codex OAuth** path first and can fall back to **OmniRoute** when Codex auth is unavailable.
 
 [![OpenCode plugin](https://img.shields.io/badge/OpenCode-plugin-blue.svg)](https://opencode.ai/docs/plugins/)
 [![npm version](https://img.shields.io/npm/v/@makcimbx/opencode-gpt-imagegen.svg)](https://www.npmjs.com/package/@makcimbx/opencode-gpt-imagegen)
@@ -53,16 +53,16 @@ OmniRoute configuration:
 | Variable / config | Purpose |
 |---|---|
 | `GPT_IMAGEGEN_AUTH_PROVIDER=auto|codex|omniroute` | Select provider behavior; default is `auto` |
-| `GPT_IMAGEGEN_CODEX_MODEL` | Overrides the Codex subscription model; default is `gpt-5.6-sol` |
+| `GPT_IMAGEGEN_CODEX_MODEL` | Overrides the Codex subscription model; default is `gpt-6.1-sol` |
 | `GPT_IMAGEGEN_OMNIROUTE_BASE_URL` | Overrides the OmniRoute OpenAI-compatible base URL |
-| `GPT_IMAGEGEN_OMNIROUTE_MODEL` | Overrides the OmniRoute image model; default is `codex/gpt-5.6-sol` |
+| `GPT_IMAGEGEN_OMNIROUTE_MODEL` | Overrides the OmniRoute image model; default is `codex/gpt-6.1-sol` |
 | OpenCode `omniroute` auth | Preferred source for the OmniRoute API key |
 | `provider.omniroute.options.baseURL` | Standard OpenCode provider base URL source |
 | OmniRoute wrapper plugin `options.baseURL` | Supported fallback for wrapper configs such as `./plugins/omniroute-wrapper.ts` |
 
 Base URLs are normalized so both `https://host` and `https://host/v1` call `POST /v1/images/generations` without producing `/v1/v1`.
 
-`gpt-5.6-sol` drives the hosted tool call; the rendered image still comes from `gpt-image-2`. If an account or OmniRoute deployment does not expose GPT-5.6 yet, use the corresponding model override to select `gpt-5.5`.
+`gpt-6.1-sol` drives the hosted tool call. The underlying image generator is selected by the backend; the plugin does not pin or report its model version. OmniRoute determines the generator behind its configured model route. If an account or OmniRoute deployment does not expose GPT-6.1-Sol yet, use the corresponding model override to select an available model, such as `gpt-5.6-sol` for Codex or `codex/gpt-5.6-sol` for OmniRoute.
 
 Exact `size` and `quality` are currently best-effort on Codex-backed paths. Codex OAuth forwards both values; OmniRoute forwards `size` but currently omits unverified `quality`. The upstream Codex image backend may still select automatic settings and return different PNG dimensions, and the plugin does not rescale the result. This affects both paths and is tracked in [openai/codex#28723](https://github.com/openai/codex/issues/28723).
 

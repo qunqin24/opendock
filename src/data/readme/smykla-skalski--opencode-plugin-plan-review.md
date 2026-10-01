@@ -3,7 +3,7 @@
 An [opencode](https://github.com/anomalyco/opencode) v2 plugin that replaces a wall-of-markdown plan with a short, structured one you review in the terminal, and keeps you in the loop while it runs, without a mode to switch into.
 
 - **No mode switch.** The build agent decides for itself when a task needs a plan: small changes just run; multi-file, ambiguous or hard-to-undo work gets clarifying questions and a plan first. The **architect** agent is there for when you want a plan up front.
-- **Short plans.** Steps that need a human decision carry a one-line `⚑` saying what to decide. Routine steps fold into a single line, so you read the decisions, not the whole plan.
+- **Decisions stand out.** Steps that need a human decision carry a one-line `⚑` saying what to decide, so you see what needs you without the rest being hidden.
 - **Questions as one form.** Every clarifying question arrives at once, with options and the agent's recommendation.
 - **Per-step review.** Approve, reject, ask to revise, edit or comment on each step, then send the review back or execute.
 - **Planning keeps going during execution.** When the agent finds work the plan missed, it amends the plan: routine additions inside the approved files run on, anything risky or new pauses for you.
@@ -29,7 +29,7 @@ For local development, point `plugins` at a checkout: `"plugins": ["/path/to/ope
 
 1. Describe the change to the build agent as usual, or switch to the **Architect** agent to plan first.
 2. If the agent needs answers, the panel shows every question as one form. Answer and press `ctrl+s`.
-3. When a plan arrives, the panel opens with the steps that need you; `.` shows the folded routine ones. Review with the keys below.
+3. When a plan arrives, the panel opens with every step; `⚑` marks the ones that need your decision. Review with the keys below.
 4. Press `s` to send the review for another round, or `x` to execute the approved steps.
 5. The panel reopens on its own when an amendment needs approval, at a checkpoint (`x` continues, `s` asks for changes), and when the plan finishes with the "what changed" digest.
 
@@ -44,7 +44,6 @@ For local development, point `plugins` at a checkout: `"plugins": ["/path/to/ope
 | `A` | approve every undecided step | |
 | `n` | general feedback | |
 | `s` / `x` | send review (revise) / execute or continue | |
-| `.` | show or fold routine steps | |
 | `d` | open the diff viewer | |
 | `tab` / `shift+tab` | | next / previous question |
 | `space`, `enter` | | select option, type a text answer |
@@ -97,6 +96,10 @@ last step done ──► "what changed" digest: checks, touched files, drift, ri
 - The review reaches the model as a synthetic message; the timeline shows a one-line notice such as `Plan review v2: 5✓ 1✗ 2✎ → revise`.
 - Planning agents do not get opencode's one-question-at-a-time `question` tool; `plan_ask` replaces it. `plan_step` and `plan_amend` exist only while a plan executes.
 - Touched files come from the edit permission check: each edit is attributed to the step in progress, and an edit outside that step's files shows as drift.
+
+### History RPC
+
+`planreview.history({ sessionID })` returns `{ events }` in chronological order. Each event has a stable session-local `id`, timestamp `at`, `reason`, plan `version`, and a plan snapshot. Review events also include the submitted action, decisions, and note. Events are stored separately in plugin storage and survive restarts. `planreview.get` remains the current-state endpoint.
 
 ## Known gaps
 

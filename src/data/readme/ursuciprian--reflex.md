@@ -807,18 +807,20 @@ login, [GUIDE: System 2](docs/GUIDE.md#system-2)):
 On an API backend the case System 2 gets is about 500 tokens (512 in the ladder eval above, capped
 at 1,500) and the verdict about 22 tokens.
 
-**Jev vs Laya, head to head** (same code, same cases, same hour; Laya 0.3.20 on an Apple M5 Max;
-[GUIDE: measured against Jev](docs/GUIDE.md#measured-against-jev), run with `npm run eval-compare`):
+**Jev vs Laya, head to head** (same code, same cases, 2026-09-30; Laya 0.3.20 and 0.3.22 gave identical
+results, on an Apple M5 Max; [GUIDE: measured against Jev](docs/GUIDE.md#measured-against-jev), run
+with `npm run eval-compare`):
 
 | Golden set | Jev 1.13.0 | Laya `typed-decisions` (raw, the default) | Laya `english` (raw) |
 |---|---|---|---|
-| Tool gate (97): ok, MISS, over | 97, 0, 0 | 64, 0, 33 | 64, 0, 33 |
+| Tool gate (199): ok, MISS, over | 199, 0, 0 | 147, 0, 52 | 145, 0, 54 |
+| MCP and file writes (83): ok, MISS, over | 83, 0, 0 | 79, 0, 4 | 79, 0, 4 |
 | Injection guard (62): precision, recall, high-severity missed | 97 %, 100 %, 0 | 54 %, 100 %, 0 | 64 %, 85 %, 5 |
-| Ladder (41): unsafe, System 1 denies | 0, 10 | 0, 30 | 0, 31 |
-| Instructions (20): exact | 20 | 2 | 3 |
+| Ladder (47): unsafe, humans per 100 | 0, 31.9 | 0, 10.6 (it denies instead) | 0, 8.5 |
+| Instructions (20): exact | 20 | 1 | 6 |
 | Model routing (27): sensitivity correct, leaks | 27, 0 | 7, 0 | 8, 0 |
 | Tool router (15): ok, unsafe | 14, 0 | 1, 0 | 1, 0 |
-| Tool gate latency p50 per call | 300 to 330 ms (network) | 125 ms (local, MPS) | not reported |
+| Tool gate latency p50 per call | 373 ms (network) | 156 ms (local, MPS) | 156 ms |
 
 Raw `typed-decisions` has no safety failure, but gets there by denying or flagging most things;
 calibrated Laya checkpoints miss a deny Jev catches. Jev stays the recommendation for every
@@ -957,7 +959,7 @@ The full list: [GUIDE: safety properties and limits](docs/GUIDE.md#safety-proper
 
 ## FAQ
 
-Short answers; the full list of 30 questions is in [docs/FAQ.md](docs/FAQ.md).
+Short answers; the full list of 31 questions is in [docs/FAQ.md](docs/FAQ.md).
 
 ### How do I stop Claude Code from running dangerous commands?
 

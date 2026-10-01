@@ -114,9 +114,12 @@ Checked in this order:
 Checked in this order:
 
 1. `COMMANDCODE_USAGE_API_KEY` (an explicit usage credential).
-2. `COMMANDCODE_API_KEY`, `COMMAND_CODE_API_KEY`, or `CMD_API_KEY`.
-3. `~/.commandcode/auth.json`.
-4. `OPENCODE_AUTH_CONTENT` or OpenCode's `auth.json` `commandcode` entry.
+2. The active Command Code connection from `/connect`, resolved on the server by
+   the bundled server plugin. On OpenCode V2 this is the live credential store:
+   reconnecting a key updates it, and it is not written back to `auth.json`.
+3. `COMMANDCODE_API_KEY`, `COMMAND_CODE_API_KEY`, or `CMD_API_KEY`.
+4. `~/.commandcode/auth.json`.
+5. `OPENCODE_AUTH_CONTENT` or OpenCode's `auth.json` `commandcode` entry.
 
 The plugin tries the next credential when CommandCode rejects one for the
 private `/alpha/*` billing API. This matters when `/connect` contains a
@@ -124,6 +127,11 @@ Provider-only Studio key: it can call `/provider/v1/*`, but may not be allowed
 to read subscription usage. Run `cmd auth login` to populate
 `~/.commandcode/auth.json`, or set `COMMANDCODE_USAGE_API_KEY` to explicitly
 choose a usage-capable key. Do not put API keys directly in `cli.json`.
+
+The live connection is only available while the server plugin is registered; if
+it is not, or the RPC is unreachable, the sidebar resolves the remaining sources
+locally. On V2, registering the server plugin (see above) is what keeps
+CommandCode usage working after `/connect` replaces a rejected key.
 
 `COMMANDCODE_API_URL` overrides the CommandCode API base URL.
 

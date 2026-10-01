@@ -445,6 +445,66 @@ caller.
 
 ---
 
+## Development / Testing
+
+### Running tests
+
+```bash
+npm run test:prepublish       # fast gate: tarball + tui.tsx + resolve + T1–T12 unit
+npm run test:e2e              # full E2E: isolated plugin load + one "Say OK" round-trip
+npm run test:e2e:quick        # E2E load-only, no LLM call
+```
+
+`prepublishOnly` runs **both** gates automatically on `npm publish`
+(`node test/prepublish.mjs && node test/e2e-tui.mjs --full`) and is skipped with
+`--ignore-scripts`. The whole chain takes roughly **1 minute** (fast gate ~20 s,
+isolated E2E ~10 s warm / up to ~90 s cold); the E2E is bounded by INIT 45 s +
+STEP 80 s, ~3 min total.
+
+### What the gates check
+
+**Fast gate — `test/prepublish.mjs`**
+
+| Step | What | Why |
+|---|---|---|
+| (a) tarball composition | `package.json` `files[]` field expands to exactly 6 members | no test/node_modules/tsconfig in the tarball |
+| (b) pragma regression | esbuild `--jsx=automatic` → `@opentui/solid/jsx-runtime` present, `react/jsx-runtime` absent | a removed/broken pragma kills the sidebar on npm install |
+| (c) resolve chain | replica install → `import.meta.resolve` for all tui.tsx imports | broken peer/optional dep silently breaks the sidebar |
+| (d) unit harness T1–T12 | all limit/agent/state fix assertions | regressions in modelLimits, writeStateFile, hydrate |
+
+**Isolated E2E — `test/e2e-tui.mjs`** (requires the OpenCode CLI)
+
+| Check | What | Why |
+|---|---|---|
+| A — plugin load | spins a private `opencode --standalone` PTY, asserts `msg="loading plugin" → opencode-context-indicator` and that the `file:///` entrypoint is **this checkout** | catches a plugin that no longer imports cleanly, or a config pointing at the published npm copy |
+| B — live update | one `opencode run "Say OK" --standalone` round-trip; asserts the LLM answered **and** the isolated `state.json` gained a session with `ctx > 0` | catches a regression in the `session.idle` → `writeStateFile` path |
+
+The E2E is fully **non-invasive** to your running OpenCode Desktop:
+
+- `--standalone` starts a *private* server instead of the background service Desktop uses;
+- `OPENCODE_DB` points at a throwaway DB in `%TEMP%` (your sessions are untouched);
+- `OPENCODE_CONTEXT_INDICATOR_STATE_FILE` points at a throwaway state file in `%TEMP%`
+  — the live `opencode-context-indicator-state.json` is never read or written;
+- `OPENCODE_DISABLE_PROJECT_CONFIG=1` avoids project-level config;
+- exactly **one** minimal LLM call (`Say OK`) is made, in the isolated session.
+
+The script prints `[e2e] running against ISOLATED opencode instance — your running
+sessions are not touched` at start and reports the Desktop service/GUI PIDs before
+and after the run. Override the binary with `OPENCODE_CLI`. The full run needs a
+model for the one round-trip: set `OPENCODE_E2E_MODEL` to *your* `provider/model`
+id (e.g. `OPENCODE_E2E_MODEL=myprovider/some-model`); it is **required** in full
+mode and the script exits with an instruction if it is unset. `--quick` needs no
+model.
+
+### CI
+
+`.github/workflows/ci.yml` runs `test/prepublish.mjs` on every push/PR and additionally
+does a standalone esbuild transpile check (pragmas, no React). The Node-pty E2E is not
+run in CI (requires the OpenCode Desktop binary) and is skipped gracefully when the CLI
+is absent (`[SKIP] opencode CLI not found`).
+
+---
+
 ## License
 
 [MIT](./LICENSE)

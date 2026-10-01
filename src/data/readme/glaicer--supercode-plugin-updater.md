@@ -3,71 +3,48 @@
 <p>
   <img src="public/plugin-updater.gif" alt="plugin-updater demo" width=800 />
 </p>
-<br />
 
-An OpenCode plugin that tells you when your plugins and built-in tools have updates waiting, and applies them on the next restart.
+OpenCode installs plugins and built-in tools (prettier, biome, …) into its cache and never updates them. This plugin fixes that: it checks npm for newer versions and lets you update them from one screen.
 
-## The problem
+Run `/plugin-updates`, pick what you want with `Space` / `A`, then:
 
-OpenCode installs npm plugins and managed tools (prettier, pyright, bash-language-server, …) into `~/.cache/opencode/packages`, but nothing ever updates them. Whatever version was current when a package was first cached stays there forever. There's no update check, no notification, and no command to update them. The only remedy is manually deleting cache directories.
+- `U` — update the selected plugins
+- `X` — reinstall the selected managed tools (this restarts the server)
+- `R` — re-check right now
 
-## What it does
+That's it. A few things worth knowing:
 
-It compares the installed version of every plugin and managed tool against `latest` on the npm registry — once a day on startup (24h between checks), and freshly every time you open `/plugin-updates`:
+- Server-side plugin updates apply live; TUI plugin updates take effect after you restart the TUI. The screen tells you which is which.
+- Managed tools get reinstalled by OpenCode itself on next use, so `X` restarts the server — the confirmation warns you about that.
+- Rows that can't be updated (pinned versions, local paths) are shown but not selectable.
+- The plugin never deletes anything except the cache of tools you explicitly reinstalled.
 
-- If it finds updates, you get a toast: `N OpenCode updates available. Run /plugin-updates to review them.`
-- `/plugin-updates` (command palette or slash command) opens a screen with three groups (Plugins, Managed tools, Skipped) showing `installed → latest` per package. Opening the screen always re-checks now (ignoring the 24h timer), so the list is never stale.
-- Select what you want (Space / `A`), press `U`, confirm, and OpenCode installs the fresh versions itself on the next restart.
-
-The plugin never installs or deletes anything directly. Confirming marks the stale cache entries for removal; when OpenCode exits, they're cleaned up and the built-in resolver installs fresh versions on the next start. Until you restart, nothing on disk changes.
-
-Failures are contained: one unreachable package shows as `unknown` and doesn't break the cycle; a total registry outage keeps the last result on screen.
-
-## What gets checked
-
-- Floating plugin specs from `opencode.json` and `tui.json` (union, exact duplicates checked once), like `foo` and `foo@latest`. `[spec, options]` tuple entries contribute their spec string.
-- Managed tools: the bundled tools OpenCode installs for you (prettier, pyright, …).
-
-Skipped, with the reason shown on screen: pinned specs (`foo@1.2.3`), local paths, `file:`/`git+`/URL specs, and semver ranges. Those change only when you change them, so updating them automatically makes no sense.
+If updates are found, you'll also get a toast once a day — no more than that.
 
 ## Install
 
-Install with the OpenCode CLI — it detects the TUI target and registers the plugin in `tui.json` for you:
+**OpenCode v2** (current release, 1.0.6):
 
 ```bash
-opencode plugin @glaicer/supercode-plugin-updater
+opencode plugin add @glaicer/supercode-plugin-updater
 ```
 
-- `--global` installs into the global config (`~/.config/opencode`); default is local (`.opencode` in the current project).
-- `--force` replaces an already-installed version.
-- Restart OpenCode after installing.
+**OpenCode v1** (use the 0.3.0 release — it's a different API):
 
-Manual install also works: add the package to the `plugin` array in `tui.json` (global `~/.config/opencode/tui.json` or local `<project>/.opencode/tui.json`):
-
-```jsonc
-{
-  "plugin": ["@glaicer/supercode-plugin-updater"]
-}
+```bash
+opencode plugin @glaicer/supercode-plugin-updater@0.3.0
 ```
 
-> [!IMPORTANT]
-> **The first OpenCode load after installing this plugin may be slow.** That's OpenCode downloading the plugin's packages and managed tools into its cache — it happens once. Every subsequent start is fast.
-
-| Key | Action |
-| --- | --- |
-| `j` / `k` or arrows | Move the cursor |
-| Space | Toggle the package under the cursor |
-| `A` | Select every selectable package |
-| `U` | Prepare updates for the selection (confirm dialog first) |
-| `R` | Re-check again (opening the screen already re-checks; no toast) |
-| Esc | Close |
-
-Pinned, unknown, and skipped rows are shown for information but can never be selected. Confirming shows a pending-restart banner: the marked cache entries are removed when OpenCode exits, and the next start installs the new versions.
+Restart OpenCode after installing. The first start may be slow — that's OpenCode downloading the package into its cache, it happens once.
 
 ## Development
 
 ```bash
 npm run build       # precompile the Solid TUI entrypoint into dist/
 npm run typecheck   # tsc --noEmit
-npm test            # node --test, network-free: registry and cache are fixtures
+npm test            # node --test, network-free
 ```
+
+## License
+
+MIT

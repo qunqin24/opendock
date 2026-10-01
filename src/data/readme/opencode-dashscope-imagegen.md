@@ -65,6 +65,20 @@ npm run build   # tsc → dist/ (js + d.ts)
 
 ## Usage
 
+### Example (replace with a real one)
+
+```bash
+npm start
+```
+
+
+### Example (replace with a real one)
+
+```bash
+npm start
+```
+
+
 Just ask your agent: _"generate an image of a lighthouse at dusk"_ — it will call the tool:
 
 | Arg           | Default          | Description                                               |
@@ -92,3 +106,15 @@ Output directory override: `DASHSCOPE_IMAGEGEN_DIR` env.
 ## License
 
 [MIT](LICENSE)
+
+## Who is it for
+
+<!-- TODO: who is this for? -->
+
+## Use cases
+
+<!-- TODO: 3-7 concrete use cases -->
+
+## Why choose this
+
+<!-- TODO: 2-4 differentiators, with numbers -->

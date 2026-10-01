@@ -27,7 +27,7 @@ OpenCode v2 执行边界安全插件：在原生 `shell` 工具执行命令前�
   "$schema": "https://opencode.ai/config.json",
   "plugins": [
     {
-      "package": "opencode-v2-security@1.0.1",
+      "package": "opencode-v2-security@1.3.0",
       "options": {
         "strictness": "HARD",
         "failPolicy": "fail_open",
@@ -68,12 +68,12 @@ OpenCode v2 执行边界安全插件：在原生 `shell` 工具执行命令前�
 { "BypassClassifier": ["filesystem", "secret"] }
 ```
 
-**临时豁免**——会话内 slash 命令 `/bypass <category|*|all|ALL|off>`（服务端注册命令，参数不进模型上下文）。实现为**活动续期租约**：内存存储，默认 TTL 20 分钟（`bypassLeaseTtlMs` 可调，1min–24h），会话有活动事件（查看、收件、执行、shell 启动）即续期；关掉 TUI 或服务重启后失效，必须重新 arm。
+**临时豁免**——会话内 slash 命令 `/bypass [category](,[category]) ([timeout])`（服务端注册命令，参数不进模型上下文）。实现为**固定到期租约**：内存存储，arm 时刻确定绝对到期点，**活动/子代理干活绝不续期**——设 120 就是 120 秒后失效。末尾可跟一个数字作为超时秒数（如 `/bypass fs 120`）；不带超时使用默认 `bypassLeaseTtlMs`（20 分钟，可调 1min–24h）；超时为 `0` 或负值（如 `/bypass fs -1`）表示永不自然过期，直到 `/bypass off`、会话删除或服务重启。非法/非数字/多余 token 原子拒绝，不改租约。单独 `/bypass 0` 仍是清空租约的兼容别名。
 
-- 多次 arm 叠加：`/bypass host` 后再 `/bypass network` = `{host, network}`；`off` 清空。
+- 多次 arm 叠加：`/bypass host` 后再 `/bypass network` = `{host, network}`；`off` 清空。每次 arm 的 timeout 作用于该会话**整体租约**（覆盖其到期时间）；不带 timeout 的新 arm 把到期重置为默认值。
 - 兼容别名只在输入边界展开：`fs` → `filesystem`，`os` → `host+privilege+indirection`，`web` → `network+remote`。注意 `os` 是历史收窄后的写法，**不再覆盖 `remote`**（`git.remote-history-rewrite`、`infrastructure.*`、`database.*` 需要 `remote` 单独武装）。状态、RPC、提示词与永久配置状态只使用规范类别名；永久 `BypassClassifier` 若输入别名会展开并警告，不会把别名存为类别。
 - `*` 或小写 `all` 武装全部十类；大写 `ALL` 是关闭本插件全部检查的独立 kill switch。它们是 `/bypass` 的控制语法，不是类别；提权注释和永久 `BypassClassifier` 都禁止使用 `all/*/ALL`。
-- **子代理传导**（默认开，`bypassPropagateToSubagents: false` 关闭）：子代理会话继承父会话（沿祖先链并集）的 armed 类别；子代理干活会续期父会话租约。
+- **子代理传导**（默认开，`bypassPropagateToSubagents: false` 关闭）：子代理会话继承父会话（沿祖先链并集）的 armed 类别与相同到期语义；继承是只读的，子代理活动不会延长父租约。
 
 ### 通知（agent 与用户分离）
 
@@ -118,7 +118,7 @@ sudo apt install unzip
 示例中的三个类别各管一层：`host` 豁免包管理这类运行系统状态变更的静态检查；`privilege` 覆盖 `sudo` 越权边界，并让该次调用以 host-direct 运行（不包裹 OS 沙箱，否则沙箱的 no_new_privs 会让 `sudo` 静默失败）；`sandbox` 则完全移除本次调用的 OS 沙箱（apt 需要写系统路径与真实网络，ro/rw 沙箱下都会失败）。按需请求类别：例如只改文件属主的 `chown` 只需要 `privilege`（可加 `sandbox`，当 ro 沙箱无法移除时避免 fail-loud）。
 
 - 三行必须从命令第一个字节开始、顺序和大小写完全一致；第四行起才是真实命令。可申请的类别为七个静态类别加 `sandbox`（`filesystem`/`host`/`privilege`/`secret`/`network`/`remote`/`indirection`/`sandbox`），可多选；`dynamic` 与 `slow` 不可申请（提权不能用来关掉审查层本身），`all`、`*`、`ALL` 与输入兼容别名同样禁止。
-- 插件把用户当前输入、最近上下文、当前权限、命令、类别、理由及本会话既往失败申请交给独立 direct Python reviewer；它开启 thinking、关闭 JSON output，且最终只输出 `allow_once`、`ask_user` 或 `deny`。
+- 插件把最近 **5 条用户消息**（每条最多 8000 字符，超长时保留头尾）、最多 **16 条用户/助手正文**（每条最多 4000 字符、合计 24000 字符）、实际 cwd/worktree、当前权限、命令、类别、理由及本会话既往失败申请交给独立 Python reviewer。推理文本、工具输出和插件通知不混入用户授权。Jev 使用一次 System One 请求；OpenAI-compatible 后备审查器开启 thinking、关闭 JSON output。最终仍只输出 `allow_once`、`ask_user` 或 `deny`。
 - 单次提权必须有已配置且可用的 `dynamicReview` 端点、模型与密钥，并取得独立 LLM 审查器的批准。配置缺失或审查器不可用时申请会被拒绝，命令不执行；静态预检不会兜底批准。此时提权申请仍按失败处理，与显式设置 `escalationEnabled: false`（提权前缀作为普通注释）不同。
 - **送审前 floor 预检**：插件先用「会话现有类别 ∪ 本次请求类别 ∪ 全部静态类别」（reviewer 可能给出的最大授权；底线规则本就对任何类别免疫，全类别武装下仍命中的终结规则不可能被任何授权清除，也避免未请求的普通规则或前段的普通 DENY 遮蔽同脚本后段的底线规则）跑一遍静态分类；若结果命中任何**终结规则**——不可绕过底线（`isFloorRule`）、`permission.write` 权限上限、或不可审查输入（`input.empty`/`input.opaque`；opaque 的判定是 ASK，同样在 reviewer 之前短路，不会白调 reviewer）——则**短路**：不调用 reviewer，直接返回终结型拒绝并说明"提权无法越过硬底线"。该静态拒绝**不写入** reviewer 拒绝历史（静态预检不是 reviewer 的 deny 决定），但重复提交仍会在同一预检处再次被拒；仅有未映射的普通规则不在此短路（它们交给 reviewer 正常审查）。
 - `allow_once` 只对当前 shell 调用有效。插件随后按“会话现有类别 ∪ 本次批准类别”继续执行未被这些类别豁免的普通静态/动态/permission/sandbox 检查（不是全绕过），也不会改变会话租约。若批准类别含 `privilege` 且命令需要特权，该次调用按上表语义以 host-direct 运行（或 fail-loud）。
@@ -140,7 +140,7 @@ sudo apt install unzip
 
 ### 静态放行语义
 
-arm 后命令不会被静态层直接 ALLOW：豁免对应检查后以 `bypass.static-allow` ASK 交常规动态审查器（配合对应 BYPASS RULE 提示词裁决）；若常规审查器不可用，按 `failPolicy` 处理（默认 `fail_open`，需在故障时拒绝则设为 `fail_close`）。单次提权申请则始终需要独立 LLM 审查器批准，审查失败时拒绝。无 bypass 的会话行为与旧版一致——仅有的例外是三类**修复目标**：fork bomb 全形状、`tee`/`cp`/`sysctl` 形式的 kernel 写入、`/lib64` 系统根——旧版这些只被兜底 ASK 挡住，现在被对应 floor 规则正确 DENY。
+arm 后命令不会被静态层直接 ALLOW：豁免对应检查后以 `bypass.static-allow` ASK 交常规动态审查器（配合对应 BYPASS RULE 提示词裁决）；若常规审查器不可用，按 `failPolicy` 处理（默认 `fail_open`，需在故障时拒绝则设为 `fail_close`）。单次提权申请则始终需要独立 LLM 审查器批准，审查失败时拒绝。v1.3.0 将无法确定是惰性载荷还是执行内容的情况交给动态层；可证明实际执行的底线仍拒绝。仅写入、打印或保存危险示例不等于执行，但实际写入目标、命令替换及同次调用中后续执行仍须审查。
 
 ## 会话权限层（r/w 能力上限）
 
@@ -165,7 +165,7 @@ arm 后命令不会被静态层直接 ALLOW：豁免对应检查后以 `bypass.s
 | 作用 | 按类别放宽分类器检查 | 按能力位硬拒整个动作类 |
 | 谁能调 | 用户 `/bypass`；代理注释须经独立审查 | `set_permission` 代理仅收紧；`/perm` 用户可调整 |
 | 方向 | 按类别临时放宽 | 代理仅收紧；用户可恢复，但祖先仍封顶 |
-| 时效 | 租约 TTL，活动续期 | 会话生命周期，`session.deleted` 清除 |
+| 时效 | 固定到期租约（默认 20min，可带秒超时；`<=0` 不过期），不随活动续期 | 会话生命周期，`session.deleted` 清除 |
 
 优先级：permission deny 是硬拒绝，与 bypass 独立——arm 了 filesystem 豁免但 `w` 被剥除时，写操作仍被 `permission.write` 拦下。
 
@@ -206,6 +206,8 @@ shell 请求
 
 ## 配置字段（与 v1 一致）
 
+v1.3.0 的提示词实验、真实拒绝取证、误拦/漏判结果及剩余限制见 [研究与验证摘要](./RESEARCH-v1.3.0.md)。研究比例不是线上误拦率；复杂嵌套载荷仍可能被动态模型误判。
+
 `options` 支持以下字段（白名单校验，未知字段会抛错）：
 
 | Option | 类型 | 默认 | 说明 |
@@ -229,7 +231,7 @@ shell 请求
 | `supervisorEnabled` | boolean | Windows 下 `true` | 使用原生 shell supervisor |
 | `supervisorPath` | string | 包内默认 | supervisor `bash.exe` 路径 |
 | `BypassClassifier` | string[] | `[]` | 永久豁免类别列表：`filesystem`/`host`/`privilege`/`secret`/`network`/`remote`/`indirection`/`dynamic`/`sandbox`/`slow`；未知类别警告并忽略 |
-| `bypassLeaseTtlMs` | number | `1200000`（20 分钟） | 临时豁免租约 TTL，活动续期；范围 60000–86400000 |
+| `bypassLeaseTtlMs` | number | `1200000`（20 分钟） | 临时豁免租约默认时长（无 timeout 时使用）；到期为固定时刻，活动不续期；范围 60000–86400000 |
 | `bypassPropagateToSubagents` | boolean | `true` | 子代理会话继承父会话的临时豁免 |
 | `escalationEnabled` | boolean | `true` | 是否允许代理通过 `# - REQUIRE_ESCALATION` 三行前缀申请单次提权。为 `false` 时该前缀只是普通 shell 注释（命令照常分类），不会调用提权审查器或写入提权失败记录，且所有阻断文案不再提及提权机制；常规动态审查器仍可能按分类结果运行，`/bypass`、`/perm`、`BypassClassifier` 不受影响 |
 | `permission` | object | 见权限层表 | 会话 r/w 能力层：`default`/`webIsRead`/`registerTool`/`subagentPermission`/`actionMap`（详见「会话权限层」） |

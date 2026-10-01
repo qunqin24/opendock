@@ -1,6 +1,6 @@
 # AKM Plugins
 
-Platform plugins for [AKM](https://github.com/itlackey/akm) `^0.9.18`. Both integrations expose exactly five public AKM surfaces:
+Platform plugins for [AKM](https://github.com/itlackey/akm) `^0.9.20`. The OpenCode and Claude integrations expose exactly five public AKM surfaces:
 
 | Capability | OpenCode tool | Claude slash command |
 | --- | --- | --- |
@@ -57,7 +57,26 @@ claude plugin marketplace add itlackey/akm-plugins
 claude plugin install akm@akm-plugins
 ```
 
-Claude receives the five slash commands, an AKM skill, and lifecycle hooks for scoped curation, feedback, and memory capture. See [claude/README.md](./claude/README.md) for details.
+Claude receives the five slash commands, an AKM skill, and lifecycle hooks for scoped curation, feedback, and memory capture. See [claude/README.md](./claude/README.md) for details. The hooks need Claude Code 2.1.139 or newer and Bun on `PATH`; on Windows that means `bun.exe`, and neither Git for Windows nor WSL ([details](./claude/README.md#windows)).
+
+## Codex
+
+Add the marketplace and install the plugin:
+
+```sh
+codex plugin marketplace add itlackey/akm-plugins
+codex plugin add akm@akm-plugins
+```
+
+The Codex plugin is the same [`claude/`](./claude) directory with a second manifest, `.codex-plugin/plugin.json`, listed in [`.agents/plugins/marketplace.json`](./.agents/plugins/marketplace.json). Codex receives the AKM skill, which drives the `akm` CLI directly (there are no slash commands), and two hooks: `SessionStart` injects the AKM primer and checks the CLI version, and `UserPromptSubmit` curates context for each prompt. The Claude plugin's other hooks (feedback, session extraction, tool and subagent observations) are not part of it.
+
+Codex does not run plugin hooks until you review and trust them: open `/hooks` in the Codex CLI and trust the two AKM hooks. See [claude/README.md](./claude/README.md#codex) for details. On Windows the hooks run through PowerShell with Bun on `PATH` (the manifest's `commandWindows`); [claude/README.md](./claude/README.md#windows) says what that needs and what is tested.
+
+## Updating
+
+- **Claude Code** does not auto-update third-party marketplaces by default. Turn it on in `/plugin` → Marketplaces → `akm-plugins` → Enable auto-update, or add `"autoUpdate": true` beside `source` in the `akm-plugins` entry of `extraKnownMarketplaces` in `settings.json`. The Claude desktop app starts Claude Code with `DISABLE_AUTOUPDATER=1`, which also switches plugin updates off, so desktop users also need `"env": { "FORCE_AUTOUPDATE_PLUGINS": "1" }` in `settings.json`. To update by hand: `claude plugin marketplace update akm-plugins`, then `claude plugin update akm@akm-plugins`.
+- **Codex** updates the plugin by itself every time it starts; `codex plugin marketplace upgrade akm-plugins` does it on demand. A release that changes a hook's command shows that hook as modified in `/hooks`, and it does not run until you trust it again.
+- **OpenCode** installs `akm-opencode` the first time and never checks for a newer version. To update, close OpenCode, delete `~/.cache/opencode/packages/akm-opencode@latest`, and start OpenCode again.
 
 ## Development
 
@@ -77,8 +96,8 @@ OpenCode guard reads the manifest of the dependency it actually imported;
 requesting a newer API against an older exact-pinned dependency returns a
 structured error instead of silently returning exact content.
 
-Release-order gate: publish `akm-cli@0.9.18` first, then update OpenCode's exact
-dependency and lockfile and Claude's compatibility floor to 0.9.18, run the
+Release-order gate: publish `akm-cli@0.9.20` first, then update OpenCode's exact
+dependency and lockfile and Claude's compatibility floor to 0.9.20, run the
 real-package contract suite, and only then publish the plugins. Do not fabricate
 the unpublished registry lock entry on this branch.
 
@@ -86,15 +105,15 @@ the unpublished registry lock entry on this branch.
 
 The plugins keep **MAJOR.MINOR in sync with the AKM CLI line they target, and let PATCH diverge** inside that minor. While AKM is on `0.9.x`, the plugins release `0.9.0`, `0.9.1`, `0.9.2`, … independently of AKM's own patch number.
 
-The Claude compatibility floor is `AKM_VERSION_RANGE` in [`claude/shared/akm-version.ts`](./claude/shared/akm-version.ts). On a `0.x` version a caret range remains inside a minor line — `^0.9.18` means `>=0.9.18 <0.10.0`. OpenCode exact-pins that floor (`akm-cli@0.9.18`) because it imports AKM's in-process `dist/` modules; allowing an untested patch to resolve at user install time would make one plugin release execute different private APIs on different machines.
+The Claude compatibility floor is `AKM_VERSION_RANGE` in [`claude/shared/akm-version.ts`](./claude/shared/akm-version.ts). On a `0.x` version a caret range remains inside a minor line — `^0.9.20` means `>=0.9.20 <0.10.0`. OpenCode exact-pins that floor (`akm-cli@0.9.20`) because it imports AKM's in-process `dist/` modules; allowing an untested patch to resolve at user install time would make one plugin release execute different private APIs on different machines.
 
 Patch divergence is deliberate: a plugin-only fix has to be shippable without waiting for an AKM release, which is impossible if the patch component is spent mirroring AKM's.
 
-Versions must be plain semver (`MAJOR.MINOR.PATCH`, optionally `-prerelease`). A four-component string such as `0.9.18.20260929.1` is not semver and npm rejects it on publish. For dated snapshot builds use a prerelease of the *next* patch — `0.9.19-20260929.1`, which sorts above `0.9.18` and below `0.9.19` — rather than a prerelease of the current one, which would sort *below* the version already published. Note that no prerelease satisfies a stable range like `^0.9.18`, so snapshots reach users only through an explicit npm dist-tag.
+Versions must be plain semver (`MAJOR.MINOR.PATCH`, optionally `-prerelease`). A four-component string such as `0.9.20.20260929.1` is not semver and npm rejects it on publish. For dated snapshot builds use a prerelease of the *next* patch — `0.9.21-20260929.1`, which sorts above `0.9.20` and below `0.9.21` — rather than a prerelease of the current one, which would sort *below* the version already published. Note that no prerelease satisfies a stable range like `^0.9.20`, so snapshots reach users only through an explicit npm dist-tag.
 
 Both rules are enforced, not conventional:
 
-- [`tests/version-policy.test.ts`](./tests/version-policy.test.ts) pins all four version fields to each other and to the `AKM_VERSION_RANGE` minor line, keeps Claude's install ref equal to that range, and requires OpenCode's dependency and lockfile to equal the range floor exactly.
+- [`tests/version-policy.test.ts`](./tests/version-policy.test.ts) pins all five version fields to each other and to the `AKM_VERSION_RANGE` minor line, keeps Claude's install ref equal to that range, and requires OpenCode's dependency and lockfile to equal the range floor exactly.
 - `.github/workflows/release.yml` validates the requested version *before* it stamps manifests, commits, and pushes a tag — npm would otherwise be the first thing to reject a bad version, long after the tag exists.
 
 ## Links
@@ -102,3 +121,5 @@ Both rules are enforced, not conventional:
 - [AKM CLI](https://github.com/itlackey/akm)
 - [OpenCode plugins](https://opencode.ai/docs/plugins/)
 - [Claude Code plugins](https://code.claude.com/docs/en/plugins)
+- [Codex plugins](https://developers.openai.com/plugins/build/plugins)
+- [Codex hooks](https://learn.chatgpt.com/docs/hooks)

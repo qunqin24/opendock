@@ -35,7 +35,11 @@ Add the plugin to your OpenCode config (`~/.config/opencode/opencode.json`):
 
 ## How It Works
 
-The plugin uses the `tool.execute.before` hook to prefix all commands with `snip`
+The plugin uses the `tool.execute.before` hook to forward each bash command to `snip hook`, the same rewrite engine snip uses for Claude Code and other agents (tested with snip v0.25.2):
+
+- only commands snip has a filter for are rewritten to `snip run -- <command>`, each segment of `&&`, `||`, `;` chains separately
+- commands whose output feeds a pipe or a file redirection, heredocs, shell blocks and command substitutions are left untouched
+- if `snip hook` fails, the command runs unchanged
 
 ## Development
 

@@ -31,7 +31,18 @@ OpenSpec spec workflows remain a third, separate lane.
 ```
 
 - Plan files: `.opencode/plan/<date>-<slug>.md` in your project, frontmatter
-  state machine `draft → approved → done` (exit: `abandoned`).
+  state machine `draft → approved → done`, exits `abandoned` (plain discard) and
+  `superseded` (`plan_discard {reason, supersede: "<successor path>"}` —
+  the exit for work whose execution moves to another harness, e.g.
+  `.opencode/crew/2026-10-01-....md`, rather than ends). Every terminal
+  transition appends a dated narrative section to the file body in the same
+  write as the status flip: close = each acceptance criterion's
+  pass/evidence; discard/supersede = the reason verbatim (`(none given)`
+  when absent; a supersession also records the successor path). Appended
+  sections are parser-inert — status reads frontmatter only, tick
+  counts read the Task List only — and a superseded plan's Task List
+  stays the frozen decision snapshot: closure IS the supersession, and
+  crew/goal results never tick it.
 - While a plan is in draft, `write` / `edit` / `bash` / `task` are **denied
   at the permission layer** — including your own `allow` config, and for
   every agent in that session (the draft protects shared session state; see
@@ -419,9 +430,10 @@ discovered by walking up:
 The two layers **merge**: agents combine, and on an id collision the project
 definition wins wholesale (one definition per id — no cross-layer field
 blending). A broken file empties only its own layer/pool (error finding with
-the parse location); everything else still applies. Both layers hot-apply —
-edits, and files appearing or disappearing, take effect at the next config
-hook without a host restart (see the apply-timing table below).
+the parse location); everything else still applies. Both layers re-read at
+every real materialization — host boot, a first config build, or an
+opencode config reload — without a restart; a new session alone does
+not re-read them (see the apply-timing table below).
 
 **Hierarchical pools on a shared host.** Agent frontends (paseo and friends)
 routinely share ONE opencode host process across projects, re-initializing
@@ -531,14 +543,18 @@ A rejected entry costs only itself — its siblings materialize normally.
 > error finding naming the missing half. Fix per entry: add the missing
 > `thoughtLevel`, or delete `model` to make it an Auto worker.
 
-**What applies when** — file truth is hot; only the anchor set is frozen at
-host start:
+**What applies when** — only a real materialization re-reads the pool
+files into the `forge-*` vocabulary; the anchor set itself only ever grows.
+Materialization triggers (2026-10-01 live finding): host boot (a freshly
+started CLI process reads the files as they are), the FIRST config build
+for a directory on this host, and opencode config file reloads. A NEW
+session on a long-lived shared host (serve-type) does NOT re-materialize:
 
 | change | needs a host restart? |
 | --- | --- |
-| `thoughtLevel` on an existing agent | no (applies to NEW sessions of that agent; running sessions keep their frozen depth) |
-| agent added / removed / edited, any pool file created or deleted | no restart — applies at the next config hook (materialization re-runs there; the crew gate and depth lookups always resolve fresh) |
-| a NEW directory joining the host (another project's session on the shared host) | no restart — the re-initialization itself adds the anchor and its pools |
+| `thoughtLevel` on an existing agent | no (applies to NEW sessions of that agent; running sessions keep their frozen depth) — depth lookups resolve the pool files fresh at every dispatch, independent of materialization |
+| agent added / removed / edited, any pool file created or deleted | no restart — but not at the next session either: the materialized `forge-*` set rebuilds only at the next REAL materialization (host boot, opencode config reload, or a first config build); on a long-lived shared host pool changes wait for that rebuild or a restart. The crew gate and depth lookups resolve the pool files fresh regardless |
+| a NEW directory joining the host (the first session of another project on the shared host) | no restart — that first config build itself re-initializes the plugin and appends the anchor and its pools (append-only; existing pools never flip) |
 
 ### Dispatching
 
@@ -580,12 +596,21 @@ requires a plan. The flow:
 
 1. **Register** the declared plan: `crew_begin {objective, subtasks}` — one
    titled subtask each, optionally naming the intended `forge-*` agent.
+   When the macro contract descends from a plan artifact, pass its path as
+   the optional `lineage` argument — recorded as a first-class `lineage:`
+   line in the crew record header and disclosed in the registration output
+   (explicit argument only; never inferred from a recently discarded plan).
    Registration enters a **PENDING** crew: execution has not started. The
-   registration output confirms the roster **grouped by pool with its
-   origins** (which forge.json families the dispatchable set materialized
-   from, the primary marked), points at the crew record file, presents the
-   three execution-mode choices, and stops the turn. Reconnaissance task
-   calls are free BEFORE registration.
+   registration output LEADS with the crew record path line (same
+   first-block prominence as the plan tools' `Plan created:`) and the
+   PENDING pause text instructs the model to relay that path to the user
+   alongside the choice — so you can verify the record really landed on
+   disk (an earlier output order buried the path line, and the model
+   reliably drops what it buries — leading with it is the fix). The
+   output then confirms the roster **grouped by pool with its origins**
+   (which forge.json families the dispatchable set materialized from, the
+   primary marked), presents the three execution-mode choices, and stops
+   the turn. Reconnaissance task calls are free BEFORE registration.
 2. **The pause is mechanical**: while the crew pends, every `task` dispatch is
    refused by an interception belt. The user chooses:
    - **supervised waves now** — `crew_begin {execution: "waves"}` lifts the
@@ -645,9 +670,11 @@ session AI do it — the latter only on your explicit go-ahead in that
 conversation, through the normal visible write path (when the AI writes a
 sub-pool file it also proposes a short stable `pool` namespace so ids
 survive directory renames). This is the plugin's only configuration
-invitation. Saved files apply at the next config hook — no restart needed;
-on a shared host, opening a session in a new workspace adds that anchor and
-its pools automatically.
+invitation. Saved files apply at the next real materialization — no
+restart needed; on a shared host, the first session in a NEW workspace adds
+that anchor and its pools automatically (a new session in an existing
+workspace does not re-read the files — see the apply-timing table
+above).
 
 ### Debris note
 

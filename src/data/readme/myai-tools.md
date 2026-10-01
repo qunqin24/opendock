@@ -52,7 +52,8 @@ The main idea is simple: instead of forcing one model to do everything, the plug
   across 25 languages, and built-in MCPs for docs and GitHub code
   search.
 - **[Fully customizable](docs/configuration.md)** - custom agents, prompt
-  overrides, per-agent skill/MCP permissions, and
+  overrides, per-agent skill/MCP permissions, global disable switches for
+  tools, MCPs, agents, skills, hooks, and slash commands, and
   [project-local customization](docs/project-local-customization.md).
 - **[Marketplace packages](docs/marketplace.md)** - install and manage community
   agents; package changes apply only after reloading OpenCode.
@@ -675,7 +676,7 @@ Use this section as a map: start with installation, then jump to features, confi
   <p><sub>Every merged contribution leaves a mark on the realm.</sub></p>
 
   <!-- ALL-CONTRIBUTORS-BADGE:START - Do not remove or modify this section -->
-[![All Contributors](https://img.shields.io/badge/all_contributors-124-orange.svg?style=flat-square)](#contributors-)
+[![All Contributors](https://img.shields.io/badge/all_contributors-128-orange.svg?style=flat-square)](#contributors-)
 <!-- ALL-CONTRIBUTORS-BADGE:END -->
 </div>
 
@@ -851,6 +852,12 @@ Use this section as a map: start with installation, then jump to features, confi
       <td align="center" valign="top" width="16.66%"><a href="https://github.com/maqifrnswa"><img src="https://avatars.githubusercontent.com/u/424153?v=4?s=100" width="100px;" alt="Scott Howard"/><br /><sub><b>Scott Howard</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=maqifrnswa" title="Code">💻</a></td>
       <td align="center" valign="top" width="16.66%"><a href="https://github.com/ananas-wonders"><img src="https://avatars.githubusercontent.com/u/7282452?v=4?s=100" width="100px;" alt="Ananas"/><br /><sub><b>Ananas</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=ananas-wonders" title="Code">💻</a></td>
       <td align="center" valign="top" width="16.66%"><a href="https://github.com/jaynis"><img src="https://avatars.githubusercontent.com/u/1553675?v=4?s=100" width="100px;" alt="jaynis"/><br /><sub><b>jaynis</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=jaynis" title="Code">💻</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="https://github.com/drakeo338"><img src="https://avatars.githubusercontent.com/u/328244157?v=4?s=100" width="100px;" alt="Y.B."/><br /><sub><b>Y.B.</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=drakeo338" title="Code">💻</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="https://github.com/EmojiPati"><img src="https://avatars.githubusercontent.com/u/49492351?v=4?s=100" width="100px;" alt="pati"/><br /><sub><b>pati</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=EmojiPati" title="Code">💻</a></td>
+    </tr>
+    <tr>
+      <td align="center" valign="top" width="16.66%"><a href="https://github.com/unsnow-iac"><img src="https://avatars.githubusercontent.com/u/256081678?v=4?s=100" width="100px;" alt="unsnow-iac"/><br /><sub><b>unsnow-iac</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=unsnow-iac" title="Code">💻</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="https://github.com/guidan-nick"><img src="https://avatars.githubusercontent.com/u/224735395?v=4?s=100" width="100px;" alt="guidan-nick"/><br /><sub><b>guidan-nick</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=guidan-nick" title="Code">💻</a></td>
     </tr>
   </tbody>
 </table>

@@ -210,7 +210,7 @@ Plugin options go in `options` of a `plugins` entry.
 | `maxRetries`* | `1` | Extra attempts after transient Jev errors. |
 | `fallbackMode`* | `fixed` | `fixed`, `previous`, or `error` (fail the request). |
 | `fallbackEffort`* | `high` | Effort used when classification fails. |
-| `maxRequestBytes` | `1048576` | Largest request body. |
+| `maxRequestBytes` | unset (unlimited) | Optional maximum request-body bytes; must be a positive integer. |
 | `maxInFlight` | `32` | Concurrent requests. |
 | `upstreamHeaderTimeoutMs` | `10000` | Wait for endpoint response headers. |
 | `upstreamIdleTimeoutMs` | `60000` | Longest gap between streamed chunks. |

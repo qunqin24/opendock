@@ -179,11 +179,13 @@ await anonymizer.dispose();
 |---|---|
 | [`opencode-rehydra-core`](https://www.npmjs.com/package/opencode-rehydra-core) | 核心 SDK —— 检测、匿名化、还原 |
 | [`opencode-rehydar`](packages/opencode-plugin/) | OpenCode 插件 —— 在密钥到达 LLM provider 前脱敏 |
+| [`rehydra-pi`](packages/pi-extension/) | Pi 扩展 —— 通过 `ExtensionAPI` 在 Pi 对话中保护 PII |
 
 ## 文档
 
 - [核心 SDK 用法](#作为库嵌入你的应用)
 - [OpenCode 插件](packages/opencode-plugin/README.md)
+- [Pi 扩展](packages/pi-extension/README.md)
 - [English](README.en.md)
 
 ## License
