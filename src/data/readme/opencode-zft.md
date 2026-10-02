@@ -50,11 +50,12 @@ the old codename.
 ## Install
 
 ```bash
-pip install --pre zft
+pip install zft
 ```
 
 Requires Python 3.12+ (the `zft` console script is the only entry point).
-Releases are PEP 440 pre-releases (`0.2.0aN`), hence pip's `--pre`.
+0.2.0 is the first stable release; pre-releases `0.2.0a1..a8` remain on PyPI
+for pinning older receipts.
 
 ## Quickstart
 
@@ -64,6 +65,19 @@ carries a `# @trace("EXPORT-413")` comment on the line above it — that
 binding is what every gate below counts, and `zft extract` prints the
 bindings exactly as the gates see them. On a directory with no store yet,
 `zft lint` exits 1 with `no clause store found`; scaffold first, lint second.
+
+### New project (empty directory)
+
+Run the commands below in an empty project directory: `zft create`
+bootstraps a fresh clause store under `.zft/` and scaffolds your first
+DRAFT clause (`zft lint` in a directory with no store refuses with that
+same seed hint). `zft check` then stays red — `uncovered`, coverage 0/1 —
+until a deliverable element binds: put `@trace("ALIAS")` in a comment line
+immediately above the function (Markdown: `<!-- @trace("ALIAS") -->` above
+the heading), run `zft extract`, then `zft check` again; `zft baseline`
+seeds the reverse-coverage baseline (check's warning names it when
+absent). `zft attest` writes the verification key that bare `zft verify`
+consumes.
 
 ```bash
 # Scaffold a new DRAFT clause node (seeds .zft/specs/)
@@ -121,21 +135,67 @@ zft task-gate before --subagent producer --description "[contract: release-1] im
 zft task-gate after  --subagent producer --description "[contract: release-1] implement export endpoint"
 ```
 
-## Editor integration
+## Harness integration
 
-ZFT ships thin editor plugins that enforce the two boundaries where contracts
-are decided — when work is **dispatched** to a subagent, and when the contract
-store itself is **edited**. They are silent in any project without a `.zft/`
-store.
+ZFT ships thin per-harness integrations that enforce the two boundaries where
+contracts are decided — when work is **dispatched** to a subagent, and when
+the contract store itself is **edited**. All of them are silent in any
+project without a `.zft/` store.
 
-**opencode** (`.opencode/plugins/`): the dispatch gate wraps the built-in
-`task` tool and blocks writer dispatches that are not bound to a contract
-(`[contract: <name>]` in the description); the lint gate re-runs `zft lint`
-on every `.zft/**` edit. Every decision lands in `.zft/audit.log` and
-`.zft/gates-hook/log.jsonl`.
+### Prerequisites (every harness)
+
+1. **Python 3.12+** and the CLI: `pip install zft` (stable, on PyPI).
+2. **A resolvable `zft` executable**, checked per harness in this order:
+   `ZFT_BIN` env var (authoritative; a bad override fails loudly) →
+   `<project>/.venv/bin/zft` → `zft` on `PATH` or `~/.local/bin` (where
+   `uv tool install` / `pipx` / `pip install --user` land) →
+   `python3 -m zft.cli.main`. A candidate that cannot start is skipped,
+   never green.
+3. **A seeded contract store** (`zft create`, then a contract manifest under
+   `.zft/contracts/`). This is fail-closed by design
+   (`CON-VALIDATED-OR-NO-START`): no store means nothing is enforced and
+   `zft lint` says so in a typed rejection — a gate that silently passes on
+   a missing store would be green-vacuous.
+4. **Git** in the project, for changeset-scoped after-verdicts; without it
+   the verdict degrades to tree-wide (never blocks, never fabricates scope).
+
+**Subagents — what is actually required.** The *dispatch* boundary (opencode
+only, today) fires on subagent dispatches: enforcement means implementation
+work reaches writers through the harness's `task` tool with a
+`[contract: <name>]` marker in the description. **No custom subagent
+configuration is required** — lanes resolve by name with shipped defaults
+(a fixed read-only list; every other type is a writer), and where the host
+can resolve an agent's permissions, capability wins over the name.
+
+The **desired end state is harness-agnostic: every writer works under a
+recorded contract binding** (or an explicit, audited `[ungated: reason]`) —
+a subagent dispatch is one binding path, never the only one. opencode is
+there first: since the session-binding gate, a main-session edit on a
+deliverable path is itself blocked until the session binds (`zft task-gate
+before --subagent main --description "[contract: <name>] ..."` or an
+explicit `[ungated: ...]`), so main-session-only work can no longer slip the
+dispatch boundary. zcode and Codex still enforce edit-time (+ zcode Stop
+gate) only; their dispatch-boundary paths need host-contract pinning
+(zcode PreToolUse on the agent-spawn tool; Codex exposes PostToolUse only —
+a documented ceiling, see `plugins/codex/README.md`).
+
+### The four integrations
+
+| Harness | Artifact | Dispatch boundary | Edit boundary | Completion boundary | Doc |
+| --- | --- | --- | --- | --- | --- |
+| **opencode** | npm `opencode-zft` (or copy `zft-gate.ts` + `zft-lint-gate.js`) | ✅ `task` tool wrapped: writer dispatches need `[contract: <name>]`, blocks before spawn, coverage verdict after; **main-session binding gate**: a deliverable edit before any recorded binding is blocked until the session binds (`zft task-gate before --subagent main ...`) | ✅ `zft lint` on every `.zft/**` edit (observe/enforce) | coverage verdict surfaced to the orchestrator | [`.opencode/plugins/README.md`](.opencode/plugins/README.md) |
+| **zcode** | `plugins/zft-gates` (marketplace `dev-traceagent-zcode`) or workspace `.zcode/config.json` | — (workflow carried by the skill) | ✅ PostToolUse L0 on `.zft/**` edits (observe/enforce) | ✅ Stop gate: `zft check` before *any* session may stop, subagent or main | [`plugins/zft-gates/README.md`](plugins/zft-gates/README.md) |
+| **Codex** | `plugins/codex` (skill + PostToolUse hook) | — (workflow carried by the skill) | ✅ PostToolUse L0 on `.zft/**` edits (observe/enforce) | — | [`plugins/codex/README.md`](plugins/codex/README.md) |
+| **pre-commit** | `.pre-commit-hooks.yaml` (`zft-lint`, `zft-check`) | — | ✅ at commit time (`zft-lint`) and pre-push (`zft-check`: L0 + L2-fast + gherkin) | — | [`.pre-commit-hooks.yaml`](.pre-commit-hooks.yaml) |
+
+Every decision is one JSONL line in `<root>/.zft/audit.log` (dispatches) and
+`<root>/.zft/gates-hook/log.jsonl` (edits) — the evidence layer; never delete
+by hand.
+
+**opencode** quick start:
 
 ```bash
-pip install --pre zft                                        # Python 3.12+
+pip install zft                                             # Python 3.12+
 
 # Install the gates — either from npm (versioned, auto-installed by opencode):
 bun add -D opencode-zft
@@ -150,8 +210,14 @@ cp .opencode/skills/zft/SKILL.md ~/.config/opencode/skills/zft/SKILL.md
 # restart opencode, then scaffold a clause + contract (see .opencode/plugins/README.md)
 ```
 
-A **Codex** equivalent (PostToolUse hook + agent skill) binds the same CLI
-seams, so policy and audit trails stay identical across clients.
+**zcode**: install *ZFT Gates* from the `dev-traceagent-zcode` marketplace
+(this repo's `plugins/` directory is the marketplace root), or wire the
+workspace hooks by hand — both documented in
+[`plugins/zft-gates/README.md`](plugins/zft-gates/README.md). **Codex**: a
+symlink for the skill plus one hook table, in
+[`plugins/codex/README.md`](plugins/codex/README.md). **pre-commit**: add
+this repo with `rev: v0.2.0` and pick `zft-lint` / `zft-check` — see the
+usage header in [`.pre-commit-hooks.yaml`](.pre-commit-hooks.yaml).
 
 ```
 .zft/

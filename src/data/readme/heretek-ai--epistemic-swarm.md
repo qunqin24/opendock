@@ -224,7 +224,7 @@ The canonical MCP server (`python3 runner/mcp_server.py`, stdio) exposes these t
 | `iumbtems_oss_scout` | Scout open-source libraries, audit licenses, and build clean-room blueprints. |
 | `iumbtems_brainstorm` | Lateral ideation portfolio: feature vectors, paradigm moves, falsifiable spikes. Never bug fixes. |
 | `iumbtems_darkharvest` | Product competitor teardown with per-feature `depend\|vendor\|clean-room\|skip` verdicts and SPDX attribution. |
-| `iumbtems_factory` | Drive factory run state: `init` / `phase-add` / `qa-record` / `expansion` / `stop`. State in `<project>/.factory` and `.roadmap`. |
+| `iumbtems_factory` | Drive factory run state: `init` / `phase-add` / `qa-record` / `expansion` / `stop` / `gate`. State in `<project>/.factory` and `.roadmap`. |
 | `iumbtems_verify_quote` | Audit a verbatim citation against the SHA-256 source cache (`.research/sources/<hash>.md`). |
 | `iumbtems_socratic_frontier` | Inspect or advance the Socratic decision-tree frontier (`.research/frontier.json`). |
 | `iumbtems_export_brief` | Export a proof-carrying research brief (PCRB): a self-contained signed bundle of synthesis, claims, quote witnesses, and full source texts. |

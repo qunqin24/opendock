@@ -85,6 +85,10 @@ You need [OpenCode](https://opencode.ai) 2.x and the [Claude Code CLI](https://w
 
 **Plan mode.** OpenCode's Plan agent works as usual: Claude is told it's in plan mode, and OpenCode blocks file edits.
 
+**Project instructions.** Claude Code reads `CLAUDE.md` itself, and a project's `AGENTS.md` where there is no `CLAUDE.md` (its `instructionFiles` setting). OpenCode-only instruction files, like `~/.config/opencode/AGENTS.md` or files in `instructions`, are passed on unless Claude Code already reads the same text.
+
+**Skills and agents.** OpenCode's skills (from `.claude`, `.agents` and `.opencode`) are listed for Claude and load through OpenCode's skill tool. A custom agent's own prompt, like a `writer` subagent's, is passed on as that agent's role.
+
 **Titles and summaries.** Session titles and compaction summaries run as small one-off requests on Haiku, so they barely touch your limits.
 
 **Model fallback.** If Claude Code declines a request on one model and retries on another (for example Fable to Opus), you'll see a note in the reasoning, and the session switches to the model that's actually answering.

@@ -80,7 +80,17 @@ entirely (the hide is withdrawn in the same stroke). The forge family is
 prompted to route every shell command through `forge_shell` — on hosts that
 ignore injected tools maps the builtin tool stays visible but is refused at
 call time, and the channel mandate is what keeps the model from trying it
-first (the belt refusal remains the backstop). Mixed sessions (Tab
+first (the belt refusal remains the backstop). On such unfiltered hosts the
+fallback belt family is a three-part enumeration of hard refusals at the
+tool layer: a forge-family builtin `shell`/`bash` call is refused with a
+pointer to `forge_shell`; a non-forge agent's call of any forge tool is
+refused with the partition guidance; and a `forge-*` worker (any family
+member whose agent name is not exactly `forge`) calling a harness state tool
+(`plan_*`, `goal_*`, `crew_begin`, `crew_close`) is refused as primary-only.
+That refusal fires before any execution or user confirmation dialog, so a
+worker's state-tool call never reaches a gate, and the error names the way
+out: report findings back to the orchestrating session — the primary forge
+agent alone calls the state tools. Mixed sessions (Tab
 between agents in one session): harness state (plans/goals) stays
 session-bound, tool surfaces follow the current speaker, and the goal loop
 parks instead of driving a non-forge turn. One deliberate exception: a

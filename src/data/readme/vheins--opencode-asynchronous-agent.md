@@ -12,11 +12,10 @@ Works on **both** OpenCode V1 (`>=1.18.0`) and V2 (`>=2.0.0`):
   sidebar is collapsed
 
 ```
-▼ Subagents 0.1.0
+▼ Subagents 0.3.3
 ● 1 run · ✓ 0 done · ✕ 0 err · Σ 1
- [ ] Write a single short para…
+ [ ] Write a single short para… (executor · high)
     ↳  00:07  48.0k tok  16.3 t/s
-    executor · high
 ```
 
 OpenCode V2 ships a keybind (`ctrl+b`, command `session.background`) that moves a
@@ -140,6 +139,21 @@ All configuration is optional and read from environment variables at setup time.
 | `OPENCODE_AUTO_BG_AGENTS` | *(all)* | Comma-separated allowlist of **parent** agent ids. When set, only these parents auto-background their subagents. |
 | `OPENCODE_AUTO_BG_EXCEPT` | *(none)* | Comma-separated denylist of **parent** agent ids. These parents never auto-background their subagents. |
 | `OPENCODE_AUTO_BG_DEBUG` | *(off)* | Set to `1` to log each rewrite to stderr. |
+| `OPENCODE_SUBAGENT_NOTIFY` | *(enabled)* | TUI monitor only. Set to `0`, `false`, `off`, or `no` to disable the toast shown when a background subagent finishes (`done`/`error`). |
+
+> **OpenCode V1 needs `OPENCODE_EXPERIMENTAL_BACKGROUND_SUBAGENTS=true`.** V1 gates
+> background subagents behind that flag (or the broader `OPENCODE_EXPERIMENTAL=true`).
+> Export it *before* starting OpenCode — e.g. in `~/.zshrc` or `~/.bashrc`:
+>
+> ```sh
+> export OPENCODE_EXPERIMENTAL_BACKGROUND_SUBAGENTS=true
+> ```
+>
+> OpenCode V2 always supports background subagents and needs no flag. When the flag is
+> missing on V1 the plugin **degrades gracefully**: it leaves the call untouched and
+> subagents run in the foreground, instead of failing with
+> `Background subagents require OPENCODE_EXPERIMENTAL_BACKGROUND_SUBAGENTS=true`.
+> A one-line hint is logged to stderr at startup.
 
 ### Examples
 
@@ -180,6 +194,14 @@ export OPENCODE_AUTO_BG_SUBAGENT=0
 - **No child session changes.** Backgrounding is a property of the *parent's* subagent
   tool call, not of the child session. The child runs normally; the parent just stops
   blocking on it.
+- **Toast notifications (TUI only).** When a background subagent transitions to `done`
+  or `error`, the TUI monitor shows a short toast. It is a display-only surface — it
+  never injects session parts or prompts, so it cannot affect the parent agent's loop.
+  Disable with `OPENCODE_SUBAGENT_NOTIFY=0`.
+- **V1 flag-aware.** On OpenCode V1 the plugin only injects `background: true` when
+  `OPENCODE_EXPERIMENTAL_BACKGROUND_SUBAGENTS` (or `OPENCODE_EXPERIMENTAL`) is enabled,
+  so a missing flag never turns a subagent call into a hard error. On V2 the flag is
+  not required.
 
 ---
 
@@ -187,9 +209,10 @@ export OPENCODE_AUTO_BG_SUBAGENT=0
 
 | File | Purpose |
 | --- | --- |
-| `src/index.js` | The plugin implementation (`id`, `setup`, hook logic). |
-| `server.js` | V2 entrypoint — re-exports `src/index.js`. |
+| `src/index.js` | The plugin implementation (`id`/`setup` for V2, `server` for V1, hook logic). |
+| `server.js` | `./server` entrypoint — re-exports `src/index.js` (V1 + V2). |
 | `index.js` | Alternate directory entrypoint — mirrors `server.js`. |
+| `dist/tui.js` | `./tui` entrypoint — the TUI sidebar monitor bundle. |
 | `package.json` | Package metadata and entrypoint exports. |
 
 OpenCode V2 resolves a plugin directory through its `server` entrypoint (root
@@ -200,8 +223,10 @@ either resolution path works.
 
 ## Requirements
 
-- OpenCode **V2** (`>=2.0.0`). The plugin API used here (`ctx.tool.hook`,
-  `execute.before`) is V2-only.
+- OpenCode **V1** (`>=1.18.0`) or **V2** (`>=2.0.0`). The server hook uses V1's
+  `tool.execute.before` on V1 and the V2 `ctx.tool.hook("execute.before")` API on V2;
+  the TUI monitor needs a build with TUI plugin support.
+- Node **>=22.13** (see `package.json`).
 
 ---
 

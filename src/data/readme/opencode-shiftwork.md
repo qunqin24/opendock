@@ -4,18 +4,24 @@
 
 **Status: early development (0.x).** How to set it up and use it: [docs/guide.md](docs/guide.md). The design is in [RESEARCH.md](RESEARCH.md) (Ukrainian).
 
-## Planned
+![shiftwork tui: the queue with live agents, ticket details, search and the tabs](docs/media/tui.gif)
 
-- **Fresh context per ticket.** Tickets live as Markdown files in `.scratch/<feature>/issues/NN-*.md`, in the [mattpocock-skills](https://github.com/mattpocock/skills) local tracker format. Shiftwork runs the frontier until the `Verify` commands pass.
-- **Per-type model routing.** For example, a cheap model for git tasks. Tickets without a type can be classified by Jev (TypeSafe).
-- **Skill tiers.** Strong models get a small set of skills; weaker models get more, with key skills preloaded.
-- **Model budgets.** Limits on tokens, cost, turns, context and stalls. Past a limit, Shiftwork hands off to another model, in the same process or a new one.
-- **Provider fallback on rate and usage limits,** with a shared cooldown for all workers.
-- **Backends:** [pi](https://pi.dev), Claude Code, Codex, OpenCode, OpenRouter, xAI.
+## What it does
+
+- **Fresh context per ticket.** Tickets are Markdown files in `.scratch/<feature>/issues/NN-*.md`, in the [mattpocock-skills](https://github.com/mattpocock/skills) local tracker format (or [OpenSpec](https://openspec.dev) changes). Only a ticket's `Verify` commands decide that it is done.
+- **The runner is the orchestrator.** `shiftwork run` works the frontier on its own, feature by feature, one ticket after another (or `--parallel N`), each in its own git worktree, and merges a ticket only when its gate passes.
+- **Review before merge.** By default a fresh agent on your strongest tier reviews each ticket's branch before it lands: accept merges it, reopen sends it back with the findings, follow-up files a new ticket.
+- **Per-type model routing and skill tiers.** A cheap model for git and docs, a strong one for refactors; untyped tickets can be classified by Jev. Weaker models get more skills, preloaded.
+- **Budgets with handoff.** Limits on tokens, cost, turns, time, context and stalls. Past a limit, or on a provider rate or usage limit, the shift is handed to the next model, with a cooldown shared by every worker. Limits can be lifted per run, tier, model or backend.
+- **Backends:** [pi](https://pi.dev) (any pi provider, OpenRouter, xAI and local [Ollama](https://ollama.com) models included), Claude Code, Codex, OpenCode, Grok Build and Cursor.
+- **Live dashboard.** `shiftwork tui`: the queue with readable statuses, live agents, budgets, cooldowns and logs; run, stop, pause a feature, search, mouse.
+- **Dark-factory mode.** `shiftwork run --dark-factory` takes work from your repo's GitHub issues (collaborators only, by label), plans and builds it, and reports back on the issue with links to the commits.
+
+![shiftwork run --dry-run and feature pause/resume](docs/media/cli.gif)
 
 ## The `shiftwork` skill
 
-One install command per harness (the same skill: writing tickets, running the runner, reviewing landed work):
+One install command per harness (the same skill: writing tickets, running the runner, reviewing a ticket's work):
 
 | Harness | Command |
 | --- | --- |

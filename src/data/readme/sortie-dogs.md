@@ -14,6 +14,9 @@ implementation, validation, review, and model routing.
   continuation, remediation, and restart.
 - **Adaptive execution**: small work stays small; additional agents and stronger
   models are used only when task shape or risk justifies them.
+- **Clear Worker instructions**: give Luna a concise goal, explicit constraints
+  and completion criteria; keep orchestration bookkeeping in the harness.
+  See the [instruction design principles](docs/worker-instruction-design.md).
 - **Coexistence**: Sortie activates only when selected and preserves normal
   OpenCode agents, settings, and user-owned files.
 - **Cost, time, and proof**: the objective is a verified result at the lowest
@@ -32,6 +35,11 @@ implementation, validation, review, and model routing.
 Guides: [日本語](docs/guide-ja.md) · [简体中文](docs/guide-zh-CN.md) ·
 [Testing](docs/testing.md) · [CLI testing](docs/cli-testing.md)
 
+**Current release: [v0.13.3](https://github.com/zufall-upon/Sortie-dogs/releases/tag/v0.13.3)**
+([release notes](docs/release-v0.13.3.md)). The default Mission runtime retains the `v010`
+profile, command and configuration names for compatibility; these names do not mean v0.10 is installed.
+The current asset marker is `0.13.3-reviewer-context-v1`.
+
 ## SWE-bench Lite: 170/300 (56.67%)
 
 The fixed **Sortie-dogs v0.12.24** harness resolved **170 of 300 SWE-bench Lite test issues** in one pass@1 campaign, with 9 empty patches and no official evaluation errors. Every instance has a frozen prediction and an inference-time trajectory. The task Workers ran `openai/gpt-6-luna-fast#max`; operator, coordinator and review roles ran `openai/gpt-6-sol#xhigh`. This is a system result, **not** a Luna-only model comparison or a Verified/full SWE-bench score.
@@ -40,22 +48,25 @@ The fixed **Sortie-dogs v0.12.24** harness resolved **170 of 300 SWE-bench Lite 
 
 The single official 300-instance report and frozen predictions are hash-bound in the report. Confirmed inference expense was **$162.99**; a separate **$34.60** of usage has unknown pricing and is held against the campaign cap, **not** counted as known expense. Leaderboard registration and maintainer acceptance are separate from this official local evaluation.
 
-> **Beta:** v0.12.2 builds on the v0.10.23 execution engine. Runtime behavior,
+Historical scores below belong to their fixed candidates, not v0.13.3. SWE-bench is a separate,
+optional measurement rather than a mandatory release gate.
+
+> **Beta:** v0.13.x is still stabilizing. Runtime behavior,
 > configuration, and generated assets may still change before 1.0.
 
 ## Quick start
 
-Requirements: Node.js 22.6 or newer, npm, and OpenCode.
+Requirements: Node.js 22.6 or newer, npm, and OpenCode V2.
 
 Run these commands in the target project:
 
 ```sh
-npm install --save-dev sortie-dogs
+npm install --save-dev sortie-dogs@latest
 npx sortie-dogs init .
 ```
 
-The package retains the `v010` profile/namespace for compatibility. `init` adds the OpenCode V2 plugin and the required
-two-level subagent depth to `.opencode/opencode.json(c)`, preserving existing settings:
+`init` defaults to the `v010` Mission profile and registers the OpenCode V2 plugin in
+`.opencode/opencode.json(c)`, preserving unrelated settings. It sets subagent depth to at least two:
 
 ```json
 {
@@ -64,37 +75,71 @@ two-level subagent depth to `.opencode/opencode.json(c)`, preserving existing se
 }
 ```
 
-Restart OpenCode, then run:
+If an existing local bridge already imports `sortie-dogs/server`, `init` reuses it instead of adding
+a duplicate package entry. A larger existing subagent depth is retained.
+
+Completely restart OpenCode, then run:
 
 ```text
 /sortie-v010 <task>
 ```
 
 Selecting `dog-operator` directly starts the same workflow. `dog-operator` is the
-only user-facing v0.10 authority. `dogs-coordinator` and every `*-v010` role are
+user-facing entry point for the Mission profile. `dogs-coordinator` and every `*-v010` role are
 internal children and must not be selected as task entry points.
 
-`init` installs runtime assets and merges the required OpenCode settings; the `plugins` entry loads runtime enforcement and
-model routing. A new session alone does not reload an updated
-plugin process, so restart OpenCode after installation or upgrade.
+`init` installs runtime assets and merges the required OpenCode settings; the package entry or
+existing local bridge loads enforcement and model routing. OpenCode can reload watched configuration,
+but replacing an installed dependency may require a full restart. A new chat session alone does not
+prove the newly installed plugin is loaded.
 
-## v0.12.0 workflow
+## v0.13.3 runtime updates
 
-v0.12.0 keeps Operator → Coordinator → Worker, with independent review:
+The current release integrates native background Mission execution, concise authoritative Worker
+handoffs, and same-context Reviewer corrections from PRs #148/#149 and their Ubuntu remediation.
+Operator launches its Coordinator, direct Worker and Reviewer children as native background jobs,
+returns a short acknowledgement and remains available for user chat. Native completion wakes the same
+Operator; a launch acknowledgement or idle root is not Mission completion. Coordinator's internal
+dispatch remains foreground, and unrelated chat does not cancel or replace an active Mission.
+
+After finding defects, the original Reviewer can correct and explicitly self-recheck in the same
+native session, retaining formal checks, current-source evidence, Git delivery and cumulative budget.
+The host temporarily activates a scoped correction profile and restores the read-only Reviewer profile
+afterward. Author self-recheck is recorded as `self-rechecked`, `independent=false`, never independent
+`PASS`. A different Reviewer is conditional on a concrete reachable residual Major risk.
+Unresolved Major or Medium findings still block acceptance; Operator owns final comparison and receipt.
+
+The fixed release passed candidate preflight, **1,589/1,589** Linux full tests and **12/12** Windows
+tests. Its native CLI probe observed a real Luna Fast/max Worker and Sol 6.1/xhigh Operator;
+that probe establishes startup/model identity, not task completion.
+
+The installed native correction fixture succeeded, but the original Anko measurements remain
+unaccepted, including the latest 25-minute run. This release does not claim general speedup,
+original-task completion or a new SWE-bench score. See the [release notes](docs/release-v0.13.3.md),
+[Reviewer correction specification](docs/reviewer-context-repair.md) and
+[retained implementation and measurement history](docs/anko-pr149-ubuntu-handoff.md).
+
+## Mission workflow
+
+Use Operator → Worker when one useful unit and its meaningful formal check are known;
+use Operator → Coordinator → Worker for actual discovery or decomposition:
 
 - `dog-operator` states a few requirements/negative constraints and owns user decisions and final acceptance.
   The host saves the original user message verbatim.
 - Hidden `dogs-coordinator` owns investigation, unit declarations, Worker/Scout/Advisor/Reviewer dispatch,
   in-request write-scope extensions, and corrections. It can read/search and run confirmation shell commands;
-  source editing tools belong to Worker.
+  source implementation belongs to Worker or an admitted same-context Reviewer correction.
 - `dog-worker-v010` implements a host-generated unit within its file/directory write scopes.
   Investigation commands need no pre-registration; formal checks retain real host-recorded results.
-- High-risk changes require an independent Reviewer. Low-risk skips are explicit and recorded.
-- Simple low-risk single-unit work retains Operator → Worker Fast-lane dispatch.
+- High-risk changes require an initial independent Reviewer with read/search access. Low-risk skips
+  are explicit and recorded. Reviewer-owned corrections follow the self-recheck policy above.
+- Fast-lane can include high-risk single-unit work; it never implies a review skip.
+- Investigation, edits, formal checks and requested Git delivery stay in the same implementing child.
+  Explicit user ordering is retained; no routine plan-approval or commit-only handoff is needed.
 - Unit progress appears on the running Task without stopping Coordinator or prompting Operator.
 
-The v0.10 profile is serial by design. The stable profile's Luna fabric and
-parallel integration path are not exposed in this profile. More agents are not a
+The `v010` Mission profile is serial by design; background responsiveness does not add parallel writers.
+The stable profile's Luna fabric and parallel integration path are not exposed in this profile. More agents are not a
 goal; preserving quality while reducing unnecessary expensive work is.
 
 ### SWE-bench evaluation
@@ -170,31 +215,47 @@ astroid **3/5**, pyvista **0/1**, sqlfluff **1/5**.
 ## Mission tools
 
 1. `start_mission`: Operator supplies concise requirements; the host saves original messages and returns a Coordinator task.
-2. `plan_units`: Coordinator supplies title, objective, file/directory scopes and formal checks. The host generates
+2. `plan_units`: Operator or Coordinator supplies title, objective, file/directory scopes and formal checks. The host generates
    IDs, handoff, manifest, proof mapping and the ready Worker task. No proposal approval round trip.
-3. `operator_next`: advance serial units. `expand_unit` or a reasoned `plan_units` correction extends/replaces
-   settled execution within the original requirements and retained cumulative budget.
+3. `operator_next`: advance serial units. `expand_unit` reconciles required in-request outputs while
+   preserving the same Task. A reasoned `plan_units` correction or `retry_mission_unit` handles ordinary
+   unit recovery under the original requirements and cumulative budget.
 4. `review_mission`: generate the independent review packet from source, requirements and observed checks;
    dispatch its Reviewer task for high-risk changes or record a low-risk skip.
-5. `submit_mission`: Coordinator returns a completion candidate, user-only decision, or proven external/scope/budget blocker.
-6. `complete_mission`: Operator compares the original request, source and evidence, then explicitly accepts.
+5. `repair_review`: resume the original native Reviewer session to correct its findings, run inherited
+   checks/requested Git delivery and explicitly report `SELF_RECHECKED` in that same Task. Legacy
+   `CORRECTION_READY` alone requires a same-author read-only fallback through `review_mission`.
+6. `submit_mission`: Coordinator returns a completion candidate, user-only decision, or proven external/scope/budget blocker.
+7. `complete_mission`: Operator compares the original request, source and evidence, then explicitly accepts.
    Only a succeeded receipt authorizes DONE and the measured 🐾 return report.
 
 All tool names use the `sortie_v010_` prefix. Prior proposal/plan-repair tools remain in the compatibility
-implementation but are hidden from the normal v0.12 model tool list. An in-request path extension is a
-Coordinator decision; changing the original requirements or increasing budget returns to Operator/user.
+implementation but are hidden from the normal Mission tool list. Operator/Coordinator handle in-request
+path reconciliation without a new user approval. Changes beyond the original requirements or cumulative
+budget return to Operator/user. `EVIDENCE_GAPS` is an advisory limitation, not Review `PASS` or an
+automatic extra review; failed or missing required checks still prevent acceptance.
 
 Durable profile state and hash-bound task references support restart and
 compaction recovery without reconstructing criteria from summary prose. Stale,
-foreign-root, or changed references are rejected. An optional Git lifecycle can
-create one non-overwriting branch and one explicit-path commit; it never grants
-arbitrary Git, force push, release, or publication authority.
+foreign-root, or changed references are rejected. Requested `git add <paths>` and `git commit -m ...`
+use the actual source write scope, not a fabricated `.git/**` scope. An optional host-managed Git
+lifecycle also retains its branch, commit and post-commit boundaries. Neither mode grants arbitrary
+Git, force push, release or publication authority.
+
+### Progress and acceptance evidence
+
+`sortie_v010_operator_status` keeps original requests, formal command/exit/timing observations,
+review disposition and recorded delivery in a compact Mission view. `{ "view": "progress" }` exposes
+the current unit, completed/total units, host budget and next action; `{ "view": "full" }` or
+`details_ref` provides full snapshot diagnostics. Unknown clean state or a failed commit is not delivery
+success. Reading progress does not dispatch, retry or accept work; use native completion notifications
+instead of polling. Existing status reconciliation can recover a missed child terminal event.
 
 ## Configuration
 
 ### Profile files and precedence
 
-The default package entry is the v0.10 profile:
+The default package entry is the `v010` Mission profile:
 
 - Command: `/sortie-v010`
 - Primary agent: `dog-operator`
@@ -204,9 +265,11 @@ The default package entry is the v0.10 profile:
 - Runtime state: `.sortie-dogs-v010/`
 - Installed asset marker: `.opencode/sortie-dogs-v010.version`
 
+For a global install, the marker is `<OpenCode config root>/sortie-dogs-v010.version`.
+
 Precedence is built-in defaults, global file, project file, environment JSON,
 then plugin factory options. Unknown properties or invalid types are rejected.
-Use external v0.10 role names such as `dog-operator`, `dogs-coordinator`, and
+Use external `v010` role names such as `dog-operator`, `dogs-coordinator`, and
 `dog-reviewer-v010` in `modelRouting`; do not also declare their stable aliases.
 
 Example `.opencode/sortie-dogs-v010.json`:
@@ -249,8 +312,8 @@ not invent, probe, or translate variant names.
 - `freeTierFallbackModels`: ordered global last-resort model IDs. Default:
   `opencode/deepseek-v4-flash-free`; `[]` disables this fallback.
 - `dedicatedWorkerModel`: canonical stable serial target, default
-  `openai/gpt-6.1-sol` / `medium`. The v0.10 profile also supplies its explicit
-  role routes below; do not infer the v0.10 worker route from this stable setting.
+  `openai/gpt-6.1-sol` / `medium`. The Mission profile supplies its explicit
+  role routes below; do not infer its Worker route from this stable setting.
 - `consultation.strategy`: fixed advisor identity, optional `required`, and
   positive `maxCallsPerCandidate`; default one call and not required.
 - `consultation.sourceReview`: risk-based review with `maxCallsPerCandidate`
@@ -264,27 +327,35 @@ not invent, probe, or translate variant names.
 - `continuation.summarizeModel`: optional explicit compaction model; omission
   reuses the latest observed root model.
 - `validationProfile`: `fast`, `balanced`, or `assurance`; default `balanced`.
-- `reflection`: accepted by the shared schema, but reflection writes are not
-  exposed by the serial v0.10 profile. Stable reflection remains opt-in and off by
-  default.
+- `reflection`: enabled by default for `run`, `project` and `global` layers, with at most three
+  entries / 500 estimated tokens injected. Root Operator can use `sortie_v010_reflection` to retain
+  verified process causes/preventions for later turns and sessions; this is not model training.
+  Storage and managed blocks are separate from stable. Set `reflection.enabled` to `false` to disable.
 
-The v0.10 host owns handoff and manifest controls under
+The Mission host owns handoff and manifest controls under
 `.sortie-dogs-v010/contracts/`. Do not create a legacy root
 `operation-manifest.json` for this profile and do not edit generated controls.
 Delete `.sortie-dogs-v010/` only when no Sortie run is active.
 
 ### Validation policy
 
-`validationProfile` chooses non-canonical depth:
+`validationProfile` chooses supplementary non-canonical depth:
 
 - `fast`: static checks
 - `balanced`: targeted checks
 - `assurance`: related checks
 
-Canonical proof remains canonical. Full-suite execution requires release context
-or explicit risk. Workers own static, targeted, and related checks; the root owns
-canonical and full-suite checks. An unchanged candidate, command, and environment
-reuse the same evidence instead of spending the validation budget again.
+It does not replace meaningful declared formal checks or user/project-required broad validation.
+Batch related edits, run focused checks, then execute every declared formal check in order on the
+stable candidate. The implementing Worker or admitted correcting Reviewer runs those commands;
+canonical/full-suite `owner=coordinator` is evidence accounting, not a requirement for root execution.
+
+Keep required broad checks for the final integrated candidate. Reuse valid unchanged evidence only
+when the contract permits; identity includes candidate, command, environment, scope and owner.
+Required repeated occurrences retain their own execution identities and cannot be skipped as duplicates.
+Native commands, actual working directory, exit, duration and saved source bindings establish freshness.
+Diagnostics do not substitute for formal proof. Repeat checks when changes, failures or freshness require
+it, rather than solely because a Worker changed or documentation was edited.
 
 ### Default routes
 
@@ -315,31 +386,50 @@ export { SortieDogsPlugin } from "sortie-dogs/plugin/stable";
 
 The stable profile uses `/sortie`, `dog-coordinator`,
 `.opencode/sortie-dogs.json`, `SORTIE_DOGS_CONFIG`, and `.sortie-dogs/`. Do not
-register stable and v0.10 from the same package installation path in one host.
+register stable and `v010` from the same package installation path in one host.
 
 ## Global availability
 
-Project-local installation is recommended. To expose v0.10 assets globally:
+Project-local installation is recommended. To expose the current Mission assets globally:
 
 ```sh
-npm install --global sortie-dogs
+npm install --global sortie-dogs@0.13.3
 sortie-dogs init --global --profile v010
 ```
 
-Global initialization also merges `sortie-dogs` and `experimental.subagent_depth: 2` into the
-global OpenCode config, preserving unrelated settings and the default agent.
+Global initialization registers the package or reuses an existing local V2 bridge, and sets subagent
+depth to at least two, preserving unrelated settings and the default agent.
+
+An existing `<OpenCode config root>/plugins/sortie-dogs/index.js` bridge importing `sortie-dogs/server`
+can resolve a **separate dependency** under that config root. Updating npm-global alone does not update
+it. For that layout, also install the same release at the actual config root, then rerun global init:
+
+```sh
+npm install --prefix "$HOME/.config/opencode" sortie-dogs@0.13.3
+sortie-dogs init --global --profile v010
+```
+
+The command shows the default config root; use your actual root if overridden. For a configured npm
+package entry, OpenCode V2 also provides `opencode plugin list` / `opencode plugin update`; exact
+version pins require an explicit version change. Completely restart OpenCode after updating, then
+check the installed package, asset marker and loaded plugin version.
 
 ## Updates and removal
 
-After replacing the dependency, rerun initialization and restart OpenCode:
+For project-local updates, replace the dependency, rerun initialization and completely restart OpenCode:
 
 ```sh
+npm install --save-dev sortie-dogs@latest
 npx sortie-dogs init .
 ```
 
 `init` is idempotent. It updates recognized Sortie-owned assets, records the asset
 version, preserves user configuration, and stops safely on unknown ownership or
 conflicting files.
+
+Align any exact version pin or separate bridge dependency with the intended release too. An installed
+marker of `0.13.3-reviewer-context-v1` identifies the assets; it does not prove an already-running
+OpenCode process has reloaded the plugin.
 
 There is no supported uninstall command. Remove the npm dependency separately,
 then follow the [safe manual removal guide](docs/uninstall.md). Delete only known

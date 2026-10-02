@@ -450,7 +450,10 @@ milestone. A deliverable-role subagent is spawned with a stable task id
 a one-line marker (`DONE: T5`), and the wake-hook removes that task from
 `TODO.md` for you — **deterministic, no LLM step**. A task in the file is open;
 "done" means the line is gone. Mismatched ids (`spawn for T5` but `DONE: T3` in
-the reply) are ignored as hallucinations. The format is fixed:
+the reply) are ignored as hallucinations. The todo file may be named `todo.md`
+or `todos.md` in any casing; where several of them exist in a directory, the
+ones holding at least one task row compete and the one modified last is used
+(with no task row anywhere, a regular `TODO.md` is kept). The format is fixed:
 
 ```
 - T5: <task title>
@@ -1044,10 +1047,12 @@ A cycle runs in this order:
 
 1. **Trigger.** The orchestrator's turn-end hook sees the context cross
    `endlessContext` and sets a pending latch. The latch restricts nothing: the
-   orchestrator keeps spawning, aborting and reusing as usual. From the latch
-   until the wind-down claim, its limits block on every turn says a restart is
-   pending and asks it to finish only the work already running, wait for its
-   running subagents and then end its turn.
+   orchestrator keeps spawning, aborting and reusing as usual, through the
+   quiesce wait, the wind-down and the hand-over. From the latch until the
+   wind-down claim, its limits block on every turn says a restart is pending
+   and asks it to finish only the work already running, wait for its running
+   subagents, then end its turn and leave new tasks for the next session. This
+   is a prompt notice only; `spawn` and `reuse` refuse nothing.
 2. **Quiesce.** On the orchestrator's `session.idle`, the cycle waits until
    none of that orchestrator's own subagents is running — those it spawned
    after the latch included — and the orchestrator is idle between turns. The
@@ -1055,11 +1060,15 @@ A cycle runs in this order:
    by the subagent watchdog, and the orchestrator can abort it. Only a wait in
    which none runs and the orchestrator still does not go idle abandons, after
    `OPENCODE_AGENT_INTERCOM_ENDLESS_QUIESCE_TIMEOUT_MS` (default 10 minutes).
-   The moment both hold, the cycle claims the wind-down; from then on `spawn`
-   admits only the wind-down permit below, and `reuse` refuses.
+   The moment both hold, the cycle claims the wind-down. `spawn` and `reuse`
+   stay open after the claim: the result of a subagent the orchestrator starts
+   then is buffered and delivered to the fresh session after its kickoff, a
+   subagent still running at the hand-over moves to the fresh session, and where
+   the cycle ends without a replacement the buffered results go back to the
+   orchestrator.
 3. **Wind-down.** The orchestrator is asked to spawn a single `planner`
-   subagent through a one-time permit — the one spawn a winding-down cycle
-   admits. That subagent is handed the orchestrator's open work and rewrites
+   subagent through a one-time permit — the one spawn the cycle recognises
+   as its own. That subagent is handed the orchestrator's open work and rewrites
    the project's todo file (`TODO.md` / `todos.md`) itself with the todo
    tools, inside a machine-owned `## Intercom tasks` section the plugin fences
    off. The orchestrator has no file-writing tool of its own (`PRIMARY_TOOLS`

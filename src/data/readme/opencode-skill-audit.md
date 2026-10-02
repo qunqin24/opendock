@@ -12,8 +12,8 @@ Deterministic audit trail for [Claude Code](https://code.claude.com),
 observable **skills** were invoked, when, and which **files** were changed afterwards. It gives you
 a quick skill-compliance signal before you read the code.
 
-On opencode it also renders live in the TUI sidebar, so the audit sits next to the conversation
-with no command to run.
+On opencode it also renders live in the TUI sidebar, and on Claude Code in a live pane, so the audit
+sits next to the conversation with no command to run.
 
 ```text
 ● Skill audit — f3a91c2e · ~/Dev/Web · 14:02→16:40
@@ -90,7 +90,8 @@ Claude Code / Codex ──hooks───▶ logger.sh ──┐
                                             ├─▶ ~/.claude/skill-audit/<sid>.ndjson
 opencode ──tool.execute.after──▶ plugin ────┘             │
                                                           ├─▶ skill-audit status/report/watch/list
-                                                          └─▶ opencode sidebar (live)
+                                                          ├─▶ opencode sidebar (live)
+                                                          └─▶ Claude Code pane (live)
 ```
 
 The log is the only contract between the writers and the viewers, so the CLI reads opencode
@@ -108,6 +109,22 @@ Subagent hook calls use the parent session ID, so delegated edits appear in the 
 ```
 
 Restart Claude Code so the hooks load.
+
+#### Live pane
+
+The plugin also opens a **Skill audit** pane showing the current session's timeline. It refreshes
+after every skill and file-edit tool call, and polls the log every two seconds.
+
+- **Opening:** it opens by itself at session start once the terminal is 144 columns or wider.
+  Narrower terminals hold it back until you run `/skill-audit-pane`, which opens it at any width.
+- **Placement:** in fullscreen from 110 columns it docks beside the transcript, 40 columns wide
+  (drag the edge to change it; your width is kept), and shows the full timeline. Press a `▼`/`▶` marker to collapse or expand a run or an hour. Elsewhere it sits above
+  the prompt in a compact form: the header and the latest run.
+- **Other panes:** panes from other plugins become tabs beside it (click a tab, or ctrl+x tab).
+  Only one is shown at a time. Esc or the close mark closes it.
+
+The pane is display only. The shell hooks keep writing the log through `logger.sh`, so recording
+works the same on Claude Code builds without plugin function hooks.
 
 > **Migrating from a manual setup?** Remove any `logger.sh` entries from the `hooks` block of
 > `~/.claude/settings.json` first, or every event is logged twice.
@@ -234,6 +251,7 @@ If `list` prints `no session logs in ...`, nothing was written. Go to
 | `skill-audit --help`       | Usage summary                                                    |          0 |
 | `! skill-audit status`     | Run inside a Claude Code session. Queues while the model is busy |          0 |
 | opencode sidebar           | Live timeline beside the conversation. No command to run         |          0 |
+| Claude Code pane           | Live timeline in a pane. `/skill-audit-pane` opens it            |          0 |
 | `/skill-audit`             | Show the report inside Claude Code                               | Model turn |
 | `$skill-audit`             | Show the report inside Codex                                     | Model turn |
 
@@ -361,6 +379,8 @@ and sidebar are TypeScript (`src/`) built with [Bun](https://bun.sh).
 |-------------------|----------------------------------------------------------------------------|
 | `scripts/`        | `logger.sh` hook target, the `skill-audit` CLI, `sync-versions.mjs`        |
 | `src/`            | opencode plugin (`index.ts`), sidebar (`tui.ts`), shared log and view code |
+| `hooks/`          | Claude Code shell hooks (`hooks.json`) and the live pane (`claude.tsx`)    |
+| `types/`          | `$.state` contract for the Claude Code pane                                |
 | `test/`           | Bun tests, fixtures, and `test/format-contract.sh`                         |
 | `.claude-plugin/` | Claude Code plugin manifest and marketplace entry                          |
 | `.codex-plugin/`  | Codex plugin manifest                                                      |
@@ -375,17 +395,28 @@ bun run check     # format:check + lint + typecheck (src and test) + tests
 bun run build     # dist/index.js (plugin) and dist/tui.js (sidebar)
 ```
 
-| Script                   | What                                                     |
-|--------------------------|----------------------------------------------------------|
-| `bun run format`         | Prettier, write mode                                     |
-| `bun run lint`           | ESLint over `src` and `test`                             |
-| `bun run typecheck`      | `tsc --noEmit` for `src`                                 |
-| `bun test`               | Bun test suite in `test/`                                |
-| `bun run check`          | Everything CI runs                                       |
-| `bun run check:versions` | Assert `package.json` and both `plugin.json` files agree |
-| `bun run sync:versions`  | Rewrite the plugin manifests from `package.json`         |
+| Script                     | What                                                     |
+|----------------------------|----------------------------------------------------------|
+| `bun run format`           | Prettier, write mode                                     |
+| `bun run lint`             | ESLint over `src` and `test`                             |
+| `bun run typecheck`        | `tsc --noEmit` for `src`                                 |
+| `bun test`                 | Bun test suite in `test/`                                |
+| `bun run check`            | Everything CI runs                                       |
+| `bun run test:claude`      | Validate and test the Claude Code pane (needs `claude`)  |
+| `bun run typecheck:claude` | Type-check the pane (needs `.claude-plugin/types/`)      |
+| `bun run check:versions`   | Assert `package.json` and both `plugin.json` files agree |
+| `bun run sync:versions`    | Rewrite the plugin manifests from `package.json`         |
 
-Tests live in `test/`. `test/format-contract.sh` pins the rendered CLI output against fixtures, so
+Tests live in `test/`. The Claude Code pane is the exception: its tests (`hooks/*.test.tsx`) run
+in Claude Code's mod sandbox, which has no Node or Bun, so `bun test` is rooted at `test/`
+(`bunfig.toml`). `test:claude` copies the pane's files into a scratch folder and runs
+`claude plugin validate` and `claude plugin test` there. `src/core.ts` and `src/view.ts` must stay
+free of `node:*` imports and `process` because the pane imports them; `test/core.test.ts` checks
+this. `typecheck:claude` reads the API types the engine writes to `.claude-plugin/types/` once it
+has loaded the plugin from a local folder. That folder is gitignored and not available in CI, so
+neither pane check runs in CI.
+
+`test/format-contract.sh` pins the rendered CLI output against fixtures, so
 a change to the timeline format has to be updated there deliberately. That output is the contract
 the sidebar and any third-party viewer rely on.
 

@@ -157,6 +157,33 @@ The whole vault is walked, notes and folders alike, with two exclusions:
 
 A note inside a hidden folder will therefore never resolve.
 
+## Claude Code pane: did the agent read my notes?
+
+On Claude Code the plugin also ships a hooks module (`claude/register.tsx`)
+that gives the same answer as the OpenCode sidebar below, in an **Obsidian
+notes** pane:
+
+```text
+✓ Website Redesign
+○ Weekly
+✓ Meetings/ (2 read)
+✗ Nope (no match)
+also read
+· Research/AI Agents.md
+```
+
+- The pane opens by itself on the first prompt with a wikilink, when the
+  terminal is wide enough to dock it (144 columns); `/obsidian-notes` opens it
+  at any width.
+- The status line shows the totals, `Obsidian ✓ 2 ○ 1`.
+- `/clear` starts the list over.
+
+Reads are taken from Claude Code's `Read` tool calls, with the same limits as
+on OpenCode: a note reached through `Bash` or an MCP server is not detected.
+
+Hooks modules are an early-access Claude Code feature (tested on 2.1.287).
+Wikilink resolution itself still runs through the `UserPromptSubmit` hook.
+
 ## OpenCode sidebar: did the agent read my notes?
 
 Resolving a link only tells the agent where a note is. It does not prove the
@@ -276,6 +303,14 @@ prompt containing a wikilink. On a very large vault, raise
 ```bash
 npm test          # smoke tests on Node
 npm run test:bun  # same tests on Bun, the runtime OpenCode uses
+```
+
+The Claude Code module has its own tests and checks, run with the `claude` CLI:
+
+```bash
+claude plugin validate .claude-plugin/plugin.json   # manifest + hooks module
+claude plugin test .                                # claude/*.test.ts
+claude --plugin-dir .                               # try the checkout in a session
 ```
 
 No dependencies to install: the plugin uses Node/Bun built-ins and the resolver

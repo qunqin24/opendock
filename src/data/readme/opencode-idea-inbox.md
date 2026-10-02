@@ -1,64 +1,81 @@
 # opencode-idea-inbox
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
-[![opencode](https://img.shields.io/badge/opencode-%E2%89%A51.18.31-blue)](https://opencode.ai)
+[![opencode](https://img.shields.io/badge/opencode-v2%20%E2%89%A52.0.20-blue)](https://opencode.ai)
+[![npm](https://img.shields.io/npm/v/opencode-idea-inbox)](https://www.npmjs.com/package/opencode-idea-inbox)
 
 **English** | [Русский](./README.ru.md)
 
-An [opencode](https://opencode.ai) plugin that gives your TUI a persistent idea
-backlog: capture a stray thought mid-conversation without losing focus, watch
-it live in the sidebar, then dispatch it to work from the command palette —
-into the current window or a background session.
+You're twenty minutes deep in a refactor when a completely unrelated thought
+shows up: *"...I should really try caching provider responses."*
+
+Traditionally there are three outcomes: you type it into the chat and derail
+the agent, you switch to a notes app and lose your terminal focus, or you're
+sure you'll remember it later (you won't).
+
+This plugin is a fourth option. Press `<leader>z`, type the thought, hit
+Enter — it's parked in a backlog that lives in your opencode sidebar, and you
+never left the task you were on. When you have a free moment, press
+`<leader>i`, pick an idea, and it gets dispatched to an agent while you watch
+its status tick over:
 
 ```text
-mid-dialog ──/idea "add cache"──▶ ○ pending ──palette: Ctrl+X → I──▶ ◐ in_progress ──▶ ● done ──▶ ✓ archived
+○ parked  →  ◐ running  →  ● done  →  ✓ documented
 ```
 
-## Features
+The sidebar mid-session looks like this:
 
-- **Frictionless capture** — `/idea <text>`, the `✚ New idea…` palette entry, or `Ctrl+X → Z` (`<leader>z`, a model-free dialog that writes straight to the backlog); you stay in your current task
-- **Sidebar panel** — live `Idea Inbox (n)` slot with status glyphs `○ ◐ ● ✓`, refreshed every 2 seconds
-- **Native dispatch from the palette** — `Ctrl+X → I` opens the command palette with your pending ideas first in Suggested; picking one injects a delegation mission into the main window and starts execution immediately
-- **Delete mode & clear** — prune the backlog from the palette: `🗑 Delete idea…` removes items one by one, `✖ Clear list` drops all active ideas (the `documented` archive stays)
-- **Agent-driven statuses** — the orchestrator marks an idea `in_progress` at launch and `done` when finished (via the `idea_update` tool), with a `session.idle` safety net
-- **Background alternative** — `/ideas start <id>` runs an idea in a detached session with agent `build`
-- **Persistent** — SQLite storage (WAL) per worktree, survives restarts; archived ideas stay queryable as history
+<img src="https://raw.githubusercontent.com/apilot/opencode-idea-inbox/master/assets/demo.png" alt="opencode session with the Idea Inbox sidebar showing three ideas with different statuses" width="640">
 
-## Requirements
+<details>
+<summary>▶ Watch the full loop — capture an idea, dispatch it, watch it finish (GIF, ~10 s)</summary>
 
-- opencode **1.18.31** or later (plugin API: `keymap.registerLayer`, `dispatchCommand`, sidebar slots, `tui.appendPrompt`/`submitPrompt`; the `Ctrl+X → Z` capture dialog needs 1.18.31 — on 1.18.30 plugin dialogs do not receive Enter)
-- Runtime dependencies (`@opencode-ai/*`, `@opentui/*`, `solid-js`) are installed automatically with the npm package
+<img src="https://raw.githubusercontent.com/apilot/opencode-idea-inbox/master/assets/demo.gif" alt="GIF: pressing leader+z to capture a thought into the sidebar, then dispatching it from the palette and watching the status flip to done" width="640">
+
+</details>
+
+## Which version do I need?
+
+There are two lines of this package, one per major version of opencode:
+
+| Your opencode              | Install                            | Where it lives |
+| -------------------------- | ---------------------------------- | -------------- |
+| **v2** (≥ 2.0.20)         | `opencode-idea-inbox` (`latest`)   | branch [`master`](https://github.com/apilot/opencode-idea-inbox/tree/master) (default) |
+| **v1**                    | `opencode-idea-inbox@legacy-v1` (currently 0.3.5) | branch [`legacy-v1`](https://github.com/apilot/opencode-idea-inbox/tree/legacy-v1) |
+
+Not sure what you're running? Check `opencode --version`.
+
+> **The #1 "it doesn't load" cause:** opencode **v2** reads the `plugins` key
+> (plural) and silently ignores the v1 `plugin` key. If nothing shows up after
+> install, look at that key first.
 
 ## Installation
 
-Add the plugin to `~/.config/opencode/opencode.json` (or your project's `opencode.json`):
+Add one line to your `opencode.json` / `opencode.jsonc` — global
+(`~/.config/opencode/opencode.json`) or per-project:
 
-```json
+```jsonc
 {
-  "plugin": [
-    "opencode-idea-inbox"
-  ]
+  "$schema": "https://opencode.ai/config.json",
+  "plugins": ["opencode-idea-inbox"]
 }
 ```
 
-Add the TUI part to `~/.config/opencode/tui.json` — same bare name, no subpath:
+That's the whole setup. The package exports both halves — the server part
+(tools, slash commands, session events) and the TUI part (palette commands,
+sidebar) — and opencode v2 loads them together. There is no `tui.json` to
+create; that file only existed in v1, and the `/idea`, `/ideas` commands are
+registered by the plugin itself, so there's nothing to copy around either.
 
-```json
-{
-  "plugin": [
-    "opencode-idea-inbox"
-  ]
-}
+For opencode **v1**, the same key in the v1 format:
+
+```jsonc
+{ "plugin": ["opencode-idea-inbox@legacy-v1"] }
 ```
 
-opencode installs the package from npm on the next start. Slash commands are not
-shipped by the plugin loader — copy the two markdown files manually:
-
-```bash
-mkdir -p ~/.config/opencode/command
-curl -fsSL -o ~/.config/opencode/command/idea.md https://raw.githubusercontent.com/apilot/opencode-idea-inbox/master/commands/idea.md
-curl -fsSL -o ~/.config/opencode/command/ideas.md https://raw.githubusercontent.com/apilot/opencode-idea-inbox/master/commands/ideas.md
-```
+Restart opencode afterwards — the config is not hot-reloaded — and verify with
+`opencode plugin list`. If the sidebar panel isn't visible yet, toggle it once
+with your sidebar keybind; the plugin never force-opens it.
 
 <details>
 <summary>Installing from a local clone (development)</summary>
@@ -67,111 +84,142 @@ curl -fsSL -o ~/.config/opencode/command/ideas.md https://raw.githubusercontent.
 git clone https://github.com/apilot/opencode-idea-inbox.git ~/opencode-idea-inbox
 ```
 
-```json
-{ "plugin": ["file:///home/YOU/opencode-idea-inbox"] }
+Point `plugins` at the directory:
+
+```jsonc
+{ "plugins": ["file:///home/YOU/opencode-idea-inbox"] }
 ```
 
-```json
-{ "plugin": ["file:///home/YOU/opencode-idea-inbox/tui"] }
-```
-
-```bash
-cp ~/opencode-idea-inbox/commands/*.md ~/.config/opencode/command/
-```
+Relative paths work too (`"./plugins/idea-inbox"`); the root-level `server.ts`
+/ `tui.ts` re-exports make local-directory loading work on v2.
 
 </details>
 
-Add `.opencode/idea-inbox/` to your project `.gitignore` (the SQLite DB lives there).
+## Your first five minutes
 
-Restart opencode — config is not hot-reloaded.
+1. Type `/idea try caching provider responses` — the thought is parked
+   instantly (a direct write, no model round-trip) and appears in the sidebar
+2. Press `<leader>i` — a picker opens with your pending ideas on top
+3. Hit `Enter` on one — a delegation mission lands in the current session and
+   execution starts immediately; the idea turns `◐`
+4. Watch the sidebar: `○ → ◐ → ●` as the work progresses
+5. When the agent finishes it marks the idea `● done`; run
+   `/ideas documented <id>` once you've written the results down, and the row
+   leaves the panel for the archive
 
-## Quick Start
-
-1. Type `/idea add response caching for the provider` — the agent parks it: `✓ idea_ab12cd — add response caching…`
-2. Press `Ctrl+X → I` — the palette opens with your pending ideas at the top of Suggested
-3. Hit `Enter` on an idea — a mission lands in the main window ("delegate this, use the right skills…"), execution starts immediately and the idea becomes `◐`
-4. Watch the sidebar (`Ctrl+X → B` to toggle it): `○ → ◐ → ●` as work progresses
-5. When the orchestrator finishes, it marks the idea `● done`; document results with `/ideas documented <id>` and the row leaves the panel
-
-## Usage
+## Everyday use
 
 ### Keyboard
 
 | Action | Binding |
 | ------ | ------- |
-| Open palette with the backlog | `Ctrl+X → I` (`<leader>i`; ideas first in Suggested, then `✚ New idea…`) |
-| Model-free capture dialog | `Ctrl+X → Z` (`<leader>z`) |
-| Toggle the sidebar | `Ctrl+X → B` (`<leader>b`) |
+| Open the backlog picker | `<leader>i` (command `idea-inbox.open`) |
+| Quick capture dialog (no model involved) | `<leader>z` (command `idea-inbox.capture`) |
+| Remove one idea | `idea-inbox.remove` (palette only, picker dialog) |
+| Clear the visible list | `idea-inbox.clear` (palette only, asks for confirmation; the `documented` archive stays) |
+| Show/hide the sidebar | your opencode sidebar toggle |
 
-The leader key defaults to `Ctrl+X` (`leader_timeout` 2000 ms — press the follow-up key within 2 seconds).
+All commands have stable ids (`idea-inbox.open`, `idea-inbox.capture`,
+`idea-inbox.remove`, `idea-inbox.clear`, `idea-inbox.take.<id>`) — rebind them
+via `keybinds` in your `cli.json` if the defaults clash.
 
 ### Slash commands
 
 | Command | Effect |
 | ------- | ------ |
-| `/idea <text>` | Capture an idea to the backlog |
+| `/idea <text>` | Park an idea (direct write; with no text, the agent asks you what to write down) |
 | `/ideas` | Show the active backlog table |
 | `/ideas run <id>` | Execute an idea in the current session |
-| `/ideas start <id>` | Launch an idea in a background session (agent `build`) |
+| `/ideas start <id>` | Run an idea in a background session (agent `build`) |
 | `/ideas done <id>` · `/ideas documented <id>` | Change status; `documented` archives the row |
 
-### Agent tools
+### What the agent sees
+
+The plugin registers four tools your agents can call:
 
 | Tool | Purpose |
 | ---- | ------- |
-| `idea_add` | Add an idea from dialog context |
+| `idea_add` | Add an idea from conversation context |
 | `idea_list` | List active (or filtered) ideas |
-| `idea_update` | Change status/text; `documented` hides from the panel |
-| `idea_start` | Create a background session with a mission prompt |
+| `idea_update` | Change status or text; `documented` hides from the panel |
+| `idea_start` | Spawn a background session with a mission prompt |
 
-### Statuses
+### Status lifecycle
 
-| Status | Glyph | Meaning | Set by |
-| ------ | ----- | ------- | ------ |
-| `pending` | `○` | Captured, waiting for dispatch | User (capture), server (rollback) |
-| `in_progress` | `◐` | Running in the current or a background session | Orchestrator (mission `idea_update`) or `idea_start` |
-| `done` | `●` | Finished — the orchestrator reported completion | Orchestrator (`idea_update`) or `session.idle` |
-| `documented` | `✓` | Result documented → hidden from the panel, kept in the DB | Working agent or user |
+| Status | Glyph | Meaning | Who sets it |
+| ------ | ----- | ------- | ----------- |
+| `pending` | `○` | Parked, waiting for dispatch | You (capture) or the server (rollback) |
+| `in_progress` | `◐` | Running in the current or a background session | The orchestrator (mission `idea_update`) or `idea_start` |
+| `done` | `●` | The agent reported completion | The orchestrator, or the `session.idle` safety net |
+| `documented` | `✓` | Results written down → hidden from the panel, kept in the DB | You or the working agent |
+
+## FAQ
+
+**Where is my data stored?**
+In `<worktree>/.opencode/idea-inbox/` — a plain SQLite database `ideas.db`
+(WAL mode) plus `diag.log`, the plugin's diagnostic log. Both live one per
+git worktree and survive restarts. Add `.opencode/idea-inbox/` to your
+project's `.gitignore`.
+
+**I ran `/idea <text>` and the chat stayed silent. Did it work?**
+Yes — with text present the command writes straight to the backlog without a
+model round-trip, so there's no reply in the chat. Check the sidebar or run
+`/ideas`.
+
+**The sidebar is empty even though I have ideas.**
+The panel refreshes every ~2 seconds and never force-opens itself — toggle it
+once with your sidebar keybind.
+
+**Something is off — where can I look for clues?**
+The TUI part appends what it does to
+`<worktree>/.opencode/idea-inbox/diag.log` (registrations, refresh ticks,
+errors; rotated at ~128 KB). The file is safe to delete at any time.
+
+**Can I rebind `<leader>i` / `<leader>z`?**
+Yes — see the command ids above and the `keybinds` section of your `cli.json`.
+
+**Why does the picker only show pending ideas?**
+By design: `done` and `documented` rows are history. `/ideas done` /
+`/ideas documented <id>` manage them.
+
+**Is it safe to hand idea text to agents?**
+Idea text is always wrapped in `<<< >>>` data guards in mission prompts, so a
+note that happens to contain instructions can't hijack the delegation.
 
 ## How it works
 
 ```mermaid
 flowchart LR
-    U[User] -- "/idea text" --> AG[Agent]
-    AG -- "idea_add" --> DB[(ideas.db SQLite)]
-    U -- "Ctrl+X → I" --> PAL[Command palette]
-    PAL -- "pick idea" --> INP[Main input]
-    INP -- "appendPrompt + submitPrompt" --> AG
+    U[User] -- "/idea text" --> CMD[Plugin command]
+    CMD -- "direct write" --> DB[(ideas.db SQLite)]
+    AG[Agent] -- "idea_add / idea_update" --> DB
+    U -- "<leader>i" --> PICK[Plugin picker dialog]
+    PICK -- "session.prompt mission" --> AG
     AG -- "idea_update in_progress / done" --> DB
     DB --> SB[Sidebar Idea Inbox]
 ```
 
-The palette path avoids a known upstream issue: in opencode ≤ 1.18.30 dialogs
-opened from TUI plugins do not receive keyboard input
-([#22610](https://github.com/sst/opencode/issues/22610), closed as not planned).
-On 1.18.31 `DialogPrompt` Enter works, which is what the `Ctrl+X → Z` capture
-dialog builds on; everything else rides on palette commands, prompt injection,
-and the sidebar slot.
-
-## Limitations
-
-- opencode 1.18.31 specifics: the search field of a programmatically opened palette may not accept keys — the Suggested list is the primary interface (ideas are always registered first)
-- The sidebar does not auto-open on plugin content (`auto` mode is tied to native todos) — toggle it once with `Ctrl+X → B`
-- Only `pending` ideas are offered in the palette
+The server half (`Plugin.define({ id: "idea-inbox" })`, exported from the
+package root) registers the tools, the `/idea` + `/ideas` commands, and settles
+statuses on `session.idle` / `session.deleted`. The TUI half (exported at
+`./tui`) renders the sidebar slot and the reactive palette layer; both state
+stores come from the host-owned solid runtime, so the panel updates live.
 
 ## Development
 
 ```bash
 bun install
-bun run typecheck   # tsc --noEmit
-bun test            # store unit tests
+bun run typecheck   # tsc --noEmit (src + tests)
+bun test            # full suite: store, tools, server, commands, TUI, live render
 ```
 
-Source layout: `src/store.ts` (SQLite core), `src/server/` (tools + session events), `src/tui/` (palette commands, sidebar slot, worktree resolver), `commands/` (markdown slash commands).
+Source layout: `src/store.ts` (SQLite core), `src/server/` (tools, slash
+commands, session events), `src/tui/` (palette commands, sidebar slot,
+worktree resolver), `commands/` (legacy v1 markdown commands, kept for
+reference).
 
-## Contributing
-
-Issues and PRs are welcome at <https://github.com/apilot/opencode-idea-inbox>.
+Issues and PRs are welcome at
+<https://github.com/apilot/opencode-idea-inbox>.
 
 ## License
 

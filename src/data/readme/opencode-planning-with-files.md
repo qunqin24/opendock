@@ -238,6 +238,7 @@ One hook fire measures 289ms wall-clock since the v3.6.0 optimization, down from
 
 | Version | Highlights |
 |---------|------------|
+| **v3.22.0** | OpenCode 2 support with native plugin registration, context injection, planning tools and the completion gate. OpenCode 1 remains supported; moved v2 sessions follow their current project (#298). |
 | **v3.21.0** | Explicit root and named attestation targets preserve active selection and project containment (#296). PowerShell initialization retries the concurrent pointer pre-check race with bounded, validated attempts (#294). |
 | **v3.20.8** | Claude Code sessions without a plan no longer end every reply with a Stop notice (#288). Cursor hooks move to the current schema with `sessionStart` injection (#262), Gemini CLI hooks inject through `BeforeAgent` and `AfterTool` `hookSpecificOutput` (#292), and both adapters' hook scripts are now executable on macOS and Linux; the Cursor stop hook stays silent once every phase is complete. PowerShell pointer replacement recovers or removes only its own `ReplaceFile` backup (#254). |
 | **v3.20.7** | Fixes npm capability disclosure metadata and three unavailable contributor portrait endpoints. The npm package continues to ship the canonical skill and full repository README. |

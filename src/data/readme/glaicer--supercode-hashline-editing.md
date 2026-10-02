@@ -1,12 +1,8 @@
 # hashline-editing
 
-An OpenCode plugin that edits files by line number instead of search and replace. Search and replace breaks when the same code shows up twice. Plain line numbers break when an earlier edit moves the lines below it.
+An OpenCode plugin that edits files by line number instead of search and replace.
 
-## What it does
-
-Each `read` returns a `[PATH#TAG]` header. The tag names the exact version you read, so `edit` can check it before it writes.
-
-Read a file first, then send a patch like this:
+Search and replace breaks when the same code appears twice. Plain line numbers break when an earlier edit shifts the lines below. Hashline avoids both: every `read` returns a `[PATH#TAG]` header that pins the exact version you saw, and `edit` checks that tag before writing anything.
 
 ```text
 [src/a.ts#A1B2]
@@ -15,35 +11,59 @@ replace 2-3
 +new line three
 ```
 
-Reads take `limit` and `offset`. For inserts use `insert before N`, `insert after N`, or `append`. One patch can cover several files. Every file is checked first, then written.
-
-## Benefits
-
-- Edits in one patch never shift each other. Line numbers refer to the version you read. Use the new header for the next edit.
-- Duplicate lines are safe because you point at lines, not text. A stale tag stops instead of writing to the wrong place.
-- Patches stay small. You send only the operation and the new lines, no surrounding context.
-- If the file changed on disk, the edit stops before writing anything. Read again and retry.
-- No fuzzy matching. The tag either matches or it does not.
+Operations: `replace N-M`, `replace N`, `insert before N`, `insert after N`, `append`. New lines are prefixed with `+`. One patch can cover several files — everything is validated first, then written. If the file changed on disk since your read, the tag won't match and nothing is written: read again and retry.
 
 ## Install
 
-Install with the OpenCode CLI:
+**OpenCode v2 (2.x)** — version `1.0.0`:
 
 ```bash
-opencode plugin @glaicer/supercode-hashline-editing --global
+opencode plugin add @glaicer/supercode-hashline-editing
 ```
 
-- `--global` installs into the global config (`~/.config/opencode`); default is local (`.opencode` in the current project).
-- `--force` replaces an already-installed version.
-- Restart OpenCode after installing.
-
-Manual install also works: add the package to the `plugin` array in `opencode.json`:
+**OpenCode v1 (1.x)** — version `0.1.0`. Add it to the `plugin` array of your `opencode.json`:
 
 ```json
 {
-  "$schema": "https://opencode.ai/config.json",
-  "plugin": ["@glaicer/supercode-hashline-editing"]
+  "plugin": ["@glaicer/supercode-hashline-editing@0.1.0"]
 }
 ```
 
-Restart OpenCode after saving.
+Restart OpenCode either way — running sessions don't pick up config changes. To uninstall, remove the plugin entry and restart again.
+
+## Options
+
+v2 reads options from the `plugins` entry in the global config:
+
+```jsonc
+{
+  "plugins": [
+    {
+      "package": "@glaicer/supercode-hashline-editing",
+      "options": { "enforceSeenLines": true }
+    }
+  ]
+}
+```
+
+v1 reads the same values from a `hashline` section of the config.
+
+| option | default | meaning |
+| --- | --- | --- |
+| `enforceSeenLines` | `true` | refuse to edit lines a `read` never showed |
+| `roots` | `[]` | additional Snapshot Roots besides the project root |
+| `maxPaths` | `256` | tracked-file limit of the snapshot store |
+| `maxVersionsPerPath` | `4` | remembered versions per file |
+| `maxTotalBytes` | `67108864` | total snapshot budget in bytes |
+
+## Warning: edit permissions are not enforced
+
+Hashline `edit` writes directly — the plugin API has no way to ask OpenCode for approval at write time. `edit: ask` rules won't prompt, and path-scoped `edit: deny` rules won't block it (measured on OpenCode 2.0.18). Only a blanket `edit: deny *` stops it, and only because the tool is then hidden from the model entirely. Reads are unaffected — they go through the native read tool and honor `read` permissions.
+
+If you rely on edit approvals, don't use this plugin for those files. Edits are still confined to the project root and configured `roots`, and a stale tag still refuses to write — but that's drift protection, not an approval policy.
+
+## Differences from the native edit tools
+
+- **Existing files only.** Creating files is the native `write` tool's job.
+- **No formatting.** Hashline writes exactly the lines you sent and never runs a formatter.
+- **No approval prompt.** See the warning above.

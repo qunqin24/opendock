@@ -122,6 +122,8 @@ These accept `--json` and `--config-path <file>` (`install`/`update` reject `--c
 
 Each request picks the healthiest enabled account (`rotationStrategy`, default `hybrid`): health scores drop on failures and rate limits, cooldowns keep a burned account out of the running, tokens refresh as needed, and failover walks the pool within a bounded retry budget. Logging into the same account again updates its entry rather than duplicating it. Pools are **per-project by default** — the plugin walks up from the working directory looking for a project marker (`.git`, `package.json`, `.opencode`, and friends), stopping at your home directory; without a marker it uses global storage. Set `CODEX_AUTH_PER_PROJECT_ACCOUNTS=0` to force the global pool.
 
+Accounts whose plan quota is used up are left alone until it resets, even when they hold Codex credits. Set `spendCredits: true` to spend those credits once no account has plan quota left; a toast names the account and its remaining balance. See [Spending Codex credits](docs/configuration.md#spending-codex-credits).
+
 ## Models
 
 `--modern` and `--full` install **11 base models** covering **59 variants** (selectable via `--variant`); `--legacy` installs the 59 as explicit IDs.
@@ -148,6 +150,7 @@ The TUI prompt line shows quota for the account that served the last request. `q
 - `active` (default): the serving account's remaining quota
 - `overview`: the whole pool on one line, weighted by plan
 - `resets`: banked rate-limit reset credits
+- `credits`: accounts that still hold Codex credits once plan quota is gone
 
 Pass a list (`["overview", "resets"]`) to rotate screens every `rotateMs` (default 5s). Percentages read as headroom left; set `quotaDisplay: "used"` to show consumption. All layout and forecast options are documented in [docs/configuration.md](docs/configuration.md).
 
@@ -170,6 +173,7 @@ Plugin settings are re-read per request — most edits need no restart. Boolean 
 | `CODEX_AUTH_PER_PROJECT_ACCOUNTS=0` | Force the global account pool |
 | `CODEX_KEYCHAIN=1` | Store accounts in the OS keychain |
 | `CODEX_AUTH_ROTATION_STRATEGY=hybrid\|sticky\|round-robin` | Account selection strategy |
+| `CODEX_AUTH_SPEND_CREDITS=1` | Spend Codex credits once no account has plan quota left |
 | `CODEX_AUTH_QUOTA_DISPLAY=free\|used` | Quota percentages as headroom (default) or consumption |
 | `CODEX_RETRY_ALL_UNBOUNDED=1` | Let "wait as long as the backend asks" apply when every account is rate-limited; otherwise capped at 10 minutes |
 | `ENABLE_PLUGIN_REQUEST_LOGGING=1` | Write request metadata logs |
@@ -205,7 +209,7 @@ Most issues resolve by signing in again or running `codex-doctor fix=true` insid
 
 ## Release notes
 
-- Current stable: [v6.26.0](CHANGELOG.md) — `npx -y oc-codex-multi-auth@latest`
+- Current stable: [v6.27.0](CHANGELOG.md) — `npx -y oc-codex-multi-auth@latest`
 - Full release archive: [CHANGELOG.md](CHANGELOG.md)
 
 ## Terms and license

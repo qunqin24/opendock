@@ -1,10 +1,10 @@
 # OpenCode Loop
 
-## Native OpenCode 2 (0.6.2)
+## Native OpenCode 2 (0.6.4)
 
-The npm and local-file V2 entrypoints now use the official `@opencode/plugin` `Plugin.define()` contract. The local installer writes a discovered plugin package directory with the generated runtime as a supporting module, while explicit `--legacy-v1` remains a separate compatibility path.
+The npm and V2 entrypoints use the official `@opencode/plugin` `Plugin.define()` contract. The installer now registers the exact `@bybrawe/opencode-loop` package in OpenCode's plural `plugins` configuration instead of copying a loose global plugin directory. OpenCode therefore resolves `@opencode/plugin` from Loop's own production dependency graph; explicit `--legacy-v1` remains a separate compatibility path.
 
-The installer now defaults to the standalone native V2 plugin. It needs no V1 SDK or legacy command files for a local installation. Existing npm registrations migrate from `plugin` to `plugins` without dropping object options. Use `--legacy-v1` explicitly for the compatibility installation.
+The installer defaults to the native V2 package plugin. It needs no loose local V2 copy, V1 SDK, or legacy command files. Valid legacy `plugin` registrations are now persisted into the single native `plugins` list using OpenCode 2.0.21's own normalization semantics, so native installs no longer leave parallel `plugin` and `plugins` blocks. Object options and entry order are preserved, malformed legacy values are left untouched, and unrelated provider/model settings are not rewritten. Existing 0.6.1/0.6.2 loose `plugins/opencode-loop` installs are still removed on update. Use `--legacy-v1` explicitly for the compatibility installation.
 
 V2 prompt admission and durable inbox/execution/compaction events own scheduling. Core-generated user-role messages never authorize a session abort. An unfinished dedicated Goal reserves its session, including paused and handed-off states; Loop does not wake or replace that Goal. Soft iteration timeouts do not abort a native model/tool/compaction turn.
 
@@ -17,32 +17,48 @@ Prompt/command timers, watch and stop conditions, verification, preflight/postru
 
 OpenCode Loop adds `/loop`, scheduled prompt/command/shell jobs, compact scheduling, verification/checkpoints, and the `opencode-loopd` background daemon.
 
-> **Current stable release: `0.6.2`.**
+> **Current stable release: `0.6.4`.**
 
 ## Install or update
 
-Recommended:
+### Recommended OpenCode 2 setup
+
+Install the dedicated Goal plugin first:
 
 ```bash
-npx -y @bybrawe/opencode-loop@latest
+npx -y @bybrawe/opencode-goal@latest
 ```
 
-Run the same command again to update. Then **fully restart OpenCode** and verify:
+Then install Loop by itself and disable Loop's older experimental Goal command files:
+
+```bash
+npx -y @bybrawe/opencode-loop@latest --loop-only --without-loop-goals
+```
+
+This is the recommended split for OpenCode 2:
+
+- **OpenCode Goal** owns `/goal`, durable outcome-driven work, evidence, verification, recovery, and semantic completion.
+- **OpenCode Loop** owns `/loop`, scheduling, repeated prompts/commands/shell work, and `opencode-loopd`.
+- `--loop-only` prevents the Loop installer from installing/updating the Goal companion.
+- `--without-loop-goals` removes only Loop's older experimental `/loop-goal*` command files; it does not remove the dedicated OpenCode Goal plugin.
+
+Run the same two commands again to update both packages. Loop 0.6.4 also canonicalizes valid legacy `plugin` entries into the native `plugins` list; earlier 0.6.1/0.6.2 loose global V2 installs are removed and replaced by the pinned published package. Then **fully restart OpenCode** and verify:
 
 ```text
+/goal status
 /loop-help
 /loop-doctor
 ```
 
-Install/update Loop and the dedicated Goals companion together:
+Convenience alternative: let the Loop installer also install/update the dedicated Goal companion:
 
 ```bash
 npx -y @bybrawe/opencode-loop@latest --with-goals --without-loop-goals
 ```
 
-`--without-loop-goals` removes only Loop's older experimental `/loop-goal*` command files. It keeps normal `/loop`, command/shell scheduling, daemon support, and the separate `/goal` plugin.
+For new OpenCode 2 installations, the explicit two-command setup above is preferred because ownership is clear and each package can be updated independently.
 
-Install only Loop and skip companion network work:
+Install only Loop without touching Goal:
 
 ```bash
 npx -y @bybrawe/opencode-loop@latest --loop-only

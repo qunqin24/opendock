@@ -133,7 +133,9 @@ command to run.
 | `extraBody` | Merged into the request body. A key set to `null` removes a default (`temperature`, `top_p`, `seed`, `max_tokens: 8`). For llama.cpp with a thinking model: `{ "chat_template_kwargs": { "enable_thinking": false } }`. |
 | `promptAddendum` | Site rules appended to the built-in prompt, taking precedence over it, e.g. an operation that is routine on your machines but on the built-in RISKY list. |
 | `systemPrompt` | Replaces the built-in prompt entirely. |
-| `broker`, `brokerDir`, `brokerAgents`, `noThinkProviders` | The optional broker lane, below. |
+| `broker` | `false` disables the optional broker lane. |
+| `brokerDir` | Broker state directory when it is not `~/.local/share/opencode/model-routing`. |
+| `noThinkProviders` | Provider ids whose routed `fleet-classifier` calls receive llama.cpp's no-thinking option. Default: `["llamacpp"]`. |
 
 A hosted endpoint:
 
@@ -151,9 +153,10 @@ leaves the machine.
 for opencode. When its socket exists (`~/.local/share/opencode/model-routing/broker.sock`,
 or `brokerDir`), the guard uses it in two ways. It reads the session's routing
 profile, so that a privacy profile's command text never reaches a cloud classifier.
-And it adds a second classifier lane: the guard leases a classifier target from the
-broker and runs it as a disposable child session through an opencode agent named in
-`brokerAgents` (see `examples/agents/` and `examples/classifier.broker.example.json`).
+And it adds a second classifier lane: the guard creates one disposable, unpinned
+`fleet-classifier` child (see [the complete agent example](https://github.com/sudolulo/opencode-guard/blob/main/examples/agents/fleet-classifier.md)). The broker's
+ordinary `chat.message` route owns that child's single classifier lease, model and
+reasoning variant; the guard owns its prompt, timeout and cleanup.
 The direct endpoint is tried first when both exist; the broker lane is the fallback
 when the direct one fails fast. `"broker": false` turns the lane off.
 
@@ -225,13 +228,30 @@ too often teaches people to stop reading what it asks.
 
 ### The floor
 
-Two checks run on every process-spawning tool call (`bash`, and `pty_spawn`,
+Three checks run on every process-spawning tool call (`bash`, and `pty_spawn`,
 `pty_write` and `bg_run` from pty and background-shell plugins) in every mode but
 `god`:
 
 1. **cc-safety-net** static analysis. A deny verdict throws. So does an exception
    from the analyser: its API contract is that a throw means "do not run it".
-2. **The credential guard.** Paths such as `~/.ssh/id_*`, `~/.aws/credentials`,
+2. **The launder floor.** opencode's own `permission.bash` globs let read verbs run
+   unprompted (`echo *`, `fd *`, `git diff*`), and a glob cannot look inside
+   argv: `echo x > ~/.bashrc`, `fd -HX rm -rf`, `git diff --output=f` and a quoted
+   `rg '--pre' sh` all match a read allow. For every segment opencode would run
+   without asking (its last-match-wins verdict is recomputed from the global
+   config the way opencode reads it: `config.json`, `opencode.json` and
+   `opencode.jsonc`, JSONC, over opencode's `"*": "allow"` default; a config that
+   cannot be read fails closed and is reported), the floor parses the command with
+   the same tree-sitter bash parser opencode uses and judges every command node --
+   inside loops, subshells, groups and substitutions too. It refuses a redirect
+   into a file (anything but `/dev/null`, fd merges, or a literal path inside
+   `/tmp/opencode/`) on a statement whose commands would all run unprompted, a read
+   verb whose guard (below) says it writes or runs a program, and an allowed command
+   it cannot verify as a read at all. Commands opencode would ask about are not
+   judged: a person approved those. The parser is a dependency (`npm install`); if
+   it cannot load, the plugin and `oc-check` say so and the floor refuses any
+   command with compound syntax.
+3. **The credential guard.** Paths such as `~/.ssh/id_*`, `~/.aws/credentials`,
    `~/.kube/config`, `~/.docker/config.json`, `~/.gnupg/` and `/etc/shadow`, plus
    the site's own, are refused outright. Password-manager reads are refused when
    nobody is present and left to a prompt when someone is.
@@ -250,7 +270,13 @@ About 140 inspection verbs (`ls`, `rg`, `jq`, `git log`, `docker ps`,
 default and write with one flag, so they carry per-verb guards: `sed` without `-i`,
 `find` without `-exec` or `-delete`, `curl` without a body, upload, output file or
 method flag (matched as prefixes, so `-XPOST` and `-sSLo` are caught), `git branch`
-without `-D`, `kubectl get` of anything but a Secret.
+only listing (write flags in any cluster or abbreviation, or a name without a
+list-mode option, are writes), `git grep` without `-O`, `git diff/log/show` without
+`--output` or `--ext-diff`, `fd` without `-x`/`-X` in any cluster, `rg` without
+`--pre` or `--hostname-bin`, `uniq`/`xxd` with one operand, `xxd` without `-r`,
+`pdftotext` to stdout, `tree` without `-o`, `yq` without `-i`, `bat`/`ag` without
+`--pager`, `kubectl get` of anything but a Secret. `exiftool` is not in the table
+(`-if` runs Perl).
 
 The command line is lexed with quotes honoured and every segment of a pipeline or
 `&&` chain has to be a read on its own, so `cd repo && rg foo` settles while
@@ -376,9 +402,9 @@ With opencode-broker installed, a session can carry a privacy profile (`local`,
 treated as one whose command text may not leave local infrastructure, including
 names the guard has never seen: the check is on the shape of the name, not a list,
 because a list would fail open the day the broker gains a profile. Such a session
-is classified only by a direct endpoint marked `private`, or by a broker lease
-requested with `localOnly`, whose target must come back as local. With neither, the
-command is refused, not sent.
+is classified only by a direct endpoint marked `private`, or by a `fleet-classifier`
+child whose broker route inherits that confinement from its owner and selects a local
+target. With neither, the command is refused, not sent.
 
 ### What it is not
 

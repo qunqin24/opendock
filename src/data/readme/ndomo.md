@@ -16,8 +16,8 @@ ndomo is a multi-agent orchestration plugin for [OpenCode](https://github.com/op
 | **craftsman** | Disciplined implementer — ad-hoc or plan-driven bugs, features, scoped refactors | opencode-go/gpt-5.6-luna | primary |
 | **warden** | Ops custodian — CI/CD, deploy, releases, monitoring | opencode-go/gpt-5.6-luna | primary |
 | **ranger** | Analyst / cartographer / onboarding — senses and persists findings to `analyses`, no plans | minimax/MiniMax-M3 | primary |
-| **scout** | Codebase reconnaissance | opencode/mimo-v2.5-free | subagent |
-| **scribe** | External knowledge retrieval | opencode/mimo-v2.5-free | subagent |
+| **scout** | Codebase reconnaissance | opencode-go/mimo-v2.6-flash | subagent |
+| **scribe** | External knowledge retrieval | opencode-go/mimo-v2.6-flash | subagent |
 | **painter** | UI/UX design and visual composition | opencode-go/qwen3.7-plus | subagent |
 | **smith** | Fast generic implementation | opencode-go/mimo-v2.6-flash | subagent |
 | **go-smith** | Go implementation specialist | opencode-go/mimo-v2.6-flash | subagent |

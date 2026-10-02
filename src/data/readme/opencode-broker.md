@@ -530,7 +530,13 @@ group or world permission bits, and sends its value only as `x-api-key`. This ke
 and provider OAuth state out of OpenCode's auth store. Provider keys are never logged. Per provider
 you can also set `headers`,
 `bodyExtras`, `dropBodyKeys` (for a lane that rejects a parameter the client
-sends), `streamIdleMs`, `streamUsage: false`, `jsonMode: "instruct"`, `chatApi`, `messagesApi`, `responsesApi` and
+sends), `streamIdleMs`, `streamUsage: false`, `jsonMode: "instruct"`, `chatApi`, `messagesApi`, `responsesApi`,
+`forwardSessionHints: true` (forward the request's `x-opencode-session-id` and
+`x-opencode-session-kind` to this lane: llm-auth-proxy uses the kind to pick its
+prompt-cache TTL, subagent 5m otherwise 1h, and the id to link request fingerprints
+for prefix-change diagnostics; set it only on fleet-internal lanes -- a session id
+must never reach a third-party API, so every lane that does not opt in receives
+neither hint, including on a failover into it) and
 `mirrorTextFormat: true` (copy a /responses `text.format` into `response_format`,
 for llama.cpp, which enforces only the latter).
 

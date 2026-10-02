@@ -64,10 +64,11 @@ The panel's only fixed text — `▸ FLIGHT DECK` over a separator — is **opt-
 | `turns` | How many prompts you've sent this session · **off by default** |
 | `guard` | Harness status from oc-harness-guard · **off by default** |
 | `go` | Zen Go account usage — a dial and a whole-number percent for the **5h**, **1w**, and **1m** windows, in that fixed order; a window at 90% or more turns its dial and number red, and the reset hint appears only then · **off by default** |
+| `ses` | The open session id, which the rail wraps; **click the row** to copy the full id to the terminal clipboard · **off by default** (requires the host's mouse) |
 
 `project` matches on the host's **project id**, not on a directory, so a worktree counts as part of the same project. A host that reports no project id leaves nothing to match on, and the row then totals every session that host knows about.
 
-The rows marked **off by default** — `caution`, `branch`, `total`, `spark`, `reasoning`, `turns`, `guard`, and `go` — are available but not in the default rail: add any of them to `sidebar.rows`. `caution` also needs `caution.enabled: true`; `go` needs `OPENCODE_GO_API_KEY` in the environment.
+The rows marked **off by default** — `caution`, `branch`, `total`, `spark`, `reasoning`, `turns`, `guard`, `go`, and `ses` — are available but not in the default rail: add any of them to `sidebar.rows`. `caution` also needs `caution.enabled: true`; `go` needs `OPENCODE_GO_API_KEY` in the environment; `ses` needs the host's mouse enabled to click-copy.
 
 Every field named in `sidebar.rows` renders exactly one row, in order. With `sidebar.persist` (the default), a row with no data yet shows the `sidebar.placeholder` value (default `—`) in the same label column as a live row — so the rail keeps a stable shape instead of growing rows as the session produces data. Set `"persist": false` to restore omission: rows with no data are left out entirely.
 
@@ -154,9 +155,11 @@ Everything else lives in the example file, documented inline - a typo is never f
 
 ---
 
-## 🔒 It reads. It writes one number — two with `guard` on.
+## 🔒 It reads. It writes almost nothing.
 
 Flight Deck shows what OpenCode already knows.
+
+- **One clipboard write, and only on a click.** With the opt-in `ses` row on the rail, a mouse click on that row copies the full session id to the terminal clipboard. Nothing is copied on render, in the background, or without that gesture; a terminal that cannot take the write simply does nothing.
 
 - **No network calls while the opt-in `guard` row stays off.** Nothing is fetched, nothing is sent. With `guard` enabled, the panel polls the local guard RPC — same machine, no telemetry — about every ten seconds, plus right away when the rendered session changes.
 - **No telemetry.** Nothing is collected or phoned home.
@@ -204,7 +207,7 @@ Built on the official [OpenCode V2 CLI plugin API](https://opencode.ai/v2/docs/b
 | Built against | `@opencode/plugin` `2.0.19` — pin a host version you've tested |
 | Host | OpenCode V2 (`opencode2`) |
 | Building from source | Node ≥ 22 or Bun ≥ 1.4 |
-| Writes | In-memory counters only — the animation tick, plus the `guard` row's polled status when `guard` is on; nothing to disk |
+| Writes | In-memory counters only — the animation tick, plus the `guard` row's polled status when `guard` is on; with the opt-in `ses` row, a click copies the id to the terminal clipboard (never automatic); nothing to disk |
 
 ---
 

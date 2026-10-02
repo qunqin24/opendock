@@ -15,7 +15,7 @@ See the [changelog](CHANGELOG.md) for release-by-release changes.
 - Collapsible Todo section with status filters, grouped tasks, progress and priority indicators; OpenCode 2 adds session-owned tasks and optional model-context instructions
 - Active subagent list with live statuses and click-to-open navigation, including dev-team workers running in separate local processes
 - Compact, searchable workspace skill list with user-wide favorites, recent skills, source details, and click-to-confirm slash commands
-- Configurable host quick actions, including the auto-approve toggle, with user-wide bookmarks and availability reasons
+- Configurable host quick actions, including OpenCode 1.x's auto-approve toggle and OpenCode 2.x's Permissions settings, with user-wide bookmarks and availability reasons
 - Live LSP connection status with error-first sorting and badges that reveal server names in place
 - Searchable MCP section with live radio-style connection controls
 - Click any MCP row to connect or disconnect it
@@ -189,6 +189,12 @@ and update in the sidebar when the agent calls `navigator_todo_write`. The
 starts **Off**: tasks and the agent tool work without adding Todo instructions
 to the model's context. OpenCode 1.x continues to show the host's Todo list.
 
+If you use both OpenCode 1.x and 2.x with the same global `opencode.json`, keep
+that shared server config compatible with 1.x. Place the server-plugin entry
+in a separate JSON file and set `OPENCODE_CONFIG` to its path **only when
+launching OpenCode 2.x**. The TUI configuration in `cli.json` remains separate;
+the OpenCode 1.x launch must not load Navigator's 2.x server plugin.
+
 ### Install the corner font
 
 **Required for rounded multiline selections in Nerd Font mode.** Run the font
@@ -310,8 +316,10 @@ On the Quick Actions row, click `Actions` or press `A` to choose individual
 actions and their order. Enter toggles visibility; Left/Right or Shift+Up/Down
 reorders the selected action. Changes save in the selected Global or Current
 worktree scope. Escape returns to the Quick Actions row in Sections. Navigator
-keeps an explicit allowlist of argument-free host commands, including OpenCode's
-global `permission.mode` auto-approve toggle. Bookmarks are user-wide and move
+keeps an explicit allowlist of argument-free host commands. On OpenCode 1.x,
+`permission.mode` toggles auto-approve directly. On OpenCode 2.x, the same
+Quick Action opens the host Settings dialog, where **Session → Permissions**
+switches between `prompt` and `auto accept`. Bookmarks are user-wide and move
 selected actions to the front in their configured order in both the sidebar and
 Search Everything. Usage never changes the order. Visibility remains independent,
 so any action, including a bookmarked one, can be hidden from the sidebar while it

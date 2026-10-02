@@ -26,6 +26,7 @@ This plugin gives the agent full control over multiple terminal sessions, like t
 - **Auto-cleanup**: PTYs are cleaned up when OpenCode sessions end
 - **Web UI**: Modern React-based interface for session management
 - **Real-time Streaming**: WebSocket-based live output updates
+- **TUI Sidebar**: Live session panel inside OpenCode, with output viewer and one-click cleanup
 
 ## Setup
 
@@ -97,6 +98,37 @@ This plugin provides slash commands that can be used in OpenCode chat:
 | -------------------------- | -------------------------------------------------- |
 | `/pty-open-background-spy` | Open the PTY web server interface in the browser   |
 | `/pty-show-server-url`     | Show the URL of the running PTY web server instance |
+
+## TUI Sidebar
+
+The plugin also ships a TUI plugin that renders a live PTY panel in OpenCode's
+sidebar, so sessions stay visible without leaving the terminal. It is part of the
+same package, but OpenCode loads the TUI surface from a separate config, so
+register it there too (`.opencode/tui.json`):
+
+```json
+{
+  "$schema": "https://opencode.ai/tui.json",
+  "plugin": ["opencode-pty"]
+}
+```
+
+The panel:
+
+- lists one row per session, with a bullet coloured by state (running, failed,
+  stopped), the truncated title, and the line count or exit code
+- opens a session's live output in a dialog when its row is clicked
+- removes a single session with `✕` — asking first when it is still running — and
+  drops every stopped session at once with `(clear finished)`
+- starts the server on demand, by expanding the panel: starting it is never a
+  side effect of OpenCode starting up
+- is collapsible, and remembers that state across restarts
+
+The server publishes its address to a small per-user runtime record when it
+starts, and the panel reads that — no `/proc` scan, and no session spent purely
+to learn a port. When two instances on the same project are running the record
+cannot say which is whose, so the panel asks its own instance instead, through
+the same `pty-show-server-url` round-trip run in a throwaway session.
 
 ## Web UI
 
