@@ -71,6 +71,15 @@ Or add the plugin manually to each file and restart opencode:
 > `opencode plugin opencode-usage-report` prints `Detected server + tui targets`
 > when the resolution works.
 
+> **OpenCode 2.x (0.6.0).** Both entrypoints now default-export a dual
+> definition. The server entrypoint exports `{ id, setup, server }` — V2 calls
+> `setup`, V1 calls `server`. The TUI entrypoint exports `{ id, setup, tui }` —
+> V2 calls `setup` (its `keymap.layer` runs from a headless `app`-slot
+> component), V1 calls `tui`. OpenCode 2's TUI loader rejects a default export
+> without a `setup` function (`Invalid V2 TUI plugin module`); before 0.6.0 the
+> TUI module exported only the V1 `tui` shape and failed to load on 2.x.
+> OpenCode 1.18.29+ and 2.x both load either entrypoint.
+
 Options can be passed in the tuple form, independently per entrypoint:
 
 ```jsonc

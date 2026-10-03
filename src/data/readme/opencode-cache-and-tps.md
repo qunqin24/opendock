@@ -31,14 +31,14 @@ V2版本，编辑`~/.config/opencode/cli.json`，添加包名。
 
 ```jsonc
 {
-    "plugins": [
-        {
-            "package": "opencode-cache-and-tps@latest",
-            "options": {
-                "enabled": true
-            }
-        }
-    ]
+  "plugins": [
+    {
+      "package": "opencode-cache-and-tps@latest",
+      "options": {
+        "enabled": true
+      }
+    }
+  ]
 }
 ```
 
@@ -46,16 +46,17 @@ V1版本，编辑`~/.config/opencode/tui.json`，添加包名。
 
 ```jsonc
 {
-    "$schema": "https://opencode.ai/tui.json",
-    "plugin": [
-        // ...
-        "opencode-cache-and-tps@latest"
-    ]
+  "$schema": "https://opencode.ai/tui.json",
+  "plugin": [
+    // ...
+    "opencode-cache-and-tps@latest"
+  ]
 }
-
 ```
 
-排障：若插件冲突或故障，可清理缓存并以纯净状态重启opencode，然后依次排查。V2缓存在`~/.cache/opencode/npm`，V1在`~/.cache/opencode/packages`。
+排障：若插件冲突，可关闭所有插件配置，然后依次开启并排查。
+
+强制更新：可删除缓存强制更新插件，V2缓存在`~/.cache/opencode/npm`，V1在`~/.cache/opencode/packages`。
 
 ## 本地构建
 
@@ -69,11 +70,11 @@ npm run build; $dst = "~\.config\opencode\plugins\opencode-cache-and-tps"; New-I
 
 ```jsonc
 {
-    "type": "module",
-    "dependencies": {
-        // ...
-        "@opentui/solid": "^0.5.1"
-    }
+  "type": "module",
+  "dependencies": {
+    // ...
+    "@opentui/solid": "^0.5.1"
+  }
 }
 ```
 
@@ -81,11 +82,11 @@ V1需要额外编辑`~/.config/opencode/tui.json`，添加本地TUI插件。
 
 ```jsonc
 {
-    "$schema": "https://opencode.ai/tui.json",
-    "plugin": [
-        // ...
-        "./plugins/opencode-cache-and-tps/dist/tui.js"
-    ]
+  "$schema": "https://opencode.ai/tui.json",
+  "plugin": [
+    // ...
+    "./plugins/opencode-cache-and-tps/dist/tui.js"
+  ]
 }
 ```
 

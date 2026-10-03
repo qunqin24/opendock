@@ -27,7 +27,7 @@ OpenCode v2 执行边界安全插件：在原生 `shell` 工具执行命令前�
   "$schema": "https://opencode.ai/config.json",
   "plugins": [
     {
-      "package": "opencode-v2-security@1.3.0",
+      "package": "opencode-v2-security@1.4.1",
       "options": {
         "strictness": "HARD",
         "failPolicy": "fail_open",
@@ -204,9 +204,27 @@ shell 请求
 
 静态分类（LOOSE/HARD 策略、cd 追踪、脚本指纹、目录清单等）沿用 v1 `-next` 规则集（`src/security/classifier.ts`、`src/security/reviewer.ts`、`src/security/auditor.py`），在此之上新增了 bypass 类别豁免机制与审查器提示词加固（见上方 BypassClassifier 章节）。动态审查器完全直连 OpenAI-compatible 端点，不经 opencode client。
 
+### LOOSE 语义放行（仅读写会话）
+
+LOOSE 读写会话中，一个段在所有危险扫描都通过后，若能证明只读，就直接静态 ALLOW，不再交给动态审查器：
+
+- Python：`python3 -c`、`python3 - <<'EOF'`、本地 `.py` 脚本，由 `src/security/python-readonly.py` 做 AST 只读证明（模块白名单、只读 `open`、只读 SQL；拒绝 URL、敏感文件名和环境变量读取；同目录被 import 的模块一并检查）；
+- sqlite3 只读 SQL、`gh` 读子命令与 `gh api` GET、tmux 只读命令、版本/帮助查询、`python -m json.tool`；
+- 仅限 loopback 的 `curl` GET/HEAD（不写文件）。语义放行不覆盖任何远程联网请求；
+- RO 会话的只读词汇（git 读子命令等，不含解释器、awk、curl）、`for`/`if` 等复合语句里逐段可证明的命令、字面量变量赋值与循环变量绑定、不会匹配凭据文件名的 glob 读参数；
+- `trustedCommands` 中的命令。
+
+任何一步无法证明都回退原判定（通常是 ASK）。HARD 会话保持 1.3.0 判定（回放逐行一致）；只读会话（`permScope.w=false`）不启用上面这些**语义放行**，但共享词法/词汇层的放宽（`sed -n … 2>/dev/null`、`~` 路径、`for`/`if` 复合体、`:` 内建、`git worktree list`、glob 读参数），其写上限不变。同期的漏报修复（git `--output`/`--ext-diff`/`--open-files-in-pager`、find `-fprint*`/`-fls`、awk `getline`/`print >`/`print |`、sed `w`、`xxd -r`、tar/zip 执行类选项、同目录 Python 模块遮蔽 stdlib）在所有模式下生效。
+
+### 只读会话本轮修复的三个逃逸面（1.3.0 就存在）
+
+1. **复合关键字遮蔽 interop 写**：分段遗留的 `then`/`do`/`if`/`else`/`!`/`{` 前缀把真正的可执行文件藏在了 RO 互操作与变异检查之外，`if true; then pwsh.exe -Command 'Remove-Item …'; fi` 在内核强制的只读会话里被当作"无法识别的叶子"直接放行——Linux 内核沙箱管不住 Windows 侧进程。现在这些形式与裸命令判定完全一致（DENY）。
+2. **temp 豁免绕过执行器扫描**：`sed -n '1e id' x > /tmp/o`、`awk 'BEGIN{system(…)}' > /tmp/o` 曾借 "/tmp 目标全受限" 早放行在所有模式下执行代码。temp 豁免现在先过执行器能力检查；awk（system/getline/print 管道形态，带引号内容屏蔽，`" || "` 字符串不会误判）加入 sed/rg/`git grep` 的执行器检查。
+3. **内联代码点名凭据文件**：`python3 -c "print(open('/home/u/.ssh/id_rsa').read())"`、`node -e "…readFileSync('/home/u/.ssh/id_rsa')…"` 里的路径永远不构成可分类的路径 token，"纯读"证明与内核直通都会放行。现在凭据词表（与路径注册表同源）会扫描参数与代码文本：无内核的只读会话 DENY，内核强制的只读会话转 ASK 审查。固定回放里只读（内核强制）静态放行而动态审查拒绝的命令从 4 条降到 0 条（29→25 全部为既有基线）。
+
 ## 配置字段（与 v1 一致）
 
-v1.3.0 的提示词实验、真实拒绝取证、误拦/漏判结果及剩余限制见 [研究与验证摘要](./RESEARCH-v1.3.0.md)。研究比例不是线上误拦率；复杂嵌套载荷仍可能被动态模型误判。
+v1.4.0 的静态放行、RO 修复与验证方法见 [v1.4.0 研究与验证摘要](./RESEARCH-v1.4.0.md)；同期 JEV 载荷/执行边界改进见 [迭代报告](./RESEARCH-JEV-PAYLOAD-20261003.md)与[优化提示词](./JEV-EXECUTION-SCOPE-PROMPT.md)。v1.3.0 的提示词实验、真实拒绝取证、误拦/漏判结果及剩余限制见 [v1.3.0 摘要](./RESEARCH-v1.3.0.md)。研究比例不是线上误拦率；复杂嵌套载荷仍可能被动态模型误判。
 
 `options` 支持以下字段（白名单校验，未知字段会抛错）：
 
@@ -228,6 +246,7 @@ v1.3.0 的提示词实验、真实拒绝取证、误拦/漏判结果及剩余限
 | `detachedStartIsolation` | boolean | `true` | supervisor 未激活时对 `start`/`Start-Process` 追加句柄隔离 |
 | `slowCommands` | boolean | `true` | 拦截安全但必耗时的命令（系统/挂载树的无界扫描、`-f` 流式、超长 `sleep`），除非调用方显式给了 timeout。底层默认参数：`maxDepth=16`（find/rg/fd 的 `-maxdepth` 阈值，超过才拦）、`sleepThresholdSeconds=120`（sleep 阻断阈值，`>=` 即拦）、`allowExplicitTimeout=true`（调用方传入工具参数 timeout 时不拦） |
 | `logReviewerTrace` | boolean | `false` | 审计轨迹开关。为真时每次动态审查（判决或错误）及每次动态缓存命中（allow/deny）向 `~/.opencode/reviewer-trace.jsonl` 追加一行 JSONL（含时间戳、命令、endpoint/model、判决/原因/错误）；写入失败静默忽略，不影响审查流程 |
+| `trustedCommands` | string[] | `[]` | 用户信任的命令前缀（如 `"agent-browser"`、`"opencode2 --version"`）。仅在 LOOSE 读写会话生效：某段 argv 以其中一项开头、且所有危险扫描都通过时静态 ALLOW。裸名只匹配 PATH 查找（`./tool` 不匹配 `tool`）；条目含 shell 语法时配置报错 |
 | `supervisorEnabled` | boolean | Windows 下 `true` | 使用原生 shell supervisor |
 | `supervisorPath` | string | 包内默认 | supervisor `bash.exe` 路径 |
 | `BypassClassifier` | string[] | `[]` | 永久豁免类别列表：`filesystem`/`host`/`privilege`/`secret`/`network`/`remote`/`indirection`/`dynamic`/`sandbox`/`slow`；未知类别警告并忽略 |

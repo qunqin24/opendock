@@ -421,7 +421,7 @@ No API key required. Excellent starting point:
 ```json
 {
   "agents": {
-    "coder": { "model": "opencode/minimax-m2.5-free" },
+    "coder": { "model": "opencode/nemotron-3-ultra-free" },
     "reviewer": { "model": "opencode/big-pickle" },
     "explorer": { "model": "opencode/big-pickle" }
   }
@@ -461,7 +461,7 @@ Automatic fallback to a secondary model on transient errors (including provider 
   "agents": {
     "coder": {
       "model": "anthropic/claude-sonnet-4-20250514",
-      "fallback_models": ["opencode/gpt-5-nano"]
+      "fallback_models": ["opencode/mimo-v2.6-flash-free"]
     }
   }
 }

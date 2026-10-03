@@ -8,8 +8,13 @@ filling it: system prompt, tool schemas, user/assistant text, reasoning, tool
 arguments and the residual "other" bucket.
 
 The package ships a **dual V1 + V2 plugin** (one entry works in both OpenCode
-generations) plus an optional TUI sidebar module exposed as the `./tui` entry.
-The V2 path is **tested against opencode v2.0.19**; the V1 path against 1.18.29+.
+generations) plus an optional TUI module (`./tui` entry) that renders a **live
+sidebar** and a **zero-LLM `/cx` breakdown panel** with measured contributors
+and a redacted export. The V2 path is **tested against opencode v2.0.22**; the
+V1 path against 1.18.29+.
+
+> **V1 is feature-frozen.** It is kept working for compatibility (bug fixes
+> only); all new features land in the V2 path.
 
 ![TUI sidebar — per-category context breakdown](docs/sidebar.png)
 
@@ -38,8 +43,10 @@ For every served request the plugin estimates how the context window is split:
   (Cyrillic ≈ 2.5, CJK ≈ 1.5, latin/ASCII ≈ 4 chars/token) — not a tokenizer.
   `reasoning` also carries the exact value reported by the model when present.
 * `other` is the residual (`input − sum of estimates`).
-* Tool **results** are deliberately not counted; only tool **call arguments**
-  (results are not part of the sent prompt).
+* Tool **results** are deliberately not counted in the server-side categories;
+  only tool **call arguments** are. The TUI panel's *largest contributors*
+  section **does** measure retained results — that is why it can explain the
+  (often large) residual `other` bucket.
 * `ctx` is OpenCode's native overflow count: `tokens.total` when present, else
   `input + output + cache.read + cache.write`. Percentages are **not clamped**
   at 100% — exceeding the window stays visible.
@@ -218,23 +225,57 @@ back to a plain notice if needed.
   is evicted by the `state.json` LRU cap (`MAX_TRACKED_SESSIONS`) — it may
   momentarily appear in the table.
 
+### TUI session panel (V2, terminal only)
+
+#### TUI panel (/cx) — zero-LLM breakdown
+
+`/cx` opens a full `session.panel` showing the breakdown for the current session
+**and its subagent descendants**, read from the same `state.json` bridge as the
+sidebar. Keys: `/cx` opens, `esc` closes, `r` refreshes (re-read the bridge),
+`e` exports a redacted snapshot.
+
+**Zero LLM calls.** Unlike `/context` and `/context-breakdown` (which run a real
+agent turn so the model renders the table), the panel only reads local TUI data
+and the state file; it never wakes the session and never grows the context.
+
+The **largest contributors (measured)** section char-counts the in-process
+message list and labels each row `assistant 21:04 reasoning — 4.5k "…"`: role
+in full words, the message's own clock time, the bucket (`reasoning` /
+`tool args (bash)` / `tool result (task)`), the token estimate and a bounded
+one-line preview of that part. Tool calls are measured **per tool call** (each
+carries its tool name); tool **result outputs** are counted here but not by the
+server's categories — which is why the residual `other` can look large. Top 5
+are shown. Empty state: `no messages yet`.
+
+Live only for a `file://` install from a path outside `node_modules`; the npm
+path auto-disables it (upstream `#33884`). The Desktop has no TUI, so it uses
+`/context` and `/context-breakdown` instead.
+
+#### Export (redacted)
+
+`e` writes a redacted JSON snapshot — no message text, no full session id, no
+tool output content — under `%TEMP%/opencode-context-indicator/exports/`
+(`$TMPDIR/...` elsewhere), named `context-<id8>-<yyyymmdd-HHMMSSmmm>.json`, and
+shows a toast with the file name. It never throws; on failure it logs and shows
+an error toast.
+
 ---
 
 ## Surface matrix
 
-| Surface | Toast | TUI sidebar | Breakdown log file | Slash commands |
-| --- | :---: | :---: | :---: | :---: |
-| OpenCode **1.x** — Desktop | ✅ | — | ✅ | — |
-| OpenCode **1.x** — TUI | ✅ | — | ✅ | — |
-| OpenCode **2.x** — TUI | — | ✅ | ✅ | ✅ |
-| OpenCode **2.x** — Desktop | — | — | ✅ | ✅ |
+| Surface | Toast | TUI sidebar | TUI panel (/cx) | Breakdown log file | Slash commands |
+| --- | :---: | :---: | :---: | :---: | :---: |
+| OpenCode **1.x** — Desktop | ✅ | — | — | ✅ | — |
+| OpenCode **1.x** — TUI | ✅ | — | — | ✅ | — |
+| OpenCode **2.x** — TUI | — | ✅ | ✅ | ✅ | ✅ |
+| OpenCode **2.x** — Desktop | — | — | — | ✅ | ✅ |
 
 Notes — these reflect what the plugin API actually exposes today:
 
 * **V2 has no toast channel on the server side.** The V2 plugin API
   (`ctx.*`) exposes no TUI/toast method (opencode issue `#49380`); the V2 path
-  therefore delivers everything through the log file, the TUI sidebar and the
-  `/context` / `/context-breakdown` slash commands. The sidebar is a TUI-process
+  therefore delivers everything through the log file, the TUI sidebar, the
+  `/cx` session panel and the `/context` / `/context-breakdown` slash commands. The sidebar is a TUI-process
   slot and does not exist in the Desktop app; the slash commands work in **both**.
   The TUI sidebar is **live only for a `file://` install** from a path outside
   `node_modules`; on the npm path it is auto-disabled (upstream `#33884`) — see
@@ -255,7 +296,7 @@ and `$TMPDIR` (usually `/tmp`) elsewhere:
 | File | Purpose |
 | --- | --- |
 | `context-breakdown.log` | Human-readable live snapshot + bounded final summaries |
-| `opencode-context-indicator-state.json` | Machine-readable snapshot consumed by the TUI sidebar |
+| `opencode-context-indicator-state.json` | Machine-readable snapshot consumed by the TUI sidebar and the `/cx` panel |
 | `context-events.log` | Raw event tap — **only** when `DEBUG_EVENTS` is flipped to `true` in the source (off by default) |
 
 The live `context-breakdown.log` snapshot is **rewritten** (never grows); final
@@ -306,15 +347,15 @@ limitation (`anomalyco/opencode#33884`), not a plugin bug: OpenCode's TUI loader
 skips the host Solid transform for any path inside a `node_modules` directory, so
 a slot mounted from an npm install renders once and then never live-updates.
 
-| Install | Desktop | TUI commands | TUI live sidebar |
-| --- | :---: | :---: | :---: |
-| npm (`opencode plugin add opencode-context-indicator`) | ✅ | ✅ | ❌ auto-disabled (upstream #33884) |
-| `file://` (path **outside** any `node_modules`) | ✅ | ✅ | ✅ live |
+| Install | Desktop | TUI commands | TUI live sidebar | TUI panel (/cx) |
+| --- | :---: | :---: | :---: | :---: |
+| npm (`opencode plugin add opencode-context-indicator`) | ✅ | ✅ | ❌ auto-disabled (upstream #33884) | ❌ auto-disabled |
+| `file://` (path **outside** any `node_modules`) | ✅ | ✅ | ✅ live | ✅ live |
 
 On the **npm** path the plugin detects that it lives under `node_modules` and
-**disables the sidebar gracefully** — it logs a single hint and registers no
-slot, so you never see a frozen "no data yet" panel. The `/context` /
-`/context-breakdown` slash commands and the breakdown log file keep working on
+**disables the sidebar and the panel gracefully** — it logs a single hint and
+registers no slot, so you never see a frozen "no data yet" panel. The `/context`
+/ `/context-breakdown` slash commands and the breakdown log file keep working on
 every install.
 
 #### Getting the live sidebar (`file://` install)
@@ -350,13 +391,21 @@ Add the package name to the `plugin` array in your `opencode.json`:
 
 ### Local file (no npm)
 
-Copy `index.js` and `lib/dedup.js` into `~/.config/opencode/plugins/`, keeping
-the `lib/` subdirectory next to the plugin file so the plugin's `import` of the
-helper resolves. The `lib/` folder is support code, not a separate plugin entry:
+Copy `index.js` and the whole `lib/` directory into
+`~/.config/opencode/plugins/`, keeping the `lib/` subdirectory next to the
+plugin file so the plugin's relative imports resolve. The `lib/` folder is
+support code, not a separate plugin entry:
 
 ```
 ~/.config/opencode/plugins/context-indicator.js
+~/.config/opencode/plugins/lib/cache.js
+~/.config/opencode/plugins/lib/commands.js
 ~/.config/opencode/plugins/lib/dedup.js
+~/.config/opencode/plugins/lib/estimate.js
+~/.config/opencode/plugins/lib/limits.js
+~/.config/opencode/plugins/lib/state.js
+~/.config/opencode/plugins/lib/v1.js
+~/.config/opencode/plugins/lib/v2.js
 ```
 
 To use the sidebar locally as well, point OpenCode at a `file://` copy of the
@@ -372,18 +421,21 @@ the sidebar instead.
 * **Node.js ≥ 18** (the main plugin uses only Node built-ins). `@opencode/plugin`
   is an **optional** peer dependency: OpenCode resolves it at runtime, and
   `index.js` itself does not import it (the V2 `define` helper is inlined).
-* **OpenCode ≥ 1.18.29** for the V1 path. ⚠️ The V1 path relies on
-  `experimental.chat.*` hooks, which are **experimental** and may change or stop
-  firing in future OpenCode 1.x releases; if they do, the indicator degrades
+* **OpenCode ≥ 1.18.29** for the V1 path. ⚠️ **V1 is feature-frozen** — it
+  receives bug fixes only; all new features land in the V2 path. The V1 path
+  relies on `experimental.chat.*` hooks, which are **experimental** and may
+  change or stop firing in future OpenCode 1.x releases; if they do, the
+  indicator degrades
   gracefully (the breakdown falls back to throttled `session.messages` fetches
   and toasts keep working).
 * **OpenCode ≥ 2.0.16** for the V2 path (built and verified against
-  **2.0.19**).
+  **2.0.22**).
 * **TUI sidebar**: terminal TUI only, requires the OpenTUI rendering stack that
   ships with OpenCode. `@opentui/core` and `solid-js` are **optional** peer
   dependencies resolved by OpenCode at runtime; the main plugin installs and runs
   fine without them (the sidebar simply is not available). `@opentui/solid` is
-  instead shipped as a **pinned direct dependency** (exact `0.5.12`): OpenCode's
+  instead shipped as a **pinned direct dependency** (exact `0.5.14`, matching
+  the OpenTUI stack OpenCode 2.0.22 ships): OpenCode's
   TUI loader does not expose a host instance of it, so for npm-installed plugins
   the JSX pragma would otherwise fail to resolve `@opentui/solid/jsx-runtime`
   (upstream: opencode issue #33884 — `node_modules` plugins are excluded from the
@@ -419,21 +471,16 @@ The package default export is a dual plugin:
   experimental transform hooks + toasts.
 
 Both paths write the same breakdown log; the V2 path additionally feeds the
-sidebar through `opencode-context-indicator-state.json`. Cross-instance
+sidebar and the `/cx` panel through `opencode-context-indicator-state.json`.
+The `./tui` entry (OpenCode 2.x terminal TUI) renders the sidebar slot and the
+`session.panel` contribution (`/cx`), with measured per-part contributors and
+the redacted export. Cross-instance
 duplicate final summaries are suppressed with an atomic claim marker
 (`lib/dedup.js`). Every file / estimate / subagent path is fault-tolerant: a
 failure is logged and never breaks the main event or toast path.
 
 This plugin does not touch `opencode-token-monitor`
 (`token_stats` / `token_history` / `token_export` keep working unchanged).
-
----
-
-## Screenshots
-
-<!-- TODO: add screenshots -->
-
-_(to be added)_
 
 ---
 
@@ -467,10 +514,12 @@ STEP 80 s, ~3 min total.
 
 | Step | What | Why |
 |---|---|---|
-| (a) tarball composition | `package.json` `files[]` field expands to exactly 6 members | no test/node_modules/tsconfig in the tarball |
+| (a) tarball composition | `package.json` `files[]` expands to the base files plus every `lib/*` module (count asserted dynamically) | no test/node_modules/tsconfig in the tarball |
 | (b) pragma regression | esbuild `--jsx=automatic` → `@opentui/solid/jsx-runtime` present, `react/jsx-runtime` absent | a removed/broken pragma kills the sidebar on npm install |
 | (c) resolve chain | replica install → `import.meta.resolve` for all tui.tsx imports | broken peer/optional dep silently breaks the sidebar |
 | (d) unit harness T1–T12 | all limit/agent/state fix assertions | regressions in modelLimits, writeStateFile, hydrate |
+| (e) corporate-identifier scan | no forbidden identifiers in the published surface + test tree | compliance |
+| (f) non-English scan | no non-ASCII letters (`\p{L}` above U+007F) in any repo file | English-only source rule |
 
 **Isolated E2E — `test/e2e-tui.mjs`** (requires the OpenCode CLI)
 

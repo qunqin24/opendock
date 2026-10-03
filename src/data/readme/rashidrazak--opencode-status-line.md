@@ -66,8 +66,8 @@ Requires OpenCode v2. The plugin is CLI-only, so it is loaded from
    window, below OpenCode's own footer. Run `/opencode-status-line` (alias
    `/tps`, also in the command palette) to open the stats dialog.
 
-OpenCode downloads the package and transpiles the plugin on load, so there is
-no build step.
+OpenCode downloads the package and runs its prebuilt entry, so there is nothing
+to compile on your side.
 
 The line only appears while a session is open. If it does not appear during a
 session, check that the entry is in `cli.json` (not `opencode.json`) and
@@ -125,6 +125,7 @@ bun test                    # the whole suite, no OpenCode needed
 bun test test/rate.test.ts  # one module
 bun install                 # once, for the typechecker
 bun run typecheck           # src/, the tests and the entry
+bun run build:entry         # dist/tui.js — the entry npm consumers run
 npm run check:pack          # every module the entry imports is in the tarball
 ```
 
@@ -134,23 +135,26 @@ usage-line formatting, `src/diff.ts` the uncommitted-change counter,
 `src/palette.ts` the bundled colour palettes, and `src/config.ts` the JSON
 loader. The root `tui.tsx` re-exports the entry so OpenCode can load the
 plugin from a checkout directory; npm consumers resolve the entry through the
-`exports` map.
+`exports` map, which points at the built `dist/tui.js`.
 
 CI runs the suite on Linux, macOS and Windows for every pull request, together
-with a typecheck of the source (the entry included), a transpile of the entry
+with a typecheck of the source (the entry included), a build of the npm entry
 and the tarball check. Contributions are welcome; see
 [CONTRIBUTING.md][contributing] for the workflow, and `AGENTS.md` for the
 host-API traps behind the entry.
 
 ## Publishing
 
-The package is published as source, not as a bundle. OpenCode transpiles the
-TSX on load, so there is nothing to build. `package.json` maps `./tui` to
-`src/tui.tsx`, and the `files` allowlist includes all of `src/`, so the
-tarball contains the entry and every module it imports. `@opencode/plugin` is
-a dependency; the rendering peers (`@opentui/core`, `@opentui/solid`,
-`solid-js`) are provided by OpenCode. `npm run check:pack` verifies that every
-module the entry imports is included in the tarball.
+The package ships source plus one built file. A checkout install runs
+`src/tui.tsx` as TSX, which OpenCode transpiles itself; npm consumers run
+`dist/tui.js`, which `bun run build:entry` compiles with OpenTUI's own Solid
+plugin so the entry imports `@opentui/solid` by name instead of resolving a JSX
+runtime at load (see [AGENTS.md][agents] — that difference is the 1.0.3 crash
+fix). `package.json` maps `./tui` to `dist/tui.js`, and the `files` allowlist
+carries both `src/` and `dist/`. `@opencode/plugin` is a dependency; the
+rendering peers (`@opentui/core`, `@opentui/solid`, `solid-js`) are provided by
+OpenCode. `npm run check:pack` verifies that every module the entry imports is
+in the tarball and that the packed entry is the precompiled one.
 
 Releases are published by CI. Pushing a `v*` version tag (created by
 `npm version`) triggers `.github/workflows/publish.yml`, which publishes with
@@ -171,5 +175,6 @@ release are safe. Maintainers: see [RELEASING.md][releasing].
 [setups]: https://github.com/rashidrazak/opencode-status-line/blob/main/MANUAL.md#11-ready-made-setups
 [fixes]: https://github.com/rashidrazak/opencode-status-line/blob/main/MANUAL.md#12-common-questions-and-fixes
 [issues]: https://github.com/rashidrazak/opencode-status-line/issues
+[agents]: https://github.com/rashidrazak/opencode-status-line/blob/main/AGENTS.md
 [contributing]: https://github.com/rashidrazak/opencode-status-line/blob/main/CONTRIBUTING.md
 [releasing]: https://github.com/rashidrazak/opencode-status-line/blob/main/RELEASING.md

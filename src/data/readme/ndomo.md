@@ -241,7 +241,7 @@ See [docs/configuration.md](docs/configuration.md) for full reference. Agent pre
 
 ## Skills
 
-ndomo bundles 25 skills under `skills/`, grouped by family:
+ndomo bundles 26 skills under `skills/`, grouped by family:
 
 **Caveman protocol**
 - `caveman` — ultra-compressed communication mode (~75% token reduction)
@@ -249,6 +249,7 @@ ndomo bundles 25 skills under `skills/`, grouped by family:
 - `caveman-review` — ultra-compressed code review comments (location, problem, fix)
 
 **Workflow & quality**
+- `ndomo` — operating guide for the ndomo ecosystem (plans, tasks, sessions, memory, gates)
 - `grill-me` — relentless interview to sharpen a plan or design
 - `find-skills` — discover and install additional agent skills
 - `frontend-design` — distinctive, non-templated UI design guidance

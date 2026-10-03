@@ -3,9 +3,9 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![OpenCode: V1 tested, V2 adapter](https://img.shields.io/badge/OpenCode-V1%20live%20%7C%20V2%20mock--tested-blue.svg)](https://github.com/huseyincig/opencode-guardian)
 [![TypeScript: 5.x](https://img.shields.io/badge/TypeScript-5.x-blue.svg)](https://www.typescriptlang.org/)
-[![Tests: 100% Pass](https://img.shields.io/badge/Tests-318%2F318%20Passing-brightgreen.svg)](tests/)
+[![CI](https://github.com/huseyincig/opencode-guardian/actions/workflows/ci.yml/badge.svg)](https://github.com/huseyincig/opencode-guardian/actions/workflows/ci.yml)
 
-A TypeScript quality and safety guardian plugin for **OpenCode** AI agents. This repository prepares **v0.4.0**; npm publication and GitHub release are separate maintainer-controlled steps.
+A TypeScript quality and safety plugin for **OpenCode** AI agents. See [CHANGELOG.md](CHANGELOG.md) for version history.
 
 Designed to detect common AI agent failure modes using request-time guidance and post-turn inspection: unsupported claims, responsibility evasion, silent failure masking, test weakening, unsafe destructive operations, hardcoded secrets, undeclared dependencies, incomplete implementations, and repetitive error loops.
 
@@ -13,14 +13,12 @@ Uses OpenCode's supported plugin hooks — **no manual markdown rules or system 
 
 ---
 
-## 🌟 Why OpenCode Guardian?
+## Features
 
-Traditional agent detectors often rely on external platform-specific binaries (Rust, Go, or Python) which introduce compile issues, glibc mismatches, and sluggish child-process invocation. 
-
-**OpenCode Guardian** provides:
+**OpenCode Guardian** runs in-process with prebuilt TypeScript and provides:
 - **Task fidelity:** Captures explicit user requirements before model execution (V1 `chat.message`/system transform; V2 `prompt`/`context` hooks) and checks completion on `session.idle`. Historical deferrals do not override a new explicit instruction.
-- **Zero-Binary, Pure TypeScript:** In-process checks with zero external runtime dependencies. A limited V1 benchmark measured approximately 0.217 ms per isolated engine inspection; whole-task latency depends heavily on host and model behavior.
-- **Dual-Mode Adapters:** The V1 `server` adapter was tested on OpenCode 1.18.34 using earlier v0.3.0 code; current v0.4.0 changes are covered by unit/mock-host and sandbox tests. The V2 `setup` adapter is typechecked and mock-tested but has **not** been verified on a real V2 host. Partial V2 contexts are tolerated only when strict preflight is disabled; strict preflight fails visibly when required host capabilities are unavailable.
+- **Prebuilt server:** Compiled JavaScript with no added server runtime dependencies; the optional V2 TUI uses the host’s UI runtime. See [V1 performance measurements](https://github.com/huseyincig/opencode-guardian/blob/main/docs/performance-benchmark.md) for isolated guard timings and end-to-end measurements.
+- **V1/V2 adapters:** V1 was tested with OpenCode 1.18.34 on an earlier revision. V2 is typechecked and mock-host tested; live V2 validation remains outstanding. See [verification](#testing-and-verification).
 - **Pre-Built Distribution:** Pre-compiled `dist/` is included in the package and git repository — no build toolchain (`tsc`) required on target systems.
 - **Evidence-Aware Inspection:** Correlates tool commands, exit codes, test/build/audit results, file mutations, git state, baseline checks, and normalized error fingerprints before deciding.
 - **False-Positive Defenses:** Explicit uncertainty is allowed, stale verification after a later edit is not treated as proof, and Python local/stdlib modules are distinguished from third-party dependencies.
@@ -28,18 +26,16 @@ Traditional agent detectors often rely on external platform-specific binaries (R
 
 ---
 
-## 📦 Installation
+## Installation
 
-### Method 1: NPM Package (after maintainer publication)
-
-The examples below request `0.4.0` **after it has been published to npm**; updating this repository alone does not make the package available. Until publication, use the local development method below. Add the package to the OpenCode configuration supported by your host.
+### Method 1: npm package
 
 **OpenCode v1:**
 
 ```json
 {
   "plugin": [
-    "opencode-guardian@0.4.0"
+    "opencode-guardian@latest"
   ]
 }
 ```
@@ -49,7 +45,7 @@ The examples below request `0.4.0` **after it has been published to npm**; updat
 ```json
 {
   "plugins": [
-    "opencode-guardian@0.4.0"
+    "opencode-guardian@latest"
   ]
 }
 ```
@@ -86,11 +82,11 @@ Use the absolute `file:///` path in the matching host configuration.
 }
 ```
 
-> `OpencodeGuard` remains a JavaScript export alias for source compatibility. The npm package name `opencode-guard` is **not** an alias for this project; install `opencode-guardian`.
+The package name is `opencode-guardian`. The `OpencodeGuard` JavaScript export is retained for compatibility.
 
 ---
 
-## 🛡️ The 14 Rules
+## The 14 rules
 
 | Rule | Default | What it checks |
 | :--- | :---: | :--- |
@@ -117,11 +113,11 @@ GuardFall-inspired detection recognizes selected literal shell rewrites (empty q
 
 For literal file removals (including plain `rm path`), post-turn authorization is target-specific: permission for one path does not authorize another, a different target in the same command, or an unrequested `sudo` privilege escalation. Quoted examples, questions and requests for explanations do not grant permission. Complex shell syntax is not interpreted as authorization; the finding remains advisory under the default `warn` severity.
 
-For the bounded, non-executing [synthetic security benchmark](docs/security-benchmark.md) and its limitations, see the benchmark notes below. For a transparent, evidence-linked coverage and gaps assessment, see [OWASP Agentic Top 10 (2026) mapping](https://github.com/huseyincig/opencode-guardian/blob/main/docs/owasp-agentic-top10-2026.md). This is a scope assessment, not a claim of OWASP certification or complete protection.
+For measured test cases and limitations, see the [security benchmark](https://github.com/huseyincig/opencode-guardian/blob/main/docs/security-benchmark.md) and [OWASP Agentic Top 10 coverage map](https://github.com/huseyincig/opencode-guardian/blob/main/docs/owasp-agentic-top10-2026.md).
 
 ---
 
-## ⚙️ Configuration (`opencode-guardian.json`)
+## Configuration (`opencode-guardian.json`)
 
 OpenCode Guardian works out of the box with zero configuration. `safety/destructive-operations` defaults to `warn`; the other blocking rules default to `error`.
 
@@ -169,6 +165,18 @@ To customize behavior, create `opencode-guardian.json` (or legacy `opencode-guar
 }
 ```
 
+### Dependency audit policy
+
+CI blocks on any production dependency advisory with `npm audit --omit=dev`. It also runs a full development-dependency audit through `scripts/check-dev-audit.mjs`. Babel is overridden to a patched `7.29.7+` release in the current source. The remaining 12 high-severity npm reports refer to the **same unresolved upstream** `http-cache-semantics` advisory ([GHSA-ch52-4w7c-c8xp](https://github.com/advisories/GHSA-ch52-4w7c-c8xp)) propagated through the dev-only OpenCode V2 SDK dependency tree. The dev audit prints this exception and fails if new advisory sources or affected packages appear; these 12 reports are **not fixed**. Avoid using development SDK dependencies as production runtime dependencies. When upstream publishes a fix, update the lockfile and remove the exception.
+
+### Guardian event log, status command, and optional V2 sidebar
+
+Guardian records **minimal redacted events** in `~/.local/state/opencode-guardian/events.jsonl` (or `OPENCODE_GUARDIAN_STATE_DIR/events.jsonl`). The directory is created with mode `0700` and the file with `0600` on POSIX. Events include plugin startup, inspected **shell** calls (when strict preflight is enabled), pre-execution blocks, post-turn warnings/remediations, and inspection errors. No raw commands, prompts, tool arguments, credentials, or original session IDs are written; session IDs are short SHA-256 fingerprints. Logging is best-effort and does not block tool execution if its directory is unwritable.
+
+Run `opencode-guardian-status` with the installed package, or `node scripts/guardian-status.mjs` from the repository. The command shows counters and the last-start preflight state. Counters are calculated from the newest **2 MiB** of the log; when older entries are omitted, the command and sidebar explicitly say so. The displayed preflight state reflects the **last recorded successful plugin start**, not proof that a plugin process is currently alive. Only shell calls checked by strict preflight count as "inspected"; a zero does not mean that no other tools ran.
+
+On compatible **OpenCode V2** CLI builds, the package also exports `./tui`. The sidebar appears if the CLI discovers and loads that TUI entrypoint; this has not yet been visually verified on a live V2 host. It **appends** a compact Guardian section to `sidebar.content`; it does not replace built-in widgets or other plugins' sections. The TUI reads the **local** log, so a CLI connected to a server on a different machine cannot display that server's counters. OpenCode V1 continues to use the server plugin and status command; there is no V1 sidebar API assumed here. Native TUI rendering requires the host's `@opentui/core`, `@opentui/solid` and `solid-js` runtime.
+
 ### Optional pre-execution protection (strict opt-in)
 
 Set `"preflight": { "enabled": true }` in `opencode-guardian.json` to register a pre-execution shell-tool hook. This is **disabled by default**; the existing `session.idle` checks and `safety/destructive-operations: warn` behavior remain unchanged.
@@ -198,15 +206,15 @@ For a task-focused configuration, the older conversation-style rules can be chan
 
 ---
 
-## 🧭 Explicit Task Contracts
+## Explicit task contracts
 
 When the latest genuine user prompt **explicitly** requests a repeated debug/review, Guardian builds a task contract for that human turn. It guides the agent before its model request and checks the observed tools at `session.idle`. A source-review loop requires a new, nonempty source inspection **after** the last change; a test-only loop can be supported by a successful later test run. Omitted or ambiguous evidence remains advisory where a direct contradiction cannot be established. A concrete blocker is reported instead of causing an infinite retry.
 
-This is a **conservative heuristic**, not semantic proof that every file was examined or that all requirements were met. The host must actually deliver the hooks; some V2 beta versions have reported broken event/context delivery. See [the V1/V2 task-contract design](docs/task-contract-v1-v2.md) and [source-verified international policy design](docs/international-policy.md) for architecture, sources, limitations and proposed AST/OPA extensions.
+The contract detects supported instructions and observed post-change evidence; it does not prove full repository coverage. See the [V1/V2 architecture](https://github.com/huseyincig/opencode-guardian/blob/main/docs/task-contract-v1-v2.md) and [international policy](https://github.com/huseyincig/opencode-guardian/blob/main/docs/international-policy.md).
 
 ---
 
-## 🌍 International, language-neutral task decisions
+## Language-neutral task decisions
 
 English and Turkish task extraction now has conservative signal support for **Spanish, Portuguese, French, German, Russian, Arabic, Hindi, Chinese, Japanese, Korean and Indonesian**. These identify explicit actions, repeated review, negation, requested tests, historical refusal, completion reports and blockers. They are **not** universal language understanding or an exhaustive list of paraphrases.
 
@@ -221,7 +229,7 @@ The header is optional, accepts only the documented fields, and does not grant t
 
 ---
 
-## 🔄 How It Works: Evidence + Remediation Flow
+## Evidence and remediation flow
 
 ```mermaid
 flowchart TD
@@ -250,10 +258,10 @@ flowchart TD
 
 ---
 
-## 🧪 Testing & Verification
+## Testing and verification
 
 ```bash
-# Build + 318 unit/regression tests
+# Build + 323 unit/regression tests (current main)
 npm test
 
 # Typecheck TypeScript sources
@@ -262,70 +270,37 @@ npm run typecheck
 # Isolated plugin smoke test
 node sandbox/smoke-test.mjs
 
-# 18 end-to-end behavioral scenarios
+# 18 isolated sandbox scenarios
 node sandbox/comprehensive-test.mjs
 
-# Dependency/security audit
-npm audit
+# Runtime dependency/security audit
+npm audit --omit=dev
 
-# Verify publish contents (the maintainer performs the actual npm publish)
+# Full dev audit with a tracked upstream exception
+node scripts/check-dev-audit.mjs
+
+# Inspect npm package contents
 npm pack --dry-run
 ```
 
-CI runs the full verification sequence on Node **22** and **24**. The 318 tests include active backtick and plain-removal regression cases, deletion questions versus explicit scoped authorization, strict V2 preflight failure on incomplete contexts/invalid event subscriptions, partial-V2 fallback when strict mode is off, remediation budgets, and the existing rule regressions. These are tests and host simulations, not a real V2 deployment certification.
+CI runs the full verification sequence on Node **22** and **24**. The 323 source tests include active backtick and plain-removal regression cases, deletion questions versus explicit scoped authorization, strict V2 preflight failure on incomplete contexts/invalid event subscriptions, partial-V2 fallback when strict mode is off, remediation budgets, and the existing rule regressions. Live V2 host integration remains unverified.
 
 ---
 
-## 🛠️ Project Structure
+## Project layout and documentation
 
-```
-opencode-guardian/
-├── dist/                    # Pre-built ESM distribution
-├── src/
-│   ├── index.ts             # OpenCode v1/v2 adapters
-│   ├── engine.ts            # Rule orchestration + remediation budget
-│   ├── evidence.ts          # Tool/evidence normalization + error fingerprints
-│   ├── state.ts             # Remediation/continuation budgets per human turn
-│   ├── task-contract.ts     # Explicit task extraction and optional typed directive
-│   ├── locale-intents.ts    # Conservative multilingual signals
-│   ├── task-policy.ts       # Language-neutral evidence and completion policy
-│   ├── prose.ts             # Prose normalization
-│   ├── tool-input.ts        # Common shell/file mutation extraction
-│   ├── types.ts
-│   ├── shell-risk.ts       # Bounded shell-pattern inspection
-│   ├── preflight.ts        # Optional strict pre-execution checks
-│   └── rules/               # 14 built-in rules
-├── sandbox/
-│   ├── smoke-test.mjs
-│   └── comprehensive-test.mjs
-├── tests/
-│   ├── guard.test.mjs       # Existing rules and V1/V2 host simulations
-│   ├── multilingual-task.test.mjs  # International positive/negative tests
-│   ├── structured-task.test.mjs    # Exact directive validation
-│   ├── international-adapters.test.mjs # V1/V2 locale hook simulations
-│   ├── report-audit-regression.test.mjs # Prior report-validated regressions
-│   ├── report-followup-regression.test.mjs # Source-review and quoted-intent checks
-│   ├── task-policy.test.mjs        # Language-neutral policy tests
-│   ├── security-benchmark.test.mjs # Frozen, non-executing 17-case benchmark
-│   ├── security-gap-regression.test.mjs # Active backtick and plain rm checks
-│   └── security-audit-regression.test.mjs # V2 setup and consent checks
-├── docs/                    # Security, host adapters and policy notes
-├── index.js
-├── server.js
-├── package.json
-└── tsconfig.json
-```
+- [`src/`](src/): OpenCode adapters (`index.ts`), rules, evidence and task policy, opt-in preflight, telemetry and V2 TUI.
+- [`tests/`](tests/) and [`sandbox/`](sandbox/): automated regressions and isolated host scenarios.
+- [`dist/`](dist/): prebuilt package; [`scripts/`](scripts/): status command and development-audit check.
+- [`CHANGELOG.md`](CHANGELOG.md): version history, publication status and compatibility notes.
+- [`docs/task-contract-v1-v2.md`](docs/task-contract-v1-v2.md): V1/V2 hook design and task contracts.
+- [`docs/international-policy.md`](docs/international-policy.md): supported languages and task-decision limits.
+- [`docs/security-benchmark.md`](docs/security-benchmark.md): synthetic security tests and their limits.
+- [`docs/owasp-agentic-top10-2026.md`](docs/owasp-agentic-top10-2026.md): risk coverage and gaps.
+- [`docs/performance-benchmark.md`](docs/performance-benchmark.md): earlier V1 measurements (not current-version latency claims).
 
 ---
 
-## 📚 Documentation and release readiness
-
-- [V1/V2 task-contract and hook architecture](https://github.com/huseyincig/opencode-guardian/blob/main/docs/task-contract-v1-v2.md)
-- [International task policy and limitations](https://github.com/huseyincig/opencode-guardian/blob/main/docs/international-policy.md)
-- [Synthetic security benchmark and validation boundaries](https://github.com/huseyincig/opencode-guardian/blob/main/docs/security-benchmark.md)
-- [OWASP Agentic Top 10 (2026): capabilities and gaps](https://github.com/huseyincig/opencode-guardian/blob/main/docs/owasp-agentic-top10-2026.md)
-- [v0.4.0 release preparation and manual publication checklist](https://github.com/huseyincig/opencode-guardian/blob/main/docs/release-v0.4.0.md)
-
-## 📄 License
+## License
 
 [MIT](LICENSE) © Hüseyin Hadi Çığ

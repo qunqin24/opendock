@@ -35,10 +35,10 @@ implementation, validation, review, and model routing.
 Guides: [日本語](docs/guide-ja.md) · [简体中文](docs/guide-zh-CN.md) ·
 [Testing](docs/testing.md) · [CLI testing](docs/cli-testing.md)
 
-**Current release: [v0.13.3](https://github.com/zufall-upon/Sortie-dogs/releases/tag/v0.13.3)**
-([release notes](docs/release-v0.13.3.md)). The default Mission runtime retains the `v010`
+**Current release: [v0.13.4](https://github.com/zufall-upon/Sortie-dogs/releases/tag/v0.13.4)**
+([release notes](docs/release-v0.13.4.md)). The default Mission runtime retains the `v010`
 profile, command and configuration names for compatibility; these names do not mean v0.10 is installed.
-The current asset marker is `0.13.3-reviewer-context-v1`.
+The current asset marker is `0.13.4-reviewer-continuous-v1`.
 
 ## SWE-bench Lite: 170/300 (56.67%)
 
@@ -48,7 +48,7 @@ The fixed **Sortie-dogs v0.12.24** harness resolved **170 of 300 SWE-bench Lite 
 
 The single official 300-instance report and frozen predictions are hash-bound in the report. Confirmed inference expense was **$162.99**; a separate **$34.60** of usage has unknown pricing and is held against the campaign cap, **not** counted as known expense. Leaderboard registration and maintainer acceptance are separate from this official local evaluation.
 
-Historical scores below belong to their fixed candidates, not v0.13.3. SWE-bench is a separate,
+Historical scores below belong to their fixed candidates, not v0.13.4. SWE-bench is a separate,
 optional measurement rather than a mandatory release gate.
 
 > **Beta:** v0.13.x is still stabilizing. Runtime behavior,
@@ -93,31 +93,32 @@ existing local bridge loads enforcement and model routing. OpenCode can reload w
 but replacing an installed dependency may require a full restart. A new chat session alone does not
 prove the newly installed plugin is loaded.
 
-## v0.13.3 runtime updates
+## v0.13.4 runtime updates
 
-The current release integrates native background Mission execution, concise authoritative Worker
-handoffs, and same-context Reviewer corrections from PRs #148/#149 and their Ubuntu remediation.
-Operator launches its Coordinator, direct Worker and Reviewer children as native background jobs,
-returns a short acknowledgement and remains available for user chat. Native completion wakes the same
-Operator; a launch acknowledgement or idle root is not Mission completion. Coordinator's internal
-dispatch remains foreground, and unrelated chat does not cancel or replace an active Mission.
+PR #152 restores same-session Coordinator/Operator implementation and formal validation through
+`plan_units(executor="self")`, `start_direct_unit` and `finish_direct_unit`. Known single-unit work can
+combine Mission start and planning; Luna Fast/max Worker routing remains the default. Full generated
+contracts remain visible when an explicit Read line range covers the file. Native background
+responsiveness remains: a launch acknowledgement or idle root is not Mission completion.
 
-After finding defects, the original Reviewer can correct and explicitly self-recheck in the same
-native session, retaining formal checks, current-source evidence, Git delivery and cumulative budget.
-The host temporarily activates a scoped correction profile and restores the read-only Reviewer profile
-afterward. Author self-recheck is recorded as `self-rechecked`, `independent=false`, never independent
-`PASS`. A different Reviewer is conditional on a concrete reachable residual Major risk.
-Unresolved Major or Medium findings still block acceptance; Operator owns final comparison and receipt.
+The initial independent Reviewer can investigate, correct, formally validate, deliver and self-recheck
+continuously in its original native Task. Later Major/Medium findings accumulate in that same correction
+context. Author self-recheck remains `self-rechecked`, `independent=false`, never independent `PASS`.
+A different Reviewer is conditional on concrete residual Major risk; unresolved Major/Medium findings
+still block acceptance. Operator owns final comparison and receipt.
 
-The fixed release passed candidate preflight, **1,589/1,589** Linux full tests and **12/12** Windows
-tests. Its native CLI probe observed a real Luna Fast/max Worker and Sol 6.1/xhigh Operator;
-that probe establishes startup/model identity, not task completion.
+Inherited compiler scratch no longer falsely invalidates broad-scope formal proof. Host-observed Git
+delivery, caller-setting review and test-composition guidance reduce avoidable detours. Saved host
+completion cards remain in tool history/UI, while outgoing V2 model/compaction context omits only their
+presentation body, retaining receipt and evidence identities.
 
-The installed native correction fixture succeeded, but the original Anko measurements remain
-unaccepted, including the latest 25-minute run. This release does not claim general speedup,
-original-task completion or a new SWE-bench score. See the [release notes](docs/release-v0.13.3.md),
-[Reviewer correction specification](docs/reviewer-context-repair.md) and
-[retained implementation and measurement history](docs/anko-pr149-ubuntu-handoff.md).
+Two runs of the same fixed pre-release v8 package completed the original Anko task with official local
+score 1 (F2P 9/9, P2P 94/94) and selected public probes 9/9. Times were 26m49s and 25m55s, costs
+$1.47908048 and $1.54610816; each saved more than seven minutes versus the recorded v5 sample.
+These limited same-task observations do not establish general speedup or a new SWE-bench score.
+Release preflight, full tests, fixed-commit Windows CI and native Worker-start receipts are retained in
+`_testenv/releases/0.13.4/`; startup/model identity is not task completion. See the
+[release notes](docs/release-v0.13.4.md) and [quality-loop evidence](docs/nightly-quality-loop-20261002.md).
 
 ## Mission workflow
 
@@ -128,7 +129,7 @@ use Operator → Coordinator → Worker for actual discovery or decomposition:
   The host saves the original user message verbatim.
 - Hidden `dogs-coordinator` owns investigation, unit declarations, Worker/Scout/Advisor/Reviewer dispatch,
   in-request write-scope extensions, and corrections. It can read/search and run confirmation shell commands;
-  source implementation belongs to Worker or an admitted same-context Reviewer correction.
+  it can implement and formally validate directly in its own session, or delegate a unit to Worker.
 - `dog-worker-v010` implements a host-generated unit within its file/directory write scopes.
   Investigation commands need no pre-registration; formal checks retain real host-recorded results.
 - High-risk changes require an initial independent Reviewer with read/search access. Low-risk skips
@@ -214,16 +215,19 @@ astroid **3/5**, pyvista **0/1**, sqlfluff **1/5**.
 
 ## Mission tools
 
-1. `start_mission`: Operator supplies concise requirements; the host saves original messages and returns a Coordinator task.
+1. `start_mission`: Operator supplies concise requirements; the host saves original messages. A known single unit
+   can include `unit` to combine start/planning and return its configured Worker task.
 2. `plan_units`: Operator or Coordinator supplies title, objective, file/directory scopes and formal checks. The host generates
-   IDs, handoff, manifest, proof mapping and the ready Worker task. No proposal approval round trip.
+   IDs, handoff, manifest, proof mapping and the ready Worker task. `executor="self"` keeps execution in the
+   same controller session; `start_direct_unit` / `finish_direct_unit` retain observed formal-check freshness.
 3. `operator_next`: advance serial units. `expand_unit` reconciles required in-request outputs while
    preserving the same Task. A reasoned `plan_units` correction or `retry_mission_unit` handles ordinary
    unit recovery under the original requirements and cumulative budget.
 4. `review_mission`: generate the independent review packet from source, requirements and observed checks;
    dispatch its Reviewer task for high-risk changes or record a low-risk skip.
-5. `repair_review`: resume the original native Reviewer session to correct its findings, run inherited
-   checks/requested Git delivery and explicitly report `SELF_RECHECKED` in that same Task. Legacy
+5. `repair_review`: record findings and continue correction in the running original Reviewer Task, or resume
+   that same native session. Later findings accumulate; run inherited checks/requested Git delivery and
+   explicitly report `SELF_RECHECKED` in that same Task. Legacy
    `CORRECTION_READY` alone requires a same-author read-only fallback through `review_mission`.
 6. `submit_mission`: Coordinator returns a completion candidate, user-only decision, or proven external/scope/budget blocker.
 7. `complete_mission`: Operator compares the original request, source and evidence, then explicitly accepts.
@@ -393,7 +397,7 @@ register stable and `v010` from the same package installation path in one host.
 Project-local installation is recommended. To expose the current Mission assets globally:
 
 ```sh
-npm install --global sortie-dogs@0.13.3
+npm install --global sortie-dogs@0.13.4
 sortie-dogs init --global --profile v010
 ```
 
@@ -405,7 +409,7 @@ can resolve a **separate dependency** under that config root. Updating npm-globa
 it. For that layout, also install the same release at the actual config root, then rerun global init:
 
 ```sh
-npm install --prefix "$HOME/.config/opencode" sortie-dogs@0.13.3
+npm install --prefix "$HOME/.config/opencode" sortie-dogs@0.13.4
 sortie-dogs init --global --profile v010
 ```
 
@@ -428,7 +432,7 @@ version, preserves user configuration, and stops safely on unknown ownership or
 conflicting files.
 
 Align any exact version pin or separate bridge dependency with the intended release too. An installed
-marker of `0.13.3-reviewer-context-v1` identifies the assets; it does not prove an already-running
+marker of `0.13.4-reviewer-continuous-v1` identifies the assets; it does not prove an already-running
 OpenCode process has reloaded the plugin.
 
 There is no supported uninstall command. Remove the npm dependency separately,

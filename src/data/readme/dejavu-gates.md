@@ -9,7 +9,9 @@
   <img src="logo/icon.svg" width="96" height="96" alt="dejavu logo — a lowercase d with two amber echo strokes">
 </p>
 
-<h3 align="center">dejavu — error gates for AI coding agents</h3>
+<h1 align="center">dejavu — error gates for AI coding agents</h1>
+
+<p align="center"><b>English</b> | <a href="README.ru.md">Русский</a></p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT License">
@@ -19,6 +21,15 @@
 </p>
 
 Cross-session **memory prosthesis with teeth** for AI coding agents. Agents repeat the same mistakes because they forget between sessions — and markdown rules don't fix that. dejavu mechanically detects recurring tool-call failures (bash, read, edit, write, glob, grep) and promotes them into enforced gates: a reminder on the next attempt, a hard block on same-session repeat offense. One engine, many hosts: OpenCode (plugin), Claude Code, Codex CLI, Gemini CLI, Cursor, Copilot CLI, Crush, Devin CLI, Kiro (hook-handler CLI), Cline (in-package plugin). TypeScript + Bun, ships as source, no build step.
+
+## Quickstart
+
+```bash
+npm install dejavu-gates
+dejavu report
+```
+
+Tests: `npm run test`
 
 ## Supported harnesses
 
@@ -49,7 +60,7 @@ tool call fails  →  signature normalized (paths/numbers/hashes stripped)
  retry fails again →  same-session repeat offense → hard BLOCK on further attempts
  diagnostic cmd   →  gate stays remind-only: the call RUNS and the reminder rides
                      on the failing output as a [dejavu] NOTE (once per session)
- ```
+```
 
 Design decisions (post-mortem of existing approaches):
 
@@ -198,6 +209,7 @@ echo '{"hook_event_name":"PreToolUse","session_id":"s","tool_name":"Bash","tool_
 - Every `log.jsonl` gets an `init` event with `PLUGIN_VERSION`; `detected` events carry `channel` (`exit`/`text`/`event`) and the raw exit code; `reminded`/`blocked` carry `via` (`exact`/`fuzzy`/`segment`). Stale plugin sessions are therefore visible in the data.
 - `bun scripts/doctor.ts [--repair] [projectDirs...]` — one-command report over every invariant the data model implies: gate shape, duplicate keys, temporal order, nested-token corruption, blocking without evidence, policy violations, index↔gates consistency, stale project copies, missed escalation, log integrity, secrets, version drift. `--repair` heals first (idempotent), then reports. `dejavu report [dirs...]` (the npm bin) runs the same report for any harness, no OpenCode needed.
 - `bun scripts/analyze.ts [projectDirs...]` — store summary: statuses, tools, top patterns.
+- `dejavu lesson list` / `dejavu lesson set <key> "<one-line fix>"` — review gates whose `correction` is still the machine default and write a human correction onto an existing gate (cannot create gates; promotion stays mechanical). `lesson list --all` includes watching gates; `lesson set --author owner|agent` records who wrote the correction; `lesson retire-when <key> <spec>` declares an external invalidation (`dep:<name>@>=<min>`, `path-present/absent:<p>`, `tag:<name>`) that `doctor` evaluates.
 - `/dejavu` command (OpenCode, installed globally) runs doctor first, then reports.
 - Hook CLI diagnostics: set `DEJAVU_DEBUG=1` to see engine log lines on stderr (stdout always stays pure JSON).
 
@@ -226,6 +238,8 @@ Language ecosystems covered by failure detection: JS/TS, Python, Go, Rust, Java/
 | `*/dejavu/*.corrupt*` | quarantined corruption (unparseable gates.json, excised log lines) — bytes preserved for forensics; safe to delete after inspection |
 
 The store paths are historical (`.opencode/`) but the store is harness-neutral — ALL harnesses share it. Both files are human-editable. Removing a gate object disables it. Editing `correction` improves what the agent is told. Clearing `feedbackDemoted` (and setting `status` back to `blocking`/`reminding`) re-enforces a gate the agent's behavior retired — it gets a fresh grace window via `feedbackBaseline`.
+
+Project stores keep themselves out of `git status`: init writes a self-ignoring `.opencode/dejavu/.gitignore` — `gates.json` stays committable (shared repo gotchas), runtime files (log, index, locks, tmp) are ignored — and `doctor --repair` sweeps orphaned `*.tmp` files and stale `*.lock` files (`--prune-corrupt=<days>` opts into deleting quarantine artifacts past the age; default 30 days).
 
 ### Environment overrides
 
@@ -349,76 +363,47 @@ MIT
 
 ## Who is it for
 
-<!-- TODO: who is this for? -->
+Developers who run AI coding agents daily and watch the same failures recur in every new session — the stale flag, the missing path, the command that only fails on this machine. Three profiles:
+
+- **Solo agent-heavy developers** — gates accumulate from your own `log.jsonl` evidence, so enforcement matches your actual failure history, not a generic rulebook.
+- **Multi-harness users** — one store shared across all supported hosts: a gate learned in Claude Code fires in OpenCode, Cursor, or any other harness reading the same store.
+- **Teams that want enforcement without hand-written policy** — gates promote mechanically from recurrence (3 failures across 2 sessions) and demote themselves when the agent stops fighting them; humans only edit corrections.
 
 ## Use cases
 
-<!-- TODO: 3-7 concrete use cases -->
+- **A command that keeps failing across sessions.** After 3 failures across 2 distinct sessions a gate promotes; the next attempt is aborted with a `CORRECTION:` reminder, and a same-session retry after a failed reminder blocks.
+- **Failing diagnostics that must keep running.** `tsc`, `pytest`, `cargo test` and other diagnostics promote to `reminding` — the call runs, a `[dejavu] NOTE` rides the failing output once per session, nothing is interrupted.
+- **Repeated file-probe failures.** Reads of missing files and rejected edits land in `watching` gates — measured and reportable, never interrupting.
+- **Foreground servers that strand orphans.** `npm run dev`, `uvicorn`, `next dev` starts are interrupted in the before-hook with a run-detached correction (tmux / `nohup … &`).
+- **One habit, every harness.** Signatures normalize before hashing, so the same failing call is gated in whichever host shares the store.
+- **Curating what the agent is told.** `dejavu lesson list` surfaces gates still on machine-default corrections; `lesson set` replaces them with a human fix.
 
 ## Why choose this
 
-<!-- TODO: 2-4 differentiators, with numbers -->
+- **Learning and enforcement in one loop.** A Sep 2026 survey of ~60 OSS projects found no shipped tool that both learns rules from observed failures and blocks tool calls — policy engines never learn, memory plugins never block.
+- **A mechanical hot path.** Pattern-key counting and Levenshtein ≤ 0.3 fuzzy merging decide every promotion — no LLM in the failure path.
+- **Gates answer to behavior.** 3 post-gate recurrences or 3 explicit overrides demote a gate; 3 consecutive successes heal it; 60 days without recurrence expires it.
+- **One store, 10 harnesses.** OpenCode, Claude Code, Codex CLI, Gemini CLI, Cursor, Copilot CLI, Crush, Devin CLI, Kiro, and Cline read and write the same gates.
 
 ## Examples
-### Example (replace with a real one)
+
+Install into specific harnesses and verify the hook wiring:
 
 ```bash
-npm start
+npx -y dejavu-gates install --harness claude,cursor --yes
+dejavu hooks --check
 ```
 
-## Who is it for
-
-<!-- TODO: who is this for? -->
-
-## Use cases
-
-<!-- TODO: 3-7 concrete use cases -->
-
-## Why choose this
-
-<!-- TODO: 2-4 differentiators, with numbers -->
-
-## Examples
-### Example (replace with a real one)
+Check gate health — doctor invariants over every discovered store, then per-gate recurrence verdicts:
 
 ```bash
-npm start
+dejavu report
+dejavu report --recurrence
 ```
 
-## Who is it for
-
-<!-- TODO: who is this for? -->
-
-## Use cases
-
-<!-- TODO: 3-7 concrete use cases -->
-
-## Why choose this
-
-<!-- TODO: 2-4 differentiators, with numbers -->
-
-## Examples
-### Example (replace with a real one)
+Replace a gate's machine-default correction with a human one (keys come from `lesson list`):
 
 ```bash
-npm start
-```
-
-## Who is it for
-
-<!-- TODO: who is this for? -->
-
-## Use cases
-
-<!-- TODO: 3-7 concrete use cases -->
-
-## Why choose this
-
-<!-- TODO: 2-4 differentiators, with numbers -->
-
-## Examples
-### Example (replace with a real one)
-
-```bash
-npm start
+dejavu lesson list
+dejavu lesson set <key> "run pnpm install before building"
 ```

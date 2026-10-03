@@ -4,18 +4,23 @@
 [![npm](https://img.shields.io/npm/v/opencode-cockpit?color=%23cb3837&label=opencode-cockpit)](https://www.npmjs.com/package/opencode-cockpit)
 [![npm](https://img.shields.io/npm/v/@opencode-cockpit/shell?color=%23cb3837&label=%40opencode-cockpit%2Fshell)](https://www.npmjs.com/package/@opencode-cockpit/shell)
 [![npm](https://img.shields.io/npm/v/@opencode-cockpit/status?color=%23cb3837&label=%40opencode-cockpit%2Fstatus)](https://www.npmjs.com/package/@opencode-cockpit/status)
+[![npm](https://img.shields.io/npm/v/@opencode-cockpit/review?color=%23cb3837&label=%40opencode-cockpit%2Freview)](https://www.npmjs.com/package/@opencode-cockpit/review)
+[![npm](https://img.shields.io/npm/v/@opencode-cockpit/updater?color=%23cb3837&label=%40opencode-cockpit%2Fupdater)](https://www.npmjs.com/package/@opencode-cockpit/updater)
+[![npm](https://img.shields.io/npm/v/@opencode-cockpit/subagents?color=%23cb3837&label=%40opencode-cockpit%2Fsubagents)](https://www.npmjs.com/package/@opencode-cockpit/subagents)
+[![npm](https://img.shields.io/npm/v/@opencode-cockpit/trust?color=%23cb3837&label=%40opencode-cockpit%2Ftrust)](https://www.npmjs.com/package/@opencode-cockpit/trust)
+[![Docs](https://img.shields.io/badge/docs-codestz.github.io-9d7cd8)](https://codestz.github.io/opencode-cockpit/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 **Give [OpenCode](https://opencode.ai) the instruments it does not ship with.**
 
-**[Documentation →](https://codestz.github.io/opencode-cockpit/)**  ·  [Install](https://codestz.github.io/opencode-cockpit/start/install/)  ·  [Shell](https://codestz.github.io/opencode-cockpit/shell/overview/)  ·  [Review](https://codestz.github.io/opencode-cockpit/review/overview/)  ·  [Statusline](https://codestz.github.io/opencode-cockpit/status/overview/)  ·  [Changelog](CHANGELOG.md)
+**[Documentation →](https://codestz.github.io/opencode-cockpit/)**  ·  [Install](https://codestz.github.io/opencode-cockpit/start/install/)  ·  [Shell](https://codestz.github.io/opencode-cockpit/shell/overview/)  ·  [Review](https://codestz.github.io/opencode-cockpit/review/overview/)  ·  [Statusline](https://codestz.github.io/opencode-cockpit/status/overview/)  ·  [Updater](https://codestz.github.io/opencode-cockpit/updater/overview/)  ·  [Subagents](https://codestz.github.io/opencode-cockpit/subagents/overview/)  ·  [Trust](https://codestz.github.io/opencode-cockpit/trust/overview/)  ·  [Changelog](CHANGELOG.md)
 
 A tool call has to finish. A dev server does not, and neither does the context window filling up
 behind you. Cockpit is the instrument panel: things your agent can use, and things that tell you
 what it is doing.
 
 ```sh
-opencode plugin opencode-cockpit@0.7.1 --global --force
+opencode plugin opencode-cockpit@0.8.0 --global --force
 ```
 
 ---
@@ -82,7 +87,7 @@ published, and updates the ones you pick. It pins an exact version through OpenC
 works whatever version you are stuck on, because it comes from npm rather than from the copy that
 cannot update itself.
 
-**Every plugin, not just this one · [`@opencode-cockpit/updater`](packages/updater)**
+**Every plugin, not just this one · [docs](https://codestz.github.io/opencode-cockpit/updater/overview/) · [`@opencode-cockpit/updater`](packages/updater)**
 
 ---
 
@@ -96,11 +101,35 @@ shell command and file change as a box with its output, and the answer as it is 
 Then it makes them reusable. Ask the main agent for a follow-up on a subagent's work and it continues
 *that* subagent — which already read the code — instead of starting a new one. Press `m` to message a
 subagent yourself: the main agent is told what it answered, without a turn being spent on it. `x`
-stops one (and tells the main agent why), `b` moves a blocking one to the background.
+stops one (and tells the main agent why), `b` moves a blocking one to the background. The main agent
+can read any of them in full with `subagents_read`, and wait on the ones in the background with
+`subagents_wait`.
 
 ![A subagent at work beside the conversation: its run in a pane, a question put to it from the pane, and the exchange added to the main conversation](media/subagents.gif)
 
-**Sidebar + pane · follow-ups keep context · OpenCode 1 and 2 · [docs](https://codestz.github.io/opencode-cockpit/subagents/overview/) · [`@opencode-cockpit/subagents`](packages/subagents)**
+**Sidebar + pane · 3 agent tools · follow-ups keep context · OpenCode 1 and 2 · [docs](https://codestz.github.io/opencode-cockpit/subagents/overview/) · [`@opencode-cockpit/subagents`](packages/subagents)**
+
+---
+
+### 🔐  Trust — permissions that learn
+
+`"bash": "ask"` means approving `git status` for the hundredth time; OpenCode's own "Always" means
+approving `docker compose -p prod down -v` because you once approved `docker compose -p cockpit up`.
+**Trust** sits between: approve the *exact same* command three times in a row and it answers for
+you — and records every answer, in the ledger and the log, and in the sidebar if you turn it on. A reject resets the count, `rm` and `git push` and
+`--force` cost eight approvals instead of three, and a rule you wrote to be asked (`"git push *":
+"ask"`) is never answered. `/trust` opens on what it did for you and what it is close to trusting;
+`l` opens the ledger, every rule as a tree of families (`git -C x status` is `git status`) with a
+card that says exactly what a rule answers, its history, and how to stop it. `w` trusts a whole
+family, but only when you press it.
+
+![Trust's activity screen: five prompts answered today with the reason for each, commands one approval away from being trusted with their meters, a dangerous one at 5 of 8, and a warning about OpenCode's own broad "always" approvals](media/trust-activity.png)
+
+![Trust's ledger: a tree of command families on the left, and a card for the selected command with exactly what it answers, what still asks, its approval history and the buttons to revoke it or trust its family](media/trust-ledger.png)
+
+*Drawn by `bunx @opencode-cockpit/trust preview` from a sample project, the same rows the dialog draws.*
+
+**Sidebar + ledger · exact commands, per agent · OpenCode 1 and 2 · [docs](https://codestz.github.io/opencode-cockpit/trust/overview/) · [`@opencode-cockpit/trust`](packages/trust)**
 
 ---
 
@@ -186,13 +215,13 @@ switches between the live screen and the scrollback, `?` shows details.
 **Everything**
 
 ```sh
-opencode plugin opencode-cockpit@0.7.1 --global --force
+opencode plugin opencode-cockpit@0.8.0 --global --force
 ```
 
 **Only what you want**
 
 ```sh
-opencode plugin @opencode-cockpit/shell@0.7.1 --global --force
+opencode plugin @opencode-cockpit/shell@0.8.0 --global --force
 ```
 
 The version is pinned on purpose. OpenCode resolves a plugin spec once and never again, so a
@@ -216,7 +245,7 @@ options as an object:
 
 ```json
 {
-  "plugins": [{ "package": "opencode-cockpit@0.7.1", "options": { "features": { "shell": true } } }]
+  "plugins": [{ "package": "opencode-cockpit@0.8.0", "options": { "features": { "shell": true } } }]
 }
 ```
 
@@ -249,7 +278,9 @@ files only.
 Later sources win key by key, and an invalid file is ignored rather than fatal. You can categorize
 your own commands, define watch rules, cap how long shells live, choose what may interrupt the
 agent, and trade context tokens for accuracy. Each feature's README documents its own settings:
-[Shell](packages/shell#configuration).
+[Shell](packages/shell#configuration), [Statusline](packages/status#configuration),
+[Updater](packages/updater#settings), [Subagents](packages/subagents#settings),
+[Trust](packages/trust#settings).
 
 ## Troubleshooting
 
@@ -296,8 +327,9 @@ Each shell's output feeds three views at once: a normalized **log** for the agen
 | [`@opencode-cockpit/shell`](packages/shell) | Bay 01 — background terminals | [README](packages/shell/README.md) · [docs](https://codestz.github.io/opencode-cockpit/shell/overview/) |
 | [`@opencode-cockpit/status`](packages/status) | Bay 02 — the statusline | [README](packages/status/README.md) · [docs](https://codestz.github.io/opencode-cockpit/status/overview/) |
 | [`@opencode-cockpit/review`](packages/review) | Bay 03 — a pull request in the terminal | [README](packages/review/README.md) · [docs](https://codestz.github.io/opencode-cockpit/review/overview/) |
-| [`@opencode-cockpit/updater`](packages/updater) | Bay 04 — every plugin, and an update checked against disk | [README](packages/updater/README.md) |
+| [`@opencode-cockpit/updater`](packages/updater) | Bay 04 — every plugin, and an update checked against disk | [README](packages/updater/README.md) · [docs](https://codestz.github.io/opencode-cockpit/updater/overview/) |
 | [`@opencode-cockpit/subagents`](packages/subagents) | Bay 05 — every subagent visible, reachable and reused | [README](packages/subagents/README.md) · [docs](https://codestz.github.io/opencode-cockpit/subagents/overview/) |
+| [`@opencode-cockpit/trust`](packages/trust) | Bay 06 — permissions that learn, visibly | [README](packages/trust/README.md) · [docs](https://codestz.github.io/opencode-cockpit/trust/overview/) |
 | [`@opencode-cockpit/daemon`](packages/daemon) | `cockpitd`, the shared process host | [README](packages/daemon/README.md) |
 | [`@opencode-cockpit/client`](packages/client) | Typed, auto-spawning client | [README](packages/client/README.md) |
 | [`@opencode-cockpit/protocol`](packages/protocol) | Wire contracts and schemas | [README](packages/protocol/README.md) |

@@ -2,7 +2,7 @@
 
 Plugin **exclusivo para usar [Claude Code](https://www.anthropic.com/claude-code) dentro de [OpenCode](https://opencode.ai)**. Es a la vez **provider de modelos** y **plugin**, y su backend es un **cliente ACP** ([Agent Client Protocol](https://agentclientprotocol.com)) que habla con `claude-agent-acp`. Claude Code aparece como un modelo más en OpenCode, ejecutándose con **tu suscripción de Claude**, y **OpenCode queda como orquestador**: el agente solo razona y **OpenCode ejecuta las herramientas** con sus permisos y su TUI.
 
-> Un único paquete npm que se registra a la vez como **provider** (`createACPModelProvider`) y como **plugin** (`default { id, server }`) de OpenCode.
+> Un único paquete npm que se registra a la vez como **provider** (`createACPModelProvider`) y como **plugin** (`default Plugin.define({ id, setup })`, API V2) de OpenCode.
 
 **Atajos:** [Inicio rápido](#configuración-en-opencode) · [Agentes](#agentes-claude-code-modos-esfuerzo-subagentes) · [Facturación](#system-prompt-y-facturación-suscripción-vs-extra-usage) · [Diagnóstico](#diagnóstico) · [Ejemplos de config](examples/) · [Desarrollo](docs/DEVELOPMENT.md) · [Cambios](CHANGELOG.md)
 
@@ -34,8 +34,8 @@ Puntos clave:
 
 | Requisito | Notas |
 |---|---|
-| **OpenCode** | Probado con v1.17.9. |
-| **El agente ACP** | `@zed-industries/claude-agent-acp` (binario `claude-agent-acp`) en el `PATH`. También sirve `claude-code-acp`. |
+| **OpenCode** | V2 (`>= 2.0.14`). **0.9.x solo para OpenCode V2 — en V1 usa 0.8.x.** API de plugins `Plugin.define`, `plugins[]` en config, hooks `provider.transform`/`agent.transform`/`session.hook("context")`. |
+| **El agente ACP** | `@agentclientprotocol/claude-agent-acp` (binario `claude-agent-acp`) en el `PATH`. También sirve `claude-code-acp` / `@zed-industries/claude-agent-acp`. |
 | **Claude Code CLI** | El binario `claude` instalado y **autenticado** (`claude` lee `~/.claude/.credentials.json`). El provider lo detecta con `command -v claude`. |
 | **Node** | El runtime del MCP server interno se ejecuta con `node` (debe estar en el `PATH`). |
 
@@ -45,33 +45,35 @@ Puntos clave:
 
 ```bash
 # 1. El agente ACP (una vez)
-npm i -g @zed-industries/claude-agent-acp
+npm i -g @agentclientprotocol/claude-agent-acp
 # y autentica Claude Code si no lo está:
 claude   # (login interactivo)
 
 # 2. Este provider
 npm i opencode-claude-code-acpbridge
-#   o, en desarrollo, apúntalo por ruta:  "npm": "file:///ruta/a/opencode-claude-code-acpbridge"
+#   o, en desarrollo, apúntalo por ruta (ver nota abajo)
 ```
 
 ---
 
 ## Configuración en OpenCode
 
-La config de proyecto de OpenCode va en **`<proyecto>/.opencode/opencode.json`** (no en la raíz). En rutas fuera de tu `$HOME` (p. ej. `/tmp`), apúntala con `OPENCODE_CONFIG=/ruta/opencode.json`.
+La config de proyecto de OpenCode V2 va en **`<proyecto>/.opencode/opencode.json`** (V2 la descubre solo, subiendo desde el directorio de trabajo; también acepta `opencode.jsonc` en la raíz del proyecto y `.claude`/`.agents`).
 
 ### Recomendado: auto-registro (config mínima)
 
-Lista **solo el plugin** con las opciones del agente. Al iniciar, el plugin **descubre los modelos del agente** (con una conexión ACP efímera), rellena su metadata (coste, límites, modalidades) desde [models.dev](https://models.dev) e **inyecta el provider `acp` en runtime**:
+Lista **solo el plugin** con las opciones del agente. Al iniciar, el plugin **descubre los modelos del agente** (con una conexión ACP efímera), rellena su metadata (coste, límites, modalidades) desde [models.dev](https://models.dev) e **inyecta el provider `acp` en runtime** (`provider.transform`):
 
 ```jsonc
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugin": [
-    ["opencode-claude-code-acpbridge", { "command": "claude-agent-acp" }]
+  "plugins": [
+    { "package": "opencode-claude-code-acpbridge", "options": { "command": "claude-agent-acp" } }
   ]
 }
 ```
+
+> **Desarrollo local**: si `package` es una **ruta a un directorio** (repo clonado), OpenCode resuelve el entrypoint como `<dir>/index.*` — por eso la raíz del repo tiene un `index.js` que re-exporta `dist/` (compila antes con `npm run build`). Un destino de fichero (`…/dist/index.js`) está **rechazado** por V2 (solo admite directorios para plugins configurados).
 
 Con eso aparecen `acp/sonnet`, `acp/haiku`, etc. en el selector, ya poblados con contexto/coste/modalidades. **Tú mantienes el control total del agente** mediante esas mismas opciones del plugin (la tabla de abajo: `args`, `cwd`, `env`, `claudeExecutable`, `streamCloseTimeoutMs`, `claudeCode`…). El plugin solo auto-genera la **lista de modelos y su metadata**; no impone nada más.
 
@@ -82,11 +84,12 @@ Con eso aparecen `acp/sonnet`, `acp/haiku`, etc. en el selector, ya poblados con
 
 ### Manual (avanzado / override)
 
-Para fijarlo todo a mano, declara el provider tú mismo (el plugin no lo sobreescribe):
+Sin `command` (ni `ACP_COMMAND`) el plugin **no auto-registra** nada: queda para cuando quieras declarar el provider tú mismo con la config `provider` de V2 (el plugin no lo toca):
 
 ```jsonc
 {
   "$schema": "https://opencode.ai/config.json",
+  "plugins": [{ "package": "opencode-claude-code-acpbridge" }],
   "provider": {
     "acp": {
       "npm": "opencode-claude-code-acpbridge",
@@ -94,28 +97,41 @@ Para fijarlo todo a mano, declara el provider tú mismo (el plugin no lo sobrees
       "options": { "command": "claude-agent-acp" },
       "models": { "sonnet": { "id": "sonnet", "tool_call": true, "reasoning": true } }
     }
-  },
-  "plugin": ["opencode-claude-code-acpbridge"]
+  }
 }
 ```
 
-En desarrollo, apunta por ruta: `["file:///ruta/a/opencode-claude-code-acpbridge", { … }]` en `plugin` (y `"npm": "file:///ruta/a/opencode-claude-code-acpbridge"` si declaras el provider a mano).
+En desarrollo, apunta por ruta de directorio: `"package": "/ruta/a/acp-model-provider"` en `plugins` (ver nota arriba sobre `index.js`).
 
-Si das permiso a las tools (p. ej. `"permission": { "read": "allow" }`), el agente podrá usarlas a través de OpenCode.
+En V2 los permisos de tool son un **ruleset** por agente (`agents.<n>.permissions`, por eso los agentes inyectados llevan `question: allow`); p. ej. `"permissions": [{ "action": "edit", "resource": "*", "effect": "allow" }]`.
 
 ### Cambiar el `providerID` (p. ej. para opencode-quota)
 
 Por defecto el provider se registra como **`acp`**. Si necesitas otro ID —típicamente **`anthropic`** para que [opencode-quota](https://www.npmjs.com/package/@slkiser/opencode-quota) detecte y muestre la cuota de tu **suscripción**— pásalo en las opciones del **plugin** (no declares un provider a mano, así evitas un doble backend):
 
 ```jsonc
-"plugin": [
-  ["opencode-claude-code-acpbridge", { "command": "claude-agent-acp", "providerId": "anthropic" }]
+"plugins": [
+  { "package": "opencode-claude-code-acpbridge",
+    "options": { "command": "claude-agent-acp", "providerId": "anthropic" } }
 ]
 ```
 
 Así el **auto-registro, el resume, el puente de permisos y los agentes** (`claude-code` → `anthropic/default`) usan ese ID de forma **coherente y con un solo backend**.
 
 > ⚠️ Usar `"anthropic"` **sobrescribe el provider oficial de Anthropic** de OpenCode. Es seguro **si no usas la API directa de Anthropic** (consumes de la suscripción vía ACP). A vigilar: OpenCode puede listar modelos "fantasma" de models.dev en el selector (usa solo `anthropic/default` y `anthropic/sonnet`); si algún día quieres la API directa, quita el `providerId`.
+
+### De 0.8.x (V1) a 0.9.x (V2)
+
+1. **Config del plugin**: `"plugin": [[pkg, {opts}]]` → `"plugins": [{ "package": pkg, "options": {…} }]`. Si declarabas `provider.acp` a mano, quítalo: el plugin lo auto-registra en runtime.
+2. **Agentes**: la sección `agent:` pasa a `agents:`; `permission` (mapa) → `permissions` (ruleset: `[{ "action": "Bash", "resource": "git *", "effect": "allow" }]`); `disable` → `disabled`.
+3. **Variantes**: `acp/opus:low` → `acp/opus#low` (sintaxis V2 `provider/model#variant`).
+4. **Options por agente** (mode/effort/native*): de `agent.<n>.options` → `plugins[0].options.agents.<n>.options`.
+5. **Quita `claude_permission`**: esa meta-tool ya no existe; el puente de permisos emite tool-calls de la tool `question` de OpenCode. Si tenías reglas `permission` para el puente, trasládalas a `agents.<n>.permissions` (el puente las evalúa fail-closed).
+6. **`package` = directorio con build** en desarrollo: apunta a la ruta del repo (con `index.js` raíz que re-exporta `dist/`), no a un fichero — V2 rechaza ficheros. Compila con `npm run build`.
+7. **CLI**: `opencode run` sin `-m` ignora `agent.model`; usa `opencode run -m acp/…`.
+8. **Requisitos**: OpenCode `>= 2.0.14` y agente `@agentclientprotocol/claude-agent-acp`.
+
+Detalle completo en [CHANGELOG 0.9.0](CHANGELOG.md#090--opencode-v2-2026-10-01) y plan del port en [MIGRATION_V2.md](MIGRATION_V2.md).
 
 ---
 
@@ -148,7 +164,7 @@ reanudables. Puedes ajustarlo:
 | `maxThinkingTokens` | `number` | — | (Deprecado; usa `thinking`.) |
 | `maxTurns` | `number` | — | Máximo de turnos del agente. |
 | `maxBudgetUsd` | `number` | — | Tope de gasto por turno. |
-| `mode` | `"default"\|"plan"\|"acceptEdits"\|"bypassPermissions"\|…` | — | **Modo de sesión ACP**, aplicado en caliente con `setSessionMode`. P. ej. `"plan"` (planifica) o `"bypassPermissions"` (deja que OpenCode sea la única autoridad de permisos). Configurable por agente vía `providerOptions.acp.mode`. |
+| `mode` | `"default"\|"plan"\|"acceptEdits"\|"bypassPermissions"\|…` | — | **Modo de sesión ACP**, aplicado en caliente con `setSessionMode`. P. ej. `"plan"` (planifica) o `"bypassPermissions"` (deja que OpenCode sea la única autoridad de permisos). Configurable por agente vía `plugins[0].options.agents.<n>.options.mode`. |
 | `permissionMode` | `"default"\|"acceptEdits"\|…` | resuelto por el agente | (Heredado; el ACP lo ignora para el modo de sesión — usa `mode`.) |
 | `systemPromptMode` | `"preset"\|"append"\|"replace"` | **`"preset"`** | Cómo se traslada el system prompt de OpenCode (ver "System prompt y facturación"). **`preset` (default) = consume de tu suscripción; `append`/`replace` = extra usage.** |
 | `configDir` | `string \| "isolated" \| false` | **`false`** | `false` (default): hereda tu `~/.claude`, así las sesiones iniciadas en OpenCode **se retoman con `claude --resume <id>`** (ver "Retomar la sesión en Claude Code"). No reintroduce tu ecosistema: eso lo siguen mandando `settingSources`/`tools`/`strictMcpConfig`. `"isolated"`: dir limpio con tus credenciales enlazadas (sesiones invisibles para `claude --resume`). Ruta: úsala tal cual como `CLAUDE_CONFIG_DIR`. |
@@ -173,7 +189,9 @@ reanudables. Puedes ajustarlo:
 
 Con el auto-registro **no necesitas declarar modelos**: el plugin publica los que descubre del agente — **`acp/default`** (= Opus 4.7, 1M ctx), **`acp/sonnet`**, **`acp/sonnet[1m]`**, **`acp/haiku`** — y los eliges en el selector de modelos de OpenCode. El `id` del modelo es el que se pasa al agente (vía `ANTHROPIC_MODEL`).
 
-También puedes fijarlo en el provider o por agente: `"options": { "claudeCode": { "model": "sonnet" } }`, o `agent.<nombre>.model: "acp/sonnet"`.
+También puedes fijarlo en el provider o por agente: `"options": { "claudeCode": { "model": "sonnet" } }`, o en tu config `"agents": { "claude-code": { "model": "acp/sonnet" } }`.
+
+> ⚠️ **`opencode run` sin `-m` ignora `agent.model`** (comportamiento del CLI V2: usa el model global de config). En CLI usa `-m acp/…`; en la TUI, el selector de agentes/modelos sí aplica el modelo declarado por agente.
 
 Valores: aliases (`sonnet`, `haiku`, `opus`, `default`), variantes (`sonnet[1m]` = contexto 1M) o IDs completos (`claude-sonnet-4-6`).
 
@@ -183,7 +201,7 @@ Valores: aliases (`sonnet`, `haiku`, `opus`, `default`), variantes (`sonnet[1m]`
 >
 > **Modelos (jun-2026, cuenta Max)**: `sonnet` (claude-sonnet-4-6), `sonnet[1m]` (1M ctx, *extra usage*), `haiku` (claude-haiku-4-5), `opus` (claude-opus-4-7) y `default` (= **Opus 4.7**, 1M ctx, "más capaz") **responden**. `fable` salió de la suscripción el 22-jun-2026 (pasa a *usage credits*); `mythos` solo está en "Project Glasswing" → ambos dan `issue with the selected model`. El descubrimiento solo **lista** `default/sonnet/sonnet[1m]/haiku`, pero `opus` también funciona vía `ANTHROPIC_MODEL`.
 
-El **esfuerzo (effort)** se expone como **variantes del modelo** (`acp/opus:low` … `:max`): elígelas en el selector de la TUI o fíjalas por agente con `variant`. También por-llamada vía `providerOptions.acp.effort`, o fijo en el provider:
+El **esfuerzo (effort)** se expone como **variantes del modelo** (`acp/opus#low` … `#max`, sintaxis V2 `provider/model#variant`): elígelas en el selector de la TUI o fíjalas por agente con `variant`. También por agente vía `plugins[0].options.agents.<n>.options.effort`, o fijo en el provider:
 
 ```jsonc
 "options": { "claudeCode": { "model": "sonnet", "effort": "xhigh",
@@ -217,29 +235,36 @@ En ACP "puro" el cliente **no** controla el system prompt del agente. `claude-ag
 
 Al auto-registrarse, el plugin **inyecta dos agentes** en OpenCode (selector de agentes), igual que otros plugins inyectan los suyos:
 
-- **`claude-code`** — Claude Code nativo (modelo `acp/default` = Opus 4.7), modo ACP **`bypassPermissions`** para que **OpenCode sea la única autoridad de permisos** (no añade sus propios prompts; ejecuta las tools con tu TUI/permisos).
+- **`claude-code`** — Claude Code nativo (modelo `acp/default`), modo ACP **`default`**: cada tool nativa pasa por el puente de permisos y **OpenCode es la única autoridad** (no añade prompts propios; ejecuta las tools con tu TUI/permisos).
 - **`claude-code-plan`** — modo **`plan`**: el agente **planifica** (investiga, lee, redacta el plan) sin hacer cambios destructivos. Variante de esfuerzo `high`.
 
 Cámbialos o desactívalos desde las opciones del plugin:
 
 ```jsonc
-"plugin": [["opencode-claude-code-acpbridge", { "command": "claude-agent-acp",
-  "agents": {                         // o "agents": false para no inyectar ninguno
-    "claude-code":      { "model": "default", "options": { "mode": "bypassPermissions" } },
-    "claude-code-plan": { "model": "default", "variant": "high", "options": { "mode": "plan" } }
+"plugins": [{ "package": "opencode-claude-code-acpbridge",
+  "options": { "command": "claude-agent-acp",
+    "agents": {                       // o "agents": false para no inyectar ninguno
+      "claude-code":      { "model": "default", "options": { "mode": "default" } },
+      "claude-code-plan": { "model": "default", "variant": "high", "options": { "mode": "plan" } }
+    }
   }
-}]]
+}]
 ```
 
-Cada agente lleva `options` (modo ACP, esfuerzo…) que viajan al provider como `providerOptions.acp` y se aplican **en caliente** (`setSessionMode` / `setSessionConfigOption`), sin recrear la sesión.
+Cada agente lleva `options` (modo ACP, esfuerzo…) que el `context` hook del plugin inyecta **por llamada** como `providerOptions.<providerID>` y se aplican **en caliente** (`setSessionMode` / `setSessionConfigOption`), sin recrear la sesión.
 
-> **Tu `opencode.json` manda.** Si declaras el agente en la sección `agent` de tu `opencode.json`, **tus ajustes ganan** sobre los del plugin (merge profundo): declara solo lo que quieras cambiar y hereda el resto. Ideal para **filtrar herramientas por `permission`** sin tocar el plugin:
+> **Tu `opencode.json` manda.** En V2 los agentes viven en la sección `agents` de tu config: tus campos ganan sobre los del plugin (description/model solo se rellenan si no los declaras; options hacen merge profundo). Ideal para **filtrar tools por `permissions`** (ruleset) sin tocar el plugin:
 > ```jsonc
-> "agent": {
->   "claude-code": { "permission": { "edit": "deny", "bash": "ask" } }  // hereda model/mode/options del plugin
+> "agents": {
+>   "claude-code": {
+>     "permissions": [
+>       { "action": "edit", "resource": "*", "effect": "deny" },
+>       { "action": "bash", "resource": "*", "effect": "ask" }
+>     ]   // hereda model y options del plugin
+>   }
 > }
 > ```
-> También `"disable": true` para apagar un agente inyectado.
+> También `"disabled": true` para apagar un agente inyectado.
 
 - **Modos**: como OpenCode ejecuta las tools con sus permisos, los modos de permiso de Claude Code no cambian *quién* autoriza; `bypassPermissions` solo evita el round-trip de `requestPermission`. El útil con efecto propio es **`plan`**. Evita `dontAsk` (puede bloquear tools).
 - **Subagentes**: con "OpenCode orquesta" (`tools: []`) los subagentes nativos de Claude Code están deshabilitados; el agente usa la tool `task` de **OpenCode** → los subagentes son los de OpenCode.
@@ -253,8 +278,8 @@ El agente `claude-code` combina **lo mejor de ambos mundos** — *potencia nativ
 
 - **Tools comunes → OpenCode las orquesta.** El provider captura todas las que OpenCode expone (nativas `read`/`write`/`bash`/`edit`/`grep`/… + las de tus MCP servers) y el agente las usa vía MCP: se ejecutan en OpenCode con sus permisos, su TUI y su registro (hindsight las ve). Van en `allowedTools: ["mcp__opencode"]` para que **no pidan doble permiso**.
 - **Capacidades nativas superiores de Claude Code** que OpenCode no replica, activas por defecto: **skills** (`Skill`), **subagentes** (`Task`, que delegan la ejecución a OpenCode), **búsqueda de recursos MCP** (`ListMcpResources`/`ReadMcpResource`) y tools de nicho (`NotebookEdit`). Más la **memoria del proyecto** (`CLAUDE.md`/`AGENTS.md`), que convive con hindsight.
-- **Puente de permisos.** Cuando el agente (o un subagente) quiere usar una tool **nativa**, Claude Code pide permiso vía ACP (`requestPermission`); el provider lo **camufla como un tool-call de `claude_permission`** (meta-tool que el plugin registra en OpenCode), así **OpenCode muestra su prompt `ask`** con qué quiere hacer Claude y **tu veredicto** (aprobar/rechazar) vuelve al agente. El agente tiene toda su potencia nativa, pero **tú controlas cada acción** desde OpenCode.
-  - Granularidad por tool: `permission: { claude_permission: { "Read*": "allow", "*": "ask" } }`.
+- **Puente de permisos.** Cuando el agente (o un subagente) quiere usar una tool **nativa**, Claude Code pide permiso vía ACP (`requestPermission`); el provider lo **camufla como un tool-call de la tool `question` nativa de OpenCode**, así **el diálogo aparece en tu TUI** (`Allow once` / `Always allow` / `Deny`) y **tu veredicto** vuelve al agente. Las reglas (`allow`/`deny`) se evalúan antes y resuelven sin diálogo — guardadas con `Always allow` en `~/.acp-model-provider/always.json`. El agente tiene toda su potencia nativa, pero **tú controlas cada acción** desde OpenCode.
+  - Las reglas por agente salen de tus `agents.<n>.permissions` (el plugin las publica para el puente, ignorando `action: "*"`; cualquier cosa no cubierta → diálogo, fail-closed).
   - Requiere que el agente NO esté en `bypassPermissions` → el agente `claude-code` usa `mode: "default"`.
 - **Facturación**: todos estos features mantienen tu **suscripción** (verificado con `scripts/verify-billing.mjs`, 0 extra usage) — son nativos de Claude Code.
 - Para el modelo **clásico "cerebro limpio"** (sin nativas, OpenCode ejecuta todo) usa `mode: "bypassPermissions"` + sin toggles, o el provider manual con `claudeCode.tools: []`.
@@ -323,7 +348,7 @@ Activa logs con `ACP_DEBUG=1` (verás `[acp-orchestrator]` y `[acp-mcp-host]` en
 
 | Síntoma | Causa / solución |
 |---|---|
-| `Model not found: acp/…` | OpenCode no cargó tu config o el auto-registro falló. La config debe estar en `<proyecto>/.opencode/opencode.json`; en rutas donde OpenCode no detecta el proyecto (p. ej. `/tmp`), exporta `OPENCODE_CONFIG=<ruta-a-opencode.json>`. Con `ACP_DEBUG=1` busca `[acp-plugin] auto-registered…` en el arranque. |
+| `Model not found: acp/…` | OpenCode no cargó tu config o el auto-registro falló. La config debe estar en `<proyecto>/.opencode/opencode.json`; verifica las fuentes con `opencode debug config` (debe listar tu documento con `plugins`). Con `ACP_DEBUG=1` busca `[acp-plugin] auto-registered…` en el arranque. Si el plugin es un directorio local y no hay línea `loading plugin`, falta el `index.js` raíz (compila con `npm run build`). |
 | El auto-registro no añade modelos | Ejecuta `npx opencode-claude-code-acpbridge sync <command>` para ver qué descubre y forzar refresh del caché. Si el agente no halla el binario nativo de Claude, fija `claudeExecutable`. |
 | `API Error: 400 … extra usage` | El **system prompt** disparó el clasificador de Anthropic (lo trata como app de terceros). Usa `systemPromptMode: "preset"` (default) o el **agente `claude-code`** → consume de tu suscripción. Suele pasar con `append`/`replace`, o al usar un agente con system agresivo de otro plugin (p. ej. oh-my-opencode). Ver [System prompt y facturación](#system-prompt-y-facturación-suscripción-vs-extra-usage). |
 | `Authentication required` | El `CLAUDE_CONFIG_DIR` aislado no tiene credenciales. El provider enlaza `~/.claude/.credentials.json` automáticamente; asegúrate de que `claude` esté autenticado. |
@@ -334,7 +359,7 @@ Activa logs con `ACP_DEBUG=1` (verás `[acp-orchestrator]` y `[acp-mcp-host]` en
 | No se ve el bloque de razonamiento | Comprueba que `thinking` no esté en `display:"omitted"`/`disabled` y que no aparezca `aviso: no se pudo aplicar effort=…` en stderr. |
 | El agente no pregunta, asume | Debe usar `mcp__opencode__question`. Esa tool solo la registra OpenCode en TUI (`client: "cli"`) o con `enableQuestionTool`. |
 | El agente no busca en la web | OpenCode solo registra su `websearch` con `providerId: "opencode"` o con exa/parallel activos. El perfil por defecto ya incluye la `WebSearch` **nativa** para cubrirlo. |
-| Lento con muchas tools | Con cientos de tools el agente tarda ~1 min por paso. Reduce las tools expuestas con el `permission` del agente en tu `opencode.json`. |
+| Lento con muchas tools | Con cientos de tools el agente tarda ~1 min por paso. Reduce las tools expuestas con el ruleset `permissions` del agente en tu config. |
 
 Comando de mantenimiento:
 
@@ -348,7 +373,7 @@ npx opencode-claude-code-acpbridge sync claude-agent-acp
 ## Estado y limitaciones
 
 - ✅ Chat con streaming y **bloque de razonamiento** visible en OpenCode (`Thought: …`, vía `thinking` summarized por defecto).
-- ✅ **Capacidades nativas + puente de permisos**: el agente `claude-code` usa skills, subagentes (`Task`), búsqueda de recursos MCP y `NotebookEdit` nativos, con memoria de proyecto (`CLAUDE.md`); cada acción nativa pide permiso vía el **`ask` de OpenCode** (meta-tool `claude_permission`). Las tools comunes las orquesta OpenCode (`allowedTools: ["mcp__opencode"]`, sin doble permiso). Todo en **suscripción** (verificado). Ver [Manejo de las herramientas y puente de permisos](#manejo-de-las-herramientas-y-puente-de-permisos).
+- ✅ **Capacidades nativas + puente de permisos**: el agente `claude-code` usa skills, subagentes (`Task`), búsqueda de recursos MCP y `NotebookEdit` nativos, con memoria de proyecto (`CLAUDE.md`); cada acción nativa pide permiso vía el diálogo **`question` de OpenCode** en la TUI (reglas `allow`/`deny` resuelven sin diálogo; `Always allow` persiste en `always.json`). Las tools comunes las orquesta OpenCode (`allowedTools: ["mcp__opencode"]`, sin doble permiso). Todo en **suscripción** (verificado). Ver [Manejo de las herramientas y puente de permisos](#manejo-de-las-herramientas-y-puente-de-permisos).
 - ✅ **Cerebro limpio** disponible (modo clásico): sin tools nativas ni connectors de claude.ai (`strictMcpConfig`); el agente solo usa las tools de OpenCode (`mode: "bypassPermissions"`).
 - ✅ Auto-registro: el plugin descubre los modelos del agente e inyecta el provider con metadata de models.dev (config mínima); refrescable con `npx opencode-claude-code-acpbridge sync`.
 - ✅ Sesión persistente por conversación (prompt cache) y **reanudación entre procesos** (`sessions.json` + `resumeSession` → no reenvía el historial al reabrir una sesión).
@@ -366,25 +391,30 @@ npx opencode-claude-code-acpbridge sync claude-agent-acp
 Arquitectura interna, flujos (tools diferidas, sesiones/resume, billing) y cómo extender: **[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)**. Ejemplos de `opencode.json` por caso de uso: **[examples/](examples/)**.
 
 ```
+index.js                # entrypoint de directorio local: re-exporta dist/ (Host.resolve busca <dir>/index.*)
 src/
-  index.ts              # re-exports: createACPModelProvider (provider) + default { id, server } (plugin)
+  index.ts              # re-exports: createACPModelProvider (provider) + default Plugin.define({ id, setup })
   provider/
     factory.ts          # createACPModelProvider (orquestador) + createACPProviderFromEnv (upstream sin orquestación)
-    model.ts            # ACPOrchestratorModel (LanguageModelV3): turnos, sesión persistente/resume, providerOptions, usage
+    model.ts            # ACPOrchestratorModel (LanguageModelV3): turnos, sesión persistente/resume, providerOptions, usage, puente question
     env.ts              # config por variables de entorno
   acp/
     mcp-host.ts         # MCP server sintético (TCP): expone las tools de OpenCode y DIFIERE cada tools/call
     mcp-runtime.ts      # runtime stdio que el agente spawnea (MCP a mano, sin deps) → TCP al host
     claude-config.ts    # "cerebro limpio" + CLAUDE_CONFIG_DIR aislado con credenciales; modo/effort/systemPrompt
   plugin/
-    index.ts            # hooks config (auto-registro provider + agentes) y chat.params (sessionID); deepMerge
+    index.ts            # Plugin.define setup: provider.transform (registro acp), agent.transform (claude-code + reglas),
+                        #   session.hook("context") (ocSession/ocAgent/resume*), event: session.revert.* → clearLink
+    bridge-rules.ts     # store de reglas por agente + always.json; evaluate() fail-closed (ignora action:"*")
     discover.ts         # conexión ACP efímera → modelos/modos/capabilities
-    catalog.ts          # metadata de models.dev + variants de effort
+    catalog.ts          # metadata de models.dev + variants de effort + buildModelsInfo (→ Model.Info[])
     cache.ts · sessions.ts   # cachés TTL / registro de sesiones OpenCode↔ACP
   bin/cli.ts            # `opencode-claude-code-acpbridge sync`
 ```
 
 Build: `npm run build` (genera `dist/`). El paquete exporta también `createACPProviderFromEnv` (provider upstream `@mcpc-tech/acp-ai-provider`, sin orquestación de tools) por si quieres el modo chat simple.
+
+**Smoke test V2**: proyecto de prueba con `.opencode/opencode.json` registrando el plugin por ruta de directorio, y `opencode --standalone run --agent claude-code -m acp/default "…"` (ver [docs/DEVELOPMENT.md §5](docs/DEVELOPMENT.md)). El diálogo `question` del puente requiere TUI interactiva.
 
 ## Licencia
 

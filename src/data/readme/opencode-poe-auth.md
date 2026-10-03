@@ -162,6 +162,8 @@ poe-code models --search claude
 
 ## SDK
 
+Safe Bash supports noncapturing SDK execution with `captureOutput: false` and streams CLI output without retaining a full result. It also provides [Graphviz rendering](packages/safe-bash-command-dot/README.md) through `poe-code/safe-bash/graphviz`, [local audio/video inspection and WAV editing](packages/safe-bash-command-audio/README.md) through `poe-code/safe-bash/commands/audio`, [recursive file search with `rgrep`](packages/safe-bash-command-rgrep/README.md), and [structural code search and rewrites with `ast-grep` / `sg`](packages/safe-bash-command-ast-grep/README.md).
+
 Use `poe-code` programmatically in your own code:
 
 ```typescript
@@ -192,7 +194,10 @@ console.log(result.stdout);
 Agent spawn activity timeouts and parallel concurrency limits are optional; set `activityTimeoutMs` or `maxConcurrent` explicitly when needed. Autonomous spawn retries have no ceiling unless `maxTimeoutRetries` is supplied.
 
 For plugin-first agent composition, import the public agent builder from the
-`poe-code/agent` subpath:
+`poe-code/agent` subpath. In Cloudflare Workers, pass `agent({ fs, cwd, homeDir })`
+with a SafeFS provider and configure an explicit API key or model. The agent and
+`poe-code/memory` exports support Workers without `nodejs_compat`; host subprocesses
+require an injected runner where supported:
 
 ```typescript
 import { agent, openaiResponsesPlugin, systemPromptPlugin } from "poe-code/agent";
@@ -260,7 +265,7 @@ Uses `POE_API_KEY` or the stored credential and honors `POE_BASE_URL`. Throws an
 
 These features are available but subject to breaking changes.
 
-- **[SafeJS](packages/safe-js/README.md)** — A JavaScript interpreter with explicit host capabilities, portable browser/Worker root exports, a `/workerd` entry, workerd-aware `poe-code/safe-js` and `poe-code/safe-fs` imports, filesystem adapters, configurable unlimited resource budgets, and resumable checkpoints.
+- **[SafeJS](packages/safe-js/README.md)** — A JavaScript interpreter with explicit host capabilities, portable browser/Worker root exports, a `/workerd` entry, workerd-aware `poe-code/safe-js` and `poe-code/safe-fs` imports, filesystem adapters, explicit Worker host-context capture, configurable unlimited resource budgets, and resumable checkpoints.
 - **[Pipeline](packages/pipeline/)** — Run task plans with configurable steps, live task progress, queued follow-up messages, and plans you can add while the TUI is running.
 - **[Ralph](packages/ralph/)** — Agentic build loop that iterates on a markdown doc
 - **[Experiment loop](packages/experiment-loop/)** — Karpathy-style optimize loop: agent changes code, eval script scores it, keep or discard via git, repeat.

@@ -48,7 +48,7 @@ the host and configuration.
 ### Requirements
 
 - [Bun](https://bun.sh) ≥ 1.3.0 (CI runs 1.3.0 and 1.3.5)
-- [OpenCode](https://opencode.ai) V1 `>=1.18.29 <2` (**tested with 1.18.32**), or V2 `>=2.0.3 <3` (**tested with 2.0.18**)
+- [OpenCode](https://opencode.ai) V1 `>=1.18.29 <2` (**tested with 1.18.34**), or V2 `>=2.0.3 <3` (**tested with 2.0.21**)
 - `git` on `PATH` (only used for read-only Git-state enrichment; missing git
   degrades gracefully)
 - A model provider configured in OpenCode, exposing a model that follows JSON
@@ -334,7 +334,7 @@ Every option is optional. Numeric/string options are clamped to safe bounds.
 | `maxIntentChars`               | `8000`                                                    | `1000`–`50000`                      | User-intent history budget                                                                    |
 | `transcriptMessages`           | `12`                                                      | `1`–`100`                           | Recent messages shown to the reviewer                                                         |
 | `intentMessages`               | `8`                                                       | `1`–`50`                            | Genuine user intents kept                                                                     |
-| `historyMessages`              | `200`                                                     | `20`–`500`                          | Messages fetched to recover intent                                                            |
+| `historyMessages`              | `200`                                                     | `20`–`500`                          | Operational messages fetched; literal user intent is recovered separately                     |
 | `retainReviewSessions`         | `false`                                                   | boolean                             | Keep reviewer child sessions (debug only; see below)                                          |
 | `audit`                        | `true`                                                    | boolean                             | Append one JSONL audit record per review                                                      |
 | `auditPath`                    | `~/.local/share/opencode/permission-reviewer-audit.jsonl` | path                                | Audit file location                                                                           |
@@ -350,20 +350,28 @@ Every option is optional. Numeric/string options are clamped to safe bounds.
 | `policyRules`                  | `[]`                                                      | array                               | Declarative rules (most-restrictive wins); project rules combine with trusted ones            |
 | `askDecisions`                 | `true`                                                    | boolean                             | Show the reviewer what the user answered in agent ask dialogs (scoped authorization evidence) |
 
-Config is layered: built-in defaults ← global
-`~/.config/opencode/permission-reviewer.jsonc` ← project
-`.opencode/permission-reviewer.jsonc` ← inline plugin options (later wins).
+Config is layered: built-in defaults ← trusted global
+`~/.config/opencode/permission-reviewer.jsonc` ← untrusted project
+`.opencode/permission-reviewer.jsonc` ← unknown-origin inline plugin options.
 The project layer crosses a trust boundary: it can only **tighten**
 security-sensitive fields, and its hardening survives even when a trusted layer
 set the same field. The project layer cannot choose the reviewer `model`,
-`escalationReviewer`, or replace the `policy` text (these decide where
-code/context travels and what the
-reviewer enforces), cannot redirect `auditPath`, grant `actorProfiles`, set
+`escalationReviewer`, `variant`, `outputFormat`, or replace the `policy` text
+(these decide where code/context travels and how the
+reviewer enforces and reports), cannot redirect `auditPath`, flip
+`retainReviewSessions`, `askDecisions`, or `debug`, grant `actorProfiles`, set
 `repositoryTrust: "trusted"`, downgrade a global `enforcementMode: "enforce"`,
 or relax a trusted `escalationMode: "deny"` / failure-mode deny knob /
 `confidenceThreshold` / `systemOneConfidenceThreshold` /
-`systemOneReasoningThreshold` / `riskPolicy`. Project values of the wrong type
-(including `null`) are ignored, never normalized back to defaults.
+`systemOneReasoningThreshold` / `riskPolicy`. Reviewer resource knobs
+(`timeoutMs`, `reviewBudgetMs`, and the context budgets `maxContextChars`,
+`maxEnrichmentChars`, `transcriptMessages`, `historyMessages`,
+`maxSessionDepth`, and siblings) cannot be set by the project layer at all:
+they decide how long a review runs and how much conversation reaches the
+provider, which is not a monotonic security trade, so only global
+configuration may move them in either direction. Project and inline
+values of the wrong type (including `null`) are ignored, never normalized
+back to defaults.
 
 A config file that exists but cannot be honored fails CLOSED on the trusted
 side: a malformed or unreadable **global** config, or trusted `policyRules`
@@ -410,7 +418,9 @@ Optional fine-grained hardening under interactive mode (only their own cases):
 settings can only block more, never relax security.
 
 `audit` defaults to `true`. Each completed review appends one JSON object to
-the audit path with mode `0600` (`schemaVersion: 3`): outcome, decision source,
+the audit path, which is created with — and kept at — mode `0600`: a
+pre-existing audit file with looser permissions is tightened before it
+receives new records (`schemaVersion: 3`): outcome, decision source,
 rationale, risk, authorization, confidence, per-phase latency, reviewer model,
 optional `reviewerOutcome` / `escalationDisposition` (to distinguish an explicit
 deny from fail-closed escalate→deny), optional System One escalation origin,
@@ -448,9 +458,16 @@ transport **never changes the safety decision**.
    by the host or other plugins and reviews only requests that remain `ask`.
 2. A deterministic **emergency brake** rejects unmistakable root destruction and
    direct credential export before any model call. It is wrapper-aware
-   (`sudo`, `doas`, `env`, `command`, `nice`, `nohup`, …), so `sudo rm -rf /`,
+   (`sudo`, `doas`, `env`, `command`, `nice`, `nohup`, `systemd-run`, `strace`,
+   `ltrace`, `script -c`, …), including clustered value-taking options
+   (`sudo -nu root …`), so `sudo rm -rf /`,
    `env VAR=x rm -rf /`, `/bin/rm -rf /`, `sh -c 'rm -rf /'`, `ssh host rm -rf /`,
-   and `busybox rm -rf /` are all caught.
+   and `busybox rm -rf /` are all caught. A live root glob (`rm -rf /*`) and
+   redirections onto real block devices (`> /dev/sda`, `tee /dev/sda`) are
+   treated as root destruction. Wrapper nesting deeper than a fixed
+   budget (or command lists beyond a fixed size) is not resolved: the brake
+   stays quiet for what it cannot fully see, the capability analysis is marked
+   partial, and automatic approval is blocked, escalating to the user instead.
 3. The plugin builds bounded **evidence**: recent transcript, recovered user
    intent, and optional read-only enrichment for SSH commands, local
    interpreter scripts, and Git state. Intent attribution uses a single origin
@@ -545,7 +562,14 @@ by itself** (one narrow deterministic exception exists for SSH, below).
   inspection when they name an explicit script. Inline code, modules, stdin
   programs, dynamic paths, and remote-only SSH arguments are not misidentified
   as local files.
-- **Git operations** (`add`, `commit`, `checkout`, `restore`, `rm`) get a
+- **Package scripts** (`bun run`, `npm run`, `pnpm run`, and `yarn run`) include
+  the selected manifest definition, defined conditional lifecycle hooks, and
+  bounded literal calls to other local scripts. Inspection never executes
+  package code. Cycles, unsupported workspace selection, unavailable files,
+  and expansion limits remain explicit gaps. Running a local script reports
+  possible network access rather than an observed network operation.
+- **Git operations** (`add`, `commit`, `checkout`, `restore`, `rm`, `merge`,
+  `rebase`, and `stash`) get a
   read-only pre-command snapshot: current branch, files already staged before
   the command, unstaged/untracked files, planned targets, unresolved
   shell-expanded paths, and a bounded numstat for changes that would be
@@ -559,9 +583,22 @@ by itself** (one narrow deterministic exception exists for SSH, below).
   repository-configured commands. Verification and inspection are still two
   distinct moments: a filter configured between them is a residual race the
   snapshot does not claim to eliminate.
+  Merge snapshots identify the in-progress merge index and unresolved paths.
+  Rebase snapshots describe the literal commit range and its presence in local
+  remote-tracking refs; those refs may be stale and never prove publication
+  status. Literal destinations report conservative matches to configured
+  push/fetch URLs, including equivalent GitHub HTTPS and SSH forms. A match is
+  destination identity evidence, not authorization or a trust declaration.
+  Repository or destination overrides that cannot be resolved with the safe
+  inspection commands make the snapshot unavailable.
 
 Only regular text files inside the working directory, the worktree, or
-`/tmp/opencode` can be included. Missing, blocked, and truncated executable
+`/tmp/opencode` can be included. A `cd` inside the reviewed command can move
+the resolution base for relative paths, but it never mints new approved roots:
+`cd /outside && python x.py` resolves in `/outside` and stays blocked. Git
+state inspection is contained to the same roots: a `cd /other/repo && git …`
+or `git -C /other/repo …` yields an explicitly unavailable snapshot instead of
+reading an unrelated repository. Missing, blocked, and truncated executable
 stdin is explicitly identified so the reviewer fails safe.
 
 The **only** deterministic SSH preflight rejection is an executable stdin file
@@ -602,19 +639,80 @@ binary, blocked, or truncated evidence) remains a reviewer decision.
 - SSH commands and executable stdin receive bounded, untrusted action
   enrichment; enrichment never makes an approval decision on its own.
 - Long-session user intent is recovered separately from recent operational
-  context; later explicit requests supersede conflicting older ones.
+  context; later explicit requests supersede conflicting older ones. V2 reads
+  literal user messages from the persisted message API, including history
+  before compaction. V1 scans bounded recent-history windows up to 2,000
+  messages. Both retain the configured intent count and character budget.
+  Intent appears once in the reviewer prompt; operational reasoning and
+  duplicate tool evidence are omitted, while attachments and distinct results
+  remain visible. Long literal intent retains its beginning and end with an
+  explicit omission marker.
 - Synthetic compaction/control messages are excluded from authorization
   evidence.
 - Audit failures never affect or relax the safety decision.
 - UI status messages are versioned, request-scoped, bounded, and transported
   through OpenCode's own workspace TUI event channel.
 
+### Supply chain
+
+- **No code runs at install time.** The package declares no lifecycle
+  scripts, so installing it from npm executes nothing from this repository.
+  Installing from a Git URL or a local path executes nothing either, and is
+  not a supported install method: `dist/` is gitignored, so those installs
+  yield a package without bundles. Use the npm registry; building from source
+  is an explicit `bun install && bun run build`.
+- **The tarball ships no native code.** `@opentui/core` (the host TUI
+  pipeline's renderer) declares optional platform-specific native packages
+  (for example `@opentui/core-linux-x64` on Linux) that npm resolves into the
+  install tree on your machine. Those renderer packages are used by the TUI.
+  The `@opencode/client` dependency also reaches optional
+  `@msgpackr-extract/*` native accelerators through `effect` and `msgpackr`;
+  the consumer install test tracks their platform package names too. The
+  published tarball itself contains only JavaScript, raw TSX sources, and documentation;
+  `tests/package-smoke.test.ts` rejects native addons and shared libraries,
+  `prebuilds/` directories, platform packages, and bundled-dependency payloads
+  in the ship set, and every release publishes a CycloneDX SBOM of the
+  published artifact plus npm provenance for it.
+- **The direct runtime dependency set is frozen and tested.** Adding a
+  dependency (native or not) is a reviewed change: the package smoke test
+  fails until its allowlist is updated in the same commit. The same suite
+  installs the published tarball in an isolated tree and freezes what a
+  consumer actually gets: the platform-specific packages under `@opentui`
+  (rendering only), the optional `@msgpackr-extract` accelerators, the exact
+  `@babel/core` version documented below, and an `npm audit` gate that fails
+  on any high or critical advisory. Root
+  `overrides` in this repository protect the development tree only; npm never
+  applies a dependency's overrides to the installing application, which is
+  why consumer-side guarantees live in tests against the installed tree
+  itself.
+- **Known residual exposure, documented, not fixed.** `@opentui/solid` pins
+  `@babel/core@7.28.0` exactly (every published 0.5.x does), and
+  GHSA-4x5r-pxfx-6jf8 (arbitrary file read via a crafted `sourceMappingURL`
+  comment, low severity) affects `@babel/core <= 7.29.0`. In this package
+  that copy of babel only compiles the TUI sources we ship in the tarball,
+  never repository- or attacker-influenced input, so the advisory's
+  conditions are not met by our usage; it is still reachable in the consumer
+  tree and therefore tracked: the consumer surveillance test pins the
+  installed version, and moving off 7.28.0 is a conscious bump (an
+  `@opentui/solid` release with a fixed pin, or dropping the exact-pin
+  constraint) together with this note. The development tree overrides Babel to
+  7.29.7, but that override cannot reach an npm consumer. Separately, `esbuild`
+  (a build-time dependency here, never shipped) is root-overridden past
+  GHSA-g7r4-m6w7-qqqr; that override intentionally does not reach consumers
+  because consumers never install `esbuild` from this package at all.
+- **The `effect` runtime stays external.** `@opencode-ai/plugin` resolves
+  `effect@4.0.0-beta.83` from the host's own dependency chain for OpenCode V1
+  hosts. It is externalized from our bundles, not shipped or vendored by this
+  package, and deliberately not pinned or overridden to a different version:
+  forcing another version could fork the runtime the V1 host shares with every
+  other plugin.
+
 ## Supported versions
 
 | Component             | Supported          | Notes                                                      |
 | --------------------- | ------------------ | ---------------------------------------------------------- |
-| OpenCode V1           | `>=1.18.29 <2`     | Dual object entrypoint; verified with **1.18.32**          |
-| OpenCode V2           | `>=2.0.3 <3`       | Compatibility layer; verified with **2.0.18**              |
+| OpenCode V1           | `>=1.18.29 <2`     | Dual object entrypoint; verified with **1.18.34**          |
+| OpenCode V2           | `>=2.0.3 <3`       | Compatibility layer; verified with **2.0.21**              |
 | `@opencode-ai/plugin` | `>=1.18.29 <2`     | Optional V1 peer dependency                                |
 | Bun                   | `>=1.3.0`          | Declared in `engines.bun`; CI runs **1.3.0** and **1.3.5** |
 | TUI overlay           | OpenCode V1 and V2 | Separate host adapters, shared raw TSX presentation        |
@@ -652,7 +750,7 @@ binary, blocked, or truncated evidence) remains a reviewer decision.
 
 | Symptom                                       | Likely cause                                                                      | Fix                                                                                                                                                                         |
 | --------------------------------------------- | --------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Every `ask` escalates after a long wait       | Reviewer model not found / provider not configured                                | Check the model ID in the global `permission-reviewer.jsonc` (or any V1 inline override)                                                                                    |
+| Every `ask` escalates after a long wait       | Reviewer model not found / provider not configured                                | Check the model ID in the global `permission-reviewer.jsonc`                                                                                                                |
 | Plugin does nothing                           | No `ask` rule in the host permission policy                                       | Set a V1 `"bash": "ask"` rule or a V2 shell permission with `effect: "ask"`                                                                                                 |
 | TUI overlay never appears                     | Wrong TUI config; stale process; or host without Solid/OpenTUI pipeline           | Check V1 `tui.json` or V2 global `cli.json`. The overlay is raw TSX (`dist/tui/tui.tsx`); a prebundled `dist/tui.js` does not render. Fully restart OpenCode after rebuilds |
 | Startup error: "authenticated SDK transport…" | OpenCode V1 outside `>=1.18.29 <2`, or an SDK change that hides the raw transport | Upgrade OpenCode and `@opencode-ai/plugin` into the supported range; report the version in an issue                                                                         |

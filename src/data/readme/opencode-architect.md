@@ -1,8 +1,5 @@
 # opencode-architect
-
-[![npm version](https://img.shields.io/npm/v/opencode-architect)](https://www.npmjs.com/package/opencode-architect)
-[![License: MIT](https://img.shields.io/npm/l/opencode-architect)](./LICENSE.md)
-[![OpenCode plugin](https://img.shields.io/badge/opencode-plugin-blueviolet)](https://opencode.ai/docs/plugins)
+[![npm version](https://img.shields.io/npm/v/opencode-architect?color=cb3837&label=npm)](https://www.npmjs.com/package/opencode-architect) [![Bun](https://img.shields.io/badge/Runtime-Bun-f9f1e1?logo=bun&logoColor=black)](https://bun.sh) [![License: MIT](https://img.shields.io/badge/License-MIT-22c55e)](LICENSE.md) [![Platforms](https://img.shields.io/badge/Platforms-Linux-6366f1)](#quick-start-install-the-opencode-plugin-suite) [![OpenCode plugin](https://img.shields.io/badge/opencode-plugin-blueviolet)](https://opencode.ai/docs/plugins)
 
 **Ten specialist agents that design, build, and package OpenCode extensions — agent skills, slash commands, custom tools, plugins, and MCP server integrations — right inside your AI coding assistant.**
 
@@ -16,7 +13,7 @@ Add the package to the `plugin` array in your OpenCode config — `.opencode/ope
 
 ```json
 {
-  "plugin": ["opencode-architect"]
+  "plugin": ["opencode-architect@latest"]
 }
 ```
 
@@ -24,13 +21,13 @@ The plugin registers the full agent suite at startup, with self-contained bundle
 
 ### Option 2 — Install with the CLI (bunx or npx)
 
-Copy the agents, references, and templates straight into your OpenCode directories, where you can read and modify every file:
+The CLI registers the package as a plugin: it adds `opencode-architect@latest` to the `plugin` array of your OpenCode config with surgical text editing (comments and formatting elsewhere in the file are preserved), then records the registration in an `opencode-architect.manifest.json` manifest at the scope base. Nothing is copied — the agents, references, and templates all load from the package at startup.
 
 ```bash
-# Project scope (default): copies into ./.opencode/
+# Project scope (default): edits the ./.opencode/ or repo-root config
 bunx opencode-architect install
 
-# Global scope: copies into ~/.config/opencode/
+# Global scope: edits the XDG/home config, creating opencode.jsonc if absent
 bunx opencode-architect install --scope global
 ```
 
@@ -39,15 +36,22 @@ bunx opencode-architect install --scope global
 Useful flags and commands:
 
 ```bash
-bunx opencode-architect status                  # show install mode and version for a scope
-bunx opencode-architect uninstall               # remove exactly the files a copy install wrote
-bunx opencode-architect install --force         # overwrite locally modified files, switch a scope from plugin to copy install
+bunx opencode-architect status                  # show mode, version, and the config file holding the entry
+bunx opencode-architect uninstall               # remove the plugin entry, the manifest, and any residual payload
+bunx opencode-architect clear-cache             # remove cached copies of this package from OpenCode's package cache
+bunx opencode-architect clear-cache --all --yes # remove the whole OpenCode cache directory (destructive)
+bunx opencode-architect clear-cache --dry-run   # preview what clear-cache would remove without deleting
+bunx opencode-architect install --force         # re-register and rewrite the manifest even when up to date
 bunx opencode-architect --help                  # full usage
 ```
 
-A copy install writes 10 agents into `agents/`, 9 reference docs into `opencode-architect/references/`, and 9 starter templates into `opencode-architect/templates/` of the scope base, plus an `opencode-architect.json` manifest that tracks versions and file hashes for safe upgrades. Relative reference paths inside agents are rewritten to absolute paths at install time.
+Re-running install when the manifest matches reality is a zero-write no-op. `--mode copy` is refused with an explanatory error: this package is code-backed (it ships agents), and copying cannot express plugin registration.
 
-Plugin install and copy install are mutually exclusive per scope — the CLI refuses to copy over an existing plugin entry unless you pass `--force`.
+Every install — including a no-op — also clears this package's stale copies from OpenCode's package cache (`$XDG_CACHE_HOME/opencode/packages`, falling back to `~/.cache/opencode/packages`): `opencode-architect`, `opencode-architect@latest`, and `opencode-architect@<installed version>`. Pinned copies like `opencode-architect@0.6.0` and other packages' cache dirs are left untouched. This makes OpenCode re-fetch the just-installed version on next start instead of reusing a stale or partial extraction. Removal is best-effort: a failure prints a warning but the install still succeeds.
+
+**Upgrading from a copy install (pre-0.8):** if a previous version copied agents into your scope base, install detects the old manifest, removes exactly the files it lists, prints a notice, and switches the scope to plugin registration in one step. Locally modified files are tracked by hash; uninstall and migration only remove what the manifest recorded.
+
+`clear-cache` is a manual-only command (never invoked at load time) for removing cached copies from OpenCode's package cache (`$XDG_CACHE_HOME/opencode/packages`, falling back to `~/.cache/opencode/packages`). With no flags it removes `opencode-architect` and every `opencode-architect@*` copy. `--package <name>` removes `<name>` and every `<name>@*`; `--all` removes the whole OpenCode cache directory (`$XDG_CACHE_HOME/opencode`, falling back to `~/.cache/opencode`). `--dry-run` lists what any mode would remove without deleting anything, and previews broad modes without `--yes`. Both broad modes require `--yes` to confirm, are mutually exclusive, and package names containing path separators or `..` are rejected. The command is idempotent — running with nothing cached succeeds — and removal failures warn without changing the exit code.
 
 ## What you get: ten specialist OpenCode agents
 

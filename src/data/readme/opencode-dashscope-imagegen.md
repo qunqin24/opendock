@@ -1,5 +1,7 @@
 # opencode-dashscope-imagegen
 
+**English** | [Русский](README.ru.md)
+
 > Text-to-image generation for [OpenCode](https://opencode.ai) via **Alibaba DashScope** —
 > `qwen-image-2.0`, `qwen-image-3.0` and `wan2.7-image` exposed as an `image_generate` tool
 > your coding agent can call.

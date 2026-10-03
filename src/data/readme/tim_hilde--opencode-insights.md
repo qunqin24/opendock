@@ -29,6 +29,10 @@ Add to `~/.config/opencode/opencode.json`:
 }
 ```
 
+### OpenCode 2
+
+The same package works with OpenCode 2; list it under `plugins`. Each release analyzes the sessions it stored itself: OpenCode 1 reads its `session`/`message`/`part` tables, OpenCode 2 reads `session_v2`/`session_message`. Analysis calls go through OpenCode 2's tool-less text generation instead of throwaway sessions, and progress shows on the tool call rather than as toasts.
+
 ## Usage
 
 In the opencode TUI:

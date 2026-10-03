@@ -67,6 +67,18 @@ with its context window, output limit, and input modalities. A baked-in
 inventory is used when discovery is unavailable, and the inventory is refreshed
 every six hours.
 
+Amanai advertises the reasoning levels it accepts in each model's `thinking`
+list. The plugin exposes every level except the default (`auto`) as a model
+variant backed by `settings.reasoningEffort`, so you can pick one with the
+`#variant` selector:
+
+```sh
+opencode run --model amanai/glm-5.3#high "Review this migration plan"
+```
+
+Run `/models` to see the available efforts for a model. Levels differ per model
+(`low`/`medium`/`high`/`xhigh`/`max`, and `none`/`minimal` where supported).
+
 ## Publishing
 
 ```sh

@@ -151,6 +151,21 @@ The plugin never writes to `CLAUDE.md`, `AGENTS.md` or any host settings file. H
 
 **Something failed and nothing said so.** Automatic memory warns once for authentication failures, after three consecutive recall failures, or after captured work has waited five minutes to upload. Status reports the runtime version, observed hook activity, last recall attempt/success/output, duration, queue age and scope holds. A produced hook output is not proof the host consumed it. Safe error categories land in `~/.reintersect/agent/errors.log`. The exact material that gets sent is in `~/.reintersect/agent/sessions/`, one file per session.
 
+## Hosted sandboxes
+
+### Recall-only mode
+
+A host can run the CLI's hooks without installing the plugin, for example a sandbox that calls `node reintersect-agent.mjs hook <host> <event>` from its own hook configuration. Set `REINTERSECT_AGENT_RECALL_ONLY=1` there and the hooks only recall: at session start, on each prompt, when a subagent starts and during background refreshes. They keep only the session state recall needs, write no capture log, queue no uploads, leave earlier queued batches alone and never call `IngestCodingSession`. They also print no warnings, so the host never asks the user to run a status skill it does not have. The `status` command reports the mode.
+
+The mode uses these environment variables:
+
+| Variable | Does |
+| --- | --- |
+| `REINTERSECT_AGENT_RECALL_ONLY` | Set to `1` to recall without capturing or uploading. |
+| `REINTERSECT_API_URL` | The Reintersect deployment to recall from. |
+| `REINTERSECT_API_KEY` | The key the hooks send. It only needs access to the `RecallForCodingSession` tool. |
+| `REINTERSECT_AGENT_HOME` | A writable directory for session and recall state. Defaults to `~/.reintersect/agent`. |
+
 ## Development
 
 Deploy the backend recall contract before releasing these plugin bundles. The backend retains `context` and `memoryIds` for installed 0.2.0 clients; new clients also require structured items, revisions, scope and completeness. An older backend is reported as needing an upgrade.

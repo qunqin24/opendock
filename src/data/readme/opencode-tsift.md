@@ -24,6 +24,11 @@ the downloaded archive with the release SHA-256 file before installing `tsift`
 into `$HOME/.local/bin` by default. macOS x86_64 users should install from
 crates.io with `cargo install tsift`.
 
+Release binaries are built with every language. `cargo install tsift` builds the
+default set, which leaves out opt-in languages such as Jai (its generated
+grammar is 29 MB of C); add `--features lang-jai`, or `--features all-languages`
+to match the release binaries.
+
 ## Quick Start
 
 ```sh
@@ -42,6 +47,7 @@ tsift graph-db --path . --json compact
 tsift graph-db --path . --json kind backlog --property ref_id=cvxa --limit 5
 tsift graph-db --path . --json evidence cvxa --depth 3 --limit 8
 tsift graph-db --path . --json related --kind all "realtime avatar memory"
+tsift graph-db --path . --json import codegen/trace.json   # external edges; re-import replaces
 tsift conflict-matrix --path tasks/software/tsift.md cvxa --json
 tsift dependency-dag --path tasks/software/tsift.md cvxa --json
 tsift graph-db --path . --json doctor

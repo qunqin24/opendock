@@ -102,9 +102,10 @@ or `npx @vshulcz/deja-vu "query"` to try it without installing anything. Desktop
 take MCP servers as bundles can open the `.mcpb` from the
 [latest release](https://github.com/vshulcz/deja-vu/releases/latest); it carries the binary.
 
-Claude Code, Cursor, Qwen, OpenClaw and Copilot can take the same plugin bundle from
+Claude Code, Cursor, Qwen and OpenClaw can take the same plugin bundle from
 their own marketplaces instead (Codex has a bundle of its own, in the table under
-[Harnesses with a package of their own](#harnesses-with-a-package-of-their-own)):
+[Harnesses with a package of their own](#harnesses-with-a-package-of-their-own)).
+Copilot CLI installs it too but takes only the skill, so use `deja install copilot-auto` there:
 
 ```sh
 claude plugin marketplace add vshulcz/deja-vu && claude plugin install deja-vu@deja-vu
@@ -262,7 +263,7 @@ aider &middot; Amp &middot; Antigravity &middot; Claude Code &middot; Cline &mid
 | Claude Code | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | Cline | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | Codex CLI | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
-| Copilot CLI | ✅ | ✕ | ✅ | ✅ | ✅ | ✅ | — |
+| Copilot CLI | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | VS Code Copilot Chat | ✅ | ✕ | ✅ | ✅ | ✕ | paste | — |
 | Cursor | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | sqlite3 (IDE chats, CLI tool output) |
 | DeepSeek Harness | ✅ | ✅ | ✅ | ✅ | ✕ | paste | zstd |
@@ -285,7 +286,7 @@ aider &middot; Amp &middot; Antigravity &middot; Claude Code &middot; Cline &mid
 | Kimchi Coding | ✅ | ⚠ | ⚠ | ⚠ | ✅ | paste | none |
 | Command Code | ✅ | ✅ | ✅ | ✅ | ✅ | paste | none |
 | ZCode | ✅ | ✅ | ? | ? | ✅ | paste | sqlite3 for the CLI database |
-| Kiro | ✅ | — | ✕ | ? | ✅ | paste | sqlite3 for the CLI database |
+| Kiro | ✅ | ⚠ | ✕ | ? | ✅ | paste | sqlite3 for the CLI database |
 | Kilo Code | ✅ | ⚠ | ✅ | ✅ | ✅ | paste | sqlite3 for the CLI store |
 | Roo Code | ✅ | ⚠ | ✅ | ✅ | ✅ | paste | roo CLI (editor tasks reopen in the editor) |
 | Zed | ✅ | ✕ | ✅ | ✅ | ✕ | paste | sqlite3 + zstd |
@@ -319,7 +320,7 @@ for people who install extensions there rather than from a CLI:
 | Grok Build | plugin `deja` | `grok plugin marketplace add xai-org/plugin-marketplace` then `grok plugin install deja` |
 | OpenClaw | ClawHub and npm `@vshulcz/openclaw-deja` | `openclaw plugins install clawhub:@vshulcz/openclaw-deja` |
 | pi (and omp) | npm `@vshulcz/pi-deja` | `pi install npm:@vshulcz/pi-deja` |
-| Hermes | memory provider `deja-memory` | `hermes plugins install vshulcz/deja-vu/extensions/hermes` |
+| Hermes | memory provider `deja-memory`, in the Hermes plugin catalog | `hermes plugins install deja-vu`, or from GitHub: `hermes plugins install vshulcz/deja-vu/extensions/hermes` |
 
 Either path works alone, and both together double nothing: each package reads what
 `deja install` already wrote and uses the deja you already have.
