@@ -30,8 +30,10 @@ and elapsed time. Segments with nothing to show are hidden.
 - **Cache** (`⧉`): how much of the model's input came from cache, and the
   cached token count.
 - **Speed**: the current streaming speed (`↯`) and the average for the turn
-  (`μ`). When a stream stops, the last reading stays on screen in a dimmed
-  colour.
+  (`μ`). When a stream stops, the speed segment rests at `↯ 0.0` in a dimmed
+  colour with an empty gauge — the same shape a resumed session shows.
+  `window.hold: "last"` keeps the last reading on screen instead, and `false`
+  hides the segment whenever there is no live reading.
 - **Cost and time**: the session's cost so far and how long it has been
   running.
 - **Uncommitted changes**: added and removed line counts for staged, unstaged
@@ -149,8 +151,8 @@ The package ships source plus one built file. A checkout install runs
 `src/tui.tsx` as TSX, which OpenCode transpiles itself; npm consumers run
 `dist/tui.js`, which `bun run build:entry` compiles with OpenTUI's own Solid
 plugin so the entry imports `@opentui/solid` by name instead of resolving a JSX
-runtime at load (see [AGENTS.md][agents] — that difference is the 1.0.3 crash
-fix). `package.json` maps `./tui` to `dist/tui.js`, and the `files` allowlist
+runtime at load — see [AGENTS.md][agents] for why the entry is built.
+`package.json` maps `./tui` to `dist/tui.js`, and the `files` allowlist
 carries both `src/` and `dist/`. `@opencode/plugin` is a dependency; the
 rendering peers (`@opentui/core`, `@opentui/solid`, `solid-js`) are provided by
 OpenCode. `npm run check:pack` verifies that every module the entry imports is

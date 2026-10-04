@@ -2,16 +2,31 @@
 
 [![npm version](https://img.shields.io/npm/v/sibyl-system.svg)](https://www.npmjs.com/package/sibyl-system) ![license MIT](https://img.shields.io/badge/license-MIT-green.svg)
 
-A standalone [opencode](https://opencode.ai) plugin with two capabilities:
+A standalone [opencode](https://opencode.ai) plugin:
 
 - **`sibyl_consult`** — a three-voter review council (MELCHIOR / BALTHASAR / CASPER)
   that audits an artifact against a goal and returns a **fail-closed 2/3 verdict**.
 - **`sibyl_swarm`** — a lightweight workflow swarm: an ARCHITECT persona plans a
   dependency-ordered task graph, deterministic workers execute it in waves, and
   the result is aggregated into a verdict.
+- **`sibyl_review` / `sibyl-chamber`** (v1.1) — a general review chamber with
+  isolated role sessions and one conclusion spoken in one voice (see below).
+- **`sibyl_status` + audit primitives** (`sibyl_anchor_check`, `sibyl_time_probe`,
+  `sibyl_attribute`) — read-only verification tools: run-store view, human-message
+  anchor re-verification, clock integrity, ref-move attribution.
 
 Zero coupling to team-mode or fleet orchestration: no `team_*` tools, no
 cross-agent message bus. Everything runs through plain opencode child sessions.
+
+## Session hygiene (L1)
+
+Council voters, swarm workers and the swarm judge run as **child sessions of the
+calling session** (`parentID` from the tool context): the TUI session picker
+lists root sessions only, so no sibyl ballot ever clutters your top-level
+session list. Transcripts stay in the DB, reachable from the parent session and
+mirrored into the run's sealed reply files. An empty caller session falls back
+to top-level creation. `sibyl_review` roles run fully isolated under /tmp with
+their own HOME/DB (`src/lane/isolated.ts`), never touching yours.
 
 ## v1.1 — the review chamber (民主集中制)
 
@@ -26,7 +41,7 @@ spotcheckable (`sha256sum -c CHECKSUMS.txt`) and append-only-ledgered.
 Laws: docs/isolation-laws.md. Mechanism: docs/democratic-centralism.md.
 
 ```
-node dist/cli.js run --target doc.md --goal "Is this sound?" --model local-qwen/qwen3.8-flash-next
+node dist/cli.js run --target doc.md --goal "Is this sound?" --model your-provider/your-model
 node dist/cli.js status --tail 5
 node dist/cli.js spotcheck <runId>
 ```
@@ -82,6 +97,9 @@ stderr, registers nothing, and returns empty hooks.
 | `sibyl_swarm` | `{ artifact, goal, judge? }` | ARCHITECT decomposes goal + artifact into a strict-JSON workflow schema; workers are minted deterministically and dispatched in dependency waves; drafts land in the run's space dir. Verdict: `APPROVE` / `REJECT` / `EXHAUSTED`. With `judge: true`, one extra judge pass may replace the derived verdict — an unrecognized or failed judge reply keeps the derived one. |
 | `sibyl_status` | `{ runId? }` | Read-only. Lists all recorded runs (newest last) + the last chamber-ledger rows, or shows one run's full record and space dir. |
 | `sibyl_review` | `{ target, goal, seed?, maxRounds? }` | v1.1 general democratic-centralism chamber: launches the isolated evidence→clash→judge pipeline detached and returns a receipt (explicitly NOT a verdict); the single voice lands in the run record at terminal state. CLI twin: `sibyl-chamber`. |
+| `sibyl_anchor_check` | `{ sessionId, index?, body?, expectSha256?, label? }` | Read-only verifier for "human anchor" claims (an order/approval message the owner says they sent): re-checks the claim against the engine's own session store instead of trusting a transcribed string. Closed 4-state verdict `MATCH` / `MISMATCH` / `ABSENT` / `ERROR`; the receipt carries a hash of the canonical view read, so later store mutation shows up as a view-hash difference. No `expectSha256` claim → non-verdict. |
+| `sibyl_time_probe` | `{ endpoints?, toleranceMs? }` | Clock-integrity check against independent HTTP `Date` headers (default pool: cloudflare / google / mozilla; sources with the same owner dept collapse to ONE source). Verdict: `SYNCED` / `DRIFT` / `INSUFFICIENT-SOURCES` (< 2 distinct owners is never consent). Default tolerance 300000 ms. Reads remote endpoints; sends no data beyond a HEAD request. |
+| `sibyl_attribute` | `{ moves, commits, roster }` | Pure comparator (zero network/git of its own): attributes git ref-moves to committer identities against a roster. Per-move verdict: `ATTRIBUTED` / `UNATTRIBUTED` (the silent-egress case) / `AMBIGUOUS` (byte-equal roster pair = registry defect, blocks, never picks). Identity matching is byte-exact by design — no normalization. |
 
 ## Options
 
@@ -101,6 +119,24 @@ defaults.
 | `timeoutMs` | `240000` | Per-child-session timeout (create + prompt share the budget). Integer ≥ 1. |
 | `concurrencyK` | `4` | Cap on parallel workers per wave (also capped by the schema's own `concurrency`). Integer 1–8. |
 | `staggerMs` | `2000` | Delay between worker launches within a wave, to avoid rate-limit bursts. Integer ≥ 0. |
+| `lane` | see below | v1.1 isolated-lane mechanics for `sibyl_review` / `sibyl-chamber` (`src/lane/isolated.ts`). Sub-keys: `runRoot` (string, default `"/tmp"`) — parent dir for run dirs; `opencodeBin` (non-empty string; discovery order: `$OPENCODE_BIN` → `~/.local/bin/opencode` → `/usr/local/bin/opencode` → `/usr/bin/opencode` → bare PATH name `"opencode"`; never empty, a wrong guess fails loud at spawn naming the bin) — the binary launched for each isolated role; `configSource` (default `~/.config/opencode/opencode.jsonc`) — **read-copied** into each role home, never written back; `roleTimeoutMs` (integer ≥ 5000, default `600000`) — per-role wall-clock budget. |
+| `modelPolicy` | `{ allowedPrefixes: ["local-"] }` | v1.1 E4/F1 seating allow-list: only pool models whose `providerID/modelID` starts with one of these prefixes may take a seat; everything else is denied at launch. Array of non-empty strings, **at least 1 entry** (an empty list is rejected as a deny-everything typo). Set this to your own machine's providers — the shipped default is a prefix pattern, not a specific model. |
+| `chamber` | see below | v1.1 review-chamber seats and rounds. Sub-keys: `maxRounds` (integer 1–8, default `3`) — clash/cross-critique round cap; `roles` (`{ evidence, pro, con, judge }` → pool slot names, each default `"default"`); `judgePool` (non-empty array of slot names, default `["default"]`) — the slots the independent judge may be drawn from (E2 pool+seed committed before launch). |
+
+### Portability (release principle)
+
+The published package pins **no device-side model authorizations**: the only
+model defaults shipped are empty-string sentinels (= "host default") and the
+generic `local-` seating prefix. Concrete provider/model ids live exclusively
+in **your** config — the registration tuple's options object (per-operator
+`modelPool` / `modelPolicy` / `--model` flag). Operators on shared fleets
+conventionally keep the concrete values in an operator-local file (e.g.
+`operator/release.env`, key `HISTORIAN_TRANSLATE_MODEL=<provider/model>`) that
+their own shell/opencode config feeds into that options object at registration
+time; that file sits outside the package boundary — `package.json` `files`
+ships only `dist/`, `README.md`, `LICENSE`, and ship.sh gate 5a fails the
+release if anything else appears in the tarball. `./ship.sh` additionally
+fails the release if any vendor model id reappears on a shipped surface.
 
 ## State layout
 
@@ -140,7 +176,7 @@ Dependencies point downward only:
 
 ```
 index.ts            plugin entry: parse options → share one RunStore + client
-                    adapter → register the three tools
+                    adapter → register the seven sibyl_* tools
 ├── engine/         runPersona(): create + prompt one child session through a
 │                   structural client seam; per-stage timeouts; never throws —
 │                   every failure is a structured PersonaRunResult
@@ -166,6 +202,7 @@ index.ts            plugin entry: parse options → share one RunStore + client
 ├── options.ts      zod v4 schema + parseOptions (never throws)
 ├── cli.ts          v1.1 sibyl-chamber bin: run | status | spotcheck | kill
 └── tools/          sibyl_consult / sibyl_swarm / sibyl_status / sibyl_review
+                    + audit primitives (anchor / time probe / attribution)
                     glue + shared helpers (model-slot chain, artifact reader)
 ```
 
@@ -181,9 +218,10 @@ PLAN→MINT→DISPATCH→AGGREGATE pipeline over ordinary child sessions.
 
 ```bash
 npm run typecheck   # tsc --noEmit, strict + noUncheckedIndexedAccess + exactOptionalPropertyTypes
-npm run test        # 309 unit tests, fully offline (no network, no LLM)
-npm run build       # esbuild bundle → dist/index.js (ESM)
+npm test            # 346 unit tests, fully offline (no network, no LLM)
+npm run build       # esbuild bundle → dist/index.js + dist/cli.js (ESM)
 node smoke/run-smoke.mjs   # offline smoke of the shipped surface (see smoke/README.md)
+./ship.sh           # the full release gate: all of the above + portability scan of the packed tarball
 ```
 
 Live end-to-end evidence (real opencode, real model sessions):
@@ -209,3 +247,7 @@ developed under the name MAGI and renamed to Sibyl-System before its first relea
 ## License
 
 MIT
+
+## Release wheel
+
+Tags v* require a packet receipt (docs/release/<ver>.md with a real `gate: PASS` line) and a lease; after cloning run `scripts/install-hooks.sh` — hooks are per-clone and ship empty.

@@ -7,20 +7,21 @@
 [![npm](https://img.shields.io/npm/v/@opencode-cockpit/review?color=%23cb3837&label=%40opencode-cockpit%2Freview)](https://www.npmjs.com/package/@opencode-cockpit/review)
 [![npm](https://img.shields.io/npm/v/@opencode-cockpit/updater?color=%23cb3837&label=%40opencode-cockpit%2Fupdater)](https://www.npmjs.com/package/@opencode-cockpit/updater)
 [![npm](https://img.shields.io/npm/v/@opencode-cockpit/subagents?color=%23cb3837&label=%40opencode-cockpit%2Fsubagents)](https://www.npmjs.com/package/@opencode-cockpit/subagents)
+[![npm](https://img.shields.io/npm/v/@opencode-cockpit/trail?color=%23cb3837&label=%40opencode-cockpit%2Ftrail)](https://www.npmjs.com/package/@opencode-cockpit/trail)
 [![npm](https://img.shields.io/npm/v/@opencode-cockpit/trust?color=%23cb3837&label=%40opencode-cockpit%2Ftrust)](https://www.npmjs.com/package/@opencode-cockpit/trust)
 [![Docs](https://img.shields.io/badge/docs-codestz.github.io-9d7cd8)](https://codestz.github.io/opencode-cockpit/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 **Give [OpenCode](https://opencode.ai) the instruments it does not ship with.**
 
-**[Documentation →](https://codestz.github.io/opencode-cockpit/)**  ·  [Install](https://codestz.github.io/opencode-cockpit/start/install/)  ·  [Shell](https://codestz.github.io/opencode-cockpit/shell/overview/)  ·  [Review](https://codestz.github.io/opencode-cockpit/review/overview/)  ·  [Statusline](https://codestz.github.io/opencode-cockpit/status/overview/)  ·  [Updater](https://codestz.github.io/opencode-cockpit/updater/overview/)  ·  [Subagents](https://codestz.github.io/opencode-cockpit/subagents/overview/)  ·  [Trust](https://codestz.github.io/opencode-cockpit/trust/overview/)  ·  [Changelog](CHANGELOG.md)
+**[Documentation →](https://codestz.github.io/opencode-cockpit/)**  ·  [Install](https://codestz.github.io/opencode-cockpit/start/install/)  ·  [Shell](https://codestz.github.io/opencode-cockpit/shell/overview/)  ·  [Review](https://codestz.github.io/opencode-cockpit/review/overview/)  ·  [Statusline](https://codestz.github.io/opencode-cockpit/status/overview/)  ·  [Updater](https://codestz.github.io/opencode-cockpit/updater/overview/)  ·  [Subagents](https://codestz.github.io/opencode-cockpit/subagents/overview/)  ·  [Trail](https://codestz.github.io/opencode-cockpit/trail/overview/)  ·  [Trust](https://codestz.github.io/opencode-cockpit/trust/overview/)  ·  [Configuration](#configuration)  ·  [Changelog](CHANGELOG.md)
 
 A tool call has to finish. A dev server does not, and neither does the context window filling up
 behind you. Cockpit is the instrument panel: things your agent can use, and things that tell you
 what it is doing.
 
 ```sh
-opencode plugin opencode-cockpit@0.8.0 --global --force
+opencode plugin opencode-cockpit@0.9.0 --global --force
 ```
 
 ---
@@ -38,7 +39,7 @@ every one of them reports its own health.
 [`bun run record`](CONTRIBUTING.md) and re-run on release, so none of them can drift from what
 ships.*
 
-**9 agent tools · 35 watch presets · [docs](https://codestz.github.io/opencode-cockpit/shell/overview/) · [`@opencode-cockpit/shell`](packages/shell)**
+**8 agent tools · 34 watch presets · [docs](https://codestz.github.io/opencode-cockpit/shell/overview/) · [`@opencode-cockpit/shell`](packages/shell)**
 
 ---
 
@@ -63,13 +64,29 @@ stays open for you.
 How full is the context? Where did the tokens go? What has changed? OpenCode answers the first in a
 corner and the rest not at all. **Statusline** answers them where you are already looking.
 
+With no configuration it is a table at the top of the sidebar — the window as one bar, the tokens
+broken into named rows, a proxy's budget when one writes it, and the branch's diff:
+
+```
+Status
+████████████████
+tokens 85.2k · 43%
+in     265 · 0%
+out    60 · 0%
+cache  84.9k · 100%
+──────────────
+git    5f +312 -48
+```
+
+Or a line under the prompt, `{ "status": { "sidebar": false } }`:
+
 ![The statusline under an OpenCode conversation: a context bar at 40%, the token total with its cache, input and output parts, what is uncommitted, elapsed time and todo progress](media/statusline.png)
 
-*The default line — no configuration written at all. Every part is a segment you can reshape,
-recolour or remove, or write yourself in TypeScript. Your Claude Code statusline script runs here
-unchanged, colours and all.*
+*Every part is a segment you can reshape, recolour or remove, or write yourself in TypeScript. Your
+Claude Code statusline script runs here unchanged, colours and all. `/status-setup` has the agent
+change it with you.*
 
-**14 segments · 2 surfaces · [docs](https://codestz.github.io/opencode-cockpit/status/overview/) · [`@opencode-cockpit/status`](packages/status)**
+**23 segments · 2 surfaces · [docs](https://codestz.github.io/opencode-cockpit/status/overview/) · [`@opencode-cockpit/status`](packages/status)**
 
 ---
 
@@ -108,6 +125,38 @@ can read any of them in full with `subagents_read`, and wait on the ones in the 
 ![A subagent at work beside the conversation: its run in a pane, a question put to it from the pane, and the exchange added to the main conversation](media/subagents.gif)
 
 **Sidebar + pane · 3 agent tools · follow-ups keep context · OpenCode 1 and 2 · [docs](https://codestz.github.io/opencode-cockpit/subagents/overview/) · [`@opencode-cockpit/subagents`](packages/subagents)**
+
+---
+
+### 🧭  Trail — what a conversation made
+
+A conversation opens a pull request, comments on a ticket, publishes a page — and a day later the
+links are somewhere in a scrolled-away chat. **Trail** keeps them: the agent records what it creates
+or changes outside the repository with `trail_add`, and Trail lists it in the sidebar, grouped by
+the ticket it was for, one click from the page. And the other way round: `/trail` across every
+conversation in the project says which one opened PR #33, and `g` goes back into it.
+
+![Trail at work: the agent opens a PR for COM-1736 and records it on its own, the sidebar groups it under the ticket, another conversation asks what was shipped, and g jumps back](media/trail.gif)
+
+```
+Trail                                    9
+
+COM-1801
+  a1b2c3d  Bump the pr…          12m ago
+  ENG-42   Retry the s…  Linear  15m ago ↗
+COM-1736   Bundle desy…    Jira   2h ago ↗
+  PR #33   0.8: Trust,…  GitHub   1h ago ↗
+  PR #12   Landing: Tr…  GitHub   2h ago ↗
++ 4 more · /trail
+```
+
+No setup: no account, no token, no list of tools. The agent already knows what it just did with
+whatever it uses — `gh`, an MCP server, a company CLI — so the agent writes the trail and Trail keeps
+it. When something it ran printed a PR link it never recorded, its next request says so, as a
+choice; nothing is added without the agent or you. To add one yourself, `/link`, then paste the
+link (and a note); `m` copies the trail as markdown for a PR description or a standup.
+
+**Sidebar + `/trail` · 2 agent tools · no setup · OpenCode 1 and 2 · [docs](https://codestz.github.io/opencode-cockpit/trail/overview/) · [`@opencode-cockpit/trail`](packages/trail)**
 
 ---
 
@@ -172,7 +221,7 @@ changes, never about a thousand identical recompiles:
 shell_start command="tsc --watch --noEmit" description="type checker" watch=true
 → tsc: ok → fail · src/auth.ts(42,3): error TS2339: Property 'id' does not exist
 ```
-Presets cover about 35 tools (tsc, vitest, jest, eslint, cargo, go, gradle, pytest, vite, next,
+Presets cover 34 tools (tsc, vitest, jest, eslint, cargo, go, gradle, pytest, vite, next,
 docker compose…), and anything else takes three regexes of its own. A watched process that dies
 counts as a failure, so a crashed dev server is reported too.
 
@@ -200,12 +249,23 @@ keeping line numbers and highlighting matches — and output keeps the colours t
 |---|---|
 | `/shells` | Every shell in view, plus "New shell": pick one to open its console |
 | `ctrl+x o` · `/shells-dock` | Toggle the shells panel under the chat |
-| `ctrl+x i` · `/shell` | Reopen the last shell's console |
+| `ctrl+x j` · `/shell` | Reopen the last shell's console |
 | `/shell-new` | Start a shell yourself |
 | `/shells-clear` | Remove finished shells |
 | `/plugins-update` | Every plugin you have installed: what runs, what is published, and an update checked against disk |
+| `/cockpit-setup` | The agent sets Cockpit up with you: which bays show, in the sidebar or at the bottom, in what order, quiet or present when empty — and fixes any setting from before 0.9 |
+| `/status-setup` | The agent designs the Status line with you: a preset, its segments, the sidebar or the bottom (`/statusline` until 0.9; the old name still works for one release and says the new one) |
+| `ctrl+x d` · `/subagents` | Open the subagent working now, in a pane beside the chat |
+| `ctrl+x v` · `/changes` | Open or close the review of what changed |
+| `ctrl+x k` | Move the review between the right pane and full screen |
+| `ctrl+x f` · `/trail` | What this conversation made, or every conversation in the project (`tab`) |
+| `/link` | Add a link to this conversation's trail yourself: paste the link, and a note if you like |
+| `ctrl+x p` · `/trust` | What Trust answered for you, and the ledger of what it has learned |
 
-Status reads the same everywhere — `RUN` (with a spinner), `FAIL`, `STOP`, `DONE` — running shells
+Every key is the same on OpenCode 1 and 2, none of them is one of OpenCode's own, and each bay's
+`keybinds` changes it ([Keys](https://codestz.github.io/opencode-cockpit/configuration/#keys)).
+
+A shell's status reads the same everywhere — `RUN` (with a spinner), `FAIL`, `STOP`, `DONE` — running shells
 and recent failures stay in view, the rest folds behind `▸ N more`. In the console: `i` types
 straight into the program (`ctrl+]` to stop), `c` sends ctrl+c, `r` restarts, `x` stops, `tab`
 switches between the live screen and the scrollback, `?` shows details.
@@ -215,13 +275,13 @@ switches between the live screen and the scrollback, `?` shows details.
 **Everything**
 
 ```sh
-opencode plugin opencode-cockpit@0.8.0 --global --force
+opencode plugin opencode-cockpit@0.9.0 --global --force
 ```
 
 **Only what you want**
 
 ```sh
-opencode plugin @opencode-cockpit/shell@0.8.0 --global --force
+opencode plugin @opencode-cockpit/shell@0.9.0 --global --force
 ```
 
 The version is pinned on purpose. OpenCode resolves a plugin spec once and never again, so a
@@ -245,7 +305,7 @@ options as an object:
 
 ```json
 {
-  "plugins": [{ "package": "opencode-cockpit@0.8.0", "options": { "features": { "shell": true } } }]
+  "plugins": [{ "package": "opencode-cockpit@0.9.0", "options": { "features": { "shell": true } } }]
 }
 ```
 
@@ -253,34 +313,221 @@ An existing v1 `opencode.json` with `plugin` is read by OpenCode 2 as well. To u
 the version in that entry — `/plugins-update` and `npx opencode-cockpit update` edit OpenCode 1's
 files only.
 
-**Turn features off** (in both `opencode.json` and `tui.json`):
+**After installing or updating on OpenCode 2, restart its background service:**
 
-```json
+```sh
+opencode service restart
+```
+
+OpenCode 2 runs the agent side in a background service that loads plugins once, when it starts, and
+keeps running when you close OpenCode. Until it restarts, the windows draw the new Cockpit while the
+agent keeps the old one's tools and skills. `npx opencode-cockpit@latest doctor` says when the
+service started before the install.
+
+**Configure them** in one file, read by both halves of every bay and by every project — see
+[Configuration](#configuration), or type `/cockpit-setup` and let the agent write it with you. When
+the blocks are set it offers to tune Cockpit to how you work: a tour of each bay's keys, then your
+project's conventions — the dev server to keep in a background shell, your ticket prefix for Trail —
+written as one `## Cockpit conventions` section in `AGENTS.md`, which a rerun updates in place.
+
+## Configuration
+
+Every bay reads the same two files, and nothing else needs touching:
+
+```
+~/.config/opencode-cockpit/config.json   →   <project>/.cockpit.json
+```
+
+The global file applies everywhere (`$XDG_CONFIG_HOME` is honoured); a project's file wins over it,
+section by section and key by key, so it can change one setting without restating the rest. A
+list replaces the one before it. Both halves of a bay — the agent's tools and the interface — read
+the same section, so a bay is configured in one place, not once in `opencode.json` and again in
+`tui.json`. Comments and trailing commas are fine. Everything is optional: with no file at all you
+get the defaults below.
+
+**The easy way: `/cockpit-setup`** — or just ask, "make my sidebar quieter", "hide the shells block
+when it's empty". The agent loads the `cockpit-setup` skill that ships with Cockpit and reads what
+is installed and written now with its `cockpit_settings` tool; it fixes anything from before 0.9
+first, offers a starting point (everything visible, quiet, minimal, or Status as a line under the
+prompt), asks only what is left, one question at a time, writes the smallest file that does it, and
+checks the result. From the home screen the command opens a conversation; while the agent is
+answering it waits its turn. `/status-setup` does the same for what the Status line shows. Both are
+in the palette (`ctrl+p`, "cockpit") too.
+
+### The whole shape
+
+```jsonc
+// ~/.config/opencode-cockpit/config.json — a project's .cockpit.json takes the same shape
 {
-  "plugin": [["opencode-cockpit", { "features": { "shell": true } }]]
+  "sidebar": ["status", "subagents", "shell", "trail", "trust"],   // the order, top to bottom
+  "features": { "trust": false },                                  // switch a whole bay off
+
+  "status":    { "preset": "sidebar", "sidebarRows": 14 },
+  "subagents": { "sidebarRows": 6, "hideWhenEmpty": false, "hideFinishedAfterMinutes": 60 },
+  "shell":     { "sidebarRows": 5, "dockHeight": 16, "lifecycle": { "onExit": "keep" } },
+  "trail":     { "sidebar": true, "sidebarRows": 5 },
+  "trust":     { "sidebar": true, "threshold": 3 },
+  "review":    { "variant": "right", "source": "worktree" },
+  "updater":   { "updateCheck": true }
 }
 ```
 
-**Configure them** in one file, read by both halves of the plugin and by every project:
+One section per bay, and nothing at the top level but `sidebar` and `features`.
 
-```
-~/.config/opencode-cockpit/config.json   →   <project>/.cockpit.json   →   plugin-entry options
-```
+### Keys every bay shares
+
+Spelled the same in every section:
+
+| Key | | Default |
+| --- | --- | --- |
+| `enabled` | The bay's off switch, both halves. `features.<bay>: false` does the same | `true` |
+| `sidebar` | Draw the bay's sidebar block — a boolean here; the top-level `sidebar` is the order. For Status, `false` puts its line at the bottom, under the prompt | `true`; Trust `false` |
+| `sidebarRows` | Rows the block lists before the rest fold into `+ N more` | Status 8 (its table 14), Subagents 6, Shell 5, Trail 5, Trust 3 |
+| `hideWhenEmpty` | Subagents, Shell and Trail. `false`: with nothing to list the block still says it is there — its heading and `none yet`. `true`: no block at all until there is something | `false` |
+| `keybinds` | Keys for the bay's commands, `{ "<command>": "<key>" }`; `"none"` unbinds one | Subagents `<leader>d`; Shell `<leader>o` dock, `<leader>j` console; Trail `<leader>f`; Trust `<leader>p`; Review `<leader>v` open, `<leader>k` placement |
+
+Time keys carry their unit: `hideFinishedAfterMinutes`, `hideNestedAfterSeconds`.
+
+### The sidebar order
+
+One list, at the top of either file, and nowhere else:
 
 ```json
-{
-  "kinds": { "e2e": "playwright|cypress" },
-  "defaults": { "logFile": true, "timeoutSeconds": 900 },
-  "ui": { "dockHeight": 16, "historyMinutes": 60 }
-}
+{ "sidebar": ["status", "subagents", "shell", "trail", "trust"] }
 ```
 
-Later sources win key by key, and an invalid file is ignored rather than fatal. You can categorize
-your own commands, define watch rules, cap how long shells live, choose what may interrupt the
-agent, and trade context tokens for accuracy. Each feature's README documents its own settings:
-[Shell](packages/shell#configuration), [Statusline](packages/status#configuration),
-[Updater](packages/updater#settings), [Subagents](packages/subagents#settings),
-[Trust](packages/trust#settings).
+That is the default. A project's list replaces the global one (it is an order, not a set), and a bay
+the list leaves out keeps its default place after the ones it names. On OpenCode 1 Cockpit's blocks
+sit together under OpenCode's own Context block and above the rest. An entry that is not a bay —
+`"shells"` — is not silently ignored: a `!` row asks whether you meant `"shell"`.
+
+On OpenCode 2 the bundle applies the list. **Installed as separate packages on OpenCode 2, the
+blocks draw in the order the packages are listed in `cli.json`**, so list them in the order you want
+them.
+
+### Each bay
+
+**`status`** — the Status bay ([all of it](packages/status#configuration)).
+
+| Key | | Default |
+| --- | --- | --- |
+| `preset` | A whole line by name: `sidebar` (the table), `minimal`, `default`, `detailed` (bottom lines). Anything written beside it wins | `sidebar` |
+| `surface` | `sidebar` or `bottom`; `"sidebar": false` says the same | `sidebar` |
+| `segments` | The line's parts, built-ins or your own — the whole list, replacing the preset's | the preset's |
+| `override` | Changes to the preset's segments by name, the rest kept: `false` drops one, a name swaps it, an object merges into its settings — `{ "git": { "against": "branch" } }` | none |
+| `lines` | More than one line, each with its own `surface`, `segments`, `maxRows`… | one |
+| `separator`, `stack`, `icons`, `debug`, `padding*` | How a line is laid out | per surface |
+| `commands` | Shell commands usable as segments — your Claude Code statusline script, unchanged | none |
+| `modules` | Your own segments in TypeScript; a project's add to the global ones | none |
+
+**`subagents`** — [Subagents](packages/subagents#settings).
+
+| Key | | Default |
+| --- | --- | --- |
+| `hideFinishedAfterMinutes` | Minutes a finished subagent stays in the sidebar | unset: the whole conversation |
+| `hideNestedAfterSeconds` | Seconds a finished *nested* subagent stays; negative keeps them | `30` |
+| `guidance` | Tell the agent about background subagents and follow-ups | `true` |
+
+**`shell`** — [Shell](packages/shell#configuration).
+
+| Key | | Default |
+| --- | --- | --- |
+| `kinds` | Your own shell categories, name → regex on the command | none |
+| `watch` | `presets` (your own rules) and `auto` (attach one to every shell) | `auto: false` |
+| `defaults` | Applied to every shell the agent starts: `watch`, `logFile`, `idleTimeoutSeconds`, `timeoutSeconds`, `notifyOnExit` | none |
+| `lifecycle` | `onExit` (`stopMine` or `keep`), `orphanAfterMinutes`, `removeFinishedAfterMinutes` | `stopMine`, `60`, `30` |
+| `notify` | What may interrupt the agent: `exit`, `watch`, `tailLines` | on |
+| `guidance`, `listRunningShells` | The system-prompt paragraph, and how many running shells it names | `true`, `15` |
+| `dockHeight`, `dockOpen`, `defaultView`, `colors` | The panel under the chat and the console | `14`, as last left, `screen`, `true` |
+| `hideFinishedAfterMinutes` | How long a finished shell stays in the folded views | `30` |
+
+**`trail`** — [Trail](packages/trail#settings). Nothing beyond the shared keys; its block is on by
+default, and `ctrl+x f` (`cockpit.trail.open`) opens `/trail`.
+
+**`trust`** — [Trust](packages/trust#settings).
+
+| Key | | Default |
+| --- | --- | --- |
+| `threshold` | Approvals in a row, by you, before Trust answers | `3` |
+| `dangerExtra` | What a dangerous command costs on top | `5` |
+| `expireDays` | Days unused before trust has to be earned again; `0` never | `30` |
+
+Its block is off by default (`"sidebar": true` shows it; the palette flips it for the session).
+
+**`review`** — no sidebar block.
+
+| Key | | Default |
+| --- | --- | --- |
+| `variant` | Where the panel opens: `right` or `full` | `right` |
+| `source` | What it reviews on open: `worktree` (uncommitted) or `branch` | `worktree` |
+
+**`updater`** — [Updater](packages/updater#settings).
+
+| Key | | Default |
+| --- | --- | --- |
+| `updateCheck` | Check for plugin updates once a day and say so | `true` |
+
+### Names from before 0.9
+
+0.9 gave every bay the same shape, so some names changed. **The old ones are not read.** Each one a
+file still carries is drawn as a `!` row in its bay's block, printed by
+`npx opencode-cockpit@latest doctor`, and fixed first by `/cockpit-setup`:
+
+```
+! settings: "statusline" is no longer read — run /cockpit-setup
+```
+
+| Before 0.9 | Now |
+| --- | --- |
+| `statusline` | `status` |
+| `status.maxRows` | `status.sidebarRows` |
+| Shell's keys at the file's root (`kinds`, `watch`, `defaults`, `lifecycle`, `notify`, `guidance`, `listRunningShells`) | the same keys under `shell` |
+| `ui.dockHeight`, `ui.dockOpen`, `ui.sidebarRows`, `ui.colors`, `ui.keybinds`… | the same keys under `shell` |
+| `ui.historyMinutes` | `shell.hideFinishedAfterMinutes` |
+| `ui.updateCheck` | `updater.updateCheck` |
+| `ui.sidebarOrder`, `<bay>.sidebarOrder` | the top-level `sidebar` list |
+| `subagents.hideFinishedAfter`, `subagents.hideNestedAfter` | `…Minutes`, `…Seconds` |
+| Status's keys at the file's root (`preset`, `segments`, `enabled`…) | the same keys under `status` |
+
+A file that is not valid JSON, a top-level name nothing reads, or a value of the wrong kind gets a
+`!` row too, and the defaults — never a silently blank sidebar.
+
+### OpenCode's own sidebar blocks
+
+Status's table carries what OpenCode's own Context block says. To keep only one, switch the host's
+off — it is OpenCode's setting, in OpenCode's file, and the name differs by version:
+
+```jsonc
+// OpenCode 1 — ~/.config/opencode/tui.json
+{ "plugin_enabled": { "internal:sidebar-context": false } }
+```
+
+```jsonc
+// OpenCode 2 — ~/.config/opencode/cli.json
+{ "plugins": ["opencode-cockpit@0.9.0", "-opencode.sidebar.context"] }
+```
+
+The other blocks switch the same way, by these ids (an `internal:` id in OpenCode 2's `cli.json`
+does nothing, silently). Hiding them is a matter of taste: Status's table
+already warns when an MCP or language server fails, and `opencode mcp list` still lists them all.
+
+| Block | OpenCode 1 | OpenCode 2 |
+| --- | --- | --- |
+| Context | `internal:sidebar-context` | `opencode.sidebar.context` |
+| MCP | `internal:sidebar-mcp` | `opencode.sidebar.mcp` |
+| Footer (path and branch) | `internal:sidebar-footer` | `opencode.sidebar.footer` |
+| LSP | `internal:sidebar-lsp` | — |
+| Files | `internal:sidebar-files` | — |
+| Todo | `internal:sidebar-todo` | — |
+
+Leave OpenCode's Todo block on: nothing in Cockpit replaces it.
+
+### Advanced: options on the plugin entry
+
+The same keys can also go on the plugin entry — the bundle's `["opencode-cockpit", { "shell": { … } }]`
+or a single bay's own `["@opencode-cockpit/shell", { … }]` — where they win over both files. It is
+rarely worth it: on OpenCode 1 the interface's options belong in `tui.json` and the agent's in
+`opencode.json`, so the same bay ends up configured in two places. The files are read by both.
 
 ## Troubleshooting
 
@@ -330,6 +577,7 @@ Each shell's output feeds three views at once: a normalized **log** for the agen
 | [`@opencode-cockpit/updater`](packages/updater) | Bay 04 — every plugin, and an update checked against disk | [README](packages/updater/README.md) · [docs](https://codestz.github.io/opencode-cockpit/updater/overview/) |
 | [`@opencode-cockpit/subagents`](packages/subagents) | Bay 05 — every subagent visible, reachable and reused | [README](packages/subagents/README.md) · [docs](https://codestz.github.io/opencode-cockpit/subagents/overview/) |
 | [`@opencode-cockpit/trust`](packages/trust) | Bay 06 — permissions that learn, visibly | [README](packages/trust/README.md) · [docs](https://codestz.github.io/opencode-cockpit/trust/overview/) |
+| [`@opencode-cockpit/trail`](packages/trail) | Bay 07 — what a conversation made, one click from the page | [README](packages/trail/README.md) · [docs](https://codestz.github.io/opencode-cockpit/trail/overview/) |
 | [`@opencode-cockpit/daemon`](packages/daemon) | `cockpitd`, the shared process host | [README](packages/daemon/README.md) |
 | [`@opencode-cockpit/client`](packages/client) | Typed, auto-spawning client | [README](packages/client/README.md) |
 | [`@opencode-cockpit/protocol`](packages/protocol) | Wire contracts and schemas | [README](packages/protocol/README.md) |

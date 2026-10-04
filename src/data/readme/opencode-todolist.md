@@ -60,7 +60,7 @@ The terminal client shows a live todo strip at the end of the session sidebar, s
 [✓] Add regression test
 ```
 
-In-progress tasks use the warning color and everything else is muted, matching OpenCode V1. The heading shows completed/total and the percentage; either part can be turned off. Long items wrap, lists longer than two items collapse with a click, and the strip hides itself once everything is completed.
+In-progress tasks use the warning color and everything else is muted, matching OpenCode V1. The heading shows completed/total and the percentage; either part can be turned off. Long items wrap and lists longer than two items collapse with a click. Once everything is completed the strip hides, unless the timer is on — then it stays to show the total.
 
 Run `/todo-sections` (or pick "Todolist: Settings" from the command palette) to configure:
 
@@ -68,9 +68,27 @@ Run `/todo-sections` (or pick "Todolist: Settings" from the command palette) to 
 | --- | --- | --- |
 | Show count | on | on/off |
 | Show percentage | on | on/off |
+| Show timer | on | on/off |
 | Header separator | line | none / line / line + blank |
 | Collapse threshold | 2 | 2/3/5 |
 | Border | off | on/off |
+
+### Timer
+
+With the timer on, the strip tracks how long the current todo run is taking:
+
+```
+Todo [1/3] · 33% · 4m12s
+[ ] Fix flaky checkout spec
+[•] Refactor payment webhook handler · 2m12s
+[✓] Add regression test · 3m05s
+```
+
+A run starts at the first write that opens tasks and ends at the write where nothing is open anymore. Per-task times appear when the model marks both `in_progress` and `completed`; tasks that jump straight to completed only count toward the total. Once the run finishes, the strip stays visible with `done in 12m34s` instead of hiding.
+
+Times are wall-clock: they include model thinking and user pauses. A list replaced by an unrelated one (or cleared) is treated as abandoned, and the timer restarts on the new list.
+
+The `todoread` tool reports the same timing to the model, e.g. `Current todo list (running for 4m12s):`.
 
 To enable the strip, add the package to the terminal client plugin list:
 

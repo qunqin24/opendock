@@ -103,6 +103,12 @@ belong to each Skill's exact source path, so assignments survive when a Skill
 is absent from the current workspace. Filters and Search Everything also match
 group names; choosing a group heading never runs its Skills.
 
+Rows beneath group headings are indented in Todo, Subagents, Skills, and MCP.
+Skill, MCP, and Quick Action rows reserve a leading bookmark control: unselected
+bookmarks appear on hover or keyboard focus, while favorites stay visible.
+Labels do not shift when the control appears. MCP server status icons align with
+their group status icons, including when a server has an error detail control.
+
 ![Skill group manager](https://raw.githubusercontent.com/St1ggy/opencode-navigator/main/screenshots/38-skill-groups.png)
 
 Search Everything preserves one query across Skills, Subagents, MCP, and Actions:

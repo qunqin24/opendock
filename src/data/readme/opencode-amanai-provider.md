@@ -79,6 +79,12 @@ opencode run --model amanai/glm-5.3#high "Review this migration plan"
 Run `/models` to see the available efforts for a model. Levels differ per model
 (`low`/`medium`/`high`/`xhigh`/`max`, and `none`/`minimal` where supported).
 
+Transient failures are retried instead of ending the turn. A request that hits a
+rate limit, a server error, or loses its connection mid-stream is retried up to
+five times with exponential backoff and jitter, mirroring the Command Code
+provider. Client errors such as a bad request or a rejected credential stay
+terminal.
+
 ## Publishing
 
 ```sh

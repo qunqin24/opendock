@@ -173,7 +173,7 @@ Eleven server plugins run inside the OpenCode server process; the twelfth entry,
 |---|---|
 | **WorkflowPlugin** | A state machine over multi-agent work: explicit work items, required reviewers, bounded implementation/review rounds, and hard stops when more context is needed. |
 | **ModelRolesPlugin** | Semantic model roles (`vv-role:smart`, `vv-role:fast`, …) instead of hardcoded model IDs in agents, subagents, and commands — resolved from the effective vvoc role map plus the native `modelIntent` envelope each time a session family binds its snapshot. |
-| **GuardianPlugin** | Keeps long or AFK runs moving by auto-approving routine low-risk permission requests; anything risky stays in OpenCode's normal manual approval flow. |
+| **GuardianPlugin** | Keeps long or AFK runs moving by auto-approving routine low-risk permission requests; anything risky stays in OpenCode's normal manual approval flow. The assessment uses the captured `fast` auxiliary model by default, or an opt-in provider-neutral System One decision provider. |
 | **HashlineEditPlugin** | Routes each model to exactly one native edit tool (host `edit` for GLM/Qwen/Kimi, host `apply_patch` for GPT, `str_replace_editor` for DeepSeek, `hashline_edit` for unmatched models) and hides the other edit tools per session. |
 | **SystemContextInjectionPlugin** | Injects universal guidance — including correctness obligations and evidence discipline for behavior changes — plus the work policy selected by the orchestration profile into vv-controller at startup; subagents stay unpolluted. Skill discovery is registered by `vvoc install`/`sync` through the native `skills` config, not by a plugin. |
 | **SecretsRedactionPlugin** | Redacts tokens, keys, emails, and other sensitive values before messages reach the model, restoring them only where local execution needs the originals. |
@@ -287,7 +287,7 @@ Usage analytics          → $XDG_DATA_HOME/vvoc/analytics/usage-YYYY-MM.jsonl
 
 OpenCode 2.x keeps one native config document per process. `opencode.json(c)` is loaded by the core/server plugin runtime and activates vvoc features such as model roles, Guardian, workflow, hashline edit, redaction, and web tools. The terminal UI process takes its own settings (tabs, keybinds, TUI-only plugin entries) from the native `cli.json`, and it also loads the TUI entrypoints of the plugins carried by the server inventory. vv-opencode uses that directly: the same pinned package entry (for example `@osovv/vv-opencode@X.Y.Z`) is registered once in the native `plugins` array, the host resolves its `./server` export for the server runtime and its `./tui` export for the terminal UI, and headless/server launches never load the UI module.
 
-`vvoc install`, `vvoc init`, and `vvoc sync` conservatively write that single pinned base-package entry — a string, or a `{ "package": …, "options": … }` object — into the native `plugins` array; sync also migrates the broken legacy `@osovv/vv-opencode/tui` form and older managed pins. Existing comments, unrelated settings, unrelated plugin entries, and their `options` are preserved; malformed plugin entries fail without rewrite. Supported V1 document shapes are materialized into the native V2 shape by `vvoc sync` once the host is inside the supported window, using the official OpenCode V1-to-V2 migration guide, with a timestamped `*.vvoc-backup-<timestamp>` sibling and validate-before-write. Residual or ambiguous V1 fields are refused before any mutation, so `plugin`, `agent`, `provider`, `command`, `small_model`, and `tools` never remain in a document vvoc writes.
+`vvoc install`, `vvoc init`, and `vvoc sync` conservatively write that single pinned base-package entry — a string, or a `{ "package": …, "options": … }` object — into the native `plugins` array; sync also migrates the broken legacy `@osovv/vv-opencode/tui` form and older managed pins. Machines upgraded from a V1 host carry a second, host-migrated vvoc entry in the client-side `cli.json` (the host moves the retired `tui.json(c)` plugin list there on first start), so the same commands mirror an existing managed `cli.json` entry to the pinned specifier — comments, client preferences, unrelated entries, and the entry's options are preserved, and nothing is created when no client pin exists. `vvoc doctor` and `vvoc status` print the TUI client pin beside the server pin and warn when the two drift apart. Existing comments, unrelated settings, unrelated plugin entries, and their `options` are preserved; malformed plugin entries fail without rewrite. Supported V1 document shapes are materialized into the native V2 shape by `vvoc sync` once the host is inside the supported window, using the official OpenCode V1-to-V2 migration guide, with a timestamped `*.vvoc-backup-<timestamp>` sibling and validate-before-write. Residual or ambiguous V1 fields are refused before any mutation, so `plugin`, `agent`, `provider`, `command`, `small_model`, and `tools` never remain in a document vvoc writes.
 
 The native document shape vvoc validates, extends, and writes into:
 
@@ -309,7 +309,7 @@ The native document shape vvoc validates, extends, and writes into:
 
 Role intent has a native home as well: the pinned package entry's `options.modelIntent` envelope (`model`, `smallModel`, `agents`, `commands`) carries root, small-model, agent, and command model intent inside the native document — native 2.0.18 has no `small_model` field and rejects role references in `model` and `agents.<id>.model`, so vv-opencode never writes a `vv-role:*` reference as a native model literal (the model-overrides APIs route role intent into the envelope instead). Role assignments themselves live in `vvoc.json`: `vvoc role set` and preset application edit only that file, and the model-roles runtime combines the effective role map with the raw envelope intent to resolve concrete `provider/model#variant` selections (for example `xiaomi/mimo-v2.6-flash#thinking`) when each session family binds its snapshot.
 
-Runtime plugins load the effective `vvoc.json` once during OpenCode startup and share one immutable config snapshot for the lifetime of the process; each session family additionally binds an immutable policy snapshot at its first accepted workload, so a bound family keeps the policy it was admitted under. There is no live reload: restart OpenCode after changing `vvoc.json`.
+Runtime plugins load the effective `vvoc.json` and each session family binds an immutable, credential-free behaviour-policy snapshot at its first workload. The binding is content-addressed and independent of the package version, so a bound family keeps its models, plugin policy, and orchestration profile across a reload and across a server restart, while a new session always resolves the current configuration. A family changes only when you explicitly ask: pass `--force` to `vvoc preset apply`, `vvoc plugin enable|disable`, or `vvoc role set|unset` (optionally with `--session <id>`) to rebind the active families of the current project to the current configuration, or run `/vv-rebind` in the OpenCode TUI to rebind the current session family only. `/vv-rebind` takes no arguments: it writes the same project-scoped rebind request marker naming the active session, and the re-resolved configuration applies from the family's next message (family-wide: the session plus its forks and subagents), with models switching only when their resolved selection actually changed. The command is not the native host `/reload` — that reloads host configuration, while `/vv-rebind` re-resolves vvoc policy for one session family — and it is normally unnecessary for credentials alone, since provider and web keys are already re-attached from the live configuration on every request. Run it from the project the session belongs to; a session in another worktree needs the command run from that worktree. The previous version's snapshot store is never read; the first start after upgrading rebinds existing families once to the current configuration. Credentials are never persisted — provider and web keys are re-attached from the live configuration at request time. Orchestration policy is injected at the request tail rather than into the system prefix, so switching policy does not invalidate the cached prompt prefix.
 
 ### Strict schema, loud failures
 
@@ -733,6 +733,33 @@ vvoc plugin disable web-tools
 ```
 
 Unrelated MCP search or reader tools are not removed automatically; disable those separately if you want only the two canonical tools visible.
+
+### System One decision backend
+
+Guardian can derive its bounded low-risk assessment either from the captured `fast` auxiliary model (the default) or from a provider-neutral System One decision provider that speaks the de-facto `POST /v1/systemone` protocol (`noul`, `choice`, and `score` questions returning typed probabilities instead of generated text). The client is vendor-neutral: any compliant endpoint — a hosted provider, a gateway, or a local server — is selected by `baseUrl` and `model` alone, and no hosted endpoint is assumed.
+
+```json
+"systemone": {
+  "enabled": true,
+  "baseUrl": "http://localhost:8790",
+  "model": "example",
+  "apiKey": "${SYSTEMONE_API_KEY}",
+  "timeoutMs": 5000,
+  "maxRetries": 1
+},
+"guardian": {
+  "decisionBackend": "systemone",
+  "systemone": { "lowRiskThreshold": 0.95 }
+}
+```
+
+- `decisionBackend` is `"fast"` (default) or `"systemone"`; the default keeps today's behavior unchanged.
+- With `"systemone"`, Guardian asks one `noul` ("the action is low-risk") and one `score` (risk rubric) over the same bounded review input and reuses the existing `risk_level === "low" && risk_score < approvalRiskThreshold` rule. `lowRiskThreshold` is the noul probability gate.
+- Fail-closed: an unavailable, unreachable, timed-out, or malformed provider defers to manual approval and never auto-approves from a provider answer. A disabled section, a disabled `systemone` plugin toggle, or an unresolved `${VAR}` key keeps the `fast` backend.
+- The `systemone` plugin toggle is a kill switch: `vvoc plugin disable systemone` constructs no provider and forces the fast backend.
+- `apiKey` may be a literal or a `${VAR}` placeholder resolved from the OpenCode process environment at startup, like web provider credentials. The resolved value is never logged or written to persisted config snapshots.
+
+Switching between a hosted endpoint and a local endpoint is a `baseUrl` and `model` change only, with no code change. OpenAI Decisions API and other vendor products that do not speak `/v1/systemone` are out of scope.
 
 ### `/context` inspector
 

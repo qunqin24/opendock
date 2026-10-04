@@ -7,7 +7,7 @@ Show the available Codex 5-hour and weekly subscription limits in the OpenCode s
 Requires OpenCode V2 and an OpenAI ChatGPT OAuth login (`/connect` → OpenAI → ChatGPT). An OpenAI API key does not have ChatGPT subscription quota.
 
 ```sh
-opencode plugin add @yassirh/opencode-codex-limits
+opencode plugin add @yassirh/opencode-codex-limits-plugin
 ```
 
 Restart OpenCode, select an `openai/…` model, and open a session with the sidebar visible. The command palette includes **Refresh Codex limits**.

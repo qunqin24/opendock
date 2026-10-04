@@ -302,6 +302,12 @@ so a failing check blocks the stage.
 
 ## Changelog
 
+- **0.6.1** — Kimi Code adapter tracks the 2026-09 quota-model API change:
+  usage windows now come from the `usages.limit_5h` / `limit_7d` /
+  `limit_month_total` ratios (with a `limit_month_code` breakdown), and Extra
+  Usage is read from the camelCase `boosterWallet` (fixed-point `BOOSTER`
+  balance). The pre-2026-09 `usage` / `limits[]` / `totalQuota` /
+  `booster_wallet` shapes remain as fallbacks.
 - **0.4.1** — internal: shared provider HTTP plumbing (`src/providers/http.ts`)
   replaces the copy-pasted fetch/retry/error code; context estimates simplified;
   reset times render as `Wed, Sep 16`.

@@ -230,7 +230,7 @@ Every feature, in one place:
 | Feature | What it does |
 | --- | --- |
 | **Session average** | Turns, steps and average streaming tok/s for the session you are looking at, so one fast reply cannot flatter a long session. |
-| **Last ten responses** | `· N last10 resp` is the mean of the rates of the last ten completed **responses**, next to the session average. The session average is the whole session divided as one sum; this one moves as soon as a slow reply lands, which is what tells you the session just changed character. A response with no honest rate is skipped, not counted as a zero. It counts responses, not steps: the steps inside one reply are not ten separate answers, and averaging them would answer a question nobody asked. |
+| **Last ten responses** | `· N last10` is the mean of the rates of the last ten completed **responses**, next to the session average. The session average is the whole session divided as one sum; this one moves as soon as a slow reply lands, which is what tells you the session just changed character. A response with no honest rate is skipped, not counted as a zero. It counts responses, not steps: the steps inside one reply are not ten separate answers, and averaging them would answer a question nobody asked. |
 | **Subagent work is counted** | A subagent runs as a session of its own, so its steps and tokens are added to the session that delegated the work. Its own streaming time is **not** — the session's tok/s stays a speed that session actually ran at, and the subagent's own rate stays on its own session. |
 | **Inside your app** | The numbers sit in OpenCode's own composer, in the row that already holds your agent and model. No window on top of your work, no taskbar entry, no focus steal. |
 | **It follows your tab** | Switch sessions in the app and the numbers switch with them. The readout asks for the session the window says it is showing, so switching project switches the numbers with it — it can never show another project's totals. |
@@ -560,7 +560,7 @@ To install a copy of the checkout instead, drop the `--link`. To put it somewher
 ### Development
 
 ```bash
-npm test           # 215 checks
+npm test           # 426 checks
 node selftest.mjs  # can this machine show the readout?
 npm pack           # build the publishable tarball
 npm run prepublishOnly   # what publish runs first
@@ -582,13 +582,16 @@ changelog section, commit. The workflow reads the version, runs the suite, tags 
 skips a version that is already tagged. A missing changelog entry fails the run rather than
 publishing a release with no notes.
 
-The test suite includes the mistakes worth catching twice: zombie holders in the singleton lock, a
-session with no totals yet (which must say it has nothing to show rather than borrow another
-session's numbers), two projects sharing one status directory, a subagent's tokens reaching its
-parent's rate without its stream time, a WAL write that leaves the database timestamp untouched,
-process checks on macOS and Windows driven by a fake process list so their logic is verified even
-though their hardware was not, a turn whose tokens were counted while the time spent writing its
-tool call was not, and a window that covers OpenCode while focus never left it.
+The test suite includes the mistakes worth catching twice: zombie holders in the
+singleton lock, a session with no totals yet (which must say it has nothing to
+show rather than borrow another session's numbers), two projects sharing one
+status directory, a subagent's tokens reaching its parent's rate without its
+stream time, one server for the machine that a single project's cleanup must not
+close, an asset that vanishes between the stat and the read, two responses that
+ran at the same speed, a fingerprint that has to cover the bundles under
+`assets/`, a failed update that is retried rather than written off, a turn whose
+tokens were counted while the time spent writing its tool call was not, and both
+config files when a machine has one of each.
 
 ## License
 

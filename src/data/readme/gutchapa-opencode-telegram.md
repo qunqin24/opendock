@@ -1,9 +1,24 @@
 # gutchapa-opencode-telegram
 
+> Telegram bot for opencode with a daily AI morning briefing — every news item and trending repo judged ✅ useful / ⏭️ skip against your actual setup. Plus 70+ slash commands, file sharing both ways, plugin + standalone modes.
+
 [![npm version](https://img.shields.io/npm/v/gutchapa-opencode-telegram)](https://www.npmjs.com/package/gutchapa-opencode-telegram)
 [![npm downloads](https://img.shields.io/npm/dm/gutchapa-opencode-telegram)](https://www.npmjs.com/package/gutchapa-opencode-telegram)
 [![license](https://img.shields.io/npm/l/gutchapa-opencode-telegram)](LICENSE)
 [![GitHub stars](https://img.shields.io/github/stars/gutchapa/opencode-telegram)](https://github.com/gutchapa/opencode-telegram)
+
+## Morning briefing (the reason to install)
+
+Every day at 07:30 your bot brews this — AI news, trending repos, your tracked repos — then judges **every item** against what you actually run:
+
+```
+• TabX — ✅ useful (free tab recall by meaning, try for Chrome research)
+• Llestia — ⏭️ skip (agent hiring marketplace, duplicate of what you run)
+• Trump AI Force — ⏭️ skip (news only, politics, no install)
+Bottom line: nothing to install today.
+```
+
+`/digest` fires one on demand. Real example from `~/.config/github-digest/sent/` — verdicts backed by live shell checks, never guesses.
 
 ## Demo
 
