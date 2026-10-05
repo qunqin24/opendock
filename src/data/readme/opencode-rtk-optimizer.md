@@ -23,19 +23,27 @@ Install via npm:
 npm install opencode-rtk-optimizer
 ```
 
-Then add to your OpenCode config (`opencode.json` or `.opencode/config.json`):
+Then add to your OpenCode config (`opencode.json` or `.opencode/opencode.json`):
 
 ```json
 {
-  "plugin": ["opencode-rtk-optimizer"]
+  "plugins": ["opencode-rtk-optimizer"]
 }
 ```
 
-Or copy `src/index.ts` directly into `.opencode/plugins/` for local use.
+For local development, clone the repository and run `npm ci` and `npm run build`. The local wrapper loads the built plugin. Rebuild after source changes.
+
+## Compatibility
+
+- Tested with OpenCode 2.0.22 and RTK 0.51.0. RTK must support `rtk rewrite`.
+- V1 requires OpenCode 1.18.29 or newer and the singular `plugin` config key. Older V1 releases need the previous plugin version.
+- V2 reports warnings through server logs. V1 retains toasts.
 
 ## How it works
 
-The plugin hooks into OpenCode's tool execution events and delegates shell command rewrites to `rtk rewrite`. The rewritten command executes while the original command remains visible to the model.
+The plugin delegates rewrites to `rtk rewrite` while preserving the original model-facing command. V2 permission rules must cover the rewritten command, such as `rtk git status *`. The plugin never grants permissions.
+
+Missing RTK, unsupported commands, rewrite failures, and RTK deny decisions leave commands unchanged for OpenCode's permission checks. Each command is passed as one argument to RTK and executed by OpenCode's selected shell.
 
 ```
 git status       ->  rtk git status       (72% savings)
@@ -65,6 +73,8 @@ Supported commands are determined by the installed RTK version. Common rewrites 
 ```bash
 npm run build     # build the plugin
 npm test          # run tests
+npm run test:rtk  # verify the installed RTK binary
+npm run test:plugin # verify local loading through the Node host
 ```
 
 ## License

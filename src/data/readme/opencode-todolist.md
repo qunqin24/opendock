@@ -9,6 +9,10 @@ OpenCode V2 removed the built-in todo tools. This plugin brings them back as a s
 
 Lists are stored per session and a compact summary is injected into the session context on every model request while tasks are still open, so the model keeps track of them across long conversations and context compaction.
 
+## Screenshot
+
+![Todo sidebar strip showing 7/7 tasks completed, 100% and a total run time](https://raw.githubusercontent.com/aiev/opencode-todolist/master/assets/todo-sidebar.png)
+
 ## Install
 
 ```bash
@@ -78,13 +82,13 @@ Run `/todo-sections` (or pick "Todolist: Settings" from the command palette) to 
 With the timer on, the strip tracks how long the current todo run is taking:
 
 ```
-Todo [1/3] · 33% · 4m12s
+Todo [1/3] · 33%                  4m12s
 [ ] Fix flaky checkout spec
 [•] Refactor payment webhook handler · 2m12s
 [✓] Add regression test · 3m05s
 ```
 
-A run starts at the first write that opens tasks and ends at the write where nothing is open anymore. Per-task times appear when the model marks both `in_progress` and `completed`; tasks that jump straight to completed only count toward the total. Once the run finishes, the strip stays visible with `done in 12m34s` instead of hiding.
+The header timer is right-aligned, with no separator before it. A run starts at the first write that opens tasks and ends at the write where nothing is open anymore. Per-task times appear when the model marks both `in_progress` and `completed`; tasks that jump straight to completed only count toward the total. Once the run finishes, the strip stays visible with `done in 12m34s` on the right instead of hiding.
 
 Times are wall-clock: they include model thinking and user pauses. A list replaced by an unrelated one (or cleared) is treated as abandoned, and the timer restarts on the new list.
 

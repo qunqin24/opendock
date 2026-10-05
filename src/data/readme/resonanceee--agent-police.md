@@ -90,7 +90,7 @@ A bash call goes to the plugin, which records it in the evidence ledger and asks
 | 3    | after the second             | `safe`, `human-review`               |
 
 - The elaborate loop: the block message contains the reviewer's question. The agent explains itself in chat and retries the exact same command. The retry is recognized and judged again with the justification attached.
-- Human review: the plugin summons opencode's native permission dialog showing the command and the reviewer's reason. Allow runs the command once; reject blocks it and tells the agent not to retry. If the dialog API is unavailable (older opencode), the command fails closed with the reason.
+- Human review: the plugin summons opencode's native permission dialog showing the command and the reviewer's reason. Once a command is escalated, retrying it goes back to the human instead of being re-judged. Allow runs the command once and clears the escalation; reject sticks for the rest of the session and tells the agent not to retry. If the dialog API is unavailable (older opencode), the command fails closed with the reason and the escalation stays pending.
 - Fail-closed: reviewer timeouts, HTTP failures, and malformed JSON never silently approve anything. They escalate to human review.
 
 ### Evidence ledger (observation only)

@@ -163,6 +163,8 @@ On Claude Code the plugin also ships a hooks module (`claude/register.tsx`)
 that gives the same answer as the OpenCode sidebar below, in an **Obsidian
 notes** pane:
 
+![The Obsidian notes pane docked beside a Claude Code session](docs/claude-mod.png)
+
 ```text
 ✓ Website Redesign
 ○ Weekly
@@ -172,11 +174,26 @@ also read
 · Research/AI Agents.md
 ```
 
-- The pane opens by itself on the first prompt with a wikilink, when the
-  terminal is wide enough to dock it (144 columns); `/obsidian-notes` opens it
-  at any width.
-- The status line shows the totals, `Obsidian ✓ 2 ○ 1`.
-- `/clear` starts the list over.
+The marks mean the same as in the [OpenCode sidebar](#opencode-sidebar-did-the-agent-read-my-notes):
+`✓` read, `○` linked but not read yet, `✗` no match in the vault, and *also
+read* lists vault files the agent read without you linking them.
+
+### Commands
+
+| Command           | What it does                                                                                        |
+|-------------------|-----------------------------------------------------------------------------------------------------|
+| `/obsidian-notes` | Shows the pane at any terminal width, or hides it if it is already showing. The list keeps updating |
+| `/clear`          | Claude Code's own command. Also empties the list and clears the status line                         |
+
+### When the pane appears
+
+- It opens by itself on the first prompt of a session that contains a
+  wikilink, but only when the terminal is wide enough to dock it (144
+  columns). In a narrower terminal, run `/obsidian-notes`.
+- Once you hide it, it stays hidden for the rest of the session, even as new
+  wikilinks come in. It can open by itself again after `/clear`.
+- The status line always shows the totals, `Obsidian ✓ 2 ○ 1`, whether the
+  pane is open or not.
 
 Reads are taken from Claude Code's `Read` tool calls, with the same limits as
 on OpenCode: a note reached through `Bash` or an MCP server is not detected.

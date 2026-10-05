@@ -115,13 +115,29 @@ Restart Claude Code so the hooks load.
 The plugin also opens a **Skill audit** pane showing the current session's timeline. It refreshes
 after every skill and file-edit tool call, and polls the log every two seconds.
 
+![The Claude Code Skill audit pane docked beside the transcript](docs/claude-mod.png)
+
 - **Opening:** it opens by itself at session start once the terminal is 144 columns or wider.
   Narrower terminals hold it back until you run `/skill-audit-pane`, which opens it at any width.
 - **Placement:** in fullscreen from 110 columns it docks beside the transcript, 40 columns wide
-  (drag the edge to change it; your width is kept), and shows the full timeline. Press a `▼`/`▶` marker to collapse or expand a run or an hour. Elsewhere it sits above
-  the prompt in a compact form: the header and the latest run.
+  (drag the edge to change it; your width is kept), and shows the full timeline. Press a `▼`/`▶`
+  marker to collapse or expand a run or an hour. Elsewhere it sits above the prompt in a compact
+  form: the header and the latest run.
 - **Other panes:** panes from other plugins become tabs beside it (click a tab, or ctrl+x tab).
-  Only one is shown at a time. Esc or the close mark closes it.
+  Only one is shown at a time.
+
+##### Showing and hiding the pane
+
+| Command               | What                                                                        |
+|-----------------------|-----------------------------------------------------------------------------|
+| `/skill-audit-pane`   | Close the pane when it is open, open it (at any width) when it is not       |
+| Esc or the close mark | Close the pane for this session only; the next session opens it again       |
+
+Closing with `/skill-audit-pane` is remembered in the plugin's own store (a JSON file under your
+Claude Code configuration directory), so new sessions keep it closed until you run
+`/skill-audit-pane` again, which opens it and turns auto-open back on.
+Hiding never stops recording: the shell hooks keep writing the log, and the CLI and the pane read
+it back the moment you open it again.
 
 The pane is display only. The shell hooks keep writing the log through `logger.sh`, so recording
 works the same on Claude Code builds without plugin function hooks.
@@ -242,22 +258,49 @@ If `list` prints `no session logs in ...`, nothing was written. Go to
 
 ## Usage
 
-| Command                    | What                                                             |     Tokens |
-|----------------------------|------------------------------------------------------------------|-----------:|
-| `skill-audit status [sid]` | Compact counts and recent timeline                               |          0 |
-| `skill-audit report [sid]` | Full timeline                                                    |          0 |
-| `skill-audit watch [sid]`  | Live view, refreshed every two seconds. `q` quits                |          0 |
-| `skill-audit list`         | Recent sessions                                                  |          0 |
-| `skill-audit --help`       | Usage summary                                                    |          0 |
-| `! skill-audit status`     | Run inside a Claude Code session. Queues while the model is busy |          0 |
-| opencode sidebar           | Live timeline beside the conversation. No command to run         |          0 |
-| Claude Code pane           | Live timeline in a pane. `/skill-audit-pane` opens it            |          0 |
-| `/skill-audit`             | Show the report inside Claude Code                               | Model turn |
-| `$skill-audit`             | Show the report inside Codex                                     | Model turn |
+### CLI
+
+Works from any terminal, on logs from any host. None of these cost tokens.
+
+| Command                    | What                                              |
+|----------------------------|---------------------------------------------------|
+| `skill-audit status [sid]` | Compact counts and recent timeline                |
+| `skill-audit report [sid]` | Full timeline                                     |
+| `skill-audit watch [sid]`  | Live view, refreshed every two seconds. `q` quits |
+| `skill-audit list`         | Recent sessions, newest first                     |
+| `skill-audit --help`       | Usage summary                                     |
 
 `status`, `report` and `watch` all take an optional session ID. Without one they use the most
 recently modified log, which is the wrong session if you run several at once. Get the ID from
 `skill-audit list` and pass it explicitly.
+
+### Inside a session
+
+| Host        | Command                | What                                                                 |     Tokens |
+|-------------|------------------------|----------------------------------------------------------------------|-----------:|
+| Claude Code | `/skill-audit-pane`    | Show or hide the live pane ([details](#showing-and-hiding-the-pane)) |          0 |
+| Claude Code | `! skill-audit status` | Run the CLI in the session. Queues while the model is busy           |          0 |
+| Claude Code | `/skill-audit`         | Print the full report in the transcript                              | Model turn |
+| Codex       | `$skill-audit`         | Print the full report in the transcript                              | Model turn |
+| opencode    | `skill-audit` skill    | Print the full report, once linked ([opencode](#opencode))           | Model turn |
+
+### Live views
+
+| Where               | What                                                                      |
+|---------------------|---------------------------------------------------------------------------|
+| Claude Code pane    | Opens at session start from 144 columns; `/skill-audit-pane` at any width |
+| opencode sidebar    | Always on beside the conversation. Click the header to collapse it        |
+| `skill-audit watch` | Any terminal, any host                                                    |
+
+### Configuration
+
+Set these in the environment of the host (and of your shell, for the CLI). All are optional.
+
+| Variable                   | Default                 | What                                                                                |
+|----------------------------|-------------------------|-------------------------------------------------------------------------------------|
+| `SKILL_AUDIT_DIR`          | `~/.claude/skill-audit` | Where logs are written and read                                                     |
+| `SKILL_AUDIT_IDLE_MINUTES` | `30`                    | Idle minutes after which a skill run stops claiming edits                           |
+| `SKILL_AUDIT_ICONS`        | one-cell icons          | `emoji` uses `⚡` / `⚠` in the pane and sidebar (two cells wide in most terminals) |
 
 The `⚠ edits outside skill context` counter is the compliance red flag: files changed while no
 observable skill was active.
@@ -317,6 +360,11 @@ you set `SKILL_AUDIT_DIR` for the host, export it for your shell too. Otherwise 
 
 **`skill-audit: command not found`.** The symlink is missing or its directory is not on `PATH`.
 See [CLI on your PATH](#cli-on-your-path-recommended).
+
+**The Claude Code pane no longer opens at session start.** You closed it with
+`/skill-audit-pane`, which is remembered across sessions. Run `/skill-audit-pane` again to show it
+and turn auto-open back on. If you never hid it, your terminal is likely narrower than 144
+columns; the command opens it at any width.
 
 **A skill ran but is missing from the timeline.** Expected in some cases. See
 [Honest limitations](#honest-limitations).

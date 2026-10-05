@@ -25,6 +25,77 @@ session history is never touched.
 See [On-demand pruning (no LLM)](#on-demand-pruning-no-llm) under Commands for
 full syntax and edge cases.
 
+### Agent-Initiated Pruning (`dcp_prune`)
+
+Adds an opt-in tool that lets the model propose pruning old tool outputs and
+eligible prior reasoning. It is disabled by default and requires OpenCode's
+native `ask` permission before applying a frozen selection. Targets are checked
+again after approval; if they changed or became unavailable, nothing is pruned.
+Pruned tool outputs take effect on the next request and remain undoable with
+`/dcp unprune`; session history is not modified.
+
+Enable it in `dcp.jsonc`:
+
+```jsonc
+{
+    "prune": {
+        "enabled": true,
+        "permission": "ask",
+        "nudge": {
+            "enabled": true,
+            "contextThreshold": 200000,
+            "minSavingsRatio": 0.20,
+            "growthTokens": 50000,
+            "olderThan": 1,
+            "tools": ["*"]
+        }
+    }
+}
+```
+
+The optional nudge is an ephemeral note appended to an outbound prompt when its
+criteria are met; it is event-driven, not a background poll. It uses the latest
+reported prompt input plus cache-read/write tokens; output and reasoning tokens
+are excluded. It triggers only above `contextThreshold`, after at least
+`growthTokens` of growth from the episode baseline, and when eligible tool
+pruning's estimated **net** savings reach `minSavingsRatio` of that prompt size.
+Net tool estimates account for the replacement placeholder; the percentage
+does not include reasoning. After an accepted prune, the first fresh prompt
+report becomes the new baseline; after a declined or ignored proposal, current
+reported usage becomes the baseline. Manual `dcp_prune` calls do not depend on
+these nudge thresholds.
+
+The tool accepts a single `args` string. `all` mirrors `/dcp prune all`: age 1,
+the top five tool groups, and eligible reasoning, overriding protections.
+Without `all`, default selection respects protections; explicitly supplied
+`--tools` globs override them. If no top-N/index selector is supplied, explicit
+flags select all matching tool groups. `--dry-run` returns an estimate without
+requesting approval or pruning:
+
+```text
+dcp_prune(args="all")
+dcp_prune(args="--older-than 1 --tools * --reasoning")
+dcp_prune(args="--older-than 1 --tools * --reasoning --dry-run")
+```
+
+`--tools *` explicitly selects every matching tool, including protected tools;
+use a narrower glob when that is not intended. Reasoning savings are shown
+separately and are model-dependent: they help only when the model retains prior
+reasoning, and reasoning pruning cannot be restored by `/dcp unprune`.
+
+OpenCode's native approval is required for each batch. DCP rejects a known
+effective `allow` rule rather than silently applying it, but private or
+remembered host permission rules may not be visible to the plugin and can
+bypass the native prompt. Review host permissions if approval prompts are
+important. The feature is restricted to the primary session via
+`experimental.primary_tools` and a runtime guard; `experimental.allowSubAgents`
+continues to control other DCP features and does not enable agent pruning in
+subagents.
+
+Displayed token counts and net-savings percentages are estimates/reported
+prompt usage, not provider billing or cache measurements. Live cache effects of
+agent pruning have not been empirically verified.
+
 ### Stale Tool Pruning (`staleTools` strategy)
 
 Automatically prunes completed tool outputs after a configurable number of turns (default: 3). In the upstream plugin, only errored tool calls were pruned — completed tool outputs (often 75%+ of context) were never cleaned up. This strategy continuously marks old tool outputs for removal, significantly reducing context size between compression events.
@@ -100,6 +171,14 @@ Or manually add to your `~/.config/opencode/opencode.json`:
 ```
 
 Then restart OpenCode. The plugin is cached in `~/.cache/opencode/packages/`.
+
+When running from a local checkout, build the distributable before loading it:
+
+```bash
+npm run build
+```
+
+Restart or reload OpenCode after the build so it loads the updated `dist/` files.
 
 ### Verify
 
@@ -202,6 +281,19 @@ Each level overrides the previous, so project settings take priority over global
         "enabled": true,
         // Additional tools to protect from pruning via commands (e.g., /dcp sweep)
         "protectedTools": [],
+    },
+    // Agent-initiated pruning is opt-in; enabled mode still requires host ask permission
+    "prune": {
+        "enabled": false,
+        "permission": "ask",
+        "nudge": {
+            "enabled": true,
+            "contextThreshold": 200000,
+            "minSavingsRatio": 0.2,
+            "growthTokens": 50000,
+            "olderThan": 1,
+            "tools": ["*"],
+        },
     },
     // Manual mode: disables autonomous context management,
     // tools only run when explicitly triggered via /dcp commands
@@ -321,6 +413,7 @@ DCP provides a TUI panel and one prompt-producing slash command:
 
 - `/dcp` — Opens the DCP panel with context, stats, and manual-mode controls.
 - `/dcp-compress [focus]` — Asks the model to run one compression pass. Optional focus text directs what content to compress, following the active `compress.mode`.
+- `dcp_prune` — When enabled in `prune.enabled`, lets the model request approval for pruning eligible tool outputs and optional prior reasoning. This is separate from the manual `/dcp prune` command below.
 
 ### On-demand pruning (no LLM)
 

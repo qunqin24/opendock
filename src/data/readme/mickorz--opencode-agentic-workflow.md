@@ -307,6 +307,9 @@ workflow 结束时同步写 `metrics.json` 快照（失败也写）。
 | `isolation.dir` | `string` | 仓库同级 | worktree 父目录 |
 | `isolation.baseRef` | `string` | HEAD | worktree 基准 ref |
 | `isolation.cleanup` | `always` / `on-success` / `never` | `on-success` | 清理策略 |
+| `workflows` | `string[]` | — | 声明式流程路径（.json 文件或目录） |
+| `schedulesDir` | `string` | 关闭 | 定时任务目录（配置 + 游标 + 触发记录）；需同时配置 `journalDir`，启用 `workflow_schedule` 工具与调度器 |
+| `maxConcurrentRuns` | `number` | `3` | 并发顶层 run 上限（超出返回可读失败并提示用 `workflow_control` 查看或停止在飞 run） |
 
 相对路径一律以**项目目录**（不是 service 进程 cwd）为基准解析。
 
@@ -316,11 +319,203 @@ workflow 结束时同步写 `metrics.json` 快照（失败也写）。
 
 | 参数 | 说明 |
 |------|------|
-| `flow` | workflow id（枚举由注册表驱动；缺省 `smoke`） |
-| `topic` | 主题参数 |
-| `resumeRunId` | 恢复指定 run（优先于 flow/topic；用失败输出里的 runId） |
+| `flow` | workflow id（见工具描述内清单，含 `workflow_define` 定义的自定义流程；缺省 `smoke`；未知 id 报错并列出可用清单） |
+| `topic` | 主题参数（恒传顶层） |
+| `args` | flow 声明的其余参数（对象；描述内 `[args: …]` 有提示；required/类型不符即报具体问题） |
+| `resumeRunId` | 恢复指定 run（优先于 flow/topic；用失败输出里的 runId；aborted 的 run 也可恢复） |
+| `checkpointMode` | 调用级审批覆盖：`"auto-approve" | "auto-reject"`（headless 必传前者，除非明确要拒） |
+| `background` | `true` = 后台启动并立即返回 runId（需 journalDir；用 `workflow_control` 轮询/停止）。**并发顶层 run 已支持**：最多 `maxConcurrentRuns`（默认 3）个 run 同时在飞；来自 run 内部（其 agent 会话或派生子会话）的调用仍被拒绝（递归防护，防信号量自饿死） |
+
+**`workflow_define`** —— 对话中定义自定义流程（声明式 JSON：校验 → 立即注册 → 落盘，
+之后每次启动自动装载；幂等重定义 / 改内容必须升 version）。
+
+**`workflow_control`** —— run 检查与控制（需 journalDir）：
+`action=status`（全量列表或单 run 详情，含最终 output）；
+`action=stop`（协作式停止——下一步骤边界生效，journal 收口为 `aborted`；
+进程重启遗留的悬置 running run 会被直接收口）。
 
 **`workflow_metrics`** —— 只读查询本服务累计指标（`format: "text" | "json"`）。
+
+**`workflow_schedule`** —— 定时任务管理（需 `schedulesDir` + `journalDir`）：
+
+| 参数 | 说明 |
+|------|------|
+| `action` | `create` / `list` / `get` / `delete` / `runNow` / `enable` / `disable` |
+| `id` | schedule id（kebab-case；create 必填） |
+| `flow` / `cron` | create 必填：workflow id + 四模式 cron（`* * * * *`、`*/n`、`m * * * *`、`m h * * *`、`m h * * W`，本地时区） |
+| `args` | 触发时透传的 workflow 参数（含 `topic`） |
+| `name` / `enabled` | 展示名 / 初始启用态（缺省 true） |
+
+语义边界（如实）：调度器随宿主进程存活（进程退出即停）；停机错过的 slot
+重启后**合并为最近一个**补跑；创建时刻为游标基线（更早的 slot 不补跑，
+要立即跑用 `runNow`）；触发时若有任一 run 在跑（调度器单飞，与手动并发
+上限独立——保持节奏可预期、避免并行成本意外）该 slot 记录 `skipped`
+（跳过不是延迟）；scheduled run 无人值守——checkpoint 强制 auto-approve、
+不启用 worktree 隔离；触发时用 registry 当前最新版本。
+
+## Skills
+
+npm 包内附两个 agent skill（`skills/` 目录，随包分发），教主 agent 用上面的工具
+完成「定义流程」与「迭代优化」两类高频任务：
+
+| Skill | 触发场景 |
+|-------|----------|
+| `workflow-authoring` | 「帮我定义/创建一个 workflow」「给流程加步骤/参数」「workflow_define 报错了」——从需求澄清到声明式 JSON 构造、落盘注册、试跑验证的完整链路 |
+| `workflow-optimize` | 「这个流程跑得慢/贵/老失败」「优化迭代一下」「对比改动前后」——metrics/journal 诊断 → 单主题改动 → 升版重定义 → 同参重跑 → 对比报告 |
+
+启用方式（二选一）：
+
+```jsonc
+// 方式一（推荐，零拷贝）：opencode.json 里把包内 skills 目录挂进 skills 数组
+{
+  "plugins": [{ "package": "opencode-agentic-workflow", "options": { "...": "..." } }],
+  "skills": ["node_modules/opencode-agentic-workflow/skills"]
+}
+
+// 方式二：把 skills/ 下的子目录拷进 .opencode/skills/（项目级）
+// 或 ~/.config/opencode/skills/（全局）
+```
+
+挂载后 agent 会在相关请求时自动加载；也可在 prompt 里显式 `@workflow-authoring`
+指定。
+
+## TUI 进度面板
+
+在交互式 TUI 里输入 `/workflow`（或命令面板搜 "Workflow progress"）打开进度面板：
+近期 run 一览（含 journal 里的历史 run），最新 run 展开步骤树，状态实时刷新——
+journal 每次状态变更都会派发 `run.progress` 全量快照事件。
+
+```
+Agentic Workflow
+✗ feature-development@1.0.0  5.0s
+  ✓ gather  2.0s
+  ▶ implement  2.5s
+  · verify
+  ↳ verify rejected the patch
+✓ paced@1.0.0  24.0s
+── detail
+✓ artifact@1.0.0 · completed · 42.0s
+  run_9f3c… · args {"topic":"节点详情验收"}
+  ✓ write  18.2s
+    → 已写入 artifact.md（约 1200 字）……
+  ✓ check  1.1s
+    → artifact.md exists (4.2 KB)
+```
+
+面板下半区是**节点详情**（P2-8b）：最新 run 的 journal 单读投影——runId /
+args 预览 / 每步骤的输出或错误预览（折行 + 截断）/ 步骤与总时长，以及
+**步骤级 token/模型元数据**（agent 步显示 `· 1.5k tok · glm/glm-5.3-flash`
+后缀；同一 run 的 agent 调用按 runId 聚合到所在步骤，subflow 互不串账）。
+详情经 `agentic-workflow-progress` RPC 的 `detail` 方法拉取（同一状态只拉
+一次，终态转换再拉一次收尾）；未配置 `journalDir` 时详情区静默缺省，
+面板其余不受影响。
+
+数据链路：RunJournal 状态转换 → `run.progress` 事件总线 → ProgressBoard（容量 20，
+journalDir 配置时用历史 run 做种子）→ `agentic-workflow-progress` RPC。headless
+（`opencode run`）下没有 TUI 监听，转发零成本；同一份事件流也会写进 traceDir
+（`events.jsonl`），可作为无头观测替代。
+
+注意：面板渲染属交互式 TUI 行为，需在真实 TUI 里人工确认（本仓库自动化覆盖到
+server 侧链路：事件发射、board 维护、RPC 契约（snapshot/detail）均有测试与 E2E
+证据；详情渲染函数对真实 journal 的输出有 E2E 快照）。
+
+## 嵌套工作流（subflow）
+
+P2-9 起支持把另一个已注册 workflow 作为步骤运行（v1 的 `workflow()` 原语对位）。
+两条路：
+
+**声明式**——步骤键 `subflow`（七类互斥键之一：agent / checkpoint / verify /
+fileExists / subflow / pipeline / race）：
+
+```jsonc
+{
+  "id": "release-orchestrator",
+  "version": "1.0.0",
+  "steps": [
+    { "name": "notes", "subflow": "release-notes", "args": { "topic": "{{topic}}" } },
+    { "name": "gate", "checkpoint": "发布说明已生成（{{steps.notes}}），批准？" }
+  ],
+  "output": "orchestrated: {{steps.notes}}"
+}
+```
+
+**代码式**——definition 内 `ctx.subflow(id, args)`：
+
+```ts
+defineWorkflow({
+  id: "my-orchestrator",
+  version: "1.0.0",
+  stepNames: ["child"],
+  async run(args, ctx) {
+    const child = await ctx.subflow!("release-notes", { topic: args.topic })
+    return { output: child.output }
+  },
+})
+```
+
+语义：
+
+- **子 run 独立 journal**：`parentRunId`/`depth` 记录 lineage；进度面板把子 run
+  缩进挂在父 run 下；子 run 失败按普通步骤失败处理（父 run fail-fast）
+- **gate/workspace 继承**：子 run 走父 run 的审批门与工作区（隔离是顶层
+  run 的属性；子 agent 的 cwd 落在父 run 的 worktree）
+- **深度上限 3**：超出明确报错（防失控递归；v1 自饿死事故的教训）
+- **依赖 journalDir**：subflow run 必须有 journal（lineage 落盘）；未配置时
+  声明式步骤给出清晰报错、代码式 ctx 不提供该方法
+- agent 步骤里的递归守卫不变：workflow 内的 agent 不能再调 workflow_start
+  （那会绕过编排）；要组合流程就用 subflow
+
+同一机制也顺带解决了 0.4.0 的已知限制「全局 gate 单例竞态」：checkpoint
+gate 与 workspace 现在经 run 级上下文（AsyncLocalStorage）解析，
+scheduler 的无人值守门与 `checkpointMode` 调用级覆盖都不再换装全局单例。
+
+## 声明式并发步骤（pipeline / race）
+
+代码组合子 `pipeline()` / `race()` 的 JSON 形态（v1 parallel/race 原语对位）——
+不想写 TS 定义也能声明并发结构：
+
+```jsonc
+{
+  "id": "multi-analysis",
+  "steps": [
+    // 条目并发 fan-out：items 每项是模板，解析后作为条目值；{{item}} 引用条目
+    { "name": "fanout", "pipeline": "分析 {{item}}（主题 {{topic}}）",
+      "items": ["{{topic}}-甲", "{{topic}}-乙", "{{topic}}-丙"],
+      "outputAs": "reports",                       // 结果数组并入 state 的键（缺省 = 步骤名）
+      "onFailure": "continue",                     // 可选：fail-fast（缺省）| continue
+      "model": "glm/glm-5.3-flash", "timeoutMs": 300000, "retries": 1 },
+    // 竞速首胜：≥2 提示并发起跑，首个成功者胜出，全败抛 WorkflowRaceError
+    { "name": "fastest", "race": ["方案A：{{topic}}", "方案B：{{topic}}"] }
+  ],
+  "output": "{{steps.fanout}}"   // pipeline 结果 = 与 items 对齐的数组（JSON 串）
+}
+```
+
+- **pipeline**：条目间并发（共享插件 `concurrency` 信号量）、单阶段；结果数组与
+  `items` 顺序对齐；`{{steps.<name>}}` 拿到 JSON 串。调用级选项
+  （model/timeoutMs/retries）每条目同规则透传。
+- **race**：败者不拖整体（与 run 控制同一诚实语义）；可选 `outputAs`。
+- **resume 粒度（如实）**：两者各占一个 journal 步骤单元——completed 即整体
+  跳过，中断后重跑整步（条目级断点不落盘，与 sequence 前缀语义一致）。
+  需要条目级恢复就拆 subflow 步或用代码式定义。
+
+## 并发 run（顶层多飞）
+
+gate/workspace 的 run 级化让**并发顶层 run** 成为安全默认：同一进程可同时
+跑最多 `maxConcurrentRuns`（默认 3）个 workflow——各自独立 journal /
+workspace（worktree）/ checkpoint 门 / 进度快照，agent 步共享同一并发
+信号量（公平排队，不会互相饿死）。
+
+递归防护（防信号量自饿死）从「任一 run 在飞即拒绝一切」改为**按调用来源
+判别**：executor 为每个 agent 任务创建的子会话在执行期内登记（`run-sessions`），
+workflow 工具凭调用会话的自身/祖先链（`session.get` 的 `parentID`，封顶
+8 跳）识别「来自 run 内部的调用」并拒绝（提示改用 subflow 组合）；顶层
+用户会话不在任何 run 树内，正常放行。会话身份缺失的宿主环境保守退回旧
+单飞语义。
+
+调度器行为不变：scheduled slot 触发时若有任一 run 在跑（含手动并发 run），
+该 slot 记 `skipped`——保持调度节奏可预期、避免并行成本意外，这是与手动
+并发上限相互独立的设计取舍。
 
 ## Journal 数据模型
 
@@ -332,6 +527,8 @@ workflow 结束时同步写 `metrics.json` 快照（失败也写）。
   "workflow": { "id": "artifact", "version": "1.0.0" },  // resume 精确版本解析依据
   "args": { "topic": "火星基地能源方案" },
   "workspace": { "provider": "git-worktree", "path": "...", "branch": "agw/run_..." },
+  "parentRunId": "run_1790994700000_xxxx",  // P2-9 lineage：subflow 子 run 指回父 run（顶层无）
+  "depth": 1,                                // 嵌套深度（顶层 0）
   "status": "failed",            // running / completed / failed / aborted
   "steps": [
     { "name": "write",      "status": "completed", "startedAt": 1760000000000 },
@@ -354,7 +551,7 @@ workflow 结束时同步写 `metrics.json` 快照（失败也写）。
 | 平台 | OpenCode **V1** 插件 API | OpenCode **V2** 插件 API |
 | workflow 形态 | 主 agent **运行时生成 JS 编排脚本**（VM 沙箱） | **声明式定义** + 语义版本注册（代码内） |
 | 调用方式 | 自然语言 → 生成脚本 → 执行 | `flow=<id>` + args（或 `resumeRunId`） |
-| 原语 | agent / parallel / sequence / fallback / race | agent / parallel / sequence / phase + check / verify / checkpoint |
+| 原语 | agent / parallel / sequence / fallback / race | agent / parallel / sequence / phase + check / verify / checkpoint + **subflow** + **pipeline/race（声明式或代码式）** |
 | 崩溃恢复 | 无 | journal + resume（completed 跳过、精确版本、幂等重放） |
 | 隔离 | 子会话 | git worktree per run（resume reattach） |
 | 观测 | TUI 进度树 | events.jsonl trace + metrics/成本聚合 |
@@ -367,7 +564,8 @@ workflow 结束时同步写 `metrics.json` 快照（失败也写）。
    中固化为 `WorkflowDefinition`（`src/workflows/` 有三个完整样例）。换来的是
    可恢复、可版本化、可审计。
 2. **一次性的动态编排仍有价值**：不需要 durable 的临时任务，直接让主 agent
-   自己并行开子会话完成即可（v2 明确拒绝嵌套 workflow 调用防递归死锁）。
+   自己并行开子会话完成即可（workflow 内的 agent 仍不可再调 workflow 工具；
+   流程级组合用 subflow 步骤 / ctx.subflow，见「嵌套工作流」一节）。
 3. OpenCode 平台自身 V1→V2 的配置/插件迁移见
    `dev-docs/guides/Migrate from V1.md`（官方指南剪藏）。
 

@@ -192,6 +192,15 @@ example and precedence rules.
 
 ### Preset Docs
 
+Project settings in `.opencode/oh-my-opencode-slim.json[c]` are inherited from
+ancestor directories, matching the host's discovery: v2 walks to the filesystem
+root; v1 stops at the Git worktree boundary. `OPENCODE_DISABLE_PROJECT_CONFIG`
+disables the project walk.
+Closer settings override matching fields. Prompt files and the optional
+`skills_include_local` grants also search ancestor `.opencode` directories,
+following OpenCode's directory discovery. See
+[Configuration](docs/configuration.md#config-files) for precedence and trust boundaries.
+
 Consider presets as guidelines as they are often outdated.
 
 - **[OpenAI Preset](docs/openai-preset.md)** — the default generated preset; runs all agents on OpenAI models.
@@ -676,7 +685,7 @@ Use this section as a map: start with installation, then jump to features, confi
   <p><sub>Every merged contribution leaves a mark on the realm.</sub></p>
 
   <!-- ALL-CONTRIBUTORS-BADGE:START - Do not remove or modify this section -->
-[![All Contributors](https://img.shields.io/badge/all_contributors-131-orange.svg?style=flat-square)](#contributors-)
+[![All Contributors](https://img.shields.io/badge/all_contributors-133-orange.svg?style=flat-square)](#contributors-)
 <!-- ALL-CONTRIBUTORS-BADGE:END -->
 </div>
 
@@ -861,6 +870,10 @@ Use this section as a map: start with installation, then jump to features, confi
       <td align="center" valign="top" width="16.66%"><a href="https://rclb.dev/"><img src="https://avatars.githubusercontent.com/u/856570?v=4?s=100" width="100px;" alt="Rodrigo Belem"/><br /><sub><b>Rodrigo Belem</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=rbelem" title="Code">💻</a></td>
       <td align="center" valign="top" width="16.66%"><a href="https://mustbethecode.com/"><img src="https://avatars.githubusercontent.com/u/42842700?v=4?s=100" width="100px;" alt="GWA"/><br /><sub><b>GWA</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=mustbethecode" title="Code">💻</a></td>
       <td align="center" valign="top" width="16.66%"><a href="https://github.com/lancew"><img src="https://avatars.githubusercontent.com/u/11627?v=4?s=100" width="100px;" alt="Lance Wicks"/><br /><sub><b>Lance Wicks</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=lancew" title="Code">💻</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="https://incerry.cnblogs.com/"><img src="https://avatars.githubusercontent.com/u/36690780?v=4?s=100" width="100px;" alt="InCerryGit"/><br /><sub><b>InCerryGit</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=InCerryGit" title="Code">💻</a></td>
+    </tr>
+    <tr>
+      <td align="center" valign="top" width="16.66%"><a href="https://github.com/doublepi123"><img src="https://avatars.githubusercontent.com/u/54027436?v=4?s=100" width="100px;" alt="doublepi123"/><br /><sub><b>doublepi123</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=doublepi123" title="Code">💻</a></td>
     </tr>
   </tbody>
 </table>

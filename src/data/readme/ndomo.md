@@ -117,7 +117,7 @@ See [docs/installer.md](docs/installer.md) for detailed steps and full flag refe
 
 ndomo persists plans, tasks, sessions, analyses and ops records (incidents, deployments, releases, rollbacks) in a project-local SQLite database
 (`<project>/.ndomo/state.db`) with FTS5 search, audit trail, and auto-archive
-to markdown on completion. 62 tools are exposed via OpenCode, grouped by domain:
+to markdown on completion. 65 tools are exposed via OpenCode, grouped by domain:
 
 | Domain | Tools |
 |---|---|
@@ -132,6 +132,7 @@ to markdown on completion. 62 tools are exposed via OpenCode, grouped by domain:
 | Obsidian | `obsidian_export`, `obsidian_read_note` |
 | Ops | `incident_create`, `rollback_record` |
 | Design & review | `design_create`, `critic_review` |
+| Specs | `spec_create`, `spec_get`, `spec_lint` |
 | Utility | `status`, `ndomo_write_unlock`, `stats` |
 
 The foreman uses these to track work across agent dispatches; ranger writes `analyses` rows (linkable to plans via `analysis_link_plan`). See
@@ -215,6 +216,27 @@ On trip: warning emitted, target task marked `failed` with error `"Circuit break
 {
   "circuitBreaker": { "threshold": 4000 }
 }
+```
+
+### Spec-Driven Gates (T0/T1)
+
+Spec-driven development is opt-in per plan (see [docs/workflows.md](docs/workflows.md)):
+
+| Gate | Scope | Rule |
+|---|---|---|
+| T0 | plan with `metadata.specId` | cannot reach `approved` while `spec_lint` reports any `error` finding; the block message names the offending path/rule; a deleted spec file blocks approval naming the missing path |
+| T1 (extended) | task with non-empty `metadata.reqIds` | `task_verify({verdict:"passed"})` additionally requires `result.redProof` (failing-test output captured before implementation) + ≥1 `testRef` tagged `REQ-xxx`; the existing inspector-only rule still applies |
+
+Plans/tasks without those metadata keys behave exactly as before (REQ-006 — no migration;
+the metadata reuses the existing JSON columns).
+
+```typescript
+// Spec tools (opt-in SDD)
+spec_create({ slug: 'sdd-core' })          // → { path, id, created }
+spec_lint({ id: 'SPEC-001' })              // → { ok, findings: [{ rule, severity, line, message }], stats }
+
+// Task verification with red-proof (extended T1)
+task_verify({ taskId, verdict: 'passed', result: { redProof: 'bun test ... → 1 failed', testRefs: ['REQ-001-AC-1'] } })
 ```
 
 ## Configuration

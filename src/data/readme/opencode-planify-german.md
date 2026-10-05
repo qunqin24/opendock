@@ -25,7 +25,7 @@ maschinenlesbare Fassung.
 | --- | --- | --- |
 | Instructions | `instructions/planify.md` | Immer geladen: Deutsch, Schweizer Rechtschreibung, Plan als JSON über `plan_render`. |
 | Skill | `skills/planify/SKILL.md` | Auf Abruf: Schema, Feldbedeutungen, Schreibregeln, Diagrammweg, Beispiel. |
-| Plugin | `src/plugin.ts` | Registriert das Tool `plan_render`: validiert, schreibt JSON und HTML nach `docs/plans/`, öffnet die Datei. |
+| Plugin | `src/plugin.ts` | Registriert `plan_render` (validiert, schreibt JSON und HTML nach `docs/plans/`, öffnet die Datei) und `plan_pr` (Plan in die Description eines Bitbucket-PRs). |
 | Renderer | `src/render.ts`, `templates/` | Schema-Prüfung (ajv), Orthografie-Warnungen, Nunjucks, SVG inline. |
 
 ## Installation
@@ -36,11 +36,12 @@ maschinenlesbare Fassung.
 npx opencode-presets install opencode-planify-german
 ```
 
-Das Bundle installiert die drei Teile zusammen: das Plugin mit dem Tool
-`plan_render` aus der npm-Registry (auf die Version gepinnt), die Regeldatei nach
-`instructions` und den Skill nach `skills.paths`.
+Das Bundle installiert die drei Teile zusammen: das Plugin mit den Tools
+`plan_render` und `plan_pr` aus der npm-Registry (auf die Version gepinnt), die
+Regeldatei nach `instructions` und den Skill nach `skills.paths`. Es fragt die
+Bitbucket-URL und einen HTTP Access Token ab, die `plan_pr` braucht.
 
-Der Installer schreibt für das Plugin nur den Paket-Spec nach `opencode.json`;
+Der Installer schreibt für das Plugin den Paket-Spec samt Optionen nach `opencode.json`;
 geladen wird das Paket beim nächsten Start von opencode. Also opencode einmal neu
 starten, dann prüfen:
 
@@ -70,6 +71,29 @@ npx opencode-presets remove opencode-planify-german
    Warnung zurück. Pfade, Kommandos und der Slug sind ausgenommen.
 5. Geschrieben werden `docs/plans/<TICKET>-<slug>.plan.json` und `.html`, dann
    öffnet die Datei.
+
+## Plan in die PR-Description (Bitbucket Data Center)
+
+Auf Verlangen schreibt `plan_pr` den Plan als Markdown in die Description des
+offenen PRs des aktuellen Branches: "Schreib den Plan in den PR". Der PR muss
+existieren, `plan_pr` legt keinen an und schreibt keinen Kommentar. Die
+Description wird vollständig ersetzt, Titel und Reviewer bleiben. Ein Diagramm
+fehlt dort, Bitbucket stellt kein SVG dar.
+
+Projekt und Repository kommen aus `origin`, die Basis-URL und ein HTTP Access
+Token aus den Plugin-Optionen. Das Bundle fragt beide bei der Installation ab;
+ohne Terminal-Eingabe:
+
+```sh
+export BITBUCKET_TOKEN=…
+npx opencode-presets install opencode-planify-german \
+  --set bitbucketUrl=https://bitbucket.example.com --set-env bitbucketToken=BITBUCKET_TOKEN
+```
+
+Der Token steht danach im Klartext in `opencode.json`. Ohne Plugin-Optionen
+greifen die Umgebungsvariablen `PLANIFY_BITBUCKET_URL` und
+`PLANIFY_BITBUCKET_TOKEN`. Der Token geht nur an die konfigurierte Instanz: eine PR-URL auf einem
+anderen Host lehnt `plan_pr` ab.
 
 ## Browser
 

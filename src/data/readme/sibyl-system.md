@@ -164,6 +164,28 @@ Plainly stated:
   0-confidence REJECT ballot with reason `verdict-unparseable: …`.
 - There is no lenient mode, by design.
 
+## Ballot-integrity laws (W1–W3, added 2026-10-05 after the campaign postmortems)
+
+- **Convener recusal (W1).** Every consult/swarm/review run resolves the
+  convening execution chain through the engine's own session store
+  (`session.get` parent links — never a self-report) and scans it for drafting
+  evidence of the artifact (write/edit parts targeting it, or content matches).
+  A kinship hit stamps the run `independence=NOT-INDEPENDENT`: the ballot is
+  preserved as data but is not in any effective path. A chain that cannot be
+  read stamps `UNVERIFIABLE` — unreadable is never silently clean.
+- **Absence is a disability (W2).** Before any tally is honored, every declared
+  voter/worker must have left a terminal row (`ok|error|timeout` + detail) in
+  the run's `TERMINALS.txt`. A declared seat without its row is counted
+  `dead-without-record=N` on the first receipt line and forces `CANNOT_ANSWER` —
+  never folded into an approve or a reject. A worker session ending with empty
+  content is a failure, not a done ballot.
+- **The ruler rides the ballot (W3).** Each terminal record embeds
+  `instrument: {rulesHash, components}` — the sha256 of every persona prompt /
+  criteria text the build actually sends (councilors, architect, judge, repair
+  grammar, chamber roles). `rulesHash` flips with any ruler edit, so
+  "re-evaluate under the new rules" is reproducible and comparable; the
+  `rules=<12hex>` label rides the receipt face and `sibyl_status` lines.
+
 ## Security notes
 
 - Consult/swarm send the artifact text to your configured model pool providers.
@@ -198,7 +220,15 @@ index.ts            plugin entry: parse options → share one RunStore + client
 │                   transcript/disk signal grading, canary veto
 ├── state/          RunStore + v1.1 chamber records: EOF-append ledger (A5),
 │                   face-last regeneration, CHECKSUMS + spotcheck (A4)
-├── personas.ts     registry: 3 councilors + ARCHITECT, model slots
+├── personas.ts     registry: 3 councilors + ARCHITECT + judge/repair texts,
+│                   model slots — the single source the W3 face hashes
+├── terminal.ts     W2 terminal-row grammar (ok|error|timeout), parse + the
+│                   dead-without-record declared-minus-recorded diff
+├── instrument.ts   W3 ruler face: sha256 set of the live prompt/criteria
+│                   texts + deterministic rulesHash fold
+├── independence.ts W1 convener-recusal: engine-store chain walk +
+│                   drafting-evidence scan (INDEPENDENT / NOT-INDEPENDENT /
+│                   UNVERIFIABLE, fail-closed on unreadable)
 ├── options.ts      zod v4 schema + parseOptions (never throws)
 ├── cli.ts          v1.1 sibyl-chamber bin: run | status | spotcheck | kill
 └── tools/          sibyl_consult / sibyl_swarm / sibyl_status / sibyl_review
@@ -250,4 +280,4 @@ MIT
 
 ## Release wheel
 
-Tags v* require a packet receipt (docs/release/<ver>.md with a real `gate: PASS` line) and a lease; after cloning run `scripts/install-hooks.sh` — hooks are per-clone and ship empty.
+Tags v* require a packet receipt (docs/release/<ver>.md with a real `gate: PASS` line) and a lease; after cloning run `scripts/install-hooks.sh` — hooks are per-clone and ship empty. **W4 (2026-10-05):** the hook reads the receipt AND `package.json`'s version exclusively from the pushed tag's **object body** (`git show <oid>:<path>`); working-tree reads are forbidden — the tag must carry its own paperwork, and the in-tag version must equal the tag name (ghost-version class killed). Regression-locked in `test/hook-prepush.test.ts` (ref lines fed via stdin).

@@ -5,11 +5,11 @@
   </picture>
 </p>
 
-<p align="center"><b>The one memory your coding agents share, built from the history already on your disk.</b></p>
+<p align="center"><b>Your coding agents stop re-debugging what you already fixed.</b></p>
 
-<p align="center">Your agent is about to re-debug something you fixed in March — in a different agent.
-deja starts full: it indexes what Claude Code, Codex, Cursor and 32 more agents already wrote to disk,
-and hands it back in whichever agent asks.</p>
+<p align="center">Claude Code, Codex, Cursor and 35 more agents already save every session to disk.
+deja indexes all of it, months back, and hands the part that matters
+to whichever agent is working now.</p>
 
 <p align="center">English | <a href="docs/readme/README.zh.md">简体中文</a> | <a href="docs/readme/README.zh-TW.md">繁體中文</a> | <a href="docs/readme/README.ja.md">日本語</a> | <a href="docs/readme/README.ko.md">한국어</a> | <a href="docs/readme/README.es.md">Español</a> | <a href="docs/readme/README.pt.md">Português</a> | <a href="docs/readme/README.fr.md">Français</a> | <a href="docs/readme/README.de.md">Deutsch</a> | <a href="docs/readme/README.ru.md">Русский</a> | <a href="docs/readme/README.tr.md">Türkçe</a> | <a href="docs/readme/README.hi.md">हिन्दी</a></p>
 
@@ -27,9 +27,9 @@ deja install --auto
 
 <table align="center">
 <tr>
-<td align="center" width="33%">Most accurate<br><b>97.2% R@5</b> on LongMemEval-S<br><sub>MemPalace publishes 96.6%, agentmemory 95.2%</sub></td>
-<td align="center" width="33%">Cheapest<br><b>half the tokens</b> of agentmemory<br><sub>on a task this machine had already solved</sub></td>
-<td align="center" width="33%">Fastest<br><b>17.6 s</b> to index 19,195 sessions<br><sub>the next of seven tools takes 72 s</sub></td>
+<td align="center" width="33%">Recall<br><b>97.2% R@5</b> on LongMemEval-S<br><sub>MemPalace publishes 96.6%, agentmemory 95.2%</sub></td>
+<td align="center" width="33%">Tokens<br><b>half the tokens</b> of agentmemory<br><sub>on a task this machine had already solved</sub></td>
+<td align="center" width="33%">Index time<br><b>17.6 s</b> to index 19,195 sessions<br><sub>the next of seven tools takes 72 s</sub></td>
 </tr>
 </table>
 
@@ -51,7 +51,7 @@ deja install --auto
 ## Highlights
 
 - **Starts full.** Months of history from before you installed it are searchable on day one: `deja "connection pool exhausted"` over gigabytes.
-- **One memory, every agent.** A fix found in Codex comes back in Claude Code, Cursor or opencode; all [thirty-five agents](#supported-harnesses) read the same index.
+- **One memory, every agent.** A fix found in Codex comes back in Claude Code, Cursor or opencode; all [thirty-eight agents](#supported-harnesses) read the same index.
 - **Nobody has to ask.** Recall arrives at session start, before a file is edited or a command runs, and after a command fails.
 - **Survives compaction.** Over 43 measured compactions the summary kept 77% of the decisions and 0.2% of the commands; deja hands back the rest ([how](docs/compaction.md)).
 - **Indexes the work, not just the talk.** The files each turn opened, the commands with their exit status, the exact spans an edit replaced.
@@ -244,13 +244,14 @@ whether or not the tool is called.
 | `how` | the tool or target, e.g. `go test` | `project?`, `limit?` | The real invocation, from what agents ran here. |
 | `orient` | nothing — it asks about the project | `project?`, `limit?` | The commands past sessions ran here and the files they worked in. |
 | `remember` | one durable fact or decision | `project?`, `tags?` | Stores a durable decision for later recall. |
+| `handoff` | a session id or harness name; empty for the newest session here | `harness?` | Another session's goal, standing instructions, latest conclusions, passed checks and where it stopped, to continue it. |
 
 </details>
 
 ## Supported harnesses
 
 <!-- matrix:start -->
-aider &middot; Amp &middot; Antigravity &middot; Claude Code &middot; Cline &middot; Codex CLI &middot; Copilot CLI &middot; VS Code Copilot Chat &middot; Cursor &middot; DeepSeek Harness &middot; Gemini CLI &middot; Goose &middot; Grok Build &middot; Hermes &middot; Kimi Code &middot; omp (Oh My Pi) &middot; OpenClaw &middot; opencode &middot; Continue &middot; Crush &middot; pi &middot; prime-agent (PrimeIntellect) &middot; Qwen Code &middot; Cherry Studio &middot; Senpi &middot; gajae-code &middot; Kimchi Coding &middot; Command Code &middot; ZCode &middot; Kiro &middot; Kilo Code &middot; Roo Code &middot; Zed &middot; CodeWhale &middot; Reasonix.
+aider &middot; Amp &middot; Antigravity &middot; Claude Code &middot; Cline &middot; Codex CLI &middot; Copilot CLI &middot; VS Code Copilot Chat &middot; Cursor &middot; DeepSeek Harness &middot; Gemini CLI &middot; Goose &middot; Grok Build &middot; Hermes &middot; Kimi Code &middot; omp (Oh My Pi) &middot; OpenClaw &middot; opencode &middot; Continue &middot; Crush &middot; pi &middot; prime-agent (PrimeIntellect) &middot; Qwen Code &middot; Cherry Studio &middot; Senpi &middot; gajae-code &middot; Kimchi Coding &middot; Command Code &middot; ZCode &middot; Kiro &middot; Kilo Code &middot; Roo Code &middot; Zed &middot; CodeWhale &middot; CodeBuddy Code &middot; Reasonix &middot; TRAE CLI &middot; Muse Code.
 
 <details>
 <summary>What each one supports</summary>
@@ -291,7 +292,10 @@ aider &middot; Amp &middot; Antigravity &middot; Claude Code &middot; Cline &mid
 | Roo Code | ✅ | ⚠ | ✅ | ✅ | ✅ | paste | roo CLI (editor tasks reopen in the editor) |
 | Zed | ✅ | ✕ | ✅ | ✅ | ✕ | paste | sqlite3 + zstd |
 | CodeWhale | — | — | ? | ? | ✅ | paste | none |
+| CodeBuddy Code | ✅ | ✅ | — | — | — | paste | none |
 | Reasonix | ✅ | ✅ | ✅ | ✅ | ✅ | paste | zstd for 1.x sessions |
+| TRAE CLI | — | — | ? | ? | ✅ | paste | none |
+| Muse Code | ? | ⚠ | ? | ? | — | paste | none |
 
 ✅ works &middot; — possible, not built yet &middot; ✕ the harness has no such mechanism &middot; ⚠ waiting on the harness itself &middot; ? not investigated
 

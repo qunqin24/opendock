@@ -10,6 +10,10 @@ A TUI sidebar plugin for OpenCode that monitors shell commands in real time. Age
 
 > OpenCode V2 only (`opencode2` / `@opencode/cli` 2.x).
 
+## Screenshot
+
+![Shell panel in the sidebar listing commands with status, elapsed time and exit codes](https://raw.githubusercontent.com/aiev/opencode-shell-magazine/master/assets/shell-panel.png)
+
 ## Install
 
 ```bash

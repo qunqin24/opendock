@@ -6,7 +6,7 @@ before automatically approving them.
 By default the reviewer runs in its own OpenCode session. It may inspect the workspace with `read`,
 `glob`, `grep`, and `lsp`, but cannot edit files, run shell commands, access the network, use MCP
 tools, or start subagents. Alternatively, decisions can be delegated to the
-[Jev](#jev-reviewer-backend) decision model over HTTP.
+[decision model](#decision-model-reviewer-backend) over HTTP — TypeSafe AI's Jev or Cloudflare's Clef.
 
 ## Supported OpenCode versions
 
@@ -114,13 +114,18 @@ remains entirely in OpenCode.
 }
 ```
 
-### Jev reviewer backend
+### Decision model reviewer backend
 
-Set `reviewer.backend` to `"jev"` to have [TypeSafe AI](https://typesafe.ai/)'s Jev decision model
-judge each operation instead of an OpenCode session. The plugin sends one request to the System One
-API with the operation (`source`, `action`, `resource`, and the user's latest prompt) and a single
-`allow` / `deny` / `escalate` choice. No reviewer agent or session is created, the workspace is not
-inspected, and a review typically answers in well under a second.
+Set `reviewer.backend` to `"decision-model"` to have a decision model judge each operation instead
+of an OpenCode session. The plugin sends one request with the operation (`source`, `action`,
+`resource`, and the user's latest prompt) and a single `allow` / `deny` / `escalate` choice. No
+reviewer agent or session is created and the workspace is not inspected. Two providers speak the
+same System One API:
+
+| Provider     | Models                                                                                                  | Credentials (option / environment)                                       | Default model |
+| ------------ | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ | ------------- |
+| `typesafe`   | [TypeSafe AI](https://typesafe.ai/)'s Jev (`jev-latest`, `jev-1.13.0`, …)                               | `apiKey` / `TYPESAFE_API_KEY`, optional `baseURL` / `TYPESAFE_BASE_URL`  | `jev-latest`  |
+| `cloudflare` | [Cloudflare](https://developers.cloudflare.com/workers-ai/)'s Clef on Workers AI (`clef`, `clef-flash`) | `apiKey` / `CLOUDFLARE_API_TOKEN`, `accountId` / `CLOUDFLARE_ACCOUNT_ID` | `clef`        |
 
 ```jsonc
 {
@@ -130,10 +135,11 @@ inspected, and a review typically answers in well under a second.
       "options": {
         "mode": "on-ask",
         "reviewer": {
-          "backend": "jev",
+          "backend": "decision-model",
           "timeoutMs": 10000,
-          "jev": {
-            "model": "jev-latest",
+          "decisionModel": {
+            "provider": "cloudflare", // or "typesafe"
+            "model": "clef",
             "minAllowProbability": 0.6,
           },
         },
@@ -143,43 +149,101 @@ inspected, and a review typically answers in well under a second.
 }
 ```
 
-| Option                             | Environment variable | Default                   | Description                                                     |
-| ---------------------------------- | -------------------- | ------------------------- | --------------------------------------------------------------- |
-| `reviewer.backend`                 | —                    | `"opencode"`              | `"opencode"` (reviewer session) or `"jev"`                      |
-| `reviewer.jev.apiKey`              | `TYPESAFE_API_KEY`   | — (required for `jev`)    | TypeSafe AI API key                                             |
-| `reviewer.jev.baseURL`             | `TYPESAFE_BASE_URL`  | `https://api.typesafe.ai` | API origin; a bare HTTPS origin (HTTP only for loopback)        |
-| `reviewer.jev.model`               | —                    | `"jev-latest"`            | Jev model or alias; pin a version such as `jev-1.13.0`          |
-| `reviewer.jev.minAllowProbability` | —                    | `0.6`                     | An `allow` answered with a lower probability becomes `escalate` |
+| Option                                       | Default                   | Description                                                               |
+| -------------------------------------------- | ------------------------- | ------------------------------------------------------------------------- |
+| `reviewer.backend`                           | `"opencode"`              | `"opencode"` (reviewer session) or `"decision-model"`                     |
+| `reviewer.decisionModel.provider`            | — (required)              | `"typesafe"` or `"cloudflare"`                                            |
+| `reviewer.decisionModel.apiKey`              | from the environment      | TypeSafe AI API key, or a Cloudflare API token with Workers AI access     |
+| `reviewer.decisionModel.baseURL`             | `https://api.typesafe.ai` | `typesafe` only: API origin; a bare HTTPS origin (HTTP only for loopback) |
+| `reviewer.decisionModel.accountId`           | from the environment      | `cloudflare` only: the 32-character account ID                            |
+| `reviewer.decisionModel.model`               | per provider (above)      | Model or alias; pin a version such as `jev-1.13.0` for stable behavior    |
+| `reviewer.decisionModel.minAllowProbability` | `0.6`                     | An `allow` answered with a lower probability becomes `escalate`           |
 
-- The key and the base URL come from the same place. With `reviewer.jev.apiKey`, only
-  `reviewer.jev.baseURL` applies (`TYPESAFE_BASE_URL` is ignored); with `TYPESAFE_API_KEY`, only
-  `TYPESAFE_BASE_URL` applies, and setting `reviewer.jev.baseURL` without a key next to it fails at
-  startup. This keeps one source from redirecting a key supplied by another.
-- Prefer the `TYPESAFE_API_KEY` environment variable: `opencode.json` is often committed, and a key
-  written there is shared with it. Surrounding whitespace in the key is trimmed.
-- The plugin fails at startup when the `jev` backend has no API key or an invalid base URL. The
-  variable is read by the process that loads the plugin: if OpenCode 2.x's background service was
-  already running, run `opencode service restart` after exporting it.
-- Jev returns a choice with calibrated probabilities rather than an explanation, so the verdict
-  reason reads like `Jev chose deny (allow 0.00, deny 0.99, escalate 0.01).` A hesitant `allow`
-  below `minAllowProbability` is escalated to a human; `deny` and `escalate` are taken as answered.
+- Prefer the environment variables: `opencode.json` is often committed, and a key written there is
+  shared with it. Surrounding whitespace in keys is trimmed. The plugin fails at startup when the
+  provider has no key (or, for Cloudflare, no valid account ID or model name) or an invalid base
+  URL. The variables are read by the process that loads the plugin: if OpenCode 2.x's background
+  service was already running, run `opencode service restart` after exporting them.
+- `typesafe`: the key and the base URL come from the same place. With
+  `reviewer.decisionModel.apiKey`, only `reviewer.decisionModel.baseURL` applies
+  (`TYPESAFE_BASE_URL` is ignored); with `TYPESAFE_API_KEY`, only `TYPESAFE_BASE_URL` applies, and
+  setting `reviewer.decisionModel.baseURL` without a key next to it fails at startup. This keeps
+  one source from redirecting a key supplied by another.
+- `cloudflare`: requests always go to
+  `https://api.cloudflare.com/client/v4/accounts/<accountId>/ai/run/@cf/cloudflare/<model>`; there
+  is no base URL option, so the token never reaches another host. The variable names match
+  wrangler's, but a `CLOUDFLARE_API_TOKEN` exported for deployments is often broad — create a token
+  scoped to Workers AI for the reviewer. AI Gateway is not supported yet.
+- A decision model returns a choice with calibrated probabilities rather than an explanation, so
+  the verdict reason reads like `clef chose deny (allow 0.01, deny 0.86, escalate 0.13).` A
+  hesitant `allow` below `minAllowProbability` is escalated to a human; `deny` and `escalate` are
+  taken as answered.
+- Measured from a devcontainer on 2026-10-04, a review took 0.2–0.9 s on either Clef model. Both
+  Clef models allowed `pnpm test` and denied sending `.env` to a remote host, but `clef-flash` followed
+  [custom review instructions](#custom-review-instructions) only weakly (a force-push declared safe
+  rose to allow 0.53, under the default threshold, where `clef` reached 0.80), which is why `clef`
+  is the default.
 - The operation leaves your machine: the resource holds the full command, file content of a
   write or edit, and permission metadata such as diffs, and the user intent is your latest prompt.
-  All of it is sent to TypeSafe AI (or `baseURL`), so an edit of a secrets file sends those secrets.
-- A resource larger than 64,000 characters once encoded as JSON (for example a large file write) is sent as a
-  truncated preview, and a prompt longer than 16,000 characters is cut; an `allow` for either is
-  escalated, because Jev saw only part of it. With `on-ask` that leaves OpenCode's permission prompt;
-  with `all-tools` such a tool call is always blocked, and retrying the same call does not help —
-  split the write or switch to `on-ask`.
-- `baseURL` must use HTTPS unless it points at a loopback host (`localhost`, `127.0.0.1`, `[::1]`). Whoever serves it receives the API key
-  and decides every verdict, so set it only in configuration you trust (not a repository's
-  `opencode.json` you have not reviewed) — the same holds for `minAllowProbability`, which lowers
-  the bar for an automatic approval.
+  All of it is sent to the provider, so an edit of a secrets file sends those secrets.
+- A resource larger than 64,000 characters once encoded as JSON (for example a large file write)
+  is sent as a truncated preview, and a prompt longer than 16,000 characters is cut; an `allow` for
+  either is escalated, because the model saw only part of it. With `on-ask` that leaves OpenCode's
+  permission prompt; with `all-tools` such a tool call is always blocked, and retrying the same call
+  does not help — split the write or switch to `on-ask`.
+- `baseURL` must use HTTPS unless it points at a loopback host (`localhost`, `127.0.0.1`,
+  `[::1]`). Whoever serves it receives the API key and decides every verdict, so set it only in
+  configuration you trust (not a repository's `opencode.json` you have not reviewed) — the same
+  holds for `minAllowProbability`, which lowers the bar for an automatic approval.
 - Redirects are refused so the API key is never forwarded to another host, and the timeout covers
   the whole request including the response body. HTTP errors (`402` out of credit, `429` rate
   limited, `5xx` outage) are reported by status only and handled like any other reviewer failure.
-- `reviewer.model` has no effect with the `jev` backend, and `reviewer.jev` none with `opencode`. `jev-latest` follows new model releases,
-  which may shift verdicts; pin a version for stable behavior.
+- `reviewer.model` has no effect with the `decision-model` backend, and `reviewer.decisionModel`
+  none with `opencode`. Aliases such as `jev-latest` follow new model releases, which may shift
+  verdicts; pin a version for stable behavior.
+- Deprecated: `backend: "jev"` with `reviewer.jev` (`apiKey`, `baseURL`, `model`,
+  `minAllowProbability`) from v0.3 still works and means `decision-model` with the `typesafe`
+  provider. Combining it with `reviewer.decisionModel` fails at startup, and so does
+  `reviewer.jev` next to `backend: "decision-model"`.
+
+### Usage and cost statistics
+
+Each decision model review appends one line to a usage log at
+`$XDG_DATA_HOME/opencode-auto-approval-plugin/usage.jsonl` (`~/.local/share/…` when `XDG_DATA_HOME`
+is unset): the time, provider, model, a hash of the project directory, input and output tokens,
+latency, the verdict (`error` for a failed call), and the cost at the time of the review. The
+operation, your prompt and the reason are never written, and the file is created readable by you
+only. The project hash keeps the path out of the file but is not a secret — anyone who guesses a
+path can hash it and match it — so treat the log as private before sharing it. Reviews with the
+`opencode` backend run in OpenCode sessions, so `opencode stats` already counts them.
+
+Show the totals with the bundled command, modelled on `opencode stats`:
+
+```sh
+npx opencode-auto-approval-plugin stats              # this calendar year so far
+npx opencode-auto-approval-plugin stats --days 7     # today and the 7 days before (0 = today)
+npx opencode-auto-approval-plugin stats --year 2026
+npx opencode-auto-approval-plugin stats --all --project . --json
+```
+
+```text
+auto-approval stats · today and the 7 days before · all projects
+
+reviews 1,284   tokens 612k in / 51k out   cost $0.11
+
+provider    model       reviews  tokens in  tokens out      cost  p50 latency
+cloudflare  clef            904       431k           0     $0.10       412 ms
+typesafe    jev-latest      380       181k         51k  $0.00760       212 ms
+
+verdicts  allow 81% · escalate 15% · deny 3% · error 1%
+```
+
+- Costs use the input prices published on 2026-10-04 (USD per million tokens: Jev $0.042, Clef
+  $0.24, Clef-flash $0.09; output tokens are free) and apply to the official endpoints only. A
+  model without a known price, or a review sent to a custom `baseURL`, is counted but left out of
+  the cost, and the summary says how many reviews that was. The latency column is the median.
+- Set `reviewer.recordUsage` to `false` to stop writing the log. A failure to write it never
+  affects a review.
 
 ### Custom review instructions
 
@@ -209,14 +273,14 @@ string.
 
 - Both backends receive the instructions as trusted guidance that takes precedence over the
   built-in safety guidance — though never over the answer format or the rule that operation data
-  is untrusted, so text inside a command or file cannot pose as your instructions: the `opencode` reviewer reads them in its prompt ahead of the operation
-  data, and the `jev` backend appends them to the question's `instructions`, never to the state
-  it judges.
+  is untrusted, so text inside a command or file cannot pose as your instructions: the `opencode`
+  reviewer reads them in its prompt ahead of the operation data, and the `decision-model` backend
+  appends them to the question's `instructions`, never to the state it judges.
 - They are guidance for an AI reviewer, not deterministic rules: the reviewer still sees the whole
   operation and may decide otherwise. Use OpenCode's own permission rules (`permissions` on 2.x,
   `permission` on 1.x) when a tool must always be allowed or denied. Explicit OpenCode `deny` rules still always win.
-- Blank entries are ignored, and the joined text may be at most 4,000 characters. With the `jev`
-  backend the instructions are sent, and billed, with every review.
+- Blank entries are ignored, and the joined text may be at most 4,000 characters. With the
+  `decision-model` backend the instructions are sent, and billed, with every review.
 - Instructions can widen what is approved automatically, so set them only in configuration you
   trust, like `baseURL` and `minAllowProbability` — not in a repository's `opencode.json` you have
   not reviewed.
@@ -238,7 +302,7 @@ OpenCode's plugin API does not provide a way to create and await a new permissio
 `tool.execute.before`. Therefore, `all-tools` fails closed for an `escalate` verdict: the tool does
 not run and the user must explicitly retry after reviewing the reported reason.
 
-Both modes work the same way with either reviewer backend, except that the Jev backend always
+Both modes work the same way with either reviewer backend, except that the decision-model backend always
 escalates an operation too large to send in full (see above).
 
 Explicit OpenCode `deny` rules always remain in effect. The plugin is an additional review layer;
@@ -277,19 +341,19 @@ pnpm cicheck       # run everything CI runs
 
 ## Scripts
 
-| Script                 | Description                                               |
-| ---------------------- | --------------------------------------------------------- |
-| `pnpm build`           | Build ESM + CJS bundles and type declarations into `dist` |
-| `pnpm check`           | `fmt:check` + `oxlint` + `typecheck`                      |
-| `pnpm cicheck`         | `cicheck:code` + `cicheck:content` — what CI runs         |
-| `pnpm cicheck:code`    | `check` + `test`                                          |
-| `pnpm cicheck:content` | `cspell` + `secretlint`                                   |
-| `pnpm fix`             | Auto-fix formatting and lint problems                     |
-| `pnpm generate`        | Regenerate AI tool configs from `.rulesync/`              |
-| `pnpm knip`            | Report unused files, exports, and dependencies            |
-| `pnpm test`            | Run the test suite                                        |
-| `pnpm test:coverage`   | Run the test suite with coverage                          |
-| `pnpm typecheck`       | Type-check without emitting                               |
+| Script                 | Description                                                          |
+| ---------------------- | -------------------------------------------------------------------- |
+| `pnpm build`           | Build the library (ESM + CJS, types) and the `stats` bin into `dist` |
+| `pnpm check`           | `fmt:check` + `oxlint` + `typecheck`                                 |
+| `pnpm cicheck`         | `cicheck:code` + `cicheck:content` — what CI runs                    |
+| `pnpm cicheck:code`    | `check` + `test`                                                     |
+| `pnpm cicheck:content` | `cspell` + `secretlint`                                              |
+| `pnpm fix`             | Auto-fix formatting and lint problems                                |
+| `pnpm generate`        | Regenerate AI tool configs from `.rulesync/`                         |
+| `pnpm knip`            | Report unused files, exports, and dependencies                       |
+| `pnpm test`            | Run the test suite                                                   |
+| `pnpm test:coverage`   | Run the test suite with coverage                                     |
+| `pnpm typecheck`       | Type-check without emitting                                          |
 
 ## mise tasks
 

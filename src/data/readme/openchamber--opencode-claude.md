@@ -89,7 +89,7 @@ You need [OpenCode](https://opencode.ai) 2.x and the [Claude Code CLI](https://w
 
 **Skills and agents.** OpenCode's skills (from `.claude`, `.agents` and `.opencode`) are listed for Claude and load through OpenCode's skill tool. A custom agent's own prompt, like a `writer` subagent's, is passed on as that agent's role.
 
-**Titles and summaries.** Session titles and compaction summaries run as small one-off requests on Haiku, so they barely touch your limits.
+**Titles and summaries.** Session titles run as small one-off requests on Haiku, so they barely touch your limits. Compaction summaries are written by the chat's own model from its Claude session, so they cover the whole conversation with full tool results; most of it comes from the prompt cache. The session itself isn't changed.
 
 **Model fallback.** If Claude Code declines a request on one model and retries on another (for example Fable to Opus), you'll see a note in the reasoning, and the session switches to the model that's actually answering.
 

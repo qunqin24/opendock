@@ -159,15 +159,15 @@ grep '<task_id>' .vvoc/specs/*/plan.xml     # dependency graph
 grep '<COMPONENT-' .vvoc/specs/*/*.xml      # component map across spec and plan
 ```
 
-`vv-controller` explicitly routes `vv-spec`, `vv-plan`, and `vv-review`; `vv-execute`, `vv-reflect`, and `vv-handoff` are available as managed skills for plan execution, durable repository memory, and end-of-session handoff notes.
+`vv-controller` explicitly routes `vv-spec`, `vv-plan`, and `vv-review`; `vv-execute`, `vv-reflect`, and `vv-handoff` are available as managed skills for plan execution, environment reflection and durable repository memory, and end-of-session handoff notes.
 
 ---
 
 ## What's inside
 
-### The eleven server plugins and the native TUI
+### The server plugins and the native TUI
 
-Eleven server plugins run inside the OpenCode server process; the twelfth entry, **ContextTuiPlugin**, runs in the terminal UI through the same pinned package's `./tui` export.
+The server plugins run inside the OpenCode server process; **ContextTuiPlugin** runs in the terminal UI through the same pinned package's `./tui` export.
 
 | Plugin | What it does |
 |---|---|
@@ -182,6 +182,7 @@ Eleven server plugins run inside the OpenCode server process; the twelfth entry,
 | **AnalyticsPlugin** | Local-only token and cache telemetry per model step, a live `cache NN%` indicator in the TUI, and `vvoc analytics cache-hit-rate` for retrospective comparison. |
 | **PeakHoursPlugin** | Warns or blocks models whose provider is in peak-priced hours right now, suggests connected off-peak providers, and shows a persistent orange banner in the TUI. |
 | **SpecGuardPlugin** | Deterministic host-side verification of spec-package artifacts: annotates reads with lint verdicts and validates writes; in enforce mode refuses writes that would break the format. |
+| **TelegramBridgePlugin** | Runs a single-owner Telegram bot inside the OpenCode server process: one private-chat DM topic per active session with a live status emoji in the topic title, a General control topic, manual permission and question buttons, and durable state that survives `opencode service restart`. |
 | **ContextTuiPlugin** | The `/context` inspector: an honest, scrollable TUI dialog showing context-window usage by category, tool, and MCP server. |
 
 ### Managed agents
@@ -196,6 +197,7 @@ All prompt files are scaffolded by `vvoc install` / `vvoc sync`:
 | `vv-spec-reviewer` | Checks whether implementation matches the requested spec and acceptance criteria |
 | `vv-code-reviewer` | Looks for bugs, regressions, maintainability risks, and missing tests |
 | `investigator` | Finds the root cause first when behavior is unclear or a failure needs diagnosis |
+| `vv-reflector` | Reflects on a session and its subagent tree to propose environment improvements, lessons, and runbooks; read-only, and runs the bundled `session-graph` extractor |
 | `guardian` | Supports GuardianPlugin by reviewing permission requests and auto-approving only routine low-risk ones |
 
 Managed prompts and the universal guidance injected into primary sessions carry explicit correctness obligations. For behavior changes, agents derive the material properties that must be preserved from the request and established contracts, separate write scope from impact and verification scope, investigate directly affected consumers, challenge a material assumption with a diagnostic counterexample, and choose verification at the level the risk arises. Controllers tie completion claims to observed evidence rather than status markers; reviewers distinguish no discovered defect from sufficient support for a material claim and can fail a change for a material verification gap. Agents also keep evidence-supported conclusions settled until a concrete trigger — contradictory evidence, a specific counterexample, a changed requirement, or changed inputs — reopens them; they surface false premises instead of silently satisfying them, distinguish unsupported pressure from concrete evidence, and interpret test results as evidence against the request and contracts rather than as the specification. These obligations are prompt-level guidance only: `vvoc install` / `vvoc sync` deliver the current wording, changes take effect after an OpenCode restart like all vvoc config changes, and the bundled contract tests check instruction delivery and wording — they do not evaluate or guarantee how a real model behaves.
@@ -210,7 +212,7 @@ Two families: `vv-*` skills guide the work protocol, while `vvoc-*` skills opera
 | `vv-plan` | A spec is approved and ready to implement | A task-level implementation plan with file targets, contracts, dependencies, and acceptance criteria |
 | `vv-execute` | A plan is approved and you want it applied step by step | Ordered execution with verification, an explicit inline-or-classic mode choice, and applied spec/plan archival |
 | `vv-review` | You want findings, not fixes | A review-only workflow that reports spec/code issues and stops before implementation |
-| `vv-reflect` | A long development, debugging, ops, or investigation session produced reusable knowledge | Durable notes in existing docs or `.vvoc/lessons` / `.vvoc/runbooks` for future agents |
+| `vv-reflect` | A long development, debugging, ops, or investigation session exposed environment friction or produced reusable knowledge | Dispatches the read-only `vv-reflector` subagent over the session and its subagent tree, then applies environment improvements (documents, steering, guardrails, skills, tooling) or lessons/runbooks only after per-entry approval |
 | `vv-handoff` | You are ending a session and want the visible context preserved | A redacted XML note at `.vvoc/handoff/YYYY-MM-DD-<session-slug>/handoff.xml`, written from already-visible context only |
 | `vvoc-usage-analytics` | You ask about token usage, cache hit rate, costs, or caching regressions | Read-only analysis across `vvoc analytics`, the analytics JSONL, and historical `opencode.db` data |
 
@@ -689,6 +691,49 @@ The engine checks well-formedness, the attribute ban, the template contract per 
 ```
 
 Conservatively materialized by `vvoc sync`/`init`; `enforce` blocks only ERROR states; internal failures degrade to a warning log and never break a tool call. Changes require an OpenCode restart, like other runtime plugin settings.
+
+### Telegram bridge
+
+`TelegramBridgePlugin` runs a single-owner Telegram bot inside the OpenCode server process — no second process, no exposed ports. Enable forum topics for the bot in @BotFather first; the bridge uses the private chat between you and the bot only.
+
+The layout is one Telegram DM topic per active session, with a fixed **General** topic as the control lane. Topic titles carry a live status emoji (⚙️ running, 💤 idle, ❓ question, 🔐 permission, ‼️ error, ⏹ aborted) ahead of the session title. A session stays active while it is running or was updated within the activity window (default 240 minutes, or used through the bot); when it goes inactive its topic is closed — never deleted, history stays readable — and `/sync` reconciles topics to the actual active session set.
+
+Commands:
+
+| Command | Where | What it does |
+|---|---|---|
+| `/new` | General | Pick a project from an inline list; the session is created with that project's default agent and gets its own topic |
+| `/sync` | General | Idempotent reconciliation: create topics for active sessions missing one, close stale ones, report counts |
+| `/status` | General or session topic | Active sessions with context usage, or the current session's state |
+| `/help` | anywhere | Command list |
+| plain text | session topic | Prompt for that session; consecutive texts inside the merge window join into one prompt |
+| `/model` | session topic | Inline provider and model picker; the current model is applied through the session model switch |
+| `/rename <title>` | session topic | Rename the session and its topic |
+| `/messages` | session topic | Browse user messages; Revert rolls the session back, Fork branches a new session that gets its own topic |
+| `/abort` | session topic | Interrupt the session |
+| `/settings` | anywhere | Toggle reasoning visibility, tool-call detail, and markdown/raw reply format |
+
+Permissions and agent questions arrive as inline-button prompts in the owning session topic — `✅ Once / ♾ Always / ❌ Reject` for permissions, the offered options plus `✍️ Custom` for questions. Choosing Custom holds the topic's input gate so your next plain message becomes the answer (`/cancel` aborts); nothing is ever auto-approved and no decision is fabricated when a prompt is resolved outside Telegram. Subagent activity renders as bounded cards in the parent topic. Images, PDFs, and text files (bounded, albums included) can be attached to prompts; oversized files are rejected with an explicit notice.
+
+Configuration is an optional top-level section of `vvoc.json` (schema v3). The bot never starts without it:
+
+```json
+"telegram": {
+  "enabled": true,
+  "botToken": "${TELEGRAM_BOT_TOKEN}",
+  "allowedUserIds": [123456789],
+  "activityWindowMinutes": 240,
+  "apiRoot": "https://tg.example.com"
+}
+```
+
+- `botToken` — a literal or `${VAR}` placeholder resolved from the OpenCode process environment at startup; an unset variable disables the gateway with a value-free diagnostic naming the variable. Prefer the environment or the global vvoc layer; never commit a token.
+- `allowedUserIds` — the numeric Telegram user ids allowed to talk to the bot (get yours from @userinfobot). This is the entire access boundary: single owner, private chat, non-owner messages are ignored.
+- `activityWindowMinutes` — how long a session stays active after its last update (default 240).
+- `apiRoot` or `proxyUrl` — mutually exclusive connectivity modes for restricted corporate networks: a custom Bot API root behind your own reverse proxy, or an outbound proxy URL for `api.telegram.org`.
+- `settings` — delivery defaults: `showReasoning` (default false), `showToolCalls` (default false), `formatMode` (`markdown` default or `raw`), `codeFileMaxKb` (default 100; larger code blocks arrive as file documents), `mergeWindowMs` (default 1500).
+
+Durable state (update offset, topic and session map, message mirror, pending finals, settings) lives in the OpenCode plugin storage, scoped to the plugin, and survives `opencode service restart`; a changed bot token resets the stored maps instead of reusing stale bindings. Assistant output streams through draft previews with a throttled edit fallback, finals are delivered exactly once per message across restarts, and all topics share one chat rate budget, so streaming is throttled adaptively. Telegram configuration changes require an OpenCode restart, like other runtime plugins; the `telegram` plugin toggle (`plugins["telegram"]`) is a kill-switch that registers nothing.
 
 ### Web tools
 

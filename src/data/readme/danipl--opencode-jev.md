@@ -9,7 +9,7 @@
 [![license](https://img.shields.io/github/license/danipl/opencode-jev?style=flat-square&label=license&labelColor=12101f&color=a78bfa)](./LICENSE)
 [![OpenCode V2](https://img.shields.io/badge/OpenCode-V2-e879f9?style=flat-square&labelColor=12101f)](https://opencode.ai)
 
-[![latest release](https://img.shields.io/badge/latest%20release-v1.1.0-e879f9?style=for-the-badge&labelColor=12101f&logo=github&logoColor=white)](https://github.com/danipl/opencode-jev/releases/latest) <!-- x-release-please-version -->
+[![latest release](https://img.shields.io/badge/latest%20release-v1.2.0?style=for-the-badge&labelColor=12101f&logo=github&logoColor=white)](https://github.com/danipl/opencode-jev/releases/latest) <!-- x-release-please-version -->
 
 **Your reasoning model should think about your problem — not about which of twelve tools to call.**
 `opencode-jev` puts TypeSafe's cheap, fast System-1 model in front of every inference request: it picks
@@ -78,7 +78,7 @@ The bare name tracks the **`latest`** dist-tag — every publish moves it, so a 
 version for reproducibility or to freeze a known-good release:
 
 ```jsonc
-{ "plugins": ["@danipl/opencode-jev@1.1.0"] } // x-release-please-version — exact version, never auto-updates
+{ "plugins": ["@danipl/opencode-jev@1.2.0"] } // x-release-please-version — exact version, never auto-updates
 ```
 
 Heads-up while pre-1.0: `feat:` releases (minor bumps) *can* change behavior. If that matters to
@@ -113,10 +113,15 @@ Config sources — first defined value wins per field:
 5. plugin options (directory-package registrations only)
 6. env `TYPESAFE_API_KEY` / `JEV_API_URL` / `JEV_MIN_CONFIDENCE`
 
+Config-file fields: `apiKey`, `apiUrl`, `minConfidence`, `model`, `timeoutMs`
+(milliseconds; non-positive or bogus values count as unset) — see
+[jev.yaml.example](./jev.yaml.example). `JEV_MODEL` / `JEV_TIMEOUT_MS` are env
+fallbacks for `model` / `timeoutMs`.
+
 | Env var | Default | Meaning |
 | --- | --- | --- |
-| `JEV_MODEL` | `jev-latest` | Jev model id |
-| `JEV_TIMEOUT_MS` | `2000` | Jev round-trip timeout |
+| `JEV_MODEL` | `jev-latest` | Jev model id (fallback for `model`) |
+| `JEV_TIMEOUT_MS` | `2000` | Jev round-trip timeout (fallback for `timeoutMs`) |
 | `JEV_DEBUG_FILE` | `/tmp/opencode-jev.log` | decision log path |
 | `JEV_DEBUG` | — | `1` echoes the log to stdout |
 | `JEV_DEBUG_MAX_BYTES` | `262144` | log rotation cap (one `.1` backup) |
@@ -128,18 +133,36 @@ Jev must never break a session. The request passes through **untouched** on: low
 failure, timeout, parse errors, or an invalid API key (latched off after the first 401/403 — zero
 added latency afterwards). Only primary agent-loop requests are considered
 (`event.kind === "primary"`); title/compaction traffic is skipped. Responses-API built-in tools
-(`type !== "function"`) are never offered to Jev and never trimmed to.
+(`type !== "function"`) are never offered to Jev, never trimmed to, and never removed by a trim —
+they always survive (issue #12 verdict: Jev may only demote function tools).
 
 ### Reading the decision log
 
 Every decision is appended to the debug log — `tail -f /tmp/opencode-jev.log` to watch routing
 live. Each request ends in one tagged line:
 
-- **`apply:`** — Jev acted; tools trimmed to its pick.
+- **`apply:`** — Jev acted; tools trimmed to its pick (+ any built-ins kept).
 - **`bypass:`** — request untouched, with the reason.
 
 Line-by-line interpretation:
 [docs/DEVELOPMENT.md — "Reading the decision log"](./docs/DEVELOPMENT.md#reading-the-decision-log).
+
+## Privacy
+
+With routing active, every eligible request POSTs a compact snapshot to `apiUrl` (default
+`https://api.typesafe.ai/v1/systemone` — TypeSafe's endpoint; override with the `apiUrl` config
+field or `JEV_API_URL`). The snapshot contains:
+
+- **`state`** — the first user message plus the last 4 conversation turns, each turn capped at
+  2 KB and the whole payload at 8 KB. In a coding agent those turns routinely contain file
+  contents, tool output, and error messages — treat this like sending context to another model
+  provider.
+- **Tool names** — up to the first 254 names, offered as routing choices. Names only, never
+  schemas or descriptions.
+
+No `apiKey` configured = no hook registered = nothing ever leaves your machine. If conversation
+egress is not acceptable at all, leave the plugin unconfigured or point `apiUrl` at a self-hosted
+Jev-compatible endpoint.
 
 ## Development
 

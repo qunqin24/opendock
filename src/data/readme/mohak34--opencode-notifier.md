@@ -197,7 +197,7 @@ Create `~/.config/opencode/opencode-notifier.json` with this example configurati
 - `showSessionTitle` - Include the session title in notification messages via `{sessionTitle}` placeholder (default: false)
 - `showIcon` - Show OpenCode icon with Windows/Linux notifications and macOS `node-notifier` (default: true). AppleScript uses the Script Editor icon
 - `customIconPath` - Path to a custom icon for notifications. Useful on WSL where Windows paths are needed (default: null)
-- `suppressWhenFocused` - Skip popups, sounds, bells, and V1 event commands when the terminal is focused (default: true). V2 server commands are unaffected. See [Focus detection](#focus-detection) for platform details
+- `suppressWhenFocused` - Skip popups, sounds, bells, and V1 event commands when the terminal is focused (default: true). A list such as `["notification"]` skips only those channels: `"sound"`, `"notification"`, `"bell"`, `"command"`. V2 server commands are unaffected. See [Focus detection](#focus-detection) for platform details
 - `enableOnDesktop` - V1 only: run the plugin on Desktop and Web clients (default: false). V2 runs commands on the server and local alerts in its terminal component; this flag does not control V2 delivery.
 - `notificationSystem` - On macOS, select `"osascript"` or `"node-notifier"` (default: "osascript"). Select `"ghostty"` on any platform running Ghostty for native OSC 9 notifications
 - `suppressGhosttySound` - macOS only: when `true` with `notificationSystem: "ghostty"`, skips the plugin's sound to avoid duplicating macOS Notification Center's default sound (default: false)
@@ -331,7 +331,7 @@ Set per-event volume from `0` to `1`:
 
 - On players that support volume control, `0` = mute and `1` = full volume
 - Values outside `0..1` are clamped automatically
-- Windows playback and Linux `aplay` ignore volume settings. For reliable muting, set `sound` to `false` and remove any per-event `sound: true` overrides, or disable sound for each event
+- `0` skips playback on every platform. Otherwise Windows playback and Linux `aplay` ignore volume settings. For reliable muting, set `sound` to `false` and remove any per-event `sound: true` overrides, or disable sound for each event
 
 ### Custom commands
 
@@ -466,6 +466,16 @@ To disable this and always get notified:
 }
 ```
 
+To skip only some channels while focused, list them. This keeps sounds but hides popups:
+
+```json
+{
+  "suppressWhenFocused": ["notification"]
+}
+```
+
+Valid entries are `"sound"`, `"notification"`, `"bell"`, and `"command"`. Unknown entries are ignored. An empty list behaves like `false`. `"command"` applies to V1 event commands only.
+
 ## Minimum duration threshold
 
 You can suppress `complete` and `subagent_complete` notifications for short-lived sessions. Set `minDuration` to the number of seconds a session must exceed to trigger a done notification:
@@ -500,9 +510,11 @@ The plugin tracks native OpenCode child sessions and their descendants from crea
 | Linux Wayland (KDE)                      | `kdotool`                              | `kdotool` installed | Tested                         |
 | Linux Wayland (GNOME)                    | Optional Shell bridge, then AT-SPI (`gdbus`) | `gdbus` installed   | AT-SPI tested (Ubuntu 26.04.1 LTS + GNOME Shell 50.1 + Ghostty 1.3.0); Shell bridge needs desktop validation |
 | Linux Wayland (river, dwl, Cosmic, etc.) | No window backend; pane fallback when available | -                 | Notifies when focus cannot be determined |
-| Windows                                  | `GetForegroundWindow()` via PowerShell | None                  | Untested                       |
+| Windows                                  | Foreground window vs. OpenCode's console owner, via PowerShell | None | Untested |
 
 **GNOME Wayland**: Focus detection first tries the optional Shell extension described under [Jump back to terminal](#linux-jump-back-to-terminal-from-notification), then falls back to the accessibility bus. Without the extension, restricted Shell APIs and XWayland tools such as `xdotool` cannot provide the native Wayland window identity used here. The AT-SPI fallback selects the terminal window with its `ACTIVE` state bit set. Ghostty is matched by its `/com/mitchellh/ghostty` AT-SPI path, other terminals by app name, including the `gnome-terminal-server` alias. AT-SPI window identity is `bus@path` since paths repeat across processes. This fallback was verified on Ubuntu 26.04.1 LTS + GNOME Shell 50.1 + Ghostty 1.3.0; the new Shell bridge still needs live desktop validation. With several terminal windows open, suppression compares against the window that was active at startup. Set `OPENCODE_NOTIFIER_DEBUG=1` to log the focus backend decision.
+
+**Windows**: Alerts are suppressed only when the window hosting OpenCode is provably in front. Windows Terminal and the classic console are matched by window handle, so another terminal window or any other app does not suppress alerts. For hosts that do not own their console window, such as VS Code, WezTerm, and Alacritty, the host is the nearest parent process with a visible window. It counts only when it has exactly one such window and is not Explorer, so VS Code with several windows open always alerts. Anything uncertain delivers the alert. Tabs are not distinguished: with OpenCode in a background Windows Terminal tab, the window still counts as focused. Set `OPENCODE_NOTIFIER_DEBUG=1` to log each decision with the raw probe output.
 
 **Unsupported compositors**: Wayland has no standard protocol for querying the focused window. Each compositor has its own IPC. Without a window backend, supported pane checks provide a best-effort fallback. If neither can determine focus, notifications are allowed.
 

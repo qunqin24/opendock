@@ -157,7 +157,7 @@ The default generated configuration:
 
 `frontend-developer`, `backend-developer`, and `business-analyst` treat their available skills as mandatory instructions: when skills are configured for them, they are prompted to load those skills via the `skill` tool before doing substantive work. `trigger-developer` has its own set of default skills available but is not required to load them before substantive work.
 
-Session management is enabled by default even though it is not shown in the starter config. See **[Session Management](docs/session-management.md)** if you want to customize how many resumable child-agent sessions are remembered.
+Session management is enabled by default even though it is not shown in the starter config. Remembered child sessions get short aliases (`exp-1`, `ora-1`); the agent continues one by passing `task_id` with the same specialist, and gets a fresh child when it omits `task_id`. See **[Session Management](docs/session-management.md)** for the reuse rules and how many resumable child-agent sessions are remembered.
 
 ### For Alternative Providers
 
@@ -362,7 +362,7 @@ Use this section as a map: start with installation, then jump to features, confi
 | Doc                                                  | What it covers                                                                 |
 | ---------------------------------------------------- | ------------------------------------------------------------------------------ |
 | **[Council](docs/council.md)**                       | Run multiple models in parallel and synthesize a single answer with `@council` |
-| **[Session Management](docs/session-management.md)** | Reuse recent child-agent sessions with short aliases instead of starting over  |
+| **[Session Management](docs/session-management.md)** | Explicitly reuse child-agent sessions with `task_id` aliases, or start fresh by omitting it |
 | **[Codemap](docs/codemap.md)**                       | Generate hierarchical codemaps to understand large codebases faster            |
 
 ### ⚙️ Config & Reference

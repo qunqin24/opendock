@@ -1,6 +1,6 @@
 # OpenCode Loop
 
-## Native OpenCode 2 (0.6.5)
+## Native OpenCode 2 (0.6.6)
 
 The npm and V2 entrypoints use the official `@opencode/plugin` `Plugin.define()` contract. The installer now registers the exact `@bybrawe/opencode-loop` package in OpenCode's plural `plugins` configuration instead of copying a loose global plugin directory. OpenCode therefore resolves `@opencode/plugin` from Loop's own production dependency graph; explicit `--legacy-v1` remains a separate compatibility path.
 
@@ -17,51 +17,55 @@ Prompt/command timers, watch and stop conditions, verification, preflight/postru
 
 OpenCode Loop adds `/loop`, scheduled prompt/command/shell jobs, compact scheduling, verification/checkpoints, and the `opencode-loopd` background daemon.
 
-> **Current stable release: `0.6.5`.**
+> **Current stable release: `0.6.6`.**
 
 ## Install or update
 
 ### Recommended OpenCode 2 setup
 
-Install the dedicated Goal plugin first:
+Install **both packages separately**:
 
 ```bash
+npx -y @bybrawe/opencode-loop@latest
 npx -y @bybrawe/opencode-goal@latest
 ```
 
-Then install Loop by itself and disable Loop's older experimental Goal command files:
+This is the recommended setup. The two installers stay independent:
+
+- the Loop command installs or updates **OpenCode Loop only**;
+- the Goal command installs or updates the dedicated **OpenCode Goal** plugin;
+- Loop does **not** install, detect, refresh, migrate, or otherwise modify `@bybrawe/opencode-goal` during a normal install/update;
+- Loop omits/removes its older experimental `/loop-goal*` command files by default.
+
+OpenCode Goal owns `/goal`, durable objective state, evidence, verification, restart recovery, and semantic completion. See [OpenCode Goal](https://github.com/ByBrawe/opencode-goal).
+
+A combined `--with-goals` path remains only as a compatibility/convenience option; the recommended setup is the two separate commands above:
 
 ```bash
-npx -y @bybrawe/opencode-loop@latest --loop-only --without-loop-goals
+npx -y @bybrawe/opencode-loop@latest --with-goals
 ```
 
-This is the recommended split for OpenCode 2:
+If you explicitly need Loop's **legacy experimental** `/loop-goal*` commands for compatibility, opt in with:
 
-- **OpenCode Goal** owns `/goal`, durable outcome-driven work, evidence, verification, recovery, and semantic completion.
-- **OpenCode Loop** owns `/loop`, scheduling, repeated prompts/commands/shell work, and `opencode-loopd`.
-- `--loop-only` prevents the Loop installer from installing/updating the Goal companion.
-- `--without-loop-goals` removes only Loop's older experimental `/loop-goal*` command files; it does not remove the dedicated OpenCode Goal plugin.
+```bash
+npx -y @bybrawe/opencode-loop@latest --with-loop-goals
+```
 
-Run the same two commands again to update both packages. Loop 0.6.4 also canonicalizes valid legacy `plugin` entries into the native `plugins` list; earlier 0.6.1/0.6.2 loose global V2 installs are removed and replaced by the pinned published package. Then **fully restart OpenCode** and verify:
+Those legacy commands are not recommended for new setups; prefer the dedicated Goal plugin instead.
+
+`--loop-only` remains as an explicit alias for the new default Loop-only behavior, and `--without-loop-goals` remains as a compatibility alias for the new default clean command surface.
+
+Run the relevant install command again to update that package. Then **fully restart OpenCode** and verify:
 
 ```text
-/goal status
 /loop-help
 /loop-doctor
 ```
 
-Convenience alternative: let the Loop installer also install/update the dedicated Goal companion:
+If you installed Goal too:
 
-```bash
-npx -y @bybrawe/opencode-loop@latest --with-goals --without-loop-goals
-```
-
-For new OpenCode 2 installations, the explicit two-command setup above is preferred because ownership is clear and each package can be updated independently.
-
-Install only Loop without touching Goal:
-
-```bash
-npx -y @bybrawe/opencode-loop@latest --loop-only
+```text
+/goal status
 ```
 
 Global npm alternative:
@@ -84,7 +88,7 @@ opencode-loop --uninstall
 npm uninstall -g @bybrawe/opencode-loop
 ```
 
-Project Loop state under `.opencode/opencode-loop/` is intentionally preserved by uninstall.
+Loop uninstall never removes the dedicated Goal plugin. Project Loop state under `.opencode/opencode-loop/` is intentionally preserved by uninstall.
 
 ## The mental model
 
@@ -374,7 +378,7 @@ Recommended choices are to finish/pause the Goal or use a separate session. Adva
 
 That escape hatch can create competing autonomous turns; use it only when that is intentional.
 
-Loop's older experimental `/loop-goal*` commands remain available for compatibility unless installed with `--without-loop-goals`. For new strongly verified Goal work, prefer:
+Loop's older experimental `/loop-goal*` commands are omitted by default. They remain available only as an explicit compatibility opt-in with `--with-loop-goals`. For new strongly verified Goal work, use the separate [OpenCode Goal](https://github.com/ByBrawe/opencode-goal) plugin:
 
 ```bash
 npx -y @bybrawe/opencode-goal@latest

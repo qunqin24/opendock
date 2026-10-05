@@ -5,6 +5,7 @@
 [![npm](https://img.shields.io/npm/v/opencode-secrets-env)](https://www.npmjs.com/package/opencode-secrets-env)
 [![CI](https://github.com/bytesnail/opencode-secrets-env/actions/workflows/ci.yml/badge.svg)](https://github.com/bytesnail/opencode-secrets-env/actions/workflows/ci.yml)
 [![npm downloads](https://img.shields.io/npm/dm/opencode-secrets-env)](https://www.npmjs.com/package/opencode-secrets-env)
+[![platforms: Linux · macOS · Windows](https://img.shields.io/badge/platforms-Linux%20%C2%B7%20macOS%20%C2%B7%20Windows-informational)](https://github.com/bytesnail/opencode-secrets-env/actions/workflows/ci.yml)
 [![license: MIT](https://img.shields.io/badge/license-MIT-green)](./LICENSE)
 
 An [OpenCode](https://opencode.ai) plugin that loads secrets from
@@ -22,6 +23,9 @@ to a dotfiles repo without leaking keys.
 ![Demo: rotating a key in `secrets.env` — the running OpenCode service reloads it and reconnects the affected MCP server in about a second, no restart](./.github/assets/demo.gif)
 
 ## Install
+
+Tested on Linux, macOS and Windows — CI runs unit tests and real-host
+end-to-end tests on all three, against both OpenCode V1 and V2 hosts.
 
 OpenCode V2 (`@opencode/cli` 2.x):
 
@@ -142,6 +146,7 @@ works on both V1 and V2 hosts:
 | `override` | `boolean`  | `false` | Overwrite variables that already exist in the real environment. By default the real environment always wins. |
 | `required` | `string[]` | `[]`    | Variables that must exist after loading. A warning is logged for each missing one. |
 | `watch`    | `boolean`  | `true`  | Watch the secrets file and hot-reload `process.env` when it changes (see below). |
+| `pollIntervalMs` | `number` | `5000`  | Interval of the mtime poll backing the file watcher (only with `watch` on). OS watch events are the fast path; the poll heals dropped events — FSEvents can drop them under load, which would otherwise miss the reload entirely. One stat per interval; `0` disables the net (not recommended). |
 | `mcpReconnect` | `boolean \| "all" \| string[]` | `true` | After a hot reload, reconnect MCP servers so they pick up new values. `true` = only servers whose config references a changed variable (precise), `"all"` = every enabled server, `["name"]` = only those servers, `false` = never. |
 | `quiet`    | `boolean`  | `false` | Silence info/debug messages (warnings are always shown). |
 | `debug`    | `boolean`  | `false` | Also log the *names* of applied/skipped keys. Values are never logged. |
@@ -149,7 +154,10 @@ works on both V1 and V2 hosts:
 ## Hot reload
 
 When `watch` is enabled (the default), editing `secrets.env` takes effect
-within about a second — no `opencode service restart` needed:
+within about a second — no `opencode service restart` needed. The watcher is
+event-driven, backed by a low-frequency mtime poll (default 5 s): if the OS
+drops a watch event — FSEvents can, under load — the change still lands
+within one poll interval instead of being missed until the next restart:
 
 - **Added keys** are injected into the running service's `process.env`.
 - **Changed keys** are updated in place — but only keys the plugin itself
@@ -250,39 +258,9 @@ key-level detail.
 
 ## Development
 
-```sh
-npm install
-npm run typecheck
-npm test              # unit tests (node --test)
-npm run test:e2e      # real-host end-to-end tests (v2 then v1)
-npm run test:e2e:v1   # only against opencode-ai (V1 host)
-npm run test:e2e:v2   # only against @opencode/cli (V2 host)
-```
-
 The package is published as TypeScript source (OpenCode loads plugins
-directly), so there is no build step. The plugin entry point is `index.ts` at
-the package root; `env.ts` holds the pure loading logic and `rawconfig.ts`
-the raw-config scanning (both the flat V1 `mcp.<name>` and the nested V2
-`mcp.servers.<name>` shapes). Everything is unit tested with `node --test`,
-including an end-to-end pass through the V1 entry point and a V2 pass
-through `setup()` with a fake MCP domain covering env-ref substitution and
-precise reconnection.
-
-`test/e2e/run.mjs` goes further and tests against the real hosts: it packs
-the plugin with `npm pack`, installs it, installs the pinned host CLI
-(`opencode-ai` / `@opencode/cli`), boots it with an isolated
-`HOME`/`XDG_*`/`OPENCODE_TEST_HOME` sandbox and asserts the full chain —
-plugin load, secrets injection, a stub MCP server spawned with the values,
-hot reload and (on V2) the reconnect cycle. Host versions are pinned at the
-top of the file; bump them deliberately.
-
-The pins track the latest stable hosts. The `engines.opencode` floor in
-`package.json` is the oldest V1 release passing the harness — 1.14.34, where
-the `mcp list` in-process bootstrap refactor (anomalyco/opencode#25521) first
-shipped; older V1 releases inject and hot-reload fine but do not load
-plugins on the `mcp list` path, so MCP processes spawned there miss the
-injected variables. Re-probe with
-`OPENCODE_E2E_V1_SPEC=opencode-ai@<version> node test/e2e/run.mjs --host v1`.
+directly), so there is no build step. Setup, test commands and house rules
+live in [CONTRIBUTING.md](./CONTRIBUTING.md).
 
 To load a local checkout while developing, reference the directory:
 
@@ -293,6 +271,8 @@ To load a local checkout while developing, reference the directory:
   ]
 }
 ```
+
+Release history lives in [CHANGELOG.md](./CHANGELOG.md).
 
 ## License
 
