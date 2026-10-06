@@ -144,4 +144,4 @@ See `CONTRIBUTING.md` before sending code.
 Built on the vendored `fast-jev-compaction` engine (MIT) by
 [tamaratran](https://github.com/tamaratran/fast-jev-compaction), via the v1 adapter. The engine is
 byte-identical; only the adapter and the v2 message mapper are new. See
-`vendor/fast-jev-compaction/LICENSE`. MIT — see `LICENSE`.
+`src/vendor/fast-jev-compaction/LICENSE`. MIT — see `LICENSE`.

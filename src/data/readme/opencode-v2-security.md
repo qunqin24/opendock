@@ -1,6 +1,8 @@
 # opencode-v2-security
 
-OpenCode v2 执行边界安全插件：在原生 `shell` 工具执行命令前进行静态审查，并可配置动态 LLM 审查、单次提权和会话权限上限。插件使用 v2 effect 插件 API（`{ id, effect(ctx) }`，`effect` 返回 `Effect.Effect`）。
+OpenCode v2 全自动执行边界安全插件：在原生 `shell` 执行前形成原因报告，进行自动 LLM 审查、自动采证与单次授权，同时执行会话权限上限。没有等待人工确认的判定分支。插件使用 v2 effect 插件 API（`{ id, effect(ctx) }`，`effect` 返回 `Effect.Effect`）。
+
+1.5.0 保持现有配置和 category 名称兼容；研究和冻结验证依据见 [RESEARCH-v1.5.0.md](./RESEARCH-v1.5.0.md)。授权针对同一命令与事实报告，不把未选项的绝对概率、弱提示或批准后的随机重审当成新的拒绝理由。
 
 ## v1 → v2 hook 映射
 
@@ -27,7 +29,7 @@ OpenCode v2 执行边界安全插件：在原生 `shell` 工具执行命令前�
   "$schema": "https://opencode.ai/config.json",
   "plugins": [
     {
-      "package": "opencode-v2-security@1.4.1",
+      "package": "opencode-v2-security@1.5.0",
       "options": {
         "strictness": "HARD",
         "failPolicy": "fail_open",
@@ -56,7 +58,7 @@ OpenCode v2 执行边界安全插件：在原生 `shell` 工具执行命令前�
 
 ## 分类豁免与单次提权
 
-动态审查提示词按当前生效类别组装。授权只来自插件验证后的会话状态或经独立审查器批准的严格提权头；命令、文件内容及其他注释中的同名文字不能开启豁免。历史拒绝按当前权限重新判断。
+分类描述实际效果与 owner，不因已有许可减少事实归因；审批单独处理真实授权上下文。授权只来自插件验证后的会话状态或经独立审查器批准的严格提权头；命令、文件内容及其他注释中的同名文字不能开启豁免。首次可申请拒绝给出必要类别的完整最小集合，弱 secondary 仅作诊断，不进入下一次申请的硬覆盖要求。
 
 正常 API Bearer 鉴权和 SSH 密钥认证与凭据外传分开判断。审查器自身的文件读取权限与被审命令权限独立，`secret` 豁免不会让审查器读取真实秘密文件。`dynamic` 类别跳过常规动态审查器，始终按「审查器不可用 + `fail_open`」路由，不受配置的 `failPolicy` 影响；不可绕过底线和会话权限仍优先。
 
@@ -77,12 +79,12 @@ OpenCode v2 执行边界安全插件：在原生 `shell` 工具执行命令前�
 
 ### 通知（agent 与用户分离）
 
-v2 不存在“用户可见但模型不可见”的会话消息类型：`synthetic`/`system`/`shell` 都会进入模型上下文，且无 `description` 的 `synthetic` 在 TUI 聊天里还会被过滤掉。因此状态反馈分两条通道，互不共用：
+权限状态说明不是新的会话输入。`session.synthetic` 属于持久化 input admission，不能作为权限变化通知使用。状态反馈分两条通道：
 
-- **agent 侧**：以 `session.synthetic`（`resume:false`）追加一条普通 user 消息。内容明确写成 “The user temporarily allowed…” 的可信用户授权说明，并逐项解释实际放宽的检查；它不再使用 `<system_reminder>` 或注入样式包装。仅在状态跳变时发送，不主动唤醒会话。
+- **agent 侧**：`session.hook("context")` 在下一次真实模型请求中注入当前有效权限与 bypass 状态。变更、继承和到期只更新状态快照，不追加 synthetic/prompt、不启动 idle runner，不堆积过期授权消息。
 - **用户侧**：服务端注册 event-only RPC（`src/bypass-rpc.ts`），由本包的 TUI 伴随入口（`src/tui.ts`，package `exports["./tui"]`）订阅并弹 toast 显示 armed/updated/cleared/expired/status。参数非法时命令抛错，TUI 显示 usage；usage 不再回显给 agent。
-- “是否变化”以**已告知 agent 的集合**为准（而非当前 `activeBypass`）：sweep 运行时租约已过期，若按当前集合重算会得出“无变化”而漏报到期的结束提示。
-- 无 TUI 伴随（旧 host 无 RPC 域或未加载 CLI 插件）时静默降级：agent 警告仍生效，用户 toast 不可用。
+- 下一次模型请求读取最新状态；到期或清除后不会残留旧的有效授权说明。显式用户命令自身的正常执行不属于“权限提醒额外唤醒”。
+- 无 TUI 伴随时，context 中的权限边界仍生效；旧 host 缺 context hook 时不回退为会唤醒会话的新输入。
 - **本地目录安装**：host 对“目录”形式的插件目标只解析 `<dir>/index`（server）与 `<dir>/tui`（TUI），不看 package.json exports；因此仓库根有 `index.ts` / `tui.ts` 两个薄转发文件。npm 包则走 `exports`。
 
 ### 类别语义
@@ -91,16 +93,18 @@ v2 不存在“用户可见但模型不可见”的会话消息类型：`synthet
 |---|---|
 | `filesystem` | 文件系统检查：项目文件删除、数据破坏、重定向覆写、归档解包等 |
 | `host` | **运行中系统状态**：进程/服务管理（systemctl、kill）、电源、包安装、持久化与反取证变更 |
-| `privilege` | **跨越权限/隔离边界**：sudo/doas/pkexec/su/sudoedit/runuser/setpriv/capsh、chown/chgrp/权限位与 setcap/setfacl、用户与身份管理（useradd/usermod/userdel/passwd/chpasswd/visudo）、内核参数（`sysctl -w`、写 `/proc/sys`）、命名空间逃逸、内核模块与内核操作（modprobe/insmod/rmmod/kexec）、特权容器（`--privileged`/`--pid=host`/挂 docker.sock）、防火墙/MAC 边界（iptables/nft/ufw/setenforce）与 loop 设备（losetup）。`privilege` 同时改变沙箱路由：生效集合含 `privilege` 且命令在**命令位置**执行需要 OS 特权的操作（上述各族 + 设置 setuid/setgid 位的 chmod；按 `;`/`&&`/`||`/`|`/换行分段判定，`sh -c`/`eval`/命令替换载荷递归检查；字符串、参数、注释位置出现这些词一律不触发）时，生效集合含 `privilege` 的**该次调用以 host-direct 运行（不包裹 OS 沙箱）**；rw profile 复用既有 `sandbox.allowSudo`/host-direct 路由经 helper 执行。若该次无法去沙箱（ro profile 忽略 allowSudo），改为**终止型显式拒绝**（fail-loud），文案指向 `/bypass sandbox`、提权时附加 `sandbox` 类别、或配置 `sandbox.allowSudo`。生效集合**不含** `privilege` 的，即使动态审查器 ALLOW 也不让命令在沙箱内静默失败：该次调用在动态审查前即**终止型拒绝**，文案要求 `/bypass privilege` 或在提权时附加 `privilege`（rw profile 只有 `sandbox.allowSudo` 提供 host-direct 路由；`sandbox` 类别或 `mode:"full"` 已去沙箱时不触发）。host-direct 那次调用会向 agent 追加一条 `opencode-v2-security:` 前缀提醒（开启 `logReviewerTrace` 时另附审计行）。限制：命令位置与 `sh -c`/`eval`/命令替换载荷之外，交给 shell 消费的 heredoc 脚本体（`bash <<'EOF' … EOF`、`sh <<EOF … EOF`，引号与否皆可；`sudo`/`env`/`command` 前缀亦可）同样识别；但 heredoc 体交给非 shell 消费者（`cat`/`python3`/`tee`）以及经 stdin 管道（如把 `echo 'sudo id'` 管给 `sh`）不在识别范围内 |
-| `secret` | 凭据/敏感文件检查：`.env`、`~/.ssh/*`、`/etc/shadow`、`/proc/*/environ` 的读取/修改/删除。读取需要 `secret`，修改/删除需要 `filesystem+secret` 合取 |
-| `network` | 网络目的地与数据传输；不自动豁免秘密内容或远端破坏 |
+| `privilege` | 实际权限或隔离政策改变：属主、capabilities、setuid、用户政策、内核参数、namespace 操作、特权容器、防火墙/MAC 等。普通 broker、仅选择 namespace 和已有政策事实不属于此类；同凭据对象保护弱化归 `secret`。瞬态 sudo/root 身份不单独计风险，但实际 OS 能力和沙箱路由仍需满足，见下方说明 |
+| `secret` | 活跃凭据对象的值暴露、复制 staging、内容修改/删除、保护弱化。同一对象操作不再机械重复计 `filesystem` 或 `privilege`；摘要/长度、正常签发服务鉴权、收紧模式和仅提及路径不是值暴露 |
+| `network` | 越出接收边界的敏感传输、未授权通信使用，以及非公开资源访问范围扩张；正常公开演示和未越原定边界的可信 loopback 不因此过报。不自动豁免秘密内容或远端破坏 |
 | `remote` | 下载执行、远端仓库历史、数据库、云与集群状态变更 |
 | `indirection` | 本地脚本、解释器包装、编码载荷、动态展开及无法完成的静态检查 |
 | `dynamic` | **跳过动态 LLM 审查器**（静态层仍生效；跳过审查器始终按「不可用 + fail_open」处理，无视配置的 `failPolicy`） |
 | `sandbox` | 本次 shell 移除 Linux OS sandbox；分类器、动态审查与权限层仍运行 |
 | `slow` | 跳过慢命令优化拦截 |
 
-规则可以要求多个类别，且按合取处理：删除凭据需要 `filesystem+secret`，凭据外传需要 `secret+network`，远端下载执行需要 `network+remote`。只武装其中一类不会放行另一类风险。
+真实独立风险按合取处理：凭据删除本身为 `secret`，同时删除普通资料仍需 `filesystem+secret`；凭据离机仍需 `secret+network`。取回并执行是一体 `remote` 动作，不重复计附随传输；同调用另有独立敏感传输则保留 `network`。瞬态 root/sudo 身份不单独成为风险，但真实 OS 权限与沙箱路由要求仍独立执行。
+
+**特权路由与风险分开**：bwrap 的 `no_new_privs` 会使 sudo 等操作在隔离中失败。需要 OS 特权的调用必须有可用的已授权路由；读写 profile 可以使用现有 host-direct 路由，只读天花板不会被模型同意或 category 豁免解除。字符串、注释和仅保存的载荷不取得特权。无法提供路由时明确拒绝，不等待人工确认，也不静默执行注定失败的命令。
 
 ### 代理单次提权协议
 
@@ -118,13 +122,13 @@ sudo apt install unzip
 示例中的三个类别各管一层：`host` 豁免包管理这类运行系统状态变更的静态检查；`privilege` 覆盖 `sudo` 越权边界，并让该次调用以 host-direct 运行（不包裹 OS 沙箱，否则沙箱的 no_new_privs 会让 `sudo` 静默失败）；`sandbox` 则完全移除本次调用的 OS 沙箱（apt 需要写系统路径与真实网络，ro/rw 沙箱下都会失败）。按需请求类别：例如只改文件属主的 `chown` 只需要 `privilege`（可加 `sandbox`，当 ro 沙箱无法移除时避免 fail-loud）。
 
 - 三行必须从命令第一个字节开始、顺序和大小写完全一致；第四行起才是真实命令。可申请的类别为七个静态类别加 `sandbox`（`filesystem`/`host`/`privilege`/`secret`/`network`/`remote`/`indirection`/`sandbox`），可多选；`dynamic` 与 `slow` 不可申请（提权不能用来关掉审查层本身），`all`、`*`、`ALL` 与输入兼容别名同样禁止。
-- 插件把最近 **5 条用户消息**（每条最多 8000 字符，超长时保留头尾）、最多 **16 条用户/助手正文**（每条最多 4000 字符、合计 24000 字符）、实际 cwd/worktree、当前权限、命令、类别、理由及本会话既往失败申请交给独立 Python reviewer。推理文本、工具输出和插件通知不混入用户授权。Jev 使用一次 System One 请求；OpenAI-compatible 后备审查器开启 thinking、关闭 JSON output。最终仍只输出 `allow_once`、`ask_user` 或 `deny`。
+- 插件把最近 **5 条用户消息**（每条最多 8000 字符，超长时保留头尾）、最多 **16 条用户/助手正文**（每条最多 4000 字符、合计 24000 字符）、实际 cwd/worktree、当前权限、命令、类别、理由及本会话既往失败申请交给独立 Python reviewer。推理文本、工具输出和插件通知不混入用户授权。结果仅为 `allow_once`、`collect_evidence` 或 `deny`；缺少必要事实时自动采证，不请求用户确认。
 - 单次提权必须有已配置且可用的 `dynamicReview` 端点、模型与密钥，并取得独立 LLM 审查器的批准。配置缺失或审查器不可用时申请会被拒绝，命令不执行；静态预检不会兜底批准。此时提权申请仍按失败处理，与显式设置 `escalationEnabled: false`（提权前缀作为普通注释）不同。
 - **送审前 floor 预检**：插件先用「会话现有类别 ∪ 本次请求类别 ∪ 全部静态类别」（reviewer 可能给出的最大授权；底线规则本就对任何类别免疫，全类别武装下仍命中的终结规则不可能被任何授权清除，也避免未请求的普通规则或前段的普通 DENY 遮蔽同脚本后段的底线规则）跑一遍静态分类；若结果命中任何**终结规则**——不可绕过底线（`isFloorRule`）、`permission.write` 权限上限、或不可审查输入（`input.empty`/`input.opaque`；opaque 的判定是 ASK，同样在 reviewer 之前短路，不会白调 reviewer）——则**短路**：不调用 reviewer，直接返回终结型拒绝并说明"提权无法越过硬底线"。该静态拒绝**不写入** reviewer 拒绝历史（静态预检不是 reviewer 的 deny 决定），但重复提交仍会在同一预检处再次被拒；仅有未映射的普通规则不在此短路（它们交给 reviewer 正常审查）。
-- `allow_once` 只对当前 shell 调用有效。插件随后按“会话现有类别 ∪ 本次批准类别”继续执行未被这些类别豁免的普通静态/动态/permission/sandbox 检查（不是全绕过），也不会改变会话租约。若批准类别含 `privilege` 且命令需要特权，该次调用按上表语义以 host-direct 运行（或 fail-loud）。
+- `allow_once` 只对当前命令与匹配事实报告有效，不改变会话租约。同报告批准后不再次随机运行普通动态归因追加类别；真实权限、底线与路由检查仍执行。脚本、权限、目标或政策变化会明确使旧报告失效，而不是静默扩权。
 - 提权审查器单独限速为任意滚动 3 秒最多启动 2 次；仅此 reviewer 限速，普通分类和常规动态审查不限速。
-- `ask_user` 或 `deny` 后，本会话不能再对相似命令重复申请；相似判断读取本会话与**祖先会话链**（父子 subagent 链，最多 64 级）失败记录的只读并集，子会话逐字重试父会话已被拒的申请同样被本地拒绝。失败历史最多保留 8 条；达到上限后，为保持有界且不重新开放旧失败，本会话后续注释提权全部 fail closed。用户仍可直接使用 `/bypass` 授权；`/bypass` 本身不清除记录。记录只在 `session.deleted` 事件或插件卸载时清除，因此“本会话不得对相似命令重复申请”这一限制不受 `/bypass` 影响。
-- 无法通过再次提交注释申请解决的提权失败（已在途、历史容量饱和、相似命令被拒、审查器不可用、会话上下文读取失败、会话结束、reviewer 的 `ask_user`/`deny`）使用**终结型结尾**：引导跳过该步骤或请用户用 `/bypass <请求类别>`（无类别时为 `/bypass` 或 `/perm`）授权，不再拼接“ask for escalation”；审查器基础设施错误额外说明“本次未记录失败、稍后可用同一申请重试”。所有 agent 侧提醒（bypass 生效/结束/ALL/权限变更）以 `opencode-v2-security:` 前缀标明来源。
+- `collect_evidence` 进入有界的自动取证与新事实评估；不能把拿到正文直接当成安全。无法取得证据则明确拒绝，指出证据限制，不进入人工等待。
+- 相同已拒绝申请仍受有界失败历史限制；基础设施错误与模型否决分源。终结型拒绝要求跳过无法安全执行的步骤，不以“请用户授权”作为继续路径。所有 agent 侧状态说明以 `opencode-v2-security:` 标明来源。
 
 ### 不可绕过底线
 
@@ -151,7 +155,7 @@ arm 后命令不会被静态层直接 ALLOW：豁免对应检查后以 `bypass.s
 ### 执行面
 
 - **`ctx.permission.hook("evaluate")`**（主通道）：每次工具权限断言都经过它，缺位即把 `ev.effect` 降为 `"deny"` 并附说明。只收紧、永不放宽已计算的 effect。
-- **分类器 `permScope` 兜底**：无 `w` 时写/删形段 DENY（规则 `permission.write`）；类别豁免不能越过此权限拒绝。`permission.write` 阻断消息不附提权指南也不消耗每周期首次完整指南——权限上限是独立检查，文案直接要求用户用 `/perm +w` 或 `/perm rw` 授权。
+- **分类器 `permScope` 兜底**：无 `w` 时写/删形段 DENY（规则 `permission.write`）；类别豁免不能越过此权限拒绝。`permission.write` 是独立权限天花板，不被解释为模型反悔，也不进入等待用户确认的路径。
 - **`set_permission` 原生工具**（`codemode:false`，`permission.registerTool` 可关）：模型只能收紧**直接子会话**（`session.created` 记录的父子链，回退 `session.get().parentID` 在线查证）；`sessionID` 为必填参数，缺失、空值、caller 自身、孙代或任意会话一律以 `Tool.Error` 形错误 fail closed；放宽同样拒绝。
 - **子代理 `permission` 参数**（`permission.subagentPermission` 可关）：RO 父会话可以创建 RO 子代理；子会话继承父上限。若声明更窄权限，`session.created` 时立即绑定，并由 `execute.after` 再确认。
 - **slash 命令**：`/perm <ro|rw|w|none> [sessionID]`，用户可调整本会话或后代会话基线；祖先上限仍生效。
@@ -189,20 +193,19 @@ UI label 显示 `rwx`（RO 为 `r-x`），因为 `x` 始终可用且不可切换
 
 ```text
 shell 请求
-  -> escalation stage（仅当 byte 0 有严格三行前缀）
-       direct Python reviewer: allow_once | ask_user | deny
-       allow_once -> 只把本次所选类别加入当前 shell 的检查上下文
-       ask_user/deny -> 拒绝；同会话相似命令不可再次申请
-  -> 本地静态分类器（逐段、最坏结果合并）
-       permission / Linux OS sandbox gates remain active
-       ALLOW -> opencode 原生 shell
-       DENY  -> 拒绝（消息对模型可见）
-    ASK 或强制上下文 -> 动态 LLM 审查器（OpenAI-compatible）
-                   ALLOW -> opencode 原生 shell
-                    DENY  -> 拒绝（HARD：绕过尝试还会中断会话）
+  -> 真实权限与不可绕过底线检查
+  -> 静态事实 + 内在效果审查 -> 同一命令/事实/政策报告
+       需要证据 -> 有界自动取证 -> 新事实重新评估
+       可执行 -> opencode 原生 shell
+       可申请拒绝 -> 最小完整类别集合，代理自主申请单次授权
+  -> 自动 reviewer: allow_once | collect_evidence | deny
+       allow_once -> 复用对应报告，不二次随机归因
+       collect_evidence -> 自动取证，不等待人工
+       deny -> 明确拒绝，不把模型选择与程序底线混为一谈
+  -> 执行准入：真实 permission / sandbox / 事实变化检查仍有效
 ```
 
-静态分类（LOOSE/HARD 策略、cd 追踪、脚本指纹、目录清单等）沿用 v1 `-next` 规则集（`src/security/classifier.ts`、`src/security/reviewer.ts`、`src/security/auditor.py`），在此之上新增了 bypass 类别豁免机制与审查器提示词加固（见上方 BypassClassifier 章节）。动态审查器完全直连 OpenAI-compatible 端点，不经 opencode client。
+静态事实收集（cd 追踪、脚本身份、目录清单等）仍由本地分类器执行；风险归因与自动授权协议分别处理。JEV 直连已配置 System One 端点，OpenAI-compatible 通道使用现有配置；不通过 opencode client 代发模型请求，也不自动修改用户端点或密钥配置。
 
 ### LOOSE 语义放行（仅读写会话）
 
@@ -233,7 +236,7 @@ v1.4.0 的静态放行、RO 修复与验证方法见 [v1.4.0 研究与验证摘�
 | `shell` | string | 环境探测 | 分类器方言提示；v2 无 `config` hook，不能读取 opencode 配置里的 shell，仅由此字段 + `SHELL` 环境变量 + 平台默认决定 |
 | `securityEnabled` | boolean | `true` | 整体开关 |
 | `strictness` | `"LOOSE" \| "HARD"` | `"LOOSE"` | 静态规则集 + 动态系统提示 |
-| `failPolicy` | `"fail_ask" \| "fail_open" \| "fail_close"` | `"fail_open"` | 常规动态审查器不可用/失败时的行为；单次提权审查失败始终拒绝，不受此项影响。**`fail_ask` 在 v2 归一化为 `fail_close`**（v2 无法交互确认），拒绝消息会注明原因 |
+| `failPolicy` | `"fail_open" \| "fail_close"` | `"fail_open"` | 常规动态审查器不可用/失败时的自动处理；单次授权审查失败仍拒绝。旧 JSON 值 `fail_ask` 仅作兼容输入归一化为 `fail_close`，不是可选择的人工确认模式 |
 | `dynamicReview.baseURL` | string | — | OpenAI-compatible base URL（自动补 `/chat/completions`）；仅 loopback 允许 http |
 | `dynamicReview.model` | string | — | 模型 ID |
 | `dynamicReview.apiKey` | string | — | API key（`apiKey`/`apiKeyEnv` 二选一） |
@@ -260,7 +263,7 @@ v1.4.0 的静态放行、RO 修复与验证方法见 [v1.4.0 研究与验证摘�
 
 ## 与 v1 的行为差异（v2 约束所致）
 
-1. **`fail_ask` 移除**：`failPolicy: "fail_ask"` 被归一化为 `fail_close`——审查器不可用时直接拒绝，而非弹出确认工具。拒绝消息会显式说明 "interactive user confirmation is unavailable in v2"。
+1. **全自动失败处理**：不再暴露 `fail_ask` 模式；旧配置值兼容读取为 `fail_close`，无需编辑现有配置。审查器不可用、模型否决、证据限制与权限底线各有明确来源，没有等待用户确认的分支。
 2. **拒绝语义**：`execute.before` 是 v2 唯一可失败的 tool hook（失败通道 `Tool.Error`，`execute.after` 为 `never`）。effect 形态下，宿主运行每个 hook 回调返回的 `Effect`；本插件把判定主体包在 `Effect.tryPromise({ try, catch })` 里，所有阻断都经 `catch` 路由成一个 `_tag: "Tool.Error"` 的值（源码核实：session runner 对 `_tag === "Tool.Error"` 的失败执行 `catchTag` → `failTool`，把消息作为**本次工具调用**的失败返回给模型；其他失败会让整个 step 失败）。`catchTag` 按 `_tag` 判别，故假对象无需是真正的 `Tool.Error` 实例。静态/动态/policy 拒绝消息带有“跳过不必要步骤或申请提权，不要尝试替代方式绕过检查”的指导。
 3. **目录解析**：v2 ctx 无 `directory/worktree`，按会话从 `ctx.session.get().location.directory` 解析（带 30 分钟 TTL 与 512 条目上限的缓存），失败回退 `process.cwd()`。effect ctx 下 `ctx.session.*` 返回 `Effect`，经插件内部捕获的宿主 runtime 桥接运行，保留宿主服务。
 4. **会话清理**：`session.deleted` 事件经 `ctx.event.subscribe()`（`Stream`）以 `Stream.runForEach` + `Effect.forkScoped` 消费；插件 scope 关闭时中断 fiber，事件形状为 `{ type, data: { sessionID } }`。

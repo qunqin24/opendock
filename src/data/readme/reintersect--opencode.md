@@ -23,10 +23,23 @@ One sign-in covers every host on the machine, because they all run the same bina
 
 Requires Claude Code 2.1.283 or later.
 
+Install for yourself across all projects (the default user scope):
+
 ```bash
 claude plugin marketplace add reintersect/agent-plugins
 claude plugin install reintersect@reintersect
 ```
+
+To use Reintersect only in a particular repository or work project, run these commands from that project's root directory instead:
+
+```bash
+claude plugin marketplace add reintersect/agent-plugins
+claude plugin install reintersect@reintersect --scope local
+```
+
+Local scope enables the plugin for you in that project through `.claude/settings.local.json`. For a setup shared with collaborators, use `--scope project` instead, which records the plugin in `.claude/settings.json`.
+
+If you're switching an existing user-scope installation to local scope, first run `claude plugin uninstall reintersect@reintersect --scope user --keep-data`, then use the local install commands above. Start a new Claude Code session in the project and check `claude plugin list` to confirm the scope. See [Claude Code's installation scopes](https://code.claude.com/docs/en/discover-plugins#choose-an-install-scope) for details.
 
 ### Codex
 

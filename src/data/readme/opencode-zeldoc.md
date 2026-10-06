@@ -85,8 +85,39 @@ The plugin uses that key. Without a stored login it falls back to the
 
 | Source                   | Used when                                   |
 | ------------------------ | ------------------------------------------- |
+| `.zeldoc-profile` + CLI  | The project is pinned to a saved profile    |
 | `opencode auth login`    | A Zeldoc API key is stored (preferred)      |
 | `ZELDOC_API_KEY`         | No stored key                               |
+
+### One key per customer
+
+If you work for several customers, each with their own Zeldoc key, pin each
+project to its key with the [zeldoc CLI](https://github.com/martinmose/zeldoc-cli#one-key-per-customer):
+
+```bash
+zeldoc auth login --profile acme   # save Acme's key once
+cd ~/work/acme-app
+zeldoc auth pin acme               # writes .zeldoc-profile containing "acme"
+```
+
+In a project with a `.zeldoc-profile` file (in its folder or a folder above),
+the plugin asks the CLI for that project's key (`zeldoc auth token`) and
+OpenCode uses it for the model list and for every Zeldoc request, instead of
+the key from `opencode auth login` or `ZELDOC_API_KEY`. Projects without the
+file work as before, and need no CLI.
+
+If the project is pinned but the key cannot be read (the CLI is not
+installed, or no key is saved under that profile), Zeldoc requests fail with a
+message that says why. They are never sent with your other Zeldoc key, which
+may belong to another customer.
+
+OpenCode 1 reads the pin when it starts in a project, so restart it after
+changing the pin. OpenCode 2 checks the pin on every request.
+
+The CLI is looked up on your `PATH`, then in `~/.local/bin` (or
+`$XDG_BIN_HOME`), where its installers put it.
+
+### Refreshing the model list
 
 OpenCode 1 fetches the model list when it starts; restart it after a change to
 your key's models. OpenCode 2 keeps a background service running between

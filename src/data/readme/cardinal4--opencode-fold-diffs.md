@@ -124,7 +124,7 @@ The V2 TUI plugin API (`@opencode/plugin/tui`) has no slot for message parts, so
 
 Renderable classes are matched by duck-typing (`typeof node.diff === "string"`, `content` + `filetype` for code) rather than `instanceof`, because the opentui classes are minified in the shipped binary and their names are not stable.
 
-Blocks are re-scanned on `message.part.updated` and `message.updated`, plus a 2 s sweep that catches a session opened from history, whose parts land before any event this plugin sees.
+Blocks are re-scanned on V2's `session.message.content.updated`, `session.tool.success` and `session.tool.failed`, plus `session.step.ended` and `session.execution.succeeded` (`session.shell.ended` joins them when `bash` folding is on). A 2 s sweep catches a session opened from history, whose parts land before any event this plugin sees.
 
 ## Migrating from V1
 
@@ -132,6 +132,8 @@ V1 plugin implementations do not run in V2. The V2 port made these changes:
 
 - Entrypoint is a `{ id, setup(context) }` definition (`Plugin.define()` is an identity helper, so the shape is the same). `setup` returns the cleanup function instead of `api.lifecycle.onDispose`.
 - `api.renderer` → `context.renderer`; `api.route.current.name` → `context.ui.router.current().type`; `api.event.on` → `context.data.on`; `api.ui.toast` → `context.ui.toast.show`; `api.keymap.registerLayer` → `context.keymap.layer`.
+- `context.keymap.layer` is called directly from `setup` on 2.0.23+; earlier V2 builds read Solid context there, so the plugin still registers from a component mounted in the `app` slot for them.
+- Event names are V2's: `message.updated` / `message.part.updated` are legacy schemas in V2 and are never emitted. The plugin listens to `session.message.content.updated`, `session.tool.success` / `session.tool.failed`, `session.step.ended` and `session.execution.succeeded` (plus `session.shell.ended` when bash folding is on). These names exist from 2.0.10 on, so older V2 installs get the same fix without upgrading.
 - Tool headers are no longer one string. V1 rendered `"← Edit src/app.ts"`; V2 renders a label node plus a path node, so detection and the stats suffix target the label.
 - `bash` defaults to `false`, because V2 now trims long commands to two lines itself.
 - Config moves from `tui.json` to `cli.json` (or `opencode.json(c)`).
@@ -153,7 +155,7 @@ V1 plugin implementations do not run in V2. The V2 port made these changes:
 
 ## Status
 
-Written against **opencode v2.0.10 / v2.0.11**. The tree-walking, block matching, fold/unfold and toggle logic run green against a mock renderer tree shaped like V2's (`node --test`), and the fold was checked against a real transcript: `visible = false` (Yoga `display: none`) is what actually hides a body, not `maxHeight`.
+Written against **opencode v2.0.24**, and compatible across the V2 line: the `session.*` events this version listens to exist from v2.0.10 on, so an older V2 install gets the fix without upgrading. The tree-walking, block matching, fold/unfold and toggle logic run green against a mock renderer tree shaped like V2's (`node --test`), and the fold was checked against a real transcript: `visible = false` (Yoga `display: none`) is what actually hides a body, not `maxHeight`.
 
 Edits with fewer than `min_lines` changed lines (default 6) are left expanded on purpose — a one-line change is already its own summary. Set `min_lines: 0` to fold every file block.
 

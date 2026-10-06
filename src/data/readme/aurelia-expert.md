@@ -11,13 +11,9 @@
 
 # aurelia-expert
 
-**Eight router-routed Aurelia v2 MVVM skills for AI coding agents**
+[![npm version](https://img.shields.io/npm/v/aurelia-expert?label=npm)](https://www.npmjs.com/package/aurelia-expert) [![Bun Runtime](https://img.shields.io/badge/Bun-Runtime-orange?link=https://bun.sh)](https://bun.sh) [![MIT License](https://img.shields.io/badge/License-MIT-green?link=LICENSE)](LICENSE) [![OpenCode Plugin](https://img.shields.io/badge/OpenCode-Plugin-blue?link=https://opencode.ai)](https://opencode.ai) [![Platforms](https://img.shields.io/badge/Platforms-Windows%7CmacOS%7CLinux-lightgrey)](https://bun.sh)
 
-[![OpenCode Plugin](https://img.shields.io/badge/OpenCode-Plugin-blue?link=https://opencode.ai)](https://opencode.ai)
-[![npm version](https://img.shields.io/npm/v/aurelia-expert?label=npm)](https://www.npmjs.com/package/aurelia-expert)
-[![MIT License](https://img.shields.io/badge/License-MIT-green?link=LICENSE)](LICENSE)
-[![Bun Runtime](https://img.shields.io/badge/Bun-Runtime-orange?link=https://bun.sh)](https://bun.sh)
-[![Platforms](https://img.shields.io/badge/Platforms-Windows%7CmacOS%7CLinux-lightgrey)](https://bun.sh)
+**Eight router-routed Aurelia v2 MVVM skills for AI coding agents**
 
 [Quick start](#quick-start) · [Bundled skills](#bundled-skills) · [Examples](#examples) · [Requirements](#requirements) · [Development](#development)
 

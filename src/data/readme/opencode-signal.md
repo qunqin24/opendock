@@ -92,21 +92,35 @@ To turn it off: `"enabled": false` (or remove the entry) and restart opencode.
 
 | You send | What happens |
 |---|---|
-| any text | prompt to the current session (the one you last worked in); 👀 reaction = accepted |
+| any text | prompt to the current session — the one you last typed a prompt in, or picked with `/use` or `/new`; 👀 reaction = accepted |
+| a **swipe-reply** to a message | goes to what that message is about: answers that question or permission request, or prompts that session — in whichever project it came from |
 | `/help` | command list |
-| `/status` | project, current session, working/idle, how many answers are waiting |
+| `/status` | project, current session, working/idle, how many answers are waiting, other open windows |
 | `/sessions` | recent sessions, numbered |
-| `/use N` | switch to session N from `/sessions` |
-| `/new [title]` | new session; your next message is its first prompt |
+| `/use N` | switch to session N from `/sessions` (the terminal switches too) |
+| `/new [title]` (or `/clear`) | new session; your next message is its first prompt (the terminal switches too) |
 | `/abort` | stop the current task |
 | `/skip` | dismiss the waiting question / deny the waiting permission |
+| `/projects` | open opencode windows, numbered |
+| `/project N` | talk to window N |
 
-While a question or permission request is waiting, your next non-command message answers it:
+While a question or permission request is waiting, your next plain message answers it — unless you moved on with
+`/new`, `/use` or `/project` after it was asked: then plain messages go to the session you picked, and you answer the
+old request by swipe-replying to it.
 
 - question: `2`, or `1,3` for multi-select, or your own text (when the question allows it)
+- several questions in one request: they arrive together; reply with one line per question, in order —
+  ```
+  2
+  1,3
+  my own answer
+  ```
+  or answer some now and the rest later, or start a line with `Q3:` to answer just that one
 - permission: `y` · `a` · `n` · or a sentence (deny, and the AI sees your sentence as feedback)
 
-Prompts from Signal reuse the agent and model of the session's last prompt.
+Prompts from Signal reuse the agent and model of the session's last prompt. If prompts were queued while a session was
+working, the finished message carries the answer to each of them. Texts over ~1800 bytes arrive as several numbered
+messages, so nothing hides behind Signal's "Read more".
 
 ## Options
 
@@ -129,14 +143,25 @@ Prompts from Signal reuse the agent and model of the session's last prompt.
 ## Several opencode windows
 
 Every window posts its own notifications, questions and permission requests (each message starts with the project
-name). **Only one window receives your Signal messages** — the first one started. When it closes, another window
-takes over within about 15 seconds. `/status` tells you which project is listening.
+name), and you can talk to all of them from the one group:
+
+- `/projects` lists the open windows; `/project N` makes window N the one your messages go to.
+- Typing a prompt in a window's terminal makes that window the one Signal talks to, as for sessions.
+- A request that is waiting in any window takes your next plain message (the oldest one, if several are waiting).
+  Swipe-reply to a message to be specific: the reply goes to the window and session that posted it.
+
+One window reads Signal and hands each message to the window it is for. If that window closes, another takes over
+within about 10 seconds; if a window stops taking its messages, you are told instead of hearing nothing.
+`opencode run` jobs post their results but never read Signal or take the focus.
 
 ## Files
 
 - `~/.local/state/opencode-signal-bridge/bridge.log` — what the bridge did
 - `~/.local/state/opencode-signal-bridge/signal-cli.log` — the daemon's output (message contents are not logged)
-- `~/.local/state/opencode-signal-bridge/inbound.lock` — which opencode receives messages
+- `~/.local/state/opencode-signal-bridge/inbound.lock` — which opencode reads Signal
+- `~/.local/state/opencode-signal-bridge/instances/` — one small file per open window
+- `~/.local/state/opencode-signal-bridge/inbox/` — messages on their way to another window
+- `~/.local/state/opencode-signal-bridge/focus.json` — which window you talk to
 
 ## Keep signal-cli updated
 
@@ -153,6 +178,9 @@ https://github.com/AsamK/signal-cli/releases into `~/.local/opt/signal-cli-<vers
   on its own.
 - **Your messages are ignored** — they must be sent in the `opencode` group from your own account (phone or Signal
   Desktop). Messages from anyone else, and Note to Self, are ignored.
+- **Replies show up above your message** — Signal can sort by the sender's clock. The bridge warns when this
+  computer's clock is behind Signal's (`bridge.log`: "clock is …s behind"). On WSL, `sudo hwclock -s`, or
+  `wsl --shutdown` from Windows, fixes it.
 
 ## Development
 
@@ -161,6 +189,7 @@ git clone https://github.com/AhmedMoharam/signal-bridge.git opencode-signal
 cd opencode-signal
 npm install
 npm run typecheck
+npm test        # Node >= 22.6: a mock signal-cli and several plugin instances in their own processes, ~80 s
 ```
 
 To use a local checkout instead of the npm package, point the `plugin` entry at the file:

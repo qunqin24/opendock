@@ -91,9 +91,9 @@ so nothing is ever spent on a provider you did not list.
 
 | Key | Meaning |
 |---|---|
-| `targets` | The models. Each has `providerID`, `modelID` and `kind` (`cloud` or `local`). Local targets add `capacity` (the server's `--parallel`), `context` (tokens per slot) and optionally `prepareCommand` (argv, run when the model is not loaded), `minContextTokens`, `outputReserve`, `contextHeadroom` and `modelCapacity`. Any target may add `fit` (per-tier preference weight), `effort` (per-tier reasoning variant), and `effortCeiling` (highest catalog-advertised reasoning level policy may select). |
+| `targets` | The models. Each has `providerID`, `modelID` and `kind` (`cloud` or `local`). Local targets add `capacity` (the server's `--parallel`), `context` (tokens per slot) and optionally `prepareCommand` (argv, run when the model is not loaded), `minContextTokens`, `outputReserve`, `contextHeadroom` and `modelCapacity`. Set `embedding: true` only on an embedding model: the gateway refuses embedding work on other targets and chat work on it. Any target may add `fit` (per-tier preference weight), `effort` (per-tier reasoning variant), and `effortCeiling` (highest catalog-advertised reasoning level policy may select). |
 | `targets.*.modelCapacity` | For local targets that share one model (say a coder lane and a classifier lane on the same server model): how many leases the *model* may already carry, summed over every target that names it, for this target to take another. A second limit next to `capacity`, which still caps the target's own share. Set it below `--parallel` on one target to keep slots free for the others, or for callers that reach the model server without a lease. Unset: only `capacity` applies. |
-| `tiers` | Ordered target lists for `deep`, `smart`, `build`, `fast-build`, `review`, `worker` and `classifier`. |
+| `tiers` | Ordered target lists for `deep`, `smart`, `build`, `fast-build`, `review`, `worker`, `classifier` and `embedding`. |
 | `fallbacks` | Per tier, ordered groups consulted only when the tier's own list has nothing eligible. |
 | `agentTiers` | Which tier each opencode agent rides. Exact names, or a trailing `*` for a prefix; values are a tier, `inherit` (ride the parent session's tier) or `classifier`. Merged over the defaults: `build`→build, `plan`→smart, `general`→inherit, `explore`→worker, tier-named agents to their tier, and opencode-guard's `fleet-classifier*` agents to classifier. |
 | `defaultAgentTier` | Tier for any agent `agentTiers` does not match. Default `worker`. |
@@ -534,9 +534,9 @@ instead name `keyFile`: the gateway reads it per request, requires a non-empty r
 group or world permission bits, and sends its value only as `x-api-key`. This keeps the proxy key
 and provider OAuth state out of OpenCode's auth store. Provider keys are never logged. Per provider
 you can also set `headers`,
-`bodyExtras`, `dropBodyKeys` (for a lane that rejects a parameter the client
+  `bodyExtras`, `dropBodyKeys` (for a lane that rejects a parameter the client
 sends), `streamIdleMs`, `streamUsage: false`, `jsonMode: "instruct"`, `chatApi`, `messagesApi`, `responsesApi`,
-`forwardSessionHints: true` (forward the request's `x-opencode-session-id` and
+  `embeddingsApi: true` (required for `/v1/embeddings`), `forwardSessionHints: true` (forward the request's `x-opencode-session-id` and
 `x-opencode-session-kind` to this lane: llm-auth-proxy uses the kind to pick its
 prompt-cache TTL, subagent 5m otherwise 1h, and the id to link request fingerprints
 for prefix-change diagnostics; set it only on fleet-internal lanes -- a session id
@@ -551,6 +551,14 @@ Chat is offered to every provider except one with `chatApi: false`; Responses an
 offered only to providers with `responsesApi: true` and `messagesApi: true`, respectively. If no
 configured provider can serve the requested API, the gateway returns a capability-specific `502`
 without contacting the broker or an upstream.
+
+`POST /v1/embeddings` is buffered-only and is offered only to providers with
+`embeddingsApi: true`. It requires a mapped model and leases with `api: "embeddings"`, so it can
+use only a target marked `embedding: true`; those targets cannot serve chat, Responses, or Messages.
+The endpoint rejects `stream: true`, accepts at most 2,048 input items, and rejects bodies larger
+than 1 MiB with `413`. Eligibility uses the largest individual input (`ceil(chars / 4)` for strings,
+token-array length for token IDs), not the combined batch. When upstream omits usage, the ledger
+records the sum of input estimates, output `0`, and `estimated: true`.
 
 Native Messages rewrites only `model` and preserves all other request fields. The gateway accepts
 its caller key as either `Authorization: Bearer` or `x-api-key`, but forwards neither client header.

@@ -355,6 +355,111 @@ dialog for the current session and `session.permissions` in the user-wide
 `cli.json` (`"prompt"` or `"autoaccept"`) for its startup default. Restart
 OpenCode after changing `cli.json`.
 
+## Limits: provider quotas and banked resets
+
+Navigator keeps subscription limits separate from OpenCode's session token and
+cost statistics. Codex subscription data comes from its documented app-server
+`account/rateLimits/read` RPC. It reports provider-owned usage windows, reset
+times, account identity, and any available banked reset credits. The installed
+Codex 0.160.0 protocol also exposes the separate
+`account/rateLimitResetCredit/consume` RPC. Navigator requires explicit
+confirmation before using it and never redeems credits in the background.
+Limits follows the model and verified connection selected in the current OpenCode
+session. Codex's ordinary `codex` windows appear as **Codex account** quota, shared
+across models. The protocol can return `normalModelSlug: null` for this ordinary
+bucket; that field is display metadata for quota aliases, not a prerequisite for
+account usage. Separate model-specific buckets require explicit model association.
+Switching provider, model, session, or account invalidates stale reads and credit actions.
+CodexBar is useful for discovering providers, but its cookie, credential-file,
+and undocumented endpoint integrations are not Navigator data sources.
+
+| Source | Native measurement | Banked reset credits |
+| --- | --- | --- |
+| Codex app-server | Rate-limit windows and account ID | Available count, optional details and expiry, confirmed manual consumption |
+| MiniMax and NanoGPT | Explicit model-associated subscription windows; separate pay-as-you-go balances | Read-only |
+| GitHub Copilot | Official SDK token-scoped premium allowance, checked against the selected model's billing metadata | Read-only |
+| OpenRouter, DeepSeek, Moonshot, SiliconFlow, Novita, Poe, AIHubMix | Current-account balance or key spending budget, preserving provider-native currency/points and permission requirements | Read-only |
+| OpenAI API, Anthropic, Azure OpenAI, Groq, Cerebras, Fireworks | Native model-response counters or explicitly labelled configured capacities | Read-only |
+| Claude Code (not integrated) | Session-local `rate_limits` statusline payload after a Claude Code response | No documented cross-process consumption API |
+| OpenCode session statistics | Token and cost statistics, not subscription quota | Not applicable |
+| Other providers | Capability guidance until a documented source and model/account mapping are verified | No action without a documented consume API |
+
+The additional native sources use the **OpenCode 2 Navigator server plugin** already
+used for Todo. Configure it on the 2.x launch path as described in the installation
+section. OpenCode 1.x retains Codex support; additional sources need the 2.x public
+integration/HTTP APIs. Without the server plugin, Limits shows setup guidance.
+**Provider sources** lists audited capabilities and unsupported-source reasons;
+the [source inventory](PROVIDERS.md) includes public API references and prerequisites.
+
+The server resolves the active host credential through OpenCode's public API.
+Quota RPCs return measurements, never credentials. Response-header observations
+use real model requests without issuing extra inference calls or consuming their
+response bodies. HTTP-only observations may be absent on WebSocket transports.
+REST reads use a short in-memory cache; Refresh bypasses it. Observed headers older
+than two minutes are marked stale instead of presented as current remaining quota.
+
+Limits is visible and expanded by default, first below the session title. Change
+its visibility and order under **Settings → Sections** in Global or Current
+worktree scope. Hiding or collapsing it does not stop background refreshes, and
+does not grant permission to spend a reset credit. **Focus Limits** is also
+available from the command palette.
+
+![Codex quota windows and reset times](screenshots/39-provider-limits.png)
+
+![Audited provider sources and required capabilities](screenshots/47-provider-sources.png)
+
+### Link the intended Codex account
+
+Install a Codex CLI exposing the documented read and consume RPCs (verified with
+0.160.0), ensure `codex` is on the same machine's `PATH`, and sign in with a ChatGPT
+account. Navigator starts `codex app-server --stdio` lazily after the account is
+associated with the selected ChatGPT connection.
+
+OpenCode 2's built-in ChatGPT OAuth integration reports an account ID. Navigator
+automatically associates that identity and verifies it against Codex's reported
+account. API-key OpenAI connections use API measurements instead of a ChatGPT
+subscription.
+
+When the host does not provide a verifiable identity, select **Link Codex CLI
+account** and confirm the reported account ID if it matches this host connection.
+The private, user-wide binding is saved **once per connection**, or once per
+provider on hosts without a connection API, and reused across models, projects,
+and sessions. **Unlink Codex account** removes the manual association; **Relink
+Codex account** is available after an account change. Compatible older model
+bindings are reused; conflicting bindings remain isolated until a deliberate relink.
+
+For an associated connection, Limits shows the ordinary Codex account quota and
+any explicitly associated model buckets, their native units and durations, reset times, and
+the last successful read time. It refreshes quietly every five seconds, even
+when hidden. **Refresh** requests a read immediately; a failed read preserves
+cached windows with a stale label and **Retry**. Unsupported mappings, changed
+sign-in/account, and rate-limited reads have separate muted guidance.
+
+### Review and manually use a banked reset
+
+**Review reset credits** displays the provider's available count, optional credit
+details, statuses, and expiry. Selecting a credit first checks fresh eligibility
+and opens a separate confirmation tied to the current account and model. Cancel
+or Escape returns to the credit list without spending anything.
+
+The provider must report ordinary usage blocked, an applicable account or model window, and an
+available reset credit. A displayed percentage alone does not establish
+eligibility. A reset can affect other eligible Codex windows as well. Navigator
+checks the account and eligibility again before submission. Read-only providers
+do not gain a consume action.
+
+After an uncertain result, **Reconcile pending attempt** reuses the same
+idempotency key, including after a restart. Only its unresolved account/model,
+optional credit ID, and attempt key are saved in private preferences. Definitive
+outcomes clear that journal; quotas themselves are not saved to disk. A pending
+attempt on another account must be resolved on its original binding first.
+
+![Separate account-bound banked reset confirmation](screenshots/41-reset-confirmation.png)
+
+An absent Codex credit detail list does not mean there are zero credits: the
+provider may report a count without individual rows. Navigator does not read
+provider credential files or save credentials in preferences.
+
 ## Configuration sources
 
 Navigator validates and deep-merges three simultaneous sources in this order:
@@ -457,9 +562,31 @@ sources are left untouched.
 Configured files may define behavior, layout, desired MCP states, layout and MCP
 presets, workspace-profile links, and MCP groups. Navigator deliberately ignores
 favorites, recent-item history, trusted skills, onboarding state, paths, and other
-private mutable data. The files are read-only defaults: UI changes continue to use
-the concurrency-safe preferences file under OpenCode's state directory. Resetting
-a scope removes only its saved override and reveals configured values again.
+private mutable data. UI changes normally use the concurrency-safe preferences
+file under OpenCode's state directory. Resetting a scope removes only its saved
+override and reveals configured values again.
+
+To deliberately save a named, commit-safe project profile, choose **Current
+worktree** in Navigator Settings, copy the portable settings JSON, and paste it
+into a temporary file. From that project's root, preview and then save it:
+
+```sh
+opencode-navigator-profile save Focus < /path/to/portable-settings.json
+opencode-navigator-profile save Focus --apply < /path/to/portable-settings.json
+```
+
+If the command is not installed globally, run it with
+`npx --yes --package=opencode-navigator opencode-navigator-profile` instead.
+The command writes only the validated layout preset, desired MCP states, and
+their optional link into `.opencode/navigator.json`. It preserves other project
+configuration, rejects stale or symlinked targets, and never copies favorites,
+history, trust choices, or private paths. Use `--replace` deliberately to update
+an existing project profile. After saving, restart OpenCode to load the project
+file, then open **Settings → Presets → Focus → Preview & apply**. The profile is
+never applied merely by entering the project, and applying it does not save the
+layout as a default. Saved Global or Current worktree presets with the same name
+still take precedence, so use a distinct name if you want the project profile
+to be visible in the current installation.
 
 Choose `Global` or `Current worktree` before editing from the sidebar gear button.
 Behavior changes apply immediately in the selected scope. Section visibility,
@@ -622,11 +749,12 @@ session or workspace dismisses the entire search dialog chain.
 Development requires Bun 1.4.2 and Node.js 24.16 or newer. Install dependencies with
 `bun install --frozen-lockfile`.
 
-ESLint uses the Solid preset from
-[`@st1ggy/linter-config`](https://github.com/St1ggy/linter-config); Prettier uses its
-common preset. `eslint.config.js` documents project-specific adaptations for
-OpenTUI callbacks, SDK compatibility, and test fixtures. Type-aware linting covers
-application code, tests, build scripts, and JavaScript configuration files.
+Oxlint uses the `solid-ox` preset from
+[`@st1ggy/linter-config`](https://github.com/St1ggy/linter-config); Oxfmt uses its
+`oxfmt-common` preset. `oxlint.config.ts` documents project-specific adaptations for
+OpenTUI callbacks, SDK compatibility, and test fixtures. Type-aware analysis uses
+`oxlint-tsgolint`; `tsconfig.lint.json` covers application code, tests, build scripts,
+and configuration files. Formatter exclusions are maintained in `oxfmt.config.ts`.
 
 ```sh
 bun run test
@@ -644,7 +772,7 @@ bun run screenshots:verify
 bun run check
 ```
 
-`bun run check` runs the tests, TypeScript, ESLint, bundle-size guard, and formatting
+`bun run check` runs the tests, TypeScript, Oxlint, bundle-size guard, and Oxfmt
 check. The unminified TUI bundle is limited to 360,000 bytes.
 Font generation is a separate development task: `bun run font:build` and
 `bun run font:check` use `uv` and the pinned FontTools dependency. Users install
@@ -655,7 +783,7 @@ CI checks that the bundled font matches its generator.
 through Ghostty on Xvfb. The image includes the bundled corner font and a pinned
 JetBrainsMono Nerd Font; every displayed task, session, workspace, path, skill,
 server, error, and preset is synthetic. `bun run screenshots:verify` renders the
-same 37 scenes to a temporary directory and fails if any PNG differs. Three scenes
+same scenes to a temporary directory and fails if any PNG differs. Additional scenes
 keep the pinned Nerd Font but remove the Navigator corner font so the uninstalled-font
 experience remains reproducible beside the required-font captures. The harness
 requires Docker with Linux ARM64 support. These commands are available for harness

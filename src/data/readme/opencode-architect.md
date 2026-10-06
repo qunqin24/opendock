@@ -9,11 +9,11 @@ opencode-architect is an [OpenCode](https://opencode.ai) plugin and CLI that shi
 
 ### Option 1 — Install as an OpenCode plugin
 
-Add the package to the `plugin` array in your OpenCode config — `.opencode/opencode.json` in your project, or `~/.config/opencode/opencode.json` for all projects:
+Add the package to the `plugins` array in your OpenCode config — `.opencode/opencode.json` in your project, or `~/.config/opencode/opencode.json` for all projects:
 
 ```json
 {
-  "plugin": ["opencode-architect@latest"]
+  "plugins": ["opencode-architect@latest"]
 }
 ```
 
@@ -21,7 +21,7 @@ The plugin registers the full agent suite at startup, with self-contained bundle
 
 ### Option 2 — Install with the CLI (bunx or npx)
 
-The CLI registers the package as a plugin: it adds `opencode-architect@latest` to the `plugin` array of your OpenCode config with surgical text editing (comments and formatting elsewhere in the file are preserved), then records the registration in an `opencode-architect.manifest.json` manifest at the scope base. Nothing is copied — the agents, references, and templates all load from the package at startup.
+The CLI registers the package as a plugin: it adds `opencode-architect@latest` to the `plugins` array of your OpenCode config with surgical text editing (comments and formatting elsewhere in the file are preserved), then records the registration in an `opencode-architect.manifest.json` manifest at the scope base. Nothing is copied — the agents, references, and templates all load from the package at startup. A legacy v1 `plugin` entry is left untouched and reported with an upgrade advisory.
 
 ```bash
 # Project scope (default): edits the ./.opencode/ or repo-root config
@@ -47,11 +47,11 @@ bunx opencode-architect --help                  # full usage
 
 Re-running install when the manifest matches reality is a zero-write no-op. `--mode copy` is refused with an explanatory error: this package is code-backed (it ships agents), and copying cannot express plugin registration.
 
-Every install — including a no-op — also clears this package's stale copies from OpenCode's package cache (`$XDG_CACHE_HOME/opencode/packages`, falling back to `~/.cache/opencode/packages`): `opencode-architect`, `opencode-architect@latest`, and `opencode-architect@<installed version>`. Pinned copies like `opencode-architect@0.6.0` and other packages' cache dirs are left untouched. This makes OpenCode re-fetch the just-installed version on next start instead of reusing a stale or partial extraction. Removal is best-effort: a failure prints a warning but the install still succeeds.
+Every install — including a no-op — also clears this package's stale cache keys from OpenCode's plugin cache (`$XDG_CACHE_HOME/opencode/npm`, falling back to `~/.cache/opencode/npm`): `opencode-architect`, `opencode-architect@latest`, and `opencode-architect@<installed version>` — each key holding every cached generation beneath it. Pinned keys like `opencode-architect@0.6.0` and other packages' cache keys are left untouched. This makes OpenCode re-fetch the just-installed version on next start instead of reusing a stale or partial extraction. Removal is best-effort: a failure prints a warning but the install still succeeds.
 
 **Upgrading from a copy install (pre-0.8):** if a previous version copied agents into your scope base, install detects the old manifest, removes exactly the files it lists, prints a notice, and switches the scope to plugin registration in one step. Locally modified files are tracked by hash; uninstall and migration only remove what the manifest recorded.
 
-`clear-cache` is a manual-only command (never invoked at load time) for removing cached copies from OpenCode's package cache (`$XDG_CACHE_HOME/opencode/packages`, falling back to `~/.cache/opencode/packages`). With no flags it removes `opencode-architect` and every `opencode-architect@*` copy. `--package <name>` removes `<name>` and every `<name>@*`; `--all` removes the whole OpenCode cache directory (`$XDG_CACHE_HOME/opencode`, falling back to `~/.cache/opencode`). `--dry-run` lists what any mode would remove without deleting anything, and previews broad modes without `--yes`. Both broad modes require `--yes` to confirm, are mutually exclusive, and package names containing path separators or `..` are rejected. The command is idempotent — running with nothing cached succeeds — and removal failures warn without changing the exit code.
+`clear-cache` is a manual-only command (never invoked at load time) for removing cached package keys from OpenCode's plugin cache (`$XDG_CACHE_HOME/opencode/npm`, falling back to `~/.cache/opencode/npm`), where each key directory holds every cached generation beneath it. With no flags it removes `opencode-architect` and every `opencode-architect@*` key. `--package <name>` removes `<name>` and every `<name>@*`; `--all` removes the whole OpenCode cache directory (`$XDG_CACHE_HOME/opencode`, falling back to `~/.cache/opencode`). `--dry-run` lists what any mode would remove without deleting anything, and previews broad modes without `--yes`. Both broad modes require `--yes` to confirm, are mutually exclusive, and package names containing path separators or `..` are rejected. The command is idempotent — running with nothing cached succeeds — and removal failures warn without changing the exit code.
 
 ## What you get: ten specialist OpenCode agents
 

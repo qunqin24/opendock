@@ -1,7 +1,8 @@
 # magpie-community plugins
 
 [OpenCode](https://opencode.ai) provider plugins for coding-plan
-subscriptions, maintained by the community. Each package signs in to one
+subscriptions, and [gateway middleware](#gateway-middleware) for magpie,
+maintained by the community. Each package signs in to one
 subscription and makes its requests. The packages work in OpenCode and in
 [magpie](https://usemagpie.ai), which runs OpenCode's provider plugins.
 
@@ -24,6 +25,31 @@ subscription and makes its requests. The packages work in OpenCode and in
 | [workbuddy](packages/workbuddy) | WorkBuddy (international build) | `workbuddy-ai` |
 | [zcode](packages/zcode) | ZCode: Z.ai / BigModel (智谱) GLM Coding Plan, team seats, Start Plan | `zcode` |
 | [zed](packages/zed) | Zed (Pro, Pro Trial, Student, Business): Anthropic, OpenAI, Google and xAI models hosted by Zed | `zed` |
+
+## Gateway middleware
+
+These packages aren't OpenCode plugins. magpie runs them in its gateway, on the requests every agent sends and the replies it gets back, whichever provider serves them. Each one is a port of something [New API](https://github.com/QuantumNous/new-api) does for its channels, or something agents commonly need.
+
+| Package | What it does |
+|---|---|
+| [param-override](packages/param-override) | New API's 参数覆盖 (`param_override`): set, delete, move, copy or rewrite request fields, for some models or under conditions, or turn a request away |
+| [model-map](packages/model-map) | New API's 模型重定向 (`model_mapping`): send a model under another name, by name or `/pattern/`; replies name the model asked for |
+| [system-prompt](packages/system-prompt) | Your own system prompt on every request, or on some agents' or models', in each API's own place |
+| [word-guard](packages/word-guard) | New API's 敏感词过滤: turn away or mask words and patterns in what users send, and in replies |
+| [think-tags](packages/think-tags) | Take `<think>…</think>` out of a reply's text, or put a Chat reply's `reasoning_content` into it (`thinking_to_content`) |
+
+```sh
+magpie plugin add @magpie-community/middleware-<name>
+magpie plugin options <name> '<json>'
+```
+
+In the app, they're under Plugins › Discover › Gateway middleware, and each one's **Options** button edits its options in its row.
+
+A middleware package is a folder under `packages/<name>/` with:
+
+- **`package.json`**: name `@magpie-community/middleware-<name>`, `"magpie": {"middleware": "./<name>.middleware.js", "options": {…}}`, no `main`. `options` is the example magpie offers when none are set.
+- **`<name>.middleware.js`**: exports `onRequest`, `onEvent` and/or `onResponse` ([the hooks](https://usemagpie.ai/docs/plugins#middleware)). It runs in magpie's gateway on moejs, so it is one file and imports nothing.
+- **`cases.json`** and a test that runs them with `check()` from `scripts/middleware.mjs`, which calls the hooks the way the gateway does.
 
 ## Use
 
@@ -97,8 +123,8 @@ MIT
 
 ## The market
 
-`registry.json` is the list magpie's Plugins tab shows. The packages here
-come first, then other OpenCode provider plugins worth knowing. magpie
+`registry.json` is the list magpie's Plugins tab shows: the packages
+here. A middleware's entry has `"kind": "middleware"` and no `providers`. magpie
 fetches it every few hours and keeps a copy built into the app for when
 it can't. To list a plugin, add an entry with its npm `package`, a
 `name`, `providers` (the provider ids it signs in to), an `icon` and a

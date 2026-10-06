@@ -96,7 +96,9 @@ When the session is busy:
 
 When the session is idle, `/queue` input runs immediately. Bare `/queue` and queue controls work whether the session is idle or busy.
 
-Queues are scoped to the current project and session. They are stored in OpenCode's user data directory and restored with their previous running or stopped state after OpenCode restarts or crashes. Restored queues do not replay just because the session starts idle; a running queue resumes after the session becomes busy and then finishes successfully. A send interrupted by a crash remains queued because the plugin cannot know whether OpenCode accepted it before exiting.
+Queues are scoped to the current project and session. Using OpenCode's `/move` to change a session's directory keeps its queue, selected models, attachments, and running or stopped state. Queued work replays in the session's current directory.
+
+Queues are stored in OpenCode's user data directory and restored with their previous running or stopped state after OpenCode restarts or crashes. Restored queues do not replay just because the session starts idle; a running queue resumes after the session becomes busy and then finishes successfully. A send interrupted by a crash remains queued because the plugin cannot know whether OpenCode accepted it before exiting.
 
 ## Change queued models
 
@@ -123,7 +125,9 @@ The plugin reads the variable at initialization. It overrides the global setting
 
 ## Carry between sessions
 
-`/queue:carry` adds a fresh-session boundary to the queue. When it reaches the front and the current session finishes, the plugin creates a new session in the same directory, moves all remaining entries there, and switches the TUI to it. The new session starts with an empty conversation. Each entry keeps its selected agent, model, thinking variant, and attachments.
+`/queue:carry` adds a fresh-session boundary to the queue. When it reaches the front, the plugin checks the live session status and waits for the current run and any in-flight replays to finish. It then creates a session in the current directory, transfers the remaining queue, and switches the TUI to it.
+
+The new session starts with an empty conversation. Each entry keeps its selected agent, model, thinking variant, and attachments. If a carry is cancelled or its transfer fails after session creation, the plugin removes the unused new session.
 
 For example, while the first task is running:
 
@@ -156,6 +160,27 @@ The previous session's queue becomes empty after the transfer. Boundaries surviv
 `/queue:flush` respects session boundaries. It sends only the entries before the next carry, which waits for the current run and any in-flight replays to finish. Automatic replay then continues one entry at a time in the new session. A stopped queue stays stopped when carried. An idle carry with nothing after it opens an empty session. Consecutive carries each open a fresh session.
 
 Carry does not accept arguments or attachments. `/queue:now carry` sends the word `carry` as a prompt.
+
+## Remaining blockers for OpenCode v2
+
+Migrating while keeping the plugin's own queue and current features requires these APIs:
+
+- Expose existing session APIs to server plugins ([#47229](https://github.com/anomalyco/opencode/issues/47229)):
+  - `context.session.shell()` to replay queued shell commands.
+  - `context.session.active()` to check activity without waiting for idle.
+
+- Add a submission hook that lets plugins capture and consume input:
+  - Cover prompts, slash commands, shell input, and `/compact`.
+  - Run before agent/model changes, command callbacks, or message admission.
+  - Include the full text, attachments, input mode, raw command, and selected agent/model/variant.
+  - Let the plugin handle input successfully without adding a transcript message or starting execution.
+  - The prompt hook from [#45550](https://github.com/anomalyco/opencode/pull/45550) supports rewriting, but does not provide this full interception.
+  - The composer APIs in [#51209](https://github.com/anomalyco/opencode/issues/51209) and [#51490](https://github.com/anomalyco/opencode/pull/51490) cover reading, appending, and focusing input, rather than consuming submissions.
+
+- Bind saved settings to each released input ([#48356](https://github.com/anomalyco/opencode/issues/48356)):
+  - Accept saved agent/model/variant settings on prompts and commands, and the saved model on compaction.
+  - Apply settings when the input is delivered, without changing work already running.
+  - Preserve this behavior for `/queue:now` and `/queue:flush`, which can submit input while the session is busy.
 
 ## Notes
 

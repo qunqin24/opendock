@@ -142,7 +142,7 @@ harness supports, aider's read-only context file, and the Windows `cmd /c deja m
 <details>
 <summary>What gets written into each agent's own guidance file</summary>
 
-Install also writes user-level guidance for the harnesses it detects: Claude Code, Codex, opencode, Gemini CLI, Antigravity, Qwen, Kimi Code, pi, Senpi, Copilot, VS Code Copilot Chat, Cursor, Goose, OpenClaw, Hermes, Roo Code, omp, Amp, prime-agent, DeepSeek Harness, Continue, Crush and Zed each get it in their own guidance file (or under the configured `XDG_CONFIG_HOME`). Re-run rewrites deja's skill or marked block without changing surrounding user content. Use `deja install --all --no-guidance` to opt out; Grok Build gets the shared skill in `~/.agents/skills`, which is what it reads; the `~/.grok/GROK.md` written beside it is for the unrelated community CLI that shares that directory. Cursor has no user-level instructions file, so it gets the shared skill in `~/.agents/skills` — one of the four places Cursor reads skills from — read only when something looks relevant rather than every session. Kilo Code, gajae-code, Command Code, Cherry Studio and Reasonix get the skill, and Kiro a steering file, from their own install target.
+Install also writes user-level guidance for the harnesses it detects: Claude Code, Codex, opencode, Gemini CLI, Antigravity, Qwen, Kimi Code, pi, Senpi, Copilot, VS Code Copilot Chat, Cursor, Goose, OpenClaw, Hermes, Roo Code, omp, Amp, prime-agent, DeepSeek Harness, Continue, Crush, CodeBuddy Code, WorkBuddy, Zed, TRAE CLI, TRAE IDE and Muse Code each get it in their own guidance file (or under the configured `XDG_CONFIG_HOME`). Re-run rewrites deja's skill or marked block without changing surrounding user content. Use `deja install --all --no-guidance` to opt out; Grok Build gets the shared skill in `~/.agents/skills`, which is what it reads; the `~/.grok/GROK.md` written beside it is for the unrelated community CLI that shares that directory. Cursor has no user-level instructions file, so it gets the shared skill in `~/.agents/skills` — one of the four places Cursor reads skills from — read only when something looks relevant rather than every session. Kilo Code, gajae-code, Command Code, Cherry Studio and Reasonix get the skill, and Kiro a steering file, from their own install target.
 
 </details>
 
@@ -292,15 +292,19 @@ aider &middot; Amp &middot; Antigravity &middot; Claude Code &middot; Cline &mid
 | Roo Code | ✅ | ⚠ | ✅ | ✅ | ✅ | paste | roo CLI (editor tasks reopen in the editor) |
 | Zed | ✅ | ✕ | ✅ | ✅ | ✕ | paste | sqlite3 + zstd |
 | CodeWhale | — | — | ? | ? | ✅ | paste | none |
-| CodeBuddy Code | ✅ | ✅ | — | — | — | paste | none |
+| CodeBuddy Code | ✅ | ✅ | ✅ | ✅ | ✅ | paste | none |
 | Reasonix | ✅ | ✅ | ✅ | ✅ | ✅ | paste | zstd for 1.x sessions |
-| TRAE CLI | — | — | ? | ? | ✅ | paste | none |
-| Muse Code | ? | ⚠ | ? | ? | — | paste | none |
+| TRAE CLI | ✅ | ✅ | ✅ | ? | ✅ | paste | none |
+| Muse Code | ✅ | ✅ | ✅ | ? | ✅ | paste | none |
 
 ✅ works &middot; — possible, not built yet &middot; ✕ the harness has no such mechanism &middot; ⚠ waiting on the harness itself &middot; ? not investigated
 
 </details>
 <!-- matrix:end -->
+
+TRAE IDE is wired, not read: its chats are in an encrypted database. `deja install trae-ide`
+adds the MCP server and the skill, and `trae-ide-auto` adds hooks, which TRAE IDE runs only
+after you turn them on in Settings > Hooks.
 
 Custom store locations go through `DEJA_*_ROOT` variables, and each agent's own relocation
 variable is honored too. The

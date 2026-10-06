@@ -9,12 +9,7 @@
 
 # opencode-gemiterm-skills
 
-[![npm version](https://img.shields.io/npm/v/opencode-gemiterm-skills?color=cb3837&label=npm)](https://www.npmjs.com/package/opencode-gemiterm-skills)
-[![Bun](https://img.shields.io/badge/Runtime-Bun-f9f1e1?logo=bun&logoColor=black)](https://bun.sh)
-[![License: MIT](https://img.shields.io/badge/License-MIT-22c55e)](LICENSE)
-[![Platforms](https://img.shields.io/badge/Platforms-Windows%20%7C%20macOS%20%7C%20Linux-6366f1)](#installation)
-[![OpenCode plugin](https://img.shields.io/badge/opencode-plugin-blueviolet)](https://opencode.ai/docs/plugins)
-[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/Expert-Vision-Software/opencode-gemiterm-skills)
+[![npm version](https://img.shields.io/npm/v/opencode-gemiterm-skills?color=cb3837&label=npm)](https://www.npmjs.com/package/opencode-gemiterm-skills) [![Bun](https://img.shields.io/badge/Runtime-Bun-f9f1e1?logo=bun&logoColor=black)](https://bun.sh) [![License: MIT](https://img.shields.io/badge/License-MIT-22c55e)](LICENSE) [![Platforms](https://img.shields.io/badge/Platforms-Windows%20%7C%20macOS%20%7C%20Linux-6366f1)](#installation) [![OpenCode plugin](https://img.shields.io/badge/opencode-plugin-blueviolet)](https://opencode.ai/docs/plugins) [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/Expert-Vision-Software/opencode-gemiterm-skills)
 
 **Gemini terminal skills for AI agents — chat export, search & AI-powered debates**
 

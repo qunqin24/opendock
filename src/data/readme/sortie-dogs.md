@@ -56,7 +56,187 @@ optional measurement rather than a mandatory release gate.
 
 ## Quick start
 
-Requirements: Node.js 22.6 or newer, npm, and OpenCode V2.
+### Codex host adapter (experimental, unreleased Mission additions)
+
+Choose this route for Codex; OpenCode is not required and **do not run `sortie-dogs init` for it**.
+Use Node.js 22.6 or newer and an existing Codex CLI with ChatGPT authentication. Ubuntu validation
+used Node.js 22.22.1 and Codex 0.160.1. Sortie neither installs Codex nor starts a login flow, copies
+credentials, or creates a second host configuration. Mission execution refuses non-ChatGPT auth.
+
+The Mission additions below are development-branch changes, not a claim about npm's published
+`0.13.8` / `latest`. Given a reviewed local candidate tarball, install it in the target project and
+inspect the entrypoint before running a prompt:
+
+```sh
+npm install --save-dev /path/to/reviewed-sortie-dogs.tgz
+npx --no-install sortie-dogs codex mission --help
+```
+
+A maintainer with checkout dependencies already present can produce that tarball with `npm pack`
+(build included). This does not publish it. Use the packed version for the CLI and SDK below.
+
+Sortie-dogs also exports a host adapter for the official Codex app-server stdio protocol. This is
+separate from selecting an OpenAI model through OpenCode: OpenCode model routing still uses the
+OpenCode host, while `CodexAppServerHost` starts and observes native Codex threads and turns.
+
+```ts
+import { CodexAppServerHost, createCodexAppServerTransport } from "sortie-dogs";
+
+const transport = createCodexAppServerTransport({ executable: "codex" });
+const host = new CodexAppServerHost(transport);
+const threadID = await host.startThread({ cwd: process.cwd(), ephemeral: true });
+const result = await host.runTurn(threadID, "Implement the admitted unit.", {
+  cwd: process.cwd(),
+  approvalPolicy: "unlessTrusted",
+  sandboxPolicy: {
+    type: "workspaceWrite",
+    writableRoots: [process.cwd()],
+    networkAccess: false,
+  },
+});
+await host.close();
+```
+
+The adapter reuses Sortie's host-neutral core instead of copying its goal, acceptance, evidence, or
+ledger implementation. It exposes completed Codex items as authoritative observations, supports
+exact persisted-thread resume and turn interruption (ephemeral threads have no resumable rollout), and declines command/file approvals unless the caller
+provides an approval handler. Permission-subset requests receive an empty grant unless the caller
+connects `permissionsApproval`; approved responses are limited to the native request. Unsupported
+server-initiated requests fail closed.
+
+For the existing Operator → Coordinator → Worker → Reviewer Mission workflow, use:
+
+```sh
+npx --no-install sortie-dogs codex mission --prompt "Implement and review the requested change" --model gpt-6.1-sol --effort medium
+```
+
+The equivalent public SDK entrypoint is:
+
+```ts
+import { CodexMissionSession } from "sortie-dogs";
+
+const mission = await CodexMissionSession.create({
+  projectRoot: process.cwd(),
+  model: "gpt-6.1-sol", // Choose a model available to the existing signed-in account.
+  effort: "medium",
+  // resumeThreadID: "saved-root-thread-id", // Continue the same Mission when needed.
+});
+try {
+  const result = await mission.run("Implement and review the requested change");
+  console.log(JSON.stringify(result));
+  process.exitCode = result.accepted ? 0 : 1;
+} finally {
+  await mission.close();
+}
+```
+
+This Linux-first route uses `CodexMissionSession` and the existing Mission tools, correction grants,
+validation evidence, and final Operator acceptance. It runs saved native Codex threads with existing
+ChatGPT authentication; it does not import OpenCode settings or introduce a second Mission ledger.
+Commands run through `/bin/bash` using the native app-server's configured permissions. Sortie does not
+replace them with a fixed repository-only or network-disabled policy, change host configuration, or select
+full access. Thread turns retain native thread permissions; standalone `command/exec` uses the server's
+configured policy, not a thread's temporary grants. A parent application's in-memory approval is not
+automatically transferred to a separately launched app-server.
+SDK hosts can forward native command/file approval requests through `approval` and permission-subset
+requests through `permissionsApproval`. The native host remains responsible for deciding and enforcing
+the grant. The CLI reports approval requests but has no interactive approval bridge; without a connected
+host callback, no grant is returned. `command/exec` has no thread-scoped approval API, so inheriting the
+configured policy does not add an escalation path for these standalone commands.
+Use SDK `permissions` or CLI `--permissions <native-profile>` only to explicitly select an existing
+native profile for thread start/resume and standalone commands. Omission retains native defaults,
+which may be read-only. Invalid or disallowed profiles fail through the native server without fallback;
+no configuration file is changed. Low-level `CodexAppServerHost` callers must opt into
+`experimentalApi: true` for profile APIs; Mission sessions already negotiate that capability. Progress reports the effective native profile, sandbox and approval
+routing. This selection does not configure a delegated parent-host executor's own permissions.
+See [Ubuntu acceptance evidence and remaining work](docs/codex-mission-acceptance-20261006.md).
+
+For a parent application with an existing approval-aware executor, pass the optional SDK
+`executeCommand` callback. It receives the exact post-hook argv, cwd, timeout, thread/turn/call identity,
+and an AbortSignal for bash/read/write operations. The parent owns approval and execution; Sortie does
+not infer a grant from prompt text or create another permission store. Return `completed` only after
+execution ends, with the real integer exitCode, stdout and stderr. Approval alone is not a result.
+`denied` and `not-started` explicitly mean nothing ran and create no validation exit. `interrupted`,
+`unknown`, exceptions and invalid results retain unknown execution and stop resends. The host owns
+command timeout enforcement; Sortie does not add a separate deadline to its approval interaction.
+Closing the adapter signals cancellation; late callback results cannot establish validation, and the
+host must reconcile any still-running process. Omission keeps native `command/exec`; a connected
+executor never falls back to native execution after rejection or failure. Existing Mission before/after
+hooks, command identity and validation acceptance remain shared. CLI progress identifies the selected
+executor; the CLI itself does not attach a parent executor.
+The bash tool accepts `workdir` (absolute or relative to the project root). The shared hooks and both
+executors use that directory; progress and receipts include the effective cwd. A successful command in
+another directory does not satisfy a validation declared for the project root.
+
+Packaged role models and reasoning levels apply by default. `--model` and `--effort` explicitly
+override all roles; SDK callers can use `roleModels` for individual roles. Unsupported native model
+names fail rather than silently selecting another model. Availability depends on the signed-in account.
+
+Use `--resume <root-thread-id>` to continue a saved Mission root. Without it, a single unfinished Codex
+Mission in this repository is selected automatically; multiple unfinished roots require an explicit
+selection. Resume restores native messages and tool evidence, including child sessions. Completed native
+receipts feed the existing reservation reconciliation without replaying tool execution. A new Task stopped
+before child binding can be recovered when the exact terminal parent thread/turn/call/input matches and
+the prior adapter is closed or its Linux process identity proves it is gone. The host retains that proof in
+the existing Mission and reconciles the reservation before another model prompt; repeated recovery does
+not settle it again. Concurrent recovery claims are serialized.
+
+A newly created ordinary Worker also saves its exact dispatch binding before the child prompt is sent.
+If its parent Task result is lost, recovery can match that binding to the child's single, fully loaded,
+completed native turn. The initial recovery path supports leaf Workers only: later turns, nested Tasks,
+untracked native children, missing bindings and ambiguous identities remain unknown. Recovery restores
+execution completion for the existing settlement path; missing validation evidence is a process defect,
+not an invented PASS. It does not rerun the implementation. Continue with only the work or validation
+still needed for normal Operator acceptance.
+
+SIGINT/SIGTERM closes the adapter and exits 130/143. Bound children without an exact completed dispatch,
+and commands sent without a saved terminal receipt, remain unknown and are not resent. App-server exit
+does not prove an external command has stopped. Linux process-death checks do not prove external writer
+quiescence either; other platforms require a clean adapter close for automatic prelaunch recovery.
+Inspect the original executor before recovery; do not delete Mission state to force a retry.
+Per-session usage is native thread cumulative usage (including earlier turns), not a Mission total;
+monetary cost is unavailable and reported as `null`.
+The existing Mission report uses observed per-turn token deltas and execution times. Cache and reasoning
+subtotals are counted once. Its pre-terminal snapshot excludes final-answer generation, while final JSON
+retains native thread totals. Terminal accounting observations survive cold reload in the existing Mission;
+missing baselines remain unavailable. Native turn aggregates do not establish model-request counts, API
+costs or remaining subscription allowance, so these values are not inferred.
+CLI exit 0 means Operator acceptance; exit 1 means incomplete work or an execution error; exit 2
+means invalid arguments. A native turn completing alone is not acceptance.
+The CLI writes bounded progress records to stderr: tool start/completion, commands and exit codes,
+replan reasons, next actions, child identity, and public model commentary. Final JSON remains on stdout.
+
+For a manifest-bound mission, use the SDK `runCodexMission(...)` or the CLI:
+
+```sh
+sortie-dogs codex run --manifest operation-manifest.json --prompt "Implement the requested change"
+```
+
+The operation manifest remains required. The mission runner reuses Sortie's existing goal ledger,
+protected evidence capture, settlement, and repository-wide scope leases. It does not emulate
+OpenCode plugin hooks, install Codex assets, switch models implicitly, or copy/import/modify OpenCode
+settings and sessions. Codex command and file events are post-execution observations, not a claimed
+pre-execution write guard. The stdio transport is the supported initial integration; experimental
+WebSocket transport is intentionally out of scope.
+
+The manifest-run CLI handles SIGINT/SIGTERM by requesting interruption and cleaning up its
+app-server (exit 130/143). SDK callers can pass an `AbortSignal` as `signal`. Before
+turn dispatch, cancellation settles the reservation and releases its lease. After
+dispatch, app-server exit or an interrupt acknowledgement does not prove that an
+externally hosted command stopped. Cancellation or transport loss therefore preserves
+the active goal/reservation as an unknown outcome and stops lease heartbeats without
+claiming completion. SIGKILL can leave the same unresolved state.
+
+Lease expiry alone does not authorize a retry: subsequent Codex missions refuse with
+`codex-mission-outcome-unknown:no-resend` and the ledger path, including across
+stable/v010 profiles. Inspect the prior worker and ledger before recovery; do not
+delete the ledger or automatically resend the prompt. This is a Codex admission
+check; it does not establish quiescence of external command executors.
+
+### OpenCode plugin
+
+Requirements: Node.js 22.6 or newer, npm, and OpenCode V2. These installation and `init` steps
+configure the OpenCode route; they are not prerequisites for the Codex route above.
 
 Run these commands in the target project:
 

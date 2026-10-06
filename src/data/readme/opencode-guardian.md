@@ -3,9 +3,9 @@
 [![npm version](https://img.shields.io/npm/v/opencode-guardian?color=cb3837&logo=npm&logoColor=white)](https://www.npmjs.com/package/opencode-guardian)
 [![npm downloads](https://img.shields.io/npm/dm/opencode-guardian?color=blue&logo=npm&logoColor=white)](https://www.npmjs.com/package/opencode-guardian)
 [![OpenCode: v1 & v2](https://img.shields.io/badge/OpenCode-v1%20%7C%20v2%20Dual--Mode-10b981?logo=terminal&logoColor=white)](https://opencode.ai)
-[![Acceptance: 4/4 Verified](https://img.shields.io/badge/Acceptance-Dual%20Host%204%2F4%20Accepted-10b981?logo=checkmarx&logoColor=white)](docs/verification-report.md)
-[![Tests: 429/429 Passing](https://img.shields.io/badge/Tests-429%2F429%20Passing-339933?logo=githubactions&logoColor=white)](docs/verification-report.md)
-[![Node.js](https://img.shields.io/badge/node-%3E%3D24.0.0-339933?logo=nodedotjs&logoColor=white)](package.json)
+[![Live baseline: v0.6.0 4/4](https://img.shields.io/badge/Live%20Baseline-v0.6.0%204%2F4-10b981?logo=checkmarx&logoColor=white)](docs/verification-report.md)
+[![Tests: 439/439 Passing](https://img.shields.io/badge/Tests-439%2F439%20Passing-339933?logo=githubactions&logoColor=white)](docs/verification-report.md)
+[![Node.js](https://img.shields.io/badge/node-%3E%3D22.0.0-339933?logo=nodedotjs&logoColor=white)](package.json)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178c6?logo=typescript&logoColor=white)](tsconfig.json)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
@@ -21,14 +21,17 @@ OpenCode Guardian continuously supervises agent turns: guiding model execution b
 
 ![Automated and host acceptance results](docs/assets/verification-overview.svg)
 
-Guardian **v0.6.0** is rigorously validated across both automated test suites and real host runtime environments:
+> The graphic combines the current **v0.6.1 automated verification** with the historical **v0.6.0 dual-host acceptance baseline**. The v0.6.1 source tree has 439/439 automated tests passing; the full V1/V2 live-host matrix below remains the last completed dual-host baseline.
 
-- **Dual-Host Live Acceptance:** **4 / 4 — ACCEPTED** on real OpenCode V1 (`1.18.34`) and OpenCode V2 (`2.0.22`) host platforms.
-- **Automated Verification:** **429 / 429** unit and regression tests passing with 100% success rate.
+Guardian **v0.6.1** is validated as follows:
+
+- **Current Automated Verification:** **439 / 439** unit and regression tests passing.
 - **Sandbox Scenarios:** **18 / 18** end-to-end multi-turn agent failure and recovery scenarios verified.
+- **Static Analysis:** standard and strict TypeScript gates pass; Oxlint reports **0 warnings / 0 errors**.
 - **Dependency Security:** **0 vulnerabilities** across production and development dependency audits.
+- **Historical Dual-Host Baseline:** **4 / 4 — ACCEPTED** on real OpenCode V1 (`1.18.34`) and OpenCode V2 (`2.0.22`) for released v0.6.0. v0.6.1 adds targeted foreground-subagent handoff hardening on top of that baseline.
 
-Read the comprehensive [Verification and Acceptance Report](docs/verification-report.md) for full reproduction steps, methodology, and live host logs.
+Read the comprehensive [Verification and Acceptance Report](docs/verification-report.md) for reproduction steps, methodology, evidence boundaries, and the historical live-host matrix.
 
 ---
 
@@ -40,6 +43,7 @@ Read the comprehensive [Verification and Acceptance Report](docs/verification-re
 - **Guardian Commands:** Ctrl+P and slash commands display detailed status, activity, diagnostics, rules, configuration and version; confirmed statistics reset preserves audit history.
 - **Project-Scoped Audit Log:** Stores safe event codes, reasons and intervention outcomes in `<project>/.opencode/guardian-events.jsonl` with `0600` POSIX permissions, a 2 MiB limit and one rotated archive. Never stores prompt or command text.
 - **Evidence-Based Task Contracts:** Analyzes human requests across 13 languages to extract required verifications (tests, builds, source reviews) and detects premature completion claims. When the host provides a tool-after observation, SHA-256 evidence is tied to the observed file contents.
+- **Foreground Subagent Finalization Barrier:** For synchronous delegated work, Guardian owns the handoff boundary: blocking findings are remediated on the child session before the parent receives the tool result, and the parent sees the revised final child report instead of a stale first-pass report. Background subagents keep the existing idle-remediation path.
 - **14 Deterministic Rules:** Blocks shortcuts, empty stubs, unverified claims, masked errors, test weakening, leaked secrets, undeclared dependencies, and repetitive execution loops.
 - **Zero Configuration:** Works instantly out of the box with production-tested defaults. Fully configurable via `opencode-guardian.json`.
 - **Zero Runtime Dependencies:** Precompiled JavaScript (`dist/`) has no mandatory third-party runtime dependencies. The optional TUI utilizes the host's OpenTUI/Solid runtime.
@@ -111,7 +115,7 @@ To mount the Guardian sidebar in your OpenCode terminal:
 ### 🔽 Collapsed View (Default)
 
 ```text
-▶ Guardian                 v0.6.0
+▶ Guardian                 v0.6.1
 Status                       ● Active
 Interventions                 0w · 0r
 ```
@@ -125,7 +129,7 @@ Interventions                 0w · 0r
 Clicking the `▶ Guardian` header expands the widget:
 
 ```text
-▼ Guardian                 v0.6.0
+▼ Guardian                 v0.6.1
 Preflight                  ○ disabled
 Inspected                           0
 Blocked                             0
@@ -195,7 +199,7 @@ OpenCode Guardian evaluates assistant turns against 14 deterministic rules. Rule
 | **Security** | `security/no-secrets` | `error` | Blocks hardcoded API keys (OpenAI, Anthropic, Google, AWS, GitHub, Slack, Stripe, JWTs, private keys, database URLs with passwords). |
 | **Manifest** | `manifest/no-ghost-deps` | `error` | Blocks undeclared third-party imports not found in `package.json`, `pyproject.toml`, `requirements.txt`, `go.mod`, or `Cargo.toml`. Local modules and stdlib are recognized. |
 | **Runtime** | `runtime/circuit-breaker` | `error` | Blocks repetitive failing commands hitting identical errors 3 times consecutively without progress, breaking runaway agent loops. |
-| **Task** | `task/instruction-fidelity` | `error` | Prevents the agent from refusing an explicit task solely because the user previously paused or deferred it in an earlier turn. |
+| **Task** | `task/instruction-fidelity` | `error` | Prevents historical refusals and redundant confirmation handoffs from overriding the user's current explicit action. |
 | **Task** | `task/completion-gate` | `error` | Ensures requested verifications (fresh test execution, post-change source inspection) are observed before the agent declares completion. |
 
 ---
@@ -351,7 +355,9 @@ flowchart TD
     Outcome -->|Evidence insufficient| Unverified[remediation-unverified]
 ```
 
-The diagram illustrates the v0.6.0 dual-mode runtime. Strict preflight is **opt-in** and evaluates recognized or configured tools; an out-of-scope tool is still governed by host permissions. Tool-after observations and SHA-256 file snapshots are captured **when the host supplies supported evidence**. After a remediation, only supported, observable follow-up evidence can establish `remediation-verified`.
+The diagram illustrates the v0.6.1 dual-mode runtime. Strict preflight is **opt-in** and evaluates recognized or configured tools; an out-of-scope tool is still governed by host permissions. Tool-after observations and SHA-256 file snapshots are captured **when the host supplies supported evidence**. After a remediation, only supported, observable follow-up evidence can establish `remediation-verified`.
+
+For foreground delegated work (`task` on V1, `subagent` on V2), v0.6.1 adds a bounded handoff barrier. Child-session findings are inspected before the parent tool result settles; if remediation is required, Guardian resumes the child, waits for the remediation turn to finish, re-inspects it, and replaces the parent-facing tool result with the latest child report. The barrier is limited to foreground delegation and does not convert background subagents into blocking handoffs.
 
 ---
 

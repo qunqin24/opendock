@@ -1,8 +1,9 @@
-# opencode-systemone-gate
+# guardrails-md
 
 Stops your coding agent from running the bash command you'd regret.
 
-Every bash command [opencode](https://opencode.ai) is about to execute is
+Every bash command your coding agent ([opencode](https://opencode.ai),
+[pi](https://pi.dev) or [Claude Code](https://code.claude.com)) is about to execute is
 scored by a small decision model first, in about 100 ms. If the command
 destroys data, leaks a secret, or breaks a rule in your repo's
 `guardrails.md`, the call is blocked and the agent is told why, so it can
@@ -34,27 +35,118 @@ promise that the agent cannot be persuaded — it promises that the boundary
 holds anyway, because the gate judges the command and your rules, not the
 conversation that led to it.
 
-## Try it
+## Quickstart
 
-Add the plugin to `opencode.json` (global or per project):
+Two steps. First teach the gate your rules, then put it in the harness.
+
+**1. Add `guardrails.md` to your repo** (root, `.opencode/guardrails.md`,
+`.pi/guardrails.md` or `.claude/guardrails.md`).
+Write it yourself — the value is in deciding what your team actually allows,
+not in shipping a generic file. The example below is a starting point for the
+shape:
+
+```markdown
+# Guardrails for agents in this repo
+
+## The agent MUST NOT
+
+- Edit this file (guardrails.md) itself — it is written and changed by humans, through review.
+- Change anything in production — production changes reach production only through Git/CD.
+- Push directly to the main branch — all changes go through pull request.
+- Install software outside the project's declared dependencies.
+- Send data to external services outside our approved list (docs/approved-domains.md).
+- Run irreversible operations against shared systems — deletions, cleanup, resets.
+
+## The agent MAY
+
+- Inspect any environment read-only.
+- Run tests, lint, and builds locally.
+- Create branches and push feature branches.
+- Read documentation from the approved sources in docs/approved-domains.md.
+```
+
+The gate reads the file once at session start, so restart the harness after
+editing. Only the first 2000 characters are sent to the model, so keep the
+file short and put the MUST NOT rules first. If the file is longer, the gate
+warns you at startup and in every block message, and the rules after the cut
+are not applied.
+See [`guardrails.example.md`](guardrails.example.md).
+
+**2. Install the gate in your harness.**
+
+For opencode, add the plugin to `opencode.json` (global or per project):
 
 ```json
 {
-  "plugin": ["@bergetai/opencode-systemone-gate"]
+  "plugin": ["@bergetai/opencode-guardrails-md"]
 }
 ```
 
-Set a key and restart opencode (plugins load at startup):
+For pi, install from a clone of this repo (an npm release for pi is coming):
+
+```sh
+git clone https://github.com/berget-ai/guardrails-md
+cd guardrails-md && npm install
+pi install ./
+```
+
+For Claude Code, install from this repo's marketplace, at the prompt of a
+running session:
+
+```
+/plugin install guardrails-md --marketplace berget-ai/guardrails-md
+```
+
+Answer `y` to add the marketplace, then pick a scope; the user scope loads
+it in every session from then on. It is a hooks module that Claude Code
+loads in-process from `hooks/hooks.json`, so there is no build step and no
+`npm install`. To run it from a clone for one session instead, use
+`claude --plugin-dir ./guardrails-md`.
+
+Hooks modules are an early-access Claude Code API (checked on 2.1.291);
+the engine may change them between releases. Claude Code has no Berget seat
+token — set `BERGET_API_KEY` (below) for this harness.
+
+Set a key and restart the harness (plugins and extensions load at startup):
 
 ```sh
 export BERGET_API_KEY=…
 ```
 
 Keys come from [berget.ai](https://berget.ai). The free tier includes €5 of
-credit, and a gate call is small enough that it lasts a long time. If you already use Berget Code
-and are logged in through `@bergetai/opencode-auth`, skip the key: the gate
-picks up your seat token. If you run your own System One-compatible endpoint,
-point `BERGET_BASE_URL` at it instead.
+credit, and a gate call is small enough that it lasts a long time. If you
+are logged in to Berget in your harness (`@bergetai/opencode-auth` in opencode,
+`/login` in pi), skip the key: the gate picks up your seat token. If you run your own
+System One-compatible endpoint, point `BERGET_BASE_URL` at it instead.
+
+From now on, every bash command your agent runs has to pass your guardrails
+before it is allowed. Above the threshold the command is blocked with an
+explanation the agent can read; below it, it runs.
+
+## Git pre-commit hook
+
+The same judgement works as a git pre-commit hook: every commit's staged
+diff is scored before it enters the repository. Personal data (GDPR) and
+secrets are blocked; the team's own names in bylines and author fields pass.
+
+Install for every repo on your machine (uses your global `core.hooksPath` if
+you have one, otherwise copy to `.git/hooks/pre-commit` per repo):
+
+```sh
+curl -o ~/.git-hooks/guardrails-pre-commit \
+  https://raw.githubusercontent.com/berget-ai/guardrails-md/main/hooks/pre-commit
+chmod +x ~/.git-hooks/guardrails-pre-commit
+```
+
+Then chain it from your global pre-commit hook (or create one):
+
+```bash
+# ~/.git-hooks/pre-commit
+python3 ~/.git-hooks/guardrails-pre-commit || exit 1
+```
+
+Same env config as the plugin. Fail-closed by default: if the endpoint is
+unreachable the commit is blocked — retry, or set `SYSTEMONE_FAIL_OPEN=1`.
 
 ## Why a model and not a regex
 
@@ -121,38 +213,6 @@ difference matters:
   `guardrails.md` is agent-editable between sessions — a file line must not
   be able to switch the backstop off.
 
-## Team guardrails
-
-Write a `guardrails.md` in the repo root (or `.opencode/guardrails.md`).
-Write it yourself — the value is in deciding what your team actually
-allows, not in shipping a generic file. The example below is a starting
-point for the shape:
-
-```markdown
-# Guardrails for agents in this repo
-
-## The agent MUST NOT
-
-- Edit this file (guardrails.md) itself — it is written and changed by humans, through review.
-- Change anything in production — production changes reach production only through Git/CD.
-- Push directly to the main branch — all changes go through pull request.
-- Install software outside the project's declared dependencies.
-- Send data to external services outside our approved list (docs/approved-domains.md).
-- Run irreversible operations against shared systems — deletions, cleanup, resets.
-
-## The agent MAY
-
-- Inspect any environment read-only.
-- Run tests, lint, and builds locally.
-- Create branches and push feature branches.
-- Read documentation from the approved sources in docs/approved-domains.md.
-```
-
-The gate reads the file once at session start, so restart opencode after
-editing. Only the first 2000 characters are sent to the model, so keep the
-file short and put the important rules first.
-See [`guardrails.example.md`](guardrails.example.md).
-
 ## Overriding a block
 
 The agent cannot disable the gate or un-block a command by retrying, and
@@ -162,9 +222,9 @@ session start, but an agent with edit access could still weaken its rules
 for the *next* session. Treat `guardrails.md` changes as code review, and
 unattended agents should treat the file as untrusted input. Your overrides:
 
-- **Once:** restart opencode with `SYSTEMONE_GATE=off` and redo the step.
-- **Tune:** raise `SYSTEMONE_THRESHOLD` if the gate is too jumpy for your
-  taste.
+- **Once:** restart the harness with `SYSTEMONE_GATE=off` and redo the step.
+- **Tune:** raise `SYSTEMONE_THRESHOLD` (it must stay below 1) if the gate
+  is too jumpy for your taste.
 - **Fix the policy:** if the block is a false positive against your rules,
   change `guardrails.md`. That is the durable fix, and since the file lives
   in the repo, the change goes through review like any other edit.
@@ -224,11 +284,11 @@ credentials, sandboxes and human review still matter.
 
 | Variable | Default | Meaning |
 |---|---|---|
-| (seat token) | auto | Berget Code seat auth via `@bergetai/opencode-auth` |
+| (seat token) | auto | Berget seat auth from the harness's login (see [Harness differences](#harness-differences)) |
 | `BERGET_API_KEY` | – | Bearer token for CI/headless (fallback: `TYPESAFE_API_KEY`) |
 | `BERGET_BASE_URL` | `https://api.berget.ai` | Gateway root or full `/v1/systemone` URL (fallback: `TYPESAFE_BASE_URL`) |
 | `BERGET_MODEL` | `berget/bev` | Model id as exposed by the gateway (fallback: `TYPESAFE_DEFAULT_MODEL`) |
-| `SYSTEMONE_THRESHOLD` | `0.7` | Block threshold (0–1) |
+| `SYSTEMONE_THRESHOLD` | `0.7` | Block threshold, strictly between 0 and 1. Anything else (`abc`, empty, `0`, `1`, …) falls back to `0.7` with a warning |
 | `SYSTEMONE_FAIL_OPEN` | – | Set to `1` to let commands run when the endpoint is unreachable (default is fail-closed) |
 | `SYSTEMONE_GATE` | – | Set to `off` to disable the gate |
 | `SYSTEMONE_LOG` | – | Set to `1` to write the audit log |
@@ -261,7 +321,7 @@ The wait doubles with every block; restarting opencode resets it.
 ```
 
 Retrying early returns the same message with the remaining time and does
-not extend the cooldown. Restarting opencode resets the counter; the
+not extend the cooldown. Restarting the harness resets the counter; the
 audit log records the block count and cooldown with every verdict.
 
 ## Details
@@ -278,17 +338,72 @@ milliseconds and no extra round-trip. The questions use the `noul` type from
 the System One contract; any endpoint that implements the contract works.
 
 Nothing is written to disk unless you turn on the audit log. With
-`SYSTEMONE_LOG=1`, every verdict is appended as JSONL to
-`~/.cache/opencode/systemone-gate.log` with the full command and all scores.
+`SYSTEMONE_LOG=1`, every verdict is appended as JSONL to the harness's log
+file (see [Harness differences](#harness-differences)) with the full command and all scores.
 Verdicts you disagree with can be reviewed there and fed back as training
 data for the next fine-tune. The log holds whatever your commands hold, so
 treat it as sensitive.
 
-Manual install: copy [`index.ts`](index.ts) into
-`~/.config/opencode/plugins/` (global) or `.opencode/plugins/` (per project)
-and register `"plugin": ["./plugins/index.ts"]`. Manual installs need
-`@typesafe-ai/sdk` resolvable (`npm install -g @typesafe-ai/sdk`); the npm
-package brings it as a dependency.
+Manual install for opencode: copy [`core.ts`](core.ts) and
+[`adapters/opencode.ts`](adapters/opencode.ts) into
+`~/.config/opencode/plugins/guardrails-md/` (global) or
+`.opencode/plugins/guardrails-md/` (per project), keeping the `adapters/`
+folder, and register
+`"plugin": ["./plugins/guardrails-md/adapters/opencode.ts"]`. Manual installs
+need `@typesafe-ai/sdk` resolvable (`npm install -g @typesafe-ai/sdk`); the
+npm package brings it as a dependency.
+
+## Harness differences
+
+The judging is the same in every harness: same questions, threshold,
+cooldown and fail-closed default. opencode and pi share [`core.ts`](core.ts);
+the Claude Code module carries its own copy of the questions, decision,
+block wording and cooldown, because a hooks module runs without Node and
+imports only files of the plugin. Keep the two in step when editing
+either. What differs is where the gate looks.
+
+| | opencode | pi | Claude Code |
+|---|---|---|---|
+| Hook | `tool.execute.before`, bash only | `tool_call`, bash only, including calls a codemode script makes | hooks module: `tool.call` on `Bash` and on `Monitor` when it runs a `command`; `session.start` freezes the policy and the environment |
+| On block | throws; the agent reads the message | returns `{ block, reason }` to the agent and shows a warning to you (on stderr in `pi -p`) | answers `{ deny }`; Claude reads the reason |
+| Without a credential | inactive; one log line with `SYSTEMONE_LOG=1` | inactive; warns you once per session (on stderr in `pi -p`) | inactive; a toast warns you at session start |
+| Seat token | `$XDG_DATA_HOME/opencode/auth.json` (default `~/.local/share`) | pi's Berget login, OAuth or API key, resolved by pi itself; then the OAuth entry in `$PI_CODING_AGENT_DIR/auth.json` (default `~/.pi/agent`) | none — `BERGET_API_KEY` (or `TYPESAFE_API_KEY`) only |
+| Policy file | `guardrails.md`, then `.opencode/guardrails.md` | `guardrails.md`, then `.pi/guardrails.md` | `guardrails.md`, then `.claude/guardrails.md` |
+| Policy read from | the project directory opencode passes the plugin | the directory pi was started in | the session's directory, frozen at `session.start` |
+| Audit log | `~/.cache/opencode/systemone-gate.log` | `~/.cache/pi/systemone-gate.log` | not supported (`$.fs` cannot append) |
+
+In pi, `/reload` counts as a restart: it re-reads `guardrails.md` and resets
+the cooldown. pi's `powershell` tool is not gated; if a repo enables it in
+`.pi/settings.json`, commands run through it skip the gate.
+
+In Claude Code, the module lives as long as the session, so the frozen
+policy, the environment and the cooldown stay in memory, as in opencode
+and pi. `session.start` fires once per session and not on `/compact`, so
+compaction neither re-reads `guardrails.md` nor resets the cooldown;
+`/clear` keeps both too. Starting a new session, or a hot reload while
+developing the plugin, re-reads `guardrails.md` and resets the cooldown.
+
+Claude Code skips a hook that throws or overruns and lets the call
+through, so the module attaches a `.catch` handler that denies instead:
+the gate fails closed. If `session.start` never ran, every command is
+denied. The endpoint call goes through Claude Code's own `$.http.fetch`:
+when your organization's web-fetch policy refuses `api.berget.ai` (or
+your `BERGET_BASE_URL`), the call fails and the command is denied like
+any unreachable endpoint (or allowed with `SYSTEMONE_FAIL_OPEN=1`).
+The call times out after 5 s, as the SDK's does in opencode and pi, and a
+timeout is treated like an unreachable endpoint. Unlike the SDK, the module
+makes one attempt with no retry on 429 or 5xx. The `SYSTEMONE_*` and
+`BERGET_*` variables are read once, at `session.start`; changing them takes
+a new session.
+
+`Bash` is gated, and so is `Monitor` when it runs a shell `command` (a
+Monitor watching a WebSocket runs nothing and passes). `PowerShell` is not
+gated, mirroring pi's decision: on Windows without Git Bash, where Claude
+Code registers only PowerShell, the gate never fires.
+
+To test the module, run `npm run test:claude`. It copies the plugin to a
+temp folder and runs `claude plugin test` there, because that command
+would otherwise pick up the vitest files.
 
 ## License
 

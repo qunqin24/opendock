@@ -24,7 +24,8 @@ your OpenCode profile in sync across machines using a private GitHub repository.
 - **Add your own cards.** Write a small card module on your machine and novaSpace
   shows it alongside the built-in cards.
 - **Fits in with your theme.** Cards use colours from your current OpenCode
-  theme, so they look right in light and dark themes.
+  theme, so they look right in light and dark themes. The sidebar itself has no
+  background, so a translucent terminal shows through between the cards.
 
 ## Installation
 
