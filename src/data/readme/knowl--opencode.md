@@ -12,6 +12,8 @@
 
 <a href="https://discord.gg/YrWbHe8FBB"><img src="https://img.shields.io/badge/Discord-Join%20the%20server-5865F2?logo=discord&logoColor=white&style=for-the-badge" alt="Join the Knowl Discord" height="40" /></a>
 
+<a href="https://peerpush.com/p/knowl" target="_blank" rel="noopener"><img src="https://peerpush.com/p/knowl/badge.png" alt="Knowl on PeerPush" width="230" /></a>
+
 <p align="center">
   <a href="#the-idea-memory-that-retires-itself"><picture><source media="(prefers-color-scheme: light)" srcset="docs/assets/chips/light/stat-supersession.svg"><img src="docs/assets/chips/stat-supersession.svg" alt="Scores 90 on MemoryAgentBench FactConsolidation single-hop at 262K" height="38" /></picture></a>
   <a href="#quick-start"><picture><source media="(prefers-color-scheme: light)" srcset="docs/assets/chips/light/stat-nokeys.svg"><img src="docs/assets/chips/stat-nokeys.svg" alt="0 API keys needed" height="38" /></picture></a>

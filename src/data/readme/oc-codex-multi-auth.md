@@ -91,12 +91,12 @@ opencode auth login   # OpenAI -> Codex OAuth (Add account — ChatGPT Plus/Pro)
 
 ## Command map
 
-Two surfaces: **24 `codex-*` tools** inside an OpenCode session, and a standalone CLI for everything else. The full argument reference is in [docs/tools-and-cli.md](docs/tools-and-cli.md).
+Two surfaces: **25 `codex-*` tools** inside an OpenCode session, and a standalone CLI for everything else. The full argument reference is in [docs/tools-and-cli.md](docs/tools-and-cli.md).
 
 | Group | Tools | Purpose |
 | --- | --- | --- |
 | Setup | `codex-setup`, `codex-help`, `codex-next` | guided first-run checklist, help by topic, suggested next action |
-| Accounts | `codex-status`, `codex-list`, `codex-switch`, `codex-remove` | inspect the pool, pin or switch the active account, drop entries |
+| Accounts | `codex-status`, `codex-list`, `codex-switch`, `codex-enable`, `codex-remove` | inspect the pool, pin or switch the active account, re-enable or drop entries |
 | Identity | `codex-label`, `codex-tag`, `codex-note` | name accounts, group them with tags, attach private notes |
 | Quota | `codex-limits`, `codex-warm`, `codex-reset` | per-account and pool quota, open usage windows, banked reset credits |
 | Health | `codex-health`, `codex-doctor`, `codex-diag`, `codex-dashboard`, `codex-metrics`, `codex-refresh` | health view, diagnostics plus safe repairs, redacted snapshots, counters |
@@ -209,7 +209,7 @@ Most issues resolve by signing in again or running `codex-doctor fix=true` insid
 
 ## Release notes
 
-- Current stable: [v6.27.0](CHANGELOG.md) — `npx -y oc-codex-multi-auth@latest`
+- Current stable: [v6.28.0](CHANGELOG.md) — `npx -y oc-codex-multi-auth@latest`
 - Full release archive: [CHANGELOG.md](CHANGELOG.md)
 
 ## Terms and license

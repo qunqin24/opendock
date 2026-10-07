@@ -1,6 +1,10 @@
 # opencode-courier
 
 [![CI](https://github.com/ivopogace/opencode-courier/actions/workflows/ci.yml/badge.svg)](https://github.com/ivopogace/opencode-courier/actions/workflows/ci.yml)
+[![Quality Gate](https://sonarcloud.io/api/project_badges/measure?project=ivopogace_opencode-courier&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=ivopogace_opencode-courier)
+[![Coverage](https://sonarcloud.io/api/project_badges/measure?project=ivopogace_opencode-courier&metric=coverage)](https://sonarcloud.io/summary/new_code?id=ivopogace_opencode-courier)
+[![Security Rating](https://sonarcloud.io/api/project_badges/measure?project=ivopogace_opencode-courier&metric=security_rating)](https://sonarcloud.io/summary/new_code?id=ivopogace_opencode-courier)
+[![Maintainability Rating](https://sonarcloud.io/api/project_badges/measure?project=ivopogace_opencode-courier&metric=sqale_rating)](https://sonarcloud.io/summary/new_code?id=ivopogace_opencode-courier)
 [![npm](https://img.shields.io/npm/v/opencode-courier)](https://www.npmjs.com/package/opencode-courier)
 [![Socket Badge](https://badge.socket.dev/npm/package/opencode-courier)](https://socket.dev/npm/package/opencode-courier)
 [![License: MIT](https://img.shields.io/npm/l/opencode-courier)](LICENSE)
@@ -81,12 +85,14 @@ line to the server log naming both versions, so a mismatch is named before a too
 
 | opencode-courier | OpenCode V2 (`opencode` and `@opencode/plugin`) |
 |---|---|
+| 0.2.2 | 2.0.24 |
 | 0.2.1 | 2.0.23 |
 | 0.2.0 | 2.0.22 |
 | 0.1.6 | 0.0.0-beta-19271 (the beta line: `opencode2` from `@opencode-ai/cli`, and `@opencode-ai/plugin`) |
 
-0.2.1 changes nothing but the pin: 2.0.23 changed nothing the plugin calls, and 0.2.0 passes the
-suite on 2.0.23 as well. 0.2.0 was tested on 2.0.22 and on the `dev` build 0.0.0-dev-20534 of 2026-10-04, the newest build
+0.2.2 moves the pin to 2.0.24, which changed nothing the plugin calls; 0.2.1 passes the suite on
+2.0.24 as well. 0.2.1 changes nothing but the pin: 2.0.23 changed nothing the plugin calls, and
+0.2.0 passes the suite on 2.0.23 as well. 0.2.0 was tested on 2.0.22 and on the `dev` build 0.0.0-dev-20534 of 2026-10-04, the newest build
 then (no 2.x release above 2.0.22 existed), where the suite passed too. Of the older hosts tried, it
 loads on 2.0.4 and 2.0.21 (nothing in between was run, and the suite was not), and fails to load on
 2.0.0 and 2.0.3, which lack the `model` domain the plugin API gained in 2.0.4. The version in
@@ -100,7 +106,7 @@ from the load failure on those hosts before 2.0.4. Check yours with `opencode --
 install the matching CLI with:
 
 ```bash
-npm install -g @opencode/cli@2.0.23
+npm install -g @opencode/cli@2.0.24
 ```
 
 ### The plugin
@@ -158,7 +164,7 @@ Then list it in `opencode.json` (V2 uses `plugins`, plural). A local plugin path
 | `courier_send` | Delivers a message to a session, signed with the sender's id, waking it if idle. |
 | `courier_status` | One look at a session: outcome, idle time, last reply and the permission requests and questions it waits on. For check-ins, not for waiting. |
 | `courier_children` | Lists the sessions this one (or a given `sessionID`) started with `courier_spawn`, each with what `courier_status` reports plus its directory, whether it is isolated and when it was started. |
-| `courier_cleanup` | Removes the git worktree of a child started with `isolate: true` and drops the child from `courier_children`. Keeps a worktree with uncommitted changes or commits on no branch, tag or remote and lists them, unless `force: true` is passed. |
+| `courier_cleanup` | Removes the git worktree of a child started with `isolate: true` and drops the child from `courier_children`. Keeps a worktree with uncommitted changes or commits on no branch, tag or remote and lists them, unless `force: true` is passed. Runs git from its usual install locations, never through `PATH`; set `OPENCODE_COURIER_GIT` to git's absolute path if yours is elsewhere ([reference](docs/reference.md#worktree-cleanup)). |
 | `courier_answer` | Passes the person's answer to a permission request or a question that a session started from this one waits on, after the plugin relayed it here: `reply` (`once`, `always` or `reject`, with an optional `message`) for a permission request, `answers` for a question. See [A child that asks for permission](docs/reference.md#a-child-that-asks-for-permission) and [A child that asks a question](docs/reference.md#a-child-that-asks-a-question). |
 | `courier_later` | Schedules a message for a session (this one by default) in `delayMinutes` or `at` an ISO time, and returns an id. When due it is delivered like `courier_send`, queued behind any running turn and waking the session if idle. |
 | `courier_cancel` | Drops a message scheduled with `courier_later`, e.g. because the child it was waiting for reported first. |
@@ -181,8 +187,10 @@ The short version; the long one, with every edge, is [docs/reference.md](docs/re
   [More](docs/reference.md#a-child-that-asks-for-permission).
 - **A child that asks a question** with OpenCode's question tool has it shown in the top session.
   When that session asks you the same question, your answer goes to the child's waiting call as if
-  you had answered there; a question stays answerable across an interrupted turn or a server
-  restart. [More](docs/reference.md#a-child-that-asks-a-question).
+  you had answered there. Whichever answer reaches the child first counts, in its session, in the
+  parent's or by `courier_answer`, and the other question is withdrawn; a question stays answerable
+  across an interrupted turn or a server restart.
+  [More](docs/reference.md#a-child-that-asks-a-question).
 - **The plugin remembers.** Each parent's children (`courier_children`), pending `courier_later`
   messages and open questions survive a compaction or a restart; entries are dropped after 14 days.
   [Roster](docs/reference.md#roster), [Scheduled messages](docs/reference.md#scheduled-messages).
@@ -278,10 +286,12 @@ them: [docs/real-model.md](docs/real-model.md).
 CI (`.github/workflows/ci.yml`) runs both suites on every push to `main` and every pull request,
 with the OpenCode CLI at the same version as the pinned plugin API, and the live suite once more
 with the CLI at its `latest` dist-tag: that job may fail, and its step summary names the version it
-ran on, so a host release that breaks the plugin is seen without blocking the build. Releases start from GitHub and
-end with a maintainer's 2FA approval on npm: [docs/releasing.md](docs/releasing.md). What the plugin
-API does that the plugin had to work around, and what changed when the pin last moved:
-[docs/plugin-api-notes.md](docs/plugin-api-notes.md).
+ran on, so a host release that breaks the plugin is seen without blocking the build. On `main` and
+on this repository's own pull requests, a SonarCloud job then scans `src/` with the unit suites'
+coverage (`sonar-project.properties`), and fails when the quality gate does. Releases start from
+GitHub and end with a maintainer's 2FA approval on npm: [docs/releasing.md](docs/releasing.md).
+What the plugin API does that the plugin had to work around, and what changed when the pin last
+moved: [docs/plugin-api-notes.md](docs/plugin-api-notes.md).
 
 ## Contributing
 

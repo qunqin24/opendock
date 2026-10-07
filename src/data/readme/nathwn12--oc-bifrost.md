@@ -5,7 +5,7 @@
 **Run V1-era OpenCode plugin hooks on the OpenCode V2 runtime.**
 *V2 hard-rejects them at load; this small plugin loads them anyway.*
 
-[![npm](https://img.shields.io/npm/v/@nathwn12/oc-bifrost?label=npm&color=205EA6)](https://www.npmjs.com/package/@nathwn12/oc-bifrost) [![check](https://github.com/nathwn12/oc-bifrost/actions/workflows/ci.yml/badge.svg)](https://github.com/nathwn12/oc-bifrost/actions/workflows/ci.yml) [![license: MIT](https://img.shields.io/badge/license-MIT-66800B.svg)](LICENSE) [![downloads](https://img.shields.io/npm/dm/@nathwn12/oc-bifrost)](https://www.npmjs.com/package/@nathwn12/oc-bifrost)
+[![npm version](https://img.shields.io/npm/v/@nathwn12/oc-bifrost)](https://www.npmjs.com/package/@nathwn12/oc-bifrost) [![license: MIT](https://img.shields.io/badge/license-MIT-blue)](./LICENSE) [![node >=22](https://img.shields.io/badge/node-%E2%89%A522-green)](https://nodejs.org) [![opencode v2](https://img.shields.io/badge/opencode-v2-blueviolet)](https://opencode.ai) [![npm weekly downloads](https://img.shields.io/npm/dw/@nathwn12/oc-bifrost)](https://www.npmjs.com/package/@nathwn12/oc-bifrost) [![CI](https://github.com/nathwn12/oc-bifrost/actions/workflows/ci.yml/badge.svg)](https://github.com/nathwn12/oc-bifrost/actions/workflows/ci.yml)
 
 </div>
 
@@ -20,12 +20,19 @@ OpenCode V2 intentionally broke the plugin API — a V1 module is hard-rejected 
 
 The bridge is **one entry** in the `plugins` array of your `opencode.jsonc`; OpenCode resolves the package itself, so there is no separate install step.
 
+```text
+Install the oc-bifrost OpenCode plugin:
+1. Add the object form of @nathwn12/oc-bifrost to the "plugins" array in ~/.config/opencode/opencode.jsonc — a "package" field plus its required "options" block, not a bare string. Use the example below.
+2. Restart OpenCode.
+3. Verify: opencode plugin check, then opencode plugin list (shows what actually loaded)
+```
+
 ```jsonc
 // opencode.jsonc
 {
   "plugins": [
     {
-      "package": "@nathwn12/oc-bifrost@1.4.3",
+      "package": "@nathwn12/oc-bifrost@1.4.5",
       "options": {
         "trustRemote": true, // consent: the first `github:` fetch downloads and executes a remote plugin
         "plugins": ["github:obra/superpowers"]
@@ -37,11 +44,13 @@ The bridge is **one entry** in the `plugins` array of your `opencode.jsonc`; Ope
 
 Restart OpenCode. **That's the whole setup** — the mount report names what bridged and what was refused. Proof: [`PROOF.md`](PROOF.md), [`VERIFIED-PLUGINS.md`](VERIFIED-PLUGINS.md); agent-driven setup: [`INSTALL.md`](INSTALL.md).
 
-### 🧭 What actually mounts — two paths
+---
+
+## 🌉 What it does
 
 A module named in `options.plugins` is routed by its **shape**, and only the V1 shape is hook-translated:
 
-- **V1 hook module** - a factory (a `default` async export, `{ server: factory }`, or any named function export - a `*Plugin` name is only the tie-breaker preference, `src/discover.ts`). Its hooks are translated one by one against the [compatibility matrix](#-compatibility-matrix) below.
+- **V1 hook module** - a factory (a `default` async export, `{ server: factory }`, or any named function export - a `*Plugin` name is only the tie-breaker preference, `src/discover.ts`). Its hooks are translated one by one against the [compatibility matrix](#-compatibility) below.
 - **V2-shaped definition** — an `export default` carrying `{ id, setup | effect }`. It mounts **as-is** with the host context, exactly as the host itself would have mounted it. A **dual-export** file that ships both a V1 named export *and* a V2 default (for example `obra/superpowers@v6.4.2`) takes this path: the V2 default is used and the V1 named export is left untouched — no hook translation is applied to it.
 
 Sourcing is `github:` / a local path / a bundled `preset:` only. **npm and bare package names are refused** (`src/index.ts`); point at an installed copy by absolute path instead. And a plugin that needs one of the seven refused V1 hooks still needs a real port — the bridge will not fake it.
@@ -54,32 +63,12 @@ Name each legacy plugin with **exactly one** of three specifiers:
 
 > **Version gate.** `github:` requires **oc-bifrost 0.4.0 or later**; releases **0.3.0 and below** cannot mount it — use the offline fallback or a local path there.
 
-### 📌 Version choice & updates
-
-- **Pin the exact version** — `"package": "@nathwn12/oc-bifrost@1.4.3"`. Predictable, and the version these docs describe.
-- `@^1.0.0` auto-tracks 1.x and never adopts a new major silently.
-- A bare `@nathwn12/oc-bifrost` or `@latest` may be unstable while OpenCode's plugin cache settles.
-- **If an update does not appear:** run `opencode plugin check`; if it still does not, delete `~/.cache/opencode/npm/@nathwn12/oc-bifrost@latest` and reload.
-
----
-
-## 🔐 Trust model
-
-Mounting a `github:` plugin downloads the repository snapshot at the resolved commit and executes its entry file **in the host process, with your rights**. The sha256 recorded on first use pins those exact bytes — the tarball and the entry file alike — it does not vouch for them.
-
-- **Cold cache refuses by default** — nothing is fetched or executed until you opt in, per bridge entry: `"trustRemote": true`, or `OC_BIFROST_TRUST=github` (an explicit `false` wins over the env var).
-- **Warm, hash-verified cache** loads on its own: no re-consent, no network. A hash mismatch refuses loudly instead of running unverified bytes.
-- **The mount report keeps consent informed** — one line naming the resolved commit, the `sha256` digest, the byte count, and that it executes with the host process's full user rights.
-- **Offline or air-gapped** — the cold-cache fetch is fail-closed; pre-warm on a networked machine and copy the shared `oc-bifrost/github/v2/` cache across. It lives under `$XDG_CACHE_HOME/opencode/` or, by default, `~/.cache/opencode/`; snapshot trees materialize at `…/oc-bifrost/github/v2/<id>/tree/`. A flat pre-snapshot cache at `…/oc-bifrost/github/<id>/` is ignored with a warning (it cannot provide sibling files) and re-fetched with the same one-time consent.
-
----
-
-## 🔌 Offline / no-fetch fallback — `preset:rtk` (optional)
+### 🔌 Offline / no-fetch fallback — `preset:rtk` (optional)
 
 **Optional; not the advertised route.** When GitHub is unreachable — an offline or air-gapped host — `preset:rtk` mounts a **bundled** V1 plugin (`vendor/rtk.ts`, verbatim `rtk-ai/rtk` `v0.50.0`, Apache-2.0) with **zero network**. It is opt-in, so nothing from RTK runs unless you ask for it.
 
 ```jsonc
-{ "package": "@nathwn12/oc-bifrost@1.4.3", "options": { "plugins": ["preset:rtk"] } }
+{ "package": "@nathwn12/oc-bifrost@1.4.5", "options": { "plugins": ["preset:rtk"] } }
 ```
 
 **Prerequisite:** the `rtk` binary (`>= 0.23.0`) on `PATH`; `preset:rtk` probes before mounting and names this command if it is missing. No winget? Take the release asset from [`rtk-ai/rtk`](https://github.com/rtk-ai/rtk/releases) instead. Not from crates.io — `cargo install rtk` installs a different project.
@@ -93,7 +82,65 @@ brew install rtk                 # macOS / Linux
 
 ---
 
-## 🧾 The mount report — and where to read it when stdout is gone
+## ⚙️ Configure
+
+### 📌 Version choice & updates
+
+- **Pin the exact version** — `"package": "@nathwn12/oc-bifrost@1.4.5"`. Predictable, and the version these docs describe.
+- `@^1.0.0` auto-tracks 1.x and never adopts a new major silently.
+- A bare `@nathwn12/oc-bifrost` or `@latest` may be unstable while OpenCode's plugin cache settles.
+- **If an update does not appear:** run `opencode plugin check`; if it still does not, delete `~/.cache/opencode/npm/@nathwn12/oc-bifrost@latest` and reload.
+
+### ⚙️ Options
+
+| Option | Type | Default | Meaning |
+|---|---|---|---|
+| `plugins` | `Array<string \| { spec, options }>` | `[]` | Specifiers to bridge — `github:`, a local path, or the bundled offline fallback (`preset:`) |
+| `trustRemote` | `boolean` | `false` | Consent to fetch + execute a `github:` plugin on a cold cache |
+| `strict` | `boolean` | `false` | Abort setup on an unsupported or unmountable hook |
+| `verbose` | `boolean` | `true` | Print the per-plugin compatibility report |
+| `freshness` | `"off" \| "online"` | `"off"` | Check the bundled pin against upstream's latest release after mounting |
+| `provision` | `"host" \| "npm" \| "off"` | `"host"` | How a fetched `github:` snapshot's declared dependencies are provided before its entry is imported - `"host"` junctions them from the shared OpenCode npm cache (zero network), `"npm"` adds an `npm install --no-save` fallback for packages the host store lacks, `"off"` is 1.3.x behavior |
+| `wireTui` | `boolean` | `false` | Opt-in TUI wiring for a mounted `github:` snapshot - ensures a `tui.tsx` wrapper at the tree root and adds the tree as a `file://` plugin entry in cli.json; snapshot layouts only (the single-file fallback is never wired), and a wire failure is a loud row that never aborts the mount |
+
+`freshness: "online"` (or `OC_BIFROST_FRESHNESS=online`) is off by default, never downloads or executes plugin code, fires off the load path, and reports `unknown` - not an error - when offline or rate-limited.
+
+`OC_BIFROST_PROVISION` sets the `provision` mode when the option is omitted (`"host"`, `"npm"`, or `"off"`); an explicit option wins, and an invalid value is a loud refusal. `OC_BIFROST_WIRE_TUI` opts `wireTui` in with exactly `"1"` or `"true"`; an explicit option wins, anything else is off.
+
+Wire a TUI plugin from github:
+
+```jsonc
+// opencode.jsonc
+{
+  "plugins": [
+    {
+      "package": "@nathwn12/oc-bifrost@1.4.5",
+      "options": {
+        "plugins": ["github:obra/superpowers"],
+        "trustRemote": true, // consent: the first `github:` fetch downloads and executes a remote plugin
+        "wireTui": true // after mount, add a tui.tsx wrapper and a cli.json plugin entry
+      }
+    }
+  ]
+}
+```
+
+The durable report file (see the mount report section below) is controlled by the `OC_BIFROST_REPORT` environment variable, not an option: it defaults to the shared OpenCode cache and can be redirected to a path or disabled with `off`.
+
+---
+
+## 🛡️ Safety
+
+### 🔐 Trust model
+
+Mounting a `github:` plugin downloads the repository snapshot at the resolved commit and executes its entry file **in the host process, with your rights**. The sha256 recorded on first use pins those exact bytes — the tarball and the entry file alike — it does not vouch for them.
+
+- **Cold cache refuses by default** — nothing is fetched or executed until you opt in, per bridge entry: `"trustRemote": true`, or `OC_BIFROST_TRUST=github` (an explicit `false` wins over the env var).
+- **Warm, hash-verified cache** loads on its own: no re-consent, no network. A hash mismatch refuses loudly instead of running unverified bytes.
+- **The mount report keeps consent informed** — one line naming the resolved commit, the `sha256` digest, the byte count, and that it executes with the host process's full user rights.
+- **Offline or air-gapped** — the cold-cache fetch is fail-closed; pre-warm on a networked machine and copy the shared `oc-bifrost/github/v2/` cache across. It lives under `$XDG_CACHE_HOME/opencode/` or, by default, `~/.cache/opencode/`; snapshot trees materialize at `…/oc-bifrost/github/v2/<id>/tree/`. A flat pre-snapshot cache at `…/oc-bifrost/github/<id>/` is ignored with a warning (it cannot provide sibling files) and re-fetched with the same one-time consent.
+
+### 🧾 The mount report — and where to read it when stdout is gone
 
 The per-plugin mount report is the proof surface: it names every hook that bridged (`full`), approximated (`partial`), or was refused (`unsupported`), plus each `github:` resolved commit and digest. It prints to the console (`verbose: true`, the default).
 
@@ -103,9 +150,7 @@ The host **discards stdout** when it runs as a **managed background service** or
 - **Override:** `OC_BIFROST_REPORT=<path>` writes somewhere else; `OC_BIFROST_REPORT=off` disables the file.
 - **Policy:** **append** across loads (a crashed or exited run is still readable), hard-capped at **256 KiB** — a write that would cross the cap rolls the file over so the newest report survives whole. Control characters are escaped before they reach disk; console behaviour is unchanged.
 
----
-
-## 🚫 Never leave a V1 plugin in a discovery directory
+### 🚫 Never leave a V1 plugin in a discovery directory
 
 V2 loads `.opencode/plugin/`, `.opencode/plugins/`, `<config>/plugin/`, and `<config>/plugins/` directly and hard-rejects the module before oc-bifrost can see it. Park legacy files in `legacy/` and reference them from `options.plugins`; the bridge also warns at load if it finds one stranded.
 
@@ -113,7 +158,32 @@ oc-bifrost bridges **hooks**, not a plugin's external dependencies: if a plugin 
 
 ---
 
-## 🧩 Compatibility matrix
+## 🧹 Uninstall
+
+The bridge is **one entry** in the `plugins` array - remove that entry and restart OpenCode, and nothing else was installed to undo.
+
+To also remove a downloaded `github:` plugin, delete its entry under the shared `oc-bifrost/github/` cache (`$XDG_CACHE_HOME/opencode/`, or `~/.cache/opencode/` by default).
+
+---
+
+## 🛠️ Development
+
+```sh
+npm install
+npm run check      # typecheck + build + tests
+```
+
+### 🤝 Contributing
+
+Two doors, both gated on proof:
+- **Add hook coverage** — edit `src/compat-matrix.ts`, implement the bridge, add the test its row names.
+- **Add a verified plugin** — smoke-test it and add a row to [`VERIFIED-PLUGINS.md`](VERIFIED-PLUGINS.md).
+
+See [`CONTRIBUTING.md`](CONTRIBUTING.md).
+
+---
+
+## 🧩 Compatibility
 
 The unit of compatibility is the **V1 hook**, not the plugin — once a hook is bridged, every plugin that uses it works untouched.
 
@@ -148,67 +218,12 @@ The unit of compatibility is the **V1 hook**, not the plugin — once a hook is 
 
 **No hook is ever dropped silently.** Refused hooks warn at load, or abort under `strict: true`. The single source of truth is [`src/compat-matrix.ts`](src/compat-matrix.ts), and every row names the test that proves it.
 
----
-
-## 🙏 Honest bounds
+### 🙏 Honest bounds
 
 This bridges **the mappable subset**, not "any plugin, seamlessly." Nine of the twenty-four matrix rows are refused out loud (seven V1 hooks and two facade calls): no faithful V2 destination exists for their semantics, and no compatibility layer can invent one. Plugins that depend on those need a real port. The refusal list is the product being honest — and it is the contract.
 
 ---
 
-## ⚙️ Options
-
-| Option | Type | Default | Meaning |
-|---|---|---|---|
-| `plugins` | `Array<string \| { spec, options }>` | `[]` | Specifiers to bridge — `github:`, a local path, or the bundled offline fallback (`preset:`) |
-| `trustRemote` | `boolean` | `false` | Consent to fetch + execute a `github:` plugin on a cold cache |
-| `strict` | `boolean` | `false` | Abort setup on an unsupported or unmountable hook |
-| `verbose` | `boolean` | `true` | Print the per-plugin compatibility report |
-| `freshness` | `"off" \| "online"` | `"off"` | Check the bundled pin against upstream's latest release after mounting |
-| `provision` | `"host" \| "npm" \| "off"` | `"host"` | How a fetched `github:` snapshot's declared dependencies are provided before its entry is imported - `"host"` junctions them from the shared OpenCode npm cache (zero network), `"npm"` adds an `npm install --no-save` fallback for packages the host store lacks, `"off"` is 1.3.x behavior |
-| `wireTui` | `boolean` | `false` | Opt-in TUI wiring for a mounted `github:` snapshot - ensures a `tui.tsx` wrapper at the tree root and adds the tree as a `file://` plugin entry in cli.json; snapshot layouts only (the single-file fallback is never wired), and a wire failure is a loud row that never aborts the mount |
-
-`freshness: "online"` (or `OC_BIFROST_FRESHNESS=online`) is off by default, never downloads or executes plugin code, fires off the load path, and reports `unknown` - not an error - when offline or rate-limited.
-
-`OC_BIFROST_PROVISION` sets the `provision` mode when the option is omitted (`"host"`, `"npm"`, or `"off"`); an explicit option wins, and an invalid value is a loud refusal. `OC_BIFROST_WIRE_TUI` opts `wireTui` in with exactly `"1"` or `"true"`; an explicit option wins, anything else is off.
-
-Wire a TUI plugin from github:
-
-```jsonc
-// opencode.jsonc
-{
-  "plugins": [
-    {
-      "package": "@nathwn12/oc-bifrost@1.4.3",
-      "options": {
-        "plugins": ["github:obra/superpowers"],
-        "trustRemote": true, // consent: the first `github:` fetch downloads and executes a remote plugin
-        "wireTui": true // after mount, add a tui.tsx wrapper and a cli.json plugin entry
-      }
-    }
-  ]
-}
-```
-
-The durable report file (see above) is controlled by the `OC_BIFROST_REPORT` environment variable, not an option: it defaults to the shared OpenCode cache and can be redirected to a path or disabled with `off`.
-
----
-
-## 🛠 Develop
-
-```sh
-npm install
-npm run check      # typecheck + build + tests
-```
-
-## Contributing
-
-Two doors, both gated on proof:
-- **Add hook coverage** — edit `src/compat-matrix.ts`, implement the bridge, add the test its row names.
-- **Add a verified plugin** — smoke-test it and add a row to [`VERIFIED-PLUGINS.md`](VERIFIED-PLUGINS.md).
-
-See [`CONTRIBUTING.md`](CONTRIBUTING.md).
-
-## License
+## 📄 License
 
 MIT

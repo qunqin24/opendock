@@ -194,6 +194,7 @@ $ deja "jwt refresh token"
 | Command | What it does |
 | --- | --- |
 | `deja ctx <query>` | Markdown digest of the best match, ready to pipe into a prompt. |
+| `deja recall <words>` | The page the MCP recall tool gives an agent: about 4 KB, this project first. For skills and scripts that run deja through the shell. |
 | `deja resume <id>` | Reopen a found session in its native harness. |
 | `deja restore <path>` | Hand back a span an agent replaced, from the `old_string` its edit recorded. Never writes over the original. |
 | `deja promote <id>` | Distill a session into a curated note with provenance, tags and a lifecycle state. Notes outrank raw transcripts. |

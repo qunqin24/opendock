@@ -636,6 +636,18 @@ for overrides, extra agents and disabling roles.
 | `TM_SEARCH_MAX_HITS` | `10` | hits kept per engine leg and in the fused list |
 | `TM_SEARCH_DISABLED_ENGINES` | unset | engines removed from the roster AND from every `auto` route (`sogou,baidu` style) |
 | `TM_BASH_TIMEOUT_PROBE_MS` | `60000` | ceiling forced onto a `timeout` the model set for a read-only probe command (0 disables) |
+| `TM_PRUNE` | `on` | `off` stops context pruning entirely (settled message bodies stay in the request) |
+| `TM_PRUNE_AT_PERCENT` | `70` | prune once the request reaches this share of the model's window; derived from `limit.context`, never a fixed token count. **Clamped to 40–95** — a lower value is silently raised to 40, so a reproduction that sets 5 is really testing 40 |
+| `TM_PRUNE_KEEP_TAIL_PERCENT` | `40` | share of the window kept verbatim at the tail; the newest message is always kept |
+| `TM_RETRY` | `on` | `off` stops the retry governor (no backoff directive, no cooldown) |
+| `TM_RETRY_BASE_MS` | `5000` | first backoff after a quota/rate-limit error; doubles per consecutive error |
+| `TM_RETRY_MAX_MS` | `60000` | ceiling for that backoff |
+| `TM_RETRY_JITTER` | `0.3` | ± fraction applied to the wait, so parallel sessions do not re-fire together |
+| `TM_RETRY_BREAK_AFTER` | `5` | consecutive errors before the cooldown starts |
+| `TM_RETRY_COOLDOWN_MS` | `60000` | how long new sub-agent dispatches are refused once the breaker trips |
+| `TM_SPLIT_ADVICE` | `on` | `off` stops the split hint (the prompt discipline stays) |
+| `TM_SPLIT_BRIEF_TOKENS` | `4000` | a dispatch brief above this size earns a split hint on the next request. **Clamped to ≥200** — a lower value is silently raised, so a reproduction that sets 50 is really testing 200 |
+| `TM_SPLIT_MAX_CRITERIA` | `3` | the prompt's own rule: more acceptance criteria than this is a signal to split |
 | `TM_BASH_TIMEOUT_MAX_MS` | `0` | optional global ceiling for every other bash command — off by default so a real build keeps the timeout it asked for |
 | `TM_JOIN_MAX_WAIT_MS` | `60000` | ceiling on `tm_join { waitMs }`. Was 300 000, and a lead parked in it twice in a row (19 min of nothing) while its children worked — waiting is not parallelism, so the default now says "check, then work". A second consecutive wait after nothing settled is cut to 10 s and answered with what to do instead |
 | `TM_STORE_RECLAIM` | `on` | at boot, reclaim what an upgrade left behind: a per-workspace store shard idle past the TTL, and the pre-shard `blackboard/` + `trajectory/` under the temp-dir fallback (503 MB of expired runs on one real machine, with no sweeper pointed at them any more). Only TTL-expired entries are ever removed — a fresh run dir survives, because a session started before the upgrade may still be writing there. `off` leaves the disk exactly as found (the test runner sets it) |
@@ -644,9 +656,6 @@ for overrides, extra agents and disabling roles.
 | `TM_AGENT_TEMPERATURE` | `off` | `on` applies a per-role sampling table (architect 0.35 / researcher 0.3 / reviewer 0.1 / rest 0.2) via `chat.params`; or give it `reviewer=0.05;team=0.4`. Off = the documented "all agents at 0.2" invariant stands |
 | `TM_COMPACTION_CONTEXT` | `on` | on the host's pre-compaction hook, add the must-survive list (reply skeleton, offload handles, open sub-agent session ids, provenance, board paths). Additive — the host's own summarizer prompt is never replaced |
 | `TM_COMPACTION_AUTOCONTINUE` | `on` | `off` stops the host from silently resuming the turn after a compaction, so a human re-reads state first |
-| `TM_COMPACT_TRIGGER` | `on` | Team's own early compaction: `off` hands the timing back to the host entirely |
-| `TM_COMPACT_AT_PERCENT` | `75` | usage percentage of the model's window at which Team submits a compaction via `ctx.session.compact` (clamped 5–95). The usage number comes from the host's `session.usage.updated` event, the denominator from `ctx.model.list()`'s `limit.context` |
-| `TM_COMPACT_MIN_MS` | `60000` | floor between two compaction admissions for one session (capped 600000), so a ratio that does not drop cannot become a compaction loop |
 | `TM_SHELL_NO_COLOR` | `on` | inject `NO_COLOR`/`TERM=dumb` into every child shell via `shell.env` (ANSI progress bars are pure context tax). Never overwrites a value the host already set |
 | `TM_SHELL_ENV` | — | explicit `KEY=VALUE;KEY2=VALUE2` passthrough into child shells — deliberately allowlisted, so this hook can't become a side channel for the parent environment |
 | `TM_MEMORY_GLOBAL_DIR` | `~/.opencode-team/memories/global/` | tm_memory GLOBAL tier store |

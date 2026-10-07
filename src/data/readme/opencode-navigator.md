@@ -33,7 +33,7 @@ See the [changelog](CHANGELOG.md) for release-by-release changes.
 - Save visibility, expansion, and order globally or for the current worktree
 - Copy the selected scope's layout and MCP states as versioned JSON, then validate and preview imports
 - Focus the sidebar with `Ctrl+Shift+F`, then navigate with arrows or `j`/`k`
-- Open sidebar shortcut mode with `Ctrl+Shift+B`; press `h` to toggle the panel
+- Open sidebar shortcut mode with `Ctrl+Shift+B`; press `h` to toggle the panel, `c` to check Navigator updates, or `u` to check and confirm an update
 - Optionally open new sessions directly in an empty chat with the sidebar, skipping Home on startup and from New session
 - Keep OpenCode's compact footer while showing host and Navigator versions with independent update indicators; click a version label or its update icon to confirm an in-place update through the current installation method and scope
 
@@ -365,7 +365,7 @@ Codex 0.160.0 protocol also exposes the separate
 `account/rateLimitResetCredit/consume` RPC. Navigator requires explicit
 confirmation before using it and never redeems credits in the background.
 Limits follows the model and verified connection selected in the current OpenCode
-session. Codex's ordinary `codex` windows appear as **Codex account** quota, shared
+session. Codex's ordinary `codex` windows describe verified account quota shared
 across models. The protocol can return `normalModelSlug: null` for this ordinary
 bucket; that field is display metadata for quota aliases, not a prerequisite for
 account usage. Separate model-specific buckets require explicit model association.
@@ -388,8 +388,8 @@ The additional native sources use the **OpenCode 2 Navigator server plugin** alr
 used for Todo. Configure it on the 2.x launch path as described in the installation
 section. OpenCode 1.x retains Codex support; additional sources need the 2.x public
 integration/HTTP APIs. Without the server plugin, Limits shows setup guidance.
-**Provider sources** lists audited capabilities and unsupported-source reasons;
-the [source inventory](PROVIDERS.md) includes public API references and prerequisites.
+The [source inventory](PROVIDERS.md) includes audited public API references,
+permission requirements, and unsupported-source reasons.
 
 The server resolves the active host credential through OpenCode's public API.
 Quota RPCs return measurements, never credentials. Response-header observations
@@ -405,8 +405,6 @@ does not grant permission to spend a reset credit. **Focus Limits** is also
 available from the command palette.
 
 ![Codex quota windows and reset times](screenshots/39-provider-limits.png)
-
-![Audited provider sources and required capabilities](screenshots/47-provider-sources.png)
 
 ### Link the intended Codex account
 
@@ -424,20 +422,29 @@ When the host does not provide a verifiable identity, select **Link Codex CLI
 account** and confirm the reported account ID if it matches this host connection.
 The private, user-wide binding is saved **once per connection**, or once per
 provider on hosts without a connection API, and reused across models, projects,
-and sessions. **Unlink Codex account** removes the manual association; **Relink
-Codex account** is available after an account change. Compatible older model
+and sessions. After an account change, authentication guidance offers **Relink
+Codex account** and **Unlink Codex account** for the outdated manual association. Compatible older model
 bindings are reused; conflicting bindings remain isolated until a deliberate relink.
 
-For an associated connection, Limits shows the ordinary Codex account quota and
-any explicitly associated model buckets, their native units and durations, reset times, and
-the last successful read time. It refreshes quietly every five seconds, even
-when hidden. **Refresh** requests a read immediately; a failed read preserves
-cached windows with a stale label and **Retry**. Unsupported mappings, changed
-sign-in/account, and rate-limited reads have separate muted guidance.
+Limits starts with **[Provider name] Model name · variant**. Activate the model or
+variant with the mouse or keyboard to open OpenCode's native selector. Each quota
+window uses two compact rows: remaining headroom with an adaptive muted thin-line
+scale spanning the available sidebar content width, then a muted reset time.
+Both rows stay within the sidebar's padding when it resizes. Healthy views omit
+account IDs, technical scope/window-duration suffixes, source explanations, and update timestamps. Account scope and native window durations remain in the data model;
+durations describe provider quota windows, not time remaining until reset. Balances retain their native
+currency or point unit; a missing total does not become a full progress scale.
+
+The header has no section counter. Its compact **Refresh** control requests a
+read immediately; background reads continue every five seconds, including while
+hidden. Failed reads retain cached windows with stale guidance and the same header
+control for retrying. Unsupported mappings, authentication, and setup states have
+separate muted guidance.
 
 ### Review and manually use a banked reset
 
-**Review reset credits** displays the provider's available count, optional credit
+The header's **Banked Resets** button appears when credits or an unresolved attempt
+exist. It displays the provider's available count, optional credit
 details, statuses, and expiry. Selecting a credit first checks fresh eligibility
 and opens a separate confirmation tied to the current account and model. Cancel
 or Escape returns to the credit list without spending anything.
@@ -628,6 +635,25 @@ contrasting focus palette; the field follows actual input focus and blur.
 The command palette also exposes `Focus sidebar` and direct commands for Todo,
 Subagents, Skills, Quick Actions, LSP, and MCP. Both sidebar shortcuts can be
 changed at runtime in settings.
+
+Press `Ctrl+Shift+B` to enter Navigator shortcuts, then choose an action:
+
+| Key | Action |
+| --- | --- |
+| `h` | Toggle sidebar visibility |
+| `t` / `a` / `s` / `q` / `l` / `m` | Focus Todo / Subagents / Skills / Quick Actions / LSP / MCP |
+| `c` | Check for a Navigator update and report whether one is available |
+| `u` | Check for a Navigator update, then open its confirmation if available |
+| `Escape` | Cancel shortcut mode |
+
+The mode ends after an action or five seconds of inactivity. Its toast lists only
+actions supported by the current host; LSP is omitted on OpenCode 2.x. Change the
+entry shortcut under **Settings → Behavior**. The command palette also offers
+**Check Navigator updates** and **Update Navigator**.
+
+Manual checks report when Navigator is current or the update source is unavailable.
+Updates require confirmation, preserve the existing installation method and scope,
+and show a restart reminder after completion. Background check failures stay quiet.
 
 ### Search Everything
 

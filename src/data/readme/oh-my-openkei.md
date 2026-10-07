@@ -114,12 +114,6 @@ The default generated configuration:
         "skills": [],
         "mcps": []
       },
-      "council": {
-        "model": "openai/gpt-5.4-fast",
-        "variant": "xhigh",
-        "skills": [],
-        "mcps": []
-      },
       "librarian": {
         "model": "minimax-coding-plan/MiniMax-M2.7",
         "skills": [],
@@ -203,13 +197,12 @@ If any agent fails to respond, check your provider authentication and config fil
 
 #### Routing Flow
 
-- **Orchestrator** can delegate to `debugger`, `explorer`, `librarian`, `oracle`, `designer`, `frontend-developer`, `backend-developer`, `trigger-developer`, `observer`, and `council`.
+- **Orchestrator** can delegate to `debugger`, `explorer`, `librarian`, `oracle`, `designer`, `frontend-developer`, `backend-developer`, `trigger-developer`, and `observer`.
 - **Planner** is planning-only and can delegate only to `explorer`, `librarian`, `oracle`, and `designer`.
 - **Sprinter** is self-executing and does not delegate.
 - **Business Analyst** can delegate research to `explorer`, `librarian`, and `oracle`.
 - **Specialists** are leaf executors: once delegated to, they do the bounded work and hand results back.
 - **Observer** is disabled by default until you explicitly enable it in config.
-- **Council** is available, but intentionally expensive and kept on a stricter path than normal delegation.
 
 #### Orchestrator
 
@@ -316,17 +309,6 @@ The following agents are delegated to by the primary agents based on task type.
 **Recommended Models:** `cerebras/zai-glm-4.7`, `fireworks-ai/accounts/fireworks/routers/kimi-k2p5-turbo`, `openai/gpt-5.4-mini`  
 **Model Guidance:** Choose a fast, reliable coding model for routine backend tasks. Receives bounded server-side tasks from Orchestrator such as API implementation, database work, and service logic changes.
 
-#### Council
-
-> [!NOTE] > **Why doesn't Orchestrator auto-call Council more often?** This is intentional. Council runs multiple models at once, so automatic delegation is kept strict because it is usually the highest-cost path in the system. In practice, Council is meant to be used manually when you want it, for example: `@council compare these two architectures`.
-
-**Role:** Multi-LLM consensus and synthesis  
-**Prompt:** [council.ts](src/agents/council.ts)  
-**Guide:** [docs/council.md](docs/council.md)  
-**Default Setup:** Config-driven — councillors come from `council.presets` and the Council agent model comes from your normal `council` agent config  
-**Recommended Setup:** Strong Council model + diverse councillors across providers  
-**Model Guidance:** Use a strong synthesis model for the Council agent and diverse models as councillors. The value of Council comes from comparing different model perspectives, not just picking the single strongest model everywhere.
-
 #### Observer
 
 > [!NOTE] > **Why a separate agent?** If your Orchestrator model is not multimodal, enable Observer to handle images, screenshots, PDFs, and other visual files. Observer is disabled by default and gives the Orchestrator a dedicated multimodal reader without forcing you to change your main reasoning model. Set `disabled_agents: []` and an `observer` model in your configuration.
@@ -361,7 +343,6 @@ Use this section as a map: start with installation, then jump to features, confi
 
 | Doc                                                  | What it covers                                                                 |
 | ---------------------------------------------------- | ------------------------------------------------------------------------------ |
-| **[Council](docs/council.md)**                       | Run multiple models in parallel and synthesize a single answer with `@council` |
 | **[Session Management](docs/session-management.md)** | Explicitly reuse child-agent sessions with `task_id` aliases, or start fresh by omitting it |
 | **[Codemap](docs/codemap.md)**                       | Generate hierarchical codemaps to understand large codebases faster            |
 

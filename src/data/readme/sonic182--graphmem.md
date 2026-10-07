@@ -163,6 +163,27 @@ See [docs/cli.md](docs/cli.md#gmem-code) and
 [docs/mcp.md](docs/mcp.md#code-navigation-tools) for supported languages, options,
 and coverage limits.
 
+### Measured coding benefits
+
+gmem adds structured code navigation to your agent's existing shell workflow:
+it complements `rg`, `git`, and file reads rather than replacing them.
+
+In an OpenClaw benchmark, neutral gmem (without additional guidance) showed:
+
+| Task / model | Observed benefit vs shell-only control |
+| --- | --- |
+| Symbol lookup · Nemotron Lightning 3.5 | **88% fewer median tokens**, **90% lower estimated mean cost**, and **5/5 correct vs 3/5** |
+| Change analysis · GLM 5.3 Flash | **40% fewer median tokens**, **55% lower estimated mean cost**, with **5/5 correct in both variants** |
+| Symbol lookup · DeepSeek V4.1 Flash | **48% lower estimated mean cost**, with **5/5 correct in both variants** |
+
+Results vary by task and model: some tasks used more tokens or cost more with
+gmem. These observations cover one repository and five attempts per
+configuration; costs use published rates, and GLM had additional resource caps.
+The benchmark measures code navigation and comprehension, not code generation
+or narrative memory.
+
+See the [full methodology and results](docs/evaluation/code-tools-agent-benchmark.md).
+
 ## Build
 
 Stable Rust is required. CPU builds need no extra feature:

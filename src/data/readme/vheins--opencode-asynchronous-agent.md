@@ -7,16 +7,27 @@ monitor** for those background subagents.
 Works on **both** OpenCode V1 (`>=1.18.0`) and V2 (`>=2.0.0`):
 
 - **`./server`** — the tool hook that forces `background = true`
-- **`./tui`** — the sidebar monitor: running/done/error counts, per-subagent
-  elapsed time, **total tokens + tokens/sec**, and a status-bar line when the
-  sidebar is collapsed
+- **`./tui`** — the sidebar monitor: a Saffteen-style collapsible InfoCard stack
+  (activity/result, provider token report, task progress, workspace) plus
+  per-subagent cards (title, activity, todo, elapsed time, Tools count, context
+  used with percent, and Tok/s). The async-agent identity
+  is preserved: running/done/error/total counts, per-subagent elapsed time,
+  **total tokens + tokens/sec**, and a compact one-line status bar when the
+  sidebar is collapsed.
 
 ```
-▼ Subagents 0.3.3
-● 1 run · ✓ 0 done · ✕ 0 err · Σ 1
- [ ] Write a single short para… (executor · high)
-    ↳  00:07  48.0k tok  16.3 t/s
+Subagents · 3 runs
+● 1 run · ✓ 1 done · ✕ 1 err · Σ 3
 ```
+
+The sidebar renders a collapsible InfoCard stack. The `Subagents · N runs` aggregate is
+rendered exactly once; each subagent appears as a single card (not a row plus a
+card) showing its session title, activity, todo, elapsed time, tool-call count,
+context used with percent of the model limit, and output Tok/s.
+Clicking a subagent card navigates to that subagent's session. The `app_bottom`
+line mirrors the aggregate when the sidebar is collapsed. Status segments are
+color-coded from the active theme: run (`accent`), done (`success`), err
+(`error`), total (`textMuted`).
 
 OpenCode V2 ships a keybind (`ctrl+b`, command `session.background`) that moves a
 *running* foreground subagent into background observation. This plugin gives you the
@@ -140,6 +151,7 @@ All configuration is optional and read from environment variables at setup time.
 | `OPENCODE_AUTO_BG_EXCEPT` | *(none)* | Comma-separated denylist of **parent** agent ids. These parents never auto-background their subagents. |
 | `OPENCODE_AUTO_BG_DEBUG` | *(off)* | Set to `1` to log each rewrite to stderr. |
 | `OPENCODE_SUBAGENT_NOTIFY` | *(enabled)* | TUI monitor only. Set to `0`, `false`, `off`, or `no` to disable the toast shown when a background subagent finishes (`done`/`error`). |
+| `OPENCODE_SUBAGENT_TASK_PROGRESS` | *(off)* | TUI monitor only. Set to a truthy value (`1`, `true`, `on`, …) to show the "Task progress" card. Hidden unless explicitly enabled. |
 
 > **OpenCode V1 needs `OPENCODE_EXPERIMENTAL_BACKGROUND_SUBAGENTS=true`.** V1 gates
 > background subagents behind that flag (or the broader `OPENCODE_EXPERIMENTAL=true`).
@@ -212,7 +224,11 @@ export OPENCODE_AUTO_BG_SUBAGENT=0
 | `src/index.js` | The plugin implementation (`id`/`setup` for V2, `server` for V1, hook logic). |
 | `server.js` | `./server` entrypoint — re-exports `src/index.js` (V1 + V2). |
 | `index.js` | Alternate directory entrypoint — mirrors `server.js`. |
-| `dist/tui.js` | `./tui` entrypoint — the TUI sidebar monitor bundle. |
+| `src/tui.tsx` | Source of the TUI sidebar plugin (InfoCard stack + per-subagent cards + async identity). |
+| `src/model.ts` | Sidebar data helpers: `activityDetail`, `sessionMetrics`, `sidebarActivity`. |
+| `src/subagent.ts` | Subagent detail fetch (`fetchSubagent`), summary (`subagentDetails`), duration (`elapsedLabel`). |
+| `src/workspace.ts` | Bounded Git workspace scan for the "Workspace & files" card. |
+| `dist/tui.js` | `./tui` entrypoint — the built TUI sidebar bundle (`bun run build`). |
 | `package.json` | Package metadata and entrypoint exports. |
 
 OpenCode V2 resolves a plugin directory through its `server` entrypoint (root

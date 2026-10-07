@@ -64,6 +64,9 @@ setup(启动, 每项目一次):
 
 在会话里输入 `/open-in-idea`:
 
+> **非 macOS**:第 1、3 步的自动打开被跳过(没有对应的启动命令),请**先手动打开 IDE 和当前项目**,再执行本命令 ——
+> 端口在监听就会正常接入,并同样等到 `idea_*` 工具就绪才返回。
+
 1. **让运行中的 IDEA 实例打开/激活当前项目**:`open -a "IntelliJ IDEA" <项目目录>` —— **复用已运行的实例**(不会重复开新实例),
    项目已打开时只把它切到前台。**无论 MCP 是否已就绪都会执行这一步**:端点能应答只说明 IDEA 在运行(可能开的是**别的**项目),
    不代表当前项目已打开;
@@ -325,6 +328,10 @@ export { default } from "/Users/yutao/Projects/opencode-idea/src/index.js";
   (`get_project_modules`,带 `IJ_MCP_SERVER_PROJECT_PATH`):返回模块 = 已打开 → 跳过 `open -a`;报
   `Unable to determine the target project` = 未打开 → `open -a` 打开。MCP 关闭时会用一次短探测并立即给出设置提示。
   项目刚打开时的短暂"项目未就绪"由工具失败分类兜底(「IDE 在、但项目没打开」→ 重新打开并让模型重试)。
+- **项目路径按 IDE 的写法归一化**:IDE 收的是系统无关形式(正斜杠),其自带配置示例在 Windows 上也是
+  `"E:/gitea/secondev-demo"`。OpenCode 的 `location` 在 Windows 上是原生反斜杠,所以 `src/mcp/idea.js` 的
+  `ideProjectPath()` 把它转成正斜杠,**注册与探测走同一个函数**,两者必须一致,否则会用一种写法注册、又用另一种
+  写法去问,永远匹配不上。macOS 上是原样透传。
 - IDE **2026.2+** 提供 Streamable HTTP 端点 `/stream`,这是插件**唯一**使用的传输(`type: "remote"`)。注册本身不启动任何子进程,
   所以没有"桥进程被 IDE 拖死后变成僵尸"这一类问题。`/open-in-idea` 仍要求 IDE MCP 已在监听(冷启动约数十秒),因此会先等就绪再注册。
 - **空闲驱逐(已实测)**:OpenCode 把一个 Location 的服务缓存在 `LayerMap` 里,`idleTimeToLive` = **60 分钟**;空闲到期即整体驱逐,
@@ -339,7 +346,9 @@ export { default } from "/Users/yutao/Projects/opencode-idea/src/index.js";
 - `/close-in-idea` 会**注销 IDE MCP** 并删标记 + 清空注入的环境。
 - 插件**完全不再检查 `.idea` 目录**:是否是 IDEA 项目只由项目标记(`/open-in-idea` 设置、`/close-in-idea` 清除)决定。
   (`/open-in-idea` 会让 IDEA 打开并导入该项目,`.idea` 由 IDEA 自己生成,插件无需也不应据此判断。)
-- 打开 IDE 仅实现 macOS (`open -a`);首次打开若弹 Trust 对话框,需确认后重试。
+- **自动拉起 IDE 仅实现 macOS** (`open -a`)。其他平台(包括 Windows)没有对应的启动命令,**请手动打开 IDE 和项目**,再执行
+  `/open-in-idea` —— 端口在监听就会正常接入,其余能力(注册、探测、自愈、工具暴露)与 macOS 完全一致。
+  IDE 里打开 MCP 服务(2026.2+)并启用 Brave Mode;首次打开若弹 Trust 对话框,需确认后重试。
 - IDE MCP 没有「打开项目」工具,因此打开动作走 OS/CLI,而非 MCP。
 - 插件热重载会断开 IDE 连接,需重跑 `/open-in-idea`。
 - 插件不修改任何工具的定义、描述或可用性;IDE MCP 工具以 `idea_*` 直接暴露给模型 (`codemode: false`),不用 `execute` 包裹。

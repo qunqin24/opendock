@@ -14,14 +14,16 @@ are the ones that matter right now — refreshed before you start a query.
 
 ```
 Usage limits
-OpenCode Go                     updated just now
-5h    ━━━━━━━━━ 78%             · resets 55m
-Week  ━━━━ 37%                  · resets 2d 2h
-Month ━━ 18%                    · resets 27d 15h
+OpenCode Go              updated just now
+5h      ━━━━━━━━    78%        in 55m
+Week    ━━━━        37%        in 2d 2h
+Month   ━━          18%        in 27d 15h
 ```
 
 Limit bars are colored by severity: green `<50%`, amber `50–74%`, orange `75–99%`,
 red `100%`. Credit balances show in green while the account is usable, red when not.
+Labels, bars, percentages, and reset countdowns use fixed-width columns so usage
+updates and multiple windows stay aligned. `in …` is the time until that quota resets.
 
 ## Requirements
 
@@ -56,7 +58,7 @@ git clone https://github.com/lhw/opencode-plugin-usage
 cd opencode-plugin-usage
 npm install
 npm run typecheck    # tsc --noEmit
-npm test             # parser self-checks (node, no deps)
+npm test             # parser + rendered layout checks (Node >=26.4)
 npm run build        # esbuild → dist/tui.js
 ```
 
@@ -151,7 +153,7 @@ in `src/tui.ts`.
 
 ```sh
 npm run typecheck    # tsc --noEmit
-npm test             # parser self-checks (node, no deps)
+npm test             # parser + rendered layout checks (Node >=26.4)
 npm run build        # esbuild → dist/tui.js
 npm publish          # runs typecheck + build + test first
 ```

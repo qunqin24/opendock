@@ -3,17 +3,17 @@
 [![npm version](https://img.shields.io/npm/v/opencode-guardian?color=cb3837&logo=npm&logoColor=white)](https://www.npmjs.com/package/opencode-guardian)
 [![npm downloads](https://img.shields.io/npm/dm/opencode-guardian?color=blue&logo=npm&logoColor=white)](https://www.npmjs.com/package/opencode-guardian)
 [![OpenCode: v1 & v2](https://img.shields.io/badge/OpenCode-v1%20%7C%20v2%20Dual--Mode-10b981?logo=terminal&logoColor=white)](https://opencode.ai)
-[![Live baseline: v0.6.0 4/4](https://img.shields.io/badge/Live%20Baseline-v0.6.0%204%2F4-10b981?logo=checkmarx&logoColor=white)](docs/verification-report.md)
-[![Tests: 439/439 Passing](https://img.shields.io/badge/Tests-439%2F439%20Passing-339933?logo=githubactions&logoColor=white)](docs/verification-report.md)
+[![Live Acceptance: V1 & V2 Passed](https://img.shields.io/badge/Live%20Acceptance-V1%20%26%20V2%20Passed-10b981?logo=checkmarx&logoColor=white)](docs/acceptance-v1.md)
+[![Tests: 514/514 Passing](https://img.shields.io/badge/Tests-514%2F514%20Passing-339933?logo=githubactions&logoColor=white)](docs/verification-report.md)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D22.0.0-339933?logo=nodedotjs&logoColor=white)](package.json)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178c6?logo=typescript&logoColor=white)](tsconfig.json)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-[Installation](#installation) · [Rules](#the-14-guardrail-rules) · [Configuration](#configuration-opencode-guardianjson) · [TUI Interface](#tui-sidebar-interface) · [Architecture](#architecture--turn-lifecycle) · [Verification](#verification--live-acceptance)
+[Installation](#installation) · [Rules](#the-14-guardrail-rules) · [Secret Protection](#-multi-layer-secret-protection--post-execution-redaction) · [Configuration](#configuration-opencode-guardianjson) · [TUI Interface](#tui-sidebar-interface) · [Architecture](#architecture--turn-lifecycle) · [Smart Questions Coordination](#-smart-questions-coordination-protocol) · [Verification](#verification--live-acceptance)
 
 A high-performance, deterministic quality, safety, and verification plugin for **OpenCode** AI coding agents.
 
-OpenCode Guardian continuously supervises agent turns: guiding model execution before calls, correlating tool results at session idle, intercepting recognized destructive shell actions and secret-bearing file writes, and requiring verifiable tool evidence before agents declare tasks complete.
+OpenCode Guardian continuously supervises agent turns: guiding model execution before calls, correlating tool results at session idle, intercepting recognized destructive shell actions and secret-bearing file writes, redacting sensitive tool outputs before model visibility, and requiring verifiable tool evidence before agents declare tasks complete.
 
 ---
 
@@ -21,17 +21,17 @@ OpenCode Guardian continuously supervises agent turns: guiding model execution b
 
 ![Automated and host acceptance results](docs/assets/verification-overview.svg)
 
-> The graphic combines the current **v0.6.1 automated verification** with the historical **v0.6.0 dual-host acceptance baseline**. The v0.6.1 source tree has 439/439 automated tests passing; the full V1/V2 live-host matrix below remains the last completed dual-host baseline.
+> The graphic combines the current **v0.6.8 automated verification** with the real-host acceptance runs across **OpenCode V1 (`1.18.34`)** and **OpenCode V2 (`2.0.24`)** executed on real host with `opencode-go/mimo-v2.6-flash`.
 
-Guardian **v0.6.1** is validated as follows:
+Guardian **v0.6.8** is validated as follows:
 
-- **Current Automated Verification:** **439 / 439** unit and regression tests passing.
+- **Current Automated Verification:** **521 / 521** unit, security, and regression tests passing.
 - **Sandbox Scenarios:** **18 / 18** end-to-end multi-turn agent failure and recovery scenarios verified.
 - **Static Analysis:** standard and strict TypeScript gates pass; Oxlint reports **0 warnings / 0 errors**.
 - **Dependency Security:** **0 vulnerabilities** across production and development dependency audits.
-- **Historical Dual-Host Baseline:** **4 / 4 — ACCEPTED** on real OpenCode V1 (`1.18.34`) and OpenCode V2 (`2.0.22`) for released v0.6.0. v0.6.1 adds targeted foreground-subagent handoff hardening on top of that baseline.
+- **Real Host Acceptance (V1 & V2):** Both OpenCode V1 (`1.18.34`) and OpenCode V2 (`2.0.24`) verified with real LLM agent sessions (`opencode-go/mimo-v2.6-flash`).
 
-Read the comprehensive [Verification and Acceptance Report](docs/verification-report.md) for reproduction steps, methodology, evidence boundaries, and the historical live-host matrix.
+Read the comprehensive [V1 Acceptance Report](docs/acceptance-v1.md), [V2 Acceptance Report](docs/acceptance-v2.md), and [Verification and Acceptance Report](docs/verification-report.md) for reproduction steps, methodology, and full test matrices.
 
 ---
 
@@ -44,6 +44,7 @@ Read the comprehensive [Verification and Acceptance Report](docs/verification-re
 - **Project-Scoped Audit Log:** Stores safe event codes, reasons and intervention outcomes in `<project>/.opencode/guardian-events.jsonl` with `0600` POSIX permissions, a 2 MiB limit and one rotated archive. Never stores prompt or command text.
 - **Evidence-Based Task Contracts:** Analyzes human requests across 13 languages to extract required verifications (tests, builds, source reviews) and detects premature completion claims. When the host provides a tool-after observation, SHA-256 evidence is tied to the observed file contents.
 - **Foreground Subagent Finalization Barrier:** For synchronous delegated work, Guardian owns the handoff boundary: blocking findings are remediated on the child session before the parent receives the tool result, and the parent sees the revised final child report instead of a stale first-pass report. Background subagents keep the existing idle-remediation path.
+- **Decoupled Smart Questions Coordination (`[OPENCODE_HANDOFF:v1]`):** Seamlessly bridges human decisions to Smart Questions when questions or confirmations are required. Designates `auto_select=allowed` for choices and `auto_select=forbidden` for destructive actions, while preventing redundant confirmation requests.
 - **14 Deterministic Rules:** Blocks shortcuts, empty stubs, unverified claims, masked errors, test weakening, leaked secrets, undeclared dependencies, and repetitive execution loops.
 - **Zero Configuration:** Works instantly out of the box with production-tested defaults. Fully configurable via `opencode-guardian.json`.
 - **Zero Runtime Dependencies:** Precompiled JavaScript (`dist/`) has no mandatory third-party runtime dependencies. The optional TUI utilizes the host's OpenTUI/Solid runtime.
@@ -115,7 +116,7 @@ To mount the Guardian sidebar in your OpenCode terminal:
 ### 🔽 Collapsed View (Default)
 
 ```text
-▶ Guardian                 v0.6.1
+▶ Guardian                 v0.6.8
 Status                       ● Active
 Interventions                 0w · 0r
 ```
@@ -129,7 +130,7 @@ Interventions                 0w · 0r
 Clicking the `▶ Guardian` header expands the widget:
 
 ```text
-▼ Guardian                 v0.6.1
+▼ Guardian                 v0.6.8
 Preflight                  ○ disabled
 Inspected                           0
 Blocked                             0
@@ -291,6 +292,32 @@ Standard MCP tool IDs ending in recognized shell actions (for example `mcp__prov
 
 ---
 
+## 🔐 Multi-Layer Secret Protection & Post-Execution Redaction
+
+Guardian provides an end-to-end secret protection pipeline operating across all tool outputs and model context:
+
+```text
+Guardian Pipeline
+   │
+   ├─ PRE: Command/input security & broad environment dump assessment
+   │
+   ├─ TOOL EXECUTION (Host runtime)
+   │
+   ├─ POST: Deterministic secret redaction (stdout, stderr, tool result objects, MCP)
+   │
+   └─ FINAL CONTEXT GATE: Secret-free LLM context (session messages & parts transform)
+```
+
+### What It Protects
+- **Post-Execution Output Redaction:** Any command output dumping environment variables or sensitive files (`docker exec ... env`, `printenv`, `cat .env`, `docker inspect`, container logs) has secret values deterministically replaced with `[REDACTED]`.
+- **Known Credential Formats:** OpenAI, Anthropic, GitHub (classic & fine-grained), Slack, AWS, Google, Stripe, npm, GitLab tokens.
+- **Connection Strings & Hashes:** Database URIs (`postgres://`, `mysql://`, `mongodb://`, `redis://`) have embedded passwords redacted while preserving host and database structure. Hashes (bcrypt, argon2, scrypt, sha512-crypt) and multiline PEM private key blocks are cleanly sanitized.
+- **Runtime Environment Discovery:** Discovers and registers sensitive keys and credentials active in the process environment, preventing raw values from leaking into model context even if emitted without key names.
+- **Final LLM Context Gatekeeper:** Hooks into `experimental.chat.messages.transform` (v1) and `session.hook("context")` (v2) to guarantee raw sensitive values never enter the prompt or turn history fed to the model.
+- **Safe Keys Untouched:** Preserves standard system environment variables (`PATH`, `HOME`, `PORT`, `NODE_ENV`, `USER`, `SHELL`, `PWD`, etc.).
+
+---
+
 ## 📈 Telemetry & CLI Status
 
 Guardian maintains a private, redacted log of local events:
@@ -355,9 +382,64 @@ flowchart TD
     Outcome -->|Evidence insufficient| Unverified[remediation-unverified]
 ```
 
-The diagram illustrates the v0.6.1 dual-mode runtime. Strict preflight is **opt-in** and evaluates recognized or configured tools; an out-of-scope tool is still governed by host permissions. Tool-after observations and SHA-256 file snapshots are captured **when the host supplies supported evidence**. After a remediation, only supported, observable follow-up evidence can establish `remediation-verified`.
+The diagram illustrates the v0.6.8 dual-mode runtime. Strict preflight is **opt-in** and evaluates recognized or configured tools; an out-of-scope tool is still governed by host permissions. Tool-after observations and SHA-256 file snapshots are captured **when the host supplies supported evidence**. After a remediation, only supported, observable follow-up evidence can establish `remediation-verified`.
 
-For foreground delegated work (`task` on V1, `subagent` on V2), v0.6.1 adds a bounded handoff barrier. Child-session findings are inspected before the parent tool result settles; if remediation is required, Guardian resumes the child, waits for the remediation turn to finish, re-inspects it, and replaces the parent-facing tool result with the latest child report. The barrier is limited to foreground delegation and does not convert background subagents into blocking handoffs.
+For delegated subagent work (`task` on V1, `subagent` on V2), v0.6.8 enforces capability-aware remediation isolation. Read-only subagents (reviewers, oracles, explorers) do not receive synthetic remediation and never enter redundant review loops upon completing their findings; write-allowed subagents (fixers, editors) retain bounded remediation support with controlled retries. The barrier is limited to foreground delegation and does not convert background subagents into blocking handoffs.
+
+---
+
+## 🤝 Smart Questions Coordination Protocol
+
+> [!NOTE]
+> Guardian and Smart Questions are **completely standalone plugins** that operate independently with zero required package dependencies. When installed together in the same OpenCode environment, they optionally coordinate through this decoupled, versioned protocol (`[OPENCODE_HANDOFF:v1]`).
+
+OpenCode Guardian coordinates with **[OpenCode Smart Questions](https://github.com/huseyincig/opencode-smart-questions)** through an independent, versioned protocol block (`[OPENCODE_HANDOFF:v1]`) without requiring direct package dependencies:
+
+```text
+[opencode-guardian remediation]
+
+[OPENCODE_HANDOFF:v1]
+source=guardian
+action=question_required
+kind=choice
+auto_select=allowed
+handoff_id=gq_c47f9a12b0
+
+Please ask the user which deployment strategy is preferred.
+```
+
+### Deterministic Handoff Architecture:
+
+- **Legitimate Choices (`kind=choice / auto_select=allowed`):** When technical decisions legitimately require user selection (e.g. strategy choices, architecture alternatives), Guardian emits a choice handoff. Smart Questions presents native forms with recommended options and auto-selects after a safe countdown if uninterrupted.
+- **Destructive Confirmations (`kind=approval / auto_select=forbidden`):** Irreversible or high-risk actions (e.g. database drops, production deletions) emit an approval handoff with `auto_select=forbidden`. Smart Questions strictly suppresses auto-reply and countdown, requiring mandatory human confirmation.
+- **Redundant Question Prevention:** When the user already gave explicit direction (governed by `task/instruction-fidelity`), Guardian blocks unnecessary confirmation questions and withholds handoffs entirely.
+- **Host Provenance & Anti-Spoofing:** All handoffs require trusted Guardian provenance metadata (`metadata["opencode-guardian"] === true`). Unauthenticated user prompt text cannot forge handoffs.
+- **TTL & Turn Binding:** Active handoffs expire after 120 seconds, reset cleanly on new human turns, and cannot be reused after consumption.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant U as User / Agent
+    participant G as Guardian
+    participant SQ as Smart Questions
+    participant Host as OpenCode Host
+
+    U->>G: Agent turn evaluates blocking rule
+    alt Genuine Choice Required
+        G->>Host: Remediation + [OPENCODE_HANDOFF:v1] (auto_select=allowed)
+        Host->>SQ: Trusted handoff received
+        U->>Host: Native question with [SQ:recommended]
+        SQ->>Host: Countdown & auto-selects recommended option
+    else Destructive / Sensitive Action
+        G->>Host: Remediation + [OPENCODE_HANDOFF:v1] (auto_select=forbidden)
+        Host->>SQ: Trusted approval handoff received
+        U->>Host: Native question with choices
+        Note over SQ,Host: Auto-reply strictly disabled - user must click manually
+    else Work Already Authorized
+        G->>Host: Instruction fidelity blocks - no handoff generated
+        U->>Host: Agent directly continues authorized work
+    end
+```
 
 ---
 

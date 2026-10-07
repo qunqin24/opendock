@@ -166,7 +166,30 @@ Memories are kept as what they are: a title, a body of sentences that were actua
 shibaox-mem ui
 ```
 
-Opens a local page over your memories: every project with its counts, memories newest first or by the same search the agent uses, each in full with its files and the prompt it came from. Archive what you do not want shown; bring it back when you do. It listens on the loopback only, behind a token in the URL, loads nothing from the network, and stops itself after half an hour without you.
+Opens a local page over your memories: every project with its counts, memories newest first or by the same search the agent uses, each in full with its files and the turn it came from. Press ⌘K for a command palette that searches every project at once. Edit a title, a body, a kind or an importance when the judge got it wrong; archive what you do not want shown and bring it back when you do. The **Turns** tab shows what each session did (prompt, answer, files, commands, errors) and which memories it left behind; **Overview** is the project's dashboard: what is stored, by kind and importance, eight weeks of activity, how fast the hooks have been. **Settings** is where the product is configured (below). Light and dark, keyboard first (`/`, ↑ ↓, Esc). It listens on the loopback only, behind a token in the URL, loads nothing from the network, and stops itself after half an hour without you or a tab.
+
+It opens by itself when a session starts, in any agent — one viewer per machine, reused by every session, never a second tab — and stays closed under CI, over SSH, or when you turn that off.
+
+## Settings
+
+Everything is in one file, `~/.shibaox/mem/env`, readable by you only, edited from the viewer's **Settings** tab or by hand. A variable set in the environment always wins over the file.
+
+| Key | What it does | Default |
+|---|---|---|
+| `TYPESAFE_API_KEY` | Turns on the TypeSafe judge | — |
+| `SHIBAOX_MEM_TYPESAFE` | `off` keeps the key but lets the rules judge alone | `on` |
+| `SHIBAOX_MEM_RETENTION_DAYS` | How long `compact` keeps finished turns no memory came from | `90` |
+| `SHIBAOX_MEM_UI_AUTO_OPEN` | Open the viewer when a session starts | `on` |
+| `SHIBAOX_MEM_STORE_DIR` | Where the database lives, when it was moved to another disk (set by **Storage**, not by hand) | the data directory |
+| `SHIBAOX_MEM_BACKUP_TO` | Where backups go: a folder, or `s3://bucket/prefix` | — |
+| `SHIBAOX_MEM_BACKUP_EVERY_HOURS` | Hours between backups; `0` means only on demand | `24` |
+| `SHIBAOX_MEM_BACKUP_KEEP` | How many backups to keep | `10` |
+| `SHIBAOX_MEM_BACKUP_S3_ENDPOINT` · `_REGION` · `_ACCESS_KEY` · `_SECRET_KEY` | The bucket's credentials (AWS, R2, MinIO, B2) | — |
+
+The tab also shows what `doctor` sees for every agent, runs `compact` with a preview first, and holds two things no file can:
+
+- **Storage.** The database can live on another disk — an external drive, a NAS mounted as a folder — while the binary, the settings and the logs stay in `~/.shibaox/mem`, so the plugins never notice. Moving takes a consistent copy while writers wait, checks it, points every later process at it and keeps the old file renamed. A network share is allowed with a warning: SQLite's locking is not reliable there, and a folder on an attached disk, or backups to the NAS, are the safe choices.
+- **Backups.** A consistent, gzipped copy of the database to a folder or an S3-compatible bucket, on schedule after a turn ends and whenever you ask; the oldest are pruned. Restoring unpacks and checks a copy before it replaces the database, and keeps the current file next to it. Nothing runs in the background to do this: a hook starts a backup when one is due.
 
 ## Commands
 
@@ -178,6 +201,7 @@ The binary is at `~/.shibaox/mem/bin/shibaox-mem`; put that directory on your `P
 | `shibaox-mem doctor` | Checks the installation — database, search, queue, speed, judge, every agent — and says what to do about anything wrong |
 | `shibaox-mem ui` | The viewer |
 | `shibaox-mem compact` | Removes old records no memory depends on and gives the space back; never deletes memories |
+| `shibaox-mem backup` · `--list` · `--restore <name>` | A copy to the configured folder or bucket, now; what is there; one of them back in place |
 | `shibaox-mem import claude-mem` | Brings memories over from claude-mem |
 | `shibaox-mem rejudge` | Asks TypeSafe to judge imported memories properly |
 | `shibaox-mem install <agent>` · `uninstall <agent>` | The direct install, for agents without a plugin system |
@@ -186,7 +210,7 @@ The binary is at `~/.shibaox/mem/bin/shibaox-mem`; put that directory on your `P
 
 Without a key, the rules judge every turn and nothing ever leaves your machine. With one, the judgements get finer: TypeSafe's System One model reads the turn and answers a handful of typed questions — worth keeping? which kind? how important? which sentences stand on their own? — in about a quarter of a second, in the background, for about $0.00006 a turn.
 
-Put the key in `~/.shibaox/mem/env`:
+Paste the key in the viewer's **Settings** (it is kept in `~/.shibaox/mem/env`, readable by you only), or write it there yourself:
 
 ```
 TYPESAFE_API_KEY=…
@@ -197,7 +221,7 @@ What is sent is the text of the turn being judged, and only that. If the service
 ## Privacy and your data
 
 - **Redaction before storage.** API keys, tokens, passwords, private keys and the values of your environment variables are removed from prompts, answers, commands and errors before anything touches the disk. Text inside `<private>…</private>` is never stored.
-- **One file, yours.** `~/.shibaox/mem/shibaox-mem.db`, SQLite in WAL mode. Copy it, back it up, delete it. `SHIBAOX_HOME` moves the whole `~/.shibaox`; `SHIBAOX_MEM_DATA_DIR` moves only this product's data.
+- **One file, yours.** `~/.shibaox/mem/shibaox-mem.db`, SQLite in WAL mode. Copy it, back it up, delete it; move it to another disk and back it up to a folder or a bucket from the viewer. `SHIBAOX_HOME` moves the whole `~/.shibaox`; `SHIBAOX_MEM_DATA_DIR` moves only this product's data.
 - **No telemetry, no account, no network** — except the TypeSafe requests you opt into, and the one download of the binary.
 - **A project is a repository.** Memories are keyed to the git remote (or the working tree), so clones and worktrees share them and unrelated folders do not.
 - **Removable.** `shibaox-mem uninstall <agent>` restores each configuration file it touched; uninstalling the plugin removes the plugin. Delete `~/.shibaox/mem` to delete everything.
@@ -222,13 +246,13 @@ The importer can only map claude-mem's types onto ours and give every memory of 
 | OpenCode | npm plugin | the plugin API | the system prompt | verified up to the prompt |
 | Cursor | plugin | hooks | session start | from the documentation; not yet run |
 
-"As documented" means the adapter follows the agent's published hook contract and has not yet been exercised in a live session on that event; the [decision records](docs/adr/0006-m3-multi-agente.md) say exactly what was captured and what was not.
+"As documented" means the adapter follows the agent's published hook contract and has not yet been exercised in a live session on that event; the [decision records](docs/adr/0006-m3-multi-agent.md) say exactly what was captured and what was not.
 
 ## Development
 
 ```sh
 bun install
-bun run check      # typecheck, lint and 900+ tests, including end-to-end runs of the compiled binary
+bun run check      # typecheck, lint and 980+ tests, including end-to-end runs of the compiled binary
 bun run build      # the five release binaries, in dist/
 bun run plugins    # regenerates what each agent installs, from one definition
 ```

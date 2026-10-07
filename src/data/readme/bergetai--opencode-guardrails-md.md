@@ -213,13 +213,61 @@ difference matters:
   `guardrails.md` is agent-editable between sessions — a file line must not
   be able to switch the backstop off.
 
+## Protected files
+
+Some files are not judged, they are simply out of the agent's reach. The
+edit, write and patch tools refuse to touch a list of paths, relative to the
+project root (an entry ending in `/` protects everything below it; no
+globs):
+
+```
+guardrails.md
+.agents/guardrails.md
+.opencode/guardrails.md
+.pi/guardrails.md
+.claude/guardrails.md
+opencode.json
+opencode.jsonc
+.opencode/
+.pi/
+.claude/settings.json
+.claude/settings.local.json
+.github/workflows/
+```
+
+While the gate is on, the refusal is deterministic — no model call, no
+threshold, no cooldown, and retrying costs nothing — and the message tells the agent whose file this is:
+
+```
+SystemOne-gate: protected file — guardrails.md
+  Policy and harness configuration are edited by your human, not the agent.
+  Ask them to make the change and restart opencode.
+```
+
+Why this list: the gate freezes `guardrails.md` at session start, but a
+session that could rewrite it with the Edit tool could rule the *next*
+session under its own rules — the same self-approval hole as the removed
+allow-file. `.opencode/` and `.pi/` hold the gate's own plugin and extension
+files; `.claude/settings*.json` can disable the plugin (the rest of
+`.claude/` — CLAUDE.md, skills, rules — is content an agent legitimately
+edits); `.github/workflows/` is what runs your CI. Symlinks are resolved in
+every harness, so a link that lands on a protected file is protected under
+its own name too. Matching ignores case on every platform, so
+`Guardrails.MD` is protected as well.
+
+The list guards the file-editing tools, not bash: `echo >> guardrails.md` is
+not matched against the list — it goes to the decision model like every
+other command, subject to its judgement and your `guardrails.md`.
+
 ## Overriding a block
 
 The agent cannot disable the gate or un-block a command by retrying, and
-there is no override file it could write. The one agent-reachable influence
-left is the repo's `guardrails.md` itself — the gate reads it once at
-session start, but an agent with edit access could still weaken its rules
-for the *next* session. Treat `guardrails.md` changes as code review, and
+there is no override file it could write. The agent-reachable influence left
+is narrow: the repo's `guardrails.md` itself is frozen for the running
+session, and the edit tools refuse to touch it (and the other protected
+paths) at all — see [Protected files](#protected-files). A rewrite can still
+be attempted through bash, where it goes to the decision model like every
+other command. Treat `guardrails.md` changes as code review, and
 unattended agents should treat the file as untrusted input. Your overrides:
 
 - **Once:** restart the harness with `SYSTEMONE_GATE=off` and redo the step.
@@ -242,9 +290,10 @@ credentials, sandboxes and human review still matter.
 
 ## What it doesn't do
 
-- It gates bash commands only. File edits and other tool calls pass
-  through. Every argument that points to an existing file is read and
-  judged together with the command — whatever tool would run it
+- It gates bash commands only. Other tool calls pass through, except that
+  the file-editing tools refuse to touch [protected
+  paths](#protected-files). Every argument that points to an existing file
+  is read and judged together with the command — whatever tool would run it
   (`bash x.sh`, `perl x.pl`, `dotnet x.csx`, `awk -f x.awk`, a data
   file passed to anything). This closes the write-then-run bypass
   where an agent writes logic with the ungated edit tools and executes
@@ -364,13 +413,14 @@ either. What differs is where the gate looks.
 
 | | opencode | pi | Claude Code |
 |---|---|---|---|
-| Hook | `tool.execute.before`, bash only | `tool_call`, bash only, including calls a codemode script makes | hooks module: `tool.call` on `Bash` and on `Monitor` when it runs a `command`; `session.start` freezes the policy and the environment |
+| Hook | `tool.execute.before`: bash judged; `edit`, `write` and `apply_patch` checked against the protected paths | `tool_call`, including calls a codemode script makes: bash judged; `edit` and `write` checked against the protected paths | hooks module: `tool.call` on `Bash` and on `Monitor` when it runs a `command`; `Edit`, `Write` and `NotebookEdit` checked against the protected paths; `session.start` freezes the policy, the root and the environment |
 | On block | throws; the agent reads the message | returns `{ block, reason }` to the agent and shows a warning to you (on stderr in `pi -p`) | answers `{ deny }`; Claude reads the reason |
 | Without a credential | inactive; one log line with `SYSTEMONE_LOG=1` | inactive; warns you once per session (on stderr in `pi -p`) | inactive; a toast warns you at session start |
 | Seat token | `$XDG_DATA_HOME/opencode/auth.json` (default `~/.local/share`) | pi's Berget login, OAuth or API key, resolved by pi itself; then the OAuth entry in `$PI_CODING_AGENT_DIR/auth.json` (default `~/.pi/agent`) | none — `BERGET_API_KEY` (or `TYPESAFE_API_KEY`) only |
 | Policy file | `guardrails.md`, then `.opencode/guardrails.md` | `guardrails.md`, then `.pi/guardrails.md` | `guardrails.md`, then `.claude/guardrails.md` |
 | Policy read from | the project directory opencode passes the plugin | the directory pi was started in | the session's directory, frozen at `session.start` |
 | Audit log | `~/.cache/opencode/systemone-gate.log` | `~/.cache/pi/systemone-gate.log` | not supported (`$.fs` cannot append) |
+| Protected files | `edit`, `write`, `apply_patch` refuse protected paths; a block throws | `edit` and `write` refuse protected paths; a block returns `{ block, reason }` and warns you | `Edit`, `Write` and `NotebookEdit` refuse protected paths; the module answers `{ deny }`. Symlinks are resolved in all three |
 
 In pi, `/reload` counts as a restart: it re-reads `guardrails.md` and resets
 the cooldown. pi's `powershell` tool is not gated; if a repo enables it in
@@ -399,7 +449,9 @@ a new session.
 `Bash` is gated, and so is `Monitor` when it runs a shell `command` (a
 Monitor watching a WebSocket runs nothing and passes). `PowerShell` is not
 gated, mirroring pi's decision: on Windows without Git Bash, where Claude
-Code registers only PowerShell, the gate never fires.
+Code registers only PowerShell, the gate never fires. `Edit`, `Write` and
+`NotebookEdit` are not judged, but refuse writes to the [protected
+paths](#protected-files).
 
 To test the module, run `npm run test:claude`. It copies the plugin to a
 temp folder and runs `claude plugin test` there, because that command

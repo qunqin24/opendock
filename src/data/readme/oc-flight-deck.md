@@ -5,13 +5,20 @@
 **Live session telemetry for your OpenCode terminal.**
 *The numbers where you're already looking — because your agent is spending money right now.*
 
-![npm](https://img.shields.io/npm/v/oc-flight-deck) ![license](https://img.shields.io/badge/license-MIT-blue) ![node](https://img.shields.io/badge/node-%E2%89%A522-green) ![downloads](https://img.shields.io/npm/dm/oc-flight-deck) ![check](https://img.shields.io/github/actions/workflow/status/nathwn12/oc-flight-deck/check.yml)
+[![npm version](https://img.shields.io/npm/v/oc-flight-deck)](https://www.npmjs.com/package/oc-flight-deck) [![license: MIT](https://img.shields.io/badge/license-MIT-blue)](./LICENSE) [![node >=22](https://img.shields.io/badge/node-%E2%89%A522-green)](https://nodejs.org) [![opencode v2](https://img.shields.io/badge/opencode-v2-blueviolet)](https://opencode.ai) [![npm weekly downloads](https://img.shields.io/npm/dw/oc-flight-deck)](https://www.npmjs.com/package/oc-flight-deck) [![CI](https://github.com/nathwn12/oc-flight-deck/actions/workflows/check.yml/badge.svg)](https://github.com/nathwn12/oc-flight-deck/actions/workflows/check.yml)
 
 </div>
 
 ---
 
 ## ⚡ Quick start
+
+```text
+Install the oc-flight-deck OpenCode plugin:
+1. Add "oc-flight-deck" to the "plugins" array in ~/.config/opencode/opencode.jsonc.
+2. Restart OpenCode.
+3. Verify: the panel appears beside an open session.
+```
 
 Add the plugin to your `opencode.jsonc`:
 
@@ -74,9 +81,7 @@ Every field named in `sidebar.rows` renders exactly one row, in order. With `sid
 
 The `guard` row only appears when oc-harness-guard is installed and answering; without it the row stays on the placeholder. Flight Deck never installs or requires the other plugin — each side works alone.
 
----
-
-## 🚨 `caution` — calibrated, not guessed
+### 🚨 `caution` — calibrated, not guessed
 
 A hang emits no events — its only signature is *absence*. So `caution` watches a clock, stays silent on healthy sessions, and when it speaks it reports what it saw, never what it means: `shell running 8m41s`, not "stuck".
 
@@ -155,7 +160,9 @@ Everything else lives in the example file, documented inline - a typo is never f
 
 ---
 
-## 🔒 It reads. It writes almost nothing.
+## 🔒 Safety
+
+**It reads. It writes almost nothing.**
 
 Flight Deck shows what OpenCode already knows.
 
@@ -208,6 +215,12 @@ Built on the official [OpenCode V2 CLI plugin API](https://opencode.ai/v2/docs/b
 | Host | OpenCode V2 (`opencode2`) |
 | Building from source | Node ≥ 22 or Bun ≥ 1.4 |
 | Writes | In-memory counters only — the animation tick, plus the `guard` row's polled status when `guard` is on; with the opt-in `ses` row, a click copies the id to the terminal clipboard (never automatic); nothing to disk |
+
+---
+
+## 📄 License
+
+MIT © 2026 nathwn12 — see [LICENSE](./LICENSE).
 
 ---
 

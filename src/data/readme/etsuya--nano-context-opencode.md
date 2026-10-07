@@ -58,13 +58,23 @@ at a TUI module makes the server fail to load the plugin.
 
 Then restart OpenCode, or run `opencode reload`.
 
-The package ships TypeScript source rather than a build, so there is no build
-step: OpenCode runs on Bun, which executes it directly.
+The published package ships precompiled JavaScript under `dist/` rather than
+building at install time. OpenCode only runs its Solid JSX transform on plugin
+files outside `node_modules`, so a git/npm install of raw `.tsx` would compile
+with Bun's default JSX and every reactive expression in the meter would freeze
+at its initial value. Runtime imports stay bare and OpenCode rewrites them to
+its own modules.
 
 ### Installing from a checkout
 
-`package` may also be a **directory**, which is what you want while working on the
-plugin itself — edits to the source take effect on reload, with no build:
+`package` may also be a **directory**, which is what you want while working on
+the plugin itself. The terminal entry re-exports `dist/tui.js`, so after
+editing `src/` run the compile step before reloading:
+
+```sh
+npm install
+npm run compile
+```
 
 ```jsonc
 {

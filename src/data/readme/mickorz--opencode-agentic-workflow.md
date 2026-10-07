@@ -78,6 +78,31 @@ journal 记录每一步，崩溃后 resume 按精确版本解析定义、跳过�
 
 **前置**：OpenCode V2（`opencode` CLI 可用且有能正常对话的模型）、Node.js 20+、git。
 
+### 方式一：安装器（推荐）
+
+```bash
+# 交互式（安装方式 / 模型 / journal / skills 逐项确认，配置合并保留注释、自动 .bak）
+npx @mickorz/opencode-agentic-workflow install
+
+# 无头（flags 指齐 + --yes，零交互——适合脚本 / CI）
+npx @mickorz/opencode-agentic-workflow install --project --model glm/glm-5.3-flash --yes
+```
+
+三种方式：`--global`（`~/.config/opencode/opencode.json`，全项目生效）、
+`--project`（当前项目 `opencode.json`，推荐）、`--locked`（npm 装进
+`node_modules` + 配置指本地路径，适合团队协作；skills 零拷贝）。
+生成的 options 最小可用集：`model` + `agent: "build"` +
+`journalDir: ".agentic-workflow/journal"`（`--no-journal` / `--no-skills`
+可关）。skills 拷贝进原生扫描目录（`.opencode/skills/` 或
+`~/.config/opencode/skills/`）。
+
+配套命令：`update`（locked 走 `npm update`；其余清宿主插件缓存，重启后
+拉最新）、`uninstall`（与安装对称：条目清空连键删、空壳配置整文件删、
+locked 无条件 `npm uninstall`；skill 目录与 journal 属用户数据，交互确认
+或打印手动清理命令）、`doctor`（只读排查 `[OK]/[WARN]/[FAIL]` 清单）。
+
+### 方式二：手改配置
+
 ```jsonc
 // 1. 在你的项目里配置插件（<你的项目>/opencode.json）
 //    package 用 npm 包名；model 换成你的 providerID/modelId
@@ -410,14 +435,36 @@ args 预览 / 每步骤的输出或错误预览（折行 + 截断）/ 步骤与�
 一次，终态转换再拉一次收尾）；未配置 `journalDir` 时详情区静默缺省，
 面板其余不受影响。
 
+### Open Session 回放
+
+每个 agent 调用实际发生在宿主子会话里（挂在主会话下，TUI 会话列表可导航）。
+v1 的「打开会话」在 v2 的对位实现：executor 把子会话 ID 透传到
+`agent.completed` 事件，journal 按步骤聚合成 `sessionIDs`（pipeline/race 步
+是多会话，按发生顺序累积；reopen 重跑会清掉旧清单）。面板据此自动回放
+**最新 run 最后一个带会话的步骤**的完整对话：
+
+```
+── session
+fanout · ses_8b1f…
+  ❯ 针对条目「回放甲」写一句结论…
+  · 回放甲：并发回放链路通畅。
+  ❯ 针对条目「回放乙」写一句结论…
+  · 回放乙：会话 ID 已贯通落盘。
+```
+
+回放经同一 RPC 的 `session` 方法拉取（`{runId, step, index?}`——index 选
+pipeline 步的第几个会话，缺省最后一个；消息取 user/assistant 文本，单条
+预览 800 字、至多 50 条）。任意步骤的会话都可经该 RPC 取回，不限于面板
+自动选择的那一个。
+
 数据链路：RunJournal 状态转换 → `run.progress` 事件总线 → ProgressBoard（容量 20，
 journalDir 配置时用历史 run 做种子）→ `agentic-workflow-progress` RPC。headless
 （`opencode run`）下没有 TUI 监听，转发零成本；同一份事件流也会写进 traceDir
 （`events.jsonl`），可作为无头观测替代。
 
 注意：面板渲染属交互式 TUI 行为，需在真实 TUI 里人工确认（本仓库自动化覆盖到
-server 侧链路：事件发射、board 维护、RPC 契约（snapshot/detail）均有测试与 E2E
-证据；详情渲染函数对真实 journal 的输出有 E2E 快照）。
+server 侧链路：事件发射、board 维护、RPC 契约（snapshot/detail/session）均有
+测试与 E2E 证据；journal 落盘 sessionIDs 有真机 E2E 断言）。
 
 ## 嵌套工作流（subflow）
 

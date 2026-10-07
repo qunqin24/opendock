@@ -16,21 +16,21 @@
 
 ## 核心能力
 
-插件通过 OpenCode 的 `config` hook 在运行时注入以下能力（不向项目 `.opencode/` 目录写入文件）：
+插件面向 OpenCode V2，在运行时注册以下能力（不向项目 `.opencode/` 目录写入文件）：
 
-- **commands**（12 个）：`/opsx-propose`、`/opsx-explore`、`/opsx-apply`、`/opsx-archive`、`/opsx-new-change`、`/opsx-continue-change`、`/opsx-ff-change`、`/opsx-update-change`、`/opsx-sync-specs`、`/opsx-verify-change`、`/opsx-bulk-archive`、`/opsx-onboard`
-- **skills**（12 个）：`openspec-propose`、`openspec-explore`、`openspec-apply`、`openspec-archive` 及 8 个扩展技能（new-change / continue-change / ff-change / update-change / verify-change / sync-specs / bulk-archive-change / onboard）
+- **commands**（12 个核心命令，支持 6 个标准简写别名）：`/opsx-propose`、`/opsx-explore`、`/opsx-apply`、`/opsx-archive`，以及标准简写 `/opsx-new`、`/opsx-continue`、`/opsx-ff`、`/opsx-update`、`/opsx-sync`、`/opsx-verify`（同时完全兼容原 `/opsx-*-change` 命名）
+- **skills**（12 个核心技能，支持上游标准别名）：`openspec-propose`、`openspec-explore`、`openspec-apply`（及 `openspec-apply-change`）、`openspec-archive`（及 `openspec-archive-change`）及 8 个扩展技能
 
 每个 skill 内置 JavaScript 参考脚本，替代外部 openspec CLI。
 
 ## 安装
 
-在项目根目录的 `opencode.json` 中加入：
+需要 OpenCode V2。在项目根目录的 `opencode.json` 中加入：
 
 ```json
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugin": ["@devcxl/opencode-spec"]
+  "plugins": ["@devcxl/opencode-spec"]
 }
 ```
 
@@ -38,13 +38,13 @@
 
 ## 配置
 
-OpenSpec 默认输出到项目根下的 `openspec/` 目录。如需自定义，使用 plugin 元组格式传入 `directory` 选项：
+OpenSpec 默认输出到项目根下的 `openspec/` 目录。如需自定义，通过 V2 的插件选项传入 `directory`：
 
 ```json
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugin": [
-    ["@devcxl/opencode-spec", { "directory": "docs" }]
+  "plugins": [
+    { "package": "@devcxl/opencode-spec", "options": { "directory": "docs" } }
   ]
 }
 ```
@@ -69,23 +69,23 @@ explore（可选，随时使用）
 
 **扩展命令**
 
-| 命令 | Skill | 功能 |
-|------|-------|------|
-| `/opsx-new-change` | `openspec-new-change` | 启动新变更，逐步创建 artifact |
-| `/opsx-continue-change` | `openspec-continue-change` | 继续创建下一个 artifact |
-| `/opsx-ff-change` | `openspec-ff-change` | 快速生成全部 planning artifacts |
-| `/opsx-update-change` | `openspec-update-change` | 更新 planning artifacts 并保持一致性 |
-| `/opsx-sync-specs` | `openspec-sync-specs` | 同步 delta specs 到 main specs |
-| `/opsx-verify-change` | `openspec-verify-change` | 验证实现与 artifact 匹配 |
-| `/opsx-bulk-archive` | `openspec-bulk-archive-change` | 批量归档多个变更 |
-| `/opsx-onboard` | `openspec-onboard` | 引导式完整工作流教学 |
+| 命令 | 别名 | Skill | 功能 |
+|------|------|-------|------|
+| `/opsx-new-change` | `/opsx-new` | `openspec-new-change` | 启动新变更，逐步创建 artifact |
+| `/opsx-continue-change` | `/opsx-continue` | `openspec-continue-change` | 继续创建下一个 artifact |
+| `/opsx-ff-change` | `/opsx-ff` | `openspec-ff-change` | 快速生成全部 planning artifacts |
+| `/opsx-update-change` | `/opsx-update` | `openspec-update-change` | 更新 planning artifacts 并保持一致性 |
+| `/opsx-sync-specs` | `/opsx-sync` | `openspec-sync-specs` | 同步 delta specs 到 main specs |
+| `/opsx-verify-change` | `/opsx-verify` | `openspec-verify-change` | 验证实现与 artifact 匹配 |
+| `/opsx-bulk-archive` | — | `openspec-bulk-archive-change` | 批量归档多个变更 |
+| `/opsx-onboard` | — | `openspec-onboard` | 引导式完整工作流教学 |
 
 ## 注入方式
 
-插件启动时通过 `config` hook 在运行时注入 commands 和 skills：
+插件启动时通过 OpenCode V2 的插件接口在运行时注册 commands 和 skills：
 
-- **commands**：直接注册到 OpenCode 的 `config.command`，无需写入项目目录即可被 `/` 触发
-- **skills**：将 `assets/skills/` 复制到系统临时目录，替换内部路径占位符后，通过 `config.skills.paths` 注册；进程退出时自动清理
+- **commands**：运行时注册，无需写入项目目录即可被 `/` 触发
+- **skills**：将 `assets/skills/` 复制到系统临时目录，替换内部路径占位符后运行时注册；插件卸载时清理
 
 ## 本地开发
 

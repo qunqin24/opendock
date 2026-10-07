@@ -707,7 +707,7 @@ Both `agents.*` and `categories.*` accept either shape:
 | Model family | ocmm behavior |
 | ------------ | ------------- |
 | Explicit user config or request | Respected as written except for review/plan-review floors: `reviewer`, Oracle review profiles (`oracle`, `oracle-high`, `oracle-2nd`, etc.), and `plan-critic` are raised to the model family's xhigh-equivalent/highest-supported review effort when possible. |
-| GPT-like non-mini built-in defaults | Built-in defaults never request below `high`; category defaults from `coding` upward resolve to `max`. GPT-5.6 supports native `reasoningEffort=max`; other GPT-like/Codex-like families use their catalog-supported maximum effort. |
+| GPT-like non-mini built-in defaults | Older GPT defaults retain the `high` floor. GPT-6.1+ Sol preserves `low`/`medium` and maps unsupported `minimal`/canonical `off` to `low`; explicit neutral `none` remains a no-op. Category defaults from `coding` upward resolve to `max`. GPT-5.6+ supports native `reasoningEffort=max`; other families use their supported maximum effort. |
 | GPT-like mini | Keeps the provider's full low-effort ladder, including `minimal`, `low`, and no-op `none` when supported. |
 | Claude Opus 4.7+ / Fable | Built-in defaults do not emit an ocmm-owned `thinking` budget or `reasoningEffort`; explicit non-review user config is passed through as written, while review/plan-review agents still receive the xhigh-equivalent floor when possible. |
 | Older Claude | Uses Anthropic `thinking` budgets for non-`none` variants. |
@@ -767,6 +767,10 @@ documenting     prose-capable lane           (none)          standalone document
 
 Rows above describe built-in selection lanes, not required provider channels or model IDs. Example model names elsewhere in the repository are references only; explicit user configuration and the currently available model catalog decide the actual model. Agent rows show source defaults or enforced review floors; category rows show the **raw source values** from `src/data/categories.ts`. At runtime the variant policy normalizes categories from `coding` upward to model-appropriate `max` unless the user explicitly overrides them; see the variant policy table above. Entries marked `(none)` carry no built-in variant and rely on this normalization.
 
+New GPT defaults use GPT-6.1 Sol for former Terra and high/xhigh Sol assignments, GPT-6 Astra for maximum-tier assignments, and GPT-6 Luna for lightweight lookup roles. Existing Astra heads remain Astra-first; GPT-5.5 and GPT-5.4 (including mini) remain compatibility fallbacks rather than new primary defaults. Runtime upgrades use only observed provider catalog keys in the declared lane: newer Astra versions such as 6.1/6.2 are eligible, but Sol, Luna, and unlabelled GPT models are not Astra successors. Provider tie order and fallback tuning are preserved.
+
+Codex generation is offline: its confirmed-model table and project `.codex/ocmm.jsonc` are build inputs, not a live release monitor. Future Codex defaults require an explicit configuration/table update and regeneration; user-selected models are never globally migrated. This checkout's local Codex config was explicitly updated to GPT-6.1 Sol while retaining its variants and existing Astra/Luna selections. Codex preserves Sol/Luna `low`/`medium` effort in the new assignments, with the existing reviewer/Oracle/plan-critic xhigh floors still enforced.
+
 The primary review structure is primary-model or primary-lane self-review through `reviewer`, plus external-model cross-checks through canonical Oracle slots (`oracle`, `oracle-2nd`, optional `oracle-3rd` ... `oracle-9th` when explicitly configured). Runtime logical tier names such as `oracle-high` and `oracle-max` are derived from configured `variants` and stay within slot 1; they are not separate slot registrations. `oracle` is the first external cross-check slot and shares implementation-review semantics via `promptSource: "reviewer"`; `oracle-2nd` is the second-priority external slot. Explicit user model configuration remains authoritative and may remove model heterogeneity. `agents.oracle-high` is a deprecated config spelling migrated to `agents.oracle-2nd` during config load so legacy config keeps working while canonical keys remain slot-based. Supporting utility agents (`builder`, `doc-search`, `code-search`, `media-reader`) still use the workflow/model-family deepwork prompt without an additional role prompt. `builder` is registered with `mode:"primary"`; `planner` is registered with `mode:"all"` so it can be selected directly and used as a delegated task agent. Each category has a prompt under `prompts/<workflow>/category/<name>.md` that is set as the category-subagent's system prompt. Callers invoke categories via `task(category="deep", ...)` or direct subagent names such as `@deep` and `@quick`. The upstream-style compatibility alias `@explore` maps to local `code-search`; `@oracle` selects the independent local `oracle` agent rather than aliasing `reviewer`.
 
 ### Category model-availability diagnostics
@@ -788,9 +792,9 @@ OpenCode sources and the independent Codex adapter are organized separately:
 ```
 prompts/
   v1/                               # OpenCode deepwork prompts
-    deepwork/{default,gpt,gpt-5.6,gemini,glm,codex,planner}.md
+    deepwork/{default,gpt,claude-opus-5,gemini,glm,codex,planner,kimi-k27,swe-2}.md
     agents/{orchestrator,reviewer,planner,clarifier,plan-critic}.md
-    category/*.md (10 files)
+    category/*.md (11 sources; 10 default categories, cross-cutting opt-in)
   codex/                            # Codex adapter sources
     deepwork/ agents/ category/
 skills/
@@ -817,7 +821,9 @@ Model-family variant selection (`pickDeepworkVariantForAgent`):
 - Codex family -> `codex.md`
 - others (Claude/Kimi/Minimax/unknown) -> `default.md`
 
-Variant is selected at config time using the final selected agent model after explicit user configuration, inherited aliases, and catalog-confirmed upgrades are considered. For built-in functional agents, ocmm composes `agents/<name>.md` with the selected `deepwork/<variant>.md`; the role prompt is authoritative for that agent's scope and the deepwork prompt supplies workflow/model calibration. Categories receive only their category prompt. No runtime keyword detection — prompts are attached declaratively.
+Variant is selected at config time using the final selected agent model after explicit user configuration, inherited aliases, and catalog-confirmed upgrades are considered. Built-in functional agents compose their authoritative `agents/<name>.md` role before subordinate workflow/model calibration. Each adapter's `deepwork/gpt.md` is the sole GPT/Codex behavioral calibration, applied once to detected GPT/Codex models, including planners and categories. Planner retains its planning doctrine; `codex.md` contains only host tool compatibility. Category roles remain authoritative, with no Astra-only inline addenda. Opus calibration remains orchestrator-only; Kimi/SWE keep their separate additive layers. Explicit prompt overrides retain priority.
+
+Codex profiles carry one guarded shared GPT layer ahead of runtime selection: GPT/Codex-family models apply it, non-GPT models ignore it without ignoring their role, planner, embedded skills, or adapter tool instructions. GPT generations share prompt behavior, not parameter capabilities: runtime model detection, native `max` support, effort translation, and review floors remain model-dependent. Generated profiles are refreshed only through the generator. Prompts are attached declaratively, not selected by conversation keywords.
 
 For OpenCode, v1 skills are injected on the first message per session via `chat.message` (queue) + `system.transform` (prepend).
 

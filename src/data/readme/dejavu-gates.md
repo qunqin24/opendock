@@ -36,7 +36,7 @@ Tests: `npm run test`
 | Harness | Install | Block (pre) | Remind NOTE (post) | Notes |
 |---|---|---|---|---|
 | **OpenCode** | npm plugin / source | ✅ | ✅ | full integration: all channels, repeat guard, compaction context |
-| **Claude Code** | `install-hooks.ts` | ✅ | ✅ | `additionalContext` annotations; hooks carry no exit codes → text detection |
+| **Claude Code** | `install-hooks.ts` | ✅ | ✅ | `additionalContext` annotations; `SessionStart` hook injects a gate digest (top enforced gates) at session start; hooks carry no exit codes → text detection |
 | **Codex CLI** | `install-hooks.ts` | ✅ | ✅ | hooks are stable and on by default; Pre/PostToolUse fire for every tool (matcher covers `Bash` + `apply_patch`); a first-run trust prompt may still apply to project hooks |
 | **Gemini CLI** | `install-hooks.ts` | ✅ | ✅ | BeforeTool/AfterTool |
 | **Cursor** | `install-hooks.ts` | ✅ | ✅ | shell events + CC-compatible events |
@@ -70,7 +70,7 @@ Design decisions (post-mortem of existing approaches):
 - **Two scopes.** Repo-specific gotchas live in `<repo>/.opencode/dejavu/` (committable); patterns seen in 2+ project dirs are agent-level habits and move to `~/.config/opencode/dejavu/`. No single store can see all projects, so a global pattern index (`index.json`) counts distinct project dirs per key and drives the escalation.
 - **Gates rot — so they expire.** 60 days without recurrence and a gate is dropped. A gate blocked 10+ times without the error going away gets `review: true` for manual inspection.
 - **The metric is recurrence-after-gate.** Tracked per gate as `recurredAfterGate` — if gates don't reduce recurrence, the whole approach is wrong and you'll see it in the data.
-- **Enforcement has negative feedback.** The metric acts: a gate that keeps failing after promotion (3+ recurrences across 2+ sessions that reoffended after a reminder) or keeps getting explicitly bypassed (3+ `dejavu:proceed` overrides across 2+ distinct sessions on a blocking gate — reminding-gate overrides are logged but not counted, and a single stubborn/injected session cannot disarm a gate) is friction, not teaching — it demotes itself to `watching` and never re-promotes mechanically (`feedbackDemoted`). A human can re-enforce by setting `status` back and clearing `feedbackDemoted` in `gates.json`; the gate then gets a fresh grace window.
+- **Enforcement has negative feedback.** The metric acts: a gate that keeps failing after promotion (3+ recurrences across 2+ sessions that reoffended after a reminder) or keeps getting explicitly bypassed (blocking: 3+ `dejavu:proceed` overrides across 2+ distinct sessions; reminding: 5 distinct bypassing sessions, no raw-count bar — bypassing a gate that never interrupts is weaker friction; a single stubborn/injected session cannot disarm a gate) is friction, not teaching — it demotes itself to `watching` and never re-promotes mechanically (`feedbackDemoted`). A human can re-enforce by setting `status` back and clearing `feedbackDemoted` in `gates.json`; the gate then gets a fresh grace window.
 - **No identity, no teeth.** A signature whose substance was entirely parameterized away (`cmd <path> <str>`, `node <str>`) matches a whole command family and can never enforce — it may only watch. Over-generic shapes degrade to evidence instead of punishing unrelated calls.
 - **Fail-open, always.** The hook CLI never wedges a host: malformed payloads, a broken store, or an internal dejavu bug produce `{}` + exit 0. stdout carries only the decision JSON; everything else goes to stderr.
 
@@ -169,7 +169,7 @@ Harness specifics:
 - **Crush**: PreToolUse only (no AfterTool upstream) — dejavu runs degraded: blocking works, reminders can't annotate; the shared store still teaches Crush from gates learned elsewhere.
 - **Devin CLI**: hooks live in `.devin/hooks.v1.json` where the file root IS the event map — the installer merges dejavu entries into it and strips them on uninstall, foreign events survive. Devin also auto-imports Claude-format hooks from `.claude/settings.json` (`read_config_from.claude`, on by default), so a Claude install already gates Devin sessions. No user-level hooks file is documented — project scope only.
 - **Kiro**: hooks are standalone files under `.kiro/hooks/`; dejavu owns `dejavu-gates.json` there. Kiro blocks on any non-zero hook exit and injects a successful hook's stdout into agent context, so the reminding NOTE rides raw on stdout and an allow writes nothing. Kiro documents no user-level hooks path — project scope only.
-- **Claude Code**: `PostToolUseFailure` is wired to the same post handler; payloads carry no exit codes, so failure detection runs on output text (the engine's text channel).
+- **Claude Code**: `PostToolUseFailure` is wired to the same post handler; payloads carry no exit codes, so failure detection runs on output text (the engine's text channel). The `SessionStart` hook injects a digest of the project's top enforced gates (blocking first, then reminding) as `additionalContext`, so the agent knows the gated calls before losing a first one to a reminder.
 
 Manual invocation (any harness with command hooks):
 
@@ -239,7 +239,7 @@ Language ecosystems covered by failure detection: JS/TS, Python, Go, Rust, Java/
 
 The store paths are historical (`.opencode/`) but the store is harness-neutral — ALL harnesses share it. Both files are human-editable. Removing a gate object disables it. Editing `correction` improves what the agent is told. Clearing `feedbackDemoted` (and setting `status` back to `blocking`/`reminding`) re-enforces a gate the agent's behavior retired — it gets a fresh grace window via `feedbackBaseline`.
 
-Project stores keep themselves out of `git status`: init writes a self-ignoring `.opencode/dejavu/.gitignore` — `gates.json` stays committable (shared repo gotchas), runtime files (log, index, locks, tmp) are ignored — and `doctor --repair` sweeps orphaned `*.tmp` files and stale `*.lock` files (`--prune-corrupt=<days>` opts into deleting quarantine artifacts past the age; default 30 days).
+Project stores keep themselves out of `git status`: init writes a self-ignoring `.opencode/dejavu/.gitignore` — `gates.json` is designed to be committable (shared repo gotchas; it carries repo-relative project paths and session ids, no absolute machine paths), runtime files (log, index, locks, tmp) are ignored — and `doctor --repair` sweeps orphaned `*.tmp` files and stale `*.lock` files (`--prune-corrupt=<days>` opts into deleting quarantine artifacts past the age; default 30 days). A root-level `.gitignore` rule for `.opencode/` overrides the nested re-include — repos that ignore `.opencode/` at the root must adjust their ignore rules to actually commit `gates.json`.
 
 ### Environment overrides
 
@@ -255,6 +255,7 @@ Project stores keep themselves out of `git status`: init writes a self-ignoring 
 | `DEJAVU_HEAL_SUCCESSES` | 3 | 1–100 | consecutive successes that retire a gate |
 | `DEJAVU_DEMOTE_RECURRENCES` | 3 | 1–100 | post-gate recurrences that demote a gate |
 | `DEJAVU_DEMOTE_OVERRIDES` | 3 | 1–100 | explicit bypasses that demote a blocking gate |
+| `DEJAVU_TAUGHT_REMINDERS` | 5 | 1–100 | reminders with zero reoffense that retire a gate as taught |
 
 ## Development
 

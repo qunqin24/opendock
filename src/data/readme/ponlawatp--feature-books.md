@@ -26,7 +26,7 @@ next run onward, and does not retranslate existing books.
   - `PostToolUse` — `fb-staleness-check` reports which feature's fence the just-edited file belongs to, so keeping Feature Books current after an edit doesn't rely on the model remembering to check
   - `Stop` (Antigravity, Claude Code, and Codex) — `fb-autobook` continues the turn if changed code isn't reflected in its owning Feature Book (stale Change Log or a new, unclaimed feature); loop-guarded, disable with `FB_AUTOBOOK=0`
 - **Scripts**: `graph-lint`, `diff-impact`, `fence-check`, `fb-init`, `fb-fix`, `fb-new`,
-  `fb-learn-pr`, `fb-claim`, `fb-autobook`, `fb-version-check`, `fb-staleness-check`,
+  `fb-learn-pr`, `fb-claim`, `fb-api-spec`, `fb-autobook`, `fb-version-check`, `fb-staleness-check`,
   `fb-tasks-list`, `fb-tasks-lint` (Node ≥ 16, no dependencies)
 
 ## Install
@@ -152,6 +152,7 @@ Ask the AI:
 - `use fb-new tool` to create a feature book
 - `use fb-impact tool` to analyze blast radius
 - `use fb-claim tool` to add a file to a feature's fence
+- `use fb-api-spec tool` to sync Yaak requests with new/changed APIs
 
 ### Claude Code
 ```bash
@@ -344,6 +345,39 @@ Task lifecycle is represented by physical folders: `issues/` (new) → `decision
 Only `issues/` → `decisions/` is automated. Hold cards require `hold_reason`, `resume_when`, and
 `held_at`; cancelled cards require `cancellation_reason` and `cancelled_at`. `fb-tasks-lint`
 validates these fields and catches folder/status drift after manual drag operations.
+
+## API specs for Yaak
+
+`/fb-api-spec` keeps a matching [Yaak](https://yaak.app) request in sync after a feature adds or
+changes an API, adapted to the project's architecture. It uses the `yaak` CLI (shared local DB with
+the desktop app); override the binary with `FB_YAAK_BIN`.
+
+The architecture lives in a **profile** at `.feature-books/api-specs/profile.json` (or
+`<portal>/api-specs/profile.json` when a workspace portal exists above the repo), created once by
+`fb-api-spec.mjs init`. Each entrypoint has a role:
+
+- `primary` - the entrypoint users/clients call. Every new API gets a request here.
+- `raw` - a direct entrypoint to one service (for example an HTTP-to-NATS bridge where the URL is
+  the message subject). Added only for services the profile exposes this way.
+
+`urlTemplate` uses a literal `{route}` placeholder (Yaak `${[ var ]}` variables stay untouched);
+`folder` may use `{module}` / `{service}` and `/` for nesting. Example for a gateway + NATS bridge:
+
+```json
+{
+  "version": 1,
+  "tool": "yaak",
+  "yaakWorkspaceId": null,
+  "entrypoints": [
+    { "id": "gateway", "kind": "http", "role": "primary", "method": "POST",
+      "urlTemplate": "${[ gateway_url ]}/api/v1/{route}", "folder": "gateway/{module}" },
+    { "id": "bridge", "kind": "http-nats", "role": "raw", "method": "POST",
+      "urlTemplate": "${[ nats_bridge_url ]}/{route}", "folder": "raw/{service}" }
+  ]
+}
+```
+
+`upsert` is idempotent (same entrypoint + method + route updates in place) and never deletes.
 
 ## Cross-repository capabilities
 
