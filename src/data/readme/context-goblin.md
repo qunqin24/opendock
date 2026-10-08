@@ -1,6 +1,6 @@
 # Context Goblin
 
-OpenCode plugin for AI coding agents that creates a compact, safe project-context cache and code map. Context Goblin helps OpenCode agents reduce repository rediscovery, lower file reads, and reuse project facts without caching secrets.
+OpenCode plugin for AI coding agents that creates a compact project-context cache and code map. Context Goblin helps OpenCode agents reduce repository rediscovery, lower file reads, and reuse project facts while excluding common sensitive paths.
 
 Useful for OpenCode plugin workflows, AI coding agents, repository context caching, token usage evidence, safe project summaries, and code-map based project understanding.
 
@@ -62,9 +62,14 @@ Cache files:
 .opencode/cache/context-goblin/usage-state.json
 ```
 
-The cache includes detected stack, package scripts, a compact directory map, a ranked source/test code map, safety exclusions, and project instructions when present. The state file also records cache statistics such as byte size, line count, section list, tracked-file count, and code-map coverage.
+The cache includes detected stack, package script names, a compact directory map, a ranked source/test code map, safety exclusions, and a note when `AGENTS.md` exists. It does not copy package script bodies, test descriptions, or `AGENTS.md` contents. The state file also records cache statistics such as byte size, line count, section list, tracked-file count, and code-map coverage.
 
 The usage state stores local numeric OpenCode token rollups only: step count, hashed session IDs for unique session counts, input/output/reasoning/cache/total tokens, and reported cost when available. It does not store prompts, responses, tool outputs, or file contents.
+
+Freshness checks track Git state and ignored source files, or source content when Git
+is unavailable. Source scans are bounded to 2,000 files and 32 MiB; if freshness
+cannot be verified within those limits, the cache is treated as stale. Cache format
+changes also trigger regeneration.
 
 ## Usage
 
@@ -92,7 +97,7 @@ If the slash command does not appear:
 
 ```txt
 1. Confirm config includes "context-goblin".
-2. Confirm npm latest is 0.1.21 or newer.
+2. Confirm npm latest is 0.1.22 or newer.
 3. Fully restart OpenCode after changing config.
 4. Check project config is not overriding global plugin config.
 ```
@@ -144,28 +149,13 @@ unique session count
 
 Important caveat: these are OpenCode event token statistics, not a guaranteed provider billing invoice. Providers may omit fields, report `cost: 0`, or account for cached/reasoning tokens differently.
 
-## Recommended Agent Flow
-
-Before broad repository discovery, ask the agent to use Context Goblin in this order:
-
-```txt
-1. context_goblin_status
-2. if missing or stale: context_goblin_refresh
-3. context_goblin_read
-4. context_goblin_stats
-5. briefly summarize cache freshness, size, tracked files, and code-map coverage
-6. inspect only task-specific files whose implementation details are still missing
-```
-
-Reusable agent instruction:
-
-```txt
-Before broad repository discovery, use Context Goblin. Call context_goblin_status, refresh if missing or stale, read the cache, then call context_goblin_stats and briefly mention cache freshness, size, tracked files, and code-map coverage. Use the cache to avoid broad scans and read only task-specific files that are still needed.
-```
-
 ## Safety
 
-Context Goblin must not cache secrets, dependency folders, generated output, or cache internals.
+Context Goblin excludes known sensitive paths, resolves source links before reading,
+and avoids copying free-form instructions, test descriptions, and package script
+bodies into the cache. These protections reduce exposure but cannot recognize every
+possible secret in filenames, import paths, or source identifiers. Review generated
+cache content before sharing it outside your machine.
 
 Default exclusions include:
 
@@ -205,7 +195,7 @@ npm run check:tokens
 ### How results are judged
 
 - **Compatibility `pass`** means both arms completed, Context Goblin used the required
-  tools correctly, answer quality met the benchmark, the cache stayed within its size
+  tools correctly, both answers met the benchmark checklist, the cache stayed within its size
   limit, and no secret leakage was detected.
 - **Overall efficiency `pass`** means all three measured efficiency signals improved:
   direct file reads, uncached input tokens, and total event tokens.
@@ -215,6 +205,9 @@ npm run check:tokens
   flat or unavailable on at least one signal.
 - We do not claim guaranteed token savings from one-shot results. Repeatable savings
   require a completed multi-run stability benchmark.
+- The `6/6` score measures coverage of six answer topics. It does not independently
+  prove the implementation plan is correct; the detailed reports include both answers
+  for review.
 
 Run the current coding-model comparison:
 
@@ -240,18 +233,31 @@ accounting; the general report emphasizes completion and quality. Each arm denie
 `task`, `bash`, and `edit`, and the Goblin arm uses the single low-overhead
 `context_goblin_get` call before focused reads.
 
-Latest comparison on OpenCode `1.18.20` with Context Goblin `0.1.21`:
+Each OpenCode invocation has a 180-second timeout (override with
+`OPENCODE_TIMEOUT_MS`). A provider error stops remaining model calls and preserves
+the last completed report. To generate the general report from the same completed
+token-run events without another model call, use:
 
-| Model | Baseline Reads | Goblin Reads | File Reduction | Input Token Reduction | Total Token Reduction | Quality | Cache Size | Compatibility | Overall Efficiency |
+```bash
+REUSE_EXISTING=1 AB_METADATA_PATH="$PWD/examples/token-usage-ab.metadata.tsv" \
+OPENCODE_MODELS="openai/gpt-5.5 openai/gpt-5.6-sol" npm run check:models:general
+```
+
+Reused events must match the current package version and all requested models.
+
+Latest completed comparison: 2026-10-08, OpenCode `1.18.20`, Context Goblin `0.1.22`.
+Read counts are distinct files accessed through the built-in `read` tool.
+
+| Model | Baseline Reads | Goblin Reads | File Reduction | Input Token Reduction | Total Token Reduction | Checklist | Cache Size | Compatibility | Overall Efficiency |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- |
-| openai/gpt-5.5 | 16 | 9 | 44% | 28% | 47% | 6/6 | 2,587 bytes | pass | pass |
-| openai/gpt-5.6-sol | 17 | 11 | 35% | 45% | 35% | 6/6 | 2,587 bytes | pass | pass |
+| openai/gpt-5.5 | 17 | 8 | 53% | -28% | 7% | 6/6 | 2,449 bytes | pass | fail |
+| openai/gpt-5.6-sol | 17 | 9 | 47% | 51% | 34% | 6/6 | 2,449 bytes | pass | pass |
 
-Both models passed compatibility and overall efficiency with quality `6/6`, no secret
-leakage, and positive reductions across all measured signals:
-
-- `gpt-5.5`: files `−44%`, input `−28%`, total `−47%`.
-- `gpt-5.6-sol`: files `−35%`, input `−45%`, total `−35%`.
+Both models passed the tool-flow, safety, and answer-coverage checks. `gpt-5.6-sol`
+also passed all efficiency checks. `gpt-5.5` reduced file reads and total event
+tokens, but its uncached input tokens increased by 28%, so its efficiency result
+is `fail`. The combined A/B command exits nonzero when any requested model fails;
+this run does not support a claim of savings across both models.
 
 Detailed reports: [general A/B](./examples/model-general-ab-report.md) and
 [token usage](./examples/token-usage-ab-report.md). Total event tokens include

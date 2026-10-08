@@ -546,6 +546,62 @@ scheduler 的无人值守门与 `checkpointMode` 调用级覆盖都不再换装�
   跳过，中断后重跑整步（条目级断点不落盘，与 sequence 前缀语义一致）。
   需要条目级恢复就拆 subflow 步或用代码式定义。
 
+## 代码流程（自定义 JS 逻辑）
+
+声明式 JSON 表达不了的东西——**定义变量、写辅助方法、确定性计算、
+条件分支**——用代码流程模块（P2-14）。flows 目录放 `.js` / `.mjs` /
+`.cjs`，与 JSON 同目录混装、同规则装载（坏文件跳过并告警、保留 id 拦截、
+同 id@version 去重）：
+
+```js
+// flows/custom-logic.mjs —— 需要确定性逻辑时的形态
+import { defineWorkflow, agent } from "@mickorz/opencode-agentic-workflow/core"
+
+const slugify = (s) => String(s).trim().replaceAll(/\s+/g, " ").replaceAll(" ", "-").toLowerCase()
+
+export default defineWorkflow({
+  id: "custom-logic",
+  version: "1.0.0",
+  stepNames: ["research", "wrap"],          // 静态声明：journal/resume 依赖步骤序号稳定
+  async run(args, ctx) {
+    const slug = slugify(args.topic)         // ← 自定义变量 + 方法
+    const state = await ctx.runSteps([       // runSteps = journal 记录 + resume 前缀跳过的统一入口
+      async () => ({ research: (await agent(`针对「${args.topic}」写一句结论…`)).output }),
+      async (prev) => ({ wrap: (await agent(`原样返回：${prev?.research ?? ""}`)).output }),
+    ])
+    return { output: `${slug}: ${state.wrap}` }
+  },
+})
+```
+
+> ⚠️ `agent()` 返回 `AgentResult` **对象**（含 usage/model/sessionID），进模板/拼接
+> 要取 `.output`——直接插值会得到 `[object Object]`（真机 E2E 实测踩到）。
+
+可用 API（`<pkg>/core` 导出，与内置流程同源）：
+
+| 类别 | 导出 |
+|---|---|
+| 定义 | `defineWorkflow`（+ `WorkflowDefinition` / `WorkflowContext` 等类型） |
+| 编排 | `sequence` / `resumeSequence` / `parallel` / `pipeline` / `race` / `fallback` / `retry` / `phase` |
+| 子代理 | `agent`（+ `AgentCallOptions` / `AgentResult` / `TokenUsage`） |
+| 质量门 | `assert` / `verify` / `assertVerify` / `checkpoint`（+ `ReviewVerdict`） |
+| 谓词/工具 | `fileExists` / `isFile` / `isDirectory` / `commandSuccess` / `getCommandRunner` |
+| 并发 | `withConcurrencyLimit` |
+
+要点：
+
+- **与声明式完全同权**：registry 眼里都是 `id@version` 资产——journal / resume /
+  版本解析 / metrics / 面板详情与 Open Session 回放全部一致（代码流程的
+  sessionIDs 同样落盘）
+- **journal 契约**：编排步骤统一走 `ctx.runSteps(steps, { stepNames })`——
+  手动 `await` 编排不会进 journal，resume 无从谈起
+- **形态约定**：模块 `export default`（或具名 `definition`）一个
+  `defineWorkflow({...})` 结果；`id` 唯一且不撞内置（smoke/reliable/
+  artifact/feature-development），结构变更必须升 `version`
+- **发布前联调**：包还没装进项目时，import 可临时写编译产物绝对路径
+  （`…/opencode-agentic-workflow/dist/core/index.js`）
+- TS 用户：先 `tsc` 出 `.js`（装载器只认 `.js/.mjs/.cjs`，不内嵌 TS 编译）
+
 ## 并发 run（顶层多飞）
 
 gate/workspace 的 run 级化让**并发顶层 run** 成为安全默认：同一进程可同时

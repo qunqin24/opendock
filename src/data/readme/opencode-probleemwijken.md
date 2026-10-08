@@ -51,11 +51,11 @@ Welke events daarvoor gebruikt worden verschilt per OpenCode-versie:
 
 | Trigger | OpenCode 1 | OpenCode 2 |
 |---------|------------|------------|
-| Sessie klaar | `session.idle` | `session.status` (idle) + `session.idle` |
+| Sessie klaar | `session.idle` | `session.execution.succeeded` (+ `session.status` idle / `session.idle` als fallback) |
 | Error | `session.error` | `session.execution.failed` |
 | Permissie | `permission.asked` | `permission.asked` |
 
-In OpenCode 2 is `session.idle` afgeschaft ten gunste van `session.status`. De plugin luistert naar allebei en ontdubbelt intern, dus je hoort nooit twee geluiden voor dezelfde sessie.
+In OpenCode 2 draait één achtergrondservice (`opencode serve --service`) voor al je open projecten, en die start de plugin één keer per project. Alle instanties zien dezelfde eventstream, dus elke instantie checkt eerst of het event bij zijn eigen project hoort. Zo hoor je per sessie precies één geluid, met de juiste projectnaam in de notificatie.
 
 ## Geluiden
 

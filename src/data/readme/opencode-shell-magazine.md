@@ -7,6 +7,7 @@ A TUI sidebar plugin for OpenCode that monitors shell commands in real time. Age
 - **History**: scans session messages on mount (tool parts + user shell messages) so older commands are backfilled.
 - **Actions**: kill a running command, copy the command, open its output file, and get a system notification when long commands finish.
 - **Multi-TUI safe**: state is persisted through the host's atomic read-modify-write storage, so concurrent TUI instances never overwrite each other.
+- **Lightweight history**: independent session stores, compressed large text, on-demand output, and no writes/repaints for unchanged idle entries.
 
 > OpenCode V2 only (`opencode2` / `@opencode/cli` 2.x).
 
@@ -95,10 +96,41 @@ Restart the TUI and the **Shell** panel appears at the bottom of the sidebar.
 4. **Settling**: the host registry only keeps running shells. After a plugin restart, still-running background commands appear in the registry; a "running" entry that is absent from the registry has ended (its `ended` event was missed). The panel settles it from that evidence — never from a timeout.
 5. **Subagents**: tool parts named `subagent`/`task` reference descendant sessions; those sessions are scanned recursively (depth-limited) and their shells are tagged with the agent name, so a subagent's commands show up next to yours (toggleable).
 
+### History storage and migration
+
+OpenCode's live-reloaded `tui` directory stores only a tiny revision pointer for each
+session — not its list of commands. History metadata and large commands, errors and
+outputs are losslessly compressed in immutable, content-addressed files **outside**
+that directory. Outputs are decoded only on row expansion. Navigating through many
+sessions therefore cannot accumulate large history stores in the host reload loop.
+Compression/decompression uses asynchronous workers rather than the rendering thread.
+Unchanged registry polls do not rewrite history, and completed panels stop their clock.
+
+Older versions used one `shell_magazine.session_data` JSON string for every session.
+On first access to each session, the plugin imports its record from that file without
+registering the large legacy file with OpenCode's live-reloaded storage. The original
+file remains untouched for backup and rollback. Nothing is truncated or expired by this
+migration. Concurrent instances publish complete immutable records, then atomically
+compare-and-swap the revision under the host's per-session storage lock. A conflicting
+writer retries its merge against the latest revision; it never overwrites fresh data.
+
+The legacy path respects `XDG_STATE_HOME` and the OpenCode release channel. For a
+nonstandard state directory, use a plugin option `legacyHistoryFile` with the full path
+to the old JSON file and `historyDirectory` for the separate payload directory. Payload
+files are published atomically, use private permissions, and are verified by SHA-256
+when read. Identical text is deduplicated safely across concurrent TUIs.
+
+**After upgrading from a version with monolithic history, reopen existing TUIs once.**
+OpenCode 2.0.22–2.0.24 retains previously registered stores even after plugin hot reload;
+the plugin cannot unregister that old store through the public API. The background
+service and sessions do not need to be restarted. Newly opened TUIs load only the new
+per-session stores.
+
 ## Development
 
 ```bash
 npm install
+npm run version
 npm run typecheck
 npm run build
 npm test

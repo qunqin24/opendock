@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/logo.png" alt="You.com Agent Skills and Plugins logo" width="100%">
+  <img src="assets/banner.png" alt="You.com Agent Skills and Plugins logo" width="100%">
 </p>
 
 # You.com Web Search & Research
@@ -43,7 +43,7 @@ The plugin contains skills and remote MCP server configs only. It has no hooks a
 - `https://api.you.com/mcp/finance` (finance)
 - `https://you.com/docs/_mcp/server` (You.com docs search, used by `you-discover`)
 
-Requests are handled under the [You.com privacy policy](https://you.com/legal/privacy). Web pages and search results are treated as untrusted data, never as instructions.
+Requests are handled under the [You.com privacy policy](https://you.com/privacy). Web pages and search results are treated as untrusted data, never as instructions.
 
 ## Skills
 

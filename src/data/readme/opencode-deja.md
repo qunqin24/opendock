@@ -142,7 +142,7 @@ harness supports, aider's read-only context file, and the Windows `cmd /c deja m
 <details>
 <summary>What gets written into each agent's own guidance file</summary>
 
-Install also writes user-level guidance for the harnesses it detects: Claude Code, Codex, opencode, Gemini CLI, Antigravity, Qwen, Kimi Code, pi, Senpi, Copilot, VS Code Copilot Chat, Cursor, Goose, OpenClaw, Hermes, Roo Code, omp, Amp, prime-agent, DeepSeek Harness, Continue, Crush, CodeBuddy Code, WorkBuddy, Zed, TRAE CLI, TRAE IDE and Muse Code each get it in their own guidance file (or under the configured `XDG_CONFIG_HOME`). Re-run rewrites deja's skill or marked block without changing surrounding user content. Use `deja install --all --no-guidance` to opt out; Grok Build gets the shared skill in `~/.agents/skills`, which is what it reads; the `~/.grok/GROK.md` written beside it is for the unrelated community CLI that shares that directory. Cursor has no user-level instructions file, so it gets the shared skill in `~/.agents/skills` — one of the four places Cursor reads skills from — read only when something looks relevant rather than every session. Kilo Code, gajae-code, Command Code, Cherry Studio and Reasonix get the skill, and Kiro a steering file, from their own install target.
+Install also writes user-level guidance for the harnesses it detects: Claude Code, Codex, opencode, Gemini CLI, Antigravity, Qwen, Kimi Code, pi, Senpi, Copilot, VS Code Copilot Chat, Cursor, Goose, OpenClaw, Hermes, Roo Code, omp, Amp, prime-agent, DeepSeek Harness, Continue, Crush, CodeBuddy Code, WorkBuddy, Zed, TRAE CLI, TRAE IDE, Muse Code, CodeWhale and ZCode each get it in their own guidance file (or under the configured `XDG_CONFIG_HOME`). Re-run rewrites deja's skill or marked block without changing surrounding user content. Use `deja install --all --no-guidance` to opt out; Grok Build gets the shared skill in `~/.agents/skills`, which is what it reads; the `~/.grok/GROK.md` written beside it is for the unrelated community CLI that shares that directory. Cursor has no user-level instructions file, so it gets the shared skill in `~/.agents/skills` — one of the four places Cursor reads skills from — read only when something looks relevant rather than every session. Kilo Code, gajae-code, Kimchi, Command Code, Cherry Studio and Reasonix get the skill, and Kiro the skill and a steering file, from their own install target.
 
 </details>
 
@@ -260,43 +260,43 @@ aider &middot; Amp &middot; Antigravity &middot; Claude Code &middot; Cline &mid
 | Harness | MCP recall | Auto-recall | Skill | Command | Resume | Handoff | Needs |
 | --- | :-: | :-: | :-: | :-: | :-: | :-: | --- |
 | aider | ⚠ | ✅ | ✕ | ⚠ | ✕ | ✅ | deja aider |
-| Amp | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
+| Amp | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | threads from 0.0.1774963753 on live on ampcode.com; deja reads those its plugin has written out, and older local ones |
 | Antigravity | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | Claude Code | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | Cline | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | Codex CLI | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | Copilot CLI | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
-| VS Code Copilot Chat | ✅ | ✕ | ✅ | ✅ | ✕ | paste | — |
+| VS Code Copilot Chat | ✅ | ✅ | ✅ | ✅ | ✕ | ✅ | — |
 | Cursor | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | sqlite3 (IDE chats, CLI tool output) |
-| DeepSeek Harness | ✅ | ✅ | ✅ | ✅ | ✕ | paste | zstd |
+| DeepSeek Harness | ✅ | ✅ | ✅ | ✅ | ✕ | ✅ | zstd |
 | Gemini CLI | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | Goose | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | deja goose |
 | Grok Build | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | sqlite3 (grok-dev store) |
-| Hermes | ✅ | ✅ | ✅ | ✅ | ✅ | paste | sqlite3 |
+| Hermes | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | sqlite3 |
 | Kimi Code | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | omp (Oh My Pi) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
-| OpenClaw | ✅ | ✅ | ✅ | ✅ | ✅ | paste | sqlite3 (2026.8+ store); zstd for .zst archives |
+| OpenClaw | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | sqlite3 (2026.8+ store); zstd for .zst archives |
 | opencode | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | sqlite3 |
-| Continue | ✅ | ⚠ | ✅ | ✅ | ✅ | paste | — |
+| Continue | ✅ | ⚠ | ✅ | ✅ | ✅ | ✅ | — |
 | Crush | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | sqlite3 |
 | pi | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | prime-agent (PrimeIntellect) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | Qwen Code | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
-| Cherry Studio | ✅ | ✕ | ✅ | ✕ | ✕ | paste | import the server once in Settings -> MCP; enable the skill for the agent |
+| Cherry Studio | ✅ | ✅ | ✅ | ✕ | ✕ | paste | import the server once in Settings -> MCP; enable the skill for the agent |
 | Senpi | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | none |
-| gajae-code | ✅ | ✅ | ✅ | ✅ | ✅ | paste | none |
-| Kimchi Coding | ✅ | ⚠ | ⚠ | ⚠ | ✅ | paste | none |
-| Command Code | ✅ | ✅ | ✅ | ✅ | ✅ | paste | none |
-| ZCode | ✅ | ✅ | ? | ? | ✅ | paste | sqlite3 for the CLI database |
-| Kiro | ✅ | ⚠ | ✕ | ? | ✅ | paste | sqlite3 for the CLI database |
-| Kilo Code | ✅ | ⚠ | ✅ | ✅ | ✅ | paste | sqlite3 for the CLI store |
-| Roo Code | ✅ | ⚠ | ✅ | ✅ | ✅ | paste | roo CLI (editor tasks reopen in the editor) |
+| gajae-code | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | none |
+| Kimchi Coding | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | none |
+| Command Code | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | none |
+| ZCode | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | sqlite3 for the CLI database |
+| Kiro | ✅ | ✅ | ✅ | ? | ✅ | ✅ | sqlite3 for the CLI database |
+| Kilo Code | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | sqlite3 for the CLI store |
+| Roo Code | ✅ | ✕ | ✅ | ✅ | ✅ | paste | roo CLI (editor tasks reopen in the editor) |
 | Zed | ✅ | ✕ | ✅ | ✅ | ✕ | paste | sqlite3 + zstd |
-| CodeWhale | — | — | ? | ? | ✅ | paste | none |
-| CodeBuddy Code | ✅ | ✅ | ✅ | ✅ | ✅ | paste | none |
-| Reasonix | ✅ | ✅ | ✅ | ✅ | ✅ | paste | zstd for 1.x sessions |
-| TRAE CLI | ✅ | ✅ | ✅ | ? | ✅ | paste | none |
-| Muse Code | ✅ | ✅ | ✅ | ? | ✅ | paste | none |
+| CodeWhale | ✅ | ✅ | ✅ | ? | ✅ | ✅ | none |
+| CodeBuddy Code | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | none |
+| Reasonix | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | zstd for 1.x sessions |
+| TRAE CLI | ✅ | ✅ | ✅ | ? | ✅ | ✅ | none |
+| Muse Code | ✅ | ✅ | ✅ | ? | ✅ | ✅ | none |
 
 ✅ works &middot; — possible, not built yet &middot; ✕ the harness has no such mechanism &middot; ⚠ waiting on the harness itself &middot; ? not investigated
 

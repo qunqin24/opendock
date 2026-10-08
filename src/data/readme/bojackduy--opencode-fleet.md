@@ -25,7 +25,8 @@ Or from npm once published:
 | ---- | ------------ |
 | `fleet_register` | Register current session (daemon, directory, summary) |
 | `fleet_list` | List workers **you own** (per-commander scoped, 24h TTL, excludes self by default; `scope:"all"` for the explicit global roster) |
-| `fleet_discover` / `fleet_ps` | Discover live sessions + process/port join (v1 API first; ownership-annotated: owner / `unassigned` / `unknown`) |
+| `fleet_tree` | Hierarchy grouped by parentID over workers **you own** + self (`scope:"all"` for the explicit global hierarchy) |
+| `fleet_discover` / `fleet_ps` | Discover live sessions + process/port join (v1 API first; ownership-annotated: owner / `unassigned` / `unknown`; default hides workers owned by other commanders, `scope:"all"` for the explicit global roster) |
 | `fleet_assign` / `fleet_unassign` / `fleet_transfer` | Claim a worker, release (one or all), transfer to another commander — exactly one owner per worker |
 | `fleet_my_workers` / `fleet_unassigned` | Your owned workers (incl. stale rows) / claimable workers with no owner |
 | `fleet_recover_commander` | After a daemon restart: recover your workers from a dead `oldDaemonId` to your current daemon (same sessionId, old pid must be exited; worker keys preserved, generations bumped) |
@@ -62,6 +63,14 @@ Every delegation still lands as a normal user message (`agent` / `model` /
 (`commander-only` default, `hold`, `refuse`) is enforced after ownership on
 both send and delivery.
 
+Current limit: file events alone do not wake an idle AI automatically.
+`fleet_watch` surfaces your assignment events (`join/leave/idle/done/role/
+transfer`) as journal rows you poll for — no automatic prompt is injected
+into an idle model when a file lands. A commander (human or a looping agent)
+must read `fleet_watch` and act; likewise a worker only sees a delegation
+when its session is live enough to receive the injected user message. Plan
+polling accordingly.
+
 ## Restart recovery
 
 Same-process hostname flips heal automatically on the next heartbeat. After
@@ -94,6 +103,20 @@ Reply ending with exactly: DONE:<one-line-result>
 
 Workers reply via `.res.json`; commanders are auto-notified via `.notify.json`.
 
+## loopd goal awareness (read-only)
+
+Fleet rows surface the loopd goal behind a worker when the worker's project
+uses loopd: fleet reads the project-local `<directory>/.opencode/loopd/state.json`
+and joins on the worker (or owner) session ID.
+
+- `fleet_list` / `fleet_my_workers` gain an appended `loopd` column
+  (`<goal-name>:<status>/<phase>`, `-` when none).
+- `fleet_status` rows append `| loopd:<goal-name>:<status>/<phase>` when matched.
+
+Read-only and fail-open: the state file is never written, missing/corrupt/
+oversize state renders as `-` (or no suffix), and existing columns are
+unchanged (append-only).
+
 ## OpenCode v2
 
 The same entry line works in **both** runtimes (minimum v2 `2.0.16`): v2
@@ -121,7 +144,7 @@ Caveats:
 - Do **not** point a v2 `plugins` entry at a file path (`…/dist/index.js`
   is rejected — "must be a directory"). Use the package spec above, or an
   absolute directory that contains `server.*`/`index.*` at its root.
-- All 26 `fleet_*` tools register natively per location; identity is the
+- All `fleet_*` tools register natively per location; identity is the
   calling `sessionID`. Delegation routes by the target row's `runtime`:
   same-process in-process prompt → remote v2 HTTP (`POST
   {url}/api/session/{id}/prompt`, password read from

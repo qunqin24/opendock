@@ -268,6 +268,14 @@ src/
 
 Taken at `Chathula/opencode-vision-router@0.2.0`. Changes since:
 
+- **Fixed: nested media parts (OpenCode 2.0.11+) were never rewritten.** The
+  V2 `context`-hook rewrite matched only the flat pre-2.0.11 media part
+  (`{type:"media", mediaType, data}`). OpenCode 2.0.11+ (verified on 2.0.15)
+  delivers AI-SDK-style parts — `{type:"media", filename,
+  media:{mediaType, source:{type:"base64"|"bytes", data}}}` — so the matcher
+  never fired, the image passed through untouched, and the harness replaced it
+  with `ERROR: Cannot read ... (this model does not support image input)` for
+  text-only main models. Both shapes are now matched, with regression tests.
 - **Fixed: `force: false` never skipped a multimodal main model.** The V2 capability
   probe called `ctx.catalog.model.list()`. `@opencode/plugin` exposed the catalog at
   `ctx.catalog.model` up to `2.0.3` but renamed it to `ctx.model` by `2.0.10`, so on

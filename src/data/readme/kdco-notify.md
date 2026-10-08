@@ -131,7 +131,7 @@ Works out of the box. To customize, create `~/.config/opencode/kdco-notify.json`
 
 Configuration keys:
 
-- `notifyChildSessions` (default `false`): when `true`, include child/sub-session `session.idle` and `session.error` notifications (question and permission notifications are unaffected).
+- `notifyChildSessions` (default `false`): when `true`, include child/sub-session `session.idle` and `session.error` notifications (question and permission notifications are unaffected). When `false`, child sessions are filtered via `session.created` tracking (no extra API calls) with `session.get` as fallback; while a subagent is still active, the parent notification is deferred instead of firing prematurely.
 - `quietSeconds` (default `8`): seconds of session silence after a turn ends before notifying. Set to `0` to disable quiet-based detection (event-based only).
 - `timeout` (default `0`): seconds before a desktop notification disappears automatically. Set to `0` for no timeout. Supported on macOS and Linux outside of cmux.
 - `terminal` (optional): override terminal auto-detection.

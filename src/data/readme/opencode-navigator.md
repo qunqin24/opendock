@@ -145,7 +145,7 @@ the uninstalled-font result remains visible rather than being documented only in
 
 ![Nerd Font without Navigator corner font](https://raw.githubusercontent.com/St1ggy/opencode-navigator/main/screenshots/35-no-corner-font-layout-preview.png)
 
-The [complete 38-state screenshot gallery](screenshots/README.md) shows every
+The [complete 47-state screenshot gallery](screenshots/README.md) shows every
 Todo and Subagent filter, sidebar section, Search and Settings tab, preset menu
 and preview, confirmation, keyboard-help, setup, and icon-fallback state.
 
@@ -370,6 +370,11 @@ across models. The protocol can return `normalModelSlug: null` for this ordinary
 bucket; that field is display metadata for quota aliases, not a prerequisite for
 account usage. Separate model-specific buckets require explicit model association.
 Switching provider, model, session, or account invalidates stale reads and credit actions.
+In OpenCode 2.x, Limits follows the prompt's selected model immediately, before a
+message is sent, through the public reactive `ui.model.current()` API. OpenCode
+1.x through 1.18.35 exposes only the saved session model: a newly selected prompt
+model becomes visible to Navigator when the host saves it, normally on submission.
+An immediate pre-submission switch in 1.x needs a new public host accessor or event.
 CodexBar is useful for discovering providers, but its cookie, credential-file,
 and undocumented endpoint integrations are not Navigator data sources.
 
@@ -436,10 +441,17 @@ durations describe provider quota windows, not time remaining until reset. Balan
 currency or point unit; a missing total does not become a full progress scale.
 
 The header has no section counter. Its compact **Refresh** control requests a
-read immediately; background reads continue every five seconds, including while
-hidden. Failed reads retain cached windows with stale guidance and the same header
+read immediately. Automatic refresh defaults to **five minutes**, including while
+hidden. Change **Settings → Behavior → Limits refresh interval** in Global or
+Current worktree scope; enter a whole number of minutes, with a minimum of one.
+Changing the effective interval reschedules the timer without an extra quota read.
+Model/account switches and manual Refresh remain immediate; unrelated settings
+updates and provider-response observations do not trigger extra quota polling.
+Failed reads retain cached windows with stale guidance and the same header
 control for retrying. Unsupported mappings, authentication, and setup states have
 separate muted guidance.
+
+![Scoped Limits refresh interval setting](screenshots/47-limits-refresh-settings.png)
 
 ### Review and manually use a banked reset
 
@@ -492,6 +504,7 @@ Navigator plugin tuple:
     "focusKey": "ctrl+shift+f",
     "searchKey": "ctrl+shift+k",
     "persistMcp": true,
+    "limitsRefreshMinutes": 5,
     "startInChat": false,
     "showSessionTitle": true,
     "showSessionDate": true,
@@ -530,10 +543,10 @@ For example, the schema-valid `opencode.json` entry is:
 }
 ```
 
-Behavior keys control the optional start-in-chat flow, shortcuts, MCP persistence, `nerd`/`text` icon style, row
+Behavior keys control the optional start-in-chat flow, shortcuts, MCP persistence, Limits refresh cadence, `nerd`/`text` icon style, row
 density, item limits, and Navigator's safe Quick Action allowlist. Unknown values,
 sections, actions, and MCP states are discarded. The previous snake_case tuple
-options (`toggle_key`, `focus_key`, `search_key`, `persist_mcp`, `start_in_chat`, `show_session_title`,
+options (`toggle_key`, `focus_key`, `search_key`, `persist_mcp`, `limits_refresh_minutes`, `start_in_chat`, `show_session_title`,
 `show_session_date`, `corner_font`, `icon_style`,
 `lsp_icon_style`, `row_density`, `section_item_limits`, `quick_action_order`,
 `quick_action_visibility`, `sections`, and `section_order`) remain compatible;

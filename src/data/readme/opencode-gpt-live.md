@@ -6,7 +6,7 @@
   <a href="https://www.npmjs.com/package/opencode-gpt-live"><img alt="npm" src="https://img.shields.io/npm/v/opencode-gpt-live?color=8b5cf6&label=npm"></a>
   <a href="https://github.com/malhashemi/opencode-gpt-live/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/malhashemi/opencode-gpt-live/actions/workflows/ci.yml/badge.svg"></a>
   <a href="LICENSE"><img alt="MIT license" src="https://img.shields.io/badge/license-MIT-22d3ee"></a>
-  <img alt="OpenCode 2.0.14 or newer" src="https://img.shields.io/badge/OpenCode-%E2%89%A5%202.0.14-4ade80">
+  <img alt="OpenCode 2.0.20 or newer" src="https://img.shields.io/badge/OpenCode-%E2%89%A5%202.0.20-4ade80">
   <img alt="macOS, Linux, Windows" src="https://img.shields.io/badge/platforms-macOS%20%C2%B7%20Linux%20%C2%B7%20Windows-64748b">
 </p>
 
@@ -51,7 +51,7 @@ throughout the call.
 
 ## Requirements
 
-- [OpenCode](https://opencode.ai) 2.0.14 or newer.
+- [OpenCode](https://opencode.ai) 2.0.20 or newer.
 - A ChatGPT account signed in to OpenCode: run `/connect`, choose OpenAI, then "ChatGPT Pro/Plus". Voice availability
   and usage limits depend on your ChatGPT plan.
 - A microphone and speakers (or headphones).

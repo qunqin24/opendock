@@ -52,6 +52,20 @@ A middleware package is a folder under `packages/<name>/` with:
 - **`<name>.middleware.js`**: exports `onRequest`, `onEvent` and/or `onResponse` ([the hooks](https://usemagpie.ai/docs/plugins#middleware)). It runs in magpie's gateway on moejs, so it is one file and imports nothing.
 - **`cases.json`** and a test that runs them with `check()` from `scripts/middleware.mjs`, which calls the hooks the way the gateway does.
 
+## Skills
+
+Agent skills for magpie users, in `skills/<name>/SKILL.md`.
+
+| Skill | What it does |
+|---|---|
+| [magpie-quota](skills/magpie-quota) | Lets an agent check what is left of every subscription, coding plan and key balance magpie has (`magpie quota --json`), and wait for allowance to come back |
+
+In magpie, it is first under Library › Market › Skills. Elsewhere:
+
+```sh
+npx skills add magpie-community/plugins --skill magpie-quota
+```
+
 ## Use
 
 magpie:

@@ -133,7 +133,7 @@ and ships the workflow-authoring skill (see [Authoring workflows](#authoring)).
 | **`ultracode` mode** | Raises reasoning effort and makes fan-out the default. Four ways in: the `ultracode` agent, the keyword, `/ultracode`, a project config flag. A filename mention (`src/ultracode.ts`) never triggers the keyword (`keywordBehavior` flips the default, [Install](#install)) |
 | **Safety rails** | Recursion guard (a nested `workflow()` runs one level only), per-agent inactivity deadline plus wall-clock ceiling, global concurrency cap, orphan reaper, retention pruning, large-run advisory — advice only, never a block (numbers below) |
 | **Run control (in progress)** | `stop` is live; a run's directory accepts `control.jsonl`: `pause`/`resume` gate new agents while in-flight work finishes, `stop-run`/`stop-agent` abort the run or one child — `stop-run` records the run `cancelled` exactly as `workflow({ stop })` does (#134), `restart-agent` parsed but not implemented. TUI selection/restart keys and the drill-down view are the next slice |
-| **Approval prompt** | Names the real workflow (not the ignored title), its description and phases, the run id, the projected agent count. The script is persisted to the run directory **before** the prompt — open its `script.js` and read exactly what will run. `always` is scoped per workflow name |
+| **Approval prompt** | Names the real workflow (the launch's `title` argument is run metadata — it surfaces on the run's own renders, not in the prompt), its description and phases, the run id, the projected agent count. The script is persisted to the run directory **before** the prompt — open its `script.js` and read exactly what will run. `always` is scoped per workflow name |
 
 **Script globals.**
 

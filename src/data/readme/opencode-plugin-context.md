@@ -12,14 +12,18 @@ used and money spent.
 ```
 Context
 ━━━━━━━━━━━━━━━━━ 69%
+▍c20K ▍p90K ▍t500 ▍o2K ▍r6K ▍f81K
 138K / 200K tokens
 $0.04 spent
 62.4 TPS · avg 48.1 · 23s
 ```
 
 
-One color-coded legend row follows the bar — `▍` marker in the segment's color,
-then a muted letter + count. Colors follow the active theme:
+A color-coded legend follows the bar — each segment is a `▍` marker in the
+segment's color plus a muted letter + count. Entries run left-to-right in the
+same order as the bar and wrap onto extra lines as the sidebar narrows, so every
+nonzero segment (including ones too small to fill a single bar cell) is listed
+with its exact count. Colors follow the active theme:
 
 | Segment            | Legend | Theme color | Default look          |
 | ------------------ | ------ | ----------- | --------------------- |
@@ -31,8 +35,8 @@ then a muted letter + count. Colors follow the active theme:
 | free space         | `f`    | `text`      | white / default text  |
 
 With `estimate: true` the `prompt` bucket is split into **user** input, **tool**
-calls + results (incl. MCP) and **system** (the remainder), shown as two legend
-rows (used buckets, then reserved/free):
+calls + results (incl. MCP) and **system** (the remainder). The legend still
+flows and wraps the same way, just with more entries:
 
 ```
 Context
@@ -198,6 +202,18 @@ npm run build        # esbuild → dist/tui.js
 npm run dev:install  # build + install into ~/.config/opencode/context/
 npm publish          # runs typecheck + build + test first
 ```
+
+For the legend's native layout regression check, build first, then open a terminal
+at least 80 columns × 60 rows and run from this repository:
+
+```sh
+OPENCODE_CLI_CONFIG_CONTENT="{\"plugins\":[\"$PWD/scripts/layout-check\"]}" opencode
+```
+
+This renders fixed lopsided, sub-cell, and estimate fixtures at 37 and 24 columns
+without making model requests or changing your configuration. The check writes
+`/tmp/opencode/context-layout-check.json` with `passed`, assertions, and the actual
+rendered frame. Exit the CLI after the fixtures appear.
 
 ## License
 

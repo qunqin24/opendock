@@ -6,16 +6,16 @@ Every bash command your coding agent ([opencode](https://opencode.ai),
 [pi](https://pi.dev) or [Claude Code](https://code.claude.com)) is about to execute is
 scored by a small decision model first, in about 100 ms. If the command
 destroys data, leaks a secret, or breaks a rule in your repo's
-`guardrails.md`, the call is blocked and the agent is told why, so it can
+`GUARDRAILS.md`, the call is blocked and the agent is told why, so it can
 pick another route.
 
 ```
 SystemOne-gate: blocked command — destructive=0.98 > 0.7
   rm -rf ./important-data
 Judged destructive/leaking on its own merits — named exceptions in
-guardrails.md do not override this. If it is intended, your human
+GUARDRAILS.md do not override this. If it is intended, your human
 can run it directly, or restart opencode with SYSTEMONE_GATE=off
-for a session that needs it. The agent must not edit guardrails.md
+for a session that needs it. The agent must not edit GUARDRAILS.md
 to work around this.
 ```
 
@@ -26,7 +26,7 @@ Two situations where a pattern list leaves you exposed.
 Teams that work close to production. The agent runs `kubectl`, `helm` and
 `git push` all day, and the difference between routine and incident is your
 team's policy, not a filename pattern. The gate reads that policy from
-`guardrails.md` and applies it to every command.
+`GUARDRAILS.md` and applies it to every command.
 
 Background agents that read mail, tickets or forms. Their input is written
 by strangers, and a crafted message can talk an agent into running
@@ -39,8 +39,9 @@ conversation that led to it.
 
 Two steps. First teach the gate your rules, then put it in the harness.
 
-**1. Add `guardrails.md` to your repo** (root, `.opencode/guardrails.md`,
-`.pi/guardrails.md` or `.claude/guardrails.md`).
+**1. Add `GUARDRAILS.md` to your repo** (root, `.opencode/GUARDRAILS.md`,
+`.pi/GUARDRAILS.md` or `.claude/GUARDRAILS.md`; the legacy lowercase
+`guardrails.md` spellings are still read).
 Write it yourself — the value is in deciding what your team actually allows,
 not in shipping a generic file. The example below is a starting point for the
 shape:
@@ -50,7 +51,7 @@ shape:
 
 ## The agent MUST NOT
 
-- Edit this file (guardrails.md) itself — it is written and changed by humans, through review.
+- Edit this file (GUARDRAILS.md) itself — it is written and changed by humans, through review.
 - Change anything in production — production changes reach production only through Git/CD.
 - Push directly to the main branch — all changes go through pull request.
 - Install software outside the project's declared dependencies.
@@ -70,7 +71,7 @@ editing. Only the first 2000 characters are sent to the model, so keep the
 file short and put the MUST NOT rules first. If the file is longer, the gate
 warns you at startup and in every block message, and the rules after the cut
 are not applied.
-See [`guardrails.example.md`](guardrails.example.md).
+See [`guardrails.example.md`](guardrails.example.md) — copy it to `GUARDRAILS.md`.
 
 **2. Install the gate in your harness.**
 
@@ -196,7 +197,7 @@ not the whole defense.
 |---|---|
 | `destructive` | Does the command delete, overwrite, or irreversibly destroy data, databases, clusters, or infrastructure? Version-control-recoverable effects (git rm, checkout, branch operations) and removed build artifacts/caches are not irreversible — but in GitOps repositories a push can trigger irreversible infrastructure changes, so the actual effect is what gets judged. |
 | `credentials` | Does the command contain, print, or send credentials, secrets, API keys, or tokens? |
-| `guardrails_violation` | Does the command violate the team's `guardrails.md`? Asked only when the file exists. |
+| `guardrails_violation` | Does the command violate the team's `GUARDRAILS.md`? Asked only when the file exists. |
 | `policy_exception` | Does the guardrails text explicitly name this command as allowed? Vague permissions do not count. Asked only when the file exists. |
 
 Each answer is a score between 0 and 1. Anything above the threshold
@@ -210,7 +211,7 @@ difference matters:
   does not unlock `rm -rf /var/lib/postgresql`.
 - `destructive` and `credentials` are about the command's nature, and named
   exceptions do not override them. Those two are the backstop, and
-  `guardrails.md` is agent-editable between sessions — a file line must not
+  `GUARDRAILS.md` is agent-editable between sessions — a file line must not
   be able to switch the backstop off.
 
 ## Protected files
@@ -221,11 +222,12 @@ project root (an entry ending in `/` protects everything below it; no
 globs):
 
 ```
-guardrails.md
-.agents/guardrails.md
-.opencode/guardrails.md
-.pi/guardrails.md
-.claude/guardrails.md
+GUARDRAILS.md
+.agents/GUARDRAILS.md
+.opencode/GUARDRAILS.md
+.pi/GUARDRAILS.md
+.claude/GUARDRAILS.md
+the same five paths in lowercase — legacy aliases, each matched case-insensitively
 opencode.json
 opencode.jsonc
 .opencode/
@@ -239,12 +241,12 @@ While the gate is on, the refusal is deterministic — no model call, no
 threshold, no cooldown, and retrying costs nothing — and the message tells the agent whose file this is:
 
 ```
-SystemOne-gate: protected file — guardrails.md
+SystemOne-gate: protected file — GUARDRAILS.md
   Policy and harness configuration are edited by your human, not the agent.
   Ask them to make the change and restart opencode.
 ```
 
-Why this list: the gate freezes `guardrails.md` at session start, but a
+Why this list: the gate freezes `GUARDRAILS.md` at session start, but a
 session that could rewrite it with the Edit tool could rule the *next*
 session under its own rules — the same self-approval hole as the removed
 allow-file. `.opencode/` and `.pi/` hold the gate's own plugin and extension
@@ -255,26 +257,26 @@ every harness, so a link that lands on a protected file is protected under
 its own name too. Matching ignores case on every platform, so
 `Guardrails.MD` is protected as well.
 
-The list guards the file-editing tools, not bash: `echo >> guardrails.md` is
+The list guards the file-editing tools, not bash: `echo >> GUARDRAILS.md` is
 not matched against the list — it goes to the decision model like every
-other command, subject to its judgement and your `guardrails.md`.
+other command, subject to its judgement and your `GUARDRAILS.md`.
 
 ## Overriding a block
 
 The agent cannot disable the gate or un-block a command by retrying, and
 there is no override file it could write. The agent-reachable influence left
-is narrow: the repo's `guardrails.md` itself is frozen for the running
+is narrow: the repo's `GUARDRAILS.md` itself is frozen for the running
 session, and the edit tools refuse to touch it (and the other protected
 paths) at all — see [Protected files](#protected-files). A rewrite can still
 be attempted through bash, where it goes to the decision model like every
-other command. Treat `guardrails.md` changes as code review, and
+other command. Treat `GUARDRAILS.md` changes as code review, and
 unattended agents should treat the file as untrusted input. Your overrides:
 
 - **Once:** restart the harness with `SYSTEMONE_GATE=off` and redo the step.
 - **Tune:** raise `SYSTEMONE_THRESHOLD` (it must stay below 1) if the gate
   is too jumpy for your taste.
 - **Fix the policy:** if the block is a false positive against your rules,
-  change `guardrails.md`. That is the durable fix, and since the file lives
+  change `GUARDRAILS.md`. That is the durable fix, and since the file lives
   in the repo, the change goes through review like any other edit.
 
 ## Disclaimer
@@ -327,7 +329,7 @@ credentials, sandboxes and human review still matter.
   instructions", fake JSON answers, authority claims, prompts in other
   languages — did not move the verdict in any of eight tested cases, but
   encoding is a real gap. If your agents run untrusted input, treat encoded
-  pipelines as blocked territory in `guardrails.md`.
+  pipelines as blocked territory in `GUARDRAILS.md`.
 
 ## Configuration
 
@@ -417,21 +419,21 @@ either. What differs is where the gate looks.
 | On block | throws; the agent reads the message | returns `{ block, reason }` to the agent and shows a warning to you (on stderr in `pi -p`) | answers `{ deny }`; Claude reads the reason |
 | Without a credential | inactive; one log line with `SYSTEMONE_LOG=1` | inactive; warns you once per session (on stderr in `pi -p`) | inactive; a toast warns you at session start |
 | Seat token | `$XDG_DATA_HOME/opencode/auth.json` (default `~/.local/share`) | pi's Berget login, OAuth or API key, resolved by pi itself; then the OAuth entry in `$PI_CODING_AGENT_DIR/auth.json` (default `~/.pi/agent`) | none — `BERGET_API_KEY` (or `TYPESAFE_API_KEY`) only |
-| Policy file | `guardrails.md`, then `.opencode/guardrails.md` | `guardrails.md`, then `.pi/guardrails.md` | `guardrails.md`, then `.claude/guardrails.md` |
+| Policy file | `GUARDRAILS.md`, then `.opencode/GUARDRAILS.md` (lowercase legacy names after) | `GUARDRAILS.md`, then `.pi/GUARDRAILS.md` (lowercase legacy names after) | `GUARDRAILS.md`, then `.claude/GUARDRAILS.md` (lowercase legacy names after) |
 | Policy read from | the project directory opencode passes the plugin | the directory pi was started in | the session's directory, frozen at `session.start` |
 | Audit log | `~/.cache/opencode/systemone-gate.log` | `~/.cache/pi/systemone-gate.log` | not supported (`$.fs` cannot append) |
 | Protected files | `edit`, `write`, `apply_patch` refuse protected paths; a block throws | `edit` and `write` refuse protected paths; a block returns `{ block, reason }` and warns you | `Edit`, `Write` and `NotebookEdit` refuse protected paths; the module answers `{ deny }`. Symlinks are resolved in all three |
 
-In pi, `/reload` counts as a restart: it re-reads `guardrails.md` and resets
+In pi, `/reload` counts as a restart: it re-reads `GUARDRAILS.md` and resets
 the cooldown. pi's `powershell` tool is not gated; if a repo enables it in
 `.pi/settings.json`, commands run through it skip the gate.
 
 In Claude Code, the module lives as long as the session, so the frozen
 policy, the environment and the cooldown stay in memory, as in opencode
 and pi. `session.start` fires once per session and not on `/compact`, so
-compaction neither re-reads `guardrails.md` nor resets the cooldown;
+compaction neither re-reads `GUARDRAILS.md` nor resets the cooldown;
 `/clear` keeps both too. Starting a new session, or a hot reload while
-developing the plugin, re-reads `guardrails.md` and resets the cooldown.
+developing the plugin, re-reads `GUARDRAILS.md` and resets the cooldown.
 
 Claude Code skips a hook that throws or overruns and lets the call
 through, so the module attaches a `.catch` handler that denies instead:

@@ -46,8 +46,8 @@ hook 共 6 個（名稱凍結，註冊點對照見 `src/modules/diagnostics/inve
 | 形式 | 寫法 | 版本 | 適用情境 |
 |---|---|---|---|
 | npm | `"opencode-ultrawork"` | 自動抓 `latest`，會跟著更新 | 一般使用者，想直接用最新版本 |
-| npm（釘住 major） | `"opencode-ultrawork@^2.3.0"` | 只收 `2.x` 的更新 | 想自動吃小改動，但不跨大版本 |
-| npm（完全釘住） | `"opencode-ultrawork@2.3.0"` | 固定不動 | 需要可重現的環境 |
+| npm（釘住 major） | `"opencode-ultrawork@^3.0.0"` | 只收 `3.x` 的更新 | 想自動吃小改動，但不跨大版本 |
+| npm（完全釘住） | `"opencode-ultrawork@3.0.0"` | 固定不動 | 需要可重現的環境 |
 | git | `"github:smile-minecraft/opencode-ultrawork#<完整 commit hash>"` | 固定在那個 commit | 要用還沒發布的 commit，或追 V2 開發進度 |
 | 本機目錄 | `"/path/to/opencode-ultrawork"` | 跟你 working tree 走 | 開發這個外掛本身 |
 
@@ -59,12 +59,12 @@ npm 形式（一般使用者）：
 }
 ```
 
-要控制版本就在套件名稱後面加 `@` 加版本範圍，寫法跟 npm 一樣——`^2.0.0`、`~2.0.1`、`2.0.0` 都可以。**沒寫版本時 OpenCode 會裝 `latest`**，所以要可重現就一定要寫。名單只有 `@` 加範圍（或純數字）的時候，套件名稱要寫完整：
+要控制版本就在套件名稱後面加 `@` 加版本範圍，寫法跟 npm 一樣——`^3.0.0`、`~3.0.1`、`3.0.0` 都可以。**沒寫版本時 OpenCode 會裝 `latest`**，所以要可重現就一定要寫。名單只有 `@` 加範圍（或純數字）的時候，套件名稱要寫完整：
 
 ```jsonc
 {
-  // 收 2.x 的更新，不跨到 3.0
-  "plugins": ["opencode-ultrawork@^2.3.0"]
+  // 收 3.x 的更新，不跨到 4.0
+  "plugins": ["opencode-ultrawork@^3.0.0"]
 }
 ```
 
@@ -119,13 +119,13 @@ git 形式（固定版本、不自動更新）：
     "catalog": "index"
   },
   "verification": {
-    // 能呼叫 verification_run 的 agent，預設只有 momus
+    // 能呼叫 verification_run 的 agent 名單（覆寫示例；未設定時為空，沒有 agent 能呼叫）
     "runAllowedAgents": ["momus"],
-    // 能呼叫 change-scope-check 的 agent，預設 build 與 ultra
+    // 能呼叫 change-scope-check 的 agent 名單（覆寫示例；未設定時為空，沒有 agent 能呼叫）
     "scopeCheckAllowedAgents": ["build", "ultra"]
   },
   "memory": {
-    // writerAgents 只採全域設定；空陣列表示沒有 writer
+    // writerAgents 只採全域設定；未設定時為空（沒有 writer），空陣列同樣表示沒有 writer
     "writerAgents": ["memorizer"],
     "inject": true,
     // 兩層記憶各自的預算，全部選填（預設見 memoryLayerBudget 的 default）。
@@ -149,7 +149,7 @@ git 形式（固定版本、不自動更新）：
       "requireMemoryDisposition": true
     },
     "evidencePack": {
-      // 派發 subagent 時強制檢查實作說明七節格式的名單，預設這三個
+      // 派發 subagent 時強制檢查實作說明七節格式的名單（覆寫示例；未設定時為空，不檢查）
       "gatedSubagents": ["implementer", "debugger", "ultra-coder"]
     }
   }
@@ -158,7 +158,7 @@ git 形式（固定版本、不自動更新）：
 
 模組開關在 `modules` 底下，預設全部開啟；關掉的模組不註冊工具、不掛 hook（`src/settings/defaults.ts`）。`memory` 關閉時，任務結案不再要求記憶處置；`commentSignal` 關閉時，結案流程的相關檢查回報「未啟用」而不是失敗。
 
-驗證工具的 agent 授權清單（`verification.runAllowedAgents`、`verification.scopeCheckAllowedAgents`）與實作說明檢查的受控 subagent（`workflow.evidencePack.gatedSubagents`）都可以在設定覆寫，預設值見上例。型別寫錯（例如把清單寫成字串）會在載入時警告並退回預設，不影響外掛載入。空陣列代表清空名單：`runAllowedAgents`／`scopeCheckAllowedAgents` 為空時沒有 agent 能呼叫該工具（fail closed），`gatedSubagents` 為空時不再做派發前檢查。授權清單在模組註冊時快照，改完要重新載入才生效（同下）。
+驗證工具的 agent 授權清單（`verification.runAllowedAgents`、`verification.scopeCheckAllowedAgents`）、記憶寫入名單（`memory.writerAgents`）與實作說明檢查的受控 subagent（`workflow.evidencePack.gatedSubagents`）都可以在設定指定，這四個清單未設定時皆為空（fail closed）：`runAllowedAgents`／`scopeCheckAllowedAgents` 為空時沒有 agent 能呼叫該工具，`writerAgents` 為空時沒有 agent 能寫記憶，`gatedSubagents` 為空時不再做派發前檢查。上面的範例是覆寫示例，不是預設值。型別寫錯（例如把清單寫成字串）會在載入時警告並退回預設，不影響外掛載入。授權清單在模組註冊時快照，改完要重新載入才生效（同下）。
 
 **改完設定要重新載入或重啟 OpenCode 才生效。**實測 OpenCode 2.0.16 只監看外掛原始檔（約 1 秒內重新載入），改 `opencode.jsonc` 或 `ultrawork.jsonc` 不會自動生效。
 
@@ -206,7 +206,7 @@ git 形式（固定版本、不自動更新）：
 
 每層索引上限 3000 字元，每主題（含 frontmatter）4000 字元，description 120 字元，每層最多 3 個 pinned；每層 pinned 注入正文預算 2500 字元，筆記上限 1000 字元；每層主題數預設不限制（`maxTopics: 0`）。這些都是 `memory.budget` 的預設值，全域層與專案層可以各自覆寫（`budget.global` 只採全域設定，`budget.project` 兩層都能寫；寫錯的欄位警告並退回預設）。一般寫入超限會拒絕，不截斷；總量型預算（索引、主題檔、pinned 數）只在寫入讓該項變大且超過上限時拒絕，現況已超標時縮減、刪除、核對仍可寫入。description 是單一欄位上限，縮短就會過；主題數超限只擋新增，既有主題保留。遷移保留超大內容並由診斷提示整理。
 
-任何 agent 可用 `memory-search`、`memory-read`、`memory-note`。`memory-extract`、`memory-write`、`memory-maintain` 限 `memory.writerAgents` 名單，預設只有 memorizer；沒有 agent 身分時拒絕。writerAgents 只能寫在全域設定，專案層指定時會忽略並警告。空清單合法，但高風險任務無法宣告處置。工具參數、錯誤碼與復原流程見 [記憶重新設計規格](docs/memory-redesign.md)。
+任何 agent 可用 `memory-search`、`memory-read`、`memory-note`。`memory-extract`、`memory-write`、`memory-maintain` 限 `memory.writerAgents` 名單，未設定時為空（沒有 writer）；沒有 agent 身分時拒絕。writerAgents 只能寫在全域設定，專案層指定時會忽略並警告。空清單合法，但高風險任務無法宣告處置。工具參數、錯誤碼與復原流程見 [記憶重新設計規格](docs/memory-redesign.md)。
 
 `memory-write` 預設 preview，確認後以 apply 寫入；update、delete、verify 必須帶 `memory-read` 回傳的 expectedSha256。工具會在該層鎖內核對版本、檢查預算與疑似 secret、寫主題與索引，再附加證據。log 寫入失敗會回復主題與索引。記憶工具首次存取可能先觸發舊資料遷移。
 
@@ -264,11 +264,58 @@ Comment Signal 只掃「註解語法有對應 lexer 分支」的副檔名，共 
 
 以下是在設定 repo（`~/.config/opencode` 那一側）要做的事：
 
-1. `opencode.jsonc` 加上 `"plugins": [..., "opencode-ultrawork@^2.3.0"]`（或用 `github:` 形式釘住某個 commit，見「安裝」）；刪掉 `plugins/opencode-ultrawork.ts`、`plugins/opencode-ultrawork/`、`tests/ultrawork/`、`scripts/generate-ultrawork-baseline.ts`。
+1. `opencode.jsonc` 加上 `"plugins": [..., "opencode-ultrawork@^3.0.0"]`（或用 `github:` 形式釘住某個 commit，見「安裝」）；刪掉 `plugins/opencode-ultrawork.ts`、`plugins/opencode-ultrawork/`、`tests/ultrawork/`、`scripts/generate-ultrawork-baseline.ts`。
 2. `skills-policy.json`、`skills-personal.json`、`skill-drafts/`、`skill-quarantine/` 搬到 `<全域設定資料夾>/.ultrawork/`（外掛第一次啟動會自動搬；但設定 repo 裡讀它們的 `scripts/skill-approval.ts`、`scripts/skill-profile.ts`、`lib/skill-capability.ts` 和 `tests/config/` 的契約測試要改路徑）。
 3. `AGENTS.md`、`agents/*.md`、`commands/*.md` 裡的 `.opencode/memory/…`、`.opencode/plans/…` 字串改成 `.ultrawork/…`。
 4. `lib/dcp-evidence-policy.ts` 列的是 ultrawork 工具名稱，名稱沒變就不用改。
 5. 把那條讀設定 repo 技能政策的使用者專屬測試移回設定 repo 的 `tests/config/`。
+
+## 升級到 3.0.0
+
+這一節是給已經在用 2.x 的使用者。3.0.0 是大版本：`^2.3.0` 這類範圍不會自動升到 3.0.0，一定要手動改釘選。
+
+### 同一次更新要做的兩件事
+
+1. 改 plugins 釘選：`"opencode-ultrawork@^3.0.0"`（要完全可重現就寫死 `"opencode-ultrawork@3.0.0"`）。
+2. 在同一次設定更新補上四個清單：`verification.runAllowedAgents`、`verification.scopeCheckAllowedAgents`、`memory.writerAgents`、`workflow.evidencePack.gatedSubagents`。
+
+```jsonc
+{
+  "verification": {
+    "runAllowedAgents": ["momus"],
+    "scopeCheckAllowedAgents": ["build", "ultra"]
+  },
+  // writerAgents 只採全域層的值，寫在專案層會被忽略並警告
+  "memory": { "writerAgents": ["memorizer"] },
+  "workflow": {
+    "evidencePack": {
+      "gatedSubagents": ["implementer", "debugger", "ultra-coder"]
+    }
+  }
+}
+```
+
+缺了第 2 步會直接影響可用性：v3 這四個清單預設皆為空（fail closed）——沒設就沒有 agent 能呼叫該驗證工具、沒有 writer、七節檢查停用。2.x 沒寫這些清單時還有內建名單可用；升上 3.0.0 卻沒補，驗證工具、記憶寫入與派發檢查會全部被拒絕或停用——載入設定時不會警告，呼叫時才會看到明確的拒絕訊息（驗證工具回 `AGENT_NOT_ALLOWED`、記憶工具回 `WRITER_REQUIRED`），`workflow_doctor` 與 `workflow_health_check` 也會以警告提示清單為空。
+
+### 相容與不變的東西
+
+- 既有匯出相容：`loadSettings`、`resolveVerificationRunAllowedAgents`、`resolveChangeScopeCheckAllowedAgents`、`searchSkills`、`insertAgentSkillAllow`、`removeAgentSkillLine`、`loadPersonalPins`、`resolvePersonalPinsPath`、`PERSONAL_PINS_SCHEMA_VERSION` 的名稱與路徑不變（由 `tests/v2/native/compat-exports.test.ts` 把關）。
+- 全部 49 個工具的名稱、參數、回傳格式，以及全部註解功能（七個 `comment_signal` 工具、`AI_DO_NOT_EDIT:P0` 阻斷、掃描政策、結案檢查）保留不變。
+- 設定欄位不變：2.x 的 `ultrawork.jsonc` 不用改寫就能讀，差別只有四個清單的預設改為空。
+
+### 退場：escalation
+
+升級限制（escalation）已退場：既有 `session/<id>/escalation` 舊紀錄會原樣保留，外掛不再讀寫，不需要手動清理。
+
+### 回退限制
+
+- 回退時把 plugins 釘選指回舊版本，並用事前備份的設定還原（`.ultrawork/` 預設不進版控，升級前先自行備份）。
+- 2.x 資料格式可被 v3 回讀（2.x 形狀副本的讀寫已由 `tests/v2/native/v2-data-readback.test.ts` 驗證）；但完整雙向回退（v3 寫入後再拿 2.x 讀）沒有驗證，不要假設一定可行。
+
+### 共用核心與宿主支援
+
+- 工具實作與設定格式共用同一份宿主無關核心：入口 `src/index.ts` 經 `src/opencode/adapter.ts` 把平台能力轉成宿主能力，再交給 `src/core/setup.ts`。
+- 但不承諾跨宿主共享任務、記憶或工作階段資料；目前只提供 OpenCode 宿主適配器，其他宿主（例如 pi）尚未支援。
 
 ## 開發
 

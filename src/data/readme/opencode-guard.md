@@ -335,10 +335,16 @@ refused, and the `oc-*` commands refuse to change anything when run under openco
 Like the reveal guard, this stops a helpful model from unblocking itself. It is
 not a sandbox.
 
-### Subagents inherit their parent's mode
+### Subagents inherit their ancestors' mode
 
-A subagent has no mode file of its own, so it tracks its parent's mode, capped
-below `god`. When a subagent in an inherited mode is refused a permission, the
+A subagent has no mode file of its own. It runs under the stricter of two
+inherited modes: its parent's (the parent's file, else the global mode) and that
+of the nearest ancestor with a mode file (else the global mode), both capped below
+`god`. A direct child gets its parent's mode exactly as before 1.7.0; a deeper
+subagent can no longer run under a global mode looser than the one set on its
+root. If the guard cannot read a subagent's ancestry it refuses the subagent's
+tool calls rather than guess, and leaves its permission prompts to the person.
+When a subagent in an inherited mode is refused a permission, the
 refusal is answered rather than left as a prompt for the operator, and the parent's
 task result gets a list of what was refused and why. The parent holds the mode the
 child was refused under, so it decides: run it itself, re-dispatch a narrower
@@ -356,6 +362,51 @@ like a permission problem instead of the dispatch mistake it is. Agents that
 declare `write`, `exec` or nothing are untouched, so the gate cannot break a
 dispatch that works today. It runs even in `god`: god lifts limits on what may run,
 it is not licence for an incoherent tool call.
+
+### Agent team tree rules
+
+Background tasks (`task` with `background: true`, behind opencode's
+`OPENCODE_EXPERIMENTAL_BACKGROUND_SUBAGENTS` flag) are the teammates of an agent
+team. These rules keep a team a hub around the session that started it. They run
+above the god bypass, like the dispatch gate, and a lookup the guard cannot
+complete refuses the call with an error naming the rule.
+
+- G1: `task` with `task_id` resumes only a child of the calling session.
+  opencode itself resumes any session id, and starts a fresh child for an id that
+  does not exist.
+- G2: `background: true` only from a root session with a person at the TUI, and
+  never together with `task_id`.
+- G4: a teammate, and anything it dispatches, cannot call `workflow_run`,
+  `peer_*`, `schedule_*`, `bg_watch`, `bg_unwatch`, or a `bg_*` tool with
+  `all: true`.
+
+A teammate is a child of a root whose creating `task` call had
+`background: true` in its arguments; a foreground task promoted to the
+background later is not one. G3 is the mode rule in the section above.
+
+G4 fails closed on a session it cannot classify. A child of a root with no
+creating `task` part in the root's history (for example a child that
+opencode-agent-workflows creates through the SDK for a workflow step) is treated
+as possibly in a team: it, and everything below it, is refused `workflow_run`,
+`peer_*`, `schedule_*`, `bg_watch`, `bg_unwatch`, and any `bg_*` call with
+`all: true`, and the refusal says retrying will not help. Its other tools are
+unaffected. This is deliberate: a teammate's creating part can disappear from
+the root's history (a revert removes it), and a missing part must never turn a
+teammate into an outsider. Classification is decided by the session just below
+the root on the caller's path, so a workflow child started from a foreground
+subagent is classified by that subagent's (foreground) `task` part and keeps
+these tools.
+
+Only a creating part counts: a `task` part that carries `task_id` (a resume)
+never classifies a child, so a foreground resume of a teammate cannot make it
+look like an outsider. A "no creating part" answer is remembered for 30 seconds
+so a retried call does not re-page up to 200 pages of history; a stale entry can
+only refuse. A history page that arrives without paging headers counts as the
+last page only when it is short, and a transient (5xx or transport) session read
+is retried once before the lookup fails.
+
+Level `off` skips G1, G2 and G4, like the other checks that run before a tool
+call; the teammate index is still fed from events at every level.
 
 ### Refusing tool calls after Esc
 

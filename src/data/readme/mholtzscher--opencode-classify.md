@@ -6,7 +6,7 @@ Six independent Bun packages for OpenCode V2. Each plugin owns its dependencies,
 
 | Plugin | What it does | Interface and requirements |
 | --- | --- | --- |
-| [Classify](./classify/README.md) | Typed judgments and bounded semantic file search with TypeSafe AI, Cloudflare Clef, Laya, or Ollama; file/code/diff evidence | Namespaced server tools and backend-selection command; TUI picker/status. Requires explicit backend configuration. |
+| [Classify](./classify/README.md) | Typed judgments and bounded semantic file search with OpenAI Decisions, TypeSafe AI, Cloudflare Clef, Laya, or Ollama; file/code/diff evidence | Namespaced server tools and backend-selection command; TUI picker/status. Requires explicit backend configuration. |
 | [Cache metrics](./cache-metrics/README.md) | Session input cache-hit rate, token totals, per-response history, and JSON export | TUI sidebar and history panel. History includes subagents by default. |
 | [Quota usage](./quota-usage/README.md) | Remaining Codex weekly and OpenCode Go monthly/rolling/weekly account quotas | Web/TUI chat tool and TUI sidebar backed by server RPC. Uses active provider connections. |
 | [GitHub tools](./github-tools/README.md) | PR creation/descriptions, review-thread validation and fixes, check investigation, Plannotator review | Four server commands plus the TUI-only `/pr-review` picker. Requires authenticated `gh`. |
@@ -58,7 +58,7 @@ Load one copy of each plugin; avoid configuring multiple sources with the same p
 
 ## Runtime setup
 
-- **Classify:** credentials and evidence resolve on the server. Start Laya or Ollama separately for local inference. OpenAI Decisions is reserved but unavailable; the plugin does not execute decisions or automatically fail over.
+- **Classify:** credentials and evidence resolve on the server. Start Laya or Ollama separately for local inference. OpenAI Decisions uses its dedicated API with `gpt-6-luna`; the plugin does not execute decisions or automatically fail over.
 - **Quota usage:** uses active `openai` and `opencode-go` connections on the server. Codex requires ChatGPT account credentials. Ask for quotas in web or TUI chat; the sidebar refreshes every minute and after successful session execution.
 - **GitHub tools:** authenticate `gh` on the server for `/pr`, `/pr-comments`, `/pr-comments-fix`, and `/pr-actions`. `/pr-review` uses `gh` on the TUI host and invokes `/plannotator-review`.
 - **Spec tools:** existing specs must be direct files under the invoking session's `specs/` directory. Supply the [workflow dependencies](./spec-tools/docs/WORKFLOWS.md#dependencies), including server-side `/plannotator-annotate` for annotation.
