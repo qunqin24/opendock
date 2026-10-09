@@ -20,12 +20,19 @@ Install the oc-todo OpenCode plugin:
 3. Verify: the `todo` tool is available to the agent.
 ```
 
-Add the plugin to your `opencode.jsonc`:
+Add the plugin to your `opencode.jsonc` - stable (npm) or bleeding edge (github):
 
 ```jsonc
-// opencode.jsonc
-{ "plugins": ["oc-todo"] }
+// opencode.jsonc - stable (npm):
+{ "plugins": ["oc-todo@0.4.0"] }
 ```
+
+```jsonc
+// opencode.jsonc - bleeding edge (github) instead of stable, not in addition:
+{ "plugins": ["oc-todo@git+https://github.com/nathwn12/oc-todo.git#ac48febf140034a3c6b98387f8cfe80700d82e16"] }
+```
+
+See [INSTALL.md](./INSTALL.md) for the three routes: pinned npm, the github package spec, and a no-npm local directory entry.
 
 Restart OpenCode. **That's the whole setup** — no config file, no options. The `todo` tool is available to the agent immediately, and the checklist appears in the sidebar beside an open session whenever that session has todos.
 
@@ -59,11 +66,11 @@ A `write` item may carry an `id`; when it does, the existing item keeps its iden
 
 Rendering rules — **decided, not configurable**:
 
-- **No todos** → nothing renders.
-- **Header** → one row while the list is non-empty: an ASCII toggle (`v` expanded, `>` collapsed), a space, then `Todos n/n` where the first `n` is the closed count. The collapsed and expanded headers share the same column offset.
+- **No todos** -> one muted hint line (`todo - use the todo tool for multi-step work`), clipped to the same 28-cell budget.
+- **Header** -> one row while the list is non-empty: a toggle (`String.fromCharCode(0x25BC)` U+25BC expanded, `String.fromCharCode(0x25B6)` U+25B6 collapsed), a space, then `Todos n/n` where the first `n` is the closed count. The collapsed and expanded headers share the same column offset.
 - **Any pending / in_progress** → the full checklist; closed lines are muted.
-- **All completed / cancelled** → auto-collapses to the header, `> Todos n/n` with `n == total`, so finished work leaves closure without a stale list.
-- **Every row is columns** → a one-cell mark column, its guaranteed separator, then the value. Marks are single cells: `-` pending, `~` in_progress, `x` completed, `/` cancelled. For single-cell text the value is clipped to a 28-cell budget so a long todo cannot wrap the sidebar, and a note count stays a suffix (` (2 notes)`); a wide-character content value is clipped at render time instead, so the row still cannot wrap. The marks, the toggle, and the ellipsis are single-cell and narrow.
+- **All completed / cancelled** -> auto-collapses to the header, `String.fromCharCode(0x25B6) Todos n/n` with `n == total`, so finished work leaves closure without a stale list.
+- **Every row is columns** → a one-cell mark column, its guaranteed separator, then the value. Marks are single cells: pending `String.fromCharCode(0x25CB)` (U+25CB), in_progress `String.fromCharCode(0x25D0)` (U+25D0), completed `String.fromCharCode(0x25CF)` (U+25CF), cancelled `String.fromCharCode(0x2297)` (U+2297). For single-cell text the value is clipped to a 28-cell budget so a long todo cannot wrap the sidebar, and a note count stays a suffix (` (2 notes)`); a wide-character content value is clipped at render time instead, so the row still cannot wrap. The marks, the toggle, and the ellipsis are single-cell and narrow.
 - **Click the header to toggle** — a manual choice wins for that session. The removed V1 sidebar had the same toggle; this one works at any list length, not only above two items.
 
 Storage never auto-prunes. Items change only when the caller mutates them (`write`, `clear`, or a per-item action). The render rules are what keep the surface quiet — the data keeps the history.
@@ -96,7 +103,7 @@ The rendering rules above are **decided, not configurable**: the sidebar exposes
 - **No network.** The plugin makes no outbound calls — the `todo` tool and the sidebar both work offline. Nothing is fetched, nothing is sent.
 - **No telemetry.** Nothing is collected or phoned home.
 - **One storage location.** Every mutation is written to plugin storage under `todos/session/<sessionID>` in the host's own SQLite store — a session-scoped key, not a file the plugin owns. Nothing is written anywhere else.
-- **Read-only rendering.** The sidebar only reads the stored list; the `tui.tsx` entry never mutates it. A session with no todos renders nothing at all.
+- **Read-only rendering.** The sidebar only reads the stored list; the `tui.tsx` entry never mutates it. An empty session renders only the muted hint line.
 
 Delete the plugin and the stock sidebar is back, exactly as it was.
 

@@ -7,7 +7,7 @@ OpenCode V2 removed the built-in todo tools. This plugin brings them back as a s
 - **`todowrite`** — create or replace the todo list for the current session.
 - **`todoread`** — read the current list back.
 
-Lists are stored per session and a compact summary is injected into the session context on every model request while tasks are still open, so the model keeps track of them across long conversations and context compaction.
+Lists are stored per session and a compact summary is injected into the session context while tasks are still open — at every user turn and whenever the list changes mid-run — so the model keeps track of them across long conversations and context compaction.
 
 ## Screenshot
 
@@ -66,7 +66,7 @@ The terminal client shows a live todo strip at the end of the session sidebar, s
 
 In-progress tasks use the warning color and everything else is muted, matching OpenCode V1. The heading shows completed/total and the percentage; either part can be turned off. Long items wrap and lists longer than two items collapse with a click. Once everything is completed the strip hides, unless the timer is on — then it stays to show the total.
 
-Run `/todo-sections` (or pick "Todolist: Settings" from the command palette) to configure:
+Run `/todo-settings` (or pick "Todolist: Settings" from the command palette) to configure:
 
 | Setting | Default | Values |
 | --- | --- | --- |

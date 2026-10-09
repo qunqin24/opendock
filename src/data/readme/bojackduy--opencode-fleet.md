@@ -155,6 +155,23 @@ Caveats:
 - v1 behaviour is unchanged (v1 pin `@opencode-ai/plugin 1.18.32` kept for
   v1 paths; v2 uses structural types only).
 
+## Development and packaging
+
+Run `npm ci`, `npm run typecheck`, `npm run build`, then `npm test`.
+Tests import compiled modules; `npm test` deliberately does not rebuild.
+Builds clean only this repository's `dist` directory, so removed modules cannot
+linger in a release. npm packages retain JavaScript, declarations, and the fleet
+skill but omit source/declaration maps. `prepack` and release scripts validate
+and test a fresh build; the publish workflow reuses that tested output.
+
+Inbox scans and periodic rebeats skip overlapping ticks. Cleanup stops new
+ticks/deliveries; already-issued host calls and reply collection may finish.
+Duplicate-delivery guards are retained rather than evicted unsafely.
+
+TUI tests currently cover imports, contracts, and headless control/view logic,
+not live rendered reactivity. The current TypeScript JSX emit does not apply
+Solid's compile-time reactive transforms; import success is not rendering proof.
+
 ## License
 
 AGPL-3.0-or-later — see [LICENSE](./LICENSE).

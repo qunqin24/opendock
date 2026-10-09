@@ -82,9 +82,9 @@ totals:
 
 - **instant** — smoothed rate over a 1s rolling window, colored by speed: red
   `<10`, amber `10–49`, green `≥50`. Shown only while tokens are arriving.
-- **avg** — tokens / active generation span (first → last token), so idle time
-  doesn't drag it down. Shown once the stream goes quiet.
-- **elapsed** — active generation span.
+- **avg** — tokens / accumulated active time. Pauses longer than 5 seconds are
+  excluded, so waiting for a question or returning later doesn't drag it down.
+- **elapsed** — accumulated active time, excluding those pauses.
 
 Counts come from `session.text.delta` / `session.reasoning.delta`, estimated with
 the same chars/4 heuristic used elsewhere (sub-token deltas are carried over), so

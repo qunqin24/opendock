@@ -188,4 +188,4 @@ Native test versions qualify integration mechanisms; they are not runtime allowl
 
 ## Contributing
 
-See [the contributor guide](https://github.com/j7an/superpowers-manager/blob/main/CONTRIBUTING.md) for development, testing, packaging, CI, and repository layout. Architecture details live in the [harness interface](https://github.com/j7an/superpowers-manager/blob/main/docs/harness-interface.md) and [adapter result contract](https://github.com/j7an/superpowers-manager/blob/main/docs/adapter-result-contract.md).
+See [the contributor guide](https://github.com/j7an/superpowers-manager/blob/main/docs/development.md) for development, testing, packaging, CI, and repository layout. Architecture details live in the [harness interface](https://github.com/j7an/superpowers-manager/blob/main/docs/harness-interface.md) and [adapter result contract](https://github.com/j7an/superpowers-manager/blob/main/docs/adapter-result-contract.md).

@@ -144,10 +144,10 @@ See [`runtime/README.md`](runtime/README.md) for full documentation.
 
 ```json
 {
-  "plugin": ["@shift-preflight/opencode-plugin"],
-  "provider": {
+  "plugins": ["@shift-preflight/opencode-plugin"],
+  "providers": {
     "anthropic": {
-      "options": {
+      "settings": {
         "baseURL": "http://localhost:8787/v1"
       }
     }
@@ -155,7 +155,8 @@ See [`runtime/README.md`](runtime/README.md) for full documentation.
 }
 ```
 
-See [`opencode-plugin/README.md`](opencode-plugin/README.md) for setup details.
+Supports OpenCode V2 and V1 1.18.29+. See
+[`opencode-plugin/README.md`](opencode-plugin/README.md) for V1 configuration and setup details.
 
 ## Agent integrations
 

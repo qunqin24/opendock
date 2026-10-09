@@ -102,25 +102,28 @@ All options are optional. They go in the `options` object of the plugin's
 
 ## API keys
 
-Keys resolve automatically from what opencode itself uses, in order:
+For providers other than OpenAI, credentials resolve from OpenCode in this order:
 
 1. `providers.<id>.apiKey` in the plugin options
 2. `OPENCODE_AUTH_CONTENT` (opencode's injectable auth file)
-3. opencode's auth store — `auth.json` in the opencode data directory
-   (`~/.local/share/opencode/` on Linux, `~/Library/Application Support/opencode/`
-   on macOS, `%APPDATA%\opencode\` on Windows), under the provider id
-4. the provider's env var (see table below)
+3. active OpenCode credential (V2 SQLite credential store)
+4. legacy `auth.json` in OpenCode's data directory
+5. the provider's env var (see table below)
 
 So if you've already connected a provider in opencode (`opencode auth login` or
 `/connect`), no extra configuration is needed.
 
-| Provider       | env var                  |
-| -------------- | ------------------------ |
-| opencode-go    | `OPENCODE_API_KEY`       |
+OpenAI Codex uses the OpenCode OAuth **access token** and account ID for Codex
+subscription limits. An OpenAI Platform API key (`OPENAI_API_KEY` or
+`providers.openai.apiKey`) cannot access those limits and is not used.
+
+| Provider       | Credential source                  |
+| -------------- | ----------------------------------- |
+| opencode-go    | `OPENCODE_API_KEY`                  |
 | github-copilot | `GITHUB_TOKEN` (`GH_TOKEN` also) |
-| deepseek       | `DEEPSEEK_API_KEY`       |
-| openrouter     | `OPENROUTER_API_KEY`     |
-| openai         | `OPENAI_API_KEY`         |
+| deepseek       | `DEEPSEEK_API_KEY`                  |
+| openrouter     | `OPENROUTER_API_KEY`                |
+| openai         | OpenCode OAuth login                |
 
 ## Providers
 
@@ -130,7 +133,7 @@ So if you've already connected a provider in opencode (`opencode auth login` or
 | github-copilot | `https://api.github.com/copilot_internal/user`                 | premium/chat/completions + bars  |
 | deepseek       | `https://api.deepseek.com/user/balance`                        | remaining credit                 |
 | openrouter     | `https://openrouter.ai/api/v1/credits`                         | remaining credit (credits − usage) |
-| openai         | `https://api.openai.com/v1/dashboard/billing/credit_grants`    | remaining credit (org admin key) |
+| openai         | `https://chatgpt.com/backend-api/wham/usage`                   | Codex 5h + weekly quota windows  |
 
 Adding a provider is one new file in `src/providers/` implementing the `Provider`
 interface (key resolution + a `fetchUsage`) and adding it to the `providers` array

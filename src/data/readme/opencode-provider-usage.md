@@ -117,7 +117,7 @@ opencode service restart                         # 重载生效，或直接重�
 ```
 
 `plugins` 里写不带版本号的包名时，opencode 每次服务启动会自动检查新版（仅提示，
-不自动安装）；想锁定版本可写 `opencode-provider-usage@0.1.1`，精确版本不会被
+不自动安装）；想锁定版本可写 `opencode-provider-usage@0.1.2`，精确版本不会被
 `plugin update` 触碰。
 
 ### 本地开发

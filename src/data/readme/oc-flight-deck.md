@@ -20,12 +20,19 @@ Install the oc-flight-deck OpenCode plugin:
 3. Verify: the panel appears beside an open session.
 ```
 
-Add the plugin to your `opencode.jsonc`:
+Add the plugin to your `opencode.jsonc` - stable (npm) or bleeding edge (github):
 
 ```jsonc
-// opencode.jsonc
-{ "plugins": ["oc-flight-deck"] }
+// opencode.jsonc - stable (npm):
+{ "plugins": ["oc-flight-deck@0.12.0"] }
 ```
+
+```jsonc
+// opencode.jsonc - bleeding edge (github) instead of stable, not in addition:
+{ "plugins": ["oc-flight-deck@git+https://github.com/nathwn12/oc-flight-deck.git#c5ee57c269fcd1db164a95bb7676e43e08298001"] }
+```
+
+See [INSTALL.md](./INSTALL.md) for the three routes: pinned npm, the github package spec, and a no-npm local directory entry.
 
 Restart OpenCode. **That's the whole setup.** No config file, no options, nothing to learn. The panel appears beside an open session and starts reading.
 
@@ -41,9 +48,9 @@ branch     main
 cost       $0.245 · 2 subagents
 tokens     533k in · 91k out
 cache      98% hit · 32M read
-context    ██░░░░░░░░ 18%
+context    ██░░░░░░░░ ~18%
 elapsed    2h 14m 37s
-tps        18.0 tok/s
+tps        18 tok/s
 ```
 
 Every row is read from the open session at render time — except `caution`, which watches a clock rather than events (a hang emits none); `elapsed`, which is seeded once from the session's own recorded assistant turn spans and then accumulates the busy windows this run observes, rather than a value the session reports; and the opt-in `guard` row, which is polled from the local guard RPC.
@@ -61,17 +68,17 @@ The panel's only fixed text — `▸ FLIGHT DECK` over a separator — is **opt-
 | `total` | The family total and subagent count on a row of its own · **off by default** |
 | `project` | Every session in this project, not just the one on screen |
 | `tokens` | Input and output, cumulative |
-| `cache` | Hit rate first — the number that explains the bill — then cache reads |
-| `context` | A gauge of how full the window is |
+| `cache` | Hit rate first - `read / (read + input)` - then cache reads. Cache writes are excluded from the rate (creating an entry is not a lookup) but counted in `context` occupancy (a written entry still occupies the window) |
+| `context` | An estimated (`~`) gauge of how full the window is - occupancy is a proxy from the last request's `input + cache.read + cache.write`, not a host-reported figure |
 | `perms` | What is waiting for approval, not just how many |
 | `elapsed` | Active time — the clock runs only while this session, a subagent in its tree, or one of its shells is working, and freezes when everything settles. It is seeded once from the assistant turn spans the host already recorded for that session, so it survives a restart instead of resetting to `—`; work observed live after that keeps counting in memory. It measures active time, not wall-clock since the session began |
-| `tps` | Average speed **while streaming**: output **plus reasoning** tokens divided by the time the provider was actively streaming (`streamed - created`), subagents included. Idle time between turns and the tool settlement after a turn are never counted, so the figure freezes when everything settles instead of decaying or hiding; a turn still in flight counts up to now. On a host that exposes no per-message timestamps it falls back to the lifetime average, which includes idle and can therefore sag. Not configurable |
+| `tps` | Live speed **while generating**: the generation-token (output + reasoning) delta between polls over the generating-time delta (streaming spans, or the busy-gated active clock), smoothed and drawn whole - no decimals. Reasoning keeps its own row too. Idle is never divided: the figure freezes when everything settles and hides until ~2 s of generating time and ~10 tokens are on record. Not configurable |
 | `spark` | Recent turn sizes as a shape · **off by default** |
 | `reasoning` | Reasoning tokens, when the model emits them · **off by default** |
 | `turns` | How many prompts you've sent this session · **off by default** |
 | `guard` | Harness status from oc-harness-guard · **off by default** |
 | `go` | Zen Go account usage — a dial and a whole-number percent for the **5h**, **1w**, and **1m** windows, in that fixed order; a window at 90% or more turns its dial and number red, and the reset hint appears only then · **off by default** |
-| `ses` | The open session id, which the rail wraps; **click the row** to copy the full id to the terminal clipboard · **off by default** (requires the host's mouse) |
+| `ses` | An 18-wide clipped preview of the open session id (never the full id on the rail); **click the row** to copy the full id to the terminal clipboard . **off by default** (requires the host's mouse) |
 
 `project` matches on the host's **project id**, not on a directory, so a worktree counts as part of the same project. A host that reports no project id leaves nothing to match on, and the row then totals every session that host knows about.
 

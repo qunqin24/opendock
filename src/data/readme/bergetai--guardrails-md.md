@@ -35,6 +35,14 @@ promise that the agent cannot be persuaded — it promises that the boundary
 holds anyway, because the gate judges the command and your rules, not the
 conversation that led to it.
 
+## Not the guardrails.md convention
+
+This project is unrelated to the [guardrails.md](https://guardrails.md/)
+convention, where the agent appends its own lessons to `GUARDRAILS.md`. Here
+the file is written by humans and the gate blocks the agent from editing it,
+so if your repo already follows that convention, the agent can no longer
+update the file once the gate is installed.
+
 ## Quickstart
 
 Two steps. First teach the gate your rules, then put it in the harness.
@@ -79,17 +87,22 @@ For opencode, add the plugin to `opencode.json` (global or per project):
 
 ```json
 {
-  "plugin": ["@bergetai/opencode-guardrails-md"]
+  "plugin": ["@bergetai/guardrails-md"]
 }
 ```
 
-For pi, install from a clone of this repo (an npm release for pi is coming):
+The package was called `@bergetai/opencode-guardrails-md` up to 0.5.1. That
+name is deprecated; replace it with `@bergetai/guardrails-md` in your config.
+
+For pi, install the same package from npm (add `-l` to install it for the
+current project only):
 
 ```sh
-git clone https://github.com/berget-ai/guardrails-md
-cd guardrails-md && npm install
-pi install ./
+pi install npm:@bergetai/guardrails-md
 ```
+
+To run pi from a clone instead, use `pi install ./` in the cloned repo after
+`npm install`.
 
 For Claude Code, install from this repo's marketplace, at the prompt of a
 running session:

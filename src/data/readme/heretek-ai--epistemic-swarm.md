@@ -5,11 +5,13 @@
 > phases under dual QA, and open a PR a human merges. Mechanical gates and a
 > human-only approval channel keep autonomous runs honest.
 
-> **Status: 1.1.3.** Live-run visibility and seat discipline from the 1.1.2
-> dogfood (#63). Every status view leads with whether the run is working,
-> waiting, stuck or done: `es status`, `es watch`, `es runs`, the factory
-> dashboard and a TUI footer indicator. Factory seats run in the foreground,
-> with one writer per research file. 1.1.2 added `audit.phase`, pipeline A and
+> **Status: 1.1.4.** A security fix: a flag before the verb
+> (`es --cwd . <verb>`) no longer slips past the human-only shell rule
+> (#88). 1.1.3 added live-run visibility and seat discipline. Every status
+> view leads with whether the run is working, waiting, stuck or done:
+> `es status`, `es watch`, `es runs`, the factory dashboard and a TUI footer
+> indicator. Factory seats run in the foreground, with one writer per
+> research file. 1.1.2 added `audit.phase`, pipeline A and
 > signed run state; 1.1.1 was the security release (bubblewrap for every agent
 > shell, the passphrase-sealed Ed25519 human key, terminal-only approvals).
 > Install from npm (`@heretek-ai/epistemic-swarm`, `@heretek-ai/es-core`,

@@ -560,9 +560,11 @@ To install a copy of the checkout instead, drop the `--link`. To put it somewher
 ### Development
 
 ```bash
-npm test           # 432 checks
-node selftest.mjs  # can this machine show the readout?
-npm pack           # build the publishable tarball
+npm test                 # 439 checks
+npm run test:compat      # the compatibility check's own logic
+npm run compat           # this plugin against the pinned OpenCode API
+node selftest.mjs        # can this machine show the readout?
+npm pack                 # build the publishable tarball
 npm run prepublishOnly   # what publish runs first
 ```
 
@@ -574,6 +576,7 @@ opencode-vitals/
 ├── cli.mjs             npx opencode-vitals@latest (install, selftest, status, uninstall)
 ├── install.mjs         the installer itself
 ├── selftest.mjs        can this machine show the readout?
+├── scripts/compat.mjs  checks the plugin against a new OpenCode's event schema
 └── tests/vitals.test.mjs
 ```
 
@@ -581,6 +584,20 @@ Releases are cut by `.github/workflows/release.yml`: bump the version in `packag
 changelog section, commit. The workflow reads the version, runs the suite, tags and publishes, and
 skips a version that is already tagged. A missing changelog entry fails the run rather than
 publishing a release with no notes.
+
+### Staying compatible with OpenCode releases
+
+This plugin's only contract with OpenCode is the names it matches on — the session events it
+subscribes to and the prompt hook it registers. It never imports OpenCode, so a type checker has
+nothing to check. What it does have is the event schema: OpenCode publishes every event definition
+in `@opencode/schema`, and `EventManifest.Latest` is the map of every type the current server knows.
+
+`.github/workflows/opencode-compat.yml` runs once a day. It asks npm for the current
+`@opencode/plugin` version, installs it, and checks two things: the plugin's own suite still passes,
+and every event the plugin handles still exists in the new schema. A removed or renamed handled event
+is a break and opens one issue per version; an added event is not a break and only appears in the
+report. The version checked against is pinned as a dev dependency in `package.json`, so bumping the
+pin is the fix and the record. Run the same check locally with `npm install && npm run compat`.
 
 The test suite includes the mistakes worth catching twice: zombie holders in the
 singleton lock, a session with no totals yet (which must say it has nothing to

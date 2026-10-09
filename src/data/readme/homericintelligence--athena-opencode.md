@@ -61,12 +61,12 @@ commit or a supported release tag. Then, restart or reload the harness so that i
 skills.
 
 opencode installs Athena as the scoped npm plugin `@homericintelligence/athena-opencode`. Add this
-plugin to the `plugin` array of your `opencode.json`:
+plugin to the `plugins` array of your `opencode.json`:
 
 ```json
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugin": ["@homericintelligence/athena-opencode"]
+  "plugins": ["@homericintelligence/athena-opencode"]
 }
 ```
 

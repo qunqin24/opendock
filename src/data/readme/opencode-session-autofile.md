@@ -26,21 +26,32 @@ Title updates can occasionally arrive out of order at session start, so the plug
 
 ### Periodic reconciliation
 
-Besides the two event-driven paths above, the plugin also runs a periodic sweep (every 10 minutes by default — see `reconcileIntervalMs` in [ADVANCED.md](ADVANCED.md)) that lists your sessions, re-derives each one's folder from its *current* title tag, and moves any that aren't already filed there — including a session that was moved to a different folder by hand after it was first filed. Untagged or unmapped sessions are always left alone; the plugin only ever files sessions, it never removes one from a folder on its own initiative. Sessions already correctly filed cost no extra API calls, and archived sessions are skipped. See [ADVANCED.md](ADVANCED.md) for the interval option and its limits.
+**Not available in this version (OpenCode 2 / V2 plugin contract).** The V2 Promise plugin context (`@opencode/plugin@2.0.25`'s `SessionDomain`) does not expose a `session.list` method, which this feature requires to enumerate a project's sessions — confirmed by reading the installed package's types directly, and confirmed at runtime (`reconciliationSupported: false` in this plugin's own diagnostic state). The two event-driven paths above (immediate filing on title change, bounded retry when a turn ends) are unaffected and cover ordinary session filing. The reconciliation code is still present internally, gated behind a runtime capability check, so it will activate automatically with no plugin changes if a future `@opencode/plugin` release restores `session.list`. **If you need active reconciliation today, it is only available in `opencode-session-autofile@0.4.1` on OpenCode 1.x.** See [ADVANCED.md](ADVANCED.md) for the interval option and its limits (relevant again if/when support returns).
 
 ## Requirements
 
-- **OpenCode**, with plugin hooks and the `session.updated`/`session.idle` events (see [Compatibility](#compatibility)).
+- **OpenCode 2.0.20 or newer** (see [Compatibility](#compatibility)). This targets the V2 plugin contract (`@opencode/plugin`, default export `{ id, setup }`). **For OpenCode 1.x, use `opencode-session-autofile@0.4.1`** — the two major versions use incompatible plugin APIs and are not cross-compatible; pin the version that matches your OpenCode major version.
 - **OpenChamber running and reachable**, since the plugin calls its `/api/session-folders` API to read and move sessions between folders. By default OpenChamber's web server listens on `http://localhost:3000`; if yours runs elsewhere, set `apiBaseUrl` accordingly (see Configuration below). If OpenChamber isn't reachable, filing attempts fail silently and are logged — they never block the chat.
 
-## Install from the OpenChamber plugin screen
+## Install
 
-1. In OpenChamber's **Add plugin** screen, choose **From npm**.
-2. Set **Spec** to `opencode-session-autofile@latest`.
-3. Select **User** to enable it for every local workspace, or **Project** for only the current workspace.
-4. Optionally provide the JSON configuration below, then add the plugin and restart OpenCode.
+Pin an exact version in `opencode.json(c)`'s plugin array — never `@latest` in production, since `0.4.1` (OpenCode 1.x) and `0.5.0+` (OpenCode 2.x) are not interchangeable. The V1-style tuple form below is confirmed working against a real OpenCode 2.0.25 instance (OpenCode reads and normalizes it even on V2); the V2 object form is per [OpenCode's own plugin docs](https://opencode.ai/v2/docs/build/plugins) but has not independently been confirmed with a local/unpublished build — once this package is live on npm, both forms resolve the same published package, so there is no reason to expect it to behave differently, but it has not been separately tested:
 
-Adding the plugin replaces OpenCode's native `title` agent prompt with the plugin's own tagging prompt (or your custom `titlePrompt`, if set). This happens automatically every time OpenCode starts with the plugin enabled — not just once at install — so the title agent always stays in sync with your current `mappings`/`titlePrompt` configuration.
+```jsonc
+// V1-style config key ("plugin", tuple form) — still read and normalized under OpenCode 2
+"plugin": [
+  ["opencode-session-autofile@0.5.0", { "mappings": { "Tech": "Tech" } }]
+]
+```
+
+```jsonc
+// V2-native config key ("plugins", object form)
+"plugins": [
+  { "package": "opencode-session-autofile@0.5.0", "options": { "mappings": { "Tech": "Tech" } } }
+]
+```
+
+Restart OpenCode after adding or changing the entry. Adding the plugin replaces OpenCode's native `title` agent/request prompt with the plugin's own tagging prompt (or your custom `titlePrompt`, if set) every time it loads, so the title generator always stays in sync with your current `mappings`/`titlePrompt` configuration.
 
 ## Configuration
 
@@ -81,6 +92,7 @@ OpenCode must be restarted after adding, removing, or changing a plugin.
 
 ## Compatibility
 
-- OpenCode with plugin hooks and `session.updated`/`session.idle` events, plus a `PluginInput.client` exposing `session.get`.
-- OpenChamber with the local `/api/session-folders` endpoint.
-- Periodic reconciliation additionally needs `PluginInput.client.session.list`. If it's missing on your OpenCode/SDK build, the plugin logs that once and simply skips the periodic sweep — the two event-driven paths above are unaffected.
+- **OpenCode 2.0.20+** with the V2 (`@opencode/plugin`) Promise plugin contract: `session.hook("title", ...)`, `event.subscribe`, and `session.get`. Clean-load and the `session.created` event-driven filing path are verified against a real OpenCode 2.0.25 instance end to end (plugin loads, folder gets created, session gets filed). The `session.renamed` path and the `session.execution.*` bounded-retry fallback share the same underlying classify-and-file logic and are covered by the test suite and by `tsc` against the real SDK types, but have not independently been exercised against a live instance. The title-prompt-injection hook (`session.hook("title", ...)`) is covered by a unit test only — exercising it live requires an actual model call, which an isolated test environment can't provide without real provider credentials.
+- OpenChamber with the local `/api/session-folders` endpoint (verified against OpenChamber 2.1.1's rewritten, merge-queue-based route — see [ADVANCED.md](ADVANCED.md) for what changed).
+- Periodic reconciliation additionally needs a `session.list` method on the plugin context, which the installed `@opencode/plugin@2.0.25` does not expose (see above) — it is gated behind a runtime check and currently always off.
+- **For OpenCode 1.x**, use `opencode-session-autofile@0.4.1` instead, which targets the V1 plugin contract and includes active periodic reconciliation.

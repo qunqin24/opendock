@@ -68,6 +68,18 @@ Requires OpenCode v2. The plugin is CLI-only, so it is loaded from
    window, below OpenCode's own footer. Run `/opencode-status-line` (alias
    `/tps`, also in the command palette) to open the stats dialog.
 
+3. Optional: hide OpenCode's own prompt footer, so the status line is the only
+   footer and matches the screenshot above. Prefix the built-in plugin's name
+   with `-` in the same `plugins` list:
+
+   ```json
+   {
+     "plugins": ["-opencode.prompt.footer", "@rashidrazak/opencode-status-line"]
+   }
+   ```
+
+   Restart OpenCode to apply it.
+
 OpenCode downloads the package and runs its prebuilt entry, so there is nothing
 to compile on your side.
 

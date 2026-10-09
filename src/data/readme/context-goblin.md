@@ -245,19 +245,21 @@ OPENCODE_MODELS="openai/gpt-5.5 openai/gpt-5.6-sol" npm run check:models:general
 
 Reused events must match the current package version and all requested models.
 
-Latest completed comparison: 2026-10-08, OpenCode `1.18.20`, Context Goblin `0.1.22`.
+Latest completed comparison: 2026-10-08 13:13 UTC, OpenCode `1.18.20`, Context Goblin `0.1.22`.
 Read counts are distinct files accessed through the built-in `read` tool.
 
 | Model | Baseline Reads | Goblin Reads | File Reduction | Input Token Reduction | Total Token Reduction | Checklist | Cache Size | Compatibility | Overall Efficiency |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- |
-| openai/gpt-5.5 | 17 | 8 | 53% | -28% | 7% | 6/6 | 2,449 bytes | pass | fail |
-| openai/gpt-5.6-sol | 17 | 9 | 47% | 51% | 34% | 6/6 | 2,449 bytes | pass | pass |
+| openai/gpt-5.5 | 16 | 6 | 63% | 25% | 27% | 6/6 | 2,449 bytes | pass | pass |
+| openai/gpt-5.6-sol | 17 | 11 | 35% | 19% | 31% | 6/6 | 2,449 bytes | pass | pass |
 
-Both models passed the tool-flow, safety, and answer-coverage checks. `gpt-5.6-sol`
-also passed all efficiency checks. `gpt-5.5` reduced file reads and total event
-tokens, but its uncached input tokens increased by 28%, so its efficiency result
-is `fail`. The combined A/B command exits nonzero when any requested model fails;
-this run does not support a claim of savings across both models.
+Both models passed the tool-flow, safety, answer-coverage, and efficiency checks
+in this rerun. The combined A/B command completed successfully.
+
+Code and protocol were unchanged from the initial `0.1.22` comparison, which
+recorded a 28% uncached-input increase on `gpt-5.5`. That result is preserved in
+[previous run history](./examples/ab-run-history.md). The difference between these
+one-shot runs means repeatable savings have not yet been established.
 
 Detailed reports: [general A/B](./examples/model-general-ab-report.md) and
 [token usage](./examples/token-usage-ab-report.md). Total event tokens include

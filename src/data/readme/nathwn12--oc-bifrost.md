@@ -32,7 +32,7 @@ Install the oc-bifrost OpenCode plugin:
 {
   "plugins": [
     {
-      "package": "@nathwn12/oc-bifrost@1.4.5",
+      "package": "@nathwn12/oc-bifrost@1.6.3",
       "options": {
         "trustRemote": true, // consent: the first `github:` fetch downloads and executes a remote plugin
         "plugins": ["github:obra/superpowers"]
@@ -53,12 +53,13 @@ A module named in `options.plugins` is routed by its **shape**, and only the V1 
 - **V1 hook module** - a factory (a `default` async export, `{ server: factory }`, or any named function export - a `*Plugin` name is only the tie-breaker preference, `src/discover.ts`). Its hooks are translated one by one against the [compatibility matrix](#-compatibility) below.
 - **V2-shaped definition** — an `export default` carrying `{ id, setup | effect }`. It mounts **as-is** with the host context, exactly as the host itself would have mounted it. A **dual-export** file that ships both a V1 named export *and* a V2 default (for example `obra/superpowers@v6.4.2`) takes this path: the V2 default is used and the V1 named export is left untouched — no hook translation is applied to it.
 
-Sourcing is `github:` / a local path / a bundled `preset:` only. **npm and bare package names are refused** (`src/index.ts`); point at an installed copy by absolute path instead. And a plugin that needs one of the seven refused V1 hooks still needs a real port — the bridge will not fake it.
+Sourcing is `github:` / a registry package / a local path / a bundled `preset:`. A registry package is a bare name - `oc-todo`, `oc-todo@0.4.0`, `@scope/pkg@^1.0.0`, `pkg@latest` - or the same behind an `npm:`, `pnpm:`, or `bun:` prefix (`src/registry.ts`). And a plugin that needs one of the seven refused V1 hooks still needs a real port - the bridge will not fake it.
 
-Name each legacy plugin with **exactly one** of three specifiers:
+Name each legacy plugin with **exactly one** of four specifiers:
 
 - **`github:<owner>/<repo>[@<ref>][#<path>]`** — **The advertised, default route — snapshot-first.** The ref resolves to a commit once, at first fetch (the default branch when no `@<ref>`), then the **repository tarball** is fetched from codeload **at that resolved commit** and materialized as a whole tree — sibling files exist beside the plugin entry, so `obra/superpowers` reads its own `skills/`. **Caps:** 16 MiB compressed · 64 MiB uncompressed · 5000 files. **Hostile archives are refused outright, never materialized** — path-traversal, absolute/`..` escapes, NUL/backslash names, duplicate paths; a link or device entry refuses the snapshot too. The old single-file fetch is the **loud fallback** for an over-cap, malformed, or candidate-less snapshot: the mount note names the loss — `sibling files are NOT available`, and a plugin that reads them by relative path is inert. Never a silent downgrade. No `#<path>` → `hooks/opencode/<repo>.ts`, `hooks/opencode/index.ts`, `plugin.ts`, `index.ts` are probed in order inside the tree, and a miss lists every path it tried.
 - **A local path** — resolves against the session directory; park it in `legacy/`, never a discovery directory.
+- **A registry package** - `oc-todo`, `oc-todo@0.4.0`, `@scope/pkg@^1.0.0`, `pkg@latest`, or the same behind an `npm:` / `pnpm:` / `bun:` prefix. bifrost installs it itself into a bifrost-owned cache (`~/.cache/opencode/oc-bifrost/registry/<id>/`, `$XDG_CACHE_HOME` when set) because the host installer drops `npm:` alias specs and ships no pnpm/bun installer: `bun add --exact` first (the host runs on bun), `npm install --no-save --legacy-peer-deps` fallback - zero runtime dependencies, the manager is spawned, never imported. Cache-first (a warm cache mounts with zero spawns); the installed entry must exist before import or the mount fails loudly. It mounts whatever it resolves to: a V1 factory bridges, a V2 definition runs its native `setup`. **Alias honesty:** `pnpm:` and `bun:` install through that same spawned manager - the mount note says so plainly and never implies a real pnpm/bun install happened.
 - **A bundled, zero-fetch fallback** — for offline / air-gapped hosts; documented in the fallback section below.
 
 > **Version gate.** `github:` requires **oc-bifrost 0.4.0 or later**; releases **0.3.0 and below** cannot mount it — use the offline fallback or a local path there.
@@ -68,7 +69,7 @@ Name each legacy plugin with **exactly one** of three specifiers:
 **Optional; not the advertised route.** When GitHub is unreachable — an offline or air-gapped host — `preset:rtk` mounts a **bundled** V1 plugin (`vendor/rtk.ts`, verbatim `rtk-ai/rtk` `v0.50.0`, Apache-2.0) with **zero network**. It is opt-in, so nothing from RTK runs unless you ask for it.
 
 ```jsonc
-{ "package": "@nathwn12/oc-bifrost@1.4.5", "options": { "plugins": ["preset:rtk"] } }
+{ "package": "@nathwn12/oc-bifrost@1.6.3", "options": { "plugins": ["preset:rtk"] } }
 ```
 
 **Prerequisite:** the `rtk` binary (`>= 0.23.0`) on `PATH`; `preset:rtk` probes before mounting and names this command if it is missing. No winget? Take the release asset from [`rtk-ai/rtk`](https://github.com/rtk-ai/rtk/releases) instead. Not from crates.io — `cargo install rtk` installs a different project.
@@ -86,7 +87,7 @@ brew install rtk                 # macOS / Linux
 
 ### 📌 Version choice & updates
 
-- **Pin the exact version** — `"package": "@nathwn12/oc-bifrost@1.4.5"`. Predictable, and the version these docs describe.
+- **Pin the exact version** — `"package": "@nathwn12/oc-bifrost@1.6.3"`. Predictable, and the version these docs describe.
 - `@^1.0.0` auto-tracks 1.x and never adopts a new major silently.
 - A bare `@nathwn12/oc-bifrost` or `@latest` may be unstable while OpenCode's plugin cache settles.
 - **If an update does not appear:** run `opencode plugin check`; if it still does not, delete `~/.cache/opencode/npm/@nathwn12/oc-bifrost@latest` and reload.
@@ -95,7 +96,7 @@ brew install rtk                 # macOS / Linux
 
 | Option | Type | Default | Meaning |
 |---|---|---|---|
-| `plugins` | `Array<string \| { spec, options }>` | `[]` | Specifiers to bridge — `github:`, a local path, or the bundled offline fallback (`preset:`) |
+| `plugins` | `Array<string \| { spec, options }>` | `[]` | Specifiers to bridge - `github:`, a registry package (bare name or `npm:`/`pnpm:`/`bun:` prefix), a local path, or the bundled offline fallback (`preset:`) |
 | `trustRemote` | `boolean` | `false` | Consent to fetch + execute a `github:` plugin on a cold cache |
 | `strict` | `boolean` | `false` | Abort setup on an unsupported or unmountable hook |
 | `verbose` | `boolean` | `true` | Print the per-plugin compatibility report |
@@ -114,7 +115,7 @@ Wire a TUI plugin from github:
 {
   "plugins": [
     {
-      "package": "@nathwn12/oc-bifrost@1.4.5",
+      "package": "@nathwn12/oc-bifrost@1.6.3",
       "options": {
         "plugins": ["github:obra/superpowers"],
         "trustRemote": true, // consent: the first `github:` fetch downloads and executes a remote plugin
@@ -204,7 +205,7 @@ The unit of compatibility is the **V1 hook**, not the plugin — once a hook is 
 | `event` | 🟡 partial | `ctx.event.subscribe()` - V2 `session.execution.succeeded\|failed\|interrupted` synthesised to the V1 `session.idle` envelope; other names/payloads pass through |
 | `client.session.messages` | 🟡 partial | `ctx.session.context` — active context (post-compaction) only; the full transcript is HTTP-only |
 | `experimental.chat.system.transform` | 🟡 partial | `ctx.session.hook("context")` |
-| `experimental.chat.messages.transform` | 🟢 full | `ctx.session.hook("context")` — V1 `{info,parts}` envelope pre-fill + write-back |
+| `experimental.chat.messages.transform` | 🟢 full | `ctx.session.hook("context")` - V1 `{info,parts}` envelope pre-fill + shape-aware write-back (originals kept whole only when unchanged) |
 | `experimental.session.compacting` | 🟡 partial | `ctx.session.hook("compaction")` |
 | `client.session.children` | 🔴 refused | no plugin-scoped child listing in V2 (HTTP-only; the plugin context carries no server address) |
 | `client.tui.showToast` | 🔴 refused | `tui.toast.show` is a TUI-process event; no server-plugin toast surface |

@@ -11,6 +11,11 @@ macOS and Linux:
 curl -fsSL https://archdev.ai/install.sh | bash
 ```
 
+Linux builds need glibc 2.34 or later (Ubuntu 22.04, Debian 12, RHEL 9 and
+newer). On x64 hosts with an older glibc, and on musl distributions such as
+Alpine, the installer installs the static musl build instead. arm64 has no
+static build yet.
+
 Windows (PowerShell):
 
 ```powershell

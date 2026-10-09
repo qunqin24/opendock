@@ -28,7 +28,7 @@ OpenCode 的供应商清单来自 models.dev 目录，**目录里没有的供应
 
 ```jsonc
 {
-  "plugins": ["@justsilver/opencode-providers@0.3.1"]
+  "plugins": ["@justsilver/opencode-providers@0.3.2"]
 }
 ```
 
