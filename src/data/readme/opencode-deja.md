@@ -7,7 +7,7 @@
 
 <p align="center"><b>Your coding agents stop re-debugging what you already fixed.</b></p>
 
-<p align="center">Claude Code, Codex, Cursor and 35 more agents already save every session to disk.
+<p align="center">Claude Code, Codex, Cursor and 38 more agents already save every session to disk.
 deja indexes all of it, months back, and hands the part that matters
 to whichever agent is working now.</p>
 
@@ -47,6 +47,23 @@ deja install --auto
 <p align="center"><a href="https://vshulcz.github.io/deja-vu/">Docs</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">Benchmarks</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/compare.html">How it compares</a> &middot; <a href="docs/INTEGRATING.md">Building it into your tool</a></p>
 
 <p align="center"><sub>Found it useful? <a href="https://github.com/vshulcz/deja-vu">Star deja-vu on GitHub</a>.</sub></p>
+
+## Search it yourself
+
+`deja` with no arguments in a terminal opens a search over every agent's history. It starts
+on the sessions behind your uncommitted change, then the recent ones in this project, and
+the list narrows as you type.
+
+<p align="center"><img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/tui.gif" width="720" alt="Typing a search in the deja screen, reading the session it found, and continuing that session in another agent"></p>
+
+- `↑↓` picks a session, `↵` opens it at the match, `n` and `N` step through the matches, `esc` goes back. Inside a session, `/` finds a word and `]` `[` jump between the turns you asked.
+- The box takes filters: an agent with a colon (`codex:`), `today`, `yesterday`, `week`, `month`, and `in:<project>`.
+- `r` resumes the session in the agent that wrote it. `o` continues it in any other agent, which starts with what the session asked, decided and left open.
+- `tab` switches between this project, all projects and Deleted, the sessions their agent deleted that deja still holds; `R` puts one back.
+- `?` lists every key, `^k` has the rest (copy the session id or project path, forget a session), `q` quits.
+
+With `DEJA_TUI=0` it prints the text summary instead, which is also `deja brief`. Piped, it
+prints what is indexed and which command to run next.
 
 ## Highlights
 
@@ -92,7 +109,7 @@ Start a new agent session and ask it something you worked on months ago:
 > have we dealt with jwt refresh rotation before? check your memory
 
 It does not have to be asked, either — with auto-recall the agent already knows what you
-solved in that project when the session opens.
+solved in that project when the session opens. To look for yourself, run `deja`.
 
 <details>
 <summary>Other ways to install, and what to do if you want less than all of it</summary>
@@ -149,7 +166,9 @@ Install also writes user-level guidance for the harnesses it detects: Claude Cod
 ## Privacy
 
 Indexing and search are local. The network is used only by `deja update`, `deja sync ssh`,
-the version check in `deja doctor`, and `deja embed` against an endpoint you configure.
+the version check in `deja doctor`, `deja embed` against an endpoint you configure, and a
+once-a-day look at the latest release from an interactive command. That look sends no
+session data; `DEJA_OFFLINE=1` or `DEJA_NO_UPDATE_NOTICE=1` turns it off.
 
 Credentials are stripped as the index is built: cloud and provider keys, tokens and JWTs,
 PEM blocks, passwords in URLs or stated in prose. Each becomes `[redacted:<kind>]` and the
@@ -163,6 +182,9 @@ skips a project per line, or a whole store with `harness:opencode`. The
 [security model](docs/SECURITY-MODEL.md) has the data flows and what redaction cannot catch.
 
 ## CLI
+
+Bare `deja` in a terminal opens [the search screen](#search-it-yourself). With a query,
+or any command below, it prints and exits:
 
 ```text
 $ deja "jwt refresh token"
@@ -178,13 +200,17 @@ $ deja "jwt refresh token"
 | Command | What it does |
 | --- | --- |
 | `deja <query>` | Search every history. Multi-word is AND and quoted phrases require contiguous text; a query with no exact match then tries word forms and close spellings, which is where a substring reaches its word (`code` finds `opencode`). |
-| `deja` | With an index and a terminal: today's sessions, recalls served, a question you asked in more than one session, and a wall your agents keep hitting. |
+| `deja` | In a terminal, the full-screen search above. `deja brief` prints the text summary instead: today's sessions, what deja served, recent work and a search to try. |
 | `deja wip` | What the last session in this directory was doing: the task, what it settled, the files in flight, the last command and whether it failed — derived from the transcript, not from a note someone remembered to write. |
 | `deja blame <path>[:line]` | Which sessions discussed a file, what was decided, and why. With a line: the commit that last changed it, and the session that wrote that line or the text the commit replaced. `--attribution` prints the line answer alone, as JSON with `--json`, and `--git-note` records it in `refs/notes/deja`. |
 | `deja files <topic>` | The other direction: which files the work on a subject actually touched. |
 | `deja how <tool>` | How this machine actually runs a thing, with the real flags, from what agents ran before. |
 | `deja fix <error>` | What this machine ran after that same error before, when the error did not come back. Never a merge, a force push or a deletion. |
 | `deja friction` | Errors that hit three or more separate sessions, with the harnesses named. |
+
+When the first word of a bare query has at least four characters and is one
+edit from a command name, deja names that command on stderr and then searches
+as usual. `deja search <query>` skips the suggestion.
 
 <details>
 <summary>Using what it finds, and moving it between machines</summary>
@@ -529,7 +555,8 @@ knows only what an agent chose to save. The
 
 Under
 `~/.claude/projects`, one JSONL file per session; Codex keeps `~/.codex/sessions`, Cursor a
-SQLite `state.vscdb`. `deja search` reads them all in place, `deja last` lists the recent
+SQLite `state.vscdb`. deja reads them all in place: bare `deja` opens a screen to search
+and read them, `deja search` does it from a script, `deja last` lists the recent
 sessions of every agent, and `deja view` opens the whole history as one local page. Paths
 for each agent: [where sessions are stored](https://vshulcz.github.io/deja-vu/guide/where-sessions-are-stored.html).
 

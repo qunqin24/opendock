@@ -225,15 +225,19 @@ back to a plain notice if needed.
 * If `ctx.session.synthetic` throws, the command logs an actionable error and the
   payload is preserved in the log — there is no other delivery channel in this
   runtime (no `noReply`/`prompt` option exists).
-* **The model may echo the instruction line.** Because delivery is an agent turn,
-  the model can reproduce the verbatim instruction prefix
-  (`Reproduce the markdown table below exactly…`) in its answer instead of
-  echoing only the payload.
-* **Deleted sessions can linger.** `session.deleted` clears the in-memory caches
-  but not the `state.json` entry, so a deleted session that had already served a
-  step (has tokens) is not filtered as a phantom and stays listed until its entry
-  is evicted by the `state.json` LRU cap (`MAX_TRACKED_SESSIONS`) — it may
-  momentarily appear in the table.
+* **Instruction echo.** Delivery is an agent turn: the model renders the
+  payload, and with the previous instruction wording it occasionally echoed
+  the instruction line itself. Both instructions now delimit the payload with
+  explicit tags (`<context-summary>` / `<context-breakdown>`) and instruct the
+  model to output only the tagged content — an unambiguous payload boundary
+  instead of a "reproduce exactly" phrasing. Residual risk: a model may still
+  add light commentary or include the tags themselves.
+* **Deleted sessions age out over 30 days.** A `state.json` entry is pruned on
+  the next write once it has been untouched for 30 days (tombstone prune), so
+  deleted sessions no longer linger until the `MAX_TRACKED_SESSIONS` LRU cap.
+  Until the prune fires, a deleted session that had already served a step (has
+  tokens) is not filtered as a phantom and may momentarily appear in the
+  table.
 
 ### TUI session panel (V2, terminal only)
 

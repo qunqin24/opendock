@@ -2,6 +2,9 @@
 
 Runs Claude Code `SessionStart` hooks in [opencode](https://opencode.ai), which has no hook system of its own.
 
+One package serves **both opencode generations**: the dual entrypoint runs on opencode V2 and on opencode V1
+(1.18.29 or newer), with the same bridged behaviour in each.
+
 If you maintain a Claude Code plugin (or a `.claude/settings.json`) that bootstraps a session — installs
 dependencies, warms a cache, syncs config — that work silently does nothing under opencode. This plugin
 executes those same commands and forwards their output the way Claude Code would.
@@ -19,22 +22,51 @@ opencode has no hooks. That is not an oversight in the docs — it is verifiable
   `CLAUDE.md` and `~/.claude/skills/` only. `settings.json` and hook definitions are ignored.
 
 So a Claude Code `hooks.json` is inert under opencode. The only startup extension point is the plugin
-function body, which runs once when the plugin loads. This package maps one onto the other.
+entrypoint — the plugin function body in V1, `setup` in V2 — which runs once when the plugin loads. This
+package maps one onto the other.
 
 ## Mapping
 
-| Claude Code                       | opencode                                             |
-| --------------------------------- | ---------------------------------------------------- |
-| `SessionStart` + `matcher`         | the plugin function body (runs once at load)          |
-| `type: "command"`                  | executed via `sh -c` using opencode's shell           |
-| `${CLAUDE_PLUGIN_ROOT}`            | the `root` option                                     |
-| stdout `{ "systemMessage": "…" }`  | appended to the system prompt                         |
-| stdout `{ "continue": false }`     | remaining commands are skipped                        |
+| Claude Code                       | opencode V1                                     | opencode V2                                      |
+| --------------------------------- | ----------------------------------------------- | ------------------------------------------------ |
+| `SessionStart` + `matcher`         | the plugin function body (runs once at load)    | the `setup` body (runs once at load)             |
+| `type: "command"`                  | `sh -c` via opencode's shell                    | `sh -c` via `node:child_process`                 |
+| `${CLAUDE_PLUGIN_ROOT}`            | the `root` option                               | the `root` option                                |
+| stdout `{ "systemMessage": "…" }`  | `experimental.chat.system.transform`            | session `context`/`compaction`/`generate`/`title` hooks |
+| stdout `{ "continue": false }`     | remaining commands are skipped                  | remaining commands are skipped                   |
 
 Claude Code's stdout control contract is honoured: hook scripts routinely interleave the JSON directive with
 ordinary log lines, so stdout is scanned line by line rather than parsed as one document.
 
 ## Install
+
+### opencode V2
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugins": ["@raultov/opencode-hooks-plugin"]
+}
+```
+
+With options:
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugins": [
+    {
+      "package": "@raultov/opencode-hooks-plugin",
+      "options": {
+        "root": "/path/to/your/claude-plugin",
+        "skip": ["some-claude-only-hook.sh"]
+      }
+    }
+  ]
+}
+```
+
+### opencode V1
 
 ```sh
 opencode plugin @raultov/opencode-hooks-plugin
@@ -65,6 +97,15 @@ With options:
   ]
 }
 ```
+
+### Notes
+
+- **opencode V1 older than 1.18.29** cannot load the dual entrypoint (it predates object entrypoints).
+  Pin `@raultov/opencode-hooks-plugin@0.2.0` there.
+- **Loading from a local path** (development, or a checkout): point the config at the built `dist/`
+  directory, which contains `index.js`. npm package names resolve `dist/index.js` on their own.
+- The `./v1` and `./v2` package exports expose each generation's entrypoint in isolation, mostly for
+  tests and wrappers; the default export already serves both.
 
 ## Which hooks file is used
 
@@ -133,7 +174,8 @@ whole. The notice names the command and how it failed, never its stderr, which s
 opencode --print-logs --log-level DEBUG
 ```
 
-Entries are tagged `service=opencode-hooks`.
+opencode V1 entries are tagged `service=opencode-hooks`; opencode V2 logs to the console with an
+`[opencode-hooks]` prefix.
 
 **`CLAUDE_PLUGIN_ROOT` is exported** to every command, since hook scripts often read it directly.
 **`CLAUDE_CODE_ENTRYPOINT` is deliberately not set** — scripts use it to gate Claude-Code-only behaviour, and
@@ -145,10 +187,12 @@ Claude Code; put it in `skip`.
 - **Only `SessionStart` is bridged.** The other Claude Code events have opencode counterparts you can wire up
   directly in a plugin of your own, and doing so needs no `hooks.json`: `PreToolUse` → `tool.execute.before`,
   `PostToolUse` → `tool.execute.after`, `Stop` → the `session.idle` event, `SessionEnd` → `session.deleted`.
-- **`systemMessage` injection uses an experimental opencode hook**
-  (`experimental.chat.system.transform`). It is present in `@opencode-ai/plugin` but may change without
-  notice. If injected messages ever stop appearing, that is the first thing to check — the log output is
-  unaffected. Set `injectSystemMessages: false` to opt out and rely on logs only.
+- **`systemMessage` injection differs per generation.** opencode V2 uses the stable session request
+  hooks, offering the block to every request kind that carries a system prompt (`context`, `compaction`,
+  `generate`, `title`). opencode V1 uses an experimental hook (`experimental.chat.system.transform`)
+  that may change without notice; if injected messages ever stop appearing there, that is the first
+  thing to check — the log output is unaffected. Set `injectSystemMessages: false` to opt out and rely
+  on logs only.
 - **`continue: false` skips the remaining commands** but cannot abort the session the way Claude Code does;
   opencode has no equivalent control channel.
 

@@ -203,6 +203,12 @@ The launcher entry and the copy of the app's renderer are made by the plugin its
 by the installer — `opencode plugin add` runs none of this package's code, so the first thing to
 execute after a package install is the plugin, and that is where it sets itself up.
 
+The entry starts a small readout host before the window, using the app's own binary run as Node, so
+a server is listening by the time the window asks for one. The plugin's own server binds the same
+port, and both are allowed to: an OpenCode update restarts the service the plugin lives in, and the
+host keeps answering for as long as the window is open. On a cold start the window used to meet a
+port that was not listening yet — `ERR_CONNECTION_REFUSED` — and this is what removed that.
+
 ---
 
 ## Why
@@ -560,7 +566,7 @@ To install a copy of the checkout instead, drop the `--link`. To put it somewher
 ### Development
 
 ```bash
-npm test                 # 439 checks
+npm test                 # 454 checks
 npm run test:compat      # the compatibility check's own logic
 npm run compat           # this plugin against the pinned OpenCode API
 node selftest.mjs        # can this machine show the readout?

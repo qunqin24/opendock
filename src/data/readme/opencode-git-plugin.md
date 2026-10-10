@@ -82,6 +82,7 @@ Do not add the plugin to `opencode.json(c)`; that file is for server plugins and
 | Option | Type | Default | Description |
 | --- | --- | --- | --- |
 | `intervalMs` | `number` | `4000` | Refresh interval in milliseconds; values below `1000` are clamped. |
+| `folderTree` | `string` | `"none"` | File list style: `"none"` (full paths), `"comfortable"` (indented tree, 2 cols/level), `"compact"` (tree, 1 col/level), or `"minimal"` (plain indentation). |
 
 ## Usage
 
@@ -92,6 +93,7 @@ Do not add the plugin to `opencode.json(c)`; that file is for server plugins and
 - Click a row to open its diff; click the branch name to enter stage mode (every clicked file toggles staged/unstaged; branch click or `ESC` exits)
 - Clicking the prompt input exits list mode so typing is never hijacked
 - Staging also via palette (`Git Panel: Stage/Unstage File`)
+- With `folderTree` enabled, clicking a folder collapses/expands it; in stage mode, clicking a folder stages/unstages everything inside it (unstages only when all of its files are already staged)
 
 ### Diff panel
 
@@ -110,7 +112,7 @@ Do not add the plugin to `opencode.json(c)`; that file is for server plugins and
 
 - `Loading…` while fetching
 - `Working tree clean` when there is nothing to show (header stats hidden)
-- `Empty repo — no commits yet` before the first commit
+- `Empty repo — no commits yet` before the first commit when nothing is staged or untracked (files still list normally once they exist)
 - `Not a git repository` outside a repo, plus raw fetch errors
 
 ## Development

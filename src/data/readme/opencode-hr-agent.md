@@ -75,6 +75,21 @@ curl -fsSL https://raw.githubusercontent.com/TachikomaGundam/AIHR/main/scripts/i
 powershell -c "irm https://raw.githubusercontent.com/TachikomaGundam/AIHR/main/scripts/install.ps1 | iex"
 ```
 
+On flaky or proxied networks, fetch first and run second. `curl … | sh`
+reports the exit code of `sh`, not of `curl`: a stalled download can look
+like a successful no-op (field signature: zero bytes for minutes, then
+`curl: (28)`; installer log audit 2026-10-08/09). The two-step form gives
+the fetch retries and fails loudly if the script never arrives:
+
+```bash
+curl -fSL --connect-timeout 20 --retry 6 --retry-delay 10 --retry-connrefused \
+  https://raw.githubusercontent.com/TachikomaGundam/AIHR/main/scripts/install.sh \
+  -o /tmp/aihr-install.sh && sh /tmp/aihr-install.sh
+```
+
+The bundle download inside the installer already retries with backoff on its
+own; the recipe above protects the first hop.
+
 Flags: `--version X.Y.Z` pins the release · `--bundle <path>` installs from a local bundle instead of downloading · `--port N` sets the database port · `--reinstall` re-runs over an existing install (idempotent: the data directory, database included, stays intact). Open a fresh shell so the `~/.aihr/bin` shim is on PATH, then `hr db-up && hr status`.
 
 Everything the installer places lives in ONE directory it owns: `~/.aihr` (Linux/macOS) or `%LOCALAPPDATA%\aihr` (Windows) — `app/` the bundled runtime (no Python needed on the target), `pg/` the vendored PostgreSQL, `bin/` the PATH shim, `data/pgdata` the database itself, `db.env` the first-boot random password written with `0600` permissions, `share/aihr` the packaged configuration, and `receipt.json` the record of every written path. Outside the owned directory the installer touches exactly two things: a clearly-marked block in your shell rc pointing PATH at the shim, and the two opencode config arrays it registers plugins into; all of it is on the receipt. npm is NOT an install step: the installer tail `hr install-post` registers the plugin packages in opencode's config arrays (the main `plugin` array in `opencode.jsonc`, plus `tui.json` for the FastDraw TUI half), and opencode/bun auto-fetches those npm packages at startup. `hr db-up` needs no Docker. It decides its backend automatically among the embedded vendored Postgres (the bundle default), a compose container (the existing lane, kept), or a BYO PostgreSQL described by `HR_DSN` / `hr.toml`; `hr db-status` reports which backend is live. The Docker-free turnkey install lands with **aihr 0.4.0 (2026-09)**; the 0.3.0 era in which `hr db-up` required a preinstalled Docker (the "docker not found" era) is superseded.

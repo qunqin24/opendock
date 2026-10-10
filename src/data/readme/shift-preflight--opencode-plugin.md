@@ -195,6 +195,33 @@ shift-ai env --list
 
 All agents share the same proxy on port 8787 — start it once and every agent benefits.
 
+### Daemon ownership and upgrades
+
+`proxy start` and `proxy ensure` save a private JSON record in `~/.shift/proxy.pid`
+containing the PID, process start time, executable, owner, and port. Lifecycle
+commands serialize through `~/.shift/proxy.lock`; state updates use atomic
+replacement. One state directory manages one background daemon at a time.
+
+`proxy stop` signals only a process matching that record and verifies its exit
+before clearing the record. It checks identity again before escalating from
+`SIGTERM` to `SIGKILL`. Linux uses a pidfd bound to the process instance and requires
+Linux 5.3+ for managed shutdown. macOS uses kernel process metadata; its identity
+check and signal are separate operations, so a narrow check-to-signal race remains.
+This protects against stale or recycled PIDs, not against someone who can rewrite
+your private state with a forged identity.
+
+Versions through 0.10.3 stored only a numeric PID. These legacy records cannot
+prove ownership, so the new CLI refuses to signal them. For a one-time upgrade:
+
+1. Stop the old daemon through its service manager, or manually verify the
+   process identity before stopping it in your process manager.
+2. Once the old daemon is stopped, remove the legacy `~/.shift/proxy.pid` file.
+3. Run `shift-ai proxy ensure` to create an identity-verified record.
+
+A healthy legacy or foreground proxy can still be reused by `ensure`, but it
+will appear as `ownership unverified` in `status`. Foreground LaunchAgent/systemd
+services remain owned by their supervisor and should be stopped through it.
+
 ## Install
 
 ### Homebrew (macOS/Linux)

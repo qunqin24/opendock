@@ -13,7 +13,7 @@
     <img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg" alt="License">
   </a>
   <a href="plugin/pyproject.toml">
-    <img src="https://img.shields.io/badge/version-0.3.3-green.svg" alt="Version">
+    <img src="https://img.shields.io/badge/version-0.3.5-green.svg" alt="Version">
   </a>
   <a href="plugin/pyproject.toml">
     <img src="https://img.shields.io/badge/python-%3E%3D3.12-brightgreen.svg" alt="Python">
@@ -66,7 +66,7 @@ Requires Node.js 20+ (for `npx`) and the host CLI you're installing into (`claud
 npx claude-smart install
 ```
 
-Then restart Claude Code.
+Run `/reload-plugins` in your existing Claude Code session, or use the update in your next session.
 
 ### Codex
 
@@ -74,7 +74,7 @@ Then restart Claude Code.
 npx claude-smart install --host codex
 ```
 
-Then fully quit and reopen Codex so hooks reload.
+Start a new Codex session to load the update; you can finish your existing session first. If hook trust needs review, use `/hooks`.
 
 ### OpenCode
 
@@ -84,6 +84,15 @@ npx claude-smart install --host opencode
 
 Then restart OpenCode in your project so it loads the plugin from `opencode.json`. Add `--global` to install for all OpenCode projects on this machine instead.
 
+### Check an update
+
+```bash
+npx claude-smart status
+npx claude-smart status --host codex
+```
+
+Shows the installed version and the version each recent session last used in a hook. Historical observations do not confirm that a session is still active. Codex uses `CODEX_HOME` when set; run installation and status with the same account home as your session.
+
 ### Uninstall
 
 ```bash
@@ -92,7 +101,7 @@ npx claude-smart uninstall --host codex       # Codex
 npx claude-smart uninstall --host opencode    # OpenCode
 ```
 
-Restart the host afterward. Learned data under `~/.reflexio/` and `~/.claude-smart/` is preserved and shared across hosts, so you can uninstall or switch hosts without losing skills or preferences.
+Afterward, use `/reload-plugins` in Claude Code, start a new Codex session, or restart OpenCode. Learned data under `~/.reflexio/` and `~/.claude-smart/` is preserved and shared across hosts, so you can uninstall or switch hosts without losing skills or preferences.
 
 For per-host details — what the installers and uninstallers touch, OpenCode config resolution and model/env overrides, and Windows notes — see [Host install notes](./DEVELOPER.md#host-install-notes) in DEVELOPER.md. Developing the plugin itself? See [Developing locally](./DEVELOPER.md#developing-locally).
 
@@ -148,7 +157,7 @@ https://github.com/user-attachments/assets/ed84d73a-d5b7-4a0d-ab2c-f2c060c3f276
 
 ## Dashboard
 
-A web UI for browsing session histories, inspecting preferences, and editing project-specific and shared skills. The dashboard auto-starts alongside the backend, so you can open **http://localhost:3001** directly. Or run `/claude-smart:dashboard` in Claude Code to open it in your browser. In Codex, run `bash ~/.reflexio/plugin-root/scripts/dashboard-open.sh`.
+A web UI for browsing session histories, inspecting preferences, and editing project-specific and shared skills. The local backend binds to `127.0.0.1:8071` by default. The dashboard auto-starts alongside the backend, so you can open **http://localhost:3001** directly. Or run `/claude-smart:dashboard` in Claude Code to open it in your browser. In Codex, run `bash ~/.reflexio/plugin-root/scripts/dashboard-open.sh`.
 
 <p align="center">
   <img src="assets/preferences_dashboard.png" alt="Preferences dashboard" width="49%">

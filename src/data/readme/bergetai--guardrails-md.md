@@ -39,9 +39,10 @@ conversation that led to it.
 
 This project is unrelated to the [guardrails.md](https://guardrails.md/)
 convention, where the agent appends its own lessons to `GUARDRAILS.md`. Here
-the file is written by humans and the gate blocks the agent from editing it,
-so if your repo already follows that convention, the agent can no longer
-update the file once the gate is installed.
+the file is written by humans, so if your repo already follows that
+convention, the edit tools will refuse the agent's writes to the file once the
+gate is installed (bash writes are still judged, not hard-blocked; see
+[Protected files](#protected-files)).
 
 ## Quickstart
 
@@ -83,7 +84,9 @@ See [`guardrails.example.md`](guardrails.example.md) — copy it to `GUARDRAILS.
 
 **2. Install the gate in your harness.**
 
-For opencode, add the plugin to `opencode.json` (global or per project):
+### opencode
+
+Add the plugin to `opencode.json` (global or per project):
 
 ```json
 {
@@ -94,7 +97,9 @@ For opencode, add the plugin to `opencode.json` (global or per project):
 The package was called `@bergetai/opencode-guardrails-md` up to 0.5.1. That
 name is deprecated; replace it with `@bergetai/guardrails-md` in your config.
 
-For pi, install the same package from npm (add `-l` to install it for the
+### pi
+
+Install the same package from npm (add `-l` to install it for the
 current project only):
 
 ```sh
@@ -104,8 +109,9 @@ pi install npm:@bergetai/guardrails-md
 To run pi from a clone instead, use `pi install ./` in the cloned repo after
 `npm install`.
 
-For Claude Code, install from this repo's marketplace, at the prompt of a
-running session:
+### Claude Code
+
+Install from this repo's marketplace, at the prompt of a running session:
 
 ```
 /plugin install guardrails-md --marketplace berget-ai/guardrails-md
@@ -120,6 +126,8 @@ loads in-process from `hooks/hooks.json`, so there is no build step and no
 Hooks modules are an early-access Claude Code API (checked on 2.1.291);
 the engine may change them between releases. Claude Code has no Berget seat
 token — set `BERGET_API_KEY` (below) for this harness.
+
+### API key
 
 Set a key and restart the harness (plugins and extensions load at startup):
 

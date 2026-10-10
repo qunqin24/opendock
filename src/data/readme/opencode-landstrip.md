@@ -44,10 +44,6 @@ merged-policy inspection, CLI options, and platform limits.
 - [OpenCode](packages/opencode-landstrip/README.md): `opencode-landstrip` plugin.
 - [Pi](packages/pi-landstrip/README.md): `pi-landstrip` extension and subagents.
 
-## Development
-
-Run `make ci` from the repository root.
-
 ## License
 
 - Native sandbox: [LGPL-3.0-or-later](packages/landstrip/LICENSE).

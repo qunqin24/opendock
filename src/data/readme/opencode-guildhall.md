@@ -32,6 +32,8 @@ all as a story.
   [world protocol](packages/core/PROTOCOL.md). A repo's whole history is next.
 - **A world that tells the story.** A director picks the camera shots, captions narrate as it
   happens, the Legends book and recaps keep it, and the guild makes music as it works.
+- **A repo becomes a world.** A public repo's file tree grows into an island with mountain ranges,
+  rivers, lakes, forests, towns, a castle and buildings your agents walk into.
 - **Built to scale.** 300 adventurers in 143 draw calls, an experimental WebGPU renderer, and
   archipelagos of repos. The numbers are on [How it's built](https://guildhall.codestz.dev/how).
 - **Honest by design.** Only real events move the world, and nothing is faked. The public site
@@ -44,7 +46,7 @@ all as a story.
 | [OpenCode](#opencode) | Every session an adventurer, plus nine guild agents to work with | Add the plugin to `opencode.json` |
 | [Claude&nbsp;Code](#claude-code) | Every session and subagent, in the same hall | Install once, merge the printed hooks |
 | [GitHub&nbsp;seas](#github-seas) | Commits, pull requests, CI and releases as ships | Automatic when a project's remote is on GitHub |
-| [Repo&nbsp;islands](#repo-islands-and-archipelagos) | A public repo's file tree grown into an island, or several as an archipelago | `?repo=owner/name` or `?archipelago` |
+| [Repo&nbsp;islands](#repo-islands-and-archipelagos) | A public repo's file tree grown into a world, or several as an archipelago | `?repo=owner/name` or `?archipelago` |
 | Git&nbsp;history | A repo's whole history played as a story (Repo Chronicle) | Coming |
 | [Your&nbsp;own](#your-own) | Anything that can POST JSON: deploys, services, jobs | The [world protocol](packages/core/PROTOCOL.md) |
 
@@ -94,8 +96,35 @@ stored. Set `GUILDHALL_GITHUB=0` to turn the watch off.
 ### Repo islands and archipelagos
 
 Add `?repo=owner/name` to the hall's URL and your browser reads that public repo's file tree from
-GitHub and grows an island from it. `?archipelago` sets several side by side, or name your own with
+GitHub and grows a world from it. `?archipelago` sets several side by side, or name your own with
 `?repos=a/b,c/d`. The **Your repo as an island** door in the hall does the same.
+
+<p align="center">
+  <img src="packages/hall/public/demos/world.webp" alt="An island grown from a repo: grey mountain ranges inland with rivers running down to the sea, forests on the slopes, and a walled town with roads and farms on the plain." width="100%" />
+</p>
+
+The island is one landmass sized by the repo's files, so a big repo reads as big. What grows on it
+follows the repo's shape:
+
+- **Land and water.** Mountain ranges stand inland, with ledged flanks and rocky summits. Rivers run
+  down them to valley lakes and the sea, and forests thin out to a treeline.
+- **Towns and castles.** Each folder becomes a district with its own square, and big repos earn a
+  castle. They are built from a catalogue of prefabs; `?lab=prefabs` is a sandbox to browse them,
+  with seeded variants.
+- **Places to visit.** A forge, library, tavern, mine, watchtower and market stand in their
+  districts. Agents walk in to do the matching work (edit at the forge, read at the library, test at
+  the watchtower, plan at the tavern), and the windows glow while someone is inside.
+- **Island life.** Townsfolk keep a day: home at night, then out to work, the plaza at dusk. Guards
+  walk the walls, traders push barrows, fishers cast from the quay and animals graze. Trails climb
+  the mountains in switchbacks, and a Scout searching may hike to a lookout.
+- **Growth film.** `?grow` replays the repo's history, and the town now builds in stages: plots,
+  frames, walls, roofs, then the castle once the repo is big enough.
+- **Light and distance.** Cascaded shadows, a low sun that throws the ranges' shadows across the
+  land, a touch of haze in the distance, and real shadows under characters, on WebGL and WebGPU.
+
+The world generator runs in a Web Worker, so growing React's island no longer freezes the page (a
+1.1 s stall became about 95 ms). An archipelago with React and far islands around it runs at 97 fps at High.
+`?gen=1` brings back the earlier, simpler islands.
 
 ### Your own
 
@@ -111,8 +140,8 @@ install. A few links straight into a scene:
 
 - [`?story=seas`](https://guildhall.codestz.dev/?story=seas): a party's run with its GitHub sea
   beside it, from the first push to the release.
-- [`?repo=facebook/react`](https://guildhall.codestz.dev/?repo=facebook/react): an island grown
-  from a public repo's file tree. Any `owner/name` works.
+- [`?repo=facebook/react`](https://guildhall.codestz.dev/?repo=facebook/react): a world grown
+  from a public repo's file tree. Any `owner/name` works. Add `&grow` to watch it build.
 - [`?archipelago`](https://guildhall.codestz.dev/?archipelago): several repos as islands, side by
   side.
 - [`?story=rush&n=300`](https://guildhall.codestz.dev/?story=rush&n=300): a crowd of 300
@@ -277,12 +306,17 @@ goes with any of them.
 tier the party scene runs well above it; the numbers, and how they're measured, are on
 [How it's built](https://guildhall.codestz.dev/how). A few things keep it fast:
 
-- Island tiles are instanced and placed props are batched per material. Each character's parts are
+- Island tiles are instanced and placed props are batched per material. Mountains and far islands
+  drop to coarser detail with distance, and repo worlds grow off the main thread. Each character's parts are
   merged into two skinned meshes, and big crowds draw from baked bone textures with mesh LOD.
 - One shadow-casting sun, and its shadow map is redrawn only when something it covers changes: a
-  few times every four seconds instead of every frame. Moving characters get cheap blob shadows.
+  few times every four seconds instead of every frame. Repo islands use cascaded maps, where the far
+  cascade redraws only when the sun turns. Characters near the camera cast real shadows; the rest
+  get cheap blob shadows.
 - Outlines, mist, sun shafts and colour grading run in a single post-processing pass.
-- Occasional layers, like the graveyard's undead and the ghost ship, load the first time they're needed.
+- Occasional layers, like the graveyard's undead, the ghost ship and a repo island's civic
+  buildings, load the first time they're needed. Characters ship meshopt-compressed, 410 KB gzip
+  lighter on first paint.
 - Quality adapts on its own across three tiers. An Ultra tier with a tilt-shift miniature look is
   there if you choose it.
 - Where the browser has WebGPU, **Settings › Renderer** switches to an experimental WebGPU

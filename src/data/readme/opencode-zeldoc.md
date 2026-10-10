@@ -124,6 +124,28 @@ your key's models. OpenCode 2 keeps a background service running between
 sessions, so there the plugin also refreshes the list every 5 minutes and as
 soon as you log in with a different key.
 
+## Troubleshooting
+
+### Only ZDev shows up
+
+ZDev is the only Zeldoc model models.dev lists. Seeing only ZDev means
+OpenCode is showing the models.dev list: either the plugin is not installed
+(`opencode plugin list` should show `opencode-zeldoc`, 0.2.0 or newer for
+OpenCode 2), or it could not get your key's list.
+
+To see why, in OpenCode 2 run `/zeldoc-debug` in a session. It refreshes the
+list, then adds a short report to the session without starting a model turn:
+the plugin and OpenCode versions, where the key came from (a pin, a stored
+login or `ZELDOC_API_KEY`), the models it got, and why the last fetch failed.
+The report never contains the key itself, only the first 8 characters of its
+SHA-256, which the Key column on the Zeldoc dashboard also shows. OpenCode 1
+writes the reason to its log instead, from the service `opencode-zeldoc`.
+
+A sandbox that keeps a placeholder in `ZELDOC_API_KEY` and lets a proxy add the
+real key on the way out must add it to `GET /v1/zeldoc/models` too, not only to
+chat requests. Otherwise chats work, the list fails with `401 Missing API key`,
+and you see only ZDev.
+
 ## Develop
 
 This repo uses [Flox](https://flox.dev) for a reproducible dev environment

@@ -1,5 +1,11 @@
 # ZFT (Zero-Friction Traceability)
 
+When agents hand work to each other, acceptance runs on vibes: there is no
+pre-agreed definition of done, and when the deliverable is wrong there is no
+artifact-level answer to *which agreed item was missed*. Tracing tools
+observe what happened — they don't bind the work to what was agreed.
+
+ZFT turns the handoff into a contract with machine-checked evidence.
 Contract-grounded verification for multi-agent work.
 
 ## What ZFT is
@@ -31,6 +37,20 @@ the `traceagent` import package and the 2026-09-12 note that kept
 `traceagent` canonical). Run state lives under `.zft/`; dated logs retain
 the old codename.
 
+## Where zft sits
+
+flock runs the swarm inside one boundary; flockwork is how swarms coordinate
+across boundaries; zft is why you can trust either.
+
+flock (whiteducksoftware/flock) orchestrates agents inside one runtime over a
+shared blackboard; flockwork (our git-refspace coordinator) moves work across
+trust boundaries where agents share nothing but a repo. zft is the
+contract-and-proof layer above both — it binds a deliverable from either world
+to a pre-agreed, machine-checked contract.
+
+Not affiliated with whiteducksoftware/flock (their pip package is
+flock-core); the names are neighbors, the layers are different.
+
 ## The L0–L3 verification gate
 
 `zft gate` enforces four sequential tiers:
@@ -47,6 +67,31 @@ the old codename.
 - **L3 · Signed attestation** — DSSE-enveloped attestation over the clause
   subjects, verifiable against the live store.
 
+## Honest state
+
+**Version.** 0.2.0 — the first stable cut (2026-09-29), live on PyPI.
+Requires **Python 3.12+**; the `zft` console script is the only entry point.
+
+**Battle-tested.** The gates police this repository's own development: the
+seed contract in [`.zft/specs/`](.zft/specs/) gates every commit, and each
+release cut went through its own L0–L3 pipeline. Beyond the dogfood, the
+gate loop was exercised end-to-end by a multi-agent research program's
+benchmark — **9 bench windows, 56 engaged agent pairs judged through the
+gates** under a preregistered, frozen-before-execution evaluation design.
+
+**Experimental.** `zft task-gate` (dispatch-boundary enforcement) and
+`zft impact` (impact queries) are the youngest surfaces; their semantics may
+still settle. The editor plugins (opencode via npm, Codex port in
+[`plugins/codex/`](plugins/codex/)) are thin CLI wrappers, observe-mode by
+default, enforce-only when you opt in.
+
+**Known boundary.** A green `zft check` proves **traceability, not
+conformance**: the gate mechanically verifies bindings, store integrity, and
+bound-suite execution — it does not execute your clause's semantics for you.
+[`docs/KNOWN-GAPS.md`](docs/KNOWN-GAPS.md) is the living register of exactly
+where that boundary sits, starting with Gap 001 and its committed
+adversarial probe.
+
 ## Install
 
 ```bash
@@ -54,8 +99,9 @@ pip install zft
 ```
 
 Requires Python 3.12+ (the `zft` console script is the only entry point).
-0.2.0 is the first stable release; pre-releases `0.2.0a1..a8` remain on PyPI
-for pinning older receipts.
+0.2.0 is the first release installable without `--pre`. Before it, PyPI carried
+only PEP 440 pre-releases (`0.2.0aN`, concretely `0.2.0a1..a8`); those
+pre-releases remain on PyPI alongside stable 0.2.0 for pinning older receipts.
 
 ## Quickstart
 
@@ -195,7 +241,7 @@ by hand.
 **opencode** quick start:
 
 ```bash
-pip install zft                                             # Python 3.12+
+pip install zft                                              # Python 3.12+
 
 # Install the gates — either from npm (versioned, auto-installed by opencode):
 bun add -D opencode-zft
@@ -237,11 +283,19 @@ working self-hosted example for every gate tier above.
 
 ## Design
 
+New here? [`docs/CONCEPTS.md`](docs/CONCEPTS.md) is the one-page mental
+model — contract, clause, binding, gates, ledger — with a worked example.
+
 Full architecture, decision records (D1–D6), and the verification pipeline
 specification live in [`designs/ARCHITECTURE.md`](designs/ARCHITECTURE.md).
 Release notes are in [`CHANGELOG.md`](CHANGELOG.md); the framework landscape
 research is under [`docs/research/`](docs/research) and the positioning
 analysis in [`docs/POSITIONING.md`](docs/POSITIONING.md).
+
+## Roadmap
+
+One line, no promises: the gates are becoming the trust layer between agents
+— the signed acceptance payload of one handoff is the contract of the next.
 
 ## License
 

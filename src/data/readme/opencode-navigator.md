@@ -432,13 +432,19 @@ Codex account** and **Unlink Codex account** for the outdated manual association
 bindings are reused; conflicting bindings remain isolated until a deliberate relink.
 
 Limits starts with **[Provider name] Model name · variant**. Activate the model or
-variant with the mouse or keyboard to open OpenCode's native selector. A muted
-vertical guide joins the quota windows, with one guide-only row between them
-(`|` in Text fallback). Each window uses two compact rows: a full-width adaptive
+variant with the mouse or keyboard to open OpenCode's native selector. Quota
+windows have one blank row between them, without a vertical guide or gutter.
+Each window uses two compact rows: a full-width adaptive
 thin-line scale, then muted reset time on the left and remaining headroom aligned
 to the right. The remaining value keeps its own space; long reset text is clipped.
-Both rows stay within the sidebar's padding when it resizes. Healthy views omit
-account IDs, technical scope/window-duration suffixes, source explanations, and update timestamps. Account scope and native window durations remain in the data model;
+Both rows stay within the sidebar's padding when it resizes.
+
+The filled part of each scale uses muted text; the unfilled part uses the much
+quieter, theme-derived sidebar-divider tone. Reset time and remaining values keep
+their readable colors in both icon modes and when the theme changes.
+
+Healthy views omit account IDs, technical scope/window-duration suffixes, source
+explanations, and update timestamps. Account scope and native window durations remain in the data model;
 durations describe provider quota windows, not time remaining until reset. Balances retain their native
 currency or point unit; a missing total does not become a full progress scale.
 

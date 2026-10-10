@@ -12,6 +12,8 @@ strong model handles quick edits and hard debugging without you switching
 effort levels by hand. It works in OpenCode, Pi, Codex CLI, and any client
 that can talk to a local proxy, with the classifier you choose.
 
+![Illustrative effort routing: a classifier lowers effort for a rename and keeps it high for debugging a race condition.](assets/readme.gif)
+
 ![Core comparison: both arms solve 44 of 44; Jev averages 20.2% less input, 14.3% less output, and 8.7% less time than fixed high.](eval/results/router-core-comparison.svg)
 
 Across the tested GPT-6 Astra task mix, Jev-routed effort and fixed `high`

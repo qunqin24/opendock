@@ -21,11 +21,11 @@ OpenCode Guardian continuously supervises agent turns: guiding model execution b
 
 ![Automated and host acceptance results](docs/assets/verification-overview.svg)
 
-> The graphic combines the current **v0.9.0 automated verification** with the real-host acceptance runs across **OpenCode V1 (`1.18.34`)** and **OpenCode V2 (`2.0.24`)** executed on real host with `opencode-go/mimo-v2.6-flash`.
+> The graphic combines the current **v0.10.0 automated verification** with the real-host acceptance runs across **OpenCode V1 (`1.18.34`)** and **OpenCode V2 (`2.0.24`)** executed on real host with `opencode-go/mimo-v2.6-flash`.
 
-Guardian **v0.9.0** is validated as follows:
+Guardian **v0.10.0** is validated as follows:
 
-- **Current Automated Verification:** **545 / 545** unit, security, toast notification, and regression tests passing.
+- **Current Automated Verification:** **549 / 549** unit, security, toast notification, and regression tests passing.
 - **Sandbox Scenarios:** **18 / 18** end-to-end multi-turn agent failure and recovery scenarios verified.
 - **Static Analysis:** standard and strict TypeScript gates pass; Oxlint reports **0 warnings / 0 errors**.
 - **Dependency Security:** **0 vulnerabilities** across production and development dependency audits.
@@ -116,7 +116,7 @@ To mount the Guardian sidebar in your OpenCode terminal:
 ### 🔽 Collapsed View (Default)
 
 ```text
-▶ Guardian                 v0.9.0
+▶ Guardian                 v0.10.0
 Status                       ● Active
 Interventions                 0w · 0r
 ```
@@ -130,7 +130,7 @@ Interventions                 0w · 0r
 Clicking the `▶ Guardian` header expands the widget:
 
 ```text
-▼ Guardian                 v0.9.0
+▼ Guardian                 v0.10.0
 Preflight                  ○ disabled
 Inspected                           0
 Blocked                             0
@@ -382,9 +382,9 @@ flowchart TD
     Outcome -->|Evidence insufficient| Unverified[remediation-unverified]
 ```
 
-The diagram illustrates the v0.9.0 dual-mode runtime. Strict preflight is **opt-in** and evaluates recognized or configured tools; an out-of-scope tool is still governed by host permissions. Tool-after observations and SHA-256 file snapshots are captured **when the host supplies supported evidence**. After a remediation, only supported, observable follow-up evidence can establish `remediation-verified`.
+The diagram illustrates the v0.10.0 dual-mode runtime. Strict preflight is **opt-in** and evaluates recognized or configured tools; an out-of-scope tool is still governed by host permissions. Tool-after observations and SHA-256 file snapshots are captured **when the host supplies supported evidence**. After a remediation, only supported, observable follow-up evidence can establish `remediation-verified`.
 
-For delegated subagent work (`task` on V1, `subagent` on V2), v0.9.0 enforces capability-aware remediation isolation with strict tool-failure verification: write-capable agents cannot bypass concrete unresolved failures by merely reporting them, read-only subagents fail-safe to avoid loops without synthetic prompts, instruction-fidelity violations block with high confidence, lifecycle teardown uses reverse-splice idempotent disposal, and per-rule fingerprint remediation budgeting prevents infinite repetition while allowing distinct substantive errors to be fixed. Furthermore, v0.9.0 features preflight/verification hook isolation, color-coded user toast notifications, and hardened circuit breaker streak resets across command families.
+For delegated subagent work (`task` on V1, `subagent` on V2), v0.10.0 enforces capability-aware remediation isolation with strict tool-failure verification: write-capable agents cannot bypass concrete unresolved failures by merely reporting them, read-only subagents fail-safe to avoid loops without synthetic prompts, instruction-fidelity violations block with high confidence, lifecycle teardown uses reverse-splice idempotent disposal, and per-rule fingerprint remediation budgeting prevents infinite repetition while allowing distinct substantive errors to be fixed. Furthermore, v0.10.0 features Windows command stage parsing, rollback budget preservation, preflight/verification hook isolation, color-coded user toast notifications, and synthetic remediation assertions.
 
 ---
 

@@ -80,10 +80,10 @@ it adds:
 ## How it works
 
 A parent session calls `courier_spawn`, gets a session id back immediately and ends its turn. The
-child works on its own and, when it is done or stuck, calls `courier_send` with the parent's id.
-That message lands in the parent's inbox and OpenCode starts a new turn for the parent if it is
-idle. A child whose turn fails instead, so that it cannot report, is reported by the plugin, and a
-child that waits for a permission or asks a question has it passed to the parent, who asks you and
+child works on its own and, when it is done or stuck, calls `courier_send` with the parent's id, a
+status and what it produced. That message lands in the parent's inbox and OpenCode starts a new
+turn for the parent if it is idle. A child whose turn fails instead, so that it cannot report, or ends without reporting, is
+reported by the plugin, and a child that waits for a permission or asks a question has it passed to the parent, who asks you and
 passes your answer back. A child that waits on a form only you can answer, such as OpenCode asking
 which web search provider to use, has its parent told so.
 
@@ -149,7 +149,8 @@ opencode plugin add opencode-courier
 
 This installs the package from npm and adds `"opencode-courier"` to `plugins` in the global
 configuration (`~/.config/opencode/opencode.json`). To receive webhooks, replace that entry with the
-object form shown under [Webhooks](#webhooks), which carries a `webhook` option.
+object form shown under [Webhooks](#webhooks), which carries a `webhook` option; the [session tree
+limits](#session-trees) are options of the same entry.
 
 Install it by name, without a version: OpenCode only checks plugins for updates when their entry is
 not an exact version, so `opencode-courier@0.2.1` is never offered a newer release. How to move an
@@ -188,16 +189,17 @@ Then list it in `opencode.json` (V2 uses `plugins`, plural). A local plugin path
    the last commit, so an uncommitted `opencode.json` is not there and the child falls back to your
    global config: keep providers and models in the global config, or commit the file. When you are
    done with an isolated child, `courier_cleanup` it so its worktree does not linger.
-4. A child that crashes before calling `courier_send` never wakes the parent. When you spawn a
-   long-running child, also `courier_later` a check-in for yourself, and `courier_cancel` it when
-   the child reports.
+4. A child whose turn fails, or ends without `courier_send`, is reported to its parent by the
+   plugin. What the plugin cannot see, such as a server that stops while a child runs, a
+   `courier_later` check-in still covers: for a long-running child, schedule one for yourself and
+   `courier_cancel` it when the child reports.
 
 ## Tools
 
 | Tool | Does |
 |---|---|
-| `courier_spawn` | Creates a session (optionally in its own git worktree with `isolate: true`) on the parent's model, sends it the task plus a brief naming the parent and how to report back, and returns at once. |
-| `courier_send` | Delivers a message to a session, signed with the sender's id, waking it if idle. |
+| `courier_spawn` | Creates a session (optionally in its own git worktree with `isolate: true`) on the parent's model, sends it the task plus a brief naming the parent, how to report back and when to split the task further, and returns at once. Refused past the [session tree limits](#session-trees). |
+| `courier_send` | Delivers a message to a session, signed with the sender's id, waking it if idle. From a child to its parent, a `status` (`done`, `partial`, `blocked` or `failed`) makes it the child's report, carried as an attribute of the message (`<courier from="…" status="done">`), and `artifacts` (`branch`, `commits`, `files`, `checks`) are listed in its body in a fixed layout; a message without a status is progress, not the report ([reference](docs/reference.md#a-childs-report)). |
 | `courier_status` | One look at a session: outcome, idle time, last reply and the permission requests and questions it waits on. For check-ins, not for waiting. |
 | `courier_children` | Lists the sessions this one (or a given `sessionID`) started with `courier_spawn`, each with what `courier_status` reports plus its directory, whether it is isolated and when it was started. |
 | `courier_cleanup` | Removes the git worktree of a child started with `isolate: true` and drops the child from `courier_children`. Keeps a worktree with uncommitted changes or commits on no branch, tag or remote and lists them, unless `force: true` is passed ([reference](docs/reference.md#worktree-cleanup)). |
@@ -214,9 +216,21 @@ The short version; the long one, with every edge, is [docs/reference.md](docs/re
 - **A child runs on its parent's model**, not on OpenCode's default, so a parent you moved to
   another model starts children that can reach theirs too. An `agent` with a model of its own keeps
   it. [More](docs/reference.md#the-childs-model).
+- **A child can split its task** with `courier_spawn` of its own, within the [limits](#session-trees):
+  its brief says when to split and when to do the work itself, and a session that splits checks
+  its children's work and sends one combined report. [More](docs/reference.md#session-trees-and-their-limits).
+- **A child reports once, with a status**: `done`, `partial`, `blocked` (it needs a decision from
+  its parent, and says what) or `failed`, as an attribute of the message, with its artifacts listed
+  in the body. A message without a status is progress, so a child that sends "halfway" and then
+  stops is still reported as ending without a report. [More](docs/reference.md#a-childs-report).
 - **A child that fails** cannot report, so the plugin does: every failed turn of a spawned session
   sends its parent a message marked `failed="<error type>"`, with the error, waking it if idle.
   [More](docs/reference.md#a-child-that-fails).
+- **A child that ends its turn without reporting** to its parent has the parent told, marked
+  `ended="without-report"`, with its last reply, waking it if idle; it counts toward the limits
+  until it reports. One that waits, on a request, a session it started, a scheduled message or a
+  webhook it just subscribed to, is not reported, nor is one that answers what you typed in its session.
+  [More](docs/reference.md#a-child-that-ends-without-a-report).
 - **A child that asks for permission** has the request passed to the session at the top, with what
   it asks for and the choices OpenCode offers (`once`, `always`, `reject`). That session asks you
   and answers with `courier_answer`; the child carries on.
@@ -230,8 +244,8 @@ The short version; the long one, with every edge, is [docs/reference.md](docs/re
 - **A child that shows a form** the plugin cannot pass on, such as OpenCode's web search asking
   for a provider, has the top session told, marked `asks="form"`, with the form's choices: only you
   can answer it, in the child's session. [More](docs/reference.md#a-child-that-shows-a-form).
-- **The plugin remembers.** Each parent's children (`courier_children`), pending `courier_later`
-  messages and open questions survive a compaction or a restart; entries are dropped after 14 days.
+- **The plugin remembers.** Each parent's children (`courier_children`) and whether each owes a
+  report, pending `courier_later` messages and open questions survive a compaction or a restart; entries are dropped after 14 days.
   [Roster](docs/reference.md#roster), [Scheduled messages](docs/reference.md#scheduled-messages).
 - **One OpenCode server per data directory, preferably.** A second server on the same one, such as
   `opencode serve` next to `opencode service`, shares the plugin's storage: one of the two delivers
@@ -240,6 +254,32 @@ The short version; the long one, with every edge, is [docs/reference.md](docs/re
 - **Worktrees are yours to remove.** An isolated child's worktree is kept until `courier_cleanup`,
   which refuses to drop uncommitted changes or unbranched commits unless told to.
   [More](docs/reference.md#worktree-cleanup).
+
+## Session trees
+
+A spawned session may start sessions of its own, so the sessions form a tree, and three options
+bound it. Set them in the plugin's `options`, in the global config (`~/.config/opencode/opencode.json`):
+
+```jsonc
+{
+  "plugins": [{ "package": "opencode-courier", "options": { "maxDepth": 2, "maxChildren": 3 } }]
+}
+```
+
+| Option | Default | |
+|---|---|---|
+| `maxDepth` | `3` | How deep the tree goes: your session is depth 0, the sessions it starts depth 1. A session at `maxDepth` cannot start sessions. |
+| `maxChildren` | `5` | How many sessions one session started may have live at once. |
+| `maxTotal` | `20` | How many spawned sessions may be live at once in one tree. |
+
+`courier_spawn` refuses a spawn past a limit, naming it and saying what to do instead: do the work
+itself, or wait for a child to report. A session counts while it is live: its turn runs, it owes
+its parent a report (its task or a message reached it after it last reported, failed or was interrupted), or a
+session below it is live. One that has reported, with nothing live below it, does not. Each
+spawned session's model is also told its role on every request: `sub-orchestrator`, which may split
+its task, or `leaf`, at `maxDepth`, which does not see `courier_spawn` at all. Your own session gets
+a `root orchestrator` part only once it has started a session; one that never does is sent exactly
+what it was before. The details: [the reference](docs/reference.md#session-trees-and-their-limits).
 
 ## Webhooks
 

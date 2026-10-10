@@ -7,7 +7,7 @@ OpenCode V2 removed the built-in todo tools. This plugin brings them back as a s
 - **`todowrite`** — create or replace the todo list for the current session.
 - **`todoread`** — read the current list back.
 
-Lists are stored per session and a compact summary is injected into the session context while tasks are still open — at every user turn and whenever the list changes mid-run — so the model keeps track of them across long conversations and context compaction.
+Lists are stored per session and a compact summary is injected into the session context while tasks are still open — at every user turn and whenever the list changes mid-run — so the model keeps track of them across long conversations and context compaction. A constant reminder line asks the model to update statuses as steps finish (see `Update reminders` below).
 
 ## Screenshot
 
@@ -70,12 +70,15 @@ Run `/todo-settings` (or pick "Todolist: Settings" from the command palette) to 
 
 | Setting | Default | Values |
 | --- | --- | --- |
+| Update reminders | on | on/off |
 | Show count | on | on/off |
 | Show percentage | on | on/off |
 | Show timer | on | on/off |
 | Header separator | line | none / line / line + blank |
 | Collapse threshold | 2 | 2/3/5 |
 | Border | off | on/off |
+
+**Update reminders** adds a constant line to the system prompt once a session has a todo list, asking the model to mark items completed in the same step instead of batching. The line never changes within a session, so it does not affect prompt caching; sessions that never use a list are untouched. Turn it off to fall back to the tail notice alone.
 
 ### Timer
 
@@ -121,6 +124,10 @@ To load your working copy before publishing, point the global `plugins` config a
 ```
 
 Plugin changes under watched config directories reload automatically; otherwise restart the OpenCode service.
+
+### Releasing
+
+Bump the version in `package.json` and `package-lock.json` (`npm version <version> --no-git-tag-version`), commit it with the plain version string (e.g. `0.5.0`), and push a `vX.Y.Z` tag. The `Publish to npm` workflow then builds the package, publishes it to npm, and creates the matching GitHub release with generated notes.
 
 ## License
 

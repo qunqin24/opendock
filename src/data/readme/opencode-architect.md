@@ -36,7 +36,11 @@ bunx opencode-architect install --scope global
 Useful flags and commands:
 
 ```bash
-bunx opencode-architect status                  # show mode, version, and the config file holding the entry
+bunx opencode-architect status                  # resolve what a session would load, per scope, plus an effective verdict
+bunx opencode-architect status --scope global   # narrow the resolution to one scope
+bunx opencode-architect status --online         # also query the npm registry and flag a stale resolved copy
+bunx opencode-architect status --path ../other  # resolve against another project directory
+bunx opencode-architect status --package other  # resolve another installed package by name
 bunx opencode-architect uninstall               # remove the plugin entry, the manifest, and any residual payload
 bunx opencode-architect clear-cache             # remove cached copies of this package from OpenCode's package cache
 bunx opencode-architect clear-cache --all --yes # remove the whole OpenCode cache directory (destructive)
@@ -44,6 +48,8 @@ bunx opencode-architect clear-cache --dry-run   # preview what clear-cache would
 bunx opencode-architect install --force         # re-register and rewrite the manifest even when up to date
 bunx opencode-architect --help                  # full usage
 ```
+
+`status` does not report the manifest version alone: for each scope it resolves what a session would actually load. It prints the config file that holds the registration, the raw entry as written (`name@latest`, a pinned spec, a `{ package }` object, or a path/`file://` form), and the resolved source on disk — an npm spec resolves to OpenCode's package cache (`$XDG_CACHE_HOME/opencode/npm`, falling back to `~/.cache/opencode/npm`), a path entry to the package checkout — with the version read from that copy's `package.json` and the copy's age as a staleness hint (`resolved=1.0.0 (cache copy, 2h old)`). It closes with an effective verdict and warns when a package is registered in both scopes — the verdict annotates the double-load (`should load: 1.0.0 (cache copy, local + global; both scopes register — double-load)`) — when the manifest version disagrees with the resolved copy, when the cached copy for a spec is missing or incomplete, or when a config file cannot be parsed. The verdict answers from the strongest source it can: a resolved copy on disk (`cache copy` / `checkout copy`), else the registration spec itself — a pinned exact version answers directly (`should load: 1.0.0 (pinned spec, local)`, since the host fetches exactly that at next start) and `@latest` answers with the published version under `--online` (`npm latest`); a range like `^1.7.0` stays `unresolved` until a copy exists, and only then falls back to the manifest version. `status` is read-only. Without `--online` it never touches the network; `--online` queries the npm registry for every registered package — the name comes from the entry, or from the checkout's `package.json` for path-form registrations — and prints it per scope (`npm-latest=1.0.0`) plus `, latest <version>` on the verdict, flagging staleness; network failures warn rather than fail. `--path <dir>` resolves against another project directory (the directory must exist), so a package installed elsewhere can be checked without `cd`-ing into it. `--package <name>` resolves `<name>` instead of `opencode-architect`: it matches a plugins entry or a path checkout whose `package.json` name is `<name>`, reads that scope's `<name>.manifest.json` (or the legacy `<name>.json`), and, under `--online`, queries the registry for `<name>` — so a package installed from another repo can be inspected in place. `--online` and `--path` are status-only; `--package` applies to `status` and `clear-cache` only; any other command rejects them with an explanatory error.
 
 Re-running install when the manifest matches reality is a zero-write no-op. `--mode copy` is refused with an explanatory error: this package is code-backed (it ships agents), and copying cannot express plugin registration.
 

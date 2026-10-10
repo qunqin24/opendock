@@ -5,567 +5,320 @@
 <h1 align="center">opencode-cli-enforcer</h1>
 
 <p align="center">
-  <strong>Resilient multi-LLM CLI orchestration for OpenCode</strong><br>
-  <em>Execute Claude, Gemini &amp; Codex with circuit breakers, smart retry, automatic fallback, and role-based routing.</em>
+  <strong>Claude Code as a first-class OpenCode v2 model provider</strong><br>
+  <em>Use a Claude subscription (no API key) while OpenCode keeps full ownership of tools, permissions, and session history.</em>
 </p>
 
 <p align="center">
-  <a href="https://github.com/lleontor705/opencode-cli-enforcer/actions/workflows/ci.yml"><img src="https://github.com/lleontor705/opencode-cli-enforcer/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
-  <a href="https://www.npmjs.com/package/opencode-cli-enforcer"><img src="https://img.shields.io/npm/v/opencode-cli-enforcer?color=cb3837" alt="npm" /></a>
-  <a href="https://github.com/lleontor705/opencode-cli-enforcer/blob/master/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License" /></a>
-  <img src="https://img.shields.io/badge/platform-windows%20%7C%20macos%20%7C%20linux-brightgreen" alt="Platform" />
-  <img src="https://img.shields.io/badge/runtime-Bun%20%E2%89%A51.3.5-f472b6" alt="Bun" />
+  <a href="https://github.com/lleontor705/opencode-cli-enforcer/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License" /></a>
+  <img src="https://img.shields.io/badge/runtime-node%20%E2%89%A520-brightgreen" alt="Node >= 20" />
 </p>
 
 ---
 
-## Why opencode-cli-enforcer?
+## What this plugin is
 
-Running AI CLIs in production is fragile. Processes timeout, rate limits hit, binaries disappear. Calling three different CLIs means three different failure modes, arg formats, and platform quirks.
+`opencode-cli-enforcer` is an **OpenCode v2 plugin** that registers Claude Code as a first-class model
+provider through `@anthropic-ai/claude-agent-sdk`. It publishes the provider id **`claude-bridge`**
+and a static catalog of Claude Code models, so a user with a Claude subscription can select
+`claude-bridge/*` models and generate text **without an `ANTHROPIC_API_KEY`** — authentication is
+delegated to the Claude Code CLI the SDK drives.
 
-**opencode-cli-enforcer** wraps all of that into a single, resilient plugin:
+The design principle is a strict separation of duties:
 
-<table>
-<tr>
-<td width="50%">
+- **OpenCode is the sole tool executor.** The bridge never runs tools itself. Claude Code only
+  *requests* tools, and every request is routed back to the OpenCode host, which validates, approves,
+  executes, and returns the result.
+- **OpenCode keeps its own session history, permissions, and compaction.** Claude Code runs as a
+  generation backend behind a parked SDK query; it is never given authority over the workspace.
 
-**Without this plugin**
-- Manual subprocess management
-- No retry on transient failures
-- One CLI down = entire workflow blocked
-- OS-specific arg handling per CLI
-- Secrets leak into error logs
-- No visibility into CLI health
+Everything provider-specific lives behind seven provider-agnostic seams, so the second provider —
+the Google Antigravity CLI (`agy`) — ships as configuration rather than a rewrite. See
+[Architecture overview](#architecture-overview) and the [agy provider note](#google-antigravity-agy-wave-b-shipped).
 
-</td>
-<td width="50%">
+## Requirements
 
-**With this plugin**
-- 4 tools, zero boilerplate
-- Exponential backoff + jitter retry
-- Automatic fallback chain across providers
-- Cross-platform (Windows `.cmd` shims, PATH augmentation)
-- Secret redaction on all output
-- Real-time health dashboard
+- **Node.js >= 20** (the plugin is ESM-only; `package.json` declares `"type": "module"`).
+- **OpenCode v2** with plugin API `@opencode/plugin` `2.x`.
+- **Claude Code CLI** installed and authenticated with a subscription on the same machine. The
+  bridge spawns it through the Agent SDK; it does not ship the CLI.
+- **Google Antigravity CLI (`agy`) — required only for the `agy` provider.** Install it and
+  authenticate once so it caches its OAuth credentials
+  (`~/.gemini/antigravity-cli/antigravity-oauth-token`). The bridge drives `agy` headless over its
+  documented stream-json protocol and does not ship the CLI.
+- A local workspace. Remote / non-local workspaces are out of scope for v1.
 
-</td>
-</tr>
-</table>
+## Install and registration
 
----
+OpenCode v2 discovers plugins from the `plugins` array in `opencode.jsonc`. Each entry is an object
+with a `package` and an optional `options` object; the options object is exposed to the plugin as
+`ctx.options`.
 
-## Architecture
-
-<p align="center">
-  <img src="docs/assets/architecture.svg" alt="Architecture diagram" width="780" />
-</p>
-
-```
-cli_exec(prompt)
-  |
-  v
-+----------------------------------------------------------+
-|                  Resilience Engine                        |
-|                                                          |
-|  Global Time Budget (shared across ALL attempts)         |
-|  +---------+     +---------+     +---------+             |
-|  | Claude  | --> | Gemini  | --> | Codex   |  fallback   |
-|  +---------+     +---------+     +---------+  chain      |
-|       |               |               |                  |
-|       v               v               v                  |
-|  [Circuit Breaker] -----> [Retry w/ Backoff] --> [execa] |
-|  3 failures = open        max 2 retries          10MB    |
-|  5 timeouts = open        1s-10s + jitter        buffer  |
-|  60s cooldown             abort-aware sleep               |
-+----------------------------------------------------------+
-```
-
----
-
-## Quick Start
-
-### 1. Install as OpenCode plugin (recommended)
-
-Add to your OpenCode configuration:
-
-```json
-{
-  "plugin": ["opencode-cli-enforcer@latest"]
-}
-```
-
-### 2. Install via npm / bun
-
-```bash
-bun add opencode-cli-enforcer
-# or
-npm install opencode-cli-enforcer
-```
-
-### 3. Prerequisites
-
-You need at least **one** CLI installed and authenticated:
-
-| CLI | Install | Auth |
-|-----|---------|------|
-| [Claude Code](https://docs.anthropic.com/en/docs/claude-code) | `npm i -g @anthropic-ai/claude-code` | `claude login` |
-| [Gemini CLI](https://github.com/google-gemini/gemini-cli) | `npm i -g @anthropic-ai/gemini-cli` | `gcloud auth login` |
-| [Codex CLI](https://github.com/openai/codex) | `npm i -g @openai/codex` | `codex auth` |
-
----
-
-## Tools Reference
-
-### `cli_exec` — Execute with full resilience
-
-The primary tool. Sends a prompt to a CLI with automatic retry, circuit breaker protection, and fallback.
-
-```typescript
-cli_exec({
-  cli: "claude",
-  prompt: "Explain the observer pattern with a TypeScript example",
-  mode: "generate",           // "generate" | "analyze"
-  timeout_seconds: 300,       // Global budget: 10-1800s
-  allow_fallback: true        // Try gemini/codex on failure
-})
-```
-
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `cli` | `"claude" \| "gemini" \| "codex"` | *required* | Primary CLI provider |
-| `prompt` | `string` | *required* | Prompt to send (max 100KB) |
-| `mode` | `"generate" \| "analyze"` | `"generate"` | `analyze` enables file reads (Claude only) |
-| `timeout_seconds` | `number` | `720` | Global timeout budget in seconds |
-| `allow_fallback` | `boolean` | `true` | Auto-fallback to alternative providers |
-
-**Response:**
+Register the published npm package:
 
 ```jsonc
 {
-  "success": true,
-  "cli": "claude",
-  "stdout": "The Observer pattern is a behavioral design pattern...",
-  "stderr": "",
-  "duration_ms": 4523,
-  "timed_out": false,
-  "used_fallback": false,
-  "fallback_chain": ["claude"],
-  "error": null,
-  "error_class": null,           // "transient" | "rate_limit" | "permanent" | "crash"
-  "circuit_state": "closed",     // "closed" | "open" | "half-open"
-  "attempt": 1,
-  "max_attempts": 3
-}
-```
-
----
-
-### `cli_status` — Health dashboard
-
-Returns real-time health for all providers: installation status, circuit breaker state, and usage statistics.
-
-```typescript
-cli_status({})
-```
-
-**Response:**
-
-```jsonc
-{
-  "platform": "windows",
-  "detection_complete": true,
-  "retry_config": { "max_retries": 2, "base_delay_ms": 1000, "max_delay_ms": 10000 },
-  "breaker_config": { "failure_threshold": 3, "timeout_threshold": 5, "cooldown_seconds": 60 },
-  "providers": [
+  "plugins": [
     {
-      "name": "claude",
-      "installed": true,
-      "path": "/usr/local/bin/claude",
-      "version": "1.0.16",
-      "circuit_breaker": {
-        "state": "closed",
-        "consecutive_failures": 0,
-        "consecutive_timeouts": 0,
-        "total_executions": 12,
-        "total_failures": 1,
-        "total_timeouts": 0
-      },
-      "usage": {
-        "total_calls": 12,
-        "success_rate": "92%",
-        "avg_duration_ms": 3400
-      },
-      "fallback_order": ["gemini", "codex"]
+      "package": "opencode-cli-enforcer",
+      "options": {
+        "providers": {
+          "claude": { "enabled": true }
+        },
+        "defaultProvider": "claude"
+      }
     }
-    // ... gemini, codex
   ]
 }
 ```
 
----
-
-### `cli_list` — List installed providers
-
-Quick check of which CLIs are available on the system.
-
-```typescript
-cli_list({})
-```
-
-**Response:**
+Or register a local checkout directly by path (useful for development):
 
 ```jsonc
 {
-  "installed_count": 2,
-  "providers": [
-    { "provider": "claude", "path": "/usr/local/bin/claude", "version": "1.0.16", "strengths": ["reasoning", "code-analysis", "debugging", "architecture", "planning"] },
-    { "provider": "gemini", "path": "/usr/local/bin/gemini", "version": "0.1.8", "strengths": ["research", "trends", "knowledge", "large-context", "web-search"] }
+  "plugins": [
+    {
+      "package": "file:/absolute/path/to/opencode-cli-enforcer",
+      "options": {}
+    }
   ]
 }
 ```
 
----
+With no `options`, the plugin runs with safe defaults: the `claude` provider is enabled, the `agy`
+provider is disabled, and `defaultProvider` is `claude`. Restart OpenCode (or reload plugins) after
+editing `opencode.jsonc`. The plugin then registers via
+`Plugin.define({ id: "claude-bridge", setup })` and adds the provider and its model catalog through
+`ctx.provider.transform`, idempotently (a hot reload never duplicates records).
 
-### `cli_route` — Role-based routing
+## Quick start
 
-Recommends the best CLI for a task based on agent role. Considers both provider strengths and real-time availability.
+1. Install and authenticate the Claude Code CLI for your user (subscription login, no API key).
+2. Add the plugin entry shown above to `opencode.jsonc`.
+3. Restart OpenCode.
+4. Select a model from the **`claude-bridge`** provider, for example `claude-bridge/claude-sonnet-5`.
+5. Send a prompt. Tool calls made by the model are executed by OpenCode; approvals and permission
+   prompts behave exactly as they do for any other provider.
 
-```typescript
-cli_route({
-  role: "developer",
-  task_description: "Refactor the auth module to use JWT"
-})
-```
+The catalog is a static projection (the Agent SDK exposes no enumerable model list). It includes the
+`fable`, `opus`, `sonnet`, and `haiku` families; 1M-context variants are requested only for model ids
+measured to serve them, and dated snapshot ids are never exposed. See
+[docs/config.md](docs/config.md) for the full configuration reference.
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `role` | `"manager" \| "coordinator" \| "developer" \| "researcher" \| "reviewer" \| "architect"` | Agent role |
-| `task_description` | `string?` | Optional context |
+To use the Google Antigravity provider instead, install and authenticate the `agy` CLI, acknowledge
+its four constraints, set `providers.agy.enabled` to `true`, and optionally set `defaultProvider` to
+`"agy"`. See the [agy provider note](#google-antigravity-agy-wave-b-shipped).
 
-**Routing table:**
+## Architecture overview
 
-<p align="center">
-  <img src="docs/assets/routing.svg" alt="Role routing table" width="620" />
-</p>
+The bridge is built from seven **provider-agnostic Layer-1 seams** (`src/provider/seams.ts`). No
+provider-specific type appears in any seam signature; the provider registry
+(`src/provider/registry.ts`) is the only place that binds a provider id to implementations.
 
-| Role | Primary CLI | Reasoning |
-|------|------------|-----------|
-| **Manager** | Gemini | Research, trends, large-context analysis |
-| **Coordinator** | Claude | Reasoning, planning, decision-making |
-| **Developer** | Codex | Code generation, refactoring, full-auto |
-| **Researcher** | Gemini | Knowledge synthesis, web search |
-| **Reviewer** | Claude | Code analysis, debugging, quality |
-| **Architect** | Claude | System design, architecture planning |
+| Seam | Responsibility |
+|---|---|
+| `CliTransport` | Spawn the backend CLI, build argv, write stdin NDJSON, read stdout lines, capture stderr, map exit codes, and arm a per-turn watchdog. |
+| `EventMapper<Raw, Normalized>` | Translate native events to the normalized `TurnResult{status, text, usage, sessionId}`. **Usage normalization happens here** (Claude is per-message; cumulative-per-session counters are converted to turn deltas at this seam). |
+| `SessionStore` | Opaque, provider-neutral conversation handle `{provider, conversationRef}`. Core never parses a provider's storage format. |
+| `ToolChannel` | Register host tools with the backend (Claude: in-process MCP server). |
+| `PermissionPolicy` | Capability-honest `supportsInteractiveApproval` flag. |
+| `SteeringPolicy` | Capability-honest `supportsMidTurnSteer` flag. |
+| `ProviderProbe` | Detect, version, and health-check a provider. |
 
-**Response:**
+**Parked query + in-process MCP handshake.** One Agent SDK `query()` is spawned per OpenCode
+session and kept parked for the life of that session. Its `prompt` is an ack-carrying async iterable
+(`src/provider/prompt-stream.ts`), so a new turn writes into the live stream instead of respawning
+the child. Host tools are served to Claude Code over an in-process MCP server
+(`src/mcp/server.ts`); each `tools/call` is paired to its result by Claude's own `tool_use` id
+(`src/mcp/rendezvous.ts`, order-tolerant, two-map), and OpenCode's tool results are delivered back
+into the rendezvous on the next step. A mid-turn steer is written to Claude's stdin and acknowledged
+**before** any tool result is delivered, so the steer is observed at the next tool boundary rather
+than degrading into a follow-up turn.
+
+**Session mirror (REUSE / REBUILD).** The OpenCode conversation is mirrored into Claude Code's
+`~/.claude/projects` JSONL so the same session can be reopened in the `claude` CLI and vice versa.
+A per-session state machine (`src/session/mirror.ts`) chooses one of four transitions each turn —
+`reuse`, `clean-start-preserve`, `clean-start`, or `rebuild` — plus a `force-rotate` after an abort.
+Host history rewrites (compaction, revert) mark the mirror for rebuild; the full-file rewrite
+preserves the Claude Code session id, re-materializes `@file` attachment expansions at stable
+ordinals, and is gated by a fail-closed post-write integrity check (`src/session/verify.ts`): a
+mirror the bridge cannot re-read is treated as a failed write, never resumed.
+
+**Isolated compaction lane.** OpenCode remains the sole compactor. When the host requests
+compaction, the bridge answers it with a throwaway one-off summarizer query
+(`src/session/compaction.ts`) that shares nothing with the session's parked query or mirror:
+`persistSession: false`, `maxTurns: 1`, `tools: []`, and every filesystem settings/skill/memory
+source disabled, with the same scrubbed child environment. If the lane fails, it leaves the host
+result unset so OpenCode falls back to its own compaction — a failure never aborts the request.
+
+**Error taxonomy.** Every surfaced error is classified into exactly one closed category with a
+stable, append-only code (`src/errors/taxonomy.ts`): `config`, `transport`, `tool`, `stream`,
+`rate-limit`, and `session-mirror`. Unsendable prompts fail loud before they reach the child
+(`assertSendablePrompt`) rather than silently degrading.
+
+**Teardown and leak assertions.** Abort signals, backend child exit, and normal turn end all funnel
+through a single teardown path (`src/errors/teardown.ts`): interrupt/close the SDK query, fail the
+prompt stream so queued **and** in-flight acks settle, resolve every parked MCP handler with a text
+result (never reject — a rejected handler would strand Claude's `tools/call` forever), force-rotate
+the mirror, and clear per-query state. A fail-loud leak scan then asserts no dangling query, pending
+handler, unended stream, or unreleased context remains.
+
+## Capability matrix
+
+| Capability | `claude` (Wave A) | `agy` (Wave B, shipped) |
+|---|---|---|
+| Provider / models registered | Yes — static Claude Code catalog | Yes — static Antigravity catalog |
+| Auth | Claude subscription via Claude Code CLI | Antigravity CLI cached OAuth credentials |
+| Reasoning / thinking stream | Yes | **No** — `thinking_tokens` are counted, but there is no text stream |
+| Partial tool input | Yes (streamed) | **No** — the whole tool call arrives at the step's `DONE` |
+| Streaming granularity | Token-level | **Step-level** — one `ACTIVE`/`DONE` pair per step |
+| Tool execution | OpenCode host executes; in-process MCP rendezvous | OpenCode host executes; out-of-process stdio MCP runner + loopback bridge |
+| Interactive approval (`supportsInteractiveApproval`) | **Yes** | **No** — declarative `settings.json` allow-rules / MCP-side enforcement |
+| Mid-turn steering (`supportsMidTurnSteer`) | **Yes** — acked stdin steer at tool boundaries | **No** — steering is queued to the next turn boundary |
+| Session resume | Yes — REUSE/REBUILD `~/.claude/projects` JSONL mirror | Yes — opaque `conversationRef` resumed with `--conversation`; clean-start on history divergence (no rebuild / force-rotate) |
+| Usage accounting | Per-message | Cumulative-per-session, normalized to per-turn deltas at the seam |
+| Constraint acknowledgment gate | `child-env-hygiene`, `session-mirror-rebuild-cost` (acknowledged by default) | Four constraints; **all must be acknowledged before enablement** |
+
+Missing capabilities degrade **by policy**, not by accident: the honest seam flags let the core
+downgrade an unsupported interaction instead of assuming it silently.
+
+## Configuration
+
+Full reference: **[docs/config.md](docs/config.md)**. It documents every option, its default,
+fail-closed validation semantics, the per-provider acknowledgment gate, `CLAUDE_CONFIG_DIR`
+behavior, and child-environment hygiene. The short version:
+
+- `providers.claude` — `enabled`, `modelOverride`, `debugLogs`, `toolsAllow`, `acknowledgedConstraints`.
+- `providers.agy` — `enabled`, `acknowledgedConstraints`, `dangerouslySkipPermissionsConsent`. Enabling
+  it starts the host-tool loopback runner; user-level `agy mcp add` registration stays opt-in.
+- `defaultProvider` — `"claude"` (default) or `"agy"`.
+- Child-env hygiene: the backend child receives `ENABLE_CLAUDEAI_MCP_SERVERS=0`,
+  `DISABLE_AUTO_COMPACT=1`, and every `ANTHROPIC_*` variable scrubbed.
+
+## Operator Actions
+
+These are the actions an operator (not the plugin) is responsible for.
+
+1. **Install and authenticate the Claude Code CLI.** The bridge requires a working, subscription-
+   authenticated `claude` CLI on the same machine. No API key is stored by the plugin.
+2. **Install and authenticate the `agy` CLI for the `agy` provider.** The `agy` provider requires a
+   discoverable `agy` binary with cached credentials. Run `agy` once to complete OAuth login; the
+   bridge only checks that the cached token file exists and never reads it.
+3. **Keep `ANTHROPIC_*` out of the OpenCode server environment.** Never export `ANTHROPIC_API_KEY`
+   (or any `ANTHROPIC_*` variable) into the environment that launches OpenCode. An exported key
+   would hijack the child CLI's subscription auth. The bridge scrubs `ANTHROPIC_*` from the child
+   environment as defense in depth, but the operator must not rely on that scrub alone.
+4. **Choose the session-mirror location via `CLAUDE_CONFIG_DIR`.** Set `CLAUDE_CONFIG_DIR` to move
+   the `~/.claude` root (and therefore the mirrored `projects/` JSONL). When unset, the bridge uses
+   `~/.claude`. The same variable is honored by the `claude` CLI, so both sides see the same files.
+5. **Complete the acknowledgment gate before enabling a provider.** Enabling a provider whose
+   constraint register is not fully acknowledged throws a config error and registers nothing. Claude
+   is acknowledged by default; `agy` requires the explicit [acknowledgment gate](#acknowledgment-gate).
+6. **Opt in before mutating agy's user-level MCP config.** Registering the host-tool runner with
+   `agy mcp add` writes machine-global config (`~/.gemini/config/mcp_config.json`); the bridge keeps
+   this off by default and only performs it under explicit operator opt-in.
+7. **Reopen mirrored sessions in the `claude` CLI (optional).** Because the mirror lands in the
+   standard Claude Code project store, the same conversation can be opened from either side.
+8. **Know the integration environment gates (development / CI).** The integration suites are opt-in:
+   `CLAUDE_BRIDGE_INTEGRATION=1` enables the Wave A live-CLI oracle (the CI integration job is gated on
+   the repository variable of the same name), `AGY_BRIDGE_INTEGRATION=1` enables the Wave B `agy`
+   live-CLI oracle, and `AGY_BRIDGE_RECORD=1` enables quota-spending fixture recording. Each gate skips
+   cleanly when unset; none is set by the plugin at runtime.
+
+### Acknowledgment gate
+
+The configuration carries a per-provider enablement map with an explicit acknowledgment gate. Each
+provider has a **constraint register**; enabling it requires acknowledging every constraint id in
+that register, otherwise setup fails closed with a config error that names the missing
+acknowledgments.
+
+- **`claude` register** (acknowledged by default): `child-env-hygiene`, `session-mirror-rebuild-cost`.
+- **`agy` register** (all four required to enable): `tos-third-party-access-ambiguity`,
+  `fatal-control-frames`, `no-mid-turn-steer`, `auto-allowed-workspace-writes`.
 
 ```jsonc
 {
-  "role": "developer",
-  "task_description": "Refactor the auth module to use JWT",
-  "recommended_cli": "codex",
-  "reasoning": "Role \"developer\" maps to codex (code-generation, edits, refactoring, full-auto).",
-  "fallback_chain": ["codex", "claude", "gemini"],
-  "availability": { "codex": true, "claude": true, "gemini": false }
+  "providers": {
+    "agy": {
+      "enabled": true,
+      "acknowledgedConstraints": [
+        "tos-third-party-access-ambiguity",
+        "fatal-control-frames",
+        "no-mid-turn-steer",
+        "auto-allowed-workspace-writes"
+      ]
+    }
+  }
 }
 ```
 
----
+The `agy` ToS constraint is an explicit operator legal-risk decision. Enabling a provider is an
+assumption of risk by the operator running the plugin; the plugin only *enforces* the gate, it does
+not interpret any terms or grant permission. See
+[docs/agy-tos-acknowledgment.md](docs/agy-tos-acknowledgment.md).
 
-## Resilience Pipeline
+## Google Antigravity (`agy`) — Wave B (shipped)
 
-<p align="center">
-  <img src="docs/assets/resilience-pipeline.svg" alt="Resilience pipeline" width="780" />
-</p>
+The `agy` provider adapts the Google Antigravity CLI behind the **same seven seams** as `claude`, so
+it is a configuration-level addition rather than a second code path. What began as the planned Wave B
+adapter now ships, gated by the Terms-of-Service acknowledgment above. Its constraint register
+records why the seams are capability-honest rather than Claude-shaped:
 
-### Global Time Budget
+- `tos-third-party-access-ambiguity` — Google Antigravity Additional Terms leave programmatic
+  third-party access ambiguous (Google AI Developer Forum threads `185992`, `186954`, `185494`,
+  `186952`, `187241`). Enabling `agy` is an operator risk decision.
+- `fatal-control-frames` — in-stream `control_request`/`control_response` frames and slash commands
+  are fatal to the child (exit `2`); only `user` message events may be written to stdin.
+- `no-mid-turn-steer` — `agy` cannot be steered mid-turn; steering is queued to the next turn
+  boundary.
+- `auto-allowed-workspace-writes` — `agy` auto-allows workspace writes by default; enforcement
+  relies on declarative allow-rules and explicit `--dangerously-skip-permissions` consent.
 
-Unlike per-attempt timeouts, the **global time budget** is shared across ALL retries and ALL fallback providers. This prevents timeout multiplication:
+All four must be acknowledged before `providers.agy.enabled` may be `true`, exactly as in the
+[acknowledgment gate](#acknowledgment-gate) above.
 
-```
-Traditional:  3 providers x 3 attempts x 300s timeout = 2700s worst case
-This plugin:  300s total budget across everything       =  300s worst case
-```
+### Honest capability downgrades
 
-Each attempt receives the **remaining** seconds, not the full budget. When the budget runs out, execution stops immediately.
+| Capability | `agy` behavior |
+|---|---|
+| Reasoning stream | None. `thinking_tokens` are counted in usage, but there is no thinking text stream. |
+| Partial tool input | None. The complete tool call arrives in one `tool_info` block at a step's `DONE`. |
+| Streaming granularity | Step-level, not token-level. |
+| Mid-turn steering | Not supported. Steering is queued and delivered at the next turn boundary. |
+| Interactive approval | Not supported. Permissions are declarative. |
+| Session mirror | No REUSE/REBUILD JSONL mirror. The conversation is resumed by opaque id; a history divergence clean-starts. |
 
-### Circuit Breaker
+### Host tools through the stdio MCP runner
 
-Per-CLI failure isolation with **separate thresholds** for failures and timeouts (because slow ≠ broken):
+`agy` cannot call back into a parked in-process handler, so host tools reach it through a spawned
+stdio MCP server. The plugin runs a loopback HTTP bridge bound to `127.0.0.1` with a per-process
+bearer token, and the runner (`src/agy/runner.ts`) is a stdio MCP child that forwards `tools/list`
+and `tools/call` to that bridge. The runner is what `agy` spawns, so the tool schemas and the
+fail-closed permission checks are exactly the same server the `claude` path uses — the hop adds no
+second tool surface and the bridge is never routable beyond loopback.
 
-<p align="center">
-  <img src="docs/assets/circuit-breaker.svg" alt="Circuit breaker states" width="620" />
-</p>
+### Registration, permissions, and resume accounting
 
-| State | Behavior | Transition |
-|-------|----------|------------|
-| **Closed** | Normal operation, requests pass through | 3 failures OR 5 timeouts &rarr; Open |
-| **Open** | All requests blocked, provider is skipped | After 60s cooldown &rarr; Half-Open |
-| **Half-Open** | One probe request allowed | Success &rarr; Closed / Failure &rarr; Open |
-
-### Retry with Exponential Backoff
-
-```
-Attempt 0:  immediate
-Attempt 1:  ~1s  + jitter (+-30%)
-Attempt 2:  ~2s  + jitter (+-30%)
-            capped at 10s max
-```
-
-- **Transient errors** (network, socket): standard retry
-- **Rate limits** (429, quota): retry with 3x longer delay
-- **Process timeouts**: skip retries entirely, move to next provider
-- **Permanent errors** (auth, 401/403): skip retries, move to fallback
-- **Crash** (SIGKILL, ENOENT): skip retries, move to fallback
-
-### Error Classification
-
-```
-Error arrives
-  |
-  +-- exitCode 137 / SIGKILL / ENOENT ---------> CRASH      (no retry)
-  +-- 429 / "rate limit" / "quota" -------------> RATE_LIMIT (retry, 3x delay)
-  +-- 401 / 403 / "auth" / "not found" --------> PERMANENT  (no retry)
-  +-- everything else --------------------------> TRANSIENT  (retry)
-```
-
-### Fallback Chain
-
-When a provider fails, the next one in the chain takes over automatically:
-
-```
-Claude ---[fail]---> Gemini ---[fail]---> Codex
-Gemini ---[fail]---> Claude ---[fail]---> Codex
-Codex  ---[fail]---> Claude ---[fail]---> Gemini
-```
-
----
-
-## Cross-Platform Support
-
-<table>
-<tr>
-<th>Feature</th>
-<th>Windows</th>
-<th>macOS / Linux</th>
-</tr>
-<tr>
-<td>Binary detection</td>
-<td><code>where</code></td>
-<td><code>which</code></td>
-</tr>
-<tr>
-<td><code>.cmd/.bat</code> shims</td>
-<td>Auto-wrapped with <code>cmd /c</code></td>
-<td>N/A</td>
-</tr>
-<tr>
-<td>PATH augmentation</td>
-<td>npm, scoop, cargo, pnpm dirs</td>
-<td>Standard PATH</td>
-</tr>
-<tr>
-<td>Large prompts (&gt;30KB)</td>
-<td colspan="2" align="center">Delivered via <code>stdin</code> to avoid OS arg-length limits</td>
-</tr>
-<tr>
-<td>Environment</td>
-<td colspan="2" align="center">Allowlisted vars only (no secrets leak to subprocesses)</td>
-</tr>
-</table>
-
-### Detection Caching
-
-CLI availability is cached for **5 minutes** to avoid repeated filesystem lookups. The cache covers:
-- Binary path resolution
-- Version detection
-- Both positive and negative results
-
----
-
-## Security
-
-| Protection | Description |
-|-----------|-------------|
-| **Secret redaction** | API keys (`sk-*`, `key-*`, `AIza*`, `ant-api*`) and Bearer tokens stripped from all output |
-| **Environment filtering** | Only system essentials + proxy vars passed to subprocesses. No API keys — CLIs handle their own auth. |
-| **Input isolation** | Large prompts (>30KB) delivered via stdin, not shell args |
-| **No shell interpolation** | All CLI execution via `execa` (no `shell: true`) |
-
----
-
-## Examples
-
-### Basic: Ask Claude to review code
-
-```typescript
-const result = await cli_exec({
-  cli: "claude",
-  prompt: "Review this function for bugs:\n\nfunction add(a, b) { return a - b }",
-  mode: "analyze",
-  timeout_seconds: 120
-})
-// result.stdout → "Bug found: the function is named `add` but performs subtraction..."
-```
-
-### Fallback: Primary CLI is down
-
-```typescript
-// Claude's circuit breaker is open (too many recent failures)
-const result = await cli_exec({
-  cli: "claude",
-  prompt: "Generate a REST API for user management",
-  allow_fallback: true
-})
-// result.cli → "gemini" (automatic fallback)
-// result.used_fallback → true
-```
-
-### Role routing: Pick the right tool for the job
-
-```typescript
-// For a developer task, route to Codex (best at code generation)
-const recommendation = await cli_route({
-  role: "developer",
-  task_description: "Implement pagination for the /users endpoint"
-})
-// recommendation.recommended_cli → "codex"
-
-// Then execute with the recommended CLI
-const result = await cli_exec({
-  cli: recommendation.recommended_cli,
-  prompt: "Implement pagination for the /users endpoint using cursor-based pagination"
-})
-```
-
-### Monitor health across providers
-
-```typescript
-const status = await cli_status({})
-
-for (const provider of status.providers) {
-  console.log(`${provider.name}: ${provider.circuit_breaker.state} | ${provider.usage.success_rate}`)
-}
-// claude: closed | 95%
-// gemini: closed | 88%
-// codex: open   | 60%  <-- circuit breaker tripped
-```
-
-### Large prompt via stdin
-
-```typescript
-const largeCodebase = readFileSync("src/index.ts", "utf-8") // 45KB file
-const result = await cli_exec({
-  cli: "claude",
-  prompt: `Analyze this codebase for security vulnerabilities:\n\n${largeCodebase}`,
-  mode: "analyze",
-  timeout_seconds: 600
-})
-// Prompt >30KB → automatically delivered via stdin (no OS arg-length issues)
-```
-
----
-
-## Hooks
-
-The plugin injects two hooks into the OpenCode lifecycle:
-
-### `experimental.chat.system.transform`
-
-Automatically injects CLI availability into the system prompt of every agent (except `orchestrator` and `task_decomposer`), so the LLM knows which tools are available and their current health.
-
-### `tool.execute.after`
-
-Tracks when agents invoke CLIs directly via `bash` instead of using `cli_exec`, incrementing usage counters for observability.
-
----
-
-## Provider Strengths
-
-<p align="center">
-  <img src="docs/assets/providers.svg" alt="Provider strengths" width="700" />
-</p>
-
-| Provider | Binary | Strengths |
-|----------|--------|-----------|
-| **Claude** | `claude` | Reasoning, code analysis, debugging, architecture, planning |
-| **Gemini** | `gemini` | Research, trends, knowledge, large-context, web search |
-| **Codex** | `codex` | Code generation, edits, refactoring, full-auto mode |
-
----
-
-## Configuration Reference
-
-### Circuit Breaker Defaults
-
-| Parameter | Value | Description |
-|-----------|-------|-------------|
-| `failureThreshold` | `3` | Consecutive failures before opening |
-| `timeoutThreshold` | `5` | Consecutive timeouts before opening (slow ≠ broken) |
-| `cooldownMs` | `60000` | Milliseconds before open &rarr; half-open |
-| `halfOpenSuccessThreshold` | `1` | Successes in half-open to close |
-
-### Retry Defaults
-
-| Parameter | Value | Description |
-|-----------|-------|-------------|
-| `maxRetries` | `2` | Maximum retry attempts per provider |
-| `baseDelayMs` | `1000` | Base delay for exponential backoff |
-| `maxDelayMs` | `10000` | Maximum delay cap |
-| `jitterFactor` | `0.3` | Random jitter range (+-30%) |
-
-### Executor Defaults
-
-| Parameter | Value | Description |
-|-----------|-------|-------------|
-| `STDIN_THRESHOLD` | `30000` | Characters before switching to stdin delivery |
-| `MAX_BUFFER` | `10MB` | Maximum stdout/stderr buffer |
-
----
+- **Declarative permissions.** With `supportsInteractiveApproval = false`, `agy` enforces a
+  `settings.json` allow list plus MCP-side denial. A tool absent from the allow list is denied at the
+  MCP boundary rather than silently executed. The `--dangerously-skip-permissions` bypass is emitted
+  only under explicit operator consent (`providers.agy.dangerouslySkipPermissionsConsent`).
+- **User-level MCP registration is opt-in.** Registering the runner with `agy mcp add` mutates
+  machine-global user config (`~/.gemini/config/mcp_config.json`), so it defaults to a dry-run
+  manifest and only runs when the operator explicitly opts in.
+- **Resume accounting.** `agy` reports cumulative-per-session usage. The bridge keeps the last
+  cumulative total per conversation out of band and seeds the mapper before a resume, so a resumed
+  turn reports only its own delta and never re-counts the session. See
+  [docs/config.md](docs/config.md#agy-provider).
 
 ## Development
 
-```bash
-bun install              # Install dependencies
-bun test                 # Run all tests (85 tests)
-bun test --watch         # Watch mode
-bun test tests/retry.test.ts  # Run a single test file
-bun run typecheck        # Type-check without emitting
-bun run build            # Build
+```sh
+npm install
+npx tsc --noEmit                          # typecheck src/
+node --import tsx --test tests/**/*.test.ts   # run the unit test suite
 ```
-
-### Project Structure
-
-```
-src/
-  index.ts             Plugin entry, 4 tools, 2 hooks
-  resilience.ts        Global time budget, retry + breaker + fallback
-  circuit-breaker.ts   Per-CLI state machine (failures + timeouts)
-  executor.ts          execa wrapper, Windows handling, PATH augmentation
-  cli-defs.ts          Provider configs, arg builders, role routing
-  detection.ts         CLI auto-detection with 5-min cache
-  retry.ts             Exponential backoff, abort-aware sleep
-  error-classifier.ts  Error categorization for retry decisions
-  safe-env.ts          Environment variable allowlist
-  redact.ts            Secret redaction
-  platform.ts          OS detection
-
-tests/
-  8 test files, 85 tests covering all modules
-```
-
----
-
-## Contributing
-
-1. Fork the repo
-2. Create a feature branch from `develop`: `git checkout -b feat/my-feature develop`
-3. Make your changes and add tests
-4. Run `bun test` (all 85 must pass)
-5. Open a PR to `develop`
-
----
 
 ## License
 
-[MIT](LICENSE) &copy; [lleontor705](https://github.com/lleontor705)
+MIT. See [LICENSE](LICENSE).

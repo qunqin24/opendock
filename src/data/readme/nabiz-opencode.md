@@ -50,6 +50,17 @@ npm install && npm run build
 # Preflight (before install): node scripts/check-symlink.mjs
 ```
 
+## Packages
+
+Published on the npm registry (registry install verified, no git needed):
+
+- [`nabiz-core`](https://www.npmjs.com/package/nabiz-core) — shared
+  host-independent engine (hbmon client, bg-tasks, prune, progress,
+  notice/disclosure texts). `npm install nabiz-core`
+- [`nabiz-opencode`](https://www.npmjs.com/package/nabiz-opencode) — opencode
+  adapter (6 plugins via `plugin/` bundle + MCP `nabiz_safe`/`nabiz_raw`).
+  `npm install nabiz-opencode`
+
 ## Requirements
 
 - The `hbmon` binary (`~/.cargo/bin/hbmon` or on `PATH`). If missing, extensions
@@ -64,5 +75,5 @@ same handshake, same `woke_on` summaries, same exit mapping
 live daemon smoke for `bg_*` (cursor / registry / `wait_ms`).
 
 Gates: `npm run lint` (oxlint, whole repo), `npm run typecheck:ext` +
-`npm run check:pi` (pi 1.0.x compatibility), `npm test` inside
+`npm run check:pi` (pi 1.x compatibility), `npm test` inside
 `packages/harness-opencode` (or `npm run test:lowmem` from the root).
