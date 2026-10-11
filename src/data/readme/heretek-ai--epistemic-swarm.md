@@ -5,13 +5,14 @@
 > phases under dual QA, and open a PR a human merges. Mechanical gates and a
 > human-only approval channel keep autonomous runs honest.
 
-> **Status: 1.6.0.** Phase 5 self-improvement: telemetry harvest
-> (`es improve harvest`), distillation into reviewable proposals
-> (`es improve distill`), and the self-dogfood factory preset
-> (`docs/SELF-DOGFOOD.md`) — runs learn from runs, and the factory builds
-> this repo into draft PRs a human reviews (#135–#138). Install from npm
-> (`@heretek-ai/epistemic-swarm`, `@heretek-ai/es-core`, `@heretek-ai/es-cli`);
-> run `es key seal` once.
+> **Status: 2.3.0.** Phase 9 recursive self-improvement & model distillation:
+> prompt candidates evolve against telemetry failure clusters and ship only
+> behind a strict Pareto gate with benchmark receipts (`improve/optimizer`),
+> passed phase worktrees export scrubbed SFT/DPO datasets
+> (`es improve export-dataset`), and candidate builds promote through an
+> explicitly human-enabled canary with instant rollback (#174–#176).
+> Install from npm (`@heretek-ai/epistemic-swarm`, `@heretek-ai/es-core`,
+> `@heretek-ai/es-cli`); run `es key seal` once.
 
 ## Naming
 
@@ -23,8 +24,10 @@
 ## What it does
 
 - **Factory stages, enforced by code.** Grill → Research → Spec → Build ⇄ QA →
-  Release runs through a state machine; every `es_*` tool refuses an
-  out-of-order step. Approvals (frontier, spec) are human-only and complete
+  Release runs through a state machine; the phase-transition tools refuse an
+  out-of-order step (status, validation, approval-request, gate-record,
+  audit-open, research, scout, brainstorm, harvest, design and LSP tools are
+  intentionally stage-free: seat-gated, not stage-gated). Approvals (frontier, spec) are human-only and complete
   in the TUI (masked passphrase dialog, in-process signing), in the browser
   (preview, then passphrase over loopback), or at a terminal
   (`es approve`); waivers and trust stay terminal-only (`es waive`,
@@ -37,8 +40,10 @@
   scanning, OSV, budgets (diff size, file length, complexity, dependency
   justification, test-with-behaviour), with structured `file:line:rule`
   findings and signed, expiring waivers.
-- **Evidence-first research.** Content-addressed source cache, a pure verbatim
-  quote verifier, and an epistemic auditor that downgrades ungrounded claims.
+- **Evidence-first research.** Content-addressed source cache, a quote
+  verifier that is verbatim after documented normalisation (NFKC, typography
+  folds, markdown stripping, whitespace collapse), and an epistemic auditor
+  that flags, prunes and refuses ungrounded claims.
   Web sources come through an ordered backend chain (Scraper-Swarm gateway,
   Brave, Firecrawl, SearXNG, direct fetch) with per-backend cooldowns: one
   provider's outage or rate limit fails over to the next, while a safety
@@ -171,11 +176,11 @@ bun install
 bun run check        # biome + tsc + bun test (all packages)
 bun run docs:gen     # regenerate schemas/ + docs/ after schema changes
 bun run docs:check   # CI drift check
-scripts/pack-smoke.sh   # build, pack and install the packages; run them under Node and Bun
+scripts/pack-smoke.sh   # build, pack and install the packages; run the CLI under Node and the plugin server under Bun
 scripts/v2-head.sh   # run the real-host suite against OpenCode v2 HEAD
 ```
 
-Platform: Linux, Node ≥ 22 or Bun. No Python.
+Platform: Linux (CI runs ubuntu-latest), CLI under Node 22, plugin server under Bun. No Python.
 
 ## Documentation
 

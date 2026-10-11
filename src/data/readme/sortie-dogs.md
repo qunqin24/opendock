@@ -19,8 +19,8 @@ evidence-backed result, not more agents for their own sake.
 [![Node.js](https://img.shields.io/node/v/sortie-dogs)](https://www.npmjs.com/package/sortie-dogs)
 [![MIT License](https://img.shields.io/npm/l/sortie-dogs)](LICENSE)
 
-**Current release: [v0.13.11](https://github.com/zufall-upon/Sortie-dogs/releases/tag/v0.13.11)**
-· [Release notes](docs/release-v0.13.11.md)
+**Current release: [v0.13.13](https://github.com/zufall-upon/Sortie-dogs/releases/tag/v0.13.13)**
+· [Release notes](docs/release-v0.13.13.md)
 
 [Quick start](#quick-start) · [Workflow](#mission-workflow) · [Models](#default-models) ·
 [Measured results](#measured-results) · [Configuration](#configuration) · [Documentation](#documentation)
@@ -57,7 +57,7 @@ Use an existing Codex CLI signed in with **ChatGPT**. On Windows, PowerShell **7
 available; POSIX uses bash. Sortie does not install Codex, start login or use a metered API fallback.
 
 ```sh
-npm install --save-dev sortie-dogs@0.13.11
+npm install --save-dev sortie-dogs@0.13.13
 npx --no-install sortie-dogs codex init .
 ```
 
@@ -86,7 +86,7 @@ bridge. [Codex guide: SDK, permissions, progress, resume and manifest route](doc
 Use **OpenCode V2**. In the target project:
 
 ```sh
-npm install --save-dev sortie-dogs@0.13.11
+npm install --save-dev sortie-dogs@0.13.13
 npx --no-install sortie-dogs init .
 ```
 
@@ -188,7 +188,7 @@ known expense. Official local evaluation and leaderboard acceptance are separate
 **8/23 (34.8%)**, versus v0.12.25's 7/23; all seven prior resolutions retained, no empty patches or
 official evaluation errors. [Fixed conditions, stopped-run accounting and costs](docs/benchmarks/swebench-lite-history.md#v0131-dev23-2026-09-30).
 
-All scores belong to their fixed candidates, **not v0.13.11**. SWE-bench remains an optional
+All scores belong to their fixed candidates, **not v0.13.13**. SWE-bench remains an optional
 measurement, not a release gate. Different budgets, models and conditions are not controlled comparisons.
 
 ## Configuration
@@ -211,7 +211,7 @@ Install the desired package version and rerun **your host's** initializer:
 
 An OpenCode config-local bridge may resolve a separate package; npm-global update alone does not
 update it. [Global/update instructions](docs/configuration.md#global-availability).
-The current Mission asset marker is `0.13.11-operation-result-v1`; the Codex skill marker is
+The current Mission asset marker is `0.13.13-mission-context-v1`; the unchanged Codex skill marker is
 `0.13.11-codex-skill-v2`. Installed markers alone do not prove a running host reloaded the new version.
 
 There is no supported uninstall command. Remove the dependency and only known Sortie-owned paths;
@@ -227,7 +227,7 @@ follow the [manual removal guide](docs/uninstall.md), never delete the entire `.
   [SWE-bench history](docs/benchmarks/swebench-lite-history.md) · [Historical local case study](docs/benchmark-reference.md).
 - **Development:** [Testing](docs/testing.md) · [CLI testing](docs/cli-testing.md) ·
   [Windows tests](docs/windows-tests.md) · [Release routine](docs/release-batch.md).
-- **Releases:** [v0.13.11](docs/release-v0.13.11.md) · [v0.13.10](docs/release-v0.13.10.md) ·
+- **Releases:** [v0.13.13](docs/release-v0.13.13.md) · [v0.13.12](docs/release-v0.13.12.md) · [v0.13.11](docs/release-v0.13.11.md) · [v0.13.10](docs/release-v0.13.10.md) ·
   [v0.13.9](docs/release-v0.13.9.md) · [All GitHub releases](https://github.com/zufall-upon/Sortie-dogs/releases).
 
 ## Community

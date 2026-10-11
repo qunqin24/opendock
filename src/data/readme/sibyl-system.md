@@ -12,6 +12,7 @@ A standalone [opencode](https://opencode.ai) plugin:
   the result is aggregated into a verdict.
 - **`sibyl_review` / `sibyl-chamber`** (v1.1) — a general review chamber with
   isolated role sessions and one conclusion spoken in one voice (see below).
+- **`sibyl_audit`** — the outside lane as a product organ: completion-state ballots convene themselves from a fresh root session (see Tools).
 - **`sibyl_status` + audit primitives** (`sibyl_anchor_check`, `sibyl_time_probe`,
   `sibyl_attribute`) — read-only verification tools: run-store view, human-message
   anchor re-verification, clock integrity, ref-move attribution.
@@ -98,6 +99,7 @@ stderr, registers nothing, and returns empty hooks.
 | Tool | Arguments | Behavior |
 |------|-----------|----------|
 | `sibyl_consult` | `{ artifact, goal }` | `artifact` is a file path or inline multi-line text (≤ 256 KiB). The three councilors audit it in parallel; each reply is parsed into a verdict (one in-session JSON-only repair shot per voter). Returns the tally, merged reasons/must-fix, run id, and per-voter reply file paths. |
+| `sibyl_audit` | `{ artifact, goal }` | Independent audit lane: the council is convened by a FRESH engine-provisioned root session (structurally non-kin to any drafting chain), so the ballot enters the effective path without the caller's identity touching it. Receipt: auditor session id (retained, DB-reconcilable), artifact sha256 bound at start and end (mid-flight drift => VOID), verdict face; anything but INDEPENDENT on the fresh convener => REFUSED, no receipt. |
 | `sibyl_swarm` | `{ artifact, goal, judge? }` | ARCHITECT decomposes goal + artifact into a strict-JSON workflow schema; workers are minted deterministically and dispatched in dependency waves; drafts land in the run's space dir. Verdict: `APPROVE` / `REJECT` / `EXHAUSTED`, forced to `CANNOT_ANSWER` when a declared worker left no terminal row (W2) or zero drafts were produced. With `judge: true`, one extra judge pass may replace the derived verdict — an unrecognized or failed judge reply keeps the derived one. |
 | `sibyl_status` | `{ runId? }` | Read-only. Lists all recorded runs (newest last) + the last chamber-ledger rows, or shows one run's full record and space dir. |
 | `sibyl_review` | `{ target, goal, seed?, maxRounds? }` | v1.1 general democratic-centralism chamber: launches the isolated evidence→clash→judge pipeline detached and returns a receipt (explicitly NOT a verdict); the single voice lands in the run record at terminal state. CLI twin: `sibyl-chamber`. |
@@ -211,7 +213,7 @@ Dependencies point downward only:
 
 ```
 index.ts            plugin entry: parse options → share one RunStore + client
-                    adapter → register the seven sibyl_* tools
+                    adapter → register the eight sibyl_* tools
 ├── engine/         runPersona(): create + prompt one child session through a
 │                   structural client seam; per-stage timeouts; never throws —
 │                   every failure is a structured PersonaRunResult

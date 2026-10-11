@@ -7,20 +7,20 @@ Five independent Bun packages for OpenCode V2. Each plugin owns its dependencies
 | Plugin | What it does | Interface and requirements |
 | --- | --- | --- |
 | [Classify](./classify/README.md) | Typed judgments with OpenAI Decisions, TypeSafe AI, Cloudflare Clef, Laya, or Ollama; file/code/diff evidence | Namespaced decision tool and backend-selection command; TUI picker/status. Requires explicit backend configuration. |
-| [Cache metrics](./cache-metrics/README.md) | Session input cache-hit rate, token totals, per-response history, and JSON export | TUI sidebar and history panel. History includes subagents by default. |
-| [Quota usage](./quota-usage/README.md) | Remaining Codex weekly and OpenCode Go monthly/rolling/weekly account quotas | Web/TUI chat tool and TUI sidebar backed by server RPC. Uses active provider connections. |
-| [Workflow tools](./workflow-tools/README.md) | Spec planning/refinement/implementation, PR publication/metadata, feedback delivery and check investigation | Eight server commands; OpenCode 2.0.22+. External skills and server-side authenticated `gh` as needed; no TUI entry. |
+| [Cache metrics](./cache-metrics/README.md) | Session input cache-hit rate, token totals, per-response history, and JSON export | TUI sidebar and history panel. History includes the root session and its subagents by default. |
+| [Quota usage](./quota-usage/README.md) | Remaining Codex and OpenCode Go account quotas | Web/TUI chat tool and automatically refreshed TUI sidebar. Uses active provider accounts on the server. |
+| [Workflow tools](./workflow-tools/README.md) | Spec planning/refinement/implementation, PR publication/metadata, feedback delivery and check investigation | Server commands; see [package.json](./workflow-tools/package.json) for OpenCode requirements. External skills and server-side authenticated `gh` as needed; no TUI entry. |
 | [Marketplace](./marketplace/README.md) | Browse a sample catalog of skills, commands, and agents | TUI prototype. Install/update/uninstall actions change durable UI state, not OpenCode resources. |
 
-Each plugin README covers setup and common use, with detailed guides under its `docs/` directory.
+Each plugin README covers setup and common use. Contributor details belong in its `docs/DEVELOPMENT.md`.
 
 ## Install
 
 Add the plugins you want to the `plugins` array in `opencode.jsonc`. Use a project configuration or the global `~/.config/opencode/opencode.jsonc` (`$XDG_CONFIG_HOME/opencode/opencode.jsonc` when set). `opencode.json` is also supported. Merge entries into existing settings.
 
-Classify is available on npm as [`@mholtzscher/opencode-classify`](https://www.npmjs.com/package/@mholtzscher/opencode-classify). The other plugins install from Git.
+Use the install target in each plugin's README. The example below uses Git for most packages; Classify and Workflow tools also document npm targets.
 
-This example lists all five packages. Keep only those you want. Classify uses TypeSafe here and needs `TYPESAFE_API_KEY` in the OpenCode server environment. To choose another backend, read [Classify configuration](./classify/docs/CONFIGURATION.md). Before replacing legacy specification or GitHub plugins, follow [Workflow tools migration](./workflow-tools/docs/MIGRATION.md).
+This example lists all five packages. Keep only those you want. Classify uses TypeSafe here and needs `TYPESAFE_API_KEY` in the OpenCode server environment. To choose another backend, read [Classify configuration](./classify/docs/CONFIGURATION.md).
 
 ```jsonc
 {
@@ -47,6 +47,25 @@ Load one copy of each plugin. When switching sources, replace the existing entry
 
 ## Development
 
+### Environment setup
+
+Install [mise](https://mise.jdx.dev/getting-started.html), then from the repository root:
+
+```sh
+mise trust
+mise install
+mise run install
+mise run check
+```
+
+[`mise.toml`](./mise.toml) pins Bun and Node for local development and CI. CI uses `mise-action` to install only the runtimes needed by each job; publishing uses Node's bundled npm. The configuration also retains the lint tools, uv, Pitchfork, and optional Laya daemon configuration. `mise install` installs tools; `mise run install` installs locked dependencies separately in the root and each plugin, without creating a workspace. Neither command starts Laya.
+
+Use `mise run lint`, `mise run fix`, `mise run typecheck`, or `mise run test` for individual checks. After Cache metrics TUI changes, run `mise run build:tui` before `mise run check` and commit `cache-metrics/dist/tui.js`; checks do not rebuild it automatically. Tasks run from the repository root even when invoked inside a plugin.
+
+For direct `bun` commands, [activate mise in your shell](https://mise.jdx.dev/getting-started.html#activate-mise) or prefix them with `mise exec --`.
+
+### Local plugins
+
 Run `bun install` inside each plugin you work on. Add its directory to `plugins`. Relative paths resolve from the containing config file. You can also use an absolute path from another project. The root install supplies lint tooling only.
 
 The repository's [`opencode.jsonc`](./opencode.jsonc) loads all five local plugins and contains operator-specific settings. See Classify's [development configuration](./classify/docs/CONFIGURATION.md#repository-development-configuration) before using hosted profiles or changing models. Inference servers are managed separately.
@@ -59,9 +78,7 @@ On OpenCode V2.0.26, a global package plus its local checkout produces `Duplicat
 
 Root `opencode.jsonc` uses experimental `integration.use` policies with `plugin:<package-target>` resources to block installed Git and npm sources in this project. If global package targets change, update these policies to match. Preserve local path entries and their options. This behavior was verified against V2.0.26, whose public policies guide did not document `integration.use`.
 
-Before loading Workflow tools, follow [migration prerequisites](./workflow-tools/docs/MIGRATION.md#remove-legacy-sources-first). Removing old deny policies can re-enable global legacy installations with different IDs. Repository changes do not edit global configuration.
-
-After changing plugin sources, open `/plugins` and confirm all five repository plugins are **active, local**, with no duplicate failures or legacy command providers. Unrelated global plugins should remain active. CLI preferences still come from global `cli.json`; there is no project-local CLI settings file.
+After changing plugin sources, open `/plugins` and confirm all five repository plugins are **active, local**, with no duplicate failures. Unrelated global plugins should remain active. CLI preferences still come from global `cli.json`; there is no project-local CLI settings file.
 
 ### Verification
 

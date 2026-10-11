@@ -369,6 +369,11 @@ faber:
 - [Configuration](docs/guides/configuration.md) - Complete configuration reference
 - [Troubleshooting](docs/guides/troubleshooting.md) - Common issues and solutions
 
+### Building Packs
+- [Pack Best Practices](plugins/faber/docs/PACK-BEST-PRACTICES.md) - What core FABER expects from a pack, with a conformance checklist
+- [Plugin Extension Guide](plugins/faber/docs/PLUGIN-EXTENSION-GUIDE.md) - Pack layout, workflows, and how projects use a pack
+- [Workflow Step Reference](plugins/faber/docs/WORKFLOW-STEP-REFERENCE.md) - Workflow fields that `workflow-execute` reads
+
 ### Examples
 - [Code Examples](docs/examples/README.md) - Runnable TypeScript and Python examples
   - Simple Workflow - Basic workflow execution

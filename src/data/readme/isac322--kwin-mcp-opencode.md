@@ -8,7 +8,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![CI](https://github.com/isac322/kwin-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/isac322/kwin-mcp/actions/workflows/ci.yml)
 
-A [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server that enables AI agents (Claude Code, Cursor, and other MCP clients) to launch, interact with, and observe any Wayland application in a fully isolated virtual KWin session -- without affecting the user's desktop. It also supports **live desktop automation** by connecting to an existing KWin session (real desktop or container) for collaborative workflows. With 33 MCP tools covering mouse, keyboard, touch, clipboard, accessibility tree inspection, screenshot capture, and window management, kwin-mcp provides everything needed for end-to-end GUI testing and desktop automation on Linux.
+A [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server that enables AI agents (Claude Code, Cursor, and other MCP clients) to launch, interact with, and observe any Wayland application in an isolated virtual KWin session -- without affecting the user's desktop display or input. It also supports **live desktop automation** by connecting to an existing KWin session (real desktop or container) for collaborative workflows. With 35 MCP tools covering mouse, keyboard, touch, clipboard, accessibility tree inspection, screenshot capture, and window management, kwin-mcp provides everything needed for end-to-end GUI testing and desktop automation on Linux.
 
 ## Table of Contents
 
@@ -27,7 +27,7 @@ A [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server that e
 
 ## Why kwin-mcp?
 
-- **Isolated sessions** -- Each session runs in its own `dbus-run-session` + `kwin_wayland --virtual` sandbox. Your host desktop is never affected.
+- **Isolated sessions** -- Each session runs in its own `dbus-run-session` + `kwin_wayland --virtual` compositor. Your host desktop never receives its windows or input. This is not a filesystem or network sandbox; see [Isolation scope](#isolation-scope).
 - **Live session support** -- Connect to a real KDE Plasma desktop or a KWin instance inside a container (e.g. `systemd-nspawn`) for collaborative "share my screen" workflows.
 - **No screenshots required for interaction** -- The AT-SPI2 accessibility tree gives the AI agent structured widget data (roles, names, coordinates, states, available actions), so it can interact with UI elements without relying solely on vision.
 - **Zero authorization prompts** -- Uses KWin's private EIS (Emulated Input Server) D-Bus interface directly, bypassing the XDG RemoteDesktop portal. No user confirmation dialogs.
@@ -42,7 +42,7 @@ Run end-to-end GUI tests for KDE/Qt/GTK applications in headless isolated sessio
 
 ### AI-Driven Desktop Automation
 
-Let AI agents like Claude Code autonomously operate desktop applications. The agent reads the accessibility tree to understand the UI, performs actions through 33 MCP tools, and observes the results via screenshots -- creating a complete feedback loop for any Wayland application.
+Let AI agents like Claude Code autonomously operate desktop applications. The agent reads the accessibility tree to understand the UI, performs actions through 35 MCP tools, and observes the results via screenshots -- creating a complete feedback loop for any Wayland application.
 
 ### Live Desktop Collaboration
 
@@ -190,6 +190,9 @@ kwin-mcp-cli --default-live-session
 
 # Attach captured screenshots to tool results as MCP image content
 kwin-mcp --screenshot-images
+
+# Downscale every screenshot so its longer side is at most 2576 pixels
+kwin-mcp --screenshot-images --screenshot-max-edge 2576
 ```
 
 ### Screenshot Images in Tool Results (`--screenshot-images`)
@@ -217,23 +220,39 @@ Any JSON MCP config takes the flag as another argument:
 
 The flag is off by default because every attached frame is sent to the model and costs context tokens, and a `screenshot_after_ms` burst attaches all of its frames — there is no cap. In a live session (`session_connect` or `--default-live-session`) the images are your real desktop's pixels, so enabling the flag sends them to the model provider.
 
+### Screenshot Size (`--screenshot-max-edge`, `region`, `max_edge`)
+
+A screenshot of a large desktop can be too big for a model. A 7680x1440 workspace is an 11-megapixel PNG of several megabytes. A model provider downscales an oversized image before the model sees it, and the model's pixel coordinates then refer to the resized image, which the `Coordinate space` line does not describe. kwin-mcp can bound and crop the image itself, so the line stays exact:
+
+- `--screenshot-max-edge N` downscales every saved screenshot and `screenshot_after_ms` frame so its longer side is at most `N` pixels, keeping the aspect ratio. `0`, the default, keeps full resolution. The bound must keep the image within the provider's limits, or the provider resizes it again and the formula below no longer matches the model's coordinates. According to [Anthropic's vision documentation](https://platform.claude.com/docs/en/build-with-claude/vision#evaluate-image-size) (checked 2026-10-10), Claude 4.7 and later models take at most 2576 pixels on the long edge and 4784 visual tokens of 28x28 pixels; earlier models take 1568 pixels and 1568 tokens. 2576 suits a wide desktop such as 7680x1440 (2576x483); a 16:9 image fits at 2576x1449 on the newer models and 1456x819 on earlier ones, and a squarer image or crop needs a smaller bound. The flag may be given only once; repeating it is a startup error.
+- `screenshot`'s `max_edge` overrides the flag for one call; `max_edge=0` returns full resolution.
+- `screenshot`'s `region` (`[x, y, width, height]` in global logical coordinates) crops the capture to that rectangle. The part outside the captured workspace is dropped, and the `Coordinate space` line reports the crop's origin and size. A region that misses the workspace entirely is an error.
+
+When an image was downscaled, its `Coordinate space` line keeps the logical origin and size and adds the image's pixel size and the mapping from the saved image's pixels: each image pixel maps to the logical point at its source pixel's center, for example `image 2576x483 downscaled: pixel (px, py) shows (0 + (px + 0.5) * 7680 / 2576 - 0.5, 0 + (py + 0.5) * 1440 / 483 - 0.5)`. Small text is unreadable in a downscaled overview of a wide desktop, so take the overview first, then a `region` around the area of interest at full resolution.
+
 ## Available Tools
 
 ### Session Management (3 tools)
 
 | Tool | Parameters | Description |
 |------|-----------|-------------|
-| `session_start` | `app_command?` `str`, `screen_width?` `int` (1920), `screen_height?` `int` (1080), `enable_clipboard?` `bool` (false), `keep_screenshots?` `bool` (false), `isolate_home?` `bool` (false), `keep_home?` `bool` (false), `env?` `dict` | Start an isolated KWin Wayland session, optionally launching an app. Set `enable_clipboard=true` to enable clipboard tools (requires `wl-clipboard`). Set `keep_screenshots=true` to preserve screenshot files after `session_stop`. Set `isolate_home=true` to create a temporary HOME with isolated XDG directories (config, data, cache, state), preventing apps from reading/writing host user settings. Set `keep_home=true` to preserve the isolated home directory after `session_stop`. Pass extra environment variables via `env`. Startup is deadline-bounded: a failed handshake raises `RuntimeError` with the captured session stderr and stray stdout. |
-| `session_connect` | `dbus_address?` `str`, `wayland_display?` `str`, `keep_screenshots?` `bool` (false) | Connect to an existing KWin session (real desktop or container). Defaults to `$DBUS_SESSION_BUS_ADDRESS` and `$WAYLAND_DISPLAY`. Clipboard is always enabled. `session_stop` only disconnects without killing KWin or pre-existing apps. |
+| `session_start` | `app_command?` `str`, `screen_width?` `int` (1920), `screen_height?` `int` (1080), `enable_clipboard?` `bool` (false), `keep_screenshots?` `bool` (false), `isolate_home?` `bool` (false), `keep_home?` `bool` (false), `env?` `dict` | Start an isolated KWin Wayland session, optionally launching an app. Set `enable_clipboard=true` to enable clipboard tools (requires `wl-clipboard`). Set `keep_screenshots=true` to preserve screenshot files after `session_stop`. Set `isolate_home=true` to create a temporary HOME with isolated XDG directories (config, data, cache, state), so apps use fresh settings instead of the host user's. Set `keep_home=true` to preserve the isolated home directory after `session_stop`. Pass extra environment variables via `env`. Startup is deadline-bounded: a failed handshake raises `RuntimeError` with the captured session stderr and stray stdout. |
+| `session_connect` | `dbus_address?` `str`, `wayland_display?` `str`, `keep_screenshots?` `bool` (false), `enable_accessibility?` `bool` (false) | Connect to an existing KWin session (real desktop or container). Defaults to `$DBUS_SESSION_BUS_ADDRESS` and `$WAYLAND_DISPLAY`. Clipboard is always enabled. `session_stop` only disconnects without killing KWin or pre-existing apps. The result's `Accessibility:` line reports the desktop's `org.a11y.Status.IsEnabled` switch; `enable_accessibility=true` turns it on until `session_stop` (see [Accessibility Tree](#accessibility-tree)). |
 | `session_stop` | _(none)_ | Stop the session and clean up. For virtual sessions: signals the whole session process group (`SIGTERM`, then `SIGKILL` for members that remain), so descendants still stop even if the session leader already exited. For live sessions: disconnects without killing KWin or pre-existing apps. |
 
 ### Observation (3 tools)
 
 | Tool | Parameters | Description |
 |------|-----------|-------------|
-| `screenshot` | `include_cursor?` `bool` (false) | Capture the whole workspace as a PNG. Returns the file path and a `Coordinate space` line with the image's logical origin, size, capture backend, and coverage. Image pixel `(px, py)` is the global logical point `(origin_x + px, origin_y + py)`, the same space `mouse_click` and `touch_tap` take. |
+| `screenshot` | `include_cursor?` `bool` (false), `region?` `list[int]`, `max_edge?` `int` | Capture the whole workspace, or the `[x, y, width, height]` `region` of it, as a PNG. Returns the file path and a `Coordinate space` line with the image's logical origin, size, capture backend, and coverage. Image pixel `(px, py)` is the global logical point `(origin_x + px, origin_y + py)`, the same space `mouse_click` and `touch_tap` take. `max_edge` downscales so the longer side is at most that many pixels (`0` = full resolution; default from `--screenshot-max-edge`); a downscaled image's line adds its pixel size and the pixel-to-logical formula. See [Screenshot Size](#screenshot-size---screenshot-max-edge-region-max_edge). |
 | `accessibility_tree` | `app_name?` `str`, `max_depth?` `int` (15), `role?` `str` | Get the AT-SPI2 widget tree with roles, names, states, coordinates, the text content of editors and entries (`text='...'`, capped at 200 characters), and scrollbar/slider positions (`value=current/max`). Use `role` to filter to specific element types (e.g. `"button"`, `"check box"`). Non-matching elements are hidden but their children are still traversed. |
 | `find_ui_elements` | `query` `str`, `app_name?` `str`, `states?` `list[str]` | Search for UI elements by name, role, or description (case-insensitive); matches report their text content and scrollbar/slider value when they have one. Optionally filter by AT-SPI2 states (e.g. `["focused"]`, `["active", "visible"]`). `query` can be empty when filtering by states only. |
+
+### Accessibility Actions (1 tool)
+
+| Tool | Parameters | Description |
+|------|-----------|-------------|
+| `invoke_ui_action` | `query` `str`, `action_name` `str`, `app_name?` `str` | Invoke a native AT-SPI action on exactly one matching element without pointer coordinates. `query` matches element name, role, or description case-insensitively; `action_name` must equal an exposed action name case-insensitively (for example `Press`). `app_name` optionally scopes the search. Zero matches do nothing and ambiguous matches fail closed. State-changing actions are never automatically retried. |
 
 ### Mouse Input (6 tools)
 
@@ -272,14 +291,15 @@ The flag is off by default because every attached frame is sent to the model and
 | `clipboard_get` | _(none)_ | Read the current clipboard text content. Requires `enable_clipboard=true` in `session_start` and `wl-clipboard` installed. |
 | `clipboard_set` | `text` `str` | Set the clipboard text content. Same requirements as `clipboard_get`. |
 
-### Window Management (6 tools)
+### Window Management (7 tools)
 
 | Tool | Parameters | Description |
 |------|-----------|-------------|
 | `launch_app` | `command` `str`, `env?` `dict` | Launch an application inside the running session. Returns PID and log path. |
 | `list_windows` | _(none)_ | List all accessible application windows with per-window titles and active/focused state markers via AT-SPI2 |
-| `focus_window` | `app_name` `str` | Activate and raise a window by application name (case-insensitive match), via KWin scripting |
+| `focus_window` | `app_name?` `str`, `window_id?` `str` | Activate and raise a window via KWin scripting. Use `window_id` for an exact window from `window_geometry`; otherwise `app_name` uses a case-insensitive application/title match. |
 | `window_geometry` | `app_name?` `str`, `window_id?` `str` | Report each window's KWin id, an `[active]` marker, and frame and client rectangles in **global screen coordinates** via KWin scripting — the same space `find_ui_elements` / `accessibility_tree` report and `mouse_click` / `touch_tap` take. `window_id` filters to one window by exact id. |
+| `window_set_geometry` | `window_id` `str`, `x?` `int`, `y?` `int`, `width?` `int`, `height?` `int` | Move and/or resize exactly one window by its KWin id. Any subset of x/y/width/height may be supplied; at least one field is required and width/height must be positive. The resulting frame geometry is observed again through KWin before it is reported. |
 | `active_window` | _(none)_ | Report the window KWin currently treats as active (id, frame, client), e.g. to confirm `focus_window` |
 | `window_close` | `window_id` `str` | Ask exactly one window, addressed by the id from `window_geometry`, to close (like its titlebar button). Disabled in live sessions to protect unsaved work. |
 
@@ -308,7 +328,7 @@ Claude Code / AI Agent
   |
   |  MCP (stdio)
   v
-kwin-mcp server  (33 tools)       kwin-mcp-cli (interactive REPL)
+kwin-mcp server  (35 tools)       kwin-mcp-cli (interactive REPL)
   |                                  |
   +--- both delegate to AutomationEngine (core.py) ---+
   |
@@ -358,7 +378,11 @@ kwin-mcp provides three layers of isolation from the host desktop:
 1. **D-Bus isolation** -- `dbus-run-session` creates a private session bus. The isolated session's services (KWin, AT-SPI2, portals) are invisible to the host.
 2. **Display isolation** -- `kwin_wayland --virtual` creates its own Wayland compositor with a virtual framebuffer. No windows appear on the host display.
 3. **Input isolation** -- Input events are injected through KWin's EIS interface into the isolated compositor only. The host desktop receives no input from kwin-mcp.
-4. **Home directory isolation** (optional) -- When `isolate_home=true` is set in `session_start`, a temporary HOME directory is created with isolated XDG directories (`XDG_CONFIG_HOME`, `XDG_DATA_HOME`, `XDG_CACHE_HOME`, `XDG_STATE_HOME`). Apps in the session cannot read or modify host user settings (e.g. `~/.config/kdeglobals`), improving test reproducibility and safety. `XDG_RUNTIME_DIR` is intentionally not isolated because the Wayland socket resides there.
+4. **Home directory isolation** (optional) -- When `isolate_home=true` is set in `session_start`, a temporary HOME directory is created with isolated XDG directories (`XDG_CONFIG_HOME`, `XDG_DATA_HOME`, `XDG_CACHE_HOME`, `XDG_STATE_HOME`). Apps that follow the XDG base directories read and write these instead of host user settings (e.g. `~/.config/kdeglobals`), improving test reproducibility. `XDG_RUNTIME_DIR` is intentionally not isolated because the Wayland socket resides there.
+
+#### Isolation scope
+
+These layers separate the session's bus, display, and input from the host desktop. They do not confine the processes: launched apps run as your user with your filesystem permissions and network access, and can still reach the original home directory by absolute path when `isolate_home=true`. Run untrusted applications in a container or VM rather than relying on a virtual session.
 
 ### Automatic Session Cleanup at Exit
 
@@ -403,6 +427,8 @@ kwin-mcp reads the output topology through KWin scripting immediately before and
 ### Accessibility Tree
 
 The AT-SPI2 accessibility bus within the isolated session is queried via PyGObject (`gi.repository.Atspi`). This provides a structured tree of all UI widgets with their roles (button, text field, menu item, etc.), names, states (focused, enabled, visible, etc.), screen coordinates, and available actions (click, toggle, etc.).
+
+Firefox, like other apps that check it, exposes an accessibility tree only while the session's `org.a11y.Status.IsEnabled` switch is on, and a stock Plasma session leaves it off. Virtual sessions switch it on before any app starts; their accessibility bus is private, so the host desktop is unaffected. A live session (`session_connect`) does not change it by default; the result's `Accessibility:` line says whether it is on. Pass `enable_accessibility=true` to switch it on for the whole desktop until `session_stop`, which switches it back off (unless it was already on before the connection). The restore turns the switch back off whenever this connection turned it on, so a change the user makes to the switch while connected is overwritten at `session_stop`; enabling accessibility before connecting keeps it on. Every switch read and write is bounded to a few seconds, so a stalled desktop bus cannot hold `session_stop` or the server's exit. Firefox follows the change at runtime; an app that reads the switch only at startup must be restarted. The server's exit switches it back off too, including when a tool is still running. Restoring is best-effort: a server killed with `SIGKILL`, or a bus that refuses the call, leaves the switch on. Launch Chromium with `--force-renderer-accessibility` to expose web page content: in Chromium 154 the switch alone gave only empty window frames, and the flag gave the page tree whatever the switch.
 
 ## System Requirements
 
@@ -588,7 +614,8 @@ Coverage includes:
 - failing-session lifecycle regressions that stub `kwin_wayland`/`dbus-run-session` on `PATH`: `session_start` must fail within its startup deadline and surface the captured session stderr plus stray stdout (including a newline-free partial line), and teardown must reap the entire owned process group even when the session leader was already reaped or a descendant ignores `SIGTERM`;
 - a KWin bus-name readiness regression whose `kwin_wayland` stub creates the Wayland socket before starting the real compositor: `session_start` must wait until `org.kde.KWin` has an owner before it sets up EIS input, and must fail with a clear error when KWin exits first or never takes the name;
 - an accessibility-bus check that `org.a11y.Bus` has an owner as soon as `session_start` returns, before any app or AT-SPI2 query could activate it, and that a failed activation (a `dbus-send` stub on `PATH`) is reported as a `Warning:` line in the `session_start` output;
-- exact input-schema checks for all 33 registered tools, plus installed-server stdio calls through every MCP wrapper;
+- the `org.a11y.Status.IsEnabled` switch: on in virtual sessions, and in live sessions reported, left off by default, switched on by `enable_accessibility=true`, and restored by `session_stop` and by a server exit while a tool is still running;
+- exact input-schema checks for all 35 registered tools, plus installed-server stdio calls through every MCP wrapper;
 - nested visual tests that start Xvfb and a test-owned KWin compositor inside the container, connect the installed MCP server to it, and verify pixels as well as accessibility state;
 - KCalc before/after pixel transitions and a deterministic GUI probe for mouse hover, cursor inclusion, animation frame bursts, and CJK text (`GUI 검증 42`) rendered differently from a tofu control (`□□`);
 - screenshot coordinate mapping at output scales 1.0 and 1.45 (the fractional scale is set through `kscreen-doctor`): a probe button found by pixel color in the screenshot is clicked at origin plus pixel and must activate, and single screenshots and frame bursts report the logical workspace as their coordinate space;

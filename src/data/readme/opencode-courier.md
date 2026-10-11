@@ -73,7 +73,9 @@ it adds:
 - **Webhooks:** GitHub reviews, comments and CI runs, or any signed POST, wake the
   [subscribed](#webhooks) session.
 - **Worktree isolation:** `isolate: true` gives a child its own git worktree, so children can edit
-  files in parallel.
+  files in parallel. An isolated child that splits hands its committed work down: its isolated
+  children start from its HEAD, and each isolated child commits on `courier/<its session ID>` and
+  reports that branch for its parent to merge ([nested isolation](docs/reference.md#nested-isolation)).
 - **Relaying to you:** a child's permission requests and questions reach you through the parent,
   and your answers go back; a form only you can answer is pointed out to you.
 
@@ -115,6 +117,43 @@ Watch the child's question open in the parent's session as OpenCode's own questi
 
 Both recordings are real runs with a free model on [OpenCode Zen](https://opencode.ai/zen) (Muse
 Spark 1.3).
+
+## Recursive orchestration
+
+A session splits a goal across child sessions, each child decides in turn whether to split its
+part again, and the results are checked and integrated at every level on the way back up. The
+plugin ships the playbook as an OpenCode skill, `courier-orchestrate`, listed in every session with
+the plugin loaded: how to decide whether to split, and to say which in one line of the reply
+(`split: no, because …; considered: <the parts you weighed>` or `split: 3 parts: …`), plan the
+parts, start them in one join group, end the turn, read each report by its status, verify
+first-hand through the project's scripts, integrate and report upward, and what to do when a part
+fails, ends quietly, blocks or hits a limit. It names the parts an implementation task with one
+tightly coupled core usually still has: its e2e scenario, its documentation, sometimes a second
+test file, and a review of the core by a session with fresh context (`isolate: false`, it edits
+nothing). The session does the core itself first and commits it, then starts one session per
+remaining part, if 2 or more remain; a review session's findings are a report to act on, and
+running the checks stays the session's own. Its description asks a model to load it at the start
+of any implementation task that may have independent parts, and a session nobody spawned is pointed to it by its system prompt as well
+([Session trees](#session-trees)); `/skills` in the TUI attaches it to your prompt. Its text:
+[the reference](docs/reference.md#the-courier-orchestrate-skill).
+
+The smoke test's recursive scenario (`COURIER_SCENARIO=recursive`, [docs/real-model.md](docs/real-model.md#recursive-orchestration))
+asks a free model:
+
+> Have this job done through helper sessions started with courier_spawn, one session per part, and
+> do no part yourself. It has two parts. Part "numbers" is itself two independent halves, which the
+> session that gets it hands to two sessions of its own: one runs `` `sleep 20; echo $((17 * 23))` ``
+> and writes the number it printed to numbers/a.txt, the other runs `` `sleep 20; echo $((2 ** 10))` ``
+> and writes the number it printed to numbers/b.txt. Part "count" runs `` `sleep 20; echo $((99 - 57))` ``
+> and writes the number it printed to count/total.txt. When the parts have reported back, read the
+> three files yourself and reply with one line: RESULTS \<a\> \<b\> \<total\>
+
+The root starts two sessions and ends its turn; the "numbers" session starts two of its own, ends
+its turn, checks both files when their reports wake it and reports once to the root; the "count"
+session does its part itself. The root is woken by the two reports, reads the three files and
+replies `RESULTS 391 1024 42`. The checker verifies the shape of the tree, that no session polled or
+went past `maxDepth`, that every report carries a status and each sub-orchestrator reported once,
+after its children, and the files and the final line.
 
 ## Install
 
@@ -185,11 +224,17 @@ Then list it in `opencode.json` (V2 uses `plugins`, plural). A local plugin path
    (run one web search in your own session and answer OpenCode's prompt, or use its "Third-party
    search" setting): otherwise the first child to search shows that prompt in its own session,
    which only you can answer there.
-3. Use `isolate: true` whenever children edit files in parallel. The child's worktree is made from
-   the last commit, so an uncommitted `opencode.json` is not there and the child falls back to your
+3. Your own session's prompts are relayed nowhere, and each one stalls the whole tree until you
+   answer it. Before an unattended run, allow the orchestrating session's toolchain up front: the
+   repository's `bun run` and `npm run` scripts, `git`, and whatever its checks need. Prefer one rule
+   on `bun run *` or `npm run *` over a rule per binary; the skill tells a session that orchestrates
+   to run checks through the project's scripts rather than `./node_modules/.bin/<tool>`, so one rule
+   covers them.
+4. Use `isolate: true` whenever children edit files in parallel. The child's worktree is made from
+   the last commit (from an isolated session, its HEAD), so an uncommitted `opencode.json` is not there and the child falls back to your
    global config: keep providers and models in the global config, or commit the file. When you are
    done with an isolated child, `courier_cleanup` it so its worktree does not linger.
-4. A child whose turn fails, or ends without `courier_send`, is reported to its parent by the
+5. A child whose turn fails, or ends without `courier_send`, is reported to its parent by the
    plugin. What the plugin cannot see, such as a server that stops while a child runs, a
    `courier_later` check-in still covers: for a long-running child, schedule one for yourself and
    `courier_cancel` it when the child reports.
@@ -198,11 +243,13 @@ Then list it in `opencode.json` (V2 uses `plugins`, plural). A local plugin path
 
 | Tool | Does |
 |---|---|
-| `courier_spawn` | Creates a session (optionally in its own git worktree with `isolate: true`) on the parent's model, sends it the task plus a brief naming the parent, how to report back and when to split the task further, and returns at once. Refused past the [session tree limits](#session-trees). |
-| `courier_send` | Delivers a message to a session, signed with the sender's id, waking it if idle. From a child to its parent, a `status` (`done`, `partial`, `blocked` or `failed`) makes it the child's report, carried as an attribute of the message (`<courier from="…" status="done">`), and `artifacts` (`branch`, `commits`, `files`, `checks`) are listed in its body in a fixed layout; a message without a status is progress, not the report ([reference](docs/reference.md#a-childs-report)). |
+| `courier_spawn` | Creates a session (optionally in its own git worktree with `isolate: true`, which from an isolated session starts at its HEAD, [nested isolation](docs/reference.md#nested-isolation)) on the parent's model, sends it the task plus a brief naming the parent, how to report back and when to split the task further, and returns at once. With a `group` name, the reports of every session started under that name are held and delivered together, in one message ([reference](docs/reference.md#join-groups)). Refused past the [session tree limits](#session-trees). |
+| `courier_send` | Delivers a message to a session, signed with the sender's id, waking it if idle. From a child to its parent, a `status` (`done`, `partial`, `blocked` or `failed`) makes it the child's report, carried as an attribute of the message (`<courier from="…" status="done">`), and `artifacts` (`branch`, `commits`, `files`, `checks`) are listed in its body in a fixed layout; a message without a status is progress, not the report ([reference](docs/reference.md#a-childs-report)). From a member of a join group, a report with `done`, `partial` or `failed` is held with the group instead, and the result says so. |
 | `courier_status` | One look at a session: outcome, idle time, last reply and the permission requests and questions it waits on. For check-ins, not for waiting. |
-| `courier_children` | Lists the sessions this one (or a given `sessionID`) started with `courier_spawn`, each with what `courier_status` reports plus its directory, whether it is isolated and when it was started. |
-| `courier_cleanup` | Removes the git worktree of a child started with `isolate: true` and drops the child from `courier_children`. Keeps a worktree with uncommitted changes or commits on no branch, tag or remote and lists them, unless `force: true` is passed ([reference](docs/reference.md#worktree-cleanup)). |
+| `courier_children` | Lists the sessions this one (or a given `sessionID`) started with `courier_spawn`, each with what `courier_status` reports plus its directory, whether it is isolated, when it was started and, for one started in a group, the group and whether its report is `held`, `out` or `released`. |
+| `courier_tree` | Lists the whole tree under this session (or a given `sessionID`): every session started from it with `courier_spawn`, directly or through others, depth first, each with what `courier_children` shows plus its depth, its parent, and its report state (whether it owes a report, sent progress, ended without one, and the status of its last report). Cut at `maxTotal` sessions ([reference](docs/reference.md#seeing-and-stopping-a-subtree)). |
+| `courier_stop` | Interrupts a session you started, directly or through others, and every session under it, deepest first, and cancels the `courier_later` messages scheduled for them. With `cleanup: true` it also removes their worktrees, by `courier_cleanup`'s rules (kept ones are listed). You are not told of what you stopped; a session between you and the target is, once, as `ended="stopped"` ([reference](docs/reference.md#seeing-and-stopping-a-subtree)). |
+| `courier_cleanup` | Removes the git worktree of a child started with `isolate: true` and drops the child from `courier_children`. Keeps a worktree with uncommitted changes or commits on no branch, tag or remote and lists them, unless `force: true` is passed ([reference](docs/reference.md#worktree-cleanup)). A child without a worktree is only dropped from `courier_children`; either way, a join group member that has not reported is dropped from its group, which is released without it ([reference](docs/reference.md#join-groups)). |
 | `courier_answer` | Passes your answer to a permission request or a question that a session started from this one waits on: `reply` (`once`, `always` or `reject`, with an optional `message`) for a permission request, `answers` for a question. |
 | `courier_later` | Schedules a message for a session (this one by default) in `delayMinutes` or `at` an ISO time, and returns an id. When due it is delivered like `courier_send`, queued behind any running turn and waking the session if idle. |
 | `courier_cancel` | Drops a message scheduled with `courier_later`, e.g. because the child it was waiting for reported first. |
@@ -223,6 +270,16 @@ The short version; the long one, with every edge, is [docs/reference.md](docs/re
   its parent, and says what) or `failed`, as an attribute of the message, with its artifacts listed
   in the body. A message without a status is progress, so a child that sends "halfway" and then
   stops is still reported as ending without a report. [More](docs/reference.md#a-childs-report).
+- **A join group wakes you once.** Start a batch of sessions with the same `group` name, and
+  their `done`, `partial` and `failed` reports are held until the last one is in and your turn has ended, then delivered
+  in one message, marked `group="<name>"`, listing every report with its status and artifacts in
+  the order the sessions were started. A `blocked` report, progress, a failed turn, a silent end, a
+  permission request and a question reach you at once, as ever; a member whose turn fails or is
+  interrupted leaves the group, which is released without it. A member that will not report (it
+  ended its turn silently, or you gave up on it) holds the others back: drop it with
+  `courier_cleanup`, and the group is released without it, the message naming it; a report it
+  sends after all comes on its own. Held reports survive a restart, and the name is free again
+  once the group has been delivered. [More](docs/reference.md#join-groups).
 - **A child that fails** cannot report, so the plugin does: every failed turn of a spawned session
   sends its parent a message marked `failed="<error type>"`, with the error, waking it if idle.
   [More](docs/reference.md#a-child-that-fails).
@@ -244,12 +301,16 @@ The short version; the long one, with every edge, is [docs/reference.md](docs/re
 - **A child that shows a form** the plugin cannot pass on, such as OpenCode's web search asking
   for a provider, has the top session told, marked `asks="form"`, with the form's choices: only you
   can answer it, in the child's session. [More](docs/reference.md#a-child-that-shows-a-form).
+- **You can see and stop a whole subtree.** `courier_tree` lists every session under yours with its
+  depth and report state; `courier_stop` interrupts one of them and everything under it, deepest
+  first, and cancels their scheduled messages. A stop is neither a failure nor a silent end, and
+  only a session above the target may order it. [More](docs/reference.md#seeing-and-stopping-a-subtree).
 - **The plugin remembers.** Each parent's children (`courier_children`) and whether each owes a
-  report, pending `courier_later` messages and open questions survive a compaction or a restart; entries are dropped after 14 days.
+  report, held group reports, pending `courier_later` messages and open questions survive a compaction or a restart; entries are dropped after 14 days.
   [Roster](docs/reference.md#roster), [Scheduled messages](docs/reference.md#scheduled-messages).
 - **One OpenCode server per data directory, preferably.** A second server on the same one, such as
   `opencode serve` next to `opencode service`, shares the plugin's storage: one of the two delivers
-  `courier_later` messages, but a child's permission request can only be answered from the server
+  `courier_later` messages and released groups, but a child's permission request can only be answered from the server
   that runs the child. [More](docs/reference.md#two-servers-on-one-data-directory).
 - **Worktrees are yours to remove.** An isolated child's worktree is kept until `courier_cleanup`,
   which refuses to drop uncommitted changes or unbranched commits unless told to.
@@ -277,9 +338,11 @@ itself, or wait for a child to report. A session counts while it is live: its tu
 its parent a report (its task or a message reached it after it last reported, failed or was interrupted), or a
 session below it is live. One that has reported, with nothing live below it, does not. Each
 spawned session's model is also told its role on every request: `sub-orchestrator`, which may split
-its task, or `leaf`, at `maxDepth`, which does not see `courier_spawn` at all. Your own session gets
-a `root orchestrator` part only once it has started a session; one that never does is sent exactly
-what it was before. The details: [the reference](docs/reference.md#session-trees-and-their-limits).
+its task, or `leaf`, at `maxDepth`, which does not see `courier_spawn` at all. Your own session is
+told, in one line, to load the `courier-orchestrate` skill before a task that touches several files
+or areas, decide whether to split it, and say which in one line of its reply (`split: no, because …;
+considered: <the parts you weighed>` or `split: 3 parts: …`); once it has started a session, that
+line becomes a `root orchestrator` part with the limits. The details: [the reference](docs/reference.md#session-trees-and-their-limits).
 
 ## Webhooks
 
@@ -360,8 +423,9 @@ gets a scenario there.
 The smoke test (`e2e/real-model.sh`) runs the same server with a real model (by default a free one
 on [OpenCode Zen](https://opencode.ai/zen), no key needed) and checks that the parent spawns instead
 of doing the work, ends its turn instead of polling, and is woken by each report;
-`COURIER_SCENARIO=permission` and `COURIER_SCENARIO=question` exercise the two relays. Which models
-pass and what was tuned for them: [docs/real-model.md](docs/real-model.md).
+`COURIER_SCENARIO=permission` and `COURIER_SCENARIO=question` exercise the two relays, and
+`COURIER_SCENARIO=recursive` the [recursive orchestration](#recursive-orchestration) above. Which
+models pass and what was tuned for them: [docs/real-model.md](docs/real-model.md).
 
 CI runs both suites on every push to `main` and every pull request, with the OpenCode CLI at the
 pinned version, and the live suite once more on the newest OpenCode release, where a failure warns

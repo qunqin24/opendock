@@ -8,9 +8,14 @@
   <p><strong>OpenCode V2 Desktop on Linux.</strong> The readout is drawn by the app's own window, so
   it is the desktop app and not the terminal that has to be running. macOS and Windows are not
   supported yet — see <a href="#platform-support">Platform support</a> for exactly what is missing.</p>
+  <p><strong>It also makes Arabic read correctly.</strong> The same window gets Arabic text direction
+  fixed in messages and the prompt box, so an Arabic reply is aligned and ordered the way Arabic
+  reads and not the way English does — one plugin, no second launcher.
+  <a href="#arabic-text">Arabic text ↓</a> · <a href="#arabic-text">العربية ↓</a></p>
   <p>
     <img alt="platform: Linux only" src="https://img.shields.io/badge/platform-Linux%20only-d93f0b">
     <img alt="app: OpenCode V2 Desktop, not the terminal client" src="https://img.shields.io/badge/app-OpenCode%20V2%20Desktop-2ea44f">
+    <img alt="also: Arabic RTL text direction" src="https://img.shields.io/badge/also-Arabic%20RTL-2ea44f">
     <img alt="dependencies: none" src="https://img.shields.io/badge/dependencies-none-2ea44f">
     <img alt="network: the npm registry, for update checks only, opt out with --no-update" src="https://img.shields.io/badge/network-npm%20registry%2C%20updates%20only-2ea44f">
     <img alt="license: MIT" src="https://img.shields.io/badge/license-MIT-8b5cf6">
@@ -243,10 +248,43 @@ Every feature, in one place:
 | **Nothing to clean up** | It is drawn by OpenCode's own window, so there is no second process, no lock, and nothing left on screen when you close the app. |
 | **It tells you when it updated** | A new version announces itself once in the log, so you can tell the copy you are reading about from the one that is running. |
 | **You can check what is running** | `npx opencode-vitals@latest selftest` checks whether this machine can show the readout: the app is installed, its renderer can be copied, the copy is current, and the readout is wired into it. |
+| **Arabic reads correctly** | The same copy of the renderer also carries a small fix for Arabic text: message blocks and the prompt box read and align right-to-left by their own content, while code, diffs and shell output stay left-to-right. See [Arabic text](#arabic-text). |
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/moutazideal/opencode-vitals/main/docs/readout-close.png" width="640" alt="The readout close up: 1 turns, 1 steps, 200 tok/s and 200 last10, in the app's own muted and bright text colours">
 </p>
+
+## Arabic text
+
+> **العربية:** يقدّم هذا البلجن — إلى جانب قراءة سرعة الموديل — **تصحيح اتجاه النص العربي وترتيبه**
+> داخل رسائل OpenCode ومربع الكتابة. الرسالة العربية تُقرأ من اليمين إلى اليسار وتُحاذى يميناً بحسب
+> محتواها، بينما يبقى الكود والمسارات ومخرجات الأوامر من اليسار إلى اليمين؛ فجملة عربية فيها كود أو
+> كلمة إنجليزية لا تختلط أولوياتها. الواجهة كاملة (القوائم، الشريط الجانبي، شريط العنوان) تبقى كما
+> صنعها OpenCode. لا شيء تحتاج تفعيله: بعد تحديث البلجن وإعادة تشغيل التطبيق، اعمل بالعربية مباشرة.
+
+OpenCode's desktop app is left-to-right by default, and an Arabic reply can end up
+laid out the wrong way round — its punctuation and the English and code inside it
+in the wrong order. The renderer copy this plugin already serves adds two small
+files beside the readout that fix exactly that, in two places only:
+
+- **messages** — assistant replies, your own messages, compaction summaries and
+  retry notices;
+- **the prompt box** — the composer you type in.
+
+It does **not** mirror the whole interface. The sidebar, menus and titlebar are
+left as OpenCode made them.
+
+- `arabic.css` sets `unicode-bidi: plaintext` and `text-align: start` on message
+  blocks and the composer, so each block reads and aligns by its own content, and
+  pins code, diffs, paths and shell output to `direction: ltr` so they are never
+  reordered.
+- `arabic.js` marks message blocks `dir="auto"`, so an Arabic block becomes
+  genuinely right-to-left — which also lets OpenCode's own `:dir(rtl)` rules mirror
+  its layout — while an English block beside it stays left-to-right.
+
+Neither file touches the numbers. To leave OpenCode completely untouched, turn the
+whole renderer copy off with the `popup` option (see [Options](#options)), which
+takes the readout and the Arabic fix away together.
 
 ## The numbers, exactly
 
@@ -310,7 +348,7 @@ records, if you want to compute something else.
 | --- | --- |
 | **Platform** | **Linux** |
 | **App** | **OpenCode V2 Desktop** — the terminal client is not enough |
-| OpenCode version | V2 (developed against 2.0.14, 2.0.16, 2.0.18 and 2.0.19) |
+| OpenCode version | V2 (developed against 2.0.14, 2.0.16, 2.0.18, 2.0.19 and 2.0.26) |
 | Node | 18 or newer, for the plugin |
 | Python | **not needed any more** |
 | Packages to install | **none** |
@@ -397,7 +435,7 @@ on a machine that was only being asked a question.
 | --- | --- | --- |
 | `popup` | `true` | Show the readout. `false` keeps measuring and serves nothing to the app. |
 | `historyLimit` | `20` | Measurements kept in storage, 1–100. |
-| `log` | `false` | Log one line per measurement through OpenCode's logger. Errors and version changes are printed either way. |
+| `log` | `false` | Log one line per measurement. Errors and version changes are printed either way. |
 | `enabled` | `true` | Master switch. |
 
 ```json
@@ -410,6 +448,10 @@ on a machine that was only being asked a question.
   ]
 }
 ```
+
+These lines go to OpenCode's logger when the host offers one and to the service's console
+otherwise; OpenCode V2's `App` API exposes no logger, so on the desktop app they appear in the
+service log.
 
 Environment variables, for the curious:
 
@@ -566,7 +608,7 @@ To install a copy of the checkout instead, drop the `--link`. To put it somewher
 ### Development
 
 ```bash
-npm test                 # 454 checks
+npm test                 # 493 checks
 npm run test:compat      # the compatibility check's own logic
 npm run compat           # this plugin against the pinned OpenCode API
 node selftest.mjs        # can this machine show the readout?
@@ -615,6 +657,16 @@ ran at the same speed, a fingerprint that has to cover the bundles under
 `assets/`, a failed update that is retried rather than written off, a turn whose
 tokens were counted while the time spent writing its tool call was not, and both
 config files when a machine has one of each.
+
+## Community
+
+- [Contributing](CONTRIBUTING.md) — how the code is meant to be changed, and the
+  rules the suite enforces.
+- [Code of conduct](CODE_OF_CONDUCT.md)
+- [Security policy](SECURITY.md) — the trust model, and how to report a problem
+  privately.
+- [Accessibility](ACCESSIBILITY.md) — what this does for readers, its known
+  limitations, and how to report a barrier.
 
 ## License
 

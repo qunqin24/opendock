@@ -29,7 +29,8 @@ a dimmed inline placeholder in the empty composer with
 ## Requirements
 
 - [opencode](https://opencode.ai) v2 (TUI plugins; tested against 2.0.25).
-- A provider/model that supports the stateless generation endpoint, or set `model` explicitly.
+- A provider/model and authentication method that support OpenCode's stateless
+  `generate.text` endpoint. Set `model` explicitly if no default small model is available.
 
 ## Install
 
@@ -41,15 +42,24 @@ cd opencode-ghost
 ./install.sh
 ```
 
-Then **restart opencode** — plugins are loaded at startup only. `install.sh`
+Then **restart opencode** to load the installed copy. `install.sh`
 copies the plugin into `<config>/plugins/opencode-ghost/` and registers it in
-`<config>/cli.json`, migrating an existing v1 `tui.json` registration (and its
+`<config>/cli.json`, migrating an existing v1 `tui.json` or `tui.jsonc` registration (and its
 options) if one is found.
 Removed options (`apiKey`, `endpoint`, `internalSessionMarkerDir`, `argHints`)
 are stripped from Ghost registrations. Other configuration is preserved.
 The installer accepts JSON objects only; JSONC or invalid configuration is
 left intact along with the installed sources and requires manual registration
-using the snippet below. Node is required for the installer.
+using the snippet below. An unrelated, unparseable legacy TUI config is skipped.
+Node is required for the installer; automatic config discovery also requires
+`opencode` on `PATH`.
+
+The default target comes from `opencode debug paths`, falling back to
+`$XDG_CONFIG_HOME/opencode` or `~/.config/opencode`. Pass one or more config
+directories explicitly with `./install.sh /path/to/config`; `./install.sh --all`
+also targets an existing `~/.config/opencode` directory. After pulling updates,
+rerun the installer and restart opencode. A manual registration pointing at the
+repo's `src` only needs a restart.
 
 ### Manually
 
@@ -59,6 +69,7 @@ directory containing this file; a project's `.opencode/cli.json` is not loaded.
 
 ```jsonc
 {
+  "$schema": "https://opencode.ai/v2/cli.json",
   "plugins": ["/absolute/path/to/opencode-ghost/src"]
 }
 ```
@@ -67,10 +78,11 @@ Pass options with the object form:
 
 ```jsonc
 {
+  "$schema": "https://opencode.ai/v2/cli.json",
   "plugins": [
     {
       "package": "/absolute/path/to/opencode-ghost/src",
-       "options": { "model": "openai/gpt-6-luna-fast" }
+      "options": { "model": "openai/gpt-6-luna-fast" }
     }
   ]
 }
@@ -87,11 +99,16 @@ copy, use `/absolute/path/to/config/plugins/opencode-ghost`.
 | ---------------- | ---------- | ------------------- | ------------------------------------------------------------- |
 | `enabled`        | `boolean`  | `true`              | Initial state; `/suggest` toggles it at runtime (persisted).  |
 | `model`          | `string`   | OpenCode small default | Explicit `provider/model` override. Otherwise uses the effective title-agent model or OpenCode's small-model selection policy. |
-| `acceptKeys`     | `string[]` | `["tab", "right"]`  | Key names as reported by the terminal (`tab`, `right`, ...). Modifier aliases (`meta`, `option`, `cmd`, `control`) are normalised; unknown modifiers are ignored. |
-| `maxChars`       | `number`   | `120`               | Maximum suggestion length.                                     |
+| `acceptKeys`     | `string[]` | `["tab", "right"]`  | Key names as reported by the terminal (`tab`, `right`, ...). Modifier aliases (`meta`, `option`, `cmd`, `control`) are normalised; keys with unknown modifiers are ignored. |
+| `maxChars`       | `number`   | `120`               | Requested response character budget and maximum displayed suggestion length. |
 | `idleDelayMs`    | `number`   | `500`               | Debounce after a turn finishes before generating.               |
 | `recentMessages` | `number`   | `10`                | How many recent messages feed the suggestion prompt.            |
 | `system`         | `string`   | built-in            | Override the system prompt sent to the suggestion model.        |
+
+`maxChars` is included as a soft character budget in every generation prompt,
+including custom `system` prompts. OpenCode's experimental `generate.text` API
+has no output-token limit; the model can exceed the requested budget. Ghost
+still enforces `maxChars` when normalizing the displayed suggestion.
 
 ## Commands
 
@@ -104,7 +121,7 @@ copy, use `/absolute/path/to/config/plugins/opencode-ghost`.
   the error.
 - `/suggest debug on` / `/suggest debug off` — set debug mode explicitly.
 - `/suggest log` — show the last 20 generation attempts (outcome, model,
-  latency, length and error detail) in a dialog, regardless of debug mode.
+  total and stage latency, length and error detail) in a dialog, regardless of debug mode.
 
 Model precedence is the persisted `/suggest model` override, then the `model`
 option, then the effective title agent's model from OpenCode's public agent API.
@@ -122,12 +139,15 @@ Like OpenCode's title generation, an override, title or small model without a
 configured variant uses its first supported `none`, `minimal` or `low` variant.
 Catalog IDs are used directly. The model catalog is cached for five minutes
 (cleared by `/suggest model` and re-enabling, and refetched once before reporting
-no small model); the agent list is read on every generation. No matching small
+no small model when a cached catalog has no match); the agent list is read on
+each default-model resolution. No matching small
 model means a warning and no suggestion. Ghost never uses the main model as a generation fallback or retries
 with another provider. An explicit override or configured title model may use
 a different provider from the session's primary model.
 
-When enabling, a suggestion is generated immediately for the current session.
+When re-enabling with `/suggest`, generation starts without the debounce for the
+current idle session if it has conversation text. Loading the plugin or switching
+sessions does not itself generate a suggestion.
 
 ## How it works
 
@@ -143,7 +163,7 @@ When enabling, a suggestion is generated immediately for the current session.
   ownership. Host hint/color updates are retained while the ghost is visible;
   dismissal restores only values still owned by Ghost, including rich hints.
 - Accepting uses the composer editor's `insertText` directly, without submitting.
-- Typing, pasting, navigation, a new execution, disabling and unloading cancel
+- Typing, pasting, undo/redo, leaving the session, a new execution, disabling and unloading cancel
   pending generation. Duplicate completion events do not generate again.
 - Retains only one suggestion, bounded by `maxChars`, for the visible session.
   Acceptance, a new turn, session changes, disabling, model changes and unloading
@@ -151,13 +171,17 @@ When enabling, a suggestion is generated immediately for the current session.
 
 ## Debugging
 
-Ghost records every generation attempt to a bounded in-memory history (the last
+Ghost records generation outcomes in a bounded in-memory history (the last
 20): outcome (`ok`, `empty`, `echo`, `no model`, `error`, `aborted`), the resolved
-model with its variant, latency, suggestion length and error detail. `/suggest log`
+model with its variant, total latency, message-sync/model-resolution/generation
+stage timings, suggestion length and error detail. Latency excludes the debounce;
+only reached stages are recorded, including failures and cancellations. `/suggest log`
 shows it in a dialog at any time; `aborted` covers attempts cancelled by typing,
 a newer turn, leaving the session, disabling or unload, so a missing suggestion can
-be traced to a debounce, an empty or `NONE` reply, an echo filter, or a provider
-error. `/suggest debug` toggles the same data as a toast on each attempt (aborts
+be traced to an empty or `NONE` reply, an echo filter, or a provider
+error. Cancelled debounces and runs skipped for lack of conversation text or an
+ineligible session have no generation entry. `/suggest debug`
+toggles the same data as a toast on each recorded outcome (aborts
 are logged but not toasted). The history is not written to disk.
 
 When a generation is `ok` but nothing is visible, `/suggest log` also shows the
@@ -186,15 +210,20 @@ section also reports focus, keymap mode and the placeholder colour. With
   OpenTUI's public pre-render callback; host renderer changes need re-verification.
 - **Key fallthrough.** Without an eligible ghost, Tab/Right fall through to
   the host. OpenCode V2's default agent-cycle shortcut is Shift+Tab.
-- **Cost.** One model call per turn while enabled. Point `model` at a cheap or
-  free model.
-- **Provider compatibility.** OpenAI and google-vertex generation worked in
-  verification. Anthropic's stateless endpoint failed with plugin-auth OAuth
-  in verification; choose a supported provider/model. Luna 6.1 is not available.
-- Generation errors show one warning toast per plugin load with the model
-  override command. Aborts and `NONE` replies produce no warning or preview.
-- Effective agents and catalogs are read per generation for the session's
-  location. The stateless endpoint has no location argument; project-only models
+- **Cost.** At most one generation call per debounced completion in the visible,
+  idle session. Re-enabling can make an additional call. Point `model` at a cheap
+  or free model.
+- **Provider compatibility.** Stateless generation support depends on the
+  provider, model and authentication method; normal session generation support
+  does not guarantee compatibility. Use `/suggest log` to inspect failures and
+  `/suggest model provider/model` to choose a supported model.
+- Generation errors show a warning toast with the model override command,
+  once per plugin load or since the last `/suggest model` change. Message-sync
+  failures have a separate once-per-load warning. Aborts and `NONE` replies
+  produce no warning or preview.
+- Model resolution uses the session's location and a location-scoped catalog
+  cache. Default-model resolution also reads effective agents. The stateless
+  endpoint has no location argument; project-only models
   may fail server-global resolution. Invalid overrides and provider failures warn
   without retrying through another provider or a session.
 
@@ -202,8 +231,10 @@ section also reports focus, keymap mode and the placeholder colour. With
 
 ```sh
 bun install
-bun run typecheck
 bun run test
+bun run typecheck
+bun run lint:sh
+bash scripts/changelog.sh check
 ```
 
 No build step: like other opencode TUI plugins, the package ships TSX source and

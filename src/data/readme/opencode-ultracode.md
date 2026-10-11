@@ -132,12 +132,27 @@ decide in `/workflows`:
   optional note from you are appended as a follow-up message, so the agent
   continues from where it was instead of starting over (a research agent that
   made 100 tool calls keeps all of it).
+- `S` **restarts it from scratch**: its session is dropped, a fresh one is
+  opened and the full task is sent again (plus an optional note). Use it when
+  the agent has painted itself into a corner and continuing would not help.
 - `X` **skips it**: the script gets `null`, as before.
 
-You can also act on a healthy agent: `P` pauses just that agent (its session
-is kept) and resumes it, `X` stops it, and `R` on a running agent interrupts it
-and continues it with your note when it is heading the wrong way. The run-level
-`p`/`x` keys are unchanged.
+You can also act on a healthy agent: `t` sends it a message in its own session
+(a running agent is interrupted and continues with your text), `P` pauses just
+that agent (its session is kept) and resumes it, `S` restarts it from scratch,
+`X` stops it, and `R` on a running agent interrupts it and continues it with
+your note when it is heading the wrong way.
+
+`X` is final for the script: it receives `null` right away and moves on, so a
+stopped agent cannot be restarted while the run is live. To redo it, press `S`
+(or `R`) on it after the run ends — the run resumes, that agent runs again, and
+the script re-executes with its new result.
+
+The run-level `p` works the same way for the whole run: every running agent is
+interrupted (no more tokens are spent), its session is kept, and queued agents
+stay queued. `p` again resumes: the interrupted agents continue in their own
+sessions from where they were, and agents you paused by hand with `P` stay
+paused until you resume them yourself.
 
 Automatic retries still happen first (a structured-output agent gets two
 attempts); every retry is a follow-up in the same session. To restore the old
@@ -149,7 +164,8 @@ completed agent is journaled, so resuming replays those results; agents that
 were still running, paused or failed continue **in their own sessions** rather
 than from scratch. `R` on a failed agent of a stopped or even completed run
 resumes the run and continues that agent with your note; agents whose input
-changes as a result re-run, the rest replay.
+changes as a result re-run, the rest replay. `S` on any agent of such a run,
+even a completed one, redoes it from scratch in a fresh session the same way.
 
 ### The `workflow` tool
 
@@ -162,6 +178,7 @@ changes as a result re-run, the rest replay.
 | `resumeRunId` | Resume a stopped run, or one whose engine died, by its run id       |
 | `retryAgentId`| With `resumeRunId`: one failed agent (e.g. `ag-002`) to continue in its session; also works on a completed run |
 | `retryNote`   | With `retryAgentId`: a note for that agent about what to fix       |
+| `retryFresh`  | With `retryAgentId`: start the agent over in a fresh session (full task again) instead of continuing; also allowed on a completed agent |
 
 ### Writing a script
 
@@ -174,7 +191,9 @@ automatically in every project the plugin is loaded in.
 export const meta = {
   name: 'review-changes',
   description: 'Review changed files across dimensions, verify each finding',
-  phases: [{ title: 'Review' }, { title: 'Verify' }, { title: 'Synthesize' }],
+  // agents: listed as pending in /workflows before the script gets there;
+  // Verify has none because it runs one agent per finding
+  phases: [{ title: 'Review', agents: ['review:bugs', 'review:perf'] }, { title: 'Verify' }, { title: 'Synthesize', agents: 1 }],
 }
 
 const FINDING = { type: 'object', properties: { findings: { type: 'array' } }, required: ['findings'] }
@@ -206,10 +225,16 @@ return await agent(`Write the final report for these findings: ${JSON.stringify(
 | `agent(prompt, opts?)`       | Spawns a sub-agent in its own session. Resolves to the schema-validated object or the final text; `null` when the agent is stopped or when the user skips a failed agent (see above). `opts`: `label`, `phase`, `schema`, `model`, `agentType` (an opencode agent such as `explore` or `general`). Sub-agents never get the `workflow` tool. |
 | `parallel(thunks)`           | Runs `Array<() => Promise>` concurrently and waits for all of them. A throwing thunk becomes `null`.                                                                 |
 | `pipeline(items, ...stages)` | Runs each item through every stage independently, with no barrier between stages. When the concurrency cap is hit, later stages get free slots first, so items flow through end to end. The default choice. |
-| `phase(title)`               | Starts a display phase. Use the same titles as `meta.phases`.                                                                                                        |
+| `phase(title)`               | Starts a display phase. Use the same titles as `meta.phases`. A `meta.phases` entry can declare `agents` (a count or the labels) so those agents show as pending, and count toward progress, from the start. |
 | `log(message)`               | Narrator line shown in the run view.                                                                                                                                 |
 | `args`                       | Whatever the tool call passed as `args`.                                                                                                                             |
 | `budget`                     | `{ total, spent(), remaining() }`. `agent()` throws once `total` is reached.                                                                                         |
+
+`agent()` returns a Promise and must be awaited (directly, or through `parallel()` /
+`pipeline()`). A script is rejected before it starts when an un-awaited agent promise
+is put into a prompt or string (`JSON.stringify`, `${...}`, `+`), since the next agent
+would receive `{}` instead of the result; a promise that is merely never awaited is
+reported as a warning in the run log and in the tool's reply.
 
 Scripts have no filesystem, network or Node APIs. `Date.now()`, `Math.random()`
 and no-arg `new Date()` throw so a resumed run replays deterministically.
@@ -221,8 +246,8 @@ Concurrency is capped at roughly `min(16, cpus - 2)` agents at a time and
 | Screen       | Keys                                                                                                                                              |
 |--------------|---------------------------------------------------------------------------------------------------------------------------------------------------|
 | Run list     | `↑↓` select · `⏎` open · `r` result · `x` stop · `p` pause / resume · `s` save script · `d` delete · `esc` back                                    |
-| Run view     | `↑↓` phase or agent · `←→` switch pane · `⏎` open · `r` result · `x` stop · `p` pause / resume · `s` save · `!` answer a pending permission · on the selected agent: `R` retry · `P` pause / resume · `X` stop / skip |
-| Agent detail | `↑↓` scroll · `←→` previous / next agent · `e` show tool and thinking previews · `p` expand prompt · `⏎` answer a permission or question · `R` retry / steer · `P` pause / resume · `X` stop / skip |
+| Run view     | `↑↓` phase or agent · `←→` switch pane · `⏎` open · `r` result · `x` stop · `p` pause / resume · `s` save · `!` answer a pending permission · on the selected agent: `t` message · `R` retry · `S` restart fresh · `P` pause / resume · `X` stop / skip |
+| Agent detail | `↑↓` scroll · `←→` previous / next agent · `e` show tool and thinking previews · `p` expand prompt · `⏎` answer a permission or question · `t` message · `R` retry / steer · `S` restart fresh · `P` pause / resume · `X` stop / skip |
 | Result view  | `↑↓` scroll · `g` top                                                                                                                             |
 
 The agent detail shows a **Live** feed while the agent runs (text, thinking
@@ -240,6 +265,11 @@ Activity · 3 tools · 2 thoughts                                 e shows previe
 
 Thinking rows appear only when the provider streams reasoning. With thinking
 disabled the list holds tool calls only.
+
+When an agent's context fills up and opencode compacts the session (or the
+agent compacts it itself), that shows up as a `⊟ compact` row in the same list,
+with the context size it had just before, so the drop in the CONTEXT column
+afterwards is explained. Compactions do not count as tool calls.
 
 ### Where things live
 
@@ -265,7 +295,12 @@ the engine.
 npm install
 npm run typecheck      # tsc --noEmit
 npm run test:runtime   # engine self-test against a mock opencode client
+npm run build          # compile the TUI plugin to dist/ (runs on prepublish)
 ```
+
+The npm package's `./tui` entry is `dist/tui/index.js`, not the `.tsx` source:
+opencode only applies the Solid JSX transform to files outside `node_modules`,
+so an installed plugin must ship JSX that is already compiled.
 
 ```
 src/
@@ -277,6 +312,7 @@ src/
   tui/store.ts       state.json polling and fine-grained merge
   tui/requests.ts    pending permission / question tracking for sub-agents
   shared/            types and formatting shared by both plugins
+scripts/build.mjs    compiles src/tui + src/shared to dist/ with babel-preset-solid
 skills/workflow-authoring/SKILL.md
 ```
 

@@ -57,7 +57,7 @@ One package supports both OpenCode generations. They install as separate binarie
 | Default export shape | function *or* `{ id, server }` | `{ id, setup }` (object required) |
 | Toast fallback | Available (opt-in) | Not available — v2 server plugins have no UI surface |
 
-> Verified against OpenCode **2.0.2** (server reports `features: server+tui, status: active`), whose shipped binary implements the v2 TUI plugin API this package targets — its own built-in TUI plugins (`opencode.notifications`, `diff-viewer`) use `Plugin.define({ id, setup })` with `ctx.ui.slot({ append, render })` and `ctx.data.on(...)`. Also verified against `opencode2` beta `0.0.0-beta-17639`.
+> Tested on OpenCode v2 (server reports `features: server+tui, status: active`), whose shipped binary implements the v2 TUI plugin API this package targets — its own built-in TUI plugins (`opencode.notifications`, `diff-viewer`) use `Plugin.define({ id, setup })` with `ctx.ui.slot({ append, render })` and `ctx.data.on(...)`.
 
 ---
 
@@ -159,7 +159,8 @@ These need APIs that do not exist on v1, so they are inert on `opencode`.
 | Feature | What you get | v2 API |
 |---|---|---|
 | Calibrated live rate | The streaming estimate is corrected against provider token counts, learned per model | `session.step.started` (model/agent) + `session.step.ended` (tokens) |
-| Generation vs end-to-end TPS | Tool execution subtracted, so a turn that waited on a shell command still reports the model's real rate | `session.tool.called` / `.success` / `.failed` |
+| Tool-call output counted | Arguments the model writes for a tool call (a file write, an edit) count as output, so a step that only calls a tool still has a real reading | `session.tool.input.delta` / `.ended` |
+| Tool time | Time the turn spent running tools, shown separately in the detailed footer; it is never inside a step's rate window | `session.tool.called` / `.success` / `.failed` |
 | Time to first token | Measured from turn start on the host clock | `session.execution.started` + event `created` |
 | Hidden overhead | Tokens spent on auto-title and compaction that no step reports | `session.usage.updated` residual |
 | Per-subagent breakdown | Live footer aggregate — `TPS Σ 318 \| main 63 \| explore 91 \| …` — while subagents generate, on **both** hosts (v1 via `session.created`/`.updated` parentID + `api.state.session`; v2 via `ctx.data.session.root` / `.family`). Σ sums every session streaming tokens right now — a root waiting on its subagents drops out on its own, and counts again once it resumes. Children keep their spawn position (no column swapping), stay visible through long tool calls while the host reports them running, and drop off ~4s after they finish. The v2-only sidebar adds the full family breakdown panel | `api.state.session` (v1) / `ctx.data.session` (v2) |
@@ -174,19 +175,18 @@ the footer meter and nothing else.
 ```text
 /tps              open the throughput dashboard
 /tps detail       toast with current stats
-/tps detailed     footer shows gen / ttft / overhead
+/tps detailed     footer shows tools / ttft / overhead
 /tps compact      default footer
 /tps hidden       hide the meter
 /tps reset        clear the durable ledger
 ```
 
 **Latency.** Token counting is incremental — each chunk is scanned once and never re-read, so
-absorbing a long response is linear rather than quadratic. On v2 the displayed rate also uses a
-shorter EWMA half-life (120ms vs v1's 250ms), since host-clock timestamps make the rolling
-window accurate enough that extra exponential smoothing mostly just adds lag. The v2 display throttle defaults to 8ms — the host delivers events in ~10ms batches, so
-publishing faster cannot reveal anything new — and the publish itself is synchronous, so a
-delta is visible in about a millisecond. v1 keeps its 50ms default for the costlier toast path.
-Tune with `updateIntervalMs` (display throttle) and `rollingWindowMs` (averaging window); an
+absorbing a long response is linear rather than quadratic. The live rate is exact from the
+second chunk of a stream (about 100ms in on v2) with no seed value or smoothing lag, and the
+publish is synchronous, so a chunk is on screen about a millisecond after it arrives. The v2
+display throttle defaults to 8ms; v1 keeps its 50ms default for the costlier toast path. Tune
+with `updateIntervalMs` (display throttle) and `rollingWindowMs` (averaging window); an
 explicit value overrides the default on either host.
 
 **Clock note.** The TUI delivers events in ~10ms batches, so wall-clock time inside a handler is
@@ -226,6 +226,7 @@ TPS_METER_SHOW_AVERAGE=true
 TPS_METER_SHOW_INSTANT=true
 TPS_METER_SHOW_TOTAL_TOKENS=true
 TPS_METER_SHOW_ELAPSED=false
+TPS_METER_SHOW_CACHE_HIT=true
 
 # Token counting heuristic
 TPS_METER_FALLBACK_HEURISTIC=chars_div_4  # chars_div_4 | chars_div_3 | words_div_0_75
@@ -251,6 +252,7 @@ Create `.opencode/tps-meter.json` in your project root:
   "showInstant": true,
   "showTotalTokens": true,
   "showElapsed": false,
+  "showCacheHit": true,
   "format": "compact",
   "minVisibleTPS": 0,
   "fallbackTokenHeuristic": "chars_div_4",
@@ -286,6 +288,7 @@ Output: `TPS: 92.4 (avg 78.1) | tokens: 1,842 | 00:23`
 | `showInstant` | `boolean` | `true` | Show instantaneous TPS in display |
 | `showTotalTokens` | `boolean` | `true` | Show total token count |
 | `showElapsed` | `boolean` | `false` | Show elapsed time |
+| `showCacheHit` | `boolean` | `true` | Show the prompt cache hit rate (provider-reported) |
 | `format` | `string` | `"compact"` | Display format: `compact`, `verbose`, `minimal` |
 | `minVisibleTPS` | `number` | `0` | Minimum TPS value to trigger display |
 | `fallbackTokenHeuristic` | `string` | `"chars_div_4"` | Token counting method |
@@ -317,6 +320,21 @@ Enable visual feedback with color-coded TUI text based on token throughput speed
 **Note:** Persistent TUI display supports color coding directly. Legacy toast color coding is available only when `toastFallback` is enabled and OpenCode exposes TUI toast methods (`client.tui.showToast` or `client.tui.publish`); the fallback `client.toast` methods only support info/success variants.
 
 ---
+
+## Cache Hit Rate
+
+OpenCode reports provider token usage as `{ input, output, reasoning, cache: { read, write } }`,
+where `input` EXCLUDES cache reads and writes. The meter therefore computes the prompt-side
+total as `input + cache.read + cache.write` and shows the cached share:
+
+```
+cache hit rate = cache.read / (input + cache.read + cache.write)
+```
+
+The meter appends `cache 91%` to the footer once a provider-reported step has settled. During
+streaming no cache accounting is available yet, so the segment is omitted rather than shown as
+`0%` — nothing appears until the first step of a session has finished, which is expected and not
+a fault. Toggle with `showCacheHit` / `TPS_METER_SHOW_CACHE_HIT`.
 
 ## Display Formats
 
@@ -425,23 +443,42 @@ Two consequences worth knowing:
 
 - **No role filtering is needed.** `session.text.delta` and `session.reasoning.delta` are assistant output by construction, so v1's message-role cache, part-type filtering, and part-text extraction have no v2 equivalent — user prompts can no longer leak into the count.
 - **Final totals are exact, not heuristic.** `session.step.ended` carries provider-reported `tokens.output` and `tokens.reasoning`, which the meter prefers over its own character-based estimate. The heuristic still drives the live rolling rate, since deltas arrive before any usage report.
+- **The settled average describes what streamed.** It is the streamed tokens divided by the time they streamed over, corrected by the provider's count when the two agree within 2x. Reasoning the provider reports but the host never streamed is left out of that comparison, so hidden reasoning cannot inflate the rate.
 
 `session.step.ended` reports the same finish reasons as v1 (`stop`, `length`, `tool-calls`, `content-filter`, `error`, `unknown`), so tool-call and error handling behave identically across both hosts: a `tool-calls` finish freezes the reading on screen instead of clearing it, and `unknown` discards it.
 
-### Part Types Counted
+### Output Counted
 
-Only these message part types contribute to TPS:
+Only model output contributes to TPS:
 - `text` — Assistant output text
 - `reasoning` — Assistant reasoning stream
+- Tool-call arguments the model writes (v2 only, from `session.tool.input.*`)
 
-All other part types are ignored to avoid counting tool output, snapshots, patches, or file contents as model tokens.
+Tool results, snapshots, patches and file contents are ignored: they are not tokens the model generated.
 
-### Ring Buffer
+### How the Rate Is Measured
 
-The tracker uses a fixed-size ring buffer (max 100 entries) with automatic pruning:
-- Removes entries older than the rolling window
-- Enforces maximum size with FIFO eviction
-- Efficient for high-frequency token streams
+Hosts batch output before publishing it (v2 flushes every ~100ms), so each chunk's tokens were
+generated over the interval since the previous chunk, not at the instant it arrived. The tracker
+rates every chunk over that interval:
+
+- **The opening chunk counts toward the total but never toward a rate.** It was generated over an
+  interval the meter never saw (time to first token included). Dividing it by the few milliseconds
+  before the first update is what produced five-digit readings.
+- **No reading is shown until a rate is measurable** (at least 50ms of generation, normally the
+  second chunk). A response that arrives in a single chunk shows only its settled figures.
+- **The live rate is the rolling window** (`rollingWindowMs`), timed entirely by the timestamps
+  tokens were recorded with: host event times on v2, local time on v1. Clocks are never mixed.
+- **Tool-call arguments are rated like any other chunk**, over the gap since the previous one.
+  Many providers deliver a tool call whole, and the host then emits its start and end ~100ms
+  apart, so that gap says nothing about how long the model took to write it.
+- **A step too short to time** (a single chunk, such as a tool call delivered whole) settles at
+  its tokens over the step's whole duration, from when the step began. That includes time to
+  first token, so it reads low rather than high.
+- **Calibration is weighted by size and saved per model.** Each step's provider count corrects
+  the heuristic in proportion to how many tokens it covered, so a short tool call (whose count
+  includes call framing) barely moves it. When reasoning streamed but the provider reports
+  none, the step is left out, since its count cannot be compared.
 
 ---
 

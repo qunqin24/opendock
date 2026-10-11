@@ -123,13 +123,21 @@ Add `"$CFG/toolbox/node_modules/@bandonker/opencode-memory"` to the `plugins` ar
 ```bash
 git clone https://github.com/bandonker/open-toolbox.git
 cd open-toolbox
-npm install
-npm run build:packages        # emits packages/<name>/ (package.json + index.js)
+npm install                  # build, link, install runtime deps, write opencode.jsonc
+```
 
-CFG="$HOME/.config/opencode"
-mkdir -p "$CFG/toolbox"
-cp -r packages/* "$CFG/toolbox/"
-(cd "$CFG/toolbox" && npm install)
+That is the whole install. `npm install` runs `prepare`, which builds the
+packages, links them into `$HOME/.config/opencode/toolbox/`, installs the
+`@opencode/plugin` runtime there, applies the exports patch the v2 loader needs
+on Linux, and registers every plugin in `opencode.jsonc`. Nothing is hardcoded:
+the repo location comes from the clone, the toolbox from `$HOME`.
+
+It is safe to run repeatedly — a second `npm install` on an already-set-up
+machine changes nothing. If it ever needs re-doing by hand:
+
+```bash
+npm run setup                # the same, without reinstalling dependencies
+npm run deploy:check         # report toolbox drift, change nothing
 ```
 
 Register with the same `node -e` snippet above, then reload.
@@ -170,7 +178,7 @@ The same two commands run on every push in [CI](.github/workflows/ci.yml).
 
 ### Layout
 
-After `npm run build:packages` and installing:
+After `npm run setup` (which `npm install` runs automatically):
 
 ```
 ~/.config/opencode/        # or <repo>/.opencode/
@@ -719,11 +727,13 @@ A helper file ended up inside `plugins/`. opencode treats **every export** of a 
 
 Check each of these in order:
 
-1. `npm run build:packages` actually produced `packages/<name>/package.json`.
-2. `toolbox/node_modules` exists (one `npm install` at the `toolbox/` level).
-3. Every `toolbox/<name>/node_modules` symlink exists.
+1. `npm run setup` completed (`packages/<name>/package.json` exists).
+2. `toolbox/node_modules` exists.
+3. Every `toolbox/<name>/` resolves (a symlink in link mode).
 4. The absolute paths in the `plugins` array of `opencode.jsonc` are the **package directories**, not the `.ts` files.
 5. You reloaded (`opencode reload`) or restarted — a reload is required, and for a fresh install a full restart is safer.
+
+If any of those are wrong, `npm run setup` repairs all of them.
 
 Confirm what opencode actually registered:
 

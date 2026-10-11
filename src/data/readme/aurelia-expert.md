@@ -11,7 +11,7 @@
 
 # aurelia-expert
 
-[![npm version](https://img.shields.io/npm/v/aurelia-expert?label=npm)](https://www.npmjs.com/package/aurelia-expert) [![Bun Runtime](https://img.shields.io/badge/Bun-Runtime-orange?link=https://bun.sh)](https://bun.sh) [![MIT License](https://img.shields.io/badge/License-MIT-green?link=LICENSE)](LICENSE) [![OpenCode Plugin](https://img.shields.io/badge/OpenCode-Plugin-blue?link=https://opencode.ai)](https://opencode.ai) [![Platforms](https://img.shields.io/badge/Platforms-Windows%7CmacOS%7CLinux-lightgrey)](https://bun.sh)
+[![OpenCode Plugin](https://img.shields.io/badge/OpenCode-Plugin-blue?link=https://opencode.ai)](https://opencode.ai) [![npm version](https://img.shields.io/npm/v/aurelia-expert?label=npm)](https://www.npmjs.com/package/aurelia-expert) [![MIT License](https://img.shields.io/badge/License-MIT-green?link=LICENSE)](LICENSE) [![Bun Runtime](https://img.shields.io/badge/Bun-Runtime-orange?link=https://bun.sh)](https://bun.sh) [![Platforms](https://img.shields.io/badge/Platforms-Windows%7CmacOS%7CLinux-lightgrey)](https://bun.sh) [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/Expert-Vision-Software/aurelia-expert)
 
 **Eight router-routed Aurelia v2 MVVM skills for AI coding agents**
 
@@ -37,7 +37,7 @@ bunx aurelia-expert install
 npx skills add expert-vision-software/aurelia-expert --skill aurelia-expert -a opencode
 
 # 3. OpenCode auto-install — add to your opencode.json
-#    { "plugin": ["aurelia-expert"] }
+#    { "plugins": ["aurelia-expert@latest"] }
 ```
 
 That's it — skills are available immediately. The CLI defaults to **local scope** (writes to `./.opencode/skills/`). Pass `--scope global` to install once for all your projects (`~/.config/opencode/skills/`).
@@ -168,23 +168,23 @@ npx skills add expert-vision-software/aurelia-expert --skill aurelia-expert -a o
 
 ### 3. OpenCode plugin auto-install
 
-Add `aurelia-expert` to your `opencode.json` `plugin` array:
+Add `aurelia-expert` to your `opencode.json` `plugins` array:
 
 ```json
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugin": ["aurelia-expert"]
+  "plugins": ["aurelia-expert@latest"]
 }
 ```
 
-OpenCode installs the package on next session start, then `plugin.ts#config()` runs a scope-aware, manifest-gated install: it detects where the plugin is registered (global config, `.opencode/opencode.json`, or a root `opencode.json` — with `name` ≡ `name@latest` ≡ `name@x.y.z` semantic matching) and ensures the skills only in the detected scope(s). Detection is read-only; the hook never edits `plugin` arrays, never touches a root `opencode.json`, refuses to rewrite unparseable configs, and is a zero-write no-op when the manifest already matches. If the plugin is not registered in any scope, a one-shot advisory is logged per session.
+OpenCode installs the package on next session start, then the plugin's v2 Effect-first entry (`src/plugin.ts`, exposed as `Plugin.define({ id, effect })`) runs a scope-aware, manifest-gated install at load: it detects where the plugin is registered (global config, `.opencode/opencode.json`, or a root `opencode.json` — with `name` ≡ `name@latest` ≡ `name@x.y.z` semantic matching, `file://`/path entries that resolve to this package, and legacy singular `plugin` entries still detected read-only for migration; both `opencode.json` and `opencode.jsonc` are read) and ensures the skills only in the detected scope(s). Detection is read-only; the effect never throws (the v2 startup non-interference contract), never edits `plugins` arrays or permission config, never touches a root `opencode.json`, refuses to rewrite unparseable configs, and is a zero-write no-op when the manifest already matches. If the plugin is not registered in any scope, a one-shot advisory is logged per project directory per session.
 
 For local development against a checkout of this repo, reference the directory directly:
 
 ```json
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugin": ["file:///absolute/path/to/aurelia-expert"]
+  "plugins": ["file:///absolute/path/to/aurelia-expert"]
 }
 ```
 

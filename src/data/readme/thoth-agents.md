@@ -65,7 +65,7 @@ The commands below install at **global/user scope**.
 | <a href="https://github.com/anomalyco/opencode"><picture><source media="(prefers-color-scheme: dark)" srcset="https://svgl.app/library/opencode-dark.svg"><img src="https://svgl.app/library/opencode.svg" alt="OpenCode logo" width="48" height="48"></picture></a><br>**OpenCode** | Native plugin, agent team, workflow skills, and memory setup. | `npx thoth-agents@latest install --agent=opencode` |
 | <a href="https://github.com/openai/codex"><img src="https://github.com/openai.png?size=120" alt="OpenAI logo — Codex" width="48" height="48"></a><br>**Codex** | Native plugin plus the required global agent and instruction setup. **Close Codex first.** | `npx thoth-agents@latest install --agent=codex` |
 | <a href="https://claude.com/product/claude-code"><img src="https://github.com/anthropics.png?size=120" alt="Anthropic logo — Claude Code" width="48" height="48"></a><br>**Claude Code** | Marketplace agents and skills, completed by the CLI's external skills and memory setup. **Run the prerequisites below first.** | `npx thoth-agents@latest install --agent=claude` |
-| <a href="https://github.com/earendil-works/pi"><img src="https://raw.githubusercontent.com/EremesNG/thoth-mem/master/img/pi.svg" alt="Pi logo" width="48" height="48"></a><br>**Pi** | Native package, five specialists, delegation and research extensions, workflow skills, and memory setup. **Recommended for the best experience.** | `npx thoth-agents@latest install --agent=pi` |
+| <a href="https://github.com/earendil-works/pi"><img src="https://raw.githubusercontent.com/EremesNG/thoth-mem/master/img/pi.svg" alt="Pi logo" width="48" height="48"></a><br>**Pi** | Native package, five specialists, delegation, research, theme, sidebar and background-task extensions, workflow skills, and memory setup. **Recommended for the best experience.** | `npx thoth-agents@latest install --agent=pi` |
 
 ### Claude Code prerequisites
 
@@ -83,8 +83,11 @@ claude plugin install thoth-agents@thoth-plugins --scope user
 
 Inside Pi, use `/subagents-model` to edit model and effort profiles for global
 and project subagent definitions. See [subagent profile configuration](docs/installation.md#configure-subagent-model-profiles-inside-pi).
-Use `/subagents-tools` to edit each specialist's explicit tool list, including
-registered active and inactive extension and MCP tools. Globs (including `*`) are
+Both commands are registered by pi-subagents on pi-core's shared list-editor
+shell, with native CSI-u/kitty and legacy navigation keys and wheel support in
+regular and fullscreen TUI mode. Use `/subagents-tools` to edit resolved global/project definitions' tool
+lists, including registered active and inactive extension and MCP tools. Thoth
+supplies managed-specialist validation and reset defaults through an optional adapter. Globs (including `*`) are
 manual advanced selections over all registered root tools; the panel preserves
 them read-only. Edit `disallowed_tools` manually for injected tools and trimming
 globs; only Oracle denies `ask_orchestrator` by default. See
@@ -93,13 +96,36 @@ globs; only Oracle denies `ask_orchestrator` by default. See
 Pi setup currently supports the default `~/.pi/agent` root. See the
 [Pi installation guide](docs/installation.md#pi) for runtime requirements,
 existing-package conflicts, and recovery. Thoth manages its separate Pi
-delegation runtime as package `@thoth-agents/pi-subagents` (`0.1.0`) through
-`npm:@thoth-agents/pi-subagents@>=0.1.0`. Existing `pi-subagents` and
+delegation runtime as package `@thoth-agents/pi-subagents` through
+`npm:@thoth-agents/pi-subagents@>=0.3.0`, the first release owning
+`/subagents-tools`. Upgrade both packages together and `/reload` if Pi reports
+missing or duplicate command ownership. Existing `pi-subagents` and
 `pi-subagents-j0k3r` installs need manual recovery through Pi's package manager
 before setup. Local checkout development uses `pnpm run setup:pi:local`, which
 points Pi at the fork under `pi-packages/pi-subagents`; publishing the fork is
 not required for that path. Pi extensions run with your user's system
 permissions; agent tool allowlists are not an OS sandbox.
+
+### Optional Pi provider extensions (manual install)
+
+The installer does **not** install or manage the Claude/Antigravity bridges or
+pi-openai-fast. Install only those you want, then restart Pi:
+
+```bash
+pi install npm:@thoth-agents/pi-claude-bridge
+pi install npm:@thoth-agents/pi-antigravity-bridge
+pi install npm:@thoth-agents/pi-openai-fast
+```
+
+Authenticate Claude Code or the `agy` CLI separately. Claude rate-limit events
+from root and child sessions share pi-core's process-wide, account-wide registry
+(not a bus channel); affected subagent rows/details show active warnings and reset
+times without changing task status. Quota is on demand: `/claude quota` uses an
+experimental SDK API without sending a prompt; `/agy quota` shows Antigravity
+usage. Antigravity costs are API-equivalent estimates from an explicit catalog
+mapping, not subscription charges. The theme marks the total `(sub)` by default
+for both `claude-bridge` and `antigravity`. See
+[provider commands and caveats](docs/installation.md#manual-pi-provider-extensions).
 
 For scopes, troubleshooting, or local checkout installation, see the
 [installation guide](docs/installation.md). Local Pi checkout installs keep
@@ -177,6 +203,7 @@ uncertainty, and risk and selects the fitting specialist.
 
 | Designer | Worker |
 | :---: | :---: |
+| <img src="img/agents/designer.webp" width="150" alt="Hathor as the Designer"> | <img src="img/agents/worker.webp" width="150" alt="Ptah as the Worker"> |
 | **Makes interfaces work well.** Owns material UI/UX, accessibility, interaction, and visual quality. | **Implements changes.** Owns delegated implementation, including coupled behavior, edge cases, migrations, and correctness-critical work. |
 
 Research and review specialists are read-only. Implementation work has one
@@ -245,13 +272,58 @@ do not prove those other pieces are current. Use `status` to inspect the last
 complete CLI-managed installation and follow any reported recovery actions.
 
 For Pi, the first-party `thoth-agents` package remains exact and receipt-verified.
-The five mandatory external extensions use stable minimum-only `>=` ranges, so
+The nine selected extensions use stable minimum-only `>=` ranges, so
 Pi's native package manager can update them independently without waiting for a
-Thoth release. Status validates each installed manifest's package name and
-SemVer floor; newer stable versions are healthy, while prerelease, malformed,
+Thoth release. Install and applied Update now include
+`@thoth-agents/pi-thoth-theme`, `@thoth-agents/pi-background-tasks` and
+`@thoth-agents/pi-sidebar` at `>=0.3.0`.
+Existing copies of these three packages from any source are preserved and verified
+without reinstalling when compatible; older copies are left untouched and block
+completion with manual upgrade guidance. Ambiguous sources fail closed. Status
+validates each installed manifest's package name and SemVer floor; newer stable
+versions are healthy, while prerelease, malformed,
 missing, or older versions are not. Re-running Install or applying Update
-migrates legacy exact external sources through Pi while preserving package
-resource filters and unrelated settings.
+migrates legacy exact sources for the other selected extensions through Pi while
+preserving package resource filters and unrelated settings.
+
+Subagents (v2) and background tasks (v1) publish summary-only snapshots through
+[pi-core's task channels](pi-packages/pi-core/README.md#task-summary-and-usage-channels).
+The status line uses `thoth:subagents:usage`, not the removed raw
+`thoth:subagent-usage` bus event. Upgrade pi-subagents and pi-thoth-theme to
+`>=0.3.0` together and `/reload` to retain subagent cost display; the usage
+checkpoint discriminator is unchanged.
+
+The shared Pi Work panel uses pi-core's v2 data-only provider contract and
+[discovery/action API](pi-packages/pi-core/README.md#discovery-and-actions).
+Upgrade pi-subagents, pi-background-tasks and pi-todo together to `>=0.3.0`, then
+`/reload`; first-owner arbitration hides incompatible sections in mixed v1/v2
+installs. Subagent state is v2; background state, usage, requests and Render KIT remain v1.
+
+The [Pi sidebar](pi-packages/pi-sidebar/README.md) adds read-only Session,
+Workspace, Cost and discovered Todos/Subagents/Background panels in fullscreen and
+regular mode. `/sidebar` toggles, `/sidebar panels` lists ids for show/hide/order
+commands, and `/sidebar resize` resizes. `/sidebar settings` edits panel order,
+visibility, startup and default width; `/sidebar cost` opens task-cost curves
+against elapsed time per task, labeled by display name or a short task-summary name.
+Themed Agents/Background headers show static status-icon counts, omitting zero
+counts (Todos keeps completed/total), and detail commands; Workspace shows a
+`~`-abbreviated path and tracked file/line changes versus HEAD. Agent metrics
+include all available metrics with semantic icons (ASCII labels) in shared
+aligned columns that wrap without dropping metrics, stably across digit changes. Only displayed source panels absorb their
+Work sections; hiding the sidebar restores them. Panel order/visibility and
+startup policy/default width live in `~/.pi/agent/thoth-sidebar.json`. Subagent
+state v2 adds up to 100 cost-ranked persisted session summaries in `history`. Private Pi layout seams
+have guarded fallback; regular mode covers the live viewport, not historical
+scrollback. Update related extensions together to avoid mixed old UI owners.
+
+Pi's question UI replaces the editor without covering chat. `Ctrl+]` collapses it
+to a one-line dock and returns input to the editor; during an active run, `Enter`
+queues a steering message without answering the question. `Ctrl+]` re-expands
+with answers and drafts preserved, and the open tool-call card shows collapsed
+state. While open, `Ctrl+]` shadows editor `jumpForward`; collapsed `Esc` belongs
+to the editor or focused overlay. History/detail overlays close back to the
+expanded question or otherwise the editor; collapse and teardown preserve
+visible foreign-overlay focus. See [question controls](pi-packages/pi-questions-user/README.md#keyboard-controls).
 
 ## Documentation
 

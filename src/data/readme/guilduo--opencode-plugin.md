@@ -204,30 +204,33 @@ Writes return only a dry-run or execution plan unless `--execute` is supplied. A
 
 ## DSH plugin: install and connect
 
-The Guilduo plugin for **DeepSeek Harness (DSH)** is available on npm as [`@guilduo/dsh-oauth-poc`](https://www.npmjs.com/package/@guilduo/dsh-oauth-poc). As of October 10, 2026, `latest` and `beta` both resolve to **0.6.0-beta.16**. It adds **Settings → Guilduo**, browser OAuth and the `guilduo-workflows` Skill. Tested host: Windows, DSH **0.2.0-rc.2**.
+The Guilduo plugin for **DeepSeek Harness (DSH)** is available on npm as [`@guilduo/dsh-oauth-poc`](https://www.npmjs.com/package/@guilduo/dsh-oauth-poc). As of October 10, 2026, `latest` and `beta` both resolve to **0.6.0-beta.17**. It adds **Settings → Guilduo**, browser OAuth and the `guilduo-workflows` Skill. Tested host: Windows, DSH **0.2.0-rc.2**. [Official DSH guide](https://guilduo.com/docs/en/dsh/).
 
 Stop the Web/Desktop hosts before installing or updating this existing Web profile:
 
 ```powershell
-dsh plugin --profile web add @guilduo/dsh-oauth-poc@0.6.0-beta.16 --ignore-scripts
+dsh plugin --profile web add @guilduo/dsh-oauth-poc@latest --ignore-scripts
 ```
 
 Restart the host and reload the browser. Open a conversation → **Settings → Guilduo → 接続 → ブラウザーで認証**, then approve in the browser. Desktop uses its native plugin manager, with the same package and version.
 
-See the **[English How-to](docs/guilduo-dsh-howto.md)** / **[日本語の導入・使い方](docs/guilduo-dsh-howto.jp.md)** for sharing, updates, safe removal and troubleshooting. The user confirmed public OAuth, MCP reads/writes and Desktop saved authentication reuse after restart. Settings-free first-input/new-session/fork use, Agent Handoff and Human answer → resume remain pending. Feature development is paused at this beta stopping point; see [current acceptance status](docs/guilduo-dsh-status.md).
+See the **[English How-to](docs/guilduo-dsh-howto.md)** / **[日本語の導入・使い方](docs/guilduo-dsh-howto.jp.md)** for sharing, updates, safe removal and troubleshooting. Beta.17 includes the independently reviewed maintenance fixes. The user's beta.16 public OAuth, MCP reads/writes and Desktop saved authentication reuse are accepted; beta.17's full Human/Handoff and settings-free workflow acceptance remains open. All three plugins are entering the polish phase; see [current acceptance status](docs/guilduo-dsh-status.md).
 
-## OpenCode and OpenClaw extensions
+## OpenCode, OpenClaw and Claude Code extensions
 
 Guilduo's independent extensions reuse each host's native OAuth MCP connection and bundle the `guilduo-workflows` Skill. They preserve existing MCP aliases and other plugins. Installation does not grant Quest write permission or register a new Agent.
 
 | Host | Package | Guide |
 | --- | --- | --- |
-| OpenCode 1.18.32 / 1.18.35 | `@guilduo/opencode-plugin@0.6.0-beta.16` | [English](plugins/guilduo-opencode/README.md) / [日本語](plugins/guilduo-opencode/README.jp.md) |
-| OpenClaw 2026.9.9 | `@guilduo/openclaw-plugin@0.6.0-beta.16` | [English](plugins/guilduo-openclaw/README.md) / [日本語](plugins/guilduo-openclaw/README.jp.md) |
+| OpenCode 1.18.32 / 1.18.35 | `@guilduo/opencode-plugin@0.6.0-beta.16` (`latest` / `beta`) | [Official guide](https://guilduo.com/docs/en/opencode/) / [日本語](https://guilduo.com/docs/opencode/) |
+| OpenClaw 2026.9.9 | `@guilduo/openclaw-plugin@0.6.0-beta.16` (`latest` / `beta`) | [Official guide](https://guilduo.com/docs/en/openclaw/) / [日本語](https://guilduo.com/docs/openclaw/) |
+| Claude Code 2.1.286+ | `guilduo@guilduo` `0.6.0-beta.2` (Claude Code marketplace `ELRdn/Guilduo`, not npm) | [Official guide](https://guilduo.com/docs/en/claude/) / [日本語](https://guilduo.com/docs/claude/) |
 
-Check the [release and acceptance status](docs/guilduo-host-extensions-status.md) before installing. OpenCode's optional phase reminder is off by default and can start an additional model request when explicitly bound to a session. OpenClaw uses the standard Settings / Accounts connection UI. [Independent DSH feedback](docs/guilduo-dsh-independent-review.md) is tracked separately; DSH beta.16 is unchanged.
+Use the official guides for installation, OAuth, updates and removal. OpenCode's optional phase reminder is off by default and can start an additional model request when explicitly bound to a session. OpenClaw uses the standard Settings / Accounts connection UI. `latest` selects the recommended published prerelease; version numbers and acceptance limits remain visible in the [release status](docs/guilduo-host-extensions-status.md) and [independent completion assessments](docs/guilduo-plugins-completion.md).
 
 ## Skill / OpenAI Plugin / MCP App
+
+OpenAI / ChatGPT, Codex, Grok Bot and Muse Code beta.12 candidates reuse the canonical Skill. See the [English installation and acceptance guide](docs/guilduo-next-hosts.md) / [日本語](docs/guilduo-next-hosts.jp.md). OpenAI submission uses a separate hooks-free ZIP; Codex includes optional trusted lifecycle assistance. Grok and Muse real-model acceptance is not implied by candidate distribution.
 
 - Official Skill: [`skills/questforge-workflows/SKILL.md`](skills/questforge-workflows/SKILL.md)
 - OpenAI Plugin preparation package: [`plugins/questforge/`](plugins/questforge/)
