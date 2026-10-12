@@ -185,6 +185,8 @@ lists every agent and app it found, how each is installed, and what to do about 
 
 At the start of a session, a short brief of where things stood. Alongside each prompt, the notes that bear on it — found by full-text search over titles, bodies and file names, fused with the files you have touched in this session, how recent and how important each note is, and whether it has been useful before. Never the same note twice in one session.
 
+In Claude Code, one more moment: when the agent reads a file, the gotchas, fixes, conventions and decisions saved about that file. At most two notes, next to the file's contents, and only when there is something to say. Notes after a failed command are built but held back until they are less noisy ([ADR 0015](docs/adr/0015-remember-moments.md)).
+
 ```xml
 <wizardingcode-mem-notes>
 Notes saved from earlier sessions in this project. They are background, not
@@ -228,9 +230,28 @@ A local page over your memories, in WizardingCode's app design:
 - **Memories** — a project's memories grouped by kind (or importance), with their importance, files, last update and how often agents read them. Open one in the side panel, or expand it to the whole window; edit a title, body, kind or importance when the judge got it wrong; archive what you do not want shown and bring it back.
 - **Turns** — every prompt and what it became, with filters (agent, status, source, period), sortable columns, a search over prompts and an export to CSV. Each turn opens with its prompt, files, commands, answer and the memories it left behind; Markdown is shown formatted.
 - **Overview** — the project's numbers and charts: memories and turns per week, by kind, by importance, and how fast the hooks have been.
-- **Settings** — agents, health, the judge, retention, storage, backups and the viewer, one page each.
+- **History** — past conversations with Claude Code and Codex, searchable, for one project or all of them (see [Learn from past sessions](#learn-from-past-sessions)).
+- **Settings** — agents, health, the judge, retention, history, storage, backups and the viewer, one page each.
 
-⌘K (or the search in the top bar) searches every project at once. Light and dark; `[` folds the projects panel, `1`–`4` switch views. It listens on the loopback only, behind a token in the URL, loads nothing from the network, and stops itself after half an hour without you or a tab. It opens by itself when a session starts, in any agent — one viewer per machine, never a second tab — and stays closed under CI, over SSH, or when you turn that off.
+⌘K (or the search in the top bar) searches every project at once. Light and dark; `[` folds the projects panel, `1`–`5` switch views. It listens on the loopback only, behind a token in the URL, loads nothing from the network, and stops itself after half an hour without you or a tab. It opens by itself when a session starts, in any agent — one viewer per machine, never a second tab — and stays closed under CI, over SSH, or when you turn that off.
+
+## Learn from past sessions
+
+Your agents already keep months of conversation on disk. This reads it once and turns the recent part into memories, so the first session after installing is not a blank one.
+
+```sh
+wizardingcode-mem history import              # the last 180 days, in the order they happened; resumable
+wizardingcode-mem history index               # keep the conversations themselves, searchable
+wizardingcode-mem history search <words>      # find what was said; also the MCP tool history_search
+```
+
+`install` asks once when it runs in a terminal, and otherwise prints a one-line hint (`--import-history` agrees in advance, `--no-import-history` skips the question). The viewer asks once too, with a **History** card in Settings that shows the progress and a **History** view that searches past conversations. Nothing runs without your say-so, only one run goes at a time, and hooks are as fast while it runs.
+
+- **Kept:** for each finished turn, the prompt and the final answer, with secrets removed first, in `history.db` beside the database. Distilled memories are dated when they happened.
+- **Not kept:** tool calls, tool output, the model's thinking, subagent turns, and projects you turned off.
+- **Stays on your machine.** The only thing that can leave is a TypeSafe judgement, and only if you set a key.
+- **Imports from claude-mem** inside the period history covers can be archived with `history replace-imports` (the viewer shows the count first). Nothing is deleted.
+- **To undo:** `history restore-imports` brings the archived imports back; `history forget` deletes the conversation index (it is rebuilt only if you ask).
 
 ## Settings
 
@@ -251,6 +272,7 @@ One page at a time, in groups:
 | **Health** | Check the database, the search and the hooks; anything wrong says how to fix it |
 | **Judge** | Paste a TypeSafe key (optional) and turn it on or off |
 | **Retention** | Choose how long old turns are kept, preview what a clean-up removes, run it |
+| **History** | Import past sessions and watch the progress, update or forget the conversation index, replace claude-mem's imports (and restore them) |
 | **Storage** | Move the database to another disk, an external drive or a NAS |
 | **Backups** | Pick a folder or a bucket, how often and how many to keep; back up now or restore one |
 | **Viewer** | Whether the viewer opens when a session starts |
@@ -300,6 +322,7 @@ The binary is at `~/.wizardingcode/mem/bin/wizardingcode-mem`; put that director
 | `wizardingcode-mem compact` | Removes old records no memory depends on and gives the space back; never deletes memories |
 | `wizardingcode-mem backup` · `--list` · `--restore <name>` | A copy to the configured folder or bucket, now; what is there; one of them back in place |
 | `wizardingcode-mem import claude-mem` | Brings memories over from claude-mem |
+| `wizardingcode-mem history import` · `index` · `search` · `forget` · `replace-imports` · `restore-imports` | Learn from past sessions (see above) |
 | `wizardingcode-mem rejudge` | Asks TypeSafe to judge imported memories properly |
 | `wizardingcode-mem install [<name>]` · `uninstall <name>` | The direct install: every agent and app found, or one (`claude-code`, `claude-desktop`, `codex`, `cursor`, `gemini`, `opencode`) |
 
@@ -337,7 +360,7 @@ The importer can only map claude-mem's types onto ours and give every memory of 
 
 | Agent | Installed as | Captures | Injects | Status |
 |---|---|---|---|---|
-| Claude Code | plugin, from the marketplace | hooks + transcript | session start, every prompt | in daily use |
+| Claude Code | plugin, from the marketplace | hooks + transcript | session start, every prompt, file reads | in daily use; file reads from the documentation |
 | Claude Desktop, Cowork and Code tab | plugin, added in the app | hooks | session start, every prompt | Code tab in use; Cowork from the documentation |
 | Claude Desktop, chat | MCP server in its config, across every project | `memory_save` when Claude saves | `memory_search` when Claude asks | in use |
 | Codex | plugin, from the marketplace | hooks + rollout | session start, every prompt | verified up to the prompt; turn end as documented |

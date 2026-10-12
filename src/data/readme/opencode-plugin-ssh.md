@@ -1,19 +1,73 @@
 # opencode-plugin-ssh
 
-OpenCode plugin for persistent SSH connections, interactive PTY shells, SFTP file operations, and remote background job management.
+Persistent interactive SSH sessions, profiles, PTY shells, SFTP/SCP file transfers, and remote background job supervision for **Claude Code**, **OpenCode**, and **MCP clients**.
+
+Dual-compatible as an **OpenCode Plugin** and a standalone **Model Context Protocol (MCP) Server**.
+
+---
 
 ## Features
 
 - **Persistent SSH Sessions**: Reuses open connections in memory without repeating handshakes.
 - **PTY Shell & Multiplexed Exec**: Run single discrete commands or maintain state across commands in a persistent shell.
-- **SFTP File Management**: Read, write, and perform targeted search-and-replace edits on remote files.
+- **SFTP & High-Speed SCP**: Read, write, targeted find-and-replace, and chunked recursive local-remote or remote-to-remote file transfers.
+- **Claude Code & MCP Native**: Works out-of-the-box with Claude Code (`claude mcp add`), Cursor, Claude Desktop, and OpenCode.
 - **Pager Guard**: Automatically sets `TERM=dumb`, `PAGER=cat`, and `CI=1` to prevent interactive hangs.
 - **Key & Passphrase Support**: Reads private keys from disk or options, supporting passphrases and environment variables.
 - **Detached Background Jobs**: Spawn, inspect, fetch logs, and terminate long-running remote processes.
 - **Cluster Broadcast**: Execute commands across multiple active sessions concurrently.
 - **System Diagnostics**: Single-call probe gathering OS, hardware, runtime, and network info.
 
-## Installation
+---
+
+## Usage with Claude Code
+
+### Option 1: Quick Add via CLI (Recommended)
+
+Run directly in your terminal:
+
+```bash
+claude mcp add ssh -- npx -y opencode-plugin-ssh
+```
+
+### Option 2: Project `.mcp.json`
+
+Add a `.mcp.json` file in your repository root:
+
+```json
+{
+  "mcpServers": {
+    "ssh": {
+      "command": "npx",
+      "args": ["-y", "opencode-plugin-ssh"]
+    }
+  }
+}
+```
+
+### Option 3: Claude Code Plugin & Mod (Slash Commands + Live Spinner)
+
+Install directly into Claude Code:
+
+```bash
+claude plugin add opencode-ssh
+```
+
+Or load locally during development:
+
+```bash
+claude --plugin-dir /path/to/opencode-ssh
+```
+
+When loaded as a Claude Code plugin/mod, it automatically adds:
+- **`/ssh-profiles`**: Browse configured hosts and connection parameters from `~/.ssh/config`.
+- **`/ssh-status`**: View real-time active SSH tool operations and history.
+- **`/ssh-help`**: Instant cheatsheet of available SSH commands and MCP tools.
+- **Live Spinner Feedback**: Shows `· SSH: <operation>` on the Claude Code spinner whenever a remote SSH or SCP task is running.
+
+---
+
+## Usage with OpenCode
 
 Add to your OpenCode configuration (`opencode.json` or `~/.config/opencode/opencode.jsonc`):
 
@@ -25,25 +79,34 @@ Add to your OpenCode configuration (`opencode.json` or `~/.config/opencode/openc
 }
 ```
 
-Or install as a dependency:
+Or install as a local dependency:
 
 ```bash
 npm install -D opencode-plugin-ssh
 ```
 
-You can also install directly from GitHub:
+---
 
-```jsonc
+## Usage with Claude Desktop / Cursor / Other MCP Clients
+
+Add to your `claude_desktop_config.json` or Cursor MCP configuration:
+
+```json
 {
-  "plugin": [
-    "git+https://github.com/maik205/opencode-ssh.git"
-  ]
+  "mcpServers": {
+    "ssh": {
+      "command": "npx",
+      "args": ["-y", "opencode-plugin-ssh"]
+    }
+  }
 }
 ```
 
+---
+
 ## Tools
 
-All tools are registered under the `ssh` namespace:
+All tools are available across both OpenCode and MCP clients:
 
 ### Sessions & Connections
 - `ssh_list_profiles`: List profiles from `~/.ssh/config` and saved configurations.
@@ -62,7 +125,7 @@ All tools are registered under the `ssh` namespace:
 - `ssh_pty_read`: Retrieve recent buffer output from the PTY shell.
 
 ### Filesystem (SFTP & SCP)
-- `ssh_scp`: Securely copy files or directories between local machine and remote host (`upload` / `download`), or stream directly between two remote sessions (`remote_to_remote`) with recursive and high-throughput chunked transfer support.
+- `ssh_scp`: Securely copy files or directories between local machine and remote host (`upload` / `download`), or stream directly between two remote sessions (`remote_to_remote`) with recursive and chunked transfer support.
 - `ssh_read_file`: Read remote files with pagination and line numbering.
 - `ssh_write_file`: Write or overwrite remote files over SFTP.
 - `ssh_edit_file`: Find and replace exact substrings within remote files.
@@ -79,6 +142,8 @@ All tools are registered under the `ssh` namespace:
 - `ssh_job_status`: Check status and exit code of a spawned job.
 - `ssh_job_logs`: Fetch stdout and stderr output from a background job.
 - `ssh_job_kill`: Terminate a background job with a specified signal.
+
+---
 
 ## License
 

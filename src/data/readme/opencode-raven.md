@@ -1,6 +1,7 @@
 <div align="center">
   <h1>opencode-raven</h1>
   <p><strong>Keep noisy tool work out of your main OpenCode context.</strong></p>
+  <p><strong>Supports OpenCode V2 (2.0.26+) and OpenCode V1 (1.18.29+), in one package.</strong></p>
   <p>
     <a href="https://www.npmjs.com/package/opencode-raven"><img src="https://img.shields.io/npm/v/opencode-raven.svg" alt="npm version" /></a>
     <a href="https://www.npmjs.com/package/opencode-raven"><img src="https://img.shields.io/npm/dm/opencode-raven.svg" alt="npm downloads" /></a>
@@ -29,7 +30,21 @@
 
 ## Install
 
-Raven requires OpenCode 1.15.12 or newer. Add it to `opencode.jsonc`:
+**Raven 2.3 supports OpenCode V2 (2.0.26+).** OpenCode V1 (1.18.29+) remains supported in the same package—no separate plugin is needed.
+
+### OpenCode V2
+
+Use the v2 `plugins` key in `opencode.jsonc`:
+
+```jsonc
+{
+  "plugins": ["opencode-raven"]
+}
+```
+
+### OpenCode V1
+
+Use the v1 `plugin` key in `opencode.jsonc`:
 
 ```jsonc
 {
@@ -40,6 +55,16 @@ Raven requires OpenCode 1.15.12 or newer. Add it to `opencode.jsonc`:
 Restart OpenCode, then run `/raven` to verify the loaded version, model, routing, MCP health, and estimated savings. A fresh install may ask for one additional restart after selecting its model.
 
 OpenCode resolves the package from npm and caches it automatically.
+
+### Upgrading From OpenCode 1 To 2
+
+Keep using `opencode-raven`; change its OpenCode config entry from `plugin` to `plugins`. Raven's existing `~/.config/opencode/opencode-raven/raven-config.json` is shared by both versions, including models, on-demand MCPs, routing settings, and stats. Quit and restart OpenCode after upgrading.
+
+OpenCode 1 uses Raven's `server()` entrypoint; OpenCode 2 uses `setup()` and automatically loads the terminal companion. The terminal companion displays `/raven` command results in a scrollable dialog (arrow keys, Page Up/Down, or mouse wheel; Esc to close) and delivers startup/update warnings as toasts, without sending a prompt to the model. The v2 server also exposes the typed `opencode-raven/rpc` command contract for other clients.
+
+The v1 minimum is 1.18.29 because earlier versions cannot load the shared object entrypoint. See OpenCode's [plugin migration guide](https://opencode.ai/v2/docs/build/plugins/migrate-v1) for the upstream lifecycle and config changes.
+
+For local development, v1 can load `file:///path/to/opencode-raven/index.ts`; v2 requires the package directory, `file:///path/to/opencode-raven`.
 
 ### First-Time Setup
 
@@ -75,6 +100,24 @@ In this run, Raven handled the search-heavy web research in a child session and 
 
 The main model receives Raven's final answer instead of its raw tool output. Each result includes a Raven session ID that the main agent can pass back for a context-aware follow-up. Child sessions remain available in OpenCode's session/subagent view for inspection.
 
+### Background Retrieval (OpenCode V2)
+
+On V2, `raven_seek` and `raven_mcp` **run in the background by default**. The initial response contains a child-session handle, not the findings. The calling agent can continue independent work; Raven delivers compact findings or a failure notice to that same calling session when retrieval finishes, including when the caller is itself a child session.
+
+```text
+raven_seek(query="Find the current API documentation")
+raven_mcp(query="Retrieve library examples", background=true)
+raven_seek(query="Find the definition needed for my next step", background=false)
+```
+
+Use `background: false` when the next step depends on the answer. Do not poll, repeat a pending retrieval, or finalize conclusions that need its findings. Wait for the completion message before reusing its `sessionId` for a follow-up.
+
+Background retrieval keeps Raven's configured timeouts, permissions, continuation checks, and context estimates. Returning the handle ends the calling tool, not the child retrieval. To stop it, open the returned child session and interrupt it. Deleting the calling session also cancels its pending retrievals.
+
+Results are delivered through V2's durable synthetic inbox input, which can resume the calling agent and therefore cause another model turn. Undelivered results are retained in plugin storage and retried when that location's plugin next loads. A plugin/service restart cancels running work; Raven reports the interruption instead of automatically replaying searches or potentially stateful MCP calls. V1 keeps its existing foreground behavior.
+
+Raven manages its own background child sessions using the public plugin APIs. This does not add native Ctrl+B background support to Raven's custom tools.
+
 For direct search control, mention `@Raven` in any chat. This sends the request to the search agent, but it is optional and not required for automatic routing.
 
 Under the hood, Raven registers two public delegation tools and one internal bridge:
@@ -84,6 +127,8 @@ Under the hood, Raven registers two public delegation tools and one internal bri
 | `raven_seek` | Creates or resumes a Raven Search session for narrowly scoped evidence retrieval. |
 | `raven_mcp` | Creates or resumes a Raven MCP session for configured on-demand MCP capabilities. |
 | `raven_mcp_bridge` | Internal bridge used only by the Raven MCP agent. |
+
+On OpenCode V2, Raven auto-approves permission checks for the public `raven_seek` and `raven_mcp` delegation tools instead of prompting on every call. Explicit deny rules still apply. This does not change permission checks for other tools or access restrictions on the internal MCP bridge.
 
 For a related follow-up, the main agent can reuse the ID returned by the earlier call:
 
@@ -97,6 +142,10 @@ Raven accepts a resumed session only when it belongs to the same root session tr
 OpenCode's built-in tools already exist; Raven routes selected calls instead of replacing those tools. Global MCPs also remain globally registered, so their schemas still enter the main session even when Raven routes their calls.
 
 On-demand MCPs are different: Raven discovers and calls them internally, so their full schemas are not registered globally. Enabled servers are probed after startup to discover tools and health, then per-session connections are opened when Raven uses them. "On-demand" describes schema exposure and normal use, not the absence of a startup health probe.
+
+On OpenCode V2, reopening the TUI triggers a fresh background health and tool-discovery check even if the shared service is still running. This runs once per workspace per TUI launch; returning from sessions or reactivating the plugin does not repeat it. Overlapping attachment checks share the same refresh. Use `/raven mcp refresh [server_name]` to retry manually without restarting the service.
+
+Automatic and manual MCP refreshes use top-right notifications for progress and results, without opening a command dialog or a session tab.
 
 ## Configuration
 
@@ -183,7 +232,7 @@ Generated MCP metadata and main-model guidance live beside `raven-config.json`. 
 
 ## Routing
 
-Default routed tools are `grep`, `glob`, `webfetch`, `fetch`, `websearch`, and search-like `bash` commands.
+Default routed tools are `grep`, `glob`, `webfetch`, `fetch`, `websearch`, and search-like `bash` commands. On OpenCode 2, Raven also recognizes the native `shell` tool; `bash` and `shell` are routing aliases, so existing routing settings continue to work. Exact `excludeTools` entries use the host's actual tool name.
 
 Global MCPs are automatically routed when their OpenCode tool names use the normal `<server>_<tool>` prefix. Use a keyword for suffix-style names:
 
@@ -246,6 +295,20 @@ Review `Raven.md` and your MCP commands before using Raven in sensitive environm
 - MCP failure: run `/raven mcp`, then `/raven mcp refresh <server>` after correcting its URL, command, environment, or credentials.
 - Stale plugin version: run `/raven update`, restart OpenCode, and follow the cache-clearing instructions it prints if needed.
 - Remove Raven: delete `"opencode-raven"` from `plugin`, restart, then optionally remove `~/.config/opencode/opencode-raven/`.
+
+On OpenCode 2, remove it from `plugins` instead. `/raven update` uses v1 cache-clearing behavior only on OpenCode 1; on v2 it checks the version and provides restart/pinned-version instructions while leaving cache management to OpenCode.
+
+## Development Checks
+
+```sh
+bun install
+bun test
+bun run typecheck
+bun scripts/smoke-compat.ts v1 /path/to/opencode-v1
+bun scripts/smoke-compat.ts v2 /path/to/opencode-v2
+```
+
+The native smoke checks use isolated configuration and data directories. The v2 check uses a deterministic local model endpoint to exercise routed main-agent search, direct Raven child search, delegation completion, and command/RPC output without calling a paid model provider.
 
 See [CHANGELOG.md](CHANGELOG.md) for release history.
 

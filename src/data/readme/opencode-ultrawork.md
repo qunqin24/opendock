@@ -1,8 +1,8 @@
 # opencode-ultrawork
 
-OpenCode V2 原生外掛，提供 49 個工具與 6 個 hook，負責工作區搜尋、驗證、工作說明檢查、Comment Signal、技能管理、任務與計畫狀態、診斷和專案記憶。工具的名稱、參數與回傳格式是對外凍結的介面，改動前要先取得使用者同意。
+OpenCode V2 原生外掛，提供 50 個工具與 6 個 hook，負責工作區搜尋、驗證、工作說明檢查、Comment Signal、技能管理、任務與計畫狀態、診斷和專案記憶。工具的名稱、參數與回傳格式是對外凍結的介面，改動前要先取得使用者同意。
 
-來源：介面凍結清單見 `src/modules/diagnostics/inventory.ts`（49 工具、6 hook、11 分類），並由 `tests/v2/native/diagnostics/tool-parity.test.ts` 逐項把關。
+來源：介面凍結清單見 `src/modules/diagnostics/inventory.ts`（50 工具、6 hook、11 分類），並由 `tests/v2/native/diagnostics/tool-parity.test.ts` 逐項把關。
 
 > 本文提到的 `src/…`、`tests/…`、`AGENTS.md` 都是 repo 裡的路徑。npm 套件只內含 `src/`、`schema/`、`index.ts`、`README.md`、`LICENSE`，其餘檔案請到 [GitHub repo](https://github.com/smile-minecraft/opencode-ultrawork) 對應的 branch 查看。
 
@@ -28,7 +28,9 @@ OpenCode V2 原生外掛，提供 49 個工具與 6 個 hook，負責工作區�
 - `commentSignal`：`comment_signal_check`、`comment_signal_touched_report`、`comment_signal_explain`、`comment_signal_policy`、`comment_signal_only_new`、`comment_signal_baseline`、`comment_signal_suppress`
 - `skills`：`skill_search`
 - `skiller`：`skiller-scan`、`skiller-validate`、`skiller-draft`、`skiller-draft-read`、`skiller-draft-update`、`skiller-draft-delete`、`skiller-promote`、`skiller-retire`、`skiller-restore`、`skiller-import`、`skiller-policy-update`
-- `workflow`：`task-state-sync`、`task-content-read`、`task-content-update`、`plan-state-sync`、`plan-task-link`、`plan-status`、`plan-next`、`plan-progress-reconcile`、`plan-content-create`、`plan-content-read`、`plan-content-update`、`plan-content-delete`、`work-order-build`
+- `workflow`：`task-state-sync`、`task-content-read`、`task-content-update`、`plan-state-sync`、`plan-task-link`、`plan-status`、`plan-next`、`plan-progress-reconcile`、`plan-content-create`、`plan-content-read`、`plan-content-update`、`plan-content-delete`、`work-order-build`、`workflow-id-check`
+  - 計畫 ID 與任務 ID 的格式在建立時檢查：計畫 ID 是二到四個小寫的英文單字（版本寫成 `v` 加數字），任務 ID 是「主題-兩位數流水號」。不符合時 `plan-state-sync`／`task-state-sync` 的 `create` 回 `INVALID_PLAN_ID`／`INVALID_TASK_ID`；已經存在的 ID 不受影響。
+  - `workflow-id-check` 比對任務註冊檔案裡實際存在的 ID，找出寫進專案內容的 ID：不帶參數檢查這次的 git 變更（新增的行、新檔案的內容和檔名，`.ultrawork/` 除外），`staged: true` 只看已暫存的變更，`text` 檢查一段文字。不是 git repo 時回 `available: false`，不當成乾淨。
 - `diagnostics`：`workflow_bootstrap`、`workflow_doctor`、`workflow_health_check`、`workflow_l1_check`、`tool_hook_manifest`、`ultrawork_selftest`
 - `memory`：`memory-search`、`memory-read`、`memory-note`、`memory-extract`、`memory-write`、`memory-maintain`、`memory-task-close`
 
@@ -230,6 +232,28 @@ Comment Signal 只掃「註解語法有對應 lexer 分支」的副檔名，共 
 
 升級例外：如果結案訊息提到「升級前的阻斷記錄無法歸檔」，只重查單檔不會解除——那筆舊記錄說不出是哪個檔案，單檔的乾淨報告覆蓋不到它。解除方法是做一次完整且乾淨的重掃：先呼叫 `comment_signal_check`（不帶 `path`）重掃本工作階段；若該工作階段沒有可掃描的已修改檔（重掃掃到 0 個檔案），改以 `path: "."` 加 `changedOnly: false` 重掃整個專案。掃到檔案且結果乾淨後即解除。
 
+## 計畫 ID 與任務 ID
+
+ID 只用來指出是哪一個計畫、哪一個任務，不能寫進專案的內容。外掛在五個地方把關，五處用同一套比對：以任務註冊檔案裡實際存在的 ID 為準（`src/modules/workflow/core/workflow-id.ts`），不用正規表達式猜格式。
+
+| 時機 | 行為 |
+| --- | --- |
+| `plan-state-sync`／`task-state-sync` 的 `create` | 檢查格式。計畫 ID 是二到四個小寫的英文單字（版本寫成 `v` 加數字）；任務 ID 是「主題-兩位數流水號」。不符合回 `INVALID_PLAN_ID`／`INVALID_TASK_ID`。只檢查新建立的 ID |
+| `workflow-id-check` | 唯讀。不帶參數檢查這次的 git 變更：新增的行、新檔案的內容和檔名。`staged: true` 只看已暫存的變更，`text` 檢查一段文字 |
+| `task-state-sync` 的 `complete` | 這次的變更裡有 ID 就回 `WORKFLOW_ID_IN_PROJECT`，並列出位置 |
+| shell 工具執行 `git commit` 之前 | 指令裡的訊息或已暫存的內容有 ID 就擋下這次執行 |
+| `memory-write`、skiller 的驗證 | 記憶的標題、description、正文，以及技能的內容有 ID 就回 `WORKFLOW_ID_IN_MEMORY`／`WORKFLOW_ID_MARKER` |
+
+幾個要知道的界線：
+
+- 只看這次新增的內容。既有的內容裡早就存在的 ID 不會擋住不相干的工作。
+- `.ultrawork/` 底下不檢查，那裡是 ID 該出現的地方。
+- 不是 git repo、git 無法執行，或宿主沒有提供程序能力時，`workflow-id-check` 回 `available: false`，`complete` 不擋。沒檢查不等於沒問題。
+- 新格式的計畫 ID 只有英文單字，和功能的名稱分不開，所以不比對；比對的是任務 ID，以及帶日期的舊格式計畫 ID。舊格式的任務 ID 短於四個字元或不含數字的不比對。
+- 駝峰、底線和去掉連字號的寫法都算，例如任務 `economy-review-02` 會找到 `EconomyReview02Test`。
+
+`work-order-build` 會在 `Task Identity` 的最後固定附上一段說明，交代 ID 只用在回報。`plan-content-create` 沒有給內容時，產生六個固定章節：目標與不做的事、已確認的證據、決定、任務、風險與復原、還沒決定的事。
+
 ## 內容引用診斷
 
 `workflow_doctor` 有一項 `Content Ref Path Integrity` 檢查，逐項驗證任務與計畫註冊檔裡的內容引用（`contentRef`）是否還指得到正文；逐項清單放在回傳的 `content_ref_issues` 欄位，每筆含 `owner`（任務或計畫）、`id`、`field`、`ref`、`kind`、`repair`（實作見 `src/modules/diagnostics/shared.ts`）。`kind` 有四種：
@@ -270,6 +294,14 @@ Comment Signal 只掃「註解語法有對應 lexer 分支」的副檔名，共 
 4. `lib/dcp-evidence-policy.ts` 列的是 ultrawork 工具名稱，名稱沒變就不用改。
 5. 把那條讀設定 repo 技能政策的使用者專屬測試移回設定 repo 的 `tests/config/`。
 
+## 升級到 3.1.0
+
+- **新建立的計畫和任務要用新的 ID 格式**，不符合會被 `create` 拒絕。已經存在的計畫和任務不受影響，照常可以轉換狀態、連結和結案。
+- **新增第 50 個工具 `workflow-id-check`。** 角色的權限採預設拒絕的話，要替會改檔案、核對 diff 或結案的角色放行它。
+- **`complete` 和 `git commit` 多了一道檢查**：這次的變更（或已暫存的內容、commit 訊息）裡有已登記的 ID 就擋下。舊專案裡既有的 ID 不算，但是只要這次新增的行裡出現，就要先改掉。
+- **`memory-write` 拒絕含 ID 的內容，也拒絕正文開頭夾著 frontmatter 的寫入**（之前會被寫成兩份 frontmatter）。更新既有主題時只檢查這次送進來的欄位。
+- `work-order-build` 組出來的工作說明多了一段固定文字；`plan-content-create` 的預設章節改成中文的六個章節。既有的內容檔不會被改動。
+
 ## 升級到 3.0.0
 
 這一節是給已經在用 2.x 的使用者。3.0.0 是大版本：`^2.3.0` 這類範圍不會自動升到 3.0.0，一定要手動改釘選。
@@ -300,7 +332,7 @@ Comment Signal 只掃「註解語法有對應 lexer 分支」的副檔名，共 
 ### 相容與不變的東西
 
 - 既有匯出相容：`loadSettings`、`resolveVerificationRunAllowedAgents`、`resolveChangeScopeCheckAllowedAgents`、`searchSkills`、`insertAgentSkillAllow`、`removeAgentSkillLine`、`loadPersonalPins`、`resolvePersonalPinsPath`、`PERSONAL_PINS_SCHEMA_VERSION` 的名稱與路徑不變（由 `tests/v2/native/compat-exports.test.ts` 把關）。
-- 全部 49 個工具的名稱、參數、回傳格式，以及全部註解功能（七個 `comment_signal` 工具、`AI_DO_NOT_EDIT:P0` 阻斷、掃描政策、結案檢查）保留不變。
+- 全部 50 個工具的名稱、參數、回傳格式，以及全部註解功能（七個 `comment_signal` 工具、`AI_DO_NOT_EDIT:P0` 阻斷、掃描政策、結案檢查）保留不變。
 - 設定欄位不變：2.x 的 `ultrawork.jsonc` 不用改寫就能讀，差別只有四個清單的預設改為空。
 
 ### 退場：escalation
@@ -327,7 +359,7 @@ bun run typecheck
 
 `src/**` 零 V1 import 的 gate：`tests/v2/native/v1-free-surface.test.ts`。三者都要通過才算完成一個階段（`AGENTS.md`）。
 
-提醒：49 個工具的名稱、參數與回傳格式是對外介面，凍結清單由 `tests/v2/native/diagnostics/tool-parity.test.ts` 把關；任何改變都要先問使用者（`AGENTS.md`）。
+提醒：50 個工具的名稱、參數與回傳格式是對外介面，凍結清單由 `tests/v2/native/diagnostics/tool-parity.test.ts` 把關；任何改變都要先問使用者（`AGENTS.md`）。
 
 ## 授權
 

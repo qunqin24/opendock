@@ -27,6 +27,11 @@ to the international endpoint.)
 All harnesses share one identity and data tree (`~/.memorylake/harness/`):
 configure once, use from every client.
 
+Every harness drives the [`memorylake` CLI](https://github.com/memorylake-ai/memorylake-cli)
+under the hood and fetches it on demand during setup, so none of the installs
+below needs a separate download. Put the CLI on your `PATH` to reach the same
+memory from a terminal or a script — see [From the terminal](#from-the-terminal).
+
 ## Claude Code
 
 ```
@@ -73,7 +78,7 @@ harness can skip it. See [`opencode-plugin/README.md`](opencode-plugin/README.md
 ## QwenPaw
 
 ```
-qwenpaw plugin install https://github.com/memorylake-ai/memorylake-harness/releases/download/qwenpaw-plugin-v0.2.1/memory-memorylake-0.2.1.zip
+qwenpaw plugin install https://github.com/memorylake-ai/memorylake-harness/releases/download/qwenpaw-plugin-v0.2.2/memory-memorylake-0.2.2.zip
 ```
 
 Then, per Agent, in the Console: Agent settings → Memory backend → Memory
@@ -105,3 +110,33 @@ In WorkBuddy: Skills → Plugins → **+** (add marketplace) →
 
 Machines already set up for another harness can skip the last step. See
 [`workbuddy-plugin/README.md`](workbuddy-plugin/README.md).
+
+## From the terminal
+
+The harnesses log in through the CLI and keep the credentials where the CLI
+keeps them (`~/.memorylake/credentials.toml`), so a CLI you install yourself on
+a machine already set up for any harness is logged in from the first command:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/memorylake-ai/memorylake-cli/main/scripts/install.sh | sh
+memorylake auth status
+memorylake lib upload ./report.pdf
+memorylake search "what did we decide about the schema"
+```
+
+Windows: `irm https://raw.githubusercontent.com/memorylake-ai/memorylake-cli/main/scripts/install.ps1 | iex`.
+The full command reference — files, facts, databases, conversations, agents,
+skills, teams — is in the
+[memorylake-cli README](https://github.com/memorylake-ai/memorylake-cli#commands).
+
+## Beyond coding sessions
+
+The memory the harnesses write to is the same one a team's calls, meetings,
+documents and agents can land in.
+[memorylake-usecases](https://github.com/memorylake-ai/memorylake-usecases)
+has runnable demos of that — sales calls, meetings, a codebase, contract review,
+bookkeeping, agent bug replay, Reflexion-style agent memory and more — each a
+directory with sample data, a CLI runner that prints every command, a local web
+UI and a recorded run. A machine set up for any harness can run them as is: the
+demos use the CLI the harness installed and, with `MEMORYLAKE_API_KEY` unset, its
+login.

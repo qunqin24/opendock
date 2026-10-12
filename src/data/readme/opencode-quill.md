@@ -54,7 +54,7 @@ Add the package to `plugins` in `~/.config/opencode/cli.json`:
 {
   "$schema": "https://opencode.ai/v2/cli.json",
   "plugins": [
-    "opencode-quill@0.1.4"
+    "opencode-quill"
   ]
 }
 ```

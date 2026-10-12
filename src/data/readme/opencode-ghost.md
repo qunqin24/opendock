@@ -34,7 +34,23 @@ a dimmed inline placeholder in the empty composer with
 
 ## Install
 
-### From this repo (recommended)
+### From npm (recommended)
+
+Add the package to your `cli.json` (normally `~/.config/opencode/cli.json`):
+
+```jsonc
+{
+  "$schema": "https://opencode.ai/v2/cli.json",
+  "plugins": ["opencode-ghost"]
+}
+```
+
+Then **restart opencode**; it installs the package on startup. Pin a version
+with `"opencode-ghost@1.3.7"`, or change the version and restart to update.
+Pass options with the object form shown under [Manually](#manually), using
+`"package": "opencode-ghost"`.
+
+### From this repo
 
 ```sh
 git clone https://github.com/ozandogrultan/opencode-ghost.git
@@ -225,7 +241,9 @@ section also reports focus, keymap mode and the placeholder colour. With
   cache. Default-model resolution also reads effective agents. The stateless
   endpoint has no location argument; project-only models
   may fail server-global resolution. Invalid overrides and provider failures warn
-  without retrying through another provider or a session.
+  without retrying through another provider or a session. A "Model unavailable"
+  reply is retried on the same model with backoff (1s to 8s), since the server
+  catalog can still be loading right after startup.
 
 ## Development
 

@@ -26,6 +26,7 @@ OpenCode plugin providing hooks, specialized agents (product-owner, orchestrator
   - [gitingest](#gitingest)
   - [prompt-session](#prompt-session)
   - [list-child-sessions](#list-child-sessions)
+  - [Orchestrator loop](#orchestrator-loop)
   - [pdf-to-markdown](#pdf-to-markdown)
   - [agent-promote](#agent-promote)
   - [Blockchain](#blockchain)
@@ -175,6 +176,7 @@ A primary agent that owns execution decisions and delivers the user's objective 
 1. **Organize** useful execution units from the request and real dependencies.
 2. **Prepare** suitable workspaces: isolation for parallel or conflicting work, a shared workspace when sequential execution preserves existing work.
 3. **Delegate** with clear objectives, context, and expected evidence. The initial prompt requires each worker to move its own session to the assigned workspace and verify the workspace and expected Git revision before editing, building, testing, or running other mutating commands. Optional model comparisons load [implementation-comparison](skill/implementation-comparison/SKILL.md) on demand.
+   - Start a new subagent session for each new subject or independent objective. Reuse a session only for follow-up work on the same subject, even when the agent role or model stays the same.
 4. **Validate** proportionately, using tests, direct checks, and specialist review where they help. Checks attributed to a SHA require that exact revision without staged, unstaged, or untracked code, tests, or configuration affecting the result; verify the SHA and working-tree state before and after checks, using a clean validation worktree when needed. Reuse worker and reviewer context for corrections.
 5. **Integrate and finish** incrementally, tying check evidence to the exact delivery SHA and rerunning relevant checks after every synchronization, even without conflicts, before integration. Verify and record the integrated revision and its results. Preserve existing work and recover from regressions before adding changes to an affected baseline.
 
@@ -189,6 +191,10 @@ With `orchestrator` selected, say **"Automatic mode"** to delegate remaining cho
 #### Memory
 
 **`.opencode/orchestrator/learnings.md`** holds useful repo facts and failed approaches with their causes. The coordinator maintains it only when there is something worth retaining. Status and delivery evidence live in the backlog. Active tickets also retain applicable execution references: worker session ID, branch/worktree, last validated SHA with check commands and results, and next step or blocker. On resume, verify these references against available sessions and Git state; `list-child-sessions` uses an in-memory registry that may be incomplete after a restart. There is no run ledger; backlog and memory edits are not automatically committed.
+
+#### Periodic coordination
+
+For sustained background work, the orchestrator can activate a [persistent coordination loop](#orchestrator-loop). Every ten minutes by default, it receives a steering reminder with the established objective and a fresh child/shell activity snapshot. It reconciles progress, resumes the appropriate workers, and creates useful next tasks when needed. It stops the loop when the objective is achieved or the user requests it.
 
 #### Model configuration
 
@@ -413,6 +419,7 @@ Send a message to a child session (subagent) to continue the conversation. Usefu
 |-----------|------|----------|---------|-------------|
 | `message` | `string` | Yes | - | The message to send to the child session |
 | `sessionId` | `string` | No | - | The child session ID to target. If omitted, targets the last child session. |
+| `delivery` | `string` | No | `steer` | `steer` guides ongoing work; `queue` defers the message until later. |
 
 #### Usage Examples
 
@@ -425,12 +432,22 @@ promptSession({
   message: "Can you clarify the error handling approach?",
   sessionId: "abc123"
 })
+
+// Defer a follow-up until after the current work
+promptSession({
+  message: "After your current task, summarize the changes",
+  sessionId: "abc123",
+  delivery: "queue"
+})
 ```
 
 #### Behavior
 
 - If `sessionId` is not provided, the tool targets the most recently created child session tracked since the plugin loaded (pass `sessionId` explicitly for older sessions)
-- Messages are sent with `queue` delivery, so each prompt gets its own turn
+- Messages default to `steer` delivery for answers, corrections, and clarifications
+  affecting ongoing work. Use `delivery: "queue"` for follow-up work intended to wait
+- Steering takes effect at the next step boundary; a running model request or tool
+  may delay delivery
 - Returns a confirmation once the message is admitted to the child session
 - Returns an error message if no child session exists for the current session
 - The plugin then polls the child session until the turn triggered by the sent
@@ -438,19 +455,21 @@ promptSession({
   turn's final assistant text, and injects a `<subagent sessionID="..." state="...">`
   notification into the parent session through the durable session inbox, mirroring
   the core's background subagent completion format
-- The report is scoped to the exact turn: the watch anchors on the inbox message id
-  returned by the prompt (falling back to send time), so queued messages to the same
-  child each get their own completion notification
-- Transient polling failures are retried (up to 3 in a row); the watch is capped at
-  30 minutes. If the watch dies or times out, the parent receives an explicit
-  abandonment notification instead of waiting forever
+- One shared watcher per parent/child pair tracks pending messages. It anchors on
+  each inbox message ID and waits until that message appears in the child history;
+  send time is used only when admission returns no message ID
+- Notifications are deduplicated by the completion marker's ID. Messages completed
+  together produce one notification; distinct completed turns still produce their
+  own notifications, even when their reports have identical text
+- Transient polling failures are retried (up to 3 in a row); each admitted message
+  has a 30-minute completion budget. If watching fails or times out, the parent
+  receives an explicit abandonment notification instead of waiting forever
 
 #### Limitations
 
-- Completion watching is in-memory: if the server restarts between sending the
-  message and the child's completion, the watch stops; a best-effort abandonment
-  notification is sent when the parent session is still alive (same class of
-  limitation as core issue #36349)
+- Active watchers are cancelled when the plugin unloads. Watching is in-memory:
+  pending watches are not restored after a plugin reload or server restart, and an
+  abandonment notification is not guaranteed across shutdowns
 - This compensates for the upstream gap where turns resumed via `prompt-session`
   do not notify the parent (anomalyco/opencode#50751, #35066); remove it once the
   core notifies from the child session completion path
@@ -489,6 +508,43 @@ Child sessions (2):
 2. [def456] Architecture Discussion
    Created: 2024-01-15T11:00:00Z | Updated: 2024-01-15T11:15:00Z
 ```
+
+---
+
+### Orchestrator loop
+
+`start-orchestrator-loop` enables or updates one persistent reminder loop for the current **root orchestrator session**. `stop-orchestrator-loop` disables that session's loop and cancels its still-pending reminders. The stop tool can also be used after switching the session to another agent.
+
+#### Parameters
+
+| Tool | Parameter | Type | Required | Default | Description |
+|------|-----------|------|----------|---------|-------------|
+| `start-orchestrator-loop` | `objective` | `string` | Yes | - | The user's established objective |
+| `start-orchestrator-loop` | `intervalMinutes` | `integer` | No | `10` | Reminder interval, from 1 to 35791 minutes (the timer's supported range) |
+| `stop-orchestrator-loop` | - | - | - | - | Uses the current session; takes no parameters |
+
+Example tool arguments:
+
+```json
+{
+  "objective": "Complete the agreed implementation and validate its acceptance criteria",
+  "intervalMinutes": 10
+}
+```
+
+#### Behavior
+
+- The first reminder arrives after one interval. Calling start again replaces the objective and cadence and cancels obsolete pending reminders.
+- Reminders use `steer`, including when the orchestrator is active. Delivery happens at a step boundary; a running model request or tool may delay it.
+- At most one reminder for the loop remains in the session inbox. Later intervals reuse it instead of accumulating messages.
+- Each reminder includes paginated child-session activity and running shell IDs from the children's locations, including worktrees. An inactive child is not assumed finished: it may await a shell or another background tool. Failed lookups are reported as unknown activity.
+- The orchestrator decides what to resume or create toward the objective, using native `subagent` notifications for those executions.
+- There is no total-duration cutoff. Transient delivery failures are logged and retried at the next interval.
+- Settings are stored in OpenCode's plugin storage. Reloading the owning location's plugin restores the loop at its next future interval; missed intervals are skipped. The server and that plugin instance must be running to send reminders.
+- Each loop belongs to the plugin location that started it, preventing other loaded worktrees from scheduling duplicate reminders. Reminders pause while a different agent is selected in the target session.
+- Stopping removes the persisted configuration, waits for an in-flight reminder attempt even when invoked from another loaded location, and cancels reminders still in the inbox. Already delivered inputs and running worker tasks are not interrupted. Deleting the session removes its loop; plugin cleanup stops timers while retaining enabled configurations for reload.
+
+The `opencode` CLI must be on the server's `PATH` and connect to the same OpenCode service. The plugin checks the target session's identity before using `opencode api` for inbox and activity operations that the plugin SDK does not expose. API calls have a 30-second request timeout; this is not a limit on the loop's lifetime.
 
 ---
 

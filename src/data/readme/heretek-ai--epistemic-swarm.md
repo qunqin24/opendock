@@ -5,12 +5,11 @@
 > phases under dual QA, and open a PR a human merges. Mechanical gates and a
 > human-only approval channel keep autonomous runs honest.
 
-> **Status: 2.3.0.** Phase 9 recursive self-improvement & model distillation:
-> prompt candidates evolve against telemetry failure clusters and ship only
-> behind a strict Pareto gate with benchmark receipts (`improve/optimizer`),
-> passed phase worktrees export scrubbed SFT/DPO datasets
-> (`es improve export-dataset`), and candidate builds promote through an
-> explicitly human-enabled canary with instant rollback (#174–#176).
+> **Status: 2.5.0.** Phase 11 autonomy wiring: machine-signed stage exits on
+> integration/factory branches (ADR 0004, human acceptance pending),
+> staging landings with the human release veto, opt-in canary cycles, and
+> Goodhart defaults in the self-dogfood preset. Releases, `main`, trust,
+> waivers and keys stay human-only. See the CHANGELOG for what is reachable.
 > Install from npm (`@heretek-ai/epistemic-swarm`, `@heretek-ai/es-core`,
 > `@heretek-ai/es-cli`); run `es key seal` once.
 

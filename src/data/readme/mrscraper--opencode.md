@@ -6,6 +6,8 @@ saved scraper reruns, stored results, and account usage. The plugin also
 includes four focused skills that help OpenCode choose the right workflow and
 preserve raw page content.
 
+The same package works in OpenCode 2 and OpenCode 1.
+
 ## What this plugin adds
 
 - An MCP server named `mrscraper` that points at the hosted Streamable HTTP
@@ -13,20 +15,41 @@ preserve raw page content.
 - OAuth 2.1 sign-in handled by OpenCode; no credential is stored in this
   package.
 - The `mrscraper`, `mrscraper-fetch`, `mrscraper-scrape`, and `mrscraper-serp`
-  skills, loaded on demand through OpenCode's `skill` tool.
+  skills.
 - A fetch-first workflow that keeps raw page responses available for analysis,
   verification, and follow-up transformations.
 
-If your configuration already defines `mcp.mrscraper`, the plugin keeps your
-entry and only adds the skills.
+If your configuration already defines a `mrscraper` MCP server, the plugin
+keeps your entry and only adds the skills. It also leaves any skill with the
+same name that you already have in place.
 
 ## Requirements
 
-- [OpenCode](https://opencode.ai/docs/) (verified with 1.18.34).
+- OpenCode 2 (verified with 2.0.26), or OpenCode 1.18.29 or later (verified
+  with 1.18.29 and 1.19.0). On older OpenCode 1 releases, pin
+  `@mrscraper/opencode@0.1.0`.
 - A [MrScraper](https://app.mrscraper.com) account.
 - Permission to access and process the target content.
 
 ## Install
+
+### OpenCode 2
+
+```bash
+opencode plugin add @mrscraper/opencode
+```
+
+This adds the package to `plugins` in your global configuration. To enable it
+for one project instead, add it to that project's `opencode.jsonc`:
+
+```jsonc
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugins": ["@mrscraper/opencode"]
+}
+```
+
+### OpenCode 1
 
 ```bash
 opencode plugin @mrscraper/opencode --global
@@ -42,8 +65,7 @@ Or add the package to the `plugin` list in `~/.config/opencode/opencode.json`
 }
 ```
 
-OpenCode installs npm plugins when it starts and caches them under
-`~/.cache/opencode/packages/`.
+OpenCode installs npm plugins when it starts and caches them.
 
 ## Sign in
 
@@ -51,16 +73,10 @@ OpenCode installs npm plugins when it starts and caches them under
 opencode mcp auth mrscraper
 ```
 
-OpenCode opens the MrScraper consent page and waits up to five minutes for the
-browser to return to `http://127.0.0.1:19876/mcp/oauth/callback`. It requests
-the `scrape:read`, `scrape:write`, and `account:read` scopes advertised by the
-server, plus `offline_access` for token refresh, and stores the tokens in
-`~/.local/share/opencode/mcp-auth.json`. Never paste OAuth tokens or API keys
-into chat.
-
-On a remote machine, open the printed URL in a local browser after forwarding
-the callback port, for example `ssh -L 19876:127.0.0.1:19876 <host>`, or use
-an API key instead.
+In OpenCode 2 you can also run `/mcps` in a session, select `mrscraper`, and
+sign in there. OpenCode opens the MrScraper consent page in your browser,
+registers its own OAuth client, and stores the tokens outside your project
+configuration. Never paste OAuth tokens or API keys into chat.
 
 Check the connection:
 
@@ -71,11 +87,37 @@ opencode mcp list
 `mrscraper` shows `needs authentication` before sign-in and `connected`
 afterwards.
 
+On a machine without a local browser, use an API key instead (next section).
+OpenCode 1 waits for the browser on `http://127.0.0.1:19876/mcp/oauth/callback`,
+so you can also forward that port, for example
+`ssh -L 19876:127.0.0.1:19876 <host>`.
+
 ## Use an API key instead of OAuth
 
 Create a key at [app.mrscraper.com/api-tokens](https://app.mrscraper.com/api-tokens),
 export it as `MRSCRAPER_API_KEY` in the environment that starts OpenCode, and
-define the server yourself:
+define the server yourself.
+
+OpenCode 2 (`opencode.jsonc`):
+
+```jsonc
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugins": ["@mrscraper/opencode"],
+  "mcp": {
+    "servers": {
+      "mrscraper": {
+        "type": "remote",
+        "url": "https://mcp.mrscraper.com/mcp",
+        "oauth": false,
+        "headers": { "Authorization": "Bearer {env:MRSCRAPER_API_KEY}" }
+      }
+    }
+  }
+}
+```
+
+OpenCode 1 (`opencode.json`):
 
 ```json
 {
@@ -95,8 +137,10 @@ define the server yourself:
 ```
 
 OpenCode substitutes `{env:MRSCRAPER_API_KEY}` when it loads the configuration,
-so the key stays out of the file. An API key carries your full account
-authority; OAuth scopes do not apply to it.
+so the key stays out of the file. In OpenCode 2 the substitution happens in the
+background service, so the variable must be set where the service starts; after
+setting it, run `opencode service restart` from that shell. An API key carries
+your full account authority; OAuth scopes do not apply to it.
 
 ## Try it
 
@@ -104,21 +148,18 @@ authority; OAuth scopes do not apply to it.
 Fetch https://www.scrapethissite.com/pages/simple/ and summarize the page.
 ```
 
-OpenCode prefixes MCP tools with the server name:
+The server provides these tools. OpenCode 1 shows them as `mrscraper_<tool>`;
+OpenCode 2 reaches MCP tools through Code Mode by default.
 
 | Tool | Purpose |
 | --- | --- |
-| `mrscraper_fetch` | Retrieve and preserve a known page's raw response. |
-| `mrscraper_scrape` | Run managed structured extraction or bounded site mapping. |
-| `mrscraper_serp` | Discover public pages through Google. |
-| `mrscraper_rerun` | Reuse a saved AI or manual scraper configuration. |
-| `mrscraper_results` | Browse and filter stored result records. |
-| `mrscraper_result` | Retrieve one stored result or poll an asynchronous run. |
-| `mrscraper_status` | Inspect subscription usage and request outcomes. |
-
-To keep the tools out of every session, add `"tools": { "mrscraper_*": false }`
-to your configuration and enable them per agent; see
-[MCP servers](https://opencode.ai/docs/mcp-servers/#manage).
+| `fetch` | Retrieve and preserve a known page's raw response. |
+| `scrape` | Run managed structured extraction or bounded site mapping. |
+| `serp` | Discover public pages through Google. |
+| `rerun` | Reuse a saved AI or manual scraper configuration. |
+| `results` | Browse and filter stored result records. |
+| `result` | Retrieve one stored result or poll an asynchronous run. |
+| `status` | Inspect subscription usage and request outcomes. |
 
 ## Fetch-first routing
 
@@ -150,17 +191,25 @@ Review MrScraper's [MCP documentation](https://docs.mrscraper.com/docs/getting-s
 
 ## Update or remove
 
-An unpinned entry stays on the version OpenCode first cached. To control
-updates, pin a version and change it when you upgrade:
+OpenCode 2 checks unpinned npm plugins for updates without installing them.
+Update or remove the plugin with:
+
+```bash
+opencode plugin update @mrscraper/opencode
+opencode plugin remove @mrscraper/opencode
+```
+
+In OpenCode 1, an unpinned entry stays on the version OpenCode first cached.
+To control updates, pin a version and change it when you upgrade:
 
 ```json
 {
-  "plugin": ["@mrscraper/opencode@0.1.0"]
+  "plugin": ["@mrscraper/opencode@0.2.0"]
 }
 ```
 
-To remove MrScraper, delete the entry from `plugin`, then remove the stored
-OAuth tokens:
+To remove it from OpenCode 1, delete the entry from `plugin`. In either
+version, remove the stored OAuth tokens afterwards:
 
 ```bash
 opencode mcp logout mrscraper
@@ -179,7 +228,8 @@ account.
 ## Development
 
 ```text
-index.ts        registers the MCP server and the skills directory
+index.ts        default export with an OpenCode 2 `setup()` and an OpenCode 1
+                `server()`; both register the MCP server and the skills
 skills/         MCP-oriented skills, copied verbatim from
                 mrscraper-com/mrscraper-claude-plugin (plugins/mrscraper/skills)
 ```
@@ -190,10 +240,12 @@ npm run check
 npm pack --dry-run
 ```
 
-Test a local checkout by adding its absolute path to `plugin` in an OpenCode
-configuration, then run `opencode mcp list` and `opencode debug skill`. Record
-user-visible changes in [CHANGELOG.md](CHANGELOG.md) and follow
-[PUBLISHING.md](PUBLISHING.md) for releases.
+Test a local checkout in both majors before a release. In OpenCode 2, add the
+checkout's absolute path to `plugins`, then run `opencode mcp list` and
+`opencode api skill.list`. In OpenCode 1, add it to `plugin`, then run
+`opencode mcp list` and `opencode debug skill`. Record user-visible changes in
+[CHANGELOG.md](CHANGELOG.md) and follow [PUBLISHING.md](PUBLISHING.md) for
+releases.
 
 ## License
 

@@ -18,7 +18,7 @@ Each plugin README covers setup and common use. Contributor details belong in it
 
 Add the plugins you want to the `plugins` array in `opencode.jsonc`. Use a project configuration or the global `~/.config/opencode/opencode.jsonc` (`$XDG_CONFIG_HOME/opencode/opencode.jsonc` when set). `opencode.json` is also supported. Merge entries into existing settings.
 
-Use the install target in each plugin's README. The example below uses Git for most packages; Classify and Workflow tools also document npm targets.
+Use the install target in each plugin's README. The example below uses Git for most packages; Classify, Workflow tools, Quota usage, and Cache metrics also document npm targets.
 
 This example lists all five packages. Keep only those you want. Classify uses TypeSafe here and needs `TYPESAFE_API_KEY` in the OpenCode server environment. To choose another backend, read [Classify configuration](./classify/docs/CONFIGURATION.md).
 
@@ -96,4 +96,4 @@ From the repository root, run `bun install`, then `bun run check` for Ultracite'
 
 ## Releases
 
-Release Please manages independent versions, changelogs, tags, and GitHub releases for all five plugins. Classify and Workflow tools have npm publishing jobs for `@mholtzscher/opencode-classify` and `@mholtzscher/opencode-workflow-tools`, using GitHub Actions trusted publishing after npm-side setup. See [Releasing](./docs/RELEASING.md) for first-publish setup and the release workflow.
+Release Please manages independent versions, changelogs, tags, and GitHub releases for all five plugins. Classify, Workflow tools, Quota usage, and Cache metrics have npm publishing jobs for `@mholtzscher/opencode-classify`, `@mholtzscher/opencode-workflow-tools`, `@mholtzscher/opencode-quota-usage`, and `@mholtzscher/opencode-cache-metrics`, using GitHub Actions trusted publishing after npm-side setup. See [Releasing](./docs/RELEASING.md) for first-publish setup and the release workflow.

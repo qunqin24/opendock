@@ -26,7 +26,18 @@
 
 ### OpenCode
 
-Add this plugin to your [OpenCode config](https://opencode.ai/docs/plugins/). For example, in `opencode.json`:
+Supports **OpenCode 2.x** and **OpenCode 1.18.29+** from the same package.
+
+For **OpenCode 2**, add this plugin to `plugins` in `opencode.json`:
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugins": ["@makcimbx/opencode-gpt-imagegen"]
+}
+```
+
+For **OpenCode 1.18.29+**, use the singular `plugin` field:
 
 ```json
 {
@@ -35,7 +46,9 @@ Add this plugin to your [OpenCode config](https://opencode.ai/docs/plugins/). Fo
 }
 ```
 
-OpenCode auto-installs the package via Bun on next launch — no separate `npm install` step is needed. The plugin works best when OpenCode is authenticated with ChatGPT/Codex OAuth, and can also use OmniRoute credentials already stored in OpenCode auth.
+OpenCode auto-installs the package on next launch — no separate `npm install` step is needed. Restart OpenCode after adding or updating the plugin. The plugin works best when OpenCode is authenticated with ChatGPT/Codex OAuth, and can also use OmniRoute credentials already stored in OpenCode.
+
+In OpenCode 2, the plugin registers `gpt_imagegen` through the native tool API and reads active credentials through the integration API on each invocation. OpenCode manages credential resolution and refresh. Output and reference paths follow the current session directory, including sessions moved to another worktree.
 
 ### Claude Code
 
@@ -56,8 +69,8 @@ Other MCP clients can start the same stdio server with `npx -y @makcimbx/opencod
 
 Default behavior is `auto`:
 
-1. Use Codex OAuth from OpenCode's `openai` auth entry when available, otherwise from the Codex CLI login (`$CODEX_HOME/auth.json`, default `~/.codex/auth.json`). Expired access tokens are skipped: the plugin never refreshes or rewrites either login, so if both are expired, start OpenCode or Codex CLI once to refresh them.
-2. Otherwise fall back to OmniRoute API auth from `GPT_IMAGEGEN_OMNIROUTE_API_KEY` (the Claude Code plugin option), OpenCode's `omniroute` auth entry, or `provider.omniroute.options.apiKey`.
+1. In OpenCode 2, resolve the active `openai` integration credential first. Otherwise use Codex OAuth from OpenCode 1's `openai` auth entry, then the Codex CLI login (`$CODEX_HOME/auth.json`, default `~/.codex/auth.json`). Expired access tokens are skipped. The plugin never refreshes or rewrites login files itself; for file-based credentials, start OpenCode or Codex CLI to refresh expired tokens.
+2. Otherwise fall back to OmniRoute API auth from `GPT_IMAGEGEN_OMNIROUTE_API_KEY` (the Claude Code plugin option), OpenCode 2's active `omniroute` integration, OpenCode 1's `omniroute` auth entry, or provider configuration.
 
 Force a provider for debugging:
 
@@ -76,8 +89,11 @@ OmniRoute configuration:
 | `GPT_IMAGEGEN_OMNIROUTE_API_KEY` | Overrides the OmniRoute API key (Claude Code plugin option `OmniRoute API key`) |
 | `GPT_IMAGEGEN_OMNIROUTE_MODEL` | Overrides the OmniRoute image model; default is `codex/gpt-6.1-sol` |
 | OpenCode `omniroute` auth | Preferred source for the OmniRoute API key |
+| OpenCode 2 `providers.omniroute.settings.baseURL` / `.apiKey` | Native V2 provider configuration; active integration credentials take priority over configured keys |
 | `provider.omniroute.options.baseURL` | Standard OpenCode provider base URL source |
 | OmniRoute wrapper plugin `options.baseURL` | Supported fallback for wrapper configs such as `./plugins/omniroute-wrapper.ts` |
+
+Wrapper options are supported in both OpenCode 1's `plugin` array and OpenCode 2's `plugins` array (`{ "package": "...", "options": { ... } }`). File-based fallbacks, including the MCP server, read the global OpenCode config; the OpenCode 2 plugin also reads the live provider settings through its context.
 
 Base URLs are normalized so both `https://host` and `https://host/v1` call `POST /v1/images/generations` without producing `/v1/v1`.
 

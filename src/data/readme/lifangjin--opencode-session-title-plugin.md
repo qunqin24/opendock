@@ -21,6 +21,14 @@ This plugin detects title-generation calls and strips the system prompt back to 
 
 ## How it works
 
+One default export supports both opencode generations: v2 calls `setup()`, v1 (>= 1.18.29) calls `server()`.
+
+### opencode v2
+
+The plugin registers the dedicated `title` session hook (`ctx.session.hook("title", ...)`), which fires only for title-generation requests — detection is structural, no content sniffing needed to find the call. The system payload is `Array<SystemPart>`; opencode core initializes it to exactly `[SystemPart.make(PROMPT_TITLE)]`, and other plugins' `title` hooks may append more parts before or after ours. The plugin locates the pure `PROMPT_TITLE` via the content markers below, strips every other part, and replaces the array in place with a single `{ type: "text", text: pureTitle }` part.
+
+### opencode v1
+
 The plugin hooks `experimental.chat.system.transform`:
 
 1. **Detection**: When any system string contains the full sentence `"You are a title generator. You output ONLY a thread title. Nothing else."` (the first line of opencode's `PROMPT_TITLE`), the hook identifies this as a title-generation call. The full sentence is required — shorter markers like `"You are a title generator"` match cross-references in other agents' system prompts and cause false positives.
@@ -40,7 +48,16 @@ Detection is content-based because `experimental.chat.system.transform` receives
 ### As a published package
 
 ```jsonc
-// ~/.config/opencode/opencode.json
+// opencode v2 config: "plugins" + object form
+{
+  "plugins": [
+    "@lifangjin/opencode-session-title-plugin@latest"
+  ]
+}
+```
+
+```jsonc
+// opencode v1 config: "plugin" + tuple form (~/.config/opencode/opencode.json)
 {
   "plugin": [
     "@lifangjin/opencode-session-title-plugin@latest"
@@ -51,6 +68,19 @@ Detection is content-based because `experimental.chat.system.transform` receives
 ### With options
 
 ```jsonc
+// opencode v2
+{
+  "plugins": [
+    {
+      "package": "@lifangjin/opencode-session-title-plugin@latest",
+      "options": { "debug": true }
+    }
+  ]
+}
+```
+
+```jsonc
+// opencode v1
 {
   "plugin": [
     ["@lifangjin/opencode-session-title-plugin@latest", { "debug": true }]
@@ -61,6 +91,16 @@ Detection is content-based because `experimental.chat.system.transform` receives
 ### From source (local dev)
 
 ```jsonc
+// opencode v2
+{
+  "plugins": [
+    { "package": "/path/to/opencode-session-title-plugin", "options": { "debug": true } }
+  ]
+}
+```
+
+```jsonc
+// opencode v1
 {
   "plugin": [
     ["/path/to/opencode-session-title-plugin", { "debug": true }]
@@ -76,7 +116,7 @@ Build: `bun install && bun run build`
 | ---------- | --------- | ------- | --------------------------------------------------------------------------------------- |
 | `debug`    | `boolean` | `false` | Write detection/filtering details to `~/.local/share/opencode/log/session-title-filter.log` and stderr. Also dumps full system entries to timestamped `.txt` files (max 10 retained). |
 | `enabled`  | `boolean` | `true`  | Master switch. Set `false` to detect-only (no mutation).                                |
-| `notify`   | `boolean` | `true`  | Show a TUI toast immediately after calculating token savings.                           |
+| `notify`   | `boolean` | `true`  | Show a TUI toast immediately after calculating token savings. v1 API only — v2 server plugins have no TUI toast API, savings are logged instead. |
 
 ### Toast
 
@@ -129,9 +169,32 @@ Start a new opencode session. With `debug: true`, check the log file at `~/.loca
 
 ## Compatibility
 
-- opencode with `@opencode-ai/plugin` >= 1.4.0
-- Hook used: `experimental.chat.system.transform` only
-- The detection marker (`"You are a title generator. You output ONLY a thread title. Nothing else."`) is tied to opencode's built-in `PROMPT_TITLE`. If opencode changes the title-agent prompt, update `TITLE_MARKER` in `src/index.ts`.
+One package, both generations (dual entrypoint per the official migration guide):
+
+- opencode v2 (`@opencode/plugin` >= 2.0.0): dedicated `title` session hook; detection is structural (the hook only fires for title requests).
+- opencode v1 (`@opencode-ai/plugin` >= 1.18.29): `experimental.chat.system.transform`; detection is content-based.
+- Older v1 releases (< 1.18.29) only support function-style default exports — pin `@lifangjin/opencode-session-title-plugin@0.0.x` there.
+- The detection marker (`"You are a title generator. You output ONLY a thread title. Nothing else."`) is tied to opencode's built-in `PROMPT_TITLE` (verified identical in v2 core as of 2.0.26). If opencode changes the title-agent prompt, update `TITLE_MARKER` in `src/index.ts`.
+
+## Do you still need this plugin?
+
+Honest answer: **opencode v2 solved most of this plugin's original job at the architectural level.**
+
+- The v1 root cause was a single generic `experimental.chat.system.transform` hook that covered *every* LLM call — other plugins' injections (project memory, skill listings, ...) polluted title calls too, so this plugin stripped them back.
+- v2 splits hooks by request kind: `context` (primary agent loop), `compaction`, `generate`, and `title` each fire only for their own request. A plugin registering a `context` hook no longer affects title requests at all.
+- A v2 title request starts with `system` set to exactly `[SystemPart.make(PROMPT_TITLE)]`, and the title input itself is bounded by core (first user message truncated to 2,000 chars; regeneration context capped at 8,000 chars).
+
+What's left of the value on v2:
+
+1. **Defense**: if some plugin explicitly registers a `title` hook and appends content, this plugin still strips it — though it depends on hook execution order (ours must run after theirs), so the guarantee is weaker than on v1. No plugin in the current v2 ecosystem is known to do this.
+2. **Observability**: token-savings logging (v2 has no toast; the v1 path keeps toasts).
+
+The cost of keeping it is near zero: safe no-op when the marker is missing, idempotent when the system is already clean.
+
+Recommendation:
+
+- Still on v1 (the current stable line): **keep it — it's the whole point.**
+- Fully on v2: optional insurance + metering. If your goal is cost, the bigger lever is a cheap model for title generation via v2 config (`agents.title.model`, replacing v1's `small_model`) — that's configuration, not a plugin.
 
 ## License
 

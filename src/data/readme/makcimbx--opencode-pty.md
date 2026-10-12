@@ -33,7 +33,21 @@ This plugin gives the agent full control over multiple terminal sessions, like t
 
 ## Setup
 
-Add the published package to your [OpenCode config](https://opencode.ai/docs/config/):
+The package supports OpenCode 2.0 and OpenCode 1.18.29 or newer through a shared entrypoint.
+
+### OpenCode 2.0
+
+Add the published package to your [OpenCode V2 config](https://opencode.ai/v2/docs/config):
+
+```json
+{
+  "plugins": [{ "package": "@makcimbx/opencode-pty" }]
+}
+```
+
+### OpenCode V1
+
+Add the package to your [OpenCode V1 config](https://opencode.ai/docs/config/):
 
 ```json
 {
@@ -341,6 +355,32 @@ Use when the agent cannot go idle—for example when a `/goal` plugin auto-resum
 
 ### Permissions
 
+#### OpenCode 2.0
+
+V2 uses ordered `permissions` rules and the `shell` action. PTY tool calls check the
+invoking agent's rules followed by the session's rules; the last matching rule wins.
+The Web UI uses the `build` agent's rules because its requests have no agent tool context.
+
+```json
+{
+  "permissions": [
+    { "action": "shell", "resource": "npm *", "effect": "allow" },
+    { "action": "shell", "resource": "git push *", "effect": "deny" },
+    { "action": "external_directory", "resource": "*", "effect": "deny" }
+  ]
+}
+```
+
+Rules requiring `ask`, including unmatched resources, are treated as denied by the
+plugin. Configure explicit `allow` rules for commands and external working directories
+that PTY sessions need. V2 PTY tool calls default to the plugin's location directory.
+
+Exit notifications use queued synthetic messages to resume the existing session without
+switching its agent or model. Deleting a session cleans up its PTYs; unloading the V2
+plugin also stops its PTYs, closes the Web UI server, and cancels its event subscription.
+
+#### OpenCode V1
+
 This plugin respects OpenCode's [permission settings](https://opencode.ai/docs/permissions/) for the `bash` tool. Commands spawned via `pty_spawn` are checked against your `permission.bash` configuration.
 
 ```json
@@ -420,7 +460,15 @@ bun unittest    # Runs the unit tests
 bun test:e2e    # Runs the e2e tests
 ```
 
-To load a local checkout in OpenCode:
+To load a local checkout in OpenCode 2.0:
+
+```json
+{
+  "plugins": [{ "package": "file:///absolute/path/to/opencode-pty/index.ts" }]
+}
+```
+
+For OpenCode V1 1.18.29 or newer:
 
 ```json
 {
@@ -428,6 +476,12 @@ To load a local checkout in OpenCode:
   "plugin": ["file:///absolute/path/to/opencode-pty/index.ts"]
 }
 ```
+
+Older V1 loaders require a function entrypoint. For a local checkout, point `plugin` at
+`file:///absolute/path/to/opencode-pty/src/plugin.ts`. The package also exports the V1
+implementation as `@makcimbx/opencode-pty/v1` for wrapper plugins.
+
+Fully quit and restart OpenCode after changing its plugin configuration or plugin code.
 
 ## Diagrams
 

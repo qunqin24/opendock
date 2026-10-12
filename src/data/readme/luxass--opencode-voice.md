@@ -13,9 +13,10 @@ Extensions for [Pi](https://pi.dev) and [OpenCode](https://opencode.ai), publish
 
 ## OpenCode plugins
 
-| Package                  | What it does                                      | Documentation                              |
-| ------------------------ | ------------------------------------------------- | ------------------------------------------ |
-| `@luxass/opencode-voice` | Record speech and transcribe it for your prompts. | [Voice](packages/opencode-voice/README.md) |
+| Package                     | What it does                                                 | Documentation                                    |
+| --------------------------- | ------------------------------------------------------------ | ------------------------------------------------ |
+| `@luxass/opencode-personal` | Load Git, package-manager, and generated worker-file guards. | [Personal](packages/opencode-personal/README.md) |
+| `@luxass/opencode-voice`    | Record speech and transcribe it for your prompts.            | [Voice](packages/opencode-voice/README.md)       |
 
 ## Development
 

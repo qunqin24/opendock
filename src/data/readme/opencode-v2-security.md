@@ -75,7 +75,7 @@ OpenCode v2 全自动执行边界安全插件。Linux 原生 shell 与内置文�
 }
 ```
 
-将 `JEV_API_KEY` 设为可供 OpenCode 服务读取的环境变量。新链仅使用 JEV，不回退到 OpenAI-compatible 端点；审查基础设施失败会拒绝当前调用。纯 TS，无构建步骤（v2 直接加载 `.ts`）。未确认重新加载前，不应宣称配置或源码变更已经生效。
+将 `JEV_API_KEY` 设为可供 OpenCode 服务读取的环境变量。新链仅使用 JEV，不回退到 OpenAI-compatible 端点。检查失败由 `failPolicy` 统一处理：默认 `fail_open` 放行当前调用；观察器不可用时不插入运行时监督标记，直接执行原调用。`fail_close` 保持故障拒绝。JEV 实际否决、静态底线、权限／只读天花板、保护路径拒绝、用户撤销与取消不受 fail-open 放宽。纯 TS，无构建步骤（v2 直接加载 `.ts`）。未确认重新加载前，不应宣称配置或源码变更已经生效。
 
 ### 目录自动发现与配置文件兜底
 
@@ -154,7 +154,7 @@ sudo apt install unzip
 
 - 三行必须从命令第一个字节开始、顺序和大小写完全一致；第四行起才是真实命令。可申请的类别为七个静态类别加 `sandbox`（`filesystem`/`host`/`privilege`/`secret`/`network`/`remote`/`indirection`/`sandbox`），可多选；`dynamic` 与 `slow` 不可申请（提权不能用来关掉审查层本身），`all`、`*`、`ALL` 与输入兼容别名同样禁止。
 - 插件把最近 **5 条用户消息**（每条最多 8000 字符，超长时保留头尾）、最多 **16 条用户/助手正文**（每条最多 4000 字符、合计 24000 字符）、实际 cwd/worktree、当前权限、命令、类别、理由及本会话既往失败申请交给独立 Python reviewer。推理文本、工具输出和插件通知不混入用户授权。结果仅为 `allow_once`、`collect_evidence` 或 `deny`；缺少必要事实时自动采证，不请求用户确认。
-- 单次提权必须有已配置且可用的 `dynamicReview` 端点、模型与密钥，并取得独立 LLM 审查器的批准。配置缺失或审查器不可用时申请会被拒绝，命令不执行；静态预检不会兜底批准。此时提权申请仍按失败处理，与显式设置 `escalationEnabled: false`（提权前缀作为普通注释）不同。
+- 可完成的授权审查仍由独立 LLM 审查器裁决；模型实际否决不会被故障策略放宽。配置缺失或审查器不可用属于检查失败，统一按 `failPolicy` 放行或拒绝；故障放行不是模型批准。
 - **送审前 floor 预检**：插件先用「会话现有类别 ∪ 本次请求类别 ∪ 全部静态类别」（reviewer 可能给出的最大授权；底线规则本就对任何类别免疫，全类别武装下仍命中的终结规则不可能被任何授权清除，也避免未请求的普通规则或前段的普通 DENY 遮蔽同脚本后段的底线规则）跑一遍静态分类；若结果命中任何**终结规则**——不可绕过底线（`isFloorRule`）、`permission.write` 权限上限、或不可审查输入（`input.empty`/`input.opaque`；opaque 的判定是 ASK，同样在 reviewer 之前短路，不会白调 reviewer）——则**短路**：不调用 reviewer，直接返回终结型拒绝并说明"提权无法越过硬底线"。该静态拒绝**不写入** reviewer 拒绝历史（静态预检不是 reviewer 的 deny 决定），但重复提交仍会在同一预检处再次被拒；仅有未映射的普通规则不在此短路（它们交给 reviewer 正常审查）。
 - `allow_once` 只对当前命令与匹配事实报告有效，不改变会话租约。同报告批准后不再次随机运行普通动态归因追加类别；真实权限、底线与路由检查仍执行。脚本、权限、目标或政策变化会明确使旧报告失效，而不是静默扩权。
 - 提权审查器单独限速为任意滚动 3 秒最多启动 2 次；仅此 reviewer 限速，普通分类和常规动态审查不限速。
@@ -175,7 +175,7 @@ sudo apt install unzip
 
 ### 静态放行语义
 
-arm 后命令不会被静态层直接 ALLOW：豁免对应检查后以 `bypass.static-allow` ASK 交常规动态审查器（配合对应 BYPASS RULE 提示词裁决）；若常规审查器不可用，按 `failPolicy` 处理（默认 `fail_open`，需在故障时拒绝则设为 `fail_close`）。单次提权申请则始终需要独立 LLM 审查器批准，审查失败时拒绝。v1.3.0 将无法确定是惰性载荷还是执行内容的情况交给动态层；可证明实际执行的底线仍拒绝。仅写入、打印或保存危险示例不等于执行，但实际写入目标、命令替换及同次调用中后续执行仍须审查。
+arm 后命令不会被静态层直接 ALLOW：豁免对应检查后以 `bypass.static-allow` ASK 交常规动态审查器（配合对应 BYPASS RULE 提示词裁决）；检查不可用或失败统一按 `failPolicy` 处理（默认 `fail_open`，需在故障时拒绝则设为 `fail_close`），实际授权否决仍拒绝。v1.3.0 将无法确定是惰性载荷还是执行内容的情况交给动态层；可证明实际执行的底线仍拒绝。仅写入、打印或保存危险示例不等于执行，但实际写入目标、命令替换及同次调用中后续执行仍须审查。
 
 ## 会话权限层（r/w 能力上限）
 
@@ -225,6 +225,8 @@ UI 不再展示 rwx/x/YOLO 字样。状态尚未同步时显示未知状态，�
 启用 sandbox 的 shell 命令由 `bin/opencode-boundary-watch`（`native/linux-sandbox/opencode-boundary-watch.c`，`make -C native/linux-sandbox` 构建）以纯 ptrace 方式监督：payload 不经过 mount/NNP/Landlock 包裹直接运行，插件内没有任何脚本内容/危害分析；只有越过声明写根、只读上限、凭据路径、网络/IPC、特权或 opaque 能力（io_uring、ptrace、进程间句柄、CLONE_UNTRACED、foreign ABI 等）的 syscall 才在进入点暂停并向本进程内的 broker 通道（AF_UNIX NDJSON）请求一次裁决。裁决分三段：观察器发现越界 → **静态审查**（只返回 ALLOW/ASK）→ 静态不能证明时 **动态审查**（JEV）。回复语义：`allow` 对已批准命令 detach 全树改原生执行（setuid/interop 可用，lease/模式撤回仍能 killpg 全组）；`continue` 只放行本次 syscall（L2 缓存命中路径）；`deny`、超时（`--approve-timeout-ms`，默认 35s）或通道 EOF 一律 kill 整个 tracee 树，助手退出码 126 并说明"该操作未执行，此前步骤可能已生效"。payload 最终退出后 broker 关闭前，助手发送一行 `{type:"exit","exit":<真实0..255码>}` 终态帧（无需回复），供 background 调用在没有工具返回的情况下结算缓存与清理。
 
 - **拒绝文案统一**：所有监督器拒绝/取消/审批失败终态输出 `Command blocked: <reason>. <The boundary operation was not performed|The command was stopped>; earlier steps may already have run. Do not automatically rerun the whole command.`；阶段由 `details.atExit`（helper 对每个事件显式发出 true/false）与 `runtimeBlockedPhase`（entry|exit|unknown）三态决定——只有显式 entry 才承诺"操作未执行"，exit 侧（recvmsg cmsg）、运行中取消、模式撤销、审批未完成与未知一律"command was stopped"；reviewer 事实文案按同阶段区分。普通 OS 失败不加该前缀。前台输出、后台 shell 输出与 metadata.runtimeBlocked 三处可见，首次原因不被后续 EOF 覆盖。
+- **故障放行**：以上故障拒绝仅适用于 `fail_close`。`fail_open` 向 helper 传入 `--fail-open`：broker EOF／协议错误／审批超时放开整棵进程树，启动检查失败时直接执行原载荷；不生成拒绝文案。用户取消和模式／权限撤销使用独立 cancel 帧，仍终止命令，不能把它们当作故障 EOF 放行。
+- **取消帧完整性**：broker 等待 cancel 写入完成后才关闭通道；未能确认发送时走原执行器的中断兜底。观察器在空闲期按完整 NDJSON 帧组装控制消息，最多 511 字节、1 秒。已开始但截断、超时或超限的控制帧按取消处理，不因 fail-open 放开进程树。
 - **detach 后仍受监督**：'allow' detach 的进程保持登记，取消（broker EOF/撤销/host SIGTERM·INT·HUP）仍按 pid 逐个 SIGKILL——`setsid` 只能逃出 killpg，逃不出登记表；watcher 是 child subreaper，孤儿后代 reparent 到 watcher 一并收割。**终态语义**：root 退出只记录结果，唯一 terminal exit 帧在整树被 waitpid 收割干净（ECHILD）后发出——后台命令的 cache 推进不会因为 root 先退而提前兑现；监督期 broker 关闭一律视为取消（会到达每个后代）。宿主 SIGKILL 无法捕获，仍是声明限制（残留后代此时确实会漏）。
 - **控制面保护（--protect）**：broker socket 目录、watcher 二进制、包自身代码目录按受保护路径处理——写其内部**或**其祖先（父目录 rename/unlink/chmod 会整个换掉控制面）都触发边界事件，即使会话 workspace 就是本仓库。与内容审查无关，是完整性边界；另有启动指纹（dev:ino:size:mtimeNs）兜底，镜像被换即拒绝并要求重启会话。
 - **/dev 与 stdio**：仅白名单设备（/dev/null、/dev/pts/* 等）的 **I/O** 放行；其余 /dev 节点写操作一律边界事件；metadata 操作（chmod/chown/xattr/utime）对设备节点**不豁免**。`/dev/fd/N`、`/dev/std{in,out,err}` 先按 **tracee** 的 fd 表解析成真实对象再分类（realpath 只会绑到监督器自己的 fd）——`/dev/fd/3` 指到普通文件时事件 target 就是该真实路径；fd 0–2 同样经 /proc/pid/fd 解析，管道/tty 放行、被重定向到真实文件即按对象写边界。
@@ -233,7 +235,7 @@ UI 不再展示 rwx/x/YOLO 字样。状态尚未同步时显示未知状态，�
 - **无需审批的拒绝（errno 注入）**：观察器把某些 syscall 在入口改为空操作并在出口返回错误码，只减少能力、不放行，整棵树继续受观察：`io_uring_setup` → `ENOSYS`（libuv/Node、Bun、tokio 回退到 epoll/线程池）；连接 nscd 套接字 → `ENOENT`（glibc 自行读取用户/组数据库，`ls -l`、`ps`、`id`、`stat` 不再越界）；读取 watcher 自身 `/proc/<pid>/*`（cmdline 含 broker token）与 root 所有的 procps `ps` 扫描其他进程 environ → `EACCES`。其他程序读其他进程 environ 仍是 read 边界。
 - **直接放行**：信号 0（只探测存在，uutils `tail` 的 `kill(0,0)`）；连接 root 所有、目录不可写的 `/run/systemd/userdb/*`；发往内核（`nl_pid` 0）的 netlink（`getifaddrs` 等查询；非 root 的 tracee 无法获得修改网络状态的能力）。
 - **interop 判定**：按 binfmt_misc 规则读文件头 `MZ`，不看文件名：ELF 格式的 `bun.exe`、`opencode.exe` 原生执行，不再是 interop 事件；改名的 PE 仍是。读不到文件头时退回 `.exe` 后缀判定。所有运行时观察的调用设置 `GIT_OPTIONAL_LOCKS=0`，只读 Git 命令不再在 worktree 的主仓库 gitdir 写 `index.lock`。
-- **缓存范围**：L1 按 (会话、securitySnapshot、用户授权摘要、复核后精确摘要) 键控；L2 只给非 fullApproval 的 write 级操作，按 (path, 父目录 dev:ino) + 对象身份（dev/ino/mode——同 inode 的 chmod 即失效，内容 mtime 不失效）绑定，调用结束（含非零退出码，不含被拦截）后推进到落盘对象。L2 还绑定写入效果并且不会放宽：`replace`（O_TRUNC/truncate/creat）⊃ `overwrite` ⊃ `append` ⊃ `fd-write`，`mkdir` 单列；符号链接、硬链接、设备节点不进入 L2。旧授权范围的查询只是未命中，不会清空当前缓存；最多保留 64 个会话的缓存状态。ReadOnly 会话也复用 read/network 越界的审查结果。opaque/requiresFullApproval 事件**完全不缓存正向**（exe 未变不等于同一动作；间接可变输入无法绑定），deny 结果仍可缓存。全部缓存随 `/perm` 模式、租约、快照与真实新用户消息失效。
+- **缓存范围**：L1 按 (会话、securitySnapshot、边界核心摘要) 键控——核心摘要是越界本身而不是命令文本：事件 kind/syscall/operation/写入效果、目标稳定身份（canonical path、domain、exists、dev/ino/mode、父目录 dev:ino，不含 size/mtime/ctime）、执行映像身份与 basename、跨越进程 argv 摘要（bash/sh/dash/zsh/ksh/fish/busybox sh 等 shell 解释器除外——其 argv 是整条命令行）、运行 cwd、只读/可写审查政策版本与活动豁免面。`| tail -30` 改成 `| tail -20` 或追加 `; echo x` 命中同一越界的 L1；原生文件工具同理按 (工具 + 解析目标 + 身份 + 模式) 而非原始输入键控。正向条目（allow，L1 与 L2）TTL 20 分钟且**滑动续期**（每次命中重置），只绑定安全快照——新用户消息不再使其失效，任何安全状态变化（/perm、/bypass、kill switch、租约到期）清空该会话全部缓存；负向条目（deny，仅 L1）TTL 5 分钟不滑动，仍绑定 adjudicated 时的用户消息摘要——新消息可能授权曾被拒绝的操作，故拒绝在新消息后未命中。L2 只给非 fullApproval 的 write 级操作，按 (path, 父目录 dev:ino) + 对象身份（dev/ino/mode——同 inode 的 chmod 即失效，内容 mtime 不失效）绑定，调用结束（含非零退出码，不含被拦截）后推进到落盘对象。L2 还绑定写入效果并且不会放宽：`replace`（O_TRUNC/truncate/creat）⊃ `overwrite` ⊃ `append` ⊃ `fd-write`，`mkdir` 单列；符号链接、硬链接、设备节点不进入 L2。旧快照范围的查询只是未命中，不会清空当前缓存；最多保留 64 个会话的缓存状态。ReadOnly 会话也复用 read/network 越界的审查结果。opaque/requiresFullApproval 事件**完全不缓存正向**（exe 未变不等于同一动作；间接可变输入无法绑定），deny 结果仍可缓存。
 - **argv 脱敏**：事件里的 argv 只以 digest/argc 进入复核与日志，绝不外发明文。
 - **环境继承取舍**：payload 原样继承宿主环境（含密钥）。启动代码钩子（`BASH_ENV`、`ENV`、`BASH_FUNC_*`、`SHELLOPTS`、`PROMPT_COMMAND`、`LD_*` 等）在外层 shell 被改名为 `OPENCODE_DEFER<N>_*`（置原名空串——已核实宿主 `packages/core/src/shell.ts` 在 hook 前物化 env 且 spawner 不合并父 env，空串语义稳妥），存储名与原名以 `--defer <storage>=<name>` 显式对传给 helper：traced child 只恢复被声明的对子，用户自有同前缀变量原样透传。**槽位耗尽即拒绝启动**（任一钩子拿不到空闲存储名或超 256 对上限→ 命令在 payload 存在前被 sandboxDenyCommand 拦截，外层固定 /bin/sh，不保留原钩子、不静默丢值）。
 - **NOFOLLOW-last**：unlink/rmdir/rename/lchown/l*xattr/linkat 目的端等操作按 canonical(parent)+basename 判定——删除指向外部的根内符号链接不是外部删除；rename/link 事件同时携带源与目标两个 target（硬链接会改源 inode 元数据）。路径解析遵守内核遍历顺序：realpath 先跟符号链接再处理 `..`，不做词法折叠——`a/link/../f` 与 `a/f` 可能是不同对象；linkat 源端仅在 `AT_SYMLINK_FOLLOW` 时 follow。
@@ -241,6 +243,52 @@ UI 不再展示 rwx/x/YOLO 字样。状态尚未同步时显示未知状态，�
 - **兄弟线程冻结**：入口 gate 的 syscall 在消费过**可变 tracee 状态**（路径串、sockaddr/msghdr、解析出真实路径的共享 fd）时，兄弟暂停保持到该 syscall 的 exit stop；未消费可变状态（如写管道——fd 解析为非路径即返）则入口检查后立即释放，同进程 rendezvous 不会死锁。已在真实 stop 上停住的兄弟即视为已冻结（消费其 stop 延后回放，而非等不来的 INTERRUPT 事件）；task 枚举失败、拒绝 INTERRUPT 的线程一律整条命令 fail closed——刚 clone 未登记的 born-stopped 线程经 INTERRUPT 收敛（running 会停在确认 stop，born-stopped 的待决 EVENT_STOP 也会确认，EPERM 才 fail）。recv 族例外——cmsg 在 exit stop 重新冻结检查。排空窗口为有界残留。
 - **在途 fd 绑定保护**：gate 每消费一个 fd 当前绑定（fd→路径/pipe/socket/"已关闭" 均为可变事实）就记录该 fd 号；同一 fd 表（`CLONE_FILES` 组，含跨 tgid）里兄弟对它执行 `close`/`dup2`/`dup3`/`close_range` 重绑时，该 syscall 在其**自己的 entry stop**被挂起，直到消费方 syscall 退出——被审查的对象即实际执行的对象。只挂起重绑者本身，其它兄弟照常运行，普通 pipe 并发不受影响；`dup`/`fcntl F_DUPFD`/`open`/`accept`/SCM_RIGHTS 只分配新槽位，不打扰在途绑定，不挂起。
 - **残留限制（未声明已覆盖）**：detach 阶段**新出生**的、未经 ptrace 登记且通过新 session 逃逸的后代，仅在成为孤儿 reparent 后才可被收割（subreaper 覆盖，非实时登记）；宿主对 watcher 的 SIGKILL 无法捕获，此时残留后代确实会漏（TERM/INT/HUP 已覆盖）；同 dev:ino 上仅 mtime/atime 变化不失效 L2 grant（按设计，mode/身份变才变）；外部进程经非 ptrace 通道并发改文件不能完全杜绝；白名单外 `ioctl` 一律 opaque 事件；`MZ` 文件头/DrvFs 路径 exec 走 interop 事件但 Windows 端真实执行未做线上验证；`opencode` CLI 写自身日志目录与 `/sys/kernel/debug/tracing/trace_marker`、不带 `-readonly` 的 `sqlite3` 以读写方式打开根外数据库，仍是写边界；setuid `sudo`/`su` 仅在 'allow' detach 后可运行；线上真实 OpenCode V2 宿主与 JEV 后端未做端到端验收。
+
+### 额外写根：`sandbox.allowWrite`（1.7.0，未发布）
+
+可显式把工具的日志、缓存等路径列为附随写根，例如：
+
+```json
+{
+  "sandbox": {
+    "allowWrite": ["~/.local/share/opencode/log"]
+  }
+}
+```
+
+只接受绝对路径，支持 `~`、`~/…`；尚未创建的路径按最深的已存在父目录校验。符号链接叶节点或被重定向的根不采用。`/`、HOME 及其祖先，与凭据存储、denyWrite、插件包、观察器或 broker 控制面重叠的路径，以及敏感路径，会逐项警告并忽略；数组类型、字符串类型或相对路径错误仍是配置错误。
+
+这些路径与原有附随写根一样，在 **Auto 和 Read only** 中加入观察器允许列表；denyWrite、protect、凭据与敏感目标的排除仍优先，不会扩大独立权限上限。JEV 只在现有的 `Current allowed write roots` 中看到它们。
+
+显式根与 worktree 私有根同时保持逐目标观察：普通附随写入由本地检查直接 `continue`，不调用 JEV；敏感目标不享受根豁免，Auto 走正常审查／拒绝链，Read only 拒绝写入。仅传入 `--root` 而跳过目标检查不构成此项授权。
+
+### L3：重复写入建议的临时写根（1.7.0，未发布）
+
+仅 Auto/可写会话启用。20 分钟内，三个不同 shell 工具调用分别获准写入同一规范父目录（含静态、JEV 或 L1/L2 放行），会触发一次**独立后台** JEV 选择题；当前命令不等待它。每个会话/目录每 20 分钟最多一次，`none` 再抑制 20 分钟。只提交代码预先筛好的目录及最多三个祖先，顺序从窄到宽，绝不提交 HOME 或更高层级。
+
+候选不能覆盖工作区或已有根，也不能与凭据、denyWrite、protect 或控制面重叠。候选的名称扫描不超过三层、5000 项；凭据样式名称、数据库、任何类型的 `.git` 条目（包括 linked worktree 的指针文件）、扫描截断或错误均不能带来授权。像 `~/.local/share/opencode` 中的 `auth.json` 和 `opencode.db` 会淘汰宽根，而纯日志子目录仍可候选。JEV 只能选择给定候选或 `none`，不根据概率改写答案；上下文不支持继续使用工具，或写入是任务操作而非例行日志/缓存/锁等附随活动时应选 `none`。
+
+获准根仅存在于当前会话内存，20 分钟到期、最新真实用户消息摘要变化或安全快照变化后，在下次使用时失效；Read only 不使用 L3。新 shell 调用加入有效根；临时根同时保留观察器的逐写入事件，用本地有效期/排除检查直接回复 `continue`，不走静态/JEV 复审，也不会让长命令沿用已到期的根。L3 的模型、协议、扫描错误只意味着不扩根，绝不因此拒绝命令。审计事件为 `l3_root_request/granted/declined/error/expired`，只保留命令 SHA-256 和目录路径，不记录原始命令或凭据。
+
+会话删除会清除 L3 授权和重复记录，并阻止在途建议重新安装授权；超过窗口的目录记录在访问时及现有维护定时器中清理。
+
+### 链接 worktree 的私有 git 目录（1.7.0，未发布）
+
+会话工作区是 git 链接 worktree（`git worktree add`）时，`cwd/.git` 是一个 `gitdir:` 指针文件，指向主仓库 `.git/worktrees/<name>` 下的私有元数据目录——index 刷新、HEAD、reflog、MERGE_HEAD 等例行记账都写在那里，不在工作区内。没有额外根时，linked worktree 里一次普通 `git status` 都按根外写入计一次边界审查。
+
+Auto/可写会话的 shell 路径把该目录加入写根（`src/security/worktree-roots.ts` 的 `linkedWorktreePrivateDir`）。返回前逐条验证：`cwd/.git` 必须是含 `gitdir:` 指针的普通文件；指针规范化后必须是现存目录且含 `commondir`；`commondir` 目标必须是带 `HEAD` 文件与 `objects` 目录的真实公共 git 目录；私有目录必须恰为 `<commondir>/worktrees/<name>`；私有目录的 `gitdir` 必须回指 `cwd/.git`——指向其他 worktree 私有目录、公共 `.git` 本身或无关路径的伪造 `.git` 文件一律忽略。任一环节不符都只是不加根，绝不拒绝命令。
+
+只读会话与原生文件工具不获得该根；公共 `.git`（objects、refs）不在授权内，`git commit`/`git checkout` 的公共写入仍是边界事件。该根与 `sandbox.allowWrite` 走同一套 denyWrite、protect、凭据与敏感目标排除。
+
+## 跨实例共享安全状态（1.7.0，未发布）
+
+宿主按会话位置各加载一个插件实例，但所有实例运行在同一服务进程内。过去存于各实例闭包的用户权限/会话安全状态——Bypass 租约、会话 rwx 基线与祖先链、显式禁 Bypass 屏障、permStash、安全快照基线/epoch、审批缓存、L3 授权与会话通知快照——现在统一保存在 `src/security/shared-state.ts` 的进程级注册表（`globalThis[Symbol.for("opencode-v2-security.state.v1")]`）。效果：一个位置里 arm 的 `/bypass` 或设置的 `/perm` 对由其他实例服务的会话同样生效；某位置重启导致插件重载时，新实例直接接管既有状态而不是静默清空；一条安全通知由处理该会话 prompt hook 或工具结果的任一实例恰好送达一次；任一实例的安全快照变化都会清空该会话的共享审批缓存。
+
+实例变更共享映射后发布 `session-state-changed`，其余实例的反应与本地变更相同：刷新合并安全通知（顺带撤销本实例运行中的受监督调用）、重新同步后代、经自己的 RPC 通道重发 TUI 快照。反应幂等，实例销毁时注销监听。ctx 句柄、broker、RPC 注册、定时器与在途审查仍按实例持有。状态仍是纯内存，无文件持久化——服务重启清空全部租约与基线。
+
+默认权限、永久豁免和继承策略按会话所属位置（directory/workspaceID）推导，而非使用当前处理通知的实例配置。同一位置的配置注册冲突只警告一次，并保留权限／豁免的更严格交集；所属实例缺失或重载期间收紧为不可写，不借故障策略扩权。通知认领仅表示在途发布，跨实例按会话串行，成功或失败均释放；已送达去重独立保存。
+
+网络 L1 另绑定观察到的地址族、规范 IP、端口及 IPv6 scope ID，allow 和 deny 都不会跨已识别端点串用。端点不能完整识别时不缓存正向决定，负向决定仍按观察证据与用户消息摘要缓存。
 
 ## 行为总览
 
@@ -289,7 +337,7 @@ v1.4.0 的静态放行、RO 修复与验证方法见 [v1.4.0 研究与验证摘�
 | `shell` | string | 环境探测 | 分类器方言提示；v2 无 `config` hook，不能读取 opencode 配置里的 shell，仅由此字段 + `SHELL` 环境变量 + 平台默认决定 |
 | `securityEnabled` | boolean | `true` | 整体开关 |
 | `strictness` | `"LOOSE"`（旧兼容拼写） | `"LOOSE"` | 只有一个当前策略；旧 HARD 输入被拒绝 |
-| `failPolicy` | `"fail_open" \| "fail_close"` | `"fail_open"` | 常规动态审查器不可用/失败时的自动处理；单次授权审查失败仍拒绝。旧 JSON 值 `fail_ask` 仅作兼容输入归一化为 `fail_close`，不是可选择的人工确认模式 |
+| `failPolicy` | `"fail_open" \| "fail_close"` | `"fail_open"` | 所有插件检查故障的统一策略：基础设施／协议／超时、helper／沙箱／ptrace、broker、证据检查、会话查询、目标变化、缓存及未预期异常；`fail_open` 放行，`fail_close` 拒绝。真实安全拒绝和用户取消／撤销始终生效。`fail_open` 优先于 `sandbox.onUnavailable: "fail_close"`，加载时警告一次。旧 `fail_ask` 归一化为 `fail_close` |
 | `dynamicReview.baseURL` | string | — | OpenAI-compatible base URL（自动补 `/chat/completions`）；仅 loopback 允许 http |
 | `dynamicReview.model` | string | — | 模型 ID |
 | `dynamicReview.apiKey` | string | — | API key（`apiKey`/`apiKeyEnv` 二选一） |
@@ -302,7 +350,7 @@ v1.4.0 的静态放行、RO 修复与验证方法见 [v1.4.0 研究与验证摘�
 | `dynamicReview.auditorPath` | string | — | 已废弃：仅为兼容旧配置而接受，不再使用 |
 | `detachedStartIsolation` | boolean | `true` | supervisor 未激活时对 `start`/`Start-Process` 追加句柄隔离 |
 | `slowCommands` | boolean | `true` | 拦截安全但必耗时的命令（系统/挂载树的无界扫描、`-f` 流式、超长 `sleep`），除非调用方显式给了 timeout。底层默认参数：`maxDepth=16`（find/rg/fd 的 `-maxdepth` 阈值，超过才拦）、`sleepThresholdSeconds=120`（sleep 阻断阈值，`>=` 即拦）、`allowExplicitTimeout=true`（调用方传入工具参数 timeout 时不拦） |
-| `logReviewerTrace` | boolean | `false` | 审计轨迹开关。每轮动态审查写请求与结果/错误，另写最终裁决；包含摘要、调用标识、reviewer、裁决分支，不含原始命令或凭据。没有审查缓存；写入失败不影响审查流程 |
+| `logReviewerTrace` | boolean | `false` | 完整审计轨迹开关。每轮动态审查写请求与结果/错误，另写最终裁决；不含原始命令或凭据。故障放行始终记录 `fail_open_pass` 和简短故障码：开启时写入 `~/.opencode/reviewer-trace.jsonl`，关闭时仅写入 `sandbox.scratch/reviewer-trace.jsonl`。可用时附加非阻断 metadata；日志写入失败不阻断调用 |
 | `trustedCommands` | string[] | `[]` | 用户信任的命令前缀（如 `"agent-browser"`、`"opencode2 --version"`）。仅在 LOOSE 读写会话生效：某段 argv 以其中一项开头、且所有危险扫描都通过时静态 ALLOW。裸名只匹配 PATH 查找（`./tool` 不匹配 `tool`）；条目含 shell 语法时配置报错 |
 | `supervisorEnabled` | boolean | Windows 下 `true` | 使用原生 shell supervisor |
 | `supervisorPath` | string | 包内默认 | supervisor `bash.exe` 路径 |

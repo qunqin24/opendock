@@ -237,6 +237,22 @@ installs it with Bun automatically at startup:
 }
 ```
 
+> **Only one `plugin` key per config.** JSON silently keeps the *last* duplicate,
+> so a stray second `"plugin": []` elsewhere in the file will overwrite this entry
+> and the plugin never loads.
+
+#### Updating the npm package
+
+opencode caches npm plugins under `~/.cache/opencode/packages/` and reuses the
+cached copy on every startup — it does **not** re-check npm for a newer version.
+To upgrade, clear the cache and restart so the next startup re-pulls the latest:
+
+```bash
+rm -rf ~/.cache/opencode/packages/opencode-context-trimmer*
+```
+
+Then confirm the version in the log (see *Confirm it loaded* below).
+
 ### Option 2: local file
 
 opencode also auto-discovers plugins under `~/.config/opencode/plugin/` (or

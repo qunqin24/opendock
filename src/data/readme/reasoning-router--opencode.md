@@ -14,13 +14,13 @@ that can talk to a local proxy, with the classifier you choose.
 
 ![Illustrative effort routing: a classifier lowers effort for a rename and keeps it high for debugging a race condition.](assets/readme.gif)
 
-![Core comparison: both arms solve 44 of 44; Jev averages 20.2% less input, 14.3% less output, and 8.7% less time than fixed high.](eval/results/router-core-comparison.svg)
-
-Across the tested GPT-6 Astra task mix, Jev-routed effort and fixed `high`
-effort each solved **44/44 attempts**, and Jev used **14% fewer output tokens**
-(including reasoning) and finished **9% faster** on average. Results on other
-workloads, models, and classifiers may differ.
-[See the evaluation](eval/results/router-consolidated-2026-09-25.md).
+In our SWE-bench Verified runs on GPT-6 Astra, Jev-routed effort solved every
+task that fixed `high` effort solved, and how much it saved depended on how
+hard the task was. On a short Flask fix, Jev used **52% fewer output tokens**
+(including reasoning) and finished in about half the time. On harder Django and
+pytest issues, output fell by only 5–7% and time changed by less than 10%.
+These are a few selected tasks, so treat them as examples, not an expected
+saving. [See the evaluation](eval/results/router-consolidated-2026-09-25.md).
 
 > **Status: alpha.** Install the packages below from npm as described in each
 > package README.
@@ -63,8 +63,12 @@ REASONING_ROUTER_UPSTREAM_API_KEY=<openai-key> \
 npx @reasoning-router/proxy
 ```
 
-For Codex, add the proxy as a provider in `~/.codex/config.toml`. The
-classifier picks the effort, so Codex's own effort setting is ignored:
+For Codex, add a profile at `~/.codex/reasoning-router.config.toml` that keeps the
+model and swaps only the provider, then run `codex -p reasoning-router` (Codex 0.161.0
+or later), adding `-m gpt-6-sol` or another model to override the default. Plain `codex` is unchanged. The classifier picks the effort, so
+Codex's own effort setting is ignored. To use a ChatGPT subscription instead
+of an API key, chain the proxy to CLIProxyAPI
+([guide](packages/proxy#chatgpt-subscription-through-cliproxyapi)):
 
 ```toml
 model = "gpt-6-astra"
@@ -122,7 +126,7 @@ edits and tool calls and save high or max for architecture and hard debugging.
 ## Alpha limitations
 
 - **Tested with:** Node.js 24.x, OpenCode V2 2.0.18, Pi 1.0.4, and Codex CLI
-  0.159.0 (through the proxy). Other versions may work but are untested.
+  0.159.0 and 0.161.0 (through the proxy). Other versions may work but are untested.
 - **Models:** only those listed under [Supported models](#supported-models).
   Other models are rejected locally. Pi routes Claude models only.
 - **Classifiers:** the router asks the configured classifier and applies its
@@ -152,8 +156,8 @@ The packages are:
   classifier-independent router.
 - [`@reasoning-router/opencode`](packages/opencode): the OpenCode V2 plugin.
 - [`@reasoning-router/classifiers`](packages/classifiers): the
-  classifiers (Jev, Cloudflare Clef, Laya, Kev, OpenAI Decisions, and CLM),
-  selected by `classifier.provider`.
+  classifiers (Jev, Cloudflare Clef, Laya, Kev, OpenAI Decisions, CLM,
+  Microsoft-Decision-1, and Liquid d1), selected by `classifier.provider`.
 - [`@reasoning-router/pi`](packages/pi): the Pi extension (Claude models
   only, for now).
 - [`@reasoning-router/proxy`](packages/proxy): the standalone
@@ -271,6 +275,47 @@ and `REASONING_ROUTER_CLASSIFIER_MODEL` to choose a CLM head (the server
 defaults to `clm-latest`). See [docs/classifiers/clm.md](docs/classifiers/clm.md)
 for the pinned version, the pooling backend, and the 2,048-token truncation.
 Only API compatibility has been verified. Effort-decision quality has not.
+
+### Microsoft-Decision-1
+
+[Microsoft-Decision-1](https://learn.microsoft.com/azure/foundry/foundry-models/how-to/use-foundry-models-microsoft-decision)
+is Microsoft's decision model on Microsoft Foundry. Deploy it in your Foundry
+resource, then use the resource endpoint, deployment name, and API key from
+the deployment details page:
+
+```bash
+REASONING_ROUTER_CLASSIFIER=microsoft-decision \
+REASONING_ROUTER_CLASSIFIER_BASE_URL=https://<resource>.services.ai.azure.com \
+REASONING_ROUTER_CLASSIFIER_MODEL=<deployment-name> \
+REASONING_ROUTER_CLASSIFIER_API_KEY=<foundry-api-key> \
+reasoning-router
+```
+
+All three settings are required. Only API keys are supported, not Microsoft
+Entra ID tokens. It is tested against mocked responses only; live
+compatibility and effort-selection quality are unverified. See
+[packages/classifiers](packages/classifiers/README.md#microsoft-decision-1-provider-microsoft-decision)
+for details.
+
+### Liquid d1
+
+[Liquid d1](https://docs.liquid.ai/lfm/models/d1) is Liquid AI's hosted
+decision model. Create a key at [console.liquid.ai](https://console.liquid.ai),
+then:
+
+```bash
+REASONING_ROUTER_CLASSIFIER=liquid \
+REASONING_ROUTER_CLASSIFIER_API_KEY=<liquid-key> \
+reasoning-router
+```
+
+To use a Vercel AI Gateway key instead, also set
+`REASONING_ROUTER_CLASSIFIER_BASE_URL=https://ai-gateway.vercel.sh/typesafe`.
+Set `REASONING_ROUTER_CLASSIFIER_MODEL=d1:free` for Liquid's free text-only
+model. It is tested against mocked responses only; live compatibility and
+effort-selection quality are unverified. See
+[packages/classifiers](packages/classifiers/README.md#liquid-d1-provider-liquid)
+for details.
 
 ## Supported models
 
