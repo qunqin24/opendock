@@ -2,7 +2,8 @@
 
 `opencode-tinfoil` adds a Tinfoil-verified provider to
 [OpenCode](https://opencode.ai). The same package supports OpenCode V1
-(1.18.29 or later) and V2. It sends inference requests through Tinfoil's
+(1.18.29 or later) and V2 (2.0.27 or later). It sends inference requests through
+Tinfoil's
 [`SecureClient`](https://www.npmjs.com/package/tinfoil), using each OpenCode
 version's own OpenAI-compatible protocol implementation.
 
@@ -15,7 +16,7 @@ transport failure aborts the request; there is no plaintext fallback.
 ```jsonc
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugins": ["opencode-tinfoil@0.3.0"],
+  "plugins": ["opencode-tinfoil@0.3.1"],
   "providers": {
     "tinfoil": {
       "package": "opencode-tinfoil/provider",
@@ -43,7 +44,7 @@ want marked providers:
 ```jsonc
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugins": [{ "package": "opencode-tinfoil@0.3.0", "options": { "defaultProvider": false } }],
+  "plugins": [{ "package": "opencode-tinfoil@0.3.1", "options": { "defaultProvider": false } }],
   "providers": {
     "private-inference": {
       "package": "opencode-tinfoil/provider",
@@ -81,8 +82,10 @@ plugin, a V1-style marked provider may remain on the ordinary HTTP runtime.
 A service that uses this transport should reject plaintext inference
 independently of the client plugin.
 
-The published package installs its V2 provider-runtime dependencies alongside
-the plugin. You do not need to install `@opencode/ai` or `effect` separately.
+The published package installs its V2 protocol dependency (`@opencode/ai`)
+alongside the plugin. OpenCode supplies the shared `effect` runtime and
+`@opencode/plugin` modules. You do not need to install them separately. V2
+requires OpenCode 2.0.27 or later, with Effect 4's stable `effect/http` exports.
 
 ## OpenCode V1 (1.18.29+)
 
@@ -91,7 +94,7 @@ Add the plugin to create the canonical Tinfoil provider:
 ```jsonc
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugin": ["opencode-tinfoil@0.3.0"]
+  "plugin": ["opencode-tinfoil@0.3.1"]
 }
 ```
 
@@ -120,7 +123,7 @@ provider and upgrades every marked provider:
 
 ```jsonc
 {
-  "plugin": ["opencode-tinfoil@0.3.0"],
+  "plugin": ["opencode-tinfoil@0.3.1"],
   "provider": {
     "private-inference": {
       "npm": "@ai-sdk/openai-compatible",
@@ -147,7 +150,7 @@ the one surviving plugin invocation still upgrades every marked provider in
 the merged provider map.
 
 A service that supplies only marked providers can suppress the default direct
-provider with `["opencode-tinfoil@0.3.0", { "defaultProvider": false }]`. This
+provider with `["opencode-tinfoil@0.3.1", { "defaultProvider": false }]`. This
 loader control is intended for generated service configuration; ordinary users
 should need only the bare plugin entry and provider definitions.
 

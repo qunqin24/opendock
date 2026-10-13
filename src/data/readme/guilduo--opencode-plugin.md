@@ -21,7 +21,7 @@ Guilduo is a **Human × AI Work Platform** where people and AI Agents can commis
 | Official LP | [Guilduo Landing Page](https://guilduo.com/) | Learn about Guilduo's principles, features, and workflow |
 | Official Web App | [Guilduo / Relay Forge](https://app.guilduo.com/) | Open the public beta Command and Quest workspace |
 
-`/next/relay-forge/` is a deployment path inside an Appwrite Site, not the official Web App URL. Appwrite Sites generated deployment URLs and the old `workers.dev` URL are retained for validation, compatibility, and rollback. The canonical path for new users is the Guilduo domain above. The currently deployed candidate is `0.6.0-beta.8`, managed separately from tagged releases.
+`/next/relay-forge/` is a deployment path inside an Appwrite Site, not the official Web App URL. Appwrite Sites generated deployment URLs and the old `workers.dev` URL are retained for validation, compatibility, and rollback. The canonical path for new users is the Guilduo domain above. Production deployments and GitHub source tags are managed separately; publishing a source Release does not deploy to production.
 
 ### What each public URL is for
 
@@ -60,7 +60,7 @@ Guilduo is an independent project and is not affiliated with, endorsed by, or an
 | Google Calendar, Google Tasks, Notion, and Toggl | **Early Access / OAuth preparation** |
 | Unity Battle Lab, native Android/iOS, and autonomous Agent execution | Pending |
 
-The app version is the `0.6.0-beta.8` candidate, REST/MCP is `2.7.0`, and the data Schema is `7`. External Provider OAuth is disabled by default while public beta safety and review preparation are prioritized. Accounts and user state are being migrated to Appwrite.
+The app version is the `0.6.0-beta.9` candidate, REST/MCP is `2.7.0`, and the data Schema is `7`. External Provider OAuth is disabled by default while public beta safety and review preparation are prioritized. Accounts and user state are being migrated to Appwrite.
 
 ## Design Principles
 
@@ -285,7 +285,7 @@ npm run worker:dev
 
 During TypeScript development, the Worker runtime types are generated from the Wrangler configuration. `npm run typecheck` combines type generation, generated-output consistency checks, explicit `any` and `@ts-nocheck` checks, and strict type checks for the browser, Worker, Node, and battle prototype. Vite transformation and type checking are separate, while API/MCP contracts are maintained by dedicated tests.
 
-Public deployment is reserved for `v*` tag GitHub Actions. The pipeline gates D1 migration, Worker deployment, and health checks in that order, then smoke-tests the Appwrite Sites publication. Follow [`APPWRITE_MIGRATION.md`](APPWRITE_MIGRATION.md) for Firebase migration validation and cutover.
+The `v*` tag workflow checks the package version, that the tagged commit is an ancestor of `main`, and the release notes, then publishes a GitHub source Release after CI, type checks, tests, build, and preview gates pass. It does not use deployment secrets or automatically run production migrations or deploy Sites or Workers. Production deployment is separate, through the existing manual `.github/workflows/deploy-appwrite-site.yml` and `.github/workflows/deploy-appwrite-worker.yml`, with `production` environment protection and retained-cache gates maintained. The beta.9 integration reconciles the previously direct-deployed Worker fixes; see [`the integration record`](docs/work-integration-20261012.md) for verification and publication receipts. The core source Release `v0.6.0-beta.9` and host extensions `beta.12` are versioned separately; Guilduo remains in public beta. See [`RELEASE_SETUP.md`](RELEASE_SETUP.md).
 
 ## Documentation
 

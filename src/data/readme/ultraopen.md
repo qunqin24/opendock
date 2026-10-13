@@ -124,7 +124,7 @@ and ships the workflow-authoring skill (see [Authoring workflows](#authoring)).
 | Capability | What it does |
 | --- | --- |
 | **`workflow` tool** | Runs a JavaScript script that fans out across parallel subagents — background by default: the tool returns the run id at once and the run continues detached. Blocking is one option flip ([Install](#install)) |
-| **`workflow_status` tool** | Reads a run's live state from disk — status (`running` `completed` `failed` `cancelled` `orphaned`), phase, agent counts, token total, `budget { total, spent }`, last logs, final value or failure text once settled. A `wait` blocks one call up to 300 s instead of polling. Read-only, cross-process, crash-safe: the run directory is the source of truth |
+| **`workflow_status` tool** | Reads a run's live state from disk — status (`running` `completed` `failed` `cancelled` `orphaned`), phase, agent counts, token total, `budget { total, spent }`, last logs, final value or failure text once settled — plus one row per agent: label, status, phase, failure reason, token spend, child session id, recording path (#150, [ADR-0004](./docs/adr/0004-agent-recording.md)). A `wait` blocks one call up to 300 s instead of polling. Read-only, cross-process, crash-safe: the run directory is the source of truth |
 | **Notifications, not polling** | `<workflow-completed>`/`<workflow-failed>` lands in the conversation when the run settles (mechanics in [docs/launch-contract.md](./docs/launch-contract.md)) |
 | **Stop & auto-resume** | `workflow({ stop })` cancels a detached run; a run its process interrupted auto-resumes on the next start (guards in [docs/launch-contract.md](./docs/launch-contract.md)) |
 | **Saved workflows** | Named scripts run by name: `workflow('deploy-check')` in any script, one `/workflow-<name>` command per saved file, `/workflow-resume <runId>` to replay a past run. Defaults: `<config>/ultraopen/workflows` and the project's `.opencode/ultraopen/workflows` (which wins on collision); `workflowPaths` adds more |
@@ -132,6 +132,7 @@ and ships the workflow-authoring skill (see [Authoring workflows](#authoring)).
 | **Resume** | `resumeFromRunId` replays unchanged calls instantly; the first edited call and everything after it in the same scope runs live. Failed runs keep their partial journal |
 | **`ultracode` mode** | Raises reasoning effort and makes fan-out the default. Four ways in: the `ultracode` agent, the keyword, `/ultracode`, a project config flag. A filename mention (`src/ultracode.ts`) never triggers the keyword (`keywordBehavior` flips the default, [Install](#install)) |
 | **Safety rails** | Recursion guard (a nested `workflow()` runs one level only), per-agent inactivity deadline plus wall-clock ceiling, global concurrency cap, orphan reaper, retention pruning, large-run advisory — advice only, never a block (numbers below) |
+| **Per-agent transcript recording** | Every agent of every run records its full part-event stream append-only to its own JSONL in the run directory (`recordings/<index>-<label>.jsonl`, always on — [ADR-0004](./docs/adr/0004-agent-recording.md)). Upstream's child-transcript view is unreliable for schema-forced children — `format` poisons the message listing that view reads (observed blank in repeated probes through opencode 1.18.33), so the recording is the only predictable readable copy of that agent's stream. The launch result and the agent rows point at the human path: the `/sessions` picker (children are titled `ultraopen · <label>`) and child navigation on a transcript line — leader+down enters, right/left cycles, up returns; locate by id or title, never by position |
 | **Run control (in progress)** | `stop` is live; a run's directory accepts `control.jsonl`: `pause`/`resume` gate new agents while in-flight work finishes, `stop-run`/`stop-agent` abort the run or one child — `stop-run` records the run `cancelled` exactly as `workflow({ stop })` does (#134), `restart-agent` parsed but not implemented. TUI selection/restart keys and the drill-down view are the next slice |
 | **Approval prompt** | Names the real workflow (the launch's `title` argument is run metadata — it surfaces on the run's own renders, not in the prompt), its description and phases, the run id, the projected agent count. The script is persisted to the run directory **before** the prompt — open its `script.js` and read exactly what will run. `always` is scoped per workflow name |
 
@@ -200,7 +201,9 @@ here, concrete findings on a staged demo diff, from an uncaught fetch to an off-
 
 ![Findings in the transcript](https://github.com/PhillipChaffee/ultraopen/raw/main/assets/screenshots/04-results.png)
 
-Agents show as `⠋` running, `✓` done, `✗` failed. All three surfaces (strip, sidebar, prompt
+Agents show as `⠋` running, `✓` done, `✗` failed; a row that has spawned its child carries the
+child's session id, and the sidebar carries the transcript hint (picker + gesture) under the rows
+(#150). All three surfaces (strip, sidebar, prompt
 status) are served by one shared poller — one directory pass per second — so having them all
 open costs one read. The surfaces update imperatively (`node.content` + `requestRender()`) to
 work around an upstream 1.18.x rendering limitation; `src/tui/index.tsx` documents the

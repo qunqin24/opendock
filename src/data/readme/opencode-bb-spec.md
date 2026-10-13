@@ -5,7 +5,7 @@
 <h1 align="center">📐 BB-Spec</h1>
 
 <p align="center">
-  <strong>A spec-driven Claude Code pipeline that carries fuzzy requirements all the way to shipped code.</strong>
+  <strong>A PRD-driven Claude Code pipeline that carries fuzzy requirements all the way to shipped code.</strong>
 </p>
 
 <p align="center">
@@ -26,7 +26,7 @@
 
 <p align="center">
   <a href="#-30-second-start">Quick Start</a> ·
-  <a href="#-the-spec--ship-pipeline">Pipeline</a> ·
+  <a href="#-the-prd--ship-pipeline">Pipeline</a> ·
   <a href="#-stages-at-a-glance">Stages</a> ·
   <a href="#-companion-constraint-skills">Skills</a> ·
   <a href="#-claude-code-install">Install</a> ·
@@ -48,36 +48,34 @@ The 5 mainline commands:
 
 | Command | What it does | When |
 |---|---|---|
-| `/spec` | Break a requirement into one-rule-per-file specs | New requirement |
-| `/plan` | spec → function-level implementation plan | Spec is ready |
-| `/exec` | Three-agent isolated Test→Impl→Review | Plan is ready |
+| `/prd` | Challenge → clarify → break down; after one approval, writes the PRD + AGENTS.md, then auto-runs plan → exec | New requirement |
+| `/plan` | PRD → function-level implementation plan, then auto-runs exec | Auto-invoked by `/prd` |
+| `/exec` | Three-agent isolated Test→Impl→Review, auto-runs doc-update at the end | Auto-invoked by `/plan`; resume manually after an interruption |
 | `/review` | Parallel finders + adversarial verify | Before opening PR |
 | `/git-push` | pre-review self-check + push + open PR | Ready to ship |
 
-Three branches, callable anytime: `/git-clone` (pull a remote project locally + write `.bb-spec.yaml`, one-shot onboarding), `/revise` (route any deviation back to the right stage by root cause), `/doc-update` (whole-repo spec / doc / code consistency sweep).
-
-Optional upstream: `/prd` (PM / requester brainstorms a PRD; shipped separately as bb-spec-product).
+Three branches, callable anytime: `/git-clone` (pull a remote project locally + write `.bb-spec.yaml`, one-shot onboarding), `/revise` (route any deviation back to the right stage by root cause), `/doc-update` (doc / code consistency sweep; `/exec` and `/revise` also run it automatically over the current change at the end).
 
 ---
 
-## 🔁 The `spec → ship` pipeline
+## 🔁 The `prd → ship` pipeline
 
 ```
  (opt) /git-clone ──► clone remote + write .bb-spec.yaml
    │
- (opt) /prd ──► PRD doc
-   │
- /spec ──► /plan ──► /exec ──► /review ──► /git-push
-  what       how      Red→Green→Review  finders+adv  pre-review+open PR
+ /prd ══► /plan ══► /exec ══► /doc-update ──► /review ──► /git-push
+  what      how      Red→Green  docs mirror code   finders+adv  pre-review+open PR
+ (the only approval)    →Review
+ ══► chained automatically, no more prompts (stops only for new third-party deps or design calls)
                                                           │
         ┌─────────────────────────────────────────────────┘
         │
         ▼ /revise (anytime, routed by root cause)
-          spec-defect → /spec   ·   impl-drift → /exec   ·   review finding → targeted fix
+          PRD defect → edit this branch's PRD   ·   impl drift → TDD fix   ·   big requirement change → /prd
 
  (opt) /test-webview · /test-api — frontend / backend e2e between /exec and /review
- /doc-update (periodic / on-demand) — sweep whole repo → default updates spec/doc;
-                                        obviously bad code stops to ask → routes to /revise
+ /doc-update (periodic / on-demand) — sweep doc / code drift → default updates docs;
+                                        code violating project constraints stops to ask → routes to /revise
 ```
 
 **Why this pipeline is reliable** — every handoff is a *file on disk*, not a memory in the chat. That's what makes it resumable, AI-swappable, and auditable end to end.
@@ -89,24 +87,30 @@ Optional upstream: `/prd` (PM / requester brainstorms a PRD; shipped separately 
   - **Multi-repo workspace**: creates a shared parent dir and clones each member repo into it (restoring the relative layout the build tool expects); refuses to nest or overwrite
   - Tightly scoped: **only** pulls code + writes `base_dir` — does not read code or install deps
 
-- **`/spec`** — Requirement breakdown through dialogue. Answers **"what to build."**
-  - One rule per file, ≤100 lines, one thing + one example, non-overlapping
-  - Lightweight `INDEX.md` up front — readers scan the index before loading specifics
+- **`/prd`** — The single entry point for new requirements. Answers **"what to build, and why."**
+  - Challenge first ("not worth building" is a valid outcome) → progressive clarification → breakdown, all in **plan mode for read-only alignment**; you **approve once**, then `/plan` → `/exec` → `/doc-update` run on their own
+  - Writes the **PRD** (`docs/prd/<date>.<topic>/`: background, goals, non-goals, user stories, testable constraints and acceptance criteria, decision log) and **AGENTS.md** (constraints that apply to the whole project, e.g. "no generics")
+  - The PRD stays editable within its branch (fix the plan mid-implementation by editing it) and freezes once merged; **code is the single source of truth for "what it does now"** — the PRD only answers "why"
+  - Every later commit carries a `Requirement: <PRD dir name>` trailer: `git log -L :function:file` lists the requirements that touched a function, and the matching PRD's decision log tells you why it was built that way
+  - Supports multi-repo workspaces (e.g. `docs/` and each service are separate repos): the PRD and AGENTS.md live in the docs repo, and commits in every repo carry the trailer
 
-- **`/plan`** — spec → self-contained, **function-level** plan. Answers **"how to build it."**
+- **`/plan`** — PRD → self-contained, **function-level** plan. Answers **"how to build it."**
   - One independent problem per file, down to function names and responsibilities; declarative artifacts (DDL / API contracts / config) are **inlined in final form** for exec to write verbatim
-  - Invocation enters **plan mode for read-only alignment** — nothing lands until you approve; **new third-party dependencies are listed as a dedicated section**, and approval counts as the explicit user consent version-policy requires
+  - Auto-invoked by `/prd` with no separate approval; it stops only when a **new third-party dependency** is needed, and your consent there counts as the authorization version-policy requires
+  - Plans exist only while executing — `/exec` deletes them once everything is done, so they never duplicate the PRD
 
 - **`/exec`** — **Three-agent isolated execution**, the core anti-cheat design.
-  - *Test* agent reads spec rules only, writes failing tests (Red)
-  - *Impl* agent **never sees the spec**, only the tests + function list, so it can't quietly "teach to intent"; new third-party libs capped by the plan's approved list
-  - *Review* agent checks against the spec plus a robustness/security pass, read-only
+  - *Test* agent reads PRD constraints only, writes failing tests (Red)
+  - *Impl* agent **never sees the PRD**, only the tests + function list, so it can't quietly "teach to intent"; new third-party libs capped by the plan's approved list
+  - *Review* agent checks against the PRD acceptance criteria and AGENTS.md plus a robustness/security pass, read-only
   - Progress written to `PROGRESS.md` after every step — **token-exhausted runs resume losslessly**
+  - If the plan turns out to be wrong mid-implementation, it stops and lets you pick: change the code / change this PRD / pause; small changes are made in place, big ones go back to `/prd` for re-approval
+  - When everything is done, auto-runs `/doc-update` in tail mode so this PRD and docs like README mirror what was actually delivered
 
 - **`/test-webview`** — **Web-interaction acceptance** for frontend / web projects.
   - Brings the app up via the project's Docker stack (confirmed once, then remembered; `down -v` cleans up afterward), drives a real browser via the browser MCP
   - **Each case runs in an isolated serial subagent** — hundreds of cases never blow the main context; fully serial (shared single browser)
-  - Cases auto-generated from spec / plan / PRD; **coverage alignment** before a full run, gaps never silently dropped; failures route to `/revise`
+  - Cases auto-generated from the acceptance criteria and verification paths of this branch's PRD (merged, historical PRDs are not read); **coverage alignment** before a full run, gaps never silently dropped; failures route to `/revise`
   - Requires a browser MCP (playwright / chrome-devtools)
 
 - **`/test-api`** — **API e2e** for any backend.
@@ -124,21 +128,24 @@ Optional upstream: `/prd` (PM / requester brainstorms a PRD; shipped separately 
   - Read-only — never auto-edits; requires Claude Code ≥ 2.1.154
 
 - **`/revise`** — The exception handler, callable anytime.
-  - Classifies a deviation's **root cause** into one of three: *spec-defect* (→ `/spec`), *impl-drift* (→ `/exec`), *requirement-change*
+  - First reads the code to confirm current behavior and traces back to the relevant PRD via `git log -L`, then classifies the deviation's **root cause** into one of three: *PRD defect*, *impl drift*, *requirement change*
+  - This branch's PRD may be edited; merged PRDs are not — the reason for the fix goes into the commit body
   - Every review finding that needs fixing funnels through here
+  - Auto-runs `/doc-update` in tail mode after the fix
 
 - **`/git-push`** — User-triggered push + PR flow (single or multi-repo).
-  - When a spec `INDEX.md` exists, first runs a **branch-spec self-check (pre-review)**: a subagent diffs the branch vs main against the spec, fixes violations in a loop
-  - Drafts a **6-section PR description** (background / requirement / approach / result / tests / spec, < 50 lines) used directly as the PR body
+  - When AGENTS.md or a PRD on this branch exists, or this branch's commits point to a merged PRD, first runs a **branch self-check (pre-review)**: a subagent checks the branch diff against the project constraints, the PRD and the change notes in commit messages, fixes violations in a loop
+  - The PR description carries the `Requirement:` trailer; the repo must allow only rebase merging (GitHub: only "Allow rebase merging", and the main-branch ruleset's "Allowed merge methods" set to Rebase only; GitLab: "Fast-forward merge" with squash set to "Do not allow"), so every commit lands on the main branch with its own `Requirement:` line
+  - Drafts a **6-section PR description** (background / requirement / approach / result / tests / conventions, < 50 lines) used directly as the PR body
 
-- **`/doc-update`** — Whole-repo spec / doc / code **consistency sweep**.
-  - Six drift classes: spec-stale / doc-stale / code-violation / spec-conflict / orphan-index / uncovered-rule
-  - **Code is the truth; spec / docs are mirrored to it**; only obvious hard-constraint violations stop and ask, then route to `/revise` for TDD
-  - Clear boundaries against `/revise` (single point) and the `/review` `review-design` finder (doc-sync lens) (PR-diff scope)
+- **`/doc-update`** — Doc / code **consistency sweep**.
+  - Four finding classes: doc-stale (root docs out of date) / prd-stale (this branch's PRD doesn't match what was delivered) / code-violation (code breaks AGENTS.md) / agents-conflict (project constraints contradict each other)
+  - **Code is the truth; docs are mirrored to it**; code changes always ask first and route to `/revise` for TDD; merged PRDs are never touched in any mode
+  - **Tail mode** (`--tail`): auto-invoked when `/exec` or `/revise` finishes; covers only what the current branch touched
 
 **Ships with**
 
-- **8 orchestration subagents** driven by the stages above: `test-engineer` / `impl-engineer` / `spec-reviewer` / `webview-test-runner` / `review-defect` / `review-design` / `review-codex` / `pre-reviewer`
+- **8 orchestration subagents** driven by the stages above: `test-engineer` / `impl-engineer` / `prd-reviewer` / `webview-test-runner` / `review-defect` / `review-design` / `review-codex` / `pre-reviewer`
 - **4 passive hooks** (automatic): block npm/yarn, block main commit, dependency version self-check, Stop four-point self-check
 
 ---
@@ -147,16 +154,10 @@ Optional upstream: `/prd` (PM / requester brainstorms a PRD; shipped separately 
 
 These feed rules into the pipeline above — install only the layers you need.
 
-### bb-spec-product — product requirements (pipeline upstream)
-
-- **`prd`** — PM / requester brainstorms with AI: challenge first (rejection is a valid outcome) → diverge → converge, producing a self-contained PRD — goals / non-goals, prioritized user stories (every P0 carries concrete use cases and acceptance criteria), and open questions left for engineers; needs no git repo or code context, consumed directly by `/spec`
-
-> **PMs don't need Claude Code**: every release auto-packages [`bb-spec-prd-skill.zip`](https://github.com/0xBB2B/bb-spec/releases/latest/download/bb-spec-prd-skill.zip) — download it and upload via **Settings → Customize → Skills** on claude.ai web / desktop to use the skill standalone (paid plan with code execution required); the resulting PRD is delivered to engineers as a downloadable file.
-
 ### bb-spec-core — universal discipline
 
 - **`tdd-workflow`** — Red-Green-Refactor discipline with standard flows for the add / modify / delete scenarios
-- **`version-policy`** — Standard/official libraries first — importing a new third-party library requires explicit user consent (a plan-approved dependency list counts); check a dependency's official latest version before pinning it; never trust training memory
+- **`version-policy`** — Standard/official libraries first — importing a new third-party library requires explicit user consent (a dependency list you consented to during `/plan` counts); check a dependency's official latest version before pinning it; never trust training memory
 - **`git-workflow`** — Branch decisions, incremental commits, the six-section PR description, post-merge cleanup
 
 ### bb-spec-backend — backend stack constraints
@@ -180,7 +181,7 @@ These feed rules into the pipeline above — install only the layers you need.
 
 ## 📦 Claude Code Install
 
-BB-Spec ships as **five independently installable sub-plugins** — install only the constraint layers you need.
+BB-Spec ships as **four independently installable sub-plugins** — install only the constraint layers you need.
 
 First add the marketplace once, inside Claude Code:
 
@@ -193,12 +194,11 @@ Then install whichever layers you want:
 | Sub-plugin | What it gives you | Command |
 |---|---|---|
 | **bb-spec-core** _(recommended base)_ | TDD / version-policy / git-workflow discipline + 3 passive hooks | `/plugin install bb-spec-core@0xbb2b` |
-| **bb-spec-workflow** _(core)_ | spec → plan → exec → review → revise → git-push (+ opt test-webview / test-api e2e), git-clone one-shot init, init reverse-spec, doc-update whole-repo consistency sweep + 11 subagents | `/plugin install bb-spec-workflow@0xbb2b` |
-| **bb-spec-product** | /prd requirement brainstorm → PRD doc with concrete use cases (for PMs / requesters) | `/plugin install bb-spec-product@0xbb2b` |
+| **bb-spec-workflow** _(core)_ | prd → plan → exec → doc-update → review → revise → git-push (+ opt test-webview / test-api e2e), git-clone one-shot init + 8 subagents | `/plugin install bb-spec-workflow@0xbb2b` |
 | **bb-spec-backend** | Go / REST API / DB / authN / authZ / observability / service / config constraints | `/plugin install bb-spec-backend@0xbb2b` |
 | **bb-spec-frontend** | Vue 3 + TS + Vite + Tailwind + bun stack & engineering conventions (+ bun hook) | `/plugin install bb-spec-frontend@0xbb2b` |
 
-Pick by need — e.g. just the disciplines and workflow without any stack opinions: install `bb-spec-core` + `bb-spec-workflow`. On a PM's / requester's machine: just `bb-spec-product`. Want everything: install all five.
+Pick by need — e.g. just the disciplines and workflow without any stack opinions: install `bb-spec-core` + `bb-spec-workflow`. Want everything: install all four.
 
 Or add it manually to `~/.claude/settings.json` (enable only what you want):
 
@@ -212,73 +212,38 @@ Or add it manually to `~/.claude/settings.json` (enable only what you want):
   "enabledPlugins": {
     "bb-spec-core@0xbb2b": true,
     "bb-spec-workflow@0xbb2b": true,
-    "bb-spec-product@0xbb2b": false,
     "bb-spec-backend@0xbb2b": false,
     "bb-spec-frontend@0xbb2b": false
   }
 }
 ```
 
-### Install via Claude Code Desktop (with screenshots)
-
-For the Claude Code Desktop app (Mac / Windows). Pure GUI flow — no commands required.
-
-**1. Open the plugin manager**
-
-Click `+` in the input box → `Plugins` → `Manage plugins`:
-
-<p align="center">
-  <img src="./assets/desktop/01-manage-plugins.png" alt="Open plugin manager" width="100%" />
-</p>
-
-**2. Add a marketplace**
-
-In the Plugins panel, click `Add` (top right) → `Add marketplace`:
-
-<p align="center">
-  <img src="./assets/desktop/02-add-marketplace.png" alt="Add marketplace" width="100%" />
-</p>
-
-**3. Choose "Add from a repository"**
-
-In the dialog, pick `Add from a repository`:
-
-<p align="center">
-  <img src="./assets/desktop/03-from-repository.png" alt="Add from a repository" width="100%" />
-</p>
-
-**4. Paste the bb-spec URL and sync**
-
-URL: `https://github.com/0xBB2B/bb-spec`, then click `Sync`:
-
-<p align="center">
-  <img src="./assets/desktop/04-sync-url.png" alt="Sync marketplace" width="100%" />
-</p>
-
-**5. Enable the core trio**
-
-The Directory now shows bb-spec's 5 sub-plugins. Click the gear icon on the `Bb spec core` / `Bb spec workflow` / `Bb spec product` cards to enable them (backend / frontend optional):
-
-<p align="center">
-  <img src="./assets/desktop/05-enable-plugins.png" alt="Enable plugins" width="100%" />
-</p>
-
-**6. Verify the install**
-
-Back in the input box, type `/prd`. If the command suggestion shows up, you're set:
-
-<p align="center">
-  <img src="./assets/desktop/06-verify-prd.png" alt="Verify install" width="100%" />
-</p>
-
 ## 🔄 Versioning
 
 ```bash
-/plugin update                  # check and update every installed plugin
-/plugin update bb-spec-core     # update only one sub-plugin
+claude plugin update bb-spec-workflow@0xbb2b   # update one sub-plugin from your terminal
 ```
 
-The five sub-plugins share a single synchronized version line.
+To update all of them at once: run `/plugin` in a session, open the **Marketplaces** tab, select `0xbb2b`, then choose **Update marketplace**.
+
+The four sub-plugins share a single synchronized version line.
+
+### Upgrading from 13 or earlier
+
+No migration is needed. Delete or keep the old `.bb-spec/` directory in your project — either way, start your next requirement with `/prd` right after upgrading.
+
+If you keep the old directory (`.bb-spec/docs/` below is the default location; if you changed `base_dir` in `.bb-spec.yaml`, use yours):
+
+- The old `.bb-spec/docs/spec/`, `.bb-spec/docs/prd/.archive/` and `.bb-spec/docs/plan/INDEX.md` are never read or modified.
+- Until `.bb-spec/docs/prd/GLOSSARY.md` exists, `/prd` uses the terms in `.bb-spec/docs/spec/GLOSSARY.md`; the first time it records a term, it copies the whole table to the new location and leaves the old one untouched.
+- Plans left unfinished under 13 can't be resumed — start again with `/prd`. Once you no longer need them, remove `plan/INDEX.md` and the topic directories it lists with `git rm -r`.
+
+Code written before you adopted bb-spec has no `Requirement:` marker in its commits, so there is no PRD to look up. When you fix it with `/revise`, the expected behavior you describe is the reference.
+
+Two things outside `.bb-spec/` need manual action:
+
+1. If you installed `bb-spec-product`, uninstall it with `/plugin uninstall bb-spec-product@0xbb2b`. `/prd` now lives in `bb-spec-workflow`.
+2. If you copied the old `CLAUDE.template.md` into a CLAUDE.md (global `~/.claude/CLAUDE.md` or the project root), change item 4 of "任务分流" (task routing) from `/spec → /plan → /exec` to `/prd`, and in item 3 change "有现成 spec/plan/代码可对照" (existing spec/plan/code to compare against) to "有现成 PRD 或代码可对照" (existing PRD or code to compare against).
 
 ---
 
@@ -307,16 +272,16 @@ CI runs automatically on PRs and pushes to main (`.github/workflows/ci.yml`).
 
 ## 🛠️ Recommended companions
 
-### CLAUDE.md template
+### AGENTS.md: project constraints and lookup rules
 
-The repo-root [`CLAUDE.template.md`](./CLAUDE.template.md) is a companion "iron-rule index" reference. It is **not installed automatically** — copy it to your `~/.claude/CLAUDE.md` or a project-root `CLAUDE.md` as needed and trim to taste.
+`/prd` writes constraints that apply to the whole project (e.g. "no generics", "SQL joins span at most 3 tables") into `AGENTS.md` at the project root, and constraints that belong to a single feature into the PRD — no constraint is written in two places. `AGENTS.md` also has a "how to look up features and issues" section: any answer about "what the system does now" must come from code actually read, with `file:line`; for "why", use `git log -L` to find the requirements that touched the function, then read the PRD; when the PRD and the code disagree, the code wins. Claude Code reads `CLAUDE.md` but not `AGENTS.md` directly, so `/prd` makes sure the project-root `CLAUDE.md` contains an `@AGENTS.md` line to import it.
 
 ### .bb-spec.yaml project config
 
-`/prd`, `/spec` and `/plan` output under `.bb-spec/docs/` by default (`.bb-spec/docs/prd/`, `…/spec/`, `…/plan/`); runtime transient artifacts (e.g. webview screenshots) go to the sibling `.bb-spec/.cache/` (auto-gitignored). Create a `.bb-spec.yaml` in the project root to override the bb-spec root directory:
+`/prd` and `/plan` output under `.bb-spec/docs/` by default (`.bb-spec/docs/prd/`, `…/plan/`); runtime transient artifacts (e.g. webview screenshots) go to the sibling `.bb-spec/.cache/` (auto-gitignored). Create a `.bb-spec.yaml` in the project root to override the bb-spec root directory:
 
 ```yaml
-base_dir: my/bb  # → my/bb/docs/{prd,spec,plan,test}/ and my/bb/.cache/ ; use ./ to place them at the project root
+base_dir: my/bb  # → my/bb/docs/{prd,plan,test}/ and my/bb/.cache/ ; use ./ to place them at the project root
 ```
 
 Reference template: [`.bb-spec.template.yaml`](./.bb-spec.template.yaml).
@@ -339,15 +304,15 @@ BB-Spec stands on three excellent projects. Each shaped a different part of its 
 
 | Project | What it does best | What BB-Spec borrowed & hardened |
 |---|---|---|
-| [**Superpowers**](https://github.com/obra/Superpowers) (obra) — a complete coding-agent methodology | End-to-end staged workflow, subagent-driven development with phased review, TDD Red-Green-Refactor, git-worktree isolation, Socratic brainstorming, a composable skill library | The whole `spec → ship` pipeline backbone, splitting work across role-specialized subagents, mandatory TDD, multi-stage / adversarial review, and dialogue-first requirement clarification |
+| [**Superpowers**](https://github.com/obra/Superpowers) (obra) — a complete coding-agent methodology | End-to-end staged workflow, subagent-driven development with phased review, TDD Red-Green-Refactor, git-worktree isolation, Socratic brainstorming, a composable skill library | The whole `prd → ship` pipeline backbone, splitting work across role-specialized subagents, mandatory TDD, multi-stage / adversarial review, and dialogue-first requirement clarification |
 | [**ECC**](https://github.com/affaan-m/ECC) (affaan-m) — an agent-harness "operating system" | A large layered system of agents / skills / hooks / rules, passive hooks that auto-enforce, rules-as-infrastructure, memory persistence across sessions | The layered, independently-installable sub-plugin suite, passive hooks that enforce discipline, and distilling engineering conventions into loadable constraint skills |
-| [**skills**](https://github.com/mattpocock/skills) (mattpocock) — "Skills For Real Engineers" | Targets real failure modes (misalignment / verbosity / quality / architecture), deep questioning to align on intent, shared domain language, user- vs model-invoked skills, vertical slicing | Challenge-first dialogue to pin down requirements before any code, dual-trigger skills (slash command + model auto-trigger), and the one-rule-per-file minimalism |
+| [**skills**](https://github.com/mattpocock/skills) (mattpocock) — "Skills For Real Engineers" | Targets real failure modes (misalignment / verbosity / quality / architecture), deep questioning to align on intent, shared domain language, user- vs model-invoked skills, vertical slicing | Challenge-first dialogue to pin down requirements before any code, dual-trigger skills (slash command + model auto-trigger), and the single-source-of-truth minimalism |
 
 **Where BB-Spec goes its own way** — differentiators none of the three combine:
 
-- **Three-agent isolated execution** — the Impl agent *physically never sees the spec*, only the tests, so it cannot quietly "teach to intent"; tests, implementation, and review are written by mutually-blind agents.
+- **Three-agent isolated execution** — the Impl agent *physically never sees the PRD*, only the tests, so it cannot quietly "teach to intent"; tests, implementation, and review are written by mutually-blind agents.
 - **Disk documents as the only handoff** — every stage hands off a file, not chat memory, so a run resumes losslessly across sessions, `/clear`, or even a different model picking up the work.
-- **Bidirectional spec ⇄ code loop** — not just spec → code: `/doc-update` sweeps the whole repo and updates specs as the code drifts.
+- **Code ⇄ PRD, traceable both ways through git** — code is the single source of truth and the PRD only records why; every commit carries a requirement trailer, so you can go from a feature to its code and from a function back to the requirement and trade-offs behind it, with no hand-synced rule documents in between to go stale.
 
 ---
 

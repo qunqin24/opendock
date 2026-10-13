@@ -9,7 +9,7 @@
 
 <p align="center">
   <strong>Memory for coding agents.</strong><br>
-  What one session learns, the next one is told — in Claude Code, Claude Desktop, Codex, Gemini CLI, OpenCode and Cursor, from the same memory.
+  What one session learns, the next one is told — in Claude Code, Claude Desktop, Codex, OpenCode, Cursor, Qwen Code, Factory Droid, GitHub Copilot and Antigravity, from the same memory.
 </p>
 
 <p align="center">
@@ -108,13 +108,9 @@ Codex reviews a plugin's hooks before running them: open `/hooks` once and accep
 
 </td></tr>
 
-<tr><td><strong>Gemini CLI</strong></td><td>
+<tr><td><strong>Gemini CLI</strong><br><sub>no longer supported</sub></td><td>
 
-```sh
-gemini extensions install https://github.com/WizardingCode-io/wizardingcode-mem
-```
-
-It is also listed in the [Gemini CLI extensions gallery](https://geminicli.com/extensions/browse/).
+Google moved Gemini CLI's users to Antigravity CLI, and wizardingcode-mem followed: `wizardingcode-mem install antigravity`. An old Gemini CLI install of wizardingcode-mem keeps running until removed: hooks written straight into Gemini's `settings.json` now do nothing, but the 0.4.4 Gemini extension runs its own bundled binary and MCP server, which keep working at 0.4.4 and fail open once the database has moved to a newer schema. `wizardingcode-mem uninstall gemini` removes either (`install` and `doctor` point it out). Memories from Gemini sessions stay.
 
 </td></tr>
 
@@ -133,6 +129,21 @@ With the binary on the machine ([step 2](#get-the-binary-for-claude-desktops-cha
 ```sh
 wizardingcode-mem install cursor
 ```
+
+</td></tr>
+
+<tr><td><strong>Qwen Code, Factory Droid, GitHub Copilot, Antigravity</strong></td><td>
+
+With the binary on the machine ([step 2](#get-the-binary-for-claude-desktops-chat-and-cursor)), one command each:
+
+```sh
+wizardingcode-mem install qwen
+wizardingcode-mem install droid
+wizardingcode-mem install copilot      # the Copilot CLI and VS Code agent mode
+wizardingcode-mem install antigravity  # the CLI, the 2.0 app and the IDE
+```
+
+Each writes the agent's own hooks file and MCP server beside whatever you already have there, and `uninstall <name>` puts it back. The Copilot CLI gets its MCP server; for VS Code, `install copilot` prints the `code --add-mcp` line to run. These four are from the documentation and not yet run in a live session ([ADR 0016](docs/adr/0016-more-agents.md)).
 
 </td></tr>
 </table>
@@ -171,7 +182,7 @@ needs Node.js 18 or later; or download `wizardingcode-mem-windows-x64.exe` from 
 </td></tr>
 </table>
 
-Each of these checks the binary's SHA-256 against the release before using it. The curl script and `npx … install` also set up every supported agent and app they find; `wizardingcode-mem install <name>` does one (`claude-code`, `claude-desktop`, `codex`, `cursor`, `gemini`, `opencode`). Configuration files are backed up first, and `wizardingcode-mem uninstall <name>` puts them back. Where an agent has both the plugin and this direct install, the plugin stands down, so nothing is said twice.
+Each of these checks the binary's SHA-256 against the release before using it. The curl script and `npx … install` also set up every supported agent and app they find; `wizardingcode-mem install <name>` does one (`claude-code`, `claude-desktop`, `codex`, `cursor`, `opencode`, `qwen`, `droid`, `copilot`, `antigravity`). Configuration files are backed up first, and `wizardingcode-mem uninstall <name>` puts them back. Where an agent has both the plugin and this direct install, the plugin stands down, so nothing is said twice.
 
 ### Check it
 
@@ -219,6 +230,10 @@ The agent also gets three tools — `memory_search`, `memory_get` and `memory_sa
 
 Memories are kept as what they are: a title, a body of sentences that were actually said, the files they are about, the kind (`decision`, `fix`, `gotcha`, `convention`, `change`, `discovery`), an importance from 1 to 5, and where they came from.
 
+## Modules
+
+wizardingcode-mem is one engine with modules: each module can add context at the hook moments, offer tools to the agent and add views to the viewer, all inside one budget. Memory is the one module shipped today; `WIZARDINGCODE_MODULES` (default `memory`) adds modules: memory is always on, and stopping it for a project is the existing per-project "memory off". See [ADR 0019](docs/adr/0019-one-engine.md).
+
 ## The viewer
 
 ```sh
@@ -231,9 +246,10 @@ A local page over your memories, in WizardingCode's app design:
 - **Turns** — every prompt and what it became, with filters (agent, status, source, period), sortable columns, a search over prompts and an export to CSV. Each turn opens with its prompt, files, commands, answer and the memories it left behind; Markdown is shown formatted.
 - **Overview** — the project's numbers and charts: memories and turns per week, by kind, by importance, and how fast the hooks have been.
 - **History** — past conversations with Claude Code and Codex, searchable, for one project or all of them (see [Learn from past sessions](#learn-from-past-sessions)).
-- **Settings** — agents, health, the judge, retention, history, storage, backups and the viewer, one page each.
+- **Across projects** — which projects read each other, the suggested links with the signal behind each (Link / Reject), and your rules: proposals to make yours and the ones you accepted (Undo). See [Linked projects and your rules](#linked-projects-and-your-rules).
+- **Settings** — agents, health, the judge, retention, history, search, storage, backups and the viewer, one page each.
 
-⌘K (or the search in the top bar) searches every project at once. Light and dark; `[` folds the projects panel, `1`–`5` switch views. It listens on the loopback only, behind a token in the URL, loads nothing from the network, and stops itself after half an hour without you or a tab. It opens by itself when a session starts, in any agent — one viewer per machine, never a second tab — and stays closed under CI, over SSH, or when you turn that off.
+⌘K (or the search in the top bar) searches the project and the ones linked to it, or every project at once with one switch. Light and dark; `[` folds the projects panel, `1`–`6` switch views. It listens on the loopback only, behind a token in the URL, loads nothing from the network, and stops itself after half an hour without you or a tab. It opens by itself when a session starts, in any agent — one viewer per machine, never a second tab — and stays closed under CI, over SSH, or when you turn that off.
 
 ## Learn from past sessions
 
@@ -252,6 +268,38 @@ wizardingcode-mem history search <words>      # find what was said; also the MCP
 - **Stays on your machine.** The only thing that can leave is a TypeSafe judgement, and only if you set a key.
 - **Imports from claude-mem** inside the period history covers can be archived with `history replace-imports` (the viewer shows the count first). Nothing is deleted.
 - **To undo:** `history restore-imports` brings the archived imports back; `history forget` deletes the conversation index (it is rebuilt only if you ask).
+
+## Search by meaning (optional)
+
+Searches match words. With a small model downloaded once, they also find notes by what they mean, when the note uses other words than the question, or another language (Portuguese and English meet).
+
+```sh
+wizardingcode-mem embed download --backfill   # about 140 MB, once; then a vector for every note already there
+wizardingcode-mem embed status                # present, size, switched on
+wizardingcode-mem embed delete                # remove the model and its vectors; searches match words again
+```
+
+`install` asks once in a terminal (`--semantic` agrees in advance, `--no-semantic` skips the question), and the viewer's **Settings → Search** page downloads it with a progress bar, fills the vectors, turns it on or off and deletes it. `doctor` says how it stands.
+
+- **Where it is used:** `memory_search` and `history_search` (the agent's tools), the viewer's ⌘K search and its History view. **Never** to choose what is added to your agent's context: what the hooks inject is still chosen by words, files and importance alone.
+- **What it costs:** the 146 MB model in `~/.wizardingcode/mem/models`, and about 350 bytes per note in the database (vectors travel in backups, so a restore does not need a rebuild). A search across every project takes about 10 ms more in the viewer. The agent's `memory_search` pays more: the MCP server opens a connection per call and rebuilds the packed vectors each time, about 73 ms more per call on a store of 90,000 notes (ADR 0017).
+- **The only download, and nothing of yours goes out:** a fixed address, checked against a pinned checksum and size before it is used. The model is [potion-multilingual-128M](https://huggingface.co/minishlab/potion-multilingual-128M) by Minish Lab (MIT), repacked for this binary; no resident process, no generative model.
+- **Turn it off** from Settings or with `WIZARDINGCODE_MEM_SEMANTIC=off`; the model is kept until you delete it.
+
+## Linked projects and your rules
+
+Each session reads its own project. Two things widen that, and both wait for your yes.
+
+**Linked projects.** When an API, a web app and a mobile app are one product, or a project uses a library of yours, what was learned in one is worth knowing in the other. wizardingcode-mem suggests links from exact signals, never from a model: two remotes with the same owner *and* a shared name (`shop-api`, `shop-web`; the owner alone never suggests, so forty client repositories under one account are not one group), a `package.json`, `composer.json`, `go.mod` or `Cargo.toml` that names the other project, or one workspace. You confirm or reject each one in the viewer's **Across projects** view, or ask your agent, which has a `project_links` tool to list, link, unlink, confirm and reject. There is no terminal command for it.
+
+- **Same product** links read both ways; **uses** is one way: the project sees the library, the library does not see it. Links never chain.
+- **Little, and labelled:** linked projects take at most 15% of the session brief (only notes of importance 4 or more, marked "from <project>") and at most one note per prompt, only when it beats the project's own best. `memory_search` and the viewer search the project and its linked ones, each result named with its project.
+- Deciding on a pair decides it: confirming or rejecting one suggestion rejects the pair's other one (a library you said a project *uses* does not come back as the same product), a rejected pair is never suggested again, and unlinking counts as a rejection. Linking by hand still works on a rejected pair.
+- A project with memory off feeds no other project: its notes leave the linked projects, and its rules leave every project.
+
+**Your rules.** A convention or decision that repeats in projects not linked to each other, or one you said holds everywhere, is proposed in the viewer as one of *your* rules. "Said" means you typed it, in a short sentence that holds both a rule phrase ("always", "in every project", "sempre que", "usa sempre", "a partir de agora") and the rule's own words: pasted reports, code, quotes and long prompts do not count, and with a TypeSafe key the judge must be sure the rule is personal. Make it yours and it reaches every project and every agent, marked "(you)", in at most 15% of the brief; the project copies are set aside, never deleted, and Undo brings them back. Nothing becomes yours without the yes.
+
+Suggestions and proposals are worked out in the background after distilling, never while you wait; with no link and no rule of yours, what your agent sees is exactly what it saw before. Older binaries (0.5.0) cannot open the database once a newer one has migrated it: update every agent together.
 
 ## Settings
 
@@ -273,6 +321,7 @@ One page at a time, in groups:
 | **Judge** | Paste a TypeSafe key (optional) and turn it on or off |
 | **Retention** | Choose how long old turns are kept, preview what a clean-up removes, run it |
 | **History** | Import past sessions and watch the progress, update or forget the conversation index, replace claude-mem's imports (and restore them) |
+| **Search** | Download the search model, fill its vectors, turn search by meaning on or off, delete it |
 | **Storage** | Move the database to another disk, an external drive or a NAS |
 | **Backups** | Pick a folder or a bucket, how often and how many to keep; back up now or restore one |
 | **Viewer** | Whether the viewer opens when a session starts |
@@ -296,6 +345,7 @@ Edit `~/.wizardingcode/mem/env` yourself, or set the variable in the environment
 | `TYPESAFE_API_KEY` | Turns on the TypeSafe judge | — |
 | `WIZARDINGCODE_MEM_TYPESAFE` | `off` keeps the key but lets the rules judge alone | `on` |
 | `WIZARDINGCODE_MEM_RETENTION_DAYS` | How long `compact` keeps finished turns no memory came from | `90` |
+| `WIZARDINGCODE_MEM_SEMANTIC` | `off` keeps the search model but searches by words only | `on` |
 | `WIZARDINGCODE_MEM_UI_AUTO_OPEN` | Open the viewer when a session starts | `on` |
 | `WIZARDINGCODE_MEM_STORE_DIR` | Where the database lives, when it was moved to another disk (set by **Storage**, not by hand) | the data directory |
 | `WIZARDINGCODE_MEM_BACKUP_TO` | Where backups go: a folder, or `s3://bucket/prefix` | — |
@@ -323,8 +373,9 @@ The binary is at `~/.wizardingcode/mem/bin/wizardingcode-mem`; put that director
 | `wizardingcode-mem backup` · `--list` · `--restore <name>` | A copy to the configured folder or bucket, now; what is there; one of them back in place |
 | `wizardingcode-mem import claude-mem` | Brings memories over from claude-mem |
 | `wizardingcode-mem history import` · `index` · `search` · `forget` · `replace-imports` · `restore-imports` | Learn from past sessions (see above) |
+| `wizardingcode-mem embed download` · `status` · `delete` · `backfill` | Search by meaning (see above) |
 | `wizardingcode-mem rejudge` | Asks TypeSafe to judge imported memories properly |
-| `wizardingcode-mem install [<name>]` · `uninstall <name>` | The direct install: every agent and app found, or one (`claude-code`, `claude-desktop`, `codex`, `cursor`, `gemini`, `opencode`) |
+| `wizardingcode-mem install [<name>]` · `uninstall <name>` | The direct install: every agent and app found, or one (`claude-code`, `claude-desktop`, `codex`, `cursor`, `opencode`, `qwen`, `droid`, `copilot`, `antigravity`) |
 
 ## TypeSafe, if you want it
 
@@ -342,7 +393,7 @@ What is sent is the text of the turn being judged, and only that. If the service
 
 - **Redaction before storage.** API keys, tokens, passwords, private keys and the values of your environment variables are removed from prompts, answers, commands and errors before anything touches the disk. Text inside `<private>…</private>` is never stored.
 - **One file, yours.** `~/.wizardingcode/mem/wizardingcode-mem.db`, SQLite in WAL mode. Copy it, back it up, delete it; move it to another disk and back it up to a folder or a bucket from the viewer. `WIZARDINGCODE_HOME` moves the whole `~/.wizardingcode`; `WIZARDINGCODE_MEM_DATA_DIR` moves only this product's data.
-- **No telemetry, no account, no network** — except the TypeSafe requests you opt into, and the one download of the binary.
+- **No telemetry, no account, no network** — except the TypeSafe requests you opt into, the one download of the binary, and the one download of the search model if you ask for it.
 - **A project is a repository.** Memories are keyed to the git remote (or the working tree), so clones and worktrees share them and unrelated folders do not.
 - **Removable.** `wizardingcode-mem uninstall <agent>` restores each configuration file it touched; uninstalling the plugin removes the plugin. Delete `~/.wizardingcode/mem` to delete everything.
 
@@ -364,9 +415,12 @@ The importer can only map claude-mem's types onto ours and give every memory of 
 | Claude Desktop, Cowork and Code tab | plugin, added in the app | hooks | session start, every prompt | Code tab in use; Cowork from the documentation |
 | Claude Desktop, chat | MCP server in its config, across every project | `memory_save` when Claude saves | `memory_search` when Claude asks | in use |
 | Codex | plugin, from the marketplace | hooks + rollout | session start, every prompt | verified up to the prompt; turn end as documented |
-| Gemini CLI | extension, from the release | hooks | session start, every prompt | verified at session start; turns as documented |
 | OpenCode | npm plugin | the plugin API | the system prompt | verified up to the prompt |
 | Cursor | plugin | hooks | session start | from the documentation; not yet run |
+| Qwen Code | direct install (`~/.qwen/settings.json`) | hooks | session start, every prompt | from the documentation; not yet run |
+| Factory Droid | direct install (`~/.factory/hooks.json`) | hooks | session start, every prompt | from the documentation; not yet run |
+| GitHub Copilot, CLI and VS Code | direct install (`~/.copilot/hooks/wizardingcode-mem.json`) | hooks (prompts and turn ends) | session start | from the documentation; not yet run |
+| Antigravity, CLI, 2.0 and IDE | direct install (`~/.gemini/config/hooks.json`) | nothing yet: no prompt event, no documented transcript | the first model call | from the documentation; not yet run |
 
 "As documented" means the adapter follows the agent's published hook contract and has not yet been exercised in a live session on that event; the [decision records](docs/adr/0006-m3-multi-agent.md) say exactly what was captured and what was not.
 

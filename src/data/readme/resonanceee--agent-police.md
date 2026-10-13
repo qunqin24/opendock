@@ -21,11 +21,14 @@ Then reference it in your project (or global) opencode config:
 ```json
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugin": ["@resonanceee/agent-police"]
+  "plugins": ["@resonanceee/agent-police"]
 }
 ```
 
-You can also point the plugin entry at a local checkout of this repo (`"plugin": ["./plugin.ts"]`) if you prefer to run from source.
+Requires opencode 2.0 or newer (V2 plugin API). Version 0.1.x is the last
+opencode 1.x line.
+
+You can also point the plugin entry at a local checkout of this repo (`"plugins": ["./plugin.ts"]`) if you prefer to run from source.
 
 Configure the reviewer model through environment variables before starting opencode:
 
@@ -212,7 +215,7 @@ Reproducibility: tracks, runner, and analyzer live in `test/rb/`. See `test/rb/r
 
 - `bash` is gated by the reviewer. `read`, `edit`, `write`, `grep`, and `glob` are observed only and never blocked.
 - Review state and the evidence ledger are in memory per session. Restarting opencode resets them.
-- Human review uses opencode's native permission dialog (`POST /api/session/{id}/permission`), added in opencode 1.18.
+- Human review uses opencode's native permission dialog, raised through the plugin permission.evaluate hook (opencode 2.x). The judge's escalation turns the command's own permission check into an ask; allow/deny arrive back on the event stream. Allow runs the command once and approves retries without re-judging; reject sticks for the session and tells the agent not to retry.
 - Latency: one judge call per new command, plus one per justification round. On chat models keep the reviewer on a cheap flash class model; with `jev-latest` a decision call is ~0.3–0.7s. The monitor, when enabled, adds no latency.
 - `AGENTPOLICE_MAX_TOKENS` (default 4096) caps reviewer responses. Some providers fail when an uncapped request has to reserve the model's full context against your credit balance.
 

@@ -177,6 +177,23 @@ what that verification covers, and what it does not, is in
 | [acceptance.md](./docs/acceptance.md) | every acceptance criterion, and what is not done |
 | [docs/README.md](./docs/README.md) | the full index, and what supersedes what |
 
+## Claude Code plugin
+
+This repository is also a Claude Code plugin marketplace. Its one plugin
+carries a `birddog` skill that teaches a Claude Code session how to use the
+CLI (discover, write a config, start an owned instance, follow events,
+acknowledge, stop) and how to read what it reports. It is versioned with the
+CLI, so the skill describes the release it ships with.
+
+```
+/plugin install birddog --marketplace BrutalSystems/birddog
+```
+
+On Claude Code older than 2.1.275, add the marketplace first with
+`/plugin marketplace add BrutalSystems/birddog`, then run
+`/plugin install birddog@birddog`. The plugin installs no hooks of its own;
+`birddog hooks install` stays a separate, explicit step.
+
 ## Keeping it up to date
 
 Publishing a release does not touch an installed copy: `birddog --version`

@@ -40,6 +40,7 @@ Get an API key at [search1api.com](https://www.search1api.com/).
 
 - `search1api_search` — search the live web
 - `search1api_news` — search current news
+- `search1api_ask` — automatic source routing and relevance ranking (5 credits)
 - `search1api_crawl` — retrieve readable page content
 - `search1api_sitemap` — discover site links
 - `search1api_trending` — explore GitHub or Hacker News trends
@@ -54,3 +55,26 @@ npm test
 ## License
 
 MIT
+
+
+## Current API capabilities
+
+Search supports `bingcn`, `yandex`, and `grokipedia`; `sogou` is removed.
+Search and news support `day`, `week`, `month`, and `year`. Search accepts
+`page` on engines with native pagination.
+
+The default Ask tool accepts only a natural-language `query`. The server
+chooses engines and a time window and returns `query`, `intent`, ranked
+`results`, and `errors`. Ask results include `source` and `relevance`; this
+endpoint returns search results rather than a generated answer. Each call
+costs **5 credits**. Use ordinary search when the engine and keywords are known.
+
+Engine-specific search/news attributes stay inside optional per-result
+`metadata`: GitHub uses `kind`, `stars`, `language`, and `num_comments`;
+Hacker News news results use `story_url`, `points`, and `num_comments`.
+`published_date` stays optional at the result top level. Zero counts are
+preserved and unavailable fields are omitted. Credit Grokipedia results as
+"Powered by xAI".
+
+`search1api_ask` is registered by default. Authenticated requests use
+`search1api-cli>=2.0`; existing shared OAuth sessions and API keys still work.

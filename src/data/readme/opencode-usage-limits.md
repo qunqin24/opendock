@@ -33,7 +33,7 @@ Monthly                         60%
 - **两个用量来源**：OpenCode Go、ClinePass，按当前模型自动切换。
 - **三个窗口**：5 小时滚动 / 周 / 月，含百分比、进度条、重置倒计时。
 - **绿黄红提醒**：< 50% 绿、50–79% 黄、≥ 80% 红（阈值见 `core.ts`）。
-- **金额显示**：OpenCode Go 显示 `已用 / 限额`（$12 / $30 / $60）；ClinePass 的限额从 `/users/me/plan` 实时读取。
+- **金额显示**：ClinePass 显示 `已用 / 限额`（限额从 `/users/me/plan` 实时读取，$10 / $25 / $50）；OpenCode Go 只显示百分比，并在**底部**标注当前模型的额度（如 `$80/$160`）供参考。
 - **整体折叠**：点标题行收起，只留一行；状态持久化，重启保持。
 - **不打扰**：选中其他 provider 时**完全不渲染**，不占空间。
 - **限流退避**：遇 429 / 5xx / 网络失败自动指数退避（最长 5 分钟），并显示 `retry in Ns`。
@@ -44,7 +44,7 @@ Monthly                         60%
 
 | Provider ID | 名称 | 用量接口 | 显示金额 |
 | --- | --- | --- | --- |
-| `opencode-go` | [OpenCode Go](https://opencode.ai/docs/go) | `GET https://opencode.ai/zen/go/v1/usage` | 是（$12 / $30 / $60） |
+| `opencode-go` | [OpenCode Go](https://opencode.ai/zh/go) | `GET https://opencode.ai/zen/go/v1/usage` | 否（只显示百分比；底部标注当前模型额度） |
 | `cline-pass` | [ClinePass](https://docs.cline.bot/getting-started/clinepass) | `GET https://api.cline.bot/api/v1/users/me/plan/usage-limits` | 是（从 `/users/me/plan` 实时读取套餐上限） |
 
 > Cline 的公开文档见 [Cline API](https://docs.cline.bot/api/overview)。
@@ -96,7 +96,7 @@ CLI 插件在本地 TUI 进程内运行，因此可以直接读取 `auth.json` �
 | 选项 | 类型 | 默认 | 说明 |
 | --- | --- | --- | --- |
 | `refreshMs` | number | `30000` | 轮询间隔（毫秒） |
-| `limits` | object | — | 覆盖内置额度，如 `{ "opencode-go": { "monthly": 100 } }` |
+| `limits` | object | — | 仅作 ClinePass 的回退：套餐上限读取失败时使用，如 `{ "cline-pass": { "hour5": 10, "weekly": 25, "monthly": 50 } }` |
 
 配色阈值写在源码中：`core.ts` 的 `WARN_AT` / `DANGER_AT`，`tui.tsx` 的 `readPalette`。
 

@@ -13,7 +13,7 @@
     <img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg" alt="License">
   </a>
   <a href="plugin/pyproject.toml">
-    <img src="https://img.shields.io/badge/version-0.3.5-green.svg" alt="Version">
+    <img src="https://img.shields.io/badge/version-0.3.6-green.svg" alt="Version">
   </a>
   <a href="plugin/pyproject.toml">
     <img src="https://img.shields.io/badge/python-%3E%3D3.12-brightgreen.svg" alt="Python">
@@ -255,3 +255,12 @@ See the [LICENSE](LICENSE) file for details.
 ---
 
 **Powered by** [Reflexio](https://github.com/ReflexioAI/reflexio) · **Runs on** [Claude Code](https://claude.com/claude-code), Codex, and OpenCode · **Written in** Python 3.12+
+
+Search hooks reserve a durable request identity in the session buffer before
+retrieval. The corresponding response is published with that same identity;
+retries keep it, and searches after a frozen publish belong to a later response.
+Older buffered publishes keep their existing retry IDs. Cancelled turns do not
+attach their retrieved-playbook references to a later prompt's answer. Search
+alone does not supply a conversation or an outcome for offline tuning: the
+response still needs to be published. Buffer writes and identity reservations
+share a cross-process file lock on Linux, macOS, and native Windows.

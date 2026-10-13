@@ -18,7 +18,7 @@ next run onward, and does not retranslate existing books.
 - **Skill** `feature-books` — teaches the AI to load a feature book 1 hop before editing, respect the fence, and update the Change Log
 - **Rules** (`rules/AGENTS.md`) — automatically loaded in Antigravity to ensure the agent consults Feature Books before code changes and reconciles them afterward
 - **Workflows**: initialize, fix, version, create, impact, sync, configure, learn from PR reviews,
-  claim, task, and triage — invoke `$feature-books` or ask naturally in Antigravity or Codex, use `/<command>` in
+  claim, product map, task, and triage — invoke `$feature-books` or ask naturally in Antigravity or Codex, use `/<command>` in
   Claude Code, or `use <tool>` in OpenCode
 - **Hooks** (all plain deterministic scripts — no AI/LLM call in any of them):
   - `SessionStart` (Claude/Codex) / `PreInvocation` (Antigravity) — `fb-version-check` compares the vault's stamped version against the installed plugin, and `fb-autobook --snapshot` snapshots clean files
@@ -153,6 +153,7 @@ Ask the AI:
 - `use fb-impact tool` to analyze blast radius
 - `use fb-claim tool` to add a file to a feature's fence
 - `use fb-api-spec tool` to sync Yaak requests with new/changed APIs
+- ask for a product module map (follows `commands/fb-product-map.md`)
 
 ### Claude Code
 ```bash
@@ -378,6 +379,23 @@ The architecture lives in a **profile** at `.feature-books/api-specs/profile.jso
 ```
 
 `upsert` is idempotent (same entrypoint + method + route updates in place) and never deletes.
+
+## Product module map
+
+`/fb-product-map <focus area> [slug]` turns a "what do we have, and what should we build next in
+<focus area>?" question into a spec bundle under `specs/`:
+
+- `<slug>.md` - every module with a UI entry point (maturity, backend, owning book), the focus
+  area's capability matrix, integration gaps, and options `O1..On` with estimated impact/effort,
+  a suggested order, and open questions for the product owner
+- `<slug>-diagrams.md` - module map, capability heatmap, integration flow, opportunity quadrant
+  (`assets/<slug>/NN-name.{svg,dark.svg,png}`)
+- `<slug>.html`, `<slug>-diagrams.html` - rendered copies with theme toggle and a zoom/pan lightbox
+- `<slug>-prototypes.html` - click-through sketches of the top options, styled after the live app
+
+The survey runs one subagent per navigation group in parallel when the runtime has subagents.
+Diagrams use the `diagram-design` skill when it is installed and fall back to
+hand-written SVG otherwise. Page and prototype shells live in `templates/product-map/`.
 
 ## Cross-repository capabilities
 

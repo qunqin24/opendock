@@ -24,7 +24,7 @@
 
 ## 演示
 
-[![asciicast](https://asciinema.org/a/1264754.svg)](https://asciinema.org/a/1264754)
+[![asciicast](docs/asciicast.svg)](https://asciinema.org/a/1264754)
 
 安装插件 → 重启 opencode → `/models` 中选择 Command Code 模型 → 直接对话。
 
@@ -47,7 +47,68 @@ opencode plugin @herouucn/opencode-commandcode
 
 本地开发可直接用路径：`"plugin": ["file:///absolute/path/to/opencode-commandcode"]`。
 
+### 版本兼容（opencode v1 / v2 双入口）
+
+本插件是 one-package 双版本，**入口随 opencode 大版本而不同**：
+
+| opencode | 入口 | 说明 |
+|---|---|---|
+| **v2** | 包名或目录 | 组合入口（`plugin/index.ts`），读 `id` / `setup` |
+| **v1**（≥ 1.18.29） | `@herouucn/opencode-commandcode/plugin.v1` | 纯 V1 adapter（对应文件 `plugin/v1.ts`） |
+
+v1 的 `opencode.json` 写法：
+
+```jsonc
+// opencode.json（opencode v1）
+{
+  "plugin": ["@herouucn/opencode-commandcode/plugin.v1"]
+}
+```
+
+本地路径用法（v1）：
+
+```jsonc
+// opencode.json（opencode v1，本地开发）
+{
+  "plugin": ["file:///absolute/path/to/opencode-commandcode/plugin/v1.ts"]
+}
+```
+
+**v1 不要挂目录或包名**（即 `"plugin": ["@herouucn/opencode-commandcode"]`）。原因：v1 的配置挂载路径对含顶层 await 的目录入口求值会崩溃（模型列表为 0），且 v1 运行时不注入 `@opencode/plugin`，所以 v1 必须改用不依赖它的纯 V1 adapter `plugin/v1.ts`。
+
 重启 opencode 后在 `/models` 中选择 Command Code 模型即可对话。
+
+### 模型引用格式（V1 / V2 通用）
+
+模型引用一律写成 `commandcode/<完整 id>`，**两个大版本格式完全相同**，一份配置（如
+oh-my-opencode-slim、`opencode.json` 的 `model` 字段、`opencode run --model`）无需按版本分叉：
+
+| 场景 | 写法 |
+| --- | --- |
+| deepseek v4.1 flash | `commandcode/deepseek/deepseek-v4.1-flash` |
+| MiniMax M3 Free | `commandcode/MiniMaxAI/MiniMax-M3-Free` |
+
+原因是 `src/catalog.ts` 的 `toConfigKey` 恒等返回目录 id（含首段、含内部斜杠、含大小写），
+V1 注入的 config key 与 V2 的 model id 逐字一致。（历史版本曾在 V1 剥掉首段并转小写，
+导致 V1 写 `commandcode/deepseek-v4.1-flash`、且 `minimax/…` 与 `MiniMaxAI/…` 撞 key——已废弃。）
+
+### V2 下用 `auth login` 录入 API key
+
+opencode v2 的 `auth login` 候选列表来自 **integration 注册表**，插件已按 v2 机制注册
+`commandcode` integration（一个 key 方法 + 一个 `COMMANDCODE_API_KEY` env 方法）：
+
+```bash
+opencode auth login commandcode             # v2：位置参数（/connect 里搜 Command Code）
+opencode auth login --provider commandcode  # v1：flag 形态（见上表入口差异）
+```
+
+- 通过 `auth login` 录入的 key 会存成 **credential，并覆盖插件注入的 `settings.apiKey`
+  模板**（即 credential 优先；没有 credential 时才回落到模板 / 环境变量）。
+- 环境变量方式依然可用；此时 `opencode auth list` 会把 `COMMANDCODE_API_KEY` 显示为
+  `commandcode` 的 **environment** 连接（无需登录）。
+- 注册 integration 后插件会同时把 provider 的 `activation` 固定为 `enabled`（opencode v2
+  的 provider 可用性判定在有同名 integration 时不再走「无 integration」兜底分支），
+  因此未配置任何凭证时 provider 与模型列表仍然可用。
 
 ## 配置
 

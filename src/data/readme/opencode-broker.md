@@ -108,7 +108,7 @@ so nothing is ever spent on a provider you did not list.
 | `budgets` | Per provider, the subscription's `windows` (`id`, `periodMs`, `meter`: `requests` or `tokens`, `capacity`, optional `anchor`) and optionally `planUsage.type` (`anthropic-oauth`, `openai-oauth`, `bailian-cli`, or the generic `http`) to read exact usage from the provider. |
 | `deals` | Time-limited discounts (`providerID`, `multiplier`, optional `modelPrefix`, `daily`, `window`) the balancer leans into. |
 | `tierProviderWeights` | Per tier, a provider preference weight (>1 leans toward, <1 saves for other tiers). |
-| `trustedSubscriptionProviders` | Explicit operator attestation that an `api`-labelled provider is subscription-backed. Trusted providers may enumerate active catalog models, but trust does not bypass role, evidence, resolver, capability, probe, probation, rejection, or rollback gates. Unlisted `api` and unknown-auth providers stay quarantined. |
+| `trustedSubscriptionProviders` | Explicit operator attestation that an `api`-labelled provider is subscription-backed. Trusted providers may enumerate active catalog models, but trust does not bypass role, evidence, resolver, capability, probe, probation, rejection, or rollback gates. Unlisted `api` and unknown-auth providers stay quarantined. | Listing a provider here also suppresses OpenCode's monetary footer for its models: subscription use is not per-token spend, so the router zeroes those models' catalog prices and OpenCode shows no figure at all. Local-target providers are treated the same way; every other provider keeps its prices and still shows real pay-per-token cost.
 | `modelRoles` | Provider-qualified role-policy overrides. Product roles cannot be removed; overrides may adjust validated matchers, tiers, fit, evidence domains, `effortCeiling`, and an optional `requiredReasoningMode`. |
 | `reconcile.apply` | Dormant runtime controls: `enabled` defaults to `false`. Enabling requires absolute `overlayPath`, `generationsRoot`, and `currentLinkPath`; incomplete configuration stays off with a visible error. Package 4 owns live activation. |
 | `localModelsUrl` | The local server's model list (llama.cpp router mode `/v1/models`), polled to see what is loaded. |
@@ -535,7 +535,7 @@ group or world permission bits, and sends its value only as `x-api-key`. This ke
 and provider OAuth state out of OpenCode's auth store. Provider keys are never logged. Per provider
 you can also set `headers`,
   `bodyExtras`, `dropBodyKeys` (for a lane that rejects a parameter the client
-sends), `streamIdleMs`, `streamUsage: false`, `jsonMode: "instruct"`, `chatApi`, `messagesApi`, `responsesApi`,
+sends), `streamIdleMs`, `streamUsage: false`, `jsonMode: "instruct"`, `assembleFromStream: true` (see below), `chatApi`, `messagesApi`, `responsesApi`,
   `embeddingsApi: true` (required for `/v1/embeddings`), `forwardSessionHints: true` (forward the request's `x-opencode-session-id` and
 `x-opencode-session-kind` to this lane: llm-auth-proxy uses the kind to pick its
 prompt-cache TTL, subagent 5m otherwise 1h, and the id to link request fingerprints
@@ -551,6 +551,17 @@ Chat is offered to every provider except one with `chatApi: false`; Responses an
 offered only to providers with `responsesApi: true` and `messagesApi: true`, respectively. If no
 configured provider can serve the requested API, the gateway returns a capability-specific `502`
 without contacting the broker or an upstream.
+
+A chat, Responses or Messages request's context size is estimated as `ceil(chars / 4)` of its JSON
+body, with every image part (chat `image_url`, Responses `input_image`, Messages `image` with any
+`source`, including one inside a `tool_result` or a block-array `system`; inline base64 or a remote
+URL) counted as a flat 1,500 tokens instead of its encoded length. Messages `document` (PDF) parts
+stay counted as text: their real cost grows with page count, which the gateway cannot see, and
+chars/4 of the base64 already tends to under-count a text-heavy PDF. A 1280x720 JPEG is ~99,000 base64 characters
+but measured 222-277 real prompt tokens on qwen3.8-27b. A lane whose `maxContextTokens` (or the
+mapped name's override) is below the estimate is not offered the request; when that drops every
+lane that serves the API, the `502` says `request estimated at N tokens exceeds the context cap M
+for every lane that serves it`, M being the largest cap among those lanes.
 
 `POST /v1/embeddings` is buffered-only and is offered only to providers with
 `embeddingsApi: true`. It requires a mapped model and leases with `api: "embeddings"`, so it can
@@ -598,6 +609,50 @@ backpressure, and reports input, output, cache-read, and cache-write usage.
   error frame and is reported to the broker, but a second model's tokens are
   never spliced onto the first one's sentence. The stream watchdog measures
   silence, not total duration, so long generations are not cut off.
+- **A lane that cannot stream is asked for a buffered reply
+  (`bufferStreamingUpstream: true`).** The fleet auth proxy refuses streaming on
+  purpose: its Anthropic chat route rejects `stream` unless it is false, and its
+  Anthropic Responses route rejects a `stream` key at all. A caller that streams
+  -- Home Assistant Assist does -- therefore failed with `llm-auth-proxy: stream
+  must be false` every time its profile fell back to that lane. On a provider
+  with `"bufferStreamingUpstream": true` a streaming chat or `/v1/responses` ask
+  goes upstream buffered, with `stream` and `stream_options` removed, and the
+  finished reply is written to the client as the equivalent SSE stream: chat
+  sends role and content deltas (with `reasoning_content`), one `tool_calls`
+  delta, the `finish_reason` chunk, a usage chunk only when the client asked for
+  `stream_options.include_usage`, then `[DONE]`; `/v1/responses` sends typed
+  events from `response.created` through `response.completed`, `.incomplete` or
+  `.failed`. The client sees no tokens until the reply is whole, which is what
+  keeps failover, lease settle and release, usage reporting and the failure log
+  identical to the buffered path; `timeoutMs` is the deadline and no stall
+  watchdog applies. This is the mirror image of `assembleFromStream`, so a lane
+  that sets both is refused when the config loads. A lane that was asked to
+  stream but answered with one buffered chat document instead is dressed as a
+  stream through the same framing, so a streamed client keeps its tool calls and
+  reasoning there too; it used to receive content and a `finish_reason` only.
+- **A buffered request can be cancelled on a llama.cpp router lane
+  (`assembleFromStream: true`).** llama.cpp in router mode (measured on build
+  b11552) does not stop a NON-streaming generation when its HTTP client hangs
+  up; it stops a streaming one within about 0.2 s. So when the gateway's
+  `timeoutMs` fired, or a caller gave up, the gateway closed its connection and
+  the model kept generating to `max_tokens` -- one such orphan held a 27b slot
+  for 12 minutes, and a retry could add a second. On a provider with
+   `"assembleFromStream": true` the gateway forwards a non-streaming chat or
+   `/v1/responses` request upstream with `stream: true`. Chat also receives
+   `stream_options.include_usage` (merged into any the client sent), reads the
+   stream to `[DONE]`, and returns the `chat.completion` the buffered upstream
+   would have: content,
+  `reasoning_content`, tool calls assembled by index, `finish_reason`,
+  `logprobs`, usage, and any other field at its first non-null value. Timing
+  is the buffered path's (`timeoutMs` plus the client's abort, no stall
+  watchdog), and nothing reaches the client until the body is whole, so
+  failover, `holdOpenMs`, JSON unwrapping and accounting are unchanged. A
+   stream with an error frame, unparseable data or no terminal event is a failed
+   attempt (`stream_error`) and fails over. A Responses stream returns the full
+   `response` carried by `response.completed` (or assembles output items when a
+   compatible server omits it); `response.failed`, `error`, or no completion
+   also fails over. Off by default; it never applies to streaming requests,
+   chat `n > 1`, `/v1/messages` or `/v1/embeddings`.
 - **Usage accounting is not the client's option.** The gateway asks every
   upstream for streamed usage and strips the extra frame for clients that did
   not ask. When an upstream sends none it estimates, and says so; it never
@@ -612,6 +667,33 @@ backpressure, and reports input, output, cache-read, and cache-write usage.
   to `prepareWaitMs` (default 3 minutes). An unmapped one fails at once rather
   than holding a client that did not ask for that model. A model whose slots
   are all busy (`target-busy`) is waited out for every request.
+- **Failures are logged, successes are not.** Every authorized model request
+  that ends with a non-2xx status, or whose client disconnects, writes one JSON
+  line to stderr (journald under systemd); so does every upstream attempt that
+  failed before a later attempt succeeded. Clean successes write nothing. There
+  is no switch: the cost is one line per failure.
+
+  ```json
+  {"source":"opencode-broker-gateway","ts":"2026-10-12T14:41:33.643Z","event":"request_failed","route":"/v1/chat/completions","label":"smart","profile":"auto","tier":"smart","caller":"127.0.0.1","status":502,"attempts":[{"provider":"openai","model":"gpt-6-sol","outcome":"http_500","detail":"failed"},{"provider":"openai","model":"gpt-6-sol","outcome":"http_500","detail":"failed"}],"duration_ms":1,"streaming":false,"error":"gateway: no provider could serve the request: upstream openai HTTP 500: failed"}
+  ```
+
+  `event` is `request_failed` (non-2xx), `client_aborted` (the client hung up
+  first; `status` is what the gateway had decided, or the head already sent),
+  or `attempt_failed` (one line per failed lane of a request that then
+  succeeded, each with that one attempt). `status` is the status the gateway
+  decided, which for a `holdOpenMs` request can differ from the 200 already on
+  the wire. `caller` is the socket's remote address; `profile`/`tier` are null
+  for a session-bound request. An attempt's `outcome` is `http_<status>`,
+  `usage_limit`, `timeout`, `stalled` (streaming watchdog), `network`,
+  `stream_error`, `bad_json`, `credential` or `no_forward_config`. `detail` is
+  the upstream's error message (the `error.message` of a JSON body, else the
+  raw text) and `error` the gateway's own reply message. Both have control
+  characters stripped, `Bearer ...` and `sk-...` tokens replaced with
+  `[redacted]`, and are capped at 300 characters. Request and response bodies,
+  prompt text, headers and keys are never written. A failure before the
+  gateway key is checked (a 401) is not logged, so an unauthenticated prober
+  cannot fill the journal. Read them with
+  `journalctl --user -u opencode-gateway.service -o cat | grep '"event":'`.
 
 ### GPU tenant control
 

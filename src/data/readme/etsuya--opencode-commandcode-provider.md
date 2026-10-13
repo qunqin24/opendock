@@ -8,6 +8,7 @@
 
 - **Zero runtime dependencies.** Nothing to install but the plugin itself. No bun, no test framework, no bundler, no vendored SDK.
 - **No protocol code of its own.** SSE parsing, tool calls, reasoning blocks and image parts are delegated to opencode's own AI SDK adapters. There is no request-conversion layer and no hand-written streaming parser to keep in sync.
+- **Every protocol Command Code serves.** Chat Completions, the OpenAI **Responses** API and Anthropic Messages each ride opencode's matching native adapter. When a model advertises both OpenAI transports, the picker offers it twice: the plain key for `/chat/completions`, and a `-responses` key whose name ends in `(R)` for `/responses`.
 - **The whole catalog, not a snapshot.** Every model Command Code offers, each with its exact context window, effort levels, vision support and advertised price. See [docs/models.md](docs/models.md).
 - **Self-refreshing.** The model list is fetched from the live public catalog endpoint at startup, cached for 6 hours, and replayed into a running opencode with `/commandcode-refresh` — no restart required. The embedded snapshot is only a fallback, so starting opencode never blocks on a network request.
 - **Plan-aware instead of plan-guessing.** Command Code gates models server-side. This provider registers the whole catalog and labels the gated ones (`GPT-5.5 (Pro+)`), passing the server's rejection message through verbatim — it never infers your plan from local files, tokens or API probing. Declare a plan in the config and the picker filters for you.

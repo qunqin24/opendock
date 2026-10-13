@@ -5,9 +5,9 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.1.0-111111?style=flat-square" alt="Version">
+  <img src="https://img.shields.io/badge/version-1.3.0-111111?style=flat-square" alt="Version">
   <img src="https://img.shields.io/badge/works%20with-Claude%20Code%20%7C%20opencode-111111?style=flat-square" alt="Works with Claude Code and opencode">
-  <img src="https://img.shields.io/badge/skills-20-111111?style=flat-square" alt="20 skills">
+  <img src="https://img.shields.io/badge/skills-22-111111?style=flat-square" alt="22 skills">
   <img src="https://img.shields.io/badge/commands-6-111111?style=flat-square" alt="6 commands">
   <img src="https://img.shields.io/badge/license-MIT-111111?style=flat-square" alt="MIT license">
 </p>
@@ -127,18 +127,18 @@ entregable global de la Fase.
 | `/nueva-fase [cambio]` | Gate spec-driven: evalúa si un cambio amerita una nueva Fase y la redacta **antes** de codear. |
 | `/modo [estricto/relajado/off]` | Cambia o consulta la intensidad del recordatorio ambiental. |
 | `/track [slug \| nuevo <slug>]` | Lista, cambia o crea los planes (tracks) del repo. |
-| `/fase <FNN>` | Abre worktree y rama para una Fase, con el plan copiado adentro. |
+| `/fase <FNN \| SFx.y>` | Abre worktree y rama para una Fase o Subfase, con scope acotado y documentos aislados. |
 | `/review [commit]` | Revisa el diff actual contra el plan: detecta código sin planificar o que contradice la spec. |
 | `/audit` | Audita TODO el repo contra `architecture.md` y `diseno_db.md`: detecta drift global. |
 | `/help` | Referencia rápida de comandos y skills. |
 
-## Skills
+## Skills (22)
 
 **Documentos:** `especificar` (description + architecture + diseño DB), `planificar` (plan maestro + tareas), `bitacora` (log de incidentes), `ejecucion` (guía de arranque/deploy).
 
-**El loop de calidad:** `testear` (crea y corre tests unitarios + simulación de usuario), `verificar-dod` (gate de Definition-of-Done, sin verde no hay `[X]`), `auditar-coherencia` (drift docs↔código), `construir` (ejecuta el plan por subagentes, uno por Tarea).
+**El loop de calidad:** `testear` (crea y corre tests unitarios + simulación de usuario), `verificar-dod` (gate de Definition-of-Done con recibos auditables en `docs/logs/recibos/`), `auditar-coherencia` (drift docs↔código), `construir` (ejecuta el plan por subagentes, uno por Tarea).
 
-**Estándares de lenguaje:** `python`, `r`, `rust`, `astro`, `sql`, `ts`, `webapp`.
+**Estándares de arquitectura y lenguaje:** `frontend-standards`, `backend-standards`, `python`, `r`, `rust`, `astro`, `sql`, `ts`, `webapp`.
 
 **Empaquetadas:** `generar-diagramas` (Mermaid), `semantic-commit`, `pull-request`, `caveman`, `visualizar-datos`.
 
@@ -206,7 +206,7 @@ Reutiliza el `gemini-extension.json` de este repo. Una diferencia: Antigravity c
 
 ## Autoría
 
-`init` fija el autor de docs y commits desde tu identidad git (el usuario de GitHub conectado, si lo hay) o preguntándolo en repos locales — y lo persiste en `CLAUDE.md`/`AGENTS.md` para no volver a preguntar. **Sin coautoría LLM por defecto**: ningún commit lleva `Co-Authored-By` salvo que lo habilites explícitamente en esa sección o lo pidas.
+`init` fija el autor de docs y commits desde tu identidad git (el usuario de GitHub conectado, si lo hay) o preguntándolo en repos locales — y lo persiste en `CLAUDE.md`/`AGENTS.md` para no volver a preguntar. **Coautoría LLM activada por defecto**: los commits registran `Co-Authored-By: <Modelo> <<email>>` según el asistente o modelo activo (Claude, Gemini, ChatGPT, DeepSeek, Qwen, Kimi, etc.), a menos que el usuario elija desactivarla en el arranque o en la sección de autoría.
 
 ## Publicar en npm
 

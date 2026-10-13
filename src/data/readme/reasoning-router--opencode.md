@@ -205,8 +205,8 @@ REASONING_ROUTER_CLASSIFIER_MODEL=clef \
 reasoning-router
 ```
 
-Set `REASONING_ROUTER_CLASSIFIER_MODEL` to `clef` or `clef-flash`. It is
-required.
+Set `REASONING_ROUTER_CLASSIFIER_MODEL` to `clef`, `clef-omni`, or
+`clef-flash`. It is required.
 
 ### Laya
 

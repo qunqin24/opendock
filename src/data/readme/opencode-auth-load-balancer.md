@@ -27,18 +27,55 @@ Selection is **not** round-robin. It is weighted primarily by **weekly** usage, 
 - [Bun](https://bun.com) ≥ 1.3
 - opencode (TUI), with the Anthropic, OpenAI, and/or Kimi For Coding providers available
 
+### OpenCode 1 compatibility
+
+The default server and TUI entries target **OpenCode 1.x** (verified with **1.19.0**).
+The existing account pool is reused; accounts do not need to be registered again.
+Configure the npm package in `opencode.json`:
+
+```jsonc
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugin": ["opencode-auth-load-balancer"]
+}
+```
+
+For a local build, use the package directory or `dist/index.js`. Register the
+existing `tui/auth-load-balancer-tui.ts` entry in `tui.json` as described below.
+On OAuth inference HTTP 401, the plugin refreshes the rejected access token once
+and retries, even if its advertised expiry is still in the future. Refreshes
+share the account lock and adopt a concurrently rotated token; a second 401
+rotates to another account. A revoked refresh token requires re-login.
+
+OpenCode 2 remains an explicit opt-in through `v2.js` (or the npm `./v2`
+export), with the separate `./tui-v2` entry. Its configuration uses `plugins`
+(plural), and it uses different host APIs. Do not load a V2 entry into V1.
+V2 status and account management use server RPC; its Gist sidebar controls
+have not yet been ported from V1.
+
+Verification:
+
+```bash
+bun run typecheck
+bun test
+bun run build
+bun run scripts/smoke-v1.ts . --live  # OpenCode 1, real Opus call using the existing pool
+bun run scripts/smoke-v2.ts . --inference  # OpenCode 2, local mock Anthropic rotation
+```
+
 ---
 
 ## Install & build
 
 ```bash
 bun install
-bun run build      # → dist/index.js (a single self-contained file)
+bun run build      # V1: dist/index.js; V2: dist/v2-entry.js
 ```
 
-The bundle imports only Node built-ins, so it can be dropped into opencode as one file.
+The V1 bundle imports only Node built-ins and can be installed as one file.
+OpenCode 1 loads the default package entry. OpenCode 2 must explicitly load `v2.js`.
 
-### Load it into opencode (local / dev)
+### Load it into OpenCode 1 (local / dev)
 
 opencode auto-loads any `.ts`/`.js` file in a **plugins directory**:
 
@@ -50,13 +87,13 @@ Copy or symlink the built bundle into your opencode project's plugin dir:
 ```bash
 # macOS / Linux — symlink so rebuilds are picked up automatically
 mkdir -p .opencode/plugins
-ln -sf "$(pwd)/dist/index.js" .opencode/plugins/auth-load-balancer.js
+ln -sf "$(pwd)/dist/v1.js" .opencode/plugins/auth-load-balancer.js
 ```
 
 ```powershell
 # Windows (PowerShell) — copy (symlinks need Developer Mode / admin)
 New-Item -ItemType Directory -Force -Path .opencode\plugins | Out-Null
-Copy-Item dist\index.js .opencode\plugins\auth-load-balancer.js
+Copy-Item dist\v1.js .opencode\plugins\auth-load-balancer.js
 ```
 
 Restart opencode to load it. (opencode does **not** hot-reload plugins — see the dev loop below.)
@@ -266,7 +303,7 @@ Then register the entry in `~/.config/opencode/tui.json` (this is how opencode l
 }
 ```
 
-> **Why this shape (it matters):** TUI plugins load from the `plugin` array in `tui.json`, **not** from the server's plugins-dir glob. The server *separately* globs `{plugin,plugins}/*.{ts,js}` and loads every match as a **server** plugin — so a TUI entry dropped in `plugins/` is also loaded by the server, rejected (`must default export … server()`), and logs an error on **every** launch (and a stray scoring `.ts` there would be mis-loaded as a plugin and break provider resolution). Keeping the four files OUTSIDE `plugins/` and registering only via `tui.json` avoids that. The split into a `.ts` **entry** that **lazily imports** a `.tsx` **view** is still required because opencode's runtime SolidJS JSX transform (`@opentui/solid`) only matches `*.{tsx,jsx}` — a `.ts` cannot itself contain JSX, and the lazy import keeps the server plugin worker (which never runs `tui()`) from evaluating the SolidJS module graph. Developed against opencode / `@opencode-ai/plugin` `>=1.18.26` + `@opentui/solid` `0.5.10` (the versions currently pinned in `package.json`). The `.tsx` view **is** typechecked (`tsconfig.tui.json`) and linted here — its JSX deps (`solid-js` + `@opentui/*`) are installed as devDependencies pinned to those versions — so type/import/prop breaks are caught in CI; only its runtime rendering still needs a live opencode TUI to verify. The toast + `auth_lb_status` tool + `bun run status` CLI cover the same information regardless. (`auth-load-balancer-tui.logic.ts` has no JSX and no TUI-runtime dependency, so it is directly unit-tested rather than only typechecked.)
+> **Why this shape (it matters):** TUI plugins load from the `plugin` array in `tui.json`, **not** from the server's plugins-dir glob. The server *separately* globs `{plugin,plugins}/*.{ts,js}` and loads every match as a **server** plugin — so a TUI entry dropped in `plugins/` is also loaded by the server, rejected (`must default export … server()`), and logs an error on **every** launch (and a stray scoring `.ts` there would be mis-loaded as a plugin and break provider resolution). Keeping the four files OUTSIDE `plugins/` and registering only via `tui.json` avoids that. The split into a `.ts` **entry** that **lazily imports** a `.tsx` **view** is still required because opencode's runtime SolidJS JSX transform (`@opentui/solid`) only matches `*.{tsx,jsx}` — a `.ts` cannot itself contain JSX, and the lazy import keeps the server plugin worker (which never runs `tui()`) from evaluating the SolidJS module graph. Developed against opencode / `@opencode-ai/plugin` `>=1.18.26` + `@opentui/solid` `0.5.10` originally; development dependencies now use `0.5.17` for V2 compatibility. The `.tsx` view **is** typechecked (`tsconfig.tui.json`) and linted here — its JSX deps (`solid-js` + `@opentui/*`) are installed as devDependencies pinned to those versions — so type/import/prop breaks are caught in CI; only its runtime rendering still needs a live opencode TUI to verify. The toast + `auth_lb_status` tool + `bun run status` CLI cover the same information regardless. (`auth-load-balancer-tui.logic.ts` has no JSX and no TUI-runtime dependency, so it is directly unit-tested rather than only typechecked.)
 
 ---
 
@@ -359,8 +396,8 @@ The unit/integration suite runs with coverage **gated at 100%** (lines and funct
 
 opencode loads plugins once at startup, so the loop is:
 
-1. `bun run dev` — keeps `dist/index.js` rebuilt on every edit.
-2. Symlink `dist/index.js` into your opencode project's `.opencode/plugins/` once (see install above).
+1. `bun run dev` — keeps both server entry points rebuilt on every edit.
+2. For V1, register the package in `opencode.json` using `plugin`, or symlink `dist/index.js` into `.opencode/plugins/` (see install above).
 3. Edit code → the watcher rebuilds → **restart opencode** to reload the plugin.
 4. Use it; watch the toasts, run `bun run status`, and set `OPENCODE_AUTH_LB_DEBUG=1` to log selections.
 

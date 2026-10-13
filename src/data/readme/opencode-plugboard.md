@@ -33,7 +33,7 @@ client ──▶ plugboard listener ──▶ OpenCode session ──▶ provide
 
 ## Quick start
 
-Tested on OpenCode 2.0.26. The peer range `>=2.0.26 <2.1` allows 2.0.x patch releases.
+Tested on OpenCode 2.0.26 and 2.0.27. The peer range `>=2.0.26 <2.1` allows 2.0.x patch releases; only 2.0.26 and 2.0.27 are tested.
 
 **1. Pick a key** for your app, in the environment OpenCode starts from:
 
@@ -47,7 +47,7 @@ export PLUGBOARD_KEY_MY_APP=choose-a-long-random-string
 {
   "plugins": [
     {
-      "package": "opencode-plugboard@0.23.0",
+      "package": "opencode-plugboard@0.26.0",
       "options": {
         "keys": { "my-app": "{env:PLUGBOARD_KEY_MY_APP}" },
         "models": ["anthropic/claude-sonnet-4-6", "github-copilot/*", "opencode-go/glm-5.3-flash"],
@@ -212,6 +212,8 @@ curl -s "http://127.0.0.1:4010/v1/models?capability=vision" -H "Authorization: B
 
 ### Limits and caching
 
+`promptCache` with `affinity: "anchor"` keeps the provider prompt cache stable across requests, which gains on ChatGPT subscription models. See [prompt-cache affinity][configuration-affinity].
+
 #### Concurrency and rate limits
 
 `limits` caps how many model calls run at once, and how many an app may start per minute. Nothing queues. A call over a cap gets a 429 at once, so the provider never sees it.
@@ -275,11 +277,11 @@ Plugboard returns the model's tool calls to the caller and never runs them. The 
   {"id": "call_1", "type": "function", "function": {"name": "get_weather", "arguments": "{\"city\": \"Paris\"}"}}]}}]}
 ```
 
-Send the answer back as a `{"role": "tool", "tool_call_id": "call_1", "content": "..."}` message. Tool call ids differ by model, so do not parse them. `maxTools` (default 32) caps the tools one request may carry.
+Send the answer back as a `{"role": "tool", "tool_call_id": "call_1", "content": "..."}` message. Tool call ids differ by model, so do not parse them. `maxTools` (default 64) caps the tools one request may carry.
 
 #### Structured output
 
-`response_format` with `json_schema` returns the arguments as the message content. The model is asked to answer through a `respond` tool. The provider does not enforce the schema, so validate the result.
+`response_format` with `json_schema` returns the arguments as the message content. The model is asked to answer through a `respond` tool. The provider does not enforce the schema, so validate the result. Anthropic-only clients can get the same JSON with a forced tool call: see [structured extraction with a forced tool](https://jjjermiah.github.io/opencode-plugboard/messages#structured-extraction-with-a-forced-tool).
 
 ```sh
 curl -s http://127.0.0.1:4010/v1/chat/completions -H "Authorization: Bearer $KEY" \
@@ -300,7 +302,7 @@ curl -s http://127.0.0.1:4010/v1/chat/completions -H "Authorization: Bearer $KEY
 Send images as `data:` URLs, which always work. Plain `http(s)` URLs are fetched by the server only when you allow it.
 
 ```jsonc
-"remoteImages": { "allow": ["images.internal"] }   // or true for public addresses only
+"remoteImages": { "allow": ["images.internal"], "schemes": ["https"], "maxBytes": 5242880 }   // tightened (since 0.26.0): HTTPS only, 5 MB per image. `true` is public addresses only
 ```
 
 With `true` or an `allow` list, the server fetches only public addresses by default, and refuses loopback, private, link-local and CGNAT ranges. Turn it on only if you need it, because it makes the server fetch URLs that callers send.
@@ -314,6 +316,13 @@ With `true` or an `allow` list, the server fetches only public addresses by defa
 ```
 
 Above the cap the request gets a 400 `too_many_choices`. `n` works on Chat Completions and on `/v1/completions`.
+
+Since 0.27.0 one app can have a lower cap (#270). It only lowers the global one:
+
+```jsonc
+"maxN": 4,
+"apps": { "chat-widget": { "maxN": 1 } }   // this app's n above 1 gets the same 400
+```
 
 #### Token counting
 
@@ -347,7 +356,7 @@ Usage is recorded per app and per UTC day: requests, errors, latency, tokens, es
 ```
 
 ```sh
-curl -s "http://127.0.0.1:4010/v1/usage?from=2026-10-01&to=2026-10-11" \
+curl -s "http://127.0.0.1:4010/plugboard/usage?from=2026-10-01&to=2026-10-11" \
   -H "Authorization: Bearer $PLUGBOARD_ADMIN_KEY"
 ```
 
@@ -366,10 +375,22 @@ Cost is an estimate at list prices, so use it to compare apps, not as a bill. Th
 Every request is kept as an OpenCode session in a directory for its app, so it never mixes with your projects. You can read what each app asked and what the model answered. Chat responses carry the session id as `x-plugboard-session`.
 
 ```jsonc
-"history": { "maxSessions": 500, "maxAgeDays": 30 }   // per app; the stricter limit wins
+"history": { "maxSessions": 500, "maxAgeDays": 30 }   // the global limits; the stricter one wins within an app
 ```
 
-Without `history`, sessions are kept forever.
+Without `history`, sessions older than 30 days are pruned (`maxAgeDays` defaults to 30). Set `"maxAgeDays": 0` to keep them forever. Sessions created before the upgrade are not indexed, so they are never pruned.
+
+Since 0.27.0 one app can keep a different amount (#265). A field set on the app replaces the global one for that app, and an unset field falls back to it:
+
+```jsonc
+"history": { "maxSessions": 500 },
+"apps": {
+  "discord-bot": { "history": { "maxSessions": 20 } },
+  "coding": { "history": { "maxSessions": 5000, "maxAgeDays": 180 } }
+}
+```
+
+Gotcha: the global `maxAgeDays` defaults to 30, so an app that sets only `maxSessions` is still pruned after 30 days. To keep it longer, set its `maxAgeDays`; an app cannot set `0` (keep forever), so use a large value such as `36500`.
 
 #### Metrics and logs
 
@@ -380,8 +401,10 @@ Prometheus metrics are off by default. Turn them on, and get structured logs whe
 "logFormat": "json"   // one object per line; ids and outcomes only, never keys or bodies
 ```
 
+Since 0.27.0 `logLevel` picks the lowest level written, and `logRequests: false` drops the per-request access lines (#262). Problems stay visible at `warn`: rate limits, budget refusals, failed fallbacks and failed history deletions. Admin key creation and revocation are audit lines and are written at every level. See [`logLevel` in the configuration](https://github.com/jjjermiah/opencode-plugboard/blob/main/docs/configuration.md) for the full list.
+
 ```sh
-curl -s http://127.0.0.1:4010/metrics -H "Authorization: Bearer $KEY" | grep plugboard_requests_total
+curl -s http://127.0.0.1:4010/plugboard/metrics -H "Authorization: Bearer $KEY" | grep plugboard_requests_total
 ```
 
 Every response has an `x-plugboard-request-id`, the same id that appears on that request's log lines. Useful log events include `request.finished`, `request.limited` and `model.fallback`. The metrics have no model label, so their cardinality stays bounded.
@@ -394,10 +417,10 @@ A server shared by a Discord bot, n8n, Open WebUI and a coding agent, with most 
 {
   "plugins": [
     {
-      "package": "opencode-plugboard@0.23.0",
+      "package": "opencode-plugboard@0.26.0",
       "options": {
         // Reachable from the LAN. Non-loopback hosts refuse to start without keys.
-        "listen": { "host": "10.0.1.50", "port": 4010 },
+        "listen": { "host": "192.0.2.10", "port": 4010 },
 
         // One key per app. Each app's history, usage and limits are separate.
         "keys": {
@@ -458,7 +481,7 @@ One page per client, with the config, a chat, a tool call, structured output and
 | --- | --- | --- |
 | OpenAI Python SDK | [openai-python][client-openai-python] | pass |
 | OpenAI JS SDK | [openai-js][client-openai-js] | pass |
-| Vercel AI SDK | [vercel-ai-sdk][client-vercel-ai-sdk] | pass with `createOpenAICompatible` or `.chat()`; structured output needs `supportsStructuredOutputs: true` there; the default `openai(id)` call works through `/v1/responses` (set `store: false` for multi-turn) |
+| Vercel AI SDK | [vercel-ai-sdk][client-vercel-ai-sdk] | pass with `createOpenAICompatible` or `.chat()`; structured output needs `supportsStructuredOutputs: true` there; the default `openai(id)` call works through `/v1/responses` (multi-turn chats work with the default `store: true`, and `store: false` also works) |
 | LangChain Python | [langchain-python][client-langchain-python] | pass; `json_mode` on `fast` was unreliable |
 | LangChain JS | [langchain-js][client-langchain-js] | pass except `gpt-5.6*` ids, which force the Responses API, and `json_mode` on `fast` |
 | pydantic-ai | [pydantic-ai][client-pydantic-ai] | pass with `OpenAIChatModel` |
@@ -470,7 +493,21 @@ One page per client, with the config, a chat, a tool call, structured output and
 | Kilo Code | [kilo-code][client-kilo-code] | docs only, not run yet |
 | LibreChat | [librechat][client-librechat] | docs only, not run yet |
 | Zed | [zed][client-zed] | docs only, not run yet |
+| LobeChat | [lobechat][client-lobechat] | docs only, not run yet (web app) |
+| Chatbox | [chatbox][client-chatbox] | docs only, not run yet (desktop app); OpenAI and Gemini provider types |
+| Jan | [jan][client-jan] | docs only, not run yet (desktop app and CLI); OpenAI and Anthropic API formats |
+| AnythingLLM | [anythingllm][client-anythingllm] | docs only, not run yet (desktop/Docker app); Generic OpenAI provider |
+| SillyTavern | [sillytavern][client-sillytavern] | docs only, not run yet (web app); Custom (OpenAI-compatible) source |
+| Cline | [cline][client-cline] | docs only, not run yet (VS Code extension); OpenAI Compatible provider |
+| Roo Code | [roo-code][client-roo-code] | docs only, not run yet (VS Code extension); needs native tool calling |
+| promptfoo | [promptfoo][client-promptfoo] | pass against the scripted fake: `promptfoo eval` 2/2 (text, tool call); model-graded assertions need a plugboard grader |
+| smolagents | [smolagents][client-smolagents] | partial against the scripted fake: text, stream, tool call pass; tool round trip fails on the fake (scripted reply); needs `smolagents[openai]` |
+| Mastra | [mastra][client-mastra] | pass against the scripted fake: text, stream, tool call, tool round trip; needs `plugboard/fast`, not bare `fast` |
+| Haystack | [haystack][client-haystack] | pass against the scripted fake: pipeline text, stream, tool call, tool round trip |
+| LlamaIndex | [llamaindex][client-llamaindex] | pass against the scripted fake: text, stream, tool call, tool round trip; `OpenAILike` (the `OpenAI` class rejects `fast`) |
 | OpenAI Agents SDK (Python) | [openai-agents][client-openai-agents] | pass on Responses and Chat Completions: text, stream, tools, structured output |
+| Go (go-openai) | [go-openai][client-go-openai] | pass: text, stream and a tool round trip on `fast` (go-openai v1.43.0) |
+| .NET (openai-dotnet) | [openai-dotnet][client-openai-dotnet] | pass: text, stream and a tool round trip on `fast` (OpenAI NuGet 2.14.0) |
 | LiteLLM (as a client) | [litellm-client][client-litellm] | pass: text, stream, tools |
 | Instructor | [instructor][client-instructor] | pass: TOOLS, JSON_SCHEMA and partial streaming modes |
 | DSPy | [dspy][client-dspy] | pass: Predict, ChainOfThought, typed output |
@@ -485,7 +522,7 @@ The protocol-level results are in the [compatibility matrix][compatibility]. It 
 
 - **Responses keeps no conversation.** Every request carries the whole conversation, and `previous_response_id` and `conversation` are rejected. The output items of recent answers are held in memory for an hour, so the `item_reference`s that the Vercel AI SDK sends back resolve; a restart clears them ([#147](https://github.com/jjjermiah/opencode-plugboard/issues/147)). For n8n, turn "Use Responses API" off.
 - **Stop sequences** are removed from the answer when they end it, on the Anthropic, OpenAI and Gemini routes. The host reports only that the turn stopped, so a sequence the provider ended on without returning it is not removed.
-- **Anthropic structured outputs** (`output_config.format`) are refused with a 400. Use `json_schema` on the OpenAI or Gemini endpoints.
+- **Anthropic structured outputs** (`output_config.format`) are refused with a 400. Use `json_schema` on the OpenAI or Gemini endpoints, or a forced tool call on `/v1/messages` ([recipe](https://jjjermiah.github.io/opencode-plugboard/messages#structured-extraction-with-a-forced-tool)).
 - **Gemini `candidateCount` above 1** is refused. The OpenAI endpoints serve `n`.
 - **Gemini model ids with a `/`** sent by the AI SDK's Google provider or LangChain's `google-genai` lack the `models/` prefix and get a 401. The `@google/genai` SDK works.
 - **Tools with `json_schema`** in one request return the caller's tool calls, not the schema answer ([#34](https://github.com/jjjermiah/opencode-plugboard/issues/34)).
@@ -501,9 +538,10 @@ Open work is tracked in the [v0.1 milestone](https://github.com/jjjermiah/openco
 
 - **Bind address.** The listener binds `127.0.0.1` by default. A non-loopback `listen.host` refuses to start without `keys`. On a loopback bind, a `Host` header that is not `localhost`, `127.0.0.1` or `[::1]` gets a 403.
 - **Keys cross the network in clear text.** The endpoint speaks plain HTTP. For remote access, allow only known addresses in the firewall, tunnel over SSH, or put a TLS-terminating proxy in front. See [reaching plugboard from another host or container][reach] and [remote access][remote-access].
+- **Browser origins.** `cors.origins` (since 0.26.0) names the web pages allowed to call plugboard. Every other origin gets no CORS header, and `"*"` needs keys. See [browser origins](https://jjjermiah.github.io/opencode-plugboard/configuration#browser-origins-since-0-26-0).
 - **Keep keys out of the config file.** Use `{env:VAR}` and keep the values in the environment or a secret store. Every app needs its own key.
 - **`adminKey` reads usage only.** It cannot call the model routes, and it must differ from every app key.
-- **Keyless mode is loopback only.** Without `keys`, the one app is `default`, and only local callers can reach it.
+- **Keyless mode is loopback only.** Without `keys`, the one app is `default`, and only local callers can reach it. On a shared machine, set `"requireKeys": true` (since 0.26.0) so the server refuses to run keyless and every local request needs a key.
 - **Remote images are off by default.** Turning them on makes the server fetch URLs chosen by callers.
 - **The plugin runs inside OpenCode.** It sees your provider logins, so pin the version and update it on purpose.
 
@@ -531,6 +569,7 @@ Not affiliated with or endorsed by OpenAI, Anthropic, Google, GitHub or Microsof
 [configuration-apps]: https://jjjermiah.github.io/opencode-plugboard/configuration#apps-and-keys
 [configuration-aliases]: https://jjjermiah.github.io/opencode-plugboard/configuration#aliases-and-fallbacks
 [configuration-limits]: https://jjjermiah.github.io/opencode-plugboard/configuration#concurrency-and-rate-limits
+[configuration-affinity]: https://jjjermiah.github.io/opencode-plugboard/configuration#prompt-cache-affinity
 [configuration-usage]: https://jjjermiah.github.io/opencode-plugboard/configuration#usage-statistics
 [configuration-reload]: https://jjjermiah.github.io/opencode-plugboard/configuration#reloads-and-restarts
 [responses]: https://jjjermiah.github.io/opencode-plugboard/responses
@@ -559,7 +598,21 @@ Not affiliated with or endorsed by OpenAI, Anthropic, Google, GitHub or Microsof
 [client-kilo-code]: https://jjjermiah.github.io/opencode-plugboard/clients/kilo-code
 [client-librechat]: https://jjjermiah.github.io/opencode-plugboard/clients/librechat
 [client-zed]: https://jjjermiah.github.io/opencode-plugboard/clients/zed
+[client-lobechat]: https://jjjermiah.github.io/opencode-plugboard/clients/lobechat
+[client-chatbox]: https://jjjermiah.github.io/opencode-plugboard/clients/chatbox
+[client-jan]: https://jjjermiah.github.io/opencode-plugboard/clients/jan
+[client-anythingllm]: https://jjjermiah.github.io/opencode-plugboard/clients/anythingllm
+[client-sillytavern]: https://jjjermiah.github.io/opencode-plugboard/clients/sillytavern
+[client-cline]: https://jjjermiah.github.io/opencode-plugboard/clients/cline
+[client-roo-code]: https://jjjermiah.github.io/opencode-plugboard/clients/roo-code
+[client-llamaindex]: https://jjjermiah.github.io/opencode-plugboard/clients/llamaindex
+[client-haystack]: https://jjjermiah.github.io/opencode-plugboard/clients/haystack
+[client-mastra]: https://jjjermiah.github.io/opencode-plugboard/clients/mastra
+[client-smolagents]: https://jjjermiah.github.io/opencode-plugboard/clients/smolagents
+[client-promptfoo]: https://jjjermiah.github.io/opencode-plugboard/clients/promptfoo
 [client-openai-agents]: https://jjjermiah.github.io/opencode-plugboard/clients/openai-agents
+[client-go-openai]: https://jjjermiah.github.io/opencode-plugboard/clients/go-openai
+[client-openai-dotnet]: https://jjjermiah.github.io/opencode-plugboard/clients/openai-dotnet
 [client-litellm]: https://jjjermiah.github.io/opencode-plugboard/clients/litellm-client
 [client-instructor]: https://jjjermiah.github.io/opencode-plugboard/clients/instructor
 [client-dspy]: https://jjjermiah.github.io/opencode-plugboard/clients/dspy

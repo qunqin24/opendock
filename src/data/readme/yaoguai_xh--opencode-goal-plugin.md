@@ -4,10 +4,10 @@
 >
 > **Changes in this fork**:
 > - Added an OpenCode 1 TUI sidebar entrypoint (`./tui` export) that renders the live goal status, elapsed time, auto-continue count, token usage, and objective.
-> - The sidebar reads the same project-local per-session state shards the server plugin writes (`<project>/.opencode/goals/state.json.sessions/…`), so it stays aligned with the session-title indicator without extra tool calls.
+> - Goal state and lifecycle ledgers use a user-level directory, isolated by project and session. Existing project-local session shards migrate when accessed, and the sidebar shares the server's path resolution, including custom paths.
 > - Fixed the sidebar state-update issue inherited from the prevalentWare reference implementation: the sidebar now re-reads goal state reactively on `message.part.updated`, `message.updated`, `session.status`, and `session.idle` events instead of reading once at render time.
 > - `@opentui/solid` and `solid-js` are declared as peer dependencies so the TUI resolves them consistently with the OpenCode host.
-> - The server plugin (goal workflow, commands, tools, persistence, title indicator) is unchanged from upstream.
+> - The goal workflow, commands, tools, and session-title indicator build on the upstream implementation.
 
 [![npm version](https://img.shields.io/npm/v/@yaoguai_xh/opencode-goal-plugin)](https://www.npmjs.com/package/@yaoguai_xh/opencode-goal-plugin)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
@@ -92,11 +92,11 @@ project-local `tui.json`):
 }
 ```
 
-The sidebar reads the same project-local per-session state that the server
+The sidebar reads the same user-level, project-isolated session state that the server
 plugin writes, so its status, auto-continue count, token usage, elapsed time,
-and checkpoints stay aligned with `/goal status`. If `stateFilePath` or
-`OPENCODE_GOAL_STATE_PATH` is customized, pass the same value to the TUI plugin
-tuple in `tui.json`.
+and objective stay aligned with `/goal status`. If `stateFilePath` is customized,
+pass the same value to the TUI plugin tuple in `tui.json`. An
+`OPENCODE_GOAL_STATE_PATH` override must be present in both processes' environments.
 
 Or let the CLI add the plugin entry for you and then add the `command` block by hand:
 
@@ -294,15 +294,32 @@ Markers must appear on their own final line. The bracketed form is canonical, bu
 
 **Wrap-up vs. hard stop.** When a limit is reached, the plugin sends one final prompt asking the assistant to summarize what is done, what remains, and the next concrete step — rather than stopping silently. Use `/goal resume` to continue after any stop, including limit stops and no-progress pauses.
 
-Goal state is persisted by default to a **project-local** namespace rooted at `.opencode/goals/state.json` relative to the working directory, so goals follow the project rather than your home directory. Each OpenCode session gets a separate hashed shard at `<stateFilePath>.sessions/<sha256(sessionID)>/state.json`, allowing unrelated sessions in the same project to run concurrently. The state is local and is not synchronized across machines. You may want to add `.opencode/goals/` to your `.gitignore`.
+Goal state is persisted by default in a **user-level directory, isolated by project**. The namespace root is `${XDG_STATE_HOME:-~/.local/state}/opencode-goal-plugin/projects/<sha256(projectDirectory)>/state.json`. The project identity is its normalized absolute directory, with symlinks resolved when the directory exists. Each OpenCode session gets a separate hashed shard at `<stateFilePath>.sessions/<sha256(sessionID)>/state.json`, allowing unrelated projects and sessions to run concurrently. State is local and is not synchronized across machines. Moving a project to a different absolute path selects a new project namespace.
+
+```text
+~/.local/state/opencode-goal-plugin/projects/
+└── <project hash>/
+    └── state.json.sessions/
+        └── <session hash>/
+            ├── state.json
+            └── state.json.ledger.jsonl
+```
+
+The plugin creates no `.opencode` directory for new default storage. OpenCode treats existing `.opencode` directories as configuration directories and can install dependencies in them; keeping goal runtime state outside those directories avoids triggering that per-project installation.
 
 The state-file location is resolved with this precedence:
 
 1. the `stateFilePath` plugin option, if set;
 2. the `OPENCODE_GOAL_STATE_PATH` environment variable, if set;
-3. the project-local default `<cwd>/.opencode/goals/state.json`.
+3. the user-level, project-isolated default shown above.
 
-When a project has no shard namespace yet, the plugin migrates all sessions from older locations on first session access: the legacy `~/.opencode-goal-plugin/state.json` and the XDG path `${XDG_STATE_HOME:-~/.local/state}/opencode-goal-plugin/state.json`. Migration is exclusively claimed; after every session shard is written, the source files are retired to timestamped `.migrated…` backups so another project cannot import the same private goal state. An explicit `stateFilePath` or `OPENCODE_GOAL_STATE_PATH` is used as the shard namespace root and has no migration fallback.
+An explicit option or environment path is used literally (relative paths resolve against the active project directory), with no automatic project hash or migration fallback. Use the same override in the server and TUI when customizing it; omitting it enables automatic project isolation.
+
+**Upgrading from project-local storage.** On first access to each session, the plugin copies its old shard from `<project>/.opencode/goals/state.json.sessions/` into the new project namespace, including its lifecycle ledger and rotated generations. The source and destination leases prevent concurrent writes during copying. If an older process owns the source shard, goal controls remain passive until that process exits and you retry. An interrupted copy resumes on retry. Existing destination state takes precedence, and recovered active goals remain paused until `/goal resume`.
+
+Old project-local state files are preserved. Sessions you have not opened yet remain available for migration on later access. Before cleaning up an existing `.opencode`, migrate the sessions you need or retain a backup of the entire `goals/` directory. Remove the directory only after checking whether it also contains project agents, commands, plugins, or configuration. Keeping `.opencode` means OpenCode may recreate its generated dependencies on subsequent launches, even if goal state has moved.
+
+Older aggregate project state at `.opencode/goals/state.json` is also supported and preserved. For the pre-project legacy aggregate locations (`~/.opencode-goal-plugin/state.json` and `${XDG_STATE_HOME:-~/.local/state}/opencode-goal-plugin/state.json`), the existing exclusive migration partitions sessions and retires shared source files to timestamped `.migrated…` backups so another project cannot import the same state.
 
 The state directory is created with owner-only permissions, and the JSON state file is written as `0600` because it may contain goal text, assistant checkpoints, and workflow history.
 
@@ -365,7 +382,6 @@ Pass options when registering the plugin to change the defaults for all goals. T
         "budgetWrapupRatio": 0.8,
         "maxPromptFailures": 3,
         "persistState": true,
-        "stateFilePath": ".opencode/goals/state.json",
         "resultRetentionMs": 604800000,
         "maxStoredResults": 200
       }
@@ -391,7 +407,7 @@ Additional plugin-level options:
 - `goalAgentName` / `verifierAgentName` — customize the registered native agent names (defaults `goal` and `goal-verify`). The verifier is a hidden subagent with a default-deny tool policy; only `read`, `glob`, and `grep` are allowed.
 - `sdkShape` — OpenCode session-client argument shape: `legacy` (the default generated `PluginInput` client using `{ path, body, query }`) or `flat` (clients using `{ sessionID, ... }`). Read-only `messages`/`get` calls may probe the alternate shape after an argument/schema `TypeError`; mutating calls are never replayed, so set this option correctly for embedded clients.
 - `persistState` — whether to persist active goals and recent goal results to disk.
-- `stateFilePath` — root path for the persisted session-shard namespace. Overrides the default project-local path and the `OPENCODE_GOAL_STATE_PATH` env var. Useful if you want a fixed or ephemeral location. When unset, the default root is `<cwd>/.opencode/goals/state.json`; shards are written below `<stateFilePath>.sessions/` (see the persistence section above).
+- `stateFilePath` — root path for the persisted session-shard namespace. Overrides the user-level, project-isolated default and the `OPENCODE_GOAL_STATE_PATH` env var. Useful if you want a fixed or ephemeral location. When unset, the root is `${XDG_STATE_HOME:-~/.local/state}/opencode-goal-plugin/projects/<sha256(projectDirectory)>/state.json`; shards are written below `<stateFilePath>.sessions/` (see the persistence section above). An explicit path bypasses automatic project isolation; pass the same option to the TUI plugin.
 - `ledgerFilePath` — override where the lifecycle ledger is written. By default each session shard keeps its ledger next to its state file as `<state.json>.ledger.jsonl`.
 - `ledgerMaxBytes` / `ledgerRetentionFiles` — bound the lifecycle ledger to 2 MiB per generation and three rotated generations by default. Set retention to `0` to discard the active ledger when it reaches the size ceiling.
 - `resultRetentionMs` — how long a completed goal summary remains available through `/goal status` after the goal leaves active memory.
@@ -481,11 +497,12 @@ The captured original title lives in memory only, so a hard process kill leaves 
 ## TUI sidebar
 
 The OpenCode 1 TUI entrypoint renders a persistent sidebar for the current
-session. It follows the session's completed Goal tool results and refreshes on
+session. It reads the server's persisted session shard first and refreshes on
 OpenCode message and session events, so changes to status, elapsed time,
-auto-continue count, token usage, and the latest checkpoint appear without
-requiring another `/goal status` command. The project-local state shard remains
-the restart and migration fallback.
+auto-continue count, token usage, and objective appear without requiring another
+`/goal status` command. Completed Goal tool results and cached snapshots serve as
+fallbacks when the file is unavailable. Both entrypoints share the same default
+project namespace and support the same path option and environment override.
 
 The sidebar supports the active, paused, blocked, and completed states. It is
 read-only: Goal mutations continue to go through the server plugin's commands

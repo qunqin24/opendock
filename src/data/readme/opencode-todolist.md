@@ -6,6 +6,7 @@ OpenCode V2 removed the built-in todo tools. This plugin brings them back as a s
 
 - **`todowrite`** — create or replace the todo list for the current session.
 - **`todoread`** — read the current list back.
+- **`/todo`** — post the current list into the conversation.
 
 Lists are stored per session and a compact summary is injected into the session context while tasks are still open — at every user turn and whenever the list changes mid-run — so the model keeps track of them across long conversations and context compaction. A constant reminder line asks the model to update statuses as steps finish (see `Update reminders` below).
 
@@ -50,7 +51,36 @@ Example output:
 4. [-] Update changelog
 ```
 
-`todowrite` always receives the complete list and replaces the previous one. Passing `{"todos": []}` clears it.
+`todowrite` always receives the complete list and replaces the previous one. Passing `{"todos": []}` clears it. Lists accept up to 100 items of 500 characters each.
+
+Run `/todo` to post the current list into the conversation. The command reads the newest `todowrite` from the session log (falling back to this plugin's own storage), so a list written by another tool shows up too, and sends the report — counts, current task, full list — as your next message, which the assistant sees and answers.
+
+## Auto todos
+
+A project can seed every session with a checklist: `auto-todos.json` at the repository root or under `.opencode/`:
+
+```json
+{
+  "todos": [
+    { "content": "Run the test suite", "priority": "high", "always": true },
+    { "content": "Update the changelog" }
+  ],
+  "deduplicate": true
+}
+```
+
+Each entry is merged into the list on every `todowrite`:
+
+| Field | Effect |
+| --- | --- |
+| `content` | Required task text; entries over 500 characters are dropped |
+| `priority` | Optional: `high`, `medium`, `low` |
+| `always` | `true` adds the item to every list; `false` (default) adds it only when the incoming list is empty |
+| `match` | Only inject when an existing item contains this text (case-insensitive) |
+| `order` | `"first"` or a 0-based index; omitted appends |
+| `deduplicate` | Default `true`: skip items whose content contains, or is contained by, an existing item |
+
+Injection is best-effort: a missing, unreadable or invalid file leaves the model's list untouched, and the merged list never exceeds the `todowrite` limits (100 items, 500 characters per entry).
 
 ## Sidebar
 

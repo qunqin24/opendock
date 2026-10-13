@@ -1,24 +1,11 @@
 # opencode-fold-diffs
 
-> [!IMPORTANT]
-> **This is a fork, and it exists for one reason: OpenCode V2 support.**
->
-> The original plugin is **[Tanner Bruhn](https://github.com/tannerbruhn)**'s [`tannerbruhn/opencode-fold-diffs`](https://github.com/tannerbruhn/opencode-fold-diffs) (npm: `opencode-fold-diffs`) — the **OpenCode V1** plugin, whose V1 implementation does not run in V2. This fork — [`cardin/opencode-fold-diffs`](https://github.com/cardin/opencode-fold-diffs), published as [`@cardinal4/opencode-fold-diffs`](https://www.npmjs.com/package/@cardinal4/opencode-fold-diffs) — ports it to **OpenCode V2** (the `@opencode/cli` 2.x line, `opencode v2.0.x`). Install this fork if you are on V2; install upstream if you are on V1.
->
-> **All credit for the original plugin goes to [Tanner Bruhn](https://github.com/tannerbruhn).** This fork is unofficial and independent: Tanner has not reviewed it, does not maintain it, and does not endorse it. Report bugs in this fork here, not upstream.
+> [!NOTE]
+> **Unofficial OpenCode V2 port of [Tanner Bruhn](https://github.com/tannerbruhn)'s [`opencode-fold-diffs`](https://github.com/tannerbruhn/opencode-fold-diffs) (npm: `opencode-fold-diffs`) — the OpenCode V1 plugin.** This fork — [`cardin/opencode-fold-diffs`](https://github.com/cardin/opencode-fold-diffs), published as [`@cardinal4/opencode-fold-diffs`](https://www.npmjs.com/package/@cardinal4/opencode-fold-diffs) — ports it to **OpenCode V2** (`@opencode/cli` 2.x, `opencode v2.0.x`). Install this fork on V2, upstream on V1. Tanner has not reviewed or endorsed it; report bugs here, not upstream.
 
-**Every `write` and `edit` dumps the whole file or the whole diff into your transcript, and stays there.** This plugin folds those blocks down to their header line — `# Wrote 40 lines · click to expand  src/app.ts` — and opens them again on click, or with a fold/unfold-all key if you configure one.
+**Every `write`, `edit` and `apply_patch` dumps the whole file or the whole diff into your transcript, and stays there.** This plugin folds those blocks down to their header line — `# Wrote 40 lines · click to expand  src/app.ts` — and opens them again on click, or with a fold/unfold-all key if you configure one.
 
-The V2 port is not a re-host: it follows V2's new plugin API and render tree, so the V1 code cannot be reused. See [Migrating from V1](#migrating-from-v1) for what changed.
-
-## What V2 already folds
-
-V2 tightened the transcript on its own, and this plugin deliberately leaves those parts alone:
-
-- `read` / `glob` / `grep` calls fold into a one-line exploration group (`Explored — 3 reads, 2 searches`), click to expand.
-- A bash **command** is trimmed to two lines and its **output** to ten, both click to expand.
-
-The tools V2 still renders in full are exactly the ones that fill the scrollback: `write`, `edit`, `apply_patch`. Upstream has been asked three times — [#9089](https://github.com/anomalyco/opencode/issues/9089) (minimal diff display), [#14511](https://github.com/anomalyco/opencode/issues/14511) (a toggle keybind, like Claude Code's `ctrl+o`), [#19074](https://github.com/anomalyco/opencode/issues/19074) (collapse tool output) — and all three were closed without a setting. This is that setting, from outside.
+V2 already collapses the tools it considers noisy: `read` / `glob` / `grep` fold into a one-line exploration group (`Explored: 3 reads, 2 searches`), and a bash **command** trims to two lines with its **output** to ten, all click-to-expand. The three tools that actually fill the scrollback — `write`, `edit`, `apply_patch` — are the ones it leaves alone. Upstream has been asked three times — [#9089](https://github.com/anomalyco/opencode/issues/9089) (minimal diff display), [#14511](https://github.com/anomalyco/opencode/issues/14511) (a toggle keybind, like Claude Code's `ctrl+o`), [#19074](https://github.com/anomalyco/opencode/issues/19074) (collapse tool output) — and all three were closed without a setting. This is that setting, from outside.
 
 ## What you see
 
@@ -55,7 +42,7 @@ Then list it in your CLI config so the terminal loads the TUI entrypoint. Add it
 }
 ```
 
-This package is TUI-only (it has no server entrypoint), so configure it in `cli.json`. CLI-only plugins also stay active when the terminal connects to a remote server.
+This plugin's behavior is TUI-only (its server entry is a no-op that exists so OpenCode can discover it by id), so configure it in `cli.json`. TUI plugins also stay active when the terminal connects to a remote server.
 
 With options:
 
@@ -89,7 +76,7 @@ Clone this repository and point the plugin entry at the checkout. The package sh
 ## Options
 
 ```json
-"plugins": [["@cardinal4/opencode-fold-diffs", { "lines": 3, "min_lines": 10, "key": "ctrl+f" }]]
+"plugins": [{ "package": "@cardinal4/opencode-fold-diffs", "options": { "lines": 3, "min_lines": 10, "key": "ctrl+f" } }]
 ```
 
 | Option | Default | Meaning |
@@ -116,35 +103,21 @@ Clone this repository and point the plugin entry at the checkout. The package sh
 
 The V2 TUI plugin API (`@opencode/plugin/tui`) has no slot for message parts, so a plugin cannot render a tool block itself. It has to reach the renderables the host already made:
 
-1. **Find the transcript.** The only scrollbox in the tree with `stickyScroll && stickyStart === "bottom"`. The sidebar, dialogs, autocomplete and diff viewer all have scrollboxes; none of them are sticky.
+1. **Find the transcript.** The scrollbox with `stickyScroll && stickyStart === "bottom"`. The sidebar, dialogs, autocomplete and diff viewer all have scrollboxes; none of them are sticky. The one other sticky scrollbox in V2 is the shell output viewer, which is a dialog and is skipped by its `shell-output-scroll` id.
 2. **Find the blocks.** A V2 `BlockTool` renders its header first as a row box whose first two children are the label text (`# Wrote`, `← Edit`, `← Patched`, `# Created`, `# Deleted`) and the path value. File blocks are matched on that label; a bash block carries no header, so it is found by shape — a child whose first grandchild is the `$ `-prefixed command.
 3. **Fold.** Set `visible = false` on the children carrying the bulk. That sets Yoga `display: none`, so the body leaves layout instead of leaving a hole. A zero `max-height` alone is not enough — the box collapses to zero rows but OpenTUI still paints the diff. A positive `lines` value keeps the first body visible and uses `maxHeight` for it instead. The block's own chrome (`gap`, `paddingTop`, `paddingBottom` of 1) is tightened to zero so a folded block occupies one row.
 4. **Toggle.** Assign `onMouseUp` on the block. The solid adapter sets that as a plain property, so a plugin can set it the same way — it replaces `BlockTool`'s own handler, which is why the copy-on-select guard is reimplemented here. For a bash block the host's handler is the output toggle and must be preserved, so the handler goes on the command text with `stopPropagation()` instead.
 5. **Restate the header.** The stats suffix is appended to the label text node, not the path. If solid will not let go of that node the plugin stops trying and folds without the suffix.
 
-Renderable classes are matched by duck-typing (`typeof node.diff === "string"`, `content` + `filetype` for code) rather than `instanceof`, because the opentui classes are minified in the shipped binary and their names are not stable.
+Renderable classes are matched by duck-typing (`typeof node.diff === "string"` for a diff, `typeof node.content === "string"` for a written file) rather than `instanceof`, because the opentui classes are minified in the shipped binary and their names are not stable. `filetype` is deliberately not required: it was dropped in 2.0.16 and restored in 2.0.27, and keying off it silently stopped write blocks from folding.
 
 Blocks are re-scanned on V2's `session.message.content.updated`, `session.tool.success` and `session.tool.failed`, plus `session.step.ended` and `session.execution.succeeded` (`session.shell.ended` joins them when `bash` folding is on). A 2 s sweep catches a session opened from history, whose parts land before any event this plugin sees.
 
-## Migrating from V1
+## Status
 
-V1 plugin implementations do not run in V2. The V2 port made these changes:
+Written against **opencode v2.0.24** and re-checked against **v2.0.27**; the `session.*` events it listens to exist from v2.0.10 on, so an older V2 install gets the fix without upgrading. The tree-walking, block matching, fold/unfold and toggle logic run green against a mock renderer tree shaped like V2's (`node --test`), and the fold was checked against a real transcript: `visible = false` (Yoga `display: none`) is what actually hides a body, not `maxHeight`.
 
-- Entrypoint is a `{ id, setup(context) }` definition (`Plugin.define()` is an identity helper, so the shape is the same). `setup` returns the cleanup function instead of `api.lifecycle.onDispose`.
-- `api.renderer` → `context.renderer`; `api.route.current.name` → `context.ui.router.current().type`; `api.event.on` → `context.data.on`; `api.ui.toast` → `context.ui.toast.show`; `api.keymap.registerLayer` → `context.keymap.layer`.
-- `context.keymap.layer` is called directly from `setup` on 2.0.23+; earlier V2 builds read Solid context there, so the plugin still registers from a component mounted in the `app` slot for them.
-- Event names are V2's: `message.updated` / `message.part.updated` are legacy schemas in V2 and are never emitted. The plugin listens to `session.message.content.updated`, `session.tool.success` / `session.tool.failed`, `session.step.ended` and `session.execution.succeeded` (plus `session.shell.ended` when bash folding is on). These names exist from 2.0.10 on, so older V2 installs get the same fix without upgrading.
-- Tool headers are no longer one string. V1 rendered `"← Edit src/app.ts"`; V2 renders a label node plus a path node, so detection and the stats suffix target the label.
-- `bash` defaults to `false`, because V2 now trims long commands to two lines itself.
-- Config moves from `tui.json` to `cli.json` (or `opencode.json(c)`).
-
-## Testing
-
-1. Restart so the plugin loads: `opencode service restart`, then relaunch the TUI.
-2. Confirm it loaded: `/plugins` should list `opencode-fold-diffs` by id, and `Ctrl+P` → **Fold / unfold file diffs** should be in the palette.
-3. Ask the agent for a small edit. The block should render as a single header row, `← Edit +2 −1 · click to expand  path`. Click it to open, click again to close.
-4. If you configured a `key`, press it to fold or unfold every block in the session. Otherwise use the palette command **Fold / unfold file diffs**.
-5. If nothing folds, run `Ctrl+P` → **Fold diffs: diagnose**. The toast reports what the plugin can see:
+To confirm it loaded, restart (`opencode service restart`) and check `/plugins` lists `opencode-fold-diffs` and `Ctrl+P` → **Fold / unfold file diffs** is in the palette. If nothing folds, run **Fold diffs: diagnose** — the toast reports what the plugin can see:
 
 | Result | Meaning |
 |---|---|
@@ -153,11 +126,17 @@ V1 plugin implementations do not run in V2. The V2 port made these changes:
 | `transcript: yes · blocks: N · folded: N` | Detection and folding ran; if the blocks still look expanded, the fold did not take on the renderables. |
 | `stats: off` | Folding works but the header could not be restated (Solid owns the label node). |
 
-## Status
-
-Written against **opencode v2.0.24**, and compatible across the V2 line: the `session.*` events this version listens to exist from v2.0.10 on, so an older V2 install gets the fix without upgrading. The tree-walking, block matching, fold/unfold and toggle logic run green against a mock renderer tree shaped like V2's (`node --test`), and the fold was checked against a real transcript: `visible = false` (Yoga `display: none`) is what actually hides a body, not `maxHeight`.
-
 Edits with fewer than `min_lines` changed lines (default 6) are left expanded on purpose — a one-line change is already its own summary. Set `min_lines: 0` to fold every file block.
+
+## V2 port notes
+
+The port follows V2's new plugin API and render tree, so the V1 code could not be reused:
+
+- Entrypoint is a `{ id, setup(context) }` definition; `setup` returns the cleanup function instead of `api.lifecycle.onDispose`.
+- `api.renderer` → `context.renderer`, `api.route.current.name` → `context.ui.router.current().type`, `api.event.on` → `context.data.on`, `api.ui.toast` → `context.ui.toast.show`, `api.keymap.registerLayer` → `context.keymap.layer` (called straight from `setup` on 2.0.23+, from an `app`-slot component before that).
+- Event names are V2's `session.*` events; `message.updated` / `message.part.updated` are legacy schemas that never fire.
+- Tool headers are a label node plus a path node, so detection and the stats suffix target the label.
+- `bash` defaults to `false` because V2 trims long commands itself, and config moves from `tui.json` to `cli.json`.
 
 ## License
 

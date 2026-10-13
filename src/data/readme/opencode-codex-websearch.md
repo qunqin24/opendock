@@ -4,7 +4,7 @@ An [OpenCode v2](https://opencode.ai/v2/docs) websearch provider backed by ChatG
 
 ## Requirements
 
-- OpenCode v2 with the `@opencode/plugin` 2.0.3 API
+- OpenCode v2. This version is tested with OpenCode 2.0.26 and 2.0.27, and CI checks it against the latest OpenCode release daily.
 - An active ChatGPT OAuth connection and a ChatGPT account with Codex access
 
 Connect ChatGPT through `/connect` or `opencode auth login` (use `opencode2` instead if that is your v2 executable). Select the ChatGPT browser or headless OAuth method rather than an OpenAI API key.
@@ -16,7 +16,7 @@ Add the package and select the `codex` search provider in your OpenCode v2 confi
 ```json
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugins": ["opencode-codex-websearch@0.2.0"],
+  "plugins": ["opencode-codex-websearch@0.2.1"],
   "websearch": { "provider": "codex" }
 }
 ```
@@ -36,7 +36,7 @@ Configure result limits and filters using plugin options:
   "$schema": "https://opencode.ai/config.json",
   "plugins": [
     {
-      "package": "opencode-codex-websearch@0.2.0",
+      "package": "opencode-codex-websearch@0.2.1",
       "options": {
         "max_results": 8,
         "recency": 30,
@@ -71,7 +71,7 @@ The built-in tool uses the v2 `websearch` permission action, with the search que
 }
 ```
 
-HTTP errors preserve status codes and `Retry-After` so OpenCode can handle rate limits, including provider fallback when using its `random` provider selection.
+HTTP errors preserve status codes and `Retry-After`. With OpenCode's `random` provider selection, an HTTP 429 puts this provider into cooldown and OpenCode retries the search with another provider. That relies on Effect's HTTP module, which the plugin loads from OpenCode only when a request fails. If a future OpenCode release stops providing it, the plugin still loads and searches still work, but a rate-limited search fails instead of switching providers.
 
 ## Authentication
 
@@ -102,11 +102,21 @@ npm run typecheck
 npm test
 ```
 
-Tests exercise provider registration, options, credential resolution and account changes, model discovery, result conversion, HTTP errors, cancellation, timeouts, and cleanup using synthetic credentials and HTTP responses.
+Tests exercise provider registration, options, credential resolution and account changes, model discovery, result conversion, HTTP errors, cancellation, timeouts, and cleanup using synthetic credentials and HTTP responses. They also load the plugin as OpenCode releases with a missing, incompatible, or pre-4.0 Effect HTTP module would.
+
+To check the plugin against a real OpenCode release, run:
+
+```sh
+npm run test:opencode
+```
+
+This packs the checkout, installs it with its production dependencies, and loads it into a throwaway OpenCode server with its own configuration, data, and port. It passes when the plugin is active and the ChatGPT Codex provider is registered. It uses the `opencode` on your `PATH`; set `OPENCODE_BIN` to test another binary. To test a published version instead, pass it as an argument, such as `npm run test:opencode -- opencode-codex-websearch@latest`.
+
+The OpenCode compatibility workflow runs this check on pull requests, before each release is published, and daily against the latest OpenCode release. The daily run also checks the published package.
 
 ## Releasing
 
-Maintainers publish by updating `package.json`, merging the change to `main`, and publishing a GitHub Release whose tag is `v` followed by the package version (for this release, `v0.2.0`). The release workflow runs typechecking and tests, then publishes to npm through OIDC without an npm token. npm automatically records provenance.
+Maintainers publish by updating `package.json`, merging the change to `main`, and publishing a GitHub Release whose tag is `v` followed by the package version (for this release, `v0.2.1`). The release workflow first checks that the release loads in the latest OpenCode, then runs typechecking and tests and publishes to npm through OIDC without an npm token. npm automatically records provenance.
 
 ## License
 

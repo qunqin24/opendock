@@ -62,6 +62,11 @@ dist/            # built entrypoints shipped to npm
 Solid JSX runtime (`@opentui/solid`) is only provided at runtime, not from the
 installed plugin.
 
+`@opencode/plugin` is a package dependency. `@opentui/core`, `@opentui/solid`
+and `solid-js` are peer dependencies because OpenCode provides them at runtime;
+they are also listed as dev dependencies so a clone can build and type check
+(types track OpenCode `2.0.27`).
+
 OpenCode installs package plugins under `~/.cache/opencode/npm/`. The server
 entrypoint (`dist/index.js`) registers the quota RPC; the `tui` entrypoint
 (`dist/tui.js`) renders the sidebar in the CLI.

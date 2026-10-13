@@ -1,6 +1,6 @@
 # OpenCode plugins
 
-Five independent Bun packages for OpenCode V2. Each plugin owns its dependencies, lockfile, and TypeScript configuration; this repository is not a Bun workspace.
+Four independent Bun packages for OpenCode V2. Each plugin owns its dependencies, lockfile, and TypeScript configuration; this repository is not a Bun workspace.
 
 ## Plugins
 
@@ -10,7 +10,6 @@ Five independent Bun packages for OpenCode V2. Each plugin owns its dependencies
 | [Cache metrics](./cache-metrics/README.md) | Session input cache-hit rate, token totals, per-response history, and JSON export | TUI sidebar and history panel. History includes the root session and its subagents by default. |
 | [Quota usage](./quota-usage/README.md) | Remaining Codex and OpenCode Go account quotas | Web/TUI chat tool and automatically refreshed TUI sidebar. Uses active provider accounts on the server. |
 | [Workflow tools](./workflow-tools/README.md) | Spec planning/refinement/implementation, PR publication/metadata, feedback delivery and check investigation | Server commands; see [package.json](./workflow-tools/package.json) for OpenCode requirements. External skills and server-side authenticated `gh` as needed; no TUI entry. |
-| [Marketplace](./marketplace/README.md) | Browse a sample catalog of skills, commands, and agents | TUI prototype. Install/update/uninstall actions change durable UI state, not OpenCode resources. |
 
 Each plugin README covers setup and common use. Contributor details belong in its `docs/DEVELOPMENT.md`.
 
@@ -20,7 +19,7 @@ Add the plugins you want to the `plugins` array in `opencode.jsonc`. Use a proje
 
 Use the install target in each plugin's README. The example below uses Git for most packages; Classify, Workflow tools, Quota usage, and Cache metrics also document npm targets.
 
-This example lists all five packages. Keep only those you want. Classify uses TypeSafe here and needs `TYPESAFE_API_KEY` in the OpenCode server environment. To choose another backend, read [Classify configuration](./classify/docs/CONFIGURATION.md).
+This example lists all four packages. Keep only those you want. Classify uses TypeSafe here and needs `TYPESAFE_API_KEY` in the OpenCode server environment. To choose another backend, read [Classify configuration](./classify/docs/CONFIGURATION.md).
 
 ```jsonc
 {
@@ -29,7 +28,6 @@ This example lists all five packages. Keep only those you want. Classify uses Ty
     "github:mholtzscher/opencode-plugins#main::path:cache-metrics",
     "github:mholtzscher/opencode-plugins#main::path:quota-usage",
     "github:mholtzscher/opencode-plugins#main::path:workflow-tools",
-    "github:mholtzscher/opencode-plugins#main::path:marketplace",
     {
       "package": "@mholtzscher/opencode-classify",
       "options": {
@@ -68,7 +66,7 @@ For direct `bun` commands, [activate mise in your shell](https://mise.jdx.dev/ge
 
 Run `bun install` inside each plugin you work on. Add its directory to `plugins`. Relative paths resolve from the containing config file. You can also use an absolute path from another project. The root install supplies lint tooling only.
 
-The repository's [`opencode.jsonc`](./opencode.jsonc) loads all five local plugins and contains operator-specific settings. See Classify's [development configuration](./classify/docs/CONFIGURATION.md#repository-development-configuration) before using hosted profiles or changing models. Inference servers are managed separately.
+The repository's [`opencode.jsonc`](./opencode.jsonc) loads all four local plugins and contains operator-specific settings. See Classify's [development configuration](./classify/docs/CONFIGURATION.md#repository-development-configuration) before using hosted profiles or changing models. Inference servers are managed separately.
 
 Run plain `opencode` from this repository to use the local plugins while retaining global MCP servers, permissions, providers, and CLI settings. The project config merges over the global config, but plugin arrays accumulate rather than replace one another.
 
@@ -78,11 +76,11 @@ On OpenCode V2.0.26, a global package plus its local checkout produces `Duplicat
 
 Root `opencode.jsonc` uses experimental `integration.use` policies with `plugin:<package-target>` resources to block installed Git and npm sources in this project. If global package targets change, update these policies to match. Preserve local path entries and their options. This behavior was verified against V2.0.26, whose public policies guide did not document `integration.use`.
 
-After changing plugin sources, open `/plugins` and confirm all five repository plugins are **active, local**, with no duplicate failures. Unrelated global plugins should remain active. CLI preferences still come from global `cli.json`; there is no project-local CLI settings file.
+After changing plugin sources, open `/plugins` and confirm all four repository plugins are **active, local**, with no duplicate failures. Unrelated global plugins should remain active. CLI preferences still come from global `cli.json`; there is no project-local CLI settings file.
 
 ### Verification
 
-Run `bun run typecheck` in each affected plugin. Full repository validation is five typechecks and four test suites: run `bun test` in every plugin except Marketplace, which has no test script. Additional details:
+Run `bun run typecheck` in each affected plugin. Full repository validation is four typechecks and four test suites: run `bun test` in every plugin. Additional details:
 
 | Plugin guide | Notes |
 | --- | --- |
@@ -90,10 +88,9 @@ Run `bun run typecheck` in each affected plugin. Full repository validation is f
 | [Cache metrics development](./cache-metrics/docs/DEVELOPMENT.md) | Rebuild with `bun run build:tui` before testing TUI changes and commit `dist/tui.js`. Keep host runtimes external and avoid install/build lifecycle hooks. |
 | [Quota usage development](./quota-usage/docs/DEVELOPMENT.md) | Shared server/TUI RPC and provider parsing. |
 | [Workflow tools development](./workflow-tools/docs/DEVELOPMENT.md) | Scoped server services, strict spec paths, PR snapshots and external smoke checklist. |
-| [Marketplace development](./marketplace/docs/DEVELOPMENT.md) | Typecheck and interactive prototype checks. |
 
 From the repository root, run `bun install`, then `bun run check` for Ultracite's Oxlint, anti-slop, and Oxfmt checks. `bun run fix` applies fixes and formatting; generated/build output is excluded.
 
 ## Releases
 
-Release Please manages independent versions, changelogs, tags, and GitHub releases for all five plugins. Classify, Workflow tools, Quota usage, and Cache metrics have npm publishing jobs for `@mholtzscher/opencode-classify`, `@mholtzscher/opencode-workflow-tools`, `@mholtzscher/opencode-quota-usage`, and `@mholtzscher/opencode-cache-metrics`, using GitHub Actions trusted publishing after npm-side setup. See [Releasing](./docs/RELEASING.md) for first-publish setup and the release workflow.
+Release Please manages independent versions, changelogs, tags, and GitHub releases for all four plugins. Classify, Workflow tools, Quota usage, and Cache metrics have npm publishing jobs for `@mholtzscher/opencode-classify`, `@mholtzscher/opencode-workflow-tools`, `@mholtzscher/opencode-quota-usage`, and `@mholtzscher/opencode-cache-metrics`, using GitHub Actions trusted publishing after npm-side setup. See [Releasing](./docs/RELEASING.md) for first-publish setup and the release workflow.

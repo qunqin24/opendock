@@ -1,6 +1,6 @@
 # opencode-quill
 
-[![CI](https://github.com/ozandogrultan/opencode-quill/actions/workflows/ci.yml/badge.svg)](https://github.com/ozandogrultan/opencode-quill/actions/workflows/ci.yml)
+[![CI](https://github.com/ozandogrultan/opencode-quill/actions/workflows/ci.yml/badge.svg)](https://github.com/ozandogrultan/opencode-quill/actions/workflows/ci.yml) [![npm](https://img.shields.io/npm/v/opencode-quill)](https://www.npmjs.com/package/opencode-quill)
 
 Local word autocomplete and next-word prediction for the **OpenCode V2** prompt
 composer — inspired by [oh-my-pi (OMP)](https://github.com/can1357/oh-my-pi)'s

@@ -1,11 +1,24 @@
+<div align="center">
+
 # open-toolbox
 
-**A pack of local plugins for [opencode](https://opencode.ai) Desktop v2** — session orchestration, decision/error journals, snippet library, codebase search, tool-call audit, context pruning, memory, goal loops, secret redaction, and a lifetime usage dashboard.
+**19 local plugins that turn [opencode](https://opencode.ai) Desktop v2 into a serious daily driver.**
+
+Session orchestration · durable memory · context pruning · secret redaction · doom-loop breaking · a lifetime usage dashboard — all local SQLite, no cloud services, no embedding APIs.
 
 [![ci](https://github.com/bandonker/open-toolbox/actions/workflows/ci.yml/badge.svg)](https://github.com/bandonker/open-toolbox/actions/workflows/ci.yml)
+[![npm — 19 packages](https://img.shields.io/badge/npm-19%20packages-CB3837?logo=npm)](https://www.npmjs.com/~bandonker)
 [![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![opencode plugin](https://img.shields.io/badge/opencode-plugin%20v2-000000.svg)](https://opencode.ai/docs/plugins)
+[![opencode plugin v2](https://img.shields.io/badge/opencode-plugin%20v2-000000.svg)](https://opencode.ai/docs/plugins)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](#contributing)
+
+<img src="images/usage-stats2.PNG" alt="The usage-stats dashboard included in the pack" width="760">
+
+<sub>The usage-stats dashboard, included in the pack.</sub>
+
+</div>
+
+One `npm install` gives your sessions a memory, a plan, a flight recorder, and a seatbelt: durable decisions, errors and long-term memory; agent orchestration with real file locks; a plan mode that executes itself; context pruning that keeps prompts lean; secret redaction for everything outbound; and a local dashboard of what it all cost. Everything runs in-process, stores to local SQLite, and calls no external service.
 
 ---
 
@@ -41,6 +54,8 @@ You: "Refactor the auth module — spawn a reviewer when done"
 
 Key tools: `spawn_session`, `session_wait`, `session_send`, `session_handoff`, `session_permission`, `session_cancel`
 
+Or let the pack run the orchestrations for you: **`/plan`** walks a task through a real planning phase — research, clarifying questions, a phased plan with risks and success criteria — then executes it by spawning one child session per step (free models first). **`/deep-research`** fans a topic across parallel research child sessions, iterates on the gaps they report, and consolidates the findings into one report.
+
 ### 2. Durable knowledge
 
 Build a searchable memory of decisions, errors, snippets, and code:
@@ -67,6 +82,7 @@ Keep prompts lean without losing information:
 - **secret-shield** scrubs secrets from outbound HTTP, prompts, and tool args
 - **finish-guard** fixes SSE streams that send content after `finish_reason`
 - **tool-audit** records every tool call with redaction for debugging
+- **code-review** reviews files, diffs, and whole projects — then optionally spawns fixer agents for what it finds
 
 ---
 
@@ -82,7 +98,26 @@ Install the pack from npm — no clone, no build:
 CFG="$HOME/.config/opencode"
 mkdir -p "$CFG/toolbox" && cd "$CFG/toolbox"
 npm init -y >/dev/null 2>&1
-npm install @bandonker/opencode-sessions @bandonker/opencode-decision-log @bandonker/opencode-error-journal @bandonker/opencode-snippet-library @bandonker/opencode-codebase-index @bandonker/opencode-tool-audit @bandonker/opencode-command-pack @bandonker/opencode-context-pruner @bandonker/opencode-session-export @bandonker/opencode-memory @bandonker/opencode-goal @bandonker/opencode-secret-shield @bandonker/opencode-finish-guard @bandonker/opencode-strip-skills-catalog @bandonker/opencode-usage-stats
+npm install \
+  @bandonker/opencode-code-review \
+  @bandonker/opencode-codebase-index \
+  @bandonker/opencode-command-pack \
+  @bandonker/opencode-context-pruner \
+  @bandonker/opencode-decision-log \
+  @bandonker/opencode-deep-research \
+  @bandonker/opencode-error-journal \
+  @bandonker/opencode-finish-guard \
+  @bandonker/opencode-goal \
+  @bandonker/opencode-loop-guard \
+  @bandonker/opencode-memory \
+  @bandonker/opencode-plan \
+  @bandonker/opencode-secret-shield \
+  @bandonker/opencode-session-export \
+  @bandonker/opencode-sessions \
+  @bandonker/opencode-snippet-library \
+  @bandonker/opencode-strip-skills-catalog \
+  @bandonker/opencode-tool-audit \
+  @bandonker/opencode-usage-stats
 ```
 
 Register the packages in the global config. This **merges** into an existing `opencode.jsonc` rather than overwriting it:
@@ -185,7 +220,7 @@ After `npm run setup` (which `npm install` runs automatically):
  ├── opencode.jsonc         # "plugins" array pointing at toolbox/*/
  └── toolbox/               # one directory per plugin
      ├── package.json       # shared dependency manifest
-     ├── node_modules/      # one install, shared by all 15
+     ├── node_modules/      # one install, shared by all 19
      ├── opencode-sessions/ # index.js + helpers.js
      │   └── node_modules -> ../node_modules
      ├── memory/
@@ -195,7 +230,7 @@ After `npm run setup` (which `npm install` runs automatically):
      │   └── node_modules -> ../node_modules
      ├── context-pruner/
      ├── secret-shield/
-     └── … 15 in total
+     └── … 19 in total
 ```
 
 <details>
@@ -217,7 +252,7 @@ Resolution is anchored at the package directory, not hoisted to the config root.
 
 ## Plugins
 
-15 plugins grouped by category. Click any name to jump to its expandable documentation.
+19 plugins grouped by category. Click any name to jump to its expandable documentation.
 
 ### Orchestration
 
@@ -225,6 +260,8 @@ Resolution is anchored at the package directory, not hoisted to the config root.
 | :-- | :--: | :-- |
 | **[opencode-sessions](#plugin-opencode-sessions)** | 9 | Spawn child sessions, wait for results, send follow-ups, answer permission prompts, cancel — and hand off the current working point into a fresh session. Adds targeted project presence and file-collision warnings. |
 | **[goal](#plugin-goal)** | 3 | Set an objective and keep working until it is reached. Auto-continues turns, re-injects the goal into every request, and stops on completion, block, interrupt, stall, or budget exhaustion. |
+| **[plan](#plugin-plan)** | 37 | `/plan` runs a full planning phase — research, questions, a phased plan with risks, criteria and estimates — then executes it with one child session per step. Tracks progress, checkpoints and rollbacks per project. |
+| **[deep-research](#plugin-deep-research)** | 6 | `/deep-research` fans a topic across parallel research child sessions, iterates on the gaps the agents report, and consolidates deduplicated, conflict-flagged findings into one report. |
 | **[command-pack](#plugin-command-pack)** | — | Registers 7 slash commands so the pack is one keystroke away (see [Commands](#commands)). |
 
 ### Data / Storage
@@ -254,6 +291,7 @@ Resolution is anchored at the package directory, not hoisted to the config root.
 | **[secret-shield](#plugin-secret-shield)** | 4 | v2-native secret detector and redactor for outbound HTTP, prompts, tool args/results, and child-process env. |
 | **[finish-guard](#plugin-finish-guard)** | — | Normalises OpenAI-compatible SSE streams so content after `finish_reason` cannot abort the turn. |
 | **[loop-guard](#plugin-loop-guard)** | — | Always-on doom-loop breaker: nudges the model after a run of identical tool calls or replies, then cancels the turn. |
+| **[code-review](#plugin-code-review)** | 11 | Reviews files, diffs and whole projects for security issues, smells and type problems — with an LLM fallback pass, fixer subagents, and trend tracking in local SQLite FTS5. |
 
 > All SQLite-backed plugins use `bun:sqlite` when available and fall back to `node:sqlite`. Databases land in `~/.opencode-plugins/`.
 
@@ -318,6 +356,44 @@ Goal state is persisted per session, so it survives plugin reloads and long turn
 | `log` | `OPENCODE_GOAL_LOG` | `false` | Log loop activity to stderr |
 
 **The loop.** `/goal Ship the login fix` stores the objective and starts a normal turn. Follow it with dash-prefixed lines to list success criteria. The objective is re-injected into every request, so it survives long turns and compaction; when a turn ends the plugin queues a continuation prompt carrying the objective and the remaining budget. It stops when the model calls `goal_complete` (which requires concrete evidence unless `requireEvidence` is off) or `goal_blocked`, when you interrupt a turn (the goal **pauses** rather than fighting you), when `stallLimit` turns run no tools and the reply is unchanged, after `maxFailures` consecutive execution errors, or when the iteration/time budget is exhausted. A paused or budget-stopped goal can be resumed with `/goal resume`.
+
+</details>
+
+<a id="plugin-plan"></a>
+<details>
+<summary><strong>plan</strong> — a planning phase that executes as child sessions</summary>
+
+`/plan <task>` walks a task through a real planning phase: the agent researches the task, asks clarifying questions, and writes a phased plan annotated with risks, success criteria, time and cost estimates, and research notes. Execution then spawns one child session per step — free models first, paid as fallback — with parallel children capped and progress tracked per project; `/plan status` shows the live board.
+
+Plan state is tracked in-plugin per project and session and exposed to the model as 37 tools (`plan` plus 36 `plan_*` helpers), including `plan_add_step`, `plan_add_risk`, `plan_add_criterion`, `plan_add_research`, `plan_progress`, `plan_checkpoint`, `plan_approve_phase`, `plan_rollback`, `plan_spawn_child`, `plan_metrics`, `plan_cost_optimize`, `plan_test_strategy`, `plan_time_estimate`, `plan_generate_docs` — and `plan_link_decision`, `plan_link_error`, `plan_link_snippet` to tie the plan into the decision log, error journal, and snippet library.
+
+#### Options
+
+| Option | Env var | Default | Meaning |
+| :-- | :-- | :-- | :-- |
+| `enabled` | `OPENCODE_PLAN_ENABLED` | `true` | Register the plugin, its tools and `/plan` |
+| `maxParallelChildren` | `OPENCODE_PLAN_MAX_PARALLEL_CHILDREN` | `3` | Child sessions allowed to run at once (1–10) |
+| `notify` | `OPENCODE_PLAN_NOTIFY` | `true` | Post plan notifications into the session |
+| `log` | `OPENCODE_PLAN_LOG` | `false` | Log plan activity to stderr |
+
+</details>
+
+<a id="plugin-deep-research"></a>
+<details>
+<summary><strong>deep-research</strong> — autonomous multi-agent research</summary>
+
+`/deep-research <topic>` fans the topic out across a taxonomy of research angles as parallel child sessions (bounded by `maxConcurrent`), then iterates: it reads what the agents report, finds the gaps, and dispatches follow-up questions with `deep_research_deliberate`, recording the agents' answers with `deep_research_answer`. `deep_research_consolidate` merges the findings and the deliberation Q&A into one deduplicated, conflict-flagged `report.md` inside the topic folder; `deep_research_runs` lists past runs and their report paths. History lives in local SQLite.
+
+Tools: `deep_research`, `deep_research_deliberate`, `deep_research_answer`, `deep_research_consolidate`, `deep_research_write_report`, `deep_research_runs`.
+
+#### Options
+
+| Option | Env var | Default | Meaning |
+| :-- | :-- | :-- | :-- |
+| — | `OPENCODE_DEEP_RESEARCH_ENABLED` | `true` | Turn deep research off without uninstalling (`0` disables) |
+| `dir` | `OPENCODE_DEEP_RESEARCH_DIR` | `~/.opencode-plugins/deep-research` | Where the SQLite history and reports are written |
+| `maxConcurrent` | `OPENCODE_DEEP_RESEARCH_CONCURRENCY` | `4` | Research agents running at once (1–8) |
+| `model` | `OPENCODE_DEEP_RESEARCH_MODEL` | — | Pin research agents to `providerID/modelID` |
 
 </details>
 
@@ -645,6 +721,8 @@ Tools: `secret_shield_scan`, `secret_shield_stats`, `secret_shield_shape`, `secr
 
 Normalise OpenAI-compatible SSE streams when a content, reasoning, or tool delta arrives after the provider's `finish_reason` chunk. This prevents `AI.Error.InvalidProviderOutput: OpenAI Chat received content after the finish reason` and the follow-on `Failed to drain Session` cascade for reasoning models behind strict gateways.
 
+A stream the gateway *cuts* mid-generation (content in hand, no finish reason) is deliberately left unterminated rather than closed with an invented `finish_reason`. A fabricated `"stop"` would mark the turn as a clean completion, hiding the cut and suppressing opencode's own recovery — an incomplete stream is a retryable error, so the turn is re-attempted and continued instead of silently keeping truncated text. Cuts are counted in `finish_guard_stats` (`truncated`) and the payloads immediately before the cut are dumped to the capture file.
+
 #### Options
 
 | Option | Env var | Default | Meaning |
@@ -653,6 +731,11 @@ Normalise OpenAI-compatible SSE streams when a content, reasoning, or tool delta
 | `log` | `OPENCODE_FINISH_GUARD_LOG` | `false` | Log each normalised stream to stderr |
 | `retry` | `OPENCODE_FINISH_GUARD_RETRY` | `true` | Ask opencode to retry the turn when a stream is malformed |
 | `retryMax` | `OPENCODE_FINISH_GUARD_RETRY_MAX` | `3` | Maximum retry attempts before the turn is allowed to fail |
+| `retryDelayBase` | `OPENCODE_FINISH_GUARD_RETRY_DELAY_BASE` | `300` | Initial retry delay in milliseconds |
+| `retryDelayMax` | `OPENCODE_FINISH_GUARD_RETRY_DELAY_MAX` | `2000` | Maximum retry delay in milliseconds |
+| `-` | `OPENCODE_FINISH_GUARD_CAPTURE` | `/tmp/opencode/finish-guard-toolcalls.jsonl` | Where truncated or undecodable provider streams are dumped for diagnosis |
+
+Tools: `finish_guard_test` (run the SSE transform on a sample payload), `finish_guard_stats` (observed stream metrics — `normalised`, `truncated`, `retries`).
 
 </details>
 
@@ -676,11 +759,42 @@ loop-guard watches every tool call and every outgoing request. It counts **conse
 
 </details>
 
+<a id="plugin-code-review"></a>
+<details>
+<summary><strong>code-review</strong> — security and quality review, with fixer agents</summary>
+
+Reviews files, diffs, and whole projects for security vulnerabilities, code smells, and type-safety issues. A static pass runs first; when it finds fewer than `llmFallbackThreshold` findings, a free-LLM pass fills in the gaps. Reviews and custom rules live in a local SQLite FTS5 database, so history, search, per-category stats, and trend analysis accumulate over time.
+
+With `enableAgentFixes` on, findings are handed to fixer subagents (at most `maxFixAgents` at once); `code_review_fix` returns the suggested patch for one finding.
+
+Commands: `/code-review file <path>`, `/code-review diff`, `/code-review project [path]`, `/code-review fix-all [reviewId]`, `/code-review deep [path]`, `/deep-code-review [path]`.
+
+Tools (11): `code_review_file`, `code_review_diff`, `code_review_project`, `code_review_history`, `code_review_get`, `code_review_search`, `code_review_stats`, `code_review_trends`, `code_review_fix`, `code_review_custom_rules`, `code_review_config`.
+
+#### Options
+
+| Option | Env var | Default | Meaning |
+| :-- | :-- | :-- | :-- |
+| `enabled` | `OPENCODE_CODE_REVIEW_ENABLED` | `true` | Register the plugin and its tools |
+| `enableLlmFallback` | `OPENCODE_CODE_REVIEW_LLM_FALLBACK` | `true` | Run a free-LLM pass when the static scan is sparse |
+| `llmFallbackThreshold` | `OPENCODE_CODE_REVIEW_LLM_FALLBACK_THRESHOLD` | `5` | Findings below this trigger the LLM fallback |
+| `enableAgentFixes` | `OPENCODE_CODE_REVIEW_AGENT_FIXES` | `true` | Hand findings to fixer subagents after a review |
+| `enableAutoFix` | `OPENCODE_CODE_REVIEW_ENABLE_AUTOFIX` | `true` | Attach a suggested fix to each finding |
+| `maxFixAgents` | `OPENCODE_CODE_REVIEW_MAX_FIX_AGENTS` | `6` | Fixer children allowed to run at once |
+| `spawnMode` | `OPENCODE_CODE_REVIEW_SPAWN_MODE` | `agent` | `agent` = the reviewer spawns fixers; `direct` = the plugin does |
+| `directReviewTimeoutSec` | `OPENCODE_CODE_REVIEW_DIRECT_REVIEW_TIMEOUT_SEC` | `300` | Seconds direct mode waits for its reviewer |
+| `reviewModel` / `fixModel` | `OPENCODE_CODE_REVIEW_REVIEW_MODEL` / `OPENCODE_CODE_REVIEW_FIX_MODEL` | — | Pin the reviewer / fixer model as `providerID/modelID` |
+| `deepReview` | `OPENCODE_CODE_REVIEW_DEEP` | `true` | Expose `/deep-code-review` and `/code-review deep` |
+
+More knobs: per-category rule toggles (`rules.security`, `rules.bugs`, `rules.style`, `rules.performance`), `focusAreas`, `severity` and `severityOverrides`, `includePatterns` / `excludePatterns`, file and finding caps (`maxFiles` 50, `maxFindingsPerFile` 20), and the `enableTrendAnalysis` / `enableConfidenceScoring` toggles.
+
+</details>
+
 ---
 
 ## Commands
 
-`command-pack` adds these to your command palette (`usage-stats` adds `/stats`, `goal` adds `/goal`):
+`command-pack` adds these to your command palette (`usage-stats` adds `/stats`, `goal` adds `/goal`, `plan` adds `/plan`, `deep-research` adds `/deep-research`, and `code-review` adds `/code-review` and `/deep-code-review`):
 
 | Command | Does |
 | :-- | :-- |
@@ -693,6 +807,10 @@ loop-guard watches every tool call and every outgoing request. It counts **conse
 | `/toolbox` | Show which pack tools are installed in this session |
 | `/stats` | Refresh and open the usage dashboard — runs server-side, so it costs **zero model tokens** |
 | `/goal` | Set an objective the agent keeps working toward until it is reached (`/goal status`, `pause`, `resume`, `done`, `clear` manage it) |
+| `/plan` | Run a full planning phase — research, clarifying questions, a phased plan — then execute it with one child session per step |
+| `/deep-research <topic>` | Fan a topic out across parallel research child sessions and consolidate the findings into one report |
+| `/code-review file <path> \| diff \| project [path]` | Review a file, a diff, or a whole project — `fix-all` spawns fixer agents, `deep` escalates |
+| `/deep-code-review [path]` | Deep review of a path (same as `/code-review deep`) |
 
 Each command injects a short instruction into the current session, so the agent does the work with its normal tools. If a command's tool isn't installed, the instruction says so instead of failing silently.
 
@@ -851,9 +969,9 @@ npm publish --access public                # scoped packages need --access publi
 
 `packages/` is generated and gitignored. Publish order does not matter — the packages have no runtime dependency on each other.
 
-**Release rule: one version for all 15.** Bump `version` in the root `package.json`; the build stamps that value onto every package, and they are always published in lockstep. Never publish packages at mixed versions — a user installing the pack over time would otherwise end up with an untested combination. Publish only from a green `main` (`npm test`, `typecheck`, `pack:check`).
+**Release rule: one version for all 19.** Bump `version` in the root `package.json`; the build stamps that value onto every package, and they are always published in lockstep. Never publish packages at mixed versions — a user installing the pack over time would otherwise end up with an untested combination. Publish only from a green `main` (`npm test`, `typecheck`, `pack:check`).
 
-**Releases go through the `publish` workflow, not `npm publish` by hand.** Pushing a tag `vX.Y.Z` runs the full gate (tests, typecheck, pack check), refuses to publish when the tag disagrees with the root version, then publishes all 15 with provenance via OIDC trusted publishing — no npm token involved:
+**Releases go through the `publish` workflow, not `npm publish` by hand.** Pushing a tag `vX.Y.Z` runs the full gate (tests, typecheck, pack check), refuses to publish when the tag disagrees with the root version, then publishes everything not already on npm at that version with provenance via OIDC trusted publishing — no npm token involved. Versions already on npm are skipped, so tagging a release that was published by hand (or tagging twice) is a clean no-op that just syncs GitHub with npm:
 
 ```bash
 npm version minor   # or major/patch; bumps root package.json
@@ -861,7 +979,7 @@ git push origin main
 git tag v1.2.0 && git push origin v1.2.0
 ```
 
-One-time setup, per package: npmjs.com → package → Settings → Trusted publisher → GitHub Actions, this repo, workflow `publish.yml`. Until that is done for a package, its publish step fails and the workflow stops — add all 15 before the first tagged release.
+One-time setup, per package: npmjs.com → package → Settings → Trusted publisher → GitHub Actions, this repo, workflow `publish.yml`. Until that is done for a package, its publish step fails and the workflow stops — add all 19 before the first tagged release.
 
 ---
 
@@ -986,6 +1104,14 @@ Issues and PRs are welcome. Here are some guidelines:
 
 ## Changelog
 
+### 1.2.1 — 2026-10-13
+
+All 19 packages published to npm as `1.2.1`.
+
+- finish-guard: a stream the gateway cuts mid-generation (content in hand, no finish reason) is left unterminated instead of being closed with an invented `finish_reason`. A fabricated `"stop"` marked the turn as a clean completion — hiding the cut, skipping opencode's retry-and-continue recovery, and leaving `finish_guard_stats` at `retries: 0` while turns kept dying. The cut is still counted (`truncated`) and captured with the payloads immediately before it.
+- finish-guard: a socket that dies mid-stream now arrives as a clean end instead of a rejected body, unlabelled SSE bodies are normalised rather than skipped, and `finish_guard_stats` reports `normalised` (streams the transform actually rewrote — "loaded but never fires" is directly answerable) and counts retries opencode scheduled on its own.
+- Tooling: one `npm install` builds, links and configures the whole toolbox; a new test asserts every installed plugin registers its tools.
+
 ### 2026-09-28
 
 - Initial release with 15 plugins
@@ -998,3 +1124,7 @@ Issues and PRs are welcome. Here are some guidelines:
 ## License
 
 [MIT](LICENSE) © Bandonker
+
+---
+
+<sub>If open-toolbox earns a place in your setup, a star on the repo helps other opencode users find it.</sub>
