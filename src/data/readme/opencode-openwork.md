@@ -121,6 +121,10 @@ pnpm install
 pnpm dev   # launches the Electron desktop app with hot reload
 ```
 
+Coding agents and tests should not open that window on your screen: they use
+the app in headless Chrome instead (see [Headless web](#headless-web-no-electron)
+and `AGENTS.md`).
+
 ### Repository layout
 
 | Path | What lives there |
@@ -175,6 +179,7 @@ To run the OpenWork UI in a browser against a local `openwork-server` (no deskto
 
 ```bash
 pnpm world up dev-app-web --detach
+pnpm world up dev-app-web --detach -- --browser   # also opens it in headless Chrome and prints a cdp address
 ```
 
 `pnpm dev:headless-web` is a compatibility alias for the same script. The alias

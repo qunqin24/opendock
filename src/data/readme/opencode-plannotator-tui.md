@@ -13,12 +13,14 @@ official OpenCode or Plannotator release.
 
 ```text
 /annotate                         Review the last completed assistant reply
+/annotate 2                       Review the second most recent reply
+/annotate 3                       Review the third most recent reply
 /annotate docs/plan.md            Review a Markdown document
 /annotate "docs/release plan.md"  Review a path containing spaces
 /annotate ~/Documents/notes.txt   Review a plain-text document
 ```
 
-`/annotate-last` is an alias with the same optional file argument.
+`/annotate-last` always reviews the latest completed reply; any supplied argument is ignored.
 
 ## Install
 
@@ -75,6 +77,9 @@ cancelled reviews submit nothing.
 
 **Replies:** the latest completed text reply, with paginated history lookup.
 Reasoning, in-progress messages and tool-call commentary are excluded.
+Pass a positive integer to select the Nth most recent eligible reply: `1` is the
+default, `2` is the previous reply, and so on. If there are too few replies, the
+plugin reports that instead of opening another reply.
 
 **Documents:** local UTF-8 `.md`, `.mdx`, `.markdown` and `.txt` files up to 2 MiB.
 Relative paths resolve against the captured session's working directory, not the
@@ -160,8 +165,9 @@ See [release instructions](docs/releasing.md) and [changelog](CHANGELOG.md).
 这是 **Plannotator TUI 的非官方 OpenCode 适配插件**。
 
 - `/annotate`：批注上一条完整回复。
+- `/annotate 2`：批注倒数第二条，`3`、`4` 依次往前；`1` 等同于默认。
 - `/annotate 文档.md`：批注文档，支持中文、空格和相对路径。
-- `/annotate-last`：同义入口，也可带文件路径。
+- `/annotate-last`：固定批注最新一条完整回复，忽略附带参数。
 - 选中文字 → `c` 写批注 → Enter 保存 → `q` 返回 →「Send and continue」。
 - 文档采用独立快照，反馈附原文件路径，确认后发回发起批注的会话。
 - 更新：`opencode plugin update opencode-plannotator-tui@latest`，然后重新打开终端客户端。

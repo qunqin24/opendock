@@ -1,5 +1,9 @@
 # Spicrawl agent plugins
 
+[![smithery badge](https://smithery.ai/badge/spicrawl/web-scraper)](https://smithery.ai/servers/spicrawl/web-scraper)
+
+Also available as an MCP server: [Smithery](https://smithery.ai/servers/spicrawl/web-scraper) · [MCP Registry](https://registry.modelcontextprotocol.io/v0/servers?search=io.github.OfficialSpicrawl/mcp)
+
 Spicrawl's plugins for coding agents and workflow tools, in one repository. For coding agents it
 connects the agent to the hosted Spicrawl MCP server and, in the tools that support it, gives the
 agent a skill that explains how to use it. For Dify and n8n it adds Spicrawl as a plugin or node
@@ -311,11 +315,11 @@ Notes:
   own `~/.cursor/mcp.json`.
 - `opencode/` is the source of the npm package `opencode-spicrawl` (OpenCode has no plugin
   marketplace format). It has its own `package.json` version and is published to npm separately
-  from these manifests, so its version does not have to match `0.2.1`.
+  from these manifests, so its version does not have to match `0.2.2`.
 - The collection version is `version` in `gemini-extension.json` and in the manifests under
   `plugins/` (`.claude-plugin`, `.cursor-plugin`, `.factory-plugin`, `.github/plugin` and
-  `spicrawl-openai/plugin.json`). It is `0.2.1` (0.2.0 added the Dify and n8n integrations; 0.2.1 aligned the skill with the public
-  rendering tiers) and these files are bumped together. `opencode/` and `dify/` are versioned on their own, and so is the n8n node, which lives in its own repository.
+  `spicrawl-openai/plugin.json`). It is `0.2.2` (0.2.0 added the Dify and n8n integrations; 0.2.1 aligned the skill with the public
+  rendering tiers; 0.2.2 added the plugin `README.md` and `LICENSE`, and the category and tags in the Cursor manifest, for Cursor marketplace review) and these files are bumped together. `opencode/` and `dify/` are versioned on their own, and so is the n8n node, which lives in its own repository.
 - `dify/` is the Dify plugin. The n8n community node is not in this repository: its source is
   [OfficialSpicrawl/n8n-nodes-spicrawl](https://github.com/OfficialSpicrawl/n8n-nodes-spicrawl), with the package at that repository's root because
   n8n's verification looks for `credentials/` there. Neither is a coding-agent plugin: they call

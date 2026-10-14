@@ -101,7 +101,7 @@ For each primary request, the router:
 - **To the classifier:** bounded excerpts of recent user and assistant text, up
   to 8 recent tool results (with tool names and error flags), a short failure
   summary, and the model ID. Hosted-tool and computer-use payloads are not
-  sent. Laya, Kev, and CLM run on your own server.
+  sent. Laya, Kev, CLM, and SGLang run on your own server.
 - **To your endpoint:** the full request, with the effort update added.
 - **Logged:** metadata only (IDs, model, effort, latency, token counts), and
   only to the proxy's stdout or a decision log you enable. Prompts, tool
@@ -157,7 +157,8 @@ The packages are:
 - [`@reasoning-router/opencode`](packages/opencode): the OpenCode V2 plugin.
 - [`@reasoning-router/classifiers`](packages/classifiers): the
   classifiers (Jev, Cloudflare Clef, Laya, Kev, OpenAI Decisions, CLM,
-  Microsoft-Decision-1, and Liquid d1), selected by `classifier.provider`.
+  Microsoft-Decision-1, Liquid d1, and SGLang), selected by
+  `classifier.provider`.
 - [`@reasoning-router/pi`](packages/pi): the Pi extension (Claude models
   only, for now).
 - [`@reasoning-router/proxy`](packages/proxy): the standalone
@@ -316,6 +317,26 @@ model. It is tested against mocked responses only; live compatibility and
 effort-selection quality are unverified. See
 [packages/classifiers](packages/classifiers/README.md#liquid-d1-provider-liquid)
 for details.
+
+### SGLang
+
+[SGLang](https://docs.sglang.io/docs/supported-models/decision_models) serves
+a System One endpoint for chat models (v0.5.21 and later) and for decision
+checkpoints such as PPLX-Decider (nightly builds). You run the server
+yourself; the router only calls it over HTTP:
+
+```bash
+python -m sglang.launch_server --model-path Qwen/Qwen3.8-27B --host 127.0.0.1 --port 30000
+REASONING_ROUTER_CLASSIFIER=sglang reasoning-router
+```
+
+The default base URL is `http://127.0.0.1:30000`. Set
+`REASONING_ROUTER_CLASSIFIER_API_KEY` only if the server runs with
+`--api-key`. See [docs/classifiers/sglang.md](docs/classifiers/sglang.md) for
+the pinned version, model and template restrictions, and the difference
+between a chat model's next-token scores and a calibrated decision
+checkpoint. Only API compatibility has been verified. Effort-decision quality
+has not.
 
 ## Supported models
 

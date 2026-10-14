@@ -7,9 +7,31 @@
 - 兼容任何 OpenAI 风格的 `/images/generations` 与 `/images/edits` 接口
 - 跨平台缩放（基于 [sharp](https://sharp.pixelplumbing.com)），不依赖 `sips` 等系统命令
 
+## 版本与兼容（重要）
+
+| 版本 | 目标 opencode | 插件 API | npm 安装 |
+|---|---|---|---|
+| **2.x**（当前线，`next` tag） | opencode **2.0+** | `@opencode/plugin@2`（`Plugin.define` + `ctx.tool` / `ctx.session`） | `opencode-image@next` |
+| 1.x（`latest` tag） | opencode **1.x** | `@opencode-ai/plugin` | `opencode-image@latest` |
+
+- v2 的插件运行时**只认** `export default { id, effect | setup }`，v1 形态的插件在 v2 里加载不了，所以这是**大版本切换**。
+- 本仓库 `publishConfig.tag` 固定为 `next`，直接 `npm publish` **不会**顶掉 `latest`，因此 **v1 老用户不会被自动升级到 2.x**。
+- v1 线要出新补丁：`bun run release:legacy`（打 patch 到 `latest`）。
+
 ## 安装
 
-在 `opencode.json` / `opencode.jsonc` 里配置：
+opencode **2.0+**（v2 插件 API）：
+
+```jsonc
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugin": [
+    ["opencode-image@next", { "apiKey": "sk-..." }]
+  ]
+}
+```
+
+opencode **1.x**（保持老版本）：
 
 ```jsonc
 {
@@ -20,7 +42,8 @@
 }
 ```
 
-opencode 启动时会自动从 npm 安装插件到 `~/.cache/opencode/packages/opencode-image/node_modules/`。
+opencode 启动时会自动从 npm 安装插件到 `~/.cache/opencode/packages/opencode-image.../node_modules/`。
+
 
 ## 配置项
 

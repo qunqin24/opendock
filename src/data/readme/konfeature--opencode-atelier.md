@@ -48,7 +48,7 @@ Two ways to run Atelier, depending on what you have.
 
 ### Path 1 — You have a Kubernetes cluster
 
-Apply the server + console manifests under [`infra/k8s/v2`](infra/k8s/v2/README.md)
+Apply the server + console manifests under [`infra/k8s`](infra/k8s/README.md)
 (namespaces, RBAC, a config ConfigMap, a Secret for GitHub OAuth, the
 Deployment/Service/Ingress). Everything else is configured from the console on
 first connection, or via the CLI. Then open your dashboard domain, sign in with
@@ -112,7 +112,6 @@ server to it.
 - **Secrets store** — `{"$secret": "NAME"}` references in any spec field, resolved server-side, never stored in the runtime DB
 - **GitHub OAuth** — sign in with GitHub, optionally gated to an org, with repository/branch discovery
 - **Multi-dev per sandbox** — nothing stops multiple developers (or one dev + one agent) sharing a sandbox
-- **Custom npm registry** — point every sandbox at your Verdaccio/Nexus/Artifactory proxy with one setting
 - **Config file sync** — global and per-scope config files, automatically synced into sandboxes
 
 ### The seam that keeps it simple
@@ -170,7 +169,7 @@ bun run --filter @atelier/console dev  # Console: http://localhost:5174
 
 The repo is a Bun monorepo: `@atelier/server` (Bun/Elysia) and
 `@atelier/console` (React 19 / TanStack Router) apps, the in-pod
-`atelier-agent` (Rust, `apps/agent-v2`), the `atelier` host CLI (`apps/cli`),
+`atelier-agent` (Rust, `apps/agent`), the `atelier` host CLI (`apps/cli`),
 and the `@atelier/spec` / `@atelier/compose` / `@atelier/shared` packages.
 See [`AGENTS.md`](AGENTS.md) for the full layout.
 

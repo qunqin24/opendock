@@ -12,7 +12,7 @@ resets in 6d 12h
 ## Install
 
 ```sh
-opencode plugin add @cardinal4/opencode-tavily-quota
+opencode plugin add opencode-tavily-quota
 ```
 
 Or declare it in `cli.json` to pass the API key option (see
@@ -80,7 +80,7 @@ the API key as a plugin option instead, register the plugin in `cli.json`:
 {
   "plugins": [
     {
-      "package": "@cardinal4/opencode-tavily-quota@latest",
+      "package": "opencode-tavily-quota@latest",
       "options": {
         "apiKey": "tvly-..."
       }
@@ -104,7 +104,7 @@ reference as `apiKey` to avoid pasting the raw key into `cli.json`:
 {
   "plugins": [
     {
-      "package": "@cardinal4/opencode-tavily-quota@latest",
+      "package": "opencode-tavily-quota@latest",
       "options": {
         "apiKey": "{file:~/.secrets/tavily-api-key}"
       }
@@ -151,6 +151,36 @@ npm install
 npm test
 npm run typecheck
 ```
+
+## Releasing
+
+Releases are published by GitHub Actions (`.github/workflows/publish.yml`). The
+workflow runs when a GitHub Release is published, checks that the release tag
+matches the `package.json` version, runs the tests and type check, then runs
+`npm publish` against the public registry using
+[npm trusted publishing](https://docs.npmjs.com/trusted-publishers/) (OIDC).
+No `NPM_TOKEN` secret is stored, and provenance is attached automatically.
+
+To cut a release:
+
+1. Bump `version` in `package.json` and `package-lock.json`, commit, and push to
+   `main`.
+2. Create a GitHub Release with a matching `vX.Y.Z` tag.
+
+The workflow then publishes `opencode-tavily-quota@X.Y.Z`.
+
+One-time npm setup: trusted publishing cannot create a package, so the first
+publish under the new name must be done manually (`npm publish` from a logged-in
+shell). After the package exists, add a trusted publisher on npmjs.com under the
+package's **Settings → Trusted Publisher**:
+
+- Provider: **GitHub Actions**
+- Repository: `cardin/opencode-tavily-quota`
+- Workflow filename: `publish.yml`
+
+From then on the workflow publishes without any token. (The previous scoped
+package, `@cardinal4/opencode-tavily-quota`, can be deprecated with
+`npm deprecate @cardinal4/opencode-tavily-quota "renamed to opencode-tavily-quota"`.)
 
 ## Notes
 

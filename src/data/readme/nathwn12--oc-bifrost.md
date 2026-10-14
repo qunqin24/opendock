@@ -7,7 +7,6 @@
   <a href="LICENSE"><img src="https://img.shields.io/github/license/nathwn12/oc-bifrost" alt="License" /></a>
   <img src="https://img.shields.io/github/languages/top/nathwn12/oc-bifrost" alt="Language" />
   <img src="https://img.shields.io/badge/platform-windows--linux-2b3137" alt="Platform" />
-  <a href="https://github.com/nathwn12/oc-bifrost/actions/workflows/ci.yml"><img src="https://github.com/nathwn12/oc-bifrost/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
 </p>
 
 ## What it is
@@ -64,7 +63,7 @@ On load the bridge prints a per-plugin mount report naming every hook that bridg
 Prerequisites: Node 22 or later, npm.
 ```sh
 npm install
-npm run check      # typecheck + build + tests
+npm run check      # typecheck + compile + tests
 ```
 
 ## Docs
@@ -73,7 +72,7 @@ npm run check      # typecheck + build + tests
 - [PROOF.md](PROOF.md) — the verification record behind every claim above.
 - [VERIFIED-PLUGINS.md](VERIFIED-PLUGINS.md) — plugins smoke-tested against oc-bifrost on OpenCode V2, with the route each row exercised.
 - [CONTRIBUTING.md](CONTRIBUTING.md) — how to add hook coverage or a verified plugin; both doors are gated on proof.
-- [src/compat-matrix.ts](src/compat-matrix.ts) — the single source of truth for the compatibility matrix; every row names the test that proves it.
+- [src/compat-matrix.ts](https://github.com/nathwn12/oc-bifrost/blob/main/src/compat-matrix.ts) — the single source of truth for the compatibility matrix; every row names the test that proves it (the published package ships the built `dist/compat-matrix.js`).
 
 ## Status
 

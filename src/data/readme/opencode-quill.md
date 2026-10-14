@@ -10,38 +10,66 @@ As you type, Quill predicts the remainder of your current prose word or the next
 word in sequence, shown as dimmed inline ghost text directly at your cursor.
 Press <kbd>Tab</kbd> or <kbd>→</kbd> to accept it, or <kbd>Esc</kbd> to dismiss.
 
-```text
-> can you refactor the test
-                           s   ← dimmed ghost text, Tab or → to accept
-```
-
 ## What it does
 
 - **Zero AI, completely local:** Runs entirely on-device without sending prompt
-  text to any model, API, or external service. Query latency is under 0.05 ms.
-- **Context-aware ranking:** Blends a high-frequency English vocabulary prior
-  with an online absolute-discounting n-gram model (bigrams and trigrams)
-  learned dynamically from your submitted prompt history.
-- **Completes words and predicts next words:** Completes the active word
-  prefix as you type (`refac` → `tor`) and predicts following words after a space
-  (`please run ` → `tests`) when prior evidence supports the sequence.
+  text to any model, API, or external service.
+- **Context-aware ranking:** Blends a common-English vocabulary prior with an
+  online n-gram model (bigrams and trigrams) learned from your prompt history.
+- **Completes words, fixes typos, and predicts next words:** Completes the active
+  prose prefix, offers single-edit corrections, and predicts following words
+  when learned evidence supports the sequence.
 - **Ghost-text styling:** Matches [opencode-ghost](https://github.com/ozandogrultan/opencode-ghost)'s
-  dimmed appearance (`0.55` opacity over the theme's muted text color),
-  rendering seamlessly in the OpenTUI buffer without displacing cursor position.
-- **Safe acceptance:** Inserts editable text into the draft without submitting.
-  Supports native undo (<kbd>Ctrl+-</kbd> or <kbd>Cmd+Z</kbd>). Never overwrites
-  existing text and never touches the system clipboard.
+  dimmed appearance (the theme's muted text color), rendered in the OpenTUI
+  buffer without displacing the cursor.
+- **Safe acceptance:** Inserts or corrects the active word in the draft without
+  submitting. Supports native undo (<kbd>Ctrl+-</kbd> or <kbd>Cmd+Z</kbd>). Never
+  overwrites unrelated draft text and never touches the system clipboard.
 - **Coexists with Ghost:** [Ghost](https://github.com/ozandogrultan/opencode-ghost)
   suggests entire next prompts in an *empty* composer using a model; Quill
   predicts words in an *active* draft locally. When both are installed, each
   activates only in its respective domain without key conflicts.
 - **Prose-aware gating:** Automatically suppresses suggestions in code blocks,
   backticks, file paths, URLs, slash commands, shell executions, active selections,
-  and modal dialogs.
+  composers holding attachments or pasted-text chips, and modal dialogs.
+- **End-of-draft only:** Suggestions appear when the cursor is at the end of the
+  draft, either on a partial word or after a space.
+
+## What suggestions look like
+
+The suggestion appears dimmed at the end of the draft. It is not part of the
+editable text until you press <kbd>Tab</kbd> or <kbd>→</kbd>.
+
+| Kind | Your draft | Dimmed suggestion | Draft after acceptance |
+| --- | --- | --- | --- |
+| Word completion | `please comp` | `lete` | `please complete` |
+| Typo correction | `please cmplete` | ` → complete` | `please complete` |
+| Next word | `please run ` | `tests` | `please run tests` |
+
+A correction looks like this, with only ` → complete` dimmed:
+
+```text
+> please cmplete → complete
+```
+
+- **Completions append** the missing letters or next word.
+- **Corrections replace only the active word**, preserving its initial-capital
+  or all-uppercase casing (`Cmplete` → `Complete`, `CMPLETE` → `COMPLETE`).
+  First-person contractions use a capital `I` in corrections and next-word
+  suggestions (`I'm`, `I'll`, `I've`, `I'd`). Lowercase contraction prefixes
+  are replaced on acceptance too (`i'v` → `I've`).
+- **Normal completions take precedence.** For example, `whate` completes to
+  `whatever` rather than being corrected to `what`. Typo correction is a
+  fallback when no confident prefix completion is available; recognized words
+  are not corrected.
+- **Earlier words are never rewritten.** With learned evidence for
+  `please run tests`, typing `please rnu ` can suggest `tests`. Accepting it
+  produces `please rnu tests`, leaving `rnu` unchanged.
 
 ## Requirements
 
-- [OpenCode](https://opencode.ai) ≥ 2.0.26 (V2 TUI plugin runtime).
+- [OpenCode](https://opencode.ai) with the V2 TUI plugin runtime (the supported
+  range is `engines.opencode` in `package.json`).
 - Node.js (for the installer script).
 
 ## Install
@@ -141,84 +169,66 @@ Custom keybindings can also be overridden using OpenCode's standard
 - **Command Palette (`Ctrl+P`)** — Includes **Word autocomplete: on/off** and
   **Clear word autocomplete history**.
 
-## Learning and Prediction Architecture
+## How it works
 
-### 1. How Quill Learns
+### Learning
 
-Quill listens to OpenCode session events in real time:
-- `session.execution.started` (prompt submitted)
-- `session.execution.succeeded` (turn completed)
-- `session.inbox.delivered` (message delivered to a session)
+Quill learns from your own submitted prompts, never from assistant output:
 
-When a message is received:
-1. **Deduplication:** Message IDs (`<sessionID>:<messageID>`) are checked against
-   a rolling set of up to 8,000 processed messages so each prompt is ingested once.
-2. **Prose Sanitization:** Text is stripped of markdown fenced code blocks, inline
-   backticks, URLs, file paths (`foo/bar.ts`), camelCase identifiers, slash commands
-   (`/command`), shell lines (`$ ...`), and lines indented by 4+ spaces.
-3. **Sequence Splitting:** Consecutive prose words delimited by spaces or punctuation
-   are partitioned into independent grammatical clauses. Punctuation (`.`, `,`, `!`, `?`)
-   and code snippets reset the context window so words separated by syntax are never
-   learned as adjacent phrases.
-4. **Vocabulary Hygiene:** New words not present in the base dictionary must appear
-   at least **twice** across distinct prompts before becoming suggestible candidates.
-   This prevents accidental typos or one-off strings from entering your suggestions.
-   Pasted blocks exceeding 4,000 characters or 12 lines are ignored.
+- It listens to session events (`session.execution.started`,
+  `session.execution.succeeded`, `session.inbox.delivered`).
+- On startup and when you open a session, it also backfills from the user
+  messages of the current and most recently updated sessions.
+- Each message is ingested once, tracked by `<sessionID>:<messageID>`.
+- Only prose is learned. Code blocks, inline code, URLs, file paths,
+  identifiers, slash commands, shell lines, indented blocks and very large
+  pastes are ignored.
+- Punctuation, line breaks and code reset the context, so words separated by
+  syntax are never learned as adjacent.
+- A word missing from the base vocabulary becomes suggestible only after it
+  has been seen more than once.
 
-### 2. How Predictions Grow
+### Prediction
 
-The language model consists of two tiers:
+- **Baseline prior:** a bundled English word-frequency table (SUBTLEX) gives
+  useful completions from the first keystroke.
+- **Personal model:** unigram, bigram and trigram counts from your prompts.
+  Context evidence falls back from trigram to bigram to unigram as it thins out.
+- **Current draft:** words already in the draft get a small boost.
+- **Confidence gating:** a suggestion is shown only when it clears a
+  confidence threshold, which is stricter for next-word predictions than for
+  prefix completions. If the typed prefix is already the most likely word,
+  nothing is shown.
+- **Typo fallback:** when prefix completion is not confident enough, nearby
+  words are ranked with an edit penalty and a stricter confidence threshold.
+  Correction confidence is the edit-penalized model score. Suggestions must
+  clear an absolute evidence floor and a separate candidate-dominance check.
+  Corrections require at least three typed letters. Short words are eligible
+  only for whole-word letter swaps that preserve the first letter; other edits
+  and mistyped longer prefixes require at least five letters, except for
+  apostrophe contractions, including missing apostrophes. Deletions repair only
+  doubled letters, not arbitrary extra characters or word endings.
+  Unknown tokens such as `json`, `yaml`, `bool`, `opts`,
+  and `enum` are left unchanged, and uncertain typos such as `fucn` can produce
+  no suggestion. Context repair uses the same edit guards and confidence checks
+  and requires repeated learned continuation evidence; not every typo produces
+  a suggestion.
+- **Bounded size:** the personal model is pruned to its most frequent entries
+  when saved.
 
-- **Baseline Prior:** A static unigram frequency table of 20,000 common English words
-  derived from the open-source SUBTLEX corpus. Provides instant, high-quality
-  spelling completions from your very first keystroke.
-- **Personal N-Gram Model:** Increments frequency counts as you submit prompts:
-  - **Unigrams** (`w`): Individual word frequencies.
-  - **Bigrams** (`u → w`): Transition frequencies from previous word `u`.
-  - **Trigrams** (`u, v → w`): Transition frequencies from two preceding words `u, v`.
+### Storage
 
-**Scoring & Interpolation:**
-Candidates are scored using Jelinek-Mercer interpolation combined with absolute
-discounting ($D = 0.5$):
+Quill uses OpenCode's durable plugin storage, which writes JSON under the XDG
+state directory (`$XDG_STATE_HOME` when set, otherwise `~/.local/state`):
 
-$$\text{score}(w \mid u, v) = \max\left(\frac{c(u, v, w) - D}{c(u, v)}, 0\right) + \frac{D \cdot |\{w : c(u, v, w) > 0\}|}{c(u, v)} \cdot \text{score}(w \mid v)$$
-
-If strong trigram evidence exists, the contextual prediction dominates. As context
-thins out, the model falls back gracefully to bigram transitions and then unigram
-frequencies.
-
-**Prefix-Constrained Posterior:**
-When you type a prefix (e.g. `refac`), all candidates matching the prefix—including
-the prefix itself if it is already a complete word—are ranked. A suggestion is only
-displayed when its calibrated confidence exceeds a quality threshold (30% for prefix
-completions, 55% for next-word predictions). If the typed prefix is already the most
-probable word, no ghost text is shown.
-
-**Bounded Capacity:**
-To keep memory and storage footprint minimal, the personal model enforces strict caps:
-- Words: Top 8,000 most frequent entries
-- Bigrams: Top 30,000 transitions
-- Trigrams: Top 30,000 transitions
-- Message deduplication log: 8,000 IDs
-
-### 3. Where State is Stored
-
-Quill uses OpenCode V2's durable plugin storage API (`context.storage.store`), which
-persists state as clean JSON files inside your standard XDG state directory:
-
-| Setting / Data | File Path |
+| Data | File |
 | --- | --- |
-| **Learned Model** | `~/.local/state/opencode/<channel>/tui/plugin.quill.learning.json` |
-| **Plugin Settings** | `~/.local/state/opencode/<channel>/tui/plugin.quill.settings.json` |
+| Learned model | `opencode/<channel>/tui/plugin.quill.learning.json` |
+| Settings | `opencode/<channel>/tui/plugin.quill.settings.json` |
 
-*(On systems with `$XDG_STATE_HOME` set, `$XDG_STATE_HOME/opencode/<channel>/tui/` is used).*
-
-**Privacy Guarantee:**
-- The snapshot file stores **only token frequency pairs** (e.g. `["refactor", 12]`, `["run\0tests", 5]`)
-  and the IDs of processed messages (`<sessionID>:<messageID>`).
-- **Raw prompt text is never written to disk or stored in snapshots.**
-- The storage files stay strictly on your local machine and are never tracked in Git
-  or included in npm packages.
+The learned model holds only word, bigram and trigram counts plus processed
+message IDs. Raw prompt text is never written to disk. These files stay on your
+machine and are never tracked in Git or published to npm.
 
 ## Development
 

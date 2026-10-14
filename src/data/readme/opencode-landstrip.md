@@ -5,14 +5,14 @@ Seatbelt on macOS, and AppContainer or restricted users on Windows.
 
 ## Quick start
 
-Install the CLI and native binary for your platform:
+Install:
 
 ```sh
 npm install --save-dev @landstrip/landstrip-api
 ```
 
-For Linux or macOS, save this as `policy.json`. Windows requires explicit read
-grants for the program and its dependencies; see the manual below.
+On Linux/macOS, save this as `policy.json`. Windows also needs explicit read
+grants for the executable and its dependencies.
 
 ```json
 {
@@ -35,14 +35,14 @@ npx landstrip policy validate -p policy.json
 npx landstrip doctor
 ```
 
-See [landstrip(1)](packages/landstrip/man/man1/landstrip.1) for policy rules,
-merged-policy inspection, CLI options, and platform limits.
+See [landstrip(1)](packages/landstrip/man/man1/landstrip.1) for CLI options,
+policy rules, and platform limits.
 
 ## Integrations
 
-- [Node.js API](packages/landstrip-api/README.md): native binary access and trap types.
-- [OpenCode](packages/opencode-landstrip/README.md): `opencode-landstrip` plugin.
-- [Pi](packages/pi-landstrip/README.md): `pi-landstrip` extension and subagents.
+- [Node.js API](packages/landstrip-api/README.md)
+- [OpenCode plugin](packages/opencode-landstrip/README.md)
+- [Pi extension](packages/pi-landstrip/README.md)
 
 ## License
 

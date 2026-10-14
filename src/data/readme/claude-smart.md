@@ -13,7 +13,7 @@
     <img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg" alt="License">
   </a>
   <a href="plugin/pyproject.toml">
-    <img src="https://img.shields.io/badge/version-0.3.6-green.svg" alt="Version">
+    <img src="https://img.shields.io/badge/version-0.3.9-green.svg" alt="Version">
   </a>
   <a href="plugin/pyproject.toml">
     <img src="https://img.shields.io/badge/python-%3E%3D3.12-brightgreen.svg" alt="Python">
@@ -60,28 +60,84 @@
 
 Requires Node.js 20+ (for `npx`) and the host CLI you're installing into (`claude`, `codex`, or `opencode`) on `PATH`.
 
-### Claude Code
+### Guided installation
 
 ```bash
 npx claude-smart install
 ```
 
+Choose one or more detected coding agents with the arrow keys and Space, then
+press Enter. Single-choice settings use the arrow keys and Enter. Esc or Ctrl+C
+cancels before configuration is saved.
+
+The guide asks where to store and process your data:
+
+- **Local Reflexio:** starts a background backend on this machine. Choose which
+  available agent CLI powers background learning; it can analyze interactions
+  from every installed integration.
+- **Managed Reflexio:** enter an HTTPS endpoint and a hidden API key. No local
+  backend starts; memory storage and background learning run in Reflexio cloud.
+  The local dashboard connects to that cloud backend by default.
+
+In local mode, choose the learning agent and either its provider-configured
+default or a specific supported model ID. For unattended installs, use
+`--model <model-id>` with `--provider`. The chosen model is applied to extraction
+and optimizer calls. Managed mode reports the server-configured model when
+available, otherwise explicitly reports that its default model is not exposed.
+
+The dashboard's **Data source** dropdown selects Local or Managed Reflexio.
+It defaults to the saved runtime mode. Its endpoint, overview totals, preferences,
+skills, and backend sessions follow the selected source; viewing another source
+does not change learning/storage settings. The header shows the selected endpoint
+as a read-only connection label, with an **Open cloud dashboard** link in Managed
+mode. Change connection settings in **Configure**. Overview metrics use backend summary
+counts for the last 30 days, rather than list limits. Connection failures are
+shown explicitly. Older skill citations without a project/shared identity remain
+visible under Legacy skill usage; exact per-skill counts use identified citations.
+A backend must be configured and reachable to view its data.
+Previously configured connections are retained privately when changing modes.
+The dashboard currently trusts local OS users: other accounts on a shared machine
+can access its configured backend connections. Per-user dashboard authentication
+requires a separate change.
+
+**This device** lists local session buffers and hook activity separately. Those
+counts can differ between machines connected to the same managed account.
+
+Review the configuration before installation starts. Saved settings and installed
+agents are preselected on subsequent runs. Preparation and service startup show
+phase and elapsed progress; detailed logs live in `~/.claude-smart/install-logs/`.
+If an integration fails, the others still install and the summary reports each result.
+Runtime environments remain separate so an agent's rollback cannot break another.
+
+### Explicit installation
+
+For an unattended first install, specify the backend. Multiple agents can be
+installed in one command:
+
+```bash
+npx claude-smart install --host claude-code,codex --backend local --provider codex
+npx claude-smart install --host opencode --backend local --provider opencode --global
+```
+
+For managed mode, supply the API key through a named environment variable rather
+than a command-line argument:
+
+```bash
+npx claude-smart install --host claude-code,codex --backend managed \
+  --url https://www.reflexio.ai/ --api-key-env REFLEXIO_API_KEY
+```
+
+Existing `--host codex` and `--host opencode` commands still work. Without a terminal,
+saved backend/provider settings are reused; a fresh install requires `--backend`.
+Use `--yes` to skip interactive questions when all required settings are supplied
+or saved. For multiple local agents, specify `--provider` unless one is already saved.
+Use `--read-only` to retrieve memories without publishing interactions, or `--learn`
+to resume learning. The interactive guide offers both modes for either backend.
+
+### Activate each integration
+
 Run `/reload-plugins` in your existing Claude Code session, or use the update in your next session.
-
-### Codex
-
-```bash
-npx claude-smart install --host codex
-```
-
 Start a new Codex session to load the update; you can finish your existing session first. If hook trust needs review, use `/hooks`.
-
-### OpenCode
-
-```bash
-npx claude-smart install --host opencode
-```
-
 Then restart OpenCode in your project so it loads the plugin from `opencode.json`. Add `--global` to install for all OpenCode projects on this machine instead.
 
 ### Check an update
@@ -96,12 +152,19 @@ Shows the installed version and the version each recent session last used in a h
 ### Uninstall
 
 ```bash
-npx claude-smart uninstall                    # Claude Code
+npx claude-smart uninstall                    # Choose integrations interactively
+npx claude-smart uninstall --host claude-code,codex  # Remove multiple integrations
+npx claude-smart uninstall --host claude-code  # Claude Code
 npx claude-smart uninstall --host codex       # Codex
 npx claude-smart uninstall --host opencode    # OpenCode
 ```
 
 Afterward, use `/reload-plugins` in Claude Code, start a new Codex session, or restart OpenCode. Learned data under `~/.reflexio/` and `~/.claude-smart/` is preserved and shared across hosts, so you can uninstall or switch hosts without losing skills or preferences.
+
+Uninstall keeps saved configuration and the chosen background learning provider.
+Removing an integration does not uninstall its agent CLI. Remaining integrations
+can continue using the same learning provider. OpenCode removal applies to the
+current project config, or its global config with `--global`.
 
 For per-host details — what the installers and uninstallers touch, OpenCode config resolution and model/env overrides, and Windows notes — see [Host install notes](./DEVELOPER.md#host-install-notes) in DEVELOPER.md. Developing the plugin itself? See [Developing locally](./DEVELOPER.md#developing-locally).
 
@@ -148,7 +211,7 @@ https://github.com/user-attachments/assets/ed84d73a-d5b7-4a0d-ab2c-f2c060c3f276
 - ⚡ **Fully automatic learning** — Every user turn, tool call, and assistant response is captured via lifecycle hooks and extracted into rules without you running anything.
 - 📈 **Continuously self-tuning, not just append-on-conflict** — Existing rules are continuously refined, not just appended to. Wording gets clearer, *when-to-apply* triggers tighten or broaden as evidence accumulates, near-duplicates merge, stale rules are superseded, and dead ones are archived. The library gets sharper, not just bigger.
   > *e.g.* correct the same `npm test --run` gotcha twice → consolidated into one rule. New evidence shows it applies to `vitest` too → scope broadened. Switch policy to `pnpm test` → old rule archived, new one supersedes it.
-- 🔌 **No external API call** — semantic search runs on an in-process ONNX embedder (all-MiniLM-L6-v2), and all data (preferences, skills, interaction buffers) is stored locally on your machine (`~/.reflexio/` and `~/.claude-smart/`).
+- 🔌 **Local or managed storage** — in local mode, semantic search runs on an in-process ONNX embedder (all-MiniLM-L6-v2) and memories stay on this machine. Managed mode stores and processes memories on the configured cloud backend; device interaction buffers remain local.
 - 🔎 **Hybrid search** — Skills and preferences are indexed with vector + BM25 search for fast, robust retrieval.
 - 🧪 **Offline resilience** — If the reflexio backend is down, hooks buffer to disk; the next successful publish drains them.
 - 🧰 **Manual correction marker** — `/claude-smart:learn` in Claude Code, or `bash ~/.reflexio/plugin-root/scripts/cli.sh learn` in Codex, flags the last turn as a correction so the extractor weights it heavily.
@@ -157,7 +220,7 @@ https://github.com/user-attachments/assets/ed84d73a-d5b7-4a0d-ab2c-f2c060c3f276
 
 ## Dashboard
 
-A web UI for browsing session histories, inspecting preferences, and editing project-specific and shared skills. The local backend binds to `127.0.0.1:8071` by default. The dashboard auto-starts alongside the backend, so you can open **http://localhost:3001** directly. Or run `/claude-smart:dashboard` in Claude Code to open it in your browser. In Codex, run `bash ~/.reflexio/plugin-root/scripts/dashboard-open.sh`.
+A web UI for browsing session histories, inspecting preferences, and editing project-specific and shared skills. The local backend binds to `127.0.0.1:8071` by default. The dashboard auto-starts in both local and managed mode at **http://localhost:3001**. Its data-source selector defaults to your saved runtime mode; managed mode reads cloud totals without starting a local backend. Or run `/claude-smart:dashboard` in Claude Code to open it in your browser. In Codex, run `bash ~/.reflexio/plugin-root/scripts/dashboard-open.sh`.
 
 <p align="center">
   <img src="assets/preferences_dashboard.png" alt="Preferences dashboard" width="49%">

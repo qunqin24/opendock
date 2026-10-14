@@ -7,7 +7,6 @@
   <a href="LICENSE"><img src="https://img.shields.io/github/license/nathwn12/oc-todo" alt="License" /></a>
   <img src="https://img.shields.io/github/languages/top/nathwn12/oc-todo" alt="Language" />
   <img src="https://img.shields.io/badge/platform-windows--linux-2b3137" alt="Platform" />
-  <a href="https://github.com/nathwn12/oc-todo/actions/workflows/ci.yml"><img src="https://github.com/nathwn12/oc-todo/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
 </p>
 
 ## What it is

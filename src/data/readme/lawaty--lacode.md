@@ -283,6 +283,20 @@ option is optional:
 | `models` | — | An inline slot list. Highest-priority source. |
 | `modelsFile` | — | An explicit slot file; short-circuits the chain below. |
 | `reapMs` | `30000` | Hang-reaper interval. |
+| `selfUpdate` | `true` | Check for a newer release at most once per ~6h and install it in the background; it applies on the next opencode start. `false` — or `LACODE_NO_SELFUPDATE=1` — turns the check off. |
+| `omniroute` | — | Optional [OmniRoute](#configuring-omniroute) gateway integration. Absent or `{ enabled: false }` changes nothing. |
+
+### Staying up to date
+
+opencode's plugin cache is **write-once**: it resolves `@lawaty/lacode` to an
+exact version once and never re-resolves — not on restart, not with
+`opencode plugin -g -f`, not with a range pin, not with a tagged config spec. So
+LaCode keeps itself current instead (US-27): at startup it compares its own
+version to npm's `latest` (at most once per ~6h, silent when offline) and, when
+behind, reinstalls its own cache entry in the background using the opencode
+binary — no npm or bun required. The running session keeps its loaded code; the
+new version takes effect on the next start, and the log says so. Run
+`lacode update` to do it on demand, or `lacode update --check` to just report.
 
 ### Pool preset resolution
 
@@ -301,6 +315,112 @@ change a preset, then restart every opencode process.
 allowlist anywhere in the package, and no cost check of any kind: only the
 structure is validated. The bundled preset is built from free models because
 that is a sensible default, not because the pool requires it.
+
+### Configuring OmniRoute
+
+[OmniRoute](https://github.com/diegosouzapw/OmniRoute) is a local
+OpenAI-compatible AI gateway (default `http://localhost:20128/v1`) that routes a
+request across many providers with fallback and "combos". LaCode can register it
+as an opencode provider for you. It is **off by default**: if you do not set
+`omniroute.enabled: true`, nothing below happens and LaCode makes no request.
+
+```jsonc
+{
+  "plugin": [
+    ["@lawaty/lacode", {
+      "omniroute": {
+        "enabled": true,
+        "baseURL": "http://localhost:20128/v1",
+        "apiKey": "sk_omniroute",          // optional; OMNIROUTE_API_KEY overrides it
+        "combo": "static-best-free",        // optional: let OmniRoute do the routing
+        "models": ["cc/claude-sonnet-4-6", "gemini-3-flash"], // hard allowlist
+        "tiers": {
+          "primary": ["cc/claude-sonnet-4-6"],
+          "backup": ["gemini-3-flash"]
+        },
+        "stickyPerSession": true,
+        "healthCheck": true,
+        "timeoutMs": 5000
+      }
+    }]
+  ]
+}
+```
+
+| Field | Default | Meaning |
+| --- | --- | --- |
+| `enabled` | `false` | Turns the integration on. |
+| `baseURL` | `http://localhost:20128/v1` | Gateway base URL, normalised to exactly one `/v1`. |
+| `apiKey` | — | Bearer key. **`OMNIROUTE_API_KEY` overrides this value.** The key is never logged. |
+| `combo` | — | An OmniRoute combo id (or `auto`) to expose as a selectable model even though the gateway does not list it. Exposed first. |
+| `models` | — | A **hard allowlist**: only these ids are ever exposed, even if the gateway lists more. |
+| `tiers` | — | `{ "primary": [...], "backup": [...] }` preference order over models the allowlist already permits. |
+| `stickyPerSession` | `true` | Keep a session on one model while that model is healthy. |
+| `healthCheck` | `true` | Probe `GET /models` at startup; a failed check disables the integration for that run only. |
+| `timeoutMs` | `5000` | Budget for LaCode's own calls to the gateway. |
+
+An enabled but invalid block (bad `baseURL`, a non-array `models`, …) is rejected
+as a whole: LaCode logs one warning naming the problem and continues exactly as
+if the integration were off. It never crashes opencode.
+
+**What it registers.** On the first `config` pass LaCode health-checks the
+gateway, reads `GET /models`, filters it through your `models` allowlist (or
+exposes everything the gateway lists when no allowlist is set), and writes a
+`provider.omniroute` entry — `npm: "@ai-sdk/openai-compatible"` with your
+`baseURL` / `apiKey` — so `omniroute/<model-id>` becomes selectable. If you
+already have a `provider.omniroute` block, LaCode leaves it completely untouched
+and warns; it also never adds a `whitelist`. Because opencode loads
+`@ai-sdk/openai-compatible` itself, no extra dependency is installed.
+
+**Combo vs. allowlist.** Set `combo` and OmniRoute does the fallback for you (let
+it route). Without a combo, LaCode exposes the allowlist ordered by `tiers`
+(primary first), tracks a rolling latency and error rate per model, and skips a
+model while it is cooling after a transient failure — 429, 408 and 5xx, honouring
+`Retry-After` and otherwise using capped exponential backoff. Non-transient
+errors (400, 401, 403, 404) are surfaced to you, never failed over.
+
+**Using OmniRoute in the pool.** The integration only *registers* the provider —
+it never touches your pool, and it does not place a slot for you. To route pooled
+work (exploration, implementation, cartography) through the gateway, list it in
+your pool like any other model:
+
+```
+# ~/.config/lacode/pool.txt
+omniroute/auto             3
+opencode/space-bunny-free  2
+opencode-go/step-5-preview-free 1
+opencode/big-pickle        1
+```
+
+`omniroute/auto` then takes slot 1 (weight 3) and drains pooled mechanical work
+before it reaches the bundled opencode/opencode-go ("zen") models. Any
+`omniroute/<id>` works, provided the id is exposed — by `combo`/`models`, or the
+whole catalog when neither is set. Because the plugin writes the pool nothing,
+the only thing that changes when the gateway is down is that `omniroute/<id>`
+fails; every other slot keeps working. See
+[docs/USER-STORIES.md](docs/USER-STORIES.md) US-28.
+
+**A note on mid-session switching.** opencode 1.18.34 exposes no hook to change
+an agent's main model mid-request, so LaCode cannot swap models inside a running
+session; use an OmniRoute `combo` (or `auto`) if you want per-request fallback.
+LaCode's selection engine decides which models are exposed and in what order, and
+its cooldown/backoff rules are unit-tested.
+
+**Getting a key.** Open the OmniRoute dashboard, go to API Manager / API Keys and
+copy a key into `OMNIROUTE_API_KEY` (recommended) or `omniroute.apiKey`. On a
+local instance with `REQUIRE_API_KEY=false`, the literal placeholder
+`sk_omniroute` is accepted.
+
+**Troubleshooting**
+
+| Symptom | Cause | Fix |
+| --- | --- | --- |
+| `omniroute health check failed` at startup | Gateway not running, wrong `baseURL`, or a startup race | Start OmniRoute on `http://localhost:20128` and restart opencode. The integration is disabled for that run only, not permanently. |
+| `no usable models` | The gateway returned an empty list, or every id was filtered out by `models` | `curl -H "Authorization: Bearer $OMNIROUTE_API_KEY" http://localhost:20128/v1/models` and check `models`/`combo` against the returned ids. |
+| `401` / `Invalid API key` | `REQUIRE_API_KEY=true` and the key is missing or wrong | Create a key in the dashboard, export `OMNIROUTE_API_KEY`, or set `REQUIRE_API_KEY=false` locally and use `sk_omniroute`. |
+| `404` on a URL containing `/v1/v1/` | A `baseURL` that already carried `/v1` was given twice | LaCode normalises this, so it should not come from LaCode; check a hand-written `provider.omniroute` block, which LaCode leaves untouched. |
+| Provider registered but models are missing | You already had `provider.omniroute` | Remove it and let LaCode write it, or add the models yourself — LaCode never modifies an existing provider. |
+| Pooled work still runs on the bundled models | The gateway was unhealthy/disabled at startup, or you have no `omniroute/…` slot in your pool | Check the startup log for `omniroute health check failed` / `no usable models`, then add `omniroute/<model>` to `pool.txt` (or `pool.json`) to route pooled work through the gateway. |
 
 ### Which models run which agent
 

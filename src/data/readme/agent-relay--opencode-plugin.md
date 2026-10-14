@@ -2,7 +2,7 @@
 
 Skills, slash commands, and a Claude Code plugin for building multi-agent systems with Agent Relay.
 
-Package metadata lives in [prpm.json](prpm.json). The repo currently publishes `agent-workforce-skills` version `1.9.0`.
+Package metadata lives in [prpm.json](prpm.json). The repo currently publishes `agent-workforce-skills` version `1.10.0`.
 
 ## Published Skills
 
@@ -12,7 +12,8 @@ Package metadata lives in [prpm.json](prpm.json). The repo currently publishes `
 | [writing-agent-relay-workflows](skills/writing-agent-relay-workflows/SKILL.md) | 2.0.0 | **DEPRECATED** - the superseded v1 `@relayflows/core` WorkflowBuilder engine. Use [`writing-relayflows`](skills/writing-relayflows/SKILL.md) for v2; keep this only to maintain an existing v1 workflow. |
 | [setting-up-relayfile](skills/setting-up-relayfile/SKILL.md) | 1.1.2 | Set up Relayfile mounts and writeback for provider files through local filesystem access. |
 | [setting-up-agent-relay-desktop](skills/setting-up-agent-relay-desktop/SKILL.md) | 1.1.10 | Install and configure Agent Relay Desktop end-to-end from a Codex or Claude session, including headless Linux, device login, registration, webhooks, integrations, and verification. |
-| [setting-up-agent-relay-sessions](skills/setting-up-agent-relay-sessions/SKILL.md) | 0.2.8 | Set a person up for live agent-to-agent session handoff end-to-end from a Codex or Claude session: reuse `setting-up-agent-relay-desktop` for the desktop leg, install the agent-sessions cloud MCP before the session starts, confirm the handoff tools loaded, and prove a live round trip with a teammate (or self-verify the roster + own-session read path when no teammate is online yet). |
+| [setting-up-agent-relay-sessions](skills/setting-up-agent-relay-sessions/SKILL.md) | 0.2.9 | Set a person up for live agent-to-agent session handoff end-to-end from a Codex or Claude session: reuse `setting-up-agent-relay-desktop` for the desktop leg, install the agent-sessions cloud MCP before the session starts, confirm the handoff tools loaded, and prove a live round trip with a teammate (or self-verify the roster + own-session read path when no teammate is online yet). |
+| [setting-up-capy-on-agent-relay](skills/setting-up-capy-on-agent-relay/SKILL.md) | 0.1.1 | Put a person's Capy threads on Agent Relay from any agent: the workspace Capy key, the public Capy plugin, guided setup in a Capy thread (bind, optional organization-wide auto-join, device Access), and a proven round trip. |
 | [signing-in-to-agent-relay-cloud](skills/signing-in-to-agent-relay-cloud/SKILL.md) | 0.1.0 | Sign a person in to Agent Relay Cloud through the OAuth device flow from an agent session: device grant, polling, refresh, whoami, and the CLI credential handoff, with no token printed. |
 | [setting-up-agent-relay-flows](skills/setting-up-agent-relay-flows/SKILL.md) | 0.1.0 | Choose a catalog flow and repository, connect tools and coding-agent credentials, activate the listener through the direct-source deploy API, and verify it is listening. Builds on `signing-in-to-agent-relay-cloud`. |
 | [subscribing-relay-webhooks-and-writebacks](skills/subscribing-relay-webhooks-and-writebacks/SKILL.md) | 0.1.7 | Subscribe a session to GitHub PR and Slack channel events so they are injected, and write back to providers through a Relayfile mount, with the verified steps and known defects. |
@@ -61,6 +62,18 @@ Install [`agent-relay-teams`](plugins/claude/agent-relay-teams) from the `agent-
 grok plugin install AgentWorkforce/skills#plugins/grok/agent-relay --trust
 ```
 
+## Grok Bot and ChatGPT plugins
+
+[`plugins/grok-bot`](plugins/grok-bot) packages the hosted Agent Relay MCP
+connection for Grok Bot. Its [skill](skills/agent-relay-grok-bot/SKILL.md)
+is a canonical prpm package. The repository's
+`.cursor-plugin/marketplace.json` points to it for Cursor Marketplace review.
+[`plugins/chatgpt`](plugins/chatgpt) packages the same hosted connection. Its
+review ZIP assembles the canonical [onboarding](skills/agent-relay-chatgpt-setup/SKILL.md)
+and [usage](skills/agent-relay-chatgpt/SKILL.md) prpm skills. Both require OAuth;
+repository availability does not mean either
+marketplace listing has been approved or published.
+
 ## Claude Code Channel Plugin
 
 [`agent-relay-channel`](plugins/claude/agent-relay-channel) is a Claude Code [channel](https://code.claude.com/docs/en/channels): relay messages from other agents arrive in your running session in real time and Claude answers with a `reply` tool, gated by pairing and a sender allowlist.
@@ -85,6 +98,10 @@ settings under `~/.claude/channels/agent-relay/` are reused.
 ## OpenCode Plugin
 
 [`plugins/opencode/agent-relay`](plugins/opencode/agent-relay) is the npm package `@agent-relay/opencode-plugin`: it lets the Agent Relay desktop deliver relay messages into an open OpenCode session and read the answer back. Add `"plugins": ["@agent-relay/opencode-plugin"]` to OpenCode V2's `opencode.json` (`"plugin"` on V1). It stays out of the way when the desktop has installed its own copy.
+
+### Capy
+
+[`plugins/capy/agent-relay`](plugins/capy/agent-relay) puts Capy threads on Agent Relay through Agent Relay Cloud: each thread gets its own relay agent, relay messages are posted into it as new turns, and its conversation uploads to Sessions. To onboard, paste this into any Capy thread: `Set me up on Agent Relay: https://github.com/AgentWorkforce/skills/blob/main/skills/setting-up-capy-on-agent-relay/SKILL.md`. Capy reads the skill, proposes the plugin (press Add, then Connect, and sign in to Agent Relay), binds the thread and walks through the rest. An owner or admin first connects a Capy service-user key in Agent Relay Cloud → Settings → Workspace → Capy. See [`setting-up-capy-on-agent-relay`](skills/setting-up-capy-on-agent-relay/SKILL.md) for the full journey.
 
 ## Install Packages
 
@@ -164,6 +181,8 @@ npx skills add https://github.com/AgentWorkforce/skills \
   --skill messaging-agents-on-the-relay
 ```
 
+The collection also carries `setting-up-capy-on-agent-relay` as an optional package, for people whose Capy threads should join the relay (it needs no desktop). With `skills`, add `--skill setting-up-capy-on-agent-relay` to include it.
+
 Add `-g` for a user-level install, or `--agent claude-code` to pick a tool. (`--agent codex` writes to `./.agents/skills`; use the `~/.codex/skills` mirror above if you need Codex to load them globally.) The sessions, subscribing and messaging skills stop and tell you which companion to install if the desktop skill is missing; the desktop skill is the foundation and has no companion requirement.
 
 ### Agent Relay Cloud and Flows setup skills
@@ -196,6 +215,7 @@ plugins/claude/agent-relay-teams/ # Claude Code plugin, hooks, worker agent, and
 plugins/grok/agent-relay/       # Grok Build plugin: setup and messaging skills, /relay-leader-mode
 plugins/claude/agent-relay-channel/ # Claude Code channel plugin: relay messages into a running session
 plugins/opencode/agent-relay/   # @agent-relay/opencode-plugin npm package (generated from the desktop template)
+plugins/capy/agent-relay/       # Capy plugin: Cloud's hosted relay MCP plus the agent-relay skill
 workflows/                      # Maintenance and audit workflows
 prpm.json                       # Package manifest
 ```

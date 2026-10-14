@@ -13,6 +13,8 @@ My personal plugins for OpenCode V2 (beta).
 - [`opencode-quick-links`](packages/opencode-quick-links/README.md): searches and opens links from the active conversation.
 - [`opencode-pr-link`](packages/opencode-pr-link/README.md): opens the current session's pull request in the browser.
 - [`opencode-quick-quote`](packages/opencode-quick-quote/README.md): quotes paragraphs from the last reply with inline autocomplete.
+- [`opencode-external-tabs`](packages/opencode-external-tabs/README.md): opens sessions created by other clients as background tabs.
+- [`opencode-bubble-tabs`](packages/opencode-bubble-tabs/README.md): moves tabs to the front when a session finishes or needs your input.
 
 ## Development
 

@@ -7,7 +7,6 @@
   <a href="LICENSE"><img src="https://img.shields.io/github/license/nathwn12/oc-flight-deck" alt="License" /></a>
   <img src="https://img.shields.io/github/languages/top/nathwn12/oc-flight-deck" alt="Language" />
   <img src="https://img.shields.io/badge/platform-windows--linux-2b3137" alt="Platform" />
-  <a href="https://github.com/nathwn12/oc-flight-deck/actions/workflows/ci.yml"><img src="https://github.com/nathwn12/oc-flight-deck/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
 </p>
 
 ## What it is
@@ -20,7 +19,7 @@ A session's own cost excludes its subagents, so the reported figure understates 
 
 ## Features
 
-- Live rows for `status`, `agent`, `model`, `cost`, `project`, `tokens`, `cache`, `context`, `perms`, `elapsed` and `tps`, plus opt-in rows: `caution`, `branch`, `total`, `spark`, `reasoning`, `turns`, `guard`, `go` and `ses`.
+- Live rows for `status`, `agent`, `model`, `cost`, `project`, `tokens`, `cache`, `context`, `perms`, `elapsed` and `tps`, plus opt-in rows: `caution`, `branch`, `total`, `spark`, `reasoning`, `turns`, `guard`, `go` and `ses`. `layout.labels` renames any of them — `{ "cost": "session", "total": "lifetime" }` draws your own cost under `session` and the family total under `lifetime`.
 - Family-scoped money: cost, tokens, cache and reasoning cover the conversation plus every subagent session in its tree; the project row covers every session in the project.
 - Elapsed time recomputed from the assistant-turn spans the host recorded, so a restart returns the same value instead of resetting.
 - Live throughput over `sidebar.tps.scope` (`family` or `session`, default `family`), reading `0 tok/s` whenever the scope is not generating.
@@ -53,7 +52,7 @@ Every key is optional. The real config keys, taken from [flight-deck.schema.json
 - `sidebar.enabled`, `sidebar.lines`, `sidebar.rows`, `sidebar.tps.scope` (`family` or `session`), `sidebar.persist`, `sidebar.placeholder`, `sidebar.maxLines` (default `24`), `sidebar.footer.lines`, `sidebar.footer.go`.
 - `footer.enabled` / `footer.text`: a single line in the prompt footer, off unless configured.
 - `caution.enabled` (default `false`), `toolWatchSeconds` (`180`), `toolCautionSeconds` (`420`), `turnWatchSeconds` (`600`), `turnCautionSeconds` (`1200`), `repeatThreshold` (`3`), `exemptTools`, `toast` (`false`). To use the annunciator, add `caution` to `sidebar.rows` and set `caution.enabled: true`.
-- `layout.labelWidth` (`10`), `layout.barWidth` (`10`), `layout.sparkWidth` (`12`).
+- `layout.labelWidth` (`10`), `layout.barWidth` (`10`), `layout.sparkWidth` (`12`), `layout.labels` (per-row label renames, e.g. `{ "cost": "session", "total": "lifetime" }`; every other row keeps its built-in label).
 - `format.duration` (`spaced` or `compact`).
 - `glyphs.watch`, `glyphs.caution`, `glyphs.clear`.
 - `style.lines` and `style.rows.*`: theme color roles with OpenTUI text attributes.

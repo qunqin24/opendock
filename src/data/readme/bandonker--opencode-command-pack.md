@@ -1,20 +1,14 @@
 <div align="center">
 
-# open-toolbox
+<img src="images/banner.svg" alt="open-toolbox — 19 local plugins for opencode Desktop v2" width="1280">
 
 **19 local plugins that turn [opencode](https://opencode.ai) Desktop v2 into a serious daily driver.**
-
-Session orchestration · durable memory · context pruning · secret redaction · doom-loop breaking · a lifetime usage dashboard — all local SQLite, no cloud services, no embedding APIs.
 
 [![ci](https://github.com/bandonker/open-toolbox/actions/workflows/ci.yml/badge.svg)](https://github.com/bandonker/open-toolbox/actions/workflows/ci.yml)
 [![npm — 19 packages](https://img.shields.io/badge/npm-19%20packages-CB3837?logo=npm)](https://www.npmjs.com/~bandonker)
 [![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![opencode plugin v2](https://img.shields.io/badge/opencode-plugin%20v2-000000.svg)](https://opencode.ai/docs/plugins)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](#contributing)
-
-<img src="images/usage-stats2.PNG" alt="The usage-stats dashboard included in the pack" width="760">
-
-<sub>The usage-stats dashboard, included in the pack.</sub>
 
 </div>
 

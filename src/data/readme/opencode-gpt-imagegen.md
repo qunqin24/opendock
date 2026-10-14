@@ -2,24 +2,22 @@
 
 > **⚠️ ChatGPT subscription users: update before October 14, 2026.** [GPT-5.5 will retire from Codex with ChatGPT sign-in](https://learn.chatgpt.com/docs/models#gpt-55-retirement). Plugin versions before `0.1.13` use GPT-5.5 and will stop generating images. Follow the [update steps](#updating-the-plugin) to install `0.1.13` or later.
 
+> **📣 OpenAI API key support is on hold.** This plugin supports only ChatGPT sign-in. If you need API key support, please share your use case in [#120](https://github.com/yuji-hatakeyama/opencode-gpt-imagegen/issues/120).
+
 <p align="center"><img src="./ogp.png" alt="opencode-gpt-imagegen × gpt-image-2" /></p>
 
-> Bring [**ChatGPT Images 2.0**](https://openai.com/index/introducing-chatgpt-images-2-0/) (`gpt-image-2`) to [OpenCode](https://opencode.ai). Use it through your **ChatGPT subscription** (no API costs!) or through the **OpenAI API** — your call.
+> Bring [**ChatGPT Images 2.0**](https://openai.com/index/introducing-chatgpt-images-2-0/) (`gpt-image-2`) to [OpenCode](https://opencode.ai). Use it through your **ChatGPT subscription** (no API costs!).
 
 [![OpenCode plugin](https://img.shields.io/badge/OpenCode-plugin-blue.svg)](https://opencode.ai/docs/plugins/)
 [![npm version](https://img.shields.io/npm/v/opencode-gpt-imagegen.svg)](https://www.npmjs.com/package/opencode-gpt-imagegen)
 [![CI](https://github.com/yuji-hatakeyama/opencode-gpt-imagegen/actions/workflows/ci.yml/badge.svg)](https://github.com/yuji-hatakeyama/opencode-gpt-imagegen/actions/workflows/ci.yml)
 [![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 
-| Auth path | Status | Billing |
-|---|---|---|
-| **ChatGPT subscription** (OAuth) | **Available now in v0.1.0** | **No extra cost** — comes out of your existing Plus / Pro / Business plan |
-| **OpenAI API key** | **Coming soon in v0.2.0** | Pay-per-image against your API credits, with `generate` + `edit` support |
-
 ## Highlights
 
-- **Subscription-friendly.** Generations ride on the same Codex backend channel OpenCode already uses for ChatGPT subscription chat — billed against your ChatGPT plan, not your API credits.
+- **Subscription-friendly.** Generations ride on the same Codex backend channel OpenCode already uses for ChatGPT subscription chat — billed against your existing ChatGPT Plus, Pro, or Business plan, not your API credits.
 - **Reference images.** Pass up to five input images alongside the prompt for style guidance, edit targets, or compositing inputs.
+- **Transparent backgrounds.** Ask for a transparent background, a cutout, or background removal, and the agent passes `background: "transparent"` to get an RGBA PNG. The cutout edges can be rough, with a faint semi-transparent halo. For a clean cutout, generate the image on a plain background and remove the background yourself.
 
 ## Installation
 
@@ -49,11 +47,11 @@ If you use an unversioned entry or `@latest` but do not have that directory, see
 
 Just ask your agent in natural language and `gpt_imagegen` will be picked up.
 
-The three examples below are the **actual outputs of this repo's e2e test suite** — see [`tests/e2e/subscription.test.ts`](./tests/e2e/subscription.test.ts) for the exact prompts and assertions.
+The four examples below are the **actual prompts and outputs of this repo's e2e test suite** — see [`tests/e2e/gpt_imagegen.test.ts`](./tests/e2e/gpt_imagegen.test.ts) for the assertions. The e2e prompts name the tool and the output path explicitly to keep the test runs predictable. In normal use, you can just describe the image you want.
 
 ### Example A — generate
 
-> Draw a man in a navy samue with a red hachimaki, standing in a garden full of cherry blossoms. 90s anime style. Save it as `character.png`, portrait 1024x1536.
+> Use the gpt_imagegen tool to generate an image at character.png. Content: a man wearing a navy-blue samue and a red hachimaki headband, standing in a garden of cherry blossoms in full bloom. Style: hand-drawn 90s Japanese animation style. Size: 1024x1536 (portrait).
 
 <p align="center"><img src="./assets/character.png" alt="Example A output: man in samue, portrait" width="320" /></p>
 
@@ -61,7 +59,7 @@ The three examples below are the **actual outputs of this repo's e2e test suite*
 
 `gpt_imagegen` never overwrites an existing file: when the `out` path is already taken, it picks `-v2`, `-v3`, … instead.
 
-> Now do the same path but make it a woman in a yellow yukata holding a red wagasa, in a moonlit garden with fireflies. Landscape 1536x1024.
+> Use the gpt_imagegen tool to generate an image at character.png. Content: a woman wearing a yellow yukata and holding a red wagasa parasol, standing in a garden at night with fireflies dancing around her. Style: hand-drawn 90s Japanese animation style. Size: 1536x1024 (landscape).
 
 The previous `character.png` is left untouched; the new image lands at `character-v2.png`.
 
@@ -71,17 +69,25 @@ The previous `character.png` is left untouched; the new image lands at `characte
 
 Pass up to five image paths via the `images` argument and the model uses them as references for the next generation — for style guidance, characters to keep, scenes to extend, and so on.
 
-> Take `character.png` and `character-v2.png` and put both characters together on the engawa of an old Japanese house, smiling at the viewer. 16:9 landscape, same 90s anime style.
+> Use the gpt_imagegen tool to generate an image at together.png. Pass ./character.png and ./character-v2.png in the images argument. Content: the man from Image 1 (navy samue + red hachimaki) and the woman from Image 2 (yellow yukata + red wagasa) standing side by side on the engawa veranda of an old Japanese house, smiling at the viewer. Preserve each character's outfit, hairstyle, and props exactly. Style: hand-drawn 90s Japanese animation style. Size: 1672x941.
 
 <p align="center"><img src="./assets/together.png" alt="Example C output: both characters composed onto an engawa" width="640" /></p>
 
-## Roadmap
+### Example D — transparent background
 
-| Version | Auth path | Scope | Status |
-|---|---|---|---|
-| **v0.1.0** | ChatGPT subscription | `gpt_imagegen` with optional reference images (generation + reference-guided edits via prompting) | **Released** |
-| **v0.2.0** | OpenAI API key | Adds the API-key billing path: both `generate` (`/v1/images/generations`) and `edit` (`/v1/images/edits`) with reference images | Next |
-| **v0.3.0** | OpenAI API key | Adds **pixel-precise mask inpainting** via `/v1/images/edits` (binary PNG alpha mask) | Planned |
+Ask for a transparent background, and the agent passes `background: "transparent"` to get an RGBA PNG.
+
+> Use the gpt_imagegen tool to generate an image at sticker.png. Content: a sticker of a red paper lantern with a transparent background. Style: hand-drawn 90s Japanese animation style. Size: 1254x1254.
+
+<p align="center"><img src="./assets/sticker.png" alt="Example D output: red paper lantern sticker with a transparent background" width="320" /></p>
+
+### Sizes
+
+`gpt_imagegen` generates only these sizes: `1254x1254` (1:1), `1536x1024` (3:2), `1024x1536` (2:3), `1448x1086` (4:3), `1086x1448` (3:4), `1672x941` (16:9), and `941x1672` (9:16).
+
+The Codex image backend does not take pixel dimensions. It always generates about 1.57 megapixels and takes only the aspect ratio from the prompt. These sizes are common aspect ratios at that pixel count, so the backend produces them as requested. The output can still differ from the requested size by 1px ([#107](https://github.com/yuji-hatakeyama/opencode-gpt-imagegen/issues/107#issuecomment-6020015062)).
+
+If you ask for an unsupported size, the tool instructs the agent to ask you which supported size to use. The agent also asks when you give no size and the request does not imply a shape. When the request implies a shape, such as a YouTube thumbnail or an app icon, the agent picks the matching size without asking. To get another exact size, resize or crop the output afterwards, for example with ImageMagick.
 
 ## How it works
 

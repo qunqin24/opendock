@@ -29,50 +29,54 @@ Auto-detects available providers. Auto-refreshes every 60 seconds.
 
 ## Requirements
 
-- OpenCode >= 1.3.13
-- Node.js >= 22
+- OpenCode >= 2.0.28 (plugin version 0.3.0 and later)
+- Node.js >= 22 for the optional helper command. OpenCode supplies the TUI runtime.
+
+Version 0.3.0 migrates the plugin to OpenCode 2's CLI plugin API. It does not
+support OpenCode 1; use the 0.2.x release for V1 instead.
 
 ## Setup
 
 This is a TUI-only plugin.
 
-- Add it to `~/.config/opencode/tui.json`
-- Do not add it to `~/.config/opencode/config.json`
+- Add it to `~/.config/opencode/cli.json`
+- Do not add this CLI-only plugin to `opencode.json` / `config.json`
 - Restart OpenCode fully after changing the config
 
 ### Load from npm package
 
-If the package is available from npm, add this to `~/.config/opencode/tui.json`:
+Once version 0.3.0 is available from npm, add this to `~/.config/opencode/cli.json`:
 
 ```json
 {
-  "$schema": "https://opencode.ai/tui.json",
-  "plugin": [
+  "$schema": "https://opencode.ai/v2/cli.json",
+  "plugins": [
     "@yuting4281/opencode-usage-plugin"
   ]
 }
 ```
 
-You usually do not need to run `npm install` manually for the TUI plugin itself. OpenCode reads the package name from `tui.json` and resolves/installs it through its own plugin system.
+You usually do not need to run `npm install` manually for the TUI plugin itself. OpenCode reads the package name from `cli.json` and resolves/installs it through its own plugin system.
 
-Use the package name only. Do not use `@yuting4281/opencode-usage-plugin/tui` in `tui.json`.
+Use the package name only. Do not use `@yuting4281/opencode-usage-plugin/tui` in `cli.json`.
 
-When installed from npm, OpenCode resolves the package's `./tui` export automatically. Users only need the package name in `tui.json`.
+When installed from npm, OpenCode resolves the package's `./tui` export automatically. Users only need the package name in `cli.json`.
 
 ### Use a local checkout
 
-For local development or if you cloned this repo directly, point `tui.json` at the plugin file:
+For local development or if you cloned this repo directly, point `cli.json` at the plugin directory (not `tui.tsx`):
 
 ```json
 {
-  "$schema": "https://opencode.ai/tui.json",
-  "plugin": [
-    "/absolute/path/to/opencode-usage-plugin/tui.tsx"
+  "$schema": "https://opencode.ai/v2/cli.json",
+  "plugins": [
+    "/absolute/path/to/opencode-usage-plugin"
   ]
 }
 ```
 
-Using an absolute path is the most reliable option for local installs.
+Using an absolute directory path is the most reliable option for local installs.
+OpenCode 2 resolves the directory's `./tui` export; a direct `tui.tsx` path does not load this CLI plugin.
 
 ## Optional helper command
 
@@ -96,21 +100,21 @@ Most users do not need this. If you want to force the plugin to use `opencode-au
 
 ```json
 {
-  "$schema": "https://opencode.ai/tui.json",
-  "plugin": [
-    [
-      "@yuting4281/opencode-usage-plugin",
-      { "command": "opencode-auth-usage" }
-    ]
+  "$schema": "https://opencode.ai/v2/cli.json",
+  "plugins": [
+    {
+      "package": "@yuting4281/opencode-usage-plugin",
+      "options": { "command": "opencode-auth-usage" }
+    }
   ]
 }
 ```
 
-If you are loading the plugin from a local checkout, replace `"@yuting4281/opencode-usage-plugin"` with the same absolute `tui.tsx` path you used above.
+If you are loading the plugin from a local checkout, replace `"@yuting4281/opencode-usage-plugin"` with the same absolute directory path you used above.
 
 ## Options
 
-Pass as the second element of the plugin tuple:
+Pass in the plugin entry's `options` object:
 
 | Option | Default | Description |
 |--------|---------|-------------|
@@ -126,10 +130,11 @@ Pass as the second element of the plugin tuple:
 
 ## Troubleshooting
 
-- If the panel does not appear, make sure the plugin is only configured in `tui.json`
-- For a local checkout, prefer an absolute path to `tui.tsx`
+- If the panel does not appear, make sure the plugin is configured in `cli.json` (V2 no longer reads changes to `tui.json`)
+- For a local checkout, use an absolute directory path, not a direct path to `tui.tsx`
 - After changing config, fully quit and reopen OpenCode
-- Check the latest log in `~/.local/share/opencode/log/` for `service=tui.plugin` errors
+- Check `~/.local/share/opencode/log/opencode.log` for CLI plugin errors (`role=cli`)
+- `opencode plugin list` lists server plugins, not this CLI-only plugin
 - If the plugin is loaded, you should see the `Usage` panel and the `/usage` command
 - If the NVIDIA row is missing, make sure `auth.json` has an `nvidia` entry (set up via `opencode auth login`)
 - If the Grok row is missing, make sure `auth.json` has an `xai` OAuth entry (set up via `opencode auth login`)

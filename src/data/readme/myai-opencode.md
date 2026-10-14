@@ -719,7 +719,7 @@ Use this section as a map: start with installation, then jump to features, confi
   <p><sub>Every merged contribution leaves a mark on the realm.</sub></p>
 
   <!-- ALL-CONTRIBUTORS-BADGE:START - Do not remove or modify this section -->
-[![All Contributors](https://img.shields.io/badge/all_contributors-135-orange.svg?style=flat-square)](#contributors-)
+[![All Contributors](https://img.shields.io/badge/all_contributors-136-orange.svg?style=flat-square)](#contributors-)
 <!-- ALL-CONTRIBUTORS-BADGE:END -->
 </div>
 
@@ -910,6 +910,7 @@ Use this section as a map: start with installation, then jump to features, confi
       <td align="center" valign="top" width="16.66%"><a href="https://github.com/doublepi123"><img src="https://avatars.githubusercontent.com/u/54027436?v=4?s=100" width="100px;" alt="doublepi123"/><br /><sub><b>doublepi123</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=doublepi123" title="Code">💻</a></td>
       <td align="center" valign="top" width="16.66%"><a href="https://github.com/timothy-cloudopsguy"><img src="https://avatars.githubusercontent.com/u/96697196?v=4?s=100" width="100px;" alt="Timothy"/><br /><sub><b>Timothy</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=timothy-cloudopsguy" title="Code">💻</a></td>
       <td align="center" valign="top" width="16.66%"><a href="https://github.com/mwoodson"><img src="https://avatars.githubusercontent.com/u/236828?v=4?s=100" width="100px;" alt="Matt Woodson"/><br /><sub><b>Matt Woodson</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=mwoodson" title="Code">💻</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="https://github.com/caiozizh"><img src="https://avatars.githubusercontent.com/u/244536034?v=4?s=100" width="100px;" alt="caiozizh"/><br /><sub><b>caiozizh</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=caiozizh" title="Code">💻</a></td>
     </tr>
   </tbody>
 </table>

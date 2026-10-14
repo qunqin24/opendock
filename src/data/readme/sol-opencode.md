@@ -36,8 +36,10 @@ Register per [V2 plugin docs](https://dev.opencode.ai/v2/docs/build/plugins).
 
 ## npm
 
-`sol-opencode` is published: **0.1.0** on npmjs (first CI publish via
-GitHub Actions trusted publishing, 2026-10-12 — OIDC, no tokens). Install:
+`sol-opencode` is published on npmjs. The plugin config below pins the version
+this README is written against; `npm i sol-opencode` installs the latest. The
+first CI publish (`v0.1.0`) went out via GitHub Actions trusted publishing,
+2026-10-12 — OIDC, no tokens. Install:
 
 ```bash
 npm i sol-opencode
@@ -46,7 +48,7 @@ npm i sol-opencode
 ```jsonc
 {
   "plugins": [
-    { "package": "sol-opencode@0.1.0", "options": { "actionFusion": true, "observationPack": true } }
+    { "package": "sol-opencode@0.1.1", "options": { "actionFusion": true, "observationPack": true } }
   ]
 }
 ```
@@ -59,7 +61,7 @@ independent of the local-directory channel above. Pinned against OpenCode **2.0.
 | How you reference it | What OpenCode V2 loads |
 |---|---|
 | Local directory path (clone-to-try, `"package": "/abs/path"` or `"./plugins/x"`) | `<dir>/index.ts` → `<dir>/index.js` directly. **The `exports` map is NOT consulted** on this channel. |
-| Package name / `file:` specifier (the future npm form) | Normal Node resolution via the package.json `exports` map → `dist/index.js`. |
+| Package name / `file:` specifier | Normal Node resolution via the package.json `exports` map → `dist/index.js`. |
 
 The root `index.ts` is the local-directory entrypoint and simply re-exports `src/index.ts`;
 `exports` (→ `dist/`) remains the publish entrypoint. Both channels land on the same implementation,
@@ -80,7 +82,14 @@ absolute path inside `node_modules/sol-opencode` selects the local-directory cha
 | `actionFusion` | `true` | Wrap mutation tools with optional `then_run` |
 | `observationPack` | `true` | Archive large tool results and project placeholders on later provider requests |
 
-Invalid option values log a warning and disable that mechanism only; `setup` does not throw.
+Option handling is defensive. A value that is not `true`/`false` logs a warning and disables that
+mechanism only; an unrecognised key (a typo such as `actionfusion`) warns and leaves the other
+mechanism enabled; a non-object `options` value disables both. None of those cases throw.
+
+`setup` throws only when **no** mechanism could register at all. A mechanism whose host domain is
+missing (`ctx.tool`, `ctx.session`, `ctx.storage`, an absolute `ctx.location.directory`) warns and is
+skipped, and the other mechanism stays active. Disposal attempts every registration in reverse
+registration order, so one failing disposer cannot leave the rest registered.
 
 ## Provenance
 

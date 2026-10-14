@@ -25,10 +25,12 @@ This plugin gives the agent full control over multiple terminal sessions, like t
 - **Reliable Waiting**: Wait for screen conditions or process exit without polling
 - **Exit Notifications**: Get notified when root-session processes finish
 - **Hard Timeouts**: Automatically stop runaway processes after a configured limit
-- **Permission Support**: Respects OpenCode's bash permission settings
+- **Permission Support**: Checks V2 `shell` or V1 `bash` rules and canonical working directories
+- **Isolation**: Plugin instances have independent state; agent tools only access their own session's PTYs
 - **Session Lifecycle**: Sessions persist until explicitly killed
 - **Auto-cleanup**: PTYs are cleaned up when OpenCode sessions end
-- **Web UI**: Modern React-based interface for session management
+- **Web UI**: Authenticated React-based interface for session management
+- **V2 TUI Sidebar**: Session-scoped process list, live output, kill confirmation and finished-session cleanup
 - **Real-time Streaming**: WebSocket-based live output updates
 
 ## Setup
@@ -83,6 +85,16 @@ This plugin provides slash commands that can be used in OpenCode chat:
 | -------------------------- | -------------------------------------------------- |
 | `/pty-open-background-spy` | Open the PTY web server interface in the browser   |
 | `/pty-show-server-url`     | Show the URL of the running PTY web server instance |
+| `/pty-panel`              | Toggle the PTY sidebar (OpenCode V2 CLI only)       |
+
+### V2 CLI sidebar
+
+The package's `./tui` entrypoint is loaded automatically by the V2 CLI. Expand **PTY**
+in the session sidebar (or use `/pty-panel`) to see processes belonging to that session.
+Click a process to inspect its live screen, or **×** to remove it. Running processes
+require confirmation; **Clear finished** never stops running processes. Elapsed time
+stops increasing after exit. The panel uses OpenCode's authenticated RPC transport,
+including remote clients, and does not start the Web UI server.
 
 ## Web UI
 
@@ -100,6 +112,15 @@ If you name it "task" or "process" or anything else, the agent will sometimes ru
 2. Run slash command `/pty-open-background-spy`.
 
 This will start the background sessions observer cockpit server and launch the browser with web UI.
+
+Browser commands create a **single-use link valid for 30 seconds**, then exchange it
+for an HttpOnly, SameSite=Strict cookie. Re-run the command if a link expires. Opening
+the bare server address without credentials returns `401`. HTTP and WebSocket requests
+with a foreign Origin or Host are rejected. Only `/health` is public.
+
+The authenticated Web UI is a trusted human console for this plugin instance: its
+interactive input is not a sandbox or a per-command shell permission boundary. Keep
+the server on loopback; do not expose its plaintext HTTP listener to an untrusted network.
 
 ### Features
 
@@ -130,6 +151,7 @@ The web server provides a REST API for session management:
 
 ```bash
 curl -X POST http://localhost:[PORT]/api/sessions \
+  -H "Authorization: Bearer $PTY_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "command": "bash",
@@ -140,13 +162,18 @@ curl -X POST http://localhost:[PORT]/api/sessions \
 ```
 
 Replace `[PORT]` with the actual port number shown in the server console output.
+Use the exact server origin (including hostname), not a localhost alias. Programmatic
+clients require the server's in-memory bearer token (`server.auth.token` when embedding
+`PTYServer`); browser bootstrap nonces are not bearer tokens. `createApiClient(origin,
+{ Authorization: 'Bearer …' })` supports authenticated automation.
 
 #### WebSocket Streaming
 
 Connect to `/ws` for real-time updates:
 
 ```javascript
-const ws = new WebSocket('ws://localhost:[PORT]/ws')
+// Run from the authenticated Web UI origin; its cookie authenticates the handshake.
+const ws = new WebSocket(`${location.origin.replace(/^http/, 'ws')}/ws`)
 
 ws.onmessage = (event) => {
   const data = JSON.parse(event.data)
@@ -373,11 +400,15 @@ The Web UI uses the `build` agent's rules because its requests have no agent too
 
 Rules requiring `ask`, including unmatched resources, are treated as denied by the
 plugin. Configure explicit `allow` rules for commands and external working directories
-that PTY sessions need. V2 PTY tool calls default to the plugin's location directory.
+that PTY sessions need. V2 PTY tool calls default to the invoking session's current
+directory, including after a session moves. Symlinks and Windows junctions are resolved
+before external-directory checks. Tools cannot inspect or modify another session's PTYs.
 
 Exit notifications use queued synthetic messages to resume the existing session without
 switching its agent or model. Deleting a session cleans up its PTYs; unloading the V2
 plugin also stops its PTYs, closes the Web UI server, and cancels its event subscription.
+Cancelling `pty_wait` or `pty_snapshot_wait` removes its listeners/timers without killing
+the process. Explicit `pty_kill`, session deletion, unload and hard deadlines stop processes.
 
 #### OpenCode V1
 
@@ -400,7 +431,7 @@ This plugin respects OpenCode's [permission settings](https://opencode.ai/docs/p
 > **Limitations compared to built-in bash tool:**
 >
 > - **"ask" permissions are treated as "deny"**: Since plugins cannot trigger OpenCode's permission prompt UI, commands matching an "ask" pattern will be denied. A toast notification will inform you when this happens. Configure explicit "allow" or "deny" for commands you want to use with PTY.
-> - **"external_directory" with "ask" is treated as "allow"**: When the working directory is outside the project and `permission.external_directory` is set to "ask", this plugin allows it (with a log message). Set to "deny" explicitly if you want to block external directories.
+> - **"external_directory" with "ask" is treated as "deny"**: Explicitly allow external working directories when needed. Configuration lookup failures also deny execution rather than silently bypassing permissions.
 
 #### Example: Allow specific commands for PTY
 

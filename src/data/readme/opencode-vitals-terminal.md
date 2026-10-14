@@ -2,7 +2,7 @@
 
 **Session usage, below your prompt and in your sidebar.**
 
-Turns, model steps, and context usage **in OpenCode V2's existing terminal prompt footer**, with cumulative tokens and cost **in the session sidebar**. No separate dashboard, desktop renderer injection, server hooks, telemetry, or extra model requests.
+Turns, model steps, and context usage **in OpenCode V2's existing terminal prompt footer**, with cumulative tokens, cost, and tool-call statistics **in the session sidebar**. No separate dashboard, desktop renderer injection, server hooks, telemetry, or extra model requests.
 
 **For the full-screen terminal client**, not Desktop or `opencode mini`.
 
@@ -31,6 +31,16 @@ Steps: 42
 Total tokens: 320,000
 Context: 24,000 (19%)
 Cost: $0.43
+Tool calls: 52
+  read: 18
+  grep: 12
+  rubydex (subtotal): 10
+    get_declaration: 6
+    get_descendants: 4
+  posh (subtotal): 6
+    posh_search: 4
+    posh_docsets: 2
+  shell: 6
 ```
 
 With the sidebar visible, the footer switches to a standard-style model-context summary, without repeating turns or steps:
@@ -53,6 +63,7 @@ Click the footer summary or sidebar vitals section, or run `/vitals`, for an inp
 | **History-aware totals** | Read full history on resume and reconnect, and exclude reverted messages after undo. Incomplete totals are marked with `~`. |
 | **A footer that fits** | Abbreviate on narrow terminals while retaining the host's spinner, working directory, and editor-file display. |
 | **Sidebar vitals** | Show exact counts, cumulative tokens, and cost in the right sidebar, with a context-only footer. Restore turns and steps in the footer when the sidebar is hidden. |
+| **Tool-call statistics** | Show total calls and a per-tool breakdown, sorted by frequency, only in the sidebar. Includes built-in and MCP tools. |
 
 ## Install
 
@@ -107,19 +118,22 @@ The environment override replaces the configured plugin array for that process; 
 
 ## Display
 
-There are no display options to configure. Turns, steps, cumulative tokens, context usage, and recorded cost are always enabled. Previous `tokens` and `cost` options are ignored.
+There are no display options to configure. Turns, steps, cumulative tokens, context usage, recorded cost, and sidebar tool-call statistics are always enabled. Previous `tokens` and `cost` options are ignored.
 
 Cumulative total tokens and recorded cost are shown in the sidebar and `/vitals`, never in the footer. Cost includes `$0.00`. With the sidebar hidden, the footer shows turns, steps, and current context usage. With the sidebar visible, it shows only model-context usage to avoid repeating the sidebar metrics.
+
+Tool-call statistics appear **only in the sidebar**, not in the footer or `/vitals` dialog. Dotted tool names are grouped by the namespace before the first dot: `rubydex.*` appears under `rubydex (subtotal)`, `posh.*` under `posh (subtotal)`, and other namespaces follow the same rule. Individual tools are indented beneath their subtotal, omitting only that namespace prefix; for example, `mcp.server.search` appears as `server.search` under `mcp (subtotal)`. Grouping is case-sensitive and requires a nonempty namespace and child name. Plain names remain separate, so an actual tool named `posh` is distinct from `posh (subtotal)`. Top-level rows are ordered by most calls first (using each namespace subtotal) and alphabetically for ties; children follow the same ordering. Recorded tool names and session accounting are unchanged. Code Mode calls recorded in OpenCode's `toolCalls` metadata are included alongside the outer `execute` call. Subtotals do not add calls to the session total. Sessions without calls show `Tool calls: 0`. Incomplete history marks the total, subtotal, and per-tool counts with `~`.
 
 ## What the numbers mean
 
 - **Turns:** delivered user messages in this session's timeline. Includes the current turn. Steering messages count as separate user turns; this is **not** a count of completed assistant responses. Queued/pending messages, synthetic messages, and shell commands do not count.
 - **Steps:** distinct primary assistant/model-call messages, including a call in progress or a failed call. Multiple tool calls in one response are one step. Provider retries reusing the same assistant message ID do not inflate the counter. Title generation and compaction are not primary steps.
+- **Tool calls:** distinct tool calls in primary assistant messages, including running, completed, and failed calls. Inputs still being streamed do not count until the call starts. Repeated snapshots of the same call do not increase its count; separate calls to the same tool do. Built-in, MCP, and provider-executed tools keep their recorded names. Code Mode's `execute` wrapper and each invocation in its recorded trace count separately; tool names are not guessed by parsing code. Calls inside subagent sessions are not added to the parent session's breakdown.
 - **Total:** cumulative provider-reported token usage: input + output + reasoning + cache-read + cache-write across primary model steps. Repeated context/cache tokens are counted per request, just as in OpenCode's usage accounting. This is neither unique transcript size nor billed cost. Usage updates when the provider finishes a step; missing usage is not estimated. Auxiliary title/compaction/generate usage is excluded.
 - **Context:** the unlabeled token count in the footer. This is the original footer's estimate: the latest primary step's token usage since the last completed compaction, with its model's context-window percentage when known. It is not the cumulative token total.
 - **Cost:** OpenCode's existing session-cost value, which can include auxiliary work and descendants. It is not recalculated from the primary-step token total. `$0.00` means zero recorded cost, not necessarily zero actual billing; missing pricing information is not estimated.
 
-Turn, step, and token counters are **for the session you are viewing**. Subagent sessions have their own counters; the running-subagent indicator is still displayed.
+Turn, step, token, and tool-call counters are **for the session you are viewing**. Subagent sessions have their own counters; the running-subagent indicator is still displayed.
 
 Full history is paginated independently of the TUI's recent-message cache, so resuming a long session does not reset its counters. Until history finishes loading, or if it cannot be read, incomplete totals carry a `~` prefix. Context remains available from the recent-message cache. Reconnects reread history, and staged/committed undo excludes the reverted part of the timeline. Removed history is not a lifetime-spend ledger.
 
@@ -127,13 +141,21 @@ On narrow terminals the labels abbreviate first, then the context percentage and
 
 ## Privacy
 
-Only lightweight usage metadata is kept in client memory. The plugin does not persist or log prompts, responses, file attachments, or tool output. There is no telemetry or separate analytics service. History comes from the connected OpenCode server, including remote servers, through the TUI's existing authenticated client. Disabling/reloading the plugin unsubscribes events and aborts its pending history reads.
+Only lightweight usage metadata, including tool-call IDs and names, is kept in client memory. The plugin does not persist or log prompts, responses, file attachments, tool inputs, or tool output. There is no telemetry or separate analytics service. History comes from the connected OpenCode server, including remote servers, through the TUI's existing authenticated client. Disabling/reloading the plugin unsubscribes events and aborts its pending history reads.
 
 ## Remove
 
 Remove this plugin's entry, `-opencode.prompt.footer`, and `-opencode.sidebar.context` from `cli.json`, then restart or reload the terminal client. Removing the disabling entries restores OpenCode's built-in footer contribution and Context section. Keep your other plugin entries and settings.
 
 ## Development
+
+### Code Mode trace compatibility
+
+OpenCode's tool metadata is a generic JSON object; the public API does not specify a typed `toolCalls` trace or guarantee its ordering. Nested-call accounting supports `execute` snapshots whose `metadata.toolCalls` is an append-only array of records with a nonempty string `tool` name. Existing array positions must identify the same invocation as statuses change and new calls are appended. The outer tool-call ID and original array index together identify each nested call; malformed entries are skipped without renumbering later calls.
+
+Missing or non-array traces contribute only the outer `execute` call. A producer that reorders or reuses trace positions requires an adapter change; input/output content is not retained to guess invocation identity. Projection tests cover the expected trace shape. These tests do not establish a producer-side ordering guarantee.
+
+### Commands
 
 ```sh
 npm ci

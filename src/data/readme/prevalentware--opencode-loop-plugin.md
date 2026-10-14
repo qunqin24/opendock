@@ -13,6 +13,7 @@ The OpenCode Loop Plugin adds:
 - `/loop <interval> <instruction>` and `/loop <instruction>` (dynamic pacing) as an OpenCode command for TUI, desktop, and web.
 - A server-side scheduler with per-loop timers that injects a synthetic iteration prompt only when the session is idle, with busy backoff.
 - Dynamic loops where the agent itself picks the delay before each next iteration via `schedule_next_run`, mirroring Claude Code's self-paced `/loop`.
+- Keep-alive loops: `create_loop({ keep_alive: true })` keeps a background or subagent session scheduled across turns and exempts it from age expiry.
 - Agent tools: `create_loop`, `list_loops`, `stop_loop`, `pause_loop`, `resume_loop`, `run_loop`, `schedule_next_run`, and `clear_loops`.
 - Persistent loop state that survives OpenCode restarts, with atomic writes and owner-only file permissions.
 - A TUI sidebar with live countdowns and a `Loops` command-palette entry to run, pause, resume, or stop loops.
@@ -27,7 +28,7 @@ Choose the instructions that match the CLI you run:
 | OpenCode version | How to identify it | Instructions |
 | --- | --- | --- |
 | OpenCode 1 stable | You run `opencode` and `opencode --version` prints `1.x` | [OpenCode 1](#opencode-1-stable) |
-| OpenCode 2 preview | You run `opencode2` | [OpenCode 2](#opencode-2-preview) |
+| OpenCode 2 | You run `opencode` and `opencode --version` prints `2.x` | [OpenCode 2](#opencode-2) |
 
 Do not mix the configuration formats. OpenCode 1 uses `plugin` and `tui.json`; OpenCode 2 uses `plugins` and the global `~/.config/opencode/cli.json`.
 
@@ -63,9 +64,15 @@ OpenCode detects both package entrypoints and writes the plugin into the server 
 }
 ```
 
-### OpenCode 2 Preview
+### OpenCode 2
 
-This plugin supports OpenCode 2 preview `0.0.0-next-17055` while remaining compatible with OpenCode 1. Add the package to both V2 plugin lists.
+This plugin supports OpenCode 2 (`2.x`) while remaining compatible with OpenCode 1.
+
+```bash
+opencode plugin add @prevalentware/opencode-loop-plugin
+```
+
+For manual installation, add the package to both V2 plugin lists.
 
 `opencode.json`:
 
@@ -85,7 +92,7 @@ This plugin supports OpenCode 2 preview `0.0.0-next-17055` while remaining compa
 
 OpenCode 2 does not read the V1 `tui.json` file. The server entrypoint is loaded from `opencode.json`; the sidebar and palette integration are loaded from the global `~/.config/opencode/cli.json`.
 
-The OpenCode 2 plugin API is still in preview. This release targets the exact preview above; later previews may require a plugin update. V2 supports the `/loop` command, all loop tools, persistent state, idle scheduling, dynamic loops, Plan-mode safety, session cleanup, and TUI sidebar/palette integration. The dedicated V1 compaction-context hook has no V2 equivalent in this preview. V2 still injects the active-loop system reminder before model dispatch, but cannot append the separate loop block directly to a compaction operation.
+V2 supports the `/loop` command, all loop tools, persistent state, idle scheduling, dynamic loops, Plan-mode safety, session cleanup, and TUI sidebar/palette integration. The plugin does not yet integrate the V2 compaction hook. V2 still injects the active-loop system reminder before model dispatch, but cannot append the separate loop block directly to a compaction operation.
 
 ## Usage
 
@@ -120,11 +127,31 @@ After creating a loop, the agent immediately performs the first iteration in the
 
 A dynamic loop mirrors Claude Code's self-paced `/loop`: at the end of each iteration the agent calls `schedule_next_run` with a delay in seconds and a one-sentence reason ("watching CI run"), or calls `stop_loop` to end the loop. If an iteration ends without doing either, the loop ends — exactly like omitting `ScheduleWakeup` in Claude Code.
 
+### Keeping a background session alive
+
+A subagent's session normally has no future of its own: the turn that spawned it ends, the parent detaches, and nothing re-enters that session again. `keep_alive` gives it one.
+
+```
+create_loop(
+  instruction: "Check whether the migration finished. If it has, report the result and call stop_loop.",
+  interval: "5m",
+  keep_alive: true
+)
+```
+
+The session keeps being re-prompted on the cadence and is exempt from age expiry. After an OpenCode restart, the plugin verifies that the session is accessible in the current host location before acquiring its ownership lease and restoring the timer. Sessions in another location or unavailable to this host remain dormant; ordinary loops still require an authoritative session observation.
+
+Explicit `max_runs`, session deletion, and manual pause/stop still apply. Failed injections retain bounded backoff and pause after `max_consecutive_failures`; inspect the loop and use `resume_loop` after resolving the failure. Call `stop_loop` when the work resolves or is abandoned.
+
+`keep_alive` requires a fixed interval. Dynamic pacing hands the next run to the agent every turn, so a single missed `schedule_next_run` would end the very future the flag exists to hold open; that combination is rejected when the loop is created.
+
+Handing a result back to whoever asked for the work stays the agent's job. This flag only keeps the session running long enough to do it.
+
 ### How iterations are scheduled
 
 - Iterations only run while the session is idle. If a loop comes due while the session is busy, it is deferred with a short backoff and retried when the session goes idle.
 - If several loops in one session are due at once, one iteration is injected and the rest wait for the next idle.
-- Failed injections are recorded in the loop's `lastError` and retried after a backoff; they never crash OpenCode.
+- Failed injections store only the safe `provider/model request failed` category. They use bounded exponential backoff and are paused after five consecutive failures by default; provider responses and session data are never persisted or logged.
 - Loops are stopped automatically when their session is deleted, when `max_runs` is reached, or after 7 days (configurable).
 
 ## Options
@@ -141,6 +168,8 @@ In OpenCode 1, server options use the package-and-options tuple in `opencode.jso
         "max_loops_per_session": 5,
         "busy_backoff_seconds": 60,
         "failure_backoff_seconds": 60,
+        "max_failure_backoff_seconds": 3600,
+        "max_consecutive_failures": 5,
         "max_loop_age_days": 7,
         "dynamic_max_delay_seconds": 86400,
         "restricted_agents": ["plan"],
@@ -164,6 +193,8 @@ In OpenCode 2, use the plugin object form:
         "max_loops_per_session": 5,
         "busy_backoff_seconds": 60,
         "failure_backoff_seconds": 60,
+        "max_failure_backoff_seconds": 3600,
+        "max_consecutive_failures": 5,
         "max_loop_age_days": 7,
         "dynamic_max_delay_seconds": 86400,
         "restricted_agents": ["plan"],
@@ -180,7 +211,9 @@ Defaults:
 - `min_interval_seconds`: `30`; the smallest accepted interval and the lower clamp for dynamic delays.
 - `max_loops_per_session`: `5` open (active or paused) loops per session.
 - `busy_backoff_seconds`: `60`; retry delay when an iteration comes due while the session is busy.
-- `failure_backoff_seconds`: `60`; retry delay when injecting the iteration prompt fails.
+- `failure_backoff_seconds`: `60`; base retry delay when injecting the iteration prompt fails. Consecutive failures double this delay.
+- `max_failure_backoff_seconds`: `3600`; upper bound for exponential failure backoff, including the first retry.
+- `max_consecutive_failures`: `5`; number of consecutive provider/model failures after which the loop is paused with an inspectable `blockedReason`.
 - `max_loop_age_days`: `7`; loops stop automatically after this age. Set `0` to disable expiry.
 - `dynamic_max_delay_seconds`: `86400`; upper clamp for `schedule_next_run` delays.
 - `restricted_agents`: `["plan"]`; iterations are deferred while the session's last prompt came from one of these agents.
@@ -203,7 +236,12 @@ If `XDG_DATA_HOME` is not set, the default is:
 
 Set `OPENCODE_LOOP_STATE_PATH` to use a custom file.
 
-The state file is written atomically with owner-only permissions when the host filesystem supports it. Active interval loops are rehydrated and rescheduled when OpenCode restarts. Dynamic loops that were waiting on the agent to schedule their next run cannot recover on their own after a restart and are stopped with an explanatory reason.
+The state file is written atomically with owner-only permissions when the host filesystem supports it. Persisted loops are rehydrated only after authoritative session context establishes a renewable session lease, preventing concurrent OpenCode instances from driving the same session. Dynamic loops that were waiting on the agent to schedule their next run cannot recover on their own after a restart and are stopped with an explanatory reason.
+
+
+Session lease revisions identify ownership epochs; heartbeats keep the current epoch stable. Claims and automatic dynamic-loop cleanup are checked against that session epoch. Pausing, stopping, or explicitly rescheduling a loop invalidates any pending delivery claim.
+
+State mutations use an atomic lock with a process ID and unique owner token. A suspended live writer keeps its lock; a crashed writer's lock is recovered only after its process has exited. Waiting for a live writer times out after 30 seconds rather than stealing its lock. This coordinates processes on the same host; sharing one state path between different hosts is unsupported.
 
 ## Credits
 
@@ -219,6 +257,8 @@ bun run typecheck
 bun run build
 npm pack --dry-run
 ```
+
+The server build bundles its private Effect 3 persistence implementation. Keep it bundled: an OpenCode V2 host can resolve a bare `effect` import to its incompatible Effect 4 runtime. The package regression test loads the built server with an Effect 4 host to cover this boundary. The TUI remains exported as source.
 
 ## Publishing
 

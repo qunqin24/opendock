@@ -6,11 +6,11 @@ Keep [Graphify](https://github.com/Graphify-Labs/graphify) code graphs fresh in 
 
 ## Install
 
-Requires OpenCode `>=1.17.15 <2` and Graphify `0.9.32` with MCP support:
+Requires OpenCode `>=2.0.28 <3` and Graphify `0.9.32` with MCP support:
 
 ```bash
 uv tool install "graphifyy[mcp]==0.9.32"
-opencode plugin opencode-graphify-init --global
+opencode plugin add opencode-graphify-init
 ```
 
 Restart OpenCode, open a concrete project, then run:
@@ -51,13 +51,32 @@ Use `GRAPHIFY_OUT=.ai/graphify-out` in shells and Graphify MCP configuration. Do
 
 ## Update or remove
 
-A bare `opencode-graphify-init` entry follows npm `latest`. To pin a release:
+A bare `opencode-graphify-init` entry follows npm `latest` when checking or updating plugins. To pin a release, replace the existing entry in `plugins` with `opencode-graphify-init@<version>`, or remove it before adding the pinned version:
 
 ```bash
-opencode plugin opencode-graphify-init@<version> --global --force
+opencode plugin remove opencode-graphify-init
+opencode plugin add opencode-graphify-init@<version>
 ```
 
-To remove the plugin, delete only its matching string or tuple from the global `opencode.jsonc` or `opencode.json`, preserve every other entry, and restart OpenCode. There is no global npm installation to uninstall. Existing graph data remains until you remove it separately.
+Use `opencode plugin update` to update installed package plugins. To remove this plugin:
+
+```bash
+opencode plugin remove opencode-graphify-init
+```
+
+Restart OpenCode after changing plugins. Existing graph data remains until you remove it separately.
+
+## Migrate from OpenCode 1
+
+This implementation uses the OpenCode v2 plugin API. In `opencode.jsonc` or `opencode.json`, move the package entry from the old `plugin` array to `plugins`; object entries use `{ "package": "opencode-graphify-init", "options": {} }` instead of a tuple. Preserve the other entries and settings.
+
+```json
+{
+  "plugins": ["opencode-graphify-init"]
+}
+```
+
+The package includes both server and TUI entrypoints. OpenCode automatically loads the TUI companion from the active server plugin, so no separate `tui.json` entry is needed. Notifications are scoped to the current project and recovered when the TUI connects late. The consent records and graphs under `.ai/graphify-out/` keep their existing lifecycle.
 
 ## Develop
 

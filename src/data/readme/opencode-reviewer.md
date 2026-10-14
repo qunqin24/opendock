@@ -1,10 +1,10 @@
 # OpenCode Reviewer
 
 Reviews pending permissions in the [OpenCode](https://github.com/anomalyco/opencode) sidebar using a separate LLM. Reviews
-native shell commands, file edits, and external-directory access. Skill, MCP and
-custom-tool requests currently remain manual.
-Supports streaming explanations, saved report history, auto-approval, and Linux
-desktop notifications with distinct sounds.
+native shell commands, file edits, skill loading, and external-directory access.
+MCP and custom-tool requests currently remain manual.
+Supports streaming explanations, saved report history and stats, auto-approval, and Linux
+desktop notifications (Gnome) with distinct sounds.
 
 This plugin is meant to enable you to run sessions with less frequent input in a safer way. Also giving the reviewer context of specific files the agent might want to run/see/... The review prompts are freely configurable, so you can determine the reviewers behavior very accurately.
 
@@ -29,7 +29,7 @@ There is no project-local CLI configuration. OpenCode loads the
   "$schema": "https://opencode.ai/v2/cli.json",
   "plugins": [
     {
-      "package": "opencode-reviewer@2.0.1",
+      "package": "opencode-reviewer@latest",
       "options": {
         "baseURL": "https://openrouter.ai/api/v1",
         "model": "your-model",
@@ -79,28 +79,18 @@ launching OpenCode. The inline key takes precedence. Omit both for an unauthenti
 endpoint. Remove `instructions` to use the built-in prompts and
 `notificationSoundDirectory` to use the bundled sounds.
 
-The connection, credential and directory values above are examples, not defaults.
-All boolean, numeric and per-type notification values shown are the defaults.
-Restart OpenCode after changing reviewer configuration. Also load the server
-companion in `opencode.json`, globally or in the project. Keep permission rules
-only in this server configuration, not in `cli.json`:
+You also need to edit `opencode.json`, as the plugin needs to be informed of states
+that are not exposed by TUI APIs:
 
 ```json
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugins": ["opencode-reviewer@2.0.1"],
-  "permissions": [
-    { "action": "shell", "resource": "*", "effect": "ask" },
-    { "action": "edit", "resource": "*", "effect": "ask" },
-    { "action": "skill", "resource": "*", "effect": "ask" },
-    { "action": "external_directory", "resource": "*", "effect": "ask" }
-  ]
+  "plugins": ["opencode-reviewer@latest"]
 }
 ```
 
-Merge these entries with your existing configuration. Rules are ordered and the last
-matching rule wins. Reviews run only when OpenCode asks for permission. Existing
-`allow` rules and native autoaccept skip review. See OpenCode's
+### Opencode docs
+
 [server config](https://opencode.ai/v2/docs/config),
 [CLI config](https://opencode.ai/v2/docs/cli/config) and
 [CLI plugins](https://opencode.ai/v2/docs/build/plugins/cli) guides.
@@ -120,14 +110,14 @@ inclusive, fractions are invalid, and the maximum safe integer is
 | `apiKey` | string | Unset | Nonempty Bearer token. Takes precedence over `apiKeyEnv`. |
 | `apiKeyEnv` | string | Unset | Environment-variable name matching `[A-Za-z_][A-Za-z_0-9]*`. Without an inline key, its value must be set and nonblank when a review runs. Omit both key options for no Authorization header. |
 | `instructions` | string | Unset (built-ins) | Absolute, NUL-free directory path containing overrides for the [prompt templates](https://github.com/mightykatun/opencode-reviewer/tree/main/prompts), not inline instructions. Missing named files use built-ins; supplied files must be readable, regular, non-symlink, nonempty UTF-8 text up to 64 KiB. Fixed contracts cannot be overridden. |
-| `stream` | boolean | `false` | Request SSE and show provisional rating/text updates. Normal automatic approval waits for a completed, validated report; fast mode can approve on an early Safe rating. Presentation rules are described below. |
+| `stream` | boolean | `false` | Request SSE and show provisional rating/text updates. Normal automatic approval waits for a completed, validated report; fast mode can approve on an early Safe rating. Approval rules are described below. |
 | `reviewBash` | boolean | `true` | Review native `shell` permissions. The option keeps its existing name. |
 | `reviewEdits` | boolean | `true` | Review native `edit`, `write` and `patch` tools, which use the `edit` permission action. |
-| `reviewSkills` | boolean | `true` | Skill-review category switch. Exact mandatory skill instructions are currently unavailable to the V2 collector, so these requests remain manual. |
+| `reviewSkills` | boolean | `true` | Review native skill loading using the exact requested ID and full currently registered main instructions. Assumes the selected definition stays unchanged while permission is pending. Missing or ambiguous instructions remain manual. |
 | `reviewMcp` | boolean | `false` | MCP-review category switch. V2 MCP collection is currently unsupported; enabling this does not supply missing origin/catalog evidence or permit automatic approval. |
 | `reviewCustomTools` | boolean | `false` | Custom-tool review category switch. V2 custom-tool collection is currently unsupported; these requests remain manual. |
 | `reviewExternalDirectories` | boolean | `false` | Review directory access independently of operation-review switches. Directory approval can resume the operation without another prompt. |
-| `autoApprove` | boolean | `false` | Allow Safe reviews once automatically. Normally waits for completion, validation and the countdown. Requires the top-level conversation and physical presentation proof; subagent browsing never permits automatic approval. Normal-mode report-history cover has a separate physical-proof exception. |
+| `autoApprove` | boolean | `false` | Allow Safe reviews once automatically. Normally waits for completion, validation and the countdown. Works throughout the current conversation, including subagent browsing and hidden/covered reports. Home, dashboards, unrelated conversations and native permission decision editing wait without cancellation. |
 | `fastMode` | boolean | `false` | Requires `autoApprove: true`. Approve an eligible, front-of-queue request as soon as a Safe rating is parsed, bypassing the countdown. Respects `stream`; with `stream: false`, waits for the complete validated response. Finish the report and save it in the background after approval. |
 | `extraCareful` | boolean | `true` | Include extra-careful guidance when `autoApprove` is enabled. Setting `false` omits that guidance without disabling automatic approval. |
 | `autoApproveDelaySeconds` | integer | `15` | `0`–`3600` seconds. Positive values include an extra 200 ms initial grace; `0` skips the wait but keeps the other approval checks. Ignored in fast mode. |
@@ -142,10 +132,10 @@ inclusive, fractions are invalid, and the maximum safe integer is
 | `maxFiles` | integer | `6` | `1`–`1000` distinct file candidates per shell/edit review, including unavailable candidates. |
 | `maxEvidenceBytes` | integer | `131072` | `1`–`16777216` bytes for command/source content, edit diffs or category-specific JSON evidence. Optional items are omitted whole; oversized mandatory evidence fails analysis. This is not a cap on the full prompt or HTTP request. |
 
-Notification channels are independent: `banner: false, sound: true` is sound-only;
-`banner: true, sound: false` is banner-only; both `false` disable that type.
+Notification channels are independent: `banner: false, sound: true` is sound-only,
+`banner: true, sound: false` is banner-only, both `false` disable that type.
 `notify` and `notifySound` take precedence. Invalid notification settings disable
-notification work without invalidating otherwise valid review settings.
+notification.
 
 My LLMs insist on writing a bunch of useless text to my README, so I collapsed them here in case anyone wants to inflict themselves (or more likely their agent) the pain of reading it.
 
@@ -156,23 +146,32 @@ Markdown and scrolling. If the sidebar is hidden, use OpenCode's Show sidebar
 command.
 
 The reviewer panel appears only in the main conversation. Opening any subagent,
-including a nested one, hides the panel and prevents normal and fast auto-approval.
-Reviews may still finish while hidden. If a Safe report has never started a normal
-countdown, returning to the main conversation can start a fresh one once the host
-confirms the panel is visible. Leaving after a countdown starts cancels auto-approval
-for that request for the rest of that plugin run. Returning or disabling and
-re-enabling review won't restart it.
+including a nested one, hides the panel but does not stop normal or fast auto-approval
+within that conversation. A Safe report need not be displayed before approval.
+Command selectors, dialogs, report history, other session panels, sidebar hiding,
+terminal resizing and disabled mouse tracking do not cancel automation.
 
-Auto-approval requires mouse tracking so the host can check that the panel is
-visible and receives clicks. With mouse tracking off, you can still read reports
-and approve requests manually. The plugin doesn't enable mouse tracking or reveal
-a hidden sidebar unless you click an approval notification; it checks that the
-sidebar is absent from the main conversation before showing it.
+Home, dashboard routes and unrelated conversations hold approval until you return
+to the request's conversation. A countdown already started keeps its original
+deadline; if it expires while waiting, approval can proceed immediately on return
+after fresh checks. A review that has never started a countdown starts its full
+delay when its conversation becomes eligible.
 
-The skill, MCP and custom-tool options are still present, but these reviews aren't
-supported in V2. The reviewer can't get the required skill instructions or verify
-the source and catalog information for MCP and custom tools. Those requests need
-manual approval; they aren't rated Safe.
+The plugin doesn't enable mouse tracking or reveal a hidden sidebar unless you
+click an approval notification; it checks that the sidebar is absent from the main
+conversation before showing it. Hidden automatic reports are saved normally.
+
+Skill reviews use the full main instructions from the server's current registered
+skill definition, not a fresh `SKILL.md` read or an invocation-time snapshot. This
+assumes that the selected definition stays unchanged while its permission is pending.
+The exact skill ID, native call and permission scope must match. Missing, ambiguous
+or oversized main instructions remain manual. Supporting files and scripts are not
+inspected; their omission alone does not prevent review. Allowing a skill loads its
+instructions, not a blanket grant for later tool actions.
+
+MCP and custom-tool reviews remain unsupported in V2 because required origin and
+catalog evidence is unavailable. Their switches do not turn those requests into
+Safe ratings or automatic approvals.
 
 Code Mode and its tool search stay enabled. Native tool calls can be reviewed when
 the reviewer can match them exactly to their permission requests. Nested calls
@@ -189,15 +188,13 @@ operation evidence is verified. Context can't override the review rules.
 With streaming enabled, Evaluating and its spinner disappear when a rating arrives.
 The rating is provisional until the full response passes validation. A retry
 clears the preview and brings back the loading indicator. Normal auto-approval
-waits for the full validated report and for the host to confirm that it's displayed
-in the main conversation.
+waits for the full validated report, then the configured countdown.
 
 With `autoApprove: true` and `fastMode: true`, a parsed Safe rating can approve the
 request before the streamed report finishes, without a countdown. The request must
-be first in OpenCode's permission queue, and the host must confirm the panel is
-visible in the main conversation. Browsing a subagent, hiding the sidebar or
-covering it with a dialog or report history prevents fast approval. Without
-streaming, fast mode waits for the full validated response, then skips the countdown.
+be first in OpenCode's permission queue and belong to the currently viewed conversation
+or its descendants. The report may be hidden or covered. Without streaming, fast
+mode waits for the full validated response, then skips the countdown.
 
 After confirmed fast approval, the live panel shows **Auto-approved; finishing
 report…** and stays ahead of newer requests until its report finishes. Hiding the
@@ -220,14 +217,15 @@ limits and overall timeout still apply. Retried requests can incur additional
 provider charges, and unreported usage remains unknown.
 
 During an auto-approval countdown, click the countdown to allow once immediately,
-or Cancel to leave the request manual. Hiding or covering the panel cancels the
-countdown too, except when this plugin's report history is displayed in the main
-conversation and passes the host's visibility checks. Browsing any subagent or
-switching conversations cancels it. Returning, reopening the panel or re-enabling
-review won't restart a canceled countdown. If the plugin can't confirm the result
-of an approval attempt, it leaves the request manual and never retries that attempt.
-Cancel before using native Allow always or rejection
-forms; those forms alone do not stop the countdown.
+or Cancel to leave the request manual. Only explicit stop actions, such as Cancel,
+disabling review, or native interruption/rejection, stop automation for that request.
+Returning, reopening the panel or re-enabling review won't restart a canceled countdown.
+Selecting native Allow always or Reject, or editing a rejection reason, holds
+approval without cancellation. Returning to Allow once resumes eligibility with
+the original countdown deadline. Ambiguous native choice state also waits.
+Temporary queue/cache/read failures wait and recover after fresh verification.
+Changed or unverifiable requests remain manual. If the plugin can't confirm the
+result of a sent approval attempt, it never retries that write.
 Cancel remains available during native preparation, until the approval is sent.
 Positive countdowns add a 200 ms initial grace and then update on remaining-time
 boundaries. A zero-second setting still approves without that grace.
@@ -236,6 +234,13 @@ boundaries. A zero-second setting still approves without that grace.
 descendants. The setting is saved for resume. Both commands are also in the command
 palette. Disabling stops unapproved reviews and countdowns while native permission
 controls remain available. Already-approved fast-mode reports finish in the background.
+The commands remain available when review configuration or the companion is unavailable;
+they save the preference without starting reviews.
+
+At startup, the reviewer waits for the connected server event stream before its first
+companion handshake. Connection waiting and retries for timed-out or not-yet-available
+handshakes share one 10-second budget. If it remains unavailable, history and notifications still work;
+reload the plugin to try again. Invalid handshake data is not retried.
 
 If the server reconnects or the companion is replaced, reviews and auto-approval
 stop. Reload the plugin or restart OpenCode to resume. This keeps cached permissions
@@ -245,13 +250,14 @@ from the old connection separate from the new one.
 
 Use `/reviewer-history` or **Reviewer: Report history** in the command palette to
 open the newest saved report for the current conversation and its descendants.
+**Alt+H** toggles report history from the main conversation. Its shortcut can be
+remapped with `keybinds["reviewer.history.toggle"]` in global `cli.json`.
 Left/Right or the arrow buttons select older/newer entries; Up/Down and
 PageUp/PageDown scroll. Close or Escape closes history. Repeating the command
 returns to the newest report. History remains available with review disabled or
 invalid reviewer configuration. The history command preserves a hidden sidebar;
 clicking an approval notification reveals it and selects that permission's live or saved report.
-Keyboard browsing also works with mouse tracking off; that does not grant
-automatic-approval history cover.
+Keyboard browsing also works with mouse tracking off.
 
 Each entry shows the original report, available usage, model, provider and outcome:
 **Auto approved**, **Manually approved**, **Cancelled**, or **Rejected**. Cancelled
@@ -261,12 +267,8 @@ native Allow once replies whose submitting client cannot be identified. History
 keeps the latest completed report, which can differ from the report that caused
 approval in another window.
 
-In normal mode, opening report history can leave a countdown running in the main
-conversation. The host must confirm that the history heading and footer are visible
-and the review report is rendered. A newly completed Safe review can become eligible
-for a countdown under the same checks. OpenCode dialogs, including the command palette, still cancel an
-active countdown; opening history afterward won't restart it. History blocks fast
-approval. Browsing saved reports doesn't itself approve requests or replay notifications.
+Opening report history does not hold normal or fast auto-approval for eligible live
+requests. Browsing saved reports doesn't itself approve requests or replay notifications.
 
 Reports are saved only after a permission resolution that qualifies for history.
 They can contain private text and are kept under OpenCode's local state base:
@@ -276,9 +278,11 @@ storage, the plugin uses its private, plugin-owned sibling
 `opencode-reviewer-state/opencode-reviewer/` without changing host-directory permissions.
 An existing safe sibling database remains in use across restarts. Conversation
 enable/disable settings stay in the original OpenCode state directory.
-The plugin deletes them only when it can verify that a deleted conversation belongs
-to the matching server and scope. If that can't be verified after an offline
-deletion, it keeps the history; a missing list entry or bare 404 isn't enough.
+Saved modes require private ownership and a nonreplaceable path; an untrusted or
+unreadable mode suspends review rather than silently enabling it.
+Deleting a conversation currently leaves its saved history in place. Known live
+deletion events invalidate only volatile session state, not saved reports or totals.
+A missing list entry or bare 404 cannot prove deletion ownership.
 Windows using the same state directory share history, grouped by host directory
 and main conversation. Reports not yet saved can be lost on shutdown or during a
 prolonged storage failure.
@@ -303,7 +307,7 @@ review counts once, even without usage data; a fresh review after re-enabling co
 again. Retries count extra API attempts actually dispatched, including format
 corrections and transport recovery. Manual approvals are not auto-approvals.
 Timings run from evaluation start, including evidence and retries, to the accepted
-attempt's first rating and final validated response, excluding rendering/countdown
+attempt's first rating and final validated response, excluding countdown
 time. Non-streaming reviews use the final response time for both measurements.
 Averages use running means and sample counts; stored review details also retain
 their individual timings. Both scopes persist in the existing history database
@@ -326,7 +330,7 @@ received usage from unsuccessful or interrupted reviews, which do not count as
 completed reviews. Averages include measured reviews only.
 
 Reviews send the pending request, latest user prompt, project context, and relevant
-file snapshots, diffs, or tool arguments to your endpoint before approval. Shell
+file snapshots, diffs, registered skill instructions, or tool arguments to your endpoint before approval. Shell
 file snapshots can follow symlinks outside the project. Missing evidence is noted
 in the report; ratings are advice based on the supplied evidence.
 </details>
@@ -343,8 +347,8 @@ terminal is focused:
 - **Session needs attention:** manual permissions. Reviewed requests
   stay silent during identification, report generation and retries. Final Safe
   reports notify when auto-approval is disabled or canceled, or after failed approval
-  is confirmed to remain pending. Waiting for rendering, queue position or an
-  automatic countdown to start does not trigger attention. Disabled/unsupported
+  is confirmed to remain pending. Waiting for conversation eligibility, native priority
+  or an automatic countdown to start does not trigger attention. Disabled/unsupported
   reviews and terminal analysis failures can notify without a report.
 - **Unsafe permission needs human approval:** a completed, validated Unsafe review,
   with its own sound. Provisional streamed ratings never notify.
@@ -358,7 +362,8 @@ terminal is focused:
   wait for the previous player to finish, so successive alerts do not overlap.
 - **Session error:** an unrecovered session/provider failure, not a review failure.
 - **Session ended:** a completed root-agent response, not a question/permission
-  pause or an explicit user interruption.
+  pause or an explicit user interruption. Waits until the conversation's subagents,
+  shells and terminals have finished, including work the main agent stopped waiting for.
 
 Permission attention, Unsafe and question notifications, including their reminders,
 apply only to the current native input blocker in each visited root conversation.
@@ -450,6 +455,6 @@ After building, run `node scripts/test-runtime.mjs --profile ci` for that same
 profile. Use `node scripts/test-runtime.mjs --list` for the complete runtime
 inventory or `node scripts/test-runtime.mjs --plan --profile ci` for a
 host-independent plan. Profiles select documented scenario/flag combinations;
-interactive desktop checks and historical replays have separate prerequisites.
+interactive desktop checks have separate prerequisites.
 See [AGENTS.md](https://github.com/mightykatun/opencode-reviewer/blob/main/AGENTS.md)
 for runtime tests and the tag-driven release process.

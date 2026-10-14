@@ -7,12 +7,33 @@
   <a href="https://www.npmjs.com/package/opencode-froggy"><img src="https://badge.fury.io/js/opencode-froggy.svg" alt="npm version"></a>
 </p>
 
-OpenCode plugin providing hooks, specialized agents (product-owner, orchestrator, architect, doc-writer, rubber-duck, partner, code-reviewer, code-simplifier), skills (extreme-programming, backlog-management, implementation-comparison, ask-questions-if-underspecified, tdd), and tools (gitingest, pdf-to-markdown, blockchain queries, agent-promote).
+## Philosophy
+
+OpenCode Froggy brings **multi-agent delegation and orchestration** to OpenCode, guided by **Extreme Programming (XP)**.
+
+- **Delegate with purpose:** specialized agents handle focused tasks; the orchestrator coordinates them and validates the result.
+- **Work in short feedback loops:** test, code, refactor, review, and integrate incrementally.
+- **KISS:** choose the simplest solution that meets the need.
+- **YAGNI:** build what is needed now, not what might be useful later.
+
+**Clear objectives. Focused agents. Simple solutions. Verified results.**
+
+## Keep orchestration moving
+
+Delegation is only the start. The **orchestrator loop** periodically brings the orchestrator back to the objective with a fresh view of child-agent activity and running shells. It can follow up on stalled work, coordinate pending reviews, and advance the next tasks without waiting for another user prompt.
+
+The loop persists across plugin reloads and server restarts, with a configurable interval (10 minutes by default). It supports sustained multi-agent work—not just one round of delegation.
+
+Reminders require the OpenCode server and plugin to be running. The orchestrator stops the loop when the objective is achieved or the user asks it to stop.
+
+See [Orchestrator loop](#orchestrator-loop) for tools and configuration.
 
 ---
 
 ## Table of Contents
 
+- [Philosophy](#philosophy)
+- [Keep orchestration moving](#keep-orchestration-moving)
 - [Installation](#installation)
 - [Commands](#commands)
 - [Agents](#agents)
@@ -139,6 +160,8 @@ It does not modify Linear issues, add comments, or update project files.
 | `code-simplifier` | subagent | Simplifies recently modified code for clarity and maintainability while strictly preserving behavior. |
 | `partner` | subagent | Strategic ideation partner that breaks frames, expands solution spaces, and surfaces non-obvious strategic options. Read-only. |
 | `rubber-duck` | subagent | Rubber duck for thinking out loud. Listens, reflects, and asks gentle, focused questions to help users clarify their own ideas. Read-only. |
+
+The `code-reviewer` permits common Git inspection commands, including tracked files, refs, history, and worktrees. Branch permissions cover bounded listing forms such as `git branch -r --sort=-committerdate` and `git branch --list -a --sort=-committerdate`; use `git for-each-ref` for advanced filtering and formatting. For tag and configuration queries, put the explicit read mode first: `git tag --list`, `git config get`, or `git config list`. Remote inspection uses `git remote`, `git remote -v`, `git remote get-url`, or `git remote show`. Select the repository with the shell tool's `workdir`.
 
 ### product-owner
 

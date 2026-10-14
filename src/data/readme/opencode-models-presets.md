@@ -6,17 +6,17 @@ Assign models and variants to OpenCode agents, review the changes, and save reus
 
 ## Install
 
-Requires OpenCode `>=1.17.15 <2`.
+Requires OpenCode `>=2.0.28 <3`. This release uses the V2 CLI plugin API and does not support OpenCode 1.
 
-```bash
-opencode plugin opencode-models-presets --global
+Add the package to `plugins` in the global `~/.config/opencode/cli.json` (or `$XDG_CONFIG_HOME/opencode/cli.json`; `OPENCODE_CONFIG_DIR` overrides the configuration directory):
+
+```json
+{
+  "plugins": ["opencode-models-presets"]
+}
 ```
 
-To pin the first automated npm release:
-
-```bash
-opencode plugin opencode-models-presets@0.3.1 --global --force
-```
+To pin a release, use `"opencode-models-presets@<version>"`. Choose a release that declares V2 support. Published releases through 0.3.5 used the V1 API.
 
 Restart OpenCode, then press `Ctrl+P` and choose **Configure model presets**, or run `/models-profiles`.
 
@@ -31,12 +31,12 @@ See [Configuration](docs/configuration.md) for profiles, presets, storage, and w
 
 ## Configure options
 
-Options live beside the npm package spec in `tui.json`:
+Options use the object form in `cli.json`:
 
 ```json
 {
-  "plugin": [
-    ["opencode-models-presets", {"profilesDir": ".opencode/model-profiles"}]
+  "plugins": [
+    {"package": "opencode-models-presets", "options": {"profilesDir": ".opencode/model-profiles"}}
   ]
 }
 ```
@@ -47,7 +47,7 @@ Relative profile paths resolve from the active project.
 
 Keep `"opencode-models-presets"` to follow `latest`. To pin a release, use `"opencode-models-presets@<version>"`.
 
-To remove the plugin, delete only its matching string or tuple from the global `tui.json`, preserve every other entry, and restart OpenCode. There is no global npm installation to uninstall.
+To remove the plugin, delete only its matching string or package object from the global `cli.json`, preserve every other entry, and restart OpenCode. There is no global npm installation to uninstall.
 
 ## Develop
 
@@ -60,3 +60,11 @@ See [Contributing](CONTRIBUTING.md) to load local source and run checks.
 - [Security policy](SECURITY.md)
 - [Changelog](CHANGELOG.md)
 - [MIT License](LICENSE)
+
+## Migrating from OpenCode 1
+
+OpenCode V2 replaces terminal settings in `tui.json` with global `cli.json`, and package options use `{ "package": "...", "options": {...} }` instead of tuples. Existing saved presets and last-applied history remain in their original JSON files. Existing legacy agent configuration is preserved; new configuration uses native V2 `agents` and model references.
+
+After successful assignment writes, the plugin requests the V2 configuration reload. This rebuilds every loaded location on the connected server and cancels pending permissions and forms. If reload fails, the file remains saved and the plugin reports that a restart is required.
+
+See the official [V1 migration guide](https://dev.opencode.ai/v2/docs/migrate-v1/) and [CLI plugin API](https://dev.opencode.ai/v2/docs/build/plugins/cli).

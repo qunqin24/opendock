@@ -1,14 +1,15 @@
 # opencode-patchflow
 
-Anchor-based atomic batch edits for OpenCode: one auditable tool call instead of opaque `python3 <<'EOF'` heredocs or N chained `edit` calls.
+Anchor-based atomic batch edits for OpenCode: one auditable tool call where
+the agent would otherwise smuggle writes through `shell` or chain N fragile
+`edit` calls.
 
-> **Requires OpenCode 2.x.** Built against `@opencode/plugin` 2.0.26 and uses
-> only the V2 plugin API (`Plugin.define`, `tool.transform`, `permission`
-> and `tool` hooks). It does not work on OpenCode 1.x.
+> **Requires OpenCode 2.x.** Built against `@opencode/plugin` 2.x and the V2
+> plugin API only (`Plugin.define`, `tool` and `permission` hooks). There is
+> no 1.x support.
 
-## Why
-
-Agents often edit files through `shell` with a Python heredoc:
+Agents under pressure edit files the way that costs the fewest round-trips,
+which usually means a Python heredoc through `shell`:
 
 ```sh
 python3 - <<'EOF'
@@ -18,47 +19,16 @@ open(p, 'w').write(s)
 EOF
 ```
 
-That works in one round-trip (see the Program-Aided LM literature: models fail
-less when state stays in code rather than across tool-call turns), but it is
-opaque to permissions, review, and diff logging. Chaining N `edit` calls is
-auditable but costs N round-trips and N exact-match failures.
-
-`patchflow_apply` keeps the single-call ergonomics with the audit trail:
-
-- `edits: [{ path, anchor, text, mode, expectCount }]` — find an anchor,
-  assert it occurs `expectCount` times (default 1), insert after it or replace it.
-- All edits validate before any write (atomic per file group).
-- `dryRun: true` previews without writing.
-- One call can touch many files.
-
-## Install
-
-```jsonc
-// opencode.jsonc
-{
-  "$schema": "https://opencode.ai/config.json",
-  "plugins": ["opencode-patchflow"]
-}
-```
-
-Local development:
-
-```jsonc
-{ "plugins": [{ "package": "/home/mateo/opencode-patchflow/src/index.ts", "options": {} }] }
-```
-
-Options:
-
-```jsonc
-{ "package": "opencode-patchflow", "options": { "monitorOnly": true, "suggestOnAsk": true } }
-```
-
-- `monitorOnly` (default `true`): only log covert-write observations; never
-  change a verdict. Static `deny` rules always win.
-- `suggestOnAsk` (default `true`): when a shell request already resolves to
-  `ask`, append a pointer to `patchflow_apply`.
-
-## Usage
+One call, but opaque to permissions, review, and diff logging — and silent
+about partial failure. The honest alternative, chaining N `edit` calls,
+restores the audit trail at N times the latency and N exact-match
+rollbacks. `patchflow_apply` keeps the single-call ergonomics with the
+trail intact: each edit names a file, an anchor, and the text to insert
+after it or replace it with, asserting the anchor occurs exactly
+`expectCount` times (default 1). Every edit in the call validates before
+anything is written, so a batch lands atomically per file group instead of
+halfway. `dryRun: true` previews the whole batch without touching disk, and
+one call can span as many files as the change needs.
 
 ```ts
 // One tool call, two files, asserted anchors:
@@ -71,12 +41,38 @@ patchflow_apply({
 });
 ```
 
-The plugin also watches `shell`: when a command hides a file write
-(`python open(w)`, `sed -i`, `perl -pi`, `tee`, `>`/`>>` to a file) it logs
-`[patchflow] covert-write (...) observed` and, on an already-asking request,
-suggests this tool. It never allows what rules deny and never denies what
-rules allow — it is a nudge, not a gate. Pair it with a real policy engine
-for enforcement.
+The plugin also watches `shell` for the heredoc habit itself. When a
+command hides a file write — `open(p, 'w')` in Python, `sed -i`, `perl
+-pi`, `tee`, a bare `>`/`>>` redirect — it logs a `[patchflow]
+covert-write (…) observed` line, and when that request already resolves to
+`ask`, it appends a pointer to `patchflow_apply`. It never allows what your
+rules deny and never denies what they allow; it is a nudge, not a gate, so
+pair it with a real policy engine where enforcement matters.
+
+```jsonc
+// opencode.jsonc
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugins": ["opencode-patchflow"]
+}
+```
+
+Two options tune the monitor,
+`{ "monitorOnly": true, "suggestOnAsk": true }`. The first keeps the plugin
+to observation, never touching a permission verdict (static `deny` rules
+win regardless). The second controls the pointer appended to
+already-asking shell requests. A third option, `{ "metrics": true }`,
+keeps session-aggregated counters — successful applies and dry runs with
+edit and file totals, errors, observed covert writes, and built-in `edit`
+calls as the comparison baseline — in
+`~/.local/share/opencode/log/patchflow-metrics.json`. Only counts, never
+commands or contents; at most twenty sessions are kept, oldest first out,
+with cumulative totals beside them. It defaults to off. Local development points at the source
+directly:
+
+```jsonc
+{ "plugins": [{ "package": "/home/mateo/opencode-patchflow/src/index.ts", "options": {} }] }
+```
 
 ## Development
 
@@ -86,7 +82,8 @@ npm test        # node --test, no build step
 npm run typecheck
 ```
 
-Requires Node >= 22 (type stripping runs `.ts` tests directly).
+Needs Node 22 or newer: the test files run straight through type
+stripping, with no compilation involved.
 
 ## License
 
