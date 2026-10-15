@@ -302,6 +302,13 @@ so a failing check blocks the stage.
 
 ## Changelog
 
+- **0.6.2** — OpenCode 2 context panel fixes: the V2 adapter now reads the
+  model id from the store's `model.id`, so the model lookup succeeds and the
+  cell grid, per-category percentages and compaction-headroom line render
+  again instead of `—`; the translated messages also carry the session id, and
+  the system-prompt capture anchors its freshness check to the turn's user
+  message — OpenCode 2 fires the capture hook just before the assistant
+  message is stamped, which previously marked every capture `(derived)`.
 - **0.6.1** — Kimi Code adapter tracks the 2026-09 quota-model API change:
   usage windows now come from the `usages.limit_5h` / `limit_7d` /
   `limit_month_total` ratios (with a `limit_month_code` breakdown), and Extra

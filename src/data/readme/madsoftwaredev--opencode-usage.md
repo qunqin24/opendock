@@ -4,7 +4,7 @@
 
 # OpenCode Plugins
 
-**Eleven focused plugins for OpenCode V2.**
+**Ten maintained plugins for OpenCode V2.**
 
 Persistent goals, chat usage, terminal customization, background subagents, lint feedback, direnv, and compaction, each in its own package.
 
@@ -27,7 +27,7 @@ OpenCode V2 loads plugins from two places. Server plugins extend sessions, tools
 %%{init: {'theme': 'base', 'themeVariables': {'primaryColor': '#f6f8fa', 'primaryBorderColor': '#57606a', 'primaryTextColor': '#24292f', 'lineColor': '#57606a'}}}%%
 flowchart LR
     S["Server plugins (opencode.json)"] --> A["goal · background-subagent · lint-feedback · direnv · compaction-model"]
-    T["TUI plugins (cli.json)"] --> B["goal · chat-title · sidebar-resize · usage · subagent-sidebar · stats · btw"]
+    T["TUI plugins (cli.json)"] --> B["goal · chat-title · sidebar-resize · usage · subagent-sidebar · stats"]
 ```
 
 ## Plugins
@@ -40,13 +40,18 @@ flowchart LR
 | [Lint feedback](packages/lint-feedback/README.md) · [npm](https://www.npmjs.com/package/@madsoftwaredev/opencode-lint-feedback) | Server | Appends project-local ESLint diagnostics after successful edits. Checks only, never fixes. |
 | [direnv](packages/direnv/README.md) · [npm](https://www.npmjs.com/package/@madsoftwaredev/opencode-direnv) | Server | Applies the approved direnv environment to each shell command's working directory. |
 | [Compaction model](packages/compaction-model/README.md) · [npm](https://www.npmjs.com/package/@madsoftwaredev/opencode-compaction-model) | Server | Summarizes checkpoints with a selectable model and reasoning variant. |
-| [`/btw`](packages/btw/README.md) · [npm](https://www.npmjs.com/package/@madsoftwaredev/opencode-btw) | TUI | Runs a side conversation in a background fork of the current session. |
 | [Goal](packages/goal/README.md) · [npm](https://www.npmjs.com/package/@madsoftwaredev/opencode-goal) | Server + TUI | Keeps a persistent goal across compaction, resumes work within a nudge budget, and shows goal state above the composer. |
 | [Chat title](packages/chat-title/README.md) · [npm](https://www.npmjs.com/package/@madsoftwaredev/opencode-chat-title) | TUI | Keeps the current chat title visible above the transcript while the sidebar is hidden. |
 | [Sidebar resize](packages/sidebar-resize/README.md) · [npm](https://www.npmjs.com/package/@madsoftwaredev/opencode-sidebar-resize) | TUI | Adds a draggable sidebar edge and saves the chosen width. |
 | [Usage](packages/usage/README.md) · [npm](https://www.npmjs.com/package/@madsoftwaredev/opencode-usage) | TUI | Shows chat and subagent tokens, cache efficiency, recorded cost, and API-equivalent cost in the sidebar and `/usage` popup. |
 
 Each plugin README documents its behavior, setup, and limitations.
+
+### Deprecated
+
+[`@madsoftwaredev/opencode-btw`](packages/btw/README.md) (`/btw`) is deprecated
+and no longer maintained. Remove it from your OpenCode plugins configuration.
+Its source remains available for reference.
 
 > [!WARNING]
 > Upgrading from `0.1.0`? Background subagent, subagent sidebar, lint feedback, and direnv dropped the `local.` prefix from their plugin IDs in `0.1.1`. npm package names are unchanged, but update any config rules that reference the old IDs (`local.direnv` is now `direnv`, and so on).
@@ -100,7 +105,6 @@ opencode plugin add @madsoftwaredev/opencode-compaction-model
 # TUI plugins (cli.json)
 opencode plugin add @madsoftwaredev/opencode-subagent-sidebar
 opencode plugin add @madsoftwaredev/opencode-stats
-opencode plugin add @madsoftwaredev/opencode-btw
 opencode plugin add @madsoftwaredev/opencode-chat-title
 opencode plugin add @madsoftwaredev/opencode-sidebar-resize
 opencode plugin add @madsoftwaredev/opencode-usage
@@ -163,7 +167,7 @@ for details and a working configuration example.
 | --- | --- |
 | direnv | `direnv` installed where the OpenCode server runs, plus an approved `.envrc` per project (`direnv allow`). |
 | Lint feedback | Node on the shell's `PATH`, project-installed ESLint 9 or 10, and a flat `eslint.config.*` file. |
-| Subagent sidebar, stats, `/btw`, chat title, sidebar resize, usage | The OpenCode terminal UI. |
+| Subagent sidebar, stats, chat title, sidebar resize, usage | The OpenCode terminal UI. |
 | Goal, chat title, sidebar resize, usage | OpenCode V2 with the 2.0.27 plugin API and OpenTUI 0.5.17 or later. Goal also requires its server plugin. |
 
 ## Develop

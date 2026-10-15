@@ -1,83 +1,67 @@
 # opencode-session-autofile
 
-If you use [OpenCode](https://opencode.ai) with [OpenChamber](https://github.com/opencode-ai), you've probably ended up with a wall of untitled or loosely-named sessions in one flat list. This plugin fixes that automatically: it teaches OpenCode's title generator to end every session title with a category tag like `[Sales]` or `[Language]`, then watches for that tag and moves the session into the matching OpenChamber folder — no clicking, no manual dragging.
+Files [OpenChamber](https://github.com/openchamber/openchamber) sessions into folders automatically, from **one rules file** you can read at a glance. For OpenCode 2.x (`@opencode/plugin`). For OpenCode 1.x use `opencode-session-autofile@0.4.1`.
 
-## How it works
+## Rules
 
-1. The plugin replaces OpenCode's title-generation prompt with one that still writes a short, descriptive title, but always ends it with exactly one bracketed tag from your list of categories, e.g.:
-
-   ```
-   Fix flaky login test [Tech]
-   Follow up with prospect [Sales]
-   French verb practice [Language]
-   ```
-
-2. Whenever a session's title updates, the plugin reads the tag and looks it up in your **mappings** — a simple label → folder name table.
-3. If the tag matches a mapping, the plugin moves that exact session into the corresponding OpenChamber folder, creating the folder first if it doesn't already exist.
-4. Untagged sessions, unrecognized tags, and `[Unfiled]` are left alone — nothing happens, and the chat is never interrupted or blocked by a filing attempt.
-
-### Example
-
-With a mapping of `{ "Sales": "Client work" }`, a session titled `Follow up with prospect [Sales]` is automatically moved into a "Client work" folder in OpenChamber. Rename or add categories any time by editing the mapping — no code changes required.
-
-### Catching missed titles
-
-Title updates can occasionally arrive out of order at session start, so the plugin also does a bounded double-check when a session goes idle: it re-reads the session's current title a few times with a short delay and files it then if the first attempt was missed. This is a safety net, not the primary mechanism — most sessions file immediately.
-
-### Periodic reconciliation
-
-**Not available in this version (OpenCode 2 / V2 plugin contract).** The V2 Promise plugin context (`@opencode/plugin@2.0.25`'s `SessionDomain`) does not expose a `session.list` method, which this feature requires to enumerate a project's sessions — confirmed by reading the installed package's types directly, and confirmed at runtime (`reconciliationSupported: false` in this plugin's own diagnostic state). The two event-driven paths above (immediate filing on title change, bounded retry when a turn ends) are unaffected and cover ordinary session filing. The reconciliation code is still present internally, gated behind a runtime capability check, so it will activate automatically with no plugin changes if a future `@opencode/plugin` release restores `session.list`. **If you need active reconciliation today, it is only available in `opencode-session-autofile@0.4.1` on OpenCode 1.x.** See [ADVANCED.md](ADVANCED.md) for the interval option and its limits (relevant again if/when support returns).
-
-## Requirements
-
-- **OpenCode 2.0.20 or newer** (see [Compatibility](#compatibility)). This targets the V2 plugin contract (`@opencode/plugin`, default export `{ id, setup }`). **For OpenCode 1.x, use `opencode-session-autofile@0.4.1`** — the two major versions use incompatible plugin APIs and are not cross-compatible; pin the version that matches your OpenCode major version.
-- **OpenChamber running and reachable**, since the plugin calls its `/api/session-folders` API to read and move sessions between folders. By default OpenChamber's web server listens on `http://localhost:3000`; if yours runs elsewhere, set `apiBaseUrl` accordingly (see Configuration below). If OpenChamber isn't reachable, filing attempts fail silently and are logged — they never block the chat.
-
-## Install
-
-Pin an exact version in `opencode.json(c)`'s plugin array — never `@latest` in production, since `0.4.1` (OpenCode 1.x) and `0.5.0+` (OpenCode 2.x) are not interchangeable. The V1-style tuple form below is confirmed working against a real OpenCode 2.0.25 instance (OpenCode reads and normalizes it even on V2); the V2 object form is per [OpenCode's own plugin docs](https://opencode.ai/v2/docs/build/plugins) but has not independently been confirmed with a local/unpublished build — once this package is live on npm, both forms resolve the same published package, so there is no reason to expect it to behave differently, but it has not been separately tested:
-
-```jsonc
-// V1-style config key ("plugin", tuple form) — still read and normalized under OpenCode 2
-"plugin": [
-  ["opencode-session-autofile@0.5.0", { "mappings": { "Tech": "Tech" } }]
-]
-```
-
-```jsonc
-// V2-native config key ("plugins", object form)
-"plugins": [
-  { "package": "opencode-session-autofile@0.5.0", "options": { "mappings": { "Tech": "Tech" } } }
-]
-```
-
-Restart OpenCode after adding or changing the entry. Adding the plugin replaces OpenCode's native `title` agent/request prompt with the plugin's own tagging prompt (or your custom `titlePrompt`, if set) every time it loads, so the title generator always stays in sync with your current `mappings`/`titlePrompt` configuration.
-
-## Configuration
-
-The `mappings` option is a flat JSON object: each key is the tag OpenCode writes into the title, and each value is the OpenChamber folder name to file it into. Keys and folder names don't need to match — this is how you rename or consolidate categories into your own folder structure.
+One entry per destination folder. Everything that sends a session there is in the same place:
 
 ```json
 {
-  "apiBaseUrl": "http://localhost:3000",
-  "mappings": {
-    "Language": "Language",
-    "Tech": "Tech",
-    "Sales": "Client work"
-  }
+  "rules": [
+    { "folder": "Sales",    "description": "accounts, prospects, CRM", "keywords": ["salesforce", "gong", "cliente*"] },
+    { "folder": "Tech",     "description": "software, IT, infrastructure", "keywords": ["docker", "script", "plugin"],
+                            "directories": ["/home/me/code"] },
+    { "folder": "Personal", "description": "family, health, everyday matters", "tags": ["Personal", "Family"], "keywords": ["familia", "impuestos"] }
+  ]
 }
 ```
 
-A tag is recognized anywhere in the title, including before a scheduler-added timestamp such as `Morning sales brief [Sales] 2026-08-28 06:00`. A mapping entry that isn't a non-empty string is ignored rather than causing an unexpected move.
+| Field | Meaning |
+| --- | --- |
+| `folder` | OpenChamber folder to file into (created if missing). |
+| `description` | Shown to the title model so it knows when to pick this folder's tag. |
+| `tags` | Bracketed tags the title model may write (`… [Tech]`). Omit it and the tag is the folder name. `[]` means "no tag for this folder". |
+| `keywords` | Words looked up in the session **title**. Ignores case and accents, whole words only; a trailing `*` matches any ending (`cliente*` → Clientes). |
+| `directories` | Absolute paths. A session whose working directory is that path, or inside it, qualifies. |
 
-For less common options (`enabled`, `titlePrompt`, `fallbackMaxAttempts`, `fallbackDelayMs`, `reconcileIntervalMs`), see [ADVANCED.md](ADVANCED.md).
+**Which rule wins** (first hit, top to bottom): an explicit tag, then a keyword, then a directory. Inside each level the order of the rules in the file decides. A title ending in `[Unfiled]` is never filed, whatever its keywords say. Keywords only see the short title, not the conversation; the tag is the stronger signal because the title model saw the first message.
 
-## Safety and behavior notes
+The tag list the title model is offered is generated from these same rules, so what it can write and what the plugin can file never drift apart.
 
-- A missing destination folder is created automatically the first time it's needed.
-- If two folders in the same scope already share the exact destination name, the plugin skips the move rather than guessing which one you meant.
-- Filing failures (network errors, a temporarily unreachable OpenChamber API, etc.) are logged and never block or interrupt the chat.
-- Writes are protected against silent loss from concurrent writers (e.g. two OpenChamber tabs open at once): the plugin detects when a write was accepted but discarded, re-fetches the latest folder state, and retries the merge a bounded number of times.
+## Setup
+
+Put the rules in a file. With no options at all the plugin looks for `~/.config/opencode/session-autofile-rules.json` (it does not need to exist; until it does, the built-in domain list applies). To keep the file somewhere else, point the plugin at it with `rulesFile`. The file is re-read whenever it changes, so edits apply without restarting OpenCode (a broken edit keeps the last good rules and is reported in the diagnostics).
+
+```jsonc
+// opencode.jsonc
+"plugin": [
+  ["opencode-session-autofile@0.6.0", { "rulesFile": "~/path/to/autofile-rules.json" }]
+]
+```
+
+`rules` can also be given inline instead of `rulesFile`. The old `mappings` table (`{ "Tag": "Folder" }`) still works when no `rules` are set. With no configuration at all, a built-in list of domains (Language, Tech, Personal, Business, Sales, Career, Finance, Immigration, Artist) applies.
+
+Try a rules file against your live sessions before turning it on, writing nothing (from a clone of this repo; the script is not part of the npm package):
+
+```bash
+bun scripts/dry-run.ts path/to/rules.json http://localhost:3000
+```
+
+or set `"dryRun": true` in the plugin options to make the plugin itself only log and record what it would do.
+
+## When it runs
+
+1. **When a session is created or renamed**, and **when a turn ends** (a few bounded re-checks, for titles that arrive late). A session already in the right folder costs one read and no write.
+2. **A periodic sweep** (every 10 minutes by default, first pass ~20 s after load) lists every session from OpenChamber's `GET /api/session` and fixes the ones that are in the wrong folder, including one dragged away by hand: the rules always win. Archived sessions are skipped. A subagent session goes wherever its root session goes (its own title is ignored); set `includeSubagents` to `false` to leave subagents alone. It needs OpenChamber's API reachable at `apiBaseUrl` (default `http://localhost:3000`); if you set a UI password the plugin cannot authenticate and will fail silently.
+
+Filing failures are logged and never block the chat.
+
+## Known limits
+
+- **OpenChamber's sidebar does not re-read folders by itself.** Moves made by the plugin are saved on the server immediately, but an already-open window shows them only after a reload (desktop: *OpenChamber → Reload Webview*). This is how OpenChamber loads folders, not something a plugin can change.
+- A client that was open with an old folder list and then drags a session can overwrite the plugin's moves for that folder; the next sweep puts them back.
+- OpenChamber 2.x never reports write conflicts, so two simultaneous writers to the same folder can lose one write silently.
 
 ## Development
 
@@ -88,11 +72,4 @@ bun run typecheck
 bun run build
 ```
 
-OpenCode must be restarted after adding, removing, or changing a plugin.
-
-## Compatibility
-
-- **OpenCode 2.0.20+** with the V2 (`@opencode/plugin`) Promise plugin contract: `session.hook("title", ...)`, `event.subscribe`, and `session.get`. Clean-load and the `session.created` event-driven filing path are verified against a real OpenCode 2.0.25 instance end to end (plugin loads, folder gets created, session gets filed). The `session.renamed` path and the `session.execution.*` bounded-retry fallback share the same underlying classify-and-file logic and are covered by the test suite and by `tsc` against the real SDK types, but have not independently been exercised against a live instance. The title-prompt-injection hook (`session.hook("title", ...)`) is covered by a unit test only — exercising it live requires an actual model call, which an isolated test environment can't provide without real provider credentials.
-- OpenChamber with the local `/api/session-folders` endpoint (verified against OpenChamber 2.1.1's rewritten, merge-queue-based route — see [ADVANCED.md](ADVANCED.md) for what changed).
-- Periodic reconciliation additionally needs a `session.list` method on the plugin context, which the installed `@opencode/plugin@2.0.25` does not expose (see above) — it is gated behind a runtime check and currently always off.
-- **For OpenCode 1.x**, use `opencode-session-autofile@0.4.1` instead, which targets the V1 plugin contract and includes active periodic reconciliation.
+Options not listed here (`enabled`, `titlePrompt`, `fallbackMaxAttempts`, `fallbackDelayMs`, `reconcileIntervalMs`, `includeSubagents`, `dryRun`) are in [ADVANCED.md](ADVANCED.md).

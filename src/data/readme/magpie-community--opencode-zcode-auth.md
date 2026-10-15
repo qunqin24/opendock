@@ -18,6 +18,7 @@ subscription and makes its requests. The packages work in OpenCode and in
 | [minimax](packages/minimax) | MiniMax Code (China): account credits and M Plan, with MiniMax Code's device sign-in | `minimax-code` |
 | [minimax](packages/minimax) | MiniMax Code (international): account credits and M Plan, with MiniMax Code's device sign-in | `minimax-code-global` |
 | [mimo](packages/mimo) | Xiaomi MiMo, with a Xiaomi account | `mimo-app` |
+| [opendesign](packages/opendesign) | Open Design Cloud (open-design.ai), with the Open Design CLI's device sign-in | `opendesign` |
 | [qoder](packages/qoder) | Qoder subscription (qoder.com), with Qoder's device sign-in | `qoder` |
 | [qoder](packages/qoder) | Qoder CN subscription (qoder.cn), with Qoder CN's device sign-in | `qoder-cn` |
 | [trae](packages/trae) | Trae CN (trae.cn) and Trae international (trae.ai), free tier included, with Trae's browser sign-in (experimental) | `trae-cn`, `trae-global` |
@@ -62,6 +63,7 @@ it off puts the config back.
 | Package | Agent |
 |---|---|
 | [aider](packages/aider) | [Aider](https://aider.chat): `~/.aider.conf.yml`, through litellm's `openai/` prefix |
+| [type4me](packages/type4me) | [Type4Me](https://github.com/joewongjc/type4me), macOS voice input: `~/Library/Application Support/Type4Me/magpie-agent.json`, for its LLM post-processing |
 
 ```sh
 magpie plugin add @magpie-community/agent-<name>
@@ -178,9 +180,38 @@ it can't. To list a plugin, add an entry with its npm `package`, a
 `summary` in English and Chinese (`{"en": …, "zh": …}`), and open a pull
 request.
 
-A new package's first version is published by hand before its pull request
-is merged: npm's trusted publishing, which publishes every later version
-from `main`, can't create a package. A magpie-community npm owner runs
-`scripts/publish.sh <otp>` on the pull request's branch and sets
-`.github/workflows/publish.yml` as the package's Trusted Publisher on
-npmjs.com. The pull request's `on-npm` check fails until then.
+## Publishing
+
+A version bump pushed to `main` ships itself, two ways
+(`.github/workflows/publish.yml`):
+
+- **dist**: every package's version is packed onto the `dist` branch
+  (`scripts/dist.mjs`): `tgz/<file>` and `index.json`, which names each
+  version's tarball and its sha512. magpie (0.1.1243 and later) installs a
+  `@magpie-community` package from there whenever npm doesn't have the
+  version: a new package, or one npm refused. It installs a tarball only
+  when the sha512 matches. This needs nobody, so **a new plugin is merged
+  as soon as its review is done**; it never waits for npm.
+- **npm**: every version npm doesn't have yet is published. npm tries
+  trusted publishing (OIDC) first, which needs the package to name
+  `publish.yml` as its Trusted Publisher on npmjs.com with `npm publish`
+  allowed. A trust made since 2026-09-03 allows only `npm stage publish`
+  unless told otherwise, so make it with `--allow-publish`:
+
+  ```sh
+  npx npm@latest trust github <package> --file publish.yml \
+    --repo magpie-community/plugins --allow-publish \
+    --registry=https://registry.npmjs.org/ -y
+  ```
+
+A package's first version can't go through trusted publishing: a Trusted
+Publisher is set on a package that exists, and setting one takes an
+owner's 2FA. Until an owner of the magpie-community npm org
+publishes it (`scripts/publish.sh <otp>`) and sets its Trusted Publisher as
+above, magpie serves it from `dist`, and the publish run notes it without
+failing. The repository's `NPM_TOKEN` secret, a granular token with 2FA
+bypassed, still publishes a first version while npm lets such tokens
+publish (npm plans to end that in January 2027).
+
+A pull request's `on-npm` check notes any package not on npm yet. It is
+not a reason to hold the merge.

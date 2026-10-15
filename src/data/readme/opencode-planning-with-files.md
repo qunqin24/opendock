@@ -39,13 +39,11 @@ Persistent file-based planning for AI coding agents and long-running agent tasks
   <a href="#readme-nav-before-clear"><strong>See it survive /clear</strong></a> ·
   <a href="#readme-nav-quick-install"><strong>Install</strong></a> ·
   <a href="#readme-nav-long-running">Long-running tasks</a> ·
-  <a href="#readme-nav-hosts">First-class hosts</a> ·
-  <a href="#readme-nav-multi-agent">Multi-agent</a> ·
-  <a href="#readme-nav-benchmark">The numbers</a>
+  <a href="#readme-nav-hosts">First-class hosts</a>
 </p>
 
 <p align="center">
-  <sub>Proof, comparisons and the repository reference are <a href="#readme-nav-reference">further down</a> · <a href="docs/installation.md">Full install guide</a></sub>
+  <sub>Open the Commands, Multi-agent runs, Benchmarks &amp; more section below for the reference · <a href="docs/installation.md">Full install guide</a></sub>
 </p>
 
 
@@ -383,74 +381,8 @@ Full list of everyone who made this project better: [CONTRIBUTORS.md](./CONTRIBU
 </details>
 
 
-<a id="readme-nav-multi-agent"></a>
-
-## Multi-agent runs: orchestrators, workers and subagents
-
-> **NOTE**
-> **Markdown on disk is the shared state between agents.** One orchestrator owns `task_plan.md` and the shared summaries; every worker appends to its own ledger or assigned file. Pin each independent task with `PLAN_ID` before starting its host, or use separate worktrees.
-
-- **Run ledger per agent.** Workers append one JSON line per event to `.planning/<id>/ledger-<agent>.jsonl` (`ledger-append.sh`); `ledger-summary.sh` synthesizes a fixed-shape, KV-cache-stable block from all ledgers that replaces the raw `progress.md` tail in autonomous and gated mode. No free text from disk reaches the model through that block.
-- **Plan isolation per task.** `init-session.sh "<name>"` gives each parallel task its own `.planning/YYYY-MM-DD-<slug>/` directory; `PLAN_ID` pins a terminal to one of them, `set-active-plan.sh --list` shows available plans and phase counts, and `set-active-plan.sh <id>` switches the shared pointer.
-- **Threads whose cwd is a shared parent.** `PWF_PLAN_ROOT=<absolute path>` binds an agent thread to the project that owns the plan; an ambiguous cwd, where a nested project carries its own planning state, injects nothing rather than guessing.
-- **Session attachment.** An `.attached` marker authorizes context but does not select a task. In the Codex, Hermes, Pi, and standalone hook routes, armed isolation with multiple plans requires `PLAN_ID`; otherwise context is refused. A project-root pin alone cannot distinguish tasks within that root.
-- **Parallel-write guard.** The next turn warns if checked items or completed phases decrease. This is an advisory check after the write, not a lock or merge mechanism. It does not detect every overwritten plan, `progress.md`, or `findings.md`.
-- **Stall-aware gate.** The completion gate reads the ledger, not `progress.md` mtime, so a worker that stopped producing events releases the stop instead of looping.
-- **One plan, many hosts.** Claude Code, Codex, Pi, Hermes and OpenCode read the same files, the same `.attestation` and the same gate counters, so a plan can be handed from one agent to another mid-run.
-
-The contract and the `.mode` tokens are specified in the skill itself ([SKILL.md, Autonomous and Gated Modes](skills/planning-with-files/SKILL.md#autonomous-and-gated-modes-v3)) and in [docs/long-running-agent-tasks.md](docs/long-running-agent-tasks.md).
-
-To find a saved plan, run the installed `scripts/set-active-plan.sh --list` helper from your project directory, or `scripts/set-active-plan.ps1 -List` in PowerShell. It lists named plans under that project's `.planning/` directory, with phase counts for the shipped English and translated templates. `[active]` marks the shared default pointer. Listing does not select a plan or attach a session; use the displayed ID as `PLAN_ID` before starting a concurrent task. Kiro's separate `.kiro/plan` layout is not part of this inventory.
-
-<a id="reference"></a>
-
-<a id="readme-nav-reference"></a>
-
-## Reference
-
-Everything below is the proof and the reference half: the benchmarks and their limits, what lands in your project and what the repository ships, and every guide in `docs/`. Release history and community projects sit in the collapsible sections below [First-class hosts: native plugins](#first-class-hosts-native-plugins).
-
-| | |
-|---|---|
-| [Benchmark Results](#benchmark-results) | The eval run, the blind A/B, the recovery benchmark, and their disclosed limits |
-| [File Structure](#file-structure) | What lands in your project, and the repository layout |
-| [Documentation](#documentation) | Every guide in `docs/` |
-
-<a id="readme-nav-benchmark"></a>
-
-## Benchmark Results
-
-> **Methodology note:** the 96.7% figure comes from the v2.21.0 evaluation run on `claude-sonnet-4-6` (2026-03-06). It measures file-pattern fidelity (does the agent create and maintain the 3-file structure), not goal-drift over long autonomous runs. Newer models and the autonomous-mode work are not yet covered by this number. Full methodology, dataset, and assertion list: [docs/evals.md](docs/evals.md).
-
-Evaluated with Anthropic's [skill-creator](https://github.com/anthropics/skills/tree/main/skills/skill-creator) framework: skill v2.21.0, model `claude-sonnet-4-6`, 2026-03-06. 10 parallel subagents, 5 task types, 30 objectively verifiable assertions, 3 blind A/B comparisons.
-
-<p align="center">
-  <img src="media/benchmark-skill-vs-baseline.svg" width="860" alt="Eval results, with skill vs without: assertions passed 29 of 30 vs 2 of 30, 3-file pattern followed 5 of 5 vs 0 of 5, blind A/B wins 3 of 3 vs 0 of 3, average rubric score 10.0 vs 6.8">
-</p>
-
-| Test | with_skill | without_skill |
-|------|-----------|---------------|
-| Pass rate (30 assertions) | **96.7%** (29/30) | 6.7% (2/30) |
-| 3-file pattern followed | 5/5 evals | 0/5 evals |
-| Blind A/B wins | **3/3 (100%)** | 0/3 |
-| Avg rubric score | **10.0/10** | 6.8/10 |
-
-### Recovery after a context wipe
-
-> **Internal benchmark, v1 (2026-07-06).** Author-run against v3.4.0, harness-authored tasks, deterministic grading, no LLM grades anything. Treat it as the project's own measurement, not an independent comparison. Full method, arms, disclosed limits, and grader validation: [docs/evals.md](docs/evals.md#test-5-competitive-benchmark-v1-seven-planning-methods-head-to-head-2026-07-06-internal).
-
-Protocol: the session is hard-stopped at roughly half done, and a fresh session is told only "Continue the work in this directory." Every graded run across every arm ended pytest-green (77/77), so the difference is re-orientation cost, not correctness.
-
-<p align="center">
-  <img src="media/recovery-turns.svg" width="860" alt="Turns to resume after a context wipe, internal benchmark v1: 5.0 with planning-with-files, 13.3 for a raw agent with no planning method">
-</p>
-
-**With the planning files on disk, a resume took 5.0 turns on average; a raw agent took 13.3.** Planning-file recovery plus hook injection put phase state in front of the model before its first tool call, and the same run found no correctness penalty anywhere. This internal v1 used the earlier default transcript catchup; current automatic recovery is file-only and has not been re-benchmarked under the same protocol. Contributors can run that current protocol from [examples/file-only-recovery/](examples/file-only-recovery/README.md). Running the fixture is not a new measurement of the 5.0 or 13.3 figures. An animated summary lives at [docs/benchmark/index.html](docs/benchmark/index.html) ([rendered view](https://htmlpreview.github.io/?https://github.com/OthmanAdi/planning-with-files/blob/master/docs/benchmark/index.html)).
-
-[Full methodology and results](docs/evals.md) · [Technical write-up](docs/article.md)
-
 <details id="full-reference">
-<summary><strong>📚 Commands and extended reference</strong></summary>
+<summary><strong>📚 Commands, Multi-agent runs, Benchmarks &amp; more</strong> <code>[15 sections]</code></summary>
 
 ### Long-run safeguards
 
@@ -559,6 +491,25 @@ One skill, three integration tiers. Know what your agent gets before you install
 
 Per-platform setup guides, discovery paths and sandbox runtimes are in the collapsible sections below [First-class hosts: native plugins](#first-class-hosts-native-plugins).
 
+
+<a id="readme-nav-multi-agent"></a>
+
+## Multi-agent runs: orchestrators, workers and subagents
+
+> **NOTE**
+> **Markdown on disk is the shared state between agents.** One orchestrator owns `task_plan.md` and the shared summaries; every worker appends to its own ledger or assigned file. Pin each independent task with `PLAN_ID` before starting its host, or use separate worktrees.
+
+- **Run ledger per agent.** Workers append one JSON line per event to `.planning/<id>/ledger-<agent>.jsonl` (`ledger-append.sh`); `ledger-summary.sh` synthesizes a fixed-shape, KV-cache-stable block from all ledgers that replaces the raw `progress.md` tail in autonomous and gated mode. No free text from disk reaches the model through that block.
+- **Plan isolation per task.** `init-session.sh "<name>"` gives each parallel task its own `.planning/YYYY-MM-DD-<slug>/` directory; `PLAN_ID` pins a terminal to one of them, `set-active-plan.sh --list` shows available plans and phase counts, and `set-active-plan.sh <id>` switches the shared pointer.
+- **Threads whose cwd is a shared parent.** `PWF_PLAN_ROOT=<absolute path>` binds an agent thread to the project that owns the plan; an ambiguous cwd, where a nested project carries its own planning state, injects nothing rather than guessing.
+- **Session attachment.** An `.attached` marker authorizes context but does not select a task. In the Codex, Hermes, Pi, and standalone hook routes, armed isolation with multiple plans requires `PLAN_ID`; otherwise context is refused. A project-root pin alone cannot distinguish tasks within that root.
+- **Parallel-write guard.** The next turn warns if checked items or completed phases decrease. This is an advisory check after the write, not a lock or merge mechanism. It does not detect every overwritten plan, `progress.md`, or `findings.md`.
+- **Stall-aware gate.** The completion gate reads the ledger, not `progress.md` mtime, so a worker that stopped producing events releases the stop instead of looping.
+- **One plan, many hosts.** Claude Code, Codex, Pi, Hermes and OpenCode read the same files, the same `.attestation` and the same gate counters, so a plan can be handed from one agent to another mid-run.
+
+The contract and the `.mode` tokens are specified in the skill itself ([SKILL.md, Autonomous and Gated Modes](skills/planning-with-files/SKILL.md#autonomous-and-gated-modes-v3)) and in [docs/long-running-agent-tasks.md](docs/long-running-agent-tasks.md).
+
+To find a saved plan, run the installed `scripts/set-active-plan.sh --list` helper from your project directory, or `scripts/set-active-plan.ps1 -List` in PowerShell. It lists named plans under that project's `.planning/` directory, with phase counts for the shipped English and translated templates. `[active]` marks the shared default pointer. Listing does not select a plan or attach a session; use the displayed ID as `PLAN_ID` before starting a concurrent task. Kiro's separate `.kiro/plan` layout is not part of this inventory.
 
 ## How It Works
 
@@ -748,6 +699,53 @@ Pi runtime modes:
 > A note from the author: this project blew up in less than 24 hours, and everyone who starred, forked, shared, and shipped fixes is the reason it kept going. If the skill helps you work smarter, that is all I wanted. Thank you.
 
 ---
+
+<a id="reference"></a>
+
+<a id="readme-nav-reference"></a>
+
+## Reference
+
+Everything below is the proof and the reference half: the benchmarks and their limits, what lands in your project and what the repository ships, and every guide in `docs/`. Release history and community projects sit in the collapsible sections below [First-class hosts: native plugins](#first-class-hosts-native-plugins).
+
+| | |
+|---|---|
+| [Benchmark Results](#benchmark-results) | The eval run, the blind A/B, the recovery benchmark, and their disclosed limits |
+| [File Structure](#file-structure) | What lands in your project, and the repository layout |
+| [Documentation](#documentation) | Every guide in `docs/` |
+
+<a id="readme-nav-benchmark"></a>
+
+## Benchmark Results
+
+> **Methodology note:** the 96.7% figure comes from the v2.21.0 evaluation run on `claude-sonnet-4-6` (2026-03-06). It measures file-pattern fidelity (does the agent create and maintain the 3-file structure), not goal-drift over long autonomous runs. Newer models and the autonomous-mode work are not yet covered by this number. Full methodology, dataset, and assertion list: [docs/evals.md](docs/evals.md).
+
+Evaluated with Anthropic's [skill-creator](https://github.com/anthropics/skills/tree/main/skills/skill-creator) framework: skill v2.21.0, model `claude-sonnet-4-6`, 2026-03-06. 10 parallel subagents, 5 task types, 30 objectively verifiable assertions, 3 blind A/B comparisons.
+
+<p align="center">
+  <img src="media/benchmark-skill-vs-baseline.svg" width="860" alt="Eval results, with skill vs without: assertions passed 29 of 30 vs 2 of 30, 3-file pattern followed 5 of 5 vs 0 of 5, blind A/B wins 3 of 3 vs 0 of 3, average rubric score 10.0 vs 6.8">
+</p>
+
+| Test | with_skill | without_skill |
+|------|-----------|---------------|
+| Pass rate (30 assertions) | **96.7%** (29/30) | 6.7% (2/30) |
+| 3-file pattern followed | 5/5 evals | 0/5 evals |
+| Blind A/B wins | **3/3 (100%)** | 0/3 |
+| Avg rubric score | **10.0/10** | 6.8/10 |
+
+### Recovery after a context wipe
+
+> **Internal benchmark, v1 (2026-07-06).** Author-run against v3.4.0, harness-authored tasks, deterministic grading, no LLM grades anything. Treat it as the project's own measurement, not an independent comparison. Full method, arms, disclosed limits, and grader validation: [docs/evals.md](docs/evals.md#test-5-competitive-benchmark-v1-seven-planning-methods-head-to-head-2026-07-06-internal).
+
+Protocol: the session is hard-stopped at roughly half done, and a fresh session is told only "Continue the work in this directory." Every graded run across every arm ended pytest-green (77/77), so the difference is re-orientation cost, not correctness.
+
+<p align="center">
+  <img src="media/recovery-turns.svg" width="860" alt="Turns to resume after a context wipe, internal benchmark v1: 5.0 with planning-with-files, 13.3 for a raw agent with no planning method">
+</p>
+
+**With the planning files on disk, a resume took 5.0 turns on average; a raw agent took 13.3.** Planning-file recovery plus hook injection put phase state in front of the model before its first tool call, and the same run found no correctness penalty anywhere. This internal v1 used the earlier default transcript catchup; current automatic recovery is file-only and has not been re-benchmarked under the same protocol. Contributors can run that current protocol from [examples/file-only-recovery/](examples/file-only-recovery/README.md). Running the fixture is not a new measurement of the 5.0 or 13.3 figures. An animated summary lives at [docs/benchmark/index.html](docs/benchmark/index.html) ([rendered view](https://htmlpreview.github.io/?https://github.com/OthmanAdi/planning-with-files/blob/master/docs/benchmark/index.html)).
+
+[Full methodology and results](docs/evals.md) · [Technical write-up](docs/article.md)
 
 ## File Structure
 

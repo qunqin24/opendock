@@ -9,7 +9,8 @@ cannot call, miss models it can, and get no context limits or capabilities for
 Zeldoc's own models. This plugin asks Zeldoc which models your key has and
 builds the model picker from that answer. When a model is removed from your key,
 it disappears from OpenCode on the next start (OpenCode 1) or within minutes
-(OpenCode 2).
+(OpenCode 2). On OpenCode 2 it also routes the `websearch` tool through
+[Zeldoc.ai's private search](#web-search-opencode-2).
 
 ## How it works
 
@@ -124,6 +125,31 @@ your key's models. OpenCode 2 keeps a background service running between
 sessions, so there the plugin also refreshes the list every 5 minutes and as
 soon as you log in with a different key.
 
+## Web search (OpenCode 2)
+
+On OpenCode 2 the plugin also adds **Zeldoc.ai** as a provider for the built-in
+`websearch` tool, using the same key as the models (including a pinned key).
+Queries go to Zeldoc.ai's private search, `POST /v1/search/zeldoc-search`. See
+[Web search](https://docs.zeldoc.ai/web-search/) for what leaves your machine.
+
+The plugin makes Zeldoc.ai the default provider. Without that, OpenCode 2 asks
+on the first search and, if you choose *Allow*, spreads queries randomly over
+all its built-in providers (Exa, Firecrawl, Parallel, Tavily and TinyFish). A
+`websearch` entry in your config wins over the plugin:
+
+```jsonc
+{
+  "websearch": { "provider": "zeldoc" } // explicit; same as the plugin's default
+  // "websearch": false                 // turns web search off
+}
+```
+
+OpenCode only hands search providers the query, so Zeldoc search's
+`time_range`, `language` and `engines` options are not available here.
+
+OpenCode 1 has no search-provider API. There, use the custom tool from the
+[Web search](https://docs.zeldoc.ai/web-search/#opencode-1) page.
+
 ## Troubleshooting
 
 ### Only ZDev shows up
@@ -134,7 +160,7 @@ OpenCode is showing the models.dev list: either the plugin is not installed
 OpenCode 2), or it could not get your key's list.
 
 To see why, in OpenCode 2 run `/zeldoc-debug` in a session. It refreshes the
-list, then adds a short report to the session without starting a model turn:
+list, then adds a short report to the session, which the model replies to:
 the plugin and OpenCode versions, where the key came from (a pin, a stored
 login or `ZELDOC_API_KEY`), the models it got, and why the last fetch failed.
 The report never contains the key itself, only the first 8 characters of its
@@ -143,8 +169,8 @@ writes the reason to its log instead, from the service `opencode-zeldoc`.
 
 A sandbox that keeps a placeholder in `ZELDOC_API_KEY` and lets a proxy add the
 real key on the way out must add it to `GET /v1/zeldoc/models` too, not only to
-chat requests. Otherwise chats work, the list fails with `401 Missing API key`,
-and you see only ZDev.
+chat requests, and to `POST /v1/search/zeldoc-search` for web search. Otherwise
+chats work, the list fails with `401 Missing API key`, and you see only ZDev.
 
 ## Develop
 

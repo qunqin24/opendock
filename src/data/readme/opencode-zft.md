@@ -33,8 +33,8 @@ coverage claims.
 
 ZFT (Zero-Friction Traceability) is the product, repository, Python package,
 and CLI name (decision 2026-09-17, supersedes the 2026-09-13 note that kept
-the `traceagent` import package and the 2026-09-12 note that kept
-`traceagent` canonical). Run state lives under `.zft/`; dated logs retain
+the `zft` import package and the 2026-09-12 note that kept
+`zft` canonical). Run state lives under `.zft/`; dated logs retain
 the old codename.
 
 ## Where zft sits
@@ -69,7 +69,7 @@ flock-core); the names are neighbors, the layers are different.
 
 ## Honest state
 
-**Version.** 0.2.0 — the first stable cut (2026-09-29), live on PyPI.
+**Version.** 0.2.1 — leak-free maintenance cut (2026-10-15), live on PyPI.
 Requires **Python 3.12+**; the `zft` console script is the only entry point.
 
 **Battle-tested.** The gates police this repository's own development: the
@@ -230,7 +230,7 @@ a documented ceiling, see `plugins/codex/README.md`).
 | Harness | Artifact | Dispatch boundary | Edit boundary | Completion boundary | Doc |
 | --- | --- | --- | --- | --- | --- |
 | **opencode** | npm `opencode-zft` (or copy `zft-gate.ts` + `zft-lint-gate.js`) | ✅ `task` tool wrapped: writer dispatches need `[contract: <name>]`, blocks before spawn, coverage verdict after; **main-session binding gate**: a deliverable edit before any recorded binding is blocked until the session binds (`zft task-gate before --subagent main ...`) | ✅ `zft lint` on every `.zft/**` edit (observe/enforce) | coverage verdict surfaced to the orchestrator | [`.opencode/plugins/README.md`](.opencode/plugins/README.md) |
-| **zcode** | `plugins/zft-gates` (marketplace `dev-traceagent-zcode`) or workspace `.zcode/config.json` | — (workflow carried by the skill) | ✅ PostToolUse L0 on `.zft/**` edits (observe/enforce) | ✅ Stop gate: `zft check` before *any* session may stop, subagent or main | [`plugins/zft-gates/README.md`](plugins/zft-gates/README.md) |
+| **zcode** | `plugins/zft-gates` (marketplace `dev-zft-gates`) or workspace `.zcode/config.json` | — (workflow carried by the skill) | ✅ PostToolUse L0 on `.zft/**` edits (observe/enforce) | ✅ Stop gate: `zft check` before *any* session may stop, subagent or main | [`plugins/zft-gates/README.md`](plugins/zft-gates/README.md) |
 | **Codex** | `plugins/codex` (skill + PostToolUse hook) | — (workflow carried by the skill) | ✅ PostToolUse L0 on `.zft/**` edits (observe/enforce) | — | [`plugins/codex/README.md`](plugins/codex/README.md) |
 | **pre-commit** | `.pre-commit-hooks.yaml` (`zft-lint`, `zft-check`) | — | ✅ at commit time (`zft-lint`) and pre-push (`zft-check`: L0 + L2-fast + gherkin) | — | [`.pre-commit-hooks.yaml`](.pre-commit-hooks.yaml) |
 
@@ -256,13 +256,13 @@ cp .opencode/skills/zft/SKILL.md ~/.config/opencode/skills/zft/SKILL.md
 # restart opencode, then scaffold a clause + contract (see .opencode/plugins/README.md)
 ```
 
-**zcode**: install *ZFT Gates* from the `dev-traceagent-zcode` marketplace
+**zcode**: install *ZFT Gates* from the `dev-zft-gates` marketplace
 (this repo's `plugins/` directory is the marketplace root), or wire the
 workspace hooks by hand — both documented in
 [`plugins/zft-gates/README.md`](plugins/zft-gates/README.md). **Codex**: a
 symlink for the skill plus one hook table, in
 [`plugins/codex/README.md`](plugins/codex/README.md). **pre-commit**: add
-this repo with `rev: v0.2.0` and pick `zft-lint` / `zft-check` — see the
+this repo with `rev: v0.2.1` and pick `zft-lint` / `zft-check` — see the
 usage header in [`.pre-commit-hooks.yaml`](.pre-commit-hooks.yaml).
 
 ```

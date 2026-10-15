@@ -28,7 +28,9 @@ feet.
   before any tokens are spent, and an in-flight turn that blows past the limit
   mid-run is aborted.
 - **Warnings.** One-off toasts at 50%, 80% and 95% of the limit, so spend is
-  visible before it becomes a wall.
+  visible before it becomes a wall, plus one when the limit is reached or
+  changed. Toasts come from the TUI entry, so they need the sidebar plugin
+  enabled.
 - **Sidebar block.** A progress bar, amount spent, and percentage used, rendered
   directly under the built-in Context block.
 
@@ -43,7 +45,7 @@ feet.
 
 ## Requirements
 
-- opencode **1.18** or newer.
+- opencode **2.0** or newer. (For opencode 1.x, use `opencode-budget-limit@1.0.2`.)
 - macOS or Linux. Windows is not supported.
 
 ## Install
@@ -58,15 +60,9 @@ config files. `opencode plugin` reads the package's `exports`, notices both
 targets, and writes each one into the right file for you: the server entry into
 `opencode.json` and the TUI entry into `tui.json`.
 
-Then add the slash command at `~/.config/opencode/commands/budget.md`:
-
-```markdown
----
-description: Show or change the spend limit for this session
----
-
-budget $ARGUMENTS
-```
+The server plugin registers its own `/budget` command, so there is no separate
+markdown command file to install. If you are upgrading from 1.x, delete
+`~/.config/opencode/commands/budget.md` — it is now redundant.
 
 Restart opencode.
 

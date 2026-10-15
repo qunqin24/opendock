@@ -238,7 +238,7 @@ to unthemed text rather than throwing.
 | [opencode-usage-quota-tracker](https://github.com/ranjithrajv/opencode-usage-quota-tracker) | Live provider quota + usage in sidebar footer                  |
 | [opencode-model-recommender](https://github.com/ranjithrajv/opencode-model-recommender)     | Model recommendations by cache ratio, token cost, session cost |
 | [opencode-skill-lister](https://github.com/ranjithrajv/opencode-skill-lister)               | Skills list in sidebar                                         |
-| [opencode-plugin-manager](https://github.com/ranjithrajv/opencode-plugin-manager)           | Plugin manager in sidebar                                      |
+| [opencode-plugin-browser](https://github.com/ranjithrajv/opencode-plugin-browser)           | Plugin manager in sidebar                                      |
 
 Install from the registry:
 

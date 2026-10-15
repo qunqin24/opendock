@@ -91,6 +91,73 @@ missing (`ctx.tool`, `ctx.session`, `ctx.storage`, an absolute `ctx.location.dir
 skipped, and the other mechanism stays active. Disposal attempts every registration in reverse
 registration order, so one failing disposer cannot leave the rest registered.
 
+## Measured behavior (2026-10-12/13 A/B campaigns)
+
+Numbers below come from arm-controlled runs (same model, same prompt, same repo
+state; plugin off vs on) measured with [`benchmarks/`](./benchmarks/). Every
+figure here re-runs from the raw NDJSON captures with the committed
+`benchmarks/measure.py`; per-round-trip and peak context are the
+projection-controlled metrics, while run *totals* also scale with agent-chosen
+step counts, which is itself arm-sensitive.
+
+Lanes and scope: host OpenCode 2.0.27. Review bundle (n=4 per arm, 2026-10-13)
+on `opencode-go/gpt-5.6-luna#high`. Audit fan-out over a pinned OpenWrt repo,
+5 areas (n=8 pairs, 2026-10-12/13), all on free-tier lanes:
+`mimo-v2.6-flash-free`, `nemotron-3.5-lightning-free`,
+`nemotron-3-ultra-free`, plus `muse-spark-1.3-contributor-free` on the
+plugin arm.
+
+**Observation Pack**
+- Review-sized sessions, medians (min–max over 4 runs/arm): **avg context per
+  provider round-trip 82,292 (71,214–93,470) → 70,807 (58,309–80,226) with the
+  imperative wording, −14%**, and **→ 63,908 (60,796–65,728) with the
+  availability-style placeholder, −22%**. **Peak session context 116,094 →
+  92,150 (−21%)** and **→ 80,856 (−30%)**. The placeholder arm needed ~1.5× the
+  provider round-trips (median 14→21) where the imperative arm needed ~2.4×
+  (14→33): the wording buys round-trips, not only context.
+- Audit-style sessions (7 off-vs-plugin pairs, same model + prompt per pair):
+  on the pairs where packing engaged **and neither arm hit the 730 s watchdog**,
+  billed context fell **−49%** (`n35-docs`: 2,970,491 → 1,524,897; 9 packed
+  objects) and **−80%** (`ultra-docs`: 4,225,138 → 830,894; 10 packed objects),
+  with peak **−26%** / **−46%**. Pack coverage: 9 objects over 8 over-gate
+  results, and 10 over 9.
+- Two disclosures, because the pairs above are a subset:
+  - **A gate-crossing pair went the other way.** `mimo-backend` packed 9
+    objects and billed **+10.8%** (532,918 → 590,419). Both its arms were killed
+    at the 730 s cap, so its totals are not comparable — and neither is
+    `mimo-build-ci`'s −31%, the low end of any "−31% to −80%" style range, which
+    was likewise truncated on both arms. Truncated pairs are excluded here
+    rather than counted on the side that flatters the result.
+  - **Small sessions show no projection effect either way.** `mimo-tests`
+    (0 objects, −0.3% billed) is genuinely inert. `mimo-docs` (0 objects) shows
+    **+178%** at 2 vs 5 round-trips, which is the step-count effect above, not a
+    projection regression.
+- Placeholder wording matters: the availability-style placeholder (since 0.1.1)
+  beat the imperative "call obs_recall" phrasing by 13–37% in billed context and
+  23–44% in provider round-trips (two families re-measured from captures, one
+  taken from the campaign tables); runs carrying the imperative never recalled
+  (0 across all of them), while neutral-wording runs recalled spontaneously when
+  archived bytes were actually needed.
+- Short sessions (~2 provider sends) never see a placeholder at all (recent
+  results stay verbatim by design); projection savings require session length.
+
+**Action Fusion**
+- `then_run` is exposed on `edit`/`write` with optional `shell`, works when
+  used (allow/reject/fail/blank paths verified), and **no free-tier model
+  adopted it in the two plugin-arm fixer sessions that ran** (`n35`, `nu`; the
+  other two planned fixer lanes failed in ~10 s on daily quota) where the prompt
+  merely permitted it — agents serialized edit → shell regardless. The two
+  off-arm sessions in that batch say nothing about adoption: without the plugin,
+  `then_run` is unavailable. Fusion is currently opt-in-by-capability, not a
+  measured win; treat it as scaffolding.
+
+See [`benchmarks/README.md`](./benchmarks/README.md) for the protocol, the
+method rules that make these numbers citable, and how to regenerate them.
+
+The merge rule for a model-visible change — schema text, result text, an archive
+chunk boundary, or a failure path that replaces a silent drop — is in
+[`docs/quality-guard.md`](./docs/quality-guard.md).
+
 ## Provenance
 
 Portable algorithms are copied from SoL-Pi (MIT, NVIDIA copyright). Reference commit: `e1a586af0ad8956f42ae5b26bba20e48fbf30e00`.

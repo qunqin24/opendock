@@ -258,9 +258,9 @@ after changing the plugin list.
 ### Build the local artifact
 
 The artifact ships the plugin as a **locally packed tarball** that bundles the
-private `@jevguard/core` and `@jevguard/opencode-adapter` workspace code, so a
-clean consumer installs one tarball and never resolves a workspace link or a
-private registry package. It also packages the `jevguard-rules` and `jev-init`
+private `@jevguard/core`, `@jevguard/node-infra` and `@jevguard/opencode-adapter`
+workspace code, so a clean consumer installs one tarball and never resolves a
+workspace link or a private registry package. It also packages the `jevguard-rules` and `jev-init`
 skills and their private validators under `skills/<name>/`.
 
 Build the tarball from this repository:
@@ -533,11 +533,16 @@ its runtime, which keeps the evaluation model portable to future adapters.
 ```text
 packages/
 ├── core/                 domain, policy, evaluation, gate
+├── claude-code-adapter/  Claude Code tool-attributed units, hook and review worker
+├── claude-code-plugin/   Claude Code plugin composition and artifact
+├── node-infra/           shared Node infra: credentials, Jev transport, policy, history
 ├── opencode-adapter/     OpenCode attribution and presentation
 ├── plugin/               OpenCode composition root and CLI
 └── testkit/              fixtures and contract helpers
 
-plugin → opencode-adapter → core
+plugin → opencode-adapter → node-infra → core
+plugin ────────────────────→ node-infra
+testkit ──────────────────────────────→ core
 ```
 
 ## Status

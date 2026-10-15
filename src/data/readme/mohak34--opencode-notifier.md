@@ -459,6 +459,8 @@ tmux source-file ~/.tmux.conf
 
 When `suppressWhenFocused` is `true` (the default), popups, sounds, bells, and V1 event commands are skipped when the terminal running OpenCode is focused. Supported terminal and multiplexer pane checks also apply. V2 server event commands run independently of local focus.
 
+On macOS, focus detection reads the app name from either the `lsappinfo` name=value output or its multiline application report. If no valid name can be extracted, it falls back to AppleScript (`System Events`). Failed queries keep notifications enabled.
+
 To disable this and always get notified:
 
 ```json
@@ -507,7 +509,7 @@ Work from third-party delegation plugins without native child-session events, or
 
 | Platform                                 | Method                                   | Requirements          | Status                         |
 | ---------------------------------------- | ---------------------------------------- | --------------------- | ------------------------------ |
-| macOS                                    | AppleScript (`System Events`)          | None                  | Untested                       |
+| macOS                                    | `lsappinfo`, then AppleScript (`System Events`) | None           | Untested                       |
 | Linux X11                                | `xdotool`                              | `xdotool` installed | Untested                       |
 | Linux Wayland (Hyprland)                 | `hyprctl activewindow`; legacy or Lua (0.55+) `dispatch` for click-to-focus | None | Tested (0.56.2, Lua config) |
 | Linux Wayland (Niri)                     | `niri msg --json focused-window`       | None                  | Tested                         |

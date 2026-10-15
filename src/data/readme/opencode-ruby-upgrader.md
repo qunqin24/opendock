@@ -88,7 +88,7 @@ Use `/ruby-upgrade --dry-run` for a no-write inventory and proposed migration as
 
 ### Local credentials and environment files
 
-`git worktree add` only checks out files tracked by Git. Untracked files (such as `.env`, local credential files, `config/database.yml.local`, or project-specific test environment configuration) are **not** copied from your main worktree to the new linked worktree. If your specs or local test setup require environment variables or credentials to run, you must manually create or copy them into the new worktree (`../<repo>-ruby-<target>/`). The agent never creates, copies, or commits credentials or secrets.
+`git worktree add` only checks out files tracked by Git. Untracked files (such as `.env`, local credential files, `config/database.yml.local`, or project-specific test environment configuration) are **not** copied from your main worktree to the new linked worktree. `git worktree add` only checks out files tracked by Git. Untracked files (such as `.env`, local credential files, `config/database.yml.local`, or project-specific test environment configuration) are **not** copied from your main worktree to the new linked worktree. If your specs or local test setup require environment variables or credentials to run, you must manually create or copy them into the new worktree (`../<repo>-ruby-<target>/`). The agent never creates, copies, or commits credentials or secrets, and its permission policy blocks it from reading or editing `.env`/`.env.*` files (`.env.example` stays readable).
 
 
 
@@ -97,7 +97,7 @@ Use `/ruby-upgrade --dry-run` for a no-write inventory and proposed migration as
 The agent has completed a real end-to-end migration against a public fixture: [`ruby2-rails4-bootstrap-heroku`](https://github.com/lilla021/ruby2-rails4-bootstrap-heroku) (BSD-2-Clause) moved from **Ruby 2.4.10 / Rails 4.2.11.3** to **Ruby 3.4.10 / Rails 7.1.6** across 15 receipt-backed hops. Every hop was validated by `bundle exec rspec` in an isolated Docker container, then committed as a local checkpoint before the next hop began.
 
 - [Upgrade pull request](https://github.com/lilla021/ruby2-rails4-bootstrap-heroku/pull/1) — the full migration: 19 commits, one per reviewed step, with lint and spec checks currently passing on GitHub Actions.
-- [Evidence ledger](https://github.com/lilla021/opencode-ruby-upgrader/blob/v0.1.9/E2E_EVIDENCE.md) — every hop's validation receipt, commit SHA, and the fixes the migration required.
+- [Evidence ledger](https://github.com/lilla021/opencode-ruby-upgrader/blob/v0.1.19/E2E_EVIDENCE.md) — every hop's validation receipt, commit SHA, and the fixes the migration required.
 
 This proves the workflow works on a genuinely old, real-world Rails stack. It does not claim every upgrade is safe — see [Safety model](#safety-model) for what the agent refuses to do without you, and [Product limits](#product-limits) for what it cannot prove.
 
@@ -119,7 +119,7 @@ Every hop declares its expected changed files before commit. The commit gate blo
 
 ## Security boundaries
 
-The agent defaults unknown shell commands to an OpenCode confirmation prompt. Git inspection is allowed, while direct Git mutation, GitHub CLI, publishing, and shell chaining/pipes/substitutions are denied. Dependency installation/updates, recognized tests, state writes, `commit-hop`, and `commit-rails-hop` require confirmation. This protects against accidental agent actions, not malicious project code: dependency installation and tests execute project-controlled code with your local user permissions. Use an isolated environment for repositories you do not trust, and review any command OpenCode asks you to approve.
+The agent defaults unknown shell commands to an OpenCode confirmation prompt. Read-only inspection is allowed — Git queries plus the CLI's own `preflight`, `status`, `inventory`, `supply-chain`, and `git-capabilities`. Direct Git mutation, GitHub CLI, publishing, and shell chaining/pipes/substitutions are denied. Dependency installation/updates, recognized tests, runtime preparation, state-machine writes, and every `commit-*` command (Ruby, Rails, and Bundler) require confirmation. The agent is also denied reading or editing `.env`/`.env.*` files (`.env.example` stays readable), denied reaching secret-file paths through the shell, and denied subagent delegation, which would otherwise drop these gates. This protects against accidental agent actions, not malicious project code: dependency installation and tests execute project-controlled code with your local user permissions. Use an isolated environment for repositories you do not trust, and review any command OpenCode asks you to approve.
 
 New reports require `record-executed-iteration --validation <id>` or `record-executed-rails-iteration --validation <test-id>`; asserted results cannot be recorded or committed. The accepted IDs map to fixed no-shell commands: `bundle-rspec`, `bundle-rails-test`, `bundle-rake-test`, `bin-rails-test`, and, for Rails bridges, `rails-app-update`. When the target Ruby is unavailable on your host, the agent runs `prepare-target-runtime --ruby <x.y.z>` after selecting the exact target patch release. One confirmation provisions labeled per-run Ruby and isolated database Docker resources, installs Node, installs Bundler 2.4.22, runs `bundle install`, and, for Rails, creates the isolated test database.
 
@@ -157,11 +157,11 @@ Every run has a generated JSON record and Markdown companion under `.ruby-upgrad
 
 As an example, here is one such run rendered in the dashboard — per-hop summaries, test metrics, and citation links. The full process and per-hop detail live in the run reports themselves:
 
-![Example of the local evidence dashboard](https://raw.githubusercontent.com/lilla021/opencode-ruby-upgrader/v0.1.9/docs/dashboard.png)
+![Example of the local evidence dashboard](https://raw.githubusercontent.com/lilla021/opencode-ruby-upgrader/v0.1.19/docs/dashboard.png)
 
 The same reports open as a vault — each run is a Markdown note paired with its JSON record:
 
-![Example vault view: run reports as paired Markdown and JSON notes](https://raw.githubusercontent.com/lilla021/opencode-ruby-upgrader/v0.1.9/docs/vault.png)
+![Example vault view: run reports as paired Markdown and JSON notes](https://raw.githubusercontent.com/lilla021/opencode-ruby-upgrader/v0.1.19/docs/vault.png)
 
 ### Infrastructure review (advisory)
 
@@ -187,7 +187,7 @@ A Ruby upgrade occasionally cannot cross a version boundary on its own. Two case
 
 ### Rails bridge
 
-If a resolved Rails version blocks the next Ruby hop, that Ruby run becomes terminal and a separate Rails-bridge run takes over. See the [Rails bridge lifecycle](https://github.com/lilla021/opencode-ruby-upgrader/blob/v0.1.9/docs/rails-bridge.md) reference.
+If a resolved Rails version blocks the next Ruby hop, that Ruby run becomes terminal and a separate Rails-bridge run takes over. See the [Rails bridge lifecycle](https://github.com/lilla021/opencode-ruby-upgrader/blob/v0.1.19/docs/rails-bridge.md) reference.
 
 ### Bundler bridge
 
@@ -204,7 +204,7 @@ npx opencode-ruby-upgrader record-bundler-bridge --report <run>.json \
 
 A bridge cannot be approved for a pin that already clears the floor, so this cannot block a hop for no reason. The bridge run then researches a contiguous Bundler ladder (`begin-bundler-bridge`, `record-bundler-research`), and a hop is recorded only when the rewritten `BUNDLED WITH` pin **and** the Bundler that actually executed the tests both match the target. Because Bundler 4.0 follows 2.7 directly, the ladder may cross that boundary in a single hop.
 
-Full lifecycle detail: [docs/bundler-bridge.md](https://github.com/lilla021/opencode-ruby-upgrader/blob/v0.1.9/docs/bundler-bridge.md).
+Full lifecycle detail: [docs/bundler-bridge.md](https://github.com/lilla021/opencode-ruby-upgrader/blob/v0.1.19/docs/bundler-bridge.md).
 
 ## Recovery
 
@@ -251,7 +251,7 @@ The credential scanner is heuristic: it recognizes common token formats and quot
 
 No telemetry, no analytics, and no report uploads. Migration evidence is written only under `.ruby-upgrades/` in the current worktree — run reports under `.ruby-upgrades/runs/` and nonsecret runtime metadata in `.ruby-upgrades/runtime.json` — and the dashboard binds to `127.0.0.1` only. Reports may contain target versions, branch names, commit SHAs, changed-file names, dependency source origins, citations, and bounded validation metadata — absolute local paths and recognized credentials are redacted, but redaction is best-effort. Prepared Docker containers, networks, and images stay on your machine and are labelled with the run ID and a one-way hash of the worktree path, never the path itself.
 
-Full detail in [PRIVACY.md](https://github.com/lilla021/opencode-ruby-upgrader/blob/v0.1.9/PRIVACY.md). To report a vulnerability, see [SECURITY.md](https://github.com/lilla021/opencode-ruby-upgrader/blob/v0.1.9/SECURITY.md).
+Full detail in [PRIVACY.md](https://github.com/lilla021/opencode-ruby-upgrader/blob/v0.1.19/PRIVACY.md). To report a vulnerability, see [SECURITY.md](https://github.com/lilla021/opencode-ruby-upgrader/blob/v0.1.19/SECURITY.md).
 
 ## Contributing
 

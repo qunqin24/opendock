@@ -24,7 +24,7 @@ The setup wizard:
 Then start OpenCode with a SimpleLLM model:
 
 ```bash
-opencode --model simplellm/Qwen3-Coder-30B-A3B-Instruct
+opencode --model simplellm/glm-5.3-flash
 ```
 
 Re-run the command any time models or your URL change — it **merges** into your existing OpenCode config without overwriting other providers.
@@ -51,6 +51,28 @@ import { SimpleLLMPlugin, discoverModels } from '@simplellm/opencode-provider'
 ```
 
 `SimpleLLMPlugin` is an OpenCode plugin factory; `discoverModels()` fetches the current model list from a SimpleLLM instance.
+
+## Output budget
+
+Setup and model discovery use a **32,000-token output budget**, capped at the
+context length for smaller contexts. This follows OpenCode v1.18.18’s default client budget; it is not
+a verified maximum or a guarantee of support by every model. Context length is kept separately from
+the catalogue; output is no longer guessed as half of that context.
+
+Existing configurations are not changed automatically. To apply this manually,
+keep both fields under `provider.simplellm.models.<model-id>.limit`, for example:
+
+```json
+"limit": { "context": 1048576, "output": 32000 }
+```
+
+Adjusting an output budget does not establish the cause of unrelated request
+errors. Increase it only within the limits supported by the selected endpoint.
+
+Live verification on 2026-10-15: 25 of 26 enabled models completed streaming
+requests with `max_tokens: 32000` through the public API. Qwen3-32B returned
+`model_unavailable` with both 32000 and 128. This checks acceptance with a short
+prompt, not generation of 32,000 tokens or a full context window.
 
 ## Development
 

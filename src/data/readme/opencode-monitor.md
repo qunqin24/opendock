@@ -30,9 +30,9 @@ An agent that needs to wait for something otherwise has two bad options:
   the actual condition, and freezes the agent.
 
 `monitor` moves the waiting into the shell. It arms a long-lived watcher and
-**pushes each stdout line back into the session as a new turn**, so the agent
-wakes per event without re-arming. The call returns immediately with a monitor
-id; the agent spends roughly zero effort while parked.
+**pushes each matching stdout line into the session**: idle agents wake, and
+active runs receive steering at the next model-turn boundary. The call returns
+immediately with a monitor id; the agent spends roughly zero effort while parked.
 
 ## Quick example
 
@@ -46,8 +46,8 @@ monitor({
 })
 ```
 
-The call returns a monitor id immediately. Each matching line then arrives as its
-own wake, tagged with the label:
+The call returns a monitor id immediately. Each matching line then arrives as a
+notification, tagged with the label:
 
 ```
 <monitor id="m_1a2b3c4d" line="7" label="app errors">
@@ -67,13 +67,31 @@ monitor disappears from the registry and the sidebar:
 `monitor` always arms a **streaming** watcher — every stdout line becomes a wake.
 It takes:
 
-| field             | required | meaning                                                        |
-| ----------------- | -------- | -------------------------------------------------------------- |
-| `command`         | yes      | shell command to run and watch                                 |
-| `description`     | no       | label shown in each wake and the sidebar                       |
-| `ready_pattern`   | no       | regex — only lines matching it wake the agent (omit = all)     |
-| `persistent`      | no       | `true` = run for the whole session; default = bounded          |
-| `timeout_seconds` | no       | bounded watches auto-stop after this (default 300, max 3600)   |
+| # | field             | required | meaning                                                        |
+| - | ----------------- | -------- | -------------------------------------------------------------- |
+| 1 | `command`         | yes      | shell command to run and watch                                 |
+| 2 | `description`     | no       | label shown in each wake and the sidebar                       |
+| 3 | `ready_pattern`   | no       | regex — only lines matching it wake the agent (omit = all)     |
+| 4 | `persistent`      | no       | `true` = run for the whole session; default = bounded          |
+| 5 | `timeout_seconds` | no       | bounded watches auto-stop after this (default 300, max 3600)   |
+| 6 | `steer`           | no       | `true` (default) = deliver during active runs; `false` = wait for each wake's full response |
+
+### Steering vs serialized delivery
+
+By default, events are submitted as they arrive, even while the agent is already
+working or responding to a previous event. OpenCode picks them up at the next
+model-turn boundary; the current streamed response is allowed to finish. An idle
+session is woken immediately. Multiple events can be handled together in the next
+model turn.
+
+Set `steer: false` to keep the previous behavior: submit one event, wait for the
+agent's full response, then submit the next event. Later events remain queued in
+the monitor until that response finishes.
+
+```
+monitor({ description: "deploy events", command: "tail -n0 -f deploy.log",
+          ready_pattern: "READY|FAILED", steer: false })
+```
 
 ### Bounded vs session-length
 
@@ -139,7 +157,8 @@ Each stdout line is forwarded to the session via OpenCode's synchronous
 path — deliberately not the `prompt_async` endpoint, which is silently dropped on
 idle sessions
 ([anomalyco/opencode#21524](https://github.com/anomalyco/opencode/issues/21524)).
-Wakes are serialized one per turn, so a chatty watcher cannot flood the agent.
+Steering delivery does not wait for that request's full agent response before
+submitting the next event. `steer: false` restores one full response per event.
 
 <details>
 <summary><b>Design notes: how the sidebar sees server-side state</b></summary>
@@ -190,6 +209,19 @@ npm run build       # compile dist/tui.js (server.ts is loaded from source)
 npm test            # node:test
 npm run typecheck
 ```
+
+Run the steering integration test against an installed OpenCode executable:
+
+```sh
+OPENCODE_TEST_BINARY=/usr/bin/opencode node --test test/steering-live.test.ts
+```
+
+It starts an isolated OpenCode server with a controlled local model stream and
+checks delivery during streaming, the next model-turn boundary, serialized
+opt-out, and automatic idle wakes. It removes its sessions, watchers, server,
+and temporary state afterward.
+Set `OPENCODE_TEST_PLUGIN` to an installed package's absolute `src/server.ts`
+path to test that package's server entry and monitor manager.
 
 ### Publish
 

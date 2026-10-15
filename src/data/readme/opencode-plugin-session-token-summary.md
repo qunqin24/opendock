@@ -5,13 +5,14 @@
 An OpenCode TUI plugin that adds a compact session-usage panel to the sidebar.
 It aggregates the root session and all nested subagent sessions.
 
-![alt text](image.png)
+![Session Token Summary sidebar panel](sidebar.png)
 
 ## Features
 
 - Compact OpenCode sidebar panel with live session updates
+- Click the panel title to customize visible metrics and see the plugin version
 - Input, output, reasoning, cache read, cache write, and total token counts
-- Cache hit ratio and assistant turn count
+- Cache hit (ratio or percentage) and assistant turn count
 - Usage aggregated across the root session and every nested subagent
 - Reported API costs for metered providers
 - API-equivalent cost estimates for quota and subscription-backed providers
@@ -28,24 +29,23 @@ It aggregates the root session and all nested subagent sessions.
 
 ## OpenCode 2 Install
 
-For a local checkout, run `npm ci`, then replace the existing package entry in
-`~/.config/opencode/cli.json` with the checkout directory. Preserve other plugins and settings:
+Add the npm package to `~/.config/opencode/cli.json`, or replace its existing
+entry. Preserve other plugins and settings:
 
 ```json
 {
   "$schema": "https://opencode.ai/v2/cli.json",
   "plugins": [
-    "/absolute/path/to/opencode-plugin-session-token-summary"
+    "opencode-plugin-session-token-summary@^2"
   ]
 }
 ```
 
-Use the directory, not `tui.tsx`: OpenCode V2 resolves the directory's `tui`
-entrypoint and skips direct-file TUI entries. Restart the TUI if it does not reload.
+OpenCode installs the package from npm automatically. Restart the TUI if it does
+not reload.
 
-After `2.0.0` is published, you can use `opencode-plugin-session-token-summary@^2`
-instead of the local path. The published `0.4.x` package targets the legacy TUI
-plugin API and cannot be used with OpenCode 2.
+The `0.4.x` package targets the legacy TUI plugin API and cannot be used with
+OpenCode 2.
 
 ## OpenCode V1 Install
 
@@ -56,16 +56,42 @@ OpenCode V1 users must install the final legacy release, `0.4.1`:
 3. Enter `opencode-plugin-session-token-summary@0.4.1`.
 
 This creates an entry in `~/.config/opencode/tui.json`. Do not install an
-unversioned package in V1 after `2.0.0` is published, because later releases
-target OpenCode 2.
+unversioned package in V1, because later releases target OpenCode 2.
 
 ## Notes
+
+Click **Session Token Summary** in the sidebar, or press `Ctrl+P` and choose
+**Customize Session Token Summary**, to open the settings popup. Toggle metrics
+with the mouse or use arrow keys and Space. Preferences apply immediately and
+are saved across restarts. Choose **Close** or press Esc to dismiss the popup.
+In short terminals, use arrow keys or the mouse wheel to scroll through settings.
+
+![Session Token Summary settings modal](settings.png)
+
+**Show/hide** controls individual metrics; thinking tokens are off by default
+for new settings. **Options** lets you hide zero-valued rows or display cache
+hit as a percentage. Both options are off by default. The percentage is
+cache reads divided by input tokens plus cache writes and cache reads; the ratio
+is cache reads divided by input tokens plus cache writes. Existing saved metric
+choices are preserved.
+
+**Show cache-miss notices** is off by default. It warns about new suspected misses
+of at least 20K tokens, comparing consecutive completed requests within each
+session, including subagents. It skips the first request, resets after compaction,
+and requires evidence of cache activity. Opening a session or enabling the option
+does not replay historical warnings. Inspired by
+[Pi’s cache-miss heuristic](https://github.com/badlogic/pi-mono/blob/b45e0ebcc5ae2fc42a6f2f23104d10e656e6bedb/packages/coding-agent/src/core/cache-stats.ts),
+this estimates prompt overlap, not confirmed provider failures. Model switches
+and idle gaps are context hints, not proof of the cause. No cost-loss estimate is
+shown; providers that do not report caching cannot be assessed.
 
 The panel reads V2 session totals and paginated assistant messages for the
 selected session and its nested descendants. It limits descendant requests to
 four concurrent operations and keeps the last complete snapshot if a background
 refresh fails. It works with the connected server, including remote servers,
 and needs no separate API key.
+
+With cache-miss notices enabled, message fetching also includes compaction records.
 
 Nonzero cost reported by OpenCode is shown as `$ cost`. For messages with an
 explicit zero cost, the plugin uses OpenCode's model
@@ -82,6 +108,11 @@ npm install
 npm run check
 npm run pack:check
 ```
+
+To load a local checkout in OpenCode 2, run `npm ci`, then replace the npm entry
+in `~/.config/opencode/cli.json` with the checkout's absolute directory path.
+Use the directory, not `tui.tsx`: OpenCode V2 resolves the directory's `tui`
+entrypoint and skips direct-file TUI entries. Restart the TUI if it does not reload.
 
 ## License
 

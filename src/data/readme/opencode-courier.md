@@ -22,7 +22,7 @@ prompt](#demos)).
 ## Quickstart
 
 ```bash
-npm install -g @opencode/cli@2.0.28   # OpenCode V2, at the version courier is tested on
+npm install -g @opencode/cli@2.0.29   # OpenCode V2, at the version courier is tested on
 opencode plugin add opencode-courier  # by name, so OpenCode offers new releases
 opencode                              # in any folder
 ```
@@ -44,9 +44,9 @@ sometimes stall on a request; if nothing moves for a few minutes, send the promp
 
 Courier is built on OpenCode V2's plugin API (`@opencode/plugin`), not the V1 one
 (`@opencode-ai/plugin`), and needs OpenCode V2. Each release is pinned to one V2 version and tested
-against it end to end; the current one is tested on **OpenCode 2.0.28**. CI also runs the live
-suite on the newest OpenCode release, so a host release that breaks the plugin shows up there
-first. Older releases and their versions: [Supported OpenCode version](#supported-opencode-version).
+against it end to end; the current one is tested on **OpenCode 2.0.29**. CI also runs the live
+suite on the newest OpenCode release, on `main` and nightly, so a host release that breaks the
+plugin shows up there first. Older releases and their versions: [Supported OpenCode version](#supported-opencode-version).
 
 ## Courier or the built-in subagent tool?
 
@@ -64,8 +64,9 @@ a self-contained task that needs nothing from you on the way. Use courier when t
 - **Worktree isolation:** `isolate: true` gives a child its own git worktree, so children can edit
   files in parallel; each commits on `courier/<its session ID>` and reports that branch for its
   parent to merge ([nested isolation](docs/reference.md#nested-isolation)).
-- **Relaying to you:** a child's permission requests and questions reach you through the parent,
-  and your answers go back; a form only you can answer is pointed out to you.
+- **Relaying to you:** a child's permission requests and questions reach you through the parent:
+  a request is approved in OpenCode's own permission prompt in the parent's session, never by its
+  model, and your answers go back; a form only you can answer is pointed out to you.
 
 ## How it works
 
@@ -116,6 +117,7 @@ line to the server log naming both ([more](docs/reference.md#the-opencode-versio
 
 | opencode-courier | OpenCode V2 (`opencode` and `@opencode/plugin`) |
 |---|---|
+| 0.5.0, 0.6.0 | 2.0.29 |
 | 0.4.0, 0.4.1 | 2.0.28 |
 | 0.2.3, 0.3.0 | 2.0.26 |
 | 0.2.2 | 2.0.24 |
@@ -124,12 +126,12 @@ line to the server log naming both ([more](docs/reference.md#the-opencode-versio
 | 0.1.6 | 0.0.0-beta-19271 (the beta line: `opencode2` from `@opencode-ai/cli`, and `@opencode-ai/plugin`) |
 
 The [terminal part](#in-the-terminal) relies on the host to provide its UI modules and is tested on
-OpenCode 2.0.28 only; the server part works as before on older V2 hosts from 2.0.4 on.
+OpenCode 2.0.29 only; the server part works as before on older V2 hosts from 2.0.4 on.
 
 Check yours with `opencode --version`, and install the matching CLI with:
 
 ```bash
-npm install -g @opencode/cli@2.0.28
+npm install -g @opencode/cli@2.0.29
 ```
 
 ### The plugin
@@ -161,7 +163,7 @@ From a local clone, `bun install && npm run build`, then list its `dist` **direc
    as `opencode serve` next to it, cannot pass your answer on to a child the other runs
    ([why](docs/reference.md#two-servers-on-one-data-directory)).
 2. Give the agents that run children the permissions their work needs: a child that hits an approval
-   prompt waits until you answer it through its parent. Let them use the `question` tool if they
+   prompt waits until you answer OpenCode's prompt for it in the parent's session. Let them use the `question` tool if they
    should be able to ask you. Choose a web search provider before children search the web (run one
    web search in your own session, or use OpenCode's "Third-party search" setting), or the first
    child to search shows that prompt in its own session, which only you can answer there.
@@ -188,7 +190,7 @@ From a local clone, `bun install && npm run build`, then list its `dist` **direc
 | `courier_tree` | Lists the whole tree under a session, depth first, with each one's depth and report state. |
 | `courier_stop` | Interrupts a session below you and everything under it, and cancels their scheduled messages; `cleanup: true` removes their worktrees too. |
 | `courier_cleanup` | Removes an isolated child's worktree, unless it holds unsaved work, and forgets the child. |
-| `courier_answer` | Passes your answer to a permission request or a question that a session under this one waits on. |
+| `courier_answer` | Answers a permission request that a session under this one waits on, after OpenCode has asked you in this session, or passes your answer to its question. |
 | `courier_later` | Schedules a message for a session (this one by default) in `delayMinutes` or `at` a time. |
 | `courier_cancel` | Drops a message scheduled with `courier_later`. |
 | `courier_subscribe` | Subscribes a session to webhook deliveries for a topic (`owner/repo`, `owner/repo#12` or a name). |
@@ -212,9 +214,11 @@ Each tool's parameters: [the reference](docs/reference.md#the-tools).
   children, a scheduled message or a webhook is not, nor is one that answers what you typed in its
   session. [More](docs/reference.md#a-child-that-fails).
 - **Permission requests and questions reach you.** A child's request or question is passed to the
-  session at the top of its tree, any number of levels down; that session asks you and passes your
-  answer back, or links its own question to the child's so your pick goes straight to it. Whichever
-  answer comes first counts, and the other is withdrawn.
+  session at the top of its tree, any number of levels down. For a request, that session proposes an
+  answer with `courier_answer`, and OpenCode asks you in its own permission prompt, in that session
+  and under its rules, before anything is passed on: its model cannot approve, only propose. For a
+  question, it asks you and passes your answer back, or links its own question to the child's so your
+  pick goes straight to it. Whichever answer comes first counts, and the other is withdrawn.
   [More](docs/reference.md#a-child-that-asks-for-permission).
 - **Some forms only you can answer**, such as OpenCode's web search asking for a provider: the top
   session is told, and you answer in the child's session. [More](docs/reference.md#a-child-that-shows-a-form).
@@ -222,7 +226,8 @@ Each tool's parameters: [the reference](docs/reference.md#the-tools).
   [terminal](#in-the-terminal). [More](docs/reference.md#seeing-and-stopping-a-subtree).
 
 Children, held reports, scheduled messages and open questions survive a compaction or a restart;
-entries are dropped after 14 days ([roster](docs/reference.md#roster)).
+entries are dropped after 14 days, or at once when OpenCode deletes the child, unless it is isolated
+([roster](docs/reference.md#roster)).
 
 ## Session trees
 
@@ -252,27 +257,34 @@ does not. Each spawned session's brief says when to split its task and when to d
 
 The package ships a part for OpenCode's terminal UI, which the TUI loads from the server's plugin
 list; the server half behaves the same whether or not a TUI is attached. In a session that started
-sessions, the prompt's footer shows what the tree under it is doing: how many run, wait on you or
-are idle, and for each [join group](docs/reference.md#join-groups) how many of its members have
+sessions, the prompt's footer shows what the tree under it is doing: how many run, wait on you (a
+permission request, a question or a form they show) or are idle, and for each [join group](docs/reference.md#join-groups) how many of its members have
 reported:
 
 ```
-courier 2 running · 1 waiting on you · group pair 1/2
+courier 1 waiting on you · 2 running · group pair 1/2
 ```
 
 `/courier tree` opens a panel beside the session with the tree under it, a row per session indented
-by depth, with what it does, its report and its group's standing; a session that started others gets
-a bar of the parts reported, a leaf how long it ran, its last tool call and its cost. `↑`/`↓` select,
+by depth, with what it does, its report and its group's standing; a session waiting on you gets a line per
+request or form (`shows a form: Web Search`), a session that started others gets
+a bar of the parts reported, a leaf how long it ran, its last tool call and its cost. A tree that has
+started more than `maxTotal` sessions over time is listed live ones first, then newest, and the header
+says how many older ones are left out; the footer counts them all. `↑`/`↓` select,
 `enter` opens the session, `s` stops it and everything under it after you confirm, as `courier_stop`
-would, and `q` closes the panel; `/courier stop <session>` stops from the prompt. While open, the panel
+would, `x` forgets a `gone` session after you confirm, removing its worktree by `courier_cleanup`'s
+rules, and `q` closes the panel; `/courier stop <session>` stops from the prompt. While open, the panel
 follows you between sessions: into one of its tree it keeps that tree, the session on screen marked
-`(on screen)`; elsewhere it shows that session's tree, or closes if it started none.
+`(on screen)`; elsewhere it shows that session's tree, or hides while you are in a session without one,
+or on the home screen, and shows again once you are back in one; only `q` closes it for good.
 
 `ctrl+x k` (the leader key, then `k`), `/asks` (or `/ask`), the palette's "Courier: what waits on you" or a click
 on "waiting on you" opens the asks inbox: every permission request, question and form waiting
-anywhere in the tree, oldest first, with where it comes from, answered in a dialog with no model in
-between; the session that started the tree hears once that you settled it. The TUI plays OpenCode's
-sounds for a child's report, a group's release and a new ask ([more](docs/reference.md#in-the-terminal)).
+anywhere in the tree, however many sessions it has, oldest first, after the top session's own permission
+requests, such as the prompt `courier_answer` has OpenCode show there, with where it comes from, kept current
+while it is open as asks arrive or are settled elsewhere, answered in a dialog with no model in between; the session that started the tree hears once that you settled it. The TUI plays OpenCode's
+sounds for a child's report and a group's release, and OpenCode's own for a new ask, which the courier
+adds a notification to for a native child ([more](docs/reference.md#in-the-terminal)).
 
 While a permission prompt or form is shown in the session, OpenCode hides the footer, so open the
 inbox with `ctrl+x k` (or `/asks` once the prompt is back).
@@ -298,7 +310,8 @@ the courier's own tree, limits and relays work as without the option. What chang
   top session's model is only told. `opencode run` and the TUI's auto-accept mode answer them as their
   own subagents'.
 - **Turn it on only with OpenCode's TUI or the paired app**, which show those prompts; with a bare
-  API client nobody prompts you, and only `courier_answer` is left.
+  API client nobody prompts you, and only `courier_answer` is left, which prompts you in the top
+  session before it passes anything on.
 
 ## Webhooks
 

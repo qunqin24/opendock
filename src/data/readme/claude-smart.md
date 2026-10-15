@@ -13,7 +13,7 @@
     <img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg" alt="License">
   </a>
   <a href="plugin/pyproject.toml">
-    <img src="https://img.shields.io/badge/version-0.3.9-green.svg" alt="Version">
+    <img src="https://img.shields.io/badge/version-0.3.11-green.svg" alt="Version">
   </a>
   <a href="plugin/pyproject.toml">
     <img src="https://img.shields.io/badge/python-%3E%3D3.12-brightgreen.svg" alt="Python">
@@ -95,6 +95,9 @@ counts for the last 30 days, rather than list limits. Connection failures are
 shown explicitly. Older skill citations without a project/shared identity remain
 visible under Legacy skill usage; exact per-skill counts use identified citations.
 A backend must be configured and reachable to view its data.
+The dashboard follows the managed Reflexio workspace style: neutral light/dark
+surfaces, green accents, flat metric bands, and consistent page spacing. The
+theme switch applies across dashboard, sessions, preferences, skills, and settings.
 Previously configured connections are retained privately when changing modes.
 The dashboard currently trusts local OS users: other accounts on a shared machine
 can access its configured backend connections. Per-user dashboard authentication
@@ -327,3 +330,25 @@ attach their retrieved-playbook references to a later prompt's answer. Search
 alone does not supply a conversation or an outcome for offline tuning: the
 response still needs to be published. Buffer writes and identity reservations
 share a cross-process file lock on Linux, macOS, and native Windows.
+
+
+### Short sessions and completion
+
+Automatic session completion keeps Reflexio's usefulness judge enabled. Claude
+Code's SessionEnd publishes an unsaved tail, then sends a completion hint even if
+Stop already saved every message. Acceptance does not mean extraction has finished.
+Explicit `/learn` remains a manual force operation.
+
+With the updated Reflexio backend, publish-only integrations (including Codex,
+OpenCode, and direct clients) evaluate short sessions after six hours without a new
+publication in the same session. The operator can configure
+`extraction_idle_timeout_seconds` (`21600` by default, `0` disables for new
+publications). This fallback is a low-urgency policy, not proof a session ended.
+Normal full-window and stride extraction still runs promptly. A negative judge
+result produces no learning and is recorded as examined.
+
+Managed mode requires a server update; changing the plugin alone cannot update a
+cloud server. An older server retains saved messages and logs that completion is
+unsupported; the plugin does not republish or force extraction. Idle fallback
+starts with new publications after backend upgrade; old saved sessions can be
+explicitly finalized on the updated backend.

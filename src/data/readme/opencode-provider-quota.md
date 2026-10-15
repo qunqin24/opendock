@@ -2,6 +2,9 @@
 
 A local-first OpenCode quota sidebar for OpenAI and GitHub Copilot.
 
+> **Version 2.x targets OpenCode v2** (`>=2.0.28 <3`). For OpenCode v1
+> (`>=1.18.25 <2`) use `opencode-provider-quota@1.0.0`.
+
 ## Sidebar
 
 Each provider card shows:
@@ -18,22 +21,37 @@ OpenAI reports quota differently per plan, so both shapes are read:
 - Consumer/Codex plans expose `rate_limit.primary_window` and `secondary_window`
   as 5h and weekly windows.
 - Business/enterprise plans leave those null and instead expose a credit budget
-  under `spend_control.individual_limit`. That budget renders as the bar, with
-  the absolute balance shown beneath it.
+  under `spend_control.individual_limit`. That budget renders as the bar.
 
 Timestamps from OpenAI are epoch seconds. Percentages from all providers are
 read on a 0-100 scale and never rescaled, so a 1% remainder is never mistaken
-for a full quota. The absolute credit balance is computed but not rendered in
-the sidebar; the bar and reset time are the only quota UI.
+for a full quota.
+
+## Architecture
+
+The package is a standard OpenCode v2 plugin with a server entry and a CLI
+(TUI) entry:
+
+- `opencode-provider-quota` (server) resolves the active OpenAI and GitHub
+  Copilot OAuth connections through OpenCode's integration API, queries the
+  provider endpoints, and exposes display-safe snapshots through the
+  `lmasaya.opencode-provider-quota` RPC.
+- `opencode-provider-quota/tui` renders the **QUOTA** section in the sidebar
+  (`sidebar.content` slot) by calling that RPC once a minute.
+
+Credentials stay inside the server process. They are never sent to the TUI,
+which also makes the sidebar work against a remote OpenCode server.
 
 ## Security Model
 
-- Reads only the matching OAuth entry from OpenCode's global `auth.json`.
+- Reads credentials only through OpenCode's integration API
+  (`ctx.integration.connection`); it does not read `auth.json`, the database,
+  or any other file.
 - Has no repository-local configuration, shell execution, telemetry, persistence, dependency updates, or provider URL overrides.
 - Sends each credential only to its fixed HTTPS provider endpoint.
 - Rejects redirects, uses a 10-second deadline, caps responses at 64 KiB, and keeps quota results only in memory.
 - Polls each provider at most once per minute and coalesces concurrent requests.
-- Does not refresh or write OAuth credentials. Reauthenticate with OpenCode when a token expires.
+- Does not refresh or write OAuth credentials. Reconnect the provider in OpenCode when a token expires.
 
 OpenAI and Copilot use unofficial subscription endpoints that can change without notice.
 
@@ -41,85 +59,67 @@ OpenAI and Copilot use unofficial subscription endpoints that can change without
 
 ### 1. Requirements
 
-- OpenCode `>=1.18.25 <2` (the plugin uses TUI plugin slots introduced in the 1.x series).
-- An OpenCode subscription login for at least one supported provider:
-  OpenAI (Codex/ChatGPT) or GitHub Copilot.
+- OpenCode `>=2.0.28 <3`.
+- A subscription login for at least one supported provider: OpenAI
+  (Codex/ChatGPT) or GitHub Copilot.
 
 ### 2. Add the plugin to your OpenCode config
 
-OpenCode configuration files are JSON or JSONC and are **merged** across
-locations, so you can install the plugin globally, per project, or both.
+Add the package to `plugins` in your global `~/.config/opencode/opencode.jsonc`
+(applies to every project) or a project `opencode.jsonc`:
 
-**Global (recommended)** — `~/.config/opencode/opencode.json`, applies to all
-projects:
-
-```json
+```jsonc
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugin": ["opencode-provider-quota@1.0.0"]
+  "plugins": ["opencode-provider-quota@2.0.0"]
 }
 ```
 
-**Per project** — `opencode.json` in the project root (safe to commit):
+Plugin arrays from all config files are applied together, so just add the
+entry to an existing `plugins` list. Pin an exact version rather than using an
+unbounded spec: OpenCode installs npm plugins at startup and does not change
+exact versions afterwards.
 
-```json
-{
-  "$schema": "https://opencode.ai/config.json",
-  "plugin": ["opencode-provider-quota@1.0.0"]
-}
-```
-
-If you already have a `plugin` array (or other settings), just add the entry —
-config files merge, with project config overriding the global file only for
-conflicting keys.
-
-Pin an exact version rather than using an unbounded spec. OpenCode installs
-npm plugins automatically via Bun at startup and caches them in
-`~/.cache/opencode/node_modules/`.
-
-### 3. Authenticate the providers
-
-The sidebar reads OAuth credentials that OpenCode itself stores — the plugin
-never asks for or stores secrets itself. Authenticate each provider you want
-to monitor:
+Alternatively, install it from the CLI:
 
 ```sh
-opencode auth login
+opencode plugin add opencode-provider-quota@2.0.0
 ```
 
-Select `openai` and/or `github-copilot` from the prompt (or use `/connect`
-in the TUI). Credentials are stored in
-`~/.local/share/opencode/auth.json` (or `$XDG_DATA_HOME/opencode/auth.json`),
-which is the only file this plugin reads. Verify what is authenticated with:
+The CLI part loads automatically from the same entry; you do not need to add
+the package to `cli.json`.
+
+### 3. Connect the providers
+
+Connect each provider in OpenCode (`/connect` in the TUI). Check the result
+with:
 
 ```sh
-opencode auth list
+opencode plugin list
 ```
 
 ### 4. Verify the sidebar
 
-Restart OpenCode (npm plugins install at startup). A **QUOTA** section
-appears at the bottom of the TUI sidebar with one card per authenticated
-provider. Cards render within a few seconds and refresh at most once per
-minute; a provider without quota data shows a muted unavailable state instead
-of a misleading bar.
+Restart OpenCode. A **QUOTA** section appears at the bottom of the sidebar with
+one card per provider. Cards render within a few seconds and refresh at most
+once per minute; a provider without quota data shows a muted unavailable state
+instead of a misleading bar.
 
 ### Troubleshooting
 
 | Symptom | Fix |
 | --- | --- |
-| No **QUOTA** section in the sidebar | Check the `plugin` entry is in `~/.config/opencode/opencode.json` or the project `opencode.json`, and that the JSON parses. |
-| "OAuth authentication unavailable" | Run `opencode auth login` for the provider; the card needs an `oauth` entry in `auth.json`. |
-| "OAuth authentication expired" | Re-run `opencode auth login` — the plugin does not refresh tokens. |
+| No **QUOTA** section in the sidebar | Run `opencode plugin list` and check `lmasaya.opencode-provider-quota` is listed; check the `plugins` entry parses. |
+| "OAuth authentication unavailable" | Connect the provider with `/connect`; the card needs an OAuth connection (API keys are not supported). |
+| "OAuth authentication expired" | Reconnect the provider in OpenCode; the plugin does not refresh tokens. |
 | "quota response changed" / "upstream http ..." | The unofficial provider endpoint may have changed or rejected the request; retry later or open an issue. |
-| Only one card shows | Each card requires that provider to be authenticated; the other provider is skipped silently. |
+| "quota refresh failed" | The TUI could not reach the plugin's RPC; check `opencode service status` and `~/.local/share/opencode/log/opencode.log`. |
 
 ## How the package is published
 
-The published package is only `package.json` and `dist/` — no `node_modules`.
-OpenCode embeds `@opentui/*` and `solid-js` in its own binary and provides
-them to plugins, so they are declared as optional peer dependencies rather
-than vendored.
+The published package is only `package.json` and `dist/`. OpenCode provides
+`@opencode/plugin`, `@opentui/*` and `solid-js` to plugins at runtime, so they
+are declared as optional peer dependencies rather than vendored.
 
 ## Development
 
@@ -132,10 +132,10 @@ mise exec -- npm run test:ui
 ```
 
 The UI regression test uses Bun (pinned in `mise.toml`) and OpenTUI's real
-test renderer against `dist/tui.js`. It supplies synthetic credentials and
-mocked provider responses, verifies delayed cards and percentage bars, checks
-refreshes do not duplicate cards, and checks timer cleanup. Run `mise install`
-first to provision the test runtime.
+test renderer against `dist/tui.js`. It mocks the quota RPC and verifies
+delayed cards, percentage bars, the error state, that refreshes do not
+duplicate cards, and timer cleanup. Run `mise install` first to provision the
+test runtime.
 
 ## Releasing
 

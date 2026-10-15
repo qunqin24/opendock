@@ -2,7 +2,7 @@
 
 Reviews pending permissions in the [OpenCode](https://github.com/anomalyco/opencode) sidebar using a separate LLM. Reviews
 native shell commands, file edits, skill loading, and external-directory access.
-MCP and custom-tool requests currently remain manual.
+MCP and custom tools share a tool-review category, with registered descriptions and JSON Schemas included when available.
 Supports streaming explanations, saved report history and stats, auto-approval, and Linux
 desktop notifications (Gnome) with distinct sounds.
 
@@ -19,14 +19,22 @@ each request's data and scope rather than allowing only specific host versions.
 
 ## Install and config
 
-Add this entry to the global `~/.config/opencode/cli.json`, or
-`$XDG_CONFIG_HOME/opencode/cli.json` when `XDG_CONFIG_HOME` is set.
-There is no project-local CLI configuration. OpenCode loads the
-[npm package](https://www.npmjs.com/package/opencode-reviewer) from this entry.
+Reviews send request data, the latest user prompt, and selected file snapshots,
+diffs, skill instructions or tool arguments to your configured endpoint **before
+permission approval**. Shell snapshots can follow symlinks outside the project;
+denying the command afterward cannot undo that disclosure. Use an endpoint you
+trust, and a local reviewer or a sandbox without accessible secrets when working
+with untrusted repositories.
+
+Add this entry to the global `~/.config/opencode/opencode.json`, or
+`$XDG_CONFIG_HOME/opencode/opencode.json` when `XDG_CONFIG_HOME` is set.
+OpenCode loads the [npm package](https://www.npmjs.com/package/opencode-reviewer)
+and its terminal component from this single entry. No reviewer entry is needed
+in `cli.json`.
 
 ```json
 {
-  "$schema": "https://opencode.ai/v2/cli.json",
+  "$schema": "https://opencode.ai/config.json",
   "plugins": [
     {
       "package": "opencode-reviewer@latest",
@@ -40,9 +48,8 @@ There is no project-local CLI configuration. OpenCode loads the
         "reviewBash": true,
         "reviewEdits": true,
         "reviewSkills": true,
-        "reviewMcp": false,
-        "reviewCustomTools": false,
-        "reviewExternalDirectories": false,
+        "reviewTools": true,
+        "reviewExternalDirectories": true,
         "autoApprove": false,
         "fastMode": false,
         "extraCareful": true,
@@ -79,25 +86,14 @@ launching OpenCode. The inline key takes precedence. Omit both for an unauthenti
 endpoint. Remove `instructions` to use the built-in prompts and
 `notificationSoundDirectory` to use the bundled sounds.
 
-You also need to edit `opencode.json`, as the plugin needs to be informed of states
-that are not exposed by TUI APIs:
-
-```json
-{
-  "$schema": "https://opencode.ai/config.json",
-  "plugins": ["opencode-reviewer@latest"]
-}
-```
-
 ### Opencode docs
 
-[server config](https://opencode.ai/v2/docs/config),
-[CLI config](https://opencode.ai/v2/docs/cli/config) and
+[OpenCode config](https://opencode.ai/v2/docs/config) and
 [CLI plugins](https://opencode.ai/v2/docs/build/plugins/cli) guides.
 
 ## Options reference
 
-These are options inside the plugin's `options` object in global `cli.json`.
+These are options inside the plugin's `options` object in global `opencode.json`.
 Defaults apply only to omitted options. `null` is invalid. Boolean and integer
 options require JSON booleans and numbers, not quoted strings. Integer ranges are
 inclusive, fractions are invalid, and the maximum safe integer is
@@ -114,9 +110,8 @@ inclusive, fractions are invalid, and the maximum safe integer is
 | `reviewBash` | boolean | `true` | Review native `shell` permissions. The option keeps its existing name. |
 | `reviewEdits` | boolean | `true` | Review native `edit`, `write` and `patch` tools, which use the `edit` permission action. |
 | `reviewSkills` | boolean | `true` | Review native skill loading using the exact requested ID and full currently registered main instructions. Assumes the selected definition stays unchanged while permission is pending. Missing or ambiguous instructions remain manual. |
-| `reviewMcp` | boolean | `false` | MCP-review category switch. V2 MCP collection is currently unsupported; enabling this does not supply missing origin/catalog evidence or permit automatic approval. |
-| `reviewCustomTools` | boolean | `false` | Custom-tool review category switch. V2 custom-tool collection is currently unsupported; these requests remain manual. |
-| `reviewExternalDirectories` | boolean | `false` | Review directory access independently of operation-review switches. Directory approval can resume the operation without another prompt. |
+| `reviewTools` | boolean | `true` | Review other tools, including MCP and custom tools, using `TOOL-REVIEW-PROMPT.md`. Exact call linkage, arguments and permission scope are required. Descriptions and JSON Schemas are optional; missing evidence is explained to the LLM, which decides Safe/Unsafe. Safe reviews can use normal or fast automatic approval. |
+| `reviewExternalDirectories` | boolean | `true` | Review directory access independently of operation-review switches. Directory approval can resume the operation without another prompt. |
 | `autoApprove` | boolean | `false` | Allow Safe reviews once automatically. Normally waits for completion, validation and the countdown. Works throughout the current conversation, including subagent browsing and hidden/covered reports. Home, dashboards, unrelated conversations and native permission decision editing wait without cancellation. |
 | `fastMode` | boolean | `false` | Requires `autoApprove: true`. Approve an eligible, front-of-queue request as soon as a Safe rating is parsed, bypassing the countdown. Respects `stream`; with `stream: false`, waits for the complete validated response. Finish the report and save it in the background after approval. |
 | `extraCareful` | boolean | `true` | Include extra-careful guidance when `autoApprove` is enabled. Setting `false` omits that guidance without disabling automatic approval. |
@@ -169,9 +164,20 @@ or oversized main instructions remain manual. Supporting files and scripts are n
 inspected; their omission alone does not prevent review. Allowing a skill loads its
 instructions, not a blanket grant for later tool actions.
 
-MCP and custom-tool reviews remain unsupported in V2 because required origin and
-catalog evidence is unavailable. Their switches do not turn those requests into
-Safe ratings or automatic approvals.
+Tool reviews use the exact effective tool ID, captured arguments and pending
+permission scope. Current server-side registered names, descriptions and input
+JSON Schemas are included when available. Missing, duplicate, oversized,
+unreadable or unsupported definitions are omitted with factual reasons sent to
+the LLM. The LLM decides whether the remaining evidence justifies Safe or Unsafe;
+missing optional evidence does not itself force manual approval.
+
+This assumes any supplied definition stays unchanged while approval is pending
+and accurately describes behavior. The reviewer does not inspect executors or
+remote implementations, infer origin from names, or claim an invocation-time
+definition snapshot. Ambiguous call linkage still remains manual because the
+reviewer cannot identify the operation being approved. Saved reports use the tool
+category. All review categories default to enabled; `autoApprove` still defaults
+to false. `reviewTools` replaces `reviewMcp` and `reviewCustomTools`.
 
 Code Mode and its tool search stay enabled. Native tool calls can be reviewed when
 the reviewer can match them exactly to their permission requests. Nested calls
@@ -448,12 +454,15 @@ Disable overlapping notification plugins to avoid duplicate alerts.
 Use Node.js 24.15.0+ within 24.x, or 22.22.2+ within 22.x, and npm.
 Run `npm ci --ignore-scripts`, then `npm run check` for typechecking, source tests,
 pure-helper tests and the build. `npm run test:helpers` runs the helper checks
-without building or starting OpenCode. Pull-request CI checks both Node versions
-and runs a separate representative Linux fixture profile on stock OpenCode
-2.0.26 and 2.0.27.
-After building, run `node scripts/test-runtime.mjs --profile ci` for that same
+without building or starting OpenCode. Pushing a version tag runs verification
+and publication in one workflow: source tests, helper tests, reproducible builds
+and archive checks must pass before the exact verified archive is published.
+The manual **Extended host checks** workflow tests Node 22/24 and the real Linux
+TUI on the newest stable OpenCode V2. These timing-sensitive host fixtures are
+not an automatic release prerequisite.
+After building, run `node scripts/test-runtime.mjs --profile v2-acceptance` for that same
 profile. Use `node scripts/test-runtime.mjs --list` for the complete runtime
-inventory or `node scripts/test-runtime.mjs --plan --profile ci` for a
+inventory or `node scripts/test-runtime.mjs --plan --profile v2-acceptance` for a
 host-independent plan. Profiles select documented scenario/flag combinations;
 interactive desktop checks have separate prerequisites.
 See [AGENTS.md](https://github.com/mightykatun/opencode-reviewer/blob/main/AGENTS.md)

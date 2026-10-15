@@ -1,13 +1,11 @@
-# opencode-plugin-manager
+# opencode-plugin-browser
 
-[![CI](https://github.com/ranjithrajv/opencode-plugin-manager/actions/workflows/ci.yml/badge.svg)](https://github.com/ranjithrajv/opencode-plugin-manager/actions/workflows/ci.yml)
+[![CI](https://github.com/ranjithrajv/opencode-plugin-browser/actions/workflows/ci.yml/badge.svg)](https://github.com/ranjithrajv/opencode-plugin-browser/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/opencode-plugin-browser)](https://www.npmjs.com/package/opencode-plugin-browser)
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](LICENSE)
 
-> **Note:** this plugin is published on npm as `opencode-plugin-browser` —
-> the original project name, kept for package continuity. The repository and
-> README title use `opencode-plugin-manager`; both refer to the same package.
-> Install it by the npm name shown below.
+> **Note:** this project was formerly `opencode-plugin-manager`. The repository
+> and the npm package are both `opencode-plugin-browser` now; old links redirect.
 
 An [OpenCode](https://opencode.ai) sidebar section listing **plugins** with
 installed/uninstalled status — placed below the built-in MCP section and the

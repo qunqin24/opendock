@@ -11,7 +11,7 @@
 
 ## What it is
 
-oc-bifrost is an OpenCode plugin that runs V1-era plugin hooks on the OpenCode V2 runtime, which otherwise hard-rejects a V1 module at load (`Plugin must export a default definition with an id and an effect or setup function`). Each named module is routed by shape: V1 hook modules get their hooks translated one by one against the compatibility matrix, while V2-shaped definitions mount as-is, exactly as the host would mount them. Plugins are sourced from GitHub (the snapshot-first `github:` route), the npm registry, a local path, or a bundled offline fallback (`preset:rtk`). It is published as `@nathwn12/oc-bifrost` — these docs describe `1.6.4` — and needs Node 22 or later on the host.
+oc-bifrost is an OpenCode plugin that runs V1-era plugin hooks on the OpenCode V2 runtime, which otherwise hard-rejects a V1 module at load (`Plugin must export a default definition with an id and an effect or setup function`). Each named module is routed by shape: V1 hook modules get their hooks translated one by one against the compatibility matrix, while V2-shaped `{id, setup}` definitions mount as-is, exactly as the host would mount them, and Effect-only `{id, effect}` definitions are refused out loud for direct host mounting. Plugins are sourced from GitHub (the snapshot-first `github:` route), the npm registry, a local path, or a bundled offline fallback (`preset:rtk`). It is published as `@nathwn12/oc-bifrost` — these docs describe `1.6.4` — and needs Node 22 or later on the host.
 
 ## Why
 
@@ -19,9 +19,9 @@ OpenCode V2 intentionally broke the V1 plugin API, stranding every V1-era plugin
 
 ## Features
 
-- Shape-based routing: V1 hook factories are translated hook by hook; V2 definitions (including dual-export files that ship both) mount as-is with the host context.
+- Shape-based routing: V1 hook factories are translated hook by hook; V2 `{id, setup}` definitions (including dual-export files that ship both) mount as-is with the host context, while Effect-only `{id, effect}` definitions are refused out loud for direct host mounting.
 - Snapshot-first `github:` sourcing: the ref resolves to a commit once at first fetch, then the whole repository tree is materialized so sibling files work; hostile archives are refused outright, never materialized.
-- Registry sourcing: bare names (`oc-todo`, `pkg@1.2.0`, `@scope/pkg@^1.0.0`) and `npm:` / `pnpm:` / `bun:` prefixed forms install into a bifrost-owned cache and mount whatever they resolve to, V1 or V2.
+- Registry sourcing: bare names (`oc-todo`, `pkg@1.2.0`, `@scope/pkg@^1.0.0`) and `npm:` / `pnpm:` / `bun:` prefixed forms install into a bifrost-owned cache and mount whatever they resolve to, V1 or `{id, setup}` V2, and refuse Effect-only `{id, effect}` out loud for direct host mounting.
 - Bundled offline fallback `preset:rtk` (verbatim `rtk-ai/rtk` `v0.50.0`, Apache-2.0) with zero network; it probes for the `rtk` binary (`>= 0.23.0`) on `PATH` before mounting.
 - Honest compatibility contract: 6 full, 9 partial, 9 refused over all 24 matrix rows (`src/compat-matrix.ts` is the single source of truth); refused hooks warn at load or abort under `strict: true`.
 - Consent-gated fetching: a cold-cache `github:` fetch refuses by default until `trustRemote: true` (or `OC_BIFROST_TRUST=github`); a warm, hash-verified cache loads with no network and no re-consent.

@@ -4,9 +4,12 @@
 
 # magpie-sub2api
 
+<a href="https://github.com/broven/magpie-sub2api"><img src="https://img.shields.io/badge/Star-on%20GitHub-f5c518?style=for-the-badge&logo=github" alt="Star on GitHub" height="48"></a>
+
 把任意一个 [sub2api](https://github.com/Wei-Shaw/sub2api) 站点接成 [magpie](https://usemagpie.ai) 的 provider：填站点地址和 API key 登录，magpie 就能用这个 key 所在分组的模型，并按 key 的剩余额度做路由。
 
 - **模型**：取自 `GET /v1/models`（key 所在分组列出的模型）。Claude 系列走 `/v1/messages`，OpenAI 系列（`gpt-*`、`o1`/`o3`…、`codex-*`）走 `/v1/responses`，其余走 `/v1/chat/completions`。
+- **思考等级**：取自站点的 Codex 模型清单（`GET /backend-api/codex/models` 里每个模型的 `supported_reasoning_levels`），magpie / Codex 里就能切换。站点给不出时，沿用 magpie 已有的该模型等级（models.dev 或配置里的 `variants`），再没有就给会思考的模型 `low` / `medium` / `high`。
 - **用量**：取自 `GET /v1/usage`，按 key 的计费方式换成 magpie 的用量窗口（见下表）。magpie 的用量页、菜单栏和路由都读这些窗口：某个窗口用满后，magpie 会先绕开这个 key。
 
 ## 为什么不用 magpie 自带的 `balance=/v1/usage`
@@ -84,7 +87,7 @@ magpie plugin login backup
 
 ## 兼容性
 
-sub2api **≥ 0.2.14**。插件只调用上游的公开接口（`/v1/models`、`/v1/usage`），不依赖任何站点的私有改动。CI 对 0.2.14 和最新版各跑一遍端到端测试。
+sub2api **≥ 0.2.14**。插件只调用上游的公开接口（`/v1/models`、`/backend-api/codex/models`、`/v1/usage`），不依赖任何站点的私有改动。CI 对 0.2.14 和最新版各跑一遍端到端测试。
 
 ## 开发与测试
 
@@ -106,3 +109,5 @@ SUB2API_URL=https://api.example.com SUB2API_KEY=sk-... ./e2e.sh
 ## 许可证
 
 MIT
+
+插件图标是 [sub2api](https://github.com/Wei-Shaw/sub2api) 的 logo（`assets/logo.svg`），版权归 sub2api 项目所有，它的许可证是 LGPL-3.0。

@@ -20,7 +20,7 @@ OpenCode Froggy brings **multi-agent delegation and orchestration** to OpenCode,
 
 ## Keep orchestration moving
 
-Delegation is only the start. The **orchestrator loop** periodically brings the orchestrator back to the objective with a fresh view of child-agent activity and running shells. It can follow up on stalled work, coordinate pending reviews, and advance the next tasks without waiting for another user prompt.
+Delegation is only the start. The **orchestrator loop** periodically sends a short coordination check to the orchestrator. This prompts the orchestrator to check current work and blockers, coordinate pending reviews, update the backlog, release eligible temporary workspaces, and advance the next useful action without waiting for another user prompt.
 
 The loop persists across plugin reloads and server restarts, with a configurable interval (10 minutes by default). It supports sustained multi-agent work—not just one round of delegation.
 
@@ -203,6 +203,8 @@ A primary agent that owns execution decisions and delivers the user's objective 
    - Checks attributed to a SHA require that exact revision without staged, unstaged, or untracked code, tests, or configuration affecting the result; verify the SHA and working-tree state before and after checks, using a clean validation worktree when needed.
 5. **Integrate and finish** incrementally, tying check evidence to the exact delivery SHA and rerunning relevant checks after every synchronization, even without conflicts, before integration. Verify and record the integrated revision and its results. Preserve existing work and recover from regressions before adding changes to an affected baseline.
 
+The orchestrator also owns the [workspace lifecycle](agent/orchestrator.md#workspace-lifecycle): release temporary worktrees after accepted deliveries/reports or when review/validation no longer needs them, and reconcile leftovers at startup, resume, periodic reminders, and closure. Verify that all workspace users and background work are finished, preserve branches and durable evidence/recovery copies, and move sessions to an existing checkout before removal. Unknown ownership/activity, unverified preservation, or unsafe removal behavior blocks cleanup; routine cleanup never forces removal. Track each workspace as active, retained with a reason/next step, or removed after verification. The plugin sends reminders, not automatic deletions based on child inactivity.
+
 #### Autonomy and automatic mode
 
 Routine technical choices, ticket adjustments, scheduling, and recovery need no renewed approval. The orchestrator adapts after failures rather than stopping at a fixed retry count, and keeps independent work moving. Review depth, parallelism, and planning depth adapt to the work; independent review remains required for non-trivial changes.
@@ -217,7 +219,7 @@ With `orchestrator` selected, say **"Automatic mode"** to delegate remaining cho
 
 #### Periodic coordination
 
-For sustained background work, the orchestrator can activate a [persistent coordination loop](#orchestrator-loop). Every ten minutes by default, it receives a steering reminder with the established objective and a fresh child/shell activity snapshot. It reconciles progress and pending reviews, resumes workers only for their original assignments, and starts fresh sessions for independent work. It stops the loop when the objective is achieved or the user requests it.
+For sustained background work, the orchestrator can activate a [persistent coordination loop](#orchestrator-loop). Every ten minutes by default, it receives a short, fixed steering reminder to check activity, results, reviews, blockers, backlog updates, and workspace cleanup. The orchestrator inspects current state as needed, resumes workers only for their original assignments, and starts fresh sessions for independent work. It stops the loop when the objective is achieved or the user requests it.
 
 #### Model configuration
 
@@ -492,15 +494,16 @@ Example tool arguments:
 
 - The first reminder arrives after one interval. Calling start again replaces the objective and cadence and cancels obsolete pending reminders.
 - Reminders use `steer`, including when the orchestrator is active. Delivery happens at a step boundary; a running model request or tool may delay it.
-- At most one reminder for the loop remains in the session inbox. Later intervals resume that same synthetic input by ID instead of accumulating messages, including after a reload or a failed wake attempt.
-- Each reminder includes paginated child-session activity and running shell IDs from the children's locations, including worktrees. Shells are matched by owning session across all successfully inspected locations, even after a child moves. An inactive child is not assumed finished: it may await a shell or another background tool. An inaccessible worktree reports unknown shell activity for its children while preserving known shells from other locations.
+- At most one reminder for the loop remains in the session inbox. Later intervals resume that same synthetic input by ID instead of accumulating messages, including after a reload or a failed wake attempt. Obsolete pending reminder text is replaced at the next interval.
+- Each reminder is a fixed, short coordination check. It asks the orchestrator to check current worker/background activity, new results, pending reviews, and blockers, reconcile meaningful backlog changes and verify saved updates, release eligible temporary workspaces, and advance useful work. The loop does not fetch or inject child/shell inventories or repeat the stored objective.
 - The orchestrator decides what to resume or create toward the objective, using native `subagent` notifications for those executions.
+- Workspace cleanup follows the orchestrator's workspace lifecycle, including verification and backlog records of removals or retention reasons. The reminder itself does not authorize removal.
 - There is no total-duration cutoff. Transient delivery failures are logged and retried at the next interval.
 - Settings are stored in OpenCode's plugin storage. Reloading the owning location's plugin restores the loop at its next future interval; missed intervals are skipped. The server and that plugin instance must be running to send reminders.
 - Each loop belongs to the plugin location that started it, preventing other loaded worktrees from scheduling duplicate reminders. Reminders pause while a different agent is selected in the target session.
 - Stopping removes the persisted configuration, waits for an in-flight reminder attempt even when invoked from another loaded location, and cancels reminders still in the inbox. Already delivered inputs and running worker tasks are not interrupted. Deleting the session removes its loop; plugin cleanup stops timers while retaining enabled configurations for reload.
 
-The `opencode` CLI must be on the server's `PATH` and connect to the same OpenCode service. The plugin checks the target session's identity before using `opencode api` for inbox and activity operations that the plugin SDK does not expose. API calls have a 30-second request timeout; this is not a limit on the loop's lifetime.
+The `opencode` CLI must be on the server's `PATH` and connect to the same OpenCode service. The plugin checks the target session's identity before using `opencode api` for inbox operations that the plugin SDK does not expose. API calls have a 30-second request timeout; this is not a limit on the loop's lifetime.
 
 ---
 

@@ -48,7 +48,7 @@ the host and configuration.
 ### Requirements
 
 - [Bun](https://bun.sh) ≥ 1.3.0 (CI runs 1.3.0 and 1.3.5)
-- [OpenCode](https://opencode.ai) V1 `>=1.18.29 <2` (**tested with 1.18.34**), or V2 `>=2.0.3 <3` (**tested with 2.0.21**)
+- [OpenCode](https://opencode.ai) V1 `>=1.18.29 <2` (**tested with 1.19.0**), or V2 `>=2.0.3 <3` (**tested with 2.0.28**)
 - `git` on `PATH` (only used for read-only Git-state enrichment; missing git
   degrades gracefully)
 - A model provider configured in OpenCode, exposing a model that follows JSON
@@ -200,7 +200,9 @@ The model options are:
 - **`model`**: in `provider/model` form. Chat models must match a configured
   OpenCode provider; supported Jev IDs use the direct System One API below.
 - **`variant`**: reasoning effort the model supports (`max`, `high`, `medium`,
-  `low`, `none`). Passed straight through to OpenCode.
+  `low`, `none`). Passed straight through to OpenCode. On V2, when the model
+  does not offer the default `medium`, the review uses the model's own default;
+  any other variant the model does not offer fails closed to a manual prompt.
 - **`outputFormat`**: how the reviewer returns its decision: `json_schema`
   (default; uses OpenCode's structured output, needs provider support) or
   `text` (ask the model to emit JSON in plain text and parse it locally). Use
@@ -214,6 +216,11 @@ output reliably. Model mistakes can cause unsupported approvals as well as
 unnecessary escalations, so compare both safety errors and format validity.
 Higher reasoning variants may cost more or take longer without always improving
 the result.
+
+Free OpenCode Zen models (for example `opencode/big-pickle` or the `*-free`
+IDs) cannot be used as the reviewer: Zen only serves its free tier to OpenCode's
+own clients and rejects the sessions the plugin creates, so every review falls
+back to a manual prompt. Use a paid or subscription model instead.
 
 ### Jev System One reviewer
 
@@ -726,8 +733,8 @@ binary, blocked, or truncated evidence) remains a reviewer decision.
 
 | Component             | Supported          | Notes                                                      |
 | --------------------- | ------------------ | ---------------------------------------------------------- |
-| OpenCode V1           | `>=1.18.29 <2`     | Dual object entrypoint; verified with **1.18.34**          |
-| OpenCode V2           | `>=2.0.3 <3`       | Compatibility layer; verified with **2.0.21**              |
+| OpenCode V1           | `>=1.18.29 <2`     | Dual object entrypoint; verified with **1.19.0**           |
+| OpenCode V2           | `>=2.0.3 <3`       | Compatibility layer; verified with **2.0.28**              |
 | `@opencode-ai/plugin` | `>=1.18.29 <2`     | Optional V1 peer dependency                                |
 | Bun                   | `>=1.3.0`          | Declared in `engines.bun`; CI runs **1.3.0** and **1.3.5** |
 | TUI overlay           | OpenCode V1 and V2 | Separate host adapters, shared raw TSX presentation        |
