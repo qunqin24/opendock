@@ -1,5 +1,9 @@
 # OpenCode Optimised Toolings
 
+> [!IMPORTANT]
+> **OpenCode v1 Final Release**: This is the final release for OpenCode v1 (`v1.18.x`).
+> OpenCode v2 introduces a completely redesigned plugin architecture and is currently **not supported**.
+
 A zero-touch, updateable OpenCode plugin that turns the terminal UI into a mouse-first IDE and adds production-grade filesystem, terminal, codebase-memory, web, stealth, settings, and host-integration tools.
 
 ## One control plane

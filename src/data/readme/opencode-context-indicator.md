@@ -40,6 +40,8 @@ For every served request the plugin estimates how the context window is split:
   tool schemas 1.4k (est tokens)
   other       5.6k (= input - sum of estimates)
   source      context-hook
+  prompt cache read=12.0k (27% of input) write=1.1k (provider-reported)
+  reclaim     ~9.8k redundant tool output (3 duplicate(s) — estimate)
   subagents   2 session(s): in=8.1k out=2.3k r=1.0k worst=12%
 ```
 
@@ -56,6 +58,18 @@ For every served request the plugin estimates how the context window is split:
 * `ctx` is OpenCode's native overflow count: `tokens.total` when present, else
   `input + output + cache.read + cache.write`. Percentages are **not clamped**
   at 100% — exceeding the window stays visible.
+* `prompt cache` is **provider-reported and exact** (`tokens.cache.read` /
+  `tokens.cache.write`), shown as a share of `input`. It is a *subset* of input,
+  so it is deliberately **not** added to the category sum: a cache read means the
+  provider served those prompt tokens from its prompt cache, not that they are
+  absent from the window. `n/a` when the provider reports nothing.
+* `reclaim` is the **waste detector**: tool output already in the context that is
+  redundant — the **same target** invoked repeatedly (the same file read twice,
+  the same URL fetched again) or **byte-identical output**. It is an estimate of
+  what trimming/compaction could reclaim (the non-largest member of each
+  duplicate group), reported honestly as *"N redundant tool outputs ≈ X tokens"*
+  — never as "the model wasted effort". Findings are per-session and **path-free
+  in the persisted/exported form**.
 * The denominator is the **opencode v2.0.23 compaction ceiling**: `window =
   limit.input || limit.context`; `reserve = max(floor(window * 0.1), window >=
   32_000 ? 16_000 : 0)`; the ceiling is `window - reserve`. When opencode
@@ -164,6 +178,13 @@ unavailable._
 
 ### Tool results by tool (main)
 webfetch 242.1k · read 18.4k · bash 4.9k · +3 more
+
+### Prompt cache (main, provider-reported)
+read 12.0k (27% of input) · write 1.1k
+
+### Potential reclaim (redundant tool output)
+- read src/a.ts x2 — ~9.8k reclaimable
+_~9.8k across 3 redundant tool output(s) — estimate of what trimming/compaction could reclaim._
 ```
 
 It is delivered with `resume:true` **and** a verbatim instruction prefix, so the
@@ -553,7 +574,7 @@ caller.
 ### Running tests
 
 ```bash
-npm run test:prepublish       # fast gate: tarball + tui.tsx + resolve + T1–T22 unit checks
+npm run test:prepublish       # fast gate: tarball + tui.tsx + resolve + T1–T24 unit checks
 npm run test:e2e              # full E2E: isolated plugin load + one "Say OK" round-trip
 npm run test:e2e:quick        # E2E load-only, no LLM call
 npm run test:drift            # OpenTUI pin vs the latest RELEASED opencode (also in CI)
@@ -574,7 +595,7 @@ STEP 80 s, ~3 min total.
 | (a) tarball composition | `package.json` `files[]` expands to the base files plus every `lib/*` module (count asserted dynamically) | no test/node_modules/tsconfig in the tarball |
 | (b) pragma regression | esbuild `--jsx=automatic` → `@opentui/solid/jsx-runtime` present, `react/jsx-runtime` absent | a removed/broken pragma kills the sidebar on npm install |
 | (c) resolve chain | replica install: host-bridged + peer packages resolve; local tui.tsx relative imports resolve via node from the entry (resolve-bridge.cjs) | broken peer/optional dep or a bad local import silently breaks the sidebar |
-| (d) unit harness T1–T22 | limit/agent/state fix assertions plus measureContributors, redacted-export, shared category-helper and sanitizer/unicode checks (51 total) | regressions in modelLimits, writeStateFile, hydrate, contributors, export |
+| (d) unit harness T1–T24 | limit/agent/state fix assertions plus measureContributors, redacted-export, shared category-helper, sanitizer/unicode, prompt-cache and waste-detector checks (58 total) | regressions in modelLimits, writeStateFile, hydrate, contributors, export |
 | (e) corporate-identifier scan | no forbidden identifiers in the published surface + test tree | compliance |
 | (f) non-English scan | no non-ASCII letters (`\p{L}` above U+007F) in any repo file | English-only source rule |
 

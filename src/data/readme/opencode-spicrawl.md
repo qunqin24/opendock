@@ -1,8 +1,17 @@
-# Spicrawl agent plugins
+# Spicrawl agent plugins: web scraping for Claude Code, Cursor, Codex and Gemini CLI
 
 [![smithery badge](https://smithery.ai/badge/spicrawl/web-scraper)](https://smithery.ai/servers/spicrawl/web-scraper)
 
-Also available as an MCP server: [Smithery](https://smithery.ai/servers/spicrawl/web-scraper) · [MCP Registry](https://registry.modelcontextprotocol.io/v0/servers?search=io.github.OfficialSpicrawl/mcp)
+**How do I give Claude Code, Cursor, Codex or Gemini CLI web scraping?** Connect the agent to
+Spicrawl's hosted [Model Context Protocol](https://modelcontextprotocol.io/) (MCP) server at
+`https://mcp.spicrawl.com/mcp`. This repository packages that connection as a plugin or extension
+for each tool, so setup is one install command plus an API key from <https://app.spicrawl.com>.
+Through the full server the agent gets 24 `spicrawl_*` tools: fetch a web page as clean Markdown
+(or HTML, text or JSON), render pages that need JavaScript, extract fields with CSS selectors, run
+batch jobs over lists of URLs, keep login sessions, and read its own request history and usage. For
+Claude Code, run `claude plugin marketplace add OfficialSpicrawl/agent-plugins && claude plugin install spicrawl@spicrawl-plugins`.
+For Gemini CLI, run `gemini extensions install https://github.com/OfficialSpicrawl/agent-plugins`.
+Cursor and Codex are in the table below.
 
 Spicrawl's plugins for coding agents and workflow tools, in one repository. For coding agents it
 connects the agent to the hosted Spicrawl MCP server and, in the tools that support it, gives the
@@ -17,23 +26,37 @@ Spicrawl is a web scraping API for AI agents. Through the MCP server an agent ca
 - read its request history and its usage;
 - search Spicrawl's docs.
 
-This repository holds the packaging for these tools:
+## Supported tools
 
-| Tool | What is installed |
-|---|---|
-| Claude Code | plugin (MCP server + skill) |
-| Codex | plugin (skill + MCP server entry), in OpenAI's portable format; the key goes in your Codex config |
-| ChatGPT | the same plugin, connecting through OAuth at `/chatgpt/mcp` once that endpoint is live; not in the directory yet (see [ChatGPT and Codex](#chatgpt-and-codex)) |
-| Cursor | plugin (MCP server + skill) |
-| OpenCode | npm plugin `opencode-spicrawl` (adds the MCP server) |
-| Factory Droid | plugin (MCP server + skill) |
-| Devin | plugin (MCP server + skill), installed from this repository |
-| Gemini CLI | extension (MCP server + context file) |
-| GitHub Copilot CLI | plugin (skill), plus one command for the MCP server |
-| Dify | plugin `.difypkg` (Scrape, Extract and Batch scrape tools), from a GitHub release of this repository |
-| n8n | community node `n8n-nodes-spicrawl` (Scrape URL and Batch Scrape), on npm; source in [OfficialSpicrawl/n8n-nodes-spicrawl](https://github.com/OfficialSpicrawl/n8n-nodes-spicrawl) |
-| Any tool that reads Agent Skills | the skill only (`npx skills add`) |
-| Any MCP client | the MCP server, by hand |
+Each tool needs a Spicrawl API key; see [Get an API key](#get-an-api-key) and the section for your
+tool under [Install](#install).
+
+| Tool | Install | What you get |
+|---|---|---|
+| Claude Code | `claude plugin marketplace add OfficialSpicrawl/agent-plugins && claude plugin install spicrawl@spicrawl-plugins` | plugin (MCP server + skill); Claude Code asks for the key when you enable it |
+| Cursor | `git clone https://github.com/OfficialSpicrawl/agent-plugins.git && mkdir -p ~/.cursor/plugins/local && cp -r agent-plugins/plugins/spicrawl ~/.cursor/plugins/local/spicrawl` | plugin (MCP server + skill); restart Cursor, then set `SPICRAWL_API_KEY` under Plugins, Configure |
+| Codex | `codex plugin marketplace add OfficialSpicrawl/agent-plugins` | plugin (skill + MCP server entry), in OpenAI's portable format; then install `spicrawl` from `/plugins`. The key goes in your Codex config (see [ChatGPT and Codex](#chatgpt-and-codex)) |
+| ChatGPT | not in the directory yet | the same plugin, connecting through OAuth at `/chatgpt/mcp` once that endpoint is live (see [ChatGPT and Codex](#chatgpt-and-codex)) |
+| Gemini CLI | `gemini extensions install https://github.com/OfficialSpicrawl/agent-plugins` | extension (MCP server + context file); asks for the key as a setting |
+| OpenCode | `"plugin": ["opencode-spicrawl"]` in `opencode.json` | npm plugin `opencode-spicrawl` (adds the MCP server); reads `SPICRAWL_API_KEY` |
+| Factory Droid | `droid plugin marketplace add OfficialSpicrawl/agent-plugins && droid plugin install spicrawl@spicrawl-plugins --scope user` | plugin (MCP server + skill); reads `SPICRAWL_AUTH` |
+| GitHub Copilot CLI | `copilot plugin marketplace add OfficialSpicrawl/agent-plugins && copilot plugin install spicrawl@spicrawl-plugins` | plugin (skill), plus one command for the MCP server (see [GitHub Copilot CLI](#github-copilot-cli)) |
+| Devin | `devin plugins install --local ./plugins/spicrawl` | plugin (MCP server + skill), run from a clone of this repository |
+| Dify | Plugins, Marketplace, search "Spicrawl" | plugin (Scrape, Extract and Batch scrape tools), from the [Dify Marketplace](https://marketplace.dify.ai/plugin/spicrawl/spicrawl) |
+| n8n | `npm install n8n-nodes-spicrawl` in `~/.n8n/nodes`, or Settings, Community Nodes, Install | community node `n8n-nodes-spicrawl` (Scrape URL and Batch Scrape), on npm; source in [OfficialSpicrawl/n8n-nodes-spicrawl](https://github.com/OfficialSpicrawl/n8n-nodes-spicrawl) |
+| Any tool that reads Agent Skills | `npx skills add OfficialSpicrawl/agent-plugins` | the skill only |
+| Any MCP client | `https://mcp.spicrawl.com/mcp` (Streamable HTTP, header `Authorization: Bearer <key>`) | the MCP server, by hand |
+
+## Where to find Spicrawl
+
+- Dify Marketplace: <https://marketplace.dify.ai/plugin/spicrawl/spicrawl>
+- Smithery: <https://smithery.ai/servers/spicrawl/web-scraper>
+- Cursor Directory: <https://cursor.directory/plugins/spicrawl>
+- npm: [`@spicrawl/mcp`](https://www.npmjs.com/package/@spicrawl/mcp) (the MCP server),
+  [`opencode-spicrawl`](https://www.npmjs.com/package/opencode-spicrawl) and
+  [`n8n-nodes-spicrawl`](https://www.npmjs.com/package/n8n-nodes-spicrawl)
+- Official MCP Registry: [`io.github.OfficialSpicrawl/mcp`](https://registry.modelcontextprotocol.io/v0/servers?search=io.github.OfficialSpicrawl/mcp)
+- Glama: <https://glama.ai/mcp/connectors/com.spicrawl.mcp>
 
 ## Get an API key
 
@@ -205,11 +228,15 @@ Extract and Batch scrape. It calls the Spicrawl API directly, not the MCP server
 API key (with the `scrape` scope, plus `batch` for Batch scrape) in the plugin's authorization
 settings.
 
-1. Download `spicrawl-<version>.difypkg` from the [`dify-v*` releases](https://github.com/OfficialSpicrawl/agent-plugins/releases)
-   of this repository.
-2. In Dify open Plugins, Install plugin, and either pick GitHub (this repository, the release and
-   the file) or upload the downloaded file.
-3. Choose To Authorize on the Spicrawl plugin and paste your API key.
+1. In Dify open Plugins, Marketplace, search for Spicrawl and select Install, or open the
+   [Spicrawl listing](https://marketplace.dify.ai/plugin/spicrawl/spicrawl). It needs Dify 1.14.2
+   or later.
+2. Choose To Authorize on the Spicrawl plugin and paste your API key.
+
+To install a specific release, or on a Dify that cannot reach the Marketplace, download
+`spicrawl-<version>.difypkg` from the [`dify-v*` releases](https://github.com/OfficialSpicrawl/agent-plugins/releases)
+of this repository and pick it under Plugins, Install plugin. The package on GitHub is unsigned, so
+a self-hosted Dify with signature verification on rejects it; install from the Marketplace there.
 
 See [`dify/README.md`](dify/README.md) for the tools and their parameters.
 
@@ -245,6 +272,81 @@ describes the Spicrawl tools, the CLI and the HTTP API. It does not connect the 
 | Transport | Streamable HTTP |
 | Header | `Authorization: Bearer <your key>` |
 | OAuth | not used; turn automatic OAuth off if the client tries it |
+
+## FAQ
+
+### How do I add web scraping to Claude Code?
+
+Install the plugin: `claude plugin marketplace add OfficialSpicrawl/agent-plugins`, then
+`claude plugin install spicrawl@spicrawl-plugins`. Or add only the server:
+
+```sh
+claude mcp add --transport http spicrawl https://mcp.spicrawl.com/mcp \
+  --header "Authorization: Bearer $SPICRAWL_API_KEY"
+```
+
+Then ask Claude Code to read a URL; it calls `spicrawl_scrape`.
+
+### How do I add web scraping to Cursor?
+
+Install the `spicrawl` plugin and set `SPICRAWL_API_KEY` under Plugins, Configure (see
+[Cursor](#cursor)), or put the server in `~/.cursor/mcp.json`. The plugin is also listed on the
+[Cursor Directory](https://cursor.directory/plugins/spicrawl).
+
+### How do I add web scraping to Codex or Gemini CLI?
+
+Codex: `codex plugin marketplace add OfficialSpicrawl/agent-plugins`, then add the server with your
+key to `~/.codex/config.toml` (see [ChatGPT and Codex](#chatgpt-and-codex)). Gemini CLI:
+`gemini extensions install https://github.com/OfficialSpicrawl/agent-plugins`.
+
+### What is MCP, and which server do these plugins use?
+
+MCP, the Model Context Protocol, is an open protocol that lets an AI app call external tools. The
+plugins connect to Spicrawl's hosted server at `https://mcp.spicrawl.com/mcp` over Streamable HTTP,
+with your API key as a bearer token. Spicrawl fetches the page and returns the content, so nothing
+else runs on your machine.
+
+### What can the agent do with Spicrawl?
+
+Fetch one URL as Markdown, HTML, text or JSON; extract named fields with CSS selectors; take a
+screenshot; run batch jobs over many URLs; keep a session's cookies and storage between requests;
+read its request history and credit usage; and search Spicrawl's documentation. The Markdown is the
+page's main content, which keeps token use down.
+
+### Does it work on pages that need JavaScript?
+
+Yes. If a plain fetch comes back empty, the agent can ask for JavaScript rendering. A plain fetch
+costs 1 credit and JavaScript rendering costs 3.
+
+### Can it crawl a whole website?
+
+No. Spicrawl fetches the URLs you give it. To cover a site, collect the URLs (from a sitemap, for
+example) and submit them as a batch job.
+
+### Can it read pages behind a login?
+
+A session keeps cookies and storage between requests, so the agent can sign in once and read
+further pages with the same session. Use it only for sites and accounts you are allowed to access.
+
+### How much does it cost?
+
+Credits are charged only for successful requests, and a failed request costs 0. See
+<https://docs.spicrawl.com/credits> for the price of each kind of request.
+
+### Where does my API key go?
+
+Only to Spicrawl. See [What is sent where](#what-is-sent-where). No file in this repository contains
+a key.
+
+### Which other tools does it support?
+
+ChatGPT, OpenCode, Factory Droid, GitHub Copilot CLI, Devin, Dify, n8n, and any tool that reads
+Agent Skills or speaks MCP. See [Supported tools](#supported-tools).
+
+### What license is it under?
+
+The plugins in this repository are Apache-2.0. Spicrawl itself is a hosted service that needs an
+account and an API key.
 
 ## What is sent where
 

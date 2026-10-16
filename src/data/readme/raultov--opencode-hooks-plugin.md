@@ -1,6 +1,7 @@
 # opencode-hooks-plugin
 
-Runs Claude Code `SessionStart` hooks in [opencode](https://opencode.ai), which has no hook system of its own.
+Runs Claude Code `SessionStart` and `PostToolUse` hooks in [opencode](https://opencode.ai), which has no hook
+system of its own.
 
 One package serves **both opencode generations**: the dual entrypoint runs on opencode V2 and on opencode V1
 (1.18.29 or newer), with the same bridged behaviour in each.
@@ -30,8 +31,10 @@ package maps one onto the other.
 | Claude Code                       | opencode V1                                     | opencode V2                                      |
 | --------------------------------- | ----------------------------------------------- | ------------------------------------------------ |
 | `SessionStart` + `matcher`         | the plugin function body (runs once at load)    | the `setup` body (runs once at load)             |
+| `PostToolUse` + `matcher`          | `tool.execute.after`                            | `tool.hook("execute.after")`, completed calls    |
 | `type: "command"`                  | `sh -c` via opencode's shell                    | `sh -c` via `node:child_process`                 |
 | `${CLAUDE_PLUGIN_ROOT}`            | the `root` option                               | the `root` option                                |
+| `$CLAUDE_PROJECT_DIR`              | the project directory                           | the project directory                            |
 | stdout `{ "systemMessage": "…" }`  | `experimental.chat.system.transform`            | session `context`/`compaction`/`generate`/`title` hooks |
 | stdout `{ "continue": false }`     | remaining commands are skipped                  | remaining commands are skipped                   |
 
@@ -104,6 +107,8 @@ With options:
   Pin `@raultov/opencode-hooks-plugin@0.2.0` there.
 - **Loading from a local path** (development, or a checkout): point the config at the built `dist/`
   directory, which contains `index.js`. npm package names resolve `dist/index.js` on their own.
+  On V2, plugins are keyed by `id` and the first one loaded wins, so a local build is ignored while the
+  published package is also configured (in the global config, say): remove one of the two.
 - The `./v1` and `./v2` package exports expose each generation's entrypoint in isolation, mostly for
   tests and wrappers; the default export already serves both.
 
@@ -149,6 +154,29 @@ Both layouts share the same shape, so either works:
 | `reportFailures`       | `boolean`                | `true`                                   | Whether a failed command adds a one-line notice to the system prompt.        |
 | `env`                  | `Record<string, string>` | `{}`                                     | Extra environment variables exported to every command.                      |
 
+## PostToolUse
+
+After each opencode tool call that changes files, the `PostToolUse` commands whose `matcher` selects the
+Claude Code tool name run, in order. The matcher follows Claude Code: empty or `*` selects every tool,
+anything else is a regular expression over the whole name.
+
+| opencode V1   | opencode V2 | Claude Code `tool_name` | `tool_input`                                                       |
+| ------------- | ----------- | ----------------------- | ------------------------------------------------------------------ |
+| `write`       | `write`     | `Write`                 | `file_path`, `content`                                             |
+| `edit`        | `edit`      | `Edit`                  | `file_path`, `old_string`, `new_string`, `replace_all`             |
+| `bash`        | `shell`     | `Bash`                  | `command`, `description`, `timeout`, `run_in_background`           |
+| `apply_patch` | `patch`     | `Edit`, once per file   | `file_path` of each file the patch adds, updates or moves to        |
+
+Every other tool runs no command: there is no Claude Code payload this plugin could vouch for. A `write` or
+`edit` with no file path runs none either. A patch's deleted files, and the source of a move, are left out: they
+no longer exist, and Claude Code never reports an `Edit` on a missing file. `file_path` is always absolute,
+resolved against the project directory. The payload also carries `session_id`, `cwd` and `hook_event_name`; it
+carries no `transcript_path` and no `tool_response`.
+
+Each command is awaited, as Claude Code does, so a hook that inspects the working tree sees the tool's effect.
+It is bounded by `commandTimeoutMs`. A failure is logged only: it never reaches the system prompt and never
+fails the tool call. stdout directives are not honoured.
+
 ## Behaviour
 
 **Startup is not blocked.** opencode awaits the plugin function, so awaiting the hook commands there would
@@ -161,8 +189,10 @@ starve the rest. The two timeouts are easy to confuse: `commandTimeoutMs` bounds
 bounds how long the first model call waits for all of them. Bun's shell exposes no way to kill a running
 command, so an overrunning one is left to finish on its own.
 
-**Commands get no stdin.** They run with stdin from `/dev/null`, so a hook that reads it by accident sees
-EOF instead of hanging.
+**Commands get the event payload on stdin,** as in Claude Code, and stdin then ends, so a hook that reads it
+sees EOF instead of hanging. `SessionStart` gets `hook_event_name`, `source: "startup"` and `cwd`; there is no
+`session_id` (no session exists when the plugin loads) and no `transcript_path` (there is no Claude Code
+transcript).
 
 **Failures are soft.** A missing script, a non-zero exit, or a network timeout produces a log entry and the
 next command still runs. A broken hook never breaks your session. The model is told too: each failed command
@@ -184,9 +214,10 @@ Claude Code; put it in `skip`.
 
 ## Limitations
 
-- **Only `SessionStart` is bridged.** The other Claude Code events have opencode counterparts you can wire up
-  directly in a plugin of your own, and doing so needs no `hooks.json`: `PreToolUse` → `tool.execute.before`,
-  `PostToolUse` → `tool.execute.after`, `Stop` → the `session.idle` event, `SessionEnd` → `session.deleted`.
+- **Only `SessionStart` and `PostToolUse` are bridged.** The other Claude Code events have opencode
+  counterparts you can wire up directly in a plugin of your own: `PreToolUse` → `tool.execute.before`,
+  `Stop` → the `session.idle` event, `SessionEnd` → `session.deleted`.
+- **`SessionStart` runs once per opencode process,** when the plugin loads, not once per session.
 - **`systemMessage` injection differs per generation.** opencode V2 uses the stable session request
   hooks, offering the block to every request kind that carries a system prompt (`context`, `compaction`,
   `generate`, `title`). opencode V1 uses an experimental hook (`experimental.chat.system.transform`)

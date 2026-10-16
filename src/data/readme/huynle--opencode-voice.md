@@ -37,8 +37,10 @@ repository): it works for connecting to a hub that runs elsewhere, but a local h
 until you build the app. To run a hub yourself, use the npm package, a [release binary](#running-the-hub)
 or Docker, or run `npm install && npm run build:web` in a source checkout.
 
-Then run **`/hub`** in OpenCode (`/voice` still works as an alias). The first time, it offers **Set up
-OpenCode Hub** with two paths.
+Then run **`/hub`** in OpenCode to set up and configure the hub connection. The first time, it offers
+**Set up OpenCode Hub** with two paths. **`/voice`** talks to the session on screen: it connects (running
+the setup first when needed), shares the session for Voice and opens it in the browser with Voice mode
+starting.
 
 ### Local: everything on this computer
 
@@ -50,8 +52,8 @@ OpenCode Hub** with two paths.
    pick a provider and paste its API key (one [OpenRouter](https://openrouter.ai/keys) key covers both
    directions, or point both at your own OpenAI-compatible servers), **Save**, then **Test voice**. Keys
    stay on this computer in `~/.local/state/opencode-hub`.
-3. `/hub` → **Talk on this device** opens the current session; **Open hub** opens the home page any time.
-   **Conversation** on a session page is the hands-free Voice loop.
+3. **`/voice`** in a session opens it in the browser with Voice mode (the hands-free loop) starting;
+   `/hub` → **Open hub in browser** opens the home page any time.
 
 ### Your own hub (phones anywhere)
 
@@ -164,11 +166,17 @@ conversation mode and utterances (403 `not_exposed` for sessions not shared with
 
 | Route | Result |
 |---|---|
-| `POST /api/sessions/:id/turn {text}` | sends a turn; while the session tree is running it steers instead. Answers `{mode: "turn" \| "steer"}`. 400 empty or over 100,000 characters; 409 "A turn is already running for this session" |
+| `POST /api/sessions/:id/turn {text, images?}` | sends a turn; while the session tree is running it steers instead. Answers `{mode: "turn" \| "steer"}`. `images` is up to 4 `{mime, data, name?}` (PNG, JPEG, WebP or GIF; canonical base64 whose bytes match the type; each at most 512 KB decoded, together at most 750,000 base64 characters); `text` may be empty when images are attached. They reach OpenCode as inline file attachments. 400 empty, over 100,000 characters or invalid images (with the reason); 409 "A turn is already running for this session" |
+| `GET /api/sessions/:id/timeline/messages/:message/files/:index` | one image attached to a user message, as bytes with its type (`cache-control: private, no-store`). Timeline user items list their attachments as `files: [{index, mime, name?}]` (never the bytes). Only PNG, JPEG, WebP and GIF are served (404 otherwise or when missing); 413 when the image would not fit in a protocol frame (about 650 KB) |
 | `POST /api/sessions/:id/stop` | interrupts running descendants deepest first, then the root; idempotent. Also releases the hub's turn lock for the tree: a turn request still waiting answers `{outcome: "interrupted"}` and the next turn can start (`/interrupt` does the same) |
 | `GET /api/sessions/:id/summary` | context usage, todos, MCP status (at most 100 servers), branch and working-tree change stats (each part optional). `changes` lists at most 500 files, most-changed first, with `totalFiles` and `truncated`; its `additions`/`deletions` cover every file |
 | `GET /api/sessions/:id/diff?file=` | one file's patch, on demand (capped at 400 KB as JSON, then `truncated: true`); never stored in the hub |
 | `POST /api/sessions/:id/read` · `GET /api/reads` | per-user read marks, synced to your other devices |
+| `GET /api/push/prefs?endpoint=` | `{prefs, quietHours, muted, subscriptions, subscribed?}`: this device's toggles (`handoff, question, permission, finished, failed, say`) and quiet hours, the user's muted sessions, how many subscriptions the hub holds for this device, and whether it holds `endpoint` |
+| `PUT /api/push/prefs {toggles…, quietHours?}` | boolean toggles (a 0.5.0 `blocked` sets question and permission); `quietHours` `{start: "HH:MM", end: "HH:MM", timeZone}` or `null` (400 when invalid) |
+| `POST /api/push/subscribe {subscription, prefs?, oldEndpoint?}` · `POST /api/push/unsubscribe {endpoint}` | this device's subscriptions; `oldEndpoint` is dropped (rotated subscription) |
+| `POST /api/push/test` | a test notification to the caller's device only: `{sent, failed: [{host, status?}], subscriptions}`; 429 with `retry-after` within 10 s of the last one |
+| `PUT /api/push/mute {sessionID, muted}` | mutes or unmutes a session's notifications for the user: `{muted}` |
 
 ## Spoke (OpenCode plugin)
 
@@ -180,7 +188,7 @@ The web app, speech and phones live on the hub.
 | Entry | File | Role |
 |---|---|---|
 | server | `server.ts` → `src/index.ts` | Starts the process-wide spoke (`src/spoke/`), `hub.*` RPC (also under the legacy id `voice.*`), the `voice` agent, short-reply and orchestrator `context` hook |
-| tui | `tui.ts` → `src/tui.ts` | `/hub` dialog (alias `/voice`); reports the sessions it shows (`hub.presence`) |
+| tui | `tui.ts` → `src/tui.ts` | `/hub` dialog and `/voice`; reports the sessions it shows (`hub.presence`) |
 | rpc | `rpc.ts` → `src/rpc.ts` | `HubRpc` (id `hub`; `VoiceRpc` is the deprecated id `voice`): `status / setServer / checkServer / enroll / startLocalHub / setMode / setSession / pairCode / handoff / openLink / conversation / presence` |
 
 OpenCode resolves a local plugin directory as `<dir>/server`, `<dir>/tui` and `<dir>/rpc` (`package.json`
@@ -197,16 +205,29 @@ OpenCode resolves a local plugin directory as `<dir>/server`, `<dir>/tui` and `<
   sessions). Every reported session can be inspected and controlled in both modes; in `session` mode the
   others are listed with `exposed: false` so the phone can offer "Enable voice", and only Voice
   (conversation mode, utterances) is refused for them.
-- **/hub** (alias **/voice**): before this machine is enrolled (or after the hub revoked it), **Set up
-  OpenCode Hub**: On this computer (local hub, every session or only chosen ones), Connect to a hub… (URL
-  checked with `hub.checkServer`, i.e. `GET <url>/healthz`, then device-code approval in the browser), or Not now; a
-  configured remote server comes first as "Connect to <host>". The decisions are pure functions in
-  `src/setup.ts`. Once set up: Talk on this device, Open hub (home page via a one-time sign-in link;
-  starts a local hub first when it is down, `hub.startLocalHub`), Send to phone, Conversation mode on/off,
-  This session on/off, Mode, Pair a phone, and Server (Set up again…).
-- **One-time links** (`hub.openLink`, `sessionID` optional): `<hub>/login?code=…&next=/s/<id>` or `next=/`.
-  While speech is not usable (see `ready` below) the hub redirects to `<next>#speech`, and the page opens
-  Settings → Speech.
+- **/hub** configures the hub connection. Before this machine is enrolled (or after the hub revoked it),
+  **Set up OpenCode Hub**: On this computer (local hub, every session or only chosen ones), Connect to a
+  hub… (URL checked with `hub.checkServer`, i.e. `GET <url>/healthz`, then device-code approval in the
+  browser), or Not now; a configured remote server comes first as "Connect to <host>". The decisions are
+  pure functions in `src/setup.ts`. Once set up, the title shows the server and connection state, and the
+  menu has: **Server** (keep it, Change server URL… with the same reachability check, Use a hub on this
+  computer, Set up again…), **Start local hub** (a local server that is not answering), **This machine:
+  approved / waiting for approval / revoked**, **Mode**, **This session on/off** (mode "This session
+  only"), **Pair a phone**, **Open hub in browser** (home page via a one-time sign-in link; starts a local
+  hub first when it is down, `hub.startLocalHub`), and for a shared session **Send to phone** and
+  **Conversation mode on/off**.
+- **/voice** (no menu; `src/voice-command.ts`): with a session on screen, it (1) runs the /hub setup when
+  the machine is not set up (then continues once connected; a hub that still waits for approval says to run
+  /voice again), asks for a mode when sharing is off, and connects (starting a local hub when needed); (2)
+  shares the session for Voice (`hub.setSession` in "This session only" mode); (3) opens
+  `<hub>/s/<session>?voice=1` through a one-time sign-in link (`hub.openLink {sessionID, voice: true}`).
+  The page turns Voice mode on for that session (turning it off in any other session first) and removes
+  `?voice=1` from the address. When the browser will not start audio without a tap (a link opened from the
+  terminal), the page shows **Tap to start Voice mode** instead of an error. The `voice` agent keeps its
+  name.
+- **One-time links** (`hub.openLink`, `sessionID` and `voice` optional): `<hub>/login?code=…&next=/s/<id>`
+  (with `voice`: `next=/s/<id>?voice=1`) or `next=/`; `/login` accepts no other `next`. While speech is not
+  usable (see `ready` below) the hub redirects to `<next>#speech`, and the page opens Settings → Speech.
 - One active spoke per process (`globalThis` singleton); the shared background service
   (`opencode serve --service`) also lists its root sessions from the last `list.days` days, at most
   `list.max`, newest first (no subagent children, nothing archived; `src/spoke/listing.ts`), plus sessions
@@ -285,8 +306,9 @@ not persist those potentially sensitive details.
   is refused for sessions not shared with Voice. Replies reach the hub as forwarded
   `session.text.ended`, `session.inbox.delivered` and `session.agent.selected` events.
 - State is per process and in memory; the hub re-sends `conversation on` after a reconnect.
-- From the terminal: `/hub → Conversation mode` toggles it for the current session (same code path),
-  then offers to send the session to your phone.
+- From the terminal: `/voice` opens the current session in the browser with Voice mode starting; `/hub →
+  Conversation mode` toggles conversation mode only (same code path as the phone), then offers to send the
+  session to your phone.
 
 ## Central server
 
@@ -332,9 +354,15 @@ the Docker image, npm package and binaries ship the build). One store fed by the
 - **`/`**: All sessions as a sortable, filterable table (a list on phones); filters and sort are kept per device.
 - **`/s/<id>`**: the transcript (markdown replies, "Thought for Ns", "Used N tools" with full details on demand,
   subagent rows linking to their sessions), permission cards, and the composer: Send while idle, Steer while the
-  session tree runs, Stop for the whole tree, Dictate, Voice mode (hands-free, see below; turns Voice on first when
-  needed) with a microphone picker, and the Voice/Worker model menus. The right rail (a bottom sheet on phones) shows
-  the server, branch, context use, MCP servers and changed files with a diff viewer. Every session works with Voice
+  session tree runs, Stop for the whole tree, Dictate (into this session's draft; leaving the session while
+  recording cancels it; each session keeps its own unsent draft), Voice mode (hands-free, see below; a toggle that
+  turns Voice on first when needed; one session at a time, so turning it on elsewhere turns the first one off; it
+  keeps running while you look at other sessions, which show a "Voice: <session>" pill with End) with a
+  microphone picker, and the Voice/Worker model menus. The right rail (a bottom sheet on phones) has
+  cards that collapse from their header (remembered per device): **Environment** (machine with
+  online/offline/Connecting, project folder with the full path as tooltip, branch, and where it is open:
+  TUI, Herdr or background), Context, **Connectors · N connected** (MCP servers) and Changes with a diff
+  viewer. Every session works with Voice
   off; Voice only adds speech.
 - **`/new`**, **`/settings`** (account, notifications, Voice, Speech, machines and approvals, devices, admin),
   **`/pair`**, **`/approve`**.
@@ -394,23 +422,48 @@ Pure logic lives in `web/src/core` and `web/src/lib` (bun tests in `test/web-*.t
   take Send, Steer, Stop and permission replies like any other session. Only Voice is off: the row's ⋯
   menu has **Turn Voice on** (`POST /api/sessions/:id/expose {on:true}`; shown at once, reverted on
   error), and Voice mode on such a session turns Voice on first.
-- **New session** (+ in the header, + on any group, or a group's ⋯ menu): machine (when several are
-  online), workspace (Herdr workspaces first, then known folders), folder (a Herdr workspace's pane
-  folders, most used first), optional title, and **Open in Herdr** (shown when the machine runs Herdr; on
-  by default for a Herdr workspace). Sends `POST /api/machines/:id/sessions {directory, title?,
-  herdrWorkspace?}`; the new session opens with an offer to start conversation mode. "Opened in Herdr ·
-  <workspace>" confirms the new tab; if Herdr failed, the session still exists and the hub's `warning`
-  is shown. 409 (background service not connected) is shown in the sheet.
+- **New session** (`/new`; + in the header, + on any group, or a group's ⋯ menu), composer first: "Describe
+  a task or ask a question" (images can be attached), and under it where it runs: **Environment** (your
+  machines on this hub: online first with their process and OpenCode version, offline ones listed but not
+  selectable; ✓ on the chosen one), **Project** (a popover with search: Herdr workspaces with their pane
+  folders, then known folders), the folder's **branch** (from the summary of the latest session in that
+  folder, when there is one) and **Open in Herdr tab** (a Herdr workspace on a machine that runs Herdr; on
+  by default). Submitting sends `POST /api/machines/:id/sessions {directory, herdrWorkspace?}`, opens the
+  new session and sends the prompt (and images) as its first turn (`POST /api/sessions/:id/turn`). The last
+  environment and folder are remembered on the device (`localStorage` `hub.newSession`); the group "+"
+  preselects with `?machine=&key=&dir=`. "Opened in Herdr · <workspace>" confirms the new tab; if Herdr
+  failed, the session still exists and the hub's `warning` is shown. 409 (background service not
+  connected) is shown under the composer.
 
-**Notifications** (web push, VAPID keys generated once and stored in the state file): hand-offs from the
-terminal and blocked sessions are on by default, "finished" (a root session's run succeeded or failed,
-except voice turns started from the page) is opt-in per device. Payloads are `{kind, sessionID, title,
-body}` with a short title only (e.g. "api-server needs permission"); at most one per session and kind
-every 30 s; expired subscriptions (404/410) are pruned. "Read agent replies as notifications when the phone is locked"
-(push pref `say`) is opt-in per device: the hub pushes spoken replies while no phone shows the session.
+**Notifications** (web push, VAPID keys generated once and stored in the state file). Each device picks what
+it wants (Settings → Notifications): **a session asks a question**, **needs permission**, **failed**,
+**finished** (a root session's run succeeded, except voice turns started from the page), **hand-offs from the
+terminal**, and **Voice replies when you're not watching** (pref `say`: spoken replies while no device shows
+the session). Questions, permissions, hand-offs and Voice replies are on by default; finished and failed are
+opt-in (0.5.0's single "blocked" toggle became question + permission, and its "finished" became finished +
+failed, migrated on start). Optional **quiet hours** per device (local start/end time in the browser's time
+zone) hold everything except hand-offs; **Mute notifications** in a session's ⋯ menu silences one session
+for you on every device (hand-offs still come through). At most one per session and kind every 30 s
+(Voice replies: 10 s); expired subscriptions (404/410) are pruned.
 
-- **Android (Chrome)**: open the public URL, pair, tap the bell (Enable notifications). Use Chrome's
-  "Add to Home screen"/"Install app" for a standalone window.
+- **Status per device**: Settings → Notifications shows the browser permission, whether the service worker
+  is registered and whether this hub holds this browser's subscription. "Allowed, but this device is not
+  subscribed on this hub" means nothing will arrive (typical after the hub moved to a new address): **Enable
+  notifications on this device** fixes it. When permission is granted, the app re-subscribes by itself on
+  load if the hub lost the subscription, and the service worker re-subscribes when the browser rotates it
+  (`pushsubscriptionchange`). **Send test notification** sends one to this device only and shows the result
+  (sent, or the push service's status).
+- **Delivery**: questions, permissions and failures are sent with `urgency: high` and a TTL of one hour so a
+  phone in doze gets them; they stay on screen until handled (`requireInteraction`), vibrate, and replace the
+  previous one of the same session and kind. A permission notification asks the hub (with the device's
+  cookie, from the service worker) what the request is, shows it, and offers **Allow once** / **Reject**;
+  the payload itself never carries it. Payloads are `{kind, sessionID, title, body, requestID?}`.
+- **Android (Chrome)**, for notifications that arrive with the screen off: open the public URL, sign in or
+  pair, then Chrome's menu → **Install app** (or Add to Home screen) and use the installed app; Settings →
+  Notifications → **Enable notifications on this device** and **Send test notification**. In Android
+  settings → Apps → Chrome (and the installed app, if listed): Notifications allowed (all categories), and
+  **Battery → Unrestricted** (not "Optimized"), so Chrome may receive pushes while dozing. Notifications of
+  an app you have not opened for a long time can be delayed by Android's adaptive battery.
 - **iPhone/iPad**: web push needs iOS/iPadOS 16.4+ and the app added to the Home Screen
   (Share → Add to Home Screen); open it from the icon, then enable notifications. Audio replies need a
   tap first (the mic or Send button unlocks playback).
@@ -602,7 +655,7 @@ A TTS `speed` (0.5–2.0) is sent when set; a provider that answers 400 gets one
 |---|---|
 | `GET /api/settings/speech` | `{stt: {provider, model, baseURL?, language?, apiKey}, tts: {provider, model, voice, baseURL?, speed?, apiKey}, voiceHints, ready}`. `apiKey` is `{set, last4?, source: "settings" \| "config" \| "env" \| "none"}` (`config`: hub.json); a key is never returned. `voiceHints` maps model ID prefixes to known voices. `ready` is `{stt, tts, reason?}`: a direction is usable when `openrouter` has a key or `openai-compatible` has a base URL; `reason` says what is missing. The page shows a **Set up speech** card (home and session view) until both are ready, and the mic opens speech settings instead of recording while STT is not usable |
 | `PUT /api/settings/speech {stt?, tts?}` | partial update, answers like GET. `apiKey`: string sets, `null` clears, absent keeps; changing `provider` or `baseURL` without a new key drops the stored one. 400 for unknown providers, names over 200 chars, bad URLs, speed outside 0.5–2.0, `openai-compatible` without `baseURL` |
-| `GET /api/settings/speech/models?kind=stt\|tts` | `[{id, name}]`. OpenRouter: its model list filtered by output modality (`transcription` / `speech`), cached 10 min, 502 when unreachable. OpenAI-compatible: `GET {baseURL}/models`, `[]` on any failure |
+| `GET /api/settings/speech/models?kind=stt\|tts` | `{models: [{id, name, current?}], note?}`, the configured model first (`current`, added when the provider does not list it). OpenRouter: its model list filtered by output modality (`transcription` / `speech`), cached 10 min, 502 when unreachable. OpenAI-compatible: `GET {baseURL}/models` classified by kind (speech-to-text: transcribe/whisper/stt/asr names or audio-in/text-out audio models; text-to-speech: tts/speech/voice names or speech/audio output, never chat, embedding, image, rerank or music models); when nothing is labeled, every model with `note`; only the configured model on any failure |
 | `POST /api/settings/speech/test {kind: "tts", text?}` | `audio/mpeg` preview with the current settings (text capped at 300 chars). `kind: "stt"` is 501 |
 
 Writes need the same-origin `Origin`. Provider failures are 502 with the provider's message.
@@ -692,12 +745,18 @@ Pure logic is in `web/src/core/feedback-core.ts` (tested with bun); `web/src/cor
   when leaving the view. The hub uses this to decide when to push.
 - **Screen off** (Settings → Voice → "Keep listening when screen is off", off by default). Off: the
   Screen Wake Lock keeps the screen on while listening. On: no wake lock. The mic and VAD keep running
-  when the page is hidden. The lock screen shows media controls (`navigator.mediaSession`: session
-  title, "OpenCode Voice"); pause stops listening (mic muted, speech cleared) and play resumes. A
-  silent looping audio element plays to make suspension less likely. **This is best-effort:** whether
+  when the page is hidden. A silent looping audio element plays to make suspension less likely. **This is best-effort:** whether
   listening survives a locked screen depends on Android Chrome (battery saver, OS version), and iOS
   suspends it. The OpenCode session keeps running on the laptop either way. When the phone is not
   listening, turn on the `say` notification to get replies as push notifications.
+- **"Voice mode on" notification**: while Voice mode is on, the page shows a silent, persistent system
+  notification through the service worker (tag `voice-mode`): "<session title> · listening" (thinking,
+  speaking, muted; updated at most every 3 s) with **End** and **Open**. End reaches the page (which ends
+  Voice mode); with no page open, the service worker turns conversation mode off at the hub itself with the
+  device cookie. It closes when Voice mode ends or the page goes away. It needs notification permission:
+  without it the Voice bar shows **Allow notifications**. The Media Session shows "Voice mode on" with the
+  session title on the lock screen while Voice audio plays; its pause and stop end Voice mode (logic in
+  `web/src/core/voice-notifier.ts`).
 - **Settings → Speech** (your own settings; admins also edit the server default): cards for Speech-to-text and Text-to-speech, with provider
   (OpenRouter / OpenAI-compatible), base URL (OpenAI-compatible only), model, voice (TTS), language (STT,
   optional), server-side speed (TTS, optional, 0.25–4) and API key. Model and voice are buttons that open a
@@ -723,7 +782,7 @@ laptop to the providers in your config.
    first machine is approved by itself, the mode is set, and the hub opens.
 2. Speech: on the page (Settings → Speech), or in `~/.config/opencode-hub/hub.json` (`chmod 600`;
    examples below).
-3. `/hub → Talk on this device` / **Open hub** open the page with a one-time sign-in link; no
+3. `/voice` / `/hub` → **Open hub in browser** open the page with a one-time sign-in link; no
    pairing needed. To use a phone on the same network, the hub must listen beyond loopback (see notes).
 
 Or run the hub yourself: `scripts/hub-local.sh` (foreground, reads `hub.json`), or keep it running with
@@ -838,7 +897,7 @@ day one; everything below keeps working with a one-time warning where noted.
 |---|---|
 | npm `@huynle/opencode-voice` | `@huynle/opencode-hub` |
 | `opencode plugin add github:huynle/opencode-voice` | `github:huynle/opencode-hub` |
-| `/voice` | `/hub` (`/voice` kept as an alias) |
+| `/voice` | `/hub` for the connection; `/voice` (0.5.1) opens the session with Voice mode |
 | `opencode-voice-hub` command | `opencode-hub` (`opencode-voice-hub` kept as an alias) |
 | binaries `opencode-voice-hub-<os>-<arch>` | `opencode-hub-<os>-<arch>` |
 | image `ghcr.io/huynle/opencode-voice-hub` | `ghcr.io/huynle/opencode-hub` |

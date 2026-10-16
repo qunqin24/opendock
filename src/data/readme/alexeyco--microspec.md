@@ -1,3 +1,8 @@
+> [!IMPORTANT]
+> This repository is frozen. Why reinvent the wheel when
+> [`@alexeyco/opencode-openspec`](https://github.com/alexeyco/opencode-openspec) already does
+> all of this — and better: use that package instead.
+
 # @alexeyco/microspec
 
 Task Contract: a task-scoped Micro-SDD flow for OpenCode and Pi — `/microspec.brief` produces one executable `TASK.md`, `/microspec.execute` runs it through parallel subagent waves.
@@ -61,7 +66,7 @@ Full catalog with report formats and dispatch mechanics: [docs/agents.md](docs/a
 | ------------------------------------------------------ | ------------------------------------------------------------------------------------------- |
 | [microspec-brief](skills/microspec-brief/SKILL.md)     | Briefing flow — scope check → interview → playback gate → plan + draft → critique → TASK.md |
 | [microspec-execute](skills/microspec-execute/SKILL.md) | Execution flow — waves → verification → review → stop/guardrail handling → Result           |
-| [microspec-retro](skills/microspec-retro/SKILL.md)     | Retrospective — evidence bundle → ranked findings (mechanical / judgment / dead rule)       |
+| [microspec-retro](skills/microspec-retro/SKILL.md)     | Retrospective — evidence bundle → ranked findings                                           |
 | [task-contract](skills/task-contract/SKILL.md)         | Canonical TASK.md contract specification                                                    |
 
 ## Usage
@@ -72,7 +77,7 @@ Full catalog with report formats and dispatch mechanics: [docs/agents.md](docs/a
 4. Run `/microspec.execute` — the plugin reads TASK.md, sets status `in_progress`, groups plan steps by `deps` into waves, dispatches one subagent per step in parallel. Four situations halt for the user (irreversible action, security change, external side effect, broken plan). Guardrail tiers: plain imperative → `blocked`; `[ask]` prefix → pause and ask. The Plan's `Delivery:` marker decides whether the final wave ends with a commit/push step or with a `Do not commit or push.` guardrail.
 5. After each wave, `microspec-verifier` checks affected acceptance criteria with fresh-run evidence; after the final wave, `microspec-reviewer` critiques the cumulative diff with a `REVIEW FOCUS:` block. After a fix round, scoped re-review: `ADDRESSED` / `NOT-ADDRESSED`. When a PR is wanted, its body (`What` / `Why` / `Verified` / `Look here first`) is drafted from the run and offered with a prefilled compare link.
 6. All AC verified `PASS`, no blocking findings → status `done`. Final report lists completed steps, `choice:` entries, `ruling:` entries, and `git diff --stat`.
-7. Run `/microspec.retro` — the orchestrator compiles an evidence bundle (TASK.md, run counters, `git diff --stat`, quality bar) and dispatches `microspec-retrospector` for a read-only retrospective. At most ten findings ranked by severity, each classified mechanical, judgment, or dead rule, delivered as ready-to-file issue bodies with a prefilled creation link to the plugin repository and an offer to create — host-repo findings reported without links. Nothing is applied.
+7. Run `/microspec.retro` — the orchestrator compiles an evidence bundle (TASK.md, run counters, `git diff --stat`, quality bar) and dispatches `microspec-retrospector` for a read-only retrospective. At most ten findings ranked by severity, each in four fixed sections (`What happened` / `Why it matters` / `How to fix` / `How to verify`). The report opens with one issues link to the plugin repository; findings about your own repo are advice only. Nothing is applied.
 
 ```text
 User: /microspec.brief Add retry logic to the HTTP client
@@ -93,7 +98,7 @@ User: /microspec.execute
  └─ Result: done (choices, rulings, evidence)
 
 User: /microspec.retro
- └─ microspec-retrospector (≤10 findings — mechanical / judgment / dead rule)
+ └─ microspec-retrospector (≤10 findings)
 ```
 
 The Plan section is the single source of execution order.

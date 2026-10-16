@@ -50,7 +50,7 @@ restart Tabby. Configure under **Settings → Opencode Status**.
 (atomic temp+rename):
 
 ```json
-{ "ts": 0, "event": "PreToolUse", "session": "ses_…", "ppid": 0, "ancestors": [], "cwd": "" }
+{ "ts": 0, "event": "PreToolUse", "session": "ses_…", "ppid": 0, "ancestors": [], "cwd": "", "title": "Fix the bug" }
 ```
 
 `event` reuses the `tabby-claude-status` names (`PreToolUse`,
@@ -61,6 +61,12 @@ carries the TUI client's pid (located by its `-s <sessionID>` command line) plus
 its ancestor chain; the Tabby plugin intersects that with each tab's pty child
 processes. Child (subagent) sessions resolve to their root session via
 `session.created` parentIDs.
+
+Several bare TUIs in the same directory share one cwd, so every daemon event
+lists all of their pids as ancestors and ancestry alone cannot tell their tabs
+apart. The spool therefore also carries the session `title` (from
+`session.created` / `session.renamed`); the Tabby plugin matches it against the
+tab's `OC | <title>` terminal title and prefers that match over ancestry.
 
 ## Development
 

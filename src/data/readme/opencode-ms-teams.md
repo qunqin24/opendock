@@ -67,11 +67,12 @@ OpenCode 세션에서 `/connect-teams` 스킬을 호출한다.
 
 OpenCode 세션이 사용자 승인(permission) 또는 질문(question) 을 기다릴 때, Teams 채팅으로 발송되는 알림 메시지 하단에 답장 명령 예시가 포함된다. **OpenCode TUI 로 돌아가지 않고 Teams 답장만으로 응답 가능**.
 
-각 알림에는 짧은 코드 (`p......` = permission, `q......` = question) 가 부여되며, 답장 명령은 이 코드를 인용한다. 답장 verb 는 **최상위 keyword** (`#allow`, `#reject`, `#answer`, `#skip`) 로 동작한다.
+각 알림에는 짧은 코드 (`p......` = permission, `q......` = question) 가 부여되며, 답장 명령은 이 코드를 인용한다. 답장 verb 는 **최상위 keyword** (`#allow`, `#allow-always`, `#reject`, `#answer`, `#skip`) 로 동작한다.
 
 | 명령 | 설명 |
 |---|---|
 | `#allow <code>` | permission 을 이번 한 번만 승인 (`once`) |
+| `#allow-always <code>` | permission 을 승인하고 이후 동일 패턴 요청도 자동 승인 (`always`, TUI 의 `Allow always` 와 동일) |
 | `#reject <code>` | permission 거부 |
 | `#answer <code> <label>[, <label2>...]` | 단일 질문에 label 응답 (multiple 은 comma 로 여러 label) |
 | `#answer <code>-<n> <label>` | 여러 질문이 있는 경우 sub-code (`{code}-1`, `{code}-2`) 로 개별 응답 |
@@ -93,6 +94,7 @@ Workspace: /home/user/my-project
 
 Teams 답장으로도 응답 가능:
 • #allow pa7k9m
+• #allow-always pa7k9m
 • #reject pa7k9m
 ```
 
@@ -122,6 +124,7 @@ Workspace: /home/user/my-project
 
 Teams 답장으로도 응답 가능:
 • #allow p9r2t8
+• #allow-always p9r2t8
 • #reject p9r2t8
 ```
 
@@ -306,6 +309,7 @@ Workspace: /home/user/my-project
 
 Teams 답장으로도 응답 가능:
 • #allow pxm4kq
+• #allow-always pxm4kq
 • #reject pxm4kq
 ```
 
@@ -357,22 +361,26 @@ opencode 서버가 이미 permission 을 처리했거나 sessionID/permissionID 
 ❌ 적용 실패 · pa7k9m allow (opencode 세션이 이미 응답했거나 만료됨)
 ```
 
-##### 시나리오 12: `#allow-always` (미지원)
+##### 시나리오 12: `#allow-always` (항상 승인)
 
 **사용자 답장**:
 ```
 #allow-always pa7k9m
 ```
 
-**Plugin 결과**: `#allow` 뒤 `-` 는 후행 경계가 아니므로 `detectTrigger` 자체가 매칭 실패. SDK 호출 없음, promptAsync 주입 없음, Teams 후속 없음. 완전히 무시됨.
+**Plugin 결과**: `#allow-always` 는 `#allow` 와 별개의 최상위 keyword 로 매칭되어 SDK 를 `response: "always"` 로 호출한다. OpenCode TUI 의 `Allow always` 버튼과 동일하게 이후 같은 패턴의 permission 요청은 다시 묻지 않는다. Teams:
+```
+✅ 반영됨 · pa7k9m allow-always
+```
 
-> 영구 권한 부여는 반드시 OpenCode TUI 의 `Allow always` 버튼으로만 가능. Teams 원격 답장으로 permanent grant 는 계정 탈취 시 위험이 크므로 의도적으로 차단.
+> `always` 승인은 이후 요청까지 자동 승인되므로 범위가 넓다. 특히 alert 본문에 `⚠️ Workspace 외부 경로` 가 표시된 경우 `#allow` (일회성) 사용을 권장한다.
 
 #### 요약 치트시트
 
 | 상황 | Teams 답장 |
 |---|---|
 | Permission 승인 (일회성) | `#allow <p_code>` |
+| Permission 승인 (항상) | `#allow-always <p_code>` |
 | Permission 거부 | `#reject <p_code>` |
 | Question 단일 답변 | `#answer <q_code> <label>` |
 | Question 복수 답변 | `#answer <q_code> <label1>, <label2>` |
@@ -387,7 +395,7 @@ opencode 서버가 이미 permission 을 처리했거나 sessionID/permissionID 
 
 #### 제약 및 안전장치
 
-- **`#allow-always` 는 지원하지 않는다** — 영구 권한 부여는 반드시 OpenCode TUI 에서 진행. 원격 계정 탈취 시 permanent broad grant 가 되는 위험을 차단.
+- **`#allow-always` 는 범위가 넓다** — 이후 동일 패턴 요청까지 자동 승인되므로 Teams 계정이 탈취되면 broad grant 로 이어질 수 있다. 확신이 없으면 `#allow` (일회성) 을 사용할 것.
 - **알 수 없는 code** (오타·만료·이미 응답됨) 는 조용히 무시. 잘못된 code 반복 시도로 인한 알림 폭탄 방지.
 - **다른 채팅방에서 온 code** 는 무시 (rootSid 일치 검증).
 - **TTL**: 코드는 24시간 후 자동 만료. OpenCode 세션이 TUI 로 먼저 응답한 경우에도 즉시 정리됨.
@@ -633,7 +641,7 @@ Azure AD 앱 등록/권한 신청은 조직의 Azure 관리자 안내를 따른�
 **감지 경로 3종** (defense-in-depth):
 1. assistant 응답에 `CONNECT_TRIGGER_MARKER` (HTML 주석) 포함
 2. assistant 응답에 `"**Microsoft Teams 연동을 시작합니다.**"` 문구 포함 (모델이 marker 를 누락한 경우 대비)
-3. 사용자 입력 첫 줄이 `/connect-teams` slash 로 시작 (스킬 실행 여부와 무관하게 즉시 activate)
+3. 사용자 입력이 `/connect-teams` 호출인 경우 — 첫 줄이 `/connect-teams` 로 시작하거나, OpenCode TUI 가 스킬을 SKILL.md 본문으로 확장해 보낸 경우 (스킬 실행 여부와 무관하게 즉시 activate, 채팅방 목록 조회가 끝날 때까지 대기)
 
 또한 사용자가 처음부터 `19:...` 형식 chatId 를 붙여넣으면 **implicit connect** 로 취급하여 activate.
 

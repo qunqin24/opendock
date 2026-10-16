@@ -15,10 +15,10 @@ you too.
   config, so new models appear after a restart (or a new login) as soon
   as they ship.
 - **Login that doesn't leak keys.** Browser-based login (PKCE) issues a fresh
-  `lr_` key and stores it in `~/.local/share/opencode/auth.json` — OpenCode's
-  own credential store. The plugin never writes your key to any other file.
-  Prefer a key you already have? Paste it (it's validated against the gateway
-  before it's accepted).
+  `lr_` key and hands it to OpenCode's own credential store (v2 keeps
+  credentials in its database, with `/connect` managing accounts). The plugin
+  never writes your key to any other file. Prefer a key you already have?
+  Paste it with the **Paste an API key** method.
 - **LunaRoute MCP built in.** When you're logged in, the hosted LunaRoute MCP
   server is registered in your live session config so tools like
   `generate_image` are callable from OpenCode. Nothing is written to your
@@ -34,9 +34,12 @@ you too.
 
 ## Requirements
 
-- OpenCode **>= 1.14.49**.
+- OpenCode **>= 2.0.0** (v2 plugin API).
+- **OpenCode 1.x users**: stay on `@lunaroute/opencode-extension@0.3.1` — this
+  release is v2-only. Pin it explicitly (`"plugins": ["@lunaroute/opencode-extension@0.3.1"]`),
+  because unpinned installs follow `@latest` and would stop loading on 1.x.
 - A LunaRoute account with access to at least one organization.
-- Linux or macOS. (Windows is untested and unsupported in v1.)
+- Linux or macOS.
 
 ## Quick start
 
@@ -48,9 +51,12 @@ OpenCode reads all of them; the project one wins on conflicts. (Do not use the
 ```json
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugin": ["@lunaroute/opencode-extension"]
+  "plugins": ["@lunaroute/opencode-extension"]
 }
 ```
+
+One entry loads both halves: the server plugin and the `./tui` CLI plugin
+(no `tui.json`, no `cli.json` needed).
 
 Previously installed an older release? Clear OpenCode's plugin cache first —
 see [Troubleshooting](#troubleshooting).
@@ -78,20 +84,18 @@ paste promptly. A failed paste ends the flow (OpenCode cannot re-prompt) —
 re-run `/connect` for a fresh code; the instance log carries the exact
 reason.
 
-Before your first login, `/models` shows a single LunaRoute entry —
-**Log in to load models**. That placeholder is intentional: it keeps
-LunaRoute visible in `/connect` (OpenCode hides providers that have no
-models). Selecting it before logging in just fails with a 401; log in via
-`/connect` and it is replaced by the real catalog.
+Before your first login, no LunaRoute models are listed. `/connect` lists
+LunaRoute as an integration (that is what v2 lists), so the provider stays
+reachable regardless of the model count.
 
 ## LunaRoute MCP tools
 
 When you are logged in, the extension registers the hosted LunaRoute MCP
-server (`https://mcp.lunaroute.com/mcp`) in the **live session config** —
-tools (in v1: `generate_image`) become callable from OpenCode. The entry
-exists only in memory for the session: **it is never written to
-`opencode.json` or any other config file**, and your `lr_` key is never
-persisted anywhere outside OpenCode's own auth store.
+server (`https://mcp.lunaroute.com/mcp`) through the v2 MCP transform —
+tools become callable from OpenCode. The entry exists only in the live
+registry: **it is never written to `opencode.json` or any other config
+file**, and your `lr_` key is never persisted anywhere outside OpenCode's
+own credential store.
 
 - **Logged out**: no registration occurs (silent). Log in with `/connect`.
 - **After login or key rotation**: MCP refreshes automatically when the
@@ -173,31 +177,21 @@ Environment escape hatches only ever **disable** (values `off`, `0`,
 
 ### `/lunaroute` settings command (TUI)
 
-The package ships a TUI plugin (`exports["./tui"]`) that registers a
-`/lunaroute` slash command: it lists the five settings with their current
-values, and selecting one changes it — write-first, then the live-apply
-reload (a failed write never triggers the reload). It runs in the TUI
-process, outside the prompt loop, so it never spends a model turn.
+The package ships a v2 CLI plugin (`exports["./tui"]`) that registers a
+`/lunaroute` slash command through the TUI keymap. It offers the five
+settings with their current values plus **Refresh models**:
 
-> **Loading status — unverified.** In the 7pd6 spike the external TUI module
-> was never imported on OpenCode 1.18.30 despite a correct manifest and
-> `tui.json` (the server half of the same package loaded, and opencode's own
-> TUI-plugin commands rendered). The spike could not distinguish a broken
-> loader from the unpublished/local-spec install used in the sandbox; a real
-> published install may work. Until smoke item **T1** confirms it, treat the
-> `lunaroute.json` file + env hatches below as the supported interface and the
-> command as best-effort. See
-> [docs/tui-plugin-loading-spike.md](./docs/tui-plugin-loading-spike.md).
+- **Settings rows** — write-first: the value is persisted to
+  `lunaroute.json`, then the location reloads so the server plugin re-reads
+  the file and re-evaluates its registration gates. A failed write shows an
+  error toast and never reloads.
+- **Refresh models** — reloads the location (re-fetching the LunaRoute
+  catalog) and reports how many LunaRoute models are available.
 
-TUI plugins are declared in `tui.json`, **not** `opencode.json`:
-
-```jsonc
-// ~/.config/opencode/tui.json  (global)  or  <project>/.opencode/tui.json
-{ "plugin": ["@lunaroute/opencode-extension"] }
-```
-
-`opencode plugin @lunaroute/opencode-extension` writes that entry for you
-(it detects the server + TUI targets from the package manifest).
+It runs in the TUI process, outside the prompt loop, so it never spends a
+model turn. No `tui.json`/`cli.json` entry is needed: the same
+`plugins` entry in `opencode.json` that loads the server half also loads
+`./tui`.
 
 **Headless / no TUI**: the command is simply absent — settings stay fully
 functional as the `lunaroute.json` file plus the env hatches above. Edit the
@@ -344,66 +338,44 @@ that the Responses default applies.
 
 ## Troubleshooting
 
-- **`/connect` doesn't list LunaRoute**: run `opencode models | grep -i lunaroute`
-  first — the LunaRoute provider (placeholder model **Log in to load models**
-  before first login) must appear there too.
-  - **Missing from `opencode models` too** → the plugin isn't loading (or is
-    stale). OpenCode only reports load failures in the server log
-    (`~/.local/share/opencode/log/opencode.log` — look for
-    `failed to load plugin`; LunaRoute hook activity lands there as
-    `LunaRoute:` lines). In order of likelihood:
-    - **Stale plugin cache** (if you installed an older release before):
-      OpenCode pins the plugin at
-      `~/.cache/opencode/packages/@lunaroute/opencode-extension@latest`
-      (macOS: `~/Library/Caches/opencode/packages/@lunaroute/…`) and never
-      re-checks npm — a cached pre-0.1.2 copy keeps running forever, and
-      releases before 0.1.2 don't keep LunaRoute listed in `/connect`.
-      Clear it and restart OpenCode:
-      `rm -rf ~/.cache/opencode/packages/@lunaroute`.
-    - **Wrong config file or entry form**: the `plugin` entry must be in a
-      config file OpenCode reads (global `~/.config/opencode/opencode.json`
-      or a project `opencode.json`) and spelled as the npm name
-      `"@lunaroute/opencode-extension"` — a tarball/`file:` path entry does
-      not load on OpenCode ≥ 1.18.30.
-  - **Listed in `opencode models` but not `/connect`** → check
-    `enabled_providers` / `disabled_providers` in your OpenCode config:
-    OpenCode hides providers not in `enabled_providers` and those in
-    `disabled_providers` — remove `lunaroute` from the latter or add it to the
-    former.
-  - **Re-authenticating after a revoked key** (shape-valid credential,
-    gateway 401): `/connect` may not list LunaRoute — use the CLI instead:
-    `opencode providers login --provider lunaroute` opens the same
-    login-method picker.
-- **Placeholder says "Couldn't load models — check connection and restart"**:
-  you're logged in, but the model catalog could not be fetched (network, or a
-  custom `baseURL`/`LUNAROUTE_ROUTING_URL` pointing somewhere that doesn't
-  answer `/models`). The provider stays listed so you can retry; fix the
-  connection or URL and restart OpenCode.
-- **No models appear after login**: the gateway may be unreachable, or the
-  key may be stale. Re-run `/connect`.
-- **Key rotation**: re-run `/connect` — the new key replaces the old one, and
-  MCP picks it up on the next instance reload (no restart needed).
-- **Removing your credentials**: delete the `lunaroute` entry from
-  `~/.local/share/opencode/auth.json` (OpenCode has no `/disconnect` command
-  yet). The plugin stops injecting models and MCP on the next start; until
-  then, an open session keeps using the old key — server-side revocation is
-  what actually cuts access.
-- **Unreadable or corrupt auth.json**: the plugin logs one secret-free
-  warning and behaves as logged out (nothing is removed from your config).
-  Re-running `/connect` rewrites the store and restores the session.
+- **Plugin doesn't load / no LunaRoute models**: check `opencode plugin list`
+  (or the server log, `~/.local/share/opencode/log/opencode.log`) for
+  `failed to load plugin`. Common causes:
+  - **OpenCode 1.x with this release installed**: this release needs OpenCode
+    2.x. Pin `@lunaroute/opencode-extension@0.3.1` for 1.x.
+  - **Wrong config key/place**: the entry must be `plugins` in a config file
+    OpenCode reads (global `~/.config/opencode/opencode.json` or a project
+    `opencode.json`). The legacy `plugin` key is auto-normalized, but use
+    `plugins` going forward.
+  - **Stale cache**: older releases can linger under
+    `~/.cache/opencode/npm/@lunaroute/` (`~/Library/Caches/opencode/npm/...`
+    on macOS) — remove it and restart.
+- **`/connect` doesn't list LunaRoute**: check that the plugin is active
+  (`opencode plugin list`); LunaRoute appears as an integration with up to
+  three methods (browser, remote browser, API key).
+- **No models appear after login**: the gateway may be unreachable or the key
+  stale. Re-run `/connect`; v2 keeps accounts, so a new login is a new
+  account you can switch back from.
+- **Key rotation / multiple accounts**: `/connect` → LunaRoute lists saved
+  accounts; new logins become active and can be renamed or deleted there.
+  The plugin follows the active credential for models, MCP, and tools.
+- **Removing credentials**: use `/connect` (or `opencode auth logout`) — v2
+  stores credentials in its own database; editing `auth.json` no longer does
+  anything (v1 credentials are imported once at migration).
 - **`web_search` missing**: it only registers when logged in **and** the
-  hosted MCP server offers it (checked at session start). Log in via
-  `/connect`, then reload or restart; if it's still missing, the server
-  didn't offer it to your org. `LUNAROUTE_WEB_TOOLS=off` disables it on
-  purpose.
-- **Settings file problems**: a malformed `lunaroute.json` logs one warn and
-  behaves as if the file were absent (defaults) — fix the JSON and reload;
-  nothing else is affected.
+  hosted MCP server offers it. Log in via `/connect`, then reload or restart;
+  if it's still missing, the server didn't offer it to your org.
+  `LUNAROUTE_WEB_TOOLS=off` disables it on purpose.
+- **Settings file problems**: a malformed `lunaroute.json` behaves as if the
+  file were absent (defaults); fix the JSON and reload.
+- **Diagnostics**: the plugin prints warnings to its process output
+  (`console.*`). OpenCode 2.0.x does not route plugin console output into
+  `opencode.log`, so server-side warnings may not be visible in the log file;
+  user-facing failures surface in `/connect` and the LunaRoute status.
 - **Generated image not visible to the model**: it is saved locally and
   attached as a file — if the model still can't see it, the model in use may
   lack vision; check the model's capabilities in `/models`.
-- **Windows**: not supported in v1 — the auth store path is verified on
-  Linux and macOS only.
+- **Windows**: untested and unsupported.
 
 ## Development
 

@@ -95,6 +95,23 @@ means it leaves the prompt to you.
 by a subagent. The floor (below) runs in every other mode. Redaction runs in all
 four.
 
+On an OpenCode host that advertises native `permissionAuthority: 2`, `god` follows the
+[god escalation policy](file:///home/dev/opencode-guard/docs/superpowers/specs/2026-10-14-god-escalation-policy-design.md).
+The god root's own request for any visible tool is allowed, including one that an
+`opencode.json` deny rule names: the guard returns an exact, logged
+`override: "root"` for that one request, and nothing is saved. Opencode's deny
+rules therefore no longer hold for the god root itself. Any refusal of a
+descendant of a god root on `bash`, `read`, `glob`, `grep`, `edit` or `write` becomes an exact
+parent ask that the root model answers once or rejects with `guard_pending` /
+`guard_decide`. That covers seat and role denies, session ceilings, named deny rules,
+the guard's own floors, control-file writes and reveal-arm. Under an `auto` root, a
+descendant's native deny is judged the way the root's own command would be (the
+classifier, or a one-time human prompt for a named rule). Tree gates, the launch guard,
+the read-intent gate and hidden tools are unchanged. Unattended runs, level `off` and
+older hosts keep the behaviour described here, with no escalation and no override.
+Known gap: refusals from `pty_spawn`, `bg_run` and other process tools without a
+guaranteed native ask still throw for god descendants.
+
 The level is the escape hatch: `on` is everything, `static` drops the classifier
 (in `auto`, a command that is not a static read then gets a prompt instead of a
 model call), and `off` turns the plugin off.

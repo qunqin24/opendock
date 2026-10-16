@@ -14,15 +14,14 @@ polling.
 [![License: MIT](https://img.shields.io/npm/l/opencode-courier)](LICENSE)
 [![Supported OpenCode V2 version](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2Fivopogace%2Fopencode-courier%2Fmain%2Fpackage.json&query=%24.peerDependencies%5B%27%40opencode%2Fplugin%27%5D&label=opencode&color=blue)](#supported-opencode-version)
 
-![A parent spawns two slow children, writes a README itself, and is woken by each report](docs/demo-async-tui.gif)
+https://github.com/user-attachments/assets/74a50b9c-462a-43f5-8737-bc7dd1917988
 
-A parent writes a README while two slow children work, and each report wakes it ([the
-prompt](#demos)).
+The edge cases on the live terminal UI, narrated ([what it shows](#demos)).
 
 ## Quickstart
 
 ```bash
-npm install -g @opencode/cli@2.0.29   # OpenCode V2, at the version courier is tested on
+npm install -g @opencode/cli@2.0.30   # OpenCode V2, at the version courier is tested on
 opencode plugin add opencode-courier  # by name, so OpenCode offers new releases
 opencode                              # in any folder
 ```
@@ -44,7 +43,7 @@ sometimes stall on a request; if nothing moves for a few minutes, send the promp
 
 Courier is built on OpenCode V2's plugin API (`@opencode/plugin`), not the V1 one
 (`@opencode-ai/plugin`), and needs OpenCode V2. Each release is pinned to one V2 version and tested
-against it end to end; the current one is tested on **OpenCode 2.0.29**. CI also runs the live
+against it end to end; the current one is tested on **OpenCode 2.0.30**. CI also runs the live
 suite on the newest OpenCode release, on `main` and nightly, so a host release that breaks the
 plugin shows up there first. Older releases and their versions: [Supported OpenCode version](#supported-opencode-version).
 
@@ -80,21 +79,18 @@ idle); `queue: true` waits until the current turn ends.
 
 ## Demos
 
-**The parent does not wait.** Prompt: *"Spawn two children: one runs `sleep 30` then lists the
-exports of math.js, the other runs `sleep 45` then lists the exports of text.js. Don't wait for
-them: meanwhile write a short README.md for this folder yourself, and add their reports to it when
-they arrive."* The recording at the top is this run: the parent writes its README and finishes its
-turn 16 seconds in, while both children still sleep; each report (the `Message from ses_…` line)
-then starts a new turn on its own, and the parent folds it into the README.
+The video at the top (1:46, narrated) is the TUI driven in `tmux` on the scripted stand-in model of
+the live test, with `e2e/tui.sh`'s setup, so each scene is real plugin behaviour:
 
-**A child's question reaches you.** Prompt: *"Spawn a child session to add a multiply function to
-math.js. It must ask me first whether to name it multiply, times or product."*
-
-![A child's question opens as a form in the parent's session, times is picked, and the child carries on](docs/demo-question-tui.gif)
-
-The child's question opens in the parent's session as OpenCode's own question form, `times` is
-picked, and the child adds `times` to math.js and reports. Both recordings are real runs with a free
-model on [OpenCode Zen](https://opencode.ai/zen) (Muse Spark 1.3).
+- **A join group:** one member reports and its report is held with the group, while the other waits
+  on a permission request, so the footer says one is waiting on you. You allow it from the asks inbox
+  (`ctrl+x k`), and both reports reach the parent in one message.
+- **A child whose turn fails:** OpenCode shows "Session failed", the parent is told, and the
+  `/courier tree` row reads `failed`.
+- **A child that ends its turn without a report:** the parent is told, and the row says so.
+- **`/courier stop`:** pick the session, confirm, and it is stopped.
+- **A form only you can answer:** a child's web search shows a form; the footer, the panel row and
+  the asks inbox point to it, and answering it there wakes the parent.
 
 ## Recursive orchestration
 
@@ -117,7 +113,8 @@ line to the server log naming both ([more](docs/reference.md#the-opencode-versio
 
 | opencode-courier | OpenCode V2 (`opencode` and `@opencode/plugin`) |
 |---|---|
-| 0.5.0, 0.6.0 | 2.0.29 |
+| 0.7.1 | 2.0.30 |
+| 0.5.0, 0.6.0, 0.7.0 | 2.0.29 |
 | 0.4.0, 0.4.1 | 2.0.28 |
 | 0.2.3, 0.3.0 | 2.0.26 |
 | 0.2.2 | 2.0.24 |
@@ -126,12 +123,12 @@ line to the server log naming both ([more](docs/reference.md#the-opencode-versio
 | 0.1.6 | 0.0.0-beta-19271 (the beta line: `opencode2` from `@opencode-ai/cli`, and `@opencode-ai/plugin`) |
 
 The [terminal part](#in-the-terminal) relies on the host to provide its UI modules and is tested on
-OpenCode 2.0.29 only; the server part works as before on older V2 hosts from 2.0.4 on.
+OpenCode 2.0.30 only; the server part works as before on older V2 hosts from 2.0.4 on.
 
 Check yours with `opencode --version`, and install the matching CLI with:
 
 ```bash
-npm install -g @opencode/cli@2.0.29
+npm install -g @opencode/cli@2.0.30
 ```
 
 ### The plugin
@@ -213,13 +210,20 @@ Each tool's parameters: [the reference](docs/reference.md#the-tools).
   plugin, with the error or its last reply, waking it if idle; one that waits on a request, its own
   children, a scheduled message or a webhook is not, nor is one that answers what you typed in its
   session. [More](docs/reference.md#a-child-that-fails).
+- **A message that fails to wake its session is sent again.** A report, notice or scheduled message
+  (but not a note that a request was answered elsewhere) that waits in an idle session's inbox for 30 seconds without a turn starting for it is sent once
+  more under the same inbox id, which OpenCode takes for the same message, not a second one. If the
+  session still does not take it, the footer and the tree panel show it as `stalled`, for you to
+  prompt it. [More](docs/reference.md#a-missed-wake).
 - **Permission requests and questions reach you.** A child's request or question is passed to the
   session at the top of its tree, any number of levels down. For a request, that session proposes an
   answer with `courier_answer`, and OpenCode asks you in its own permission prompt, in that session
   and under its rules, before anything is passed on: its model cannot approve, only propose. For a
   question, it asks you and passes your answer back, or links its own question to the child's so your
   pick goes straight to it. Whichever answer comes first counts, and the other is withdrawn.
-  [More](docs/reference.md#a-child-that-asks-for-permission).
+  A request starts a turn in the top session if it is idle; if you answer it somewhere else, the
+  note that it is settled waits for that session's next turn, usually the child's report or its
+  silence, instead of starting one of its own. [More](docs/reference.md#a-child-that-asks-for-permission).
 - **Some forms only you can answer**, such as OpenCode's web search asking for a provider: the top
   session is told, and you answer in the child's session. [More](docs/reference.md#a-child-that-shows-a-form).
 - **You can see and stop a whole subtree** with `courier_tree` and `courier_stop`, or in the
@@ -257,8 +261,9 @@ does not. Each spawned session's brief says when to split its task and when to d
 
 The package ships a part for OpenCode's terminal UI, which the TUI loads from the server's plugin
 list; the server half behaves the same whether or not a TUI is attached. In a session that started
-sessions, the prompt's footer shows what the tree under it is doing: how many run, wait on you (a
-permission request, a question or a form they show) or are idle, and for each [join group](docs/reference.md#join-groups) how many of its members have
+sessions, the prompt's footer shows what the tree under it is doing: how many wait on you (a
+permission request, a question or a form they show), are [stalled](docs/reference.md#a-missed-wake),
+run or are idle, and for each [join group](docs/reference.md#join-groups) how many of its members have
 reported:
 
 ```
@@ -267,7 +272,7 @@ courier 1 waiting on you · 2 running · group pair 1/2
 
 `/courier tree` opens a panel beside the session with the tree under it, a row per session indented
 by depth, with what it does, its report and its group's standing; a session waiting on you gets a line per
-request or form (`shows a form: Web Search`), a session that started others gets
+request or form (`shows a form: Web Search`), a stalled one since when its message waits, a session that started others gets
 a bar of the parts reported, a leaf how long it ran, its last tool call and its cost. A tree that has
 started more than `maxTotal` sessions over time is listed live ones first, then newest, and the header
 says how many older ones are left out; the footer counts them all. `↑`/`↓` select,

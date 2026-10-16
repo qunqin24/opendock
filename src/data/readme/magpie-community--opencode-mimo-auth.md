@@ -1,8 +1,11 @@
 # magpie-community plugins
 
 [OpenCode](https://opencode.ai) provider plugins for coding-plan
-subscriptions, and [gateway middleware](#gateway-middleware) and [agents](#agents) for magpie,
-maintained by the community. Each package signs in to one
+subscriptions, and [gateway middleware](#gateway-middleware),
+[routing strategies](#routing-strategies), [tools for every
+agent](#tools-for-every-agent), [pages](#pages) and [agents](#agents) for
+magpie, maintained by the community. To make one, see
+[Write your own](#write-your-own). Each package signs in to one
 subscription and makes its requests. The packages work in OpenCode and in
 [magpie](https://usemagpie.ai), which runs OpenCode's provider plugins.
 
@@ -21,6 +24,7 @@ subscription and makes its requests. The packages work in OpenCode and in
 | [opendesign](packages/opendesign) | Open Design Cloud (open-design.ai), with the Open Design CLI's device sign-in | `opendesign` |
 | [qoder](packages/qoder) | Qoder subscription (qoder.com), with Qoder's device sign-in | `qoder` |
 | [qoder](packages/qoder) | Qoder CN subscription (qoder.cn), with Qoder CN's device sign-in | `qoder-cn` |
+| [raccoon](packages/raccoon) | SenseTime Raccoon (商汤小浣熊, xiaohuanxiong.com): account credits and daily check-in, with browser sign-in or Raccoon desktop's sign-in | `raccoon` |
 | [trae](packages/trae) | Trae CN (trae.cn) and Trae international (trae.ai), free tier included, with Trae's browser sign-in (experimental) | `trae-cn`, `trae-global` |
 | [workbuddy](packages/workbuddy) | WorkBuddy (China build, CodeBuddy plan) | `workbuddy` |
 | [workbuddy](packages/workbuddy) | WorkBuddy (international build) | `workbuddy-ai` |
@@ -39,6 +43,7 @@ These packages aren't OpenCode plugins. magpie runs them in its gateway, on the 
 | [system-prompt](packages/system-prompt) | Your own system prompt on every request, or on some agents' or models', in each API's own place |
 | [word-guard](packages/word-guard) | New API's 敏感词过滤: turn away or mask words and patterns in what users send, and in replies |
 | [think-tags](packages/think-tags) | Take `<think>…</think>` out of a reply's text, or put a Chat reply's `reasoning_content` into it (`thinking_to_content`) |
+| [codex-history](packages/codex-history) | Opt-in Responses history compatibility after switching providers: remove historical ciphertext and optional item IDs while preserving readable content and tool-call pairing |
 
 ```sh
 magpie plugin add @magpie-community/middleware-<name>
@@ -52,6 +57,62 @@ A middleware package is a folder under `packages/<name>/` with:
 - **`package.json`**: name `@magpie-community/middleware-<name>`, `"magpie": {"middleware": "./<name>.middleware.js", "options": {…}}`, no `main`. `options` is the example magpie offers when none are set.
 - **`<name>.middleware.js`**: exports `onRequest`, `onEvent` and/or `onResponse` ([the hooks](https://usemagpie.ai/docs/plugins#middleware)). It runs in magpie's gateway on moejs, so it is one file and imports nothing.
 - **`cases.json`** and a test that runs them with `check()` from `scripts/middleware.mjs`, which calls the hooks the way the gateway does.
+
+### Routing strategies
+
+A gateway plugin can also add routings: how one pool is ordered for a request, where the pool is a provider's accounts or keys, or a group's members. Each shows in every routing picker as `<plugin>/<name>`, beside magpie's own (smart, order, rotate, usage, pace, weight).
+
+| Package | Routings |
+|---|---|
+| [reserve](packages/reserve) | `reserve/ceiling`: fill accounts in order up to a share of their allowance (80% by default), then the next; `reserve/accounts-first`: subscriptions before API keys, keys by weight |
+
+```sh
+magpie plugin add @magpie-community/middleware-<name>
+magpie group set <id> routing=<name>/<routing>
+```
+
+A routing package is a folder under `packages/<name>/` with:
+
+- **`package.json`**: name `@magpie-community/middleware-<name>`, `"magpie": {"gateway": "./<name>.gateway.js", "options": {…}}`, no `main`.
+- **`<name>.gateway.js`**: exports `strategies`, `{<routing>: (pool, seats, options) => [indexes]}` ([the reference](https://usemagpie.ai/docs/plugins#gateway-points)). Each seat has `key`, `account`, `known`, `used`, `soon`, `pace`, `weight`, `resting` and `tokens`. A strategy has 20 ms. One that throws, or answers anything but a permutation of the seats, leaves them in their listed order. It runs on moejs, so it is one file and imports nothing.
+- **`strategies.json`** and a test that runs them with `checkStrategies()` from `scripts/middleware.mjs`: seats in, the order of their keys wanted out.
+
+## Tools for every agent
+
+These give tools to every agent magpie connects. magpie serves them on its MCP server, `/mcp/magpie/tools`, named `<plugin>_<tool>`.
+
+| Package | Tools |
+|---|---|
+| [calc](packages/calc) | `eval` exact arithmetic in fractions, `convert` units (data, time, length, mass, angle, temperature), `date` calendar date math across time zones and DST. No network, no key |
+
+```sh
+magpie plugin add @magpie-community/tools-<name>
+magpie plugin            # lists each plugin's tools
+```
+
+A tools package is a folder under `packages/<name>/` with:
+
+- **`package.json`**: name `@magpie-community/tools-<name>`, `"type": "module"`, `"main": "./index.mjs"`.
+- **`index.mjs`**: exports one async plugin function that returns a `tool` hook, `{tool: {<name>: {description, args, execute(args)}}}` ([the reference](https://usemagpie.ai/docs/plugins#tools)). `args` is JSON Schema, and magpie passes the arguments on as they came, so `execute` checks them itself. A string it returns is sent as text, anything else as its JSON. Every function the module exports is taken as a plugin, so helpers go in another file.
+- a test of each tool's `execute`. `bun scripts/check.mjs` loads the plugin and checks each tool's name, description and `args`.
+
+## Pages
+
+These add a page to magpie's window, in the app and in `magpie web`, under Plugins in the sidebar.
+
+| Package | Page | Reads |
+|---|---|---|
+| [usage](packages/usage) | Usage glance: calls, errors, tokens and cost for today, 7 or 30 days, and the models behind them | `usage:summary` |
+
+```sh
+magpie plugin add @magpie-community/page-<name>
+```
+
+A page package is a folder under `packages/<name>/` with:
+
+- **`package.json`**: name `@magpie-community/page-<name>`, no `main`, and `"magpie": {"page": {"title", "file", "icon"}, "permissions": [...], "options": {…}}` ([the reference](https://usemagpie.ai/docs/plugins#pages)). `permissions` lists the reads the page makes, and magpie refuses any other. Declare only what it reads.
+- **the page**: HTML, CSS and scripts in files. It runs in a sandboxed frame with no network (`connect-src 'none'`) and no inline scripts. It talks to magpie only through `_magpie/bridge.js`: `magpie.ready`, `magpie.read(name, params)`, `magpie.options.get/set` (at most once a second), and `magpie.theme` with `onTheme`, whose `--magpie-*` variables it styles itself by.
+- a test that the page's scripts read only what `permissions` declares and reach no network, and of what it draws from a read.
 
 ## Agents
 
@@ -156,6 +217,26 @@ built-in, the plugin's provider shows as `<id>-plugin`. Once the built-in
 is gone, it takes over the same id, so an agent set to `<id>/<model>` keeps
 working.
 
+## Write your own
+
+The reference is [usemagpie.ai/docs/plugins](https://usemagpie.ai/docs/plugins): [tools](https://usemagpie.ai/docs/plugins#tools), [pages](https://usemagpie.ai/docs/plugins#pages), [gateway points](https://usemagpie.ai/docs/plugins#gateway-points) (routing strategies among them), [middleware](https://usemagpie.ai/docs/plugins#middleware) and [agents](https://usemagpie.ai/docs/plugins#agents). [Quick start](https://usemagpie.ai/docs/plugins#quick) is the shortest way in.
+
+Start from the package of the same kind here and rename it:
+
+- a tool: [calc](packages/calc);
+- a page: [usage](packages/usage);
+- a routing: [reserve](packages/reserve);
+- middleware: [think-tags](packages/think-tags);
+- an agent: [aider](packages/aider);
+- a subscription: [zen-free](packages/zen-free).
+
+Try it from its folder before publishing, in a sandbox HOME:
+
+```sh
+magpie plugin add ./packages/<name>
+magpie plugin
+```
+
 ## Checking a package
 
 ```sh
@@ -173,11 +254,13 @@ MIT
 ## The market
 
 `registry.json` is the list magpie's Plugins tab shows: the packages
-here. A middleware's entry has `"kind": "middleware"` and no `providers`. magpie
+here. An entry that signs in to nothing has a `"kind"` and no `providers`:
+`"middleware"` for gateway middleware and routing strategies, `"tools"`,
+`"page"` or `"agent"`. magpie
 fetches it every few hours and keeps a copy built into the app for when
 it can't. To list a plugin, add an entry with its npm `package`, a
-`name`, `providers` (the provider ids it signs in to), an `icon` and a
-`summary` in English and Chinese (`{"en": …, "zh": …}`), and open a pull
+`name`, `providers` (the provider ids it signs in to), an `icon` (one
+magpie has, or none) and a `summary` in English and Chinese (`{"en": …, "zh": …}`), and open a pull
 request.
 
 ## Publishing
@@ -207,9 +290,20 @@ A version bump pushed to `main` ships itself, two ways
 A package's first version can't go through trusted publishing: a Trusted
 Publisher is set on a package that exists, and setting one takes an
 owner's 2FA. Until an owner of the magpie-community npm org
-publishes it (`scripts/publish.sh <otp>`) and sets its Trusted Publisher as
-above, magpie serves it from `dist`, and the publish run notes it without
-failing. The repository's `NPM_TOKEN` secret, a granular token with 2FA
+publishes it and sets its Trusted Publisher as above, magpie serves it
+from `dist`, and the publish run notes it without failing.
+
+An owner does all of it with one command, from any checkout:
+
+```sh
+sh scripts/owner.sh            # --dry-run says what it would do
+```
+
+It first-publishes every package npm doesn't have and makes its Trusted
+Publisher, makes again (with npm publish allowed) the Trusted Publisher of
+every package whose version npm lacks, and runs `publish.yml` for those.
+It works from origin/main, skips what is up to date, and asks for 2FA in
+the browser. The repository's `NPM_TOKEN` secret, a granular token with 2FA
 bypassed, still publishes a first version while npm lets such tokens
 publish (npm plans to end that in January 2027).
 

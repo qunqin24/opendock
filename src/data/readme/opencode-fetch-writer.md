@@ -45,7 +45,7 @@ From **0.3.0** the same package serves both generations; on OpenCode 1 it additi
 // opencode.jsonc
 {
   "plugin": [
-    ["opencode-fetch-writer@0.3.0", {
+    ["opencode-fetch-writer@0.4.0", {
       "providerId": "my-provider",
       "uaTarget": "my-app/1.0.0",
       "headersToStrip": ["x-unwanted-header"],
@@ -67,7 +67,7 @@ From **0.3.0** the same package serves both generations; on OpenCode 1 it additi
   "$schema": "https://opencode.ai/config.json",
   "plugins": [
     {
-      "package": "opencode-fetch-writer@0.3.0",
+      "package": "opencode-fetch-writer@0.4.0",
       "options": {
         "providerId": "my-provider",
         "uaTarget": "my-app/1.0.0",
@@ -155,7 +155,7 @@ Since v0.2.0 one plugin entry can manage several providers through the `provider
 {
   "plugins": [
     {
-      "package": "opencode-fetch-writer@0.3.0",
+      "package": "opencode-fetch-writer@0.4.0",
       "options": {
         "providers": {
           "corp-gateway": { "uaTarget": "my-corp-agent/2.1", "headersToStrip": ["x-unwanted-header"] },
@@ -171,15 +171,36 @@ Each provider gets its own rule. `FETCH_WRITER_UA` still applies to providers wi
 
 > On versions before 0.2.0 the same effect is achievable by listing the plugin twice with different options — the `providers` map just keeps it to one entry.
 
+## Tool renaming (v1, 0.4.0+)
+
+Some gateways count or filter requests by the tool names in the body. `toolRenameSuffix` appends a suffix to every tool name in the outbound request — the `tools` list, the `message` history's `tool_calls`, and a named `tool_choice` — and maps response `tool_calls` names back, so the host keeps working with its original tool names.
+
+```jsonc
+// v1 tuple syntax
+{
+  "plugin": [
+    ["opencode-fetch-writer@0.4.0", {
+      "providerId": "my-provider",
+      "toolRenameSuffix": "_x"
+    }]
+  ]
+}
+```
+
+- **V1 only.** V2's `http.request` hook receives the request after the body is encoded, so the option is ignored there with an error log.
+- **OpenAI-compatible request bodies only.** Anthropic-shape bodies pass through unchanged.
+- Fail-open: requests without tools, non-JSON bodies, and unbufferable (streaming) bodies are sent untouched.
+
 ## Options
 
 | Option | Type | Default | Description |
 |---|---|---|---|
 | `providerId` | `string` | — | Legacy single-provider mode: provider ID (key in your `provider` map). Required unless `providers` is set. |
-| `providers` | `Record<string, ProviderRule>` | — | Multi-provider mode: map of provider ID → rule (`uaTarget` / `headersToStrip` / `headersToInject`). Mutually exclusive with `providerId`. |
+| `providers` | `Record<string, ProviderRule>` | — | Multi-provider mode: map of provider ID → rule (`uaTarget` / `headersToStrip` / `headersToInject` / `toolRenameSuffix`). Mutually exclusive with `providerId`. |
 | `uaTarget` | `string` | — | Target User-Agent. Omit to leave the UA unchanged. |
 | `headersToStrip` | `string[]` | `[]` | Header names to delete from outgoing requests. |
 | `headersToInject` | `Record<string, string>` | `{}` | Headers to inject when missing. **Never overwrites** existing values. |
+| `toolRenameSuffix` | `string` | — | Suffix appended to every tool name in the request body (tools list, message-history `tool_calls`, named `tool_choice`); response `tool_calls` names are mapped back. **V1 only, and only OpenAI-compatible request bodies** — Anthropic-shape bodies pass through unchanged. V2 ignores the option with an error log. |
 | `debug` | `boolean` | `false` | Enable debug logging to stderr. |
 
 ## Environment variables

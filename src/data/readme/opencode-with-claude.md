@@ -93,9 +93,24 @@ OpenCode 2 (`plugins` and `providers.<id>.settings` instead of `plugin` and
 }
 ```
 
-In both cases the `baseURL` is only a placeholder: the plugin rewrites every
-Anthropic request to whatever port its own proxy actually got, so several
-OpenCode instances can run side by side.
+In both examples, the configured `baseURL` is only a placeholder. The plugin
+uses the port its own proxy actually got, so several OpenCode instances can
+run side by side:
+
+- **OpenCode 1.x:** the `config` hook replaces
+  `provider.anthropic.options.baseURL` with the proxy origin, without `/v1`.
+- **OpenCode 2:** the `model.request` hook replaces the entire request
+  `baseURL` with the proxy origin plus `/v1` for Anthropic requests. It does
+  not append `/v1` to `providers.anthropic.settings.baseURL` or preserve its
+  configured path.
+
+For OpenCode 2 requests that pass through this plugin's `model.request` hook,
+`http://127.0.0.1:3456` and `http://127.0.0.1:3456/v1` are equivalent
+placeholders; **the configured `/v1` suffix is not required**. The example
+keeps `/v1` to match OpenCode 2's Anthropic endpoint format: its transport
+uses a custom base URL as-is and adds `/messages`, not `/v1/messages`.
+This equivalence depends on the hook running; it does not apply to calls
+that bypass the hook or when the plugin is not loaded.
 
 If you installed with Homebrew, point the plugin entry at the installed
 file instead of the package name (the path is stable across upgrades, and

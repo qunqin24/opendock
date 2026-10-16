@@ -81,7 +81,7 @@ Secrets go in `.env` — never commit them.
 
 ## Slack Bridge (opencode)
 
-Watch and steer opencode agent runs from Slack. An auto-loaded plugin posts each session into its own Slack thread and turns permission prompts into buttons you can answer from Slack.
+Watch and steer opencode agent runs from Slack. The bridge is the external [`opencode-slack-bridge`](https://github.com/devrkd/opencode-slack-bridge) package ([`docs/slack-integration.md`](https://github.com/devrkd/opencode-slack-bridge/blob/main/docs/slack-integration.md) has the full behaviour reference), loaded via `opencode.json` → `"plugin"`. It posts each session into its own Slack thread and turns permission prompts into buttons you can answer from Slack.
 
 - **Progress out**: none — the channel only receives approval/question cards (with a compact, redacted context summary); routine progress (tool runs, plans, completions, errors) stays out of Slack, and host-specific detail (paths, hostnames, usernames) is redacted.
 - **Input back**: **Approve once / Always / Reject** buttons on approval prompts, option buttons for the agent's `question` tool; thread replies are injected into the running session as prompts; `!abort` stops it.
@@ -110,6 +110,6 @@ SLACK_CHANNEL=C0123ABCD
 SLACK_ALLOWED_USERS=U0123ABCD
 ```
 
-7. Run `opencode`. First launch installs the plugin deps (Bun); the bridge then connects and posts a thread per session.
+7. Run `opencode`. It installs the package on first launch; the bridge then connects and posts a thread per session.
 
 Set `SLACK_BRIDGE=off` to disable. With no `SLACK_ALLOWED_USERS`, any channel member can approve commands — set it. Thread mapping is persisted in `.opencode/slack-bridge-state.json` (gitignored).

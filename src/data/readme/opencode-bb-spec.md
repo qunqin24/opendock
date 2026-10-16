@@ -48,7 +48,7 @@ The 5 commands you type day to day:
 
 | Command | What it does | When |
 |---|---|---|
-| `/prd` | Challenge → clarify → break down; after one approval, writes the PRD + AGENTS.md, then auto-runs plan → exec → doc-update | New requirement |
+| `/prd` | Challenge → clarify → break down; after one approval, writes the PRD + AGENTS.md, then auto-runs plan → exec → doc-update | New requirement, or changing how a merged feature behaves |
 | `/revise` | Diagnose by root cause → targeted fix → regression check, then auto-runs doc-update | A bug, or results that don't match expectations |
 | `/git-push` | pre-review self-check + push + open PR | Ready to open a PR |
 | `/exec` | Resume the plan from where it stopped | After an interruption or `/clear` |
@@ -89,7 +89,7 @@ First-time setup: `/git-clone` (pull a remote project locally + write `.bb-spec.
   - **Multi-repo workspace**: creates a shared parent dir and clones each member repo into it (restoring the relative layout the build tool expects); refuses to nest or overwrite
   - Tightly scoped: **only** pulls code + writes `base_dir` — does not read code or install deps
 
-- **`/prd`** — The single entry point for new requirements. Answers **"what to build, and why."**
+- **`/prd`** — The single entry point for new requirements. Answers **"what to build, and why."** Changing how a merged feature or pre-bb-spec code behaves also starts here, however small (e.g. raising a timeout from 120 to 600 seconds, or changing a button label from "Submit" to "Save"): a new PRD records the trade-offs.
   - Challenge first ("not worth building" is a valid outcome) → progressive clarification → breakdown, all in **plan mode for read-only alignment**; you **approve once**, then `/plan` → `/exec` → `/doc-update` run on their own
   - Writes the **PRD** (`docs/prd/<date>.<topic>/`: background, goals, non-goals, user stories, testable constraints and acceptance criteria, decision log) and **AGENTS.md** (constraints that apply to the whole project, e.g. "no generics")
   - The PRD stays editable within its branch (fix the plan mid-implementation by editing it) and freezes once merged; **code is the single source of truth for "what it does now"** — the PRD only answers "why"
@@ -112,16 +112,19 @@ First-time setup: `/git-clone` (pull a remote project locally + write `.bb-spec.
 - **`/doc-update`** — Doc / code **consistency sweep**.
   - Four finding classes: doc-stale (root docs out of date) / prd-stale (this branch's PRD doesn't match what was delivered) / code-violation (code breaks AGENTS.md) / agents-conflict (project constraints contradict each other)
   - **Code is the truth; docs are mirrored to it**; code changes always ask first and route to `/revise` for TDD; merged PRDs are never touched in any mode
+  - Maintains the **ARCHITECTURE.md** outline at the project root (which modules exist, where they live, how they work together; tables and APIs as an overview only): full-repo mode drafts it from the code when missing and writes it after your approval; tail mode keeps it current as the branch adds, removes or moves modules or changes tables and API groups. When learning the current state, the AI reads it first to locate modules, then reads the code
   - **Tail mode** (`--tail`): auto-invoked when `/exec` or `/revise` finishes; covers only what the current branch touched
 
 - **`/git-push`** — User-triggered push + PR flow (single or multi-repo).
+  - If `ocr` ([open-code-review](https://github.com/alibaba/open-code-review)) is installed, runs one `ocr review` right after the rebase: Claude checks each finding against the code, lists the ones worth fixing by priority (🔴/🟡/🟢), and you pick which ones `/revise` fixes
   - When AGENTS.md or a PRD on this branch exists, or this branch's commits point to a merged PRD, first runs a **branch self-check (pre-review)**: a subagent checks the branch diff against the project constraints, the PRD and the change notes in commit messages, fixes violations in a loop
   - The PR description carries the `Requirement:` trailer; the repo must allow only rebase merging (GitHub: only "Allow rebase merging", and the main-branch ruleset's "Allowed merge methods" set to Rebase only; GitLab: "Fast-forward merge" with squash set to "Do not allow"), so every commit lands on the main branch with its own `Requirement:` line
   - Drafts a **6-section PR description** (background / requirement / approach / result / tests / conventions, < 50 lines) used directly as the PR body
 
 - **`/revise`** — The exception handler, callable anytime.
   - First reads the code to confirm current behavior and traces back to the relevant PRD via `git log -L`, then classifies the deviation's **root cause** into one of three: *PRD defect*, *impl drift*, *requirement change*
-  - This branch's PRD may be edited; merged PRDs are not — the reason for the fix goes into the commit body
+  - When the requirement changed (*PRD defect*, *requirement change*): only this branch's PRD is edited, with an entry in its decision log; if the PRD is merged or there is none, it stops and hands off to `/prd` for a new PRD
+  - Bugs, security and robustness issues (*impl drift*) are fixed here even when the PRD is merged; the reason and the trade-offs (what was chosen, what was rejected, and why) go into the commit body
   - Every review finding that needs fixing funnels through here
   - Auto-runs `/doc-update` in tail mode after the fix
 
@@ -240,7 +243,7 @@ If you keep the old directory (`.bb-spec/docs/` below is the default location; i
 - Until `.bb-spec/docs/prd/GLOSSARY.md` exists, `/prd` uses the terms in `.bb-spec/docs/spec/GLOSSARY.md`; the first time it records a term, it copies the whole table to the new location and leaves the old one untouched.
 - Plans left unfinished under 13 can't be resumed — start again with `/prd`. Once you no longer need them, remove `plan/INDEX.md` and the topic directories it lists with `git rm -r`.
 
-Code written before you adopted bb-spec has no `Requirement:` marker in its commits, so there is no PRD to look up. When you fix it with `/revise`, the expected behavior you describe is the reference.
+Code written before you adopted bb-spec has no `Requirement:` marker in its commits, so there is no PRD to look up. Fix its bugs with `/revise`, using the expected behavior you describe as the reference; to change its design or behavior, start a new PRD with `/prd`.
 
 Two things outside `.bb-spec/` need manual action:
 

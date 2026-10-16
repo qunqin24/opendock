@@ -58,6 +58,9 @@ A correction looks like this, with only ` → complete` dimmed:
   First-person contractions use a capital `I` in corrections and next-word
   suggestions (`I'm`, `I'll`, `I've`, `I'd`). Lowercase contraction prefixes
   are replaced on acceptance too (`i'v` → `I've`).
+- **Learned casing is kept.** A word you usually capitalize mid-sentence is
+  suggested that way: `oz` shows ` → Ozan` and replaces the word, while `Oz`
+  completes with `an`.
 - **Normal completions take precedence.** For example, `whate` completes to
   `whatever` rather than being corrected to `what`. Typo correction is a
   fallback when no confident prefix completion is available; recognized words
@@ -186,7 +189,10 @@ Quill learns from your own submitted prompts, never from assistant output:
 - Punctuation, line breaks and code reset the context, so words separated by
   syntax are never learned as adjacent.
 - A word missing from the base vocabulary becomes suggestible only after it
-  has been seen more than once.
+  has been seen more than once, and not while it is a prefix of a learned word
+  you use at least as often (`addr` yields to `addressed`).
+- Casing is learned from words written mid-sentence; sentence-initial
+  capitals are ignored.
 
 ### Prediction
 
@@ -214,7 +220,8 @@ Quill learns from your own submitted prompts, never from assistant output:
   and requires repeated learned continuation evidence; not every typo produces
   a suggestion.
 - **Bounded size:** the personal model is pruned to its most frequent entries
-  when saved.
+  when saved. Once it holds about 100,000 learned words, every count is halved
+  and single-use entries are dropped, so recent habits outweigh old ones.
 
 ### Storage
 
@@ -226,8 +233,8 @@ state directory (`$XDG_STATE_HOME` when set, otherwise `~/.local/state`):
 | Learned model | `opencode/<channel>/tui/plugin.quill.learning.json` |
 | Settings | `opencode/<channel>/tui/plugin.quill.settings.json` |
 
-The learned model holds only word, bigram and trigram counts plus processed
-message IDs. Raw prompt text is never written to disk. These files stay on your
+The learned model holds only word, bigram, trigram and word-casing counts plus
+processed message IDs. Raw prompt text is never written to disk. These files stay on your
 machine and are never tracked in Git or published to npm.
 
 ## Development

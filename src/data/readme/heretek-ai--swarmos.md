@@ -181,6 +181,85 @@ SwarmOS v0.4.0 expands OpenCode V2 beyond software engineering into a **Universa
 - **Oh-My-Pi Precision Hashline Editing (`tools.fs.hash_read` & `tools.fs.hash_edit`)**: Tags every line with a 2-hex FNV-1a content hash (`42#a7: const x = 1;`) and applies multi-hunk line-range replacements with automatic $\pm 3$-line drift recovery.
 - **Antigravity Persistent Artifacts (`/artifacts` & `tools.artifacts.*`)**: Automatically syncs `.opencode/artifacts/task.md` and `plan.md` into the live session context window across turns.
 
+### Agent Reliability Engines (v0.5.0+): `/map`, Circuit Breaker, Checkpoints, Memory & PTY Tap
+
+SwarmOS v0.5.0 adds five engines that keep long-running agents oriented, recoverable, and out of retry loops:
+
+- **PageRank RepoMap & Blast-Radius Analyzer (`/map`, `tools.repo.map`, `tools.repo.blast_radius`)**: Parses `import`/`export` edges and top-level symbols across the repository, ranks files by PageRank centrality (`tools.repo.map({ topN })`), and lists the direct and transitive reverse-import dependents of a file (`tools.repo.blast_radius({ path })`) before you change its interface.
+- **Doom-Loop Circuit Breaker (automatic)**: Tracks tool attempts per session. After **2 consecutive `edit`/`patch` failures** on the same file it injects a `<circuit-breaker-intervention>` steering the agent to `tools.fs.hash_read` / `tools.fs.hash_edit`; after **3 consecutive identical `shell` failures** it halts blind retries and requires root-cause notes in `notes.md`.
+- **Zero-Git-Noise Checkpoints (`tools.checkpoints.create` / `rollback` / `list`)**: Snapshots the given `paths` into `.opencode/checkpoints/<id>.json` before a risky refactor, then restores them (and removes files that did not exist yet) in one call, without commits or touching `HEAD`.
+- **Cross-Session Episodic Memory (`tools.memory.record_lesson` / `recall`)**: Stores repository lessons (`id`, `trigger`, `lesson`, optional `scopePaths`) in `.opencode/memory/lessons.json` and injects them as `<episodic-repository-memory>` into every non-compaction turn.
+- **Live PTY & Dev-Server Log Tap (`tools.pty.read_logs`)**: Reads a persistent terminal (`ptyID`, via `ctx.experimental.terminal.read`) or a log file (`logFile`, default `.opencode/artifacts/devserver.log`), with `lines` (10–500, default 80) and `filterErrorsOnly` so agents can check HMR/SSR/runtime errors right after an edit.
+
+### Measurement & Verification (v0.6.0+): `/doctor`, `tools.verify.*`, telemetry & benchmarks
+
+SwarmOS v0.6.0 makes it possible to check that SwarmOS is actually running and actually helping:
+
+- **Host contract check & `/doctor`**: At startup SwarmOS probes every OpenCode V2 capability it uses (`src/host/contract.ts`) and runs each module separately. `/doctor` (or `tools.swarmos.doctor`) lists which capabilities exist, which modules registered, which were skipped and why (for example `permission-guard: skipped (host lacks permission.hook)`), and any exceptions thrown inside SwarmOS hooks, which are caught instead of breaking the host's tool call. `bun run contract:check <opencode-checkout>` scans an OpenCode V2 source tree for the hook names and APIs SwarmOS relies on; `OPENCODE_V2_SRC=<checkout> bun test` runs the same check in the test suite.
+- **`tools.verify.run` / `tools.verify.checks`**: Finds the repository's own typecheck, lint and test commands (from a `verifier` field in `.opencode/swarmos.json` or `opencode.json`, `AGENTS.md` lines like ``- test: `bun test` ``, `package.json` scripts, or Cargo/Go/pytest defaults). With `scope: "changed"` (default) it runs typecheck and lint plus only the tests that import changed files (via the RepoMap), strips colour codes, and returns pass/fail counts and `file:line` failures. Runs are saved in `.opencode/verify/` along with a fingerprint of the working tree.
+- **Verified QA receipts**: For projects created with `tools.org.init_project`, a `PASS` receipt must cite the `verifyRunId` of a passing run taken on the task's current code, and `verify_release_ready` requires a passing `scope: "full"` run on the current tree. Editing anything afterwards makes both stale. Pass `requireVerifiedReceipts: false` to `init_project` to opt out.
+- **Telemetry & observe mode**: Each session's tool calls, failures, circuit-breaker fires, turns and (when the host reports it) token usage are written to `.opencode/telemetry/<sessionID>.jsonl`. `{"mode": "observe"}` in `.opencode/swarmos.json` (or `SWARMOS_MODE=observe`) loads only telemetry and `/doctor`.
+- **Benchmark harness (`bench/`)**: 12 tasks (bugs, multi-file refactors, constraint-heavy features, UI fixes, one Python task), each with hidden tests and a reference solution. `bun run bench:check` proves every task fails untouched and passes when solved; `bun bench/run.ts --driver agent` runs a real agent on each task with SwarmOS on and in observe mode, and reports success rate, turns, tool failure rate, breaker fires, tokens and cache hits. See `bench/README.md`.
+
+### Safety (v0.7.0+): shell parsing, real worktree tournaments, edit transactions & taint tracking
+
+- **Shell commands are parsed, not pattern-matched**: `src/agents/shell-parse.ts` splits commands on `;`, `&&`, `||`, pipes and newlines, follows `$(...)`, backticks, process substitution, heredocs, `bash -c`/`sh -c`, `eval`, and wrappers like `sudo`, `env`, `timeout` and `xargs`, records redirections, and classifies every command as read, verify, write, network, destructive or exec. `bash -c "echo x > src/a.ts"`, `tee`, `cp` and `$(rm …)` no longer get past the guard. Every file a shell command writes goes through the same contract, ownership and tournament checks as `edit`.
+- **Per-role policy**: destructive commands (`git reset --hard`, `git push -f`, `git checkout -- …`, `rm -rf /`) are denied for everyone, but `--force-with-lease` is fine. `director` and `manager` cannot write, and need approval to run code or reach the network. `qa-adversary` may write only test files, and inline code (`python -c`, `node -e`) needs approval. Read-only commands from `director`, `manager`, `explore`, `plan` and `qa-adversary` run without a prompt. `explore` and `plan` need approval for anything else. Commands SwarmOS cannot parse always need approval.
+- **Real worktree tournaments**: `tools.org.plan_tournament` creates a git worktree per candidate at `.worktrees/<taskId>` on branch `swarmos/<taskId>`. While a tournament is active, its files are locked in the main tree and each candidate may edit only its own worktree. `tools.verify.run({ dir })` verifies a candidate, `tools.org.score_tournament` ranks all candidates (passing first, then fewest failures, then smallest diff), and `tools.org.resolve_tournament` merges the winner with `--no-ff`, removes every candidate worktree and branch, and aborts cleanly on conflicts.
+- **All-or-nothing edits**: before every `edit`, `write` or `patch`, SwarmOS snapshots the files the call will touch (patch envelopes and unified diffs are parsed for targets). If the call fails, every file is restored, files the call created are removed, and the model is told what was rolled back. Multi-file calls also leave an `auto-*` checkpoint, and only the last 20 are kept.
+- **Untrusted-content tracking**: after a session reads `webfetch`, `websearch`, browser, or third-party MCP output (including Code Mode scripts that call them), saved approvals no longer cover risky actions. Network commands, writes outside the project, edits to `.opencode/`, `.git/`, CI workflows, `package.json`, `.env` or shell profiles, and inline or downloaded code need approval again until the user runs `/untaint`.
+- `/doctor` now also shows how many times the host invoked each hook, so a hook stuck at 0 after real use (for example `tool.execute.before`) shows the host doesn't fire it.
+
+### Context Efficiency (v0.8.0+): budgeted context, self-maintaining memory, multi-language RepoMap & tool profiles
+
+- **One context budget**: a single injector replaces the separate artifact and memory hooks. Each turn it collects candidate blocks (an untrusted-content notice when relevant, a short per-role toolbox hint, `task.md`, `plan.md`, and lessons), ranks them, and packs them into `contextBudgetTokens` (default 6000). One artifact may take at most 40% of the budget and is truncated beyond that, so it can't crowd out lessons. `/doctor` shows how much of the budget each session used and what was dropped.
+- **Relevant lessons, not all lessons**: lessons are scored by `scopePaths` matches against the files this session has read or edited, by keyword overlap with those paths and the agent's role, by their track record, and by age (half-life of 90 days since last use). Lessons flagged `needsReview` are never injected.
+- **Memory that maintains itself**: when the circuit breaker fires and a later call on the same file or command succeeds, SwarmOS saves a lesson proposal with the evidence (`tools.memory.proposals`). Proposals are never injected until a human or agent accepts them, ideally with the real root cause written in (`tools.memory.accept_proposal` / `reject_proposal`). Injected lessons gain a success when `tools.verify.run` passes in that session and a failure when it fails or the breaker fires on a file in their scope. Two or more failures that outnumber the successes set `needsReview`; `tools.memory.forget` deletes a lesson.
+- **Multi-language RepoMap**: the repo map now parses TypeScript/JavaScript, Python, Go (module path from `go.mod`, used `pkg.Symbol` selectors) and Rust (`mod`, `use crate::`/`super::`/`self::`) after stripping comments and strings, so commented-out imports no longer count. Parsing is lexer-based, not tree-sitter, so the drop-in bundle stays a single file with no WASM grammars. Edges record which symbols each importer takes, so `tools.repo.blast_radius({ path, symbol })` lists only the files that use that symbol, following re-exports and renames. PageRank now iterates to convergence, and parsed files are cached by mtime.
+- **Smaller always-on tool list**: only `pinnedNamespaces` (default `org`, `fs`, `repo`, `verify`, `artifacts`) stay pinned in Code Mode; other namespaces stay registered and discoverable via search, and each role gets a one-line hint naming the namespaces it is most likely to need.
+
+### Unified Heretek Platform (v1.0.0): 7 Repositories Consolidated into 1 Omni-Harness
+
+`SwarmOS v1.0.0` consolidates the entire Heretek-AI OpenCode ecosystem (`SwarmOS`, `The-Agency`, `claude-4-opencode`, `IUMBTEMS`, `opencode-rea`, `godot-opencode`, and `GDevelop-Unlocked`) into a single zero-fork architecture:
+
+1. **Pillar 1 — IUMBTEMS Epistemic & Dialectic Engine (`tools.epistemic.*`, `/grill`)**:
+   - SHA-256 content-addressed source cache (`.opencode/epistemic/sources/<shortHash>.md`) with SPDX license contamination classification (`permissive`, `weak-copyleft`, `copyleft-contaminating`, `unknown`).
+   - Deterministic quote verifier (`tools.epistemic.verify_claims`) that parses `[VERIFIED: <shortHash> | "exact verbatim quote"]` tags and confirms every quote exists verbatim in the cached source.
+   - Socratic stress-tester (`tools.epistemic.grill_spec` & `/grill`) that challenges architecture specs before locking contracts.
+2. **Pillar 2 — `claude-4-opencode` Zero-Config Compatibility Bridge (`tools.claude.*`)**:
+   - Automatically discovers `.claude/commands/*.md`, `.claude/agents/*.md`, and `.claude/skills/*/SKILL.md` in the workspace or `~/.claude` and registers them as native OpenCode V2 slash commands, subagents, and skills.
+3. **Pillar 3 — Quantitative 100-Point Visual Quality & UI/UX Judge (`tools.ui.score_ux`, `tools.ui.get_ux_scorecard_script`)**:
+   - Deterministic 6-axis UI/UX scorecard across **Spatial & Viewport Integrity (25 pts)**, **Alignment & Grid Harmony (20 pts)**, **Typography & WCAG Contrast (20 pts)**, **Interactive & Accessibility Completeness (15 pts)**, **Design Token Discipline (10 pts)**, and **Runtime Health (10 pts)**.
+   - Produces a `0..100` score, letter grade (`S`/`A`/`B`/`C`/`F`), and exact remediation checklist saved to `.opencode/artifacts/ux-scorecard.json` (passing requires `score >= 85` and `0` horizontal overflow).
+4. **Pillar 4 — On-Demand Domain Packs (`tools.packs.*`, `/pack`)**:
+   - Zero-overhead domain packs that stay dormant on standard software repos and auto-activate when domain markers are detected:
+     - **Godot 4.x Pack (`godot-opencode`)**: `tools.packs.godot_inspect_scene` parses `.tscn`/`.tres` scene trees, node hierarchies, attached `.gd` scripts, and signal connections; registers `specialist-godot`.
+     - **GDevelop 5 Pack (`GDevelop-Unlocked`)**: `tools.packs.gdevelop_inspect_game` and `tools.packs.gdevelop_unlock_ai_config` inspect `game.json` layouts/events and generate local custom AI endpoint configuration; registers `specialist-gdevelop`.
+     - **Reverse Engineering Pack (`opencode-rea`)**: `tools.packs.re_inspect_binary` performs safe static triage on ELF/PE/Mach-O/WASM binaries (magic header, SHA-256, byte entropy, suspicious URLs/paths/crypto constants); registers `specialist-re`.
+5. **Pillar 5 — `The-Agency` Live Swarm Command Center WebUI (`tools.org.render_dashboard`, `/dashboard`)**:
+   - Generates a self-contained High-Craft Technical Dark HTML5 dashboard (`.opencode/artifacts/swarm-dashboard.html`) displaying the 5-Gate Kanban Board, Locked Contracts, Worktree Tournaments, 100-Point UI/UX Scorecards, Epistemic Cache, and Active Domain Packs.
+
+### Complete Roadmap Edition (v0.9.0+): Task Spend Budgets, Session Replay -> Benchmarks, Warm Parallel LSP & Pinned Host Fixture
+
+- **Per-Task Spend & Step Budgets (`tools.org.claim_task`, `tools.org.set_task_budget`)**: Tasks on `.opencode/org/board.json` now accept `budget: { maxTokens?, maxTurns?, maxToolCalls? }`. When a subagent claims a task via `tools.org.claim_task`, SwarmOS accumulates token, turn, and tool-call usage on `task.usage`. If a subagent exceeds any budget ceiling, `createTaskBudgetEvaluator` locks further file mutations, shell commands, and subagent spawns, appends a `<task-budget-exceeded>` notice, and returns control to `manager` to either raise the budget (`tools.org.set_task_budget`) or re-scope the task.
+- **Session Replay -> Benchmark Regression Exporter (`/replay`, `tools.replay.*`)**: `tools.replay.list_sessions` scans `.opencode/telemetry/*.jsonl` and ranks sessions with tool failures or circuit-breaker fires first. `tools.replay.export_benchmark({ sessionID })` (or `/replay <sessionID>`) packages a recorded failure session into a runnable benchmark regression task under `bench/tasks/<taskId>/` (`task.json`, `repo/`, `replay-trace.json`, `solution/`), and `tools.replay.replay_session` replays the recorded tool timeline step-by-step.
+- **Parallel & Warm-Cached Diagnostics + Symbol Intelligence (`tools.lsp.*`)**: `runParallelDiagnostics` caches file diagnostics by `(absPath, mtimeMs, size)` so unchanged files in multi-file edits return in `0ms`, runs multi-file checks in bounded parallel batches, and exposes `tools.lsp.diagnostics`, `tools.lsp.definitions`, `tools.lsp.references`, and `tools.lsp.status` inside Code Mode.
+- **Pinned OpenCode V2 (`v2.0.26`) Host Contract Fixture (`test/fixtures/opencode-v2-ref/`)**: Includes a pinned reference snapshot of OpenCode V2's plugin host contract so `bun run contract:check` and `bun test` verify every required capability and hook literal out-of-the-box without requiring an external monorepo checkout.
+
+#### Configuration (`.opencode/swarmos.json`)
+
+```jsonc
+{
+  "mode": "full",                 // or "observe"; env: SWARMOS_MODE
+  "telemetry": true,              // env: SWARMOS_TELEMETRY
+  "autoTransactions": true,       // env: SWARMOS_AUTO_TRANSACTIONS
+  "taintTracking": true,          // env: SWARMOS_TAINT_TRACKING
+  "contextBudgetTokens": 6000,    // env: SWARMOS_CONTEXT_BUDGET
+  "pinnedNamespaces": ["org", "fs", "repo", "verify", "artifacts"], // env: SWARMOS_PINNED=org,fs
+  "verifier": { "typecheck": "bun run typecheck", "test": "bun test" }
+}
+```
+
 ---
 
 ## 8. Development & Testing
@@ -191,6 +270,9 @@ bun install
 
 # Run automated test suite
 bun test
+
+# Check every benchmark task is solvable and not already passing
+bun run bench:check
 
 # Typecheck source
 bun run typecheck

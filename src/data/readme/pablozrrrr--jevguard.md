@@ -427,6 +427,65 @@ The report prints aggregated counts, rule IDs, check IDs, and reason codes only 
 never file paths, tasks, diffs, or credentials. A missing or empty history is a
 normal empty report, not an error.
 
+### Rule feedback
+
+Tell JevGuard whether a `FAIL` was right. The answer is stored locally and only
+feeds the calibration shown by `jevguard report`; it never changes a rule, a
+threshold, or what the model returns.
+
+```sh
+# unanswered rule FAILs, newest first, numbered
+jevguard feedback
+
+# answer one: right = a real violation, wrong = a false alarm
+jevguard feedback 1 wrong
+```
+
+Numbers stay fixed to the last listing. Built-in checks are not covered. See
+[configuration](./docs/configuration.md)
+for details.
+
+## Diagnose your setup
+
+`jevguard doctor` checks your local setup without touching the network or changing
+anything:
+
+```sh
+jevguard doctor
+jevguard doctor --json
+```
+
+It reports `OK`, `WARN` or `FAIL` for the credential source, `.jev/rules.md`,
+`.jev/config.yaml` and the OpenCode plugin registration, each with a hint when
+something is wrong. It never prints the API key or any part of it — only whether the
+key comes from the OS credential store or the `TYPESAFE_API_KEY` override. It exits
+`0` unless a check fails (warnings are fine) and `1` when one does. The project root is
+the first parent directory of the current directory that contains `.git`, or the
+current directory when there is none. Claude Code installs are not covered yet.
+
+## Check rules on demand
+
+`jevguard rules check` runs your repository rules against a diff you provide, without
+waiting for an agent turn:
+
+```sh
+git diff --cached | jevguard rules check --diff - --task "Add rate limiting to login"
+jevguard rules check --diff change.diff --rule ARCH-001 --json
+```
+
+It evaluates the repository rules over the diff with the same scope filtering,
+evidence safety, slicing and gate thresholds as a review, but runs no built-in checks,
+starts no remediation and writes nothing to the review history. The input must be
+plain `git diff` output (or a plain `---`/`+++` unified diff) with `a/` and `b/`
+prefixes; anything else is refused whole, never partly evaluated (see
+[configuration](./docs/configuration.md#cli-diagnostics-and-on-demand-rule-checks)).
+`--task` is optional; without it a neutral default task is sent. It prints each rule's outcome, probability, severity and
+scoped paths, never the task or the diff. Exit codes: `0` completed with no `FAIL` and
+no `UNAVAILABLE`; `1` at least one rule `FAIL`ed; `2` it could not check completely
+(invalid arguments, an unreadable or unsupported diff, an unknown `--rule`, or an
+`UNAVAILABLE` result). See [configuration](./docs/configuration.md#cli-diagnostics-and-on-demand-rule-checks)
+for the full contract.
+
 ## Implemented behavior
 
 The current release implements the full local review path:

@@ -26,44 +26,83 @@ index is still installed.
 
 ## Install
 
-### From npm (recommended)
+### With the OpenCode CLI (recommended)
 
 ```bash
-npm install @javierkaiser/opencode-indexing
+opencode plugin add @javierkaiser/opencode-indexing
 ```
 
-Then reference it from `opencode.json`:
+That is the whole install. OpenCode downloads the package into its own cache and
+records it in the global `plugins` array, and it loads both halves of the plugin:
+the server side (`index.ts`, which registers the tools) and the terminal UI
+(`tui.ts`, which adds the prompt-footer indicator and the `/indexing` page).
+
+Update and remove it with the same command family:
+
+```bash
+opencode plugin check     # is there a newer version?
+opencode plugin update    # install it
+opencode plugin remove @javierkaiser/opencode-indexing
+```
+
+`plugin add` installs the plugin but knows nothing about its tools, so it does
+not write permission rules. Add this one to `opencode.json` to keep the host
+asking before the only tool that writes your settings file:
 
 ```jsonc
 {
-  "plugins": [
-    { "package": "@javierkaiser/opencode-indexing" }
+  "permissions": [
+    { "action": "indexing_config_set", "resource": "*", "effect": "ask" }
   ]
 }
 ```
 
-### Global installer (alternative)
+The other six tools only read. OpenCode's base policy already allows everything
+(`{ "action": "*", "resource": "*", "effect": "allow" }`), so they need no rule;
+write them out only if you want to tighten the set.
 
-The installer is cross-platform; it only needs Node >= 22.6.
+### One command, permissions included
+
+To skip the manual rule:
 
 ```bash
-# Linux / macOS
-./install.sh
-
-# Windows
-powershell -ExecutionPolicy Bypass -File .\install.ps1
-
-# Any platform (the wrappers just call this)
-node install.mjs
+npx @javierkaiser/opencode-indexing
 ```
 
-It copies the plugin to the global config directory (`$XDG_CONFIG_HOME/opencode` or `~/.config/opencode`, same path used on Windows), installs runtime deps (`ignore`, plus optional `@lancedb/lancedb@0.26.2` and the tree-sitter WASM packages), adds one `permissions` rule per tool to `opencode.json` (read tools `allow`, `indexing_config_set` `ask`), and restarts the OpenCode service.
+The installer runs `opencode plugin add`, writes the permission rules, and
+restarts the service. It picks its strategy from where it runs: from an installed
+copy — an npx cache, an unpacked tarball — it installs the published package;
+from a checkout it installs your working tree instead, so edits take effect on
+restart with no publish in between. It prints which one it chose.
 
-Those are V2 rules — `{ "action": "indexing_search", "resource": "*", "effect": "allow" }` inside the `permissions` array. The older `permission` action map is a V1 shape that V2 ignores, so the installer removes any of its own entries from that map rather than leaving something that looks configured but grants nothing.
+| Flag | Effect |
+| --- | --- |
+| `--package [spec]` | Install the published package (default spec `@latest`) |
+| `--local` | Copy this directory into the config dir (development) |
+| `--skip-deps` | `--local` only: copy the files, install no dependencies |
+| `--no-restart` | Do not restart the service |
 
-Options: `--skip-deps` (copy files only), `--no-restart`. PowerShell accepts `-SkipDeps` / `-NoRestart` too.
+`install.sh` and `install.ps1` are thin wrappers over it; PowerShell also accepts
+`-Local`, `-Package`, `-Spec`, `-SkipDeps` and `-NoRestart`.
 
-If no package manager is available the copy still happens and the plugin runs with reduced features (line chunker instead of tree-sitter, no LanceDB).
+`--package` deletes any copied plugin it finds: both sources define the same
+plugin id and the config directory is scanned automatically, so leaving both
+would load the plugin twice.
+
+If no package manager is available, a `--local` install still copies the files
+and the plugin runs with reduced features (line chunker instead of tree-sitter,
+no LanceDB).
+
+### Manual
+
+To manage the directory yourself, point `opencode.json` at it. Relative paths
+resolve from the config file containing the entry:
+
+```jsonc
+{
+  "plugins": ["./plugins/opencode-indexing"]
+}
+```
 
 ## How it works
 
@@ -302,15 +341,35 @@ Settings are stored in `~/.config/opencode/indexing.json` (plugin options → `i
 ```jsonc
 {
   "plugins": [
-    { "package": "./plugins/opencode-indexing", "options": {
+    { "package": "@javierkaiser/opencode-indexing", "options": {
       "vectorStore": "qdrant",
       "qdrantUrl": "http://localhost:6333",
       "importFromKilo": true,
-      "autoRefresh": false
+      "autoRefresh": false,
+      "ignoreKiloConfig": false
     }}
   ]
 }
 ```
+
+| Option | Meaning |
+| --- | --- |
+| `vectorStore` | `qdrant` or `lancedb` for the **own** index. Does not affect where an import reads from. |
+| `qdrantUrl` / `qdrantApiKey` | Qdrant connection |
+| `provider` / `model` / `dimension` | Embedding profile, overriding the resolved one |
+| `importFromKilo` | Import a compatible Kilo index on build instead of re-embedding |
+| `autoRefresh` | Refresh inline on search when few files changed |
+| `enabled` | Master switch: when false the own index is neither written nor refreshed |
+| `ignoreKiloConfig` | Stop reading `~/.config/kilo/kilo.jsonc` entirely |
+
+`~/.config/kilo/kilo.jsonc` is read as a fallback for the embedding provider,
+model, dimensions **and API keys**, which is what makes a free import possible:
+the same model has to be used to reuse Kilo's vectors. Set `ignoreKiloConfig` to
+`true` to cut that off, or override any single value with the options above, an
+environment variable, or `~/.config/opencode/indexing.json` — in that order of
+precedence, with plugin options winning.
+
+### Environment variables
 
 | Variable | Meaning |
 | --- | --- |

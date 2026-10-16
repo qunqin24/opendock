@@ -4,6 +4,8 @@
 
 让 [Magpie](https://usemagpie.ai/) 通过你的 Google 账号使用 Gemini 网页版。插件在本机运行 [gemini-web2api-go](https://github.com/zexadev/gemini-web2api-go) 后端，把 Gemini 网页转成 OpenAI 兼容接口。
 
+> **2026-10-16 更新**：现在正价支付的 Google AI Pro 可以直接在 Antigravity 中使用 `gemini-4-argon`，同理也可以直接用 Magpie 反代。
+
 ## 开始使用
 
 1. 在 Magpie 插件市场安装 **magpie-gemini-web**。
@@ -26,15 +28,15 @@
 
 ## 插件选项
 
-工具调用和图片输入默认关闭，Coding Agent 需要工具时请开启：
+工具调用默认开启（Coding Agent 每个请求都带工具），图片输入默认关闭。需要图片输入时：
 
 ```bash
-magpie plugin options magpie-gemini-web '{"allowTools":true,"allowImages":true}'
+magpie plugin options magpie-gemini-web '{"allowImages":true}'
 ```
 
 | 选项 | 默认值 | 说明 |
 | :--- | :--- | :--- |
-| `allowTools` | `false` | 允许工具调用（实验性）。关闭时带工具的请求会返回 400 |
+| `allowTools` | `true` | 允许工具调用（实验性，由上游用提示词模拟）。设为 `false` 时带工具的请求会返回 400 |
 | `allowImages` | `false` | 允许图片输入 |
 | `baseURL` | `http://127.0.0.1:8083/v1` | 默认后端地址 |
 | `contextLimit` / `outputLimit` | `1000000` / `8192` | 向客户端声明的上下文 / 输出上限 |
@@ -74,6 +76,12 @@ Magpie 的额度卡片会显示 Google 账号的 **5 小时** 和 **每周** 用
 
 - 工具调用由上游用提示词模拟，不一定可靠，Flash 系列经常不调用工具。
 - 只开放 `gemini-` 开头的文本模型；`cost` 显示为 0 不代表 Google 的实际配额。
+
+## macOS 原生 Task（实验性）
+
+在 macOS 上登录时会多出一个「macOS 原生 Task（实验性）」选项：请求不走 Gemini Web 后端，而是交给本机常驻服务，由 Gemini.app 自己的 Task 模式执行，工具调用走原生的 Function Calling 通道，模型为 `gemini-task-argon`。Windows 和 Linux 上不会出现这个选项，请继续使用上面的一键配置。
+
+当前为 Alpha：仅支持已验证的 Gemini.app 版本，选这个选项之前需要先在本机完成 setup（需要 Gemini.app 已登录，以及会话模板），只完成过一次真实 Argon 的工具往返验证，读不到额度；Agent 中途打断时，未回传结果的工具调用会占住唯一的 Task 名额最长约 4 分钟。配置步骤、会话要求和限制见 [native-task/README.md](native-task/README.md)。
 
 ## Argon 增强版（可选）
 

@@ -109,10 +109,11 @@ npm run check
 npm run pack:check
 ```
 
-To load a local checkout in OpenCode 2, run `npm ci`, then replace the npm entry
-in `~/.config/opencode/cli.json` with the checkout's absolute directory path.
-Use the directory, not `tui.tsx`: OpenCode V2 resolves the directory's `tui`
-entrypoint and skips direct-file TUI entries. Restart the TUI if it does not reload.
+To load a local checkout in OpenCode 2, run `npm ci && npm run build`, then
+replace the npm entry in `~/.config/opencode/cli.json` with the checkout's
+absolute directory path. Use the directory, not `tui.tsx`: OpenCode V2 resolves
+the directory's `tui` entrypoint and skips direct-file TUI entries. Restart the
+TUI if it does not reload.
 
 ## License
 

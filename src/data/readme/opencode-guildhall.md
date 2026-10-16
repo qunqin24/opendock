@@ -2,387 +2,290 @@
 
 <p align="center">
   <strong>Events in. A living world out.</strong><br />
-  Plug in any event stream (coding agents, GitHub, a repo's whole history, or your own) and watch it
-  become a living 3D island: crowds, weather, ships, a director and a story. Live in your browser, at 60 fps.
+  A repository, its coding agents and its CI, grown into a hex island with people on it.
+  In your browser, with nothing to install.
 </p>
 
 <p align="center">
   <a href="https://guildhall.codestz.dev"><strong>See it live</strong></a> ·
-  <a href="#what-can-feed-it">What can feed it</a> ·
-  <a href="#try-it-live">Try it live</a> ·
-  <a href="https://guildhall.codestz.dev/how">How&nbsp;it's&nbsp;built</a>
+  <a href="https://guildhall.codestz.dev/demos">Demos</a> ·
+  <a href="https://guildhall.codestz.dev/hall/facebook/react">React's island</a> ·
+  <a href="https://guildhall.codestz.dev/built">How&nbsp;it's&nbsp;built</a> ·
+  <a href="https://guildhall.codestz.dev/studio">Studio</a>
 </p>
 
 <p align="center">
-  <a href="https://www.npmjs.com/package/opencode-guildhall"><img alt="npm" src="https://img.shields.io/npm/v/opencode-guildhall?color=c9a227&label=npm" /></a>
   <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-c9a227" /></a>
-  <img alt="OpenCode 1 and 2" src="https://img.shields.io/badge/OpenCode-v1%20%C2%B7%20v2-4f8fd6" />
+  <img alt="Assets: CC0" src="https://img.shields.io/badge/assets-CC0-c9a227" />
 </p>
 
 <p align="center">
-  <img src=".github/media/island-sunset.webp" alt="The guild's island at sunset from a low angle: a walled keep with a glowing hearth, a village, forest and mountains, ships on a pink sea, and a story caption reading 'The Architect and the Librarian bring their loot home.'" width="100%" />
+  <img src=".github/media/v2-hero.webp" alt="The demo guild's castle at golden hour: a stone keep and a great hall inside a curtain wall, the village, fields and the graveyard behind it. Heroes are coming home, with chips over their heads ('Artisan II, returning with loot', 'Artisan, returning with loot', 'Architect, home with loot', 'Guildmaster, dispatching'), six portraits in the face bar at the top left, the chronicle at the bottom left ('Guildmaster sends a quest: Verify against the contract', 'Warden joins the party') and a caption reading 'The Artisan returns with the loot: Lookahead row added; boundary test passes.'" width="100%" />
 </p>
 
-Guildhall is a 3D world engine for event streams. Whatever you plug in, each worker becomes an
-adventurer on the island, each action a **deed** with its own sigil, and each call for help a
-**plea**. The weather follows how things are going, ships sail in from GitHub, and a bard tells it
-all as a story.
+Guildhall turns what happens in a repository into a world you can watch. The repo's folders and
+packages become towns, villages, a mine and a harbour on a hex island, and the island grows with the
+repo. Each coding agent is a hero who walks to the place its work touches. Pull requests sail in as
+ships, CI is the weather, and townsfolk keep their own day around it all. When things go wrong, the
+island answers: a storm, a skeleton in the graveyard, a dragon over the peaks. When they go well, there
+are fireworks.
 
-- **Any source.** OpenCode, Claude Code, GitHub, or your own through the open
-  [world protocol](packages/core/PROTOCOL.md). A repo's whole history is next.
-- **A world that tells the story.** A director picks the camera shots, captions narrate as it
-  happens, the Legends book and recaps keep it, and the guild makes music as it works.
-- **A repo becomes a world.** A public repo's file tree grows into an island with mountain ranges,
-  rivers, lakes, forests, towns, a castle and buildings your agents walk into.
-- **Built to scale.** 300 adventurers in 143 draw calls, an experimental WebGPU renderer, and
-  archipelagos of repos. The numbers are on [How it's built](https://guildhall.codestz.dev/how).
-- **Honest by design.** Only real events move the world, and nothing is faked. The public site
-  plays recorded and simulated stories, and says so.
+This is V2, a rebuild of [V1](#v1). Same idea, a new world: hex tiles, prefabs authored as data, a
+castle that grows with the repo, and a world built off the main thread.
 
-## What can feed it
+## What you can do
 
-| Source | What you see | Quick start |
-|---|---|---|
-| [OpenCode](#opencode) | Every session an adventurer, plus nine guild agents to work with | Add the plugin to `opencode.json` |
-| [Claude&nbsp;Code](#claude-code) | Every session and subagent, in the same hall | Install once, merge the printed hooks |
-| [GitHub&nbsp;seas](#github-seas) | Commits, pull requests, CI and releases as ships | Automatic when a project's remote is on GitHub |
-| [Repo&nbsp;islands](#repo-islands-and-archipelagos) | A public repo's file tree grown into a world, or several as an archipelago | `?repo=owner/name` or `?archipelago` |
-| Git&nbsp;history | A repo's whole history played as a story (Repo Chronicle) | Coming |
-| [Your&nbsp;own](#your-own) | Anything that can POST JSON: deploys, services, jobs | The [world protocol](packages/core/PROTOCOL.md) |
-
-The OpenCode plugin and the Claude Code hook ship in one npm package, `opencode-guildhall`. The
-npm package keeps its original name for now.
-
-<a id="install"></a>
-
-### OpenCode
-
-Add the plugin to `opencode.json`, restart OpenCode, and open <http://127.0.0.1:4747>.
-
-```jsonc
-{ "plugin": ["opencode-guildhall"] }
-```
-
-That's OpenCode 1.18 or later. On OpenCode 2.0.18 or later, use `"plugins"`, or run
-`opencode plugin add opencode-guildhall`. Pick **guild-master** with Tab (shift+tab on v2), and the
-hall follows every OpenCode window you have open. Ports, options and upgrade notes are in the
-[plugin README](packages/opencode-guildhall/README.md).
-
-### Claude Code
-
-Install the package once, then print the hooks block and merge it into `~/.claude/settings.json`
-(every project) or a project's `.claude/settings.local.json`:
-
-```sh
-npm install -g opencode-guildhall
-opencode-guildhall claude-code --print
-```
-
-The command only prints; it never edits your settings. The hook runs on every Claude Code event,
-says nothing back to Claude, and always lets it carry on. It starts the hub the first time it's
-needed (with Bun from your PATH, or Node without it), so open <http://127.0.0.1:4747> once a
-session is going. Each project is its own guild, and a project open in both OpenCode and Claude
-Code shares one. A global install keeps the hook's path stable: `npx` and `bunx` run from a cache
-that gets cleared.
-
-### GitHub seas
-
-When a project's remote is on GitHub, the hub watches it and the sea fills with ships: commits and
-pull requests sail in, the lighthouse burns steady while CI passes and pulses red when it fails, and
-a release arrives as a galleon. It uses `gh auth token` if the GitHub CLI is installed and logged in
-(public repos are watched without a token, less often). The token is read when needed and never
-stored. Set `GUILDHALL_GITHUB=0` to turn the watch off.
-
-### Repo islands and archipelagos
-
-Add `?repo=owner/name` to the hall's URL and your browser reads that public repo's file tree from
-GitHub and grows a world from it. `?archipelago` sets several side by side, or name your own with
-`?repos=a/b,c/d`. The **Your repo as an island** door in the hall does the same.
+- **Watch a demo story.** [Demos](https://guildhall.codestz.dev/demos) plays guilds of agents at
+  work: the five-act Saga, [World events](https://guildhall.codestz.dev/?story=events), a party, a
+  lone hero, Claude Code and OpenCode side by side, a GitHub sea, a rush of twelve quests. Click a
+  hero to follow it, and a director picks the shots when you don't.
+- **Grow a public repo's island from its history.** `/hall/<owner>/<repo>` builds the island from
+  the repo's chronicle, then **Watch it grow** replays it from the first commit.
+  [The Harbour](https://guildhall.codestz.dev/harbour) lists every repo with a chronicle.
+- **Connect Claude Code live, on your machine.** Your sessions show up as heroes on your repo's
+  island while they work. This runs on localhost only ([how](#connect-claude-code-live)).
+- **Take it on your phone.** The HUD folds into a face bar, a caption and one menu, and one finger
+  orbits around the hero you follow.
 
 <p align="center">
-  <img src="packages/hall/public/demos/world.webp" alt="An island grown from a repo: grey mountain ranges inland with rivers running down to the sea, forests on the slopes, and a walled town with roads and farms on the plain." width="100%" />
+  <img src=".github/media/v2-react.webp" alt="React's repository as a hex island in autumn, seen from the sea: villages and towns labelled with its packages (compiler, 4,253 files, capital; react-dom, react-reconciler, react-devtools-shared, scripts as a mine, fixtures as a camp and more), roads between them, rivers, lakes and orange and green woods, with the timeline at the bottom: Watch it grow, 12 Oct 2026, 1,954 contributors, 7,254 files." width="100%" />
+  <br /><sub>React's island at <a href="https://guildhall.codestz.dev/hall/facebook/react">/hall/facebook/react</a>.</sub>
 </p>
 
-The island is one landmass sized by the repo's files, so a big repo reads as big. What grows on it
-follows the repo's shape:
-
-- **Land and water.** Mountain ranges stand inland, with ledged flanks and rocky summits. Rivers run
-  down them to valley lakes and the sea, and forests thin out to a treeline.
-- **Towns and castles.** Each folder becomes a district with its own square, and big repos earn a
-  castle. They are built from a catalogue of prefabs; `?lab=prefabs` is a sandbox to browse them,
-  with seeded variants.
-- **Places to visit.** A forge, library, tavern, mine, watchtower and market stand in their
-  districts. Agents walk in to do the matching work (edit at the forge, read at the library, test at
-  the watchtower, plan at the tavern), and the windows glow while someone is inside.
-- **Island life.** Townsfolk keep a day: home at night, then out to work, the plaza at dusk. Guards
-  walk the walls, traders push barrows, fishers cast from the quay and animals graze. Trails climb
-  the mountains in switchbacks, and a Scout searching may hike to a lookout.
-- **Growth film.** `?grow` replays the repo's history, and the town now builds in stages: plots,
-  frames, walls, roofs, then the castle once the repo is big enough.
-- **Light and distance.** Cascaded shadows, a low sun that throws the ranges' shadows across the
-  land, a touch of haze in the distance, and real shadows under characters, on WebGL and WebGPU.
-
-The world generator runs in a Web Worker, so growing React's island no longer freezes the page (a
-1.1 s stall became about 95 ms). An archipelago with React and far islands around it runs at 97 fps at High.
-`?gen=1` brings back the earlier, simpler islands.
-
-### Your own
-
-Anything that can send JSON to `127.0.0.1:4747` can be a source. The
-[world protocol](packages/core/PROTOCOL.md) has the vocabulary, the wire format and an adapter in
-30 lines. From a clone, run the hub with `bun packages/hub/src/main.ts`, start the hall with
-`bun run dev`, and add `?live` to its URL.
-
-## Try it live
-
-[guildhall.codestz.dev](https://guildhall.codestz.dev) plays a simulated guild, with nothing to
-install. A few links straight into a scene:
-
-- [`?story=seas`](https://guildhall.codestz.dev/?story=seas): a party's run with its GitHub sea
-  beside it, from the first push to the release.
-- [`?repo=facebook/react`](https://guildhall.codestz.dev/?repo=facebook/react): a world grown
-  from a public repo's file tree. Any `owner/name` works. Add `&grow` to watch it build.
-- [`?archipelago`](https://guildhall.codestz.dev/?archipelago): several repos as islands, side by
-  side.
-- [`?story=rush&n=300`](https://guildhall.codestz.dev/?story=rush&n=300): a crowd of 300
-  adventurers (1 to 500).
-- [`?renderer=webgpu`](https://guildhall.codestz.dev/?renderer=webgpu): the experimental WebGPU
-  renderer, where the browser has it. **Settings › Renderer** switches it in the hall.
-
-## Watch it work
-
-<p align="center">
-  <img src=".github/media/saga-loop.webp" alt="An animated loop of the island at night during the closing festival: lanterns and bunting strung over the village square, the keep's hearth glowing, fireworks bursting above the keep, and a caption reading 'The quest is complete. The Guildmaster has the last word.'" width="100%" />
-  <br /><sub><a href=".github/media/saga-loop.mp4">Watch the loop as MP4</a></sub>
-</p>
+The island keeps the seasons: a hall takes them from its own timeline, so Watch it grow turns the
+years, and a demo story keeps its own. Places live with the work: one being read glows warm, one being
+edited raises its scaffold, and one failing is blighted until the fix lands. **Share island**, in the
+crest menu, draws the island as it stands today into a Chronicle card to download or link.
 
 <table>
   <tr>
-    <td colspan="2">
-      <img src=".github/media/work-sites.webp" alt="Three close-ups: an explorer chopping at the forest edge, two researchers fishing at the river bend, a verifier shooting arrows at the proving grounds." width="100%" />
-      <p><strong>Real work, real places.</strong> Each role has a trade. Explorers chop wood while they
-      search your code, researchers fish while they read the web, verifiers shoot at targets while your
-      tests run, and implementers raise a building in the yard as they write. Logs, fish and arrows
-      pile up as the deeds finish.</p>
-    </td>
+    <td width="50%"><img src=".github/media/v2-winter.webp" alt="The keep in winter during the World events demo: snow on the roofs, the walls and the fields, low sun, and chips over the heroes in the yard ('Artisan II, editing hexworld/shows.ts', 'Illuminator, editing shows/festival.ts', 'Guildmaster, dispatching')." width="100%" /></td>
+    <td width="50%"><img src=".github/media/v2-share.webp" alt="React's Chronicle card, landscape, as Share island draws it: 'The Chronicle of react/react, since May 2013, 13 years', 13 years, 19.1k commits, 1,954 contributors, 130 releases, 37 places, 7,254 files, three lines of its history, and the autumn island beside them." width="100%" /></td>
   </tr>
   <tr>
-    <td colspan="2">
-      <img src=".github/media/weather.webp" alt="The same village four ways: a clear noon, a rainy night lit by lanterns, a grey storm and a snowy morning." width="100%" />
-      <p><strong>A living island.</strong> Day and night follow your clock (or a fixed hour), and the
-      weather follows the share of recent deeds that failed. A busy guild runs warm; a guild left
-      quiet for a long time turns cold.</p>
-    </td>
-  </tr>
-  <tr>
-    <td width="50%">
-      <img src=".github/media/graveyard.webp" alt="A graveyard at night. Two hooded skeletons have risen by their graves near a lit crypt. Caption: 'The Verifier and the Explorer II fall, and the graveyard stirs.'" width="100%" />
-      <p><strong>The graveyard.</strong> A failed session rises as a skeleton and keeps vigil until it
-      recovers. Failed deeds raise minions that crumble away.</p>
-    </td>
-    <td width="50%">
-      <img src=".github/media/legends.webp" alt="The Legends book open over the island: a party's quest told chapter by chapter, with each adventurer's deeds, loot, time, tokens and cost." width="100%" />
-      <p><strong>Captions and Legends.</strong> The bard narrates as it happens. The Legends book tells
-      each quest chapter by chapter, with deeds, loot, tokens and cost, and copies out as text.</p>
-    </td>
-  </tr>
-  <tr>
-    <td colspan="2">
-      <img src=".github/media/parties.webp" alt="The full HUD: a plea banner waiting for permission, a parties panel listing three quests, the guild roster, and a chronicle of every deed with a timeline." width="100%" />
-      <p><strong>Parties, pleas and the chronicle.</strong> Several conversations at once become
-      separate parties, each under its own banner. A permission request shows up as a plea you can
-      open. The chronicle lists every deed, and the timeline lets you scrub through the whole session.</p>
-    </td>
+    <td valign="top"><sub><strong>Winter.</strong> The World events demo is told in the snow.</sub></td>
+    <td valign="top"><sub><strong>Share island.</strong> React's Chronicle card, landscape.</sub></td>
   </tr>
 </table>
 
-**A cinematic director.** With the bard on, the camera picks its own shots: establishing views,
-follows, close-ups, two-shots. It cuts to whatever matters most, and a plea outranks everything.
-In replays it fast-forwards through the quiet stretches. Take the camera back any time.
+## The island answers
 
-**Sound.** Every deed plays a note in a key that follows the mood (minor at night), over a bed of
-wind, rain, sea, fire and night insects. It is synthesized in the browser, apart from a few
-recorded effects. Sound is off until you turn it on.
+Real events set off the island's own shows. Nothing is faked: each one is earned by a rule, and a
+live hall spaces the big ones at least 150 seconds apart.
+[World events](https://guildhall.codestz.dev/?story=events) is a four-minute demo that earns every
+one in turn.
 
-**GitHub seas.** Ships for commits and pull requests, a lighthouse for CI and a galleon for each
-release. [More above](#github-seas).
+<table>
+  <tr>
+    <td width="25%"><img src=".github/media/v2-strip-fireworks.webp" alt="Night over the island in the Saga's festival: a blue ring firework above the dark sea and the lamplit village, the keep lit at the bottom." width="100%" /></td>
+    <td width="25%"><img src=".github/media/v2-strip-dragon.webp" alt="A red dragon flying in the rain over a grey sea and the snowy coast of the island." width="100%" /></td>
+    <td width="25%"><img src=".github/media/v2-strip-tavern.webp" alt="The tavern's beer garden at eight in the evening: patrons round the tables in lamplight, toasting ('Another round!', 'To the guild!')." width="100%" /></td>
+    <td width="25%"><img src=".github/media/v2-strip-skeleton.webp" alt="A horned skeleton warrior rising from a grave among the headstones of the graveyard, autumn trees and fields behind." width="100%" /></td>
+  </tr>
+  <tr>
+    <td valign="top"><sub><strong>Fireworks.</strong> Fifteen clean deeds earn a festival at nightfall.</sub></td>
+    <td valign="top"><sub><strong>The dragon.</strong> Three failed builds in a row bring it over the peaks.</sub></td>
+    <td valign="top"><sub><strong>The tavern.</strong> At 20:00 the tables drink, toast and sing.</sub></td>
+    <td valign="top"><sub><strong>The graveyard.</strong> A red CI run raises a skeleton. A fix lays it to rest.</sub></td>
+  </tr>
+</table>
 
-**Townsfolk.** Farmers, a fisher, merchants, gate guards, children and a graveyard keeper go about
-their day around the guild.
+There is more: a comet for the hundredth deed, a rainbow when a storm clears, a ghost ship, pirates
+when a party's bill runs high, a galleon for a release, a lighthouse for CI. At sea, wakes follow
+every boat, and open issues queue on the quay as plates. In town, lamplighters go round at dusk and
+a few of the latest drinkers walk home tipsy.
 
-**Secret events.** The island answers rare moments in your work. A clean quest earns a festival.
-A long run that ends in a fall may bring a ghost ship out of the mist. There are more: a rainbow,
-pirates, comets, a dragon. Each has its own trigger, and they're more fun to find than to read
-about.
+## The site
 
-<p align="center">
-  <img src=".github/media/rainbow-dragon.webp" alt="A rainbow over the village while a red dragon circles above the mountains." width="100%" />
-</p>
-<p align="center">
-  <img src=".github/media/events-pair.webp" alt="Left: lanterns and bunting strung across the square at night for a festival. Right: a glowing green ghost ship on a dark sea." width="100%" />
-</p>
+| Route | What it is |
+|---|---|
+| [`/`](https://guildhall.codestz.dev) | The island with a demo guild at work. Type an `owner/repo` to open its hall. |
+| [`/demos`](https://guildhall.codestz.dev/demos) | The demo stories, opened over the island (`/?story=saga`, `events`, `party`, `solo`, `factions`, `seas`, `rush`) |
+| [`/hall/<owner>/<repo>`](https://guildhall.codestz.dev/hall/facebook/react) | A repo's island, grown from its chronicle, with its history on a timeline |
+| [`/harbour`](https://guildhall.codestz.dev/harbour) | Every chronicled repo |
+| [`/built`](https://guildhall.codestz.dev/built) | How it's built: the engineering, the numbers, and the journey |
+| [`/studio`](https://guildhall.codestz.dev/studio) | The Studio, the workshop the world is made in |
 
-## How it works
+A **chronicle** is a public repo's whole history, read once and stored small: its folders over time,
+its releases, its contributors week by week. No code and no file contents. Chronicles are built and
+served by [guildhall-chronicles](https://github.com/Codestz/guildhall-chronicles); open a request there
+to add a repo. A repo with no chronicle opens as a **sketch**: the generator's own island, marked as
+such, not that repo's.
 
-```mermaid
-flowchart LR
-  OC["OpenCode<br/>(v1 or v2)"] -- session events --> H["herald<br/>(the plugin)"]
-  H -- "POST changes" --> HUB["hub<br/>127.0.0.1:4747"]
-  CC["Claude Code"] -- "hook events" --> HUB
-  YOU["your adapter"] -- "POST changes" --> HUB
-  GH["GitHub"] -. "commits, PRs, CI" .-> HUB
-  HUB -- chronicles --> DISK[("~/.cache/guildhall")]
-  HUB -- WebSocket --> HALL["hall<br/>(your browser)"]
-```
-
-Every source is turned into one small vocabulary of **changes**: sessions, deeds, pleas and
-replies. The **herald** does it inside OpenCode, the Claude Code hook does it from Claude Code's
-hook events, and your own adapter can do it from anything. They all send to the **hub**, a tiny
-local server that the herald or the hook starts the first time it's needed. The hub records each
-session as a chronicle on disk, watches GitHub for the sea, and serves the **hall**, a React Three
-Fiber app that turns the stream into the island. The hall reads only changes, so it can't tell which source a
-guild came from. The [world protocol](packages/core/PROTOCOL.md) has the details.
-
-## How it's built
-
-[How it's built](https://guildhall.codestz.dev/how) is the long read: 300 adventurers in 143 draw
-calls (down from 1,226), WebGL against WebGPU measured honestly, the TSL gotchas, repos grown into
-islands and GitHub as a sea. Every number is measured, and every section ends in a live link.
-
-## The guild
-
-For OpenCode, the plugin also gives you nine agents to work with. You talk to the **Guildmaster**.
-It sizes your request, briefs the specialists, has their work checked by a verifier, and reports
-back.
-
-The world draws every actor as an **archetype**. The nine guild agents each map onto one, and so
-does anyone from any other source:
-
-| Archetype | Agent role | What it does | What it may do | Where it works |
-|---|---|---|---|---|
-| **Guildmaster** | Guildmaster (and the root of any party) | Talks to you, plans, briefs specialists, reports back | Read; shell asks first; may launch the eight specialists | Quest board in the keep |
-| **Architect** | Architect (and Claude Code's `Plan`) | Designs the structure first: boundaries, plans, task contracts | Write Markdown under `docs/` only | Drafting table in the keep |
-| **Artisan** | Implementer | Builds one bounded task: the code and its tests | Edit files; run the project's checks; any other command asks | Forge, then the construction yard |
-| **Warden** | Verifier | Tries to prove the work wrong, returns a cited verdict | Read; run the checks; every other command is denied | Inspection bench, then the proving grounds |
-| **Archivist** | Librarian | Library docs at your installed version, plus the project's decisions | Read and use the web | Library, then the wizard tower |
-| **Scout** | Explorer (and Claude Code's `Explore`) | Maps your codebase | Read only | Map table, then the forest edge |
-| **Scholar** | Researcher | Answers open questions from the web, with sources | Read and use the web | Map table, then the river bend |
-| **Illuminator** | Designer | Designs and builds UI within your design system | Edit files; run the checks; any other command asks | Easel in the keep |
-| **Herald** | Product owner | Turns a vague goal into a spec with testable criteria | Write Markdown under `docs/` only | Scroll desk in the keep |
-| **Wanderer** | Any agent from outside the guild (OpenCode's `general`, Claude Code's `general-purpose`) | Whatever its own agent does | What its own host allows | The quarry |
-| **Automaton** | A bot account (a GitHub app, `…[bot]`) | Automated work: CI, dependency updates | What its own host allows | The quarry |
-
-The chips and the roster show the archetype, with the source's own name beneath it
-(`Warden · verifier`); Settings → Names switches to the source's names alone. A source can also say
-which archetype an actor is outright.
-
-- **Permissions are enforced twice.** OpenCode's own rules: every agent starts from deny-all and
-  gets back only what its job needs. "Checks" means an exact list of test, lint, typecheck and
-  read-only git commands. Protected paths (your OpenCode config, `AGENTS.md`, `.git/` and others)
-  can't be written by any agent. Then a pre-run guard in the plugin reads every shell line a guild
-  agent runs, with a real shell parser, before it runs: the Verifier may only run those exact
-  checks, and no agent may redirect output into a protected path, however the line is written. The [plugin README](packages/opencode-guildhall/README.md#permissions) has
-  the full rules and their known limits.
-- **Models.** By default no role sets a model: everyone runs on the one you picked, with any
-  provider. If you want, map the `strong`, `standard` and `fast` tiers, or a single agent, to
-  models of your choice.
-- **Make them yours.** Your config overrides the plugin's, field by field.
-  `npx opencode-guildhall eject` writes the prompts into `.opencode/agents/` for you to edit.
-  `{ "agents": false }` turns the guild off and keeps only the hall.
-
-## Privacy
-
-Everything runs on your machine. The hub listens on `127.0.0.1` only and refuses events from web
-pages and non-local origins. Chronicles are kept in `~/.cache/guildhall/chronicles/<project>/`.
-They hold your prompts and code, so treat them like your shell history. Nothing is uploaded. The
-outside requests are few: the hall's fonts, which your browser loads from Google Fonts; the GitHub
-seas, where the hub asks api.github.com about your project's repo (`GUILDHALL_GITHUB=0` turns it
-off); and `?repo=`, where your browser reads a public repo's file tree from GitHub. No session data
-goes with any of them.
-
-## Performance
-
-60 fps is the bar, and the hall measures itself against it. On a Retina MacBook at the default High
-tier the party scene runs well above it; the numbers, and how they're measured, are on
-[How it's built](https://guildhall.codestz.dev/how). A few things keep it fast:
-
-- Island tiles are instanced and placed props are batched per material. Mountains and far islands
-  drop to coarser detail with distance, and repo worlds grow off the main thread. Each character's parts are
-  merged into two skinned meshes, and big crowds draw from baked bone textures with mesh LOD.
-- One shadow-casting sun, and its shadow map is redrawn only when something it covers changes: a
-  few times every four seconds instead of every frame. Repo islands use cascaded maps, where the far
-  cascade redraws only when the sun turns. Characters near the camera cast real shadows; the rest
-  get cheap blob shadows.
-- Outlines, mist, sun shafts and colour grading run in a single post-processing pass.
-- Occasional layers, like the graveyard's undead, the ghost ship and a repo island's civic
-  buildings, load the first time they're needed. Characters ship meshopt-compressed, 410 KB gzip
-  lighter on first paint.
-- Quality adapts on its own across three tiers. An Ultra tier with a tilt-shift miniature look is
-  there if you choose it.
-- Where the browser has WebGPU, **Settings › Renderer** switches to an experimental WebGPU
-  renderer. WebGL stays the default.
-
-## Develop
+## Quick start
 
 Needs [Bun](https://bun.sh) 1.3.5 or later.
 
 ```sh
 bun install
-bun run dev          # the hall, with simulated stories (Settings › Story)
-bun test             # unit tests
-bun run check        # lint, typecheck and tests
+bun run dev        # the site and the Studio, on http://localhost:5300
 ```
 
-To watch real sessions while developing, run the hub with `bun packages/hub/src/main.ts`, then add
-`?live` to the hall's URL.
+Open <http://localhost:5300>. The island, the demos and the halls all run from here.
+
+The 3D models are not in the repo. They are free CC0 packs, imported into `library/` (gitignored)
+once:
+
+1. Download the free tiers of the packs listed under [Credits](#credits). Put the zips in
+   `assets/raw/` and unzip each into `assets/src/<zip name>/`, e.g.
+   `assets/src/KayKit_Medieval_Hexagon_Pack_1.0_FREE/`.
+2. Run `bun run import` (or name packs: `bun run import kaykit-hexagon kenney-nature`). It
+   normalises scale and pivots, maps colours onto one palette, bakes them into vertex colours and
+   writes the catalog. `assets/DOWNLOADS.md` lists every source and licence.
+
+Other scripts:
+
+```sh
+bun run check      # lint, typecheck and tests
+bun test           # tests only
+bun run shots <url> --out <path>   # a headless screenshot with frame stats
+```
+
+## Connect Claude Code live
+
+Live mode is **localhost only**. The hub that collects your sessions binds `127.0.0.1` and refuses
+any non-local origin, so the public site never sees your agents. It is V1's hub and hook, kept under
+[`live/`](live) and unchanged.
+
+1. Install the dependencies once, from the repo root:
+
+   ```sh
+   bun install
+   ```
+
+2. Print the hook block and merge it into the settings of the project you want to watch
+   (`<project>/.claude/settings.local.json`), or into `~/.claude/settings.json` for every project:
+
+   ```sh
+   bun live/claude-code/src/install.ts --print
+   ```
+
+   The command only prints; it never edits a settings file. The hook runs on 13 Claude Code events,
+   says nothing back to Claude and always lets it carry on. If Claude Code can't find `bun`, put
+   the full path from `which bun` in the printed commands. To remove it, delete the block.
+
+3. Start a Claude Code session in that project. The hook starts the hub the first time it's needed;
+   you can also run it yourself with `bun live/hub/src/main.ts` (port 4747).
+
+4. With `bun run dev` running, open:
+
+   ```
+   http://localhost:5300/hall/<owner>/<repo>?feed=live
+   ```
+
+   The hub names each project after its folder, and the hall follows the guild named like
+   `<repo>`. If the folder has another name, add `&guild=<folder name>`.
+
+Each session is a hero, each subagent another. Heroes walk to the package of the file they touch;
+the Guildmaster (the session that sends the others out) stays in the great hall. A permission
+request shows as a plea over the hero. When the project's remote is on GitHub, the hub also watches
+it: pull requests sail in as ships and CI sets the weather (`GUILDHALL_GITHUB=0` turns that off).
+
+Chronicles of your sessions are kept in `~/.cache/guildhall/chronicles/<project>/`. They hold your
+prompts and code, so treat them like your shell history. Nothing is uploaded.
+
+## How it's built
+
+The long read, with measured numbers, is [How it's built](https://guildhall.codestz.dev/built). In
+short:
 
 | Package | What it is |
 |---|---|
-| [`packages/opencode-guildhall`](packages/opencode-guildhall) | The published plugin: herald, hub and a built hall in one package, plus the `eject` and `claude-code` CLI |
-| [`packages/herald`](packages/herald) | The OpenCode side: adds the agents, translates events, sends them to the hub |
-| [`packages/claude-code`](packages/claude-code) | The Claude Code side: a hook that translates Claude Code's events and sends them to the hub |
-| [`packages/hub`](packages/hub) | The local server: takes events, keeps chronicles, serves the hall over WebSocket |
-| [`packages/hall`](packages/hall) | The 3D world and HUD: `scene/`, `guild/` (state, story, director), `hud/`, `audio/` |
-| [`packages/roster`](packages/roster) | The nine roles: prompts, permissions, model tiers, and how each looks and where it works |
-| [`packages/core`](packages/core) | The shared event model, and the translators for OpenCode 1 and 2 |
-| [`packages/sim`](packages/sim) | Scripted demo stories (`solo`, `party`, `rush`, `parties`) and their player |
+| [`packages/core`](packages/core) | Types, the event vocabulary (V1's wire format), hashing, the logger |
+| [`packages/assets`](packages/assets) | The catalog, the palette and the house style |
+| [`packages/world`](packages/world) | The hex island: terrain, rivers, places, roads, sites, tiles to prefabs, collisions, life plans |
+| [`packages/sim`](packages/sim) | Pure reducers over events: heroes, places, story, captions, legends, chronicles, the demo stories |
+| [`packages/render`](packages/render) | three.js: the stage, batches and LOD, crowd, water, sky, shadows, event effects |
+| [`packages/ui`](packages/ui) | The React HUD and site pieces |
+| [`apps/studio`](apps/studio) | The site and the Studio in one app |
+| [`tools/*`](tools) | `import` (packs to library), `shots` (screenshots and the perf bench), `palette`, `chronicle` (the deep chronicle builder the chronicles repo runs) |
+| [`live/`](live) | V1's hub and Claude Code hook, which live mode runs on your machine |
 
-<details>
-<summary><strong>Building the 3D assets</strong></summary>
+- **One-way layers.** `core → assets → world → sim → render`, each importing only the ones before
+  it. `ui` sits beside render and never touches three.js. Apps may use any package but never import
+  three directly. The pure layers (core to sim) import no three, React or Node, so they run in
+  workers and tests. A test (`test/layers.test.ts`) enforces it.
+- **The world is built in a worker.** Terrain, places, roads, tiles and life plans are generated
+  off the main thread, behind a loading cover; the island shows once, whole.
+- **Stable growth.** An island of N tiles is exactly the first N tiles of any bigger one, so a
+  growing repo only adds land at the edge, and the history replay never moves what is there.
+- **Event-sourced.** Every source becomes one log of events. The hall reads the world at a time `t`
+  by replaying the log from the nearest checkpoint, so live, replay, scrubbing and stories are one path.
+- **Data, not code, for the look.** Tile prefabs are JSON in `data/tiles/`, with the spots where
+  people sit, work and talk, authored in the Studio.
 
-The web-ready models in `packages/hall/public/assets/` are committed, so you only need this to
-change them. `bun scripts/assets.ts` turns the original packs into compressed `.glb` files: it
-prunes them, shares one animation rig between all the characters, merges the meshes and applies
-meshopt compression.
+## On your phone
 
-The source packs aren't in the repo. Download the free versions from
-[KayKit on itch.io](https://kaylousberg.itch.io/) (Adventurers 2.0, Character Animations 1.1,
-Dungeon Pack 1.1, Furniture Bits, RPG Tools Bits, Fantasy Weapons Bits, Medieval Hexagon Pack,
-Forest Nature Pack, Restaurant Bits, Skeletons 1.1, Halloween Bits) and Kenney's
-[Pirate Kit](https://kenney.nl/assets/pirate-kit). Put the zips in `assets/raw/` and unzip each one
-into `assets/src/<zip name>/`. Then run `bun scripts/assets.ts` for everything, or name some
-outputs: `bun scripts/assets.ts forest lands`.
+<p align="center">
+  <img src=".github/media/v2-phone.webp" alt="The island on a phone, 390 pixels wide: the keep and the great hall at golden hour with the Guildmaster's chip and knights in the yard, the caption 'The Guildmaster sends the Artisan, the Artisan II and the Archivist out at once.' and a face bar of five hero portraits and +1 at the bottom, with the crest, the party's name and a menu button along the top." width="260" />
+</p>
 
-</details>
+The same site works at 390 px wide. The top row is the crest, the repo and a menu. The menu opens
+one bottom sheet (Guild, Places, Chronicle, Settings). At the bottom are the face bar, the caption
+and a thin timeline. Chips show names only, except on the hero you follow. Landscape is laid out
+like the desktop.
+
+## The Studio
+
+<p align="center">
+  <img src=".github/media/v2-studio.webp" alt="The Studio's home: 'Guildhall Studio, Events in. A living world out.', the read-only badge in the top bar, a live tile preview of a canteen with its beer garden, and counts: 1,568 pieces, 18 packs, 83 tile prefabs, 234 activity spots, 132 animation clips." width="100%" />
+</p>
+
+The Studio is where the world is made: pieces and palette at true scale, the tile composer, the hex
+map with its knobs, NPCs, grips (how every character holds every prop in every animation). It is
+public at [/studio](https://guildhall.codestz.dev/studio). Online it is read-only: explore freely,
+nothing is saved. On localhost, saving writes to `data/`.
+
+## Performance
+
+The bar is 60 fps on an M1 laptop at the default quality, and the rule is that **performance work
+must not change what you see**.
+
+- LOD switches only where the difference is under about a pixel, and crossfades over a band; every
+  threshold has a gap between switching in and out, so nothing pops or flickers.
+- The governor holds a 12 ms frame by trading resolution, a quarter step of pixel ratio at a time.
+  It never overrides a quality you pick in Settings, and Settings → Motion holds the frame rate to
+  Auto, Smooth 30 or Max.
+- Shadow cascades re-aim only when the camera leaves an inner area, so panning costs what standing
+  still does.
+- Placed pieces are batched per material, the crowd draws from one baked bone texture, and the
+  island draws in a few dozen calls.
+- A static draw list, one shared material per kind of object and no extra anti-aliasing pass keep
+  a standing camera nearly free. The 3D models ship gzipped.
+
+The hero view draws in 8.1 ms at the 95th percentile, and a first visit downloads 5.2 MB (it was
+9.3). A 12,000-file island at mid and wide views still takes 12 to 15 ms a frame, GPU-bound, over the 12 ms the governor aims for. Numbers are measured
+with the bench in `tools/shots` on a quiet machine, never estimated.
 
 ## Credits
 
-- 3D models and animations by **Kay Lousberg**, [KayKit](https://kaylousberg.itch.io/), under
-  [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/). From the free tiers of Character
-  Pack: Adventurers 2.0, Character Animations 1.1, Dungeon Pack 1.1, Furniture Bits, RPG Tools Bits,
-  Fantasy Weapons Bits, Medieval Hexagon Pack, Forest Nature Pack, Restaurant Bits, Skeletons 1.1
-  and Halloween Bits.
-- Sound effects by **Kenney**, [kenney.nl](https://kenney.nl/), under
-  [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/): a curated subset of
-  [RPG Audio](https://kenney.nl/assets/rpg-audio) and [Impact Sounds](https://kenney.nl/assets/impact-sounds).
-  The notes and ambience are synthesized in the browser.
-- Ships by **Kenney**: [Pirate Kit](https://kenney.nl/assets/pirate-kit), under
-  [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/).
-- Built with [three.js](https://threejs.org), [React Three Fiber](https://r3f.docs.pmnd.rs) and the
-  pmndrs ecosystem (drei, postprocessing), for [OpenCode](https://opencode.ai).
-- The event translators come from opencode-cockpit, and the agent prompts are adapted from Agentry.
+All 3D assets and sounds are CC0 1.0. Attribution isn't required; it is given anyway.
 
-The full asset list is in [`packages/hall/public/assets/CREDITS.md`](packages/hall/public/assets/CREDITS.md).
+- **3D models and animations** by **Kay Lousberg**, [KayKit](https://kaylousberg.itch.io/), under
+  [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/). Free tiers of Medieval Hexagon Pack,
+  Forest Nature Pack, Medieval Builder Pack, Resource Bits, RPG Tools Bits, Furniture Bits,
+  Adventurers 2.0, Fantasy Weapons Bits, Skeletons 1.1, Dungeon Pack 1.1, Halloween Bits and Character
+  Animations 1.1.
+- **3D models** by **Kenney**, [kenney.nl](https://kenney.nl/), under
+  [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/): Nature Kit, Castle Kit, Fantasy Town
+  Kit 2.0, Graveyard Kit, Survival Kit and Pirate Kit.
+- **Sound effects** by **Kenney**, under [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/):
+  a few samples from [RPG Audio](https://kenney.nl/assets/rpg-audio) and
+  [Impact Sounds](https://kenney.nl/assets/impact-sounds). Sound is off until you turn it on.
+- Built with [three.js](https://threejs.org), [React](https://react.dev), [Vite](https://vite.dev)
+  and [Bun](https://bun.sh). Fonts from Google Fonts.
+
+The full list of sources, with links and licence files, is in `assets/DOWNLOADS.md`. Other packs
+were imported while exploring (Quaternius among them), but they are not in the house style and the
+site does not ship them.
+
+## V1
+
+V1 is kept for history. Its code is on the [`v1` tag](https://github.com/Codestz/guildhall/tree/v1);
+only its hub and Claude Code hook stay here, in `live/`. V1 had the OpenCode plugin
+(`opencode-guildhall` on npm), the archipelago of repos and the WebGPU renderer;
+[RELEASE_NOTES.md](RELEASE_NOTES.md) says what moved, what changed and what is parked. Animals are parked too: they did not fit the low-poly style, so
+pens and pastures stand empty for now.
 
 ## License
 

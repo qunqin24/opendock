@@ -9,11 +9,23 @@ secure enclaves that even Tinfoil cannot read into.
 
 ## Setup
 
-1. Install the plugin:
+Supports OpenCode 1.19.1+ (1.x) and 2.0.30+.
+
+1. Install the plugin (OpenCode 2):
 
    ```bash
-   opencode plugin @tinfoilsh/opencode-provider --global
+   opencode plugin add @tinfoilsh/opencode-provider
    ```
+
+   To upgrade an existing OpenCode 2 installation:
+
+   ```bash
+   opencode plugin update @tinfoilsh/opencode-provider
+   opencode service restart
+   ```
+
+   For OpenCode 1.x, use
+   `opencode plugin @tinfoilsh/opencode-provider --global` instead.
 
 2. Set your API key:
 

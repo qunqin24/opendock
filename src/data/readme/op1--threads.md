@@ -21,7 +21,7 @@ The "op" in `op-threads` stands for opinionated. Threads makes these choices for
 
 ## Install
 
-Threads 0.3.1 needs OpenCode 2.0.28. On OpenCode 2.0.26 or earlier, use Threads 0.2.8.
+Threads 0.3.2 needs OpenCode 2.0.28. On OpenCode 2.0.26 or earlier, use Threads 0.2.8.
 
 1. Add the server plugin:
 

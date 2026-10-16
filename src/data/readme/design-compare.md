@@ -278,6 +278,14 @@ go build -o design-compare
 go test -v ./...
 ```
 
+拡張機能の MCP クライアント（timeout / abort / 子プロセス回収）は Node 組み込みの test runner で検証します。実バイナリ比較ケースのため、先に `go build -o design-compare .` が必要です。
+
+```bash
+go build -o design-compare .
+npm run test:ext
+# または: node --test extensions/design-compare/mcp-client.test.ts
+```
+
 ---
 
 ## 5. 各種ツール（Codex / Claude）へのセットアップ手順

@@ -71,7 +71,7 @@ Data comes from the [Requesty Management API](https://docs.requesty.ai/api-refer
 
 ## Installation
 
-Choose the instructions for your OpenCode major version. The same npm package supports both, but OpenCode 1.x and 2.x use different plugin installers and configuration files.
+Choose the instructions for your OpenCode major version. The same npm package supports both, but OpenCode 1.x and 2.x use different plugin configuration files.
 
 ### OpenCode 1.x
 
@@ -91,17 +91,17 @@ OpenCode 1.x stores TUI plugin configuration in `tui.json`. The install command 
 
 ### OpenCode 2.x
 
-Install the package globally with the v2 plugin command:
+Install the package globally:
 
 ```sh
 opencode plugin add @christiangalsterer/opencode-requesty-plugin
 ```
 
-For a project-specific installation, add the package to that project's `opencode.json` `plugins` array. V2 does not use the v1 `opencode plugin <package>` command to edit project configuration.
+V2 CLI plugin configuration is global. Set the plugin options in `~/.config/opencode/cli.json`.
 
 ```json
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://opencode.ai/v2/cli.json",
   "plugins": [
     {
       "package": "@christiangalsterer/opencode-requesty-plugin",
@@ -122,13 +122,12 @@ For OpenCode 1.x, force the plugin installer to fetch the package again:
 opencode plugin -f @christiangalsterer/opencode-requesty-plugin
 ```
 
-For OpenCode 2.x, update global plugins with:
+For OpenCode 2.x, update the installed plugin with:
 
 ```sh
 opencode plugin update @christiangalsterer/opencode-requesty-plugin
 ```
 
-Project-configured v2 plugins use the version resolved from the `plugins` entry in `opencode.json`; update a pinned version there when needed.
 
 OpenCode does not currently support plugin updates reliably. See OpenCode PRs #35777, #32822, and #37300. To force OpenCode to download the configured plugin versions, clear its plugin cache:
 
@@ -141,7 +140,7 @@ rm -rf ~/.cache/opencode/packages/@christiangalsterer/opencode-requesty-plugin*
 The plugin options are the same in both versions, but the files and JSON shapes differ:
 
 - **OpenCode 1.x:** plugin registration/options go in `tui.json`; the Requesty provider goes in `opencode.json`.
-- **OpenCode 2.x:** plugin registration/options and the Requesty provider both go in `opencode.json`.
+- **OpenCode 2.x:** plugin registration/options go in the global `~/.config/opencode/cli.json`, the Requesty provider goes in global or project `opencode.json`.
 
 Use the matching example below. Do not combine the v1 `plugin`/tuple shape with the v2 `plugins`/object shape.
 
@@ -188,11 +187,11 @@ The Requesty provider is configured separately in the project or global `opencod
 
 ### OpenCode 2.x
 
-OpenCode 2 uses `plugins` with an object containing `package` and `options`. Provider configuration uses the plural `providers` key and provider `settings`:
+OpenCode 2 uses the global `~/.config/opencode/cli.json` for terminal-client plugin configuration. Configure the plugin with `plugins` and an object containing `package` and `options`:
 
 ```json
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://opencode.ai/v2/cli.json",
   "plugins": [
     {
       "package": "@christiangalsterer/opencode-requesty-plugin",
@@ -225,7 +224,15 @@ OpenCode 2 uses `plugins` with an object containing `package` and `options`. Pro
         }
       }
     }
-  ],
+  ]
+}
+```
+
+Configure the Requesty provider separately in the global `~/.config/opencode/opencode.json` or a project `opencode.json`. V2 provider configuration uses the plural `providers` key and provider `settings`:
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
   "providers": {
     "requesty": {
       "settings": {
@@ -273,7 +280,7 @@ Restart OpenCode after changing configuration.
 
 If you utilize different API keys for various projects, it is highly recommended to enable `showKeyName` in your configuration. This allows you to easily identify which Requesty API key is currently active in the sidebar, session prompt, and detail dialog.
 
-Example for enabling key identification:
+Example for enabling key identification (add to the plugin options in V2's global `~/.config/opencode/cli.json`):
 
 ```json
 {
@@ -324,13 +331,13 @@ Example for enabling key identification:
 }
 ```
 
-### Complete OpenCode 2.x configuration example
+### Complete OpenCode 2.x configuration examples
 
-Place this in the project `opencode.json` (or `opencode.jsonc`). For global use, add the plugin to your global OpenCode configuration instead.
+Put plugin registration and options in the global `~/.config/opencode/cli.json`:
 
 ```json
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://opencode.ai/v2/cli.json",
   "plugins": [
     {
       "package": "@christiangalsterer/opencode-requesty-plugin",
@@ -362,7 +369,15 @@ Place this in the project `opencode.json` (or `opencode.jsonc`). For global use,
         }
       }
     }
-  ],
+  ]
+}
+```
+
+Put Requesty provider credentials in the global `~/.config/opencode/opencode.json` or a project `opencode.json`:
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
   "providers": {
     "requesty": {
       "settings": {
@@ -413,19 +428,52 @@ Details:
 
 ## API key detection
 
-The plugin resolves credentials in this order: an explicit API key in a Requesty provider configuration, an environment variable declared by a matching Requesty provider, then `REQUESTY_API_KEY` from the plugin process environment. `{env:VAR}` values are interpolated. OpenCode 1.x uses `provider.requesty.options.apiKey`; OpenCode 2.x uses `providers.requesty.settings.apiKey`. Custom provider entries are supported when their `baseURL` points to a Requesty host.
+The plugin resolves credentials in this order: an explicit API key in a Requesty provider configuration, an environment variable declared by a matching Requesty provider, then `REQUESTY_API_KEY` from the plugin process environment. `{env:VAR}` values are interpolated. OpenCode 1.x uses `provider.requesty.options.apiKey`; OpenCode 2.x uses `providers.requesty.settings.apiKey` in `opencode.json`. The plugin itself and its options are configured separately in V2's global `cli.json`. Custom provider entries are supported when their `baseURL` points to a Requesty host.
+
+OpenCode 1.x — direct API key in `opencode.json`:
 
 ```json
 {
   "provider": {
     "requesty": {
-      "options": { "apiKey": "sk-..." }
+      "options": {
+        "apiKey": "sk-..."
+      }
     }
   }
 }
 ```
 
-OpenCode 2.x configuration uses `providers` and `settings`:
+OpenCode 1.x — environment variable in `opencode.json`:
+
+```json
+{
+  "provider": {
+    "requesty": {
+      "options": {
+        "apiKey": "{env:REQUESTY_API_KEY}"
+      }
+    }
+  }
+}
+```
+
+OpenCode 2.x — direct API key in `opencode.json`:
+
+```json
+{
+  "providers": {
+    "requesty": {
+      "settings": {
+        "apiKey": "sk-...",
+        "baseURL": "https://api-v2.requesty.ai/v1"
+      }
+    }
+  }
+}
+```
+
+OpenCode 2.x — environment variable in `opencode.json`:
 
 ```json
 {
@@ -440,25 +488,13 @@ OpenCode 2.x configuration uses `providers` and `settings`:
 }
 ```
 
-Or via an environment variable:
-
-```json
-{
-  "provider": {
-    "requesty": {
-      "options": { "apiKey": "{env:REQUESTY_API_KEY}" }
-    }
-  }
-}
-```
-
 If no key is found, the widget shows a short setup hint instead of failing.
 
 ## Development
 
 ### Local development install
 
-Point at a local checkout instead:
+For OpenCode 1.x, point the TUI plugin configuration at a local checkout:
 
 ```json
 {
@@ -475,6 +511,8 @@ Point at a local checkout instead:
   ]
 }
 ```
+
+For OpenCode 2.x, plugin options belong in the global `~/.config/opencode/cli.json` as shown in the [V2 configuration example](#complete-opencode-2x-configuration-examples). To test the local V2 adapter discovered from `.opencode/plugins/`, use the Docker setup below.
 
 ```bash
 bun install
@@ -500,7 +538,7 @@ bun run docker:build:v2
 REQUESTY_API_KEY=your-requesty-api-key bun run docker:run:v2
 ```
 
-Both containers start in Bash at `/home/harness/workspace`. For V1, the mounted `.opencode/tui.json` loads `/home/harness/plugin/dist/tui.js`; for V2, OpenCode discovers `.opencode/plugins/requesty/tui.ts`, whose adapter loads the same local build. Both containers mount `~/.config/opencode/opencode.json` for provider settings.
+Both containers start in Bash at `/home/harness/workspace`. For V1, the mounted `.opencode/tui.json` loads `/home/harness/plugin/dist/tui.js`; for V2, OpenCode discovers `.opencode/plugins/requesty/tui.ts`, whose adapter loads the same local build. Both containers mount `~/.config/opencode/opencode.json` for provider settings. V2's CLI configuration is global at `~/.config/opencode/cli.json`; the Docker V2 run uses the local adapter discovery path for testing.
 
 The project is fully typed TypeScript (`strict` mode). Sources live in `src/` (`.ts`/`.tsx`), tests in `test/`. The build pre-compiles the shared `src/tui.tsx` entrypoint and both lazy host adapters with OpenTUI's Solid Babel plugin (`@opentui/solid/bun-plugin`), then emits declarations via `tsconfig.build.json`. The entrypoint dynamically imports only the adapter selected by the host (`tui` for v1, `setup` for v2), so the unused host API is not loaded.
 

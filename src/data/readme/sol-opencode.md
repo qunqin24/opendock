@@ -162,6 +162,8 @@ chunk boundary, or a failure path that replaces a silent drop — is in
 
 Portable algorithms are copied from SoL-Pi (MIT, NVIDIA copyright). Reference commit: `e1a586af0ad8956f42ae5b26bba20e48fbf30e00`.
 
+Where this port does not follow SoL-Pi, and why: [docs/upstream-fork-register.md](./docs/upstream-fork-register.md).
+
 Pinned runtime: see [docs/pin.md](./docs/pin.md).
 
 ## License

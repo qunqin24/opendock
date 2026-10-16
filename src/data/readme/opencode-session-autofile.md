@@ -34,9 +34,9 @@ The tag list the title model is offered is generated from these same rules, so w
 Put the rules in a file. With no options at all the plugin looks for `~/.config/opencode/session-autofile-rules.json` (it does not need to exist; until it does, the built-in domain list applies). To keep the file somewhere else, point the plugin at it with `rulesFile`. The file is re-read whenever it changes, so edits apply without restarting OpenCode (a broken edit keeps the last good rules and is reported in the diagnostics).
 
 ```jsonc
-// opencode.jsonc
-"plugin": [
-  ["opencode-session-autofile@0.6.0", { "rulesFile": "~/path/to/autofile-rules.json" }]
+// opencode.jsonc (OpenCode 2.x uses the `plugins` key and the object form)
+"plugins": [
+  { "package": "opencode-session-autofile@0.7.0", "options": { "rulesFile": "~/path/to/autofile-rules.json" } }
 ]
 ```
 
@@ -56,6 +56,17 @@ or set `"dryRun": true` in the plugin options to make the plugin itself only log
 2. **A periodic sweep** (every 10 minutes by default, first pass ~20 s after load) lists every session from OpenChamber's `GET /api/session` and fixes the ones that are in the wrong folder, including one dragged away by hand: the rules always win. Archived sessions are skipped. A subagent session goes wherever its root session goes (its own title is ignored); set `includeSubagents` to `false` to leave subagents alone. It needs OpenChamber's API reachable at `apiBaseUrl` (default `http://localhost:3000`); if you set a UI password the plugin cannot authenticate and will fail silently.
 
 Filing failures are logged and never block the chat.
+
+## `current_session` tool (0.7.0+)
+
+The plugin also registers a small tool, `current_session`, that tells the model which session it is running in. It takes no input and returns `{ "ok": true, "id", "title", "directory", "isChild", "archived" }`, plus `workspaceID` and `parentID` when they exist (`parentID` only for a child session).
+
+- The id is the one OpenCode passes to that very tool call, confirmed with `session.get`. A fork, subagent or `/btw` child gets its own id, never its parent's. If the id cannot be confirmed the tool returns `{ "ok": false, ... }` instead of guessing.
+- It is always registered, even with `"enabled": false` (that switch only stops filing) and even if the rules file is broken.
+- The title is a snapshot: it can change when the title model or a manual rename updates it. The id never changes.
+- The tool is a direct tool (not Code-Mode-only). Under the OpenChamber Claude integration it appears as `mcp__openchamber__current_session`.
+- Callers should accept the result only when `ok` is `true` and `id` is a non-empty string, use the returned `directory`, and on `ok: false` stop and report `reason`/`guidance` (a missing tool means the plugin is not loaded; an error does not call for a restart). Never look a session up by title or "newest" to find your own id.
+- Typical use: pass the id to a follow-up scheduler so a delayed prompt lands in this very conversation.
 
 ## Known limits
 

@@ -13,6 +13,9 @@ desktop.
 Install it with one config line. It adds agents and commands it finds missing,
 and it never overwrites one you already defined.
 
+Upgrading? See [CHANGELOG.md](CHANGELOG.md) — it ships with the package, so it
+is also on disk at `node_modules/@lawaty/lacode/CHANGELOG.md`.
+
 ## Why
 
 | Capability | The problem it solves |
@@ -24,7 +27,9 @@ and it never overwrites one you already defined.
 | SSH notification tunnel | Work on a remote host raises its notification on that host, which has no desktop. |
 | Repository context map | Every task starts by exploring your codebase cold, and every agent re-discovers the same layout, the same entry points and the same boundaries — paid for again on every run. |
 
-## Install
+## Getting started
+
+### 1. Install
 
 Add one line to your opencode config — `~/.config/opencode/opencode.json`, or
 the `.jsonc` beside it:
@@ -35,228 +40,60 @@ the `.jsonc` beside it:
 
 **That is the entire install.** opencode resolves an npm plugin specifier itself
 and installs it at startup, so there is no `npm install` to run first and no
-directory to create. Do not run `npm i -g @lawaty/lacode`: a global npm install
-is never consulted by opencode, so it changes nothing about whether the plugin
+directory to create. Do not run `npm i -g @lawaty/lacode`: a global npm install is
+never consulted by opencode, so it changes nothing about whether the plugin
 loads.
 
-It is also the form to keep as your default: if your opencode does not load the
-bare specifier, add to this line rather than replacing it. The
-[procedure below](#if-the-agents-are-missing) says when that is, and
-[which versions this is known on](#which-opencode-versions-this-is-known-on)
-says what is actually verified.
-
-To install it explicitly instead — or to install it once for every project on
-the machine rather than per config — use the CLI, which does the same thing:
+To install it for every project on the machine rather than per config, let the
+CLI do the same thing:
 
 ```bash
-opencode plugin @lawaty/lacode        # this project
-opencode plugin @lawaty/lacode -g     # global, for every project on the machine
+opencode plugin @lawaty/lacode -g
 ```
 
-**Restart opencode afterwards.** Nothing here hot-reloads: the `plugin` array is
-read at startup, so without a restart the change does not take effect and the
-agent set will look stale for no visible reason.
+### 2. Restart opencode
 
-### Where it is installed
+**Nothing here hot-reloads.** The `plugin` array is read at startup, so without a
+restart the change does not take effect and the agent set will look stale for no
+visible reason.
 
-opencode installs npm plugins itself, into one directory per specifier under its
-cache — not into your project's `node_modules`, and not from anywhere a global
-npm install put them. Ask opencode where that cache is instead of assuming,
-because where it lives differs by platform:
-
-```bash
-opencode debug paths
-```
-
-It prints the directories opencode is using on this machine — config, data, log
-and the rest. Find the **cache** line and append
-`/packages/<specifier>/node_modules/` to the path it reports. On Linux with no
-`XDG_CACHE_HOME` set, that comes out as, for example:
-
-```
-~/.cache/opencode/packages/@lawaty/lacode@latest/node_modules/
-```
-
-**That last line is an illustration of one platform's layout, not a path to
-copy.** Where the same cache root sits on another operating system is not
-something this document should guess at — read it from `opencode debug paths`
-and use what it prints.
-
-To inspect what a specifier actually resolved to, list its directory under that
-cache root. An **empty** directory with no `node_modules` inside it means the
-install failed — almost always an unpublished or misspelled package — and
-opencode starts normally **without** the plugin. A **populated** directory there
-means the install succeeded and tells you nothing at all about whether the
-plugin was loaded; that is the next section, and telling those two apart is the
-whole reason for reading it.
-
-### If the agents are missing
-
-A plugin that fails to load is silent: opencode starts normally, prints nothing,
-logs nothing, and the agents are simply not there. Work down this. Every step
-below is written to hold whichever opencode version you are running — none of
-them depends on knowing the answer in advance.
-
-**1 — Write the bare specifier and restart.**
-
-```json
-{ "plugin": ["@lawaty/lacode"] }
-```
-
-Nothing here hot-reloads, so the restart is part of the step, not a footnote.
-
-**2 — Check whether the plugin loaded.**
+### 3. Check it loaded
 
 ```bash
 opencode agent list | grep -E '^(explore|implement|context)'
 ```
 
-A working install prints `explore`, `implement` and `context`, each with the
-hidden `-1`..`-4` pool variants alongside. If the
-grep returns nothing and the list holds only opencode's own built-ins, the plugin
-did not load. Run it in the same shell environment opencode runs in — an
-`agent list` under a different `HOME` or `XDG_CONFIG_HOME` tests a different
-machine. **If the agents are listed, stop here: the one line above is the whole
-install**, and nothing further in this section applies to you.
+You should see `explore`, `implement` and `context`, each with hidden `-1`..`-4`
+pool variants alongside. That is the whole install, and you are done.
 
-**3 — Decide which failure you are looking at.** Inspect the package directory
-under the cache root from
-[Where it is installed](#where-it-is-installed), and also check that `plugin`
-really is in the config file opencode reads.
+**If that prints nothing, the plugin did not load** — and opencode will not tell
+you: it starts normally, logs nothing, and the agents are simply absent. A
+plugin that fails to load is silent by design of the host, so this check is the
+only way to know. The
+[troubleshooting guide](docs/INSTALL.md#if-the-agents-are-missing) walks the
+procedure.
 
-- **Empty** (no `node_modules` inside): the install failed — check the package
-  name, and that it is published. There is nothing to load yet.
-- **Populated**: the install worked and the loader dropped the plugin. Go to
-  step 4. These two look identical from the outside, which is why this step
-  exists.
+### 4. Use it
 
-**4 — If the install worked and the agents are still missing, point the loader
-at the built file.** Add a second entry; leave the bare name in place:
+Nothing to turn on. Ask for something that delegates, and the pool takes it from
+there:
 
-```json
-{
-  "plugin": [
-    "@lawaty/lacode",
-    "file:///ABSOLUTE-PATH-FROM-debug-paths/packages/@lawaty/lacode@latest/node_modules/@lawaty/lacode/dist/index.js"
-  ]
-}
+```
+> use the explore agent to find where auth tokens are validated
 ```
 
-`ABSOLUTE-PATH-FROM-debug-paths` is a placeholder to be replaced, not a
-directory: take the cache path `opencode debug paths` reports for **your**
-machine and put it in front of `/packages/…`. It must be an absolute path with
-`$HOME` already expanded and no `~` left in it. Re-derive it after a cache wipe
-or a reinstall — the directory is keyed by specifier, so it moves when the
-version does.
+To see what the pool is doing underneath:
 
-Why keep both entries instead of swapping the bare name out:
+```bash
+/lacode-doctor        # slots, model resolution, OmniRoute — report only, changes nothing
+lacode version        # which LaCode is actually running, and whether opencode loads that one
+```
 
-- The bare name is what makes opencode install the package into its cache, and
-  therefore what creates the path the `file://` entry points at.
-- The `file://` entry is what actually loads the plugin.
-- They **cannot double-inject** on opencode 1.18.35, where the bare name
-  contributes nothing at all: the pair loads the plugin exactly once. On any
-  other version this is untested, which is precisely why step 4 is something you
-  take *because* step 2 showed the agents missing, and never on the expectation
-  that it would help.
+In a repository with no `.opencode/context/` yet, the first session builds it in
+the background; `/context-init` forces it, and [Context map](#context-map)
+explains what it is for.
 
-**5 — Restart, and expect two restarts after a cache wipe.** The first start
-installs the package and creates the path the `file://` entry points at, but a
-path that does not exist at startup is a path that cannot be loaded in that same
-run. The second start finds it and loads the plugin. After that it is steady
-state.
-
-This package also publishes `main` and an `exports["./server"]` entry pointing at
-the same built file, because those are two of the shapes a plugin loader
-resolving an entry point consults. They are forward-compatibility metadata and
-they cost nothing — but they do **not** fix this on 1.18.35: adding either one to
-the *installed* cache copy was tested there and the bare specifier still loaded
-nothing. No other version has been observed where they help either. Use the
-`file://` entry.
-
-### Which opencode versions this is known on
-
-Exactly one version has been measured, and the procedure above is deliberately
-not built around that fact. Treat this table as the evidence it is, which is one
-row wide.
-
-| opencode version | bare spec loads? | `file://` needed? | evidence |
-| --- | --- | --- | --- |
-| 1.18.35 | No — installs the package, then silently drops it | Yes | **Verified** on 1.18.35: a populated cache directory, zero agents injected, no error and no log line; the `file://` entry loads the full agent set. |
-| Any other version | **Unknown** | **Unknown** | **Untested.** No other opencode version has been run against this package in either direction. |
-
-Every command quoted on this page was run against 1.18.35. **If your version is
-not the one measured here, follow the procedure above rather than reading this
-table as coverage of your build**: each step stands on its own, and step 2 tells
-you which situation you are in before any version-specific advice is relevant.
-
-### macOS
-
-The plugin runs on macOS. It is plain JavaScript with no native dependency, and
-what the package publishes is the built JavaScript rather than TypeScript
-sources, so nothing about loading it is Linux-only. Use the procedure above
-unchanged.
-
-Three things differ, and all three are worth reading rather than assuming:
-
-- **Paths.** Do not copy a cache path out of this document — the example under
-  [Where it is installed](#where-it-is-installed) is one platform's layout. Run
-  `opencode debug paths` and build the `file://` entry from what it reports.
-  This page deliberately does not name a macOS cache root: where opencode keeps
-  it on a Mac has not been established here, and a plausible-looking guess is
-  worse than an instruction to look.
-- **Notifications** are delivered through `osascript`, or through
-  `terminal-notifier` when `osascript` is not installed, rather than through the
-  Linux `notify-send` (US-26). `lacode doctor` reports which channel your machine
-  would actually use.
-- **The repository's shell scripts are Linux-only by design**, and are not in the
-  published package. They drive one person's SSH topology, so each is on the side
-  it belongs to:
-
-- **Remote hosts are plain npm clients.** A remote host installs the plugin the
-  same way (`opencode plugin @lawaty/lacode -g`); there is nothing to rsync. The
-  notification hop is a direct ssh (`ControlMaster` + `ControlPersist`) set up
-  once with `lacode tunnel setup` — no reverse forward, no listening port, no
-  systemd unit. See [Remote hosts](#remote-hosts) and docs/TUNNEL.md.
-- The repo still carries the author's personal, Linux-only tooling from the older
-  reverse-forward setup (`bin/oc`, `bin/oc-notify`, `bin/oc-notify-receiver`,
-  `bin/oc-sync`). None of it is in the published package, and none of it is needed
-  for the npm-client path above.
-
-**The test suite runs on macOS.** It is written to pass on a Mac as well as on
-Linux, so "it works on a Mac" is a supported claim rather than an intention. The
-few checks that exercise the Linux-only shell scripts above skip themselves on a
-machine that cannot run them, naming the reason — a bash 3.2 with no `mapfile`,
-or no GNU `timeout` — rather than passing silently or failing confusingly.
-
-### The `lacode` CLI
-
-The package also ships the `lacode` CLI (`notify`, `forward`, `doctor`, `receive`, `tunnel setup`) — see
-[Remote hosts](#remote-hosts). The plugin install does **not** put it on your
-`PATH`; run it from the package's `node_modules/.bin`, or install just the CLI
-globally with `npm i -g @lawaty/lacode` if you want the bare command. (That
-global install is for the command only — it is still never what makes the plugin
-load.)
-
-### What the install gives you
-
-Two things are worth knowing about what npm actually hands you:
-
-- **`@opencode-ai/plugin` is a peer dependency.** It is not vendored into this
-  package and never will be: a second copy of the SDK inside the tarball would
-  mean opencode and the plugin holding two different module instances, and
-  instance identity is what plugin state hangs on. npm installs the peer for you;
-  if you install with a tool that does not, install `@opencode-ai/plugin` at the
-  same version yourself.
-- **You get compiled JavaScript, not TypeScript sources.** The tarball ships
-  `dist/`, built from `src/` at pack time (`prepack` runs the build, so a stale
-  `dist/` cannot be published). This is not a preference: node strips types
-  natively from 22.18 but **refuses to for files under `node_modules`**, so a
-  package that shipped `.ts` worked fine in a checkout and failed on install —
-  `lacode --help` died with `ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING`. A
-  published package cannot depend on its consumer's loader being lenient.
-
-## Configuration
+## Configure
 
 Plugin options are a tuple — the package name, then an options object. Every
 option is optional:
@@ -281,11 +118,11 @@ option is optional:
 | --- | --- | --- |
 | `enabled` | `true` | The single off switch. `false` injects nothing at all and does no writes. |
 | `models` | — | An inline slot list. Highest-priority source. |
-| `modelsFile` | — | An explicit slot file; short-circuits the chain below. |
+| `modelsFile` | — | An explicit slot file; short-circuits the [resolution chain](docs/CONFIGURATION.md#pool-preset-resolution). |
 | `reapMs` | `30000` | Hang-reaper interval. |
 | `selfUpdate` | `true` | Check for a newer release at most once per ~6h and install it in the background; it applies on the next opencode start. `false` — or `LACODE_NO_SELFUPDATE=1` — turns the check off. |
 | `sound` | `true` | Play a short tone with each notification, one per outcome, so you can tell a finished session from a question or a permission prompt without reading the popup. It is opt-out: `false` — or `LACODE_SOUND=0` (`false`, `off`, `no` work too, and beat the option) — turns the sound off, and anything else, a typo included, leaves it on. |
-| `omniroute` | — | Optional [OmniRoute](#configuring-omniroute) gateway integration. Absent or `{ enabled: false }` changes nothing. |
+| `omniroute` | — | Optional [OmniRoute](docs/OMNIROUTE.md) gateway integration. Absent or `{ enabled: false }` changes nothing. |
 
 ### Staying up to date
 
@@ -299,240 +136,55 @@ binary — no npm or bun required. The running session keeps its loaded code; th
 new version takes effect on the next start, and the log says so. Run
 `lacode update` to do it on demand, or `lacode update --check` to just report.
 
-### Pool preset resolution
+### Which LaCode is running
 
-The slot list is the first of these that yields usable slots:
+`lacode version` answers it — and the answer is often not the version number you
+expected, because the plugin entry in your config decides which copy is loaded:
 
-1. plugin options — `models` in the tuple above
-2. `~/.config/lacode/pool.json` (its parent directory is created for you)
-3. the bundled `presets/free-tier.json`
-4. a built-in fallback, so routing always works
-
-A missing, unreadable or structurally broken source falls through to the next and
-logs one warning; nothing here throws into opencode. Nothing hot-reloads —
-change a preset, then restart every opencode process.
-
-**Any model list is accepted, including paid ones** (US-7). There is no free-tier
-allowlist anywhere in the package, and no cost check of any kind: only the
-structure is validated. The bundled preset is built from free models because
-that is a sensible default, not because the pool requires it.
-
-### Configuring OmniRoute
-
-[OmniRoute](https://github.com/diegosouzapw/OmniRoute) is a local
-OpenAI-compatible AI gateway (default `http://localhost:20128/v1`) that routes a
-request across many providers with fallback and "combos". LaCode can register it
-as an opencode provider for you. It is **off by default**: if you do not set
-`omniroute.enabled: true`, nothing below happens and LaCode makes no request.
-
-**Setting it up on a client machine.** Four steps, in this order:
-
-1. Install OmniRoute, then make it stay up: run `omniroute autostart enable`
-   once. That writes a systemd user unit in a headless session, or an XDG
-   autostart entry in a graphical one, and OmniRoute supervises itself from
-   there on. Its gateway listens on `http://localhost:20128/v1`. The gateway's
-   lifecycle is **the client's responsibility**: LaCode never starts, supervises
-   or stops it, it only probes it. The gateway must therefore already be
-   running **before** you start opencode — one that is down at startup is
-   disabled for that run, and the integration is per-run.
-2. Add the plugin block to your opencode config:
-   `["@lawaty/lacode", { "omniroute": { "enabled": true, "apiKey": "<your omniroute key>", "combo": "auto", "models": [] } }]`
-3. Optionally, to route pooled work through it, make `omniroute/auto 3` the
-   **first** line of `~/.config/lacode/pool.txt`. `pool.txt` is optional user
-   config; the bundled default preset does **not** include OmniRoute.
-4. **Restart opencode.** Nothing here hot-reloads.
-
-With `models: []` and `combo: "auto"`, the plugin registers exactly one model,
-`omniroute/auto`, which then appears in the model picker for any agent — no
-hand-maintained model list.
-
-The full option set, for reference:
-
-```jsonc
-{
-  "plugin": [
-    ["@lawaty/lacode", {
-      "omniroute": {
-        "enabled": true,
-        "baseURL": "http://localhost:20128/v1",
-        "apiKey": "sk_omniroute",          // optional; OMNIROUTE_API_KEY overrides it
-        "combo": "static-best-free",        // optional: let OmniRoute do the routing
-        "models": ["cc/claude-sonnet-4-6", "gemini-3-flash"], // hard allowlist
-        "tiers": {
-          "primary": ["cc/claude-sonnet-4-6"],
-          "backup": ["gemini-3-flash"]
-        },
-        "stickyPerSession": true,
-        "healthCheck": true,
-        "timeoutMs": 5000
-      }
-    }]
-  ]
-}
+```bash
+lacode version
 ```
 
-| Field | Default | Meaning |
-| --- | --- | --- |
-| `enabled` | `false` | Turns the integration on. |
-| `baseURL` | `http://localhost:20128/v1` | Gateway base URL, normalised to exactly one `/v1`. |
-| `apiKey` | — | Bearer key. **`OMNIROUTE_API_KEY` overrides this value.** The key is never logged. |
-| `combo` | — | An OmniRoute combo id (or `auto`) to expose as a selectable model even though the gateway does not list it. Exposed first. |
-| `models` | — | A **hard allowlist**: only these ids are ever exposed, even if the gateway lists more. |
-| `tiers` | — | `{ "primary": [...], "backup": [...] }` preference order over models the allowlist already permits. |
-| `stickyPerSession` | `true` | Keep a session on one model while that model is healthy. |
-| `healthCheck` | `true` | Probe `GET /models` at startup; a failed check disables the integration for that run only. |
-| `timeoutMs` | `5000` | Budget for LaCode's own probe and model-cache calls to the gateway. It is not written into the provider options, so it does not bound real traffic — opencode's own default applies there. |
-
-An enabled but invalid block (bad `baseURL`, a non-array `models`, …) is rejected
-as a whole: LaCode logs one warning naming the problem and continues exactly as
-if the integration were off. It never crashes opencode.
-
-**What it registers.** On the first `config` pass LaCode health-checks the
-gateway, reads `GET /models`, filters it through your `models` allowlist (or
-exposes everything the gateway lists when no allowlist is set), and writes a
-`provider.omniroute` entry — `npm: "@ai-sdk/openai-compatible"` with your
-`baseURL` / `apiKey` — so `omniroute/<model-id>` becomes selectable. If you
-already have a `provider.omniroute` block, LaCode leaves it completely untouched
-and warns; it also never adds a `whitelist`. Because opencode loads
-`@ai-sdk/openai-compatible` itself, no extra dependency is installed.
-
-**Combo vs. allowlist.** Set `combo` and OmniRoute does the fallback for you
-(let it route): the combo leads the exposed models, so opencode can hand a failed
-request to the gateway's own fallback chain. Without a combo, LaCode exposes the
-allowlist ordered by `tiers` (primary first). Candidate order is `filterModels`
-(combo first, then the hard allowlist) followed by `orderByTier`, and that is
-all — LaCode picks which model is exposed and in what order; it does not measure
-latency or error rate at runtime, and it does not skip a model because it
-failed.
-
-**Using OmniRoute in the pool.** The integration only *registers* the provider —
-it never touches your pool, and it does not place a slot for you. To route pooled
-work (exploration, implementation, cartography) through the gateway, list it in
-your pool like any other model:
-
 ```
-# ~/.config/lacode/pool.txt
-omniroute/auto             3
-opencode/space-bunny-free  2
-opencode-go/step-5-preview-free 1
-opencode/big-pickle        1
+version    0.4.1
+root       /home/you/lacode
+source     checkout
+commit     9446c88 (dirty)
+dist       current
+config     /home/you/.config/opencode/opencode.jsonc
+plugin     file:///home/you/lacode/dist/index.js
+this copy  yes — opencode loads this copy
 ```
 
-`omniroute/auto` then takes slot 1 (weight 3) and drains pooled mechanical work
-before it reaches the bundled opencode/opencode-go ("zen") models. Any
-`omniroute/<id>` works, provided the id is exposed — by `combo`/`models`, or the
-whole catalog when neither is set. Because the plugin writes the pool nothing,
-the only thing that changes when the gateway is down is that `omniroute/<id>`
-fails; every other slot keeps working. See
-[docs/USER-STORIES.md](docs/USER-STORIES.md) US-28.
+`npm ls -g @lawaty/lacode` answers a different question. It reports the package
+opencode resolves *by name*, which is not necessarily the one running: a config
+may load the plugin by absolute path, in which case a stale global install can
+sit there reporting a version nothing uses. So this command reads your actual
+`plugin` array and says whether it resolves to the copy speaking.
 
-**A note on mid-session switching.** opencode 1.18.34 exposes no hook to change
-an agent's main model mid-request, so LaCode cannot swap models inside a running
-session; use an OmniRoute `combo` (or `auto`) if you want per-request fallback.
-LaCode's selection engine decides which models are exposed and in what order, and
-its cooldown/backoff rules are unit-tested.
+`source` distinguishes a git checkout from an npm install, `commit` and the
+dirty flag name what the code was built from, and `dist` is the trap worth
+knowing about — opencode loads `dist/index.js` while you edit and pull `src/`,
+so a `git pull` can leave you running yesterday's build with nothing failing.
+When it reports `stale`, rebuild with `npm run build`. No network is touched;
+`lacode update --check` is what asks npm whether something newer exists.
 
-**Getting a key.** Open the OmniRoute dashboard, go to API Manager / API Keys and
-copy a key into `OMNIROUTE_API_KEY` (recommended) or `omniroute.apiKey`. On a
-local instance with `REQUIRE_API_KEY=false`, the literal placeholder
-`sk_omniroute` is accepted.
+## What you get
 
-**Troubleshooting**
+Three agents, pooled and rotated: `explore`, `implement` and `context`. You spawn
+the base name and the pool picks a cheap model slot for it. Behind each base sits
+up to four hidden variants — one per slot — and a spawn of the bare name is the
+only thing that works: naming a variant lets the caller choose the provider
+directly, which is exactly what the rotation and the per-slot ceiling exist to
+prevent, so it is refused.
 
-| Symptom | Cause | Fix |
-| --- | --- | --- |
-| `omniroute health check failed` at startup | Gateway not running, wrong `baseURL`, or a startup race | Start OmniRoute on `http://localhost:20128` and restart opencode; `omniroute autostart enable` makes that durable across restarts. The integration is disabled for that run only, not permanently. |
-| `omniroute health check failed` at startup, then a repeating `cooling omniroute/<id> (hang)` and `Model not found` churn on one slot | OmniRoute was started *after* opencode, and `pool.txt` names an `omniroute/<id>` slot | The integration is off for that run, but the pool still routes to the slot: the request hangs, the reaper cools it for 600s, and the cycle repeats. Start OmniRoute, then restart opencode. |
-| `ProviderModelNotFoundError: Model not found` on an id the gateway serves | The id is a valid OmniRoute route but is not in the plugin's `models` allowlist, so the plugin never exposed it | Add the id to `models`, or use `combo: "auto"` with `omniroute/auto`. A valid gateway route is not automatically an exposed model. |
-| `no usable models` | The gateway returned an empty list, or every id was filtered out by `models` | `curl -H "Authorization: Bearer $OMNIROUTE_API_KEY" http://localhost:20128/v1/models` and check `models`/`combo` against the returned ids. |
-| `401` / `Invalid API key` | `REQUIRE_API_KEY=true` and the key is missing or wrong | Create a key in the dashboard, export `OMNIROUTE_API_KEY`, or set `REQUIRE_API_KEY=false` locally and use `sk_omniroute`. |
-| `404` on a URL containing `/v1/v1/` | A `baseURL` that already carried `/v1` was given twice | LaCode normalises this, so it should not come from LaCode; check a hand-written `provider.omniroute` block, which LaCode leaves untouched. |
-| Provider registered but models are missing | You already had `provider.omniroute` | Remove it and let LaCode write it, or add the models yourself — LaCode never modifies an existing provider. |
-| Pooled work still runs on the bundled models | The gateway was unhealthy/disabled at startup, or you have no `omniroute/…` slot in your pool | Check the startup log for `omniroute health check failed` / `no usable models`, then add `omniroute/<model>` to `pool.txt` (or `pool.json`) to route pooled work through the gateway. |
-
-### Which models run which agent
-
-Only the **pool** writes a model onto a pooled agent, from whichever source wins
-above. The pooled bases (`explore`, `implement`, `context`)
-and their hidden `-1`..`-4` variants therefore carry no model of their own: a
-model written next to an agent would be a second source of truth that silently
-wins whenever routing falls through. Spawn a base and let the pool route it.
-
-### ⚠️ Per-agent tool grants must be in your own config
-
-**LaCode cannot grant tools to its agents, and this is not an oversight you can
-work around by configuring it.** If you keep a global `"tools"` block in your
-config — for example `"tools": { "playwright_*": false }` — then the pooled
-exploration and implementation bases (`explore` and `implement`, plus their
-hidden `-1`..`-4` pool variants) lose browser access, and **nothing tells them why**: the tool call is simply
-refused mid-task. `context` gets no grant either, which is correct — it
-writes the context map and has no business in a browser.
-
-opencode folds an agent's `tools` into its permission list **at config-load
-time**, while decoding the config — before any plugin runs. A plugin's `config`
-hook mutates the already-decoded config, so the fold never re-runs and anything
-it puts in `agent.tools` is inert. (Verified on opencode 1.18.34/1.18.35 with
-`opencode debug agent explore`: a grant written in your own config shows two
-`playwright_*` entries — `deny` then `allow`, last one winning — while the same
-grant injected by the plugin shows only the `deny`.) LaCode's other injected
-fields are not affected; `permission`, `prompt`, `model`, `description`,
-`temperature`, `mode` and `hidden` are all read after the plugin hook runs.
-
-**So if you use a global `"tools"` block, declare the grants yourself:**
-
-```jsonc
-{
-  "tools": { "playwright_*": false },
-  "agent": {
-    "explore": { "tools": { "playwright_*": true } },
-    "implement": { "tools": { "playwright_*": true } }
-  }
-}
-```
-
-The hidden pool variants (`explore-1`, `implement-2`, …) inherit
-nothing here — add a line per variant you actually spawn, or drop the global
-deny and scope it to the agents that should not have browser access instead.
-
-Nothing hot-reloads: after editing your config, restart every running opencode
-process.
-
-### What gets injected
-
-**17 agent keys**: the 5 bases `build`, `plan`, `explore`, `implement`,
-`context`, plus one hidden
-`<base>-1`..`-4` pool variant for each of the 3 pooled bases.
-
-`build` and `plan` exist in opencode as built-ins, so on a stock config those
-two keys are already taken and merge-without-clobber keeps the built-in — the
-LaCode definitions of `build` and `plan` are what you get if you remove the
-built-ins of those names first.
-
-**Five keys are deliberately not injected.** `basic` is a byte-for-byte
-duplicate of `plan` apart from a pinned model, and `plan` is injected instead.
-`expert` pins a specific model and carries a personal benchmark note in its
-description — a package cannot ship someone else's provider, quota or benchmark
-results — though its escalation ladder still resolves, because the two deep
-tiers it escalates to *are* injected. And `explore`, `general` and `implement`
-are only `{ "disable": true }` stubs in the author's own config: turning off
-opencode's built-in agents is a decision about one person's configuration, not
-a default a package should impose on a stranger.
-
-One **field** is deliberately not injected either: `tools`, for the
-load-time-folding reason explained above. Nothing else the plugin writes into
-an agent is subject to it.
-
-**Installation merges, it does not clobber** (US-16). An agent, command or
-instruction is added only when that key is absent from your config. A
-user-defined agent of the same name is left byte-identical — not patched, not
-partially merged. Skips are counted and logged once.
-
-**`enabled: false` turns all of it off** (US-17). No pool model rewriting, no
-agent injection, no command injection, no reaper timer armed, no
-`~/.config/lacode` directory created.
-
-These three are specified in [docs/USER-STORIES.md](docs/USER-STORIES.md) as
-US-7, US-16 and US-17, and each has tests.
+Four commands: `/context-init`, `/context-update`, `/context-review` and
+`/lacode-doctor`. Everything is added **only when your config does not already
+define it** — an agent or command you wrote yourself is left byte-identical,
+never patched or partially merged. `{"enabled": false}` turns the whole thing off
+without leaving a trace. The exact injection list, and the three keys that are
+deliberately *not* injected, are in
+[docs/CONFIGURATION.md](docs/CONFIGURATION.md#what-gets-injected).
 
 ## Context map
 
@@ -569,6 +221,35 @@ re-discovering structure; as with everything else here, no savings percentage is
 published, because none has been independently measured. The mechanism, the
 permission rule that makes one writer possible, and what the log lines mean are
 in [docs/CONTEXT.md](docs/CONTEXT.md).
+
+## Managerial directions
+
+The plugin creates `manager.md` in `.opencode/context/` for you, and never
+overwrites it once it exists. It is your file: it records what you want done
+and how you want it approached — what is being worked on, what comes next,
+what you have settled, and what every agent should keep in mind. It says
+nothing about where code lives, so it can never contradict the code, and
+within that domain it outranks the five generated files and any agent's
+inference about what matters right now.
+
+The file is per-clone and not committed, so it is yours rather than shared
+team state. It has no fixed schema — the headings below are a convenience.
+Add your own; every heading in it is treated as direction.
+
+- `## Current`: what is being worked on right now. Rewrite it rather than
+  appending, so it does not become a running history. If the file passes
+  roughly 150 lines, run `/context-review`.
+- `## Next`: what comes next, in order.
+- `## Confirmed`: what you have personally ratified. Treat these as settled
+  decisions, not as permission to skip reading the code.
+- `## Instructions`: standing direction beyond the current task — priorities,
+  things to care about, constraints that are not obvious from the code.
+
+**Who may write it.** The context agent is explicitly permission-denied from
+touching this path, so the automatic post-session run can never alter it. An
+agent working in your live session may write it only when you explicitly ask
+it to, and only what you asked for — never on its own initiative, and never
+to "keep it up to date".
 
 ## Cost
 
@@ -644,12 +325,22 @@ status.
 Configuration, the payload format, the receiver contract and holding the forward
 open are in [docs/TUNNEL.md](docs/TUNNEL.md).
 
-## User stories
+## Further reading
 
-Twenty-nine stories across seven epics, each written as a behavioural contract
-with acceptance criteria a test can assert mechanically — the pains behind them,
-the Given/When/Then criteria, and the story-to-test mapping are in
-[docs/USER-STORIES.md](docs/USER-STORIES.md).
+Optional. Nothing above needs any of it — this is where the detail lives once you
+want it.
+
+| | |
+| --- | --- |
+| [Install and troubleshooting](docs/INSTALL.md) | Where opencode puts the package, what to do when the agents are missing, the version matrix, macOS differences, and the `lacode` CLI. |
+| [Configuration reference](docs/CONFIGURATION.md) | Every plugin option, how the pool resolves its slots, per-agent tool grants, and exactly what gets written into your config. |
+| [OmniRoute gateway](docs/OMNIROUTE.md) | The optional local gateway integration: setup, full option set, a latency-measured free combo, and its troubleshooting table. |
+| [Context map](docs/CONTEXT.md) | The mechanism behind `.opencode/context/` — the one-writer permission rule, the five files, and what the log lines mean. |
+| [Remote hosts and notifications](docs/TUNNEL.md) | The SSH notification hop, payload format, receiver contract, and holding the forward open. |
+| [Benchmarks](docs/BENCHMARKS.md) | How the cost harness works, and why it deliberately publishes no savings number. |
+| [User stories](docs/USER-STORIES.md) | The behavioural contracts behind all of the above, written so a test can assert them. |
+| [Operations runbook](OPERATIONS.md) | Maintainer-facing: what runs where, what needs a restart, how the pieces are distributed across machines. |
+| [Changelog](CHANGELOG.md) | What changed in each release. |
 
 ## Development
 

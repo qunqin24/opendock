@@ -26,6 +26,7 @@ Your agent asks for "food banks in Texas, with their annual revenue" and gets ro
 [![n8n node](https://img.shields.io/npm/v/n8n-nodes-specstream?label=n8n%20node)](https://www.npmjs.com/package/n8n-nodes-specstream)
 [![MCP Registry](https://img.shields.io/badge/MCP%20Registry-ai.specstream%2Fspecstream-blue)](https://registry.modelcontextprotocol.io/v0.1/servers?search=ai.specstream)
 [![Smithery](https://smithery.ai/badge/specstream/specstream)](https://smithery.ai/servers/specstream/specstream)
+[![Add to Replit](https://replit.com/badge?caption=Add%20to%20Replit)](https://replit.com/integrations?mcp=eyJkaXNwbGF5TmFtZSI6IlNwZWNTdHJlYW0iLCJiYXNlVXJsIjoiaHR0cHM6Ly9hcGkuc3BlY3N0cmVhbS5haS9tY3AifQ==)
 
 This repository holds what you install around SpecStream: MCP client setup, agent plugins and skills, SDKs, the n8n node, a GitHub Action, and examples. The product itself runs at [specstream.ai](https://specstream.ai). Licensed MIT.
 
@@ -48,6 +49,14 @@ This repository holds what you install around SpecStream: MCP client setup, agen
 | [`integrations/opencode/`](integrations/opencode) | `opencode-specstream`: OpenCode plugin (MCP server and the four skills) |
 | [`integrations/openclaw/`](integrations/openclaw) | `@specstream/openclaw-plugin`: OpenClaw plugin (find a list, read its rows, four skills) |
 | [`integrations/pi/`](integrations/pi) | `@specstream/pi-package`: Pi package (the hosted MCP server and four skills) |
+| [`integrations/obsidian/`](integrations/obsidian) | Obsidian plugin: ask for a list in a note, approve the price, get a Markdown table with sources |
+| [`integrations/open-webui/`](integrations/open-webui) | Open WebUI tool: quote, approve and read lists from a chat, plus the native MCP route |
+| [`integrations/anythingllm/`](integrations/anythingllm) | AnythingLLM agent skill, plus the MCP route |
+| [`integrations/convex/`](integrations/convex) | Convex component (`@specstream/convex`): live web data as records in your Convex tables, a source for every value |
+| [`integrations/fivetran/`](integrations/fivetran) | Fivetran Connector SDK connector: your lists, records and each value with its source page in your warehouse |
+| [`integrations/airbyte/`](integrations/airbyte) | Airbyte source (manifest-only): your lists and records, each value with its source page |
+| [`integrations/meltano/`](integrations/meltano) | `tap-specstream` on PyPI: Singer tap for Meltano and any Singer target, lists and records with each value's source page |
+| [`integrations/coda/`](integrations/coda) | Coda Pack: sync a list into a table with a source column for every value, price a request, find a list from a button |
 | [`plugins/grok/`](plugins/grok) | Grok Build plugin (the hosted MCP server and four skills) |
 | [`plugins/kiro/`](plugins/kiro) | Kiro power (the hosted MCP server and four skills) |
 | [`integrations/vscode/`](integrations/vscode) | VS Code extension: MCP sign-in and `@specstream` chat |
@@ -246,6 +255,27 @@ Add the plugin to `opencode.json`. It adds the SpecStream server and the four sk
 ```
 
 Details and options: [`integrations/opencode`](integrations/opencode).
+
+### Replit
+
+[![Add to Replit](https://replit.com/badge?caption=Add%20to%20Replit)](https://replit.com/integrations?mcp=eyJkaXNwbGF5TmFtZSI6IlNwZWNTdHJlYW0iLCJiYXNlVXJsIjoiaHR0cHM6Ly9hcGkuc3BlY3N0cmVhbS5haS9tY3AifQ==)
+
+The button adds SpecStream to Replit Agent; you sign in when the Project Editor asks. No key goes in the link.
+
+### Any other client that takes a URL
+
+Lovable, Gumloop, Relevance AI, Lindy, Manus, Genspark and the rest: add a remote MCP server, paste `https://api.specstream.ai/mcp`, and sign in when asked. If the client only takes headers, use `Authorization: Bearer $SPECSTREAM_API_KEY`.
+
+### Agents that speak A2A
+
+SpecStream is also an [A2A](https://a2a-protocol.org) agent. The Agent Card is at `https://api.specstream.ai/.well-known/agent-card.json` (A2A 1.0, with the 0.3 fields) and the JSON-RPC endpoint is `https://api.specstream.ai/a2a`. Without a key, it reads the request back and prices it:
+
+```bash
+curl -s https://api.specstream.ai/a2a -H 'Content-Type: application/json' -H 'A2A-Version: 1.0' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"SendMessage","params":{"message":{"messageId":"m1","role":"ROLE_USER","parts":[{"text":"Plumbers in Denver with a phone number"}]}}}'
+```
+
+With `Authorization: Bearer $SPECSTREAM_API_KEY` (or an OAuth token), the reply is a task waiting for approval. Reply on the task with a data part `{"confirm_max_cents": N}`, where N is the quoted maximum, to run it; `GetTask` returns the rows, each value with its `source_url`.
 
 ### n8n
 

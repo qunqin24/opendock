@@ -11,7 +11,7 @@
 > 本 README 由 绘里酱 执笔！
 >
 > ![Node.js >= 18](https://img.shields.io/badge/node.js-%3E%3D18-brightgreen)
-> ![License MIT](https://img.shields.io/github/license/nino-natsume/eri)
+> ![License AGPL-3.0-or-later](https://img.shields.io/github/license/nino-natsume/eri)
 > ![npm version](https://img.shields.io/npm/v/eri-ai)
 > ![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20Windows%20%7C%20Termux%20%7C%20WSL-blue)
 > ![opencode-personality](https://img.shields.io/badge/opencode-personality-7c3aed)
@@ -64,7 +64,7 @@
 | `erotic-chan.md`<br>`code-monkey.md`<br>`debug-san.md`<br>`architect-sama.md`<br>`test-chan.md` | 5 个子智慧体（xx / 代码 / 调试 / 架构 / 测试） |
 | `personality.json` | opencode-personality 插件配置（default / 绘里酱 / erotic 三人格 + mood 系统） |
 | `opencode.json` | opencode 配置模板（插件、skill 路径、子智慧体注册、`/mood` `/personality` 等命令） |
-| `package.json` | 深度部署时写入 `~/.config/opencode/` 的依赖（`opencode-personality` 插件） |
+| `opencode-package.json` | OpenCode 深度集成的**选装依赖**清单（`opencode-personality` 插件等），仅在选中/检测到 OpenCode 时复制为 `~/.config/opencode/package.json` 并安装；未选择任何工具时不安装任何依赖 |
 | `PKGBUILD` `.SRCINFO` `eri.install` | Arch Linux AUR 打包三件套 |
 
 ## 支持的终端编程工具

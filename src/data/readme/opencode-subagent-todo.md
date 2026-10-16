@@ -1,5 +1,9 @@
 # opencode-subagent-todo
 
+[![npm version](https://img.shields.io/npm/v/opencode-subagent-todo.svg)](https://www.npmjs.com/package/opencode-subagent-todo)
+[![ci](https://github.com/dchekmarev/opencode-subagent-todo/actions/workflows/ci.yml/badge.svg)](https://github.com/dchekmarev/opencode-subagent-todo/actions/workflows/ci.yml)
+[![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
+
 Per-session task tracking for [opencode](https://opencode.ai) subagents.
 
 opencode ships a built-in `todowrite` tool for the main agent, but it is denied to
@@ -42,9 +46,13 @@ subagent gets a fresh, empty list.
   either way ("use `todowrite` when available, otherwise `track`"), and the lookup is
   cached per session and fails open.
 
-## Install
+## Requirements
 
-Requires opencode 1.x.
+- opencode 1.x (developed and tested against 1.19; the hint hook uses
+  `experimental.chat.system.transform`, which may change between releases).
+- Node.js 22.18+ (only needed for local development of this package).
+
+## Install
 
 ### From npm (recommended)
 

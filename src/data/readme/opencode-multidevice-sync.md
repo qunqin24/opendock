@@ -4,6 +4,8 @@ A community fork of `opencode-github-sync` 3.0.1 for moving OpenCode configurati
 
 **Early preview, not a stable production release.** Keep independent backups. Use one active computer at a time. This project is not affiliated with OpenCode or the upstream author.
 
+**0.2.0-v2.1 isolated V2 preview:** read [V2 compatibility and limits](docs/V2-COMPATIBILITY.md) and [interrupted history policy](docs/INTERRUPTED-HISTORY.md) first. Pinned to OpenCode 2.0.29; interrupted histories require explicit offline push and pull. Live export remains strict. Existing V1 install examples below are not a V2 rollout procedure.
+
 [Русская документация](README.ru.md) | [Migration](docs/MIGRATION.md) | [Safety model](docs/SAFETY.md) | [Roadmap](docs/ROADMAP.md)
 
 ## What is implemented
