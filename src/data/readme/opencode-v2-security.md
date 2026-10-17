@@ -107,13 +107,15 @@ OpenCode v2 全自动执行边界安全插件。Linux 原生 shell 与内置文�
 - 兼容别名只在输入边界展开：`fs` → `filesystem`，`os` → `host+privilege+indirection`，`web` → `network+remote`。注意 `os` 是历史收窄后的写法，**不再覆盖 `remote`**（`git.remote-history-rewrite`、`infrastructure.*`、`database.*` 需要 `remote` 单独武装）。状态、RPC、提示词与永久配置状态只使用规范类别名；永久 `BypassClassifier` 若输入别名会展开并警告，不会把别名存为类别。
 - `all/*/ALL/yolo` 均切换到 `[Bypass mode]`，不是逐类全开。它们是 `/bypass` 的控制语法，不是类别；提权注释和永久 `BypassClassifier` 都禁止使用 `all/*/ALL`。
 - **子代理传导**（默认开，`bypassPropagateToSubagents: false` 关闭）：子代理会话继承父会话（沿祖先链并集）的 armed 类别与相同到期语义；继承是只读的，子代理活动不会延长父租约。
+- **自定义授权**：`/bypass c <原文>` 等同于 `/bypass custom <原文>`，末尾数字也是授权正文，不作为超时。`/bypass c`、`/bypass custom`、`/bypass -c`、`/bypass -custom` 清空本会话自定义授权；`/bypass -c <索引或文本>`（也可用 `-custom`）按从 0 开始的本地索引删除一项，或删除所有包含该文本的项。数字超出索引范围时按文本匹配。删除不改变其他类别、Bypass 模式或剩余租约的截止时间，也不撤销祖先会话的授权。`+c`／`+custom` 必须附带非空正文。
+- **命令帮助**：`/bypass help`（也可用 `?`、`-h`、`--help`）打开持续帮助对话框，显示当前模式、类别、自定义授权及用法；宿主无对话框接口时退回浮动提示。
 
 ### 通知（agent 与用户分离）
 
 权限切换通过追加通知传达，不改写 system prompt 或已有会话历史。状态反馈分两条通道：
 
 - **agent 侧**：变更、继承和到期只记录最新状态；宿主准备下一条真实用户消息时（`session.hook("prompt")`），在该消息入队之前用 `session.synthetic`（`resume:false`、`delivery:"steer"`）追加一条 user-role 通知，两者在同一次模型请求中送达。状态变更本身不入队：inbox 里待处理的 steer 项会让正在收尾的 runner 再发一次模型请求。排队（`queue`）的用户消息不携带通知（排队项每轮只提升一条，通知会单独占一轮），留给下一条 steer 消息。同一状态不重复通知，切回 Auto 也明确通知。旧通知保持为历史记录，不被覆盖、删除或重新插入历史前缀。
-- **用户侧**：服务端注册 event-only RPC（`src/bypass-rpc.ts`），由本包的 TUI 伴随入口（`src/tui.ts`，package `exports["./tui"]`）订阅并弹 toast 显示 armed/updated/cleared/expired/status。参数非法时命令抛错，TUI 显示 usage；usage 不再回显给 agent。
+- **用户侧**：服务端通过 RPC（`src/bypass-rpc.ts`）同步状态，由 TUI 伴随入口（`src/tui.tsx`，package `exports["./tui"]`）刷新状态栏。只有成功执行 `/bypass`、`/perm` 后，带 `command` 标记的最终结果才弹一次 toast；多操作命令不提示中间结果。租约到期、子代理权限变化、`set_permission` 和跨实例同步只更新状态，不弹 toast。`/bypass help` 单独显示帮助对话框。参数非法时命令抛错，由宿主 TUI 显示错误；错误不回显给 agent。
 - 到期或清除追加新的状态通知，先前通知不再表示当前授权。显式用户命令自身的正常执行不属于“权限提醒额外唤醒”。
 - 无 TUI 伴随时，工具执行边界仍生效；通知不注册或修改模型 context hook。
 - **本地目录安装**：host 对“目录”形式的插件目标只解析 `<dir>/index`（server）与 `<dir>/tui`（TUI），不看 package.json exports；因此仓库根有 `index.ts` / `tui.ts` 两个薄转发文件。npm 包则走 `exports`。
@@ -224,7 +226,7 @@ UI 不再展示 rwx/x/YOLO 字样。状态尚未同步时显示未知状态，�
 
 启用 sandbox 的 shell 命令由 `bin/opencode-boundary-watch`（`native/linux-sandbox/opencode-boundary-watch.c`，`make -C native/linux-sandbox` 构建）以纯 ptrace 方式监督：payload 不经过 mount/NNP/Landlock 包裹直接运行，插件内没有任何脚本内容/危害分析；只有越过声明写根、只读上限、凭据路径、网络/IPC、特权或 opaque 能力（io_uring、ptrace、进程间句柄、CLONE_UNTRACED、foreign ABI 等）的 syscall 才在进入点暂停并向本进程内的 broker 通道（AF_UNIX NDJSON）请求一次裁决。裁决分三段：观察器发现越界 → **静态审查**（只返回 ALLOW/ASK）→ 静态不能证明时 **动态审查**（JEV）。回复语义：`allow` 对已批准命令 detach 全树改原生执行（setuid/interop 可用，lease/模式撤回仍能 killpg 全组）；`continue` 只放行本次 syscall（L2 缓存命中路径）；`deny`、超时（`--approve-timeout-ms`，默认 35s）或通道 EOF 一律 kill 整个 tracee 树，助手退出码 126 并说明"该操作未执行，此前步骤可能已生效"。payload 最终退出后 broker 关闭前，助手发送一行 `{type:"exit","exit":<真实0..255码>}` 终态帧（无需回复），供 background 调用在没有工具返回的情况下结算缓存与清理。
 
-- **拒绝文案统一**：所有监督器拒绝/取消/审批失败终态输出 `Command blocked: <reason>. <The boundary operation was not performed|The command was stopped>; earlier steps may already have run. Do not automatically rerun the whole command.`；阶段由 `details.atExit`（helper 对每个事件显式发出 true/false）与 `runtimeBlockedPhase`（entry|exit|unknown）三态决定——只有显式 entry 才承诺"操作未执行"，exit 侧（recvmsg cmsg）、运行中取消、模式撤销、审批未完成与未知一律"command was stopped"；reviewer 事实文案按同阶段区分。普通 OS 失败不加该前缀。前台输出、后台 shell 输出与 metadata.runtimeBlocked 三处可见，首次原因不被后续 EOF 覆盖。
+- **拒绝文案统一**：broker 提供的终态文案原样保留；helper 缺省取消仅输出一行 `Command cancelled:`（宿主 TERM/INT/HUP 退出码为 `128 + signal`，显式 cancel 或已开始但不完整、超时或超限的控制帧为 130），不生成拒绝措辞；拒绝仍使用退出码 126，TS 侧拒绝文案为 `Command blocked: <reason>. <The boundary operation was not performed|The command was stopped>; earlier steps may already have run. Do not automatically rerun the whole command.`；阶段由 `details.atExit`（helper 对每个事件显式发出 true/false）与 `runtimeBlockedPhase`（entry|exit|unknown）三态决定——只有显式 entry 才承诺"操作未执行"，exit 侧（recvmsg cmsg）、运行中取消、模式撤销、审批未完成与未知一律"command was stopped"；reviewer 事实文案按同阶段区分。普通 OS 失败不加该前缀。前台输出、后台 shell 输出与 metadata.runtimeBlocked 三处可见，首次原因不被后续 EOF 覆盖。
 - **故障放行**：以上故障拒绝仅适用于 `fail_close`。`fail_open` 向 helper 传入 `--fail-open`：broker EOF／协议错误／审批超时放开整棵进程树，启动检查失败时直接执行原载荷；不生成拒绝文案。用户取消和模式／权限撤销使用独立 cancel 帧，仍终止命令，不能把它们当作故障 EOF 放行。
 - **取消帧完整性**：broker 等待 cancel 写入完成后才关闭通道；未能确认发送时走原执行器的中断兜底。观察器在空闲期按完整 NDJSON 帧组装控制消息，最多 511 字节、1 秒。已开始但截断、超时或超限的控制帧按取消处理，不因 fail-open 放开进程树。
 - **detach 后仍受监督**：'allow' detach 的进程保持登记，取消（broker EOF/撤销/host SIGTERM·INT·HUP）仍按 pid 逐个 SIGKILL——`setsid` 只能逃出 killpg，逃不出登记表；watcher 是 child subreaper，孤儿后代 reparent 到 watcher 一并收割。**终态语义**：root 退出只记录结果，唯一 terminal exit 帧在整树被 waitpid 收割干净（ECHILD）后发出——后台命令的 cache 推进不会因为 root 先退而提前兑现；监督期 broker 关闭一律视为取消（会到达每个后代）。宿主 SIGKILL 无法捕获，仍是声明限制（残留后代此时确实会漏）。

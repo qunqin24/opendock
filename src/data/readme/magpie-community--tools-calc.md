@@ -17,6 +17,7 @@ subscription and makes its requests. The packages work in OpenCode and in
 | [devin](packages/devin) | Devin subscription (the devin CLI's account) | `devin` |
 | [factory](packages/factory) | Factory (Droid) subscription | `factory` |
 | [grok](packages/grok) | Grok (SuperGrok / X Premium+), through the Grok Build CLI's sign-in | `grok` |
+| [kimi-work](packages/kimi-work) | Ordinary Kimi desktop Work subscription, through the desktop app's local sign-in; separate from Kimi Code | `kimi-work` |
 | [kiro](packages/kiro) | Kiro (Free, Pro, Pro+, Power), with Kiro's sign-in, kiro-cli's or the IDE's, or an API key | `kiro` |
 | [minimax](packages/minimax) | MiniMax Code (China): account credits and M Plan, with MiniMax Code's device sign-in | `minimax-code` |
 | [minimax](packages/minimax) | MiniMax Code (international): account credits and M Plan, with MiniMax Code's device sign-in | `minimax-code-global` |
@@ -124,6 +125,7 @@ it off puts the config back.
 | Package | Agent |
 |---|---|
 | [aider](packages/aider) | [Aider](https://aider.chat): `~/.aider.conf.yml`, through litellm's `openai/` prefix |
+| [kimi-desktop](packages/kimi-desktop) | Ordinary [Kimi desktop](https://www.kimi.com/) Work, through its authenticated local runtime; not Kimi Code CLI |
 | [type4me](packages/type4me) | [Type4Me](https://github.com/joewongjc/type4me), macOS voice input: `~/Library/Application Support/Type4Me/magpie-agent.json`, for its LLM post-processing |
 
 ```sh

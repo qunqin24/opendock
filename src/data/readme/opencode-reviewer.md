@@ -125,7 +125,7 @@ inclusive, fractions are invalid, and the maximum safe integer is
 | `maxOutputTokens` | integer | `4096` | `1` through the maximum safe integer. Sent as `max_tokens` on every reviewer POST, including retries/corrections. Your provider/model enforces its supported output limit. |
 | `timeoutMs` | integer | `30000` | `1`–`3600000` milliseconds shared across evidence collection, HTTP requests, retries and corrections; not a fresh budget per POST. |
 | `maxFiles` | integer | `6` | `1`–`1000` distinct file candidates per shell/edit review, including unavailable candidates. |
-| `maxEvidenceBytes` | integer | `131072` | `1`–`16777216` bytes for command/source content, edit diffs or category-specific JSON evidence. Optional items are omitted whole; oversized mandatory evidence fails analysis. This is not a cap on the full prompt or HTTP request. |
+| `maxEvidenceBytes` | integer | `131072` | `1`–`16777216` bytes for command/source content, edit diffs or category-specific JSON evidence. Oversized source files and diffs use numbered relevant excerpts with a `missing X more lines` footer. Counts are exact when the bounded scan completes, otherwise marked unavailable. Other optional items may be omitted; oversized mandatory evidence fails analysis. This is not a cap on the full prompt or HTTP request. |
 
 Notification channels are independent: `banner: false, sound: true` is sound-only,
 `banner: true, sound: false` is banner-only, both `false` disable that type.
@@ -251,9 +251,11 @@ companion handshake. Connection waiting and retries for timed-out or not-yet-ava
 handshakes share one 10-second budget. If it remains unavailable, history and notifications still work;
 reload the plugin to try again. Invalid handshake data is not retried.
 
-If the server reconnects or the companion is replaced, reviews and auto-approval
-stop. Reload the plugin or restart OpenCode to resume. This keeps cached permissions
-from the old connection separate from the new one.
+After a network disconnect, live review resumes automatically when the client and
+native event stream reconnect and a fresh companion handshake succeeds. Pending
+requests are read again without reusing old evidence. Canceled or uncertain approvals
+stay manual, and started countdowns keep their original deadline. A companion replaced
+without a connection change still requires a plugin reload.
 
 ### Report history
 

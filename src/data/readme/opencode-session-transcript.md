@@ -1,12 +1,18 @@
 # opencode-session-transcript
 
-A correct `/export` for OpenCode, in plugin form.
+Fixes `/export`'s truncation bug. Writes Markdown for reading, not JSON for
+re-import — it complements `/export` rather than replacing it.
 
 > **This is a stopgap** for bugs in `/export`
 > ([#50732](https://github.com/anomalyco/opencode/issues/50732),
 > [#50014](https://github.com/anomalyco/opencode/issues/50014)) that are being
 > fixed upstream. Once those land, this should be retired in favour of a
 > correct `/export`.
+
+> **Not a backup.** `/export` writes JSON, which `opencode import` can read
+> back. This writes Markdown, which cannot be re-imported, and it drops
+> assistant reasoning to do it. If you want a restorable archive, keep using
+> `/export`.
 
 ## The problem
 

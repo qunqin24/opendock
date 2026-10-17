@@ -53,7 +53,7 @@ From npm, in `~/.config/opencode/opencode.jsonc`:
 ```jsonc
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugins": ["opencode-codex-control"]
+  "plugins": ["opencode-codex-control"],
 }
 ```
 
@@ -61,7 +61,7 @@ From a local checkout (useful while developing):
 
 ```jsonc
 {
-  "plugins": ["/absolute/path/to/opencode-codex-control"]
+  "plugins": ["/absolute/path/to/opencode-codex-control"],
 }
 ```
 
@@ -76,10 +76,10 @@ From a local checkout (useful while developing):
         "codexHome": "~/.codex",
         "codexCli": "codex",
         "computerUse": true,
-        "chrome": true
-      }
-    }
-  ]
+        "chrome": true,
+      },
+    },
+  ],
 }
 ```
 
@@ -91,7 +91,7 @@ either surface:
 
 ```jsonc
 {
-  "permissions": [{ "action": "chrome", "resource": "*", "effect": "ask" }]
+  "permissions": [{ "action": "chrome", "resource": "*", "effect": "ask" }],
 }
 ```
 
@@ -132,3 +132,23 @@ src/tools/chrome.ts
 
 MIT. Portions are adapted from [Executor](https://github.com/RhysSullivan/executor)
 (MIT, Copyright (c) 2026 Rhys Sullivan) — see `NOTICE` and `LICENSE-EXECUTOR`.
+
+## Contributing
+
+Use Bun 1.4.2 (pinned in `packageManager`) and install with
+`bun install --frozen-lockfile`. TypeScript stays at 5.8.2 for host compatibility.
+
+| Command                                               | Coverage                                                                                             |
+| ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `bun run format` / `bun run format:check`             | Write / check Oxfmt formatting                                                                       |
+| `bun run lint`                                        | Oxlint with no warnings                                                                              |
+| `bun run typecheck`                                   | Source, tests, scripts and config through the root tsconfig                                          |
+| `bun run check`                                       | Formatting, lint, types and normal offline tests                                                     |
+| `bun run test:artifact`                               | Pack, install offline in a temporary consumer, load the public TS entry and set up disabled surfaces |
+| `bun run release:check`                               | All contributor and artifact checks                                                                  |
+| `bun run release:version` / `bun run release:publish` | Tegami version preparation / checked publication                                                     |
+
+The host loads raw TypeScript; there is no build step. Artifact validation does
+not launch Codex, desktop apps or browsers. `smoke` is a separate manual live
+integration probe and is excluded from offline checks. See [Releasing](docs/release.md)
+for the existing push-to-`dev` version and publication workflow.

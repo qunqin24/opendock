@@ -1,6 +1,6 @@
 # magpie-wakatime
 
-把本机 Magpie 网关记录的 AI 请求用量同步成 WakaTime heartbeats。插件跑在 Magpie 自带的 Bun 插件宿主里，只读取本机用量接口，不改写 agent 配置，也不接管请求。
+把本机 Magpie 网关记录的 AI 请求用量同步成 WakaTime heartbeats。插件跑在 Magpie 自带的 Bun 插件宿主里，从本机用量接口读取统计，通过请求钩子识别项目和分支，不改写 agent 配置或请求内容。
 
 ## 安装
 
@@ -29,8 +29,8 @@ key 由 Magpie 存到配置目录下的 `plugin-auth.json`，插件只读取这�
 - `gatewayUrl`：默认 `http://127.0.0.1:3425`。只接受本机回环地址，端口可改。
 - `authAccount`：绑定 `plugin-auth.json` 中的 WakaTime 账号 ID，例如 `wakatime` 或 `wakatime#xxxxxx`。默认仅在只有一个可用账号时自动选择。
 - `apiKeyEnv`：默认 `WAKATIME_API_KEY`。插件读取这个环境变量的值作为 WakaTime 写入密钥。
-- `project`：默认 `Magpie`。heartbeat 的项目标签，是固定归档名，不代表识别出了真实仓库。
-- `projectByAgent`：按 agent id 覆盖项目标签，例如 `{"codex":"Work"}`。
+- `project`：默认 `Magpie`。无法识别真实项目时使用的归档名。
+- `projectByAgent`：按 agent id 强制覆盖项目标签，优先于自动识别，例如 `{"codex":"Work"}`。
 - `excludeAgents`：排除某些 agent，用于避开已由其他 WakaTime 集成采集的部分。
 
 写入密钥按顺序取：登录时填写的 key、`apiKeyEnv` 指定的环境变量、`WAKATIME_HOME`（默认用户目录）下 `.wakatime.cfg` 的 `[settings] api_key`。插件只读这些来源，不修改它们。缺少密钥时只记录状态，不开始采集，也不确定首次启用时间。
@@ -42,16 +42,19 @@ key 由 Magpie 存到配置目录下的 `plugin-auth.json`，插件只读取这�
 每条有实际 token 消耗的请求记录生成一个 heartbeat：
 
 - `entity` 是发起这次请求的 agent 名（例如 `codex`，取不到时用 `magpie`），`type` 是 `app`，`category` 是 `ai coding`，`is_write` 为 `false`。WakaTime 的应用/实体维度因此会把各个 agent 分开。
-- `time` 用请求发生时间；`project` 按上面的配置。
+- `time` 用请求发生时间。`project` 优先使用 `projectByAgent`，其次使用请求工作目录对应的 Git 仓库名，非 Git 目录使用目录名，最后回退到 `project`。Git worktree 使用原仓库名；`branch` 是请求发生时的分支名，无法识别或处于 detached HEAD 时省略。
 - `ai_input_tokens` = `in + cache_write`（未命中缓存的输入加缓存写入），`ai_cached_input_tokens` = `cache_read`（为 0 时省略），`ai_output_tokens` = `out`。WakaTime 按未命中缓存的输入、缓存输入、输出三项分别计价，所以缓存读取单独上报。`reasoning` 是 `out` 的内部拆分，不重复相加。
 - `ai_session` 是本机随机盐加 agent/session 的 HMAC 摘要，同一会话稳定、跨机器不可还原。
 - `user_agent` 携带模型名称、版本和 `effort` 推理强度，优先使用实际响应模型 `served`，缺失时使用 `model`。格式沿用 [WakaTime CLI](https://github.com/wakatime/wakatime-cli/blob/develop/pkg/ai/ai.go)，例如 `gpt/5.4-high`；无法解析版本时只发送通用标识。同一批次的模型信息逐条保留，WakaTime 是否识别及如何展示取决于其服务端支持。
+- 请求头 `X-Machine-Name` 携带经过 URL 编码的本机主机名，`Timezone` 携带系统 IANA 时区。User-Agent 同时包含系统名、内核版本和架构，Windows 使用 WakaTime CLI 的 `windows` 标识。
+
+项目识别使用 [Magpie 异步请求钩子](https://usemagpie.ai/docs/plugins#asynchronous-gateway-hooks)提供的 `cwd`，通过客户端响应 `response_id` 精确关联用量，只处理宿主标记为 `local` 的请求。旧版宿主、缺少工作目录、通过命名网关密钥转发的请求，或未收到完成通知时，使用配置的项目标签并省略分支。已有历史记录不会按当前工作目录或分支补填。Git 命令只读且有超时；Git 不可用时使用工作目录名。
 
 这些是后台 AI 请求的活动时间点，只能说明当时有请求，不能证明你在键盘前；时长由 WakaTime 按自己的规则计算。
 
 ## 不会发送什么
 
-账号名、邮箱、密钥、提示词、对话正文、工具结果、文件路径、供应商配置名、上游地址、费用和错误正文都不会离开本机；和 agent 有关的字段只有它的名字，用作 heartbeat 的实体标识。本地状态库只保存归一化统计、摘要和队列。
+账号名、邮箱、密钥、提示词、对话正文、工具结果、完整文件路径、供应商配置名、上游地址、费用和错误正文都不会离开本机。项目名、分支名、机器名、系统信息、时区和 agent 名会发送给 WakaTime。本地状态库保存归一化统计、摘要、队列和项目/分支快照，不保存工作目录、原始响应 ID 或对话内容。
 
 ## 与现有 WakaTime 采集的重复
 
@@ -83,7 +86,7 @@ bun src/sync.mjs preview [--directory <Magpie 配置目录>] [--limit 5]
 - 首次启用时间之后才开始采集，不自动回灌安装前的历史；停机后逐日补读，并每 10 分钟复查前两天，更早的补录不保证。
 - 待发送队列上限 100,000 条，达到上限停止推进扫描进度并显示积压。已发送和永久拒绝记录保留用于去重，不计入此上限。
 - 上传走 WakaTime 的 `heartbeats.bulk`，每批 25 条；网络错误、429、5xx 按 5 秒到 5 分钟退避，`401/403` 停止发送等你修密钥。
-- 被 WakaTime 永久拒绝（4xx）的条目进入隔离状态，不阻塞后续记录；待发送记录在再次扫描时更新 token 和模型信息，已发送记录的事后修正只记为差异，不重发整条统计。
+- 被 WakaTime 永久拒绝（4xx）的条目进入隔离状态，不阻塞后续记录；待发送记录在再次扫描时更新 token、模型和项目/分支信息，已发送记录的事后修正只记为差异，不重发整条统计。
 - 仅适用于本机个人网关。多人共用同一个网关时不能直接当多人统计使用。
 
 ## 卸载

@@ -21,7 +21,7 @@ No confirmation dialogs — closing is immediate. Session content is **not** del
 ## Requirements
 
 - OpenCode V2 (docs: <https://opencode.ai/v2/docs/build/plugins/cli>)
-- Dependencies: `@opentui/core`, `@opentui/solid`, `solid-js` (see `peerDependencies` in `package.json`)
+- Dependencies: `@opencode/plugin` (TUI entry: `@opencode/plugin/tui`); peer dependencies: `@opentui/core`, `@opentui/solid`, `solid-js` (see `peerDependencies` in `package.json`)
 
 ## Installation / Loading
 
@@ -61,22 +61,22 @@ Put `src/tui.tsx` into the `plugins/tui/` directory of the global config directo
 opencode-v2-tui-closetab/
 ├── package.json      # npm package metadata (exports exposes both ./ and ./tui entry points)
 ├── src/
-│   ├── index.ts      # Main entry: declares the plugin id and marks tui: true
+│   ├── index.ts      # Main entry: declares the plugin id
 │   └── tui.tsx       # TUI entry: /close command implementation (incl. custom JSX multi-select dialog)
 ├── README.md
 └── LICENSE           # MIT
 ```
 
-- `src/index.ts`: main entry, marked `tui: true`, loaded by OpenCode to associate the TUI entry.
+- `src/index.ts`: main entry, declares the plugin id; OpenCode discovers the TUI entry through the package's `./tui` export (`src/tui.tsx`).
 - `src/tui.tsx`: TUI-side implementation. Key points:
-  - The keymap command must be registered inside the `render` callback of `ui.slot` (component context, which includes `Keymap.Provider`) — do not call `ctx.keymap.layer()` directly in `setup()`;
+  - The keymap command is registered directly in `setup()` via `ctx.keymap.layer(() => ({ ... }))` (supported by the OpenCode v2 plugin API; the layer is removed automatically when the plugin unloads);
   - The multi-select dialog is rendered via `ctx.ui.dialog.show(() => JSX)` with a custom Solid component, and keyboard handling uses `useKeyboard` from `@opentui/solid`;
   - zh/en locales are auto-detected (`options.locale` or system `LANG`/`LC_ALL`).
 
 ## Disclaimer / Learning Notice
 
 - This plugin is **for learning purposes only** — for learning OpenCode V2 plugin development. It is not an official project.
-- The plugin APIs it depends on (`@opencode-ai/plugin`, `@opentui/*`) are all **beta APIs** and may break compatibility with future versions.
+- The plugin APIs it depends on (`@opencode/plugin`, `@opentui/*`) are all **beta APIs** and may break compatibility with future versions.
 - Use at your own risk. Do not use in production.
 
 ## License

@@ -46,5 +46,5 @@ policy rules, and platform limits.
 
 ## License
 
-- Native sandbox: [LGPL-3.0-or-later](packages/landstrip/LICENSE).
+- Native sandbox: [LGPL-2.1-or-later](packages/landstrip/LICENSE).
 - Node.js API and agent extensions: Apache-2.0; see each package's `LICENSE`.

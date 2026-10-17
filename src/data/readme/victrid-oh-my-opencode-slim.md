@@ -4,7 +4,7 @@
   </a>
   <h3>✨ oh-my-opencode-slim ✨</h3>
 
-  <p><i>Seven divine beings emerged from the dawn of code, each an immortal master of their craft,<br>awaiting your command to forge order from chaos and build what was once thought impossible.</i></p>
+  <p><i>Six divine beings emerged from the dawn of code, each an immortal master of their craft,<br>awaiting your command to forge order from chaos and build what was once thought impossible.</i></p>
 
   <p><b>Opencode Multi Agent Suite</b> · Mix any models · Auto delegate tasks</p>
   <p><sub>by <b>Boring Dystopia Development</b></sub></p>
@@ -35,9 +35,9 @@ The main idea is simple: instead of forcing one model to do everything, the plug
 
 ### ✨ Highlights
 
-- **[Seven specialized agents](#meet-the-pantheon)** - Orchestrator, Explorer,
-  Oracle, Council, Librarian, Designer, and Fixer. Each part of the job goes to
-  the agent best suited for it - mix any models across any providers.
+- **[Six specialized agents](#meet-the-pantheon)** - Orchestrator, Explorer,
+  Oracle, Council, Designer, and Fixer. Each part of the job goes to the agent
+  best suited for it - mix any models across any providers.
 - **[Background orchestration](docs/background-orchestration.md)** - the
   Orchestrator dispatches specialists as background tasks, tracks them, and
   reconciles results before continuing - parallel work by default, with
@@ -173,12 +173,11 @@ The default generated configuration includes both `openai` and `opencode-go` pre
   "preset": "openai",
   "presets": {
     "openai": {
-      "orchestrator": { "model": "openai/gpt-6-sol", "variant": "high", "skills": ["*"], "mcps": ["*", "!context7"] },
-      "oracle": { "model": "openai/gpt-6-astra", "variant": "high", "skills": ["simplify"], "mcps": [] },
-      "librarian": { "model": "openai/gpt-6-luna", "variant": "low", "skills": [], "mcps": ["context7", "gh_grep"] },
-      "explorer": { "model": "openai/gpt-6-luna", "variant": "low", "skills": [], "mcps": [] },
-      "designer": { "model": "openai/gpt-6-luna", "variant": "medium", "skills": [], "mcps": [] },
-      "fixer": { "model": "openai/gpt-6-luna", "variant": "high", "skills": [], "mcps": [] }
+      "orchestrator": { "model": "openai/gpt-6-sol", "variant": "high", "skills": ["*"] },
+      "oracle": { "model": "openai/gpt-6-astra", "variant": "high", "skills": ["simplify"] },
+      "explorer": { "model": "openai/gpt-6-luna", "variant": "low", "skills": [] },
+      "designer": { "model": "openai/gpt-6-luna", "variant": "medium", "skills": [] },
+      "fixer": { "model": "openai/gpt-6-luna", "variant": "high", "skills": [] }
     }
   }
 }
@@ -299,7 +298,7 @@ If any agent fails to respond, check your provider authentication and config fil
   </tr>
   <tr>
     <td colspan="2">
-      <b>Role:</b> <code>Codebase reconnaissance</code>
+      <b>Role:</b> <code>Codebase reconnaissance and external research</code>
     </td>
   </tr>
   <tr>
@@ -416,48 +415,7 @@ If any agent fails to respond, check your provider authentication and config fil
 
 ---
 
-### 05. Librarian: The Weaver of Knowledge
-
-<table>
-  <tr>
-    <td width="30%" align="center" valign="top">
-      <img src="img/librarian.jpg" width="240" style="border-radius: 10px;">
-      <br><sub><i>The weaver of understanding.</i></sub>
-    </td>
-    <td width="70%" valign="top">
-      The Librarian was forged when humanity realized that no single mind could hold all knowledge. They are the weaver who connects disparate threads of information into a tapestry of understanding. They traverse the infinite library of human knowledge, gathering insights from every corner and binding them into answers that transcend mere facts. What they return is not information - it's understanding.
-    </td>
-  </tr>
-  <tr>
-    <td colspan="2">
-      <b>Role:</b> <code>External knowledge retrieval</code>
-    </td>
-  </tr>
-  <tr>
-    <td colspan="2">
-      <b>Prompt:</b> <a href="src/agents/librarian.ts"><code>librarian.ts</code></a>
-    </td>
-  </tr>
-  <tr>
-    <td colspan="2">
-      <b>Default Model:</b> <code>openai/gpt-6-luna</code>
-    </td>
-  </tr>
-  <tr>
-    <td colspan="2">
-      <b>Recommended Models:</b> <code>deepseek-v4-flash</code> <code>gpt-5.3-codex</code> <code>mimo-v2.5</code> <code>minimax-m2.7</code>
-    </td>
-  </tr>
-  <tr>
-    <td colspan="2">
-      <b>Model Guidance:</b> Choose a fast, low-cost model. Librarian handles research and documentation lookups, so speed and efficiency usually matter more than using your strongest reasoning model.
-    </td>
-  </tr>
-</table>
-
----
-
-### 06. Designer: The Guardian of Aesthetics
+### 05. Designer: The Guardian of Aesthetics
 
 <table>
   <tr>
@@ -498,7 +456,7 @@ If any agent fails to respond, check your provider authentication and config fil
 
 ---
 
-### 07. Fixer: The Last Builder
+### 06. Fixer: The Last Builder
 
 <table>
   <tr>
@@ -547,7 +505,7 @@ If any agent fails to respond, check your provider authentication and config fil
 > **Why a separate agent?** If your Orchestrator model is not multimodal, enable Observer to handle images, screenshots, and other visual files. Observer is disabled by default and gives the Orchestrator a dedicated multimodal reader without forcing you to change your main reasoning model. Set `disabled_agents: []` and an `observer` model in your configuration. The bundled `opencode-go` install preset does this automatically because its GLM Orchestrator is not multimodal. Omitting `image_routing` preserves existing conditional Observer behavior. `"auto"` is capability-aware: models that accept image input keep attachments inline for native vision; non-vision chains get attachments saved under `.opencode/images/<session>/` with a delegation nudge by path. `"direct"` always keeps image parts inline. Saved workspace images are not automatically deleted. Remove the whole `.opencode/images/` directory or a single session subdirectory manually when no longer needed (references in old conversations then stop resolving); images from session-less messages are saved at the top level.
 
 > [!TIP]
-> **Subagents reading images.** Advisory subagents (explorer, librarian, oracle, designer, councillors) can dispatch `@observer` themselves for image files on disk. On OpenCode v2 hosts this needs one extra hop of nesting, which the host denies by default — set `"experimental": { "subagent_depth": 2 }` in your opencode config to enable it. Fixer, observer itself, and the council synthesizer stay non-spawning by design.
+> **Subagents reading images.** Advisory subagents (explorer, oracle, designer, councillors) can dispatch `@observer` themselves for image files on disk. On OpenCode v2 hosts this needs one extra hop of nesting, which the host denies by default — set `"experimental": { "subagent_depth": 2 }` in your opencode config to enable it. Fixer, observer itself, and the council synthesizer stay non-spawning by design.
 
 <table>
   <tr>

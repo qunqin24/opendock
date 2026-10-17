@@ -228,6 +228,10 @@ Extract and Batch scrape. It calls the Spicrawl API directly, not the MCP server
 API key (with the `scrape` scope, plus `batch` for Batch scrape) in the plugin's authorization
 settings.
 
+[![Spicrawl for Dify: install, add your key, then Scrape, Extract and Batch scrape in workflows and agents](assets/dify-demo.webp)](https://docs.spicrawl.com/agents/dify)
+
+Watch the full video on the [Dify docs page](https://docs.spicrawl.com/agents/dify), or download [`assets/dify-demo.mp4`](assets/dify-demo.mp4).
+
 1. In Dify open Plugins, Marketplace, search for Spicrawl and select Install, or open the
    [Spicrawl listing](https://marketplace.dify.ai/plugin/spicrawl/spicrawl). It needs Dify 1.14.2
    or later.

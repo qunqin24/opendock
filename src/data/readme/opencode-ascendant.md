@@ -56,5 +56,5 @@ make build   # install, match versions, rebuild skills + opencode package, verif
 See [RELEASE.md](./RELEASE.md) for the full release process
 (changesets, `make version`, `make build`, tag-push CI publish).
 
-Requires a recent OpenCode v2 host (the plugin needs an Effect ≥4.0.4
-runtime for `@effect/platform-node-shared`).
+Requires a recent OpenCode v2 host (the plugin needs an Effect ≥4.0.5
+runtime for `@effect/platform-bun`).

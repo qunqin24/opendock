@@ -70,6 +70,7 @@ Existing project with no specs yet? Start with `/openspec.init` — it bootstrap
 - [`/openspec.init`](skills/openspec-init/SKILL.md) — bootstrap the baseline: research the codebase → agree on capabilities → validated `openspec/specs/**`
 - [`/openspec.plan`](skills/openspec-plan/SKILL.md) — coverage interview → parallel research → grill (1–3 rounds, up to 5) → draft → critique loop → validated, ready to build
 - [`/openspec.apply`](skills/openspec-apply/SKILL.md) — implement `tasks.md` in dependency-ordered waves, verify scenarios, review the diff
+- [`/openspec.archive`](vendor/openspec/skills/openspec-archive-change/SKILL.md) — archive completed changes through the vendored archive workflows; two or more ids run the bulk one
 - [`/openspec.retro`](skills/openspec-retro/SKILL.md) — meta: mine the finished run for prompt defects — ≤8 cited, ranked findings, read-only
 
 ### Roles
@@ -108,9 +109,10 @@ versioning trade-off: [docs/vendor-sync.md](docs/vendor-sync.md).
 Skill ids match upstream exactly (`openspec-propose`, `openspec-apply-change`,
 …), so a project with `openspec init --tools opencode` alongside the plugin
 loads the same workflows — the plugin just keeps them current on every release
-instead of on every manual `openspec update`. The four commands this plugin
+instead of on every manual `openspec update`. The five commands this plugin
 adds (`/openspec.init`, `/openspec.plan`, `/openspec.apply`,
-`/openspec.retro`) and the upstream ones coexist: upstream skills are
+`/openspec.archive`, `/openspec.retro`) and the upstream ones coexist:
+upstream skills are
 single-workflow steps, the flow commands are the multi-agent runs over the
 whole change.
 

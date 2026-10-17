@@ -6,6 +6,7 @@ Extensions for [Pi](https://pi.dev) and [OpenCode](https://opencode.ai), publish
 
 | Package                | What it does                                                                      | Documentation                                |
 | ---------------------- | --------------------------------------------------------------------------------- | -------------------------------------------- |
+| `@luxass/pi-questions` | Ask tabbed questions with choices, notes, and Markdown previews.                  | [Questions](packages/pi-questions/README.md) |
 | `@luxass/pi-btw`       | Ask side questions in a popover, then optionally send a summary to the main chat. | [btw](packages/pi-btw/README.md)             |
 | `@luxass/pi-personal`  | Load defaults and extensions tuned to a single personal workflow.                 | [personal](packages/pi-personal/README.md)   |
 | `@luxass/pi-voice`     | Record speech and transcribe it for your prompts.                                 | [Voice](packages/pi-voice/README.md)         |
@@ -48,7 +49,7 @@ Each Pi extension in this repository already has:
 
 Publish each extension as its own npm package through the existing Changesets release workflow. The private repository-root package is not published. The keyword makes a published package eligible for gallery discovery; it does not guarantee immediate indexing. No separate submission step is documented.
 
-Optional `pi.image` and `pi.video` fields add gallery previews. Each package sets `pi.image` to a generated PNG cover committed under `packages/*/docs/`. Run `pnpm covers` to regenerate them, and push the result to `main` so the raw GitHub URLs resolve. `pi.video` can add a video preview.
+Optional `pi.image` and `pi.video` fields add gallery previews. Packages with covers set `pi.image` to a generated PNG committed under `packages/*/docs/`. Run `pnpm covers` to regenerate them, and push the result to `main` so the raw GitHub URLs resolve. `pi.video` can add a video preview.
 
 ## License
 

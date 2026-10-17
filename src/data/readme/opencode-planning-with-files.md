@@ -245,6 +245,7 @@ One hook fire measures 289ms wall-clock since the v3.6.0 optimization, down from
 
 | Version | Highlights |
 |---------|------------|
+| **v3.24.1** | Validate hidden adapter frontmatter, repair KiloCode resource links, and document the prerequisites and commands for all six CI suites (#314, #315, #316). |
 | **v3.24.0** | Native Qoder CLI plugin with isolated hook execution and the CLI completion gate (PR #313). Claude Code refreshes PreToolUse context only when the selected view changes, with session isolation, recovery resets and an always-inject opt-out (#312). |
 | **v3.23.0** | Public file-only recovery fixture with separate trial arms (#303). DSH V4 message-source compatibility (#306), resolver-based manual workflows (#300), and accurate Codex opt-out documentation (#302). |
 | **v3.22.0** | OpenCode 2 support with native plugin registration, context injection, planning tools and the completion gate. OpenCode 1 remains supported; moved v2 sessions follow their current project (#298). |

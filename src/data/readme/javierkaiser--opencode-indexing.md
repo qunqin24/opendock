@@ -26,28 +26,78 @@ index is still installed.
 
 ## Install
 
-### With the OpenCode CLI (recommended)
+### With npx (recommended)
+
+```bash
+npx @javierkaiser/opencode-indexing
+```
+
+This is the whole install: the installer runs `opencode plugin add`, writes the
+permission rules, restarts the service, and, when you ask for it, also installs
+and registers the companion `codegraph`
+MCP. It picks its strategy from where it runs — from an npx cache or an
+unpacked tarball it installs the published package, from a checkout it
+installs your working tree instead — so edits take effect on restart with no
+publish in between. It prints which one it chose.
+
+Add `--with-codegraph` to install and register codegraph as part of the same run
+(the flag is opt-in and only has effect in the published-package mode):
+
+```bash
+npx @javierkaiser/opencode-indexing --with-codegraph
+```
+
+| Flag | Effect |
+| --- | --- |
+| `--package [spec]` | Install the published package (default spec `@latest`) |
+| `--local` | Copy this directory into the config dir (development) |
+| `--skip-deps` | `--local` only: copy the files, install no dependencies |
+| `--no-restart` | Do not restart the service |
+| `--with-codegraph` | Install and register codegraph as a companion MCP (opt-in, `--package` only) |
+
+### The codegraph companion
+
+[CodeGraph](https://github.com/colbymchenry/codegraph) is a separate tool — a
+local code-graph indexer exposed as an MCP server — and this plugin drives it
+rather than reimplementing it. If it is not installed yet:
+
+```bash
+npm install -g @colbymchenry/codegraph
+```
+
+The package is scoped, and that matters: `codegraph` unscoped on npm is an
+unrelated 2024 library with no CLI, so installing that name exits 0 and leaves
+nothing on `PATH`.
+
+Installing it is only half of it. `indexing_build` and `indexing_import` also
+start the CLI for the workspace, so both indexes are built by the same action:
+`codegraph init --yes` the first time a folder is seen, `codegraph sync`
+afterwards. codegraph is a **companion, not a dependency** — with the CLI absent
+nothing is spawned, no build fails, and no line is added to the output. Turn it
+off with `/indexing-config set codegraph=false`, and see
+[Semantic search and code graphs](#semantic-search-and-code-graphs) for why the
+two belong together.
+
+The launch is detached and reported as started, never as finished: on a large
+monorepo `init` runs for minutes, and a tool call that blocked that long would
+be worse than one that returns. Anything that fails afterwards lands in
+`.codegraph/daemon.log`. A home directory or a drive root is refused rather than
+indexed, and launches are limited to one per 15 seconds per workspace because
+codegraph's own daemon already watches files.
+
+### With the OpenCode CLI
 
 ```bash
 opencode plugin add @javierkaiser/opencode-indexing
 ```
 
-That is the whole install. OpenCode downloads the package into its own cache and
-records it in the global `plugins` array, and it loads both halves of the plugin:
-the server side (`index.ts`, which registers the tools) and the terminal UI
-(`tui.ts`, which adds the prompt-footer indicator and the `/indexing` page).
-
-Update and remove it with the same command family:
-
-```bash
-opencode plugin check     # is there a newer version?
-opencode plugin update    # install it
-opencode plugin remove @javierkaiser/opencode-indexing
-```
-
-`plugin add` installs the plugin but knows nothing about its tools, so it does
-not write permission rules. Add this one to `opencode.json` to keep the host
-asking before the only tool that writes your settings file:
+OpenCode downloads the package into its own cache and records it in the global
+`plugins` array, and it loads both halves of the plugin: the server side
+(`index.ts`, which registers the tools) and the terminal UI (`tui.ts`, which
+adds the prompt-footer indicator and the `/indexing` page). It brings `plugin
+check`, `plugin update` and `plugin remove` with it, but it cannot write
+permission rules — add this one to `opencode.json` to keep the host asking
+before the only tool that writes your settings file:
 
 ```jsonc
 {
@@ -61,29 +111,8 @@ The other six tools only read. OpenCode's base policy already allows everything
 (`{ "action": "*", "resource": "*", "effect": "allow" }`), so they need no rule;
 write them out only if you want to tighten the set.
 
-### One command, permissions included
-
-To skip the manual rule:
-
-```bash
-npx @javierkaiser/opencode-indexing
-```
-
-The installer runs `opencode plugin add`, writes the permission rules, and
-restarts the service. It picks its strategy from where it runs: from an installed
-copy — an npx cache, an unpacked tarball — it installs the published package;
-from a checkout it installs your working tree instead, so edits take effect on
-restart with no publish in between. It prints which one it chose.
-
-| Flag | Effect |
-| --- | --- |
-| `--package [spec]` | Install the published package (default spec `@latest`) |
-| `--local` | Copy this directory into the config dir (development) |
-| `--skip-deps` | `--local` only: copy the files, install no dependencies |
-| `--no-restart` | Do not restart the service |
-
 `install.sh` and `install.ps1` are thin wrappers over it; PowerShell also accepts
-`-Local`, `-Package`, `-Spec`, `-SkipDeps` and `-NoRestart`.
+`-Local`, `-Package`, `-Spec`, `-SkipDeps`, `-NoRestart` and `-WithCodegraph`.
 
 `--package` deletes any copied plugin it finds: both sources define the same
 plugin id and the config directory is scanned automatically, so leaving both
@@ -109,12 +138,17 @@ resolve from the config file containing the entry:
 ```
 OpenCode ──► indexing_search ──┬──► Kilo's index (read-only)      Qdrant ws-*  ·  Kilo LanceDB
                                └──► own index (read/write)        own LanceDB (default)  ·  Qdrant oc-*
+
+OpenCode ──► codegraph_*  ───────► codegraph's graph (its own)    .codegraph/codegraph.db
+             ▲
+             └── indexing_build / indexing_import keep it in step
 ```
 
 - **Read-only reuse**: the plugin computes the same collection name Kilo uses (`ws-` + sha256 of the workspace path, first 16 hex chars), validates the embedding profile stored in the metadata point, and queries with an embedding from the *same* model (e.g. Mistral `codestral-embed-2505`, 1536d).
 - **Import without re-embedding**: `indexing_build` (or `indexing_import`) can copy vectors + chunks from an existing Kilo index — both its Qdrant collections and its local LanceDB database — at **zero embedding cost**, then incrementally index only the delta.
 - **Own index**: manifest-based incremental indexer (per-file sha256) writing to `oc-*` collections or an embedded LanceDB database, using the same chunk payload shape as Kilo (`filePath`, `fileHash`, `codeChunk`, `startLine`, `endLine`, `segmentHash`, `pathSegments`).
 - **Merge**: results from Kilo + own are merged; own (fresher) hits win on overlap; ghost hits (deleted files) are filtered out.
+- **Companion graph**: the same build starts codegraph for the workspace, which keeps its own index in `.codegraph/` and serves it over its own MCP server. This plugin never reads or writes that database — see [Semantic search and code graphs](#semantic-search-and-code-graphs).
 
 ## Tools (namespace `indexing`)
 
@@ -156,6 +190,7 @@ Settable keys (case-insensitive):
 | `ollamaurl` | Ollama base URL |
 | `openaicompatibleurl` / `openaicompatiblekey` | OpenAI-compatible endpoint |
 | `importfromkilo` | `true` to import from Kilo when building, `false` to start from scratch |
+| `codegraph` | `false` to stop also running the `codegraph` CLI on build. On by default; a no-op when codegraph is not installed |
 | `autorefresh` | Refresh the own index automatically on search |
 | `enabled` | Master switch. `false` pauses writing and refreshing; search keeps reading Kilo's index |
 | `searchmaxresults` | Result cap per search |
@@ -384,6 +419,12 @@ Word about data safety: Kilo's indexes (`ws-*` collections and its LanceDB direc
 ## Requirements
 
 - OpenCode v2 (plugin API `@opencode/plugin@2.x`).
+- **For the prompt-footer indicator:** `solid-js`, `@opentui/core` and
+  `@opentui/solid`, which the plugin installs itself (~14 MB). They used to be
+  declared as optional *peer* dependencies, on the assumption that the host
+  already had them; OpenCode 2.0.30 stopped providing them and the indicator
+  silently stopped rendering. Everything else works without them — the settings
+  page degrades to dialogs and the footer is simply absent.
 - **For the own index: nothing to run.** The default store is embedded LanceDB
   (`@lancedb/lancedb@0.26.2`), so there is no server to start, no port to free and
   no container to keep alive.
@@ -395,12 +436,13 @@ Word about data safety: Kilo's indexes (`ws-*` collections and its LanceDB direc
 ### Where each index lives
 
 The own index and Kilo's index are independent, and each one is chosen on its
-own:
+own. codegraph keeps a third, and it is the one this plugin never writes to:
 
 | Index | Default | Configured by |
 | --- | --- | --- |
 | Own index | embedded LanceDB, under `~/.local/state/opencode-indexing/lancedb` | `vectorStore` |
 | Kilo index (read-only) | whatever `kilo.jsonc` says | Kilo itself |
+| codegraph's graph | `.codegraph/` inside the workspace | codegraph itself |
 
 Kilo's `vectorStore` used to decide where this plugin's own index was written,
 because both were read from the same setting chain. That is no longer the case:
@@ -434,20 +476,31 @@ that. Set vectorStore=qdrant explicitly in
 Set `vectorStore=qdrant` in `~/.config/opencode/indexing.json` (or run
 `/indexing-config set vectorstore=qdrant`) to use a Qdrant server instead.
 
-## Semantic search vs. code graphs (roadmap)
+## Semantic search and code graphs
 
-`opencode-indexing` implements **semantic (vector) search**. It is worth being
-explicit about how it compares to **code-graph** tooling (call graphs, symbol
-graphs, SCIP-style indexes), because they answer different questions and are
-complementary:
+Two indexes, not two options. This plugin builds and searches the semantic one;
+it also keeps codegraph's code graph in step for the same folder, so a single
+`indexing_build` leaves both current. Neither replaces the other, and this is not
+a fork of codegraph — see [The codegraph companion](#the-codegraph-companion)
+for the install side.
 
-| | Semantic index (this plugin) | Code graph |
+### The two indexes
+
+| | Semantic index (this plugin) | Code graph (codegraph) |
 | --- | --- | --- |
 | Question it answers | "Where is the code that does something like X?" | "Who calls X? What breaks if I change it? Path from A to B?" |
 | Signal | Meaning (embeddings over chunks) | Structure (symbols, `CALLS`, `DEFINES`, `IMPORTS` edges) |
 | Strengths | Natural language, concepts without known identifiers, cross-language | Exact structural facts, multi-hop traversals, no similarity false positives |
 | Weaknesses | "Similar" is not "relevant"; no notion of connections | Cannot find a concept with no known symbol; fragile on dynamic code |
-| Cost profile | Embedding API + vector DB | Local parsing + small graph store |
+| What it costs to stay fresh | **Paid**: the embedding API, re-run when the model changes | **Free**: local parsing and a small graph store, re-run on every edit |
+
+That last row is what shapes the setup. A semantic index is re-embedded only when
+the model changes, and that is money; a graph is synced whenever a file is
+touched, and that is CPU. Two cadences for two economies — which is the reason
+to keep both pointed at one folder rather than at two projects that quietly
+drift apart.
+
+### Measuring the difference
 
 We measured this rather than assuming it. [`bench/`](./bench) runs the same
 real questions about code through four methods — word matching, symbol-name
@@ -466,23 +519,43 @@ What it found:
   better on both: more files found on one codebase, a better position on the
   other.
 
-One caveat that matters for reading that: the benchmark measures `codegraph
-query`, the one subcommand that matches names. It does **not** measure what a
-graph is actually good for — who calls what, what breaks if you change it,
-paths between two places. Those are the graph's real strength and they are not
-in the numbers above.
+One caveat, and it is larger than it looks. The benchmark measures
+`codegraph query`, the one subcommand that matches **names**. It does **not**
+measure what a graph is actually good for — who calls what, what breaks if you
+change it, paths between two places. So the fusion above is *semantic + name
+matching*, **not** *semantic + graph traversal*. What would actually justify
+reaching for the graph is not in those numbers, and this section does not claim
+it is.
 
-The broader consensus points the same way: use embeddings to find the entry node
-by intent, then walk the graph for exact relationships. Cursor reported ~12.5%
-retrieval-accuracy improvement combining semantic search with grep; Sourcegraph
-layers semantic search over a SCIP graph; Aider uses tree-sitter + PageRank with
-no embeddings at all for repo maps.
+### Using them together
 
-This plugin deliberately stays on the semantic side and coexists with grep/read
-(see the tool descriptions and the bundled skill). A code-graph mode (tree-sitter
-symbol/edge extraction into SQLite, exposed as `indexing_graph_*` tools that
-chain after `indexing_search`) is a candidate for a future major version; the
-tree-sitter infrastructure is already in place.
+The division of labour is the one the wider field converges on: use embeddings
+to find the entry node **by intent**, then walk the graph for **exact
+relationships**.
+
+1. `indexing_search` — "where is the retry logic for failed webhooks". Finds the
+   neighbourhood from meaning alone, with no identifier to know in advance.
+2. `codegraph_explore` — the same area, returning the verbatim source of the
+   relevant symbols, the call paths between them, and what depends on them.
+3. `codegraph_impact` / `codegraph_callers` — once the question becomes "what
+   breaks if I change this", the graph answers exactly, and a similarity search
+   cannot.
+
+Both are live in the same session, so an assistant moves between them without
+being asked to.
+
+### Why there are no graph tools in this plugin
+
+There are no `indexing_graph_*` tools here, and that is a decision rather than a
+gap. An earlier version of this section proposed adding tree-sitter symbol and
+edge extraction into SQLite as a candidate for a future major version. Once
+codegraph was available as a companion, that plan would have reimplemented
+something another tool already does better — in a second store, behind a second
+indexer that has to be kept alive and fresh.
+
+The plugin stays on the semantic side and coexists with grep/read (see the tool
+descriptions and the bundled skill). What it adds for the structural half is to
+keep it current, not to duplicate it.
 
 ## Development
 
@@ -500,7 +573,9 @@ node test/cli.ts build      --vector-store lancedb --root .
 
 ## Acknowledgements
 
-This plugin interoperates with the open-source [Kilo Code](https://github.com/Kilo-Org/kilocode) indexing format (MIT License, Copyright (c) 2026 Kilo Code). The line-based chunker and the tree-sitter queries are ports of Kilo Code's implementation. It also builds on [opencode](https://github.com/anomalyco/opencode) (MIT), [LanceDB](https://github.com/lancedb/lancedb) (Apache-2.0), [web-tree-sitter](https://github.com/tree-sitter/tree-sitter) (MIT), [tree-sitter-wasms](https://github.com/Gregoor/tree-sitter-wasms) (Unlicense) and [ignore](https://github.com/kaelzhang/node-ignore) (MIT).
+This plugin interoperates with the open-source [Kilo Code](https://github.com/Kilo-Org/kilocode) indexing format (MIT License, Copyright (c) 2026 Kilo Code). The line-based chunker and the tree-sitter queries are ports of Kilo Code's implementation. It also builds on [opencode](https://github.com/anomalyco/opencode) (MIT), [LanceDB](https://github.com/lancedb/lancedb) (Apache-2.0), [Apache Arrow](https://github.com/apache/arrow) (Apache-2.0), [web-tree-sitter](https://github.com/tree-sitter/tree-sitter) (MIT), [tree-sitter-wasms](https://github.com/Gregoor/tree-sitter-wasms) (Unlicense), [ignore](https://github.com/kaelzhang/node-ignore) (MIT), and — for the terminal UI — [SolidJS](https://github.com/solidjs/solid) (MIT) and [OpenTUI](https://github.com/sst/opentui) (MIT).
+
+The companion code graph is [CodeGraph](https://github.com/colbymchenry/codegraph) (MIT), a separate project this one installs and drives rather than bundles. Its npm package is `@colbymchenry/codegraph`; the unscoped `codegraph` on npm is a different, unrelated project.
 
 Kilo Code is a trademark of its owners; this project is **unofficial and not affiliated** with Kilo Code or the OpenCode project.
 

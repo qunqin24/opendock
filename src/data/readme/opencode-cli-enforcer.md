@@ -19,9 +19,9 @@
 ## What this plugin is
 
 `opencode-cli-enforcer` is an **OpenCode v2 plugin** that registers Claude Code as a first-class model
-provider through `@anthropic-ai/claude-agent-sdk`. It publishes the provider id **`claude-bridge`**
+provider through `@anthropic-ai/claude-agent-sdk`. It publishes the provider id **`claude`**
 and a static catalog of Claude Code models, so a user with a Claude subscription can select
-`claude-bridge/*` models and generate text **without an `ANTHROPIC_API_KEY`** — authentication is
+`claude/*` models and generate text **without an `ANTHROPIC_API_KEY`** — authentication is
 delegated to the Claude Code CLI the SDK drives.
 
 The design principle is a strict separation of duties:
@@ -88,7 +88,7 @@ Or register a local checkout directly by path (useful for development):
 With no `options`, the plugin runs with safe defaults: the `claude` provider is enabled, the `agy`
 provider is disabled, and `defaultProvider` is `claude`. Restart OpenCode (or reload plugins) after
 editing `opencode.jsonc`. The plugin then registers via
-`Plugin.define({ id: "claude-bridge", setup })` and adds the provider and its model catalog through
+`Plugin.define({ id: "cli-providers", setup })` and adds the provider and its model catalog through
 `ctx.provider.transform`, idempotently (a hot reload never duplicates records).
 
 ## Quick start
@@ -96,7 +96,7 @@ editing `opencode.jsonc`. The plugin then registers via
 1. Install and authenticate the Claude Code CLI for your user (subscription login, no API key).
 2. Add the plugin entry shown above to `opencode.jsonc`.
 3. Restart OpenCode.
-4. Select a model from the **`claude-bridge`** provider, for example `claude-bridge/claude-sonnet-5`.
+4. Select a model from the **`claude`** provider, for example `claude/claude-sonnet-5`.
 5. Send a prompt. Tool calls made by the model are executed by OpenCode; approvals and permission
    prompts behave exactly as they do for any other provider.
 
@@ -318,6 +318,48 @@ npm install
 npx tsc --noEmit                          # typecheck src/
 node --import tsx --test tests/**/*.test.ts   # run the unit test suite
 ```
+
+CI runs the same gates on `ubuntu-latest` and `macos-latest` across Node 20, 22, and 24, plus the
+dependency-review, CodeQL, and Scorecard workflows summarized below.
+
+## Supply chain and CI/CD
+
+The release path is treated as part of the product's threat model.
+
+**SHA-pinned actions.** Every `uses:` across all workflows pins a full 40-character commit SHA with
+the upstream tag in a trailing comment, so a moved or deleted tag cannot silently change what runs.
+CI declares a read-only top-level grant and escalates per job; in the release pipeline only `publish`
+requests `id-token: write` and only the GitHub-release job requests `contents: write`.
+
+**Dependabot.** `.github/dependabot.yml` checks the `npm` and `github-actions` ecosystems weekly (on
+Mondays) under a bounded open-PR limit. Minor and patch bumps are batched into grouped PRs; major npm
+bumps are deliberately left ungrouped so breaking changes get individual review. Keeping the Actions
+ecosystem fresh is what turns the SHA pins into reviewable PRs instead of silent staleness.
+
+**Dependency review.** Pull requests run `actions/dependency-review-action`, which fails on
+high-or-worse severity advisories and posts a summary comment only when the review fails.
+
+**CodeQL.** `.github/workflows/codeql.yml` analyzes `javascript-typescript` with the broader
+`security-extended` query suite on pushes and pull requests to `main` and on a weekly schedule.
+
+**OpenSSF Scorecard.** `.github/workflows/scorecard.yml` runs on branch-protection changes, a weekly
+cron, and pushes to `main`; it publishes the signed results and uploads its SARIF findings to code
+scanning, retaining an artifact copy for 14 days.
+
+**SBOM and provenance.** The release pipeline generates a CycloneDX SBOM from the lockfile with
+development dependencies omitted, uploads it as a 90-day artifact, and attaches it to the GitHub
+release. The package itself is pushed with `npm publish --provenance`, producing a signed attestation
+that ties the published tarball to the workflow run that built it.
+
+**Release approval gate.** Pushing a `v*` tag starts a three-stage pipeline: `verify` (the tag must
+match the `package.json` version and be documented in `CHANGELOG.md`, then typecheck, unit tests, and
+the SBOM), `publish` (gated by the `production` environment's required reviewers, using OIDC trusted
+publishing when `vars.NPM_TRUSTED_PUBLISHING == '1'` and an npm token otherwise), and the GitHub
+release created from the changelog section. Its `concurrency` group never cancels in progress, so a
+publish is not interrupted halfway.
+
+**License metadata.** The package is MIT: `package.json` declares `"license": "MIT"`, `LICENSE` ships
+in the npm `files` allowlist, and the badge above matches both.
 
 ## License
 

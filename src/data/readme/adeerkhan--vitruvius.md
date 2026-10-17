@@ -87,6 +87,10 @@ The verifier is benchmarked, not asserted. Its checked-in results are on-disk, r
 | Structural contract (26 skills) | enforced in CI | [validate-contract.mjs](scripts/validate-contract.mjs) |
 | Provenance schema (selected sidecars, `inferred` derivation traces) | selected root/plan/draft checks plus deterministic generic closure fixtures; legacy local closure remains opt-in | [validate-artifacts.mjs](scripts/validate-artifacts.mjs) |
 
+Repository-only assets (not in the npm package): `outputs/`, `evals/` run
+records and `tasks/benchmark/results/`. These are development artefacts;
+run `npm run check:local-artifacts` against a clean outputs tree to reproduce.
+
 Reproduce:
 
 ```bash
@@ -123,6 +127,14 @@ node scripts/fixed-case.mjs results evals/results/manifest.json evals/results
 ```
 
 The E1/C1 subagent runs are on-demand evidence and are not part of `npm test`; the checked-in C1 bundle records their artifact hashes and independent grades. GC1, PR1, and V1 are deterministic contract checks; V1 still requires a real pilot record before any outcome claim. The problem-anchor contract is also deterministic: it proves a report is bound to the artifacts it studied, not that its claims are correct. When installed as a package, the same validators are available as `vitruvius-goal-check`, `vitruvius-artifact-closure`, `vitruvius-field-pilot`, and `vitruvius-problem-anchor`; `test:package-consumer` proves that by installing the packed tarball into a clean consumer. `test:input-gate` proves every standalone research skill declares the shared gate in `references/input-gate.md`. `test:majority` scores the verifier benchmark across independent runs, takes the per-case majority verdict, and publishes agreement and per-run residuals (`benchmark:majority` runs it on real result directories); a majority false approval fails the strict gate. OpenCode role adapters are rendered from `agents/*.md` by `installer/render.mjs`, so they cannot drift from the role contracts.
+
+**Recording comparison work.** A local run used for comparison work against
+the empirical study records both references alongside the run — the paper
+([arXiv:2605.20668](https://arxiv.org/pdf/2605.20668)) and the benchmark
+repository
+([prometheus-eval/into-the-unknown](https://github.com/prometheus-eval/into-the-unknown)),
+pinned by commit — so a comparison result is attributed to a method revision
+instead of being reconstructed from memory later.
 
 ## Worked Examples
 
@@ -478,6 +490,8 @@ Vitruvius points research at the best free, verifiable layers for the job:
 - **Standards and code** (primary): ASME, ASTM, AISC, ACI, ASCE, IEEE, IEC, UL, IBC — cite standard + section + edition
 - **Academic literature**: OpenAlex (primary, keyless), Semantic Scholar, arXiv, alphaXiv fast search
 - **Web search**: Used for non-academic sources and recency (when host exposes the tool)
+
+**Empirical reference (AI reviewers):** Kim, S. et al. (2026), *“On the limits and opportunities of AI reviewers: Reviewing the reviews of Nature-family papers with 45 expert scientists”*, arXiv:2605.20668. https://arxiv.org/pdf/2605.20668 — a 469-hour, 45-scientist expert annotation study of 2,960 review items across 82 Nature-family papers. It is the empirical basis for the reviewer/meta-reviewer prompt, significance-bar, devil’s-advocate, and severity-calibration guidance applied throughout Vitruvius; see the extracted copy in `docs/` (gitignored for local reading) for full details.
 
 **Rejected sources:** Undated blog posts, content aggregators, forum posts without primary links, sources that appear AI-generated.
 

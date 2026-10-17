@@ -173,6 +173,11 @@ no longer exist, and Claude Code never reports an `Edit` on a missing file. `fil
 resolved against the project directory. The payload also carries `session_id`, `cwd` and `hook_event_name`; it
 carries no `transcript_path` and no `tool_response`.
 
+It also carries `model`: the id of the model the session last called, as Claude Code puts it in its
+`SessionStart` payload. opencode can switch models mid-session, so it is read from the latest call (V1
+`chat.params`, V2 `model.request`), and a subagent's calls carry its own. Before a session's first model call
+there is no `model` key.
+
 Each command is awaited, as Claude Code does, so a hook that inspects the working tree sees the tool's effect.
 It is bounded by `commandTimeoutMs`. A failure is logged only: it never reaches the system prompt and never
 fails the tool call. stdout directives are not honoured.
