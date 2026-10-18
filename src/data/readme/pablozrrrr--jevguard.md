@@ -1,12 +1,41 @@
 # JevGuard
 
 > **Semantic policy engine for coding agents.**
+>
+> JevGuard reviews every change an AI coding agent makes against the rules of your
+> repository, written in plain Markdown, and reports `PASS`, `WARN`, or `FAIL` per
+> rule. It runs in the background for OpenCode and Claude Code, never blocks the
+> agent, and never edits your code.
 
 ![JevGuard: semantic policy engine for coding agents](https://raw.githubusercontent.com/pablozr/JevGuard/main/27b864b2-3f64-4211-99dd-26764c549d03.png)
 
 JevGuard checks the code an agent just changed against the policies that matter in
 your repository. It uses Jev for a narrow semantic judgment per rule, then applies
 your local deterministic gate to return `PASS`, `WARN`, or `FAIL`.
+
+| Host | Package | Status |
+| --- | --- | --- |
+| [OpenCode](https://opencode.ai) | `@pablozrrrr/jevguard` | Available, targets OpenCode `1.18.32` |
+| [Claude Code](https://claude.com/claude-code) | `@pablozrrrr/jevguard-claude-code` | Available through this repository's plugin marketplace |
+| Codex | — | Planned |
+
+## Quick start
+
+```sh
+# 1. Store your Jev key in the OS credential store (shared by both hosts)
+bunx --package @pablozrrrr/jevguard jevguard login
+
+# 2a. OpenCode: register the plugin in opencode.json
+bunx --package @pablozrrrr/jevguard jevguard install
+
+# 2b. Claude Code: install from the marketplace
+claude plugin marketplace add pablozr/JevGuard
+claude plugin install jevguard@jevguard
+```
+
+Then add your rules to `.jev/rules.md` (in OpenCode, the bundled `jev-init` skill can
+bootstrap them) and keep working with your agent as usual. Details are in
+[Install](#install) and the [Claude Code guide](./docs/configuration.md#claude-code).
 
 ```text
 agent completes a turn
@@ -27,13 +56,15 @@ specific policy, and leaves planning, code generation, and correction with the
 coding agent.
 
 > [!WARNING]
-> JevGuard is in active development. The current release targets OpenCode `1.18.32`
-> and evaluates every rule block declared in `.jev/rules.md` plus the `SCOPE-CREEP`
+> JevGuard is in active development. The OpenCode plugin targets OpenCode `1.18.32`
+> and the Claude Code plugin is distributed through this repository's marketplace.
+> Both evaluate every rule block declared in `.jev/rules.md` plus the `SCOPE-CREEP`
 > and `COMPLEXITY` built-ins. Reviews are background and observe-only: they report
 > results but never alter the agent context or block a task. When remediation is
-> enabled and a review has any `FAIL`, the plugin asks a hidden `jevguard-proposer`
-> subagent for a proposal in an isolated child session and shows a generic toast; the
-> proposer never edits code.
+> enabled and a review has any `FAIL`, JevGuard drafts a strategy-only proposal; it
+> never edits code. The sections below describe the OpenCode plugin; the Claude Code
+> plugin's differences are documented in the
+> [Claude Code guide](./docs/configuration.md#claude-code).
 
 ## Why JevGuard
 
@@ -314,6 +345,23 @@ hidden `jevguard-proposer` subagent, so no second entrypoint or shim is needed. 
 server plugin reviews and reports turns, and — when remediation is enabled and a review
 fails — creates the proposal child session automatically.
 
+### Claude Code
+
+Inside Claude Code:
+
+```text
+/plugin marketplace add pablozr/JevGuard
+/plugin install jevguard@jevguard
+```
+
+The Claude Code plugin reviews each closed unit of work in a detached background
+worker, shows the result in the session (status line, transcript line, and a toast on
+`FAIL`) without sending it to the model, and records it in the same local history.
+Remediation proposals are off by default and are enabled from your user config, never
+from the repository. It needs `node` `>=22.13.0`, `npm`, and `git` on `PATH`. See the
+[Claude Code guide](./docs/configuration.md#claude-code) for what is reviewed, the
+in-session display, and remediation.
+
 ### Author rules with the bundled skill
 
 The package ships two OpenCode skills beside the plugin: `jevguard-rules` to author
@@ -461,7 +509,7 @@ something is wrong. It never prints the API key or any part of it — only wheth
 key comes from the OS credential store or the `TYPESAFE_API_KEY` override. It exits
 `0` unless a check fails (warnings are fine) and `1` when one does. The project root is
 the first parent directory of the current directory that contains `.git`, or the
-current directory when there is none. Claude Code installs are not covered yet.
+current directory when there is none. It does not check Claude Code installs yet.
 
 ## Check rules on demand
 
@@ -550,25 +598,20 @@ ordinary turn is reviewed normally.
 
 ## Roadmap
 
-The multi-rule, scope-creep, and complexity slices are implemented. Planned work
-beyond them:
+Implemented so far: multi-rule reviews, the `SCOPE-CREEP` and `COMPLEXITY`
+built-ins, the `jev-init` policy bootstrap, local review history with feedback and
+calibration (`jevguard report`, `jevguard feedback`), on-demand checks
+(`jevguard rules check`, `jevguard doctor`), and the Claude Code plugin. Planned work:
 
 ```text
-V0.3  Remaining built-in semantic check: test adequacy
-  ↓
-V0.4  jev-init: evidence-based policy bootstrap
-  ↓
-V0.5  On-demand evidence and explanations
-  ↓
-V0.6  Opt-in, bounded auto-remediation
-  ↓
-V0.7  Observe / enforce / remediate modes
-  ↓
-V0.8  Rule packs
-  ↓
-V0.9  Local feedback and calibration
-  ↓
-V1    Claude Code and Codex adapters
+V0.3  Remaining built-in semantic check: test adequacy        planned
+V0.4  jev-init: evidence-based policy bootstrap               done
+V0.5  On-demand evidence and explanations                     partial (rules check)
+V0.6  Opt-in, bounded auto-remediation                        planned
+V0.7  Observe / enforce / remediate modes                     planned
+V0.8  Rule packs                                              planned
+V0.9  Local feedback and calibration                          done
+V1    Claude Code and Codex adapters                          Claude Code done, Codex planned
 ```
 
 The auto-propose slice is implemented: after a review with a `FAIL`, an enabled
@@ -586,8 +629,9 @@ CI and pull-request policy review come after V1, using the same versioned rules.
 
 ## Architecture
 
-JevGuard is a pnpm TypeScript monorepo. The core has no dependency on OpenCode or
-its runtime, which keeps the evaluation model portable to future adapters.
+JevGuard is a pnpm TypeScript monorepo. The core has no dependency on OpenCode,
+Claude Code, or their runtimes, which keeps the evaluation model portable across
+host adapters.
 
 ```text
 packages/
@@ -601,6 +645,7 @@ packages/
 
 plugin → opencode-adapter → node-infra → core
 plugin ────────────────────→ node-infra
+claude-code-plugin → claude-code-adapter → node-infra → core
 testkit ──────────────────────────────→ core
 ```
 
@@ -624,6 +669,11 @@ add session messages, or block a task. The proposal is a separate, configurable,
 strategy-only workflow delivered by the server plugin; it never edits code and never
 applies a change. Real-host validation against exact OpenCode `1.18.32` is still
 pending.
+
+The Claude Code plugin reuses the same core, policy files, gate, and local history. It
+reviews closed units of work in a detached worker and shows results in the session
+without sending them to the model; see the
+[Claude Code guide](./docs/configuration.md#claude-code).
 
 ## Development
 

@@ -1,46 +1,66 @@
-# OpenCode Hub
+# Hub
 
-A remote console for your [OpenCode](https://opencode.ai) sessions, from your phone or any browser.
-Formerly **opencode-voice** ([what changed](#migrating-from-opencode-voice)).
+<img src="web/public/icon.svg" alt="" width="72" align="right">
 
-- **Every session, anywhere**: one hub connects all your OpenCode processes and machines. Follow live
-  activity (tool calls, thinking, subagents, streamed replies), read the conversation, and get push
-  notifications when a session needs you.
-- **Remote control**: send a turn (it steers the run while the session is busy), stop a whole session
-  tree, answer permissions, switch models, and start new sessions, from the phone.
+**Hub** is a central hub that your AI agent harnesses connect to. Each harness (a coding agent's
+terminal app, server or IDE plugin) runs a thin client, a *spoke*, that connects outbound to your hub;
+the hub gives you one place to follow, steer and be notified about every agent session on every machine,
+from your phone or any browser.
+
+Hub is harness-agnostic by design: the hub's API, web console and spoke protocol are not tied to one
+agent. [OpenCode](https://opencode.ai) is the first supported harness, through the `@huynle/hub` OpenCode
+plugin. More harnesses can connect by speaking the same spoke protocol (`src/protocol.ts`).
+
+Formerly **opencode-voice** and, briefly, **opencode-hub**
+([what changed](#migrating-from-opencode-voice-or-opencode-hub)).
+
+## Features
+
+- **Remote console**: one hub connects all your agent processes and machines. Follow live activity
+  (tool calls, thinking, subagents, streamed replies), read the conversation, send a turn (it steers the
+  run while the session is busy), stop a whole session tree, answer permissions, switch models, and
+  start new sessions, from the phone.
+- **Notifications**: web push when a session asks a question, needs permission, fails or finishes, with
+  per-device toggles, quiet hours and per-session mute.
+- **Voice** (optional feature, `/voice`): dictation and a hands-free conversation mode with a voice agent
+  that answers in short spoken sentences on a fast model and hands real work to background subagents.
+  Bring your own speech: OpenRouter or any OpenAI-compatible STT/TTS service (including self-hosted).
 - **What's open in your terminals first**: sessions open in Herdr or the OpenCode TUI, grouped like
   Herdr's sidebar, with the rest under Recent; pin and hide in sync across devices.
 - **Session details**: context usage, todos, MCP status, branch and per-file diffs, on demand; unread
   marks synced per user.
-- **Voice (optional)**: dictation and a hands-free conversation mode with a voice agent that answers in
-  short spoken sentences on a fast model and hands real work to background subagents. Bring your own
-  speech: OpenRouter or any OpenAI-compatible STT/TTS service (including self-hosted).
-- **Runs where you want**: a hub on your computer with nothing extra to install, or your own hub for
-  phones anywhere, with single-owner pairing or sign-in with Google for several people.
+- **Self-hostable**: a hub on your computer with nothing extra to install, or your own hub for phones
+  anywhere (standalone binary, Docker or Bun), with single-owner pairing or sign-in with Google for
+  several people.
 
-Requires OpenCode v2 (tested with 2.0.25). The hub runs on OpenCode's own runtime, a standalone binary,
-Docker, or [Bun](https://bun.sh) ≥ 1.3.
+In a harness, `/hub` configures the harness's connection to the hub, and each feature is its own
+`/<command>`: today `/voice`; more features will be added the same way.
 
-## Quick start
+Requires OpenCode v2 (tested with 2.0.25) for the OpenCode harness. The hub runs on OpenCode's own
+runtime, a standalone binary, Docker, or [Bun](https://bun.sh) ≥ 1.3.
+
+## Quick start (OpenCode)
 
 Install the plugin (adds it to your global OpenCode config), then restart the background service so it
 loads:
 
 ```sh
-opencode plugin add @huynle/opencode-hub
+opencode plugin add @huynle/hub
 opencode service restart
 ```
 
 Install from npm: the npm package ships the built web app, so the plugin can run a local hub. A GitHub
-install (`opencode plugin add github:huynle/opencode-hub`) has no built web app (`web/dist` is not in the
+install (`opencode plugin add github:huynle/hub`) has no built web app (`web/dist` is not in the
 repository): it works for connecting to a hub that runs elsewhere, but a local hub it starts answers 503
 until you build the app. To run a hub yourself, use the npm package, a [release binary](#running-the-hub)
 or Docker, or run `npm install && npm run build:web` in a source checkout.
 
-Then run **`/hub`** in OpenCode to set up and configure the hub connection. The first time, it offers
-**Set up OpenCode Hub** with two paths. **`/voice`** talks to the session on screen: it connects (running
-the setup first when needed), shares the session for Voice and opens it in the browser with Voice mode
-starting.
+Then, in OpenCode:
+
+| Command | What it does |
+|---|---|
+| **`/hub`** | Configures this harness's hub connection: the server URL, connect and approve (enroll) this machine, which sessions to share (mode), pair a phone, and open the hub in the browser. The first time it offers **Set up Hub** with two paths (below). |
+| **`/voice`** | The Voice feature: talks to the session on screen. It connects (running the setup first when needed), shares the session for Voice and opens it in the browser with Voice mode starting. |
 
 ### Local: everything on this computer
 
@@ -51,7 +71,7 @@ starting.
 2. Use it: open any session to follow and steer it. For Voice, set up speech once (Settings → Speech):
    pick a provider and paste its API key (one [OpenRouter](https://openrouter.ai/keys) key covers both
    directions, or point both at your own OpenAI-compatible servers), **Save**, then **Test voice**. Keys
-   stay on this computer in `~/.local/state/opencode-hub`.
+   stay on this computer in `~/.local/state/hub`.
 3. **`/voice`** in a session opens it in the browser with Voice mode (the hands-free loop) starting;
    `/hub` → **Open hub in browser** opens the home page any time.
 
@@ -69,10 +89,10 @@ on a server behind your HTTPS reverse proxy (see [Running the hub](#running-the-
    phone**.
 
 Pre-configured machines: with `"server": "https://hub.example.com"` in
-`~/.config/opencode-hub/config.json`, `/hub` leads with **Connect to hub.example.com**.
+`~/.config/hub/config.json`, `/hub` leads with **Connect to hub.example.com**.
 `/hub` → **Server** → **Set up again…** switches between local and a hosted hub later.
 
-Optional: put the voice agent on a fast model in `~/.config/opencode-hub/config.json`:
+Optional: put the voice agent on a fast model in `~/.config/hub/config.json`:
 `"voiceModel": "anthropic/claude-haiku-4-5"` (any `provider/model` you have). Subagents keep the
 session's model.
 
@@ -83,32 +103,32 @@ The hub serves the web app, pairs devices, enrolls machines, and does push and (
 | Way | For | How |
 |---|---|---|
 | **`/hub` → On this computer** | Local use; nothing to install (plugin from npm) | started by the plugin with OpenCode's own runtime (`BUN_BE_BUN=1 opencode bin/hub.ts`), or `bun` when installed |
-| **Standalone binary** | Any server or laptop, no runtime needed | `opencode-hub-<os>-<arch>` from the [releases](https://github.com/huynle/opencode-hub/releases) |
-| **Docker** | Servers | `ghcr.io/huynle/opencode-hub` (linux/amd64, linux/arm64) |
-| **bunx / from source** | Bun users, development | `bunx --package @huynle/opencode-hub opencode-hub` · `bun bin/hub.ts` |
+| **Standalone binary** | Any server or laptop, no runtime needed | `hub-<os>-<arch>` from the [releases](https://github.com/huynle/hub/releases) |
+| **Docker** | Servers | `ghcr.io/huynle/hub` (linux/amd64, linux/arm64) |
+| **bunx / from source** | Bun users, development | `bunx --package @huynle/hub hub-server` · `bun bin/hub.ts` |
 
 Every way reads the same configuration (env vars over `hub.json`, see [Configuration](#configuration)) and
 answers `--help` and `--version`. While no device is paired, the hub logs a pairing code for the first one.
 
 **Standalone binary.** One file per platform with the runtime and the web app embedded:
-`opencode-hub-<darwin|linux>-<arm64|x64>` and `opencode-hub-windows-x64.exe`, plus `SHA256SUMS`.
+`hub-<darwin|linux>-<arm64|x64>` and `hub-windows-x64.exe`, plus `SHA256SUMS`.
 
 ```sh
-curl -LO https://github.com/huynle/opencode-hub/releases/latest/download/opencode-hub-linux-x64
-curl -LO https://github.com/huynle/opencode-hub/releases/latest/download/SHA256SUMS
-sha256sum --check --ignore-missing SHA256SUMS && chmod +x opencode-hub-linux-x64
-HUB_PUBLIC_URL=https://hub.example.com ./opencode-hub-linux-x64
+curl -LO https://github.com/huynle/hub/releases/latest/download/hub-linux-x64
+curl -LO https://github.com/huynle/hub/releases/latest/download/SHA256SUMS
+sha256sum --check --ignore-missing SHA256SUMS && chmod +x hub-linux-x64
+HUB_PUBLIC_URL=https://hub.example.com ./hub-linux-x64
 ```
 
-On macOS, a downloaded binary is quarantined: `xattr -d com.apple.quarantine opencode-hub-darwin-arm64`.
+On macOS, a downloaded binary is quarantined: `xattr -d com.apple.quarantine hub-darwin-arm64`.
 Build them yourself with `scripts/build-binaries.sh [target…]` (writes `dist/`).
 
 **Docker.**
 
 ```sh
-docker run -d --name opencode-hub -p 127.0.0.1:4097:4097 -v hub-data:/data \
-  ghcr.io/huynle/opencode-hub
-docker logs opencode-hub          # the first device's pairing code
+docker run -d --name hub -p 127.0.0.1:4097:4097 -v hub-data:/data \
+  ghcr.io/huynle/hub
+docker logs hub          # the first device's pairing code
 ```
 
 Without `HUB_PUBLIC_URL` the app is at `http://127.0.0.1:4097`. Behind a reverse proxy, set
@@ -117,7 +137,7 @@ Without `HUB_PUBLIC_URL` the app is at `http://127.0.0.1:4097`. Behind a reverse
 ```yaml
 services:
   hub:
-    image: ghcr.io/huynle/opencode-hub:latest
+    image: ghcr.io/huynle/hub:latest
     restart: unless-stopped
     ports: ["127.0.0.1:4097:4097"]   # your reverse proxy terminates HTTPS in front of this
     environment:
@@ -129,12 +149,12 @@ volumes:
 ```
 
 The image sets `HUB_HOST=0.0.0.0`, `HUB_PORT=4097` and `HUB_STATE_DIR=/data`. Build it locally with
-`docker build -t opencode-hub .`.
+`docker build -t hub .`.
 
-**bunx / from source.** `bunx --package @huynle/opencode-hub opencode-hub` (needs Bun ≥ 1.3), or in
+**bunx / from source.** `bunx --package @huynle/hub hub-server` (needs Bun ≥ 1.3), or in
 a checkout: `npm install --no-audit --no-fund && bun bin/hub.ts`. `scripts/hub-local.sh` runs it in the
-foreground with `hub.json`; `scripts/com.opencode-hub.hub.plist` is a launchd template. The
-`opencode-voice-hub` command still works as an alias of `opencode-hub`.
+foreground with `hub.json`; `scripts/io.github.huynle.hub.plist` is a launchd template. The
+`opencode-hub` and `opencode-voice-hub` commands still work as aliases of `hub-server`.
 
 **Security:** the hub can drive your OpenCode sessions, which can run tools. Every API call needs a
 paired device or a signed-in user; spokes need machine tokens; nothing trusts the client IP. For a public
@@ -145,16 +165,18 @@ spokes, sign-in and the PWA.
 ## Configuration
 
 - **Hub**: env vars (`HUB_HOST`, `HUB_PORT`, `HUB_PUBLIC_URL`, `HUB_STATE_DIR`, `OPENROUTER_API_KEY`, …)
-  over `~/.config/opencode-hub/hub.json` (`$HUB_CONFIG`); see [Central server](#central-server) and
+  over `~/.config/hub/hub.json` (`$HUB_CONFIG`); see [Central server](#central-server) and
   [hub.json](#hubjson). Speech providers and keys are easiest to set in the app (Settings → Speech).
-- **Plugin**: `~/.config/opencode-hub/config.json` (`$OPENCODE_HUB_CONFIG`; server, mode, machine token,
-  voice model…), written by `/hub`; see [Spoke](#spoke-opencode-plugin).
-- The former `VOICE_*` / `OPENCODE_VOICE_*` names and `opencode-voice` directories still work; see
-  [Migrating from opencode-voice](#migrating-from-opencode-voice).
+- **Plugin** (OpenCode spoke): `~/.config/hub/config.json` (`$HUB_SPOKE_CONFIG`; server, mode, machine
+  token, voice model…), written by `/hub`; see [Spoke](#spoke-opencode-plugin).
+- The former `VOICE_*`, `OPENCODE_VOICE_CONFIG` and `OPENCODE_HUB_CONFIG` names and the `opencode-voice`
+  and `opencode-hub` directories still work; see
+  [Migrating from opencode-voice or opencode-hub](#migrating-from-opencode-voice-or-opencode-hub).
 
 ## How it works
 
-The hub serves the web app, push and (for Voice) speech. The OpenCode plugin ("spoke") runs in every
+The hub serves the web app, push and (for Voice) speech, and talks to harnesses only through
+spokes over one protocol (`src/protocol.ts`). The OpenCode plugin is the first spoke: it runs in every
 OpenCode process (the background service and each `opencode --standalone`), connects **outbound** to the
 hub over a WebSocket, lists sessions, forwards compact events, and runs prompts, stops and permission
 replies on the hub's request.
@@ -188,13 +210,13 @@ The web app, speech and phones live on the hub.
 | Entry | File | Role |
 |---|---|---|
 | server | `server.ts` → `src/index.ts` | Starts the process-wide spoke (`src/spoke/`), `hub.*` RPC (also under the legacy id `voice.*`), the `voice` agent, short-reply and orchestrator `context` hook |
-| tui | `tui.ts` → `src/tui.ts` | `/hub` dialog and `/voice`; reports the sessions it shows (`hub.presence`) |
+| tui | `tui.ts` → `src/tui.ts` | `/hub` dialog and the feature commands (`/voice`), registered through `src/tui-commands.ts` (ids `hub.<id>`, palette group "Hub"); reports the sessions it shows (`hub.presence`) |
 | rpc | `rpc.ts` → `src/rpc.ts` | `HubRpc` (id `hub`; `VoiceRpc` is the deprecated id `voice`): `status / setServer / checkServer / enroll / startLocalHub / setMode / setSession / pairCode / handoff / openLink / conversation / presence` |
 
-OpenCode resolves a local plugin directory as `<dir>/server`, `<dir>/tui` and `<dir>/rpc` (`package.json`
+The plugin ids are `hub` (server) and `hub.tui`. OpenCode resolves a local plugin directory as `<dir>/server`, `<dir>/tui` and `<dir>/rpc` (`package.json`
 `main` is ignored), and an installed package through its `exports` (`./server`, `./tui`, `./rpc`).
 
-- **Config**: `~/.config/opencode-hub/config.json` (or `$OPENCODE_HUB_CONFIG`), shared by all
+- **Config**: `~/.config/hub/config.json` (or `$HUB_SPOKE_CONFIG`), shared by all
   processes on the machine, mode 0600, watched live. Holds the server URL, mode, machine token,
   `subagent` (the agent conversation mode delegates to; default `general`, `[A-Za-z0-9_.-]+`),
   `autoStartLocalHub` (default `true`; see [Local only](#local-only)), `herdr` (default `true`; read open
@@ -206,7 +228,7 @@ OpenCode resolves a local plugin directory as `<dir>/server`, `<dir>/tui` and `<
   others are listed with `exposed: false` so the phone can offer "Enable voice", and only Voice
   (conversation mode, utterances) is refused for them.
 - **/hub** configures the hub connection. Before this machine is enrolled (or after the hub revoked it),
-  **Set up OpenCode Hub**: On this computer (local hub, every session or only chosen ones), Connect to a
+  **Set up Hub**: On this computer (local hub, every session or only chosen ones), Connect to a
   hub… (URL checked with `hub.checkServer`, i.e. `GET <url>/healthz`, then device-code approval in the
   browser), or Not now; a configured remote server comes first as "Connect to <host>". The decisions are
   pure functions in `src/setup.ts`. Once set up, the title shows the server and connection state, and the
@@ -299,9 +321,9 @@ not persist those potentially sensitive details.
   it needs no restart.
 - Child text and execution events are paired by the hub. The latest assistant message of a successful
   child is emitted as root-session speech; failures, interruptions and stale partial results are not.
-- Server ops: `steer` sends the text with `delivery: "steer"` (metadata `{source: "opencode-hub", mode:
-  "conversation"}`, or `mode: "remote"` for a session not shared with Voice; 0.4 and earlier wrote
-  `source: "opencode-voice"`, and readers accept both) and returns the inbox ID at once; `interrupt`
+- Server ops: `steer` sends the text with `delivery: "steer"` (metadata `{source: "hub", mode:
+  "conversation"}`, or `mode: "remote"` for a session not shared with Voice; 0.5 wrote `source:
+  "opencode-hub"` and 0.4 and earlier `source: "opencode-voice"`, and readers accept all three) and returns the inbox ID at once; `interrupt`
   interrupts the session; `conversation` turns the mode on/off and returns the agent now in effect, and
   is refused for sessions not shared with Voice. Replies reach the hub as forwarded
   `session.text.ended`, `session.inbox.delivered` and `session.agent.selected` events.
@@ -321,13 +343,13 @@ holds the startup (`bin/hub.ts` serves `web/` from disk; the compiled binaries e
 
 | Env | Default | |
 |---|---|---|
-| `HUB_CONFIG` | `~/.config/opencode-hub/hub.json` | optional config file ([Local only](#local-only)); env vars win over it |
+| `HUB_CONFIG` | `~/.config/hub/hub.json` | optional config file ([Local only](#local-only)); env vars win over it |
 | `HUB_AUTH` | `pairing` | `oidc` for several users signing in with Google; see [Multi-user](#multi-user-sign-in-with-google) |
 | `HUB_HOST` / `HUB_PORT` | `127.0.0.1` / `4097` | listen address |
 | `HUB_PUBLIC_URL` | `http://<host>:<port>` (`http://127.0.0.1:<port>` when the host is `0.0.0.0` / `::`) | origin used in links, cookies and CSRF checks |
-| `HUB_STATE_DIR` | `~/.local/state/opencode-hub` | `state.json` (0600): users, machines and devices (token hashes only) with their owners, VAPID keys, push subscriptions, speech settings (server default and per user; provider API keys set from the phone), the audit log (last 500 entries) |
+| `HUB_STATE_DIR` | `~/.local/state/hub` | `state.json` (0600): users, machines and devices (token hashes only) with their owners, VAPID keys, push subscriptions, speech settings (server default and per user; provider API keys set from the phone), the audit log (last 500 entries) |
 | `HUB_TURN_TIMEOUT_MS` | `600000` | the hub waits this + 15 s so the spoke's own timeout result arrives first |
-| `HUB_VAPID_SUBJECT` | the https public URL, else `mailto:opencode-hub@localhost` | contact sent to push services |
+| `HUB_VAPID_SUBJECT` | the https public URL, else `mailto:hub@localhost` | contact sent to push services |
 | `OPENROUTER_API_KEY` | | default key for the `openrouter` speech provider (never sent to other providers) |
 | `HUB_STT_MODEL`, `HUB_TTS_MODEL`, `HUB_VOICE`, `HUB_MAX_*` | see `src/central/config.ts` | speech defaults; the phone's speech settings override them |
 
@@ -345,13 +367,16 @@ recent activity.
 
 ### Phone app (PWA)
 
-`web/` is the OpenCode Hub console, a Solid + Vite + TypeScript PWA built to `web/dist` (`npm run build:web`;
+`web/` is the Hub console, a Solid + Vite + TypeScript PWA built to `web/dist` (`npm run build:web`;
 the Docker image, npm package and binaries ship the build). One store fed by the hub's SSE stream drives:
 
 - **Sidebar** (⌘B collapses; a drawer on phones): search, New session, Needs you, Running, Pinned, sessions open in a
-  terminal grouped by project (or server) with `+`, Recents; rows show status, Voice, an unread dot and a `⋯` menu
-  (pin, hide, stop, Voice on/off).
+  terminal grouped by project (or server) with `+`, Recents; rows show status, a pulsing green dot left of the
+  title for the session live in Voice (in Voice mode here, or in a conversation), an unread dot and a `⋯` menu
+  (pin, hide, stop, Allow/Disallow Voice).
 - **`/`**: All sessions as a sortable, filterable table (a list on phones); filters and sort are kept per device.
+  There is no Voice column or Voice filter: the live Voice session gets the green dot before its title, and the
+  row's `⋯` menu has **Allow Voice** / **Disallow Voice**.
 - **`/s/<id>`**: the transcript (markdown replies, "Thought for Ns", "Used N tools" with full details on demand,
   subagent rows linking to their sessions), permission cards, and the composer: Send while idle, Steer while the
   session tree runs, Stop for the whole tree, Dictate (into this session's draft; leaving the session while
@@ -406,7 +431,7 @@ Pure logic lives in `web/src/core` and `web/src/lib` (bun tests in `test/web-*.t
 - **Recent**: everything else the machine reported (its history window), grouped by workspace with
   nested worktrees and subfolders, with search (title, project name, directory; case- and
   diacritic-insensitive, all words must match, matches highlighted; opens every group) and filter chips
-  All · Active · Needs you · Today · Voice on · Enabled. Groups that are pinned, active, blocked or changed
+  All · Active · Needs you · Today · Enabled. Groups that are pinned, active, blocked or changed
   within a day start open; only open groups render rows, 50 at a time ("Show more"). A **Standalone**
   section lists standalone processes.
 - **Hidden**: hidden workspaces (with how many sessions they hide) and hidden sessions, each with Unhide.
@@ -420,7 +445,7 @@ Pure logic lives in `web/src/core` and `web/src/lib` (bun tests in `test/web-*.t
   without `/api/prefs/view`, they stay on the device. Open/closed groups and the filter stay per device.
 - **Voice off** sessions (`exposed: false`, mode `session`) open, show their status and live activity, and
   take Send, Steer, Stop and permission replies like any other session. Only Voice is off: the row's ⋯
-  menu has **Turn Voice on** (`POST /api/sessions/:id/expose {on:true}`; shown at once, reverted on
+  menu has **Allow Voice** (`POST /api/sessions/:id/expose {on:true}`; shown at once, reverted on
   error), and Voice mode on such a session turns Voice on first.
 - **New session** (`/new`; + in the header, + on any group, or a group's ⋯ menu), composer first: "Describe
   a task or ask a question" (images can be attached), and under it where it runs: **Environment** (your
@@ -503,7 +528,7 @@ HUB_OIDC_CLIENT_ID=1234567890-abc.apps.googleusercontent.com \
 HUB_OIDC_CLIENT_SECRET=GOCSPX-… \
 HUB_OIDC_ALLOWED=alice@example.com,bob@example.com,@example.org \
 HUB_ADMIN_EMAILS=alice@example.com \
-opencode-hub
+hub-server
 ```
 
 ```json
@@ -600,6 +625,8 @@ public URL, `localhost`, `127.0.0.1` and `[::1]` with the same scheme and port c
 | `POST /api/sessions/:id/conversation {on}` | `conversation` | `200 {on, agent}`. 404 when no machine of yours reports the session |
 | `GET /api/sessions/:id` | | `{id, title, directory, parentID?, project?, projectName?, updated, exposed, state, blockers, now?, busy, conversation, status, activity}`; catalog sessions also carry `conversation` |
 | `POST /api/sessions/:id/presence {visible}` | | `204`; the phone posts on `visibilitychange` and every 30 s while visible. A root session is *watched* while any device reported it (or one of its subagent sessions) visible within 45 s |
+| `POST /api/sessions/:id/permission {requestID, decision}` | `permission` | `204`. `decision` is `once`, `always` or `reject`; `:id` is the session or any ancestor. Tried on every process that forwarded the request (OpenCode keeps pending permissions per process and per location; the spoke replies through the plugin instance of the location that holds it). `409 {code: "gone"}` "This request was already answered or expired" when none holds it (its card is dropped). 400 bad decision |
+| `POST /api/sessions/:id/form {formID, answer}` · `{formID, cancel: true}` | `form` | `204`. Answers (or dismisses) a pending OpenCode form, e.g. the agent's question tool. `answer` is field key → text, number, true/false or list of texts (≤ 50 fields, texts ≤ 20,000 characters, lists ≤ 100). Form blockers carry their `fields` (key, type, title, description, options, custom, required, limits, `when`) so a client can render them. The plugin API has no forms: the spoke uses its own server's HTTP API (the background service, or a foreground `opencode serve` with `--port` and `OPENCODE_PASSWORD`), else relays to a TUI of that server that polls RPC `hub.formActions`; with neither, 502 "answer it in the terminal". `409 {code: "gone"}` when no process holds it |
 
 The hub keeps the conversation flag per session in memory. When a process sends a sessions snapshot,
 owns a session in conversation mode, and was not told yet (it reconnected or took over ownership), the
@@ -780,24 +807,24 @@ laptop to the providers in your config.
 
 1. `/hub` → **On this computer**. If no hub is running, the plugin starts one in the background; the
    first machine is approved by itself, the mode is set, and the hub opens.
-2. Speech: on the page (Settings → Speech), or in `~/.config/opencode-hub/hub.json` (`chmod 600`;
+2. Speech: on the page (Settings → Speech), or in `~/.config/hub/hub.json` (`chmod 600`;
    examples below).
 3. `/voice` / `/hub` → **Open hub in browser** open the page with a one-time sign-in link; no
    pairing needed. To use a phone on the same network, the hub must listen beyond loopback (see notes).
 
 Or run the hub yourself: `scripts/hub-local.sh` (foreground, reads `hub.json`), or keep it running with
-the launchd template `scripts/com.opencode-hub.hub.plist` (not installed by anything; install steps are
+the launchd template `scripts/io.github.huynle.hub.plist` (not installed by anything; install steps are
 in the file).
 
 ### hub.json
 
-`~/.config/opencode-hub/hub.json` (or `$HUB_CONFIG`). All fields are optional.
+`~/.config/hub/hub.json` (or `$HUB_CONFIG`). All fields are optional.
 
 | Field | |
 |---|---|
 | `host`, `port` | listen address (default `127.0.0.1`, `4097`) |
 | `publicURL` | origin used in links (default `http://<host>:<port>`) |
-| `stateDir` | hub state (default `~/.local/state/opencode-hub`; `~/` is expanded) |
+| `stateDir` | hub state (default `~/.local/state/hub`; `~/` is expanded) |
 | `speech.stt` | `{provider, model, baseURL?, language?, apiKey?}` |
 | `speech.tts` | `{provider, model, voice, baseURL?, speed?, apiKey?}` |
 | `auth` | `{mode, issuer?, clientId, clientSecret, allowed, admins}`; see [Multi-user](#multi-user-sign-in-with-google) |
@@ -839,8 +866,8 @@ When the configured server is loopback (`localhost`, `127.0.0.1`, `[::1]`, http 
 on it, the plugin starts `<this repo>/bin/hub.ts` as a detached background process bound to that
 address and port. The runtime (`resolveHubRuntime` in `src/spoke/localhub.ts`): this process when it is
 `bun`, else `bun` on `PATH`, else `~/.bun/bin/bun`, else the current executable with `BUN_BE_BUN=1`
-(inside OpenCode that is the `opencode` binary, a compiled Bun, so nothing else needs installing). Output is appended to `~/.local/state/opencode-hub/hub.log` (`$HUB_STATE_DIR`
-if set; a legacy `~/.local/state/opencode-voice` is copied there first). It happens on setup (**On this
+(inside OpenCode that is the `opencode` binary, a compiled Bun, so nothing else needs installing). Output is appended to `~/.local/state/hub/hub.log` (`$HUB_STATE_DIR`
+if set; a legacy `~/.local/state/opencode-hub`, else `~/.local/state/opencode-voice`, is copied there first). It happens on setup (**On this
 computer**, any process), on **Open hub** (even with auto-start
 off), and when an enrolled connection is refused:
 the shared service process (`--service`) tries at once, other processes after 8 s so the service goes
@@ -849,7 +876,7 @@ gone, or that has not answered for a minute, is replaced. If a hub from the lock
 port, nothing is started (two hubs would share one state). Failed starts are retried after 30 s, then
 doubling up to 15 min, and `/hub` shows the reason. Something else answering on the port (any HTTP
 reply) is left alone. Servers that are not loopback are never started. Turn it off with
-`"autoStartLocalHub": false` in `~/.config/opencode-hub/config.json`.
+`"autoStartLocalHub": false` in `~/.config/hub/config.json`.
 
 ### First machine
 
@@ -866,7 +893,7 @@ machines (a reverse proxy on the same host makes every request look local).
   one hub, so switching drops the token; `/hub` → **Server** → **Set up again…** reconnects (each hub keeps its own
   machines, devices, and speech settings).
 - **One hub per machine at a time** (port and state). Stop a background hub with `kill $(jq .pid
-  ~/.local/state/opencode-hub/hub.pid)` or `pkill -f bin/hub.ts`.
+  ~/.local/state/hub/hub.pid)` or `pkill -f bin/hub.ts`.
 - The microphone works on `http://localhost` / `127.0.0.1` without https (browsers treat loopback as a
   secure context); web push works on `127.0.0.1` / `localhost` in Chrome.
 - Cookies are host-only, so `localhost` and `127.0.0.1` each need their own sign-in; both are accepted
@@ -875,51 +902,58 @@ machines (a reverse proxy on the same host makes every request look local).
   open, ideally https, e.g. through Tailscale). Then the first-machine shortcut is off, and phone mic and
   push need https.
 
-## Migrating from opencode-voice
+## Migrating from opencode-voice or opencode-hub
 
-opencode-voice 0.5.0 is **OpenCode Hub**: same features, Voice optional. Nothing needs to change on
-day one; everything below keeps working with a one-time warning where noted.
+The project was **opencode-voice** (≤ 0.4), then **opencode-hub** (0.5, `@huynle/opencode-hub` was never
+published to npm), and is now **Hub** (0.6): same features, harness-agnostic name. Nothing needs to
+change on day one; everything below keeps working, with a one-time warning where noted.
 
-1. Replace the plugin: `opencode plugin add @huynle/opencode-hub` (a `github:huynle/opencode-hub` install
-   has no built web app, so it only suits connecting to a hub that runs elsewhere),
-   remove `@huynle/opencode-voice` from your OpenCode plugins, and `opencode service restart`. The final
-   `@huynle/opencode-voice` 0.5.0 only re-exports `@huynle/opencode-hub` and prints a rename notice.
-2. Start OpenCode or the hub once: on first start, the legacy files are **copied** (file modes such as
-   0600 kept; the old files are never deleted; one log line each) when the new location does not exist
-   yet. Explicit paths (`HUB_CONFIG`, `OPENCODE_HUB_CONFIG`, `HUB_STATE_DIR`, `stateDir` in hub.json, or
-   their legacy names) are used as they are, without copying. Stop a running opencode-voice hub first so
-   its state is copied in a consistent state; after checking the new hub, you may remove the old
-   directories yourself.
-3. Rename environment variables when convenient. The new name wins when both are set; a legacy name logs
-   `VOICE_X is deprecated; rename it to HUB_X` once (or `… is ignored because HUB_X is set`).
+1. Replace the plugin: `opencode plugin add @huynle/hub` (a `github:huynle/hub` install has no built web
+   app, so it only suits connecting to a hub that runs elsewhere), remove `@huynle/opencode-voice` or a
+   `github:huynle/hub` / `github:huynle/opencode-voice` entry from your OpenCode plugins, and
+   `opencode service restart`. `@huynle/opencode-voice` 0.6.0 only re-exports `@huynle/hub` and prints a
+   rename notice. There is no `@huynle/opencode-hub` package to replace.
+2. Start OpenCode or the hub once: on first start, when the new location does not exist yet, the most
+   recent legacy copy is **copied** there: the `opencode-hub` one first, else the `opencode-voice` one
+   (file modes such as 0600 kept; the old files are never deleted; one log line each). Explicit paths
+   (`HUB_CONFIG`, `HUB_SPOKE_CONFIG`, `HUB_STATE_DIR`, `stateDir` in hub.json, or their legacy names) are
+   used as they are, without copying. Stop a running old hub first so its state is copied in a
+   consistent state; after checking the new hub, you may remove the old directories yourself.
+3. Rename environment variables when convenient. The new name wins when both are set, then the most
+   recent legacy name; a legacy name logs `VOICE_X is deprecated; rename it to HUB_X` once (or `… is
+   ignored because HUB_X is set`).
 
-| Before (opencode-voice) | Now (OpenCode Hub) |
-|---|---|
-| npm `@huynle/opencode-voice` | `@huynle/opencode-hub` |
-| `opencode plugin add github:huynle/opencode-voice` | `github:huynle/opencode-hub` |
-| `/voice` | `/hub` for the connection; `/voice` (0.5.1) opens the session with Voice mode |
-| `opencode-voice-hub` command | `opencode-hub` (`opencode-voice-hub` kept as an alias) |
-| binaries `opencode-voice-hub-<os>-<arch>` | `opencode-hub-<os>-<arch>` |
-| image `ghcr.io/huynle/opencode-voice-hub` | `ghcr.io/huynle/opencode-hub` |
-| `~/.config/opencode-voice/config.json` (plugin) | `~/.config/opencode-hub/config.json` (copied) |
-| `~/.config/opencode-voice/hub.json` | `~/.config/opencode-hub/hub.json` (copied) |
-| `~/.local/state/opencode-voice/` (hub state, `hub.log`) | `~/.local/state/opencode-hub/` (copied, without the `hub.pid` lock) |
-| `OPENCODE_VOICE_CONFIG` | `OPENCODE_HUB_CONFIG` |
-| `VOICE_HUB_CONFIG` | `HUB_CONFIG` |
-| `VOICE_HOST`, `VOICE_PORT`, `VOICE_PUBLIC_URL`, `VOICE_STATE_DIR` | `HUB_HOST`, `HUB_PORT`, `HUB_PUBLIC_URL`, `HUB_STATE_DIR` |
-| `VOICE_AUTH`, `VOICE_OIDC_ISSUER`, `VOICE_OIDC_CLIENT_ID`, `VOICE_OIDC_CLIENT_SECRET`, `VOICE_OIDC_ALLOWED`, `VOICE_ADMIN_EMAILS`, `VOICE_OIDC_INSECURE_ISSUER` | `HUB_AUTH`, `HUB_OIDC_ISSUER`, `HUB_OIDC_CLIENT_ID`, `HUB_OIDC_CLIENT_SECRET`, `HUB_OIDC_ALLOWED`, `HUB_ADMIN_EMAILS`, `HUB_OIDC_INSECURE_ISSUER` |
-| `VOICE_STT_MODEL`, `VOICE_TTS_MODEL`, `VOICE_VOICE`, `VOICE_MAX_AUDIO_BYTES`, `VOICE_MAX_SPEECH_CHARS`, `VOICE_TURN_TIMEOUT_MS`, `VOICE_VAPID_SUBJECT` | `HUB_STT_MODEL`, `HUB_TTS_MODEL`, `HUB_VOICE`, `HUB_MAX_AUDIO_BYTES`, `HUB_MAX_SPEECH_CHARS`, `HUB_TURN_TIMEOUT_MS`, `HUB_VAPID_SUBJECT` |
-| dev scripts: `VOICE_SERVE_LOG`, `VOICE_SERVE_PORT`, `VOICE_LOG_LEVEL` | `HUB_SERVE_LOG`, `HUB_SERVE_PORT`, `HUB_LOG_LEVEL` |
-| launchd `com.opencode-voice.hub` | `com.opencode-hub.hub` (bootout the old agent first; steps in the plist) |
-| RPC id `voice` | `hub` (the server registers both) |
-| prompt metadata `source: "opencode-voice"` | `"opencode-hub"` (readers accept both) |
+| Before (opencode-voice ≤ 0.4) | Before (opencode-hub 0.5) | Now (Hub 0.6) |
+|---|---|---|
+| npm `@huynle/opencode-voice` | (not published) | `@huynle/hub` |
+| `github:huynle/opencode-voice` | `github:huynle/hub` | `github:huynle/hub` |
+| plugin ids `opencode-voice` / `opencode-voice.tui` | `opencode-hub` / `opencode-hub.tui` | `hub` / `hub.tui` |
+| `/voice` (connection and Voice) | `/hub` (connection), `/voice` (Voice) | `/hub` (connection), `/voice` (Voice) |
+| `opencode-voice-hub` command | `opencode-hub` | `hub-server` (`opencode-hub` and `opencode-voice-hub` kept as aliases) |
+| binaries `opencode-voice-hub-<os>-<arch>` | `hub-<os>-<arch>` | `hub-<os>-<arch>` |
+| image `ghcr.io/huynle/opencode-voice-hub` | `ghcr.io/huynle/hub` | `ghcr.io/huynle/hub` |
+| `~/.config/opencode-voice/config.json` (plugin) | `~/.config/hub/config.json` | `~/.config/hub/config.json` (copied) |
+| `~/.config/opencode-voice/hub.json` | `~/.config/hub/hub.json` | `~/.config/hub/hub.json` (copied) |
+| `~/.local/state/opencode-voice/` (hub state, `hub.log`) | `~/.local/state/hub/` | `~/.local/state/hub/` (copied, without the `hub.pid` lock) |
+| `OPENCODE_VOICE_CONFIG` | `OPENCODE_HUB_CONFIG` | `HUB_SPOKE_CONFIG` |
+| `VOICE_HUB_CONFIG` | `HUB_CONFIG` | `HUB_CONFIG` |
+| `VOICE_HOST`, `VOICE_PORT`, `VOICE_PUBLIC_URL`, `VOICE_STATE_DIR` | `HUB_*` | `HUB_HOST`, `HUB_PORT`, `HUB_PUBLIC_URL`, `HUB_STATE_DIR` |
+| `VOICE_AUTH`, `VOICE_OIDC_ISSUER`, `VOICE_OIDC_CLIENT_ID`, `VOICE_OIDC_CLIENT_SECRET`, `VOICE_OIDC_ALLOWED`, `VOICE_ADMIN_EMAILS`, `VOICE_OIDC_INSECURE_ISSUER` | `HUB_*` | `HUB_AUTH`, `HUB_OIDC_ISSUER`, `HUB_OIDC_CLIENT_ID`, `HUB_OIDC_CLIENT_SECRET`, `HUB_OIDC_ALLOWED`, `HUB_ADMIN_EMAILS`, `HUB_OIDC_INSECURE_ISSUER` |
+| `VOICE_STT_MODEL`, `VOICE_TTS_MODEL`, `VOICE_VOICE`, `VOICE_MAX_AUDIO_BYTES`, `VOICE_MAX_SPEECH_CHARS`, `VOICE_TURN_TIMEOUT_MS`, `VOICE_VAPID_SUBJECT` | `HUB_*` | `HUB_STT_MODEL`, `HUB_TTS_MODEL`, `HUB_VOICE`, `HUB_MAX_AUDIO_BYTES`, `HUB_MAX_SPEECH_CHARS`, `HUB_TURN_TIMEOUT_MS`, `HUB_VAPID_SUBJECT` |
+| dev scripts: `VOICE_SERVE_LOG`, `VOICE_SERVE_PORT`, `VOICE_LOG_LEVEL` | `HUB_*` | `HUB_SERVE_LOG`, `HUB_SERVE_PORT`, `HUB_LOG_LEVEL` |
+| launchd `com.opencode-voice.hub` | `com.opencode-hub.hub` | `io.github.huynle.hub` (bootout the old agent first; steps in the plist) |
+| RPC id `voice` | `hub` | `hub` (the server also registers `voice`) |
+| prompt metadata `source: "opencode-voice"` | `"opencode-hub"` | `"hub"` (readers accept all three) |
+| default VAPID subject `mailto:opencode-voice@localhost` | `mailto:hub@localhost` | `mailto:hub@localhost` (existing subscriptions keep working) |
 
 Unchanged: the `voice` agent and conversation mode, the hub's HTTP API and spoke protocol (old and new
-spokes and hubs interoperate), device cookies, `state.json` and `hub.json` contents.
+spokes and hubs interoperate), device cookies (`voice_device`, `voice_oidc`: nobody is signed out),
+`state.json` and `hub.json` contents.
 
 **Docker**: the image sets `HUB_HOST`, `HUB_PORT` and `HUB_STATE_DIR`, which win over `VOICE_HOST`,
 `VOICE_PORT` and `VOICE_STATE_DIR`: if you override those on the container, rename them to `HUB_*`. Other
-`VOICE_*` variables (e.g. `VOICE_PUBLIC_URL`, OIDC settings) keep working.
+`VOICE_*` variables (e.g. `VOICE_PUBLIC_URL`, OIDC settings) keep working. The state lives in the `/data`
+volume, so only the image name changes.
 
 **A new domain** (e.g. moving from `voice.example.com` to `hub.example.com`):
 
@@ -928,14 +962,14 @@ spokes and hubs interoperate), device cookies, `state.json` and `hub.json` conte
   as an authorized redirect URI of the OAuth client (and the origin, if listed). Keep the old URI until
   the move is done.
 - Point each machine's plugin at the new URL (`/hub` → **Server**, or `"server"` in
-  `~/.config/opencode-hub/config.json`). Changing the URL drops the machine token, so approve the machine
+  `~/.config/hub/config.json`). Changing the URL drops the machine token, so approve the machine
   again; keeping the old hostname as a redirect avoids that only for browsers, not for spokes.
 - Device cookies belong to a hostname: browsers and phones sign in (or pair) once more on the new domain.
 
 ## Development
 
 ```sh
-git clone https://github.com/huynle/opencode-hub && cd opencode-hub
+git clone https://github.com/huynle/hub && cd hub
 npm install         # bun install works too
 npm test            # bun test (scripts/test-ci.sh runs each file alone and builds the web app first)
 npm run typecheck   # hub and web app
@@ -948,7 +982,7 @@ Console development: `bun test/web-mock-hub.ts 4311` fakes a hub with fixtures (
 (`CHROMIUM_PATH` if Playwright's browsers are not installed; screenshots go to the temp dir).
 
 Point a project's `.opencode/opencode.jsonc` at your checkout to try changes:
-`{ "plugins": [{ "package": "/path/to/opencode-hub" }] }`. If the plugin is also installed globally,
+`{ "plugins": [{ "package": "/path/to/hub" }] }`. If the plugin is also installed globally,
 OpenCode keeps the first copy with the same id, so test with `OPENCODE_CONFIG_DIR` pointing at a copy of
 your config without the global entry.
 
@@ -961,26 +995,31 @@ D=$(python3 -c 'import urllib.parse,os;print(urllib.parse.quote(os.path.abspath(
 scripts/oc.sh POST "/api/rpc/hub/status?directory=$D" '{"input":{}}'
 ```
 
-Set `OPENCODE_HUB_CONFIG` to a temp file for such checks so the real machine config is untouched.
+Set `HUB_SPOKE_CONFIG` to a temp file for such checks so the real machine config is untouched.
 
 Releasing: bump `version` in `package.json`, add a `CHANGELOG.md` entry, and push a tag `vX.Y.Z`.
 `.github/workflows/release.yml` tests, then publishes the binaries with `SHA256SUMS` to the GitHub
-Release, `ghcr.io/huynle/opencode-hub:<version>` and `:latest`, and `@huynle/opencode-hub` to npm through
+Release, `ghcr.io/huynle/hub:<version>` and `:latest`, and `@huynle/hub` to npm through
 trusted publishing (OIDC, no token; the trusted publisher is configured for the package on npmjs.com).
 `scripts/build-binaries.sh` and `docker build .` do the same locally.
 
 The legacy package `@huynle/opencode-voice` lives in `packages/opencode-voice-shim/` (a re-export of
-`@huynle/opencode-hub` with a rename notice; not part of the main package and not published by the
-workflow). Publish it by hand after `@huynle/opencode-hub` of the same version is on npm:
+`@huynle/hub` with a rename notice; not part of the main package and not published by the
+workflow). Publish it by hand after `@huynle/hub` of the same version is on npm:
 `cd packages/opencode-voice-shim && npm publish --access public`, then
-`npm deprecate @huynle/opencode-voice@"<0.5.0" "Renamed to @huynle/opencode-hub"`.
+`npm deprecate @huynle/opencode-voice@"<0.6.0" "Renamed to @huynle/hub"`. The interim name
+`@huynle/opencode-hub` was never published, so it has no shim. A new package name needs one manual first
+publish before trusted publishing can take over (see the comment in `release.yml`).
 
 ## Known limits
 
 - Speech-to-text is batch per utterance (on-device voice detection + one request per utterance); no
   streaming STT provider yet.
 - Voice detection is a simple energy detector; noisy rooms may need tuning.
-- Questions (forms) are shown on the page but must be answered in the terminal.
+- Questions (forms) of a headless standalone server (`opencode serve --stdio` without its TUI) cannot be
+  answered from the hub; the background service, a foreground `opencode serve` and TUI-launched
+  standalone servers can.
+- Stop on a subagent session's page stops its whole tree (as on the root's page).
 - Listening with the phone screen off depends on the browser (best-effort on Android Chrome; not
   possible on iOS). Replies and alerts still arrive as push notifications.
 - The voice agent registers as a visible primary agent (`voice`) in OpenCode's agent list.

@@ -163,7 +163,7 @@ The [usage reference](https://github.com/j7an/superpowers-manager/blob/main/docs
 
 ## Requirements and platforms
 
-The installed package requires Node >=24. Native source, tests, and packaging tooling target latest Node 24. Every other requirement is command-specific and is checked before dispatch. This table is derived from production by `tests/bin/readme-requirements.test.ts`.
+The installed package requires Node >=24. Native source, tests, and packaging tooling target latest Node 24; CI also runs the shared suite on latest Node 26. Every other requirement is command-specific and is checked before dispatch. This table is derived from production by `tests/bin/readme-requirements.test.ts`.
 
 <!-- requirements:begin -->
 

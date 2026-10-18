@@ -245,6 +245,8 @@ One hook fire measures 289ms wall-clock since the v3.6.0 optimization, down from
 
 | Version | Highlights |
 |---------|------------|
+| **v3.24.3** | Pi verifies the exact plan snapshot used for context and phase counts; selected-attestation read failures stay blocking. The guide clarifies explicit re-attestation after progress edits (#326). |
+| **v3.24.2** | Pi parity mode suppresses unchanged pre-tool plan views after confirmed context insertion, with visible-edit refresh, session isolation and recovery invalidation. Approval and attestation remain checked; `PWF_PRETOOL=always` restores prior Pi per-leaf reminders (#323, PR #324). |
 | **v3.24.1** | Validate hidden adapter frontmatter, repair KiloCode resource links, and document the prerequisites and commands for all six CI suites (#314, #315, #316). |
 | **v3.24.0** | Native Qoder CLI plugin with isolated hook execution and the CLI completion gate (PR #313). Claude Code refreshes PreToolUse context only when the selected view changes, with session isolation, recovery resets and an always-inject opt-out (#312). |
 | **v3.23.0** | Public file-only recovery fixture with separate trial arms (#303). DSH V4 message-source compatibility (#306), resolver-based manual workflows (#300), and accurate Codex opt-out documentation (#302). |
@@ -820,6 +822,29 @@ Code, documentation, and issue contributors. Select a portrait to open a GitHub 
 
 <!-- contributor-portraits:start -->
 <p align="center">
+  <a href="https://github.com/littleblacklb" title="@littleblacklb"><img src="https://github.com/littleblacklb.png?size=56" width="48" height="48" alt="@littleblacklb"></a>
+  <a href="https://github.com/Amiirhosseini" title="@Amiirhosseini"><img src="https://github.com/Amiirhosseini.png?size=56" width="48" height="48" alt="@Amiirhosseini"></a>
+  <a href="https://github.com/AvitalAviv" title="@AvitalAviv"><img src="https://github.com/AvitalAviv.png?size=56" width="48" height="48" alt="@AvitalAviv"></a>
+  <a href="https://github.com/DorianZheng" title="@DorianZheng"><img src="https://github.com/DorianZheng.png?size=56" width="48" height="48" alt="@DorianZheng"></a>
+  <a href="https://github.com/dubes394" title="@dubes394"><img src="https://github.com/dubes394.png?size=56" width="48" height="48" alt="@dubes394"></a>
+  <a href="https://github.com/dylanpulver" title="@dylanpulver"><img src="https://github.com/dylanpulver.png?size=56" width="48" height="48" alt="@dylanpulver"></a>
+  <a href="https://github.com/Enard52" title="@Enard52"><img src="https://github.com/Enard52.png?size=56" width="48" height="48" alt="@Enard52"></a>
+  <a href="https://github.com/JianweiWangs" title="@JianweiWangs"><img src="https://github.com/JianweiWangs.png?size=56" width="48" height="48" alt="@JianweiWangs"></a>
+  <a href="https://github.com/lazyst" title="@lazyst"><img src="https://github.com/lazyst.png?size=56" width="48" height="48" alt="@lazyst"></a>
+  <a href="https://github.com/loarland" title="@loarland"><img src="https://github.com/loarland.png?size=56" width="48" height="48" alt="@loarland"></a>
+  <a href="https://github.com/luyanfeng" title="@luyanfeng"><img src="https://github.com/luyanfeng.png?size=56" width="48" height="48" alt="@luyanfeng"></a>
+  <a href="https://github.com/marcmuon" title="@marcmuon"><img src="https://github.com/marcmuon.png?size=56" width="48" height="48" alt="@marcmuon"></a>
+  <a href="https://github.com/mfehlhaber" title="@mfehlhaber"><img src="https://github.com/mfehlhaber.png?size=56" width="48" height="48" alt="@mfehlhaber"></a>
+  <a href="https://github.com/mixian939" title="@mixian939"><img src="https://github.com/mixian939.png?size=56" width="48" height="48" alt="@mixian939"></a>
+  <a href="https://github.com/msuadOf" title="@msuadOf"><img src="https://github.com/msuadOf.png?size=56" width="48" height="48" alt="@msuadOf"></a>
+  <a href="https://github.com/mtuwei" title="@mtuwei"><img src="https://github.com/mtuwei.png?size=56" width="48" height="48" alt="@mtuwei"></a>
+  <a href="https://github.com/nazeshinjite" title="@nazeshinjite"><img src="https://github.com/nazeshinjite.png?size=56" width="48" height="48" alt="@nazeshinjite"></a>
+  <a href="https://github.com/sean3808" title="@sean3808"><img src="https://github.com/sean3808.png?size=56" width="48" height="48" alt="@sean3808"></a>
+  <a href="https://github.com/shouldnotappearcalm" title="@shouldnotappearcalm"><img src="https://github.com/shouldnotappearcalm.png?size=56" width="48" height="48" alt="@shouldnotappearcalm"></a>
+  <a href="https://github.com/st01cs" title="@st01cs"><img src="https://github.com/st01cs.png?size=56" width="48" height="48" alt="@st01cs"></a>
+  <a href="https://github.com/tingles2233" title="@tingles2233"><img src="https://github.com/tingles2233.png?size=56" width="48" height="48" alt="@tingles2233"></a>
+  <a href="https://github.com/Whxuan0701" title="@Whxuan0701"><img src="https://github.com/Whxuan0701.png?size=56" width="48" height="48" alt="@Whxuan0701"></a>
+  <a href="https://github.com/wqh17101" title="@wqh17101"><img src="https://github.com/wqh17101.png?size=56" width="48" height="48" alt="@wqh17101"></a>
   <a href="https://github.com/kaichen" title="@kaichen"><img src="https://github.com/kaichen.png?size=56" width="48" height="48" alt="@kaichen"></a>
   <a href="https://github.com/fuahyo" title="@fuahyo"><img src="https://github.com/fuahyo.png?size=56" width="48" height="48" alt="@fuahyo"></a>
   <a href="https://github.com/lasmarois" title="@lasmarois"><img src="https://github.com/lasmarois.png?size=56" width="48" height="48" alt="@lasmarois"></a>

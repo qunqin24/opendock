@@ -127,8 +127,7 @@ smoke test remains partial because the server exposes no custom tool-list API.
 
 ```sh
 bun install
-bun run typecheck:tsgo    # tsgo --noEmit (Go-based TypeScript compiler)
-bunx tsc --noEmit         # fallback typecheck
+bun run typecheck           # single typecheck (tsgo --noEmit, Effect-aware Go compiler; falls back to tsc only if tsgo is unavailable)
 bun test                  # or bunx vitest run
 bun run check             # typecheck + tests
 ```

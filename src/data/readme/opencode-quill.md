@@ -1,6 +1,17 @@
-# opencode-quill
+<h1 align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/logo-dark.svg">
+    <img src="assets/logo.svg" alt="quill" height="96">
+  </picture>
+</h1>
 
-[![CI](https://github.com/ozandogrultan/opencode-quill/actions/workflows/ci.yml/badge.svg)](https://github.com/ozandogrultan/opencode-quill/actions/workflows/ci.yml) [![npm](https://img.shields.io/npm/v/opencode-quill)](https://www.npmjs.com/package/opencode-quill)
+<p align="center">
+  <a href="https://github.com/ozandogrultan/opencode-quill/actions/workflows/ci.yml"><img src="https://github.com/ozandogrultan/opencode-quill/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://www.npmjs.com/package/opencode-quill"><img src="https://img.shields.io/npm/v/opencode-quill" alt="npm"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT"></a>
+  <a href="#contributing"><img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg" alt="PRs welcome"></a>
+  <a href="https://github.com/ozandogrultan/opencode-quill/stargazers"><img src="https://img.shields.io/github/stars/ozandogrultan/opencode-quill.svg?style=social" alt="GitHub stars"></a>
+</p>
 
 Local word autocomplete and next-word prediction for the **OpenCode V2** prompt
 composer — inspired by [oh-my-pi (OMP)](https://github.com/can1357/oh-my-pi)'s

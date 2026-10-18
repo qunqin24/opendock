@@ -9,6 +9,7 @@ Extensions for [Pi](https://pi.dev) and [OpenCode](https://opencode.ai), publish
 | `@luxass/pi-questions` | Ask tabbed questions with choices, notes, and Markdown previews.                  | [Questions](packages/pi-questions/README.md) |
 | `@luxass/pi-btw`       | Ask side questions in a popover, then optionally send a summary to the main chat. | [btw](packages/pi-btw/README.md)             |
 | `@luxass/pi-personal`  | Load defaults and extensions tuned to a single personal workflow.                 | [personal](packages/pi-personal/README.md)   |
+| `@luxass/pi-resources` | Browse loaded resources, registered tools, and loader diagnostics.                | [Resources](packages/pi-resources/README.md) |
 | `@luxass/pi-voice`     | Record speech and transcribe it for your prompts.                                 | [Voice](packages/pi-voice/README.md)         |
 | `@luxass/pi-whimsical` | Display playful working messages while the agent runs.                            | [Whimsical](packages/pi-whimsical/README.md) |
 
@@ -18,6 +19,14 @@ Extensions for [Pi](https://pi.dev) and [OpenCode](https://opencode.ai), publish
 | --------------------------- | ------------------------------------------------------------ | ------------------------------------------------ |
 | `@luxass/opencode-personal` | Load Git, package-manager, and generated worker-file guards. | [Personal](packages/opencode-personal/README.md) |
 | `@luxass/opencode-voice`    | Record speech and transcribe it for your prompts.            | [Voice](packages/opencode-voice/README.md)       |
+
+## Shared libraries
+
+| Package                      | What it does                                                                           | Documentation                                               |
+| ---------------------------- | -------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| `@luxass/herdr-agent-shared` | Report and clear blocked sidebar labels without taking over Herdr lifecycle reporting. | [Herdr agent shared](packages/herdr-agent-shared/README.md) |
+
+These are runtime dependencies for extension authors, not separately installed Pi extensions or OpenCode plugins.
 
 ## Development
 

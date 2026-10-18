@@ -6,6 +6,11 @@ Reusable agent skills for [opencode](https://opencode.ai). Each skill is a direc
 `SKILL.md` entry point (YAML frontmatter: `name`, `description`) plus optional `assets/`,
 `scripts/`, and `tests/`.
 
+At runtime everything a skill writes lives in one project-local workspace root, `.pdca/` — helpers
+it runs (`.pdca/scripts/`), cycle status files (`.pdca/status/`) and evidence
+(`.pdca/<task>/rv<k>/`). The skill's own `scripts/` is the source of those helpers; the project runs
+its copies from `.pdca/scripts/`.
+
 ## Contents
 
 Skills live under [`opencode/`](opencode/).
@@ -84,6 +89,15 @@ checks skip unless you point at that checkout:
 ```sh
 OPENCODE_CONFIG_REPO=/path/to/opencode-config \
   python3 -m unittest discover -s opencode/pdca-dotnet/tests -p 'test_*.py'
+```
+
+`pdca-collection` additionally ships a dependency-free bash check of its git model (branch
+chain, `--no-ff` merge of completed groups, conflict detection, single-group isolation, and an
+incomplete group preserved but never merged) on throwaway temp repositories. `unittest discover`
+runs it through `tests/test_git_model.py`; it can also be run directly:
+
+```sh
+bash opencode/pdca-collection/tests/git-model-sim.sh
 ```
 
 ## Plugins

@@ -2,24 +2,24 @@
 
 **English** · [简体中文](README.zh-CN.md)
 
-Nine self-contained [OpenCode](https://opencode.ai) v2 plugins that register web search providers. Each file stands on its own: copy one into your plugins directory, or install the package to get all nine.
+Eleven self-contained [OpenCode](https://opencode.ai) v2 plugins that register web search providers. Each file stands on its own: copy one into your plugins directory, or install the package to get all eleven.
 
-[AnySearch](https://www.anysearch.com/) · [Brave Search](https://brave.com/search/api/) · [Jina](https://jina.ai/) · [Linkup](https://www.linkup.so/) · [Metaso](https://metaso.cn/) · [Querit](https://querit.ai/) · [SerpApi](https://serpapi.com/) · [Serper](https://serper.dev/) · [You.com](https://you.com/)
+[AnySearch](https://www.anysearch.com/) · [Brave Search](https://brave.com/search/api/) · [DeepSeek](https://api-docs.deepseek.com/guides/search/) · [Jina](https://jina.ai/) · [Keenable](https://keenable.ai/) · [Linkup](https://www.linkup.so/) · [Metaso](https://metaso.cn/) · [Querit](https://querit.ai/) · [SerpApi](https://serpapi.com/) · [Serper](https://serper.dev/) · [You.com](https://you.com/)
 
 ## Why this exists
 
 OpenCode v2 ships with five web search providers built in: `exa`, `firecrawl`, `parallel`, `tavily` and `tinyfish`. Outside that set, a much wider field of search APIs offers free quotas or free tiers — enough to run an agent's searches without paying for the privilege.
 
-This repository adds plugins for nine more of them, taking the pool from five providers to fourteen. AnySearch runs without a key at all; the other eight bind only when you supply one, so installing this package never routes a query to a provider that would immediately fail. Which of them are worth your time depends on the free tier each one currently offers, so check a provider's pricing before you rely on it.
+This repository adds plugins for eleven more of them, taking the pool from five providers to sixteen. AnySearch and Keenable run without a key at all; the other nine bind only when you supply one, so installing this package never routes a query to a provider that would immediately fail. Which of them are worth your time depends on the free tier each one currently offers, so check a provider's pricing before you rely on it.
 
 ## Install
 
-Three equivalent ways to install; pick one. **npm is recommended**: a version published to the registry is immutable, so a pinned `@1.0.1` always installs the same bytes, whereas a GitHub tag can in principle be moved by a maintainer to point at a different commit. The first two install the same complete package (all nine); use the third for one or two files only.
+Three equivalent ways to install; pick one. **npm is recommended**: a version published to the registry is immutable, so a pinned `@2.1.1` always installs the same bytes, whereas a GitHub tag can in principle be moved by a maintainer to point at a different commit. The first two install the same complete package (all eleven); use the third for one or two files only.
 
 ### 1. From npm (recommended)
 
 ```sh
-# add @1.0.1 to pin
+# add @2.1.1 to pin
 opencode plugin add opencode-search-plugin
 ```
 
@@ -35,7 +35,7 @@ or declare it in `opencode.json(c)`:
 ### 2. From GitHub
 
 ```sh
-# add #v1.0.1 to pin
+# add #v2.1.1 to pin
 opencode plugin add github:guotree/opencode-search-plugin
 ```
 
@@ -67,20 +67,44 @@ For a location that is not auto-discovered, list it explicitly:
 
 ### Skip the services you have no key for
 
-Loading the package registers all nine, but a provider without a key never joins the search pool — see [Keys](#keys). To keep them out of the registry entirely:
+Loading the package registers all eleven, but a provider without a key never joins the search pool — see [Keys](#keys). To keep some out of the registry entirely, use either or both of these optional options:
 
 ```jsonc
 {
   "plugins": [
     {
       "package": "opencode-search-plugin",
-      "options": { "disable": ["serper", "serpapi", "youcom"] }
+      "options": { "disable": ["osp-serper", "osp-serpapi", "osp-youcom"] }
     }
   ]
 }
 ```
 
-`disable` takes the provider IDs listed in the table below.
+- `disable` is a deny-list: it never registers the IDs it names — the provider IDs in the table below. AnySearch and Keenable need no key, so `disable` is the only way to keep those two out of the pool.
+- `enable` is an allow-list: only the IDs it names are registered, and everything else is skipped — `"enable": ["osp-brave", "osp-jina"]` runs those two alone.
+
+When both are set, **`disable` wins on any overlap**. A per-provider exclusion is never overridden by a bulk allow-list:
+
+```jsonc
+{
+  "options": {
+    "enable": ["osp-brave", "osp-jina", "osp-serper"],
+    "disable": ["osp-serper", "osp-youcom"]
+    // osp-serper stays out: disable overrides enable.
+    // osp-youcom was never allowed in; that entry is inert.
+  }
+}
+```
+
+Read as set arithmetic, the registered pool is `enable − disable`. The overlap drops out; a `disable` ID the allow-list never contained was never a candidate to begin with — redundant, but harmless and unreported. The overlap is the only redundancy that earns a warning, and the log names the IDs in it.
+
+```text
+enable  = {osp-brave, osp-jina, osp-serper, osp-keenable, osp-linkup}
+disable = {osp-keenable, osp-linkup, osp-youcom}
+pool    =  osp-brave, osp-jina          -- enable minus disable
+```
+
+Configuration that cannot take effect is reported in the log rather than silently dropped: an ID this package does not register (a typo) is named, as is an option that is not an array. An `enable` list that ends up naming no known provider leaves the pool empty — the log says so.
 
 ## Upgrade
 
@@ -93,7 +117,7 @@ opencode plugin update github:guotree/opencode-search-plugin
 opencode plugin update
 ```
 
-The target is the specifier that was configured: an npm install is named by its package name, a GitHub install answers only to its `github:` form — naming it by its bare package name fails with `Plugin is not configured`. Run `opencode plugin check` first to see what is outdated. An install without a pinned version follows new releases; a pinned one — `@1.0.1` on npm, `#v1.0.1` on GitHub — stays on its pin until you re-run `plugin add` with a newer pin or edit the specifier in `opencode.json(c)`. A locally copied file is upgraded by copying the new version over the old one.
+The target is the specifier that was configured: an npm install is named by its package name, a GitHub install answers only to its `github:` form — naming it by its bare package name fails with `Plugin is not configured`. Run `opencode plugin check` first to see what is outdated. An install without a pinned version follows new releases; a pinned one — `@2.1.1` on npm, `#v2.1.1` on GitHub — stays on its pin until you re-run `plugin add` with a newer pin or edit the specifier in `opencode.json(c)`. A locally copied file is upgraded by copying the new version over the old one.
 
 ## Uninstall
 
@@ -104,18 +128,18 @@ opencode plugin remove opencode-search-plugin
 opencode plugin remove github:guotree/opencode-search-plugin
 ```
 
-The same rule: pass the specifier you installed with. The command edits the global configuration; if the plugin is instead a `plugins` entry in `opencode.json(c)` or a locally copied file, delete the entry or the copied `.ts` file. Saved `/connect` credentials are untouched — a reinstall finds them again — and to turn off a few providers instead of the whole plugin, use `disable` above.
+The same rule: pass the specifier you installed with. The command edits the global configuration; if the plugin is instead a `plugins` entry in `opencode.json(c)` or a locally copied file, delete the entry or the copied `.ts` file. Saved `/connect` credentials are untouched — a reinstall finds them again — and to turn off a few providers instead of the whole plugin, use `enable`/`disable` above.
 
 ## Keys
 
-Every provider except AnySearch needs an API key. Give it one of two ways:
+Every provider except AnySearch and Keenable needs an API key. Give it one of two ways:
 
 - **`/connect`** inside OpenCode — stored per provider, rotated without a restart, and survives environment changes.
 - **Environment variable** — read as a fallback, so it works in headless and CI contexts.
 
 A provider with no key stays unbound: it is absent from the websearch pool, so `"provider": "random"` can never route a query to a service that would immediately fail.
 
-AnySearch is the exception. It has an anonymous tier, so it is always registered and only attaches an `Authorization` header when a key exists.
+AnySearch and Keenable are the exceptions. Both have an anonymous tier, so they are always registered and only attach their credential header when a key exists. For Keenable the two tiers draw on separate budgets: a key spends the free allowance of 100,000 requests a month, while a keyless call goes to the `/public` endpoint instead and is metered by rate — 1,000 requests an hour and 10 a second per IP, on a pool shared with everyone else on your egress address. A key is what makes that shared headroom irrelevant.
 
 Once keys are in place, pick how OpenCode chooses among them:
 
@@ -123,27 +147,33 @@ Once keys are in place, pick how OpenCode chooses among them:
 { "websearch": { "provider": "random" } }
 ```
 
-`random` spreads queries across every bound provider. Set it to a specific ID such as `"brave"` to pin one, or `false` to turn web search off.
+`random` spreads queries across every bound provider. Set it to a specific ID such as `"osp-brave"` to pin one, or `false` to turn web search off.
 
 ## Providers
 
+Every ID below carries an `osp-` prefix — this package's namespace. OpenCode's own providers register bare vendor names (`exa`, `tavily`), and a vendor's official plugin would do the same, so the prefix is what keeps those entries from colliding with ours — both in the websearch pool and in the `/connect` table, where credentials are keyed by integration ID. Use the prefixed form verbatim in `websearch.provider` and in `enable`/`disable`.
+
+The namespace also shows on the display name: `/connect` lists each of this package's entries with an `(osp)` marker — `DeepSeek (osp)` beside a built-in `DeepSeek` — so a key saved here cannot be mistaken for a built-in provider's. The websearch pool keeps the plain provider name, since the pool holds only search providers and the collision does not exist there.
+
 | Provider | ID | Key (env / `/connect`) | Anonymous | Notes |
 | --- | --- | --- | --- | --- |
-| AnySearch | `anysearch` | `ANYSEARCH_API_KEY` | yes | Free tier per IP; intent router, `cn`/`intl` zones |
-| Brave Search | `brave` | `BRAVE_SEARCH_API_KEY` | no | Independent index, 20 results max |
-| Jina | `jina` | `JINA_API_KEY` | no | Page content is opt-in because it is token-billed |
-| Linkup | `linkup` | `LINKUP_API_KEY` | no | `flash`/`fast`/`standard`/`deep` reasoning depth |
-| Metaso | `metaso` | `METASO_API_KEY` | no | Billed per search, not per result |
-| Querit | `querit` | `QUERIT_API_KEY` | no | Falls back to sentence matches when a snippet is missing |
-| SerpApi | `serpapi` | `SERPAPI_API_KEY` | no | Google via SerpApi; also has its own free 1-hour server cache |
-| Serper | `serper` | `SERPER_API_KEY` | no | Google via Serper; billed per query in credits |
-| You.com | `youcom` | `YDC_API_KEY` | no | Web and news merged; extraction modes |
+| AnySearch | `osp-anysearch` | `ANYSEARCH_API_KEY` | yes | Free tier per IP; intent router, `cn`/`intl` zones |
+| Brave Search | `osp-brave` | `BRAVE_SEARCH_API_KEY` | no | Independent index, 20 results max |
+| DeepSeek | `osp-deepseek` | `DEEPSEEK_API_KEY` | no | In-house index; $0.75 per 1,000 successful requests; 5 QPS cap |
+| Jina | `osp-jina` | `JINA_API_KEY` | no | Page content is opt-in because it is token-billed |
+| Keenable | `osp-keenable` | `KEENABLE_API_KEY` | yes | 100,000 requests a month with a key; keyless tier is per IP |
+| Linkup | `osp-linkup` | `LINKUP_API_KEY` | no | `flash`/`fast`/`standard`/`deep` reasoning depth |
+| Metaso | `osp-metaso` | `METASO_API_KEY` | no | Billed per search, not per result |
+| Querit | `osp-querit` | `QUERIT_API_KEY` | no | Falls back to sentence matches when a snippet is missing |
+| SerpApi | `osp-serpapi` | `SERPAPI_API_KEY` | no | Google via SerpApi; also has its own free 1-hour server cache |
+| Serper | `osp-serper` | `SERPER_API_KEY` | no | Google via Serper; billed per query in credits |
+| You.com | `osp-youcom` | `YDC_API_KEY` | no | Web and news merged; extraction modes |
 
 ## Configuration
 
 Knobs are environment variables, read once when OpenCode starts — change one and restart. Defaults match what each API documents, so leaving them unset is the right starting point.
 
-### Shared by all nine
+### Shared by all eleven
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
@@ -169,6 +199,12 @@ Knobs are environment variables, read once when OpenCode starts — change one a
 | `BRAVE_LANG` | — | Result language, e.g. `en`, `zh-hans`, `pt-br` |
 | `BRAVE_FRESHNESS` | — | `pd` (24h), `pw` (7d), `pm` (31d), `py` (365d), or `YYYY-MM-DDtoYYYY-MM-DD` |
 
+### DeepSeek
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `DEEPSEEK_COUNT` | `10` | Results per search, clamped to 1–50 (DeepSeek's maximum). Price is per request, so more results cost nothing extra |
+
 ### Jina
 
 | Variable | Default | Meaning |
@@ -177,6 +213,15 @@ Knobs are environment variables, read once when OpenCode starts — change one a
 | `JINA_INCLUDE_CONTENT` | off | `true` returns each hit's full page markdown — far more context and billed tokens |
 | `JINA_GL` / `JINA_HL` | — | Country / language code |
 | `JINA_LOCATION` | — | City-level origin to simulate, e.g. `Berlin` |
+
+### Keenable
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `KEENABLE_MAX_RESULTS` | `10` | Results per search, clamped to 1–50 |
+| `KEENABLE_MODE` | — | `pro` (deeper retrieval) or `realtime` (fastest); unset leaves Keenable's own default |
+| `KEENABLE_TITLE` | `opencode-search-plugin` | App name sent as `X-Keenable-Title`, which the keyless endpoint requires to attribute the call |
+| `KEENABLE_API_KEY` | — | Optional; keyless access works without it |
 
 ### Linkup
 
@@ -241,18 +286,20 @@ Dates are parsed from relative phrases (`3 hours ago`, `3小时前`), absolute f
 opencode plugin list
 
 # Which providers are actually in the pool?
-# A provider missing here has no key, or is listed in `disable`.
+# A provider missing here has no key, or `enable`/`disable` kept it out.
+# AnySearch and Keenable are always present, since neither needs a key.
 opencode api get "/api/websearch/provider"
 ```
 
 Also worth checking:
 
-- **A provider is missing from the pool** — it has no key. Run `/connect` or export its variable, then restart; credential changes made in `/connect` rebind without one.
+- **A provider is missing from the pool** — it has no key, or `disable` (or a narrow `enable`) filtered it out. Run `/connect` or export its variable, then restart; credential changes made in `/connect` rebind without one. A name that should be there but is not is often a typo: the log flags unknown IDs and any `enable`/`disable` overlap.
+- **A search fails with `Keenable rate limited the request (HTTP 429)`** — the keyless pool is capped at 1,000 requests an hour and 10 a second per IP, shared with the rest of your egress address. Set `KEENABLE_API_KEY` to draw on your own allowance instead.
 - **A search fails with `Connect X in /connect, or set X_API_KEY`** — the key disappeared between binding and searching. Reconnect or re-export.
 - **Everything is slow or burning credits** — leave `*_CACHE_TTL` at its default. Repeated queries within the window are served from memory.
 - **Nothing happens after editing a plugin file** — OpenCode watches plugins and reloads them; if it does not, `opencode service restart`.
 
-Logs live at `~/.local/share/opencode/log/opencode.log`; filter for `loading plugin` to see every plugin OpenCode resolved, with its entrypoint.
+Logs live at `~/.local/share/opencode/log/opencode.log`; filter for `loading plugin` to see every plugin OpenCode resolved, with its entrypoint. Warnings this plugin emits about `enable`/`disable` land in the same file, carrying a `[opencode-search-plugin]` prefix.
 
 ## Development
 

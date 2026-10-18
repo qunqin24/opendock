@@ -55,10 +55,19 @@ Requires OpenCode v2 (CLI plugin API).
 
 ## How it gets the API key
 
-The plugin reads `~/.local/share/opencode/account.json`, finds the account with
-`serviceID === "opencode-go"` and uses its `credential.key`. The key is only
-used in memory for the `Authorization: Bearer` request; it is never printed or
-written anywhere.
+The plugin asks the host for the current credential: `context.client.credential.list()`
+(the server's `GET /api/credential`, which returns every stored credential including
+its secret value) and picks the active `opencode-go` entry with `value.type === "key"`.
+
+That is the authoritative source: it always reflects the key you just rotated,
+with no file to keep in sync.
+
+For older hosts that do not expose `credential.list`, it falls back to reading
+`~/.local/share/opencode/account.json` (`serviceID === "opencode-go"`). That file
+is legacy: OpenCode may stop maintaining it when a key is rotated.
+
+In both paths the key is only used in memory for the `Authorization: Bearer`
+request; it is never printed or written anywhere.
 
 ## Language
 

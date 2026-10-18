@@ -11,7 +11,7 @@ No re-typing birth data. No made-up charts. Same input → same result.
 - **One record, endless questions**: career, timing, relationships, transits
 - **KP by default, Parashari on request**: no mixed methods
 - **Remembers what matters**: confirmed events build over time
-- **Works where you work**: Claude, Codex, Cursor, Copilot, ChatGPT and more
+- **Works where you work**: OpenCode, Claude, Codex, Cursor, Copilot, ChatGPT and more
 
 ## How it works
 
@@ -23,24 +23,26 @@ Just describe your birth details or ask a life question. It picks the right mode
 
 ## Install in 30 seconds
 
-**Claude Code:**
+**OpenCode (recommended)**
+```console
+opencode plugin add opencode-ascendant
+```
+
+⚠️ Requires OpenCode v2.
+
+**Claude Code**
 ```text
 /plugin marketplace add thaletto/ascendant-agents
 /plugin install ascendant@ascendant
 ```
 
-**Codex:**
+**Codex**
 ```console
 codex plugin marketplace add thaletto/ascendant-agents --ref main
 codex plugin add ascendant@ascendant
 ```
 
-**OpenCode:**
-```console
-opencode plugin add opencode-ascendant
-```
-
-**Any other agent:**
+**Agent Skills**
 ```console
 npx skills add thaletto/ascendant-agents --skill ascendant
 ```
@@ -51,10 +53,6 @@ npx skills add thaletto/ascendant-agents --skill ascendant
 make build   # install, match versions, rebuild skills + opencode package, verify
 ```
 
-## Releasing opencode-ascendant
-
-See [RELEASE.md](./RELEASE.md) for the full release process
-(changesets, `make version`, `make build`, tag-push CI publish).
-
-Requires a recent OpenCode v2 host (the plugin needs an Effect ≥4.0.5
-runtime for `@effect/platform-bun`).
+Releases publish to npm and open a GitHub Release on tag push — see
+[RELEASE.md](./RELEASE.md) and the
+[Releases page](https://github.com/thaletto/ascendant-agents/releases).

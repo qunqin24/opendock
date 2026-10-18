@@ -13,7 +13,7 @@ The problem is that when Qwen3.8 is used through **OpenCode → Ollama**, the re
 This project works around that request-path limitation without requiring changes to OpenCode or Ollama:
 
 1. The plugin starts a small local HTTP proxy automatically.
-2. The proxy exposes reasoning-level variants of each Qwen3.8 model, using IDs such as `qwen3.8:27b-mlx-effort-medium`.
+2. The proxy exposes reasoning-level variants of each Qwen3.8 model, using IDs such as `qwen3.8:27b-effort-medium`.
 3. When OpenCode requests one of those variants, the proxy converts the suffix into Ollama's `reasoning_effort` parameter.
 4. Ollama receives the original model ID plus the requested reasoning level.
 
@@ -22,11 +22,11 @@ In short:
 ```text
 OpenCode
    |
-   | qwen3.8:27b-mlx-effort-medium
+   | qwen3.8:27b-effort-medium
    v
 Qwen Thinking Proxy
    |
-   | model=qwen3.8:27b-mlx
+   | model=qwen3.8:27b
    | reasoning_effort=medium
    v
 Ollama
@@ -38,15 +38,15 @@ The result is that the four reasoning levels can be exposed as ordinary selectab
 
 The proxy is model-agnostic and will rewrite any Qwen3.8 model:
 
-- `qwen3.8:27b-mlx`
+- `qwen3.8:27b`
 - `qwen3.8:27b-mtp-q4_K_M`
 
 and exposes reasoning variants:
 
-- `qwen3.8:27b-mlx-effort-none`
-- `qwen3.8:27b-mlx-effort-low`
-- `qwen3.8:27b-mlx-effort-medium`
-- `qwen3.8:27b-mlx-effort-xhigh`
+- `qwen3.8:27b-effort-none`
+- `qwen3.8:27b-effort-low`
+- `qwen3.8:27b-effort-medium`
+- `qwen3.8:27b-effort-xhigh`
 - `qwen3.8:27b-mtp-q4_K_M-effort-none`
 - `qwen3.8:27b-mtp-q4_K_M-effort-low`
 - `qwen3.8:27b-mtp-q4_K_M-effort-medium`
@@ -63,8 +63,8 @@ OpenCode
    v
 Qwen Thinking Proxy :11437
    |
-   | qwen3.8:27b-mlx-effort-medium
-   |        -> model=qwen3.8:27b-mlx
+   | qwen3.8:27b-effort-medium
+   |        -> model=qwen3.8:27b
    |        -> reasoning_effort=medium
    v
 Ollama :11434
@@ -78,7 +78,7 @@ Before installing the plugin, make sure the following are available on your mach
 
 - **OpenCode 1.18.x or later** with plugin support.
 - **Ollama** installed and running locally.
-- An **Ollama-supported Qwen3.8 model**, such as `qwen3.8:27b-mlx` or a Qwen3.8 MTP variant.
+- An **Ollama-supported Qwen3.8 model**, such as `qwen3.8:27b` or a Qwen3.8 MTP variant.
 - **Bun 1.1.26 or later**. The plugin uses Bun to start the local proxy as a child process, and the configuration-generator script is also written for Bun. The proxy disables `Bun.serve`'s idle timeout so long generations are not cut off, and that option requires Bun 1.1.26; on older versions it is silently ignored.
 - **Git**, if installing directly from this GitHub repository.
 - A standard **JSON-formatted OpenCode configuration** if you plan to use the `generate:variants` utility. The generator does not currently parse JSONC comments or trailing commas.
@@ -118,7 +118,7 @@ Once published, the easiest installation is to add the package directly to your 
 {
   "$schema": "https://opencode.ai/config.json",
   "plugin": [
-    "opencode-ollama-qwen-thinking@0.1.2"
+    "opencode-ollama-qwen-thinking@0.1.3"
   ]
 }
 ```
@@ -161,10 +161,10 @@ Then add the local repository path to your OpenCode configuration:
 After restarting OpenCode, select one of the following model IDs:
 
 ```
-ollama/qwen3.8:27b-mlx-effort-none
-ollama/qwen3.8:27b-mlx-effort-low
-ollama/qwen3.8:27b-mlx-effort-medium
-ollama/qwen3.8:27b-mlx-effort-xhigh
+ollama/qwen3.8:27b-effort-none
+ollama/qwen3.8:27b-effort-low
+ollama/qwen3.8:27b-effort-medium
+ollama/qwen3.8:27b-effort-xhigh
 
 ollama/qwen3.8:27b-mtp-q4_K_M-effort-none
 ollama/qwen3.8:27b-mtp-q4_K_M-effort-low
@@ -175,7 +175,7 @@ ollama/qwen3.8:27b-mtp-q4_K_M-effort-xhigh
 The original model IDs remain valid:
 
 ```
-ollama/qwen3.8:27b-mlx
+ollama/qwen3.8:27b
 ollama/qwen3.8:27b-mtp-q4_K_M
 ```
 
@@ -214,7 +214,7 @@ This is recommended if you have more than one Qwen3.8 model:
 ```bash
 bun run generate:variants -- \
   --input ~/.config/opencode/opencode.json \
-  --model qwen3.8:27b-mlx \
+  --model qwen3.8:27b \
   --output ~/opencode-qwen-thinking.json
 ```
 
@@ -224,7 +224,7 @@ You can also select a different provider:
 bun run generate:variants -- \
   --input ./opencode.json \
   --provider ollama \
-  --model qwen3.8:27b-mlx
+  --model qwen3.8:27b
 ```
 
 ### Update the existing file in place
@@ -234,7 +234,7 @@ Use `--in-place` when you want the four generated entries written directly into 
 ```bash
 bun run generate:variants -- \
   --input ~/.config/opencode/opencode.json \
-  --model qwen3.8:27b-mlx \
+  --model qwen3.8:27b \
   --in-place
 ```
 
@@ -243,7 +243,7 @@ The script does not overwrite an existing generated variant unless `--force` is 
 ```bash
 bun run generate:variants -- \
   --input ~/.config/opencode/opencode.json \
-  --model qwen3.8:27b-mlx \
+  --model qwen3.8:27b \
   --in-place \
   --force
 ```
@@ -257,8 +257,8 @@ Given this source entry:
   "provider": {
     "ollama": {
       "models": {
-        "qwen3.8:27b-mlx": {
-          "name": "Qwen3.8 27B MLX",
+        "qwen3.8:27b": {
+          "name": "Qwen3.8 27B",
           "options": {
             "temperature": 1,
             "num_ctx": 131072
@@ -273,10 +273,10 @@ Given this source entry:
 the generated config contains the original entry plus four entries with the same settings:
 
 ```text
-qwen3.8:27b-mlx-effort-none   -> No Thinking
-qwen3.8:27b-mlx-effort-low    -> Low Thinking
-qwen3.8:27b-mlx-effort-medium -> Medium Thinking
-qwen3.8:27b-mlx-effort-xhigh  -> Xhigh Thinking
+qwen3.8:27b-effort-none   -> No Thinking
+qwen3.8:27b-effort-low    -> Low Thinking
+qwen3.8:27b-effort-medium -> Medium Thinking
+qwen3.8:27b-effort-xhigh  -> Xhigh Thinking
 ```
 
 The generated entries deliberately do not add a separate reasoning parameter. The proxy selects the reasoning level from the `-effort-<level>` suffix and converts it into Ollama's `reasoning_effort` request field.
@@ -356,14 +356,14 @@ QWEN_THINKING_DEBUG=1 opencode
 A request for:
 
 ```
-qwen3.8:27b-mlx-effort-medium
+qwen3.8:27b-effort-medium
 ```
 
 is transformed into:
 
 ```json
 {
-  "model": "qwen3.8:27b-mlx",
+  "model": "qwen3.8:27b",
   "reasoning_effort": "medium"
 }
 ```
@@ -422,8 +422,8 @@ QWEN_THINKING_DEBUG=1 opencode
 You should see entries similar to:
 
 ```
-[proxy] qwen3.8:27b-mlx-effort-medium
-        -> qwen3.8:27b-mlx
+[proxy] qwen3.8:27b-effort-medium
+        -> qwen3.8:27b
         reasoning_effort=medium
 ```
 

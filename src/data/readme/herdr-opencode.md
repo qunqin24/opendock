@@ -1,3 +1,6 @@
+> a fun experiment, no longer maintained
+> (ty for the mems herdr, gg's)
+
 # herdr-opencode
 
 [![npm](https://img.shields.io/npm/v/@phux/herdr-opencode)](https://www.npmjs.com/package/@phux/herdr-opencode)

@@ -1,16 +1,20 @@
-# opencode-context-sidebar
+# opencode-tui-extras
 
 [English](README.md) | [简体中文](README.zh-CN.md)
 
-Provider-agnostic Context Usage sidebar for OpenCode v2, with optional Skills management, transparency, and MCP status styling. The existing OpenCode v1 adapter remains available in maintenance mode.
+OpenCode v2 TUI enhancements: Context, Skills, and MCP sidebars, a transparent interface, Powerline-style prompt and sidebar status bars, and an Open in VS Code workflow action.
 
 <p align="center">
-  <img src="images/opencode-context-sidebar.png" alt="Context Usage sidebar preview" width="600">
+  <img src="images/opencode-tui-extras.png" alt="OpenCode TUI Extras sidebar preview" width="600">
 </p>
 
 ## Features
 
-- Most recent assistant message with a positive normalized token total, respecting OpenCode v2 compaction and revert boundaries
+- Context, Skills, and MCP sidebars integrated with the OpenCode v2 TUI
+- Optional transparent interface that follows the active theme and light/dark mode
+- Optional theme-aware Powerline-style status bars for the prompt and sidebar
+- Optional `Open in VS Code` action in the working-directory menu
+- Most recent assistant message with a positive normalized token total, respecting compaction and revert boundaries
 - Input, cache hit, cache miss, and cache write breakdown
 - Output, thinking, and response breakdown
 - Cache hit rate and colored distribution bar
@@ -18,63 +22,18 @@ Provider-agnostic Context Usage sidebar for OpenCode v2, with optional Skills ma
 - Session cumulative cost, matching OpenCode's built-in Context behavior
 - Collapsible Context details with the current percentage in the collapsed title
 - Dynamic separators that follow the available sidebar width
-- Built for OpenCode v2, with maintenance-only OpenCode v1 compatibility
-- Optional transparent mode that follows the active theme and light/dark mode
-- Optional MCP sidebar with a green `Connected` label and native MCP management dialogs
-- Optional Skills sidebar and searchable manager with persistent per-project enable/disable state
-- Optional theme-aware Powerline styling for the existing prompt and sidebar footers
-- Optional `Open in VS Code` action in the working-directory menu
+- Green `Connected` MCP status with native MCP management dialogs
+- Searchable Skills manager with persistent per-project enable/disable state
 
 The plugin works with any provider that reports standard OpenCode token usage fields.
 
 ## Install
 
-Supported baselines are OpenCode v2.0.26 or newer, and OpenCode v1.18.0 or newer in maintenance mode.
+OpenCode v2.0.26 or newer is required.
 
-### OpenCode v2
+### CLI/TUI (`cli.json`)
 
-OpenCode v2 is the primary target. Add the plugin to the global CLI config—`$XDG_CONFIG_HOME/opencode/cli.json` when `XDG_CONFIG_HOME` is set, otherwise `~/.config/opencode/cli.json`—and disable the built-in Context sidebar:
-
-```json
-{
-  "plugins": [
-    "-opencode.sidebar.context",
-    "opencode-context-sidebar"
-  ]
-}
-```
-
-Restart OpenCode after changing the configuration.
-
-### OpenCode v1 compatibility
-
-The existing v1 adapter and installation path remain available for compatibility, but v1 support is maintenance-only and will not receive new features. Install the package with OpenCode v1, then disable the built-in Context panel in `$XDG_CONFIG_HOME/opencode/tui.json` when `XDG_CONFIG_HOME` is set, `~/.config/opencode/tui.json` otherwise, or the project-local `.opencode/tui.json`:
-
-```json
-{
-  "$schema": "https://opencode.ai/tui.json",
-  "plugin": ["opencode-context-sidebar"],
-  "plugin_enabled": {
-    "internal:sidebar-context": false
-  }
-}
-```
-
-Restart OpenCode after changing the configuration. The package exposes both adapters so existing v1 installations can continue using the same package.
-
-## OpenCode v2 options
-
-All options are disabled by default. They are available only on OpenCode v2 and will not be added to the maintenance-only v1 adapter.
-
-| Option | Default | Behavior |
-| --- | --- | --- |
-| `transparent` | `false` | Clears selected active-theme backgrounds, keeps modal surroundings transparently dimmed, and follows theme and light/dark mode changes |
-| `mcp` | `false` | Adds the custom MCP status sidebar; disable the built-in MCP sidebar to avoid duplicates |
-| `skills` | `false` | Adds a compact Skills sidebar and `/skills-settings` manager; the server plugin stores per-project disabled IDs |
-| `powerline` | `false` | Applies theme-aware Powerline colors and separators to the existing prompt and sidebar footers |
-| `vscode` | `false` | Adds `Open in VS Code` to the menu shown when the prompt or sidebar path is clicked |
-
-Enable TUI-only options with the object form in the same global CLI config. This example enables all four TUI-only additions:
+Add the TUI plugin to the global CLI config at `$XDG_CONFIG_HOME/opencode/cli.json` when `XDG_CONFIG_HOME` is set, or `~/.config/opencode/cli.json` otherwise:
 
 ```json
 {
@@ -82,26 +41,10 @@ Enable TUI-only options with the object form in the same global CLI config. This
     "-opencode.sidebar.context",
     "-opencode.sidebar.mcp",
     {
-      "package": "opencode-context-sidebar",
+      "package": "opencode-tui-extras",
       "options": {
-        "transparent": true,
-        "mcp": true,
-        "powerline": true,
-        "vscode": true
-      }
-    }
-  ]
-}
-```
-
-Skills management also changes the server-side Skill catalog, so the package must be loaded in both places: keep the TUI entry above in `cli.json`, and add the same package with `skills: true` to the global or project `opencode.json(c)`:
-
-```jsonc
-{
-  "plugins": [
-    {
-      "package": "opencode-context-sidebar",
-      "options": {
+        "context": true,
+        "sidebarScrollbar": false,
         "transparent": true,
         "mcp": true,
         "skills": true,
@@ -113,13 +56,50 @@ Skills management also changes the server-side Skill catalog, so the package mus
 }
 ```
 
-When connecting to a remote server, install and configure the server package there, and keep the CLI/TUI package configured on the client. The server owns disabled Skill state; the client only owns presentation state such as whether the Skills section is collapsed. Loading both entrypoints is intentional: the server filters the catalog and exposes RPC, while the TUI renders the Sidebar and Dialog.
+The two entries prefixed with `-` disable OpenCode's built-in Context and MCP sidebars because this example enables their replacements. Omit `-opencode.sidebar.context` when `context` is `false`, and omit `-opencode.sidebar.mcp` when `mcp` is `false`.
+
+`context` and `sidebarScrollbar` are independent CLI/TUI options. Setting both to `false` omits the custom Context section and still hides the right Sidebar scrollbar.
+
+### Skills server (`opencode.json(c)`)
+
+When `skills` is enabled in `cli.json`, also load the server plugin with `skills: true`. Add it to the global `~/.config/opencode/opencode.json(c)` or a project-level `opencode.json(c)`:
+
+```jsonc
+{
+  "plugins": [
+    {
+      "package": "opencode-tui-extras",
+      "options": {
+        "skills": true
+      }
+    }
+  ]
+}
+```
+
+The Server filters the Skill catalog, exposes the management RPC, and stores disabled Skill IDs per project. The CLI/TUI renders the Sidebar and Dialog. When connecting to a remote Server, configure this Server plugin remotely and keep the CLI/TUI plugin in the local `cli.json`.
+
+Restart OpenCode after changing either configuration file.
+
+## Options
+
+The Context section and Sidebar scrollbar are shown by default. Optional enhancements are disabled by default.
+
+| Option | Default | Behavior |
+| --- | --- | --- |
+| `context` | `true` | Shows the Context usage section; set to `false` to omit it |
+| `sidebarScrollbar` | `true` | Shows the right Sidebar's vertical scrollbar; set to `false` to hide it while preserving mouse, trackpad, and keyboard scrolling |
+| `transparent` | `false` | Clears selected active-theme backgrounds, keeps modal surroundings transparently dimmed, and follows theme and light/dark mode changes |
+| `mcp` | `false` | Adds the custom MCP status sidebar; disable the built-in MCP sidebar to avoid duplicates |
+| `skills` | `false` | Adds a compact Skills sidebar and `/skills-settings` manager; the server plugin stores per-project disabled IDs |
+| `powerline` | `false` | Applies theme-aware Powerline colors and separators to the prompt and sidebar status bars |
+| `vscode` | `false` | Adds `Open in VS Code` to the menu shown when the prompt or sidebar path is clicked |
 
 ### Context interaction
 
 Click the `Context` title to collapse or expand its details. The collapsed title shows the computed context-window percentage. It displays `0.0%` when no eligible token usage exists or when the selected message has no valid positive context limit. Colors are green below 80%, yellow from 80% to below 90%, and red at 90% or above.
 
-On OpenCode v2, the plugin selects the latest token-bearing assistant message after the most recent completed compaction and respects the active revert boundary.
+The plugin selects the latest token-bearing assistant message after the most recent completed compaction and respects the active revert boundary.
 
 ### MCP behavior
 
@@ -153,7 +133,7 @@ Use transparent mode with the original theme (for example, `one-dark` rather tha
 
 ### Powerline mode
 
-Powerline mode keeps OpenCode's existing footer content, layout, responsive behavior, and click actions. It only applies theme-derived foreground and background colors plus Powerline separators to the rendered prompt footer and sidebar location. Path, activity, context, cost, and command segments update with theme or light/dark mode changes. Context keeps the same green, yellow, and red thresholds as the Context panel.
+Powerline mode keeps OpenCode's existing status-bar content, layout, responsive behavior, and click actions. It only applies theme-derived foreground and background colors plus Powerline separators to the prompt and sidebar status bars. Path, activity, context, cost, and command segments update with theme or light/dark mode changes. Context keeps the same green, yellow, and red thresholds as the Context panel.
 
 If `` or `` renders incorrectly, configure the terminal to use a Powerline-compatible font or a Nerd Font. Powerline styling pauses while a modal dialog is open so dialogs remain visually isolated.
 
@@ -201,15 +181,17 @@ npm install
 npm run build
 ```
 
-For local TUI-only loading with OpenCode v2, build the project first, then point `~/.config/opencode/cli.json` to the generated `dist` directory. Add `-opencode.sidebar.mcp` only when the `mcp` option is enabled:
+For local TUI-only loading, build the project first, then point `~/.config/opencode/cli.json` to the generated `dist` directory. Add `-opencode.sidebar.mcp` only when the `mcp` option is enabled:
 
 ```json
 {
   "plugins": [
     "-opencode.sidebar.context",
     {
-      "package": "file:///absolute/path/to/opencode-context-sidebar/dist",
+      "package": "file:///absolute/path/to/opencode-tui-extras/dist",
       "options": {
+        "context": true,
+        "sidebarScrollbar": false,
         "transparent": true,
         "mcp": false,
         "powerline": true,
@@ -226,22 +208,10 @@ To test Skills management from a source checkout, keep the generated `dist` dire
 {
   "plugins": [
     {
-      "package": "file:///absolute/path/to/opencode-context-sidebar/dist",
+      "package": "file:///absolute/path/to/opencode-tui-extras/dist",
       "options": { "skills": true }
     }
   ]
-}
-```
-
-For compatibility testing with OpenCode v1, build the project first, then point `tui.json` to the repository root:
-
-```json
-{
-  "$schema": "https://opencode.ai/tui.json",
-  "plugin": ["file:///absolute/path/to/opencode-context-sidebar"],
-  "plugin_enabled": {
-    "internal:sidebar-context": false
-  }
 }
 ```
 

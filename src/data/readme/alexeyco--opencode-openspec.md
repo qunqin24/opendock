@@ -4,29 +4,6 @@ An OpenCode agentic flow for the [most loved spec framework](https://github.com/
 
 ![OpenCode agentic flow for OpenSpec](docs/gallery/banner.svg)
 
-## Install
-
-Requires [Node.js ≥ 20.19](https://nodejs.org) and the [OpenSpec CLI](https://openspec.dev/docs/installation) — the plugin delegates every mechanical gate to it:
-
-```sh
-npm install -g @fission-ai/openspec@latest
-```
-
-Not installed yet? No separate step needed — the first flow run detects it
-and offers to install (say yes). Prefer [Homebrew](https://formulae.brew.sh/formula/openspec)?
-`brew install openspec` works too; the plugin finds any `openspec` on PATH.
-
-Add the plugin to `opencode.json`:
-
-```json
-{ "plugins": ["@alexeyco/opencode-openspec"] }
-```
-
-That's the whole setup — the plugin registers all 12 OpenSpec workflow skills
-itself, so `openspec init` inside your project is optional; useful only when
-other tools ([30+ of them](https://openspec.dev/docs/supported-tools)) touch
-the same repo.
-
 ## QuickStart
 
 ```text
@@ -52,6 +29,57 @@ AI:  Wave table: wave 1 [api, ui] parallel · wave 2 [docs] serialized on theme.
 ```
 
 Existing project with no specs yet? Start with `/openspec.init` — it bootstraps baseline specs describing what the code actually does today.
+
+## Comparison
+
+How this plugin compares to the other OpenSpec×OpenCode tools.
+Despite the shared name, @alexeyco/opencode-openspec is unrelated to AngDrew's [opencode-openspec](https://github.com/AngDrew/opencode-openspec).
+✅ documented in the linked sources · ⚠️ partial or implemented differently · ❌ not found in the public sources checked
+
+| | [@alexeyco](https://www.npmjs.com/package/@alexeyco/opencode-openspec) | [AngDrew](https://github.com/AngDrew/opencode-openspec) | [Octane0411](https://github.com/Octane0411/opencode-plugin-openspec) | [oso](https://github.com/moyaspace/openspec-superpowers-opencode) | [openflow](https://github.com/lininn/openflow) |
+|---|---|---|---|---|---|
+| OpenCode-native plugin | ✅ | ✅ | ✅ | ❌[^1] | ❌[^2] |
+| AI-drafted artifacts pipeline | ✅ | ❌[^3] | ❌[^4] | ✅ | ✅ |
+| Adversarial review in planning | ✅ | ❌[^5] | ❌[^6] | ⚠️[^7] | ✅ |
+| Parallel subagent implementation waves | ✅ | ❌ | ❌ | ❌[^8] | ❌ |
+| Mechanical `openspec validate` gate | ✅ | ❌[^9] | ❌[^10] | ✅ | ⚠️[^11] |
+| Retro | ✅ | ❌ | ❌ | ✅[^12] | ❌ |
+| Published on npm | ✅ | ❌[^13] | ✅ | ✅ | ✅ |
+
+[^1]: oso ships as a global CLI (`oso init`), not an OpenCode plugin entry — [source](https://github.com/moyaspace/openspec-superpowers-opencode).
+[^2]: lininn/openflow ships as a global CLI (`openflow init`), not an OpenCode plugin entry — [source](https://github.com/lininn/openflow).
+[^3]: AngDrew's `openspec_ff` writes fixed Markdown templates, not AI-drafted content — [source](https://github.com/AngDrew/opencode-openspec).
+[^4]: Octane0411 registers a single planning agent and defines no artifact pipeline; users are sent to an external command — [source](https://github.com/Octane0411/opencode-plugin-openspec).
+[^5]: AngDrew's `openspec_ff` writes fixed Markdown templates, not AI-drafted content — [source](https://github.com/AngDrew/opencode-openspec).
+[^6]: Octane0411 registers a single planning agent and defines no artifact pipeline; users are sent to an external command — [source](https://github.com/Octane0411/opencode-plugin-openspec).
+[^7]: oso has an interactive brainstorm step; no separate critic loop is documented — [source](https://github.com/moyaspace/openspec-superpowers-opencode).
+[^8]: oso parallelizes via git worktrees, one change per worktree — not execution waves — [source](https://github.com/moyaspace/openspec-superpowers-opencode).
+[^9]: AngDrew claims "no external dependencies"; its only spec inspection is a regex requirement counter — [source](https://github.com/AngDrew/opencode-openspec).
+[^10]: Octane0411 registers a single planning agent and defines no artifact pipeline; users are sent to an external command — [source](https://github.com/Octane0411/opencode-plugin-openspec).
+[^11]: lininn/openflow calls the openspec CLI and reads its output, with a manual fallback; no separate validate command is documented — [source](https://github.com/lininn/openflow).
+[^12]: the `superpowers-bridge` schema keeps an evidence-first `retrospective` artifact — [source](https://github.com/moyaspace/openspec-superpowers-opencode).
+[^13]: [AngDrew/opencode-openspec](https://github.com/AngDrew/opencode-openspec) has a single commit (2026-02-01, [history](https://github.com/AngDrew/opencode-openspec/commits)) and is not published on npm — the registry returns 404 ([registry.npmjs.org/opencode-openspec](https://registry.npmjs.org/opencode-openspec)), so the `npm install opencode-openspec` line in its README does not resolve.
+
+All cells checked 2026-10-17 against the linked public sources.
+
+<details>
+<summary>Detailed comparison</summary>
+
+| | [@alexeyco](https://www.npmjs.com/package/@alexeyco/opencode-openspec) | [AngDrew](https://github.com/AngDrew/opencode-openspec) | [Octane0411](https://github.com/Octane0411/opencode-plugin-openspec) | [oso](https://github.com/moyaspace/openspec-superpowers-opencode) | [openflow](https://github.com/lininn/openflow) |
+|---|---|---|---|---|---|
+| Delivery | OpenCode plugin ([npm](https://www.npmjs.com/package/@alexeyco/opencode-openspec)) | OpenCode plugin ([repo](https://github.com/AngDrew/opencode-openspec)) | OpenCode plugin ([npm](https://www.npmjs.com/package/opencode-plugin-openspec)) | Global CLI + project template (`oso`), not a plugin package ([npm](https://www.npmjs.com/package/@moyaspace/openspec-superpowers-opencode)) | Global CLI generating skills for Claude Code/Codex/Cursor/OpenCode ([npm](https://www.npmjs.com/package/@lininn/openflow)) |
+| Plan drafting | Interview → parallel research → grill → draft → critique loop ([docs/agents.md](docs/agents.md)) | Writes fixed Markdown templates, no AI drafting ([repo](https://github.com/AngDrew/opencode-openspec)) | Single `openspec-plan` agent: edits OpenSpec documents, implementation code read-only ([npm](https://www.npmjs.com/package/opencode-plugin-openspec)) | 13 `/opsx-*` commands, Superpowers bridge, TDD ([repo](https://github.com/moyaspace/openspec-superpowers-opencode)) | Phases init/proposal/brainstorming/grill/spec/amend/build/close ([repo](https://github.com/lininn/openflow)) |
+| Apply model | Dependency-ordered parallel subagent waves ([docs/agents.md](docs/agents.md)) | Sequential "Ralph loop", no parallel waves ([repo](https://github.com/AngDrew/opencode-openspec)) | None — planning only ([npm](https://www.npmjs.com/package/opencode-plugin-openspec)) | Parallelism via git worktrees, not execution waves ([repo](https://github.com/moyaspace/openspec-superpowers-opencode)) | Build phase, no parallel waves documented ([repo](https://github.com/lininn/openflow)) |
+| Validation | Mechanical upstream `openspec validate` gate ([README](#install)) | No external CLI ("no external dependencies"), regex requirement counter ([repo](https://github.com/AngDrew/opencode-openspec)) | No validate tool, only permits `openspec` bash calls ([repo](https://github.com/Octane0411/opencode-plugin-openspec)) | Own `/opsx-verify` (CLI status checklist + schema validate), delegates to the openspec CLI ([repo](https://github.com/moyaspace/openspec-superpowers-opencode)) | Calls the openspec CLI and reads its output, manual fallback, no separate validate command documented ([repo](https://github.com/lininn/openflow)) |
+| Commands & roles | 5 `/openspec.*` commands, 7 subagent roles, 16 skills ([docs/agents.md](docs/agents.md)) | 7 tools + 7 skills, no commands or subagents ([repo](https://github.com/AngDrew/opencode-openspec)) | 1 agent, no commands/skills/subagents ([repo](https://github.com/Octane0411/opencode-plugin-openspec)) | 13 `/opsx-*` commands ([repo](https://github.com/moyaspace/openspec-superpowers-opencode)) | CLI + generated multi-tool skills, not OpenCode-native ([repo](https://github.com/lininn/openflow)) |
+| Retro | /openspec.retro — read-only run retrospective, ≤8 cited findings ([docs/agents.md](docs/agents.md)) | None ([repo](https://github.com/AngDrew/opencode-openspec)) | None ([repo](https://github.com/Octane0411/opencode-plugin-openspec)) | Evidence-first `retrospective` artifact in the schema ([repo](https://github.com/moyaspace/openspec-superpowers-opencode)) | None documented ([repo](https://github.com/lininn/openflow)) |
+| npm package | Published ([npm](https://www.npmjs.com/package/@alexeyco/opencode-openspec)) | Not published — registry 404[^14] | `opencode-plugin-openspec` v0.1.4 ([npm](https://www.npmjs.com/package/opencode-plugin-openspec)) | v1.1.1 ([npm](https://www.npmjs.com/package/@moyaspace/openspec-superpowers-opencode)) | v0.5.2 ([npm](https://www.npmjs.com/package/@lininn/openflow)) |
+
+[^14]: [AngDrew/opencode-openspec](https://github.com/AngDrew/opencode-openspec) has a single commit (2026-02-01, [history](https://github.com/AngDrew/opencode-openspec/commits)) and is not published on npm — the registry returns 404 ([registry.npmjs.org/opencode-openspec](https://registry.npmjs.org/opencode-openspec)), so the `npm install opencode-openspec` line in its README does not resolve.
+
+</details>
+
+Among the tools above, none combines all three: dependency-ordered parallel subagent waves in /openspec.apply, a mechanical upstream openspec validate gate, and a role-based plan flow (interview → parallel research → grill → critique). Single features exist elsewhere — lininn/openflow has a grill phase, oso keeps a retrospective artifact and parallelizes via git worktrees — the combination is what this plugin adds.
 
 ## Why
 
@@ -93,39 +121,36 @@ Full catalog with report formats and dispatch mechanics: [docs/agents.md](docs/a
 - [openspec-retro](skills/openspec-retro/SKILL.md) — evidence bundle → retrospector → relay ≤8 findings
 - `openspec-propose`, `openspec-explore`, `openspec-apply-change`, … (all 12) — upstream [OpenSpec workflow skills](https://openspec.dev/docs/supported-tools), vendored and auto-synced ([docs/vendor-sync.md](docs/vendor-sync.md))
 
+## Install
+
+Requires [OpenCode v2](https://opencode.ai) (plugin API), [Node.js ≥ 22.18](https://nodejs.org) and the [OpenSpec CLI](https://openspec.dev/docs/installation) — the plugin delegates every mechanical gate to it:
+
+```sh
+npm install -g @fission-ai/openspec@latest
+```
+
+Not installed yet? No separate step needed — the first flow run detects it
+and offers to install (say yes). Prefer [Homebrew](https://formulae.brew.sh/formula/openspec)?
+`brew install openspec` works too; the plugin finds any `openspec` on PATH.
+
+Add the plugin to `opencode.json`:
+
+```json
+{ "plugins": ["@alexeyco/opencode-openspec"] }
+```
+
+That's the whole setup — the plugin registers all 12 OpenSpec workflow skills
+itself, so `openspec init` inside your project is optional; useful only when
+other tools ([30+ of them](https://openspec.dev/docs/supported-tools)) touch
+the same repo.
+
 ## Keeping skills current
 
-`vendor/openspec/` is generated byte-for-byte from the pinned CLI; every file
-carries upstream's `generatedBy` stamp. A daily GitHub Actions job installs
-the latest OpenSpec, re-vendors, and opens a PR when anything drifts — the
-PR also mirrors the vendored number into the plugin version, so plugin
-`1.14.2` bundles exactly the skills of CLI `1.14.2`. Dependabot covers the
-rest of the dependencies and explicitly stays off `@fission-ai/openspec` so
-pin, vendor, and version can only move together. Mechanics and the
-versioning trade-off: [docs/vendor-sync.md](docs/vendor-sync.md).
+All 12 upstream workflow skills are vendored byte-identically; a daily CI job re-vendors from the latest OpenSpec and opens a PR on drift, and plugin `vX.Y.Z` bundles exactly the skills of CLI `vX.Y.Z`. Mechanics and the versioning trade-off: [docs/vendor-sync.md](docs/vendor-sync.md).
 
 ## Using both?
 
-Skill ids match upstream exactly (`openspec-propose`, `openspec-apply-change`,
-…), so a project with `openspec init --tools opencode` alongside the plugin
-loads the same workflows — the plugin just keeps them current on every release
-instead of on every manual `openspec update`. The five commands this plugin
-adds (`/openspec.init`, `/openspec.plan`, `/openspec.apply`,
-`/openspec.archive`, `/openspec.retro`) and the upstream ones coexist:
-upstream skills are
-single-workflow steps, the flow commands are the multi-agent runs over the
-whole change.
-
-## Requirements
-
-- [OpenCode v2](https://opencode.ai) (plugin API).
-- [OpenSpec CLI](https://openspec.dev/docs/installation) in PATH for the
-  `openspec_validate` gate — npm or Homebrew; if it's missing the flow
-  offers to install it, and only continues critic-only (plan) if you
-  decline.
-- Node ≥ 22.18 for development (`make check`).
-- Version = the OpenSpec version inside: plugin `vX.Y.Z` bundles skills
-  generated by CLI `X.Y.Z`.
+Skill ids match upstream exactly and coexist with the five flow commands — upstream skills are single-workflow steps, the flow commands are the multi-agent runs over the whole change: [docs/using-both.md](docs/using-both.md).
 
 ## See also
 
@@ -139,6 +164,7 @@ whole change.
   dispatch mechanics.
 - [docs/vendor-sync.md](docs/vendor-sync.md) — the skill-freshness pipeline.
 - [CONTRIBUTING.md](CONTRIBUTING.md) — development and release workflow.
+- Alternatives in the same niche — [AngDrew/opencode-openspec](https://github.com/AngDrew/opencode-openspec), [Octane0411/opencode-plugin-openspec](https://github.com/Octane0411/opencode-plugin-openspec), [moyaspace/openspec-superpowers-opencode](https://github.com/moyaspace/openspec-superpowers-opencode), [lininn/openflow](https://github.com/lininn/openflow) — see [Comparison](#comparison).
 
 MIT — vendored OpenSpec skills remain under their upstream MIT license,
 stamped with the version that generated them.

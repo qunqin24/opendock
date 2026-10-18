@@ -567,6 +567,9 @@ bundled version.
 | <img src="img/skills/simplify.webp" width="120" alt="Simplify artifact"><br>[`simplify`](src/skills/simplify/SKILL.md) | Behavior-preserving simplification for readability and maintainability | `oracle` | ask for simplification or during review |
 | <img src="img/skills/worktrees.webp" width="120" alt="Worktrees artifact"><br>[`worktrees`](src/skills/worktrees/SKILL.md) | Git worktrees as safe, isolated coding lanes for risky or parallel work | `orchestrator` | `work in a worktree` |
 | <img src="img/skills/clonedeps.webp" width="120" alt="Clonedeps artifact"><br>[`clonedeps`](src/skills/clonedeps/SKILL.md) | Clones dependency source locally so agents can inspect library internals | `orchestrator` | `clone dependencies` |
+| <img src="img/skills/step-back.webp" width="120" alt="Step Back artifact"><br>[`step-back`](src/skills/step-back/SKILL.md) | Pauses snowballing patches to reassess direction and propose a cleaner path | `orchestrator` | automatic when fixes start stacking |
+| <img src="img/skills/deanchor.webp" width="120" alt="Deanchor artifact"><br>[`deanchor`](src/skills/deanchor/SKILL.md) | Generalizes from examples instead of copying them with light edits | `orchestrator` | automatic when a request includes examples |
+| <img src="img/skills/ai-estimates.webp" width="120" alt="AI Estimates artifact"><br>[`ai-estimates`](src/skills/ai-estimates/SKILL.md) | Estimates task duration for a human working with AI, not alone | `orchestrator` | ask how long something will take |
 | <img src="img/skills/reflect.webp" width="120" alt="Reflect artifact"><br>[`reflect`](src/skills/reflect/SKILL.md) | Turns repeated workflow friction into reusable skills, agents, or config | `orchestrator` | `/reflect` |
 | <img src="img/skills/oh-my-opencode-slim.webp" width="120" alt="oh-my-opencode-slim artifact"><br>[`oh-my-opencode-slim`](src/skills/oh-my-opencode-slim/SKILL.md) | Configures and safely improves the plugin setup itself | `orchestrator` | ask to tune your setup |
 
@@ -664,7 +667,7 @@ Use this section as a map: start with installation, then jump to features, confi
 | **[Project Customization](docs/project-local-customization.md)** | Repository-specific custom agents, prompt overrides, per-agent skills, and precedence |
 | **[Background Orchestration](docs/background-orchestration.md)** | Scheduler-first orchestrator model built around native background subagents |
 | **[Maintainer Guide](docs/maintainers.md)** | Issue triage rules, label meanings, support routing, and repo maintenance workflow |
-| **[Skills](docs/skills.md)** | Bundled skills such as `simplify`, `codemap`, `clonedeps`, `deepwork`, `verification-planning`, `reflect`, `worktrees`, and `oh-my-opencode-slim` |
+| **[Skills](docs/skills.md)** | Bundled skills such as `simplify`, `codemap`, `clonedeps`, `deepwork`, `verification-planning`, `step-back`, `deanchor`, `ai-estimates`, `reflect`, `worktrees`, and `oh-my-opencode-slim` |
 | **[MCPs](docs/mcps.md)** | `context7`, `gh_grep`, and how MCP permissions work per agent |
 | **[Tools](docs/tools.md)** | Built-in tool capabilities like `webfetch`, LSP tools, code search, and formatters |
 

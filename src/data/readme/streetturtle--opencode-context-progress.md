@@ -10,11 +10,14 @@ If this helps your workflow, please star the repo.
 
 ## Install
 
+Requires OpenCode 2.0 or newer.
+
 ```sh
-opencode plugin --global @streetturtle/opencode-open-in
-opencode plugin --global @streetturtle/opencode-context-progress
-opencode plugin --global @streetturtle/opencode-recap
-opencode plugin --global @streetturtle/opencode-session-tokens
+opencode plugin add @streetturtle/opencode-open-in
+opencode plugin add @streetturtle/opencode-context-progress
+opencode plugin add @streetturtle/opencode-recap
+opencode plugin add @streetturtle/opencode-session-tokens
+opencode plugin add @streetturtle/opencode-current-prompt
 ```
 
 or from OpenCode, press <kbd>ctrl</kbd>+<kbd>p</kbd> -> "Install Plugin" -> "@streetturtle/opencode-open-in"
@@ -25,3 +28,4 @@ or from OpenCode, press <kbd>ctrl</kbd>+<kbd>p</kbd> -> "Install Plugin" -> "@st
 - [`@streetturtle/opencode-context-progress`](./plugins/context-progress)` - context usage progress bar with token usage, window limit, and spend.
 - [`@streetturtle/opencode-recap`](./plugins/recap) - one-click AI recap for the current session.
 - [`@streetturtle/opencode-session-tokens`](./plugins/session-tokens) - collapsible session token totals with per-model breakdown.
+- [`@streetturtle/opencode-current-prompt`](./plugins/current-prompt) - keeps the latest user prompt visible in the sidebar.

@@ -20,7 +20,7 @@ Add it to your global OpenCode config, `~/.config/opencode/opencode.jsonc`. Keep
 {
   "plugins": [
     {
-      "package": "opencode-plugboard@0.48.0",
+      "package": "opencode-plugboard@0.49.0",
       "options": {
         "keys": { "my-app": "{env:PLUGBOARD_KEY_MY_APP}" },
         "models": ["opencode-go/glm-5.3-flash"],
@@ -29,13 +29,6 @@ Add it to your global OpenCode config, `~/.config/opencode/opencode.jsonc`. Keep
     }
   ]
 }
-```
-
-Set the key in the environment OpenCode starts from, restart OpenCode, then touch the server once. OpenCode loads no plugin until a client connects.
-
-```sh
-export PLUGBOARD_KEY_MY_APP=choose-a-long-random-string
-opencode api get /api/agent
 ```
 
 ## First request

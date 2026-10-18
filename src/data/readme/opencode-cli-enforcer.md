@@ -320,7 +320,7 @@ node --import tsx --test tests/**/*.test.ts   # run the unit test suite
 ```
 
 CI runs the same gates on `ubuntu-latest` and `macos-latest` across Node 20, 22, and 24, plus the
-dependency-review, CodeQL, and Scorecard workflows summarized below.
+commit-message lint, dependency-review, CodeQL, and Scorecard workflows summarized below.
 
 ## Supply chain and CI/CD
 
@@ -339,6 +339,10 @@ ecosystem fresh is what turns the SHA pins into reviewable PRs instead of silent
 **Dependency review.** Pull requests run `actions/dependency-review-action`, which fails on
 high-or-worse severity advisories and posts a summary comment only when the review fails.
 
+**Commit message lint.** CI lints every commit in a push or pull request against Conventional
+Commits (`commitlint.config.mjs` extending `@commitlint/config-conventional`) — the convention
+release-please parses to decide versions. Merge commits are ignored by commitlint's defaults.
+
 **CodeQL.** `.github/workflows/codeql.yml` analyzes `javascript-typescript` with the broader
 `security-extended` query suite on pushes and pull requests to `main` and on a weekly schedule.
 
@@ -351,12 +355,23 @@ development dependencies omitted, uploads it as a 90-day artifact, and attaches 
 release. The package itself is pushed with `npm publish --provenance`, producing a signed attestation
 that ties the published tarball to the workflow run that built it.
 
-**Release approval gate.** Pushing a `v*` tag starts a three-stage pipeline: `verify` (the tag must
-match the `package.json` version and be documented in `CHANGELOG.md`, then typecheck, unit tests, and
-the SBOM), `publish` (gated by the `production` environment's required reviewers, using OIDC trusted
-publishing when `vars.NPM_TRUSTED_PUBLISHING == '1'` and an npm token otherwise), and the GitHub
-release created from the changelog section. Its `concurrency` group never cancels in progress, so a
-publish is not interrupted halfway.
+**Release automation (release-please).** Releases follow the Release-PR pattern: Conventional
+Commits land on `main`, and release-please opens/updates a Release PR that bumps `package.json`,
+`package-lock.json`, and `CHANGELOG.md`. Merging that PR creates the `v*` tag and the GitHub
+release with the changelog notes. **Tags and releases are never created by hand — not from the
+GitHub UI, not from the CLI** — the bot owns them so the version, changelog, tag, and release
+notes cannot drift apart. The bot runs with a personal access token (`RELEASE_PLEASE_TOKEN`
+secret, fine-grained, Contents + Pull requests read/write) because tags created with the built-in
+`GITHUB_TOKEN` would not trigger the tag-driven pipeline below; a preflight step fails loud when
+the secret is missing.
+
+**Release approval gate.** The tag push starts a three-stage pipeline: `verify` (the tag must
+match the `package.json` version and be documented in `CHANGELOG.md`, then typecheck, unit tests,
+and the SBOM), `publish` (gated by the `production` environment's required reviewers, using OIDC
+trusted publishing when `vars.NPM_TRUSTED_PUBLISHING == '1'` and an npm token otherwise), and the
+GitHub-release job, which attaches the SBOM to the bot-created release without touching its notes
+(creating the release from the changelog section only as a fallback). Its `concurrency` group
+never cancels in progress, so a publish is not interrupted halfway.
 
 **License metadata.** The package is MIT: `package.json` declares `"license": "MIT"`, `LICENSE` ships
 in the npm `files` allowlist, and the badge above matches both.

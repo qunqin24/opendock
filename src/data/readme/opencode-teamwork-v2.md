@@ -36,27 +36,38 @@ agents/team/*.md                  # 11 team agents (markdown, V2 frontmatter)
 docs/ARTIFACTS.md                 # canonical artifact layout, topologies, schemas
 lib/team.mjs                      # installer core (config dir, model map, agent files)
 lib/picker.mjs                    # interactive model picker (`opencode models`)
-bin/opencode-teamwork.mjs         # CLI: init / models / install / status
+lib/runs.mjs                      # run inspection, DAG visualization, worktree pruning
+lib/doctor.mjs                    # environment diagnostic health checks
+bin/opencode-teamwork.mjs         # CLI: init / models / install / status / doctor / runs / inspect / prune
 scripts/lint-prompts.mjs          # prompt linter (run in CI)
+scripts/test-cost.mjs             # session tree consumption tests
+scripts/test-engine.mjs           # DAG engine, security gate & worktree tests
+scripts/test-doctor.mjs           # hermetic environment & CLI doctor tests
 postinstall.mjs                   # asks for models during npm install
 ```
 
 ## Engine (tools + hooks)
 
-The run mechanics are real, not prompt prose. The plugin registers five tools
-(named `teamwork_*` after the `teamwork` namespace) and two hooks:
+The run mechanics are real, not prompt prose. The plugin registers deterministic
+tools (named `teamwork_*` after the `teamwork` namespace) and runtime permission hooks:
 
 | Tool | Purpose |
 | --- | --- |
+| `teamwork_budget` | budget preflight: console credit derivation |
 | `teamwork_plan` | create the run dir + `plan.dag.json` / `state.json` / `costs.json` |
 | `teamwork_status` | per-task progress for the active run |
 | `teamwork_resume` | tasks still open, for a restart |
-| `teamwork_cost` | read/add budget spend (warns at 80%) |
-| `teamwork_pitfall` | append to the pitfall registry |
+| `teamwork_cost` | read real budget spend across OpenCode session tree (sentinel + workers + verifiers) |
+| `teamwork_pitfall` | append to the pitfall registry (dynamically injected into workers) |
+| `teamwork_next` | evaluates DAG dependencies, lifecycle states, and ready tasks |
+| `teamwork_task_update` | deterministic task state machine transitions (`pending` → `worker_active` → `worker_done` → `verifier_active` → `verified_pass` / `verified_fail` / `blocked`) |
+| `teamwork_security_audit` | mandatory pre-merge security gate (`verify/security-audit.json`) |
+| `teamwork_worktree` | out-of-repo git worktree provisioning, diff, merge, resolve & cleanup |
 
 Hooks: `permission.evaluate` enforces the read-only guarantee for the verifier,
-falsifier and scout **in code** (not just in their prompts), and
-`session.context` injects the active run's state + pitfalls into every team
+falsifier, scout and security auditor **in code** (not just in their prompts),
+enforces network constraints (`constraints.network: denied`), and
+`session.context` injects the active run's state + recent pitfalls into every team
 agent's system prompt.
 
 All run artifacts live under `.opencode/teamwork/<session-id>/`; see
@@ -99,11 +110,15 @@ opencode plugin add opencode-teamwork-v2
 npx opencode-teamwork-v2 init      # pick models, install agents, register plugin
 npx opencode-teamwork-v2 models    # pick models only (never edits opencode.json)
 npx opencode-teamwork-v2 status    # show what is installed and mapped
+npx opencode-teamwork-v2 doctor    # diagnose environment health (or --json)
+npx opencode-teamwork-v2 runs      # list active/past runs and spent budgets
+npx opencode-teamwork-v2 inspect   # inspect latest run DAG, tasks, and audit
+npx opencode-teamwork-v2 prune     # prune completed git worktrees
 ```
 
 `opencode-teamwork` and `opencode-teamwork-v2` are aliases for the same CLI. If
 you are running from **inside this package's own checkout**, use the bundled
-scripts (`npm run init`, `npm run models`, `npm run status`) — `npx <name>` there
+scripts (`npm run init`, `npm run models`, `npm run status`, `npm run doctor`, `npm run runs`, `npm run inspect`, `npm run prune`) — `npx <name>` there
 resolves the local package rather than the registry copy.
 
 Agent prompt files are left untouched by default. To also adopt updated prompt

@@ -36,11 +36,19 @@ Or add the plugin to your OpenCode configuration:
 ```json
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugin": ["@jfrz38/opencode-copy-last"]
+  "plugins": ["@jfrz38/opencode-copy-last"]
 }
 ```
 
 Restart OpenCode after changing plugin configuration.
+
+### Compatibility
+
+- OpenCode 2: supported through the plugin API introduced in OpenCode 2. The result is reported with a toast provided by the plugin's TUI entrypoint.
+- OpenCode 1.18.29 and newer: supported through the same package.
+- OpenCode older than 1.18.29: not supported.
+
+OpenCode 2 provides the plugin runtime, so `@opencode/plugin` is declared as an optional peer instead of being installed again with its server dependency tree. The shared package entrypoint loads that runtime only when OpenCode 2 invokes it, keeping the OpenCode 1 entrypoint independent.
 
 ## Usage
 
@@ -132,9 +140,11 @@ Multiple copied items are separated with a Markdown horizontal rule:
 
 ## How It Works
 
-The plugin registers the `/copy-last` command with OpenCode and intercepts it before it reaches the LLM. It reads the current session, selects the requested messages, formats them as Markdown, copies the result to the clipboard, and shows a toast.
+The plugin registers the `/copy-last` command with OpenCode and intercepts it before it reaches the LLM. It reads the current session, selects the requested messages, formats them as Markdown, copies the result to the clipboard, and reports the outcome.
 
 Because the command is handled locally by the plugin, running `/copy-last` does not send a new prompt to the model.
+
+On OpenCode 2 the outcome is reported through an RPC event rendered as a toast by the plugin's TUI entrypoint, because the OpenCode 2 server cannot show toasts itself. Messages already replaced by a compaction summary are not copied, because the plugin reads the session context OpenCode exposes to plugins.
 
 For `pair`, the plugin uses the last visible agent response before the next user message. This avoids copying an intermediate response produced while tools or subagents are still running. Reasoning, tool output, synthetic text, ignored text, and child-session messages are not included.
 

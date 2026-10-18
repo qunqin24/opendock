@@ -95,7 +95,10 @@ only** — the 1.18.x personality was removed in the 1.7.0 line:
 (a 2.x plugin cannot create an agent, so the six roles and six `/team-*` commands come from
 a generator step in that guide — that step is not optional.)
 (If a URL is unreachable — common on mainland-China networks — retry with
-the mirror prefix: https://ghproxy.net/ + the same path.)
+the mirror prefix: https://ghproxy.net/ + the same path. And if `npm` is
+slow or blocked, point it at a registry mirror for this install:
+`npm config set registry https://registry.npmmirror.com` — or add
+`--registry https://registry.npmmirror.com` to the one command that needs it.)
 Then verify the install using the checks in that guide.
 ```
 
@@ -296,7 +299,7 @@ the agent pages through with `tm_fetch` when it genuinely needs the payload.
 > host's `permission.evaluate`. `tm_ledger` is the lead's list where the host gives a
 > plugin no `todowrite`.
 > **Nothing we change reaches outside Team.** Every v2 hook fires for every session on
-> the host, so the tool-surface trim, the 0.2 temperature, the blackboard note, the offload
+> the host, so the tool-surface trim, the blackboard note, the offload
 > of native results, the R6/address strictening and the forced-background dispatch all ask
 > "is this one of our six roles?" first — `build`, `plan` and your own agents stay as a
 > fresh install leaves them. Calls whose owner the host did not tell us are left alone too,
@@ -602,7 +605,7 @@ the auto-create state.
 
 When the global file is **absent**, the plugin creates it at boot — atomically,
 idempotently, and **never overwriting an existing file**. What it writes is an
-**inert** template: all **59** registry keys, each as a *comment* under a
+**inert** template: all **57** registry keys, each as a *comment* under a
 one-line description, so the file parses to `{}` and sets nothing until you
 uncomment what you want.
 
@@ -611,7 +614,7 @@ uncomment what you want.
 {
   // "offloadThreshold": 2000,            // 卸载阈值（估算 token；等于阈值也卸载）。
   // "envProtect": "strict",              // R6 环境防护模式（strict/standard/off）。（红线：仅全局）
-  // …共 59 个键，每个都带一行说明
+  // …共 57 个键，每个都带一行说明
 }
 ```
 
@@ -646,7 +649,6 @@ Options live on the plugin entry, not in `team-mode.jsonc`:
 | `autoCreate` | `true` | Write the inert global `team-mode.jsonc` at boot when absent. |
 | `ttlDays` (alias `blackboardTtlDays`) | `5` | Blackboard retention, valid range (0, 365]. |
 | `envProtect` | `true` | Plugin-wide kill switch; `false` resolves the R6 mode to `off`. |
-| `temperature` | `false` | `false` = the documented 0.2 invariant; a number overrides it. |
 
 On 2.x a plugin entry is either a **string** or an **object** with `package` and
 `options`. The 1.x tuple form `["@te-river/…", { … }]` is rejected
@@ -674,7 +676,7 @@ Your own agents named `team` / `architect` / … always take precedence; the
 plugin never clobbers user definitions. See [Customization](#-customization)
 for overrides, extra agents and disabling roles.
 
-### Key reference (all 59)
+### Key reference (all 57)
 
 **Offload, previews and the store**
 
@@ -723,7 +725,6 @@ for overrides, extra agents and disabling roles.
 
 | Key | Type | Default | Meaning |
 |---|---|---|---|
-| `maxConcurrentSubagents` | number | `3` | Hard cap on concurrent `subagent` calls (`0` disables). Measured: `permission.evaluate` really fires for that action, so this is a gate and not a suggestion. |
 | `prune` | `on`/`off` | `on` | Context pruning: replace a SETTLED message body with a self-explaining pointer (an offload handle, a child id, a note). Evidence is never destroyed — the reply skeleton, GOAL/ACCEPTANCE, provenance, system messages, a still-running child and an uncollected child id are protected whole, and the untouched messages stay byte-exact. `off` disables. |
 | `pruneAtPercent` | number | `70` | Prune once the request reaches this share of the model's window, derived from `limit.context` — never a hard-coded token count. **Clamped to 40–90.** |
 | `pruneKeepTailPercent` | number | `40` | Share of the window kept verbatim at the tail; the newest message is always kept. |
@@ -761,7 +762,6 @@ for overrides, extra agents and disabling roles.
 | Key | Default | Status |
 |---|---|---|
 | `askTimeoutFloorMin` | `1` | **Orphaned.** Its only consumer was the v1 approval gate, which was deleted (a 2.x plugin cannot raise a dialog, so there was nothing to time out on). Say so rather than leaving a knob that does nothing. |
-| `agentTemperature` | `""` | v1-only |
 | `compactionContext` | `on` | v1-only |
 | `shellEnv` | `""` | v1-only |
 | `ptcWebBridge` | `on` | v1-only |
@@ -959,7 +959,7 @@ opencode-team-mode/
 │   ├── envprotect.ts     ← R6 facade (patterns / classifiers / gate predicates / hook)
 │   ├── identity.ts       ← Agent-name identity (case-insensitive lead match)
 │   ├── tm/               ← Governed tools: pipelines / store / preview / guard / refs /
-│   │                        config-layers (the 59-key registry) / config-files (the two
+│   │                        config-layers (the 57-key registry) / config-files (the two
 │   │                        layers) / config-template (the inert auto-created file) /
 │   │                        webfetch / search / memory / board / ledger / dispatch
 │   ├── host/             ← v2 personality (setup / guard / offload / session / events / …)

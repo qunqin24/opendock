@@ -22,7 +22,8 @@ OpenCode v2 全自动执行边界安全插件。Linux 原生 shell 与内置文�
 - **隐私范围**：普通日志与 `.bash_history`、`.zsh_history` 不因文件名被当作隐私。具体密钥、令牌和敏感环境变量仍受保护；“只读”不能自动豁免真正的凭据披露。日志的修改、删除、伪造或内容外传与普通只读诊断分开判断。
 - **审查诊断**：`logReviewerTrace: true` 启用现有 `~/.opencode/reviewer-trace.jsonl`。一轮动态审查通常产生 request、result、outcome 三条记录，不是三次 JEV 请求；按 `effects_review_request` 与 `callID/round` 统计审查轮数。`reviewer` 标明 JEV 或测试注入，`source`（如 coverage、bounded）只表示裁决分支。记录命令 SHA256、调用标识、静态触发规则和策略版本，不记录命令全文、用户请求、custom 授权、正文或凭据。无需新增 `reviewerTrace` 配置项。
 - **Auto 常规写入范围**：项目、配置的 scratch，加 `~/.cache` 与 `~/.npm/_cacache`。这是有限的缓存范围扩展，不包含整个 HOME、用户设置、用户状态或 Windows 目录；缓存根及目标的符号链接越界不继承这个放行，凭据/系统路径判定优先。Read only 不获得缓存写权限。
-- **Read only 临时目录**：Read only 仍可写全局临时目录及其子目录：配置的 scratch、`/tmp`、`/var/tmp`、`TMPDIR`，以及 WSL 下 Windows 用户的 `%TEMP%`/`%TMP%`（如 `C:\Users\<user>\AppData\Local\Temp`，经 `cmd.exe` 每进程探测一次）。shell 与原生 write/edit/patch 都适用。只采用已存在的规范目录；覆盖 `/` 或 HOME 的根不采用。会话工作区即使位于临时目录内也保持只读，sandbox.denyWrite 与插件控制面保护仍优先。
+- **全局临时目录**：Auto 与 Read only 都可写配置的 scratch、`/tmp`、`/var/tmp`、`TMPDIR`，以及 WSL 下 Windows 用户的 `%TEMP%`/`%TMP%`（如 `C:\Users\<user>\AppData\Local\Temp`，经 `cmd.exe` 每进程探测一次）及其子目录。shell 与原生 write/edit/patch 都适用。只采用已存在的规范目录；覆盖 `/` 或 HOME 的根不采用。Read only 的会话工作区即使位于临时目录内也保持只读，sandbox.denyWrite 与插件控制面保护仍优先。对已有目录执行 mkdir 不改变状态，不因控制面祖先保护而拒绝。
+- **插件开发目录**：会话工作区明确位于当前插件包目录内时，允许正常开发写入；其他工作区仍保护插件安装目录。运行中的观察器二进制与 broker 通信目录不随开发豁免放开。
 
 只调整补证终局时，在现有配置的 `dynamicReview` 对象内加入：
 
@@ -258,7 +259,7 @@ UI 不再展示 rwx/x/YOLO 字样。状态尚未同步时显示未知状态，�
 }
 ```
 
-只接受绝对路径，支持 `~`、`~/…`；尚未创建的路径按最深的已存在父目录校验。符号链接叶节点或被重定向的根不采用。`/`、HOME 及其祖先，与凭据存储、denyWrite、插件包、观察器或 broker 控制面重叠的路径，以及敏感路径，会逐项警告并忽略；数组类型、字符串类型或相对路径错误仍是配置错误。
+只接受绝对路径，支持 `~`、`~/…`；尚未创建的路径按最深的已存在父目录校验。符号链接叶节点或被重定向的根不采用。`/`、HOME 及其祖先，与凭据存储、denyWrite、插件包或观察器重叠的路径，broker 专用的 `security-boundary-*` 子树，以及敏感路径，会逐项警告并忽略；`/tmp/opencode` 等共享临时根不因包含 broker 子目录而整体拒绝，实际 broker 目标仍不享受写入豁免。数组类型、字符串类型或相对路径错误仍是配置错误。
 
 这些路径与原有附随写根一样，在 **Auto 和 Read only** 中加入观察器允许列表；denyWrite、protect、凭据与敏感目标的排除仍优先，不会扩大独立权限上限。JEV 只在现有的 `Current allowed write roots` 中看到它们。
 

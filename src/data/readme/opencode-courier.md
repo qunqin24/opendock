@@ -191,6 +191,8 @@ From a local clone, `bun install && npm run build`, then list its `dist` **direc
 | `courier_cancel` | Drops a message scheduled with `courier_later`. |
 | `courier_subscribe` | Subscribes a session to webhook deliveries for a topic (`owner/repo`, `owner/repo#12` or a name). |
 | `courier_unsubscribe` | Drops one topic, or all of a session's. |
+| `courier_recall` | One look at what earlier session trees in this project did: how each was split and how its parts went, and the lesson its orchestrator left; with `sessionID`, one tree's [record](#memory) in full. |
+| `courier_note` | Writes the one lesson of this session tree, a line of at most 300 characters, on its [record](#memory), for the next orchestrator in the project; a second call replaces it. From the top or a sub-orchestrator, never a leaf. |
 
 Each tool's parameters: [the reference](docs/reference.md#the-tools).
 
@@ -256,6 +258,36 @@ interrupted), or a session below it is live. One that has reported, with nothing
 does not. Each spawned session's brief says when to split its task and when to do it itself
 ([more](docs/reference.md#session-trees-and-their-limits)).
 
+## Memory
+
+What an orchestrator learns about splitting work in a project would otherwise die with its transcript,
+so the plugin keeps **one record per session tree**, in the project (every worktree of a repository
+shares it), from facts it already has: when the tree started and last
+moved, the top session's title and its `split:` line, whether and when the top called `courier_recall`,
+and for each session started in the tree its title, depth, isolation, join group, status (`done`,
+`partial`, `blocked`, `failed`, `interrupted`, `stopped`, `stalled` or `out`, still owing its report),
+how long it ran, what it cost, how full its context got and how many of its spawns were refused. Never a
+report's body or artifacts: they can hold code and secrets, and the parent has verified the work. A
+record is written again as each turn in the tree ends, so it stands on its own once the
+[roster](docs/reference.md#roster) has forgotten the children, and a tree reads as finished once no
+session in it runs and every part has settled.
+
+The one thing a model writes into it is **the tree's lesson**: one line of at most 300 characters,
+with `courier_note`, from the session that verified the tree, what the next orchestrator in the project
+should know about splitting work here that the facts do not say. It is kept dated on the record, a
+second note replaces it, a sub-orchestrator's is marked with its depth, and a leaf cannot write one: a
+child never writes memory. A lesson is history, not a rule: one that holds every time belongs in
+AGENTS.md or the skill, which the tool and the skill say to leave to the person.
+
+`courier_recall` reads them back: one line per tree, newest first, the lesson after the facts, or one
+record in full. The `courier-orchestrate` skill's first step asks for one call before the split
+decision, and its last for one `courier_note` before the top replies, none when there is nothing; a root
+that has started no sessions is pointed to the first, and a leaf sees neither tool. Each project keeps
+its newest 30 records and none that last moved over 90 days ago. `"memory": false` in the plugin's
+`options` turns it off: nothing is written, `courier_recall` says so and `courier_note` is refused.
+In the [terminal](#in-the-terminal), `/courier memory` shows the records and forgets one, or only its
+lesson ([more](docs/reference.md#memory)).
+
 ## In the terminal
 
 The package ships a part for OpenCode's terminal UI, which the TUI loads from the server's plugin
@@ -309,6 +341,14 @@ adds a notification to for a native child ([more](docs/reference.md#in-the-termi
 
 While a permission prompt or form is shown in the session, OpenCode hides the footer, so open the
 inbox with `ctrl+x k` (or `/asks` once the prompt is back).
+
+`/courier memory` (or the palette's "Courier: memory") lists the project's [tree records](#memory), newest
+first, one row each: the day the tree started and its title, its parts counted by status, how long it ran
+and what its parts cost, with its lesson on the line under it. `enter` shows one in full, the tree's facts,
+each part's status, duration, cost and context use, and the lesson; `x` forgets the record under the row
+after you confirm, or, in the record on its lesson's rows, only the lesson, keeping the facts; `q` closes.
+With `"memory": false` it says memory is off in this project. Nothing a model sees changes but what
+`courier_recall` lists ([more](docs/reference.md#the-memory-view)).
 
 ## Native child sessions
 

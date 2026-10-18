@@ -522,6 +522,8 @@ bun run test
 bun run build
 ```
 
+The build includes JavaScript and declaration source maps in `dist/` for local debugging. Source maps are excluded from package archives and published releases.
+
 ### Test the local plugin in Docker
 
 Build the version-specific image, then start its interactive Bash shell with the checked-out plugin mounted into the container. Each run script builds `dist/tui.js` first; no tarball or registry installation is needed.
@@ -540,7 +542,7 @@ REQUESTY_API_KEY=your-requesty-api-key bun run docker:run:v2
 
 Both containers start in Bash at `/home/harness/workspace`. For V1, the mounted `.opencode/tui.json` loads `/home/harness/plugin/dist/tui.js`; for V2, OpenCode discovers `.opencode/plugins/requesty/tui.ts`, whose adapter loads the same local build. Both containers mount `~/.config/opencode/opencode.json` for provider settings. V2's CLI configuration is global at `~/.config/opencode/cli.json`; the Docker V2 run uses the local adapter discovery path for testing.
 
-The project is fully typed TypeScript (`strict` mode). Sources live in `src/` (`.ts`/`.tsx`), tests in `test/`. The build pre-compiles the shared `src/tui.tsx` entrypoint and both lazy host adapters with OpenTUI's Solid Babel plugin (`@opentui/solid/bun-plugin`), then emits declarations via `tsconfig.build.json`. The entrypoint dynamically imports only the adapter selected by the host (`tui` for v1, `setup` for v2), so the unused host API is not loaded.
+The project is fully typed TypeScript (`strict` mode). Sources live in `src/` (`.ts`/`.tsx`), tests in `test/`. The build pre-compiles the shared `src/tui.tsx` entrypoint and both lazy host adapters with OpenTUI's Solid Babel plugin (`@opentui/solid/bun-plugin`), then emits declarations via `tsconfig.build.json`. JavaScript and declaration source maps are generated in `dist/` for local debugging and excluded from package archives. The entrypoint dynamically imports only the adapter selected by the host (`tui` for v1, `setup` for v2), so the unused host API is not loaded.
 
 ## License
 

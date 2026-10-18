@@ -115,13 +115,15 @@ Relative paths work too (`"./plugins/idea-inbox"`); the root-level `server.ts`
 | ------ | ------- |
 | Open the backlog picker | `<leader>i` (command `idea-inbox.open`) |
 | Quick capture dialog (no model involved) | `<leader>z` (command `idea-inbox.capture`) |
-| Remove one idea | `idea-inbox.remove` (palette only, picker dialog) |
-| Clear the visible list | `idea-inbox.clear` (palette only, asks for confirmation; the `documented` archive stays) |
+| Remove ideas — multi-select: ☑ mark, delete in one go | `idea-inbox.remove`; in the `<leader>i` picker — deletion items at the bottom of the list |
 | Show/hide the sidebar | your opencode sidebar toggle |
 
 All commands have stable ids (`idea-inbox.open`, `idea-inbox.capture`,
-`idea-inbox.remove`, `idea-inbox.clear`, `idea-inbox.take.<id>`) — rebind them
-via `keybinds` in your `cli.json` if the defaults clash.
+`idea-inbox.remove`, `idea-inbox.take.<id>`) — rebind them via `keybinds` in
+your `cli.json` if the defaults clash. The `idea-inbox.clear` command
+("Clear the visible list") is gone — its function became the "Clear all"
+item of the removal menu; move your rebind to `idea-inbox.remove` if you had
+one.
 
 ### Slash commands
 

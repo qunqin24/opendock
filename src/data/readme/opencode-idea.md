@@ -162,6 +162,8 @@ IDE MCP 可用时,插件通过 **系统提示注入**告诉模型**哪些事该�
      - 重构/格式化 → `ide_rename_refactoring` / `ide_reformat_file`
      - 校验 → `ide_lint_files` / `ide_get_file_problems` / `ide_build_project`
      - 运行配置 → `ide_get_run_configurations` / `ide_execute_run_configuration`(+ 配套插件的启停工具)
+     - 部署(**仅配套插件 + Ultimate**)→ `ide_list_deployment_servers` / `ide_upload_to_deployment` /
+       `ide_download_from_deployment` / `ide_get_deployment_task_status`
    - **读、写、找文本、找文件用原生工具**(`read` / `write` / `edit` / `grep` / `glob`)—— 这几件事走 IDE 只是多一跳,
      所以映射表里**不出现** `ide_search_text` / `ide_search_regex` / `ide_search_file` / `ide_apply_patch` /
      `ide_create_new_file`,也不再禁止它们的原生对应物。
@@ -200,9 +202,18 @@ IDE MCP 可用时,插件通过 **系统提示注入**告诉模型**哪些事该�
 引导只在 **IDE MCP 可用**时生效;MCP 不可用时仅保留 fast-fail 恢复提示。`injectGuidance: false` 可关闭系统提示注入。
 
 **条件注入**:映射表里只有内置 MCP Server 自带的那批工具是「永远写死」的。如果 IDE 里另外装了配套的
-[`idea-mcp-enhance`](https://github.com/syllr/idea-mcp-enhance) 插件,它提供的 run configuration 启停工具也会被加进
-下面的「运行配置」段。判据是**这次请求的工具快照里真的有这些工具** —— 没装的 IDE 上这段一个字都不会出现,模型不会去调
-一个不存在的工具。
+[`idea-mcp-enhance`](https://github.com/syllr/idea-mcp-enhance) 插件,它提供的**两组**工具会各自被加进下面的段落 ——
+run configuration 的启停工具进「运行配置」段,部署工具进「服务器文件同步」段。判据都是**这次请求的工具快照里真的有这些工具**:
+装不上的 IDE 上对应内容一个字都不会出现,模型不会去调一个不存在的工具。
+
+两组的前提不同,所以是两组、两条独立的判据:启停工具只要有配套插件就有;部署工具**还要求
+`com.jetbrains.plugins.webDeployment`(FTP/SFTP/WebDAV Connectivity)—— 它只在 Ultimate 里存在**。
+用一个布尔覆盖两者,部署工具就会替"启停工具在不在"作答。
+
+**逐项目核对到命令名一级**:配套插件的工具是**按项目分别存在**的,所以每条工具后面列出的命令名只包含
+**真的提供它**的那些项目(`src/ide-guidance.js` 的 `ENHANCE_SUFFIXES` + `servesTool`)——
+"根项目在 IDEA Ultimate、子项目在 PyCharm Community"时,部署那几条只会写根项目的命令名,不会顺手把子项目也写上去。
+内置工具不受影响:它们每个项目都有一份,照旧全部列出。
 
 ## 工具参数 (schema 收敛 + `execute.before`)
 
@@ -265,11 +276,13 @@ opencode-idea 对这一组工具做三件事:
      建配置是落盘成 `.run/*.run.xml` 供反复用)。判据只写在这一处,**「命令执行」段不重复**,只留
      「配置一律不由你写」这条无条件的,以及"该建的用哪条路建"那一条按工具是否存在分流:有工具时指向上面那条、
      并说明非 Shell 类型与删 / 改交给用户调 `idea-run-config-manager` skill;
-     没有工具时换成「讲清楚配置名 / 命令 / 工作目录 / 理由,请用户在 IDE 里自己建」—— 那时**连那个 skill 也不会出现**
-     (它的门就是这个工具),所以引导里顺手把这一点说明了,免得以后有人把它当成漏写而"补"上一句调不到的指令。**没装插件时绝不会提到那个工具。**
+     没有工具时换成「讲清楚配置名 / 命令 / 工作目录 / 理由,请用户在 IDE 里自己建」—— 那时 skill 本身仍在(它不按工具门禁),
+     但缺 create 工具时它也只能把流程交回用户,所以引导里顺手把这一点说明了,免得以后有人把它当成漏写而"补"上一句调不到的指令。
+     **没装插件时绝不会提到那个工具。**
 3. **工具名清单**写在 `src/mcp/enhance.js`(与原生 IDE 的 `src/mcp/idea.js` 分开放:原生走原生,插件的走插件的),
    与该仓库的 `RunLifecycleSchemas.kt` 保持同步。工具按**存在的子集**逐个点名(而不是「有就全写」),这样旧版本的配套
-   插件少给一两个工具时,引导也不会提到它们。
+   插件少给一两个工具时,引导也不会提到它们。同理,**每条命令名只列真的提供它的项目**(逐项目核对,见「条件注入」)——
+   一个项目装了配套插件、另一个没装是可能的。
 
 > 没装 `idea-mcp-enhance` 的 IDE 一切照旧:工具不存在,引导也不提,模型继续按原来的方式工作。
 
@@ -289,27 +302,26 @@ opencode-idea 对这一组工具做三件事:
 - 无论哪条路,**写完都要用 `get_run_configurations` 复查** —— `type` 写错 IDE 会静默忽略整个文件,这是唯一的判据;
 - 这些事**不再散着说"让用户自己去 IDE 里搞"**,而是统一指向那个 skill:**让用户调它**(`@idea-run-config-manager`)—— 它是本项目 run
   configuration 增 / 删 / 改的唯一流程入口,**只能由用户触发**(理由见下面的「而且只能用户调」);
-- **没装配套插件** → 那个 skill 也不存在(它的门就是 create 工具),此时才直接请用户自己在 IDE 里建。
+- **没装配套插件** → skill 仍然在(它现在不按工具门禁),只是缺 create 工具时它也只能把流程交回用户,请你在 IDE 里建。
 
 > **曾经有一个 `idea-run-config` skill 教模型凭记忆手写 `.run/*.run.xml`,已经删掉。** 理由不是"不许写",而是**不许凭空写**:`type` 写错 IDE 会
 > **静默忽略整个文件、日志里也不报**,凭记忆猜 option 名就是这么错的。现在这件事由 `idea-run-config-manager` 接手 —— 但**每个类型都得有一份实测模板**
 > (`assets/types/`,字段名全部来自真实文件),没模板的类型宁可交给用户。
 
-**skill 的生命周期跟随两道门,缺一不可**:
+**skill 在插件加载时一次性注册,不跟随工具目录**:
 
-1. **项目配置** —— `/open-in-ide` 写入配置时注册、`/delete-in-ide` 删配置时注销;以前配置过的 root 在 `setup` 时(读回配置)
-   也会走这一步。未配置的 root 不受影响。
-2. **IDE 真的在提供这个 skill 依赖的工具** —— skill 在自己的 frontmatter 里用 `requires:` 声明它绕着哪个工具写,而且写的是**后缀**
-   (例如 `idea-standalone` 声明 `rerun_run_configuration`、`idea-run-config-manager` 声明 `create_shell_run_configuration`,真实工具名是
-   `<项目前缀>rerun_run_configuration` / `<项目前缀>create_shell_run_configuration`)。**没这个工具就不注册这个 skill**:
-   一个教模型去调"它根本看不到的工具"的 skill,不是知识,是一次注定的失败调用。工具的可见性是双向跟随的 —— `setup` 时还没
-   连过 IDE、目录未知,所以那时**不注册**;等 IDE 应答(`/open-in-ide` 或重连)后目录才算已知,该出现的才出现;反过来,某个
-   请求里工具没了,skill 也跟着撤(不需要等重连)。
-   `requires` 必须写 **OpenCode 侧的名字**(IDE 工具带 `ide_` 服务器前缀),因为门就是拿它跟 `ctx.tool.list()` 比;
-   写成 IDE 的原始名(`rerun_run_configuration`)会让这个 skill 在任何机器上都不出现,而且没有任何报错。
+- **判据只有"插件加载了"** —— 不看项目有没有 `/open-in-ide`、也不看 IDE 此刻serve 了哪些工具。
+- **为什么不再按工具门禁**:早先的做法是"IDE 真的提供了这个 skill 绕着的工具才注册"(frontmatter 的 `requires:` + `ctx.tool.list()`)。
+  门本身是对的,但**注册时机错了**:它发生在 `/open-in-ide` 完成之后,而客户端在这之前就已经把 skill 列表快照给当前会话了 ——
+  结果是"服务端注册了、`@` 补全里看不到",**必须刷新页面才出现**。注册提前到 `setup`,就落在快照之前。
+- **工具缺失的代价放回正文** —— skill 里本来就写了"工具列表里没有 `<前缀>_rerun_run_configuration` 时交回用户"这类话;
+  一个缺席的工具是模型能读到并处理的事实,一个看不见的 skill 不是。
+- **`requires:` 这个键已彻底删除** —— 它曾是本插件自己的门禁元数据,OpenCode 不认,注册走 `ctx.skill.transform` 时也不会带上它;
+  门禁取消后它就成了"看起来在设门、实际没人读"的死字段,留着只会误导下一个改代码的人。skill 绕着哪几件工具写,由正文自己说明。
 
-文档放在 `skills/<id>/SKILL.md`(每个 skill 一个目录,`name` / `description` / `requires` 走 YAML frontmatter,`requires` 由
-loader 消费、**不会进入注册给 OpenCode 的定义**),由 `src/skill/loader.js` 扫描加载 —— **加新 skill 只需加一个目录,不用改代码**。
+文档放在 `skills/<id>/SKILL.md`(每个 skill 一个目录,`name` / `description` 走 YAML frontmatter,需要"只由用户调"时再加
+`metadata: opencode/autoinvoke: false`),由 `src/skill/loader.js` 扫描加载 —— **加新 skill 只需加一个目录,不用改代码**。
+
 
 还可以用 OpenCode 官方的 frontmatter 写法**关掉模型主动调用**:
 
@@ -352,14 +364,25 @@ loader 读的是 OpenCode 文档里的那个嵌套写法(它自己的读取器�
 1. **建 / 改 / 删**(直接动手):Shell 类型走 `ide_create_shell_run_configuration`,其余类型直接写 / 改 / 删 `.run/<名字>.run.xml`,
    **每种类型照自己的模板写**,写完用 `get_run_configurations` 复查;
 2. **建档**:过滤之后剩下的每个 run configuration 在**项目根 `AGENTS.md`** 的标记块(`<!-- idea-run-config-manager:begin -->` /
-   `<!-- idea-run-config-manager:end -->`)里占一行 —— `项目 | run configuration | 怎么跑 | 何时跑 | 跑前做 | 说明`,
-   **按操作系统分成两张表**(macOS / Linux、Windows,与 `idea-standalone` 的两张应用表同一种拆法:同一条流程在两个平台上常常不是同一条命令);
-   **与 `idea-standalone` 块的表共享同一套公共列并同序同宽**(谁 / `run configuration` / `怎么跑` / `何时跑` / `跑前做` / `说明`),
-   但**各自特有的列留在自己的语义位置**:standalone 的应用表多一格 `端口`(服务化应用一定有),固定流程表没有;
-   列宽按同一约定(中文两字 = 四个 dash),所以**不需要补空格**,`edit` 之类的工具重写文件也不会破坏对齐;
-   **热重载矩阵只有 3 列,不参与这套对齐** —— 它答的是"改动后要不要重启";
-   **目录 / 端口 / 干什么都不单开一格**(standalone 的端口除外):前两个配置里本来就有,抄进表只会过时,第三个与 `说明` 重复;
+   `<!-- idea-run-config-manager:end -->`)里占**一个条目** —— 标题是配置名(括号里写它属于哪个项目),下面五项固定:
+   `when` / `before run` / `run` / `after run` / `desc`;
+   **每一项各选一种写法**(行内 / 子列表),同一配置里可以混用 —— 全行内、全子列表、混合(例如 `when` 一句、`after run` 三条)都合法,判据只有"这一项自己有几句话",模板里给了两种形态的可照抄例子;
+   `when` 回答的是**谁能起它**,而这件事只有三种:`用户授权触发`(用户开口 / 在本会话里一次性授权之后 AI 才跑,后面写用户通常在什么情况下要它跑)、
+   `AI 自己触发`(AI 判断到场景就自己跑,**必须把场景写具体**)、`用户手动触发` ——
+   最后这一种**不进条目**,只登记在块末尾「用户手动触发(线下,AI 不跑)」一节,**只有名字**,五项一律不写(没人会照它跑);
+   判断不了就问用户,有副作用(改远端 / 动数据 / 出产物)又说不清场景的,归"用户授权触发";
+   `after run` 写跑完的结果(产物落在哪、接下来要不要发布 / 拷贝 / 通知,没有就写 `无`),`desc` 写它是什么、有什么坑 —— **五项始终都在**,不省略;
+   **按操作系统分成两节**(macOS / Linux、Windows,与 `idea-standalone` 的两张应用表同一种拆法:同一条流程在两个平台上常常不是同一条命令);
+   **与 `idea-standalone` 应用表的列同名同序** —— `before run` / `run` / `after run` / `desc` 四项两边一致;
+   本块多 `when`(服务化应用就是改完代码起它来测,没有别的时机),那边多 `app` / `run configuration` / `port`;
+   **热重载矩阵只有 3 列,不参与这套对应** —— 它答的是"改动后要不要重启";
+   **目录 / 端口 / 干什么都不单开一项**(standalone 的端口除外):前两个配置里本来就有,抄进来只会过时,第三个与 `desc` 重复;
 3. **过滤**:服务化(长驻应用)的配置归 `idea-standalone` 的块,这里先读那个块把它排除,**两个块永不重叠**。
+
+> **两个块的形态刻意不同**:档案块是**条目式**(一条配置一个条目,五项各占一行 —— `desc` 常是一段话,塞进表格格子里既难读、
+> 又要靠补空格维持对齐),`idea-standalone` 的应用表**保持表格**(列短、还有 `端口` 这种一格一个值的列)。
+> 所以两边靠的是**同名同序的四项**(`before run` / `run` / `after run` / `desc`)加各自独有的列,而不是宽度;
+> `AGENTS.md` 里一眼能看出哪几条是服务、哪几条是固定流程,靠的就是它。
 
 **SKILL.md 只有一份五步流程**(读 → 枚举 → 建 / 删 / 改 → 同步 → 核对),外加**支持矩阵**与**硬性契约**(落地位置、固定信封、复查、
 路径宏、不要写模板外的字段)——**它自己就带着规矩**;两类内容另放在两个地方,各管一段:
@@ -367,7 +390,7 @@ loader 读的是 OpenCode 文档里的那个嵌套写法(它自己的读取器�
 | 模板                                                       | 装什么                                                                                |
 | ---------------------------------------------------------- | ------------------------------------------------------------------------------------- |
 | `skills/idea-run-config-manager/assets/types/<类型>.md`    | **一个类型一份**:那个类型的实测样本 + 字段表 + 坑(索引就是 SKILL.md 里的**支持矩阵**) |
-| `skills/idea-run-config-manager/assets/AGENTS.template.md` | 产物(档案)的骨架:表格列、每一列写什么、枚举与过滤的要求,都在它的生成提示里            |
+| `skills/idea-run-config-manager/assets/AGENTS.template.md` | 产物(档案)的骨架:条目怎么写、五项分别写什么、枚举与过滤的要求,都在它的生成提示里      |
 
 **支持矩阵(7 份已落、2 份待实物)**:
 
@@ -384,26 +407,64 @@ loader 读的是 OpenCode 文档里的那个嵌套写法(它自己的读取器�
 把矩阵里那个类型从 ⏳ 改成 ✅。**每个字段名都来自真实文件,不靠猜** —— `js.build_tools.npm`(属性 + 自定义元素)、`ShConfigurationType`
 (`<option>` 子元素)、`NodeJSConfigurationType`(全属性)三种写法并存,套错就是静默失效。
 
-**先过滤,再建档**:**服务化的配置不进这张表** —— 它们已经登记在 `AGENTS.md` 的 `idea-standalone` 块里(端口 / 热重载也写在那里),
-所以建档第一步是读那个块、把它的表里出现过的名字记下来并排除,**剩下的**才是本表内容。
+**先过滤,再建档**:**服务化的配置不进这个块** —— 它们已经登记在 `AGENTS.md` 的 `idea-standalone` 块里(端口 / 热重载也写在那里),
+所以建档第一步是读那个块、把它的表里出现过的名字记下来并排除,**剩下的**才是本块内容。
 
-这张表**以带前缀的工具为准**,不围绕 IDE 界面说话:各项目各有自己的前缀(root 是 `ide`,子项目是它的目录名),枚举与执行都用**它自己那个前缀**的
-`<前缀>_get_run_configurations` / `<前缀>_execute_run_configuration` …;`项目` 列写的就是这个前缀,一条配置属于谁、该用哪套工具跑由它决定。
+这个档案块**以带前缀的工具为准**,不围绕 IDE 界面说话:各项目各有自己的前缀(root 是 `ide`,子项目是它的目录名),枚举与执行都用**它自己那个前缀**的
+`<前缀>_get_run_configurations` / `<前缀>_execute_run_configuration` …;**条目标题括号里写的就是这个前缀**,一条配置属于谁、该用哪套工具跑由它决定。
 
-这张表的用途是**能被下次读到**:要办同类事情时先查它,有现成的就用,不再重复建 —— 所以**联动是硬要求**:配置被**新建 / 删除 / 修改**
-(无论谁做的:工具建的、用户自己建的、用户删掉的)都要在文档里同步**加行 / 删行 / 改行**,否则表就开始骗人。
+这个块的用途是**能被下次读到**:要办同类事情时先查它,有现成的就用,不再重复建 —— 所以**联动是硬要求**:配置被**新建 / 删除 / 修改**
+(无论谁做的:工具建的、用户自己建的、用户删掉的)都要在文档里同步**加条目 / 删条目 / 改条目**,否则它就开始骗人。
 
 **别的文档都指向这里**:引导文本与 `idea-standalone` skill 碰到"要建 / 删 / 改一个配置",不再让用户自己去 IDE 里摸,而是让用户调本 skill ——
 增 / 删 / 改的流程入口只有这一个,而它只由用户触发。
 
-**它比 `idea-standalone` 多一道门**:frontmatter 里 `requires: create_shell_run_configuration` —— 它绕着"新建配置"这件事写,而新建只有
-配套插件 `idea-mcp-enhance` 能做,所以**没装插件的 IDE 看不到它**(`idea-standalone` 只要 `rerun_run_configuration`,门更松)。这是刻意的:
+**它绕着"新建配置"这件事写**(新建只有配套插件 `idea-mcp-enhance` 能做),但**这不影响它出不出现** —— 两个 skill 都在插件加载时注册,
+不缺任何工具也照样在列表里;缺工具时由正文把流程交回用户(`idea-standalone` 只要 `rerun_run_configuration`,门更松)。这是刻意的:
 一个只教模型"去建配置"、却没给建配置工具的 skill,只会把用户拖进一次注定失败的调用。
 
 **而且只能用户调**:它的 frontmatter 带 `metadata: opencode/autoinvoke: false`,loader 翻成定义的 `autoinvoke: false` ——
 skill 照常注册,但**不进模型的可选列表**,模型不会自己挑上它,只有用户显式指定(`@idea-run-config-manager`)才会加载。
 理由是它**直接动手改项目文件与项目资产**:`.run/*.run.xml` 与 `AGENTS.md` 都由用户自己按这个 skill 的流程来改,模型不主动挑上它。
 「该不该建」的时机判断仍在引导文本的判据里(那是模型该管的事),**动手权**留给人。
+
+## Deployment 全套 (配套插件 `idea-mcp-enhance`)
+
+IDE 内置的 MCP Server **完全不碰部署** —— 既不报 IDE 里配了哪些 Deployment 服务器,也不能把文件传上去 / 拉下来。
+配套插件 [`idea-mcp-enhance`](https://github.com/syllr/idea-mcp-enhance)(IDEA 2026.2+,另装)补齐这四个:
+
+| 工具 (OpenCode 里叫 `ide_*`)     | 作用                                                                                                                                                       |
+| -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ide_list_deployment_servers`    | 本项目可用的服务器(名称 / 项目级还是应用级 / 协议 / host / port / **本项目里的路径映射**),以及**项目级**的部署选项与危险组合告警。**只读 IDE 配置,不联网** |
+| `ide_upload_to_deployment`       | 把映射到的**本地目录**传到服务器(等同 IDE 的 Upload to …)。`mode` 默认 `mirror` —— **会删掉服务器上多出来的文件**;`upload` 则保留远端多余文件。**破坏性**  |
+| `ide_download_from_deployment`   | 把服务器上映射目录的内容拉回本地(等同 IDE 的 Download from …),**以服务器为准**:两边都有的文件被远端覆盖(相同则不写)。**没有"保留我的版本"这个选项**        |
+| `ide_get_deployment_task_status` | 用 `handle` 查一次传输的状态与计数;**永不启动任何传输**                                                                                                    |
+
+opencode-idea 对它做三件事,和上面那组是同一套:
+
+1. **透传** —— 工具目录整体转发(见「按能力选工具」),所以四个工具自动以 `ide_*` 出现在模型的工具表里;
+2. **条件引导** —— 只有这次请求的工具快照里真的有它们,才出现「服务器文件同步」这一节。**这一节整节(含标题)都由配套插件提供**,
+   所以一个工具都没有时它**完全消失** —— 不能像「运行配置」那样留一个空标题(那一节还有内置的 `get_run_configurations` /
+   `execute_run_configuration` 撑着)。整节**锚在一个工具上**(模板里 `{{#if canListDeploymentServers}}` 直接包住标题):
+   这四个由同一道前提注册、同进同出,拿其中一个当判据就够,不需要再造一个"四个里任一个"的聚合标志。触发条件也因此比
+   上面那组更严:部署工具**还要求 `com.jetbrains.plugins.webDeployment`**,而它只在 **Ultimate** 里存在,
+   所以 Community IDE 上这一节永远不出现;
+3. **工具名清单**写在 `src/mcp/enhance.js`(`DEPLOYMENT_SUFFIXES` + `deploymentCapabilities`),与该仓库的
+   `DeploymentSchemas.kt` 保持同步。**四个工具逐个点名**(而不是"有就全写"),而且每条命令名只列**真的提供它**的项目
+   (见「条件注入」的逐项目核对):它们通常同进同出(同一道插件前提),但"通常"不是"总是" —— 点名一个模型调不到的工具
+   就是一次注定失败的调用。
+
+这节存在的理由是**一条路由规则**:往服务器传 / 取文件要走这些工具,**不要自己拼 `ssh` / `rsync` / `scp`** ——
+IDE 的连接、路径映射、排除规则都在它后面,自己拼的那份与 IDE 看到、管理的不是同一份。文案里同时点明两件容易读错的事:
+`mirror` 是**默认值**且**会删远端文件**(而 MCP 路径上没有确认步骤),下载**以远端为准**、没有"保留我的版本"。
+
+还有一个语义必须写明,否则模型会把正常的中间态当失败去重试:上传 / 下载都在 IDE 后台跑,单次调用只等到 `waitMs`
+(默认 10 秒)为止,返回 `state: "in_progress"` 是**正常**的 —— 拿 `handle` 调 `get_deployment_task_status` 接着看,
+**不要用重复调上传 / 下载来代替**(那样拿不到进度)。
+
+> **这一组没有 skill,和 run configuration 不同。** run configuration 要 skill 是因为"某种类型怎么写"是一批得逐类型实测的
+> 模板(`assets/types/`);部署没有这层知识 —— 四个工具的 schema 已经说清 `serverName` / `mode` 怎么填,而"该不该传、传给谁"
+> 是模型当场看 `list_deployment_servers` 的判断。再加一个 skill 只是把同一段话抄第二遍。
 
 ## 项目命令执行 (Run Configuration)
 
@@ -583,6 +644,11 @@ export { default } from "/Users/yutao/Projects/opencode-idea/src/index.js";
   实测数字(拿运行中的 IDE MCP 拉 `tools/list`,单个项目):IDE 暴露 **64** 个 → 隐藏 48 → **模型可见 16 个**,
   而且这 16 个**恰好等于引导里点名的 16 个** —— 没有"能看见但没人告诉它用途"的残留。多项目就是 N × 16:
   暴露面完全由插件决定,不需要 OpenCode 提供任何白名单能力,也不需要惰性注册。
+
+- **部署工具只在 Ultimate 上出现**:`ide_list_deployment_servers` / `ide_upload_to_deployment` /
+  `ide_download_from_deployment` / `ide_get_deployment_task_status` 来自配套插件(`idea-mcp-enhance`),而且额外要求
+  `com.jetbrains.plugins.webDeployment`(**仅 Ultimate 有**)—— 少了任何一个前提,四个工具都不在,引导里的「服务器文件同步」一节
+  也整节消失,模型照旧用原生手段处理文件传输。详见「Deployment 全套」。
 
 - **端口是产品常量,不开放配置**:IDEA 的 MCP 在 **64342**,PyCharm 在 **64462**(`src/ide-projects.js` 的 `IDE_PORTS`),
   跨版本不变。所以"探哪个端口"由项目的 IDE 唯一决定,不需要扫描候选端口,也不需要用户填任何东西。

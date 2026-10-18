@@ -119,6 +119,28 @@ inherit:
 Sessions already running pick hooks up without restarting. Everything here
 preserves what is already configured, and can be removed.
 
+## Expecting a finish
+
+Quiet and `no_progress` speak about silence, so a worker that is still busy
+long past the time it was expected to take raises neither. Give the target a
+deadline and birddog raises **one** `overdue` alert if it has not exited by
+then:
+
+```json
+{ "id": "worker-1", "provider": "claude",
+  "policy": { "deadline_after_seconds": 5400 } }
+```
+
+```sh
+birddog watch update --instance <id> --target worker-1 --deadline 45m   # or an RFC3339 time
+birddog watch update --instance <id> --target worker-1 --clear-deadline
+```
+
+`deadline` takes an RFC3339 time; `deadline_after_seconds` runs from when the
+instance began watching the target. `overdue` is in the default `alert_on`, and
+never fires for a target with no deadline. Exiting resolves it; moving the
+deadline ahead resolves it too.
+
 ## Getting told
 
 Alerts go to the orchestrator that configured birddog, never to a watched

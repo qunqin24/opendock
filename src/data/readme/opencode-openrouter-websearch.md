@@ -13,19 +13,21 @@ OpenCode plugin: web search through the [OpenRouter web plugin](https://openrout
 
 ## How it works
 
-```
-query ──▶ OpenRouter /api/v1/responses (model + web plugin)
-              │  returns: answer + N results (full page contents)
-              ▼
-        [summarize: on]  second model call
-              │  each result is truncated to summarizeMaxChars first
-              │  prompt keeps unique facts, numbers, conflicts, [n] citations
-              ▼
-        agent receives: one compact brief + source list (urls only)
-        [summarize: off]
-              │
-              ▼
-        agent receives: full result contents (old behavior)
+```mermaid
+sequenceDiagram
+    participant Agent
+    participant Plugin as OpenRouterWebsearch
+    participant OpenRouter
+    participant Summarizer
+
+    Agent->>Plugin: websearch
+    Plugin->>OpenRouter: Search via web plugin
+    OpenRouter-->>Plugin: Search results
+    opt Summarization enabled
+        Plugin->>Summarizer: Summarize results
+        Summarizer-->>Plugin: Brief with citations and sources
+    end
+    Plugin-->>Agent: Search response
 ```
 
 - **Search call** runs the configured model through OpenRouter's web plugin (Exa by default) and produces the raw answer plus results with page contents.
