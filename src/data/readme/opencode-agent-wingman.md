@@ -24,15 +24,15 @@ The detector is deterministic and bounded. It does not call another model, uploa
 - Observes completed assistant text without treating user prompts as agent struggle.
 - Detects repeated failures, error-family recurrence, read/search churn, plan repetition, consultation churn, and dense low-progress windows.
 - Applies confidence scoring, cooldowns, per-episode caps, and global rate limits.
-- Defaults to a bounded inline synthetic no-reply advisory; notification-only and shadow modes remain available.
+- Defaults to a bounded, visible user-role advisory in the next model request; notification-only and shadow modes remain available.
 - Fails open: detector or delivery errors never block OpenCode.
 - Uses a version-neutral runtime adapter with no OpenCode package dependency or exact-version gate.
 
 ## Inline advisory
 
-When the detector identifies a high-confidence low-progress loop, Agent Wingman adds a concise synthetic advisory at the session boundary. The message is explicitly marked as plugin-generated and uses `noReply` so it does not start another model turn automatically.
+When the detector identifies a high-confidence low-progress loop, Agent Wingman queues a fixed advisory for the next model request in the same active run. The native message-transform hook persists a labelled user-role message through `session.prompt` with `noReply: true`, then includes it in the current model request. The `chat.message` hook preserves the active agent, model, variant, tool mask, system, output format and execution metadata on that exact plugin-created message. A new user-message boundary may cause one additional sequential model request; the plugin does not explicitly launch another run. Advice expires, is cleared at idle, and is discarded when the user message or execution generation changes. Compaction requests do not receive advice. If compaction creates a new user-message root, the old advice is discarded.
 
-![Agent Wingman synthetic advisory displayed inline in OpenCode](./assets/agent-wingman-synthetic-advisory.png)
+The advisory is visible in the conversation as a separate user-role message labelled as plugin-generated, not user-authored.
 
 ## Install
 
@@ -69,7 +69,7 @@ Or add it to `opencode.json`:
 
 | Mode | Model-visible | Behaviour |
 |---|---:|---|
-| `inject` | Yes | Default. Adds a synthetic no-reply advisory and falls back to notify on failure. |
+| `inject` | Yes | Default. Persists a labelled user-role advisory at the next model request; unknown context falls back to notify. |
 | `notify` | No | Shows a warning toast and writes a structured local log. |
 | `shadow` | No | Logs eligible interventions without displaying them. Good for calibration. |
 
@@ -86,8 +86,8 @@ See [CONFIGURATION.md](./CONFIGURATION.md) for every bounded option.
 
 ## Privacy and safety
 
-- No telemetry, external service, persistence, or network call is added by the plugin.
-- Raw prompts, tool arguments, tool output, source files, and command results are not retained.
+- No telemetry or external service is added. Visible delivery persists the advisory in the local OpenCode conversation through its SDK.
+- Detector state does not retain raw prompts, tool arguments, tool output, source files, or command results. Visible delivery briefly copies the active message metadata to preserve worker context; OpenCode stores that metadata with the advisory.
 - Secret-shaped values are redacted before fingerprinting.
 - Fingerprints use an ephemeral per-process HMAC key, so they cannot be correlated across restarts.
 - Advisories are fixed templates and never quote untrusted tool output.
@@ -111,7 +111,7 @@ CI additionally loads the same distributable through real OpenCode minimum, midp
 
 Agent Wingman is advisory. It does not browse, execute tools, mutate files, delegate agents, make access-control decisions, or claim that deterministic detection can identify every unproductive loop. Start in `shadow` mode when evaluating unfamiliar workflows.
 
-The default inline advisory is a fixed template marked `synthetic` and `noReply`. It never includes raw prompts, tool arguments, tool output, source text, or command results. Set `mode` to `notify` for user-only delivery or `shadow` for log-only calibration.
+The default advisory is a fixed template labelled as plugin-generated in a visible user-role message. If the host lacks the prompt surface, the advisory remains a synthetic part of the model request. It never includes raw prompts, tool arguments, tool output, source text, or command results. Set `mode` to `notify` for user-only delivery or `shadow` for log-only calibration.
 
 ## Contributing
 

@@ -13,8 +13,10 @@ This is the completion-discipline plugin: smallest sound design, then finish the
 ### Pi
 
 ```sh
-pi install git:github.com/phall1/ponytail-on-stimulants
+pi install npm:ponytail-on-stimulants
 ```
+
+`pi update --extensions` then keeps it on the latest release; pin with `npm:ponytail-on-stimulants@<version>` to opt out. `git:github.com/phall1/ponytail-on-stimulants` tracks `main` instead.
 
 ### Oh My Pi (OMP)
 
@@ -33,6 +35,14 @@ codex plugin add ponytail-on-stimulants@ponytail-on-stimulants
 ```
 
 Then open `/hooks`, **review and trust** SessionStart, SubagentStart, UserPromptSubmit, PreToolUse, PostToolUse, and Stop, and start a new thread. Untrusted hooks never run. Codex uses `hooks/codex-hooks.json`; Claude retains its separate failure-event configuration.
+
+If `/hooks` lists no Ponytail on Stimulants hooks, your Codex build skips plugin-bundled hooks (`codex features list` shows `plugin_hooks false`; Codex 0.162.1 does). Install the same hooks at user level from the plugin checkout, then trust them in `/hooks`:
+
+```sh
+node scripts/codex-hooks.js install     # writes $CODEX_HOME/hooks.json; uninstall reverses it
+```
+
+Remove them again (`uninstall`) if your Codex starts running plugin hooks, or every hook runs twice.
 
 Invoke skills as `$ponytail-on-stimulants:ponytail-on-stimulants` or `$ponytail-on-stimulants:ponytail-on-stimulants-review`. Append a mode to the primary skill to switch it.
 
@@ -106,6 +116,24 @@ Human input resets the counter. Extension/hook follow-ups do not. Hard caps and 
 | **Static-rule hosts** | Host-enabled rule file | No mutable native mode | None. |
 
 Jev stays optional, disabled by default, and Pi/OMP-only (in-process). File-hook hosts do not call TypeSafe.
+
+### Recap index
+
+Every host with an operational gate (Pi, OMP, Codex, OpenCode, Claude Code) appends one line per settled turn, in every mode, to a local append-only TSV: `${XDG_STATE_HOME:-~/.local/state}/ponytail-on-stimulants/recaps.tsv` (`%LOCALAPPDATA%` on Windows). A turn is settled when no completion pass is queued; aborted and interrupted turns are skipped.
+
+```text
+time	harness	project	branch	session	stats	ask → outcome
+2026-10-18T09:41:03Z	opencode	~/workspace/api	fix-parser	ses_1a2b3c4d5e6f	dirty=2 tools=31 errors=0	Fix the parser bug → Fixed the parser and added a regression test.
+```
+
+The recap is deterministic: the first line of the request plus the first sentence of the final reply, markdown-stripped, secret-redacted, and truncated. No model call. Grep it like any log:
+
+```sh
+rg api ~/.local/state/ponytail-on-stimulants/recaps.tsv | tail
+column -ts$'\t' ~/.local/state/ponytail-on-stimulants/recaps.tsv | tail -20
+```
+
+Set `PONYTAIL_ON_STIMULANTS_RECAP=0` (or `"recap": false` in `config.json`) to disable it, and `PONYTAIL_ON_STIMULANTS_RECAP_FILE` (or `"recapFile"`) to move it. The file holds task and reply excerpts; it never leaves the machine.
 
 ### Experimental Jev judge
 

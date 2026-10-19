@@ -38,11 +38,14 @@ lib/team.mjs                      # installer core (config dir, model map, agent
 lib/picker.mjs                    # interactive model picker (`opencode models`)
 lib/runs.mjs                      # run inspection, DAG visualization, worktree pruning
 lib/doctor.mjs                    # environment diagnostic health checks
-bin/opencode-teamwork.mjs         # CLI: init / models / install / status / doctor / runs / inspect / prune
+lib/timeline.mjs                  # chronological run lifecycle builder & renderer
+lib/export.mjs                    # read-only run report builder (HTML / Markdown export)
+bin/opencode-teamwork.mjs         # CLI: init / models / install / status / doctor / runs / inspect / timeline / export / prune
 scripts/lint-prompts.mjs          # prompt linter (run in CI)
 scripts/test-cost.mjs             # session tree consumption tests
 scripts/test-engine.mjs           # DAG engine, security gate & worktree tests
 scripts/test-doctor.mjs           # hermetic environment & CLI doctor tests
+scripts/test-timeline.mjs         # timeline hermetic unit tests
 postinstall.mjs                   # asks for models during npm install
 ```
 
@@ -113,12 +116,14 @@ npx opencode-teamwork-v2 status    # show what is installed and mapped
 npx opencode-teamwork-v2 doctor    # diagnose environment health (or --json)
 npx opencode-teamwork-v2 runs      # list active/past runs and spent budgets
 npx opencode-teamwork-v2 inspect   # inspect latest run DAG, tasks, and audit
+npx opencode-teamwork-v2 timeline  # chronological run timeline, task durations & cost
+npx opencode-teamwork-v2 export    # export a run report (HTML by default, or --markdown)
 npx opencode-teamwork-v2 prune     # prune completed git worktrees
 ```
 
 `opencode-teamwork` and `opencode-teamwork-v2` are aliases for the same CLI. If
 you are running from **inside this package's own checkout**, use the bundled
-scripts (`npm run init`, `npm run models`, `npm run status`, `npm run doctor`, `npm run runs`, `npm run inspect`, `npm run prune`) — `npx <name>` there
+scripts (`npm run init`, `npm run models`, `npm run status`, `npm run doctor`, `npm run timeline`, `npm run runs`, `npm run inspect`, `npm run prune`) — `npx <name>` there
 resolves the local package rather than the registry copy.
 
 Agent prompt files are left untouched by default. To also adopt updated prompt
@@ -178,6 +183,54 @@ defaults without touching files that already exist.
    ```
 
    To activate without a restart: `opencode reload`.
+
+## Run reports (`export`)
+
+`opencode-teamwork export` turns one run into a report you can share or archive.
+It only reads the run directory; it never changes run state.
+
+```sh
+npx opencode-teamwork-v2 export [<session-id>] [--session <id>] [--html | -m|--markdown] [-o <file>|-o -]
+```
+
+- **Session id:** pass it positionally (`export <session-id>`) or with
+  `--session <id>`. If you omit it, the newest run under `.opencode/teamwork/`
+  (most recently updated) is exported.
+- **Format:** `--html` is the default. `-m` / `--markdown` writes GitHub-flavored
+  Markdown instead.
+- **Output:** with `-o <file>` / `--output <file>` the report goes to that file.
+  Without `-o`, the report is written to
+  `.opencode/teamwork/<session-id>/report.html` (or `report.md` for Markdown) and
+  the **absolute** path is printed to stdout. `-o -` streams the report to stdout
+  and writes no file.
+- **Exit codes:** `0` on success; `1` for a missing or invalid run, or a file-write error.
+
+Examples:
+
+```sh
+# HTML to .opencode/teamwork/<id>/report.html
+opencode-teamwork export 20261012-101500-a1b2
+
+# Markdown to .opencode/teamwork/<id>/report.md
+opencode-teamwork export 20261012-101500-a1b2 -m
+
+# Same run, named output file
+opencode-teamwork export --session 20261012-101500-a1b2 -o report.html
+
+# Stream Markdown to stdout and redirect it yourself
+opencode-teamwork export -m -o - > run-report.md
+
+# Newest run, HTML
+opencode-teamwork export
+```
+
+The HTML report is a **standalone single file**: CSS is embedded, and it loads no
+CDN, fonts, or scripts, so it works fully offline and is safe to attach or archive.
+The Markdown report uses tables and a checklist, so it pastes cleanly into a PR
+description or issue comment. Both show the summary (status, topology, duration,
+budget, spend, tokens), a tasks table, the security audit, and the pitfalls. See
+[`docs/ARTIFACTS.md`](docs/ARTIFACTS.md#export-report-reporthtml--reportmd) for the
+format details.
 
 ## Model assignment
 

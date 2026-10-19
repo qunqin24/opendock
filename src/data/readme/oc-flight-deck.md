@@ -1,6 +1,8 @@
-# oc-flight-deck
-
-**See live cost, tokens, and context for every OpenCode session, right in your sidebar.**
+<p align="center">
+  <img src="assets/icon.svg" width="120" height="120" alt="oc-flight-deck icon" />
+</p>
+<h1 align="center">oc-flight-deck</h1>
+<p align="center"><strong>See live cost, tokens, and context for every OpenCode session, right in your sidebar.</strong></p>
 
 ## Install
 
@@ -59,3 +61,11 @@ Silence it: set `"notifications": { "enabled": false }` in the same file to swit
 - Package: https://www.npmjs.com/package/oc-flight-deck
 - Issues: https://github.com/nathwn12/oc-flight-deck/issues
 - OpenCode V2 plugin API: https://opencode.ai/v2/docs/build/plugins/cli
+
+<!-- nathwn12 house footer: identical in every repo. Do not edit. -->
+<p align="center">
+  <a href="https://github.com/nathwn12"><img src="assets/signature.svg" width="96" alt="nathwn12" /></a>
+</p>
+<p align="center">
+  <sub>Built by <a href="https://github.com/nathwn12">nathwn12</a> · <a href="https://github.com/nathwn12?tab=repositories">All projects</a></sub>
+</p>

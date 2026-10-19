@@ -30,6 +30,9 @@ maschinenlesbare Fassung.
 
 ## Installation
 
+Braucht opencode 2 oder neuer: ab 1.0.0 nutzt das Plugin die Plugin-API V2
+(`@opencode/plugin`). Für opencode 1 bleibt `opencode-planify-german@0.6.0`.
+
 Über [opencode-presets](https://github.com/trick77/opencode-presets):
 
 ```sh
@@ -38,21 +41,43 @@ npx opencode-presets install opencode-planify-german
 
 Das Bundle installiert die drei Teile zusammen: das Plugin mit den Tools
 `plan_render` und `pr_summary` aus der npm-Registry (auf die Version gepinnt), die
-Regeldatei nach `instructions` und den Skill nach `skills.paths`. Es fragt die
+Regeldatei nach `instructions` und den Skill in die Skill-Pfade. Es fragt die
 Bitbucket-URL und einen HTTP Access Token ab, die `pr_summary` braucht.
 
-Der Installer schreibt für das Plugin den Paket-Spec samt Optionen nach `opencode.json`;
-geladen wird das Paket beim nächsten Start von opencode. Also opencode einmal neu
-starten, dann prüfen:
+Der Installer schreibt für das Plugin den Paket-Spec samt Optionen nach `opencode.json`:
 
-```sh
-opencode debug agent plan | grep plan_render
-opencode debug skill | grep planify
+```jsonc
+{
+  "plugins": [
+    {
+      "package": "opencode-planify-german@1.0.0",
+      "options": {
+        "bitbucketUrl": "https://bitbucket.example.com",
+        "bitbucketToken": "…"
+      }
+    }
+  ]
+}
 ```
 
-Kein Treffer bei `plan_render`: das Plugin ist nicht angekommen. Dann Bundle neu
-installieren und opencode neu starten — ohne das Tool ist der Skill wirkungslos,
-und Pläne von Hand als HTML zu schreiben ist keine Ersatzlösung.
+Geladen wird das Paket beim nächsten Start von opencode. Also opencode einmal neu
+starten (`opencode service restart`), dann prüfen:
+
+```sh
+opencode plugin list | grep opencode-planify-german
+```
+
+Die Liste füllt sich erst einige Sekunden nach dem Neustart; vor dem Schluss
+"fehlt" also nochmals aufrufen. Bleibt es ohne Treffer, ist das Plugin nicht
+angekommen, der Grund steht im Log (`opencode debug paths` zeigt das
+Verzeichnis, gesucht wird nach "failed to load plugin"). Ein lokales
+Plugin-Verzeichnis ohne `index.*` oder `server.*` an der Wurzel überspringt
+opencode ohne Logeintrag. Dann Bundle neu installieren und opencode neu starten —
+ohne die Tools ist der Skill wirkungslos, und Pläne von Hand als HTML zu schreiben
+ist keine Ersatzlösung.
+
+Relative Pfade (`outDir`, `diagram.svgPath`) und die git-Abfragen von `pr_summary`
+gelten ab dem Verzeichnis, in dem opencode das Plugin lädt, also dem Projekt.
 
 Deinstallieren:
 

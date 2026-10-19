@@ -125,6 +125,7 @@ option is optional:
 | `models` | — | An inline slot list. Highest-priority source. |
 | `modelsFile` | — | An explicit slot file; short-circuits the [resolution chain](docs/CONFIGURATION.md#pool-preset-resolution). |
 | `reapMs` | `30000` | Hang-reaper interval. |
+| `probeMs` | `900000` | How often benched models are checked by actually using them. `0` turns the periodic check off and leaves the `pool_recheck` tool as the only way to ask. |
 | `selfUpdate` | `true` | Check for a newer release at most once per ~6h and install it in the background; it applies on the next opencode start. `false` — or `LACODE_NO_SELFUPDATE=1` — turns the check off. |
 | `sound` | `true` | Play a short tone with each notification, one per outcome, so you can tell a finished session from a question or a permission prompt without reading the popup. It is opt-out: `false` — or `LACODE_SOUND=0` (`false`, `off`, `no` work too, and beat the option) — turns the sound off, and anything else, a typo included, leaves it on. |
 | `omniroute` | — | Optional [OmniRoute](docs/OMNIROUTE.md) gateway integration. Absent or `{ enabled: false }` changes nothing. |
@@ -184,6 +185,19 @@ up to four hidden variants — one per slot — and a spawn of the bare name is 
 only thing that works: naming a variant lets the caller choose the provider
 directly, which is exactly what the rotation and the per-slot ceiling exist to
 prevent, so it is refused.
+
+A model that rate-limits or runs out of quota is benched and taken out of the
+rotation until its window ends, so one sick provider does not take the pool with
+it. Those windows are computed backoff rather than a promise from the provider,
+and a quota-shaped one can run for hours — long enough for a provider that has
+since recovered, or whose quota you reset in its own console, to stay excluded
+while every delegated spawn queues behind the survivors. So LaCode asks instead
+of guessing: every fifteen minutes, and on demand via the `pool_recheck` tool, it
+probes each benched model with one real request on that exact model. A model that
+answers is re-admitted immediately — nothing restarts, nothing reloads — and a
+model that is still limited keeps exactly the window it had, because a check must
+never be the thing that extends the wait. A change is reported as a toast and a
+log line; a pass that finds nothing changed says nothing at all.
 
 Six commands: `/context-init`, `/context-update`, `/context-review`,
 `/lacode-doctor`, `/agent-instructions` and `/pool`. Everything is added **only
@@ -258,8 +272,11 @@ is the hidden `instructions` agent, reachable solely through the
 instruction you have given to `AGENTS.md`, then reports what it changed. It is
 a normal agent turn, not a dead append: tell it what you want and review the
 result. The `instructions` agent is the one agent permitted to edit that file,
-its grant is scoped to `AGENTS.md` alone, and no other agent can spawn it —
-the command is the only route in.
+its write grant is scoped to `AGENTS.md` alone, and no other agent can spawn it —
+the command is the only route in. It may also **read** `.opencode/context/`, so a
+directive does not restate a fact the map has already settled or contradict one it
+has not read; the map stays read-only to it, and the `context` agent remains its
+only writer.
 
 ## Cost
 

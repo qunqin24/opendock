@@ -11,6 +11,20 @@ OpenCode 2.x loads plugins through the new v2 plugin API (`{ id, setup(context) 
 
 The recovery logic itself is untouched — it comes entirely from the upstream package, so this adapter automatically stays in sync with upstream v1 changes.
 
+## What 0.2.0 fixes
+
+0.1.1 had three v2/v1 mismatches that produced a **"Tool execution interrupted" storm**: the engine aborted live tool calls and then stood down instead of resuming.
+
+| Bug | Effect | Fix |
+|---|---|---|
+| `session.status()` returned `{}`, and v2 messages use `content: [{type:"tool"}]` while the engine parses v1 `parts[]`/`tool_calls` | The engine could not see in-flight tools, so its 15s "parent stuck" check aborted mid-tool runs | `status()` now reports live sessions/tools from the event bus, and `normalizeMessages()` converts v2 messages (only *running* tools become `tool_use`/`pending`) |
+| `session.execution.interrupted` was translated to `session.interrupted` even for aborts the adapter itself issued | The engine read its own abort as a user cancel (`userCancelled = true`) and skipped the resume prompt | Aborts issued by the adapter are remembered for 15s; their `interrupted` event is swallowed |
+| Every v2 event was forwarded as `message.updated` with no role/tokens | Activity tracking was blind, and the stall detector worked from stale state | Events are mapped explicitly (`session.step.ended` → finish/tokens, `session.inbox.delivered` → user message, tool/step/text/reasoning events refresh activity); unknown events are dropped |
+
+Also fixed: `tool.ids` is now answered from `context.tool.list()` instead of throwing on every check, and the default resume prompt is a guarded instruction rather than the bare string `continue` (see [upstream #45](https://github.com/Mte90/opencode-auto-resume/issues/45)).
+
+Behaviour that is intentionally preserved: a genuinely silent stream still recovers at the engine's 180s chunk timeout, because `status()` stops reporting "busy" after 90s without events.
+
 > Upstream PR [Mte90/opencode-auto-resume#44](https://github.com/Mte90/opencode-auto-resume/pull/44) proposes merging this adapter into the upstream package itself (as its `./server` entrypoint). Once that lands and is published, you can install `opencode-auto-resume` directly on 2.x and drop this adapter.
 
 ## Requirements

@@ -87,33 +87,34 @@ same table as the CLI, with the % budget column drawn as a progress bar:
 The dialog sizes itself to the terminal: a wide frame spells the budget labels out,
 a narrow one shortens them to the window (`wk`, `mo`, `d`).
 
+Requires **OpenCode V2** (`@opencode/plugin` >= 2). It does not load in V1.
+
 ```bash
-opencode plugin @1930dev/opencode-usage
+opencode plugin add @1930dev/opencode-usage
 ```
 
-That installs the package and writes it into `~/.config/opencode/tui.json`. To do it
-by hand:
+That installs the package and writes it into the global config. To do it by hand,
+add it to `plugins` in `~/.config/opencode/opencode.json`:
 
 ```json
 {
-  "$schema": "https://opencode.ai/tui.json",
-  "plugin": ["@1930dev/opencode-usage"]
+  "$schema": "https://opencode.ai/config.json",
+  "plugins": ["@1930dev/opencode-usage"]
 }
 ```
 
-TUI plugins go in `tui.json`, not in `opencode.json` and not in
-`~/.config/opencode/plugins/`. Both of those are loaded as *server* plugins, and
-opencode rejects a TUI-only module there with
-`must default export an object with server()`.
+The package exports `./tui`, so the CLI loads the dialog itself; nothing goes in
+`cli.json`. `opencode plugin list` shows it, and `opencode plugin check` reports
+updates for it.
 
-To run it from a clone instead, build first and point `tui.json` at the bundle:
+To run it from a clone instead, build first and point the config at the bundle:
 
 ```bash
 bun install && bun run build
 ```
 
 ```json
-{ "plugin": ["/absolute/path/to/opencode-usage/dist/tui.js"] }
+{ "plugins": ["/absolute/path/to/opencode-usage/dist/tui.js"] }
 ```
 
 Restart opencode after a rebuild: the bundle is read once at start.
@@ -204,15 +205,18 @@ table and carried in `--json`.
 - [Bun](https://bun.sh) >= 1.0 — the CLI reads opencode's SQLite through `bun:sqlite`
 - [opencode](https://opencode.ai) with existing sessions, at
   `~/.local/share/opencode/opencode.db`
-- For live quota: provider credentials already configured in opencode, at
-  `~/.local/share/opencode/auth.json`
+- For the `/usage` dialog: OpenCode V2. V1 is not supported.
+- For live quota: provider credentials already configured in opencode. V2 keeps
+  them in its own database and this reads them from there; V1 keeps them at
+  `~/.local/share/opencode/auth.json` and this falls back to that.
 
 ## Configuration
 
 - `AA_API_KEY` — Artificial Analysis key, used by `top` for the intelligence indices.
   Optional: without it `top` still prints prices, only without `IQ` and `IQ/$`.
   A free key is at [artificialanalysis.ai/data-api](https://artificialanalysis.ai/data-api)
-- `OPENCODE_AUTH_PATH` — override the path to opencode's `auth.json`
+- `OPENCODE_AUTH_PATH` — override the path to opencode's `auth.json`, the V1
+  credential file. It is read only when the database holds no credentials.
 - `OPENCODE_DB_PATH` — override the path to opencode's database
 - `OPENCODE_USAGE_BUDGETS` — override the path to `budgets.json`
 - `OPENCODE_USAGE_CACHE` — cache directory (default `~/.cache/opencode-usage`)
@@ -237,7 +241,7 @@ since `cli` and `plugin` both build on `core`:
 
 - `@opencode-usage/core` — shared data layer (SQLite, quotas, matching, ranking)
 - `@opencode-usage/cli` — the `opencode-usage` binary
-- `@opencode-usage/plugin` — the opencode TUI plugin
+- `@opencode-usage/plugin` — the OpenCode V2 CLI plugin
 
 Only the root package is published; `core` is inlined into both bundles.
 

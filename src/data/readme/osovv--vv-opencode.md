@@ -31,7 +31,7 @@ vv-opencode addresses each of these:
 - **A state machine for multi-agent work** — explicit work items, required reviewers, round limits, and hard stops instead of free-form subagent loops.
 - **Portable model choices** — agents reference roles like `vv-role:smart` and `vv-role:fast`; you map roles to concrete models per machine or project and switch stacks with one preset command.
 - **Per-model editing** — each model edits through the tool it knows best: DeepSeek gets its `str_replace_editor` contract, GLM/Qwen/Kimi use the host built-in `edit`, GPT keeps the host `apply_patch` path, and unmatched models get the plugin's `hashline_edit`. Routing is resolved dynamically per session and exposes exactly one edit tool to each model.
-- **Provider-neutral web tools** — agents get one canonical `web_search` and `web_fetch` contract backed by Exa, Brave, Z.AI, native retrieval, or Spider, instead of provider-specific search and reader schemas leaking into your prompts.
+- **Provider-neutral web tools** — agents get one canonical `web_search` and `web_fetch` contract backed by Exa, Brave, Z.AI, DeepSeek, native retrieval, or Spider, instead of provider-specific search and reader schemas leaking into your prompts.
 - **Long-run safety** — Guardian auto-approves routine low-risk permissions (risky ones stay in OpenCode's manual approval flow), and secrets are redacted before they reach the model.
 - **Reproducible setup** — `vvoc install` / `vvoc sync` recreate the same workflow on any machine or project.
 
@@ -177,7 +177,7 @@ The server plugins run inside the OpenCode server process; **ContextTuiPlugin** 
 | **HashlineEditPlugin** | Routes each model to exactly one native edit tool (host `edit` for GLM/Qwen/Kimi, host `apply_patch` for GPT, `str_replace_editor` for DeepSeek, `hashline_edit` for unmatched models) and hides the other edit tools per session. |
 | **SystemContextInjectionPlugin** | Injects universal guidance — including correctness obligations and evidence discipline for behavior changes — plus the work policy selected by the orchestration profile into vv-controller at startup; subagents stay unpolluted. Skill discovery is registered by `vvoc install`/`sync` through the native `skills` config, not by a plugin. |
 | **SecretsRedactionPlugin** | Redacts tokens, keys, emails, and other sensitive values before messages reach the model, restoring them only where local execution needs the originals. |
-| **WebToolsPlugin** | Two provider-neutral tools — `web_search` and `web_fetch` — over Exa, Brave, Z.AI, native retrieval, or Spider, with permission checks and normalized output. |
+| **WebToolsPlugin** | Two provider-neutral tools — `web_search` and `web_fetch` — over Exa, Brave, Z.AI, DeepSeek, native retrieval, or Spider, with permission checks and normalized output. |
 | **ToolHistoryCompactionPlugin** | Shrinks the context replayed to the model by compacting old tool outputs non-destructively, without touching on-disk history. |
 | **AnalyticsPlugin** | Local-only token and cache telemetry per model step, a live `cache NN%` indicator in the TUI, and `vvoc analytics cache-hit-rate` for retrospective comparison. |
 | **PeakHoursPlugin** | Warns or blocks models whose provider is in peak-priced hours right now, suggests connected off-peak providers, and shows a persistent orange banner in the TUI. |
@@ -743,8 +743,8 @@ Diagnose the bridge without opening the server: `vvoc telegram status` reports t
 
 `WebToolsPlugin` exposes exactly two canonical model-facing tools:
 
-- `web_search` requests the `web_search` permission and returns ranked titles, URLs, snippets, and publication dates. Search uses Exa by default, Brave when configured, or the direct Z.AI/Zhipu Tool API for an explicitly selected region.
-- `web_fetch` requests the `web_fetch` permission and retrieves a known HTTP or HTTPS URL as Markdown, text, raw HTML, or a direct JPEG, PNG, GIF, WebP, or PDF attachment. Fetch uses local native retrieval by default, Spider for configured textual extraction, or the direct Z.AI/Zhipu Reader Tool API.
+- `web_search` requests the `web_search` permission and returns ranked titles, URLs, snippets, and publication dates. Search uses Exa by default, Brave when configured, the direct Z.AI/Zhipu Tool API for an explicitly selected region, or the direct DeepSeek Search Tool API.
+- `web_fetch` requests the `web_fetch` permission and retrieves a known HTTP or HTTPS URL as Markdown, text, raw HTML, or a direct JPEG, PNG, GIF, WebP, or PDF attachment. Fetch uses local native retrieval by default, Spider for configured textual extraction, the direct Z.AI/Zhipu Reader Tool API, or the direct DeepSeek Fetch Tool API, which always returns Markdown.
 
 The `web-tools` vvoc plugin toggle is enabled by default. Provider selection belongs to `vvoc.json`, not to individual model calls:
 
@@ -755,7 +755,7 @@ The `web-tools` vvoc plugin toggle is enabled by default. Provider selection bel
 }
 ```
 
-Supported search providers are `exa` (default), `brave`, and `zai`. Supported fetch providers are `native` (default, no credential required), `spider`, and `zai`. A `zai` section must set `region` to either `international` or `china`; the plugin never guesses or falls back to another region.
+Supported search providers are `exa` (default), `brave`, `zai`, and `deepseek`. Supported fetch providers are `native` (default, no credential required), `spider`, `zai`, and `deepseek`. A `zai` section must set `region` to either `international` or `china`; the plugin never guesses or falls back to another region. The `deepseek` provider requires no region.
 
 Both tools validate a closed caller contract before any provider dispatch. `web_search` accepts `query`, an optional `count` (1–20), and an optional `freshness`; `web_fetch` accepts a URL, an optional `format`, and an optional `timeout` in seconds greater than 0 and at most 120 (fractional values such as `0.5` are allowed). Unknown keys, an invalid URL scheme or shape, or an out-of-range provided value are rejected before the permission prompt or any provider request, so no provider is dispatched and no network call is made. Provider credentials are resolved from configuration once at startup as described below; structural validation only prevents the permission prompt, provider dispatch, and network use, and does not re-resolve or override that startup resolution. Document text, binary/media content, and per-call provider or credential selection are never part of the caller contract. Defaults are applied at execution time even when OpenCode forwards raw, unparsed arguments, so the effective behavior is unchanged: an omitted `count` is 8, an omitted `format` is `markdown`, and an omitted `timeout` is 30 seconds (bounded at 120). Provider and credential configuration is still resolved once at startup from `vvoc.json`; changing it takes effect only after restarting OpenCode through the same `vvoc sync` and restart flow as before.
 
@@ -768,9 +768,11 @@ Direct Z.AI endpoint routing:
 
 The `zai` provider calls these documented REST Tool APIs directly. It does not use MCP, install or manage Z.AI MCP servers, or consume GLM Coding Plan MCP quota. Direct requests require ordinary Z.AI/Zhipu API entitlement and may use paid API balance. For fetch, supported image and PDF URLs still return direct attachments; textual targets are sent to the selected regional Reader endpoint.
 
+The `deepseek` provider likewise calls the documented DeepSeek Tool APIs directly — search at `https://api.deepseek.com/v1/tools/search` and fetch at `https://api.deepseek.com/v1/tools/fetch` — with bearer authentication using the same API key as the DeepSeek chat completions API, and it does not use MCP. The search query is forwarded verbatim, including operators such as `site:` and quoted phrases, `freshness` maps to the documented `after:` operator, and search requests snippets only, so full pages go through `web_fetch`, whose DeepSeek route returns Markdown content. Only documented rate-limit responses are retried, with bounded backoff. Direct requests require ordinary DeepSeek API entitlement and may use paid API balance.
+
 Credentials resolve in this order:
 
-1. `EXA_API_KEY`, `BRAVE_API_KEY`, `SPIDER_API_KEY`, or `ZAI_API_KEY` for the selected provider
+1. `EXA_API_KEY`, `BRAVE_API_KEY`, `SPIDER_API_KEY`, `ZAI_API_KEY`, or `DEEPSEEK_API_KEY` for the selected provider
 2. `web.search.apiKey` or `web.fetch.apiKey` in the effective `vvoc.json`
 
 Environment variables win when both sources exist; config changes take effect after restarting OpenCode. Config `apiKey` values may be literal or use `${VAR}` placeholders resolved from the OpenCode process environment at startup, matching `secretsRedaction.secret`; a placeholder referencing an unset or empty variable logs a startup warning naming the config field and the missing variable names, never values. Placeholder-resolved `apiKey` values become exact-match SecretsRedactionPlugin rules for provider-bound message flows, and WebToolsPlugin diagnostics report only the credential source (`env` or `config`), never the value. If a project-layer `.vvoc/vvoc.json` containing an `apiKey` is tracked by Git, startup logs warn with the file name only. Prefer environment variables or the global vvoc layer; do not commit credentials.

@@ -85,7 +85,9 @@ them too. Together they are the whole interface the model uses.
 Every item has a **stable id** (a number, e.g. `3`), assigned when the item is
 first written and preserved across list rewrites by matching content. Ids are
 shown as `#3` in `todo_read`, in the injected context block, and in the panel,
-and are what `todo_remove` and the panel's remove key take.
+and are what `todo_remove` and the panel's remove key take. The stored id is a
+bare token — the leading `#` is display-only, so sending `#3` back is accepted
+and normalized to `3` (a decorated id is also healed on load).
 
 ### `todo_write`
 

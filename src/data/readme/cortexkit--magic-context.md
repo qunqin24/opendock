@@ -243,7 +243,7 @@ Because it runs during idle time, the dreamer pairs well with local models, even
 
 Recall works **across sessions** (a new session inherits everything) and **across harnesses** (write a memory in OpenCode, retrieve it in Pi or OMP).
 
-> **Auto search hints** *(on by default)* run a background `ctx_search` each turn and whisper a "vague recall" when something relevant exists — like almost remembering a note you took. It appends only compact fragments, never full content; set `memory.auto_search.enabled: false` to turn it off. **Git commit indexing** *(opt-in)* makes your project history semantically searchable as an additional `ctx_search` source — enable with `memory.git_commit_indexing.enabled: true`.
+> **Auto search hints** *(on by default)* run a background `ctx_search` each turn and whisper a "vague recall" when something relevant exists — like almost remembering a note you took. It appends only compact fragments, never full content; set `memory.auto_search.enabled: false` to turn it off. It also searches past conversation with `memory.enabled: false`, so turning memory off does not turn it off. **Git commit indexing** *(opt-in)* makes your project history semantically searchable as an additional `ctx_search` source — enable with `memory.git_commit_indexing.enabled: true`.
 
 ### Agent tools at a glance
 

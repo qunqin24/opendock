@@ -9,7 +9,7 @@
 把任意一个 [sub2api](https://github.com/Wei-Shaw/sub2api) 站点接成 [magpie](https://usemagpie.ai) 的 provider：填站点地址和 API key 登录，magpie 就能用这个 key 所在分组的模型，并按 key 的剩余额度做路由。
 
 - **模型**：取自 `GET /v1/models`（key 所在分组列出的模型）。Claude 系列走 `/v1/messages`，OpenAI 系列（`gpt-*`、`o1`/`o3`…、`codex-*`）走 `/v1/responses`，其余走 `/v1/chat/completions`。
-- **思考等级**：取自站点的 Codex 模型清单（`GET /backend-api/codex/models` 里每个模型的 `supported_reasoning_levels`），magpie / Codex 里就能切换。站点给不出时，沿用 magpie 已有的该模型等级（models.dev 或配置里的 `variants`），再没有就给会思考的模型 `low` / `medium` / `high`。
+- **思考等级**：取自站点的 Codex 模型清单（`GET /backend-api/codex/models` 里每个模型的 `supported_reasoning_levels`），magpie / Codex 里就能切换。站点给不出时，看 [models.dev](https://models.dev) 上该模型的官方条目（只认模型所属厂商自己那一条，如 `deepseek` 下的 `deepseek-flash`，转售方的不算）：会不会思考、`reasoning_options` 里的 effort 档位、是否要回传上一轮思考（`interleaved`）、上下文和输出上限。没有官方条目时，沿用 magpie 已有的该模型等级（models.dev 或配置里的 `variants`），再没有就给会思考的模型 `low` / `medium` / `high`。models.dev 一天拉一次，结果存在系统缓存目录（`$XDG_CACHE_HOME`，否则 macOS 为 `~/Library/Caches`、其他为 `~/.cache`）下的 `magpie-sub2api/models-dev.json`，magpie 重启也不重拉；拉不到时照旧，不影响模型列表。
 - **用量**：取自 `GET /v1/usage`，按 key 的计费方式换成 magpie 的用量窗口（见下表）。magpie 的用量页、菜单栏和路由都读这些窗口：某个窗口用满后，magpie 会先绕开这个 key。
 
 ## 为什么不用 magpie 自带的 `balance=/v1/usage`

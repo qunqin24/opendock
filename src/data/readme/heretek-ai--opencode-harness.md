@@ -1,8 +1,59 @@
-# `@heretek-ai/opencode-harness` (`v1.0.7`)
+# `@heretek-ai/opencode-harness` (`v1.0.12`)
 
 Plugin-first OpenCode v2 in-process harness targeting **Muse 1.3** (`opencode-go/muse-spark-1.3-contributor`): zero-patch built-in tool interceptors (`edit`, `read`, `write`, `patch`, `shell`, `subagent`), post-formatter FNV-1a `<post-edit-anchors>` resync receipts, adaptive `session.hook("retry")` stream/overload recovery, cross-file relative import & named-export contract verification, lexer-safe atomic multi-file `rename_symbol`, Dual Direct + Code Mode (`tools.harness.*`) tool registration, 4-hex FNV-1a hash-anchored file edits, AST structural codemods, PageRank repository mapping, lexer-aware symbol reference & call-site search, blast-radius, circular-dependency & dead-code architecture auditing, all-or-nothing atomic transactions, warm-cached post-mutation diagnostics, stack-frame `<fault-context>` localization, head+tail anti-truncation output compaction, KV-cache-safe context budgeting, automatic circuit-breaker episodic lesson synthesis, role/path/contract/taint permission guards, a doom-loop circuit breaker, and DOM geometry auditing.
 
 Single-session in-process plugin only — no HTTP servers, daemons, or multi-agent DAG schedulers. See `AGENTS.md` for the scope contract and `docs/prompts/SPEC.md` for the full build specification.
+
+### Requirements (OH-8.2-install-story)
+
+Minimum supported host: **`anomalyco/opencode@ed772f5`** (dev, 2026-10-16 —
+the pinned commit `scripts/host-test/run.sh` verifies against) or any newer
+`anomalyco/opencode` dev commit whose promise-plugin API (`ctx.tool`,
+`ctx.permission`, `ctx.session`, `ctx.shell`, `ctx.agent`, `ctx.command`,
+`ctx.mcp`, `Tool.Options` `{namespace, codemode, pinned}`) still matches the
+shapes in `src/host/contract-adapter.ts`. Stock `opencode-ai@latest`
+compatibility is **unproven** (no `repository`/`homepage` metadata to
+cross-check the fork's promise-plugin API against it) — do **not** install
+the stock host and expect the harness to load.
+
+Install the supported host (one command):
+
+```bash
+git clone https://github.com/anomalyco/opencode.git && \
+  git -C opencode checkout ed772f5009755b5262805a7ba07e66e1417f140a && \
+  (cd opencode && bun install --ignore-scripts)
+```
+
+then point the harness at it:
+
+```bash
+OPENCODE_DIR=/path/to/opencode make host-test
+```
+
+Pin-advance matrix note: whenever `OPENCODE_REF` in `scripts/host-test/run.sh`
+advances, update the commit in this section in the same change and re-run
+`make host-test` at both the old pin and the new head before merging — the
+two pins are the supported-host matrix until a newer floor is proven.
+
+### LOC budget note (OH-scope-loc-budget)
+
+`src/` currently holds 22 modules (~12.0k raw / ~10.0k stripped LOC, self-cap
+raw ≤ 12,100 / stripped ≤ 10,100 — revised by audit-remediation-C for the
+mandated P1/P2/P3 security fixes, which cannot stay net-zero against a
+99.9%-full cap; functionality is never deleted to hit a line count)
+against the
+original blueprint budget of 3,000–5,000 LOC (and the original ~450-line sketch
+ask). The overage is authorized scope growth, not drift: 8 waves delivered a
+14-tool plugin with 8 pinned Code Mode companions, 16+ zero-patch interceptors,
+permission/taint/circuit-breaker guards, RepoMap/blast-radius/rename engines,
+incremental verification, architecture auditing, calibration, episodic memory,
+transactions, and DOM auditing. The revised tracked budget is raw ≤ 12,100 /
+stripped ≤ 10,100, enforced as a CI tracking signal (`bash
+scripts/check-loc.sh`, wired into `.github/workflows/ci.yml`) — it reports and
+warns but never fails the build in its default form, and functionality is never
+deleted to hit a line count. The same script doubles as a hard gate:
+`bash scripts/check-loc.sh --fail-over=12100 --fail-over-stripped=10100`
+(the CI gate form) exits non-zero over either cap.
 
 ## Install & Build
 
@@ -21,9 +72,13 @@ make host-test  # load the plugin into a real OpenCode V2 host (see below)
 pinned commit, copies `scripts/host-test/harness-host.upstream.ts` into
 `packages/core/test/plugin/`, and runs it with the upstream plugin fixture. It
 asserts every tool registers through the real promise-plugin adapter and tool
-registry, that `file_hash_read` executes, and that unload succeeds. Override
-the upstream commit with `OPENCODE_REF=<sha>` or reuse a checkout with
-`OPENCODE_DIR=<path>`. CI runs it on every pull request.
+registry, executes all 14 tools (mutating tools via in-memory/no-op and
+fail-closed failure paths so the checkout is never modified), executes a
+Code Mode `tools.harness.*` companion, fires every hook through the real
+pipeline, and asserts scope-close unload removes all tools/hooks and reload
+restores them exactly once. Override the upstream commit with
+`OPENCODE_REF=<sha>` or reuse a checkout with `OPENCODE_DIR=<path>`. CI runs
+it on every pull request.
 
 ## Plugin Usage
 
@@ -40,7 +95,7 @@ Host contract notes:
 ```jsonc
 {
   "plugins": [
-    ["@heretek-ai/opencode-harness", {
+    { "package": "@heretek-ai/opencode-harness", "options": {
       "contextBudgetTokens": 4000,
       // Opt-in: add lsp-mcp-server (bunx) and fallow-mcp (npx --yes) when absent.
       // Off by default because both download and run npm packages.
@@ -49,16 +104,22 @@ Host contract notes:
       // tool guidance to the system prompt. Off by default because it changes
       // the system prompt for every model.
       "museCalibration": false
-    }]
+    } }
   ]
 }
 ```
+
+> Config shape note: under the native v2 `plugins` key, entries must be
+> strings or `{ "package": ..., "options"?: ... }` objects. The legacy tuple
+> form (`["pkg", { ... }]`) belongs to the old v1 `plugin` key only — under
+> `plugins` the upstream decoder drops tuple entries, so the harness would
+> never load. Always use the object form above.
 
 For tests or custom hosts, `setupOpenCodeV2Harness(ctx, options)` returns `{ report, ready, dispose }`, where `report` is the `/doctor` self-diagnostics.
 
 ### KV-cache note on `event.system`
 
-The original spec required `event.system` to stay byte-for-byte unchanged. With `museCalibration: true`, the `session.hook("prompt" | "context" | "generate")` calibration deliberately rewrites the upstream `meta.txt` subagent bullet and appends a static guidance overlay to `event.system[0]`. The result is identical on every turn, so provider prefix caches still hit; dynamic context (task, plan, lessons) is still appended only to the last user message. If upstream rewords the bullet, a one-line fallback matcher still replaces it. With the default (`false`), the system prompt is left untouched.
+The original spec required `event.system` to stay byte-for-byte unchanged. With `museCalibration: true`, the `session.hook("context" | "generate")` calibration deliberately rewrites the upstream `meta.txt` subagent bullet and appends a static guidance overlay to `event.system[0]`. The result is identical on every turn, so provider prefix caches still hit; dynamic context (task, plan, lessons) is still appended only to the last user message. The `session.hook("prompt")` handler sanitizes upstream prompt text (compaction pseudo-transcripts) — the shape the real host sends, which carries no `system` — and only calibrates `system` on hosts that provide it. If upstream rewords the bullet, a one-line fallback matcher still replaces it. With the default (`false`), the system prompt is left untouched.
 
 ### 2. Explicit Programmatic Activation (`activate` / `createHarnessPlugin`)
 

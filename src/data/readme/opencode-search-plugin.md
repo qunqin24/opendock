@@ -2,28 +2,64 @@
 
 **English** · [简体中文](README.zh-CN.md)
 
-Eleven self-contained [OpenCode](https://opencode.ai) v2 plugins that register web search providers. Each file stands on its own: copy one into your plugins directory, or install the package to get all eleven.
+[![npm version](https://img.shields.io/npm/v/opencode-search-plugin.svg)](https://www.npmjs.com/package/opencode-search-plugin)
+[![npm downloads](https://img.shields.io/npm/dm/opencode-search-plugin.svg)](https://www.npmjs.com/package/opencode-search-plugin)
+[![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-[AnySearch](https://www.anysearch.com/) · [Brave Search](https://brave.com/search/api/) · [DeepSeek](https://api-docs.deepseek.com/guides/search/) · [Jina](https://jina.ai/) · [Keenable](https://keenable.ai/) · [Linkup](https://www.linkup.so/) · [Metaso](https://metaso.cn/) · [Querit](https://querit.ai/) · [SerpApi](https://serpapi.com/) · [Serper](https://serper.dev/) · [You.com](https://you.com/)
+**Web search for OpenCode that works out of the box, no API key required.**
+
+AnySearch and Keenable work immediately without any configuration. Other providers activate only when an API key is configured, ensuring you are not billed for unused services.
+
+When OpenCode operates in `random` mode, it automatically fails over to the next available provider if one encounters an HTTP 429 rate limit. Providers without configured keys are excluded from the pool, preventing requests to unconfigured services.
+
+```sh
+opencode plugin add opencode-search-plugin
+```
+
+After installation, ask OpenCode any question that requires a web search.
+
+## Skip the provider prompt
+
+On your first search, OpenCode prompts you to select a search provider. Set `websearch.provider` in your configuration to bypass this prompt:
+
+```jsonc
+{
+  "$schema": "https://opencode.ai/config.json",
+  "websearch": { "provider": "random" }
+}
+```
+
+`"random"` uses one provider per session and automatically fails over to another if rate-limited. You can also pin a specific provider using its ID (such as `"osp-brave"`), or disable web search with `false`.
+
+<!-- TODO: replace this comment with a 10-second GIF:
+     set websearch.provider -> ask a question -> provider responds with sources -->
+
+## Supported providers
+
+[AnySearch](https://www.anysearch.com/) · [Bocha](https://bocha.ai/) · [Brave Search](https://brave.com/search/api/) · [DeepSeek](https://api-docs.deepseek.com/guides/search/) · [Jina](https://jina.ai/) · [Keenable](https://keenable.ai/) · [Linkup](https://www.linkup.so/) · [Metaso](https://metaso.cn/) · [Ollama](https://ollama.com/) · [Perplexity](https://www.perplexity.ai/) · [Querit](https://querit.ai/) · [SerpApi](https://serpapi.com/) · [Serper](https://serper.dev/) · [You.com](https://you.com/) · [Zhipu](https://bigmodel.cn/)
 
 ## Why this exists
 
-OpenCode v2 ships with five web search providers built in: `exa`, `firecrawl`, `parallel`, `tavily` and `tinyfish`. Outside that set, a much wider field of search APIs offers free quotas or free tiers — enough to run an agent's searches without paying for the privilege.
+OpenCode v2 ships with several built-in search providers: `exa`, `firecrawl`, `parallel`, `tavily`, and `tinyfish`. In addition, many external search APIs offer free tiers or generous free quotas.
 
-This repository adds plugins for eleven more of them, taking the pool from five providers to sixteen. AnySearch and Keenable run without a key at all; the other nine bind only when you supply one, so installing this package never routes a query to a provider that would immediately fail. Which of them are worth your time depends on the free tier each one currently offers, so check a provider's pricing before you rely on it.
+This plugin integrates those providers into OpenCode:
+
+- AnySearch and Keenable work immediately without an API key or account.
+- Multiple providers offer free tiers, making it practical to maintain a low-cost backup pool.
+- Expands OpenCode's `random` mode pool: when a provider returns an HTTP 429, OpenCode retries with another to prevent search interruptions.
 
 ## Install
 
-Three equivalent ways to install; pick one. **npm is recommended**: a version published to the registry is immutable, so a pinned `@2.1.1` always installs the same bytes, whereas a GitHub tag can in principle be moved by a maintainer to point at a different commit. The first two install the same complete package (all eleven); use the third for one or two files only.
+Choose your preferred installation method. **npm is recommended**: published versions are immutable, so pinning with `@<version>` guarantees a consistent build.
 
 ### 1. From npm (recommended)
 
 ```sh
-# add @2.1.1 to pin
+# Append @<version> to pin a specific version
 opencode plugin add opencode-search-plugin
 ```
 
-or declare it in `opencode.json(c)`:
+Or declare it in `opencode.json(c)`:
 
 ```jsonc
 {
@@ -35,11 +71,11 @@ or declare it in `opencode.json(c)`:
 ### 2. From GitHub
 
 ```sh
-# add #v2.1.1 to pin
+# Append #v<version> to pin a specific tag
 opencode plugin add github:guotree/opencode-search-plugin
 ```
 
-or declare it in `opencode.json(c)`:
+Or declare it in `opencode.json(c)`:
 
 ```jsonc
 {
@@ -50,24 +86,24 @@ or declare it in `opencode.json(c)`:
 
 ### 3. By copying a file
 
-Every plugin is a single `.ts` file with no relative imports and no build step. Drop it where OpenCode auto-discovers plugins:
+Each provider plugin is a self-contained `.ts` file with no relative imports and no build step. Place it in one of OpenCode's auto-discovery directories:
 
 ```text
 ~/.config/opencode/plugins/            # global
-<project>/.opencode/plugins/           # one project
+<project>/.opencode/plugins/           # project-scoped
 ```
 
-For a location that is not auto-discovered, list it explicitly:
+For directories outside the auto-discovery paths, specify the file path explicitly:
 
 ```jsonc
 { "plugins": ["./plugins/brave-search.ts"] }
 ```
 
-> Do not install the package *and* copy its files. Both register the same websearch provider IDs, so the pool would contain each service twice.
+> Do not install the package *and* copy individual plugin files. Both register the same provider IDs, which will duplicate entries in the search pool.
 
-### Skip the services you have no key for
+### Skip providers you don't use
 
-Loading the package registers all eleven, but a provider without a key never joins the search pool — see [Keys](#keys). To keep some out of the registry entirely, use either or both of these optional options:
+Installing the package registers all providers, but providers without configured API keys remain inactive (see [Keys](#keys)). To completely exclude or restrict providers, use `disable` or `enable`:
 
 ```jsonc
 {
@@ -80,181 +116,205 @@ Loading the package registers all eleven, but a provider without a key never joi
 }
 ```
 
-- `disable` is a deny-list: it never registers the IDs it names — the provider IDs in the table below. AnySearch and Keenable need no key, so `disable` is the only way to keep those two out of the pool.
-- `enable` is an allow-list: only the IDs it names are registered, and everything else is skipped — `"enable": ["osp-brave", "osp-jina"]` runs those two alone.
+- `disable`: Deny-list of provider IDs (from the table below). Because AnySearch and Keenable require no key, `disable` is the only way to remove them from the pool.
+- `enable`: Allow-list of provider IDs. Only the listed IDs are registered. For example, `"enable": ["osp-brave", "osp-jina"]` activates only those two.
 
-When both are set, **`disable` wins on any overlap**. A per-provider exclusion is never overridden by a bulk allow-list:
+If both are specified, **`disable` takes precedence on any overlap**:
 
 ```jsonc
 {
   "options": {
     "enable": ["osp-brave", "osp-jina", "osp-serper"],
     "disable": ["osp-serper", "osp-youcom"]
-    // osp-serper stays out: disable overrides enable.
-    // osp-youcom was never allowed in; that entry is inert.
+    // osp-serper is excluded: disable overrides enable.
+    // osp-youcom was not in enable, so it is safely ignored.
   }
 }
 ```
 
-Read as set arithmetic, the registered pool is `enable − disable`. The overlap drops out; a `disable` ID the allow-list never contained was never a candidate to begin with — redundant, but harmless and unreported. The overlap is the only redundancy that earns a warning, and the log names the IDs in it.
-
-```text
-enable  = {osp-brave, osp-jina, osp-serper, osp-keenable, osp-linkup}
-disable = {osp-keenable, osp-linkup, osp-youcom}
-pool    =  osp-brave, osp-jina          -- enable minus disable
-```
-
-Configuration that cannot take effect is reported in the log rather than silently dropped: an ID this package does not register (a typo) is named, as is an option that is not an array. An `enable` list that ends up naming no known provider leaves the pool empty — the log says so.
+The active set is computed as `enable - disable`. Overlapping IDs are dropped, and invalid or unrecognized IDs produce a warning in the logs rather than failing silently.
 
 ## Upgrade
 
 ```sh
-# installed from npm
+# Installed from npm
 opencode plugin update opencode-search-plugin
-# installed from GitHub
+# Installed from GitHub
 opencode plugin update github:guotree/opencode-search-plugin
-# everything outdated
+# Update all outdated plugins
 opencode plugin update
 ```
 
-The target is the specifier that was configured: an npm install is named by its package name, a GitHub install answers only to its `github:` form — naming it by its bare package name fails with `Plugin is not configured`. Run `opencode plugin check` first to see what is outdated. An install without a pinned version follows new releases; a pinned one — `@2.1.1` on npm, `#v2.1.1` on GitHub — stays on its pin until you re-run `plugin add` with a newer pin or edit the specifier in `opencode.json(c)`. A locally copied file is upgraded by copying the new version over the old one.
+The update target must match the configured plugin specifier:
+- For npm installations, use the package name (`opencode-search-plugin`).
+- For GitHub installations, use the full `github:` specifier (using a bare package name will return `Plugin is not configured`).
+
+Run `opencode plugin check` first to inspect available updates. Unpinned installations update to the latest release. Pinned installations (`@<version>` on npm, `#v<version>` on GitHub) remain at their pinned version until you edit the specifier in `opencode.json(c)` or run `plugin add` with a new version. For locally copied files, replace the existing `.ts` file with the newer version.
 
 ## Uninstall
 
 ```sh
-# installed from npm
+# Installed from npm
 opencode plugin remove opencode-search-plugin
-# installed from GitHub
+# Installed from GitHub
 opencode plugin remove github:guotree/opencode-search-plugin
 ```
 
-The same rule: pass the specifier you installed with. The command edits the global configuration; if the plugin is instead a `plugins` entry in `opencode.json(c)` or a locally copied file, delete the entry or the copied `.ts` file. Saved `/connect` credentials are untouched — a reinstall finds them again — and to turn off a few providers instead of the whole plugin, use `enable`/`disable` above.
+Pass the same specifier used during installation. This command updates global configuration. If the plugin was configured as an entry in `opencode.json(c)` or as a local file, remove the configuration entry or delete the copied `.ts` file. Saved `/connect` credentials are preserved and will be recognized upon reinstallation. To deactivate specific providers without removing the entire plugin, use `enable` / `disable` as described above.
 
 ## Keys
 
-Every provider except AnySearch and Keenable needs an API key. Give it one of two ways:
+Every provider except AnySearch and Keenable requires an API key. You can provide credentials in one of two ways:
 
-- **`/connect`** inside OpenCode — stored per provider, rotated without a restart, and survives environment changes.
-- **Environment variable** — read as a fallback, so it works in headless and CI contexts.
+- **`/connect` in OpenCode**: Stored per provider, rotatable without restarting OpenCode, and unaffected by environment changes.
+- **Environment variables**: Read as a fallback for headless, automated, or CI environments.
 
-A provider with no key stays unbound: it is absent from the websearch pool, so `"provider": "random"` can never route a query to a service that would immediately fail.
+Environment variables use the `OSP_<PROVIDER>_API_KEY` namespace (e.g., `OSP_BRAVE_API_KEY`) to prevent naming collisions with other tools that export vendor variables. Credentials stored in `/connect` always take precedence over environment variables.
 
-AnySearch and Keenable are the exceptions. Both have an anonymous tier, so they are always registered and only attach their credential header when a key exists. For Keenable the two tiers draw on separate budgets: a key spends the free allowance of 100,000 requests a month, while a keyless call goes to the `/public` endpoint instead and is metered by rate — 1,000 requests an hour and 10 a second per IP, on a pool shared with everyone else on your egress address. A key is what makes that shared headroom irrelevant.
+A provider without a configured key remains unbound: it is omitted from the search pool, ensuring `"provider": "random"` never routes queries to a service that would immediately fail.
 
-Once keys are in place, pick how OpenCode chooses among them:
+AnySearch and Keenable are exceptions. Both include an anonymous tier and are registered by default, attaching credentials only when a key is provided. For Keenable, the two tiers use separate quotas: configuring a key provides 100,000 free requests per month, whereas keyless requests route to the `/public` endpoint and are rate-limited to 1,000 requests/hour and 10 requests/second per IP (shared across all users on that egress address). Configuring an API key removes dependence on that shared IP rate limit.
 
-```jsonc
-{ "websearch": { "provider": "random" } }
-```
-
-`random` spreads queries across every bound provider. Set it to a specific ID such as `"osp-brave"` to pin one, or `false` to turn web search off.
+With keys configured, `websearch.provider` controls routing: `"random"` distributes queries across all bound providers (see [Skip the provider prompt](#skip-the-provider-prompt)), a specific ID such as `"osp-brave"` pins that provider, and `false` disables web search entirely.
 
 ## Providers
 
-Every ID below carries an `osp-` prefix — this package's namespace. OpenCode's own providers register bare vendor names (`exa`, `tavily`), and a vendor's official plugin would do the same, so the prefix is what keeps those entries from colliding with ours — both in the websearch pool and in the `/connect` table, where credentials are keyed by integration ID. Use the prefixed form verbatim in `websearch.provider` and in `enable`/`disable`.
+Each provider ID carries an `osp-` prefix to prevent name collisions with OpenCode's built-in providers or official vendor plugins (which use bare names like `exa` or `tavily`). Use the prefixed ID in `websearch.provider` and in `enable` / `disable` options.
 
-The namespace also shows on the display name: `/connect` lists each of this package's entries with an `(osp)` marker — `DeepSeek (osp)` beside a built-in `DeepSeek` — so a key saved here cannot be mistaken for a built-in provider's. The websearch pool keeps the plain provider name, since the pool holds only search providers and the collision does not exist there.
+In OpenCode's `/connect` settings, each provider is labeled with an `(osp)` suffix (e.g., `DeepSeek (osp)`) to distinguish it from built-in integrations. The search pool itself displays the clean provider name without the suffix.
 
 | Provider | ID | Key (env / `/connect`) | Anonymous | Notes |
 | --- | --- | --- | --- | --- |
-| AnySearch | `osp-anysearch` | `ANYSEARCH_API_KEY` | yes | Free tier per IP; intent router, `cn`/`intl` zones |
-| Brave Search | `osp-brave` | `BRAVE_SEARCH_API_KEY` | no | Independent index, 20 results max |
-| DeepSeek | `osp-deepseek` | `DEEPSEEK_API_KEY` | no | In-house index; $0.75 per 1,000 successful requests; 5 QPS cap |
-| Jina | `osp-jina` | `JINA_API_KEY` | no | Page content is opt-in because it is token-billed |
-| Keenable | `osp-keenable` | `KEENABLE_API_KEY` | yes | 100,000 requests a month with a key; keyless tier is per IP |
-| Linkup | `osp-linkup` | `LINKUP_API_KEY` | no | `flash`/`fast`/`standard`/`deep` reasoning depth |
-| Metaso | `osp-metaso` | `METASO_API_KEY` | no | Billed per search, not per result |
-| Querit | `osp-querit` | `QUERIT_API_KEY` | no | Falls back to sentence matches when a snippet is missing |
-| SerpApi | `osp-serpapi` | `SERPAPI_API_KEY` | no | Google via SerpApi; also has its own free 1-hour server cache |
-| Serper | `osp-serper` | `SERPER_API_KEY` | no | Google via Serper; billed per query in credits |
-| You.com | `osp-youcom` | `YDC_API_KEY` | no | Web and news merged; extraction modes |
+| AnySearch | `osp-anysearch` | `OSP_ANYSEARCH_API_KEY` | yes | Free tier per IP; intent routing, `cn` / `intl` zones |
+| Bocha | `osp-bocha` | `OSP_BOCHA_API_KEY` | no | Bing-compatible results; billed per search, and by token when summaries are requested |
+| Brave Search | `osp-brave` | `OSP_BRAVE_API_KEY` | no | Independent index, 20 results max |
+| DeepSeek | `osp-deepseek` | `OSP_DEEPSEEK_API_KEY` | no | In-house index; $0.75 per 1,000 successful requests; 5 QPS rate limit |
+| Jina | `osp-jina` | `OSP_JINA_API_KEY` | no | Full-page content is opt-in due to token-based billing |
+| Keenable | `osp-keenable` | `OSP_KEENABLE_API_KEY` | yes | 100,000 free requests/month with a key; keyless tier is rate-limited per IP |
+| Linkup | `osp-linkup` | `OSP_LINKUP_API_KEY` | no | Four reasoning depths: `flash`, `fast`, `standard`, `deep` |
+| Metaso | `osp-metaso` | `OSP_METASO_API_KEY` | no | Billed per search, not per result |
+| Ollama | `osp-ollama` | `OSP_OLLAMA_API_KEY` | no | Free personal tier; returns full-page markdown per result (up to 10 results, no publication dates) |
+| Perplexity | `osp-perplexity` | `OSP_PERPLEXITY_API_KEY` | no | Search API returns direct search results without generated answers; $5.00 / 1,000 requests ($1.00 with `fast`) |
+| Querit | `osp-querit` | `OSP_QUERIT_API_KEY` | no | Falls back to sentence matches when a snippet is missing |
+| SerpApi | `osp-serpapi` | `OSP_SERPAPI_API_KEY` | no | Google via SerpApi; includes SerpApi's free 1-hour server-side cache |
+| Serper | `osp-serper` | `OSP_SERPER_API_KEY` | no | Google via Serper; billed per query in credits |
+| You.com | `osp-youcom` | `OSP_YDC_API_KEY` | no | Combined web and news results; multiple extraction modes |
+| Zhipu | `osp-zhipu` | `OSP_ZHIPU_API_KEY` | no | Standalone search endpoint, no model call; billed per search from ¥0.01 (Search-Std), no free tier; four engines including Sogou and Quark; `cn` / `intl` sites both supported |
 
 ## Configuration
 
-Knobs are environment variables, read once when OpenCode starts — change one and restart. Defaults match what each API documents, so leaving them unset is the right starting point.
+Configuration options are loaded as environment variables on startup. If you change a setting, restart OpenCode for it to take effect. Default values align with upstream API documentation recommendations.
 
-### Shared by all eleven
+### Shared by every provider
 
-| Variable | Default | Meaning |
+| Variable | Default | Description |
 | --- | --- | --- |
-| `<PROVIDER>_CACHE_TTL` | `600000` | Milliseconds to reuse a response for the same normalized query. `0` disables caching. |
+| `<PROVIDER>_CACHE_TTL` | `600000` | Duration in milliseconds to reuse cached responses for identical normalized queries (`0` disables caching) |
+| `<PROVIDER>_TIMEOUT` | `25000` | Timeout in milliseconds before failing a request (`0` removes timeout while preserving cancellation) |
 
 ### AnySearch
 
-| Variable | Default | Meaning |
+| Variable | Default | Description |
 | --- | --- | --- |
-| `ANYSEARCH_MAX_RESULTS` | `10` | Results per search, clamped to the API's 1–10 |
-| `ANYSEARCH_TAG` | — | Pin the intent router to a sub-domain, e.g. `code.doc` |
-| `ANYSEARCH_ZONE` | — | `cn` or `intl` |
-| `ANYSEARCH_LANGUAGE` | — | Preferred result language, e.g. `zh-CN` |
-| `ANYSEARCH_FORMAT` | `markdown` | `markdown` or `json` for the content field |
-| `ANYSEARCH_API_KEY` | — | Optional; anonymous access works without it |
+| `ANYSEARCH_MAX_RESULTS` | `10` | Results per search, clamped to 1–10 |
+| `ANYSEARCH_TAG` | — | Pins the intent router to a sub-domain, e.g., `code.doc` |
+| `ANYSEARCH_ZONE` | — | Geographic zone: `cn` or `intl` |
+| `ANYSEARCH_LANGUAGE` | — | Preferred result language, e.g., `zh-CN` |
+| `ANYSEARCH_FORMAT` | `markdown` | Content format: `markdown` or `json` |
+| `OSP_ANYSEARCH_API_KEY` | — | Optional; anonymous access is used when omitted |
+
+### Bocha
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `BOCHA_COUNT` | `10` | Results per search, clamped to 1–50 (Bocha's maximum) |
+| `BOCHA_FRESHNESS` | — | Freshness filter: `noLimit`, `oneDay`, `oneWeek`, `oneMonth`, `oneYear`, `YYYY-MM-DD`, or `YYYY-MM-DD..YYYY-MM-DD`. Omitting this parameter is recommended by Bocha, as upstream query rewriting may yield empty results for fixed ranges |
+| `BOCHA_SUMMARY` | `off` | `true` replaces snippets with generated summaries (provides more context at higher per-request cost) |
 
 ### Brave Search
 
-| Variable | Default | Meaning |
+| Variable | Default | Description |
 | --- | --- | --- |
 | `BRAVE_NUM` | `8` | Results per search, clamped to 1–20 (Brave's maximum) |
 | `BRAVE_COUNTRY` | — | Two-letter country code, or `ALL` |
-| `BRAVE_LANG` | — | Result language, e.g. `en`, `zh-hans`, `pt-br` |
-| `BRAVE_FRESHNESS` | — | `pd` (24h), `pw` (7d), `pm` (31d), `py` (365d), or `YYYY-MM-DDtoYYYY-MM-DD` |
+| `BRAVE_LANG` | — | Result language code, e.g., `en`, `zh-hans`, `pt-br` |
+| `BRAVE_FRESHNESS` | — | Time filter: `pd` (24h), `pw` (7d), `pm` (31d), `py` (365d), or `YYYY-MM-DDtoYYYY-MM-DD` |
 
 ### DeepSeek
 
-| Variable | Default | Meaning |
+| Variable | Default | Description |
 | --- | --- | --- |
-| `DEEPSEEK_COUNT` | `10` | Results per search, clamped to 1–50 (DeepSeek's maximum). Price is per request, so more results cost nothing extra |
+| `DEEPSEEK_COUNT` | `10` | Results per search, clamped to 1–50 (DeepSeek's maximum). Billed per request; additional results incur no extra charge |
 
 ### Jina
 
-| Variable | Default | Meaning |
+| Variable | Default | Description |
 | --- | --- | --- |
-| `JINA_NUM` | `0` | Results per search, 1–100. `0` omits the parameter, which keeps Jina's faster and wider result types |
-| `JINA_INCLUDE_CONTENT` | off | `true` returns each hit's full page markdown — far more context and billed tokens |
+| `JINA_NUM` | `0` | Results per search (1–100). `0` omits the parameter, preserving Jina's faster and broader result types |
+| `JINA_INCLUDE_CONTENT` | `off` | `true` returns full-page markdown per hit, significantly increasing context and billed tokens |
 | `JINA_GL` / `JINA_HL` | — | Country / language code |
-| `JINA_LOCATION` | — | City-level origin to simulate, e.g. `Berlin` |
+| `JINA_LOCATION` | — | Simulated city-level location, e.g., `Berlin` |
+| `JINA_TIMEOUT` | `25000` (`60000` with `JINA_INCLUDE_CONTENT`) | Request timeout in milliseconds; full-page fetching uses a higher default timeout |
 
 ### Keenable
 
-| Variable | Default | Meaning |
+| Variable | Default | Description |
 | --- | --- | --- |
 | `KEENABLE_MAX_RESULTS` | `10` | Results per search, clamped to 1–50 |
-| `KEENABLE_MODE` | — | `pro` (deeper retrieval) or `realtime` (fastest); unset leaves Keenable's own default |
-| `KEENABLE_TITLE` | `opencode-search-plugin` | App name sent as `X-Keenable-Title`, which the keyless endpoint requires to attribute the call |
-| `KEENABLE_API_KEY` | — | Optional; keyless access works without it |
+| `KEENABLE_MODE` | — | Search mode: `pro` (deeper retrieval) or `realtime` (faster); unset uses Keenable's default |
+| `KEENABLE_TITLE` | `opencode-search-plugin` | Application identifier sent as `X-Keenable-Title`, required by the keyless endpoint for attribution |
+| `OSP_KEENABLE_API_KEY` | — | Optional; keyless access is used when omitted |
 
 ### Linkup
 
-| Variable | Default | Meaning |
+| Variable | Default | Description |
 | --- | --- | --- |
-| `LINKUP_DEPTH` | `fast` | `flash`, `fast`, `standard`, or `deep` |
+| `LINKUP_DEPTH` | `fast` | Search depth: `flash`, `fast`, `standard`, or `deep` |
 | `LINKUP_MAX_RESULTS` | `10` | Results per search, clamped to 1–100 |
 
 ### Metaso
 
-| Variable | Default | Meaning |
+| Variable | Default | Description |
 | --- | --- | --- |
 | `METASO_SEARCH_SIZE` | `20` | Results per search, clamped to 1–100 |
-| `METASO_INCLUDE_RAW_CONTENT` | off | `true` returns every hit's full source text at the same search cost, but far more context tokens |
+| `METASO_INCLUDE_RAW_CONTENT` | `off` | `true` returns full source text per hit without extra search cost, but substantially increases context tokens |
+
+### Ollama
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `OLLAMA_MAX_RESULTS` | `5` | Results per search, clamped to 1–10 (API maximum). Because each result includes full-page markdown rather than snippets, the default 5 results provide extensive context |
+
+### Perplexity
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `PERPLEXITY_MAX_RESULTS` | `10` | Results per search, clamped to 1–20 (web search supports up to 20; `search_type=people` accepts up to 50) |
+| `PERPLEXITY_SEARCH_TYPE` | — | Search type: `web` (API default, $5.00 / 1,000 requests), `fast` ($1.00 / 1,000 requests, lower latency), or `people`; unset omits the parameter |
+| `PERPLEXITY_RECENCY` | — | Recency filter: `hour`, `day`, `week`, `month`, or `year` |
+| `PERPLEXITY_COUNTRY` | — | Two-letter ISO 3166-1 country code, e.g., `US` |
+| `PERPLEXITY_LANGUAGE` | — | Comma-separated ISO 639-1 language codes, e.g., `en,zh` (maximum of 10 codes sent, adhering to the stricter quickstart limit) |
+
+There is intentionally no domain or source filter configuration: the Perplexity API provides no dedicated toggle for news, Reddit, or academic search. Upstream documentation recommends using `search_domain_filter` allowlists per query rather than applying a global configuration.
 
 ### Querit
 
-| Variable | Default | Meaning |
+| Variable | Default | Description |
 | --- | --- | --- |
 | `QUERIT_COUNT` | `8` | Results per search |
 
 ### SerpApi
 
-| Variable | Default | Meaning |
+| Variable | Default | Description |
 | --- | --- | --- |
 | `SERPAPI_GL` / `SERPAPI_HL` | — | Country / language code |
-| `SERPAPI_TBS` | — | Advanced filter, e.g. `qdr:d` (past day), `qdr:y` (past year) |
+| `SERPAPI_TBS` | — | Advanced search filter, e.g., `qdr:d` (past day), `qdr:y` (past year) |
 
-There is deliberately no result-count knob: Google withdrew the `num` parameter, so SerpApi cannot honour one.
+There is intentionally no result-count configuration: Google deprecated the `num` parameter, so SerpApi no longer supports it.
 
 ### Serper
 
-| Variable | Default | Meaning |
+| Variable | Default | Description |
 | --- | --- | --- |
 | `SERPER_NUM` | `10` | Results per search, clamped to 1–100 |
 | `SERPER_GL` / `SERPER_HL` | — | Country / language code |
@@ -262,44 +322,62 @@ There is deliberately no result-count knob: Google withdrew the `num` parameter,
 
 ### You.com
 
-| Variable | Default | Meaning |
+| Variable | Default | Description |
 | --- | --- | --- |
 | `YOUCOM_COUNT` | `10` | Results per section (web and news each), clamped to 1–100 |
-| `YOUCOM_EXTRACTION` | `highlights` | `highlights` returns answering passages, `none` returns bare snippets, `full_page` crawls every hit and bills per live-fetched page |
-| `YOUCOM_LANGUAGE` / `YOUCOM_COUNTRY` | — | e.g. `EN` / `US` |
-| `YOUCOM_FRESHNESS` | — | `day`, `week`, `month`, `year`, or `YYYY-MM-DDtoYYYY-MM-DD` |
+| `YOUCOM_EXTRACTION` | `highlights` | Extraction mode: `highlights` returns answering passages, `none` returns raw snippets, and `full_page` fetches full pages and bills per fetched page |
+| `YOUCOM_LANGUAGE` / `YOUCOM_COUNTRY` | — | Language / country code, e.g., `EN` / `US` |
+| `YOUCOM_FRESHNESS` | — | Freshness filter: `day`, `week`, `month`, `year`, or `YYYY-MM-DDtoYYYY-MM-DD` |
+
+### Zhipu
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `ZHIPU_COUNT` | `10` | Results per search, clamped to 1–50 (Zhipu's maximum) |
+| `ZHIPU_ENGINE` | `search_std` | Search engine: `search_std` (¥0.01/search), `search_pro` (¥0.03, higher recall), `search_pro_sogou` / `search_pro_quark` (¥0.05 each). On `ZHIPU_SITE=intl` the only documented engine is `search-prime` ($0.01/search), which is also that site's default |
+| `ZHIPU_RECENCY` | — | Time filter: `oneDay`, `oneWeek`, `oneMonth`, `oneYear`, or `noLimit`. Omitting it leaves the API's `noLimit` default in place |
+| `ZHIPU_CONTENT_SIZE` | — | Excerpt length: `medium` (the API default) or `high`, which sends fuller excerpts at the same per-search price |
+| `ZHIPU_SITE` | `cn` | Endpoint: `cn` for `open.bigmodel.cn`, `intl` for `api.z.ai`. The two are separate account systems -- keys, engines and prices are not interchangeable |
+
+The default `search_std` is the cheapest engine; `search_pro` costs three times as much for higher recall, and the Sogou / Quark engines trade a higher price for their own source pools (Sogou covers the Tencent ecosystem and Zhihu; Quark skews recent). Every dispatch is billed -- there is no free tier -- so repeat queries ride the shared cache. Queries are cut to the API's 70-character `search_query` ceiling before dispatch, `count` is omitted on `search_pro_quark` (whose spec row leaves the field out), and on `search_pro_sogou` it is snapped to the nearest of 10/20/30/40/50.
 
 ## How a query flows
 
-1. OpenCode asks the selected provider for the query.
-2. The normalized query (trimmed, whitespace collapsed) is checked against an in-memory cache. A hit returns immediately — repeat queries are free and instant.
-3. On a miss the key is resolved again, so a key rotated in `/connect` applies to the very next search.
-4. The request goes out; failures surface the HTTP status and response body so you can see what the provider actually said.
-5. The response is schema-decoded, mapped to `{ url, title, content, time }`, and cached.
+1. OpenCode issues a search request to the active provider.
+2. The normalized query (trimmed of leading/trailing whitespace with internal whitespace collapsed) is checked against an in-memory cache. Cache hits return immediately without an external API request.
+3. On a cache miss, the API key is freshly resolved so that keys rotated in `/connect` take effect immediately.
+4. The request is dispatched with an abort timeout (`<PROVIDER>_TIMEOUT`, default 25s) to prevent unresponsive upstreams from hanging the session.
+5. The response is schema-validated, mapped to `{ url, title, content, time }`, and cached for subsequent identical queries.
 
-Dates are parsed from relative phrases (`3 hours ago`, `3小时前`), absolute formats (`Sep 30, 2026`, `31 Mar 2026`), and ISO 8601. Strings whose lenient parsing would invent a wrong year — `Nov 1`, which `Date.parse` reads as 2001 — are dropped rather than reported as a bogus timestamp.
+Publication dates are parsed from relative expressions (`3 hours ago`, `3小时前`), absolute dates (`Sep 30, 2026`, `31 Mar 2026`), and ISO 8601 timestamps. Incomplete date strings that could cause lenient parsers to infer an incorrect year (such as `Nov 1`) are ignored.
 
 ## Troubleshooting
 
 ```sh
-# Is the plugin loaded, and did it fail?
+# Check if the plugin is loaded and view its status
 opencode plugin list
 
-# Which providers are actually in the pool?
-# A provider missing here has no key, or `enable`/`disable` kept it out.
-# AnySearch and Keenable are always present, since neither needs a key.
+# List providers currently active in the search pool
+# A provider omitted here either lacks an API key or was excluded by enable/disable
+# AnySearch and Keenable are always included since neither requires a key
 opencode api get "/api/websearch/provider"
 ```
 
-Also worth checking:
+Common issues to check:
 
-- **A provider is missing from the pool** — it has no key, or `disable` (or a narrow `enable`) filtered it out. Run `/connect` or export its variable, then restart; credential changes made in `/connect` rebind without one. A name that should be there but is not is often a typo: the log flags unknown IDs and any `enable`/`disable` overlap.
-- **A search fails with `Keenable rate limited the request (HTTP 429)`** — the keyless pool is capped at 1,000 requests an hour and 10 a second per IP, shared with the rest of your egress address. Set `KEENABLE_API_KEY` to draw on your own allowance instead.
-- **A search fails with `Connect X in /connect, or set X_API_KEY`** — the key disappeared between binding and searching. Reconnect or re-export.
-- **Everything is slow or burning credits** — leave `*_CACHE_TTL` at its default. Repeated queries within the window are served from memory.
-- **Nothing happens after editing a plugin file** — OpenCode watches plugins and reloads them; if it does not, `opencode service restart`.
+- **Provider is missing from the search pool**: The provider lacks an API key or was excluded by `disable` (or omitted from `enable`). Configure the key in `/connect` or export its environment variable and restart OpenCode (credentials updated in `/connect` rebind immediately without restarting). If a configured provider is missing, check the logs for typos: unrecognized IDs and conflicts between `enable` and `disable` are flagged on startup.
+- **Search fails with `Keenable rate limited the request (HTTP 429)`**: The keyless tier is limited to 1,000 requests/hour and 10 requests/second per IP, shared across all users on that egress address. Configure `OSP_KEENABLE_API_KEY` to use your dedicated free monthly quota instead.
+- **Search fails with `Ollama API error 401`**: `OSP_OLLAMA_API_KEY` must be an ollama.com account key from [ollama.com/settings/keys](https://ollama.com/settings/keys). If your environment variable holds a bearer token for a local or custom Ollama proxy, configure the API key in `/connect` under **Ollama Search (osp)** instead, which takes precedence over the environment variable.
+- **Search fails with `Bocha balance is exhausted (HTTP 403)`**: The account balance is exhausted; recharge at [open.bocha.cn](https://open.bocha.cn). The error message includes Bocha's response message and a `log_id` for contacting support.
+- **Search fails with `Bocha rate limited the request (HTTP 429)`**: Bocha's per-account request limit scales with total recharge amount. When returned by Bocha, a `retry after Ns` hint is included in the error message.
+- **Search fails with `Zhipu rejected the API key (HTTP 401)`**: The key most likely belongs to the other site. The `cn` site ([open.bigmodel.cn](https://open.bigmodel.cn), `ZHIPU_SITE=cn`) and the `intl` site ([api.z.ai](https://api.z.ai), `ZHIPU_SITE=intl`) are separate account systems whose keys are not interchangeable. Set `ZHIPU_SITE` to match where the key was issued, or get a key from [bigmodel.cn](https://bigmodel.cn/usercenter/proj-mgmt/apikeys).
+- **Search fails with `Zhipu rate limited the request (HTTP 429)`**: Concurrent searches are capped per account, reported by the API as code 1701. Zhipu attaches a `retry after Ns` hint when it has one; waiting it out or running fewer searches at once clears the refusal.
+- **Search fails with `Connect X in /connect, or set OSP_X_API_KEY`**: The credentials were removed or became unavailable between provider registration and search execution. Reconfigure the key in `/connect` or export the environment variable.
+- **Search fails with `X search timed out after 25000ms`**: The upstream provider did not respond within the deadline. Retrying often succeeds. If a provider is consistently slow in your network environment, increase its `<PROVIDER>_TIMEOUT`. This deadline prevents a hanging upstream connection from blocking the entire session, as OpenCode does not enforce its own search timeout.
+- **Queries are slow or consuming excessive credits**: Keep `*_CACHE_TTL` at its default value. Identical queries within the cache TTL window are served from memory without network calls or credit consumption.
+- **Changes to a local plugin file do not take effect**: OpenCode watches plugins and reloads them automatically. If changes are not picked up, run `opencode service restart`.
 
-Logs live at `~/.local/share/opencode/log/opencode.log`; filter for `loading plugin` to see every plugin OpenCode resolved, with its entrypoint. Warnings this plugin emits about `enable`/`disable` land in the same file, carrying a `[opencode-search-plugin]` prefix.
+Logs are located at `~/.local/share/opencode/log/opencode.log`. Filter for `loading plugin` to inspect each resolved plugin and its entry point. Plugin warnings (such as `enable` / `disable` conflicts) are written to this file with an `[opencode-search-plugin]` prefix.
 
 ## Development
 
@@ -308,12 +386,12 @@ npm install
 npm run check     # typecheck + tests
 ```
 
-- `npm run typecheck` — strict TypeScript across every plugin and test.
-- `npm test` — the shared provider contract, per-provider behaviour, date parsing, aggregate registration, and repository-structure guards.
+- `npm run typecheck`: Strict TypeScript checking across all plugins and tests.
+- `npm test`: Runs the shared provider contract, individual provider behaviors, date parsing, aggregate registration, and repository structure guards.
 
-`@opencode/plugin` and `effect` are declared as **devDependencies**, not `dependencies`. OpenCode provides both to plugins at runtime — the same mechanism that lets a single `.ts` file run from `~/.config/opencode/plugins/` with no `node_modules` at all. Declaring them as runtime dependencies would make `opencode plugin add` install a 127 MB tree (`effect` alone is 47 MB, and `@opencode/plugin` pulls in `@aws-sdk`, `google-auth-library` and `@opentelemetry`) to reach 100 KB of plugin source; as devDependencies they are present for typechecking and tests, and absent from a consumer's install.
+`@opencode/plugin` and `effect` are declared as **devDependencies**, not `dependencies`. OpenCode provides both packages at runtime, which allows standalone `.ts` files to run directly from `~/.config/opencode/plugins/` without a local `node_modules` directory. Declaring them as runtime dependencies would cause `opencode plugin add` to download a 127 MB dependency tree (`effect` alone is 47 MB, and `@opencode/plugin` pulls in `@aws-sdk`, `google-auth-library`, and `@opentelemetry`) for 100 KB of plugin source code. Declaring them as devDependencies keeps them available for typechecking and testing while omitting them from consumer installations.
 
-The structure tests exist because each file must remain independently copyable: they fail if a plugin starts importing a sibling module, if the shared blocks stop being byte-identical copies, or if a provider's IDs drift apart. See [CONTRIBUTING.md](CONTRIBUTING.md).
+Structure tests enforce that each plugin file remains independently copyable. They will fail if a plugin imports a sibling module, if shared blocks diverge from their canonical byte-for-byte implementation, or if provider IDs become inconsistent. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 

@@ -45,6 +45,32 @@ https://raw.githubusercontent.com/WallBreakerNO4/opencode-commandcode-provider/m
 
 v1 支持面已冻结（只修致命问题），推荐升级到 OpenCode 2；继续使用 v1 的安装步骤见[冻结版安装指南](https://github.com/WallBreakerNO4/opencode-commandcode-provider/blob/v0.1.2/docs/guide/installation.md)。注意：V1 安装后仍需重启宿主才能加载插件。
 
+## ZDR（零数据保留）
+
+ZDR 开启后，请求只路由到不保留数据的上游。若所选模型没有 ZDR 可用上游，请求会直接失败（422 `cmd_zdr_no_providers`），不会回退到保留数据的上游。**ZDR 采用上游透传定价，单价通常高于常规请求。**
+
+默认关闭。开启方式（二选一，config 优先）：
+
+- OpenCode 2 配置（`opencode.json`）：
+
+  ```json
+  {
+    "providers": {
+      "commandcode-go": {
+        "settings": { "zdr": true }
+      }
+    }
+  }
+  ```
+
+- 环境变量：
+
+  ```bash
+  export COMMANDCODE_ZDR=1
+  ```
+
+V1 用户写入 `provider.commandcode-go.options.zdr: true`。关闭：把 `zdr` 改为 `false`（或删除该键），并确认未设置 `COMMANDCODE_ZDR`。
+
 ## 免责声明
 
 本项目为社区开发的第三方插件，与 Command Code 官方无关。插件桥接的 `/alpha/generate` 端点无公开文档，行为可能随官方更新而变动，使用产生的账号风险请自行评估。仅供学习交流。

@@ -204,20 +204,42 @@ Full shape catalogue: [`docs/PATTERNS.md`](./docs/PATTERNS.md).
 
 ## Verify
 
-Set `"debug": true`. Each turn logs one request line plus one line per response
-attempt (`sessionID/user-messageID`, `#n` counts retries):
+Set `"debug": true`. Each turn logs a request line, a wire line, and one line per
+response attempt (`sessionID/user-messageID`, `#n` counts retries):
 
 ```
-[dsml] request ses_abc/msg_xyz sanitized=2msgs/3parts nudge=no
+[dsml] request ses_abc/msg_xyz tools=12 sanitized=2msgs/3parts nudge=no
+[dsml] wire ses_abc/wire tools=12 names=[shell,edit,...] messages=27
 [dsml] response ses_abc/msg_xyz#1 recovered=1
 [dsml] response ses_abc/msg_xyz#2 passthrough
 ```
 
+- `tools=N` (on `request`): number of tools OpenCode intends to send, logged
+  before request assembly. `tools=(none)`/absent on very old logs.
+- `wire … tools=N names=[...] messages=M`: the actual `tools` array read from the
+  outbound `http.request` body (cloned, never consumed). Use it to confirm tools
+  survive to the wire — e.g. to rule out an upstream drop when DSML leaks.
 - `sanitized=Nmsgs/Mparts`: replayed history stripped, notes left behind.
 - `recovered=N`: the fix fired.
 - `passthrough`: no markup seen, bytes untouched.
 - `held-candidate-no-call`: markup-shaped but unparseable, emitted verbatim.
   Seeing this often means a new variant. File an issue with the excerpt.
+
+> `wire` only fires on in-scope `providers` with `debug: true`, on primary
+> (not sub-agent) requests.
+
+## Verify a `tools=0` correlation
+
+Malformed output is sometimes blamed on the request carrying no tools. The probe
+settles this locally: compare the `request tools=N` and `wire tools=N` values on
+the turns that leak. If both are `>0` while DSML still leaks, the tools array
+survived assembly and dispatch — the failure is downstream of OpenCode.
+
+```sh
+# tools count on every wire request, and whether tools=0 ever occurs
+grep 'wire ' /tmp/opencode/dsml-plugin.log | grep -oE 'tools=[0-9]+' | sort | uniq -c
+grep -c 'tools=0\b' /tmp/opencode/dsml-plugin.log   # want 0
+```
 
 ## Development
 

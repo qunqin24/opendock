@@ -15,7 +15,7 @@ The plugin bridges opencode's OpenAI-style chat requests to the official [`@curs
 - **System prompts** — delivered via `AGENTS.md` in a per-session workspace (the `--system-prompt` flag is server-gated by Cursor)
 - **Dynamic model list with variants** — fetched live from `Cursor.models.list()`, cached 24h; one id per model, with every reasoning-effort / thinking / fast / context variant on opencode's Ctrl+T variant picker
 - **Context limits** — each model publishes the context window of Cursor's default variant, so opencode's auto-compaction and context indicator work
-- **Real error statuses** — 400 / 401 / 402 / 403 / 429 / 502 instead of a 200 stream carrying an error
+- **Real error statuses** — 400 / 401 / 402 / 403 / 409 / 429 / 502 instead of a 200 stream carrying an error
 - **Cancellation** — Esc or a sub-agent timeout cancels the Cursor run and closes the agent
 - **Concurrency cap and retry** — at most 4 Cursor runs at once (configurable); transient failures retried before the first byte
 - **Usage** — prompt, completion, cached-read, and reasoning tokens reported to opencode
@@ -23,12 +23,13 @@ The plugin bridges opencode's OpenAI-style chat requests to the official [`@curs
 
 ## Requirements
 
-- Node >= 22.13 (opencode runs plugins on Bun, which also works)
-- A Cursor subscription
+- Node >= 22.13 (opencode runs the plugin on its bundled Bun; Node is needed for the `npx` CLI)
+- opencode >= 1.19. Older versions lack the `chat.headers` hook and `session.status` events: sessions fall back to content-hash keys and a long tool call is cut off after 10 minutes.
+- A Cursor plan that includes agent usage
 
 ## Install
 
-All three methods end with `opencode auth login` (next section).
+All three methods end with `opencode auth login`, then a restart of opencode, then `opencode models | grep cursor/` (next section).
 
 ### 1. One command (npx)
 
@@ -36,8 +37,8 @@ All three methods end with `opencode auth login` (next section).
 npx @vidit19sharma/opencode-cursor-auth setup
 ```
 
-Adds the plugin to the `plugin` array of your opencode config (`~/.config/opencode/opencode.json[c]`, or creates `opencode.json`); running it again is a no-op.
-`--dry-run` shows the change without writing; `--config <path>` targets a specific file. A `.jsonc` file with comments is never rewritten — you get the one-line manual edit instead.
+Adds the plugin to the `plugin` array of your opencode config; running it again is a no-op. The config is the first of: `--config <path>`, `$OPENCODE_CONFIG`, `opencode.jsonc` / `opencode.json` (`.jsonc` preferred) in `$OPENCODE_CONFIG_DIR`, `$XDG_CONFIG_HOME/opencode/` or `~/.config/opencode/`; if none exists, `opencode.json` is created there. The original is backed up to `<file>.bak-cursor-auth`; the file's permission mode is kept and a symlinked config is edited in place.
+`--dry-run` shows the change without writing. A file that only parses after stripping comments or trailing commas is never rewritten, whatever its extension (exit 2, you get the one-line manual edit instead); a comment-free `.jsonc` is rewritten normally.
 
 ### 2. Manual
 
@@ -69,12 +70,20 @@ opencode auth login
 
 Pick **Cursor**, then either:
 
-- **Log in with Cursor (browser)** — opens cursor.com, mints a 90-day SDK key, stored at `~/.cursor/sdk/auth.json`
+- **Log in with Cursor (browser)** — opencode prints (and may open) a cursor.com login URL; signing in mints a 90-day SDK key, stored at `~/.cursor/sdk/auth.json`. On a headless/SSH machine, open the printed URL on any device; the key is saved on the machine running opencode.
 - **Paste a Cursor API key** — from [cursor.com/dashboard](https://cursor.com/dashboard)
 
 Alternatively set `CURSOR_API_KEY` in your environment.
 
-When the browser-login key is used, the plugin checks it before each request (cached 60s): a missing or expired key returns a 401 telling you to run `opencode auth login`, and a one-time warning is printed to stderr within 7 days of expiry. The check is skipped for pasted keys and `CURSOR_API_KEY`.
+**Restart opencode after logging in.** The model list and a pasted key are read at startup; until you restart, only `cursor/auto` is listed. Then check with `opencode models | grep cursor/`.
+
+Key precedence: pasted key > `CURSOR_API_KEY` > browser-login key in `~/.cursor/sdk/auth.json`.
+
+When the browser-login key is used, the plugin checks it before each request (cached 60s), and a one-time warning is printed to stderr within 7 days of expiry. The check is skipped for pasted keys and `CURSOR_API_KEY`. Requests fail with 401 and one of:
+
+- ``Cursor SDK key missing — run `opencode auth login` and pick Cursor`` (never logged in)
+- ``Cursor SDK key expired on <date> — run `opencode auth login` and pick Cursor``
+- ``Cursor API key is empty — run `opencode auth login` and pick Cursor, or paste a key from cursor.com/dashboard`` (`invalid_api_key`, an empty pasted key)
 
 ## Use
 
@@ -92,11 +101,13 @@ Or pick any `cursor/*` model from the opencode model selector.
 npx @vidit19sharma/opencode-cursor-auth update
 ```
 
-Then restart opencode. opencode pins `@latest` to the version it first installed and never re-checks npm, so this deletes that cached copy and opencode installs the current release on next start. Tell-tale sign you need it: Ctrl+T shows no variants, or features from the changelog are missing. Manual equivalent:
+Then restart opencode. opencode pins `@latest` to the version it first installed and never re-checks npm, so this deletes every cached `opencode-cursor-auth@*` copy under `<cache>/packages/` (and the legacy `<cache>/npm/`), where `<cache>` is `$XDG_CACHE_HOME/opencode` or `~/.cache/opencode`; opencode installs the current release on next start. `--dry-run` lists what would be removed; with no cached copy it prints "nothing to update". Tell-tale sign you need it: Ctrl+T shows no variants, or features from the changelog are missing. Manual equivalent:
 
 ```sh
-rm -rf ~/.cache/opencode/packages/@vidit19sharma/opencode-cursor-auth@latest
+rm -rf ~/.cache/opencode/packages/@vidit19sharma/opencode-cursor-auth@*
 ```
+
+**Pinning / rollback.** `"plugin": ["@vidit19sharma/opencode-cursor-auth@0.4.1"]` pins a version; `@latest` floats but is only resolved on first install (hence `update`). To roll back, change the pin, run `update`, restart opencode.
 
 ## Models
 
@@ -137,9 +148,12 @@ The models cache is refetched once on upgrade.
 | Path | Contents |
 | --- | --- |
 | `~/.cursor/sdk/auth.json` | 90-day SDK key from browser login (written by `@cursor/sdk`) |
-| `~/.cache/opencode-cursor-auth/models.json` | Model catalog, 24h TTL, blocked-model flags |
-| `~/.cache/opencode-cursor-auth/sessions.json` | Conversation → Cursor agent map, 7-day TTL |
-| `~/.cursor/projects/<workspace>` | Cursor's agent store and transcript for each bridge workspace (written by `@cursor/sdk`); removed with the workspace |
+| `~/.cache/opencode-cursor-auth/models.json` (or `$XDG_CACHE_HOME/opencode-cursor-auth/`) | Model catalog, 24h TTL, blocked-model flags; `0600` |
+| `~/.cache/opencode-cursor-auth/sessions.json` (same dir) | opencode session → Cursor agent map, 7-day TTL, max 256 entries; `0600` |
+| `$TMPDIR/opencode-cursor-XXXXXX/AGENTS.md` | Per-session workspace (dir `0700`); holds the system prompt in plaintext |
+| `~/.cursor/projects/<slug>` (or `$CURSOR_DATA_DIR/projects/`) | Cursor's agent store and transcript for each bridge workspace (written by `@cursor/sdk`); removed with the workspace, or swept after 7 idle days |
+
+The plugin sends nothing anywhere except to Cursor through `@cursor/sdk`; the SDK reports run metadata (model, prompt length/hash, run ids) to Cursor as telemetry.
 
 ## How it works
 
@@ -162,11 +176,12 @@ opencode ──(OpenAI chat JSON)──> plugin fetch() ──> @cursor/sdk Agen
 | Status | When |
 | --- | --- |
 | 400 | Unknown model or bad argument (Cursor's message), unknown variant param |
-| 401 | SDK key missing/expired, or Cursor rejects the key |
+| 401 | SDK key missing or expired, empty pasted key (`invalid_api_key`), or Cursor rejects the key — see [Authenticate](#authenticate) for the messages |
 | 402 | Plan usage limit reached (`insufficient_quota`); not retried, waiting won't help |
 | 403 | Model blocked for your account (`permission_error`) |
-| 429 | Cursor rate limit; carries `retry-after` when Cursor's message names a wait |
-| 502 | Anything else |
+| 409 | `continuation_in_progress`: a second tool result for the same call while one is being processed |
+| 429 | Cursor rate limit (`rate_limit_error`); retried with backoff first, carries `retry-after` when Cursor's message names a wait |
+| 502 | Anything else (`api_error`), after retries |
 
 These are JSON error responses when the failure happens before the first byte; mid-stream failures emit an SSE `error` frame and close the stream without `[DONE]`.
 
@@ -175,22 +190,23 @@ These are JSON error responses when the failure happens before the first byte; m
 ```sh
 bun install
 bun run build        # tsc → dist/
-bun run test         # end-to-end bridge tests (requires Cursor login, uses real Cursor usage)
+bun run test         # offline: plugin unit tests, bridge unit tests, CLI tests (runs in CI)
+bun run test:e2e     # bun spike/e2e-bridge.ts: real Cursor account, Tests 0-32, ~12 min, spends quota
+bun run smoke        # fresh-HOME install smoke: packs the plugin, 3 checks (startup, auth login, first request before login)
+bun run test:cli     # npx setup/update against temp config dirs
 bun run spike        # raw @cursor/sdk validation
-bun run test:cli     # exercises the npx setup command against temp config dirs (7 cases)
-bun run smoke        # packs the plugin and loads it in a pristine HOME (startup, auth login, first request before login)
 ```
 
 Release steps for maintainers are in [RELEASE.md](RELEASE.md).
 
-The e2e suite (Tests 0-32) covers plain streaming, a full tool loop on one held run, in-memory and disk-persisted session resume, AGENTS.md system-prompt delivery, mid-stream abort, error statuses, session scoping, context limits and key checks, model variants, the concurrency cap, retry semantics, blocked models, parked-run slot and expiry handling, token-usage estimation for tool loops, cross-process session resume, the startup workspace sweep, image forwarding, workspace validation, built-in tool refusal, replay injection, and the busy-aware idle backstop for parked runs.
+The e2e suite covers plain streaming, a full tool loop on one held run, in-memory and disk-persisted session resume, AGENTS.md system-prompt delivery, mid-stream abort, error statuses, session scoping, context limits and key checks, model variants, the concurrency cap, retry semantics, blocked models, parked-run slot and expiry handling, token-usage estimation for tool loops, cross-process session resume, the startup workspace sweep, image forwarding, workspace validation, built-in tool refusal, replay injection, and the busy-aware idle backstop for parked runs.
 
 ## Known limitations
 
 - `systemPrompt` as a true harness replacement is feature-gated server-side by Cursor; system text is applied via `AGENTS.md` as a project rule (merged under Cursor's harness prompt).
 - Cursor's catalog has no entitlement info, so models your plan or team blocks only disappear after the first 403.
 - `limit.context` is per model, not per variant: picking a smaller-context variant (e.g. gpt-5.5 `272k`) keeps the base model's 1M limit in opencode's context indicator and auto-compaction.
-- A run parked waiting for a tool result is released after 10 minutes of silence from opencode, or after 2 hours even while opencode reports the session busy. A tool result arriving later still works: the conversation is replayed into a fresh Cursor agent.
+- A run parked waiting for a tool result is released after 10 minutes of silence from opencode; while opencode reports the session busy or retrying it is kept, up to a hard cap of exactly 2 hours. A tool result arriving later still works: the conversation is replayed into a fresh Cursor agent.
 - Usage/rate limits are whatever your Cursor plan enforces — the plugin adds none beyond the concurrency cap.
 
 ## License

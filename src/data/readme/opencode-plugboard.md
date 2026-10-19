@@ -1,30 +1,43 @@
-# opencode-plugboard
+<div align="center">
+  <br />
+  <h1>opencode-plugboard</h1>
+  <p>Your OpenCode logins, served as an API</p>
 
 [![npm](https://img.shields.io/npm/v/opencode-plugboard)](https://www.npmjs.com/package/opencode-plugboard)
 [![license](https://img.shields.io/npm/l/opencode-plugboard)](https://github.com/jjjermiah/opencode-plugboard/blob/main/LICENSE)
 [![CI](https://github.com/jjjermiah/opencode-plugboard/actions/workflows/ci.yml/badge.svg)](https://github.com/jjjermiah/opencode-plugboard/actions/workflows/ci.yml)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/jjjermiah/opencode-plugboard/badge)](https://scorecard.dev/viewer/?uri=github.com/jjjermiah/opencode-plugboard)
-<!-- OpenSSF Best Practices: register at https://www.bestpractices.dev first (answers in docs/best-practices.md). Then replace <id> with the project id and uncomment the next line:
-[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/<id>/badge)](https://www.bestpractices.dev/projects/<id>)
--->
 
-Plugboard is an OpenCode V2 plugin. It serves OpenAI, Anthropic and Gemini compatible HTTP APIs from your OpenCode server, so any app that speaks one of them can use the provider logins and models you already have in OpenCode. Each app gets its own key. OpenCode never runs your tools.
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/jjjermiah/opencode-plugboard/main/docs/public/hero-dark.svg" />
+    <img src="https://raw.githubusercontent.com/jjjermiah/opencode-plugboard/main/docs/public/hero-light.svg" width="860" alt="Apps call plugboard with the OpenAI, Anthropic or Gemini API. Plugboard runs inside your OpenCode server, turns each request into an OpenCode session and uses your provider logins." />
+  </picture>
+  <br />
+</div>
 
-Full documentation: **https://jjjermiah.github.io/opencode-plugboard**
+Use the models you already log in to in OpenCode (ChatGPT, Claude, GitHub Copilot, OpenCode Go and the rest) from any app that speaks the OpenAI, Anthropic or Gemini API.
+
+Plugboard is an OpenCode V2 plugin. It opens an HTTP listener inside your OpenCode server and answers those APIs with your connected providers. Each app gets its own key, model list and limits. Tool calls go back to your app; OpenCode never runs them.
+
+Documentation: **https://jjjermiah.github.io/opencode-plugboard**
 
 ## Install
 
-Add it to your global OpenCode config, `~/.config/opencode/opencode.jsonc`. Keep the version pinned and change it on purpose, after reading the [changelog](https://github.com/jjjermiah/opencode-plugboard/blob/main/CHANGELOG.md).
+```sh
+bunx opencode-plugboard init --fast anthropic/claude-haiku-4-5
+```
+
+This adds plugboard to your global OpenCode config (`~/.config/opencode/opencode.jsonc`), creates a key for one app, allows every model you are logged in to, and prints the key. Restart OpenCode. To write the entry by hand instead:
 
 ```jsonc
 {
   "plugins": [
     {
-      "package": "opencode-plugboard@0.49.0",
+      "package": "opencode-plugboard@0.57.0",
       "options": {
         "keys": { "my-app": "{env:PLUGBOARD_KEY_MY_APP}" },
-        "models": ["opencode-go/glm-5.3-flash"],
-        "aliases": { "fast": "opencode-go/glm-5.3-flash" }
+        "models": "connected",
+        "aliases": { "fast": "anthropic/claude-haiku-4-5" }
       }
     }
   ]
@@ -33,50 +46,48 @@ Add it to your global OpenCode config, `~/.config/opencode/opencode.jsonc`. Keep
 
 ## First request
 
-The listener is on `127.0.0.1:4010`. This prints `pong`:
-
 ```sh
+export PLUGBOARD_KEY=<the key init printed>
 curl -s http://127.0.0.1:4010/v1/chat/completions \
-  -H "Authorization: Bearer $PLUGBOARD_KEY_MY_APP" \
+  -H "Authorization: Bearer $PLUGBOARD_KEY" \
   -H "Content-Type: application/json" \
   -d '{"model": "fast", "messages": [{"role": "user", "content": "reply with exactly: pong"}]}' \
   | jq -r '.choices[0].message.content'
 ```
 
-Any OpenAI SDK works the same way. Set the base URL to `http://127.0.0.1:4010/v1` and the API key to your plugboard key.
+Any SDK works the same way: set its base URL to `http://127.0.0.1:4010/v1` (Anthropic and Gemini SDKs: `http://127.0.0.1:4010`) and its API key to your plugboard key.
 
 ## What it serves
 
-| API | Endpoint |
+| API | Endpoints |
 | --- | --- |
 | OpenAI Chat Completions | `POST /v1/chat/completions` |
-| OpenAI Responses | `POST /v1/responses` |
+| OpenAI Responses | `POST /v1/responses`, `GET`/`DELETE /v1/responses/{id}`, `GET /v1/responses/{id}/input_items` |
 | Anthropic Messages | `POST /v1/messages`, `POST /v1/messages/count_tokens` |
 | Gemini | `POST /v1beta/models/{model}:generateContent`, `:streamGenerateContent`, `:countTokens` |
+| Files | `/v1/files` (OpenAI and Anthropic), `/upload/v1beta/files` and `/v1beta/files` (Gemini) |
 | Legacy completions | `POST /v1/completions` |
 | Models | `GET /v1/models`, `GET /v1/models/{id}` |
 
-## What you can do with it
+Streaming, tool calls, structured output, images, PDFs and reasoning output work through the usual SDK calls.
 
-- [Give each app its own key and rules](https://jjjermiah.github.io/opencode-plugboard/guides/apps-and-keys), so traffic, history and usage stay separate.
-- [Expose only the models you choose](https://jjjermiah.github.io/opencode-plugboard/guides/models-and-aliases), under short aliases with fallback chains.
-- [Cap concurrency, rate and spend](https://jjjermiah.github.io/opencode-plugboard/guides/limits-budgets-and-caching), and cache repeated answers.
-- [Use tools, structured output and images](https://jjjermiah.github.io/opencode-plugboard/guides/tools-output-and-images) through the usual SDK calls.
-- [Read history, usage and metrics](https://jjjermiah.github.io/opencode-plugboard/guides/history-usage-and-monitoring) per app, in a dashboard or in OpenCode's TUI.
-- [Serve other machines](https://jjjermiah.github.io/opencode-plugboard/guides/serving-other-machines) safely, and keep an always-on server awake.
+## Works with
 
-More: [connect your app](https://jjjermiah.github.io/opencode-plugboard/connect), [client setup pages](https://jjjermiah.github.io/opencode-plugboard/clients/), [configuration reference](https://jjjermiah.github.io/opencode-plugboard/configuration), [known gaps](https://jjjermiah.github.io/opencode-plugboard/apis#known-gaps).
+OpenAI, Anthropic and Google SDKs for Python, JavaScript, Go, .NET and Rust; LangChain, LlamaIndex, pydantic-ai, the Vercel AI SDK, CrewAI and other agent frameworks; Open WebUI, LibreChat, n8n, Dify and Home Assistant; Claude Code, Codex CLI, Gemini CLI, Aider, Cline, Continue and Zed. Setup for each: [client pages](https://jjjermiah.github.io/opencode-plugboard/clients/).
 
-Plugboard is early (0.x). A minor release can change an option or a default.
+## Features
+
+- [Per-app keys and rules](https://jjjermiah.github.io/opencode-plugboard/guides/apps-and-keys): each app has its own model scope, system prompt, endpoints and caps.
+- [Aliases and fallbacks](https://jjjermiah.github.io/opencode-plugboard/guides/models-and-aliases): short model names, and chains that move to the next model when one fails.
+- [Limits, budgets and caching](https://jjjermiah.github.io/opencode-plugboard/guides/limits-budgets-and-caching): concurrency, request rate, daily or monthly spend, and a response cache.
+- [Tools, structured output, images and files](https://jjjermiah.github.io/opencode-plugboard/guides/tools-output-and-images).
+- [History, usage and monitoring](https://jjjermiah.github.io/opencode-plugboard/guides/history-usage-and-monitoring): per-app usage, a dashboard, a TUI page and Prometheus metrics.
+- [Serving other machines](https://jjjermiah.github.io/opencode-plugboard/guides/serving-other-machines) from an always-on OpenCode server.
+
+Plugboard is 0.x: a minor release can change an option or a default. Read the [changelog](https://github.com/jjjermiah/opencode-plugboard/blob/main/CHANGELOG.md) before you move the pin.
 
 ## Project
 
-- [Security policy](https://github.com/jjjermiah/opencode-plugboard/blob/main/SECURITY.md) and the [security notes](https://jjjermiah.github.io/opencode-plugboard/security).
-- [Contributing](https://github.com/jjjermiah/opencode-plugboard/blob/main/CONTRIBUTING.md).
-- [Changelog](https://github.com/jjjermiah/opencode-plugboard/blob/main/CHANGELOG.md).
+[Security policy](https://github.com/jjjermiah/opencode-plugboard/blob/main/SECURITY.md) · [Contributing](https://github.com/jjjermiah/opencode-plugboard/blob/main/CONTRIBUTING.md) · [Changelog](https://github.com/jjjermiah/opencode-plugboard/blob/main/CHANGELOG.md)
 
-## License
-
-MIT. See [LICENSE](https://github.com/jjjermiah/opencode-plugboard/blob/main/LICENSE).
-
-Not affiliated with or endorsed by OpenAI, Anthropic, Google, GitHub or Microsoft. Product names are trademarks of their owners.
+MIT licensed. Not affiliated with or endorsed by OpenAI, Anthropic, Google, GitHub or Microsoft.

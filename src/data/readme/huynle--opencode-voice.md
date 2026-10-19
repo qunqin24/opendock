@@ -26,7 +26,7 @@ Formerly **opencode-voice** and, briefly, **opencode-hub**
   that answers in short spoken sentences on a fast model and hands real work to background subagents.
   Bring your own speech: OpenRouter or any OpenAI-compatible STT/TTS service (including self-hosted).
 - **What's open in your terminals first**: sessions open in Herdr or the OpenCode TUI, grouped like
-  Herdr's sidebar, with the rest under Recent; pin and hide in sync across devices.
+  Herdr's sidebar, with the rest under Recent; rename, pin and archive in sync across devices.
 - **Session details**: context usage, todos, MCP status, branch and per-file diffs, on demand; unread
   marks synced per user.
 - **Self-hostable**: a hub on your computer with nothing extra to install, or your own hub for phones
@@ -51,8 +51,9 @@ opencode service restart
 
 Install from npm: the npm package ships the built web app, so the plugin can run a local hub. A GitHub
 install (`opencode plugin add github:huynle/hub`) has no built web app (`web/dist` is not in the
-repository): it works for connecting to a hub that runs elsewhere, but a local hub it starts answers 503
-until you build the app. To run a hub yourself, use the npm package, a [release binary](#running-the-hub)
+repository): it works for connecting to a hub that runs elsewhere, but it does not start a local hub
+(`/hub` → **Start local hub** and the automatic start say the web app is missing; a hub started by hand
+from such an install answers 503 on its pages). To run a hub yourself, use the npm package, a [release binary](#running-the-hub)
 or Docker, or run `npm install && npm run build:web` in a source checkout.
 
 Then, in OpenCode:
@@ -188,15 +189,16 @@ conversation mode and utterances (403 `not_exposed` for sessions not shared with
 
 | Route | Result |
 |---|---|
-| `POST /api/sessions/:id/turn {text, images?}` | sends a turn; while the session tree is running it steers instead. Answers `{mode: "turn" \| "steer"}`. `images` is up to 4 `{mime, data, name?}` (PNG, JPEG, WebP or GIF; canonical base64 whose bytes match the type; each at most 512 KB decoded, together at most 750,000 base64 characters); `text` may be empty when images are attached. They reach OpenCode as inline file attachments. 400 empty, over 100,000 characters or invalid images (with the reason); 409 "A turn is already running for this session" |
+| `POST /api/sessions/:id/turn {text, images?}` | sends a turn; while the session tree is running it steers instead (202 `{mode: "steer", inboxID}`). An idle turn answers its `TurnResult` (`{outcome, reply, message?}`) when it ends; with `Prefer: respond-async` (the console sends it) a turn still running after 1.5 s answers 202 `{mode: "turn"}` (`Preference-Applied: respond-async`) and its result follows as an SSE `turn` event `{sessionID, outcome, reply, message?}`, so no proxy cuts a long request. The session stays busy until the turn ends either way. `images` is up to 4 `{mime, data, name?}` (PNG, JPEG, WebP or GIF; canonical base64 whose bytes match the type; each at most 512 KB decoded, together at most 750,000 base64 characters); `text` may be empty when images are attached. They reach OpenCode as inline file attachments. 400 empty, over 100,000 characters or invalid images (with the reason); 409 "A turn is already running for this session" |
 | `GET /api/sessions/:id/timeline/messages/:message/files/:index` | one image attached to a user message, as bytes with its type (`cache-control: private, no-store`). Timeline user items list their attachments as `files: [{index, mime, name?}]` (never the bytes). Only PNG, JPEG, WebP and GIF are served (404 otherwise or when missing); 413 when the image would not fit in a protocol frame (about 650 KB) |
+| `POST /api/sessions/:id/rename` | `{title}` → `{title}`: renames the session in OpenCode (`session.update`), through the process that owns it, else any other process that reports it. The title is trimmed and must be 1–200 characters (400 otherwise). Works with Voice off; the new title shows in every console at once (the spoke reports it before answering) |
 | `POST /api/sessions/:id/stop` | interrupts running descendants deepest first, then the root; idempotent. Also releases the hub's turn lock for the tree: a turn request still waiting answers `{outcome: "interrupted"}` and the next turn can start (`/interrupt` does the same) |
 | `GET /api/sessions/:id/summary` | context usage, todos, MCP status (at most 100 servers), branch and working-tree change stats (each part optional). `changes` lists at most 500 files, most-changed first, with `totalFiles` and `truncated`; its `additions`/`deletions` cover every file |
 | `GET /api/sessions/:id/diff?file=` | one file's patch, on demand (capped at 400 KB as JSON, then `truncated: true`); never stored in the hub |
 | `POST /api/sessions/:id/read` · `GET /api/reads` | per-user read marks, synced to your other devices |
 | `GET /api/push/prefs?endpoint=` | `{prefs, quietHours, muted, subscriptions, subscribed?}`: this device's toggles (`handoff, question, permission, finished, failed, say`) and quiet hours, the user's muted sessions, how many subscriptions the hub holds for this device, and whether it holds `endpoint` |
 | `PUT /api/push/prefs {toggles…, quietHours?}` | boolean toggles (a 0.5.0 `blocked` sets question and permission); `quietHours` `{start: "HH:MM", end: "HH:MM", timeZone}` or `null` (400 when invalid) |
-| `POST /api/push/subscribe {subscription, prefs?, oldEndpoint?}` · `POST /api/push/unsubscribe {endpoint}` | this device's subscriptions; `oldEndpoint` is dropped (rotated subscription) |
+| `POST /api/push/subscribe {subscription, prefs?, oldEndpoint?}` · `POST /api/push/unsubscribe {endpoint}` | this device's subscriptions; `oldEndpoint` is dropped (rotated subscription). The endpoint must be https on a public hostname that resolves only to public addresses (no loopback, private, link-local, CGNAT or ULA hosts, no `localhost`/`*.local`/`*.internal`), else 400 |
 | `POST /api/push/test` | a test notification to the caller's device only: `{sent, failed: [{host, status?}], subscriptions}`; 429 with `retry-after` within 10 s of the last one |
 | `PUT /api/push/mute {sessionID, muted}` | mutes or unmutes a session's notifications for the user: `{muted}` |
 
@@ -296,7 +298,9 @@ work to a background subagent. Routine workers inherit the fast voice model; cod
 architecture and risky work use the configured full work model. Successful workers finish with a short
 speech-ready result that the hub reads directly, without waiting for another voice-agent summary. You
 can keep talking while work runs; related follow-ups continue the active worker and unrelated tasks start
-a fresh one.
+a fresh one. Several independent requests in one breath ("check the deploy and update the changelog") start
+one background worker each, in parallel, in the same turn; each worker gets a short name ("Deploy check") that
+the task board and announcements use.
 
 The phone composer exposes separate **Voice** and **Worker** model controls for each session. Each picker
 lists the connected OpenCode process's available models and variants. Choices are saved per user and
@@ -319,8 +323,26 @@ not persist those potentially sensitive details.
   agent exists, the session keeps its agent and the `context` hook adds the orchestrator prompt instead.
 - The delegate agent (`subagent` in the config) is added per request by the `context` hook, so changing
   it needs no restart.
+- **Task board**: the `context` hook also gives the voice agent (and a conversation on another agent) a live
+  list of the workers it started (`src/spoke/taskboard.ts`, from this process's events): title, sessionID,
+  state (working, blocked with what it waits for, done with its latest text, failed with the reason, stopped)
+  and for how long, at most 8 (live ones first) of at most 200 characters each. So "what's running?" or "how's
+  the deploy going?" needs no tool call. A session without workers gets no board.
+- **Stopping one task by voice**: the plugin adds a tool `hub_task_stop {sessionID} | {all: true}`. The voice
+  agent calls it for "cancel the deploy one" (that worker and whatever runs below it are interrupted, deepest
+  first) or "stop all the workers" (every running worker of the session). It only reaches sessions below the
+  calling session (never the caller itself, its siblings or another session's workers), so the voice agent
+  keeps listening. The phone's stop words ("stop", "cancel", "never mind", "stop that", "hold on") still
+  interrupt the root turn at once.
 - Child text and execution events are paired by the hub. The latest assistant message of a successful
-  child is emitted as root-session speech; failures, interruptions and stale partial results are not.
+  child is emitted as root-session speech; interruptions and stale partial results are not. **Announcements**
+  (hub, `src/central/registry.ts`): while another worker of the session runs or waits, or one was announced in
+  the last minute, a result starts with the task's title ("Deploy check finished: …"); a result the voice agent
+  already said in the last two minutes is not read again. A failed worker is announced once with its reason
+  ("Lint failed: rate limit exceeded."), a worker's permission request or question once per request ("Cleanup
+  needs your permission.", "… has a question."); a stopped worker is not. Announcements are ordinary `say`s
+  without `seq` (`messageID` `announce:failed:<session>`, `announce:permission:<id>`, `announce:form:<id>`),
+  so the phone queues them after the sentence playing and never cuts one off.
 - Server ops: `steer` sends the text with `delivery: "steer"` (metadata `{source: "hub", mode:
   "conversation"}`, or `mode: "remote"` for a session not shared with Voice; 0.5 wrote `source:
   "opencode-hub"` and 0.4 and earlier `source: "opencode-voice"`, and readers accept all three) and returns the inbox ID at once; `interrupt`
@@ -373,7 +395,22 @@ the Docker image, npm package and binaries ship the build). One store fed by the
 - **Sidebar** (⌘B collapses; a drawer on phones): search, New session, Needs you, Running, Pinned, sessions open in a
   terminal grouped by project (or server) with `+`, Recents; rows show status, a pulsing green dot left of the
   title for the session live in Voice (in Voice mode here, or in a conversation), an unread dot and a `⋯` menu
-  (pin, hide, stop, Allow/Disallow Voice).
+  (rename, pin, archive, stop, Allow/Disallow Voice).
+- **Archive**: **Archive** in a session's `⋯` menu takes it out of the table, the sidebar's groups, Recents and
+  Running, on all your devices (with **Undo**). Nothing is deleted and OpenCode's history is untouched:
+  archiving is the hub's own, per user, because OpenCode has no archive API yet (when it gets one, Archive
+  will map to it). The **Archived** chip on `/` lists archived sessions with **Unarchive**. One exception: an
+  archived session that needs you (a permission or question) also shows under **Needs you** (sidebar and the
+  Needs you chip), so a question is never missed. In the table, tick rows (or the header box for all shown
+  rows) and press **Archive** (or **Unarchive** under Archived); **Archive inactive…** archives every session
+  without activity for more than N days (30 by default; not running, pinned or open in a terminal) after a
+  confirmation with the count. Sessions archived in OpenCode itself (`time.archived`) never reach the hub.
+  Sessions hidden with an earlier version are archived now (same stored list, `hiddenSessions`).
+- **Rename**: **Rename…** in a session's `⋯` menu (table row, sidebar row, phone list, the session's title
+  menu), or a click on the title in the session's top bar, turns the title into a text field with the title
+  selected: Enter (or clicking away) saves, Escape cancels. The new title shows at once and is set in
+  OpenCode itself (`POST /api/sessions/:id/rename`), so terminals see it too; if that fails the old title
+  comes back with a message.
 - **`/`**: All sessions as a sortable, filterable table (a list on phones); filters and sort are kept per device.
   There is no Voice column or Voice filter: the live Voice session gets the green dot before its title, and the
   row's `⋯` menu has **Allow Voice** / **Disallow Voice**.
@@ -439,8 +476,8 @@ Pure logic lives in `web/src/core` and `web/src/lib` (bun tests in `test/web-*.t
   group: New session here, Pin / Unpin workspace, Hide / Unhide workspace (and Collapse / Expand in
   Recent). Hiding a workspace hides the sessions in it: a Herdr workspace (`herdr:<id>`), a project
   folder, or a nested folder such as a worktree.
-- **Synced view settings**: pins and hides are per user on the hub (`GET`/`PUT /api/prefs/view`), shown at
-  once, reverted with a message if the hub refuses, with Undo after a hide. Other devices update live
+- **Synced view settings**: pins, archived sessions and hidden workspaces are per user on the hub (`GET`/`PUT /api/prefs/view`), shown at
+  once, reverted with a message if the hub refuses, with Undo after an archive. Other devices update live
   (SSE `prefs`). Pins from 0.3 (stored on the device) are moved into them once. With an older hub
   without `/api/prefs/view`, they stay on the device. Open/closed groups and the filter stay per device.
 - **Voice off** sessions (`exposed: false`, mode `session`) open, show their status and live activity, and
@@ -600,8 +637,8 @@ unchanged sessions frame does not re-broadcast the catalog.
 |---|---|---|
 | `POST /api/sessions/:id/expose {on}` | `expose` | `200 {exposed}` from a reporting process (service first). 400 bad body, 404 not reported, 502 spoke error |
 | `POST /api/machines/:machineID/sessions {directory, title?, herdrWorkspace?}` | `create` | `201 {sessionID, openedIn?: "herdr", warning?}` from the machine's service process; with `herdrWorkspace` (≤ 100 characters) the session is also opened in a new tab of that Herdr workspace, and when that fails the answer has a `warning` instead of `openedIn`. 400 bad input or `unknown workspace` (not a workspace root, session directory or Herdr pane folder of that machine), 404 unknown machine, 409 no service process connected |
-| `GET /api/prefs/view` | – | `{prefs: {hiddenSessions, hiddenWorkspaces, pinnedSessions, pinnedWorkspaces}}`, the caller's view preferences (pairing mode: the single user) |
-| `PUT /api/prefs/view {any of the four lists}` | – | Replaces the lists given (each ≤ 500 non-empty strings of ≤ 4096 characters, duplicates dropped; other keys 400). Stored on the user record; SSE `{type: "prefs", prefs}` goes to the user's other devices (never to other users, not to the device that changed them) |
+| `GET /api/prefs/view` | – | `{prefs: {hiddenSessions, hiddenWorkspaces, pinnedSessions, pinnedWorkspaces}}`, the caller's view preferences (pairing mode: the single user). `hiddenSessions` is the user's **archived** sessions (the name is from before Archive was called Hide) |
+| `PUT /api/prefs/view {any of the four lists}` | – | Replaces the lists given (each ≤ 500 non-empty strings, `hiddenSessions` ≤ 5000, of ≤ 4096 characters, duplicates dropped; other keys 400). Stored on the user record; SSE `{type: "prefs", prefs}` goes to the user's other devices (never to other users, not to the device that changed them) |
 
 For a session reported only with `exposed: false`, `utterance` and `conversation` answer
 `403 {error: "Voice is not enabled for this session", code: "not_exposed"}`; inspecting and controlling it
@@ -635,9 +672,16 @@ hub sends it `{op: "conversation", on: true}` once. Deleting the session clears 
 SSE (`/api/events`) adds:
 
 - `{type: "conversation", sessionID, on}` when the flag changes.
-- `{type: "say", sessionID, messageID, ordinal, text}` for each `session.text.ended` of a **root** session
-  in conversation mode (subagent text is not spoken); deduped by `(messageID, ordinal)` across
-  processes; blank text is skipped.
+- `{type: "say", sessionID, messageID, ordinal, seq, text}`: **root** text in conversation mode is spoken
+  while it is written. The hub cuts the streamed `session.text.delta`s of each text part (`messageID`,
+  `ordinal`) into sentences (`src/central/say-stream.ts`: sentence ends followed by the next sentence, line
+  breaks, whole fenced code blocks, abbreviations/decimals/file names kept together, runs over 300 chars cut
+  at a comma) and sends one `say` per completed sentence right after its delta, `seq` counting from 0 per text
+  part; `session.text.ended` (authoritative: missed deltas are recovered) flushes the rest. Sentences are
+  raw slices of the text: `/api/speak` makes each one speakable. One process's deltas are used per text part
+  and the end is handled once, so each sentence is sent once; an interrupted or failed run, or conversation
+  mode turning off, drops the unspoken rest. A successful subagent's final message is spoken through its
+  root as before: one `say` per text part without `seq`. Blank text is skipped.
 - `{type: "heard", sessionID, inboxID}` when OpenCode delivers an utterance's inbox item (also when the
   delivery event arrives before the steer result).
 - `{type: "activity", sessionID, rootID, item}` when an activity item is created or changes state, for
@@ -658,9 +702,11 @@ SSE (`/api/events`) adds:
 
 Pushes in conversation mode depend on presence: while the session is watched, "finished" is not sent
 (the phone is open and speaking). When nobody watches, "finished" is sent as usual and each spoken text
-of the root session is pushed as kind `say` (title = session title, body = the text, max 180 chars; at
+of the root session (the whole text part, when it ends) is pushed as kind `say` (title = session title, body = the text, max 180 chars; at
 most one every 10 s per session; on by default, pref `say`). "blocked" is always sent. `/api/transcribe` and `/api/speak` have no rate limit; `/api/speak` accepts up to
-`HUB_MAX_SPEECH_CHARS` per call, so the phone sends sentence-sized chunks.
+`HUB_MAX_SPEECH_CHARS` per call, so the phone sends sentence-sized chunks. `/api/speak` streams the provider's MP3 through as it
+arrives (chunked; nothing is buffered on the hub, and a phone that cancels aborts the upstream request), so playback
+can start before synthesis ends; provider errors still answer 502 before any audio.
 
 ### Speech settings
 
@@ -670,8 +716,8 @@ STT and TTS each use a provider configured from the phone (Settings → Speech) 
 provider than `hub.json`, the file's section is ignored for that direction; when it picks another base
 URL, the file's key is not sent there. Providers:
 
-- `openrouter` (default, base `https://openrouter.ai/api/v1`): STT is JSON with base64 `input_audio`,
-  TTS is `POST /audio/speech`.
+- `openrouter` (default, base `https://openrouter.ai/api/v1`): STT is an OpenAI-style multipart upload
+  (`file`, `model`, `language?`: the audio goes up as binary, not base64 JSON), TTS is `POST /audio/speech`.
 - `openai-compatible` (`baseURL` required: `https://…`, or `http://localhost` / `127.0.0.1` for local
   servers): STT is multipart `POST {baseURL}/audio/transcriptions` (`file`, `model`, `language?`), TTS is
   `POST {baseURL}/audio/speech {model, input, voice, response_format: "mp3", speed?}`. No env key.
@@ -698,19 +744,32 @@ it again, say "pause listening", or leave the page to turn it off. Leaving the p
 
 - **VAD** (`web/conversation-core.js`, frames from `web/vad-worklet.js`, with a ScriptProcessor fallback):
   energy-based detection on about 20 ms frames. The noise floor falls fast and rises slowly, and the
-  threshold is 10 dB above it with 4 dB of hysteresis. Speech must last 250 ms to count, and 300 ms of
-  audio before it is kept. The threshold rises by 8 dB while the phone is speaking.
-- **Endpointing**: a segment ends after 550 ms of silence. It is encoded to 16 kHz mono 16-bit WAV
+  threshold is 10 dB above it with 4 dB of hysteresis. Speech must last 300 ms to count, and 300 ms of
+  audio before it is kept. The threshold rises by 8 dB while the phone is speaking. These timings live in
+  `VOICE_TIMINGS` (`web/src/core/conversation-core.ts`).
+- **Endpointing**: a segment ends after 350 ms of silence. It is encoded to 16 kHz mono 16-bit WAV
   and sent to `/api/transcribe` at once. A transcript that reads as complete is sent right away:
   it ends in `. ? !`, or has 3+ words and doesn't end in "and", "but", "so", "um", "the" and the like.
-  Otherwise it waits up to 1.5 s. If you speak again during the wait, the next segment's transcript
+  Otherwise it waits up to 0.8 s. If you speak again during the wait, the next segment's transcript
   is joined to it. Empty and filler-only transcripts are dropped. Utterances are capped at 60 s.
 - **Commands**: an utterance that is only "stop", "cancel", "never mind", "stop that" or "hold on"
   calls `POST …/interrupt` and stops speech. "Pause listening" turns the mode off.
-- **Speech out**: each SSE `say` is split into sentences. Abbreviations, decimals, file names and
+- **Speech out**: root replies arrive one sentence at a time while they are written (`say` with `seq`);
+  the phone plays them in `seq` order per text part and drops duplicates (`SayAssembler`). A `say` without
+  `seq` (a subagent's result) is split into sentences. Abbreviations, decimals, file names and
   list items are handled, and fenced code becomes "(code omitted)". Each sentence goes to `/api/speak`,
-  one ahead of playback, and plays through one `<audio>` element. Speech that lasts 250 ms or more
-  (barge-in) pauses playback and clears the queue. The transcript shows your utterances with ✓ (sent)
+  up to two ahead of playback, and plays through one `<audio>` element while its MP3 is still downloading:
+  through MediaSource (`audio/mpeg` SourceBuffer; Chrome, Android, Firefox), appending bytes as they arrive
+  (`web/src/core/audio-stream.ts`). Browsers without MP3 in MediaSource (some iOS Safari versions) play each
+  sentence once it has fully downloaded, as before. Prefetched sentences keep downloading while they wait. Speech that lasts 300 ms or more
+  (barge-in) pauses playback, clears the queue and mutes the rest of the replies that were speaking, also a reply still
+  being written whose next sentence has not arrived yet (their later sentences still show in the transcript); a
+  new reply speaks again. Barge-in never interrupts anything: what you say steers the agent, and background
+  workers keep running (only a stop phrase interrupts the agent's turn).
+- **Turn timing**: each turn's steps are `performance.mark`s (`hub-voice:speech-end`, `…:transcript`,
+  `…:accepted`, `…:first-say`, `…:first-byte` (the reply's first audio byte arrived), `…:first-audio` (it plays); visible in the browser's performance tools), and the Voice bar's
+  state has the last turn as its tooltip: "last turn: 1.8 s to first audio" with the steps (transcript,
+  accepted, first reply, first byte, audio). A typed turn counts from when the hub accepted it. The transcript shows your utterances with ✓ (sent)
   and ✓✓ (heard). Agent text is merged with the bubble already streamed from deltas. Subagents
   starting, finishing or failing appear as small notes. Typed text is sent as an utterance while the
   mode is on.
@@ -761,12 +820,17 @@ Pure logic is in `web/src/core/feedback-core.ts` (tested with bun); `web/src/cor
   assistant message); in conversation mode the spoken `say` text is merged into the bubble of the same message.
   The home list shows the same "now" text with a spinner for working sessions.
 - **Progress cues** (conversation mode; Settings → Voice → "Progress cues", on by default): a soft
-  tone when the agent hears an utterance, then "Working on it." if the session is working and the
-  agent has not spoken within 5 s. "Started a subagent." plays when a subagent starts, unless the agent
+  tone as soon as you stop speaking (the moment the segment goes to transcription; typed text gets it when
+  the agent receives it), then "Working on it." if the session is working and the
+  agent has not spoken within 2.5 s of the end of your speech. "Started a subagent." plays when a subagent starts, unless the agent
   spoke in the last 3 s. "Still working." plays after 40 s without speech while work continues, and
   a double tone plays when a subagent finishes. Failed tools are not spoken (they show in the feed). Cues never
   play while you are talking or the agent's speech is playing; they wait, and are dropped once the agent
-  speaks. Each phrase is synthesized once per page load and cached in memory.
+  speaks. Cues are event-driven: one timer for the next deadline (no polling), re-armed on speech, status and
+  playback changes. The phrases are synthesized in parallel when Voice mode starts and kept in memory and in
+  the browser's Cache Storage (`hub-cues-v1`, keyed by TTS provider, model, voice, speed and server, so a later
+  session starts with them ready and a voice change fetches them again); a ready phrase starts playing at
+  once. A phrase that is not ready yet when its cue fires plays a short tone instead.
 - **Presence**: while a session view is open, the phone posts `POST /api/sessions/:id/presence
   {visible}` on visibility changes and every 30 s while visible, and `{visible:false}` on `pagehide` and
   when leaving the view. The hub uses this to decide when to push.

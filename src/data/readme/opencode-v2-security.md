@@ -4,25 +4,26 @@ OpenCode v2 全自动执行边界安全插件。Linux 原生 shell 与内置文�
 
 1.5.0 保持现有配置和 category 名称兼容；研究和冻结验证依据见 [RESEARCH-v1.5.0.md](./RESEARCH-v1.5.0.md)。授权针对同一命令与事实报告，不把未选项的绝对概率、弱提示或批准后的随机重审当成新的拒绝理由。
 
-## 1.6.0 本地源码后端更新（尚未发布到 npm）
+## 1.8.0 本地源码后端（尚未发布到 npm）
 
 - **范围**：Linux shell 和 OpenCode 内置文件工具。全部 codemode 工具、MCP、其他直连自定义工具不纳入新链路；本轮不实现 Windows 文件或网络沙箱。TUI 只负责当前模式与授权状态展示。
 - **三种模式**：TUI 统一显示 `[Read only]`、`[Auto mode]`、`[Bypass mode]`。Auto 可追加 `, bypassing: filesystem,network` 和 `, custom bypassing on`；custom 授权正文不显示在状态栏。
 - **用户切换**：`/perm r`、`ro`、`readonly`、`read-only` 选择 Read only；`/perm w`、`rw`、`auto` 选择 Auto；`/perm bypass` 选择 Bypass。`/bypass all`、`*`、`ALL`、`yolo` 也选择 Bypass，不再表示“全部类别”。类别和 custom 豁免属于 Auto 的附加授权，祖先只读上限仍优先。
 - **单一策略**：HARD 策略已移除，不能通过配置或旧审查器选择。旧 `strictness: "LOOSE"` 仅作为单一策略的兼容拼写，不是另一种模式。
 - **审查基准**：工作区与配置的临时目录可写，其他位置的写入以及进程、远端、权限和明确凭据效果进入静态审查。内置文件工具使用真实路径检查，而不是宣称在宿主进程内建立 OS 沙箱。
-- **静态层**：完整操作 known-safe → ALLOW；不能证明 → ASK 并交给 JEV。只有 ALLOW/ASK 两态，没有静态 DENY。ALLOW 是执行授权，不再由旧安全 DENY 或沙箱能力检查改判。独立 `/perm` 权限上限和无效输入仍生效。shell 命令在运行时观察器下按「观察 → 越界时静态审查 → 不能证明时动态审查」三段执行，见下文「运行时边界观察」。
-- **放行即执行**：读写会话中，静态放行、JEV 放行，以及配置允许的补证终局，均对当前命令使用一次性 `full` marker，直接调用原执行器。外部新目录、`sudo`、变量路径不再因插件的只读挂载、NNP 或可写路径枚举能力而被二次拒绝。命令与本次调用绑定，不永久扩大其他调用的权限；每次仍独立审查。真实操作系统权限、Windows ACL 或 sudo 凭据问题不由模型授权改变。
-- **动态层**：包内 `src/security/v10-8-pipeexec.json` 是冻结题组原样副本。使用 `jev-latest`，保留 `builds/adjud.py` 的阈值与分支顺序，不添加旧全局裁决题、不降低效果概率、不回退到另一套模型题组。
+- **静态层**：运行时边界复核使用 ALLOW/ASK：known-safe 放行，不能证明则交给 JEV。启动前真实 Shell 命令的闭合底线、独立 `/perm` 权限上限和无效输入仍可拒绝。JS/TS/Python 文件中的命令字符串只构成审查信号，不因源码文本匹配被当作已执行的底线。执行链为「观察 → 越界时静态审查 → 不能证明时动态审查」。
+- **放行即继续**：普通 Shell 保持观察并继续原进程，不自动重放先前步骤；事件许可只覆盖相应边界，需要整树许可的不透明能力另行审查。外部目录、`sudo` 和变量路径不因旧只读挂载再被否决，但模型授权不改变真实 OS 权限、Windows ACL 或 sudo 凭据要求。
+- **动态层**：使用 `jev-latest` 与包内 `src/security/v11-gold-prompt.json`。六个效果概率题与四个策略题共 10 题，Read only 增加符合性题后为 11 题。Variant B 的物质性阈值为 `>= 0.40`；闭合底线、只读限制及已确认未覆盖的物质效果先于补证回退，不以授权降低效果概率，不回退到另一套模型题组。
 - **仅 JEV**：不再启用 OpenAI-compatible 审查器或失败回退；可用性只依赖 `dynamicReview.jev` 的端点和密钥环境变量。旧 OpenAI 字段兼容读取但不起作用，无需补齐它们。当前实现使用已核验的 `systemone` 协议；`decisions` 的不同协议尚未接入。
-- **授权**：用户消息、保留的会话上下文以及可信 `/bypass` 状态进入同一请求。类别豁免跳过对应静态检查；动态层通过 `bypass.categories/custom` 判断授权覆盖。命令正文或工具输出里自称“已批准”不构成授权。新 Linux 链路无需 `REQUIRE_ESCALATION` 前缀。
-- **补证终局**：`collect_evidence` 有可补信息时自动采集，最多一次补证后复审。补证确实耗尽且 `floor=no` 时，`dynamicReview.onUncollectable` 决定 `allow` 或 `deny`，默认 **`allow`**。放行记录为接受信息不足，不是已证明安全；拒绝记录为补证限制，不是模型否决。floor 命中或未明确、协议错误及网络失败不由该选项放宽。
+- **授权**：最近五轮真实用户消息在 12,000 字符预算内保留，连同会话上下文及可信 `/bypass` 状态进入请求；可信 question 答复只保留实际选择。类别豁免不扩大独立读写上限。命令正文或工具输出自称“已批准”不构成授权；最新限制或撤回优先，旧部署任务不会因参数微调而自动失效。
+- **补证终局**：最多一次有界补证后复审。明确底线、只读违规和 `uncovered` 否决不放宽；真正耗尽补证的未知由 `dynamicReview.onUncollectable` 决定 `allow` 或 `deny`，默认 **`allow`**，记录为接受未知而非证明安全。协议或网络故障另按 `failPolicy` 处理。
 - **重试限制**：不把普通错误文本当作许可，也不自动重跑可能已有未知副作用的整条脚本。单次获准的执行例外与永久扩大沙箱边界不同。
 - **只读会话**：`/perm` 没有写权限时仍执行独立只读上限，审查放行及类别豁免都不授予写权限。仍需要沙箱的调用才受 helper 可用性约束；读写会话的获准直接执行不依赖 bwrap。
 - **隐私范围**：普通日志与 `.bash_history`、`.zsh_history` 不因文件名被当作隐私。具体密钥、令牌和敏感环境变量仍受保护；“只读”不能自动豁免真正的凭据披露。日志的修改、删除、伪造或内容外传与普通只读诊断分开判断。
-- **审查诊断**：`logReviewerTrace: true` 启用现有 `~/.opencode/reviewer-trace.jsonl`。一轮动态审查通常产生 request、result、outcome 三条记录，不是三次 JEV 请求；按 `effects_review_request` 与 `callID/round` 统计审查轮数。`reviewer` 标明 JEV 或测试注入，`source`（如 coverage、bounded）只表示裁决分支。记录命令 SHA256、调用标识、静态触发规则和策略版本，不记录命令全文、用户请求、custom 授权、正文或凭据。无需新增 `reviewerTrace` 配置项。
+- **脚本证据与凭据遮盖**：首次审查前附加有界执行脚本正文，并优先按观察到的 argv 与进程 CWD 解析，避免 `cd nested` 后附加根目录同名文件。审查 argv 的敏感赋值、参数值及 URL 全部 userinfo 显示为 `[redacted]`；缓存仍绑定原始参数摘要。
+- **审查诊断**：`logReviewerTrace: true` 启用 `~/.opencode/reviewer-trace.jsonl`，记录明文 `command`、原始边界参数与完整 `effects`／原始 JEV 答案。一轮 request/result/outcome 不是三次 JEV 请求。此日志可能含敏感参数，不能提交或随意分享；新建文件为 `0600`，既有文件权限不会自动改变。后台停止在释放授权前记录 `effects_background_blocked`；关闭详细追踪时也向 scratch 写最小通知，但不写原始命令。前台说明使用 `Tool.Error`，迟到的后台拒绝通过同会话待发通知交付；两者都不写入被执行进程 stdout/stderr。
 - **Auto 常规写入范围**：项目、配置的 scratch，加 `~/.cache` 与 `~/.npm/_cacache`。这是有限的缓存范围扩展，不包含整个 HOME、用户设置、用户状态或 Windows 目录；缓存根及目标的符号链接越界不继承这个放行，凭据/系统路径判定优先。Read only 不获得缓存写权限。
-- **全局临时目录**：Auto 与 Read only 都可写配置的 scratch、`/tmp`、`/var/tmp`、`TMPDIR`，以及 WSL 下 Windows 用户的 `%TEMP%`/`%TMP%`（如 `C:\Users\<user>\AppData\Local\Temp`，经 `cmd.exe` 每进程探测一次）及其子目录。shell 与原生 write/edit/patch 都适用。只采用已存在的规范目录；覆盖 `/` 或 HOME 的根不采用。Read only 的会话工作区即使位于临时目录内也保持只读，sandbox.denyWrite 与插件控制面保护仍优先。对已有目录执行 mkdir 不改变状态，不因控制面祖先保护而拒绝。
+- **全局临时目录**：Auto 与 Read only 使用配置的 scratch、`/tmp`、`/var/tmp`、`TMPDIR` 及 WSL 的 Windows 临时目录。Windows 路径从继承环境或常规用户目录推导，不为探测启动 `cmd.exe`。只采用已存在的规范目录，覆盖 `/` 或 HOME 的根不采用；Read only 工作区仍只读。临时凭据样式文件需区分夹具与真实暂存秘密，不能凭 `/tmp` 自动豁免真实凭据或 HOME 链接；denyWrite、活动 broker 与控制面保护优先。
 - **插件开发目录**：会话工作区明确位于当前插件包目录内时，允许正常开发写入；其他工作区仍保护插件安装目录。运行中的观察器二进制与 broker 通信目录不随开发豁免放开。
 
 只调整补证终局时，在现有配置的 `dynamicReview` 对象内加入：
@@ -227,7 +228,8 @@ UI 不再展示 rwx/x/YOLO 字样。状态尚未同步时显示未知状态，�
 
 启用 sandbox 的 shell 命令由 `bin/opencode-boundary-watch`（`native/linux-sandbox/opencode-boundary-watch.c`，`make -C native/linux-sandbox` 构建）以纯 ptrace 方式监督：payload 不经过 mount/NNP/Landlock 包裹直接运行，插件内没有任何脚本内容/危害分析；只有越过声明写根、只读上限、凭据路径、网络/IPC、特权或 opaque 能力（io_uring、ptrace、进程间句柄、CLONE_UNTRACED、foreign ABI 等）的 syscall 才在进入点暂停并向本进程内的 broker 通道（AF_UNIX NDJSON）请求一次裁决。裁决分三段：观察器发现越界 → **静态审查**（只返回 ALLOW/ASK）→ 静态不能证明时 **动态审查**（JEV）。回复语义：`allow` 对已批准命令 detach 全树改原生执行（setuid/interop 可用，lease/模式撤回仍能 killpg 全组）；`continue` 只放行本次 syscall（L2 缓存命中路径）；`deny`、超时（`--approve-timeout-ms`，默认 35s）或通道 EOF 一律 kill 整个 tracee 树，助手退出码 126 并说明"该操作未执行，此前步骤可能已生效"。payload 最终退出后 broker 关闭前，助手发送一行 `{type:"exit","exit":<真实0..255码>}` 终态帧（无需回复），供 background 调用在没有工具返回的情况下结算缓存与清理。
 
-- **拒绝文案统一**：broker 提供的终态文案原样保留；helper 缺省取消仅输出一行 `Command cancelled:`（宿主 TERM/INT/HUP 退出码为 `128 + signal`，显式 cancel 或已开始但不完整、超时或超限的控制帧为 130），不生成拒绝措辞；拒绝仍使用退出码 126，TS 侧拒绝文案为 `Command blocked: <reason>. <The boundary operation was not performed|The command was stopped>; earlier steps may already have run. Do not automatically rerun the whole command.`；阶段由 `details.atExit`（helper 对每个事件显式发出 true/false）与 `runtimeBlockedPhase`（entry|exit|unknown）三态决定——只有显式 entry 才承诺"操作未执行"，exit 侧（recvmsg cmsg）、运行中取消、模式撤销、审批未完成与未知一律"command was stopped"；reviewer 事实文案按同阶段区分。普通 OS 失败不加该前缀。前台输出、后台 shell 输出与 metadata.runtimeBlocked 三处可见，首次原因不被后续 EOF 覆盖。
+- **拒绝与取消说明**：helper 只通过认证 broker 控制帧报告拒绝、取消和终态，不向子进程 stdout/stderr 输出拦截文案。前台失败使用 `Tool.Error`：已确认审查否决为 `Command blocked` 并保留 `Do not bypass this denial...`；检查故障、取消和权限变化为 `Command failed`，不伪装成模型否决。运行时说明保留实际触发点，明确可能已部分执行且没有回滚；首次原因不被后续 EOF 覆盖。普通 OS 错误保留原始输出，不能据此推断为插件拒绝。
+- **后台拒绝通知**：工具已返回 `status:"running"` 后不能再改写原调用的 `Tool.Error`。后台终态先按会话保存完整拒绝说明及禁止绕过指导，并记录 `effects_background_blocked`，再释放授权。通知在既有模型请求中可见，并由下一个已完成工具结果前置送达，或在下一条真实用户提示前通过 `session.synthetic`（`resume:false`、`steer`）持久化；不会单独唤醒 runner，也不写入后台进程 stderr。临时上下文副本不算已送达，工具结果或成功的真实提示发布才清理对应通知；会话删除时清理待发通知。
 - **故障放行**：以上故障拒绝仅适用于 `fail_close`。`fail_open` 向 helper 传入 `--fail-open`：broker EOF／协议错误／审批超时放开整棵进程树，启动检查失败时直接执行原载荷；不生成拒绝文案。用户取消和模式／权限撤销使用独立 cancel 帧，仍终止命令，不能把它们当作故障 EOF 放行。
 - **取消帧完整性**：broker 等待 cancel 写入完成后才关闭通道；未能确认发送时走原执行器的中断兜底。观察器在空闲期按完整 NDJSON 帧组装控制消息，最多 511 字节、1 秒。已开始但截断、超时或超限的控制帧按取消处理，不因 fail-open 放开进程树。
 - **detach 后仍受监督**：'allow' detach 的进程保持登记，取消（broker EOF/撤销/host SIGTERM·INT·HUP）仍按 pid 逐个 SIGKILL——`setsid` 只能逃出 killpg，逃不出登记表；watcher 是 child subreaper，孤儿后代 reparent 到 watcher 一并收割。**终态语义**：root 退出只记录结果，唯一 terminal exit 帧在整树被 waitpid 收割干净（ECHILD）后发出——后台命令的 cache 推进不会因为 root 先退而提前兑现；监督期 broker 关闭一律视为取消（会到达每个后代）。宿主 SIGKILL 无法捕获，仍是声明限制（残留后代此时确实会漏）。
@@ -239,7 +241,7 @@ UI 不再展示 rwx/x/YOLO 字样。状态尚未同步时显示未知状态，�
 - **直接放行**：信号 0（只探测存在，uutils `tail` 的 `kill(0,0)`）；连接 root 所有、目录不可写的 `/run/systemd/userdb/*`；发往内核（`nl_pid` 0）的 netlink（`getifaddrs` 等查询；非 root 的 tracee 无法获得修改网络状态的能力）。
 - **interop 判定**：按 binfmt_misc 规则读文件头 `MZ`，不看文件名：ELF 格式的 `bun.exe`、`opencode.exe` 原生执行，不再是 interop 事件；改名的 PE 仍是。读不到文件头时退回 `.exe` 后缀判定。所有运行时观察的调用设置 `GIT_OPTIONAL_LOCKS=0`，只读 Git 命令不再在 worktree 的主仓库 gitdir 写 `index.lock`。
 - **缓存范围**：L1 按 (会话、securitySnapshot、边界核心摘要) 键控——核心摘要是越界本身而不是命令文本：事件 kind/syscall/operation/写入效果、目标稳定身份（canonical path、domain、exists、dev/ino/mode、父目录 dev:ino，不含 size/mtime/ctime）、执行映像身份与 basename、跨越进程 argv 摘要（bash/sh/dash/zsh/ksh/fish/busybox sh 等 shell 解释器除外——其 argv 是整条命令行）、运行 cwd、只读/可写审查政策版本与活动豁免面。`| tail -30` 改成 `| tail -20` 或追加 `; echo x` 命中同一越界的 L1；原生文件工具同理按 (工具 + 解析目标 + 身份 + 模式) 而非原始输入键控。正向条目（allow，L1 与 L2）TTL 20 分钟且**滑动续期**（每次命中重置），只绑定安全快照——新用户消息不再使其失效，任何安全状态变化（/perm、/bypass、kill switch、租约到期）清空该会话全部缓存；负向条目（deny，仅 L1）TTL 5 分钟不滑动，仍绑定 adjudicated 时的用户消息摘要——新消息可能授权曾被拒绝的操作，故拒绝在新消息后未命中。L2 只给非 fullApproval 的 write 级操作，按 (path, 父目录 dev:ino) + 对象身份（dev/ino/mode——同 inode 的 chmod 即失效，内容 mtime 不失效）绑定，调用结束（含非零退出码，不含被拦截）后推进到落盘对象。L2 还绑定写入效果并且不会放宽：`replace`（O_TRUNC/truncate/creat）⊃ `overwrite` ⊃ `append` ⊃ `fd-write`，`mkdir` 单列；符号链接、硬链接、设备节点不进入 L2。旧快照范围的查询只是未命中，不会清空当前缓存；最多保留 64 个会话的缓存状态。ReadOnly 会话也复用 read/network 越界的审查结果。opaque/requiresFullApproval 事件**完全不缓存正向**（exe 未变不等于同一动作；间接可变输入无法绑定），deny 结果仍可缓存。
-- **argv 脱敏**：事件里的 argv 只以 digest/argc 进入复核与日志，绝不外发明文。
+- **审查文本脱敏**：复核收到遮盖敏感值后的 argv、command 和证据命令文本；带空格的单／双引号参数和赋值同样显示为 `[redacted]`。原始 argv 摘要只供宿主缓存使用；显式详细追踪仍可能记录原始命令和边界参数，须按敏感本地日志保护，不能把它当作已脱敏的复核请求。
 - **环境继承取舍**：payload 原样继承宿主环境（含密钥）。启动代码钩子（`BASH_ENV`、`ENV`、`BASH_FUNC_*`、`SHELLOPTS`、`PROMPT_COMMAND`、`LD_*` 等）在外层 shell 被改名为 `OPENCODE_DEFER<N>_*`（置原名空串——已核实宿主 `packages/core/src/shell.ts` 在 hook 前物化 env 且 spawner 不合并父 env，空串语义稳妥），存储名与原名以 `--defer <storage>=<name>` 显式对传给 helper：traced child 只恢复被声明的对子，用户自有同前缀变量原样透传。**槽位耗尽即拒绝启动**（任一钩子拿不到空闲存储名或超 256 对上限→ 命令在 payload 存在前被 sandboxDenyCommand 拦截，外层固定 /bin/sh，不保留原钩子、不静默丢值）。
 - **NOFOLLOW-last**：unlink/rmdir/rename/lchown/l*xattr/linkat 目的端等操作按 canonical(parent)+basename 判定——删除指向外部的根内符号链接不是外部删除；rename/link 事件同时携带源与目标两个 target（硬链接会改源 inode 元数据）。路径解析遵守内核遍历顺序：realpath 先跟符号链接再处理 `..`，不做词法折叠——`a/link/../f` 与 `a/f` 可能是不同对象；linkat 源端仅在 `AT_SYMLINK_FOLLOW` 时 follow。
 - **ABI**：每个 syscall-entry 用 `PTRACE_GET_SYSCALL_INFO.arch` 校验 x86_64；compat/x32/int80 一律 opaque `exec-domain` 全批事件，不会按 x86_64 表误判静默漏拦。

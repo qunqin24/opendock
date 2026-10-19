@@ -1,6 +1,8 @@
-# oc-todo
-
-**Track your session's next steps without losing them between turns.**
+<p align="center">
+  <img src="assets/icon.svg" width="120" height="120" alt="oc-todo icon" />
+</p>
+<h1 align="center">oc-todo</h1>
+<p align="center"><strong>Track your session's next steps without losing them between turns.</strong></p>
 
 ## Install
 
@@ -76,3 +78,11 @@ Open the visual inspector with `/show-todos`, move with `up`/`down` or `k`/`j`, 
 - Repository: https://github.com/nathwn12/oc-todo
 - Package: https://www.npmjs.com/package/oc-todo
 - Issues: https://github.com/nathwn12/oc-todo/issues
+
+<!-- nathwn12 house footer: identical in every repo. Do not edit. -->
+<p align="center">
+  <a href="https://github.com/nathwn12"><img src="assets/signature.svg" width="96" alt="nathwn12" /></a>
+</p>
+<p align="center">
+  <sub>Built by <a href="https://github.com/nathwn12">nathwn12</a> · <a href="https://github.com/nathwn12?tab=repositories">All projects</a></sub>
+</p>

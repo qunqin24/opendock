@@ -1,6 +1,8 @@
-# oc-bifrost
-
-**Keep your V1-era OpenCode plugins running on OpenCode V2 — supported hooks bridge across, the rest refuse out loud.**
+<p align="center">
+  <img src="assets/icon.svg" width="120" height="120" alt="oc-bifrost icon" />
+</p>
+<h1 align="center">oc-bifrost</h1>
+<p align="center"><strong>Keep your V1-era OpenCode plugins running on OpenCode V2 — supported hooks bridge across, the rest refuse out loud.</strong></p>
 
 ## Install
 
@@ -90,3 +92,11 @@ List each legacy plugin in `options.plugins` with exactly one specifier: `github
 - Compatibility matrix: <https://github.com/nathwn12/oc-bifrost/blob/main/src/compat-matrix.ts>
 - Setup guide: [INSTALL.md](INSTALL.md)
 - Verification record: [PROOF.md](PROOF.md)
+
+<!-- nathwn12 house footer: identical in every repo. Do not edit. -->
+<p align="center">
+  <a href="https://github.com/nathwn12"><img src="assets/signature.svg" width="96" alt="nathwn12" /></a>
+</p>
+<p align="center">
+  <sub>Built by <a href="https://github.com/nathwn12">nathwn12</a> · <a href="https://github.com/nathwn12?tab=repositories">All projects</a></sub>
+</p>

@@ -44,6 +44,8 @@ Restart opencode — done. Works out of the box with no configuration. To tune i
 
 ## Why
 
+![per-request context size: without trimming it grows linearly until the request overflows the model context window and the session stops; with context-trimmer the sticky window holds it in a stable band](docs/assets/cost-curve.png)
+
 opencode is **stateless** toward the model: every request resends the entire
 history. The longer the session, the more tokens are resent — tens of thousands,
 hundreds of thousands — until one request `exceeds the model context window` and
