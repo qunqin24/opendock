@@ -46,6 +46,7 @@ Recognized tool installations and installer downloads require approval. Existing
 - `/opencode-shell-info` — show the loaded plugin and OpenCode versions.
 - `/opencode-shell-diagnostics` — check mise and RTK, show the report, and explain the result briefly.
 - `/opencode-shell-inventory` — show the cached tool list and the last list supplied to the agent, without refreshing it.
+- `/opencode-shell-check git status` — preview RTK rewriting without running the command. Uses the plugin's working directory and reports the chosen shell. Trusted mise hooks may run; the preview does not grant shell approval.
 
 These commands ask the agent to call the matching tool, so they use an LLM call and normal tool permissions. Diagnostics show environment loading and command rewriting, **not proof of command execution or RTK gain tracking**. The last hook and inventory reports are shared across the plugin instance, not session-specific.
 

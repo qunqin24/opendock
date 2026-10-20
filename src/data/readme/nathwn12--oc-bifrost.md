@@ -78,6 +78,29 @@ List each legacy plugin in `options.plugins` with exactly one specifier: `github
 - Consent-gated fetching: a cold `github:` cache refuses until `trustRemote`, then pins the snapshot by commit and digest.
 - A durable mount report on every load, mirrored to a file for hosts that discard stdout.
 
+## Configure it
+
+You set each key in `options` on the bridge entry, or in `oc-bifrost.jsonc` in your OpenCode config directory. The file path is `~/.config/opencode/oc-bifrost.jsonc` when no config override is set (`$OPENCODE_CONFIG_DIR` wins when set, else `$XDG_CONFIG_HOME/opencode`, else `~/.config/opencode`). An explicit `options` key wins key by key over the file, so the npm route keeps working while you read the file form here.
+
+- `plugins` — default unset, so nothing mounts until you list it. You list one specifier per entry, the same four forms described under Use it.
+- `trustRemote` — default false. You set it true before the first `github:` fetch, because a cold cache refuses to download and execute remote code until you consent.
+- `strict` — default false. You set it true when you want an unsupported hook or a failed entry to abort setup instead of warning and mounting the rest.
+- `verbose` — default true. You set it false when you want the mount report silent.
+- `freshness` — default `"off"`. You set `"online"` when you want the bundled preset checked against its upstream release after it mounts. When you omit it, `OC_BIFROST_FRESHNESS` decides, and only `online` opts in.
+- `provision` — default `"host"`. You keep `"host"` when the shared OpenCode npm cache already holds the snapshot deps, you set `"npm"` when it does not, and you set `"off"` when you want no provisioning. When you omit it, `OC_BIFROST_PROVISION` decides.
+- `wireTui` — default false. You set it true when you want a mounted `github:` snapshot wired into your `cli.json`. When you omit it, `OC_BIFROST_WIRE_TUI` decides, and only `"1"` or `"true"` opts in.
+
+If your `github:obra/superpowers` mount refuses with a missing package because its dependencies are missing from the host npm cache, `provision: "npm"` is the escape. It keeps the host junction attempt and adds an `npm install --no-save` fallback for the packages the host store lacks. Paste this as `~/.config/opencode/oc-bifrost.jsonc`:
+
+```jsonc
+{
+  // ~/.config/opencode/oc-bifrost.jsonc
+  "plugins": ["github:obra/superpowers"],
+  "trustRemote": true,
+  "provision": "npm"
+}
+```
+
 ## Requirements
 
 - OpenCode V2 (`opencode --version` reports `2.x`).
@@ -92,6 +115,9 @@ List each legacy plugin in `options.plugins` with exactly one specifier: `github
 - Compatibility matrix: <https://github.com/nathwn12/oc-bifrost/blob/main/src/compat-matrix.ts>
 - Setup guide: [INSTALL.md](INSTALL.md)
 - Verification record: [PROOF.md](PROOF.md)
+- Issues: <https://github.com/nathwn12/oc-bifrost/issues>
+- Releases: <https://github.com/nathwn12/oc-bifrost/releases>
+- License: [LICENSE](LICENSE)
 
 <!-- nathwn12 house footer: identical in every repo. Do not edit. -->
 <p align="center">

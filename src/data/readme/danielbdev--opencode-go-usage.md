@@ -38,9 +38,14 @@ There is no build step: the packages ship their TypeScript sources and OpenCode 
 ## Releasing
 
 A release is cut by pushing a tag shaped `<directory>@<version>`, for example `go-usage@0.1.2`. GitHub
-Actions then runs the tests and the typecheck, checks that the tag matches the manifest, and publishes that
-package through OIDC trusted publishing. No npm token is stored anywhere, and npm attaches a SLSA
-provenance attestation automatically.
+Actions runs the tests and the typecheck, checks that the tag matches the manifest, and **stages** the
+version into npm's staging queue. Nothing is installable until a maintainer approves it with 2FA: `npm
+stage list`, then `npm stage approve <stage-id>`.
+
+Staging is also what makes a **new** package work with no hand publish and no throwaway version: when a
+staged publish creates a name that does not exist yet, npm writes its own `0.0.0-stage` placeholder, and
+the real version waits in the queue. The CI credential is a granular token that may only stage packages,
+so no credential in this repository can publish on its own.
 
 Versions are **independent per package**: touching one plugin never forces a release of another. The
 repository root stays at `0.0.0` and is never published.
@@ -55,8 +60,9 @@ maintainer only, and the release path is protected by a tag ruleset and `CODEOWN
 - Every package ships its **sources unminified**: there is no build step and no bundle, so the audit
   surface is the entire program.
 - **Nothing runs at install time** — no `preinstall`, `postinstall` or `prepare` script anywhere.
-- Every release carries a **provenance attestation** tying the tarball to the commit and the workflow that
-  built it.
+- Releases are built and staged by CI from this repository, and published only after a maintainer approves
+  the staged version with 2FA; `npm audit signatures` reports whether a published version carries a
+  provenance attestation.
 - A plugin that touches a credential says exactly what it does with it, and what you can verify instead of
   trusting, in that package's own Security section.
 

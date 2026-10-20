@@ -420,6 +420,20 @@ deja embed
 `DEJA_EMBED_KEY` takes precedence. `OPENAI_API_KEY` is used automatically only for an
 HTTPS `api.openai.com` URL; it is never implicitly sent to local or third-party endpoints.
 
+Models trained with instruction prefixes, such as the multilingual E5 family, need them on
+both sides. `DEJA_EMBED_QUERY_PREFIX` goes in front of every search query and
+`DEJA_EMBED_PASSAGE_PREFIX` in front of every indexed text; both are empty by default:
+
+```sh
+export DEJA_EMBED_MODEL='multilingual-e5-small'
+export DEJA_EMBED_QUERY_PREFIX='query: '
+export DEJA_EMBED_PASSAGE_PREFIX='passage: '
+deja embed
+```
+
+The passage prefix is part of the sidecar's model name, so changing it embeds everything
+again, and search ignores vectors made with another model or prefix (it says so once).
+
 The sidecar sits beside the index as `.vectors.bin`, not inside `index.db`. Float32 vectors
 cost roughly 4 MB per 1k messages for a 1,024 dimension model. A remote endpoint receives
 the redacted indexed text, truncated to about 2k characters, but never raw source files.
@@ -536,6 +550,28 @@ A recall is a lexical lookup against a local index:
 0.7–0.8 ms median, and nothing waits on a model. A hook adds the process start and a
 freshness check over your stores on top of that: about 0.2 s end to end on a 1.9 GB
 store, and 0.59 s for the per-prompt hook on an index of 19k sessions.
+
+</details>
+
+<details>
+<summary><b>Can I stop it reindexing on its own?</b></summary>
+
+Yes. On a busy server, `DEJA_NO_AUTO_INDEX=1` or `"auto_index": false` in
+`~/.config/deja/policy.json` stops every automatic update. Search, MCP recall and hooks
+answer from the last finished index and say when it was updated, and nothing deja starts
+on its own writes it. Run `deja index` from cron or a systemd timer.
+
+</details>
+
+<details>
+<summary><b>Can I index for search only?</b></summary>
+
+Yes. `DEJA_SEARCH_ONLY=1` or `"search_only": true` in `~/.config/deja/policy.json` skips
+mining fixes, commands and co-occurrence, about a fifth of a build's CPU; it takes effect
+on the next `deja index`. Search, recall and blame work as before; `deja fix` says the
+index is search-only. The `DEJA_INDEX_*` switches
+that keep commands, tool output, paths and edits out of the index, and what each one
+turns off, are in the [commands guide](https://vshulcz.github.io/deja-vu/guide/commands.html#what-the-index-keeps).
 
 </details>
 

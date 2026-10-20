@@ -48,7 +48,7 @@ npm i sol-opencode
 ```jsonc
 {
   "plugins": [
-    { "package": "sol-opencode@0.1.1", "options": { "actionFusion": true, "observationPack": true } }
+    { "package": "sol-opencode@0.1.2", "options": { "actionFusion": true, "observationPack": true } }
   ]
 }
 ```
@@ -85,6 +85,17 @@ absolute path inside `node_modules/sol-opencode` selects the local-directory cha
 Option handling is defensive. A value that is not `true`/`false` logs a warning and disables that
 mechanism only; an unrecognised key (a typo such as `actionfusion`) warns and leaves the other
 mechanism enabled; a non-object `options` value disables both. None of those cases throw.
+
+### Archive retention
+
+Observation Pack writes archived tool results beneath `<data-home>/sol-opencode/observation-pack/objects/`.
+An absolute `XDG_DATA_HOME` selects the data home when configured; otherwise the plugin uses the
+platform default (`~/.local/share` on Linux, `~/Library/Application Support` on macOS, or
+`%LOCALAPPDATA%` on Windows). Archive objects are kept indefinitely: the plugin does not expire or
+garbage-collect them when a session ends, the session index changes, the plugin is disposed, or
+OpenCode restarts. This includes objects that become orphaned from their session index. There is no
+automatic size limit or built-in purge command, so archive storage can grow over time. Removing an
+object file makes its archived text unavailable to `obs_recall`.
 
 `setup` throws only when **no** mechanism could register at all. A mechanism whose host domain is
 missing (`ctx.tool`, `ctx.session`, `ctx.storage`, an absolute `ctx.location.directory`) warns and is
@@ -142,17 +153,37 @@ plugin arm.
   results stay verbatim by design); projection savings require session length.
 
 **Action Fusion**
-- `then_run` is exposed on `edit`/`write` with optional `shell`, works when
-  used (allow/reject/fail/blank paths verified), and **no free-tier model
-  adopted it in the two plugin-arm fixer sessions that ran** (`n35`, `nu`; the
-  other two planned fixer lanes failed in ~10 s on daily quota) where the prompt
-  merely permitted it — agents serialized edit → shell regardless. The two
-  off-arm sessions in that batch say nothing about adoption: without the plugin,
-  `then_run` is unavailable. Fusion is currently opt-in-by-capability, not a
-  measured win; treat it as scaffolding.
+- `then_run` is exposed on `edit` and `write` with optional `shell`. Tests cover the allow, reject, failure, and blank paths.
+- In the 2026-10-13 fixer sessions, neither of the two plugin-enabled models adopted `then_run`. The prompt only permitted chaining. Two other planned model lanes failed on quota.
+- The explicit-instruction probe below measured adoption in both plugin runs. Each matched pair saved one provider round-trip. This is a small synthetic task on one model, not a broad adoption rate.
 
-See [`benchmarks/README.md`](./benchmarks/README.md) for the protocol, the
-method rules that make these numbers citable, and how to regenerate them.
+### Issue #27 residual probes (2026-10-20)
+
+Both probes used OpenCode 2.0.27 and `opencode-zen/nemotron-3.5-lightning-free`. The raw captures are not committed. The fixture generator, prompts, and procedure are in [`benchmarks/probes/`](./benchmarks/probes/) and [`benchmarks/README.md`](./benchmarks/README.md).
+
+#### Forced archive retrieval
+
+The `neu` arm read a fresh 16,765-byte `BIG.txt`. The model made two separate checkpoint calls. It then retrieved the archived observation at offset 0. The prompt did not include the expected sentinel. Both runs completed `obs_recall`. An independent byte check confirmed that each `SENTINEL_OUT.txt` matched the 17-byte fixture value. Each run packed one object. `big_results` counts the large read and the recall result.
+
+| rep | round-trips | billed ctx | avg/RT | peak | tail4 avg | output tokens | tool calls | >10 KiB results | recalls | objects | wall | exact file |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|
+| 1 | 5 | 48,805 | 9,761 | 12,146 | 10,599 | 439 | 5 | 2 | 1 | 1 | 44 s | yes |
+| 2 | 12 | 163,278 | 13,606 | 17,007 | 16,574 | 591 | 13 | 2 | 1 | 1 | 44 s | yes |
+
+Rep 2 first tried two invalid observation IDs. The run then retrieved the placeholder ID. The reported cost includes these failed calls and its extra file checks. The initial `cat` result in rep 1 showed the sentinel before the checkpoints. The model reported the archived ID after the checkpoints. The `obs_recall` call returned the sentinel line. The trace proves that the retrieval path completed. It does not prove that the model forgot the earlier value.
+
+#### Action Fusion with an explicit instruction
+
+Each pair used identical prompt bytes and a fresh copy of the same off-by-one fixture. The `off` arm ran the test in a separate shell call. The `neu` arm passed an object to `then_run`. Both edit results showed `[then_run:succeeded] PASS`. All four fixtures passed an independent `sh test_sum.sh` check after the run.
+
+| rep | off RT | plugin RT | saved | off billed ctx | plugin billed ctx | off tool calls | plugin tool calls | `then_run` | test |
+|---|---:|---:|---:|---:|---:|---:|---:|---|---|
+| 1 | 4 | 3 | 1 (25%) | 25,626 | 19,885 | 5 | 4 | succeeded | PASS |
+| 2 | 4 | 3 | 1 (25%) | 25,898 | 19,902 | 5 | 4 | succeeded | PASS |
+
+One `off` trace included a string-valued `then_run` field. It did not return a fusion-success marker. The test ran in a separate shell call. The small sample (n=2) and single model limit this result to the tested task.
+
+See [`benchmarks/README.md`](./benchmarks/README.md) for the protocol, the method rules that make these numbers citable, and how to regenerate them.
 
 The merge rule for a model-visible change — schema text, result text, an archive
 chunk boundary, or a failure path that replaces a silent drop — is in

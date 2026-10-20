@@ -23,8 +23,15 @@ Tested against OpenCode `2.0.24`.
 ## Install
 
 ```sh
-opencode plugin add @hacky.software/opencode-todo-supervisor@0.3.11
+opencode plugin add @hacky.software/opencode-todo-supervisor@0.3.13
 ```
+
+> **OpenCode 2.0.32 packaging note:** TUI entries installed from npm are
+> loaded with a dynamic `import()`, which resolves the plugin's own bundled
+> `solid-js`. That second Solid instance renders once but does not react: the
+> composer strip stays hidden and arrow-key selection does not move. Point the
+> config at a local checkout instead (below) — the host transpiles local TUI
+> entries against its own runtime, so slots and keymaps stay live.
 
 This also loads the bundled TUI entry. To pass options, use the object form:
 

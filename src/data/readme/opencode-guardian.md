@@ -3,8 +3,8 @@
 [![npm version](https://img.shields.io/npm/v/opencode-guardian?color=cb3837&logo=npm&logoColor=white)](https://www.npmjs.com/package/opencode-guardian)
 [![npm downloads](https://img.shields.io/npm/dm/opencode-guardian?color=blue&logo=npm&logoColor=white)](https://www.npmjs.com/package/opencode-guardian)
 [![OpenCode: v1 & v2](https://img.shields.io/badge/OpenCode-v1%20%7C%20v2%20Dual--Mode-10b981?logo=terminal&logoColor=white)](https://opencode.ai)
-[![Live Acceptance: V1 & V2 Passed](https://img.shields.io/badge/Live%20Acceptance-V1%20%26%20V2%20Passed-10b981?logo=checkmarx&logoColor=white)](docs/acceptance-v1.md)
-[![Tests: 514/514 Passing](https://img.shields.io/badge/Tests-514%2F514%20Passing-339933?logo=githubactions&logoColor=white)](docs/verification-report.md)
+[![Historical V1/V2 host baseline](https://img.shields.io/badge/Host%20baseline-historical-10b981?logo=checkmarx&logoColor=white)](docs/acceptance-v1.md)
+[![Tests: 619/619 Passing](https://img.shields.io/badge/Tests-619%2F619%20Passing-339933?logo=githubactions&logoColor=white)](docs/verification-report.md)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D22.0.0-339933?logo=nodedotjs&logoColor=white)](package.json)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178c6?logo=typescript&logoColor=white)](tsconfig.json)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
@@ -21,19 +21,21 @@ OpenCode Guardian continuously supervises agent turns: guiding model execution b
 
 ![Automated and host acceptance results](docs/assets/verification-overview.svg)
 
-> The graphic combines the current **v0.11.1 automated verification** with the real-host acceptance runs across **OpenCode V1 (`1.18.34`)** and **OpenCode V2 (`2.0.24`)** executed on real host with `opencode-go/mimo-v2.6-flash`.
+> The graphic separates **v0.11.2 automated verification** from historical V1/V2 host acceptance. A new live-host and interactive TUI acceptance run has not been performed for v0.11.2.
 
-Guardian **v0.11.1** is validated as follows:
+Guardian **v0.11.2** was checked on **20 October 2026**, using Node **24.22.0**:
 
-- **Current Automated Verification:** **600 / 600** unit, security, toast notification, and regression tests passing.
+- **Current Automated Verification:** **619 / 619** unit, security, toast notification, and regression tests passing.
 - **Sandbox Scenarios:** **18 / 18** end-to-end multi-turn agent failure and recovery scenarios verified.
 - **Static Analysis:** standard and strict TypeScript gates pass; Oxlint reports **0 warnings / 0 errors**.
-- **Dependency Security:** **0 vulnerabilities** across production and development dependency audits.
-- **Real Host Acceptance (V1 & V2):** Both OpenCode V1 (`1.18.34`) and OpenCode V2 (`2.0.24`) verified with real LLM agent sessions (`opencode-go/mimo-v2.6-flash`).
+- **Dependency Audits:** Not rerun for this patch; no dependency versions changed.
+- **Historical Host Acceptance (V1 & V2):** Earlier host results, original versions and test environments remain in the acceptance reports; they are not a new acceptance run for this patch.
 
 Read the comprehensive [V1 Acceptance Report](docs/acceptance-v1.md), [V2 Acceptance Report](docs/acceptance-v2.md), and [Verification and Acceptance Report](docs/verification-report.md) for reproduction steps, methodology, and full test matrices.
 
 ---
+
+See the [0.11.2 release notes](CHANGELOG.md) for Error/serialization redaction, V1 cancellation, session-cache cleanup and permission-classification fixes.
 
 ## ✨ Key Highlights
 
@@ -42,6 +44,8 @@ Read the comprehensive [V1 Acceptance Report](docs/acceptance-v1.md), [V2 Accept
 - **In-App Update Indicator:** Shows a green `(↑)` header icon and places `Update available` first in the sidebar when npm reports a newer release.
 - **Guardian Commands:** Ctrl+P and slash commands display detailed status, activity, diagnostics, rules, configuration and version; confirmed statistics reset preserves audit history.
 - **Project-Scoped Audit Log:** Stores safe event codes, reasons and intervention outcomes in `<project>/.opencode/guardian-events.jsonl` with `0600` POSIX permissions, a 2 MiB limit and one rotated archive. Never stores prompt or command text.
+- **V1 Session Cancellation:** Native session-deletion events and new human prompts, including attachment-only messages, cancel stale idle work and prevent deleted capability caches from returning.
+- **Error Redaction:** Nested Error metadata, non-enumerable causes and aggregate errors are sanitized; executable serialization callbacks are removed and reserved JSON fields remain safe own properties.
 - **Evidence-Based Task Contracts:** Analyzes human requests across 13 languages to extract required verifications (tests, builds, source reviews) and detects premature completion claims. When the host provides a tool-after observation, SHA-256 evidence is tied to the observed file contents.
 - **Foreground Subagent Finalization Barrier:** For synchronous delegated work, Guardian owns the handoff boundary: blocking findings are remediated on the child session before the parent receives the tool result, and the parent sees the revised final child report instead of a stale first-pass report. Background subagents keep the existing idle-remediation path.
 - **Decoupled Smart Questions Coordination (`[OPENCODE_HANDOFF:v1]`):** Seamlessly bridges human decisions to Smart Questions when questions or confirmations are required. Designates `auto_select=allowed` for choices and `auto_select=forbidden` for destructive actions, while preventing redundant confirmation requests.
@@ -116,7 +120,7 @@ To mount the Guardian sidebar in your OpenCode terminal:
 ### 🔽 Collapsed View (Default)
 
 ```text
-▶ Guardian                 v0.11.1
+▶ Guardian                 v0.11.2
 Status                       ● Active
 Interventions                 0w · 0r
 ```
@@ -130,7 +134,7 @@ Interventions                 0w · 0r
 Clicking the `▶ Guardian` header expands the widget:
 
 ```text
-▼ Guardian                 v0.11.1
+▼ Guardian                 v0.11.2
 Preflight                  ○ disabled
 Inspected                           0
 Blocked                             0
@@ -382,9 +386,9 @@ flowchart TD
     Outcome -->|Evidence insufficient| Unverified[remediation-unverified]
 ```
 
-The diagram illustrates the v0.11.1 dual-mode runtime. Strict preflight is **opt-in** and evaluates recognized or configured tools; an out-of-scope tool is still governed by host permissions. Tool-after observations and SHA-256 file snapshots are captured **when the host supplies supported evidence**. After a remediation, only supported, observable follow-up evidence can establish `remediation-verified`.
+The diagram illustrates the v0.11.2 dual-mode runtime. Strict preflight is **opt-in** and evaluates recognized or configured tools; an out-of-scope tool is still governed by host permissions. Tool-after observations and SHA-256 file snapshots are captured **when the host supplies supported evidence**. After a remediation, only supported, observable follow-up evidence can establish `remediation-verified`.
 
-For delegated subagent work (`task` on V1, `subagent` on V2), v0.11.1 enforces capability-aware remediation isolation with strict tool-failure verification: write-capable agents cannot bypass concrete unresolved failures by merely reporting them, read-only subagents fail-safe to avoid loops without synthetic prompts, instruction-fidelity violations block with high confidence, lifecycle teardown uses reverse-splice idempotent disposal, and per-rule fingerprint remediation budgeting prevents infinite repetition while allowing distinct substantive errors to be fixed. Furthermore, v0.11.1 features accurate post-turn inspection telemetry counting, robust V2 subagent handoff recognition across metadata and structured outputs, evidence trust boundaries, per-file patch attribution, credential redaction in telemetry and secret sanitizers, idle queue coalescing with stable turn inspection, Windows command stage parsing, rollback budget preservation, preflight/verification hook isolation, color-coded user toast notifications, and synthetic remediation assertions.
+For delegated subagent work (`task` on V1, `subagent` on V2), v0.11.2 enforces capability-aware remediation isolation with strict tool-failure verification: write-capable agents cannot bypass concrete unresolved failures by merely reporting them, read-only subagents fail-safe to avoid loops without synthetic prompts, instruction-fidelity violations block with high confidence, lifecycle teardown uses reverse-splice idempotent disposal, and per-rule fingerprint remediation budgeting prevents infinite repetition while allowing distinct substantive errors to be fixed. Furthermore, v0.11.2 features accurate post-turn inspection telemetry counting, robust V2 subagent handoff recognition across metadata and structured outputs, evidence trust boundaries, per-file patch attribution, credential redaction in telemetry and secret sanitizers, idle queue coalescing with stable turn inspection, Windows command stage parsing, rollback budget preservation, preflight/verification hook isolation, color-coded user toast notifications, and synthetic remediation assertions.
 
 ---
 

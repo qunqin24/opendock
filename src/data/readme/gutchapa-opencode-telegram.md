@@ -1,13 +1,34 @@
 # gutchapa-opencode-telegram
 
-> Telegram bot for opencode with a daily AI morning briefing — every news item and trending repo judged ✅ useful / ⏭️ skip against your actual setup. Plus 70+ slash commands, file sharing both ways, plugin + standalone modes.
+> Control opencode from Telegram. Send prompts, files and 70+ slash commands from your phone, and get the agent's replies back in the chat. Runs as an opencode plugin or as a standalone bot. Ships a daily AI morning briefing that judges every news item and trending repo ✅ useful / ⏭️ skip against your actual setup.
 
 [![npm version](https://img.shields.io/npm/v/gutchapa-opencode-telegram)](https://www.npmjs.com/package/gutchapa-opencode-telegram)
 [![npm downloads](https://img.shields.io/npm/dm/gutchapa-opencode-telegram)](https://www.npmjs.com/package/gutchapa-opencode-telegram)
 [![license](https://img.shields.io/npm/l/gutchapa-opencode-telegram)](LICENSE)
 [![GitHub stars](https://img.shields.io/github/stars/gutchapa/opencode-telegram)](https://github.com/gutchapa/opencode-telegram)
 
-## Morning briefing (the reason to install)
+## Quick start
+
+Standalone bot (works even when opencode is not running):
+
+```bash
+npm install -g gutchapa-opencode-telegram
+export TELEGRAM_BOT_TOKEN=123456:ABC...
+export ALLOWED_TELEGRAM_USERS=your_telegram_user_id
+opencode-telegram-bot
+```
+
+As an opencode plugin, add it to `~/.config/opencode/opencode.json` and restart opencode:
+
+```json
+{
+  "plugin": ["gutchapa-opencode-telegram"]
+}
+```
+
+Telegram polling is opt-in for the plugin (`{ "enabled": true }` or `TELEGRAM_PLUGIN_ENABLED=1`). The token and allowed users go in plugin options or the env vars above. Full walkthrough below.
+
+## Morning briefing
 
 Every day at 07:30 your bot brews this — AI news, trending repos, your tracked repos — then judges **every item** against what you actually run:
 
@@ -28,33 +49,20 @@ Bottom line: nothing to install today.
 >
 > ⭐ If this is useful, [star the repo](https://github.com/gutchapa/opencode-telegram) — it's the only signal that keeps it maintained.
 
-## Install
+## How it runs
 
-One line, ready to go:
+Two ways, same bot:
 
-```bash
-npm install gutchapa-opencode-telegram
-```
-
-It ships a CLI (`opencode-telegram-bot`) plus an opencode plugin. Set your bot
-token and allowed users, then run it (see the setup section below for the full
-walkthrough — standalone, launchd/systemd, or Docker).
-
-A Telegram bot for [opencode](https://opencode.ai). Chat with your local AI
-assistant from Telegram — run commands, read/search/list files, and control the
-agent with 70+ slash commands (`/reset`, `/status`, `/model`,
-`/goal`, `/skills`, `/tell`, ...).
-
-Two ways to run it:
-
-1. **As an opencode plugin** — load it from `opencode.json` and it registers
-   with the running opencode instance (TUI, `opencode serve`, or `opencode run`).
-   Telegram polling is opt-in; enable it per config (see below). Agentic replies
-   run against the hosting opencode server via the SDK client.
+1. **As an opencode plugin** — registers with the running opencode instance
+   (TUI, `opencode serve`, or `opencode run`). Telegram polling is opt-in;
+   agentic replies go through the hosting opencode server.
 2. **As a standalone bot** (`opencode-telegram-bot` / `npm start`) — a
    long-running Telegram poller that spawns `opencode run` for agentic replies.
    Use this if you want the bot available even when opencode is not running
    (e.g. via launchd, systemd, or Docker).
+
+Commands include `/reset`, `/status`, `/model`, `/goal`, `/skills`, `/tell`
+and 60+ more. Full setup walkthrough (launchd, systemd, Docker) is below.
 
 ## Install as a plugin
 

@@ -21,7 +21,7 @@ According to the [official DeepSeek API pricing page](https://api-docs.deepseek.
 - `01:00–04:00 UTC`
 - `06:00–10:00 UTC`
 
-The intervals are half-open: `01:00` is peak, `04:00` is off-peak, `06:00` is peak, and `10:00` is off-peak.
+The intervals are half-open: `01:00` is peak, `04:00` is off-peak, `06:00` is peak, and `10:00` is off-peak. Peak runs **Monday–Friday** only; weekends are entirely off-peak.
 
 The displayed clock uses the computer's system timezone, including automatic daylight-saving changes. The timezone abbreviation is shown after the local time (for example, `CET`, `CEST`, or `PST`).
 

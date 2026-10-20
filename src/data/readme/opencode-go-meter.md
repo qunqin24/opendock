@@ -24,15 +24,23 @@ and on the prompt footer row, with a forecast of where the current pace lands by
 ## Install
 
 ```bash
+opencode plugin add opencode-go-meter
+```
+
+Restart opencode: the plugin is read at startup. To update later: `opencode plugin update`,
+then restart.
+
+For hacking on it, install from a clone instead — plugins are also discovered from
+`~/.config/opencode/plugins/<name>/` and need no `opencode.json` entry:
+
+```bash
 git clone https://github.com/LeonVeganMan/opencode-go-meter ~/.config/opencode/plugins/opencode-go-meter
 ```
 
-Local plugins are discovered from `~/.config/opencode/plugins/<name>/` — no entry in
-`opencode.json` is needed. Restart opencode: the plugin itself is read at startup.
-
-Also published on npm as [`opencode-go-meter`](https://www.npmjs.com/package/opencode-go-meter).
-The clone above stays the documented install — opencode loads plugins from that folder — and the
-npm package is there for the directories and registries that index plugins.
+The clone is for development only. `opencode plugin add` installs the npm package
+*alongside* it, and OpenCode would then load the same plugin twice: duplicated palette
+entries and a doubled sidebar block. Pick one — move the clone out of
+`~/.config/opencode/plugins/` before installing from npm.
 
 The built-in blocks this plugin replaces are the reason it exists. If you keep them, disable them in
 `cli.json` so the figures are not shown twice:

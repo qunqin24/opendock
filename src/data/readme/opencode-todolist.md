@@ -30,6 +30,18 @@ Or add it manually to `~/.config/opencode/opencode.json`:
 
 Restart OpenCode if the plugin is not picked up automatically.
 
+Requires opencode v2.0+ (any 2.0.x server).
+
+## Updating
+
+Re-run the same install command (`opencode plugin add opencode-todolist`
+re-resolves to the latest). Restart the server after updating. There is no
+in-place updater.
+
+## Uninstall
+
+Remove the entry from your OpenCode config and restart the server.
+
 ## Usage
 
 Ask the agent to "make a todo list for this task", or let it use the tools on its own while working. You can also ask it to "read the todo list" at any point.

@@ -1,6 +1,6 @@
 # Git Autocommit Plugin for OpenCode
 
-[![npm version](https://badge.fury.io/js/@reachdevel%2Fopencode-git-commit.svg)](https://badge.fury.io/js/@reachdevel%2Fopencode-git-commit)
+[![npm version](https://badge.fury.io/js/opencode-git-autocommit.svg)](https://www.npmjs.com/package/opencode-git-autocommit)
 
 An OpenCode plugin that automatically commits changes when your coding session ends.
 
@@ -32,7 +32,7 @@ Commit messages are derived from the staged diff itself, so they are determinist
 
 ### Via Command Line
 ```bash
-opencode plugin add @reachdevel/opencode-git-commit@latest
+opencode plugin add opencode-git-autocommit@latest
 ```
 
 ### Via Configuration
@@ -41,14 +41,16 @@ Add to your `opencode.json`:
 {
   "$schema": "https://opencode.ai/config.json",
   "plugins": [
-    "@reachdevel/opencode-git-commit@latest"
+    "opencode-git-autocommit@latest"
   ]
 }
 ```
 
 ### Manual Installation
+If you manage dependencies yourself, install the package and reference it by name:
+
 ```bash
-npm install @reachdevel/opencode-git-commit
+npm install opencode-git-autocommit
 ```
 
 Then add to `opencode.json`:
@@ -56,7 +58,7 @@ Then add to `opencode.json`:
 {
   "$schema": "https://opencode.ai/config.json",
   "plugins": [
-    "file:///path/to/node_modules/@reachdevel/opencode-git-commit/dist/index.js"
+    "opencode-git-autocommit"
   ]
 }
 ```

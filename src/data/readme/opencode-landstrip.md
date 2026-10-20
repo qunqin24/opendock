@@ -30,8 +30,8 @@ grants for the executable and its dependencies.
 ```
 
 ```sh
-npx landstrip run -p policy.json -- cargo test
-npx landstrip policy validate -p policy.json
+npx landstrip -p policy.json -- cargo test
+npx landstrip check -p policy.json
 npx landstrip doctor
 ```
 

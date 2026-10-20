@@ -12,21 +12,21 @@ Lossless context compression for OpenCode.
 
 OpenCode's built-in compaction replaces an entire conversation with one summary blob. The user messages, the assistant's reasoning, tool calls, design decisions, and workflow are all flattened into a generic template (Goal, Progress, Key Decisions...). The agent wakes up with amnesia, forced to reconstruct its working state from an abstraction that captured a fraction of what mattered.
 
-Magic Compact takes a different approach: preserve the conversation skeleton, give each eligible old assistant turn its own bounded native-history generation request, and ask a hidden summarizer to write that turn's continuation summary while denying its operational tools. OpenCode injects the side-effect-free `StructuredOutput` response tool for the JSON-schema request and returns its response on assistant `info.structured`; the fork's ordered session rule allows that one host tool after denying the rest. Safety comes from OpenCode's native history conversion, bounded explicit turn indexes, strict global response ordering, exact profitability projection, source revalidation, and non-destructive backup recovery.
+Magic Compact takes a different approach: preserve the conversation skeleton, give each eligible old assistant turn its own bounded native-history generation request, and ask a hidden summarizer to write that turn's continuation summary while denying its operational tools. OpenCode injects the side-effect-free `StructuredOutput` response tool for the JSON-schema request and returns its response on assistant `info.structured`; the fork's ordered session rule allows that one host tool after denying the rest. Safety comes from OpenCode's native history conversion, bounded explicit turn indexes, strict global response ordering, exact profitability projection, at-rest source checks, and a new successor session that leaves the original session untouched.
 
 ## How
 
 Instead of collapsing an entire session into a single generic summary, Magic Compact replaces old assistant turns with validated per-turn continuation summaries while leaving user messages and tool calls in place.
 
-Exact user messages remain in context. Magic Compact resolves the model and variant explicitly configured on OpenCode's native compaction agent plus its live provider limits once; it never silently falls back to the source session model. It estimates ordinary model-visible text with the local tokenizer, charges real file parts and tool attachments as typed media, and estimates `data:` strings embedded in tool values by encoded length without tokenizing their payloads. Selected turns stay chronological and whole, with exactly one target turn per generation request, a 400K normal estimated-input target scaled down for smaller models, and at most five independent requests in flight. The fixed 8K reserve covers only non-explicit host, system, and provider overhead. Separately, every batch tokenizes its complete rendered explicit request exactly once, including static instructions, the repeated global index, target JSON, conservative fixed-shape markers and marker injections, exact ordinals, media counts, punctuation, and any following-halo stop record.
+Exact user messages remain in context. Magic Compact resolves the model and variant you configure on its own `magic-compact-summarizer` agent plus its live provider limits once; it never falls back to the source session model or OpenCode's native compaction agent. It estimates ordinary model-visible text with the local tokenizer, charges real file parts and tool attachments as typed media, and estimates `data:` strings embedded in tool values by encoded length without tokenizing their payloads. Selected turns stay chronological and whole, with exactly one target turn per generation request, a 400K normal estimated-input target scaled down for smaller models, and at most five independent requests in flight. The fixed 8K reserve covers only non-explicit host, system, and provider overhead. Separately, every batch tokenizes its complete rendered explicit request exactly once, including static instructions, the repeated global index, target JSON, conservative fixed-shape markers and marker injections, exact ordinals, media counts, and punctuation.
 
-Each selected turn requires a fresh full-source fork and isolation, plus a request that repeats the fixed instructions, response schema, global index, and any optional neighboring context. Long histories therefore increase both model input and control work for copying, verifying, isolating, and deleting forks. Each fork is populated by one host replay of the planned history rather than the host's native copy, so that work grows with the stored message and part count, and each fork rereads the source once to confirm it has not changed. The repeated index cost grows with both the number of selected targets and the number of indexed turns.
+Each selected turn requires a fresh full-source fork and isolation, plus a request that repeats the fixed instructions, response schema, global index, and any optional preceding turn. Long histories therefore increase both model input and control work for copying, verifying, isolating, and deleting forks. Each fork is populated by one host replay of the planned history rather than the host's native copy, so that work grows with the stored message and part count, and each fork rereads the source once to confirm it has not changed. The repeated index cost grows with both the number of selected targets and the number of indexed turns.
 
 Before batch execution, Magic Compact builds one immutable global orientation index from every complete turn in the effective post-checkpoint source history. This includes eligible targets, opaque existing-summary turns, and the retained complete tail, but excludes an active incomplete turn. Each `{sourceOrdinal, anchor}` entry contains only the stable one-based source-turn position and the escaped first ordinary user-text line capped at 160 characters. Every batch receives the same byte-identical map.
 
-Each batch starts from a fresh complete source fork with an ordered session rule that denies every operational tool and then allows the injected `StructuredOutput` response tool. OpenCode 1.18.30 still resolves the final model tool map through the merged agent-and-session rules, where the last matching rule wins, so the trailing allow is what keeps the host response tool. Magic Compact verifies rewritten IDs and history shape, captures the exact retained rewritten IDs, order, roles, parent links, part types, and fork references, deletes every unrelated fork message through OpenCode's message-delete endpoint, then requires that exact retained identity after reload. Native checkpoint artifacts are never used as halos. OpenCode supplies only that batch's retained target and permitted neighboring-halo user, assistant, tool, reasoning, and media history through native conversion. The exact target index remains separate: each entry contains its marker, target ordinal, and expected user-and-assistant inline-image count, plus an optional nonce-bound stop marker on a following halo. The global map provides long-range user-anchor orientation, not distant detailed assistant or tool history. Magic Compact never serializes SDK objects, tool states, assistant traces, data URLs, provider metadata, or encrypted reasoning, and it never manually attaches files. Output packing separately budgets estimated summary and visual-description content plus the mandatory JSON envelope, array/object punctuation, echoed marker/ordinal fields, `summary` property, and every visual-description record. Each request's JSON response must contain exactly one result carrying its target's exact marker and ordinal. All batch responses and exact target-ordinal coverage are validated before backup or source mutation.
+Each batch starts from a fresh complete source fork with an ordered session rule that denies every operational tool and then allows the injected `StructuredOutput` response tool. OpenCode 1.18.30 still resolves the final model tool map through the merged agent-and-session rules, where the last matching rule wins, so the trailing allow is what keeps the host response tool. Magic Compact verifies rewritten IDs and history shape, captures the exact retained rewritten IDs, order, roles, parent links, part types, and fork references, deletes every unrelated fork message through OpenCode's message-delete endpoint, then requires that exact retained identity after reload. Native checkpoint artifacts are never used as halos. OpenCode supplies only that batch's retained target and permitted preceding-turn user, assistant, tool, reasoning, and media history through native conversion; later turns never enter the request. The exact target index remains separate: each entry contains its marker, target ordinal, and expected user-and-assistant inline-image count. The global map provides long-range user-anchor orientation, not distant detailed assistant or tool history. Magic Compact never serializes SDK objects, tool states, assistant traces, data URLs, provider metadata, or encrypted reasoning, and it never manually attaches files. Output packing separately budgets estimated summary and visual-description content plus the mandatory JSON envelope, array/object punctuation, echoed marker/ordinal fields, `summary` property, and every visual-description record. Each request's JSON response must contain exactly one result carrying its target's exact marker and ordinal. All batch responses and exact target-ordinal coverage are validated before any successor session is created.
 
-Fork creation and model requests have no local wall-clock deadline, so Magic Compact retains ownership of every generation fork even when OpenCode takes longer than 30 seconds to clone a session. Permission updates, message isolation, marker injection, and toast delivery remain bounded. Once a fork exists, provider or validation failure abort and fork deletion are command-owned and awaited; every started batch drains through cleanup before the command settles. A turn above the normal target is still planned when it fits the hard model-derived limit; otherwise Magic Compact fails before backup with `/magic-trim`-first guidance. A mandatory explicit request or global index that cannot fit fails before fork creation with trim-first/model-capacity guidance. Planning uses a conservative fixed-shape nonce, then generates each real nonce, renders the exact immutable prompt, and checks its normal, hard, halo, usable-input, and output estimates before creating any fork. Batches are planned from the same pre-generation source and remain independent; no generated summary is fed into another batch. The first batch failure stops new admission, every already-active batch is drained, and all active failures are surfaced in deterministic batch order without raw provider payloads. Output exhaustion requires a model with more output capacity, because every request already covers a single turn. Magic Compact makes one `session.prompt` call per fork and adds no plugin-level retry, adaptive splitting, per-turn fallback, partial writes, or model fallback. OpenCode may apply its runtime provider/transport retry policy or additional model steps required by structured-output processing.
+Fork creation and model requests have no local wall-clock deadline, so Magic Compact retains ownership of every generation fork even when OpenCode takes longer than 30 seconds to clone a session. Permission updates, message isolation, marker injection, and toast delivery remain bounded. Once a fork exists, provider or validation failure abort and fork deletion are command-owned and awaited; every started batch drains through cleanup before the command settles. A turn above the normal target is still planned when it fits the hard model-derived limit; otherwise Magic Compact fails before creating a successor, with `/magic-trim`-first guidance. A mandatory explicit request or global index that cannot fit fails before fork creation with trim-first/model-capacity guidance. Planning uses a conservative fixed-shape nonce, then generates each real nonce, renders the exact immutable prompt, and checks its normal, hard, halo, usable-input, and output estimates before creating any fork. Batches are planned from the same pre-generation source and remain independent; no generated summary is fed into another batch. The first batch failure stops new admission, every already-active batch is drained, and all active failures are surfaced in deterministic batch order without raw provider payloads. Output exhaustion requires a model with more output capacity, because every request already covers a single turn. Magic Compact makes one `session.prompt` call per fork and adds no plugin-level retry, adaptive splitting, per-turn fallback, partial writes, or model fallback. OpenCode may apply its runtime provider/transport retry policy or additional model steps required by structured-output processing.
 
 <p align="center">
   <img src=".github/assets/visualization.png" alt="Compaction Comparison" />
@@ -37,22 +37,40 @@ Fork creation and model requests have no local wall-clock deadline, so Magic Com
 - Lossless boundary — Preserve exact user messages, native checkpoint safety, source ordering, and retrievable omitted tool I/O instead of flattening history into one recap.
 - On-demand compaction overhead — Model and TypeSafe calls happen only when you run `/magic-compact` or `/magic-trim`, not during the normal agentic loop.
 - Preserved user messages — Exact requirements and guidance remain visible to the agent, verbatim.
-- Smart tool call pruning — Bulky completed tool I/O is replaced with omission notices, with original content cached and retrievable on demand via `read_omitted_content`.
+- Smart tool call pruning — Bulky completed tool I/O is replaced with compact recovery references, with original content cached and retrievable on demand via `read_omitted_content`.
 - Recompactable — Run `/magic-compact` again later to compact new turns while preserving prior summaries.
 - Trim without summarizing — OpenCode can prune historical tool I/O with `/magic-trim` while preserving assistant responses.
 - Task-aware retention — Before `/magic-compact` or `/magic-trim` changes a tool call, TypeSafe Jev judges whether its content is likely to help the current task. Calls it is confident about are kept whole for that run; the rest follow the normal pruning rules. `/magic-trim --heuristic` skips this step.
-- Bounded native batches — Fresh complete forks are isolated to whole target turns and bounded neighboring halos, then prompted once each with exactly one target turn and at most five requests in flight. Every request also receives the same bounded global user-anchor map, while distant assistant and tool detail stays out of the fork. Selecting more turns means more requests and more repeated request input.
+- Bounded native batches — Fresh complete forks are isolated to whole target turns and a bounded preceding turn, then prompted once each with exactly one target turn and at most five requests in flight. Every request also receives the same bounded global user-anchor map, while distant assistant and tool detail stays out of the fork. Selecting more turns means more requests and more repeated request input.
 - Native media handling — OpenCode's normal retained-fork conversion carries user files, assistant files, and tool-result attachments as typed media. Magic Compact requires image capability when retained fork content may expose an image. It does not redact, reattach, fetch, resize, OCR, encode media in its prompt, or tokenize data-URL bytes for batch estimates.
-- Lossless media persistence — Original user file parts and v3-covered assistant inline image parts remain untouched in the source, backup, API, and exports. New v3 summary envelopes carry a locally built user-then-assistant ordinal/MIME/SHA-256 manifest that remains valid when OpenCode rewrites IDs during forks or recovery. Persisted v2 manifests remain user-only and readable, but their historical `partId` does not override canonical content identity. Tool `state.attachments` stay on OpenCode's native media path and are not added to the persisted manifest. OpenCode's transient message-transform hook validates exact v2/v3 manifest matches and replaces each with a declarative placeholder only when the placeholder is strictly smaller than the original file URL token contribution; otherwise the exact file part stays inline and model-facing. Missing manifests do nothing and mismatches fail closed.
-- Useful-savings gate — A turn is replaced only when its exact projected replacement (summary plus the same planned pruning) is strictly smaller than the turn's exact source. Net-negative turns stay byte-identical. If the projected result cannot save at least 20% of the selected profitable turns' eligible removable content, Magic Compact fails unchanged before backup, mutation, or a stats increment instead of claiming weak savings.
+- Lossless media persistence — Original user file parts and v3-covered assistant inline image parts remain untouched in the original session, the successor, the API, and exports. New v3 summary envelopes carry a locally built user-then-assistant ordinal/MIME/SHA-256 manifest that remains valid when record IDs are rewritten for a fork or successor. Persisted v2 manifests remain user-only and readable, but their historical `partId` does not override canonical content identity. Tool `state.attachments` stay on OpenCode's native media path and are not added to the persisted manifest. OpenCode's transient message-transform hook validates exact v2/v3 manifest matches and replaces each with a declarative placeholder only when the placeholder is strictly smaller than the original file URL token contribution; otherwise the exact file part stays inline and model-facing. Missing manifests do nothing and mismatches fail closed.
+- Model-written image descriptions — The summarizer describes each inline image in a summarized turn, and later model requests rely on that description wherever the image is projected out. Magic Compact checks that every image has a description and that the stored images still match the manifest, but it cannot check that a description is accurate, and live runs have seen the summarizer misdescribe a simple test image. The original images stay stored in the original session and the successor. See `docs/Core.md` for the limits.
+- Useful-savings gate — A turn is replaced only when its exact projected replacement (summary plus the same planned pruning) is strictly smaller than the turn's exact source. Net-negative turns stay byte-identical. If the projected result cannot save at least 20% of the selected profitable turns' eligible removable content, Magic Compact fails before creating a successor or a stats increment instead of claiming weak savings.
 
 ## Installation
 
-Install the `arkive-compact` package by adding it to your OpenCode config:
+Arkive Compact supports OpenCode 1 (1.18.30 and later 1.x releases) and OpenCode 2 (2.0.28) from the same package. On OpenCode 1, install the `arkive-compact` package by adding it to your OpenCode config, together with a model for the plugin's summarizer agent:
 
 ```json
 {
   "$schema": "https://opencode.ai/config.json",
+  "plugin": ["arkive-compact@latest"],
+  "agent": {
+    "magic-compact-summarizer": {
+      "model": "openai/gpt-5.1",
+      "variant": "low"
+    }
+  }
+}
+```
+
+The plugin registers `magic-compact-summarizer` as a hidden subagent with its own prompt and a deny-all tool rule, and keeps the `model` and optional `variant` you set. Every per-turn summary and every temporary retention summary uses that model. There is no fallback: without a configured model, compaction and task-aware retention fail with setup guidance. Pick a model whose context window fits your longest single turn.
+
+The OpenCode 1 TUI loads its own plugins from `tui.json`, not from `opencode.json`. List the package there too so every TUI still showing a compacted or trimmed session opens its successor automatically; without it the commands still work and name the successor:
+
+```json
+{
+  "$schema": "https://opencode.ai/tui.json",
   "plugin": ["arkive-compact@latest"]
 }
 ```
@@ -72,6 +90,57 @@ rm -rf ~/.cache/opencode/packages/arkive-compact*
 NPM_CONFIG_MIN_RELEASE_AGE=0 opencode plugin arkive-compact --global
 ```
 
+### HTTP listener
+
+On OpenCode 1, `/magic-compact`, `/magic-trim`, and `/magic-stats` talk to OpenCode through its public HTTP API, so OpenCode must be running with a listener:
+
+```bash
+opencode --port 0          # TUI with a listener on a free local port
+opencode serve --port 4096 # or a headless server; connect with `opencode attach`
+```
+
+Without `--attach`, `opencode run` uses an embedded server even when given `--port`, so for scripted use start `opencode serve` and pass its URL to `opencode run --attach`.
+
+Before writing anything, the plugin proves that the listener belongs to the same OpenCode instance. It registers a disabled, per-process agent entry carrying a random value and requires the listener's config to return that value. A plain `opencode` run without `--port` has no listener of its own, and another instance may own the default port, so the commands refuse with startup guidance instead of guessing. If the server uses basic auth, set `OPENCODE_SERVER_PASSWORD` (and `OPENCODE_SERVER_USERNAME` when it is not `opencode`) in the server environment.
+
+### OpenCode 2
+
+On OpenCode 2, list the package under `plugins` and define the summarizer agent yourself; OpenCode 2 plugins can update an agent but not create one:
+
+```jsonc
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugins": ["arkive-compact"],
+  "agents": {
+    "magic-compact-summarizer": { "model": "openai/gpt-5.1#low" },
+  },
+}
+```
+
+The plugin turns that agent into a hidden subagent with its own prompt and a deny-all permission rule, and keeps your model and variant. Without the agent or its model, compaction and task-aware retention fail with setup guidance.
+
+`/magic-compact` and `/magic-trim` need this server's HTTP API, because OpenCode 2 gives plugins no session transfer or history APIs. The plugin uses OpenCode's registered background service, which the OpenCode 2 TUI and `opencode run` use by default (`opencode serve --service` starts it headless). A private server (`opencode run --standalone`) is not supported. To use a standalone `opencode serve` listener instead, pass its URL as the `serverUrl` option and export `OPENCODE_SERVER_PASSWORD` (and `OPENCODE_SERVER_USERNAME` when it is not `opencode`) in the server environment:
+
+```jsonc
+{
+  "plugins": [
+    {
+      "package": "arkive-compact",
+      "options": { "serverUrl": "http://127.0.0.1:4096" },
+    },
+  ],
+}
+```
+
+Before any read or write, the plugin requires the endpoint to report its own process ID and the same source session as the plugin context, and refuses otherwise. It never guesses a port or starts a service.
+
+What differs on OpenCode 2:
+
+- Commands report their result as the command's error message, which OpenCode 2 returns to the client; there are no progress toasts. Every TUI still showing the original session opens a ready successor and shows the outcome as a toast. The outcome is also stored on the successor in `metadata.magicCompact.outcome`, and `/magic-stats` returns its summary as the command message.
+- The successor copies the original's active instruction entries and leaves out the host's old instruction-change notices, which describe changes against the original's history. User messages and all other records are copied unchanged.
+- Summaries are stored in the first assistant message of each summarized turn, with the summary metadata on that message. Inline user images stay stored unchanged; once summarized, a request that replays the summary and its images sends a short placeholder in their place when that is smaller. A request that replays history from before the session's latest native compaction (after a switch to a model the compaction's provider checkpoint does not serve) needs the server's HTTP API to read the complete history; without it that request is refused rather than sent with the summarized images inline. Compaction refuses before any model request when the summarizer would not receive every image it must describe: a model without image input, an image type the provider does not accept, malformed image data, or more than OpenCode's 25 MiB of image data in one request.
+- OpenCode 1 and OpenCode 2 sessions keep separate omission caches and stats; nothing is migrated between hosts.
+
 ### Task-aware retention setup
 
 Task-aware retention needs a TypeSafe API key in the environment of the OpenCode server process, which is the process that loads plugins:
@@ -82,13 +151,23 @@ export TYPESAFE_API_KEY=...
 
 Restart the OpenCode server process after setting it; restarting an attached TUI does not reload the environment. Without the key, `/magic-compact` and `/magic-trim` fail without changing anything whenever they find a tool call to evaluate, and suggest `/magic-trim --heuristic`, which trims by the rules below without any model or TypeSafe call.
 
-Configure an explicit model on OpenCode's native compaction agent as well. Retention first generates a temporary whole-session summary on a fork, then sends one excerpted tool call at a time to pinned TypeSafe `jev-1.13.0`, with at most four requests in flight and no retries. No retention model calls occur when there are no candidates. In the real-session evaluation, native summary generation took 10.1 to 17.8 seconds including fork and cleanup; Jev added 0.96 to 1.59 seconds for 16 to 24 candidates. Those are measurements from one environment, not latency guarantees.
+Retention uses the summarizer agent's model: it first generates a temporary whole-session summary on a fork, then sends one excerpted tool call at a time to pinned TypeSafe `jev-1.13.0`, with at most four requests in flight and no retries. No retention model calls occur when there are no candidates. In the real-session evaluation, native summary generation took 10.1 to 17.8 seconds including fork and cleanup; Jev added 0.96 to 1.59 seconds for 16 to 24 candidates. Those are measurements from one environment, not latency guarantees.
 
-The keep threshold is `0.80`, selected on development sessions before held-out inference. Each call is judged independently for likely reuse of concrete input or output: useful duplicates, recoverable content, still-relevant procedures and unchanged useful content in partly edited reads can qualify. Uncertainty follows the pruning rules. Fixed JSON-byte excerpts are latest request 5,000, summary 8,000, originating request 600, input 3,000 and output 9,000; short input fields up to 200 bytes stay whole when they fit. These limits have measured token headroom, not a tokenizer guarantee. A keep retains the whole current call, without a size cap or persistent pin. See [the evaluation](docs/RetentionEvaluation.md) for the 144-case protocol, observed results and limitations.
+The default keep threshold is `0.60`. The operator chose it on 2026-10-18 after a development study of one real session. It is not a held-out or native-summary calibration; the earlier `0.80` was the threshold frozen for the September held-out evaluation. Each call is judged independently for likely reuse of concrete input or output: useful duplicates, recoverable content, still-relevant procedures and unchanged useful content in partly edited reads can qualify. Uncertainty follows the pruning rules. Fixed JSON-byte excerpts are latest request 5,000, summary 8,000, originating request 600, input 3,000 and output 9,000; short input fields up to 200 bytes stay whole when they fit. These limits have measured token headroom, not a tokenizer guarantee. A keep retains the whole current call, without a size cap or persistent pin. See [the evaluation](docs/RetentionEvaluation.md) for the 144-case protocol, the development study behind `0.60`, observed results and limitations.
+
+To use a different threshold, set `MAGIC_COMPACT_KEEP_THRESHOLD_PERCENT` in the same server environment. The value is a plain decimal percent from 0 to 100 without a `%` sign, for example `60`, `70` or `60.5`; a call is kept when the probability is at or above it. The default needs no variable, so leave it unset to keep `0.60`.
+
+```bash
+export MAGIC_COMPACT_KEEP_THRESHOLD_PERCENT=70
+```
+
+The server reads the variable each time a command runs, so the value must be in the environment of the OpenCode server process. When that process runs as a service, such as under systemd, set the variable in the service's environment and restart the service after changing it; an attached shell's exports do not reach it. `/magic-compact` and `/magic-trim` use the same value on OpenCode 1 and OpenCode 2. An invalid value (empty, `60%`, above 100, not a number) fails the command before any summary or TypeSafe request and before any session change, and the message names the variable. `/magic-trim --heuristic` does not read it.
 
 Install `arkive-compact`; run `/magic-compact`, `/magic-trim`, and `/magic-stats`. The distribution rename does not add `/arkive-*` command aliases: the runtime remains Magic Compact.
 
 Compact and trim show a long-lived view-only progress toast while they run, then send terminal success, no-op, or failure feedback. If a timed-out progress delivery later settles, Magic Compact best-effort reasserts the terminal toast. Progress feedback does not add conversation history, model input, stats, or omission-cache entries, and toast delivery failure does not change the command or recovery outcome. A host-side delivery after the client promise has rejected cannot be detected.
+
+A failure toast (`Magic Compact Failed` or `Magic Trim Failed`) says what stopped the command. Most of the plugin's own messages also say what happened to the original session and what to do next; a plain argument error says only what the argument must be. On OpenCode 1 that includes failures before any session work: a bad argument, an invalid `MAGIC_COMPACT_KEEP_THRESHOLD_PERCENT` or a listener the plugin cannot verify. The toast stays up for 50 ms per character of its text, at least 8 seconds. When a successor step failed, a `Details:` line gives the stage and, when known, the HTTP status and system error code; quote it when you report a problem. A candidate session that was kept is named as kept, with the note that this run did not mark it ready (another writer may have), so inspect or delete it rather than continue in it. When several summary requests fail, the message lists up to three distinct reasons once each, then every temporary session or partial fork it could not delete, so you can delete them yourself. Magic Compact shows only messages it wrote for this purpose. Any other error, including one from a dependency, is shown only as an unexpected error with its HTTP status or system error code; the OpenCode server log has the original. On OpenCode 2 the same text is the command error.
 
 ## Usage
 
@@ -99,11 +178,12 @@ To compact, run `/magic-compact [N]` with an optional argument indicating how ma
 - `N` is the number of recent request turns to preserve whole. A request turn is one user request plus every assistant message and tool call that follows it until the next user request, so a single preserved turn can hold a large share of the context. Default: `0` (summarize everything, including the most recent complete turn). A trailing user request with no assistant reply is never counted.
 - Success feedback and the ignored compaction notice report how many request turns were summarized and how many whole turns `N` preserved. The no-op message also states the preserved turns whenever `N` kept any, as when `N` covers every eligible turn; run `/magic-compact 0` to include them.
 - The notice reports `Stored history (estimate)`: canonical counts of the whole stored session. A session with a native checkpoint stores a prefix that OpenCode does not send to the model, so these totals include that hidden prefix and can exceed the request size the model receives. They are estimates, not provider usage, and OpenCode's context meter can differ.
-- Task-aware retention runs first when any summarized turn has a tool call whose content pruning would change: one whole-session summary from the native compaction model, then one TypeSafe Jev judgment per such call. A call kept whole still counts toward the per-turn and overall savings checks, so keeping it can leave its turn unsummarized or fail the savings gate. A missing key or any summary or classification failure stops the command before generation, backup, or writes.
-- A backup session is created before the first source write. Pre-backup failures leave the current source unchanged, and every failure after backup creation preserves both the live source and its named backup for manual recovery.
-- Summary generation and the useful-savings projection run before backup creation without mutating the source. A backup still exists before the first durable compaction write.
-- From the first summary insertion attempt onward, any failure preserves both the live source and its named backup without selecting either or deleting the live source. The surfaced error names both session IDs for manual recovery, and no successful stats increment is recorded.
-- After inserting its own summaries and boundary, Magic Compact revalidates the full source before executing the exact preplanned prune mutations. Unexpected drift preserves both sessions before pruning or accounting writes.
+- Task-aware retention runs first when any summarized turn has a tool call whose content pruning would change: one whole-session summary from the summarizer model, then one TypeSafe Jev judgment per such call. A call kept whole still counts toward the per-turn and overall savings checks, so keeping it can leave its turn unsummarized or fail the savings gate. A missing key or any summary or classification failure stops the command before generation or a successor.
+- The result is a new root session, the successor, with fresh session, message, and part IDs. The original session and its subagent sessions are never written: no message, part, title, or metadata changes. The success message and toast name the successor's session ID. When the successor is ready, every TUI with this plugin that is still showing the original session opens it, whichever terminal or headless client ran the command: two terminals on the original both move to the successor. A TUI showing any other conversation is left alone, and the original stays available to reopen.
+- The successor copies the original's title, agent, model, permission rules, metadata, directory, and workspace, so your next prompt there resolves the way it would have in the original. Its lineage lives under `metadata.magicCompact` (`successorOf`, `operation`, `compactionCount`, `ready`).
+- Compaction runs only on a root session at rest: no running model response or tool call, no busy or retrying session in its subagent tree, no pending permission request or question, no native compaction in progress, and no pending revert. An unknown session state counts as active. The whole stored history is checked, so an assistant message with no completion time or error, or a tool call that never finished, refuses a session that is otherwise idle, even after later turns completed. The error says that the stored history holds an unfinished record, which blocks even an idle session, and what to do: if work may still be running, wait and retry; otherwise continue without the command or in another session, because Magic Compact never edits stored records. A last `Record:` line names the first such record by message ID (and tool name, call ID and state) and counts the rest. `/magic-trim --heuristic` does not bypass the check. The source is read again, completely, just before the successor is marked ready; any change to its history or continuation state discards the unready successor and leaves the original as it was.
+- A failure before the successor is ready deletes the candidate only when it still holds nothing but records Magic Compact wrote. A candidate someone else changed, or one whose ready update may have applied, is kept and named in the error.
+- While one compact or trim command runs for a session, a second one for the same session in the same OpenCode process is refused. Other clients are covered by the at-rest and drift checks above, which detect a change but cannot lock the session.
 
 Examples:
 
@@ -113,21 +193,19 @@ Examples:
 
 ### Pending reverts
 
-`/magic-compact` refuses to run while the session has a pending revert left by `/undo`. OpenCode's prompt-time revert cleanup silently deletes the reverted suffix whenever the session is prompted, so Magic Compact fails closed instead of losing content you may still want.
+`/magic-compact` and `/magic-trim` refuse to run while the session has a pending revert left by `/undo`, because a successor cannot tell whether you meant to keep or discard the undone messages.
 
 - Want the undone content back? Run `/redo` first to restore it without a model call, then compact.
 - Meant to discard it? Let OpenCode finish the revert through its normal flow — the next message you send commits it — then retry.
-
-Magic Compact does not force the cleanup itself: OpenCode exposes no session-serialized or compare-and-swap revert commit, so forcing cleanup could delete messages appended after the revert point.
 
 ### `/magic-trim` (Experimental)
 
 Run `/magic-trim [N] [--heuristic]` to apply the same tool I/O pruning rules without summarizing or deleting ordinary user and assistant content.
 
 - `N` preserves tool I/O in the most recent assistant turns. Default: `0` (trim all eligible turns).
-- By default, trimming applies task-aware retention like `/magic-compact`: when a tool call's content would change, it asks the native compaction model for one whole-session summary and TypeSafe Jev for one judgment per such call, then keeps confidently useful calls whole. A missing key or any summary or classification failure stops before the backup or any write.
+- By default, trimming applies task-aware retention like `/magic-compact`: when a tool call's content would change, it asks the summarizer model for one whole-session summary and TypeSafe Jev for one judgment per such call, then keeps confidently useful calls whole. A missing key or any summary or classification failure stops before a successor is created.
 - `--heuristic` skips retention and makes no model or TypeSafe request. Trimming never generates turn summaries or creates a compaction boundary.
-- A backup session is created before trimming. When retention ran, the source must still match the history it was classified against, with no pending revert, before the first write. Any failure before the first source write is attempted, including a failed source read, removes the unused backup and leaves the live source and any concurrent messages unchanged; if that removal fails, the error names both session IDs for manual cleanup. If no tool state changes, Magic Compact deletes that unnecessary backup before reporting the no-op. A failure once the first write has been attempted retains the existing promoted-backup recovery path.
+- Like compaction, trimming writes its result to a new successor session and never changes the original. It covers the complete stored history, not only what the model currently sees, and has the same at-rest, drift, and candidate-cleanup rules. If no tool state would change, no successor is created.
 - Token reductions are included in `/magic-stats` on the exact canonical active-content basis. The ignored trim notice is stored for display but excluded from that model-facing count.
 - The trim notice reports `Stored history (estimate)` with the same meaning as the compaction notice. Trimming tool output that sits in a prefix a native checkpoint hides from the model reduces these stored totals even though the model's request does not change.
 
@@ -143,7 +221,7 @@ The trim result adds one retention line, matching its terminal toast, for exampl
 Retention | Task-aware retention kept 21 of 233 evaluated tool call(s) whole (read 7, hive_status 3, task 2, +9 other calls).
 ```
 
-The denominator counts evaluated candidates, not all completed calls. The breakdown shows at most three tool names, ordered by kept count then name; remaining keeps are counted as other calls. Names are shortened to 24 characters and control/whitespace characters are collapsed. No arguments or tool content appear. Zero keeps, no candidates and heuristic mode are explicit. An all-kept no-op reports through the toast only and removes its unnecessary backup.
+The denominator counts evaluated candidates, not all completed calls. The breakdown shows at most three tool names, ordered by kept count then name; remaining keeps are counted as other calls. Names are shortened to 24 characters and control/whitespace characters are collapsed. No arguments or tool content appear. Zero keeps, no candidates and heuristic mode are explicit. An all-kept no-op reports through the toast only and creates no successor.
 
 Held-out evaluation kept 10 unique calls, nine labelled useful, with 32% consensus useful recall. This small sample does not establish universal precision or probability calibration.
 
@@ -151,13 +229,13 @@ Held-out evaluation kept 10 unique calls, nine labelled useful, with 32% consens
 
 Run `/magic-stats` to show cumulative token savings for the current conversation. Net tokens physically pruned and inline-image tokens projected out of model requests are persisted and reported separately, as are their subsequent cache-read savings.
 
-Reported token counts are canonical active-content estimates, not provider usage. `/magic-stats` totals and the compact and trim notices all count the whole stored history, including any prefix a native checkpoint hides from the model, so they describe stored size rather than the request the model receives. Model-facing before/after counts use the same pure manifest projection as OpenCode's request transform, include model-facing synthetic content such as the compaction boundary, exclude ignored user reporting notices including the notice that displays the count, and include ignored assistant text. OpenCode's context meter is a provider usage snapshot and can remain stale after in-place compaction until a later assistant response refreshes it. Magic Compact never mutates provider usage metadata or fabricates an after-provider count.
+Reported token counts are canonical active-content estimates, not provider usage. `/magic-stats` totals and the compact and trim notices all count the whole stored history, including any prefix a native checkpoint hides from the model, so they describe stored size rather than the request the model receives. Model-facing before/after counts use the same pure manifest projection as OpenCode's request transform, include model-facing synthetic content such as the compaction boundary, exclude ignored user reporting notices including the notice that displays the count, and include ignored assistant text. Each successor starts with the original's cumulative totals and adds its own reduction; the original's stats stay unchanged. Counts describe the conversation, not disk space: the original session still holds its full history. OpenCode's context meter is a provider usage snapshot; in a successor it can show the copied last response's usage until a later assistant response refreshes it. Magic Compact never mutates provider usage metadata or fabricates an after-provider count.
 
 ### The Omitted Content Tool
 
 Magic Compact registers a `read_omitted_content` tool that the agent can call to retrieve any tool input or output that was pruned during compaction or trimming.
 
-Each omission notice in the conversation includes an integrity-protected Content ID such as `2c4f6a8b0d1e:omitted-yH8kQ2pL5vN7sR4tU6wXzA`. The agent uses that ID to retrieve an exact original task prompt or captured result from the authorized current-session cache. Historical content is not a new assignment or proof of current file state; reread files when current contents are needed. OpenCode preserves historical v1 bare entries during migration and backup copying, but cannot retrieve them because they have no cryptographic binding. Unavailable or integrity-invalid entries fail closed instead of returning guessed bytes.
+Each recovery reference in the conversation includes an integrity-protected Content ID such as `2c4f6a8b0d1e:omitted-yH8kQ2pL5vN7sR4tU6wXzA`, for example `[Omitted; Content ID: 2c4f6a8b0d1e:omitted-yH8kQ2pL5vN7sR4tU6wXzA]`. The agent uses that ID to retrieve the exact original input or output from the authorized current-session cache. OpenCode may truncate a large tool result and provide a reference to the full output. A successor session holds copies of its source's entries; an ID copied into an unrelated session, such as a subagent's, does not grant access. Historical content is not a new assignment or proof of current file state; reread files when current contents are needed. OpenCode preserves historical v1 bare entries during migration and successor copying, but cannot retrieve them because they have no cryptographic binding. Unavailable or integrity-invalid entries fail closed instead of returning guessed bytes.
 
 ## Pruning Rules
 
@@ -176,16 +254,16 @@ Removed or condensed:
 
 - Assistant reasoning, text, and step markers — replaced by the per-turn summary; v3 manifest-covered inline image files stay persisted
 - Most synthetic/injected messages (file expansions, plan reminders, prior compaction notices, etc.)
-- Bulky completed tool I/O — replaced with an omission notice pointing to the cache
+- Bulky completed tool I/O — replaced with a recovery reference pointing to the cache
 
 ### Tool I/O Rules
 
 Completed tool outputs over 128 words or 1024 characters are omitted by default. A few tools have special handling.
 
-- `read` — output always omitted; retrieve the exact captured result by Content ID or reread for current file contents
-- `write` / `edit` / `apply_patch` — large file content omitted
-- `bash` — commands over 1024 characters are truncated
-- `task` — large prompts replaced with a historical placeholder containing their Content ID and a retrieval hint; output omitted above a higher threshold (512 words / 4096 characters)
+- `read` — output always replaced with a reference carrying its size and Content ID; retrieve the exact captured result or reread for current file contents
+- `write` / `edit` / `apply_patch` — large file content replaced in the input field itself with a reference (`edit` keeps one entry for `oldString` and `newString` together)
+- `bash` — commands over 1024 characters keep their first 512 characters followed by a truncation reference; the whole command is cached
+- `task` — large prompts replaced with a historical placeholder carrying their Content ID; output omitted above a higher threshold (512 words / 4096 characters), and the reference names the native child session when the host reports one
 - `question` — input and output preserved
 - `todowrite` / `skill` — output discarded without caching (redundant or reloadable)
 
@@ -193,7 +271,7 @@ Pending, running, and errored tool calls are always preserved as-is.
 
 Completed tool calls processed by pruning are marked so later trim and compaction operations do not output-trim them again. Idempotent input rules still apply to calls processed under earlier rules.
 
-Task prompt placeholders identify historical omissions, not runnable assignments. Retrieve the original before reuse. Earlier bare `[Omitted]` placeholders remain unchanged; their recovery ID, when available, stays in the output-side notice.
+Task prompt placeholders identify historical omissions, not runnable assignments. Retrieve the original before reuse. A new input reference sits in the field it replaced, so the output carries no separate input notice. Histories already trimmed keep their earlier XML notices, bare `[Omitted]` placeholders and long task placeholders unchanged; they are not reformatted.
 
 A call kept by task-aware retention is left exactly as it was, including its trim marker, and is judged again the next time either command runs. Nothing about the decision is stored.
 
@@ -224,6 +302,40 @@ Magic Compact Offers:
 - Focused compaction — The plugin does one job: compress the conversation without turning the runtime into a memory subsystem.
 
 If you want a lightweight, user-driven compaction tool with minimal ongoing overhead, Magic Compact is the better fit. If you want a full long-term memory system with background maintenance, Magic Context is the heavier alternative.
+
+## Model evaluations
+
+### Compaction evaluation
+
+The compaction evaluation measures how well a model works as the Magic Compact summarizer. It packs this checkout, loads it into an OpenCode server you already run on this machine, and runs `/magic-compact 1` on three frozen synthetic cases in fresh sessions of a private temporary project. Each attempt is checked mechanically against its source and, when you pass a judge model or import your own grades, scored against the cases' gold facts. Without grades the report says `Semantic: UNGRADED`.
+
+The model's provider must already be signed in to that server; the eval reads only the server's Basic Auth from `OPENCODE_SERVER_USERNAME` and `OPENCODE_SERVER_PASSWORD`, and never reads or copies provider credentials. It does not touch your existing sessions or global configuration. Supported servers are OpenCode 1.18.30, 1.19.0 and 2.0.28.
+
+```bash
+bun run eval:compact check
+mkdir -p runs
+bun run eval:compact run --server http://127.0.0.1:4096 --model anthropic/claude-haiku-5-5#low --out runs/haiku-low-preflight --dry-run
+bun run eval:compact run --server http://127.0.0.1:4096 --model anthropic/claude-haiku-5-5#low --out runs/haiku-low --repeat 2
+bun run eval:compact report runs/haiku-low
+```
+
+`check` is offline, and `--dry-run` stops after preflight without creating a session or calling a model. `--out` must not exist yet but its parent must, and a dry run still creates its own `--out` directory, so the preflight above has a name of its own. A run makes one paid summarizer request per attempt, and `--judge provider/model[#variant]` adds one paid request per delivered summary. Three synthetic cases describe one model on one host setup, not a general accuracy rate. See [the compaction evaluation](docs/CompactionEvaluation.md) for isolation, cleanup, mechanical checks, grading and host versions.
+
+### Decision evaluation
+
+Task-aware retention asks a decision model whether the assistant would use a tool call's content again. The decision evaluation scores a model on that question with fixed cases: each gives the latest request, a session summary and one completed tool call, and compares the model's probability with a hand-written label. It measures the keep/trim decision only. It does not run `/magic-trim` end to end, judge summaries, or change the production model or its keep threshold.
+
+It runs against any versioned TypeSafe Jev model (`jev-1.13.0` by default; aliases such as `jev-latest` are refused so runs stay repeatable) or the OpenAI Decisions API. Each provider needs its own API key in the environment: `TYPESAFE_API_KEY` or `OPENAI_API_KEY`. OpenCode sign-ins are not used.
+
+```bash
+bun run eval:decisions check
+bun run eval:decisions run --provider jev --model jev-1.14.0 --dry-run
+export TYPESAFE_API_KEY=<your TypeSafe key>
+bun run eval:decisions run --provider jev --model jev-1.14.0 --out /tmp/decisions/jev-1.14.0
+bun run eval:decisions report /tmp/decisions/jev-1.14.0
+```
+
+The first two commands are offline. The bundled pack has 17 synthetic smoke cases, so a score is a sanity check, not a held-out result. Its `--threshold` reference is `0.8`, independent of production's default and of the environment override; `--threshold 0.6` compares a model at the production default on non-held-out data, and held-out datasets accept only `0.8`. See [the decision evaluation](docs/DecisionEvaluation.md) for providers, dataset format, saved results, metrics and limits.
 
 ## License
 

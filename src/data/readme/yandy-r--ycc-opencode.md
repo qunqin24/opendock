@@ -216,7 +216,7 @@ Use `ycc:plan-workflow` to run the full pipeline, or invoke individual stages. `
 
 ## Development Sync
 
-Generated trees live under `packages/cursor/`, `packages/claude/`, `.agents-plugin/`, `.codex-plugin/`, and `.opencode-plugin/`. The canonical source is the Claude-facing [`ycc/`](ycc/) tree. Do not hand-edit generated files.
+Generated trees live under `packages/cursor/`, `packages/claude/`, `packages/omp/`, `.agents-plugin/`, `.codex-plugin/`, and `.opencode-plugin/`. The canonical source is the Claude-facing [`ycc/`](ycc/) tree. Do not hand-edit generated files.
 
 Regenerate and validate derived artifacts with:
 
@@ -227,17 +227,19 @@ Regenerate and validate derived artifacts with:
 
 Both accept `--only <targets>` with comma-separated values.
 
-`sync.sh` targets are `inventory`, `cursor`, `codex`, `opencode`, `agents`, and `claude`.
+`sync.sh` targets are `inventory`, `cursor`, `codex`, `opencode`, `omp`, `agents`, and `claude`.
 
 - `inventory` updates `docs/inventory.json` and the `GENERATED-*` regions of `README.md`.
 - `cursor` writes native packages under `packages/cursor/`.
 - `codex` writes `.codex-plugin/` skills, agents, and plugin metadata.
 - `opencode` writes `.opencode-plugin/` skills, agents, commands, `opencode.json`, and `AGENTS.md`.
+- `omp` writes OMP (oh-my-pi) skills under `packages/omp/ycc/skills/`, plus the hidden `ycc-shared` skill for `_shared`, task agents under `packages/omp/ycc/agents/`, and one `/ycc:<skill>` command entrypoint per public skill under `packages/omp/ycc/commands/`. It is not installable yet.
 - `agents` writes `.agents-plugin/` cross-tool skills for `~/.agents/skills`, plus `ycc-shared/`.
 - `claude` writes the native add-on packages under `packages/claude/` (`ycc-mcp`, `ycc-hooks`, and `ycc-all`).
 
-`validate.sh` accepts those names and also `claude-native`, `cursor-native`, `codex-native`, `json`, `config`, `packages`, `release`, `mods`, `practices`, and `scope`.
+`validate.sh` accepts those names and also `claude-native`, `cursor-native`, `codex-native`, `json`, `config`, `packages`, `release`, `mods`, `practices`, `scope`, and `types`.
 
+- `omp` checks generated OMP skill, agent and command drift (bytes and modes), content policy, command inventory parity, and generator golden tests.
 - `claude-native`, `cursor-native`, and `codex-native` check generated native package drift, runtime policy, and fixtures.
 - `json` checks `.claude-plugin/marketplace.json` and `ycc/.claude-plugin/plugin.json`.
 - `packages` checks `ycc/settings/packages.json`, dependency closures, and catalog parity.
@@ -246,6 +248,7 @@ Both accept `--only <targets>` with comma-separated values.
 - `mods` checks the Claude Code mods under `ycc/mods`.
 - `practices` checks the authoring ratchet in `scripts/practices-baseline.json`.
 - `scope` checks the changed-path mapping behind `--changed`.
+- `types` runs `mypy --strict` over the modules listed in `pyproject.toml` `[tool.mypy]`, with mypy pinned in `scripts/requirements-mypy.txt` (installed by CI; locally a matching `python3 -m mypy` or `uvx`).
 
 Examples:
 
@@ -278,7 +281,7 @@ removed, then run `./scripts/sync.sh` and `./scripts/validate.sh`.
 ```
 ystack/
 ├── .claude-plugin/
-│   └── marketplace.json     # marketplace registry (single ycc entry)
+│   └── marketplace.json     # Claude marketplace (ycc, ycc-mcp, ycc-hooks, ycc-all)
 ├── .agents/
 │   └── plugins/
 │       └── marketplace.json # repo-local Codex marketplace source
@@ -293,7 +296,8 @@ ystack/
 │       └── skills/
 ├── packages/                  # generated native packages; do not hand-edit
 │   ├── claude/                # ycc-mcp, ycc-hooks, ycc-all
-│   └── cursor/                # ycc, ycc-rules, ycc-mcp, ycc-hooks, installer-fallback
+│   ├── cursor/                # ycc, ycc-rules, ycc-mcp, ycc-hooks, installer-fallback
+│   └── omp/                   # ycc/{skills,agents,commands} for OMP (not installable until YAN-1171)
 ├── .opencode-plugin/          # opencode bundle (synced by install.sh install --target opencode)
 │   ├── agents/                # generated from ycc/agents
 │   ├── commands/              # generated from public ycc/skills (thin, skill-tool dispatch)
@@ -340,7 +344,16 @@ ystack/
 │   ├── generate_opencode_plugin.py    # opencode.json + AGENTS.md + MCP translation
 │   ├── validate-opencode-plugin.sh    # JSON schema + sync check
 │   ├── generate_opencode_common.py    # shared paths / transforms / model + tool maps
-│   └── opencode_model_aliases.json    # Claude-shorthand → openai/gpt-5.4-family map
+│   ├── opencode_model_aliases.json    # Claude-shorthand → openai/gpt-5.4-family map
+│   ├── generate-omp-skills.sh         # wrapper → generate_omp_skills.py
+│   ├── generate_omp_skills.py         # ycc/skills → packages/omp/ycc/skills (+ ycc-shared stub)
+│   ├── validate-omp-skills.sh         # sync check (bytes + modes) + content policy
+│   ├── generate-omp-agents.sh         # wrapper → generate_omp_agents.py
+│   ├── generate_omp_agents.py         # ycc/agents → packages/omp/ycc/agents (OMP task agents)
+│   ├── validate-omp-agents.sh         # sync check + agent frontmatter/content policy
+│   ├── generate-omp-commands.sh       # wrapper → generate_omp_commands.py
+│   ├── generate_omp_commands.py       # public ycc/skills → packages/omp/ycc/commands (/ycc:<skill>)
+│   └── validate-omp-commands.sh       # sync check + inventory parity + content policy
 ├── ycc/                       # the consolidated Claude Code plugin
 │   ├── .claude-plugin/
 │   │   └── plugin.json        # name: "ycc", current version in plugin.json

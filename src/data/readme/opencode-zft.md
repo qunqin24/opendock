@@ -69,7 +69,16 @@ flock-core); the names are neighbors, the layers are different.
 
 ## Honest state
 
-**Version.** 0.2.1 — leak-free maintenance cut (2026-10-15), live on PyPI.
+**Canonical repository.** This is the single working repository for zft
+development and publication; the earlier private development line is
+archived (read-only, no longer worked in). Two invariants keep it
+leak-free: the `leak-sweep` pre-commit hook
+(`tests/unit/test_no_private_leaks.py`) rejects private identifiers and
+absolute home paths in tracked files, and release cuts are reviewed
+against it. The `zft check .` store in [`.zft/specs/`](.zft/specs/) is this
+repository's own contract corpus.
+
+**Version.** 0.3.0 — gate-core adapters + leak-removal cut (2026-10-20); 0.2.1 was the leak-free maintenance cut (2026-10-15).
 Requires **Python 3.12+**; the `zft` console script is the only entry point.
 
 **Battle-tested.** The gates police this repository's own development: the
@@ -225,18 +234,40 @@ gate) only; their dispatch-boundary paths need host-contract pinning
 (zcode PreToolUse on the agent-spawn tool; Codex exposes PostToolUse only —
 a documented ceiling, see `plugins/codex/README.md`).
 
-### The four integrations
+### The five integrations
 
 | Harness | Artifact | Dispatch boundary | Edit boundary | Completion boundary | Doc |
 | --- | --- | --- | --- | --- | --- |
 | **opencode** | npm `opencode-zft` (or copy `zft-gate.ts` + `zft-lint-gate.js`) | ✅ `task` tool wrapped: writer dispatches need `[contract: <name>]`, blocks before spawn, coverage verdict after; **main-session binding gate**: a deliverable edit before any recorded binding is blocked until the session binds (`zft task-gate before --subagent main ...`) | ✅ `zft lint` on every `.zft/**` edit (observe/enforce) | coverage verdict surfaced to the orchestrator | [`.opencode/plugins/README.md`](.opencode/plugins/README.md) |
 | **zcode** | `plugins/zft-gates` (marketplace `dev-zft-gates`) or workspace `.zcode/config.json` | — (workflow carried by the skill) | ✅ PostToolUse L0 on `.zft/**` edits (observe/enforce) | ✅ Stop gate: `zft check` before *any* session may stop, subagent or main | [`plugins/zft-gates/README.md`](plugins/zft-gates/README.md) |
 | **Codex** | `plugins/codex` (skill + PostToolUse hook) | — (workflow carried by the skill) | ✅ PostToolUse L0 on `.zft/**` edits (observe/enforce) | — | [`plugins/codex/README.md`](plugins/codex/README.md) |
+| **pi** | `packages/pi-zft` (extension: L0 edit gate + settle gate) | — (workflow carried by the skill) | ✅ `zft lint` on every `.zft/**` edit (observe/enforce) | ✅ settle gate: `zft check` at turn end, demand loop capped (default 3) | [`packages/pi-zft`](packages/pi-zft) (this README below) |
 | **pre-commit** | `.pre-commit-hooks.yaml` (`zft-lint`, `zft-check`) | — | ✅ at commit time (`zft-lint`) and pre-push (`zft-check`: L0 + L2-fast + gherkin) | — | [`.pre-commit-hooks.yaml`](.pre-commit-hooks.yaml) |
 
 Every decision is one JSONL line in `<root>/.zft/audit.log` (dispatches) and
 `<root>/.zft/gates-hook/log.jsonl` (edits) — the evidence layer; never delete
 by hand.
+**Gate-core architecture (the JS adapters).** The opencode and pi JS
+adapters are thin protocol shims over one pure, zero-dependency policy
+unit: `packages/zft-gate-core` (`findStoreRoot` / `inCorpus` / `parsePatchPaths`
+/ `corpusPathsFor` / `resolveGate` / `runGate` / `appendLog`, plus the
+`gateUnavailableRecord()` superset factory). Both adapters import it
+**relative** (`./core/gate-core.js`, a synced byte copy — no bare
+specifiers, no node_modules, no symlinks). `scripts/sync-zft-gates.mjs`
+owns the arrow: the **package dirs are canonical**; `.opencode/plugins/`
+and the packages' `core/` copies are deployed artifacts (the script runs
+as `pretest` and, in copy+assert mode, as `prepublishOnly`). One schema
+across every writer (opencode, pi, codex, zcode): every gate-decision
+record carries `blocked` (true iff the event was blocked); `blocked` is
+absent only from meta-records (`passthrough`, `unclassified`,
+`outside_root`). Cross-adapter drift is caught by
+`packages/zft-gate-core/test/parity.test.ts`, which fires identical
+events through both adapters and diffs the records. Caveat: pi loads
+extensions from user scope (`~/.pi/agent/extensions/`) or project scope
+(`<root>/.pi/extensions/`); the project scope is trust-gated — a
+fresh project silently no-ops until the extension is trusted (`-a` / trust
+grant), while the user scope is unaffected.
+
 
 **opencode** quick start:
 
@@ -256,8 +287,37 @@ cp .opencode/skills/zft/SKILL.md ~/.config/opencode/skills/zft/SKILL.md
 # restart opencode, then scaffold a clause + contract (see .opencode/plugins/README.md)
 ```
 
+**pi** quick start (the `pi-zft` extension — L0 edit gate + settle gate):
+
+```bash
+pip install zft                                              # Python 3.12+
+
+# Copy the extension into pi's extensions dir (global scope shown):
+mkdir -p ~/.pi/agent/extensions
+cp -r packages/pi-zft ~/.pi/agent/extensions/pi-zft
+# the extension imports the pi runtime types only; it needs no build step.
+
+# The zft workflow skill (Agent Skills spec — same SKILL.md zcode uses):
+mkdir -p ~/.agents/skills/zft-gates
+#   copy the skill from the zcode package:  plugins/zft-gates/skills/zft-gates/SKILL.md
+
+# restart pi; the gates are silent outside any .zft/ store.
+```
+
+Modes and knobs (same as the opencode port):
+
+- `ZFT_HOOK_MODE` — `observe` (default: record + report, never block) or
+  `enforce` (an L0 failure or a broken gate becomes an error result the
+  model must see).
+- `ZFT_BIN` — authoritative gate binary override.
+- `ZFT_SETTLE_CAP` — consecutive `zft check` failures before the settle
+  gate gives up (default 3). The demand text always cites the
+  `.zft/runs/<id>` run and tells the model to stop or fix.
+- Every gate decision is one JSONL line in `<root>/.zft/gates-hook/log.jsonl`.
+
 **zcode**: install *ZFT Gates* from the `dev-zft-gates` marketplace
 (this repo's `plugins/` directory is the marketplace root), or wire the
+
 workspace hooks by hand — both documented in
 [`plugins/zft-gates/README.md`](plugins/zft-gates/README.md). **Codex**: a
 symlink for the skill plus one hook table, in
@@ -300,3 +360,36 @@ One line, no promises: the gates are becoming the trust layer between agents
 ## License
 
 Apache-2.0 — see [LICENSE](LICENSE).
+
+## Publishing
+
+Version table (independent per-artifact versioning):
+
+| Artifact | Registry | Version | Publish command |
+| --- | --- | --- | --- |
+| `zft` (Python) | PyPI | 0.3.0 | `python -m build && twine upload dist/*` |
+| `opencode-zft` | npm | 0.3.0 | `cd packages/opencode-zft && npm publish` |
+| `pi-zft` | npm | 0.3.0 | `cd packages/pi-zft && npm publish` |
+| flockwork harness | PyPI | 0.4.0 | separate repository |
+
+Publishing flow (JS adapters):
+
+1. Change the canonical package
+   (`packages/opencode-zft/` or `packages/pi-zft/`).
+2. `node scripts/sync-zft-gates.mjs` — deploys the package to
+   `.opencode/plugins/` and the packages' `core/` byte copies; commit the
+   deploy alongside.
+3. Bump the version in the package's `package.json` and record it in
+   `CHANGELOG.md` (this table too).
+4. `npm publish` from the package directory — `prepublishOnly` re-runs the
+   sync in copy+assert mode, so a stale deploy or a stale `core/` copy
+   fails the publish rather than shipping.
+
+Install (consumers): `npm i -g opencode-zft` wires the opencode plugin;
+`pi-zft` installs by copying the package into
+`~/.pi/agent/extensions/pi-zft/` (user scope — the project scope is
+trust-gated in pi). The gate behavior itself is identical across
+adapters; see [`.opencode/plugins/README.md`](.opencode/plugins/README.md)
+for the record schema and
+[`packages/zft-gate-core/README.md`](packages/zft-gate-core/README.md)
+for the policy unit.

@@ -736,17 +736,39 @@ Writes need the same-origin `Origin`. Provider failures are 502 with the provide
 ### Conversation mode (phone)
 
 On `/s/<id>`, the **Conversation** button next to the mic starts hands-free mode. It turns on the mic
-(echo cancellation, noise suppression and auto gain on), then calls `POST …/conversation {on:true}`, keeps
+(mono, with the browser's echo cancellation, noise suppression and auto gain on), then calls `POST …/conversation {on:true}`, keeps
 the screen awake (Screen Wake Lock, taken again when the page becomes visible) and shows a level ring
 around the mic with the current state: Listening, Hearing you, Transcribing, Sent ✓ and Speaking. Tap
 it again, say "pause listening", or leave the page to turn it off. Leaving the page calls
 `{on:false}` with `keepalive`. While conversation mode is off, tap-to-talk works as before.
 
-- **VAD** (`web/conversation-core.js`, frames from `web/vad-worklet.js`, with a ScriptProcessor fallback):
-  energy-based detection on about 20 ms frames. The noise floor falls fast and rises slowly, and the
-  threshold is 10 dB above it with 4 dB of hysteresis. Speech must last 300 ms to count, and 300 ms of
-  audio before it is kept. The threshold rises by 8 dB while the phone is speaking. These timings live in
-  `VOICE_TIMINGS` (`web/src/core/conversation-core.ts`).
+- **Speech detection** (`web/src/core/speech-vad.ts`; ~20 ms frames from `web/public/vad-worklet.js`, with a
+  ScriptProcessor fallback): on-device [Silero VAD](https://github.com/snakers4/silero-vad) v5 (MIT) through
+  onnxruntime-web (MIT, wasm, single-threaded, so no COOP/COEP headers are needed) in a Web Worker
+  (`web/src/voice/silero-worker.ts`). The mic audio is resampled to 16 kHz and cut into 32 ms chunks; each
+  chunk's speech probability starts speech at ≥ 0.6 sustained for 250 ms (most of the onset voiced, so
+  isolated clicks never add up) and ends it after 350 ms below 0.35. Typing, a fan, clatter, beeps and hum
+  score low; speech scores high at any loudness. An energy detector stays as a cheap pre-gate (chunks within
+  3 dB of the adaptive noise floor skip the model) and as the fallback while the model loads, if it fails to
+  load (logged once in the console) or stalls: noise floor that falls fast and rises slowly, threshold 10 dB
+  above it with 4 dB of hysteresis, 300 ms to count. 300 ms of audio before the onset is kept. The model
+  (2.3 MB) and the wasm (12 MB; 2.3 MB with Brotli) load when Voice mode first starts, as hashed static
+  assets the hub serves with `cache-control: immutable` (and compressed when the browser accepts it), outside
+  the main JS chunk; the Voice bar's tooltip says which detector runs and its time per chunk (about 1 ms).
+- **Mic sensitivity** (Settings → Voice, per device, Normal by default, applies at once): Low needs ≥ 0.75 for
+  350 ms (ends below 0.45; pre-gate 6 dB; energy fallback 13 dB / 400 ms), Normal as above, High ≥ 0.45 for
+  180 ms (ends below 0.25; no pre-gate margin; energy fallback 7 dB / 250 ms).
+- **Echo guard**: while a reply or a progress cue plays, and 400 ms after, a barge-in needs more: the model's
+  probability ≥ 0.85 (Low 0.92, High 0.75) and 8 dB more energy. The browser's echo cancellation removes most
+  of the reply from the mic first.
+- **Noise transcripts** (`web/src/core/junk-transcript.ts`): what speech-to-text makes of noise is dropped
+  before it reaches the agent and shown dim in the Voice bar for 3 s ("ignored: “Thank you.”"): empty or
+  punctuation-only text, sound tags ("[Music]", "(applause)", "♪"), Whisper's stock phrases ("Thank you.",
+  "you", "Bye.", "Thanks for watching!", "Subtitles by …", "Amara.org" …), one word repeated, and one or two
+  words from under 400 ms of speech unless they hold a command or answer word ("yes", "no", "okay", "stop",
+  "cancel", "wait", "go ahead", "cancel that" …). With a Whisper model the hub also asks for `verbose_json` and
+  leaves out segments Whisper rates `no_speech_prob` > 0.6 (OpenRouter and OpenAI-compatible providers; one
+  that refuses `verbose_json` gets plain requests from then on).
 - **Endpointing**: a segment ends after 350 ms of silence. It is encoded to 16 kHz mono 16-bit WAV
   and sent to `/api/transcribe` at once. A transcript that reads as complete is sent right away:
   it ends in `. ? !`, or has 3+ words and doesn't end in "and", "but", "so", "um", "the" and the like.
@@ -761,8 +783,8 @@ it again, say "pause listening", or leave the page to turn it off. Leaving the p
   up to two ahead of playback, and plays through one `<audio>` element while its MP3 is still downloading:
   through MediaSource (`audio/mpeg` SourceBuffer; Chrome, Android, Firefox), appending bytes as they arrive
   (`web/src/core/audio-stream.ts`). Browsers without MP3 in MediaSource (some iOS Safari versions) play each
-  sentence once it has fully downloaded, as before. Prefetched sentences keep downloading while they wait. Speech that lasts 300 ms or more
-  (barge-in) pauses playback, clears the queue and mutes the rest of the replies that were speaking, also a reply still
+  sentence once it has fully downloaded, as before. Prefetched sentences keep downloading while they wait. Speech while a reply plays
+  (barge-in, past the echo guard) pauses playback, clears the queue and mutes the rest of the replies that were speaking, also a reply still
   being written whose next sentence has not arrived yet (their later sentences still show in the transcript); a
   new reply speaks again. Barge-in never interrupts anything: what you say steers the agent, and background
   workers keep running (only a stop phrase interrupts the agent's turn).
@@ -821,14 +843,17 @@ Pure logic is in `web/src/core/feedback-core.ts` (tested with bun); `web/src/cor
   The home list shows the same "now" text with a spinner for working sessions.
 - **Progress cues** (conversation mode; Settings → Voice → "Progress cues", on by default): a soft
   tone as soon as you stop speaking (the moment the segment goes to transcription; typed text gets it when
-  the agent receives it), then "Working on it." if the session is working and the
-  agent has not spoken within 2.5 s of the end of your speech. "Started a subagent." plays when a subagent starts, unless the agent
-  spoke in the last 3 s. "Still working." plays after 40 s without speech while work continues, and
-  a double tone plays when a subagent finishes. Failed tools are not spoken (they show in the feed). Cues never
+  the agent receives it), then a short acknowledgement ("On it.", "One moment.", "Let me check." …) if the
+  session is working and the agent has not spoken within 2.5 s of the end of your speech. A hand-off phrase
+  ("I'll hand that off.", "Getting a helper on it." …) plays when a subagent starts, unless the agent
+  spoke in the last 3 s. A still-working phrase ("Still on it.", "Almost there." …) plays after 40 s without
+  speech while work continues, and a double tone plays when a subagent finishes. Failed tools are not spoken (they show in the feed). Cues never
   play while you are talking or the agent's speech is playing; they wait, and are dropped once the agent
   speaks. Cues are event-driven: one timer for the next deadline (no polling), re-armed on speech, status and
-  playback changes. The phrases are synthesized in parallel when Voice mode starts and kept in memory and in
-  the browser's Cache Storage (`hub-cues-v1`, keyed by TTS provider, model, voice, speed and server, so a later
+  playback changes. Each cue has several variants (`CUE_VARIANTS` in `web/src/core/feedback-core.ts`), chosen
+  from a shuffle-bag: every variant once before any repeats, never the same phrase twice in a row, and a variant
+  whose audio is already loaded wins. All variants are synthesized, 2 at a time, when Voice mode starts (ending Voice mode
+  cancels what is left) and kept in memory and in the browser's Cache Storage (`hub-cues-v1`, keyed by TTS provider, model, voice, speed and server, so a later
   session starts with them ready and a voice change fetches them again); a ready phrase starts playing at
   once. A phrase that is not ready yet when its cue fires plays a short tone instead.
 - **Presence**: while a session view is open, the phone posts `POST /api/sessions/:id/presence
@@ -1079,7 +1104,9 @@ publish before trusted publishing can take over (see the comment in `release.yml
 
 - Speech-to-text is batch per utterance (on-device voice detection + one request per utterance); no
   streaming STT provider yet.
-- Voice detection is a simple energy detector; noisy rooms may need tuning.
+- Voice detection tells speech from noise, not whose speech it is: a TV or people talking nearby still count
+  (Mic sensitivity Low helps; mute or headphones are the sure way).
+- The compiled binaries and the Docker image grow by about 14 MB (the speech model and onnxruntime's wasm).
 - Questions (forms) of a headless standalone server (`opencode serve --stdio` without its TUI) cannot be
   answered from the hub; the background service, a foreground `opencode serve` and TUI-launched
   standalone servers can.

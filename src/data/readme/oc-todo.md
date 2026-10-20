@@ -37,7 +37,7 @@ Pin the reviewed release instead of tracking `main`:
 
 ```jsonc
 {
-  "plugins": ["oc-todo@0.5.0"]
+  "plugins": ["oc-todo@latest"]
 }
 ```
 
@@ -78,6 +78,8 @@ Open the visual inspector with `/show-todos`, move with `up`/`down` or `k`/`j`, 
 - Repository: https://github.com/nathwn12/oc-todo
 - Package: https://www.npmjs.com/package/oc-todo
 - Issues: https://github.com/nathwn12/oc-todo/issues
+- Releases: https://github.com/nathwn12/oc-todo/releases
+- License: [LICENSE](LICENSE)
 
 <!-- nathwn12 house footer: identical in every repo. Do not edit. -->
 <p align="center">

@@ -529,9 +529,10 @@ V2 path). It does not register configurable keys of its own.
 
 The package default export is a dual plugin:
 
-* `setup(ctx)` — V2 entry (OpenCode ≥ 2.0.16). Registers a `session.hook("context", …)`
-  to capture the final messages / system prompt / tool schemas right before each
-  model request, subscribes to the event stream (`session.created`,
+* `setup(ctx)` — V2 entry (OpenCode ≥ 2.0.16). Registers `session.hook("context", …)`
+  and `session.hook("compaction", …)` to capture the final messages / system
+  prompt / tool schemas right before each model request (and each compaction
+  request), subscribes to the event stream (`session.created`,
   `session.step.ended`, `session.idle`, `session.compacted`, failure events),
   records limits from the model registry and registers the
   `/context` + `/context-breakdown` slash commands (via
@@ -549,12 +550,15 @@ duplicate final summaries are suppressed with an atomic claim marker
 (`lib/dedup.js`). Every file / estimate / subagent path is fault-tolerant: a
 failure is logged and never breaks the main event or toast path.
 
-**Compaction staleness.** OpenCode's compaction runs a separate flow that fires
-no `context` hook, so the numbers a `session.compacted` write re-persists are
-the *pre-compaction* ones. The plugin flags such an entry
-(`compactStale` in `state.json`) and every surface shows `(stale — compacted)`
-until the next model request refreshes the breakdown — i.e. the data is exactly
-as fresh as the last model request in the session.
+**Compaction staleness.** OpenCode dispatches a dedicated `compaction` hook at
+the start of a compaction request, carrying the same pre-compaction payload as
+the `context` hook. The plugin registers it and persists the *true*
+pre-compaction breakdown at that moment, flagging the entry stale
+(`compactStale` in `state.json`) so every surface shows `(stale — compacted)`
+until the next model request refreshes it. The trailing `session.compacted`
+event is kept as a fallback (for hosts or paths where the hook does not fire);
+a no-op compaction ("Nothing to compact yet") writes no stale entry. The data
+is always exactly as fresh as the last model request in the session.
 
 This plugin does not touch `opencode-token-monitor`
 (`token_stats` / `token_history` / `token_export` keep working unchanged).

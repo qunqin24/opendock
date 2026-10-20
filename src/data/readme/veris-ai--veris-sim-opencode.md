@@ -1,5 +1,12 @@
 # Veris plugins
 
+This repository is a plugin marketplace with two plugins:
+
+- [`veris`](#veris): use Veris service twins while you develop and test an
+  application.
+- [`bench`](#bench): put your own agent on a [Veris Bench](https://benchmark.veris.ai)
+  bench.
+
 Veris runs stateful twins of the external services an application calls. An
 **environment** names a set of those services; a **sandbox** is one running
 deployment of it. The `veris` CLI signs in, defines environments, starts
@@ -103,6 +110,9 @@ Any other agent, through the `skills` CLI:
 ```
 npx skills add veris-ai/plugins --all
 ```
+
+`--all` also installs the `bench` plugin's skill; name the skills with
+`--skill` to install only these.
 
 ### The credential
 
@@ -241,3 +251,58 @@ reads each service base URL from its `env_hint` variable.
 0.2.1 — `setup` names the services it inferred when asking to create an environment.
 
 0.2.0 — three commands (`setup`, `build`, `fix`) replace the 0.1 skills.
+
+## bench
+
+One skill, `add-your-agent`. It takes the agent in the current repository to a
+**Your image** candidate on a Veris Bench bench: it adds a small server the
+bench's simulated user talks to, points the agent at the bench's twins, writes
+the Dockerfile, builds and pushes the image, registers the candidate, and runs
+a smoke trial to prove it. The agent's own code stays as it is.
+
+It needs Docker with buildx, `curl` and `jq`, a registry Docker can push to, and
+a Veris Bench API key in `VERIS_API_KEY`. A person issues the key in the
+console: **Overview**, **API keys**, **Issue**.
+
+### Install
+
+Claude Code:
+
+```
+/plugin marketplace add veris-ai/plugins
+/plugin install bench@veris
+```
+
+Then, in the agent's repository:
+
+```
+/bench:add-your-agent bench_...
+```
+
+Codex:
+
+```
+codex plugin marketplace add veris-ai/plugins
+codex plugin add bench@veris
+```
+
+and `$bench:add-your-agent`. The skill runs Docker and calls the Veris Bench
+API, and Codex's default sandbox allows neither: start Codex with
+`codex -s danger-full-access`, or approve `docker`, `curl` and `jq` when it asks.
+
+Any other agent, through the `skills` CLI:
+
+```
+npx skills add veris-ai/plugins --skill add-your-agent
+```
+
+What the skill does, step by step, is the
+[Add your agent](https://docs.veris.ai/add-your-agent) page.
+
+### Versions
+
+0.1.0 — `add-your-agent`: http or ws server around the agent (Python and Node
+patterns), twin addresses from `VERIS_DS_SERVICE_URLS`, a `linux/amd64` image
+pinned by digest, the candidate registered from `bench/candidate.json`, and a
+smoke trial checked attempt by attempt: completed, replies, model calls visible
+to the grader, tool calls, and requests at each twin.

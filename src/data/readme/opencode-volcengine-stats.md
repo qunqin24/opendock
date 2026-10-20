@@ -7,9 +7,9 @@
 
 [中文文档](README.zh-CN.md)
 
-An [OpenCode](https://opencode.ai) TUI plugin showing your **Volcengine Ark
-Coding Plan** quota usage in the session sidebar (like the built-in context /
-MCP panels — nothing on the home screen):
+An [OpenCode](https://opencode.ai) **v2** CLI plugin showing your **Volcengine
+Ark Coding Plan** quota usage in the session sidebar (like the built-in
+context / MCP panels — nothing on the home screen):
 
 ![Screenshot: 5h / 1W / 1M usage bars in the OpenCode session sidebar](docs/screenshot.png)
 
@@ -17,6 +17,10 @@ Data comes from the local [`arkcli`](https://www.npmjs.com/package/@volcengine/a
 — the plugin never calls the Ark API or handles auth. Data auto-refreshes every
 60s; press **`ctrl+alt+r`** (or click the `↻` line under the bars) to refresh
 immediately.
+
+> **OpenCode v1:** this package line (`1.x`) supports OpenCode **v2 only**.
+> V1 users should pin the legacy line — `opencode-volcengine-stats@0.3.x` —
+> and follow its README for the V1 `tui.json` setup.
 
 ## Install
 
@@ -28,29 +32,37 @@ arkcli auth login
 arkcli usage plan --product coding-plan --format json   # sanity check
 ```
 
-Then either let OpenCode add the plugin:
+Then either let OpenCode add the plugin to your global config:
 
 ```bash
-opencode plugin opencode-volcengine-stats        # current project
-opencode plugin opencode-volcengine-stats -g     # global (all projects)
+opencode plugin add opencode-volcengine-stats
 ```
 
-or add it to the TUI config (`~/.config/opencode/tui.json` global, or
-`<project>/.opencode/tui.json` per project) and restart:
+or list it yourself in `opencode.json` (global
+`~/.config/opencode/opencode.json`, or a project `opencode.jsonc` /
+`.opencode/opencode.json`) and restart OpenCode:
 
-```json
+```jsonc
 {
-  "$schema": "https://opencode.ai/tui.json",
-  "plugin": ["opencode-volcengine-stats"]
+  "$schema": "https://opencode.ai/config.json",
+  "plugins": ["opencode-volcengine-stats"]
 }
 ```
 
-> This is a **TUI** plugin, loaded via `tui.json` — not `.opencode/plugins/`
-> (that directory is for *server* plugins).
+The CLI auto-loads the package's TUI component from the active plugin list, so
+no separate terminal configuration is needed. If you run the terminal against
+a **remote server** and want the plugin active locally regardless, list it in
+the global CLI config `~/.config/opencode/cli.json` instead:
+
+```jsonc
+{
+  "plugins": ["opencode-volcengine-stats"]
+}
+```
 
 ## Configuration
 
-Options are passed as the second element of the `plugin` entry:
+Pass options with the object form of a `plugins` entry:
 
 | Option          | Default        | Meaning                             |
 |-----------------|----------------|-------------------------------------|
@@ -61,12 +73,41 @@ Options are passed as the second element of the `plugin` entry:
 | `showCountdown` | `true`         | Show the per-window reset countdown |
 | `refreshKey`    | `"ctrl+alt+r"` | Hotkey for an immediate refresh     |
 
-```json
+```jsonc
 {
-  "$schema": "https://opencode.ai/tui.json",
-  "plugin": [["opencode-volcengine-stats", { "pollMs": 30000, "barWidth": 18 }]]
+  "$schema": "https://opencode.ai/config.json",
+  "plugins": [
+    {
+      "package": "opencode-volcengine-stats",
+      "options": { "pollMs": 30000, "barWidth": 18 }
+    }
+  ]
 }
 ```
+
+## Troubleshooting
+
+**`ctrl+alt+r` does nothing (Windows / WSL / tmux).** If OpenCode's built-in
+`ctrl+alt+k` (which-key) is also dead, the combination is being intercepted
+before it reaches the terminal — common causes are the Chinese IME (Microsoft
+Pinyin grabs Ctrl+Alt combos), an AutoHotkey script, or another system-wide
+hotkey. Verify by switching the keyboard layout to English US (Win+Space) and
+pressing the hotkey again. If you cannot remove the interceptor, bind the
+refresh command to a different key, for example `alt+r` (its `ESC r` sequence
+passes through WSL + tmux reliably):
+
+```jsonc
+{
+  "plugins": [
+    {
+      "package": "opencode-volcengine-stats",
+      "options": { "refreshKey": "alt+r" }
+    }
+  ]
+}
+```
+
+The clickable `↻` hint line always works regardless of keyboard transport.
 
 ## License
 

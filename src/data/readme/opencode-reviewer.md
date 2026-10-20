@@ -1,21 +1,23 @@
 # OpenCode Reviewer
 
 Reviews pending permissions in the [OpenCode](https://github.com/anomalyco/opencode) sidebar using a separate LLM. Reviews
-native shell commands, file edits, skill loading, and external-directory access.
-MCP and custom tools share a tool-review category, with registered descriptions and JSON Schemas included when available.
+native shell commands, file edits, skill loading, external-directory access and tools/MCPs.
 Supports streaming explanations, saved report history and stats, auto-approval, and Linux
 desktop notifications (Gnome) with distinct sounds.
+
+### Commands:
+  - Review/outcome history panel: **Alt+h**
+  - Per session reviewer instructions: **Alt+i**
 
 This plugin is meant to enable you to run sessions with less frequent input in a safer way. Also giving the reviewer context of specific files the agent might want to run/see/... The review prompts are freely configurable, so you can determine the reviewers behavior very accurately.
 
 > ⚠️ **Disclaimer**
 >
-> This does not make running agents foolproof and safe! An actor running intrusive commands on your machine will always create attack surface! It just reduces risk, and enables you to get more insight into what your agent is doing.
+> This does not make running agents foolproof and safe! An actor able to run any/intrusive commands on your machine can always exploit an attack surface or create damage! It's meant to reduce risks, and enables you to get more insight into what your agent is doing.
 
 ![](./assets/recording.gif)
 
-For OpenCode V2 on Linux. The plugin checks the server companion's protocol and
-each request's data and scope rather than allowing only specific host versions.
+For OpenCode V2 on Linux.
 
 ## Install and config
 

@@ -93,15 +93,17 @@ On setup the plugin emits an unconditional loud warning that this rule must be i
 
 ## Budgets
 
-`INDEX.md` ≤ 30 lines on disk; `activeContext`/`architecture`/`style`/`issues` ≤ 60 lines; `decisions.md` unbounded with a ≤60-line injectable tail; handoffs ≤ 60 lines/file. Auto-inject payload = `INDEX ≤30 + brief ≤48 + status ≤1 + hint ≤1` (≤80 total). An over-cap `INDEX.md` is not attached; `/memory-review` reports the violation instead.
+`INDEX.md` ≤ 30 lines on disk; `activeContext`/`architecture`/`style`/`issues` ≤ 60 lines; `decisions.md` unbounded with a ≤60-line injectable tail; handoffs ≤ 60 lines/file. Auto-inject payload = `INDEX ≤30 + brief ≤48 + status ≤1 + hint ≤1` (≤80 total). An over-cap `INDEX.md` is not attached (the `[memory]` status line reports it with its line count until trimmed); `/memory-review` reports the violation instead. A failure capture whose append is rejected (activeContext at cap without a rotatable Known-errors block, or a file I/O error) is reported on the status line too — fix the file or run `/memory-review`. When the budget cannot carry the status line, its notices stay queued for the next turn.
+
+Handoffs are listed names-only via `memory_recall` (`file: "handoffs"` newest first; `file: "handoffs/archive"` for rotated/archived entries) — recall one by its full `handoffs/…` path.
 
 ## Evals (spec §9)
 
 Recall success (why-questions answered in ≤2 capped reads) vs tokens injected, reported as three numbers (measured by `test/acceptance.test.ts`):
 
-- **static = 10 lines** — hand-owned `AGENTS.md` protocol block (≤10 non-empty lines) + the `memory_recall` description (~3–4 wrapped lines). Always present, never counted against `injectBudgetLines`.
-- **per-prompt with content = 90 lines** — static + `INDEX` ≤30 (once per prompt) + brief ≤48 + hint ≤1 + status ≤1. The injectable portion (INDEX + brief + hint + status) is capped at `injectBudgetLines` = 80.
-- **session-total = per-prompt × model steps** — the `context` hook re-emits brief + status on every model call including tool-driven continuations, so 4 model steps ≈ 360 lines. The hint is throttled to once per prompt/session (`<projectID>/hint/<sessionID>/<promptHash>`).
+- **static = 11 lines** — hand-owned `AGENTS.md` protocol block (6 non-empty lines; test-bounded at ≤10) + the `memory_recall` description (5 wrapped lines at 80 cols). Always present, never counted against `injectBudgetLines`.
+- **per-prompt with content = 91 lines** — static + `INDEX` ≤30 (once per prompt) + brief ≤48 + hint ≤1 + status ≤1. The injectable portion (INDEX + brief + hint + status) is capped at `injectBudgetLines` = 80.
+- **session-total = per-prompt × model steps** — the `context` hook re-emits brief + status on every model call including tool-driven continuations, so 4 model steps ≈ 364 lines. The hint is throttled to once per prompt/session (`<projectID>/hint/<sessionID>/<promptHash>`).
 
 ## Metrics (local-only)
 

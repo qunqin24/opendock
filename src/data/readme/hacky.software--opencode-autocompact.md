@@ -55,8 +55,15 @@ that, for one session, without touching anyone else's config.
 ## Install
 
 ```sh
-opencode plugin add @hacky.software/opencode-autocompact@0.1.6
+opencode plugin add @hacky.software/opencode-autocompact@0.1.7
 ```
+
+> **OpenCode 2.0.32 packaging note:** TUI entries installed from npm are
+> loaded with a dynamic `import()`, which resolves the plugin's own bundled
+> `solid-js`. That second Solid instance renders once but does not react, so
+> the footer chip stays hidden and the side panel never refreshes. Point the
+> config at a local checkout instead (below) — the host transpiles local TUI
+> entries against its own runtime, so slots and keymaps stay live.
 
 Or add it to `opencode.json` directly — string form, or the object form to pass
 options:

@@ -172,7 +172,7 @@ Node.js 18+, no `jq`. Hooks only - see
 
 ```sh
 git clone https://github.com/dynamic/throughline && cd throughline
-omp plugin link .omp-plugin
+omp plugin link .
 ```
 
 Requires `git`, `jq`, and [Bun](https://bun.sh) on your `PATH` (OMP's own runtime).

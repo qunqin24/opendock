@@ -112,6 +112,32 @@ Among the tools above, none combines all three: dependency-ordered parallel suba
 - [`/omos.archive`](vendor/openspec/skills/openspec-archive-change/SKILL.md) — archive completed changes through the vendored archive workflows; two or more ids run the bulk one
 - [`/omos.retro`](skills/omos-retro/SKILL.md) — meta: mine the finished run for prompt defects — ≤8 cited, ranked findings, read-only
 
+<details>
+<summary>Using Codex CLI? Same flows, invoked as skill mentions</summary>
+
+The plugin also ships as a native Codex CLI plugin (see
+[docs/codex.md](docs/codex.md) for install). No slash commands — Codex
+plugins have no command surface; every flow is a skill mention
+(OpenCode → Codex):
+
+- `/omos.init` → `$omos-init` — bootstrap baseline specs
+- `/omos.plan` → `$omos-plan` — interview → research → grill → draft → critique
+- `/omos.apply` → `$omos-apply` — parallel `spawn_agent` waves → verify → review
+- `/omos.archive` → `$omos-archive` — archive via the bundled upstream archive skill (bulk for two or more ids)
+- `/omos.retro` → `$omos-retro` — run retrospective, ≤8 cited findings
+- `$omos-setup` — Codex-only first step: installs the seven role agent files
+
+Roles run as native Codex subagents from `~/.codex/agents/omos-*.toml`, and
+the `openspec validate` gate is the bundled MCP server
+(`mcp__openspec__openspec_validate`) — same report format as here.
+`$omos-archive` delegates to the bundled `$openspec-archive-change` skill
+(`$openspec-bulk-archive-change` for two or more ids). The Codex bundle
+ships one skill set — the six flow skills plus the same 12 vendored
+upstream skills the OpenCode plugin registers — so no project-level
+`openspec init` is needed there.
+
+</details>
+
 ### Roles
 
 - [omos-researcher](agents/omos-researcher.md) — repo + spec facts with `path:line` evidence; read-only
