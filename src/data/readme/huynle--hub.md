@@ -21,7 +21,13 @@ Formerly **opencode-voice** and, briefly, **opencode-hub**
   run while the session is busy), stop a whole session tree, answer permissions, switch models, and
   start new sessions, from the phone.
 - **Notifications**: web push when a session asks a question, needs permission, fails or finishes, with
-  per-device toggles, quiet hours and per-session mute.
+  per-device toggles, quiet hours and per-session mute; opt-in **Activity updates** (one quiet, self-replacing
+  notification per session) to follow subagents, long tools and scripts with the screen off.
+- **Live without waste**: the console's stream resumes where it left off after a lock or app switch (event
+  ids + replay), pauses while the page is hidden, and carries streamed text only for the session on screen.
+- **Running detection**: a session counts as working while OpenCode reports it busy or retrying, or while a
+  shell or terminal it started still runs (e.g. a background `sleep 60 &` or build script), also when it was
+  already running before the plugin started.
 - **Voice** (optional feature, `/voice`): dictation and a hands-free conversation mode with a voice agent
   that answers in short spoken sentences on a fast model and hands real work to background subagents.
   Bring your own speech: OpenRouter or any OpenAI-compatible STT/TTS service (including self-hosted).
@@ -190,14 +196,16 @@ conversation mode and utterances (403 `not_exposed` for sessions not shared with
 | Route | Result |
 |---|---|
 | `POST /api/sessions/:id/turn {text, images?}` | sends a turn; while the session tree is running it steers instead (202 `{mode: "steer", inboxID}`). An idle turn answers its `TurnResult` (`{outcome, reply, message?}`) when it ends; with `Prefer: respond-async` (the console sends it) a turn still running after 1.5 s answers 202 `{mode: "turn"}` (`Preference-Applied: respond-async`) and its result follows as an SSE `turn` event `{sessionID, outcome, reply, message?}`, so no proxy cuts a long request. The session stays busy until the turn ends either way. `images` is up to 4 `{mime, data, name?}` (PNG, JPEG, WebP or GIF; canonical base64 whose bytes match the type; each at most 512 KB decoded, together at most 750,000 base64 characters); `text` may be empty when images are attached. They reach OpenCode as inline file attachments. 400 empty, over 100,000 characters or invalid images (with the reason); 409 "A turn is already running for this session" |
+| `GET /api/sessions/:id/timeline?limit=N&order=desc` · `?limit=N&before=<older>` | the conversation as timeline rows, newest first: the latest `limit` rows (1–200, default 50) in chronological order, plus `older` (the cursor of the rows before them) while there are more. `before=<older>` returns the page before that cursor. Cursors are row keys, so they stay valid while new messages arrive. A page starts at a message boundary when it can (it may be up to twice `limit` then). 400 for an unknown cursor (history reverted or compacted: start again from the newest page). The forward mode `?limit=N&cursor=` (oldest rows first, `cursor` for the next page) still works; it cannot be combined with `before` or `order=desc`. The spoke reads OpenCode's history for a first page and serves the following pages from a short-lived per-session cache (30 s, dropped when the session changes) |
 | `GET /api/sessions/:id/timeline/messages/:message/files/:index` | one image attached to a user message, as bytes with its type (`cache-control: private, no-store`). Timeline user items list their attachments as `files: [{index, mime, name?}]` (never the bytes). Only PNG, JPEG, WebP and GIF are served (404 otherwise or when missing); 413 when the image would not fit in a protocol frame (about 650 KB) |
 | `POST /api/sessions/:id/rename` | `{title}` → `{title}`: renames the session in OpenCode (`session.update`), through the process that owns it, else any other process that reports it. The title is trimmed and must be 1–200 characters (400 otherwise). Works with Voice off; the new title shows in every console at once (the spoke reports it before answering) |
 | `POST /api/sessions/:id/stop` | interrupts running descendants deepest first, then the root; idempotent. Also releases the hub's turn lock for the tree: a turn request still waiting answers `{outcome: "interrupted"}` and the next turn can start (`/interrupt` does the same) |
 | `GET /api/sessions/:id/summary` | context usage, todos, MCP status (at most 100 servers), branch and working-tree change stats (each part optional). `changes` lists at most 500 files, most-changed first, with `totalFiles` and `truncated`; its `additions`/`deletions` cover every file |
 | `GET /api/sessions/:id/diff?file=` | one file's patch, on demand (capped at 400 KB as JSON, then `truncated: true`); never stored in the hub |
 | `POST /api/sessions/:id/read` · `GET /api/reads` | per-user read marks, synced to your other devices |
-| `GET /api/push/prefs?endpoint=` | `{prefs, quietHours, muted, subscriptions, subscribed?}`: this device's toggles (`handoff, question, permission, finished, failed, say`) and quiet hours, the user's muted sessions, how many subscriptions the hub holds for this device, and whether it holds `endpoint` |
-| `PUT /api/push/prefs {toggles…, quietHours?}` | boolean toggles (a 0.5.0 `blocked` sets question and permission); `quietHours` `{start: "HH:MM", end: "HH:MM", timeZone}` or `null` (400 when invalid) |
+| `GET /api/events?lite=1&session=<id>&last=<id>` | the live stream (SSE). Every message has an `id:`; reconnecting with `Last-Event-ID` (EventSource does it) or `?last=` replays what was missed when the hub still has it (last 2000 events or 5 minutes per user; one fresh `catalog` stands for any catalog changes), else sends the catalog then `{type: "resync"}` (the page refetches what it shows). Ids are `<epoch>.<n>`; a hub restart starts a new epoch. `lite=1` leaves out `delta`/`reasoning` except of `session`'s tree (status, activity, catalog, turns and the rest still come). Heartbeat: `event: ping` every 20 s |
+| `GET /api/push/prefs?endpoint=` | `{prefs, quietHours, activityMinutes, muted, subscriptions, subscribed?}`: this device's toggles (`handoff, question, permission, finished, failed, say, activity`), activity update interval and quiet hours, the user's muted sessions, how many subscriptions the hub holds for this device, and whether it holds `endpoint` |
+| `PUT /api/push/prefs {toggles…, quietHours?, activityMinutes?}` | boolean toggles (a 0.5.0 `blocked` sets question and permission); `quietHours` `{start: "HH:MM", end: "HH:MM", timeZone}` or `null`; `activityMinutes` a whole number 1–60 (400 when invalid) |
 | `POST /api/push/subscribe {subscription, prefs?, oldEndpoint?}` · `POST /api/push/unsubscribe {endpoint}` | this device's subscriptions; `oldEndpoint` is dropped (rotated subscription). The endpoint must be https on a public hostname that resolves only to public addresses (no loopback, private, link-local, CGNAT or ULA hosts, no `localhost`/`*.local`/`*.internal`), else 400 |
 | `POST /api/push/test` | a test notification to the caller's device only: `{sent, failed: [{host, status?}], subscriptions}`; 429 with `retry-after` within 10 s of the last one |
 | `PUT /api/push/mute {sessionID, muted}` | mutes or unmutes a session's notifications for the user: `{muted}` |
@@ -208,6 +216,13 @@ The plugin is a thin client ("spoke") of the hub. Every OpenCode process that lo
 it opens **one** outbound WebSocket (`/spoke/ws`, protocol in `src/protocol.ts`), lists the sessions it
 knows, forwards their events, and runs turns, stops and permission replies on the hub's request.
 The web app, speech and phones live on the hub.
+
+Besides the session, tool and permission events, a spoke forwards `session.status` (busy/retry/idle) and the
+shells and terminals sessions start (`session.shell.started/ended`, `shell.created/exited/deleted`,
+`pty.created/updated/exited/deleted`) in compact form: id, session, command (≤ 200 characters), status and exit
+code; never output, files or environment. When it connects (and again after its hub connection or OpenCode
+event stream comes back) it asks its own server what runs now (`session.active` and `shell.list`) and sends a
+`session.seed` event per running session, so a session that was already running shows as working at once.
 
 | Entry | File | Role |
 |---|---|---|
@@ -508,6 +523,16 @@ zone) hold everything except hand-offs; **Mute notifications** in a session's �
 for you on every device (hand-offs still come through). At most one per session and kind every 30 s
 (Voice replies: 10 s); expired subscriptions (404/410) are pruned.
 
+**Activity updates** (pref `activity`, off by default on every device; Settings → Notifications shows a hint
+until it is on): to know what happens without keeping the screen on. Steps of interest in a session tree — a
+subagent started or ended, a tool that took 30 s or more, a background shell or terminal that ended (with its
+exit code: "bun run build exited 0", "was killed", "timed out"), the session going idle — become one
+notification per session, tagged per session so each replaces the last quietly (no new sound, normal
+urgency, 5-minute TTL). The first step after a quiet spell goes out at once; later ones are collected until the
+device's interval ends (Settings: 1–60 minutes, default 5) and sent together ("3 tools · explore finished ·
+Finished"). Short tools are only counted. Quiet hours and muted sessions apply; nothing is sent while a
+device shows the session.
+
 - **Status per device**: Settings → Notifications shows the browser permission, whether the service worker
   is registered and whether this hub holds this browser's subscription. "Allowed, but this device is not
   subscribed on this hub" means nothing will arrive (typical after the hub moved to a new address): **Enable
@@ -670,6 +695,13 @@ owns a session in conversation mode, and was not told yet (it reconnected or too
 hub sends it `{op: "conversation", on: true}` once. Deleting the session clears the flag.
 
 SSE (`/api/events`) adds:
+
+- Each session's status tree entry may carry `jobs` (`[{id, kind: "shell" | "pty", command?, status:
+  "running" | "exited" | "timeout" | "killed", exit?, background?, started?, ended?}]`: running ones plus the
+  last 5 that ended) and `retry` (`{attempt?, message?}`, with `detail` "Retrying: …"). A session is
+  `working` while its run, a busy/retry `session.status` or a running job lasts. The console shows a job count
+  next to the status (table, sidebar), "Retrying …" or "· 1 job" in the session header, and a **Jobs** card in
+  the rail (command, running time, exit code for a minute after it ends).
 
 - `{type: "conversation", sessionID, on}` when the flag changes.
 - `{type: "say", sessionID, messageID, ordinal, seq, text}`: **root** text in conversation mode is spoken
@@ -863,11 +895,19 @@ Pure logic is in `web/src/core/feedback-core.ts` (tested with bun); `web/src/cor
   Screen Wake Lock keeps the screen on while listening. On: no wake lock. The mic and VAD keep running
   when the page is hidden. A silent looping audio element plays to make suspension less likely. **This is best-effort:** whether
   listening survives a locked screen depends on Android Chrome (battery saver, OS version), and iOS
-  suspends it. The OpenCode session keeps running on the laptop either way. When the phone is not
-  listening, turn on the `say` notification to get replies as push notifications.
+  suspends it. Android Chrome usually stops the microphone when the screen turns off (the track is muted
+  or ended, the AudioContext suspended, no audio frames). Voice mode watches for that: no frames for 1.5 s,
+  a muted/ended track or a suspended AudioContext → the Voice bar says "Paused — mic stopped by the phone
+  (screen off). Unlock to resume.", the notification becomes "Voice mode paused · unlock to talk", the lock
+  screen controls show paused and a short falling tone plays. While hidden it keeps nudging the audio
+  (resume every 3 s, the silent loop); it says "listening" again only once audio frames arrive. On unlock
+  (visible, `pageshow`, focus, track unmute) it resumes the AudioContext, asks for the microphone again if
+  the track ended (or shows "Tap to start Voice mode" when that needs a tap), retries with backoff while
+  visible, and plays a rising tone. The OpenCode session keeps running on the laptop either way. When the
+  phone is not listening, turn on the `say` notification to get replies as push notifications.
 - **"Voice mode on" notification**: while Voice mode is on, the page shows a silent, persistent system
   notification through the service worker (tag `voice-mode`): "<session title> · listening" (thinking,
-  speaking, muted; updated at most every 3 s) with **End** and **Open**. End reaches the page (which ends
+  speaking, muted; updated at most every 3 s, at once when the phone stops or gives back the microphone) with **End** and **Open**. End reaches the page (which ends
   Voice mode); with no page open, the service worker turns conversation mode off at the hub itself with the
   device cookie. It closes when Voice mode ends or the page goes away. It needs notification permission:
   without it the Voice bar shows **Allow notifications**. The Media Session shows "Voice mode on" with the
@@ -1114,6 +1154,10 @@ publish before trusted publishing can take over (see the comment in `release.yml
 - Listening with the phone screen off depends on the browser (best-effort on Android Chrome; not
   possible on iOS). Replies and alerts still arrive as push notifications.
 - The voice agent registers as a visible primary agent (`voice`) in OpenCode's agent list.
+- A catalog change still sends every machine's full catalog to each stream (about 1 KB per few sessions); the
+  replay buffer is in memory (a hub restart means a full catalog + `resync`).
+- Running shells are seeded from the spoke's own server (`shell.list` for the 20 most recent session
+  directories); shells in other directories show up once they emit an event.
 
 ## License
 

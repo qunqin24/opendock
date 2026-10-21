@@ -208,7 +208,7 @@ Opens a full settings page: current configuration, detected Kilo sources, and th
 | `enter` | Run the selected action |
 | `e` | Edit settings (opens the dialog editor) |
 | `r` | Reload status |
-| `esc` | Close the page |
+| `esc` | Close the page, returning to the session it was opened from |
 
 ### Prompt-footer indicator
 
@@ -241,7 +241,8 @@ Settings are edited in a dialog-based flow, reachable three ways:
 
 - Press `e` from the `/indexing` page.
 - The command **Indexing: settings (dialogs)** in the command palette (a manual escape hatch if the page ever fails to render).
-- Automatically: if the host has no JSX runtime, `/indexing` opens this flow instead of the page.
+- Automatically: if the host cannot resolve the TUI runtime modules the page
+  needs, `/indexing` opens this flow instead of the page.
 
 `indexing_config` (the tool) reports the same configuration as `/indexing-config` and works in every client, because tools run server-side, and `indexing_config_set` changes a value the same way. Together they are the whole configuration surface for clients that do not dispatch slash commands.
 
@@ -419,14 +420,20 @@ Word about data safety: Kilo's indexes (`ws-*` collections and its LanceDB direc
 ## Requirements
 
 - OpenCode v2 (plugin API `@opencode/plugin@2.x`).
-- **For the prompt-footer indicator:** `solid-js`, `@opentui/core` and
-  `@opentui/solid`, which the plugin installs itself (~14 MB). They used to be
-  declared as optional *peer* dependencies, on the assumption that the host
-  already had them; OpenCode 2.0.30 stopped providing them and the indicator
-  silently stopped rendering. Everything else works without them — the settings
-  page degrades to dialogs and the footer is simply absent.
+- **For the terminal UI (prompt-footer indicator and `/indexing` page):** the
+  `solid-js`, `@opentui/core` and `@opentui/solid` runtime that the host
+  provides. The plugin installs no copy of them: the TUI imports the host's
+  singletons through virtual module ids (`opentui:runtime-module:…`) and uses
+  no JSX, so both sides share one reactive runtime. That is the fix for a
+  plugin loaded from an npm spec, where local copies shadowed the host's and
+  the Solid runtime was never bridged — the settings page and the footer
+  indicator painted once and never updated (upstream
+  [anomalyco/opencode#33884](https://github.com/anomalyco/opencode/issues/33884)).
+  The three remain declared as dev dependencies and optional peers, never as
+  installable dependencies. Without the host runtime the settings page degrades
+  to dialogs and the footer is simply absent.
 - **For the own index: nothing to run.** The default store is embedded LanceDB
-  (`@lancedb/lancedb@0.26.2`), so there is no server to start, no port to free and
+  (`@lancedb/lancedb`), so there is no server to start, no port to free and
   no container to keep alive.
 - **A Qdrant server is only needed if you ask for it**, either by setting
   `vectorStore=qdrant` or because a Kilo index you want to import lives in Qdrant.
@@ -573,7 +580,7 @@ node test/cli.ts build      --vector-store lancedb --root .
 
 ## Acknowledgements
 
-This plugin interoperates with the open-source [Kilo Code](https://github.com/Kilo-Org/kilocode) indexing format (MIT License, Copyright (c) 2026 Kilo Code). The line-based chunker and the tree-sitter queries are ports of Kilo Code's implementation. It also builds on [opencode](https://github.com/anomalyco/opencode) (MIT), [LanceDB](https://github.com/lancedb/lancedb) (Apache-2.0), [Apache Arrow](https://github.com/apache/arrow) (Apache-2.0), [web-tree-sitter](https://github.com/tree-sitter/tree-sitter) (MIT), [tree-sitter-wasms](https://github.com/Gregoor/tree-sitter-wasms) (Unlicense), [ignore](https://github.com/kaelzhang/node-ignore) (MIT), and — for the terminal UI — [SolidJS](https://github.com/solidjs/solid) (MIT) and [OpenTUI](https://github.com/sst/opentui) (MIT).
+This plugin interoperates with the open-source [Kilo Code](https://github.com/Kilo-Org/kilocode) indexing format (MIT License, Copyright (c) 2026 Kilo Code). The line-based chunker and the tree-sitter queries are ports of Kilo Code's implementation. It also builds on [opencode](https://github.com/anomalyco/opencode) (MIT), [LanceDB](https://github.com/lancedb/lancedb) (Apache-2.0), [Apache Arrow](https://github.com/apache/arrow) (Apache-2.0), [web-tree-sitter](https://github.com/tree-sitter/tree-sitter) (MIT), [tree-sitter-wasms](https://github.com/Gregoor/tree-sitter-wasms) (Unlicense), [ignore](https://github.com/kaelzhang/node-ignore) (MIT), and — for the terminal UI, whose runtime the host provides — [SolidJS](https://github.com/solidjs/solid) (MIT) and [OpenTUI](https://github.com/sst/opentui) (MIT).
 
 The companion code graph is [CodeGraph](https://github.com/colbymchenry/codegraph) (MIT), a separate project this one installs and drives rather than bundles. Its npm package is `@colbymchenry/codegraph`; the unscoped `codegraph` on npm is a different, unrelated project.
 

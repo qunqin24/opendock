@@ -24,7 +24,7 @@ Rules include:
 - `must` for requirements, stated as facts without softening.
 - No vague intensifiers or words that signal laziness or condescension.
 - Lists and headings over walls of text, conclusion first.
-- One "Next:" line at the end naming a concrete action.
+- A "Next:" line at the end that gives the next step as runnable commands in a fenced code block.
 - No em dashes as punctuation, no "please" in instructions, no "etc.".
 
 Because the injection happens per request, the rules survive context compaction.
@@ -90,7 +90,13 @@ Rules state what to do, not what to avoid by name.
 ### Steps
 
 1. Open `~/.config/opencode/opencode.json`.
-2. Add the package name to the `plugin` array:
+2. Add the package name to the plugin array. opencode v2 uses the `plugins` key, opencode v1 uses `plugin`:
+
+   ```json
+   {
+     "plugins": ["@vasilvestre/opencode-plain-style"]
+   }
+   ```
 
    ```json
    {
@@ -119,28 +125,32 @@ Use this to test changes before publishing, or to run a fork.
 
    ```json
    {
-     "plugin": ["file:///absolute/path/to/opencode-plain-style/.opencode/plugins/plain-style.mjs"]
+     "plugins": ["file:///absolute/path/to/opencode-plain-style/.opencode/plugins/plain-style.js"]
    }
    ```
 
-   The path must be absolute and must point at the `.mjs` file, not the directory.
+   opencode v1 uses the same URL under the `plugin` key. The path must be absolute and must point at the `.js` file, not the directory.
 
 3. Restart opencode.
 
 ### Uninstall
 
-1. Remove the entry from the `plugin` array in `~/.config/opencode/opencode.json`.
+1. Remove the entry from the plugin array (`plugins` in opencode v2, `plugin` in v1) in `~/.config/opencode/opencode.json`.
 2. Restart opencode.
 
 ## How it works
 
-The plugin registers one hook: `experimental.chat.system.transform`.
-On each request it pushes the rulebook text into the system prompt array.
-The rulebook is read from disk once at module load, so each request costs one array push and zero I/O.
-Total plugin code: about 25 lines, no dependencies.
+The plugin exports one object with two entrypoints; opencode picks the one matching its version:
 
-Note: the hook is marked experimental in opencode.
-If opencode renames it, the plugin fails loudly at startup rather than injecting nothing.
+- opencode v1 calls `server()`. It hooks `experimental.chat.system.transform` and pushes the rulebook text (a string) into the system prompt array on each request.
+- opencode v2 calls `setup()`. It registers a `context` session hook and appends a `{ type: "text" }` part to the system prompt.
+
+The rulebook is read from disk once at module load, so each request costs one array push and zero I/O.
+The plugin has no dependencies.
+
+In opencode v1 the hook must mutate `output.system` in place: a reassignment is silently ignored.
+
+Note: v1 support needs opencode 1.18.29 or later (object-style plugin entrypoints).
 
 ## Example output
 
@@ -196,6 +206,18 @@ For a hard guarantee, add deterministic linting (for example Vale) to CI.
 The table shows the original 16-rule baseline. The current 19-rule rulebook
 re-validated on the same model at +26.7 points (53.3% to 80.0%, 2026-08-03).
 
+The 2026-10-20 rulebook (rule 16 rephrased: runnable commands in a fenced block)
+re-validated on two free-tier models:
+
+| Model                             | Control | Treatment | Delta |
+| --------------------------------- | ------: | --------: | ----: |
+| opencode/deepseek-v4.1-flash-free |   60.0% |     100.0% | +40.0 |
+| opencode/glm-5.3-flash-free       |   66.7% |      73.3% |  +6.6 |
+
+Free tiers stay inside the noise of their earlier runs; deepseek posts the
+strongest treatment arm measured so far.
+Full per-field numbers: [bench/README.md](bench/README.md).
+
 Full details: [bench/BENCHMARK.md](bench/BENCHMARK.md).
 
 ## Customize the rules
@@ -205,9 +227,11 @@ Fork the repo, edit the file, and point your config at the local copy:
 
 ```json
 {
-  "plugin": ["file:///path/to/your/fork/.opencode/plugins/plain-style.mjs"]
+  "plugins": ["file:///path/to/your/fork/.opencode/plugins/plain-style.js"]
 }
 ```
+
+opencode v1 uses the `plugin` key instead.
 
 ## Development
 

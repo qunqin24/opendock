@@ -474,6 +474,33 @@ is classified only by a direct endpoint marked `private`, or by a `fleet-classif
 child whose broker route inherits that confinement from its owner and selects a local
 target. With neither, the command is refused, not sent.
 
+### Quoted Python stdin
+
+The agent-spawn check recognizes `at = ...` as a Python assignment rather than
+an `at` scheduler command only inside a directly invoked, isolated Python 3
+program supplied by a quoted stdin heredoc:
+
+```sh
+python3 -I -S -B - <<'PY'
+record = {"at": 1}
+at = record.get("at")
+print(at)
+PY
+```
+
+Both `-I` and `-S` are required so working-directory imports, `PYTHONPATH` and
+site hooks cannot replace the standard library; `-B` is optional. A bundled
+helper requires `python3` and parses the complete body with `ast.parse`; it
+never executes that body. Only a restricted subset of data processing and
+read-only file access is accepted. Unsupported imports, calls, syntax or
+bindings remain refused, as do unisolated invocations and wrappers. Missing
+Python or a failed checker also refuses the exemption.
+
+The checker limits input to 64 KiB, the complete AST to 4,000 nodes and depth
+80, and its subprocess to two seconds. Existing raw-source launcher and local
+server API checks still apply. This exception is neither a general permission
+grant nor a Python/OS sandbox.
+
 ### What it is not
 
 A sandbox. The guard is built to stop a well-meaning agent from doing something

@@ -11,7 +11,7 @@ Install from npm, run setup once, then work normally.
 ### Install
 
 ```bash
-opencode plugin add hmoc-steward-acp@0.2.1
+opencode plugin add hmoc-steward-acp
 ```
 
 Reload OpenCode afterwards. The plugin loads on startup, so a running session keeps the old code until you restart.

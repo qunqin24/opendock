@@ -226,7 +226,29 @@ workspace at its directory; outside cmux it shows a toast instead.
 
 ### TUI sidebar and home list
 
-Click the sidebar's `search…` box to filter sessions in place; click
+`sidebarPlacement` (`"append"` or `"prepend"`, default: `"append"`) places the
+**Sessions** section below or above OpenCode's native sidebar sections. With
+`"append"`, native todos appear above Sessions when available.
+
+`showSidebar` (boolean, default: `true`) controls whether the **Sessions** section
+appears in the sidebar. Set it to `false` to hide the section while keeping the
+home list, session picker, and other commands available. OpenCode's native sidebar
+is unaffected. In `cli.json`, replace the existing `"opencode-sesh"` string entry
+with the object below; do not add a second entry. Keep other plugin entries and
+the `opencode.json` entry unchanged:
+
+```json
+{
+  "plugins": [
+    {
+      "package": "opencode-sesh",
+      "options": { "showSidebar": true, "sidebarPlacement": "append" }
+    }
+  ]
+}
+```
+
+When the section is visible, click its `search…` box to filter sessions in place; click
 elsewhere or press Esc to leave search. Click the **Sessions** heading to drive
 the list from the keyboard instead of the mouse (`↑`/`↓` to move, Enter to open,
 Option-P to preview, Option-S to pin a session, Option-R to pin its directory,

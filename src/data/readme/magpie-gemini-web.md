@@ -17,7 +17,7 @@
 | **思考档位** | `minimal` / `low` / `medium` / `high` 四档（`minimal` 最快最省） | `low`（普通）/ `high`（`-thinking` 扩展思考）两档 |
 | **登录方式** | 弹出独立浏览器窗口直接登录 Google | 用无痕窗口登录并复制 `cookie` |
 | **额度卡片** | 显示冷却中的模型与恢复时间 | 同步网页版 **5 小时** 与 **每周** 用量及重置时间 |
-| **本地后端** | AIStudio2API (`v0.2.13`) | gemini-web2api-go (`4.22.0-magpie.1` 优化版) |
+| **本地后端** | AIStudio2API (`v0.2.14`) | gemini-web2api-go (`4.22.0-magpie.1` 优化版) |
 
 ---
 
@@ -74,6 +74,10 @@ magpie plugin options magpie-gemini-web '{"allowImages":true}'
 magpie plugin options magpie-gemini-web '{"studio":{"proxy":"http://127.0.0.1:7890"}}'
 ```
 
+> **Windows PowerShell**：`magpie` 实际运行的是 `magpie.cmd` 包装器，它转发参数时会弄丢 JSON 里的双引号。请直接调用它背后的可执行文件：这个文件和 `magpie.cmd` 在同一个文件夹（`where.exe magpie` 可以找到），文件名可能是 `magpie-windows-amd64.exe` 之类，Magpie 的「设置 → 命令行」里也会显示。写法取决于 PowerShell 版本（用 `$PSVersionTable.PSVersion` 查看）：
+> - PowerShell 7.3 及以上，默认设置：`& "<可执行文件的完整路径>" plugin options magpie-gemini-web '{"allowImages":true}'`
+> - Windows PowerShell 5.1（系统自带）：它不会替你转义参数里的双引号，要写成 `\"`：`& "<可执行文件的完整路径>" plugin options magpie-gemini-web '{\"allowImages\":true}'`
+
 | 选项 | 默认值 | 适用范围 | 说明 |
 | :--- | :--- | :--- | :--- |
 | `allowTools` | `true` | 共用（可用 `studio.allowTools` 单独覆盖） | 允许工具调用。设为 `false` 时带工具的请求返回 400 |
@@ -89,8 +93,8 @@ magpie plugin options magpie-gemini-web '{"studio":{"proxy":"http://127.0.0.1:78
 **配置代理访问 Google：**
 - **AI Studio**：推荐在本地管理页设置。打开额度卡片「管理页」一行里的地址（默认 `http://127.0.0.1:2048`），用户名 `magpie`，密码是数据目录 `config.json` 里的 `adminPassword`；保存代理后在管理页重启服务即可生效，之后插件重启后端也不会覆盖它。
   - 也可以用上表的 `studio.proxy` 或环境变量 `AI_STUDIO_PROXY`，它们优先于管理页里保存的代理。改了要重启本地服务才生效（`npm run studio:stop`，下一次请求会自动启动）。
-  - 都没设置时，后端自动使用 `HTTPS_PROXY` 环境变量或系统代理（Windows 的「代理」设置）。
-  - **Magpie 里给 `ai-studio` 设置的供应商代理不会传给本地后端**，请用上面两种方式之一设置。
+  - 都没设置时，后端直连；Windows 上会使用系统代理（Windows 的「代理」设置）。
+  - **后端不使用 Magpie 的代理（包括给 `ai-studio` 设置的供应商代理），也不读取 `HTTPS_PROXY` 等环境变量**：它在 Magpie 退出后仍会运行，借用 Magpie 的代理到时可能已经失效。请用上面两种方式之一设置。加入这项修复之前的插件版本启动的后端，可能还在用启动时环境变量里的代理（比如 Magpie 的）；「代理出口」一行会标出来，并说明重启后会怎样。
   - 额度卡片的「代理出口」一行会显示后端当前实际使用的代理、它来自哪里，以及新设置是否还要重启才生效；登录 Google 时的说明、登录失败的提示和 `npm run studio:status` 也会显示。
   - 监听地址、API Key、管理员账号等由插件管理，在管理页修改不会生效。
 - **Gemini Web**：后端不读取 `HTTP_PROXY`，请打开本地管理面板 `http://127.0.0.1:8083/admin` 在代理池中添加（登录口令为数据目录 `secrets.json` 中的 `adminToken`）。
@@ -108,6 +112,11 @@ magpie plugin options magpie-gemini-web '{"studio":{"proxy":"http://127.0.0.1:78
 <summary><b>🛠️ AI Studio 命令行工具</b>（查看状态、重新登录、离线安装）</summary>
 
 <br>
+
+**本地服务什么时候启动、停止：**
+- 插件加载时（例如打开 Magpie）会在后台启动本地服务；之后发请求、刷新额度卡片时，服务没在运行也会自动启动。
+- 本地服务是独立进程，**退出 Magpie 不会停止它**，下次打开 Magpie 直接接着用。
+- 停止服务用下表的 `studio:stop`（或卡片、报错里给出的完整命令）。停止只是一次性的：下一次请求会再次启动它。
 
 当插件报错提示运行命令时，直接复制报错中的完整命令执行即可。在插件目录下也可使用：
 
@@ -135,8 +144,8 @@ magpie plugin options magpie-gemini-web '{"studio":{"proxy":"http://127.0.0.1:78
 - 插件将请求并发限制为 1，但仍无法完全排除 Google 账号风控风险，请自行评估使用。
 
 **AI Studio 升级与模型范围：**
-- 插件固定使用经过 SHA-256 校验的 `v0.2.13-magpie.1`（基于上游 `v0.2.13`），通过升级插件更新后端。同基线或更旧的官方托管后端在下次管理启动时自动升级，保留账号、端口与登录凭据。
-- **托管后端已在 macOS、Linux、Windows 统一禁用在线更新**：管理页提示“请通过 Magpie 插件升级”，更新接口返回 HTTP 403，检查更新也不会访问 GitHub。用户自行连接的外部服务不受影响。补丁和可复现构建流程见 [docs/studio-release.md](docs/studio-release.md)。
+- 插件固定使用经过 SHA-256 校验的 `v0.2.14-magpie.1`（基于上游 `v0.2.14`），通过升级插件更新后端。同基线或更旧的官方版、以及旧版插件装的托管后端，在下次管理启动时自动升级，保留账号、端口与登录凭据。
+- **托管后端已在 macOS、Linux、Windows 统一禁用在线更新**：管理页提示“更新由 magpie-gemini-web 管理”，更新接口返回 HTTP 409，检查更新也不会访问 GitHub。用户自行连接的外部服务不受影响。托管构建方式和可复现构建流程见 [docs/studio-release.md](docs/studio-release.md)。
 - Unix 的 `package/` 仍尽力设置为 `0555`，作为额外的文件保护；权限设置失败不阻断服务，在线更新的禁用也不依赖该权限。若要手动删除数据目录来重置，请先停止服务，再运行 `chmod -R u+w "<数据目录>/package"` 恢复可写权限，然后删除；将 `<数据目录>` 替换为实际路径。
 - 若自行更新到更新版或定制版，插件会提示版本冲突，并提供带正确 `--data-dir` 的 `stop`、`install`、`start` 命令。停止时会找回更新后的监听进程 PID，并核对可执行文件路径；无法核实身份就不会发送终止信号。HTTP 端口关闭但进程尚未退出时，插件不会重装或启动第二个进程。
 - 已停止但文件被替换的后端会从校验通过的固定版本安装包恢复；校验失败不会启动替换文件。安装会保留账号和运行数据文件，但**不保证旧版本能读取新版迁移过的数据**。手动降级前先停止服务并备份整个数据目录（包括 `auth/`、`runtime/requests.db` 等）；已知发生数据迁移时应升级插件以匹配新版后端。

@@ -1,7 +1,19 @@
 # opencode-harness-kit
 
-[![CI](https://github.com/pham-canh/space-harness/actions/workflows/ci.yml/badge.svg)](https://github.com/pham-canh/space-harness/actions/workflows/ci.yml)
+[![CI](https://github.com/pham-canh/opencode-harness-kit/actions/workflows/ci.yml/badge.svg)](https://github.com/pham-canh/opencode-harness-kit/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/opencode-harness-kit.svg)](https://www.npmjs.com/package/opencode-harness-kit)
+
+<p align="center">
+  <video src="docs/demo/pitch.mp4" width="720" controls></video>
+</p>
+
+*Four minutes forty-seven seconds, recorded live from a real terminal and
+narrated — every command on screen is typed and executed while the camera
+runs. The voiceover is in [`video/`](video/), along with what it took to
+record it and the two mistakes that cost the most time.*
+
+*It was recorded against an earlier version of the kit: the numbers it names
+are the ones from then, and the ones below are the ones now.*
 
 A harness kit for [OpenCode](https://opencode.ai) that is **model-agnostic by
 construction**. Switching models is a data edit, not a code change.
@@ -10,12 +22,16 @@ construction**. Switching models is a data edit, not a code change.
 npx -y opencode-harness-kit init    # pick a free model, then install + verify
 ```
 
+<p align="center">
+  <img src="docs/demo-loop.gif" width="760" alt="oc-harness list showing the model-agnostic profiles, then oc-harness verify reporting a consistent install">
+</p>
+
 then restart opencode. That is the whole quickstart. No npm account needed on
 your side — `npx` only downloads the published kit. Prefer git? The same three
 steps from a checkout (see [Install](#install)):
 
 ```bash
-git clone https://github.com/pham-canh/space-harness.git
+git clone https://github.com/pham-canh/opencode-harness-kit.git
 ./bin/oc-harness.mjs init
 ```
 
@@ -51,22 +67,62 @@ src/                         ← no model name anywhere in here
 Same plugin source, twelve shipped profiles, twelve different behaviours. The
 test suite asserts that rather than taking it on faith.
 
+### How a request travels
+
+```mermaid
+flowchart LR
+  P[profile JSON<br/>model, effort, fallback, retention] --> C[oc-harness use<br/>compiles the profile]
+  C --> CFG[~/.config/opencode/opencode.jsonc<br/>agent.&lt;lane&gt;.model]
+  CFG --> PL[the plugin: guard, prune, router, telemetry]
+  PL --> LANES[10 lanes<br/>each on the model built for it]
+  LANES --> PR[prune: old tool output<br/>becomes a stub]
+  LANES --> GD[guard: denied commands<br/>and writes outside the project]
+  LANES --> RT[router: a spent route<br/>moves to the next rung]
+  LANES --> TL[telemetry: what each lane<br/>actually cost]
+```
+
+Four things happen to a request, and they are four separate files:
+
+| | |
+|---|---|
+| `src/guard.ts` | refuses the commands the kit never allows, and any write outside the project |
+| `src/prune.ts` | replaces old tool output with a one-line stub, so the window holds the work and not the noise |
+| `src/router.ts` | when a route is spent, moves the lane to the next rung of its own chain |
+| `src/telemetry.ts` | records what each lane actually cost, so `oc-harness lanes` can say which ones earn their place |
+
+The model for a lane is in the **config**, not in a prompt and not in a file
+the agent reads. That is the whole design: the answers are data, and a data
+edit is reviewable.
+
 ## A fleet, not a model
 
 The default profile is a **fleet**: ten jobs, ten free models, one session.
 
+The table below is the **unrestricted** fleet (`fleet-all`), where every lane
+gets the model built for it. The default is the **safe** fleet
+(`fleet-safe`), where every lane resolves to a provider with a zero-retention
+policy and six of the ten run on a second-choice model to stay there. Both
+cover the same ten jobs; they differ in what they are willing to promise
+about your prompts.
+
 | lane | job | model | measured |
 |---|---|---|---|
-| `build` | write and verify the change | MiniMax M3.1 Flash | 3.1 s |
-| `plan` | turn a request into a plan | Beam | **2.6 s** |
-| `reviewer` | read a change in two passes | Nemotron 3 Ultra | 4.7 s (34 s cold) |
-| `locate` | find where something lives | Nemotron 3.5 Lightning | 3.7 s |
-| `verify` | run the project's checks | Big Pickle | 6.5 s |
-| `vision` | read an image or a screenshot | MiMo-V2.6 Flash | 19.2 s |
-| `doc` | read a long document or a spec | GLM 5.3 Flash | 5.4 s |
-| `schema` | produce JSON or a JSON schema | DeepSeek V4.1 Flash | 3.4 s |
-| `sweep` | sweep a lot of code mechanically | Nemotron 3.5 Super VL | 4.2 s |
-| `longform` | read a megabyte, or write alternatives | LongCat 2.5 Preview | 9.4 s |
+| `build` | write and verify the change | MiniMax M3.1 Flash | 6.9 s |
+| `plan` | turn a request into a plan | Beam | **6.1 s** |
+| `reviewer` | read a change in two passes | Nemotron 3 Ultra | 7.8 s (34 s cold) |
+| `locate` | find where something lives | Nemotron 3.5 Lightning | 6.9 s |
+| `verify` | run the project's checks | Big Pickle | 10.4 s |
+| `vision` | read an image or a screenshot | MiMo-V2.6 Flash | 9.3 s (19 s with an image) |
+| `doc` | read a long document or a spec | GLM 5.3 Flash | 7.4 s |
+| `schema` | produce JSON or a JSON schema | DeepSeek V4.1 Flash | 10.7 s |
+| `sweep` | sweep a lot of code mechanically | Nemotron 3.5 Super VL | 8.4 s |
+| `longform` | read a megabyte, or write alternatives | LongCat 2.5 Preview | 12.0 s |
+
+The `measured` column is the median of five one-line requests to that model
+on 2026-10-21 - the same prompt for every model, from the process start, so
+it is the wait a lane would cost.
+[`docs/ROUTING.md`](docs/ROUTING.md) has the method, the install telemetry
+beside it, and the command that produced it.
 
 Each lane is an OpenCode agent with its own model, its own context window and
 its own effort level. You do not switch models: you hand the job to the lane
@@ -80,16 +136,12 @@ agent=build    modelID=minimax-m3.1-flash-free
 ```
 
 Why ten lanes and not one model: the free tier is genuinely uneven, and the
-difference is measurable. Beam answers in 2.6 seconds with a 1M window;
-MiMo reads an image in 19 and MiniMax reads the same image in 8; Nemotron
-Super VL is the only model on the tier that publishes a `none` effort level,
-which makes "reasoning off" a job of its own. Putting each on the job it is
-good at is worth more than any single "best" model.
-
-The default is the **safe** fleet, and it is safe by construction rather than
-by label: every lane resolves to a provider with a zero-retention policy, and
-six of the ten lanes run on a second-choice model to stay there. The
-unrestricted fleet gives every lane the model built for it.
+difference is measurable. Beam answers in 6.1 seconds with a 1M window, and
+the four fastest models are inside a second of each other; MiMo reads an
+image in 19 and MiniMax reads the same image in 8; Nemotron Super VL is the
+only model on the tier that publishes a `none` effort level, which makes
+"reasoning off" a job of its own. Putting each on the job it is good at is
+worth more than any single "best" model.
 
 The full table, with the measurements behind every choice and the three
 capabilities the tier turns out not to have, is in
@@ -115,7 +167,7 @@ $ oc-harness use fleet-safe --print
 // Derived numbers, do not hand-edit:
 //   compaction.reserved  24,000  (12% of the narrowest input cap in play)
 //   prune threshold      176,000  (narrowest input cap minus reserve)
-//   role effort          plan=max  build=max  reviewer=max  locate=unset  ...
+//   role effort          plan=max  build=max  reviewer=max  locate=low  ...
 //   lane models          build=minimax-m3.1-flash-free (out 512,000)  plan=...
 ```
 
@@ -147,7 +199,7 @@ $ oc-harness show fleet-safe
   lane effort
     plan       max
     locate     low
-    sweep      (unset)    (requested none)
+    sweep      low
 ```
 
 A model with no tunable effort at all gets **no** `variant` written, rather
@@ -199,38 +251,172 @@ it. One file covers ten jobs either way.
 The five-lane profiles run everything on one model, which is the right shape
 when you want one route and want to know exactly which one.
 
+## Free models are perishable, so check them
+
+Every model in the table above is a **free tier slot**, and free tier slots
+turn over in days. Zen states free models are available "for a limited time"
+with no date attached, so a profile is a snapshot of a moment rather than a
+stable thing.
+
+Observed lifetimes, from one install's 20-day history:
+
+| model | observed lifetime |
+|---|---|
+| `mimo-v2.5-free` | 1 day |
+| `big-pickle` | 1 day |
+| `nemotron-3-ultra-free` | 3 days |
+| `muse-spark-1.3-contributor-free` | still running at 20 days |
+
+The tier turned over again since. Five of this kit's own profiles are already
+withdrawn, and one of them was the **default** at the time:
+
+| withdrawn | why it matters |
+|---|---|
+| `space-bunny-free` | It was the default profile. A config left pointing at it kept working and kept saying it was zero-retention. |
+| `x-preview-f-free` | Withdrawn within a month of shipping. |
+| `deepseek-v4-flash-free` | Withdrawn within a month. Replaced by `deepseek-v4.1-flash-free`. |
+| `muse-spark-1.3-contributor-free` | A Meta contributor route whose provider was permitted to train on prompts. The paid route is still in the catalogue. |
+| `mimo-v2.5-free` | Observed alive for one day. Replaced by `mimo-v2.6-flash-free`. |
+
+The full list, with a reason for each, is in
+[`profiles/index.json`](profiles/index.json).
+
+### The four commands, and when each one runs
+
+| command | what it checks | when |
+|---|---|---|
+| `oc-harness list` | the profiles this kit ships, with retention and caveats | offline, any time |
+| `oc-harness doctor` | every profile against the live model catalogue, and the installed config against the active profile | **before every release**, and whenever a lane starts failing with a 429 or a "model not found" |
+| `oc-harness doctor --check-models` | one run, non-zero when a shipped model is no longer in the catalogue | from cron: the shape a scheduler wants |
+| `oc-harness doctor --watch` | keeps watching, and reports only what **changed** | leave it in a terminal for a week |
+| `oc-harness refresh <id>` | re-derives a profile's machine-derived fields from live metadata | when `doctor` reports drift |
+| `oc-harness verify` | the installed config still matches the profile, and the kit's own files are still installed | after every `use` / `install` |
+
+A cron line that tells you the moment a route disappears, rather than the
+moment a lane starts failing:
+
+```cron
+0 9 * * * cd ~/.config/opencode && oc-harness doctor --check-models
+```
+
+`doctor` separates the two kinds of finding, because they are not the same
+kind of finding:
+
+- **A broken install** — the config no longer matches the profile, or the
+  active profile no longer loads. This always exits non-zero.
+- **Perishable metadata** — a profile has drifted from models.dev because a
+  provider changed a context window or a capability flag. This is reported and
+  exits zero, unless you pass `--strict`, which is for a release.
+
+A CI job that failed on the second kind would go red on a Tuesday because
+somebody else changed a provider's limits, and a job that goes red for a
+reason you cannot act on is a job people stop reading.
+
+It is not a hypothetical. The day this was written, four of the twelve
+shipped profiles had already drifted from the live catalogue — the
+`temperature` flag had flipped on every one of them.
+
+### What `refresh` will and will not touch
+
+`refresh` rewrites only the fields a machine can derive: context, output and
+input ceilings, the effort levels a model publishes, and the capability flags.
+It never touches `retention`, `note`, `roles` or the fallback queue, because
+those are human judgements and a script overwriting a privacy verdict is worse
+than drift.
+
+**If a provider changes its terms, a human has to say so.** `retention.yml` is
+hand-curated and dated (`verified:` on every entry). `doctor` will catch the
+one case it can check mechanically — a profile that says `zero-retention`
+while `retention.yml` now says `may-train` — and nothing else.
+
+### What happens when a model is withdrawn
+
+No plugin hook can change the model of a running session, so the failover is
+not mid-flight:
+
+1. The router marks the route spent when a request fails with a free-tier
+   limit or a withdrawal.
+2. At the **next** session start, the lane that used it moves to the next rung
+   of its own chain, and the session's own model moves to the next profile in
+   the fallback queue.
+3. A fleet keeps its lanes. One spent route costs one lane, not ten — that is
+   the whole reason every lane carries a chain of models instead of a single
+   name.
+
+If a model is withdrawn and the lane's whole chain has gone with it, the lane
+falls back to the profile's base model. If even that is spent, the lane still
+gets a model and the config header says what the effective retention turned
+out to be. A lane is never left without one.
+
+See [docs/KNOWN-LIMITS.md](docs/KNOWN-LIMITS.md) for the rest of what this
+tier cannot do.
+
 ## Requirements
 
 | | |
 |---|---|
 | Node | **22 or newer** — `engines` in package.json, and the CLI uses `node:` prefixed builtins. Node 20 fails at import time, not with a friendly message. |
 | npm | 10 or newer, for `npm ci` when installing from a checkout |
-| OS | macOS, Linux and Windows. No platform checks in the code; the tests run on `ubuntu-latest`. |
-| Shell | none. The CLI never shells out, so no `bash`, `zsh` or `fish` setup is needed. |
-| Network | `list` and `doctor` read models.dev, which is the point of both. Everything else, including `install`, `use` and `verify`, works offline. |
-| Disk | it writes into `~/.config/opencode/` and nothing else. |
+| OS | macOS, Linux and Windows. The tests run on `ubuntu-latest`. |
+| Shell | none needed to *use* the kit — no `bash`, `zsh` or `fish` setup. `doctor` and `refresh` call `curl` to read models.dev. `baseline` and the measurement scripts read the install database with `sqlite3`, and fall back to python3's own `sqlite3` module when that binary is not installed — so python3 is the one thing to have. Everything else, including `install`, `use` and `verify`, works offline. |
+| Network | only `doctor` and `refresh` need it, and only to read the live model catalogue. `list` is offline: it reads the shipped profiles. Everything else works offline. |
+| Disk | `use` and `install` write into `~/.config/opencode/` and nothing else. `doctor` writes nothing. `refresh` rewrites a profile in the kit's own
+directory - `node_modules` for an npm install - and keeps a backup of the
+one it replaced. |
 
 `~/.config/opencode/` is your live agent config. `use` and `install` write there,
-`verify` only reads, and `use --dryrun` writes nothing at all. Every write keeps
-a `.bak` next to the file, including under `--yes`.
+`verify` only reads, and `use --dryrun` writes nothing at all. Every write
+keeps a dated copy in `~/.config/opencode/backups/`, including under
+`--yes`, and `oc-harness restore <file>` puts one back.
 
 ## Commands
 
 ```
 oc-harness list       profiles with retention and caveats
-oc-harness show <id>  resolved lanes, derived numbers, fallback chains
+oc-harness show <id>  resolved lanes, derived numbers, fallback chains, guard rules
 oc-harness init       pick a free profile, then install + use + verify
 oc-harness use <id>   compile a profile into ~/.config/opencode/opencode.jsonc
-oc-harness use <id> --dryrun   print what would be written, write nothing
+oc-harness use <id> --dryrun   print a summary of what would be written, write nothing
 oc-harness refresh <id> re-derive a profile against the live model list
 oc-harness install    symlink the plugin, prompts, skills and GLOBAL.md
-oc-harness link       just the plugin and instruction file, no prompts or skills
+oc-harness link       just the plugin, no prompts or skills
 oc-harness verify     check the install against the profile; non-zero on drift
 oc-harness agents     report agents the effort tiering does not reach
 oc-harness lanes      report which lanes the fleet actually used
+oc-harness lanes --json   the same report, for a script
+oc-harness trust      set up npm trusted publishing for this package
 oc-harness doctor     re-check profiles against models.dev and the live config
+oc-harness doctor --watch  poll the catalogue, and report only what changed
+oc-harness refresh --all   re-derive every shipped profile against the live catalogue
+oc-harness upgrade    check for a newer kit, refresh the profiles, rewrite the config
+oc-harness backups   the configs that were replaced, newest first
+oc-harness uninstall remove the plugin, prompts, skills and GLOBAL.md again
+oc-harness cost      what the kit is doing on this project, in numbers
+oc-harness restore <file>  put one back
 oc-harness baseline   measure the current install
+oc-harness run        drive .space/tasks.md to done with the build agent
 ```
+
+The measurement scripts are in `eval/`, and each one says what it measures
+at the top of the file:
+
+```
+node eval/run.mjs               the pruner and the allowlist
+node eval/measure-prune.mjs     the pruner, on real sessions
+node eval/measure-install.mjs   before and after the install
+node eval/models.mjs            every model the profiles use, one line each
+node eval/ab.mjs                the A/B: the same task with and without the kit
+```
+
+Every flag accepts both spellings: `--profile fleet-safe` and
+`--profile=fleet-safe` are the same flag.
+
+Every command that can fail says so in its exit code, so a script can tell
+"the kit says no" from "the kit broke".
+[`docs/EXIT-CODES.md`](docs/EXIT-CODES.md) lists them.
+
+`doctor`, `show` and `lanes` take `--json` and print nothing else, so a
+script gets the answer without parsing prose.
 
 `oc-harness <anything-else>` now exits non-zero with the list of real commands,
 instead of printing help and reporting success.
@@ -294,23 +480,25 @@ Ten lanes is a hypothesis. `oc-harness lanes` counts the requests:
 ```
 $ oc-harness lanes
 
-  lane            reqs     avg ms  model
-  ----------------------------------------------------------------
-  plan                7       2624  beam-free
-  build              21      10104  minimax-m3.1-flash-free
-  reviewer            2       4716  nemotron-3-ultra-free
-  locate              4       3680  nemotron-3.5-lightning-free
-  verify              2       6546  big-pickle
-  vision              2      19167  mimo-v2.6-flash-free
-  doc                 2       5421  glm-5.3-flash-free
-  schema              1       3390  deepseek-v4.1-flash-free
-  sweep               3       4221  nemotron-3.5-super-vl-free
-  longform            2       9382  longcat-2.5-preview-free
+  lane             reqs     avg ms     avg ctx  model
+  ----------------------------------------------------------------------
+  plan                0          -           -  deepseek-v4.1-flash-free        never used
+  build              87       9935           -  minimax-m3.1-flash-free, deepseek-v4.1-flash-free
+  reviewer            0          -           -  glm-5.3-flash-free              never used
+  ...
+  9 lane(s) were never used cut candidates, not defects
+  one request is one assistant message; avg ms covers the requests that finished
 ```
 
 A lane that is never used is a description the model reads on every turn and
 a free model doing nothing. Cut it from the profile's `roles` and the lane
 leaves the config with it.
+
+The `build` row is not comparable with the others: it includes the turns
+that did the delegating, so it counts the work of the other nine lanes. A
+one-line `build` reply on its own is about a third of that number, and
+rather more on a cold start. [`docs/ROUTING.md`](docs/ROUTING.md) has the
+per-profile tables and what each row measures.
 
 One request is one assistant message, which is one round trip to the provider:
 a lane that makes three tool calls makes three requests. The counters come
@@ -326,12 +514,12 @@ From one real install:
 
 ```
 CONTEXT PER REQUEST
-  p50   100,942   p90  256,940    p99  481,687    max  547,986
-  fresh input p50  528
+  p50    99,648   p90  246,536    p99  482,779    max  547,986
+  fresh input p50  534
 STORED MESSAGE BYTES
-  tool        116.58 MB   77.9%
-  reasoning    23.10 MB   15.4%
-  text          3.12 MB    2.1%
+  tool        114.78 MB   77.9%
+  reasoning    22.94 MB   15.6%
+  text          3.04 MB    2.1%
 READ PRESSURE
   read calls                 2,966
   grep/glob/list               249
@@ -340,15 +528,15 @@ READ PRESSURE
   cut by the 200-line cap     441
   re-reads with an offset     423
 PERMISSION PRESSURE
-  prompt with kit allowlist  1,002 (18.5%)
+  prompt with kit allowlist  1,002 (19.1%)
 compaction events  0  (never fired)
 ```
 
 Four numbers in that report changed how this kit is configured, and two of them
 reversed an earlier decision:
 
-**Tool output is 78% of stored context**, and sessions re-read ~101k tokens per
-request to add ~528 new ones. That is why pruning here is deterministic and
+**Tool output is 78% of stored context**, and sessions re-read ~100k tokens per
+request to add ~534 new ones. That is why pruning here is deterministic and
 unconditional.
 
 **Read pressure is 11.9 whole-file reads per search.** Every production harness
@@ -364,6 +552,57 @@ reads exceed 51,200 bytes, so that ceiling is not what limits context.
 
 Your numbers stay on your machine; only the script is in the repo.
 
+`npm run measure` is an **observation** about one install: it compares the
+work before the kit landed with the work after, and the work is never the
+same. It says so when the two windows are not comparable, and the gate uses
+the number that is.
+
+`npm run measure:prune` is the attributable one. opencode stores the message
+parts unpruned — the pruner rewrites the outgoing request, not the history —
+so the stored parts of a real session are exactly what the pruner was given,
+and replaying the real pruner over them measures exactly what it removed, on
+the same messages with and without. On one install, on 2026-10-20:
+**80.5% of the context across 60 real sessions**. The number moves with the
+sessions, because it is measured over the ones this machine happened to
+have - so run the command for the number on yours.
+
+**What is kept is the newest copy of each DISTINCT output.** The window on
+recent calls was a window on *recency*, and a long session walks out of it:
+after six more calls, the only copy of a file the agent had read was gone,
+and the agent read it again. On the long-task A/B that was seventeen
+re-reads and five times the input tokens. The newest copy of each distinct
+output now survives however old it is, and only the repeats are stubbed -
+**-69% input tokens and -60% wall time** on that task, at the cost of a
+bigger context. It is a setting: `prune.keepDistinctOutputs` in the profile,
+`false` to get the old behaviour back.
+
+## Memory
+
+The kit does not implement memory. A local vector store with embeddings, a
+web UI, auto-capture and a user profile is a large thing to build badly, and
+[`opencode-mem`](https://github.com/tickernelz/opencode-mem) already is one.
+
+What the kit does is make it one flag away and keep the config honest about
+it:
+
+```bash
+oc-harness use fleet-safe --memory        # adds opencode-mem to the plugin list
+oc-harness use fleet-safe --memory=opencode-mem@2.32.0   # a pinned version
+```
+
+Your own plugins are never touched — the entry is **added**, so a config that
+already has it does not grow a second copy, and a config that already has
+other plugins keeps them.
+
+The memory plugin keeps its own configuration in
+`~/.config/opencode/opencode-mem.jsonc`. It stores and searches without one,
+but **auto-capture needs a provider** to summarise a session into a memory, so
+give it one:
+
+```jsonc
+{ "opencodeProvider": "openai", "opencodeModel": "inherit" }
+```
+
 ## The plugins
 
 | module | hook | job |
@@ -371,7 +610,21 @@ Your numbers stay on your machine; only the script is in the repo.
 | `guard.ts` | `tool.execute.before` | Blocks destructive commands in code. Fail-closed. |
 | `prune.ts` | `experimental.chat.messages.transform` | Replaces old tool output with a one-line stub. |
 | `router.ts` | `config`, `event`, `chat.message` | Moves a lane to the next rung of its chain when a route is spent. |
-| `telemetry.ts` | `event`, `chat.message`, `tool.execute.after` | Local JSONL, gitignored, never a network call. |
+| `telemetry.ts` | `event`, `tool.execute.after` | Local JSONL, gitignored, never a network call. |
+
+Both `.space/telemetry.jsonl` and `.space/prune.jsonl` are written in the
+**project**, not wherever opencode was started from. The prune log used to
+land in the process's working directory, which is often your home directory.
+
+**The utility route.** `small_model` is what opencode uses for its short
+auxiliary calls — a title, a one-line summary, a question rewritten. It used
+to be the session model, so every one of those calls paid the session model's
+*reasoning*, and reasoning, not output, is what a short call costs. Measured
+on this tier, a title costs **49 reasoning tokens on DeepSeek and 332 on
+Nemotron 3.5 Super VL**, and DeepSeek answers in 7.2 s against 22.7 s for
+GLM. A fleet now names a cheaper route; a single-model profile keeps its one
+route, because "one route, and it is the one you asked for" is a promise those
+profiles make. The generated file says which route it chose.
 
 `guard.ts` matches against the command a shell would actually run, not the text
 it was handed. It splits on shell separators, honours quotes so that a `;`
@@ -383,11 +636,19 @@ not guard-blocked; it falls through to the `*` ask permission so opencode
 prompts for human approval before publishing.
 
 Writes are scoped to the project directory, with the OS temp directory as the
-one exception GLOBAL.md allows.
+one exception GLOBAL.md allows. That covers every tool that writes: `write`
+and `edit` by their path, `apply_patch` by the paths named in the patch, and
+a bash command by its **working directory** — a command run from `/etc` is
+writing outside the project, whatever the command is.
+
+A write tool whose arguments name no file is blocked rather than allowed
+through: a guard that cannot see what a write touches cannot scope it. And
+if the guard itself cannot decide, it blocks — a guard that quietly passes
+when broken is worse than none.
 
 Pruning keeps user messages, assistant prose, diffs, and the last few turns
-verbatim, and never touches the in-flight turn. Old reasoning is dropped, since
-stale reasoning is worse than none.
+verbatim, and never touches the in-flight turn. Old reasoning is dropped,
+since stale reasoning is worse than none.
 
 `router.ts` fails over **per lane**. A fleet has ten routes, so one spent
 route must not take the other nine down with it: the lane that used the dead
@@ -456,8 +717,8 @@ Without registry access, the checkout path works identically:
 
 ```bash
 pkg install nodejs git
-git clone https://github.com/pham-canh/space-harness.git
-./space-harness/bin/oc-harness.mjs init
+git clone https://github.com/pham-canh/opencode-harness-kit.git
+./opencode-harness-kit/bin/oc-harness.mjs init
 ```
 
 The kit writes to `$HOME/.config/opencode` like everywhere else, so there is
@@ -496,16 +757,36 @@ Writes outside the project still ask, via `external_directory`.
 
 | lane | mode | job | effort |
 |---|---|---|---|
-| `build` | primary | writes and verifies code | middle |
-| `plan` | primary | turns a request into an executable plan | highest |
-| `reviewer` | subagent | two passes, never edits | highest |
-| `locate` | subagent | finds code, reports `file:line`, never designs | lowest |
-| `verify` | subagent | runs checks, never fixes them | lowest |
+| `build` | primary | writes and verifies code | `max` |
+| `plan` | primary | turns a request into an executable plan | `max` |
+| `reviewer` | subagent | two passes, never edits | `max` |
+| `locate` | subagent | finds code, reports `file:line`, never designs | `low` |
+| `verify` | subagent | runs checks, never fixes them | `low` |
 | `vision` | subagent | reads an image or a screenshot | model's |
 | `doc` | subagent | reads a long document or a spec | model's |
-| `schema` | subagent | produces JSON a program can parse | highest |
-| `sweep` | subagent | bulk mechanical sweep, no judgement | lowest |
+| `schema` | subagent | produces JSON a program can parse | `max` |
+| `sweep` | subagent | bulk mechanical sweep, no judgement | `low` / `none` |
 | `longform` | subagent | very long context, or several answers | model's |
+
+The effort column is the request in the profile, resolved against the levels
+of the model the lane actually runs on — so `max` is `max` where the model
+publishes it and the nearest level that does exist where it does not, and
+`none` is no variant at all on a model that cannot turn reasoning off. Run
+`oc-harness show <profile>` for the resolved values and the note explaining
+any difference.
+
+The tier is worth protecting: measured on one install, DeepSeek spends **320
+reasoning tokens a message at `max` and 19 at `low`**, so the lever is a
+factor of 17. A lane that asks for a tier and lands on a model that publishes
+none runs at that model's natural rate instead, and the generated config says
+so in the form `locate=unset(asked low)`.
+
+Three lanes in the unrestricted fleet cannot get their tier, and the
+measurement says they are the three cheapest reasoners on the tier — 116, 59
+and 18 reasoning tokens a message, against 289 for `build` and 198 for
+`plan`, which keep their tier on purpose. The one lane that was genuinely
+expensive was `sweep`, running on a model that reasons 420 tokens a message
+for what is supposed to be a mechanical grep. It does not any more.
 
 `locate` is deliberately *not* called `scout`: OpenCode ships a built-in `scout`
 subagent for dependency and external-docs research, and shipping our own file
@@ -515,6 +796,11 @@ the built-in exists for.
 Each lane carries a `steps` cap. It is a loop breaker, not a quality knob: on
 exhaustion OpenCode forces a text-only response, so an agent that has stopped
 making progress reports rather than looping until the context is gone.
+
+Each lane also gets its own `permission.task` rule — `deny` for everything
+except the lanes it may hand work to. That is the mechanism behind "hand the
+job to the lane that has it": a lane that is not allowed to spawn anything
+cannot quietly become a general-purpose agent on the most expensive tier.
 
 ## The skill loop
 
@@ -537,6 +823,65 @@ the conversation instead of the requirement.
 Publishing is never a loop step. `space-finish` prepares the change; a human
 decides it ships.
 
+## What it costs, measured
+
+The kit's own A/B - the same task with and without it, ten reps per arm, 120
+agent runs, both arms on the same model, on this repository at a pinned commit
+so anyone can repeat it:
+
+| metric (median) | kit on | kit off |
+|---|---|---|
+| **correct** | **54/60** | **55/60** |
+| tool calls | 12.5 | 8 |
+| input tokens | 56,205 | 10,540 |
+| final context | 39,928 | 12,718 |
+| wall seconds | 43 | 21 |
+| paths written outside the target | 0 | 0 |
+
+**On a task that fits in one read, the kit is a cost.** It spends over five
+times the input tokens and takes twice as long, and the answers are a tie -
+54 against 55, and a second run of the same 120 runs gave 55 against 54.
+The two edit tasks are a tie at 10/10, and the guard stopped no writes in
+either arm.
+
+The earlier version of this table said 52/60 against 59/59 - the kit looked
+clearly worse - and that was the grader's fault: it could not read a
+citation written as `**File:** x` on one line and `**Line:** 105` on the
+next, which is the shape some of the kit's answers took. Re-scoring the
+same 120 runs with the fixed grader gives 34/40 against 30/40 on the lookup
+tasks - the kit ahead, where the old grader had it behind. The full account is in [eval/RESULTS.md](eval/RESULTS.md).
+
+**On a long task the pruner is where the kit pays.** The suite above is
+made of two-line questions answered in one or two reads, and a session that
+short never grows the history far enough for pruning to matter. So there is
+a second suite with one task that touches twelve files and asks a question
+about the code that consumes what it changed — and on it, with the pruner's
+rule fixed (see below), the kit's arm makes the same number of tool calls
+as the arm without the kit (47 against 46) and takes 1.2x the wall time.
+
+**The pruner used to make the agent re-read.** The first run of that task
+said the kit was much worse: 86 tool calls against 43 and 282,000 input
+tokens against 51,000, for the same final context. Seventeen of the reads
+were re-reads. The pruner keeps the last six tool outputs and stubs
+everything older — a window on *recency* — so after six more calls the only
+copy of a file the agent had read was gone, and the agent read it again. The
+newest copy of each **distinct** output now survives however old it is, and
+only the repeats are stubbed. Same subject, same task, same model: **-69%
+input tokens and -60% wall time**, at the cost of a bigger context.
+
+**The process is measured too, and the result is not flattering.** The kit
+claims a reviewer that reviews and does not edit. A task that invites the
+agent to fix what it finds, graded on the finding being cited AND the file
+being untouched, gives **2/2 against 2/2**: the kit's reviewer lane and the
+default agent behaved the same. The lane is not what made them behave, and
+it is soft — a task that says "fix it" overrides it. Both are in
+[eval/RESULTS.md](eval/RESULTS.md), because a claim that is not measured is
+a claim.
+
+Whether it is worth it depends on whether the work is long. A repository of
+one-file lookups should not install this. The full table is in
+[eval/RESULTS.md](eval/RESULTS.md).
+
 ## Known limits
 
 Read [docs/KNOWN-LIMITS.md](docs/KNOWN-LIMITS.md) before relying on failover.
@@ -545,11 +890,43 @@ session, so switching happens at the next session, not mid-flight. What a
 plugin *can* do is move a lane to the next rung of its chain before the
 session starts.
 
+## What is next, and what is not measured yet
+
+The claims this project makes are measured, and where a measurement has not
+happened the claim is written down as a gap rather than as a fact. These are
+the open ones.
+
+**The pruner's rule was measured on one task.** Keeping the newest copy of
+each distinct tool output instead of a window on recent calls cut the input
+tokens by 69% and the wall time by 60% on the long-task A/B. One task is one
+workload. It needs the same treatment on a repository that is not this one,
+and on a session that runs for hours rather than minutes.
+
+**The reviewer's "you never fix" is an instruction, not a boundary.** The
+measurement of it came out even: the kit's reviewer lane and a default agent
+behaved the same on a review task, and a task that says "fix it" overrode
+the lane. The kit's own loop keeps the line by never asking a reviewer to
+fix anything. A guard that cannot be overridden by a task is worth having,
+and that is not built yet.
+
+**The nightly A/B needs a provider key on the repository.** The workflow
+exists, it runs, and it is skipped until the key is set — the variable
+`HAS_OPENCODE_KEY` says the secret is there. The numbers in
+[eval/RESULTS.md](eval/RESULTS.md) are the ones taken by hand.
+
+**The TypeScript pilot is one public repository.** It is now a real one
+(`typesense-js`, pinned by commit) rather than a private tree, which is what
+made it checkable. Two languages are not a survey.
+
+**The lanes are ten because ten models were available.** That is a
+hypothesis about the tier, not a number. `oc-harness lanes` counts the
+requests and says which lanes were never used; cutting them is a data edit.
+
 ## Development
 
 ```bash
 npm install
-npm run check        # everything: build, typecheck, tests, live install, verify
+npm run check        # everything offline: build, typecheck, tests
 ```
 
 Or one layer at a time:
@@ -557,6 +934,7 @@ Or one layer at a time:
 ```bash
 npm test             # model-agnostic assertions, no network, no model calls
 npm run typecheck
+npm run check:install  # the above, plus the live install measurement and verify
 npm run eval         # synthetic: pruning, prompt pressure, effort projection
 npm run measure      # is this install behaving? narrow reads, context
 npm run attribute    # where the context went: fixed overhead vs history
@@ -565,8 +943,8 @@ npm run baseline     # your own install, from scratch
 ```
 
 `eval/ab.mjs` runs the same tasks with and without the kit, to separate the kit
-from the work. It spawns real agents, so it is not part of `npm run check`, and
-it wants a subject it can hand each run a private copy of:
+from the work. It spawns real agents, so it is not part of any check, and it
+wants a subject it can hand each run a private copy of:
 
 ```bash
 node eval/prepare.mjs --repo ~/work/lablab-harness --ref 8a674f5
@@ -576,7 +954,7 @@ node eval/ab.mjs --rescore <saved stream dir>   # re-grade without spawning agen
 
 `npm test` and `npm run typecheck` need nothing but the repo, so CI runs those.
 The rest read `~/.local/share/opencode/opencode.db` and `~/.config/opencode`,
-which only exist on a machine that has run OpenCode with the kit installed -
+which only exist on a machine that has run OpenCode with the kit installed —
 `npm run check:online` additionally hits the model catalog over the network.
 
 Measured results, and the limits they do not cross, are in
@@ -588,9 +966,15 @@ and the measurements behind each choice.
 
 [`CHANGELOG.md`](CHANGELOG.md) records what each release changed and, for the
 releases before this one, what was broken in it — the silent failures that a
-config could look correct through. [`MIGRATION.md`](MIGRATION.md) covers
-0.2.x → 0.3.0: the profile ids changed, the config layout changed, and the
-telemetry file now means something different.
+config could look correct through. [`MIGRATION.md`](MIGRATION.md) covers the
+two upgrades that ask something of you: 0.2.x → 0.3.0 (the profile ids
+changed, the config layout changed, the telemetry file now means something
+different) and 0.3.x → 0.4.x (the guard started refusing in code what it used
+to only suggest, and the pre-commit hook started running your project's
+tests instead of the kit's).
+
+[`docs/EXIT-CODES.md`](docs/EXIT-CODES.md) lists what every command returns
+when it fails, so a script can tell "the kit says no" from "the kit broke".
 
 ## Contributing
 

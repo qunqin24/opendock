@@ -47,6 +47,7 @@ OpenCode 2 requires a package directory here (it resolves `index.js` and the TUI
 ### OpenCode 2 notes
 
 - **Toasts** come from a TUI companion module (`mighty-reviewer/tui`) that OpenCode 2 loads alongside the server plugin. Each notice is also queued as a `mighty-reviewer` entry in the session it concerns, where it enters the conversation on the next turn without waking the agent.
+- **Sidebar panel**: the same TUI module adds a "Mighty Reviewer" box to the right sidebar, styled to sit next to the oh-my-opencode-slim agent panel. See [Sidebar panel](#sidebar-panel-opencode-2).
 - **The review session is a root session**, not a child of the coding session. OpenCode 2 caps nested subagents at depth 1 (`experimental.subagent_depth`), and a nested review session could not spawn its four critics. The parent link is stored in the review session's metadata, and the toast offers to open the review session.
 - **`enforceNoShip`** denies `git commit` / `git push` through the permission hook, so a blocked command shows up as a permission denial carrying the reviewer's message.
 - Tool names differ between hosts (`bash` is `shell`, `task` is `subagent`); progress tracking and the critic permissions account for both.
@@ -93,6 +94,36 @@ OpenCode 2 requires a package directory here (it resolves `index.js` and the TUI
 
 6. **Stall guard**: if the review session goes idle **without** a SHIP/NO-SHIP verdict (e.g. the orchestrating agent launched the critics as background tasks and ended its turn early), the review is not finalized as a fizzle. The plugin re-prompts the review session to collect the critic results and emit the verdict, capped at 2 nudges, after which the review finalizes with whatever it has. Duplicate idle events never burn the nudge budget.
 
+### Sidebar panel (OpenCode 2)
+
+While you are in a session that has a review, the right sidebar shows a small panel:
+
+```
+┌───────────────────────────────────────────────────────┐
+│ ▼ Mighty Reviewer v0.9.3                       NO-SHIP│
+│ ✓ review        7 files +240/-31   1m42               │
+│   ✓ adversarial-risk    1 P0  ·  ·  2 P3  12k         │
+│   ✓ design-principles          clean   8k             │
+│   ✓ security-checklist  ·  ·  3 P2  ·  11k            │
+│   ✓ ai-slop                    no report              │
+│                                                       │
+│ total            1 P0  ·  3 P2  2 P3 · verified 4 of 6│
+│ cycle 1/2 · fixes sent to session                     │
+└───────────────────────────────────────────────────────┘
+```
+
+- A spinner marks anything still running, `✓` marks a critic that has returned. Click the header to unfold the panel and see the per-critic rows again; it folds back to the header line with the verdict once the review finishes (`SHIP`, `NO-SHIP`, `done`, or `timed out`).
+- The `review` row shows the diff scope from the reviewed session (`<files> files +<added>/-<deleted>`, omitted if unavailable) and elapsed time, right-aligned: ticking while the review runs, fixed once it finishes (`42s`, `1m42`, `1h05`). The phase (`critics 2/4`, `verifying`, ...) is shown only while running, and only once it says something the row doesn't already (an early "starting"/"gates" phase is skipped).
+- Each critic row shows a constant-position severity run across P0-P3: a colored `<n> P<k>` where it found something (P0/P1 red, P2 amber, P3 muted), a faint `·` where it found nothing, `clean` in place of the whole run when every slot is zero, `no report` when the critic ended without any text, and `not run` for a critic the review never got to. The faint number at the row's right edge is that critic's token total.
+- These are each critic's own findings, before the review session verifies and merges them. The `total` row (shown once at least one critic has reported) sums the same severity run across critics, raw; once the review itself finishes and its own report can be read, it appends `· verified N of M`, where N is what survived the review's adversarial verification and dedup, and M is the raw total that preceded it.
+- A `cycle N/max` line appears once the NO-SHIP -> fix -> re-review loop (`MAX_REREVIEW_CYCLES`) has run at least once for this session, with `· fixes sent to session` appended while the latest verdict is NO-SHIP.
+- While there is no review yet for the session you are viewing, the panel stays folded with `idle` like the other sidebar panels, showing the latest queued notice for it underneath (e.g. "diff too large for review, skipped") instead of staying silent.
+- Click the `review` row or a critic row to open that session. Clicking a critic row also opens a findings panel for it (P0/P1 lines plus the review's status); run the **`/review-findings`** command for the same panel over every critic at once. On a host without a panel system, clicking a critic row still just opens its session. In the findings panel, esc or q closes the panel, f toggles fullscreen.
+
+The panel reads session titles, status, metadata, and critic reports from the TUI's own session data, so it needs no extra setup beyond the review-progress metadata the plugin writes on the review session itself (`parentID`, `cycle`, `maxCycles`, `startedAt`, `criticsDone`, `criticsTotal`, `verdict`), which the panel reads back for the `cycle` line and a sidebar that survived a restart. After a restart, when the TUI has not loaded past review sessions yet, it asks the server for recent sessions to find them. On a TUI without sidebar slots it is skipped and toasts keep working.
+
+How findings are counted: a finding is a line that starts with a severity tag (`### [P1] ...`, `- **P2** ...`, `| P3 | file:line |`, `P1: ...`), a `Severity: P1` field, or a list item under a heading that is only a severity (`### P1`). Severity mentions inside sentences, ranges like `P0-P3`, tallies like `P1: 2`, and code blocks are ignored.
+
 ## Configuration
 
 All options go in the plugin entry in `opencode.json` (OpenCode 2 object form shown; OpenCode 1 uses the tuple form `["mighty-reviewer", { ... }]` under `plugin`):
@@ -119,6 +150,7 @@ All options go in the plugin entry in `opencode.json` (OpenCode 2 object form sh
 | `maxDiffLines` | `2000` | Skip review when more changed lines than this (lockfiles/generated excluded from the count) |
 | `ignore` | `[]` | Extra regex patterns (strings) for files to exclude from review |
 | `idleDebounceMs` | `1000` | Debounce for `session.idle` before triggering a review |
+| `timeoutMs` | `600000` | Review time budget. At half time a review still in its mechanical gates is steered straight to the critics; at the deadline a review whose critics are running gets one extension of half the budget, otherwise it is aborted. The review session is also denied access outside the project directory, so a headless permission prompt cannot stall it |
 | `enforceNoShip` | `false` | Block `git commit` / `git push` in a session while a NO-SHIP verdict is unresolved (until a later review SHIPs, e.g. via `/mighty-review`). On OpenCode 2 this is a permission denial |
 | `progressToasts` | `true` | Toast on review phase transitions (gates done / critics done); `review_status` and live session titles report progress regardless |
 | `updateCheck` | `true` | Check npm for a newer version a few seconds after startup |

@@ -60,7 +60,7 @@ Identity keys stay on your machine in `~/.huddo` (override with `HUDDO_HOME`). R
 
 ## Harness plugins
 
-- **OpenCode:** [`opencode-huddo`](integrations/opencode) adds the MCP server and the skill (`"plugin": ["opencode-huddo"]`).
+- **OpenCode:** [`opencode-huddo`](integrations/opencode) adds the MCP server and the skills (`"plugin": ["opencode-huddo"]`).
 - **pi:** [`pi-huddo`](integrations/pi): `pi install npm:pi-huddo`.
 - **Hermes:** [Portable Agent Plugin](integrations/hermes) with a pinned server version and no background process.
 

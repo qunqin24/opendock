@@ -9,9 +9,10 @@ depends on a sibling — if you only want the usage HUD, you install only that o
 | ------- | ------------ | ------- |
 | [`@danielbdev/opencode-go-usage`](packages/go-usage) | OpenCode Go subscription usage — the 5-hour, weekly and monthly windows — in the session sidebar | `opencode plugin add @danielbdev/opencode-go-usage` |
 | [`@danielbdev/opencode-agents`](packages/agents) | Subagent status in the session sidebar, with a colour per state | `opencode plugin add @danielbdev/opencode-agents` |
+| [`@danielbdev/opencode-todo`](packages/todo) | A `todo` tool the model keeps current, plus the list in the session sidebar | `opencode plugin add @danielbdev/opencode-todo` |
 
-Both render in the session sidebar: usage takes the top of the content region, agents takes the bottom,
-below the MCP block.
+All three render in the session sidebar: usage takes the top of the content region; agents and todo share the
+bottom, below the MCP block, in configuration order.
 
 ## Layout
 
@@ -19,6 +20,7 @@ below the MCP block.
 packages/
   go-usage/   server half (resolves the credential, reads the endpoint) + TUI half
   agents/     TUI half only
+  todo/       server half (registers the tool) + TUI half
 ```
 
 A plugin that needs a credential does that work in a **server entrypoint** and hands the TUI nothing but a
@@ -37,7 +39,7 @@ There is no build step: the packages ship their TypeScript sources and OpenCode 
 
 ## Releasing
 
-A release is cut by pushing a tag shaped `<directory>@<version>`, for example `go-usage@0.1.2`. GitHub
+A release is cut by pushing a tag shaped `<directory>@<version>`, for example `todo@0.1.1`. GitHub
 Actions runs the tests and the typecheck, checks that the tag matches the manifest, and **stages** the
 version into npm's staging queue. Nothing is installable until a maintainer approves it with 2FA: `npm
 stage list`, then `npm stage approve <stage-id>`.

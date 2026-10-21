@@ -154,6 +154,11 @@ Or enable in `~/.claude/settings.json`:
 }
 ```
 
+OMP (oh-my-pi, `omp >= 18.12.2`) is pre-release: its `ycc` and `ycc-mcp`
+packages are unlisted until YAN-1180, so install them from a checkout with
+`./install.sh install --target omp` (add `--project` for this project only,
+`--dry-run` to preview). See [`docs/install/omp.md`](docs/install/omp.md).
+
 For local development installs, generated compatibility bundles, model defaults,
 and desktop app notes, use the dedicated install guides. Recommended sync form:
 
@@ -162,10 +167,11 @@ and desktop app notes, use the dedicated install guides. Recommended sync form:
 ./install.sh sync --target claude --intent mods                          # Claude Code mods (ycc/mods)
 ./install.sh sync --target all --intent settings,rules
 ./install.sh install --target all --only agents                         # standalone agents, no plugin
+./install.sh install --target omp                                       # OMP via omp plugin (pre-release)
 ./install.sh sync --target codex,claude,opencode --intent mcp            # current project
 ./install.sh sync --target codex,claude,opencode --intent mcp --global   # user-global
 ./install.sh sync --target opencode --intent mcp --mcps github,linear    # only these servers
-./install.sh list-mcps                                                   # managed MCP server names
+./install.sh list mcps                                                   # managed MCP server names
 ./install.sh remove --target all --only mcp                              # undo project MCP
 ./install.sh remove --target all --intent settings,rules                 # undo any intent, any target
 ./install.sh cli && ycc completion --install                             # `ycc` on PATH for other projects
@@ -200,6 +206,7 @@ Dedicated guides:
 | Codex / Codex Desktop          | [`docs/install/codex.md`](docs/install/codex.md)         |
 | opencode                       | [`docs/install/opencode.md`](docs/install/opencode.md)   |
 | `~/.agents/skills` (Zed etc)   | [`docs/install/agents.md`](docs/install/agents.md)       |
+| OMP (oh-my-pi)                 | [`docs/install/omp.md`](docs/install/omp.md)             |
 | Shared installer concepts      | [`docs/install/README.md`](docs/install/README.md)       |
 | Native packages (all runtimes) | [`docs/install/v6/README.md`](docs/install/v6/README.md) |
 
@@ -233,13 +240,13 @@ Both accept `--only <targets>` with comma-separated values.
 - `cursor` writes native packages under `packages/cursor/`.
 - `codex` writes `.codex-plugin/` skills, agents, and plugin metadata.
 - `opencode` writes `.opencode-plugin/` skills, agents, commands, `opencode.json`, and `AGENTS.md`.
-- `omp` writes OMP (oh-my-pi) skills under `packages/omp/ycc/skills/`, plus the hidden `ycc-shared` skill for `_shared`, task agents under `packages/omp/ycc/agents/`, and one `/ycc:<skill>` command entrypoint per public skill under `packages/omp/ycc/commands/`. It is not installable yet.
+- `omp` writes OMP (oh-my-pi) skills under `packages/omp/ycc/skills/`, plus the hidden `ycc-shared` skill for `_shared`, task agents under `packages/omp/ycc/agents/`, one `/ycc:<skill>` command entrypoint per public skill under `packages/omp/ycc/commands/`, the `packages/omp/ycc-mcp/.mcp.json` MCP config, and the package manifests. The root `.omp-plugin/marketplace.json` is written only for packages listed in `ycc/settings/packages.json`; none is listed yet.
 - `agents` writes `.agents-plugin/` cross-tool skills for `~/.agents/skills`, plus `ycc-shared/`.
 - `claude` writes the native add-on packages under `packages/claude/` (`ycc-mcp`, `ycc-hooks`, and `ycc-all`).
 
 `validate.sh` accepts those names and also `claude-native`, `cursor-native`, `codex-native`, `json`, `config`, `packages`, `release`, `mods`, `practices`, `scope`, and `types`.
 
-- `omp` checks generated OMP skill, agent and command drift (bytes and modes), content policy, command inventory parity, and generator golden tests.
+- `omp` checks generated OMP skill, agent, command and package-manifest drift (bytes and modes), content policy, command inventory parity, catalog listing, lockstep versions, package closure, and generator golden tests.
 - `claude-native`, `cursor-native`, and `codex-native` check generated native package drift, runtime policy, and fixtures.
 - `json` checks `.claude-plugin/marketplace.json` and `ycc/.claude-plugin/plugin.json`.
 - `packages` checks `ycc/settings/packages.json`, dependency closures, and catalog parity.
@@ -297,7 +304,7 @@ ystack/
 ├── packages/                  # generated native packages; do not hand-edit
 │   ├── claude/                # ycc-mcp, ycc-hooks, ycc-all
 │   ├── cursor/                # ycc, ycc-rules, ycc-mcp, ycc-hooks, installer-fallback
-│   └── omp/                   # ycc/{skills,agents,commands} for OMP (not installable until YAN-1171)
+│   └── omp/                   # ycc (skills, agents, commands), ycc-mcp (.mcp.json) + OMP manifests (unlisted until release)
 ├── .opencode-plugin/          # opencode bundle (synced by install.sh install --target opencode)
 │   ├── agents/                # generated from ycc/agents
 │   ├── commands/              # generated from public ycc/skills (thin, skill-tool dispatch)
@@ -353,7 +360,11 @@ ystack/
 │   ├── validate-omp-agents.sh         # sync check + agent frontmatter/content policy
 │   ├── generate-omp-commands.sh       # wrapper → generate_omp_commands.py
 │   ├── generate_omp_commands.py       # public ycc/skills → packages/omp/ycc/commands (/ycc:<skill>)
-│   └── validate-omp-commands.sh       # sync check + inventory parity + content policy
+│   ├── validate-omp-commands.sh       # sync check + inventory parity + content policy
+│   ├── generate-omp-packages.sh       # wrapper → generate_omp_packages.py
+│   ├── generate_omp_packages.py       # packages.json → packages/omp/<pkg> manifests + .omp-plugin catalog
+│   ├── validate-omp-packages.sh       # sync check + catalog/manifest/lockstep/closure policy
+│   └── test-omp-native-packages.sh    # opt-in live omp install from a pinned fixture (not CI)
 ├── ycc/                       # the consolidated Claude Code plugin
 │   ├── .claude-plugin/
 │   │   └── plugin.json        # name: "ycc", current version in plugin.json

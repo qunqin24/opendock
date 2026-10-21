@@ -4,6 +4,7 @@
 [![npm](https://img.shields.io/npm/v/opencode-groq-dictate?label=npm)](https://www.npmjs.com/package/opencode-groq-dictate)
 [![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![release](https://img.shields.io/github/v/tag/LeonVeganMan/opencode-groq-dictate?label=release)](https://github.com/LeonVeganMan/opencode-groq-dictate/releases)
+[![OpenDock](https://img.shields.io/badge/OpenDock-listed-orange)](https://www.opendock.net/plugins/opencode-groq-dictate/)
 [![tests](https://img.shields.io/badge/tests-bun%20test-informational.svg)](#development)
 
 Dictation inside the **opencode v2** TUI: press `alt+v`, speak, press `alt+v` again.
@@ -66,19 +67,19 @@ clone out of `~/.config/opencode/plugins/` before installing from npm.
 
 | Key | Action |
 |-----|--------|
-| `alt+v` | start recording, press again to stop and transcribe |
-| `ctrl+alt+v` | same, but the prompt is submitted as soon as the text lands |
-| click on `🎤 Groq Dictate` or on the `state` row | same as `alt+v` |
+| `alt+v` | start recording; while recording, stop and paste the text so you can review it |
+| `ctrl+alt+v` | start recording; while recording, stop, paste and send it right away |
+| click on `Groq Dictate` or on the `state` row | same as `alt+v` |
 | `ctrl+click` on the same two | same as `ctrl+alt+v` |
 | `esc` | cancel the take: no upload, no request, no cost |
 | `/dictate` | same as `alt+v`, from the command palette |
-| `⚙` next to the title | open the settings panel |
+| `settings` next to the title | open the settings panel |
 
 A take stops on its own after 60 seconds. Everything else is in the palette under
 **Voice**: `Dictate (Groq) and submit`, `Dictation model`, `Dictation language`,
 `Dictation quota`, `Dictation settings`.
 
-The `⚙` panel (or `Dictation settings` in the palette) holds the four things worth
+The `settings` panel (or `Dictation settings` in the palette) holds the four things worth
 changing: the two shortcuts, the model and the language. Click a row, write the new
 value, and it applies at once — the keymap layer reads the stored config, so a new
 combination works without restarting OpenCode. A blank shortcut disables the key but
@@ -172,7 +173,7 @@ separate from the TUI so it can be unit tested without a terminal.
 
 - TUI only: dictating into a browser or an editor is out of scope. A desktop shortcut
   running a small script is still the right tool there.
-- The transcript is pasted, not submitted: you always get a chance to fix it.
+- The transcript is pasted, not submitted, unless you stop with `ctrl+alt+v` or a ctrl+click: the plain stop always leaves you a chance to fix it.
 - No automatic stop at the end of a sentence yet. The microphone gain on a typical
   laptop is too high for a threshold to separate voice from room; see [TODO.md](TODO.md)
   for the measurements and the sketch.

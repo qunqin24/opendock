@@ -4,7 +4,7 @@
 
 Persistent cost and token tracking with a native OpenCode TUI dashboard.
 
-`/cost` opens a full-screen dashboard with date, project, and model filters. Costs come directly from OpenCode's assistant-message records, so this plugin does not maintain a separate provider pricing table.
+`/cost` opens a full-screen dashboard with date, project, and model filters. Costs come directly from OpenCode's assistant and completed-compaction records, so this plugin does not maintain a separate provider pricing table.
 
 ![opencode-cost dashboard showing cost, token, model, project, and daily activity breakdowns](https://raw.githubusercontent.com/ZackarySantana/opencode-cost/main/assets/oc-cost-demo.png)
 
@@ -12,7 +12,7 @@ Published on npm as [`opencode-cost`](https://www.npmjs.com/package/opencode-cos
 
 ## Requirements
 
-- OpenCode 1.18.11 or newer within the 1.x release line
+- OpenCode 2.1.1 or newer within the 2.x release line
 - Bun, which is already used by OpenCode's plugin runtime
 
 The TUI plugin API is new and version-coupled. This package declares an `engines.opencode` range so incompatible OpenCode versions skip it rather than loading an unsupported interface.
@@ -22,15 +22,14 @@ The TUI plugin API is new and version-coupled. This package declares an `engines
 Install globally so usage from every project is recorded:
 
 ```sh
-opencode plugin --global opencode-cost
+opencode plugin add opencode-cost
 ```
 
-The package exposes separate server and TUI entrypoints. OpenCode detects both and updates:
+The package exposes a V2 server plugin at its main entrypoint and a native dashboard at `./tui`. OpenCode automatically loads both from the global server configuration:
 
-- `~/.config/opencode/opencode.json` or `opencode.jsonc` for collection
-- `~/.config/opencode/tui.json` for the native dashboard
+- `~/.config/opencode/opencode.json` or `opencode.jsonc`
 
-Quit and restart OpenCode after installation. Plugin configuration is loaded only at startup.
+For a local checkout, add its absolute directory to `plugins` in that file after building it. Watched configuration changes reload automatically; restart OpenCode if a local build is not picked up.
 
 Then run:
 
@@ -57,36 +56,53 @@ The server plugin stores an idempotent SQLite ledger at:
 <opencode-state>/opencode-cost/cost.sqlite
 ```
 
-Each assistant message is keyed by its OpenCode message ID. Repeated message updates replace the existing values instead of double-counting cost.
+Each usage record is keyed by its OpenCode message ID. Repeated message updates replace the existing values instead of double-counting cost.
 
 Recorded costs remain in the ledger if their original OpenCode session is later deleted. To clear all history, quit OpenCode and remove the database file.
 
 ### Existing sessions
 
-The first time a project is opened with the plugin enabled, its existing sessions are backfilled. A project is marked complete only after every session was read successfully; interrupted imports retry on the next startup. Projects that are never opened after installation cannot be discovered by the server plugin and are imported when they are next opened.
+The first time a project is opened in the terminal with the plugin enabled, its existing sessions are backfilled, including paginated history before compaction and sessions in other worktrees of the same project. A project is marked complete only after every session was read successfully; interrupted imports retry on the next startup. Projects that are never opened after installation are imported when they are next opened.
+
+In V2, historical backfill runs in the terminal plugin because the server plugin context exposes only messages after the latest compaction. Live usage is still collected by the server, including headless sessions. Open the project in the terminal to import any older usage.
+
+The dashboard and collector share a local SQLite file; a dashboard connected to a remote server does not read that server's ledger.
 
 ## Custom Database Path
 
-Both plugin targets accept a `database` option. Configure the same path in `opencode.jsonc` and `tui.json`:
+Both plugin targets accept a `database` option. Configure it in `opencode.jsonc`; the automatically loaded dashboard receives the same options:
 
 ```jsonc
 {
-  "plugin": [["opencode-cost", { "database": "/absolute/path/cost.sqlite" }]]
+  "$schema": "https://opencode.ai/config.json",
+  "plugins": [
+    { "package": "opencode-cost", "options": { "database": "/absolute/path/cost.sqlite" } }
+  ]
 }
 ```
 
 A relative path is resolved from OpenCode's state directory.
 
+## Upgrading from V1
+
+This version uses the [OpenCode V2 plugin API](https://opencode.ai/v2/docs/build/plugins/migrate-v1) and no longer loads in OpenCode 1.x. Use the V2 `plugins` configuration shown above and remove any old explicit `opencode-cost` entry from `tui.json`; V2 uses `cli.json` for terminal-only plugins, but this package's dashboard is loaded automatically with its server plugin.
+
+The SQLite path and schema are unchanged. Existing recorded usage is preserved without conversion.
+
 ## Development
 
+The project pins Bun 1.4.3 with [mise](https://mise.jdx.dev/) and `packageManager` in `package.json`.
+
 ```sh
+mise trust
+mise install
 bun install
-bun test
 bun run typecheck
 bun run build
+bun test
 ```
 
-To load a local checkout, reference its absolute directory in both OpenCode plugin configurations, then restart OpenCode.
+To load a local checkout, reference its absolute directory in `plugins` in `opencode.jsonc`, then restart OpenCode if needed.
 
 ## Data Model
 

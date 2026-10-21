@@ -55,7 +55,7 @@ The agent calls `threads_spawn`, and the worker starts in the background. Your c
 ⠋ 1 worker ctrl+x j
 ```
 
-Press `ctrl+x j` to open the Threads list. Highlight the worker and press **Enter** to open its conversation.
+Press `ctrl+x j` to open the Threads list. Highlight the worker, press **Enter**, and choose **Open** to open its conversation.
 
 When the worker finishes, its report arrives in your conversation. Workers that pass leave the list by themselves. Workers that fail, or stop without a report, stay in the list so you notice them.
 

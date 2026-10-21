@@ -4,7 +4,7 @@
 [![npm downloads](https://img.shields.io/npm/dm/opencode-guardian?color=blue&logo=npm&logoColor=white)](https://www.npmjs.com/package/opencode-guardian)
 [![OpenCode: v1 & v2](https://img.shields.io/badge/OpenCode-v1%20%7C%20v2%20Dual--Mode-10b981?logo=terminal&logoColor=white)](https://opencode.ai)
 [![Historical V1/V2 host baseline](https://img.shields.io/badge/Host%20baseline-historical-10b981?logo=checkmarx&logoColor=white)](docs/acceptance-v1.md)
-[![Tests: 619/619 Passing](https://img.shields.io/badge/Tests-619%2F619%20Passing-339933?logo=githubactions&logoColor=white)](docs/verification-report.md)
+[![Tests: 725/725 Passing](https://img.shields.io/badge/Tests-725%2F725%20Passing-339933?logo=githubactions&logoColor=white)](docs/discipline-coverage.md)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D22.0.0-339933?logo=nodedotjs&logoColor=white)](package.json)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178c6?logo=typescript&logoColor=white)](tsconfig.json)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
@@ -21,21 +21,23 @@ OpenCode Guardian continuously supervises agent turns: guiding model execution b
 
 ![Automated and host acceptance results](docs/assets/verification-overview.svg)
 
-> The graphic separates **v0.11.2 automated verification** from historical V1/V2 host acceptance. A new live-host and interactive TUI acceptance run has not been performed for v0.11.2.
+> The graphic separates **v0.12.1 automated verification** from historical V1/V2 host acceptance. A new live-host and interactive TUI acceptance run has not been performed for v0.12.1.
 
-Guardian **v0.11.2** was checked on **20 October 2026**, using Node **24.22.0**:
+Guardian **v0.12.1** was checked on **20 October 2026**, using Node **24.22.0**:
 
-- **Current Automated Verification:** **619 / 619** unit, security, toast notification, and regression tests passing.
+- **Current Automated Verification:** **725 / 725** unit, security, toast notification, and regression tests passing.
 - **Sandbox Scenarios:** **18 / 18** end-to-end multi-turn agent failure and recovery scenarios verified.
 - **Static Analysis:** standard and strict TypeScript gates pass; Oxlint reports **0 warnings / 0 errors**.
-- **Dependency Audits:** Not rerun for this patch; no dependency versions changed.
-- **Historical Host Acceptance (V1 & V2):** Earlier host results, original versions and test environments remain in the acceptance reports; they are not a new acceptance run for this patch.
+- **Dependency Audits:** Not rerun for v0.12.0; no dependency versions changed.
+- **Historical Host Acceptance (V1 & V2):** Earlier host results, original versions and test environments remain in the acceptance reports; they are not a new acceptance run for v0.12.0.
 
 Read the comprehensive [V1 Acceptance Report](docs/acceptance-v1.md), [V2 Acceptance Report](docs/acceptance-v2.md), and [Verification and Acceptance Report](docs/verification-report.md) for reproduction steps, methodology, and full test matrices.
 
+Guardian **v0.12.1** adds scoped test summaries, observed edit-integrity advisories and contextual rule checks. See [discipline coverage, configuration and limitations](docs/discipline-coverage.md) for the fourteen-rule evaluation, supported formats and evidence boundaries.
+
 ---
 
-See the [0.11.2 release notes](CHANGELOG.md) for Error/serialization redaction, V1 cancellation, session-cache cleanup and permission-classification fixes.
+See the [0.12.1 release notes](CHANGELOG.md) for engine evidence, edit-integrity and contextual discipline improvements.
 
 ## ✨ Key Highlights
 
@@ -120,7 +122,7 @@ To mount the Guardian sidebar in your OpenCode terminal:
 ### 🔽 Collapsed View (Default)
 
 ```text
-▶ Guardian                 v0.11.2
+▶ Guardian                 v0.12.1
 Status                       ● Active
 Interventions                 0w · 0r
 ```
@@ -134,7 +136,7 @@ Interventions                 0w · 0r
 Clicking the `▶ Guardian` header expands the widget:
 
 ```text
-▼ Guardian                 v0.11.2
+▼ Guardian                 v0.12.1
 Preflight                  ○ disabled
 Inspected                           0
 Blocked                             0
@@ -196,16 +198,16 @@ OpenCode Guardian evaluates assistant turns against 14 deterministic rules. Rule
 | **Discipline** | `discipline/no-apology` | `error` | Blocks sycophantic, defensive, or repetitive apology language across multiple languages. |
 | **Quality** | `quality/no-shortcuts` | `error` | Blocks concrete deferred-work phrases (`TODO`, `FIXME`, `HACK`, "will do later"). Ambiguous hedging phrases are flagged as advisory warnings. |
 | **Integrity** | `integrity/no-stubs` | `error` | Blocks `NotImplementedError`, empty function stubs, Rust `todo!()`/`unimplemented!()`, and placeholder returns. |
-| **Integrity** | `integrity/no-unverified-claims` | `error` | Correlates statements like "tests pass" or "build succeeded" against recorded tool exit codes. Direct contradictions block. |
+| **Integrity** | `integrity/no-unverified-claims` | `error` | Correlates success claims with observed outcomes and explicit current passed-test counts with fresh supported summaries. Direct contradictions block. |
 | **Integrity** | `integrity/no-silent-failure` | `error` | Blocks test, build, lint, typecheck, or audit commands masked with `\|\| true`, `exit 0`, or suppressed exit codes. |
-| **Safety** | `safety/no-truncation` | `error` | Blocks lazy edit placeholders (e.g. `// ... rest of code unchanged ...`) that can accidentally truncate production code. |
+| **Safety** | `safety/no-truncation` | `error` | Blocks source edit placeholders; observed whole-file definition loss produces an advisory. Literal examples and documentation are excluded from placeholder checks. |
 | **Safety** | `safety/destructive-operations` | `warn` | Inspects hard resets, force pushes, recursive deletion (`rm -rf`), database drops, and unpublish actions. Plain `rm` requires explicit scoped user consent. |
 | **Testing** | `testing/no-cheat` | `error` | Blocks malicious test tampering: targeted `describe.skip`, `it.skip`, `test.skip`, `fit`, or assertion stripping in test files. |
 | **Security** | `security/no-secrets` | `error` | Blocks hardcoded API keys (OpenAI, Anthropic, Google, AWS, GitHub, Slack, Stripe, JWTs, private keys, database URLs with passwords). |
-| **Manifest** | `manifest/no-ghost-deps` | `error` | Blocks undeclared third-party imports not found in `package.json`, `pyproject.toml`, `requirements.txt`, `go.mod`, or `Cargo.toml`. Local modules and stdlib are recognized. |
-| **Runtime** | `runtime/circuit-breaker` | `error` | Blocks repetitive failing commands hitting identical errors 3 times consecutively without progress, breaking runaway agent loops. |
-| **Task** | `task/instruction-fidelity` | `error` | Prevents historical refusals and redundant confirmation handoffs from overriding the user's current explicit action. |
-| **Task** | `task/completion-gate` | `error` | Ensures requested verifications (fresh test execution, post-change source inspection) are observed before the agent declares completion. |
+| **Manifest** | `manifest/no-ghost-deps` | `error` | Blocks undeclared third-party imports. Runtime JS/TS imports declared only in dev dependencies are advisory unless `productionOnly` is enabled; type-only/test/build imports retain exceptions. |
+| **Runtime** | `runtime/circuit-breaker` | `error` | Blocks identical execution failures repeated 3 times without progress. Explicit user cancellations do not count as faults. |
+| **Task** | `task/instruction-fidelity` | `error` | Checks narrow English/Turkish research-only constraints against observed actions and prevents historical refusals or redundant confirmation handoffs from overriding current instructions. |
+| **Task** | `task/completion-gate` | `error` | Requires observed requested verification. Recognized zero-test, skipped-only and conflicting summaries cannot satisfy a required test run. |
 
 ---
 
@@ -252,12 +254,15 @@ Guardian works out of the box with zero configuration. You can customize rules a
 - `"warn"`: Recorded in telemetry and displayed in TUI, but does not interrupt agent flow.
 - `"off"`: Completely disables the rule.
 
+Runtime dev-only imports are advisory by default. To enforce production dependency declarations, configure `"manifest/no-ghost-deps": { "severity": "error", "productionOnly": true }` inside `rules`. This uses file-role conventions rather than a bundler/reachability analysis. See [configuration and detection boundaries](docs/discipline-coverage.md#configuration).
+
 ---
 
 ## 🌐 Task Contracts & Multilingual Support
 
 When a user submits an instruction, Guardian extracts a deterministic task contract before model execution. Supported intent patterns include:
 - **Languages Supported:** English, Turkish, Spanish, Portuguese, French, German, Russian, Arabic, Hindi, Chinese, Japanese, Korean, and Indonesian.
+- **Research-Only Constraints:** The new mutation/install/push checks recognize narrow English and Turkish research-only phrases; this narrower check does not cover all thirteen task-contract languages.
 - **Verification Modes:** Requires observable evidence (e.g. running tests, building, typechecking, or performing a fresh post-change file inspection).
 - **Explicit Header Directive (Optional):** For deterministic contract specification regardless of natural language phrasing:
 
@@ -270,7 +275,7 @@ Please refactor the authentication service and verify all tests pass.
 
 ## 🔒 Preflight Shell Protection (Opt-In)
 
-By default, Guardian analyzes operations after tool execution. To block recognized destructive shell commands and hardcoded secrets in supported file writes **before execution**, explicitly enable preflight:
+By default, Guardian analyzes operations after tool execution. To block recognized destructive shell commands, hardcoded secrets and source truncation placeholders in supported file writes **before execution**, explicitly enable preflight:
 
 ```json
 {
@@ -281,7 +286,7 @@ By default, Guardian analyzes operations after tool execution. To block recogniz
 ```
 
 - Intercepts recognized destructive commands (`rm -rf /`, scoped/unscoped `git reset --hard` and forced pushes, `DROP DATABASE`, `mkfs`, common literal fork-bomb signatures, encoded base64-to-shell pipelines).
-- Operates at the host hook level (`tool.execute.before` in v1, `ctx.tool.hook("execute.before")` in v2). Recognized file-writing actions (including `mcp__Node_Command__file_mutate`) also check inspectable content and replacement edits for potential hardcoded secrets.
+- Operates at the host hook level (`tool.execute.before` in v1, `ctx.tool.hook("execute.before")` in v2). Recognized file-writing actions (including `mcp__Node_Command__file_mutate`) also check inspectable content and replacement edits for potential hardcoded secrets and source truncation placeholders.
 
 Standard MCP tool IDs ending in recognized shell actions (for example `mcp__provider__shell_exec`) are inspected automatically. For an MCP or custom tool with an unrecognized execution action, explicitly opt it in:
 
@@ -386,9 +391,9 @@ flowchart TD
     Outcome -->|Evidence insufficient| Unverified[remediation-unverified]
 ```
 
-The diagram illustrates the v0.11.2 dual-mode runtime. Strict preflight is **opt-in** and evaluates recognized or configured tools; an out-of-scope tool is still governed by host permissions. Tool-after observations and SHA-256 file snapshots are captured **when the host supplies supported evidence**. After a remediation, only supported, observable follow-up evidence can establish `remediation-verified`.
+The diagram illustrates the v0.12.0 dual-mode runtime. Strict preflight is **opt-in** and evaluates recognized or configured tools; an out-of-scope tool is still governed by host permissions. Tool-after observations and SHA-256 file snapshots are captured **when the host supplies supported evidence**. Supported whole-file writes also use before/after observations for advisory content-loss detection; missing before hooks cannot reconstruct old file content. After a remediation, only supported, observable follow-up evidence can establish `remediation-verified`.
 
-For delegated subagent work (`task` on V1, `subagent` on V2), v0.11.2 enforces capability-aware remediation isolation with strict tool-failure verification: write-capable agents cannot bypass concrete unresolved failures by merely reporting them, read-only subagents fail-safe to avoid loops without synthetic prompts, instruction-fidelity violations block with high confidence, lifecycle teardown uses reverse-splice idempotent disposal, and per-rule fingerprint remediation budgeting prevents infinite repetition while allowing distinct substantive errors to be fixed. Furthermore, v0.11.2 features accurate post-turn inspection telemetry counting, robust V2 subagent handoff recognition across metadata and structured outputs, evidence trust boundaries, per-file patch attribution, credential redaction in telemetry and secret sanitizers, idle queue coalescing with stable turn inspection, Windows command stage parsing, rollback budget preservation, preflight/verification hook isolation, color-coded user toast notifications, and synthetic remediation assertions.
+For delegated subagent work (`task` on V1, `subagent` on V2), Guardian preserves capability-aware remediation isolation: write-capable agents retain bounded remediation, read-only subagents avoid synthetic remediation loops, and per-rule fingerprints distinguish substantive errors. Teardown remains idempotent. Both adapters share evidence normalization, per-file patch attribution, credential redaction, idle coalescing, Windows command parsing, preflight/verification hook isolation and toast notifications.
 
 ---
 

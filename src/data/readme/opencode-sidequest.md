@@ -51,6 +51,13 @@ OpenCode installs the package automatically. Terminal clients also load its
 `./tui` export; other clients load only the server half. Restart OpenCode after
 changing the plugin configuration.
 
+The package ships the terminal half compiled (`dist/tui.js`). OpenCode applies its
+Solid transform only to files outside `node_modules`, so an installed package that
+shipped the TSX would paint its panel once and never update it: the page tabs would
+not change, the key hints would stay on their first text, and the MCP list would not
+collapse. A checkout loaded by path does not show that failure, because OpenCode
+compiles those files itself.
+
 ### From a checkout
 
 For local development, replace the package spec with the checkout's absolute path:
@@ -290,6 +297,7 @@ behavior below was driven through a real OpenCode client in an isolated tmux, as
 | Panel pages, `y` `o`, drag and double-click resize, fullscreen | Checked in a real terminal with an isolated tmux client, injecting mouse drags |
 | Opening a step in the panel, messaging it, `Esc` back out, `g` | Checked the same way: a typed message reached the step and its reply showed in the panel |
 | Auto-open on a run, auto-close, following across tabs, the `ctrl+g` flip, `<leader>b` | Checked the same way |
+| Packed tarball installed under `node_modules`, as npm would | Checked in OpenCode 2.1.1 with an isolated tmux client: `ctrl+g` focuses the panel, the key hints follow focus, and `y` and `o` change pages. The MCP collapse was not re-checked |
 | `focusKey: "<leader>p"` with a Ctrl+G leader | Checked in OpenCode 2.0.32 with an isolated tmux client: opens the panel, switches focus both ways, and updates footer and Help shortcuts |
 | `<leader>o` from a step | Checked the same way; it is a plugin command because OpenCode's `session.parent` did not fire in a step's session |
 | Session page against OpenCode's sidebar | Same data and layout, checked by eye; it is a copy, so a change in OpenCode's sidebar will not follow |
@@ -316,7 +324,17 @@ not a reproduction of the reported session switch.
 npm install
 npm test
 npm run typecheck
+npm run build
+npm run verify-pack
 ```
+
+`npm run build` compiles `tui.tsx` into `dist/tui.js` (ignored by Git), and `npm pack`
+and `npm publish` build first. `npm run verify-pack` packs the package the way
+`npm publish` does, unpacks the tarball, and checks that `exports["./tui"]` names
+compiled JavaScript, that the compiled file contains no JSX or automatic JSX runtime
+and imports `effect` from `@opentui/solid`, and that every relative import resolves
+inside the tarball. Verify a change to the terminal half through an npm install of the
+packed tarball, not only a path load, because a path load hides the failure above.
 
 Linting and the other checks run through [prek](https://prek.j178.dev/), locally on
 every commit and in CI. The type check and the tests are hooks too, so run
@@ -336,6 +354,7 @@ prek run --all-files
 | markdownlint-cli2 | Markdown, configured in `.markdownlint.yaml` |
 | biome-ci | TypeScript and JavaScript lint rules, configured in `biome.jsonc`; read-only, with the formatter off |
 | typecheck, test | `tsc --noEmit` and the `node:test` suites |
+| verify-pack | `npm pack` plus a check that the tarball ships the compiled terminal half |
 
 CI runs the same hooks from `.github/workflows/ci.yaml`, which calls the reusable
 `.github/workflows/prek.yaml`.
@@ -345,9 +364,11 @@ CI runs the same hooks from `.github/workflows/ci.yaml`, which calls the reusabl
 | `index.ts` | Server plugin: scheduler, tools, storage, RPC |
 | `dag.mjs` | Pure logic: validation, state transitions, prompts, status table |
 | `rpc.ts` | RPC and run schema shared by both halves |
-| `tui.tsx` | Terminal plugin: panel, strip, keys |
+| `tui.tsx` | Terminal plugin: panel, strip, keys; shipped compiled as `dist/tui.js` |
 | `layout.mjs` | Pure rendering of the graph, strip, and detail card |
 | `panel-state.mjs` | Pure decisions: when to open and close, selection, run store |
+| `scripts/build.mjs` | Compiles `tui.tsx` into `dist/` with OpenCode's Solid transform |
+| `scripts/verify-pack.mjs` | Packs the package and checks the tarball ships the compiled terminal half |
 | `test/` | `node:test` suites |
 
 Tests need `typescript` to load the server plugin. One test decodes every

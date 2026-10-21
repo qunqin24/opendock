@@ -29,7 +29,7 @@ Restart OpenCode after saving. On first run the bridge downloads the listed plug
 Paste this to your agent:
 
 ```text
-Add "@nathwn12/oc-bifrost@1.6.5" to the plugins array in my OpenCode V2 opencode.jsonc with options {"plugins": ["github:obra/superpowers"], "trustRemote": true}. Restart OpenCode, then run `opencode plugin check` and `opencode plugin list`, and report the oc-bifrost mount lines plus any unsupported hooks.
+Add "@nathwn12/oc-bifrost@1.6.9" to the plugins array in my OpenCode V2 opencode.jsonc with options {"plugins": ["github:obra/superpowers"], "trustRemote": true}. Restart OpenCode, then run `opencode plugin check` and `opencode plugin list`, and report the oc-bifrost mount lines plus any unsupported hooks.
 ```
 
 ### Wire it yourself
@@ -57,14 +57,14 @@ Pin the exact release instead of tracking latest:
 {
   "plugins": [
     {
-      "package": "@nathwn12/oc-bifrost@1.6.5",
+      "package": "@nathwn12/oc-bifrost@1.6.9",
       "options": { "plugins": ["preset:rtk"] }
     }
   ]
 }
 ```
 
-`@1.6.5` equals the current npm `latest` tag. `preset:rtk` runs with zero network; a cold `github:` fetch needs network plus `trustRemote`.
+`@1.6.9` equals the current npm `latest` tag. `preset:rtk` runs with zero network; a cold `github:` fetch needs network plus `trustRemote`.
 
 ## Use it
 
@@ -106,7 +106,7 @@ If your `github:obra/superpowers` mount refuses with a missing package because i
 - OpenCode V2 (`opencode --version` reports `2.x`).
 - Node 22 or later (`node --version`).
 - The npm registry reachable for the first fetch; `preset:rtk` needs no network but needs the `rtk` binary on `PATH`.
-- Peer `@opencode/plugin@2.0.30`, supplied by your host — you install nothing extra.
+- Peer `@opencode/plugin@2.1.1`, supplied by your host — you install nothing extra.
 
 ## Links
 

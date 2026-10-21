@@ -60,9 +60,12 @@ a chat-with-your-agent relay, it never injects text into your sessions.
   toast appears on tap; on next OpenCode restart older buttons answer politely
   with "outdated" instead of dying silently.
 - ❓ **Questions** (v2 `form.*`) answered in chat: single-select questions
-  arrive as tap buttons (answer or ⏹ skip → `question.reply` / `reject`),
-  other question types stay notify-only with the terminal pointer, and
-  pending questions survive restarts (`question.list` recovery).
+  arrive as tap buttons (answer via `session.form.reply` when available,
+  otherwise `question.reply`; skip via `question.reject`), other question types
+  stay notify-only with the terminal pointer, and pending questions survive
+  restarts (`question.list` recovery). When the host exposes no reply surface
+  (OpenCode 2.1.1 currently exposes none), the message is notify-only with the
+  terminal pointer instead of showing dead buttons.
 - ✅ / ❌ / ⏹ **Lifecycle events** — completion (debounced so mid-run pauses
   don't spam), failure with error type, cancellation (silent).
 - 🤖 **Bot command menu** — `/start`, `/status`, `/setup`, `/stop`, `/help`
@@ -78,7 +81,7 @@ a chat-with-your-agent relay, it never injects text into your sessions.
 
 ## Requirements
 
-- OpenCode **v2** (tested on 2.0.32) or **v1** (the hooks-based
+- OpenCode **v2** (tested on 2.1.1) or **v1** (the hooks-based
   `@opencode-ai/plugin` contract, e.g. the 1.x line). v1 has no per-plugin
   options, so its configuration is environment-driven only.
 - A Telegram bot token (via [@BotFather] — takes one minute) and the chat id of
@@ -181,7 +184,6 @@ All options live under `options.` of the plugin entry. Only `botToken` and
 | `interactions` | boolean | `true` | When `false`, permissions go out as simple messages (no buttons) |
 | `idleDebounceMs` | number | 60000 | Wait after `execution.succeeded` before pinging you; any new activity cancels it |
 | `idleCooldownMs` | number | 600000 | Min gap between completion notifications for the same session — conversational pauses never spam (0 disables) |
-| `dedupTtlMs` | number | 120000 | Reserved window for dedupe bookkeeping |
 | `maxMessageChars` | number | 3800 | Max body length (Telegram hard limit is 4096) |
 | `hideCommands` | boolean | `false` | Replace shell/tool arguments with `[n]` in bodies |
 | `logFile` | string | off | Append-only debug log path (token-redacted, one line per event) |
@@ -258,13 +260,14 @@ Deliberately not scheduled; revisit when they earn their complexity:
 - menu-style settings keyboard (runtime config writes are outside the
   current plugin surface);
 - reply-to-message → in-session notes (extra control channel);
-- multi-field question wizards (open, keep notify-only for now).
+- multi-field question wizards (open, keep notify-only for now);
+- use `session.form.cancel` as the skip surface when a host exposes it.
 
 ## Development
 
 ```sh
 bun install     # dev only: typescript + @types/bun
-bun run ci      # typecheck + tests
+bun run ci      # lint + typecheck + tests
 bun run typecheck
 bun test
 ```

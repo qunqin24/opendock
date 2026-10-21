@@ -30,13 +30,19 @@ grants for the executable and its dependencies.
 ```
 
 ```sh
-npx landstrip -p policy.json -- cargo test
+npx landstrip run -p policy.json -- cargo test
 npx landstrip check -p policy.json
+npx landstrip capabilities
 npx landstrip doctor
 ```
 
 See [landstrip(1)](packages/landstrip/man/man1/landstrip.1) for CLI options,
 policy rules, and platform limits.
+
+On Linux, commands always run in new user, PID, and mount namespaces with a
+private `/proc`. Landlock and seccomp still enforce filesystem and network
+policy. Execution fails closed when namespaces are unavailable; `check`,
+`doctor` and `capabilities` report the kernel error.
 
 ## Integrations
 

@@ -54,7 +54,7 @@ The sidebar shows when space allows (`session.sidebar: "auto"`). Toggle it with 
 |---|---|
 | Click the **Changes** title | Collapse / expand the section |
 | Click a file row | Open the diff viewer (session source) |
-| `Ctrl+P` → **Changes: toggle collapse** | Same collapse, keyboard-only |
+| `Ctrl+P` → **Toggle collapse** (Changes group) | Same collapse, keyboard-only |
 
 Collapse state is persisted per TUI instance.
 

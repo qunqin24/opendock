@@ -363,13 +363,14 @@ Apache-2.0 — see [LICENSE](LICENSE).
 
 ## Publishing
 
-Version table (independent per-artifact versioning):
+Version table (house convention: the npm packages stay version-aligned
+with the Python CLI, pinned by `tests/unit/test_package.py`):
 
 | Artifact | Registry | Version | Publish command |
 | --- | --- | --- | --- |
 | `zft` (Python) | PyPI | 0.3.0 | `python -m build && twine upload dist/*` |
-| `opencode-zft` | npm | 0.3.0 | `cd packages/opencode-zft && npm publish` |
-| `pi-zft` | npm | 0.3.0 | `cd packages/pi-zft && npm publish` |
+| `opencode-zft` | npm | 0.3.0 | `cd packages/opencode-zft && npm stage publish` → `npm stage approve <id>` |
+| `pi-zft` | npm | 0.3.0 | `cd packages/pi-zft && npm stage publish` → `npm stage approve <id>` |
 | flockwork harness | PyPI | 0.4.0 | separate repository |
 
 Publishing flow (JS adapters):
@@ -381,9 +382,12 @@ Publishing flow (JS adapters):
    deploy alongside.
 3. Bump the version in the package's `package.json` and record it in
    `CHANGELOG.md` (this table too).
-4. `npm publish` from the package directory — `prepublishOnly` re-runs the
-   sync in copy+assert mode, so a stale deploy or a stale `core/` copy
-   fails the publish rather than shipping.
+4. `npm stage publish` from the package directory (requires npm ≥ 12 and a
+   staging token) — `prepublishOnly` re-runs the sync in copy+assert mode,
+   so a stale deploy or a stale `core/` copy fails the publish rather than
+   shipping. Then `npm stage approve <stage-id>`; the registry asks for a
+   one-time browser password, which only an interactive terminal can
+   provide.
 
 Install (consumers): `npm i -g opencode-zft` wires the opencode plugin;
 `pi-zft` installs by copying the package into

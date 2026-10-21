@@ -3,6 +3,7 @@
 [![opencode v2](https://img.shields.io/badge/opencode-v2-orange.svg)](#requirements)
 [![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![release](https://img.shields.io/github/v/tag/LeonVeganMan/opencode-go-meter?label=release)](https://github.com/LeonVeganMan/opencode-go-meter/releases)
+[![OpenDock](https://img.shields.io/badge/OpenDock-listed-orange)](https://www.opendock.net/plugins/opencode-go-meter/)
 [![npm](https://img.shields.io/npm/v/opencode-go-meter)](https://www.npmjs.com/package/opencode-go-meter)
 [![tests](https://img.shields.io/badge/tests-bun%20test-informational.svg)](#development)
 

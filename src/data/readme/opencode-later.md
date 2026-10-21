@@ -22,10 +22,10 @@ Published on npm as [`opencode-later`](https://www.npmjs.com/package/opencode-la
 
 ## Requirements
 
-- OpenCode 1.18.12 or newer within the 1.x release line
+- OpenCode 2.1.1 or newer within the 2.x release line
 - Bun, which is already used by OpenCode's plugin runtime
 
-The TUI plugin API is new and version-coupled. This package declares an `engines.opencode` range so incompatible OpenCode versions skip it rather than loading an unsupported interface.
+This is a V2 plugin, using `@opencode/plugin` and OpenTUI 0.6.6 or newer. It does not support OpenCode V1.
 
 The sidebar works in the terminal TUI. It does not appear in the desktop application or `opencode --mini`.
 
@@ -34,15 +34,21 @@ The sidebar works in the terminal TUI. It does not appear in the desktop applica
 Install globally so the same list is available from every project:
 
 ```sh
-opencode plugin --global opencode-later
+opencode plugin add opencode-later
 ```
 
-The package exposes separate server and TUI entrypoints. OpenCode detects both and updates:
+Alternatively, add the package to the global `~/.config/opencode/opencode.jsonc` (or `opencode.json`), preserving any existing settings:
 
-- `~/.config/opencode/opencode.json` or `opencode.jsonc`
-- `~/.config/opencode/tui.json` for commands, the sidebar, and the native management view
+```jsonc
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugins": ["opencode-later"]
+}
+```
 
-Quit and restart OpenCode after installation. Plugin configuration is loaded only at startup.
+The package exposes a main server entrypoint and a `./tui` entrypoint. V2 automatically loads the terminal component from the server's plugin list; no duplicate terminal configuration is needed. For terminal-only loading (including remote servers), put the same `plugins` entry in `~/.config/opencode/cli.json` instead.
+
+V2 watches configuration for changes. Restart OpenCode if the plugin does not appear after installation.
 
 Then run:
 
@@ -87,32 +93,45 @@ The plugin stores its SQLite database at:
 <opencode-state>/opencode-later/later.sqlite
 ```
 
-This is plugin-owned global storage and does not use OpenCode's database. SQLite WAL mode and transactions allow multiple active OpenCode processes to read and update the list safely.
+This is plugin-owned global storage and does not use OpenCode's database. The state directory is `$XDG_STATE_HOME/opencode`, or `~/.local/state/opencode` by default. SQLite WAL mode and transactions allow multiple active OpenCode processes to read and update the list safely.
+
+The database location and schema are unchanged from V1, so existing active items, order, and completed history are retained without conversion.
 
 To clear all active items and history, quit OpenCode and remove the database file.
 
 ## Custom Database Path
 
-Both plugin targets accept a `database` option. Configure the same path in `opencode.jsonc` and `tui.json`:
+Set the `database` option on the plugin entry in `opencode.jsonc` (or `cli.json` for terminal-only loading):
 
 ```jsonc
 {
-  "plugin": [["opencode-later", { "database": "/absolute/path/later.sqlite" }]]
+  "plugins": [
+    {
+      "package": "opencode-later",
+      "options": { "database": "/absolute/path/later.sqlite" }
+    }
+  ]
 }
 ```
 
 A relative path is resolved from OpenCode's state directory.
 
+## Migrating from V1
+
+Install this V2 implementation and replace the old `plugin` entry with the `plugins` format above. Remove the old entry from `tui.json`; V2 terminal-only plugins use the global `cli.json` instead. Keep any custom `database` option pointing to the same file. Do not configure the package in both `opencode.jsonc` and `cli.json`.
+
+The port follows the official [plugin migration guide](https://opencode.ai/v2/docs/build/plugins/migrate-v1) and [CLI plugin API](https://opencode.ai/v2/docs/build/plugins/cli).
+
 ## Development
 
 ```sh
 bun install
-bun test
+bun run test
 bun run typecheck
 bun run build
 ```
 
-To load a local checkout, reference its absolute directory in both OpenCode plugin configurations, then restart OpenCode.
+After building, load a local checkout by adding its absolute directory to `plugins` in `opencode.jsonc` (or the global `cli.json` for terminal-only loading). Restart OpenCode after rebuilding if necessary.
 
 ## Data Model
 

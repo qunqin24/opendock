@@ -41,10 +41,10 @@ Global configuration is `~/.config/opencode/opencode.jsonc` (or the OpenCode con
 
 Restart/reload OpenCode and look for `context-guard: observe; diagnostics ...`. Observe mode records policy decisions and never requests compaction; OpenCode's own automatic compaction remains active. Inspect diagnostics first, then set `mode` to `enforce` to admit native compaction at runtime step boundaries. The complete [example](examples/opencode.jsonc) includes model, role, and agent policies. **Last matching rule wins**; selectors within a rule are ANDed.
 
-For a known-good published version, pin the exact version in the existing entry's `package` field or use the manager. Use `0.1.0` only after this project publishes that version.
+Pin the exact published version in the existing entry's `package` field or use the manager. Version `0.2.3` restores context usage for existing sessions when the plugin is enabled and keeps stale occupancy visible.
 
 ```sh
-opencode plugin add @cesarus777/opencode-cgp@0.1.0
+opencode plugin add @cesarus777/opencode-cgp@0.2.1
 ```
 
 Manage the configured target with the [official V2 CLI](https://dev.opencode.ai/v2/docs/plugins):
@@ -96,9 +96,15 @@ A provider measurement refers to its **completed request**, not the next assembl
 
 ## Native TUI
 
-Open `/context-guard` or **Open Context Guard** in the command palette for current prompt occupancy, effective input capacity, trigger/headroom, measurement freshness, compaction phase and nested agent status. A native sidebar section appears where the host mounts its sidebar; the panel also works on child routes and narrow terminals. Estimates, unknown values, stale measurements and uncertain compaction remain explicit.
+Open `/context-guard` or **Open Context Guard** in the command palette for current prompt occupancy, effective input capacity, trigger/headroom, measurement freshness, compaction phase and nested agent status. A native sidebar section appears where the host mounts its sidebar; the panel also works on child routes and narrow terminals. The main session includes a live context chart scaled to its full effective input capacity, with a horizontal compaction threshold and recent usage samples. Key values stay visible as text. Estimates, unknown values, stale measurements and uncertain compaction remain explicit.
 
 The TUI reads bounded snapshots over public OpenCode RPC, including when telemetry is disabled. Remote clients also need a client-side package registration in `cli.json`; see [the example](examples/cli.jsonc) and [controls, installation and bounds](docs/configuration.md#native-context-guard-view). It targets the inspected 2.0.29 API. The actual local host passes wide root, child and narrow grandchild panel checks. Use **Context Guard: open panel** above a child composer, where the host hides its usual prompt and palette shortcut. tmux, Neovim and cross-machine remote validation remain open.
+
+Enabling Context Guard after work has already started also shows the last reported prompt usage for idle sessions and subagents. Opening the sidebar or panel restores it from the public session context, preserving its original age and **STALE** label. Stale usage still shows tokens and occupancy percentage. Restoration respects model changes, reverts and completed compactions; unavailable provider usage stays unknown. These reads never request compaction, and transcript content is never retained or sent through the plugin RPC.
+
+Per-session live TPS, average model throughput, average session throughput and observed TTFT appear in the selected session and child rows. Live TPS and TTFT use `~` to mark estimates; completed rates use provider totals. Configurable local history defaults to seven days with a 64 MiB total cap, independently of diagnostic telemetry. See [metric definitions and history exports](docs/configuration.md#live-performance-and-retained-history).
+
+Press **c** in the Context Guard panel for retained-history terminal charts. View one metric at a time with **Left / Right**, change the time window with **[ / ]**, and select an agent instance with **Up / Down**. Press **c** to return or **q** to close the panel; controls stay visible below the scrollable content. Generate a self-contained interactive browser report with `bun run charts /absolute/history-directory --output report.html`. It includes filters, UTC timestamp tooltips, request statistics and SVG export. Installed packages expose the same command as `context-guard charts ...` (Bun required). See [chart controls and limits](docs/configuration.md#performance-charts).
 
 ## Inspect
 

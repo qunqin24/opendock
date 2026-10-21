@@ -213,8 +213,9 @@ deliberately *not* injected, are in
 Agents are stateless between tasks, and exploring your repository is the most
 expensive part of any task — so every agent pays for it again, re-deriving the
 same layout, entry points and boundaries from scratch. LaCode keeps a short,
-maintained map of the repository in `.opencode/context/` (five files:
-`architecture`, `contexts`, `conventions`, `workflows`, `decisions`) and injects
+maintained map of the repository in `.opencode/context/` (five navigation files:
+`architecture`, `contexts`, `conventions`, `workflows`, `decisions`, plus
+`active.md` — the active backlog) and injects
 a standing rule that every agent reads the relevant file before exploring and
 starts from the canonical entry points it lists. The map holds conclusions, not
 inventories: it answers "what should I look at first?" and nothing else, which
@@ -251,7 +252,7 @@ in [docs/CONTEXT.md](docs/CONTEXT.md).
 The project's root `AGENTS.md` is your own statement of intent: it records
 what you want worked on and how you want it approached. It says nothing about
 where code lives, so it can never contradict the code, and within that domain
-it outranks the five generated context files and any agent's inference about what
+it outranks the generated context files and any agent's inference about what
 matters right now.
 
 The file is per-clone and not committed, so it is yours rather than shared
@@ -369,7 +370,7 @@ want it.
 | [Install and troubleshooting](docs/INSTALL.md) | Where opencode puts the package, what to do when the agents are missing, the version matrix, macOS differences, and the `lacode` CLI. |
 | [Configuration reference](docs/CONFIGURATION.md) | Every plugin option, how the pool resolves its slots, per-agent tool grants, and exactly what gets written into your config. |
 | [OmniRoute gateway](docs/OMNIROUTE.md) | The optional local gateway integration: setup, full option set, a latency-measured free combo, and its troubleshooting table. |
-| [Context map](docs/CONTEXT.md) | The mechanism behind `.opencode/context/` — the one-writer permission rule, the five files, and what the log lines mean. |
+| [Context map](docs/CONTEXT.md) | The mechanism behind `.opencode/context/` — the one-writer permission rule, the files, and what the log lines mean. |
 | [Remote hosts and notifications](docs/TUNNEL.md) | The SSH notification hop, payload format, receiver contract, and holding the forward open. |
 | [Benchmarks](docs/BENCHMARKS.md) | How the cost harness works, and why it deliberately publishes no savings number. |
 | [User stories](docs/USER-STORIES.md) | The behavioural contracts behind all of the above, written so a test can assert them. |

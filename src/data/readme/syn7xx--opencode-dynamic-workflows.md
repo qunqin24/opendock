@@ -6,7 +6,7 @@
   <a href="https://www.npmjs.com/package/@syn7xx/opencode-dynamic-workflows"><img alt="npm" src="https://img.shields.io/npm/v/@syn7xx/opencode-dynamic-workflows?color=fab283&label=npm"></a>
   <a href="https://github.com/syn7xx/opencode-dynamic-workflows/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/syn7xx/opencode-dynamic-workflows/actions/workflows/ci.yml/badge.svg"></a>
   <a href="LICENSE"><img alt="MIT license" src="https://img.shields.io/badge/license-MIT-9d7cd8"></a>
-  <img alt="OpenCode 2.0.16 or newer" src="https://img.shields.io/badge/OpenCode-%E2%89%A5%202.0.16-7fd88f">
+  <img alt="OpenCode 2.1.0 or newer" src="https://img.shields.io/badge/OpenCode-%E2%89%A5%202.1.0-7fd88f">
   <img alt="macOS, Linux, Windows" src="https://img.shields.io/badge/platforms-macOS%20%C2%B7%20Linux%20%C2%B7%20Windows-808080">
   <a href="docs/integrating.md"><img alt="Protocol v1, OpenAPI 3.1" src="https://img.shields.io/badge/protocol-v1%20%C2%B7%20OpenAPI%203.1-56b6c2"></a>
 </p>
@@ -113,7 +113,7 @@ it writes a Workflow for the task at hand and runs it with `workflow_inline` onc
 
 ## Requirements
 
-- [OpenCode](https://opencode.ai) **2.0.16** or later. The plugin uses the V2 plugin API and does not work with
+- [OpenCode](https://opencode.ai) **2.1.0** or later. The plugin uses the V2 plugin API and does not work with
   OpenCode V1.
 - Any model OpenCode can use. Typed results work best with models that call tools reliably; for the others the engine
   falls back to JSON in the reply, repair turns and an extraction call.
