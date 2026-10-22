@@ -71,6 +71,7 @@ For another MCP client, configure it to launch your installed binary:
 gmem remember "Use nextest for integration tests" \
   --type convention --scope repo:/absolute/path/to/project
 gmem search "integration tests"
+gmem tokens --over-limit   # memories the embedding model truncates
 gmem tui
 gmem mcp
 ```
@@ -79,7 +80,8 @@ Memories default to the current Git repository; `git` must be on `PATH`.
 Outside a repository, the default scope is `global`. Reads always include global
 memories; explicitly select other projects with `--scope` (CLI) or `scopes` (MCP).
 Writes are limited to the current repository and `global`, including updates and
-deletions. The MCP `list_scopes` tool discovers scopes and their write permissions.
+deletions. The MCP `list_scopes` tool discovers scopes and their write permissions;
+`list` pages through the memories of a selection.
 Data lives in `~/.graphmem`; set `GRAPHMEM_HOME` to use another directory.
 
 [CLI reference](docs/cli.md) · [MCP tool reference](docs/mcp.md)

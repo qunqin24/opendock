@@ -6,7 +6,7 @@ Retrospectives for coding agents. An [OpenCode](https://opencode.ai) v2 plugin t
 
 An agent does not learn from its own sessions. The only record of where it struggled is the log, and logs go unread. This plugin reads the log and comes back with proposals.
 
-> Status: complete and working, verified against OpenCode 2.0.32. The npm package goes live with `v0.1.0`; until that tag lands, point `opencode.json` at a checkout.
+> Status: complete and working, verified against OpenCode 2.0.32. The npm package is `opencode-retro`; `v0.1.0` is its first release with functionality.
 
 ## The problem
 
@@ -37,7 +37,7 @@ When a session ends its log is kept, and by default nothing further happens unti
 
 Each log is analysed in a session of its own, created for that one call and removed afterwards: the log goes in, no agent, no history and no tools are involved, and text comes out. The agent that did the work is deliberately excluded, since it would defend its own decisions.
 
-Sessions that have not finished are read as well, including the one the command was run in: their friction is the most recent there is. Nothing about them is settled, though. The log is not marked analysed, because the session will have more to say, and it is not removed while the session is working. A working session is read again only once its log has grown, so running `/retro` twice costs nothing for a session that has said nothing new.
+Sessions that have not finished are read as well, including the one the command was run in: their friction is the most recent there is. Nothing about them is settled, though. The log is not marked analysed, because the session will have more to say, and it is not removed while the session is working. A working session is read again only once its log has grown, and then only the part that is new: what has already become a lesson is not analysed a second time. Sessions that are left open and returned to are the normal case, so without that a `/retro` weeks later would re-read everything and re-derive lessons that were already acted on.
 
 A session is skipped without a call only when it cannot contain evidence of anything: one instruction, one answer, nothing done. A conversation with no tool calls at all is still analysed, because that is exactly where a wrong instruction file shows up — a wrong answer and a correction, with nothing executed.
 
@@ -66,7 +66,7 @@ The criteria are not compiled into the plugin. They live in [`prompts/extract.md
 
 The file states that this is a starting point and not a checklist.
 
-### Review
+### Propose
 
 The plugin reads the log. The human reads proposals. It stops at the proposal and does not edit project files.
 
@@ -176,7 +176,7 @@ OpenCode fetches the plugin from npm; name it in `opencode.json`:
 
 `options.model` is optional. Without it the plugin uses the model your sessions run on, falling back to the workspace default. `.retro/selfcheck.md` reports whether an analysis ran, and why it failed if it did not.
 
-To run a checkout instead — when working on the plugin itself — point `package` at its absolute path. A relative path leaves session startup hanging without an error.
+**Check what npm actually has first.** Every version below `0.1.0` is a name placeholder: it loads without error, registers no command, creates no `.retro/`, and reports nothing — so following this snippet before the first real release leaves you with a session that looks normal and a plugin that is not there. If `npm view opencode-retro version` is below `0.1.0`, point `package` at an absolute path to a checkout instead; that is also how you run it while working on the plugin. A relative path leaves session startup hanging without an error, and an exact version can be pinned (`opencode-retro@0.1.0`) once there is one.
 
 Everything else is optional:
 
@@ -186,7 +186,7 @@ Everything else is optional:
 - `proposeLimit` — lessons in one `/retro all`, default ten.
 - `extractLimit` — logs analysed by one `/retro`, unlimited by default.
 - `maxOutput` — characters of tool output stored in the shadow log per step, default 8000.
-- `maxInput` — characters one analysis may send, default 32000. Past a limit of its own the model returns an empty answer rather than an error, so a long log is trimmed to fit: less tool output first, then whole steps from the middle, each gap saying how many went.
+- `maxInput` — characters one analysis may send, default 32000. A long log is trimmed to fit: less tool output first, then whole steps from the middle, each gap saying how many went. This bounds the cost, not the answer: on some models the reply comes back empty rather than as an error, more often the longer the input, so an empty reply is asked again at half the size and then at a quarter. A log that still gets no answer is tried again on the next `/retro`, and `.retro/selfcheck.md` names it as failed.
 - `extractTimeoutMs` — how long one analysis may take before it is given up on, default 90000.
 - `heartbeatMs` — the shortest gap between self-check writes while a session works, default 60000.
 - `keepSessions` — keep every log, including ones nothing cites; off by default.
@@ -213,7 +213,7 @@ Everything the plugin writes stays under `.retro/` in the project, and nowhere e
 
 A log stays on disk as long as an open lesson cites it. A lesson's evidence names a session and a range of steps, and during review the question "what actually happened there?" has to have an answer that is not a summary. Once every lesson citing a log has been decided, the log is removed. Growth is bounded by the number of open lessons, which is capped, rather than by the age of the project.
 
-There is nothing to add to the project's `.gitignore`. On first run the plugin writes `.retro/.gitignore` and git applies it to everything below: sessions, state, the self-check, the plugin log and prompt update notices are ignored, while `lessons/`, `archive/` and the live prompt files are not. That file is seeded once and is the project's own from then on.
+There is nothing to add to the project's `.gitignore`. On first run the plugin writes `.retro/.gitignore` and git applies it to everything below: sessions, state, the self-check, the plugin log, prompt update notices and any half-written `.tmp` file a crash left are ignored, while `lessons/`, `archive/` and the live prompt files are not. That file is seeded once and is the project's own from then on.
 
 The split is the design rather than a convenience. Lessons and the archive are knowledge about the project: readable, visible in review, and they travel with the repository. The prompts are its configuration, worth sharing with whoever else works here. The rest would only make noise in a diff.
 

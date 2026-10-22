@@ -90,6 +90,10 @@ Settings → Extensions.
 
 ```jsonc
 {
+    // Off: DCP fully inactive. Free: compress tool + nudges.
+    "enabled": true,
+    // Passive: keep the compress tool, suppress every periodic nudge.
+    "passiveMode": false,
     "compress": {
         "permission": "allow",
         "minContextLimit": "20%",
@@ -105,30 +109,30 @@ Both context limits accept a token count or a percentage of the model's context
 window; the defaults are `"20%"` and `"80%"`, and `compress.modelMinLimits` /
 `compress.modelMaxLimits` override them per `providerID/modelID`.
 
-The rest of the upstream configuration (strategies, protection lists, manual
-mode, subagents) still applies, except `compress.mode` and `autoUpdate`, which
-the fork no longer uses. Compress prompt text can be overridden through
-`dcp-prompts/overrides/` when `experimental.customPrompts` is enabled.
+The rest of the upstream configuration (strategies, protection lists, subagents)
+still applies, except `compress.mode` and `autoUpdate`, which the fork no longer
+uses. Compress prompt text can be overridden through `dcp-prompts/overrides/`
+when `experimental.customPrompts` is enabled.
 
-### Passive projects (manual compression only)
+### Modes
 
-To turn off every automatic behavior in one project while keeping compression
-available on demand, add this to that project's `.opencode/dcp-rc.jsonc`:
+| `enabled` | `passiveMode`     | Behavior                                                     |
+| --------- | ----------------- | ------------------------------------------------------------ |
+| `false`   | —                 | **Off**: no compress tool, no nudges, no strategies          |
+| `true`    | `false` (default) | **Free**: compress tool always available, periodic nudges on |
+| `true`    | `true`            | **Passive**: compress tool available, all nudges suppressed  |
 
-```jsonc
-{
-    "manualMode": {
-        "enabled": true, // no turn/iteration/context-limit nudges
-        "automaticStrategies": false, // no deduplication or error purging
-        "allowCompressTool": true, // compress when you ask for it, no /dcp-compress needed
-    },
-}
-```
+Passive mode only silences nudges. Deduplication and error purging follow
+`strategies.*.enabled`, and the model keeps its normal compression guidance.
+`/dcp-compress` still asks the model to compress on demand in both Free and
+Passive mode.
 
-The compress tool, message IDs, `/dcp` commands, and statistics keep working;
-only the plugin's autonomous pushes are gone. This is a project default, not a
-lock: `/dcp manual off` restores automatic behavior for the current session,
-and `/dcp manual on` switches a normal session back to passive mode.
+The mode can also be changed for a running session: `/dcp passive on|off|reset`
+or the **Passive mode** row in the DCP panel overrides `passiveMode` for the
+current session. The override is stored with the session's DCP state, survives
+restarts, and never edits the conversation; only nudge injection into the next
+outgoing request changes. `reset` returns to the `dcp-rc.jsonc` default, and new
+sessions always start from config.
 
 `scrubModelOutput` removes DCP tags and reminder blocks the model may echo into
 its reply; `scrubMessageIds` also removes message-ID refs (`@N@`, `@bN@`,
@@ -230,8 +234,10 @@ Each level overrides the previous, so project settings take priority over global
 ```jsonc
 {
     "$schema": "https://raw.githubusercontent.com/royalcat/opencode-dcp-rc/master/dcp.schema.json",
-    // Enable or disable the plugin
+    // Off: DCP fully inactive. Free: compress tool + nudges.
     "enabled": true,
+    // Passive: keep the compress tool but suppress every nudge.
+    "passiveMode": false,
     // Enable debug logging to ~/.config/opencode/logs/dcp/
     "debug": false,
     // Notification display: "off", "minimal", or "detailed"
@@ -243,17 +249,6 @@ Each level overrides the previous, so project settings take priority over global
         "enabled": true,
         // Additional tools to protect from pruning via commands (e.g., /dcp sweep)
         "protectedTools": [],
-    },
-    // Manual mode: disables autonomous context management,
-    // tools only run when explicitly triggered via /dcp commands
-    "manualMode": {
-        "enabled": false,
-        // When true, automatic cleanup (deduplication, purgeErrors)
-        // still runs even in manual mode
-        "automaticStrategies": true,
-        // When true, the model may still call compress on its own when you
-        // ask it to in chat; when false, only /dcp-compress can trigger it
-        "allowCompressTool": false,
     },
     // Protect from pruning for <turns> message turns past tool invocation
     "turnProtection": {
@@ -339,10 +334,11 @@ Each level overrides the previous, so project settings take priority over global
 
 ### Commands
 
-DCP provides a TUI panel and one prompt-producing slash command:
+DCP provides a TUI panel and these commands:
 
-- `/dcp` — Opens the DCP panel with context, stats, and manual-mode controls.
-- `/dcp-compress [focus]` — Asks the model to run one compression pass. Optional focus text directs what content to compress, following the active `compress.mode`.
+- `/dcp` — Opens the DCP panel with context and stats.
+- `/dcp passive [on|off|reset]` — Overrides passive mode for the current session without adding a message to the conversation.
+- `/dcp-compress [focus]` — Asks the model to compress the context now. Optional focus text directs what content to compress.
 
 ### Prompt Overrides
 

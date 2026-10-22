@@ -185,6 +185,8 @@ The bridge listens on `127.0.0.1`, closes after completion or cancellation, and 
 
 Muse conversations disable automatic `task` delegation and use a stable per-session prompt cache key. The default reasoning effort is `medium` when supported. Available CLI reasoning variants remain selectable. Auxiliary Muse work uses an available Spark model with light reasoning; the main model selection is preserved.
 
+Tool and structured-output schemas are adapted automatically to Muse's ten-level nesting limit. Schemas within the limit are unchanged. Overflowing branches retain their original rules as JSON text in a description, with provider-side strict mode disabled for the affected definition. Tools stay available, argument values are unchanged, and OpenCode retains the original tool validation.
+
 ## Local storage and configuration
 
 | Setting | Location or purpose |
@@ -206,6 +208,7 @@ The existing CLI account keeps its own settings. New isolated profiles start wit
 | Browser account required | Run `muse-auth login` or use OpenCode's `/connect`. |
 | Quota is unknown or stale | Check the observation time. A new real model response normally carries a new subscription usage event. |
 | Newly unlocked model is missing | Run `muse-auth status`, then restart OpenCode. |
+| `JSON schema exceeds the maximum nesting depth of 10 levels` | Update the plugin and restart OpenCode. Deep MCP schemas are adapted automatically. |
 | Account switching does not happen | Check `muse-auth status`, enable automatic switching, and verify another account supports the selected model. |
 | Need diagnostics | Run `muse-auth doctor` and share redacted output in an issue. |
 

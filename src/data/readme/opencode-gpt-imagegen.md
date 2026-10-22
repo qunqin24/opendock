@@ -32,7 +32,25 @@ Add this plugin to your [OpenCode config](https://opencode.ai/docs/plugins/). Fo
 }
 ```
 
-OpenCode auto-installs the package via Bun on next launch — no separate `npm install` step is needed. The plugin requires OpenCode to be authenticated with ChatGPT.
+OpenCode auto-installs the package via Bun on next launch — no separate `npm install` step is needed. The plugin requires OpenCode to be authenticated with ChatGPT, unless you send requests through a proxy as described in [Sending requests through a proxy](#sending-requests-through-a-proxy).
+
+### Sending requests through a proxy
+
+Set `baseURL` if you reach ChatGPT through a gateway rather than signing OpenCode in to ChatGPT yourself, for example a local proxy that holds one or more ChatGPT sign-ins and spreads requests across them. In that setup OpenCode's `auth.json` usually has no ChatGPT sign-in, and calling chatgpt.com directly would bypass the gateway.
+
+```json
+{
+  "plugin": [["opencode-gpt-imagegen", { "baseURL": "http://127.0.0.1:3457/v1" }]]
+}
+```
+
+With `baseURL` set, the plugin does not read `auth.json` and sends the proxy no credentials. It sends the same requests it would send to ChatGPT, to `<baseURL>/images/generations`, or to `<baseURL>/images/edits` when reference images are given. Your proxy works with this option if it:
+
+- accepts those two `POST` routes without an `Authorization` header;
+- forwards the JSON body unchanged to the Codex images endpoints (`https://chatgpt.com/backend-api/codex/images/generations` and `/edits`), signed in with a ChatGPT account. The body has `prompt`, `model`, `quality`, `size` and `background`, plus `images` (a list of `{ "image_url": "data:..." }`) for edits;
+- answers with the backend's JSON, in which `data[0].b64_json` holds the PNG. Any non-2xx status is reported as an error together with the start of the response body.
+
+The request takes as long as the backend needs to draw the image, often 30 seconds or more, so the proxy must not time it out early.
 
 ### Updating the plugin
 

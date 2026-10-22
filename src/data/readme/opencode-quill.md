@@ -42,14 +42,19 @@ Press <kbd>Tab</kbd> or <kbd>→</kbd> to accept it, or <kbd>Esc</kbd> to dismis
   activates only in its respective domain without key conflicts.
 - **Prose-aware gating:** Automatically suppresses suggestions in code blocks,
   backticks, file paths, URLs, slash commands, shell executions, active selections,
-  composers holding attachments or pasted-text chips, and modal dialogs.
-- **End-of-draft only:** Suggestions appear when the cursor is at the end of the
-  draft, either on a partial word or after a space.
+  and modal dialogs. Attachment and pasted-text chips are treated as non-prose:
+  words are still suggested after them, but never inside them, and typo
+  replacements are not offered while a chip is present.
+- **End-of-draft by default:** Suggestions appear on a partial word or after a
+  space at the end of the draft. Opt-in logical-line-end completion can also
+  append a suffix or next word immediately before a newline, preserving later
+  lines. It never suggests in the middle of a line or at a visual wrap boundary.
 
 ## What suggestions look like
 
-The suggestion appears dimmed at the end of the draft. It is not part of the
-editable text until you press <kbd>Tab</kbd> or <kbd>→</kbd>.
+The suggestion appears dimmed at the cursor, at the end of the draft or an
+opt-in logical line end. It is not part of the editable text until you press
+<kbd>Tab</kbd> or <kbd>→</kbd>.
 
 | Kind | Your draft | Dimmed suggestion | Draft after acceptance |
 | --- | --- | --- | --- |
@@ -145,6 +150,7 @@ To pass custom options:
       "package": "/absolute/path/to/opencode-quill/src",
       "options": {
         "enabled": true,
+        "completeAtLineEnd": true,
         "acceptKeys": ["tab", "right"],
         "dismissKeys": ["escape"]
       }
@@ -159,9 +165,26 @@ Restart OpenCode after editing `cli.json`.
 
 | Option | Type | Default | Description |
 | --- | --- | --- | --- |
-| `enabled` | `boolean` | `true` | Enables or disables suggestions; can also be toggled with `/quill`. |
+| `enabled` | `boolean` | `true` | Initial default for suggestions and learning; a persisted `/quill` toggle takes precedence. |
+| `completeAtLineEnd` | `boolean` | `false` | Also append completions or next words immediately before a newline within a draft. |
 | `acceptKeys` | `string[]` | `["tab", "right"]` | Keys that accept and insert the active word suggestion. |
 | `dismissKeys` | `string[]` | `["escape"]` | Keys that dismiss the visible suggestion without inserting. |
+| `cycleNextKeys` | `string[]` | `[]` | Optional keys for the next confident word suggestion. |
+| `cyclePreviousKeys` | `string[]` | `[]` | Optional keys for the previous confident word suggestion. |
+
+`completeAtLineEnd` uses prose context only up to the cursor while checking
+code and attachment ranges across the full draft. It inserts only missing
+letters or a next word, without replacing typed text. Typo and casing
+replacements remain limited to chip-free draft ends. The suggestion must fit
+the visible cursor row; it never overwrites the next line. Acceptance preserves
+later lines, attachment metadata, host callbacks, and native undo/redo.
+
+Cycling changes only the ghost text; Tab still accepts the selected suggestion.
+Alternatives use the same confidence and typo guards as the best suggestion.
+The ranked list is capped at five, wraps in either direction, and resets when
+the draft, cursor, attachment ranges, or learned model changes. Alternatives
+that do not fit the visible cursor row are skipped. Without a visible,
+eligible alternative, cycle keys fall through to OpenCode.
 
 Custom keybindings can also be overridden using OpenCode's standard
 `keybinds` map in `cli.json`:
@@ -170,16 +193,28 @@ Custom keybindings can also be overridden using OpenCode's standard
 {
   "keybinds": {
     "quill.accept": "ctrl+y",
-    "quill.dismiss": "ctrl+g"
+    "quill.dismiss": "ctrl+g",
+    "quill.next": "alt+n",
+    "quill.previous": "alt+p"
   }
 }
 ```
+
+Quill's accept/dismiss/cycle layer runs in base mode at priority `2`, only in
+the focused normal composer. A visible suggestion takes Tab/Right for
+acceptance and Escape for dismissal. With no eligible visible suggestion,
+commands return `false` or are disabled so host dispatch continues. Host
+autocomplete that captures navigation suppresses Quill; its Tab and Escape
+handlers remain in control. Dialogs and selections also suppress Quill.
 
 ## Commands
 
 - `/quill` — Toggle word autocomplete on or off (persisted across sessions).
 - `/quill on` / `/quill off` — Set autocomplete explicitly.
 - `/quill clear` (alias `/quill reset`) — Erase everything Quill has learned from your prompts.
+- `quill.next` / `quill.previous` — Keymap commands for cycling visible word
+  alternatives; no default bindings. Configure the cycle options above or
+  OpenCode's `keybinds` map.
 - **Command Palette (`Ctrl+P`)** — Includes **Word autocomplete: on/off** and
   **Clear word autocomplete history**.
 
@@ -193,7 +228,9 @@ Quill learns from your own submitted prompts, never from assistant output:
   `session.execution.succeeded`, `session.inbox.delivered`).
 - On startup and when you open a session, it also backfills from the user
   messages of the current and most recently updated sessions.
-- Each message is ingested once, tracked by `<sessionID>:<messageID>`.
+- Each message is ingested once, tracked by `<sessionID>:<messageID>`. All
+  processed IDs, including those of ignored pastes, are retained until
+  `/quill clear`.
 - Only prose is learned. Code blocks, inline code, URLs, file paths,
   identifiers, slash commands, shell lines, indented blocks and very large
   pastes are ignored.
@@ -230,7 +267,7 @@ Quill learns from your own submitted prompts, never from assistant output:
   no suggestion. Context repair uses the same edit guards and confidence checks
   and requires repeated learned continuation evidence; not every typo produces
   a suggestion.
-- **Bounded size:** the personal model is pruned to its most frequent entries
+- **Bounded counts:** the personal model is pruned to its most frequent entries
   when saved. Once it holds about 100,000 learned words, every count is halved
   and single-use entries are dropped, so recent habits outweigh old ones.
 
@@ -244,9 +281,18 @@ state directory (`$XDG_STATE_HOME` when set, otherwise `~/.local/state`):
 | Learned model | `opencode/<channel>/tui/plugin.quill.learning.json` |
 | Settings | `opencode/<channel>/tui/plugin.quill.settings.json` |
 
-The learned model holds only word, bigram, trigram and word-casing counts plus
-processed message IDs. Raw prompt text is never written to disk. These files stay on your
-machine and are never tracked in Git or published to npm.
+The learned model holds word, bigram, trigram and word-casing counts plus
+processed message IDs. These include local one-to-three-word fragments from
+your prose, so the model can reveal parts of your prompts. Quill does not store
+raw prompts or full message bodies. These files stay on your machine and are
+never tracked in Git or published to npm. `/quill clear` erases the learned
+model; the persisted on/off setting is separate.
+
+The processed-ID ledger is not pruned: its memory usage, stored size, and full
+serialization cost grow with the number of processed messages. Word and context
+counts remain bounded. Existing version-1 snapshots keep their counts and
+retained IDs without a reset. IDs absent from older capped snapshots cannot be
+recovered, so those messages may be learned again when backfilled.
 
 ## Development
 

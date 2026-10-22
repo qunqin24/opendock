@@ -14,7 +14,7 @@
 | Status | Actively maintained personal OpenCode tool/plugin |
 | Type | OpenCode TUI plugin / host extension |
 | Host app | OpenCode `>=2.0.32`; release smoke also covers current `2.1.2` |
-| Package | `opencode-usage-monitor` `3.0.0` |
+| Package | `opencode-usage-monitor` `3.1.0` |
 | Runtime | Bun `>= 1.3.0` for local development |
 | Maintainer checks | `bun install --frozen-lockfile && bun run typecheck && bun run typecheck:host && bun test && bun run build:all && bun run verify:package` |
 
@@ -30,7 +30,7 @@ The plugin renders inside the OpenCode terminal UI sidebar.
 
 ## Summary
 
-- Displays OpenAI ChatGPT usage windows such as 5h/week with reset timing and optional plan or credits details.
+- Displays OpenAI ChatGPT usage windows, available Codex reset credits, and optional nearest reset-credit expiry.
 - Displays Z.AI and GLM 5h/week/month quota windows with reset timing and optional plan details. Supports enterprise/org coding plans via organization and project scoping.
 - Displays DeepSeek account balance (CNY) with an optional granted/topped-up breakdown.
 - Displays OpenCode Go 5h/week/month usage windows with reset timing.
@@ -44,14 +44,7 @@ The plugin renders inside the OpenCode terminal UI sidebar.
 ## Quick start
 
 ```sh
-# OpenCode v2: register the TUI plugin in ~/.config/opencode/cli.json
-# (see "Installation" below)
-
-# optional: build from a local checkout for development
-git clone https://github.com/Mark1708/opencode-usage-monitor.git
-cd opencode-usage-monitor
-bun install
-bun run build:all
+opencode plugin add opencode-usage-monitor@3.1.0
 ```
 
 ## Installation
@@ -61,21 +54,22 @@ bun run build:all
 Install the release with the v2 plugin manager:
 
 ```sh
-opencode plugin add opencode-usage-monitor@3.0.0
+opencode plugin add opencode-usage-monitor@3.1.0
 ```
 
-The equivalent explicit configuration is:
+The equivalent manual configuration is:
 
 ```jsonc
 {
-  "$schema": "https://opencode.ai/v2/cli.json",
-  "plugins": ["opencode-usage-monitor@3.0.0"]
+  "$schema": "https://opencode.ai/config.json",
+  "plugins": ["opencode-usage-monitor@3.1.0"]
 }
 ```
 
-Add the package once, either to `~/.config/opencode/cli.json` or to the v2
-`plugins` field in `opencode.json(c)`. The package exports separate v2 server
-and TUI definitions.
+The command installs the package and adds its npm spec to `plugins` in the
+global `~/.config/opencode/opencode.json`. For project-scoped installation, add
+the same entry to `opencode.json(c)` in the project root. The package exports
+separate v2 server and TUI definitions.
 
 This major does not support OpenCode v1. V1 users must pin
 `opencode-usage-monitor@2.0.1`; there is no dual-runtime compatibility shim.
@@ -83,7 +77,7 @@ This major does not support OpenCode v1. V1 users must pin
 ### Package install for local development
 
 ```sh
-bun add opencode-usage-monitor@3.0.0
+bun add opencode-usage-monitor@3.1.0
 ```
 
 ### Local checkout
@@ -163,7 +157,11 @@ Full documented shape:
   },
   "providers": {
     "openai": {
-      "credential": { "source": "opencode", "entry": "openai" }
+      "credential": { "source": "opencode", "entry": "openai" },
+      "options": {
+        "show_resets": true,
+        "show_reset_expiry": false
+      }
     },
     "zai": {
       "credential": { "source": "opencode", "entry": "zai-coding-plan" },
@@ -196,6 +194,13 @@ The plugin never reads `auth.json`, never falls back to inactive credentials,
 and never retains refresh tokens, labels, arbitrary metadata, or raw host
 credential records. `OPENAI_API_KEY` and `OPENAI_ADMIN_KEY` are not used for
 subscription quota.
+
+Available Codex reset credits are shown by default from the primary usage
+response. Set `providers.openai.options.show_resets` to `false` to hide them.
+Set `show_reset_expiry` to `true` to make a conditional supplemental request
+and show the nearest available credit expiry. The supplemental request runs
+only when resets are visible and at least one credit is available; a failure
+omits the expiry without hiding the usage windows or reset count.
 
 ### Z.AI and GLM
 

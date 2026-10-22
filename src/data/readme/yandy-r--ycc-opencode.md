@@ -240,7 +240,7 @@ Both accept `--only <targets>` with comma-separated values.
 - `cursor` writes native packages under `packages/cursor/`.
 - `codex` writes `.codex-plugin/` skills, agents, and plugin metadata.
 - `opencode` writes `.opencode-plugin/` skills, agents, commands, `opencode.json`, and `AGENTS.md`.
-- `omp` writes OMP (oh-my-pi) skills under `packages/omp/ycc/skills/`, plus the hidden `ycc-shared` skill for `_shared`, task agents under `packages/omp/ycc/agents/`, one `/ycc:<skill>` command entrypoint per public skill under `packages/omp/ycc/commands/`, the `packages/omp/ycc-mcp/.mcp.json` MCP config, and the package manifests. The root `.omp-plugin/marketplace.json` is written only for packages listed in `ycc/settings/packages.json`; none is listed yet.
+- `omp` writes OMP (oh-my-pi) skills under `packages/omp/ycc/skills/`, plus the hidden `ycc-shared` skill for `_shared`, task agents under `packages/omp/ycc/agents/`, one `/ycc:<skill>` command entrypoint per public skill under `packages/omp/ycc/commands/`, the `packages/omp/ycc-mcp/.mcp.json` MCP config, the flat `packages/omp/ycc-rules/rules/ycc-*.md` rules, and the package manifests. The root `.omp-plugin/marketplace.json` is written only for packages listed in `ycc/settings/packages.json`; none is listed yet.
 - `agents` writes `.agents-plugin/` cross-tool skills for `~/.agents/skills`, plus `ycc-shared/`.
 - `claude` writes the native add-on packages under `packages/claude/` (`ycc-mcp`, `ycc-hooks`, and `ycc-all`).
 
@@ -304,7 +304,7 @@ ystack/
 ├── packages/                  # generated native packages; do not hand-edit
 │   ├── claude/                # ycc-mcp, ycc-hooks, ycc-all
 │   ├── cursor/                # ycc, ycc-rules, ycc-mcp, ycc-hooks, installer-fallback
-│   └── omp/                   # ycc (skills, agents, commands), ycc-mcp (.mcp.json) + OMP manifests (unlisted until release)
+│   └── omp/                   # ycc (skills, agents, commands), ycc-mcp (.mcp.json), ycc-rules (flat rules/) + OMP manifests (unlisted until release)
 ├── .opencode-plugin/          # opencode bundle (synced by install.sh install --target opencode)
 │   ├── agents/                # generated from ycc/agents
 │   ├── commands/              # generated from public ycc/skills (thin, skill-tool dispatch)
@@ -364,7 +364,8 @@ ystack/
 │   ├── generate-omp-packages.sh       # wrapper → generate_omp_packages.py
 │   ├── generate_omp_packages.py       # packages.json → packages/omp/<pkg> manifests + .omp-plugin catalog
 │   ├── validate-omp-packages.sh       # sync check + catalog/manifest/lockstep/closure policy
-│   └── test-omp-native-packages.sh    # opt-in live omp install from a pinned fixture (not CI)
+│   ├── test-omp-native-packages.sh    # opt-in live omp install from a pinned fixture (not CI)
+│   └── test-omp-herdr-hooks.sh        # opt-in herdr proof: herdr's OMP integration, no ycc reporter (not CI)
 ├── ycc/                       # the consolidated Claude Code plugin
 │   ├── .claude-plugin/
 │   │   └── plugin.json        # name: "ycc", current version in plugin.json

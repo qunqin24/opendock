@@ -78,7 +78,7 @@ absolute home paths in tracked files, and release cuts are reviewed
 against it. The `zft check .` store in [`.zft/specs/`](.zft/specs/) is this
 repository's own contract corpus.
 
-**Version.** 0.3.0 — gate-core adapters + leak-removal cut (2026-10-20); 0.2.1 was the leak-free maintenance cut (2026-10-15).
+**Version.** 0.3.1 — changeset-scoping and gate-correctness fixes (2026-10-21); 0.3.0 was the gate-core adapters + leak-removal cut (2026-10-20).
 Requires **Python 3.12+**; the `zft` console script is the only entry point.
 
 **Battle-tested.** The gates police this repository's own development: the
@@ -368,9 +368,9 @@ with the Python CLI, pinned by `tests/unit/test_package.py`):
 
 | Artifact | Registry | Version | Publish command |
 | --- | --- | --- | --- |
-| `zft` (Python) | PyPI | 0.3.0 | `python -m build && twine upload dist/*` |
-| `opencode-zft` | npm | 0.3.0 | `cd packages/opencode-zft && npm stage publish` → `npm stage approve <id>` |
-| `pi-zft` | npm | 0.3.0 | `cd packages/pi-zft && npm stage publish` → `npm stage approve <id>` |
+| `zft` (Python) | PyPI | 0.3.1 | `python -m build && twine upload dist/*` |
+| `opencode-zft` | npm | 0.3.1 | `cd packages/opencode-zft && npm stage publish` → `npm stage approve <id>` |
+| `pi-zft` | npm | 0.3.1 | `cd packages/pi-zft && npm stage publish` → `npm stage approve <id>` |
 | flockwork harness | PyPI | 0.4.0 | separate repository |
 
 Publishing flow (JS adapters):

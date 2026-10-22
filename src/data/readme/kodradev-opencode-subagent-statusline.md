@@ -7,9 +7,11 @@ Subagents
 ● 1 running · ✓ 2 done · × 0 error
 
 ● Review authentication
-  ◷ 00:30 · 12.2k tok
+  ◷ 00:30 · 12.2k · $0.0041
+  claude-sonnet-4.5
 ✓ Review components
-  ◷ 00:20 · 13.8k tok
+  ◷ 00:20 · 13.8k · $0.0037
+  claude-sonnet-4.5
 ```
 
 ## Installation
@@ -39,7 +41,9 @@ Restart OpenCode and show the sidebar. Use only one of these configuration files
 
 - The **Subagents** panel appears at the top of the sidebar when the current session has child sessions, including nested descendants.
 - Status updates arrive through OpenCode events: `running`, `pending`, `done`, `error`, or `interrupted`. Running subagents appear first and are never hidden by the row limit.
-- Each row shows accumulated execution time and token usage. Time excludes pauses between executions; `--:--` means timing history is loading or unavailable. Tokens include input, output, reasoning, and cache usage for that subagent, not its descendants or current context size.
+- Each row shows accumulated execution time, token usage, and cost (`$0.00` when the model is free or usage is not reported). Time excludes pauses between executions; `--:--` means timing history is loading or unavailable. Tokens include input, output, reasoning, and cache usage for that subagent, not its descendants or current context size.
+- Timing is persisted per session, so totals survive TUI restarts and plugin reloads. Usage is refreshed when a step ends or the subagent finishes, instead of waiting for the next panel mount.
+- The third row shows the subagent's model, replaced by its failure reason or retry countdown when applicable.
 - Click a title to open that subagent's session. Click `+N more` to expand the list or `Show fewer` to collapse it.
 - The panel follows the active theme and stays hidden when there are no subagents, unless loading fails. Click the retry message if it cannot load them.
 

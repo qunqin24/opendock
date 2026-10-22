@@ -10,7 +10,12 @@ LLMs waste a lot of tokens reading and re-reading your code and asking you for c
 - **`memory_*` tools** — remember facts, decisions, and commands the agent should
   keep across sessions (`memory_init`, `memory_remember`, `memory_recall`,
   `memory_update`, `memory_forget`, `memory_list`, `memory_undo`,
-  `memory_evidence`, `memory_export`, `memory_import`, `memory_decay`).
+  `memory_evidence`, `memory_export`, `memory_import`, `memory_decay`,
+  `memory_status`).
+- **Memory at a glance** — the terminal shows a footer badge (injected chars
+  vs budget + a cache-health dot) and a `/memory` panel; desktop/web/IDE get
+  the same report in-chat via `/memory-report`, including the *measured*
+  prompt-cache hit rate. See [Memory at a glance](#memory-at-a-glance).
 - **`/repo-init`** — for each repo: indexes the code graph and remembers the
   test/build commands, keyed to the git head. The command installs itself; no
   setup beyond the plugin.
@@ -47,6 +52,10 @@ prompt cache on every message. This one is built the other way around:
 - **Hard character budget.** The block is capped at 1200 characters by default
   (see Options) and trimmed at whole-memory boundaries — never cut mid-sentence.
 - **Evidence is never injected**, and the standing system digest is two lines.
+- **Receipts, not promises.** The plugin measures your session's actual
+  prompt-cache usage (from each turn's `tokens.cache` accounting) and shows it
+  next to the badge — so a cache hit rate you can watch, not just a byte-freeze
+  claim you have to trust.
 
 Measured on a deterministic workload (50 memories, 20 prompts, 3 mid-session
 store writes) using the plugin's real injection code:
@@ -130,7 +139,7 @@ Add a `plugins` entry to your opencode config —
 ```json
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugins": ["opencode-self-improvement@0.2.2"]
+  "plugins": ["opencode-self-improvement@0.3.0"]
 }
 ```
 
@@ -144,7 +153,7 @@ bump the version in the config and restart. On Opencode v2 you can also manage
 it with the CLI:
 
 ```sh
-opencode plugin add opencode-self-improvement@0.2.2
+opencode plugin add opencode-self-improvement@0.3.0
 opencode plugin update opencode-self-improvement
 ```
 
@@ -187,6 +196,7 @@ the plugin entry in `opencode.json(c)` instead of the plain string:
 | `autoCapture` | `false` (off) | When on, each session-idle event makes one cheap model pass that proposes memory candidates. Every candidate still goes through the 4-gate write pipeline — capture can never bypass the gates. Off by default: the zero-token install stays zero-token. |
 | `captureModel` | — | `"provider/id"` model used for auto-capture. Required when `autoCapture` is on; a missing or invalid value disables capture with a startup warning. |
 | `captureMax` | `3` | Maximum candidates proposed per idle event. |
+| `notifyBlocked` | `true` (on) | Terminal (TUI) half only: toast when the write gate blocks a memory write. `false` keeps the panel quiet; blocks are always in `memory_evidence` regardless. |
 
 ## Code graph (optional)
 
@@ -250,6 +260,38 @@ and the tool reports a tally of four outcomes per line —
 
 so re-running the same import is a no-op (everything collapses). Copying an
 export to a fresh machine is how you seed a new laptop from an old one.
+
+## Memory at a glance
+
+"Wait, what did the memory plugin just do?" — answered differently per client,
+same data (`memory_status` tool under the hood; no model call):
+
+**Terminal (opencode CLI)** — the plugin ships a TUI half
+(`@opencode/plugin/tui`) that loads automatically:
+
+- a footer badge: `● mem 1157/1200c · cache 96%` — the injected block against
+  its budget, and the measured session prompt-cache hit rate. The dot is green
+  (stable + warm), yellow (a recent recompute, or 50–90% reads), or red (last
+  turn served almost nothing from cache). `—` until the first assistant turn.
+- **`/memory`** opens a session panel (every number is this session only):
+  - **CONTEXT** — exact chars + estimated tokens riding now, % of the budget,
+    requests the current epoch has ridden, session-lifetime totals, and how
+    many requests abstained (silence is a feature)
+  - **CACHE** — epoch invalidations this session with the last reason, server
+    recompute count, and the *measured* prompt-cache read rate of the last turn
+    — the receipt, not just the promise
+  - **INJECTED BLOCK** — the verbatim block riding your prompts, or an explicit
+    "abstained: no vocabulary overlap"
+  - **RECENT BLOCKED WRITES** — that `memory_remember` that didn't stick,
+    with its gate reason
+  - **STORE** — active / superseded / open / scopes
+  - keys: `r` refresh, `f` fullscreen
+- a warning toast when a write is blocked (opt out: `"notifyBlocked": false`)
+
+**Desktop / web / IDE** — no TUI slots there (they're terminal-only), so use
+the self-installed **`/memory-report`** chat command: the same four sections,
+rendered in the conversation. For editing, the browser admin (`bun memory-view`)
+works everywhere.
 
 ## Admin Tool
 

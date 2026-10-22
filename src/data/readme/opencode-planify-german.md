@@ -50,7 +50,7 @@ Der Installer schreibt für das Plugin den Paket-Spec samt Optionen nach `openco
 {
   "plugins": [
     {
-      "package": "opencode-planify-german@1.0.0",
+      "package": "opencode-planify-german@1.0.1",
       "options": {
         "bitbucketUrl": "https://bitbucket.example.com",
         "bitbucketToken": "…"
@@ -100,7 +100,7 @@ npx opencode-presets remove opencode-planify-german
 ## Zusammenfassung in die PR-Description (Bitbucket Data Center)
 
 `pr_summary` schreibt eine Zusammenfassung in die Description des offenen PRs
-des aktuellen Branches: 3-4 Absätze zu Aufgabe, Problem und Lösung, bei 110
+des aktuellen Branches: 1-3 Absätze zu Aufgabe, Problem und Lösung, bei 110
 Zeichen umbrochen. Nicht der Plan. Ist die Umsetzung fertig, bietet das Modell es
 an, geschrieben wird nach Ja oder auf Verlangen ("Zusammenfassung in den PR").
 Die Description wird vollständig ersetzt, Titel und Reviewer bleiben. Kommentare

@@ -17,6 +17,18 @@ Concepts (model tiering, per-model specialized prompts, intent gating, proactive
 
 The plugin **does not** change the model on a per-call basis via `chat.params`. OpenCode's `chat.params` output schema has no `model` field. Per-agent routing happens via the `config` hook (the only safe seam for model selection), and reactive re-routing happens via the `event` hook + `client.session.prompt`.
 
+## DSMM submodule
+
+[DSMM](https://github.com/hugefiver/dsmm) is an independent DeepSeek Harness project, linked here at `dsmm/` as a Git submodule. Its dependencies, tests, npm package and GitHub Releases are maintained in its own repository; it is not part of the OCMM pnpm workspace or release pipeline.
+
+To check out the pinned DSMM revision:
+
+```sh
+git submodule update --init dsmm
+```
+
+Run DSMM development commands from `dsmm/` and follow its own README and contributor instructions. Commit and push DSMM changes in that repository before updating the submodule pointer in OCMM.
+
 ## Workflows
 
 OpenCode uses the skill-driven **`v1`** workflow by default. The config/path label stays `v1`, but model-facing prompt text calls it `deepwork`. The default prompt is a concise local controller, and skills are injected on the first message per session through `chat.message` + `system.transform`.

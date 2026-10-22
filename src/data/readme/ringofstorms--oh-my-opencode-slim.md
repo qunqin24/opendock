@@ -671,6 +671,10 @@ illustrated overview at
 
 ## 🖥️ Companion
 
+Native source and releases: **[oh-my-opencode-companion](https://github.com/alvinunreal/oh-my-opencode-companion)**.
+The plugin keeps the installer, updater, and state integration; existing commands
+and configuration are unchanged.
+
 The optional Companion is a floating desktop status window for live agent
 activity. It shows the current session state and which agents are active, so
 background work is easier to follow at a glance.
@@ -727,6 +731,7 @@ Use this section as a map: start with installation, then jump to features, confi
 | **[Project Customization](docs/project-local-customization.md)** | Repository-specific custom agents, prompt overrides, per-agent skills, and precedence |
 | **[Background Orchestration](docs/background-orchestration.md)** | Scheduler-first orchestrator model built around native background subagents |
 | **[Maintainer Guide](docs/maintainers.md)** | Issue triage rules, label meanings, support routing, and repo maintenance workflow |
+| **[Developer Evals](docs/evals.md)** | Source-checkout routing/reliability harness, offline scoring, and advisory model judging |
 | **[Skills](docs/skills.md)** | Bundled skills such as `simplify`, `codemap`, `clonedeps`, `deepwork`, `verification-planning`, `step-back`, `deanchor`, `ai-estimates`, `reflect`, `worktrees`, and `oh-my-opencode-slim` |
 | **[MCPs](docs/mcps.md)** | `context7`, `gh_grep`, and how MCP permissions work per agent |
 | **[Tools](docs/tools.md)** | Built-in tool capabilities like `webfetch`, LSP tools, code search, and formatters |
@@ -740,7 +745,7 @@ Use this section as a map: start with installation, then jump to features, confi
   <p><sub>Every merged contribution leaves a mark on the realm.</sub></p>
 
   <!-- ALL-CONTRIBUTORS-BADGE:START - Do not remove or modify this section -->
-[![All Contributors](https://img.shields.io/badge/all_contributors-138-orange.svg?style=flat-square)](#contributors-)
+[![All Contributors](https://img.shields.io/badge/all_contributors-139-orange.svg?style=flat-square)](#contributors-)
 <!-- ALL-CONTRIBUTORS-BADGE:END -->
 </div>
 
@@ -934,6 +939,9 @@ Use this section as a map: start with installation, then jump to features, confi
       <td align="center" valign="top" width="16.66%"><a href="https://github.com/caiozizh"><img src="https://avatars.githubusercontent.com/u/244536034?v=4?s=100" width="100px;" alt="caiozizh"/><br /><sub><b>caiozizh</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=caiozizh" title="Code">💻</a></td>
       <td align="center" valign="top" width="16.66%"><a href="https://github.com/capyBearista"><img src="https://avatars.githubusercontent.com/u/20227532?v=4?s=100" width="100px;" alt="Arjun Pramanik"/><br /><sub><b>Arjun Pramanik</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=capyBearista" title="Code">💻</a></td>
       <td align="center" valign="top" width="16.66%"><a href="https://gianniscks.github.io/"><img src="https://avatars.githubusercontent.com/u/6207534?v=4?s=100" width="100px;" alt="Giannis Papakostas"/><br /><sub><b>Giannis Papakostas</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=giannisCKS" title="Code">💻</a></td>
+    </tr>
+    <tr>
+      <td align="center" valign="top" width="16.66%"><a href="https://github.com/Phototonic"><img src="https://avatars.githubusercontent.com/u/35551999?v=4?s=100" width="100px;" alt="Lucas Wright"/><br /><sub><b>Lucas Wright</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=Phototonic" title="Code">💻</a></td>
     </tr>
   </tbody>
 </table>

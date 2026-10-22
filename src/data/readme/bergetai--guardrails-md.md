@@ -78,21 +78,35 @@ shape:
 The gate reads the file once at session start, so restart the harness after
 editing. Only the first 2000 characters are sent to the model, so keep the
 file short and put the MUST NOT rules first. If the file is longer, the gate
-warns you at startup and in every block message, and the rules after the cut
-are not applied.
+warns you in every block message and, except on opencode 2, also at startup.
+The rules after the cut are not applied.
 See [`guardrails.example.md`](guardrails.example.md) — copy it to `GUARDRAILS.md`.
 
 **2. Install the gate in your harness.**
 
 ### opencode
 
-Add the plugin to `opencode.json` (global or per project):
+Add the plugin to `opencode.json` (global or per project). opencode 2 reads
+the `plugins` key:
+
+```json
+{
+  "plugins": ["@bergetai/guardrails-md"]
+}
+```
+
+opencode 1.x reads `plugin` instead:
 
 ```json
 {
   "plugin": ["@bergetai/guardrails-md"]
 }
 ```
+
+The package supports opencode 1.18.29 and newer, including 2.x. Older 1.x
+releases cannot load it. opencode 2 does not report a plugin that fails to load,
+so after an upgrade check that `opencode plugin list` shows
+`@bergetai/guardrails-md`.
 
 The package was called `@bergetai/opencode-guardrails-md` up to 0.5.1. That
 name is deprecated; replace it with `@bergetai/guardrails-md` in your config.
@@ -137,8 +151,11 @@ export BERGET_API_KEY=…
 
 Keys come from [berget.ai](https://berget.ai). The free tier includes €5 of
 credit, and a gate call is small enough that it lasts a long time. If you
-are logged in to Berget in your harness (`@bergetai/opencode-auth` in opencode,
-`/login` in pi), skip the key: the gate picks up your seat token. If you run your own
+are logged in to Berget in your harness (`@bergetai/opencode-auth` in opencode
+1.x, `/login` in pi), skip the key: the gate picks up your seat token. opencode
+2 does not refresh that token. One left behind by 1.x is still used until it
+expires, and after that the gate goes inactive without a warning. Set the key
+on opencode 2. If you run your own
 System One-compatible endpoint, point `BERGET_BASE_URL` at it instead.
 
 From now on, every bash command your agent runs has to pass your guardrails
@@ -421,7 +438,10 @@ Manual install for opencode: copy [`core.ts`](core.ts) and
 `~/.config/opencode/plugins/guardrails-md/` (global) or
 `.opencode/plugins/guardrails-md/` (per project), keeping the `adapters/`
 folder, and register
-`"plugin": ["./plugins/guardrails-md/adapters/opencode.ts"]`. Manual installs
+`"plugin": ["./plugins/guardrails-md/adapters/opencode.ts"]`. opencode 2
+loads `.opencode/plugins/` on its own but only from a root `index.ts`, so add
+one containing `export { default } from "./adapters/opencode.ts"` instead of
+registering the path. Manual installs
 need `@typesafe-ai/sdk` resolvable (`npm install -g @typesafe-ai/sdk`); the
 npm package brings it as a dependency.
 
@@ -436,14 +456,14 @@ either. What differs is where the gate looks.
 
 | | opencode | pi | Claude Code |
 |---|---|---|---|
-| Hook | `tool.execute.before`: bash judged; `edit`, `write` and `apply_patch` checked against the protected paths | `tool_call`, including calls a codemode script makes: bash judged; `edit` and `write` checked against the protected paths | hooks module: `tool.call` on `Bash` and on `Monitor` when it runs a `command`; `Edit`, `Write` and `NotebookEdit` checked against the protected paths; `session.start` freezes the policy, the root and the environment |
+| Hook | 1.x `tool.execute.before`: bash judged; `edit`, `write` and `apply_patch` checked against the protected paths. 2.x `tool.hook("execute.before")`: the same for `shell`, `edit`, `write` and `patch` | `tool_call`, including calls a codemode script makes: bash judged; `edit` and `write` checked against the protected paths | hooks module: `tool.call` on `Bash` and on `Monitor` when it runs a `command`; `Edit`, `Write` and `NotebookEdit` checked against the protected paths; `session.start` freezes the policy, the root and the environment |
 | On block | throws; the agent reads the message | returns `{ block, reason }` to the agent and shows a warning to you (on stderr in `pi -p`) | answers `{ deny }`; Claude reads the reason |
 | Without a credential | inactive; one log line with `SYSTEMONE_LOG=1` | inactive; warns you once per session (on stderr in `pi -p`) | inactive; a toast warns you at session start |
-| Seat token | `$XDG_DATA_HOME/opencode/auth.json` (default `~/.local/share`) | pi's Berget login, OAuth or API key, resolved by pi itself; then the OAuth entry in `$PI_CODING_AGENT_DIR/auth.json` (default `~/.pi/agent`) | none — `BERGET_API_KEY` (or `TYPESAFE_API_KEY`) only |
+| Seat token | 1.x: `$XDG_DATA_HOME/opencode/auth.json` (default `~/.local/share`); 2.x: the same file, which 2.x never refreshes; set `BERGET_API_KEY` | pi's Berget login, OAuth or API key, resolved by pi itself; then the OAuth entry in `$PI_CODING_AGENT_DIR/auth.json` (default `~/.pi/agent`) | none — `BERGET_API_KEY` (or `TYPESAFE_API_KEY`) only |
 | Policy file | `GUARDRAILS.md`, then `.opencode/GUARDRAILS.md` (lowercase legacy names after) | `GUARDRAILS.md`, then `.pi/GUARDRAILS.md` (lowercase legacy names after) | `GUARDRAILS.md`, then `.claude/GUARDRAILS.md` (lowercase legacy names after) |
 | Policy read from | the project directory opencode passes the plugin | the directory pi was started in | the session's directory, frozen at `session.start` |
 | Audit log | `~/.cache/opencode/systemone-gate.log` | `~/.cache/pi/systemone-gate.log` | not supported (`$.fs` cannot append) |
-| Protected files | `edit`, `write`, `apply_patch` refuse protected paths; a block throws | `edit` and `write` refuse protected paths; a block returns `{ block, reason }` and warns you | `Edit`, `Write` and `NotebookEdit` refuse protected paths; the module answers `{ deny }`. Symlinks are resolved in all three |
+| Protected files | `edit`, `write`, `apply_patch` (2.x: `patch`) refuse protected paths; a block throws | `edit` and `write` refuse protected paths; a block returns `{ block, reason }` and warns you | `Edit`, `Write` and `NotebookEdit` refuse protected paths; the module answers `{ deny }`. Symlinks are resolved in all three |
 
 In pi, `/reload` counts as a restart: it re-reads `GUARDRAILS.md` and resets
 the cooldown. pi's `powershell` tool is not gated; if a repo enables it in

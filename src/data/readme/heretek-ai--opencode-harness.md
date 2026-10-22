@@ -47,12 +47,12 @@ ask). The overage is authorized scope growth, not drift: 8 waves delivered a
 14-tool plugin with 8 pinned Code Mode companions, 16+ zero-patch interceptors,
 permission/taint/circuit-breaker guards, RepoMap/blast-radius/rename engines,
 incremental verification, architecture auditing, calibration, episodic memory,
-transactions, and DOM auditing. The revised tracked budget is raw ≤ 12,100 /
-stripped ≤ 10,100, enforced as a CI tracking signal (`bash
+transactions, and DOM auditing. The revised tracked budget is raw ≤ 12,260 /
+stripped ≤ 10,180, enforced as a CI tracking signal (`bash
 scripts/check-loc.sh`, wired into `.github/workflows/ci.yml`) — it reports and
 warns but never fails the build in its default form, and functionality is never
 deleted to hit a line count. The same script doubles as a hard gate:
-`bash scripts/check-loc.sh --fail-over=12100 --fail-over-stripped=10100`
+`bash scripts/check-loc.sh --fail-over=12260 --fail-over-stripped=10180`
 (the CI gate form) exits non-zero over either cap.
 
 ## Install & Build

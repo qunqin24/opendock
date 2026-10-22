@@ -1,9 +1,12 @@
+# sesh
+
+[![CI](https://github.com/ozandogrultan/opencode-sesh/actions/workflows/ci.yml/badge.svg)](https://github.com/ozandogrultan/opencode-sesh/actions/workflows/ci.yml)
+
 <h1 align="center">
   <img src="assets/logo.svg" alt="sesh" height="96">
 </h1>
 
 <p align="center">
-  <a href="https://github.com/ozandogrultan/opencode-sesh/actions/workflows/ci.yml"><img src="https://github.com/ozandogrultan/opencode-sesh/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://www.npmjs.com/package/opencode-sesh"><img src="https://img.shields.io/npm/v/opencode-sesh" alt="npm"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT"></a>
   <a href="#contributing"><img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg" alt="PRs welcome"></a>
@@ -336,6 +339,13 @@ covers the current project) and offer to resume one.
 **Where is my data?** It reads the opencode database read-only and caches
 extracted text under `${XDG_CACHE_HOME:-~/.cache}/sesh` (or `SESH_CACHE_DIR`).
 Nothing is uploaded anywhere.
+
+**What if a lock stays busy after a crash?** Stop all sesh pickers before
+manually removing the lock directory named in the error; for pin locks, also
+fully quit OpenCode. Locks are never automatically reclaimed. Restart OpenCode
+after upgrading so older plugin instances cannot reclaim locks. Interrupted
+extraction temporary files may remain in the cache; remove them only after all
+pickers have stopped.
 
 **Does it work on Windows?** It targets macOS and Linux. WSL should work; native
 Windows is untested.

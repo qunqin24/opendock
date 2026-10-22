@@ -22,7 +22,7 @@ declined to port it** (issue #9389). Rather than fork it, REEVE splits the job
 into four layers with their own licenses:
 
 ```
-proxy layer     cross-provider fallback        Bifrost (Apache-2.0)      independent of the engine version
+proxy layer     cross-provider fallback        GATE (in-process, ours)   in the plugin; no binary, no separate service
 orchestration   dispatch discipline, 4 phases  prompts + agent files    v2 already provides the mechanism
 ledger layer    ledger / silent death / concurrency   this repo's plugin   the eight things v2 lacks
 review layer    independent diff review        rules from OCR (Apache-2.0)   no tool to install
@@ -61,9 +61,9 @@ review layer    independent diff review        rules from OCR (Apache-2.0)   no 
 |---|---|---|
 | 0 | plan / API map / HANDOFF errata | — |
 | 1 | 8 agents in `agents/*.md` (7 subagents marked `hidden`) | ✅ permission gates, independent review, multiple rounds; only `foreman` is visible |
-| 2 | `plugin/` ledger layer (**135** tests) | ✅ concurrency queue / wall-clock interrupt / cross-restart reconcile / ledger round-trip / roster injected into the `subagent` tool description / proxy self-hosting / chain hot reload (≤4 s) / stats cross-check |
+| 2 | `plugin/` ledger layer (**140** tests) | ✅ concurrency queue / wall-clock interrupt / cross-restart reconcile / ledger round-trip / roster injected into the `subagent` tool description / proxy self-hosting / chain hot reload (≤4 s) / stats cross-check |
 | 3 | `skills/review/` review layer | ✅ real diff, line numbers, structured output |
-| 4 | `proxy/` Bifrost chain + deploy and convergence scripts | ✅ tier routing / fallback / vision tier / attribution |
+| 4 | GATE proxy layer (in-process: routing / fallback / ledger / catalog) | ✅ real-host acceptance: free lane 200, fault-injection downgrade to paid, per-session stickiness, ≤5 s hot reload, paid direct call unchanged |
 | 5 | `extensions/reeve/` console (chain editor + stats + ledger) | ✅ installed in openchamber 2.3.3, rendered, ledger read through the host file bridge; edit → save → runtime rules hot-reload → "applied" |
 | 6.7 | the whole system inside the plugin package | ✅ agents and skills registered by the plugin; only `opencode.jsonc` remains in the config dir |
 | 6.8 | endpoint bootstrap | ✅ the config holds a single plugin line; the plugin writes `providers.reeve` itself (additive, backed up, comments preserved) |
@@ -113,10 +113,9 @@ path, public zip, or git branch. Only the git form self-updates. Release via
 
 **`provision.json`** (plugin package root, shipped in the npm tarball) is the
 installation contract read by an assembler such as ocrc: plugin spec and
-directory fallback, the Bifrost artifact (version + sha256 + destination), the
-extension zip, and post-install checks. Manually, the equivalent is the two
-steps above plus placing `bifrost-http` (2.3.0) in `~/.reeve/proxy/` and
-`chmod 755`; reeve short-circuits when the checksum matches.
+directory fallback, the extension zip, the config paths that get synced, and
+post-install checks. **There are no binary artifacts**: the GATE proxy layer is
+plain JS inside the plugin, so installation is exactly the two steps above.
 
 ## CI and release
 
@@ -124,7 +123,7 @@ All in `.github/workflows/`, all offline (no provider traffic):
 
 | Action | Trigger | What it does |
 |---|---|---|
-| CI | push `main` / PR | plugin tests (node 22 and 24) · npm pack content assertions (license texts present, `docs/` and secrets absent) · extension gate + byte-identical rebuild · engine config sample · public-tree gate |
+| CI | push `main` / PR | plugin tests (ubuntu node 22 + 24, windows node 24) · coverage hard floor (`scripts/coverage-baseline.json`, only ratchets up) · npm pack content assertions (license texts present, `docs/` and secrets absent) · extension gate + byte-identical rebuild · engine config sample · public-tree gate |
 | Release (normal path) | `bash scripts/publish-repo.sh --tag` | export public tree → tag `v<plugin version>` on that commit → CI publishes with OIDC (SLSA provenance) |
 | Release (manual) | push tag `v<version>` or dispatch the workflow | tag↔version check → version not published → tests → pack assertions → `npm publish --access public --provenance` |
 

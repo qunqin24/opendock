@@ -120,7 +120,10 @@ Object form in `opencode.jsonc`:
 {
   "plugins": [
     {
-      "package": "file:///path/to/opencode-plugin-dsml-recover",
+      // npm package name (what `opencode plugin add` writes)
+      "package": "opencode-plugin-dsml-recover",
+      // or point at a local checkout instead:
+      // "package": "file:///path/to/opencode-plugin-dsml-recover",
       "options": {
         // match your provider — DeepInfra is the tested one
         "providers": ["deepinfra"],

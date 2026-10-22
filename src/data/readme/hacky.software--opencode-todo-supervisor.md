@@ -15,15 +15,16 @@ composer (`📋 ███░░░░░ 8/17 open`) tracks the list.
 - a TUI strip + popover panel, slash command, palette entries, and toasts.
 
 Nudges are delivered as synthetic session input, so the model sees them as normal
-instructions. Every nudge is self-contained: counts, the open items (with
-priorities), a short explainer of why it fired, and how to finish.
+instructions. Every nudge is self-contained: it tells the model to read the
+outstanding todo tasks and continue working on them, with counts, the open items
+(with priorities), a short explainer of why it fired, and how to finish.
 
 Tested against OpenCode `2.0.24`.
 
 ## Install
 
 ```sh
-opencode plugin add @hacky.software/opencode-todo-supervisor@0.3.13
+opencode plugin add @hacky.software/opencode-todo-supervisor
 ```
 
 > **OpenCode 2.0.32 packaging note:** TUI entries installed from npm are
@@ -358,11 +359,12 @@ Nudges go out through `ctx.session.synthetic({ sessionID, text, description,
 metadata })`, so the model receives them as ordinary instructions rather than a
 visible user turn. Each nudge:
 
-- carries the counts, the open items (with priorities), and an explainer — e.g.
+- carries the counts, the open items (with priorities), an explainer — e.g.
   `Idle nudge #2 — the session went idle with 3 of 7 todos left.` or
   `Stall nudge #1 — no activity for ~7.2 min from: subagent ses_… / background
   shell "sleep 200" / tool subagent "Add the panel" / open step (stall threshold
-  5 min).`;
+  5 min).` — and an explicit instruction to read the outstanding tasks and
+  continue working on them;
 - is rate-limited (`minNudgeIntervalMs`) and de-duplicated by an open-item hash;
 - backs off after `maxNoProgressNudges` nudges with an unchanged list and resumes
   on the next `todo_write` (the panel's `s` can pause/resume too).

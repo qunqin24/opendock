@@ -31,11 +31,11 @@ Tool-**name** case is **not** repaired here — opencode already does that in `e
 1. Add the plugin to `opencode.json`:
 
    ```json
-   { "plugin": ["@wombatfish/opencode-toolcall-repair"] }
+   { "plugins": ["@wombatfish/opencode-toolcall-repair"] }
    ```
 
    OpenCode auto-installs it (Bun). For local dev before publishing, point at the source:
-   `"plugin": ["file:///D:/Projects/opencode-toolcall-repair"]`.
+   `"plugins": ["file:///D:/Projects/opencode-toolcall-repair"]`.
 
 2. Add a provider that routes through the proxy, and point your open models at it:
 

@@ -29,7 +29,7 @@ Then restart OpenCode and enable memory for your project:
 Read the [plain-language guide](docs/working-with-memory.md) before turning on
 shared memory. While shared mode is on, project-specific chat turns are saved there too.
 
-Requires `uv`/`uvx` and Node 20+. The `embedded` backend additionally requires Ollama
+Requires `uv`/`uvx` and Node.js 22.19.0+. The `embedded` backend additionally requires Ollama
 with `nomic-embed-text`; `file` has no extra dependency.
 
 ## Repository layout

@@ -1,6 +1,6 @@
 # opencode-github-copilot-usage
 
-An [OpenCode](https://opencode.ai) V2 plugin that shows your GitHub Copilot usage, in AI credits and percentage, right in the TUI.
+An [OpenCode](https://opencode.ai) plugin for V1 and V2 that shows your GitHub Copilot usage, in AI credits and percentage, right in the TUI.
 
 ```
 Copilot 2,000/15,000 cr · 13.3%
@@ -8,7 +8,7 @@ Copilot 2,000/15,000 cr · 13.3%
 
 ## Features
 
-- Usage line below the prompt footer, shown only while a GitHub Copilot model is selected.
+- Usage line below the prompt footer, shown only while a GitHub Copilot model is selected (on V1: when the session's latest message used Copilot).
 - Colour changes as you approach your limit: muted below 75%, warning from 75%, error from 90%.
 - Refreshes every 15 seconds and shortly after each completed turn.
 - `/copilot` slash command (also in the command palette) with full details: account, plan, billing type, used/remaining, overage, and reset date.
@@ -64,6 +64,9 @@ V2 (`opencode.jsonc`):
       "options": {
         // Poll interval in seconds (minimum 5, default 15)
         "interval": 15,
+        // Footer format: "full" (default) shows "Copilot 2,000/15,000 cr · 13.3%",
+        // "percent" shows "Copilot 13.3%". /copilot always shows full details.
+        "display": "full",
       },
     },
   ],
@@ -74,7 +77,7 @@ V1 (`tui.json`):
 
 ```json
 {
-  "plugin": [["opencode-github-copilot-usage", { "interval": 15 }]]
+  "plugin": [["opencode-github-copilot-usage", { "interval": 15, "display": "percent" }]]
 }
 ```
 

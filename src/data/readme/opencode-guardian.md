@@ -4,7 +4,7 @@
 [![npm downloads](https://img.shields.io/npm/dm/opencode-guardian?color=blue&logo=npm&logoColor=white)](https://www.npmjs.com/package/opencode-guardian)
 [![OpenCode: v1 & v2](https://img.shields.io/badge/OpenCode-v1%20%7C%20v2%20Dual--Mode-10b981?logo=terminal&logoColor=white)](https://opencode.ai)
 [![Historical V1/V2 host baseline](https://img.shields.io/badge/Host%20baseline-historical-10b981?logo=checkmarx&logoColor=white)](docs/acceptance-v1.md)
-[![Tests: 725/725 Passing](https://img.shields.io/badge/Tests-725%2F725%20Passing-339933?logo=githubactions&logoColor=white)](docs/discipline-coverage.md)
+[![Tests: 730/730 Passing](https://img.shields.io/badge/Tests-730%2F730%20Passing-339933?logo=githubactions&logoColor=white)](docs/discipline-coverage.md)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D22.0.0-339933?logo=nodedotjs&logoColor=white)](package.json)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178c6?logo=typescript&logoColor=white)](tsconfig.json)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
@@ -21,23 +21,23 @@ OpenCode Guardian continuously supervises agent turns: guiding model execution b
 
 ![Automated and host acceptance results](docs/assets/verification-overview.svg)
 
-> The graphic separates **v0.12.1 automated verification** from historical V1/V2 host acceptance. A new live-host and interactive TUI acceptance run has not been performed for v0.12.1.
+> The graphic separates **v0.12.3 automated verification** from historical V1/V2 host acceptance. A new live-host and interactive TUI acceptance run has not been performed for v0.12.3.
 
-Guardian **v0.12.1** was checked on **20 October 2026**, using Node **24.22.0**:
+Guardian **v0.12.3** was checked on **21 October 2026**, using Node **24.22.0**:
 
-- **Current Automated Verification:** **725 / 725** unit, security, toast notification, and regression tests passing.
+- **Current Automated Verification:** **731 / 731** unit, security, toast notification, and regression tests passing.
 - **Sandbox Scenarios:** **18 / 18** end-to-end multi-turn agent failure and recovery scenarios verified.
 - **Static Analysis:** standard and strict TypeScript gates pass; Oxlint reports **0 warnings / 0 errors**.
-- **Dependency Audits:** Not rerun for v0.12.0; no dependency versions changed.
-- **Historical Host Acceptance (V1 & V2):** Earlier host results, original versions and test environments remain in the acceptance reports; they are not a new acceptance run for v0.12.0.
+- **Dependency Audits:** Not rerun for v0.12.3; no dependency versions changed.
+- **Historical Host Acceptance (V1 & V2):** Earlier host results, original versions and test environments remain in the acceptance reports; they are not a new acceptance run for v0.12.3.
 
 Read the comprehensive [V1 Acceptance Report](docs/acceptance-v1.md), [V2 Acceptance Report](docs/acceptance-v2.md), and [Verification and Acceptance Report](docs/verification-report.md) for reproduction steps, methodology, and full test matrices.
 
-Guardian **v0.12.1** adds scoped test summaries, observed edit-integrity advisories and contextual rule checks. See [discipline coverage, configuration and limitations](docs/discipline-coverage.md) for the fourteen-rule evaluation, supported formats and evidence boundaries.
+Guardian **v0.12.3** protects subagents and in-progress execution turns from false-positive completion gate blocking, recognizes multilingual ongoing-work statements across all 13 supported languages, standardizes actionable remediation prompts with numbered instructions, and enforces an anti-distraction directive. See [discipline coverage, configuration and limitations](docs/discipline-coverage.md) for the fourteen-rule evaluation, supported formats and evidence boundaries.
 
 ---
 
-See the [0.12.1 release notes](CHANGELOG.md) for engine evidence, edit-integrity and contextual discipline improvements.
+See the [0.12.3 release notes](CHANGELOG.md) for engine evidence, subagent completion-gate fixes, and actionable discipline improvements.
 
 ## ✨ Key Highlights
 
@@ -122,7 +122,7 @@ To mount the Guardian sidebar in your OpenCode terminal:
 ### 🔽 Collapsed View (Default)
 
 ```text
-▶ Guardian                 v0.12.1
+▶ Guardian                 v0.12.3
 Status                       ● Active
 Interventions                 0w · 0r
 ```
@@ -136,7 +136,7 @@ Interventions                 0w · 0r
 Clicking the `▶ Guardian` header expands the widget:
 
 ```text
-▼ Guardian                 v0.12.1
+▼ Guardian                 v0.12.3
 Preflight                  ○ disabled
 Inspected                           0
 Blocked                             0

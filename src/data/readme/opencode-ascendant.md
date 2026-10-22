@@ -1,6 +1,6 @@
-# Ascendant Agents
+# Skills
 
-[![skills.sh](https://skills.sh/b/thaletto/ascendant-agents)](https://skills.sh/thaletto/ascendant-agents)
+[![skills.sh](https://skills.sh/b/astro-ascendant/skills)](https://skills.sh/astro-ascendant/skills)
 
 Save a birth chart once. Get consistent, evidence-backed readings every time.
 
@@ -15,7 +15,7 @@ No re-typing birth data. No made-up charts. Same input → same result.
 
 ## How it works
 
-1. `init`: save birth data to generate Vedic and KP charts, dashas, Ashtakavarga
+1. `add`: save birth data to generate Vedic and KP charts, dashas, Ashtakavarga
 2. Ask anything: answers cite your stored chart, not vibes
 3. `setup`: only when needed to install calculation deps
 
@@ -32,19 +32,19 @@ opencode plugin add opencode-ascendant
 
 **Claude Code**
 ```text
-/plugin marketplace add thaletto/ascendant-agents
+/plugin marketplace add astro-ascendant/skills
 /plugin install ascendant@ascendant
 ```
 
 **Codex**
 ```console
-codex plugin marketplace add thaletto/ascendant-agents --ref main
+codex plugin marketplace add astro-ascendant/skills --ref main
 codex plugin add ascendant@ascendant
 ```
 
 **Agent Skills**
 ```console
-npx skills add thaletto/ascendant-agents --skill ascendant
+npx skills add astro-ascendant/skills --skill ascendant
 ```
 
 ## For contributors
@@ -53,6 +53,6 @@ npx skills add thaletto/ascendant-agents --skill ascendant
 make build   # install, match versions, rebuild skills + opencode package, verify
 ```
 
-Releases publish to npm and open a GitHub Release on tag push — see
+Releases publish to npm and open a GitHub Release on tag push; see
 [RELEASE.md](./RELEASE.md) and the
-[Releases page](https://github.com/thaletto/ascendant-agents/releases).
+[Releases page](https://github.com/astro-ascendant/skills/releases).

@@ -346,9 +346,11 @@ lacode doctor                                        # what the environment reso
 ```
 
 `lacode notify` is fire-and-forget and always exits 0 — an unreachable desktop
-must never be able to fail the process that tried to notify you. `lacode forward
-HOST -- COMMAND` runs a command on another host over ssh and exits with its
-status.
+must never be able to fail the process that tried to notify you. The one
+exception is an actionable notification — one carrying a permission request id
+— which waits for the click, because the answer is the whole point of it.
+`lacode forward HOST -- COMMAND` runs a command on another host over ssh and
+exits with its status.
 
 The full CLI is `notify`, `forward`, `doctor`, `version`, `update`, `receive`
 and `tunnel setup`. `version` reports which copy of LaCode is running — and

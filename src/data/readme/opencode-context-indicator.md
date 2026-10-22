@@ -499,13 +499,13 @@ the sidebar instead.
   gracefully (the breakdown falls back to throttled `session.messages` fetches
   and toasts keep working).
 * **OpenCode ≥ 2.0.16** for the V2 path (built and verified against
-  **2.0.26**).
+  **2.1.2**).
 * **TUI sidebar**: terminal TUI only, requires the OpenTUI rendering stack that
   ships with OpenCode. `@opentui/core` and `solid-js` are **optional** peer
   dependencies resolved by OpenCode at runtime; the main plugin installs and runs
   fine without them (the sidebar simply is not available). `@opentui/solid` is
-  instead shipped as a **pinned direct dependency** (exact `0.5.17`, matching
-  the OpenTUI stack OpenCode 2.0.26 ships): OpenCode's
+  instead shipped as a **pinned direct dependency** (exact `0.6.6`, matching
+  the OpenTUI stack OpenCode 2.1.2 ships): OpenCode's
   TUI loader does not expose a host instance of it, so for npm-installed plugins
   the JSX pragma would otherwise fail to resolve `@opentui/solid/jsx-runtime`
   (upstream: opencode issue #33884 — `node_modules` plugins are excluded from the
@@ -578,10 +578,11 @@ caller.
 ### Running tests
 
 ```bash
-npm run test:prepublish       # fast gate: tarball + tui.tsx + resolve + T1–T24 unit checks
+npm run test:prepublish       # fast gate: tarball + tui.tsx + resolve + T1-T25c unit checks
 npm run test:e2e              # full E2E: isolated plugin load + one "Say OK" round-trip
 npm run test:e2e:quick        # E2E load-only, no LLM call
-npm run test:drift            # OpenTUI pin vs the latest RELEASED opencode (also in CI)
+npm run test:drift            # advisory: warns on non-breaking host drift (also in CI)
+npm run test:drift:strict     # release check: fails on ANY host drift
 ```
 
 `prepublishOnly` runs **both** gates automatically on `npm publish`
@@ -599,7 +600,7 @@ STEP 80 s, ~3 min total.
 | (a) tarball composition | `package.json` `files[]` expands to the base files plus every `lib/*` module (count asserted dynamically) | no test/node_modules/tsconfig in the tarball |
 | (b) pragma regression | esbuild `--jsx=automatic` → `@opentui/solid/jsx-runtime` present, `react/jsx-runtime` absent | a removed/broken pragma kills the sidebar on npm install |
 | (c) resolve chain | replica install: host-bridged + peer packages resolve; local tui.tsx relative imports resolve via node from the entry (resolve-bridge.cjs) | broken peer/optional dep or a bad local import silently breaks the sidebar |
-| (d) unit harness T1–T24 | limit/agent/state fix assertions plus measureContributors, redacted-export, shared category-helper, sanitizer/unicode, prompt-cache and waste-detector checks (58 total) | regressions in modelLimits, writeStateFile, hydrate, contributors, export |
+| (d) unit harness T1-T25c | limit/agent/state fix assertions plus measureContributors, redacted-export, shared category-helper, sanitizer/unicode, prompt-cache and waste-detector checks (62 total) | regressions in modelLimits, writeStateFile, hydrate, contributors, export |
 | (e) corporate-identifier scan | no forbidden identifiers in the published surface + test tree | compliance |
 | (f) non-English scan | no non-ASCII letters (`\p{L}` above U+007F) in any repo file | English-only source rule |
 
@@ -644,9 +645,15 @@ repo inactivity — a push or manual run re-enables them):
    `lib/*` imports);
 2. `test/prepublish.mjs` — the full fast gate (a)–(f), including the standalone
    esbuild transpile check (pragmas, no React);
-3. `test/drift-watch.mjs` — the OpenTUI pin must match the OpenTUI catalog of the
-   **latest released** opencode; red CI means "bump the pin before the next
-   release".
+3. `test/drift-watch.mjs` — compares the OpenTUI pins and the
+   `@opencode/plugin` types devDependency with the **latest released** opencode.
+   It is **advisory by default**: patch drift prints a `::warning::` annotation
+   and exits 0, so the daily pipeline does not go red on every host patch. Only
+   a **breaking** drift fails: a major bump, a minor bump of
+   `@opencode/plugin` (its TUI type surface is not guaranteed additive), a
+   minor bump for 0.x `@opentui/*`, or a structural host change (no
+   `workspaces.catalog` / no `@opentui` entries). Before a release run
+   `npm run test:drift:strict` to fail on any drift.
 
 The Node-pty E2E is not run in CI (requires the OpenCode binary) and is skipped
 gracefully when the CLI is absent (`[SKIP] opencode CLI not found`).

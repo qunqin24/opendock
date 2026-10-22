@@ -2,13 +2,13 @@
 
 Configurable early compaction for root sessions and nested agents, using OpenCode's native durable compaction API. No model-limit changes, prompt injection, custom summaries, or task/workflow rewrites. Observe mode is the default.
 
-Targets **`@opencode/plugin@2.0.29`**. The published SDK, official documentation, runner implementation, and upstream continuation test were inspected. The real 2.0.29 server and native TUI now pass [local verification with a synthetic provider](docs/validation/tui-2.0.29-2026-10-16.md); real-provider compaction and Superpowers validation remain unverified. See [compatibility](docs/compatibility.md).
+Targets **`@opencode/plugin@2.0.29`**. The published SDK, official documentation, runner implementation, and upstream continuation test were inspected. The real 2.0.29 server and native TUI now pass [local verification with a synthetic provider](docs/validation/tui-2.0.29-2026-10-16.md); real-provider compaction and Superpowers validation remain unverified. OpenCode 2.1.2 also passes [local server/TUI validation](docs/validation/context-chart-2.1.2-2026-10-22.md). See [compatibility](docs/compatibility.md).
 
 ## Install
 
 The intended npm distribution is **`@cesarus777/opencode-cgp`**. It becomes available after this repository's first publication. The unscoped `opencode-context-guard` name belongs to another project; do not install it expecting this plugin.
 
-Minimum supported host: **OpenCode V2 2.0.29**. Only 2.0.29 has been tested; V1 is unsupported.
+Minimum supported host: **OpenCode V2 2.0.29**. Versions 2.0.29 and 2.1.2 have been tested locally with a synthetic provider; V1 is unsupported.
 
 After this project's first publication, register the global package through the native manager:
 
@@ -41,7 +41,7 @@ Global configuration is `~/.config/opencode/opencode.jsonc` (or the OpenCode con
 
 Restart/reload OpenCode and look for `context-guard: observe; diagnostics ...`. Observe mode records policy decisions and never requests compaction; OpenCode's own automatic compaction remains active. Inspect diagnostics first, then set `mode` to `enforce` to admit native compaction at runtime step boundaries. The complete [example](examples/opencode.jsonc) includes model, role, and agent policies. **Last matching rule wins**; selectors within a rule are ANDed.
 
-Pin the exact published version in the existing entry's `package` field or use the manager. Version `0.2.3` restores context usage for existing sessions when the plugin is enabled and keeps stale occupancy visible.
+Pin the exact published version in the existing entry's `package` field or use the manager. Version `0.2.4` keeps the context chart continuous through pauses, retains its history between sidebar and panel, and shows confirmed compaction drops. It also adds local OpenCode 2.1.2 validation.
 
 ```sh
 opencode plugin add @cesarus777/opencode-cgp@0.2.1
@@ -96,7 +96,7 @@ A provider measurement refers to its **completed request**, not the next assembl
 
 ## Native TUI
 
-Open `/context-guard` or **Open Context Guard** in the command palette for current prompt occupancy, effective input capacity, trigger/headroom, measurement freshness, compaction phase and nested agent status. A native sidebar section appears where the host mounts its sidebar; the panel also works on child routes and narrow terminals. The main session includes a live context chart scaled to its full effective input capacity, with a horizontal compaction threshold and recent usage samples. Key values stay visible as text. Estimates, unknown values, stale measurements and uncertain compaction remain explicit.
+Open `/context-guard` or **Open Context Guard** in the command palette for current prompt occupancy, effective input capacity, trigger/headroom, measurement freshness, compaction phase and nested agent status. A native sidebar section appears where the host mounts its sidebar; the panel also works on child routes and narrow terminals. The main session includes a live context chart scaled to its full effective input capacity, with a horizontal compaction threshold and recent usage samples. Pauses and temporarily lower values retain the previous chart level in gray with a dashed top; a confirmed compaction followed by reported usage permits a visible drop within the same trace. Key values stay visible as text. Estimates, unknown values, stale measurements and uncertain compaction remain explicit.
 
 The TUI reads bounded snapshots over public OpenCode RPC, including when telemetry is disabled. Remote clients also need a client-side package registration in `cli.json`; see [the example](examples/cli.jsonc) and [controls, installation and bounds](docs/configuration.md#native-context-guard-view). It targets the inspected 2.0.29 API. The actual local host passes wide root, child and narrow grandchild panel checks. Use **Context Guard: open panel** above a child composer, where the host hides its usual prompt and palette shortcut. tmux, Neovim and cross-machine remote validation remain open.
 

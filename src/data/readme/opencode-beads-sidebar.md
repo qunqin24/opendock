@@ -4,8 +4,7 @@
 [![npm](https://img.shields.io/npm/v/opencode-beads-sidebar)](https://www.npmjs.com/package/opencode-beads-sidebar)
 
 Shows your current [beads](https://github.com/gastownhall/beads) plan — and how far
-through it you are — in the [opencode](https://opencode.ai) sidebar, the way the
-built-in Todo panel shows opencode's own throwaway todos.
+through it you are — in the [OpenCode V2](https://opencode.ai/v2) sidebar.
 
 ![The Beads panel following a plan from 0% to 100% as its tasks close](https://raw.githubusercontent.com/nycdubliner/opencode-beads-sidebar/main/docs/beads-burndown.gif)
 
@@ -27,22 +26,35 @@ subagent — and renders nothing. Neither needs the other.
 
 ## Install
 
-Needs [`bd`](https://github.com/gastownhall/beads) on your `PATH` and opencode ≥ 1.18.
+Needs [`bd`](https://github.com/gastownhall/beads) on your `PATH` and
+**OpenCode ≥ 2.0.32**. This branch targets the V2 CLI plugin API; use package
+version `0.1.1` for legacy V1 installations.
 
-```bash
-opencode plugin opencode-beads-sidebar --global
+Add the package to the global `~/.config/opencode/cli.json` (or
+`$XDG_CONFIG_HOME/opencode/cli.json`):
+
+```json
+{
+  "$schema": "https://opencode.ai/v2/cli.json",
+  "plugins": ["opencode-beads-sidebar"]
+}
 ```
 
-opencode installs the published package and its dependencies itself. TUI
-plugins are configured in `tui.json`, not `opencode.json` — if the plugin
-doesn't appear after a restart, check that the entry landed there. Then open a
-session in a repo with a `.beads` directory.
+Merge this into your existing configuration, preserving other plugins. V2
+uses `cli.json`, not V1's `tui.json`; there is no project-local `cli.json`.
+For an unpublished migration checkout, use the absolute checkout path instead
+and build it first (see [Hacking on it](#hacking-on-it)). The npm `0.1.1`
+release remains V1 until a V2 release is published.
 
-To run from a checkout instead (for hacking), see
-[Hacking on it](#hacking-on-it).
+Open a session in a repo with a `.beads` directory. The active session's actual
+worktree root is resolved through the V2 client, including sessions launched
+from subdirectories and linked Git worktrees. While a session is loading or
+a location lookup fails, the panel and its actions stay inactive rather than
+operating on another workspace. Run `/bd-refresh` to retry a failed lookup.
 
-> Installing straight from GitHub (`opencode plugin github:...`) does *not* work
-> — opencode 1.18 mangles the spec into a directory name and never installs it.
+`bd` runs on the machine running the TUI. Use this plugin only when the
+server's project paths refer to that same filesystem; remote-server paths
+are not translated or executed remotely.
 
 ## What it shows
 
@@ -84,12 +96,25 @@ In the command palette (`ctrl+p`), and as slash commands.
 
 Clicking a row opens that bead's details.
 
-Actions go through a picker rather than a cursor in the panel, because no
-sidebar section in opencode takes keyboard focus — the built-in Todo and
-Modified Files panels are display-only too.
+Actions go through a picker rather than a cursor in the panel. Cancelling a
+picker leaves beads unchanged. Switching sessions while a picker is open
+keeps that action bound to the workspace in which it started.
 
-Keybindings are yours to set in `tui.json` under `keybinds`, using the command
-names above (`beads.focus`, `beads.close`, …).
+Keybindings are yours to set in `cli.json` under `keybinds`, using flat command
+IDs (not a nested `beads` object):
+
+```json
+{
+  "keybinds": {
+    "beads.focus": "<leader>bf",
+    "beads.refresh": "<leader>br"
+  }
+}
+```
+
+Focus pins are per session and saved in V2 plugin storage, including across
+hot reloads and TUI restarts. Legacy V1 KV pins are not migrated; run
+`/bd-focus` once to restore a pin after upgrading.
 
 ## What it does to your data
 
@@ -100,8 +125,9 @@ reversible with `bd`.
 `bd` is invoked directly rather than through a shell, so bead titles and ids are
 passed as arguments and never interpreted as shell commands; ids sourced from
 `.beads/last-touched` or bd's own JSON are additionally validated before use, so
-a crafted id can't be smuggled in as a flag. Nothing is sent anywhere: no
-network calls, no telemetry.
+a crafted id can't be smuggled in as a flag. The plugin makes no network calls or telemetry requests. `bd` can have its own
+usage metrics; set `BD_DISABLE_METRICS=1` to disable those for the TUI and its
+subprocesses. CI uses that opt-out for real-bd integration tests.
 
 One caveat worth knowing: if the agent is also editing beads while you act on
 one, `bd` is last-write-wins. The panel re-reads after every write so it won't
@@ -109,17 +135,9 @@ show you a state the agent has already moved past.
 
 ## Configuration
 
-Nothing is required. Two things you can change if you want:
-
-**Replace the built-in Todo panel instead of sitting under it.** The Beads
-section renders below Todo by default. To hide opencode's todos entirely:
-
-```json
-{
-  "plugin": ["/absolute/path/to/opencode-beads-sidebar"],
-  "plugin_enabled": { "internal:sidebar-todo": false }
-}
-```
+The panel appends to V2's `sidebar.content` slot. V2 no longer exposes V1's
+numeric panel ordering, so exact placement relative to other plugins follows
+their enable order. The old `internal:sidebar-todo` override does not apply.
 
 **Trace what it's doing.** Set `BEADS_SIDEBAR_DEBUG=/tmp/beads.log` to log
 refreshes, scope resolution, and pinning.
@@ -139,15 +157,17 @@ right away, but doesn't by itself move the panel's attention to another epic.
 
 ## Hacking on it
 
+Use Node ≥ 26.4 (required by the V2 OpenTUI development dependencies).
+
 ```bash
 git clone https://github.com/nycdubliner/opencode-beads-sidebar
 cd opencode-beads-sidebar && npm install
 ```
 
-Then point `~/.config/opencode/tui.json` at the checkout:
+Then point `~/.config/opencode/cli.json` at the checkout:
 
 ```json
-{ "plugin": ["/absolute/path/to/opencode-beads-sidebar"] }
+{ "plugins": ["/absolute/path/to/opencode-beads-sidebar"] }
 ```
 
 Before sending a change:
@@ -159,19 +179,29 @@ npm run typecheck   # tsc --noEmit
 npm test            # node --test
 ```
 
-The unit tests cover the non-JSX modules (`bd.ts`, `scope.ts`, `commands.ts`)
+The unit tests cover the non-JSX modules (`bd.ts`, `scope.ts`, `commands.ts`, `store.ts`, `session.ts`)
 — everything that can run under plain Node. The `.tsx` files need opencode's
 live renderer and are exercised only by the host. `test/integration.test.ts`
 runs against a real `bd` from your `PATH` and skips itself when there isn't
 one; CI runs it on a macOS runner with `brew install beads`.
 
+The root `tui.js` shim is required for V2 directory installs, which resolve
+`<checkout>/tui` rather than the package export. It forwards to the same
+precompiled `dist/tui.js` used by npm installs.
+
 A path-loaded plugin uses its own `node_modules` at runtime, so `npm install`
 isn't optional, and the installed `@opentui/*` must match the version opencode
-itself runs. The dev pins track `@opencode-ai/plugin`'s own peer range, which
+itself runs. The dev pins track `@opencode/plugin`'s own peer range, which
 is what keeps a plain `npm install` conflict-free; the package declares
 `@opentui/*` as peer dependencies so a published install lets opencode pick
 versions matching itself — which is why the npm install route is the robust
 one.
+
+For manual V2 verification, load the built checkout, switch between sessions
+in different worktrees, pin/unpin an epic, cancel each picker, run start/close/
+reopen, click a row, edit beads externally, and hot-reload/disable the plugin.
+Check that old timers stop and navigation cannot redirect a pending action.
+`opencode plugin check` alone is not a runtime compatibility test.
 
 Three things here are load-bearing and easy to undo by accident. Each one fails
 by rendering an empty panel rather than raising an error, so none of them

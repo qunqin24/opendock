@@ -14,7 +14,8 @@ tags:
 **Landing page:** [looper.dancingteeth.net](https://looper.dancingteeth.net/) (static site in [`site/`](./site/)).
 
 ```bash
-pnpm add -D @dancingteeth/agent-looper
+# Core CLI only (init, setup, --version). Add the SDK for the runtime you will run:
+pnpm add -D @dancingteeth/agent-looper @cursor/sdk   # example: Cursor worker/judge
 pnpm exec agent-loop-init
 pnpm exec agent-loop-setup    # pick worker + judge runtimes (one-screen wizard)
 # or draft a loop from an idea: pnpm exec agent-loop-prompt --out .cursor/loops/my-task
@@ -26,7 +27,7 @@ pnpm exec agent-loop run .cursor/loops/my-task
 
 Each runtime also needs its own SDK or CLI and key, e.g. `@cursor/sdk` + `CURSOR_API_KEY` for Cursor, `claude` on PATH for Claude Code, `opencode` for OpenCode. [`docs/runtime-map.md`](./docs/runtime-map.md) lists them all; `pnpm exec agent-check <runtime>` confirms one is wired. Flags and the rest are below. You do not need them for a first green run.
 
-How the loop is shaped: [`README.intro.md`](./README.intro.md). Technical deep dive: [`ARCHITECTURE.md`](./ARCHITECTURE.md) (including §1.1 — the harness is a small control-flow graph; the Ralph loop lives inside the worker node). npm releases: [`docs/releasing.md`](./docs/releasing.md). What shipped: [`CHANGELOG.md`](./CHANGELOG.md) (current **0.8.2**). Embedding this package as a library dependency in another ADE: [`docs/embed-api.md`](./docs/embed-api.md). Reporting a vulnerability: [`SECURITY.md`](./SECURITY.md).
+How the loop is shaped: [`README.intro.md`](./README.intro.md). Technical deep dive: [`ARCHITECTURE.md`](./ARCHITECTURE.md) (including §1.1 — the harness is a small control-flow graph; the Ralph loop lives inside the worker node). npm releases: [`docs/releasing.md`](./docs/releasing.md). What shipped: [`CHANGELOG.md`](./CHANGELOG.md) (current **0.8.3**). Embedding this package as a library dependency in another ADE: [`docs/embed-api.md`](./docs/embed-api.md). Reporting a vulnerability: [`SECURITY.md`](./SECURITY.md).
 
 Supports pluggable **agent SDK** workers (`runtime`) and judges (`reviewRuntime`). Shipped today: **Cursor**, **Cline** (Pass / Credits), **OpenCode** (Go + BYOK), **Pi**, **Codex**, **DSH** (PATH `dsh`), **Muse** (PATH `muse`), **Claude** (PATH `claude`, `--safe-mode`). Defaults and cost notes: [`docs/runtime-map.md`](./docs/runtime-map.md). DSH companion for `dsh web` (skills + scaffold, not a second harness): [`docs/dsh-plugin.md`](./docs/dsh-plugin.md). OpenCode companion plugin (1.x + 2.x: skills, detached `agent_loop_start`, shell guard): [`plugins/opencode-agent-looper/`](./plugins/opencode-agent-looper/). Muse Code: [`docs/muse-runtime.md`](./docs/muse-runtime.md). Claude Code: [`docs/claude-runtime.md`](./docs/claude-runtime.md). To measure cheap-worker claims on a frozen loop: [`docs/runtime-cost-bench.md`](./docs/runtime-cost-bench.md). The judge runs on the worker's runtime when `reviewRuntime` is unset (each runtime has its own judge model, e.g. OpenCode → DeepSeek V4 Pro, Claude → Opus); set `reviewRuntime` + `reviewModel` to pair a cheap worker with a different judge.
 
@@ -205,6 +206,7 @@ Per-loop overrides in `loop.json`: `taskwarriorProject`, `taskwarriorUuid`, `hit
   verify-logs/             # optional — sidecar verify stdout/stderr (`verifyLogMode`)
   failure-domains.ndjson   # optional — stagnation / max iterations / gate exhaust
   failure-context.md       # optional — written by meta-loop probe for fix loop
+  lessons.md               # optional — verify gotchas from prior green runs (harness-owned)
 ```
 
 ### Verification (`verify` / `verifyMode`)
@@ -215,9 +217,9 @@ Per-loop overrides in `loop.json`: `taskwarriorProject`, `taskwarriorUuid`, `hit
 | `verifyMode` | `command` | `command` = shell only. `skill` = verify agent reads `verifySkill`, emits `VERIFY_RESULT: PASS/FAIL`, then runs shell `verify` on PASS. Skill-verify uses the same iteration agent as the worker (reasoning ladder / `escalateModel` apply). |
 | `verifySkill` | — | Path to `VERIFY.skill.md` (required when `verifyMode` is `skill`). |
 | `finalVerify` | — | Stricter outer check after inner `verify` passes. |
-| `verifyLogMode` | `inline` | How verify stdout/stderr reach the next worker. `inline` pastes the capture. `sidecar` is **optional**: write `<loop-dir>/verify-logs/` and put a ~600-character preview + path in the prompt. Leave unset / `inline` when verify is short. |
+| `verifyLogMode` | `sidecar` | How verify stdout/stderr reach the next worker. **`sidecar`** (default) writes `<loop-dir>/verify-logs/` and puts a tail-biased preview + path in the prompt. **`inline`** pastes the in-memory capture only (head+tail when long). |
 
-Default stays **`inline`**. Use `"verifyLogMode": "sidecar"` only when verify dumps are large (full vitest / Playwright / compiler walls) and would otherwise repeat in every later prompt. Sidecar does not change the verifier; capture is still capped (~64KB) before anything is written to disk.
+Default is **`sidecar`** so failures at the end of vitest/Playwright walls stay visible without bloating every prompt. Set `"verifyLogMode": "inline"` when verify is always short. In-memory capture is capped (~64KB, head+tail) before sidecar write.
 
 Legacy `loop.json` field `syncPostgres` maps to `syncOnSuccess`.
 
@@ -235,6 +237,9 @@ Legacy `loop.json` field `syncPostgres` maps to `syncOnSuccess`.
 | `mode` | `forward` | `reverse` = clean-room rebuild (`templates/GOAL.reverse.template.md`) |
 | `pauseAfterIteration` | `false` | Wait for Enter after each iteration (TTY only) |
 | `injectFailureContext` | `false` | Read `failure-context.md` into the prompt (meta-loop fix rounds) |
+| `lessons` | `false` | Opt-in: read/write `lessons.md` — bounded verify gotchas from earlier green runs, quoted as data in the stable prompt head |
+| `deliverables` | — | Repo-relative files the worker must create (absolute or `..` paths are rejected); harness re-prompts before verify when missing or empty |
+| `deliverableNudges` | `2` | Max extra worker calls per iteration when `deliverables` are still missing (`0`–`5`) |
 | `syncOnSuccess` | `true` | Run repo profile `syncCommand` after success |
 | `notifyTelegram` | `true` | Send completion report when Telegram env + profile are configured |
 | `telegramAttachReview` | `true` | Attach `review.md` as a second Telegram message |
@@ -250,6 +255,7 @@ Legacy `loop.json` field `syncPostgres` maps to `syncOnSuccess`.
 | `reasoningEscalationStep` | `1` | Tiers to step per iteration (`1` or `2`) |
 | `escalateModelReasoningEffort` | — | Reasoning tier on escalated model |
 | `escalateAfterStagnation` | `2` | Identical-failure count before model switch (after reasoning ceiling). Worker timeout / no-tool stall switches immediately and does not wait for this count. |
+| `stallProbes` | `false` | When `true`, the first time identical failures hit `escalateAfterStagnation`, the harness runs two differently guided probe workers (procedure hints vs repo facts), keeps the better workspace, then resumes normal escalation — at most once per run. Workspace snapshots are stored as git objects (worktree + index, no stash); restore puts back the branch and HEAD, rewrites only paths that differ, never follows symlinks, keeps file permissions, never deletes a path the snapshot's ignore rules ignore and never deletes under `.cursor/loops/`. **Limits:** ignored files are not snapshotted; restore reverts every change made during the probe round — one loop per worktree, don't edit while probes run. |
 | `skills` | — | Explicit `…/SKILL.md` paths (merged with GOAL refs). Default prompt is an **index** (name, description, path) — worker **Read**s the file when needed. |
 | `skillDisclosure` | `index` | `index` = progressive disclosure (0.4.0 default; 0.3.0 always inlined). `inline` = paste full SKILL.md bodies. Pin the field on any loop that must keep the old in-prompt runbook. |
 | `plugins` | — | Agent Plugins package dirs — discovers `skills/*/SKILL.md` ([`docs/agent-plugins.md`](./docs/agent-plugins.md)) |
@@ -341,15 +347,19 @@ CLI overrides: `--mode reverse`, `--pause-after-iteration`, `--review-gate`, `--
 When `reviewGate: true` and verify passes:
 
 ```text
-primary review (reviewRuntime + reviewModel; default cursor)
+primary review (reviewRuntime + reviewModel)
   → optional reviewReproduce path filter
   → optional reviewReproduceAgent KEEP/DROP
-  → optional reviewSecondaryRuntime merge
+  → optional reviewSecondaryRuntime merge (verdict merge, not error fallback)
   → gating blockers remain? → fix iteration (up to maxReviewCycles)
   → else PASS / ADVISORY → complete
 ```
 
+If the **primary judge session errors** (timeout, provider fault, text-with-no-tool-calls), the harness retries once, then runs **`reviewSecondary`** as a fallback judge (without a second merge pass on the same model). When both fail, the run **parks** (`status: waiting`, CLI exit `2`, `failure-domains.ndjson` reason `review_judge_failed`) — verify already passed.
+
 Unparseable verdicts retry (`unparseableReviewRetries`). Gate exhaust can escalate to HITL (`reviewGateHitl`). Gating bullets (`severity: error` + a recognized impact tag) keep the gate open even if a later `### Verdict — PASS` heading appears in the same `review.md`. Heading vs body token disagreement with no gating bullets is unparseable.
+
+`run-report.md` includes **billing token** rows (uncached in / out / cache read / cache write by worker vs judge) and an **expected tool errors** table when any session recorded `tool_end` failures or plain-text tool stalls.
 
 ## Ralph loop alignment
 
@@ -518,6 +528,14 @@ Example payload:
 AGENT_LOOP_DONE {"v":1,"kind":"loop","bundle":".cursor/loops/my-task","complete":true,"exitCode":0,"reason":"Verifier passed (exit 0).","iterations":2,"runReport":".cursor/loops/my-task/run-report.md"}
 ```
 
+`exitCode` in the JSON matches the CLI process exit code:
+
+| Code | Meaning |
+| --- | --- |
+| `0` | Success (`complete: true`) |
+| `1` | Fatal harness error (uncaught throw, bad argv) |
+| `2` | Incomplete or parked — verify/review gate/stagnation (`status: continue`) or human/provider park (`status: waiting`; budget, env/setup, judge unavailable, transient worker cap; `complete: false`) |
+
 Human logs stay on **stderr**; the sentinel is written with **`fs.writeSync(1, …)`** so piped stdout is not lost before `process.exit`. Side channels (`notifyWebhook` / `notifyCommand` / PR comment) run **after** the sentinel and are time-capped so a hung hook cannot delay wake.
 
 ### Cloud Agents
@@ -534,7 +552,7 @@ Do not promise in-chat wake from `AGENT_LOOP_DONE` on Cloud Agents.
 
 ## Export packs (cloud / PR audit)
 
-In-loop `review.md` / `log.ndjson` / `run-report.md` stay **gitignored** (noisy mid-run). When `exportPack: true` (default), each finished loop also writes a curated snapshot to:
+In-loop `review.md` / `log.ndjson` / `run-report.md` / `verify-logs/` stay **gitignored** (noisy mid-run). `agent-loop-init` adds a block for loop artifacts including `.cursor/loops/**/verify-logs/`. When `exportPack: true` (default), each finished loop also writes a curated snapshot to:
 
 ```text
 .cursor/loop-exports/<slug>/

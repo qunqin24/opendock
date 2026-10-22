@@ -12,7 +12,7 @@ OpenCode 插件,面向 JetBrains 项目 (IntelliJ IDEA / PyCharm / WebStorm 等)
 > **需要项目环境的命令走 Run Configuration**:跑 `java` / `python` / `npm` 这类依赖项目配好的 JDK / Node / Python 版本的
 > 命令时,引导模型用 `ide_execute_run_configuration`(配置 **由用户**先在 IDE 里建好),而不是原生 shell;不需要项目
 > 环境的命令照常走原生 shell。 **IDE 内置终端 (`ide_execute_terminal_command`) 已被隐藏** —— 实测它并不继承项目环境,
-> 对原生 shell 没有任何优势。详见「项目命令执行」。
+> 对原生 shell 没有任何优势。详见「Run Configuration 全套」。
 
 非 JetBrains 项目完全不受影响。 **手动接入**:插件启动不探测、不连接任何 IDE。三个命令管全部:
 
@@ -75,13 +75,8 @@ setup(启动, 每 root 一次):
   2. 触发成功 → 把该错误改写为"已重连 / 已重新打开,请重试",模型同一回合重试;失败 → 保持原错误
 
 请求驱动的恢复(没有后台轮询;每个 Location(项目)各一份插件实例):
-  1. `prompt` 钩子(消息进入时,OpenCode 会 await 它)——「已配置 + 本实例没有任何 MCP 注册」→
-     探测端口,**只注册、绝不 `open -a`**;命中就重建,于是**这条消息本身**就带上了 IDE 工具
-  2. `context` 钩子——某条请求"曾经有 IDE 工具、现在没有" → 立刻锁存并在后台重建(不等下一条消息)
-  3. `execute.after` 钩子——IDE 工具调用以"不可用"告终(`MCP server "<名>" is not available` /
-     `Error POSTing to endpoint`)→ 重跑接入流程,并把错误改写成"已重连,请重试";
-     普通业务错误(文件不存在等)不动作
-  ※ 三者都只在**确实有事发生**时动;没人用这个项目时,插件完全静止
+  prompt / context / execute.after 三个钩子各管一件事,只在**确实有事发生**时动;
+  没人用这个项目时,插件完全静止。三个钩子分别做什么见「行为」。
 ```
 
 ## 接入 (`/open-in-ide` 与 `/add-sub-module-in-ide`)
@@ -150,50 +145,120 @@ configure_ide_project({ path: "modelserver", ide: "pycharm" })   // 配置一个
 
 ## 按能力选工具 (直接调用引导)
 
-IDE MCP 可用时,插件通过 **系统提示注入**告诉模型 **哪些事该走 IDE**;不修改任何工具 (原生或 IDEA)
-的定义、描述或可用性:
+IDE MCP 可用时,插件通过 **系统提示注入**告诉模型 **哪些事该走 IDE**;除下面「工具参数」那一处刻意的例外
+(只做减法:从 schema 里删掉一个参数),不修改任何工具 (原生或 IDEA) 的定义、描述或可用性:
 
 1. **系统提示注入**:通过 `ctx.session.hook("context", …)` 往每次请求的 system 里追加一段引导 + 能力映射表。 **文本本身在
    `src/ide-guidance.template.md`**——它是一份要给人 review 的提示词文档,条件直接用 `{{#if …}}` 写在那几行外面,所以打开模板
    就能看到最终渲染成什么样;`src/template.js` 是渲染器 (支持 `{{var}}` / `{{#if}}` / `{{else}}`, **不做 HTML 转义**——
    输出是 Markdown,`<jar>!/<entry>` 和反引号必须原样过)。含工具名 (`<项目前缀>_<name>`;root 是 `ide_*`,
    子项目是 `<目录名>_*`)与关键参数名:
-    - **只有 IDE 才有的能力才写进去** —— 符号级检索、项目模型、检查与构建、重构与格式化、运行配置:
+    - **原生工具做不到、或做得很差的能力才写进去** —— 符号级检索、项目模型、检查与构建、重构与格式化、跨文件补丁、运行配置:
         - 符号 → `ide_search_symbol` / `ide_get_symbol_info` / `ide_analyze_calls`
         - 项目与编辑器 → `ide_get_project_modules` / `ide_get_project_dependencies` / `ide_list_directory_tree` /
           `ide_get_all_open_file_paths` / `ide_open_file_in_editor`
         - 重构/格式化 → `ide_rename_refactoring` / `ide_reformat_file`
+        - 批量改文件 → `ide_apply_patch`(一个调用带多个 `*** Update File:` 段落)
         - 校验 → `ide_lint_files` / `ide_get_file_problems` / `ide_build_project`
         - 运行配置 → `ide_get_run_configurations` / `ide_execute_run_configuration`(+ 配套插件的启停工具)
         - 部署 (**仅配套插件 + Ultimate**)→ `ide_list_deployment_servers` / `ide_upload_to_deployment` /
           `ide_download_from_deployment` / `ide_get_deployment_task_status`
-    - **读、找文本、找文件用原生工具**(`read` / `grep` / `glob`)—— 这几件事走 IDE 只是多一跳,
+    - **读、找文本、找文件用原生工具**(`read` / `grep` / `glob` 这三个**工具**,不是命令行里的同名命令)—— 这几件事走 IDE 只是多一跳,
       所以映射表里 **不出现** `ide_search_text` / `ide_search_regex` / `ide_search_file`,也不再禁止它们的原生对应物。
-    - **写文件一律用原生 `write` / `edit`**:IDE 的 `apply_patch` / `create_new_file` 已收起 —— 补丁工具按上下文精确匹配,
-      标点被规范化就整块对不上(`Hunk context not found`),而原生写没有这层限制。IDE 侧只留 **重构**与**格式化**。
-      **`ide_reformat_file` 会从磁盘重读**,所以外部写完直接格式化是安全的(实测:新增 / 删除 / 改文本都不会被旧副本
+      **工具名与命令行命令必须分开写**:老文案只写"读与搜索用原生工具(read / grep / glob)",`grep` 是个裸词,模型把它读成了
+      命令行的 `grep`,于是自己去 `shell` 里跑 `grep -Rn`,把 `node_modules` 一起扫了(实测:1.6G 的 `node_modules` 下慢了将近
+      一百倍,捞出来的还全是第三方噪音)。所以现在点明"是工具,不是同名命令",并把被禁的那条替代路连理由一起写出来:
+      搜文本只走原生 `grep`(它按 `.gitignore` 排除,`node_modules` / `dist` 根本不进结果,范围用 `path` 参数收窄),
+      不走 `shell` 里的 `grep -R` / `rg`;找文件同理用原生 `glob`,不是 `shell` 里的 `find`。
+      「跑命令用原生 `shell`」那条也补了边界 —— 它是**跑命令**的地方,不是搜代码的地方,否则两条规则打架、模型两头都能挑。
+    - **改单个文件用原生 `write` / `edit`;一次要改多个文件用 `ide_apply_patch`**:IDE 的 `create_new_file` 已收起
+      (原生 `write` 就够),而 **`apply_patch` 留着**。
+      **它和 OpenCode 的原生 `patch` 是两件独立的事**,只是功能重合(都能一次改多个文件),参数与补丁方言都不一样:
+      IDE 这个收 `input`,吃 Codex 格式(`*** Begin Patch` / `*** Update File:` / `@@` / `-` / `+`)或 unified git diff;
+      原生那个收 `patchText`,用 `*** Add File` / `*** Update File` / `*** Delete File` 段落
+      ([官方文档](https://opencode.ai/v2/docs/tools/))。
+      **引导里不提原生 `patch`** —— 它只对 GPT 系模型暴露,多数模型的工具表里没有,提了只会让模型去找一个不存在的工具。
+      **为什么要留着 IDE 这个**:原生 `patch` 不在,别的模型就只剩 `edit` / `write` —— 于是"十几个文件做同一个改动"
+      这个场景**一个工具都没有**,模型只好自己写 python 脚本整文件重写:
+      慢,而且会把没让改的地方也重排掉,还可能覆盖掉别人的改动。`apply_patch` 只碰补丁里写明的那几行,
+      正好补上这个洞。
+      **它的"脆"是可控的,不是破坏性的**(实测 2026.2.3):上下文对不上时那一个 hunk 失败、**该文件原样不动**,
+      返回里点名是哪个文件(`<路径>: Hunk context not found`);多个文件时是**逐个应用**的,不是全成或全败
+      (`N out of M operations applied`),失败的读一下再改即可。引导把这三点都写明了,模型才敢用。
+      旧文案把它收起的理由是"补丁工具按上下文精确匹配,标点被规范化就整块对不上" —— 这条理由本身没错,
+      但它推不出"该藏起来":失败是**局部**的、可定位的,藏掉工具反而逼模型去用更危险的整文件重写。
+      另一头 **`ide_reformat_file` 会从磁盘重读**,所以外部写完直接格式化是安全的(实测:新增 / 删除 / 改文本都不会被旧副本
       冲掉);会丢内容的只有 **用户在编辑器里正改着的那份脏 buffer**,别对它跑 formatter。
       **读**是另一回事:`ide_read_file` 可能给出旧快照,要它跟上得先跑一次 `ide_get_file_problems`。
     - **唯一例外是 `ide_read_file`**:它是读 **包内文件**的唯一手段 (`<jar>!/<entry>` 的依赖 jar 内文件、`jrt://` 的
       JDK 镜像),引导只在这个用途上点名它,并写明普通文件一律用 `read`。
 
-   **有两处不只写"工具能干什么",还写了"什么时候走它 / 不要走哪条替代路"**:
-   一是「校验」,lint / build 在清单里等于没提醒 —— 实测模型绕开工具、自己去 `shell` 里临时编译一遍就宣布
-   完成 (它还为此给了一套自洽的理由:沙箱 IDE 是另一个进程)。这一节 **先讲"改完自己先查一遍",再把判断权
-   交回模型**:大片改动 → 全部改完一次 `build_project`(中途不查,半成品的检查结果只会误导);单点改动 /
-   同一文件反复微调 → 告一段落时对这轮改过的文件一次 `lint_files`;改了签名 / 接口 / import / 依赖走 build,
-   只动文件内部实现走 lint 就够。 **两个失效方向都点名**——每敲一次编辑就查一次,和压根不查一样是错的,而
-   "这一轮属于哪一种"只有模型自己知道,提示词只能给判据、不能替它决定。末两条是收口:查出来的问题要改掉或
-   说明为什么不改;别用 `shell` 里临时编译代替 IDE 工具,也别先猜"索引还没同步 / 那是另一个进程"就绕开
-   (实测两次绕开都是这句猜测,而工具其实一次就答了)。
-   二是「符号」,而且它是被实测打回来的:**一个 IntelliJ 插件会话里 398 次 `shell`、模型自己 reasoning 里
-   `javap` 出现 175 次,`search_symbol` 只出现 3 次 (两次还是用户开口之后)**。老文案把这件事写成"找符号
-   声明位置的技巧",而模型当时的动因是"这个平台方法到底怎么实现的"——两边对不上,触发点就永远不 fire。
-   所以现在 **先把动因写在节标题下面第一句**("要读任何类 / 方法 / 字段的源码,就两步"),把"依赖库 / 三方包 /
-   平台 jar 里的实现"点明为 **这套用得最多的地方**,并显式禁掉它真正的默认手艺:自己拼 jar 路径 + `javap` /
-   `unzip` / 解包看字节码。理由给的是能赢过直觉的那条:**IDE 索引里那份就是项目编译时真正用的依赖**(自己
-   拼的常常是另一份副本,版本对不上),而且读出来是反编译源码,不是要来回十几次才拼得出逻辑的字节码清单。
-   总则里各有同义的一句,因为 **总则才是每条路由规则都会路过的地方**,而这两类失败恰恰都是"整段跳过"。
+   **引导按「路径在不在项目里」分路** —— 这是整个文档的总纲,放在最前面:
+
+   - **项目内** —— **原生工具为主**。读文件、搜文本、找文件、改单个文件,原生 `read` / `grep` / `glob` / `write` /
+     `edit` 都能做,而且更快(按 `.gitignore` 排除)。**原生做不了、或者做得很差的,才用 IDE 工具** ——
+     符号检索、依赖实现、重构、格式化、校验、运行配置、跨文件补丁。
+     **两边都不顺手时,你自己判断用 `shell` 里的工具** —— 那是**第三选择,不是第一选择**。
+   - **项目外** —— **只有原生工具和 `shell`**,IDE 工具不参与。这不是保守,是硬事实:**请求的路径必须落在某个
+     已打开项目的目录树内,IDE 才会去解析它**;项目外的路径(`/tmp`、别的仓库、用户主目录)两个 IDE 都会直接报错。
+
+   这条总纲替代了老版本的「只有 IDE 才有的能力才走 IDE」—— 那句话在 `apply_patch` 放出来之后就不准了
+   (IDE 的 `apply_patch` 与 OpenCode 的原生 `patch` 是两件独立的事,功能重合而已)。
+
+   **有五处不只写"工具能干什么",还写了"什么时候走它 / 不要走哪条替代路"**。每一处都是被实测打回来才补上的,
+   所以下面只列"当初错在哪 → 现在怎么写",故事细节看上面对应的条目:
+
+   | 处 | 当初错在哪 | 现在怎么写 |
+   | --- | --- | --- |
+   | 路由 (总纲) | 只写"用 IDE 工具",没分项目内 / 项目外 | 项目内原生为主 → IDE 补位 → 两边都不行才 `shell`;项目外只有原生 + `shell` |
+   | 校验 | 清单里写着 lint / build,模型当没看见,自己去 `shell` 里临时编译一遍就宣布完成 | 先讲"改完自己先查一遍",再把判断权交回模型;两个失效方向(查太勤 / 压根不查)都点名 |
+   | 符号 | 写成"找符号声明位置的技巧",而模型当时的动因是"这个平台方法到底怎么实现的"——两边对不上,触发点永远不 fire | 先写动因("要读源码就两步"),再显式禁掉默认手艺:自己拼 jar 路径 + `javap` / `unzip` |
+   | 搜索 | 只写"用原生工具(read / grep / glob)",`grep` 是裸词,模型读成了命令行的 `grep` | 点明"是工具,不是命令行里的同名命令",并禁掉 `shell` 里的 `grep -R` / `rg` / `find` |
+   | 写文件 | 只写"写文件一律用原生 write / edit",但那俩都只管一个文件 | 放开 `apply_patch` 并点名;禁掉默认手艺:自己写脚本整文件重写 |
+   | 改名 | 只写"按符号改名",模型读成"手动改一处",没想到它能跨文件按语义更新所有引用 | 写明"改符号优先走重构、改文字走文本工具",并说明它**不碰注释与字符串**;禁掉用文本替换改名 |
+   | 读文件 | 引导一个字没提 `read` 的 `offset` / `limit`,模型只看见 `sed` 这条路 | 点明"要读某一段就传 offset + limit",并禁掉 `shell` 里的 `sed -n 'a,bp'` |
+
+   总则里各有同义的一句,因为 **总则才是每条路由规则都会路过的地方**,而这几类失败恰恰都是"整段跳过"。
+
+   **「改名 / 读文件」这两条是拿全量会话统计出来的**,不是推测。查 OpenCode 的会话库
+   (`~/.local/share/opencode/opencode.db`),统计 `session_message` 里所有 assistant 的工具调用:
+
+   | 读文件 | 次数 | 编辑文件 | 次数 |
+   | --- | --- | --- | --- |
+   | `shell` 里 `sed -n 'a,bp'` | **2512** | `shell` 里 python 脚本 | **3345** |
+   | 原生 `read`(带 `offset`/`limit`) | 1760 | 原生 `edit` | 2605 |
+   | 原生 `read`(整文件) | 1242 | `idea_apply_patch` | 2478 |
+   | | | `idea_read_file` | 1910 |
+
+   而 `ide_rename_refactoring` 在这 33231 次调用里只出现过 **1 次**,还是探针 —— "改一个符号铺到十几个文件"
+   这类活全靠 python 脚本 / sed 整文件重写。**工具是有的,是引导没告诉它什么时候用。**
+
+### `ide_rename_refactoring` 的实测能力边界
+
+在 `mcp-test-project`(Java / Python / Go / JS 四种语言各一个服务)上实测:
+
+| 场景 | 结果 |
+| --- | --- |
+| 跨文件改名(3 个文件引用同一个符号) | ✅ 声明 + 全部调用点一起改,返回 `with 2 usages` |
+| 改类名 | ✅ 连**文件名**一起改(`Calculator.java` → `PriceCalculator.java`) |
+| 局部变量 / 对象字段 | ✅ 同一文件内全部引用一起改 |
+| **注释里的同名文本** | ✅ **原样不动** |
+| **字符串字面量里的同名文本** | ✅ **原样不动**(`with 0 usages`) |
+| 符号不存在 / 文件不存在 / 大小写不符 | ✅ 明确报错(`isError=true` + 原因) |
+| Java / Python / Go / ESM(`.mjs`) | ✅ 跨文件全对 |
+
+最后一行那个对比是**关键**:同一文件里符号出现两次(1 处声明 + 1 处字符串),语义重构只改声明,
+字符串原样不动 —— 文本替换(`apply_patch` / `edit` / `sed` / python)会把字符串一起改,
+那就是**改了程序的输出**,是行为变更的 bug。这条是引导里"改符号优先走重构"那句的理由。
+
+**但它不是硬规矩** —— 引导里把例外也写明了:改的本来就是文字(配置 key、模板占位符、文档、SQL)、
+**你就是想改那句字符串**、或者那个文件 IDE 根本没索引(生成物、vendor 目录)时,用文本工具才是对的,
+只是要先 `grep` 一遍确认命中范围。硬写成"必须走重构"会让模型在真正该用文本工具的场合绕远路。
+
+**一个已知的坑**:`.js` + CommonJS `require()` 的跨文件解析,取决于 `package.json` 有没有被 IDEA 挂成 JS 模块。
+没挂上时 `.js` 的模块系统不确定,`require()` 解析不了,改名就只改声明处;换成 **`.mjs`**(无条件 ESM)立刻正常。
+所以引导里写了:返回的 `usages` 数比预期少,就是有引用没被解析到 —— **先确认 IDE 索引到那个模块**
+(文件刚建出来时索引要等一会儿),别拿文本替换去"补"漏掉的引用。
 
    不会把整份工具目录重复塞进 system prompt,也不要求模型先写编排代码。IDEA MCP 工具自身的
    description/schema 仍是参数使用的权威来源;工具返回业务错误时先修正参数,不要误判成工具不可用。MCP 不可用时立即
@@ -275,6 +340,15 @@ IDE 内置的 MCP Server 只能 **启动已有**的 run configuration (`execute_
 **这族工具是运行配置的唯一写入口** —— 工具描述里写得很直白:手写的配置失败时是 **静默**的 (`type` 写错 IDE 整个忽略
 那个文件,字段名拼错则静默用默认值)。所以「照着模板手写」这条路已经封了,模板 (`assets/types/*.md`)降级为 **字段参考**。
 
+**需要项目环境的命令走 run configuration,不用原生 shell** —— 判据是这条命令 **依赖项目的运行时版本**
+(IDE 里配好的 JDK / Node / Python 等)。是 → run configuration;不是 (看文件、git、临时脚本)→ 原生 shell。
+run configuration 会继承开发时具体配的那套运行时,所以它就是个应用;配置必须 **先在 IDEA 里存在**(由用户建),
+没有就请用户建一个再跑。
+
+> **为什么不再用 IDE 终端**:`ide_execute_terminal_command` 之前被当成"自动继承 IDE 项目环境"的通道而保留暴露,但实测
+> **它拿不到项目配好的 JDK / Node / Python 版本**,和原生 shell 没有区别。既然没有优势,就把它从模型可见的工具表里
+> 隐藏掉 (`HIDDEN_IDE_TOOL_SUFFIXES`),命令执行的路由改由 run configuration 承担。
+
 配置名有自己的文法:**`[os@]base[@env]`** —— os 段 (`win` = Windows,缺省 = macOS / Linux)、base 段 (配置本体)、env 段 (环境名,
 缺省 = 默认环境 —— 起一批时逐条解析:有 `@<env>` 用它,没有就用默认)。`win@base` 与 `base@env` 都是同一个 base 的 **变体**,档案里只登记 base。解析 **交给工具**:
 `ide_inspect_run_configuration` 的 `naming` 字段把名字拆成 platform / base / env,规则是从两头往中间收 (末段是环境;首段只有
@@ -282,25 +356,14 @@ IDE 内置的 MCP Server 只能 **启动已有**的 run configuration (`execute_
 
 opencode-idea 对这一组工具做三件事:
 
-1. **透传**:IDE MCP server 以 `codemode: false` 注册,工具目录整体转发,所以这四个工具自动以 `ide_*` 出现在模型的
+1. **透传**:IDE MCP server 以 `codemode: false` 注册,工具目录整体转发,所以这七个工具自动以 `ide_*` 出现在模型的
    工具表里 —— 插件侧不需要单独声明 (也因此 **装不装这个 IDEA 插件,插件侧的代码都不用改**);
-2. **条件引导**:只有这次请求的工具快照里真的有它们,才在「运行配置 (配套插件 … 提供,装了才有)」 **自己那一节**里逐个点名 ——
-   和 IDE 自带的 `### 运行配置` 分开:两个来源,两节,读者要能分清"IDE 给我的"和"我额外装的"。没装插件时
-   **整节连同标题一起消失**。
-   两个地方会跟着变:
-    - 「运行配置」段写明 **启动 / 重启常驻进程就用 `ide_rerun_run_configuration`,不要用 `pkill` / `kill` / shell**
-      —— 这正是它要解决的问题:外部杀掉的进程 IDE 并不知道,Run 窗口仍显示运行中,下次启动就会撞端口;
-    - 「运行配置」段的 **新建那条**把 run configuration 定性成 **项目资产**:一个项目通常只建几个 (固定要跑的构建 /
-      装依赖 / dev server / 迁移), **不是随手一条命令就建一个**;判据是 **这件事以后会不会以同样形态再发生** —— 会就该建、模型必须
-      **主动**向用户提议 (摊开配置名 /
-      实际命令 / 工作目录 / 理由),用户同意才动手;不会就裸 `shell` 跑完算 (那条里写明了这层区分:`shell` 就地执行不留痕、
-      建配置是固化成一条可反复用的)。判据只写在这一处, **「命令执行」段不重复**,只留
-      「配置一律不由你写」这条无条件的,以及"该建的用哪条路建"那一条按工具是否存在分流:有工具时指向上面那条、
-      并说明非 Shell 类型与删 / 改交给用户调 `idea-run-config-manager` skill;
-      没有工具时换成「讲清楚配置名 / 命令 / 工作目录 / 理由,请用户在 IDE 里自己建」—— 那时 skill 本身仍在
-      (它不按工具门禁),
-      但缺 create 工具时它也只能把流程交回用户,所以引导里顺手把这一点说明了,免得以后有人把它当成漏写而"补"上一句调不到的指令。
-      **没装插件时绝不会提到那个工具。**
+2. **条件引导**:只有这次请求的工具快照里真的有它们,才在「运行配置」节里逐个点名。**没装插件时整节连同标题一起消失**,
+   引导不会提到一个调不到的工具。其中两条值得单独说:
+     - **启动 / 重启常驻进程就用 `ide_rerun_run_configuration`,不要用 `pkill` / `kill` / shell** —— 这正是它要解决的问题:
+       外部杀掉的进程 IDE 并不知道,Run 窗口仍显示运行中,下次启动就会撞端口;
+     - **新建那条**把 run configuration 定性成 **项目资产**:一个项目通常只建几个 (固定要跑的构建 / 装依赖 /
+       dev server / 迁移), **不是随手一条命令就建一个**。判据与提议方式见下一节。
 3. **工具名清单**写在 `src/mcp/enhance.js`(与原生 IDE 的 `src/mcp/idea.js` 分开放:原生走原生,插件的走插件的),
    与该仓库的 `RunLifecycleSchemas.kt` 保持同步。工具按 **存在的子集**逐个点名 (而不是「有就全写」),这样旧版本的配套
    插件少给一两个工具时,引导也不会提到它们。同理, **每条命令名只列真的提供它的项目**(逐项目核对,见「条件注入」)——
@@ -311,14 +374,13 @@ opencode-idea 对这一组工具做三件事:
 ## Run Configuration:文件由工具写,档案由 skill 写
 
 内置 MCP 只能 **查**(`get_run_configurations`)和 **执行**(`execute_run_configuration`)run configuration;增 / 删 / 改 /
-改名 / 查详情
-靠配套插件的那一族 (见上面的「Run Configuration 全套」)。
+改名 / 查详情靠配套插件的那一族 (见上面的「Run Configuration 全套」)。
 
-所以插件的立场是:
+### 工具写的那一半
 
 - **运行配置只有工具写** —— `ide_create_run_configuration` / `ide_update_run_configuration` /
-  `ide_delete_run_configuration`
-  是唯一写入口。理由不是"不许写",而是 **手写失败时是静默的**:`type` 写错 IDE 整个忽略那个文件,字段名拼错则静默用默认值;
+  `ide_delete_run_configuration` 是唯一写入口。理由不是"不许写",而是 **手写失败时是静默的**:`type` 写错 IDE 整个忽略
+  那个文件,字段名拼错则静默用默认值;
 - **建之前先问用户** —— run configuration 是 **项目资产**,一个项目通常只建几个。判据是
   **这件事以后会不会以同样形态再发生**:
   会就该建、模型 **主动**向用户提议 (摊开配置名 / 实际命令 / 工作目录 / 理由),同意才动手;不会就裸 `shell` 跑完算;
@@ -326,20 +388,77 @@ opencode-idea 对这一组工具做三件事:
   (Application、JAR 以及 JUnit / Docker / Spring Boot / Flyway …)也 **照样能建**:`assets/types/*.md` 只是 **字段参考**
   ,不是前置条件;
 - **建完看工具的返回值** —— `canRun` 是"现在能不能跑"的权威答案,`unknownOptions` 非空就是字段名拼错了,`storagePath`
-  是文件落在哪;
-- **档案**(`idea-run-config-manager` skill 写进项目根 `AGENTS.md` 的标记块)仍然要跟上:新增 / 删除 / 改名之后同步档案 ——
-  档案和项目里的配置对不上,比没有档案更糟;
-- **没装配套插件** → 工具不存在,引导也不提,模型继续按原来的方式工作 (在 IDE 里建)。
+  是文件落在哪。
 
 > **曾经有一个 `idea-run-config` skill 教模型凭记忆手写配置文件,已经删掉。** 理由不是"不许写",而是
-> **不许凭空写**:`type` 写错 IDE 会
-> **静默忽略整个文件、日志里也不报**,凭记忆猜 option 名就是这么错的。现在这件事由 `idea-run-config-manager` 接手 —— 但
-> **每个类型都得有一份实测模板**
+> **不许凭空写**:`type` 写错 IDE 会 **静默忽略整个文件、日志里也不报**,凭记忆猜 option 名就是这么错的。
+> 现在这件事由 `idea-run-config-manager` 接手 —— 但 **每个类型都得有一份实测模板**
 > (`assets/types/`,字段名全部来自真实文件),没模板的类型宁可交给用户。
+
+### skill 写的那一半
+
+`idea-run-config-manager` skill 做三件事:
+
+1. **建 / 改 / 删** —— 直接动手, **走工具不手写文件**,建之前先问用户要不要建,建完看工具返回的 `canRun` / `unknownOptions`;
+2. **建档** —— 过滤后剩下的每条配置在项目根 `AGENTS.md` 的标记块里占一个条目,五项固定
+   (`when` / `before run` / `run` / `after run` / `desc`);只登记 base (`win@base` / `base@env` 是同一个 base 的变体,
+   写进 `desc`)。`when` 回答"谁能起它":`用户授权触发` / `AI 自己触发` **进条目**,`用户手动触发` 只在块末尾登记名字、不进条目。
+   每一项各选一种写法 (行内 / 子列表),同一配置里混用是常态 —— 判据只有"这一项自己有几句话"。
+3. **过滤** —— 服务化 (长驻应用)的配置归 `idea-standalone` 的块, **两个块永不重叠**。
+
+每项怎么写、两种写法各长什么样、两个示例,都在模板的生成提示里,这里不再抄一遍。
+
+> **两个块都是条目式**(一条一个条目,每项一行):`desc` 常是一段话,塞进表格格子里既难读、又要靠补空格维持对齐。
+> 两边靠 **同名同序的四项**(`before run` / `run` / `after run` / `desc`)加各自独有的项 —— 在 `AGENTS.md` 里一眼就能看出
+> 哪几条是服务、哪几条是固定流程。
+
+**SKILL.md 只有一份五步流程**(读 → 枚举 → 建 / 删 / 改 → 同步 → 核对),外加 **支持矩阵**与 **硬性契约**(落地位置、固定信封、复查、
+路径宏、不要写模板外的字段)—— **它自己就带着规矩**;两类内容另放在两个地方,各管一段:
+
+| 模板                                                       | 装什么                                                                                |
+| ---------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| `skills/idea-run-config-manager/assets/types/<类型>.md`    | **一个类型一份**:那个类型的实测样本 + 字段表 + 坑(索引就是 SKILL.md 里的**支持矩阵**) |
+| `skills/idea-run-config-manager/assets/AGENTS.template.md` | 产物(档案)的骨架:条目怎么写、五项分别写什么、枚举与过滤的要求,都在它的生成提示里      |
+
+**支持矩阵 (7 份已落、2 份待实物)**:
+
+| 类型                                     | `type` id                                                                                                                               | 验证                                                 |
+| ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| Shell Script                             | `ShConfigurationType`                                                                                                                   | ✅ 本机 6 例(含 Windows)                              |
+| Maven / Gradle / npm / Python / Go Build | `MavenRunConfiguration` / `GradleRunConfiguration` / `js.build_tools.npm` / `PythonConfigurationType` / `GoApplicationRunConfiguration` | ✅ 实物                                               |
+| Node.js                                  | `NodeJSConfigurationType`                                                                                                               | ⚠️ 三个属性已验证,其余字段未验证                    |
+| Application / JAR                        | `Application` / `JarApplication`                                                                                                        | ⏳ type 已验证,**字段层无实物 → 暂不写模板,交给用户** |
+
+矩阵之外 (JUnit / TestNG / Kotlin / Docker / Spring Boot / Tomcat / Flyway / Liquibase / HTTP Request …)一律
+**没有模板** → 交给用户在 IDE 里配。
+
+**给某个类型补模板的流程**:在 IDE 里建一个最简配置 → 勾 Store as project file → 用 `ide_inspect_run_configuration` 读它的
+`configurationXml` 照抄结构 → 标清哪些字段实测 → 把矩阵里那个类型从 ⏳ 改成 ✅。 **每个字段名都来自真实文件,不靠猜** ——
+`js.build_tools.npm`(属性 + 自定义元素)、`ShConfigurationType`(`<option>` 子元素)、`NodeJSConfigurationType`(全属性)
+三种写法并存,套错就是静默失效。
+
+**先过滤,再建档**:**服务化 / 常驻应用的配置一律不进这个块**(它们归 `idea-standalone`,端口与热重载写在那边的块里);
+有那个块时,再把它登记过的名字一并排除 —— **剩下的**才是本块内容。
+
+这个档案块 **以带前缀的工具为准**,不围绕 IDE 界面说话:各项目各有自己的前缀 (root 是 `ide`,子项目是它的目录名),枚举与执行都用
+**它自己那个前缀**的 `<前缀>_get_run_configurations` / `<前缀>_execute_run_configuration` …; **条目标题括号里写的就是这个前缀**
+,一条配置属于谁、该用哪套工具跑由它决定。
+
+这个块的用途是 **能被下次读到**:要办同类事情时先查它,有现成的就用,不再重复建 —— 所以 **联动是硬要求**:配置被 **新建 /
+删除 / 修改**(无论谁做的:工具建的、用户自己建的、用户删掉的)都要在文档里同步 **加条目 / 删条目 / 改条目**,否则它就开始骗人。
+**档案和项目里的配置对不上,比没有档案更糟。**
+
+**别的文档都指向这里**:引导文本碰到"要建 / 删 / 改一个配置",不再让模型现编流程,而是让它加载本 skill ——
+增 / 删 / 改的流程与档案规则只有这一处。**两个 skill 都是模型可自取的**(frontmatter 不带 `metadata: opencode/autoinvoke: false`):
+模型判断到场景就加载。「该不该建」的判断留在引导文本里(它每次请求都在),skill 负责动手时的流程与写法。
+**它绕着"新建配置"这件事写**,但不影响它出不出现 —— 两个 skill 都在插件加载时注册,缺工具时由正文把流程交回用户
+(`idea-standalone` 只要 `rerun_run_configuration`,门更松)。
+
+### skill 怎么加载
 
 **skill 在插件加载时一次性注册,不跟随工具目录**:
 
-- **判据只有"插件加载了"** —— 不看项目有没有 `/open-in-ide`、也不看 IDE 此刻serve 了哪些工具。
+- **判据只有"插件加载了"** —— 不看项目有没有 `/open-in-ide`、也不看 IDE 此刻 serve 了哪些工具。
 - **为什么不再按工具门禁**:早先的做法是"IDE 真的提供了这个 skill 绕着的工具才注册"(frontmatter 的 `requires:` +
   `ctx.tool.list()`)。
   门本身是对的,但 **注册时机错了**:它发生在 `/open-in-ide` 完成之后,而客户端在这之前就已经把 skill
@@ -385,73 +504,6 @@ loader 读的是 OpenCode 文档里的那个嵌套写法 (它自己的读取器�
 事实一律先查后写:配置名来自 `ide_get_run_configurations`,`热重载` 来自运行方式,端口读不到就问用户 —— 不猜。
 **只动自己的标记块**:根 `AGENTS.md` 是共享文件 (`project-scaffold` 的宪法、项目自己的内容都在里面),标记之外一字不改。
 
-## run configuration 增删改 + 档案 (skill)
-
-`idea-run-config-manager` skill 做三件事:
-
-1. **建 / 改 / 删** —— 直接动手, **走工具不手写文件**:`create_run_configuration` / `update_run_configuration` /
-   `delete_run_configuration`,字段拿不准就用 `cloneFrom` 复制一个同类型的现成配置再 patch;建之前先问用户要不要建,建完看工具
-   返回的 `canRun` / `unknownOptions`。
-2. **建档** —— 过滤后剩下的每条配置在项目根 `AGENTS.md` 的标记块里占一个条目,五项固定
-   (`when` / `before run` / `run` / `after run` / `desc`);只登记 base (`win@base` / `base@env` 是同一个 base 的变体,
-   写进 `desc`)。`when` 回答"谁能起它":`用户授权触发` / `AI 自己触发` **进条目**,`用户手动触发` 只在块末尾登记名字、不进条目。
-   每一项各选一种写法 (行内 / 子列表),同一配置里混用是常态 —— 判据只有"这一项自己有几句话"。
-3. **过滤** —— 服务化 (长驻应用)的配置归 `idea-standalone` 的块, **两个块永不重叠**。
-
-每项怎么写、两种写法各长什么样、两个示例,都在模板的生成提示里,这里不再抄一遍。
-
-> **两个块都是条目式**(一条一个条目,每项一行):`desc` 常是一段话,塞进表格格子里既难读、又要靠补空格维持对齐。
-> 两边靠 **同名同序的四项**(`before run` / `run` / `after run` / `desc`)加各自独有的项 —— 在 `AGENTS.md` 里一眼就能看出
-> 哪几条是服务、哪几条是固定流程。
-
-**SKILL.md 只有一份五步流程**(读 → 枚举 → 建 / 删 / 改 → 同步 → 核对),外加 **支持矩阵**与 **硬性契约**(落地位置、固定信封、复查、
-路径宏、不要写模板外的字段)—— **它自己就带着规矩**;两类内容另放在两个地方,各管一段:
-
-| 模板                                                       | 装什么                                                                                |
-| ---------------------------------------------------------- | ------------------------------------------------------------------------------------- |
-| `skills/idea-run-config-manager/assets/types/<类型>.md`    | **一个类型一份**:那个类型的实测样本 + 字段表 + 坑(索引就是 SKILL.md 里的**支持矩阵**) |
-| `skills/idea-run-config-manager/assets/AGENTS.template.md` | 产物(档案)的骨架:条目怎么写、五项分别写什么、枚举与过滤的要求,都在它的生成提示里      |
-
-**支持矩阵 (7 份已落、2 份待实物)**:
-
-| 类型                                     | `type` id                                                                                                                               | 验证                                                 |
-| ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
-| Shell Script                             | `ShConfigurationType`                                                                                                                   | ✅ 本机 6 例(含 Windows)                              |
-| Maven / Gradle / npm / Python / Go Build | `MavenRunConfiguration` / `GradleRunConfiguration` / `js.build_tools.npm` / `PythonConfigurationType` / `GoApplicationRunConfiguration` | ✅ 实物                                               |
-| Node.js                                  | `NodeJSConfigurationType`                                                                                                               | ⚠️ 三个属性已验证,其余字段未验证                    |
-| Application / JAR                        | `Application` / `JarApplication`                                                                                                        | ⏳ type 已验证,**字段层无实物 → 暂不写模板,交给用户** |
-
-矩阵之外 (JUnit / TestNG / Kotlin / Docker / Spring Boot / Tomcat / Flyway / Liquibase / HTTP Request …)一律
-**没有模板** → 交给用户在 IDE 里配。
-
-**给某个类型补模板的流程**:在 IDE 里建一个最简配置 → 勾 Store as project file → 用 `ide_inspect_run_configuration` 读它的
-`configurationXml` 照抄结构 →
-标清哪些字段实测 →
-把矩阵里那个类型从 ⏳ 改成 ✅。 **每个字段名都来自真实文件,不靠猜** —— `js.build_tools.npm`(属性 + 自定义元素)、
-`ShConfigurationType`
-(`<option>` 子元素)、`NodeJSConfigurationType`(全属性)三种写法并存,套错就是静默失效。
-
-**先过滤,再建档**:**服务化 / 常驻应用的配置一律不进这个块**(它们归 `idea-standalone`,端口与热重载写在那边的块里);
-有那个块时,再把它登记过的名字一并排除 —— **剩下的**才是本块内容。
-
-这个档案块 **以带前缀的工具为准**,不围绕 IDE 界面说话:各项目各有自己的前缀 (root 是 `ide`,子项目是它的目录名),枚举与执行都用
-**它自己那个前缀**的
-`<前缀>_get_run_configurations` / `<前缀>_execute_run_configuration` …; **条目标题括号里写的就是这个前缀**
-,一条配置属于谁、该用哪套工具跑由它决定。
-
-这个块的用途是 **能被下次读到**:要办同类事情时先查它,有现成的就用,不再重复建 —— 所以 **联动是硬要求**:配置被 **新建 /
-删除 / 修改**
-(无论谁做的:工具建的、用户自己建的、用户删掉的)都要在文档里同步 **加条目 / 删条目 / 改条目**,否则它就开始骗人。
-
-**别的文档都指向这里**:引导文本碰到"要建 / 删 / 改一个配置",不再让模型现编流程,而是让它加载本 skill ——
-增 / 删 / 改的流程与档案规则只有这一处。
-
-**两个 skill 都是模型可自取的**(frontmatter 不带 `metadata: opencode/autoinvoke: false`):模型判断到场景就加载。
-「该不该建」的判断留在引导文本里(它每次请求都在),skill 负责动手时的流程与写法。
-
-**它绕着"新建配置"这件事写**,但不影响它出不出现 —— 两个 skill 都在插件加载时注册,缺工具时由正文把流程交回用户
-(`idea-standalone` 只要 `rerun_run_configuration`,门更松)。
-
 ## Deployment 全套 (配套插件 `idea-mcp-enhance`)
 
 IDE 内置的 MCP Server **完全不碰部署** —— 既不报 IDE 里配了哪些 Deployment 服务器,也不能把文件传上去 / 拉下来。
@@ -464,20 +516,16 @@ IDE 内置的 MCP Server **完全不碰部署** —— 既不报 IDE 里配了�
 | `ide_download_from_deployment`   | 把服务器上映射目录的内容拉回本地(等同 IDE 的 Download from …),**以服务器为准**:两边都有的文件被远端覆盖(相同则不写)。**没有"保留我的版本"这个选项**        |
 | `ide_get_deployment_task_status` | 用 `handle` 查一次传输的状态与计数;**永不启动任何传输**                                                                                                    |
 
-opencode-idea 对它做三件事,和上面那组是同一套:
+opencode-idea 对它做的是**同一套三件事**(透传 / 条件引导 / 工具名清单),差异只有两处:
 
-1. **透传** —— 工具目录整体转发 (见「按能力选工具」),所以四个工具自动以 `ide_*` 出现在模型的工具表里;
-2. **条件引导** —— 只有这次请求的工具快照里真的有它们,才出现「服务器文件同步」这一节。 **这一节整节 (含标题)
-   都由配套插件提供**,
-   所以一个工具都没有时它 **完全消失** —— 不能像「运行配置」那样留一个空标题 (那一节还有内置的 `get_run_configurations` /
-   `execute_run_configuration` 撑着)。整节 **锚在一个工具上**(模板里 `{{#if canListDeploymentServers}}` 直接包住标题):
-   这四个由同一道前提注册、同进同出,拿其中一个当判据就够,不需要再造一个"四个里任一个"的聚合标志。触发条件也因此比
-   上面那组更严:部署工具 **还要求 `com.jetbrains.plugins.webDeployment`**,而它只在 **Ultimate** 里存在,
-   所以 Community IDE 上这一节永远不出现;
-3. **工具名清单**写在 `src/mcp/enhance.js`(`DEPLOYMENT_SUFFIXES` + `deploymentCapabilities`),与该仓库的
-   `DeploymentSchemas.kt` 保持同步。 **四个工具逐个点名**(而不是"有就全写"),而且每条命令名只列 **真的提供它**的项目
-   (见「条件注入」的逐项目核对):它们通常同进同出 (同一道插件前提),但"通常"不是"总是" —— 点名一个模型调不到的工具
-   就是一次注定失败的调用。
+- **条件引导更严** —— 部署工具除了配套插件,还要求 `com.jetbrains.plugins.webDeployment`,而它只在 **Ultimate** 里存在,
+  所以 Community IDE 上这一节永远不出现。而且 **这一节整节 (含标题) 都由配套插件提供**,一个工具都没有时它 **完全消失**
+  —— 不能像「运行配置」那样留一个空标题 (那一节还有内置的 `get_run_configurations` / `execute_run_configuration` 撑着)。
+  整节 **锚在一个工具上**(模板里 `{{#if canListDeploymentServers}}` 直接包住标题):这四个由同一道前提注册、同进同出,
+  拿其中一个当判据就够,不需要再造一个"四个里任一个"的聚合标志;
+- **工具名清单**在 `src/mcp/enhance.js` 的 `DEPLOYMENT_SUFFIXES` + `deploymentCapabilities`,与该仓库的
+  `DeploymentSchemas.kt` 保持同步。四个工具逐个点名,而且每条命令名只列 **真的提供它**的项目 —— 它们通常同进同出
+  (同一道插件前提),但"通常"不是"总是",点名一个模型调不到的工具就是一次注定失败的调用。
 
 这节存在的理由是 **一条路由规则**:往服务器传 / 取文件要走这些工具, **不要自己拼 `ssh` / `rsync` / `scp`** ——
 IDE 的连接、路径映射、排除规则都在它后面,自己拼的那份与 IDE 看到、管理的不是同一份。文案里同时点明两件容易读错的事:
@@ -490,22 +538,6 @@ IDE 的连接、路径映射、排除规则都在它后面,自己拼的那份与
 > **这一组没有 skill,和 run configuration 不同。** run configuration 要 skill 是因为"某种类型怎么写"是一批得逐类型实测的
 > 模板 (`assets/types/`);部署没有这层知识 —— 四个工具的 schema 已经说清 `serverName` / `mode` 怎么填,而"该不该传、传给谁"
 > 是模型当场看 `list_deployment_servers` 的判断。再加一个 skill 只是把同一段话抄第二遍。
-
-## 项目命令执行 (Run Configuration)
-
-需要 **项目环境**的命令 (依赖用户在 IDE 里配好的 JDK / Node / Python 版本等),模型使用 **
-`ide_execute_run_configuration`**
-执行 —— 走 run configuration,不用原生 shell。
-
-- 判据是:这条命令 **依赖项目的运行时版本**。是 → run configuration;不是 (看文件、git、临时脚本)→ 原生 shell。
-- run configuration 会继承开发时具体配的那套运行时,或者干脆是你那个应用配好的运行时,所以这就是个应用。
-- 配置必须 **先在 IDEA 里存在**(由用户建)。没有就请用户建一个,再跑;
-
-> 为什么不再用 IDE 终端:`ide_execute_terminal_command` 之前被当成"自动继承 IDE 项目环境"的通道而保留暴露,但实测
-> **它拿不到项目配好的 JDK / Node / Python 版本**,和原生 shell 没有区别。既然没有优势,就把它从模型可见的工具表里
-> 隐藏掉 (`HIDDEN_IDE_TOOL_SUFFIXES`),命令执行的路由改由 run configuration 承担。
-
-引导文本由 `src/ide-guidance.js` 注入 (`### 命令执行` 段),只在 IDE MCP 可用时生效。
 
 ## 前置条件
 
@@ -581,7 +613,7 @@ opencode plugin list
 
 ```js
 // ~/.config/opencode/plugins/opencode-idea.js
-export { default } from "/Users/yutao/Projects/opencode-idea/src/index.js";
+export { default } from "/Users/yutao/IdeaProjects/opencode-idea/src/index.js";
 ```
 
 ## 配置
@@ -661,33 +693,22 @@ export { default } from "/Users/yutao/Projects/opencode-idea/src/index.js";
 - skill 定义的字段名 **以 schema 为准**,不要照官方文档:`Skill.Info` 需要 `path` (AbsolutePath),文档里写的 `location`
   不存在 —— 用错会让 `ctx.skill.transform` 抛 `SchemaError`,而 **任何 transform 失败都会禁用整个插件**(0.0.6 就是这样丢了
   `/open-in-ide`)。同理,`Skill.Info` 的完整字段是 `id` / `name` / `description?` / `autoinvoke?` / `path` / `content`。
-- 需要项目环境的命令走 `ide_execute_run_configuration`(run configuration 要先在 IDEA 里配好),不用原生 shell。
-- 一批用不到的 IDE MCP 工具被硬编码隐藏 (`src/plugin.js` 的 `HIDDEN_IDE_TOOL_SUFFIXES`, **共 49 个后缀**):
+- 一批用不到的 IDE MCP 工具被硬编码隐藏 (`src/plugin.js` 的 `HIDDEN_IDE_TOOL_SUFFIXES`, **共 48 个后缀**):
   VCS (`git_status` / `get_repositories`,版本控制走原生 `git`)、Router 派发工具 (`execute_tool`,未启用 router-only
   时冗余)、
   Debugger (全部 `xdebug_*`)、Dev Kit MCP、Inspection KTS MCP、解释器环境 MCP、 **IDE 内置终端 (`execute_terminal_command`:
   实测不继承项目环境,对原生 shell 没有优势)**、 **整个 Database 组**(数据源由用户在
   IDE 里配置,而 IDE 也不是本插件设想的数据库客户端)、 **有原生对应的文件搜索**
-  (`search_text` / `search_regex` / `search_file` 分别对应 `grep` / `grep -E` / `glob`),以及 **文件写**
-  (`apply_patch` / `create_new_file`:原生 `write` / `edit` 就够,补丁工具的上下文精确匹配反而脆 —— 见上面
-  「写文件一律用原生」)。配套插件自带的那个写文件工具同样隐藏。
+  (`search_text` / `search_regex` / `search_file` 分别对应 `grep` / `grep -E` / `glob`),以及 **建文件**
+  (`create_new_file`:原生 `write` 就够)。配套插件自带的那个写文件工具同样隐藏。
+  **`apply_patch` 不在隐藏列表里** —— 理由见上面「按能力选工具」一节里「改单个文件用原生 write / edit;一次要改多个文件用 ide_apply_patch」。
 
   存的是 **后缀**,清洗时按当前每个项目前缀 **各删一遍** —— 只处理 `ide_` 会让子项目那几份原样送到模型面前。
-  实测数字 (拿运行中的 IDE MCP 拉 `tools/list`,单个项目):IDE 暴露 **76** 个 → 隐藏 49 → **模型可见 27 个**,
-  而且这 27 个 **恰好等于引导里点名的 27 个** —— 没有"能看见但没人告诉它用途"的残留。多项目就是 N × 29:
+  实测数字 (拿运行中的 IDE MCP 拉 `tools/list`,单个项目):IDE 暴露 **75** 个 → 隐藏 47 → **模型可见 28 个**,
+  而且这 28 个 **恰好等于引导里点名的 28 个** —— 没有"能看见但没人告诉它用途"的残留。多项目就是 N × 28:
   暴露面完全由插件决定,不需要 OpenCode 提供任何白名单能力,也不需要惰性注册。
 
-- **部署工具只在 Ultimate 上出现**:`ide_list_deployment_servers` / `ide_upload_to_deployment` /
-  `ide_download_from_deployment` / `ide_get_deployment_task_status` 来自配套插件 (`idea-mcp-enhance`),而且额外要求
-  `com.jetbrains.plugins.webDeployment`(**仅 Ultimate 有**)—— 少了任何一个前提,四个工具都不在,引导里的「服务器文件同步」一节
-  也整节消失,模型照旧用原生手段处理文件传输。详见「Deployment 全套」。
-
-- **端口是产品常量,不开放配置**:IDEA 的 MCP 在 **64342**,PyCharm 在 **64462**(`src/ide-projects.js` 的 `IDE_PORTS`),
-  跨版本不变。所以"探哪个端口"由项目的 IDE 唯一决定,不需要扫描候选端口,也不需要用户填任何东西。
-- 探测只回答一个问题:**「这个 IDE 里打开着这个项目吗」** —— 一次项目作用域的 MCP 调用 (`get_project_modules`,带
-  `IJ_MCP_SERVER_PROJECT_PATH`):返回模块 = 认得 → 绑定;报
-  `Unable to determine the target project` = 不认得 → `open -a` 打开它并继续轮询到认得 (上限 60s)。
-  项目刚打开时的短暂"未就绪"由工具失败分类兜底 (「IDE 在、但项目没打开」→ 重新打开并让模型重试)。
+- **部署工具只在 Ultimate 上出现** —— 详见「Deployment 全套」。
 - **IDE 的「目录包含」语义 (实测)**:请求路径落在某个 **已打开项目的目录树内**时,IDE 会把它解析到
   那个项目,而不是报错。所以「子项目与 root 配同一个 IDE」时,只要那个 IDE 打开了 root,子项目就被判成
   "已打开" —— 它确实是 root 项目的一部分,工具能操作它的文件,但语言支持按 **root 项目**走 (例如
@@ -702,13 +723,7 @@ export { default } from "/Users/yutao/Projects/opencode-idea/src/index.js";
   所以没有"桥进程被 IDE 拖死后变成僵尸"这一类问题。`/open-in-ide` 仍要求 IDE MCP 已在监听 (冷启动约数十秒),因此会先等就绪再注册。
 - **空闲驱逐 (已实测)**:OpenCode 把一个 Location 的服务缓存在 `LayerMap` 里,`idleTimeToLive` = **60 分钟**;空闲到期即整体驱逐,
   插件实例连同 **全部** IDE MCP 注册一起消失。 **两种传输都躲不过**,所以对策不是换传输,而是请求驱动的恢复 (见「行为」):
-    - 新实例上第一条用户消息的 `prompt` 钩子会把连接接回来 —— 常态下 **不需要用户手动做什么**;
-    - 手动重建仍可用:执行 `/open-in-ide`(先注销全部旧注册、再重新注册);
-    - 插件给每个 server 配 `executionTimeoutMs`(默认 **10 分钟**)作为硬上限:兜住端点卡住时的单次调用,不再沿用 OpenCode
-      默认的 12 小时;
-    - "IDE 被关掉"这一类会被下一次 IDE 工具调用暴露 (HTTP 直接报错),由 `execute.after` 钩子分类后自愈;不产生 error 的场景
-      (例如
-      IDE 进程还在但项目没打开)由「IDE 在、项目没打开」分支处理。
+  新实例上第一条用户消息的 `prompt` 钩子会把连接接回来 —— 常态下 **不需要用户手动做什么**;手动重建仍可用:执行 `/open-in-ide`。
 - 配置存在插件名下 KV (`plugin:opencode-idea:project/<root 路径>`),内容是
   `{ root: { path, app }, children: [{ path, app }] }` —— root 与每个子项目 **各自的 IDE** 都记在里面。插件实例按
   **Location**(项目/打开目录)创建,配置按 **root 路径**共享;旧版存过的布尔 `true` 会按"root 用 idea 的 v1 配置"读入。
@@ -723,9 +738,8 @@ export { default } from "/Users/yutao/Projects/opencode-idea/src/index.js";
   IDE 里打开 MCP 服务 (2026.2+)并启用 Brave Mode;首次打开若弹 Trust 对话框,需确认后重试。
 - IDE MCP 没有「打开项目」工具,因此打开动作走 OS/CLI,而非 MCP。
 - 插件热重载会断开 IDE 连接,需重跑 `/open-in-ide`。
-- 插件不修改任何 **它不接管**的工具定义或描述;IDE 工具以 `<项目前缀>_*` 直接暴露给模型 (`codemode: false`),不用
-  `execute` 包裹。
-  唯一的例外是 `rebuild` 参数 (见「工具参数」),它对每个项目前缀各处理一遍。
+- IDE 工具以 `<项目前缀>_*` 直接暴露给模型 (`codemode: false`),不用 `execute` 包裹;
+  插件不修改任何 **它不接管**的工具定义或描述,唯一的例外是 `rebuild` 参数 (见「工具参数」),它对每个项目前缀各处理一遍。
 
 ## License
 

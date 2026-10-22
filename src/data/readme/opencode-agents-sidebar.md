@@ -14,7 +14,7 @@
 | Status | Actively maintained personal OpenCode tool/plugin |
 | Type | OpenCode TUI plugin / host extension |
 | Host app | OpenCode `>=2.0.32`; release smoke also covers current `2.1.2` |
-| Package | `opencode-agents-sidebar` `3.0.0` |
+| Package | `opencode-agents-sidebar` `3.1.0` |
 | Runtime | Bun `>=1.3.0` |
 | Maintainer checks | `bun install --frozen-lockfile && bun run typecheck && bun test && bun run build:all && bun run verify:package` |
 
@@ -43,7 +43,7 @@ The plugin renders agent categories and details inside the OpenCode terminal UI 
 ## Quick start
 
 ```sh
-opencode plugin add opencode-agents-sidebar@3.0.0
+opencode plugin add opencode-agents-sidebar@3.1.0
 ```
 
 ## Installation
@@ -53,21 +53,22 @@ opencode plugin add opencode-agents-sidebar@3.0.0
 Install the release with the v2 plugin manager:
 
 ```sh
-opencode plugin add opencode-agents-sidebar@3.0.0
+opencode plugin add opencode-agents-sidebar@3.1.0
 ```
 
-The equivalent explicit configuration is:
+The equivalent manual configuration is:
 
 ```jsonc
 {
-  "$schema": "https://opencode.ai/v2/cli.json",
-  "plugins": ["opencode-agents-sidebar@3.0.0"]
+  "$schema": "https://opencode.ai/config.json",
+  "plugins": ["opencode-agents-sidebar@3.1.0"]
 }
 ```
 
-Add the package once, either to `~/.config/opencode/cli.json` or to the v2
-`plugins` field in `opencode.json(c)`. Package order controls v2 sidebar
-contribution order.
+The command installs the package and adds its npm spec to `plugins` in the
+global `~/.config/opencode/opencode.json`. For project-scoped installation, add
+the same entry to `opencode.json(c)` in the project root. Package order controls
+v2 sidebar contribution order.
 
 This major does not support OpenCode v1. V1 users must pin
 `opencode-agents-sidebar@1.0.8`; there is no dual-runtime compatibility shim.
@@ -256,7 +257,7 @@ team 2/4
 
 ## Troubleshooting
 
-- If the package does not load, run `opencode plugin check` and verify that `opencode-agents-sidebar@3.0.0` appears once in the v2 `plugins` list.
+- If the package does not load, run `opencode plugin check` and verify that `opencode-agents-sidebar@3.1.0` appears once in the v2 `plugins` list.
 - If a local build does not load, run `bun run build:all && bun run verify:package` and test `.artifacts/package.tgz` through a disposable v2 wrapper.
 - If agents do not appear, verify `~/.config/opencode/oh-my-openagent.json` contains valid agent metadata.
 - Missing and malformed configuration produce explicit sidebar states and recover after create, replace, or edit.

@@ -1,11 +1,11 @@
-<p align="center"><picture><source media="(prefers-reduced-motion: reduce)" srcset="./docs/assets/cover-motion-still.webp" /><img src="./docs/assets/cover-motion.webp" width="100%" alt="LitFamily motion cover: five armored robots power on one by one, the LitOpenCode robot wakes with glowing eyes and a lit frame, then LITFAMILY and KEEP THE WORK LIT. light up." /></picture></p>
+<p align="center"><picture><source media="(prefers-reduced-motion: reduce)" srcset="./docs/assets/cover-motion-still.webp" /><img src="./docs/assets/cover-motion.webp" width="100%" alt="LitFamily motion cover: seven armored robots power on one by one, the LitOpenCode robot wakes with glowing eyes and a lit frame, then LITFAMILY and KEEP THE WORK LIT. light up." /></picture></p>
 
 # LitOpenCode
 
 **LitOpenCode is a workflow plugin for OpenCode. Add `lit` to a prompt and the work gets planned, built, checked and written down, so the next session knows where you stopped.**
 
 <p align="center">
-<a href="https://www.npmjs.com/package/@litfamily/litopencode"><img src="./docs/assets/readme/badge-version.svg" alt="1.0.29" /></a>
+<a href="https://www.npmjs.com/package/@litfamily/litopencode"><img src="./docs/assets/readme/badge-version.svg" alt="1.0.30" /></a>
 <a href="https://www.npmjs.com/package/@litfamily/litopencode"><img src="https://img.shields.io/npm/dm/@litfamily/litopencode?label=downloads&color=D7F75B" alt="npm downloads per month" /></a>
 <a href="./LICENSE"><img src="./docs/assets/readme/badge-license.svg" alt="MIT license" /></a>
 <a href="https://github.com/wjgoarxiv/litopencode"><img src="https://img.shields.io/github/stars/wjgoarxiv/litopencode?style=social" alt="GitHub stars" /></a>
@@ -34,7 +34,7 @@ Morning:  /lit-recap
 
 ## Quick start
 
-You need Node.js with npm, and [OpenCode](https://opencode.ai) 1.18 or 1.19 with a model provider already set up. LitOpenCode is built for OpenCode 1. OpenCode 2 changed how plugins load, and LitOpenCode does not support it yet. Install with one command:
+You need Node.js with npm, and [OpenCode](https://opencode.ai) with a model provider already set up: OpenCode 1 (1.18.29 or later), OpenCode 2, or both side by side, with OpenCode 1 run as `opencode` and OpenCode 2 as `opencode2`. The installer finds the ones you have and sets up each. Install with one command:
 
 ```sh
 npm exec --package @litfamily/litopencode@latest -- litopencode install
@@ -183,7 +183,7 @@ Install registers the plugin in OpenCode's config (`opencode.jsonc`), copies com
 
 ### Requirements
 
-Node.js with npm, and OpenCode 1.18 or 1.19 with a provider you have already logged in to. On the OpenAI provider, a fresh install plans and reviews with GPT-6 Astra and builds with GPT-6 Luna; you can choose others during install.
+Node.js with npm, and OpenCode 1 (1.18.29 or later) or OpenCode 2 with a provider you have already logged in to. On the OpenAI provider, a fresh install plans and reviews with GPT-6 Astra and builds with GPT-6 Luna; you can choose others during install.
 
 ### Check the install
 
