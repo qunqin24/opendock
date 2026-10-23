@@ -36,6 +36,6 @@ jobs:
         timeout-minutes: 25
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        run: pnpm data --fresh
+        run: pnpm data --fresh --no-translate
       - name: Build generated site
         run: pnpm build

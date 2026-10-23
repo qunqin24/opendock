@@ -1,0 +1,163 @@
+---
+import type { Plugin } from '../lib/plugins';
+import { categoryLabel, lampClass } from '../lib/plugins';
+import { avatarUrl, compactNumber, timeAgo, letterAvatar } from '../lib/utils';
+import { localeFromPath, localePath, pluginDescription, useTranslations } from '../lib/i18n';
+
+interface Board {
+  id: 'top' | 'trending' | 'downloads' | 'recent';
+  label: string;
+  plugins: Plugin[];
+}
+
+interface Props {
+  boards: Board[];
+}
+const { boards } = Astro.props;
+const lang = localeFromPath(Astro.url.pathname);
+const t = useTranslations(lang);
+
+/** The figure each board is ordered by — the one number that row is about. */
+function metric(p: Plugin, id: Board['id']): { value: string; accent?: boolean } {
+  switch (id) {
+    case 'trending':
+      return p.starsDelta7d > 0 ? { value: `+${compactNumber(p.starsDelta7d)}`, accent: true } : { value: '—' };
+    case 'downloads':
+      return { value: compactNumber(p.downloadsMonth) };
+    case 'recent':
+      return { value: timeAgo(p.createdAt, lang) };
+    default:
+      return { value: p.score.toFixed(1) };
+  }
+}
+---
+
+<div data-leaderboard>
+  {/* shadcn/ui Tabs, as static markup plus a few lines of script. */}
+  <div
+    role="tablist"
+    aria-label={t('home.board.title')}
+    class="scrollbar-none inline-flex h-9 max-w-full items-center overflow-x-auto rounded-lg bg-muted p-[3px] text-muted-foreground"
+  >
+    {
+      boards.map((b, i) => (
+        <button
+          type="button"
+          role="tab"
+          id={`board-tab-${b.id}`}
+          aria-controls={`board-panel-${b.id}`}
+          aria-selected={i === 0 ? 'true' : 'false'}
+          tabindex={i === 0 ? 0 : -1}
+          data-tab={b.id}
+          class="inline-flex h-full items-center justify-center rounded-md px-3 text-sm font-medium whitespace-nowrap transition-[color,box-shadow] hover:text-foreground aria-selected:bg-background aria-selected:text-foreground aria-selected:shadow-sm"
+        >
+          {b.label}
+        </button>
+      ))
+    }
+  </div>
+
+  {
+    boards.map((b, i) => (
+      <div
+        role="tabpanel"
+        id={`board-panel-${b.id}`}
+        aria-labelledby={`board-tab-${b.id}`}
+        data-panel={b.id}
+        hidden={i !== 0}
+        class="mt-4"
+      >
+        <div class="flex items-center justify-between border-b border-border pb-2 text-xs text-muted-foreground">
+          <span>{t('explorer.col.plugin')}</span>
+          <span>{t(`home.board.metric.${b.id}`)}</span>
+        </div>
+        <ol class="divide-y divide-border">
+          {b.plugins.map((p, idx) => {
+            const m = metric(p, b.id);
+            return (
+              <li>
+                <a
+                  href={localePath(lang, `/plugins/${p.slug}`)}
+                  class="group -mx-2 flex items-center gap-3 rounded-md px-2 py-2.5 transition-colors hover:bg-accent"
+                >
+                  <span class="tabular w-5 shrink-0 text-right text-sm text-muted-foreground">{idx + 1}</span>
+                  <span class="relative size-8 shrink-0">
+                    <span class="block size-full overflow-hidden rounded-md border border-border bg-muted">
+                      {p.ownerAvatar ? (
+                        <img
+                          src={avatarUrl(p.ownerAvatar, 32)}
+                          alt=""
+                          width="32"
+                          height="32"
+                          class="size-full object-cover"
+                          loading="lazy"
+                          decoding="async"
+                        />
+                      ) : (
+                        <span class="grid size-full place-items-center text-xs font-medium text-white" style={`background:${letterAvatar(p.title).color}`}>
+                          {letterAvatar(p.title).letter}
+                        </span>
+                      )}
+                    </span>
+                    <span
+                      class:list={['lamp absolute -right-0.5 -bottom-0.5 ring-2 ring-card', lampClass[p.healthLevel]]}
+                      title={t(`health.tip.${p.healthLevel}`)}
+                    />
+                  </span>
+                  <span class="min-w-0 flex-1">
+                    <span class="block truncate text-sm font-medium">{p.title}</span>
+                    <span class="block truncate text-xs text-muted-foreground">{pluginDescription(p, lang) ?? p.name}</span>
+                  </span>
+                  <span class="hidden shrink-0 rounded-md border border-border px-2 py-0.5 text-xs text-muted-foreground lg:inline">
+                    {categoryLabel(p.category, lang)}
+                  </span>
+                  <span
+                    class:list={[
+                      'tabular w-20 shrink-0 text-right text-sm font-medium',
+                      m.accent ? 'text-ok' : 'text-foreground',
+                    ]}
+                  >
+                    {m.value}
+                  </span>
+                </a>
+              </li>
+            );
+          })}
+        </ol>
+      </div>
+    ))
+  }
+</div>
+
+<script>
+  // WAI-ARIA tabs: click or arrow keys switch, only the active tab is in the
+  // tab order. Delegated from `document`, so they work however this script
+  // came to run (first load, soft navigation, or a dev hot reload).
+  function select(tab: HTMLElement, focus = false) {
+    const root = tab.closest<HTMLElement>('[data-leaderboard]');
+    if (!root) return;
+    root.querySelectorAll<HTMLElement>('[role="tab"]').forEach((t) => {
+      const on = t === tab;
+      t.setAttribute('aria-selected', String(on));
+      t.tabIndex = on ? 0 : -1;
+    });
+    root.querySelectorAll<HTMLElement>('[role="tabpanel"]').forEach((panel) => {
+      panel.hidden = panel.dataset.panel !== tab.dataset.tab;
+    });
+    if (focus) tab.focus();
+  }
+
+  document.addEventListener('click', (e) => {
+    const tab = (e.target as HTMLElement | null)?.closest<HTMLElement>('[data-leaderboard] [role="tab"]');
+    if (tab) select(tab);
+  });
+
+  document.addEventListener('keydown', (e) => {
+    const tab = (e.target as HTMLElement | null)?.closest<HTMLElement>('[data-leaderboard] [role="tab"]');
+    const step = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
+    if (!tab || !step) return;
+    e.preventDefault();
+    const tabs = [...tab.closest('[data-leaderboard]')!.querySelectorAll<HTMLElement>('[role="tab"]')];
+    select(tabs[(tabs.indexOf(tab) + step + tabs.length) % tabs.length], true);
+  });
+</script>

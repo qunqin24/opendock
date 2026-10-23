@@ -85,3 +85,24 @@ export function formatDate(iso: string | null | undefined, lang: Locale = 'en'):
 export function avatarUrl(url: string, size: number): string {
   return `${url}${url.includes('?') ? '&' : '?'}s=${size * 2}`;
 }
+
+/**
+ * Google-account-style placeholder for a plugin with no owner avatar: a
+ * coloured tile with the plugin's initial. The colour is derived from the
+ * name, so a plugin keeps the same one everywhere. Scope and "opencode-"
+ * prefixes are skipped, or half the directory would be "O" and "P".
+ * All colours are dark enough for white text.
+ */
+const LETTER_COLORS = [
+  '#d93025', '#e8710a', '#b06000', '#188038', '#137333', '#00796b',
+  '#1a73e8', '#185abc', '#3949ab', '#8430ce', '#a142f4', '#c2185b',
+  '#5f6368', '#795548',
+];
+
+export function letterAvatar(name: string): { letter: string; color: string } {
+  const base = name.replace(/^@[^/]+\//, '').replace(/^opencode[-_ ]?/i, '') || name;
+  const letter = (base.match(/[\p{L}\p{N}]/u)?.[0] ?? '?').toUpperCase();
+  let hash = 0;
+  for (const ch of name) hash = (hash * 31 + (ch.codePointAt(0) ?? 0)) >>> 0;
+  return { letter, color: LETTER_COLORS[hash % LETTER_COLORS.length] };
+}

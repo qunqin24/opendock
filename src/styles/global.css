@@ -1,4 +1,12 @@
+@import '@fontsource-variable/geist';
+@import '@fontsource-variable/geist-mono';
 @import 'tailwindcss';
+
+/* Scan every source file up front. In dev, Tailwind otherwise only adds a
+   React island's classes once the browser imports it, so a page reached by
+   soft navigation (e.g. Back from a plugin page) arrives with a stylesheet
+   that lacks them, and the island renders unstyled. */
+@source '..';
 @import 'tw-animate-css';
 
 @custom-variant dark (&:is(.dark *));
@@ -113,12 +121,12 @@
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
 
-  /* No webfont is self-hosted yet, so these resolve to the system stack
-     (SF Pro / SF Mono on macOS). Swapping in a hosted face later is a
-     @font-face block plus a name at the front of one of these lists. */
-  --font-sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB',
-    'Microsoft YaHei', sans-serif;
-  --font-mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+  /* Geist, self-hosted via @fontsource (imported at the top of this
+     file) — the face shadcn/ui ships with. CJK falls through to the
+     system face. */
+  --font-sans: 'Geist Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', 'PingFang SC',
+    'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  --font-mono: 'Geist Mono Variable', ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
 }
 
 @layer base {
@@ -185,7 +193,6 @@
 
   body {
     @apply bg-background text-foreground antialiased;
-    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
     text-rendering: optimizeLegibility;
   }
 
@@ -330,4 +337,65 @@
 }
 .prose-readme hr {
   @apply my-8 border-border;
+}
+
+/* Compact variant for release notes and FAQ answers: same rules, sized
+   for a panel inside a card rather than a page column. */
+.prose-readme.prose-compact {
+  @apply text-sm leading-6;
+}
+.prose-compact h1,
+.prose-compact h2,
+.prose-compact h3,
+.prose-compact h4 {
+  @apply mt-5 mb-2 border-0 pb-0 text-sm;
+}
+.prose-compact p,
+.prose-compact ul,
+.prose-compact ol,
+.prose-compact blockquote {
+  @apply my-2.5;
+}
+.prose-compact pre {
+  @apply my-3 p-3 text-xs leading-5;
+}
+
+/* --- About page prose ------------------------------------------------
+   Direct children only, so the visual blocks dropped between paragraphs
+   (weights bar, pipeline steps) keep their own styling. */
+.prose-about {
+  @apply text-[0.9375rem] leading-7 text-foreground/85;
+}
+.prose-about > * + * {
+  @apply mt-4;
+}
+.prose-about > ul {
+  @apply list-disc space-y-2 pl-5 marker:text-muted-foreground;
+}
+.prose-about strong {
+  @apply font-semibold text-foreground;
+}
+.prose-about a {
+  @apply font-medium text-foreground underline decoration-border underline-offset-4 transition-colors hover:decoration-foreground;
+}
+.prose-about code {
+  @apply rounded bg-muted px-[0.3rem] py-[0.2rem] font-mono text-[0.85em];
+}
+.prose-about > pre {
+  @apply overflow-x-auto rounded-lg border border-border bg-muted/50 p-4 font-mono text-[0.8125rem] leading-6;
+}
+.prose-about > pre code {
+  @apply bg-transparent p-0;
+}
+.prose-about > .table {
+  @apply overflow-x-auto rounded-lg border border-border;
+}
+.prose-about table {
+  @apply w-full text-sm;
+}
+.prose-about th {
+  @apply bg-muted/50 px-4 py-2.5 text-left font-medium;
+}
+.prose-about td {
+  @apply border-t border-border px-4 py-2.5 align-top;
 }

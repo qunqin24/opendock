@@ -1,0 +1,108 @@
+---
+import { localeFromPath, localePath, useTranslations } from '../lib/i18n';
+
+const lang = localeFromPath(Astro.url.pathname);
+const t = useTranslations(lang);
+---
+
+{/*
+  The compare tray: a pill pinned to the bottom of every page once something
+  is picked, so the pick survives browsing between cards and detail pages.
+  It also owns the detail page's "Compare" toggle ([data-compare-toggle]).
+*/}
+<div
+  data-compare-tray
+  data-href={localePath(lang, '/compare')}
+  data-label-tray={t('compare.tray', { n: '{n}' })}
+  data-label-remove={t('compare.remove', { title: '{title}' })}
+  data-label-full={t('compare.trayFull')}
+  hidden
+  class="fixed inset-x-0 bottom-4 z-40 flex justify-center px-4 print:hidden"
+>
+  <div class="flex max-w-full min-w-0 items-center gap-2 rounded-full border border-border bg-popover/95 py-1.5 pr-1.5 pl-4 text-sm shadow-lg backdrop-blur">
+    <span data-compare-label class="shrink-0 font-medium whitespace-nowrap"></span>
+    <ul data-compare-chips class="hidden min-w-0 items-center gap-1 overflow-hidden md:flex"></ul>
+    <span data-compare-full class="hidden shrink-0 text-xs text-warn"></span>
+    <button
+      type="button"
+      data-compare-clear
+      class="shrink-0 rounded-full px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+      >{t('compare.clear')}</button
+    >
+    <a
+      data-compare-go
+      class="inline-flex h-8 shrink-0 items-center gap-1 rounded-full bg-primary px-3.5 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+      >{t('compare.go')} <span aria-hidden="true">→</span></a
+    >
+  </div>
+</div>
+
+<script>
+  import { getCompare, onCompareChange, setCompare, toggleCompare, COMPARE_FULL_EVENT } from '../lib/compare-store';
+
+  let fullTimer: ReturnType<typeof setTimeout> | undefined;
+
+  function render() {
+    const tray = document.querySelector<HTMLElement>('[data-compare-tray]');
+    const items = getCompare();
+
+    // The detail page's toggle reflects the tray wherever it was changed.
+    document.querySelectorAll<HTMLButtonElement>('[data-compare-toggle]').forEach((b) => {
+      const on = items.some((x) => x.s === b.dataset.slug);
+      b.setAttribute('aria-pressed', String(on));
+      const label = b.querySelector('[data-compare-toggle-label]');
+      if (label) label.textContent = on ? b.dataset.labelOn! : b.dataset.labelOff!;
+    });
+
+    if (!tray) return;
+    // The compare page is the tray's destination; it has its own controls.
+    const onComparePage = location.pathname.replace(/\/$/, '') === tray.dataset.href!.replace(/\/$/, '');
+    tray.hidden = !items.length || onComparePage;
+    if (tray.hidden) return;
+
+    tray.querySelector('[data-compare-label]')!.textContent = tray.dataset.labelTray!.replace('{n}', String(items.length));
+    tray.querySelector<HTMLAnchorElement>('[data-compare-go]')!.href = `${tray.dataset.href}?p=${items.map((x) => encodeURIComponent(x.s)).join(',')}`;
+
+    // Titles come from storage, so they go in as text, never markup.
+    const chips = tray.querySelector('[data-compare-chips]')!;
+    chips.replaceChildren(
+      ...items.map((x) => {
+        const li = document.createElement('li');
+        li.className = 'flex min-w-0 items-center gap-0.5 rounded-full bg-muted py-0.5 pr-0.5 pl-2.5 text-xs';
+        const name = document.createElement('span');
+        name.className = 'max-w-32 truncate';
+        name.textContent = x.t;
+        const rm = document.createElement('button');
+        rm.type = 'button';
+        rm.dataset.compareRemove = x.s;
+        rm.ariaLabel = tray.dataset.labelRemove!.replace('{title}', x.t);
+        rm.className = 'grid size-5 place-items-center rounded-full text-muted-foreground hover:bg-background hover:text-foreground';
+        rm.textContent = '×';
+        li.append(name, rm);
+        return li;
+      }),
+    );
+  }
+
+  document.addEventListener('click', (e) => {
+    const el = e.target as HTMLElement | null;
+    const toggle = el?.closest<HTMLElement>('[data-compare-toggle]');
+    if (toggle) toggleCompare({ s: toggle.dataset.slug!, t: toggle.dataset.title! });
+    const remove = el?.closest<HTMLElement>('[data-compare-remove]');
+    if (remove) setCompare(getCompare().filter((x) => x.s !== remove.dataset.compareRemove));
+    if (el?.closest('[data-compare-clear]')) setCompare([]);
+  });
+
+  window.addEventListener(COMPARE_FULL_EVENT, () => {
+    const tray = document.querySelector<HTMLElement>('[data-compare-tray]');
+    const note = tray?.querySelector<HTMLElement>('[data-compare-full]');
+    if (!tray || !note) return;
+    note.textContent = tray.dataset.labelFull!;
+    note.classList.remove('hidden');
+    clearTimeout(fullTimer);
+    fullTimer = setTimeout(() => note.classList.add('hidden'), 2500);
+  });
+
+  onCompareChange(render);
+  document.addEventListener('astro:page-load', render);
+</script>

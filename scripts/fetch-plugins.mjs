@@ -8,11 +8,19 @@
  *   npm downloads API                        →  adoption
  *   data/history.json                        →  star deltas for "trending"
  *   data/curated.json                        →  human overrides + blocklist
+ *   data/translations.json + Bing web translator → descriptionZh (best effort)
+ *   GitHub GraphQL (README.zh-CN.md etc.)    →  translated READMEs, readme/<slug>@<lang>.md
+ *   npm versions + GitHub releases/issues    →  details/<slug>.json (changelog, community)
  *                                            ↓
  *                                     src/data/plugins.json
  *
  * Usage: pnpm data          (full run)
  *        pnpm data --limit 80   (fast dev subset)
+ *        pnpm data --translate-max 200   (cap new translations this run; default 500)
+ *
+ * New translations are only fetched on GitHub Actions (the daily refresh job);
+ * anywhere else the pipeline just applies data/translations.json. `--translate`
+ * forces Bing on, `--no-translate` forces it off.
  */
 
 import { writeFile, readFile, mkdir, rm } from 'node:fs/promises';
@@ -25,6 +33,10 @@ import { JSONCache } from './lib/cache.mjs';
 import { fetchDownloads } from './lib/downloads.mjs';
 import { classify, ALL_CATEGORIES } from './lib/categories.mjs';
 import { computeScore, healthSignals, credibleStars } from './lib/score.mjs';
+import { BingTranslator } from './lib/translate.mjs';
+import { TranslationCache, translateDescriptions, formatStats } from './lib/descriptions.mjs';
+import { findReadmeVariants, guessLang } from './lib/readme-langs.mjs';
+import { detectCompat, recentVersions } from './lib/compat.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DATA_DIR = path.join(ROOT, 'data');
@@ -32,8 +44,11 @@ const OUT_FILE = path.join(ROOT, 'src', 'data', 'plugins.json');
 // READMEs are large and only needed on detail pages, so they live as
 // individual files instead of bloating the dataset every page imports.
 const README_DIR = path.join(ROOT, 'src', 'data', 'readme');
+// Changelog and community data, also per plugin and only read by detail pages.
+const DETAILS_DIR = path.join(ROOT, 'src', 'data', 'details');
 const HISTORY_FILE = path.join(DATA_DIR, 'history.json');
 const CURATED_FILE = path.join(DATA_DIR, 'curated.json');
+const TRANSLATIONS_FILE = path.join(DATA_DIR, 'translations.json');
 const CACHE_DIR = path.join(ROOT, '.cache');
 
 // `--fresh` bypasses the caches entirely.
@@ -41,6 +56,17 @@ const NO_CACHE = process.argv.includes('--fresh');
 
 const SEARCH_KEYWORDS = ['opencode-plugin', 'opencode-plugins'];
 const HISTORY_WINDOW_DAYS = 60;
+
+const NO_TRANSLATE =
+  process.argv.includes('--no-translate') ||
+  process.env.OPENDOCK_TRANSLATE === '0' ||
+  (process.env.GITHUB_ACTIONS !== 'true' && !process.argv.includes('--translate'));
+// New translations per pipeline run. The backlog drains over several daily runs
+// instead of one run hammering an unofficial endpoint for half an hour.
+const translateMax = (() => {
+  const i = process.argv.indexOf('--translate-max');
+  return i > -1 ? Number(process.argv[i + 1]) : 500;
+})();
 
 const argLimit = (() => {
   const i = process.argv.indexOf('--limit');
@@ -86,6 +112,8 @@ async function fetchPackument(name) {
     modifiedAt: doc.time?.modified ?? null,
     keywords: latest?.keywords ?? doc.keywords ?? [],
     description: latest?.description ?? doc.description ?? null,
+    compat: detectCompat(latest, latestTag ? (doc.time?.[latestTag] ?? null) : null),
+    versions: recentVersions(doc.time),
   };
 }
 
@@ -121,6 +149,12 @@ const REPO_FRAGMENT = `
   issues(states: OPEN) { totalCount }
   readme: object(expression: "HEAD:README.md") { ... on Blob { text } }
   readmeLower: object(expression: "HEAD:readme.md") { ... on Blob { text } }
+  releases(first: 6, orderBy: { field: CREATED_AT, direction: DESC }) {
+    nodes { tagName name publishedAt url isPrerelease description }
+  }
+  topIssues: issues(first: 6, orderBy: { field: COMMENTS, direction: DESC }) {
+    nodes { number title url state createdAt comments { totalCount } }
+  }
 `;
 
 async function fetchRepos(slugs, cache) {
@@ -166,6 +200,87 @@ async function fetchRepos(slugs, cache) {
   if (slugs.length) process.stdout.write('\n');
   await cache.save();
   return result;
+}
+
+/**
+ * Translated READMEs that a plugin's README links to ("English · 简体中文").
+ * A second, smaller GraphQL pass: the paths are only known once the main
+ * README is in hand. Returns Map<slug, [{ lang, text }]>.
+ */
+async function fetchReadmeVariants(plugins, cache) {
+  const BATCH = 15;
+  const wanted = [];
+  for (const p of plugins) {
+    if (!p.hasReadme || !p.repoSlug) continue;
+    const own = guessLang(p.readme);
+    const variants = findReadmeVariants(p.readme, p.repoSlug).filter((v) => v.lang !== own);
+    if (variants.length) wanted.push({ p, variants });
+  }
+
+  const key = (p, v) => `${p.repoSlug.toLowerCase()}:${v.path}`;
+  const pending = wanted.filter(({ p, variants }) => variants.some((v) => cache.get(key(p, v)) === undefined));
+
+  for (let i = 0; i < pending.length; i += BATCH) {
+    const batch = pending.slice(i, i + BATCH);
+    const query = `query {\n${batch
+      .map(({ p, variants }, n) => {
+        const [owner, repo] = p.repoSlug.split('/');
+        const blobs = variants
+          .map((v, j) => `v${j}: object(expression: ${JSON.stringify(`HEAD:${v.path}`)}) { ... on Blob { text } }`)
+          .join(' ');
+        return `  r${n}: repository(owner: ${JSON.stringify(owner)}, name: ${JSON.stringify(repo)}) { ${blobs} }`;
+      })
+      .join('\n')}\n}`;
+
+    const data = await graphql(query);
+    batch.forEach(({ p, variants }, n) => {
+      variants.forEach((v, j) => cache.set(key(p, v), data?.[`r${n}`]?.[`v${j}`]?.text ?? null));
+    });
+    process.stdout.write(`\r  readme variants ${Math.min(i + BATCH, pending.length)}/${pending.length} repos`);
+  }
+  if (pending.length) process.stdout.write('\n');
+  await cache.save();
+
+  const result = new Map();
+  for (const { p, variants } of wanted) {
+    const texts = variants
+      .map((v) => ({ lang: v.lang, text: cache.get(key(p, v)) }))
+      .filter((v) => v.text && v.text.length > 200);
+    if (texts.length) result.set(p.slug, texts);
+  }
+  return result;
+}
+
+/**
+ * Changelog and community data for one package. In a shared repo only
+ * releases tagged with the package's own name are kept; issues stay but are
+ * flagged, since they cover the whole repo.
+ */
+function buildDetails(r, repo, sharedRepo) {
+  const bare = r.name.replace(/^@[^/]+\//, '').toLowerCase();
+  const releases = (repo?.releases?.nodes ?? [])
+    .filter((n) => n && (!sharedRepo || n.tagName.toLowerCase().includes(bare)))
+    .slice(0, 5)
+    .map((n) => ({
+      tag: n.tagName,
+      name: n.name && n.name !== n.tagName ? n.name.slice(0, 120) : null,
+      date: n.publishedAt,
+      url: n.url,
+      prerelease: n.isPrerelease,
+      // Notes are rendered as markdown on the page; cap the pathological ones.
+      body: (n.description ?? '').slice(0, 4000) || null,
+    }));
+  const issues = (repo?.topIssues?.nodes ?? [])
+    .filter((n) => n && n.comments.totalCount > 0)
+    .map((n) => ({
+      number: n.number,
+      title: n.title.slice(0, 200),
+      url: n.url,
+      state: n.state === 'OPEN' ? 'open' : 'closed',
+      comments: n.comments.totalCount,
+      date: n.createdAt,
+    }));
+  return { versions: r.versions, releases, issues, sharedRepo };
 }
 
 // ------------------------------------------------------------------ history
@@ -254,8 +369,9 @@ async function main() {
 
   // Downloads move slowly and packuments rarely change within a day; repo
   // metadata gets a shorter TTL because stars are the point of the site.
-  const pkgCache = await cache('packuments.json', 20);
-  const repoCache = await cache('repos.json', 20);
+  // Versioned names: entries cached before a field was added would hide it for a day.
+  const pkgCache = await cache('packuments-v2.json', 20);
+  const repoCache = await cache('repos-v2.json', 20);
   const dlCache = await cache('downloads.json', 20);
 
   log('fetching npm packuments…');
@@ -295,6 +411,8 @@ async function main() {
       homepage: doc.homepage ?? p.links?.homepage ?? null,
       createdAt: doc.createdAt ?? p.date ?? null,
       modifiedAt: doc.modifiedAt ?? p.date ?? null,
+      compat: doc.compat ?? { target: null, inferred: false },
+      versions: doc.versions ?? [],
       gh: parseGitHub(repoUrl),
     };
   });
@@ -314,6 +432,11 @@ async function main() {
 
   const history = trimHistory(await loadJSON(HISTORY_FILE, {}), today);
 
+  // Repos that several packages publish from: their releases and issues are
+  // only partly about any one package.
+  const repoShare = new Map();
+  for (const r of records) if (r.gh) repoShare.set(`${r.gh.owner}/${r.gh.repo}`.toLowerCase(), (repoShare.get(`${r.gh.owner}/${r.gh.repo}`.toLowerCase()) ?? 0) + 1);
+
   // ------------------------------------------------------------- assemble
   const plugins = records.map((r) => {
     const repo = r.gh ? repos.get(`${r.gh.owner}/${r.gh.repo}`.toLowerCase()) : null;
@@ -332,6 +455,8 @@ async function main() {
       title: override.title ?? displayName(r.name),
       version: r.version,
       description: override.description ?? cleanDescription(r.description ?? repo?.description),
+      // Filled from data/translations.json after ranking; null = show the original.
+      descriptionZh: null,
       keywords: r.keywords.slice(0, 12),
       topics,
       license: r.license ?? repo?.licenseInfo?.spdxId ?? null,
@@ -354,6 +479,10 @@ async function main() {
       readme,
       hasReadme: Boolean(readme && readme.length > 200),
       featured: featured.has(r.name),
+      opencode: r.compat.target,
+      opencodeInferred: r.compat.inferred,
+      // Transient, written to details/<slug>.json and removed from the snapshot.
+      details: buildDetails(r, repo, (repoShare.get(r.gh ? `${r.gh.owner}/${r.gh.repo}`.toLowerCase() : '') ?? 0) > 1),
     };
 
     base.starsDelta30d = starsDelta(history[r.name], stars, 30, today);
@@ -381,22 +510,67 @@ async function main() {
   );
   kept.sort((a, b) => b.score - a.score || b.stars - a.stars);
 
+  // Best effort: a blocked/broken translator must never fail the crawl.
+  try {
+    const cache = await new TranslationCache(TRANSLATIONS_FILE).load();
+    const translator = NO_TRANSLATE ? null : new BingTranslator();
+    log(`translating descriptions (${NO_TRANSLATE ? 'cache only' : `up to ${translateMax} new`})…`);
+    const { result, stats } = await translateDescriptions(kept, {
+      translator,
+      cache,
+      maxNew: translateMax,
+      budgetMs: 10 * 60_000,
+      log,
+    });
+    for (const p of kept) p.descriptionZh = result.get(p.name) ?? null;
+    await cache.save({ force: true });
+    log(`  ${formatStats(stats)}`);
+  } catch (err) {
+    log(`  translation skipped: ${err?.message ?? err}`);
+  }
+
   const categories = ALL_CATEGORIES.map(({ patterns, ...c }) => ({
     ...c,
     count: kept.filter((p) => p.category === c.id).length,
   })).filter((c) => c.count > 0);
+
+  // Best effort, like translation: a failed pass only costs the language switch.
+  let variants = new Map();
+  try {
+    log('fetching translated READMEs…');
+    variants = await fetchReadmeVariants(kept, await cache('readme-variants.json', 20));
+  } catch (err) {
+    log(`  readme variants skipped: ${err?.message ?? err}`);
+  }
 
   await mkdir(README_DIR, { recursive: true });
   await rm(README_DIR, { recursive: true, force: true });
   await mkdir(README_DIR, { recursive: true });
 
   let readmeCount = 0;
+  let variantCount = 0;
   await mapLimit(kept, 20, async (p) => {
     if (!p.hasReadme) return;
     await writeFile(path.join(README_DIR, `${p.slug}.md`), p.readme);
+    // `@` never appears in a slug, so these can't collide with a plugin's own file.
+    for (const v of variants.get(p.slug) ?? []) {
+      await writeFile(path.join(README_DIR, `${p.slug}@${v.lang}.md`), v.text);
+      variantCount++;
+    }
     readmeCount++;
   });
   for (const p of kept) delete p.readme;
+
+  await rm(DETAILS_DIR, { recursive: true, force: true });
+  await mkdir(DETAILS_DIR, { recursive: true });
+  let detailCount = 0;
+  await mapLimit(kept, 20, async (p) => {
+    const d = p.details;
+    if (!d || !(d.versions.length || d.releases.length || d.issues.length)) return;
+    await writeFile(path.join(DETAILS_DIR, `${p.slug}.json`), JSON.stringify(d));
+    detailCount++;
+  });
+  for (const p of kept) delete p.details;
 
   const payload = {
     generatedAt: new Date().toISOString(),
@@ -416,7 +590,8 @@ async function main() {
   await writeFile(HISTORY_FILE, JSON.stringify(history, null, 0));
 
   log(`wrote ${kept.length} plugins → src/data/plugins.json (dropped ${plugins.length - kept.length})`);
-  log(`wrote ${readmeCount} readmes → src/data/readme/`);
+  log(`wrote ${readmeCount} readmes + ${variantCount} translated → src/data/readme/`);
+  log(`wrote ${detailCount} changelog/community files → src/data/details/`);
   log(`categories: ${categories.map((c) => `${c.id}:${c.count}`).join(' ')}`);
 }
 

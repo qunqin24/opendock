@@ -10,56 +10,35 @@ const lang = localeFromPath(Astro.url.pathname);
 const t = useTranslations(lang);
 
 const spec = p.version ? `${p.name}@${p.version}` : p.name;
-
-const tabs = [
-  {
-    id: 'project',
-    label: t('install.project'),
-    hint: t('install.projectHint'),
-    file: 'opencode.json',
-    code: `{
+const config = `{
   "$schema": "https://opencode.ai/config.json",
   "plugin": ["${spec}"]
-}`,
-  },
+}`;
+
+const tabs = [
+  { id: 'project', label: t('install.project'), hint: t('install.projectHint'), file: 'opencode.json', code: config },
   {
     id: 'global',
     label: t('install.global'),
     hint: t('install.globalHint'),
     file: '~/.config/opencode/opencode.json',
-    code: `{
-  "$schema": "https://opencode.ai/config.json",
-  "plugin": ["${spec}"]
-}`,
+    code: config,
   },
-  {
-    id: 'npm',
-    label: t('install.manual'),
-    hint: t('install.manualHint'),
-    file: 'shell',
-    code: `pnpm add -D ${p.name}`,
-  },
+  { id: 'npm', label: t('install.manual'), hint: t('install.manualHint'), file: 'shell', code: `pnpm add -D ${p.name}` },
 ];
 ---
 
-<div
-  class="overflow-hidden rounded-lg border border-border bg-card"
-  data-install
->
-  <!-- The tab strip's fill already separates it from the panel; a rule on
-       top of that is redundant structure. -->
-  <div class="flex items-center gap-1 bg-secondary/50 px-2 py-1.5">
+<div data-install>
+  {/* shadcn/ui Tabs */}
+  <div role="tablist" class="grid h-9 grid-cols-3 items-center rounded-lg bg-muted p-[3px] text-muted-foreground">
     {
       tabs.map((tab, i) => (
         <button
           type="button"
+          role="tab"
           data-install-tab={tab.id}
-          aria-selected={i === 0}
-          class:list={[
-            'rounded-md px-3 py-1 text-xs font-medium transition-colors',
-            'aria-selected:bg-card aria-selected:text-foreground',
-            'text-muted-foreground hover:text-foreground',
-          ]}
+          aria-selected={i === 0 ? 'true' : 'false'}
+          class="h-full rounded-md text-sm font-medium transition-[color,box-shadow] hover:text-foreground aria-selected:bg-background aria-selected:text-foreground aria-selected:shadow-sm"
         >
           {tab.label}
         </button>
@@ -69,52 +48,42 @@ const tabs = [
 
   {
     tabs.map((tab, i) => (
-      <div data-install-panel={tab.id} class:list={[i !== 0 && 'hidden']}>
-        {/* Hint, filename and copy button share one row instead of stacking
-            three separately-ruled bands inside the card. */}
-        <div class="px-4 pt-3.5">
-          <div class="flex items-start justify-between gap-3">
-            <p class="text-xs leading-5 text-muted-foreground">{tab.hint}</p>
+      <div data-install-panel={tab.id} role="tabpanel" class:list={['mt-3', i !== 0 && 'hidden']}>
+        <div class="overflow-hidden rounded-lg border border-border">
+          <div class="flex items-center justify-between gap-3 border-b border-border bg-muted/50 py-1.5 pr-1.5 pl-3">
+            <span class="truncate font-mono text-xs text-muted-foreground">{tab.file}</span>
             <button
               type="button"
               data-copy={tab.code}
-              class="-mt-1 inline-flex shrink-0 items-center gap-1.5 rounded-md px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+              class="inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md px-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
             >
-              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" class="size-3.5">
-                <rect x="5.75" y="5.75" width="8.5" height="8.5" rx="1.5" />
-                <path d="M10.25 3.75v-1a1.5 1.5 0 0 0-1.5-1.5h-5.5a1.5 1.5 0 0 0-1.5 1.5v5.5a1.5 1.5 0 0 0 1.5 1.5h1" />
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-3.5" aria-hidden="true">
+                <rect width="14" height="14" x="8" y="8" rx="2" />
+                <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
               </svg>
               <span data-copy-label>{t('plugin.copy')}</span>
             </button>
           </div>
+          {/* Wraps instead of scrolling in the narrow sidebar; the copy button
+            still copies the exact text. */}
+          <pre class="px-3 py-3 font-mono text-xs leading-5 whitespace-pre-wrap [overflow-wrap:anywhere]"><code>{tab.code}</code></pre>
         </div>
-
-        {/* The code sits in a filled well rather than between two rules. */}
-        <div class="px-4 pt-3 pb-4">
-          <div class="rounded-md bg-muted px-3.5 py-3">
-            <p class="mb-2 font-mono text-[0.625rem] text-muted-foreground">{tab.file}</p>
-            <pre class="overflow-x-auto font-mono text-[0.8125rem] leading-6"><code>{tab.code}</code></pre>
-          </div>
-        </div>
+        <p class="mt-2.5 text-xs leading-5 text-muted-foreground">{tab.hint}</p>
       </div>
     ))
   }
 </div>
 
 <script>
-  // Re-bound after every soft navigation: the module itself only executes
-  // once, but ClientRouter swaps in a fresh set of elements each time.
-  document.addEventListener('astro:page-load', () => {
-    document.querySelectorAll<HTMLElement>('[data-install]').forEach((root) => {
-      const tabs = root.querySelectorAll<HTMLButtonElement>('[data-install-tab]');
-      tabs.forEach((tab) => {
-        tab.addEventListener('click', () => {
-          tabs.forEach((t) => t.setAttribute('aria-selected', String(t === tab)));
-          root.querySelectorAll<HTMLElement>('[data-install-panel]').forEach((panel) => {
-            panel.classList.toggle('hidden', panel.dataset.installPanel !== tab.dataset.installTab);
-          });
-        });
-      });
+  // Delegated from `document`, so the tabs work however this script came to
+  // run (first load, soft navigation, or a dev hot reload).
+  document.addEventListener('click', (e) => {
+    const tab = (e.target as HTMLElement | null)?.closest<HTMLButtonElement>('[data-install-tab]');
+    const root = tab?.closest<HTMLElement>('[data-install]');
+    if (!tab || !root) return;
+    root.querySelectorAll('[data-install-tab]').forEach((t) => t.setAttribute('aria-selected', String(t === tab)));
+    root.querySelectorAll<HTMLElement>('[data-install-panel]').forEach((panel) => {
+      panel.classList.toggle('hidden', panel.dataset.installPanel !== tab.dataset.installTab);
     });
   });
 </script>

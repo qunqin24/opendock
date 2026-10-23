@@ -1,9 +1,10 @@
 ---
 import Layout from '../layouts/Layout.astro';
+import PageHeader from '../components/PageHeader.astro';
 import PluginExplorer from '../components/PluginExplorer';
 import CategoryIcon from '../components/CategoryIcon.astro';
-import { categories, searchDocs, byCategory, categoryLabel, categoryDescription, type Category } from '../lib/plugins';
-import { formatNumber } from '../lib/utils';
+import { categories, searchDocsFor, byCategory, categoryLabel, categoryDescription, generatedAt, lampClass, type Category } from '../lib/plugins';
+import { avatarUrl, compactNumber, formatNumber, letterAvatar } from '../lib/utils';
 import { localeFromPath, localePath, useTranslations } from '../lib/i18n';
 
 interface Props {
@@ -13,12 +14,13 @@ const { category } = Astro.props;
 
 const lang = localeFromPath(Astro.url.pathname);
 const t = useTranslations(lang);
+const href = (path: string) => localePath(lang, path);
 const label = categoryLabel(category.id, lang);
 const description = categoryDescription(category.id, lang);
 
 // The explorer keeps its own category chips, so scope the dataset here and
 // let it filter within the category rather than across everything.
-const docs = searchDocs.filter((d) => d.category === category.id);
+const docs = searchDocsFor(lang).filter((d) => d.category === category.id);
 
 // Same maintenance census the index page shows, so a category keeps its
 // identity when you drill into it.
@@ -28,6 +30,9 @@ const warn = list.filter((p) => p.healthLevel === 'warn').length;
 const danger = list.length - ok - warn;
 const stars = list.reduce((sum, p) => sum + p.stars, 0);
 const pct = (n: number) => (category.count > 0 ? (n / category.count) * 100 : 0);
+const snapshot = Date.parse(generatedAt);
+const fresh = list.filter((p) => p.createdAt && snapshot - Date.parse(p.createdAt) < 7 * 864e5).length;
+const leaders = list.slice(0, 3);
 
 const siblings = categories.filter((c) => c.id !== category.id).sort((a, b) => b.count - a.count);
 
@@ -60,6 +65,9 @@ const jsonLd = {
     },
   ],
 };
+
+const card = 'rounded-xl border border-border bg-card text-card-foreground shadow-xs';
+const medal = ['bg-amber-400/15 text-amber-700 dark:text-amber-300', 'bg-zinc-400/15 text-zinc-600 dark:text-zinc-300', 'bg-orange-700/10 text-orange-800 dark:text-orange-300'];
 ---
 
 <Layout
@@ -68,79 +76,120 @@ const jsonLd = {
 >
   <script is:inline type="application/ld+json" slot="head" set:html={JSON.stringify(jsonLd)} />
 
-  <div class="mx-auto max-w-6xl px-4 py-10 sm:px-6 sm:py-14">
-    <nav class="mb-6 flex items-center gap-1.5 text-xs text-muted-foreground" aria-label={t('plugin.breadcrumbAria')}>
-      <a href={localePath(lang, '/')} class="transition-colors hover:text-foreground">
-        {t('categories.breadcrumbHome')}
-      </a>
-      <span>/</span>
-      <a href={localePath(lang, '/categories')} class="transition-colors hover:text-foreground">
-        {t('categories.breadcrumb')}
-      </a>
-      <span>/</span>
-      <span class="text-foreground">{label}</span>
-    </nav>
+  <PageHeader
+    title={label}
+    description={description}
+    breadcrumb={[[t('categories.breadcrumbHome'), href('/')], [t('categories.breadcrumb'), href('/categories')], [label]]}
+    breadcrumbLabel={t('plugin.breadcrumbAria')}
+  >
+    <span slot="icon" class="mb-5 grid size-14 place-items-center rounded-2xl border border-border bg-gradient-to-b from-background to-muted shadow-sm">
+      <CategoryIcon name={category.icon} class="size-7" />
+    </span>
+    {lang === 'zh' && <p class="mt-1 text-sm text-muted-foreground">{category.labelEn}</p>}
 
-    <header class="mb-10">
-      {/* The eyebrow is the latin name above the Chinese headline. In English
-          that would just repeat the h1, so it becomes the section label. */}
-      <p class="meta flex items-center gap-2 text-muted-foreground">
-        <CategoryIcon name={category.icon} class="size-3.5" />
-        {lang === 'zh' ? category.labelEn : t('categories.breadcrumb')}
-      </p>
+    <dl slot="aside" class="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:w-[34rem]">
+      <div class={`${card} p-4`}>
+        <dt class="text-xs text-muted-foreground">{t('categories.statPlugins')}</dt>
+        <dd class="tabular mt-1.5 text-xl font-semibold tracking-tight">{formatNumber(category.count)}</dd>
+      </div>
+      <div class={`${card} p-4`}>
+        <dt class="text-xs text-muted-foreground">{t('categories.statStars')}</dt>
+        <dd class="tabular mt-1.5 text-xl font-semibold tracking-tight">{compactNumber(stars)}</dd>
+      </div>
+      <div class={`${card} p-4`}>
+        <dt class="text-xs text-muted-foreground">{t('categories.statActive')}</dt>
+        <dd class="tabular mt-1.5 text-xl font-semibold tracking-tight">{Math.round(pct(ok))}%</dd>
+        <dd
+          class="mt-2 flex h-1.5 gap-px overflow-hidden rounded-full bg-muted"
+          role="img"
+          aria-label={t('categories.healthAria', { ok, warn, danger })}
+        >
+          <span class="block bg-ok" style={`width:${pct(ok)}%`}></span>
+          <span class="block bg-warn" style={`width:${pct(warn)}%`}></span>
+          <span class="block bg-danger" style={`width:${pct(danger)}%`}></span>
+        </dd>
+      </div>
+      <div class={`${card} p-4`}>
+        <dt class="text-xs text-muted-foreground">{t('categories.statNew')}</dt>
+        <dd class:list={['tabular mt-1.5 text-xl font-semibold tracking-tight', fresh > 0 && 'text-ok']}>+{fresh}</dd>
+      </div>
+    </dl>
+  </PageHeader>
 
-      <h1 class="display mt-3 text-[clamp(2rem,6vw,3.5rem)] leading-[0.95] text-foreground">
-        {label}
-      </h1>
+  <div class="mx-auto max-w-6xl space-y-14 px-4 pb-16 sm:px-6">
+    {/* ---- leaders ---- */}
+    {
+      leaders.length > 0 && (
+        <section aria-labelledby="leaders-title">
+          <h2 id="leaders-title" class="text-xl font-semibold tracking-tight">{t('categories.leaders')}</h2>
+          <p class="mt-1 text-sm text-muted-foreground">{t('categories.leadersDesc')}</p>
+          <ol class="mt-5 grid gap-4 md:grid-cols-3">
+            {leaders.map((p, i) => (
+              <li>
+                <a
+                  href={href(`/plugins/${p.slug}`)}
+                  class={`${card} group flex h-full flex-col p-5 transition-[border-color,box-shadow,transform] hover:-translate-y-0.5 hover:border-foreground/20 hover:shadow-md motion-reduce:hover:translate-y-0`}
+                >
+                  <div class="flex items-start justify-between gap-3">
+                    <span class="relative size-12 shrink-0">
+                      <span class="block size-full overflow-hidden rounded-xl border border-border bg-muted">
+                        {p.ownerAvatar ? (
+                          <img src={avatarUrl(p.ownerAvatar, 48)} alt="" width="48" height="48" loading="lazy" decoding="async" class="size-full object-cover" />
+                        ) : (
+                          <span class="grid size-full place-items-center font-semibold text-white" style={`background:${letterAvatar(p.title).color}`}>{letterAvatar(p.title).letter}</span>
+                        )}
+                      </span>
+                      <span class:list={['lamp absolute -right-0.5 -bottom-0.5 ring-2 ring-card', lampClass[p.healthLevel]]} aria-hidden="true" />
+                    </span>
+                    <span class:list={['tabular rounded-md px-2 py-0.5 text-xs font-semibold', medal[i]]}>#{i + 1}</span>
+                  </div>
+                  <h3 class="mt-4 truncate font-semibold">{p.title}</h3>
+                  <p class="truncate font-mono text-xs text-muted-foreground">{p.name}</p>
+                  <p class="mt-3 mb-5 line-clamp-2 min-h-10 text-sm leading-5 text-muted-foreground">{p.description ?? t('common.noDescription')}</p>
+                  <dl class="tabular mt-auto grid grid-cols-3 gap-3 border-t border-border pt-4 text-xs">
+                    <div>
+                      <dt class="text-muted-foreground">{t('explorer.col.stars')}</dt>
+                      <dd class="mt-0.5 text-sm font-semibold">{compactNumber(p.stars)}</dd>
+                    </div>
+                    <div>
+                      <dt class="text-muted-foreground">{t('explorer.col.downloads')}</dt>
+                      <dd class="mt-0.5 text-sm font-semibold">{compactNumber(p.downloadsMonth)}</dd>
+                    </div>
+                    <div>
+                      <dt class="text-muted-foreground">{t('explorer.col.score')}</dt>
+                      <dd class="mt-0.5 text-sm font-semibold">{p.score.toFixed(0)}</dd>
+                    </div>
+                  </dl>
+                </a>
+              </li>
+            ))}
+          </ol>
+        </section>
+      )
+    }
 
-      <p class="mt-4 max-w-[46ch] text-[0.9375rem] leading-6 text-muted-foreground">{description}</p>
+    {/* ---- every plugin ---- */}
+    <section aria-labelledby="all-title">
+      <h2 id="all-title" class="mb-5 text-xl font-semibold tracking-tight">{t('categories.allPlugins')}</h2>
+      <PluginExplorer client:load docs={docs} categories={[]} lang={lang} />
+    </section>
 
-      <dl class="mt-8 flex flex-wrap gap-x-8 gap-y-3 border-t border-border pt-5">
-        <div>
-          <dt class="meta text-muted-foreground/80">{t('categories.statPlugins')}</dt>
-          <dd class="tabular mt-1 font-mono text-lg text-foreground">{formatNumber(category.count)}</dd>
-        </div>
-        <div>
-          <dt class="meta text-muted-foreground/80">{t('categories.statStars')}</dt>
-          <dd class="tabular mt-1 font-mono text-lg text-foreground">{formatNumber(stars)}</dd>
-        </div>
-        <div class="min-w-[10rem] flex-1">
-          <dt class="meta text-muted-foreground/80">{t('categories.statHealth')}</dt>
-          <dd class="mt-2">
-            <span
-              class="flex h-1.5 w-full max-w-xs overflow-hidden rounded-full bg-secondary"
-              role="img"
-              aria-label={t('categories.healthAria', { ok, warn, danger })}
-            >
-              <span class="block bg-ok" style={`width:${pct(ok)}%`}></span>
-              <span class="block bg-warn" style={`width:${pct(warn)}%`}></span>
-              <span class="block bg-danger" style={`width:${pct(danger)}%`}></span>
-            </span>
-            <span class="mt-2 flex flex-wrap gap-x-4 font-mono text-[0.6875rem] text-muted-foreground">
-              <span class="text-foreground">{t('categories.activePct', { n: Math.round(pct(ok)) })}</span>
-              <span>{t('categories.stale', { n: warn })}</span>
-              {danger > 0 && <span>{t('categories.archived', { n: danger })}</span>}
-            </span>
-          </dd>
-        </div>
-      </dl>
-    </header>
-
-    <PluginExplorer client:load docs={docs} categories={[]} lang={lang} />
-
-    <nav class="mt-16 border-t border-border pt-8">
-      <p class="meta mb-4 text-muted-foreground">{t('categories.otherAreas')}</p>
-      <ul class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+    {/* ---- other categories ---- */}
+    <nav aria-labelledby="others-title">
+      <h2 id="others-title" class="text-xl font-semibold tracking-tight">{t('categories.otherAreas')}</h2>
+      <ul class="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {
           siblings.map((c) => (
             <li>
               <a
-                href={localePath(lang, `/categories/${c.id}`)}
-                class="group flex items-center gap-3 rounded-lg border border-border px-3.5 py-2.5 transition-colors hover:border-foreground/25 hover:bg-secondary/50"
+                href={href(`/categories/${c.id}`)}
+                class={`${card} group flex items-center gap-3 p-3 transition-colors hover:bg-accent`}
               >
-                <CategoryIcon name={c.icon} class="size-4 shrink-0 text-muted-foreground" />
-                <span class="min-w-0 flex-1 truncate text-[0.8125rem] group-hover:underline">{categoryLabel(c.id, lang)}</span>
-                <span class="tabular shrink-0 font-mono text-xs text-muted-foreground">{c.count}</span>
+                <span class="grid size-9 shrink-0 place-items-center rounded-lg border border-border bg-gradient-to-b from-background to-muted">
+                  <CategoryIcon name={c.icon} class="size-4" />
+                </span>
+                <span class="min-w-0 flex-1 truncate text-sm font-medium">{categoryLabel(c.id, lang)}</span>
+                <span class="tabular shrink-0 text-xs text-muted-foreground">{formatNumber(c.count)}</span>
               </a>
             </li>
           ))

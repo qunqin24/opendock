@@ -1,285 +1,630 @@
 ---
 import Layout from '../layouts/Layout.astro';
-import Hero from '../components/Hero.astro';
-import FeaturedSpotlight from '../components/FeaturedSpotlight.astro';
-import RankBoard from '../components/RankBoard.astro';
+import Leaderboard from '../components/Leaderboard.astro';
 import CategoryIcon from '../components/CategoryIcon.astro';
-import { rankings, categories, census, featured, categoryLabel, categoryDescription } from '../lib/plugins';
-import { formatNumber } from '../lib/utils';
-import { localeFromPath, localePath, useTranslations } from '../lib/i18n';
+import {
+  plugins, rankings, categories, census, totals, featured, generatedAt, categoryLabel, categoryDescription, lampClass,
+} from '../lib/plugins';
+import { newPluginsPerDay, sparkline, starsGainedPerDay } from '../lib/trends';
+import { avatarUrl, compactNumber, formatNumber, letterAvatar } from '../lib/utils';
+import { authorSlug } from '../lib/author-slug';
+import { localeFromPath, localePath, pluginDescription, useTranslations } from '../lib/i18n';
 
 const lang = localeFromPath(Astro.url.pathname);
 const t = useTranslations(lang);
+const href = (path: string) => localePath(lang, path);
 
-// Curation first, then the composite board tops it up. Falling back to
-// `rankings.top` wholesale would silently drop the featured picks whenever
-// there are fewer than four of them.
-const spotlightPlugins = [...featured, ...rankings.top.filter((p) => !featured.includes(p))].slice(0, 4);
+// "This week" is measured from the snapshot, not from build time, so the
+// numbers stay true to the data they describe.
+const snapshot = new Date(generatedAt).getTime();
+const newThisWeek = plugins.filter((p) => p.createdAt && snapshot - new Date(p.createdAt).getTime() < 7 * 864e5).length;
+const pct = (n: number) => Math.round((n / Math.max(census.total, 1)) * 100);
 
-// The hero already carries the composite ranking, so these boards are the
-// views it can't show — the ones that answer a different question.
+// --- Hero preview: the plugin index as it looks, with real rows.
+const preview = rankings.top.slice(0, 5);
+const previewChips = [...categories]
+  .filter((c) => c.id !== 'other')
+  .sort((a, b) => b.count - a.count)
+  .slice(0, 4);
+
+// --- Author wall: one face per author, best-ranked first.
+const authors: { name: string; slug: string; avatar: string }[] = [];
+for (const p of rankings.top) {
+  const slug = authorSlug(p.owner);
+  if (!slug || !p.owner || !p.ownerAvatar || authors.some((a) => a.slug === slug)) continue;
+  authors.push({ name: p.owner, slug, avatar: p.ownerAvatar });
+  if (authors.length === 40) break;
+}
+
+// --- Bento
 const boards = [
-  {
-    id: 'trending',
-    label: t('board.trending'),
-    plugins: rankings.trending.slice(0, 8),
-    metric: 'trending' as const,
-  },
-  {
-    id: 'downloads',
-    label: t('board.downloads'),
-    plugins: rankings.downloads.slice(0, 8),
-    metric: 'downloads' as const,
-  },
-  {
-    id: 'top',
-    label: t('board.top'),
-    plugins: rankings.top.slice(0, 8),
-    metric: 'top' as const,
-  },
-  {
-    id: 'recent',
-    label: t('board.recent'),
-    plugins: rankings.recent.slice(0, 8),
-    metric: 'recent' as const,
-  },
+  { id: 'top' as const, label: t('home.board.top'), plugins: rankings.top.slice(0, 10) },
+  { id: 'trending' as const, label: t('home.board.trending'), plugins: rankings.trending.slice(0, 10) },
+  { id: 'downloads' as const, label: t('home.board.downloads'), plugins: rankings.downloads.slice(0, 10) },
+  { id: 'recent' as const, label: t('home.board.recent'), plugins: rankings.recent.slice(0, 10) },
 ];
 
-// Sort categories by plugin counts
-const sortedCategories = [...categories].sort((a, b) => b.count - a.count);
+const newSeries = newPluginsPerDay(30);
+const newTotal = newSeries.reduce((s, p) => s + p.value, 0);
+const newChart = sparkline(newSeries, 300, 72);
 
-const features = ([1, 2, 3, 4] as const).map((n) => ({
-  tag: t(`home.feature.${n}.tag` as const),
-  title: t(`home.feature.${n}.title` as const),
-  desc: t(`home.feature.${n}.desc` as const, { total: formatNumber(census.total) }),
-}));
+const starSeries = starsGainedPerDay(30);
+const starTotal = starSeries.reduce((s, p) => s + p.value, 0);
+const starMax = Math.max(1, ...starSeries.map((p) => p.value));
+
+const topInstalled = rankings.downloads.slice(0, 5);
+const installMax = Math.max(1, topInstalled[0]?.downloadsMonth ?? 1);
+
+// Donut: three arcs on one circle, laid end to end.
+const RING = 2 * Math.PI * 42;
+let offset = 0;
+const ring = [
+  { label: t('home.pulse.ok'), n: census.active, stroke: 'stroke-ok', dot: 'bg-ok' },
+  { label: t('home.pulse.warn'), n: census.ailing, stroke: 'stroke-warn', dot: 'bg-warn' },
+  { label: t('home.pulse.danger'), n: census.abandoned, stroke: 'stroke-danger', dot: 'bg-danger' },
+].map((s) => {
+  const length = (s.n / Math.max(census.total, 1)) * RING;
+  const arc = { ...s, length, offset };
+  offset += length;
+  return arc;
+});
+
+const picks = [...featured, ...rankings.top.filter((p) => !featured.includes(p))].slice(0, 3);
+
+// Largest first; "Other" is a remainder rather than an area, so it goes last.
+const sortedCategories = [...categories].sort((a, b) =>
+  a.id === 'other' ? 1 : b.id === 'other' ? -1 : b.count - a.count,
+);
+
+// shadcn/ui Card anatomy, shared by every card on the page.
+const card = 'relative rounded-xl border border-border bg-card text-card-foreground shadow-xs';
+const cardTitle = 'leading-none font-semibold';
+const cardDesc = 'text-sm text-muted-foreground';
+const eyebrow = 'inline-flex items-center rounded-md border border-border bg-background px-2 py-0.5 text-xs font-medium text-muted-foreground';
+
+const code = (s: string) =>
+  `<code class="rounded bg-muted px-[0.3rem] py-[0.2rem] font-mono text-[0.8125rem] font-medium">${s}</code>`;
 ---
 
 <Layout>
-  <!-- 1. Hero Section ------------------------------------------------ -->
-  <Hero />
+  {/* --- Hero ---------------------------------------------------------------- */}
+  <section class="relative isolate overflow-hidden border-b border-border">
+    {/* A faint grid that fades out from the top centre, and a soft glow
+        behind the showcase. Both purely decorative. */}
+    <div
+      aria-hidden="true"
+      class="pointer-events-none absolute inset-0 -z-10 bg-[linear-gradient(to_right,var(--border)_1px,transparent_1px),linear-gradient(to_bottom,var(--border)_1px,transparent_1px)] bg-[size:56px_56px] [mask-image:radial-gradient(ellipse_70%_55%_at_50%_0%,#000_55%,transparent_100%)]"
+    >
+    </div>
+    <div
+      aria-hidden="true"
+      class="pointer-events-none absolute top-[38%] left-1/2 -z-10 h-[36rem] w-[64rem] max-w-[140vw] -translate-x-1/2 rounded-full bg-[radial-gradient(closest-side,oklch(0.7_0.15_265/0.22),oklch(0.75_0.12_200/0.12)_55%,transparent)] blur-2xl dark:bg-[radial-gradient(closest-side,oklch(0.55_0.2_265/0.35),oklch(0.6_0.14_200/0.15)_55%,transparent)]"
+    >
+    </div>
 
-  <!-- 2. Featured Spotlight Section ----------------------------------- -->
-  <section class="mx-auto max-w-6xl px-4 py-12 sm:px-6 sm:py-16">
-    <div class="mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
-      <div>
-        <p class="meta text-muted-foreground">
-          {t('home.spotlight.eyebrow')}
-        </p>
-        <h2 class="mt-2 text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
-          {t('home.spotlight.title')}
-        </h2>
-        <p class="mt-1 text-sm text-muted-foreground">
-          {t('home.spotlight.subtitle')}
-        </p>
-      </div>
-
+    <div class="mx-auto flex max-w-6xl flex-col items-center px-4 pt-16 text-center sm:px-6 sm:pt-24">
       <a
-        href={localePath(lang, "/plugins")}
-        class="inline-flex items-center gap-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+        href={`${href('/rankings')}#recent`}
+        class="inline-flex items-center gap-2 rounded-full border border-border bg-background/80 px-3 py-1 text-sm shadow-xs backdrop-blur transition-colors hover:bg-accent"
       >
-        {t('home.spotlight.viewAll', { total: formatNumber(census.total) })} <span aria-hidden="true">→</span>
+        <span class="relative flex size-2" aria-hidden="true">
+          <span class="absolute inline-flex size-full animate-ping rounded-full bg-ok opacity-60 motion-reduce:animate-none"></span>
+          <span class="relative inline-flex size-2 rounded-full bg-ok"></span>
+        </span>
+        {t('home.newThisWeek', { n: formatNumber(newThisWeek) })}
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="size-3.5 text-muted-foreground" aria-hidden="true">
+          <path d="M3.5 8h9m-3.5-3.5L12.5 8 9 11.5" />
+        </svg>
       </a>
-    </div>
 
-    <FeaturedSpotlight plugins={spotlightPlugins} />
-  </section>
+      <h1 class="mt-6 max-w-4xl bg-gradient-to-b from-foreground to-foreground/65 bg-clip-text pb-1 text-4xl leading-tight font-semibold tracking-tight text-balance text-transparent sm:text-6xl sm:leading-[1.05]">
+        {t('home.title', { n: formatNumber(census.total) })}
+      </h1>
+      <p class="mt-5 max-w-2xl text-base text-balance text-muted-foreground sm:text-lg">{t('home.subtitle')}</p>
 
-  <!-- 3. Multi-dimensional Rankings Section -------------------------- -->
-  <section class="border-t border-border/80 py-12 sm:py-16">
-    <div class="mx-auto max-w-6xl px-4 sm:px-6">
-      <div class="mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
-        <div>
-          <p class="meta text-muted-foreground">
-            {t('home.boards.eyebrow')}
-          </p>
-          <h2 class="mt-2 text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
-            {t('home.boards.title')}
-          </h2>
-          <p class="mt-1 text-sm text-muted-foreground">
-            {t('home.boards.subtitle')}
-          </p>
-        </div>
-
+      <div class="mt-8 flex flex-wrap items-center justify-center gap-3">
         <a
-          href={localePath(lang, "/rankings")}
-          class="inline-flex items-center gap-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+          href={href('/plugins')}
+          class="inline-flex h-10 items-center rounded-md bg-primary px-6 text-sm font-medium text-primary-foreground shadow-xs transition-[background-color,transform] hover:bg-primary/90 active:scale-[0.98]"
         >
-          {t('home.boards.viewAll')} <span aria-hidden="true">→</span>
+          {t('home.browseAll')}
+        </a>
+        <a
+          href={href('/rankings')}
+          class="inline-flex h-10 items-center rounded-md border border-border bg-background px-6 text-sm font-medium shadow-xs transition-[background-color,transform] hover:bg-accent active:scale-[0.98]"
+        >
+          {t('home.rankingsCta')}
         </a>
       </div>
 
-      <RankBoard boards={boards} />
+      {/* Preview: the plugin index, with real rows, in a tilted window. */}
+      <div class="relative mt-14 w-full max-w-4xl [perspective:2000px] sm:mt-16">
+        <figure
+          class="relative overflow-hidden rounded-t-xl border border-b-0 border-border bg-card text-left shadow-2xl shadow-black/10 sm:origin-bottom sm:[transform:rotateX(10deg)] dark:shadow-black/50"
+        >
+          <div class="flex items-center gap-3 border-b border-border bg-muted/40 px-4 py-2.5">
+            <span class="flex gap-1.5" aria-hidden="true">
+              <span class="size-2.5 rounded-full bg-[#ff5f57] ring-1 ring-black/10 ring-inset"></span>
+              <span class="size-2.5 rounded-full bg-[#febc2e] ring-1 ring-black/10 ring-inset"></span>
+              <span class="size-2.5 rounded-full bg-[#28c840] ring-1 ring-black/10 ring-inset"></span>
+            </span>
+            <span class="mx-auto rounded-md border border-border bg-background px-3 py-0.5 font-mono text-[0.6875rem] text-muted-foreground">
+              opendock.net/plugins
+            </span>
+            <span class="w-[42px]" aria-hidden="true"></span>
+          </div>
+
+          <div class="px-4 pt-5 pb-28 sm:px-6" aria-hidden="true">
+            <div class="flex h-10 items-center gap-2.5 rounded-lg border border-input bg-background px-3 text-sm text-muted-foreground shadow-xs">
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" class="size-4 shrink-0"><circle cx="7" cy="7" r="4.75" /><path d="m10.5 10.5 3.5 3.5" stroke-linecap="round" /></svg>
+              <span class="truncate">{t('palette.placeholder')}</span>
+              <kbd class="ml-auto rounded border border-border bg-muted px-1.5 font-mono text-[0.625rem]">⌘K</kbd>
+            </div>
+            <div class="mt-3 flex gap-2 overflow-hidden">
+              <span class="shrink-0 rounded-full bg-primary px-3 py-1 text-xs font-medium text-primary-foreground">{t('home.preview.all')}</span>
+              {previewChips.map((c) => (
+                <span class="shrink-0 rounded-full border border-border px-3 py-1 text-xs text-muted-foreground">{categoryLabel(c.id, lang)}</span>
+              ))}
+            </div>
+            <div class="mt-4 flex items-center justify-between border-b border-border pb-2 text-xs text-muted-foreground">
+              <span>{t('explorer.col.plugin')}</span>
+              <span class="flex gap-8"><span>{t('explorer.col.stars')}</span><span class="hidden sm:inline">{t('explorer.col.downloads')}</span></span>
+            </div>
+            <ol class="divide-y divide-border">
+              {
+                preview.map((p) => (
+                  <li class="flex items-center gap-3 py-3">
+                    <span class="relative size-8 shrink-0">
+                      <span class="block size-full overflow-hidden rounded-md border border-border bg-muted">
+                        {p.ownerAvatar ? (
+                          <img src={avatarUrl(p.ownerAvatar, 32)} alt="" width="32" height="32" class="size-full object-cover" loading="lazy" decoding="async" />
+                        ) : (
+                          <span class="grid size-full place-items-center text-xs font-medium text-white" style={`background:${letterAvatar(p.title).color}`}>{letterAvatar(p.title).letter}</span>
+                        )}
+                      </span>
+                      <span class:list={['lamp absolute -right-0.5 -bottom-0.5 ring-2 ring-card', lampClass[p.healthLevel]]} />
+                    </span>
+                    <span class="min-w-0 flex-1">
+                      <span class="block truncate text-sm font-medium">{p.title}</span>
+                      <span class="block truncate text-xs text-muted-foreground">{pluginDescription(p, lang) ?? p.name}</span>
+                    </span>
+                    <span class="hidden shrink-0 rounded-md border border-border px-2 py-0.5 text-xs text-muted-foreground md:inline">
+                      {categoryLabel(p.category, lang)}
+                    </span>
+                    <span class="tabular w-12 shrink-0 text-right text-sm font-medium">{compactNumber(p.stars)}</span>
+                    <span class="tabular hidden w-14 shrink-0 text-right text-sm text-muted-foreground sm:inline">{compactNumber(p.downloadsMonth)}</span>
+                  </li>
+                ))
+              }
+            </ol>
+          </div>
+
+          {/* Fade into the page, with the way in sitting on the fade. */}
+          <div class="absolute inset-x-0 bottom-0 flex h-36 items-end justify-center bg-gradient-to-t from-background via-background/90 to-transparent pb-6">
+            <a
+              href={href('/plugins')}
+              class="inline-flex h-9 items-center gap-1.5 rounded-full bg-primary px-4 text-sm font-medium text-primary-foreground shadow-lg transition-transform hover:scale-[1.02] active:scale-[0.98]"
+            >
+              {t('home.preview.browse', { n: formatNumber(census.total) })} <span aria-hidden="true">→</span>
+            </a>
+          </div>
+        </figure>
+      </div>
     </div>
   </section>
 
-  <!-- 4. Category Grid Section --------------------------------------- -->
-  <section class="border-t border-border/80 py-12 sm:py-16">
-    <div class="mx-auto max-w-6xl px-4 sm:px-6">
-      <div class="mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
-        <div>
-          <p class="meta text-muted-foreground">
-            {t('home.taxonomy.eyebrow')}
-          </p>
-          <h2 class="mt-2 text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
-            {t('home.taxonomy.title')}
-          </h2>
-          <p class="mt-1 text-sm text-muted-foreground">
-            {t('home.taxonomy.subtitle', { n: categories.length })}
-          </p>
+  {/* --- Author wall ------------------------------------------------------------ */}
+  <section class="border-b border-border py-8" aria-label={t('home.authors', { n: formatNumber(totals.maintainers) })}>
+    <p class="text-center text-sm text-muted-foreground">
+      {t('home.authors', { n: formatNumber(totals.maintainers) })}
+    </p>
+    <div class="group/marquee relative mt-5 overflow-hidden [mask-image:linear-gradient(to_right,transparent,#000_12%,#000_88%,transparent)]">
+      <ul class="marquee flex w-max gap-3 group-hover/marquee:[animation-play-state:paused]">
+        {
+          // Doubled so the loop is seamless; the second copy is hidden from
+          // assistive tech and the tab order so each author is reachable once.
+          [...authors, ...authors].map((a, i) => {
+            const copy = i >= authors.length;
+            return (
+              <li class="shrink-0" aria-hidden={copy ? 'true' : undefined}>
+                <a
+                  href={href(`/authors/${a.slug}`)}
+                  title={a.name}
+                  aria-label={t('plugin.byOwnerAria', { owner: a.name })}
+                  tabindex={copy ? -1 : undefined}
+                  class="block size-10 overflow-hidden rounded-full border border-border bg-muted transition-[border-color,transform] hover:scale-110 hover:border-foreground/30 motion-reduce:hover:scale-100"
+                >
+                  <img src={avatarUrl(a.avatar, 40)} alt="" width="40" height="40" class="size-full object-cover" loading="lazy" decoding="async" />
+                </a>
+              </li>
+            );
+          })
+        }
+      </ul>
+    </div>
+  </section>
+
+  <div class="mx-auto max-w-6xl space-y-24 px-4 py-20 sm:px-6 sm:py-24">
+    {/* --- Overview bento ------------------------------------------------------- */}
+    <section aria-labelledby="overview-title" data-reveal>
+      <div class="mx-auto max-w-2xl text-center">
+        <span class={eyebrow}>{t('home.overview.eyebrow')}</span>
+        <h2 id="overview-title" class="mt-4 text-3xl font-semibold tracking-tight sm:text-4xl">{t('home.overview.title')}</h2>
+        <p class={`mt-3 ${cardDesc} sm:text-base`}>{t('home.overview.desc')}</p>
+      </div>
+
+      <div class="mt-12 grid grid-cols-1 gap-4 lg:grid-cols-6">
+        {/* Leaderboard: the big tile */}
+        <div class={`${card} min-w-0 lg:col-span-4 lg:row-span-2`}>
+          <div class="flex flex-wrap items-start justify-between gap-3 px-6 pt-6">
+            <div class="space-y-1.5">
+              <h3 class={cardTitle}>{t('home.board.title')}</h3>
+              <p class={cardDesc}>{t('home.board.desc')}</p>
+            </div>
+            <a href={href('/rankings')} class="inline-flex h-8 items-center rounded-md px-3 text-sm font-medium transition-colors hover:bg-accent">
+              {t('home.board.all')} <span aria-hidden="true" class="ml-1">→</span>
+            </a>
+          </div>
+          <div class="px-6 pt-5 pb-4">
+            <Leaderboard boards={boards} />
+          </div>
         </div>
 
+        {/* New plugins: area chart */}
+        <div class={`${card} flex min-w-0 flex-col overflow-hidden lg:col-span-2`}>
+          <div class="space-y-2 px-6 pt-6">
+            <p class={cardDesc}>{t('home.stat.indexed')}</p>
+            <p class="tabular text-3xl font-semibold tracking-tight">
+              <span data-count={census.total}>{formatNumber(census.total)}</span>
+            </p>
+            <p class="text-xs text-muted-foreground">{t('home.bento.new')} · {t('home.bento.newFoot', { n: formatNumber(newTotal) })}</p>
+          </div>
+          <svg viewBox="0 0 300 72" preserveAspectRatio="none" class="mt-auto h-24 w-full text-foreground" aria-hidden="true">
+            <defs>
+              <linearGradient id="new-fill" x1="0" x2="0" y1="0" y2="1">
+                <stop offset="0" stop-color="currentColor" stop-opacity="0.18" />
+                <stop offset="1" stop-color="currentColor" stop-opacity="0" />
+              </linearGradient>
+            </defs>
+            <path d={newChart.area} fill="url(#new-fill)" />
+            <path d={newChart.line} fill="none" stroke="currentColor" stroke-width="1.5" vector-effect="non-scaling-stroke" />
+          </svg>
+        </div>
+
+        {/* Stars gained: bar chart */}
+        <div class={`${card} flex min-w-0 flex-col lg:col-span-2`}>
+          <div class="space-y-2 px-6 pt-6">
+            <p class={cardDesc}>{t('home.stat.stars')}</p>
+            <p class="tabular text-3xl font-semibold tracking-tight">
+              <span data-count={totals.stars} data-compact>{compactNumber(totals.stars)}</span>
+            </p>
+            <p class="text-xs text-muted-foreground">{t('home.bento.stars')} · {t('home.bento.starsFoot', { n: compactNumber(starTotal) })}</p>
+          </div>
+          <div class="mt-auto flex h-24 items-end gap-[3px] px-6 pt-4 pb-6" aria-hidden="true">
+            {
+              starSeries.map((p) => (
+                <span
+                  class:list={[
+                    'flex-1 rounded-t-[2px] transition-colors',
+                    // Days the star history has no reading for stay faint
+                    // rather than reading as a quiet day.
+                    p.value ? 'bg-foreground/80 hover:bg-foreground' : 'bg-border',
+                  ]}
+                  style={`height:${Math.max(4, (p.value / starMax) * 100)}%`}
+                  title={`${p.date} +${formatNumber(p.value)}`}
+                />
+              ))
+            }
+          </div>
+        </div>
+
+        {/* Health: donut */}
+        <div class={`${card} flex min-w-0 flex-col p-6 lg:col-span-2`}>
+          <div class="space-y-1.5">
+            <h3 class={cardTitle}>{t('home.health.title')}</h3>
+            <p class={cardDesc}>{t('home.health.desc')}</p>
+          </div>
+          <div class="mt-6 flex items-center gap-6">
+            <div class="relative size-28 shrink-0">
+              <svg viewBox="0 0 100 100" class="size-full -rotate-90" aria-hidden="true">
+                <circle cx="50" cy="50" r="42" fill="none" class="stroke-muted" stroke-width="12" />
+                {
+                  ring.map((s) => (
+                    <circle
+                      cx="50"
+                      cy="50"
+                      r="42"
+                      fill="none"
+                      class={s.stroke}
+                      stroke-width="12"
+                      stroke-dasharray={`${s.length} ${RING - s.length}`}
+                      stroke-dashoffset={-s.offset}
+                    />
+                  ))
+                }
+              </svg>
+              <div class="absolute inset-0 grid place-content-center text-center">
+                <span class="tabular text-xl font-semibold">{pct(census.active)}%</span>
+                <span class="text-[0.6875rem] text-muted-foreground">{t('home.bento.maintained')}</span>
+              </div>
+            </div>
+            <dl class="min-w-0 flex-1 space-y-2.5 text-sm">
+              {
+                ring.map((s) => (
+                  <div class="flex items-center justify-between gap-3">
+                    <dt class="flex items-center gap-2">
+                      <span class:list={['size-2 rounded-full', s.dot]} aria-hidden="true" />
+                      {s.label}
+                    </dt>
+                    <dd class="tabular text-muted-foreground">{formatNumber(s.n)}</dd>
+                  </div>
+                ))
+              }
+            </dl>
+          </div>
+        </div>
+
+        {/* Most installed: horizontal bars */}
+        <div class={`${card} flex min-w-0 flex-col p-6 lg:col-span-2`}>
+          <div class="space-y-1.5">
+            <h3 class={cardTitle}>{t('home.bento.installs')}</h3>
+            <p class={cardDesc}>{t('home.bento.installsFoot', { n: compactNumber(totals.downloadsMonth) })}</p>
+          </div>
+          <ol class="mt-5 space-y-3">
+            {
+              topInstalled.map((p) => (
+                <li>
+                  <a href={href(`/plugins/${p.slug}`)} class="group block">
+                    <span class="flex items-baseline justify-between gap-3 text-sm">
+                      <span class="truncate font-medium group-hover:underline group-hover:underline-offset-4">{p.title}</span>
+                      <span class="tabular shrink-0 text-xs text-muted-foreground">{compactNumber(p.downloadsMonth)}</span>
+                    </span>
+                    <span class="mt-1.5 block h-1.5 overflow-hidden rounded-full bg-muted">
+                      <span class="block h-full rounded-full bg-foreground/80" style={`width:${(p.downloadsMonth / installMax) * 100}%`} />
+                    </span>
+                  </a>
+                </li>
+              ))
+            }
+          </ol>
+        </div>
+
+        {/* Editors' picks */}
+        <div class={`${card} flex min-w-0 flex-col lg:col-span-2`}>
+          <div class="space-y-1.5 px-6 pt-6">
+            <h3 class={cardTitle}>{t('home.picks.title')}</h3>
+            <p class={cardDesc}>{t('home.picks.desc')}</p>
+          </div>
+          <ul class="space-y-1 p-3">
+            {
+              picks.map((p) => (
+                <li>
+                  <a href={href(`/plugins/${p.slug}`)} class="flex items-center gap-3 rounded-lg p-3 transition-colors hover:bg-accent">
+                    <span class="size-8 shrink-0 overflow-hidden rounded-md border border-border bg-muted">
+                      {p.ownerAvatar ? (
+                        <img src={avatarUrl(p.ownerAvatar, 32)} alt="" width="32" height="32" class="size-full object-cover" loading="lazy" decoding="async" />
+                      ) : (
+                        <span class="grid size-full place-items-center text-xs font-medium text-white" style={`background:${letterAvatar(p.title).color}`}>{letterAvatar(p.title).letter}</span>
+                      )}
+                    </span>
+                    <span class="min-w-0">
+                      <span class="block truncate text-sm font-medium">{p.title}</span>
+                      <span class="block truncate text-xs text-muted-foreground">{pluginDescription(p, lang) ?? t('common.noDescription')}</span>
+                    </span>
+                  </a>
+                </li>
+              ))
+            }
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    {/* --- Categories ------------------------------------------------------------- */}
+    <section aria-labelledby="cats-title" data-reveal>
+      <div class="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <span class={eyebrow}>{t('home.cats.eyebrow')}</span>
+          <h2 id="cats-title" class="mt-4 text-3xl font-semibold tracking-tight sm:text-4xl">{t('home.cats.title')}</h2>
+          <p class={`mt-3 ${cardDesc} sm:text-base`}>{t('home.cats.desc', { n: categories.length })}</p>
+        </div>
         <a
-          href={localePath(lang, "/categories")}
-          class="inline-flex items-center gap-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+          href={href('/categories')}
+          class="inline-flex h-9 items-center rounded-md border border-border bg-background px-4 text-sm font-medium shadow-xs transition-colors hover:bg-accent"
         >
-          {t('home.taxonomy.viewAll')} <span aria-hidden="true">→</span>
+          {t('home.cats.all')}
         </a>
       </div>
 
-      <div class="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+      <ul class="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {
           sortedCategories.map((c) => (
-            <a
-              href={localePath(lang, `/categories/${c.id}`)}
-              class="group relative flex flex-col justify-between rounded-lg border border-border/80 bg-card p-5 transition-colors hover:border-foreground/25"
-            >
-              <div>
+            <li>
+              <a
+                href={href(`/categories/${c.id}`)}
+                data-spotlight
+                class={`${card} spotlight group flex h-full flex-col gap-4 overflow-hidden p-5 transition-[border-color,transform] hover:-translate-y-0.5 hover:border-foreground/20`}
+              >
                 <div class="flex items-center justify-between">
-                  <div class="grid size-9 place-items-center rounded-md border border-border/70 text-foreground/70 transition-colors group-hover:border-foreground/25 group-hover:text-foreground">
-                    <CategoryIcon name={c.icon} class="size-4.5" />
-                  </div>
-                  <span class="tabular font-mono text-xs text-muted-foreground group-hover:text-foreground">
-                    {t('home.taxonomy.count', { n: c.count })}
+                  <span class="grid size-10 place-items-center rounded-lg border border-border bg-gradient-to-b from-background to-muted shadow-xs">
+                    <CategoryIcon name={c.icon} class="size-[18px]" />
                   </span>
+                  <span class="tabular text-2xl font-semibold tracking-tight text-foreground/90">{formatNumber(c.count)}</span>
                 </div>
-
-                <div class="mt-3.5">
-                  <h3 class="text-base font-medium tracking-tight text-foreground">
-                    {categoryLabel(c.id, lang)}
-                  </h3>
-                  {lang === 'zh' && (
-                    <p class="font-mono text-[0.6875rem] text-muted-foreground/70">{c.labelEn}</p>
-                  )}
-                  <p class="mt-2 line-clamp-2 text-xs leading-relaxed text-muted-foreground">
-                    {categoryDescription(c.id, lang)}
-                  </p>
+                <div>
+                  <h3 class="text-sm font-medium">{categoryLabel(c.id, lang)}</h3>
+                  <p class="mt-1 line-clamp-2 text-sm text-muted-foreground">{categoryDescription(c.id, lang)}</p>
                 </div>
-              </div>
-
-              <div class="mt-4 flex items-center justify-end text-xs text-muted-foreground group-hover:text-foreground">
-                <span>{t('home.taxonomy.explore')} →</span>
-              </div>
-            </a>
+              </a>
+            </li>
           ))
         }
-      </div>
-    </div>
-  </section>
+      </ul>
+    </section>
 
-  <!-- 5. OpenDock Philosophy / Bento Feature Section ------------------ -->
-  <section class="border-t border-border/80 py-16 sm:py-20">
-    <div class="mx-auto max-w-6xl px-4 sm:px-6">
-      <div class="mx-auto max-w-2xl text-center">
-        <p class="meta text-muted-foreground">
-          {t('home.philosophy.eyebrow')}
-        </p>
-        <h2 class="mt-3 text-3xl font-semibold tracking-tight text-foreground">
-          {t('home.philosophy.title')}
-        </h2>
-        <p class="mt-3 text-sm text-muted-foreground sm:text-base">
-          {t('home.philosophy.subtitle')}
-        </p>
-      </div>
+    {/* --- Publish ----------------------------------------------------------------- */}
+    <section aria-labelledby="publish-title" data-reveal class="grid gap-10 lg:grid-cols-2 lg:items-center">
+      <div>
+        <span class={eyebrow}>{t('home.publish.eyebrow')}</span>
+        <h2 id="publish-title" class="mt-4 text-3xl font-semibold tracking-tight sm:text-4xl">{t('home.publish.title')}</h2>
+        <p class={`mt-3 ${cardDesc} sm:text-base`}>{t('home.publish.desc')}</p>
 
-      <div class="mt-12 grid gap-px overflow-hidden rounded-lg border border-border/80 bg-border/80 sm:grid-cols-2">
-        {
-          features.map((f) => (
-            <div class="bg-card p-6">
-              <div class="flex items-center justify-between">
-                <span class="meta text-muted-foreground">
-                  {f.tag}
+        {/* A real sequence, so the steps are numbered and joined by a rail. */}
+        <ol class="relative mt-8 space-y-6 before:absolute before:top-3 before:bottom-3 before:left-3 before:w-px before:bg-border">
+          {
+            (['step1', 'step2', 'step3'] as const).map((step, i) => (
+              <li class="relative flex gap-4 text-sm">
+                <span class="tabular relative grid size-6 shrink-0 place-items-center rounded-full border border-border bg-background text-xs font-semibold shadow-xs">
+                  {i + 1}
                 </span>
-              </div>
-
-              <h3 class="mt-3 text-base font-medium tracking-tight text-foreground">
-                {f.title}
-              </h3>
-
-              <p class="mt-2 text-sm leading-relaxed text-muted-foreground">
-                {f.desc}
-              </p>
-            </div>
-          ))
-        }
-      </div>
-    </div>
-  </section>
-
-  <!-- 6. Developer Quick-Start & Submit CTA --------------------------- -->
-  <section class="border-t border-border/80 py-14 sm:py-18">
-    <div class="mx-auto max-w-6xl px-4 sm:px-6">
-      <div class="rounded-lg border border-border bg-card p-8 sm:p-12">
-        <div class="grid gap-8 lg:grid-cols-12 lg:items-center">
-          <!-- Left CTA content -->
-          <div class="lg:col-span-7">
-            <p class="meta text-muted-foreground">{t('home.cta.badge')}</p>
-
-            <h2 class="mt-3 text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
-              {t('home.cta.title')}
-            </h2>
-
-            <p class="mt-3 text-sm leading-relaxed text-muted-foreground sm:text-base">
-              <Fragment
-                set:html={t('home.cta.desc', {
-                  manifest:
-                    '<code class="rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-xs text-foreground font-semibold">package.json</code>',
-                  keyword:
-                    '<code class="rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-xs text-foreground font-semibold">opencode-plugin</code>',
-                })}
-              />
-            </p>
-
-            <div class="mt-6 flex flex-wrap items-center gap-3">
-              <a
-                href={localePath(lang, "/submit")}
-                class="inline-flex items-center gap-2 rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background transition-opacity hover:opacity-85"
-              >
-                {t('home.cta.rules')} →
-              </a>
-              <a
-                href={localePath(lang, "/about")}
-                class="inline-flex items-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-secondary"
-              >
-                {t('home.cta.algorithm')}
-              </a>
-            </div>
-          </div>
-
-          <!-- Right: Code snippet illustration -->
-          <div class="lg:col-span-5">
-            <div class="rounded-lg border border-border bg-muted/60 p-4 font-mono text-xs">
-              <div class="mb-3 flex items-center justify-between border-b border-border/60 pb-2.5 text-[0.6875rem] text-muted-foreground">
-                <span class="flex items-center gap-1.5">
-                  <span class="size-2.5 rounded-full bg-red-400/80"></span>
-                  <span class="size-2.5 rounded-full bg-amber-400/80"></span>
-                  <span class="size-2.5 rounded-full bg-green-400/80"></span>
-                  <span class="ml-1 font-semibold text-foreground/80">package.json</span>
+                <span class="pt-0.5 leading-6">
+                  <Fragment set:html={t(`home.publish.${step}`, { keyword: code('opencode-plugin'), manifest: code('package.json') })} />
                 </span>
-                <span>npm keyword</span>
-              </div>
-              <pre class="overflow-x-auto text-[0.8125rem] leading-relaxed text-foreground/90"><code>&#123;
-  <span class="text-amber-500">"name"</span>: <span class="text-ok">"opencode-my-plugin"</span>,
-  <span class="text-amber-500">"keywords"</span>: [
-    <span class="text-ok font-semibold">"opencode-plugin"</span>,
-    <span class="text-ok">"agent"</span>,
-    <span class="text-ok">"workflow"</span>
-  ]
-&#125;</code></pre>
-            </div>
-          </div>
+              </li>
+            ))
+          }
+        </ol>
+
+        <div class="mt-8 flex flex-wrap gap-3">
+          <a
+            href={href('/submit')}
+            class="inline-flex h-9 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow-xs transition-colors hover:bg-primary/90"
+          >
+            {t('home.publish.rules')}
+          </a>
+          <a href={href('/about')} class="inline-flex h-9 items-center rounded-md px-4 text-sm font-medium transition-colors hover:bg-accent">
+            {t('home.publish.algorithm')}
+          </a>
         </div>
       </div>
-    </div>
-  </section>
+
+      {/* Terminal: dark in both themes, like the real thing. */}
+      <div class="min-w-0 overflow-hidden rounded-xl border border-zinc-800 bg-zinc-950 shadow-2xl shadow-black/20">
+        <div class="flex items-center gap-1.5 border-b border-zinc-800 px-4 py-3" aria-hidden="true">
+          <span class="size-2.5 rounded-full bg-[#ff5f57]"></span>
+          <span class="size-2.5 rounded-full bg-[#febc2e]"></span>
+          <span class="size-2.5 rounded-full bg-[#28c840]"></span>
+        </div>
+        <pre class="overflow-x-auto px-5 py-5 font-mono text-[0.8125rem] leading-7 text-zinc-300"><code><span class="text-zinc-500">$</span> cat package.json
+{'{'} "name": "opencode-my-plugin", "keywords": [<span class="text-emerald-400">"opencode-plugin"</span>] {'}'}
+<span class="text-zinc-500">$</span> npm publish
+<span class="text-zinc-400">+ opencode-my-plugin@1.0.0</span>
+
+<span class="text-zinc-500">{t('home.publish.nextDay')}</span>
+<span class="text-emerald-400">✓</span> {t('home.publish.listed')}  <span class="text-sky-400 underline decoration-sky-400/40 underline-offset-4">opendock.net/plugins/opencode-my-plugin</span></code></pre>
+      </div>
+    </section>
+  </div>
 </Layout>
+
+<style>
+  /* Author wall: one copy of the list scrolls past, the second copy closes
+     the loop seamlessly at -50%. */
+  .marquee {
+    animation: marquee 60s linear infinite;
+  }
+  @keyframes marquee {
+    to {
+      transform: translateX(-50%);
+    }
+  }
+
+  /* Category cards: a soft light follows the pointer. */
+  .spotlight::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 200ms ease;
+    background: radial-gradient(
+      260px circle at var(--x, 50%) var(--y, 50%),
+      color-mix(in oklch, var(--foreground) 7%, transparent),
+      transparent 70%
+    );
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .spotlight:hover::before {
+      opacity: 1;
+    }
+  }
+
+  /* Sections below the fold rise in once as they scroll into view. Only
+     applied once the script has run, so nothing is hidden without JS. */
+  :global(.reveal-ready) [data-reveal] {
+    opacity: 0;
+    transform: translateY(16px);
+    transition:
+      opacity 700ms ease-out,
+      transform 700ms cubic-bezier(0.23, 1, 0.32, 1);
+  }
+  :global(.reveal-ready) [data-reveal].in {
+    opacity: 1;
+    transform: none;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .marquee {
+      animation: none;
+    }
+    :global(.reveal-ready) [data-reveal] {
+      opacity: 1;
+      transform: none;
+      transition: none;
+    }
+  }
+</style>
+
+<script>
+  import { compactNumber, formatNumber } from '../lib/utils';
+
+  const reduced = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // Counts a figure up from zero the first time it scrolls into view. The
+  // final value is already in the markup, so crawlers and no-JS readers see
+  // the real number.
+  function countUp(el: HTMLElement) {
+    const target = Number(el.dataset.count);
+    const compact = 'compact' in el.dataset;
+    // Same formatters as the server render, so the last frame matches it.
+    const format = (n: number) => (compact ? compactNumber(Math.round(n)) : formatNumber(Math.round(n)));
+    const final = el.textContent;
+    const start = performance.now();
+    const tick = (now: number) => {
+      const p = Math.min(1, (now - start) / 1200);
+      el.textContent = p < 1 ? format(target * (1 - Math.pow(1 - p, 3))) : final;
+      if (p < 1) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  }
+
+  document.addEventListener('astro:page-load', () => {
+    if (!document.querySelector('[data-reveal]')) return;
+
+    if (!reduced()) document.documentElement.classList.add('reveal-ready');
+    const seen = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue;
+          const el = entry.target as HTMLElement;
+          seen.unobserve(el);
+          if (el.matches('[data-reveal]')) el.classList.add('in');
+          else if (!reduced()) countUp(el);
+        }
+      },
+      { rootMargin: '0px 0px -10% 0px' },
+    );
+    document.querySelectorAll<HTMLElement>('[data-reveal], [data-count]').forEach((el) => seen.observe(el));
+  });
+
+  // Pointer position for the category spotlight, delegated so it survives
+  // soft navigation.
+  document.addEventListener('pointermove', (event) => {
+    const el = (event.target as HTMLElement | null)?.closest<HTMLElement>('[data-spotlight]');
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    el.style.setProperty('--x', `${event.clientX - r.left}px`);
+    el.style.setProperty('--y', `${event.clientY - r.top}px`);
+  });
+</script>

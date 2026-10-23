@@ -1,122 +1,147 @@
 ---
-import Layout from '../layouts/Layout.astro';
+import AboutShell from '../components/about/AboutShell.astro';
+import AboutSection from '../components/about/AboutSection.astro';
+import ScoreWeights from '../components/about/ScoreWeights.astro';
+import DataFlow from '../components/about/DataFlow.astro';
 import { plugins, categories, generatedAt } from '../lib/plugins';
-import { formatDate } from '../lib/utils';
+import { formatDate, formatNumber } from '../lib/utils';
+
+// The most dramatic monorepo discount in today's data, as a worked example.
+const example = plugins.filter((p) => p.starsInherited).sort((a, b) => b.stars - a.stars)[0];
+const discounted = plugins.filter((p) => p.starsInherited).length;
+
+const sections = [
+  { id: 'sources', title: 'Where the data comes from' },
+  { id: 'score', title: 'How the composite score works' },
+  { id: 'discount', title: 'Why stars get discounted' },
+  { id: 'biases', title: 'Other known biases' },
+  { id: 'categories', title: 'How categories are assigned' },
+  { id: 'health', title: 'How health badges are decided' },
+  { id: 'excluded', title: 'What gets excluded' },
+  { id: 'site', title: 'About this site' },
+  { id: 'privacy', title: 'Analytics and privacy' },
+];
 ---
 
-<Layout
-  title="Ranking algorithm and data sources"
-  description="Where OpenDock's data comes from, how the composite score is calculated, how categories are assigned, how health badges are decided, and what gets excluded. All of it public."
+<AboutShell
+  meta={{
+    title: 'Ranking algorithm and data sources',
+    description:
+      "Where OpenDock's data comes from, how the composite score is calculated, how categories are assigned, how health badges are decided, and what gets excluded. All of it public.",
+  }}
+  eyebrow="Methodology"
+  title="Data and ranking"
+  intro="Rankings shape what developers pick, so the algorithm has to be inspectable. Where the data comes from, how the score is computed, and which plugins get excluded."
+  tocLabel="On this page"
+  sections={sections}
+  stats={{ plugins: 'Plugins indexed', categories: 'Categories', discounted: 'Stars discounted', snapshot: 'Snapshot' }}
 >
-  <div class="mx-auto max-w-3xl px-4 py-10 sm:px-6 sm:py-14">
-    <header class="mb-10">
-      <h1 class="text-3xl font-semibold tracking-tight sm:text-4xl">Data and ranking</h1>
-      <p class="mt-3 text-sm leading-6 text-muted-foreground">
-        Rankings shape what developers pick, so the algorithm has to be inspectable. This page covers where the data
-        comes from, how the score is computed, and which plugins get excluded.
-      </p>
-    </header>
+  <AboutSection id="sources" title={sections[0].title}>
+    <p>Three sources, all crawled automatically. Nothing is entered by hand:</p>
+    <ul>
+      <li><strong>npm registry</strong>: every package carrying the <code>opencode-plugin</code> keyword, for its name, version, description, licence, deprecation status and repository URL.</li>
+      <li><strong>GitHub GraphQL API</strong>: stars, forks, open issues, last commit date, archived status, topics and README, fetched in batches per repository.</li>
+      <li><strong>npm downloads API</strong>: downloads over the last 7 and 30 days.</li>
+    </ul>
+    <DataFlow
+      steps={[
+        { title: 'Discover', detail: 'Search npm for every package tagged opencode-plugin.' },
+        { title: 'Enrich', detail: 'Pull package metadata, GitHub repository data and download counts.' },
+        { title: 'Score', detail: 'Compute health, category and the composite score; diff stars against history.' },
+        { title: 'Publish', detail: 'Commit the snapshot and rebuild the whole static site.' },
+      ]}
+    />
+    <p>
+      Everything is re-crawled daily. The current snapshot was generated on <strong>{formatDate(generatedAt)}</strong>, covering
+      <strong>{formatNumber(plugins.length)}</strong> plugins across <strong>{categories.length}</strong> categories.
+    </p>
+  </AboutSection>
 
-    <div class="prose-readme">
-      <h2>Where the data comes from</h2>
-      <p>Three sources, all crawled automatically. Nothing is entered by hand:</p>
-      <ul>
-        <li>
-          <strong>npm registry</strong> — every package carrying the <code>opencode-plugin</code> keyword, for its name,
-          version, description, licence, deprecation status and repository URL.
-        </li>
-        <li>
-          <strong>GitHub GraphQL API</strong> — stars, forks, open issues, last commit date, archived status, topics and
-          README, fetched in batches per repository.
-        </li>
-        <li><strong>npm downloads API</strong> — downloads over the last 7 and 30 days.</li>
-      </ul>
-      <p>
-        Everything is re-crawled daily and the whole site is rebuilt. The current snapshot was generated on
-        <strong>{formatDate(generatedAt)}</strong>, covering <strong>{plugins.length}</strong> plugins across
-        <strong>{categories.length}</strong> categories.
-      </p>
-
-      <h2>How the composite score works</h2>
-      <p>
-        Ranking on stars alone has a structural problem: stars are <strong>cumulative</strong>, so they permanently
-        favour whoever published first. A plugin released last week gaining 50 stars a day may not crack the top 100.
-        So the composite score blends four signals:
-      </p>
-      <pre><code>score = 0.35 × credited stars (log-normalised)
+  <AboutSection id="score" title={sections[1].title}>
+    <p>
+      Ranking on stars alone has a structural problem: stars are <strong>cumulative</strong>, so they permanently favour whoever
+      published first. A plugin released last week gaining 50 stars a day may not crack the top 100. So the composite score blends
+      four signals:
+    </p>
+    <ScoreWeights
+      signals={[
+        { label: 'Stars', pct: 35, detail: 'Credited stars, log-normalised.' },
+        { label: 'Installs', pct: 35, detail: 'Monthly npm downloads, log-normalised.' },
+        { label: 'Activity', pct: 20, detail: 'Decays with time since the last commit.' },
+        { label: 'Growth', pct: 10, detail: '30-day star gain, normalised by size.' },
+      ]}
+    />
+    <pre><code>score = 0.35 × credited stars (log-normalised)
       + 0.35 × monthly downloads (log-normalised)
       + 0.20 × activity (decayed by last commit date)
       + 0.10 × growth (30-day star gain, normalised by size)
-
 archived repositories: final score × 0.35
-
 credited stars = min(repo stars, max(monthly downloads × 8, 1000))</code></pre>
-      <p>A few deliberate trade-offs:</p>
-      <ul>
-        <li>
-          <strong>Logarithmic, not linear.</strong> The real gap between 100k stars and 10k stars is far smaller than the
-          numbers suggest; linear normalisation would let the head of the list flatten everything else.
-        </li>
-        <li>
-          <strong>Downloads weigh the same as stars.</strong> A star means "this looks good"; a download means "I
-          actually run this". Downloads are harder to game but get inflated by transitive dependencies, so the two hold
-          each other in check.
-        </li>
-        <li>
-          <strong>Growth is normalised by size.</strong> A 100-star project gaining 50 stars deserves more attention than
-          a 5,000-star project gaining the same 50.
-        </li>
-        <li>
-          <strong>Archived is not deleted.</strong> An archived project can still be the best available option — it just
-          has nobody maintaining it. So it is down-weighted rather than removed.
-        </li>
-      </ul>
+    <p>A few deliberate trade-offs:</p>
+    <ul>
+      <li><strong>Logarithmic, not linear.</strong> The real gap between 100k stars and 10k stars is far smaller than the numbers suggest; linear normalisation would let the head of the list flatten everything else.</li>
+      <li><strong>Downloads weigh the same as stars.</strong> A star means "this looks good"; a download means "I actually run this". Downloads are harder to game but get inflated by transitive dependencies, so the two hold each other in check.</li>
+      <li><strong>Growth is normalised by size.</strong> A 100-star project gaining 50 stars deserves more attention than a 5,000-star project gaining the same 50.</li>
+      <li><strong>Archived is not deleted.</strong> An archived project can still be the best available option; it just has nobody maintaining it. So it is down-weighted rather than removed.</li>
+    </ul>
+  </AboutSection>
 
-      <h2>Why stars get discounted</h2>
-      <p>
-        <strong>Stars belong to a repository; downloads belong to a package.</strong>
-        A plugin published from a large project's monorepo inherits that repository's entire star count.
-        <code>@mem0/opencode-plugin</code> shows 63k stars not because the plugin is popular, but because
-        <code>mem0ai/mem0</code> has 63k stars.
-      </p>
-      <p>
-        Without a correction, the top of the board fills with packages doing a few dozen downloads a month — on our first
-        full crawl, the number one package had 270k stars and 49 monthly downloads.
-      </p>
-      <p>
-        So stars only count as far as the package's own install base can support. Plugins people actually use clear that
-        ceiling easily; a package that merely sits next to a famous README does not. The floor of 1,000 keeps a
-        newly published plugin with no downloads yet from being zeroed out.
-      </p>
-      <p>
-        Around <strong>18</strong> packages currently trigger this correction. Their real star count is still shown, but
-        marked with a <code>*</code>; hover it to see the number actually credited.
-      </p>
+  <AboutSection id="discount" title={sections[2].title}>
+    <p>
+      <strong>Stars belong to a repository; downloads belong to a package.</strong> A plugin published from a large project's
+      monorepo inherits that repository's entire star count. Without a correction, the top of the board fills with packages doing a
+      few dozen downloads a month: on our first full crawl, the number one package had 270k stars and 49 monthly downloads.
+    </p>
+    {
+      example && (
+        <div class="not-prose grid gap-3 rounded-lg border border-border bg-muted/40 p-4 sm:grid-cols-3">
+          <div>
+            <p class="text-xs text-muted-foreground">Repository stars</p>
+            <p class="tabular mt-1 text-lg font-semibold">{formatNumber(example.stars)}</p>
+          </div>
+          <div>
+            <p class="text-xs text-muted-foreground">Monthly installs</p>
+            <p class="tabular mt-1 text-lg font-semibold">{formatNumber(example.downloadsMonth)}</p>
+          </div>
+          <div>
+            <p class="text-xs text-muted-foreground">Stars credited</p>
+            <p class="tabular mt-1 text-lg font-semibold text-ok">{formatNumber(example.starsCredited)}</p>
+          </div>
+          <p class="text-xs text-muted-foreground sm:col-span-3">
+            Today's largest example: <a class="font-medium text-foreground underline underline-offset-4" href={`/plugins/${example.slug}/`}>{example.name}</a>.
+          </p>
+        </div>
+      )
+    }
+    <p>
+      So stars only count as far as the package's own install base can support. Plugins people actually use clear that ceiling
+      easily; a package that merely sits next to a famous README does not. The floor of 1,000 keeps a newly published plugin with no
+      downloads yet from being zeroed out.
+    </p>
+    <p>
+      <strong>{discounted}</strong> packages currently trigger this correction. Their real star count is still shown everywhere on
+      the site; only the score uses the credited number.
+    </p>
+  </AboutSection>
 
-      <h2>Other known biases</h2>
-      <ul>
-        <li>
-          <strong>Trending needs history.</strong> Growth is computed by diffing daily snapshots, so that board is nearly
-          empty when the site is freshly deployed and only becomes meaningful after a few days.
-        </li>
-        <li>
-          <strong>Only npm-published plugins are indexed.</strong> Purely local plugins — scripts living in
-          <code>.opencode/plugins/</code> — cannot be discovered automatically.
-        </li>
-        <li>
-          <strong>Downloads are polluted by transitive dependencies.</strong> If a plugin is depended on by another
-          popular package, its download count includes people who never chose it directly.
-        </li>
-      </ul>
+  <AboutSection id="biases" title={sections[3].title}>
+    <ul>
+      <li><strong>Trending needs history.</strong> Growth is computed by diffing daily snapshots, so that board is nearly empty when the site is freshly deployed and only becomes meaningful after a few days.</li>
+      <li><strong>Only npm-published plugins are indexed.</strong> Purely local plugins, scripts living in <code>.opencode/plugins/</code>, cannot be discovered automatically.</li>
+      <li><strong>Downloads are polluted by transitive dependencies.</strong> If a plugin is depended on by another popular package, its download count includes people who never chose it directly.</li>
+    </ul>
+  </AboutSection>
 
-      <h2>How categories are assigned</h2>
-      <p>
-        Rule matching over the package name, description, npm keywords and GitHub topics. The first matching category
-        wins, so the category list is ordered by specificity. Automatic categorisation is wrong sometimes — a manual
-        override layer fixes it, see the <a href="/submit/">submit page</a>.
-      </p>
+  <AboutSection id="categories" title={sections[4].title}>
+    <p>
+      Rule matching over the package name, description, npm keywords and GitHub topics. The first matching category wins, so the
+      category list is ordered by specificity. Automatic categorisation is wrong sometimes; a manual override layer fixes it, see the
+      <a href="/submit/">submit page</a>.
+    </p>
+  </AboutSection>
 
-      <h2>How health badges are decided</h2>
+  <AboutSection id="health" title={sections[5].title}>
+    <div class="table">
       <table>
         <thead>
           <tr><th>Badge</th><th>Trigger</th></tr>
@@ -132,37 +157,39 @@ credited stars = min(repo stars, max(monthly downloads × 8, 1000))</code></pre>
           <tr><td>Actively maintained</td><td>None of the above triggered</td></tr>
         </tbody>
       </table>
-
-      <h2>What gets excluded</h2>
-      <p>
-        A package needs at least one of these to be listed: a description, a README, any stars, more than 50 monthly
-        downloads, or a manual featured flag. That filters out a substantial number of empty packages and test
-        publishes. There is also a manual blocklist for obvious placeholders and spam.
-      </p>
-
-      <h2>About this site</h2>
-      <p>
-        OpenDock is not affiliated with OpenCode. It is an independent community directory. All plugin data comes from
-        public APIs, and the site itself is fully static.
-      </p>
-
-      <h2>Analytics and privacy</h2>
-      <p>
-        This site uses a <strong>self-hosted Umami instance</strong> (<code>umami.qunqin.org</code>) to count visits, and
-        records anonymised session replays for 15% of sessions, so we can see which plugins people actually look for and
-        where the site gets in the way. No advertising, no third-party trackers, and nothing is sold or shared.
-      </p>
-      <p>
-        Those scripts <strong>do not load until you press "Allow"</strong>. A prompt appears in the corner on your first
-        visit; your choice is stored locally in your browser, and clearing site data lets you choose again. If you
-        decline, no analytics script is loaded and no usage data leaves your browser.
-      </p>
-      <p>
-        One thing declining does not stop: plugin author avatars are served from GitHub's own CDN
-        (<code>avatars.githubusercontent.com</code>), so your browser requests them whenever a listing is on screen.
-        That is inherent to showing the avatars at all, and GitHub sees those requests the same way it would if you
-        visited the repository directly.
-      </p>
     </div>
-  </div>
-</Layout>
+  </AboutSection>
+
+  <AboutSection id="excluded" title={sections[6].title}>
+    <p>
+      A package needs at least one of these to be listed: a description, a README, any stars, more than 50 monthly downloads, or a
+      manual featured flag. That filters out a substantial number of empty packages and test publishes. There is also a manual
+      blocklist for obvious placeholders and spam.
+    </p>
+  </AboutSection>
+
+  <AboutSection id="site" title={sections[7].title}>
+    <p>
+      OpenDock is not affiliated with OpenCode. It is an independent community directory. All plugin data comes from public APIs, and
+      the site itself is fully static.
+    </p>
+  </AboutSection>
+
+  <AboutSection id="privacy" title={sections[8].title}>
+    <p>
+      This site uses a <strong>self-hosted Umami instance</strong> (<code>umami.qunqin.org</code>) to count visits, and records
+      anonymised session replays for 15% of sessions, so we can see which plugins people actually look for and where the site gets in
+      the way. No advertising, no third-party trackers, and nothing is sold or shared.
+    </p>
+    <p>
+      Those scripts <strong>do not load until you press "Allow"</strong>. A prompt appears in the corner on your first visit; your
+      choice is stored locally in your browser, and clearing site data lets you choose again. If you decline, no analytics script is
+      loaded and no usage data leaves your browser.
+    </p>
+    <p>
+      One thing declining does not stop: plugin author avatars are served from GitHub's own CDN (<code>avatars.githubusercontent.com</code>),
+      so your browser requests them whenever a listing is on screen. That is inherent to showing the avatars at all, and GitHub sees
+      those requests the same way it would if you visited the repository directly.
+    </p>
+  </AboutSection>
+</AboutShell>

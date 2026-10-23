@@ -1,0 +1,104 @@
+---
+import Layout from '../layouts/Layout.astro';
+import PageHeader from '../components/PageHeader.astro';
+import PackageChecker from '../components/PackageChecker.astro';
+
+/**
+ * Layout for the submit page. The prose stays hand-written per locale in
+ * src/pages/submit.astro and src/pages/zh/submit.astro (see the note at the
+ * top of src/lib/i18n.ts); this file only decides where it goes.
+ */
+interface Props {
+  meta: { title: string; description: string };
+  eyebrow: string;
+  title: string;
+  intro: string;
+  stepsTitle: string;
+  steps: { title: string; body: string; code?: string }[];
+  copyLabel: string;
+  correction: { title: string; body: string; cta: string; secondary: string; secondaryHref: string };
+  removal: { title: string; body: string };
+}
+const p = Astro.props;
+const card = 'rounded-xl border border-border bg-card text-card-foreground shadow-xs';
+---
+
+<Layout title={p.meta.title} description={p.meta.description}>
+  <PageHeader title={p.title} eyebrow={p.eyebrow}>
+    <p class="mt-3 text-base leading-7 text-muted-foreground"><Fragment set:html={p.intro} /></p>
+  </PageHeader>
+
+  <div class="mx-auto max-w-6xl px-4 pb-16 sm:px-6">
+    <div class="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_24rem] lg:items-start">
+      {/* Steps: a real sequence, so numbered and joined by a rail. */}
+      <section aria-labelledby="steps-title">
+        <h2 id="steps-title" class="sr-only">{p.stepsTitle}</h2>
+        <ol class="relative space-y-4 before:absolute before:top-6 before:bottom-6 before:left-[1.4375rem] before:w-px before:bg-border">
+          {
+            p.steps.map((s, i) => (
+              <li class="relative flex gap-4">
+                <span class="tabular relative z-10 grid size-12 shrink-0 place-items-center rounded-full border border-border bg-background text-sm font-semibold shadow-xs">
+                  {i + 1}
+                </span>
+                <div class={`${card} min-w-0 flex-1 p-5`}>
+                  <h3 class="font-semibold">{s.title}</h3>
+                  <p class="mt-1.5 text-sm leading-6 text-muted-foreground">{s.body}</p>
+                  {s.code && (
+                    <div class="mt-4 overflow-hidden rounded-lg border border-border">
+                      <div class="flex items-center justify-between border-b border-border bg-muted/50 py-1.5 pr-1.5 pl-3">
+                        <span class="font-mono text-xs text-muted-foreground">package.json</span>
+                        <button
+                          type="button"
+                          data-copy={s.code}
+                          class="inline-flex h-7 items-center gap-1.5 rounded-md px-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
+                        >
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-3.5" aria-hidden="true">
+                            <rect width="14" height="14" x="8" y="8" rx="2" />
+                            <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
+                          </svg>
+                          <span data-copy-label>{p.copyLabel}</span>
+                        </button>
+                      </div>
+                      <pre class="overflow-x-auto px-4 py-3 font-mono text-[0.8125rem] leading-6"><code>{s.code}</code></pre>
+                    </div>
+                  )}
+                </div>
+              </li>
+            ))
+          }
+        </ol>
+      </section>
+
+      <div class="lg:sticky lg:top-20">
+        <PackageChecker />
+      </div>
+    </div>
+
+    <div class="mt-12 grid gap-4 md:grid-cols-2">
+      <section class={`${card} p-6`} aria-labelledby="fix-title">
+        <h2 id="fix-title" class="font-semibold">{p.correction.title}</h2>
+        <p class="mt-2 text-sm leading-6 text-muted-foreground">{p.correction.body}</p>
+        <div class="mt-5 flex flex-wrap gap-2">
+          <a
+            href="https://github.com/qunqin24/opendock/issues/new?template=data-correction.yml"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="inline-flex h-9 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow-xs transition-colors hover:bg-primary/90"
+          >
+            {p.correction.cta}
+          </a>
+          <a
+            href={p.correction.secondaryHref}
+            class="inline-flex h-9 items-center rounded-md border border-border bg-background px-4 text-sm font-medium shadow-xs transition-colors hover:bg-accent"
+          >
+            {p.correction.secondary}
+          </a>
+        </div>
+      </section>
+      <section class={`${card} p-6`} aria-labelledby="remove-title">
+        <h2 id="remove-title" class="font-semibold">{p.removal.title}</h2>
+        <p class="mt-2 text-sm leading-6 text-muted-foreground"><Fragment set:html={p.removal.body} /></p>
+      </section>
+    </div>
+  </div>
+</Layout>

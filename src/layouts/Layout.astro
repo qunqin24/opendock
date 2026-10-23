@@ -4,6 +4,7 @@ import { ClientRouter } from 'astro:transitions';
 import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
 import ConsentBanner from '../components/ConsentBanner.astro';
+import CompareTray from '../components/CompareTray.astro';
 import {
   DEFAULT_LOCALE, HTML_LANG, LOCALES, OG_LOCALE,
   localeFromPath, localePath, normalizePagePath, stripLocale, useTranslations,
@@ -181,6 +182,7 @@ const xDefault = new URL(localePath(DEFAULT_LOCALE, barePath), site).href;
       <slot />
     </main>
     <Footer />
+    <CompareTray />
     <ConsentBanner />
 
     <script>

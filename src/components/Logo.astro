@@ -1,32 +1,44 @@
 ---
 interface Props {
   class?: string;
-  /** Renders the wordmark next to the glyph. */
+  /** Renders the pixel wordmark; false shows only the square glyph. */
   withText?: boolean;
 }
 const { class: className = '', withText = true } = Astro.props;
 ---
 
-<span class:list={['inline-flex items-center gap-2.5', className]}>
-  <span
-    class="grid size-8 shrink-0 place-items-center rounded-lg bg-foreground text-background transition-transform duration-200 group-hover/logo:scale-105"
-  >
-    <!-- opencode mark -->
-    <svg
-      viewBox="0 0 24 24"
-      fill="currentColor"
-      fill-rule="evenodd"
-      class="size-[18px]"
-      aria-hidden="true"
+{
+  withText ? (
+    <span class:list={['flex items-center', className]}>
+      <!-- Pixel wordmark on a 6-unit grid, after the opencode logotype. -->
+      <svg viewBox="0 0 234 42" class="block h-6 w-auto" role="img" aria-label="OpenDock">
+        <g class="fill-foreground/15">
+          <path d="M6 18h12v12H6zM36 18h12v12H36zM66 24h18v6H66zM96 18h12v18H96z" />
+          <path d="M126 18h12v12h-12zM156 18h12v12h-12zM186 18h18v12h-18zM216 24h12v12h-12z" />
+        </g>
+        <path
+          class="fill-muted-foreground"
+          fill-rule="evenodd"
+          d="M0 6h24v30H0zM6 12v18h12V12zM30 6h24v30H36v6h-6zM36 12v18h12V12zM60 6h24v18H66v6h18v6H60zM66 12v6h12v-6zM90 6h24v30h-6V12H96v24h-6z"
+        />
+        <path
+          class="fill-foreground"
+          fill-rule="evenodd"
+          d="M138 0h6v36h-24V6h18zM126 12v18h12V12zM150 6h24v30h-24zM156 12v18h12V12zM180 6h24v6h-18v18h18v6h-24zM210 0h6v18h12v6h-12v12h-6zM228 6h6v12h-6zM228 24h6v12h-6z"
+        />
+      </svg>
+    </span>
+  ) : (
+    <span
+      class:list={[
+        'grid size-8 shrink-0 place-items-center rounded-lg bg-foreground text-background transition-transform duration-200 group-hover/logo:scale-105',
+        className,
+      ]}
     >
-      <path d="M16 6H8v12h8V6zm4 16H4V2h16v20z"></path>
-    </svg>
-  </span>
-  {
-    withText && (
-      <span class="text-[0.9375rem] font-semibold tracking-tight">
-        Open<span class="text-muted-foreground">Dock</span>
-      </span>
-    )
-  }
-</span>
+      <!-- opencode mark -->
+      <svg viewBox="0 0 24 24" fill="currentColor" fill-rule="evenodd" class="size-[18px]" aria-hidden="true">
+        <path d="M16 6H8v12h8V6zm4 16H4V2h16v20z" />
+      </svg>
+    </span>
+  )
+}

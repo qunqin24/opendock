@@ -1,0 +1,30 @@
+---
+/** The composite score's four signals as one stacked bar, with a legend. */
+interface Props {
+  signals: { label: string; detail: string; pct: number }[];
+}
+const { signals } = Astro.props;
+const tones = ['bg-foreground', 'bg-foreground/70', 'bg-foreground/45', 'bg-foreground/25'];
+---
+
+<div class="not-prose my-6">
+  <div class="flex h-3 gap-0.5 overflow-hidden rounded-full" aria-hidden="true">
+    {signals.map((s, i) => <span class={tones[i]} style={`width:${s.pct}%`} />)}
+  </div>
+  <ul class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+    {
+      signals.map((s, i) => (
+        <li class="rounded-lg border border-border p-3">
+          <p class="flex items-center justify-between gap-2 text-sm font-medium">
+            <span class="flex items-center gap-2">
+              <span class:list={['size-2.5 rounded-sm', tones[i]]} aria-hidden="true" />
+              {s.label}
+            </span>
+            <span class="tabular">{s.pct}%</span>
+          </p>
+          <p class="mt-1 text-xs leading-5 text-muted-foreground">{s.detail}</p>
+        </li>
+      ))
+    }
+  </ul>
+</div>

@@ -1,0 +1,175 @@
+---
+import Layout from '../layouts/Layout.astro';
+import PageHeader from '../components/PageHeader.astro';
+import { categoryLabel, lampClass } from '../lib/plugins';
+import type { Author } from '../lib/authors';
+import { avatarUrl, compactNumber, formatNumber, letterAvatar } from '../lib/utils';
+import { localeFromPath, localePath, pluginDescription, useTranslations } from '../lib/i18n';
+
+interface Props {
+  author: Author;
+}
+const { author } = Astro.props;
+
+const lang = localeFromPath(Astro.url.pathname);
+const t = useTranslations(lang);
+const href = (path: string) => localePath(lang, path);
+
+const { login, plugins: list } = author;
+const count = list.length;
+const avatar = letterAvatar(login);
+
+const site = Astro.site ?? new URL('https://www.opendock.net');
+// Trailing slash to match the canonical URL — build.format is 'directory'.
+const abs = (path: string) => new URL(`${localePath(lang, path).replace(/\/$/, '')}/`, site).href;
+const pageUrl = abs(`/authors/${author.key}`);
+
+const description = t('author.metaDescription', {
+  login,
+  n: formatNumber(count),
+  stars: formatNumber(author.stars),
+  installs: formatNumber(author.downloadsMonth),
+});
+
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@graph': [
+    {
+      '@type': 'BreadcrumbList',
+      itemListElement: [
+        { '@type': 'ListItem', position: 1, name: t('categories.breadcrumbHome'), item: abs('/') },
+        { '@type': 'ListItem', position: 2, name: t('nav.plugins'), item: abs('/plugins') },
+        { '@type': 'ListItem', position: 3, name: login },
+      ],
+    },
+    {
+      '@type': 'ProfilePage',
+      '@id': `${pageUrl}#profile`,
+      url: pageUrl,
+      name: t('author.metaTitle', { login }),
+      mainEntity: {
+        '@type': 'Person',
+        name: login,
+        alternateName: author.key !== login ? author.key : undefined,
+        url: author.profileUrl,
+        image: author.avatar ?? undefined,
+        sameAs: [author.profileUrl],
+      },
+    },
+    {
+      '@type': 'ItemList',
+      name: t('author.pluginsTitle', { login }),
+      numberOfItems: count,
+      itemListElement: list.slice(0, 50).map((p, i) => ({
+        '@type': 'ListItem',
+        position: i + 1,
+        name: p.title,
+        url: abs(`/plugins/${p.slug}`),
+      })),
+    },
+  ],
+};
+
+const card = 'rounded-xl border border-border bg-card text-card-foreground shadow-xs';
+const stats = [
+  { label: t('author.statPlugins'), value: formatNumber(count) },
+  { label: t('author.statStars'), value: compactNumber(author.stars) },
+  { label: t('author.statInstalls'), value: compactNumber(author.downloadsMonth) },
+  { label: t('author.statCategories'), value: formatNumber(author.categories.length) },
+];
+---
+
+<Layout title={t('author.metaTitle', { login })} description={description}>
+  <script is:inline type="application/ld+json" slot="head" set:html={JSON.stringify(jsonLd)} />
+
+  <PageHeader
+    title={login}
+    eyebrow={t('author.eyebrow')}
+    description={t(count === 1 ? 'author.headerDescOne' : 'author.headerDesc', { login, n: formatNumber(count) })}
+    breadcrumb={[[t('categories.breadcrumbHome'), href('/')], [t('nav.plugins'), href('/plugins')], [login]]}
+    breadcrumbLabel={t('plugin.breadcrumbAria')}
+  >
+    <span slot="icon" class="mb-5 block size-16 overflow-hidden rounded-2xl border border-border bg-muted shadow-sm">
+      {
+        author.avatar ? (
+          <img src={avatarUrl(author.avatar, 64)} alt="" width="64" height="64" loading="eager" decoding="async" class="size-full object-cover" />
+        ) : (
+          <span class="grid size-full place-items-center text-2xl font-semibold text-white" style={`background:${avatar.color}`}>{avatar.letter}</span>
+        )
+      }
+    </span>
+    <a
+      href={author.profileUrl}
+      target="_blank"
+      rel="noopener noreferrer"
+      class="mt-5 inline-flex h-9 items-center gap-2 rounded-md border border-border bg-background px-3.5 text-sm font-medium shadow-xs transition-colors hover:bg-accent"
+    >
+      {author.github ? t('author.github') : t('author.npm')}
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-3.5 text-muted-foreground" aria-hidden="true">
+        <path d="M15 3h6v6" /><path d="M10 14 21 3" /><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+      </svg>
+    </a>
+
+    <dl slot="aside" class="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:w-[34rem]">
+      {
+        stats.map((s) => (
+          <div class={`${card} min-w-0 p-4`}>
+            <dt class="truncate text-xs text-muted-foreground">{s.label}</dt>
+            <dd class="tabular mt-1.5 text-xl font-semibold tracking-tight">{s.value}</dd>
+          </div>
+        ))
+      }
+    </dl>
+  </PageHeader>
+
+  <div class="mx-auto max-w-6xl px-4 pb-16 sm:px-6">
+    <section aria-labelledby="author-plugins-title">
+      <h2 id="author-plugins-title" class="text-xl font-semibold tracking-tight">{t('author.pluginsTitle', { login })}</h2>
+      <p class="mt-1 text-sm text-muted-foreground">{t('author.pluginsDesc')}</p>
+      <ol class="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {
+          list.map((p) => (
+            <li class="min-w-0">
+              <a
+                href={href(`/plugins/${p.slug}`)}
+                class={`${card} group flex h-full flex-col p-5 transition-[border-color,box-shadow,transform] hover:-translate-y-0.5 hover:border-foreground/20 hover:shadow-md motion-reduce:hover:translate-y-0`}
+              >
+                <div class="flex items-start gap-3">
+                  <span class="relative size-10 shrink-0">
+                    <span class="block size-full overflow-hidden rounded-lg border border-border bg-muted">
+                      {p.ownerAvatar ? (
+                        <img src={avatarUrl(p.ownerAvatar, 40)} alt="" width="40" height="40" loading="lazy" decoding="async" class="size-full object-cover" />
+                      ) : (
+                        <span class="grid size-full place-items-center text-sm font-semibold text-white" style={`background:${letterAvatar(p.title).color}`}>{letterAvatar(p.title).letter}</span>
+                      )}
+                    </span>
+                    <span class:list={['lamp absolute -right-0.5 -bottom-0.5 ring-2 ring-card', lampClass[p.healthLevel]]} aria-hidden="true" />
+                  </span>
+                  <div class="min-w-0 flex-1">
+                    <h3 class="truncate text-sm font-semibold">{p.title}</h3>
+                    <p class="mt-0.5 truncate text-xs text-muted-foreground">{categoryLabel(p.category, lang)}</p>
+                  </div>
+                </div>
+                <p class="mt-3 mb-5 line-clamp-2 min-h-10 text-sm leading-5 text-muted-foreground">{pluginDescription(p, lang) ?? t('common.noDescription')}</p>
+                <dl class="tabular mt-auto grid grid-cols-3 gap-3 border-t border-border pt-4 text-xs">
+                  <div class="min-w-0">
+                    <dt class="text-muted-foreground">{t('explorer.col.stars')}</dt>
+                    <dd class="mt-0.5 text-sm font-semibold">{compactNumber(p.stars)}</dd>
+                  </div>
+                  <div class="min-w-0">
+                    <dt class="text-muted-foreground">{t('explorer.col.downloads')}</dt>
+                    <dd class="mt-0.5 text-sm font-semibold">{compactNumber(p.downloadsMonth)}</dd>
+                  </div>
+                  <div class="min-w-0">
+                    <dt class="text-muted-foreground">{t('explorer.col.score')}</dt>
+                    <dd class="mt-0.5 text-sm font-semibold">{p.score.toFixed(0)}</dd>
+                  </div>
+                </dl>
+              </a>
+            </li>
+          ))
+        }
+      </ol>
+    </section>
+  </div>
+</Layout>

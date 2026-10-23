@@ -1,17 +1,19 @@
 ---
 import Layout from '../layouts/Layout.astro';
+import PageHeader from '../components/PageHeader.astro';
 import { rankings, categoryLabel, census, generatedAt, lampClass } from '../lib/plugins';
 import type { Plugin } from '../lib/plugins';
-import { compactNumber, formatNumber, formatDate } from '../lib/utils';
-import { localeFromPath, localePath, useTranslations } from '../lib/i18n';
+import { avatarUrl, compactNumber, formatNumber, formatDate, letterAvatar } from '../lib/utils';
+import { localeFromPath, localePath, pluginDescription, useTranslations } from '../lib/i18n';
 
 const lang = localeFromPath(Astro.url.pathname);
 const t = useTranslations(lang);
+const href = (path: string) => localePath(lang, path);
 
 const TOP_N = 50;
 
 interface BoardDef {
-  id: string;
+  id: 'top' | 'stars' | 'trending' | 'downloads' | 'recent';
   label: string;
   hint: string;
   list: Plugin[];
@@ -19,7 +21,8 @@ interface BoardDef {
   metric: (p: Plugin) => number | null;
   display: (p: Plugin) => string;
   caption: string;
-  /** Star counts span 271k→170, so those bars only read on a log axis. */
+  /** Star and install counts span five orders of magnitude, so their bars
+   *  only read on a log axis. */
   scale: 'linear' | 'log' | 'none';
 }
 
@@ -40,7 +43,7 @@ const defs: BoardDef[] = [
     hint: t('rankings.board.stars.hint'),
     list: rankings.stars,
     metric: (p) => p.stars,
-    display: (p) => formatNumber(p.stars),
+    display: (p) => compactNumber(p.stars),
     caption: t('rankings.caption.stars'),
     scale: 'log',
   },
@@ -60,7 +63,7 @@ const defs: BoardDef[] = [
     hint: t('rankings.board.downloads.hint'),
     list: rankings.downloads,
     metric: (p) => p.downloadsMonth,
-    display: (p) => formatNumber(p.downloadsMonth),
+    display: (p) => compactNumber(p.downloadsMonth),
     caption: t('rankings.caption.downloads'),
     scale: 'log',
   },
@@ -80,346 +83,262 @@ const boards = defs.map((d) => {
   const entries = d.list.slice(0, TOP_N);
   const values = entries.map((p) => d.metric(p) ?? 0);
   const max = Math.max(...values, 0);
-  const empty = d.scale !== 'none' && max === 0;
-
   const rows = entries.map((p, i) => {
     const v = d.metric(p);
     let pct = 0;
-    if (v !== null && max > 0) {
-      pct = d.scale === 'log' ? Math.log10(v + 1) / Math.log10(max + 1) : v / max;
-    }
+    if (v !== null && max > 0) pct = d.scale === 'log' ? Math.log10(v + 1) / Math.log10(max + 1) : v / max;
     return { p, rank: i + 1, display: d.display(p), pct: Math.round(pct * 100) };
   });
-
-  return { ...d, rows, empty };
+  return { ...d, rows, empty: d.scale !== 'none' && max === 0 };
 });
 
-const stamped = new Date(generatedAt);
-const pad = (n: number) => String(n).padStart(2, '0');
-const snapshot = `${stamped.getFullYear()}-${pad(stamped.getMonth() + 1)}-${pad(stamped.getDate())} ${pad(
-  stamped.getHours(),
-)}:${pad(stamped.getMinutes())}`;
+const weights = [
+  { label: t('rankings.weight.stars'), pct: 35, tone: 'bg-foreground' },
+  { label: t('rankings.weight.downloads'), pct: 35, tone: 'bg-foreground/70' },
+  { label: t('rankings.weight.activity'), pct: 20, tone: 'bg-foreground/45' },
+  { label: t('rankings.weight.growth'), pct: 10, tone: 'bg-foreground/25' },
+];
+
+const card = 'rounded-xl border border-border bg-card text-card-foreground shadow-xs';
+// Gold, silver, bronze — muted enough to sit in the neutral palette.
+const medal = [
+  'bg-amber-400/15 text-amber-700 ring-amber-400/40 dark:text-amber-300',
+  'bg-zinc-400/15 text-zinc-600 ring-zinc-400/40 dark:text-zinc-300',
+  'bg-orange-700/10 text-orange-800 ring-orange-700/30 dark:text-orange-300',
+];
 ---
 
 <Layout title={t('rankings.title')} description={t('rankings.metaDescription')}>
-  <div class="mx-auto max-w-6xl px-4 py-10 sm:px-6 sm:py-14">
-    <!-- Header Section -->
-    <header class="mx-auto max-w-3xl text-center">
-      <p class="meta text-muted-foreground">
-        {t('rankings.eyebrow')} · {t('rankings.topN', { n: TOP_N })}
-      </p>
+  <PageHeader title={t('rankings.heading')} description={t('rankings.intro')} eyebrow={t('rankings.eyebrow')}>
+    <div slot="aside" class="flex flex-col items-start gap-2 lg:items-end">
+      <span class="inline-flex items-center gap-2 rounded-full border border-border bg-background/80 px-3 py-1 text-xs text-muted-foreground backdrop-blur">
+        <span class="size-1.5 rounded-full bg-ok" aria-hidden="true"></span>
+        {t('rankings.updated', { stamp: formatDate(generatedAt, lang) })}
+      </span>
+      <span class="tabular text-sm text-muted-foreground">{t('rankings.countedUnit', { n: formatNumber(census.total) })}</span>
+      <a href={href('/about')} class="text-sm font-medium underline-offset-4 hover:underline">{t('rankings.algorithmLink')} →</a>
+    </div>
+  </PageHeader>
 
-      <h1 class="mt-4 text-balance text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
-        {t('rankings.heading')}
-      </h1>
-
-      <p class="mx-auto mt-3 max-w-xl text-balance text-sm leading-relaxed text-muted-foreground">
-        {t('rankings.intro')}
-      </p>
-
-      <!-- Header Metric Strip -->
-      <div class="mt-8 grid grid-cols-1 gap-px overflow-hidden rounded-lg border border-border/80 bg-border/80 sm:grid-cols-3">
-        <div class="bg-card p-4 text-center">
-          <p class="text-xs text-muted-foreground">{t('rankings.snapshot')}</p>
-          <p class="tabular mt-1 font-mono text-sm font-medium text-foreground">
-            {snapshot}
-          </p>
-        </div>
-
-        <div class="bg-card p-4 text-center">
-          <p class="text-xs text-muted-foreground">{t('rankings.counted')}</p>
-          <p class="tabular mt-1 font-mono text-sm font-medium text-foreground">
-            {t('rankings.countedUnit', { n: formatNumber(census.total) })}
-          </p>
-        </div>
-
-        <div class="bg-card p-4 text-center">
-          <p class="text-xs text-muted-foreground">{t('rankings.algorithm')}</p>
-          <p class="mt-1 text-sm font-medium">
-            <a href={localePath(lang, "/about")} class="text-foreground hover:underline inline-flex items-center gap-1">
-              <span>{t('rankings.algorithmLink')}</span>
-              <span>→</span>
-            </a>
-          </p>
-        </div>
-      </div>
-    </header>
-
-    <!-- Leaderboard Container -->
-    <div data-rankings class="mt-12">
-      <!-- Tabs Switcher -->
-      <div
-        class="scrollbar-none sticky top-14 z-30 -mx-4 flex gap-2 overflow-x-auto border-b border-border/80 bg-background/90 px-4 py-3 backdrop-blur-xl sm:-mx-6 sm:px-6"
-        role="tablist"
-      >
+  <div class="mx-auto max-w-6xl px-4 pb-16 sm:px-6" data-rankings>
+    {/* ---- board tabs ---- */}
+    <div
+      role="tablist"
+      aria-label={t('rankings.boardsAria')}
+      class="scrollbar-none -mx-4 flex overflow-x-auto px-4 sm:mx-0 sm:px-0"
+    >
+      <div class="inline-flex h-10 items-center rounded-lg bg-muted p-[3px]">
         {
           boards.map((b, i) => (
             <button
               type="button"
               role="tab"
+              id={`rank-tab-${b.id}`}
+              aria-controls={`rank-panel-${b.id}`}
+              aria-selected={i === 0 ? 'true' : 'false'}
+              tabindex={i === 0 ? 0 : -1}
               data-rank-tab={b.id}
-              aria-selected={i === 0}
-              class:list={[
-                'shrink-0 rounded-md px-3.5 py-2 text-xs font-medium whitespace-nowrap transition-colors sm:text-sm',
-                'aria-selected:bg-foreground aria-selected:text-background',
-                'text-muted-foreground hover:bg-secondary hover:text-foreground',
-              ]}
+              class="h-full rounded-md px-4 text-sm font-medium whitespace-nowrap text-muted-foreground transition-[color,box-shadow] hover:text-foreground aria-selected:bg-background aria-selected:text-foreground aria-selected:shadow-sm"
             >
-              <span class="tabular mr-1.5 font-mono text-[0.6875rem] opacity-70">0{i + 1}</span>
               {b.label}
             </button>
           ))
         }
       </div>
+    </div>
 
-      <!-- Tab Panels -->
-      {
-        boards.map((b, i) => (
-          <div data-rank-panel={b.id} role="tabpanel" class:list={[i !== 0 && 'hidden', 'mt-6']}>
-            <div class="mb-6 flex items-center justify-between">
-              <p class="text-xs sm:text-sm text-muted-foreground">
-                {b.hint}
-                {b.scale === 'log' && (
-                  <span class="text-muted-foreground/80 font-mono text-xs">{t('rankings.logScale')}</span>
-                )}
-              </p>
-              <span class="font-mono text-xs text-muted-foreground">TOP {TOP_N}</span>
+    {
+      boards.map((b, i) => (
+        <section
+          role="tabpanel"
+          id={`rank-panel-${b.id}`}
+          aria-labelledby={`rank-tab-${b.id}`}
+          data-rank-panel={b.id}
+          hidden={i !== 0}
+          class="mt-6 space-y-6"
+        >
+          {/* How this board is ordered */}
+          <div class={`${card} flex flex-col gap-4 p-5 md:flex-row md:items-center md:justify-between`}>
+            <div class="max-w-xl">
+              <h2 class="font-semibold">{b.label}</h2>
+              <p class="mt-1 text-sm text-muted-foreground">{b.hint}</p>
             </div>
-
-            {b.empty ? (
-              <div class="rounded-lg border border-dashed border-border/80 px-6 py-16 text-center">
-                <p class="text-base font-medium text-foreground">{t('rankings.emptyTitle')}</p>
-                <p class="mx-auto mt-2 max-w-md text-xs leading-relaxed text-muted-foreground">
-                  {t('rankings.emptyBody')}
-                </p>
-                <a
-                  href="#top"
-                  data-goto-tab="top"
-                  class="mt-5 inline-flex items-center gap-1 rounded-md bg-foreground px-4 py-2 text-xs font-medium text-background hover:opacity-85"
-                >
-                  <span>{t('rankings.emptyCta')}</span>
-                  <span>→</span>
-                </a>
+            {b.id === 'top' && (
+              <div class="w-full md:w-80">
+                <p class="text-xs text-muted-foreground">{t('rankings.weights')}</p>
+                <div class="mt-2 flex h-2.5 gap-0.5 overflow-hidden rounded-full" aria-hidden="true">
+                  {weights.map((w) => <span class={w.tone} style={`width:${w.pct}%`} />)}
+                </div>
+                <ul class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs">
+                  {weights.map((w) => (
+                    <li class="flex items-center gap-1.5">
+                      <span class:list={['size-2 rounded-sm', w.tone]} aria-hidden="true" />
+                      {w.label} <span class="tabular font-medium">{w.pct}%</span>
+                    </li>
+                  ))}
+                </ul>
               </div>
-            ) : (
-              <>
-                {/* Podium Top 3 Cards */}
-                <div class="grid gap-4 sm:grid-cols-3">
-                  {b.rows.slice(0, 3).map((r) => {
-                    const isGold = r.rank === 1;
-
-                    return (
-                      <a
-                        href={localePath(lang, `/plugins/${r.p.slug}`)}
-                        class="group relative flex flex-col justify-between rounded-lg border border-border/80 bg-card p-6 transition-colors hover:border-foreground/25"
-                      >
-                        <div>
-                          {/* Rank Badge & Category */}
-                          <div class="flex items-center justify-between">
-                            <span
-                              class:list={[
-                                'tabular flex size-7 items-center justify-center rounded-md font-mono text-xs font-medium',
-                                isGold
-                                  ? 'bg-foreground text-background'
-                                  : 'bg-muted text-muted-foreground',
-                              ]}
-                            >
-                              {r.rank}
-                            </span>
-
-                            <span class="rounded-md border border-border/70 px-2 py-0.5 text-xs text-muted-foreground">
-                              {categoryLabel(r.p.category, lang)}
-                            </span>
-                          </div>
-
-                          {/* Avatar & Titles */}
-                          <div class="mt-4 flex items-center gap-3">
-                            <div class="relative size-10 shrink-0">
-                              <div class="size-full overflow-hidden rounded-lg border border-border/80 bg-secondary/50">
-                                {r.p.ownerAvatar ? (
-                                  <img
-                                    src={r.p.ownerAvatar}
-                                    alt={r.p.owner ?? r.p.name}
-                                    width="40"
-                                    height="40"
-                                    class="size-full object-cover"
-                                    loading="lazy"
-                                  />
-                                ) : (
-                                  <div class="flex size-full items-center justify-center font-mono text-xs font-bold text-foreground/70">
-                                    {(r.p.owner ?? r.p.name).charAt(0).toUpperCase()}
-                                  </div>
-                                )}
-                              </div>
-                              <span
-                                class:list={[
-                                  'lamp absolute -top-0.5 -right-0.5 z-10 ring-2 ring-card',
-                                  lampClass[r.p.healthLevel],
-                                ]}
-                                title={t(`health.tip.${r.p.healthLevel}` as const)}
-                              />
-                            </div>
-
-                            <div class="min-w-0 flex-1">
-                              <h3 class="truncate text-base font-medium tracking-tight text-foreground transition-colors group-hover:underline">
-                                {r.p.title}
-                              </h3>
-                              <p class="truncate font-mono text-xs text-muted-foreground">
-                                {r.p.name}
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Metric Block */}
-                        <div class="mt-6 border-t border-border/60 pt-4">
-                          <span class="tabular block font-mono text-3xl font-medium tracking-tight text-foreground">
-                            {r.display}
-                          </span>
-                          <span class="text-xs text-muted-foreground/80 mt-0.5 block">
-                            {b.caption}
-                          </span>
-                        </div>
-                      </a>
-                    );
-                  })}
-                </div>
-
-                {/* Long Tail Table Rows (4..50) */}
-                <div class="mt-8 overflow-hidden rounded-lg border border-border/80 bg-card p-4 sm:p-6">
-                  <div class="space-y-1">
-                    {b.rows.slice(3).map((r) => (
-                      <a
-                        href={localePath(lang, `/plugins/${r.p.slug}`)}
-                        class="group flex flex-col gap-2 rounded-md p-3 transition-colors hover:bg-secondary/60 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
-                      >
-                        {/* Rank + Avatar + Titles */}
-                        <div class="flex items-center gap-3.5 min-w-0 flex-1">
-                          <span class="tabular flex size-6 shrink-0 items-center justify-center font-mono text-xs text-muted-foreground/70">
-                            {String(r.rank).padStart(2, '0')}
-                          </span>
-
-                          <div class="relative size-8 shrink-0">
-                            <div class="size-full overflow-hidden rounded-lg border border-border/80 bg-secondary/50">
-                              {r.p.ownerAvatar ? (
-                                <img
-                                  src={r.p.ownerAvatar}
-                                  alt={r.p.owner ?? r.p.name}
-                                  width="32"
-                                  height="32"
-                                  class="size-full object-cover"
-                                  loading="lazy"
-                                />
-                              ) : (
-                                <div class="flex size-full items-center justify-center font-mono text-xs font-bold text-foreground/70">
-                                  {(r.p.owner ?? r.p.name).charAt(0).toUpperCase()}
-                                </div>
-                              )}
-                            </div>
-                            <span
-                              class:list={[
-                                'lamp absolute -top-0.5 -right-0.5 z-10 ring-2 ring-card',
-                                lampClass[r.p.healthLevel],
-                              ]}
-                              title={t(`health.tip.${r.p.healthLevel}` as const)}
-                            />
-                          </div>
-
-                          <div class="min-w-0 flex-1">
-                            <div class="flex items-center gap-2">
-                              <span class="truncate text-sm font-medium tracking-tight text-foreground transition-colors group-hover:underline">
-                                {r.p.title}
-                              </span>
-                              {r.p.archived && (
-                                <span class="shrink-0 rounded border border-danger/25 bg-danger-bg px-1.5 font-mono text-[0.625rem] text-danger">
-                                  {t('rankings.archived')}
-                                </span>
-                              )}
-                            </div>
-                            <p class="truncate font-mono text-xs text-muted-foreground">
-                              {r.p.name}
-                            </p>
-                          </div>
-                        </div>
-
-                        {/* Category + Metric Bar + Value */}
-                        <div class="flex shrink-0 items-center justify-between gap-4 self-end pl-10 sm:self-center sm:pl-0">
-                          <span class="hidden rounded-md border border-border/70 px-2 py-0.5 text-xs text-muted-foreground lg:inline-block">
-                            {categoryLabel(r.p.category, lang)}
-                          </span>
-
-                          {b.scale !== 'none' && (
-                            <div class="hidden w-28 h-1.5 overflow-hidden rounded-full bg-secondary sm:block">
-                              <div
-                                class="h-full rounded-full bg-foreground/30"
-                                style={`width:${r.pct}%`}
-                              />
-                            </div>
-                          )}
-
-                          <span class="tabular font-mono text-sm font-medium text-foreground text-right min-w-[5rem]">
-                            {r.display}
-                          </span>
-
-                          <span class="text-xs text-muted-foreground group-hover:text-foreground">
-                            →
-                          </span>
-                        </div>
-                      </a>
-                    ))}
-                  </div>
-
-                  <div class="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-border/60 pt-4 font-mono text-xs text-muted-foreground">
-                    <span>{t('rankings.onlyTop', { n: TOP_N })}</span>
-                    <a
-                      href={localePath(lang, "/plugins")}
-                      class="text-foreground hover:underline inline-flex items-center gap-1"
-                    >
-                      <span>{t('rankings.seeAll', { n: formatNumber(census.total) })}</span>
-                      <span>→</span>
-                    </a>
-                  </div>
-                </div>
-              </>
             )}
           </div>
-        ))
-      }
-    </div>
+
+          {b.empty ? (
+            <div class="rounded-xl border border-dashed border-border px-6 py-16 text-center">
+              <p class="font-medium">{t('rankings.emptyTitle')}</p>
+              <p class="mx-auto mt-1.5 max-w-md text-sm text-muted-foreground">{t('rankings.emptyBody')}</p>
+              <a
+                href="#top"
+                data-goto-tab="top"
+                class="mt-6 inline-flex h-9 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow-xs hover:bg-primary/90"
+              >
+                {t('rankings.emptyCta')}
+              </a>
+            </div>
+          ) : (
+            <>
+              {/* Podium: on wide screens #1 stands in the middle, raised. */}
+              <ol class="grid gap-4 md:grid-cols-3 md:items-end">
+                {b.rows.slice(0, 3).map((r, k) => (
+                  <li class:list={[k === 0 ? 'md:order-2' : k === 1 ? 'md:order-1' : 'md:order-3']}>
+                    <a
+                      href={href(`/plugins/${r.p.slug}`)}
+                      class:list={[
+                        card,
+                        'group flex flex-col items-center p-6 text-center transition-[border-color,box-shadow,transform] hover:-translate-y-0.5 hover:border-foreground/20 hover:shadow-md motion-reduce:hover:translate-y-0',
+                        k === 0 && 'md:pb-10 md:shadow-md',
+                      ]}
+                    >
+                      <span class:list={['tabular rounded-full px-3 py-0.5 text-sm font-semibold ring-1', medal[k]]}>#{r.rank}</span>
+                      <span class="relative mt-4 size-16 shrink-0">
+                        <span class="block size-full overflow-hidden rounded-2xl border border-border bg-muted shadow-sm">
+                          {r.p.ownerAvatar ? (
+                            <img src={avatarUrl(r.p.ownerAvatar, 64)} alt="" width="64" height="64" loading="lazy" decoding="async" class="size-full object-cover" />
+                          ) : (
+                            <span class="grid size-full place-items-center text-xl font-semibold text-white" style={`background:${letterAvatar(r.p.title).color}`}>{letterAvatar(r.p.title).letter}</span>
+                          )}
+                        </span>
+                        <span class:list={['lamp absolute -right-0.5 -bottom-0.5 scale-125 ring-2 ring-card', lampClass[r.p.healthLevel]]} aria-hidden="true" />
+                      </span>
+                      <h3 class="mt-3 w-full truncate font-semibold">{r.p.title}</h3>
+                      <p class="w-full truncate text-xs text-muted-foreground">{categoryLabel(r.p.category, lang)}</p>
+                      <p class:list={['tabular mt-4 text-3xl font-semibold tracking-tight', b.id === 'trending' && 'text-ok', b.id === 'recent' && 'text-xl']}>
+                        {r.display}
+                      </p>
+                      <p class="text-xs text-muted-foreground">{b.caption}</p>
+                    </a>
+                  </li>
+                ))}
+              </ol>
+
+              {/* The rest of the board */}
+              <div class={card}>
+                <div class="flex items-center justify-between border-b border-border px-5 py-3">
+                  <h3 class="text-sm font-medium">{t('rankings.restTitle', { n: b.rows.length })}</h3>
+                  <span class="text-xs text-muted-foreground">
+                    {b.caption}
+                    {b.scale === 'log' && ` ${t('rankings.logScale')}`}
+                  </span>
+                </div>
+                <ol class="divide-y divide-border">
+                  {b.rows.slice(3).map((r) => (
+                    <li>
+                      <a
+                        href={href(`/plugins/${r.p.slug}`)}
+                        class="flex items-center gap-3 px-5 py-3 transition-colors hover:bg-muted/50"
+                      >
+                        <span class="tabular w-6 shrink-0 text-right text-sm text-muted-foreground">{r.rank}</span>
+                        <span class="relative size-9 shrink-0">
+                          <span class="block size-full overflow-hidden rounded-lg border border-border bg-muted">
+                            {r.p.ownerAvatar ? (
+                              <img src={avatarUrl(r.p.ownerAvatar, 36)} alt="" width="36" height="36" loading="lazy" decoding="async" class="size-full object-cover" />
+                            ) : (
+                              <span class="grid size-full place-items-center text-xs font-medium text-white" style={`background:${letterAvatar(r.p.title).color}`}>{letterAvatar(r.p.title).letter}</span>
+                            )}
+                          </span>
+                          <span class:list={['lamp absolute -right-0.5 -bottom-0.5 ring-2 ring-card', lampClass[r.p.healthLevel]]} aria-hidden="true" />
+                        </span>
+                        <span class="min-w-0 flex-1">
+                          <span class="flex items-center gap-2">
+                            <span class="truncate text-sm font-medium">{r.p.title}</span>
+                            {r.p.archived && (
+                              <span class="shrink-0 rounded-md bg-danger-bg px-1.5 py-0.5 text-[0.6875rem] font-medium text-danger">{t('rankings.archived')}</span>
+                            )}
+                          </span>
+                          <span class="block truncate text-xs text-muted-foreground">{pluginDescription(r.p, lang) ?? r.p.name}</span>
+                        </span>
+                        <span class="hidden w-28 shrink-0 truncate rounded-md border border-border px-2 py-0.5 text-center text-xs text-muted-foreground lg:block">
+                          {categoryLabel(r.p.category, lang)}
+                        </span>
+                        {b.scale !== 'none' && (
+                          <span class="hidden h-1.5 w-24 shrink-0 overflow-hidden rounded-full bg-muted sm:block" aria-hidden="true">
+                            <span class="block h-full rounded-full bg-foreground/70" style={`width:${Math.max(2, r.pct)}%`} />
+                          </span>
+                        )}
+                        <span class:list={['tabular min-w-20 shrink-0 text-right text-sm font-semibold whitespace-nowrap', b.id === 'trending' && 'text-ok']}>
+                          {r.display}
+                        </span>
+                      </a>
+                    </li>
+                  ))}
+                </ol>
+                <div class="border-t border-border px-5 py-3 text-center">
+                  <a href={href('/plugins')} class="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
+                    {t('rankings.seeAll', { n: formatNumber(census.total) })} →
+                  </a>
+                </div>
+              </div>
+            </>
+          )}
+        </section>
+      ))
+    }
   </div>
 </Layout>
 
 <script>
-  document.addEventListener('astro:page-load', () => {
+  // WAI-ARIA tabs with deep links: #trending opens that board, and switching
+  // boards updates the hash without adding history entries. Handlers are
+  // delegated from `document`, so they work however this script came to run
+  // (first load, soft navigation, or a dev hot reload).
+  function select(id: string, focus = false) {
     const root = document.querySelector<HTMLElement>('[data-rankings]');
-    if (!root) return;
-
-    const tabs = root.querySelectorAll<HTMLButtonElement>('[data-rank-tab]');
-    const select = (id: string) => {
-      tabs.forEach((t) => t.setAttribute('aria-selected', String(t.dataset.rankTab === id)));
-      root.querySelectorAll<HTMLElement>('[data-rank-panel]').forEach((panel) => {
-        panel.classList.toggle('hidden', panel.dataset.rankPanel !== id);
-      });
-    };
-
-    tabs.forEach((tab) => {
-      tab.addEventListener('click', () => {
-        select(tab.dataset.rankTab!);
-        // Keep ClientRouter's state on the entry — see PluginExplorer.
-        history.replaceState(history.state, '', `#${tab.dataset.rankTab}`);
-      });
+    if (!root || !root.querySelector(`[data-rank-tab="${id}"]`)) return;
+    root.querySelectorAll<HTMLButtonElement>('[data-rank-tab]').forEach((tab) => {
+      const on = tab.dataset.rankTab === id;
+      tab.setAttribute('aria-selected', String(on));
+      tab.tabIndex = on ? 0 : -1;
+      if (on && focus) tab.focus();
     });
-
-    root.querySelectorAll<HTMLAnchorElement>('[data-goto-tab]').forEach((a) => {
-      a.addEventListener('click', (e) => {
-        e.preventDefault();
-        select(a.dataset.gotoTab!);
-        history.replaceState(history.state, '', `#${a.dataset.gotoTab}`);
-        root.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      });
+    root.querySelectorAll<HTMLElement>('[data-rank-panel]').forEach((panel) => {
+      panel.hidden = panel.dataset.rankPanel !== id;
     });
+    history.replaceState(history.state, '', `#${id}`);
+  }
 
-    const hash = location.hash.slice(1);
-    if (hash && root.querySelector(`[data-rank-tab="${hash}"]`)) select(hash);
+  document.addEventListener('click', (e) => {
+    const target = e.target as HTMLElement | null;
+    const tab = target?.closest<HTMLElement>('[data-rank-tab]');
+    if (tab) return select(tab.dataset.rankTab!);
+    const goto = target?.closest<HTMLElement>('[data-goto-tab]');
+    if (goto) {
+      e.preventDefault();
+      select(goto.dataset.gotoTab!);
+    }
   });
+
+  document.addEventListener('keydown', (e) => {
+    const tab = (e.target as HTMLElement | null)?.closest<HTMLElement>('[data-rank-tab]');
+    const step = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
+    if (!tab || !step) return;
+    e.preventDefault();
+    const tabs = [...document.querySelectorAll<HTMLElement>('[data-rank-tab]')];
+    const next = tabs[(tabs.indexOf(tab) + step + tabs.length) % tabs.length];
+    select(next.dataset.rankTab!, true);
+  });
+
+  const fromHash = () => {
+    const hash = location.hash.slice(1);
+    if (hash) select(hash);
+  };
+  fromHash();
+  document.addEventListener('astro:page-load', fromHash);
 </script>

@@ -1,0 +1,10 @@
+---
+import AuthorDetail from '../../../views/AuthorDetail.astro';
+import { authorList } from '../../../lib/authors';
+
+export function getStaticPaths() {
+  return authorList.map((author) => ({ params: { author: author.key }, props: { author } }));
+}
+---
+
+<AuthorDetail author={Astro.props.author} />

@@ -1,0 +1,126 @@
+---
+import { localeFromPath, useTranslations } from '../lib/i18n';
+
+const lang = localeFromPath(Astro.url.pathname);
+const t = useTranslations(lang);
+---
+
+{/* Checks a package against the listing rules straight from the npm
+    registry (it allows cross-origin reads), and against the current index. */}
+<section class="rounded-xl border border-border bg-card p-5 shadow-xs" aria-labelledby="checker-title" data-checker>
+  <h2 id="checker-title" class="leading-none font-semibold">{t('checker.title')}</h2>
+  <p class="mt-1.5 text-sm text-muted-foreground">{t('checker.desc')}</p>
+
+  <form class="mt-4 flex gap-2" data-checker-form>
+    <label class="min-w-0 flex-1">
+      <span class="sr-only">{t('checker.label')}</span>
+      <input
+        name="pkg"
+        required
+        autocomplete="off"
+        spellcheck="false"
+        placeholder={t('checker.placeholder')}
+        class="h-10 w-full rounded-lg border border-input bg-background px-3 font-mono text-sm shadow-xs placeholder:font-sans placeholder:text-muted-foreground focus:border-ring focus:ring-3 focus:ring-ring/20 focus:outline-none"
+      />
+    </label>
+    <button
+      type="submit"
+      class="inline-flex h-10 shrink-0 items-center rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground shadow-xs transition-colors hover:bg-primary/90 disabled:opacity-50"
+    >
+      {t('checker.submit')}
+    </button>
+  </form>
+
+  <div class="mt-4 empty:hidden" data-checker-result aria-live="polite"></div>
+</section>
+
+<script>
+  import { localeFromPath, localePath, useTranslations } from '../lib/i18n';
+
+  type Tone = 'ok' | 'warn' | 'danger';
+  const ICON: Record<Tone, string> = {
+    ok: '<path d="M20 6 9 17l-5-5"/>',
+    warn: '<path d="M12 6v7"/><path d="M12 18h.01"/>',
+    danger: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+  };
+  const TONE: Record<Tone, string> = { ok: 'bg-ok-bg text-ok', warn: 'bg-warn-bg text-warn', danger: 'bg-danger-bg text-danger' };
+
+  const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+  const row = (tone: Tone, text: string) =>
+    `<li class="flex items-start gap-2.5 text-sm"><span class="mt-0.5 grid size-4 shrink-0 place-items-center rounded-full ${TONE[tone]}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="size-2.5" aria-hidden="true">${ICON[tone]}</svg></span><span>${esc(text)}</span></li>`;
+
+  type Listed = { n: string; s: string };
+  let index: Promise<Listed[]> | null = null;
+  const listed = (): Promise<Listed[]> =>
+    (index ??= fetch('/search-index.json')
+      .then((r) => (r.ok ? (r.json() as Promise<Listed[]>) : []))
+      .catch(() => []));
+
+  async function check(root: HTMLElement, name: string) {
+    const t = useTranslations(localeFromPath(location.pathname));
+    const out = root.querySelector<HTMLElement>('[data-checker-result]')!;
+    const button = root.querySelector<HTMLButtonElement>('button[type=submit]')!;
+    button.disabled = true;
+    out.innerHTML = `<p class="text-sm text-muted-foreground">${esc(t('checker.loading'))}</p>`;
+
+    try {
+      const res = await fetch(`https://registry.npmjs.org/${name.replace('/', '%2F')}`, { signal: AbortSignal.timeout(10_000) });
+      if (res.status === 404) {
+        out.innerHTML = `<p class="text-sm text-danger">${esc(t('checker.notFound', { name }))}</p>`;
+        return;
+      }
+      if (!res.ok) throw new Error(String(res.status));
+      const doc = await res.json();
+      const latest = doc['dist-tags']?.latest;
+      const pkg = doc.versions?.[latest] ?? {};
+      const keywords: string[] = (pkg.keywords ?? doc.keywords ?? []).map((k: string) => String(k).toLowerCase());
+      const repo = String(typeof pkg.repository === 'string' ? pkg.repository : (pkg.repository?.url ?? ''));
+      const license = typeof pkg.license === 'string' ? pkg.license : pkg.license?.type;
+      const deps = { ...pkg.dependencies, ...pkg.peerDependencies };
+      const versions = [
+        Object.keys(deps).some((d) => /^@opencode-ai\/(plugin|sdk)$/.test(d)) && 'V1',
+        Object.keys(deps).some((d) => /^@opencode\/(plugin|client|schema|sdk)$/.test(d)) && 'V2',
+      ].filter(Boolean);
+      const hasKeyword = keywords.includes('opencode-plugin');
+
+      const entry = (await listed()).find((p) => p.n === name);
+      const lang = localeFromPath(location.pathname);
+      const status = entry
+        ? `<p class="flex flex-wrap items-center gap-2 text-sm font-medium"><span class="rounded-md bg-ok-bg px-2 py-0.5 text-ok">${esc(t('checker.listed'))}</span><a class="underline underline-offset-4" href="${localePath(lang, `/plugins/${entry.s}`)}">${esc(t('checker.view'))} →</a></p>`
+        : `<p class="flex flex-wrap items-center gap-2 text-sm"><span class="rounded-md bg-secondary px-2 py-0.5 font-medium">${esc(t('checker.notListed'))}</span><span class="text-muted-foreground">${esc(t(hasKeyword ? 'checker.willList' : 'checker.wontList'))}</span></p>`;
+
+      const rows = [
+        row(hasKeyword ? 'ok' : 'danger', t(hasKeyword ? 'checker.keyword' : 'checker.noKeyword')),
+        row(pkg.description ? 'ok' : 'warn', t(pkg.description ? 'checker.description' : 'checker.noDescription')),
+        row(/github\.com/i.test(repo) ? 'ok' : 'warn', t(/github\.com/i.test(repo) ? 'checker.repo' : 'checker.noRepo')),
+        row(license ? 'ok' : 'warn', license ? t('checker.license', { license }) : t('checker.noLicense')),
+        row(versions.length ? 'ok' : 'warn', versions.length ? t('checker.sdk', { versions: versions.join(' + ') }) : t('checker.noSdk')),
+        ...(pkg.deprecated ? [row('danger', t('checker.deprecated'))] : []),
+      ];
+      const published = doc.time?.[latest]?.slice(0, 10);
+
+      out.innerHTML = `
+        <div class="space-y-3 border-t border-border pt-4">
+          ${status}
+          <ul class="space-y-2">${rows.join('')}</ul>
+          ${latest ? `<p class="text-xs text-muted-foreground">${esc(t('checker.version', { version: latest, date: published ?? '—' }))}</p>` : ''}
+        </div>`;
+    } catch {
+      out.innerHTML = `<p class="text-sm text-danger">${esc(t('checker.failed'))}</p>`;
+    } finally {
+      button.disabled = false;
+    }
+  }
+
+  // Delegated from `document`, so it survives soft navigation and dev hot
+  // reloads without rebinding. Capture phase: ClientRouter also listens for
+  // form submits and would otherwise turn this into a page navigation.
+  document.addEventListener('submit', (e) => {
+    const form = (e.target as HTMLElement | null)?.closest<HTMLFormElement>('[data-checker-form]');
+    const root = form?.closest<HTMLElement>('[data-checker]');
+    if (!form || !root) return;
+    e.preventDefault();
+    const name = String(new FormData(form).get('pkg') ?? '').trim().toLowerCase();
+    if (name) void check(root, name);
+  }, true);
+</script>

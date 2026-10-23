@@ -28,6 +28,8 @@ export interface Plugin {
   title: string;
   version: string | null;
   description: string | null;
+  /** Machine translation of `description` (zh-Hans), or null when absent/not needed. */
+  descriptionZh: string | null;
   keywords: string[];
   topics: string[];
   license: string | null;
@@ -59,6 +61,45 @@ export interface Plugin {
   score: number;
   health: HealthSignal[];
   healthLevel: HealthLevel;
+  /**
+   * OpenCode plugin API the latest release targets (see scripts/lib/compat.mjs).
+   * Optional: snapshots from before the field existed don't carry it.
+   */
+  opencode?: OpencodeTarget;
+  /** True when `opencode` is 'v1' only because the release predates V2. */
+  opencodeInferred?: boolean;
+}
+
+export type OpencodeTarget = 'v1' | 'v2' | 'both' | null;
+
+/** Whether a plugin is known to run on a given OpenCode major. */
+export function supports(p: Pick<Plugin, 'opencode'>, major: 'v1' | 'v2'): boolean {
+  return p.opencode === major || p.opencode === 'both';
+}
+
+/** Changelog and community data, one file per plugin (scripts/fetch-plugins.mjs → details/). */
+export interface PluginDetails {
+  /** npm versions, newest first. */
+  versions: { v: string; t: string }[];
+  releases: {
+    tag: string;
+    name: string | null;
+    date: string;
+    url: string;
+    prerelease: boolean;
+    body: string | null;
+  }[];
+  /** The repo's most-discussed issues, open or closed. */
+  issues: {
+    number: number;
+    title: string;
+    url: string;
+    state: 'open' | 'closed';
+    comments: number;
+    date: string;
+  }[];
+  /** The repo publishes several packages, so issues aren't all about this one. */
+  sharedRepo: boolean;
 }
 
 export interface Category {
@@ -167,9 +208,24 @@ const readmeModules = import.meta.glob<string>('../data/readme/*.md', {
   import: 'default',
 });
 
-export async function loadReadme(slug: string): Promise<string | null> {
-  const loader = readmeModules[`../data/readme/${slug}.md`];
+export async function loadReadme(slug: string, lang?: string): Promise<string | null> {
+  const loader = readmeModules[`../data/readme/${slug}${lang ? `@${lang}` : ''}.md`];
   return loader ? await loader() : null;
+}
+
+const detailModules = import.meta.glob<PluginDetails>('../data/details/*.json', { import: 'default' });
+
+export async function loadDetails(slug: string): Promise<PluginDetails | null> {
+  const loader = detailModules[`../data/details/${slug}.json`];
+  return loader ? await loader() : null;
+}
+
+/** Languages with a translated README on disk (`<slug>@<lang>.md`, written by the pipeline). */
+export function readmeLangs(slug: string): string[] {
+  const prefix = `../data/readme/${slug}@`;
+  return Object.keys(readmeModules)
+    .filter((k) => k.startsWith(prefix))
+    .map((k) => k.slice(prefix.length, -'.md'.length));
 }
 
 /** Minimal shape shipped to the client-side search island. */
@@ -178,6 +234,8 @@ export interface SearchDoc {
   name: string;
   title: string;
   description: string | null;
+  /** Only populated for the zh build — English pages don't ship it to the client. */
+  descriptionZh: string | null;
   owner: string | null;
   ownerAvatar: string | null;
   category: string;
@@ -193,6 +251,8 @@ export interface SearchDoc {
   featured: boolean;
   version: string | null;
   license: string | null;
+  opencode: OpencodeTarget;
+  opencodeInferred: boolean;
 }
 
 export const searchDocs: SearchDoc[] = plugins.map((p) => ({
@@ -200,6 +260,7 @@ export const searchDocs: SearchDoc[] = plugins.map((p) => ({
   name: p.name,
   title: p.title,
   description: p.description,
+  descriptionZh: p.descriptionZh ?? null,
   owner: p.owner,
   ownerAvatar: p.ownerAvatar,
   category: p.category,
@@ -215,4 +276,13 @@ export const searchDocs: SearchDoc[] = plugins.map((p) => ({
   featured: p.featured,
   version: p.version,
   license: p.license,
+  opencode: p.opencode ?? null,
+  opencodeInferred: p.opencodeInferred ?? false,
 }));
+
+const searchDocsEn: SearchDoc[] = searchDocs.map((d) => ({ ...d, descriptionZh: null }));
+
+/** Search docs for a locale: English pages skip the translated text entirely. */
+export function searchDocsFor(lang: Locale): SearchDoc[] {
+  return lang === 'zh' ? searchDocs : searchDocsEn;
+}

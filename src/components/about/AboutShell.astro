@@ -1,0 +1,95 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import PageHeader from '../PageHeader.astro';
+import { plugins, categories, generatedAt } from '../../lib/plugins';
+import { formatDate, formatNumber } from '../../lib/utils';
+import { localeFromPath } from '../../lib/i18n';
+
+/**
+ * Frame for the about page: header with live figures, a sticky contents
+ * list, and the hand-written sections (one card each) in the slot.
+ */
+interface Props {
+  meta: { title: string; description: string };
+  eyebrow: string;
+  title: string;
+  intro: string;
+  tocLabel: string;
+  sections: { id: string; title: string }[];
+  stats: { plugins: string; categories: string; snapshot: string; discounted: string };
+}
+const p = Astro.props;
+const lang = localeFromPath(Astro.url.pathname);
+const discounted = plugins.filter((x) => x.starsInherited).length;
+
+const figures = [
+  { label: p.stats.plugins, value: formatNumber(plugins.length) },
+  { label: p.stats.categories, value: formatNumber(categories.length) },
+  { label: p.stats.discounted, value: formatNumber(discounted) },
+  { label: p.stats.snapshot, value: formatDate(generatedAt, lang) },
+];
+---
+
+<Layout title={p.meta.title} description={p.meta.description}>
+  <PageHeader title={p.title} description={p.intro} eyebrow={p.eyebrow}>
+    <dl slot="aside" class="grid grid-cols-2 gap-3 lg:w-[26rem]">
+      {
+        figures.map((f) => (
+          <div class="rounded-xl border border-border bg-card p-4 shadow-xs">
+            <dt class="text-xs text-muted-foreground">{f.label}</dt>
+            <dd class="tabular mt-1.5 text-lg font-semibold tracking-tight">{f.value}</dd>
+          </div>
+        ))
+      }
+    </dl>
+  </PageHeader>
+
+  <div class="mx-auto grid max-w-6xl grid-cols-1 gap-8 px-4 pb-16 sm:px-6 lg:grid-cols-[13rem_minmax(0,1fr)]">
+    <nav aria-label={p.tocLabel} class="hidden lg:block">
+      <div class="sticky top-20">
+        <p class="px-2 text-xs font-medium text-muted-foreground">{p.tocLabel}</p>
+        <ol class="mt-2 space-y-0.5 text-sm" data-about-toc>
+          {
+            p.sections.map((s) => (
+              <li>
+                <a
+                  href={`#${s.id}`}
+                  data-toc={s.id}
+                  class="block rounded-md px-2 py-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground aria-[current=true]:bg-accent aria-[current=true]:font-medium aria-[current=true]:text-foreground"
+                >
+                  {s.title}
+                </a>
+              </li>
+            ))
+          }
+        </ol>
+      </div>
+    </nav>
+    <div class="min-w-0 space-y-6">
+      <slot />
+    </div>
+  </div>
+</Layout>
+
+<script>
+  // Highlights the section currently in view in the contents list.
+  document.addEventListener('astro:page-load', () => {
+    const links = new Map(
+      [...document.querySelectorAll<HTMLAnchorElement>('[data-about-toc] [data-toc]')].map((a) => [a.dataset.toc!, a]),
+    );
+    if (!links.size) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue;
+          links.forEach((a, id) => a.setAttribute('aria-current', String(id === entry.target.id)));
+        }
+      },
+      { rootMargin: '-20% 0px -70% 0px' },
+    );
+    links.forEach((_, id) => {
+      const el = document.getElementById(id);
+      if (el) io.observe(el);
+    });
+  });
+</script>

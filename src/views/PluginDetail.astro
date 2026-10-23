@@ -1,11 +1,16 @@
 ---
 import Layout from '../layouts/Layout.astro';
 import InstallSnippet from '../components/InstallSnippet.astro';
-import PluginCard from '../components/PluginCard.astro';
-import { plugins, related, categoryLabel, loadReadme, lampClass, type Plugin } from '../lib/plugins';
-import { renderReadme, readmeExcerpt } from '../lib/readme';
-import { avatarUrl, compactNumber, formatNumber, timeAgo, formatDate } from '../lib/utils';
-import { localeFromPath, localePath, useTranslations } from '../lib/i18n';
+import history from '../../data/history.json';
+import { plugins, rankings, byCategory, related, categoryLabel, loadReadme, readmeLangs, loadDetails, lampClass, generatedAt, type Plugin } from '../lib/plugins';
+import { renderReadme, readmeExcerpt, withHeadingIds, extractFaq, type TocEntry } from '../lib/readme';
+import Giscus from '../components/Giscus.astro';
+import { giscusEnabled } from '../lib/giscus';
+import { findReadmeVariants, guessLang, LANG_NAMES } from '../../scripts/lib/readme-langs.mjs';
+import { sparkline } from '../lib/trends';
+import { avatarUrl, compactNumber, formatNumber, timeAgo, formatDate, letterAvatar } from '../lib/utils';
+import { authorSlug } from '../lib/author-slug';
+import { isTranslated, localeFromPath, localePath, pluginDescription, useTranslations } from '../lib/i18n';
 
 interface Props {
   plugin: Plugin;
@@ -14,69 +19,187 @@ const { plugin: p } = Astro.props;
 
 const lang = localeFromPath(Astro.url.pathname);
 const t = useTranslations(lang);
+const href = (path: string) => localePath(lang, path);
 
 const markdown = p.hasReadme ? await loadReadme(p.slug) : null;
-const readmeHtml = markdown ? await renderReadme(markdown, { repoSlug: p.repoSlug }) : null;
 
+// The README in every language the repo translates it into and links from
+// the top ("English · 简体中文"). All are rendered, one shown: the switcher
+// and those links swap them in place instead of sending readers to GitHub.
+interface ReadmeVersion {
+  lang: string;
+  label: string;
+  path: string;
+  baseDir: string;
+  markdown: string;
+  html: string;
+  toc: TocEntry[];
+}
+const readmes: ReadmeVersion[] = [];
+if (markdown) {
+  const own = guessLang(markdown);
+  const onDisk = new Set(readmeLangs(p.slug));
+  const versions = [
+    { lang: own, path: 'README.md' },
+    ...findReadmeVariants(markdown, p.repoSlug).filter((v) => v.lang !== own && onDisk.has(v.lang)),
+  ];
+  const langLinks = new Map(versions.map((v) => [v.path.toLowerCase(), v.lang]));
+  for (const [i, v] of versions.entries()) {
+    const md = i === 0 ? markdown : await loadReadme(p.slug, v.lang);
+    if (!md) continue;
+    const baseDir = v.path.includes('/') ? v.path.slice(0, v.path.lastIndexOf('/')) : '';
+    const html = await renderReadme(md, { repoSlug: p.repoSlug, baseDir, langLinks: versions.length > 1 ? langLinks : undefined });
+    readmes.push({
+      lang: v.lang,
+      label: (LANG_NAMES as Record<string, string>)[v.lang] ?? v.lang,
+      path: v.path,
+      baseDir,
+      markdown: md,
+      ...withHeadingIds(html, i ? `${v.lang.toLowerCase()}-` : ''),
+    });
+  }
+}
+// Open on the reader's language when the repo has it.
+const readmeLang =
+  (lang === 'zh' ? readmes.find((r) => r.lang.startsWith('zh')) : readmes.find((r) => r.lang === 'en'))?.lang ?? readmes[0]?.lang;
+const tocLangs = readmes.filter((r) => r.toc.length >= 3).map((r) => r.lang);
+
+// --- Changelog --------------------------------------------------------------------
+// npm versions, newest first, each with the GitHub release notes tagged for it.
+const extra = await loadDetails(p.slug);
+const releaseFor = (v: string) =>
+  extra?.releases.find((r) => {
+    const tag = r.tag.toLowerCase();
+    return tag === v || tag === `v${v}` || tag.endsWith(`@${v}`) || tag.endsWith(`-v${v}`) || tag.endsWith(`/v${v}`);
+  });
+const changelogBase = extra
+  ? extra.versions.length
+    ? extra.versions.slice(0, 8).map((x) => ({ version: x.v, date: x.t, release: releaseFor(x.v) ?? null }))
+    : extra.releases.map((r) => ({ version: r.tag, date: r.date, release: r }))
+  : [];
+const changelog = await Promise.all(
+  changelogBase.map(async (c) => ({
+    ...c,
+    notes: c.release?.body ? await renderReadme(c.release.body, { repoSlug: p.repoSlug }) : null,
+  })),
+);
+const releasesIn90d = extra ? extra.versions.filter((x) => Date.parse(generatedAt) - Date.parse(x.t) <= 90 * 864e5).length : 0;
+
+// --- Community --------------------------------------------------------------------
+// FAQ from the README in the language shown first, then the hottest issues.
+const faqSource = readmes.find((r) => r.lang === readmeLang) ?? readmes[0];
+const faq = faqSource
+  ? await Promise.all(
+      extractFaq(faqSource.markdown).map(async (e) => ({
+        question: e.question,
+        answer: await renderReadme(e.answer, { repoSlug: p.repoSlug, baseDir: faqSource.baseDir }),
+      })),
+    )
+  : [];
+const issues = extra?.issues ?? [];
+const hasCommunity = faq.length > 0 || issues.length > 0 || Boolean(p.repoUrl) || giscusEnabled;
+
+// --- OpenCode compatibility ---------------------------------------------------------
+const compat = p.opencode ?? null;
+const compatTip = compat ? t(p.opencodeInferred ? 'compat.tip.inferred' : `compat.tip.${compat}`) : null;
+
+const translated = isTranslated(p, lang);
 const description =
+  pluginDescription(p, lang) ?? (markdown ? readmeExcerpt(markdown) : null) ?? t('plugin.fallbackDescription', { title: p.title });
+// Structured data points at the canonical (English) page, so it keeps the original text.
+const structuredDescription =
   p.description ?? (markdown ? readmeExcerpt(markdown) : null) ?? t('plugin.fallbackDescription', { title: p.title });
-const metaDescription = description.length > 160
-  ? `${description.slice(0, 157).trimEnd()}...`
-  : description;
+const metaDescription = description.length > 160 ? `${description.slice(0, 157).trimEnd()}...` : description;
 const duplicateTitle = plugins.some((candidate) => candidate.slug !== p.slug && candidate.title === p.title);
 const metaTitle = duplicateTitle ? `${p.title} (${p.name})` : p.title;
+const category = categoryLabel(p.category, lang);
 
-const siblings = related(p, 3);
+// --- Where it ranks -----------------------------------------------------------
+const overallRank = rankings.top.indexOf(p) + 1;
+const inCategory = byCategory(p.category);
+const categoryRank = inCategory.indexOf(p) + 1;
+const installsAbove = Math.round((plugins.filter((x) => x.downloadsMonth < p.downloadsMonth).length / plugins.length) * 100);
+
+// --- Star history -------------------------------------------------------------
+// Daily star counts the crawler keeps per package; only drawn when there is
+// more than one reading to draw between.
+const series = Object.entries((history as Record<string, Record<string, number>>)[p.name] ?? {})
+  .sort(([a], [b]) => a.localeCompare(b))
+  .map(([date, value]) => ({ date, value }));
+const hasTrend = series.length > 1;
+const trendDelta = hasTrend ? series[series.length - 1].value - series[0].value : 0;
+const trendDays = hasTrend ? Math.round((Date.parse(series[series.length - 1].date) - Date.parse(series[0].date)) / 864e5) : 0;
+// Chart against the range actually covered, so a 40k repo gaining 600
+// stars draws a slope rather than a flat line at the top.
+const trendMin = hasTrend ? Math.min(...series.map((s) => s.value)) : 0;
+const chart = hasTrend
+  ? sparkline(series.map((s) => ({ ...s, value: s.value - trendMin })), 600, 140, 6)
+  : null;
+
+// --- Health check ---------------------------------------------------------------
+// Measured from the snapshot, so a rebuild of old data doesn't age it.
+const idleDays = p.pushedAt ? Date.parse(generatedAt) - Date.parse(p.pushedAt) : null;
+const commitTone = idleDays === null ? 'danger' : idleDays <= 180 * 864e5 ? 'ok' : idleDays <= 365 * 864e5 ? 'warn' : 'danger';
+const checks: { tone: 'ok' | 'warn' | 'danger'; text: string }[] = [
+  {
+    tone: commitTone,
+    text: p.pushedAt ? t('plugin.check.commit', { ago: timeAgo(p.pushedAt, lang) }) : t('plugin.check.noCommit'),
+  },
+  // Archiving only means something when there is a repository to archive.
+  ...(p.repoUrl
+    ? [{ tone: p.archived ? 'danger' : 'ok', text: t(p.archived ? 'plugin.check.archived' : 'plugin.check.notArchived') } as const]
+    : []),
+  { tone: p.deprecated ? 'danger' : 'ok', text: t(p.deprecated ? 'plugin.check.deprecated' : 'plugin.check.notDeprecated') },
+  { tone: p.repoUrl ? 'ok' : 'warn', text: t(p.repoUrl ? 'plugin.check.repo' : 'plugin.check.noRepo') },
+  { tone: p.hasReadme ? 'ok' : 'warn', text: t(p.hasReadme ? 'plugin.check.readme' : 'plugin.check.noReadme') },
+  {
+    tone: p.license ? 'ok' : 'warn',
+    text: p.license ? t('plugin.check.license', { license: p.license }) : t('plugin.check.noLicense'),
+  },
+  // V1-only isn't broken, but V2 is where OpenCode is going.
+  p.opencode === 'v2' || p.opencode === 'both'
+    ? { tone: 'ok', text: t(`plugin.check.compat.${p.opencode}`) }
+    : p.opencode === 'v1'
+      ? { tone: 'warn', text: t(p.opencodeInferred ? 'plugin.check.compat.v1Inferred' : 'plugin.check.compat.v1') }
+      : { tone: 'warn', text: t('plugin.check.compat.unknown') },
+];
 
 const stats = [
   {
     label: t('plugin.stat.stars'),
     value: formatNumber(p.stars),
     sub: p.starsDelta30d > 0 ? t('plugin.stat.starsSub', { n: compactNumber(p.starsDelta30d) }) : null,
-    icon: 'star',
+    good: p.starsDelta30d > 0,
   },
   {
     label: t('plugin.stat.downloads'),
     value: formatNumber(p.downloadsMonth),
     sub: p.downloadsWeek > 0 ? t('plugin.stat.downloadsSub', { n: compactNumber(p.downloadsWeek) }) : null,
-    icon: 'download',
   },
-  {
-    label: t('plugin.stat.score'),
-    value: p.score.toFixed(1),
-    sub: t('plugin.stat.scoreSub'),
-    icon: 'score',
-  },
-  {
-    label: t('plugin.stat.updated'),
-    value: timeAgo(p.pushedAt, lang),
-    sub: formatDate(p.pushedAt, lang),
-    icon: 'clock',
-  },
+  { label: t('plugin.stat.score'), value: p.score.toFixed(1), sub: t('plugin.scoreRank', { n: overallRank }), bar: p.score },
+  { label: t('plugin.stat.updated'), value: timeAgo(p.pushedAt, lang), sub: formatDate(p.pushedAt, lang) },
 ];
 
-const meta: { label: string; value: string; href?: string; external?: boolean }[] = [
-  { label: t('plugin.meta.version'), value: p.version ?? '—' },
+const details: { label: string; value: string; href?: string; external?: boolean }[] = [
+  { label: t('plugin.meta.version'), value: p.version ? `v${p.version}` : '—' },
   { label: t('plugin.meta.license'), value: p.license ?? t('plugin.meta.licenseNone') },
-  {
-    label: t('plugin.meta.category'),
-    value: categoryLabel(p.category, lang),
-    href: localePath(lang, `/categories/${p.category}`),
-  },
+  { label: t('plugin.meta.category'), value: category, href: href(`/categories/${p.category}`) },
   { label: t('plugin.meta.created'), value: formatDate(p.createdAt, lang) },
   { label: t('plugin.meta.forks'), value: formatNumber(p.forks) },
   { label: t('plugin.meta.issues'), value: formatNumber(p.openIssues) },
+  // The author page, not GitHub: for packages without a repo `owner` is an npm publisher.
   ...(p.owner
-    ? [{ label: t('plugin.meta.owner'), value: p.owner, href: `https://github.com/${p.owner}`, external: true }]
+    ? [{ label: t('plugin.meta.owner'), value: p.owner, href: authorSlug(p.owner) ? href(`/authors/${authorSlug(p.owner)}`) : undefined, external: false }]
     : []),
 ];
 
-// Rich result eligibility for "<plugin name> opencode" searches.
+const alternatives = related(p, 6);
+
+// --- Structured data (rich results for "<plugin> opencode" searches) ----------
 const site = Astro.site ?? new URL('https://www.opendock.net');
 // Trailing slash to match the canonical URL — build.format is 'directory'.
 const abs = (path: string) => new URL(`${localePath(lang, path).replace(/\/$/, '')}/`, site).href;
 const canonicalPluginUrl = new URL(localePath('en', `/plugins/${p.slug}`), site).href;
-
 const jsonLd = {
   '@context': 'https://schema.org',
   '@graph': [
@@ -84,7 +207,7 @@ const jsonLd = {
       '@type': 'SoftwareApplication',
       name: p.title,
       alternateName: p.name,
-      description,
+      description: structuredDescription,
       url: canonicalPluginUrl,
       applicationCategory: 'DeveloperApplication',
       operatingSystem: 'Cross-platform',
@@ -103,17 +226,24 @@ const jsonLd = {
       itemListElement: [
         { '@type': 'ListItem', position: 1, name: t('plugin.home'), item: abs('/') },
         { '@type': 'ListItem', position: 2, name: t('plugin.allPlugins'), item: abs('/plugins') },
-        {
-          '@type': 'ListItem',
-          position: 3,
-          name: categoryLabel(p.category, lang),
-          item: abs(`/categories/${p.category}`),
-        },
+        { '@type': 'ListItem', position: 3, name: category, item: abs(`/categories/${p.category}`) },
         { '@type': 'ListItem', position: 4, name: p.title },
       ],
     },
   ],
 };
+
+const card = 'rounded-xl border border-border bg-card text-card-foreground shadow-xs';
+const tone = {
+  ok: 'text-ok',
+  warn: 'text-warn',
+  danger: 'text-danger',
+} as const;
+const healthBadge = {
+  ok: 'border-ok/25 bg-ok-bg text-ok',
+  warn: 'border-warn/25 bg-warn-bg text-warn',
+  danger: 'border-danger/25 bg-danger-bg text-danger',
+} as const;
 ---
 
 <Layout
@@ -124,365 +254,736 @@ const jsonLd = {
 >
   <script is:inline type="application/ld+json" slot="head" set:html={JSON.stringify(jsonLd)} />
 
-  <div class="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-12">
-    <!-- Breadcrumb Navigation -->
-    <nav class="mb-6 flex flex-wrap items-center gap-1.5 font-mono text-xs text-muted-foreground" aria-label={t('plugin.breadcrumbAria')}>
-      <a href={localePath(lang, '/')} class="transition-colors hover:text-foreground">{t('plugin.home')}</a>
-      <span class="text-border">/</span>
-      <a href={localePath(lang, '/plugins')} class="transition-colors hover:text-foreground">
-        {t('plugin.allPlugins')}
-      </a>
-      <span class="text-border">/</span>
-      <a href={localePath(lang, `/categories/${p.category}`)} class="transition-colors hover:text-foreground">
-        {categoryLabel(p.category, lang)}
-      </a>
-      <span class="text-border">/</span>
-      <span class="truncate text-foreground">{p.title}</span>
-    </nav>
+  <div class="relative isolate">
+    <div
+      aria-hidden="true"
+      class="pointer-events-none absolute inset-x-0 top-0 -z-10 h-80 bg-[linear-gradient(to_right,var(--border)_1px,transparent_1px),linear-gradient(to_bottom,var(--border)_1px,transparent_1px)] bg-[size:56px_56px] [mask-image:radial-gradient(ellipse_70%_100%_at_30%_0%,#000_30%,transparent_100%)]"
+    >
+    </div>
 
-    <!-- Header: flat identity block, separated from the body by a rule
-         instead of a boxed card. -->
-    <header class="border-b border-border/80 pb-8">
-      <div class="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
-        <div class="min-w-0 flex-1">
-          <div class="flex items-start gap-4">
-            <!-- Author avatar with health lamp -->
-            <div class="relative size-14 shrink-0">
-              <div class="size-full overflow-hidden rounded-lg border border-border/80 bg-secondary/50">
-                {
-                  p.ownerAvatar ? (
-                    <img
-                      src={avatarUrl(p.ownerAvatar, 56)}
-                      alt={p.owner ?? p.name}
-                      width="56"
-                      height="56"
-                      loading="eager"
-                      decoding="async"
-                      class="size-full object-cover"
-                    />
-                  ) : (
-                    <div class="flex size-full items-center justify-center font-mono text-lg font-medium text-foreground/70">
-                      {(p.owner ?? p.name).charAt(0).toUpperCase()}
-                    </div>
-                  )
-                }
-              </div>
-              <span
-                class:list={[
-                  'lamp absolute -top-1 -right-1 z-10 scale-125 ring-3 ring-background',
-                  lampClass[p.healthLevel],
-                ]}
-                title={t(`health.tip.${p.healthLevel}` as const)}
-              />
-            </div>
+    <div class="mx-auto max-w-6xl px-4 pt-8 pb-16 sm:px-6 sm:pt-10">
+      {/* ---- breadcrumb ---- */}
+      <nav aria-label={t('plugin.breadcrumbAria')}>
+        <ol class="flex flex-wrap items-center gap-1.5 text-sm text-muted-foreground">
+          <li><a href={href('/')} class="transition-colors hover:text-foreground">{t('plugin.home')}</a></li>
+          <li aria-hidden="true">/</li>
+          <li><a href={href('/plugins')} class="transition-colors hover:text-foreground">{t('plugin.allPlugins')}</a></li>
+          <li aria-hidden="true">/</li>
+          <li><a href={href(`/categories/${p.category}`)} class="transition-colors hover:text-foreground">{category}</a></li>
+          <li aria-hidden="true">/</li>
+          <li class="truncate text-foreground" aria-current="page">{p.title}</li>
+        </ol>
+      </nav>
 
-            <div class="min-w-0 flex-1">
-              <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                <h1 class="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
-                  {p.title}
-                </h1>
-                {
-                  p.featured && (
-                    <span class="font-mono text-[0.6875rem] font-medium uppercase tracking-wide text-amber-600 dark:text-amber-500">
-                      {t('common.featured')}
-                    </span>
-                  )
-                }
-              </div>
+      {/* ---- header ---- */}
+      <header class="mt-6 flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+        <div class="flex min-w-0 items-start gap-4 sm:gap-5">
+          <span class="relative size-16 shrink-0 sm:size-20">
+            <span class="block size-full overflow-hidden rounded-2xl border border-border bg-muted shadow-sm">
+              {
+                p.ownerAvatar ? (
+                  <img src={avatarUrl(p.ownerAvatar, 80)} alt="" width="80" height="80" loading="eager" decoding="async" class="size-full object-cover" />
+                ) : (
+                  <span class="grid size-full place-items-center text-2xl font-semibold text-white" style={`background:${letterAvatar(p.title).color}`}>{letterAvatar(p.title).letter}</span>
+                )
+              }
+            </span>
+            <span class:list={['lamp absolute -right-1 -bottom-1 scale-150 ring-2 ring-background', lampClass[p.healthLevel]]} aria-hidden="true"></span>
+          </span>
 
-              <!-- Package identity line: name, version, category — plain text
-                   separated by middots, no chips. -->
-              <div class="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-                <code class="font-mono text-foreground/80">{p.name}</code>
-                <button
-                  type="button"
-                  data-copy={p.name}
-                  class="inline-flex items-center rounded p-0.5 text-muted-foreground transition-colors hover:text-foreground"
-                  title={t('plugin.copyTitle')}
-                >
-                  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" class="size-3">
-                    <rect x="5.75" y="5.75" width="8.5" height="8.5" rx="1.5" />
-                    <path d="M10.25 3.75v-1a1.5 1.5 0 0 0-1.5-1.5h-5.5a1.5 1.5 0 0 0-1.5 1.5v5.5a1.5 1.5 0 0 0 1.5 1.5h1" />
-                  </svg>
-                  <span class="sr-only" data-copy-label>{t('plugin.copy')}</span>
-                </button>
-                {p.version && (
-                  <>
-                    <span class="text-border">·</span>
-                    <span class="font-mono">v{p.version}</span>
-                  </>
-                )}
-                <span class="text-border">·</span>
-                <a
-                  href={localePath(lang, `/categories/${p.category}`)}
-                  class="transition-colors hover:text-foreground"
-                >
-                  {categoryLabel(p.category, lang)}
-                </a>
-              </div>
-            </div>
-          </div>
-
-          <p class="mt-5 max-w-2xl text-sm leading-relaxed text-muted-foreground sm:text-base">
-            {description}
-          </p>
-
-          {
-            p.keywords.length > 0 && (
-              <div class="mt-4 flex flex-wrap gap-x-3 gap-y-1.5">
-                {p.keywords.slice(0, 6).map((k) => (
-                  <a
-                    href={localePath(lang, `/plugins?q=${encodeURIComponent(k)}`)}
-                    rel="nofollow"
-                    class="font-mono text-xs text-muted-foreground transition-colors hover:text-foreground"
+          <div class="min-w-0">
+            <div class="flex flex-wrap items-center gap-2">
+              <h1 class="text-2xl font-semibold tracking-tight sm:text-3xl">{p.title}</h1>
+              <span class:list={['inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-medium', healthBadge[p.healthLevel]]}>
+                <span class="size-1.5 rounded-full bg-current" aria-hidden="true"></span>
+                {t(`health.level.${p.healthLevel}`)}
+              </span>
+              {
+                compat && (
+                  <span
+                    title={compatTip ?? undefined}
+                    class:list={[
+                      'inline-flex items-center gap-1 rounded-md border px-2 py-0.5 font-mono text-xs font-medium',
+                      compat === 'v1' ? 'border-border text-muted-foreground' : 'border-sky-500/30 bg-sky-500/10 text-sky-700 dark:text-sky-400',
+                    ]}
                   >
-                    #{k}
-                  </a>
-                ))}
-              </div>
-            )
-          }
+                    {t('compat.badge', { v: t(`compat.${compat}`) })}
+                    {p.opencodeInferred && <span aria-hidden="true">*</span>}
+                  </span>
+                )
+              }
+              {
+                p.featured && (
+                  <span class="inline-flex items-center rounded-md bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-700 dark:text-amber-400">
+                    {t('common.featured')}
+                  </span>
+                )
+              }
+            </div>
+
+            <div class="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
+              <button
+                type="button"
+                data-copy={p.name}
+                title={t('plugin.copyTitle')}
+                class="group inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-2 py-0.5 font-mono text-xs text-foreground shadow-xs transition-colors hover:bg-accent"
+              >
+                {p.name}
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-3 text-muted-foreground" aria-hidden="true">
+                  <rect width="14" height="14" x="8" y="8" rx="2" />
+                  <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
+                </svg>
+                <span class="sr-only" data-copy-label>{t('plugin.copy')}</span>
+              </button>
+              {
+                p.owner &&
+                  (authorSlug(p.owner) ? (
+                    <a
+                      href={href(`/authors/${authorSlug(p.owner)}`)}
+                      aria-label={t('plugin.byOwnerAria', { owner: p.owner })}
+                      class="underline decoration-border underline-offset-4 transition-colors hover:text-foreground hover:decoration-foreground/50"
+                    >
+                      {t('plugin.byOwner', { owner: p.owner })}
+                    </a>
+                  ) : (
+                    <span>{t('plugin.byOwner', { owner: p.owner })}</span>
+                  ))
+              }
+              {p.version && <><span aria-hidden="true">·</span><span class="font-mono">v{p.version}</span></>}
+              {p.license && <><span aria-hidden="true">·</span><span>{p.license}</span></>}
+            </div>
+
+            <p class="mt-4 max-w-2xl text-base leading-7 text-foreground/80">{description}</p>
+            {
+              translated && (
+                <details class="group mt-2 max-w-2xl text-xs text-muted-foreground">
+                  <summary class="w-fit cursor-pointer list-none select-none marker:hidden [&::-webkit-details-marker]:hidden">
+                    {t('plugin.machineTranslated')} · <span class="underline underline-offset-2 group-open:no-underline">{t('plugin.viewOriginal')}</span>
+                  </summary>
+                  <p lang="en" class="mt-2 border-l border-border pl-3 leading-5">{p.description}</p>
+                </details>
+              )
+            }
+
+            {
+              p.keywords.length > 0 && (
+                <ul class="mt-4 flex flex-wrap gap-1.5">
+                  {p.keywords.slice(0, 8).map((k) => (
+                    <li>
+                      <a
+                        href={`${href('/plugins')}?q=${encodeURIComponent(k)}`}
+                        rel="nofollow"
+                        class="inline-flex rounded-md bg-secondary px-2 py-0.5 font-mono text-xs text-secondary-foreground transition-colors hover:bg-accent"
+                      >
+                        {k}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              )
+            }
+          </div>
         </div>
 
-        <!-- Actions -->
-        <div class="flex shrink-0 flex-wrap gap-2 lg:flex-col lg:items-stretch">
+        <div class="flex shrink-0 flex-wrap gap-2">
           {
             p.repoUrl && (
               <a
                 href={p.repoUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                class="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-foreground px-3.5 text-xs font-medium text-background transition-opacity hover:opacity-85"
+                class="inline-flex h-9 items-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow-xs transition-colors hover:bg-primary/90"
               >
                 <svg viewBox="0 0 16 16" fill="currentColor" class="size-4" aria-hidden="true">
                   <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z" />
                 </svg>
-                <span>{t('plugin.repo')}</span>
+                {t('plugin.repo')}
               </a>
             )
           }
-
           <a
             href={p.npmUrl}
             target="_blank"
             rel="noopener noreferrer"
-            class="inline-flex h-9 items-center justify-center gap-2 rounded-md border border-border/80 px-3.5 text-xs font-medium text-foreground transition-colors hover:bg-secondary"
+            class="inline-flex h-9 items-center gap-2 rounded-md border border-border bg-background px-4 text-sm font-medium shadow-xs transition-colors hover:bg-accent"
           >
-            {/* npm mark. The counter is knocked out by winding direction, so
-                this must stay a single path — splitting it fills the square. */}
+            {/* npm mark: one path, the counter is cut by winding direction. */}
             <svg viewBox="0 0 24 24" fill="currentColor" class="size-4 text-[#cb3837]" aria-hidden="true">
               <path d="M1.763 0C.786 0 0 .786 0 1.763v20.474C0 23.214.786 24 1.763 24h20.474c.977 0 1.763-.786 1.763-1.763V1.763C24 .786 23.214 0 22.237 0zM5.13 5.323l13.837.019-.009 13.836h-3.464l.01-10.382h-3.456L12.04 19.17H5.113z" />
             </svg>
-            <span>{t('plugin.npm')}</span>
+            {t('plugin.npm')}
           </a>
-
+          <button
+            type="button"
+            data-compare-toggle
+            data-slug={p.slug}
+            data-title={p.title}
+            data-label-off={t('compare.cta')}
+            data-label-on={t('compare.added')}
+            aria-pressed="false"
+            class="inline-flex h-9 items-center gap-2 rounded-md border border-border bg-background px-4 text-sm font-medium shadow-xs transition-colors hover:bg-accent aria-pressed:border-foreground aria-pressed:bg-foreground aria-pressed:text-background"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3" /><path d="M16 3h3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-3" /><path d="M12 20v2" /><path d="M12 14v2" /><path d="M12 8v2" /><path d="M12 2v2" /></svg>
+            <span data-compare-toggle-label>{t('compare.cta')}</span>
+          </button>
           {
             p.homepage && p.homepage !== p.repoUrl && (
               <a
                 href={p.homepage}
                 target="_blank"
                 rel="noopener noreferrer"
-                class="inline-flex h-9 items-center justify-center gap-2 rounded-md border border-border/80 px-3.5 text-xs font-medium text-foreground transition-colors hover:bg-secondary"
+                class="inline-flex h-9 items-center gap-2 rounded-md border border-border bg-background px-4 text-sm font-medium shadow-xs transition-colors hover:bg-accent"
               >
-                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" class="size-4">
-                  <circle cx="8" cy="8" r="6.25" />
-                  <path d="M1.75 8h12.5M8 1.75a10.5 10.5 0 0 1 2.5 6.25 10.5 10.5 0 0 1-2.5 6.25 10.5 10.5 0 0 1-2.5-6.25A10.5 10.5 0 0 1 8 1.75Z" />
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4" aria-hidden="true">
+                  <circle cx="12" cy="12" r="10" /><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20" /><path d="M2 12h20" />
                 </svg>
-                <span>{t('plugin.homepage')}</span>
+                {t('plugin.homepage')}
               </a>
             )
           }
         </div>
-      </div>
-    </header>
+      </header>
 
-    <!-- Stats Strip -->
-    <div class="mt-8 grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-border/80 bg-border/80 sm:grid-cols-4">
-      {
-        stats.map((s) => (
-          <div class="bg-card p-4 sm:p-5">
-            <div class="flex items-center gap-1.5 text-xs text-muted-foreground">
-              {s.icon === 'star' && (
-                <svg viewBox="0 0 16 16" fill="currentColor" class="size-3.5 text-amber-500" aria-hidden="true">
-                  <path d="M8 .25a.75.75 0 0 1 .673.418l1.882 3.815 4.21.612a.75.75 0 0 1 .416 1.279l-3.046 2.97.719 4.192a.75.75 0 0 1-1.088.791L8 12.347l-3.766 1.98a.75.75 0 0 1-1.088-.79l.72-4.194L.818 6.374a.75.75 0 0 1 .416-1.28l4.21-.611L7.327.668A.75.75 0 0 1 8 .25Z" />
-                </svg>
-              )}
-              {s.icon === 'download' && (
-                <svg viewBox="0 0 16 16" fill="currentColor" class="size-3.5" aria-hidden="true">
-                  <path d="M7.25 1.75a.75.75 0 0 1 1.5 0v6.44l2.22-2.22a.75.75 0 1 1 1.06 1.06l-3.5 3.5a.75.75 0 0 1-1.06 0l-3.5-3.5a.75.75 0 0 1 1.06-1.06l2.22 2.22V1.75ZM2.5 11a.75.75 0 0 1 .75.75v1.5h9.5v-1.5a.75.75 0 0 1 1.5 0v2.25a.75.75 0 0 1-.75-.75H2.5a.75.75 0 0 1-.75-.75v-2.25A.75.75 0 0 1 2.5 11Z" />
-                </svg>
-              )}
-              {s.icon === 'score' && (
-                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" class="size-3.5" aria-hidden="true">
-                  <path d="M2.5 13.5v-4M6.5 13.5v-7M10.5 13.5v-2.5M14.5 13.5v-9" stroke-linecap="round" />
-                </svg>
-              )}
-              {s.icon === 'clock' && (
-                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" class="size-3.5" aria-hidden="true">
-                  <circle cx="8" cy="8" r="6.25" />
-                  <path d="M8 4.25v3.75l2.5 1.5" stroke-linecap="round" stroke-linejoin="round" />
-                </svg>
-              )}
-              <span>{s.label}</span>
-            </div>
-            <p class="tabular mt-2 font-mono text-2xl font-medium tracking-tight text-foreground">
-              {s.value}
-            </p>
-            {s.sub && (
-              <p class="tabular mt-1 font-mono text-xs text-muted-foreground">
-                {s.sub}
-              </p>
-            )}
-          </div>
-        ))
-      }
-    </div>
-
-    <!-- Main Content & Sidebar Grid -->
-    <div class="mt-10 grid gap-10 lg:grid-cols-[minmax(0,1fr)_18rem]">
-      <!-- Main Content Column -->
-      <div class="min-w-0 space-y-10">
-        <!-- Installation Section -->
-        <section>
-          <div class="mb-4 flex items-center justify-between">
-            <h2 class="text-base font-medium tracking-tight text-foreground">{t('plugin.install')}</h2>
-            <span class="font-mono text-xs text-muted-foreground">opencode.json</span>
-          </div>
-          <InstallSnippet plugin={p} />
-          <p class="mt-3 text-xs leading-relaxed text-muted-foreground">
-            {t('plugin.installNote')}
-          </p>
-        </section>
-
-        <!-- Documentation Section -->
-        <section class="overflow-hidden rounded-lg border border-border/80 bg-card">
-          <div class="flex items-center justify-between border-b border-border/80 px-4 py-3 sm:px-6">
-            <span class="font-mono text-xs text-muted-foreground">README.md</span>
-
+      <div class="mt-10 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
+        {/* ================= main ================= */}
+        <div class="min-w-0 space-y-6">
+          {/* stats */}
+          <dl class="grid grid-cols-2 gap-4 md:grid-cols-4">
             {
-              p.repoUrl && (
-                <a
-                  href={p.repoUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  class="inline-flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
-                >
-                  <span>{t('plugin.readmeSource')}</span>
-                  <span>→</span>
-                </a>
-              )
-            }
-          </div>
-
-          <div class="p-6 sm:p-8">
-            {
-              readmeHtml ? (
-                <div class="prose-readme">
-                  <Fragment set:html={readmeHtml} />
-                </div>
-              ) : (
-                <div class="rounded-lg border border-dashed border-border/80 px-6 py-14 text-center">
-                  <div class="mx-auto grid size-12 place-items-center rounded-md bg-secondary text-muted-foreground">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="size-6">
-                      <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
-                    </svg>
-                  </div>
-                  <p class="mt-4 text-sm font-medium text-foreground">{t('plugin.noReadmeTitle')}</p>
-                  <p class="mx-auto mt-1.5 max-w-sm text-xs leading-relaxed text-muted-foreground">
-                    {t('plugin.noReadmeBody')}
-                  </p>
-                  {
-                    p.repoUrl && (
-                      <a
-                        href={p.repoUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        class="mt-5 inline-flex h-9 items-center gap-1.5 rounded-md border border-border px-4 text-xs font-medium text-foreground transition-colors hover:bg-secondary"
-                      >
-                        {t('plugin.noReadmeCta')}
-                      </a>
-                    )
-                  }
-                </div>
-              )
-            }
-          </div>
-        </section>
-      </div>
-
-      <!-- Sidebar: borderless sections separated by hairlines, mirroring the
-           /plugins filter rail. -->
-      <aside class="min-w-0 space-y-8 lg:sticky lg:top-20 lg:self-start">
-        <!-- Properties -->
-        <section>
-          <h2 class="meta text-muted-foreground">{t('plugin.properties')}</h2>
-          <dl class="mt-4 divide-y divide-border/60 border-y border-border/60 text-xs">
-            {
-              meta.map((m) => (
-                <div class="flex items-center justify-between gap-3 py-2.5">
-                  <dt class="shrink-0 text-muted-foreground">{m.label}</dt>
-                  <dd class="tabular truncate font-mono font-medium text-foreground">
-                    {m.href ? (
-                      <a
-                        href={m.href}
-                        target={m.external ? '_blank' : undefined}
-                        rel={m.external ? 'noopener noreferrer' : undefined}
-                        class="underline decoration-border underline-offset-4 transition-colors hover:decoration-foreground"
-                      >
-                        {m.value}
-                      </a>
-                    ) : (
-                      m.value
-                    )}
-                  </dd>
+              stats.map((s) => (
+                <div class={`${card} p-5`}>
+                  <dt class="text-sm text-muted-foreground">{s.label}</dt>
+                  <dd class="tabular mt-2 text-2xl font-semibold tracking-tight">{s.value}</dd>
+                  {s.bar !== undefined && (
+                    <dd class="mt-2 h-1.5 overflow-hidden rounded-full bg-muted" aria-hidden="true">
+                      <span class="block h-full rounded-full bg-foreground/80" style={`width:${Math.min(100, s.bar)}%`} />
+                    </dd>
+                  )}
+                  {s.sub && <dd class:list={['mt-1.5 text-xs', s.good ? 'font-medium text-ok' : 'text-muted-foreground']}>{s.sub}</dd>}
                 </div>
               ))
             }
           </dl>
-        </section>
 
-        <!-- Health -->
-        <section>
-          <div class="flex items-center justify-between">
-            <h2 class="meta text-muted-foreground">{t('plugin.healthTitle')}</h2>
-            <span class:list={['lamp', lampClass[p.healthLevel]]} title={t(`health.tip.${p.healthLevel}` as const)} />
-          </div>
+          {/* star history */}
+          {
+            chart && (
+              <section class={`${card} p-6`} aria-labelledby="trend-title">
+                <div class="flex flex-wrap items-baseline justify-between gap-2">
+                  <h2 id="trend-title" class="leading-none font-semibold">{t('plugin.trendTitle')}</h2>
+                  <p class:list={['text-sm', trendDelta > 0 ? 'font-medium text-ok' : 'text-muted-foreground']}>
+                    {trendDelta > 0
+                      ? t('plugin.trendDelta', { n: formatNumber(trendDelta), days: trendDays })
+                      : t('plugin.trendFlat', { days: trendDays })}
+                  </p>
+                </div>
+                <svg viewBox="0 0 600 140" preserveAspectRatio="none" class="mt-5 h-36 w-full text-foreground" role="img" aria-label={t('plugin.trendTitle')}>
+                  <defs>
+                    <linearGradient id="trend-fill" x1="0" x2="0" y1="0" y2="1">
+                      <stop offset="0" stop-color="currentColor" stop-opacity="0.16" />
+                      <stop offset="1" stop-color="currentColor" stop-opacity="0" />
+                    </linearGradient>
+                  </defs>
+                  {[0.25, 0.5, 0.75].map((y) => (
+                    <line x1="0" x2="600" y1={140 * y} y2={140 * y} class="stroke-border" stroke-dasharray="3 4" vector-effect="non-scaling-stroke" />
+                  ))}
+                  <path d={chart.area} fill="url(#trend-fill)" />
+                  <path d={chart.line} fill="none" stroke="currentColor" stroke-width="2" vector-effect="non-scaling-stroke" />
+                </svg>
+                <div class="tabular mt-2 flex justify-between text-xs text-muted-foreground">
+                  <span>{series[0].date} · {formatNumber(series[0].value)}</span>
+                  <span>{series[series.length - 1].date} · {formatNumber(series[series.length - 1].value)}</span>
+                </div>
+              </section>
+            )
+          }
 
-          <p class="mt-3 text-sm font-medium text-foreground">
-            {t(`health.level.${p.healthLevel}` as const)}
-          </p>
-          <p class="mt-1 text-xs leading-relaxed text-muted-foreground">
-            {t(`health.tip.${p.healthLevel}` as const)}
-          </p>
+          {/* README */}
+          <section id="readme" class={`${card} scroll-mt-20`} aria-label="README">
+            <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-border px-6 py-3">
+              <span class="flex items-center gap-2 text-sm font-medium">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4 text-muted-foreground" aria-hidden="true">
+                  <path d="M12 7v14" /><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z" />
+                </svg>
+                README
+              </span>
+              {
+                readmes.length > 1 && (
+                  <div
+                    role="tablist"
+                    aria-label={t('plugin.readmeLang')}
+                    data-readme-tabs
+                    class="scrollbar-none order-last inline-flex h-8 w-full max-w-full items-center overflow-x-auto rounded-lg bg-muted p-[3px] text-muted-foreground sm:order-none sm:w-auto"
+                  >
+                    {readmes.map((r) => (
+                      <button
+                        type="button"
+                        role="tab"
+                        lang={r.lang}
+                        data-readme-lang={r.lang}
+                        aria-selected={r.lang === readmeLang ? 'true' : 'false'}
+                        tabindex={r.lang === readmeLang ? 0 : -1}
+                        class="inline-flex h-full shrink-0 items-center rounded-md px-2.5 text-xs font-medium whitespace-nowrap transition-[color,box-shadow] hover:text-foreground aria-selected:bg-background aria-selected:text-foreground aria-selected:shadow-sm"
+                      >
+                        {r.label}
+                      </button>
+                    ))}
+                  </div>
+                )
+              }
+              {
+                p.repoUrl &&
+                  (readmes.length > 1 ? (
+                    readmes.map((r) => (
+                      <a
+                        href={`${p.repoUrl}/blob/HEAD/${r.path}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        data-readme-for={r.lang}
+                        hidden={r.lang !== readmeLang}
+                        class="text-sm text-muted-foreground transition-colors hover:text-foreground"
+                      >
+                        {t('plugin.readmeSource')} <span aria-hidden="true">↗</span>
+                      </a>
+                    ))
+                  ) : (
+                    <a href={p.repoUrl} target="_blank" rel="noopener noreferrer" class="text-sm text-muted-foreground transition-colors hover:text-foreground">
+                      {t('plugin.readmeSource')} <span aria-hidden="true">↗</span>
+                    </a>
+                  ))
+              }
+            </div>
+            <div class="px-6 py-6 sm:px-8 sm:py-8">
+              {
+                readmes.length ? (
+                  readmes.map((r) => (
+                    <div class="prose-readme" lang={r.lang} data-readme-for={r.lang} hidden={r.lang !== readmeLang}>
+                      <Fragment set:html={r.html} />
+                    </div>
+                  ))
+                ) : (
+                  <div class="rounded-lg border border-dashed border-border px-6 py-14 text-center">
+                    <p class="font-medium">{t('plugin.noReadmeTitle')}</p>
+                    <p class="mx-auto mt-1.5 max-w-sm text-sm text-muted-foreground">{t('plugin.noReadmeBody')}</p>
+                    {p.repoUrl && (
+                      <a
+                        href={p.repoUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="mt-5 inline-flex h-9 items-center rounded-md border border-border bg-background px-4 text-sm font-medium shadow-xs transition-colors hover:bg-accent"
+                      >
+                        {t('plugin.noReadmeCta')}
+                      </a>
+                    )}
+                  </div>
+                )
+              }
+            </div>
+          </section>
 
-          <ul class="mt-4 space-y-2 border-t border-border/60 pt-4">
-            {
-              p.health.map((h) => (
-                <li class="flex items-center gap-2 text-xs text-muted-foreground">
-                  <span class:list={['size-1.5 rounded-full', h.level === 'ok' ? 'bg-ok' : h.level === 'warn' ? 'bg-warn' : 'bg-danger']} />
-                  <span>{t(`health.${h.id}` as const)}</span>
+          {/* changelog */}
+          {
+            changelog.length > 0 && (
+              <section class={card} aria-labelledby="changelog-title">
+                <div class="flex flex-wrap items-start justify-between gap-3 border-b border-border px-6 py-4">
+                  <div>
+                    <h2 id="changelog-title" class="leading-none font-semibold">{t('plugin.changelog')}</h2>
+                    <p class="mt-1.5 text-xs text-muted-foreground">{t('plugin.changelogDesc')}</p>
+                  </div>
+                  <span
+                    class:list={[
+                      'inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 text-xs whitespace-nowrap',
+                      releasesIn90d > 0 ? 'border-ok/30 bg-ok-bg text-ok' : 'border-border text-muted-foreground',
+                    ]}
+                  >
+                    <span class="size-1.5 rounded-full bg-current" aria-hidden="true"></span>
+                    {releasesIn90d > 0 ? t('plugin.changelogCadence', { n: releasesIn90d }) : t('plugin.changelogQuiet')}
+                  </span>
+                </div>
+                <ol class="px-6 py-5">
+                  {changelog.map((c, i) => (
+                    <li class="relative pb-6 pl-7 last:pb-0">
+                      {i < changelog.length - 1 && <span class="absolute top-4 bottom-0 left-[5px] w-px bg-border" aria-hidden="true" />}
+                      <span
+                        class:list={[
+                          'absolute top-1.5 left-0 size-[11px] rounded-full border-2',
+                          i === 0 ? 'border-foreground bg-foreground' : 'border-border bg-card',
+                        ]}
+                        aria-hidden="true"
+                      />
+                      <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
+                        <span class="font-mono text-sm font-medium">{c.version}</span>
+                        {i === 0 && (
+                          <span class="rounded-md bg-primary px-1.5 py-px text-[0.6875rem] font-medium text-primary-foreground">{t('plugin.changelogLatest')}</span>
+                        )}
+                        {c.release?.prerelease && (
+                          <span class="rounded-md border border-border px-1.5 py-px text-[0.6875rem] text-muted-foreground">{t('plugin.changelogPre')}</span>
+                        )}
+                        {c.release?.name && <span class="min-w-0 truncate text-sm text-muted-foreground">{c.release.name}</span>}
+                        <time datetime={c.date} title={c.date.slice(0, 10)} class="tabular ml-auto text-xs whitespace-nowrap text-muted-foreground">
+                          {timeAgo(c.date, lang)}
+                        </time>
+                      </div>
+                      {c.notes && (
+                        <details class="group mt-2" open={i === 0}>
+                          <summary class="inline-flex cursor-pointer list-none items-center gap-1 text-xs text-muted-foreground transition-colors select-none hover:text-foreground [&::-webkit-details-marker]:hidden">
+                            {t('plugin.changelogNotes')}
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-3.5 shrink-0 transition-transform group-open:rotate-180" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
+                          </summary>
+                          <div class="prose-readme prose-compact mt-2 max-h-96 overflow-y-auto rounded-lg border border-border bg-muted/30 px-4 py-3">
+                            <Fragment set:html={c.notes} />
+                          </div>
+                        </details>
+                      )}
+                    </li>
+                  ))}
+                </ol>
+                <div class="flex flex-wrap gap-x-5 gap-y-2 border-t border-border px-6 py-3 text-sm">
+                  {p.repoUrl && (
+                    <a href={`${p.repoUrl}/releases`} target="_blank" rel="noopener noreferrer" class="text-muted-foreground transition-colors hover:text-foreground">
+                      {t('plugin.changelogAll')} <span aria-hidden="true">↗</span>
+                    </a>
+                  )}
+                  <a href={`${p.npmUrl}?activeTab=versions`} target="_blank" rel="noopener noreferrer" class="text-muted-foreground transition-colors hover:text-foreground">
+                    {t('plugin.changelogNpm')} <span aria-hidden="true">↗</span>
+                  </a>
+                </div>
+              </section>
+            )
+          }
+
+          {/* community */}
+          {
+            hasCommunity && (
+              <section id="community" class={`${card} scroll-mt-20`} aria-labelledby="community-title">
+                <div class="flex flex-wrap items-start justify-between gap-3 border-b border-border px-6 py-4">
+                  <div>
+                    <h2 id="community-title" class="leading-none font-semibold">{t('plugin.community')}</h2>
+                    <p class="mt-1.5 text-xs text-muted-foreground">{t('plugin.communityDesc')}</p>
+                  </div>
+                  {p.repoUrl && (
+                    <div class="flex flex-wrap gap-2">
+                      <a
+                        href={`${p.repoUrl}/issues/new`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="inline-flex h-8 items-center rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground shadow-xs transition-colors hover:bg-primary/90"
+                      >
+                        {t('plugin.askQuestion')}
+                      </a>
+                      <a
+                        href={`${p.repoUrl}/issues`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="inline-flex h-8 items-center rounded-md border border-border bg-background px-3 text-xs font-medium shadow-xs transition-colors hover:bg-accent"
+                      >
+                        {t('plugin.allIssues')} <span aria-hidden="true" class="ml-1">↗</span>
+                      </a>
+                    </div>
+                  )}
+                </div>
+                <div class="space-y-7 px-6 py-5">
+                  {faq.length > 0 && (
+                    <div>
+                      <h3 class="text-sm font-medium">{t('plugin.faq')}</h3>
+                      <div class="mt-3 divide-y divide-border overflow-hidden rounded-lg border border-border" lang={faqSource?.lang}>
+                        {faq.map((f) => (
+                          <details class="group">
+                            <summary class="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-medium transition-colors hover:bg-accent/50 [&::-webkit-details-marker]:hidden">
+                              <span class="min-w-0">{f.question}</span>
+                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-3.5 shrink-0 transition-transform group-open:rotate-180" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
+                            </summary>
+                            <div class="prose-readme prose-compact px-4 pb-4">
+                              <Fragment set:html={f.answer} />
+                            </div>
+                          </details>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {issues.length > 0 && (
+                    <div>
+                      <h3 class="text-sm font-medium">{t('plugin.issues')}</h3>
+                      {extra?.sharedRepo && <p class="mt-1 text-xs text-muted-foreground">{t('plugin.issuesShared')}</p>}
+                      <ul class="mt-3 divide-y divide-border overflow-hidden rounded-lg border border-border">
+                        {issues.map((i) => (
+                          <li>
+                            <a href={i.url} target="_blank" rel="noopener noreferrer" class="flex items-start gap-3 px-4 py-3 transition-colors hover:bg-accent/50">
+                              {i.state === 'open' ? (
+                                <svg viewBox="0 0 16 16" fill="currentColor" class="mt-0.5 size-4 shrink-0 text-ok" aria-label={t('plugin.issueOpen')}><path d="M8 9.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z" /><path d="M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0ZM1.5 8a6.5 6.5 0 1 0 13 0 6.5 6.5 0 0 0-13 0Z" /></svg>
+                              ) : (
+                                <svg viewBox="0 0 16 16" fill="currentColor" class="mt-0.5 size-4 shrink-0 text-violet-600 dark:text-violet-400" aria-label={t('plugin.issueClosed')}><path d="M11.28 6.78a.75.75 0 0 0-1.06-1.06L7.25 8.69 5.78 7.22a.75.75 0 0 0-1.06 1.06l2 2a.75.75 0 0 0 1.06 0l3.5-3.5Z" /><path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0Zm-1.5 0a6.5 6.5 0 1 0-13 0 6.5 6.5 0 0 0 13 0Z" /></svg>
+                              )}
+                              <span class="min-w-0 flex-1">
+                                <span class="line-clamp-2 text-sm">{i.title}</span>
+                                <span class="mt-0.5 block text-xs text-muted-foreground">
+                                  #{i.number} · {t(i.state === 'open' ? 'plugin.issueOpen' : 'plugin.issueClosed')} · {timeAgo(i.date, lang)}
+                                </span>
+                              </span>
+                              <span class="tabular inline-flex shrink-0 items-center gap-1 text-xs text-muted-foreground" title={t('plugin.issueComments', { n: i.comments })}>
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-3.5" aria-hidden="true"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z" /></svg>
+                                {i.comments}
+                              </span>
+                            </a>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {faq.length === 0 && issues.length === 0 && !giscusEnabled && (
+                    <p class="text-sm text-muted-foreground">{t('plugin.communityEmpty')}</p>
+                  )}
+
+                  {giscusEnabled && (
+                    <div>
+                      <h3 class="text-sm font-medium">{t('plugin.comments')}</h3>
+                      <p class="mt-1 text-xs text-muted-foreground">{t('plugin.commentsDesc')}</p>
+                      <div class="mt-4">
+                        <Giscus term={p.slug} />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </section>
+            )
+          }
+        </div>
+
+        {/* ================= sidebar ================= */}
+        <aside class="min-w-0 space-y-6">
+          <section class={`${card} p-5`} aria-labelledby="install-title">
+            <h2 id="install-title" class="leading-none font-semibold">{t('plugin.install')}</h2>
+            <p class="mt-1.5 mb-4 text-xs leading-5 text-muted-foreground">{t('plugin.installNote')}</p>
+            <InstallSnippet plugin={p} />
+            <a
+              href={href('/config-check')}
+              class="mt-3 inline-flex items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-3.5" aria-hidden="true"><path d="M9 11l3 3L22 4" /><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" /></svg>
+              {t('plugin.checkConfig')} <span aria-hidden="true">→</span>
+            </a>
+          </section>
+
+          <section class={`${card} p-5`} aria-labelledby="checks-title">
+            <h2 id="checks-title" class="leading-none font-semibold">{t('plugin.checksTitle')}</h2>
+            <p class="mt-1.5 text-xs text-muted-foreground">{t('plugin.checksDesc')}</p>
+            <ul class="mt-4 space-y-2.5">
+              {
+                checks.map((c) => (
+                  <li class="flex items-start gap-2.5 text-sm">
+                    <span class:list={['mt-0.5 grid size-4 shrink-0 place-items-center rounded-full', c.tone === 'ok' ? 'bg-ok-bg' : c.tone === 'warn' ? 'bg-warn-bg' : 'bg-danger-bg', tone[c.tone]]}>
+                      {c.tone === 'ok' ? (
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="size-2.5" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg>
+                      ) : (
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" class="size-2.5" aria-hidden="true"><path d="M12 6v7" /><path d="M12 18h.01" /></svg>
+                      )}
+                    </span>
+                    <span class:list={[c.tone === 'ok' ? 'text-foreground/80' : tone[c.tone]]}>{c.text}</span>
+                  </li>
+                ))
+              }
+            </ul>
+          </section>
+
+          <section class={`${card} p-5`} aria-labelledby="rank-title">
+            <h2 id="rank-title" class="leading-none font-semibold">{t('plugin.rankTitle')}</h2>
+            <dl class="mt-4 space-y-4 text-sm">
+              {
+                [
+                  { label: t('plugin.rank.overall'), value: t('plugin.rank.of', { n: overallRank, total: formatNumber(plugins.length) }), pct: 100 - (overallRank / plugins.length) * 100 },
+                  { label: t('plugin.rank.category', { category }), value: t('plugin.rank.of', { n: categoryRank, total: formatNumber(inCategory.length) }), pct: 100 - (categoryRank / inCategory.length) * 100 },
+                  { label: t('plugin.rank.installs'), value: t('plugin.rank.installsValue', { pct: installsAbove }), pct: installsAbove },
+                ].map((r) => (
+                  <div>
+                    <div class="flex items-baseline justify-between gap-3">
+                      <dt class="truncate text-muted-foreground">{r.label}</dt>
+                      <dd class="tabular shrink-0 font-medium">{r.value}</dd>
+                    </div>
+                    <dd class="mt-1.5 h-1.5 overflow-hidden rounded-full bg-muted" aria-hidden="true">
+                      <span class="block h-full rounded-full bg-foreground/80" style={`width:${Math.max(2, r.pct)}%`} />
+                    </dd>
+                  </div>
+                ))
+              }
+            </dl>
+          </section>
+
+          <section class={`${card} p-5`} aria-labelledby="details-title">
+            <h2 id="details-title" class="leading-none font-semibold">{t('plugin.properties')}</h2>
+            <dl class="mt-4 divide-y divide-border text-sm">
+              {
+                details.map((d) => (
+                  <div class="flex items-center justify-between gap-3 py-2 first:pt-0 last:pb-0">
+                    <dt class="shrink-0 text-muted-foreground">{d.label}</dt>
+                    <dd class="tabular truncate font-medium">
+                      {d.href ? (
+                        <a
+                          href={d.href}
+                          target={d.external ? '_blank' : undefined}
+                          rel={d.external ? 'noopener noreferrer' : undefined}
+                          class="underline decoration-border underline-offset-4 transition-colors hover:decoration-foreground"
+                        >
+                          {d.value}
+                        </a>
+                      ) : (
+                        d.value
+                      )}
+                    </dd>
+                  </div>
+                ))
+              }
+            </dl>
+          </section>
+
+          {
+            tocLangs.length > 0 && (
+              <nav
+                class={`${card} p-5 lg:sticky lg:top-20 lg:max-h-[calc(100dvh-6rem)] lg:overflow-y-auto`}
+                aria-labelledby="toc-title"
+                data-readme-toc={tocLangs.join(' ')}
+                hidden={!tocLangs.includes(readmeLang!)}
+              >
+                <h2 id="toc-title" class="leading-none font-semibold">{t('plugin.toc')}</h2>
+                {readmes.filter((r) => tocLangs.includes(r.lang)).map((r) => (
+                <ol class="mt-3 space-y-0.5 text-sm" lang={r.lang} data-readme-for={r.lang} hidden={r.lang !== readmeLang}>
+                  {r.toc.map((h) => (
+                    <li>
+                      <a
+                        href={`#${h.id}`}
+                        class:list={[
+                          'block truncate rounded-md py-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground',
+                          h.level === 2 ? 'px-2' : 'pr-2 pl-5 text-xs',
+                        ]}
+                      >
+                        {h.text}
+                      </a>
+                    </li>
+                  ))}
+                </ol>
+                ))}
+              </nav>
+            )
+          }
+        </aside>
+      </div>
+
+      {/* ---- alternatives ---- */}
+      {
+        alternatives.length > 0 && (
+          <section class="mt-14" aria-labelledby="alt-title">
+            <div class="flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <h2 id="alt-title" class="text-2xl font-semibold tracking-tight">{t('plugin.altTitle')}</h2>
+                <p class="mt-1.5 text-sm text-muted-foreground">{t('plugin.altDesc')}</p>
+              </div>
+              <div class="flex flex-wrap gap-2">
+                <a
+                  href={href(`/compare?p=${[p, ...alternatives.slice(0, 3)].map((a) => a.slug).join(',')}`)}
+                  class="inline-flex h-9 items-center gap-1.5 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow-xs transition-colors hover:bg-primary/90"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3" /><path d="M16 3h3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-3" /><path d="M12 20v2" /><path d="M12 14v2" /><path d="M12 8v2" /><path d="M12 2v2" /></svg>
+                  {t('plugin.compareCta')}
+                </a>
+                <a
+                  href={href(`/categories/${p.category}`)}
+                  class="inline-flex h-9 items-center rounded-md border border-border bg-background px-4 text-sm font-medium shadow-xs transition-colors hover:bg-accent"
+                >
+                  {category} <span aria-hidden="true" class="ml-1">→</span>
+                </a>
+              </div>
+            </div>
+            <ul class="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {alternatives.map((a) => (
+                <li>
+                  <a
+                    href={href(`/plugins/${a.slug}`)}
+                    class={`${card} group flex h-full flex-col p-5 transition-[border-color,box-shadow,transform] hover:-translate-y-0.5 hover:border-foreground/20 hover:shadow-md motion-reduce:hover:translate-y-0`}
+                  >
+                    <div class="flex items-start gap-3">
+                      <span class="relative size-9 shrink-0">
+                        <span class="block size-full overflow-hidden rounded-lg border border-border bg-muted">
+                          {a.ownerAvatar ? (
+                            <img src={avatarUrl(a.ownerAvatar, 36)} alt="" width="36" height="36" loading="lazy" decoding="async" class="size-full object-cover" />
+                          ) : (
+                            <span class="grid size-full place-items-center text-xs font-medium text-white" style={`background:${letterAvatar(a.title).color}`}>{letterAvatar(a.title).letter}</span>
+                          )}
+                        </span>
+                        <span class:list={['lamp absolute -right-0.5 -bottom-0.5 ring-2 ring-card', lampClass[a.healthLevel]]} aria-hidden="true" />
+                      </span>
+                      <span class="min-w-0">
+                        <span class="block truncate text-sm font-semibold">{a.title}</span>
+                        <span class="block truncate text-xs text-muted-foreground">{categoryLabel(a.category, lang)}</span>
+                      </span>
+                    </div>
+                    <p class="mt-3 line-clamp-2 min-h-10 text-sm leading-5 text-muted-foreground">{pluginDescription(a, lang) ?? t('common.noDescription')}</p>
+                    {/* Each figure next to this plugin's own, so the comparison reads at a glance. */}
+                    <dl class="mt-4 grid grid-cols-3 gap-3 border-t border-border pt-4 text-xs">
+                      {[
+                        { label: t('explorer.col.stars'), mine: p.stars, theirs: a.stars },
+                        { label: t('explorer.col.downloads'), mine: p.downloadsMonth, theirs: a.downloadsMonth },
+                        { label: t('explorer.col.score'), mine: p.score, theirs: a.score },
+                      ].map((m) => (
+                        <div class="min-w-0">
+                          <dt class="text-muted-foreground">{m.label}</dt>
+                          <dd class="tabular mt-0.5 flex items-center gap-1 text-sm font-semibold">
+                            {m.label === t('explorer.col.score') ? m.theirs.toFixed(0) : compactNumber(m.theirs)}
+                            {m.theirs !== m.mine && (
+                              <span class:list={['text-[0.6875rem]', m.theirs > m.mine ? 'text-ok' : 'text-muted-foreground']} aria-hidden="true">
+                                {m.theirs > m.mine ? '▲' : '▼'}
+                              </span>
+                            )}
+                          </dd>
+                        </div>
+                      ))}
+                    </dl>
+                  </a>
                 </li>
-              ))
-            }
-          </ul>
-        </section>
-
-      </aside>
+              ))}
+            </ul>
+          </section>
+        )
+      }
     </div>
-
-    <!-- Related Plugins: full-width grid below the fold instead of squeezing
-         cards into the sticky rail. -->
-    {
-      siblings.length > 0 && (
-        <section class="mt-14 border-t border-border/80 pt-10">
-          <h2 class="meta text-muted-foreground">{t('plugin.related')}</h2>
-          <div class="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {siblings.map((s) => (
-              <PluginCard plugin={s} />
-            ))}
-          </div>
-        </section>
-      )
-    }
   </div>
 </Layout>
+
+<script>
+  // README language switch. The tabs and the README's own language links
+  // ("English · 简体中文") both carry data-readme-lang. Delegated from
+  // `document`, so it works however this page was reached.
+  function show(lang: string) {
+    document.querySelectorAll<HTMLElement>('[data-readme-for]').forEach((el) => {
+      el.hidden = el.dataset.readmeFor !== lang;
+    });
+    document.querySelectorAll<HTMLElement>('[data-readme-tabs] [data-readme-lang]').forEach((tab) => {
+      const on = tab.dataset.readmeLang === lang;
+      tab.setAttribute('aria-selected', String(on));
+      tab.tabIndex = on ? 0 : -1;
+    });
+    const toc = document.querySelector<HTMLElement>('[data-readme-toc]');
+    if (toc) toc.hidden = !toc.dataset.readmeToc!.split(' ').includes(lang);
+  }
+
+  document.addEventListener('click', (e) => {
+    const link = (e.target as HTMLElement | null)?.closest<HTMLElement>('[data-readme-lang]');
+    if (!link) return;
+    e.preventDefault();
+    show(link.dataset.readmeLang!);
+    // A link inside the README may sit far down; bring the new top into view.
+    const top = document.getElementById('readme');
+    if (!link.closest('[data-readme-tabs]') && top && top.getBoundingClientRect().top < 0) top.scrollIntoView();
+  });
+
+  document.addEventListener('keydown', (e) => {
+    const tab = (e.target as HTMLElement | null)?.closest<HTMLElement>('[data-readme-tabs] [data-readme-lang]');
+    const step = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
+    if (!tab || !step) return;
+    e.preventDefault();
+    const tabs = [...tab.parentElement!.querySelectorAll<HTMLElement>('[data-readme-lang]')];
+    const next = tabs[(tabs.indexOf(tab) + step + tabs.length) % tabs.length];
+    show(next.dataset.readmeLang!);
+    next.focus();
+  });
+</script>

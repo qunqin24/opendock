@@ -1,109 +1,54 @@
 ---
-import Layout from '../layouts/Layout.astro';
+import Submit from '../views/Submit.astro';
 
-const steps = [
-  {
-    n: '01',
-    title: 'Publish to npm',
-    body: 'The plugin has to be a public npm package. Private packages, and repositories that only exist on GitHub, cannot be discovered automatically.',
-  },
-  {
-    n: '02',
-    title: 'Add the opencode-plugin keyword',
-    body: 'Put opencode-plugin in the keywords array of your package.json. That is the only listing requirement, and the entry point for the whole crawler.',
-    code: `{
+const code = (s: string) => `<code class="rounded bg-muted px-[0.3rem] py-[0.2rem] font-mono text-[0.8125rem] font-medium text-foreground">${s}</code>`;
+---
+
+<Submit
+  meta={{
+    title: 'Submit your OpenCode plugin',
+    description:
+      'OpenDock indexes every npm package tagged opencode-plugin automatically. The listing requirements, the metadata that matters, a checker for your package, and how to get something corrected.',
+  }}
+  eyebrow="For plugin authors"
+  title="Submit a plugin"
+  intro={`Good news: <strong class="font-medium text-foreground">there is nothing to submit.</strong> Publish to npm with the right keyword and you are listed the next day. Use the checker to see how your package will look before the crawl gets to it.`}
+  stepsTitle="How listing works"
+  steps={[
+    {
+      title: 'Publish to npm',
+      body: 'The plugin has to be a public npm package. Private packages, and repositories that only exist on GitHub, cannot be discovered automatically.',
+    },
+    {
+      title: 'Add the opencode-plugin keyword',
+      body: 'Put opencode-plugin in the keywords array of your package.json. That is the only listing requirement, and the entry point for the whole crawler.',
+      code: `{
   "name": "opencode-your-plugin",
   "description": "One line on the problem it solves",
   "keywords": ["opencode", "opencode-plugin"],
   "repository": "github:you/your-plugin",
   "license": "MIT"
 }`,
-  },
-  {
-    n: '03',
-    title: 'Fill in the metadata',
-    body: 'Description, repository, licence, README \u2014 those four decide your health badges and your search ranking. Each one missing adds a warning flag.',
-  },
-  {
-    n: '04',
-    title: 'Wait a day',
-    body: 'The crawl runs once daily. Your plugin appears the day after you publish. No pull request, no form.',
-  },
-];
----
-
-<Layout
-  title="Submit your OpenCode plugin"
-  description="OpenDock indexes every npm package tagged opencode-plugin automatically. The listing requirements, the metadata that matters, and how to get something corrected."
->
-  <div class="mx-auto max-w-3xl px-4 py-10 sm:px-6 sm:py-14">
-    <header class="mb-10">
-      <h1 class="text-3xl font-semibold tracking-tight sm:text-4xl">Submit a plugin</h1>
-      <p class="mt-3 text-base leading-7 text-muted-foreground">
-        Good news: <strong class="text-foreground">there is nothing to submit.</strong>
-        Publish to npm with the right keyword and you are listed the next day.
-      </p>
-    </header>
-
-    <ol class="space-y-8">
-      {
-        steps.map((s) => (
-          <li class="flex gap-5">
-            <span class="tabular mt-0.5 shrink-0 text-sm font-semibold text-muted-foreground">{s.n}</span>
-            <div class="min-w-0 flex-1">
-              <h2 class="text-base font-semibold tracking-tight">{s.title}</h2>
-              <p class="mt-1.5 text-sm leading-6 text-muted-foreground">{s.body}</p>
-              {s.code && (
-                <div class="mt-3 overflow-hidden rounded-lg border border-border bg-card">
-                  <div class="flex items-center justify-between border-b border-border bg-secondary/50 px-4 py-1.5">
-                    <span class="font-mono text-[0.6875rem] text-muted-foreground">package.json</span>
-                    <button
-                      type="button"
-                      data-copy={s.code}
-                      class="rounded px-2 py-0.5 text-xs text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-                    >
-                      <span data-copy-label>Copy</span>
-                    </button>
-                  </div>
-                  <pre class="overflow-x-auto px-4 py-3 font-mono text-[0.8125rem] leading-6"><code>{s.code}</code></pre>
-                </div>
-              )}
-            </div>
-          </li>
-        ))
-      }
-    </ol>
-
-    <section class="mt-14 rounded-xl border border-border bg-card p-6">
-      <h2 class="text-base font-semibold tracking-tight">Wrong data? Wrong category?</h2>
-      <p class="mt-2 text-sm leading-6 text-muted-foreground">
-        Automatic categorisation gets things wrong, and star counts read high for packages living inside a monorepo.
-        Both are fixable through a manual override layer \u2014 open an issue with the package name and what should change.
-      </p>
-      <div class="mt-5 flex flex-wrap gap-2">
-        <a
-          href="https://github.com/qunqin24/opendock/issues/new?template=data-correction.yml"
-          target="_blank"
-          rel="noopener noreferrer"
-          class="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90"
-        >
-          Open a correction issue
-        </a>
-        <a
-          href="/about/"
-          class="rounded-lg border border-border bg-card px-4 py-2 text-sm font-medium transition-colors hover:bg-secondary"
-        >
-          How ranking works
-        </a>
-      </div>
-    </section>
-
-    <section class="mt-8 rounded-xl border border-dashed border-border p-6">
-      <h2 class="text-base font-semibold tracking-tight">Want to be removed?</h2>
-      <p class="mt-2 text-sm leading-6 text-muted-foreground">
-        Drop the <code class="rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-xs">opencode-plugin</code>
-        keyword from your package.json, or open an issue asking to be blocklisted. Either way the next crawl removes it.
-      </p>
-    </section>
-  </div>
-</Layout>
+    },
+    {
+      title: 'Fill in the metadata',
+      body: 'Description, repository, licence and README decide your health badges and how well search finds you. Each one missing adds a warning flag.',
+    },
+    {
+      title: 'Wait a day',
+      body: 'The crawl runs once daily. Your plugin appears the day after you publish. No pull request, no form.',
+    },
+  ]}
+  copyLabel="Copy"
+  correction={{
+    title: 'Wrong data? Wrong category?',
+    body: 'Automatic categorisation gets things wrong, and star counts read high for packages living inside a monorepo. Both are fixable through a manual override layer: open an issue with the package name and what should change.',
+    cta: 'Open a correction issue',
+    secondary: 'How ranking works',
+    secondaryHref: '/about/',
+  }}
+  removal={{
+    title: 'Want to be removed?',
+    body: `Drop the ${code('opencode-plugin')} keyword from your package.json, or open an issue asking to be blocklisted. Either way the next crawl removes it.`,
+  }}
+/>

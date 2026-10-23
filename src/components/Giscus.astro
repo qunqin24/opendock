@@ -1,0 +1,78 @@
+---
+import { giscus } from '../lib/giscus';
+import { localeFromPath } from '../lib/i18n';
+
+interface Props {
+  /** Discussion key. The plugin slug, so the English and Chinese pages share one thread. */
+  term: string;
+}
+const { term } = Astro.props;
+const lang = localeFromPath(Astro.url.pathname);
+---
+
+<div
+  data-giscus
+  data-repo={giscus.repo}
+  data-repo-id={giscus.repoId}
+  data-category={giscus.category}
+  data-category-id={giscus.categoryId}
+  data-term={term}
+  data-lang={lang === 'zh' ? 'zh-CN' : 'en'}
+  class="min-h-40"
+>
+</div>
+
+<script>
+  // giscus is a third-party iframe, so it loads only when its slot scrolls
+  // near the viewport, and follows the site's own light/dark toggle rather
+  // than the OS setting.
+  const theme = () => (document.documentElement.classList.contains('dark') ? 'dark' : 'light');
+
+  function mount(el: HTMLElement) {
+    if (el.dataset.mounted) return;
+    el.dataset.mounted = '1';
+    const s = document.createElement('script');
+    s.src = 'https://giscus.app/client.js';
+    s.async = true;
+    s.crossOrigin = 'anonymous';
+    const attrs: Record<string, string> = {
+      'data-repo': el.dataset.repo!,
+      'data-repo-id': el.dataset.repoId!,
+      'data-category': el.dataset.category!,
+      'data-category-id': el.dataset.categoryId!,
+      'data-mapping': 'specific',
+      'data-term': el.dataset.term!,
+      'data-strict': '1',
+      'data-reactions-enabled': '1',
+      'data-emit-metadata': '0',
+      'data-input-position': 'top',
+      'data-theme': theme(),
+      'data-lang': el.dataset.lang!,
+      'data-loading': 'lazy',
+    };
+    for (const [k, v] of Object.entries(attrs)) s.setAttribute(k, v);
+    el.append(s);
+  }
+
+  function init() {
+    const el = document.querySelector<HTMLElement>('[data-giscus]');
+    if (!el) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) {
+          io.disconnect();
+          mount(el);
+        }
+      },
+      { rootMargin: '600px' },
+    );
+    io.observe(el);
+  }
+
+  new MutationObserver(() => {
+    const frame = document.querySelector<HTMLIFrameElement>('iframe.giscus-frame');
+    frame?.contentWindow?.postMessage({ giscus: { setConfig: { theme: theme() } } }, 'https://giscus.app');
+  }).observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+
+  document.addEventListener('astro:page-load', init);
+</script>

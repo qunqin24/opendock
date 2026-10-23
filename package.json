@@ -14,12 +14,15 @@
     "astro": "astro",
     "data": "node scripts/fetch-plugins.mjs",
     "data:dev": "node scripts/fetch-plugins.mjs --limit 120",
+    "translate": "node scripts/translate-plugins.mjs",
     "check": "astro check",
     "test": "node --test scripts/test/*.test.mjs"
   },
   "dependencies": {
     "@astrojs/react": "^6.0.2",
     "@astrojs/sitemap": "^3.7.3",
+    "@fontsource-variable/geist": "^5.3.0",
+    "@fontsource-variable/geist-mono": "^5.3.0",
     "@tailwindcss/vite": "^4.3.3",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
