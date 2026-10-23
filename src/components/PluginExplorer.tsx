@@ -6,7 +6,6 @@ import { avatarUrl, cn, compactNumber, formatNumber, letterAvatar, timeAgo } fro
 import { DEFAULT_LOCALE, localePath, pluginDescription, useTranslations, type Locale } from '../lib/i18n';
 import { categoryIcons } from '../lib/icons';
 import { authorSlug } from '../lib/author-slug';
-import { getCompare, onCompareChange, toggleCompare } from '../lib/compare-store';
 
 /**
  * The plugin table: faceted filters on the left, a sortable table on the
@@ -90,13 +89,6 @@ export default function PluginExplorer({
   const [updated, setUpdated] = useState<UpdatedId>('any');
   const [minStars, setMinStars] = useState<MinStarsId>('any');
   const [compat, setCompat] = useState<CompatId>('any');
-  // Slugs in the compare tray, kept in step with other islands and tabs.
-  const [compared, setCompared] = useState<Set<string>>(new Set());
-  useEffect(() => {
-    const sync = () => setCompared(new Set(getCompare().map((x) => x.s)));
-    sync();
-    return onCompareChange(sync);
-  }, []);
   const [sort, setSort] = useState<SortId>(initialSort);
   const [dir, setDir] = useState<Dir>('desc');
   const [visible, setVisible] = useState(PAGE_SIZE);
@@ -600,7 +592,6 @@ export default function PluginExplorer({
                   categoryLabel={hasCategories ? categoryLabels.get(d.category) : undefined}
                   installsWidth={(Math.log10(d.downloadsMonth + 1) / maxInstalls) * 100}
                   lang={lang}
-                  compared={compared.has(d.slug)}
                 />
               </li>
             ))}
@@ -825,14 +816,12 @@ function PluginCard({
   categoryLabel,
   installsWidth,
   lang,
-  compared,
 }: {
   doc: SearchDoc;
   rank: number;
   categoryLabel?: string;
   installsWidth: number;
   lang: Locale;
-  compared: boolean;
 }) {
   const t = useTranslations(lang);
   const owner = authorSlug(d.owner);
@@ -872,25 +861,7 @@ function PluginCard({
             )}
           </p>
         </div>
-        <span className="flex shrink-0 items-center gap-1">
-          {/* Shown on hover (always on touch screens) and whenever it's on. */}
-          <button
-            type="button"
-            aria-pressed={compared}
-            onClick={() => toggleCompare({ s: d.slug, t: d.title })}
-            title={t(compared ? 'compare.added' : 'compare.cta')}
-            className={cn(
-              'relative z-10 inline-flex h-6 items-center gap-1 rounded-md border px-1.5 text-[0.6875rem] font-medium transition-[opacity,color,background-color] focus-visible:opacity-100',
-              compared
-                ? 'border-foreground bg-foreground text-background'
-                : 'border-border bg-background text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-foreground [@media(hover:none)]:opacity-100',
-            )}
-          >
-            <Icon path={compared ? CHECK_ICON : COMPARE_ICON} className="size-3" />
-            {t('compare.cta')}
-          </button>
-          <span className="tabular rounded-md bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground">#{rank}</span>
-        </span>
+        <span className="tabular shrink-0 rounded-md bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground">#{rank}</span>
       </div>
 
       <p className="mt-3 line-clamp-2 min-h-10 text-sm leading-5 text-muted-foreground">
@@ -999,7 +970,6 @@ function FeaturedBadge({ lang }: { lang: Locale }) {
 const SEARCH_ICON = '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>';
 const X_ICON = '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>';
 const CHECK_ICON = '<path d="M20 6 9 17l-5-5"/>';
-const COMPARE_ICON = '<path d="M8 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3"/><path d="M16 3h3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-3"/><path d="M12 20v2"/><path d="M12 14v2"/><path d="M12 8v2"/><path d="M12 2v2"/>';
 const CLOCK_ICON = '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>';
 const CHEVRON_ICON = '<path d="m6 9 6 6 6-6"/>';
 const SORT_ICON = '<path d="m7 15 5 5 5-5"/><path d="m7 9 5-5 5 5"/>';

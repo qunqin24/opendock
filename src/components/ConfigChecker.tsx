@@ -96,7 +96,7 @@ export default function ConfigChecker({ lang }: { lang: Locale }) {
       // Storage blocked: start empty.
     }
     restored.current = true;
-    fetch(lang === 'zh' ? '/zh/facts.json' : '/facts.json')
+    fetch('/facts.json')
       .then((r) => r.json())
       .then((data: Fact[]) => setFacts(new Map(data.map((f) => [f.n, f]))))
       .catch(() => setFacts(new Map()));
@@ -269,7 +269,7 @@ export default function ConfigChecker({ lang }: { lang: Locale }) {
                 onClick={() => setText('')}
                 className="rounded-md px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
               >
-                {t('compare.clear')}
+                {t('config.clear')}
               </button>
             )}
           </div>
@@ -387,7 +387,7 @@ export default function ConfigChecker({ lang }: { lang: Locale }) {
                     onClick={copyFixed}
                     className="inline-flex h-8 shrink-0 items-center rounded-md border border-border bg-background px-3 text-xs font-medium shadow-xs transition-colors hover:bg-accent"
                   >
-                    {copied ? t('compare.copied') : t('config.copy')}
+                    {copied ? t('config.copied') : t('config.copy')}
                   </button>
                 </div>
                 <pre className="overflow-x-auto px-4 py-3 font-mono text-xs leading-5">{fixed}</pre>

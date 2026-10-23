@@ -413,19 +413,6 @@ const healthBadge = {
             </svg>
             {t('plugin.npm')}
           </a>
-          <button
-            type="button"
-            data-compare-toggle
-            data-slug={p.slug}
-            data-title={p.title}
-            data-label-off={t('compare.cta')}
-            data-label-on={t('compare.added')}
-            aria-pressed="false"
-            class="inline-flex h-9 items-center gap-2 rounded-md border border-border bg-background px-4 text-sm font-medium shadow-xs transition-colors hover:bg-accent aria-pressed:border-foreground aria-pressed:bg-foreground aria-pressed:text-background"
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3" /><path d="M16 3h3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-3" /><path d="M12 20v2" /><path d="M12 14v2" /><path d="M12 8v2" /><path d="M12 2v2" /></svg>
-            <span data-compare-toggle-label>{t('compare.cta')}</span>
-          </button>
           {
             p.homepage && p.homepage !== p.repoUrl && (
               <a
@@ -878,21 +865,12 @@ const healthBadge = {
                 <h2 id="alt-title" class="text-2xl font-semibold tracking-tight">{t('plugin.altTitle')}</h2>
                 <p class="mt-1.5 text-sm text-muted-foreground">{t('plugin.altDesc')}</p>
               </div>
-              <div class="flex flex-wrap gap-2">
-                <a
-                  href={href(`/compare?p=${[p, ...alternatives.slice(0, 3)].map((a) => a.slug).join(',')}`)}
-                  class="inline-flex h-9 items-center gap-1.5 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow-xs transition-colors hover:bg-primary/90"
-                >
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3" /><path d="M16 3h3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-3" /><path d="M12 20v2" /><path d="M12 14v2" /><path d="M12 8v2" /><path d="M12 2v2" /></svg>
-                  {t('plugin.compareCta')}
-                </a>
-                <a
-                  href={href(`/categories/${p.category}`)}
-                  class="inline-flex h-9 items-center rounded-md border border-border bg-background px-4 text-sm font-medium shadow-xs transition-colors hover:bg-accent"
-                >
-                  {category} <span aria-hidden="true" class="ml-1">→</span>
-                </a>
-              </div>
+              <a
+                href={href(`/categories/${p.category}`)}
+                class="inline-flex h-9 items-center rounded-md border border-border bg-background px-4 text-sm font-medium shadow-xs transition-colors hover:bg-accent"
+              >
+                {category} <span aria-hidden="true" class="ml-1">→</span>
+              </a>
             </div>
             <ul class="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {alternatives.map((a) => (
