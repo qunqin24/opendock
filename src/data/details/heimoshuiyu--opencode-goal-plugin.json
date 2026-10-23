@@ -1,0 +1,1 @@
+{"versions":[{"v":"1.0.0","t":"2026-06-06T07:08:16.905Z"}],"releases":[],"issues":[{"number":1,"title":"Bug: goal 工具全局注册 — LLM 自主创建 goal 导致无限循环，用户无感知","url":"https://github.com/heimoshuiyu/opencode-goal-plugin/issues/1","state":"open","comments":1,"date":"2026-07-03T10:05:28Z"}],"sharedRepo":false}

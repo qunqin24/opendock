@@ -17,23 +17,28 @@ Published on npm as `@nxxxsooo/opencode-annotate`. It replaces `opencode-plannot
 
 ```text
 /annotate                         Review the last completed assistant reply
-/annotate 2                       Review the second most recent reply
-/annotate 3                       Review the third most recent reply
 /annotate docs/plan.md            Review a Markdown document
 /annotate "docs/release plan.md"  Review a path containing spaces
 /annotate ~/Documents/notes.txt   Review a plain-text document
-/annotate page.html              Review the specified local HTML in Chrome
-/annotate https://example.com    Review the specified webpage
-/annotate web                    Open this session for browser pairing
-/annotate web off                Revoke this session's browser pairing
+/annotate-pick                    Choose a recent reply or mid-turn progress update
+/annotate-selection               Review the message containing your last transcript selection
+/annotate-web                     Open this session for browser pairing
+/annotate-web page.html           Review the specified local HTML in Chrome
+/annotate-web https://example.com Review the specified webpage
+/annotate-web off                 Revoke this session's browser pairing
 ```
 
 `/annotate-last` always reviews the latest completed reply; any supplied argument is ignored.
 
+Progress updates written during a long tool run are not replies, so `/annotate` skips them.
+Reach them with `/annotate-pick`, or drag over text in the transcript and run
+`/annotate-selection`: the plugin opens the reply or progress update containing that text,
+or just the selected text when it spans messages. Numbered `/annotate N` is retired.
+
 ## Install
 
 Requires **OpenCode 2.0.22+** and a separately installed `plannotator-tui` on your PATH.
-Tested with OpenCode 2.1.1 and Plannotator TUI 0.9.4 on macOS; unit tests also run on
+Tested with OpenCode 2.1.2 and Plannotator TUI 0.9.4 on macOS; unit tests also run on
 Linux. Windows terminal handoff has not been verified.
 
 Install the upstream TUI on macOS or Linux:
@@ -64,6 +69,20 @@ Manual configuration, preserving other entries:
 }
 ```
 
+### Match OpenCode's colors (fork required)
+
+Set `"inheritTheme": true` in the plugin's `options`, alongside `binary`. It requires
+the extended color-capable Plannotator fork
+([nxxxsooo/plannotator-tui](https://github.com/nxxxsooo/plannotator-tui), branch
+`feat/layout`); upstream 0.9.4 does not support it. The same fork adds `[ui].doc_width`
+to cap the text column on wide terminals. See [TUI theme integration](docs/tui-theme.md).
+
+Each review uses OpenCode's current resolved colors for the canvas, text, Markdown,
+borders, highlights, cursor and selection. The plugin asks the chosen binary for its
+effective configuration, copies it into that review's private directory, and validates
+the themed copy before taking over the terminal. Your original settings stay intact.
+Launchers must honor an existing `PLANNOTATOR_TUI_CONFIG`.
+
 ## Browser review (optional)
 
 Requirements: macOS and Chrome 116+, plus Node 22+ for the native host.
@@ -75,28 +94,40 @@ Requirements: macOS and Chrome 116+, plus Node 22+ for the native host.
    opens no HTTP port.
 3. Reopen the OpenCode terminal client; the shared service needs no restart.
 
-Run `/annotate web` in a target session, then open the Chrome extension. A sole live
-session is shown automatically; with several sessions, choose one once. **Change**
-opens the optional session selector. The target title is always visible, with its directory
-available on hover. A sole target is only preselected: no binding or model turn occurs until
+Run `/annotate-web` in a target session, then open the Chrome extension. A sole live
+session is shown automatically; with several sessions, choose one once. Click the
+destination beside **To** to change or refresh it. Its title stays visible beside Send,
+including while disconnected, with its directory available on hover and in the chooser.
+A sole target is only preselected: no binding or model turn occurs until
 the user clicks **Send & continue**. A disconnected destination never silently switches to another session.
 
-Pick an element or select text, write feedback, then click **Send & continue**. It saves
-the current feedback and sends it in one action; **Save note** remains available for batching.
-This sends pending notes to that captured
+Choose **Pick element** or select text, then write a comment or question. The composer
+appears for that selection. **Send N notes & continue** saves the current feedback and
+sends pending notes in one action; **Add note** collects feedback locally for a batch.
+Cmd/Ctrl+Enter adds a note or saves an edit. This sends pending notes to that captured
 session and starts a normal model turn; pairing and saving notes make no model call.
-Switching terminal tabs never changes the paired target. Revoke with `/annotate web off`.
+Switching terminal tabs never changes the paired target. Revoke with `/annotate-web off`.
+
+The numbered queue matches the page markers. Click a note's quoted target to show it
+on the page without activating the element; **Edit** changes the feedback, and **Undo**
+restores a deleted note. The delivery bar shows the pending count, destination, and sent
+state. **More review options** contains Markdown copy, JSON export, and a preview of
+all saved notes.
 
 ### Explicit routing
 
-No argument or a reply number always means TUI. Markdown/plain text files also use TUI.
-Only explicit `.html`/`.htm` paths, HTTP/HTTPS URLs, HTML file URLs, or `web` enter the browser
-workflow. A reply containing HTML links or code fences does not change the default.
+`/annotate`, `/annotate-pick` and `/annotate-selection` always use the TUI; Markdown and
+plain-text files do too. Only `/annotate-web` enters the browser workflow; passing a URL or
+HTML file to `/annotate` points you there. A reply containing HTML links or code fences does
+not change the default.
 
 ### Browser safeguards and limitations
 
-Saved notes survive reloads and are isolated by URL, including SPA routes. Per-note revision
-checks prevent stale tabs overwriting newer feedback. Full JSON/Markdown exports include
+Written drafts autosave locally and restore after panel reload or a return to the same URL,
+including SPA routes. Selecting another target with unfinished feedback offers **Add/Save
+& switch**, **Keep editing**, or **Discard & switch**. Storage failures keep the input and
+offer a retry; competing panels require an explicit choice of draft. Saved-note revision
+checks likewise prevent stale tabs overwriting newer feedback. Full JSON/Markdown exports include
 redacted URLs, exact selected text/context, verified selector hints, styles and accessibility.
 Missing/changed/ambiguous targets are labeled in the sidebar instead of silently rebound.
 Comments and drafts live in extension-owned UI/storage; the page receives only selection
@@ -104,8 +135,10 @@ metadata and numbered markers, not your written feedback.
 
 Native delivery requires an open, paired local TUI. If the receiver closes, feedback stays
 pending. A failed batch retains its original target and ID for safe retry; if that target
-is permanently gone, export the notes before starting a new review. Sent-note edits become
-new revisions. Clipboard failures expose a selectable preview. Browser-internal pages, PDF,
+is permanently gone, export the notes before starting a new review. **Retry N notes &
+continue** retries that original batch; newly composed feedback stays local for the next
+send. Changed sent notes become new pending revisions; unchanged edits send nothing new.
+Clipboard failures expose a selectable preview. Browser-internal pages, PDF,
 cross-origin iframes, Canvas and remote SSH TUI clients are outside this version's scope.
 Page Context is retired only after exporting its drafts and verifying this replacement.
 
@@ -114,6 +147,23 @@ See [implementation plan](docs/annotate-html-integration-plan.md) and
 [browser provenance](browser/UPSTREAM.md). `npm test`, `npm run test:smoke`, and
 `npm run test:browser` verify each layer; the browser test uses an existing Playwright installation
 (`PLAYWRIGHT_MODULE`) and browser executable (`CHROMIUM_PATH`) in an isolated profile.
+
+### Reload after browser companion updates
+
+After updating the unpacked `browser/` files, open `chrome://extensions` and click
+**Reload** for **OpenCode Annotate**. Return to the target webpage and open Annotate
+using its extension icon or **Alt+Shift+A**.
+
+A newly opened sidebar can load the updated `panel.mjs` while Chrome still runs an
+older `worker.mjs`. With the compact workspace, that mismatch produces
+`Cannot read properties of undefined (reading 'value')`: the sidebar expects a
+`draft` record that the older worker does not return. Reload the whole extension;
+reopening only the sidebar does not ensure the background code is refreshed.
+Saved extension-local data survives an extension reload.
+
+For diagnosis, compare the running worker's source (DevTools/CDP
+`Debugger.getScriptSource`) with `browser/worker.mjs` in the loaded checkout.
+The manifest version alone cannot identify edits to an unpacked extension.
 
 ## Review and send
 
@@ -237,10 +287,11 @@ See [release instructions](docs/releasing.md) and [changelog](CHANGELOG.md).
 这是**非官方 OpenCode 批注插件**：文本用 Plannotator TUI，网页用 Chrome 伴随扩展。
 
 - `/annotate`：批注上一条完整回复。
-- `/annotate 2`：批注倒数第二条，`3`、`4` 依次往前；`1` 等同于默认。
 - `/annotate 文档.md`：批注文档，支持中文、空格和相对路径。
+- `/annotate-pick`：从最近的回复和运行中的进度说明里选一条批注。
+- `/annotate-selection`：先在会话里拖选文字，再批注包含这段文字的消息。
 - `/annotate-last`：固定批注最新一条完整回复，忽略附带参数。
-- `/annotate 页面.html`、`/annotate https://…`、`/annotate web`：在 Chrome 中批注网页；`/annotate web off` 撤销配对。
+- `/annotate-web`：配对 Chrome；`/annotate-web 页面.html`、`/annotate-web https://…` 批注网页；`/annotate-web off` 撤销配对。
 - 选中文字 → `c` 写批注 → Enter 保存 → `q` 返回 →「Send and continue」。
 - 文档采用独立快照，反馈附原文件路径，确认后发回发起批注的会话。
 - 更新：`opencode plugin update @nxxxsooo/opencode-annotate@latest`，然后重新打开终端客户端。

@@ -1,0 +1,1 @@
+{"versions":[{"v":"1.1.0","t":"2026-09-20T11:17:15.152Z"}],"releases":[],"issues":[{"number":2,"title":"opencode-go 用量解析失败：上游响应新增字段导致 $R[N] 索引偏移","url":"https://github.com/Yinxe/opencode-tui-usage/issues/2","state":"open","comments":1,"date":"2026-07-03T13:27:51Z"}],"sharedRepo":true}

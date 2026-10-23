@@ -41,8 +41,15 @@ Press <kbd>Tab</kbd> or <kbd>→</kbd> to accept it, or <kbd>Esc</kbd> to dismis
   predicts words in an *active* draft locally. When both are installed, each
   activates only in its respective domain without key conflicts.
 - **Prose-aware gating:** Automatically suppresses suggestions in code blocks,
-  backticks, file paths, URLs, slash commands, shell executions, active selections,
-  and modal dialogs. Attachment and pasted-text chips are treated as non-prose:
+  backticks, file paths, URLs, slash commands, active selections, and modal
+  dialogs. Hyphenated words (`read-only`), brand names (`OpenCode`, `GitHub`)
+  and bare filenames with common extensions (`install.sh`) count as prose;
+  identifiers (`showSidebar`), flags and `key=value` tokens do not.
+- **Shell mode:** In the prompt's shell mode Quill completes commands,
+  subcommands and flags from a separate vocabulary learned from the commands
+  you ran, never from prose. Shell completion is case-sensitive, never corrects
+  typos, and skips paths, quoted strings, `$` expansions, assignments and any
+  command that mentions a token, secret, password, key or credential. Attachment and pasted-text chips are treated as non-prose:
   words are still suggested after them, but never inside them, and typo
   replacements are not offered while a chip is present.
 - **End-of-draft by default:** Suggestions appear on a partial word or after a
@@ -167,6 +174,7 @@ Restart OpenCode after editing `cli.json`.
 | --- | --- | --- | --- |
 | `enabled` | `boolean` | `true` | Initial default for suggestions and learning; a persisted `/quill` toggle takes precedence. |
 | `completeAtLineEnd` | `boolean` | `false` | Also append completions or next words immediately before a newline within a draft. |
+| `completeShell` | `boolean` | `true` | Initial default for shell-mode suggestions and learning; a persisted `/quill shell` toggle takes precedence. |
 | `acceptKeys` | `string[]` | `["tab", "right"]` | Keys that accept and insert the active word suggestion. |
 | `dismissKeys` | `string[]` | `["escape"]` | Keys that dismiss the visible suggestion without inserting. |
 | `cycleNextKeys` | `string[]` | `[]` | Optional keys for the next confident word suggestion. |
@@ -211,7 +219,9 @@ handlers remain in control. Dialogs and selections also suppress Quill.
 
 - `/quill` — Toggle word autocomplete on or off (persisted across sessions).
 - `/quill on` / `/quill off` — Set autocomplete explicitly.
-- `/quill clear` (alias `/quill reset`) — Erase everything Quill has learned from your prompts.
+- `/quill shell on` / `/quill shell off` — Set shell-mode autocomplete explicitly.
+- `/quill clear casing` (alias `/quill reset casing`) — Forget only the learned word casing (`OpenCode`, `GitHub`), keeping the vocabulary and phrases.
+- `/quill clear` (alias `/quill reset`) — Erase everything Quill has learned from your prompts and shell commands.
 - `quill.next` / `quill.previous` — Keymap commands for cycling visible word
   alternatives; no default bindings. Configure the cycle options above or
   OpenCode's `keybinds` map.
@@ -232,8 +242,11 @@ Quill learns from your own submitted prompts, never from assistant output:
   processed IDs, including those of ignored pastes, are retained until
   `/quill clear`.
 - Only prose is learned. Code blocks, inline code, URLs, file paths,
-  identifiers, slash commands, shell lines, indented blocks and very large
-  pastes are ignored.
+  identifiers, slash commands, shell lines, indented blocks that do not
+  continue a list item, and very large pastes are ignored.
+- Commands you run in shell mode are learned into a separate shell model from
+  the session's shell messages, on the same triggers and with the same
+  deduplication. Only plain words and flags are kept.
 - Punctuation, line breaks and code reset the context, so words separated by
   syntax are never learned as adjacent.
 - A word missing from the base vocabulary becomes suggestible only after it
@@ -279,14 +292,15 @@ state directory (`$XDG_STATE_HOME` when set, otherwise `~/.local/state`):
 | Data | File |
 | --- | --- |
 | Learned model | `opencode/<channel>/tui/plugin.quill.learning.json` |
+| Learned shell model | `opencode/<channel>/tui/plugin.quill.shell.json` |
 | Settings | `opencode/<channel>/tui/plugin.quill.settings.json` |
 
-The learned model holds word, bigram, trigram and word-casing counts plus
+The learned models hold word, bigram, trigram and word-casing counts plus
 processed message IDs. These include local one-to-three-word fragments from
 your prose, so the model can reveal parts of your prompts. Quill does not store
 raw prompts or full message bodies. These files stay on your machine and are
-never tracked in Git or published to npm. `/quill clear` erases the learned
-model; the persisted on/off setting is separate.
+never tracked in Git or published to npm. `/quill clear` erases both learned
+models; the persisted on/off settings are separate.
 
 The processed-ID ledger is not pruned: its memory usage, stored size, and full
 serialization cost grow with the number of processed messages. Word and context

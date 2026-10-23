@@ -12,13 +12,27 @@ stream — and wakes the agent **per event**. The waiting happens in a cheap she
 process, so the agent is parked at roughly zero cost and resumes the instant there
 is signal. It's the OpenCode counterpart of Claude Code's built-in Monitor tool.
 
+Supports **OpenCode v1 and v2** with the same monitor tools and sidebar. Version
+0.4.0 was tested with OpenCode 1.19.3 and 2.1.2. Node ≥ 22 is required.
+
+For OpenCode v2:
+
+```sh
+opencode plugin add opencode-monitor
+```
+
+For OpenCode v1:
+
 ```sh
 opencode plugin opencode-monitor -g
 ```
 
-> Requires OpenCode and Node ≥ 22. Installs prebuilt — there is no build step on
-> your machine. Drop `-g` to install into the current project only, or pin a
-> version with `opencode plugin opencode-monitor@0.2.0 -g`.
+The sidebar ships precompiled; no build runs during installation. For a local
+build, run `npm pack`, install its archive in your OpenCode config directory, and
+add `"./node_modules/opencode-monitor"` to `plugin` in `opencode.jsonc`. V2 accepts
+that legacy field too. Add the same path to `plugins` in `cli.json` (v2) or
+`plugin` in `tui.json` (v1). Local directory entry files are included for v2's
+plugin resolver.
 
 ## Why
 
@@ -117,8 +131,8 @@ monitor_stop({ id: "m_1a2b3c4d" }) // stop one; reaps the whole process tree
 Monitors are auto-stopped when their parent session is deleted, and the whole
 process tree is reaped on stop (`setsid` session kill), so nothing leaks.
 
-> **When _not_ to use it:** for a command that finishes quickly, just call `bash`
-> directly — `monitor` is for waiting on a slow or ongoing external condition, not
+> **When _not_ to use it:** for a command that finishes quickly, call `bash` (v1)
+> or `shell` (v2) directly — `monitor` is for waiting on a slow or ongoing external condition, not
 > a replacement for normal command execution. It also isn't a background *service
 > manager*: it watches a process and wakes you on its output, but does not hold a
 > long-running server open for you to keep interacting with.
@@ -152,25 +166,24 @@ The command runs under `setsid` in its own process group, so when the watch ends
 for any reason — the whole tree is reaped with `SIGTERM` then `SIGKILL`.
 Grandchildren die too; nothing leaks.
 
-Each stdout line is forwarded to the session via OpenCode's synchronous
-`POST /session/:id/message` (the SDK `session.prompt`). That is the *reliable* wake
-path — deliberately not the `prompt_async` endpoint, which is silently dropped on
-idle sessions
-([anomalyco/opencode#21524](https://github.com/anomalyco/opencode/issues/21524)).
-Steering delivery does not wait for that request's full agent response before
-submitting the next event. `steer: false` restores one full response per event.
+On v1, each stdout line uses the synchronous `session.prompt` route, which
+reliably wakes idle sessions. Steering does not await its full response;
+`steer: false` does.
+
+On v2, each line uses `session.synthetic` with `delivery: "steer"` and
+`resume: true`. Admission is awaited to preserve event order. For `steer: false`,
+`session.wait` also waits for the full agent response before the next line is
+submitted. Notifications retain their synthetic origin. Deleting a session or
+disposing its v2 plugin stops its watchers and closes its status socket.
 
 <details>
 <summary><b>Design notes: how the sidebar sees server-side state</b></summary>
 
-OpenCode has no in-band channel for a plugin to surface server-side state to the
-TUI (the reactive `api.state` only carries built-in domains — sessions, LSP, MCP,
-todos; `tui.publish` is limited to four fixed UI-action events), and there is no
-client endpoint to invoke a tool. So the engine exposes its live registry
-out-of-band, over a **per-invocation unix status socket**
+Both runtime adapters share a **per-invocation Unix status socket**
 (`<runtime>/opencode-monitor/status-<worktreeHash>-<token>.sock`, token random per
-plugin load) — the conventional status-endpoint pattern (cf. docker/systemd),
-independent of whether the session log is synced, compacted, or even has a TUI.
+plugin load). This keeps the sidebar independent of message-history syncing and
+uses the same transport on both versions. The v1 adapter registers
+`sidebar_content`; the v2 adapter appends to `sidebar.content`.
 
 The runtime dir is resolved via
 [`xdg-basedir`](https://github.com/sindresorhus/xdg-basedir) — `XDG_RUNTIME_DIR`
@@ -210,18 +223,22 @@ npm test            # node:test
 npm run typecheck
 ```
 
-Run the steering integration test against an installed OpenCode executable:
+Run the integration test against each installed OpenCode executable (requires
+Python 3, tmux, and the Unix shell utilities used by the watcher):
 
 ```sh
-OPENCODE_TEST_BINARY=/usr/bin/opencode node --test test/steering-live.test.ts
+OPENCODE_TEST_BINARY=/path/to/opencode-v1 node --test test/steering-live.test.ts
+OPENCODE_TEST_BINARY=/path/to/opencode-v2 node --test test/steering-live.test.ts
 ```
 
-It starts an isolated OpenCode server with a controlled local model stream and
-checks delivery during streaming, the next model-turn boundary, serialized
-opt-out, and automatic idle wakes. It removes its sessions, watchers, server,
-and temporary state afterward.
-Set `OPENCODE_TEST_PLUGIN` to an installed package's absolute `src/server.ts`
-path to test that package's server entry and monitor manager.
+It starts an isolated real server and TUI with a controlled local model stream.
+The model calls the actual `monitor`, `monitor_list`, and `monitor_stop` tools.
+Checks cover regex filtering, mid-stream delivery, event order at the next model
+boundary, serialized opt-out, idle wakes, live sidebar counts and output, watcher
+termination, and cleanup after session deletion. Sessions, processes, tmux state,
+and temporary files are removed afterward; no remote model or credentials are
+used. Set `OPENCODE_TEST_PLUGIN` to an installed package's absolute directory to
+test the packed deployment rather than the checkout.
 
 ### Publish
 

@@ -39,7 +39,7 @@ plugin, not affiliated with or endorsed by [Anomaly](https://anoma.ly).
 ## Requirements
 
 - [Bun](https://bun.sh) >= 1.3.0
-- [OpenCode](https://opencode.ai) V1 `>=1.18.29 <2` (tested with 1.18.35) or V2 `>=2.0.3 <3`
+- [OpenCode](https://opencode.ai) V1 `>=1.18.29 <2` (tested with 1.18.35) or V2 `>=2.0.22 <3`
   (tested with 2.0.26)
 - `git` on `PATH`, used only for read-only Git enrichment. Without it, the reviewer gets no Git
   snapshot.

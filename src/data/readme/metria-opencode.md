@@ -1,35 +1,37 @@
 # metria-opencode
 
-Plugin de CLI do OpenCode V2 que mostra o uso da IA atual no fim da linha do prompt (onde ficam agente/modelo), com a lógica de medição do [Metria](https://github.com/yurirxmos/metria).
+OpenCode V2 CLI plugin that shows the current AI provider usage in the prompt footer (next to agent/model), powered by [Metria](https://github.com/yurirxmos/metria)'s usage logic.
 
-- Mostra sempre a janela principal (ex.: `5h 42%`) do provider do modelo selecionado, com cor por faixa (40/65/85%).
-- Se outra janela (semanal/mensal) passar de 85%, aparece `▲ 7d 91%` ao lado; em 100% fica vermelho.
-- Quando um limite estoura (100%), aparece o tempo até resetar: `5h 100% · resets in 1h30m`. O contador atualiza sozinho e, ao zerar, o uso é buscado de novo.
-- Se a medição falhar (credencial expirada, rede), aparece `usage !` no footer e um aviso explica o motivo.
-- `/usage` (ou `/metria`) força a atualização e mostra todas as janelas com o tempo até resetar.
+- Always shows the main window (e.g. `5h 42%`) for the selected model's provider, colored by threshold (40/65/85%).
+- If another window (weekly/monthly) goes past 85%, shows `▲ 7d 91%` next to it; at 100% it turns red.
+- When a limit is hit (100%), shows the time until reset: `5h 100% · resets in 1h30m`. The counter refreshes on its own and, when it reaches zero, usage is fetched again.
+- If measurement fails (expired credential, network), shows `usage !` in the footer and a toast explains why.
+- `/usage` (or `/metria`) opens a window with the usage of **all** providers the plugin detected (Claude, Codex and OpenCode Go), with a bar per window, color by threshold and time until reset. Providers without a known quota endpoint show their **OpenCode usage** instead (tokens in/out and cost per window, from `session.stats`).
 
-| Provider no OpenCode | Fonte |
+| OpenCode provider | Source |
 | --- | --- |
-| `anthropic` | credential do servidor OpenCode ou `~/.claude/.credentials.json` → `api.anthropic.com/api/oauth/usage` |
-| `openai` | credential do servidor OpenCode ou `~/.codex/auth.json` → `chatgpt.com/backend-api/wham/usage` |
-| `opencode-go` | credential do servidor OpenCode (ou `OPENCODE_API_KEY`/`auth.json`) → `opencode.ai/zen/go/v1/usage` |
+| `anthropic` | OpenCode server credential, macOS Keychain (`Claude Code-credentials`) or `~/.claude/.credentials.json` → `api.anthropic.com/api/oauth/usage` |
+| `openai` | OpenCode server credential or `~/.codex/auth.json` → `chatgpt.com/backend-api/wham/usage` |
+| `opencode-go` | OpenCode Console OAuth (or the `opencode-go` API key / `auth.json`) → `opencode.ai/zen/go/v1/usage` |
 
-As credenciais vêm primeiro do servidor do OpenCode, então uma key trocada pela interface (`opencode auth login`, `/connect`, Console) é usada na hora — o `auth.json` só serve de reserva.
+Credentials come from the OpenCode server first, so a key swapped in the UI (`opencode auth login`, `/connect`, Console) is picked up immediately — `auth.json` is only a fallback.
 
-Quando o token do OpenAI/Codex estiver expirado, o plugin renova sozinho pelo `auth.openai.com/oauth/token` (mesmo fluxo do Codex CLI), sem alterar os arquivos de credencial.
+On macOS the Claude Code stores its OAuth in the Keychain, and the `opencode-go` provider is authenticated by the Console OAuth (the standalone API key expires on its own) — the plugin tries the sources in that order.
 
-Atualiza ao trocar de provider, ao fim de cada resposta (no máximo 1x/min) e a cada 5 min.
+When the OpenAI/Codex token is expired, the plugin renews it on its own through `auth.openai.com/oauth/token` (the same flow as the Codex CLI), without touching the credential files.
 
-## Instalação
+Refreshes when switching providers, after each response (at most 1x/min) and every 5 min.
+
+## Installation
 
 ```sh
 opencode plugin add metria-opencode
 opencode service restart
 ```
 
-Como o plugin é só de TUI, ele entra automaticamente no `~/.config/opencode/cli.json`.
+Since the plugin is TUI-only, it goes straight into `~/.config/opencode/cli.json`.
 
-### Desenvolvimento
+### Development
 
 ```sh
 git clone https://github.com/yurirxmos/metria-opencode
@@ -37,15 +39,15 @@ cd metria-opencode
 bun install
 ```
 
-Aponte o `~/.config/opencode/cli.json` para o diretório local:
+Point `~/.config/opencode/cli.json` at the local directory:
 
 ```json
-{ "plugins": ["/caminho/para/metria-opencode"] }
+{ "plugins": ["/path/to/metria-opencode"] }
 ```
 
-Depois de alterar o código, reinicie com `opencode service restart`.
+After changing the code, restart with `opencode service restart`.
 
 ```sh
 npm run check   # typecheck
-npm test        # testes
+npm test        # tests
 ```

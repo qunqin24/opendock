@@ -1,0 +1,126 @@
+<div align="center">
+
+# OpenCode Zen FreeX
+
+Use **OpenCode Zen's free models** in [magpie](https://github.com/yetone/magpie)
+
+Shared `public` credential · Automatic discovery · Native streaming protocols
+
+[简体中文](https://github.com/tkhs101/OpenCode-Zen-FreeX/blob/main/README.md) · **English**
+
+[![CI](https://img.shields.io/github/actions/workflow/status/tkhs101/OpenCode-Zen-FreeX/ci.yml?branch=main&style=flat-square&label=CI)](https://github.com/tkhs101/OpenCode-Zen-FreeX/actions/workflows/ci.yml) [![npm](https://img.shields.io/npm/v/opencode-zen-freex?style=flat-square&logo=npm&logoColor=white)](https://www.npmjs.com/package/opencode-zen-freex) [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg?style=flat-square)](LICENSE) [![Runtime: bun](https://img.shields.io/badge/runtime-bun-f472b6?style=flat-square&logo=bun&logoColor=white)](https://bun.sh)
+
+</div>
+
+## Why this fork
+
+[zen-free](https://github.com/magpie-community/plugins/tree/main/packages/zen-free) is this plugin's predecessor. Let's be clear: upstream is maintained, and bugs are fixed quickly. The problem is that it has never had a **stable, explicit position** on **free-model support**.
+
+When a free model stops working, the issue gets the answer that it **will no longer be supported**; some time later the same problem is quietly fixed and the free model works again. Support, drop, support again — users are left churning with upstream's position, never able to tell **how long the support will last**.
+
+If people depend on it, it deserves a clear answer rather than **more flip-flopping** — that is why this project exists.
+
+| UTC | Commit | What upstream said |
+| --- | --- | --- |
+| 2026-10-13 23:53 | [`643ef50`](https://github.com/magpie-community/plugins/commit/643ef5018e63be78c4aa7554696831d4220ac9c9) | The README adds a note that the free tier only works inside OpenCode itself, `this plugin doesn't work around that`; use a paid Zen key or OpenCode Go instead. The commit message says `No version bump … The code on main is left as it is` |
+| 2026-10-14 10:57 | [`a810ee7`](https://github.com/magpie-community/plugins/commit/a810ee7e882012ab106e2deb742176cd43db781a) | 0.1.6 **deletes** that note and sends OpenCode 1.19.0's own headers — 11 hours after it was added |
+| 2026-10-14 17:59 | [`5fc0a75`](https://github.com/magpie-community/plugins/commit/5fc0a75292f0e5c0c10cf65a188bff5545d6b8e9) | 0.1.7: `free models answer again` |
+
+Later upstream changes are merged as needed, while this branch keeps its own choices (for example, tool wording is captured per generation from a real OpenCode rather than pinned to one version).
+
+## Installation and login
+
+```sh
+magpie plugin add opencode-zen-freex
+magpie plugin login opencode-zen-free
+```
+
+Use `public` as the key. It is the free tier's shared credential; no personal API key is needed — anything else you enter is discarded.
+
+Personal keys belong in magpie's built-in OpenCode Zen provider: it accepts several keys and rotates or fails over between them. Credentials live in OpenCode's `auth.json` or magpie's `plugin-auth.json`.
+
+## Models
+
+Model names are written `opencode-zen-free/<id>`, for example `opencode-zen-free/big-pickle`.
+
+- **Automatic discovery**: when the host lists models, the plugin reads Zen's list; repeated listings within 60 seconds reuse the previous result. A successful read is cached (`~/.cache/opencode-zen-freex/discovery.json`, `%LOCALAPPDATA%` on Windows); when the list cannot be read, the plugin falls back to the cache or the table shipped in the package, and when the cache is used, its age is passed to the host.
+- **Limits are measured**: the catalogue, vendor claims and the wall the route actually enforces often disagree. Context is declared at the largest value measured to pass; output prefers the paid twin's declaration on the same gateway. For example, `mimo-v2.6-flash-free`'s catalogue says 200k, but 375k was served; `glm-5.3-flash-free`'s paid twin claims 1M, but 323k was the largest that passed; and the route's own refusals count too — `deepseek-v4.1-flash-free` fell from 1M to 326k after it began refusing above roughly 326,700 tokens. See [`MAINTAINING.md`'s “Limits Zen under-reports”](MAINTAINING.md#limits-zen-under-reports) for the measurements and how to re-run them.
+- **Limits are also learned from traffic**: the plugin sends no extra requests; it only probes upward and converges downward with requests it is already forwarding. Learned values survive restarts, and a refused model is pulled back to a size already proven to pass.
+- **Measured snapshots without waiting for a release**: the repository runs an incremental sweep every hour, writes `limits-observed.json` and publishes it on `main`; after startup the plugin fetches it in the background at most once per hour, falling back to its cache or the copy in the package.
+- **The list is authoritative**: `-free` models on Zen's list are offered immediately (except on protocols this plugin does not support), without waiting for the catalogue; a catalogue that cannot be read only affects what it describes, and does not make the list a fallback.
+- **No longer free means 404**: the error lists the models that are free at that moment; once a model is free again, refresh the list. Availability and rate limits belong to Zen; the plugin cannot see remaining quota.
+
+## Requests
+
+Requests go to `https://opencode.ai/inference/v1` in each model's native protocol (Chat Completions / Responses / Anthropic Messages); both streaming and plain JSON are supported.
+
+- **Borrow only OpenCode's shell**: headers, User-Agent and the tool set are matched to one OpenCode generation; a `required` tool the host lacks gets a description sent on the plugin's behalf (with no implementation behind it). The header set is deliberately minimal — **do not add your own**; two individually harmless headers can be refused together.
+- **Unknown tool names go to the host as written**: match exactly first, then case-insensitively, then ignoring `_`/`-`/`.`/whitespace, and accept only a unique result; when nothing matches or the match is ambiguous, the call is neither guessed nor dropped — the model's name, id and arguments reach the host as written, which replies with its own "no such tool"; the model then renames the call and retries. Only calls with no name at all are omitted, and the body says so.
+- **Sessions stay stable**: an OpenCode-shaped session id from the host is passed through; otherwise one is derived from the host's session identifiers and remembered, so every turn of the same conversation shares an id.
+- **Truncation and errors are reported honestly**: if a stream ends early, a Chat stream with content and no unfinished tool call is completed as a normal answer marked truncated; anything else fails. The error body is read only far enough to find a limit Zen itself states; the rest is replaced with an explanation.
+
+<details>
+<summary>Full rules for headers and session ids</summary>
+
+**Headers** are exactly: `content-type`, `accept`, `user-agent`, `x-opencode-project`, `x-opencode-session` and `x-opencode-session-id` (the same value), `x-opencode-client: cli`, `authorization: Bearer public`; Messages uses `x-api-key: public` plus `anthropic-version` instead. The plugin never sets `anthropic-beta` itself — it passes it through only when the host sends it.
+
+**Session id** is taken in order from the session headers `x-opencode-session` / `x-opencode-session-id` / `x-session-affinity` / `x-session-id` / `session_id` / `conversation-id` / `conversation_id`, then the body's `conversation_id`, `metadata.session_id`, or the `_session_<uuid>` inside Claude Code's `metadata.user_id`. If none of those exists, the system/instructions and the first user message form the seed (a changed system prompt is a different conversation); only after that is `previous_response_id` consulted, and failing that a new id is generated every time. An empty string is never a name.
+
+</details>
+
+## When the free tier stops answering
+
+The 403 this plugin returns names the OpenCode version its wording was captured from; start there. All three commands **run only in a repository checkout** (`check:gate` and `capture` are not in the published package) and need Bun; `capture` also needs `opencode` on PATH:
+
+```sh
+bun run check:gate          # which fingerprints Zen accepts; 0 if a floor answers
+bun run capture -- --dry    # all floors refused: capture, report the diff, write nothing
+bun run capture             # write only after confirming the diff
+```
+
+`capture` rewrites `fingerprint.json` rather than refusing when the file is missing or broken. The gate is not stable: a verdict describes this moment only, so run it again before trusting it; repeated refusals from one address can also trigger a cooldown. For per-generation verdicts and how to read a failure, see [`MAINTAINING.md`'s “The loop”](MAINTAINING.md#the-loop) and [“Reading a failure”](MAINTAINING.md#reading-a-failure).
+
+## Troubleshooting
+
+| Symptom | What to do |
+| --- | --- |
+| Every request is `403 FreeTierError`, with no IP-block wording | The fingerprint wording is stale. From a repository checkout run `bun run check:gate`; if every floor is refused, run `bun run capture` |
+| The `403` body is a block notice (`abuse of traffic`, or `free models aren't available … from your current network`) | The free tier is blocking the current egress IP. Switch networks or VPN exits, or wait for the block to lift; retrying or rewriting the request will not help |
+| `426 Upgrade Required` | The package claims an older OpenCode version than Zen wants. Update the plugin, or run inside a newer OpenCode |
+| `404 … not available as an OpenCode Zen free model now` | Zen no longer offers this model for free. Pick another from the models listed in the error |
+| `Model is not an available free model for this protocol` | The list changed after the request was sent. Refresh the host's model list and retry |
+| `uses the public credential` | The stored key is not `public`. Log in again with `public` |
+| A `403` without `FreeTierError` | It is Zen's own 403, not this plugin's; read it as sent |
+| `400 context_length_exceeded`, or `max_tokens` out of range | The route enforces the model's own limits. Compact the conversation or lower `max_tokens`; context refusals state no window, while `max_tokens` refusals do state the allowed range |
+| The window looks too small and you want it re-learned, or a new environment variable has no effect | Delete `opencode-zen-freex/limits.json` under the cache directory (see Environment variables for where); environment variables are read only when the host starts, so restart it |
+| A model is asked for the wrong protocol | The endpoint table in the protocol docs could not be read. Set `OPENCODE_ZEN_FREE_MODELS_DEBUG=1` to see which document failed and why |
+| You want to check snapshot freshness or whether a model was retired | From a repository checkout run `bun limits-watch.mjs --status`; exit 0 is healthy, 2 is read but has issues, 1 is unreadable. `unavailable` is history only, not a disable switch |
+| The window stays at an old value, or `raw.githubusercontent.com` is unreachable | The remote snapshot is only an optimisation; a failure does not affect requests. Point it elsewhere or turn it off with the environment variables (see Environment variables) |
+
+## Environment variables
+
+Common ones only; the full list and defaults are in [`.env.example`](https://github.com/tkhs101/OpenCode-Zen-FreeX/blob/main/.env.example). The cache directory is `%LOCALAPPDATA%` on Windows, and `$XDG_CACHE_HOME` or `~/.cache` elsewhere.
+
+| Variable | Purpose |
+| --- | --- |
+| `OPENCODE_ZEN_FREE_DISCOVERY_CACHE` | Discovery cache path; an empty string keeps discovery in memory only |
+| `OPENCODE_ZEN_FREE_LIMITS_SNAPSHOT` | Measured-snapshot path; an empty string disables reading a snapshot |
+| `OPENCODE_ZEN_FREE_LIMITS_SNAPSHOT_URL` | Remote snapshot URL; an empty string disables the remote |
+| `OPENCODE_ZEN_FREE_LIMITS_STATE` | Path to the learned-limit state; an empty string keeps it in memory only |
+| `OPENCODE_ZEN_FREE_LIMITS_DEBUG` | Set to `1` to log every raise, refusal, and route-stated window to stderr |
+| `OPENCODE_ZEN_FREE_MODELS_DEBUG` | Set to `1` to print catalogue-parsing details |
+| `OPENCODE_ZEN_FREE_MAX_WINDOW` | Upper bound for upward probing; defaults to `1048576` |
+
+## Credits
+
+| Category | Project |
+| --- | --- |
+| This plugin's predecessor | [zen-free](https://github.com/magpie-community/plugins/tree/main/packages/zen-free) |
+| Plugin host | [magpie](https://github.com/yetone/magpie) |
+| Model provider | [anomalyco/opencode](https://github.com/anomalyco/opencode) |
+| Agents used in this repository | [deepseek-harness](https://github.com/deepseek-ai/deepseek-harness) · [hermes-agent](https://github.com/NousResearch/hermes-agent) |
+| Inspiration | [9router](https://github.com/decolua/9router) · [opencode2api](https://github.com/jasonxu114514/opencode2api) · [zen-gate](https://github.com/LAGcomcom/zen-gate) |
+
+## License
+
+MIT. Forked from [zen-free](https://github.com/magpie-community/plugins/tree/main/packages/zen-free); the `LICENSE` text is unchanged: its copyright lines keep both the upstream author `xiaozhou26` and this branch's `OpenCode-Zen-FreeX contributors`. See [NOTICE](NOTICE) for provenance and why this branch exists.

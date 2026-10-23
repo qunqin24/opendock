@@ -105,10 +105,26 @@ As you work, the plugin records the session locally: your prompts, the agent's r
 
 Reintersect's tools ride along too. Mid-session the agent can search your team's conversations, read a decision and its rationale, or store something you asked it to remember.
 
+The plugin also includes an automatically selectable `reintersect` skill. It helps
+agents look up relevant team context before guessing or asking the user,
+verify important matches in their source conversation, and skip unrelated or
+already-resolved searches. The existing `recall` command remains an explicit lookup.
+
+Claude Code and Codex receive a short reminder before each prompt, on resume,
+after compaction, and at subagent start through the existing synchronous hooks.
+Async startup and background recall only deliver memory changes, so a standalone
+reminder cannot interrupt a model response already in progress. Cursor's always-applied rule points
+to the same skill. OpenCode includes the skill body in its system transform because
+its generated commands alone are not automatically selected skills. Reminder delivery
+still depends on the host enabling and consuming its hooks or rules; it does not
+prove the model will search appropriately. Recall-only sandboxes receive memories
+without the reminder because they need not have the plugin skills or search tools.
+
 Invoke the skills with `$reintersect:<name>` in Codex, `/reintersect:<name>` in Claude Code, or `/reintersect-<name>` in OpenCode:
 
 | Command | Does |
 | --- | --- |
+| `reintersect` | Look up relevant team decisions and context. |
 | `login` | Sign this machine in. |
 | `recall` | Ask what Reintersect knows about this repository, the team or you. |
 | `remember` | Store a fact, decision or preference for everyone. |

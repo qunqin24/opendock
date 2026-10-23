@@ -101,13 +101,13 @@ The default profile is a **fleet**: ten jobs, ten free models, one session.
 The table below is the **unrestricted** fleet (`fleet-all`), where every lane
 gets the model built for it. The default is the **safe** fleet
 (`fleet-safe`), where every lane resolves to a provider with a zero-retention
-policy and six of the ten run on a second-choice model to stay there. Both
+policy and seven of the ten run on a second-choice model to stay there. Both
 cover the same ten jobs; they differ in what they are willing to promise
 about your prompts.
 
 | lane | job | model | measured |
 |---|---|---|---|
-| `build` | write and verify the change | MiniMax M3.1 Flash | 6.9 s |
+| `build` | write and verify the change | Flint 40B Free | 6.9 s |
 | `plan` | turn a request into a plan | Beam | **6.1 s** |
 | `reviewer` | read a change in two passes | Nemotron 3 Ultra | 7.8 s (34 s cold) |
 | `locate` | find where something lives | Nemotron 3.5 Lightning | 6.9 s |
@@ -116,7 +116,14 @@ about your prompts.
 | `doc` | read a long document or a spec | GLM 5.3 Flash | 7.4 s |
 | `schema` | produce JSON or a JSON schema | DeepSeek V4.1 Flash | 10.7 s |
 | `sweep` | sweep a lot of code mechanically | Nemotron 3.5 Super VL | 8.4 s |
-| `longform` | read a megabyte, or write alternatives | LongCat 2.5 Preview | 12.0 s |
+| `longform` | read a megabyte, or write alternatives | Flint 40B Free | 6.9 s |
+
+`longform` used to run on `longcat-2.5-preview-free`, and the provider
+withdrew it. A withdrawn model is not a lane, it is a hole in a lane: the
+route falls to the next rung of the same chain, where MiniMax then flint
+carried the lane - flint is the model that replaced MiniMax on the tier, and
+the only one left with the context the lane exists for. The `measured`
+column for that lane is therefore flint's, not either withdrawn model's.
 
 The `measured` column is the median of five one-line requests to that model
 on 2026-10-21 - the same prompt for every model, from the process start, so
@@ -237,16 +244,16 @@ it. One file covers ten jobs either way.
 |---|---|---|---|---|
 | `fleet-safe` (default) | 10 | 200,000 | `max` | zero-retention |
 | `fleet-all` | 10 | 160,000 | `max` | **may train** |
-| `minimax-m3.1-flash-free` | 5 | 1,000,000 | `max` | zero-retention |
+| `flint-40b-free` | 5 | 262,144 | `max` | **may train** |
 | `beam-free` | 5 | 1,048,576 | `max` | retained |
 | `deepseek-v4.1-flash-free` | 5 | 200,000 | `max` | zero-retention |
 | `glm-5.3-flash-free` | 5 | 200,000 | `max` | zero-retention |
-| `longcat-2.5-preview-free` | 5 | 1,000,000 | — | zero-retention |
 | `nemotron-3.5-super-vl-free` | 5 | 1,048,576 | `xhigh` | **may train** |
 | `nemotron-3-ultra-free` | 5 | 1,000,000 | — | **may train** |
 | `nemotron-3.5-lightning-free` | 5 | 262,144 | — | **may train** |
 | `mimo-v2.6-flash-free` | 5 | 200,000 | — | **may train** |
 | `big-pickle` | 5 | 160,000 | — | **may train** |
+| `flint-40b-free` | 5 | 262,144 | `max` | **may train** |
 
 The five-lane profiles run everything on one model, which is the right shape
 when you want one route and want to know exactly which one.
@@ -277,11 +284,13 @@ withdrawn, and one of them was the **default** at the time:
 | `deepseek-v4-flash-free` | Withdrawn within a month. Replaced by `deepseek-v4.1-flash-free`. |
 | `muse-spark-1.3-contributor-free` | A Meta contributor route whose provider was permitted to train on prompts. The paid route is still in the catalogue. |
 | `mimo-v2.5-free` | Observed alive for one day. Replaced by `mimo-v2.6-flash-free`. |
+| `longcat-2.5-preview-free` | Was the `longform` lane's primary in both fleets, so when it was pulled every lane fell back a rung, and the one profile built only for that model was retired. |
+| `minimax-m3.1-flash-free` | Deprecated by the provider and replaced on the tier by `flint-40b-free`, which is the build and `longform` lane today. |
 
 The full list, with a reason for each, is in
 [`profiles/index.json`](profiles/index.json).
 
-### The four commands, and when each one runs
+### The five commands, and when each one runs
 
 | command | what it checks | when |
 |---|---|---|
@@ -289,6 +298,7 @@ The full list, with a reason for each, is in
 | `oc-harness doctor` | every profile against the live model catalogue, and the installed config against the active profile | **before every release**, and whenever a lane starts failing with a 429 or a "model not found" |
 | `oc-harness doctor --check-models` | one run, non-zero when a shipped model is no longer in the catalogue | from cron: the shape a scheduler wants |
 | `oc-harness doctor --watch` | keeps watching, and reports only what **changed** | leave it in a terminal for a week |
+| `oc-harness research` | what could **replace** a withdrawn model, and which lanes each candidate could serve | when `doctor` reports a withdrawal, and from cron before it happens |
 | `oc-harness refresh <id>` | re-derives a profile's machine-derived fields from live metadata | when `doctor` reports drift |
 | `oc-harness verify` | the installed config still matches the profile, and the kit's own files are still installed | after every `use` / `install` |
 
@@ -351,6 +361,193 @@ out to be. A lane is never left without one.
 See [docs/KNOWN-LIMITS.md](docs/KNOWN-LIMITS.md) for the rest of what this
 tier cannot do.
 
+### Research: what can replace the model that just died
+
+`doctor` answers one half of the question a perishable tier forces on you:
+**is the model I depend on still there?** The other half is **what is there
+instead** — and nobody was answering that half, so a withdrawal left a hole
+only a person could fill, by hand, out of a catalogue dump.
+
+`oc-harness research` is that half, and it is a file:
+[`src/research.js`](src/research.js).
+
+```
+$ oc-harness research
+
+research  tier opencode, 10 live of 46 free
+
+  ✓ every model in use is still live
+
+  lanes
+      build         2 live 0 dead
+      plan          2 live 0 dead
+      reviewer      2 live 0 dead
+      ...
+
+  candidates  live, free, and not in use yet
+
+      flint-40b-free  ctx 262,144  out 65,536  effort low,medium,high,xhigh,max
+        fits: plan, build, reviewer, locate, verify, doc, schema, sweep, longform
+        retention: unknown
+        no retention verdict in retention.yml - a person has to read the provider's terms
+
+  nothing here is written anywhere. A retention verdict is a person reading a provider's terms.
+```
+
+That is the healthy state. When something has been withdrawn, the same command
+says which, and says where it was used:
+
+```
+  gone  1 model(s) in use have been withdrawn
+
+      ✗ longcat-2.5-preview-free
+        withdrawn from the provider - the catalogue keeps the record and marks it deprecated
+        base model of longcat-2.5-preview-free
+        fallback rung in fleet-all: build, plan, locate, vision, doc, sweep, longform
+        fallback rung in fleet-safe: build, plan, reviewer, locate, verify, vision, doc, schema, sweep, longform
+
+  lanes
+      build         2 live 1 dead (longcat-2.5-preview-free)
+      plan          2 live 1 dead (longcat-2.5-preview-free)
+      ...
+```
+
+It reports four things:
+
+1. **The models in use that have been withdrawn**, split into the ones that are
+   a profile's own base model and the ones that are a rung in a lane chain. A
+   dead base model means that profile does nothing; a dead chain rung is a
+   fallback that fails on the day it is needed.
+2. **The lanes of the default profile**, each with how many rungs of its chain
+   are still alive. A lane with zero live rungs is a lane with no model.
+3. **The candidates** — live, free models the kit does not use yet, each with
+   its context window, its output cap, the effort levels it publishes, and
+   **which lanes it could serve**.
+4. **What is still undecided** about each candidate.
+
+#### Why the candidate list knows about lanes
+
+A model is not "better" or "worse" in the abstract. It is better or worse
+**for a lane**, and the lanes are not asking for the same thing:
+
+| what the lane needs | why |
+|---|---|
+| tool calls | every lane calls tools, so every lane needs a model that can |
+| an image in | the `vision` lane reads an image, so it needs a model that takes one |
+| a published effort level | a lane whose role asks for `max` needs a model that publishes `max` |
+
+So `research` matches each candidate against each lane, and a model that
+publishes **no** effort levels counts as a match rather than a failure: there
+is nothing to mismatch, and the kit already puts such models in the chains of
+lanes that ask for one.
+
+#### The line the script does not cross
+
+`research` **writes nothing**. Not `retention.yml`, not a profile, not the
+config.
+
+That is the same line `refresh` draws, and it is drawn for the same reason:
+`retention.yml` is a human judgement about a provider's terms — whether your
+prompts are kept, and whether they train on them. A machine cannot read a
+provider's terms of service and come back with a privacy verdict. So a
+candidate with no verdict is reported as `retention: unknown` and carries an
+explicit blocker, rather than being quietly filed under the tier it happens to
+be cheapest on.
+
+`refresh` draws the line in the other direction, and it is the one that
+matters: it **only ever removes**. A model that has been withdrawn is removed
+from the chains. A model that might do the job better is never added, because
+putting a model into a lane changes what that lane does, and that is a
+person's decision.
+
+The output of `research` is a shortlist to argue with, not a decision to
+accept. When you have read the terms and made the call, `retention.yml` is
+where the call lives, and `doctor` checks the rest.
+
+#### Run it on a schedule
+
+```cron
+0 9 * * * cd ~/.config/opencode && oc-harness doctor --check-models
+30 9 * * * cd ~/.config/opencode && oc-harness research
+```
+
+The first line says a route died. The second says what to do about it, and it
+runs half an hour later because by then you have had a cup of coffee and the
+answer is a decision, not an alarm.
+
+`research --json` prints one parseable object and nothing else, so a script
+can read it:
+
+```json
+{
+  "ok": true,
+  "tier": { "provider": "opencode", "total": 46, "live": 10, "withdrawn": 36 },
+  "shipped": { "count": 9, "gone": [] },
+  "lanes": [ { "lane": "build", "dead": [], "live": ["minimax-m3.1-flash-free", "deepseek-v4.1-flash-free"] } ],
+  "candidates": [ { "id": "flint-40b-free", "fits": ["build"], "retention": "unknown", "blockers": ["..."] } ]
+}
+```
+
+#### One thing the catalogue does that a naive check misses
+
+**A withdrawn model stays in the catalogue.** models.dev does not delete a
+model the provider pulls — it keeps the record and marks it
+`status: "deprecated"`. So "is it still in the catalogue" and "can it still
+run" are two different questions, and a check that asks the first one reports
+a dead model as a healthy fallback.
+
+That is not hypothetical. This kit's own default fleet carried a dead fallback
+rung in **all ten lanes**, and `doctor` called it healthy, because the chain
+check asked whether the model was still present. It now asks whether it is
+still alive, and it says so:
+
+```
+! fleet-safe                       drift
+    lane build: longcat-2.5-preview-free withdrawn, falls back to minimax-m3.1-flash-free
+```
+
+**Free is a price, not a name.** The tier is the set of models the provider
+charges nothing for. `big-pickle` is on it and does not end in `-free`, so
+the suffix is a naming convention and not the test — `research` reads the
+price.
+
+### Refresh: taking the dead rung out
+
+`research` tells you a rung is dead. `refresh` takes it out.
+
+```
+$ oc-harness refresh --all
+
+refreshed 11 of 11 profile(s) against the live catalogue
+  ~ fleet-safe: withdrawn rungs removed: longcat-2.5-preview-free
+      lane build: minimax, deepseek, longcat -> minimax, deepseek
+      lane longform: longcat, minimax, deepseek -> minimax, deepseek
+      ...
+```
+
+A chain names the models that could serve a lane, best first. A model the
+provider has withdrawn is not one of them any more: it cannot run, so it is
+dead weight in a chain whose entire job is to survive a withdrawal. The
+refresh removes it, and if the lane's own primary was the dead one, the lane
+takes the next live rung as its primary — a chain has to start with its
+model. The fallback queue loses its dead entries, and the utility route moves
+to a model the profile still reaches.
+
+**The refresh only ever REMOVES.** Putting a model into a lane changes what
+that lane does, and that is a person's decision — it is what `research` is
+for. A script that quietly added a candidate would be putting a model whose
+terms nobody has read into the path of every prompt.
+
+Two cases a script cannot repair, and says so instead of pretending:
+
+- **A profile whose own model was withdrawn.** There is no chain behind it to
+  fall back to, so there is nothing to repair. `refresh` reports it and leaves
+  the file alone; the honest fix is to retire the profile, and retiring one is
+  a decision a person makes. (That is exactly what happened to
+  `longcat-2.5-preview-free`.)
+- **A lane left with no model at all.** Every rung of its chain was dead. It
+  is reported, not filled.
+
 ## Requirements
 
 | | |
@@ -358,9 +555,9 @@ tier cannot do.
 | Node | **22 or newer** — `engines` in package.json, and the CLI uses `node:` prefixed builtins. Node 20 fails at import time, not with a friendly message. |
 | npm | 10 or newer, for `npm ci` when installing from a checkout |
 | OS | macOS, Linux and Windows. The tests run on `ubuntu-latest`. |
-| Shell | none needed to *use* the kit — no `bash`, `zsh` or `fish` setup. `doctor` and `refresh` call `curl` to read models.dev. `baseline` and the measurement scripts read the install database with `sqlite3`, and fall back to python3's own `sqlite3` module when that binary is not installed — so python3 is the one thing to have. Everything else, including `install`, `use` and `verify`, works offline. |
-| Network | only `doctor` and `refresh` need it, and only to read the live model catalogue. `list` is offline: it reads the shipped profiles. Everything else works offline. |
-| Disk | `use` and `install` write into `~/.config/opencode/` and nothing else. `doctor` writes nothing. `refresh` rewrites a profile in the kit's own
+| Shell | none needed to *use* the kit — no `bash`, `zsh` or `fish` setup. `doctor`, `refresh` and `research` call `curl` to read models.dev. `baseline` and the measurement scripts read the install database with `sqlite3`, and fall back to python3's own `sqlite3` module when that binary is not installed — so python3 is the one thing to have. Everything else, including `install`, `use` and `verify`, works offline. |
+| Network | only `doctor`, `refresh` and `research` need it, and only to read the live model catalogue. `list` is offline: it reads the shipped profiles. Everything else works offline. |
+| Disk | `use` and `install` write into `~/.config/opencode/` and nothing else. `doctor` writes nothing. `research` writes nothing — it is a report, not a migration. `refresh` rewrites a profile in the kit's own
 directory - `node_modules` for an npm install - and keeps a backup of the
 one it replaced. |
 
@@ -573,10 +770,23 @@ recent calls was a window on *recency*, and a long session walks out of it:
 after six more calls, the only copy of a file the agent had read was gone,
 and the agent read it again. On the long-task A/B that was seventeen
 re-reads and five times the input tokens. The newest copy of each distinct
-output now survives however old it is, and only the repeats are stubbed -
-**-69% input tokens and -60% wall time** on that task, at the cost of a
-bigger context. It is a setting: `prune.keepDistinctOutputs` in the profile,
-`false` to get the old behaviour back.
+output now survives, and only the repeats are stubbed - **-69% input tokens
+and -60% wall time** on that task, at the cost of a bigger context. It is a
+setting: `prune.keepDistinctOutputs` in the profile, `false` to get the old
+behaviour back.
+
+**The distinct outputs have a ceiling.** The rule without one is not a
+trade-off but a leak: it keeps every output the session has ever produced,
+and a long session grows without limit. Measured on a real 137-message
+session on 2026-10-22: the request was 5.26 MB, the pruner removed 0.04 MB of
+it (0.8%), and 4.74 MB of it - 92% - was the distinct outputs of the whole
+session. The profile's own budget for that request was 176,000 characters,
+so the request was twenty-nine times over. The ceiling keeps the newest
+distinct outputs and stubs the ones past it, so the property the rule was
+added for - the copy the agent is working with survives, so it does not read
+it again - still holds. It is `prune.keepDistinctBudgetChars` in the profile;
+unset means the profile's own context budget, and `0` keeps no distinct
+output at all.
 
 ## Memory
 

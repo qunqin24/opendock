@@ -50,10 +50,17 @@ it will be opt-in and off by default. Local stays the default.
 - **Proofread-before-send**: transcripts arrive as a prefilled form — edit,
   submit, or discard; a new take extends the open draft
 - **Model manager**: curated whisper models (tiny → medium, English and
-  multilingual), downloaded on demand, switchable any time
+  multilingual), downloaded on demand, switchable any time. Before a
+  download starts, the plugin checks that the model directory is writable,
+  that `tar` can read the archive, and how much room the install needs; a
+  problem is named in one sentence, low space asks instead of refusing
 - **Voice activity detection**: pauses become line breaks, silence is never decoded
 - **Noise-annotation filter**: whisper artifacts like `(buzzing)` or
   `[BLANK_AUDIO]` are dropped before they reach your chat
+- **Filler-only lines**: a line that is nothing but `uh`, `um`, `hmm`… is
+  dropped; words inside a line are never touched. The list is a setting
+  (Advanced → Cleanup), so other languages can use their own fillers; `off`
+  disables it. Enable debug logging to see what was dropped
 - **Loss-resistant safety net**: audio is kept until its draft is safely
   stored, and the draft until it is submitted; one key recovers either after
   a failure or crash
@@ -95,7 +102,7 @@ changing it clears the cached update state.
 - **Linux** (macOS/Windows planned). Audio capture requires `pw-record`
   (PipeWire), `arecord` (ALSA), or `ffmpeg`; archive extraction requires
   `tar` with bzip2 support. These are already present on most distributions.
-- OpenCode v2.0.31 or newer. The plugin runs inside OpenCode's bundled Bun runtime; each release is tested against supported current OpenCode versions.
+- OpenCode. Tested with OpenCode 2.1.1; older versions are likely to work, since the plugin uses only the public plugin API and OpenCode's bundled Bun runtime, but they are not tested. Each release's notes name the OpenCode version it was verified on.
 - ~110 MB–1.9 GB disk per model (downloaded on first run, your choice of size).
 
 ## Performance
@@ -238,7 +245,8 @@ means there was nothing on disk. The key is configurable under Shortcuts.
   model unload, reset, **About** (version and the project's GitHub and npm
   pages)
 
-**Advanced…** holds the tuned-by-default knobs: decode chunking, VAD
+**Advanced…** holds the tuned-by-default knobs: decode chunking, transcript
+cleanup (the noise-annotation filter and the filler-word list), VAD
 sensitivity, level-meter style/size/rate, toast timings, debug logging, the
 update channel.
 Changed values are marked `*` with their recommended value shown; clearing a

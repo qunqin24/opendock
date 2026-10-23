@@ -12,7 +12,7 @@ See the [changelog](CHANGELOG.md) for release-by-release changes.
 
 - Theme-aware session title with the session creation date
 - First-run setup guide with interactive section settings
-- Collapsible Todo section with status filters, grouped tasks, progress and priority indicators; OpenCode 2 adds session-owned tasks and optional model-context instructions
+- Collapsible Todo section with status filters, grouped tasks and progress; OpenCode 2 follows the host's native Todo history, while OpenCode 1.x retains supported priority indicators
 - Active subagent list with live statuses and click-to-open navigation, including dev-team workers running in separate local processes
 - Compact, searchable workspace skill list with user-wide favorites and groups, recent skills, source details, and click-to-confirm slash commands
 - Configurable host quick actions, including OpenCode 1.x's auto-approve toggle and OpenCode 2.x's Permissions settings, with user-wide bookmarks and availability reasons
@@ -34,6 +34,7 @@ See the [changelog](CHANGELOG.md) for release-by-release changes.
 - Copy the selected scope's layout and MCP states as versioned JSON, then validate and preview imports
 - Focus the sidebar with `Ctrl+Shift+F`, then navigate with arrows or `j`/`k`
 - Open sidebar shortcut mode with `Ctrl+Shift+B`; press `h` to toggle the panel, `c` to check Navigator updates, or `u` to check and confirm an update
+- Scan an icon-led shortcut hint with highlighted keys, separate navigation/update groups, and a clear Escape action; narrow terminals and Text fallback use the same controls
 - Optionally open new sessions directly in an empty chat with the sidebar, skipping Home on startup and from New session
 - Keep OpenCode's compact footer while showing host and Navigator versions with independent update indicators; click a version label or its update icon to confirm an in-place update through the current installation method and scope
 
@@ -41,10 +42,13 @@ Todo starts expanded. Subagents, skills, quick actions, LSP, and MCP start
 collapsed. Use `Save current layout as default` in sidebar settings to reuse the
 current visible/hidden, expanded/collapsed, and ordering states in new sessions.
 
-Supports OpenCode 1.18.30 and newer, including OpenCode 2.x. OpenCode 2.0.16 does
-not expose host Todo or LSP data to TUI plugins. Navigator supplies its own
-session Todo list through a separately configured server plugin in 2.x. Without
-that plugin, Todo stays visible with setup guidance. LSP is hidden on 2.x while retaining Subagents,
+Supports OpenCode 1.18.30 and newer, including OpenCode 2.x. The compatibility
+matrix covers 1.18.30, 1.19.3, 2.0.21, and 2.1.0 with separate real-host checks.
+The 2.1 integration adapts its plugin API and native renderer while retaining
+the 1.x adapter. On OpenCode 2, Navigator reads the same native Todo history as
+the host sidebar, including completed `todowrite` calls and the current revert
+boundary. Viewing Todo needs no Navigator server plugin. OpenCode 2.1 exposes
+content and four statuses, without priorities or direct Todo CRUD. LSP is hidden on 2.x while retaining Subagents,
 Skills, Quick Actions, MCP, Search, settings, and presets. All interface icons use Nerd Font glyphs by
 default (Codicons for controls, keyboard symbols for hints, language logos for LSP). Use a Nerd Fonts v3
 terminal font, or select **Settings → Behavior → Icon style → Text fallback**.
@@ -190,9 +194,28 @@ OpenCode 2.x CLI plugins are global terminal settings; there is no project-local
 plugin overrides are required. OpenCode validates `cli.json` strictly, so keep it
 within the linked schema and restart OpenCode after changing it.
 
-To enable Todo in OpenCode 2.x, also install the **server** half of Navigator.
-Add the same package to `~/.config/opencode/opencode.json` (or the project
-`opencode.json`):
+OpenCode 2.1's built-in Todo tool is opt-in. Enable it in the OpenCode server
+configuration used by that host, then restart OpenCode:
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "experimental": { "todo": true }
+}
+```
+
+Ask the agent in ordinary chat to create or change the list through `todowrite`.
+Navigator displays the latest completed native call before the session's revert
+boundary, reacts to host updates, and offers All / Active / Finished filters,
+status groups, progress, Refresh, and retry after read failures. It does not start
+model requests from Todo controls. Running or failed writes leave the last
+completed list visible; a completed write with an empty array clears it.
+Native tasks have `content` and one of `pending`, `in_progress`, `completed`, or
+`cancelled`; priorities remain unavailable in OpenCode 2's native schema.
+
+The optional **server** half of Navigator is used for provider-native quotas and
+read-only access to the previous Navigator Todo archive. Add it to the server
+configuration only when those integrations are needed:
 
 ```json
 {
@@ -204,14 +227,25 @@ Add the same package to `~/.config/opencode/opencode.json` (or the project
 For a local source installation, use the directory containing Navigator's
 `server.js` in the `plugin` array. Keep the TUI package in `cli.json` as above;
 the server configuration alone does not replace it. Restart OpenCode after
-configuring both. Todo items belong to the current session, survive restarts,
-and update in the sidebar when the agent calls `navigator_todo_write`. The
-**Todo instructions: Off/On** control in the Todo section is session-scoped and
-starts **Off**: tasks and the agent tool work without adding Todo instructions
-to the model's context. OpenCode 1.x continues to show the host's Todo list.
+configuring both. OpenCode owns native Todo persistence and tool instructions;
+the separate `navigator_todo_write` tool and Navigator Todo-instructions control
+are retired. OpenCode 1.x continues to show its supported host Todo source.
+
+Previous Navigator tasks stay in their original plugin-scoped storage. Their
+existing RPC is now a read-only archive; it never replaces native history or
+deletes the saved list. To inspect a previous session explicitly:
+
+```sh
+opencode api --standalone rpc.call --param rpcID=opencode-navigator.todo --param method=list --data '{"input":{"sessionID":"ses_previous"},"location":{"directory":"/path/to/project"}}'
+```
+
+After reviewing the archive, an ordinary chat request can transfer its content
+and statuses through the host's native tool. Archive reads do not change tasks
+or add model instructions.
 
 If you use both OpenCode 1.x and 2.x with the same global `opencode.json`, keep
-that shared server config compatible with 1.x. Place the server-plugin entry
+that shared server config compatible with 1.x. Place the 2.x experimental Todo
+setting and optional server-plugin entry
 in a separate JSON file and set `OPENCODE_CONFIG` to its path **only when
 launching OpenCode 2.x**. The TUI configuration in `cli.json` remains separate;
 the OpenCode 1.x launch must not load Navigator's 2.x server plugin.
@@ -346,6 +380,32 @@ Search Everything. Usage never changes the order. Visibility remains independent
 so any action, including a bookmarked one, can be hidden from the sidebar while it
 remains searchable. Unavailable actions stay visible with a route- or host-specific reason.
 
+### Pinned toolbar
+
+Pin frequently used Quick Actions and Skills to an icon toolbar above the sidebar's
+sections. In OpenCode 2.x it sits below the host-owned title. An empty toolbar takes
+no space. Pins are independent of bookmarks, section visibility, filters, and item limits.
+
+Use the pin control on an Action or Skill row, or open **Settings → Behavior →
+Pinned toolbar…**. The command palette also offers **Manage pinned toolbar**.
+Choose a base icon in the searchable picker, then select **Pin to toolbar**.
+The manager lets you change icons, move buttons, or unpin them. Cancelling the
+picker returns to the draft; cancelling the draft discards its changes.
+
+Where the host exposes a state, the same button can use a different icon for each
+state: auto-approve On/Off on OpenCode 1.x, and Idle/Compacting on OpenCode 2.x.
+The 2.x permissions button opens host Settings and uses its base icon. Hover or
+keyboard focus shows the button's name, observed state, or unavailable reason.
+Skill buttons retain confirmation and trust settings; a missing or ambiguous
+source stays pinned but cannot run.
+
+**Behavior → Toolbar overflow** switches between one row with a **More** menu
+(the default) and wrapping rows. Left/Right moves along a row; Up/Down moves
+between rows. The setting follows Global/Worktree scope and portable defaults.
+Pins, their order, icons, and exact Skill sources are private user-wide preferences
+and are excluded from portable exports. Use **Reload settings from file** in other
+running sessions after saving changes in another instance.
+
 In OpenCode 1.x, Navigator saves changes to the auto-approve mode as a user-wide
 default, including changes made through OpenCode's own command palette. Set the
 default under **Navigator Settings → Behavior → Default auto-approve permissions**;
@@ -372,7 +432,7 @@ account usage. Separate model-specific buckets require explicit model associatio
 Switching provider, model, session, or account invalidates stale reads and credit actions.
 In OpenCode 2.x, Limits follows the prompt's selected model immediately, before a
 message is sent, through the public reactive `ui.model.current()` API. OpenCode
-1.x through 1.18.35 exposes only the saved session model: a newly selected prompt
+1.x, rechecked at 1.19.3, exposes only the saved session model: a newly selected prompt
 model becomes visible to Navigator when the host saves it, normally on submission.
 An immediate pre-submission switch in 1.x needs a new public host accessor or event.
 CodexBar is useful for discovering providers, but its cookie, credential-file,
@@ -519,6 +579,7 @@ Navigator plugin tuple:
     "cornerFont": true,
     "lspIconStyle": "nerd",
     "rowDensity": "compact",
+    "toolbarOverflow": "menu",
     "sectionItemLimits": { "todo": 0, "skills": 5, "mcp": 5 },
     "quickActionOrder": ["session.rename", "session.copy", "session.fork"],
     "quickActionVisibility": { "session.export": false }
@@ -556,7 +617,7 @@ density, item limits, and Navigator's safe Quick Action allowlist. Unknown value
 sections, actions, and MCP states are discarded. The previous snake_case tuple
 options (`toggle_key`, `focus_key`, `search_key`, `persist_mcp`, `limits_refresh_minutes`, `start_in_chat`, `show_session_title`,
 `show_session_date`, `corner_font`, `icon_style`,
-`lsp_icon_style`, `row_density`, `section_item_limits`, `quick_action_order`,
+`lsp_icon_style`, `row_density`, `toolbar_overflow`, `section_item_limits`, `quick_action_order`,
 `quick_action_visibility`, `sections`, and `section_order`) remain compatible;
 canonical nested fields win when both forms are present.
 
@@ -667,14 +728,23 @@ Press `Ctrl+Shift+B` to enter Navigator shortcuts, then choose an action:
 | `u` | Check for a Navigator update, then open its confirmation if available |
 | `Escape` | Cancel shortcut mode |
 
-The mode ends after an action or five seconds of inactivity. Its toast lists only
-actions supported by the current host; LSP is omitted on OpenCode 2.x. Change the
+The mode ends after an action or five seconds of inactivity. Its compact,
+non-modal hint groups section navigation separately from update actions, uses
+icons and highlighted key tokens, and keeps Escape visible. It adapts to narrow
+or short terminals, light/dark themes, Text fallback, and the no-corner-font
+setting without taking focus from the prompt. Keyboard help uses the same
+action inventory and supports arrow-key and page-key scrolling. Only actions
+supported by the current host are listed; LSP is omitted on OpenCode 2.x. Change the
 entry shortcut under **Settings → Behavior**. The command palette also offers
 **Check Navigator updates** and **Update Navigator**.
 
 Manual checks report when Navigator is current or the update source is unavailable.
 Updates require confirmation, preserve the existing installation method and scope,
-and show a restart reminder after completion. Background check failures stay quiet.
+and show a restart reminder after completion. OpenCode updates stay on the running
+major line; moving from 1.x to 2.x remains a separate installation decision.
+Confirmed pinned-source Navigator updates install the target release's runtime
+dependencies in a new snapshot before switching its wrapper. The previous
+snapshot and private settings remain intact. Background check failures stay quiet.
 
 ### Search Everything
 

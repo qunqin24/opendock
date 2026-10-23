@@ -16,10 +16,10 @@
 <!-- BEGIN GENERATED: facts -->
 | | |
 |---|---|
-| **Paquete** | `oficina-opencode` v2.1.1 |
+| **Paquete** | `oficina-opencode` v3.0.5 |
 | **Tools** | 16 |
 | **Hooks** | 7 |
-| **API de plugin** | `@opencode-ai/plugin@1.15.11` |
+| **API de plugin** | `@opencode/plugin@2.1.2` |
 | **Node** | >=20 |
 | **Catálogo** | 258 agentes resolubles en 18 divisiones |
 | **Divisiones** | academic, design, engineering, finance, game-development, gis, healthcare, marketing, paid-media, product, project-management, research, sales, spatial-computing, specialized, strategy, support, testing |
@@ -30,7 +30,7 @@
 > **¿Preferís la versión en humano?** → [`docs/QUE-ES.md`](https://github.com/SOCRAMbt/AI-OFFICE/blob/main/docs/QUE-ES.md) — qué es, qué hace y por qué, sin jerga.
 > **¿Preferís el porqué técnico?** → [`docs/ARCHITECTURE.md`](https://github.com/SOCRAMbt/AI-OFFICE/blob/main/docs/ARCHITECTURE.md)
 
-[Documentación](#arquitectura) · [Garantías](https://github.com/SOCRAMbt/AI-OFFICE/blob/main/docs/GARANTIAS.md) · [Compatibilidad](https://github.com/SOCRAMbt/AI-OFFICE/blob/main/docs/COMPATIBILITY.md) · [Instalación](#instalación) · [Uso](#uso) · [CLI](#cli-operación)
+[Documentación](#arquitectura) · [Garantías](https://github.com/SOCRAMbt/AI-OFFICE/blob/main/docs/GARANTIAS.md) · [Compatibilidad](https://github.com/SOCRAMbt/AI-OFFICE/blob/main/docs/COMPATIBILITY.md) · [Prueba E2E](https://github.com/SOCRAMbt/AI-OFFICE/blob/main/docs/PRUEBA-E2E.md) · [Instalación](#instalación) · [Uso](#uso) · [CLI](#cli-operación)
 
 </div>
 
@@ -611,7 +611,18 @@ Dieciséis, no treinta. Cada tool que se suma es ruido en el contexto de todos l
 
 ```bash
 npm install -g oficina-opencode
+oficina install --target ~/.config/opencode
 ```
+
+`oficina install` copia la skill, los 7 agentes, el comando `/oficina` y el
+**entry point del plugin**.
+
+> **El entry point no es un import pelado.** El loader de plugins de OpenCode
+> v2 no resuelve bare specifiers desde `~/.config/opencode/plugins/`, así que
+> un `export { default } from "oficina-opencode"` falla. El entry que instala
+> el comando **busca el paquete en runtime** —en la config, en la cache de
+> npm de OpenCode, o subiendo desde el propio archivo— y lo importa por ruta
+> absoluta. Por eso reinstalar el paquete en otro lugar no rompe nada.
 
 ### Local (desarrollo)
 
@@ -623,13 +634,24 @@ npm run build
 
 cd ~/.config/opencode
 npm install file:/ruta/a/AI-OFFICE
+node /ruta/a/AI-OFFICE/dist/cli.js install --target ~/.config/opencode
 ```
 
-Y el entry point en `~/.config/opencode/plugins/oficina.js`:
+### Compatibilidad con la API de plugins
 
-```js
-export { OficinaPlugin, default } from "oficina-opencode"
-```
+**OpenCode v1 y v2 tienen APIs de plugins incompatibles.** No es que cambiara
+una firma: cambió la forma (v1 exporta una función con hooks; v2 exige
+`export default { id, setup(ctx) }`).
+
+El motor no depende de ninguna de las dos: define las tools en una forma
+neutra y cada entry la traduce.
+
+| Entry | Versión de OpenCode |
+|---|---|
+| `oficina-opencode` | **v2** — la principal |
+| `oficina-opencode/v1` | v1 (legacy) |
+
+Detalle completo en [`docs/COMPATIBILITY.md`](https://github.com/SOCRAMbt/AI-OFFICE/blob/main/docs/COMPATIBILITY.md).
 
 ### Configuración
 
@@ -731,12 +753,14 @@ El formato de artefactos es compatible con OFICINA v1 (la skill). El plugin **mi
 
 ## Código
 
-31 archivos TypeScript · 18 módulos en `core/` · 1 toolset · 7 hooks.
+33 archivos TypeScript · 19 módulos en `core/` · 1 toolset · 7 hooks.
 
 ```
 src/
-├── index.ts              # entry del plugin: tools + hooks
-├── cli.ts                # CLI de operación
+├── v2.ts                # entry del plugin para OpenCode v2 (tools + hooks)
+├── v1.ts                # entry legacy para OpenCode 1.x
+├── pluginEntry.ts       # entry que se copia a ~/.config/opencode/plugins/
+├── cli.ts               # CLI de operación
 ├── core/
 │   ├── types.ts          # el schema único del sistema
 │   ├── state.ts          # máquina de estados + invariantes + migración v1
@@ -772,7 +796,19 @@ src/
 
 ### Dependencias
 
-Una sola, y es peer del host: `@opencode-ai/plugin`. Zod entra por `tool.schema` — la instancia del propio plugin — para que los tipos nunca divergan de la versión que el host está corriendo.
+**Dos, y ninguna es del host:**
+
+| Paquete | Para qué |
+|---|---|
+| `@opencode/plugin` | Los tipos y el helper del API de plugins **v2**. Es la dependencia real. |
+| `zod` | Los schemas de los argumentos de las tools. Versión pineada para que los tipos no divergan. |
+
+`@opencode-ai/plugin` (v1) es un **peer opcional**: solo lo necesita el entry
+`oficina-opencode/v1`, para los hosts que todavía corren la API vieja.
+
+El motor (`core/`, `tools/`) no importa ninguno de los dos: define las tools
+en una forma neutra y cada entry las traduce. Por eso el mismo motor corre
+en v1 y en v2.
 
 ---
 

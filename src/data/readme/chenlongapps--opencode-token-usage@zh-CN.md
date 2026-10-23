@@ -1,0 +1,185 @@
+<h1 align="center">opencode-token-usage</h1>
+
+<p align="center">在 OpenCode 2 中查看 token 用量、上下文窗口、估算费用与实时性能。</p>
+
+<p align="center">
+  <a href="https://www.npmjs.com/package/@chenlongapps/opencode-token-usage" target="_blank" rel="noopener noreferrer"><img alt="npm" src="https://img.shields.io/npm/v/%40chenlongapps%2Fopencode-token-usage?style=flat-square&logo=npm" /></a>
+  <a href="https://www.npmjs.com/package/@chenlongapps/opencode-token-usage" target="_blank" rel="noopener noreferrer"><img alt="npm downloads" src="https://img.shields.io/npm/dm/@chenlongapps/opencode-token-usage" /></a>
+  <a href="https://opencode.ai/" target="_blank" rel="noopener noreferrer"><img alt="OpenCode 2" src="https://img.shields.io/badge/OpenCode-2-5A67D8?style=flat-square" /></a>
+  <a href="https://github.com/chenlongapps/opencode-token-usage/actions/workflows/ci.yml" target="_blank" rel="noopener noreferrer"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/chenlongapps/opencode-token-usage/ci.yml?style=flat-square&branch=main&label=ci" /></a>
+  <a href="LICENSE" target="_blank" rel="noopener noreferrer"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-yellow?style=flat-square" /></a>
+</p>
+
+<p align="center">
+  <a href="README.md">English</a> |
+  <strong>简体中文</strong>
+</p>
+
+### 项目简介
+
+**opencode-token-usage** 是一个面向 OpenCode 2 的社区插件，在终端界面中展示 token 用量、上下文窗口占用、估算费用和性能指标。
+
+无需离开当前对话，就能了解：当前会话及其子代理消耗了多少 token、上下文窗口还剩多少空间，以及各模型的估算费用分布。
+
+### 主要特点
+
+- **会话树用量汇总：** 统计整棵会话树的输入、输出、推理和缓存 token，包含未打开的子代理，避免重复计算分叉继承历史。
+- **上下文可见：** 查看当前会话的上下文占用、最近一次已上报请求及提示词构成估算。
+- **按模型估算费用：** 按每次调用实际使用的模型计价，以内置原厂价格快照作为回退。估算费用不等于提供商账单。
+- **性能一目了然：** 查看每秒 token 数（TPS）、首 token 时间（TTFT）及当前会话自身的对话耗时。实时 TPS 与已耗时估算以 `~` 标记。
+- **原生终端界面：** 主会话使用侧边栏，子代理视图保留单行摘要，按需打开完整面板。
+- **按需查看详情：** 通过 `/usage` 切换紧凑／详细统计，查看各模型的用量与费率，不向模型发送提示词。
+
+[![OpenCode Token Usage 插件预览](https://raw.githubusercontent.com/chenlongapps/opencode-token-usage/main/docs/assets/opencode-token-usage-preview.webp)](https://www.npmjs.com/package/@chenlongapps/opencode-token-usage)
+
+---
+
+### 安装
+
+需要 **OpenCode 2** 和 **Node.js 22+**。已验证宿主版本及 OpenTUI 引擎限制见[兼容性](#兼容性)。
+
+```bash
+opencode plugin add @chenlongapps/opencode-token-usage
+```
+
+安装后重启 OpenCode。
+
+### 快速上手
+
+1. **查看用量：** 打开会话。终端足够宽且 `session.sidebar` 设为 `auto` 时，原生侧边栏会显示 **Token Usage** 面板。
+2. **展开详情：** 输入 `/usage`，或左键点击面板的 **Token Usage** 标题。按 `d` 切换紧凑／详细模式，按 Escape 关闭；打开详情不会向模型发送提示词。
+3. **查看子代理：** 在子代理视图中，点击输入区上方的实时摘要可打开完整面板，关闭面板不会中断子代理。
+
+精确统计口径及边界情况见[详细用量](#详细用量)、[指标](#指标)和[价格来源与限制](docs/pricing.md)。
+
+关于安装、费用、子代理、推理速度及隐私的常见问题，见 [FAQ](docs/faq.zh-CN.md)。
+
+### 其他安装方式
+
+除了上述命令，也可以在项目的 `opencode.json` 或 `opencode.jsonc` 中配置：
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugins": ["@chenlongapps/opencode-token-usage"]
+}
+```
+
+连接远程服务器时，可将包名加入本机 `~/.config/opencode/cli.json` 的 `plugins`，仅加载终端入口；配置路径遵循 `XDG_CONFIG_HOME`。
+
+### 兼容性
+
+需要 Node.js 22+（见[开发](#开发)中的 OpenTUI 引擎说明）。此前发布已验证 OpenCode 2.0.9 和 2.0.10；SDK 2.0.24 集成检查已在 OpenCode 2.0.11、2.0.22、2.0.24、2.0.26 和 2.0.28 上通过。原生对话耗时与侧边栏标题点击的集成验证使用 2.0.26 和 2.0.28，其余列出的宿主检查早于这些功能加入。已测试组合见[验证记录](docs/verification.md)。
+
+### 详细用量
+
+在会话中输入 `/usage`，或左键点击侧边栏的 **Token Usage** 标题，可打开同一个居中原生弹窗，查看当前会话树的 token 总量，以及按消息实际模型汇总的估算费用。弹窗默认紧凑模式。使用 ↑/↓、Page Up/Down、Home/End 滚动，按 `d` 切换紧凑／详细数字并查看模型费率，按 Escape 或点击 **esc** 关闭。两个入口均不会向模型发送消息。侧边栏其他统计行仍可选择、复制，拖选文字不会打开弹窗。
+
+子代理视图中的摘要格式为 `Token Usage · Context … · Total … · Cost … · Time … · TPS …`。Time 仅累计被查看子代理自身每轮原生显示的对话耗时，token 总量和费用仍统计整棵树。窄终端会省略优先级较低的字段，在 Time 未隐藏时优先保留它，且不增加第二行。缺失数据仍显示不可用，不会被当作零，摘要也不提示快捷键。点击后打开较小的弹窗，按侧边栏原有行序展示精确数值（包括 Steps、TPS、TTFT 和 Run Time）；关闭时不会为完整面板预留高度。Run Time 显示时，在侧边栏及该弹窗中均为最后一行。
+
+弹窗分为五个区域，统计口径互相独立：
+
+| 区域 | 内容 |
+| --- | --- |
+| Context Window | 已用 / 上限、占活动模型上下文上限的百分比，并带占用条 |
+| Last Request | 被查看会话最近一次已上报调用的五类 token 与缓存命中率 |
+| Context Breakdown | 提示词构成估算，按占比降序排列并带条形图 |
+| Session | 全树汇总：steps、calls、tokens、缓存率与费用（紧凑模式为单行，详细模式逐类展开）；独立的 `Run Time (this session)` 行仅累计被查看会话每轮原生显示的对话耗时 |
+| By Model | 各模型的 tokens、calls 与费用，按费用降序；详细模式显示用于估算各模型费用的费率 |
+
+标题下方一行注明会话与当前活动模型，正文不再重复模型名。紧凑模式使用 `K`/`M` 缩写（`812`、`139.4K`、`3.70M`），隐藏零值行，并把 Context Breakdown 中的两类工具合并为一行 `Tools`；详细模式显示精确数字、零值行及 `System Tools` / `MCP Tools` 拆分。侧边栏仍使用精确数字和原有布局。
+
+费用沿用侧边栏的价格及 `partial`、不可定价、免费口径。详细模式下，By Model 显示 Input、Output、Reasoning、Cache Read、Cache Write 的美元／百万文本 token 费率。每组费率注明来源（OpenCode 或内置快照）、传入 token 档位和调用数；同一模型可能有多组。传入 token 为 Input + Cache Read + Cache Write。缺失费率显示 `—`，确认免费显示 `$0.00`，无法定价的调用单独计数。这些是当前用于估算已记录调用的费率，不是历史提供商账单。
+
+**Context Window** 需要已上报用量和有效的活动模型上下文上限。**Last Request** 展示所选 assistant 调用的实测 token，上限未知或来源估算不可用时仍可显示。其时间取自同一条消息，依次选用有效的流式结束、完成、创建时间；均不可用时隐藏时间。请求选择遵循被查看会话的回退截断和最后一次已完成压缩边界。
+
+弹窗中的 **Context Breakdown** 将消息、系统工具、系统提示词、技能、MCP 工具及其他分开展示。它根据被查看会话**最近一次已组装的模型请求**中的文本和工具定义估算，占比的分母是六项估算值之和。其时间为该估算自身的采样时间，可能与 Last Request 对应不同请求。这些不是提供商上报的精确 token，也不会与上方含输出、推理的实测上下文窗口相加一致。媒体内容与提供商额外包装无法准确计量。服务端插件仅保存分类数值，不保存提示词正文；未捕获到请求或服务端 RPC 不可用时显示“来源估算不可用”。
+
+### 指标
+
+| 指标 | 定义 |
+| --- | --- |
+| `Input` | 输入 token，不含缓存读取和写入 |
+| `Output` | 输出 token，不含推理 token |
+| `Reasoning` | 推理 token |
+| `Cache Rate` | `Cache Read ÷ (Input + Cache Read + Cache Write)` |
+| `Total` | 五类 token 之和 |
+| `Context` | 当前会话最后一次已完成压缩后的最新上下文用量，不随子树累计 |
+| `Steps` | 全树（含子代理）的 assistant 消息数，口径与 OpenCode 自带统计一致，compaction 与用户消息不计为 step |
+| `Est. Cost` | 按每条 assistant 与 compaction 消息实际模型估算的全树费用 |
+| `Run Time` | 被查看会话自身的累计原生对话耗时；运行中包含仅用于显示的当前轮已耗时估算，以 `~` 标记；不额外叠加子会话耗时 |
+| `TPS` | 服务端已上报的全树 `Output + Reasoning` 平均吞吐。流式进行中时，优先显示有效的近期可观察文本、reasoning summary 和工具输入估算（UTF-8 字节数 / 4），以 `~` 标记；需单次响应累计至少 20 个估算 Token、当前窗口至少 3 个合并批次且跨度至少 500ms，不计首 token 前等待时间。OpenAI Responses 等 API 不会实时暴露完整的隐藏 reasoning token，因此实时值不能表示隐藏推理吞吐。完成后恢复不带 `~` 的服务端上报吞吐 |
+| `TTFT` | 全树中可测 assistant step 的平均首 token 时间 |
+
+#### 行为
+
+- 用量覆盖会话树中服务端上报的 assistant 与 compaction 消息，包括未打开的子代理；不按文本长度估算 token。
+- 分叉会话是独立会话树。继承消息副本只归原始来源，避免重复计费。
+- `Context` 仅搜索最后一次 `status === "completed"` 的 compaction 之后；没有可靠用量或模型上限时隐藏。
+- `Steps` 统计树中全部 assistant 消息，无论是否已上报用量；复用分叉副本去重，继承历史不会重复计数。
+- `Run Time` 沿用 OpenCode 2.0.26 的原生回答页脚口径：assistant 完成时间减去上一条 idle 标记之后首个 user／synthetic 输入的创建时间。新会话的原生时间元数据尚未记录 idle 时，即使第一条 idle 消息尚未出现，也使用首条输入，同轮 synthetic 投递与 steer 不重置起点。没有 idle 标记的旧历史使用最近一条输入；会话时间元数据缺失时保留这项旧历史回退。没有输入则回退到 assistant 自身的创建时间。每轮只计最终已完成回答的耗时，不把各条 assistant step 的重叠时长重复相加。包含跨度内的模型调用、工具、重试和前台等待，不含轮次之间的空闲；父会话等待子代理的时间已在父会话跨度内，不再额外叠加子代理耗时。
+- 被查看会话运行中时，`Run Time` 估算的是**截至当前已经过去的时间**，不是最终耗时或剩余时间，累计显示值带 `~`（例如 `~42.5s`）。共享的 500ms 时钟替换当前轮已经计入的时长，不额外叠加重叠的 steer／retry 耗时。时钟 tick 只更新内存，历史读取仍由事件触发。启动／重连时通过一次可选的服务端插件只读时间 RPC 取得服务端锚点，带时间戳的实时事件可作为回退；用本地单调时钟推进，不假定远程服务端与客户端时钟一致。中途打开正在运行的会话时，从历史恢复当前轮起点。重连时若历史刷新早于校时完成，仅在同一开放轮次仍保留且历史小计未变时冻结上次可信显示，避免回落到零。没有可信锚点或有效时间时，保留原生累计值。
+- 完成、失败或中断时停止估算；上报的原生完成耗时替换估算值并移除 `~`，因此允许小幅向下校正。历史累计只包含原生已完成耗时。先累加未取整的毫秒值，再格式化（不足一秒显示毫秒，不足一分钟的秒值保留一位小数，其后显示分／小时），因此不一定等于相加各轮已取整的页脚标签。复用现有消息历史读取，重启后可恢复，也适用于安装之前的会话；不依赖实验性执行日志 API 或服务端插件。历史计时数据缺失时显示 `—`，不会显示伪零。读取失败冻结上次显示值并标注 `Not updated`（短摘要中为 `stale`）。
+- `Run Time`／`Time` 仅显示耗时及估算／未更新标记，不附加运行状态文本或动画。已空闲父会话的耗时不会因子代理活跃而增长。关闭视图或切换会话时清理相应估算，无视图需要估算时停止共享耗时 ticker。不可用／未更新的耗时仍保留各自标记。
+- 正常状态下确认累计值为零时，侧边栏、子代理摘要／浮窗及 `/usage` 紧凑／详细模式均隐藏整个 `Run Time`／`Time` 项，不留空行或空字段。当前轮实时估算非零时，首轮回答尚未完成也会显示时间。非零毫秒耗时、不可用值和未更新的耗时仍保留显示。
+- 耗时随保留历史变化：切换 agent／模型与压缩保留过去轮次；分叉继承副本不计入分叉自身耗时。暂存回退不会删除轮次，但已提交回退删除消息后，也会移除这些消息对应的耗时；已删除的历史计时无法恢复。
+- `Est. Cost` 按每条消息记录的实际模型分别计算。OpenCode 当前解析出的完整非零价格优先；若 OpenCode 给出完整零价，且内置价格快照可以完整计价，则采用快照价格。价格不完整时整条消息回退，不混用两套费率。
+- 内置回退快照从 [models.dev](https://models.dev/api.json) 生成，只采用审核过的原厂 Provider 与自家模型系列；少量经原厂核实的例外单独维护。快照覆盖有价格的文本模型，插件运行时不下载价格。网关模型通过精确原厂 ID、明确别名和已知包装格式匹配；只有终尾 `-free` 或 `:free` 会在再次精确查找前移除。
+- 确认免费时显示 `$0.00`；正费用低于 `$0.001` 时显示 `<$0.001`，不超过 `$0.01` 的费用保留三位小数，更高费用保留两位。价格不可用时显示 `—`；只有部分消息可计算时在已知小计后标注 `partial`。快照不含网关加价、区域溢价、未列明的折扣、非文本计费、工具费和税费；Est. Cost 是估算而非账单。覆盖范围、来源和限制见[价格来源与限制](docs/pricing.md)。
+- 实时 `TPS` 使用约 2 秒滑动窗口，合并 100ms 内的增量。只有同时满足三项条件才开始计算和显示：单次响应累计至少 20 个估算 Token（80 个 UTF-8 字节）、当前窗口至少 3 个合并批次、这些批次的有效跨度至少 500ms。首批增量计入响应累计门槛，但仅作测速基线，其字节不计为该时间戳之后生成的输出。各响应独立累计，不跨响应或子代理合并门槛。平滑按经过时间而非 delta 条数推进。门槛未满足时回退到历史 TPS，没有可用历史值则隐藏该行。2 秒没有新增量时，共享的内存超时任务使估算过期，不读取历史。过期后恢复输出时，重新建立基线与平滑状态，并重新满足批次数和跨度条件；同一响应的累计 Token 数保留。
+- 重连时重置实时 TPS 窗口，并通过服务端活动会话列表对账全部已跟踪会话，包括离屏会话。未结束的流静默 60 秒后进行共享活动检查，不读取消息历史；确认会话已停止后，再保留 60 秒并回收流及其 TTFT 观察。仍在运行的工具、重试及首 token 前等待没有硬性寿命上限；活动查询失败时保留状态并重试。仅有提供商的 `streamed` 元数据不代表工具已结束。没有未结束流时停止检查。
+- 实时 TPS 测量可观察的内容交付，而非模型内部生成 token 的时钟。Responses 摘要突发、仅在 done 中返回的内容和传输缓冲仍可能影响估算，不能还原完整隐藏推理。不带 `~` 时，TPS 为全树有效 assistant 样本的 `Σ(Output + Reasoning) ÷ Σ(time.streamed − time.created)`（换算为秒），不是仅取最近请求；该历史分母包含首 token 前等待，与近期实时估算口径不同。不做模型专属倍率、TPS 硬上限或隐藏 reasoning token 猜测。
+- 首次读取失败显示 `Unavailable`；后续失败保留上次完整快照、标注 `Not updated` 并自动重试。
+
+### 开发
+
+```bash
+npm ci
+npm run typecheck
+npm test
+npm run build
+npm run test:smoke
+```
+
+OpenCode SDK 包精确锁定为 `2.0.24`，OpenTUI 为 `0.5.14`。Node.js 22 下已通过干净安装、类型检查、测试、构建和真实宿主 smoke。OpenTUI 为其原生 Node 运行时声明 Node.js `>=26.4.0`，因此 Node 22 安装时 npm 会输出 `EBADENGINE`；启用 `engine-strict` 时须使用满足该依赖引擎要求的 Node 版本。插件的 TUI 在 OpenCode 内运行，并非独立的 Node 22 渲染器。本次升级保持项目 Node.js 22+ 的最低要求不变。
+
+[价格更新工作流](.github/workflows/update-prices.yml) 每天 UTC 22:00 检查 models.dev，也可在 `main` 上通过 **Run workflow** 手动触发。快照无变化就不发布。经审核的原厂来源白名单内有变化时，先通过类型检查、测试、构建和打包检查，再自动升级 patch 版本（例如 `0.4.4` → `0.4.5`），只提交 `src/prices.generated.ts`、`package.json` 和 `package-lock.json`，并原子推送 `main` 与版本标签。工作流创建 GitHub Release，显式触发该标签上的 [`publish.yml`](.github/workflows/publish.yml)，通过 npm Trusted Publishing/OIDC 发布，无需长期 npm token。仓库必须允许 GitHub Actions 推送 `main` 和创建标签；npm 必须信任 `publish.yml` 并允许执行 `npm publish`。
+
+验证失败不会升版本。已打标签但未完成的自动价格发布会优先重试同一版本，再检查新价格；registry 故障不会被当作版本不存在。发布时跳过 npm 已有版本、防止 `latest` 倒退，并在发布后最多轮询 10 分钟核验 registry 可见性，输出进度。校验超时不代表 `npm publish` 失败：先检查 registry，再重试原标签，不另升版本；已发布版本不会重复发布。新增原厂／来源白名单、别名及人工核实的价格例外仍需人工审核。配置、校验时限和重试方法见[发布说明](docs/releasing.md)。
+
+手动更新时，在联网的维护环境运行 `npm run prices:update`，审阅生成文件及例外差异，再执行上述检查。构建和插件刷新不会请求 models.dev。
+
+`test:smoke` 会打包真实产物，并在隔离的 OpenCode 与本地模拟提供商中验证加载、刷新、`/usage`、侧边栏标题点击、子代理累计、逐消息计价、原厂价格补全、模型切换、TPS、TTFT、Responses 摘要突发／done-only 摘要／静默过期，以及会话自身的原生对话耗时（未完成回答、首轮 synthetic 延续、重开运行中 TUI、终端焦点事件、空闲、中断、消息历史恢复、分叉和窄终端子代理视图）。它需要 Python 3、可用的本地端口和 npm 网络访问，不会修改现有 OpenCode 配置或调用付费模型。终端焦点检查不代表已验证物理 macOS 多屏切换、App Nap 或睡眠／唤醒行为。
+
+性能生命周期检查还会使用真实宿主的活动会话 API，对离屏监视器过滤结束事件、注入重连握手，并加速模拟 25 小时的工具／子代理等待，确认运行时保留状态、结束后无需读取历史即可回收。
+
+默认使用 `PATH` 中的 `opencode`。OpenCode 2.0.9 及之后的稳定版 2.x 可以运行；尚未与当前 SDK 验证的宿主会输出警告，然后继续实际兼容性检查。仅通过版本检查不代表兼容性已验证。SDK 依赖仍独立锁定，不随本机 CLI 更新而自动升级。
+
+如需用独立安装的二进制复现基准，而不降级日常使用的安装：
+
+```bash
+OPENCODE_BIN=/absolute/path/to/opencode-2.0.11 npm run test:smoke
+```
+
+`OPENCODE_BIN` 为版本检查、隔离服务端和 TUI 统一选择同一个可执行文件。相对路径以执行命令时的目录为基准解析。smoke 输出和 `result.json` 会记录宿主版本与所选二进制；已测试组合见[验证记录](docs/verification.md)。
+
+从源码加载时，先构建项目，再将仓库绝对路径加入目标项目的 `plugins`。
+
+### 文档
+
+- [常见问题 FAQ](docs/faq.zh-CN.md)
+- [路线图](ROADMAP.md)
+- [验证记录](docs/verification.md)
+- [发布说明](docs/releasing.md)
+- [OpenCode 2 插件开发文档](https://opencode.ai/v2/docs/build/plugins/)
+- [OpenCode 2 CLI 插件接口](https://opencode.ai/v2/docs/build/plugins/cli/)
+
+实现遵循 OpenCode 的 [TokenUsage 定义](https://github.com/anomalyco/opencode/blob/v2/packages/schema/src/token-usage.ts)、[官方计费实现](https://github.com/anomalyco/opencode/blob/v2/packages/core/src/session/usage.ts)和[分叉历史投影](https://github.com/anomalyco/opencode/blob/v2/packages/core/src/session/projector.ts)。
+
+### 声明
+
+这是一个独立的社区插件，并非由 OpenCode 团队构建、维护或认可。
+
+### 许可证
+
+[MIT](LICENSE)

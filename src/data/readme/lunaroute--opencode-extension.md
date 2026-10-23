@@ -84,9 +84,10 @@ paste promptly. A failed paste ends the flow (OpenCode cannot re-prompt) —
 re-run `/connect` for a fresh code; the instance log carries the exact
 reason.
 
-Before your first login, no LunaRoute models are listed. `/connect` lists
-LunaRoute as an integration (that is what v2 lists), so the provider stays
-reachable regardless of the model count.
+Before your first login, `/models` lists a single placeholder model
+(`Log in with /connect`) — the real catalog replaces it after `/connect`.
+`/connect` lists LunaRoute as an integration (that is what v2 lists), so the
+provider stays reachable regardless of the model count.
 
 ## LunaRoute MCP tools
 
@@ -356,6 +357,16 @@ that the Responses default applies.
 - **No models appear after login**: the gateway may be unreachable or the key
   stale. Re-run `/connect`; v2 keeps accounts, so a new login is a new
   account you can switch back from.
+- **A session shows no LunaRoute models** (or only "Couldn't load models — run
+  /lunaroute → Refresh models"): the catalog could not be fetched when that
+  session's folder first loaded — the gateway was unreachable or the key was
+  rejected — or it loaded but listed no chat model your account can use. The
+  plugin retries once, then says so instead of listing nothing (a catalog that
+  loaded before is kept, never replaced by the placeholder). Run `/lunaroute` →
+  **Refresh models** (same as `opencode reload`) once you are online: it
+  re-fetches without restarting. Still only the placeholder afterwards? Check
+  the account's available models. A revoked key needs `/connect` instead — a
+  refresh cannot fix it.
 - **Key rotation / multiple accounts**: `/connect` → LunaRoute lists saved
   accounts; new logins become active and can be renamed or deleted there.
   The plugin follows the active credential for models, MCP, and tools.

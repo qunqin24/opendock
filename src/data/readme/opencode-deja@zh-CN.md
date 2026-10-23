@@ -1,0 +1,406 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/logo-dark.svg">
+    <img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/logo.svg" width="330" alt="deja-vu">
+  </picture>
+</p>
+
+<p align="center"><b>别再让编程智能体重新调试你已经修好的问题。</b></p>
+
+<p align="center">Claude Code、Codex、Cursor 以及这台机器上的其他智能体，本来就把每次会话写在磁盘上。deja 把这些历史全部索引，几个月前的也在，
+再把有用的那部分交给正在干活的智能体。</p>
+
+<p align="center"><img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif" width="720" alt="同一个问题问同一个智能体两次：没有记忆时它毫无印象，有 deja 时它用八个月前的结论作答"></p>
+
+<p align="center"><sub><em>没有人去搜索——是智能体自己调用了 deja。两次真实运行，真实模型、真实工具调用，跑在合成语料上：不会公开任何人的历史。</em></sub></p>
+
+<p align="center"><b>deja 一开始就是满的：四十二个智能体早已写下的历史，几秒建好索引，不需要模型，也不需要额外的采集步骤。</b></p>
+
+<table align="center">
+<tr>
+<td align="center" width="33%">召回率<br><b>97.2% R@5</b>（LongMemEval-S）<br><sub>全部 500 题 · MemPalace 96.6%，agentmemory 95.2%<br>同样 19,195 个会话：100 题中 19 题排第一，第二名 14 题</sub></td>
+<td align="center" width="33%">Token 用量<br>token 只有 agentmemory 的<b>一半</b><br><sub>已做过的任务：53,558 对比 104,974<br>工具定义每轮 477 token，七个里最少</sub></td>
+<td align="center" width="33%">索引耗时<br><b>17.6 秒</b>索引 19,195 个会话<br><sub>七个工具里第二名：72 秒<br>首次回答 26 毫秒，搜索中位数 97 毫秒</sub></td>
+</tr>
+</table>
+
+<p align="center"><sub>deja-vu 是我维护的，所以每个驱动脚本、语料和评分规则都在本仓库里 &middot;
+<a href="https://vshulcz.github.io/deja-vu/guide/day-zero.html">正面对比，以及如何重跑你怀疑的那一行</a> &middot;
+<a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">LongMemEval 和 LoCoMo 的运行记录</a></sub></p>
+
+<p align="center"><a href="../../README.md">English</a> | 简体中文 | <a href="README.zh-TW.md">繁體中文</a> | <a href="README.ja.md">日本語</a> | <a href="README.ko.md">한국어</a> | <a href="README.es.md">Español</a> | <a href="README.pt.md">Português</a> | <a href="README.fr.md">Français</a> | <a href="README.de.md">Deutsch</a> | <a href="README.ru.md">Русский</a> | <a href="README.tr.md">Türkçe</a> | <a href="README.hi.md">हिन्दी</a></p>
+
+<p align="center"><a href="https://vshulcz.github.io/deja-vu/">文档</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">评测</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/compare.html">与同类对比</a></p>
+<p align="center"><sub>觉得有用的话，欢迎在 <a href="https://github.com/vshulcz/deja-vu">GitHub</a> 上给 deja-vu 点个 Star。</sub></p>
+
+## 安装
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
+deja install --auto
+```
+
+脚本把二进制放在 `~/.local/bin`。如果这个目录还不在 `PATH` 里，同一个 shell 找不到第二条命令：运行脚本打印的 `next:` 那一行（带完整路径），或者在加上 `PATH` 那一行之后开一个新 shell。
+
+连不上 `raw.githubusercontent.com` 时走 npm 镜像，版本是同一个：
+
+```sh
+npm i -g @vshulcz/deja-vu --registry=https://registry.npmmirror.com
+deja install --auto
+```
+
+安装十秒，建索引约十秒，然后就能用了。第二条命令会把 MCP 召回接到它找到的每一个智能体上，
+在支持的地方打开会话启动时的召回，并建好第一份索引，这样下一次会话不必再等。
+
+打开一个新的智能体会话，问一件几个月前做过的事：
+
+> 我们以前处理过 jwt refresh rotation 吗？查一下你的记忆
+
+也不必特意去问——开启自动召回后，会话一打开，智能体就已经知道你在这个项目里解决过什么。想自己翻一翻，运行 `deja`。
+
+opencode、DeepSeek Harness、Zed、Kimi Code、Codex CLI、Grok Build、OpenClaw、pi 和 Hermes 也有各自生态里的包，习惯在那边装扩展的人
+可以直接用：
+
+```sh
+opencode plugin opencode-deja
+dsh plugin --profile web add dsh-deja
+# Zed：扩展面板里搜 deja
+# Kimi Code：/plugins install https://github.com/vshulcz/deja-vu
+# Codex CLI：codex plugin marketplace add https://github.com/vshulcz/deja-vu && codex plugin add deja-vu@deja-vu
+# Grok Build：grok plugin marketplace add vshulcz/deja-vu && grok plugin install deja
+openclaw plugins install clawhub:@vshulcz/openclaw-deja && openclaw config set plugins.entries.deja-vu.hooks.allowConversationAccess true
+pi install npm:@vshulcz/pi-deja
+hermes plugins install deja-vu
+```
+
+`deja install --auto` 已经把上面这些都接好了，两条路走哪条都够。两边都装也没问题：包会看
+`deja install` 写了什么，只补上缺的部分，不会重复注册工具、也不会重复召回。详见
+[`extensions/`](../../extensions)。
+
+同一套搜索也是一个 skill，任何会读 `SKILL.md` 的智能体都能装：
+
+```sh
+npx skills add https://github.com/vshulcz/deja-vu --skill deja-search   # skills CLI：Claude Code、Cursor、Goose、Copilot…
+openclaw skills install @vshulcz/deja-search                            # ClawHub
+hermes skills install vshulcz/deja-vu/skills/deja-search                # Hermes
+```
+
+skill 调用的是上面装好的 `deja` 二进制，自己不带。
+
+其他安装方式：`brew install deja-vu`、
+`go install github.com/vshulcz/deja-vu/cmd/deja@latest`，或者用
+`npx @vshulcz/deja-vu "查询词"` 先试试而不装任何东西。Windows 上安装脚本会退出并提示
+`unsupported OS`——它是 shell 脚本。请用 `scoop install deja-vu`（在 Scoop 自带的 main bucket 里）或 `winget install vshulcz.deja-vu`，或从
+[最新发布](https://github.com/vshulcz/deja-vu/releases/latest)取
+`deja-vu_<version>_windows_amd64.zip`，把 `deja.exe` 放进 `PATH`。
+
+只有二进制文件也是一次完整安装：索引、搜索、`show`、`ctx`、`blame`、`--json`
+和脱敏都不需要别的东西。`deja install` 负责的是把 MCP 接进你的智能体、打开会话启动召回——值得有，但可选。
+
+## 自己搜索
+
+在终端里不带参数运行 `deja`，会打开一个覆盖所有智能体历史的搜索界面。最先列出的是你尚未提交的改动背后的会话，
+然后是这个项目最近的会话，边输入列表边收窄。
+
+<p align="center"><img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/tui.gif" width="720" alt="在 deja 界面里输入搜索、阅读找到的会话，并在另一个智能体里接着做"></p>
+
+- `↑↓` 选会话，`↵` 在命中处打开，`n` 和 `N` 在命中之间跳转，`esc` 返回。在会话里按 `/` 找词，`]` 和 `[` 在你问过的问题之间跳。
+- 搜索框也认筛选词：带冒号的智能体名（`codex:`）、`today`、`yesterday`、`week`、`month`，以及 `in:<项目>`。
+- `r` 在写下这个会话的智能体里恢复它。`o` 在任意其他智能体里接着做，新智能体一开始就带着这个会话问过什么、定下了什么、还有什么没解决。
+- `tab` 在本项目、所有项目和 Deleted 之间切换；Deleted 是智能体已经删掉、deja 仍然保留的会话，`R` 把其中一个放回原处。
+- `?` 列出所有按键，其余操作在 `^k` 里（复制会话 id 或项目路径、忘掉一个会话），在列表里 `q` 退出；`esc` 后退一步，搜索框为空时退出。
+
+设置 `DEJA_TUI=0` 时改为打印文本摘要，也就是 `deja brief` 的输出。输出到管道时，它打印已经索引了什么、下一步该运行哪条命令。
+
+## 能得到什么
+
+**在 Codex 里解决，Claude 记得。** 四十二个编程智能体把每一次对话都写进本地文件，
+deja 把这些文件变成一层它们都能读的记忆。
+
+| | |
+| --- | --- |
+| **回溯式搜索** | `deja "connection pool exhausted"` 搜遍几个 GB，包括你安装 deja 之前的一切。自然语言提问会退化到相关性档位。时间是提示，不是过滤条件。 |
+| **跨智能体召回** | MCP 的 `deja` 工具用 `recall` 模式在任何一个智能体里都能回答「这个我们三周前修过」，不管当初是谁修的。 |
+| **压缩之后仍然在** | 在 43 次上下文压缩上实测：摘要保住了 77% 的决策和 0.2% 的你跑过的命令。其余 99.8% 由 deja 交回。在 Claude Code 和 Codex 上，压缩刚开始时 deja 就把任务、文件和命令记下来，压缩之后交回一次。 |
+| **在动手的那一刻召回** | 智能体改文件或跑命令之前，`PreToolUse` 钩子会说出这个文件此前的决定、这条命令能用的写法，或者这台机器上根本没有的那个程序。命令失败时，`PostToolUse` 钩子给出这台机器上同样报错之后跑过什么——那正是智能体不会主动去问的一对。 |
+| **索引的是活儿，不只是话** | 每一轮打开过的文件、跑过的命令及其退出码、以及一次编辑替换掉的确切片段。那正是所有摘要都会丢掉的部分。 |
+
+还有：`deja promote <id> --state rejected` 标注被推翻的决定，此后每一次命中都会显示它试过并被否决；
+命中会报告「本会话涉及的 4 个文件此后已变更」，判断不了时就不说；
+`deja sync ssh laptop` 在机器之间搬运记忆，只追加、中间没有云；
+`deja handoff --to codex` 把当前上下文打包，好在另一个智能体里接着做；
+已知形态的密钥、令牌、JWT 和私钥块在建索引时会被剥掉；模式匹配不是密钥检测，未知形态可能漏过。
+
+### 把你自己的工作画出来
+
+`deja stats --card` 直接画在终端里；给它一个文件名，它会写出一张 SVG，可以放进个人主页的 README。要发到别处，就把它[转成 PNG](https://vshulcz.github.io/deja-vu/card/)——那个页面在你自己的浏览器里完成转换。
+
+<p align="center"><img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/docs/assets/stats-card-demo.svg" width="760" alt="deja 统计卡片：一年的会话热力图、它们来自哪些智能体、以及最长的一次"></p>
+
+完整的功能参考在[文档站](https://vshulcz.github.io/deja-vu/)。
+
+## 隐私
+
+建索引和搜索都在本地。只有 `deja update`、`deja sync ssh`、`deja doctor` 里的版本检查、指向你所配置端点的 `deja embed`（语义索引建好之后，每次搜索也会把查询发到那个端点），以及交互式命令每天一次查看最新发布，会用到网络。这次查看不发送任何会话数据；`DEJA_OFFLINE=1` 或 `DEJA_NO_UPDATE_NOTICE=1` 可以关掉它。
+
+凭据在建索引时脱敏：AWS 密钥、`api_key=` 与 `token=` 赋值、bearer 令牌与裸 JWT、PEM 私钥块、
+各家提供商的令牌、`scheme://user:pass@host` 形式的 URL、没有规则能匹配的高熵值，
+以及写在散文里的口令——「the admin password is …」这种没有任何分隔符可依的写法。
+值会变成 `[redacted:<kind>]`，周围的文本仍然可搜。`deja share` 和 `deja sync export` 在导出时再做一次脱敏。模式匹配不是密钥检测：规则不认识的形态可能原样通过，见安全模型。
+
+`deja forget` 把会话从重建后的索引里移除并写下墓碑，之后的 `deja index` 无法从原始历史里把它们恢复回来。
+[安全模型](../../docs/SECURITY-MODEL.md)记录了数据流向、脱敏的边界、信任假设与发布验证。
+
+## 命令行
+
+在终端里单独运行 `deja` 会打开[搜索界面](#自己搜索)。带上查询词或下面任意一条命令时，它打印结果后退出：
+
+```text
+$ deja "jwt refresh token"
+[claude] api        · Jul 8 · 8f31c0a9 — 2 matches
+  login started failing after refresh token rotation; jwt kid mismatch in tests
+  fixed by reloading jwks cache after rotateKey and adding a clock-skew test
+[codex]  web        · Jul 1 · b77d91e2 — 1 match
+  refresh token cookie needed SameSite=Lax in local callback flow
+```
+
+| 命令 | 作用 |
+| --- | --- |
+| `deja <查询词>` | 搜索所有历史。多个词是 AND，引号内要求连续文本；没有精确命中时会尝试词形与近似拼写。 |
+| `deja` | 在终端里是上面那个全屏搜索。`deja brief` 改为打印文本摘要：今天的会话、deja 交出了什么、最近的工作和一条可以试试的搜索。 |
+| `deja wip` | 这个目录里上一个会话在做什么：任务、定下来的结论、手上的文件、最后一条命令以及它是否失败。全部从记录里推出来，不依赖谁记得写笔记。 |
+| `deja blame <路径>[:行号]` | 哪些会话讨论过这个文件、当时决定了什么、为什么。给出行号时：最后改动这一行的提交，以及写下这一行、或写下被这次提交替换的那段文本的会话。 |
+| `deja files <主题>` | 反方向：某个主题的工作实际动过哪些文件。 |
+| `deja how <工具>` | 这台机器实际怎么跑一件事，带真实参数，来自智能体此前跑过的命令。 |
+| `deja fix <报错>` | 这台机器上同样的报错之后跑过什么，且那次之后错误没有再出现。绝不会是 merge、force push 或删除。 |
+| `deja friction` | 命中三个以上不同会话的报错，并指出来自哪些工具。 |
+| `deja ctx <查询词>` | 最佳命中的 Markdown 摘要，附带它改动的代码，可直接接进提示词。 |
+| `deja resume <id>` | 在原来的工具里重新打开找到的那个会话。 |
+| `deja view` | 把整个记忆导出成一个本地 HTML 文件。没有服务端，数据不离开本机。 |
+| `deja doctor [--deep]` | 自检；加 `--deep` 时用源文件验证索引。 |
+| `deja mcp` | stdio 的 MCP 服务端，也就是 `deja install` 接进去的那个。 |
+
+完整参考见[命令文档](https://vshulcz.github.io/deja-vu/guide/commands.html)。
+
+### MCP 工具
+
+服务端只暴露一个工具 `deja`，用 `mode` 参数选择能力：`recall`、`context`、`blame`、`fix`、`how`、`orient`、`remember`、`handoff`。
+`deja install` 会自动接好，只有手工配置智能体时才需要关心它。原来的六个工具名对已经接好的客户端仍然有效。
+
+## 支持的工具
+
+开启自动召回后，Claude Code 和 Codex 会在压缩开始时把当前记录交给 deja，它留下摘要即将丢掉的东西：
+任务、结论、文件、每条命令跑成了什么、以及还剩什么没做完。同一个会话、同一个工作目录下的下一个钩子
+会把这些一次性交回，总量不超过 4 KB，并附一行说明仓库此后有没有变动。
+`deja stats` 统计压缩之后到第一次编辑之间的工具调用次数，这个功能就是拿它来衡量的。
+细节见[压缩后自动恢复](../../docs/compaction.md)。
+
+Claude Code · Cline · Codex CLI · opencode · aider · Gemini CLI · Cursor · Antigravity ·
+Grok Build · Hermes · Goose · Qwen Code · Kimi Code · pi · omp (Oh My Pi) · OpenClaw ·
+Copilot CLI · VS Code Copilot Chat · Amp · prime-agent (PrimeIntellect) · Roo Code ·
+Continue · Crush · DeepSeek Harness · Cherry Studio · Senpi · gajae-code · Kimchi Coding ·
+Command Code · ZCode · CodeWhale · Reasonix · Kiro · Kilo Code · CodeBuddy Code ·
+TRAE CLI · Muse Code · Junie · JetBrains AI Assistant · Devin CLI · Windsurf / Devin Desktop · Zed。
+
+每个工具分别支持 MCP 召回、自动召回、技能、命令、resume 和 handoff 中的哪些，见
+[英文 README 的能力矩阵](../../README.md#supported-harnesses)。自定义存储位置通过 `DEJA_*_ROOT`
+变量指定，各家自己的迁移变量也会被尊重。
+
+### 自带插件包的智能体
+
+`deja install --auto` 会像接其他工具一样把下面这几个接好，那始终是最短的一条路。
+它们同时在各自的生态里有一个包，方便习惯从那边装扩展的人：
+
+| 智能体 | 包 | 安装 |
+| --- | --- | --- |
+| opencode | npm `opencode-deja` | `opencode plugin opencode-deja` |
+| DeepSeek Harness | npm `dsh-deja` | `dsh plugin --profile web add dsh-deja` |
+| Zed | `deja-context-server` | Zed → Extensions → deja |
+| Kimi Code | 插件 `deja` | `/plugins install https://github.com/vshulcz/deja-vu` |
+| Codex CLI | 插件 `deja-vu` | `codex plugin marketplace add https://github.com/vshulcz/deja-vu`，然后 `codex plugin add deja-vu@deja-vu` |
+| Grok Build | 插件 `deja` | `grok plugin marketplace add vshulcz/deja-vu`，然后 `grok plugin install deja` |
+| OpenClaw | ClawHub 与 npm `@vshulcz/openclaw-deja` | `openclaw plugins install clawhub:@vshulcz/openclaw-deja` |
+| pi（以及 omp） | npm `@vshulcz/pi-deja` | `pi install npm:@vshulcz/pi-deja` |
+| Hermes | 记忆提供者 `deja-memory`，在 Hermes 插件目录里 | `hermes plugins install deja-vu`，或从 GitHub：`hermes plugins install vshulcz/deja-vu/extensions/hermes` |
+
+两条路各自都够用，两条都走也不会出问题：每个包都会先读 `deja install` 写下的配置。
+opencode、dsh 和 OpenClaw 只补上缺的那部分；Kimi、Grok、Codex 和 pi 在安装器已经接好时
+直接让位；在 Zed 里两边用的是同一个 server id。所以无论先装哪个都不会重复。
+
+它们用的都是你已经装好的 deja，包里自带的那份只是兜底。
+
+在 [Spec Kit](https://github.com/github/spec-kit) 项目里，有一个扩展提供 `/speckit.deja-vu.recall`，在实现功能之前先搜索过去的会话：
+
+```sh
+specify extension add deja-vu --from https://github.com/vshulcz/deja-vu/releases/latest/download/deja-spec-kit.zip
+```
+
+## 可选的语义召回
+
+用 `DEJA_EMBED_URL` 把 `deja embed` 指向本地的 Ollama、LM Studio 或任何 OpenAI 兼容端点，
+换个说法提问也能命中。没有可用的运行时，词法搜索和 MCP 召回照常工作。
+
+## 证据
+
+<p>
+同一台机器已经做过的任务，<b>少花 58% 的 token</b> &middot; LongMemEval-S（470 题清理集）上 <b>88.1% hit@1</b> &middot; LoCoMo 上 <b>70.5%</b> &middot; 数 GB 历史上的查询在<b>毫秒</b>级<br>
+<sub>每组 11 次运行：53,558 token，对比未接入任何记忆时的 126,222；之后的版本上再各跑 11 次：52,815 对比 103,443 &middot;
+<a href="https://vshulcz.github.io/deja-vu/guide/day-zero.html">完成一个任务要花多少</a> &middot;
+两套检索评测都在本仓库里，几分钟即可在公开数据集上跑完 &middot;
+<a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">自己核对这些数字</a></sub>
+</p>
+
+```sh
+deja bench recall     # 排序回归下限：100 条查询，一半是俄语，召回下降时 CI 失败
+deja bench context    # 30 条带种子的任务链，外加五个负对照
+deja bench block      # 交出去的那段文字里还剩不剩答案
+deja bench prompt     # 逐条提示的钩子在什么时候开口，又在什么时候开错
+deja bench ingest     # 一次索引更新的代价：没有变化、追加一轮、新增一个记录文件、整文件重写
+deja bench read       # 读取一个数据库存储的代价，以及一个超长值对它的影响
+```
+
+上下文实验把 deja 召回与全量历史、朴素 grep 和冷启动作对比。默认种子下：
+
+| 方案 | token 中位数 | 覆盖率中位数 | 负对照 token |
+| --- | ---: | ---: | ---: |
+| deja-recall | 1,096 | 1.00 | 0 |
+| full-history | 80,547 | 1.00 | 78,145 |
+| naive-grep | 273,238 | 1.00 | 0 |
+| cold | 0 | 0.00 | 0 |
+
+与直接 grep 原始日志相同的事实覆盖率，token 少约 250 倍；比完整重放命中的会话少约 70 倍；
+在没有相关历史的链条上则什么都不注入。语料生成器和相关性标注是普通的、可审阅的 Go 代码。
+在相信任何数字之前，先审清「相关」是怎么定义的——包括我们的数字。
+
+在一份真实的存储上测得：2,419 个会话、179k 条消息，共 1.9 GB 的记录。
+
+| 指标 | 结果 |
+| --- | --- |
+| 进程内查询 | 中位数 **0.7–0.8 ms**，LongMemEval-S 干草堆上约 15 ms |
+| `deja <查询词>` 端到端 | 该存储上中位数约 0.2 s：进程启动、对所有存储做新鲜度检查、排序、打印 |
+| 仅新鲜度检查 | 没有变化时约 50 ms |
+| 索引大小 | 200 MB，约为语料的 10% |
+
+索引是增量的。会话文件变长时，只重新读那一个文件。
+
+## 工作原理
+
+`~/.cache/deja` 里的本地倒排索引：解析 JSONL 与 SQLite 存储、脱敏凭据、写出 `records.bin`
+和词桶，并在 `manifest.gob` 里记录每个文件的状态，因此重复运行只摄入变化的部分。
+MCP 服务端、统计、分享和同步都读这一份索引。细节见
+[docs/ARCHITECTURE.md](../../docs/ARCHITECTURE.md)。
+
+## 常见问题
+
+<details>
+<summary><b>有东西离开我的机器吗？</b></summary>
+
+没有，除非你主动要求。见[数据流向](../../docs/SECURITY-MODEL.md#data-flows)。
+
+</details>
+
+<details>
+<summary><b>日志里已经有的密钥怎么办？</b></summary>
+
+它们留在原本的工具文件里，那是你的智能体的数据；`deja secrets` 会指出带有密钥的会话，方便你轮换和删除，
+`--scrub` 会重写它能触及的记录。已知形态在建索引时剥掉，不会进入摘要、分享或同步导出。模式匹配不是密钥检测，
+未知形态可能漏过。见[安全模型](../../docs/SECURITY-MODEL.md#redaction-boundary)。
+
+</details>
+
+<details>
+<summary><b>会拖慢我的智能体吗？</b></summary>
+
+一次召回是对本地索引的词法查询：中位数 0.7–0.8 ms，没有任何东西在等模型。
+钩子会额外加上进程启动和对存储的新鲜度检查——几个 GB 的存储上是几十毫秒。
+
+</details>
+
+<details>
+<summary><b>我需要改变工作方式吗？</b></summary>
+
+不需要。是智能体自己调用召回；开启自动召回后，
+会话一打开它就已经知道这个项目此前的决定。
+
+</details>
+
+<details>
+<summary><b>和其他记忆工具有什么不同？</b></summary>
+
+| | deja | 记忆平台<br>(Mem0、Letta、memU) | 会话检索<br>(cass) |
+| --- | :-: | :-: | :-: |
+| 知道安装它之前的工作 | 是 | 否 | 是 |
+| 需要采集步骤 | 不需要，转录本身就是记忆 | 由智能体或你的代码写入事实 | 不需要 |
+| 需要大模型或嵌入密钥 | 否 | 是 | 可选 |
+| 不用问也会召回 | 会话开始时、以及工具执行前 | 否 | 否 |
+
+[完整对比](https://vshulcz.github.io/deja-vu/guide/compare.html)覆盖了其中十五个。
+
+</details>
+
+<details>
+<summary><b>Claude Code 的会话历史存在哪里，能搜索吗？</b></summary>
+
+在 `~/.claude/projects` 下，每个会话一个 JSONL 文件；Codex 存在 `~/.codex/sessions`，Cursor 存在 SQLite 的 `state.vscdb`。deja 就地读取它们：单独运行 `deja` 会打开一个搜索和阅读它们的界面，`deja search` 在脚本里做同样的事，`deja last` 列出每个智能体最近的会话，`deja view` 把全部历史打开成一个本地页面。各智能体的路径见[会话存在哪里](https://vshulcz.github.io/deja-vu/guide/where-sessions-are-stored.html)。
+
+</details>
+
+<details>
+<summary><b>Claude Code 的会话历史不见了，是丢了吗？</b></summary>
+
+Claude Code 会删除 30 天以前的记录（`~/.claude/settings.json` 里的 `cleanupPeriodDays`），`claude --resume` 只列出还剩下的。deja 在清理前索引过的会话，文件没了之后仍然可以搜索。详见[磁盘上的会话文件](https://vshulcz.github.io/deja-vu/guide/session-files-on-disk.html)。
+
+</details>
+
+<details>
+<summary><b>怎么全部清除？</b></summary>
+
+```sh
+deja uninstall --all
+rm -rf ~/.cache/deja ~/.local/share/deja ~/.config/deja
+```
+
+索引在 `~/.cache/deja`，`remember` 和 `promote` 的笔记在 `~/.local/share/deja`，
+规则、排除列表和 hook 启动脚本在 `~/.config/deja`（设置了 `XDG_DATA_HOME` 和
+`XDG_CONFIG_HOME` 时在它们下面；Windows 上笔记在 `%AppData%\deja`）。
+
+</details>
+
+## 指南
+
+按场景写的，不是按功能：
+
+- [快速开始（中文）](https://vshulcz.github.io/deja-vu/zh/guide/getting-started.html)——安装、接上智能体、第一次查询
+- [编程智能体记得之前的对话吗（中文）](https://vshulcz.github.io/deja-vu/zh/guide/does-my-agent-remember.html)——各个工具跨会话留下了什么
+- [为什么智能体会忘事（中文）](https://vshulcz.github.io/deja-vu/zh/guide/forgetting.html)——会话结束时消失的是什么
+- [编码智能体记得之前的对话吗？](https://vshulcz.github.io/deja-vu/guide/does-my-agent-remember.html)——每个智能体在会话之间留下了什么，又丢掉了什么
+- [磁盘上的会话文件](https://vshulcz.github.io/deja-vu/guide/session-files-on-disk.html)——`~/.claude/projects` 会长到多大，删掉要付出什么代价
+- [智能体把你刚才的上下文弄丢了](https://vshulcz.github.io/deja-vu/guide/lost-context.html)——崩溃之后、清空之后，或者会话回来时空空如也
+- [上下文窗口满了（中文）](https://vshulcz.github.io/deja-vu/zh/guide/context-window-full.html)——压缩到底保住了什么，实测数据，以及可以换成什么做法
+- [接着昨天的会话做](https://vshulcz.github.io/deja-vu/guide/resume-a-session.html)——跨所有智能体找到它，再回到它原来所属的那一个里打开
+- [智能体又犯了你已经修过的错](https://vshulcz.github.io/deja-vu/guide/repeated-mistakes.html)
+- [找到当初解决它的那次会话](https://vshulcz.github.io/deja-vu/guide/find-a-session.html)
+- [为什么智能体在会话之间会忘事](https://vshulcz.github.io/deja-vu/guide/forgetting.html) · [每个智能体把历史存在哪里](https://vshulcz.github.io/deja-vu/guide/where-sessions-are-stored.html)
+- [压缩会丢掉什么](https://vshulcz.github.io/deja-vu/guide/after-compaction.html) · [换一个智能体](https://vshulcz.github.io/deja-vu/guide/switching-agents.html) · [审计智能体做过什么](https://vshulcz.github.io/deja-vu/guide/auditing-agents.html) · [导出一次对话](https://vshulcz.github.io/deja-vu/guide/export-conversations.html) · [跨机器](https://vshulcz.github.io/deja-vu/guide/sync-across-machines.html) · [记忆要花多少 token](https://vshulcz.github.io/deja-vu/guide/token-cost.html)
+
+按工具：[opencode](https://vshulcz.github.io/deja-vu/guide/memory-for-opencode.html) · [DeepSeek Harness（中文）](https://vshulcz.github.io/deja-vu/zh/guide/memory-for-dsh.html) · [Kimi Code（中文）](https://vshulcz.github.io/deja-vu/zh/guide/memory-for-kimi.html) · [Zed](https://vshulcz.github.io/deja-vu/guide/memory-for-zed.html) · [Grok Build](https://vshulcz.github.io/deja-vu/guide/memory-for-grok.html) · [Gemini CLI](https://vshulcz.github.io/deja-vu/guide/memory-for-gemini.html) · [Qwen Code（中文）](https://vshulcz.github.io/deja-vu/zh/guide/memory-for-qwen.html) · [OpenClaw](https://vshulcz.github.io/deja-vu/guide/memory-for-openclaw.html) · [Goose](https://vshulcz.github.io/deja-vu/guide/memory-for-goose.html) · [Cline](https://vshulcz.github.io/deja-vu/guide/memory-for-cline.html) · [pi 和 omp](https://vshulcz.github.io/deja-vu/guide/memory-for-pi.html) · [Hermes](https://vshulcz.github.io/deja-vu/guide/memory-for-hermes.html)
+
+## 在你自己的历史上试一次
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
+deja install --auto
+```
+
+装好十秒，建索引十来秒。下一次智能体打开会话，它就已经知道你在这个项目里解决过什么——
+包括你装 deja 之前的那些。
+
+## 参与开发
+
+`make build test lint`，然后看 [CONTRIBUTING.md](../../CONTRIBUTING.md)。
+新增一个工具从[解析器注册表](../../docs/ARCHITECTURE.md#source-parsers)开始。
+优先级与非目标见 [ROADMAP.md](../../ROADMAP.md)。
+
+## 许可
+
+MIT © [Vladislav Shulcz](https://github.com/vshulcz)

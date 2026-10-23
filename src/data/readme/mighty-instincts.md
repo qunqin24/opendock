@@ -1,8 +1,8 @@
 # mighty-instincts
 
-An [OpenCode](https://opencode.ai) V2 plugin that observes session activity (tool calls and prompts) into a per-project log, periodically has a cheap model distil that log into small learned "instincts," and exposes [ECC](https://github.com/affaan-m/ECC)'s instinct CLI as slash commands. Nothing becomes live automatically on the write side: `/evolve` only writes inert markdown, and the observer is off by default. On the read side, the plugin adds a small `<instincts>` system-context block to every outgoing model request by default (`inject.enabled: true`); this costs no model call of its own, since it only reads instinct files this plugin (or `/instinct-import`) already wrote. A background maintenance loop (promote, prune, decay, dedupe, evolve) keeps those files tidy without any input from you.
+An [OpenCode](https://opencode.ai) V2 plugin that observes session activity (tool calls and prompts) into a per-project log, periodically has a cheap model distil that log into small learned "instincts," and exposes [ECC](https://github.com/affaan-m/ECC)'s instinct CLI as slash commands. Nothing becomes live automatically on the write side: the maintenance loop only ever *proposes* a candidate skill/command/agent/rule from related instincts (see "From habits to skills" below), and installing, rejecting, or archiving one is always a command you type; the observer is off by default too. On the read side, the plugin adds a small `<instincts>` system-context block to every outgoing model request by default (`inject.enabled: true`); this costs no model call of its own, since it only reads instinct files this plugin (or `/instinct-import`) already wrote. A background maintenance loop (promote, prune, decay, dedupe, evolve) keeps those files tidy without any input from you.
 
-On the OpenCode 2 TUI it also adds a small, collapsible sidebar board summarising three sources of the user's own observation/improvement tooling, in plain language: **Learned habits** (this plugin's own instincts and observer status), **Skill notes** (the task-observer skill's open/parked backlog), and **Skill test** (skill-creator's latest benchmark result). Hosts without the sidebar can run `/board` for the same summary as plain text.
+On the OpenCode 2 TUI it also adds a small, collapsible sidebar board summarising three sources of the user's own observation/improvement tooling, in plain language: **Learned habits** (this plugin's own instincts and observer status), **Skill notes** (the task-observer skill's open/parked backlog), and **Skill test** (skill-creator's latest benchmark result). Hosts without the sidebar can run `/board` for a short, explanatory chat summary of the same three sources instead.
 
 ## Install
 
@@ -71,6 +71,13 @@ All options are optional; defaults shown:
     "evolve": true,
     "repair": true
   },
+  "evolve": {
+    "targets": { "skill": null, "command": null, "agent": null, "rule": null }
+  },
+  "prune": {
+    "unusedDays": 30,
+    "auto": false
+  },
   "board": {
     "enabled": true,
     "sections": { "instincts": true, "observations": true, "evals": true },
@@ -101,25 +108,32 @@ All options are optional; defaults shown:
 | `maintenance.intervalHours` | How often the maintenance sweep runs on its own timer (it also always runs right after an observer run). |
 | `maintenance.dryRun` | Log what every enabled step *would* do (`would promote: ...`, `would prune: ...`, ...) instead of changing anything. See "Trying it safely" below. |
 | `maintenance.promote` / `.prune` / `.decay` / `.dedupe` / `.evolve` / `.repair` | Turn one maintenance step off without affecting the others. All default to `true`. |
+| `evolve.targets.skill` / `.command` / `.agent` | Absolute directory to install candidates of that kind into, overriding the real `~/.config/opencode/skills` / `commands` / `agents`. A skill installs to `<dir>/<suggested_name>/SKILL.md`; a command or agent to `<dir>/<suggested_name>.md`. |
+| `evolve.targets.rule` | Absolute file to append rule candidates to, overriding the project's own `AGENTS.md`. |
+| `prune.unusedDays` | How many days of zero use (lib/usage.js's usage.json) before an installed candidate is flagged as unused. Also the window `/evolve-list` uses for reporting hand-written, never-generated assets. |
+| `prune.auto` | When `true`, an unused installed candidate is archived and its installed file removed (only when it still carries the `generated_by: mighty-instincts` marker) instead of merely flagged. Off by default, like every other automatic write/delete this plugin can do. |
 | `board.enabled` | Turn the sidebar board and the `/board` command off entirely. |
 | `board.sections.instincts` / `.observations` / `.evals` | Show or hide one block of the board (Learned habits / Skill notes / Skill test, respectively; the option names are unchanged from earlier releases). |
 | `board.compact` | Start every board block collapsed to its title line only; still expandable by clicking. Does not affect the panel header. |
 | `board.refreshSeconds` | How often the board state file is recomputed on a timer (it is also refreshed on plugin setup and after every observer run). |
 | `board.observationsRoot` | Absolute path (or one starting with `~/`) to the task-observer skill's data directory. Defaults to `~/.local/share/opencode/task-observer`. |
-| `board.evalRoots` | Array of absolute paths (or ones starting with `~/`) to search for skill-creator benchmark output. Defaults to `["~/.config/opencode/skills", "$TMPDIR/opencode"]`. |
+| `board.evalRoots` | Array of absolute paths (or ones starting with `~/`) to search for skill-creator benchmark output, in priority order: the first root with any benchmark.json at all wins outright (its own newest file), and only a root beyond the first has smoke-test/fixture-looking paths filtered out before that. Defaults to `["~/.config/opencode/skills", "$TMPDIR/opencode"]`. |
 
 ## The board
 
 The board is a small, read-only summary of three sources, written by the server half of the plugin to a per-project `board-state.json` file and polled every 30 seconds (or refreshed on request) by the TUI sidebar panel and by `/board`. Every block has a status circle: a solid green `●` means active and healthy, a solid amber `●` means it needs attention, and a hollow `○` means stale or no data yet. In the sidebar, the panel header and every block title are clickable (collapsing the whole panel, or just that block, down to one line); whichever state you leave them in is remembered across restarts. The header also shows the installed version. Fully expanded, the panel reads something like:
 
 ```
-▾ Mighty Instincts v0.7.0
+▾ Mighty Instincts v0.8.0
   ▾ Learned habits               ● 16
-      added to prompts today          5
+      habits in prompts               6
       used by the agent today         2
       ready to share globally         4
         run /promote to share them
       next learning run              3m
+      skill candidates                 2
+        run /evolve-list
+      installed from habits            1
   ▾ Skill notes                  ● 398
       open                           398
       added this week                158
@@ -130,7 +144,7 @@ The board is a small, read-only summary of three sources, written by the server 
   ● active  ● needs attention  ○ stale
 ```
 
-(`/board`'s plain-text version lines the same labels and values up with dots instead of spaces, since it has no layout engine to delegate to: `Learned habits ............... ● 16`. The sidebar's own right edge follows the panel's actual rendered width, which the fixed-width preview above only approximates.)
+`/board` does not reproduce this layout: it replies in the chat as a short, explanatory summary instead (one headline line per block, then a sentence or two of plain-language context, e.g. what today's most-used habits were and why "used" is counted the way it is), since a table of dot-aligned rows reads awkwardly copied into a chat message. Both read from the exact same `board-state.json` and the same glyph/availability rules (`lib/board-text.js`), so the two are never out of step on what a given state actually means; they just say it differently.
 
 ### Glossary
 
@@ -138,11 +152,13 @@ The board intentionally avoids ECC's own vocabulary ("promote," "prune," "evolve
 
 | Row | Meaning |
 | --- | --- |
-| **added to prompts today** | How many times an instinct was included in a request today (`inject.enabled`). |
+| **habits in prompts** | How many instincts qualify for injection right now (confidence >= `inject.minConfidence`, not excluded, not pending). A live eligibility count, not a per-day tally; it can go up or down between refreshes as instincts are learned, decayed, or promoted. |
 | **used by the agent today** | How many times an included (or still-unproven, pending) instinct's trigger actually matched something you typed today. |
 | **ready to share globally** | Project instincts confident enough (>= 80%) to promote to the shared global bucket, that are not already there. `/promote` does this by hand; the maintenance loop also does it automatically once an instinct is seen in 2+ projects. |
-| **next learning run** | When the background observer is next allowed to run, given `observer.runIntervalMinutes`. |
-| **skill candidates** | How many deterministic, no-model-call skill outlines the maintenance loop's `evolve` step has written under `evolved/`, grouping related instincts; see "see `<path>`" to find them. |
+| **next learning run** | When the background observer is next allowed to run: `ready` once both `observer.runIntervalMinutes` has elapsed since the last run *and* `observer.minObservations` has piled up since, otherwise a countdown while only the interval is still outstanding. Shown as neither when the interval has already elapsed but there just has not been enough new activity yet (there is no fixed time to count down to in that case). |
+| **skill candidates** | How many candidates (lib/maintain.js's weekly `evolve` step proposes them, grouping related instincts) are still waiting on a decision; run `/evolve-list` to see them, and `/evolve-install` / `/evolve-reject` to decide. |
+| **installed from habits** | How many candidates you have installed as a real skill, command, agent, or AGENTS.md rule via `/evolve-install`. |
+| **unused candidates** | How many installed candidates have had zero uses in `prune.unusedDays` days (default 30); see "From habits to skills" below. |
 | **awaiting first use** | Instincts the observer was not confident enough about to call "learned" yet (the "50% rule," below); they graduate to real instincts once you actually use them once. |
 | **kept tidy** | What the maintenance loop did in the last 7 days: `promoted`, `archived`, `merged`, `pruned`, `candidates` (evolved outlines written), whichever of those are nonzero. |
 | **open** / **added this week** / **last reviewed** | The task-observer skill's own open backlog, how much is new this week, and when it was last reviewed by a human. |
@@ -172,8 +188,10 @@ ${CLV2_HOMUNCULUS_DIR or $XDG_DATA_HOME/ecc-homunculus or ~/.local/share/ecc-hom
     ├── maintenance.log             # plugin addition: one line per maintenance event
     ├── .observer-state.json        # plugin addition: last run time + line count for the gate
     ├── .activity.json              # plugin addition: last-observed/applied/fired-today counters
+    ├── fired-misses.log            # plugin addition: near-miss (1-2 shared word) fired-match log, capped at 200 lines
     ├── board-state.json            # plugin addition: the board's three-block summary
-    ├── evolved/<cluster-id>.md     # plugin addition: deterministic candidate-skill outlines
+    ├── usage.json                  # plugin addition: skill/command/agent usage counts (see "From habits to skills")
+    ├── evolved/<cluster-id>.md     # plugin addition: candidates proposed/installed/archived by the evolve lifecycle
     └── instincts/
         ├── personal/<id>.md        # written by the observer
         ├── inherited/<id>.md       # written by `/instinct-import`
@@ -192,14 +210,19 @@ Project identity (the `<project-hash>` above, or the shared `global` bucket when
 | `/instinct-status` | Show instinct status (project-scoped + global). |
 | `/instinct-import <file\|url> [--dry-run] [--min-confidence N] [--scope project\|global]` | Import instincts from a local file or an `https://` URL. |
 | `/instinct-export [--output file] [--domain d] [--min-confidence N] [--scope project\|global\|all]` | Export instincts to stdout or a file. |
-| `/evolve [--generate] [--limit N]` | Cluster instincts into skill/command/agent candidates; `--generate` writes them under `evolved/`. (Separate from the maintenance loop's own, always-on `evolve` step below, which writes a simpler, deterministic candidate outline without needing `--generate`.) |
+| `/evolve [--generate] [--limit N]` | Without `--generate`: a deterministic preview (no model call, no `instinct-cli.py`) of the top instinct clusters (member ids, average confidence, a "why" naming the words they share, a suggested form sized by cluster: rule < command < skill), ending with a hint to add `--generate`. With `--generate`: delegates to `instinct-cli.py`'s own evolve implementation, which writes skill/command/agent candidates under `evolved/`. (Separate from the maintenance loop's own, always-on `evolve` step below, which proposes candidates through the lifecycle described in "From habits to skills" instead.) |
+| `/evolve-list [id]` | List every candidate (proposed/installed/archived) with its kind, member count, usage, and age, plus which installed candidates and which hand-written (never-generated) skills/commands/agents look unused. With an id, shows that one candidate's full detail instead. |
+| `/evolve-show <id>` | Read-only detail for one candidate (kind, target path, members, full body). Never installs or changes anything. |
+| `/evolve-install <id> [--yes]` | Without `--yes`: previews the candidate (same detail as `/evolve-show`) and stops. With `--yes`: installs it as a real skill, command, agent, or AGENTS.md rule. Refuses if the target is a symlink, or already exists and was not written by this plugin for this exact candidate. |
+| `/evolve-reject <id> [reason]` | Archive a proposed candidate without installing it. |
+| `/evolve-archive <id>` | Archive a candidate; for an installed one, also removes the file it installed, but only if ownership and content still match exactly what was installed. |
 | `/promote [id] [--dry-run]` | Promote a specific instinct, or auto-promote everything that qualifies, to global scope. |
 | `/instinct-projects` | List known projects and their instinct counts. |
 | `/instinct-prune [--dry-run] [--max-age N]` | Delete pending instincts older than the TTL. |
 | `/instinct-observe` | Run the observer right now, ignoring the enabled/interval/threshold gates. |
-| `/board` | Show the board summary as plain text (Learned habits, Skill notes, Skill test). |
+| `/board` | Show the board as a short, explanatory chat summary (Learned habits, Skill notes, Skill test); see "The board" above. |
 
-Every command above runs `instinct-cli.py` directly and posts its output back into the session as a synthetic message (`resume: false`); none of them start a model turn. `/instinct-import` and `/promote` pass `--force`, since typing the command is the confirmation that would otherwise come from the CLI's own `y/N` prompt.
+Every command above posts its reply back into the session as a synthetic message with `resume: true`, so it surfaces immediately instead of waiting for the next turn (you just typed the command, so you are sitting right there for the reply); none of them start a model turn. The background observer's own notify message (after an unprompted run nobody is necessarily watching for) keeps `resume: false` instead. `/instinct-import` and `/promote` pass `--force`, since typing the command is the confirmation that would otherwise come from the CLI's own `y/N` prompt.
 
 ## The `instincts` tool
 
@@ -233,7 +256,7 @@ This runs on `ctx.session.hook("context", ...)`, not `"prompt"`: it only ever ap
 
 Each line's summary is the instinct's own `summary:` frontmatter field (one imperative sentence, at most 120 characters); for an instinct written before 0.7.0 with no `summary:` of its own, it falls back to the first sentence of the `## Action` section, clipped to 120 characters.
 
-Each successful injection is counted in `.activity.json` (`appliedToday`, reset at UTC midnight) and shown on the board as "added to prompts today." When an included instinct's `trigger` shares at least 3 significant words (5+ letters, case-insensitive, common filler words removed) with the latest user message, that instinct's `fired` count (in its own frontmatter) is incremented, and the day's total is shown on the board as "used by the agent today." A pending instinct (the "50% rule," above) is checked for firing exactly the same way, but is never included in the injected block itself; once it fires, the maintenance loop promotes it to a real instinct. The observer never sees the injected block itself: `lib/observe.js` still strips any legacy `<instincts>...</instincts>` block it finds in prompt text (harmless now that injection no longer writes into prompt text at all, kept for defence against a residual block from before 0.7.0).
+Each successful injection is counted in `.activity.json` (`appliedToday`, reset at UTC midnight), tracked for its own sake rather than shown on the board directly: the board's "habits in prompts" row is a live eligibility count (how many instincts qualify right now), not this per-day tally. When an included instinct's `trigger` shares at least 3 significant words (5+ letters, case-insensitive, common filler words removed) with the latest user message, that instinct's `fired` count (in its own frontmatter) is incremented, and the day's total is shown on the board as "used by the agent today." A pending instinct (the "50% rule," above) is checked for firing exactly the same way, but is never included in the injected block itself; once it fires, the maintenance loop promotes it to a real instinct. A candidate that shares 1 or 2 significant words (just under the 3-word threshold, so it never actually fires) is logged instead to `fired-misses.log` (id, shared-word count, the words themselves; capped at 200 lines), for tuning that threshold later; nothing in this plugin ever reads that log back. The observer never sees the injected block itself: `lib/observe.js` still strips any legacy `<instincts>...</instincts>` block it finds in prompt text (harmless now that injection no longer writes into prompt text at all, kept for defence against a residual block from before 0.7.0).
 
 ## Maintenance
 
@@ -243,12 +266,77 @@ A background sweep keeps the instinct stores tidy without you ever running a com
 - **prune**: deletes files in `instincts/pending/` older than 30 days (ECC's own default pending TTL); logs a warning for ones within 7 days of expiring.
 - **decay**: a personal instinct that has never fired, past 30 days old, loses 0.05 confidence per full week since its last decay; once that drops it below 0.4 it is moved (never deleted) to `instincts/archive/`.
 - **dedupe**: before the observer writes a new instinct, its trigger+summary is compared against every existing personal instinct; a close match (>= 60% word overlap) gets its confidence raised instead of creating a near-duplicate file (see step 4 under "Observer behaviour" above).
-- **evolve**: groups personal instincts by domain and by word overlap into clusters of 3+, and writes a deterministic candidate-skill outline (title, member ids and summaries, a suggested `SKILL.md` description, no model call) for each to `evolved/<cluster-id>.md`. Runs at most once a week, regardless of how often the sweep itself runs.
+- **evolve**: groups personal instincts by domain and by word overlap into clusters of 3+, and proposes (or updates) one candidate per cluster under `evolved/<cluster-id>.md` (no model call). Runs at most once a week, regardless of how often the sweep itself runs. See "From habits to skills" below for the full lifecycle, including the one step this maintenance loop never takes on its own: actually installing one.
 - **repair**: a one-off, idempotent cleanup for a personal instinct whose trigger carries a leaked trailing frontmatter fragment (e.g. `..., confidence: 0.8`), the shape a parser bug before 0.7.0 (or a hand-edited file) could leave behind.
 
 ### Trying it safely
 
 Set `"maintenance": { "dryRun": true }` to see exactly what the next sweep would do without changing anything: every line it would otherwise log to `maintenance.log` is prefixed `would` instead (`would promote: ...`, `would archive: ...`, `would merge ... into ...`, and so on), with no file written, moved, or deleted. Turn it back to `false` (the default) once you are happy with what you see.
+
+## From habits to skills
+
+Nothing this plugin learns ever becomes a real skill, command, agent, or AGENTS.md rule by itself. The weekly `evolve` maintenance step (above) only ever *proposes* a candidate; everything past that point is a one-step command you type.
+
+### Lifecycle
+
+A candidate moves through exactly three statuses, stored right on the candidate file itself (`evolved/<cluster-id>.md`, frontmatter `status:`):
+
+1. **proposed** - the weekly evolve step wrote (or updated) it. Nothing outside `evolved/` exists yet.
+2. **installed** - `/evolve-install <id>` copied its drafted artefact to a real location. `installed_at` is stamped.
+3. **archived** - either rejected before ever being installed (`/evolve-reject`, with an optional reason) or removed after being installed (`/evolve-archive`). An archived candidate blocks its own cluster from ever being re-proposed.
+
+Re-running the weekly evolve step never duplicates a candidate: if the freshly computed cluster's members overlap an existing candidate's own members by 70% or more, that candidate's `members` list is refreshed in place instead of a second candidate being written for "the same" cluster.
+
+### What gets proposed
+
+Each cluster of 3+ related instincts (the same clustering the maintenance loop's `evolve` step always used) is proposed as one of four kinds, chosen from the cluster's own size and content, no model call:
+
+| Cluster | Kind |
+| --- | --- |
+| 3 members | **rule**: a 1-3 line AGENTS.md snippet, one bullet per member. |
+| 4-5 members, summaries read as run/check/verify/test/lint/build/scan steps | **command**: a `commands/<name>.md` draft (`description:` frontmatter, then the steps). |
+| 4-5 members, otherwise | **skill**: a full `SKILL.md` draft (`name:`/`description:` frontmatter, member summaries as `## Rules`). |
+| 6+ members | **skill**. |
+| any size, if a member mentions delegation or a specialist role | **agent**: an agent markdown draft (`description:`/`mode: subagent` frontmatter, member summaries as responsibilities). This overrides every size rule above. |
+
+### The commands
+
+| Command | Does |
+| --- | --- |
+| `/evolve-list [id]` | Without an id: every candidate (any status) with kind, member count, usage, and age, plus a report of unused installed candidates and unused hand-written assets. With an id: the same single-candidate detail `/evolve-show` renders. Changes nothing either way. |
+| `/evolve-show <id>` | Read-only alias for one candidate's detail: kind, target path, members, and its full drafted body. Works on any status. Changes nothing. |
+| `/evolve-install <id>` | Without `--yes`: previews the exact same detail `/evolve-show` renders, then stops with "Re-run with --yes to install." and writes nothing. With `--yes`: copies the candidate's drafted body to its real location (below), status -> `installed`. Refuses outright if the target is a symlink, or already exists and was not written by this plugin for this exact candidate (see "Install locations and markers" below). Ends with "Restart OpenCode to load it." |
+| `/evolve-reject <id> [reason]` | status -> `archived`, with an optional reason. Only a `proposed` candidate can be rejected; an installed one goes through `/evolve-archive` instead. |
+| `/evolve-archive <id>` | status -> `archived`. For an installed candidate, also removes the file (or AGENTS.md snippet) it installed, but only when `/evolve-install` can still prove it owns that exact, unchanged content (below); a symlinked, hand-edited, or otherwise-owned file is left in place with a note instead. |
+
+`/evolve-install` is deliberately two steps: typing an id alone never writes anything, so there is always a look-before-you-leap preview (what it is, where it would go, every member instinct behind it, and its full body) before the one `--yes` re-run that actually installs it.
+
+### Install locations and markers
+
+| Kind | Default location | Override |
+| --- | --- | --- |
+| skill | `~/.config/opencode/skills/<suggested_name>/SKILL.md` | `evolve.targets.skill` (an absolute directory) |
+| command | `~/.config/opencode/commands/<suggested_name>.md` | `evolve.targets.command` |
+| agent | `~/.config/opencode/agents/<suggested_name>.md` | `evolve.targets.agent` |
+| rule | `<project root>/AGENTS.md`, appended under `## Learned rules (mighty-instincts)` | `evolve.targets.rule` (an absolute file) |
+
+Every `evolve.targets.*` override must be absolute once `~` is expanded; a relative value is rejected (with a one-time warning naming which target) and the real default location is used instead, the same defensive rule `dataDir` already follows.
+
+Every file `/evolve-install` writes carries three identifying fields in its own frontmatter: `generated_by: mighty-instincts`, `candidate_id: <this candidate's id>`, and `project_id: <the project that installed it>`, plus `members: [<member instinct ids>]`. A rule's AGENTS.md snippet carries the same `candidate_id`/`project_id` pair instead, on a bracketing pair of HTML comments (`<!-- generated_by: mighty-instincts candidate_id: ... project_id: ... -->` before the snippet, `<!-- /generated_by: mighty-instincts candidate_id: ... -->` after it), so removing one candidate's rule can never eat into a neighbouring one's, or into text you wrote yourself under that heading. `/evolve-install` also records a sha256 `installed_hash` of exactly what it wrote.
+
+Before touching anything, `/evolve-install` and `/evolve-archive` both check *all* of: the target is not a symlink; its frontmatter (or, for a rule, its start marker) carries this exact `candidate_id` and `project_id`, not merely the marker text somewhere in its prose, and not another candidate's or another project's marker (two projects can easily share one `evolve.targets.skill` directory, e.g. the real default `~/.config/opencode/skills`, without this check they could silently overwrite or delete each other's installs); and, for `/evolve-archive` only, that the file's content still hashes to its own recorded `installed_hash` (otherwise a human has edited it since, and it is left alone). Any mismatch refuses the write (install) or leaves the file in place with a note (archive); the file is never silently clobbered or deleted.
+
+### Usage tracking
+
+`<project data dir>/usage.json` counts every skill/command/agent actually used, generated by this plugin or not: the `skill` tool's own calls by `input.id` (or `input.name`, another field name seen across hosts), slash commands by name whenever a prompt starts with `/`, and subagent spawns (the `subagent`/`task` tool) by `input.agent` (or `input.subagent_type`). This depends on the host naming its tools and input fields one of those ways; a host that names them differently will simply never register usage for that kind, which is why pruning (below) treats a kind's entirely-empty usage bucket as "the signal looks dead," not as proof every installed candidate of that kind is unused. `/evolve-list` and the board read an installed candidate's own usage back by its `suggested_name`.
+
+### Feedback
+
+Whenever an installed candidate's `suggested_name` is actually used, every one of its member instincts gets its `fired` count bumped (the same counter prompt injection bumps on a real trigger match), wherever that member lives (project personal, inherited, or the shared global bucket). A member that has fired at least once is exempt from the maintenance loop's `decay` step, so the habits behind a useful artefact never decay just because people now reach for the artefact instead of the injected instinct directly.
+
+### Pruning (report-only by default)
+
+The weekly evolve step also runs `pruneCandidates`: any *installed* candidate with zero uses in `prune.unusedDays` days (default 30, and only once it has been installed at least that long) is flagged, never touched, unless `prune.auto` is explicitly turned on, in which case it is archived and its installed file removed (the same ownership- and hash-gated removal `/evolve-archive` does). Even in auto mode, a kind whose usage bucket is entirely empty is never auto-archived (see "Usage tracking" above: an all-empty bucket most likely means a dead signal, not genuine disuse), and every candidate is handled in its own try/catch, so one failure is logged and skipped rather than aborting the rest of the sweep. Rule candidates are never flagged this way: an AGENTS.md line has no runtime "it was used" signal to measure. `/evolve-list` separately reports hand-written assets (skills/commands/agents that never carried the `generated_by` marker in the first place) with zero uses in the same window, under "unused (not generated)" - these are never archived or removed, automatically or otherwise, since this plugin did not write them.
 
 ## Privacy
 

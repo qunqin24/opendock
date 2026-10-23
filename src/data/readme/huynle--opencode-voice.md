@@ -20,9 +20,11 @@ Formerly **opencode-voice** and, briefly, **opencode-hub**
   (tool calls, thinking, subagents, streamed replies), read the conversation, send a turn (it steers the
   run while the session is busy), stop a whole session tree, answer permissions, switch models, and
   start new sessions, from the phone.
-- **Notifications**: web push when a session asks a question, needs permission, fails or finishes, with
-  per-device toggles, quiet hours and per-session mute; opt-in **Activity updates** (one quiet, self-replacing
-  notification per session) to follow subagents, long tools and scripts with the screen off.
+- **Notifications**: web push when a session asks a question, needs permission, fails, or is **all done** (the
+  session and all its subagents and scripts settled, once per run), plus opt-in finer kinds (every turn,
+  stopped, retrying, each subagent, each script, long tools) and **Activity updates** (one quiet, self-replacing
+  notification per session); one toggle per kind and device, quiet hours and per-session mute
+  ([docs/notifications.md](docs/notifications.md)).
 - **Live without waste**: the console's stream resumes where it left off after a lock or app switch (event
   ids + replay), pauses while the page is hidden, and carries streamed text only for the session on screen.
 - **Running detection**: a session counts as working while OpenCode reports it busy or retrying, or while a
@@ -197,17 +199,18 @@ conversation mode and utterances (403 `not_exposed` for sessions not shared with
 |---|---|
 | `POST /api/sessions/:id/turn {text, images?}` | sends a turn; while the session tree is running it steers instead (202 `{mode: "steer", inboxID}`). An idle turn answers its `TurnResult` (`{outcome, reply, message?}`) when it ends; with `Prefer: respond-async` (the console sends it) a turn still running after 1.5 s answers 202 `{mode: "turn"}` (`Preference-Applied: respond-async`) and its result follows as an SSE `turn` event `{sessionID, outcome, reply, message?}`, so no proxy cuts a long request. The session stays busy until the turn ends either way. `images` is up to 4 `{mime, data, name?}` (PNG, JPEG, WebP or GIF; canonical base64 whose bytes match the type; each at most 512 KB decoded, together at most 750,000 base64 characters); `text` may be empty when images are attached. They reach OpenCode as inline file attachments. 400 empty, over 100,000 characters or invalid images (with the reason); 409 "A turn is already running for this session" |
 | `GET /api/sessions/:id/timeline?limit=N&order=desc` · `?limit=N&before=<older>` | the conversation as timeline rows, newest first: the latest `limit` rows (1–200, default 50) in chronological order, plus `older` (the cursor of the rows before them) while there are more. `before=<older>` returns the page before that cursor. Cursors are row keys, so they stay valid while new messages arrive. A page starts at a message boundary when it can (it may be up to twice `limit` then). 400 for an unknown cursor (history reverted or compacted: start again from the newest page). The forward mode `?limit=N&cursor=` (oldest rows first, `cursor` for the next page) still works; it cannot be combined with `before` or `order=desc`. The spoke reads OpenCode's history for a first page and serves the following pages from a short-lived per-session cache (30 s, dropped when the session changes) |
-| `GET /api/sessions/:id/timeline/messages/:message/files/:index` | one image attached to a user message, as bytes with its type (`cache-control: private, no-store`). Timeline user items list their attachments as `files: [{index, mime, name?}]` (never the bytes). Only PNG, JPEG, WebP and GIF are served (404 otherwise or when missing); 413 when the image would not fit in a protocol frame (about 650 KB) |
+| `GET /api/sessions/:id/timeline/messages/:message/files/:index` | one image attached to a user message, as bytes with its type (`cache-control: private, no-store`). Timeline user items list their attachments as `files: [{index, mime, name?}]` (never the bytes). Every timeline row carries `pos` (ordering position: session message order, then part order; derived from the message's creation time, kept increasing, so it does not change as pages move); tool rows `callID`, subagent tool rows `childSessionID` and `title` (the task description), assistant text rows `ordinal`. Only PNG, JPEG, WebP and GIF are served (404 otherwise or when missing); 413 when the image would not fit in a protocol frame (about 650 KB) |
+| `POST /api/sessions/:id/rename` `{auto: true}` | Auto-name: OpenCode regenerates the title with its Title agent (`session.update` with an empty title on the process's own server). 200 `{title}` (or `{title, unchanged: true}` when OpenCode kept it), 202 `{pending: true}` when it is still generating after 20 s (the catalog updates when it lands), 409 `plugin_outdated` when no process reporting the session supports it, 502 when the process cannot reach its server or the title model failed |
 | `POST /api/sessions/:id/rename` | `{title}` → `{title}`: renames the session in OpenCode (`session.update`), through the process that owns it, else any other process that reports it. The title is trimmed and must be 1–200 characters (400 otherwise). Works with Voice off; the new title shows in every console at once (the spoke reports it before answering) |
 | `POST /api/sessions/:id/stop` | interrupts running descendants deepest first, then the root; idempotent. Also releases the hub's turn lock for the tree: a turn request still waiting answers `{outcome: "interrupted"}` and the next turn can start (`/interrupt` does the same) |
 | `GET /api/sessions/:id/summary` | context usage, todos, MCP status (at most 100 servers), branch and working-tree change stats (each part optional). `changes` lists at most 500 files, most-changed first, with `totalFiles` and `truncated`; its `additions`/`deletions` cover every file |
 | `GET /api/sessions/:id/diff?file=` | one file's patch, on demand (capped at 400 KB as JSON, then `truncated: true`); never stored in the hub |
 | `POST /api/sessions/:id/read` · `GET /api/reads` | per-user read marks, synced to your other devices |
 | `GET /api/events?lite=1&session=<id>&last=<id>` | the live stream (SSE). Every message has an `id:`; reconnecting with `Last-Event-ID` (EventSource does it) or `?last=` replays what was missed when the hub still has it (last 2000 events or 5 minutes per user; one fresh `catalog` stands for any catalog changes), else sends the catalog then `{type: "resync"}` (the page refetches what it shows). Ids are `<epoch>.<n>`; a hub restart starts a new epoch. `lite=1` leaves out `delta`/`reasoning` except of `session`'s tree (status, activity, catalog, turns and the rest still come). Heartbeat: `event: ping` every 20 s |
-| `GET /api/push/prefs?endpoint=` | `{prefs, quietHours, activityMinutes, muted, subscriptions, subscribed?}`: this device's toggles (`handoff, question, permission, finished, failed, say, activity`), activity update interval and quiet hours, the user's muted sessions, how many subscriptions the hub holds for this device, and whether it holds `endpoint` |
+| `GET /api/push/prefs?endpoint=` | `{prefs, quietHours, activityMinutes, muted, subscriptions, subscribed?}`: this device's toggles (`handoff, question, permission, done, failed, turn, stopped, retry, subagentDone, subagentFailed, jobDone, jobFailed, longTool, say, activity`; `PUT` also accepts the legacy `finished` → `done` and `blocked` → question + permission), activity update interval and quiet hours, the user's muted sessions, how many subscriptions the hub holds for this device, and whether it holds `endpoint` |
 | `PUT /api/push/prefs {toggles…, quietHours?, activityMinutes?}` | boolean toggles (a 0.5.0 `blocked` sets question and permission); `quietHours` `{start: "HH:MM", end: "HH:MM", timeZone}` or `null`; `activityMinutes` a whole number 1–60 (400 when invalid) |
 | `POST /api/push/subscribe {subscription, prefs?, oldEndpoint?}` · `POST /api/push/unsubscribe {endpoint}` | this device's subscriptions; `oldEndpoint` is dropped (rotated subscription). The endpoint must be https on a public hostname that resolves only to public addresses (no loopback, private, link-local, CGNAT or ULA hosts, no `localhost`/`*.local`/`*.internal`), else 400 |
-| `POST /api/push/test` | a test notification to the caller's device only: `{sent, failed: [{host, status?}], subscriptions}`; 429 with `retry-after` within 10 s of the last one |
+| `POST /api/push/test {kind?}` | a test notification to the caller's device only, shaped like `kind` when given (400 for an unknown kind): `{sent, failed: [{host, status?}], subscriptions}`; 429 with `retry-after` within 10 s of the last one |
 | `PUT /api/push/mute {sessionID, muted}` | mutes or unmutes a session's notifications for the user: `{muted}` |
 
 ## Spoke (OpenCode plugin)
@@ -323,7 +326,11 @@ session, apply to the next turn or newly started worker, and fall back to the ma
 `workModel` when unset.
 
 The conversation is an inline execution timeline: streamed thinking, tools and nested subagents appear
-between messages as compact expandable rows. Reopening a session pages its projected message history from
+between messages as compact expandable rows. Rows keep the session's order, never wall-clock order: history
+rows carry the spoke's `pos` (message order, then part order), live rows go after the history loaded when they
+arrived (in arrival order) and are replaced in place by their stored row, and a subagent row stands where the
+tool call that spawned it is (timeline tool rows of `subagent`/`task` carry `childSessionID`; a subagent whose
+spawn is not loaded yet shows at the top of the loaded history). Reopening a session pages its projected message history from
 OpenCode. Expanding a tool fetches its complete input/output from the owning OpenCode process; the hub does
 not persist those potentially sensitive details.
 
@@ -426,6 +433,13 @@ the Docker image, npm package and binaries ship the build). One store fed by the
   selected: Enter (or clicking away) saves, Escape cancels. The new title shows at once and is set in
   OpenCode itself (`POST /api/sessions/:id/rename`), so terminals see it too; if that fails the old title
   comes back with a message.
+- **Auto-name**: **Auto-name** in the same `⋯` menus, or the ✨ button next to the rename field, has OpenCode
+  name the session with its Title agent (what `/rename` without a title does in the terminal; the model is
+  `agents.title.model`), from the first request and the recent conversation. The title shows "Naming…" until
+  OpenCode answers, then a toast says "Renamed to …" or "OpenCode kept the title". Needs this plugin version
+  in the session's OpenCode process (older ones answer "Update the Hub plugin to use Auto-name") and a process
+  that can reach its own server: the background service, or `opencode serve --port …` with
+  `OPENCODE_SERVER_PASSWORD` (a TUI's own `serve --stdio` server cannot; use `/rename` there).
 - **`/`**: All sessions as a sortable, filterable table (a list on phones); filters and sort are kept per device.
   There is no Voice column or Voice filter: the live Voice session gets the green dot before its title, and the
   row's `⋯` menu has **Allow Voice** / **Disallow Voice**.
@@ -512,16 +526,30 @@ Pure logic lives in `web/src/core` and `web/src/lib` (bun tests in `test/web-*.t
   failed, the session still exists and the hub's `warning` is shown. 409 (background service not
   connected) is shown under the composer.
 
-**Notifications** (web push, VAPID keys generated once and stored in the state file). Each device picks what
-it wants (Settings → Notifications): **a session asks a question**, **needs permission**, **failed**,
-**finished** (a root session's run succeeded, except voice turns started from the page), **hand-offs from the
-terminal**, and **Voice replies when you're not watching** (pref `say`: spoken replies while no device shows
-the session). Questions, permissions, hand-offs and Voice replies are on by default; finished and failed are
-opt-in (0.5.0's single "blocked" toggle became question + permission, and its "finished" became finished +
-failed, migrated on start). Optional **quiet hours** per device (local start/end time in the browser's time
+**Notifications** (web push, VAPID keys generated once and stored in the state file). Each device picks each
+kind it wants (Settings → Notifications, grouped, with a one-line description each and a "You'll get: …"
+summary); [docs/notifications.md](docs/notifications.md) lists every kind, its trigger and what is not notified:
+
+- **Needs you**: a **question**, a **permission** (on by default).
+- **Session**: **All done** (on): the root session's last turn succeeded and the whole tree is settled (no
+  subagent or shell job running, nothing waiting for an answer, no hub turn) for 15 s, once per run;
+  **Failed** (on, with the reason); **Turn finished** (every root turn, 0.7's "finished": off, noisy because
+  each background subagent that completes starts a short continuation turn); **Stopped** (shutdown,
+  inactivity) and **Retrying** (provider retries), off.
+- **Subagents**: each subagent **finished** / **failed** (off). **Scripts and tools**: a background shell or
+  terminal **exited 0** / **failed** (non-zero, killed, timed out), a **long tool** (≥ 30 s) ended (off).
+- **Voice**: spoken replies while no device shows the session (`say`) and **hand-offs** from the terminal (on).
+- **Activity digest** (off, below).
+
+Titles read "*session* · *kind*" ("KVM Rewrite · All done", "KVM Rewrite · Subagent S3 macros finished",
+"KVM Rewrite · Script exited 1"). Nothing but questions, permissions, hand-offs and spoken replies is sent
+while a device shows the session. Stored 0.7 prefs migrate on start: `finished` becomes All done (not every
+turn), the rest is kept and the new kinds start off (0.5.0's single "blocked" toggle still becomes question +
+permission). Optional **quiet hours** per device (local start/end time in the browser's time
 zone) hold everything except hand-offs; **Mute notifications** in a session's ⋯ menu silences one session
 for you on every device (hand-offs still come through). At most one per session and kind every 30 s
-(Voice replies: 10 s); expired subscriptions (404/410) are pruned.
+(Voice replies: 10 s; subagents, scripts and long tools: per subagent, job or call); expired subscriptions
+(404/410) are pruned.
 
 **Activity updates** (pref `activity`, off by default on every device; Settings → Notifications shows a hint
 until it is on): to know what happens without keeping the screen on. Steps of interest in a session tree — a
@@ -539,12 +567,14 @@ device shows the session.
   notifications on this device** fixes it. When permission is granted, the app re-subscribes by itself on
   load if the hub lost the subscription, and the service worker re-subscribes when the browser rotates it
   (`pushsubscriptionchange`). **Send test notification** sends one to this device only and shows the result
-  (sent, or the push service's status).
+  (sent, or the push service's status); pick a kind next to it to see how that kind looks.
 - **Delivery**: questions, permissions and failures are sent with `urgency: high` and a TTL of one hour so a
   phone in doze gets them; they stay on screen until handled (`requireInteraction`), vibrate, and replace the
   previous one of the same session and kind. A permission notification asks the hub (with the device's
   cookie, from the service worker) what the request is, shows it, and offers **Allow once** / **Reject**;
-  the payload itself never carries it. Payloads are `{kind, sessionID, title, body, requestID?}`.
+  the payload itself never carries it. Payloads are `{kind, sessionID, title, body, requestID?, test?}`.
+  Failures (and failed subagents and scripts) vibrate; progress kinds (turn, retrying, subagent and script
+  finished, long tool, activity) replace the previous one of the session quietly.
 - **Android (Chrome)**, for notifications that arrive with the screen off: open the public URL, sign in or
   pair, then Chrome's menu → **Install app** (or Add to Home screen) and use the installed app; Settings →
   Notifications → **Enable notifications on this device** and **Send test notification**. In Android
@@ -718,13 +748,17 @@ SSE (`/api/events`) adds:
   delivery event arrives before the steer result).
 - `{type: "activity", sessionID, rootID, item}` when an activity item is created or changes state, for
   every session (all of the owner's devices see it, like `status`). `item` is `{id, sessionID, kind: "tool" | "thinking",
-  tool?, summary?, background?, state: "running" | "done" | "failed", error?, at}`; `sessionID` is where it
+  tool?, summary?, background?, childSessionID?, state: "running" | "done" | "failed", error?, at}`
+  (`childSessionID`: the session a subagent tool started, once the tool reports it); `sessionID` is where it
   happened (a subagent session maps to its root `rootID`). The hub keeps the 30 most recent items per
   root (in memory) and returns them, newest last, as `activity` in `GET /api/sessions/:id`. Spokes forward
   tool and reasoning events in compact form (`compactActivity`): tool name, a one-line summary of the
-  input (command, path, pattern…), ok/error; never file contents or outputs. Thinking items close on
+  input (command, path, pattern…), ok/error; never file contents or outputs. A subagent tool's
+  `session.tool.progress` goes out only as `session.tool.called {id, childSessionID}` (a type every hub
+  accepts); other progress is dropped. Thinking items close on
   `session.reasoning.ended`, when the next activity in that session starts, or when its run ends.
-- `{type: "delta", sessionID, rootID, messageID?, text}` (assistant text) and `{type: "reasoning", sessionID,
+- `{type: "delta", sessionID, rootID, messageID?, ordinal?, text}` (assistant text; `ordinal`: which text part of
+  the message, as OpenCode numbers them) and `{type: "reasoning", sessionID,
   rootID, messageID?, delta}` (reasoning text; spokes cut each delta to 2000 chars and never forward the full
   text of `session.reasoning.ended`) for root **and** subagent sessions. Per session they are coalesced to at
   most one send per 100 ms (the first delta goes out at once, later ones in the window are joined); anything
@@ -732,10 +766,10 @@ SSE (`/api/events`) adds:
 - `status` entries of working sessions carry `since` (ms epoch the current run started), also in the catalog
   and `GET /api/sessions/:id`.
 
-Pushes in conversation mode depend on presence: while the session is watched, "finished" is not sent
-(the phone is open and speaking). When nobody watches, "finished" is sent as usual and each spoken text
+Pushes depend on presence: while the session is watched, run notifications (all done, turn, failed, …) are
+not sent (the page is open, and in conversation mode speaking). When nobody watches, they are sent as usual and in conversation mode each spoken text
 of the root session (the whole text part, when it ends) is pushed as kind `say` (title = session title, body = the text, max 180 chars; at
-most one every 10 s per session; on by default, pref `say`). "blocked" is always sent. `/api/transcribe` and `/api/speak` have no rate limit; `/api/speak` accepts up to
+most one every 10 s per session; on by default, pref `say`). Questions and permissions are always sent. `/api/transcribe` and `/api/speak` have no rate limit; `/api/speak` accepts up to
 `HUB_MAX_SPEECH_CHARS` per call, so the phone sends sentence-sized chunks. `/api/speak` streams the provider's MP3 through as it
 arrives (chunked; nothing is buffered on the hub, and a phone that cancels aborts the upstream request), so playback
 can start before synthesis ends; provider errors still answer 502 before any audio.
@@ -885,9 +919,20 @@ Pure logic is in `web/src/core/feedback-core.ts` (tested with bun); `web/src/cor
   playback changes. Each cue has several variants (`CUE_VARIANTS` in `web/src/core/feedback-core.ts`), chosen
   from a shuffle-bag: every variant once before any repeats, never the same phrase twice in a row, and a variant
   whose audio is already loaded wins. All variants are synthesized, 2 at a time, when Voice mode starts (ending Voice mode
-  cancels what is left) and kept in memory and in the browser's Cache Storage (`hub-cues-v1`, keyed by TTS provider, model, voice, speed and server, so a later
+  cancels what is left) and kept in memory and in the browser's Cache Storage (`hub-cues-v2`, keyed by TTS provider, model, voice, speed and server, so a later
   session starts with them ready and a voice change fetches them again); a ready phrase starts playing at
   once. A phrase that is not ready yet when its cue fires plays a short tone instead.
+- **Cue loudness**: short TTS phrases come out several dB louder or quieter than the spoken replies, so each
+  phrase is normalised while it is prefetched (never when it plays): decoded (`OfflineAudioContext`), measured
+  (ITU-R BS.1770 K-weighted, gated loudness), trimmed to at most 80 ms of leading/trailing silence, gained to the
+  replies' loudness with a look-ahead limiter keeping peaks at or below −1 dBFS, and stored as a 16-bit mono WAV
+  (with the target it was normalised to; a target that moved by more than 1 dB re-normalises the cached audio
+  without new synthesis). The target is −19.5 LUFS until replies are measured: each completed reply sentence of
+  at least 1 s is decoded when the page is idle, and the median of the last 21 per TTS voice
+  (`localStorage` `voice.replyLoudness`, clamped to −26…−14 LUFS) becomes the target. Audio that cannot be decoded
+  plays as synthesized. Cues and replies keep their plain `<audio>` elements (no Web Audio playback graph, which
+  would break background and iOS playback), both at volume 1 and the chosen speed. Pure parts:
+  `web/src/core/loudness.ts`; browser decoding: `web/src/voice/cue-loudness.ts`.
 - **Presence**: while a session view is open, the phone posts `POST /api/sessions/:id/presence
   {visible}` on visibility changes and every 30 s while visible, and `{visible:false}` on `pagehide` and
   when leaving the view. The hub uses this to decide when to push.

@@ -1,0 +1,1 @@
+{"versions":[{"v":"0.1.1","t":"2026-09-15T06:59:47.122Z"},{"v":"0.1.0","t":"2026-09-14T20:55:47.343Z"}],"releases":[],"issues":[{"number":1,"title":"When codex 5h quota expires we render `unavailable` instead of communicating reset ETA","url":"https://github.com/Bugg4/opencode-multi-usage/issues/1","state":"closed","comments":1,"date":"2026-09-27T20:54:09Z"}],"sharedRepo":false}

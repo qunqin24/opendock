@@ -54,6 +54,9 @@ left.
 `Esc` closes the window and keeps the thread. A click on `copy thread` copies the whole
 thread through the terminal clipboard.
 
+While a side question is being answered, the `btw` badge in the prompt row opens the
+window for it.
+
 A thread belongs to the session it was asked in, and it lives in memory as long as the
 process runs.
 

@@ -25,6 +25,11 @@ LLMs waste a lot of tokens reading and re-reading your code and asking you for c
 - **Export / import (JSONL)** — `memory_export` / `memory_import` back the store
   up or move it between machines. Every imported row re-enters through the same
   write gates, so an export can't smuggle junk in.
+- **Injection-resistant by construction** — every injected memory block frames
+  itself as *reference data, never instructions*; rows that arrived through a
+  path the gates can't fully vouch for carry a visible `[via import]` /
+  `[via auto-capture]` provenance marker; and the `status:"open"` frontier
+  exemption is only honored for files carrying a machine-made export header.
 - **Decay** — `memory_decay` retires stale open threads. Dry run by default;
   supersede-not-delete, snapshot-first, undoable.
 - **Auto-capture (opt-in)** — with `autoCapture` on, session-idle events get one
@@ -62,16 +67,43 @@ store writes) using the plugin's real injection code:
 
 | Policy | Recomputes | Injected chars (20 turns) | Avg/turn | Worst block |
 | --- | ---: | ---: | ---: | ---: |
-| A — recompute per prompt, uncapped (pre-0.2) | 20 | 27748 | 1387.4 | 1575 |
-| B — epoch freeze + 1200-char cap (0.2) | 4 | 20654 | 1032.7 | 1157 |
+| A — recompute per prompt, uncapped (naive) | 20 | 29460 | 1473.0 | 1765 |
+| B — epoch freeze + 1200-char cap (shipped) | 4 | 19516 | 975.8 | 1139 |
 
-Policy B injects 25.6% fewer characters — and the bigger saving isn't even in
+Policy B injects 33.8% fewer characters — and the bigger saving isn't even in
 the character count: B's block is byte-identical between store changes, so the
 prompt cache stays warm across ordinary turns. Reproduce (byte-identical
 output):
 
 ```sh
 bun bench/inject-cost.ts
+```
+
+## Write latency — one tree scan per write, not per ref
+
+GATE-1 re-resolves call signatures embedded in a memory against the live
+source tree, and GATE-2's stale-ref scan does the same for every memory in
+the scope. The original resolver enumerated the whole tree (a glob pass per
+extension, `node_modules` included) **per call form** — a write citing a few
+symbols paid N full-tree scans: ~0.4s each in a small repo, seconds in a
+monorepo. A write now builds one tree index — a single recursive walk that
+prunes `node_modules`/VCS/dot dirs — shared by both gates, and source files
+are read in bounded-parallel chunks and cached, so each file is read at most
+once per write. Measured on a 5,300-file fixture (300 sources + 5,000
+`node_modules` decoys), scope seeded with 5 embedded call forms:
+
+| Call forms in the write | Shipped | Old (scan per form) |
+| --- | ---: | ---: |
+| 1 | 17ms | 105ms |
+| 3 | 15ms | 136ms |
+| 5 | 20ms | 169ms |
+
+The shipped column is flat — the tree is walked once no matter how many refs
+the write cites. In real `node_modules`-heavy repos the old per-form scan
+measured 400–700ms, so the gap there is 20–100×. Reproduce:
+
+```sh
+bun bench/write-latency.ts
 ```
 
 ## Recall quality — no models required
@@ -231,9 +263,22 @@ as `00:11:25.867`, or a unique substring of its text. Omit it to update the newe
 entry of that scope and type. A `query` matching nothing, or matching several rows,
 writes nothing and says so rather than updating the wrong memory.
 
+## Repo scoping
+
+Memories belong to the repo that wrote them: rows are stamped with your git
+remote (an id that survives re-clones and moves between machines) or, with no
+remote, the repo path. Injection, recall, the frontier block, compaction,
+`memory_forget`, and decay only ever see the current repo plus global rows —
+project A's facts never surface in project B. Preferences and habits that
+should follow you everywhere go in with `memory_remember global: true`.
+Memories written before this existed, and ones restored through the viewer,
+are global (visible everywhere), so upgrading changes nothing; exports carry
+origin stamps, so scoping survives a machine hop.
+
 ## Backup & move between machines
 
-`memory_export` writes the live store as JSONL — one JSON object per line
+`memory_export` writes the live store as JSONL — a machine-readable header line
+(`{_export, version, exportedAt, count}`) followed by one JSON object per line
 (`{ts,type,scope,content,status,tags,issue}`), active rows only (superseded
 history stays in the store). `memory_import` reads such a file back. Defaults
 to `<memory-root>/exports/<timestamp>.jsonl`; pass `file` to choose the path
@@ -249,7 +294,7 @@ Import ~/memories.jsonl                       # memory_import
 
 Import is safe by construction: every row re-enters through the same 4-gate
 write pipeline as `memory_remember` (tagged `import`, original tags preserved),
-and the tool reports a tally of four outcomes per line —
+and the tool reports a tally of outcomes per line —
 
 | Outcome | Meaning |
 | --- | --- |
@@ -257,6 +302,12 @@ and the tool reports a tally of four outcomes per line —
 | `collapsed` | near-duplicate of an existing memory; nothing written |
 | `blocked` | rejected by a gate; reason is in `memory_evidence` |
 | `skipped` | malformed line; never reaches the gates |
+| `downgraded` | `status:"open"` without an export header to vouch for it; imported as settled |
+
+The frontier policy matters because an open row is exempt from ref grounding:
+a hand-written JSONL can't hand its rows that free pass (the header is
+friction, not a signature — the real defense is that imported content always
+injects framed as data and marked `[via import]`).
 
 so re-running the same import is a no-op (everything collapses). Copying an
 export to a fresh machine is how you seed a new laptop from an old one.
@@ -284,7 +335,7 @@ same data (`memory_status` tool under the hood; no model call):
     "abstained: no vocabulary overlap"
   - **RECENT BLOCKED WRITES** — that `memory_remember` that didn't stick,
     with its gate reason
-  - **STORE** — active / superseded / open / scopes
+  - **STORE** — active / superseded / open / scopes (plus `malformed`, only when the store contains rows whose `ts` is not a valid ISO instant — those are skipped by every reader, never loaded)
   - keys: `r` refresh, `f` fullscreen
 - a warning toast when a write is blocked (opt out: `"notifyBlocked": false`)
 
@@ -305,6 +356,8 @@ Run `bun memory-view` in your terminal and visit  http://127.0.0.1:8787 in your 
 | --- | --- |
 | `memory_*` tools not available | The plugin didn't load. Restart opencode and check the `plugins` entry in your config. |
 | `memory_remember` says blocked | A gate rejected the write (stale code reference, a cited `path/to/file.ts` that doesn't exist in the repo, overlap with a superseded memory, or an ambiguous claim). The reason is logged — check `memory_evidence`, then rephrase against current code and retry. |
+| `invalid arguments to memory_*` | The tool call didn't match the tool's input schema — nothing was done, and the message names the offending fields. Schema validation lives at the tool boundary; gate blocks look different (`blocked at GATE (…)`). |
+| STORE shows `N malformed` | Rows in a daily file have a `ts=` that is not a valid ISO instant (typically a hand-edit gone wrong). Every reader skips them; fix the `ts=` value or restore the file with `memory_undo`. |
 | `/repo-init` missing from the command list | The self-install couldn't write to `~/.config/opencode/commands/` (e.g. read-only config dir). Create it, restart, or just ask the model to "init memory for this repo" — it calls the same tool. |
 | Init says `Graph: unavailable` | `codebase-memory-mcp` couldn't start (not installed, or its once-only download is blocked). Install pinned `0.11.0` via the one-liner above, or point `OPENCODE_CBM_BIN` at the binary. Scripts are still remembered without it. |
 | Stale plugin after an update | Bump the pinned version in the `plugin` entry (or `opencode plugin update opencode-self-improvement` on v2) and restart opencode. |

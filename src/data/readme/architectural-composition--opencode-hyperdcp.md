@@ -6,22 +6,24 @@
 
 An AI agent's context window is not a black box. Most tools silently compress, summarize, or drop conversation history, and you are left hoping nothing important was lost. HyperDCP takes the opposite stance: **the context window should be 100% observable and 100% controllable by you.**
 
-Every compression is a *visible block*. Nothing is hidden, nothing is automatic:
+Every compression is a _visible block_. Nothing is hidden, nothing is automatic:
 
 - **Observable** — you can inspect exactly what was compressed, what survived, and how much was saved.
 - **Controllable** — you can rewrite a summary, switch to a different version, protect a message, or cull a block entirely.
 - **Lossless-in-practice** — nothing is forgotten unless you decide it should be; uncovered content is surfaced rather than quietly discarded.
 
-The plugin never compresses on its own. It only *reminds* (a nudge) that context is getting large, so the decision stays with you — unless you opt in to let the agent act on its own (see below).
+The plugin never compresses on its own. It only _reminds_ (a nudge) that context is getting large, so the decision stays with you — unless you opt in to let the agent act on its own (see below).
 
 ## Automatic, yet observable
 
 HyperDCP also gives the **agent** the same controls you have, so Context management can happen mid-task without breaking the observable model. Each action stays a visible block or edit rather than a silent side effect.
 
 - `recall_compressed` — search and retrieve the original messages that were folded into any compressed block, so the agent can recover exact detail on demand.
-- `rewrite_summary`, `edit_summary`, `append_summary`, `save_summary`, `fetch_summary_versions` — read and revise a block's summary as new versions.
+- `rewrite_summary`, `edit_summary`, `append_summary`, `fetch_summary_versions` — read and revise a block's summary as new versions.
 - `expand_block` — extend a block's range to absorb newly uncovered messages.
 - `edit_memo` / `read_memo` — maintain durable project memory outside the volatile chat history.
+
+Context-maintenance tools run inside a transaction. Call `enter_housekeeping` to receive eligible ranges and detailed instructions. Complete and review all planned memo updates, compression, and summary edits across every affected block before calling `leave_housekeeping` once to publish the complete maintenance pass. Keep the transaction open between individual edits and blocks. While the transaction is active, ordinary tools are blocked by default. Configure exact tool-name exceptions with `housekeeping.allowedTools` in DCP configuration; OpenCode permissions continue to apply.
 
 When **autotoggle** is enabled, the agent may also call `toggle_summary_version` itself to switch a block to a different version, or to version `v0` to **cull** a block entirely — the same actions you can take by hand, just automated. Every change remains visible in the block list and reversible.
 
@@ -70,30 +72,30 @@ OpenCode installs plugins directly from npm by name — no local build required.
 1. Add the package (and its TUI companion) to your OpenCode config,
    `~/.config/opencode/opencode.json`:
 
-   ```json
-   {
-     "$schema": "https://opencode.ai/config.json",
-     "plugin": ["@architectural-composition/opencode-hyperdcp"]
-   }
-   ```
+    ```json
+    {
+        "$schema": "https://opencode.ai/config.json",
+        "plugin": ["@architectural-composition/opencode-hyperdcp"]
+    }
+    ```
 
-   Scoped npm packages are supported. OpenCode installs the plugin automatically
-   with Bun at startup and caches it under `~/.cache/opencode/node_modules/`.
+    Scoped npm packages are supported. OpenCode installs the plugin automatically
+    with Bun at startup and caches it under `~/.cache/opencode/node_modules/`.
 
 2. The TUI pages and sidebar are registered through `~/.config/opencode/tui.json`:
 
-   ```json
-   {
-     "$schema": "https://opencode.ai/tui.json",
-     "plugin": ["@architectural-composition/opencode-hyperdcp"]
-   }
-   ```
+    ```json
+    {
+        "$schema": "https://opencode.ai/tui.json",
+        "plugin": ["@architectural-composition/opencode-hyperdcp"]
+    }
+    ```
 
-   Alternatively, add the package with the CLI, which writes these entries for you:
+    Alternatively, add the package with the CLI, which writes these entries for you:
 
-   ```sh
-   opencode plugin add @architectural-composition/opencode-hyperdcp
-   ```
+    ```sh
+    opencode plugin add @architectural-composition/opencode-hyperdcp
+    ```
 
 3. Restart OpenCode. Package updates are managed with `opencode plugin list`,
    `opencode plugin check`, and `opencode plugin update`.
@@ -103,11 +105,21 @@ OpenCode installs plugins directly from npm by name — no local build required.
 1. Open the DCP pages from the command palette (`ctrl+p`) with `/dcp-tui-blocks`,
    `/dcp-tui-messages`, or `/dcp-tui-memo`.
 2. When context grows, act on the nudge:
-   - review blocks in the **DCP Blocks** sidebar,
-   - rewrite or switch a summary version,
-   - protect messages you must keep, or cull blocks you no longer need.
+    - review blocks in the **DCP Blocks** sidebar,
+    - rewrite or switch a summary version,
+    - protect messages you must keep, or cull blocks you no longer need.
 
 The plugin ships alongside server-side commands (`/dcp ...`) and AI tools (search & retrieve of compressed messages) for finer-grained control.
+
+For example, to allow a specific read-only tool during housekeeping, add this to the DCP configuration:
+
+```json
+{
+    "housekeeping": {
+        "allowedTools": ["read"]
+    }
+}
+```
 
 ## Notes
 

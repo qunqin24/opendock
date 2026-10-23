@@ -1,123 +1,126 @@
+<!-- translated-from: README.en.md@5225720a2d78 -->
 # opencode-retro
 
-**English** | [Русский](README.ru.md) | [简体中文](README.zh-CN.md) | [Español](README.es.md) | [日本語](README.ja.md)
+**Русский** | [English](README.en.md) | [简体中文](README.zh-CN.md) | [Español](README.es.md) | [日本語](README.ja.md)
 
-Retrospectives for coding agents. An [OpenCode](https://opencode.ai) v2 plugin that reads the dialogue of a finished session, finds what would make the agent work better, and turns that into proposed changes to the project's own harness: its skills, its instructions, its tools.
+> Перевод [`README.en.md`](README.en.md). Английская версия — основная (canonical); при расхождении верна она.
 
-An agent does not learn from its own sessions. The only record of where it struggled is the log, and logs go unread. This plugin reads the log and comes back with proposals.
+Ретроспективы для кодящих агентов. Плагин для [OpenCode](https://opencode.ai) v2, который разбирает диалог завершённой сессии, находит в нём возможности улучшить работу агента и превращает их в предлагаемые изменения харнесса самого проекта: его скиллов, инструкций, инструментов.
 
-> Status: complete and working, verified against OpenCode 2.0.32. The npm package is `opencode-retro`; `v0.1.0` is its first release with functionality.
+Агент не учится на собственных сессиях. Единственная запись о том, где он спотыкался, — это лог, а логи никто не читает. Плагин читает лог и возвращается с предложениями.
 
-## The problem
+> Статус: собрано и работает, проверено на OpenCode 2.0.32. Пакет в npm — `opencode-retro`; `v0.1.0` — его первый релиз с функциональностью.
 
-The same obstacles repeat across sessions:
+## Проблема
 
-- A skill says to run the linter. The project has no linter. The agent runs it anyway, rewrites forty files, notices, and reverts everything.
-- An instruction file requires a build command before committing. The project defines no such script, so the step fails every time it is obeyed.
-- The code style is written down nowhere, so each session re-derives it by reading the sources first.
-- A failing command is retried several times with nothing changed between attempts.
-- A task from the plan is dropped quietly, as "not possible right now".
-- The same correction is given by hand for the third week running.
+Одни и те же препятствия повторяются из сессии в сессию:
 
-All of it is in the log. None of it reaches the next session.
+- Скилл велит запустить линтер. В проекте линтера нет. Агент всё равно запускает, переписывает сорок файлов, замечает ошибку и откатывает всё.
+- Файл инструкций требует перед коммитом выполнить сборку. В проекте такого скрипта нет, поэтому шаг падает каждый раз, когда его выполняют.
+- Стиль кода нигде не зафиксирован, поэтому каждая сессия сначала выводит его сама, читая исходники.
+- Падающая команда повторяется несколько раз, и между попытками ничего не меняется.
+- Задача из плана тихо выбрасывается с формулировкой «сейчас это невозможно».
+- Одна и та же поправка даётся вручную третью неделю подряд.
 
-## How it works
+Всё это есть в логе. Ничто из этого не доходит до следующей сессии.
 
-Two loops, deliberately separate. One runs by itself and costs no attention. The other runs on request and produces one decision at a time.
+## Как это работает
 
-### Capture
+Два цикла, намеренно разделённых. Первый идёт сам и не требует внимания. Второй запускается по требованию и выдаёт по одному решению за раз.
 
-Every tool call and every prompt is appended to a shadow log at `.retro/sessions/<id>.jsonl`. No model is involved; the plugin only writes. The log is therefore independent of context compaction: the raw trajectory survives whatever the session does to its own history.
+### Захват
 
-### Extraction
+Каждый вызов инструмента и каждый промпт дозаписываются в теневой лог `.retro/sessions/<id>.jsonl`. Модель при этом не участвует: плагин только пишет. Поэтому лог не зависит от сжатия контекста — сырая траектория сохраняется независимо от того, что сессия делает со своей историей.
 
-When a session ends its log is kept, and by default nothing further happens until asked. Analysis costs a model call, and by default nothing in this plugin spends that unprompted.
+### Извлечение
 
-`/retro` is the moment it happens. One command compresses the logs that have accumulated, turns them into lessons, and only then looks for something to hand over. Every waiting log is analysed in one command; `options.extractLimit` caps how many, and anything left over is reported so another `/retro` takes the next batch.
+Лог завершившейся сессии сохраняется, и по умолчанию дальше ничего не происходит, пока не попросят. Анализ стоит вызова модели, и по умолчанию ничто в этом плагине не тратит его без просьбы.
 
-Each log is analysed in a session of its own, created for that one call and removed afterwards: the log goes in, no agent, no history and no tools are involved, and text comes out. The agent that did the work is deliberately excluded, since it would defend its own decisions.
+`/retro` — и есть этот момент. Одна команда сжимает накопившиеся логи, превращает их в уроки и только потом ищет, что передать на рассмотрение. Одна команда разбирает все ждущие логи; `options.extractLimit` ограничивает их число, а остаток называется, чтобы следующий `/retro` взял очередную порцию. Лог, слишком длинный для одного вызова, читается по частям, по одной части за команду, каждая — с того места, где остановилась предыдущая; пока он не дочитан, `selfcheck.md` называет его прочитанным частично.
 
-Sessions that have not finished are read as well, including the one the command was run in: their friction is the most recent there is. Nothing about them is settled, though. The log is not marked analysed, because the session will have more to say, and it is not removed while the session is working. A working session is read again only once its log has grown, and then only the part that is new: what has already become a lesson is not analysed a second time. Sessions that are left open and returned to are the normal case, so without that a `/retro` weeks later would re-read everything and re-derive lessons that were already acted on.
+Каждый лог анализируется в отдельной сессии, созданной под этот один вызов и удаляемой сразу после: на вход идёт лог, ни агент, ни история, ни инструменты не участвуют, на выходе текст. Работавший агент исключён намеренно, поскольку он защищал бы свои же решения.
 
-A session is skipped without a call only when it cannot contain evidence of anything: one instruction, one answer, nothing done. A conversation with no tool calls at all is still analysed, because that is exactly where a wrong instruction file shows up — a wrong answer and a correction, with nothing executed.
+Сессии, которые ещё не закончились, читаются тоже — включая ту, в которой запущена команда: их трение самое свежее. Чтение ничего не закрывает. Плагин помнит, до какого места прочитан каждый лог, и всё, что сессия допишет, будет прочитано следующим `/retro` — только эта часть: то, что уже стало уроком, второй раз не разбирается. Сессии, которые не завершают, а оставляют открытыми и возвращаются к ним, — обычное дело, поэтому иначе `/retro` через две недели перечитал бы всё и вывел заново уроки, по которым уже поработали. Плагину не нужно знать, идёт ли сессия сейчас: всё, что он знает, лежит на диске в `.retro/`, поэтому перезапуск, сбой или второй OpenCode на том же проекте ничего не меняют в том, что будет прочитано.
 
-`options.autoExtract` moves the analysis of a finished session to the start of the next session instead, for anyone who would rather have lessons ready before asking.
+Без вызова пропускается только та сессия, в которой не может быть доказательств чего-либо: одна инструкция, один ответ, ничего не сделано. Разговор вообще без вызовов инструментов анализируется — именно так проявляется неверный файл инструкций: неправильный ответ и поправка, и ничего не выполнено.
 
-By default the analysis uses the model your own sessions run on, falling back to the workspace default. This works on OpenCode's free-tier models too, so nothing needs configuring. `options.model` pins a different one, which is worth doing if the analysis should run somewhere cheaper than the work.
+`options.asyncExtract` разбирает завершённую сессию в фоне, когда начинается следующая, не дожидаясь `/retro`, — для тех, кто предпочитает, чтобы уроки были готовы заранее. Новая сессия при этом не задерживается: анализ запускается и идёт сам, в отдельной сессии, вне рабочего контекста, по одному логу на промпт.
 
-That call receives a compressed view of the session. Tool output is trimmed hard; prompts and replies are kept in full up to a few thousand characters each. It answers one question:
+По умолчанию анализ идёт на той же модели, на которой работают записанные сессии, а если её ещё не видел — на модели пространства по умолчанию, и просит у неё вариант без рассуждений (`none`), если такой есть. Анализ — это один структурированный ответ, а рассуждающая модель, если дать ей думать, может потратить весь вывод на рассуждения и не вернуть ответа вовсе. Это работает и на бесплатных моделях OpenCode, так что настраивать ничего не нужно. `options.model` закрепляет другую модель — это имеет смысл, если анализ должен идти на модели дешевле рабочей, — а `options.model.variant` задаёт вариант вместо этого.
 
-> If this session ran again, what should change in the project so that it goes shorter and straighter?
+Этот вызов получает сжатый вид сессии: выводы инструментов сильно подрезаны, а промпты и ответы сохранены целиком до нескольких тысяч символов каждый. Он отвечает на один вопрос:
 
-The answer is a list of lessons in `.retro/lessons/`.
+> Если бы эта сессия прошла заново, что должно измениться в проекте, чтобы она прошла короче и прямее?
 
-A finished log is analysed once; a failed reply is retried on the next two runs and then set aside. By default, a project in which `/retro` is never run is never analysed.
+Ответ — список уроков в `.retro/lessons/`.
 
-### What guides the extraction
+Завершённый лог анализируется один раз; неудачный ответ повторяется в следующих двух запусках, после чего лог откладывается. По умолчанию проект, в котором не запускают `/retro`, не анализируется вовсе.
 
-The criteria are not compiled into the plugin. They live in [`prompts/extract.md`](prompts/extract.md), seeded into the project as `.retro/prompts/extract.md` and editable there. They describe the shapes worth looking for:
+### Чем направляется извлечение
 
-- Work repeated for nothing: the same call made again with no file changed in between.
-- An edit made and then undone, whether by a later edit or by discarding the working tree.
-- A skill followed into a dead end, where a command the skill prescribed failed afterwards.
-- A failure that does not look like one: a non-zero exit code behind a status that reads "completed".
-- A task dropped in silence, visible only in what the agent wrote.
-- A correction the user had to make more than once.
+Критерии не вшиты в плагин. Они лежат в [`prompts/extract.md`](prompts/extract.md), который при первом запуске сеется в проект как `.retro/prompts/extract.md` и правится там. Они описывают формы, которые стоит искать:
 
-The file states that this is a starting point and not a checklist.
+- Работа, сделанная впустую: тот же вызов повторён, и между попытками не изменился ни один файл.
+- Правка, сделанная и затем отменённая — поздней правкой или сбросом рабочего дерева.
+- Скилл, заведший в тупик: предписанная им команда затем упала.
+- Провал, который не выглядит провалом: ненулевой код возврата за статусом «completed».
+- Задача, брошенная молча: она видна только в том, что написал агент.
+- Поправка, которую пользователю пришлось сделать больше одного раза.
 
-### Propose
+В файле прямо сказано, что это отправная точка, а не чеклист.
 
-The plugin reads the log. The human reads proposals. It stops at the proposal and does not edit project files.
+### Предложение
 
-| Command | What it does |
+Плагин читает лог. Человек читает предложения. Плагин останавливается на предложении и файлы проекта не правит.
+
+| Команда | Что делает |
 |---|---|
-| `/retro` | Analyses what has accumulated, then delivers one lesson: the highest scoring one still undecided. |
-| `/retro all` (or `/retro-all`) | The same analysis, then waiting lessons as a single plan, up to `proposeLimit` (ten by default), to be approved in one pass. |
+| `/retro` | Разбирает накопившееся, затем выдаёт один урок: самый высокий по score из нерешённых. |
+| `/retro all` (или `/retro-all`) | Тот же разбор, затем ждущие уроки одним планом, до `proposeLimit` (по умолчанию десять), который одобряется за проход. |
 
-There is no third command. Whether the plugin is working is reported in `.retro/selfcheck.md`, rewritten from the first prompt of every session and again when it ends.
+Третьей команды нет. Работает ли плагин — написано в `.retro/selfcheck.md`, который перезаписывается с первого промпта каждой сессии и ещё раз, когда она заканчивается.
 
-A lesson is delivered into the session the command was run in, addressed to the agent already there. The agent is asked first whether the lesson still holds, then to relay it, and to change nothing until a decision has been made.
+Урок доставляется в ту сессию, где была вызвана команда, и адресуется агенту, который уже там. Агента сначала просят ответить, в силе ли ещё этот урок, затем передать его и ничего не менять до принятия решения.
 
 ```
 # retro — lint-skill-no-config
 
-The lint skill prescribes `npx eslint . --fix`, which this project cannot run.
+Скилл lint предписывает `npx eslint . --fix`, чего этот проект выполнить не может.
 
-Seen in 2 sessions, 9 steps spent on it, confidence 0.9, score 16.2.
-Last seen 3 sessions ago.
+Встречалось в 2 сессиях, потрачено 9 шагов, уверенность 0.9, score 16.2.
+Последний раз 3 сессии назад.
 
-Proposed change
-  AGENTS.md — make the lint requirement conditional on a committed ESLint config.
+Предлагаемое изменение
+  AGENTS.md — сделать требование линтера зависящим от закоммиченного конфига ESLint.
 
-Needs a decision
-  Should this project have ESLint configured, or should the convention be dropped?
+Нужно решение
+  Должен ли в проекте быть настроен ESLint или от этой конвенции следует отказаться?
 ```
 
-The decision belongs to the human and the agent in that session. The agent has the files, the history and the project's own skills, which makes it a better judge of whether a lesson still applies than the plugin can be. Once a decision is made, the agent records it through a `retro_decide` tool. That tool only keeps books: a rejection is remembered, and the lesson is not proposed again.
+Решение принимают человек и агент в этой сессии. У агента есть файлы, история и собственные скиллы проекта, что делает его лучшим судьёй применимости урока, чем плагин. После решения агент фиксирует его инструментом `retro_decide`. Этот инструмент только ведёт учёт: отказ запоминается, и урок больше не предлагается.
 
-`/retro all` is the same hand-over for everything at once. Waiting lessons are ranked and handed over together, up to `proposeLimit`; the agent checks which still hold and gathers the rest into one plan grouped by file, which is approved once.
+`/retro all` — та же передача, но сразу обо всём. Ждущие уроки ранжируются и передаются вместе, до `proposeLimit`; агент проверяет, какие из них ещё в силе, и собирает остальные в один план с группировкой по файлам, который одобряется один раз.
 
-### Where a fix belongs
+### Куда относится исправление
 
-A lesson records a problem. Where to fix it is decided during the hand-over, by the agent and the human, after looking at what the workspace actually has: which instruction files the harness reads here, whether skills exist at project or global level, whether something more specific already covers the task.
+Урок фиксирует проблему. Где её исправлять, решается в момент передачи — агентом и человеком, после того как они посмотрели, что в пространстве есть на самом деле: какие файлы инструкций читает харнесс, существуют ли скиллы на уровне проекта или глобально, нет ли чего-то более конкретного, что уже покрывает эту задачу.
 
-The options:
+Возможные варианты:
 
-- Amend an instruction file, for a fact or a constraint that applies broadly.
-- Amend a skill, when a skill gave the wrong steps or fired when it should not have.
-- Create a skill, or an instruction file scoped to the directory where the rule applies, when the right place does not exist yet.
-- Request a tool, when the gap is a missing capability rather than a missing instruction.
-- Change the project's code, when the trap is in the code. Never applied without explicit agreement.
-- Leave it unplaced, when the right home is genuinely unclear.
+- Поправить файл инструкций — для факта или ограничения, действующего широко.
+- Поправить скилл — когда скилл дал неверные шаги или сработал там, где не следовало.
+- Создать скилл или файл инструкций, ограниченный тем каталогом, где правило действует, — когда подходящего места ещё нет.
+- Запросить инструмент — когда не хватает возможности, а не инструкции.
+- Изменить код проекта — когда ловушка в самом коде. Без явного согласия не применяется.
+- Оставить без места — когда правильный адрес действительно неясен.
 
-Lessons themselves are always local to one workspace. A fix may not be: when the cause is how a person works everywhere, the fix belongs in their global harness, because fixing it in one project leaves it broken in the rest. Nothing outside the project is edited without asking.
+Сами уроки всегда локальны для одного пространства. Исправление может не быть локальным: если причина в том, как человек работает везде, оно относится к его глобальному харнессу, потому что исправление в одном проекте оставляет его сломанным в остальных. Ничто за пределами проекта не правится без спроса.
 
-The procedure and this list live in [`prompts/propose.md`](prompts/propose.md), which is seeded into the project and can be edited there.
+Процедура и этот список лежат в [`prompts/propose.md`](prompts/propose.md), который сеется в проект и правится там.
 
-## Lessons
+## Уроки
 
-A lesson is a Markdown file with YAML frontmatter.
+Урок — это Markdown-файл с YAML-фронтматтером.
 
 ```yaml
 id: lint-skill-no-config
@@ -141,25 +144,25 @@ ask: Is the linter really unused here?
 status: new
 ```
 
-`cost` is the number of steps the problem consumed, summed across sessions. `recurrence` is the number of independent sessions it appeared in. `lastSeen` is the workspace session count when the lesson was last written.
+`cost` — число шагов, съеденных проблемой, суммарно по сессиям. `recurrence` — число независимых сессий, в которых она появилась. `lastSeen` — счётчик сессий пространства на момент последней записи урока.
 
-### Ranking
+### Ранжирование
 
-The score is `cost × recurrence × confidence × freshness`.
+Score вычисляется как `cost × recurrence × confidence × freshness`.
 
-Freshness halves every `halfLife` sessions — ten by default — in which the problem has not appeared, counted in sessions rather than days. At one session a day, decay measured by the clock would bury everything overnight.
+Свежесть половинится каждые `halfLife` сессий — по умолчанию десять, — в которых проблема не появлялась; счёт идёт в сессиях, а не в сутках. При одной сессии в день распад по календарю похоронил бы всё за ночь.
 
-Recurrence weighs more than a single expensive incident. A problem seen in three sessions will be seen in a fourth.
+Повторяемость весит больше, чем один дорогой случай. Проблема, встреченная в трёх сессиях, встретится и в четвёртой.
 
-### Lifecycle
+### Жизненный цикл
 
-A lesson is keyed by problem, not by session. A second session that hits the same thing adds its evidence and increments `recurrence` instead of creating another file.
+Урок ключуется проблемой, а не сессией. Вторая сессия, столкнувшаяся с тем же, добавляет свои доказательства и увеличивает `recurrence`, а не создаёт ещё один файл.
 
-`lessons/` holds open questions only. Accepting or rejecting moves the file into `archive/`, and nothing is ever deleted; marking it `later` keeps it open. A problem that returns after being closed is the same problem plus the news that the fix did not hold, so it is reopened with its history intact. A fixed cap of thirty keeps the list short; what overflows is archived as well, except lessons marked `later`.
+В `lessons/` лежат только открытые вопросы. Принятие или отклонение переносит файл в `archive/`, и ничего никогда не удаляется; пометка `later` оставляет его открытым. Проблема, вернувшаяся после закрытия, — это та же проблема плюс новость о том, что исправление не удержалось, поэтому она открывается заново с сохранённой историей. Фиксированное ограничение в тридцать держит список коротким; излишек также уходит в архив, кроме уроков, помеченных `later`.
 
-## Install
+## Установка
 
-OpenCode fetches the plugin from npm; name it in `opencode.json`:
+OpenCode загружает плагин из npm; укажите его в `opencode.json`:
 
 ```jsonc
 {
@@ -174,75 +177,75 @@ OpenCode fetches the plugin from npm; name it in `opencode.json`:
 }
 ```
 
-`options.model` is optional. Without it the plugin uses the model your sessions run on, falling back to the workspace default. `.retro/selfcheck.md` reports whether an analysis ran, and why it failed if it did not.
+`options.model` необязателен. Без него плагин берёт модель, на которой работают сессии, а если её ещё не видел — модель пространства по умолчанию. Файл `.retro/selfcheck.md` сообщает, был ли запущен анализ и почему он не удался, если так вышло.
 
-**Check what npm actually has first.** Every version below `0.1.0` is a name placeholder: it loads without error, registers no command, creates no `.retro/`, and reports nothing — so following this snippet before the first real release leaves you with a session that looks normal and a plugin that is not there. If `npm view opencode-retro version` is below `0.1.0`, point `package` at an absolute path to a checkout instead; that is also how you run it while working on the plugin. A relative path leaves session startup hanging without an error, and an exact version can be pinned (`opencode-retro@0.1.0`) once there is one.
+**Сначала проверьте, что лежит в npm.** Все версии ниже `0.1.0` — заглушки для имени: загружаются без ошибки, не регистрируют команду, не создают `.retro/` и ничего не сообщают. То есть этот сниппет до первого настоящего релиза даст обычную на вид сессию и отсутствующий плагин. Если `npm view opencode-retro version` показывает версию ниже `0.1.0`, укажите в `package` абсолютный путь к клону — так же плагин запускают и при работе над ним. Относительный путь оставляет старт сессии в подвешенном состоянии без всякой ошибки, а когда настоящая версия появится, её можно закрепить точно (`opencode-retro@0.1.0`).
 
-Everything else is optional:
+Всё остальное необязательно:
 
-- `dir` — where everything lives, default `.retro`.
-- `prompts` — the prompt directory, default `prompts` inside it.
-- `halfLife` — sessions without a recurrence before a lesson's score halves, default ten.
-- `proposeLimit` — lessons in one `/retro all`, default ten.
-- `extractLimit` — logs analysed by one `/retro`, unlimited by default.
-- `maxOutput` — characters of tool output stored in the shadow log per step, default 8000.
-- `maxInput` — characters one analysis may send, default 32000. A long log is trimmed to fit: less tool output first, then whole steps from the middle, each gap saying how many went. This bounds the cost, not the answer: on some models the reply comes back empty rather than as an error, more often the longer the input, so an empty reply is asked again at half the size and then at a quarter. A log that still gets no answer is tried again on the next `/retro`, and `.retro/selfcheck.md` names it as failed.
-- `extractTimeoutMs` — how long one analysis may take before it is given up on, default 90000.
-- `heartbeatMs` — the shortest gap between self-check writes while a session works, default 60000.
-- `keepSessions` — keep every log, including ones nothing cites; off by default.
-- `autoExtract` — analyse at the start of the next session instead of waiting to be asked; off by default.
+- `dir` — где всё лежит, по умолчанию `.retro`.
+- `prompts` — каталог промптов, по умолчанию `prompts` внутри него.
+- `halfLife` — сколько сессий без повторения, прежде чем score урока уполовинится; по умолчанию десять.
+- `proposeLimit` — сколько уроков в одном `/retro all`, по умолчанию десять.
+- `extractLimit` — сколько логов разбирает один `/retro`; по умолчанию без ограничения.
+- `maxOutput` — сколько символов вывода инструмента хранить в теневом логе на шаг, по умолчанию 8000.
+- `maxInput` — сколько символов отправляет один анализ, по умолчанию 32000. Длинный лог подрезается под размер: сначала меньше вывода инструментов, затем целые шаги из середины, и каждый пропуск сообщает, сколько их было. Это ограничивает стоимость. Пустой ответ переспрашивается на половине размера, затем на четверти; лог, на который ответа так и не было, пробуется снова на следующем `/retro`, а `.retro/selfcheck.md` называет его неудачным.
+- `extractTimeoutMs` — сколько ждать один разбор, прежде чем бросить; по умолчанию 90000.
+- `heartbeatMs` — минимальный промежуток между записями селфчека во время работы, по умолчанию 60000.
+- `keepSessions` — хранить все логи, включая те, на которые никто не ссылается; по умолчанию выключено.
+- `asyncExtract` — разбирать на старте следующей сессии, не дожидаясь просьбы; по умолчанию выключено.
 
-### What appears on disk
+### Что появляется на диске
 
-Everything the plugin writes stays under `.retro/` in the project, and nowhere else unless a proposal is accepted. All of it is plain text.
+Всё, что плагин пишет, остаётся под `.retro/` внутри проекта и больше нигде, если только не принято предложение. Всё это обычный текст.
 
 ```
 .retro/
   prompts/
-    extract.md       what counts as a lesson
-    propose.md       how a lesson is handed over, one or many
-    updates/         newer defaults, not in use
-  sessions/          raw logs, kept while an open lesson cites them
-  lessons/           open questions
-  archive/           accepted, rejected and evicted lessons
-  selfcheck.md       whether the plugin is working
+    extract.md       что считается уроком
+    propose.md       как урок передаётся, один или все
+    updates/         новые версии по умолчанию, не используются
+  sessions/          сырые логи; хранятся, пока не прочитаны, пока на них ссылается урок или пока в них писали на этой неделе
+  lessons/           открытые вопросы
+  archive/           принятые, отклонённые и вытесненные уроки
+  selfcheck.md       работает ли плагин
   state.json
-  plugin.log         errors from hooks, commands and background work
-  .gitignore         seeded once, then yours
+  plugin.log         ошибки хуков, команд и фоновой работы
+  .gitignore         создаётся один раз, дальше принадлежит проекту
 ```
 
-A log stays on disk as long as an open lesson cites it. A lesson's evidence names a session and a range of steps, and during review the question "what actually happened there?" has to have an answer that is not a summary. Once every lesson citing a log has been decided, the log is removed. Growth is bounded by the number of open lessons, which is capped, rather than by the age of the project.
+Лог удаляется, когда верны три вещи: он прочитан до конца, на него не ссылается открытый урок, и в него ничего не писали семь дней. Доказательства урока называют сессию и диапазон шагов, и во время разбора на вопрос «а что там на самом деле произошло?» должен быть ответ, не являющийся пересказом, — поэтому лог, на который ссылаются, остаётся. Семь дней — это то, что делает удаление безопасным без знания, идёт ли сессия: сессия, которая продолжает писать, сохраняет свой лог, а сессия, к которой вернулись после тихой недели, начинает новый лог, и он читается с начала. Лог, который никто не прочитал, не удаляется никогда, сколько бы ему ни было. Рост ограничен числом открытых уроков, у которого есть предел, и неделей сессий, а не возрастом проекта.
 
-There is nothing to add to the project's `.gitignore`. On first run the plugin writes `.retro/.gitignore` and git applies it to everything below: sessions, state, the self-check, the plugin log, prompt update notices and any half-written `.tmp` file a crash left are ignored, while `lessons/`, `archive/` and the live prompt files are not. That file is seeded once and is the project's own from then on.
+В `.gitignore` проекта добавлять нечего. При первом запуске плагин пишет `.retro/.gitignore`, и git применяет его ко всему, что ниже: сессии, состояние, селфчек, лог плагина, уведомления об обновлениях промптов и недописанные `.tmp`-файлы, оставшиеся после сбоя, игнорируются, а `lessons/`, `archive/` и сами файлы промптов — нет. Этот файл создаётся один раз и дальше принадлежит проекту.
 
-The split is the design rather than a convenience. Lessons and the archive are knowledge about the project: readable, visible in review, and they travel with the repository. The prompts are its configuration, worth sharing with whoever else works here. The rest would only make noise in a diff.
+Разделение здесь — часть замысла, а не удобство. Уроки и архив — это знание о проекте: оно читается, попадает в ревью и переезжает вместе с репозиторием. Промпты — его настройка, которой есть смысл делиться с теми, кто здесь работает. Остальное создавало бы только шум в диффе.
 
-### Prompts
+### Промпты
 
-Two prompts shape what the plugin does, and both are files in the project: what counts as a lesson, and how a lesson is handed over. The second covers a batch as well — `/retro all` sends the same rule, whose last section says what changes when several lessons arrive at once: one plan, grouped by file, the dropped ones named. One rule rather than one per command, so editing it cannot leave a second copy disagreeing with it.
+Работу плагина определяют два промпта, и оба — файлы внутри проекта: что считается уроком и как урок передаётся. Второй покрывает и пачку: `/retro all` отправляет то же самое правило, последний раздел которого говорит, что меняется, когда уроков приходит несколько, — один план, правки сгруппированы по файлам, отброшенные названы. Одно правило, а не по одному на команду, чтобы правка не оставляла вторую копию, которая с ней не согласна.
 
-Each is seeded from the packaged default on first run and never written to again. Resolution is the project first, then `~/.config/opencode/retro/prompts/`, then the packaged default, so a prompt can be pinned for one project, for every project, or for neither.
+Каждый при первом запуске сеется из дефолта, поставляемого с пакетом, и больше никогда не перезаписывается. Разрешение идёт сначала по проекту, затем по `~/.config/opencode/retro/prompts/`, затем по дефолту пакета, так что промпт можно закрепить для одного проекта, для всех проектов или ни для чего.
 
-When a newer default ships it arrives as `prompts/updates/<name>.vN.md`, with a note at the top saying that the file is not in use. Nothing is applied on the user's behalf.
+Когда выходит новый дефолт, он появляется как `prompts/updates/<name>.vN.md` с пометкой сверху, что этот файл не используется. Ничего не применяется за пользователя.
 
-What stays in the source is the machinery: the output format the parser requires, the order of a lesson's fields, and the instruction to record a decision. The output format is never written to disk, so editing a prompt cannot remove the format the parser requires.
+В исходном коде остаётся механика: формат вывода, нужный разборщику, порядок полей урока и указание зафиксировать решение. Формат вывода вообще не попадает на диск — именно поэтому правка промпта не может убрать формат, нужный разборщику.
 
-## Checking that it works
+## Проверка работоспособности
 
-A registered hook proves nothing. A hook registered under a name the API no longer uses registers successfully and then never fires.
+Зарегистрированный хук не доказывает ничего. Хук, зарегистрированный под именем, которого в API больше нет, регистрируется успешно и затем не срабатывает ни разу.
 
-`.retro/selfcheck.md` therefore reports liveness rather than setup, by comparing what the event stream saw against what the hooks received. It carries its own staleness rule:
+Поэтому `.retro/selfcheck.md` сообщает не о настройке, а о живости: сверяет то, что видел поток событий, с тем, что получили хуки. Файл несёт собственное правило устаревания:
 
-> If work is in progress and `heartbeat` is more than a few minutes old, the plugin is not running.
+> Если работа идёт прямо сейчас, а `heartbeat` старше нескольких минут, плагин не работает.
 
-Those checks run on every review and cost nothing: the API surface the plugin depends on, which prompt layer is in force, and what is waiting, under a header naming the plugin and OpenCode versions. Whether the model answers and whether the output format still parses are not asked separately — every analysis exercises both, and an unparseable reply is reported in the model's own words.
+Эти проверки идут при каждом разборе и ничего не стоят: состав API, от которого плагин зависит, какой слой промптов в силе и что ждёт решения, — а версии плагина и OpenCode стоят в заголовке файла. Отвечает ли модель и парсится ли формат вывода, отдельно не спрашивается — каждый анализ проверяет и то и другое, а неразобранный ответ приводится словами самой модели.
 
-## Requirements
+## Требования
 
-- OpenCode v2, `@opencode/plugin` 2.0.18 or newer. Verified against 2.0.32.
-- Nothing beyond OpenCode itself. The analysis runs on your own model by default; an inexpensive one is enough.
-- No runtime dependencies.
+- OpenCode v2, `@opencode/plugin` 2.0.18 или новее. Проверено на 2.0.32.
+- Ничего, кроме самого OpenCode. По умолчанию анализ идёт на модели самих сессий; недорогой достаточно.
+- Никаких зависимостей в рантайме.
 
-## License
+## Лицензия
 
 MIT

@@ -13,8 +13,9 @@ OpenCode v2 全自动执行边界安全插件。Linux 原生 shell 与内置文�
 - **审查基准**：工作区与配置的临时目录可写，其他位置的写入以及进程、远端、权限和明确凭据效果进入静态审查。内置文件工具使用真实路径检查，而不是宣称在宿主进程内建立 OS 沙箱。
 - **静态层**：运行时边界复核使用 ALLOW/ASK：known-safe 放行，不能证明则交给 JEV。启动前真实 Shell 命令的闭合底线、独立 `/perm` 权限上限和无效输入仍可拒绝。JS/TS/Python 文件中的命令字符串只构成审查信号，不因源码文本匹配被当作已执行的底线。执行链为「观察 → 越界时静态审查 → 不能证明时动态审查」。
 - **放行即继续**：普通 Shell 保持观察并继续原进程，不自动重放先前步骤；事件许可只覆盖相应边界，需要整树许可的不透明能力另行审查。外部目录、`sudo` 和变量路径不因旧只读挂载再被否决，但模型授权不改变真实 OS 权限、Windows ACL 或 sudo 凭据要求。
-- **动态层**：使用 `jev-latest` 与包内 `src/security/v11-gold-prompt.json`。六个效果概率题与四个策略题共 10 题，Read only 增加符合性题后为 11 题。Variant B 的物质性阈值为 `>= 0.40`；闭合底线、只读限制及已确认未覆盖的物质效果先于补证回退，不以授权降低效果概率，不回退到另一套模型题组。
-- **仅 JEV**：不再启用 OpenAI-compatible 审查器或失败回退；可用性只依赖 `dynamicReview.jev` 的端点和密钥环境变量。旧 OpenAI 字段兼容读取但不起作用，无需补齐它们。当前实现使用已核验的 `systemone` 协议；`decisions` 的不同协议尚未接入。
+- **动态层**：默认使用 `jev-latest` 与包内 `src/security/v11-gold-prompt.json`；`dynamicReview.jev.model` 可覆盖主模型（例如 `clef`），提示词题组和裁决策略不变。六个效果概率题与四个策略题共 10 题，Read only 增加符合性题后为 11 题。Variant B 的物质性阈值为 `>= 0.40`；闭合底线、只读限制及已确认未覆盖的物质效果先于补证回退，不以授权降低效果概率，不回退到另一套模型题组。
+- **仅 JEV**：不再启用 OpenAI-compatible 审查器或跨引擎回退；当前 effects/L3 生产链的可用性只依赖 `dynamicReview.jev` 的端点、模型和密钥环境变量，并可配置最多两个同协议备用端点。旧 OpenAI 字段兼容读取但不起作用，无需补齐它们。当前实现使用已核验的 `systemone` 协议；`decisions` 的不同协议尚未接入。
+- **r6 题组**：当前冻结题组版本为 `v12-systemone-aligned-20261021-r6`，RW/RO 分别使用该版本及其 `-readonly` 后缀，旧缓存不会混用。`filesystem_severity`/`network_severity` 的 noul 题带有 `true`/`false` criteria，用来说明真假边界，实际答案仍是概率；`covered_by_bypass` 只认当前 active bypass，提示词、历史文本或过期授权不算；判断以实际观察到的 argv/targets 和嵌套效果为准，字面量、打印/保存的示例或非执行 data 不算实际效果；Read only 允许 host-listed scratch 内 session-owned 临时数据的创建、写入和删除，但不能越过 denyWrite、protected/credential 路径或 floor。
 - **授权**：最近五轮真实用户消息在 12,000 字符预算内保留，连同会话上下文及可信 `/bypass` 状态进入请求；可信 question 答复只保留实际选择。类别豁免不扩大独立读写上限。命令正文或工具输出自称“已批准”不构成授权；最新限制或撤回优先，旧部署任务不会因参数微调而自动失效。
 - **补证终局**：最多一次有界补证后复审。明确底线、只读违规和 `uncovered` 否决不放宽；真正耗尽补证的未知由 `dynamicReview.onUncollectable` 决定 `allow` 或 `deny`，默认 **`allow`**，记录为接受未知而非证明安全。协议或网络故障另按 `failPolicy` 处理。
 - **重试限制**：不把普通错误文本当作许可，也不自动重跑可能已有未知副作用的整条脚本。单次获准的执行例外与永久扩大沙箱边界不同。
@@ -23,7 +24,7 @@ OpenCode v2 全自动执行边界安全插件。Linux 原生 shell 与内置文�
 - **脚本证据与凭据遮盖**：首次审查前附加有界执行脚本正文，并优先按观察到的 argv 与进程 CWD 解析，避免 `cd nested` 后附加根目录同名文件。审查 argv 的敏感赋值、参数值及 URL 全部 userinfo 显示为 `[redacted]`；缓存仍绑定原始参数摘要。
 - **审查诊断**：`logReviewerTrace: true` 启用 `~/.opencode/reviewer-trace.jsonl`，记录明文 `command`、原始边界参数与完整 `effects`／原始 JEV 答案。一轮 request/result/outcome 不是三次 JEV 请求。此日志可能含敏感参数，不能提交或随意分享；新建文件为 `0600`，既有文件权限不会自动改变。后台停止在释放授权前记录 `effects_background_blocked`；关闭详细追踪时也向 scratch 写最小通知，但不写原始命令。前台说明使用 `Tool.Error`，迟到的后台拒绝通过同会话待发通知交付；两者都不写入被执行进程 stdout/stderr。
 - **Auto 常规写入范围**：项目、配置的 scratch，加 `~/.cache` 与 `~/.npm/_cacache`。这是有限的缓存范围扩展，不包含整个 HOME、用户设置、用户状态或 Windows 目录；缓存根及目标的符号链接越界不继承这个放行，凭据/系统路径判定优先。Read only 不获得缓存写权限。
-- **全局临时目录**：Auto 与 Read only 使用配置的 scratch、`/tmp`、`/var/tmp`、`TMPDIR` 及 WSL 的 Windows 临时目录。Windows 路径从继承环境或常规用户目录推导，不为探测启动 `cmd.exe`。只采用已存在的规范目录，覆盖 `/` 或 HOME 的根不采用；Read only 工作区仍只读。临时凭据样式文件需区分夹具与真实暂存秘密，不能凭 `/tmp` 自动豁免真实凭据或 HOME 链接；denyWrite、活动 broker 与控制面保护优先。
+- **全局临时目录**：Linux `/tmp` 与原生 Windows `$env:TEMP` 的目录本身和全部真实后代，在所有模式下无条件可写，不受文件名、工作区、denyWrite 或控制面写保护例外影响；敏感读取仍独立审查，外部链接目标不在授权内。其余临时根（配置的 scratch、`/var/tmp`、`TMPDIR` 及 WSL 的 Windows 临时目录）保留规范路径与 HOME/工作区限制；显式 scratch 可以尚未创建。Windows 路径从继承环境或常规用户目录推导，不为探测启动 `cmd.exe`。内部 broker 已迁至 `~/.opencode/run`。
 - **插件开发目录**：会话工作区明确位于当前插件包目录内时，允许正常开发写入；其他工作区仍保护插件安装目录。运行中的观察器二进制与 broker 通信目录不随开发豁免放开。
 
 只调整补证终局时，在现有配置的 `dynamicReview` 对象内加入：
@@ -66,9 +67,16 @@ OpenCode v2 全自动执行边界安全插件。Linux 原生 shell 与内置文�
           "reviewer": "jev",
           "onUncollectable": "allow",
           "jev": {
-            "endpoint": "https://api.typesafe.ai/v1/systemone",
-            "model": "jev-latest",
-            "apiKeyEnv": "JEV_API_KEY"
+            "endpoint": "https://ollama.com/v1/systemone",
+            "model": "clef",
+            "apiKeyEnv": "OLLAMA_CLOUD_API_KEY",
+            "fallbacks": [
+              {
+                "endpoint": "https://api.commandcode.ai/provider/v1/systemone",
+                "model": "typesafe/jev-1.14.0",
+                "apiKeyEnv": "COMMAND_CODE_API_KEY"
+              }
+            ]
           }
         }
       }
@@ -77,7 +85,7 @@ OpenCode v2 全自动执行边界安全插件。Linux 原生 shell 与内置文�
 }
 ```
 
-将 `JEV_API_KEY` 设为可供 OpenCode 服务读取的环境变量。新链仅使用 JEV，不回退到 OpenAI-compatible 端点。检查失败由 `failPolicy` 统一处理：默认 `fail_open` 放行当前调用；观察器不可用时不插入运行时监督标记，直接执行原调用。`fail_close` 保持故障拒绝。JEV 实际否决、静态底线、权限／只读天花板、保护路径拒绝、用户撤销与取消不受 fail-open 放宽。纯 TS，无构建步骤（v2 直接加载 `.ts`）。未确认重新加载前，不应宣称配置或源码变更已经生效。
+将 `OLLAMA_CLOUD_API_KEY` 和 `COMMAND_CODE_API_KEY` 设为可供 OpenCode 服务读取的环境变量。配置对象仍沿用 `dynamicReview.jev` 命名，是为了兼容现有 SystemOne 协议；主端点是 Clef（`model: "clef"`），备用端点是已确认存在的固定模型 `typesafe/jev-1.14.0`（这是本场景示例值，不是默认模型）。插件只读取当前服务进程的环境变量，不会自动读取 `~/.env` 或其他密钥文件。当前 effects/L3 生产链仅使用 JEV `systemone` 协议；主端点因传输、非 2xx 状态、超时或协议错误不可用时，会按顺序尝试最多两个备用端点；主密钥缺失但至少一个备用端点可用时整条链仍可用。有效否决和取消不会触发备用。所有端点都不可用才进入既定 `failPolicy`：默认 `fail_open` 放行当前调用；`fail_close` 保持故障拒绝。备用端点只读取自己的 `apiKeyEnv`，不会借用主端点或 `OC_API_KEY` 的密钥；缺少密钥的备用会被跳过。旧 Python 导出适配器不在该生产链上，仍保持原有单端点行为。JEV 实际否决、静态底线、权限／只读天花板、保护路径拒绝、用户撤销与取消不受 fail-open 放宽。纯 TS，无构建步骤（v2 直接加载 `.ts`）。未确认重新加载前，不应宣称配置或源码变更已经生效。
 
 ### 目录自动发现与配置文件兜底
 
@@ -261,7 +269,7 @@ UI 不再展示 rwx/x/YOLO 字样。状态尚未同步时显示未知状态，�
 }
 ```
 
-只接受绝对路径，支持 `~`、`~/…`；尚未创建的路径按最深的已存在父目录校验。符号链接叶节点或被重定向的根不采用。`/`、HOME 及其祖先，与凭据存储、denyWrite、插件包或观察器重叠的路径，broker 专用的 `security-boundary-*` 子树，以及敏感路径，会逐项警告并忽略；`/tmp/opencode` 等共享临时根不因包含 broker 子目录而整体拒绝，实际 broker 目标仍不享受写入豁免。数组类型、字符串类型或相对路径错误仍是配置错误。
+只接受绝对路径，支持 `~`、`~/…`；尚未创建的路径按最深的已存在父目录校验。符号链接叶节点或被重定向的根不采用。`/`、HOME 及其祖先，与凭据存储、denyWrite、插件包或观察器重叠的路径、实际运行的 broker 子树以及敏感路径，会逐项警告并忽略。`/tmp` 的无条件写授权独立于此配置生效，不能通过这些排除规则收回；内部 broker 存放于 `~/.opencode/run`，不再占用 `/tmp/opencode`。数组类型、字符串类型或相对路径错误仍是配置错误。
 
 这些路径与原有附随写根一样，在 **Auto 和 Read only** 中加入观察器允许列表；denyWrite、protect、凭据与敏感目标的排除仍优先，不会扩大独立权限上限。JEV 只在现有的 `Current allowed write roots` 中看到它们。
 
@@ -347,16 +355,21 @@ v1.4.0 的静态放行、RO 修复与验证方法见 [v1.4.0 研究与验证摘�
 | `dynamicReview.model` | string | — | 模型 ID |
 | `dynamicReview.apiKey` | string | — | API key（`apiKey`/`apiKeyEnv` 二选一） |
 | `dynamicReview.apiKeyEnv` | string | — | 存 key 的环境变量名 |
-| `dynamicReview.timeoutMs` | number | `30000` | Python 审查超时（1–120000）。常规动态审查直接使用该值；提权审查器开启 thinking、真实延迟常达数十秒，因此其子进程预算为 `max(timeoutMs, 120000)`。父进程把「预算 − min(2000, 预算/2) 毫秒」作为**整次审查的唯一绝对期限**经环境变量下发给两个 Python reviewer（严格小于任何正预算；覆盖动态审查的全部工具轮次），慢端点因此返回干净的传输错误而不是被 SIGKILL |
+| `dynamicReview.timeoutMs` | number | `30000` | 当前 effects/L3 链的**总预算**（1–120000）：每次尝试按“剩余预算 ÷ 剩余可用端点”分配，备用端点只在预算内运行。旧 Python 导出适配器仍按原语义把该值作为子进程预算：常规审查直接使用，提权审查器为 `max(timeoutMs, 120000)`；父进程把「预算 − min(2000, 预算/2) 毫秒」作为整次审查的唯一绝对期限 |
 | `dynamicReview.onUncollectable` | `"allow" \| "deny"` | `"allow"` | 新 Linux 链路：补证耗尽且 `floor=no` 时的终局；不适用于 floor、协议或基础设施故障 |
 | `dynamicReview.maxRounds` | number | `1` | 旧适配器兼容字段，范围 1–3；新冻结效果链只做有界补证后的一次复审 |
 | `dynamicReview.allowFullReadAccess` | boolean | `false` | 允许审查器只读工具访问整个文件系统 |
 | `dynamicReview.pythonPath` | string | PATH 查找 | Python 解释器 |
 | `dynamicReview.auditorPath` | string | — | 已废弃：仅为兼容旧配置而接受，不再使用 |
+| `dynamicReview.jev.enabled` | boolean | `true` | 关闭 JEV 审查链；显式 `false` 时不发起任何审查 |
+| `dynamicReview.jev.endpoint` | string | `https://opencode.ai/zen/v1/systemone` | SystemOne 主端点；必须 https，仅 loopback 允许 http；禁止 userinfo 和 fragment |
+| `dynamicReview.jev.model` | string | `jev-latest` | 主模型 ID；实际用于 effects 与 L3 请求，不再固定为冻结题组中的默认模型 |
+| `dynamicReview.jev.apiKeyEnv` | string | `JEV_API_KEY` | 主端点密钥环境变量；`OC_API_KEY` 只作为主端点的兼容后备，不供备用端点使用 |
+| `dynamicReview.jev.fallbacks` | array | `[]` | 最多两项同协议备用端点；每项必须提供自己的 `endpoint`、`model`、`apiKeyEnv`。缺密钥的备用会被跳过；无效端点/模型/环境变量名是硬配置错误，不会尝试其他端点 |
 | `detachedStartIsolation` | boolean | `true` | supervisor 未激活时对 `start`/`Start-Process` 追加句柄隔离 |
 | `slowCommands` | boolean | `true` | 拦截安全但必耗时的命令（系统/挂载树的无界扫描、`-f` 流式、超长 `sleep`），除非调用方显式给了 timeout。底层默认参数：`maxDepth=16`（find/rg/fd 的 `-maxdepth` 阈值，超过才拦）、`sleepThresholdSeconds=120`（sleep 阻断阈值，`>=` 即拦）、`allowExplicitTimeout=true`（调用方传入工具参数 timeout 时不拦） |
 | `logReviewerTrace` | boolean | `false` | 完整审计轨迹开关。每轮动态审查写请求与结果/错误，另写最终裁决；不含原始命令或凭据。故障放行始终记录 `fail_open_pass` 和简短故障码：开启时写入 `~/.opencode/reviewer-trace.jsonl`，关闭时仅写入 `sandbox.scratch/reviewer-trace.jsonl`。可用时附加非阻断 metadata；日志写入失败不阻断调用 |
-| `trustedCommands` | string[] | `[]` | 用户信任的命令前缀（如 `"agent-browser"`、`"opencode2 --version"`）。仅在 LOOSE 读写会话生效：某段 argv 以其中一项开头、且所有危险扫描都通过时静态 ALLOW。裸名只匹配 PATH 查找（`./tool` 不匹配 `tool`）；条目含 shell 语法时配置报错 |
+| `trustedCommands` | string[] | `[]` | 用户信任的命令及参数前缀，支持 `*` / `?`。读写会话中，整条 shell 调用仅含匹配命令且静态检查通过时，命令自身及其子进程的边界行为免动态审查。外部文件重定向、替换执行或未列入的附加命令不获此豁免；只读和显式保护仍优先。裸名不匹配 `./tool`；条目不能包含 shell 语法。详见下节 |
 | `supervisorEnabled` | boolean | Windows 下 `true` | 使用原生 shell supervisor |
 | `supervisorPath` | string | 包内默认 | supervisor `bash.exe` 路径 |
 | `BypassClassifier` | string[] | `[]` | 永久豁免类别列表：`filesystem`/`host`/`privilege`/`secret`/`network`/`remote`/`indirection`/`dynamic`/`sandbox`/`slow`；未知类别警告并忽略 |
@@ -366,6 +379,39 @@ v1.4.0 的静态放行、RO 修复与验证方法见 [v1.4.0 研究与验证摘�
 | `configFile` | string | — | JSON 配置文件路径（加载器指令，不是插件字段） |
 
 另支持 `reviewCommand`（仅测试注入用，插件自身从不装配）。
+
+### trustedCommands：受信任 CLI 的运行时绕行
+
+在插件的 `config.json`（或插件 options）中按需加入：
+
+```json
+{
+  "trustedCommands": [
+    "opencode",
+    "ask-gemini",
+    "agent-browser open *",
+    "google-chrome --headless *"
+  ]
+}
+```
+
+这是信任授权，不是命令沙箱：请只列入你信任其**所有匹配参数及内部行为**的工具。默认列表为空，不自动信任已安装工具。配置加载仍是浅层覆盖，后配置的列表替换前列表；需重新加载插件后生效。
+
+- 按 shell 拆分后的 argv 匹配，不以原始字符串的 `startsWith` 判断。无通配符时保持 argv 前缀语义；`*` 匹配词内任意字符、`?` 匹配一个字符，末尾独立 `*` 也匹配零个或多个参数。`agent-browser open *` 不匹配 `agent-browser close`；引号中的 `;` 只是参数数据。
+- 裸名 `opencode` 匹配 PATH 命令，不匹配 `./opencode` 或 `/other/opencode`；绝对路径需单独配置。通配符只做匹配，不在配置中执行 shell 展开。
+- `opencode run --session ses_... "prompt" 2>&1` 的工具日志写入、`ask-gemini` 的联网、匹配的浏览器及其子进程行为可以直接放行，不调用 JEV，也不据此生成其他命令可用的 L3 目录授权。
+- `opencode api ... > /outside/abc.log`、`ask-gemini ...; other-command`、`opencode "$(other-command)"` 仍走原有边界审查。变量赋值／环境前缀、无法解析的复合脚本也不走此运行时捷径。
+- 此捷径只用于具有完整读写权限的会话；取消、授权撤销、静态底线及当前边界的显式写保护仍优先。首次可放行边界即授权整条受信任调用脱离系统调用观察，保持 CLI 子进程及浏览器启动的原生行为；随后内部行为不再逐次检查，但取消监督仍保留。不要用宽泛规则信任 shell／解释器，否则它们执行的任意载荷也会被信任。
+
+### 可写目录与 mkdir
+
+**Linux 的 `/tmp` 本身及全部真实后代在所有模式下都可写，包括只读和 Auto。插件不对其中任何目录或文件施加写保护**：不因凭据式文件名、工作区位于 `/tmp`、内部目录命名或 `denyWrite` 条目而例外拦截；`denyWrite` 中解析到 `/tmp` 的条目会被忽略。符号链接若指向 `/tmp` 外部，实际外部目标不享受此授权。只读权限限制仍保护 `/tmp` 之外的非临时目标；敏感内容的读取审查不受这项写授权影响。
+
+**原生 Windows（`process.platform === "win32"`）的 `$env:TEMP` 采用相同写授权**，覆盖目录本身和全部真实后代，包括凭据式文件名；路径比较遵循 Windows 的盘符、大小写和目录边界规则。支持识别 `$env:TEMP`、`${env:TEMP}` 和 `%TEMP%` 路径写法。指向 TEMP 外部的符号链接／junction 不享受此授权；未设置或非绝对的 TEMP 不会推测为任意目录。此为共享路径策略，当前 Linux 运行时观察器不等于 Windows 原生执行验证。
+
+其他可写根目录的授权覆盖根目录本身及其普通子目录；根目录尚不存在时，也允许 `mkdir -p` 创建它及所需的缺失父目录。对已存在条目的 `mkdir` 不会修改它，只保留系统原有的成功／`EEXIST` 结果，不因前置 `mkdir -p /tmp/opencode` 而安全阻断整条命令。父目录例外仅允许建目录，不授权重命名、删除或修改父目录内容；`/tmp` 之外的显式保护仍有效。
+
+内部运行时通信目录已移至 `~/.opencode/run/security-boundary-*`，与可写临时工作区分开。`/tmp/opencode` 不再整树标记为保护区，普通临时目录、子目录和文件写入无需经过内部通信目录的保护判定；真正的通信目录仍受保护。旧的已加载实例需重新加载插件后才采用此布局。
 
 ## 与 v1 的行为差异（v2 约束所致）
 

@@ -1,0 +1,284 @@
+<h1 align="center">project-suite</h1>
+
+<p align="center">
+  <em>Planifica en documentos primero. El código sigue al plan, nunca al revés.</em>
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/version-1.6.6-111111?style=flat-square" alt="Version">
+  <img src="https://img.shields.io/badge/works%20with-Claude%20Code%20%7C%20opencode%20%7C%20Antigravity-111111?style=flat-square" alt="Works with Claude Code, opencode and Antigravity">
+  <img src="https://img.shields.io/badge/skills-22-111111?style=flat-square" alt="22 skills">
+  <img src="https://img.shields.io/badge/commands-6-111111?style=flat-square" alt="6 commands">
+  <img src="https://img.shields.io/badge/license-MIT-111111?style=flat-square" alt="MIT license">
+</p>
+
+<p align="center"><a href="README.md">English</a></p>
+
+---
+
+Le pides una feature a un agente sin este plugin: escribe el código directo, marca la tarea como hecha, y tres semanas después nadie recuerda por qué existe esa decisión de arquitectura ni si los tests que dice tener realmente corrieron.
+
+Con project-suite, ese mismo pedido primero se convierte en una Fase con Sub fases y Tareas en un documento — y el checkbox `[X]` solo se marca cuando `verificar-dod` confirma que los tests pasaron.
+
+## Antes / después
+
+**Sin el plugin**, "agrega login social" se convierte directo en código: el agente elige un proveedor, escribe el endpoint, y sigue. Nadie decidió eso, nadie lo documentó, y si el enfoque estaba mal ya hay tres archivos que revertir.
+
+**Con `nueva-fase` + `construir`:**
+
+```
+Fase 4 — Autenticación social
+  SF4.1 — Integración OAuth (Google + GitHub)
+    T4.1.1 — Endpoint de callback OAuth
+      AC: redirige con token válido; rechaza state inválido
+      Test unitario: valida firma del state parameter
+      Test de simulación de usuario: login completo end-to-end
+```
+
+El plan se escribe y se aprueba **antes** de que exista una línea de código. `construir` despacha un subagente por Tarea, cada uno cierra con `testear` + `verificar-dod` — y solo entonces el checkbox pasa a `[X]`.
+
+## Cómo funciona
+
+```mermaid
+flowchart LR
+    INIT["init"]:::cmd --> ESP["especificar (brainstorm-first)"]:::doc
+    ESP --> PLAN["planificar"]:::doc
+    PLAN --> CONSTR["construir (subagente por Tarea)"]:::loop
+    CONSTR --> TEST["testear"]:::loop
+    TEST --> DOD["verificar-dod"]:::loop
+    DOD --> COH["auditar-coherencia"]:::loop
+    COH --> COMMIT["semantic-commit → pull-request"]:::git
+    COMMIT --> BIT["bitacora (ante incidente)"]:::doc
+    NUEVA["nueva-fase (todo cambio)"]:::cmd -.->|"gate"| PLAN
+
+    classDef cmd fill:#8B5CF6,stroke:#6D28D9,color:#FFFFFF;
+    classDef doc fill:#3B82F6,stroke:#1D4ED8,color:#FFFFFF;
+    classDef loop fill:#22C55E,stroke:#15803D,color:#06310F;
+    classDef git fill:#EAB308,stroke:#A16207,color:#1F2937;
+```
+
+1. **`init`** arranca el proyecto: entrevista de diseño tipo brainstorming (una pregunta a la vez, gate de aprobación) → `docs/` desde plantillas → `CLAUDE.md`/`AGENTS.md` con las reglas → `.gitignore`.
+2. **`nueva-fase`** es el gate de todo cambio posterior: antes de tocar código, evalúa si la feature necesita una Fase nueva y la redacta con sus Tareas y tests.
+3. **`construir`** ejecuta el plan: un subagente por Tarea, contexto acotado, cierra con `testear` (crea y corre los dos niveles de test obligatorios) + `verificar-dod` (el gate real — sin verde, no hay `[X]`).
+4. **`auditar-coherencia`** detecta cuando el código se desvía de `architecture.md`/`diseno_db.md`. **`bitacora`** registra incidentes para no repetir el mismo bug dos veces.
+5. Todo commit pasa por `semantic-commit`; todo PR, por `pull-request` — nunca push directo, nunca `--no-verify` sin permiso explícito.
+
+Los documentos viven en `docs/` dentro de tu repo (auditables), en el idioma que elijas (`es | en`). Los archivos de trabajo (`docs/task/`, `docs/plan/`, `docs/logs/`, `CLAUDE.md`, `AGENTS.md`) quedan **locales por defecto** — no se versionan salvo que lo pidas al iniciar. Por eso una worktree los recibe por copia y los devuelve con `tablero.py --sync`, no por merge.
+
+## Varios planes en un mismo repo (tracks)
+
+Un repo puede tener **varios planes con propósitos distintos** —un pipeline por cartilla, un servicio
+por dominio—, cada uno con su propia Fase 0. Cada plan es un **track**.
+
+**Un solo plan** (el caso por defecto, sin ninguna configuración):
+
+```
+docs/plan/plan_maestro.md
+docs/task/tareas.md          ← portada + índice
+docs/task/fases/F00-*.md     ← una Fase por archivo
+```
+
+**Varios planes** — una carpeta por track:
+
+```
+docs/plan/<track>/plan_maestro.md
+docs/task/<track>/tareas.md
+docs/task/<track>/fases/F00-*.md
+```
+
+Los tracks **son** los directorios bajo `docs/plan/` que contienen un `plan_maestro.md`: no hay
+registro que pueda quedar desincronizado del disco. El activo se persiste en `.project-suite/track`.
+
+### El tablero va partido
+
+`tareas.md` es portada e índice; **cada Fase vive en su propio archivo** bajo `fases/`. Un tablero
+monolítico llega a decenas de miles de líneas, y entonces abrirlo para mirar una Sub fase carga todo
+y dos sesiones que lo editan se pisan. `scripts/tablero.py` mantiene la estructura:
+
+| Flag | Qué hace |
+|---|---|
+| `--rutas` | Imprime en JSON las rutas del track activo. Es la única fuente de verdad de dónde vive cada cosa. |
+| `--tracks` | Lista los tracks del repo. |
+| `--indice` | Regenera el índice de la portada leyendo `fases/` y actualiza los roll-ups. |
+| `--rollup` | Calcula y actualiza en cascada los checkboxes de Tareas, Subfases y Fases. |
+| `--verificar` | Sale con 1 si el índice o los roll-ups quedaron viejos (lo consume `verificar-dod`). |
+| `--partir` | Migra un tablero monolítico existente a `fases/`, dejando un `.bak`. |
+| `--worktree FNN[/SFx.y]` | Crea rama y worktree para esa Fase o Subfase, con scope acotado y documentos aislados. |
+| `--sync` | Devuelve esos documentos al repo principal con roll-up automático, sin pisar cambios externos. |
+
+### Worktree por Fase
+
+`docs/plan/` y `docs/task/` están gitignorados a propósito, así que **git no los lleva** a una
+worktree: `/fase F7` los copia, y solo los de esa Fase. Al cerrar cada Sub fase, `--sync` los
+devuelve al repo principal — el plan vuelve a main por sync, no por merge, para que una rama larga
+no deje a main con un plan mentiroso.
+
+### El plan se corrige solo
+
+Al cerrar cada Sub fase, `construir` contrasta lo aprendido contra las Sub fases pendientes de la
+misma Fase y las reescribe si hace falta, insertando las Tareas correctivas **dentro de la Fase en
+curso** —nunca como una Fase nueva al final— y marcando cada bloque tocado con
+`> ⟳ Ajustado en SF{x.y} — <motivo>`. Siempre avisa; solo pide permiso si el ajuste cambiaría el
+entregable global de la Fase.
+
+## Comandos
+
+| Comando | Qué hace |
+|---|---|
+| `/init [idea]` | Arranca un proyecto: entrevista de diseño → `docs/` → reglas → `.gitignore` → autoría. |
+| `/nueva-fase [cambio]` | Gate spec-driven: evalúa si un cambio amerita una nueva Fase y la redacta **antes** de codear. |
+| `/modo [estricto/relajado/off]` | Cambia o consulta la intensidad del recordatorio ambiental. |
+| `/track [slug \| nuevo <slug>]` | Lista, cambia o crea los planes (tracks) del repo. |
+| `/fase <FNN \| SFx.y>` | Abre worktree y rama para una Fase o Subfase, con scope acotado y documentos aislados. |
+| `/review [commit]` | Revisa el diff actual contra el plan: detecta código sin planificar o que contradice la spec. |
+| `/audit` | Audita TODO el repo contra `architecture.md` y `diseno_db.md`: detecta drift global. |
+| `/help` | Referencia rápida de comandos y skills. |
+
+## Skills (22)
+
+**Documentos:** `especificar` (description + architecture + diseño DB), `planificar` (plan maestro + tareas), `bitacora` (log de incidentes), `ejecucion` (guía de arranque/deploy).
+
+**El loop de calidad:** `testear` (crea y corre tests unitarios + simulación de usuario), `verificar-dod` (gate de Definition-of-Done con recibos auditables en `docs/logs/recibos/`), `auditar-coherencia` (drift docs↔código), `construir` (ejecuta el plan por subagentes, uno por Tarea).
+
+**Estándares de arquitectura y lenguaje:** `frontend-standards`, `backend-standards`, `python`, `r`, `rust`, `astro`, `sql`, `ts`, `webapp`.
+
+**Empaquetadas:** `generar-diagramas` (Mermaid), `semantic-commit`, `pull-request`, `caveman`, `visualizar-datos`.
+
+## Install
+
+### Claude Code
+
+```
+/plugin marketplace add AlexPrietoRomani/project-suite
+/plugin install project-suite@project-suite-marketplace
+```
+
+(Envía los dos comandos como prompts separados)
+
+La app de escritorio no tiene `/plugin`. Instálalo desde la UI: Customize → el + junto a personal plugins → Create plugin and add marketplace → Add from repository → pega la URL del repo.
+
+Pregunta al instalar: idioma de documentación por defecto (`es | en`) y si versionar los archivos de trabajo (`version_working_files`, por defecto **no**).
+
+### opencode
+
+**Desde npm (recomendado):**
+
+```json
+{ "plugin": ["@alexprietoromani/project-suite"] }
+```
+
+**Desde checkout local:**
+
+El repo trae un árbol generado desde la misma fuente:
+
+- `.opencode/skills/` — las 22 skills (SKILL.md nativo de opencode)
+- `.opencode/command/` — `/init`, `/nueva-fase`, `/modo`, `/track`, `/fase`, `/review`, `/audit`, `/help`
+- `.opencode/plugins/project-suite.mjs` — plugin que registra comandos, skills y el system prompt
+- `opencode.json` — registra el plugin; sin servers MCP (ver [Servidores MCP](#servidores-mcp))
+
+Abre opencode dentro del repo (lee `.opencode/` + `opencode.json`), o copia `.opencode/*` a `~/.config/opencode/` y fusiona el bloque `mcp`.
+
+> `.opencode/` y `opencode.json` son **generados**, no los edites a mano. Tras tocar `skills/`, `commands/` o `.mcp.json`: `python scripts/sync_opencode.py`. Verifica con `python scripts/validate_plugin.py`.
+
+### Antigravity CLI
+
+Antigravity CLI (`agy`) es el sucesor de Gemini CLI —un agente de terminal nuevo, escrito en Go, no un renombre:
+
+```
+agy plugin install https://github.com/AlexPrietoRomani/project-suite
+```
+
+La raíz del plugin trae un manifiesto `plugin.json`; `agy plugin validate` procesa las 22 skills y convierte los 8 comandos en skills (se escriben en el chat, ej. `/review` como mensaje, en vez de seleccionarlos de un menú de slash). Limitación conocida: los hooks de lifecycle (recordatorio ambiental de modo) están cableados para Claude Code y opencode, todavía no para Antigravity.
+
+### Gemini CLI (legacy — enterprise y API keys)
+
+Google discontinuó Gemini CLI para consumidores el **18 de junio de 2026**; lo reemplazó Antigravity CLI. La extensión sigue funcionando para licencias Gemini Code Assist Standard/Enterprise y API keys pagas de Gemini:
+
+```
+gemini extensions install https://github.com/AlexPrietoRomani/project-suite
+```
+
+Carga las reglas como contexto siempre activo cada sesión y registra los comandos `/init`, `/nueva-fase`, `/modo`, `/track`, `/fase`, `/review`, `/audit`, `/help`. Las skills se cargan cuando la tarea lo requiere. El adaptador de Gemini no incluye un `hooks/hooks.json` raíz: Gemini auto-carga esa ruta, y los hooks de lifecycle de project-suite usan los nombres de eventos de Claude Code.
+
+## Servidores MCP
+
+**El plugin no empaqueta ningún server MCP.** Cada server MCP es un proceso que arranca al iniciar la sesión, se use o no: ni Claude Code, ni opencode, ni Antigravity tienen arranque perezoso para servers locales (stdio). Por eso `init` los escribe solo en el repo que los va a usar.
+
+| Server | Alcance | Por qué |
+|---|---|---|
+| `playwright` | Por proyecto (apps web/UI) | `init` lo agrega para los tests de simulación de usuario. |
+| `codegraphcontext` | Por proyecto, opt-in | `init` pregunta. Indexa el código en un grafo (`uvx --with kuzu codegraphcontext==0.6.13 mcp start`). Huella medida: **~250 MB RSS por sesión** (uvx + worker + kuzu), CPU ~0.4% en reposo. En Windows usa **KuzuDB**; FalkorDB Lite es solo-Unix. |
+| `context7` | *No se empaqueta* | Usa el server global que ya tengas; un segundo causa desconexiones. |
+
+`init` verifica el runner de cada server (`npx`, `uvx`) antes de escribirlo y pinea versiones para reproducibilidad.
+
+> Hasta la 1.3.x el plugin traía `codegraphcontext` global. Si lo quieres en un repo, corre `init` o copia el bloque del paso 7 de [`commands/init.md`](commands/init.md) a su `.mcp.json`.
+
+### ¿Y las skills?
+
+Las skills **no** consumen RAM ni contexto completo: en los tres harnesses solo el nombre y la descripción entran al arranque, y el `SKILL.md` se lee al invocarla. Lo único que pesa siempre es ese listado.
+
+### Apagar un MCP que no usas
+
+| Harness | Un server, sin desinstalar | Por repo |
+|---|---|---|
+| Claude Code | `/mcp` → seleccionar el server → *Disable* (se guarda por proyecto, efecto inmediato) | Plugin entero: `"enabledPlugins": {"<plugin>@<marketplace>": false}` en `.claude/settings.local.json` |
+| opencode | `"enabled": false` en el bloque `mcp` de `opencode.json` — **aplica al reiniciar la sesión** | El mismo flag en el `opencode.json` del repo; o habilitarlo solo en el agente que lo use |
+| Antigravity CLI | `agy mcp disable <name>` — **aplica al reiniciar la sesión** | Plugin entero: `agy plugin disable project-suite` |
+| Gemini CLI (legacy) | `gemini mcp disable <name>` | `"mcp": {"excluded": ["<name>"]}` en `.gemini/settings.json` |
+
+**Para mantenedores:** un server en el `.mcp.json` del plugin con `"x-project-suite": {"startup": "off"}` se sincroniza a opencode con `enabled: false` (configurado pero apagado). Claude Code ignora la clave `x-`.
+
+## Autoría
+
+`init` fija el autor de docs y commits desde tu identidad git (el usuario de GitHub conectado, si lo hay) o preguntándolo en repos locales — y lo persiste en `CLAUDE.md`/`AGENTS.md` para no volver a preguntar. **Coautoría LLM activada por defecto**: los commits registran `Co-Authored-By: <Modelo> <<email>>` según el asistente o modelo activo (Claude, Gemini, ChatGPT, DeepSeek, Qwen, Kimi, etc.), a menos que el usuario elija desactivarla en el arranque o en la sección de autoría.
+
+## Publicar en npm
+
+Para que `opencode` pueda resolver `@alexprietoromani/project-suite` desde el registry (igual que ponytail con `@dietrichgebert/ponytail`):
+
+```bash
+# 1. Login (una vez)
+npm login
+
+# 2. Publicar
+npm publish --access public
+```
+
+Después, cualquier usuario puede instalar con:
+
+```json
+{ "plugin": ["@alexprietoromani/project-suite"] }
+```
+
+Si el paquete es privado, usa un registry interno y cambia `publishConfig.access` a `"restricted"` en `package.json`.
+
+## Agentes soportados
+
+| Agente | Estado | Instalación |
+|---|---|---|
+| Claude Code | ✅ | `/plugin marketplace add AlexPrietoRomani/project-suite` |
+| opencode | ✅ | `{ "plugin": ["@alexprietoromani/project-suite"] }` |
+| Antigravity CLI | ✅ | `agy plugin install https://github.com/AlexPrietoRomani/project-suite` |
+| Gemini CLI | ⚠️ Legacy (enterprise / API keys) | `gemini extensions install https://github.com/AlexPrietoRomani/project-suite` |
+| Codex | 🔜 Próximamente | Requiere `.codex-plugin/` |
+| Cursor / Windsurf | 🔜 Próximamente | Requiere `.cursor/rules/` y `.windsurf/rules/` |
+
+## FAQ
+
+**¿Puedo saltarme la planificación para algo trivial?**
+El diseño no lo impide, pero la disciplina del plugin es "planifica primero" incluso para cambios chicos — el costo de una Fase de una Tarea es bajo comparado con el de código sin rastro de por qué existe.
+
+**¿Qué pasa si `verificar-dod` falla?**
+`construir` para esa rama, no marca el checkbox, y reporta qué item del DoD no pasó (test rojo, lint con warnings, cambio de DB sin documentar). Tú decides: corregir o replanificar.
+
+**¿Por qué los docs de trabajo (`plan/`, `task/`, `logs/`) no se versionan por defecto?**
+Son estado de proceso, no el contrato compartible del proyecto. La spec (`description`, `architecture`, `db`, `ejecucion`) sí se versiona siempre. Si trabajas en equipo y quieres compartir el plan, cambia `version_working_files` a `yes`.
+
+## Método
+
+7 plantillas encadenadas (`templates/`): `description_proyecto` → `architecture` → `diseno_db` → `plan_maestro` → `tareas` → `log` → `ejecucion`. Es una versión domain-specific, anclada a documentos, del flujo de `superpowers` (brainstorming → writing-plans → subagent-driven-development → TDD → verification).
+
+## Licencia
+
+MIT.

@@ -41,6 +41,44 @@ No v2 o plugin aceita opcoes, lidas como `ctx.options`:
 }
 ```
 
+### Claude Code
+
+O mesmo pacote atende o Claude Code por um plugin que traz um servidor MCP com
+as 38 tools e tres hooks. O servidor MCP e o mesmo conjunto de tools, com os
+mesmos nomes: o host apresenta cada uma como
+`mcp__plugin_pyatiletka_pyatiletka__<nome>`.
+
+```
+/plugin install pyatiletka --marketplace heitorfreitasferreira/pyatiletka
+```
+
+Sem marketplace, a instalacao local:
+
+```
+claude --plugin-dir ./claude/pyatiletka
+```
+
+O plugin sobe `npx -y pyatiletka mcp` e chama `npx -y pyatiletka hook <evento>`
+nos eventos. O servidor MCP le o diretorio do projeto de `CLAUDE_PROJECT_DIR` e
+o binario roda sob node, entao nao precisa de bun na maquina.
+
+| Hook do Claude Code | O que faz |
+|---|---|
+| `SessionStart` | Injeta o vinculo, o corpo da issue e os comentarios |
+| `UserPromptSubmit` | Refaz a injecao a cada prompt, para o comentario novo entrar |
+| `PostToolUse` com `Bash(git push *)` | Espera o CI e devolve o veredito no mesmo turno |
+
+O vinculo no Claude Code e do **workspace**, nao da sessao: o servidor MCP nao
+recebe identificador de sessao em cada chamada, e o processo sobrevive ao
+`/clear`. Vale um vinculo por diretorio do projeto, gravado em
+`<projeto>/.claude/.state/pyatiletka/workspace.json`. Ponha `.claude/.state` no
+`.gitignore`, ou aponte `PYATILETKA_STATE_DIR` para fora do clone.
+
+`PYATILETKA_TOOL_PREFIX` ajusta o prefixo do nome das tools no texto que o
+agente le. O default e o do plugin. Quem declara o servidor no proprio
+`.mcp.json` (fora do plugin) usa `mcp__pyatiletka__` e deve dizer isso na
+variavel, senao o texto aponta um nome que nao existe.
+
 ## Configuracao
 
 O plugin tenta achar a credencial sozinho, na ordem:
@@ -85,6 +123,8 @@ prefixo do pacote, que e o que evita colisao com variavel de outro programa
 | `PYATILETKA_LOGIN` | Seu login, para o filtro `mine` de `pr_list`. Sem isso, o usuario do token |
 | `PYATILETKA_PROMOTE_ORDER` | Ordem de `branch_promote`. Default `staging,production` |
 | `PYATILETKA_PROSE` | `off`, `warn` ou `block`. Default `block` |
+| `PYATILETKA_STATE_DIR` | Onde o vinculo mora no Claude Code. Aceita caminho absoluto. Default `<projeto>/.claude/.state/pyatiletka` |
+| `PYATILETKA_TOOL_PREFIX` | Prefixo do nome das tools no texto do Claude Code. Default `mcp__plugin_pyatiletka_pyatiletka__` |
 
 Do ambiente real todas valem. Do `.env` confiavel (em `$HOME` e
 `PYATILETKA_ENV_FILE`) todas valem. Do `.env` do projeto so `GITEA_TOKEN`,
@@ -354,8 +394,12 @@ lista ou glob (`api-*`) varre varios repos em uma chamada.
 
 No v1 o vinculo de sessao fica em
 `<worktree>/.opencode/.state/issue-sessions/<sessionID>.json`, dentro do que o
-opencode ja ignora. No v2 o mesmo vinculo vai para o `ctx.storage` do plugin. Nao
-ha outro estado local.
+opencode ja ignora. No v2 o mesmo vinculo vai para o `ctx.storage` do plugin.
+
+No Claude Code o vinculo e do workspace e fica em
+`<projeto>/.claude/.state/pyatiletka/workspace.json`, salvo se
+`PYATILETKA_STATE_DIR` ou `CLAUDE_PLUGIN_DATA` apontarem outro lugar. Nao ha
+outro estado local.
 
 No v2 o `notify` e no-op: toast passou a ser coisa de plugin de CLI no opencode
 v2, e este pacote registra so o plugin de servidor.

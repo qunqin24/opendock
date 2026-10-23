@@ -58,9 +58,11 @@ opencode plugin @lawaty/lacode -g
 
 ### 2. Restart opencode
 
-**Nothing here hot-reloads.** The `plugin` array is read at startup, so without a
-restart the change does not take effect and the agent set will look stale for no
-visible reason.
+**Plugin code is not hot-reloaded.** The `plugin` array is read at startup, so
+without a restart the change does not take effect and the agent set will look
+stale for no visible reason. (The pool's slot files are the exception: editing
+`pool.txt`, `pool.json` or the bundled preset is picked up live — see
+[Configure](#configure).)
 
 ### 3. Check it loaded
 
@@ -91,6 +93,7 @@ To see what the pool is doing underneath:
 
 ```bash
 /lacode-doctor        # slots, model resolution, OmniRoute — report only, changes nothing
+/pool-recheck         # probe the benched models now; re-admit the ones that answer
 lacode version        # which LaCode is actually running, and whether opencode loads that one
 ```
 
@@ -192,15 +195,18 @@ it. Those windows are computed backoff rather than a promise from the provider,
 and a quota-shaped one can run for hours — long enough for a provider that has
 since recovered, or whose quota you reset in its own console, to stay excluded
 while every delegated spawn queues behind the survivors. So LaCode asks instead
-of guessing: every fifteen minutes, and on demand via the `pool_recheck` tool, it
-probes each benched model with one real request on that exact model. A model that
-answers is re-admitted immediately — nothing restarts, nothing reloads — and a
-model that is still limited keeps exactly the window it had, because a check must
-never be the thing that extends the wait. A change is reported as a toast and a
-log line; a pass that finds nothing changed says nothing at all.
+of guessing: every fifteen minutes, on demand via the `pool_recheck` tool, and
+the moment a pool file changes (where it validates every slot, cooling or not),
+it probes each benched model with one real request on that exact model. A model
+that answers is re-admitted immediately — nothing restarts, nothing reloads — and
+a model that is still limited keeps exactly the window it had, because a check
+must never be the thing that extends the wait. A model the provider no longer
+serves at all is benched for the quota cap and named in the report. A change is
+reported as a toast and a log line; a pass that finds nothing changed says
+nothing at all.
 
-Six commands: `/context-init`, `/context-update`, `/context-review`,
-`/lacode-doctor`, `/agent-instructions` and `/pool`. Everything is added **only
+Seven commands: `/context-init`, `/context-update`, `/context-review`,
+`/lacode-doctor`, `/agent-instructions`, `/pool` and `/pool-recheck`. Everything is added **only
 when your config does not already
 define it** — an agent or command you wrote yourself is left byte-identical,
 never patched or partially merged. `{"enabled": false}` turns the whole thing off
@@ -236,7 +242,8 @@ are reading:
 /context-review    # audit it for staleness, contradictions, duplication and bloat
 /lacode-doctor     # check the pool, model resolution and the OmniRoute gateway. Report only
 /agent-instructions # apply a client instruction to the project's AGENTS.md — client-only, see below
-/pool              # rewrite the pool slot table in ~/.config/lacode/pool.txt; restart to apply
+/pool              # rewrite the pool slot table in ~/.config/lacode/pool.txt; picked up automatically
+/pool-recheck      # probe the pool now; accepts an optional provider/model list
 ```
 
 The map is local and untracked — it describes your checkout on your machine, so
