@@ -110,6 +110,8 @@ const description =
 const structuredDescription =
   p.description ?? (markdown ? readmeExcerpt(markdown) : null) ?? t('plugin.fallbackDescription', { title: p.title });
 const metaDescription = description.length > 160 ? `${description.slice(0, 157).trimEnd()}...` : description;
+// A republished copy (see lib/disambiguate.ts) links back to the package it copies.
+const original = p.republishOf ? plugins.find((x) => x.slug === p.republishOf) : undefined;
 const duplicateTitle = plugins.some((candidate) => candidate.slug !== p.slug && candidate.title === p.title);
 const metaTitle = duplicateTitle ? `${p.title} (${p.name})` : p.title;
 const category = categoryLabel(p.category, lang);
@@ -354,6 +356,18 @@ const healthBadge = {
             </div>
 
             <p class="mt-4 max-w-2xl text-base leading-7 text-foreground/80">{description}</p>
+            {
+              original && (
+                <p class="mt-3 flex max-w-2xl items-start gap-2 rounded-lg border border-warn/30 bg-warn-bg px-3 py-2 text-sm text-foreground/80">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mt-0.5 size-4 shrink-0 text-warn" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></svg>
+                  <span>
+                    {t('plugin.republishOf')}{' '}
+                    <a href={href(`/plugins/${original.slug}`)} class="font-medium underline underline-offset-2 hover:text-foreground">{original.title}</a>{' '}
+                    {t('plugin.republishNote')}
+                  </span>
+                </p>
+              )
+            }
             {
               translated && (
                 <details class="group mt-2 max-w-2xl text-xs text-muted-foreground">

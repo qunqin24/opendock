@@ -162,6 +162,7 @@ const sortedCategories = [...categories].sort((a, b) => (a.id === 'other' ? 1 : 
   import { navigate } from 'astro:transitions/client';
   import { avatarUrl, compactNumber, letterAvatar } from '../lib/utils';
   import { localeFromPath, localePath, useTranslations } from '../lib/i18n';
+  import { rankHits, searchWeight } from '../lib/search-rank';
 
   // Resolved per call rather than once: this module survives soft navigation,
   // so the locale can change underneath it.
@@ -178,6 +179,10 @@ const sortedCategories = [...categories].sort((a, b) => (a.id === 'other' ? 1 : 
     k: string[];
     c: string;
     r: number;
+    /** score, 0–100 */
+    sc: number;
+    /** 1 on a republished copy */
+    cp?: 1;
     h: 'ok' | 'warn' | 'danger';
   }
 
@@ -271,15 +276,8 @@ const sortedCategories = [...categories].sort((a, b) => (a.id === 'other' ? 1 : 
       if (!entries) return [];
       // No query yet: show the biggest plugins rather than an empty box.
       if (!q) return entries.slice().sort((a, b) => b.r - a.r).slice(0, 6);
-      // Fuse alone orders near-identical names arbitrarily, so nudge by
-      // popularity — log-scaled and capped small, so it only breaks ties
-      // rather than letting a big repo outrank an exact name match.
-      return fuse
-        .search(q, { limit: LIMIT * 4 })
-        .map((r: any) => ({ item: r.item, rank: (r.score ?? 1) - Math.min(Math.log10(r.item.r + 1) / 6, 0.08) }))
-        .sort((a: any, b: any) => a.rank - b.rank)
-        .slice(0, LIMIT)
-        .map((r: any) => r.item);
+      // Same ordering as the /plugins search: name match plus popularity.
+      return rankHits<Entry>(fuse.search(q), q, (e) => ({ title: e.t, name: e.n, weight: searchWeight(e.sc ?? 0, e.cp === 1) })).slice(0, LIMIT);
     }
 
     function seeAllHref() {

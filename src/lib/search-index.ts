@@ -30,6 +30,9 @@ export function searchIndexResponse(lang: Locale): Response {
         k: p.keywords.filter((k) => !NOISE.has(k.toLowerCase())).slice(0, 5),
         c: p.category,
         r: p.stars,
+        sc: Math.round(p.score),
+        // Only present on republished copies, to keep the index small.
+        ...(p.republishOf ? { cp: 1 } : {}),
         h: p.healthLevel,
       })),
     ),

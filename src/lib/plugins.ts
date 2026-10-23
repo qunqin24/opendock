@@ -1,6 +1,7 @@
 import data from '../data/plugins.json';
 import { DEFAULT_LOCALE, type Locale } from './i18n';
 import { AVATAR_HOST } from './expand-doc';
+import { disambiguate } from './disambiguate';
 
 export type HealthLevel = 'ok' | 'warn' | 'danger';
 
@@ -69,6 +70,8 @@ export interface Plugin {
   opencode?: OpencodeTarget;
   /** True when `opencode` is 'v1' only because the release predates V2. */
   opencodeInferred?: boolean;
+  /** Slug of the package this one republishes under another scope (set at load, see disambiguate.ts). */
+  republishOf?: string;
 }
 
 export type OpencodeTarget = 'v1' | 'v2' | 'both' | null;
@@ -123,7 +126,7 @@ export interface PluginDataset {
 
 const dataset = data as unknown as PluginDataset;
 
-export const plugins = dataset.plugins;
+export const plugins = disambiguate(dataset.plugins);
 export const categories = dataset.categories;
 export const totals = dataset.totals;
 export const generatedAt = dataset.generatedAt;
@@ -251,6 +254,8 @@ export interface SearchDoc {
   featured: boolean;
   opencode: OpencodeTarget;
   opencodeInferred: boolean;
+  /** A republished copy of another listed package (see disambiguate.ts). */
+  republished: boolean;
 }
 
 export const searchDocs: SearchDoc[] = plugins.map((p) => ({
@@ -273,6 +278,7 @@ export const searchDocs: SearchDoc[] = plugins.map((p) => ({
   featured: p.featured,
   opencode: p.opencode ?? null,
   opencodeInferred: p.opencodeInferred ?? false,
+  republished: Boolean(p.republishOf),
 }));
 
 const searchDocsEn: SearchDoc[] = searchDocs.map((d) => ({ ...d, descriptionZh: null }));

@@ -2,6 +2,7 @@ import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, ty
 import Fuse from 'fuse.js';
 import type { Category, HealthLevel, SearchDoc } from '../lib/plugins';
 import { expandDoc } from '../lib/expand-doc';
+import { rankHits, searchWeight } from '../lib/search-rank';
 import { avatarUrl, cn, compactNumber, formatNumber, letterAvatar, timeAgo } from '../lib/utils';
 import { DEFAULT_LOCALE, localePath, pluginDescription, useTranslations, type Locale } from '../lib/i18n';
 import { categoryIcons } from '../lib/icons';
@@ -193,13 +194,15 @@ export default function PluginExplorer({
         threshold: 0.3,
         ignoreLocation: true,
         minMatchCharLength: 2,
+        includeScore: true,
       }),
     [docs],
   );
 
   const searched = useMemo(() => {
     const q = deferredQuery.trim();
-    return q ? fuse.search(q).map((r) => r.item) : docs;
+    // Name match and popularity, not Fuse's score alone (see lib/search-rank).
+    return q ? rankHits(fuse.search(q), q, (d) => ({ title: d.title, name: d.name, weight: searchWeight(d.score, d.republished) })) : docs;
   }, [deferredQuery, fuse, docs]);
 
   // One predicate per facet. Each facet's counts apply every predicate but
