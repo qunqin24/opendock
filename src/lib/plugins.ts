@@ -1,5 +1,6 @@
 import data from '../data/plugins.json';
 import { DEFAULT_LOCALE, type Locale } from './i18n';
+import { AVATAR_HOST } from './expand-doc';
 
 export type HealthLevel = 'ok' | 'warn' | 'danger';
 
@@ -247,10 +248,7 @@ export interface SearchDoc {
   createdAt: string | null;
   pushedAt: string | null;
   healthLevel: HealthLevel;
-  archived: boolean;
   featured: boolean;
-  version: string | null;
-  license: string | null;
   opencode: OpencodeTarget;
   opencodeInferred: boolean;
 }
@@ -272,15 +270,27 @@ export const searchDocs: SearchDoc[] = plugins.map((p) => ({
   createdAt: p.createdAt,
   pushedAt: p.pushedAt,
   healthLevel: p.healthLevel,
-  archived: p.archived,
   featured: p.featured,
-  version: p.version,
-  license: p.license,
   opencode: p.opencode ?? null,
   opencodeInferred: p.opencodeInferred ?? false,
 }));
 
 const searchDocsEn: SearchDoc[] = searchDocs.map((d) => ({ ...d, descriptionZh: null }));
+
+
+/**
+ * The explorer's full dataset as served from /plugins-index.json: avatars
+ * without the shared host and cache-buster, dates without the time of day.
+ * `expandDoc` (lib/expand-doc.ts) restores the avatar on the client.
+ */
+export function compactDocs(lang: Locale): SearchDoc[] {
+  return searchDocsFor(lang).map((d) => ({
+    ...d,
+    ownerAvatar: d.ownerAvatar?.replace(AVATAR_HOST, '').replace(/\?.*$/, '') ?? null,
+    createdAt: d.createdAt?.slice(0, 10) ?? null,
+    pushedAt: d.pushedAt?.slice(0, 10) ?? null,
+  }));
+}
 
 /** Search docs for a locale: English pages skip the translated text entirely. */
 export function searchDocsFor(lang: Locale): SearchDoc[] {

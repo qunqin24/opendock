@@ -15,6 +15,7 @@
     "data": "node scripts/fetch-plugins.mjs",
     "data:dev": "node scripts/fetch-plugins.mjs --limit 120",
     "translate": "node scripts/translate-plugins.mjs",
+    "indexnow": "node scripts/indexnow.mjs",
     "check": "astro check",
     "test": "node --test scripts/test/*.test.mjs"
   },

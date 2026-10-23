@@ -1,5 +1,6 @@
 import { plugins, type HealthLevel, type OpencodeTarget } from './plugins';
 import { pluginDescription, type Locale } from './i18n';
+import { AVATAR_HOST } from './expand-doc';
 
 /**
  * Per-plugin figures for the pages that work on an arbitrary set of plugins
@@ -50,7 +51,6 @@ export interface Fact {
   ar: boolean;
 }
 
-export const AVATAR_HOST = 'https://avatars.githubusercontent.com/';
 
 export function factsResponse(lang: Locale): Response {
   const facts: Fact[] = plugins.map((p) => ({

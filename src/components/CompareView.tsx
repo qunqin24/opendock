@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { Fact } from '../lib/facts';
-import { AVATAR_HOST } from '../lib/facts';
+// Not from lib/facts: that module imports the dataset, and this is a client island.
+import { AVATAR_HOST } from '../lib/expand-doc';
 import { COMPARE_MAX, setCompare } from '../lib/compare-store';
 import { avatarUrl, cn, compactNumber, formatNumber, letterAvatar, timeAgo } from '../lib/utils';
 import { localePath, useTranslations, type Locale } from '../lib/i18n';

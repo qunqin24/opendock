@@ -1,12 +1,13 @@
 ---
 import Layout from '../layouts/Layout.astro';
-import PluginExplorer from '../components/PluginExplorer';
+import PluginExplorer, { PAGE_SIZE } from '../components/PluginExplorer';
 import { searchDocsFor, categories, plugins, generatedAt } from '../lib/plugins';
 import { formatDate, formatNumber } from '../lib/utils';
 import { localeFromPath, useTranslations } from '../lib/i18n';
 
 const lang = localeFromPath(Astro.url.pathname);
 const t = useTranslations(lang);
+const docs = searchDocsFor(lang);
 ---
 
 <Layout title={t('plugins.title')} description={t('plugins.metaDescription', { n: plugins.length })}>
@@ -32,7 +33,15 @@ const t = useTranslations(lang);
       </header>
 
       <div class="mt-8">
-        <PluginExplorer client:load docs={searchDocsFor(lang)} categories={categories} lang={lang} />
+        <PluginExplorer
+          client:load
+          docs={docs.slice(0, PAGE_SIZE)}
+          total={docs.length}
+          src={lang === 'zh' ? '/zh/plugins-index.json' : '/plugins-index.json'}
+          maxDownloads={Math.max(0, ...docs.map((d) => d.downloadsMonth))}
+          categories={categories}
+          lang={lang}
+        />
       </div>
     </div>
   </div>

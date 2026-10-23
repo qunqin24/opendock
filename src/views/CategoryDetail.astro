@@ -1,7 +1,7 @@
 ---
 import Layout from '../layouts/Layout.astro';
 import PageHeader from '../components/PageHeader.astro';
-import PluginExplorer from '../components/PluginExplorer';
+import PluginExplorer, { PAGE_SIZE } from '../components/PluginExplorer';
 import CategoryIcon from '../components/CategoryIcon.astro';
 import { categories, searchDocsFor, byCategory, categoryLabel, categoryDescription, generatedAt, lampClass, type Category } from '../lib/plugins';
 import { avatarUrl, compactNumber, formatNumber, letterAvatar } from '../lib/utils';
@@ -171,7 +171,16 @@ const medal = ['bg-amber-400/15 text-amber-700 dark:text-amber-300', 'bg-zinc-40
     {/* ---- every plugin ---- */}
     <section aria-labelledby="all-title">
       <h2 id="all-title" class="mb-5 text-xl font-semibold tracking-tight">{t('categories.allPlugins')}</h2>
-      <PluginExplorer client:load docs={docs} categories={[]} lang={lang} />
+      <PluginExplorer
+        client:load
+        docs={docs.slice(0, PAGE_SIZE)}
+        total={docs.length}
+        src={lang === 'zh' ? '/zh/plugins-index.json' : '/plugins-index.json'}
+        scope={category.id}
+        maxDownloads={Math.max(0, ...docs.map((d) => d.downloadsMonth))}
+        categories={[]}
+        lang={lang}
+      />
     </section>
 
     {/* ---- other categories ---- */}

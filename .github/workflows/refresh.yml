@@ -18,7 +18,7 @@ concurrency:
 jobs:
   refresh:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
 
     steps:
       - uses: actions/checkout@v5
@@ -44,6 +44,10 @@ jobs:
           key: crawler-${{ github.run_id }}-${{ github.run_attempt }}
           restore-keys: crawler-
 
+      # Yesterday's snapshot, so IndexNow can tell which pages changed.
+      - name: Keep the previous snapshot
+        run: cp src/data/plugins.json "$RUNNER_TEMP/previous-plugins.json"
+
       - name: Crawl npm + GitHub
         timeout-minutes: 30
         env:
@@ -63,6 +67,7 @@ jobs:
         run: pnpm build
 
       - name: Commit snapshot
+        id: commit
         run: |
           git config user.name  'opendock-bot'
           git config user.email 'bot@users.noreply.github.com'
@@ -76,3 +81,12 @@ jobs:
           # reject this one and lose a day of history.
           git pull --rebase origin "${GITHUB_REF_NAME}"
           git push origin "HEAD:${GITHUB_REF_NAME}"
+          echo 'pushed=true' >> "$GITHUB_OUTPUT"
+
+      # Tells Bing & co. which pages changed, once the push has deployed.
+      # Best effort: a failed ping never fails the refresh.
+      - name: Ping search engines (IndexNow)
+        if: steps.commit.outputs.pushed == 'true'
+        continue-on-error: true
+        timeout-minutes: 20
+        run: node scripts/indexnow.mjs --previous "$RUNNER_TEMP/previous-plugins.json"

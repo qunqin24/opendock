@@ -1,6 +1,7 @@
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import Fuse from 'fuse.js';
 import type { Category, HealthLevel, SearchDoc } from '../lib/plugins';
+import { expandDoc } from '../lib/expand-doc';
 import { avatarUrl, cn, compactNumber, formatNumber, letterAvatar, timeAgo } from '../lib/utils';
 import { DEFAULT_LOCALE, localePath, pluginDescription, useTranslations, type Locale } from '../lib/i18n';
 import { categoryIcons } from '../lib/icons';
@@ -14,7 +15,7 @@ import { getCompare, onCompareChange, toggleCompare } from '../lib/compare-store
  * filters move into a sheet and the table collapses into compact rows.
  */
 
-const PAGE_SIZE = 60;
+export const PAGE_SIZE = 60;
 
 const SORTS = ['score', 'stars', 'trending', 'downloads', 'updated', 'recent'] as const;
 type SortId = (typeof SORTS)[number];
@@ -44,7 +45,20 @@ const sortValue: Record<SortId, (d: SearchDoc) => number> = {
 };
 
 interface Props {
+  /**
+   * The first page only, server-rendered so the page has content and links
+   * without JS. The full set (2600+ docs, ~1 MB) would triple in size as
+   * island props, so it comes from `src` after hydration instead.
+   */
   docs: SearchDoc[];
+  /** Size of the full set, shown before it has loaded. */
+  total: number;
+  /** URL of the full SearchDoc[] for this locale. */
+  src: string;
+  /** Limits the loaded set to one category (category pages). */
+  scope?: string;
+  /** Largest monthly installs in the full set, so install bars don't rescale on load. */
+  maxDownloads: number;
   categories: Category[];
   /** Preselects a category, e.g. when embedded on a category page. */
   initialCategory?: string;
@@ -57,7 +71,11 @@ function param(key: string): string | null {
 }
 
 export default function PluginExplorer({
-  docs,
+  docs: initialDocs,
+  total,
+  src,
+  scope,
+  maxDownloads,
   categories,
   initialCategory = 'all',
   initialSort = 'score',
@@ -87,6 +105,23 @@ export default function PluginExplorer({
   const inputRef = useRef<HTMLInputElement>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
   const sheetRef = useRef<HTMLDialogElement>(null);
+
+  // Until the full set arrives the explorer works on the first page, and the
+  // facet counts (which would be wrong) are hidden rather than shown.
+  const [loaded, setLoaded] = useState<SearchDoc[] | null>(null);
+  const docs = loaded ?? initialDocs;
+  useEffect(() => {
+    let live = true;
+    fetch(src)
+      .then((r) => r.json())
+      .then((all: SearchDoc[]) => live && setLoaded((scope ? all.filter((d) => d.category === scope) : all).map(expandDoc)))
+      .catch(() => {
+        // Offline or blocked: the first page stays usable.
+      });
+    return () => {
+      live = false;
+    };
+  }, [src, scope]);
 
   const deferredQuery = useDeferredValue(query);
   const searching = Boolean(deferredQuery.trim());
@@ -271,7 +306,7 @@ export default function PluginExplorer({
   const activeCategory = categories.find((c) => c.id === category);
 
   // Install counts span 0 to 600k+, so their bars use a log scale.
-  const maxInstalls = useMemo(() => Math.log10(Math.max(1, ...docs.map((d) => d.downloadsMonth)) + 1), [docs]);
+  const maxInstalls = Math.log10(Math.max(1, maxDownloads) + 1);
 
   const colon = lang === 'zh' ? '：' : ': ';
   const chips: { label: string; clear: () => void }[] = [
@@ -292,7 +327,7 @@ export default function PluginExplorer({
         <FilterGroup title={t('explorer.groupCategory')}>
           <Option
             active={category === 'all'}
-            count={counts.allCategories}
+            count={loaded ? counts.allCategories : null}
             marker={<Icon path={GRID_ICON} />}
             onClick={() => setCategory('all')}
           >
@@ -302,7 +337,7 @@ export default function PluginExplorer({
             <Option
               key={c.id}
               active={category === c.id}
-              count={counts.byCategory.get(c.id) ?? 0}
+              count={loaded ? counts.byCategory.get(c.id) ?? 0 : null}
               marker={<Icon path={categoryIcons[c.icon] ?? categoryIcons.package} />}
               onClick={() => setCategory(c.id)}
             >
@@ -318,7 +353,7 @@ export default function PluginExplorer({
             key={l}
             role="checkbox"
             active={levels.includes(l)}
-            count={counts.byLevel[l]}
+            count={loaded ? counts.byLevel[l] : null}
             marker={<Checkbox checked={levels.includes(l)} dot={HEALTH_DOT[l]} />}
             onClick={() => toggleLevel(l)}
           >
@@ -333,7 +368,7 @@ export default function PluginExplorer({
             key={c}
             role="radio"
             active={compat === c}
-            count={counts.byCompat[c]}
+            count={loaded ? counts.byCompat[c] : null}
             marker={<Radio checked={compat === c} />}
             onClick={() => setCompat(c)}
           >
@@ -348,7 +383,7 @@ export default function PluginExplorer({
             key={u}
             role="radio"
             active={updated === u}
-            count={counts.byUpdated[u]}
+            count={loaded ? counts.byUpdated[u] : null}
             marker={<Radio checked={updated === u} />}
             onClick={() => setUpdated(u)}
           >
@@ -365,7 +400,7 @@ export default function PluginExplorer({
               type="button"
               aria-pressed={minStars === m}
               onClick={() => setMinStars(m)}
-              disabled={minStars !== m && counts.byStars[m] === 0}
+              disabled={Boolean(loaded) && minStars !== m && counts.byStars[m] === 0}
               className="h-7 rounded-md text-xs font-medium text-muted-foreground transition-[color,box-shadow] hover:text-foreground disabled:opacity-40 aria-pressed:bg-background aria-pressed:text-foreground aria-pressed:shadow-sm"
             >
               {t(`explorer.stars.${m}`)}
@@ -417,7 +452,7 @@ export default function PluginExplorer({
               type="search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder={t('explorer.searchBig', { n: formatNumber(docs.length) })}
+              placeholder={t('explorer.searchBig', { n: formatNumber(total) })}
               className={cn(
                 'h-10 w-full rounded-lg border border-input bg-background pr-10 pl-9 text-sm shadow-xs transition-[border-color,box-shadow]',
                 'placeholder:text-muted-foreground focus:border-ring focus:ring-3 focus:ring-ring/20 focus:outline-none',
@@ -511,8 +546,8 @@ export default function PluginExplorer({
         {/* ---- summary + active filters ---- */}
         <div className="flex min-h-11 flex-wrap items-center gap-2 py-2">
           <p className="tabular mr-1 text-sm text-muted-foreground">
-            {results.length === docs.length
-              ? t('explorer.total', { n: formatNumber(docs.length) })
+            {!loaded || results.length === docs.length
+              ? t('explorer.total', { n: formatNumber(total) })
               : t('explorer.matches', { n: formatNumber(results.length) })}
           </p>
           {chips.map((c) => (
@@ -650,7 +685,7 @@ export default function PluginExplorer({
           </div>
         )}
 
-        {visible < results.length && (
+        {loaded && visible < results.length && (
           <div ref={sentinelRef} className="mt-6 flex justify-center pb-4">
             <button
               type="button"
@@ -725,7 +760,8 @@ function Option({
   children,
 }: {
   active: boolean;
-  count: number;
+  /** null while the full set is loading: no number, and nothing disabled. */
+  count: number | null;
   marker: ReactNode;
   role?: 'checkbox' | 'radio';
   onClick: () => void;
@@ -747,7 +783,7 @@ function Option({
       >
         <span className={cn('grid size-4 shrink-0 place-items-center', active ? 'text-foreground' : 'text-muted-foreground')}>{marker}</span>
         <span className="min-w-0 flex-1 truncate">{children}</span>
-        <span className="tabular text-xs text-muted-foreground">{formatNumber(count)}</span>
+        <span className="tabular text-xs text-muted-foreground">{count === null ? '' : formatNumber(count)}</span>
       </button>
     </li>
   );
