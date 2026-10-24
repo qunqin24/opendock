@@ -197,7 +197,7 @@ In OpenCode's `/connect` settings, each provider is labeled with an `(osp)` suff
 | Metaso | `osp-metaso` | `OSP_METASO_API_KEY` | no | Billed per search, not per result |
 | Moonshot | `osp-moonshot` | `OSP_MOONSHOT_API_KEY` | no | Moonshot's international site (api.moonshot.ai); standalone search endpoint, billed per successful search at $0.002 (failed or empty searches are free); separate account system from the cn site |
 | Moonshot CN | `osp-moonshot-cn` | `OSP_MOONSHOT_CN_API_KEY` | no | Moonshot's cn site (api.moonshot.cn); standalone search endpoint, billed ¥0.01 per successful search (failed or empty searches are free); separate account system from the international site |
-| Ollama | `osp-ollama` | `OSP_OLLAMA_API_KEY` | no | Free personal tier; returns full-page markdown per result (up to 10 results, no publication dates) |
+| Ollama | `osp-ollama` | `OSP_OLLAMA_API_KEY` | no | Free personal tier; returns full-page markdown per result, cut to `OLLAMA_CONTENT_CHARS` (up to 10 results, no publication dates) |
 | Perplexity | `osp-perplexity` | `OSP_PERPLEXITY_API_KEY` | no | Search API returns direct search results without generated answers; $5.00 / 1,000 requests ($1.00 with `fast`) |
 | Querit | `osp-querit` | `OSP_QUERIT_API_KEY` | no | Falls back to sentence matches when a snippet is missing |
 | SerpApi | `osp-serpapi` | `OSP_SERPAPI_API_KEY` | no | Google via SerpApi; includes SerpApi's free 1-hour server-side cache |
@@ -223,10 +223,10 @@ Configuration options are loaded as environment variables on startup. If you cha
 | Variable | Default | Description |
 | --- | --- | --- |
 | `ANYSEARCH_MAX_RESULTS` | `10` | Results per search, clamped to 1–10 |
-| `ANYSEARCH_TAG` | — | Pins the intent router to a sub-domain, e.g., `code.doc` |
+| `ANYSEARCH_TAG` | — | Pins the intent router to a sub-domain, e.g., `code.snippet`. Sub-domains that declare required parameters (`code.doc` needs `library`, most `finance.*` need `type`) cannot be used: the plugin sends no `params` channel, so the API answers 400 naming what is missing |
 | `ANYSEARCH_ZONE` | — | Geographic zone: `cn` or `intl`; an unknown value is reported and dropped rather than silently ignored |
 | `ANYSEARCH_LANGUAGE` | — | Preferred result language, e.g., `zh-CN` |
-| `ANYSEARCH_FORMAT` | `markdown` | Content format: `markdown` or `json`; an unknown value is reported and dropped rather than silently ignored |
+| `ANYSEARCH_FORMAT` | `markdown` | Content format: `markdown` or `json`; an unknown value is reported and dropped rather than silently ignored. It shapes the `content` field's extraction, not its serialization: `markdown` is the fuller markdown body with heading structure, while `json` is a plain-text description where `content` degrades to the snippet and costs far fewer context tokens |
 | `OSP_ANYSEARCH_API_KEY` | — | Optional; anonymous access is used when omitted |
 
 ### Bocha
@@ -298,8 +298,11 @@ Searches run through Kagi's v1 API (`POST kagi.com/api/v1/search`, keys from [ka
 
 | Variable | Default | Description |
 | --- | --- | --- |
-| `LINKUP_DEPTH` | `fast` | Search depth: `flash`, `fast`, `standard`, or `deep`; an unknown value is reported and dropped rather than silently ignored |
-| `LINKUP_MAX_RESULTS` | `10` | Results per search, clamped to 1–100 |
+| `LINKUP_DEPTH` | `fast` | Search depth: `flash`, `fast`, `standard`, or `deep`; an unknown value is reported and dropped rather than silently ignored. Depth buys recall and latency, not text: the three returned the same excerpt lengths when measured |
+| `LINKUP_MAX_RESULTS` | `10` | Results per search, clamped to 1–100. The API answers with at most 20 whatever is asked for (50 and 200 both return 20), so the clamp only guards a typo |
+| `LINKUP_CONTENT_CHARS` | `4000` | Code points kept from each hit's `content` (`0` keeps all of it). OpenCode never truncates a tool result, so this is the only bound on what one search spends on context |
+
+`content` is a query-relevant excerpt, not the page -- 375 to 4,395 characters across 85 measured hits, median near 2,000 -- so `LINKUP_CONTENT_CHARS` sits at the top of that range and trims the tail rather than the answer. `outputType` stays `searchResults`: `sourcedAnswer` would add an AI answer on top of source snippets that are the same text `results[].content` already holds (the lengths came back identical), and OpenCode's result shape has no field for an answer to live in. There is no server-side length control either -- unknown parameters are accepted and ignored.
 
 ### Metaso
 
@@ -338,7 +341,10 @@ The international site ([platform.kimi.ai](https://platform.kimi.ai)) is a separ
 
 | Variable | Default | Description |
 | --- | --- | --- |
-| `OLLAMA_MAX_RESULTS` | `5` | Results per search, clamped to 1–10 (API maximum). Because each result includes full-page markdown rather than snippets, the default 5 results provide extensive context |
+| `OLLAMA_MAX_RESULTS` | `5` | Results per search, clamped to 1–10 (API maximum). Each result's `content` is a page body rather than a snippet, so the count multiplies with the per-hit budget below |
+| `OLLAMA_CONTENT_CHARS` | `2000` | Code points kept from each hit's `content` (`0` keeps all of it). OpenCode never truncates a tool result, so this is the only bound between Ollama's output and the agent's context |
+
+Ollama's docs describe `content` as "a relevant content snippet from the web page". It is not: measured against the live API, `content` is the whole page and comes back byte-identical to what `web_fetch` returns for the same URL. Across 20 hits from four queries it ranged from 348 to 208,805 characters (median around 10,000), and 17 of the 20 exceeded the 2,000 default. The API offers no way to ask for less -- unknown parameters are accepted and silently ignored -- so the budget above is the only bound. It is also a recoverable one: since `content` is the same text `web_fetch` returns, an agent that needs the rest of a page can fetch it. Ollama's own agent example cuts the search output to 8,000 characters before the model reads it.
 
 ### Perplexity
 

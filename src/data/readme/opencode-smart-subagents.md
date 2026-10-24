@@ -63,17 +63,19 @@ Pass options with the object form of the plugin entry:
 ```jsonc
 {
   "plugins": [
-    { "package": "opencode-smart-subagents", "options": { "maxConcurrent": 8, "resultDelivery": "queue" } }
+    { "package": "opencode-smart-subagents", "options": { "resultDelivery": "queue" } }
   ]
 }
 ```
 
-- `maxConcurrent` (default `16`, from 1 to 50): running children allowed per parent session. A batch that would exceed it starts nothing.
 - `resultDelivery` (default `"steer"`): `"steer"` delivers a report at the parent's next step; `"queue"` holds it until the parent's current run ends.
+
+Like OpenCode's built-in tool, the plugin does not cap how many children run at once.
 
 ## Limits
 
 - Children cannot start subagents of their own. The nesting depth is one, whatever `experimental.subagent_depth` says.
+- Children cannot move or rename sessions, or create or remove worktrees, through OpenCode's `opencode` code-mode tools. The parent and the plugin own those.
 - A foreground call cannot be moved to the background from the TUI, as OpenCode's built-in tool allows. Use `background: true` instead.
 - OpenCode starts plugins for a project when something uses that project. After a server restart, children that were running when it stopped report back once a client or session touches their project again. A report that had already reached the parent's inbox before the shutdown appears when the parent session next runs.
 - Children also see the `smart-subagents` skill in their skill list; the guidance in it is written for the parent.

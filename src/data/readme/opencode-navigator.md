@@ -406,6 +406,10 @@ Pins, their order, icons, and exact Skill sources are private user-wide preferen
 and are excluded from portable exports. Use **Reload settings from file** in other
 running sessions after saving changes in another instance.
 
+![Pinned Action and Skill toolbar](https://raw.githubusercontent.com/St1ggy/opencode-navigator/main/screenshots/53-toolbar-permissions-off.png)
+
+![Searchable toolbar icon picker](https://raw.githubusercontent.com/St1ggy/opencode-navigator/main/screenshots/57-toolbar-icon-picker.png)
+
 In OpenCode 1.x, Navigator saves changes to the auto-approve mode as a user-wide
 default, including changes made through OpenCode's own command palette. Set the
 default under **Navigator Settings → Behavior → Default auto-approve permissions**;

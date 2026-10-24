@@ -44,11 +44,14 @@ plugin only touches two documented-stable APIs —
 OpenTUI 0.5 → 0.6 migration doesn't affect it. Newer `2.x` releases are
 expected to work; if one doesn't, file an issue.
 
-Manifest note: `@opencode/plugin` is capped at `>=2.0.12 <2.0.21`, since
-SDK `2.0.21+` raises its OpenTUI peer floor beyond this plugin's pinned
-`0.5.12` runtime deps and would break fresh `npm install` resolutions.
-This affects only local npm resolution — the host resolves the import at
-runtime, so OpenCode host versions above are unaffected.
+Manifest note: `@opencode/plugin` is pinned `>=2.0.12 <2.1.0`. SDK
+`2.1.0+` peers `@opentui/core >=0.6.6` and would break fresh
+`npm install` resolutions against this plugin's `0.5.17` line; everything
+up to `2.0.32` resolves cleanly since the `@opentui/*` pins moved to
+`0.5.17` (whose own peer chain fixes `solid-js` at `1.9.12` — that exact
+pin is contract, don't loosen it). This only shapes local npm trees —
+the host resolves the import at runtime, so OpenCode host versions above
+are unaffected. A full OpenTUI 0.6 migration unlocks `2.1.x+`.
 
 ## Usage
 

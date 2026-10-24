@@ -397,9 +397,10 @@ No v1 o vinculo de sessao fica em
 opencode ja ignora. No v2 o mesmo vinculo vai para o `ctx.storage` do plugin.
 
 No Claude Code o vinculo e do workspace e fica em
-`<projeto>/.claude/.state/pyatiletka/workspace.json`, salvo se
-`PYATILETKA_STATE_DIR` ou `CLAUDE_PLUGIN_DATA` apontarem outro lugar. Nao ha
-outro estado local.
+`<projeto>/.claude/.state/pyatiletka/workspace.json`. Quando
+`PYATILETKA_STATE_DIR` ou `CLAUDE_PLUGIN_DATA` apontam um caminho absoluto, o
+arquivo vai para `<estado>/<projeto>/workspace.json`, com uma pasta por projeto.
+Nao ha outro estado local.
 
 No v2 o `notify` e no-op: toast passou a ser coisa de plugin de CLI no opencode
 v2, e este pacote registra so o plugin de servidor.

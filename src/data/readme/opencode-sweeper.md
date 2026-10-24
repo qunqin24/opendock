@@ -4,13 +4,13 @@ An [opencode](https://opencode.ai) plugin that cleans up **expired sessions and 
 
 ## Compatibility
 
-The V1 entrypoint has been checked against **OpenCode 1.17.0 and 1.17.13** source, and the V2 API and loader against **OpenCode 2.0.15**. Live host integration and other releases remain unverified.
+The V1 entrypoint has been checked against **OpenCode 1.17.0 and 1.17.13** source, and the V2 API and loader against **OpenCode 2.0.15**. V2 integration has also been exercised on **OpenCode 2.1.3**: current-process binding and real-session cleanup on a private `serve` host, plus serialized multi-location timer cleanup on a native `serve --service` host using an isolated backup of real session data. Other releases and V1 live-host integration remain unverified.
 
 | Feature | V1 Mode | V2 Mode |
 |---|---|---|
 | **Session listing** | Direct SQLite read (bypasses SDK project filter & 100-row limit) | `OpenCode` SDK's `session.list()` + `session.active()` |
 | **Cross-project pagination** | ✅ Direct DB read covers all projects | ✅ Paginating `session.list()` enumerates all sessions |
-| **Process verification** | ❌ Not applicable | ✅ Uses `Service.discover()` + PID check, fail-closed on mismatch |
+| **Process verification** | ❌ Not applicable | ✅ Current `serve` listener or discovered shared service, always verified against the plugin PID |
 | **Active session protection** | Timer: no session context; Manual `/sweep`: auto-protected | Timer: auto-protected via `session.active()`; Manual: auto-protected |
 | **Delete operation** | SDK `session.delete()` | SDK `session.remove()` |
 | **Database access** | Reads `opencode.db` SQLite directly | No SQLite read; pure SDK API |
@@ -196,16 +196,22 @@ If `dbPath` is not set in the plugin options, the path auto-resolves via `XDG_DA
 
 V2 mode activates automatically when the plugin detects it's running in an OpenCode V2 host (via the `setup` function's dynamic import of `./v2.js`). The key differences:
 
-1. **Session listing via SDK API**: Uses `OpenCode.make()` client with `Service.discover()` to locate the current OpenCode server. All sessions are enumerated via `session.list()` with pagination (`listAll` function) — no direct SQLite access required.
-2. **Process verification**: After discovering the service endpoint via `Service.discover()`, V2 verifies `client.server.info().pid === process.pid`. **If the PIDs don't match, the plugin fails closed with an error** — it will not sweep sessions from a different process.
+1. **Session listing via SDK API**: Uses the complete `OpenCode.make()` client, including `session.active()`. The current process's explicit `serve --hostname/--port` listener is tried first, with authentication from `OPENCODE_SERVER_USERNAME` (default `opencode`) and `OPENCODE_SERVER_PASSWORD`. Shared-service discovery is a second candidate source. All sessions are enumerated via `session.list()` with pagination (`listAll` function) — no direct SQLite access required.
+2. **Process verification**: Every candidate must pass `client.server.info().pid === process.pid` before any session scan or deletion. A different global service is never accepted merely because the current listener is unavailable. Once verified, one client is used for the entire sweep; failures do not switch the running sweep to another server. No port scanning, guessed default port, or OpenChamber-specific path is used. An unknown listener, dynamic port `0`, or unavailable authentication cannot be assumed safe; if no candidate can be verified, the sweep fails closed.
 3. **Active session protection**: The timer sweep calls `client.session.active()` to get all currently active session IDs and protects them automatically via `protectedNow = new Set([...protectedIDs, ...active])`.
 4. **Delete operation**: Uses `client.session.remove({ sessionID: id })` instead of `session.delete()`.
 
 #### V2 Pre-delete Checks and Concurrency Limits
 
+V2 plugin sweeps share a serial queue across location instances in the same JavaScript realm, covering client verification, global snapshots, and deletion. Each invocation keeps its own options, protections, and result. The `sweepQueueID` in load logs identifies the actual shared queue; this is not a cross-Worker, cross-realm, or cross-process lock.
+
 Immediately before removal, V2 refreshes the paginated session list and active IDs. It refuses removal if the candidate disappeared, its child-tree membership or parent links changed since the initial snapshot, any member of the fresh subtree is protected/active or not expired under its own threshold and grace period, or the candidate is in the protected-ancestor closure. These checks are still not atomic with the subsequent `session.remove()` request.
 
 The fresh list/active checks and the subsequent `session.remove()` are not atomic. A session can become active or otherwise change after the checks and before the server processes DELETE, so it may still be removed. Plugin unload or cancellation can stop later requests and signal an in-flight request, but cannot retract a DELETE already accepted by the server. V2 treats `SessionNotFoundError` as success only when its `sessionID` matches the exact target being removed; a missing child ID is not treated as success for a different parent removal.
+
+**Use one host per database.** `session.active()` reports activity in the connected host, not activity in every process sharing its database. PID verification establishes the request's destination, not exclusive ownership of stored sessions. Two independent hosts using the same database can see the same sessions while missing each other's active sessions. Disabling only one sweeper timer does not fix this blind spot. Use one host with multiple clients (for example, native OpenCode can connect to an OpenChamber-owned service using `opencode --server URL`), or use genuinely separate data directories. Neither manual nor scheduled cleanup is safe to enable on a shared database with independent concurrent hosts. This plugin does not enforce database ownership or provide cross-process activity coordination.
+
+**Do not stop the host running your maintenance session.** Establish the execution host before changing service lifecycle settings; being able to read the same session from another endpoint is not proof of host identity. `opencode service set disabled true` also stops the shared service, so it is not a harmless preference change. If a stop/restart is necessary, have the operator perform it outside the affected session. A supported location reload can load a new plugin without replacing the host process, but cancels pending permissions/forms; check those first.
 
 #### V2 Delete vs V1 Delete
 
@@ -236,7 +242,7 @@ For overlapping sweeps targeting the same already-removed session, a subsequent 
 
 **`timer.unref()`**: the timer calls `unref()` (Node.js / Bun) so the opencode process can exit naturally without waiting for the next tick. Without this, `opencode run` one-shots with `interval > 0` would hang on the timer.
 
-If you genuinely need single-flight sweeps across processes, set `"interval": 0` on all but one process and rely on `/sweep` from a single TUI.
+Setting `"interval": 0` on all but one process reduces duplicate timers, but does not serialize manual sweeps or protect activity in other hosts. Do not use it as a substitute for one host per database or separate data directories.
 
 ### Warning C: LLM-mediated manual path
 
@@ -248,12 +254,7 @@ Same as Warning B — V1's SQLite-based approach has the same per-process timer 
 
 ### Warning E: V2 Process mismatch (fail-closed)
 
-When V2 mode detects that the OpenCode service's PID does not match the plugin's process PID (via `client.server.info().pid !== process.pid`), it **refuses to sweep sessions and throws an error**. This fail-closed behavior prevents the plugin from manipulating sessions it doesn't own. This can occur in unusual setups where:
-
-- The plugin is loaded in a non-standard environment
-- OpenCode is run in a container or different process hierarchy
-
-In such cases, the plugin logs the PID mismatch and exits the sweep operation safely.
+Every V2 endpoint candidate is checked using `client.server.info().pid === process.pid`. A candidate with a mismatching PID is rejected. If none can be verified, the plugin **refuses to scan or delete sessions and reports an error**. This can occur when only another process's shared-service registration is available, or when the current host's listener/authentication cannot be determined. Do not remove the PID check to make cleanup run. A matching PID does not make independent hosts sharing one database safe; see [V2 Pre-delete Checks and Concurrency Limits](#v2-pre-delete-checks-and-concurrency-limits).
 
 ## Surfaces
 
@@ -283,7 +284,7 @@ src/
   db.ts         # readonly sqlite scan layer (bun:sqlite/node:sqlite runtime-detected)
   sweep.ts      # core runSweep (mockable SweeperClient interface)
   index.ts      # opencode server plugin default export (PluginModule shape)
-  v2.ts         # OpenCode V2 runtime implementation (Service.discover, pagination)
+   v2.ts         # OpenCode V2 runtime implementation (verified host client, pagination)
 tests/
   duration.test.ts
   options.test.ts
@@ -312,10 +313,11 @@ The unit tests cover the option parser, shared cleanup algorithm, V1 config hook
 
 ### Verify V2
 
-1. For a local checkout, run `bun run build` first, then configure the V2 `plugins` package/options object using its `file://` directory URL as shown in [Installation](#installation). Set `expiry` to `"1ms"`, `dryRun` to `true`, and `interval` to `"1m"` (or `0` to disable the timer).
+1. For a local checkout, run `bun run build` first, then configure the V2 `plugins` package/options object using its `file://` directory URL as shown in [Installation](#installation). Keep the real expiry/grace thresholds, set `dryRun` to `true`, and use `interval: "1m"` temporarily to observe a real timer tick. Back up persistent data before any deletion, and ensure each database has only one host.
 2. Start/restart the V2 host. Verify the `sweep` tool and `/sweep` command are available; invoke `/sweep` and confirm the summary is returned.
 3. Check the host's console output for `opencode-sweeper timer sweep` or `opencode-sweeper timer error`. The minimum non-zero interval is `1m`; allow at least one interval for the first timer tick.
 4. V2 checks fresh pagination, active sessions, protected ancestors, and the candidate's complete subtree before each removal. These checks are not atomic with the server-side removal; a session may change after the checks. Unload/cancellation does not retract a DELETE already accepted by the server. Review dry-run output before setting `dryRun` to `false`.
+5. Exercise both native shared-service and explicit private `serve` modes. Confirm the verified PID is the plugin's host, and that an unrelated shared-service registration is not selected. For real deletion, compare session IDs before and after, including retained active sessions and ancestors; a summary count or a mock test alone is not end-to-end evidence. Restore the normal timer interval after verification.
 
 ## Release
 

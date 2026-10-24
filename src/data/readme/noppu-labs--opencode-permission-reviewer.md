@@ -5,18 +5,15 @@
 [![downloads](https://img.shields.io/npm/dw/@noppu-labs/opencode-permission-reviewer)](https://www.npmjs.com/package/@noppu-labs/opencode-permission-reviewer)
 [![OpenCode](https://img.shields.io/badge/OpenCode-%E2%89%A51.18.29-6E56CF)](https://opencode.ai)
 [![Bun](https://img.shields.io/badge/Bun-%E2%89%A51.3.0-000000)](https://bun.sh)
-[![license](https://img.shields.io/badge/license-MIT%20%2B%20Apache--2.0-blue)](#license)
+[![license](https://img.shields.io/badge/license-MIT%20%2B%20Apache--2.0-blue)](docs/NOTICE)
+
+![OpenCode Permission Reviewer: an AI reviewer for every permission prompt. A request from the agent goes to the reviewer, which weighs the task, the policy and the evidence, then allows it, denies it or asks you.](https://raw.githubusercontent.com/noppu-labs/opencode-permission-reviewer/main/docs/images/social-preview.png)
 
 An OpenCode plugin that sends every `ask` permission to a tool-free AI reviewer. The reviewer
 reads the pending request, recent transcript evidence, what you asked for, and a policy you
 control. It then allows the action, denies it with a reason the agent can act on, or escalates
 it to you. Routine actions stop waiting for a keystroke, and risky ones are still blocked or
 brought to you.
-
-This is a fork of [warc0s/opencode-permission-reviewer](https://github.com/warc0s/opencode-permission-reviewer),
-published to npm as `@noppu-labs/opencode-permission-reviewer`. It includes changes upstream
-has not released, such as Jev's System One scores in audit records. It is an unofficial community
-plugin, not affiliated with or endorsed by [Anomaly](https://anoma.ly).
 
 ## What it does
 
@@ -54,13 +51,16 @@ plugin, not affiliated with or endorsed by [Anomaly](https://anoma.ly).
 
 ## Install
 
+OpenCode V2 installs the package and registers it in one step:
+
 ```bash
-bun add @noppu-labs/opencode-permission-reviewer   # or: npm install @noppu-labs/opencode-permission-reviewer
+opencode plugin add @noppu-labs/opencode-permission-reviewer
 ```
 
-The CLI can register the plugin for you. `--host auto` detects V1 or V2, `--tui` also registers
-the overlay (V1 `tui.json` or V2 global `cli.json`), and `--npm` writes the package name instead
-of a path. It never overwrites an existing entry.
+On OpenCode V1, `opencode plugin` registers the server plugin but not the TUI overlay, so use
+the package's own CLI instead. `--host auto` detects V1 or V2, `--tui` also registers the
+overlay (V1 `tui.json` or V2 global `cli.json`), and `--npm` writes the package name instead of
+a path. It never overwrites an existing entry.
 
 ```bash
 bunx @noppu-labs/opencode-permission-reviewer init --host auto --npm --tui --yes
@@ -71,7 +71,7 @@ register the checkout's absolute path.
 
 ## Configure
 
-Register the plugin.
+To register the plugin by hand instead:
 
 OpenCode V1 (`opencode.json` in the project, or `~/.config/opencode/opencode.json`):
 
@@ -149,17 +149,10 @@ and long commands.
 | [Safety](docs/SAFETY.md)                   | Safety properties and threat model                                       |
 | [Supply chain](docs/SUPPLY-CHAIN.md)       | What the package ships, dependency policy, known advisories              |
 | [Compatibility](docs/COMPATIBILITY.md)     | Supported versions and troubleshooting                                   |
-| [Migration](MIGRATION.md)                  | Moving between OpenCode V1 and V2, rollback                              |
+| [Migration](docs/MIGRATION.md)             | Moving between OpenCode V1 and V2, rollback                              |
 | [Development](docs/DEVELOPMENT.md)         | Build output, live testing, compatibility matrix, benchmark, TUI screens |
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md). Report security issues privately as described in
-[SECURITY.md](SECURITY.md).
-
-## License
-
-Changes made in this fork are released under the [MIT License](LICENSE). Code from the upstream
-project remains under the [Apache License 2.0](LICENSE-APACHE). The reviewer policy is adapted
-from [OpenAI Codex Guardian](https://github.com/openai/codex/tree/c82cb044f3413e6584308d969b94e7a1430711ab/codex-rs/core/src/guardian)
-(Apache-2.0, Copyright OpenAI and contributors); [NOTICE](NOTICE) has the full attribution.
+See [CONTRIBUTING.md](docs/CONTRIBUTING.md). Report security issues privately as described in
+[SECURITY.md](docs/SECURITY.md).

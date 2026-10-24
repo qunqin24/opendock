@@ -28,7 +28,7 @@ Just describe your birth details or ask a life question. It picks the right mode
 opencode plugin add opencode-ascendant
 ```
 
-⚠️ Requires OpenCode v2.
+> ⚠️ Requires OpenCode v2
 
 **Claude Code**
 ```text

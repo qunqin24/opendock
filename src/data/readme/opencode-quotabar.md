@@ -118,13 +118,15 @@ Out-of-range numbers are clamped; invalid values fall back to the default.
 
 Remove the plugin entries from `opencode.jsonc` and `cli.json`, then `opencode reload` and restart
 the TUI. There are no credential or data migrations: quota readings live in memory only, and the only
-thing persisted is presentation preferences (hidden/collapsed rows).
+thing persisted is presentation preferences (hidden/collapsed rows and the quota display mode).
 
 ## Using it
 
 - **Sidebar**: each detected provider gets a row, with the provider you currently use first. Click a
-  row to collapse it to a one-line summary; click the header to collapse the whole section.
-- **Footer**: the current provider's headline meter.
+  row to collapse it to a one-line summary; click the header to collapse the whole section. Expanded
+  windows show the type and reset countdown together (for example, `5h · 1h 8m`), the percentage at
+  the right, and the bar below. Narrow terminals wrap the text without dropping information.
+- **Footer**: the current provider's headline meter, always explicitly labeled as remaining (`left`).
 - **Details** (`/quota`): every window, reset, source, age, collection state, completeness, freshness,
   and the full diagnostic (code, explanation, next action, next retry).
 
@@ -134,18 +136,25 @@ thing persisted is presentation preferences (hidden/collapsed rows).
 | `Enter` | Refresh the selected provider |
 | `r` | Refresh all |
 | `h` | Hide or show the selected provider in the sidebar |
+| `u` | Switch sidebar and details between remaining and used quota |
 | `Esc` | Close |
 
 Everything is also reachable with the mouse. Statuses are words as well as colors.
 
 ### Reading the display
 
-- Percentages are **remaining**.
+- Percentages default to **remaining**. In details, click **Display: Remaining** or press `u` to
+  switch to **Used** (`100 − remaining`). The selection updates percentages and bar fill together
+  across sidebar, collapsed summaries, and details, and persists across restarts. The footer stays
+  labeled as remaining. Existing hidden/collapsed preferences are preserved.
+- Compact window readings omit `resets in` and `left`; the reset countdown follows the window type.
+- Colors always indicate proximity to exhaustion: **10% remaining** and **90% used** have the same
+  warning color, regardless of which quantity fills the bar.
 - *Collection state*, *completeness* and *freshness* are separate: a failed refresh can sit beside
   older readings marked **stale**, and the age is the age of the last **successful** reading.
 - A window whose reset time has passed shows **reset pending refresh**. It is never shown as refilled
   until a fresh reading confirms it.
-- An unknown percentage has no bar and is never shown as 0% or 100%. A real 0% is shown as `0% left`.
+- An unknown percentage has no bar and is never shown as 0% or 100%. A real 0% is shown as `0%`.
 - Hiding a provider only removes it from the sidebar; it stays listed in the details view, marked as
   hidden, with a way to show it again.
 

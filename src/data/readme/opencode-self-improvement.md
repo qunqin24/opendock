@@ -41,6 +41,12 @@ LLMs waste a lot of tokens reading and re-reading your code and asking you for c
   superseded memories are rejected. Blocked writes are logged with a reason
   (`memory_evidence`), and nothing is ever deleted — updates supersede the old row and
   `memory_undo` rolls back.
+- **Safe across concurrent sessions** — the daily store file is shared by every
+  opencode session on the machine plus the viewer, so the whole-file rewrites
+  (update, forget, undo, viewer delete) hold a per-file lock that is honored
+  across processes, and hand the new file over with an atomic rename. Another
+  session's write is never overwritten, and a reader never sees a half-written
+  store.
 - Automatically looks for insights when you complete the verification gates (tests, linting, etc)
 - Always defaults to memories first before sending a prompt to the LLM, which saves tokens! 
 
@@ -54,6 +60,11 @@ prompt cache on every message. This one is built the other way around:
   a compaction — and stays byte-identical in between. A stable system prefix
   means the provider's prompt cache survives ordinary turns instead of being
   invalidated on every message.
+- **Two-concept evidence gate.** A free-text prompt must share at least two
+  distinct concepts with a memory for it to be injected; keyword-length
+  queries (one or two words — a deliberate search) need only one. Injection
+  stays quiet on single-word coincidences, which `memory_recall` still
+  reaches on the pull path — rare and right beats frequent and maybe.
 - **Hard character budget.** The block is capped at 1200 characters by default
   (see Options) and trimmed at whole-memory boundaries — never cut mid-sentence.
 - **Evidence is never injected**, and the standing system digest is two lines.
@@ -67,10 +78,10 @@ store writes) using the plugin's real injection code:
 
 | Policy | Recomputes | Injected chars (20 turns) | Avg/turn | Worst block |
 | --- | ---: | ---: | ---: | ---: |
-| A — recompute per prompt, uncapped (naive) | 20 | 29460 | 1473.0 | 1765 |
-| B — epoch freeze + 1200-char cap (shipped) | 4 | 19516 | 975.8 | 1139 |
+| A — recompute per prompt, uncapped (naive) | 20 | 25742 | 1287.1 | 1838 |
+| B — epoch freeze + 1200-char cap (shipped) | 4 | 19990 | 999.5 | 1139 |
 
-Policy B injects 33.8% fewer characters — and the bigger saving isn't even in
+Policy B injects 22.3% fewer characters — and the bigger saving isn't even in
 the character count: B's block is byte-identical between store changes, so the
 prompt cache stays warm across ordinary turns. Reproduce (byte-identical
 output):
@@ -123,23 +134,29 @@ right memory (store of 200; k=3 = the production injection limit):
 
 | Query, vs. the stored memory | share | R@1 | R@3 |
 | --- | ---: | ---: | ---: |
-| lexical — reuses your project's words | 46% | 100% | 100% |
-| near — reworded, one overlap | 17% | 44% | 83% |
+| lexical — reuses your project's words | 46% | 98% | 98% |
+| near — reworded, one overlap | 17% | 28% | 28% |
 | strict — zero shared words | 37% | 0% | 0% |
 
 What the benchmark bought us:
 
 - **In-project prompts are overwhelmingly lexical** — you keep saying
   `bun test`, "the rate limiter", "staging deploys". The shipped matcher
-  nails those: 100% R@3, flat from store size 50 to 500.
+  nails those: 98–100% R@3, flat from store size 50 to 500, and the
+  two-concept evidence gate never abstains on one (0 of 48).
 - **It caught a real bug.** Function words ("the", "what", "how") counted as
   matches, so nearly half the time the top memory was the wrong one. The
   matcher now ignores them on the query side: wrong-first rate fell 49% → 34%,
-  and classic BM25 — a tuned scoring algorithm — no longer beats the shipped
-  matcher on any class except the hopeless one.
+  and the two-concept evidence gate + IDF ranking finished the job: **6%**.
+- **One shared word is a coin flip, so injection stopped playing it.** At the
+  near class (a single shared concept) the old matcher force-pushed a guess;
+  free-text prompts now abstain and the pull path covers them. The trade,
+  exactly: near-class R@3 83% → 28% (the remainder is keyword-length queries,
+  which still inject on one concept) for the 34% → 6% wrong-memory number
+  above. A quiet turn beats a confident wrong one.
 - **Strict paraphrase is the real lexical wall**, and we won't pretend
   otherwise. Nothing keyword-side crosses it. So instead of confident noise the
-  matcher now goes *silent* when the vocabulary shares nothing (a third of
+  matcher now goes *silent* when the vocabulary shares nothing (35 of 39
   strict queries inject nothing at all), and the agent's `memory_recall` loop
   remains as the pull path. Embeddings are the only known crossing — the bench
   exposes a scorer seam if you want to measure them — but requiring an
@@ -171,7 +188,7 @@ Add a `plugins` entry to your opencode config —
 ```json
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugins": ["opencode-self-improvement@0.3.0"]
+  "plugins": ["opencode-self-improvement"]
 }
 ```
 
@@ -179,13 +196,15 @@ Opencode installs the package (and its dependencies) automatically with Bun at
 startup. Quit and restart opencode; the plugin loads and `/repo-init` installs
 itself. Nothing else to do.
 
-Pin the exact version (as above). An unpinned entry resolves `@latest` exactly
-once and is never re-resolved afterwards, so it silently sticks. To update,
-bump the version in the config and restart. On Opencode v2 you can also manage
-it with the CLI:
+An unpinned entry resolves `@latest` exactly once and is never re-resolved
+afterwards, so updates are deliberate: `opencode plugin update
+opencode-self-improvement`. To install a specific release, append
+`@<version>` — see [npm](https://www.npmjs.com/package/opencode-self-improvement)
+for what's current — and bump it when you want to move. On Opencode v2 you
+can also manage it with the CLI:
 
 ```sh
-opencode plugin add opencode-self-improvement@0.3.0
+opencode plugin add opencode-self-improvement
 opencode plugin update opencode-self-improvement
 ```
 
@@ -210,6 +229,32 @@ Then point the `plugins` entry at the local file instead:
 After changes, `git pull` and restart opencode.
 
 </details>
+
+## Merge gate
+
+Nothing merges without the full gate: CI runs it as required checks (`lint`,
+`test`, `smoke`), and the same sequence is one command locally:
+
+```sh
+bun run gate          # typecheck + lint + unit tests + terminal smoke & BDD
+bun run gate:hooks    # once per clone: run the gate automatically on `git push`
+```
+
+**Feature order is BDD-first.** Every new feature starts by adding (or fixing)
+a BDD scenario in `e2e/` describing the behavior as a user would observe it —
+before any implementation code and before unit tests. Then write the unit
+tests for the pieces, then the code until everything is green. If no scenario
+turns red first, the feature has no observable contract.
+
+The `e2e/` suite is what keeps a load-error release from shipping again: it
+boots the **real opencode CLI** against each candidate in a fully isolated
+instance (fresh config, fresh db, fresh memory store, empty `HOME`) driven by
+a scripted OpenAI-compatible fake model — no API keys anywhere. Scenarios
+cover loading from the source tree and from the **packed npm artifact
+installed runtime-deps-only** (the same semantics as opencode's plugin
+cache), plus BDD flows for remember, recall, exact duplicates, near duplicates,
+ungrounded claims, and forget. Needs `opencode` on `PATH` locally (or set
+`OPENCODE_BIN`).
 
 ## Options
 
@@ -328,9 +373,12 @@ same data (`memory_status` tool under the hood; no model call):
   - **CONTEXT** — exact chars + estimated tokens riding now, % of the budget,
     requests the current epoch has ridden, session-lifetime totals, and how
     many requests abstained (silence is a feature)
-  - **CACHE** — epoch invalidations this session with the last reason, server
-    recompute count, and the *measured* prompt-cache read rate of the last turn
-    — the receipt, not just the promise
+  - **CACHE** — the receipts, in plain language: cache busts this session
+    (0 = memory has never rewritten a byte of your history), the measured
+    share of prompt tokens the provider served from cache (≥90% reads =
+    "memory is cache-invisible"), or — when the provider reports no usage at
+    all — the structural proof instead: the same block bytes rode every
+    request with zero busts
   - **INJECTED BLOCK** — the verbatim block riding your prompts, or an explicit
     "abstained: no vocabulary overlap"
   - **RECENT BLOCKED WRITES** — that `memory_remember` that didn't stick,
@@ -358,6 +406,7 @@ Run `bun memory-view` in your terminal and visit  http://127.0.0.1:8787 in your 
 | `memory_remember` says blocked | A gate rejected the write (stale code reference, a cited `path/to/file.ts` that doesn't exist in the repo, overlap with a superseded memory, or an ambiguous claim). The reason is logged — check `memory_evidence`, then rephrase against current code and retry. |
 | `invalid arguments to memory_*` | The tool call didn't match the tool's input schema — nothing was done, and the message names the offending fields. Schema validation lives at the tool boundary; gate blocks look different (`blocked at GATE (…)`). |
 | STORE shows `N malformed` | Rows in a daily file have a `ts=` that is not a valid ISO instant (typically a hand-edit gone wrong). Every reader skips them; fix the `ts=` value or restore the file with `memory_undo`. |
+| `memory store is busy`, or a stray `*.logfmt.lock` | Another session or the viewer has held that store file for over 5s. Ordinary writes proceed anyway; only `memory_undo` and the viewer's restore refuse, because a forced rollback under a live writer would drop rows nobody agreed to drop. Retry. A lock left behind by a killed process is taken over after 10s; `*.lock` and `*.tmp` files in the store are write bookkeeping, safe to delete while nothing is writing. |
 | `/repo-init` missing from the command list | The self-install couldn't write to `~/.config/opencode/commands/` (e.g. read-only config dir). Create it, restart, or just ask the model to "init memory for this repo" — it calls the same tool. |
 | Init says `Graph: unavailable` | `codebase-memory-mcp` couldn't start (not installed, or its once-only download is blocked). Install pinned `0.11.0` via the one-liner above, or point `OPENCODE_CBM_BIN` at the binary. Scripts are still remembered without it. |
 | Stale plugin after an update | Bump the pinned version in the `plugin` entry (or `opencode plugin update opencode-self-improvement` on v2) and restart opencode. |

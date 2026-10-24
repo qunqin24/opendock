@@ -1,27 +1,14 @@
 # Threads for OpenCode
 
-**Opinionated background agents for OpenCode V2: visible worker sessions that report back with a verdict, and durable parallel workflows that survive restarts.**
+[![npm version](https://img.shields.io/npm/v/%40op1%2Fthreads)](https://www.npmjs.com/package/@op1/threads) [![MIT license](https://img.shields.io/badge/license-MIT-blue)](https://github.com/opzero1/threads/blob/main/LICENSE)
 
-[![npm](https://img.shields.io/npm/v/@op1/threads)](https://www.npmjs.com/package/@op1/threads) [![license](https://img.shields.io/npm/l/@op1/threads)](LICENSE)
+Threads is an OpenCode plugin that lets you hand work to background agents while you keep using your main conversation. Ask a worker to review code, investigate a bug, or test a change. It works in a separate conversation and sends back a report with evidence.
 
-Threads lets one OpenCode conversation hand work to others. Each worker is an ordinary OpenCode conversation with its own folder, agent, and model. It runs in the background and reports back to the conversation that started it. You can open any worker, read what it did, and send it a follow-up.
-
-For bigger jobs, Threads runs dynamic workflows. The agent writes a short JavaScript script that sends work to many workers at once, checks what they return, and can resume after a restart.
-
-## The opinions
-
-The "op" in `op-threads` stands for opinionated. Threads makes these choices for you:
-
-- **Workers are real conversations.** Each worker is a top-level OpenCode session that you can open in a tab. Nothing runs where you can't see it.
-- **Idle is not done.** A worker finishes by reporting `PASS`, `PASS WITH NOTES`, `FAIL`, or `INCONCLUSIVE`, with evidence. A worker that stops without a report has no verdict.
-- **Reports come to you.** The report lands in the conversation that started the worker, so the agent doesn't have to poll.
-- **One level of workers.** Workers can use OpenCode's subagents, but they can't start workers of their own.
-- **Quiet by default.** Threads opens no tabs by itself. A small footer indicator shows what's running and disappears when nothing is.
-- **Workflows keep a journal.** A resumed run reuses every finished step instead of doing it again.
+You can open any worker to see what it did and send it a follow-up. For larger jobs, workflows run agents in parallel, pass results between steps, and keep a record so you can resume after a restart.
 
 ## Install
 
-Threads 0.3.3 needs OpenCode 2.1 or later. Threads 0.3.2 needs OpenCode 2.0.28. On OpenCode 2.0.26 or earlier, use Threads 0.2.8.
+Threads **0.3.4 needs OpenCode 2.1 or later**. For older versions, see [compatibility](https://github.com/opzero1/threads/blob/main/docs/configuration.md#compatibility).
 
 1. Add the server plugin:
 
@@ -29,71 +16,58 @@ Threads 0.3.3 needs OpenCode 2.1 or later. Threads 0.3.2 needs OpenCode 2.0.28. 
    opencode plugin add @op1/threads
    ```
 
-2. Add the terminal plugin to `~/.config/opencode/cli.json`. The command in step 1 doesn't do this.
+2. Restart OpenCode.
 
-   ```json
-   {
-     "plugins": [{ "package": "@op1/threads" }]
-   }
-   ```
+OpenCode loads the terminal UI from the server plugin automatically. You do not need a second entry in `cli.json`. See [configuration](https://github.com/opzero1/threads/blob/main/docs/configuration.md) for version pinning, limits, and the optional agent skill.
 
-3. Restart OpenCode.
+## Start your first worker
 
-Optionally, copy [`skills/managed-sessions`](skills/managed-sessions) into `~/.config/opencode/skills/`. It teaches agents when to start a worker and how to brief it.
-
-## How do I run background agents in OpenCode?
-
-Ask your agent in plain language:
+Ask your agent, replacing the path with an existing project folder:
 
 ```text
-Start a Threads worker in /path/to/my-app to review the auth changes. Report findings with file paths.
+Start a Threads worker in /path/to/my-app to review the auth changes.
+Don't edit files. Report findings with file paths and evidence.
 ```
 
-The agent calls `threads_spawn`, and the worker starts in the background. Your conversation stays free. While the worker runs, the prompt footer shows:
+Your conversation stays free while the worker runs. The prompt footer shows its progress:
 
 ```text
 ⠋ 1 worker ctrl+x j
 ```
 
-Press `ctrl+x j` to open the Threads list. Highlight the worker, press **Enter**, and choose **Open** to open its conversation.
+Press `ctrl+x j` to open the Threads list. Select the worker, press **Enter**, and choose **Open** to read its conversation. You can also open the list with `/activities`.
 
-When the worker finishes, its report arrives in your conversation. Workers that pass leave the list by themselves. Workers that fail, or stop without a report, stay in the list so you notice them.
+The worker's report arrives in your main conversation. Ask your agent to send a follow-up if you need more detail. See [Work with workers](https://github.com/opzero1/threads/blob/main/docs/workers.md) for roles, permissions, and stopping workers.
 
-## How do I run agents in parallel?
+## What you can do
 
-Describe the job with `/workflow-run`:
+- **Keep separate conversations for separate tasks.** Each worker has a folder, an agent profile, and a model. You can inspect its work without mixing it into your main conversation.
+- **Get a verdict with evidence.** Workers report `PASS`, `PASS WITH NOTES`, `FAIL`, or `INCONCLUSIVE`. A worker that stops without a report has no verdict. Check the evidence before accepting the result.
+- **See what needs attention.** Threads opens no worker tabs by itself. The footer shows running work and requests for input. Workers that pass hide once idle; failed or unreported work stays visible in the list.
+- **Run work in parallel.** Workflows coordinate multiple agents, pass results to later steps, and pause for your input. Their saved records let a resumed run reuse completed steps.
+
+To start a workflow, describe the job with `/workflow-run`:
 
 ```text
-/workflow-run Audit src/auth and src/billing for missing authorization checks. Confirm each finding independently.
+/workflow-run Review src/auth and src/billing in parallel. Confirm each finding independently.
 ```
 
-The agent writes a workflow script and starts it in the background. Run `/workflows` to watch its steps, open any worker, and pause, stop, or resume the run.
+Run `/workflows` to see the steps, open a worker, or pause, stop, and resume the run. See [Run a dynamic workflow](https://github.com/opzero1/threads/blob/main/docs/workflows.md).
 
-## Threads or subagents?
+For a small lookup, OpenCode's built-in subagents may be enough. Use Threads when you want a conversation you can return to, or a workflow with several steps. [Compare workers, workflows, and subagents](https://github.com/opzero1/threads/blob/main/docs/how-it-works.md#workers-workflows-and-subagents).
 
-Use one of OpenCode's built-in subagents for a quick lookup or a small review whose answer comes straight back to you. Use a Threads worker when you want:
+## Documentation
 
-- A separate conversation that you can open, read, and follow up on.
-- Work assigned to its own folder or worktree.
-- A clear verdict with evidence, not only a finished run.
-- A specific agent profile and model for one piece of work, such as an independent reviewer.
-
-Use a Threads workflow when many agents should run in parallel, or when later steps depend on earlier results. You can mix all three: workers can use subagents too.
-
-## Learn more
-
-| To | Read |
-| --- | --- |
-| Start workers, pick roles, and follow up | [Work with workers](docs/workers.md) |
-| Run, watch, and save workflows | [Run a dynamic workflow](docs/workflows.md) |
-| Monitor unattended workflows | [Workflow heartbeats](docs/heartbeat.md) |
-| Change limits, commands, and shortcuts | [Configuration](docs/configuration.md) |
-| Look up tools, fields, and data shapes | [Reference](docs/reference.md) |
-| Understand retries, permissions, and recovery | [How Threads works](docs/how-it-works.md) |
-| Write workflow scripts by hand | [Workflow runtime contract](skills/workflow-authoring/references/runtime.md) |
-| Develop or release Threads | [Development](docs/development.md) |
-| See what changed between versions | [Changelog](CHANGELOG.md) |
+- [Work with workers](https://github.com/opzero1/threads/blob/main/docs/workers.md): start, watch, follow up, and stop.
+- [Run a dynamic workflow](https://github.com/opzero1/threads/blob/main/docs/workflows.md): parallel work, checkpoints, and saved scripts.
+- [Configuration](https://github.com/opzero1/threads/blob/main/docs/configuration.md): compatibility, limits, commands, and shortcuts.
+- [Reference](https://github.com/opzero1/threads/blob/main/docs/reference.md): tools, fields, and data shapes.
+- [How Threads works](https://github.com/opzero1/threads/blob/main/docs/how-it-works.md): permissions, retries, and recovery.
+- [Workflow heartbeats](https://github.com/opzero1/threads/blob/main/docs/heartbeat.md): monitor unattended workflows.
+- [Workflow runtime contract](https://github.com/opzero1/threads/blob/main/skills/workflow-authoring/references/runtime.md): write scripts by hand.
+- [Development](https://github.com/opzero1/threads/blob/main/docs/development.md): build, test, and release.
+- [Changelog](https://github.com/opzero1/threads/blob/main/CHANGELOG.md): changes between versions.
 
 ## License
 
-[MIT](LICENSE)
+[MIT](https://github.com/opzero1/threads/blob/main/LICENSE)

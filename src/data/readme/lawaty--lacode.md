@@ -2,10 +2,8 @@
 
 > Ultimate opencode setup for Go users
 
-> **Beta — experimental, changing fast.** LaCode ships on the npm **`beta`**
-> dist-tag rather than `latest`, so nothing pulls it by accident: install
-> `@lawaty/lacode@beta`, or pin an exact version. Interfaces here can change
-> between releases without a major bump.
+> LaCode 1.0.0 ships on the npm **`latest`** dist-tag. Prereleases use
+> `beta`: install `@lawaty/lacode@beta`, or pin an exact version.
 
 LaCode is an opencode plugin. It routes delegated work onto a weighted pool of
 cheap models instead of the expensive one, reaps subagents that hang without
@@ -29,8 +27,13 @@ is also on disk at `node_modules/@lawaty/lacode/CHANGELOG.md`.
 | Per-model cooldowns and failover | A provider rate-limits mid-session and the whole thing hard-fails, while other providers sit idle. |
 | Hang reaper | A wedged subagent holds its slot forever, so the session stalls with no error and no timeout. |
 | Desktop notifications | With several sessions open you cannot see which one finished, or which is blocked on a question. |
+| Permission answers on the popup | An approval blocks a background session, and finding that session just to click Allow is the interruption. |
+| Distinct notification sounds | A popup says something happened, but not at a glance whether it is a finish, a question or a block. |
 | SSH notification tunnel | Work on a remote host raises its notification on that host, which has no desktop. |
-| Repository context map | Every task starts by exploring your codebase cold, and every agent re-discovers the same layout, the same entry points and the same boundaries — paid for again on every run. |
+| Repository context map | Every task starts by exploring your codebase cold, re-deriving the same layout, entry points and boundaries. |
+| Active backlog | What is half-done, and what can be dropped, lives in chat history the next session cannot see. |
+| Standing instructions | The same direction gets repeated every session, or buried in config that is not per-clone. |
+| Image attachments anywhere | A TUI with no image support locks vision models out entirely. |
 
 ## Getting started
 
@@ -132,6 +135,9 @@ option is optional:
 | `selfUpdate` | `true` | Check for a newer release at most once per ~6h and install it in the background; it applies on the next opencode start. `false` — or `LACODE_NO_SELFUPDATE=1` — turns the check off. |
 | `sound` | `true` | Play a short tone with each notification, one per outcome, so you can tell a finished session from a question or a permission prompt without reading the popup. It is opt-out: `false` — or `LACODE_SOUND=0` (`false`, `off`, `no` work too, and beat the option) — turns the sound off, and anything else, a typo included, leaves it on. |
 | `omniroute` | — | Optional [OmniRoute](docs/OMNIROUTE.md) gateway integration. Absent or `{ enabled: false }` changes nothing. |
+| `watchMs` | `1000` | How often the pool files are checked for changes. `0` disables live reload. |
+| `watchDebounceMs` | `250` | Collapse a burst of editor writes into one reload. |
+| `imagePaste` | — | Image attachments: `maxBytes` (4 MiB), `maxImages` (10) and `dir`. |
 
 ### Staying up to date
 
@@ -146,6 +152,12 @@ The running session keeps its loaded code; the new version takes effect on the
 next start, and the log says so. Run `lacode update` to do it on demand, or
 `lacode update --check` to just report.
 
+1.0.0 is published to the `latest` dist-tag; prereleases use `beta`. This check
+follows `latest`. A beta install is therefore reported as current even when a
+newer beta exists,
+and `lacode update` will not move it: pin the version you want in the `plugin`
+entry, because a new specifier is what forces a fresh resolve.
+
 ### Which LaCode is running
 
 `lacode version` answers it — and the answer is often not the version number you
@@ -156,7 +168,7 @@ lacode version
 ```
 
 ```
-version    0.4.1
+version    1.0.0
 root       /home/you/lacode
 source     checkout
 commit     <hash> (dirty)
@@ -182,16 +194,16 @@ When it reports `stale`, rebuild with `npm run build`. No network is touched;
 
 ## What you get
 
-Three agents, pooled and rotated: `explore`, `implement` and `context`. You spawn
-the base name and the pool picks a cheap model slot for it. Behind each base sits
-up to four hidden variants — one per slot — and a spawn of the bare name is the
-only thing that works: naming a variant lets the caller choose the provider
-directly, which is exactly what the rotation and the per-slot ceiling exist to
-prevent, so it is refused.
+Three pooled agents: `explore`, `implement` and `context`. You spawn the base
+name and the pool picks a cheap model slot for it. Behind each base sits up to
+four hidden variants — one per slot — and a spawn of the bare name is the only
+thing that works: a hand-named variant such as `explore-1` is coerced to its
+base and routed by the pool, so naming one cannot pin a provider or skip
+ordered slot filling.
 
-A model that rate-limits or runs out of quota is benched and taken out of the
-rotation until its window ends, so one sick provider does not take the pool with
-it. Those windows are computed backoff rather than a promise from the provider,
+A model that rate-limits or runs out of quota is benched until its window ends,
+so one sick provider does not take the pool with it.
+Those windows are computed backoff rather than a promise from the provider,
 and a quota-shaped one can run for hours — long enough for a provider that has
 since recovered, or whose quota you reset in its own console, to stay excluded
 while every delegated spawn queues behind the survivors. So LaCode asks instead
@@ -200,30 +212,42 @@ the moment a pool file changes (where it validates every slot, cooling or not),
 it probes each benched model with one real request on that exact model. A model
 that answers is re-admitted immediately — nothing restarts, nothing reloads — and
 a model that is still limited keeps exactly the window it had, because a check
-must never be the thing that extends the wait. A model the provider no longer
-serves at all is benched for the quota cap and named in the report. A change is
-reported as a toast and a log line; a pass that finds nothing changed says
+must never be the thing that extends the wait. A model the provider does not
+serve at all is benched for the quota cap and named in the report.
+A change is reported as a toast and a log line; a pass that finds nothing changed says
 nothing at all.
 
-Seven commands: `/context-init`, `/context-update`, `/context-review`,
-`/lacode-doctor`, `/agent-instructions`, `/pool` and `/pool-recheck`. Everything is added **only
-when your config does not already
+Nine commands: `/context-init`, `/context-update`, `/context-review`,
+`/lacode-doctor`, `/agent-instructions`, `/pool`, `/pool-recheck`, `/image-in-cb`
+and `/image`. Everything is added **only when your config does not already
 define it** — an agent or command you wrote yourself is left byte-identical,
 never patched or partially merged. `{"enabled": false}` turns the whole thing off
 without leaving a trace. The exact injection list, and the five keys that are
 deliberately *not* injected, are in
 [docs/CONFIGURATION.md](docs/CONFIGURATION.md#what-gets-injected).
 
+Two more surfaces that need no configuration:
+
+- **`pool_status`** — the live view `/lacode-doctor` uses: per-slot load against
+  its ceiling, which slot the next spawn takes, cooldowns, hung claims and
+  whether the watcher is on. Ask for it when you want to know what the pool is
+  doing; it never changes slot selection.
+- **Notifications that wait** — a notification is never auto-dismissed; it stays
+  until you close it. On Linux a permission request carries **Allow once**,
+  **Always allow** and **Deny** buttons, and LaCode waits up to ten minutes for
+  the click.
+
 ## Context map
 
 Agents are stateless between tasks, and exploring your repository is the most
 expensive part of any task — so every agent pays for it again, re-deriving the
 same layout, entry points and boundaries from scratch. LaCode keeps a short,
-maintained map of the repository in `.opencode/context/` (five navigation files:
-`architecture`, `contexts`, `conventions`, `workflows`, `decisions`, plus
-`active.md` — the active backlog) and injects
-a standing rule that every agent reads the relevant file before exploring and
-starts from the canonical entry points it lists. The map holds conclusions, not
+maintained map of the repository in `.opencode/context/` — five navigation files
+(`architecture`, `contexts`, `conventions`, `workflows`, `decisions`) plus
+`active.md`, the active backlog, where a finished task stays a week and an open
+one stays until done — and injects a standing rule that every agent reads the
+relevant file before exploring and starts from the canonical entry points it
+lists. The map holds conclusions, not
 inventories: it answers "what should I look at first?" and nothing else, which
 is what makes reading it cheaper than the exploration it replaces.
 
@@ -244,6 +268,8 @@ are reading:
 /agent-instructions # apply a client instruction to the project's AGENTS.md — client-only, see below
 /pool              # rewrite the pool slot table in ~/.config/lacode/pool.txt; picked up automatically
 /pool-recheck      # probe the pool now; accepts an optional provider/model list
+/image-in-cb       # attach the clipboard image to this message; macOS needs pngpaste, Linux needs wl-paste or xclip
+/image             # attach one or more image files to this message; paths honour quotes, ~ and globs
 ```
 
 The map is local and untracked — it describes your checkout on your machine, so
@@ -252,11 +278,16 @@ nothing and carry on without it. What this buys is tokens not spent
 re-discovering structure; as with everything else here, no savings percentage is
 published, because none has been independently measured. The mechanism, the
 permission rule that makes one writer possible, and what the log lines mean are
-in [docs/CONTEXT.md](docs/CONTEXT.md).
+in [docs/CONTEXT.md](docs/CONTEXT.md). Automatic map runs also clean up after
+themselves: each run's session is deleted once its transcript is written, and
+the last 20 transcripts are kept under
+`~/.local/share/opencode/lacode/cartographer` (`LACODE_TRANSCRIPT_DIR` overrides
+the directory).
 
 ## Standing instructions
 
-The project's root `AGENTS.md` is your own statement of intent: it records
+The project's root `AGENTS.md` — created on first use by `/agent-instructions` —
+is your own statement of intent: it records
 what you want worked on and how you want it approached. It says nothing about
 where code lives, so it can never contradict the code, and within that domain
 it outranks the generated context files and any agent's inference about what
@@ -345,7 +376,8 @@ which explains the harness and deliberately contains no results.
 ## Remote hosts
 
 Notifications raised on a remote host need a way back to your desktop. The
-reverse SSH forward is what carries them:
+default hop is a direct `ssh` to your desktop over one warm `ControlMaster`
+connection; a reverse forward is the fallback used when `OC_LOCAL_HOST` is unset:
 
 ```bash
 lacode notify "build finished" "4 files changed"      # local desktop, or forwarded if remote
@@ -356,6 +388,8 @@ lacode doctor                                        # what the environment reso
 must never be able to fail the process that tried to notify you. The one
 exception is an actionable notification — one carrying a permission request id
 — which waits for the click, because the answer is the whole point of it.
+That click path is Linux-only: the popup carries **Allow once**, **Always allow**
+and **Deny**, and macOS gets a plain notice without buttons.
 `lacode forward HOST -- COMMAND` runs a command on another host over ssh and
 exits with its status.
 

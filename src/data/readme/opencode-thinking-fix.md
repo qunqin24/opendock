@@ -219,6 +219,8 @@ Then register it in `opencode.json` and restart OpenCode. The key depends on the
 
 The same package covers both: OpenCode v2 reads the `Plugin.define({ id, setup })` export, v1 reads the `server()` export on the same default export.
 
+> OpenCode loads the plugin itself. Registering it in `opencode.json` is the whole install. Loading it with `node require()` fails by design and is not a bug.
+
 > **The plugin is a seatbelt, not the real fix.** It keeps the field present so requests don't 400, but it does not replay the model's actual prior reasoning. To make the model remember its earlier thinking, see [Full Setup: Proxy](#full-setup-proxy). For the trade-offs, see [Plugin details](#plugin-details-the-seatbelt).
 
 | Method | Command | Best for |
@@ -334,23 +336,49 @@ A Node.js proxy that catches API responses as they come back, pulls out the actu
 
 Your model sees its full chain-of-thought from turn 1 on every subsequent turn. The difference is noticeable on complex multi-turn coding sessions.
 
-#### Two-proxy architecture
+#### Five local ports
 
-The proxy runs on **two ports**:
+The proxy runs as **five instances of the same `proxy.js` binary**, one per upstream wire:
 
 | Port | Purpose | Environment |
 |---|---|---|
-| **3457** | Direct providers (DeepSeek, Kimi, GLM, MiMo, GPT, Claude, Qwen, Gemini, etc.) | `PORT=3457` |
-| **3458** | OpenCode Go provider | `PORT=3458` `UPSTREAM_URL=https://opencode.ai/zen/go/v1` |
+| **3457** | Direct providers (DeepSeek, Kimi, GLM, MiMo, GPT, Claude, Qwen, Gemini, etc.) — auto-routed | `PORT=3457` |
+| **3458** | OpenCode Go — chat + Responses wires | `PORT=3458` `UPSTREAM_URL=https://opencode.ai/inference/go/openai/v1` |
+| **3459** | OpenCode Zen free lane — fixed upstream | `PORT=3459` `UPSTREAM_URL=https://opencode.ai/zen/v1` `REASONING_KEY=reasoning_content` |
+| **3462** | OpenRouter — fixed upstream | `PORT=3462` `UPSTREAM_URL=https://openrouter.ai/api/v1` `REASONING_KEY=reasoning_content` |
+| **3463** | OpenCode Go — Anthropic messages wire | `PORT=3463` `UPSTREAM_URL=https://opencode.ai/inference/go/anthropic/v1` |
 
-Port 3457 auto-routes based on model name using the built-in route table. Port 3458 is a fixed-upstream proxy specifically for the OpenCode Go provider. It handles the provider's supported chat and Anthropic message dialects, while passing unsupported response formats through unchanged. Both are handled by the same `proxy.js` binary, just different environment variables.
+Port 3457 auto-routes by model name through the built-in route table. The other four pin a single upstream each, because the wire path or the passback key differs per lane. The Zen lane's free-tier entries track the live catalogue — 8 free ids on 2026-10-23 — and ids that upstream retired are removed rather than left pointing at an endpoint that answers 410 `ModelDeprecated` or 400 `Model is unavailable`.
+
+#### OpenCode Go: four wires, three base URLs (measured 2026-10-23)
+
+Go is not one protocol. Per the provider's own endpoint table, each model is served over exactly one of four wires, and the base URL differs per wire. Measured against the live gateway with a Go key:
+
+| Wire | Base URL to put in `UPSTREAM_URL` | Client `api` (pi-ai) | Models |
+|---|---|---|---|
+| OpenAI chat | `https://opencode.ai/inference/go/openai/v1` | `openai-completions` | beam-free, glm-5.1/5.2/5.3/5.3-flash, hy3, hy4-preview, kimi-k2.6, kimi-k2.7-code, kimi-k3, longcat-2.0, mimo-v2.5, mimo-v2.5-pro, mimo-v2.6-flash, mimo-v2.6-pro, minimax-m2.5, minimax-m3.1-flash, omen-alpha, qwen3.6-plus, qwen3.7-max, step-5-preview, deepseek-v4.1-flash, deepseek-v4-pro |
+| Anthropic messages | `https://opencode.ai/inference/go/anthropic/v1` | `anthropic-messages` | claude-haiku-5-5, minimax-m2.7, minimax-m3, qwen3.7-plus, qwen3.8-flash, qwen3.8-max |
+| OpenAI Responses | `https://opencode.ai/inference/go/openai/v1` | `openai-responses` | gpt-6-luna, gpt-5.6-luna, grok-4.6, grok-4.7, muse-spark-1.2-contributor, muse-spark-1.3-contributor |
+| Google | `https://opencode.ai/inference/go/google/v1beta/models/<id>` | `google` | gemini-4-argon-contributor |
+
+What that means for this proxy, all four points measured rather than inferred:
+
+1. **`zen/go/v1` is not a substitute for the Anthropic wire.** Chat works on both `zen/go/v1` and `inference/go/openai/v1`, but an Anthropic `/v1/messages` call to `zen/go/v1/messages` returns **401 `Go requires a credential`** while the same body and key at `inference/go/anthropic/v1/messages` returns 200. Run a second port for it:
+   `PORT=3463 UPSTREAM_URL=https://opencode.ai/inference/go/anthropic/v1 node proxy/proxy.js`.
+2. **An Anthropic client must not get a `/v1` base.** The Anthropic SDK appends `/v1/messages` itself, so a client base of `http://127.0.0.1:3463/v1` produces `/v1/v1/messages` and a **404 with an empty body**; use `http://127.0.0.1:3463`.
+3. **Wire is per model, so a chat-only lane silently 404s.** `grok-4.6` rejects both `/chat/completions` and `/v1/messages` with `ModelProtocolUnsupported` and only answers on `/responses`. Group models by wire instead of listing them all under one provider.
+4. **Auth works both ways.** `Authorization: Bearer <key>` and Anthropic-style `x-api-key` both return 200 on all three proxy-addressable wires (the Google wire is not addressable through this proxy), so no header translation is needed. `x-opencode-session` remains mandatory; the proxy injects one when the client omits it (see the header block in `proxy.js`), which is what makes DeepSeek Harness usable against Go.
+
+Two further catalogue facts: the live `GET https://opencode.ai/inference/go/v1/models` list is authoritative (36 ids on 2026-10-23, including eight the docs page does not list: glm-5.1, grok-4.6, kimi-k2.6, minimax-m2.5, minimax-m2.7, omen-alpha, qwen3.6-plus, qwen3.7-max), and `longcat-2.5-preview-free` is documented but absent from that list, so it answers **429 `Endpoint is unavailable`**.
+
+Port 3457 auto-routes by model name through the built-in route table; the other four pin a single upstream each (3458 chat + Responses, 3463 Anthropic messages, 3459 Zen, 3462 OpenRouter), because the wire path or the passback key differs per lane. All five are the same `proxy.js` binary with different environment variables.
 
 ```bash
 # Linux / macOS / Windows (Node.js required)
 node proxy/proxy.js
 
 # OpenCode Go proxy
-PORT=3458 UPSTREAM_URL=https://opencode.ai/zen/go/v1 node proxy/proxy.js
+PORT=3458 UPSTREAM_URL=https://opencode.ai/inference/go/openai/v1 node proxy/proxy.js
 ```
 
 > **Windows PowerShell:** use `$env:PORT=3457; node proxy/proxy.js` (PowerShell) or `set PORT=3457 && node proxy/proxy.js` (CMD).
@@ -368,7 +396,7 @@ enables a service without your explicit action.
 
 ```bash
 npm install opencode-thinking-fix
-PORT=3458 UPSTREAM_URL=https://opencode.ai/zen/go/v1 \
+PORT=3458 UPSTREAM_URL=https://opencode.ai/inference/go/openai/v1 \
   node node_modules/opencode-thinking-fix/proxy/proxy.js
 ```
 
@@ -393,16 +421,64 @@ configured upstream and does not persist the credential. Stop the proxy when
 it is not needed. The systemd and watchdog options below are deliberately
 opt-in alternatives for operators who want automatic restarts.
 
-#### Install as systemd services (auto-start at boot)
+#### Install as systemd services (auto-start at login)
+
+Fresh Linux procedure. Node.js 24 or newer is required. The units execute the proxy from a checkout at `~/opencode-thinking-fix` (`%h/opencode-thinking-fix/proxy/proxy.cjs`).
+
+1) Clone to the path the units expect:
+
+```bash
+git clone https://github.com/tbosancheros39/opencode-thinking-fix.git ~/opencode-thinking-fix
+```
+
+2) Enter the checkout:
+
+```bash
+cd ~/opencode-thinking-fix
+```
+
+3) Install the runtime dependency:
+
+```bash
+npm install --omit=dev
+```
+
+This pulls `eventsource-parser`, the one runtime dep. Skipping it makes the units die at boot with `ERR_MODULE_NOT_FOUND: Cannot find package 'eventsource-parser'`.
+
+4) Copy the six units:
 
 ```bash
 mkdir -p ~/.config/systemd/user
 cp systemd/reasoning-cache.service ~/.config/systemd/user/
 cp systemd/reasoning-cache-go.service ~/.config/systemd/user/
-systemctl --user daemon-reload
-systemctl --user enable --now reasoning-cache.service
-systemctl --user enable --now reasoning-cache-go.service
+cp systemd/reasoning-cache-go-anthropic.service ~/.config/systemd/user/
+cp systemd/reasoning-cache-zen.service ~/.config/systemd/user/
+cp systemd/reasoning-cache-openrouter.service ~/.config/systemd/user/
+cp systemd/reasoning-proxy-watchdog.service ~/.config/systemd/user/
 ```
+
+5) Reload user units:
+
+```bash
+systemctl --user daemon-reload
+```
+
+6) Enable the router lane:
+
+```bash
+systemctl --user enable --now reasoning-cache.service
+```
+
+Repeat `enable --now` for the other lanes: `reasoning-cache-go.service` (3458), `reasoning-cache-go-anthropic.service` (3463), `reasoning-cache-zen.service` (3459), `reasoning-cache-openrouter.service` (3462), `reasoning-proxy-watchdog.service`.
+
+7) Verify:
+
+```bash
+systemctl --user status reasoning-cache.service
+journalctl --user -u reasoning-cache.service
+```
+
+Alternative: if you installed via npm (`node_modules/opencode-thinking-fix`), deps are present already. Run `node path/to/proxy/proxy.js` directly with no clone. The shipped units point at `~/opencode-thinking-fix`, so point them at that npm path instead before enabling.
 
 Then point OpenCode at it, in your `opencode.json`:
 
@@ -433,10 +509,10 @@ One runtime dependency (`eventsource-parser`). The proxy uses Node.js built-in `
 
 ### Auto-Recovery
 
-The watchdog only keeps the proxy alive, so start the proxy first. The script checks both proxy instances every 4 minutes and restarts any that are down:
+The watchdog only keeps the proxy alive, so start the proxy first. The script checks all five proxy instances (ports 3457/3458/3459/3462/3463) every 4 minutes and restarts any that are down:
 
 ```bash
-cp watchdog/watchdog.sh ~/reasoning-cache-proxy/
+cp watchdog/watchdog.sh ~/opencode-thinking-fix/watchdog/
 cp systemd/reasoning-proxy-watchdog.service ~/.config/systemd/user/
 systemctl --user daemon-reload
 systemctl --user enable --now reasoning-proxy-watchdog.service
@@ -461,7 +537,7 @@ See [Windows notes](#windows-notes) for the full setup.
 ```
 OpenCode → [plugin patches missing reasoning_content/reasoning]
          → [proxy injects cached real text]
-         → [watchdog keeps both proxies alive]
+         → [watchdog keeps all five proxies alive]
          → API
 ```
 
@@ -617,11 +693,14 @@ proxy/
 watchdog/
   watchdog.sh                           # auto-recovery watchdog
 systemd/
-  reasoning-cache.service               # proxy systemd unit (port 3457)
-  reasoning-cache-go.service            # OpenCode Go proxy unit (port 3458)
+  reasoning-cache.service               # universal auto-routing proxy (port 3457)
+  reasoning-cache-go.service            # OpenCode Go chat + Responses unit (port 3458)
+  reasoning-cache-go-anthropic.service  # OpenCode Go Anthropic messages unit (port 3463)
+  reasoning-cache-zen.service           # Zen free lane unit (port 3459)
+  reasoning-cache-openrouter.service    # OpenRouter unit (port 3462)
   reasoning-proxy-watchdog.service      # watchdog systemd unit
 tests/
-  test-proxy.js                         # 127 proxy assertions
+  test-proxy.js                         # 214 proxy assertions
   test-plugin.js                        # 12 plugin assertions
   live-minimax-replay.mjs               # self-contained replay gate (mock upstream)
 proof/                                  # evidence: captures, controls, CSVs, repro scripts
@@ -650,24 +729,63 @@ OpenCode v1.17.9+ (V1 plugin), OpenCode v2.0+ (V2 plugin), DeepSeek V4 Pro, Kimi
 
 ### Windows notes
 
-**Plugin and proxy work fully on Windows.** The proxy (`proxy.js`) uses one runtime dependency (`eventsource-parser`) plus Node.js built-in modules (`http`, `https`, `url`). No platform-specific code. Start it with:
+Fresh Windows procedure. Windows has no systemd. Node.js 24 or newer is required.
+
+1) Install Node.js 24 or newer from nodejs.org, then verify:
 
 ```powershell
-# PowerShell
-$env:PORT=3457; node proxy\proxy.js
+node --version
 ```
 
-**Watchdog and systemd are Linux-only.** For Windows auto-restart, use **Task Scheduler** or **NSSM** (Non-Sucking Service Manager) to run the proxy as a Windows service:
+2) Get the code with deps. Pick one path. Path A (npm, deps included):
 
 ```powershell
-# Using NSSM (install once: winget install nssm)
+npm install opencode-thinking-fix
+```
+
+The proxy lives at `node_modules/opencode-thinking-fix/proxy/proxy.js`. Path B (clone, then install deps):
+
+```bash
+git clone https://github.com/tbosancheros39/opencode-thinking-fix.git
+cd opencode-thinking-fix
+npm install --omit=dev
+```
+
+This pulls `eventsource-parser`, the one runtime dep. Skipping it fails at start with `ERR_MODULE_NOT_FOUND: Cannot find package 'eventsource-parser'`.
+
+3) Start the proxy:
+
+```powershell
+$env:PORT=3457
+node proxy/proxy.js
+```
+
+CMD equivalent: `set PORT=3457 && node proxy\proxy.js`.
+
+Path A start: run from the folder where you ran the install, pointing at the package path:
+
+```powershell
+node node_modules/opencode-thinking-fix/proxy/proxy.js
+```
+
+4) Auto-start. Pick one. Task Scheduler (built in):
+
+```powershell
+schtasks /create /tn ReasoningCacheProxy /sc onlogon /tr "cmd /c set PORT=3457 && cd /d C:\path\to\opencode-thinking-fix && node proxy\proxy.js"
+```
+
+NSSM service (install once: `winget install nssm`):
+
+```powershell
 nssm install ReasoningCacheProxy node.exe proxy\proxy.js
 nssm set ReasoningCacheProxy AppDirectory C:\path\to\opencode-thinking-fix
 nssm set ReasoningCacheProxy AppEnvironmentExtra PORT=3457
 nssm start ReasoningCacheProxy
 ```
 
-Repeat for the Go proxy on PORT=3458 with `UPSTREAM_URL=https://opencode.ai/zen/go/v1`.
+Repeat for the two Go proxies: `PORT=3458` with `UPSTREAM_URL=https://opencode.ai/inference/go/openai/v1` (chat + Responses) and `PORT=3463` with `UPSTREAM_URL=https://opencode.ai/inference/go/anthropic/v1` (Anthropic messages).
+
+5) The plugin part matches the Linux flow: `opencode plugin opencode-thinking-fix`, register `plugins` (OpenCode v2) or `plugin` (OpenCode v1.18.29+) in `opencode.json`, restart OpenCode.
 
 **OpenCode config paths on Windows:**
 

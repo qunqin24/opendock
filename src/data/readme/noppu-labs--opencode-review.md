@@ -4,6 +4,7 @@
 [![fuzz](https://github.com/noppu-labs/ai-toolkit/actions/workflows/fuzz.yml/badge.svg)](https://github.com/noppu-labs/ai-toolkit/actions/workflows/fuzz.yml)
 [![build](https://github.com/noppu-labs/ai-toolkit/actions/workflows/release.yml/badge.svg)](https://github.com/noppu-labs/ai-toolkit/actions/workflows/release.yml)
 [![attestations](https://img.shields.io/badge/releases-attested-blue?logo=github)](https://github.com/noppu-labs/ai-toolkit/attestations)
+[![npm downloads](https://img.shields.io/endpoint?url=https%3A%2F%2Ftoolkit.noppu.com%2Fapi%2Fbadges%2Fnpm-downloads&logo=npm)](https://www.npmjs.com/org/noppu-labs)
 
 Agent skills for deep code review and grounded investigation in PHP, TypeScript, Python and beyond, plus dedicated Laravel and React packs.
 
@@ -29,7 +30,7 @@ Agent skills for deep code review and grounded investigation in PHP, TypeScript,
 | `review` | 6 review skills for PHP, TypeScript, and Python: comment audit, writing comments, type-safety review, correctness review, PR review orchestrator, PR comments |
 | `investigate` | 3 skills: deterministic structural brief, deep two-pass investigation, spec/ticket review |
 
-The `review` plugin also ships as an OpenCode package, see [OpenCode install](review/README.md#opencode).
+The `review` and `investigate` plugins also ship as OpenCode packages, see the OpenCode install sections of [review](review/README.md#opencode) and [investigate](investigate/README.md#opencode).
 
 ## Install (Claude Code marketplace)
 

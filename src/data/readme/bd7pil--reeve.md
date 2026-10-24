@@ -1,8 +1,8 @@
 # REEVE
 
-**A self-owned multi-agent orchestration layer on opencode v2.**
+**A self-owned multi-agent orchestration layer for OpenCode v2.**
 
-REEVE does three things, and together they are the name:
+REEVE handles three things, and together they are the name:
 
 | What it does | Historical meaning of "reeve" |
 |---|---|
@@ -14,148 +14,183 @@ REEVE does three things, and together they are the name:
 
 [中文说明](README.zh-CN.md)
 
-## Why it exists
+## What it is
 
-The controlled side moved from **opencode v1 + `oh-my-openagent` (omo)** to
-**openchamber + opencode v2**, and **omo fails to load on v2; upstream has
-declined to port it** (issue #9389). Rather than fork it, REEVE splits the job
-into four layers with their own licenses:
+REEVE is a single OpenCode v2 plugin plus an optional OpenChamber panel. It fills
+the gaps v2 leaves open — child-task status, silent child death, concurrency
+limits, wall-clock timeouts — without writing `agents.*.model` (that key belongs
+to the OpenChamber panel).
 
 ```
-proxy layer     cross-provider fallback        GATE (in-process, ours)   in the plugin; no binary, no separate service
-orchestration   dispatch discipline, 4 phases  prompts + agent files    v2 already provides the mechanism
-ledger layer    ledger / silent death / concurrency   this repo's plugin   the eight things v2 lacks
-review layer    independent diff review        rules from OCR (Apache-2.0)   no tool to install
+GATE            in-process proxy: routing, fallback chains, ledger, catalog
+Orchestration   8 subagents + 1 visible foreman, review skill, dispatch rules
+Ledger          child-task ledger, concurrency gate, timeouts, reconciliation
+Review          independent diff review with a fixed rubric
+Panel           OpenChamber extension: chains, stats, ledger, free lane
 ```
 
-## What to read
+GATE is plain JavaScript inside the plugin. There is **no proxy binary, no
+separate service, and no Bifrost/9router dependency** — those were retired in
+0.1.8/0.1.5 respectively.
 
-> This project is written for an execution agent starting from zero. Read
-> [docs/PLAN.md](docs/PLAN.md) first (components and ownership, step 0→5, hard
-> gates), then [docs/HANDOFF.md](docs/HANDOFF.md) §15 (execution protocol).
-> Before writing plugin code read
-> [docs/research/opencode-v2-plugin-api.md](docs/research/opencode-v2-plugin-api.md) —
-> the measured v2.0.32 plugin API map.
+## Requirements
 
-| I want to… | Read |
-|---|---|
-| start working | [docs/PLAN.md](docs/PLAN.md) |
-| write a plugin | [docs/research/opencode-v2-plugin-api.md](docs/research/opencode-v2-plugin-api.md) |
-| understand the whole design | [docs/HANDOFF.md](docs/HANDOFF.md) |
-| see what is done | [docs/PROGRESS.md](docs/PROGRESS.md) |
-| check first-hand evidence | [docs/research/orchestration-stack-verdict.md](docs/research/orchestration-stack-verdict.md) (archived, partly superseded) |
-| import outside material | [NOTICE.md](NOTICE.md) (license boundaries) |
-
-> **The public tree does not contain `docs/`.** GitHub `main` and the npm
-> package ship code, config, README and license texts only. The development
-> records and `.zcode/` drafts stay in the development repo and are cut by
-> `bash scripts/publish-repo.sh` during export, so they never enter public
-> history. References such as "§6.11" below point into that local record.
-
-## Status (2026-10-19 evening)
-
-**Steps 0–6 are complete and were accepted end-to-end on a real EL7 host**
-(staging with an isolated `HOME`; the production v1 engine was untouched).
-
-| Step | Output | Real-host acceptance |
-|---|---|---|
-| 0 | plan / API map / HANDOFF errata | — |
-| 1 | 8 agents in `agents/*.md` (7 subagents marked `hidden`) | ✅ permission gates, independent review, multiple rounds; only `foreman` is visible |
-| 2 | `plugin/` ledger layer (**140** tests) | ✅ concurrency queue / wall-clock interrupt / cross-restart reconcile / ledger round-trip / roster injected into the `subagent` tool description / proxy self-hosting / chain hot reload (≤4 s) / stats cross-check |
-| 3 | `skills/review/` review layer | ✅ real diff, line numbers, structured output |
-| 4 | GATE proxy layer (in-process: routing / fallback / ledger / catalog) | ✅ real-host acceptance: free lane 200, fault-injection downgrade to paid, per-session stickiness, ≤5 s hot reload, paid direct call unchanged |
-| 5 | `extensions/reeve/` console (chain editor + stats + ledger) | ✅ installed in openchamber 2.3.3, rendered, ledger read through the host file bridge; edit → save → runtime rules hot-reload → "applied" |
-| 6.7 | the whole system inside the plugin package | ✅ agents and skills registered by the plugin; only `opencode.jsonc` remains in the config dir |
-| 6.8 | endpoint bootstrap | ✅ the config holds a single plugin line; the plugin writes `providers.reeve` itself (additive, backed up, comments preserved) |
-| 6 | `config/` engine sample + foreground visibility + sync semantics | ✅ see [docs/PROGRESS.md](docs/PROGRESS.md) §6 |
-| 6.6 | pure plugin form: proxy self-hosted, slim config | ✅ fetch/start/reuse/guard all in the plugin; fresh-EL7 simulation |
-| 6.11 | visual console: chain edit + stats | ✅ EL7: reorder + add fallback → save → runtime `routing_rules` change, snapshot `appliedAt` advances; stats cross-checked against `logs.db` |
-| 6.12 | release chain: four CI gates + OIDC npm publish + public-tree export | ✅ `@bd7pil/reeve@0.1.1` published by CI with SLSA provenance; EL7 loaded the registry form |
-
-> ⚠️ **One must-read**: a bare `opencode run` without `--model` / `--agent`
-> silently bypasses REEVE — the client supplies a default model and the server
-> uses it. Add `"model": "reeve/pro"` to the engine config to make the default
-> session take the tier (measured).
-
-**Four unknowns were settled by measurement**: opencode v2 ignores the model
-name in the response body; the real v2 plugin API shape (`codemode:false` is
-the tool-visibility switch, storage keys are `plugin:<hex(id)>:` …); the three
-agent visibility switches (`mode` / `hidden` / `disabled`); and that the v2
-provider transport hook can replace requests.
-
-**Still open** (reported honestly, not claimed as passing): the false-positive
-rate of the review subagent — collect two weeks of data with the default
-"severity does not block".
+- Node.js **>= 22**
+- OpenCode **v2** (tested against 2.0.32 and 2.1.3)
+- OpenChamber **>= 2.3.3** for the panel extension (2.5.0 tested)
+- One or more provider credentials in `~/.local/share/opencode/auth.json`
 
 ## Install
 
-**Plugin (engine side)** — one line from the npm registry; the engine fetches
-it into its global npm cache, no checkout needed:
+### 1. Engine plugin
+
+Add the plugin to `~/.config/opencode/opencode.jsonc` (or `opencode.json`):
 
 ```jsonc
-// $HOME/.config/opencode/opencode.json
-{ "model": "reeve/pro", "plugins": ["@bd7pil/reeve"] }
+{
+  "model": "reeve/standard",
+  "plugins": ["@bd7pil/reeve@0.2.3"]
+}
 ```
 
-`plugins` entries go through `npm-package-arg`: package name, version, tag, git
-spec or absolute path. The directory form is the one measured on EL7; the
-registry form uses the same path. Full config is in
-[plugin/README.md](plugin/README.md).
+- `model` is required. Without it, a bare `opencode run` / a fresh composer
+  session can use the engine's default model and silently bypass GATE.
+  `reeve/standard` is the cost-first default; choose `reeve/pro`, `reeve/flash`,
+  or `reeve/multimodal` if you want a different one. 0.2.0 removed the
+  `reeve/manual` single-target tier — pick a model directly in the composer instead.
+- The plugin registers four tiers and all agents itself, and on first start adds
+  `providers.reeve` (`http://127.0.0.1:18080/v1`) to the config if it is missing.
+  The write is additive, backed up, and comment-preserving.
+- GATE listens on **18080** by default when the plugin starts it. If 8080 is
+  occupied on your host, set the port explicitly:
 
-**Panel extension** (`extensions/reeve/`) uses the host's own mechanism:
-path, public zip, or git branch. Only the git form self-updates. Release via
-`.github/workflows/reeve-extension.yml` (manual dispatch):
-
-- `reeve.zip` → release asset; pin `reeve-<version>`, channel `reeve-latest`
-  (`https://github.com/BD7PIL/reeve/releases/download/reeve-latest/reeve.zip`)
-- `extensions/reeve` → mirrored to the `reeve` branch by `git subtree split`
-  (`https://github.com/BD7PIL/reeve#reeve`, self-updating)
-
-**`provision.json`** (plugin package root, shipped in the npm tarball) is the
-installation contract read by an assembler such as ocrc: plugin spec and
-directory fallback, the extension zip, the config paths that get synced, and
-post-install checks. **There are no binary artifacts**: the GATE proxy layer is
-plain JS inside the plugin, so installation is exactly the two steps above.
-
-## CI and release
-
-All in `.github/workflows/`, all offline (no provider traffic):
-
-| Action | Trigger | What it does |
-|---|---|---|
-| CI | push `main` / PR | plugin tests (ubuntu node 22 + 24, windows node 24) · coverage hard floor (`scripts/coverage-baseline.json`, only ratchets up) · npm pack content assertions (license texts present, `docs/` and secrets absent) · extension gate + byte-identical rebuild · engine config sample · public-tree gate |
-| Release (normal path) | `bash scripts/publish-repo.sh --tag` | export public tree → tag `v<plugin version>` on that commit → CI publishes with OIDC (SLSA provenance) |
-| Release (manual) | push tag `v<version>` or dispatch the workflow | tag↔version check → version not published → tests → pack assertions → `npm publish --access public --provenance` |
-
-**Release credentials: npm Trusted Publishing (OIDC) — no npm secret in the
-repository.** `npm trust` requires the package to exist, so 0.1.0 was published
-manually; from 0.1.1 on everything is published by CI with provenance. Adding a
-repository secret `NPM_TOKEN` switches the workflow to token mode without code
-changes.
-
-## Naming
-
+```jsonc
+{
+  "model": "reeve/standard",
+  "plugins": [
+    { "package": "@bd7pil/reeve@0.2.3", "options": { "gate": { "enabled": true, "port": 18080 } } }
+  ],
+  "providers": {
+    "reeve": {
+      "package": "@ai-sdk/openai-compatible",
+      "settings": { "baseURL": "http://127.0.0.1:18080/v1" }
+    }
+  }
+}
 ```
-brand          REEVE
-machine id     reeve
-repository     github.com/BD7PIL/reeve (public tree: no docs/ or .zcode/)
-npm package    @bd7pil/reeve        plugin (MIT)
-extension      extensions/reeve     panel.id = reeve
-ledger         ~/.reeve/ledger.json
-config         ~/.config/opencode/reeve.jsonc (user) / .opencode/reeve.jsonc (project)
-tag            plugin v<ver>; extension reeve-<ver> / reeve-latest
-release asset  reeve.zip
+
+### 2. OpenChamber panel (optional but recommended)
+
+Settings → Extensions → install one of:
+
+- **self-updating (git):** `https://github.com/BD7PIL/reeve#reeve`
+- **fixed zip:** `https://github.com/BD7PIL/reeve/releases/download/reeve-latest/reeve.zip`
+
+Grant `sessions` + `filesystem` after installation. The panel reads the plugin
+snapshot and GATE config; it never starts sessions or prompts.
+
+## Tiers and agents
+
+| Tier | Chain | Agents | Purpose |
+|---|---|---|---|
+| `reeve/pro` | `reasoning` | planner, advisor, critic | strongest reasoning; text-first |
+| `reeve/standard` | `standard` | executor, reviewer | general-purpose mid tier, image-capable |
+| `reeve/flash` | `free-first` | scout, librarian | free-first, then paid fallback |
+| `reeve/multimodal` | `vision` | looker | image/PDF via files on disk; also the image route |
+
+`foreman` is the visible primary orchestrator; it follows the session's model
+selection (top-level default `reeve/standard`).
+
+`looker` is a hidden, read-only subagent for images/PDFs **on disk**. Pasted
+images are handled by GATE directly (see below).
+
+Default chains (editable in the panel; config at
+`~/.config/opencode/reeve/fallback.jsonc`):
+
+- `standard`: zhipu glm-5.3-flash → lmuai glm-5.3-flash → free → deepseek
+- `reasoning`: zhipu glm-5.3 → deepseek → lmuai glm-5.3-flash → free
+- `free-first`: free → zhipu glm-5.3-flash → lmuai → deepseek
+- `vision`: zhipu glm-5.3-flash → lmuai → free → deepseek
+
+## Images
+
+All four tiers declare image input so the engine does not strip attachments
+before GATE sees them. When a request to `reasoning` contains an image, GATE
+routes **that request only** to the `vision` chain; the session model and
+composer selection do not change. Text requests to `reeve/pro` still use
+GLM-5.3.
+
+Pasted images have no filesystem path in OpenCode v2; they are stored inline in
+the session database. A text-only model can see only an error text, and the
+built-in `subagent` tool cannot carry attachments. REEVE therefore routes pasted
+images at the proxy layer, and uses `looker` only for file paths.
+
+## Free lane
+
+Chains can contain `@free`. At request time GATE discovers free models from
+OpenCode Zen and OpenRouter, filters them by `modalities.input` from
+`https://models.dev/api.json` (6-hour TTL, last-good cache), and expands up to
+`free.max` candidates. With `require_image: true`, only image-capable free
+models are eligible; if the metadata is unavailable, the request falls back to
+paid instead of using a text-only model. Failed free models cool down globally
+(3 failures → 600s by default).
+
+Bifrost and 9router are retired; free routing is implemented natively.
+
+## Files and state
+
+| Path | What |
+|---|---|
+| `~/.config/opencode/opencode.jsonc` | engine config (plugin + `model`) |
+| `~/.config/opencode/reeve/fallback.jsonc` | GATE chains/providers/free policy (panel-editable) |
+| `~/.reeve/ledger.json` | read-only snapshot for the panel |
+| `~/.reeve/gate.jsonl` | GATE request ledger (no keys) |
+
+## Upgrade notes
+
+- Remove any per-agent `model` overrides; the plugin owns the agent definitions.
+- `reeve/coding` no longer exists — use `reeve/standard`.
+- 0.2.0 removed the `reeve/manual` tier and its chain. Use `reeve/standard` as
+  the default and pick a model directly in the composer when you want a specific
+  one. Remove the `manual` chain, `agents.foreman`, and the
+  `chain_for_model["reeve/manual"]` entry from your `fallback.jsonc`, and change
+  any `"model": "reeve/manual"` line to `reeve/standard`. The plugin logs a
+  warning when it still sees a stale manual registration.
+- Remove the old `free.image_models` static list; image filtering is dynamic.
+- Bifrost/9router config, binaries, and autostart entries are obsolete; delete them.
+- A top-level `model` line is still required.
+
+## Development
+
+```bash
+npm install
+npm --prefix plugin test             # plugin suite (194 assertions across 10 files)
+npm run test:coverage                # coverage hard floor
+npm run lint
+npm --prefix extensions/reeve run build
+node extensions/reeve/scripts/audit.mjs --fixture   # 40 UI audit items
 ```
+
+CI runs lint, plugin tests on Ubuntu 22/24 and Windows 24, coverage, the
+extension build/byte-identical check, the UI audit, the config sample, and the
+public-tree gate. Releases use npm Trusted Publishing (OIDC) and SLSA
+provenance. See [CHANGELOG.md](CHANGELOG.md) for release notes.
+
+Development records (`PLAN`, `HANDOFF`, `PROGRESS`, research notes) are kept in
+the private development tree and are not part of the public repository. Public
+references point only to files in this tree.
+
+## Known limitations
+
+- Free-model catalogs and rate limits change; availability is best-effort.
+- Third-party relays can have quota/cache surprises; the default chains keep
+  auditable official providers as the paid backstop.
+- Image routing requires GATE to be enabled. PDF/video are not declared by the
+  tiers; convert or extract text first.
+- Review false-positive rate is not yet measured over a long window.
 
 ## License
 
-This repository's own code is MIT. Two pieces of outside material must carry
-their notices:
-
-- the ledger implementation adapted from **`oh-my-opencode-slim` (MIT)** → its
-  `LICENSE` travels with it
-- the rule documents adapted from **`alibaba/open-code-review` (Apache-2.0)** →
-  its `NOTICE` / `LICENSE` travel with them
-
-**No code or prompt literal from `oh-my-openagent` may ever be introduced** —
-it is SUL-1.0, non-relicensable, permanently. See [NOTICE.md](NOTICE.md).
+REEVE is MIT. See [LICENSE](LICENSE) and [NOTICE.md](NOTICE.md) for the two
+pieces of outside material (MIT ledger implementation; Apache-2.0 review rules).
+No code or prompt literal from `oh-my-openagent` (SUL-1.0) is included.

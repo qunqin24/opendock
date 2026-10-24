@@ -186,6 +186,13 @@ Plainly stated:
   A kinship hit stamps the run `independence=NOT-INDEPENDENT`: the ballot is
   preserved as data but is not in any effective path. A chain that cannot be
   read stamps `UNVERIFIABLE` — unreadable is never silently clean.
+- **Refused launches leave records (v1.4.0, council 16a2):** an explicit `--run-id`
+  whose tool-staged `launch-context.json` is missing or malformed is REFUSED, with a
+  `launch-refusal.json` written into the private run dir — a pinned id claiming a
+  tool launch that never staged its finding is a provenance lie, not an absence.
+  The bare CLI lane (no `--run-id`) keeps the named `UNVERIFIABLE` leg, and once the
+  chamber runner regenerates its run record, that face outvouches any contradicted
+  staged claim ("record wins").
 - **Absence is a disability (W2).** Before any tally is honored, every declared
   voter/worker must have left a terminal row (`ok|error|timeout` + detail) in
   the run's `TERMINALS.txt`. A declared seat without its row is counted
@@ -204,7 +211,9 @@ Plainly stated:
 - Consult/swarm send the artifact text to your configured model pool providers.
 - The plugin writes under its state paths (the runs file and the per-run space) and,
   for chamber/exam lanes, sealed run directories under `lane.runRoot`
-  (default `/tmp`) — role homes, transcripts, pidfiles, CHECKSUMS.
+  (default `/tmp`), every plugin-created dir `0700` (mkdir mode + explicit chmod:
+  unreachable to group/other regardless of umask — v1.4.0 private-dir law) —
+  role homes, transcripts, pidfiles, CHECKSUMS.
 - Voter/worker turns run with `bash`, `edit`, and `write` disabled per prompt.
 
 ## Architecture (`src/`)
@@ -263,7 +272,7 @@ PLAN→MINT→DISPATCH→AGGREGATE pipeline over ordinary child sessions.
 
 ```bash
 npm run typecheck   # tsc --noEmit, strict + noUncheckedIndexedAccess + exactOptionalPropertyTypes
-npm test            # full unit suite, fully offline (no network, no LLM; ~420 at v1.3.0 — the run prints the exact count)
+npm test            # full unit suite, fully offline (no network, no LLM; 459 at v1.4.0 — the run prints the exact count)
 npm run build       # esbuild bundle → dist/index.js + dist/cli.js (ESM)
 node smoke/run-smoke.mjs   # offline smoke of the shipped surface (see smoke/README.md)
 ./ship.sh           # the full release gate: all of the above + portability scan of the packed tarball

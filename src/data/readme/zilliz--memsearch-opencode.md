@@ -201,10 +201,10 @@ All plugins share the same memsearch backend. Configure once, works everywhere.
 
 #### Embedding
 
-Defaults to **ONNX bge-m3** — runs locally on CPU, no API key, no cost. On first launch the model (~558 MB) is downloaded from HuggingFace Hub.
+Use **ONNX bge-m3** for local CPU embeddings with no API key. On first launch the model (~558 MB) is downloaded from HuggingFace Hub.
 
 ```bash
-memsearch config set embedding.provider onnx     # default — local, free
+memsearch config set embedding.provider onnx     # local, free
 memsearch config set embedding.provider openai   # needs OPENAI_API_KEY
 memsearch config set embedding.provider ollama   # local, any model
 ```
@@ -428,7 +428,7 @@ pip install memsearch           # into an activated venv
 <summary><b>Optional embedding providers</b></summary>
 
 ```bash
-# As a CLI tool (recommended — local ONNX, no API key)
+# Install local ONNX support for the CLI
 uv tool install "memsearch[onnx]"
 pipx install "memsearch[onnx]"
 pip install "memsearch[onnx]"
@@ -442,6 +442,8 @@ uv add "memsearch[onnx]"
 </details>
 
 ### 🐍 Python API — Give Your Agent Memory
+
+The Python API defaults to OpenAI (`OPENAI_API_KEY`). For local embeddings, pass `embedding_provider="onnx"`.
 
 ```python
 from memsearch import MemSearch

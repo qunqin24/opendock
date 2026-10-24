@@ -1,6 +1,6 @@
 # throughline
 
-**Continuous, state-aware session memory for Claude Code, Codex CLI, OpenCode, and OMP.**
+**Continuous, state-aware session memory for Claude Code, Codex CLI, OpenCode, OMP, and Hermes Agent.**
 Captures what you *did* and what *is* - commands, file changes, decisions, live git/PR
 state - then hands it off with judgment when the session wraps. Your artifacts stay
 readable, editable, and yours.
@@ -58,13 +58,13 @@ does the full orientation pass (open PRs/issues, deep read) on demand.
 <details>
 <summary>Per-harness mechanism (click to expand)</summary>
 
-| Capture point | Claude Code / Codex CLI / OMP | OpenCode |
-|---|---|---|
-| Session start | `SessionStart` hook | `session.created` event + `experimental.chat.system.transform` |
-| User intent | `UserPromptSubmit` hook | `chat.message` hook |
-| Action | `PostToolUse` hook | `tool.execute.after` hook |
-| Compaction boundary | `PreCompact` hook, then `SessionStart` re-fires with `source=compact` | `session.compacted` event, which queues the recovery block for the next context injection |
-| Session end | `SessionEnd` hook | `session.idle` event (fires after every turn, not once at exit - see [docs/INSTALL.md#opencode](docs/INSTALL.md#opencode)) |
+| Capture point | Claude Code / Codex CLI / OMP | OpenCode | Hermes Agent |
+|---|---|---|---|
+| Session start | `SessionStart` hook | `session.created` event + `experimental.chat.system.transform` | `on_session_start` precompute, injected by `pre_llm_call` on the first turn |
+| User intent | `UserPromptSubmit` hook | `chat.message` hook | `pre_llm_call` hook |
+| Action | `PostToolUse` hook | `tool.execute.after` hook | `post_tool_call` hook |
+| Compaction boundary | `PreCompact` hook, then `SessionStart` re-fires with `source=compact` | `session.compacted` event, which queues the recovery block for the next context injection | `post_compaction` hook, re-injected on the next `pre_llm_call` |
+| Session end | `SessionEnd` hook | `session.idle` event (fires after every turn, not once at exit - see [docs/INSTALL.md#opencode](docs/INSTALL.md#opencode)) | `on_session_finalize` and `on_session_reset` hooks |
 
 Claude Code and Codex CLI share the identical shell hook scripts. OMP's hooks are
 in-process TypeScript event handlers rather than subprocess hooks, but a thin shim
@@ -125,16 +125,16 @@ Every harness reads and writes the same `.claude/throughline/` data format, so a
 project's history stays readable and continuable no matter which one you install into.
 Claude Code has the most native integration (it binds into Claude's own memory
 system); Codex CLI, OpenCode, and OMP all get full automatic capture through their
-own hook/plugin APIs. Capabilities differ in the details below - see the table for the
+own hook/plugin APIs (Hermes Agent too, see [docs/INSTALL.md#hermes-agent](docs/INSTALL.md#hermes-agent)). Capabilities differ in the details below - see the table for the
 honest comparison, then jump to the section for your harness.
 
-| | [Claude Code](#claude-code) | [Codex CLI](#codex-cli) | [OpenCode](#opencode) | [OMP](#omp) | [npx skills](#npx-skills) |
-|---|---|---|---|---|---|
-| Skills (`handoff`, `onboard`, `consolidate`, `consolidate-memory`) | yes | yes | separate install (see below - broadly auto-discovered) | yes (auto-discovered) | yes |
-| Automatic capture | yes - 5 hooks | yes - 5 hooks, one-time trust step (see below) | yes - 5 hooks | yes - 6 events (compaction is 2 events, not 1) | no |
-| Compaction survival | yes | yes | yes | yes | no |
-| Native memory binding | yes (Claude's `/memory`) | no | no | no | no |
-| Requires `jq` | yes | yes | no | yes | n/a - skills only |
+| | [Claude Code](#claude-code) | [Codex CLI](#codex-cli) | [OpenCode](#opencode) | [OMP](#omp) | [Hermes](docs/INSTALL.md#hermes-agent) | [npx skills](#npx-skills) |
+|---|---|---|---|---|---|---|
+| Skills (`handoff`, `onboard`, `consolidate`, `consolidate-memory`) | yes | yes | separate install (see below - broadly auto-discovered) | yes (auto-discovered) | yes (registered as `throughline:<name>`) | yes |
+| Automatic capture | yes - 5 hooks | yes - 5 hooks, one-time trust step (see below) | yes - 5 hooks | yes - 6 events (compaction is 2 events, not 1) | yes - 6 hooks, git repos only | no |
+| Compaction survival | yes | yes | yes | yes | yes | no |
+| Native memory binding | yes (Claude's `/memory`) | no | no | no | no | no |
+| Requires `jq` | yes | yes | no | yes | yes | n/a - skills only |
 
 ### Claude Code
 

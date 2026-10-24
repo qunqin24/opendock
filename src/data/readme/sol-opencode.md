@@ -48,7 +48,7 @@ npm i sol-opencode
 ```jsonc
 {
   "plugins": [
-    { "package": "sol-opencode@0.1.2", "options": { "actionFusion": true, "observationPack": true } }
+    { "package": "sol-opencode@0.1.3", "options": { "actionFusion": true, "observationPack": true } }
   ]
 }
 ```
@@ -183,6 +183,61 @@ Each pair used identical prompt bytes and a fresh copy of the same off-by-one fi
 
 One `off` trace included a string-valued `then_run` field. It did not return a fusion-success marker. The test ran in a separate shell call. The small sample (n=2) and single model limit this result to the tested task.
 
+### Issue #71: `then_run` adoption across models (2026-10-23)
+
+This plugin-arm experiment varied model and prompt on the `v0.1.2` base (`origin/main` `52e3e58`) with OpenCode 2.0.32. It used two fresh, seeded fixtures for each model/prompt pair, a separate `XDG_DATA_HOME` per run, and `umask 0022`. Each fixture failed before the run with `expected 7, got 3`. The independent test passed after all 12 runs, and every `test_sum.sh` stayed unchanged. The three lanes returned the smoke response and loaded the plugin before the matrix.
+
+The prompts are [`issue-71-p1.md`](./benchmarks/probes/issue-71-p1.md) (permissive) and [`issue-71-p2.md`](./benchmarks/probes/issue-71-p2.md) (explicit). P1 SHA-256: `e755b55bb7c00d5a521978928121e5c0301f10763eb0e714a170abd376b021f0`. P2 SHA-256: `540bc2a7acd2fb9bcfeb86d2c0b9d75ed12619433902c0c7d4a1089c0ea824bb`. Adoption counts only an edit/write result with `[then_run:succeeded]`. The model's final claim does not count as adoption.
+
+| Model lane | P1 adopted (n=2) | P2 adopted (n=2) | First `then_run` attempt was an object |
+|---|---:|---:|---|
+| `opencode-zen/glm-5.3-flash-free` | 2/2 | 2/2 | P1 1/2, P2 2/2 |
+| `opencode-zen/mimo-v2.6-flash-free` | 1/2 | 2/2 | P1 1/1 attempted, P2 2/2 |
+| `opencode-zen/nemotron-3.5-lightning-free` | 0/2 | 2/2 | P1 0/0 attempted, P2 2/2 |
+| **All lanes** | **3/6** | **6/6** | — |
+
+P2 adoption was 2/2 for all three lanes. P1 adoption varied from 0/2 to 2/2. This small sample points to a prompt effect, but it does not establish a general model ranking.
+
+In GLM P1 repetition 1, the first edit input supplied `then_run` as a string and omitted `oldString`. The host rejected that call with `then_run: Expected object`. A later object-shaped call succeeded. The exact runtime text `then_run must be an object with a command` appeared zero times.
+
+Every P2 `then_run` attempt used an object on its first attempt. All 12 final test claims agreed with the independent test. P2 final responses also reported the `then_run` use shown in the trace. P1 did not ask for a `then_run` claim.
+
+The tables below report every run. `shape errors` counts the exact runtime message above. `billed ctx` is input plus cache read/write. Output tokens are separate.
+
+Wall time is runner elapsed time. This experiment used the plugin arm only. It does not measure savings against plugin-off.
+
+| Run | Model | Adopted | Attempts | Shape errors | First attempt object | Independent test | Claim matches trace | Wall |
+|---|---|---:|---:|---:|---|---|---|---:|
+| P1-GLM-1 | GLM | yes | 2 | 0 | no | PASS | not asked | 18 s |
+| P1-GLM-2 | GLM | yes | 1 | 0 | yes | PASS | not asked | 7 s |
+| P2-GLM-1 | GLM | yes | 1 | 0 | yes | PASS | yes | 14 s |
+| P2-GLM-2 | GLM | yes | 1 | 0 | yes | PASS | yes | 12 s |
+| P1-MiMo-1 | MiMo | yes | 1 | 0 | yes | PASS | not asked | 43 s |
+| P1-MiMo-2 | MiMo | no | 0 | 0 | — | PASS | not asked | 29 s |
+| P2-MiMo-1 | MiMo | yes | 1 | 0 | yes | PASS | yes | 140 s |
+| P2-MiMo-2 | MiMo | yes | 1 | 0 | yes | PASS | yes | 14 s |
+| P1-Nemotron-1 | Nemotron | no | 0 | 0 | — | PASS | not asked | 22 s |
+| P1-Nemotron-2 | Nemotron | no | 0 | 0 | — | PASS | not asked | 27 s |
+| P2-Nemotron-1 | Nemotron | yes | 1 | 0 | yes | PASS | yes | 20 s |
+| P2-Nemotron-2 | Nemotron | yes | 1 | 0 | yes | PASS | yes | 26 s |
+
+| Run | Round-trips | Billed ctx | Avg/RT | Peak | Tail-4 avg | Output tokens | Tool calls |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| P1-GLM-1 | 3 | 17,130 | 5,710 | 5,917 | 5,710 | 149 | 4 |
+| P1-GLM-2 | 2 | 11,199 | 5,600 | 5,742 | 5,600 | 84 | 3 |
+| P2-GLM-1 | 2 | 11,285 | 5,642 | 5,778 | 5,642 | 110 | 3 |
+| P2-GLM-2 | 2 | 11,195 | 5,598 | 5,688 | 5,598 | 165 | 2 |
+| P1-MiMo-1 | 2 | 11,506 | 5,753 | 5,907 | 5,753 | 149 | 3 |
+| P1-MiMo-2 | 3 | 17,506 | 5,835 | 5,999 | 5,835 | 113 | 4 |
+| P2-MiMo-1 | 2 | 11,579 | 5,790 | 5,944 | 5,790 | 146 | 3 |
+| P2-MiMo-2 | 2 | 11,579 | 5,790 | 5,944 | 5,790 | 146 | 3 |
+| P1-Nemotron-1 | 4 | 27,872 | 6,968 | 7,802 | 6,968 | 503 | 5 |
+| P1-Nemotron-2 | 5 | 36,147 | 7,229 | 8,101 | 7,452 | 581 | 6 |
+| P2-Nemotron-1 | 3 | 20,246 | 6,749 | 7,194 | 6,749 | 423 | 4 |
+| P2-Nemotron-2 | 3 | 20,218 | 6,739 | 7,180 | 6,739 | 339 | 4 |
+
+The metric output matches `benchmarks/measure.py` for all 12 traces. The raw NDJSON captures remain outside the repository. See issue [#71](https://github.com/lucas-albers-lz4/SoL-OpenCode/issues/71) for the design and audit trail.
+
 See [`benchmarks/README.md`](./benchmarks/README.md) for the protocol, the method rules that make these numbers citable, and how to regenerate them.
 
 The merge rule for a model-visible change — schema text, result text, an archive
@@ -191,7 +246,9 @@ chunk boundary, or a failure path that replaces a silent drop — is in
 
 ## Provenance
 
-Portable algorithms are copied from SoL-Pi (MIT, NVIDIA copyright). Reference commit: `e1a586af0ad8956f42ae5b26bba20e48fbf30e00`.
+Portable algorithms are copied from SoL-Pi (MIT, NVIDIA copyright). Reference commit: `219568034fa54ed121ede80961655e33dfb9d0e3`.
+
+Some fixes follow upstream pull requests that are not merged there yet; the [fork register](./docs/upstream-fork-register.md) names each one.
 
 Where this port does not follow SoL-Pi, and why: [docs/upstream-fork-register.md](./docs/upstream-fork-register.md).
 

@@ -69,7 +69,8 @@ All options are optional; defaults shown:
     "decay": true,
     "dedupe": true,
     "evolve": true,
-    "repair": true
+    "repair": true,
+    "cleanupProjects": true
   },
   "evolve": {
     "targets": { "skill": null, "command": null, "agent": null, "rule": null }
@@ -107,7 +108,7 @@ All options are optional; defaults shown:
 | `inject.exclude` | Array of instinct ids to never inject, even if they otherwise qualify. |
 | `maintenance.intervalHours` | How often the maintenance sweep runs on its own timer (it also always runs right after an observer run). |
 | `maintenance.dryRun` | Log what every enabled step *would* do (`would promote: ...`, `would prune: ...`, ...) instead of changing anything. See "Trying it safely" below. |
-| `maintenance.promote` / `.prune` / `.decay` / `.dedupe` / `.evolve` / `.repair` | Turn one maintenance step off without affecting the others. All default to `true`. |
+| `maintenance.promote` / `.prune` / `.decay` / `.dedupe` / `.evolve` / `.repair` / `.cleanupProjects` | Turn one maintenance step off without affecting the others. All default to `true`. |
 | `evolve.targets.skill` / `.command` / `.agent` | Absolute directory to install candidates of that kind into, overriding the real `~/.config/opencode/skills` / `commands` / `agents`. A skill installs to `<dir>/<suggested_name>/SKILL.md`; a command or agent to `<dir>/<suggested_name>.md`. |
 | `evolve.targets.rule` | Absolute file to append rule candidates to, overriding the project's own `AGENTS.md`. |
 | `prune.unusedDays` | How many days of zero use (lib/usage.js's usage.json) before an installed candidate is flagged as unused. Also the window `/evolve-list` uses for reporting hand-written, never-generated assets. |
@@ -124,13 +125,13 @@ All options are optional; defaults shown:
 The board is a small, read-only summary of three sources, written by the server half of the plugin to a per-project `board-state.json` file and polled every 30 seconds (or refreshed on request) by the TUI sidebar panel and by `/board`. Every block has a status circle: a solid green `●` means active and healthy, a solid amber `●` means it needs attention, and a hollow `○` means stale or no data yet. In the sidebar, the panel header and every block title are clickable (collapsing the whole panel, or just that block, down to one line); whichever state you leave them in is remembered across restarts. The header also shows the installed version. Fully expanded, the panel reads something like:
 
 ```
-▾ Mighty Instincts v0.8.0
+▾ Mighty Instincts v0.8.2
   ▾ Learned habits               ● 16
       habits in prompts               6
-      used by the agent today         2
+      used today / this week      2 / 9
       ready to share globally         4
         run /promote to share them
-      next learning run              3m
+      next learning run            in 3m
       skill candidates                 2
         run /evolve-list
       installed from habits            1
@@ -144,7 +145,23 @@ The board is a small, read-only summary of three sources, written by the server 
   ● active  ● needs attention  ○ stale
 ```
 
-`/board` does not reproduce this layout: it replies in the chat as a short, explanatory summary instead (one headline line per block, then a sentence or two of plain-language context, e.g. what today's most-used habits were and why "used" is counted the way it is), since a table of dot-aligned rows reads awkwardly copied into a chat message. Both read from the exact same `board-state.json` and the same glyph/availability rules (`lib/board-text.js`), so the two are never out of step on what a given state actually means; they just say it differently.
+`/board` does not reproduce this layout: it replies in the chat as a short, explanatory summary instead (a circle and a padded label, then each block's key facts on one headline line, then a sentence or two of plain-language context underneath), since a table of dot-aligned rows reads awkwardly copied into a chat message. Both read from the exact same `board-state.json` and the same glyph/availability rules (`lib/board-text.js`), so the two are never out of step on what a given state actually means; they just say it differently. It reads something like:
+
+```
+● Learned habits   29 total, 10 in prompts, 3 used today (14 this week)
+  Habits are patterns learned from your activity; one counts as used once per prompt you type in a top-level session whose wording shares 3 or more significant words with the habit's trigger; subagent and background sessions are not counted.
+  Used today: absolute-node-path-when-shell-lacks-node (1x): Use the absolute Homebrew node path for all node calls.
+              fff-grep-anchor-fallback-to-read (1x): Read the named file directly with a windowed Read.
+  Next learning run after 14 more events (6 so far). 10 ready: /promote.
+
+● Skill notes      467 open, 167 this week, never reviewed: review overdue.
+
+○ Skill test (pr)  no measurable difference last run (100% vs 100%, 4d ago).
+
+● active  ● needs attention  ○ stale
+```
+
+The "Used today:" list reads "Most used today:" instead whenever two listed habits fired a different number of times (nothing to rank when every count is 1), is capped at 5, and each summary is clipped at a word boundary at 100 characters (this reply has no 36-column sidebar budget to justify a hard character cut). "Next learning run" reads one of three ways: `ready`, `in <duration>` (still waiting on the interval), or `after N more events (M so far)` (the interval has elapsed, but not enough has been observed yet). "Skill test" reads "no measurable difference" (and a stale, hollow glyph) whenever the pass-rate difference between the two runs is smaller than 5 points, or negative.
 
 ### Glossary
 
@@ -153,14 +170,14 @@ The board intentionally avoids ECC's own vocabulary ("promote," "prune," "evolve
 | Row | Meaning |
 | --- | --- |
 | **habits in prompts** | How many instincts qualify for injection right now (confidence >= `inject.minConfidence`, not excluded, not pending). A live eligibility count, not a per-day tally; it can go up or down between refreshes as instincts are learned, decayed, or promoted. |
-| **used by the agent today** | How many times an included (or still-unproven, pending) instinct's trigger actually matched something you typed today. |
-| **ready to share globally** | Project instincts confident enough (>= 80%) to promote to the shared global bucket, that are not already there. `/promote` does this by hand; the maintenance loop also does it automatically once an instinct is seen in 2+ projects. |
-| **next learning run** | When the background observer is next allowed to run: `ready` once both `observer.runIntervalMinutes` has elapsed since the last run *and* `observer.minObservations` has piled up since, otherwise a countdown while only the interval is still outstanding. Shown as neither when the interval has already elapsed but there just has not been enough new activity yet (there is no fixed time to count down to in that case). |
+| **used today / this week** | How many times an included (or still-unproven, pending) instinct's trigger actually matched something you typed today, and the same total summed over the last 7 days. |
+| **ready to share globally** | Project instincts that look confident enough (>= 80%) to promote to the shared global bucket, that are not already there. `/promote` does this by hand; the maintenance loop also does it automatically, via either of its own two qualification paths (see "promote" under Maintenance below) - this row is a quick confidence-only estimate of both combined, not a reimplementation of either path's full rule. |
+| **next learning run** | When the background observer is next allowed to run: `ready` once both `observer.runIntervalMinutes` has elapsed since the last run *and* `observer.minObservations` has piled up since; `in <duration>` while only the interval is still outstanding; or `after N more events (M so far)` once the interval has elapsed but there just has not been enough new activity yet (there is no fixed time to count down to in that case, but there is a concrete number of events still needed). |
 | **skill candidates** | How many candidates (lib/maintain.js's weekly `evolve` step proposes them, grouping related instincts) are still waiting on a decision; run `/evolve-list` to see them, and `/evolve-install` / `/evolve-reject` to decide. |
 | **installed from habits** | How many candidates you have installed as a real skill, command, agent, or AGENTS.md rule via `/evolve-install`. |
 | **unused candidates** | How many installed candidates have had zero uses in `prune.unusedDays` days (default 30); see "From habits to skills" below. |
 | **awaiting first use** | Instincts the observer was not confident enough about to call "learned" yet (the "50% rule," below); they graduate to real instincts once you actually use them once. |
-| **kept tidy** | What the maintenance loop did in the last 7 days: `promoted`, `archived`, `merged`, `pruned`, `candidates` (evolved outlines written), whichever of those are nonzero. |
+| **kept tidy** | What the maintenance loop did in the last 7 days: `promoted`, `archived`, `merged`, `pruned`, `candidates` (evolved outlines written), `repaired`, `cleaned` (stale project entries archived), whichever of those are nonzero. |
 | **open** / **added this week** / **last reviewed** | The task-observer skill's own open backlog, how much is new this week, and when it was last reviewed by a human. |
 | **with skill** / **without** | The two pass rates skill-creator's latest benchmark compared. |
 
@@ -181,25 +198,26 @@ Everything lands in ECC's existing on-disk layout so `instinct-cli.py` (and anyt
 
 ```
 ${CLV2_HOMUNCULUS_DIR or $XDG_DATA_HOME/ecc-homunculus or ~/.local/share/ecc-homunculus}/
-└── projects/<project-hash>/
-    ├── observations.jsonl          # tool_start / tool_complete / user_prompt records
-    ├── observations.archive/       # rotated out at 10 MB
-    ├── observer.log                # plugin addition: one line per observer run
-    ├── maintenance.log             # plugin addition: one line per maintenance event
-    ├── .observer-state.json        # plugin addition: last run time + line count for the gate
-    ├── .activity.json              # plugin addition: last-observed/applied/fired-today counters
-    ├── fired-misses.log            # plugin addition: near-miss (1-2 shared word) fired-match log, capped at 200 lines
-    ├── board-state.json            # plugin addition: the board's three-block summary
-    ├── usage.json                  # plugin addition: skill/command/agent usage counts (see "From habits to skills")
-    ├── evolved/<cluster-id>.md     # plugin addition: candidates proposed/installed/archived by the evolve lifecycle
-    └── instincts/
-        ├── personal/<id>.md        # written by the observer
-        ├── inherited/<id>.md       # written by `/instinct-import`
-        ├── pending/<id>.md         # unproven instincts (the "50% rule"); never injected
-        └── archive/<id>.md         # instincts the maintenance loop decayed below 0.4 confidence; never deleted
+├── projects/<project-hash>/
+│   ├── observations.jsonl          # tool_start / tool_complete / user_prompt records
+│   ├── observations.archive/       # rotated out at 10 MB
+│   ├── observer.log                # plugin addition: one line per observer run
+│   ├── maintenance.log             # plugin addition: one line per maintenance event
+│   ├── .observer-state.json        # plugin addition: last run time + line count for the gate
+│   ├── .activity.json              # plugin addition: last-observed/applied/fired-today/fired-this-week counters
+│   ├── fired-misses.log            # plugin addition: near-miss (1-2 shared word) fired-match log, capped at 200 lines
+│   ├── board-state.json            # plugin addition: the board's three-block summary
+│   ├── usage.json                  # plugin addition: skill/command/agent usage counts (see "From habits to skills")
+│   ├── evolved/<cluster-id>.md     # plugin addition: candidates proposed/installed/archived by the evolve lifecycle
+│   └── instincts/
+│       ├── personal/<id>.md        # written by the observer
+│       ├── inherited/<id>.md       # written by `/instinct-import`
+│       ├── pending/<id>.md         # unproven instincts (the "50% rule"); never injected
+│       └── archive/<id>.md         # instincts the maintenance loop decayed below 0.4 confidence; never deleted
+└── archive/projects/<project-hash>/  # plugin addition: `cleanupProjects` archives a stale, zero-instinct project dir here (root gone, or under a temp dir); never deleted
 ```
 
-`observer.log` carries one line per run: `<iso> run: <N> written, <N> rejected, model <provider/model>`, with ` ids: <id>,<id>,...` appended when any instinct was written and ` rejected: <reason>; <reason>; ...` appended when any block was rejected. `maintenance.log` carries one line per maintenance event (`<iso> promote: ...`, `<iso> prune: ...`, `<iso> decay: ...`, `<iso> dedupe: ...`, `<iso> evolve: ...`, `<iso> repair: ...`, `<iso> pending: ...`), plus one `<iso> run: promoted N, archived N, merged N, pruned N, candidates N, repaired N` summary line per sweep, which is what the board's "kept tidy" row and the weekly `evolve` gate both read back. Every suffix and summary line is for anyone reading the files by hand; the board only ever parses a few fixed prefixes, so older log lines without the suffixes still parse the same way.
+`observer.log` carries one line per run: `<iso> run: <N> written, <N> rejected, model <provider/model>`, with ` ids: <id>,<id>,...` appended when any instinct was written and ` rejected: <reason>; <reason>; ...` appended when any block was rejected. `maintenance.log` carries one line per maintenance event (`<iso> promote: ...`, `<iso> prune: ...`, `<iso> decay: ...`, `<iso> dedupe: ...`, `<iso> evolve: ...`, `<iso> repair: ...`, `<iso> pending: ...`, `<iso> cleanup: ...`), plus one `<iso> run: promoted N, archived N, merged N, pruned N, candidates N, repaired N, cleaned N` summary line per sweep, which is what the board's "kept tidy" row and the weekly `evolve` / daily `cleanupProjects` gates both read back. Every suffix and summary line is for anyone reading the files by hand; the board only ever parses a few fixed prefixes, so older log lines without the suffixes still parse the same way.
 
 Project identity (the `<project-hash>` above, or the shared `global` bucket when there is no git project) is resolved by calling ECC's own `detect_project()` in `vendor/ecc/instinct-cli.py`, so this plugin and the CLI agree unless resolution fails, in which case a warning is logged and the shared global bucket is used.
 
@@ -235,8 +253,8 @@ When `observer.enabled` is `true`, every observed tool call or prompt checks whe
 1. Reads the most recent observation lines (clipped per-field and capped in total size) plus the existing instinct list, so the model updates instincts instead of duplicating them. Up to 20 existing instincts with no `summary:` field (written before 0.7.0) are listed separately, with an instruction to add only that field and change nothing else.
 2. Calls `ctx.generate.text({ prompt, model })` once, with no tools available to the model.
 3. Parses `<instinct>...</instinct>` blocks out of the response and validates each one: id, trigger (rejected outright if it carries a leaked `confidence:`/`domain:`/`scope:`/`source:` fragment from a malformed model response), confidence, domain, `summary` (one imperative sentence, required, rejected over 160 characters, trimmed to 120), and no stray `---` in the body.
-4. Checks each valid instinct against the existing personal store by trigger+summary word overlap (`maintenance.dedupe`); a close match (>= 60% of the shorter side's significant words) is merged into the existing file instead of written as a duplicate.
-5. Writes anything left to `instincts/personal/`, except an instinct with confidence exactly `0.5` and no `## Evidence` section, which goes to `instincts/pending/` instead (the "50% rule": unproven until it is actually used once).
+4. Checks each valid instinct against the existing personal store on trigger-vs-trigger OR summary-vs-summary significant-word overlap (`maintenance.dedupe`); a close match (>= 60% of the shorter side's words on either field, or >= 45% on either field when both instincts also share the same domain) is merged into the existing file instead of written as a duplicate.
+5. Writes anything left to `instincts/personal/`, except an instinct with confidence `<= 0.5`, which goes to `instincts/pending/` instead (the "50% rule": unproven until it is actually used once), regardless of whether the body carries a `## Evidence` section. An instinct that has already graduated (fired at least once) is never demoted back to pending just because a later run resubmits it with a lower confidence.
 6. Logs the result to `observer.log`, runs the maintenance sweep (below), refreshes the board state, and, if `observer.notify` is true, posts a summary into the session.
 
 This is at most one `generate.text` call per interval, on whatever model you set in `observer.model`. `/instinct-observe` runs the same logic on demand, bypassing the enabled/interval/threshold gates (it still needs a model, from `observer.model` or the host default).
@@ -256,18 +274,19 @@ This runs on `ctx.session.hook("context", ...)`, not `"prompt"`: it only ever ap
 
 Each line's summary is the instinct's own `summary:` frontmatter field (one imperative sentence, at most 120 characters); for an instinct written before 0.7.0 with no `summary:` of its own, it falls back to the first sentence of the `## Action` section, clipped to 120 characters.
 
-Each successful injection is counted in `.activity.json` (`appliedToday`, reset at UTC midnight), tracked for its own sake rather than shown on the board directly: the board's "habits in prompts" row is a live eligibility count (how many instincts qualify right now), not this per-day tally. When an included instinct's `trigger` shares at least 3 significant words (5+ letters, case-insensitive, common filler words removed) with the latest user message, that instinct's `fired` count (in its own frontmatter) is incremented, and the day's total is shown on the board as "used by the agent today." A pending instinct (the "50% rule," above) is checked for firing exactly the same way, but is never included in the injected block itself; once it fires, the maintenance loop promotes it to a real instinct. A candidate that shares 1 or 2 significant words (just under the 3-word threshold, so it never actually fires) is logged instead to `fired-misses.log` (id, shared-word count, the words themselves; capped at 200 lines), for tuning that threshold later; nothing in this plugin ever reads that log back. The observer never sees the injected block itself: `lib/observe.js` still strips any legacy `<instincts>...</instincts>` block it finds in prompt text (harmless now that injection no longer writes into prompt text at all, kept for defence against a residual block from before 0.7.0).
+Each successful injection is counted in `.activity.json` (`appliedToday`, reset at UTC midnight), tracked for its own sake rather than shown on the board directly: the board's "habits in prompts" row is a live eligibility count (how many instincts qualify right now), not this per-day tally. When an included instinct's `trigger` shares at least 3 significant words (5+ letters, case-insensitive, common filler words removed) with the latest user message, that instinct's `fired` count (in its own frontmatter) is incremented, the day's total and a rolling 7-day total are both kept in `.activity.json`, and shown on the board as "used today / this week." A pending instinct (the "50% rule," above) is checked for firing exactly the same way, but is never included in the injected block itself; once it fires, the maintenance loop promotes it to a real instinct. A candidate that shares 1 or 2 significant words (just under the 3-word threshold, so it never actually fires) is logged instead to `fired-misses.log` (id, shared-word count, the words themselves; capped at 200 lines), for tuning that threshold later; nothing in this plugin ever reads that log back. The observer never sees the injected block itself: `lib/observe.js` still strips any legacy `<instincts>...</instincts>` block it finds in prompt text (harmless now that injection no longer writes into prompt text at all, kept for defence against a residual block from before 0.7.0).
 
 ## Maintenance
 
 A background sweep keeps the instinct stores tidy without you ever running a command. It runs right after every observer run, and otherwise at least every `maintenance.intervalHours` (default 24), guarded against overlapping with itself. Every step below is on by default and logs what it did to `maintenance.log`; any one can be turned off independently (`maintenance.promote: false`, etc.).
 
-- **promote**: an instinct confident enough (>= 80%, the same threshold ECC's own CLI uses) whose id (or a trigger with 70%+ word overlap, so two projects that learned "the same" thing under different ids still count) appears in 2+ distinct project stores is copied to the shared global bucket. Reimplemented directly over `projects/*/instincts/personal/*.md`; never shells out to Python for this.
+- **promote**: either of two independent qualification paths copies an instinct to the shared global bucket, whichever one it clears first: (1) cross-project corroboration, ECC's own rule - confident enough (>= 80%, the same threshold ECC's own CLI uses) and whose id (or a trigger with 70%+ word overlap, so two projects that learned "the same" thing under different ids still count) appears in 2+ distinct project stores; or (2) proven on its own, no corroboration needed - confidence >= 90% and fired >= 3 times, in a single project. Reimplemented directly over `projects/*/instincts/personal/*.md`; never shells out to Python for this. `maintenance.log` records which path qualified.
 - **prune**: deletes files in `instincts/pending/` older than 30 days (ECC's own default pending TTL); logs a warning for ones within 7 days of expiring.
 - **decay**: a personal instinct that has never fired, past 30 days old, loses 0.05 confidence per full week since its last decay; once that drops it below 0.4 it is moved (never deleted) to `instincts/archive/`.
-- **dedupe**: before the observer writes a new instinct, its trigger+summary is compared against every existing personal instinct; a close match (>= 60% word overlap) gets its confidence raised instead of creating a near-duplicate file (see step 4 under "Observer behaviour" above).
+- **dedupe**: before the observer writes a new instinct, it is compared against every existing personal instinct on trigger-vs-trigger OR summary-vs-summary word overlap; a close match (>= 60% on either field, or >= 45% on either field when both also share the same domain) gets its confidence raised instead of creating a near-duplicate file (see step 4 under "Observer behaviour" above).
 - **evolve**: groups personal instincts by domain and by word overlap into clusters of 3+, and proposes (or updates) one candidate per cluster under `evolved/<cluster-id>.md` (no model call). Runs at most once a week, regardless of how often the sweep itself runs. See "From habits to skills" below for the full lifecycle, including the one step this maintenance loop never takes on its own: actually installing one.
-- **repair**: a one-off, idempotent cleanup for a personal instinct whose trigger carries a leaked trailing frontmatter fragment (e.g. `..., confidence: 0.8`), the shape a parser bug before 0.7.0 (or a hand-edited file) could leave behind.
+- **repair**: a one-off, idempotent cleanup pass over the personal store: cleans a trigger carrying a leaked trailing frontmatter fragment (e.g. `..., confidence: 0.8`), the shape a parser bug before 0.7.0 (or a hand-edited file) could leave behind; and moves a personal instinct with confidence `<= 0.5` that has never fired into `instincts/pending/`, the "50% rule" (above) applied retroactively to anything that landed in personal before that rule covered it.
+- **cleanupProjects**: runs at most once a day. For every entry in ECC's own projects registry (`projects.json`) whose root no longer exists, or lives under the OS temp directory, and which has 0 instincts of its own, the registry entry is removed and its project directory is archived (never deleted outright) to `archive/projects/<id>/`.
 
 ### Trying it safely
 

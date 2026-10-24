@@ -181,6 +181,8 @@ the footer meter and nothing else.
 /tps reset        clear the durable ledger
 ```
 
+The dashboard closes with `escape` or `q` and returns to wherever you opened it from.
+
 **Latency.** Token counting is incremental — each chunk is scanned once and never re-read, so
 absorbing a long response is linear rather than quadratic. The live rate is exact from the
 second chunk of a stream (about 100ms in on v2) with no seed value or smoothing lag, and the
@@ -227,6 +229,7 @@ TPS_METER_SHOW_INSTANT=true
 TPS_METER_SHOW_TOTAL_TOKENS=true
 TPS_METER_SHOW_ELAPSED=false
 TPS_METER_SHOW_CACHE_HIT=true
+TPS_METER_SHOW_TTFT=false
 
 # Token counting heuristic
 TPS_METER_FALLBACK_HEURISTIC=chars_div_4  # chars_div_4 | chars_div_3 | words_div_0_75
@@ -253,6 +256,7 @@ Create `.opencode/tps-meter.json` in your project root:
   "showTotalTokens": true,
   "showElapsed": false,
   "showCacheHit": true,
+  "showTtft": false,
   "format": "compact",
   "minVisibleTPS": 0,
   "fallbackTokenHeuristic": "chars_div_4",
@@ -289,6 +293,7 @@ Output: `TPS: 92.4 (avg 78.1) | tokens: 1,842 | 00:23`
 | `showTotalTokens` | `boolean` | `true` | Show total token count |
 | `showElapsed` | `boolean` | `false` | Show elapsed time |
 | `showCacheHit` | `boolean` | `true` | Show the prompt cache hit rate (provider-reported) |
+| `showTtft` | `boolean` | `false` | Show time to first token in the footer |
 | `format` | `string` | `"compact"` | Display format: `compact`, `verbose`, `minimal` |
 | `minVisibleTPS` | `number` | `0` | Minimum TPS value to trigger display |
 | `fallbackTokenHeuristic` | `string` | `"chars_div_4"` | Token counting method |
@@ -334,7 +339,25 @@ cache hit rate = cache.read / (input + cache.read + cache.write)
 The meter appends `cache 91%` to the footer once a provider-reported step has settled. During
 streaming no cache accounting is available yet, so the segment is omitted rather than shown as
 `0%` — nothing appears until the first step of a session has finished, which is expected and not
-a fault. Toggle with `showCacheHit` / `TPS_METER_SHOW_CACHE_HIT`.
+a fault. Toggle with `showCacheHit` / `TPS_METER_SHOW_CACHE_HIT`. The figure is whole-percent,
+and rounding never crosses the 100 boundary: `12000` cached of `12040` prompt tokens reads `99%`,
+not `100%` — only a prompt with nothing left uncached reads `100%`.
+
+## Time to First Token
+
+TTFT is measured on v2 from the host's turn start to the first streamed token. The dashboard
+already reports a per-model mean, and `/tps detailed` puts the current turn's figure in the
+footer next to tool time and overhead. Set `showTtft: true` (or `TPS_METER_SHOW_TTFT=true`) to
+keep it in the compact footer as well:
+
+```
+92.4 TPS · avg 78.1 · 1,842 tok · ttft 1.2s
+```
+
+It stays on the last measured turn until the next one starts, and is omitted while the value is
+unknown, such as before the first token or on v1, which does not report a turn start. When the
+footer shows the subagent aggregate, the segment is left out because a family has no single
+first token.
 
 ## Display Formats
 

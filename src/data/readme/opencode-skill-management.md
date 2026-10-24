@@ -2,7 +2,9 @@
 
 给 OpenCode 的 skill 装一个开关：**列出、诊断、停用、恢复**，全部通过全局权限规则实现 —— 不删除、不移动、不改写任何 skill 文件。
 
-> 适配 OpenCode V2（在 2.0.32 上完整验收）。插件是单文件、纯 Node 内置模块，无第三方依赖、不调用 shell。
+> 适配 OpenCode V2（在 2.0.32 上完整验收：Windows 与 Linux 双平台 + 新进程真机 e2e）。插件是单文件、纯 Node 内置模块，无第三方依赖、不调用 shell。
+>
+> **1.0.0 兼容承诺**：四个动作（`list` / `inspect` / `disable` / `enable`）的入参与输出语义、写入的规则形状 `{ "action": "skill", "resource": <id>, "effect": "deny"|"ask" }`、规则行的同行 marker 注释格式，以及**单文件**结构，在 1.x 内不破坏（`enable` 的归属判定依赖 marker 格式）。
 
 ## 它解决什么问题
 
@@ -43,6 +45,8 @@
 `effect: "ask"` 是软停用：仍然列在模型可见的列表里，但每次加载都要确认。`dryRun: true` 只回显将要写的内容，不落盘。
 
 写入是**原子写**（同目录 `.tmp` + `rename`），保留原文件的缩进、键顺序、行尾风格（CRLF/LF）与 BOM；目标文件含 MCP 凭据，所以备份**只保留 1 份**。写完会 `reload` 并**轮询回读**校验，不符则回滚。
+
+回读判据是「规则**确实被宿主读入**」：`deny` 看调用者求值是否为 deny；`ask` 看调用者规则集里该 `{skill, id, ask}` 规则的**条数是否增加**（1.0.0 修正：旧判据「不是 deny」会被宿主的 ask 回退、以及 agent 自有 allow 同时满足，等于没校验）。写入成功但对调用者不产生该效果时（agent 自有规则排在全局规则之后），输出会写明**实际效果**，不会把"已写入"说成"已生效"。
 
 ### enable —— 恢复它
 
@@ -107,16 +111,18 @@ skill_management({ action: "enable",  id: "windows-shell" })
 ## 开发与验收
 
 ```pwsh
-node tools/verify.mjs              # 175 项断言，全部跑在临时配置目录，不碰真实全局配置
-node tools/verify.mjs --section G  # 只跑某一段（A–G）
+node tools/verify.mjs              # 248 项断言，全部跑在临时配置目录，不碰真实全局配置
+node tools/verify.mjs --section E  # 只跑某一段（A–I）
 bash tools/linux-verify.sh         # Linux/WSL 一键验收：自带 Node + opencode，落在 $HOME 下，跑完自清
 ```
 
 CI（`.github/workflows/verify.yml`）在 `ubuntu-latest` 与 `windows-latest` 上跑同一套断言，不需要任何 secret。
+H 段是性能闸门（29 skills × 12 agents × 10 rules 下 `list` < 25 ms），I 段是发布闸门
+（`npm pack --dry-run` 内容、`exports` 可解析、`install.mjs` 副本与 `src` 逐字节一致）。
 
-- 设计规范：`.openchamber/plans/skill-management-spec.md`
-- 宿主实测与踩过的坑：`docs/preflight.md`
-- 验收证据：`docs/acceptance.md`
+- 设计规范：[.openchamber/plans/skill-management-spec.md](https://github.com/sogeisetsu/opencode-skill-management/blob/main/.openchamber/plans/skill-management-spec.md)
+- 宿主实测与踩过的坑：[docs/preflight.md](https://github.com/sogeisetsu/opencode-skill-management/blob/main/docs/preflight.md)
+- 验收证据：[docs/acceptance.md](https://github.com/sogeisetsu/opencode-skill-management/blob/main/docs/acceptance.md)
 
 ## License
 

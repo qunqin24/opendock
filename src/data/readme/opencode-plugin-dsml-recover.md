@@ -70,6 +70,15 @@ does and does not do:
    at most one wake; a reply that stays silent after its poke is left alone. A
    new reply always starts fresh, so retrying never stops a live chat.
    [Settings](#retry)
+5. **Break repetition loops** (`loopGuard`, off by default). A second failure
+   mode, distinct from markup: at very long context the model collapses into
+   repeating one short sentence dozens of times ("Let me do it." ×100), with or
+   without an actual tool call attached. No markup means the parser never fires
+   and every turn logs `passthrough`. The guard detects the degenerate block
+   (a long text overwhelmingly one repeated line, or near-flat vocabulary),
+   collapses it to a short marker instead of echoing kilobytes of filler, and
+   wakes the session when such a turn stalls. Strictly opt-in and conservative:
+   prose, code, tables, and tool-result logs never trip it. [Settings](#general)
 
 ## What we learned
 
@@ -93,6 +102,18 @@ project's own testing was DeepSeek V4.1 on DeepInfra — see Scope above.)
    across multiple backend providers and only some mangle DSML. Identical prompts
    fail or succeed at random. Waiting for a provider fix is not a plan — there
    may be no single provider to fix.
+4. **There is a failure mode with no markup at all (2026-10-23).** On DeepSeek
+   V4.1 at ~520k cached context over a 688-turn session, the model collapsed into
+   repeating one short imperative sentence dozens of times — "Let me do it." was
+   observed 39, 37, 100 and 93 repeats in consecutive turns. Early turns carried
+   a valid tool call alongside the filler; later turns degraded to
+   `finish=stop` with no tool call at all, so nothing the parser could rescue
+   existed on the wire. Every such turn logs `passthrough` because there are no
+   DSML bytes to see: the marker-based detector is structurally blind to this
+   class. Hence `loopGuard` (see feature 5 above and
+   [`docs/PATTERNS.md`](./docs/PATTERNS.md) §6): repetition detection, filler
+   suppression, and an action-demand wake. Off by default because a guard that
+   rewrites plain text must earn trust before it ships enabled.
 
 ## Install
 
@@ -110,7 +131,7 @@ opencode plugin add opencode-plugin-dsml-recover
 - **Tested:** DeepSeek V4.1 via DeepInfra. Set `providers` to match your setup —
   e.g. `"providers": ["deepinfra"]`.
 - Defaults have everything enabled: `parse`, `history`, `responseFix`, `retry`.
-  The only off-by-default flag is `debug`.
+  Off by default: `debug`, `capture`, and `loopGuard`.
 
 ## Configuration
 
@@ -201,7 +222,8 @@ the wake but drop the correction text (`"retry": { "nudge": false }`).
 | Option | Default | Meaning |
 |---|---|---|
 | `providers` | `["opencode-go","opencode"]` | Provider IDs in scope. Empty disables the plugin. **Default is inherited from upstream; the tested setup uses `["deepinfra"]`.** |
-| `debug` | `false` | Per-turn logging (see Verify). Only off-by-default flag. |
+| `debug` | `false` | Per-turn logging (see Verify). |
+| `loopGuard` | `false` | Collapse degenerate repetition loops in live output (`"Let me do it."` repeated many times) and wake a session that stalls on one. Opt-in: it inspects long plain-text blocks and rewrites only blocks that are overwhelmingly one repeated line, or near-flat in vocabulary. A loop turn logs the verdict with a `LOOP` suffix, collapses emit as `loop-collapsed` (with `capture`), and its wake uses an action-demand nudge instead of the markup fixer. Distinct failure mode documented 2026-10-23 (DeepSeek V4.1 at ~520k cached context): no markup, so the DSML parser never fires. |
 
 Full shape catalogue: [`docs/PATTERNS.md`](./docs/PATTERNS.md).
 

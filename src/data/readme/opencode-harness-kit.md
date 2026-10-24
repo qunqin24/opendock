@@ -3,28 +3,12 @@
 [![CI](https://github.com/pham-canh/opencode-harness-kit/actions/workflows/ci.yml/badge.svg)](https://github.com/pham-canh/opencode-harness-kit/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/opencode-harness-kit.svg)](https://www.npmjs.com/package/opencode-harness-kit)
 
-<p align="center">
-  <video src="docs/demo/pitch.mp4" width="720" controls></video>
-</p>
-
-*Four minutes forty-seven seconds, recorded live from a real terminal and
-narrated — every command on screen is typed and executed while the camera
-runs. The voiceover is in [`video/`](video/), along with what it took to
-record it and the two mistakes that cost the most time.*
-
-*It was recorded against an earlier version of the kit: the numbers it names
-are the ones from then, and the ones below are the ones now.*
-
 A harness kit for [OpenCode](https://opencode.ai) that is **model-agnostic by
 construction**. Switching models is a data edit, not a code change.
 
 ```bash
 npx -y opencode-harness-kit init    # pick a free model, then install + verify
 ```
-
-<p align="center">
-  <img src="docs/demo-loop.gif" width="760" alt="oc-harness list showing the model-agnostic profiles, then oc-harness verify reporting a consistent install">
-</p>
 
 then restart opencode. That is the whole quickstart. No npm account needed on
 your side — `npx` only downloads the published kit. Prefer git? The same three
@@ -36,7 +20,8 @@ git clone https://github.com/pham-canh/opencode-harness-kit.git
 ```
 
 The three steps `init` runs, spelled out for when you want to know what
-happened (prefix with `npx` or `./bin/oc-harness.mjs` to taste):
+happened (prefix each with `npx -y opencode-harness-kit@latest` or
+`./bin/oc-harness.mjs` to taste):
 
 ```bash
 oc-harness use fleet-safe    # compile the profile
@@ -64,7 +49,7 @@ lanes.json                   ← the jobs
 src/                         ← no model name anywhere in here
 ```
 
-Same plugin source, twelve shipped profiles, twelve different behaviours. The
+Same plugin source, eleven shipped profiles, eleven different behaviours. The
 test suite asserts that rather than taking it on faith.
 
 ### How a request travels
@@ -253,7 +238,6 @@ it. One file covers ten jobs either way.
 | `nemotron-3.5-lightning-free` | 5 | 262,144 | — | **may train** |
 | `mimo-v2.6-flash-free` | 5 | 200,000 | — | **may train** |
 | `big-pickle` | 5 | 160,000 | — | **may train** |
-| `flint-40b-free` | 5 | 262,144 | `max` | **may train** |
 
 The five-lane profiles run everything on one model, which is the right shape
 when you want one route and want to know exactly which one.
@@ -322,7 +306,7 @@ A CI job that failed on the second kind would go red on a Tuesday because
 somebody else changed a provider's limits, and a job that goes red for a
 reason you cannot act on is a job people stop reading.
 
-It is not a hypothetical. The day this was written, four of the twelve
+It is not a hypothetical. The day this was written, four of the shipped
 shipped profiles had already drifted from the live catalogue — the
 `temperature` flag had flipped on every one of them.
 
@@ -576,8 +560,10 @@ oc-harness auto       refresh + install + use + verify, asking nothing
 oc-harness auto --json   the same reconcile, as a report a script can read
 oc-harness use <id>   compile a profile into ~/.config/opencode/opencode.jsonc
 oc-harness use <id> --dryrun   print a summary of what would be written, write nothing
+oc-harness use <id> --no-skills   leave the skill list out of the lanes' prompt
 oc-harness refresh <id> re-derive a profile against the live model list
-oc-harness install    symlink the plugin, prompts, skills and GLOBAL.md
+oc-harness install    symlink the plugin, prompts, skills and GLOBAL.md into the config dir
+                      (from `npx`, they link into a package copy it makes first - see Install)
 oc-harness link       just the plugin, no prompts or skills
 oc-harness verify     check the install against the profile; non-zero on drift
 oc-harness agents     report agents the effort tiering does not reach
@@ -593,7 +579,7 @@ oc-harness uninstall remove the plugin, prompts, skills and GLOBAL.md again
 oc-harness cost      what the kit is doing on this project, in numbers
 oc-harness restore <file>  put one back
 oc-harness baseline   measure the current install
-oc-harness run        drive .space/tasks.md to done with the build agent
+oc-harness run        build and verify .space/tasks.md, one task at a time
 ```
 
 The measurement scripts are in `eval/`, and each one says what it measures
@@ -605,6 +591,7 @@ node eval/measure-prune.mjs     the pruner, on real sessions
 node eval/measure-install.mjs   before and after the install
 node eval/models.mjs            every model the profiles use, one line each
 node eval/ab.mjs                the A/B: the same task with and without the kit
+node eval/compare.mjs           the same suite against any agent CLI, same grader
 ```
 
 Every flag accepts both spellings: `--profile fleet-safe` and
@@ -873,12 +860,15 @@ One command if you are new here (`init` asks which free profile to run on,
 then runs the two commands below plus `verify`):
 
 ```bash
-npx oc-harness init
+npx -y opencode-harness-kit@latest init
 ```
 
-Two commands, in this order, if you already know which profile you want
-(`npx oc-harness …` from the registry, or `./bin/oc-harness.mjs …` from a
-checkout — they are the same program):
+Two commands, in this order, if you already know which profile you want.
+Two forms of the same program: `npx -y opencode-harness-kit@latest …` from
+the registry, or `./bin/oc-harness.mjs …` from a checkout. Bare `oc-harness`
+elsewhere in this README is shorthand for whichever form installed it —
+`npx` leaves no global binary, so every command already naming just
+`oc-harness` is one of the two above in disguise:
 
 ```bash
 oc-harness use fleet-safe   # writes opencode.jsonc
@@ -888,6 +878,15 @@ oc-harness install                # writes everything that file points at
 `install` symlinks (not copies) the plugin, `prompts/`, `skills/` and
 `GLOBAL.md` into `~/.config/opencode/`, so this repo stays the single source
 of truth and an edit here takes effect on the next opencode start.
+
+That is the checkout behaviour, and it relies on the repository staying put.
+Run through `npx` — or any package install — there is no repository to hold
+the truth, only a npm cache that `npm cache clean --force` can delete under
+it: the installer then COPIES the package once to
+`~/.config/opencode/kit/` and links into that instead, so `npm cache clean`
+cannot dangle the harness out from under its own config. Same commands, same
+config; `uninstall` takes the copy out with the links, and `verify` judges
+both modes by the same ownership rules.
 
 ### The one command that asks nothing
 
@@ -1036,6 +1035,20 @@ except the lanes it may hand work to. That is the mechanism behind "hand the
 job to the lane that has it": a lane that is not allowed to spawn anything
 cannot quietly become a general-purpose agent on the most expensive tier.
 
+Reaching the cap is not an error OpenCode reports: it exits 0 with a text-only
+answer. `oc-harness run` counts the turns in the transcript, so a verify that
+failed after the cap says "the agent used its whole 120-step allowance" instead
+of looking like an ordinary failure. The number quoted is the one in the
+installed config for the role being run.
+
+A spent model route is the other way a run looks like a failure and is not
+one. It shows up as an empty transcript - some providers exit 0 with it, others
+hang until the ceiling kills them. In the first shape `run` stops with exit 3
+and "the agent answered nothing" rather than verifying an untouched tree; in
+the second it names the route and the limit it waited out. Either way the
+advice is `opencode run --print-logs -m <model> hi`, and a smaller `--budget`
+fails sooner.
+
 ## The skill loop
 
 The lanes above are the *who*. The skills are the *order*, and they load by
@@ -1056,6 +1069,25 @@ the conversation instead of the requirement.
 
 Publishing is never a loop step. `space-finish` prepares the change; a human
 decides it ships.
+
+`oc-harness run` automates the build-and-verify half of that loop, not the
+whole loop. It hands one task at a time to an agent, re-runs that task's own
+`verify:` command, and writes the real output back into `.space/tasks.md`. It
+does not plan, commit or push: those stay with `space-plan`, `space-finish`
+and the human. A task with no `verify:` is refused rather than assumed done,
+and so is one whose whole verify line is a command that cannot fail (`true`,
+`echo ok`). A task that edits files outside its `files:` line stops the run
+unless `--allow-extra-files` says otherwise. Because that check reads
+`git status`, `run` itself needs a work tree; outside one it refuses to start
+rather than run unfenced. `--force-unlock` clears a lock held by a live pid
+that has been reused by something else.
+
+`--review` closes the review gap without pretending a sentence is a verdict:
+after verify passes, the `reviewer` lane is asked for one JSON object matching
+[`docs/REVIEW-VERDICT.md`](docs/REVIEW-VERDICT.md). A pass marks the task done.
+A fail, a malformed reply or a crashed reviewer marks it blocked and stops the
+run with exit 5. The validated verdict is written to `.space/review/`, so the
+decision can be audited after the fact.
 
 ## What it costs, measured
 
@@ -1115,6 +1147,45 @@ a claim.
 Whether it is worth it depends on whether the work is long. A repository of
 one-file lookups should not install this. The full table is in
 [eval/RESULTS.md](eval/RESULTS.md).
+
+## The token budget
+
+A free tier is one shared window: every request in every session draws on it,
+and when it runs out the provider answers with a limit error instead of
+tokens. opencode never shows a number for it. One real chat session made 599
+requests and 12,025,980 input tokens; the first sign of trouble was the next
+request being refused, which reads as a broken model rather than a spent
+budget.
+
+The guard counts it. Each `step-finish` part reports the input tokens that
+request cost, the guard sums them per session, and at two thresholds it acts:
+
+| | default | what happens |
+|---|---|---|
+| `OC_HARNESS_BUDGET_WARN` | 2,000,000 | one toast: this session has used N tokens |
+| `OC_HARNESS_BUDGET_STOP` | 5,000,000 | tool calls are refused, with the number and the fix |
+
+```bash
+OC_HARNESS_BUDGET_STOP=2000000 opencode    # a smaller window for a long task
+OC_HARNESS_BUDGET_WARN=0 OC_HARNESS_BUDGET_STOP=0 opencode   # off
+```
+
+The stop is a refusal with an explanation, not a crash: the model gets the
+message that the session hit its budget and that a new session is the fix. A
+subagent gets its own session and its own count, so its tokens are not
+charged to the conversation that started it.
+
+The other half is the fixed cost. opencode writes every discovered skill's
+name and description into the system message, so a machine with a large skill
+collection pays tens of thousands of tokens on every request, before the
+conversation starts. The lanes carry their instructions in `prompts/`, so:
+
+```bash
+oc-harness use fleet-safe --no-skills
+```
+
+omits the skill list from the lanes' prompt and says so in the config header.
+It is off by default: removing a capability is the user's call, not the kit's.
 
 ## Known limits
 
@@ -1185,6 +1256,37 @@ node eval/prepare.mjs --repo ~/work/lablab-harness --ref 8a674f5
 node eval/ab.mjs --target <printed path> --suite eval/tasks.json --reps 2 --sanitize
 node eval/ab.mjs --rescore <saved stream dir>   # re-grade without spawning agents
 ```
+
+`--fail-fast <n>` (default 2) stops the suite when `n` runs in a row produce
+no tool call and no text. That is what a spent free route looks like: the run
+hangs until the per-run ceiling and is recorded as a timeout, so without this
+a 36-run suite spends hours measuring the provider's quota. A quota error the
+provider states outright (`Free usage limit reached`, an HTTP 429) stops the
+suite on the first run instead of waiting for two empty ones, and says so
+rather than scoring the refusal as a wrong answer. The raw streams are kept
+either way, so `--rescore <dir>` can still grade them later.
+
+Both arms pin `small_model` as well as `model`. `model` only covers the main
+loop; the title agent runs on `small_model`, whose default is a paid model, so
+an unpinned kit-off arm makes paid title calls for a benchmark that is meant
+to be free.
+
+`eval/ab.mjs` knows how to read opencode's event stream, so it can only compare
+the kit with opencode. `eval/compare.mjs` grades any CLI the same way: it runs
+the command in a fresh copy of the subject, treats stdout as the answer, and
+uses the same citation resolver and mutation comparison. That is what makes a
+number for Aider or SWE-agent comparable with the kit's own.
+
+```bash
+node eval/compare.mjs --target <prepared path> --suite eval/tasks-self.json \
+  --reps 3 --timeout 300 \
+  --arm 'aider=aider --yes --no-auto-commits --message "$PROMPT"' \
+  --arm 'swe=python -m sweagent run --problem "$PROMPT"'
+```
+
+The command runs through `sh -c` with `$PROMPT`, `$TASK_ID`, `$DIR`, `$REP` and
+`$ARM` in the environment. A command that is not on PATH stops the run with
+exit 2 instead of being reported as a 0% pass rate.
 
 `npm test` and `npm run typecheck` need nothing but the repo, so CI runs those.
 The rest read `~/.local/share/opencode/opencode.db` and `~/.config/opencode`,

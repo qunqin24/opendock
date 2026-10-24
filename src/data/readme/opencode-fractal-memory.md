@@ -53,12 +53,12 @@ No manual `tui.json` edit, no `postinstall` — `src/plugin/install.ts: patchPlu
 
 **Local dev** (this repo): `bun run dev-install` (build + sync cache + ensure `tui.json` npm spec + platform binaries for `sqlite-vec`).
 
-Published `0.8.4` (`sqlite-vec v0.1.9` brute-force, `oc-plugin`, compress router + squeez).
+Published `0.8.5` (opencode 2.x V2-only entry, `sqlite-vec v0.1.9` brute-force, `oc-plugin`, compress router + squeez).
 
 ## Features
 
 - **Memory nodes** — structured persistent memory with labels, content, metadata, and type system
-- **Dot nodes** — store Graphviz DOT source as a memory node (`type: "dot"`). Dot nodes are automatically sticky and skip embedding generation (diagram source isn't semantic text), so they survive compression and cost no vector storage. The management app renders them in-browser via the vendored `@viz-js/viz` WASM build (`management/public/vendor/viz-global.js`) — select a `dot:` node and click **◈ Open Diagram** for a pan/zoomable, fit-to-view rendering. `dot:` labels get the ×1.25 purpose-quality boost. Example: `memory(mode="set", type="dot", label="dot:auth-flow", content="digraph G {\\n  rankdir=LR;\\n  A -> B -> C;\\n}")`
+- **Dot nodes** — store Graphviz DOT source as a memory node (`type: "dot"`). Dot nodes are automatically sticky and skip embedding generation (diagram source isn't semantic text), so they survive compression and cost no vector storage. The management app renders them in-browser via the vendored `@viz-js/viz` WASM build (`frontend/static/vendor/viz-global.js`) — select a `dot:` node and click **◈ Open Diagram** for a pan/zoomable, fit-to-view rendering. `dot:` labels get the ×1.25 purpose-quality boost. Example: `memory(mode="set", type="dot", label="dot:auth-flow", content="digraph G {\\n  rankdir=LR;\\n  A -> B -> C;\\n}")`
 - **Semantic search** — ONNX-powered embeddings (all-MiniLM-L6-v2) with sqlite-vec brute-force `vec_distance_cosine` on `memory_nodes.embedding_blob` (`v0.1.9`, fallback HNSW)
 - **Native ONNX runtime** — `onnxruntime-node` with multi-threaded CPU execution (`intraOpNumThreads: 0`), full graph optimization (`graphOptimizationLevel: "all"`), CPU memory arena, and denormal/GELU approximation flags. 12-15× faster embedding inference vs WASM
 - **BM25 hybrid search + dual retrieval** — keyword + vector hybrid scoring with dynamic weight adjustment; code queries get boosted BM25 weight for exact pattern matching. BM25 runs independently across ALL scope nodes (not just vector candidates), catching keyword matches outside the vector neighborhood and covering nodes without embeddings
@@ -112,7 +112,7 @@ Published `0.8.4` (`sqlite-vec v0.1.9` brute-force, `oc-plugin`, compress router
 - **Session logging** — opt-in session log with 1MB rotation for observability
 - **Journal** — searchable journal entries (type: `journal` memory nodes) with semantic search
 - **Playbooks** — reusable workflow templates (sticky memory nodes) proposed by the agent
-- **Management server** — local web UI (port 8787) for browsing, searching, editing, backup/restore, and 3D visualization with temporal edge rendering. Settings panel organized into 5 collapsible categories, resizable sidebar with persisted width
+- **Management server** — local web UI (port 8788) for browsing, searching, editing, backup/restore, and 3D visualization with temporal edge rendering. Settings panel organized into 5 collapsible categories, resizable sidebar with persisted width
 - **Multi-graph retrieval** — temporal edges (NEXT, DURING_SESSION, CAUSAL, REFERENCES, RELATED_TO) expanded during search with confidence-weighted hop decay
 - **Auto-edge creation** — `memory(mode="set")` auto-creates NEXT edges (session chaining) and REFERENCES edges (from `label:xxx` patterns) during active sessions
 - **Synthetic evaluation** — 79-node/175-QA benchmark dataset for reproducible retrieval quality metrics (HitRate, Recall, Precision, MRR)
@@ -126,7 +126,7 @@ Published `0.8.4` (`sqlite-vec v0.1.9` brute-force, `oc-plugin`, compress router
 
 | Requirement | Version | Notes |
 |---|---|---|
-| **OpenCode** | v1.17.0+ | SDK peer dependency |
+| **OpenCode** | >=2.0.0 | Plugin runtime (V2-only entry since v0.8.5) |
 | **Bun** | >=1.0.0 | Plugin runtime |
 | **Node.js** | >=18 | For npm-based installs only |
 
@@ -248,7 +248,7 @@ Create `~/.config/opencode/opencode-mem.json` to customize (optional — all def
   },
   "management": {
     "enabled": true,
-    "port": 8787
+    "port": 8788
   },
   "journal": {
     "enabled": false
@@ -333,7 +333,8 @@ Create `~/.config/opencode/opencode-mem.json` to customize (optional — all def
 | `defaultTtlDays` | int | `0` | Default TTL for new nodes (0 = no expiry) |
 | `enableMiddleTermCapture` | bool | `true` | Save middle-term snapshots before compression (capture capped at 12 KB total / 2 KB per entry) |
 | `management.enabled` | bool | `false` | Auto-start the management web UI on plugin init |
-| `management.port` | int | `8787` | Port for the management server |
+| `management.port` | int | `8788` | Port for the management server (API + Svelte UI) |
+| `management.sveltePort` | int | — | Overrides `management.port` when set (single-server UI+API port) |
 | `journal.enabled` | bool | `false` | Enable append-only searchable journal entries |
 | `graph.enabled` | bool | `true` | Enable code knowledge graph (AST extraction + `graph` tool + auto-refresh) |
 | `graph.maxFiles` | int | `5000` | Max files to extract in background build |
@@ -662,7 +663,7 @@ The server starts automatically when `management.enabled: true` is set in `~/.co
 bun run view
 ```
 
-Opens at [http://localhost:8787](http://localhost:8787). The server starts as a background process and auto-stops on plugin shutdown.
+Opens at [http://localhost:8788](http://localhost:8788). The server runs as a child of the OpenCode service (not the TUI client), so it stays up across TUI exits and is replaced on the next start. The TUI sidebar's **Fractal Memory** box shows its live status — a port probe refreshed every few seconds, independent of the PID file.
 
 ### Usage
 

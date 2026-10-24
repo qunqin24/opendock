@@ -177,13 +177,15 @@ The default generated configuration includes both `openai` and `opencode-go` pre
 ```
 
 Presets can inherit from one base preset with `extends`: a `design` preset can
-extend `base` and override only its designer model. Changes are persisted by
-`/preset`. On v2 hosts the saved/applied preset's inference fields (`model`,
-`variant`, `temperature`, `options`) apply to new child dispatches (frozen for
-each child before its first request) and the sidebar once the server-side
-config watcher has refreshed them; a malformed config keeps the last-known-good
-state, and existing sessions plus prompt/tool/policy/skill/MCP changes stay
-frozen until a full reload; on v1 hosts reload OpenCode. See
+extend `base` and override only its designer model. On v2, `/preset` lets you
+apply subagent inference settings to **Current session** or change the
+**Global default**. `/preset <name>` and manual configuration edits change
+defaults; existing work and its future subagents retain their saved
+configuration until you explicitly reapply a preset to that session.
+Already-created children keep their own configuration. Main-session models,
+prompts, tools, skills and MCPs are not switched by the session action.
+On v1, reload OpenCode after applying a preset. See
+[Preset Switching](docs/preset-switching.md) for scope and timing, and
 [Configuration](docs/configuration.md#preset-inheritance) for the inheritance
 example and precedence rules.
 
@@ -745,7 +747,7 @@ Use this section as a map: start with installation, then jump to features, confi
   <p><sub>Every merged contribution leaves a mark on the realm.</sub></p>
 
   <!-- ALL-CONTRIBUTORS-BADGE:START - Do not remove or modify this section -->
-[![All Contributors](https://img.shields.io/badge/all_contributors-139-orange.svg?style=flat-square)](#contributors-)
+[![All Contributors](https://img.shields.io/badge/all_contributors-140-orange.svg?style=flat-square)](#contributors-)
 <!-- ALL-CONTRIBUTORS-BADGE:END -->
 </div>
 
@@ -942,6 +944,7 @@ Use this section as a map: start with installation, then jump to features, confi
     </tr>
     <tr>
       <td align="center" valign="top" width="16.66%"><a href="https://github.com/Phototonic"><img src="https://avatars.githubusercontent.com/u/35551999?v=4?s=100" width="100px;" alt="Lucas Wright"/><br /><sub><b>Lucas Wright</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=Phototonic" title="Code">💻</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="https://github.com/monsterlag"><img src="https://avatars.githubusercontent.com/u/64719697?v=4?s=100" width="100px;" alt="monsterlag"/><br /><sub><b>monsterlag</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=monsterlag" title="Code">💻</a></td>
     </tr>
   </tbody>
 </table>
