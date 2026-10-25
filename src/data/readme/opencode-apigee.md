@@ -71,9 +71,31 @@ config.
 | `clientId` | `APIGEE_CLIENT_ID` | `apigee.client.id` | |
 | `clientSecret` | `APIGEE_CLIENT_SECRET` | `apigee.client.secret` | Prefer `opencode auth login` over the config file |
 | `models` | `APIGEE_MODELS` | `apigee.agents` | Model ids the gateway publishes (array, or comma-separated) |
+| `apiVersion` | `APIGEE_API_VERSION` | `vertex.api.version` | Vertex API version in the path, default `v1` (e.g. `v1beta1`) |
+| `baseUrl` | `APIGEE_BASE_URL` | `vertex.base.url` | The whole URL up to `/models`, for a gateway that doesn't mount Vertex at the standard path. May use `{project}`, `{location}`, `{version}`; with it, `gateway` isn't needed |
 | `providerId` | | | Provider id in OpenCode, default `apigee` |
 | `name` | | | Display name, default `Gemini via Apigee` |
 | `airelay` | | | `false` to ignore AI Relay's config |
+
+### A gateway with its own path
+
+By default requests go to
+`https://<gateway>/<apiVersion>/projects/<project>/locations/<location>/publishers/google/models/<model>:streamGenerateContent`.
+A gateway that mounts Vertex under a prefix only needs the prefix in `gateway`
+(`"gateway": "https://gw.example.com/genai"`); one on another version sets
+`apiVersion`; one with a different shape altogether gives `baseUrl` — everything
+before `/models`:
+
+```json
+["opencode-apigee", {
+  "baseUrl": "https://gw.example.com/ai/{version}/vertex/{project}/{location}",
+  "apiVersion": "v1beta1",
+  "project": "my-gcp-project",
+  "tokenUrl": "https://auth.example.com/oauth/token",
+  "clientId": "my-client-id",
+  "models": ["gemini-3.8-flash"]
+}]
+```
 
 A model you describe yourself under `provider.apigee.models` in
 `opencode.json` keeps your description; the plugin only adds the rest.

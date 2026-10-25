@@ -4,9 +4,11 @@ An [OpenCode](https://opencode.ai) TUI sidebar plugin that shows Codex 5-hour an
 
 ```text
 Codex Usage
-5h   ███░░░░  week █████▋░
-42% · 2h      81% · 7d
+5h   ████▎░░░░░  week ████████▏░
+42% · 2h         81% · 7d
 ```
+
+The gauge row occupies 32 terminal cells, matching the default context gauge and Go usage plugins. Two fixed 15-cell columns contain 10-cell bars, separated by two spaces. A single available window expands to a 27-cell bar in the same allocation. Reset text stays within its column and is truncated if necessary; compact prompt lines are unchanged.
 
 ## OpenCode compatibility
 

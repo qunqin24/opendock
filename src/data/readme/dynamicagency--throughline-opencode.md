@@ -76,8 +76,9 @@ same logic against OpenCode's own API.
 </details>
 
 And over months, the same lesson can appear in session log after session log without
-ever graduating. The `consolidate` skill is the periodic pass (monthly,
-or on demand) that mines the handoff logs for lessons recurring 2+ times and proposes
+ever graduating. The `consolidate` skill is the pass you run on demand, when
+HANDOFF.md has grown bloated, or when session start reports enough logs since its last
+pass, that mines the handoff logs for lessons recurring 2+ times and proposes
 promoting each one - to a global CLAUDE.md rule, an issue on the owning skill's
 source repo, a durable project section, or native memory - with every promotion
 gated on explicit per-item approval. Session logs stay untouched as historical
@@ -202,7 +203,8 @@ machine-wide. It shares one data dir across a repo's git worktrees.
 
 Git worktrees, the opt-out marker, the kill switch, committing `HANDOFF.md` to
 a team repo (and the trust boundary that implies), and cleanup guidance are all
-in [docs/REFERENCE.md](docs/REFERENCE.md).
+in [docs/REFERENCE.md](docs/REFERENCE.md). What's planned next is in
+[docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Auto-handoff at wrap-up (optional reinforcement)
 

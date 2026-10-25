@@ -8,6 +8,8 @@ Go Usage
 22% · 2h   81% · 7d   100% · 28d
 ```
 
+The gauge row occupies 32 terminal cells, matching the default context gauge and Codex usage plugins. Three fixed 10-cell columns contain 7-cell bars, separated by one space. Reset text stays within its column and is truncated if necessary; compact prompt lines are unchanged.
+
 ## OpenCode compatibility
 
 **Plugin 1.x supports OpenCode 2.x only, starting at 2.1.3.** OpenCode 1.x and OpenCode 2.0–2.1.2 are not supported by this release line.
@@ -83,7 +85,7 @@ The compact line appears automatically on narrow terminals and in child sessions
 
 - **Usage windows**: polls the official endpoint using the active OpenCode Console credential from the connected server's credential API every 60s and on session events. A legacy `opencode-go` key is used only when Console is not connected. No legacy `auth.json` access is needed. Each window reports `percent` (0–100), `status` (`ok` / `rate-limited`), and `resetsAt`.
 - **Rendering**: Solid JSX via `@opentui/solid`, registered into `sidebar.content` and `prompt.footer.status` through `@opencode/plugin/tui`. Colors come from the active OpenCode theme.
-- **Sidebar geometry**: the session sidebar is a fixed 42 columns (37 usable after padding); the gauge columns are sized so the widest possible row (`100% · 28d`) fits exactly.
+- **Sidebar geometry**: the session sidebar is a fixed 42 columns (37 usable after padding); the gauges use 32 cells. Each fixed 10-cell column fits `100% · 28d`; longer countdowns are truncated instead of widening the columns.
 
 ## Development
 

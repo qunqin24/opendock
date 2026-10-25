@@ -1099,14 +1099,14 @@ so anyone can repeat it:
 |---|---|---|
 | **correct** | **54/60** | **55/60** |
 | tool calls | 12.5 | 8 |
-| input tokens | 56,205 | 10,540 |
+| uncached input | 56,205 | 10,540 |
 | final context | 39,928 | 12,718 |
 | wall seconds | 43 | 21 |
 | paths written outside the target | 0 | 0 |
 
 **On a task that fits in one read, the kit is a cost.** It spends over five
-times the input tokens and takes twice as long, and the answers are a tie -
-54 against 55, and a second run of the same 120 runs gave 55 against 54.
+times the uncached input tokens and takes twice as long, and the answers are a
+tie - 54 against 55, and a second run of the same 120 runs gave 55 against 54.
 The two edit tasks are a tie at 10/10, and the guard stopped no writes in
 either arm.
 
@@ -1153,16 +1153,29 @@ one-file lookups should not install this. The full table is in
 A free tier is one shared window: every request in every session draws on it,
 and when it runs out the provider answers with a limit error instead of
 tokens. opencode never shows a number for it. One real chat session made 599
-requests and 12,025,980 input tokens; the first sign of trouble was the next
-request being refused, which reads as a broken model rather than a spent
-budget.
+requests and 12,025,980 uncached input tokens; the first sign of trouble was
+the next request being refused, which reads as a broken model rather than a
+spent budget.
 
-The guard counts it. Each `step-finish` part reports the input tokens that
-request cost, the guard sums them per session, and at two thresholds it acts:
+The guard counts it. Each `step-finish` part reports what that request cost:
+
+| field | what it is | counted |
+|---|---|---|
+| `input` | the part of the prompt that was not in the provider's cache | yes |
+| `cache.read` | the cached prefix the model still had to read | yes |
+| `cache.write` | the prefix stored for the next request | yes |
+| `output`, `reasoning` | what the model wrote | no |
+
+The count is the whole context, not `input`. Counting `input` alone looks
+right and is not: with prompt caching, one measured stream reported 844, 1,289
+and 391 uncached tokens against 36,480, 7,808 and 9,088 cached ones. A budget
+built on the first column needed five to forty times the real spend to fire, and
+the window ran out first - which is exactly what happened. The guard sums the
+context per session, and at two thresholds it acts:
 
 | | default | what happens |
 |---|---|---|
-| `OC_HARNESS_BUDGET_WARN` | 2,000,000 | one toast: this session has used N tokens |
+| `OC_HARNESS_BUDGET_WARN` | 2,000,000 | one toast: this session has used N context tokens |
 | `OC_HARNESS_BUDGET_STOP` | 5,000,000 | tool calls are refused, with the number and the fix |
 
 ```bash
@@ -1175,6 +1188,34 @@ message that the session hit its budget and that a new session is the fix. A
 subagent gets its own session and its own count, so its tokens are not
 charged to the conversation that started it.
 
+### The window is shared, so a new session does not reset it
+
+The per-session count is the wrong shape for the thing that actually runs out.
+The free tier is one window per account: session A spends it, and session B -
+opened a minute later to get a clean count - is refused on its first request.
+Two sessions were measured spending one window 47 and 33 minutes apart, so
+"open a new session" is not a fix once the window is gone.
+
+The guard therefore keeps a ledger, not just a counter. Every session's spend
+is written to one file and the window is the sum of the entries inside it:
+
+| | default | what happens |
+|---|---|---|
+| `OC_HARNESS_BUDGET_WINDOW_MINUTES` | 60 | how far back the sum reaches |
+| `OC_HARNESS_BUDGET_WINDOW_WARN` | 4,000,000 | one toast: the account has used N in the window |
+| `OC_HARNESS_BUDGET_WINDOW_STOP` | 8,000,000 | tool calls are refused in *every* session, old or new |
+
+The ledger is `OC_HARNESS_BUDGET_FILE`, default
+`$XDG_STATE_HOME/opencode-harness-kit/budget.json` (`~/.local/state/...` when
+`XDG_STATE_HOME` is unset).
+
+The file is written atomically (write, then rename), an unreadable file reads
+as empty rather than failing the session, and entries older than six hours are
+dropped on the next write. `0` disables either threshold. The stop is checked
+when the tool is called, not when the session starts, so a session opened
+after the window ran out is still refused - with the window's number, not the
+session's.
+
 The other half is the fixed cost. opencode writes every discovered skill's
 name and description into the system message, so a machine with a large skill
 collection pays tens of thousands of tokens on every request, before the
@@ -1186,6 +1227,18 @@ oc-harness use fleet-safe --no-skills
 
 omits the skill list from the lanes' prompt and says so in the config header.
 It is off by default: removing a capability is the user's call, not the kit's.
+
+It covers the ten lanes. **Subagents are a separate surface** and a separate
+decision: the flag does not touch them, because the kit does not generate them
+and a subagent's prompt is where a skill is usually named. On this machine
+thirty-three subagents came from the ECC bundle with the tool enabled, and the
+rule applied to them was mechanical rather than uniform: the tool is turned
+off where the prompt never says `skill:`, and left on where it does - six
+Java/Kotlin/PHP/Python/C++ agents tell themselves to read `springboot-patterns`,
+`kotlin-patterns` and the like, so removing the tool would have made their
+instructions unrunnable. Twenty-six of the thirty-three were off. The list is
+per-machine config, not a kit default; a reinstall of the bundle can reset it,
+and `oc-harness verify` does not check it.
 
 ## Known limits
 
@@ -1270,6 +1323,50 @@ Both arms pin `small_model` as well as `model`. `model` only covers the main
 loop; the title agent runs on `small_model`, whose default is a paid model, so
 an unpinned kit-off arm makes paid title calls for a benchmark that is meant
 to be free.
+
+The kit-off arm has its own `HOME` with no kit config in it, and that is
+enough to break it: opencode resolves `provider/model` against a catalogue it
+keeps in `~/.cache/opencode/models.json`, so an arm with a bare `HOME` reports
+`ProviderModelNotFoundError` for every model the live install knows. The
+catalogue is opencode's, not the kit's, so `eval/ab.mjs` symlinks the cache
+into the temporary home along with `~/.local/share/opencode`. If a run still
+fails before it starts, the error event is now fatal on the spot:
+
+- `--out <dir>` keeps each run's stream as `<id>-<arm>-<i>.json` next to a
+  `<id>-<arm>-<i>.result.json`, and a rerun with the same `--out` skips the
+  runs that already have a result. A suite interrupted by the quota, or by a
+  reboot, continues instead of starting over.
+- `--budget <tokens>` caps the suite's context tokens - the same number the
+  guard counts, cached prefix included. It is checked before each run, so the
+  run that crosses the cap is still measured and counted; the next one stops
+  the suite with exit 2.
+- A preflight run (on by default, `--no-preflight` to skip) asks the model one
+  question before the suite and stops with exit 2 if it does not answer, if it
+  times out, or if its stream carries an error event. It costs one request and
+  saves the eighteen that a broken arm would otherwise spend being scored as
+  wrong answers. Its stream goes to a scratch directory, not `--out`, so
+  `--rescore` does not warn about a file it cannot grade.
+
+  It earns that cost on the day the window is out. `opencode run` then retries
+  the refused request three times and does not exit - one probe sat at zero
+  bytes until a 50-second timeout killed it, and the error text only appears in
+  `--print-logs`. A suite started in that state would have written 120
+  results, every one of them a timeout, and called it a benchmark. The
+  preflight turns it into `exit 2` and no result files. The 10-rep run that
+  produced the numbers in `eval/RESULTS.md` hit this at 47 of 120 runs: the 47
+  are real, the other 73 were never started, and resuming with the same
+  `--out` skips the 47. The window is also account-wide, not per model - a second free
+  model on the same provider answered "Free usage limit reached" too.
+
+The suite also turns the kit's own budget off for its runs and points the
+ledger at the run directory. A hundred and twenty runs spend more than the
+shared window's stop, and from that run on the guard would refuse tool calls -
+so the runs after it would be scored as wrong answers for a reason the suite
+is not measuring. The suite has its own cap, and the account's real window is
+not charged by a benchmark. The cap counts context, not uncached input: 47
+runs of one 10-rep attempt reported 1,284,594 uncached input tokens while the
+same streams carried 7,130,164 context tokens, so a cap set against the first
+number let the suite walk into the provider's wall.
 
 `eval/ab.mjs` knows how to read opencode's event stream, so it can only compare
 the kit with opencode. `eval/compare.mjs` grades any CLI the same way: it runs

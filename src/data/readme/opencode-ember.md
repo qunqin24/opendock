@@ -10,46 +10,46 @@
   <a href="https://github.com/ozandogrultan/opencode-ember/stargazers"><img src="https://img.shields.io/github/stars/ozandogrultan/opencode-ember?style=social" alt="GitHub stars"></a>
 </p>
 
-Estimate the cost of a **cold prompt-cache rewrite**, warn or block before
-the send, and report recorded cold writes across sessions.
+See what a **cold prompt-cache rewrite** will cost before you send it. When
+the cache TTL has lapsed on a large context, ember shows the price or blocks
+the send, and `ember gain` reports the cold writes you paid for across sessions.
 
 A port of [`cache-tax`](https://github.com/karanb192/claude-code-mods/tree/main/plugins/cache-tax)
-to [opencode](https://opencode.ai). One self-contained plugin file, no runtime
-dependencies.
+to [opencode](https://opencode.ai) V1 and V2. A server plugin plus an optional V2 TUI companion,
+no runtime dependencies.
+
+**Install:** clone the repo and run `./install.sh` ([details](#install)).
+
+## What it does
+
+- **`/ember guard warn` (default) shows the price and sends anyway.** When the TTL has
+  lapsed and the context is large, a warning toast is shown while the message sends.
+  `/ember guard refuse` hard blocks cold sends before the provider call and shows the
+  price as the session error, preventing accidental rewrites until you switch to `warn`
+  or start a new session.
+- **`/ember` keeps score.** Warm or cold, context size, cold-rewrite price,
+  guard mode, and this session's cold writes.
+- **`ember gain` reports history.** After a cold-send warning, a completed step
+  with cache-write tokens records a cold write in a UTC daily bucket. The report
+  shows cold-write counts and estimated costs.
+  Totals cover all retained buckets; the per-day table shows only the most recent days.
+  `ember discover` is an alias; `ember gain --json` dumps the raw buckets.
 
 > **Looking for cache warming?** OpenCode V2 supports
 > [session warming out of the box](https://opencode.ai/v2/docs/warming/),
 > without a plugin. Check its built-in `warming` setting first. It is disabled
 > by default, and warming requests can incur provider costs.
 
-> Why "ember": a banked fire you keep smoldering while you are away.
-
-## What it does
-
-- **Keepwarm does not currently warm caches.** `/keepwarm` arms a timer, but
-  its callback stops with `"no supported captured model request is available"`.
-  It never sends a background provider request or mutates sessions or provider config.
-- **`/ember guard warn` (default) shows the price and sends anyway.** When the TTL has
-  lapsed and the context is large, a graceful warning is shown while the message sends.
-  `/ember guard refuse` hard blocks cold sends and shows an informative error in the turn,
-  preventing accidental rewrites until you switch to `warn` or `/clear`.
-- **`/ember` keeps score.** Warm or cold, context size, cold-rewrite price, the
-  break-even (how many pings cost one cold write, and the idle that covers),
-  keepwarm state, guard mode, and this session's cold writes.
-- **`ember gain` reports history.** After a cold-send warning, a completed step
-  with cache-write tokens records a cold write in a UTC daily bucket. The report
-  includes cold-write counts and estimated costs, plus any stored heartbeat history.
-  Totals cover all retained buckets; the per-day table shows only the most recent days.
-  `ember discover` is an alias; `ember gain --json` dumps the raw buckets.
-
 ## Requirements
 
-- [opencode](https://opencode.ai) with the server-plugin API
-  (`@opencode-ai/plugin`). [package.json](package.json) records the supported
-  opencode range (`engines`) and the plugin version used for development.
-  OpenCode V2 compatibility is not verified.
-- A provider with prefix caching and reported token usage. Built-in estimates
-  cover selected Anthropic, OpenAI, and Gemini model families.
+- [opencode](https://opencode.ai) **V1 1.18.0+ or V2 2.1.4+** (see
+  `engines.opencode` in [package.json](package.json)). Both use the same package.
+- A provider with prefix caching and reported token usage. Prices come from the
+  rates OpenCode reports for the model when it has a cache-write price, otherwise
+  from a built-in table for selected Anthropic, OpenAI, and Gemini families.
+- The TUI (and on V2 its ember companion), for the warning and `/ember` toasts. Without it (for example
+  `opencode run`) the guard still blocks and records, but nothing is shown for
+  `warn` and `/ember`.
 - [Bun](https://bun.sh) on `PATH` to run the reporting CLI.
 
 ## Install
@@ -59,96 +59,80 @@ dependencies.
 ```sh
 git clone https://github.com/ozandogrultan/opencode-ember.git
 cd opencode-ember
-./install.sh
+./install.sh [config-dir]
 ```
 
-Then **restart opencode** — plugins are loaded at startup only.
+On V1, restart opencode. V2 reloads watched config on change.
 
-`install.sh` also links the report binary as `~/.local/bin/ember` (set
-`EMBER_BIN_DIR` to choose another directory), so `ember gain` works from any
-shell if that directory is on `PATH`. The link points to this checkout's
-`gain.ts`, so keep the checkout in place. An alternative is
-`npm install -g opencode-ember` for the CLI; this does not load the plugin into opencode.
-`/ember gain` inside opencode tells you to use the binary instead.
+`install.sh` copies `src/` into `<config>/plugins/ember/` (the config directory
+comes from `opencode debug paths`, or pass one), then merges `"./plugins/ember"`
+into the `plugins` array of `opencode.json` (server) and `cli.json` (terminal,
+also active when connected to a remote server). Existing entries are kept, a
+config it cannot parse as plain JSON is left untouched, and the V1
+`plugins/ember.ts` is removed when upgrading to V2.
+On V1 it installs `plugins/ember.ts` for auto-discovery with its supporting
+modules in `<config>/ember/`; existing config files are not modified.
+An existing legacy server `plugin` registry stays in that format, including tuple
+options. Config updates are staged and atomically replaced; originals remain in
+the printed `.ember-install-*` recovery directory. A failed second replacement
+rolls back the first.
 
-`install.sh` asks opencode for its own config directory (`opencode debug paths`)
-and copies `ember.ts` into `<config>/plugins/`, overwriting any existing file.
-
-### Manually
-
-Copy `ember.ts` to one of:
-
-- `~/.config/opencode/plugins/ember.ts` — all projects (global)
-- `<project>/.opencode/plugins/ember.ts` — one project
+It also links the report binary as `~/.local/bin/ember` (set `EMBER_BIN_DIR` to
+choose another directory), so `ember gain` works from any shell if that
+directory is on `PATH`. The link points to this checkout's `gain.ts`, so keep the
+checkout in place. An alternative is `npm install -g opencode-ember` for the CLI;
+this does not load the plugin into opencode. `/ember gain` inside opencode tells
+you to use the binary instead.
 
 ### From npm
 
 ```json
-{ "plugin": ["opencode-ember"] }
+{ "plugins": ["opencode-ember"] }
 ```
 
-in `opencode.json`, then restart opencode. Install the CLI
-separately with `npm install -g opencode-ember` if you want `ember gain`.
+in V2 `opencode.json` (or `opencode plugin add opencode-ember`). Add the same
+`plugins` entry to `cli.json` for warning and card toasts, including remote-server sessions.
+V1 keeps its singular config unchanged: `{ "plugin": ["opencode-ember"] }`;
+restart V1 after installation. The package exports the V2 TUI companion as `./tui`.
+Install the CLI separately with `npm install -g opencode-ember` if you want
+`ember gain`.
+
+### Manually
+
+On V2, copy the files in `src/` to `<config>/plugins/ember/`, add a `package.json` with
+`"exports": { ".": "./index.ts", "./tui": "./tui.ts" }`, and add
+`"./plugins/ember"` to `plugins` in `opencode.json` and `cli.json`.
+On V1, use `install.sh` so the single-file auto-discovered entry and its shared
+imports are installed together.
 
 ## Usage
 
 ```
-/keepwarm [6h|90m] [every 2m] [ttl 1h] | always | status | off
 /ember [guard warn|refuse]
 ember gain | discover [--json]     # the report, from any shell
 ```
 
 | command | effect |
 | --- | --- |
-| `/keepwarm` | arm a timer window (30 minutes by default); retain always mode if enabled |
-| `/keepwarm 90m` | a window of your own (`2h30m`, `6h`, …) |
-| `/keepwarm always` | persist automatic arming for this and future normal sessions |
-| `/keepwarm 6h every 2m` | override the ping period (floor 1m) |
-| `/keepwarm 6h ttl 1h` | assume the 1-hour cache tier |
-| `/keepwarm status` | the status line |
-| `/keepwarm off` | stop this session's timer and disable automatic arming globally |
 | `/ember` | the card |
 | `/ember guard warn` | show the price and send (default) |
 | `/ember guard refuse` | hard block cold sends |
 | `ember gain` | terminal report over collected history (alias `ember discover`) |
 
-Automatic arming is disabled by default. `/keepwarm` and `/keepwarm always`
-arm timers explicitly; a recorded cold write can also arm a default-length window.
-None of these paths sends warming requests. `/keepwarm off` does not cancel
-timers already armed in other sessions.
-
-Slash commands show their result in a toast and abort before any model call.
-The command result may also appear as an error in the turn. `guard block` is an
-alias for `guard refuse`.
+`/ember` shows its result in a toast and never calls a model or adds a message to
+the session. `guard block` is an alias for `guard refuse`.
 
 Guard mode is persisted globally and shared across sessions and processes.
+If saving fails, ember reports an error and refuses cold sends in the current
+process until a guard command saves successfully. Other processes and restarts
+may still use the previous saved setting.
 
-## Cache TTL and cadence
+## Cache TTL
 
 The default assumed TTL is **5 minutes**. The guard compares it with the time
 of the latest completed model step; it does not query the provider's cache.
-Default timer cadence is 80% of the TTL, subject to the configured ping floor.
-
-`/keepwarm 6h ttl 1h` changes this session's assumed TTL;
-`EMBER_TTL_SECONDS=3600` changes the default. Neither selects a provider cache
-tier or changes the price table. The card's break-even calculation is theoretical:
-background warming is unavailable.
-
-## Safe warming status
-
-The plugin never forks, prompts, deletes, or appends to a session for background
-warming, and never mutates `config.provider` or provider `options.fetch`.
-Background warming fails closed with `"no supported captured model request is available"`
-and never issues background provider requests or forked sessions.
-
-Important safety guarantees:
-- **Zero background provider requests:** Background warming fails closed immediately;
-  it never sends provider calls, consumes model quota, or triggers provider authentication loops.
-- **No session mutation:** Real session history and parent/child topologies are never altered.
-- **Usage-based accounting:** Recorded cold-write costs use reported cache-write tokens
-  and built-in rate estimates; no synthetic
-  heartbeats or tokens are recorded for failed or unsupported background requests.
-- **In-memory state hygiene:** No credentials, request headers, or prompts are written to disk.
+`EMBER_TTL_SECONDS=3600` changes the assumed TTL. It does not select a provider
+cache tier or change the price table.
 
 ## Configuration
 
@@ -156,54 +140,46 @@ Important safety guarantees:
 | --- | --- | --- |
 | `EMBER_TTL_SECONDS` | `300` | assumed cache tier |
 | `EMBER_MIN_CONTEXT` | `50000` | cold-guard context floor, tokens |
-| `EMBER_MIN_PING_SECONDS` | `60` | ping floor |
 | `EMBER_STATE_FILE` | `~/.local/share/opencode/ember.json` | state path shared by plugin and CLI |
 
 ## Prices and the reporting caveats (read this too)
 
-Dollar figures come from a small built-in table in `ember.ts` (`PRICES`: cache
-read, cache write and output rates per model family). Two consequences:
+Dollar figures use the cache rates OpenCode reports for the model, or, when it
+reports no cache-write price, a small built-in table in `src/core.ts` (`PRICES`:
+cache read, cache write and output rates per model family). Two consequences:
 
-- **Every figure is an estimate.** Prices are hard-coded list rates for the
-  Anthropic/OpenAI/Gemini families the plugin knows; they do not follow your provider,
+- **Every figure is an estimate.** The built-in table holds list rates for the
+  Anthropic/OpenAI/Gemini families the plugin knows; it does not follow your provider,
   plan, negotiated rates, or prompt-fee changes. The card estimates a cold rewrite
   using the whole context and the write rate, and a warm turn using the read rate.
   Recorded cold-write costs use reported cache-write tokens and the write rate;
   normal input and output costs are not added to the report. Treat every dollar
   value in `/ember` and `ember gain` as an approximation, not an invoice.
-  The report's net savings is kept-warm value minus ping spend and recorded
-  cold-write cost; without stored warming history it can only be zero or negative.
 - **Unpriced models read $0.00.** Models without a matching row — e.g. custom
   OpenAI-compatible ids like `custom-unpriced-model` or provider relays — report no cost, so
-  the kept-warm value, ping spend, cold-write cost, net savings and the warming
-  yield meter all run understated (or read $0.00) for them. Raw counters —
-  heartbeat counts, tokens kept warm, idle time held warm, cold-write counts —
-  are independent of pricing. Add a row to `PRICES` in `ember.ts` to include a model in the estimates.
+  the cold-write cost runs understated (or reads $0.00) for them. Cold-write
+  counts are independent of pricing. Add a row to `PRICES` in `src/core.ts` to include a model in the estimates.
 
 State lives in a versioned file, `~/.local/share/opencode/ember.json` by default.
 Multiple opencode processes (one per workspace/cmux session) share the
-file: every write re-reads it and merges, so a process writing its own session's
-window preserves sessions armed elsewhere. Reading older or unversioned state
-preserves guard settings and recorded gain history, but disables automatic arming
-and discards legacy session windows; current-version settings and windows are retained.
+file: every write re-reads it and merges, so a process writing preserves the
+history and any fields it does not recognise (including those written by older
+or newer versions). Older state files, including the `always` and `sessions`
+fields from versions with `/keepwarm`, stay readable and are ignored.
 Daily history is trimmed to a bounded number of stored date buckets on writes,
 not a number of calendar days. Delete the file to reset settings and history.
+The file holds only the guard mode and daily cold-write counts and costs; no
+credentials, request headers, or prompts are written to disk.
 
 ## Testing
 
-Free command checks (no model call; shown with default settings):
-
-```sh
-opencode debug config | grep -A2 -E '"keepwarm"|"ember"'   # loaded?
-```
+Free command checks (no model call; shown with default settings). If `/ember` is
+unknown, the plugin did not load:
 
 ```
-/keepwarm status     # "keepwarm off"
-/keepwarm 6h         # arms
 /ember               # card
 /ember guard warn    # switch guard
 ember gain           # the report (CLI)
-/keepwarm off
 ```
 
 Cold guard — launch with a 5-second pseudo-TTL and a 1-token floor:
@@ -217,31 +193,31 @@ wait at least 6 seconds, and send another message: the guard should block it
 before a provider call. `/ember guard warn` allows the next send with a warning.
 Normal sends cost whatever your provider charges.
 
-Check fail-closed keepwarm without a model call:
-
-```
-/keepwarm 1h every 1m
-```
-
-In a fresh session with no prior turn, wait a little over a minute, then run
-`/keepwarm status`. Expect `no supported captured model request is available`.
-The callback sends no provider request, records no heartbeat, and shows no stop
-toast. Run `/keepwarm off` afterward.
-
 Repository checks are listed in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## How it works
 
-`config` (registers `/keepwarm` and `/ember` commands), `chat.message` + `chat.params`
-(cold-send guard), `event` (token/price tracking from `step-finish`, session cleanup),
-`command.execute.before` (handles `/keepwarm` and `/ember`, aborted before any model call),
-and `dispose` (clears timers).
+The V2 server plugin registers a `context` hook (runs before each agent model call; only
+the call that answers a new prompt is guarded, so tool-loop steps pass), the
+`/ember` command, and an event loop (`session.step.ended` for token tracking and
+cold-write recording; compaction, revert and delete resets). It never appends to
+a session. Warnings and the card reach the screen through an `ember` RPC `notice`
+event that the TUI companion shows as a toast; refusing throws from the hook, which
+OpenCode reports as the session error. Subagent sessions are ignored.
+V1 retains its `chat.message` / `chat.params` guard and token-usage event hooks,
+with the same shared pricing, guard calculations and version-3 state store.
 
 ## Credits
 
 Ported from [`karanb192/claude-code-mods` → `cache-tax`](https://github.com/karanb192/claude-code-mods/tree/main/plugins/cache-tax).
 The design, the price arithmetic and the safety rules are theirs; this is the
 opencode translation.
+
+## More OpenCode plugins
+
+- [sesh](https://github.com/ozandogrultan/opencode-sesh) — search, preview, and resume every session across every project.
+- [ghost](https://github.com/ozandogrultan/opencode-ghost) — suggests your next prompt as ghost text in the empty composer.
+- [quill](https://github.com/ozandogrultan/opencode-quill) — local word completion and next-word prediction as you type.
 
 ## Contributing
 

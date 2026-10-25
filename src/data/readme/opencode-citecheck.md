@@ -18,6 +18,22 @@ Bibliography: refs.bib
 
 No API keys. No hosted service. No account.
 
+Not using OpenCode? The same checks run from the command line, for a single file, a whole folder or CI:
+
+```bash
+npx opencode-citecheck check paper.tex
+```
+
+See [CLI, for CI](#cli-for-ci).
+
+![opencode-citecheck flagging a DOI that does not exist](https://raw.githubusercontent.com/Xtardy/opencode-citecheck/main/docs/demo.gif)
+
+And inside OpenCode, with a real agent (Sisyphus on DeepSeek V4.1 Flash Free, plugin 0.2.2, sped up 1.5x):
+
+![An OpenCode agent writing a bibliography, getting a wrong arXiv ID flagged, and fixing it](https://raw.githubusercontent.com/Xtardy/opencode-citecheck/main/docs/opencode-demo.gif)
+
+The wrong citation is staged: I put the bad arXiv ID (2005.11499, an unrelated statistics paper) in the prompt to simulate a hallucinated reference. The agent, the tool calls and the fix are real and unedited, apart from the speed-up and the cut of OpenCode's start-up time.
+
 ---
 
 ## Why this exists
@@ -38,6 +54,7 @@ OpenCode exposes a hook that runs after a tool call and lets a plugin rewrite th
 | DOI does not exist | Crossref → OpenAlex → DataCite |
 | DOI points at a different paper | title comparison against the registry record |
 | Reference has been retracted | Crossref `updated-by`, sourced from Retraction Watch |
+| arXiv entry without a DOI field | the arXiv ID (`eprint`, `arXiv:...` in `journal`, or an arxiv.org URL) is checked through the DOI arXiv registers for every paper, `10.48550/arXiv.<id>` |
 | Entry has no DOI | optional, off by default (many valid entries lack one) |
 
 Supported syntax:
@@ -55,9 +72,9 @@ Files inspected: `.tex`, `.latex`, `.ltx`, `.md`, `.markdown`, `.mdx`, `.rmd`, `
 opencode plugin opencode-citecheck
 ```
 
-On OpenCode 2.x with the newer CLI this is `opencode plugin add opencode-citecheck`.
+This adds the package to the `.opencode/opencode.json` of the current project. Add `-g` to put it in your global config instead.
 
-Or add it to `opencode.json`:
+You can also edit the config by hand:
 
 ```json
 {
@@ -67,11 +84,16 @@ Or add it to `opencode.json`:
 
 Then just write. Nothing else to configure.
 
-### Requirements
+---
 
-OpenCode 1.18.29 or newer.
+## Status
 
-The package exports both plugin shapes: `server()` for plugin API v1 and `setup()` for v2. The v1 path is what has been tested end to end against a real OpenCode install (1.18.31). The v2 path is written against the published `@opencode/plugin` 2.0 typings but has not been exercised against a live v2 runtime; treat it as untested until someone reports back.
+Early, version 0.1.x.
+
+- Install checked on OpenCode 1.18.35. The hook itself was tested end to end on 1.18.31.
+- Needs OpenCode 1.18.29 or newer.
+- OpenCode 2.x: the package also exports `setup()` for plugin API v2, written against the published typings. I have not run it on a live v2, so if it breaks there, please open an issue.
+- The only network calls go to Crossref, OpenAlex and DataCite, with the DOIs found in your bibliography. The plugin does not edit your files; it only adds text to the tool result the model sees.
 
 ---
 

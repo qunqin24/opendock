@@ -1,12 +1,9 @@
-# sesh
-
-[![CI](https://github.com/ozandogrultan/opencode-sesh/actions/workflows/ci.yml/badge.svg)](https://github.com/ozandogrultan/opencode-sesh/actions/workflows/ci.yml)
-
 <h1 align="center">
   <img src="assets/logo.svg" alt="sesh" height="96">
 </h1>
 
 <p align="center">
+  <a href="https://github.com/ozandogrultan/opencode-sesh/actions/workflows/ci.yml"><img src="https://github.com/ozandogrultan/opencode-sesh/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://www.npmjs.com/package/opencode-sesh"><img src="https://img.shields.io/npm/v/opencode-sesh" alt="npm"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT"></a>
   <a href="#contributing"><img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg" alt="PRs welcome"></a>
@@ -21,20 +18,13 @@ terminal or from inside the TUI.
 `/sessions`) are scoped to the current project. `sesh` shows all of them —
 grouped by directory, full-text searchable, and previewable from anywhere.
 
-```text
-Sessions (8)                              ▾ hide
-search…
-▾ …/Projects/portal                          (5)
-  ├○ Retry the OAuth token refr…            2h
-  ├○ Login rate limiting notes              3d
-  ├○ Draft the release notes                7d
-  ├○ Auth middleware cleanup                11d
-  └○ Rotate the signing keys                12d
-▾ ~/Projects/mobile                          (3)
-  ├○ Author avatar upload retry             1d
-  ├○ Fix session cookie on Safari           2d
-  └○ Auth redirect loop after log…          6d
-```
+<p align="center">
+  <img src="assets/demo-tui.gif" alt="sesh: session sidebar, cross-project picker search and transcript preview inside OpenCode" width="800">
+</p>
+
+**Install:** `npm install -g opencode-sesh && sesh install` for the terminal
+picker, or add `"opencode-sesh"` to `plugins` for the TUI panel
+([details](#install)).
 
 ## Why sesh
 
@@ -82,6 +72,10 @@ existing plugins. Remove any copied
 switching to avoid loading them twice.
 
 ### Terminal picker
+
+<p align="center">
+  <img src="assets/demo.gif" alt="sesh: searching sessions across projects and previewing a transcript in the terminal picker" width="800">
+</p>
 
 Install the CLI with npm:
 
@@ -353,6 +347,12 @@ Windows is untested.
 **Why a separate terminal picker *and* a TUI panel?** The panel is always one
 keystroke away while you work. The terminal picker is fullscreen and works from
 any shell, including outside opencode.
+
+## More OpenCode plugins
+
+- [ghost](https://github.com/ozandogrultan/opencode-ghost) — suggests your next prompt as ghost text in the empty composer.
+- [quill](https://github.com/ozandogrultan/opencode-quill) — local word completion and next-word prediction as you type.
+- [ember](https://github.com/ozandogrultan/opencode-ember) — prices a cold prompt-cache rewrite before you send.
 
 ## Contributing
 

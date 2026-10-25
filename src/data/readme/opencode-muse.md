@@ -16,7 +16,7 @@ Add the published package to your project-level `opencode.jsonc` (or
 ```jsonc
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugins": ["opencode-muse@0.1.1"],
+  "plugins": ["opencode-muse@0.3.0"],
 }
 ```
 
@@ -41,7 +41,10 @@ EOF
 
 The locally packed package passed provider discovery and a text-turn smoke
 test. Muse models and a text turn were also confirmed in OpenChamber after
-restarting it. The verified Muse CLI and SDK version is 1.4.12.
+restarting it. Verified Muse CLI versions are 1.4.12 and 1.4.13 (the SDK
+stays 1.4.12; a newer CLI fingerprint starts with a recorded warning
+instead of failing). See
+[#21](https://github.com/pgquiles/opencode-muse/issues/21).
 
 ## Authentication
 
@@ -68,6 +71,14 @@ setup placeholder rather than advertising a model that will fail on use.
   supported sessions and replaying available session updates after reconnects.
 - Attach supported images (PNG, JPEG, GIF, WebP) and videos (MP4, MOV) to a
   Muse turn.
+- Pick a reasoning effort per model through OpenCode's own controls: an
+  untouched model runs its catalog default (which rotates over time), Ctrl+T
+  cycles the concrete variants (`minimal` … `max`, model-dependent, one way
+  until the model is reselected), and the TUI `/effort` command ("Switch model
+  variant", verified end to end) or a `#variant` model suffix
+  (`opencode run --model muse/…#high`) selects one explicitly. Unknown variants
+  fail the turn instead of guessing. See
+  [#28](https://github.com/pgquiles/opencode-muse/issues/28).
 - Let Muse run its own agent and tools, while the plugin prevents overlapping
   writes to the same workspace.
 
@@ -96,13 +107,25 @@ setup placeholder rather than advertising a model that will fail on use.
   been tested, but recovery from a real Muse event gap has only been tested
   with a simulated gap. See
   [#23](https://github.com/pgquiles/opencode-muse/issues/23).
-- **Muse CLI compatibility:** The plugin is pinned and verified with Muse CLI
-  and SDK 1.4.12. A protocol/schema mismatch fails closed rather than risking
-  an incompatible session; broader version-compatibility policy is tracked in
+- **Muse CLI compatibility:** The plugin is pinned to SDK 1.4.12 and speaks
+  envelope schema version 1. A newer CLI fingerprint starts with a recorded
+  warning instead of failing closed; a missing/malformed fingerprint or an
+  unsupported envelope version still fails closed. See
   [#21](https://github.com/pgquiles/opencode-muse/issues/21).
-- **Billing and simultaneous work:** Pay-as-you-go behavior has not yet been
-  tested. The plugin also allows only one active writer per workspace, so a
-  new turn may be reported as busy while another is still finishing.
+- **Billing and simultaneous work:** Pay-as-you-go catalog and text turns pass
+  on Muse 1.4.13 (see the compatibility matrix). The plugin also allows only
+  one active writer per workspace, so a new turn may be reported as busy
+  while another is still finishing.
+
+## Troubleshooting
+
+- **"Muse Spark 1.3 Contributor" never connects after a model switch:** that
+  entry is a retired OpenCode-gateway model (`opencode/muse-spark-1.3-contributor-free`),
+  not this plugin's model. It no longer resolves anywhere, so OpenCode keeps
+  retrying and the session appears stuck on "connecting". Pick the model under
+  provider **Muse Code** — `muse/muse-profile-tbh-model-muse-spark-1.3` —
+  instead of any historical "contributor-free" entry in recent-model lists. See
+  [#26](https://github.com/pgquiles/opencode-muse/issues/26).
 
 ## Credits and references
 

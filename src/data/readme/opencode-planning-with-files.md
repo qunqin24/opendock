@@ -245,6 +245,7 @@ One hook fire measures 289ms wall-clock since the v3.6.0 optimization, down from
 
 | Version | Highlights |
 |---------|------------|
+| **v3.25.2** | Plan creation through the initializer and explicit format validation; Copilot context schema and Cursor selection/install fixes; optional skill-lens resume evaluation (PRs #338, #340, #341, #342). |
 | **v3.25.1** | OpenCode reports current attestation validity; DSH preserves the `PLAN_ID` selection notice. Adds an optional skill-lens evaluation with documented limits and contributor-reported measurements (PRs #331, #333, #334). |
 | **v3.25.0** | Hermes adapter 0.3.0 binds named plans per conversation, with explicit selection, successful init/file-operation binding, persistent session records and concurrent-session isolation. Existing ambiguity, admission and attestation checks remain active (#328). |
 | **v3.24.3** | Pi verifies the exact plan snapshot used for context and phase counts; selected-attestation read failures stay blocking. The guide clarifies explicit re-attestation after progress edits (#326). |
@@ -824,6 +825,8 @@ Code, documentation, and issue contributors. Select a portrait to open a GitHub 
 
 <!-- contributor-portraits:start -->
 <p align="center">
+  <a href="https://github.com/MannXo" title="@MannXo"><img src="https://github.com/MannXo.png?size=56" width="48" height="48" alt="@MannXo"></a>
+  <a href="https://github.com/winxtxrgit" title="@winxtxrgit"><img src="https://github.com/winxtxrgit.png?size=56" width="48" height="48" alt="@winxtxrgit"></a>
   <a href="https://github.com/EmadMokhtar" title="@EmadMokhtar"><img src="https://github.com/EmadMokhtar.png?size=56" width="48" height="48" alt="@EmadMokhtar"></a>
   <a href="https://github.com/MbappeWU" title="@MbappeWU"><img src="https://github.com/MbappeWU.png?size=56" width="48" height="48" alt="@MbappeWU"></a>
   <a href="https://github.com/Vyzygota" title="@Vyzygota"><img src="https://github.com/Vyzygota.png?size=56" width="48" height="48" alt="@Vyzygota"></a>

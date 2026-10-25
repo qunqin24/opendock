@@ -1,6 +1,6 @@
 <div align="center">
   <a href="https://github.com/alvinunreal/oh-my-opencode-slim/stargazers">
-    <img src="img/v2.jpg" alt="oh-my-opencode-slim V2 Release" style="border-radius: 10px;">
+    <img src="img/v3-marketplace-2.webp" alt="oh-my-opencode-slim V3 Marketplace" style="border-radius: 10px;">
   </a>
   <h3>✨ oh-my-opencode-slim ✨</h3>
 
@@ -175,6 +175,7 @@ bun run build
 - **[OpenCode Go 预设](docs/opencode-go-preset.md)** —— 智能体使用 OpenCode Go 模型；由于其 Orchestrator 模型不支持多模态，因此启用 Observer 进行视觉分析。
 - **[作者的预设](docs/authors-preset.md)** —— 作者日常使用的精确配置，包含第三方 Skills。
 - **[$30 预设](docs/thirty-dollars-preset.md)** —— 围绕 Codex Plus 和 GitHub Copilot Pro 构建的混合服务商方案，每月约 30 美元。
+- **[$40 预设](docs/forty-dollars-preset.md)** —— 围绕 Claude Pro 和 ChatGPT Plus 构建的双订阅黄金方案，每月约 40 美元。
 
 ### 针对其他服务商
 
@@ -236,7 +237,7 @@ ping all agents
   </tr>
   <tr>
     <td colspan="2">
-      <b>推荐模型：</b> <code>openai/gpt-6-sol (medium)</code> <code>anthropic/claude-fable-5</code> <code>anthropic/claude-opus-4-8</code>
+      <b>推荐模型：</b> <code>claude-opus-5-5</code> <code>gemini-4-argon</code> <code>claude-fable-5.1</code> <code>glm-5.3</code> <code>mimo-v2.6</code> <code>minimax-m3.1</code> <code>qwen3.8-plus</code>
     </td>
   </tr>
   <tr>
@@ -277,7 +278,7 @@ ping all agents
   </tr>
   <tr>
     <td colspan="2">
-      <b>推荐模型：</b> <code>openai/gpt-5.3-codex</code> <code>cerebras/zai-glm-4.7</code> <code>fireworks-ai/accounts/fireworks/routers/kimi-k2p6-turbo</code>
+      <b>推荐模型：</b> <code>gpt-6-luna</code> <code>deepseek-flash</code>
     </td>
   </tr>
   <tr>
@@ -318,7 +319,7 @@ ping all agents
   </tr>
   <tr>
     <td colspan="2">
-      <b>推荐模型：</b> <code>openai/gpt-6-astra (xhigh)</code> <code>anthropic/claude-fable-5</code> <code>anthropic/claude-opus-4-8 (xhigh)</code>
+      <b>推荐模型：</b> <code>gpt-6-astra</code> <code>claude-opus-5-5</code> <code>claude-fable-5.1</code> <code>kimi-k3.1</code> <code>deepseek-flash</code> <code>glm-5.3</code> <code>qwen3.8-max</code>
     </td>
   </tr>
   <tr>
@@ -408,7 +409,7 @@ ping all agents
   </tr>
   <tr>
     <td colspan="2">
-      <b>推荐模型：</b> <code>google/gemini-3.5-flash</code> <code>moonshotai/kimi-k2.7-code</code>
+      <b>推荐模型：</b> <code>claude-opus-5-5</code> <code>gemini-4-argon</code> <code>gemini-3.8-flash</code> <code>kimi-k2.7-code</code> <code>minimax-m3.1</code>
     </td>
   </tr>
   <tr>
@@ -449,7 +450,7 @@ ping all agents
   </tr>
   <tr>
     <td colspan="2">
-      <b>推荐模型：</b> <code>openai/gpt-6-luna (medium)</code> <code>anthropic/claude-sonnet-4-6</code>
+      <b>推荐模型：</b> <code>gpt-6.1-sol</code> <code>claude-opus-5-5</code> <code>deepseek-flash</code>
     </td>
   </tr>
   <tr>
@@ -592,6 +593,7 @@ bunx oh-my-opencode-slim@latest companion install
 |-----|----------------|
 | **[作者的预设配置](docs/authors-preset.md)** | 作者日常使用的混合服务商配置方案 |
 | **[$30 预设配置](docs/thirty-dollars-preset.md)** | 每月约 30 美元的预算型混合服务商配置方案 |
+| **[$40 预设配置](docs/forty-dollars-preset.md)** | 每月约 40 美元的 Claude Pro + ChatGPT Plus 双订阅配置方案 |
 | **[OpenCode Go 预设](docs/opencode-go-preset.md)** | 安装程序生成的捆绑 `opencode-go` 预设 |
 
 ---

@@ -8,7 +8,7 @@ Seatbelt on macOS, and AppContainer or restricted users on Windows.
 Install:
 
 ```sh
-npm install --save-dev @landstrip/landstrip-api
+npm install --save-dev @landstrip/landstrip
 ```
 
 On Linux/macOS, save this as `policy.json`. Windows also needs explicit read
@@ -37,6 +37,9 @@ npx landstrip doctor
 
 See [landstrip(1)](packages/landstrip/man/man1/landstrip.1) for CLI options,
 policy rules, and platform limits.
+
+For TypeScript APIs, install [`@landstrip/landstrip-api`](packages/landstrip-api/README.md).
+It depends on `@landstrip/landstrip`, which owns the executable and platform packages.
 
 On Linux, commands always run in new user, PID, and mount namespaces with a
 private `/proc`. Landlock and seccomp still enforce filesystem and network

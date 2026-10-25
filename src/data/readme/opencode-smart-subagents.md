@@ -22,7 +22,7 @@ The main session gets these tools:
 
 | Tool | What it does |
 | --- | --- |
-| `subagent` | Starts one child, or continues one by `sessionID`. Foreground waits for the report; `background: true` returns at once and the report arrives later as a message. Adds `fork_turns`, `isolation`, and `capability` to OpenCode's inputs. |
+| `subagent` | Starts one child, or continues one by `sessionID`; a running child takes the new prompt mid-run, as with OpenCode's built-in tool. Foreground waits for the report; `background: true` returns at once and the report arrives later as a message. Adds `fork_turns`, `isolation`, and `capability` to OpenCode's inputs. |
 | `subagent_batch` | Starts several background children. Either all of them start or none do. |
 | `subagent_message` | Steers a running child, answers its question, or gives an idle child its next task. |
 | `subagent_status` | Lists children, their status and pending questions, and the latest output of the ones you name. Never waits. |
@@ -55,6 +55,8 @@ A background child's report arrives in the parent session as a message tagged `<
 When a foreground child asks a question, the `subagent` call returns the question at once and the child continues in the background, because the parent cannot answer while it is blocked in the call.
 
 If you type into a child session yourself, the child's next report still goes to the parent.
+
+Children that OpenCode starts itself, such as subagents from a command with `subagent: true`, report through OpenCode and do not get the child tools. Passing one's `sessionID` to `subagent` or `subagent_message` adopts it, and its later reports come from the plugin.
 
 ## Options
 

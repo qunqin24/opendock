@@ -129,8 +129,9 @@ by default for auditing the decision.
 
 Set `reviewer.agent.cleanupSessions: true` to delete reviewer sessions after a
 decision. Deletion is best-effort and **never delays** the verdict or timeout.
-This applies only to the OpenCode V2 agent runtime; the V1 and external
-Claude/Codex SDK runtimes retain their previous behavior.
+This applies only to the OpenCode V2 agent runtime: setting it at all with the
+Claude/Codex SDK runtimes (even to `false`), or setting it to `true` on OpenCode 1.x,
+is rejected at startup, since it would have no effect there.
 
 ```json
 {
@@ -192,11 +193,16 @@ reviewer does, including the decision backend's `onOversize: "agent"` fallback.
     without network access or web search, with `approval_policy = "never"` so that no request
     can lift the sandbox (a command the sandbox blocks fails), and without the project's
     `AGENTS.md` or `.codex/config.toml`: the review marks the project directory and every
-    directory above it as untrusted, so the project's `.codex/config.toml` cannot add MCP
-    servers or change any other setting even when you trusted the project in Codex. Your own
+    directory above it as untrusted — and, when the project path goes through a symlink, its
+    resolved path and the directories above that too — so the project's `.codex/config.toml`
+    cannot add MCP servers or change any other setting even when you trusted the project in
+    Codex. This override was verified on Linux and macOS paths only; on Windows, Codex's
+    matching of drive letters, separators and UNC paths was not tested. Your own
     Codex config (`$CODEX_HOME/config.toml`, `~/.codex/config.toml` by default) and any
     system-managed config still load, MCP servers included. With
-    `reviewer.agent.codexSdk.path`, the SDK there must be 0.163.0 or newer.
+    `reviewer.agent.codexSdk.path` or an installed copy, the SDK must be 0.163.0 or newer (a
+    prerelease of 0.163.0 is refused). The CommonJS build cannot locate an installed copy's
+    version, so it needs `reviewer.agent.codexSdk.path`.
 - Both can read files outside the project: Claude Code when its auto-mode classifier judges the
   read safe (measured on 2026-10-17, it read `/etc/hostname` and searched `/home` when asked to),
   Codex because its read-only sandbox can read the whole disk. What it reads reaches the model
@@ -243,22 +249,23 @@ same System One API:
 }
 ```
 
-| Option                                  | Default                   | Description                                                                                                                                |
-| --------------------------------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| `reviewer.backend`                      | `"agent"`                 | `"agent"`, `"chat"` or `"decision"`                                                                                                        |
-| `reviewer.decision.provider`            | — (required)              | `"typesafe"` or `"cloudflare"`                                                                                                             |
-| `reviewer.decision.apiKey`              | from the environment      | TypeSafe AI API key, or a Cloudflare API token with Workers AI access                                                                      |
-| `reviewer.decision.baseURL`             | `https://api.typesafe.ai` | `typesafe` only: API origin; a bare HTTPS origin (HTTP only for loopback)                                                                  |
-| `reviewer.decision.accountId`           | from the environment      | `cloudflare` only: the 32-character account ID                                                                                             |
-| `reviewer.decision.model`               | per provider (above)      | Model or alias; pin a version such as `jev-1.14.0` for stable behavior                                                                     |
-| `reviewer.decision.minAllowProbability` | `0.6`                     | An `allow` answered with a lower probability becomes `escalate`                                                                            |
-| `reviewer.decision.maxStateTokens`      | `28000`                   | Estimated size above which an operation is too large to send (1,000–60,000)                                                                |
-| `reviewer.decision.longContext`         | off                       | `typesafe` only: `true` or `{ maxStateTokens, minAllowProbability }` to send larger operations with [long context](#long-context-typesafe) |
-| `reviewer.decision.onOversize`          | `"escalate"`              | Too large: `"escalate"` to a human, or hand it to the `"agent"` or `"chat"` reviewer                                                       |
-| `reviewer.agent.maxInputBytes`          | `200000`                  | The agent reviewer escalates a prompt longer than this (UTF-8 bytes) unsent rather than let the session compact it                         |
-| `reviewer.agent.runtime`                | `"opencode"`              | Where the agent reviewer runs: `"opencode"`, `"claude-agent-sdk"` or `"codex-sdk"` ([agent runtimes](#agent-runtimes))                     |
-| `reviewer.agent.claudeAgentSdk.path`    | —                         | `claude-agent-sdk` only: absolute path of the installed `@anthropic-ai/claude-agent-sdk` package directory                                 |
-| `reviewer.agent.codexSdk.path`          | —                         | `codex-sdk` only: absolute path of the installed `@openai/codex-sdk` package directory                                                     |
+| Option                                  | Default                   | Description                                                                                                                                             |
+| --------------------------------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `reviewer.backend`                      | `"agent"`                 | `"agent"`, `"chat"` or `"decision"`                                                                                                                     |
+| `reviewer.decision.provider`            | — (required)              | `"typesafe"` or `"cloudflare"`                                                                                                                          |
+| `reviewer.decision.apiKey`              | from the environment      | TypeSafe AI API key, or a Cloudflare API token with Workers AI access                                                                                   |
+| `reviewer.decision.baseURL`             | `https://api.typesafe.ai` | `typesafe` only: API origin; a bare HTTPS origin (HTTP only for loopback)                                                                               |
+| `reviewer.decision.accountId`           | from the environment      | `cloudflare` only: the 32-character account ID                                                                                                          |
+| `reviewer.decision.model`               | per provider (above)      | Model or alias; pin a version such as `jev-1.14.0` for stable behavior                                                                                  |
+| `reviewer.decision.minAllowProbability` | `0.6`                     | An `allow` answered with a lower probability becomes `escalate`                                                                                         |
+| `reviewer.decision.maxStateTokens`      | `28000`                   | Estimated size above which an operation is too large to send (1,000–60,000)                                                                             |
+| `reviewer.decision.longContext`         | off                       | `typesafe` only: `true` or `{ maxStateTokens, minAllowProbability }` to send larger operations with [long context](#long-context-typesafe)              |
+| `reviewer.decision.onOversize`          | `"escalate"`              | Too large: `"escalate"` to a human, or hand it to the `"agent"` or `"chat"` reviewer                                                                    |
+| `reviewer.agent.maxInputBytes`          | `200000`                  | The agent reviewer escalates a prompt longer than this (UTF-8 bytes) unsent rather than let the session compact it                                      |
+| `reviewer.agent.runtime`                | `"opencode"`              | Where the agent reviewer runs: `"opencode"`, `"claude-agent-sdk"` or `"codex-sdk"` ([agent runtimes](#agent-runtimes))                                  |
+| `reviewer.agent.cleanupSessions`        | `false`                   | `opencode` runtime on OpenCode 2.x only: delete each reviewer session after its decision ([session lifecycle](#reviewer-session-lifecycle-opencode-v2)) |
+| `reviewer.agent.claudeAgentSdk.path`    | —                         | `claude-agent-sdk` only: absolute path of the installed `@anthropic-ai/claude-agent-sdk` package directory                                              |
+| `reviewer.agent.codexSdk.path`          | —                         | `codex-sdk` only: absolute path of the installed `@openai/codex-sdk` package directory                                                                  |
 
 - Prefer the environment variables: `opencode.json` is often committed, and a key written there is
   shared with it. Surrounding whitespace in keys is trimmed. The plugin fails at startup when the
@@ -451,6 +458,11 @@ alone, and the plugin needs an API key of its own.
     nothing, and cached tokens count as read;
   - the task, the untrusted-data rule and the answer format are restated after the operation data.
 
+  With every backend, a reply that holds two verdicts carrying the check is refused. In a reply with
+  more than 40 opening or closing braces, which the parser does not search whole, the word
+  `verdict` (in any case) or the check appearing more than once, or any `\u` escape, is refused
+  the same way, so a brace-heavy answer that discusses verdicts in its reasoning goes to a human.
+
   A cut that keeps the start can still go unnoticed if it is under about two fifths of English
   prose, two thirds of code or JSON, or half of Japanese; size `maxInputBytes` to the server's
   context instead of relying on the guards.
@@ -461,6 +473,54 @@ alone, and the plugin needs an API key of its own.
   `opencode.json` could pair your own key variable with its own server.
 - The usage log records chat reviews with `provider: "chat"` and the token counts the endpoint
   reports; their cost is left unpriced, since it depends on the provider and model.
+
+### What reviewers receive
+
+Every backend reviews the same state: the request's `source` (`permission-request` or `tool-call`),
+the permission `action` or tool name, the `resource` (the permission request's patterns or
+resources and metadata, or the whole tool input — commands, file paths, file contents, patches),
+the latest user prompt as `userIntent`, and the [bounded conversation](#bounded-conversation-context-opt-in)
+when you enable it. The agent backend also sees whatever its read-only tools read from the
+workspace. That state goes to the reviewer's provider, so treat it as sent there.
+
+- **Credentials are redacted by default.** Before a review starts, every string in that state is
+  copied with credential values replaced by markers such as `[REDACTED]`: the `reviewer.decision` /
+  `reviewer.chat` API keys, complete private key blocks, URL passwords, well-known token formats
+  (GitHub, OpenAI, GitLab, TypeSafe), and a secret-shaped value after `Authorization:` /
+  `X-API-Key:` / `Bearer`, a `--password` / `--token`-style flag, or in a `*_KEY=` / `*_TOKEN=` /
+  `*_SECRET=` / `*_PASSWORD=`-style assignment. The tool OpenCode runs is never changed, and the
+  reviewer is told what the markers mean. Redaction is deliberately conservative so that crafted
+  text cannot hide a destination, a file or a command from the reviewer: a secret-shaped value is
+  one run of 16 or more letters, digits and `_+=-` (or a JWT), so nothing with a space, a quote,
+  shell syntax, `.`, `/`, `~`, `:` or `@` — no path, host or URL — is ever replaced, and
+  `SSH_AUTH_SOCK=` / `*_PATH=` values stay visible. A short password, a secret in another shape, an
+  SDK runtime's own key in the environment, or one the reviewer reads from a file still reaches
+  the provider, and so does a value in a variable the same text names again (`$NAME`,
+  `printenv NAME`), since it may decide what runs; token formats inside a path or file name stay
+  visible too. Strings over 262,144 characters are only checked for the API keys, private keys and
+  token formats. Add up to 50 regular expressions of up to 500 characters with
+  `reviewer.redact.patterns` (a match is replaced only when it is itself secret-shaped — 16 or more
+  of `[A-Za-z0-9_+=-]`, or a JWT — and a pattern that matches the empty string is rejected), or turn redaction off with `reviewer.redact.enabled: false` when the reviewer must see
+  the values. Like `instructions`, set `reviewer.redact` only in configuration you trust: a broad pattern
+  can hide what a reviewer should see.
+- **Size is bounded and fails closed.** An operation larger than `reviewer.agent.maxInputBytes`,
+  `reviewer.chat.maxInputBytes` or `reviewer.decision.maxStateTokens` is never sent in part; it
+  escalates to a human, or goes to the [fallback](#operations-too-large-for-the-decision-model)
+  you configured.
+- **Reviews in flight are capped.** At most `reviewer.maxConcurrentReviews` (default 4, 1–32)
+  reviews run at once; more wait for a free slot for up to `reviewer.timeoutMs` and then escalate.
+  The review itself is then bounded by `reviewer.timeoutMs` again, so a queued operation can take up
+  to twice that before it is decided. There is no spending cap: watch the cost
+  with [`stats`](#usage-and-cost-statistics) and your provider's own limits.
+
+```jsonc
+{
+  "reviewer": {
+    "maxConcurrentReviews": 2,
+    "redact": { "patterns": ["acct-[0-9]{12}"] },
+  },
+}
+```
 
 ### Usage and cost statistics
 
@@ -589,6 +649,77 @@ unknown or the operation is ambiguous, and your instructions can only argue agai
   what must still go to a human.
 - Like `instructions`, set it only in configuration you trust — not in a repository's
   `opencode.json` you have not reviewed.
+
+### Escalate rules (deterministic)
+
+`reviewer.instructions` are guidance a model may still get wrong, and an injected or misled reviewer
+can answer `allow` to anything. `escalate` lists operations that always go to a human: a matching
+operation is escalated **before any reviewer sees it**, with every backend and both plugin API
+generations. In `on-ask` mode the OpenCode prompt stays; in `all-tools` mode the tool is blocked
+with the matched rule as the reason. Rules are off by default.
+
+```jsonc
+{
+  "plugins": [
+    {
+      "package": "opencode-auto-approval-plugin",
+      "options": {
+        "escalate": [
+          // Publishing, pushing and destroying (`shell` on OpenCode 2.x, `bash` on 1.x)
+          { "action": "shell", "resource": "*git push*" },
+          { "action": "shell", "resource": "*npm publish*" },
+          { "action": "shell", "resource": "*rm -rf*" },
+          // Network access
+          { "action": "webfetch" },
+          { "action": "shell", "resource": "*curl *" },
+          // Credentials, by path
+          { "action": "*", "resource": "*.env" },
+          { "action": "*", "resource": "*.env.*" },
+          { "action": "*", "resource": "*id_rsa*" },
+        ],
+      },
+    },
+  ],
+}
+```
+
+- `action` is matched against the OpenCode permission action in `on-ask` mode and the tool name in
+  `all-tools` mode. The shell is `shell` on OpenCode 2.x and `bash` on 1.x; list both when one
+  configuration serves both. One permission action can cover several tools (`edit` covers `write`,
+  `apply_patch` and friends), so write path rules with `"action": "*"` when they must hold in both
+  modes.
+- `resource` is matched against string **values** — a permission request's resources, patterns
+  and metadata (except the diffs, patches and previews in it) and every string in a tool input, nested
+  values included —
+  each as a whole, line by line and word by word. Quotes and shell operators separate words, so
+  `*.env` catches `cat ".env"`, `cat .env | head` and `$(cat .env)`. Two exceptions, for built-in
+  tools only: what `write`, `edit` and `multiedit` write (`content`, `oldString`, `newString`) is
+  not matched, so a path rule does not fire on code that mentions `process.env`, and the
+  `patchText` of `apply_patch` / `patch` is matched through the file paths its `*** Add File:` /
+  `Update File:` / `Delete File:` / `Move to:` headers name. Every other tool, MCP tools included,
+  has all its strings matched, contents too. Object keys, numbers and booleans are not matched. A
+  rule without `resource` matches every operation of its action. An operation more than 16 levels
+  deep, with more than 10,000 strings or more than a million characters to match (counting each
+  distinct whole string, line and word) escalates under any rule for its action.
+- Patterns use OpenCode's wildcards: `*` matches anything (including nothing), `?` one character,
+  and the whole string must match, so `git push *` matches `git push` and `git push origin` but not
+  `cd repo && git push` as a whole `all-tools` command; write `*git push*` to catch it anywhere.
+  (In `on-ask` mode OpenCode already splits a command line into its commands, so a pattern never
+  spans `&&`.) A trailing ` *` also matches the
+  bare command. Matching ignores case, shell line continuations and runs of whitespace, in patterns
+  and values alike. It never goes through a regular expression, so it cannot backtrack: the cost
+  grows with the value's and the pattern's length. Paths may arrive relative to the project in
+  `on-ask` mode (`.env`) and absolute in `all-tools` mode, so start path patterns with `*`.
+- The first matching rule, in configuration order, is the one reported. Escalations from a rule
+  are written to the [audit log](#audit-log-opt-in) like any verdict. At most 200 rules; an
+  `action` is at most 200 characters and a `resource` at most 1,000.
+- Rules are a deterministic floor, not a sandbox. A shell command can spell the same thing many
+  ways (`g""it push`, a variable, a script file, an alias) and a URL can be percent-encoded, which
+  no pattern lists. In `on-ask` mode a rule only sees what OpenCode already asks about. The
+  reviewer's own read-only session is not checked against the rules. Keep OpenCode `deny`
+  permissions for what must never run; they stay authoritative whatever the reviewer says.
+- With `allToolsNativeAsks: "review"`, a same-action native ask is answered from the reviewed call,
+  which the rules already checked; its own resources are not matched again.
 
 ### Audit log (opt-in)
 
@@ -720,31 +851,52 @@ native asks with `allToolsNativeAsks: "review"`:
 ```
 
 The default is `"preserve"`; it is deliberately **not** enabled during upgrades.
-This option does not change V1 behavior. Reviewers still cannot bypass an
+`"review"` is rejected at startup with `mode: "on-ask"` and on OpenCode 1.x, where
+it would have no effect. Reviewers still cannot bypass an
 explicit native `deny`, and an AI `deny` or `escalate` always blocks the
 tool call. Native asks for the same reviewed tool call are scoped to its
 session, agent, message and invocation, automatically expire after 45 seconds,
 and are revoked when the user prompts the root session again.
 
+With the option on, the reviewer also answers the explicit `ask` rules you
+configured yourself (for example `"git push *": "ask"`) for reviewed calls; those
+no longer reach you once the call's review allows it.
+
 Only the native action matching the already reviewed tool is granted without
-another review. Extra actions, particularly `external_directory` with its
+another review. Its resources are **not** compared with the reviewed input: a
+custom or MCP tool that asks for its own action with resources it resolves at run
+time gets those resources allowed on the strength of the input review. Extra
+actions, particularly `external_directory` with its
 resolved path, receive a separate review that can approve or deny the actual
 resources. Failed or escalated extra reviews are denied without an interactive
 prompt. This may cost an additional model call.
 
-Other plugins and core hooks may mutate a tool's input after the reviewer's
-`execute.before` hook. The plugin detects such changes in `execute.after`
-when this option is enabled, but this detection occurs **after execution** and
-is not a hard security boundary. Use only with trusted plugins and hooks.
+Other plugins and core hooks may mutate a tool's name or input after the
+reviewer's `execute.before` hook. The plugin blocks a call that changed while it
+was being reviewed, and before granting a native ask it checks that the call still
+matches what was reviewed; a changed call leaves the ask to a human. These checks
+rely on later hooks changing the same event object that OpenCode then runs. A
+change made after the review and after the last native ask (or in a call that
+raises no native ask) is only detected in `execute.after`, **after execution**: the plugin then throws,
+but the plugin API does not define what OpenCode does with that error, and the
+tool has already run. This is not
+a hard security boundary. Use only with trusted plugins and hooks. Native asks
+granted this way are not written to the [audit log](#audit-log-opt-in).
+
+This option assumes OpenCode runs `tool.execute.before` before the tool's native
+permission check, as OpenCode 2.x core does. On a host that checks first, the
+grant does not exist yet and the native ask stays with a human.
 
 ### Review modes
 
-| Mode               | Reviewed operations                                           | `allow`                   | `deny`                               | `escalate` / reviewer failure                             |
-| ------------------ | ------------------------------------------------------------- | ------------------------- | ------------------------------------ | --------------------------------------------------------- |
-| `on-ask` (default) | Only operations that OpenCode already decided should ask      | Approves the request once | Leaves the OpenCode approval pending | Leaves the OpenCode approval pending                      |
-| `all-tools`        | Every intercepted tool call, including OpenCode-allowed calls | Runs the tool             | Blocks the tool                      | Blocks the tool and reports that human review is required |
+| Mode                                                 | Reviewed operations                                           | `allow`                                              | `deny`                               | `escalate` / reviewer failure                             |
+| ---------------------------------------------------- | ------------------------------------------------------------- | ---------------------------------------------------- | ------------------------------------ | --------------------------------------------------------- |
+| `on-ask` (default)                                   | Only operations that OpenCode already decided should ask      | Approves the request once                            | Leaves the OpenCode approval pending | Leaves the OpenCode approval pending                      |
+| `all-tools`                                          | Every intercepted tool call, including OpenCode-allowed calls | Runs the tool                                        | Blocks the tool                      | Blocks the tool and reports that human review is required |
+| `all-tools` with `allToolsNativeAsks: "review"` (V2) | Every intercepted tool call, plus the native asks it raises   | Runs the tool and answers its same-action native ask | Blocks the tool                      | Blocks the tool; an extra native action is denied         |
 
-On OpenCode 2.x, `on-ask` runs inside the `permission.evaluate` hook: an `allow` verdict turns the
+On OpenCode 2.x, `on-ask` (and `all-tools` with `allToolsNativeAsks: "review"`, for the native asks
+of reviewed calls only) runs inside the `permission.evaluate` hook: an `allow` verdict turns the
 pending `ask` into `allow` before the permission prompt is shown, and the reviewer's reason is
 attached as the permission message. On OpenCode 1.x the plugin listens for the permission bus
 event and replies `once` through the SDK. In both cases anything other than `allow` leaves

@@ -2,7 +2,7 @@
 
 Markdown doc viewer side panel for the OpenCode TUI, with line numbers and GitHub-style range copying.
 
-Requires OpenCode 2.x.
+Requires OpenCode 2.1 or later.
 
 ## Install
 

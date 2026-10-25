@@ -7,7 +7,8 @@
 
 If you keep reminding your agent to use typed errors, decode with Schema, or
 check the current API, this plugin gives those reminders a permanent home in
-OpenCode V2. It includes Effect guidance and skills the agent can consult while
+OpenCode V2 and Claude Code. One package serves both from the same guidance,
+skills, and patterns. It includes Effect guidance and skills the agent can consult while
 working, plus checks that send common mistakes back for correction after edits.
 
 ## How it helps
@@ -24,16 +25,19 @@ services, streams, HTTP, SQL, React, AI, and more.
 TypeScript and TSX mistakes and return correction advice and relevant skill
 suggestions to the agent for its next turn.
 
-Checks run after successful `write`, `edit`, `patch`, and `apply_patch` calls.
-Edits and patches are checked only in newly added text; full-file writes and new
+Checks run after successful file writes, edits, and patches. Edits and patches are checked only in newly added text; full-file writes and new
 files are checked in full. Feedback asks the agent to fix valid findings or
 explain intentional exceptions. Checks are advisory and do not block writes.
 
-The bundled guidance and skills target **Effect `4.0.0` (stable)**.
-See the [rc.116 → 4.0.0 migration audit](docs/effect-4.0.0.md)
-and [complete upstream release notes](docs/effect-4.0.0-changelog.md).
+The bundled guidance and skills target **Effect `4.0.6` (stable)**.
+See the [4.0.0 → 4.0.6 migration audit](docs/effect-4.0.6.md)
+and [complete upstream release notes](docs/effect-4.0.6-changelog.md).
+The previous [rc.116 → 4.0.0 audit](docs/effect-4.0.0.md) and
+[release notes](docs/effect-4.0.0-changelog.md) remain available as history.
 
 ## Install
+
+### OpenCode
 
 Add the plugin to `opencode.jsonc` in your project, or
 `~/.config/opencode/opencode.jsonc` for all projects:
@@ -46,6 +50,48 @@ Add the plugin to `opencode.jsonc` in your project, or
 ```
 
 Start a new session. OpenCode installs the package automatically.
+
+### Claude Code
+
+```text
+/plugin install effect-enforcer --marketplace mpsuesser/opencode-effect-enforcer
+```
+
+Or add the marketplace first, then install:
+
+```sh
+claude plugin marketplace add mpsuesser/opencode-effect-enforcer
+claude plugin install effect-enforcer@effect-enforcer
+```
+
+To work from a local checkout, run `claude plugin marketplace add
+/path/to/opencode-effect-enforcer`. A local marketplace loads in place, so
+edits take effect after `/reload-plugins`. For a one-off session, run
+`claude --plugin-dir /path/to/opencode-effect-enforcer`.
+
+The hooks require Node.js 20 or newer, with `npm`, on `PATH`. In the first
+session, the plugin installs the `@ast-grep/napi` native binding into its
+Claude Code data directory, because installed plugin copies omit
+`node_modules`. If that install fails, regex-based checks still run, and the
+session context notes that AST-based checks are disabled.
+
+To turn the plugin off for one project, run
+`claude plugin disable effect-enforcer@effect-enforcer --scope project`.
+
+### How the two hosts differ
+
+The guidance, skills, and patterns are shared. Only delivery differs:
+
+| | OpenCode | Claude Code |
+| --- | --- | --- |
+| Guidance | Added to the system prompt before every model call | Added in full at session start, after `/clear`, and after compaction. It is split into labeled parts because each hook output is limited to 10,000 characters |
+| Skills | Native skill tool, as `effect-*` | Plugin skills, as `effect-enforcer:effect-*` |
+| Patterns | After `write`, `edit`, `patch`, and `apply_patch` | After `Write`, `Edit`, and `MultiEdit` |
+| Opt-out | Per agent, with `"opencode-effect-enforcer": false` | Per project, with `claude plugin disable` |
+
+Claude Code feedback is limited by the same 10,000-character cap. When several
+patterns match, the most severe findings include their guidance inline. The
+rest point to their pattern files.
 
 ## Explore what's included
 

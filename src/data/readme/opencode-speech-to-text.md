@@ -1,5 +1,22 @@
 # opencode-speech-to-text
 
+> [!IMPORTANT]
+> **This project is no longer maintained.** The plugin keeps working as it
+> is, but it won't get updates or fixes, and issues and pull requests won't be
+> reviewed. Very good speech-to-text tools now exist, so there's no need for
+> another one.
+>
+> **Try these instead:**
+>
+> - **[Simple Voice](https://github.com/yuyudhan/simple-voice)** — our free,
+>   open-source macOS dictation app. It works in every app, including
+>   opencode, runs on-device by default and sends no data. Install:
+>   `curl -fsSL https://github.com/yuyudhan/simple-voice/releases/latest/download/install.sh | bash`
+> - **[FluidVoice](https://github.com/altic-dev/FluidVoice)** — open-source
+>   macOS dictation with on-device speech-to-text.
+> - **[Wispr Flow](https://wisprflow.ai)** — a polished commercial dictation
+>   app for macOS, Windows and iOS.
+
 Push-to-talk speech-to-text for [opencode](https://opencode.ai) —
 record with **Ctrl+'**, transcribe with Groq Whisper, and drop the
 cleaned text straight into your prompt.

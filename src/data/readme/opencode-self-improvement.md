@@ -50,6 +50,33 @@ LLMs waste a lot of tokens reading and re-reading your code and asking you for c
 - Automatically looks for insights when you complete the verification gates (tests, linting, etc)
 - Always defaults to memories first before sending a prompt to the LLM, which saves tokens! 
 
+## Secret redaction
+
+`src/secrets.ts` provides one best-effort credential rule set. It runs over the
+auto-capture prompt before that prompt leaves the plugin, at the write gate
+before content is hashed or analysed, and again in `appendMemory`, the final
+write choke point used by gated writes and the viewer's edit/restore-entry
+paths. Credential-shaped values in memory content become `[redacted]`.
+Credential-shaped `scope`, `tags`, or `issue` metadata is rejected instead of
+being silently rewritten.
+
+The rules cover OpenAI `sk-` tokens; GitHub `ghp_`, `gho_`, and `github_pat_`
+tokens; Slack `xoxb-` and `xoxp-` tokens; AWS `AKIA` access-key IDs; Google
+`AIza` API keys; bearer tokens containing digits; PEM private-key blocks; and
+high-entropy values assigned to names ending in `_KEY`, `_TOKEN`, `_SECRET`,
+or `_PASSWORD` (plus `password`). This is deliberately best-effort, not a
+guarantee: it can miss hex-only secrets, passwords with few character classes,
+and credentials written in prose without an assignment.
+
+`memory_remember` still replies `Remembered` when content was redacted, so the
+stored text can differ from what was sent. Redaction is forward-only: existing
+stores are not scrubbed, and `memory_export` writes whatever is already stored
+verbatim. See [issue #74](https://github.com/abogartz/opencode-self-improvement/issues/74)
+for the separate existing-store work.
+
+Auto-capture is off by default, so capture-prompt redaction protects opt-in
+installs. The write-gate and `appendMemory` checks apply to every install.
+
 ## Token cost, on purpose
 
 Memory plugins have a reputation for burning tokens and busting the provider's
@@ -65,8 +92,10 @@ prompt cache on every message. This one is built the other way around:
   queries (one or two words — a deliberate search) need only one. Injection
   stays quiet on single-word coincidences, which `memory_recall` still
   reaches on the pull path — rare and right beats frequent and maybe.
-- **Hard character budget.** The block is capped at 1200 characters by default
-  (see Options) and trimmed at whole-memory boundaries — never cut mid-sentence.
+- **Hard character budgets.** The relevance block and each contextual pull are
+  capped at 1200 characters by default; the session-start open-threads frontier
+  has its own 3600-character cap (see Options). All are trimmed at whole-memory
+  boundaries — never cut mid-sentence.
 - **Evidence is never injected**, and the standing system digest is two lines.
 - **Receipts, not promises.** The plugin measures your session's actual
   prompt-cache usage (from each turn's `tokens.cache` accounting) and shows it
@@ -196,6 +225,10 @@ Opencode installs the package (and its dependencies) automatically with Bun at
 startup. Quit and restart opencode; the plugin loads and `/repo-init` installs
 itself. Nothing else to do.
 
+The plugin runs on the Bun embedded in your opencode build; if that Bun is
+older than 1.3.0 (this repo's tested floor) the plugin says so once at startup
+and memory features may misbehave.
+
 An unpinned entry resolves `@latest` exactly once and is never re-resolved
 afterwards, so updates are deliberate: `opencode plugin update
 opencode-self-improvement`. To install a specific release, append
@@ -263,13 +296,14 @@ the plugin entry in `opencode.json(c)` instead of the plain string:
 
 ```json
 {
-  "plugins": [{ "package": "opencode-self-improvement", "options": { "injectBudget": 1200 } }]
+  "plugins": [{ "package": "opencode-self-improvement", "options": { "injectBudget": 1200, "frontierBudget": 3600 } }]
 }
 ```
 
 | Option | Default | What it does |
 | --- | --- | --- |
-| `injectBudget` | `1200` | Character cap on the injected relevance block, trimmed at whole-memory boundaries. Env fallback: `OPENCODE_MEMORY_INJECT_BUDGET`. |
+| `injectBudget` | `1200` | Character cap on the injected relevance block and each contextual pull; trimmed at whole-memory boundaries. Env fallback: `OPENCODE_MEMORY_INJECT_BUDGET`. |
+| `frontierBudget` | `3 × injectBudget` (`3600` by default) | Character cap on the session-start open-threads block. A thread longer than this budget is not injected and is visibly reported as omitted; raise this option (or `OPENCODE_MEMORY_FRONTIER_BUDGET`) to include longer planning threads. |
 | `autoCapture` | `false` (off) | When on, each session-idle event makes one cheap model pass that proposes memory candidates. Every candidate still goes through the 4-gate write pipeline — capture can never bypass the gates. Off by default: the zero-token install stays zero-token. |
 | `captureModel` | — | `"provider/id"` model used for auto-capture. Required when `autoCapture` is on; a missing or invalid value disables capture with a startup warning. |
 | `captureMax` | `3` | Maximum candidates proposed per idle event. |
@@ -302,6 +336,8 @@ Run `/repo-init` once in every repo you work in. It:
 Ongoing use is just the memory tools. Ask the agent to remember something and it
 sticks across sessions; check what's stored with `memory_list`, refine with
 `memory_update`, retract with `memory_forget`, roll back with `memory_undo`.
+`memory_undo` only lists and restores its own `<stamp>-YYYY-MM-DD.logfmt`
+snapshots; any other file in `snapshots/` is ignored.
 
 `memory_update` takes a `query` that picks the row: its id, a clock fragment such
 as `00:11:25.867`, or a unique substring of its text. Omit it to update the newest
@@ -347,15 +383,23 @@ and the tool reports a tally of outcomes per line —
 | `collapsed` | near-duplicate of an existing memory; nothing written |
 | `blocked` | rejected by a gate; reason is in `memory_evidence` |
 | `skipped` | malformed line; never reaches the gates |
-| `downgraded` | `status:"open"` without an export header to vouch for it; imported as settled |
+| `downgraded` | `status:"open"` without an export header to vouch for it, claiming `repo:"global"`, or carrying an unverifiable stamp when the importing session has no repo scope; imported as settled |
 
 The frontier policy matters because an open row is exempt from ref grounding:
 a hand-written JSONL can't hand its rows that free pass (the header is
 friction, not a signature — the real defense is that imported content always
-injects framed as data and marked `[via import]`).
+injects framed as data and marked `[via import]`). Even with a header, an
+imported open row claiming `repo:"global"` is downgraded, so one file can't add
+an open thread to every repo. Imported `repo` and `repoPath` stamps are honored
+only when they match the importing session's current repo (an explicit
+`repo:"global"` on a settled row is kept); foreign stamps are discarded and the
+row is stamped for the importing repo instead. When there is no current repo
+scope, stamps are kept as they are (dropping them would widen the row to
+global) and a stamped open row is downgraded, since its stamp can't be verified.
 
-so re-running the same import is a no-op (everything collapses). Copying an
-export to a fresh machine is how you seed a new laptop from an old one.
+So re-running the same import in the same repo is a no-op (everything
+collapses). Copying an export to a fresh machine and importing it from that
+repo is how you seed a new laptop from an old one.
 
 ## Memory at a glance
 

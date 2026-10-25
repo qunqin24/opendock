@@ -210,6 +210,7 @@ following OpenCode's directory discovery. See
 - **[OpenCode Go Preset](docs/opencode-go-preset.md)** — runs the agents on OpenCode Go models; enables the Observer agent for visual analysis since its orchestrator model isn't multimodal.
 - **[Author's Preset](docs/authors-preset.md)** — the exact config the author runs day to day, with third-party skills.
 - **[$30 Preset](docs/thirty-dollars-preset.md)** — a mixed-provider setup built around Codex Plus and GitHub Copilot Pro for about $30/month.
+- **[$40 Preset](docs/forty-dollars-preset.md)** — a dual-subscription setup pairing Claude Pro and ChatGPT Plus for about $40/month.
 
 ### For Alternative Providers
 
@@ -271,7 +272,7 @@ If any agent fails to respond, check your provider authentication and config fil
   </tr>
   <tr>
     <td colspan="2">
-      <b>Recommended Models:</b> <code>claude-fable-5</code> <code>claude-opus-4-8</code> <code>glm-5.2</code> <code>gpt-6-sol</code> <code>mimo-v2.5</code> <code>minimax-m3</code> <code>qwen3.7-plus</code>
+      <b>Recommended Models:</b> <code>claude-opus-5-5</code> <code>gemini-4-argon</code> <code>claude-fable-5.1</code> <code>glm-5.3</code> <code>mimo-v2.6</code> <code>minimax-m3.1</code> <code>qwen3.8-plus</code>
     </td>
   </tr>
   <tr>
@@ -312,7 +313,7 @@ If any agent fails to respond, check your provider authentication and config fil
   </tr>
   <tr>
     <td colspan="2">
-      <b>Recommended Models:</b> <code>deepseek-v4-flash</code> <code>gpt-5.3-codex</code>
+      <b>Recommended Models:</b> <code>gpt-6-luna</code> <code>deepseek-flash</code>
     </td>
   </tr>
   <tr>
@@ -353,7 +354,7 @@ If any agent fails to respond, check your provider authentication and config fil
   </tr>
   <tr>
     <td colspan="2">
-      <b>Recommended Models:</b> <code>claude-fable-5</code> <code>claude-opus-4-8</code> <code>deepseek-v4-pro</code> <code>glm-5.2</code> <code>gpt-6-astra</code> <code>qwen3.7-max</code>
+      <b>Recommended Models:</b> <code>gpt-6-astra</code> <code>claude-opus-5-5</code> <code>claude-fable-5.1</code> <code>kimi-k3.1</code> <code>deepseek-flash</code> <code>glm-5.3</code> <code>qwen3.8-max</code>
     </td>
   </tr>
   <tr>
@@ -443,7 +444,7 @@ If any agent fails to respond, check your provider authentication and config fil
   </tr>
   <tr>
     <td colspan="2">
-      <b>Recommended Models:</b> <code>gemini-3.5-flash</code> <code>kimi-k2.7-code</code> <code>minimax-m3</code>
+      <b>Recommended Models:</b> <code>claude-opus-5-5</code> <code>gemini-4-argon</code> <code>gemini-3.8-flash</code> <code>kimi-k2.7-code</code> <code>minimax-m3.1</code>
     </td>
   </tr>
   <tr>
@@ -484,7 +485,7 @@ If any agent fails to respond, check your provider authentication and config fil
   </tr>
   <tr>
     <td colspan="2">
-      <b>Recommended Models:</b> <code>claude-sonnet-4-6</code> <code>deepseek-v4-flash</code> <code>gpt-6-luna</code> <code>kimi-k2.7-code</code>
+      <b>Recommended Models:</b> <code>gpt-6.1-sol</code> <code>claude-opus-5-5</code> <code>deepseek-flash</code>
     </td>
   </tr>
   <tr>

@@ -38,7 +38,8 @@ prompt again.
 OpenCode's own [`subagent` tool](https://opencode.ai/v2/docs/agents) hands back a child's final
 answer. Use it when one result is all you need. Use courier for more:
 
-- **Messages mid-run.** A child reports progress or asks its parent at any time.
+- **Messages mid-run.** A child reports progress or asks its parent at any time, and its parent
+  passes a finding that changes the other parts on to the children it affects.
 - **Waking an idle session.** A message, a schedule or a GitHub webhook starts a new turn.
 - **Parallel edits.** `isolate: true` gives a child its own git worktree and branch to merge.
 - **Asks reach you.** A child's permission requests and questions come to you through the top
@@ -97,9 +98,9 @@ Set the server options on the plugin's entry in the **global** config,
 
 | Option | Default | |
 |---|---|---|
-| `maxDepth` | `3` | How deep a tree goes. Your session is depth 0. A session at `maxDepth` cannot start sessions. |
+| `maxDepth` | `5` | How deep a tree goes. Your session is depth 0. A session at `maxDepth` cannot start sessions. |
 | `maxChildren` | `5` | Live children one session may have. |
-| `maxTotal` | `20` | Live spawned sessions in one tree. |
+| `maxTotal` | `30` | Live spawned sessions in one tree. |
 | `memory` | `true` | Keep a record of each session tree for later orchestrators ([memory](docs/reference.md#memory)). |
 | `nativeChildren` | `false` | Create non-isolated children as OpenCode subagents ([native children](docs/reference.md#native-child-sessions)). |
 | `webhook` | off | Start the webhook receiver ([webhooks](docs/reference.md#webhooks)). |
@@ -143,6 +144,9 @@ More: [in the terminal](docs/reference.md#in-the-terminal).
 - Choose a web search provider before children search, or the first one shows you a form.
 - Use `isolate: true` when children edit files in parallel. The worktree starts from the last
   commit, so keep providers in the global config or commit `opencode.json`.
+- To steer a running tree, open a child from the `/courier tree` panel, tell it what you found and ask
+  it to pass that to its parent, or message the parent directly
+  ([details](docs/reference.md#steering-a-running-tree)).
 - For a long-running child, schedule a `courier_later` check-in, in case the server stops.
 
 ## Contributing

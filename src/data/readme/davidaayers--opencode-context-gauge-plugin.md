@@ -3,9 +3,11 @@
 An [OpenCode](https://opencode.ai) TUI sidebar plugin that shows a live context-window usage gauge for the active session.
 
 ```text
-🧠 ████████▋░░░░░░░░░░░░ 43%
+🧠 ██████████▍░░░░░░░░░░░░░  43%
 18.4k / 200k · 💰 $0.53
 ```
+
+The default gauge row occupies 32 terminal cells, matching the Codex and Go usage plugins. The bar uses 24 cells and the percentage reserves four cells so its right edge stays aligned. Custom `label` or `barWidth` options can change the total width.
 
 ## OpenCode compatibility
 
@@ -80,7 +82,7 @@ Pass options using the object form in global `~/.config/opencode/cli.json`. The 
 | Option     | Type              | Default | Description                                                                |
 | ---------- | ----------------- | ------- | -------------------------------------------------------------------------- |
 | `label`    | `string \| false` | `"🧠"`  | Gauge label; set to `false` to hide                                        |
-| `barWidth` | `number`          | `20`    | Bar width in cells (clamped 4–60)                                          |
+| `barWidth` | `number`          | `24`    | Bar width in cells (clamped 4–60); overrides the default aligned layout     |
 | `warnAt`   | `number`          | `70`    | Percent at which the bar switches to the warning color                     |
 | `dangerAt` | `number`          | `90`    | Percent at which the bar switches to the danger color (clamped > `warnAt`) |
 | `showCost` | `boolean`         | `true`  | Show session cost after token counts                                       |

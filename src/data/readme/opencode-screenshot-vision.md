@@ -34,17 +34,17 @@ This is a parallel project built for learning, not a competitor claiming to repl
 
 ## How it works
 
-The plugin registers three things when opencode starts:
+The plugin registers three things when opencode starts (OpenCode 2 plugin API):
 
-1. A `vision` tool the model can call.
+1. A `vision` tool the model can call, added with `ctx.tool.transform`.
 2. A `tool.execute.after` hook that captures the image whenever a browser screenshot tool runs.
-3. A `chat.message` hook that captures pasted/dropped images from incoming messages.
+3. A `session.prompt` hook that captures pasted/dropped images from incoming prompts.
 
 ### The three flows
 
-**Browser MCP (inline).** When a [Browser MCP](https://browsermcp.io) server captures a screenshot, the image is returned inline in the tool result (`{ content: [{ type: "image", ... }] }`) — it never touches disk. The `tool.execute.after` hook captures it in memory, and calling `vision` with no arguments describes the most recent captured screenshot.
+**Browser MCP (inline).** When a [Browser MCP](https://browsermcp.io) server captures a screenshot, the image is returned inline in the tool result (`{ type: "file", uri: "data:image/png;base64,…" }`) — it never touches disk. The `tool.execute.after` hook captures it in memory, and calling `vision` with no arguments describes the most recent captured screenshot.
 
-**Pasted / dropped image.** A pasted or dropped image arrives as a file part on the incoming message. The `chat.message` hook captures it, and calling `vision` with no arguments describes it. (The auto-transparent packages do this without the manual call.)
+**Pasted / dropped image.** A pasted or dropped image arrives as a file attachment on the incoming prompt. The `session.prompt` hook captures it, and calling `vision` with no arguments describes it. (The auto-transparent packages do this without the manual call.)
 
 **File on disk (any tool).** When a screenshot is saved as a file — by Playwright, Selenium, Puppeteer, Cypress, or anything else — the model calls `vision` with a `path` argument. The plugin reads and validates that file directly.
 
@@ -65,18 +65,19 @@ The chain is resolved at runtime, and its order is configurable via `OPENCODE_VI
 
 ### Auto-skip when the main model has vision
 
-The plugin reads the active model's `capabilities.input.image` from every request. With
-`OPENCODE_VISION_AUTO_MODE=auto` (the default), an incoming image is **not** auto-described
-when the main model can already see images — no backend inference runs. Set the mode
+The plugin reads the active model's `capabilities.input` from every model request. When it
+includes `image`, and `OPENCODE_VISION_AUTO_MODE=auto` (the default), an incoming image is
+**not** auto-described — no backend inference runs. Set the mode
 explicitly to `append`/`replace` to force auto-description, or `off` to disable it entirely.
 
 ### Discovered backends
 
 The vision backends are no longer only the hardcoded local + Zen chain. On the first vision
-call, the plugin lists the configured providers and uses every model with image capability,
-ordered local-first, then free, then by cost. The local/`OPENCODE_VISION_LOCAL_MODEL` pin is
-always tried first. Zen free and paid remain the guaranteed final fallback. The candidate
-list is cached for 10 minutes and refreshed after a total failure.
+call, the plugin lists the configured models and their providers and uses every model whose
+`capabilities.input` includes `image`, ordered local-first, then free, then by cost. The
+local/`OPENCODE_VISION_LOCAL_MODEL` pin is always tried first. Zen free and paid remain the
+guaranteed final fallback. The candidate list is cached for 10 minutes and refreshed after a
+total failure.
 
 ### Privacy: keep screenshots local
 
@@ -92,7 +93,7 @@ With `local`, only the `OPENCODE_VISION_LOCAL_MODEL` pin and discovered local mo
 
 ## Requirements
 
-- [OpenCode](https://opencode.ai) (the plugin loads at startup).
+- [OpenCode](https://opencode.ai) 2.x — this release targets the V2 plugin API. On OpenCode 1.x, stay on `opencode-screenshot-vision@1`.
 - **Local tier:** any OpenAI-compatible runtime — [Ollama](https://ollama.com), [LM Studio](https://lmstudio.ai), a llama.cpp server, or vLLM — with a vision-capable model. Example for Ollama (default model `gemma4:e4b`):
 
   ```sh
@@ -109,27 +110,31 @@ With `local`, only the `OPENCODE_VISION_LOCAL_MODEL` pin and discovered local mo
 Easiest — from inside opencode's CLI:
 
 ```sh
-opencode plugin opencode-screenshot-vision        # project
-opencode plugin -g opencode-screenshot-vision     # global
+opencode plugin add opencode-screenshot-vision
 ```
 
-This installs the npm package and updates the config for you. Restart opencode afterwards.
+This installs the npm package and adds it to your global config (`~/.config/opencode/opencode.json`). Restart opencode afterwards.
 
-Or add it to `opencode.json` manually:
+Or add it to `opencode.json` manually — global, or a project-level `opencode.json` to enable it in one project only:
 
 ```jsonc
 {
-  "plugin": ["opencode-screenshot-vision"]
+  "plugins": ["opencode-screenshot-vision"]
 }
 ```
 
-Then restart opencode. npm plugins are installed automatically at startup.
+Pin the major if you want to stay on the OpenCode 2 API: `"opencode-screenshot-vision@2"`. Then restart opencode. npm plugins are installed automatically at startup, so a global `npm i -g` is not needed.
 
-Alternatively, copy the plugin file into a project's `.opencode/plugins/` directory:
+Alternatively, for local development, drop a plugin directory into the project: rename
+`vision.ts` to `index.ts` and keep the two helper modules beside it.
 
 ```sh
-cp vision.ts <project>/.opencode/plugins/vision.ts
+mkdir -p <project>/.opencode/plugins/screenshot-vision
+cp vision.ts <project>/.opencode/plugins/screenshot-vision/index.ts
+cp backend-discovery.ts main-model-capability.ts <project>/.opencode/plugins/screenshot-vision/
 ```
+
+The directory must be able to resolve `@opencode/plugin` (`bun add @opencode/plugin` in the project).
 
 Either way, restart opencode or start a new session. Plugins load at startup.
 
@@ -251,6 +256,7 @@ bun test
 - `main-model-capability.test.ts` — vision-capability detection and per-session tracking.
 - `backend-discovery.test.ts` — discovery filtering, ordering, env pin, TTL cache, edge cases.
 - `vision.integration.test.ts` — the three capture flows (file, browser-screenshot, pasted image), `vision()` no-args, auto-skip with a vision model, path validation, prompt transmission.
+- `fake-context.ts` — a minimal V2 plugin context that records the registrations, so tests and the smoke script drive the real plugin `setup` without a running server.
 
 **Live smoke** against the local vision backend (Ollama), exercising the capture flows end-to-end with real inference:
 

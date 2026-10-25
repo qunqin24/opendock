@@ -1,13 +1,13 @@
 # opencode-tetris-battle
 
-Multiplayer Tetris Battle for the OpenCode TUI.
+Multiplayer Tetris Battle for the OpenCode 2 TUI. Version 1.x targets OpenCode 1.x.
 
 Play side-by-side terminal Tetris with live opponent boards, garbage attacks, private room codes, and quick matchmaking. The game uses a hosted Convex backend for rooms, reactive board sync, attacks, and match results.
 
 ## Install
 
 ```sh
-opencode plugin opencode-tetris-battle@latest --global
+opencode plugin add opencode-tetris-battle@latest
 ```
 
 Restart OpenCode, then run:
@@ -19,7 +19,7 @@ Restart OpenCode, then run:
 ## Upgrade
 
 ```sh
-bunx opencode-tetris-battle upgrade
+opencode plugin update opencode-tetris-battle
 ```
 
 Restart your OpenCode TUI session afterwards.
@@ -93,8 +93,12 @@ The plugin works out of the box with the public hosted Tetris Battle backend.
 ```sh
 bun install
 bun run typecheck
+bun run test
+bun run build
 bunx convex dev --once --typecheck=disable
 ```
+
+To load a local checkout, build it and add the checkout directory to `plugins` in `~/.config/opencode/cli.json`.
 
 ## License
 
