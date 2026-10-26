@@ -104,6 +104,23 @@ In a repository with no `.opencode/context/` yet, the first session builds it in
 the background; `/context-init` forces it, and [Context map](#context-map)
 explains what it is for.
 
+## Feedback
+
+The feedback path has no telemetry and no analytics — it sends nothing anywhere
+— but I would still like to hear from you.
+
+- **Bug or feature request?** [Open an issue](https://github.com/lawaty/lacode/issues).
+- **Question, or want to say how you use it?** [Start a discussion](https://github.com/lawaty/lacode/discussions).
+- **Found it useful?** A ⭐ on [the repo](https://github.com/lawaty/lacode) helps
+  other people find it.
+
+`lacode feedback` prints both links. The one-time hint that points at the issue
+tracker is opt-out: set `feedbackHint: false` in the plugin options, or
+`LACODE_NO_FEEDBACK_HINT=1` in the environment. It is shown at most once, only
+when there is a TUI to show it in; piped, CI and test runs leave the flag
+untouched. A toast that fails does not consume the note, so a later interactive
+run can still show it.
+
 ## Configure
 
 Plugin options are a tuple — the package name, then an options object. Every
@@ -133,6 +150,7 @@ option is optional:
 | `reapMs` | `30000` | Hang-reaper interval. |
 | `probeMs` | `900000` | How often benched models are checked by actually using them. `0` turns the periodic check off and leaves the `pool_recheck` tool as the only way to ask. |
 | `selfUpdate` | `true` | Check for a newer release at most once per ~6h and install it in the background; it applies on the next opencode start. `false` — or `LACODE_NO_SELFUPDATE=1` — turns the check off. |
+| `feedbackHint` | `true` | Show the one-time feedback note on the first interactive run. `false` — or `LACODE_NO_FEEDBACK_HINT=1` — turns it off. The flag lives in `~/.local/share/opencode/lacode/feedback.json`; nothing is sent anywhere. |
 | `sound` | `true` | Play a short tone with each notification, one per outcome, so you can tell a finished session from a question or a permission prompt without reading the popup. It is opt-out: `false` — or `LACODE_SOUND=0` (`false`, `off`, `no` work too, and beat the option) — turns the sound off, and anything else, a typo included, leaves it on. |
 | `omniroute` | — | Optional [OmniRoute](docs/OMNIROUTE.md) gateway integration. Absent or `{ enabled: false }` changes nothing. |
 | `watchMs` | `1000` | How often the pool files are checked for changes. `0` disables live reload. |
@@ -393,12 +411,13 @@ and **Deny**, and macOS gets a plain notice without buttons.
 `lacode forward HOST -- COMMAND` runs a command on another host over ssh and
 exits with its status.
 
-The full CLI is `notify`, `forward`, `doctor`, `version`, `update`, `receive`
-and `tunnel setup`. `version` reports which copy of LaCode is running — and
-whether opencode is loading that same copy — and `update [--check]` refreshes an
-installed one. `receive` is the desktop end of the tunnel (the forced command a
-remote key is restricted to) and `tunnel setup` provisions the key and the
-forward.
+The full CLI is `notify`, `forward`, `doctor`, `feedback`, `version`, `update`,
+`receive` and `tunnel setup`. `version` reports which copy of LaCode is running —
+and whether opencode is loading that same copy — and `update [--check]` refreshes
+an installed one. `feedback` prints the Issues and Discussions links; it opens
+nothing and sends nothing. `receive` is the desktop end of the tunnel (the forced
+command a remote key is restricted to) and `tunnel setup` provisions the key and
+the forward.
 
 Configuration, the payload format, the receiver contract and holding the forward
 open are in [docs/TUNNEL.md](docs/TUNNEL.md).

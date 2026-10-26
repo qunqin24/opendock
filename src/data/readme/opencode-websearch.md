@@ -1,109 +1,96 @@
 # opencode-websearch
 
-Native web search for [OpenCode](https://opencode.ai), powered by your model's built-in search capability. No extra API keys or search services required. If you're on a supported provider, it works without any extra setup.
+Web search for [OpenCode](https://opencode.ai) using your model provider's built-in search. Adds a `native` backend to OpenCode's `websearch` tool, so no separate search service is needed.
 
-Inspired by Claude Code's WebSearch tool.
+> [!NOTE]
+> Versions 0.7 and later require OpenCode V2. Use 0.6 or earlier for OpenCode V1.
 
 ## Example
 
-Asking OpenCode about the latest PostgreSQL version:
+Each source comes back with its title, URL, publication date when known, and a summary of the relevant findings:
 
-> **What's the latest Postgres version?**
->
-> ⚙ `web-search` [query=latest PostgreSQL release version April 2026]
->
-> As of now (April 2026), the latest PostgreSQL community release is PostgreSQL 18.3.  
-> If you mean the latest major version line, that is PostgreSQL 18.
->
-> Sources:
->
-> - [PostgreSQL Roadmap](https://www.postgresql.org/developer/roadmap/)
-> - [PostgreSQL News Archive (2026-02-26 release)](https://www.postgresql.org/about/newsarchive/-/20260226/)
+```md
+## [Releases · oven-sh/bun](https://github.com/oven-sh/bun/releases)
+
+Published: 2026-10-22T00:00:00.000Z
+
+The latest release is Bun v1.4.4, marked "Latest" and tagged bun-v1.4.4. Earlier releases: v1.4.3, v1.4.2, v1.4.1, v1.4, v1.3.14. Install with `curl -fsSL https://bun.com/install | bash`, or upgrade with `bun upgrade`.
+```
 
 ## Supported providers
 
-| Provider         | What you need                                                            |
-| ---------------- | ------------------------------------------------------------------------ |
-| Anthropic        | An Anthropic provider/model in OpenCode with built-in web search support |
-| Moonshot (Kimi)  | A Moonshot API key configured in OpenCode                                |
-| OpenAI / ChatGPT | OpenAI configured in OpenCode (API key or ChatGPT connected)             |
-| GitHub Copilot   | GitHub Copilot connected in OpenCode                                     |
-| xAI (Grok)       | xAI configured in OpenCode (API key or SuperGrok connected)              |
-
-Model-level web search support depends on the provider and model you use.
+| Provider         | Search                                                            |
+| ---------------- | ----------------------------------------------------------------- |
+| Anthropic        | `web_search_20260318`, falling back to `web_search_20250305`      |
+| OpenAI / ChatGPT | Responses API `web_search`                                        |
+| GitHub Copilot   | Responses API `web_search`                                        |
+| xAI (Grok)       | Responses API `web_search`                                        |
+| Moonshot (Kimi)  | Web Search Pro API                                                |
+| Z.ai (GLM)       | Web Search API, with an API key or the Coding Plan                |
+| DeepSeek         | Search API                                                        |
+| OpenCode Go      | Claude, GPT, Grok, and Kimi models only ([details](#opencode-go)) |
 
 ## Install
 
-Add the plugin to your `opencode.json` and OpenCode will install it automatically on startup.
+Install with the OpenCode CLI:
 
-```json
+```sh
+opencode plugin add opencode-websearch
+```
+
+This installs the plugin and adds it to your global config. To upgrade, run `opencode plugin update`.
+
+The plugin is enabled automatically unless you've chosen another `websearch` provider or turned web search off. To select it explicitly:
+
+```jsonc
 {
-  "plugin": ["opencode-websearch"]
+  "websearch": { "provider": "native" },
 }
 ```
 
-## Configuration (optional)
+## Model selection
 
-By default the plugin uses your active model. The optional `"websearch"` flag lets you pin or provide a fallback model for search:
+Searches use your default model when its provider is supported. The current session's model is never used.
 
-- `"always"`: always use this model for web search
-- `"auto"`: use this model as fallback when your active provider is not supported
+To search with a specific model instead, set `"websearch": "always"` in its settings. This is useful when:
 
-### Selection order
+- Your default model can't search, for example because its provider isn't supported or it's an OpenCode Go model without web search.
+- You want searches to run on a cheaper or faster model than the one you code with.
+- You switch default models often and want searches to behave the same.
 
-1. A model tagged `"websearch": "always"`
-2. Your active model (if on a supported provider)
-3. A model tagged `"websearch": "auto"`
-4. Otherwise, the tool returns an error
-
-### Example
-
-```json
+```jsonc
 {
-  "provider": {
-    "openai": {
+  "$schema": "https://opencode.ai/config.json",
+  "providers": {
+    "opencode-go": {
       "models": {
-        "gpt-5.2": {
-          "options": {
-            "websearch": "always"
-          }
-        }
-      }
-    }
-  }
+        "gpt-6-luna": {
+          "settings": {
+            "websearch": "always",
+          },
+        },
+      },
+    },
+  },
 }
 ```
+
+### OpenCode Go
+
+Only Claude, GPT, Grok, and Kimi models can search on OpenCode Go. If your default model is another Go model, such as GLM, DeepSeek, Qwen, or MiniMax, set `"websearch": "always"` on one that can, as in the example above.
+
+Searches count toward your Go usage limits. `gpt-6-luna` and `claude-haiku-5-5` are cheap; Grok costs many times more. Kimi relies on Moonshot's deprecated `$web_search` tool and may stop working.
 
 ## Development
 
-### Local development
-
-Clone the repo and symlink the source entry into your OpenCode plugin directory:
-
 ```sh
-git clone https://github.com/emilsvennesson/opencode-websearch ~/.config/opencode/opencode-websearch
-cd ~/.config/opencode/opencode-websearch
+git clone https://github.com/emilsvennesson/opencode-websearch.git
+cd opencode-websearch
 bun install
-mkdir -p ~/.config/opencode/plugin
-ln -sf ~/.config/opencode/opencode-websearch/src/index.ts ~/.config/opencode/plugin/websearch.ts
-```
-
-OpenCode loads the plugin directly from source at startup.
-
-> When using this symlink setup, remove `"opencode-websearch"` from the `plugin` array in `opencode.json` to avoid loading it twice.
-
-### Commands
-
-```sh
-bun install
-bun run format
-bun run format:check
-bun run lint
-bun run lint:fix
-bun run typecheck
-bun run check
 bun run build
 ```
+
+Point `plugins` at the local checkout (`"plugins": ["/absolute/path/opencode-websearch"]`), then rebuild and run `/reload` in OpenCode after changes. Run `bun run check` before opening a PR.
 
 ## License
 

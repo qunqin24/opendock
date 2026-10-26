@@ -66,15 +66,19 @@ The toggle key (`<leader>v`) can be remapped in `tui.json` under the `agent-dock
 
 ```sh
 npm install
-npm test        # vitest — domain unit tests
+npm test        # builds dist/, then vitest: domain unit tests + the packed tarball loaded as OpenCode loads it
 npm run typecheck
 ```
 
-OpenCode runs on Bun and loads `.ts`/`.tsx` natively, so there is no build step for local file-plugin use:
+The package ships `dist/`, compiled by `npm run build` with the same Solid transform OpenCode applies to local plugins. Raw `.tsx` can't ship: OpenCode compiles none of the files under `node_modules`, where an npm install lives (1.0.0 shipped `src/` and never loaded from npm).
+
+For local development a file plugin needs no build, since it is not under `node_modules`:
 
 ```jsonc
 { "plugin": [["file:///absolute/path/to/opencode-agent-dock/src/index.tsx"]] }
 ```
+
+CI runs the typecheck and tests on every pull request and every push to `main`.
 
 ## License
 

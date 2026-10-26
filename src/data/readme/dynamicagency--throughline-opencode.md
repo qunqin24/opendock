@@ -70,8 +70,8 @@ Claude Code and Codex CLI share the identical shell hook scripts. OMP's hooks ar
 in-process TypeScript event handlers rather than subprocess hooks, but a thin shim
 (`hooks/post/throughline.ts`) registers the same five capture points against OMP's
 own event bus and shells out to the identical `hooks/*.sh` scripts underneath, so
-there is nothing to keep in sync. OpenCode's plugin is a full TypeScript port of the
-same logic against OpenCode's own API.
+there is nothing to keep in sync. OpenCode's plugin does the same: it maps OpenCode's
+events onto those scripts, which ship inside its npm package.
 
 </details>
 
@@ -135,7 +135,7 @@ honest comparison, then jump to the section for your harness.
 | Automatic capture | yes - 5 hooks | yes - 5 hooks, one-time trust step (see below) | yes - 5 hooks | yes - 6 events (compaction is 2 events, not 1) | yes - 6 hooks, git repos only | no |
 | Compaction survival | yes | yes | yes | yes | yes | no |
 | Native memory binding | yes (Claude's `/memory`) | no | no | no | no | no |
-| Requires `jq` | yes | yes | no | yes | yes | n/a - skills only |
+| Requires `jq` | yes | yes | yes | yes | yes | n/a - skills only |
 
 ### Claude Code
 
@@ -165,8 +165,8 @@ trust dialog on first use - see [docs/INSTALL.md](docs/INSTALL.md#codex-cli).
 }
 ```
 
-Add to `opencode.json` and restart; Bun installs it automatically. Requires
-Node.js 18+, no `jq`. Hooks only - see
+Add to `opencode.json` and restart; Bun installs it automatically. Requires `git`
+and `jq` on your `PATH`. Hooks only - see
 [docs/INSTALL.md](docs/INSTALL.md#opencode) for skills and the local-path install.
 
 ### OMP

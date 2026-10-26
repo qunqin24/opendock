@@ -192,6 +192,37 @@ ${CLV2_HOMUNCULUS_DIR or $XDG_DATA_HOME/ecc-homunculus or ~/.local/share/ecc-hom
 
 The TUI half knows the real project directory (`ctx.location.directory`) but not `<project-hash>` (ECC's own git-remote hash, resolved by a python subprocess the server half already runs). So the server half also writes a small pointer file, named only from a hash of the real directory path, holding the absolute path of the real state file. Both halves resolve the pointer file's own location the same way (the ECC data directory default chain above), so the TUI never needs to run python itself.
 
+## Automatic skill review
+
+The task-observer skill (installed separately; see its own SKILL.md) keeps an open backlog of observations about every other installed skill, meant to be reviewed on a cadence with its own `references/weekly-review.md` procedure. `review.enabled` (off by default, like every other automatic action this plugin can take) lets this plugin run that procedure for you: once the backlog is due, it spawns a headless OpenCode session (`ctx.session.create` + `ctx.session.prompt`, the same v2 API the board and observer use) that loads the task-observer skill and works through a bounded slice of the oldest open observations, then tracks that session through to completion. `/skill-review` triggers one run on demand (ignoring the cadence and cooldown, but not a review already in progress), independent of `review.enabled`; `/skill-review status` reports the open count, last review date, whether a run is due, and any in-flight session id.
+
+| Option | Description |
+| --- | --- |
+| `review.enabled` | Turn the scheduled review on. `/skill-review` works either way. |
+| `review.cadenceDays` | Minimum days since the last review before another one is due. |
+| `review.sliceSize` | How many of the oldest open observations (by id, plus anything that restates one of them) one review run is scoped to. |
+| `review.cooldownHours` | Minimum time between attempts, independent of the cadence (covers a run that was skipped or failed quickly). |
+| `review.timeoutMinutes` | How long a lock (and the spawned session itself) is allowed to run before it is considered stale, replaceable by the next attempt, and interrupted. |
+| `review.startupDelaySeconds` | How long after plugin setup the first scheduled check runs. |
+| `review.pollMinutes` | How often the scheduled check re-runs after that first one. |
+| `review.model` | `"provider/model"` for the spawned session. When unset, the host's default model is used. |
+| `review.agent` | Agent name for the spawned session. When unset, the host's default agent is used. |
+| `review.externalDirectories` | Extra absolute paths (or ones starting with `~/`) the spawned session may read from outside the task-observer workspace, beyond `~/.config/opencode` and `~/.cache/opencode/npm` (always allowed, so the session can load skills and plugin code). |
+
+The lock (`review-lock.json`) and the append-only attempt log (`review-runs.log`) both live under `<task-observer root>/skill-observations/.mighty-instincts/`, next to (never inside) the skill's own `skill-observations/` state, since several OpenCode instances on the same machine can share that workspace: the lock is created with an exclusive write, so whichever instance wins the race blocks every other one until it finishes or its `timeoutMinutes` elapses.
+
+The spawned session's permissions are last-match-wins, OpenCode 2's own resolution order: editing is denied everywhere except inside the task-observer workspace; reading outside the workspace is denied everywhere except `~/.config/opencode`, `~/.cache/opencode/npm`, and anything listed in `review.externalDirectories`; shell is allowed outright, since the review procedure runs bash snippets and a headless session has nobody to answer an "ask" permission prompt. The edit deny and the prompt's own instructions are what actually keep the review inside the workspace; shell can still write elsewhere through means an edit permission does not cover.
+
+```json
+{
+  "review": {
+    "enabled": true,
+    "model": "anthropic/claude-haiku-4-5",
+    "cadenceDays": 7
+  }
+}
+```
+
 ## What gets written, and where
 
 Everything lands in ECC's existing on-disk layout so `instinct-cli.py` (and anything else that reads it) sees the same data; the only additions are the bookkeeping files marked below:
@@ -239,6 +270,7 @@ Project identity (the `<project-hash>` above, or the shared `global` bucket when
 | `/instinct-prune [--dry-run] [--max-age N]` | Delete pending instincts older than the TTL. |
 | `/instinct-observe` | Run the observer right now, ignoring the enabled/interval/threshold gates. |
 | `/board` | Show the board as a short, explanatory chat summary (Learned habits, Skill notes, Skill test); see "The board" above. |
+| `/skill-review [status]` | Run the task-observer backlog review now in a headless session, ignoring the cadence and cooldown (but not a review already in progress). With `status`: report the open count, last review date, whether a run is due, and any in-flight session id. See "Automatic skill review" above. |
 
 Every command above posts its reply back into the session as a synthetic message with `resume: true`, so it surfaces immediately instead of waiting for the next turn (you just typed the command, so you are sitting right there for the reply); none of them start a model turn. The background observer's own notify message (after an unprompted run nobody is necessarily watching for) keeps `resume: false` instead. `/instinct-import` and `/promote` pass `--force`, since typing the command is the confirmation that would otherwise come from the CLI's own `y/N` prompt.
 

@@ -1,10 +1,13 @@
 # opencode-agent-plus
 
-Per-agent reminders and request settings for [OpenCode](https://opencode.ai) v2, set in the agent's frontmatter.
+Per-agent reminders, request settings and safe-command auto-allow for [OpenCode](https://opencode.ai) v2.
 
 Set `chat_template_kwargs` (like `enable_thinking`), sampling settings (`temperature`, `top_p`, `top_k`, `min_p`,
 penalties) and a system reminder for each OpenCode agent. Works with llama.cpp, LiteLLM and other OpenAI-compatible
 servers, and with thinking models like Qwen.
+
+Auto-allows read-only tool calls and safe shell commands (`ls`, `cat`, `git status`, `docker compose ps`, …), so
+with `shell: ask` in your permissions you get no prompt window for them — everything else still asks.
 
 OpenCode v2 drops request settings such as `temperature` for OpenAI-compatible providers, and has no per-agent
 reminder. agent-plus reads extra keys from the agent's `.md` file and applies them to every model request.
@@ -50,6 +53,7 @@ You help the user write and edit text.
 | `reminder` | text, one line or a `\|` block | Added as the last message of every model request |
 | `reminder_file` | path, relative to the agent's `.md` file | Like `reminder`, read from a file |
 | `on_error_command` | shell command, one line or a `\|` block | Run when a request fails with a connection error (server off), then retry |
+| `safe_commands` | `none` (default: on) | Turn safe-command auto-allow off for this agent |
 | `temperature` | number | Request body |
 | `top_p` | number | Request body |
 | `top_k` | whole number | Request body |
@@ -128,6 +132,24 @@ on_error_command: |
 ```
 
 It fires once per outage per session: after a request gets through, the next connection error can run it again.
+
+## Safe commands
+
+With `shell: ask` in your `permissions`, every shell command would prompt. agent-plus skips the prompt for calls
+that can only read:
+
+- Tools: `read`, `glob`, `grep`, `websearch`
+- Commands: `ls`, `cat`, `head`, `tail`, `wc`, `find`, `grep`, `rg`, `sort`, `diff`, `pwd`, `echo`, `du`, `df`,
+  `git status/log/diff/show/branch`, `docker ps/logs/inspect`, `docker compose ps/logs`, `npm ls/view/outdated`,
+  `node --version`, `psql`/`sqlite3` with read-only queries, and `ssh host <safe command>`
+- Anything with `;`, `|`, `&&`, `$( )` or redirections is checked **per part**: all parts must be safe
+
+It never overrides a configured `deny`, and only turns `ask` into `allow`. Doubtful = asked.
+
+Known unsafe flags are refused, e.g. `find -exec`, `env <cmd>`, `rg --pre`, `sort -o`, `git branch -D`,
+`git log --output=`, `ssh -o ProxyCommand=`.
+
+Turn it off for one agent with `safe_commands: none` in its frontmatter.
 
 ## Notes
 

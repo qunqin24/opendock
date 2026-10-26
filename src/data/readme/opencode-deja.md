@@ -123,9 +123,10 @@ or `npx @vshulcz/deja-vu "query"` to try it without installing anything. Desktop
 take MCP servers as bundles can open the `.mcpb` from the
 [latest release](https://github.com/vshulcz/deja-vu/releases/latest); it carries the binary.
 
-Claude Code, Cursor, Qwen and OpenClaw can take the same plugin bundle from
+Claude Code, Qwen and OpenClaw can take the same plugin bundle from
 their own marketplaces instead (Codex has a bundle of its own, in the table under
-[Harnesses with a package of their own](#harnesses-with-a-package-of-their-own)).
+[Harnesses with a package of their own](#harnesses-with-a-package-of-their-own),
+and Cursor has one in [`cursor-plugin/`](cursor-plugin/)).
 Copilot CLI installs it too but takes only the skill, so use `deja install copilot-auto` there:
 
 ```sh
@@ -256,6 +257,8 @@ The server exposes one tool, `deja`, with a `mode`; `deja install` wires it in. 
 costs 477 tokens of definitions a turn, against 8,283 for the largest of the seven servers
 measured in [day zero](https://vshulcz.github.io/deja-vu/guide/day-zero.html). The six
 older tool names (`recall`, `recall_context`, `blame`, `fix`, `how`, `remember`) still answer.
+`deja mcp --context-search` is a separate server with a single `context_search` tool, for
+Qwen Code's External Context MCP Profile v1 ([Qwen page](docs/registry/qwen.md)).
 
 <details>
 <summary>Arguments and return shapes</summary>

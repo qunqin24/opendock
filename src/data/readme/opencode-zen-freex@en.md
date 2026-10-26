@@ -26,7 +26,7 @@ If people depend on it, it deserves a clear answer rather than **more flip-flopp
 | 2026-10-14 10:57 | [`a810ee7`](https://github.com/magpie-community/plugins/commit/a810ee7e882012ab106e2deb742176cd43db781a) | 0.1.6 **deletes** that note and sends OpenCode 1.19.0's own headers — 11 hours after it was added |
 | 2026-10-14 17:59 | [`5fc0a75`](https://github.com/magpie-community/plugins/commit/5fc0a75292f0e5c0c10cf65a188bff5545d6b8e9) | 0.1.7: `free models answer again` |
 
-Later upstream changes are merged as needed, while this branch keeps its own choices (for example, tool wording is captured per generation from a real OpenCode rather than pinned to one version).
+Later upstream changes are merged as needed, while this branch keeps its own choices (for example, the system prompt and complete tool set are captured per generation from a real OpenCode rather than pinned to one version).
 
 ## Installation and login
 
@@ -54,9 +54,11 @@ Model names are written `opencode-zen-free/<id>`, for example `opencode-zen-free
 
 Requests go to `https://opencode.ai/inference/v1` in each model's native protocol (Chat Completions / Responses / Anthropic Messages); both streaming and plain JSON are supported.
 
-- **Borrow only OpenCode's shell**: headers, User-Agent and the tool set are matched to one OpenCode generation; a `required` tool the host lacks gets a description sent on the plugin's behalf (with no implementation behind it). The header set is deliberately minimal — **do not add your own**; two individually harmless headers can be refused together.
+- **Borrow only OpenCode's shell**: headers, User-Agent, the system prompt and the complete tool set are matched to the current 2.x generation of OpenCode (the 1.x lane was retired by the free tier on 2026-10-25; a retired lane is not something any IP or wording recovers). The official prompt goes in front of the host's own system instructions; a body that already carries it is left alone, so repeated shaping cannot duplicate it. The prompt ends at OpenCode's environment block — no built-in skill is advertised, because a host that is not OpenCode has none of them to load. The requests also have to **leave from a Bun runtime**, as the official clients do: magpie runs its plugins under the Bun it ships, which is what this package rides. The header set is deliberately minimal — **do not add your own**; two individually harmless headers can be refused together.
+- **The host's tools still run**: each one keeps its own wording and parameters but travels under a `clint_` name, so it cannot collide with the official set that follows it. Every tool reference in the request is renamed with it, and names in the reply are translated back; the host never sees a name it did not declare. OpenCode's own tools are sent in their complete, captured form — and because the official prompt teaches Code Mode, the prompt is followed by a `<system-reminder>` naming the `clint_` tools this host actually runs, so the model does not open the session by calling `execute` to an unknown-tool error.
 - **Unknown tool names go to the host as written**: match exactly first, then case-insensitively, then ignoring `_`/`-`/`.`/whitespace, and accept only a unique result; when nothing matches or the match is ambiguous, the call is neither guessed nor dropped — the model's name, id and arguments reach the host as written, which replies with its own "no such tool"; the model then renames the call and retries. Only calls with no name at all are omitted, and the body says so.
-- **Sessions stay stable**: an OpenCode-shaped session id from the host is passed through; otherwise one is derived from the host's session identifiers and remembered, so every turn of the same conversation shares an id.
+- **Every request is its own session**: a fresh OpenCode-shaped session id is minted per request — its timestamp is the current moment, always inside the window the tier accepts. Zen keeps its memory of traffic against the session, and a fresh session carries none of it. Set `OPENCODE_ZEN_FREE_SESSION_AFFINITY=1` to go back to one session per conversation (an OpenCode-shaped id from the host passed through; otherwise one derived from the host's session identifiers and remembered, so every turn shares an id).
+- **The project id is its own too**: the free quota is ledged per project id and egress together — a fresh id on a spent exit, or a spent id on a fresh exit, is a new ledger (measured 2026-10-26). A host that names its project keeps its name; one that does not gets a random git-hash-shaped id per request — the old `global` default was one bucket shared by every freeriding plugin user on the planet, pre-burned on popular exits.
 - **Truncation and errors are reported honestly**: if a stream ends early, a Chat stream with content and no unfinished tool call is completed as a normal answer marked truncated; anything else fails. The error body is read only far enough to find a limit Zen itself states; the rest is replaced with an explanation.
 
 <details>
@@ -64,13 +66,13 @@ Requests go to `https://opencode.ai/inference/v1` in each model's native protoco
 
 **Headers** are exactly: `content-type`, `accept`, `user-agent`, `x-opencode-project`, `x-opencode-session` and `x-opencode-session-id` (the same value), `x-opencode-client: cli`, `authorization: Bearer public`; Messages uses `x-api-key: public` plus `anthropic-version` instead. The plugin never sets `anthropic-beta` itself — it passes it through only when the host sends it.
 
-**Session id** is taken in order from the session headers `x-opencode-session` / `x-opencode-session-id` / `x-session-affinity` / `x-session-id` / `session_id` / `conversation-id` / `conversation_id`, then the body's `conversation_id`, `metadata.session_id`, or the `_session_<uuid>` inside Claude Code's `metadata.user_id`. If none of those exists, the system/instructions and the first user message form the seed (a changed system prompt is a different conversation); only after that is `previous_response_id` consulted, and failing that a new id is generated every time. An empty string is never a name.
+**Session id**: the default mints a fresh one per request and reads none of what follows. With `OPENCODE_ZEN_FREE_SESSION_AFFINITY=1`, the conversation is named in order from the session headers `x-opencode-session` / `x-opencode-session-id` / `x-session-affinity` / `x-session-id` / `session_id` / `conversation-id` / `conversation_id`, then the body's `conversation_id`, `metadata.session_id`, or the `_session_<uuid>` inside Claude Code's `metadata.user_id`. If none of those exists, the system/instructions and the first user message form the seed (a changed system prompt is a different conversation); only after that is `previous_response_id` consulted, and failing that a new id is generated every time. An empty string is never a name.
 
 </details>
 
 ## When the free tier stops answering
 
-The 403 this plugin returns names the OpenCode version its wording was captured from; start there. All three commands **run only in a repository checkout** (`check:gate` and `capture` are not in the published package) and need Bun; `capture` also needs `opencode` on PATH:
+The 403 this plugin returns names the OpenCode version its prompt and tool definitions were captured from; start there. All three commands **run only in a repository checkout** (`check:gate` and `capture` are not in the published package) and need Bun; `capture` also needs `opencode` on PATH:
 
 ```sh
 bun run check:gate          # which fingerprints Zen accepts; 0 if a floor answers
@@ -78,13 +80,13 @@ bun run capture -- --dry    # all floors refused: capture, report the diff, writ
 bun run capture             # write only after confirming the diff
 ```
 
-`capture` rewrites `fingerprint.json` rather than refusing when the file is missing or broken. The gate is not stable: a verdict describes this moment only, so run it again before trusting it; repeated refusals from one address can also trigger a cooldown. For per-generation verdicts and how to read a failure, see [`MAINTAINING.md`'s “The loop”](MAINTAINING.md#the-loop) and [“Reading a failure”](MAINTAINING.md#reading-a-failure).
+`capture` rewrites `fingerprint.json` rather than refusing when the file is missing or broken. It does not write the prompt or the complete tool set: those live in `opencode-prompt-v1.txt` and `official-tools.json`, and a release updates them from the same OpenCode version as the capture (see [`MAINTAINING.md`](MAINTAINING.md#the-loop)). The gate is not stable: a verdict describes this moment only, so run it again before trusting it; repeated refusals from one address can also trigger a cooldown. For per-generation verdicts and how to read a failure, see [`MAINTAINING.md`'s “The loop”](MAINTAINING.md#the-loop) and [“Reading a failure”](MAINTAINING.md#reading-a-failure).
 
 ## Troubleshooting
 
 | Symptom | What to do |
 | --- | --- |
-| Every request is `403 FreeTierError`, with no IP-block wording | The fingerprint wording is stale. From a repository checkout run `bun run check:gate`; if every floor is refused, run `bun run capture` |
+| Every request is `403 FreeTierError`, with no IP-block wording | The captured OpenCode shape is stale. Update the plugin; from a repository checkout run `bun run check:gate`, and if every floor is refused, recapture the profile and refresh the prompt/tool assets from the same release |
 | The `403` body is a block notice (`abuse of traffic`, or `free models aren't available … from your current network`) | The free tier is blocking the current egress IP. Switch networks or VPN exits, or wait for the block to lift; retrying or rewriting the request will not help |
 | `426 Upgrade Required` | The package claims an older OpenCode version than Zen wants. Update the plugin, or run inside a newer OpenCode |
 | `404 … not available as an OpenCode Zen free model now` | Zen no longer offers this model for free. Pick another from the models listed in the error |
@@ -104,6 +106,7 @@ Common ones only; the full list and defaults are in [`.env.example`](https://git
 | Variable | Purpose |
 | --- | --- |
 | `OPENCODE_ZEN_FREE_DISCOVERY_CACHE` | Discovery cache path; an empty string keeps discovery in memory only |
+| `OPENCODE_ZEN_FREE_SESSION_AFFINITY` | `1` keeps one session per conversation instead of a fresh session every request |
 | `OPENCODE_ZEN_FREE_LIMITS_SNAPSHOT` | Measured-snapshot path; an empty string disables reading a snapshot |
 | `OPENCODE_ZEN_FREE_LIMITS_SNAPSHOT_URL` | Remote snapshot URL; an empty string disables the remote |
 | `OPENCODE_ZEN_FREE_LIMITS_STATE` | Path to the learned-limit state; an empty string keeps it in memory only |

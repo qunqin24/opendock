@@ -157,16 +157,22 @@ on the other hand, loads the project on demand. The first call after an idle per
 few seconds.
 
 **Webhooks** work the same way, with one extra piece. A service such as GitHub or Stripe calls a
-small **relay** (n8n, or the ~30-line Node relay in the bundled skill). The relay turns that HTTP
+small **relay** (n8n, or the Node relay in the bundled skill). The relay turns that HTTP
 call into `apex/events.ingest`. OpenCode itself doesn't expose a webhook URL.
+
+The same idea covers any always-on event source: a relay keeps an outbound connection to a
+chat app, a mailbox (IMAP IDLE), an SSE or WebSocket stream or a queue, and forwards what
+matters.
 
 apex registers a skill, **`apex-callbacks`**, that teaches agents the whole recipe:
 - discovering the server URL;
 - subscribing;
-- a stateful watcher script;
-- systemd and cron;
-- the webhook relay and n8n;
-- `tools.run`.
+- designing a relay or watcher in any language and running it on any OS (systemd, launchd,
+  Task Scheduler, Docker, pm2);
+- calling OpenCode and MCP tools from relay code with `tools.run`, and its limits;
+- reachability: why a relay behind NAT can't receive Internet webhooks, and the workarounds
+  (outbound modes, Cloudflare/Tailscale/ngrok tunnels, reverse SSH, store-and-forward);
+- copyable examples in sh, Python, Node and PowerShell, plus an n8n recipe.
 
 Full reference: [docs/EVENTS.md](docs/EVENTS.md).
 
@@ -323,7 +329,7 @@ opencode-apex/
 │   ├── skills.ts         # registers the skills shipped in skills/
 │   ├── compat.ts         # load-time warnings when versions drift from OpenCode
 │   └── …                 # redact engine, patterns, crypto, conditions, guard, advisor
-├── skills/apex-callbacks/SKILL.md   # agent guide: callbacks, webhooks, watchers, tools.run
+├── skills/apex-callbacks/          # agent guide: SKILL.md + references/ (relays, reachability, run-anywhere, examples)
 ├── scripts/check-install.mjs        # pre-publish install check
 ├── test/                 # events, guard, browser suites
 └── docs/                 # CONFIG · REDACT · EVENTS · ADVISOR · GUARD · BROWSER · TROUBLESHOOTING

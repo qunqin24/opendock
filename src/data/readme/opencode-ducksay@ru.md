@@ -1,0 +1,45 @@
+# OpenCode Ducksay
+
+Маленькая ASCII-уточка живёт в боковой панели OpenCode. Пока сессия работает, она плавает, а когда ответ готов,
+устраивается у края и рассказывает короткую шутку о вашей сессии — её придумывает та же модель, что только что
+ответила вам.
+
+[English version](README.md)
+
+```text
+Ducksay
+
+
+
+        ╭───────────────────────────╮
+        │ Quack-quack!              │
+    __  ╰───────────────────────────╯
+___( o)< ╯
+\ <_. )  ~~~~     ~~~~     ~~~~     ~
+     ~~~~     ~~~~     ~~~~     ~~~~
+```
+
+## Установка
+
+Добавьте пакет в `~/.config/opencode/cli.json`, чтобы включить его везде:
+
+```json
+{
+  "plugins": ["opencode-ducksay"]
+}
+```
+
+Чтобы включить его только в одном проекте, добавьте ту же запись в `opencode.json` этого проекта.
+
+После этого перезапустите OpenCode. Сборки нет.
+
+## Документация
+
+- [Как ведёт себя уточка](https://github.com/zhek/opencode-ducksay/blob/main/docs/behavior.ru.md) — плавание, шутки,
+  вопросы и вода.
+- [Конфигурация и опции](https://github.com/zhek/opencode-ducksay/blob/main/docs/configuration.ru.md) — `swimSpeed`,
+  `silent`, `llmTimeout`, `llmContextDepth` и настройки боковой панели.
+
+## Лицензия
+
+[MIT](LICENSE) © Evgeniy Arapov

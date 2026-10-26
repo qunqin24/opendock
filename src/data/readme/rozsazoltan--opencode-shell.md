@@ -4,11 +4,15 @@ Use your [mise](https://github.com/jdx/mise) tools in OpenCode, including Deskto
 
 ## Install
 
-Install [mise](https://mise.jdx.dev/installing-mise.html). To use RTK too, run:
+Install [mise](https://mise.jdx.dev/installing-mise.html). To enable RTK command filtering, install the RTK CLI:
 
 ```sh
 mise use -g rtk@latest
 ```
+
+`opencode-shell` uses the CLI directly. Do not run `rtk init --opencode`; that installs RTK's separate OpenCode plugin, which this plugin does not need.
+
+Update RTK later with `mise upgrade rtk@latest`.
 
 Then add the plugin to your OpenCode configuration:
 
@@ -31,7 +35,17 @@ Mise must be on the OpenCode server's PATH or at `~/.local/bin/mise` (Unix) / `~
 
 - Set `RTK_DISABLED=1` to turn off rewriting.
 - Complex PowerShell commands and unsupported shells stay unchanged.
-- Custom RTK filters require `rtk trust`, again after each edit.
+
+### Custom RTK filters
+
+Add project-specific filters in `.rtk/filters.toml`. Include inline tests, then run these from the project directory:
+
+```sh
+rtk verify --require-all
+rtk trust
+```
+
+Review filters before trusting them. Run `rtk trust` again after each edit; trust applies to the exact file contents. See the [RTK filter guide](https://github.com/rtk-ai/rtk/blob/develop/src/filters/README.md) for the TOML format.
 
 ## Tools and installation approval
 

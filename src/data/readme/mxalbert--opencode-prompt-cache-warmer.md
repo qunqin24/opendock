@@ -80,6 +80,7 @@ request is simply less useful.
 | `duration` | `30m`      | How long after the last real request warming continues before it stops.  |
 | `models`   | all models | Which models to warm. Absent or empty means every model.                 |
 | `enabled`  | `true`     | Set `false` to load the plugin without warming anything.                 |
+| `debug`    | `false`    | Log each warm, each series end and each adoption to the server console.  |
 
 `interval` and `duration` accept milliseconds as a number or a string with a
 unit: `"90s"`, `"4m"`, `"4 minutes"`, `"1 hour"`. A non-finite, non-positive,
@@ -150,6 +151,14 @@ recalled; it completes against the model it was sent for.
   are restored onto the objects the host already supplied, because the host
   resolves each tool by object identity; a tool whose *key* a `context` hook
   renamed cannot be matched back and is left alone.
+- **Survive a reload** — the host re-runs `setup` whenever the plugin
+  generation changes: any plugin added, removed, updated or reordered tears this
+  one down and sets it up again. For an installed package the warm state lives
+  outside the instance, so the successor adopts it and re-arms every session
+  still inside its `duration`; warming resumes without waiting for that
+  session's next real request. A plugin loaded from a local path is re-read
+  rather than cached, and a server restart begins a new process, so both start
+  cold and warming resumes on each session's next real request.
 - **Invalidate** — the snapshot is dropped on any event that can change the
   selected transcript: compaction start/end/failure, revert stage/clear/commit,
   agent or model selection, instruction updates, message content updates, skill

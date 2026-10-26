@@ -25,7 +25,7 @@
 | 2026-10-14 10:57 | [`a810ee7`](https://github.com/magpie-community/plugins/commit/a810ee7e882012ab106e2deb742176cd43db781a) | 0.1.6 把那段说明**删掉**，改为发 OpenCode 1.19.0 原样的请求头——距加上去 11 小时 |
 | 2026-10-14 17:59 | [`5fc0a75`](https://github.com/magpie-community/plugins/commit/5fc0a75292f0e5c0c10cf65a188bff5545d6b8e9) | 0.1.7：`free models answer again` |
 
-上游的后续更新会按需合并，同时保留自己的取舍（比如工具措辞按代从真实 OpenCode 采集，而不是钉死某一个版本）
+上游的后续更新会按需合并，同时保留自己的取舍（比如系统提示词与完整工具集合按代从真实 OpenCode 采集，而不是钉死某一个版本）
 
 ## 安装与登录
 
@@ -53,9 +53,11 @@ magpie plugin login opencode-zen-free
 
 请求发往 `https://opencode.ai/inference/v1`，按每个模型的原生协议走（Chat Completions / Responses / Anthropic Messages），流式与普通 JSON 都支持。
 
-- **只借 OpenCode 的外壳**：请求头、User-Agent 与工具集合按同一代 OpenCode 配套，宿主缺的 `required` 工具会补发描述（背后没有实现）。请求头是刻意挑出的最小集合——**不要自行添加**，两个各自无害的头组合起来也会被拒。
+- **只借 OpenCode 的外壳**：请求头、User-Agent、系统提示词与完整工具集合配套为现行的 2.x 一代 OpenCode（1.x 通道已于 2026-10-25 被免费层退役；被退役的通道不是换 IP 或改措辞能救的）。官方提示词放在宿主自己的系统指令之前；正文里已经带着它就不再动，重复整形不会注入两遍。提示词到环境块为止，不点名任何内建 skill——宿主没有 OpenCode 的内建 skill 可加载。请求还必须**从 Bun 运行时发出**，与官方客户端一致：magpie 用自带的 Bun 跑插件，本插件正是借此通过。请求头是刻意挑出的最小集合——**不要自行添加**，两个各自无害的头组合起来也会被拒。
+- **宿主的工具照常运行**：每个工具保留自己的措辞与参数，但以 `clint_` 前缀的名字上路，不会与随后附上的官方工具集合相撞。请求里对它的每一处引用一并改名，回复里的名字再翻译回宿主声明的原名；宿主不会见到自己没声明的名字。OpenCode 自家的工具以采集到的完整形态发送——并且由于官方提示词教的是 Code Mode，提示词后会追加一段 `<system-reminder>`，点名本宿主真正可调的 `clint_` 工具，模型不会开局就调 `execute` 撞上 unknown tool。
 - **工具名对不上就原样交给宿主**：先精确匹配，再忽略大小写，最后忽略 `_`/`-`/`.`/空白，只取唯一结果；对不上或有歧义时不猜、不丢，由宿主回自己的「没有这个工具」，模型据此改名重试。只有没有名字的调用会被略去，并在正文说明。
-- **会话保持稳定**：宿主给了 OpenCode 形状的会话 id 就原样传，否则从宿主的会话标识派生并记住，同一会话各轮共用一个 id。
+- **每个请求自成会话**：每个请求都新铸一枚 OpenCode 形状的会话 id——时间戳取当前时刻，永远落在上游接受的窗口内。Zen 把它对流量的记忆记在会话上，新会话不带旧账。设 `OPENCODE_ZEN_FREE_SESSION_AFFINITY=1` 可回到按会话保持（宿主给的 OpenCode 形状 id 原样传，否则从宿主的会话标识派生并记住，同一会话各轮共用一个 id）。
+- **项目 id 也是自己的**：免费额度按「项目 id × 出口」记账——同一 id 换出口、或同一出口换 id，都是一本新账（2026-10-26 实测）。宿主给了项目 id 就用它的；没给则每请求随机生成一枚 git-hash 形状的专属 id——旧默认 `global` 是全世界蹭免费插件共享的桶，热门出口上早已被烧光。
 - **截断与错误如实报告**：流提前结束时，Chat 流若有内容且无未完成调用，按截断回答收尾并注明；其余情况一律失败。错误正文只读一小段找 Zen 自陈的上限，其余替换为说明。
 
 <details>
@@ -63,13 +65,13 @@ magpie plugin login opencode-zen-free
 
 **请求头**只有这些：`content-type`、`accept`、`user-agent`、`x-opencode-project`、`x-opencode-session` 与 `x-opencode-session-id`（同一个值）、`x-opencode-client: cli`、`authorization: Bearer public`；走 Messages 时改用 `x-api-key: public` 加 `anthropic-version`。`anthropic-beta` 插件自己从不设置，宿主发了才原样透传。
 
-**会话 id** 按顺序取：会话头 `x-opencode-session` / `x-opencode-session-id` / `x-session-affinity` / `x-session-id` / `session_id` / `conversation-id` / `conversation_id`，body 的 `conversation_id`，`metadata.session_id`，或 Claude Code 的 `metadata.user_id` 里的 `_session_<uuid>`。都没有时用 system/instructions 与首条用户消息做种子（system 变了就是另一个会话）；再没有才看 `previous_response_id`，仍然没有则每次新生成。空字符串一律不算名字。
+**会话 id**：默认每请求新铸一枚，下面这些信号一概不读。设了 `OPENCODE_ZEN_FREE_SESSION_AFFINITY=1` 时，按顺序取：会话头 `x-opencode-session` / `x-opencode-session-id` / `x-session-affinity` / `x-session-id` / `session_id` / `conversation-id` / `conversation_id`，body 的 `conversation_id`，`metadata.session_id`，或 Claude Code 的 `metadata.user_id` 里的 `_session_<uuid>`。都没有时用 system/instructions 与首条用户消息做种子（system 变了就是另一个会话）；再没有才看 `previous_response_id`，仍然没有则每次新生成。空字符串一律不算名字。
 
 </details>
 
 ## 免费层不再应答时
 
-插件给出的 403 会写明措辞采集自哪个 OpenCode 版本，先从它查起。下面三条都**只在仓库副本里**可跑（`check:gate` 与 `capture` 不在发布包里），需要 Bun；`capture` 还需要 PATH 里有 `opencode`：
+插件给出的 403 会写明提示词与工具定义采集自哪个 OpenCode 版本，先从它查起。下面三条都**只在仓库副本里**可跑（`check:gate` 与 `capture` 不在发布包里），需要 Bun；`capture` 还需要 PATH 里有 `opencode`：
 
 ```sh
 bun run check:gate          # 问 Zen 还认哪代指纹；只要有一代 floor 被应答，退出码为 0
@@ -77,13 +79,13 @@ bun run capture -- --dry    # floor 全被拒时：取新采集并报告差异�
 bun run capture             # 确认差异后才写入
 ```
 
-`fingerprint.json` 缺失或损坏时，`capture` 会重写一份而不是拒绝。闸门并不稳定：结论只代表此刻，信之前再跑一遍；同一地址反复被拒后还可能进冷却期。逐代结论与失败判读见 [`MAINTAINING.md` 的 “The loop”](MAINTAINING.md#the-loop) 与 [“Reading a failure”](MAINTAINING.md#reading-a-failure)。
+`fingerprint.json` 缺失或损坏时，`capture` 会重写一份而不是拒绝。它不写提示词与完整工具集合：那两样在 `opencode-prompt-v1.txt` 与 `official-tools.json` 里，发版时随同一代 OpenCode 的采集一起更新（见 [`MAINTAINING.md`](MAINTAINING.md#the-loop)）。闸门并不稳定：结论只代表此刻，信之前再跑一遍；同一地址反复被拒后还可能进冷却期。逐代结论与失败判读见 [`MAINTAINING.md` 的 “The loop”](MAINTAINING.md#the-loop) 与 [“Reading a failure”](MAINTAINING.md#reading-a-failure)。
 
 ## 排查
 
 | 现象 | 处理 |
 | --- | --- |
-| 每个请求都是 `403 FreeTierError`，正文没有 IP 封禁文案 | 指纹措辞过期。在仓库副本里跑 `bun run check:gate`；全被拒时跑 `bun run capture` |
+| 每个请求都是 `403 FreeTierError`，正文没有 IP 封禁文案 | 采集的 OpenCode 形态过期。升级插件；在仓库副本里跑 `bun run check:gate`，全被拒时重新采集指纹，并从同一发行版刷新提示词与工具资产 |
 | `403` 正文是封禁文案（`abuse of traffic`，或 `free models aren't available … from your current network`） | 免费层封的是当前出口 IP。换网络、换 VPN 出口，或等封禁解除；重试与改请求都无用 |
 | `426 Upgrade Required` | 这个包自称的 OpenCode 版本比 Zen 要的旧。升级插件，或在更新的 OpenCode 里运行 |
 | `404 … not available as an OpenCode Zen free model now` | 该模型已不再免费。从报错列出的模型里换一个 |
@@ -103,6 +105,7 @@ bun run capture             # 确认差异后才写入
 | 变量 | 作用 |
 | --- | --- |
 | `OPENCODE_ZEN_FREE_DISCOVERY_CACHE` | 模型发现缓存路径；空字符串表示只在内存中 |
+| `OPENCODE_ZEN_FREE_SESSION_AFFINITY` | `1` 恢复按会话保持，不再每请求新铸会话 id |
 | `OPENCODE_ZEN_FREE_LIMITS_SNAPSHOT` | 实测快照路径；空字符串表示不读快照 |
 | `OPENCODE_ZEN_FREE_LIMITS_SNAPSHOT_URL` | 远程快照地址；空字符串关闭远程 |
 | `OPENCODE_ZEN_FREE_LIMITS_STATE` | 学习到的上限状态路径；空字符串表示只在内存中 |

@@ -1,5 +1,7 @@
 # Opencode Token Usage Info Plugin
 
+[![npm version](https://img.shields.io/npm/v/opencode-tokens-usage?logo=npm&label=npm)](https://www.npmjs.com/package/opencode-tokens-usage)
+
 Adds a <code>/tokens_usage</code> command to OpenCode that shows what a session costs and where its tokens went:
 cost, a per-category token breakdown, and how full the context window is. Script-based only, no LLM in the loop.
 No message content leaves your machine.

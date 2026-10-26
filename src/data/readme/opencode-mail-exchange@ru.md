@@ -42,11 +42,11 @@
 Работает внутри OpenCode V2 как нативный TypeScript-плагин: Bun исполняет `src/index.ts` напрямую, сборка не нужна.
 
 Проверено на Exchange 2016 (build 15.1.2507.6), NTLMv2, внутренний CA. Bun 1.4.2, `@opencode/plugin` 2.0.26,
-117 тестов.
+204 тестов.
 
 ## Возможности
 
-- 10 `mail_*` tools: аккаунты, папки, список, поиск, чтение, sync, черновик, отправка, календарь, контакты.
+- 12 `mail_*` tools: аккаунты, папки, список, поиск, чтение, удаление, очистка «Удаленных», sync, черновик, отправка, календарь, контакты.
 - Несколько ящиков в одном процессе: свои credentials и SQLite на аккаунт.
 - Режимы хранения `off` / `metadata` / `full`; локальный SQLite-индекс в `metadata`/`full`, `off` = только EWS.
 - EWS/NTLM с явным XML-экранированием, валидацией получателей и лимитами вложений.
@@ -58,7 +58,7 @@
 - [Bun](https://bun.sh/) 1.4
 - TypeScript 5.9 (strict)
 - [Biome](https://biomejs.dev/) 2.5
-- [`ews-javascript-api`](https://github.com/gautamsi/ews-javascript-api) 0.15.3 + `@ewsjs/xhr` 3.1.3
+- [`ews-javascript-api`](https://github.com/gautamsi/ews-javascript-api) 0.15.3 + собственный NTLM XHR-провайдер (`axios` + `@ewsjs/ntlm-client`)
 - SQLite + FTS5 через `bun:sqlite`
 
 ## Начало работы
@@ -68,7 +68,7 @@
 - OpenCode V2 с `@opencode/plugin` 2.0.26 (живая проверка в сессии — R5 — пока не выполнена)
 - Bun 1.4.2 (проверено)
 - Exchange on-prem с включённым EWS и доменной NTLM-учётной записью
-- `NODE_EXTRA_CA_CERTS` с PEM корневого CA, если EWS за внутренним CA
+- Внутренний CA: `caFile` на аккаунт (применяется в рантайме); `NODE_EXTRA_CA_CERTS` — fallback для рантаймов без `tls.setDefaultCACertificates` и для standalone-скриптов
 
 ### Установка
 
@@ -77,6 +77,13 @@
 ```bash
 opencode plugin add opencode-mail-exchange
 ```
+
+OpenCode ставит пакет в свой кэш (в Windows обычно
+`C:\Users\<you>\.cache\opencode\npm\opencode-mail-exchange@latest\<timestamp>\node_modules\opencode-mail-exchange`);
+`opencode plugin list` показывает запись плагина (ID, версия, источник). Плагин загружается при следующем перечитывании конфига. Запись
+`"opencode-mail-exchange"` без `options` загружает плагин, но **не регистрирует** ни одного `mail_*` инструмента,
+пока не настроены учётные данные (`options.accounts` или верхнеуровневые `ewsUrl`/`username`/`password`) — в логе
+плагина будет `not configured`.
 
 Затем настройте плагин в `opencode.jsonc` (полный пример ниже). Из исходников:
 
@@ -117,20 +124,39 @@ bun install
 }
 ```
 
-Пароли обычно берутся из env, по одному на аккаунт; inline `password` принимается, но не рекомендуется:
+Пароли обычно берутся из env, по одному на аккаунт; inline `password` принимается, но не рекомендуется.
+Для фонового сервиса OpenCode обычно проще `{file:...}`: подстановку делает загрузчик конфига, поэтому не нужен
+ни рестарт сервиса, ни переменные окружения.
 
-```bash
-export MAIL_PASSWORD_PRIMARY='...'
-export MAIL_PASSWORD_SHARED='...'
-export NODE_EXTRA_CA_CERTS='/path/to/root-ca.pem'   # только для внутреннего CA
+```jsonc
+"accounts": [
+  {
+    "id": "primary",
+    "ewsUrl": "https://exchange.example.com/EWS/Exchange.asmx",
+    "username": "DOMAIN\\bot",
+    "selfAddress": "bot@example.com",
+    "password": "{file:C:/Users/me/.config/opencode/secrets/mail-primary.txt}"
+  }
+]
 ```
+
+В файле — только пароль одной строкой. Env-переменные (`MAIL_PASSWORD_<ID>` / `MAIL_PASSWORD`) читает
+**процесс фонового сервиса** при `setup()`, а не терминал, из которого запущен `opencode`; `.env` проекта
+плагин не читает. `{env:VAR}` в конфиге тоже работает, но переменная всё равно должна быть в окружении сервиса.
 
 `MAIL_PASSWORD` — fallback, если per-account переменная не задана. `<ID>` — id аккаунта в верхнем регистре,
 не-алфанумерика заменяется на `_`; единственный аккаунт получает `default`, несколько без явных id —
 `account-1`, `account-2`, …
 
-Без `NODE_EXTRA_CA_CERTS` Bun не доверяет внутреннему CA; симптом — непрозрачный
-`undefined is not an object (evaluating 'response.headers')` из `@ewsjs/xhr`, а не `UNABLE_TO_VERIFY_LEAF_SIGNATURE`.
+С `caFile` плагин добавляет PEM в trust store рантайма через `tls.setDefaultCACertificates`, поэтому для EWS
+`NODE_EXTRA_CA_CERTS` не обязателен. Если рантайм не поддерживает этот API, плагин предупреждает; задайте
+`NODE_EXTRA_CA_CERTS` до запуска OpenCode. Отсутствующий путь `caFile` — это `ConfigError` при старте;
+существующий, но нечитаемый или невалидный файл логируется и пропускается для этого аккаунта, а валидные
+`caFile` всё равно применяются. Заменённый по тому же пути PEM переприменяется на следующем setup
+(хэш содержимого). Ротация только добавляет доверие: старый корень остаётся доверенным до перезапуска
+процесса; чтобы отозвать скомпрометированный CA, перезапустите OpenCode. Standalone-скрипты на Bun, импортирующие исходники плагина, не наследуют
+trust store сервиса — запускайте их с `NODE_EXTRA_CA_CERTS=<root-ca.pem>` или внутри процесса OpenCode.
+Ошибка TLS/CA показывается как `EWS TLS/CA handshake failed; check NODE_EXTRA_CA_CERTS...`.
 
 ### Конфигурация
 
@@ -151,9 +177,9 @@ URL, логин и пароль не имеют значений по умолч
 | `maxBodyBytes` | `MAIL_MAX_BODY_BYTES` | 100000 (max 1 000 000) | обрезка тела, байты UTF-8 |
 | `syncIntervalMinutes` | `MAIL_SYNC_INTERVAL_MINUTES` | 5 (max 1440) | период обновления индекса |
 | `allowSend` | `MAIL_ALLOW_SEND` | `true` | разрешить `mail.send`; `true/false/1/0/yes/no/on/off`; неизвестное значение — `ConfigError` |
-| `requestTimeoutMs` | `MAIL_REQUEST_TIMEOUT_MS` | 30000 | таймаут EWS, мс (≤120000) |
+| `requestTimeoutMs` | `MAIL_REQUEST_TIMEOUT_MS` | 30000 | таймаут EWS-вызова, мс (≤120000); покрывает весь вызов, включая NTLM preflight; висящий stream ограничен удвоенной величиной сокетной неактивности плюс `signal`/`disconnect` |
 | `codemode` | `MAIL_CODEMODE` | `false` | `false` — прямые tools; `true` — только через Code Mode `execute` (глобально) |
-| `caFile` | `MAIL_CA_FILE` | — | проверка наличия PEM и подсказка про `NODE_EXTRA_CA_CERTS`; TLS-доверие задаёт только env |
+| `caFile` | `MAIL_CA_FILE` | — | PEM корневого/промежуточного CA; применяется в trust store рантайма при setup (fallback: `NODE_EXTRA_CA_CERTS`); отсутствующий путь — `ConfigError`, невалидное содержимое логируется и пропускается |
 
 Верхнеуровневые опции наследуются `accounts[]`; значения аккаунта перекрывают их, кроме `codemode` (глобальный).
 `dataDir` должен быть обычным путём: extended-length (`\\?\`) и device (`\\.\`) namespace отвергаются с
@@ -167,23 +193,63 @@ URL, логин и пароль не имеют значений по умолч
 |---|---|
 | `mail_accounts` | список аккаунтов (id, адрес, EWS URL, режим хранения) |
 | `mail_folders` | папки с unread/total |
-| `mail_list` | письма в папке (метаданные, пагинация) |
-| `mail_search` | локальный FTS + EWS-поиск по телу (Inbox), merge и дедупликация |
-| `mail_get` | письмо + тело; `fetched` / `bodyCached` |
+| `mail_list` | письма в папке (метаданные, включая `size`; `attachmentCount`, когда известен; пагинация) |
+| `mail_search` | локальный FTS + EWS-поиск по телу (Inbox), merge и дедупликация; те же поля, что у `mail_list` |
+| `mail_get` | письмо + тело; `size` (когда известен), `attachmentCount` (когда известен), `fetched` / `bodyCached` |
+| `mail_delete` | удалить по id; soft (в «Удаленные»; старый id становится недействительным) или `hard: true` (безвозвратно) |
+| `mail_empty_deleted` | безвозвратно удалить элементы верхнего уровня «Удаленных» (подпапки остаются); требует `confirm: true` |
 | `mail_sync` | инкрементальный `SyncFolderItems`; `{synced, complete}` |
 | `mail_draft` | создать черновик |
 | `mail_send` | отправить; `{sent: true}` (EWS `Send` не возвращает id) |
 | `mail_calendar` | события за период |
 | `mail_contacts` | контакты; `query` сканирует до 500 контактов страницами |
 
-Права: `mail.read` (чтение), `mail.draft` (черновики), `mail.send` (отправка).
+Права: `mail.read` (чтение), `mail.draft` (черновики), `mail.send` (отправка), `mail.delete`
+(`mail_delete` и `mail_empty_deleted`). `mail_empty_deleted` необратим и требует `confirm: true`; `confirm` —
+защита на уровне модели, а фактический гейт — право `mail.delete`. Для остального предпочитайте soft-удаление
+(`mail_delete` без `hard`).
 `account` выбирает ящик; по умолчанию первый аккаунт.
 `codemode: false` (default) — tools видны напрямую; `codemode: true` — только через `execute`.
+
+### Удаление
+
+`mail_delete` по умолчанию переносит письма в «Удаленные»; `hard: true` удаляет их безвозвратно.
+`mail_empty_deleted` безвозвратно удаляет элементы верхнего уровня «Удаленных»; подпапки остаются.
+Обоим нужно право `mail.delete`; `mail_empty_deleted` дополнительно требует `confirm: true`.
+
+В локальном индексе оба режима помечают затронутые строки tombstone. Exchange присваивает новый ItemId при
+переносе в «Удаленные», поэтому старый id становится недействительным: выполните `mail_sync` для `deleted`,
+чтобы получить новый id; обычный `mail_list` может отдать свежий кэш и не показать новую строку до
+следующего интервала sync. `mail_get`/`mail_delete` по старому id будут падать до синхронизации. Очистка также помечает tombstone все проиндексированные строки `deleted`. Если EWS отклонил весь пакет,
+индекс не меняется; при ошибках по части элементов применяются только подтверждённые удаления, а вызов
+падает со счётчиками и первой причиной. Транспортная ошибка после запроса может оставить исход неизвестным:
+перед повтором выполните `mail_sync`.
+
+Id передаются в EWS `DeleteItem`, поэтому передавайте только mail-id. Если передан id встречи, EWS удалит её
+с `SendToNone` (участники не получат отмену); плагин не различает классы элементов до удаления.
+
+### Поля письма
+
+`mail_list`, `mail_search` и `mail_get` отдают `size` (EWS `ItemSize`, байты), если размер пришёл в
+summary. На живой EWS-странице поля приходят из уже запрошенного `AllProperties`; кэшированная страница
+без них делает максимум один batch `BindToItems` (Size/HasAttachments/Attachments + To/Cc, без Body) и
+сохраняет результат; подтверждённый Success не повторяется, а Error/Warning/пустой batch повторяется
+после 60-секундного кулдауна. `attachmentCount` (включая inline-вложения)
+присутствует, когда элемент загружен со свойством `Attachments`: в `mail_get`, выполняющем bind, и в
+результатах `mail_list`/`mail_search` с живой EWS-страницы или после этого batch. Для кэшированной строки
+0 выводится из `hasAttachments: false`; при наличии вложений count отсутствует до живого bind. Это
+кэшированное измерение, и после изменения вложений оно может устареть. У тела, закэшированного старой
+версией, оба поля могут отсутствовать. `hasAttachments` остаётся дешёвым boolean. `mail_get` сохраняет полученные
+`size`/`attachmentCount` в локальный индекс. Строки с неподтверждённой batch-загрузкой (`Error`/`Warning`)
+отбрасываются. Если вся batch-загрузка упала, строки возвращаются как envelope из FindItems: `id`, `subject`,
+`size`, `hasAttachments`; `attachmentCount` нет, `recipientsKnown` = `false`; кэшированный/search-путь
+дозаполняет получателей лениво, а live-страница `mail_list` отдаёт envelope как есть (в `to` может быть пусто).
 
 Область поиска: каждый поиск объединяет локальный FTS (`inbox`, `sent`, `drafts`, `deleted`) с EWS-поиском
 по subject/body в `Inbox`, дедупликация по id; возвращаются самые новые `limit` совпадений. Остальные папки
 EWS-половиной не покрываются. Один EWS-вызов `FindItems` (~0.5 с), один `LoadPropertiesForItems` (GetItem) для
-непустой страницы и `BindToItems`, если в выдаче есть письма с неизвестными получателями.
+непустой страницы и `BindToItems`, если в выдаче есть письма с неизвестными получателями или без
+`size`/`attachmentCount`; этот batch не запрашивает `Body`.
 
 Локальный FTS трактует пунктуацию внутри слова как границу токенов и сохраняет их смежность (`R&D` и
 `R & D` ищут фразу `R D`). Числовые фрагменты и email-адреса сначала ищутся как фразовые префиксы, затем —
@@ -194,13 +260,15 @@ Runtime-оговорка: имена tools, видимость `codemode` и per
 
 ### Получатели
 
-`SyncFolderItems` не возвращает `To`/`Cc`. Для страницы с неизвестными получателями `mail_list`/`mail_search`
-делает один `BindToItems` (`ToRecipients` + `CcRecipients`) и кэширует результат; `mail_get` тоже обновляет
+`SyncFolderItems` не возвращает `To`/`Cc`. Для страницы с неизвестными получателями или без
+`size`/`attachmentCount` `mail_list`/`mail_search` делает один `BindToItems` (`ToRecipients` + `CcRecipients`
++ `Size` + `HasAttachments` + `Attachments`, без `Body`) и кэширует результат; `mail_get` тоже обновляет
 `to`/`cc`. `recipientsKnown: true` — значения достоверны (включая «получателей нет»);
 `false` — enrichment не удался или не уложился в бюджет, `to` пуст, `cc` отсутствует.
 
-Enrichment добавляет не более `min(2000, max(500, requestTimeoutMs/5))` мс задержки. При таймауте страница
-возвращается с `recipientsKnown: false`, а enrichment паркуется на 60 секунд.
+Бюджет enrichment покрывает ожидание EWS (`min(2000, max(500, requestTimeoutMs/5))` мс); запись страницы
+в SQLite — локальная работа и в бюджет не входит. При таймауте, транспортной ошибке или non-Success batch
+неподтверждённые строки возвращаются с неизвестными полями, а enrichment паркуется на 60 секунд.
 
 ### Ошибки
 
@@ -250,13 +318,12 @@ plaintext-индекс окажется там. Держите его вне п�
 
 ## Roadmap
 
-См. [docs/roadmap.md](docs/roadmap.md): шифрование SQLite с поиском по телу, Graph-бэкенд для Exchange Online,
-свой XHR-провайдер вместо глобального патча axios.
+См. [docs/roadmap.md](docs/roadmap.md): шифрование SQLite с поиском по телу, Graph-бэкенд для Exchange Online.
 
 ## Риски
 
 См. [risks.md](risks.md) — полный список (plaintext SQLite, поддержка библиотеки, EWS retirement в Exchange
-Online, глобальный патч axios).
+Online).
 
 ## Разработка
 

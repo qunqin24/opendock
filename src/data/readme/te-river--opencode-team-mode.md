@@ -77,7 +77,7 @@ Under the table sits the workflow discipline: deterministic routing, a ≤30-lin
 | 🧪 **Tester** | Test engineer | Real edge-case tests; static verification; governed UI verification via the host's native `browser_*` tools |
 | 🔎 **Researcher** | Knowledge finder | Local repo first, then the web — one of the two network roles (with the Lead) |
 
-Out of the box, **Team is your default agent** — new chats open straight into the orchestrator (opt out in [Configuration](#️-configuration)).
+Out of the box, **Team is your default agent** — the installer writes `default_agent: "Team"`, so new chats open straight into the orchestrator (see [Configuration](#️-configuration)).
 
 ---
 
@@ -237,10 +237,11 @@ The offload / trajectory / memory stores live under `<repo>/.git/opencode-team/`
 | Layer | Path | Precedence |
 |---|---|---|
 | **global** | `~/.config/opencode/team-mode.jsonc` (honours `OPENCODE_CONFIG_DIR`) | lowest — every project |
-| **project** | `<dir>/team-mode.jsonc`, walking from the workspace **up to the filesystem root** | higher — direct files merge farthest→closest |
-| **project** | `<dir>/.opencode/team-mode.jsonc`, same walk | **highest** — every `.opencode/` file overrides every direct file |
+| **project** | `<dir>/team-mode.jsonc`, walking from the workspace **up to the filesystem root** | middle — direct files merge farthest→closest |
+| **project** | `<dir>/.opencode/team-mode.jsonc`, same walk | highest user layer — every `.opencode/` file overrides every direct file |
+| **system** | `%ProgramData%\opencode\team-mode.jsonc` (Windows) / `/etc/opencode/team-mode.jsonc` (POSIX) | **highest overall** — the host's managed-settings layer outranks every user layer |
 
-That walk and precedence are the host's own config-layering rule, copied rather than invented. JSONC comments are masked at the byte level, so a commented-out key cannot read as live. A layer that fails to parse is skipped **whole**; a single bad key loses only itself; unknown keys are warned about and never applied. `tm_stats` renders the result: per-key source, skipped layers, unknown keys, auto-create state.
+So there are **three** file layers (`global < project < system`), and that walk and precedence are the host's own config-layering rule, copied rather than invented; on a platform with no derivable root (Windows without `PROGRAMDATA`) the system layer does not exist and the report says so. JSONC comments are masked at the byte level, so a commented-out key cannot read as live. A layer that fails to parse is skipped **whole**; a single bad key loses only itself; unknown keys are warned about and never applied. `tm_stats` renders the result: per-key source, skipped layers, unknown keys, auto-create state.
 
 ### It writes itself
 
@@ -250,7 +251,7 @@ When the global file is **absent**, the plugin creates it at boot — atomically
 // 全局配置。取消注释即可生效；默认全部注释 = 什么都不设置。
 {
   // "offloadThreshold": 2000,            // 卸载阈值（估算 token；等于阈值也卸载）。
-  // "envProtect": "strict",              // R6 环境防护模式（strict/standard/off）。（红线：仅全局）
+  // "envProtect": "strict",              // R6 环境防护模式（strict/standard/off）。（红线：仅全局或 system）
   // …共 64 个键，每个都带一行说明
 }
 ```
@@ -259,7 +260,7 @@ Turn it off with the plugin option `autoCreate: false`, or the internal switch `
 
 ### Red-line keys
 
-Five keys are **honored only in the global file**: `envProtect`, `r6FineAsk`, `privateSpace`, `webfetchAllowedDomains`, `bashReadonlyAllowed`. A project file may set them, but the value is **ignored and reported** — a committed project config must not switch off a guard for everyone who clones the repo. The set is derived from the registry (`redLine: true`), so a new red-line key is red-line by declaration.
+Five keys are **honored only in the global or `system` file**: `envProtect`, `r6FineAsk`, `privateSpace`, `webfetchAllowedDomains`, `bashReadonlyAllowed`. A project file may set them, but the value is **ignored and reported** — a committed project config must not switch off a guard for everyone who clones the repo; the `system` layer is the admin-managed one, so it MAY set them. The set is derived from the registry (`redLine: true`), so a new red-line key is red-line by declaration.
 
 ### Plugin options
 
@@ -276,7 +277,7 @@ Options live on the plugin entry, not in `team-mode.jsonc`:
 
 | Option | Default | Meaning |
 |---|---|---|
-| `defaultAgent` | `true` | Promote Team to the default agent slot. |
+| `defaultAgent` | `true` | Check and report which agent the installer's `default_agent` names. The 2.1.x plugin ctx has no `agent.default`, so the plugin cannot promote anything; `false` skips the check. |
 | `autoCreate` | `true` | Write the inert global `team-mode.jsonc` at boot when absent. |
 | `ttlDays` (alias `blackboardTtlDays`) | `5` | Blackboard retention, valid range (0, 365]. |
 | `envProtect` | `true` | Plugin-wide kill switch; `false` resolves the R6 mode to `off`. |
@@ -321,7 +322,7 @@ Your own agents named `team` / `architect` / … always take precedence; the plu
 | `boardMaxChars` | number | `200000` | `tm_board_write` per-file cap — over it the write refuses (with a split-the-topic hint) rather than truncating a deliverable. |
 | `boardMaxFiles` | number | `200` | Markdown files per session folder; the TTL sweeper is the only reclaim path, so the refusal names it. |
 | `joinMaxWaitMs` | number | `60000` | Ceiling on `tm_join { waitMs }`; a second consecutive wait that settled nothing is cut to 10 s with a "stop waiting" directive. |
-| `ledgerMaxItems` | number | `200` | `tm_ledger` items per session; past it the list refuses rather than quietly dropping the oldest asks. |
+| `ledgerMaxItems` | number | `1000` | `tm_ledger` items per session; past it the oldest DONE items are archived to `team-mode/ledger-archive` (and reported), and only when nothing is left to archive does the list refuse — it never quietly drops an ask. |
 | **Memory** | | | |
 | `memoryGlobalDir` | string | auto | GLOBAL tier store; empty = `~/.opencode-team/memories/global`. |
 | `memorySessionTtlMin` | number | `240` | Session-tier entry TTL (lazy + boot sweep). |
@@ -442,7 +443,7 @@ Module map, per-layer seams and every measured host fact: [AGENTS.md](./AGENTS.m
 }
 ```
 
-**Disable one:** `"researcher": { "disable": true }`. Board retention, auto-create, the default slot and the R6 kill switch are plugin-entry `options` — see [Configuration](#️-configuration).
+**Disable one:** `"researcher": { "disable": true }`. Board retention, auto-create, the default-agent check and the R6 kill switch are plugin-entry `options` — see [Configuration](#️-configuration).
 
 ## ❓ Troubleshooting
 

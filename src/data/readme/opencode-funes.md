@@ -1,13 +1,15 @@
 # opencode-funes
 
 A [funes](https://github.com/huggingface/funes) integration for OpenCode: it gives OpenCode
-funes's read tools, and keeps your memory current by converting each session into funes's
-[turns format](https://github.com/huggingface/funes/blob/main/docs/funes-jsonl.md) as you work.
+funes's read tools, keeps your memory current by converting each session into funes's
+[turns format](https://github.com/huggingface/funes/blob/main/docs/funes-jsonl.md) as you work,
+and, with a memory bound, publishes it at the session boundaries.
 
 It follows funes's
-[integration contract](https://github.com/huggingface/funes/blob/main/docs/add.md#the-integration-contract),
-so it needs funes **1.4.0** or newer. It works with OpenCode 1 (**1.18.29** or newer) and
-OpenCode 2, and is developed against **1.18.31** and **2.0.20**.
+[integration contract](https://github.com/huggingface/funes/blob/main/CONTRIBUTING.md#the-integration-contract),
+so it needs funes **1.4.0** or newer; it is developed against **1.9.1**, whose memory binding and
+publishing this README describes. It works with OpenCode 1 (**1.18.29** or newer) and OpenCode 2,
+and is developed against **1.18.31** and **2.0.20**.
 
 ## Install
 
@@ -22,7 +24,9 @@ funes add opencode <user|org>/funes-memory --from "$(npm root -g)/opencode-funes
 A clone of this repository works the same way: name its `opencode` directory with `--from`.
 
 funes asks you to confirm before it runs files it did not publish — once, until they change.
-The second form binds a memory: recall reads it, and `funes add` does the first push there.
+The second form first binds this host to a memory, as `funes bind` does: every installed agent
+recalls from it and publishes to it, and `funes add` does the first push there. The first form
+installs on the memory the host is bound to, or the local one when it is bound to none.
 
 What the install puts on the machine:
 
@@ -38,20 +42,30 @@ loads its configuration, and only when `mcp.funes` is absent:
 ```json
 {
   "mcp": {
-    "funes": { "type": "local", "command": ["/path/to/funes", "mcp"], "enabled": true }
+    "funes": {
+      "type": "local",
+      "command": ["/path/to/funes", "mcp"],
+      "environment": { "HF_HUB_USER_AGENT_ORIGIN": "funes; agent/opencode" },
+      "enabled": true
+    }
   }
 }
 ```
 
-A bound memory follows `mcp` in that command. Existing MCP entries, including a disabled or
-custom funes server, are preserved. The agent discovers the tools from funes itself; the
-plugin does not restate them. OpenCode 2 has no configuration hook: there the plugin registers
+A bound memory follows `mcp` in that command. The environment has funes name itself and OpenCode
+in its Hub requests, as the integrations funes maintains do; an origin OpenCode was started with
+is kept in front, and `funes index` and `funes push` run with the same. Existing MCP entries,
+including a disabled or custom funes server, are preserved. The agent discovers the tools from
+funes itself; the plugin does not restate them. OpenCode 2 has no configuration hook: there the plugin registers
 the same server through the MCP domain, again only when none named `funes` is configured, and
 it shows up as `mcp.servers.funes` in OpenCode 2's terms.
 
-Re-run `funes add opencode [memory]` to change the memory, and name `--from` again to install
-a newer version. Either also makes the plugin convert each project's history anew, which is
-how a memory is rebuilt. `funes remove opencode` takes the plugin file, the spool and the
+`funes bind <memory>` changes the memory, every installed agent following: funes re-runs this
+setup, which records the memory beside the bundle, and OpenCode takes it at its next start.
+`funes update` leaves an install named with `--from` as it is, so a newer version is the
+package updated and `funes add opencode --from …` run again. Each run of the setup also makes
+the plugin convert each project's history anew, which is how a memory is rebuilt; funes drops
+the turns it holds already. `funes remove opencode` takes the plugin file, the spool and the
 bundle away, and leaves your memory and OpenCode's own sessions untouched.
 
 ## What is indexed, and when
@@ -92,9 +106,19 @@ during a run remain queued. Errors are logged and retried after 1, 2, 4, ... sec
 at 60 seconds. The queue is in memory; a restart sweeps again. Disposal cancels active
 requests, processes and timers.
 
-Publishing is not automated: with a memory bound, run `funes push <memory>` when you want
-to publish. Recall on a bound memory also reads what this machine has indexed and not
-pushed yet.
+With a memory bound, the plugin publishes at the boundaries OpenCode gives it, as
+`funes push <memory>`: after a project's startup sweep, which catches up whatever an earlier
+shutdown left behind, and when OpenCode disposes the plugin — OpenCode 1 at the end of
+`opencode run` and when the TUI quits, OpenCode 2's service when it unloads or reloads the plugin
+or shuts down. A conversion that disposal cuts short waits for the next start's sweep, and is
+published after it. The push runs detached, so it outlives OpenCode, and writes what funes says to
+`funes-sync.log` beside the bundle. Publishing needs
+[TruffleHog](https://github.com/trufflesecurity/trufflehog) on `PATH`, and the first push to a
+freshly bound memory is `funes add`'s or `funes bind`'s to make, at a terminal: until one has,
+funes refuses the plugin's and the log says so (the
+[wrong-memory guard](https://github.com/huggingface/funes/blob/main/docs/automation.md#how-it-behaves)).
+Recall on a bound memory also reads what this host has indexed and not pushed yet. Without a
+memory, nothing is published.
 
 ## Converting by hand
 
@@ -156,10 +180,10 @@ needs no model and no network beyond the fetch. `OPENCODE_V1` and `OPENCODE_V2` 
 of your own, and `SMOKE_KEEP=1` leaves the temporary homes behind, logs included. Pull
 requests run the tests, the typecheck and the smoke test on Linux and macOS.
 
-To try a working copy in OpenCode itself:
+To try a working copy in OpenCode itself, on the memory this host is bound to:
 
 ```sh
-funes add opencode local --from ./opencode
+funes add opencode --from ./opencode
 funes remove opencode
 ```
 

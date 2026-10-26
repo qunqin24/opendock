@@ -94,7 +94,7 @@ about your prompts.
 |---|---|---|---|
 | `build` | write and verify the change | Flint 40B Free | 6.9 s |
 | `plan` | turn a request into a plan | Beam | **6.1 s** |
-| `reviewer` | read a change in two passes | Nemotron 3 Ultra | 7.8 s (34 s cold) |
+| `reviewer` | read a change in two passes | GLM 5.3 Flash | 7.4 s |
 | `locate` | find where something lives | Nemotron 3.5 Lightning | 6.9 s |
 | `verify` | run the project's checks | Big Pickle | 10.4 s |
 | `vision` | read an image or a screenshot | MiMo-V2.6 Flash | 9.3 s (19 s with an image) |
@@ -122,9 +122,9 @@ that has it. A delegation inside one session runs two different models — that
 was measured, not assumed:
 
 ```
-agent=build    modelID=minimax-m3.1-flash-free
-agent=reviewer modelID=nemotron-3-ultra-free
-agent=build    modelID=minimax-m3.1-flash-free
+agent=build    modelID=flint-40b-free
+agent=reviewer modelID=glm-5.3-flash-free
+agent=build    modelID=flint-40b-free
 ```
 
 Why ten lanes and not one model: the free tier is genuinely uneven, and the
@@ -144,23 +144,24 @@ capabilities the tier turns out not to have, is in
 Given a profile, `oc-harness use` writes an `opencode.jsonc` with every
 model-dependent number already worked out and commented:
 
-```
+```text
 $ oc-harness use fleet-safe --print
 
 // profile      fleet-safe
-// model        opencode/minimax-m3.1-flash-free
+// model        opencode/deepseek-v4.1-flash-free
+// utility      opencode/deepseek-v4.1-flash-free  (opencode's short calls: titles, summaries)
 // lanes        10 enabled, each on the first model its chain allows
-// context      1,000,000 tokens  (base model)
-// input cap    200,000 tokens  (narrowest lane; governs the shared reserve)
-// output cap   512,000 tokens
-// reasoning    low < medium < high < xhigh < max
+// context      200,000 tokens  (base model)
+// input cap    200,000 tokens
+// output cap   32,000 tokens
+// reasoning    low < high < max
 // retention    zero-retention
 //
 // Derived numbers, do not hand-edit:
 //   compaction.reserved  24,000  (12% of the narrowest input cap in play)
 //   prune threshold      176,000  (narrowest input cap minus reserve)
 //   role effort          plan=max  build=max  reviewer=max  locate=low  ...
-//   lane models          build=minimax-m3.1-flash-free (out 512,000)  plan=...
+//   lane models          build=deepseek-v4.1-flash-free (out 32,000)  plan=...
 ```
 
 Two numbers in there are worth explaining, because both were the wrong way
@@ -183,10 +184,11 @@ the substitution is reported:
 ```
 $ oc-harness show fleet-safe
   lanes
-  build                minimax-m3.1-flash-free  out 512,000
+  build                deepseek-v4.1-flash-free  out 32,000
   plan                 deepseek-v4.1-flash-free  out 32,000
+  reviewer             glm-5.3-flash-free        out 32,000
   locate               deepseek-v4.1-flash-free  out 32,000
-  vision               minimax-m3.1-flash-free    out 512,000
+  vision               deepseek-v4.1-flash-free  out 32,000
   ...
   lane effort
     plan       max
@@ -234,18 +236,20 @@ it. One file covers ten jobs either way.
 | `deepseek-v4.1-flash-free` | 5 | 200,000 | `max` | zero-retention |
 | `glm-5.3-flash-free` | 5 | 200,000 | `max` | zero-retention |
 | `nemotron-3.5-super-vl-free` | 5 | 1,048,576 | `xhigh` | **may train** |
-| `nemotron-3-ultra-free` | 5 | 1,000,000 | — | **may train** |
 | `nemotron-3.5-lightning-free` | 5 | 262,144 | — | **may train** |
 | `mimo-v2.6-flash-free` | 5 | 200,000 | — | **may train** |
 | `big-pickle` | 5 | 160,000 | — | **may train** |
+| `ollama-qwen3-coder` | 5 | 262,144 | — | zero-retention (local) |
 
 The five-lane profiles run everything on one model, which is the right shape
 when you want one route and want to know exactly which one.
 
 ## Free models are perishable, so check them
 
-Every model in the table above is a **free tier slot**, and free tier slots
-turn over in days. Zen states free models are available "for a limited time"
+Every model in the table above except `ollama-qwen3-coder` is a **free tier
+slot**, and free tier slots turn over in days. The Ollama profile is the one
+row that cannot be withdrawn by a provider: it runs on your machine, and its
+only cost is the memory to hold it. Zen states free models are available "for a limited time"
 with no date attached, so a profile is a snapshot of a moment rather than a
 stable thing.
 
@@ -274,17 +278,24 @@ withdrawn, and one of them was the **default** at the time:
 The full list, with a reason for each, is in
 [`profiles/index.json`](profiles/index.json).
 
-### The five commands, and when each one runs
+### The commands, and when each one runs
 
 | command | what it checks | when |
 |---|---|---|
 | `oc-harness list` | the profiles this kit ships, with retention and caveats | offline, any time |
-| `oc-harness doctor` | every profile against the live model catalogue, and the installed config against the active profile | **before every release**, and whenever a lane starts failing with a 429 or a "model not found" |
+| `oc-harness doctor` | every profile against the live model catalogue, and the installed config against the active profile | **before a release**, and whenever a lane starts failing with a 429 or a "model not found"; this is the online check, not the release gate |
 | `oc-harness doctor --check-models` | one run, non-zero when a shipped model is no longer in the catalogue | from cron: the shape a scheduler wants |
 | `oc-harness doctor --watch` | keeps watching, and reports only what **changed** | leave it in a terminal for a week |
 | `oc-harness research` | what could **replace** a withdrawn model, and which lanes each candidate could serve | when `doctor` reports a withdrawal, and from cron before it happens |
 | `oc-harness refresh <id>` | re-derives a profile's machine-derived fields from live metadata | when `doctor` reports drift |
 | `oc-harness verify` | the installed config still matches the profile, and the kit's own files are still installed | after every `use` / `install` |
+
+`npm run selfcheck` is the **release gate**: it builds, runs
+`npm run release:check -- --release` against the tarball that build produced,
+then typechecks, runs the suite, checks the import graph and the eval
+premises, and installs into a fresh directory. `doctor` is the online half —
+it reads models.dev and the installed config — and it is not a substitute for
+that gate.
 
 A cron line that tells you the moment a route disappears, rather than the
 moment a lane starts failing:
@@ -358,7 +369,7 @@ only a person could fill, by hand, out of a catalogue dump.
 ```
 $ oc-harness research
 
-research  tier opencode, 10 live of 46 free
+research  tier opencode, 9 live of 46 free
 
   ✓ every model in use is still live
 
@@ -370,12 +381,7 @@ research  tier opencode, 10 live of 46 free
 
   candidates  live, free, and not in use yet
 
-      flint-40b-free  ctx 262,144  out 65,536  effort low,medium,high,xhigh,max
-        fits: plan, build, reviewer, locate, verify, doc, schema, sweep, longform
-        retention: unknown
-        no retention verdict in retention.yml - a person has to read the provider's terms
-
-  nothing here is written anywhere. A retention verdict is a person reading a provider's terms.
+  no live free model outside the ones the kit already uses
 ```
 
 That is the healthy state. When something has been withdrawn, the same command
@@ -408,6 +414,10 @@ It reports four things:
    its context window, its output cap, the effort levels it publishes, and
    **which lanes it could serve**.
 4. **What is still undecided** about each candidate.
+
+A candidate can be live in the catalogue and still unable to answer. The
+probe result goes in `eval/unusable-models.json`, and both `research` and
+`eval/models.mjs --free` skip it until somebody re-probes it.
 
 #### Why the candidate list knows about lanes
 
@@ -580,7 +590,25 @@ oc-harness cost      what the kit is doing on this project, in numbers
 oc-harness restore <file>  put one back
 oc-harness baseline   measure the current install
 oc-harness run        build and verify .space/tasks.md, one task at a time
+oc-harness status     what the last run did, from .space/run.json
+oc-harness report     the last run as numbers: phases, tokens, verifies, failures
+oc-harness resume     continue an interrupted run, including one inside a worktree
+oc-harness work --cleanup  remove a finished worktree run; --force-cleanup discards one
+oc-harness health     routes recorded as spent; --probe asks every route once
+oc-harness mcp        read-only MCP server over stdio for editors
+oc-harness plan "<request>"  turn a request into .space/tasks.md, and refuse a plan the loop cannot run
+oc-harness work "<request>"  plan when needed, then build, verify, review and finish
 ```
+
+`work` is strict by default: it wants `--review`, `--final-verify`,
+`--final-review`, `--worktree` and `--commit` (and a git repository). For a
+quick local run on a dirty tree, pass `--no-strict`.
+
+Two flags change where the work happens rather than what it does:
+`--sandbox container` runs verify commands in a Docker container with the
+project mounted at `/work` and no network; `--adapter exec --agent-command
+"<cmd>"` runs an agent other than `opencode`, with the prompt on stdin when the
+command has no `{prompt}` placeholder.
 
 The measurement scripts are in `eval/`, and each one says what it measures
 at the top of the file:
@@ -590,6 +618,10 @@ node eval/run.mjs               the pruner and the allowlist
 node eval/measure-prune.mjs     the pruner, on real sessions
 node eval/measure-install.mjs   before and after the install
 node eval/models.mjs            every model the profiles use, one line each
+node eval/models.mjs --free --list   free models, and the ones a probe rejected
+node eval/models.mjs --free --check  probe each free route: ok, empty, timeout, error
+node eval/graph.mjs --check     the import graph, and the profile -> lane -> model graph
+node eval/selfcheck.mjs         build, typecheck, suite, graph, premises, fresh install
 node eval/ab.mjs                the A/B: the same task with and without the kit
 node eval/compare.mjs           the same suite against any agent CLI, same grader
 ```
@@ -1045,9 +1077,11 @@ A spent model route is the other way a run looks like a failure and is not
 one. It shows up as an empty transcript - some providers exit 0 with it, others
 hang until the ceiling kills them. In the first shape `run` stops with exit 3
 and "the agent answered nothing" rather than verifying an untouched tree; in
-the second it names the route and the limit it waited out. Either way the
-advice is `opencode run --print-logs -m <model> hi`, and a smaller `--budget`
-fails sooner.
+the second it names the route and the limit it waited out, unless the agent
+had already edited files: then the task is blocked with exit 2 rather than
+retried, because a second route would start on top of a partial change. Either
+way the advice is `opencode run --print-logs -m <model> hi`, and a smaller
+`--budget` fails sooner.
 
 ## The skill loop
 
@@ -1070,24 +1104,86 @@ the conversation instead of the requirement.
 Publishing is never a loop step. `space-finish` prepares the change; a human
 decides it ships.
 
-`oc-harness run` automates the build-and-verify half of that loop, not the
-whole loop. It hands one task at a time to an agent, re-runs that task's own
-`verify:` command, and writes the real output back into `.space/tasks.md`. It
-does not plan, commit or push: those stay with `space-plan`, `space-finish`
-and the human. A task with no `verify:` is refused rather than assumed done,
-and so is one whose whole verify line is a command that cannot fail (`true`,
-`echo ok`). A task that edits files outside its `files:` line stops the run
-unless `--allow-extra-files` says otherwise. Because that check reads
-`git status`, `run` itself needs a work tree; outside one it refuses to start
-rather than run unfenced. `--force-unlock` clears a lock held by a live pid
-that has been reused by something else.
+`oc-harness run` is the loop. It hands one task at a time to an agent, runs
+that task's own `verify:` command, and writes the real output back into
+`.space/tasks.md`. A failed verify is not the end: the agent is handed the real
+failure and asked to fix it, up to `--max-fix-rounds` (default 2). A review
+failure works the same way. Only an exhausted fix budget marks a task blocked.
+No task has a verify command that cannot fail without the run refusing before
+the first agent is called.
+
+`oc-harness plan "<request>"` turns a request into `.space/tasks.md`, and
+refuses to write a plan the loop cannot run: every task needs `files:`,
+`change:` and a `verify:` that can fail. The plan is validated before it
+replaces an existing file; a rejected plan never overwrites a good one.
+
+`oc-harness work "<request>"` is the whole sequence in one command: plan if
+there is no executable plan, run the loop, then final verify and final review.
+It stops at the first of: a task that cannot be fixed, a plan that cannot be
+checked, a budget (time, tokens, or per task), a spent route, or a final check
+that fails. `.space/run.json` records every task, attempt, review and
+checkpoint; `.space/summary.md` is written only when the run actually finished.
+`--force` with a request replaces an existing valid plan before walking it;
+without it, a valid plan is kept. Outside a git repository `work` runs only
+with `--allow-extra-files`, which turns off the scope check it cannot make.
+
+The run is durable, not just resumable. Every phase change goes through the
+table in `src/driver/transitions.mjs`, and `.space/run.json` keeps the last 200
+transitions in `history`. `.space/tasks.md` is redacted and replaced
+atomically, so a crash cannot leave a half-written plan. A crash inside the
+loop ends the record as `needs-human` with exit 2 and releases the lock, which
+is what `resume` expects to find.
 
 `--review` closes the review gap without pretending a sentence is a verdict:
 after verify passes, the `reviewer` lane is asked for one JSON object matching
 [`docs/REVIEW-VERDICT.md`](docs/REVIEW-VERDICT.md). A pass marks the task done.
-A fail, a malformed reply or a crashed reviewer marks it blocked and stops the
-run with exit 5. The validated verdict is written to `.space/review/`, so the
-decision can be audited after the fact.
+A fail goes back to the build agent with the blockers, then verify and review
+run again. A malformed reply or a crashed reviewer stops the run with exit 5.
+Every verdict is written to `.space/review/`, numbered by review, so the
+failure that caused a fix and the review that replaced it are both kept
+instead of the second overwriting the first.
+
+### The verify command is code
+
+A `verify:` line is shell, and the driver runs it directly. Handing the loop a
+task file is therefore handing it code, so execution is an explicit decision:
+
+```
+oc-harness run --print-verify     # print the commands, run nothing
+oc-harness run --trust-verify     # run them
+```
+
+On a terminal without `--trust-verify`, `run` lists the commands and asks
+`y/N`. Off a terminal it refuses: a scheduled job that silently ran a task file
+from a branch it did not write is exactly the failure this gate exists for.
+`--print-verify` with `--json` prints those commands as a JSON object, so a
+script that parses every `--json` result with one reader is not handed a bare
+command list on this one path.
+
+### Exit codes
+
+| code | meaning |
+|---|---|
+| 0 | every task done, and any final verify/review that was asked for passed |
+| 1 | no task file |
+| 2 | bad plan, trust refused, scope violation, budget spent, round cap, or a task already blocked |
+| 3 | a model route failed before it edited anything (task left pending; `work` tries the next route), the build agent ran and then failed, or another run holds the live lock |
+| 4 | a verify failed after its fix rounds, or a final verify failed |
+| 5 | a review failed after its fix rounds, or the reviewer's answer was not a verdict |
+
+`--final-verify "<cmd>"` runs one command after the last task - the project's
+whole suite, not one task's slice. `--final-review` reviews the whole diff from
+the commit the run started at, not just the last task. `--json` prints one
+machine-readable report on stdout and sends human progress to stderr;
+`oc-harness status` answers "what did the last run do" from the record.
+
+`work` can run on its own branch (`--branch`), commit each finished task and
+only the paths it touched (`--commit`), or do the whole run in a separate
+worktree under `.space/worktrees/` (`--worktree`). It never pushes, opens a
+pull request or publishes. A spent model route is retried once per other route
+in the lane chain, with `OC_HARNESS_MODEL` selecting the next one - never on the
+route that just failed. A timeout that already changed files is not retried:
+the task is blocked so the partial edit cannot be stacked under a second route.
 
 ## What it costs, measured
 
@@ -1148,74 +1244,6 @@ Whether it is worth it depends on whether the work is long. A repository of
 one-file lookups should not install this. The full table is in
 [eval/RESULTS.md](eval/RESULTS.md).
 
-## The token budget
-
-A free tier is one shared window: every request in every session draws on it,
-and when it runs out the provider answers with a limit error instead of
-tokens. opencode never shows a number for it. One real chat session made 599
-requests and 12,025,980 uncached input tokens; the first sign of trouble was
-the next request being refused, which reads as a broken model rather than a
-spent budget.
-
-The guard counts it. Each `step-finish` part reports what that request cost:
-
-| field | what it is | counted |
-|---|---|---|
-| `input` | the part of the prompt that was not in the provider's cache | yes |
-| `cache.read` | the cached prefix the model still had to read | yes |
-| `cache.write` | the prefix stored for the next request | yes |
-| `output`, `reasoning` | what the model wrote | no |
-
-The count is the whole context, not `input`. Counting `input` alone looks
-right and is not: with prompt caching, one measured stream reported 844, 1,289
-and 391 uncached tokens against 36,480, 7,808 and 9,088 cached ones. A budget
-built on the first column needed five to forty times the real spend to fire, and
-the window ran out first - which is exactly what happened. The guard sums the
-context per session, and at two thresholds it acts:
-
-| | default | what happens |
-|---|---|---|
-| `OC_HARNESS_BUDGET_WARN` | 2,000,000 | one toast: this session has used N context tokens |
-| `OC_HARNESS_BUDGET_STOP` | 5,000,000 | tool calls are refused, with the number and the fix |
-
-```bash
-OC_HARNESS_BUDGET_STOP=2000000 opencode    # a smaller window for a long task
-OC_HARNESS_BUDGET_WARN=0 OC_HARNESS_BUDGET_STOP=0 opencode   # off
-```
-
-The stop is a refusal with an explanation, not a crash: the model gets the
-message that the session hit its budget and that a new session is the fix. A
-subagent gets its own session and its own count, so its tokens are not
-charged to the conversation that started it.
-
-### The window is shared, so a new session does not reset it
-
-The per-session count is the wrong shape for the thing that actually runs out.
-The free tier is one window per account: session A spends it, and session B -
-opened a minute later to get a clean count - is refused on its first request.
-Two sessions were measured spending one window 47 and 33 minutes apart, so
-"open a new session" is not a fix once the window is gone.
-
-The guard therefore keeps a ledger, not just a counter. Every session's spend
-is written to one file and the window is the sum of the entries inside it:
-
-| | default | what happens |
-|---|---|---|
-| `OC_HARNESS_BUDGET_WINDOW_MINUTES` | 60 | how far back the sum reaches |
-| `OC_HARNESS_BUDGET_WINDOW_WARN` | 4,000,000 | one toast: the account has used N in the window |
-| `OC_HARNESS_BUDGET_WINDOW_STOP` | 8,000,000 | tool calls are refused in *every* session, old or new |
-
-The ledger is `OC_HARNESS_BUDGET_FILE`, default
-`$XDG_STATE_HOME/opencode-harness-kit/budget.json` (`~/.local/state/...` when
-`XDG_STATE_HOME` is unset).
-
-The file is written atomically (write, then rename), an unreadable file reads
-as empty rather than failing the session, and entries older than six hours are
-dropped on the next write. `0` disables either threshold. The stop is checked
-when the tool is called, not when the session starts, so a session opened
-after the window ran out is still refused - with the window's number, not the
-session's.
-
 The other half is the fixed cost. opencode writes every discovered skill's
 name and description into the system message, so a machine with a large skill
 collection pays tens of thousands of tokens on every request, before the
@@ -1228,17 +1256,7 @@ oc-harness use fleet-safe --no-skills
 omits the skill list from the lanes' prompt and says so in the config header.
 It is off by default: removing a capability is the user's call, not the kit's.
 
-It covers the ten lanes. **Subagents are a separate surface** and a separate
-decision: the flag does not touch them, because the kit does not generate them
-and a subagent's prompt is where a skill is usually named. On this machine
-thirty-three subagents came from the ECC bundle with the tool enabled, and the
-rule applied to them was mechanical rather than uniform: the tool is turned
-off where the prompt never says `skill:`, and left on where it does - six
-Java/Kotlin/PHP/Python/C++ agents tell themselves to read `springboot-patterns`,
-`kotlin-patterns` and the like, so removing the tool would have made their
-instructions unrunnable. Twenty-six of the thirty-three were off. The list is
-per-machine config, not a kit default; a reinstall of the bundle can reset it,
-and `oc-harness verify` does not check it.
+It covers the ten lanes. **Subagents are a separate surface**: `--no-skills` does not change a subagent's `skill` tool. It does remove every entry in the generated agent map whose prompt path is `prompts/agents/<name>.txt` - the bundled ECC subagents - because their descriptions were loaded on every request while their prompts were read only when one was delegated to. A lane, or an agent whose prompt is any other path, is left alone; a hand-written agent that reuses the `prompts/agents/` path is removed like the bundle's own. The config header names every entry removed, and the `skill` tool on a subagent left in place is still your call, not the kit's.
 
 ## Known limits
 
@@ -1307,17 +1325,28 @@ wants a subject it can hand each run a private copy of:
 ```bash
 node eval/prepare.mjs --repo ~/work/lablab-harness --ref 8a674f5
 node eval/ab.mjs --target <printed path> --suite eval/tasks.json --reps 2 --sanitize
-node eval/ab.mjs --rescore <saved stream dir>   # re-grade without spawning agents
+node eval/ab.mjs --target <printed path> --suite eval/tasks.json \
+  --rescore <saved stream dir>   # re-grade without spawning agents
+node eval/premises.mjs --target <printed path> --suite eval/tasks.json
 ```
 
+`premises` is the freshness check for a suite: it resolves every `file:line`
+citation the tasks make against the target and exits non-zero on the first one
+that no longer exists. Run it after a subject moves, before spending runs or
+trusting a rescore. Point it at this repository and `eval/tasks-self.json` to
+check the kit's own suite.
+
 `--fail-fast <n>` (default 2) stops the suite when `n` runs in a row produce
-no tool call and no text. That is what a spent free route looks like: the run
-hangs until the per-run ceiling and is recorded as a timeout, so without this
-a 36-run suite spends hours measuring the provider's quota. A quota error the
+no tool call and no text, or when `n` timeouts in a row went quiet well before
+the per-run ceiling. That is what a spent free route looks like: the run hangs
+until the per-run ceiling and is recorded as a timeout, so without this a
+36-run suite spends hours measuring the provider's quota. A quota error the
 provider states outright (`Free usage limit reached`, an HTTP 429) stops the
 suite on the first run instead of waiting for two empty ones, and says so
 rather than scoring the refusal as a wrong answer. The raw streams are kept
-either way, so `--rescore <dir>` can still grade them later.
+either way, so `--rescore <dir>` can still grade them later. The wall time
+comes from the sidecar, so a run killed at the ceiling is reported at the
+ceiling, not at the timestamp of its last event.
 
 Both arms pin `small_model` as well as `model`. `model` only covers the main
 loop; the title agent runs on `small_model`, whose default is a paid model, so
@@ -1334,15 +1363,20 @@ fails before it starts, the error event is now fatal on the spot:
 
 - `--out <dir>` keeps each run's stream as `<id>-<arm>-<i>.json` next to a
   `<id>-<arm>-<i>.result.json`, and a rerun with the same `--out` skips the
-  runs that already have a result. A suite interrupted by the quota, or by a
-  reboot, continues instead of starting over.
+  runs that already have a result. A sidecar with no verdict and no step is
+  retried instead of skipped: it is a run that never started, and skipping it
+  would make the hole permanent. A suite interrupted by the quota, or by a
+  reboot, continues instead of starting over. The directory gets a
+  `run-manifest.json`; resuming it against a different target, suite or model
+  is refused rather than mixed into one result.
 - `--budget <tokens>` caps the suite's context tokens - the same number the
-  guard counts, cached prefix included. It is checked before each run, so the
+  provider charges, cached prefix included. It is checked before each run, so the
   run that crosses the cap is still measured and counted; the next one stops
   the suite with exit 2.
 - A preflight run (on by default, `--no-preflight` to skip) asks the model one
   question before the suite and stops with exit 2 if it does not answer, if it
-  times out, or if its stream carries an error event. It costs one request and
+  times out, if it exits cleanly with an empty stream, or if its stream carries
+  an error event. It costs one request and
   saves the eighteen that a broken arm would otherwise spend being scored as
   wrong answers. Its stream goes to a scratch directory, not `--out`, so
   `--rescore` does not warn about a file it cannot grade.
@@ -1357,16 +1391,6 @@ fails before it starts, the error event is now fatal on the spot:
   are real, the other 73 were never started, and resuming with the same
   `--out` skips the 47. The window is also account-wide, not per model - a second free
   model on the same provider answered "Free usage limit reached" too.
-
-The suite also turns the kit's own budget off for its runs and points the
-ledger at the run directory. A hundred and twenty runs spend more than the
-shared window's stop, and from that run on the guard would refuse tool calls -
-so the runs after it would be scored as wrong answers for a reason the suite
-is not measuring. The suite has its own cap, and the account's real window is
-not charged by a benchmark. The cap counts context, not uncached input: 47
-runs of one 10-rep attempt reported 1,284,594 uncached input tokens while the
-same streams carried 7,130,164 context tokens, so a cap set against the first
-number let the suite walk into the provider's wall.
 
 `eval/ab.mjs` knows how to read opencode's event stream, so it can only compare
 the kit with opencode. `eval/compare.mjs` grades any CLI the same way: it runs

@@ -17,15 +17,17 @@
 ▾ USAGE · OpenCode Go
 5 hours                          0%
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-↻ 5h                       $0.00 / $12.00
+↻ 5h
 
 Weekly                           1%
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-↻ 6d 4h                    $0.30 / $30.00
+↻ 6d 4h
 
 Monthly                         60%
 ███████████████████░░░░░░░░░░░░░░░░░
-↻ 7d 14h                  $36.00 / $60.00
+↻ 7d 14h
+
+deepseek-v4.1-flash         $80/$160
 ```
 
 ## 功能
@@ -38,7 +40,8 @@ Monthly                         60%
 - **不打扰**：选中其他 provider 时**完全不渲染**，不占空间。
 - **限流退避**：遇 429 / 5xx / 网络失败自动指数退避（最长 5 分钟），并显示 `retry in Ns`。
 - **数据过期提示**：数据变旧（超过约 75 秒，即 2.5 个轮询间隔）时，标题行才显示年龄并变黄；平时不显示，不产生噪音。
-- **密钥安全**：从 OpenCode 的 `auth.json` 实时读取，插件不存储任何凭据。
+- **密钥安全**：通过 OpenCode 的凭据 API 实时读取（v2 把凭据存在自己的数据库中），
+  `auth.json` 仅作兜底；插件不存储任何凭据。
 
 ## 支持的数据源
 
@@ -82,7 +85,7 @@ opencode plugin add github:GamingNowEdward/opencode-usage-limits
 }
 ```
 
-CLI 插件在本地 TUI 进程内运行，因此可以直接读取 `auth.json` 与访问网络；它也会在连接
+CLI 插件在本地 TUI 进程内运行，因此可以调用 OpenCode 的凭据 API 与访问网络；它也会在连接
 远程 server 时保持可用。详见 [CLI 插件文档](https://opencode.ai/v2/docs/build/plugins/cli)。
 
 ## 使用
@@ -106,10 +109,15 @@ CLI 插件在本地 TUI 进程内运行，因此可以直接读取 `auth.json` �
 
 1. **注册侧边栏 slot**：`context.ui.slot({ prepend: "sidebar.content", ... })`。
 2. **读取当前模型**：`context.ui.model.current()?.providerID`（响应式）。
-3. **按 provider 拉取用量**：从 `auth.json` 取密钥，带 `Authorization: Bearer` 请求用量接口，
-   30 秒轮询一次，1 秒刷新倒计时。
+3. **按 provider 拉取用量**：通过 `context.client.credential.list()` 取密钥（OpenCode v2 的
+   权威来源），带 `Authorization: Bearer` 请求用量接口，30 秒轮询一次，1 秒刷新倒计时。
 
-密钥解析顺序：环境变量 `<PROVIDER>_API_KEY` → `~/.local/share/opencode/auth.json`。
+密钥解析顺序：环境变量 `<PROVIDER>_API_KEY` → `context.client.credential.list()` →
+`~/.local/share/opencode/auth.json`。OpenCode v2 把登录凭据存在 `opencode.db` 的 `credential`
+表中，`auth.json` 只是旧版兼容路径。
+
+若宿主版本提供 `GET /api/experimental/usage/limits`，OpenCode Go 会直接使用该接口返回的用量，
+完全不需要密钥。
 
 ## 文件结构
 
@@ -137,6 +145,14 @@ node preview.mjs cline-pass  # 只预览一个
 1. 确认当前模型属于 `opencode-go` 或 `cline-pass`。
 2. 插件文件**保存即热重载**，无需重启；只有新增/删除被 import 的文件时才需退出 TUI 重进。
 3. 查看日志：`~/.local/share/opencode/log/opencode.log`，筛 `role=cli` 与 `plugin`。
+4. 面板显示 **API key not found** 时，先确认登录状态：
+
+   ```sh
+   opencode auth list
+   ```
+
+   若已显示 `stored` 但面板仍报错，说明宿主版本过旧，无法通过凭据 API 读取密钥；
+   可临时设置环境变量 `<PROVIDER>_API_KEY`（如 `OPENCODE_GO_API_KEY`）后重启 TUI。
 
 ## 相关
 

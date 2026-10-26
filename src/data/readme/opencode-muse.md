@@ -16,7 +16,7 @@ Add the published package to your project-level `opencode.jsonc` (or
 ```jsonc
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugins": ["opencode-muse@0.3.0"],
+  "plugins": ["opencode-muse@0.7.0"],
 }
 ```
 
@@ -61,16 +61,57 @@ never reads Muse credential files, exports tokens, or changes subscription
 mode. If the CLI has no usable model catalog, the provider remains a disabled
 setup placeholder rather than advertising a model that will fail on use.
 
+## Configuration
+
+The billing lane is a plain process environment variable read once when the
+plugin loads (it is not an `opencode.json` field — probed on OpenCode 2.1.4,
+plugin options arrive empty):
+
+| Value | Meaning |
+|---|---|
+| unset (default) | Request the Contributor lane, like the Muse TUI |
+| `on` | Same as the default, explicit |
+| `off` | Request the Standard lane |
+
+```sh
+# One session on the Standard lane:
+OPENCODE_MUSE_CONTRIBUTOR_MODE=off opencode
+
+# Persist it by exporting the variable in your shell profile
+# (e.g. ~/.bashrc, ~/.zshrc) before launching OpenCode/OpenChamber.
+```
+
+Restart OpenCode/OpenChamber after changing it; the lane is fixed when the
+plugin loads. Anything else fails setup with a clear error instead of
+billing the wrong lane. Confirm the requested lane in the startup log and
+the billed lane with `muse usage`. See
+[#29](https://github.com/pgquiles/opencode-muse/issues/29).
+
 ## Features
 
 - Use Muse Code models from OpenCode or OpenChamber after adding the package to
   your OpenCode plugin configuration.
 - Keep Muse sign-in and inference inside the official Muse CLI; the plugin
   never copies or stores your subscription credentials.
+- Bill through the Contributor lane by default, like the Muse TUI, with a
+  documented opt-out to the Standard lane. See [Configuration](#configuration)
+  and [#29](https://github.com/pgquiles/opencode-muse/issues/29).
 - Continue text conversations in a mapped Muse session, including resuming
   supported sessions and replaying available session updates after reconnects.
 - Attach supported images (PNG, JPEG, GIF, WebP) and videos (MP4, MOV) to a
   Muse turn.
+- Attach audio clips (WAV, MP3, OGG, and anything else the CLI's local
+  decoder accepts) to a Muse turn: the plugin transcribes them through the
+  official `muse voice transcribe` route — voice mode is included in every
+  subscription plan — and the transcript enters the turn as declared text.
+  A clip that cannot be transcribed fails the turn loudly instead of being
+  silently dropped. See
+  [#32](https://github.com/pgquiles/opencode-muse/issues/32).
+- Attach PDF files to a Muse turn: the plugin stages the bytes under the
+  session workspace (generated name, never a user-supplied path) and tells
+  the model where to read them, so the agent parses them with its own
+  tools. The staging directory is purged when the provider unloads. See
+  [#33](https://github.com/pgquiles/opencode-muse/issues/33).
 - Pick a reasoning effort per model through OpenCode's own controls: an
   untouched model runs its catalog default (which rotates over time), Ctrl+T
   cycles the concrete variants (`minimal` … `max`, model-dependent, one way
@@ -79,22 +120,53 @@ setup placeholder rather than advertising a model that will fail on use.
   (`opencode run --model muse/…#high`) selects one explicitly. Unknown variants
   fail the turn instead of guessing. See
   [#28](https://github.com/pgquiles/opencode-muse/issues/28).
+- Answer Muse's permission prompts conversationally: Muse's exact options are
+  shown as a lettered list and your next message picks one (fuzzy match on
+  letter, number, or name). Anything unrecognized is asked once more, then
+  denied — ambiguity never approves. Queued prompts are answered
+  first-in-first-out with an echo of what was granted. See
+  [#30](https://github.com/pgquiles/opencode-muse/issues/30).
+- Answer Muse's structured option-questions conversationally: the oldest
+  unanswered question renders as a lettered list and your next message
+  answers it the same forgiving-match way, with the question echoed back on
+  success. See [#31](https://github.com/pgquiles/opencode-muse/issues/31).
+- Work each OpenCode session on its own server-managed worktree instead of
+  sharing the checkout: concurrent sessions stop serializing at the
+  workspace lock, and the human merges worktrees back through normal
+  source control (the bridge never auto-merges). Requires a trusted
+  workspace and a CLI serving the experimental worktree surface;
+  otherwise the single-writer lock applies with a notice. Empty
+  worktrees are removed when the provider unloads; anything with
+  unique work is left for you. See
+  [#34](https://github.com/pgquiles/opencode-muse/issues/34).
+- Stay working across Muse CLI updates: capability checks against the pinned
+  CLI mean a newer CLI fingerprint starts with a recorded warning instead of
+  failing, and only a missing/malformed fingerprint or an unsupported
+  envelope version fails closed. See
+  [#21](https://github.com/pgquiles/opencode-muse/issues/21).
 - Let Muse run its own agent and tools, while the plugin prevents overlapping
   writes to the same workspace.
 
 ## Current limitations
 
-- **Approvals and questions:** OpenCode/OpenChamber cannot yet show Muse's exact
-  approval choices or all structured questions. If Muse asks for one, the
-  plugin stops safely rather than guessing or approving on your behalf. See
-  [#6](https://github.com/pgquiles/opencode-muse/issues/6) and
-  [#22](https://github.com/pgquiles/opencode-muse/issues/22).
+- **Approvals:** conversational verdicts skip OpenCode permission rules until
+  core ships a native verdict channel (tracked in
+  [#22](https://github.com/pgquiles/opencode-muse/issues/22)). The
+  conversational flow above stands in meanwhile.
+- **Structured input:** single-select option-questions are answered
+  conversationally; multi-select and option-less questions cancel with a
+  reason until native structured input lands (tracked in
+  [#6](https://github.com/pgquiles/opencode-muse/issues/6)).
 - **Files and response formats:** The bridge accepts text, PNG/JPEG/GIF/WebP
-  images, and MP4/MOV video. Audio and PDF attachments are not supported.
+  images, MP4/MOV video, audio clips (transcribed to labeled text), and
+  PDF files (staged into the workspace for the agent to read) — see
+  Features.
   Strict JSON output and some OpenCode generation settings (such as
   temperature and token limits) are not supported; requests that require a
-  specific OpenCode tool are rejected. Muse's separate CLI transcription and
-  JSON-output commands are not exposed as OpenCode features.
+  specific OpenCode tool are rejected. Muse's separate CLI JSON-output
+  commands (`muse exec --json`, transcript `muse export`) are not exposed
+  as OpenCode features; `muse exec --output-schema` answer-shaping stays
+  unwired because it would fork the turn pipeline (see #35).
 - **Tools and agent instructions:** Muse runs its own agent and tools; OpenCode
   tools are not executed for a Muse turn. Recognized custom-agent instructions
   may be forwarded, but Muse otherwise follows its own workspace rules.
@@ -107,18 +179,22 @@ setup placeholder rather than advertising a model that will fail on use.
   been tested, but recovery from a real Muse event gap has only been tested
   with a simulated gap. See
   [#23](https://github.com/pgquiles/opencode-muse/issues/23).
-- **Muse CLI compatibility:** The plugin is pinned to SDK 1.4.12 and speaks
-  envelope schema version 1. A newer CLI fingerprint starts with a recorded
-  warning instead of failing closed; a missing/malformed fingerprint or an
-  unsupported envelope version still fails closed. See
-  [#21](https://github.com/pgquiles/opencode-muse/issues/21).
-- **Billing and simultaneous work:** Pay-as-you-go catalog and text turns pass
-  on Muse 1.4.13 (see the compatibility matrix). The plugin also allows only
-  one active writer per workspace, so a new turn may be reported as busy
-  while another is still finishing.
+- **Billing:** opencode-muse is subscription-only; for pay-as-you-go use
+  OpenCode's official OpenAI-compatible provider (`metamate`). Only
+  `muse usage` confirms the billed lane, and unknown Contributor settings fail
+  closed instead of guessing. Contributor catalog rows bill the requested lane
+  like every other row. See [Configuration](#configuration) and
+  [#29](https://github.com/pgquiles/opencode-muse/issues/29).
+- **Simultaneous work:** Each OpenCode session gets its own worktree where
+  the CLI supports it (see Features); where worktrees are unavailable the
+  plugin allows only one active writer per workspace, so a new turn may be
+  reported as busy while another is still finishing.
 
 ## Troubleshooting
 
+- **Contributor mode is fully supported and is the default** (see
+  [Configuration](#configuration)). If something labeled "Contributor" fails,
+  check which provider it belongs to first:
 - **"Muse Spark 1.3 Contributor" never connects after a model switch:** that
   entry is a retired OpenCode-gateway model (`opencode/muse-spark-1.3-contributor-free`),
   not this plugin's model. It no longer resolves anywhere, so OpenCode keeps

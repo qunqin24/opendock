@@ -84,7 +84,7 @@ The guidance, skills, and patterns are shared. Only delivery differs:
 
 | | OpenCode | Claude Code |
 | --- | --- | --- |
-| Guidance | Added to the system prompt before every model call | Added in full at session start, after `/clear`, and after compaction. It is split into labeled parts because each hook output is limited to 10,000 characters |
+| Guidance | Added to the system prompt before every model call | Added in full at session start, after `/clear`, after compaction, and to every subagent when it starts. It is split into labeled parts because each hook output is limited to 10,000 characters |
 | Skills | Native skill tool, as `effect-*` | Plugin skills, as `effect-enforcer:effect-*` |
 | Patterns | After `write`, `edit`, `patch`, and `apply_patch` | After `Write`, `Edit`, and `MultiEdit` |
 | Opt-out | Per agent, with `"opencode-effect-enforcer": false` | Per project, with `claude plugin disable` |
