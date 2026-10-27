@@ -41,15 +41,16 @@ OpenCode V2 plugin for on-prem Exchange: mail, calendar and contacts over EWS + 
 Reads and sends mail, lists calendar events and contacts from an on-prem Exchange mailbox through EWS with
 NTLM. Runs inside OpenCode V2 as a native TypeScript plugin: Bun executes `src/index.ts` directly, no build step.
 
-Verified on Exchange 2016 (build 15.1.2507.6), NTLMv2, internal CA. Bun 1.4.2, `@opencode/plugin` 2.0.26,
-173 tests.
+Verified on Exchange 2016 (build 15.1.2507.6), NTLMv2, internal CA. Bun 1.4.2, `@opencode/plugin` 2.0.26.
+Attachment extraction is pure JS (no native modules); CI runs on Linux, Windows and macOS. 276 tests.
 
 ## Features
 
-- 12 `mail_*` tools: accounts, folders, list, search, get, delete/empty-deleted, sync, draft, send, calendar, contacts.
+- 13 `mail_*` tools: accounts, folders, list, search, get, read-attachment, delete/empty-deleted, sync, draft, send, calendar, contacts.
 - Multiple mailboxes in one process with per-account credentials and SQLite.
 - Storage modes `off` / `metadata` / `full`; local SQLite index in `metadata`/`full`, `off` = EWS-only.
 - EWS/NTLM with explicit XML escaping, recipient validation and attachment limits.
+- Attachment text extraction: `.docx`/`.docm`, `.xlsx`/`.xlsm`, `.pdf` (text layer) and plain text.
 - Request timeout and cancellation via `context.signal`; multi-account routing with `AsyncLocalStorage`.
 
 ### Built With
@@ -58,7 +59,9 @@ Verified on Exchange 2016 (build 15.1.2507.6), NTLMv2, internal CA. Bun 1.4.2, `
 - [Bun](https://bun.sh/) 1.4
 - TypeScript 5.9 (strict)
 - [Biome](https://biomejs.dev/) 2.5
-- [`ews-javascript-api`](https://github.com/gautamsi/ews-javascript-api) 0.15.3 + `@ewsjs/xhr` 3.1.3
+- [`ews-javascript-api`](https://github.com/gautamsi/ews-javascript-api) 0.15.3 + own NTLM XHR provider (`axios` + `@ewsjs/ntlm-client`)
+- [`fflate`](https://github.com/101arrowz/fflate) 0.8 + [`yauzl`](https://github.com/thejoshwolfe/yauzl) 3.4 (streaming ZIP) + [`unpdf`](https://github.com/unjs/unpdf) 1.9 (PDF text in a worker)
+- [`saxes`](https://github.com/lddubeau/saxes) 6 (linear OOXML SAX) + [`word-extractor`](https://github.com/morungos/node-word-extractor) 1.0 (legacy `.doc`) + [`@e965/xlsx`](https://www.npmjs.com/package/@e965/xlsx) 0.20 (legacy `.xls`)
 - SQLite + FTS5 via `bun:sqlite`
 
 ## Getting Started
@@ -177,7 +180,7 @@ URL, username and password have no defaults. Examples use `example.com`.
 | `maxBodyBytes` | `MAIL_MAX_BODY_BYTES` | 100000 (max 1,000,000) | body truncation, UTF-8 bytes |
 | `syncIntervalMinutes` | `MAIL_SYNC_INTERVAL_MINUTES` | 5 (max 1440) | index refresh interval |
 | `allowSend` | `MAIL_ALLOW_SEND` | `true` | allow `mail.send`; `true/false/1/0/yes/no/on/off`; unknown value raises `ConfigError` |
-| `requestTimeoutMs` | `MAIL_REQUEST_TIMEOUT_MS` | 30000 | EWS timeout, ms (≤120000) |
+| `requestTimeoutMs` | `MAIL_REQUEST_TIMEOUT_MS` | 30000 | EWS call timeout, ms (≤120000); covers the whole call, including the NTLM preflight; a hanging stream is bounded by twice this value of socket inactivity plus `signal`/`disconnect` |
 | `codemode` | `MAIL_CODEMODE` | `false` | `false` — direct tools; `true` — only through Code Mode `execute` (global) |
 | `caFile` | `MAIL_CA_FILE` | — | PEM root/intermediate CA; applied to the runtime TLS trust store at setup (fallback: `NODE_EXTRA_CA_CERTS`); a missing path is a `ConfigError`, invalid content is logged and skipped |
 
@@ -196,6 +199,8 @@ Top-level options are inherited by `accounts[]`; per-account values win, except 
 | `mail_list` | messages in a folder (metadata incl. `size`; `attachmentCount` when known; paging) |
 | `mail_search` | local FTS + EWS body search (Inbox), merged and deduplicated; same fields as `mail_list` |
 | `mail_get` | message + body; `size` (when known), `attachmentCount` (when known), `fetched` / `bodyCached` |
+| `mail_read_attachment` | list attachments, or extract text from `.doc`/`.docx`, `.xls`/`.xlsx`, `.pdf`/plain text (`index` or `attachmentId`; `sheet` for Excel) |
+| `mail_save_attachment` | download one file attachment to `<dataDir>/attachments/...` and return `path`, `size`, `sha256` |
 | `mail_delete` | delete by ids; soft (move to Deleted Items; the old id becomes invalid) or `hard: true` (permanent) |
 | `mail_empty_deleted` | permanently delete top-level items in Deleted Items (subfolders remain); requires `confirm: true` |
 | `mail_sync` | incremental `SyncFolderItems`; `{synced, complete}` |
@@ -228,6 +233,38 @@ failure after the request may leave the outcome unknown: run `mail_sync` before 
 Ids are passed to EWS `DeleteItem`, so pass mail ids only. If a meeting id is supplied, EWS deletes it with
 `SendToNone` (attendees are not notified); the plugin does not distinguish item classes before deleting.
 
+### Attachments
+
+`mail_read_attachment` lists attachments for one message (`messageId` only) or extracts one: pass `index`
+(position in the current list) or `attachmentId` from the list. Use `attachmentId` for stable re-reads; `index`
+is positional and can point to another file if the message changed. Supported formats: `.doc`/`.docx`/`.docm`,
+`.xls`/`.xlsx`/`.xlsm`, `.pdf` (text layer only) and plain text (`text/*`, `.txt`, `.csv`, `.json`, `.xml`,
+`.html`, ...). Legacy `.doc`/`.xls` use pure-JS OLE/BIFF parsers; images and other binaries are not decoded.
+
+`mc:AlternateContent`: the first `mc:Choice` that yields text wins; later choices and `mc:Fallback` are ignored.
+
+Reading is bounded: 20 MiB per attachment, the first 200 PDF pages (`truncated: true` when more), ZIP caps of
+32 MiB per required entry and 64 MiB total, 50 sheets / 5,000 rows / 500,000 cells / 1,000 columns, and 1,000,000
+characters maximum (`maxChars`, default 100,000, min 1,000). For Excel, pass `sheet` (worksheet name or 1-based
+index) to extract one sheet with the full character budget; a sheet read bypasses the text cache. If a numeric
+sheet name exists, the exact name wins over the 1-based index. Extracted text is cut with `truncated: true`; a
+scanned PDF returns empty text with a note (no OCR). PDF and office (DOCX/XLSX/legacy) parsing runs in a worker
+(15 s timeout); abort terminates it. Text attachments are decoded in-process. This keeps a crafted attachment
+from blocking the plugin event loop. Worker memory is not capped by the Bun runtime: peak scales with input
+(measured ~650 MB for a 17.7 MB legacy `.xls`), with the 20 MiB attachment size cap as the outer bound.
+Malformed XML (an undeclared namespace prefix or an undefined entity) is rejected with an error instead of
+being partially parsed.
+
+`mail_save_attachment` writes the original file under `<dataDir>/attachments/<hash>/<name>` (only there; the name is sanitized, the extension preserved) and returns its absolute path, written name, size and sha256, so an agent can parse large files with its own code. Same 20 MiB limit as reading.
+
+With `storage: full` the extracted text is cached on demand in `attachment_text` + `attachment_fts` (no
+background download) for messages already present in the local index (run `mail_sync` first). Repeated reads by
+`attachmentId` avoid EWS; `mail_search` also returns cached attachment matches as
+`attachmentMatch: {id, name, snippet}`. The cache is invalidated by delete/empty/prune and by a sync change of
+`hasAttachments`/`attachmentCount`; a replaced attachment with the same count can keep stale text.
+`storage: metadata` and `off` never write this cache; switching away from `full` deletes the cached
+text (`attachment_text`/`attachment_fts`), so returning to `full` starts with cold reads again.
+
 ### Message fields
 
 `mail_list`, `mail_search` and `mail_get` include `size` (EWS `ItemSize`, bytes) whenever the item
@@ -246,10 +283,11 @@ load fails, rows fall back to the FindItems envelope: `id`, `subject`, `size`, `
 live `mail_list` page returns the envelope as-is (it may have an empty `to`).
 
 Search scope: every search merges local FTS (`inbox`, `sent`, `drafts`, `deleted`) with the EWS subject/body
-search in `Inbox`, deduplicating by id and returning the newest `limit` matches. Other folders are not covered
-by the EWS half. Expect one EWS `FindItems` call (~0.5 s), one `LoadPropertiesForItems` (GetItem) for a
-non-empty page, and one `BindToItems` when the result contains messages with unknown recipients or missing
-`size`/`attachmentCount`; that batch does not request `Body`.
+search in `Inbox`, deduplicating by id and returning the newest `limit` matches. With `storage: full`, local
+results also include cached attachment text; such rows carry `attachmentMatch` (EWS search does not cover
+attachments). Other folders are not covered by the EWS half. Expect one EWS `FindItems` call (~0.5 s), one
+`LoadPropertiesForItems` (GetItem) for a non-empty page, and one `BindToItems` when the result contains messages
+with unknown recipients or missing `size`/`attachmentCount`; that batch does not request `Body`.
 
 Local FTS treats punctuation inside a word as a token boundary and keeps the parts adjacent (`R&D` and
 `R & D` both match `R D`). Numeric fragments and email addresses are matched as phrase prefixes first, with an
@@ -292,7 +330,7 @@ SQLite (`bun:sqlite`, WAL, FTS5) under `dataDir`; with `accounts`, `<dataDir>/<i
 
 - `off` — no index, everything via EWS.
 - `metadata` — headers, preview, FTS; bodies on demand.
-- `full` — plus body cache, up to `maxBodyBytes`.
+- `full` — plus body cache (up to `maxBodyBytes`) and on-demand attachment text cache/FTS.
 
 The default location is outside the project. It is not restricted by location: if you point it into a repository,
 the index (plaintext) will land there. Keep it outside; `.gitignore` covers `mail.db*` and `*.sqlite*`, but does
@@ -307,25 +345,26 @@ encryption is required. Encryption is planned in [docs/roadmap.md](docs/roadmap.
 - Attachments: 40 MiB (41.9 MB) per attachment and 10 per message, checked before EWS. These checks are
   per-attachment/count, not a total request cap: a 413 can still occur when the combined request exceeds the
   IIS/EWS limit. Memory ~3.5–4.2× the file size.
+- Attachment text reading: 20 MiB per file, first 200 PDF pages, 32 MiB/64 MiB ZIP caps, 50 sheets / 5,000
+  rows / 500,000 cells / 1,000 columns, 1,000,000 characters; per-sheet Excel reads; legacy `.doc`/`.xls`; no OCR.
 - Cold start: EWS import ~0.3 s; full plugin load ~0.4 s, RSS ~105 MB; first EWS call adds ~0.45 s (live).
 - Multiple mailboxes: one process, per-account credentials and SQLite, `AsyncLocalStorage` routing.
 
 ## Not Implemented
 
-- Reading attachment content: `mail_get` returns metadata only.
+- OCR for scanned PDFs.
 - `mail_move`, flags, reply/forward.
 - Graph backend for Exchange Online.
 - EPA `Require` on FE EWS: NTLM without channel binding will fail.
 
 ## Roadmap
 
-See [docs/roadmap.md](docs/roadmap.md): SQLite encryption with body search, Graph backend for Exchange Online,
-own XHR provider replacing the global axios patch.
+See [docs/roadmap.md](docs/roadmap.md): SQLite encryption with body search, Graph backend for Exchange Online.
 
 ## Risks
 
 See [risks.md](risks.md) for the full list (plaintext SQLite, library maintenance, EWS retirement in Exchange
-Online, global axios patch).
+Online).
 
 ## Development
 

@@ -74,8 +74,9 @@ Manual configuration, preserving other entries:
 Set `"inheritTheme": true` in the plugin's `options`, alongside `binary`. It requires
 the extended color-capable Plannotator fork
 ([nxxxsooo/plannotator-tui](https://github.com/nxxxsooo/plannotator-tui), branch
-`feat/layout`); upstream 0.9.4 does not support it. The same fork adds `[ui].doc_width`
-to cap the text column on wide terminals. See [TUI theme integration](docs/tui-theme.md).
+`local/opencode`); upstream 0.9.4 does not support it. The same branch adds `[ui].doc_width`
+to cap the text column on wide terminals (proposed upstream in
+[plannotator/plannotator-tui#108](https://github.com/plannotator/plannotator-tui/pull/108)). See [TUI theme integration](docs/tui-theme.md).
 
 Each review uses OpenCode's current resolved colors for the canvas, text, Markdown,
 borders, highlights, cursor and selection. The plugin asks the chosen binary for its
@@ -110,9 +111,24 @@ Switching terminal tabs never changes the paired target. Revoke with `/annotate-
 
 The numbered queue matches the page markers. Click a note's quoted target to show it
 on the page without activating the element; **Edit** changes the feedback, and **Undo**
-restores a deleted note. The delivery bar shows the pending count, destination, and sent
-state. **More review options** contains Markdown copy, JSON export, and a preview of
-all saved notes.
+restores a deleted note. The delivery bar shows the round's note count and destination.
+
+Each send closes a review round: delivered notes leave the list and the panel is ready
+for the next round. **Restore last round** returns the most recent delivered notes to the
+list; the last ten rounds per page are kept.
+
+Delivery has two modes, shown beside the destination. With a **Live** session the primary
+button is **Send N notes**, and the copy icon beside it copies the round instead. When the
+session is **Offline**, or none is connected, the button is **Copy N notes**: it copies the
+round as Markdown for any agent and closes it the same way. Run `/annotate-web` in a
+session to switch back to Send. If a session drops during Send, the notes are kept and the
+panel switches to Copy.
+**More review options** contains a non-closing Markdown copy, JSON export, and a preview
+of the current round.
+
+After a page reload or same-site navigation, the panel reconnects its page tools
+automatically. If Chrome has withdrawn access (for example after moving to another site),
+the panel asks you to click the extension icon once; saved notes are kept.
 
 ### Explicit routing
 
@@ -137,8 +153,8 @@ Native delivery requires an open, paired local TUI. If the receiver closes, feed
 pending. A failed batch retains its original target and ID for safe retry; if that target
 is permanently gone, export the notes before starting a new review. **Retry N notes &
 continue** retries that original batch; newly composed feedback stays local for the next
-send. Changed sent notes become new pending revisions; unchanged edits send nothing new.
-Clipboard failures expose a selectable preview. Browser-internal pages, PDF,
+send. Copying a round instead supersedes a failed batch.
+Clipboard failures expose a selectable preview and keep the round open. Browser-internal pages, PDF,
 cross-origin iframes, Canvas and remote SSH TUI clients are outside this version's scope.
 Page Context is retired only after exporting its drafts and verifying this replacement.
 
@@ -155,10 +171,8 @@ After updating the unpacked `browser/` files, open `chrome://extensions` and cli
 using its extension icon or **Alt+Shift+A**.
 
 A newly opened sidebar can load the updated `panel.mjs` while Chrome still runs an
-older `worker.mjs`. With the compact workspace, that mismatch produces
-`Cannot read properties of undefined (reading 'value')`: the sidebar expects a
-`draft` record that the older worker does not return. Reload the whole extension;
-reopening only the sidebar does not ensure the background code is refreshed.
+older `worker.mjs`. The panel detects this protocol mismatch and shows **Annotate was
+updated** with a **Reload Annotate** button; reopen the panel afterwards.
 Saved extension-local data survives an extension reload.
 
 For diagnosis, compare the running worker's source (DevTools/CDP
@@ -177,6 +191,16 @@ The manifest version alone cannot identify edits to an unpacked extension.
 
 The upstream **`E`** action copies to the clipboard. This adapter's automatic
 delivery path is **q → confirm** and does not need clipboard access.
+
+With the [fork](#match-opencodes-colors-fork-required) (branch `local/opencode`; proposed
+upstream in [plannotator/plannotator-tui#109](https://github.com/plannotator/plannotator-tui/pull/109)),
+**`q`** with notes returns and submits them without the OpenCode dialog. **`Ctrl+S`**
+does the same mid-comment, saving the comment first, and also works while a Chinese
+input method is active. The header's **Send N back (q)** button does the same.
+**`Ctrl+C`** returns without sending, and OpenCode asks whether to send. `E` and `S` send as well,
+following any `[keys]` rebinding, and the clipboard copy and Review menu (resend, finish, archive) are hidden
+because OpenCode owns delivery. Upstream binaries ignore the handoff and keep
+**q → confirm**.
 
 Opening a review makes no model call. Confirming sends a normal user prompt and
 resumes the **original session**, even if the active tab changes. Empty and
@@ -293,6 +317,7 @@ See [release instructions](docs/releasing.md) and [changelog](CHANGELOG.md).
 - `/annotate-last`：固定批注最新一条完整回复，忽略附带参数。
 - `/annotate-web`：配对 Chrome；`/annotate-web 页面.html`、`/annotate-web https://…` 批注网页；`/annotate-web off` 撤销配对。
 - 选中文字 → `c` 写批注 → Enter 保存 → `q` 返回 →「Send and continue」。
+- 用 fork 时：有批注时按 `q` 直接返回并发送；写批注中途按 `Ctrl+S`，一步保存、返回并发送（中文输入法开着也有效）；`Ctrl+C` 不发送，返回后由 OpenCode 询问。
 - 文档采用独立快照，反馈附原文件路径，确认后发回发起批注的会话。
 - 更新：`opencode plugin update @nxxxsooo/opencode-annotate@latest`，然后重新打开终端客户端。
 

@@ -48,7 +48,7 @@
 
 A general coding agent is one agent with one prompt. rolebox turns it into *your* configured team: specialists defined in YAML, each with its own prompt, model, skills and permissions, working the same task together. What they learn survives the session — decisions, conventions and lessons persist in memory and come back at the next session start.
 
-The team is not a prompt chain. Work is **declared**: `graph_declare` writes a version-3 declaration naming each node's agent, its brief, and the outcomes it may report; the host dispatches the entry nodes and a worker settles its node with `graph_submit_outcome`. A node advances only through an accepted outcome — a free-form report is never read as progress. Loops are bounded and declared, and every step is inspectable while it runs.
+On DSH, roles can collaborate through [persistent peer teams](docs/team-work.md): invite complementary specialists, exchange events, claim tasks, and continue work across turns. Team execution on other hosts is deferred. Structured workflows use **declared** graphs: `graph_declare` names each node's agent, brief, and permitted outcomes; the host dispatches entry nodes and workers settle them with `graph_submit_outcome`. Graph nodes advance only through accepted outcomes, with bounded loops and inspectable state.
 
 **At a glance**
 
@@ -57,6 +57,7 @@ The team is not a prompt chain. Work is **declared**: `graph_declare` writes a v
 - **Memory** — SQLite + FTS5, auto-injected at session start and searchable from the CLI.
 - **Tools** — 32 `lsp_*` language-server tools, `hashline_*` edits anchored to content hashes, skills, references, custom functions and hooks.
 - **Desktop** — a 12-tool `computer_*` family: `computer_screenshot`, `computer_windows`, `computer_displays`, `computer_focus`, `computer_click`, `computer_move`, `computer_scroll`, `computer_drag`, `computer_type`, `computer_key`, `computer_status`, `computer_permissions`.
+- **Browser** — a [23-tool `browse_*` family](docs/browser-use.md) for semantic web-page automation: `browse_status`, `browse_open`, `browse_snapshot`, `browse_read`, `browse_click`, `browse_drag`, `browse_type`, `browse_press`, `browse_select`, `browse_hover`, `browse_scroll`, `browse_wait`, `browse_eval`, `browse_screenshot`, `browse_upload`, `browse_downloads`, `browse_dialog`, `browse_tabs`, `browse_history`, `browse_console`, `browse_network`, `browse_cookies`, `browse_close`. Gated by `browseUse`; actions need the optional Playwright peer (`npm install playwright`, then `npx playwright install chromium`).
 - **Visibility** — the dsh Rolebox monitor pane, the `rolebox monitor` TUI, and channel-filtered logs.
 
 ---
@@ -87,11 +88,11 @@ Each card carries the display name, the slug at the right (`ai-designer`, `apk-r
   <em>The TypeScript Engineer loads its own skill, reads the protocol reference, and declares the work with <code>graph_declare</code>.</em>
 </p>
 
-The role does not do the work inline. It inspects the repo and records a baseline before editing — `bun test` → 4 pass / 0 fail, `tsc --noEmit` → exit 0 — then names one real design point: `Task` has no completion state at all, so `removeCompleted()` needs one. It takes the minimal, backward-compatible reading — an optional `completed?: boolean` on `Task` plus `removeCompleted(): number` returning the removed count — and passes that decision to the worker explicitly.
+The role does not do the work inline. It inspects the repo and records a baseline before editing — the sample project’s test command → 4 pass / 0 fail, `tsc --noEmit` → exit 0 — then names one real design point: `Task` has no completion state at all, so `removeCompleted()` needs one. It takes the minimal, backward-compatible reading — an optional `completed?: boolean` on `Task` plus `removeCompleted(): number` returning the removed count — and passes that decision to the worker explicitly.
 
 It then declares `graph_declare · taskstore-remove-completed` and yields the turn so the engine can schedule it. The plan names exactly two nodes and one bounded repair round:
 
-- **`change`** (`change-applier`) — implement `removeCompleted(): number` in `src/store.ts`, add the optional `completed?: boolean` field to `Task` in `src/task.ts`, add a focused test in `tests/task.test.ts`, and run `bun test` and `tsc --noEmit`.
+- **`change`** (`change-applier`) — implement `removeCompleted(): number` in `src/store.ts`, add the optional `completed?: boolean` field to `Task` in `src/task.ts`, add a focused test in `tests/task.test.ts`, and run the sample project’s test command and `tsc --noEmit`.
 - **`review`** (`verification`, independent) — read the actual files and re-run both checks against the same baseline.
 
 The turn closes on the declaration being started (`start.kind: started`, phase `executing`, node `change` dispatched). The capture states no execution budget.
@@ -108,9 +109,9 @@ The turn closes on the declaration being started (`start.kind: started`, phase `
 
 Both nodes ran in their own sessions, and the verifying node is not the node that wrote the code. The closing synthesis reports the test coverage — `tests/task.test.ts:35-61`, importing `TaskStore` at line 4 — as two behavior tests: a mixed store that removes exactly the completed entry and returns `1` while non-completed entries and `get`/`count`/`all` stay consistent, and a no-op path that returns `0` with the store deep-equal to a pre-call snapshot.
 
-A `Checks` table sets each check against its baseline: `bun test` went from `4 pass / 0 fail` to `6 pass / 0 fail, 17 expect() calls, exit 0`, and `tsc --noEmit` stayed at `exit 0` (TypeScript 6.0.3). Both are the project's own scripts; the reviewer additionally ran an independent scratch probe over empty, all-completed and mixed stores plus `add` / `get` / `remove` / `count`, and the parent re-ran the two required commands after the reviewer settled and got the same output.
+A `Checks` table sets each check against its baseline: the sample project’s test command went from `4 pass / 0 fail` to `6 pass / 0 fail, 17 expect() calls, exit 0`, and `tsc --noEmit` stayed at `exit 0` (TypeScript 6.0.3). Both are the project's own scripts; the reviewer additionally ran an independent scratch probe over empty, all-completed and mixed stores plus `add` / `get` / `remove` / `count`, and the parent re-ran the two required commands after the reviewer settled and got the same output.
 
-The `Risk and gaps` list keeps three things open on purpose: the one judgment call still to confirm (whether `completed` should be required, or the return a `Task[]`); the fact that no git repository exists in the workspace, so scope was confirmed from the file inventory plus the pre-change baseline rather than a machine diff; and the fact that the evidence covers Bun 1.3.14 / TypeScript 6.0.3 and claims nothing about other runtimes.
+The `Risk and gaps` list keeps three things open on purpose: the one judgment call still to confirm (whether `completed` should be required, or the return a `Task[]`); the fact that no git repository exists in the workspace, so scope was confirmed from the file inventory plus the pre-change baseline rather than a machine diff; and the fact that the evidence belongs to the recorded sample toolchain and does not establish current runtime compatibility; see [Node runtime](docs/node-runtime.md) for current validation commands.
 
 ### 4 · One brief in, one outcome out
 
@@ -122,7 +123,7 @@ The `Risk and gaps` list keeps three things open on purpose: the one judgment ca
   <em>One brief in, one outcome out: the worker makes the scoped edits, runs both checks, and settles node <code>change</code> with the <code>done</code> outcome.</em>
 </p>
 
-A dispatched worker is a one-shot session with exactly two tools — `graph_worker_exec` for reads, commands and permitted edits, and `graph_submit_outcome` to settle its node. It cannot dispatch, and it cannot read or steer graph state. Here the worker's whole record is `cat` of its host handoff, the scoped edits, `cat -n` verification of the edited files, `bun test` and `tsc --noEmit`. It notes that this was not a repair round (no revise input was delivered), makes the three scoped edits, reports `6 pass / 0 fail, tsc exit 0`, and closes on `Outcome done accepted (verdict committed, no refusals) — node change is settled`. The banner across the bottom is the one-shot contract: the record does not accept follow-ups.
+The dsh worker shown here is a one-shot session using `graph_worker_exec` for reads, commands and permitted edits, and `graph_submit_outcome` to settle its node. Workers inherit the parent’s authorized task tools; nodes can restrict that catalog and choose native, discovery or code presentation. Supported hosts default to discovery; see [Worker tools](docs/worker-tools.md). Workers cannot read or steer graph state. Here the worker's whole record is `cat` of its host handoff, the scoped edits, `cat -n` verification of the edited files, the sample project’s test command and `tsc --noEmit`. It notes that this was not a repair round (no revise input was delivered), makes the three scoped edits, reports `6 pass / 0 fail, tsc exit 0`, and closes on `Outcome done accepted (verdict committed, no refusals) — node change is settled`. The banner across the bottom is the one-shot contract: the record does not accept follow-ups.
 
 ### 5 · Watch the engine while it runs
 
@@ -170,6 +171,8 @@ The Logs pane polls the workspace's `.rolebox/logs` directory (in the capture `r
 
 ## Install
 
+Rolebox's CLI and development tools require Node.js 26.4+ and npm. For a source checkout, run `npm ci`, `npm run build`, and module-scoped tests with `npm test -- tests/<module>/`. See [Node runtime and development](docs/node-runtime.md). The TUI additionally needs Node's `--experimental-ffi` flag; the test command supplies it.
+
 rolebox runs on four harnesses. A `rolebox/` directory in the **current working directory** takes precedence over the global roles directory; registry roles install with `rolebox install <name>` and deploy with `rolebox sync <opencode|pi|dsh|codex>`. Each harness has a minimum version — [Harness versions](docs/compatibility.md#harness-versions) lists them and why.
 
 | Harness | Config directory | Roles directory | Global skills | Env override |
@@ -214,7 +217,7 @@ Restart the harness. A non-bundle dsh install instead needs one `- insert:` row 
 ### Codex
 
 ```bash
-npm install -g rolebox     # or run from a checkout built with `bun run build`
+npm install -g rolebox     # or run from a checkout built with `npm run build`
 rolebox sync codex
 ```
 
@@ -277,7 +280,9 @@ A role is a directory: `role.yaml` (name, model, mode, permissions, subagents, s
 
 ## How the team runs
 
-The graph engine is how the team runs. `graph_declare` writes a version-3 declaration — each node's agent, brief and the outcomes it may report, plus the edges that route an accepted outcome — and reports persistence separately from the host's initial start decision. The host dispatches the entry nodes; a worker settles its node with `graph_submit_outcome`, which commits the node's state and arms the next node.
+For complementary specialties, [role teams on DSH](docs/team-work.md) provide persistent membership, an ordered event stream, exclusive task claims, and automatic peer wakeups. Members use independent agent sessions with their own role configuration; private child roles stay within their owning role. Team execution on OpenCode, Pi, and Codex is deferred.
+
+For structured workflows, `graph_declare` writes a version-3 declaration — each node's agent, brief and the outcomes it may report, plus the edges that route an accepted outcome — and reports persistence separately from the host's initial start decision. The host dispatches the entry nodes; a worker settles its node with `graph_submit_outcome`, which commits the node's state and arms the next node.
 
 `graph_control` applies the trusted lifecycle commands (failure, timeout, cancel, retry, `budget-stop`, and approval requests with their decisions); `graph_status` reads the recorded state back; `graph_audit` inventories the persisted store. Loops live in declared loop groups with a traversal cap, so a repair can repeat but never forever.
 
@@ -300,13 +305,14 @@ Architecture and the full toolset: [graph-outcome-protocol.md](docs/graph-outcom
 | `rolebox info [name]` | Inspect one installed role in detail (picker when omitted) |
 | `rolebox sync <target>` | Deploy installed roles to `opencode` / `pi` / `dsh` / `codex` |
 | `rolebox config [name]` | Configure models for a role and its subagents (`--target` selects the harness) |
+| `rolebox bench <subcommand>` | Local dsh role benchmarks: `init`, `validate`, `doctor`, `run`, `watch`, `report`, `baseline`, `compare` |
 | `rolebox monitor` | Runtime dashboard for a project's persisted dispatch state (TUI, `--json`, Prometheus export) |
 | `rolebox logs` | Query, follow and prune the rolebox log files (`logs files`, `logs prune`) |
 | `rolebox memory` | Manage the rolebox memory store (`list`, `show`, `search`, `delete`, `export`, `clean`, `stats`) |
 | `rolebox checkpoint` | Manage dispatch checkpoints (`list`, `clean`) |
 | `rolebox mcp` | Run the rolebox MCP server on stdio (Codex integration) |
 
-Full flags and examples: [cli.md](docs/cli.md).
+Full flags and examples: [cli.md](docs/cli.md). Build a suite with [Benchmarks on dsh](docs/benchmarks.md): response/file assertions, trusted local command checks, a `code-fix` template, independent trials, feedback against a saved baseline after role edits, and offline JSON/HTML results with file-change evidence.
 
 ---
 
@@ -332,7 +338,7 @@ Unrecognized values pass through unchanged with a warning. Full resolution chain
 | | | |
 |---|---|---|
 | [Graph outcome protocol](docs/graph-outcome-protocol.md) | [Graph v3 operations](docs/graph-v3-operations.md) | [Graph engine architecture](docs/graph-engine-architecture.md) |
-| [Memory strategy](docs/memory-strategy.md) | [Session tools](docs/session-tools-strategy.md) | [Copilot (turn-end)](docs/copilot.md) |
+| [Memory usage](docs/memory.md) | [Session tools](docs/session-tools-strategy.md) | [Copilot (turn-end)](docs/copilot.md) |
 | [Functions](docs/functions.md) | [Hooks](docs/hooks.md) | [Extensions](docs/extensions.md) |
 
 **Build a role**
@@ -341,7 +347,7 @@ Unrecognized values pass through unchanged with a warning. Full resolution chain
 |---|---|---|
 | [Create a role](docs/create-a-role.md) | [role.yaml reference](docs/role-yaml.md) | [Directory structure](docs/directory-structure.md) |
 | [Skills](docs/skills.md) | [References](docs/references.md) | [Subagents](docs/subagents.md) |
-| [Registry](docs/registry.md) | [Model aliases](docs/model-aliases.md) | |
+| [Registry](docs/registry.md) | [Model aliases](docs/model-aliases.md) | [Benchmarks on dsh](docs/benchmarks.md) |
 
 **Harnesses**
 
@@ -360,7 +366,7 @@ Unrecognized values pass through unchanged with a warning. Full resolution chain
 
 ---
 
-> **Upgrading from 0.x or 1.x?** rolebox 2.x (`package.json` currently reads `2.0.0`) runs work through the **graph outcome protocol**: `graph_declare` persists a version-3 declaration, and a node advances only through an outcome its worker submits with `graph_submit_outcome`. An existing (legacy) declaration must be rewritten for the version-3 grammar and started as a new run. A persisted legacy state body stays readable but is never advanced, and this protocol has no incremental node or edge construction tool. See [docs/graph-outcome-protocol.md](docs/graph-outcome-protocol.md).
+> **Upgrading from 0.x or 1.x?** rolebox 2.x (`package.json` currently reads `2.1.0`) runs work through the **graph outcome protocol**: `graph_declare` persists a version-3 declaration, and a node advances only through an outcome its worker submits with `graph_submit_outcome`. An existing (legacy) declaration must be rewritten for the version-3 grammar and started as a new run. A persisted legacy state body stays readable but is never advanced, and this protocol has no incremental node or edge construction tool. See [docs/graph-outcome-protocol.md](docs/graph-outcome-protocol.md).
 
 ---
 

@@ -93,6 +93,16 @@ You need [OpenCode](https://opencode.ai) 2.x and the [Claude Code CLI](https://w
 
 **Titles and summaries.** Session titles run as small one-off requests on Haiku, so they barely touch your limits. Compaction summaries are written by the chat's own model from its Claude session, so they cover the whole conversation with full tool results; most of it comes from the prompt cache. The session itself isn't changed.
 
+**Several Claude accounts.** Claude Code keeps one login per config directory. To run some projects on another account (say, a work plan), sign that account in with its own directory, then map project folders to it in the plugin options; the deepest matching folder wins and everything else stays on your default login:
+
+```bash
+CLAUDE_CONFIG_DIR=~/.claude-work claude auth login --claudeai
+```
+
+```json
+{ "plugins": [{ "package": "@openchamber/opencode-claude", "options": { "configDirs": { "~/work": "~/.claude-work" } } }] }
+```
+
 **Model fallback.** If Claude Code declines a request on one model and retries on another (for example Fable to Opus), you'll see a note in the reasoning, and the session switches to the model that's actually answering.
 
 ## Keeping usage down

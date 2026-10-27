@@ -20,19 +20,19 @@ Qwen3-ASR is an optional alternative. Its pinned 0.6B 8-bit model is about 1.01 
 Native Dictate is terminal-only: it captures audio and writes into the active prompt. Install the pinned npm release with OpenCode's plugin command:
 
 ```sh
-opencode plugin add opencode-native-dictate@0.1.0
+opencode plugin add opencode-native-dictate@0.2.0
 ```
 
-OpenCode registers CLI-only plugins in the global v2 `cli.json` (`~/.config/opencode/cli.json`, or `$XDG_CONFIG_HOME/opencode/cli.json`) and manages the npm package cache. Then install the local recorder, isolated Python runtime and selected model:
+OpenCode registers CLI-only plugins in the global v2 `cli.json` (`~/.config/opencode/cli.json`, or `$XDG_CONFIG_HOME/opencode/cli.json`) and manages the npm package cache. Adding the plugin does not install its recorder or speech runtime; this required one-time setup builds and installs them, then downloads the selected model after confirmation:
 
 ```sh
-npx --yes --package opencode-native-dictate@0.1.0 native-dictate setup
+npx --yes --package opencode-native-dictate@0.2.0 native-dictate setup
 ```
 
 Setup shows download sizes and asks before downloading. To choose Qwen instead, use:
 
 ```sh
-npx --yes --package opencode-native-dictate@0.1.0 native-dictate setup --backend qwen3-asr
+npx --yes --package opencode-native-dictate@0.2.0 native-dictate setup --backend qwen3-asr
 ```
 
 Then set the plugin's backend in `cli.json` to match the downloaded model:
@@ -41,7 +41,7 @@ Then set the plugin's backend in `cli.json` to match the downloaded model:
 {
   "plugins": [
     {
-      "package": "opencode-native-dictate@0.1.0",
+      "package": "opencode-native-dictate@0.2.0",
       "options": { "backend": "qwen3-asr" }
     }
   ]
@@ -57,7 +57,7 @@ Restart OpenCode if it is already running. The generated recorder and Python env
 Check the installation without recording or downloading anything:
 
 ```sh
-npx --yes --package opencode-native-dictate@0.1.0 native-dictate doctor
+npx --yes --package opencode-native-dictate@0.2.0 native-dictate doctor
 ```
 
 ## Install from a local checkout
@@ -77,7 +77,7 @@ This registers the checkout in the OpenCode v2 `cli.json`. It preserves JSONC co
 npm run configure:add -- --device-uid 'YOUR_CORE_AUDIO_DEVICE_UID'
 ```
 
-Remove the npm registration with `opencode plugin remove opencode-native-dictate@0.1.0`. Remove a local-checkout registration with `npm run configure:remove`. Both leave the runtime and model files available for a future install.
+Remove the npm registration with `opencode plugin remove opencode-native-dictate@0.2.0`. Remove a local-checkout registration with `npm run configure:remove`. Both leave the runtime and model files available for a future install.
 
 ## Use
 
@@ -85,7 +85,7 @@ Focus the normal editable prompt and press **Ctrl+X**, then **D** to start dicta
 
 Speak, then press **Enter** to stop and transcribe. Press **Escape** to cancel and discard the recording. The text is left in the prompt for review; it is never submitted automatically. Dictation uses OpenCode's normal editor undo history.
 
-The footer stays quiet while idle so OpenCode's path and branch details remain visible. During dictation it shows a recording indicator with elapsed time and audio level, then a short transcription indicator. Errors appear as brief notifications. Starting is refused outside the normal editable prompt and when text is selected. Typing and paste are consumed while a session is active. Focus, route, cursor or draft changes cancel the session so a late result cannot land in a different prompt.
+The footer stays quiet while idle so OpenCode's path and branch details remain visible. During dictation it shows a recording indicator with elapsed time and audio level, then a short transcription indicator. Errors appear as brief notifications. Dictation can run while OpenCode is responding: it inserts the transcript into the editable prompt and never submits it. Starting is refused outside the normal editable prompt and when text is selected. Typing and paste are consumed while a dictation session is active. Focus, route, cursor or draft changes cancel the session so a late result cannot land in a different prompt.
 
 ## Backends and privacy
 

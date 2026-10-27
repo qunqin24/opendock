@@ -6,9 +6,9 @@
 
 [![npm](https://img.shields.io/npm/v/oficina-opencode?label=npm&color=cb3837)](https://www.npmjs.com/package/oficina-opencode)
 [![license](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/SOCRAMbt/AI-OFFICE/tree/main/LICENSE)
-[![node](https://img.shields.io/badge/node-%3E%3D20-339933.svg)](https://nodejs.org)
-[![tests](https://img.shields.io/badge/tests-213%20passing-22a06b.svg)](https://github.com/SOCRAMbt/AI-OFFICE/tree/main/tests)
-[![coverage](https://img.shields.io/badge/coverage-87.3%25-7c3aed.svg)](https://vitest.dev)
+[![node](https://img.shields.io/badge/node-%3E%3D22-339933.svg)](https://nodejs.org)
+[![tests](https://img.shields.io/badge/tests-419%20passing-22a06b.svg)](https://github.com/SOCRAMbt/AI-OFFICE/tree/main/tests)
+[![coverage](https://img.shields.io/badge/coverage-87.76%25-7c3aed.svg)](https://vitest.dev)
 [![types](https://img.shields.io/badge/typescript-strict-3178c6.svg)](https://github.com/SOCRAMbt/AI-OFFICE/blob/main/tsconfig.json)
 
 **Una malla de coordinadores + peer mesh sobre un roster de roles.**
@@ -20,7 +20,7 @@
 | **Tools** | 16 |
 | **Hooks** | 7 |
 | **API de plugin** | `@opencode/plugin@2.1.2` |
-| **Node** | >=20 |
+| **Node** | >=22 |
 | **Catálogo** | 258 agentes resolubles en 18 divisiones |
 | **Divisiones** | academic, design, engineering, finance, game-development, gis, healthcare, marketing, paid-media, product, project-management, research, sales, spatial-computing, specialized, strategy, support, testing |
 | **Límites** | 20 cards · 40 llamadas · 20 spawns · 10 agentes |
@@ -73,7 +73,7 @@ Cuatro piezas lo hacen posible:
 
 Y una quinta, que es lo que hace confiable todo lo demás:
 
-**5. El roster se arma según el objetivo.** Los roles salen del catálogo real de agency-agents (**306 agentes, 25 divisiones**), matcheados contra lo que la card pide. Y cada agente recibe un **briefing** de 10 secciones con lo que sabe, lo que no, y qué tiene que entregar.
+**5. El roster se arma según el objetivo.** Los roles salen del catálogo real de agency-agents (**258 agentes, 18 divisiones**), matcheados contra lo que la card pide. Y cada agente recibe un **briefing** de 10 secciones con lo que sabe, lo que no, y qué tiene que entregar.
 
 ---
 
@@ -113,7 +113,7 @@ Cuatro capas. De abajo hacia arriba.
 
 ## Capa 0 — De dónde sale la especialidad
 
-El repo de agency-agents tiene **306 agentes en 25 divisiones**, y cada uno trae un briefing de 10 secciones. La especialidad real **no está en el `description`** del frontmatter: está en el cuerpo.
+El repo de agency-agents tiene **258 agentes en 18 divisiones**, y cada uno trae un briefing de 10 secciones. La especialidad real **no está en el `description`** del frontmatter: está en el cuerpo.
 
 Un agente de statistics declara:
 - `description`: *"Expert in quantitative research methodology..."*
@@ -801,7 +801,7 @@ src/
 | Paquete | Para qué |
 |---|---|
 | `@opencode/plugin` | Los tipos y el helper del API de plugins **v2**. Es la dependencia real. |
-| `zod` | Los schemas de los argumentos de las tools. Versión pineada para que los tipos no divergan. |
+| `zod` | Los schemas de los argumentos de las tools. Rango semver `^4.6.7` (mínimo 4.6.7 por CVE). |
 
 `@opencode-ai/plugin` (v1) es un **peer opcional**: solo lo necesita el entry
 `oficina-opencode/v1`, para los hosts que todavía corren la API vieja.
@@ -815,7 +815,7 @@ en v1 y en v2.
 ## Testing
 
 ```bash
-npm test           # 385 tests, 21 archivos
+npm test           # 419 tests, 26 archivos
 npm run coverage   # cobertura por línea
 npm run docs:check # la documentación coincide con el código
 npm run bench:selection  # el matcher le gana a las alternativas simples

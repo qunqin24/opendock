@@ -3,11 +3,7 @@
 An OpenCode 2 TUI plugin that shows the remaining Tavily API credits in the
 session sidebar.
 
-```
-Tavily
-resets in 6d 12h
-█████████████████████████   84% left
-```
+![The Tavily quota section in the OpenCode session sidebar](docs/sidebar.png)
 
 ## Install
 

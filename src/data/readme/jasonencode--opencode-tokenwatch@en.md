@@ -14,7 +14,6 @@ A terminal monitoring plugin for OpenCode CLI that displays real-time token usag
 
 - **Real-time Sidebar Dashboard**: Check input/output tokens, estimated cost, cache hit rate, and average TTFT & generation speed per model during sessions.
 - **Cache Hit Rate & Trends**: Track cache efficiency per model, with arrows showing whether the hit rate for recent requests is trending up or down.
-- **Context Window Usage**: Shows context usage from the latest assistant request in the current session (used / model limit / percentage), with color warnings near the limit; the value drops after compaction (`/compact`).
 - **Token Breakdown**: Automatically breaks down tokens into system prompt, user input, tool execution, and assistant output to identify major context consumers.
 - **Interactive Usage Reports**: Type `/usage` in the terminal to launch an ECharts interactive dashboard in your browser with historical trends, cross-model comparisons, and failed request stats; export to JSON or Markdown with one click.
 - **Built for OpenCode 2.x**: targets the 2.1.3 Plugin API and OpenTUI 0.6.6, using the host's live events and sidebar slot directly.

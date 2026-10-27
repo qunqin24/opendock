@@ -12,6 +12,18 @@ support.
 
 ## Setup
 
+**0. Have OpenCode 1.** The plugin uses OpenCode 1's plugin API. Install it with
+one of OpenCode's own commands:
+
+```bash
+curl -fsSL https://opencode.ai/install | bash      # macOS / Linux
+npm install -g opencode-ai                         # anywhere with Node
+brew install anomalyco/tap/opencode                # Homebrew
+```
+
+Not `brew install opencode`: that formula installs OpenCode 2, whose plugin
+system this plugin does not support yet.
+
 **1. Add the plugin** to `~/.config/opencode/opencode.json` (or a project's
 `opencode.json`), with your gateway's details:
 
@@ -55,6 +67,11 @@ id and secret, and the published models. Then step 1 is just:
 ```json
 { "plugin": ["opencode-apigee"] }
 ```
+
+> **Not on OpenCode's Ecosystem page yet?** The listing is waiting for review
+> ([anomalyco/opencode#58431](https://github.com/anomalyco/opencode/pull/58431)).
+> It is only a directory entry: the plugin is on npm, and adding
+> `"opencode-apigee"` to `plugin` installs it the same way either way.
 
 ## Options
 

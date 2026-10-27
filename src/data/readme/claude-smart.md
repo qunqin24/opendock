@@ -13,7 +13,7 @@
     <img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg" alt="License">
   </a>
   <a href="plugin/pyproject.toml">
-    <img src="https://img.shields.io/badge/version-0.3.13-green.svg" alt="Version">
+    <img src="https://img.shields.io/badge/version-0.3.14-green.svg" alt="Version">
   </a>
   <a href="plugin/pyproject.toml">
     <img src="https://img.shields.io/badge/python-%3E%3D3.12-brightgreen.svg" alt="Python">
@@ -292,13 +292,14 @@ Advanced users can tune claude-smart via environment variables — see [DEVELOPE
 | `~/.reflexio/data/reflexio.db` | Source of truth for learned preferences, skills, interactions, full-text indexes, and embedding tables (plus `.db-shm` / `.db-wal` WAL sidecars). Inspect with `sqlite3`. |
 | `~/.claude-smart/.env` | claude-smart config read by the hooks, backend, installer, and `npx claude-smart setup` — `CLAUDE_SMART_HOST`, `CLAUDE_SMART_USE_LOCAL_CLI`, `CLAUDE_SMART_OPENCODE_PATH`, and in managed mode `REFLEXIO_URL` / `REFLEXIO_API_KEY`. |
 | `~/.claude-smart/claude-code/claude-smart/` | Claude Code's stable local copy of the active npm package, registered as the `reflexioai` marketplace. Claude Code runs the plugin in place from its `plugin/` dir. |
-| `.claude/settings.local.json` or `~/.claude/settings.json` | Claude Code hook environment, such as `CLAUDE_SMART_ENABLE_OPTIMIZER`; use project-local settings for one repo or user settings for all projects. |
+| `.claude/settings.local.json` or `~/.claude/settings.json` | Claude Code hook environment, such as `CLAUDE_SMART_CITATIONS`; use project-local settings for one repo or user settings for all projects. |
 | `~/.codex/config.toml` | Codex plugin state, hook feature flags, and per-hook trust entries after `claude-smart install --host codex`. |
 | `~/.codex/plugins/cache/reflexioai/claude-smart/<version>/` | Codex's cached install of the `claude-smart` plugin from the `ReflexioAI` marketplace. |
 | `opencode.json` / `opencode.jsonc`, or existing `.opencode/opencode.json*` | OpenCode local plugin config patched by `claude-smart install --host opencode`; the installer updates only the claude-smart entry in OpenCode's plugin list. |
 | `~/.claude-smart/opencode/claude-smart/` | OpenCode's stable local copy of the active npm package. OpenCode config points here with `file://` so restarts do not re-resolve `claude-smart` from npm. |
 | `~/.reflexio/plugin-root` | Self-healed symlink to the active plugin dir (managed by `ensure-plugin-root.sh` — written on install, refreshed each `SessionStart`). Claude Code slash commands and Codex shell-command helpers resolve through it, so don't delete it; if you do, the next session will recreate it. |
-| `~/.claude-smart/sessions/{session_id}.jsonl` | Per-session buffer. User turns, assistant turns, tool invocations, `{"published_up_to": N}` watermarks. Safe to inspect and safe to delete — everything past the latest watermark has already been written to reflexio's DB. |
+| `~/.claude-smart/sessions/{session_id}.jsonl` | Private per-session buffer: turns, tools, frozen requests and publication watermarks. Unacknowledged data remains here; deleting the buffer can lose pending interactions. |
+| `~/.claude-smart/publish-outbox/` | Private Codex publication intents and shared worker locks. Contains destination fingerprints and completed-turn bounds; interaction content stays in session buffers. |
 | `~/.claude-smart/node/current/` | Private Node.js/npm runtime used by hooks and the dashboard after install. |
 | `~/.cache/chroma/onnx_models/all-MiniLM-L6-v2/` | Cached ONNX weights (~86 MB, downloaded once). Delete to force a re-download. |
 
@@ -357,6 +358,19 @@ publication in the same session. The operator can configure
 publications). This fallback is a low-urgency policy, not proof a session ended.
 Normal full-window and stride extraction still runs promptly. A negative judge
 result produces no learning and is recorded as examined.
+
+Optimizer policy is also owned by the Reflexio server. SessionStart no longer
+turns optimization on or rewrites its budgets, adoption permissions or assistant
+backend. Existing server settings are preserved; fresh servers keep their own
+(disabled) optimizer default until explicitly configured. The old
+`CLAUDE_SMART_ENABLE_OPTIMIZER` hook flag is no longer read. Removing or setting
+that flag does not disable an optimizer already enabled on the server; change
+`playbook_optimizer_config` on the server to do that.
+
+The separately installed `claude-smart-optimizer-assistant` helper remains
+available for explicitly configured local optimization. See the
+[backend binding notes](./DEVELOPER.md#optimizer-backend-binding) before assigning
+an executable path, especially when the server is remote.
 
 Extraction cadence is owned by the Reflexio server: configure `window_size` and
 `stride_size` there. Starting a client session preserves those settings. The

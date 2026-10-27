@@ -2,9 +2,15 @@
 
 Plugins I build for my own workflow. The sources are here to be read and forked.
 
+The TUI with the widgets below, and the model picker:
+
+![The TUI with the sidebar blocks and the footer badges](screenshots/annotated.png)
+
+![The models-pro picker: prices, context, intelligence index, the Go credit](screenshots/models-pro.png)
+
 | plugin | what it does | npm |
 |---|---|---|
-| `@rizal72/oc-models-pro` | `/models-pro`: every model with its price, context and the Go credit, in a session panel | ✓ |
+| `@rizal72/oc-models-pro` | `/models-pro`: every model with its price, context, intelligence index and the Go credit, in a session panel | ✓ |
 | `@rizal72/oc-git` | the repository in the sidebar: branch, the three counts, ahead/behind; the counts in the footer while dirty | ✓ |
 | `@rizal72/oc-coffee` | keeps the Mac awake while the agent works: cup badge in the footer, `/coffee` — macOS only | ✓ |
 | `@rizal72/oc-ponytail-widget` | the ponytail level as a badge in the prompt footer | ✓ |
@@ -12,6 +18,8 @@ Plugins I build for my own workflow. The sources are here to be read and forked.
 | `oc-context` | the Context block in the sidebar, with the window its percent is a percent of | — redraws a built-in |
 | `oc-budget` | the paying provider's budget: sidebar, footer, `/budget` | — my wallet |
 | `oc-donsetch` | keeps the `donsetch` binary current | — needs that binary |
+
+Something broken? Open an issue: https://github.com/rizal72/opencode-plugins/issues — paste the error line and the opencode version. That is the whole form.
 
 ## Install
 

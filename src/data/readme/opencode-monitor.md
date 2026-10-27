@@ -13,7 +13,7 @@ process, so the agent is parked at roughly zero cost and resumes the instant the
 is signal. It's the OpenCode counterpart of Claude Code's built-in Monitor tool.
 
 Supports **OpenCode v1 and v2** with the same monitor tools and sidebar. Version
-0.4.0 was tested with OpenCode 1.19.3 and 2.1.2. Node ≥ 22 is required.
+0.4.1 was tested with OpenCode 1.19.3 and 2.1.2. Node ≥ 22 is required.
 
 For OpenCode v2:
 
@@ -173,15 +173,23 @@ reliably wakes idle sessions. Steering does not await its full response;
 On v2, each line uses `session.synthetic` with `delivery: "steer"` and
 `resume: true`. Admission is awaited to preserve event order. For `steer: false`,
 `session.wait` also waits for the full agent response before the next line is
-submitted. Notifications retain their synthetic origin. Deleting a session or
-disposing its v2 plugin stops its watchers and closes its status socket.
+submitted. Notifications retain their synthetic origin.
+
+V2 can evict idle project services while the session and server stay alive.
+The watcher engine belongs to the server process and survives these evictions
+and plugin reloads: its PID, monitor ID, queued events, and timeout deadline stay
+unchanged. Delivery continues through the server's session API even without a
+TUI; the next plugin instance reconnects to the same engine. While detached, a
+small lifecycle check observes plugin removal and session deletion. Explicit
+stop, session deletion, plugin removal, and server exit still reap watchers.
+Monitors do not survive a server restart.
 
 <details>
 <summary><b>Design notes: how the sidebar sees server-side state</b></summary>
 
-Both runtime adapters share a **per-invocation Unix status socket**
+Both runtime adapters share a **per-engine Unix status socket**
 (`<runtime>/opencode-monitor/status-<worktreeHash>-<token>.sock`, token random per
-plugin load). This keeps the sidebar independent of message-history syncing and
+engine creation). This keeps the sidebar independent of message-history syncing and
 uses the same transport on both versions. The v1 adapter registers
 `sidebar_content`; the v2 adapter appends to `sidebar.content`.
 
@@ -190,13 +198,14 @@ The runtime dir is resolved via
 on Linux (0700, user-private), falling back to the per-user temp dir off-Linux;
 the server mkdirs it `0700`. OpenCode can run more than one server process per
 worktree and hot-reloads plugins (so an engine can exist more than once per
-process), and each incarnation hosts its own in-memory registry — hence the random
-per-load token rather than a pid (a pid token collides with itself across reloads
+process), and v1 incarnations host their own in-memory registries — hence the random
+engine token rather than a pid (a pid token collides with itself across reloads
 and orphans already-armed monitors off the filesystem). The panel connects to
 **every** socket in its worktree and merges them, so a monitor armed in any engine
 is visible; dead sockets from exited/crashed servers are pruned on the next start.
 The server pushes a fresh snapshot on every change (armed, stopped, throttled per
-line).
+line). V2 reloads reuse one engine and status socket per process and location
+(directory plus workspace ID), so they do not duplicate or restart watchers.
 
 </details>
 
@@ -235,7 +244,8 @@ It starts an isolated real server and TUI with a controlled local model stream.
 The model calls the actual `monitor`, `monitor_list`, and `monitor_stop` tools.
 Checks cover regex filtering, mid-stream delivery, event order at the next model
 boundary, serialized opt-out, idle wakes, live sidebar counts and output, watcher
-termination, and cleanup after session deletion. Sessions, processes, tmux state,
+termination, repeated v2 location reloads with the same watcher PID/ID, and cleanup
+after session deletion, plugin removal, and server shutdown. Sessions, processes, tmux state,
 and temporary files are removed afterward; no remote model or credentials are
 used. Set `OPENCODE_TEST_PLUGIN` to an installed package's absolute directory to
 test the packed deployment rather than the checkout.

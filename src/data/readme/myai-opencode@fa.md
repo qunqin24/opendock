@@ -48,7 +48,7 @@
   که Agentهای فعال، از جمله متخصص‌های در حال اجرای موازی در پس‌زمینه، را نمایش می‌دهد.
 * **[یکپارچه‌سازی Multiplexer / Multiplexer integration](docs/multiplexer-integration.md)** — امکان مشاهده کار Agentها را
   به‌صورت زنده در paneهای Tmux، Zellij، Herdr، cmux، kitty یا WezTerm فراهم می‌کند.
-* **[تغییر Preset / Preset switching](docs/preset-switching.md)** — مدل‌های کل تیم را
+* **[تغییر Preset / Preset switching](docs/presets/preset-switching.md)** — مدل‌های کل تیم را
   هنگام اجرا با `/preset` تغییر می‌دهد.
 * **[ابزارهای هوشمند کد / Code intelligence tools](docs/tools.md)** — شامل ابزارهای LSP و جست‌وجوی آگاه از AST است
   و برای ۲۵ زبان، همراه با MCPهای داخلی برای مستندات و جست‌وجوی کد GitHub،
@@ -184,10 +184,10 @@ bun run build
 پیشنهاد می‌شود Presetها را بیشتر به‌عنوان راهنما در نظر بگیرید، چون ممکن است همیشه کاملاً به‌روز نباشند.
 
 <ul dir="rtl" align="right">
-  <li><strong><a href="docs/openai-preset.md">OpenAI Preset</a></strong> — Preset پیش‌فرضی که همه Agentها را با مدل‌های OpenAI اجرا می‌کند.</li>
-  <li><strong><a href="docs/opencode-go-preset.md">OpenCode Go Preset</a></strong> — Agentها را با مدل‌های OpenCode Go اجرا می‌کند و چون مدل Orchestrator آن multimodal نیست، Agent مربوط به Observer را برای تحلیل تصویری فعال می‌کند.</li>
-  <li><strong><a href="docs/authors-preset.md">Author's Preset</a></strong> — همان تنظیماتی است که نویسنده در استفاده روزمره به کار می‌برد و شامل Skillهای شخص ثالث نیز می‌شود.</li>
-  <li><strong><a href="docs/thirty-dollars-preset.md">$30 Preset</a></strong> — یک setup چند-Provider مبتنی بر Codex Plus و GitHub Copilot Pro با هزینه تقریبی ۳۰ دلار در ماه است.</li>
+  <li><strong><a href="docs/presets/openai-preset.md">OpenAI Preset</a></strong> — Preset پیش‌فرضی که همه Agentها را با مدل‌های OpenAI اجرا می‌کند.</li>
+  <li><strong><a href="docs/presets/opencode-go-preset.md">OpenCode Go Preset</a></strong> — Agentها را با مدل‌های OpenCode Go اجرا می‌کند و چون مدل Orchestrator آن multimodal نیست، Agent مربوط به Observer را برای تحلیل تصویری فعال می‌کند.</li>
+  <li><strong><a href="docs/presets/authors-preset.md">Author's Preset</a></strong> — همان تنظیماتی است که نویسنده در استفاده روزمره به کار می‌برد و شامل Skillهای شخص ثالث نیز می‌شود.</li>
+  <li><strong><a href="docs/presets/thirty-dollars-preset.md">$30 Preset</a></strong> — یک setup چند-Provider مبتنی بر Codex Plus و GitHub Copilot Pro با هزینه تقریبی ۳۰ دلار در ماه است.</li>
 </ul>
 
 ### برای Providerهای جایگزین
@@ -686,7 +686,7 @@ bunx oh-my-opencode-slim@latest companion install
     <td dir="rtl" align="right">از laneهای <code>.slim/worktrees/</code> برای coding ایزوله، موازی یا پرریسک استفاده کنید</td>
   </tr>
   <tr>
-    <td dir="rtl" align="right"><strong><a href="docs/preset-switching.md">تغییر Preset</a></strong></td>
+    <td dir="rtl" align="right"><strong><a href="docs/presets/preset-switching.md">تغییر Preset</a></strong></td>
     <td dir="rtl" align="right">برای تغییر Preset مدل‌های Agent هنگام اجرا، از <code>/preset</code> استفاده کنید</td>
   </tr>
   <tr>

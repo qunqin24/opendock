@@ -110,7 +110,7 @@ npx @s-berdia/opencode-router status                 # models in use and quota u
 npx @s-berdia/opencode-router plan go-plus           # save the plan profile and rebuild
 npx @s-berdia/opencode-router cat                    # catalog file, date, model count
 npx @s-berdia/opencode-router install --scope global # write slash-command files
-npx @s-berdia/opencode-router@latest update          # remove OpenCode's old copy
+npx --prefer-online @s-berdia/opencode-router@latest update # remove OpenCode's old copy
 npx @s-berdia/opencode-router --help                 # all commands and options
 ```
 

@@ -20,13 +20,13 @@ Add the package to your opencode config, either the global one in `~/.config/ope
 
 The first block is for opencode 1.x (`opencode.json`), the second for opencode 2.x.
 
-opencode installs it on startup. The first time it runs, the plugin creates a starter `~/.config/opencode/WATCHDOG.yml` (and shows a toast on opencode 1.x). Then pick a model from inside opencode:
+opencode installs it on startup. The first time it runs, the plugin creates a starter `~/.config/opencode/WATCHDOG.yml` (and shows a toast on opencode 1.x). By default the advisors use the model your main agent is currently using. To pin a (cheaper) reviewer model instead, pick one from inside opencode:
 
 ```
 /advisor setup anthropic/claude-haiku-4-5
 ```
 
-This saves the model and applies it right away, no restart needed. Until a model is set, the advisor does nothing and never touches your main agent. Run `/advisor` to see its status.
+This saves the model and applies it right away, no restart needed. Until a model is set, advisors follow the main agent's model (same as `inherit`); note that in `turn` mode this doubles the model calls, so a cheap pinned model is cheaper. Run `/advisor` to see its status.
 
 To stop the plugin from creating the starter file, set `OPENCODE_ADVISOR_NO_SETUP=1`.
 
@@ -99,7 +99,7 @@ advisors:
 | Key | Default | Meaning |
 |---|---|---|
 | `advisor.enabled` | true | Master switch. oh-my-pi defaults to false, but here installing the plugin already means you want it |
-| `modelRoles.advisor` | none | Default model for advisors that have no `model` of their own |
+| `modelRoles.advisor` | none (= `inherit`) | Default model for advisors that have no `model` of their own. When unset, advisors use the main agent's current model |
 | `maxNotesPerUpdate` | 4 | 1 to 32. Order of precedence: per advisor, top level, `advisor.maxNotesPerUpdate`, then 4 |
 | `advisor.reviewMode`, `reviewInterval` | `turn`, 1 | `turn` reviews every Nth step; `agent-end` reviews every Nth time the agent stops. These apply to the default advisor only. Roster entries set their own, defaulting to `turn` and 1 |
 | `advisor.syncBacklog`, entry `syncBacklog` | off | Makes the main agent wait for the advisor before its next LLM call once N reviews are queued (`1`, `3`, `5`). `strict` waits with no limit; the others give up after 30 s. An abort, a failure or a pause ends the wait |

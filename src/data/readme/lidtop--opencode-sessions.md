@@ -13,6 +13,7 @@
 | [GH PR Status](#gh-pr-status-never-leave-a-review-waiting) | The pull requests waiting on you | [![GH PR Status version](https://img.shields.io/npm/v/@lidtop/opencode-gh-pr-status?label=gh-pr-status)](https://www.npmjs.com/package/@lidtop/opencode-gh-pr-status) |
 | [Snippets](#snippets-say-it-once-reuse-it-everywhere) | The prompts you'd otherwise type again | [![Snippets version](https://img.shields.io/npm/v/@lidtop/opencode-snippets?label=snippets)](https://www.npmjs.com/package/@lidtop/opencode-snippets) |
 | [Media](#media-narration-sound-and-images-on-request) | The voice, sound, and pictures your project needs | [![Media version](https://img.shields.io/npm/v/@lidtop/opencode-media?label=media)](https://www.npmjs.com/package/@lidtop/opencode-media) |
+| [Review](#review-steer-the-agent-from-its-diff) | A word in, while the agent is still working | [![Review version](https://img.shields.io/npm/v/@lidtop/opencode-review?label=review)](https://www.npmjs.com/package/@lidtop/opencode-review) |
 
 *Demo videos and screenshots show the OpenCode terminal UI with fictional demo data, except the Feed screenshot, which shows real public status feeds.*
 
@@ -128,6 +129,14 @@ Building something that needs a voice-over or artwork? Connect OpenRouter once w
 
 [Explore Media →](plugins/media/README.md)
 
+## Review: steer the agent from its diff
+
+The agent is ten files in and just hardcoded a timeout you wanted configurable. Point at the line instead of describing it. `/review` opens the agent's changes beside the conversation, updating as it edits.
+
+**Comment on a line → press `S` → the agent picks it up at its next step.** Comments carry the file and lines, so the agent finds them without guessing, and it replies to each one, shown under your comment. End a comment with `??` to ask instead of asking for a change. Press `u` on a name to see its usages, with the callers the change may have missed flagged, through your language server or a search. Review this turn, the whole session, uncommitted changes, or the branch against its base, and mark files viewed until they change again.
+
+[Explore Review →](plugins/review/README.md)
+
 ## Install
 
 Requires the **OpenCode 2.1.3+ terminal UI, within the 2.x release line**.
@@ -143,6 +152,7 @@ opencode plugin add @lidtop/opencode-feed
 opencode plugin add @lidtop/opencode-gh-pr-status
 opencode plugin add @lidtop/opencode-snippets
 opencode plugin add @lidtop/opencode-media
+opencode plugin add @lidtop/opencode-review
 ```
 
 **Prefer editing your config?** Instead, add the packages you want to `plugins` in your global `~/.config/opencode/opencode.jsonc` (or `opencode.json`), keeping your existing entries:
@@ -158,7 +168,8 @@ opencode plugin add @lidtop/opencode-media
     "@lidtop/opencode-feed",
     "@lidtop/opencode-gh-pr-status",
     "@lidtop/opencode-snippets",
-    "@lidtop/opencode-media"
+    "@lidtop/opencode-media",
+    "@lidtop/opencode-review"
   ]
 }
 ```
@@ -169,6 +180,6 @@ Replacing the original plugins? Remove their old configuration entries rather th
 
 ---
 
-**Make it yours:** [Later guide](plugins/later/README.md) · [Context guide](plugins/context/README.md) · [Cost guide](plugins/cost/README.md) · [Sessions guide](plugins/sessions/README.md) · [Feed guide](plugins/feed/README.md) · [GH PR Status guide](plugins/gh-pr-status/README.md) · [Snippets guide](plugins/snippets/README.md) · [Media guide](plugins/media/README.md)
+**Make it yours:** [Later guide](plugins/later/README.md) · [Context guide](plugins/context/README.md) · [Cost guide](plugins/cost/README.md) · [Sessions guide](plugins/sessions/README.md) · [Feed guide](plugins/feed/README.md) · [GH PR Status guide](plugins/gh-pr-status/README.md) · [Snippets guide](plugins/snippets/README.md) · [Media guide](plugins/media/README.md) · [Review guide](plugins/review/README.md)
 
 **Working on Opcode?** [Local development](docs/development.md) · [Architecture](docs/architecture.md) · [Verification](docs/verification.md) · [Releases](docs/releases.md)

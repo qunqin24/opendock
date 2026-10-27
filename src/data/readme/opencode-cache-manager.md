@@ -59,8 +59,8 @@ Add the package to the `plugins` array in `~/.config/opencode/opencode.jsonc`. O
 {
   "$schema": "https://opencode.ai/config.json",
   "plugins": [
-    "@noppu-labs/opencode-cache-manager@^0.5.0"
-    // or: "opencode-cache-manager@^0.5.0" -- same package, unscoped name
+    "@noppu-labs/opencode-cache-manager@^0.6.0"
+    // or: "opencode-cache-manager@^0.6.0" -- same package, unscoped name
   ]
 }
 ```
@@ -111,7 +111,7 @@ The plugin reads the header before the request goes out, applies that TTL, and s
 
 ### Proxies and other provider ids
 
-Requests to the `anthropic` provider are rewritten automatically. If you reach Claude through a proxy registered under another provider id, the plugin recognises it by the request: `POST …/messages` is the Anthropic wire, `POST …/chat/completions` is the OpenAI Chat wire, and `POST …/responses` is the OpenAI Responses wire (see [Supported providers and endpoints](docs/SUPPORTED_PROVIDERS.md)). To force a TTL for one model, add the `x-cache-ttl` header to a model variant as above. Keepalive and the sidebar work with any provider on any wire, since they only need the cache usage in the response.
+Requests to the `anthropic` and `omniroute-anthropic` providers are always treated as Claude and rewritten automatically. If you reach a model through a proxy registered under another provider id, the plugin recognises the wire by the request: `POST …/messages` is the Anthropic wire, `POST …/chat/completions` is the OpenAI Chat wire, and `POST …/responses` is the OpenAI Responses wire (see [Supported providers and endpoints](docs/SUPPORTED_PROVIDERS.md)). On the Messages wire, and on the OpenAI wires with `openaiCompatible` on, any other provider id is classified by model: a `cacheProfiles` entry, a model name that contains `claude` or starts with `anthropic/`, or the model the latest response reported, applied from the next request. A router alias that switches models therefore runs one turn behind, and on the Messages wire a request such an alias rejects (status 400 or 422) drops what was learned. A non-Claude model on an Anthropic-compatible endpoint (DeepSeek, Kimi, MiniMax, GLM, a router) is observed only: its requests are not rewritten and it is never pinged. The `x-cache-ttl` header forces a TTL only on models classified as Claude or GPT-5.6+; to force it on an alias, map the alias with `cacheProfiles` (see [Upgrading from 0.5.x](docs/UPGRADE.md#from-05x)). Keepalive and the sidebar work with any provider on any wire, since they only need the cache usage in the response.
 
 ## Keepalive
 

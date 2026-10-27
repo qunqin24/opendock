@@ -53,7 +53,7 @@ oh-my-opencode-slim은 OpenCode에서 여러 전문 에이전트의 작업을 �
   필요에 따라 활성화할 수 있습니다.
 - **[멀티플렉서 통합](docs/multiplexer-integration.md)** - Tmux, Zellij,
   Herdr, cmux, kitty 또는 WezTerm 분할 창(페인)에서 에이전트 작업을 실시간으로 확인합니다.
-- **[프리셋 전환](docs/preset-switching.md)** - `/preset`으로 실행 중에 팀 전체의
+- **[프리셋 전환](docs/presets/preset-switching.md)** - `/preset`으로 실행 중에 팀 전체의
   모델을 교체합니다. 하나의 기본 프리셋을 상속하는 기능도 지원합니다.
 - **[코드 인텔리전스 도구](docs/tools.md)** - 언어 서버 프로토콜(LSP) 도구,
   25개 언어의 추상 구문 트리(AST) 기반 검색, 문서·GitHub 코드 검색용
@@ -206,10 +206,10 @@ v1에서도 변경 사항을 적용하려면 OpenCode를 다시 로드하세요.
 
 프리셋 문서가 최신 상태가 아닐 수 있으므로, 구성 방향을 참고하는 용도로 사용하세요.
 
-- **[OpenAI 프리셋](docs/openai-preset.md)** — 기본으로 생성되는 프리셋으로, 모든 에이전트가 OpenAI 모델을 사용합니다.
-- **[OpenCode Go 프리셋](docs/opencode-go-preset.md)** — 에이전트가 OpenCode Go 모델을 사용합니다. Orchestrator 모델이 멀티모달이 아니므로 시각 분석용 Observer 에이전트를 활성화합니다.
-- **[작성자 프리셋](docs/authors-preset.md)** — 작성자가 매일 사용하는 설정으로, 외부 스킬도 포함합니다.
-- **[$30 프리셋](docs/thirty-dollars-preset.md)** — 월 약 $30로 Codex Plus와 GitHub Copilot Pro를 중심으로 구성한 혼합 프로바이더 설정입니다.
+- **[OpenAI 프리셋](docs/presets/openai-preset.md)** — 기본으로 생성되는 프리셋으로, 모든 에이전트가 OpenAI 모델을 사용합니다.
+- **[OpenCode Go 프리셋](docs/presets/opencode-go-preset.md)** — 에이전트가 OpenCode Go 모델을 사용합니다. Orchestrator 모델이 멀티모달이 아니므로 시각 분석용 Observer 에이전트를 활성화합니다.
+- **[작성자 프리셋](docs/presets/authors-preset.md)** — 작성자가 매일 사용하는 설정으로, 외부 스킬도 포함합니다.
+- **[$30 프리셋](docs/presets/thirty-dollars-preset.md)** — 월 약 $30로 Codex Plus와 GitHub Copilot Pro를 중심으로 구성한 혼합 프로바이더 설정입니다.
 
 ### 대체 프로바이더 사용하기
 
@@ -628,7 +628,7 @@ bunx oh-my-opencode-slim@latest companion install
 | **[Codemap](docs/codemap.md)** | 계층형 코드맵을 생성하여 대규모 코드베이스를 빠르게 파악 |
 | **[Clonedeps](docs/clonedeps.md)** | 선택한 의존성 소스를 Git 추적에서 제외된 로컬 작업 공간에 복제해 내부 구현 확인 |
 | **[Worktrees](docs/worktrees.md)** | `.slim/worktrees/`의 독립된 작업 공간에서 병렬·고위험 코딩 작업 수행 |
-| **[프리셋 전환](docs/preset-switching.md)** | `/preset`으로 실행 중에 에이전트 모델 프리셋 전환 |
+| **[프리셋 전환](docs/presets/preset-switching.md)** | `/preset`으로 실행 중에 에이전트 모델 프리셋 전환 |
 | **[Interview](docs/interview.md)** | 브라우저 기반 질의응답으로 아직 구체화되지 않은 아이디어를 구조화된 마크다운 명세로 변환 |
 | **[Companion](docs/companion.md)** | 파싱, 도움말, 타입을 위한 플로팅 창 Companion |
 

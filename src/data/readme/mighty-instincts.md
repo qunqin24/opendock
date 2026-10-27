@@ -139,9 +139,10 @@ The board is a small, read-only summary of three sources, written by the server 
       open                           398
       added this week                158
       last reviewed                 never
-  ▾ Skill test (pr)              ● 2d
-      with skill                     92%
-      without                         8%
+  ▾ Skill test (pr)              ○ 2d
+      new                            100%
+      old                            100%
+      verdict                   saturated
   ● active  ● needs attention  ○ stale
 ```
 
@@ -156,12 +157,12 @@ The board is a small, read-only summary of three sources, written by the server 
 
 ● Skill notes      467 open, 167 this week, never reviewed: review overdue.
 
-○ Skill test (pr)  no measurable difference last run (100% vs 100%, 4d ago).
+○ Skill test (pr)  the last edit changed nothing the evals can see: old and new both pass 100%, 8d ago. The evals are saturated; add harder cases.
 
 ● active  ● needs attention  ○ stale
 ```
 
-The "Used today:" list reads "Most used today:" instead whenever two listed habits fired a different number of times (nothing to rank when every count is 1), is capped at 5, and each summary is clipped at a word boundary at 100 characters (this reply has no 36-column sidebar budget to justify a hard character cut). "Next learning run" reads one of three ways: `ready`, `in <duration>` (still waiting on the interval), or `after N more events (M so far)` (the interval has elapsed, but not enough has been observed yet). "Skill test" reads "no measurable difference" (and a stale, hollow glyph) whenever the pass-rate difference between the two runs is smaller than 5 points, or negative.
+The "Used today:" list reads "Most used today:" instead whenever two listed habits fired a different number of times (nothing to rank when every count is 1), is capped at 5, and each summary is clipped at a word boundary at 100 characters (this reply has no 36-column sidebar budget to justify a hard character cut). "Next learning run" reads one of three ways: `ready`, `in <duration>` (still waiting on the interval), or `after N more events (M so far)` (the interval has elapsed, but not enough has been observed yet). "Skill test" names what was compared (`old vs new`, the same skill against its own previous version, or `with vs without`, a run with the skill removed) and one of four verdicts: `saturated` (both runs are already at the ceiling, so the evals cannot tell them apart at all, no matter how small this run's own difference looks), `no change` (a difference under 5 points, but not at the ceiling), `improved` (a rise of 5 points or more, the only verdict that ever reads an active, solid glyph, and only while the benchmark itself is still fresh), or `worse` (a drop of 5 points or more). Every verdict but a fresh `improved` reads a stale, hollow glyph.
 
 ### Glossary
 
@@ -179,7 +180,8 @@ The board intentionally avoids ECC's own vocabulary ("promote," "prune," "evolve
 | **awaiting first use** | Instincts the observer was not confident enough about to call "learned" yet (the "50% rule," below); they graduate to real instincts once you actually use them once. |
 | **kept tidy** | What the maintenance loop did in the last 7 days: `promoted`, `archived`, `merged`, `pruned`, `candidates` (evolved outlines written), `repaired`, `cleaned` (stale project entries archived), whichever of those are nonzero. |
 | **open** / **added this week** / **last reviewed** | The task-observer skill's own open backlog, how much is new this week, and when it was last reviewed by a human. |
-| **with skill** / **without** | The two pass rates skill-creator's latest benchmark compared. |
+| **with skill** / **without**, or **new** / **old** | The two pass rates skill-creator's latest benchmark compared: the skill included vs. removed, or (skill-creator's "old_skill" naming) the edited skill vs. its own previous version. |
+| **verdict** | What the comparison above means: `saturated` (both runs are already at the ceiling), `no change` (under a 5-point difference, but not at the ceiling), `improved` (5 points or more higher), or `worse` (5 points or more lower). |
 
 ### Where the board state lives
 

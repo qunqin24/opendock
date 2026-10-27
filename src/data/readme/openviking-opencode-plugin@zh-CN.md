@@ -420,5 +420,5 @@ OpenViking 各组件采用不同的许可证：
 - **主项目**：AGPLv3——详见 [LICENSE](../../LICENSE)
 - **crates/ov\_cli**：Apache 2.0——详见 [LICENSE](../../crates/LICENSE)
 - **examples**：Apache 2.0——详见 [LICENSE](../../examples/LICENSE)。`examples/hermes-plugin` 中的 Hermes 插件保留其 [MIT 许可证](../../examples/hermes-plugin/LICENSE)。
-- **integrations/frameworks**：适配器的包元数据和源码声明 AGPLv3，详见各包的 `LICENSE`；可运行示例保留 Apache 2.0，详见各包的 `examples/LICENSE`。
+- **integrations/frameworks**：LangChain/LangGraph 适配器采用 AGPLv3，Microsoft Agent Framework 适配器采用 MIT，详见各包的 `LICENSE`；可运行示例保留 Apache 2.0，详见各包的 `examples/LICENSE`。
 - **third\_party**：各三方项目保留其原有协议

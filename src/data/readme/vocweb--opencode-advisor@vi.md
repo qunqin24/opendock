@@ -20,13 +20,13 @@ Thêm package vào cấu hình opencode, bản toàn cục trong `~/.config/open
 
 Khối đầu dành cho opencode 1.x (`opencode.json`), khối sau dành cho opencode 2.x.
 
-opencode tự cài khi khởi động. Lần chạy đầu tiên, plugin tạo file `~/.config/opencode/WATCHDOG.yml` ban đầu (chưa có model) (và hiện toast nhắc bạn trên opencode 1.x). Sau đó chọn model ngay trong opencode:
+opencode tự cài khi khởi động. Lần chạy đầu tiên, plugin tạo file `~/.config/opencode/WATCHDOG.yml` ban đầu (chưa cố định model) (và hiện toast nhắc bạn trên opencode 1.x). Mặc định advisor dùng model mà agent chính đang dùng. Muốn cố định một model reviewer (rẻ hơn), chọn ngay trong opencode:
 
 ```
 /advisor setup anthropic/claude-haiku-4-5
 ```
 
-Lệnh này lưu model và có hiệu lực ngay, không cần khởi động lại. Khi chưa đặt model, advisor không làm gì và không ảnh hưởng đến agent chính. Gõ `/advisor` để xem trạng thái.
+Lệnh này lưu model và có hiệu lực ngay, không cần khởi động lại. Khi chưa đặt model, advisor theo model của agent chính (giống `inherit`); lưu ý ở chế độ `turn` việc này nhân đôi số lần gọi model, nên model cố định rẻ hơn sẽ tiết kiệm hơn. Gõ `/advisor` để xem trạng thái.
 
 Muốn plugin không tạo file ban đầu, đặt `OPENCODE_ADVISOR_NO_SETUP=1`. Cài thủ công từ mã nguồn: `npm install && npm run build && scripts/install.sh [--project]`.
 
@@ -99,7 +99,7 @@ advisors:
 | Khóa | Mặc định | Ý nghĩa |
 |---|---|---|
 | `advisor.enabled` | true | Công tắc chính. oh-my-pi mặc định false, nhưng ở đây cài plugin đã có nghĩa là bạn muốn dùng |
-| `modelRoles.advisor` | không | Model mặc định cho advisor không có `model` riêng |
+| `modelRoles.advisor` | không (= `inherit`) | Model mặc định cho advisor không có `model` riêng. Khi bỏ trống, advisor dùng model mà agent chính đang dùng |
 | `maxNotesPerUpdate` | 4 | Từ 1 đến 32. Thứ tự ưu tiên: theo advisor, cấp cao nhất, `advisor.maxNotesPerUpdate`, rồi 4 |
 | `advisor.reviewMode`, `reviewInterval` | `turn`, 1 | `turn` review mỗi N bước; `agent-end` review mỗi N lần agent dừng. Chỉ áp dụng cho advisor mặc định. Entry trong roster tự đặt, mặc định là `turn` và 1 |
 | `advisor.syncBacklog`, `syncBacklog` của entry | off | Bắt agent chính chờ advisor trước lần gọi LLM kế tiếp khi hàng đợi đạt N review (`1`, `3`, `5`). `strict` chờ không giới hạn, các mức còn lại bỏ chờ sau 30 giây. Abort, lỗi hoặc pause sẽ kết thúc việc chờ |

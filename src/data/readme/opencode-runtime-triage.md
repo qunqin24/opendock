@@ -10,9 +10,14 @@ The server uses an agent transform and location-scoped plugin RPC. No configurat
 
 ### Desktop commands
 
-Desktop currently does not render OpenCode's session-form API. Use arguments in Desktop: `/rt-model <agent> <provider/model#variant|restore>` or `/rt-provider <source> <target>` (and `/rt-provider restore`). The TUI commands remain interactive and list every available model, variant, and compatible provider. Unsupported no-argument Desktop commands now return an actionable error instead of creating an invisible form.
+No-argument Desktop commands use **question-style forms as a temporary workaround**, verified against OpenCode 2.1.2's source. Full TUI interaction parity is still pending; Desktop does not render arbitrary session forms.
 
-The plugin connects through local service discovery and verifies that the discovered endpoint belongs to the same plugin instance. Standalone servers without service discovery support the argument commands below. Form creation requires the client SDK because OpenCode 2.0.6's plugin context does not expose it directly.
+- `/rt-model`: choose an agent and an available model/variant, or restore that agent's command override.
+- `/rt-provider`: choose a compatible source → target provider pair, or restore all command overrides owned by the session. Only pairs matching at least one agent's exact model and variant are listed.
+
+Cancel a form to leave overrides unchanged. A session can have only one runtime triage form open at a time. Selections are revalidated when submitted; failures appear as a dismissible question. This fallback does not provide the TUI's searchable, sequential pickers or custom preset labels. The TUI commands are unchanged.
+
+For these forms, the plugin connects through local service discovery and verifies that the discovered endpoint belongs to the same plugin instance. Standalone or remote servers that cannot be discovered locally must use the argument commands below. Form creation still requires the client SDK because the server-plugin context does not expose it directly in OpenCode 2.1.2. No dependency upgrade is required for this workaround.
 
 Commands also accept arguments:
 

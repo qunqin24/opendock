@@ -15,15 +15,18 @@ Subagents normally only surface inline in the chat, and the chat scrolls away fr
 active session route
   ↓
 resolve current session
-  ├─ parent session → client.session.children() → keep the RUNNING ones
+  ├─ parent session → its child sessions → keep the RUNNING ones
   └─ subagent session → pin the one currently in focus (panel stays up)
   ↓
-app_bottom slot renders the roster:  ● title  elapsed · tokens
+bottom slot renders the roster:  ● title  elapsed · tokens
+  (OpenCode 1: app_bottom · OpenCode 2: app)
   ↓
-navigation: keymap.intercept catches ↑/↓/Enter BEFORE the prompt textarea
-            (the same mechanism opencode uses for copy-on-select), so while the
-            dock is focused the prompt is "locked" and arrows move the cursor
+navigation: while the dock is focused, ↑/↓/Enter reach it BEFORE the prompt,
+            so the prompt is "locked" and arrows move the cursor
+  (OpenCode 1: keymap.intercept · OpenCode 2: a keymap layer above the prompt's)
 ```
+
+Refresh: on OpenCode 1 the dock re-reads the roster on session events and every 300 ms; on OpenCode 2 it reads OpenCode's live session data, which updates by itself, and only ticks once a second for elapsed time.
 
 ## Features
 
@@ -36,7 +39,7 @@ navigation: keymap.intercept catches ↑/↓/Enter BEFORE the prompt textarea
 
 ## Install
 
-This is a **TUI plugin**, so it is configured in `tui.json` (not `opencode.json`):
+This is a **TUI plugin**. On OpenCode 1 it is configured in `tui.json` (not `opencode.json`):
 
 ```jsonc
 // ~/.config/opencode/tui.json  (user)  or  .opencode/tui.json  (project)
@@ -46,7 +49,32 @@ This is a **TUI plugin**, so it is configured in `tui.json` (not `opencode.json`
 }
 ```
 
+On OpenCode 2 the TUI reads `cli.json`, under `plugins`:
+
+```jsonc
+// ~/.config/opencode/cli.json
+{
+  "plugins": ["opencode-agent-dock"]
+}
+```
+
+Coming from OpenCode 1 you need not do this: on its first start, OpenCode 2 writes `cli.json` from your `tui.json`, plugins included, as long as no `cli.json` exists yet.
+
 Restart OpenCode after adding it.
+
+## Compatibility
+
+| OpenCode | Status |
+| --- | --- |
+| 1.0 – 1.3.3 | no TUI plugins in OpenCode itself |
+| 1.3.4 – 1.17 | not supported: the plugin declares `engines.opencode` `^1.18.0 \|\| ^2.0.0`, so OpenCode refuses it |
+| 1.18 – 1.x | supported |
+| 2.x | supported |
+
+On OpenCode 2:
+- the dock sits where it does on OpenCode 1: under everything, on every screen (the `app` slot);
+- it follows OpenCode 2's own session data, so it updates the moment a subagent starts, finishes or is deleted;
+- the reduced "mini" TUI shows no plugin panels, so no dock there.
 
 ## Keybindings
 
@@ -58,7 +86,7 @@ Restart OpenCode after adding it.
 | `↑` from the first row, or `ctrl+x` `v` again | Leave the dock |
 | `Esc` | _(native)_ cancel subagents |
 
-The toggle key (`<leader>v`) can be remapped in `tui.json` under the `agent-dock.toggle` command if you prefer a different one.
+The toggle key (`<leader>v`) can be remapped under the `agent-dock.toggle` command if you prefer a different one: in `tui.json` on OpenCode 1, in `cli.json` `keybinds` on OpenCode 2.
 
 > Why a toggle and not bare `↓`? In the parent session the prompt textarea captures arrow keys, and a plugin cannot blur the host prompt. `keymap.intercept` runs before the textarea, so once the dock is focused the arrows are ours. `↓` itself is also the prompt's history key, which made it an unreliable trigger.
 

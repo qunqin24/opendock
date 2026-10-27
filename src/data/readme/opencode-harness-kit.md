@@ -571,6 +571,7 @@ oc-harness auto --json   the same reconcile, as a report a script can read
 oc-harness use <id>   compile a profile into ~/.config/opencode/opencode.jsonc
 oc-harness use <id> --dryrun   print a summary of what would be written, write nothing
 oc-harness use <id> --no-skills   leave the skill list out of the lanes' prompt
+oc-harness use <id> --target v2   write the OpenCode 2 dialect (v1, v2 or auto)
 oc-harness refresh <id> re-derive a profile against the live model list
 oc-harness install    symlink the plugin, prompts, skills and GLOBAL.md into the config dir
                       (from `npx`, they link into a package copy it makes first - see Install)
@@ -599,6 +600,10 @@ oc-harness mcp        read-only MCP server over stdio for editors
 oc-harness plan "<request>"  turn a request into .space/tasks.md, and refuse a plan the loop cannot run
 oc-harness work "<request>"  plan when needed, then build, verify, review and finish
 ```
+
+`oc-harness mcp` answers `harness_status`, `harness_report`, `harness_evidence`,
+`harness_events`, `harness_health` and `harness_tasks` over stdio. Every tool is
+a read: the plan, the run record and the evidence, never resume or work.
 
 `work` is strict by default: it wants `--review`, `--final-verify`,
 `--final-review`, `--worktree` and `--commit` (and a git repository). For a
@@ -842,6 +847,34 @@ give it one:
 | `prune.ts` | `experimental.chat.messages.transform` | Replaces old tool output with a one-line stub. |
 | `router.ts` | `config`, `event`, `chat.message` | Moves a lane to the next rung of its chain when a route is spent. |
 | `telemetry.ts` | `event`, `tool.execute.after` | Local JSONL, gitignored, never a network call. |
+
+### OpenCode 2 and the V1 plugin surface
+
+OpenCode 2 does not load a V1 plugin. The config key is `plugins` rather than
+`plugin`, and the module shape is a plain `{ id, setup(ctx) }` object rather
+than a default-exported function that returns hooks. A V1 plugin under V2 is
+skipped without an error, so the session looks normal and is unguarded.
+
+The two shapes cannot share one default export: a function with `id` and
+`setup` attached still fails V2's object schema. The package therefore ships
+two entrypoints. `opencode-harness-kit` is the V1 function. On OpenCode 2,
+copy `dist/v2.js` into `.opencode/plugins/v2.ts` from a checkout, or name the
+published `opencode-harness-kit/v2` in the config's `plugins` list. Its `setup`
+builds the same hooks the V1 function returns and registers them on
+`ctx.tool`, `ctx.session` and `ctx.event`, so the four concerns in the table
+above run on both APIs rather than being silently absent on V2. What the bridge cannot carry - the startup `config` hook, `chat.params`,
+and nested calls inside Code Mode - is listed in
+[`docs/KNOWN-LIMITS.md`](docs/KNOWN-LIMITS.md#opencode-2-does-not-load-v1-plugins).
+
+The config dialect follows the loader: `oc-harness use <id> --target v2` moves
+`subagent_depth` under `experimental`, drops `batch_tool`,
+`continue_loop_on_deny`, keeps `lsp`, and sets `external_directory` to `ask`.
+`small_model` is not a V2 key, so the utility route follows `model`.
+`--target auto` reads `opencode --version`; the default stays `v1` so an
+existing install regenerates unchanged. `npm run gate:v2` reads the resolved
+config back through `opencode debug config`, then runs a live V2 server with a
+fake model and checks that the guard blocks a denied command. It skips when no
+2.x binary is installed.
 
 Both `.space/telemetry.jsonl` and `.space/prune.jsonl` are written in the
 **project**, not wherever opencode was started from. The prune log used to
@@ -1114,8 +1147,10 @@ the first agent is called.
 
 `oc-harness plan "<request>"` turns a request into `.space/tasks.md`, and
 refuses to write a plan the loop cannot run: every task needs `files:`,
-`change:` and a `verify:` that can fail. The plan is validated before it
-replaces an existing file; a rejected plan never overwrites a good one.
+`change:` and a `verify:` that can fail. An optional `accept:` line says what a
+reviewer recognises as the result; the builder sees it, but it never replaces
+the verify command. The plan is validated before it replaces an existing file;
+a rejected plan never overwrites a good one.
 
 `oc-harness work "<request>"` is the whole sequence in one command: plan if
 there is no executable plan, run the loop, then final verify and final review.
@@ -1129,10 +1164,22 @@ with `--allow-extra-files`, which turns off the scope check it cannot make.
 
 The run is durable, not just resumable. Every phase change goes through the
 table in `src/driver/transitions.mjs`, and `.space/run.json` keeps the last 200
-transitions in `history`. `.space/tasks.md` is redacted and replaced
-atomically, so a crash cannot leave a half-written plan. A crash inside the
-loop ends the record as `needs-human` with exit 2 and releases the lock, which
-is what `resume` expects to find.
+transitions in `history`. Opening a stopped record is a transition too: `start`
+begins a fresh one, `resume` clears the old verdict and returns it to
+`preflight`, and a spent route writes the provisional `route-failed` (no
+terminal) until `work` knows the chain is exhausted. `.space/tasks.md` is
+redacted and replaced atomically, so a crash cannot leave a half-written plan.
+A crash inside the loop ends the record as `needs-human` with exit 2 and
+releases the lock, which is what `resume` expects to find.
+
+Three more guarantees hold the record together. A checkpoint that cannot be
+written stops the run with exit 2 (`checkpoint-failed`) instead of returning a
+success code for a record that never changed. `--commit` commits a task before
+the plan marks it done, so a refused commit leaves the task pending. And `work`
+holds one lock for the whole request, route retries included, so a second run
+cannot enter between two attempts of the same task. `Ctrl-C` is a stop, not a
+killed process: it ends as `interrupted` with exit 130 and `resume` continues
+from the pending task.
 
 `--review` closes the review gap without pretending a sentence is a verdict:
 after verify passes, the `reviewer` lane is asked for one JSON object matching
@@ -1172,8 +1219,12 @@ command list on this one path.
 | 5 | a review failed after its fix rounds, or the reviewer's answer was not a verdict |
 
 `--final-verify "<cmd>"` runs one command after the last task - the project's
-whole suite, not one task's slice. `--final-review` reviews the whole diff from
-the commit the run started at, not just the last task. `--json` prints one
+whole suite, not one task's slice. `--verify-repeats <n>` runs every task
+verify, and the final verify, up to `n` times and stops at the first failure;
+each execution gets its own evidence entry with `repeat` and `repeats`, so a
+flaky second run is visible instead of averaged away. The default is 1.
+`--final-review` reviews the whole diff from the commit the run started at, not
+just the last task. `--json` prints one
 machine-readable report on stdout and sends human progress to stderr;
 `oc-harness status` answers "what did the last run do" from the record.
 

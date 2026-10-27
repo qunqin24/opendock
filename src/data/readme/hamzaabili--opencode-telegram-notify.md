@@ -64,10 +64,18 @@ a chat-with-your-agent relay, it never injects text into your sessions.
   otherwise `question.reply`; skip via `question.reject`), other question types
   stay notify-only with the terminal pointer, and pending questions survive
   restarts (`question.list` recovery). When the host exposes no reply surface
-  (OpenCode 2.1.1 currently exposes none), the message is notify-only with the
-  terminal pointer instead of showing dead buttons.
+  (the OpenCode 2.1.x plugin context currently exposes none for forms —
+  tracked upstream in
+  [anomalyco/opencode#51108](https://github.com/anomalyco/opencode/issues/51108)),
+  the message is notify-only with the terminal pointer instead of showing dead
+  buttons.
 - ✅ / ❌ / ⏹ **Lifecycle events** — completion (debounced so mid-run pauses
-  don't spam), failure with error type, cancellation (silent).
+  don't spam), failure with error type, cancellation (silent). Completion
+  messages include the session's cumulative **token and cost usage** when the
+  host reports it (OpenCode v2; `⚡ 13.2k in · 3.2k out · $0.042`). Failures
+  caused by a **usage limit** (OpenCode free tier, provider quota, rate
+  limits; Console budgets on hosts that emit them) get a friendly headline
+  instead of the raw error code, e.g. `⛔ Free usage limit reached`.
 - 🤖 **Bot command menu** — `/start`, `/status`, `/setup`, `/stop`, `/help`
   registered via `setMyCommands`, so the ☰ menu works out of the box.
   `/setup` prints a copy-paste-ready `opencode.jsonc` block.
@@ -81,9 +89,9 @@ a chat-with-your-agent relay, it never injects text into your sessions.
 
 ## Requirements
 
-- OpenCode **v2** (tested on 2.1.1) or **v1** (the hooks-based
-  `@opencode-ai/plugin` contract, e.g. the 1.x line). v1 has no per-plugin
-  options, so its configuration is environment-driven only.
+- OpenCode **v2** (tested on 2.1.4; the 2.0.x line is also supported) or **v1.18+**
+  (the hooks-based `@opencode-ai/plugin` contract, e.g. the 1.18/1.19 line).
+  v1 has no per-plugin options, so its configuration is environment-driven only.
 - A Telegram bot token (via [@BotFather] — takes one minute) and the chat id of
   your user or group.
 - [Bun] **only if you run the dev tooling** (typecheck/tests). The plugin itself
@@ -180,7 +188,8 @@ All options live under `options.` of the plugin entry. Only `botToken` and
 | `events.permission` | boolean | `true` | Permission request notifications + buttons |
 | `events.question` | boolean | `true` | Question (`form.created`) notifications |
 | `events.idle` | boolean | `true` | Completion notifications (debounced) |
-| `events.error` | boolean | `true` | Failure and cancellation notifications |
+| `events.error` | boolean | `true` | Failure and cancellation notifications (limit refusals included, with a friendly label) |
+| `events.usage` | boolean | `true` | Token and cost line on completion notifications (v2 only; v1 hosts report no usage and the line is omitted) |
 | `interactions` | boolean | `true` | When `false`, permissions go out as simple messages (no buttons) |
 | `idleDebounceMs` | number | 60000 | Wait after `execution.succeeded` before pinging you; any new activity cancels it |
 | `idleCooldownMs` | number | 600000 | Min gap between completion notifications for the same session — conversational pauses never spam (0 disables) |

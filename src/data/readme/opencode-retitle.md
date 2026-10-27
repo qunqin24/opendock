@@ -10,6 +10,13 @@ session title at three moments:
 It also protects titles you set by hand: once a title it did not write appears,
 retitling pauses for that session until you re-enable it.
 
+## Screenshot
+
+`/retitle-status` reports the state of the current session as a toast, without
+making a model call:
+
+![The /retitle-status toast in the OpenCode TUI](docs/retitle-status.png)
+
 ## Install
 
 Add it to `opencode.json(c)` and pass settings under `options`:
@@ -49,7 +56,7 @@ before the plugin runs, with the project overriding the global.
 
 - `/retitle-status` — report whether this session's title was set manually or by
   opencode-retitle, how far the turn counter is, and which settings differ from the
-  defaults. Makes no model call.
+  defaults. Makes no model call. See the [screenshot](#screenshot).
 - `/retitle-enable` — clear the manual-rename pause for this session and retitle
   now. Use this when you renamed a session by hand and want automatic retitling
   back.

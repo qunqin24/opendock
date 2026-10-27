@@ -1,5 +1,9 @@
 # shift
 
+[![npm](https://img.shields.io/npm/v/@iiiokojiadbi/shift)](https://www.npmjs.com/package/@iiiokojiadbi/shift)
+[![downloads](https://img.shields.io/npm/dm/@iiiokojiadbi/shift)](https://www.npmjs.com/package/@iiiokojiadbi/shift)
+[![license](https://img.shields.io/npm/l/@iiiokojiadbi/shift)](https://github.com/iiiokojiadbi/shift/blob/main/LICENSE)
+
 An agent decides by itself when to **shift**. At a stage boundary it updates its work board and task folders, writes a letter to itself and asks the harness to let the stretch's history go, saying what to hold. Right after the shift its letter, board and tasks in progress come back whole, and it continues from where it stopped. The agent does not change: only what is in front of it does.
 
 Long work outlives the context window. A harness's own compaction keeps a generic summary of the history, not the agent's line of thought: decisions get lost, and knowledge that was written down is not looked up again. shift keeps the thread on disk, in records strict enough to resume from: a state, not a diary.
@@ -9,7 +13,7 @@ Works in [Claude Code](#claude-code) (as a mod), [pi](#pi) (as an extension) and
 ## How it works
 
 1. **Records as you go.** The agent keeps `.shift/` in the project: a board (the goal, decisions with their reasons, dead ends), one folder per task with its description and tracker, finished tasks in an archive with an index, the owner's decisions, a glossary, and knowledge by kind.
-2. **A hint, not a trigger.** As the history grows, the mod adds a short hint to a tool result: a soft one at intervals, a final one when room runs out. The agent picks the moment itself, at a stage boundary, not in the middle of a thought.
+2. **A hint, not a trigger.** As the history grows, the mod adds a short hint to a tool result: a soft one after large growth (none on a small window), a final one when room runs out. The agent picks the moment itself, at a stage boundary, not in the middle of a thought.
 3. **The letter.** Before a shift the agent writes `letter.md`: where it is, what is next, what is unverified, and what the harness must hold.
 4. **The shift.** The agent calls the `shift` tool with `continue` or `wait`. The mod checks the records and refuses on a date, a missing section, a board over 150 lines, tasks out of step or nothing changed. Then it snapshots everything into `.shift/shifts/<time>/` and has the harness let the history go, steered by the letter's Hold.
 5. **Back to work.** The next message carries the records, the last shifts in brief and the letter, last. With `continue` the agent goes on by itself. With `wait` it stops, and the letter arrives with the owner's next message.
@@ -70,7 +74,7 @@ The same npm package as pi's; opencode 2.x.
 | `commit` | `true` lets the project's git take `.shift/` in; by default the mod keeps it out through the local exclude file |
 | `[files]` `shift`, `owner`, `glossary` | where `SHIFT.md`, `OWNER.md` and `GLOSSARY.md` live |
 | `[files]` `always` | the project's own files loaded whole into every session |
-| `[docs]` `dirs` | the folders and files mapped into `SHIFT.md`; `[]` turns the map off |
+| `[docs]` `dirs` | the folders (8 folders deep at most) and files mapped into `SHIFT.md`; `[]` turns the map off |
 | `[docs]` `toc`, `max_chars`, `max_pinned`, `max_description`, `max_lines` | a toc in each document, and the limits of the map and the documents |
 
 ## Documentation

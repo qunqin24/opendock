@@ -20,6 +20,13 @@ you don't need an Open WebUI API key.
   you: right after login and every 5 minutes. Models from `/api/models` that aren't in your
   config are added; configured models that Open WebUI no longer serves are removed. Models
   you configure keep your settings (name, limits), so list a model only to override them.
+- Each added model also gets its context size, output limit and image input from Open WebUI.
+  The context size comes from the backend's `max_input_tokens` (LiteLLM), `max_model_len`
+  (vLLM) or `context_length`, or from the `num_ctx` param an admin set on an Ollama model.
+  The output limit is the model's `max_tokens` param, or the backend's `max_output_tokens`
+  when it is below the context size; otherwise opencode's default applies. The model's
+  Vision capability decides whether opencode may attach images. A custom Open WebUI model
+  inherits the limits of its base model.
 - A model's effort levels (opencode variants) come from its Open WebUI model control: the
   one keyed `thinking`, or the model's only control. Each option becomes a variant, such as
   `opencode run -m home-ai/deepseek-v4.1-flash#max`, and Open WebUI applies the params the

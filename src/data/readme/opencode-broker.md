@@ -115,7 +115,7 @@ so nothing is ever spent on a provider you did not list.
 | `localContextHeadroom` | Fraction of a local window the router will lease into (default 0.6) when a target declares no `outputReserve`. |
 | `workerLocalShareDenominator` | One in N `auto` worker assignments goes to a local target (default 4; 1 disables). |
 | `profileLocalShare` | The same one-in-N local share for a named profile whose lane mixes local and cloud targets, e.g. `{ "memory": 2 }` (integer >= 2; default none, which keeps such a profile cloud-first). |
-| `burstFence` | How full a short window must be before it counts as a balancing input (default 0.9). |
+| `burstFence` | Start of the progressive short-window taper for new cloud assignments (default 0.9). Per-provider evaluation counters steer new admissions; they do not add delays. It does not change durable cross-period balancing, move held/pinned sessions, or create a quota hold. |
 | `watch.notifyCommand` | argv that `opencode-broker-watch` runs when the catalog changes. `{title}`, `{body}` and `{kind}` in it are replaced; a command naming neither `{title}` nor `{body}` gets the title and body appended. No shell is involved. |
 | `burnWatch` | The [burn watch](#the-burn-watch): `enabled` (default `true`), `notifyCommand` (argv like `watch.notifyCommand`, which it defaults to; `[]` only logs) and the thresholds listed there. |
 | `slotWatch` | The [slot watch](#the-slot-watch): `enabled` (default `true`), `intervalMs` (60000), `deferredSamples` (2), `notifyCooldownMs` (1800000). Notifies through `burnWatch.notifyCommand`. |
@@ -134,6 +134,26 @@ Environment:
 
 The broker's socket protocol is documented in [docs/API.md](docs/API.md); the
 bundled plugins are clients like any other.
+
+### Main-session weekly quota policy
+
+The broker keeps working below a provider's real limit. For a root/main session,
+weekly plan usage on its currently routed provider progressively changes how new
+work is approached; it does not move the session to another model or stop safe,
+authorized work. The 75/85/95% stages below are instructions for the agent, not
+hard tool enforcement.
+
+| Weekly usage | Main-session policy |
+|---|---|
+| 75% | Prepare now: write or update the durable handoff, and update it at stage boundaries; continue authorized work. |
+| 85% | Before every mutating unit, update the handoff and establish a safe, resumable stopping state. |
+| 95% | Start only safe, reversible, bounded mutating units. Do not start deployments, migrations, irreversible changes, or an unattended dangerous phase that could remain unfinished. Continue useful safe work. |
+
+The handoff lives at `~/.local/share/opencode/handoffs/<sessionID>.md`; it records
+authorization, decisions, repository state, evidence, pending jobs and cleanup,
+remaining work, and a verified resume command. It must contain no credentials or
+raw transcripts. A warning is not exhaustion: actual provider limits and existing
+quota handling remain authoritative.
 
 ### Delayed fallback rungs
 

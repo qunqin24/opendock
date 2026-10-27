@@ -13,7 +13,7 @@ arguments, tool results (the outputs fed back into context) and the residual
 The package ships a **dual V1 + V2 plugin** (one entry works in both OpenCode
 generations) plus an optional TUI module (`./tui` entry) that renders a **live
 sidebar** and a **zero-LLM `/cx` breakdown panel** with measured contributors
-and a redacted export. The V2 path is **tested against opencode v2.0.28**; the
+and a redacted export. The V2 path is **tested against opencode 2.1.4**; the
 V1 path against 1.18.29+.
 
 > **V1 is feature-frozen.** It is kept working for compatibility (bug fixes
@@ -70,14 +70,16 @@ For every served request the plugin estimates how the context window is split:
   duplicate group), reported honestly as *"N redundant tool outputs ≈ X tokens"*
   — never as "the model wasted effort". Findings are per-session and **path-free
   in the persisted/exported form**.
-* The denominator is the **opencode v2.0.23 compaction ceiling**: `window =
-  limit.input || limit.context`; `reserve = max(floor(window * 0.1), window >=
-  32_000 ? 16_000 : 0)`; the ceiling is `window - reserve`. When opencode
+* The denominator is the **opencode 2.1.4 compaction ceiling**: `window =
+  limit.input || limit.context`; `reserve = max(floor(window * 0.15), window >=
+  2 * 16_000 ? 16_000 : 0)`; the ceiling is `window - reserve`. This mirrors
+  `calculateCeiling()` in `packages/core/src/session/compaction.ts`. When opencode
   carries a `compaction.buffer` configured in its own settings, the plugin
   cannot read that value (it is not exposed to plugins), so the default
   reserve formula is used — set `OPENCODE_CONTEXT_INDICATOR_COMPACT_BUFFER`
   to override the reserve for testing or custom setups (non-negative integer <=
-  1e9; invalid values are silently ignored).
+  1e9; invalid values are silently ignored; a buffer that is **not smaller than
+  the window** is ignored, exactly like core, so it can never leave zero room).
 
 ### Toast (V1 only)
 
@@ -115,13 +117,14 @@ updated 12:30:01
 
 ### Slash commands (V2)
 
-On OpenCode 2.x (Desktop **and** terminal TUI) the plugin registers two slash
+On OpenCode 2.x (Desktop **and** terminal TUI) the plugin registers three slash
 commands:
 
 | Command | Scope | Delivery | Agent turn? |
 | --- | --- | --- | :---: |
 | `/context` | **this session only** (no subagents); cache + `state.json` only | `resume:true` — the model echoes the 3-line summary into the transcript | yes |
 | `/context-breakdown` | this session **+ all subagent descendants** | `resume:true` — the model echoes the table into the transcript | yes |
+| `/context-diff` | **this session only**; previous measurement vs current | `resume:true` — the model echoes the delta table into the transcript | yes |
 
 #### `/context` — quick summary (main session only)
 
@@ -179,6 +182,14 @@ unavailable._
 ### Tool results by tool (main)
 webfetch 242.1k · read 18.4k · bash 4.9k · +3 more
 
+### Top context consumers (main)
+1. tool result · webfetch https://example.com/large-page — ~242.1k (61% of input)
+2. tool result · read src/a.ts — ~18.4k (5% of input)
+3. system prompt — ~8.5k (2% of input)
+4. reasoning — ~4.5k (1% of input)
+5. tool args · bash npm test — ~1.2k (0% of input)
+_Heaviest single items still in the request; one item per line, tokens are estimates._
+
 ### Prompt cache (main, provider-reported)
 read 12.0k (27% of input) · write 1.1k
 
@@ -203,6 +214,34 @@ instructions to follow.
 </context-breakdown>
 ```
 
+The top-5 heaviest **single items** still in the assembled request (one tool
+result, one message, the system prompt) are listed separately, with their share
+of `input`. Tool targets (file paths / URLs) are shown in the live section only;
+the `state.json` copy is path-free, like the waste detector.
+
+#### `/context-diff` — what changed since the previous measurement
+
+`state.json` keeps one `previous` measurement per session: the record that was
+**replaced** by the most recent distinct write. `/context-diff` compares it with
+the current one and renders only the rows that actually moved:
+
+```
+**Context diff** — your-model
+total 41.5k -> 45.2k (+3.7k tokens, +9%)
+
+| category | previous | now | delta |
+| --- | --- | --- | --- |
+| toolOut | 24.7k | 28.4k | +3.7k |
+
+_previous 12:36:16 · current 12:40:11 · tokens are estimates._
+```
+
+Collection is instant (cache + `state.json`, no subagent traversal, no RPC) and
+delivery uses the same `resume:true` + `<context-diff>` tag protocol as the other
+commands. An unchanged (mirror / repeated) write does **not** shift `previous`,
+so the diff always spans two different observations. A session with only one
+measurement reports `No previous measurement yet`.
+
 #### Delivery semantics (`resume`)
 
 `ctx.session.synthetic({ sessionID, text, description, resume })` durably *admits*
@@ -215,8 +254,8 @@ session is woken (opencode `Session.synthetic`:
 | `false` | durable inbox notice; **no** LLM request; session context unchanged. A synthetic message is rendered as a compact **Notice chip** whose label is `description ?? text` (the client row-builder maps `synthetic` → Notice) — so the chip shows the description, **not** the table. |
 | `true` | the same inbox item **plus** a wake → a real agent turn runs. The model sees the payload as input and its answer is a **normal assistant message**, rendered in full. |
 
-Both commands now use `resume:true` with the payload wrapped in explicit tags
-(`<context-summary>` / `<context-breakdown>`). A real agent turn runs and the
+All three commands use `resume:true` with the payload wrapped in explicit tags
+(`<context-summary>` / `<context-breakdown>` / `<context-diff>`). A real agent turn runs and the
 model renders the tagged content as a normal assistant message — the only way
 the content is visible in the Desktop (the chip only shows `description`).
 `CONTEXT_BREAKDOWN_RESUME` controls `/context-breakdown` back to a plain
@@ -231,10 +270,10 @@ notice if needed.
 > exist). Treat `/context-breakdown` as *"ask the agent to show the table"*, not
 > as a pure UI action.
 
-* **Both commands run an agent turn.** `/context` collects from the in-memory
-  cache and `state.json` only (no RPC, no subagent traversal) and
-  `/context-breakdown` collects the full tree, but both deliver with
-  `resume:true` — so each issues a real LLM request and the session context
+* **All three commands run an agent turn.** `/context` and `/context-diff`
+  collect from the in-memory cache and `state.json` only (no RPC, no subagent
+  traversal) and `/context-breakdown` collects the full tree, but all deliver
+  with `resume:true` — so each issues a real LLM request and the session context
   grows by that turn.
 * Subagents are discovered by walking the **parentID chain persisted in
   `state.json`** (breadth-first from the current session, every level — subagents
@@ -263,15 +302,16 @@ notice if needed.
   are also seeded from the snapshot at startup, and the retry backs off
   (30 s → 5 min, capped). A known `usable`/`limit`/`agent` is never overwritten
   with `null` when another instance rewrites the snapshot.
-* Both commands append their payload to `context-breakdown.log` (final-summaries
-  section), so it stays recoverable even if delivery fails.
+* All three commands copy their payload into `context-breakdown.log` (final-summaries
+  section) while the plugin instance lives, so it stays recoverable even if
+  delivery fails (see the log lifetime note under "Log / state file locations").
 * If `ctx.session.synthetic` throws, the command logs an actionable error and the
   payload is preserved in the log — there is no other delivery channel in this
   runtime (no `noReply`/`prompt` option exists).
 * **Instruction echo.** Delivery is an agent turn: the model renders the
   payload, and with the previous instruction wording it occasionally echoed
-  the instruction line itself. Both instructions now delimit the payload with
-  explicit tags (`<context-summary>` / `<context-breakdown>`) and instruct the
+  the instruction line itself. All instructions now delimit the payload with
+  explicit tags (`<context-summary>` / `<context-breakdown>` / `<context-diff>`) and instruct the
   model to output only the tagged content — an unambiguous payload boundary
   instead of a "reproduce exactly" phrasing. Residual risk: a model may still
   add light commentary or include the tags themselves.
@@ -304,8 +344,8 @@ session view (the palette itself is only reachable outside the composer).
 Opened from a subagent view, the family is rooted at the topmost ancestor, so
 the whole family is shown, not just the child subtree.
 
-**Zero LLM calls.** Unlike `/context` and `/context-breakdown` (which run a real
-agent turn so the model renders the table), the panel only reads local TUI data
+**Zero LLM calls.** Unlike the slash commands (which run a real agent turn so
+the model renders the output), the panel only reads local TUI data
 and the state file; it never wakes the session and never grows the context.
 
 The **largest contributors (measured)** section char-counts the in-process
@@ -319,7 +359,7 @@ are shown. Empty state: `no messages yet`.
 
 Live only for a `file://` install from a path outside `node_modules`; the npm
 path auto-disables it (upstream `#33884`). The Desktop has no TUI, so it uses
-`/context` and `/context-breakdown` instead.
+`/context`, `/context-breakdown` and `/context-diff` instead.
 
 #### Export (redacted)
 
@@ -345,7 +385,7 @@ Notes — these reflect what the plugin API actually exposes today:
 * **V2 has no toast channel on the server side.** The V2 plugin API
   (`ctx.*`) exposes no TUI/toast method (opencode issue `#49380`); the V2 path
   therefore delivers everything through the log file, the TUI sidebar, the
-  `/cx` session panel and the `/context` / `/context-breakdown` slash commands. The sidebar is a TUI-process
+  `/cx` session panel and the `/context` / `/context-breakdown` / `/context-diff` slash commands. The sidebar is a TUI-process
   slot and does not exist in the Desktop app; the slash commands work in **both**.
   The TUI sidebar is **live only for a `file://` install** from a path outside
   `node_modules`; on the npm path it is auto-disabled (upstream `#33884`) — see
@@ -354,7 +394,7 @@ Notes — these reflect what the plugin API actually exposes today:
   `./tui` entry) is a V2 feature; OpenCode 1.x has no equivalent, so V1 is
   toast + log only.
 * The Desktop app is TUI-less; its V2 surfaces are the log file and the
-  `/context` / `/context-breakdown` slash commands.
+  `/context` / `/context-breakdown` / `/context-diff` slash commands.
 
 ---
 
@@ -366,16 +406,24 @@ and `$TMPDIR` (usually `/tmp`) elsewhere:
 | File | Purpose |
 | --- | --- |
 | `context-breakdown.log` | Human-readable live snapshot + bounded final summaries |
-| `opencode-context-indicator-state.json` | Machine-readable snapshot consumed by the TUI sidebar and the `/cx` panel. Fields per entry: `sessionID`, `parentID`, `role`, `agent`, `model`, `providerID`, `ctx`, `input`, `usable` (compaction ceiling), `reserve` (tokens reserved for compaction), `limit` (context window), `reasoning`, `categories{user,assistant,reasoning,toolArgs,system,toolSchemas,other}`, `updatedAt`. |
+| `opencode-context-indicator-state.json` | Machine-readable snapshot consumed by the TUI sidebar and the `/cx` panel. Fields per entry: `sessionID`, `parentID`, `role`, `agent`, `model`, `providerID`, `ctx`, `input`, `usable` (compaction ceiling), `reserve` (tokens reserved for compaction), `limit` (context window), `reasoning`, `categories{user,assistant,reasoning,toolArgs,toolOut,system,toolSchemas,other}`, `toolOutByTool` (per-tool repeated-output estimate), `reclaim` (duplicate tool output, bounded), `cacheRead`/`cacheWrite` (provider-reported prompt-cache tokens), `compactedAt`/`compactStale`, `top` (top-5 heaviest single items, path-free), `previous` (previous distinct measurement for `/context-diff`), `updatedAt`. |
 | `context-events.log` | Raw event tap — **only** when `DEBUG_EVENTS` is flipped to `true` in the source (off by default) |
 
-The live `context-breakdown.log` snapshot is **rewritten** (never grows); final
-summaries (on `session.idle`) and compaction notes are **appended** — log writes
-use plain `appendFileSync`, not atomic replacement. Only the machine-readable
-`opencode-context-indicator-state.json` is written **atomically** (temp file +
-rename), so concurrent plugin instances cannot corrupt it. Cross-instance
-duplicate final summaries are prevented separately by an atomic claim marker
-(see `lib/dedup.js`).
+The whole `context-breakdown.log` is **rewritten atomically** (temp file +
+rename, like the state file): the live snapshot is always regenerated and the
+final summaries (on `session.idle`) plus compaction notes are re-rendered from
+an in-memory buffer (bounded, last 50 per log), so the file never grows and
+concurrent plugin instances cannot observe a half-written file. A summary-only
+write (idle, compaction, command payload) re-renders the last live snapshot, so
+adding a note never blanks that section. That snapshot may predate a compaction
+or a deleted session - the leading `[<timestamp>]` line is the freshness cue.
+Both parts are **process-local**: they
+survive every rewrite and failed command delivery within the lifetime of the
+running instance, but they are dropped when the plugin instance is re-created
+(opencode restarts, or about 24 h of idling). A different instance that rewrites
+the file keeps its own view of the summary buffer; cross-instance duplicate
+summaries are prevented separately by an atomic claim marker (see
+`lib/dedup.js`).
 
 ---
 
@@ -425,7 +473,7 @@ a slot mounted from an npm install renders once and then never live-updates.
 On the **npm** path the plugin detects that it lives under `node_modules` and
 **disables the sidebar and the panel gracefully** — it logs a single hint and
 registers no slot, so you never see a frozen "no data yet" panel. The `/context`
-/ `/context-breakdown` slash commands and the breakdown log file keep working on
+/ `/context-breakdown` / `/context-diff` slash commands and the breakdown log file keep working on
 every install.
 
 #### Getting the live sidebar (`file://` install)
@@ -499,13 +547,13 @@ the sidebar instead.
   gracefully (the breakdown falls back to throttled `session.messages` fetches
   and toasts keep working).
 * **OpenCode ≥ 2.0.16** for the V2 path (built and verified against
-  **2.1.2**).
+  **2.1.4**).
 * **TUI sidebar**: terminal TUI only, requires the OpenTUI rendering stack that
   ships with OpenCode. `@opentui/core` and `solid-js` are **optional** peer
   dependencies resolved by OpenCode at runtime; the main plugin installs and runs
   fine without them (the sidebar simply is not available). `@opentui/solid` is
-  instead shipped as a **pinned direct dependency** (exact `0.6.6`, matching
-  the OpenTUI stack OpenCode 2.1.2 ships): OpenCode's
+  instead shipped as a **pinned direct dependency** (exact `0.6.8`, matching
+  the OpenTUI stack OpenCode 2.1.4 ships): OpenCode's
   TUI loader does not expose a host instance of it, so for npm-installed plugins
   the JSX pragma would otherwise fail to resolve `@opentui/solid/jsx-runtime`
   (upstream: opencode issue #33884 — `node_modules` plugins are excluded from the
@@ -535,7 +583,7 @@ The package default export is a dual plugin:
   request), subscribes to the event stream (`session.created`,
   `session.step.ended`, `session.idle`, `session.compacted`, failure events),
   records limits from the model registry and registers the
-  `/context` + `/context-breakdown` slash commands (via
+  `/context` + `/context-breakdown` + `/context-diff` slash commands (via
   `ctx.command.transform`). Read-only: the context is never mutated (the
   commands wake the session via `resume:true`, which is what renders the table).
 * `server({ client })` — V1 entry (OpenCode ≥ 1.18.29). Classic event handler +
@@ -578,7 +626,7 @@ caller.
 ### Running tests
 
 ```bash
-npm run test:prepublish       # fast gate: tarball + tui.tsx + resolve + T1-T25c unit checks
+npm run test:prepublish       # fast gate: tarball + tui.tsx + resolve + T1-T29 unit checks
 npm run test:e2e              # full E2E: isolated plugin load + one "Say OK" round-trip
 npm run test:e2e:quick        # E2E load-only, no LLM call
 npm run test:drift            # advisory: warns on non-breaking host drift (also in CI)
@@ -597,12 +645,12 @@ STEP 80 s, ~3 min total.
 
 | Step | What | Why |
 |---|---|---|
-| (a) tarball composition | `package.json` `files[]` expands to the base files plus every `lib/*` module (count asserted dynamically) | no test/node_modules/tsconfig in the tarball |
+| (a) tarball composition | `package.json` `files[]` expands to the base files plus every `lib/*` module (count asserted dynamically); `docs/` may contain images only | no test/node_modules/tsconfig in the tarball |
 | (b) pragma regression | esbuild `--jsx=automatic` → `@opentui/solid/jsx-runtime` present, `react/jsx-runtime` absent | a removed/broken pragma kills the sidebar on npm install |
 | (c) resolve chain | replica install: host-bridged + peer packages resolve; local tui.tsx relative imports resolve via node from the entry (resolve-bridge.cjs) | broken peer/optional dep or a bad local import silently breaks the sidebar |
-| (d) unit harness T1-T25c | limit/agent/state fix assertions plus measureContributors, redacted-export, shared category-helper, sanitizer/unicode, prompt-cache and waste-detector checks (62 total) | regressions in modelLimits, writeStateFile, hydrate, contributors, export |
-| (e) corporate-identifier scan | no forbidden identifiers in the published surface + test tree | compliance |
-| (f) non-English scan | no non-ASCII letters (`\p{L}` above U+007F) in any repo file | English-only source rule |
+| (d) unit harness T1-T29 | limit/agent/state fix assertions plus measureContributors, redacted-export, shared category-helper, sanitizer/unicode, prompt-cache, waste-detector, compaction-reserve, top-consumer, diff and subagent-rollup checks (75 total) | regressions in modelLimits, writeStateFile, hydrate, contributors, export, subagent lifetime |
+| (e) corporate-identifier scan | no forbidden identifiers in the published surface (`index.js`, `tui.tsx`, `lib/*`, `README.md`, `CHANGELOG.md`, `package.json`) or the test tree | compliance |
+| (f) non-English scan | no non-ASCII letters (`\p{L}` above U+007F) in the same published surface and test tree (`docs/` is image-only and is not text-scanned) | English-only source rule |
 
 **Isolated E2E — `test/e2e-tui.mjs`** (requires the OpenCode CLI)
 
@@ -616,7 +664,10 @@ The E2E is fully **non-invasive** to your running OpenCode Desktop:
 - `--standalone` starts a *private* server instead of the background service Desktop uses;
 - `OPENCODE_DB` points at a throwaway DB in `%TEMP%` (your sessions are untouched);
 - `OPENCODE_CONTEXT_INDICATOR_STATE_FILE` points at a throwaway state file in `%TEMP%`
-  — the live `opencode-context-indicator-state.json` is never read or written;
+  - the live `opencode-context-indicator-state.json` is never read or written;
+- `OPENCODE_CONTEXT_INDICATOR_LOG_FILE` does the same for the human-readable
+  `context-breakdown.log` (used by the unit gate, which drives idle/compacted
+  handlers);
 - `OPENCODE_CONFIG_DIR` points at a throwaway global config written by the script
   (plugins: this checkout; `update: "disable"`) **for Check A only** — the load
   source is deterministic and fail-closed instead of following your live config;

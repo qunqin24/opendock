@@ -31,27 +31,29 @@ Every tool call and every prompt is appended to a shadow log at `.retro/sessions
 
 ### Extraction
 
-When a session ends its log is kept, and by default nothing further happens until asked. Analysis costs a model call, and by default nothing in this plugin spends that unprompted.
+When a session ends its log is kept, and nothing further happens until asked. An analysis costs a model call, and nothing in this plugin spends that unprompted.
 
-`/retro` is the moment it happens. One command compresses the logs that have accumulated, turns them into lessons, and only then looks for something to hand over. Every waiting log is analysed in one command; `options.extractLimit` caps how many, and anything left over is reported so another `/retro` takes the next batch. A log too long for one call is read a part at a time, one part per command, each continuing from where the last one stopped; `selfcheck.md` lists it as read in part until it is done.
+`/retro` is the moment it happens. For every log that has accumulated it writes a **work order** — a file in `.retro/work/` naming that log, saying which part of it is new, and carrying the criteria and how to answer — and asks the agent in the session you ran it in to have each one read by a subagent of its own. Every waiting log gets an order in one command; `options.extractLimit` caps how many, and anything left over is reported so another `/retro` takes the next batch.
 
-Each log is analysed in a session of its own, created for that one call and removed afterwards: the log goes in, no agent, no history and no tools are involved, and text comes out. The agent that did the work is deliberately excluded, since it would defend its own decisions.
+The order does not contain the log; it points at it. Reading it is the subagent's job, and it is better placed to decide how — all at once, or the head and then on — than any rule the plugin could apply from outside. A subagent that gets only part way through says so, and the rest stays owed: `selfcheck.md` lists the log as read in part until it is done, and the next `/retro` asks about the remainder.
+
+Each order is read by one subagent, in a context of its own. The plugin calls no model and picks none: the reading happens on your session's model and your session's settings, with OpenCode's own agent loop. The agent that did the work being analysed is deliberately excluded, since it would defend its own decisions — a subagent was not in that session and has nothing of its own to defend.
+
+The answer is a call to the `retro_record` tool, whose schema is the output format: a malformed answer is refused by OpenCode before it reaches the plugin, and the subagent is told why and can try again. An answer with no lessons is a real answer — the session went straight. Once the records are in, the agent calls `retro_propose`, and that is what puts a lesson to you. An order nobody answers is not held against the log: nothing is concluded from silence, because a reader that failed and one that was never started look identical from here. The next `/retro` asks again, and `selfcheck.md` says how many times a log has been asked about with no answer.
 
 Sessions that have not finished are read as well, including the one the command was run in: their friction is the most recent there is. Reading one closes nothing. The plugin remembers how far each log was read, and whatever the session writes next is read on a later `/retro` — only that part: what has already become a lesson is not analysed a second time. Sessions that are left open and returned to are the normal case, so without that a `/retro` weeks later would re-read everything and re-derive lessons that were already acted on. The plugin does not need to know whether a session is still running: everything it knows is on disk in `.retro/`, so a restart, a crash or a second OpenCode on the same project changes nothing about what is read.
 
 A session is skipped without a call only when it cannot contain evidence of anything: one instruction, one answer, nothing done. A conversation with no tool calls at all is still analysed, because that is exactly where a wrong instruction file shows up — a wrong answer and a correction, with nothing executed.
 
-`options.asyncExtract` analyses a finished session in the background when the next session starts, instead of waiting for `/retro`, for anyone who would rather have lessons ready before asking. The new session is not held up: the analysis is started and left to run in a session of its own, outside the working context, one log per prompt.
+There is nothing to configure for any of this: no model, no API key, no provider. The work runs where your session already runs.
 
-By default the analysis uses the model the recorded sessions run on, falling back to the workspace default, and asks for that model's no-reasoning variant (`none`) when it has one. The analysis is one structured answer, and a reasoning model left to think can spend its whole output on reasoning and return no answer at all. This works on OpenCode's free-tier models too, so nothing needs configuring. `options.model` pins a different model, which is worth doing if the analysis should run somewhere cheaper than the work, and `options.model.variant` names the variant to use instead.
-
-That call receives a compressed view of the session. Tool output is trimmed hard; prompts and replies are kept in full up to a few thousand characters each. It answers one question:
+The log it reads is the shadow log as written: one JSON object per line, one step per object, with each tool result clamped head-and-tail to `maxOutput` at the moment it was captured so that a single enormous result cannot sit in the log for ever. The analysis answers one question:
 
 > If this session ran again, what should change in the project so that it goes shorter and straighter?
 
 The answer is a list of lessons in `.retro/lessons/`.
 
-A finished log is analysed once; a failed reply is retried on the next two runs and then set aside. By default, a project in which `/retro` is never run is never analysed.
+A finished log is analysed once; an order that goes unanswered is asked for again, and `.retro/selfcheck.md` says how many times it has been asked with no answer. That is reported as a fact rather than as a verdict about the log: the plugin cannot tell a reader that failed from one that was never started, and the usual cause is a hand-over waiting in the inbox of a session that is still working. A log the plugin itself cannot read is a different matter — after three of those it is set aside and named. A project in which `/retro` is never run is never analysed.
 
 ### What guides the extraction
 
@@ -163,18 +165,11 @@ OpenCode fetches the plugin from npm; name it in `opencode.json`:
 
 ```jsonc
 {
-  "plugins": [
-    {
-      "package": "opencode-retro",
-      "options": {
-        "model": { "providerID": "deepseek", "id": "deepseek-flash" }
-      }
-    }
-  ]
+  "plugins": [{ "package": "opencode-retro" }]
 }
 ```
 
-`options.model` is optional. Without it the plugin uses the model the sessions run on, falling back to the workspace default. `.retro/selfcheck.md` reports whether an analysis ran, and why it failed if it did not.
+There is nothing to configure: the plugin calls no model of its own, so there is no model to pick, no key to supply and no provider to reach. An analysis runs as a subagent of the session that asked for it. `.retro/selfcheck.md` reports whether one ran, and why it failed if it did not.
 
 **Check what npm actually has first.** Every version below `0.1.0` is a name placeholder: it loads without error, registers no command, creates no `.retro/`, and reports nothing — so following this snippet before the first real release leaves a session that looks normal and a plugin that is not there. If `npm view opencode-retro version` is below `0.1.0`, point `package` at an absolute path to a checkout instead; that is also how the plugin is run while working on it. A relative path leaves session startup hanging without an error, and an exact version can be pinned (`opencode-retro@0.1.0`) once there is one.
 
@@ -184,13 +179,10 @@ Everything else is optional:
 - `prompts` — the prompt directory, default `prompts` inside it.
 - `halfLife` — sessions without a recurrence before a lesson's score halves, default ten.
 - `proposeLimit` — lessons in one `/retro all`, default ten.
-- `extractLimit` — logs analysed by one `/retro`, unlimited by default.
+- `extractLimit` — work orders issued by one `/retro`, unlimited by default.
 - `maxOutput` — characters of tool output stored in the shadow log per step, default 8000.
-- `maxInput` — characters one analysis may send, default 32000. A long log is trimmed to fit: less tool output first, then whole steps from the middle, each gap saying how many went. This bounds the cost. An empty reply is asked again at half the size and then at a quarter; a log that still gets no answer is tried again on the next `/retro`, and `.retro/selfcheck.md` names it as failed.
-- `extractTimeoutMs` — how long one analysis may take before it is given up on, default 90000.
 - `heartbeatMs` — the shortest gap between self-check writes while a session works, default 60000.
 - `keepSessions` — keep every log, including ones nothing cites; off by default.
-- `asyncExtract` — analyse at the start of the next session instead of waiting to be asked; off by default.
 
 ### What appears on disk
 
@@ -203,17 +195,19 @@ Everything the plugin writes stays under `.retro/` in the project, and nowhere e
     propose.md       how a lesson is handed over, one or many
     updates/         newer defaults, not in use
   sessions/          raw logs, kept while unread, cited, or written in the last week
+  work/              a work order per log waiting to be analysed
   lessons/           open questions
   archive/           accepted, rejected and evicted lessons
   selfcheck.md       whether the plugin is working
   state.json
   plugin.log         errors from hooks, commands and background work
   .gitignore         seeded once, then the project's
+  README.md          what this directory is, for whoever opens it — seeded once
 ```
 
 A log is removed once three things are true: it has been read to the end, no open lesson cites it, and nothing has been written to it for seven days. A lesson's evidence names a session and a range of steps, and during review the question "what actually happened there?" has to have an answer that is not a summary, so a cited log stays. The seven days are what make removal safe without knowing whether a session is still running: a session that keeps writing keeps its log, and one picked up after a quiet week starts a new log, read from its start. A log nobody has read is never removed, however old. Growth is bounded by the number of open lessons, which is capped, and by a week of sessions, rather than by the age of the project.
 
-There is nothing to add to the project's `.gitignore`. On first run the plugin writes `.retro/.gitignore` and git applies it to everything below: sessions, state, the self-check, the plugin log, prompt update notices and any half-written `.tmp` file a crash left are ignored, while `lessons/`, `archive/` and the live prompt files are not. That file is seeded once and is the project's own from then on.
+There is nothing to add to the project's `.gitignore`. On first run the plugin writes `.retro/.gitignore` and git applies it to everything below: sessions, work orders, state, the self-check, the plugin log, prompt update notices and any half-written `.tmp` file a crash left are ignored, while `lessons/`, `archive/` and the live prompt files are not. That file is seeded once and is the project's own from then on.
 
 The split is the design rather than a convenience. Lessons and the archive are knowledge about the project: readable, visible in review, and they travel with the repository. The prompts are its configuration, worth sharing with whoever else works here. The rest would only make noise in a diff.
 
@@ -225,7 +219,7 @@ Each is seeded from the packaged default on first run and never written to again
 
 When a newer default ships it arrives as `prompts/updates/<name>.vN.md`, with a note at the top saying that the file is not in use. Nothing is applied on the user's behalf.
 
-What stays in the source is the machinery: the output format the parser requires, the order of a lesson's fields, and the instruction to record a decision. The output format is never written to disk, so editing a prompt cannot remove the format the parser requires.
+What stays in the source is the machinery: the answer's format, the order of a lesson's fields, and the instruction to record a decision. The format is written into each work order rather than into the prompt file, so editing a prompt cannot remove it — and its machine half is the schema of the `retro_record` tool, which OpenCode enforces before an answer reaches the plugin.
 
 ## Checking that it works
 
@@ -233,14 +227,14 @@ A registered hook proves nothing. A hook registered under a name the API no long
 
 `.retro/selfcheck.md` therefore reports liveness rather than setup, by comparing what the event stream saw against what the hooks received. It carries its own staleness rule:
 
-> If work is in progress and `heartbeat` is more than a few minutes old, the plugin is not running.
+> **If you are working right now and `heartbeat` is more than a few minutes old, this plugin is not running.**
 
-Those checks run on every review and cost nothing: the API surface the plugin depends on, which prompt layer is in force, and what is waiting, under a header naming the plugin and OpenCode versions. Whether the model answers and whether the output format still parses are not asked separately — every analysis exercises both, and an unparseable reply is reported in the model's own words.
+Those checks run every time the file is written and cost nothing: the API surface the plugin depends on, which prompt layer is in force, and what is waiting, under a header naming the plugin and OpenCode versions. Whether an analysis gets through is not asked separately — every `/retro` exercises it, and an order that came back unanswered is reported as what it was.
 
 ## Requirements
 
 - OpenCode v2, `@opencode/plugin` 2.0.18 or newer. Verified against 2.0.32.
-- Nothing beyond OpenCode itself. The analysis runs on the sessions' own model by default; an inexpensive one is enough.
+- Nothing beyond OpenCode itself. An analysis runs as a subagent of the session you ran `/retro` in, on that session's model.
 - No runtime dependencies.
 
 ## License

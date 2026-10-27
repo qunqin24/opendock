@@ -9,7 +9,18 @@ from your phone or any browser.
 
 Hub is harness-agnostic by design: the hub's API, web console and spoke protocol are not tied to one
 agent. [OpenCode](https://opencode.ai) is the first supported harness, through the `@huynle/hub` OpenCode
-plugin. More harnesses can connect by speaking the same spoke protocol (`src/protocol.ts`).
+plugin; Claude Code, Codex and terminal agents described by a preset connect through spokes of their own
+([docs/harnesses.md](docs/harnesses.md)). More harnesses can connect by speaking the same spoke protocol
+(`packages/protocol`), most easily on the spoke SDK ([docs/spoke-sdk.md](docs/spoke-sdk.md)).
+
+| Harness | Connect it with | Evidence | What the hub can do |
+|---|---|---|---|
+| OpenCode | `opencode plugin add @huynle/hub` | native | everything below |
+| Claude Code | `hub claude [claude args…]` | hooks | follow, message, answer permissions, stop; launches |
+| Codex | `hub codex [codex args…]` | rpc | follow, message, turns, steer, interrupt, answer approvals, stop; launches |
+| Presets (Aider, goose, your own) | `hub preset run <name>` | screen | paste prompts and messages, Ctrl-C |
+
+The full per-harness matrix, setup, limits and threat model: [docs/harnesses.md](docs/harnesses.md).
 
 Formerly **opencode-voice** and, briefly, **opencode-hub**
 ([what changed](#migrating-from-opencode-voice-or-opencode-hub)).
@@ -35,6 +46,20 @@ Formerly **opencode-voice** and, briefly, **opencode-hub**
   Bring your own speech: OpenRouter or any OpenAI-compatible STT/TTS service (including self-hosted).
 - **What's open in your terminals first**: sessions open in Herdr or the OpenCode TUI, grouped like
   Herdr's sidebar, with the rest under Recent; rename, pin and archive in sync across devices.
+- **Agent identity**: every session's shells carry its own hub identity, so an agent can run `hub status`, name
+  itself (`@scout`), claim a role (`@@reviewer`) and read other sessions, with app tokens for scripts and device
+  tokens for apps ([Agent identity](#agent-identity-agent-api)).
+- **Agent messaging**: sessions, scripts and you message each other through the hub (`hub msg @reviewer …`,
+  `hub ask`, the OpenCode `hub` tool, `/msg`, `hub mcp`); asks to `@me` become Decisions you answer from the
+  console ([Agent messaging](#agent-messaging)).
+- **Launches**: you, a script or an app start a session on one of your machines (`hub launch --branch feat/x
+  --prompt "…"`): a `hub node` daemon prepares a git worktree, the session gets its name, roles, labels and first
+  prompt, and ends by itself when it is done, with signed webhooks for apps ([docs/launches.md](docs/launches.md)).
+- **More harnesses**: Claude Code (`hub claude`, through its hooks), Codex (`hub codex`, through its app-server)
+  and any terminal agent described by a data-only preset (`hub preset run`); the console shows only the controls
+  each harness's spoke serves, with an evidence badge and honest delivery labels
+  ([docs/harnesses.md](docs/harnesses.md)). Write a spoke for another harness on the spoke SDK and check it with the
+  conformance suite ([docs/spoke-sdk.md](docs/spoke-sdk.md)).
 - **Session details**: context usage, todos, MCP status, branch and per-file diffs, on demand; unread
   marks synced per user.
 - **Self-hostable**: a hub on your computer with nothing extra to install, or your own hub for phones
@@ -42,10 +67,11 @@ Formerly **opencode-voice** and, briefly, **opencode-hub**
   several people.
 
 In a harness, `/hub` configures the harness's connection to the hub, and each feature is its own
-`/<command>`: today `/voice`; more features will be added the same way.
+`/<command>`: today `/voice`, `/who` and `/msg`; more features will be added the same way.
 
-Requires OpenCode v2 (tested with 2.0.25) for the OpenCode harness. The hub runs on OpenCode's own
-runtime, a standalone binary, Docker, or [Bun](https://bun.sh) ≥ 1.3.
+Requires OpenCode v2 (tested with 2.0.25) for the OpenCode harness; the Claude Code spoke is tested with Claude
+Code 2.1.296 and the Codex spoke with Codex 0.160.0. The hub runs on OpenCode's own runtime, a standalone binary,
+Docker, or [Bun](https://bun.sh) ≥ 1.3.
 
 ## Quick start (OpenCode)
 
@@ -70,6 +96,8 @@ Then, in OpenCode:
 |---|---|
 | **`/hub`** | Configures this harness's hub connection: the server URL, connect and approve (enroll) this machine, which sessions to share (mode), pair a phone, and open the hub in the browser. The first time it offers **Set up Hub** with two paths (below). |
 | **`/voice`** | The Voice feature: talks to the session on screen. It connects (running the setup first when needed), shares the session for Voice and opens it in the browser with Voice mode starting. |
+| **`/who [project \| @@role]`** | Lists the hub's named and role-holding sessions (name, project, state, online, roles), asked as the session on screen. |
+| **`/msg @name text`** | Sends the text word for word to another session (`@name`, `@@role`, `@name.project`, `ses_…`, or `@me` for you) as the session on screen. Needs a shared, connected session. |
 
 ### Local: everything on this computer
 
@@ -115,6 +143,7 @@ The hub serves the web app, pairs devices, enrolls machines, and does push and (
 | **Standalone binary** | Any server or laptop, no runtime needed | `hub-<os>-<arch>` from the [releases](https://github.com/huynle/hub/releases) |
 | **Docker** | Servers | `ghcr.io/huynle/hub` (linux/amd64, linux/arm64) |
 | **bunx / from source** | Bun users, development | `bunx --package @huynle/hub hub-server` · `bun bin/hub.ts` |
+| **Kubernetes (cluster mode)** | Several pods on Postgres + Valkey, rolling updates | [docs/cluster.md](docs/cluster.md), manifests in [`deploy/k8s/`](deploy/k8s/) |
 
 Every way reads the same configuration (env vars over `hub.json`, see [Configuration](#configuration)) and
 answers `--help` and `--version`. While no device is paired, the hub logs a pairing code for the first one.
@@ -168,8 +197,9 @@ foreground with `hub.json`; `scripts/io.github.huynle.hub.plist` is a launchd te
 **Security:** the hub can drive your OpenCode sessions, which can run tools. Every API call needs a
 paired device or a signed-in user; spokes need machine tokens; nothing trusts the client IP. For a public
 hostname, consider [sign-in with Google](#multi-user-sign-in-with-google) or an authenticating proxy in
-front of the web app, and leave `/spoke/*`, `/auth/*`, `/healthz`, the manifest and icons reachable for
-spokes, sign-in and the PWA.
+front of the web app, and leave `/spoke/*`, `/auth/*`, `/healthz`, `/.well-known/hub`, the manifest and
+icons reachable for spokes, sign-in, app discovery and the PWA (and `/mcp`, bearer-authenticated, if MCP clients
+or gateways use [MCP over HTTP](#over-http-mcp)).
 
 ## Configuration
 
@@ -212,6 +242,560 @@ conversation mode and utterances (403 `not_exposed` for sessions not shared with
 | `POST /api/push/subscribe {subscription, prefs?, oldEndpoint?}` · `POST /api/push/unsubscribe {endpoint}` | this device's subscriptions; `oldEndpoint` is dropped (rotated subscription). The endpoint must be https on a public hostname that resolves only to public addresses (no loopback, private, link-local, CGNAT or ULA hosts, no `localhost`/`*.local`/`*.internal`), else 400 |
 | `POST /api/push/test {kind?}` | a test notification to the caller's device only, shaped like `kind` when given (400 for an unknown kind): `{sent, failed: [{host, status?}], subscriptions}`; 429 with `retry-after` within 10 s of the last one |
 | `PUT /api/push/mute {sessionID, muted}` | mutes or unmutes a session's notifications for the user: `{muted}` |
+
+## Agent identity (agent API)
+
+Agents, scripts and apps talk to the hub through `/api/agent/*`, a small API with its own credentials, separate
+from the console's routes. Every request resolves to exactly one **actor**:
+
+| Actor | Credential | Who holds it |
+|---|---|---|
+| user | the device cookie (browsers) or the same secret as `Authorization: Bearer <device token>` (apps, CLIs; [linked with a code](#multi-user-sign-in-with-google)) | you, on one of your devices |
+| session | a **session token** `hst1.…` the hub mints for each session a spoke reports | that session's shells (`HUB_SESSION_TOKEN`) |
+| app | an **app token** `hat_…` you create (scopes `sessions:read`, `messages:send`, `messages:read`, `sessions:act`) | a script or tool outside a session (`hub login`) |
+
+**Session tokens in shells.** The hub mints a 24 h token for every session (subagents included) its spokes report
+for you and pushes it to the spoke, which keeps it in memory only. Every shell an agent starts through OpenCode's
+shell tool gets that session's `HUB_SESSION_TOKEN` and `HUB_URL` (the spoke's hub), with the hub bin dir first on
+PATH, so [`hub`](#hub-cli) inside a session acts as that session: `hub whoami` prints `session ses_… on machine
+mch_…`. Tokens are renewed automatically before they expire; a shell started earlier keeps its old token, so a
+`token_expired` answer means: start a new shell. A token stops working as soon as the session is no longer
+reported by that machine, the machine is revoked or the user is disabled (see
+[docs/multi-user.md](docs/multi-user.md#agent-actors-and-tokens)). Spokes of other harnesses get tokens only
+when they announce the `sessionTokens` feature. Each session also has a separate **act token**, which never goes
+into a shell; see [Agent actions and grants](#agent-actions-and-grants).
+
+**Addressing.** Wherever a route or command takes a session, it takes an address, resolved among the caller's
+own sessions only:
+
+| Address | Means |
+|---|---|
+| `ses_…` | a session ID, or an unambiguous prefix of one |
+| `@name` | a named root session. Names are `[a-z0-9-]`, 2–40 characters; each root session gets one from its first real title: its first few words, at most 4 and 24 characters, with ID-like tokens such as `ses_…` dropped (`-2`, `-3` on a clash; later title changes keep it) and can be renamed (`hub name @scout`); the old name stays an alias for 24 h. `me` is reserved (`@me` is always the user): a title like "Me" derives `me-2` |
+| `@me` | the user (messages and Decisions; never a session) |
+| `@@role` | the session(s) holding a role (`hub role claim reviewer`); `--exclusive` claims fail while another live holder exists |
+| `@name.project`, `@@role.project` | scoped to a project (its name, else the folder name) |
+
+An address several sessions match answers `ambiguous` with the candidates; another user's sessions, names and
+roles do not exist (`not_found`). A name is released 7 days after its session is archived or deleted; a role
+holder offline for 30 minutes loses the role. Some role names (such as `orchestrator…`) are reserved to the user.
+
+In an OpenCode prompt, an address is a reference, not routing: the prompt still goes to the session you typed it
+in, word for word, and the plugin attaches a short `hub-references.txt` note naming the session(s) it means (state,
+machine, project, your open asks to it) so the agent can contact them with the `hub` tool. OpenCode's own `@file`
+and `@agent` mentions win; unknown names add nothing; if the hub does not answer within 1.5 s the prompt goes on
+without the note.
+
+**Routes.** Errors are `{error: {code, message, hint?, …}}` with the codes the [CLI](#hub-cli) maps to exit
+codes. Console routes refuse session and app tokens (403); `/api/agent` refuses a request carrying both the
+cookie and a hub bearer token (400).
+
+| Route | User | Session | App (`sessions:read`) | Result |
+|---|---|---|---|---|
+| `GET /api/agent/whoami` | ✓ | ✓ | ✓ (any scope) | `{actor, user}` |
+| `GET /api/agent/status` | ✓ | ✓ | ✓ | machines → projects → sessions, each with name, roles, state, harness, activity and blockers, plus `attention` |
+| `GET /api/agent/sessions?project=&state=&machine=&label=k=v` | ✓ | ✓ | ✓ | the same sessions as a flat list |
+| `GET /api/agent/sessions/:addr` | ✓ | ✓ | ✓ | one session with full blockers and the spoke's summary (`unsupported` when its harness lacks it) |
+| `GET /api/agent/sessions/:addr/log?n=20` | ✓ | ✓ | ✓ | newest timeline rows (1–200); `422 unsupported {feature, harness}` when the spoke has no timeline, `503 offline` |
+| `GET /api/agent/watch?blocked=1&session=<addr>` | ✓ | ✓ | ✓ | SSE of compact events (`ready`, `state`, `blocker.opened/closed`, `session.added/removed`, `message`; no text) |
+| `GET /api/agent/who?project=&role=` | ✓ | ✓ | ✓ | named, role-holding and online sessions |
+| `POST /api/agent/name {name, session?}` | ✓ | own session | – | names a session (`409 name_taken`) |
+| `POST /api/agent/roles/claim {role, exclusive?, project?, session?}` · `…/roles/release` | ✓ | own session | – | claims (with a new `generation`) or releases a role |
+| `POST /api/agent/msg {to, text, wake?, urgent?, all?}` | ✓ | ✓ | `messages:send` | tells a session (`all`: every holder of a role); never yourself |
+| `POST /api/agent/ask {to, text, expiresIn?, wait?}` | ✓ | ✓ | `messages:send` | an ask, open until answered, declined or expired; `wait` (≤ 60 s) returns the `answer` |
+| `POST /api/agent/ask {to: "@me", text, options?, recommendation?, urgency?, tier?, deadline?, onTimeout?, about?, wait?}` | – | ✓ | `messages:send` | opens a **Decision** for the user (below): `{message, decision, answer?}` |
+| `GET /api/agent/decisions?state=` · `…/decisions/:id` | ✓ (all) | own | `messages:read` (own) | the Decisions the caller asked |
+| `POST /api/agent/reply {replyTo, text}` · `…/decline {replyTo, why}` | ✓ | ✓ | `messages:send` | answers a message you received (to its real sender); not a Decision's ask |
+| `GET /api/agent/inbox` · `GET /api/agent/messages/:id?wait=` | ✓ | ✓ | `messages:read` | open asks, your waiting asks, recent messages, mutes · one message and its answer |
+| `POST /api/agent/mute {session}` · `…/unmute` | ✓ | ✓ | `messages:send` | refuses (or allows again) messages from a session |
+| `GET` · `PUT /api/agent/messaging {enabled}` | ✓ | – | – | the per-user messaging switch (off: `423 paused`) |
+| `POST /api/agent/app-tokens {label?, scopes?}` · `GET` · `DELETE …/:id` | ✓ | – | – | creates (token shown once), lists, revokes app tokens |
+
+The act verbs, grants, kill switches and the agent audit are in [Agent actions and grants](#agent-actions-and-grants).
+
+**Decisions and `@me`.** `@me` addresses the user: `msg @me` is stored in the user's inbox (push kind `message`);
+`ask @me` opens a Decision `{id: "dec_…", from, about, question, options: [{id, label, safe?}], recommendation:
+{option, why?}, urgency: low|normal|high, tier: confirm|tap, deadline, onTimeout, state, answer?}` (push kind
+`decision`, generic body, opens `about[0]`, default the asking session). Only the user answers, on the console:
+`GET /api/decisions?state=`, `GET /api/decisions/:id`, `POST /api/decisions/:id/answer {option, text?}` (`text` alone
+for a Decision without options; same-origin cookie or a device token; `tap` Decisions only with the console
+cookie, else `403 forbidden`). The first answer wins, a later one gets `409 {code: "gone"}`; the answer reaches the
+asker as the user's reply to its ask (`Decision dec_…: Hold [hold]`). At the deadline, `onTimeout` (only an option
+marked `safe`) answers it (`answeredBy: "timeout"`); without one the Decision stays open and is pushed again once.
+`deadline` is in seconds and must fall before the ask expires (default: a day past the deadline, at most 7 days).
+The console shows open Decisions as cards on Home and in the sessions they concern (SSE `{type: "decision",
+decision}` on every open, answer, timeout, escalation and expiry); a `decision` push opens its card
+(`?decision=<id>`).
+
+Reads come from the hub's catalog; only `show` (summary) and `log` (timeline) ask the session's spoke, so they
+depend on what its harness supports. A session token reads all of its user's sessions but names and claims roles
+only for itself; an app token reads, and messages only with the `messages:*` scopes. `GET /.well-known/hub` (public) answers `{publicURL, version,
+minClientVersion, auth, features}` for apps and CLIs.
+
+**Apps.** A native app links with a code from Settings → Devices → **Add app** (`POST /api/devices/link`, then
+`POST /api/devices/redeem` from the app; see [Multi-user](#multi-user-sign-in-with-google)) and uses the device
+token as a user actor, on console routes and `/api/agent` alike. Revoking the device ends it.
+
+## Agent messaging
+
+Sessions, scripts, apps and you can message each other through the hub. Everything goes through the
+[`/api/agent` routes](#agent-identity-agent-api) above; the sender is always the credential that made the request
+(a session token, an app token or your device), never a field of the request.
+
+**Addresses.** `@name` (a session's name), `@@role` (the session holding a role: the idle holder, else the most
+recently active one; `--all` sends to every holder), `@name.project` / `@@role.project`, `ses_…`, and `@me` for
+you. Addresses resolve among your own sessions only; another user's sessions do not exist (`not_found`).
+
+**Verbs.** The same verbs exist in the CLI (`hub …`), the OpenCode `hub` tool, `hub mcp` and the SDK:
+
+| Verb | What it does |
+|---|---|
+| `msg <addr> "text"` | tells a session something (fire and forget) |
+| `ask <addr> "question"` | an ask, open until answered, declined or expired (1 minute to 7 days, default 24 h); `--wait` blocks for the answer |
+| `reply <msgID> "text"` · `decline <msgID> --why "…"` | answers a message you received; it goes to the message's real sender, never through the role |
+| `inbox` | asks waiting for your answer, your own open asks, recent messages, mutes |
+| `mute <addr>` · `unmute <addr>` | refuses (or accepts again) messages from a session (`forbidden`, exit 5) |
+| `who` | named and role-holding sessions |
+
+`--no-wake` admits a message without starting a turn and `--urgent` steers it into a running turn. Texts are at
+most 10,000 characters (a decline's reason 1,000).
+
+**Delivery.** A message reaches an OpenCode session as a hub message in its conversation (the spoke's `deliver`,
+OpenCode's synthetic message; it shows in the console's conversation as a message row). An idle session gets a
+turn; a busy one gets a plain `msg` after its running turn and an `ask` steered into it; subagent sessions and
+`--no-wake` messages wait for the next turn. A session that is offline gets it when it comes back (pending, for 24
+hours). A session on a spoke that cannot take messages (an older plugin, another harness without `deliver`) answers
+`unsupported` (exit 7) and nothing is stored. An open ask to an idle session is re-woken with a short reminder
+after waits of 5, 15 and 45 minutes in turn, then you are notified. Messages to you and to apps are stored in an inbox (`hub inbox`).
+
+**Envelope.** The recipient sees the message framed so its body cannot pose as anything else:
+
+```
+[hub] ask from @api (laptop) to @@reviewer → you · 10-24 08:15Z · msg_7f3a…
+----- msg_7f3a… -----
+please review the login fix
+----- msg_7f3a… -----
+↩ hub reply msg_7f3a… "…" · hub decline msg_7f3a… --why "…" · expires 10-25 08:15Z
+```
+
+The boundary carries the message's own id; body lines that look like a header, a boundary or a reply hint are
+escaped with a leading backslash; control characters, ANSI escapes, bidi overrides and zero-width characters are
+removed from the text and from every interpolated name.
+
+**Primer.** Once per session, the first time it is named explicitly or gets its first message, the hub adds a short
+note without starting a turn: who the session is (`@name`, its roles), how to message others (`hub msg`, `hub who`),
+and that messages headed `[hub]` come from other sessions or apps, not from the user. When that first message
+wakes an idle session, the note and the message reach the model together, in one model call.
+
+**Decisions.** `ask @me` from a session or app opens a Decision (question, options, a recommendation, urgency, a
+deadline with an optional safe `onTimeout`). You answer it from the console (cards on Home and in the sessions it
+concerns, a `decision` push); the answer goes back to the asker as your reply. Only users answer Decisions, never
+sessions or apps; see [Decisions and `@me`](#agent-identity-agent-api) for the routes.
+
+**Where agents send from.**
+- In a shell of an OpenCode session: `hub msg @reviewer "…"` acts as that session ([hub CLI](#hub-cli)).
+- The model itself: the plugin's `hub` tool (verbs `msg`, `ask`, `reply`, `decline`, `inbox`, `who`, `status`,
+  `whoami`, and the [act verbs](#agent-actions-and-grants)), as the calling session ([Spoke](#spoke-opencode-plugin)).
+- You, in the OpenCode TUI: `/msg @name text` (as the session on screen) and `/who`.
+- Other agents and tools: [`hub mcp`](#hub-mcp-mcp-server), as the app token you logged in with, or the hub's
+  [`POST /mcp`](#over-http-mcp) as the bearer token sent.
+- Scripts: `hub login` with an app token that has the `messages:send` (and `messages:read`) scopes.
+
+**Limits.** Per 10 minutes: 20 messages per sender→recipient pair and 300 per user (`rate_limited`, exit 6, with
+`retryAfter`), and 30 turns started per recipient (more messages are still delivered, without waking it). A chain of
+replies between agents may run 8 hops without a human turn; past that, messages are delivered without waking and
+you are notified once. Typing into a session (console, Voice, the harness) starts its chain over. You can switch
+messaging off for your account (`PUT /api/agent/messaging {enabled: false}`): sends then answer `paused` (exit 5),
+reading still works.
+
+## Agent actions and grants
+
+Agents can do more than message: a session or a script may **approve** or **deny** a permission request, **answer**
+a form, **prompt** a session or **stop** it, in your sessions and only as far as you allow. You always may (your
+own sessions, any of your credentials); an agent acts only under a **grant** you created, and anything outside it
+comes back to you as a Decision.
+
+**Who can act.**
+
+| Credential | Acts? |
+|---|---|
+| you (device cookie, device token) | always, on your own sessions; no grant, no kill switch |
+| a session's **act token** (held by the OpenCode `hub` tool) | under a grant held by that session (by its ID, its `@name`, or a reserved `@@orchestrator…` role it holds) |
+| an app token with scope `sessions:act` | under a grant held by `app:<token id>` |
+| a session's **shell token** (`HUB_SESSION_TOKEN`) | never: `403 forbidden` |
+
+**Act tokens vs shell tokens.** Every session has two hub tokens. The shell token goes into the shells the session
+starts, so `hub msg` and the other read and message verbs work from any script it runs. The act token (`typ act`)
+is pushed only to spokes that announce `actTokens`, kept apart from the shell tokens, never put in any
+environment and never shown in tool output; only the plugin's `hub` tool uses it, for the act verbs. A command an
+agent runs in a shell therefore cannot act, even with the session's own credential; the model has to call the tool,
+where the call is visible and audited.
+
+**Grants.** A grant says who may do what, where, until when:
+
+```json
+{
+  "holder": "@@orchestrator",
+  "scope": { "projects": ["/home/you/projects/api"] },
+  "allow": ["approve", "deny", "prompt", "stop"],
+  "permissions": { "allow": ["shell:bun test*", "edit:src/*"], "never": ["shell:git push*"] },
+  "expires": "8h",
+  "maxActionsPerHour": 60,
+  "allowAlways": false
+}
+```
+
+- **holder**: `ses_…` or `@name` (pinned to that session when the grant is created; the grant never follows the name
+  to another session), a reserved `@@orchestrator…` role (follows whoever holds it when it is used; only you assign
+  reserved roles), or `app:<token id>` (one of your app tokens).
+- **scope.projects**: 1–20 absolute project directories; a session is in scope when its directory is one of them or
+  inside one (on a path boundary, after resolving `.`/`..`; worktrees inside the project count).
+- **allow**: the verbs (`approve`, `deny`, `answer`, `prompt`, `stop`; `roles` is accepted for role management).
+  `deny`, `answer`, `prompt` and `stop` need only the verb; `approve` also needs the request to pass the patterns.
+- **permissions**: patterns `action[:glob]` in OpenCode's wildcard syntax (`*` any run, `?` one character, a trailing
+  ` *` optional; `bash` is OpenCode's `shell`; the action alone means every resource). A request is allowed only
+  when **every** resource it names matches an allow pattern; any never pattern wins over every allow. In shell allow
+  patterns, `$(`, backticks and `<`/`>` must be written literally (a wildcard never matches them), so
+  `shell:bun test*` does not allow `bun test $(rm -rf ~)`. Never patterns also see the command without leading
+  `VAR=…` assignments and wrappers (`sudo`, `env`, `command`, `exec`, `nohup`, `time`), so `sudo git push` is still
+  a `git push`.
+- **expires**: 1 minute to 30 days (seconds, or `30m`, `8h`, `2d`; default 8 h). **maxActionsPerHour**: 1–1000
+  (default 60), per clock hour; past it `429 rate_limited`. **allowAlways**: lets the holder reply `always` (OpenCode
+  then saves the request's rules), and only when every rule it would save lies inside the allow patterns.
+- At most 50 active grants per user. Editing replaces a grant (its holder stays, its expiry restarts); revoking ends
+  it at once and keeps it listed for the audit.
+
+**hub never rules.** `agents.never` in [hub.json](#hubjson) lists patterns no agent may approve for any user,
+checked before every grant (`{"agents": {"never": ["shell:git push*", "shell:rm -rf*", "external_directory"]}}`).
+The user can still approve such a request themselves.
+
+**The check order** for an agent: the session belongs to you (else `not_found`, like a session that does not
+exist) → kill switches → a usable grant for the verb and the session's project → not its own session tree (a
+session never answers a request or form in its own tree) → the hub's never rules → the grant's never rules → the
+allow patterns (else `needs_user`) → the hourly cap → the kill switches again → the spoke.
+
+| Answer | HTTP | CLI exit | Means |
+|---|---|---|---|
+| ok | 200 | 0 | done (the result names the grant used) |
+| `needs_user` | 403 | 4 | outside the grant: the user decides (a Decision is open) |
+| `forbidden` | 403 | 5 | no grant, a never rule, its own tree, or a shell token |
+| `paused` | 423 | 5 | a kill switch is on |
+| `rate_limited` | 429 | 6 | the grant's hourly cap |
+| `not_found` | 404 | 3 | not your session, or no such pending request or form |
+| `gone` | 410 | 8 | answered elsewhere first, expired or ended |
+| `unsupported` | 422 | 7 | the session's spoke cannot do it (e.g. an agent's prompt without `hubPrompt`) |
+| `offline` | 503 | 7 | no spoke reports the session now |
+
+**Escalation.** An approval outside the grant answers `needs_user` with the evaluation (`verdict`, `reason`, the
+grants checked, and a `tier`) and opens a Decision for you: one per agent and request (asking again updates its
+reason), with Approve once (or Approve always, when asked), Deny (safe), and the agent's `--why` as its
+recommendation. The hub sets the tier, never the agent: `tap` (answered by a tap in the console, not from a
+notification) for shell, `external_directory`, MCP and unknown tools and for anything near a never rule; `confirm`
+otherwise. Your answer replies to the permission **as you** (no grant or kill switch applies to you); if the request
+was answered elsewhere or ended first, the Decision closes and the agent's next try is `not_found`. A request's
+blocker in the console shows the recommendation ("@orchestrator recommends Approve once: …"). Limits: 20 new
+escalations per agent an hour and 20 open at once per user; escalations within a minute of the last push open
+quietly.
+
+**Grant requests.** Agents never create grants. A session (any of its tokens) or an app token with `messages:send`
+may **request** one: `POST /api/agent/grants/requests {grant, why}` (`hub grant request …`). The holder defaults to
+the requester and may only be the requester itself or a reserved role it holds. It opens a tap Decision summarising
+the grant; approving creates it as yours, and the requester is told the grant id in a reply. One open request per
+requester, 5 an hour.
+
+**Prompts.** An agent's prompt reaches the session as the hub's, never as yours: the spoke wraps it in a provenance
+envelope (`[hub] prompt from @lead · grant g_… · msg_…`, the body between boundary lines) and admits it as a hub
+message, so it never resets the loop protection's hop chain the way your own typing does. Agents may prompt root
+sessions only, never themselves, text only, always waking the session (`--delivery queue|steer` picks how it enters
+a busy one).
+
+**Deny reasons.** `deny --why "…"` passes the reason to the harness as the rejection's feedback (prefixed with who
+denied it and under which grant), on spokes that announce `permissionMessage`; an older spoke takes the reject
+without it, and the answer says so (`reasonSent: false`).
+
+**Kill switches.** Settings → Agents (or `PUT /api/agent/acting {enabled: false}`) turns agent actions off for you;
+an admin's `PUT /api/admin/agents/acting {enabled: false}` turns them off for the whole hub. Either one answers
+every act verb `423 paused`; reading and messaging keep working (messaging has its own switch), and your own
+actions and Decision answers still go through.
+
+**Verbs.** The same act verbs are in the [CLI](#hub-cli) (`hub approve | deny | answer | prompt | stop`, `hub grant
+list | show | create | revoke | request`), the OpenCode `hub` tool (verbs `approve`, `deny`, `answer`, `prompt`,
+`stop`, with the session's act token), [`hub mcp`](#hub-mcp-mcp-server) (tools of the same names, as the app token)
+and the SDK. Only you manage grants: the console (Settings → Agents) or the CLI with your device token
+(`hub login --token <device token>`).
+
+| Route | User | Session (act token) | App (`sessions:act`) |
+|---|---|---|---|
+| `POST /api/agent/sessions/:addr/approve {requestID, always?, why?}` | ✓ | under a grant | under a grant |
+| `POST /api/agent/sessions/:addr/deny {requestID, why?}` | ✓ | under a grant | under a grant |
+| `POST /api/agent/sessions/:addr/answer {formID, answer \| cancel: true, why?}` | ✓ | under a grant | under a grant |
+| `POST /api/agent/sessions/:addr/prompt {text, delivery?, why?}` (users: `images?`) | ✓ | under a grant | under a grant |
+| `POST /api/agent/sessions/:addr/stop {why?}` | ✓ | under a grant | under a grant |
+| `POST /api/agent/grants` · `GET` · `GET`/`PUT`/`DELETE …/grants/:id` | ✓ | – | – |
+| `POST /api/agent/grants/requests {grant, why}` | – | ✓ (any token) | `messages:send` |
+| `GET` · `PUT /api/agent/acting {enabled}` | ✓ | – | – |
+| `GET` · `PUT /api/admin/agents/acting {enabled}` | admins | – | – |
+| `GET /api/agent/audit?limit=&before=` | ✓ | – | – |
+
+**Audit.** Every agent action and every attempt (allowed, `needs_user`, `forbidden`, `paused`, `rate_limited`) is in
+your agent audit with who acted, the verb, the session and request, the grant, the reason and the outcome (`ok`,
+`gone`, `offline`, `unsupported`, `escalated`, `refused`, `failed`); so are your answers to escalations, grant
+requests and switch changes. Read it in Settings → Agents → Activity or with `GET /api/agent/audit` (newest first,
+pages of up to 500; the last 2000 entries are kept); new entries stream to your console as SSE `{type: "agent",
+entry}`. Admins see only a summary in the hub audit (the user, `agent.<verb>` and the actor kind; grant changes as
+`grant.create`, `grant.update`, `grant.revoke` with the grant id), never sessions, requests, reasons, holders or
+patterns.
+
+## Launches
+
+A **launch** starts a session for you on one of your machines and ends it when it is done. On each machine that
+should take launches, enrol it (the OpenCode plugin's `/hub` dialog), list where its repositories live in
+`~/.config/hub/node.json` and run the node daemon:
+
+```sh
+echo '{"workspaceRoots": ["/Users/you/projects"]}' > ~/.config/hub/node.json
+hub node install        # writes the launchd agent / systemd user unit and prints how to load it
+```
+
+Then, from anywhere:
+
+```sh
+hub launch --repo ~/projects/app --branch feat/search --name search --prompt "Add full-text search" --cleanup remove
+hub launches list       # queued → placing → provisioning → running → ended (idle, stopped, …)
+```
+
+The node makes the git worktree `~/projects/app/.worktrees/feat/search`, the machine's OpenCode service starts the
+session there as `@search`, the hub primes and prompts it, and once the session has worked and stays idle the
+launch ends `idle` and the worktree is removed (the branch stays; nothing uncommitted is ever removed). Apps launch
+with an app token (scope `sessions:launch`) under a grant with verb `launch`, retry safely with a `key`, tag
+launches with labels and follow them with signed webhooks. `--harness claude-code` or `--harness codex` launches
+those harnesses through their service spokes ([docs/launches.md](docs/launches.md#harnesses)). Everything, from the
+spec's fields and limits to placement, caps, the node's git rules, webhook signatures and sandboxed launches in
+OpenShell (`hub node openshell check`): [docs/launches.md](docs/launches.md).
+
+## hub CLI
+
+`hub` (also installed as `hubctl`) reads, names, messages and acts on your sessions through the hub's [`/api/agent` API](#agent-identity-agent-api),
+for agents and scripts. The OpenCode plugin writes both launchers into the hub bin dir (`$HUB_STATE_DIR/bin`, default
+`~/.local/state/hub/bin`) at start and puts that dir first on PATH in every shell it prepares, so inside a
+session `hub` just works. A launcher runs the CLI bundle shipped in this package (`packages/cli/dist/hub-cli.js`)
+with the OpenCode binary itself (`BUN_BE_BUN=1 exec <opencode> hub-cli.js "$@"`), so neither bun nor node has to
+be installed; without Bun it falls back to `node`. The launchers are rewritten only when their content changes.
+
+**Name clash:** GitHub's old `hub` CLI (github/hub) uses the same name. In hub sessions ours comes first on PATH;
+elsewhere use `hubctl`, or call the bundle directly (`bun …/packages/cli/dist/hub-cli.js`).
+
+```
+hub status [--json]                       machines → projects → sessions, and what needs attention
+hub sessions [--project P] [--state S[,S]] [--machine M] [--label k=v]
+hub show <addr>                           state, blockers, activity, summary
+hub log <addr> [-n 20]                    newest timeline rows (1–200), printed oldest first
+hub watch [--blocked] [--session <addr>]  events as JSON lines until Ctrl-C (pings skipped)
+hub whoami                                who this credential is
+hub who [--project P] [--role R | @@role] named and role-holding sessions
+hub name <@name> [--session <addr>]
+hub role claim <role[.project]> [--exclusive] [--session <addr>]
+hub role release <role[.project]> [--session <addr>]
+hub msg <addr> "text" [--all] [--no-wake] [--urgent]     tell: fire and forget
+hub ask <addr> "text" [--wait [secs]] [--expires 2h] [--all] [--no-wake] [--urgent]
+hub reply <msgID> "text" [--no-wake]      to the message's real sender, never via the role
+hub decline <msgID> --why "reason"
+hub ask @me "question" [--option id=label[:safe]]... [--recommend id [--why "…"]] [--urgency low|normal|high]
+        [--deadline 2h [--on-timeout <safe id>]] [--tier confirm|tap] [--about <addr>]...   a Decision for the user
+hub decisions list [--state open|answered|expired|closed]   the Decisions you asked
+hub inbox                                 asks to answer, your open asks, recent messages, mutes
+hub mute <addr> · hub unmute <addr>       refuse (or accept again) messages from a session
+hub approve <addr> <requestID> [--always] [--why "…"]   answer a permission request (once, or always)
+hub deny <addr> <requestID> [--why "…"]   reject it; the reason reaches the harness
+hub answer <addr> <formID> key=value… | --json '{…}' | --json - | --cancel [--why "…"]
+hub prompt <addr> "text" [--delivery queue|steer] [--why "…"]
+hub stop <addr> [--why "…"]               stop its running turn
+hub grant list · hub grant show <id> · hub grant revoke <id>
+hub grant create --holder <h> --project <path>... --allow approve,deny,… [--permit <pattern>]... [--never <pattern>]...
+         [--expires 8h] [--max-per-hour N] [--allow-always] | --json '{…}'
+hub grant request --project <path>... --allow approve,deny,… [--permission-allow <pattern>]... [--never <pattern>]...
+         [--holder <@@role you hold>] --why "…"     (agents) ask the user for a grant
+hub launch [--repo <path>] [--mode worktree|checkout|clone] [--branch B] [--base B] [--remote URL]
+         [--name <@name>] [--role R]... [--harness H] [--agent A] [--model provider/model]
+         [--runtime host|openshell [--profile P]] [--machine M] [--node-label k=v]... [--prefer]
+         [--label k=v]... [--prompt "text" | --prompt -] [--end idle|asked|never] [--timeout 4h]
+         [--cleanup keep|remove] [--key K]          start a session on a hub node
+hub launches list [--state S[,S]] [--label k=v]... · hub launches show <id> · hub launches stop <id>
+hub node run                              the node daemon on this machine, until Ctrl-C or SIGTERM
+hub node install [--dry-run] · hub node uninstall [--dry-run] · hub node status
+hub claude [claude args…]                 Claude Code with the hub plugin (--plugin-dir; ~/.claude untouched)
+hub claude-code install|uninstall [--dry-run] · hub claude-code status   the Claude Code daemon as a service
+hub codex [codex args…]                   Codex with its shared app-server daemon on (~/.codex untouched)
+hub codex-spoke install|uninstall [--dry-run] · hub codex-spoke status   the Codex spoke as a service
+hub preset list · hub preset check <name|file>
+hub preset run <name|file> [--socket <name> | --current] [--cwd <dir>] [--resume <id>] [--no-hub] [-- args…]
+hub mcp                                   an MCP server on stdio (see below)
+hub login [--url URL] [--token APP_TOKEN] · hub logout
+hub help · hub --version
+```
+
+Addresses are `ses_…` (or an unambiguous prefix), `@name`, `@@role`, `@name.project` and `@me` (the user). Output is short text
+(one session per line: name and ID, state, harness, current activity, blockers); `--json` prints the hub's answer
+unchanged (for errors, the `{error: {code, message, hint?, …}}` envelope on stdout as well). Errors print the
+message, any candidates or retry time, a missing feature, and the hint on stderr.
+
+**Messaging.** `msg` and `ask` print what was stored and how it reached the recipient (`delivered` into a new or
+the running turn, `queued` for its next turn, `retained` while it has a question open, `pending` while offline, or
+`stored` in a user's or app's inbox); `--all` sends to every session the address names (each holder of a role),
+`--no-wake` admits without starting a turn, `--urgent` steers into a running turn. A text (or `--why`) of `-` is
+read from stdin, so long or quoted bodies need no escaping: `git diff | hub msg @reviewer -`. `--expires` and
+`--wait` take seconds or `30s`, `5m`, `2h`, `1d` (asks expire after 1 minute to 7 days, default 24 h). `ask --wait N`
+waits up to N seconds for the answer (the CLI loops on the hub's 60 s long poll); a bare `--wait` waits until the
+ask expires. A waiting `ask` exits 0 with the answer, 1 when declined (with the reason) or still open when the
+wait is spent, and 8 when it expired; `--wait` cannot be combined with `--all`. `hub inbox` shows each open ask
+with its `hub reply` / `hub decline` line. A recipient whose spoke cannot receive messages exits 7 (`unsupported`,
+feature `deliver`: update the plugin there), messaging switched off by the user exits 5 (`paused`), sending too
+much exits 6 (`rate_limited`), and answering an ask that is already answered or expired exits 8 (`gone`). Sessions
+message with their session token; an app token needs the `messages:send` (and `messages:read` for `inbox`) scopes.
+
+**Acting.** `approve`, `deny`, `answer`, `prompt` and `stop` act on another session: the user's credential always
+may (its own sessions); an app token needs scope `sessions:act` **and** a grant; a session's shell token
+(`HUB_SESSION_TOKEN`) never acts — agents act through the OpenCode `hub` tool, which holds the session's separate
+act token. Outside the grant the hub answers `needs_user`: the CLI exits 4 and prints the evaluation (verdict,
+tier, reason, the grants checked) and the Decision opened for the user, if any. `answer` takes `key=value` pairs (a
+repeated key becomes a list), or the whole answer as JSON (`--json '{…}'`, or `--json -` from stdin; a bare
+`--json` still means raw output), or `--cancel`. `--why` is recorded in the agent audit; for `deny` it is passed to
+the harness. An already-answered request is `gone` (8), an offline machine `offline` (7).
+
+**Grants.** `hub grant list | show | create | revoke` manage what a holder (`ses_…`, `@name` — pinned to that
+session at creation —, a reserved `@@orchestrator…` role, or `app:<token id>`) may do: which verbs,
+in which projects, which permission patterns (`--permit`, `--never`; never wins), for how long and how often. Only
+the user manages grants (the console, or `hub login` with a device token): from a session's shell `create` and
+`revoke` exit 5 without asking the hub, and any credential the hub refuses exits 5. Agents `hub grant request` one
+instead (a session, or an app token with `messages:send`): the same flags, the holder defaulting to the requester,
+and a `--why` the user reads; it prints the Decision it opened, and the user's answer comes back as a reply. See
+[Agent actions and grants](#agent-actions-and-grants).
+
+**Launching.** `hub launch` starts a session on a machine running `hub node` ([docs/launches.md](docs/launches.md)): the flags become the
+body of `POST /api/agent/launches`, with only the given fields (the hub fills in its defaults: harness `opencode`,
+mode `worktree` — which needs `--branch` and uses `<repo>/.worktrees/<branch>` —, runtime `host`, end `idle`,
+cleanup `keep`). `--repo` defaults to the working directory and relative paths resolve against it; the path is the
+repository on the node and must be under that node's workspace roots. `--label k=v` tags the launch for apps
+(`hub launches list --label brain.task=abc` finds it again); `--node-label k=v` and `--machine` pick nodes, required
+unless `--prefer`. `--prompt -` reads the first prompt from stdin. `--key` makes retries safe: the same key and
+flags answer the existing launch (`… was already launched with key …`), the same key with other flags is invalid
+(exit 2). It prints the launch and its state (`queued`, `placing`, `provisioning`, `running` with the session,
+`ended` with an outcome: `idle`, `needs_user`, `failed`, `timeout`, `stopped`, `lost`); `hub launches show` adds the
+workspace, steps and artifacts (branch, head, commits). `hub launches stop` ends a launch (`stopped`); one that
+already ended exits 8 (`gone`). The user may always launch; an app token needs scope `sessions:launch` **and** a
+grant with verb `launch` covering the repo (exit 5 otherwise; the kill switch pauses it); sessions launch only
+through the OpenCode `hub` tool's act token. Apps and sessions see and stop only the launches they started.
+Too many launches exit 6 with the retry time. Apps that register a webhook verify its `Hub-Signature` with the
+SDK's `verifyWebhook({body, headers, secret})` (HMAC-SHA256 of `<t>.<raw body>`, compared in constant time,
+timestamps older than 5 minutes refused). The spec's fields and limits, states, placement, caps and webhooks are in
+[docs/launches.md](docs/launches.md).
+
+**hub node.** `hub node run` is the per-machine daemon that prepares launch workspaces: it needs an enrolled
+machine (it only reads the machine token in `~/.config/hub/config.json`) and `~/.config/hub/node.json` with at
+least `{"workspaceRoots": ["/Users/you/projects"]}` (optional `labels`, `slots`, `memoryMB`); it exits 1 when the
+machine is not enrolled, 78 when there are no workspace roots, and 0 on SIGINT/SIGTERM. `hub node install` writes a
+launchd agent (macOS, `~/Library/LaunchAgents/io.github.huynle.hub-node.plist`) or a systemd user unit (Linux,
+`~/.config/systemd/user/hub-node.service`) from the templates in `scripts/`, with the runtime and CLI entry running
+the command (so `hubctl node install` from a hub session runs the bundle with the OpenCode binary) and
+`HUB_SPOKE_CONFIG` / `XDG_CONFIG_HOME` when set, and **prints** the `launchctl` / `systemctl` commands that load it;
+hub never runs them. `--dry-run` prints the file without writing it; a second install says it is up to date (or
+updates it), and warns when the node would not run yet. `hub node uninstall` removes the file and prints the
+commands that stop the service; `hub node status` shows the file (up to date or not), the enrolment (never the
+token), node.json and the commands to inspect the service. What the node does to your repositories (worktrees under
+`<repo>/.worktrees/<branch>`, cleanup that never forces) is in [docs/launches.md](docs/launches.md#hub-node).
+
+**Other harnesses.** `hub claude` runs Claude Code with the hub's plugin loaded through `--plugin-dir` and starts the
+per-user Claude Code daemon (`hub claude-code daemon`) when none runs; `hub codex` runs Codex with its shared
+app-server daemon turned on for that run and starts the per-user Codex spoke (`hub codex-spoke serve`). Both pass
+every other argument and the exit code through, never write `~/.claude` or `~/.codex`, and run the harness without
+the hub (saying why) when the machine is not enrolled. `hub claude-code install` and `hub codex-spoke install` write
+a launchd agent or systemd user unit for those processes, like `hub node install` (printed, never loaded), so
+`claude-code` and `codex` launches can be placed without a wrapper run. `hub preset list | check | run` drives a
+harness without a spoke through a pane on a private tmux server. Settings, the op matrix and the limits:
+[docs/harnesses.md](docs/harnesses.md).
+
+**Credentials.** `HUB_URL` + `HUB_SESSION_TOKEN` (the spoke sets them in each session's shells; the CLI then
+acts as that session) win over the login file. Outside a session, `hub login --url https://hub.example` stores
+an app token in `~/.config/hub/cli.json` (`$XDG_CONFIG_HOME` respected; mode 0600) after checking it with
+`whoami`; the token is read from stdin (or prompted) unless `--token` is given — prefer stdin, since arguments are
+visible to other local users in `ps`. App tokens are created by a signed-in user with
+`POST /api/agent/app-tokens {label?, scopes?}` (scopes `sessions:read`, `messages:send`, `messages:read`; shown once) and revoked with
+`DELETE /api/agent/app-tokens/:id`; `hub logout` only deletes the file. App tokens can read but not name or
+claim roles (writes are for sessions and users). `whoami` and `status` warn on stderr when `OPENCODE_SESSION_ID`
+is set and the credential is not that session. The CLI removes `BUN_BE_BUN` from its own environment.
+
+| Exit | When |
+|---|---|
+| 0 | ok |
+| 1 | other errors, network failures, a watch stream the hub closed, an `ask --wait` declined or not yet answered |
+| 2 | usage (unknown command or option, missing argument; also the hub's `invalid`) |
+| 3 | `not_found`, `ambiguous` (candidates listed), `name_taken` |
+| 4 | `needs_user` |
+| 5 | `forbidden`, `paused` |
+| 6 | `rate_limited` (with `retryAfter`) |
+| 7 | `unsupported`, `offline` |
+| 8 | `gone`; an `ask --wait` that expired |
+| 9 | `unauthorized`, `token_expired` (a session token: start a new shell), or not logged in |
+
+### hub mcp (MCP server)
+
+`hub mcp` is a [Model Context Protocol](https://modelcontextprotocol.io) server on stdio for MCP clients outside
+OpenCode (Claude Desktop, Cursor, other agents). It speaks JSON-RPC 2.0, one message per line (MCP's stdio
+transport; protocol revisions `2025-06-18`, `2025-03-26` and `2024-11-05`), and answers `initialize`, `ping`,
+`tools/list` and `tools/call`; notifications (`notifications/initialized`, `notifications/cancelled`, which aborts
+the call) get no answer, other methods answer `-32601`. Its tools are the CLI's verbs: `whoami`, `status`,
+`sessions`, `show`, `log`, `who`, `msg`, `ask`, `reply`, `decline`, `inbox` and the act verbs `approve`, `deny`,
+`answer` (`answer` object or `cancel`), `prompt` (`delivery`) and `stop`, and the launch tools `launch` (`repo`
+required and absolute; `mode`, `branch`, `base`, `remote`, `key`, `name`, `roles`, `harness`, `agent`, `model`,
+`runtime`, `profile`, `machine`, `nodeLabels` and `labels` objects, `prefer`, `prompt`, `end`, `timeout`,
+`cleanup`), `launches` (`state`, `label`), `launch_show` and `launch_stop` (`id`), with the same arguments
+(`to`, `text`, `addr`, `id`, `requestID`, `formID`, `why`, `n`, `wake`, `urgent`, `all`, `project`, `role`, …). The act
+tools need an app token with scope `sessions:act` and a grant, the launch tools scope `sessions:launch` and a
+launch grant; `needs_user` results include the evaluation. `ask` takes `wait` of at
+most 60 s (one long poll; a longer wait is cut to 60) and `expires` in seconds or as `2h`. Answers are the CLI's
+short text; messages and answers from other sessions come in the hub's envelope and are marked as not from the
+user. Hub errors are tool results with `isError: true` and the hub's `code: message` (plus candidates and hint),
+never protocol errors. Only protocol frames go to stdout; the server ends when stdin closes (after answering the
+calls in flight) or on SIGINT/SIGTERM.
+
+```json
+{ "mcpServers": { "hub": { "command": "/home/you/.local/state/hub/bin/hubctl", "args": ["mcp"] } } }
+```
+
+(the launcher in the hub bin dir, `$HUB_STATE_DIR/bin`; just `hubctl` when that dir is on the client's PATH).
+
+**Identity.** The server acts as the CLI's credential, read for each call: `HUB_URL` + `HUB_SESSION_TOKEN` when
+set, else the `hub login` file. MCP clients start servers without a hub session's shell environment, so in practice
+it acts as the **app token** you logged in with (needs `sessions:read`, `messages:send` and `messages:read`), not
+as an OpenCode session: messages are sent from the app, and replies to them land in its inbox (the `inbox` tool),
+not in a session. Naming and roles stay out (app tokens cannot use them). Inside OpenCode, agents use the plugin's
+`hub` tool instead, which acts as the calling session.
+
+#### Over HTTP (/mcp)
+
+The hub serves the same tools at **`POST /mcp`** ([Streamable HTTP](https://modelcontextprotocol.io/specification/2025-06-18/basic/transports#streamable-http)),
+for MCP clients and gateways that take a remote server URL. It is stateless: one JSON-RPC message per POST, answered
+as `application/json` (no SSE stream, no `Mcp-Session-Id`); notifications and responses get `202` with no body;
+batches answer `-32600`; `GET`/`DELETE` answer `405` (`Allow: POST`). `initialize` also returns short
+`instructions`. Requests need `Content-Type: application/json`, an `Accept` that allows `application/json` (or
+none), a body of at most 1 MiB (else `413`) and, when sent, a supported `MCP-Protocol-Version` (else `400`). A
+browser `Origin` other than the hub's own is refused (`403`); requests without one (servers, gateways) are fine.
+
+**Auth.** `Authorization: Bearer <token>`: any credential the agent API takes, in practice an **app token**
+(Settings → Agents, or `POST /api/agent/app-tokens`) with the scopes the tools need: `sessions:read` (reading),
+`messages:send` and `messages:read` (messaging), `sessions:act` plus a grant (act tools), `sessions:launch` plus a
+launch grant (launch tools). Device, session and act tokens work too. No or a bad token answers `401` with
+`WWW-Authenticate: Bearer realm="hub"` (no OAuth discovery). The tools call `/api/agent` as that token, inside the
+hub process: scopes, grants, tenancy, kill switches and the agent audit apply as on the HTTP API, and a scope the
+token lacks is an `isError` tool result. Cookies never authenticate `/mcp`.
+
+Add it to an MCP client or gateway as a remote (HTTP) server with bearer auth, one token per user:
+
+```json
+{ "mcpServers": { "hub": { "type": "http", "url": "https://hub.example.com/mcp", "headers": { "Authorization": "Bearer hat_…" } } } }
+```
+
+(an MCP gateway: URL `https://<hub>/mcp`, auth kind bearer, per-user credential: each user pastes their own app token).
 
 ## Spoke (OpenCode plugin)
 
@@ -356,6 +940,11 @@ not persist those potentially sensitive details.
   calling session (never the caller itself, its siblings or another session's workers), so the voice agent
   keeps listening. The phone's stop words ("stop", "cancel", "never mind", "stop that", "hold on") still
   interrupt the root turn at once.
+- **Messaging other sessions**: the plugin adds a tool `hub {verb, …}` with the verbs `msg`, `ask`, `reply`,
+  `decline`, `inbox`, `who`, `status` and `whoami` (`src/spoke/hub-tool.ts`). It acts as the calling session
+  with that session's own hub token (the token never appears in the tool's output). `ask` with `wait` (seconds,
+  at most 600) blocks for the answer until the tool call is stopped; without it the answer arrives later as a hub
+  message. Messages from other sessions are shown in the hub's envelope and are not from the user.
 - Child text and execution events are paired by the hub. The latest assistant message of a successful
   child is emitted as root-session speech; interruptions and stale partial results are not. **Announcements**
   (hub, `src/central/registry.ts`): while another worker of the session runs or waits, or one was announced in
@@ -391,7 +980,10 @@ holds the startup (`bin/hub.ts` serves `web/` from disk; the compiled binaries e
 | `HUB_AUTH` | `pairing` | `oidc` for several users signing in with Google; see [Multi-user](#multi-user-sign-in-with-google) |
 | `HUB_HOST` / `HUB_PORT` | `127.0.0.1` / `4097` | listen address |
 | `HUB_PUBLIC_URL` | `http://<host>:<port>` (`http://127.0.0.1:<port>` when the host is `0.0.0.0` / `::`) | origin used in links, cookies and CSRF checks |
-| `HUB_STATE_DIR` | `~/.local/state/hub` | `state.json` (0600): users, machines and devices (token hashes only) with their owners, VAPID keys, push subscriptions, speech settings (server default and per user; provider API keys set from the phone), the audit log (last 500 entries) |
+| `HUB_STATE_DIR` | `~/.local/state/hub` | `state.json` (0600): users, machines and devices (token hashes only) with their owners, VAPID keys, push subscriptions, speech settings (server default and per user; provider API keys set from the phone), the audit log (last 500 entries); `token-keys.json` (0600): the HMAC keys that sign session tokens (created on first use, older keys kept so their tokens still verify); `agent/` (0700, files 0600, created on first use): agent data such as messages and name claims, one JSON file per user and collection, written shortly after each change and on shutdown |
+| `HUB_TOKEN_KEYS` | | overrides `token-keys.json` with the same JSON, `{"active": "<kid>", "keys": [{"kid": "<kid>", "secret": "<base64 of ≥ 32 random bytes>", "created": <ms>}]}`, e.g. a secret shared by several hub instances; the file is then never written |
+| `HUB_DATABASE_URL` / `HUB_VALKEY_URL` | | cluster mode: several hub pods sharing Postgres and Valkey (both or neither; requires `HUB_AUTH=oidc` and `HUB_TOKEN_KEYS`); see [docs/cluster.md](docs/cluster.md) |
+| `HUB_POD_ID` | the hostname | cluster mode: this pod's unique id |
 | `HUB_TURN_TIMEOUT_MS` | `600000` | the hub waits this + 15 s so the spoke's own timeout result arrives first |
 | `HUB_VAPID_SUBJECT` | the https public URL, else `mailto:hub@localhost` | contact sent to push services |
 | `OPENROUTER_API_KEY` | | default key for the `openrouter` speech provider (never sent to other providers) |
@@ -653,6 +1245,16 @@ disconnects their machines at once.
 login links from `/hub` belong to the machine's owner. The bootstrap pairing code and the local
 first-machine auto-approve exist only in `pairing` mode.
 
+**Native apps** link from Settings → Devices → **Add app**: the dialog shows a QR code of
+`hubapp://link?hub=<public URL>&code=<code>` (and the link itself), with a 5-minute countdown. The code is
+single use, 256-bit, belongs to the user who opened the dialog (who must still be active when it is redeemed)
+and works only for linking: `/login` and `/api/pair` refuse it. The app calls `POST /api/devices/redeem
+{code, deviceName?, publicKey?}` (no cookie, and no `Origin` needed: the code is the only credential) and gets
+`{device, token}`; it keeps `token` and sends it as `Authorization: Bearer <device token>`. The device appears
+in the list (audit `device.pair`, "app link"); revoking it invalidates the token. `deviceName` is cleaned
+(control characters dropped, at most 64 characters, "App" when empty); `publicKey` (PEM or base64, at most
+4096 characters) is stored with the device for later strong approvals.
+
 **Speech**: each user can set their own provider, models, voice and key (Settings → Speech); fields they
 leave empty come from the server default (admins: Settings → Speech → Server default), then `hub.json`,
 then the env. A user's key is only ever shown (masked) to that user.
@@ -704,7 +1306,12 @@ session.
 
 ### Hub API
 
-All routes need the device cookie; POSTs also need a same-origin `Origin` (or `Referer`). Every
+All routes need the device cookie; POSTs also need a same-origin `Origin` (or `Referer`). Native apps and
+other non-browser clients send the same device secret as `Authorization: Bearer <device token>` instead: same
+powers, no same-origin check (a request with both a cookie and a bearer token is refused with
+`400 {"error": …, "code": "invalid"}`; an unknown bearer token is `401 {"code": "unauthorized"}`). Other bearer
+tokens (session and app tokens) are refused on these routes (`403 {"code": "forbidden"}`); they are for
+`/api/agent/*` only. Every
 `/api/sessions/:id…` route answers `404 {"error": "Not found"}` for a session that none of the caller's
 machines reports (since 0.3.0; before, a session nobody reported was 409), so another user's session looks
 exactly like an unknown one. For a loopback
@@ -1002,6 +1609,10 @@ in the file).
 | `speech.stt` | `{provider, model, baseURL?, language?, apiKey?}` |
 | `speech.tts` | `{provider, model, voice, baseURL?, speed?, apiKey?}` |
 | `auth` | `{mode, issuer?, clientId, clientSecret, allowed, admins}`; see [Multi-user](#multi-user-sign-in-with-google) |
+| `cluster` | `{database, valkey}` URLs for cluster mode (env `HUB_DATABASE_URL` / `HUB_VALKEY_URL` win); see [docs/cluster.md](docs/cluster.md) |
+| `agents.never` | permission patterns (`action[:glob]`) no agent may ever approve, for every user, checked before any grant; see [Agent actions and grants](#agent-actions-and-grants) |
+| `agents.launches` | per-user launch caps `{maxQueued?, maxActive?, perHour?}` (defaults 50, 4, 60); see [docs/launches.md](docs/launches.md#placement-and-caps) |
+| `agents.webhooks.allowPrivate` | `true` lets webhooks target `http://`, loopback and private hosts (self-hosted receivers); see [docs/launches.md](docs/launches.md#where-webhooks-may-go) |
 
 Server fields: env vars (`HUB_HOST`, `HUB_PORT`, `HUB_PUBLIC_URL`, `HUB_STATE_DIR`) > hub.json >
 defaults. Speech: phone settings > hub.json > env vars. Values are checked like the phone's speech
@@ -1148,12 +1759,51 @@ npm install         # bun install works too
 npm test            # bun test (scripts/test-ci.sh runs each file alone and builds the web app first)
 npm run typecheck   # hub and web app
 npm run build:web   # web/dist, served by `bun bin/hub.ts`
+npm run build:cli   # packages/cli/dist/hub-cli.js, the hub CLI bundle (prepack builds both)
 ```
 
 Console development: `bun test/web-mock-hub.ts 4311` fakes a hub with fixtures (serves `web/dist`), and
 `npm run dev:web` serves the console with hot reload, proxying `/api` to it (`HUB_URL` for a real hub).
 `npm run test:e2e` runs a headless Chromium smoke test against the mock hub at desktop and phone sizes
 (`CHROMIUM_PATH` if Playwright's browsers are not installed; screenshots go to the temp dir).
+
+`test/e2e-phase2.test.ts` does the same for messaging: the OpenCode spoke (with `deliver`) and a spoke without it,
+`hub msg`/`ask`/`mute` as session tokens, replies through the `hub` tool's code path, an app token with the
+`messages:*` scopes, `hub mcp` over pipes, a Decision answered on the console route, a second user who cannot see or
+answer any of it, the pair rate limit and the messaging switch. The opt-in `HUB_IT_OPENCODE=1 bun test
+test/e2e-phase2-live.it.test.ts` connects a private `opencode serve` to a real in-process hub: one session's (stub)
+model calls `hub msg` to another session, whose model is then handed the envelope.
+
+`test/e2e-phase3.test.ts` does the same for agent actions: a spoke with `deliver`, `actTokens`, `hubPrompt` and
+`permissionMessage` and a raw spoke without them; a grant to `@@orchestrator` used through the `hub` tool's code
+path (act token) and an app token's grant through the CLI; shell tokens refused, never patterns (the grant's and
+hub.json's), the own-tree ban, `needs_user` escalated to a Decision answered on the console, the user answering
+first, both kill switches, the hourly cap, prompts with provenance, deny reasons, grant requests and the audit
+(admins see summaries only). `test/central-tenancy.test.ts` checks every phase-3 route and CLI verb across two
+users. The opt-in `HUB_IT_OPENCODE=1 bun test test/e2e-phase3-live.it.test.ts` connects a private `opencode serve`
+with shell permissions set to ask: session A's (stub) model runs a shell command, session B's model calls `hub
+approve` under its grant, and OpenCode runs A's command. `HUB_IT_OPENCODE=1 bun test test/spoke-acting.it.test.ts`
+checks hub prompts and deny reasons inside OpenCode.
+
+`test/e2e-phase1.test.ts` (part of `npm test`) runs agent identity end to end in process: a hub, the OpenCode spoke
+and a second spoke of another harness, and the `hub` CLI as a session token, an app token, a linked device and a
+second user. The opt-in `HUB_IT_OPENCODE=1 bun test test/spoke-env-inject.it.test.ts` starts a private
+`opencode serve` (own port, password and XDG dirs) with a local stub model and checks a real shell: its
+`HUB_SESSION_TOKEN`, and that `hub whoami` there prints the session. `HUB_IT_OPENCODE=1 bun test
+test/spoke-deliver.it.test.ts` does the same for hub messages: the model sees the delivered envelope, a repeated
+message id is applied once, `wake: false` waits for the next turn, and inbox deliveries carry their origin. `HUB_IT_OPENCODE=1 bun test test/spoke-hub-tool.it.test.ts` has the stub model call the `hub` tool and checks
+that the hub sees the session's token while the model and the transcript never do. `HUB_IT_OPENCODE=1 bun test
+test/spoke-prompt-refs.it.test.ts` checks that a prompt naming a session reaches the model unchanged with the
+reference note attached, and that hub-sourced prompts get none.
+
+`test/e2e-phase7.test.ts` runs the other harnesses end to end in process (the Claude Code daemon fed fixture hook
+inputs, the Codex spoke on a fake shared app-server daemon, a preset on a private tmux server, and claude-code and
+codex launches in node worktrees), and `test/e2e-phase7-conformance.test.ts` runs the spoke conformance suite against every shipped spoke
+(OpenCode included). The opt-in `HUB_IT_CLAUDE=1 bun test ./packages/claude-code/test/live.it.test.ts` and
+`HUB_IT_CODEX=1 bun test ./packages/codex/test/live.it.test.ts` run the real CLIs against the testkit's stub model
+with a throwaway `HOME`, `CLAUDE_CONFIG_DIR` / `CODEX_HOME` and a deny-all proxy. A new harness spoke starts from
+`bun packages/spoke-sdk/scaffold.ts <name> <dir>`, whose output passes `npx hub-conformance spoke --driver "bun
+<dir>/driver.ts"` as written ([docs/spoke-sdk.md](docs/spoke-sdk.md)).
 
 Point a project's `.opencode/opencode.jsonc` at your checkout to try changes:
 `{ "plugins": [{ "package": "/path/to/hub" }] }`. If the plugin is also installed globally,
@@ -1203,6 +1853,9 @@ publish before trusted publishing can take over (see the comment in `release.yml
   replay buffer is in memory (a hub restart means a full catalog + `resync`).
 - Running shells are seeded from the spoke's own server (`shell.list` for the 20 most recent session
   directories); shells in other directories show up once they emit an event.
+- Claude Code, Codex and presets serve fewer operations than OpenCode (no timeline or summary; Claude Code takes
+  hub turns only in sessions the hub launched, and its permission requests race its own dialog); see
+  [docs/harnesses.md](docs/harnesses.md#known-limits).
 
 ## License
 

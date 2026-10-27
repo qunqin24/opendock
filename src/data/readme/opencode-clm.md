@@ -42,6 +42,28 @@ options go on the `opencode.json` entry only, and the TUI plugin reads them from
 { "plugin": ["opencode-clm"] }
 ```
 
+### OpenCode 2
+
+The same package runs on OpenCode 2 (2.1+): its default export carries both entry points,
+`server` for OpenCode 1 and `id` + `setup` for OpenCode 2, as ponytail and superpowers do.
+Add it to the server config only (`"plugins"`, or the OpenCode 1 `"plugin"` list that
+OpenCode 2 migrates); options are the same:
+
+```jsonc
+// opencode.json
+{ "plugins": [{ "package": "opencode-clm", "options": { "budget": "64k" } }] }
+```
+
+On OpenCode 2, `/clm` never costs a model turn: its reply is posted to the session and
+shown at once (the model reads it at its next turn). It works the same over ACP (editors such as Zed or Devin list
+`/clm` and `/clm-compact`). Compaction behaves as in the paper (`compaction: auto`): OpenCode 2
+compacts on its own at about 85% of the model window, so CLM keeps its budget below that
+point and OpenCode only steps in when the provider rejects a request as too long.
+`compaction: on` lets OpenCode compact at its threshold; `off` is not possible from a plugin
+(set `"compaction": { "auto": false }` in opencode.json). Not available there yet: the `/clm`
+TUI panel and toasts (warnings, errors and OpenCode's compactions go to
+`<mirrorDir>/plugin.log`; `/clm status` shows the last compaction).
+
 ## Quick start
 
 | command | what it does |

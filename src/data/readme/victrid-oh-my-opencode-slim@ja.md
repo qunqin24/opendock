@@ -41,7 +41,7 @@ oh-my-opencode-slim は OpenCode 向けのエージェントオーケストレ�
 - **[Council](docs/council.md)** - `@council` で同じ質問を複数モデルに並列で投げ、1 つの回答に統合します。
 - **[Companion](docs/companion.md)** - 並列のバックグラウンド専門家を含む、稼働中のエージェントを表示する任意のフローティングデスクトップウィンドウです。
 - **[マルチプレクサー統合](docs/multiplexer-integration.md)** - Tmux、Zellij、Herdr、cmux、kitty、WezTerm のペインでエージェントの作業をライブ表示します。
-- **[プリセット切り替え](docs/preset-switching.md)** - `/preset` でチーム全体のモデルを実行時に切り替えます。
+- **[プリセット切り替え](docs/presets/preset-switching.md)** - `/preset` でチーム全体のモデルを実行時に切り替えます。
 - **[コードインテリジェンスツール](docs/tools.md)** - 25 言語対応の LSP、AST 対応検索、ドキュメント・GitHub コード検索用の組み込み MCP を提供します。
 - **[完全にカスタマイズ可能](docs/configuration.md)** - カスタムエージェント、プロンプト上書き、エージェントごとのスキル/MCP 権限、[プロジェクトローカルのカスタマイズ](docs/project-local-customization.md)に対応します。
 
@@ -51,7 +51,7 @@ oh-my-opencode-slim は OpenCode 向けのエージェントオーケストレ�
   <img src="img/openai-gpt-5-6-pantheon.jpeg" alt="OpenAI GPT-5.6 パンテオン：Terra、Sol、Luna" width="100%">
 </p>
 
-デフォルトの [OpenAI プリセット](docs/openai-preset.md) は、Terra を Orchestrator、Sol を Oracle、Luna を高速な専門レーンに割り当てます。
+デフォルトの [OpenAI プリセット](docs/presets/openai-preset.md) は、Terra を Orchestrator、Sol を Oracle、Luna を高速な専門レーンに割り当てます。
 
 ### ユーザーの声
 
@@ -178,10 +178,10 @@ bun run build
 
 ### プリセットのドキュメント
 
-- **[OpenAI プリセット](docs/openai-preset.md)** — デフォルトで生成されるプリセット。すべてのエージェントを OpenAI モデルで実行します。
-- **[OpenCode Go プリセット](docs/opencode-go-preset.md)** — エージェントを OpenCode Go モデルで実行します。Orchestrator モデルがマルチモーダルでないため、視覚分析用に Observer エージェントを有効化します。
-- **[作者のプリセット](docs/authors-preset.md)** — 作者が日常的に使う、サードパーティスキルを含む正確な設定です。
-- **[$30 プリセット](docs/thirty-dollars-preset.md)** — Codex Plus と GitHub Copilot Pro を中心とした、月額約 $30 の混合プロバイダー構成です。
+- **[OpenAI プリセット](docs/presets/openai-preset.md)** — デフォルトで生成されるプリセット。すべてのエージェントを OpenAI モデルで実行します。
+- **[OpenCode Go プリセット](docs/presets/opencode-go-preset.md)** — エージェントを OpenCode Go モデルで実行します。Orchestrator モデルがマルチモーダルでないため、視覚分析用に Observer エージェントを有効化します。
+- **[作者のプリセット](docs/presets/authors-preset.md)** — 作者が日常的に使う、サードパーティスキルを含む正確な設定です。
+- **[$30 プリセット](docs/presets/thirty-dollars-preset.md)** — Codex Plus と GitHub Copilot Pro を中心とした、月額約 $30 の混合プロバイダー構成です。
 
 ### 他のプロバイダーを利用する場合
 
@@ -574,7 +574,7 @@ bunx oh-my-opencode-slim@latest companion install
 | **[Codemap](docs/codemap.md)** | 階層的なコードマップを生成し、大規模コードベースを迅速に理解します |
 | **[Clonedeps](docs/clonedeps.md)** | 選択した依存関係のソースを ignore 済みのローカルワークスペースにクローンし、調査できるようにします |
 | **[Worktrees](docs/worktrees.md)** | `.slim/worktrees/` lane を使い、隔離された並列または高リスクなコーディング作業を行います |
-| **[Preset Switching](docs/preset-switching.md)** | `/preset` で実行時にエージェントモデルのプリセットを切り替えます |
+| **[Preset Switching](docs/presets/preset-switching.md)** | `/preset` で実行時にエージェントモデルのプリセットを切り替えます |
 | **[Interview](docs/interview.md)** | ブラウザベースの Q&A フローで、ざっくりとしたアイデアを構造化された Markdown 仕様に変換します |
 | **[Companion](docs/companion.md)** | 解析、ヘルプ、型情報のためのフローティングウィンドウ companion |
 
@@ -595,9 +595,9 @@ bunx oh-my-opencode-slim@latest companion install
 
 | Doc | 内容 |
 |-----|----------------|
-| **[Author's Preset](docs/authors-preset.md)** | 作者が日常的に使う混合プロバイダー構成 |
-| **[$30 Preset](docs/thirty-dollars-preset.md)** | 月額約 $30 で運用できる、リーズナブルな混合プロバイダー構成 |
-| **[OpenCode Go Preset](docs/opencode-go-preset.md)** | インストーラーが生成する同梱の `opencode-go` プリセット |
+| **[Author's Preset](docs/presets/authors-preset.md)** | 作者が日常的に使う混合プロバイダー構成 |
+| **[$30 Preset](docs/presets/thirty-dollars-preset.md)** | 月額約 $30 で運用できる、リーズナブルな混合プロバイダー構成 |
+| **[OpenCode Go Preset](docs/presets/opencode-go-preset.md)** | インストーラーが生成する同梱の `opencode-go` プリセット |
 
 ---
 

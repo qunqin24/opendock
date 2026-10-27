@@ -41,7 +41,7 @@ oh-my-opencode-slim 是一个用于 OpenCode 的智能体编排插件。它内�
 - **[Council](docs/council.md)** —— 使用 `@council` 针对同一问题并行运行多个模型，并综合为一个答案。
 - **[Companion](docs/companion.md)** —— 可选的浮动桌面窗口，显示哪些智能体正在运行，包括并行后台专家。
 - **[多路复用器集成](docs/multiplexer-integration.md)** —— 在 Tmux、Zellij、Herdr 或 cmux 窗格中实时观察智能体工作。
-- **[预设切换](docs/preset-switching.md)** —— 使用 `/preset` 在运行时更换整支团队的模型。
+- **[预设切换](docs/presets/preset-switching.md)** —— 使用 `/preset` 在运行时更换整支团队的模型。
 - **[代码智能工具](docs/tools.md)** —— LSP 工具、支持 25 种语言的 AST 感知搜索，以及用于文档和 GitHub 代码搜索的内置 MCP。
 - **[完全可定制](docs/configuration.md)** —— 自定义智能体、提示词覆盖、按智能体控制的 Skill/MCP 权限，以及[项目本地定制](docs/project-local-customization.md)。
 
@@ -51,7 +51,7 @@ oh-my-opencode-slim 是一个用于 OpenCode 的智能体编排插件。它内�
   <img src="img/openai-gpt-5-6-pantheon.jpeg" alt="OpenAI GPT-5.6 众神殿：Terra、Sol 和 Luna" width="100%">
 </p>
 
-默认的 [OpenAI 预设](docs/openai-preset.md) 将 Terra 映射为 Orchestrator、Sol 映射为 Oracle、Luna 映射为快速专家通道。
+默认的 [OpenAI 预设](docs/presets/openai-preset.md) 将 Terra 映射为 Orchestrator、Sol 映射为 Oracle、Luna 映射为快速专家通道。
 
 ### 用户怎么说
 
@@ -171,11 +171,11 @@ bun run build
 
 ### 预设文档
 
-- **[OpenAI 预设](docs/openai-preset.md)** —— 默认生成的预设；所有智能体均使用 OpenAI 模型。
-- **[OpenCode Go 预设](docs/opencode-go-preset.md)** —— 智能体使用 OpenCode Go 模型；由于其 Orchestrator 模型不支持多模态，因此启用 Observer 进行视觉分析。
-- **[作者的预设](docs/authors-preset.md)** —— 作者日常使用的精确配置，包含第三方 Skills。
-- **[$30 预设](docs/thirty-dollars-preset.md)** —— 围绕 Codex Plus 和 GitHub Copilot Pro 构建的混合服务商方案，每月约 30 美元。
-- **[$40 预设](docs/forty-dollars-preset.md)** —— 围绕 Claude Pro 和 ChatGPT Plus 构建的双订阅黄金方案，每月约 40 美元。
+- **[OpenAI 预设](docs/presets/openai-preset.md)** —— 默认生成的预设；所有智能体均使用 OpenAI 模型。
+- **[OpenCode Go 预设](docs/presets/opencode-go-preset.md)** —— 智能体使用 OpenCode Go 模型；由于其 Orchestrator 模型不支持多模态，因此启用 Observer 进行视觉分析。
+- **[作者的预设](docs/presets/authors-preset.md)** —— 作者日常使用的精确配置，包含第三方 Skills。
+- **[$30 预设](docs/presets/thirty-dollars-preset.md)** —— 围绕 Codex Plus 和 GitHub Copilot Pro 构建的混合服务商方案，每月约 30 美元。
+- **[$40 预设](docs/presets/forty-dollars-preset.md)** —— 围绕 Claude Pro 和 ChatGPT Plus 构建的双订阅黄金方案，每月约 40 美元。
 
 ### 针对其他服务商
 
@@ -570,7 +570,7 @@ bunx oh-my-opencode-slim@latest companion install
 | **[Codemap](docs/codemap.md)** | 生成层级代码地图，更快理解大型代码库 |
 | **[Clonedeps](docs/clonedeps.md)** | 将选定的依赖源码克隆到被忽略的本地工作区中以供检查 |
 | **[Worktrees](docs/worktrees.md)** | 使用 `.slim/worktrees/` 通道进行隔离的并行或高风险编码工作 |
-| **[预设切换](docs/preset-switching.md)** | 使用 `/preset` 在运行时切换智能体模型预设 |
+| **[预设切换](docs/presets/preset-switching.md)** | 使用 `/preset` 在运行时切换智能体模型预设 |
 | **[Interview](docs/interview.md)** | 通过基于浏览器的问答流程，将粗略想法转成结构化 markdown 规格 |
 | **[Companion](docs/companion.md)** | 用于解析、帮助和类型信息的浮动窗口 companion |
 
@@ -591,10 +591,10 @@ bunx oh-my-opencode-slim@latest companion install
 
 | 文档 | 涵盖内容 |
 |-----|----------------|
-| **[作者的预设配置](docs/authors-preset.md)** | 作者日常使用的混合服务商配置方案 |
-| **[$30 预设配置](docs/thirty-dollars-preset.md)** | 每月约 30 美元的预算型混合服务商配置方案 |
-| **[$40 预设配置](docs/forty-dollars-preset.md)** | 每月约 40 美元的 Claude Pro + ChatGPT Plus 双订阅配置方案 |
-| **[OpenCode Go 预设](docs/opencode-go-preset.md)** | 安装程序生成的捆绑 `opencode-go` 预设 |
+| **[作者的预设配置](docs/presets/authors-preset.md)** | 作者日常使用的混合服务商配置方案 |
+| **[$30 预设配置](docs/presets/thirty-dollars-preset.md)** | 每月约 30 美元的预算型混合服务商配置方案 |
+| **[$40 预设配置](docs/presets/forty-dollars-preset.md)** | 每月约 40 美元的 Claude Pro + ChatGPT Plus 双订阅配置方案 |
+| **[OpenCode Go 预设](docs/presets/opencode-go-preset.md)** | 安装程序生成的捆绑 `opencode-go` 预设 |
 
 ---
 
