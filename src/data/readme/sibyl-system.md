@@ -104,8 +104,8 @@ stderr, registers nothing, and returns empty hooks.
 | `sibyl_status` | `{ runId? }` | Read-only. Lists all recorded runs (newest last) + the last chamber-ledger rows, or shows one run's full record and space dir. |
 | `sibyl_review` | `{ target, goal, seed?, maxRounds? }` | v1.1 general democratic-centralism chamber: launches the isolated evidence→clash→judge pipeline detached and returns a receipt (explicitly NOT a verdict); the single voice lands in the run record at terminal state. CLI twin: `sibyl-chamber`. |
 | `sibyl_anchor_check` | `{ sessionId, index?, body?, expectSha256?, label? }` | Read-only verifier for "human anchor" claims (an order/approval message the owner says they sent): re-checks the claim against the engine's own session store instead of trusting a transcribed string. Closed 4-state verdict `MATCH` / `MISMATCH` / `ABSENT` / `ERROR`; the receipt carries a hash of the canonical view read, so later store mutation shows up as a view-hash difference. No `expectSha256` claim → non-verdict. |
-| `sibyl_time_probe` | `{ endpoints?, toleranceMs? }` | Clock-integrity check against independent HTTP `Date` headers (default pool: cloudflare / google / mozilla; sources with the same owner dept collapse to ONE source). Verdict: `SYNCED` / `DRIFT` / `INSUFFICIENT-SOURCES` (< 2 distinct owners is never consent). Default tolerance 300000 ms. Reads remote endpoints; sends no data beyond a HEAD request. |
-| `sibyl_attribute` | `{ moves, commits, roster }` | Pure comparator (zero network/git of its own): attributes git ref-moves to committer identities against a roster. Per-move verdict: `ATTRIBUTED` / `UNATTRIBUTED` (the silent-egress case) / `AMBIGUOUS` (byte-equal roster pair = registry defect, blocks, never picks). Identity matching is byte-exact by design — no normalization. |
+| `sibyl_time_probe` | `{ endpoints?, toleranceMs? }` | Clock-integrity check against independent HTTP `Date` headers (default pool: cloudflare / google / mozilla; sources with the same owner dept collapse to ONE source). Verdict: `SYNCED` / `DRIFT` / `INSUFFICIENT-SOURCES` (< 2 distinct owners is never consent). Default tolerance 300000 ms. `endpoints` JSON is shape-validated and every URL passes the egress gate before any fetch (reserved/internal shapes refused by rule name; blocked = failed receipt, never consent). HEAD only, zero payload, redirects not followed. |
+| `sibyl_attribute` | `{ moves, commits, roster }` | Pure comparator (zero network/git of its own): attributes git ref-moves to committer identities against a roster. Per-move verdict: `ATTRIBUTED` / `UNATTRIBUTED` (the silent-egress case) / `AMBIGUOUS` (byte-equal roster pair = registry defect, blocks, never picks). Identity matching is byte-exact by design — no normalization. `moves`/`roster` JSON is shape-validated; malformed input is refused by name (entry-indexed), never guessed at. |
 
 ## Options
 
@@ -208,7 +208,15 @@ Plainly stated:
 
 ## Security notes
 
+See **[SECURITY.md](SECURITY.md)** for the disclosure channel (private GitHub
+advisory), the full data-egress map, and the honestly-named limitations.
+Summary:
+
 - Consult/swarm send the artifact text to your configured model pool providers.
+- `sibyl_time_probe` fetches nothing before the URL passes the egress gate
+  (v1.5.0): reserved/internal address shapes, single-label hosts, non-http(s)
+  schemes, userinfo and non-default ports are refused by rule name; a blocked
+  source is a failed receipt, never consent.
 - The plugin writes under its state paths (the runs file and the per-run space) and,
   for chamber/exam lanes, sealed run directories under `lane.runRoot`
   (default `/tmp`), every plugin-created dir `0700` (mkdir mode + explicit chmod:
@@ -253,8 +261,10 @@ index.ts            plugin entry: parse options → share one RunStore + client
 ├── independence.ts W1 convener-recusal: engine-store chain walk +
 │                   drafting-evidence scan (INDEPENDENT / NOT-INDEPENDENT /
 │                   UNVERIFIABLE, fail-closed on unreadable)
-├── options.ts      zod v4 schema + parseOptions (never throws)
+├── options.ts      zod v4 schema + parseOptions (never throws); home of the
+│                   config-default single sources (DEFAULT_TIMEOUT_MS)
 ├── cli.ts          v1.1 sibyl-chamber bin: run | status | spotcheck | kill
+├── util.ts         v1.5.0 single definitions: withTimeout + errMessage
 └── tools/          sibyl_consult / sibyl_swarm / sibyl_status / sibyl_review
                     + audit primitives (anchor / time probe / attribution)
                     glue + shared helpers (model-slot chain, artifact reader)
@@ -272,7 +282,8 @@ PLAN→MINT→DISPATCH→AGGREGATE pipeline over ordinary child sessions.
 
 ```bash
 npm run typecheck   # tsc --noEmit, strict + noUncheckedIndexedAccess + exactOptionalPropertyTypes
-npm test            # full unit suite, fully offline (no network, no LLM; 459 at v1.4.0 — the run prints the exact count)
+npm test            # full unit suite, fully offline (no network, no LLM; 480 at v1.5.0 — the run prints the exact count)
+npm run coverage    # offline suite + coverage floor ratchet (lines 55 / branches 80 / funcs 90 — floors only move up; CI door)
 npm run build       # esbuild bundle → dist/index.js + dist/cli.js (ESM)
 node smoke/run-smoke.mjs   # offline smoke of the shipped surface (see smoke/README.md)
 ./ship.sh           # the full release gate: all of the above + portability scan of the packed tarball
@@ -304,4 +315,4 @@ MIT
 
 ## Release wheel
 
-Tags v* require a packet receipt (docs/release/<ver>.md with a real `gate: PASS` line) and a lease; after cloning run `scripts/install-hooks.sh` — hooks are per-clone and ship empty. **W4 (2026-10-05):** the hook reads the receipt AND `package.json`'s version exclusively from the pushed tag's **object body** (`git show <oid>:<path>`); working-tree reads are forbidden — the tag must carry its own paperwork, and the in-tag version must equal the tag name (ghost-version class killed). Regression-locked in `test/hook-prepush.test.ts` (ref lines fed via stdin).
+Tags v* require a packet receipt (docs/release/<ver>.md with a real `gate: PASS` line) and a lease; after cloning run `scripts/install-hooks.sh` — hooks are per-clone and ship empty. **W4 (2026-10-05):** the hook reads the receipt AND `package.json`'s version exclusively from the pushed tag's **object body** (`git show <oid>:<path>`); working-tree reads are forbidden — the tag must carry its own paperwork, and the in-tag version must equal the tag name (ghost-version class killed). **Tag-body hygiene (2026-10-24):** annotated-tag message bodies are scanned on push — home-path and email shapes refuse by rule name (the message is public release content; anchor facts by hash/run-id, not machine paths). Regression-locked in `test/hook-prepush.test.ts` (ref lines fed via stdin).

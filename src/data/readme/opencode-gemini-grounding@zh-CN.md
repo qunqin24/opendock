@@ -37,11 +37,11 @@
 - **🚀 原生适配 OpenCode V2 核心体系**：深度对接 V2 `id` + `setup(ctx)` 架构，同时覆盖 `ctx.tool`、`ctx.websearch`、`ctx.storage` 与 `context.progress`。
 - **🌐 双入口分流机制（WebSearch + Custom Tool）**：
   - **全局系统搜索引擎（`ctx.websearch`）**：自动注册并设为 OpenCode 全局默认的 `websearch` 提供商，日常对话任何模型联网自动透明接管；
-  - **自定义专业工具（`ctx.tool`）**：暴露 `google_grounding` 与 `websearch_cited`，并入驻 Code Mode 的 `search` 命名空间（`tools.search.google_grounding`），支持动态传参。
-- **🎯 智能防膨胀切片（全量卡片独立跳转）**：
+  - **自定义专业工具（`ctx.tool`）**：默认暴露 `google_grounding` 并入驻 Code Mode 的 `search` 命名空间（`tools.search.google_grounding`），支持动态传参（可通过 `enableLegacyAlias: true` 额外开启 `websearch_cited` 别名）。
+- **🎯 智能防膨胀分句切片（全量卡片独立跳转）**：
   - 检索到的每个来源均在 UI 中呈现为独立可点击卡片，点选任意一张均能跳转真实原文网页；
-  - 首张卡片携带完整无删减报告保证模型上下文完整；后续卡片自动匹配专属引用句摘要，**相较粗暴复制单次节省约 87.5% 重复 Token（省下 20,000+ 上下文）**。
-- **⚡ 原生持久化缓存（`ctx.storage`）**：依托 OpenCode Server 原生沙盒存储实现 TTL 缓存（默认 10 分钟），重复提问秒级瞬返，零额外延迟、零 Token 开销、彻底免疫 429。
+  - 首张卡片携带完整无删减报告保证模型上下文完整；后续卡片按**单句粒度**自动提取包含对应引用角标的核心句子，**相较粗暴复制单次节省约 87.5% 重复 Token（省下 20,000+ 上下文）**。
+- **⚡ 多维持久化缓存（`ctx.storage`）与并发合并（Singleflight）**：基于 `query + context + model + maxSources` 计算 SHA-256 缓存键（默认 10 分钟 TTL），同时自动合并同一时刻完全相同的并发请求，零额外延迟、零 Token 浪费、免疫 429。
 - **🔔 实时动态进度条（`context.progress`）**：在 TUI 终端与 Web 界面中动态显示“正在检索 Google...”、“已命中本地缓存”、“正在降级至下一模型...”等实时状态。
 - **⚙️ 现代化 `ctx.options` 配置**：支持在 `opencode.jsonc` 中直接为插件传入结构化 options，原生支持 `{env:VAR}` 自动插值。
 - **⚡ 故障自动容灾降级链**：内置多模型备选梯队，单模型请求超时宽松设定为 45 秒，总超时 180 秒（3 分钟）。遇到限流（HTTP 429）或网关波动时自动无感顺延；遇到鉴权无效（HTTP 401/403）等致命错误立即终止，绝不盲目轮询浪费时间。
@@ -127,7 +127,7 @@
 如果你正在开发、调试或为本项目贡献代码，可以通过以下本地方式加载：
 
 #### 全局插件重导出桥接
-在 OpenCode 全局插件目录新建 `~/.config/opencode/plugins/google-grounding.js`：
+在 OpenCode 全局插件目录新建 `~/.config/opencode/plugins/opencode-gemini-grounding.js`：
 ```javascript
 export { default } from "file:///D:/OpenCode/opencode-gemini-grounding/index.js";
 ```

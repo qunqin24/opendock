@@ -12,7 +12,7 @@ with `shell: ask` in your permissions you get no prompt window for them — ever
 OpenCode v2 drops request settings such as `temperature` for OpenAI-compatible providers, and has no per-agent
 reminder. agent-plus reads extra keys from the agent's `.md` file and applies them to every model request.
 
-Tested with OpenCode 2.0.28 and llama.cpp behind LiteLLM.
+Tested with OpenCode 2.2.0 and llama.cpp behind LiteLLM.
 
 ![agent-plus settings in the OpenCode sidebar](screenshot.png)
 

@@ -59,13 +59,15 @@ a chat-with-your-agent relay, it never injects text into your sessions.
 - ✍️ **Live feedback** — buttons are replaced with ✅/🚫 confirmations and a
   toast appears on tap; on next OpenCode restart older buttons answer politely
   with "outdated" instead of dying silently.
-- ❓ **Questions** (v2 `form.*`) answered in chat: single-select questions
-  arrive as tap buttons (answer via `session.form.reply` when available,
-  otherwise `question.reply`; skip via `question.reject`), other question types
-  stay notify-only with the terminal pointer, and pending questions survive
-  restarts (`question.list` recovery). When the host exposes no reply surface
-  (the OpenCode 2.1.x plugin context currently exposes none for forms —
-  tracked upstream in
+- ❓ **Questions** (v2 `form.*`) answered in chat: questions with one choice
+  field (2–5 options) arrive as tap buttons (answer via `session.form.reply`
+  when available, otherwise `question.reply`; skip via `session.form.cancel`
+  when available, otherwise `question.reject`). String fields send the selected
+  value and multiselect fields send a one-item array. Other question types stay
+  notify-only with the terminal pointer, and pending questions survive restarts
+  (`question.list` recovery). When the host exposes no reply surface (the
+  OpenCode 2.1.x plugin context currently exposes none for forms — tracked
+  upstream in
   [anomalyco/opencode#51108](https://github.com/anomalyco/opencode/issues/51108)),
   the message is notify-only with the terminal pointer instead of showing dead
   buttons.
@@ -269,8 +271,7 @@ Deliberately not scheduled; revisit when they earn their complexity:
 - menu-style settings keyboard (runtime config writes are outside the
   current plugin surface);
 - reply-to-message → in-session notes (extra control channel);
-- multi-field question wizards (open, keep notify-only for now);
-- use `session.form.cancel` as the skip surface when a host exposes it.
+- multi-field question wizards (open, keep notify-only for now).
 
 ## Development
 

@@ -72,9 +72,10 @@ Releases from v1.3.0 on carry a `bioresearcher-connector_workbuddy-v*.tar.gz`
 bundle for market submission.
 
 **OpenCode (plugin / connector):** the same server + skills + subagent ship as an
-OpenCode plugin — see [docs/connector-opencode.md](./docs/connector-opencode.md).
-Published to npm as `opencode-bioresearcher` (`"plugin": ["opencode-bioresearcher"]`
-in `opencode.json` or `opencode plugin opencode-bioresearcher`). Releases also carry
+OpenCode plugin (opencode v2 only, >= 2.0.29) — see
+[docs/connector-opencode.md](./docs/connector-opencode.md).
+Published to npm as `opencode-bioresearcher` (`"plugins": ["opencode-bioresearcher"]`
+in `opencode.json`; the biomcp MCP server is config-driven). Releases also carry
 a `bioresearcher-connector_opencode-v*.tar.gz` bundle for local or offline installation.
 
 **DeepSeek Harness (plugin / connector):** the same server + skills + subagent ship as a
@@ -107,8 +108,8 @@ changes (notes extracted from `CHANGELOG.md`).
 ### Empirical agent tests
 
 `agent-test/` holds a unified, **manually-run** test suite that drives the
-real opencode CLI against these skills and a live keyless biomcp-ts MCP
-server (costs LLM tokens; never run in CI):
+real opencode v2 CLI (>= 2.0.29) against these skills and a live keyless
+biomcp-ts MCP server (costs LLM tokens; never run in CI):
 
 ```bash
 node agent-test/run.mjs --list

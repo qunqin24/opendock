@@ -293,14 +293,17 @@ SonarQube quality gate in CI on every push.
 
 ## CI/CD
 
-GitHub Actions builds and tests on every push, runs the SonarQube quality gate,
-and publishes to npm on version tags once the gate passes.
+GitHub Actions builds and tests on every push, runs the SonarQube quality gate
+when it is enabled, and publishes to npm on version tags.
 
 ```
-Build & Test  ──▶  SonarQube Quality Gate  ──▶  Publish to npm (tags only)
+Build & Test  ──▶  SonarQube Quality Gate (optional)  ──▶  Publish to npm (tags only)
 ```
 
-Required repository secrets: `NPM_TOKEN`, `SONAR_TOKEN`, `SONAR_HOST_URL`.
+Required repository secret: `NPM_TOKEN`. The quality gate needs an external
+SonarQube server: set the repository variable `SONARQUBE_GATE=true` and the
+secrets `SONAR_TOKEN` and `SONAR_HOST_URL`. With the gate enabled, a tag is only
+published after the gate passes; without it, the gate job shows as skipped.
 
 ## Documentation
 

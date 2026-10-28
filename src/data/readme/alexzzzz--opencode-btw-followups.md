@@ -57,6 +57,9 @@ thread through the terminal clipboard.
 While a side question is being answered, the `btw` badge in the prompt row opens the
 window for it.
 
+The header of the window holds a marker that opens a list of prepared prompts, and a click on
+one of them asks it.
+
 A thread belongs to the session it was asked in, and it lives in memory as long as the
 process runs.
 

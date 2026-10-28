@@ -46,7 +46,7 @@ Attachment extraction is pure JS (no native modules); CI runs on Linux, Windows 
 
 ## Features
 
-- 13 `mail_*` tools: accounts, folders, list, search, get, read-attachment, delete/empty-deleted, sync, draft, send, calendar, contacts.
+- 14 `mail_*` tools: accounts, folders, list, search, get, read-attachment, save-attachment, delete/empty-deleted, sync, draft, send, calendar, contacts.
 - Multiple mailboxes in one process with per-account credentials and SQLite.
 - Storage modes `off` / `metadata` / `full`; local SQLite index in `metadata`/`full`, `off` = EWS-only.
 - EWS/NTLM with explicit XML escaping, recipient validation and attachment limits.
@@ -205,7 +205,7 @@ Top-level options are inherited by `accounts[]`; per-account values win, except 
 | `mail_empty_deleted` | permanently delete top-level items in Deleted Items (subfolders remain); requires `confirm: true` |
 | `mail_sync` | incremental `SyncFolderItems`; `{synced, complete}` |
 | `mail_draft` | create a draft |
-| `mail_send` | send; `{sent: true}` (EWS `Send` returns no id) |
+| `mail_send` | send; a copy is kept in Sent Items by default (`SendAndSaveCopy`), `saveCopy: false` disables it; `{sent: true}` (EWS returns no id) |
 | `mail_calendar` | events in a range |
 | `mail_contacts` | contacts; `query` scans up to 500 contacts page by page |
 
@@ -315,8 +315,10 @@ A failed tool is a successful `Result` with `content: "ERROR: ..."` and `metadat
 `completed`, not a crashed call. Stack traces are not returned. SOAP errors keep `Message`/`ErrorCode`;
 timeout, TLS and cancellation are mapped to actionable text.
 
-`mail_send` is not idempotent: a timeout or cancellation after `Send()` leaves delivery unknown; retrying may
-duplicate the message. Prefer `mail_draft` + explicit confirmation.
+`mail_send` is not idempotent: a timeout or cancellation after `Send()`/`SendAndSaveCopy()` leaves delivery unknown;
+retrying may duplicate the message. A copy is saved in Sent Items by default and only when the send succeeds; pass
+`saveCopy: false` to send without it. Prefer
+`mail_draft` + explicit confirmation.
 
 ### Sync
 

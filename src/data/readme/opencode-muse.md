@@ -123,7 +123,9 @@ the billed lane with `muse usage`. See
 - Answer Muse's permission prompts conversationally: Muse's exact options are
   shown as a lettered list and your next message picks one (fuzzy match on
   letter, number, or name). Anything unrecognized is asked once more, then
-  denied — ambiguity never approves. Queued prompts are answered
+  denied — ambiguity never approves — and your message still runs as a
+  fresh turn instead of being eaten, so a re-asking model can never trap
+  the conversation. Queued prompts are answered
   first-in-first-out with an echo of what was granted. See
   [#30](https://github.com/pgquiles/opencode-muse/issues/30).
 - Answer Muse's structured option-questions conversationally: the oldest

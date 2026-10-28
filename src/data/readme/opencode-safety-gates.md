@@ -79,7 +79,7 @@ grep "opencode-safety-gates" ~/.local/share/opencode/log/opencode.log | tail -2
 You want:
 
 ```
-[opencode-safety-gates v1.0.0] bash gate active: 2 script(s) [settings: ..., example: ...]
+[opencode-safety-gates v1.0.1] bash gate active: 2 script(s) [settings: ..., example: ...]
 ```
 
 A `WARN: no gate scripts active — bash gate is INERT` line means the bash
@@ -155,6 +155,13 @@ corrective prompt per session telling the model to verify before restating.
   gate is a single stdlib-only python script.
 - **Fail-open by design** — see "Writing your own gate script". The
   corollary is the health line: check it after every install.
+- **Not a complete security boundary** — this plugin is a safety net, not
+  a sandbox. It fails open by design, only inspects tool calls that carry
+  a command string, and matches command text with patterns — a novel
+  phrasing can always slip past a pattern. It lowers the odds of two
+  known failure modes; it does not eliminate them, and it is no substitute
+  for human review, least-privilege access, and real recoverability
+  (snapshots, out-of-band console access).
 - The bash gate inspects only tool calls that carry a command string.
 
 ## Compatibility & maintenance

@@ -19,10 +19,10 @@ evidence-backed result, not more agents for their own sake.
 [![Node.js](https://img.shields.io/node/v/sortie-dogs)](https://www.npmjs.com/package/sortie-dogs)
 [![MIT License](https://img.shields.io/npm/l/sortie-dogs)](LICENSE)
 
-**Current release: [v0.14.5](https://github.com/zufall-upon/Sortie-dogs/releases/tag/v0.14.5)**
-· [Release notes](docs/release-v0.14.5.md) · [Execution vision](docs/v0.14.0-execution-vision.md)
+**Current release: [v0.14.9](https://github.com/zufall-upon/Sortie-dogs/releases/tag/v0.14.9)**
+· [Release notes](docs/release-v0.14.9.md) · [Execution vision](docs/v0.14.0-execution-vision.md)
 
-[Quick start](#quick-start) · [Workflow](#mission-workflow) · [Models](#default-models) ·
+[When to use](#when-to-use-sortie-dogs) · [Quick start](#quick-start) · [Workflow](#mission-workflow) · [Models](#default-models) ·
 [Measured results](#measured-results) · [Configuration](#configuration) · [Documentation](#documentation)
 
 > **Beta:** the package is still stabilizing before 1.0. Both host integrations are
@@ -46,6 +46,26 @@ evidence-backed result, not more agents for their own sake.
 - **Coexistence:** explicit invocation, existing authentication and host settings, one shared
   Mission lifecycle. Normal OpenCode/Codex use and user-owned files remain yours.
 
+## When to use Sortie-dogs
+
+Use Sortie with an existing **OpenCode V2 or Codex CLI** when a bounded coding task needs:
+
+- The original goal and constraints retained across investigation, multi-file implementation,
+  validation, review and correction.
+- Either a direct author or delegated work, with edits, valid checks and cumulative budget retained
+  when the author changes.
+- A handoff that distinguishes actual commands, test results, unresolved issues and acceptance
+  from a model's completion claim.
+
+For example, request a bug fix with a regression test, preservation of unrelated local work, and
+delivery as a reviewed PR. Define the required checks and delivery boundary in the request.
+
+**Use the host directly** for ordinary questions or small edits that do not need this lifecycle.
+Sortie is not a replacement for either host, a way to bypass native permissions, or a guarantee of
+unattended completion, lower cost or better benchmark scores. Budget, model access and environment
+requirements still matter. See [host setup](#quick-start) and [evidence and limitations](#measured-results)
+before choosing it.
+
 ## Quick start
 
 Choose **one host route**. Both require Node.js **22.6+** and npm; project-local installation is
@@ -57,7 +77,7 @@ Use an existing Codex CLI signed in with **ChatGPT**. On Windows, PowerShell **7
 available; POSIX uses bash. Sortie does not install Codex, start login or use a metered API fallback.
 
 ```sh
-npm install --save-dev sortie-dogs@0.14.5
+npm install --save-dev sortie-dogs@0.14.9
 npx --no-install sortie-dogs codex init .
 ```
 
@@ -86,7 +106,7 @@ bridge. [Codex guide: SDK, permissions, progress, resume and manifest route](doc
 Use **OpenCode V2**. In the target project:
 
 ```sh
-npm install --save-dev sortie-dogs@0.14.5
+npm install --save-dev sortie-dogs@0.14.9
 npx --no-install sortie-dogs init .
 ```
 
@@ -144,9 +164,12 @@ one. Required success checks, missing commands and active/unstarted operations s
 ## Default models
 
 - **Operator / Coordinator / Reviewer / Advisor:** GPT-6.1 Sol, `xhigh`.
-- **Worker / Scout:** Luna Fast, `max`.
-- **OpenCode:** `openai/gpt-6.1-sol#xhigh` and `openai/gpt-6-luna-fast#max`.
-- **Codex:** native `gpt-6.1-sol` / `xhigh`; the Luna-fast alias maps to native
+- **Worker:** GPT-6.1 Terra Standard, `max` (no Fast/priority).
+- **Scout / dedicated Luna Worker:** Luna Fast, `max`, unchanged.
+- **OpenCode:** ordinary Worker `openai/gpt-6.1-terra#max`; management/review
+  `openai/gpt-6.1-sol#xhigh`.
+- **Codex:** ordinary Worker native `gpt-6.1-terra` / `max`, Standard; management/review
+  `gpt-6.1-sol` / `xhigh`. The retained Luna-fast alias maps to native
   `gpt-6-luna` / `max` with separate `serviceTier: "priority"` (Fast).
 
 Explicit host model selections remain authoritative. OpenCode routing and Codex native settings
@@ -155,6 +178,12 @@ subscription limits faster than Standard. Subscription USD cost and remaining al
 inferred from token totals.
 
 ## Measured results
+
+**Evidence and limitations:** these are recorded runs with fixed packages, models, tasks and
+execution conditions, not a general performance guarantee or a controlled comparison with the
+native hosts or other harnesses. Historical results do not measure the current release or its
+current default Worker. Mission acceptance, official task scoring and leaderboard acceptance are
+different outcomes; the records below keep them separate.
 
 ### Codex end-to-end completion
 
@@ -242,8 +271,8 @@ Install the desired package version and rerun **your host's** initializer:
 
 An OpenCode config-local bridge may resolve a separate package; npm-global update alone does not
 update it. [Global/update instructions](docs/configuration.md#global-availability).
-The current Mission asset marker is `0.14.5-unborn-proof-v1`; the unchanged Codex skill marker is
-`0.13.11-codex-skill-v2`. Installed markers alone do not prove a running host reloaded the new version.
+The current Mission asset marker is `0.14.9-optional-kofi-v1`; the Codex skill marker is
+`0.14.6-codex-skill-v1`. Installed markers alone do not prove a running host reloaded the new version.
 
 There is no supported uninstall command. Remove the dependency and only known Sortie-owned paths;
 follow the [manual removal guide](docs/uninstall.md), never delete the entire `.opencode` directory.
@@ -258,8 +287,19 @@ follow the [manual removal guide](docs/uninstall.md), never delete the entire `.
   [SWE-bench history](docs/benchmarks/swebench-lite-history.md) · [Historical local case study](docs/benchmark-reference.md).
 - **Development:** [Testing](docs/testing.md) · [CLI testing](docs/cli-testing.md) ·
   [Windows tests](docs/windows-tests.md) · [Release routine](docs/release-batch.md).
-- **Releases:** [v0.14.5](docs/release-v0.14.5.md) · [v0.14.4](docs/release-v0.14.4.md) · [v0.14.3](docs/release-v0.14.3.md) · [v0.14.2](docs/release-v0.14.2.md) · [v0.14.1](docs/release-v0.14.1.md) · [v0.14.0](docs/release-v0.14.0.md) · [v0.13.22](docs/release-v0.13.22.md) · [v0.13.21](docs/release-v0.13.21.md) · [v0.13.20](docs/release-v0.13.20.md) · [v0.13.19](docs/release-v0.13.19.md) · [v0.13.18](docs/release-v0.13.18.md) · [v0.13.17](docs/release-v0.13.17.md) · [v0.13.16](docs/release-v0.13.16.md) · [v0.13.15](docs/release-v0.13.15.md) · [v0.13.14](docs/release-v0.13.14.md) · [v0.13.13](docs/release-v0.13.13.md) · [v0.13.12](docs/release-v0.13.12.md) · [v0.13.11](docs/release-v0.13.11.md) · [v0.13.10](docs/release-v0.13.10.md) ·
+- **Releases:** [v0.14.9](docs/release-v0.14.9.md) · [v0.14.8](docs/release-v0.14.8.md) · [v0.14.7](docs/release-v0.14.7.md) · [v0.14.6](docs/release-v0.14.6.md) · [v0.14.5](docs/release-v0.14.5.md) · [v0.14.4](docs/release-v0.14.4.md) · [v0.14.3](docs/release-v0.14.3.md) · [v0.14.2](docs/release-v0.14.2.md) · [v0.14.1](docs/release-v0.14.1.md) · [v0.14.0](docs/release-v0.14.0.md) · [v0.13.22](docs/release-v0.13.22.md) · [v0.13.21](docs/release-v0.13.21.md) · [v0.13.20](docs/release-v0.13.20.md) · [v0.13.19](docs/release-v0.13.19.md) · [v0.13.18](docs/release-v0.13.18.md) · [v0.13.17](docs/release-v0.13.17.md) · [v0.13.16](docs/release-v0.13.16.md) · [v0.13.15](docs/release-v0.13.15.md) · [v0.13.14](docs/release-v0.13.14.md) · [v0.13.13](docs/release-v0.13.13.md) · [v0.13.12](docs/release-v0.13.12.md) · [v0.13.11](docs/release-v0.13.11.md) · [v0.13.10](docs/release-v0.13.10.md) ·
   [v0.13.9](docs/release-v0.13.9.md) · [All GitHub releases](https://github.com/zufall-upon/Sortie-dogs/releases).
+
+## Support
+
+[GitHub Sponsors](https://github.com/sponsors/zufall-upon) — sponsorships become available
+once the maintainer's Sponsors profile is approved and published.
+
+[☕ Support development / 開発を応援する](https://ko-fi.com/zufallupon)
+
+If you find this project useful, you can buy me a coffee. Support is entirely optional.
+
+このプロジェクトが役に立ったら、開発を応援できます。支援は完全に任意です。
 
 ## Community
 

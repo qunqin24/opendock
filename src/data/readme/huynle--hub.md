@@ -245,6 +245,32 @@ conversation mode and utterances (403 `not_exposed` for sessions not shared with
 
 ## Agent identity (agent API)
 
+**Organization.** `PUT /api/agent/sessions/:addr/archive {archived: true|false}` archives or unarchives one
+session in Hub views without deleting it in its harness. Users always may; app tokens need `sessions:manage`.
+The operation is idempotent, returns `{sessionID, archived, changed}`, and preserves unrelated view preferences.
+MCP exposes the same operations as `archive` and `unarchive`. Naming (`POST /api/agent/name`) also takes an app
+token with `sessions:manage`; role claims and releases take one with `sessions:manage` **and** a grant allowing
+`roles` whose projects cover the session's directory (the session must be online), under the kill switch and hourly
+cap, with every outcome in the agent audit (verbs `roles` and `roles.release`). Reserved roles stay yours to assign.
+Apps and users name the session (`session`); foreign and unknown sessions are both `404 not_found`. MCP: `name`,
+`role_claim` and `role_release`. Each change is one `session.named`, `role.claimed` or `role.released` event.
+
+**Events.** `GET /api/agent/events?cursor=&wait=&limit=&type=&session=` reads a bounded per-user journal (24 h or
+10,000 events) of compact events: `session.added/removed/changed`, `blocker.opened/closed`, `machine.changed`,
+`message.changed`, `launch.changed`, `session.archived`, `session.named`, `role.claimed`, `role.released`. Each is `{id, at, type, subject, data}` with IDs and states
+only: never prompts, message bodies, titles, blocker summaries, launch reasons or labels. Without a cursor the answer
+is empty with a cursor at the latest event; pass the returned `cursor` back to get what came after. `wait` (0–60 s)
+holds the request while nothing matches; `limit` is 1–200 (default 50); `type` (exact, or `launch.*`) and `session`
+may repeat and still advance the cursor over what they skip. At most 1,000 events are inspected per request; `more`
+means some remain. A cursor the journal no longer covers (expired, trimmed, hub restarted) answers
+`{events: [], cursor, more: false, reset: true, refresh: ["status", "sessions", "inbox", "decisions", "launches"]}`:
+re-read those, then continue with the new cursor. `GET /api/agent/watch` streams the same events live over SSE
+(`{type: "ready"}` first, `{type: "reset", refresh}` when its cursor is no longer covered, `event: ping` while
+idle), with the same visibility and filters (`blocked=1` is `type=blocker.*`). A malformed, forged or another user's cursor is
+`400 invalid_cursor`. Unknown event types are valid; ignore them. App tokens need `events:subscribe`, and see each
+family only with its scope: session and machine events with `sessions:read`, archive, name and role events with `sessions:manage`,
+messages they are a party to with `messages:read`, launches they started with `sessions:launch`. MCP: `events`.
+
 Agents, scripts and apps talk to the hub through `/api/agent/*`, a small API with its own credentials, separate
 from the console's routes. Every request resolves to exactly one **actor**:
 
@@ -252,7 +278,7 @@ from the console's routes. Every request resolves to exactly one **actor**:
 |---|---|---|
 | user | the device cookie (browsers) or the same secret as `Authorization: Bearer <device token>` (apps, CLIs; [linked with a code](#multi-user-sign-in-with-google)) | you, on one of your devices |
 | session | a **session token** `hst1.…` the hub mints for each session a spoke reports | that session's shells (`HUB_SESSION_TOKEN`) |
-| app | an **app token** `hat_…` you create (scopes `sessions:read`, `messages:send`, `messages:read`, `sessions:act`) | a script or tool outside a session (`hub login`) |
+| app | an **app token** `hat_…` you create (scopes `sessions:read`, `sessions:manage`, `messages:send`, `messages:read`, `sessions:act`, `sessions:launch`, `events:subscribe`) | a script or tool outside a session (`hub login`) |
 
 **Session tokens in shells.** The hub mints a 24 h token for every session (subagents included) its spokes report
 for you and pushes it to the spoke, which keeps it in memory only. Every shell an agent starts through OpenCode's
@@ -297,10 +323,11 @@ cookie and a hub bearer token (400).
 | `GET /api/agent/sessions?project=&state=&machine=&label=k=v` | ✓ | ✓ | ✓ | the same sessions as a flat list |
 | `GET /api/agent/sessions/:addr` | ✓ | ✓ | ✓ | one session with full blockers and the spoke's summary (`unsupported` when its harness lacks it) |
 | `GET /api/agent/sessions/:addr/log?n=20` | ✓ | ✓ | ✓ | newest timeline rows (1–200); `422 unsupported {feature, harness}` when the spoke has no timeline, `503 offline` |
-| `GET /api/agent/watch?blocked=1&session=<addr>` | ✓ | ✓ | ✓ | SSE of compact events (`ready`, `state`, `blocker.opened/closed`, `session.added/removed`, `message`; no text) |
+| `GET /api/agent/watch?blocked=1&session=<addr>&cursor=` | ✓ | ✓ | ✓ (+ each family's scope) | SSE of the same compact events as `/api/agent/events` (see **Events**), after `ready`; each frame's `id:` is a cursor to resume with (`?cursor=` or `Last-Event-ID`); `reset` when it is no longer covered |
+| `GET /api/agent/events?cursor=&wait=&limit=&type=&session=` | ✓ | ✓ | `events:subscribe` (+ each family's scope) | compact events after a resumable cursor (see **Events** above) |
 | `GET /api/agent/who?project=&role=` | ✓ | ✓ | ✓ | named, role-holding and online sessions |
-| `POST /api/agent/name {name, session?}` | ✓ | own session | – | names a session (`409 name_taken`) |
-| `POST /api/agent/roles/claim {role, exclusive?, project?, session?}` · `…/roles/release` | ✓ | own session | – | claims (with a new `generation`) or releases a role |
+| `POST /api/agent/name {name, session?}` | ✓ | own session | `sessions:manage` | names a session (`409 name_taken`) |
+| `POST /api/agent/roles/claim {role, exclusive?, project?, session?}` · `…/roles/release` | ✓ | own session | `sessions:manage` + `roles` grant | claims (with a new `generation`) or releases a role; never a reserved role for an app |
 | `POST /api/agent/msg {to, text, wake?, urgent?, all?}` | ✓ | ✓ | `messages:send` | tells a session (`all`: every holder of a role); never yourself |
 | `POST /api/agent/ask {to, text, expiresIn?, wait?}` | ✓ | ✓ | `messages:send` | an ask, open until answered, declined or expired; `wait` (≤ 60 s) returns the `answer` |
 | `POST /api/agent/ask {to: "@me", text, options?, recommendation?, urgency?, tier?, deadline?, onTimeout?, about?, wait?}` | – | ✓ | `messages:send` | opens a **Decision** for the user (below): `{message, decision, answer?}` |
@@ -450,7 +477,7 @@ where the call is visible and audited.
   reserved roles), or `app:<token id>` (one of your app tokens).
 - **scope.projects**: 1–20 absolute project directories; a session is in scope when its directory is one of them or
   inside one (on a path boundary, after resolving `.`/`..`; worktrees inside the project count).
-- **allow**: the verbs (`approve`, `deny`, `answer`, `prompt`, `stop`; `roles` is accepted for role management).
+- **allow**: the verbs (`approve`, `deny`, `answer`, `prompt`, `stop`; `roles` lets an app token with `sessions:manage` claim and release roles of sessions in scope).
   `deny`, `answer`, `prompt` and `stop` need only the verb; `approve` also needs the request to pass the patterns.
 - **permissions**: patterns `action[:glob]` in OpenCode's wildcard syntax (`*` any run, `?` one character, a trailing
   ` *` optional; `bash` is OpenCode's `shell`; the action alone means every resource). A request is allowed only
@@ -744,7 +771,11 @@ OpenCode (Claude Desktop, Cursor, other agents). It speaks JSON-RPC 2.0, one mes
 transport; protocol revisions `2025-06-18`, `2025-03-26` and `2024-11-05`), and answers `initialize`, `ping`,
 `tools/list` and `tools/call`; notifications (`notifications/initialized`, `notifications/cancelled`, which aborts
 the call) get no answer, other methods answer `-32601`. Its tools are the CLI's verbs: `whoami`, `status`,
-`sessions`, `show`, `log`, `who`, `msg`, `ask`, `reply`, `decline`, `inbox` and the act verbs `approve`, `deny`,
+`sessions`, `show`, `log`, `who`, `msg`, `ask`, `reply`, `decline`, `inbox`, `message_show` (`id`, `wait`),
+`mute` and `unmute` (`addr`; agent-message mutes, not console notifications), `decisions` (`state`) and
+`decision_show` (`id`) (reading the Decisions you asked; no tool answers one, only the user does), and
+`webhook_create` (`url`, `events`, `label`), `webhooks`, `webhook_show` (`id`) and `webhook_delete` (`id`). Webhooks
+carry the same canonical compact events as `events`; their signing secret appears only in `webhook_create`. The act verbs are `approve`, `deny`,
 `answer` (`answer` object or `cancel`), `prompt` (`delivery`) and `stop`, and the launch tools `launch` (`repo`
 required and absolute; `mode`, `branch`, `base`, `remote`, `key`, `name`, `roles`, `harness`, `agent`, `model`,
 `runtime`, `profile`, `machine`, `nodeLabels` and `labels` objects, `prefer`, `prompt`, `end`, `timeout`,
@@ -752,7 +783,8 @@ required and absolute; `mode`, `branch`, `base`, `remote`, `key`, `name`, `roles
 (`to`, `text`, `addr`, `id`, `requestID`, `formID`, `why`, `n`, `wake`, `urgent`, `all`, `project`, `role`, …). The act
 tools need an app token with scope `sessions:act` and a grant, the launch tools scope `sessions:launch` and a
 launch grant; `needs_user` results include the evaluation. `ask` takes `wait` of at
-most 60 s (one long poll; a longer wait is cut to 60) and `expires` in seconds or as `2h`. Answers are the CLI's
+most 60 s (one long poll; a longer wait is cut to 60) and `expires` in seconds or as `2h`; `ask @me` reports the
+Decision it opened. Answers are the CLI's
 short text; messages and answers from other sessions come in the hub's envelope and are marked as not from the
 user. Hub errors are tool results with `isError: true` and the hub's `code: message` (plus candidates and hint),
 never protocol errors. Only protocol frames go to stdout; the server ends when stdin closes (after answering the
@@ -768,7 +800,7 @@ calls in flight) or on SIGINT/SIGTERM.
 set, else the `hub login` file. MCP clients start servers without a hub session's shell environment, so in practice
 it acts as the **app token** you logged in with (needs `sessions:read`, `messages:send` and `messages:read`), not
 as an OpenCode session: messages are sent from the app, and replies to them land in its inbox (the `inbox` tool),
-not in a session. Naming and roles stay out (app tokens cannot use them). Inside OpenCode, agents use the plugin's
+not in a session. App tokens can archive, unarchive and name sessions with `sessions:manage`, and claim or release roles with it plus a `roles` grant. Inside OpenCode, agents use the plugin's
 `hub` tool instead, which acts as the calling session.
 
 #### Over HTTP (/mcp)
@@ -782,7 +814,7 @@ none), a body of at most 1 MiB (else `413`) and, when sent, a supported `MCP-Pro
 browser `Origin` other than the hub's own is refused (`403`); requests without one (servers, gateways) are fine.
 
 **Auth.** `Authorization: Bearer <token>`: any credential the agent API takes, in practice an **app token**
-(Settings → Agents, or `POST /api/agent/app-tokens`) with the scopes the tools need: `sessions:read` (reading),
+(Settings → Agents, or `POST /api/agent/app-tokens`) with the scopes the tools need: `sessions:read` (reading), `sessions:manage` (archive/unarchive, name; roles also need a `roles` grant), `events:subscribe` (events),
 `messages:send` and `messages:read` (messaging), `sessions:act` plus a grant (act tools), `sessions:launch` plus a
 launch grant (launch tools). Device, session and act tokens work too. No or a bad token answers `401` with
 `WWW-Authenticate: Bearer realm="hub"` (no OAuth discovery). The tools call `/api/agent` as that token, inside the

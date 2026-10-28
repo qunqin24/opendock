@@ -69,6 +69,21 @@ Manual configuration, preserving other entries:
 }
 ```
 
+## Antigravity (AGY) support
+
+`opencode-annotate` provides companion support for Google Antigravity CLI (`agy`) via `agy-annotate`:
+
+- **Slash commands `/annotate` & `/annotate-web`**: Built-in AGY skill at `agy/skills/annotate/` handles review directly within active AGY sessions.
+- **Interactive TUI**: Resolves the OpenCode-adapted Plannotator fork with Dracula theme inheritance, 120-column measure layout, and one-key send.
+- **Native Delivery**: Hooks into AGY lifecycle (`SessionStart`, `PreInvocation`, `Stop`) to deliver feedback directly into the conversation turn without network listeners.
+- **CLI Commands**:
+  ```sh
+  npx agy-annotate status     # View active AGY sessions and annotation pairing
+  npx agy-annotate tui        # Review latest assistant reply or markdown file
+  npx agy-annotate web        # Pair browser companion with active AGY session
+  npx agy-annotate queue      # Inspect pending delivered annotations
+  ```
+
 ### Match OpenCode's colors (fork required)
 
 Set `"inheritTheme": true` in the plugin's `options`, alongside `binary`. It requires
@@ -195,12 +210,24 @@ delivery path is **q → confirm** and does not need clipboard access.
 With the [fork](#match-opencodes-colors-fork-required) (branch `local/opencode`; proposed
 upstream in [plannotator/plannotator-tui#109](https://github.com/plannotator/plannotator-tui/pull/109)),
 **`q`** with notes returns and submits them without the OpenCode dialog. **`Ctrl+S`**
-does the same mid-comment, saving the comment first, and also works while a Chinese
-input method is active. The header's **Send N back (q)** button does the same.
+does the same mid-comment, saving the comment first. The header's **Send N back (q)**
+button does the same as `q`.
 **`Ctrl+C`** returns without sending, and OpenCode asks whether to send. `E` and `S` send as well,
 following any `[keys]` rebinding, and the clipboard copy and Review menu (resend, finish, archive) are hidden
 because OpenCode owns delivery. Upstream binaries ignore the handoff and keep
 **q → confirm**.
+
+### Chinese and other input methods
+
+An input method holds plain letters while it composes, so review keys such as `e`, `q`
+and `s`, and OpenCode's permission shortcuts, do nothing. With
+[Slash Saver](https://github.com/nxxxsooo/slash-saver) 1.1+ installed in `/Applications`,
+the plugin selects its configured ASCII source while you browse a review or answer a
+permission prompt, and restores your source afterwards. With the fork, the comment and edit
+boxes switch back to your writing source while open. Set `"inputSource": false` in the
+plugin's `options` to turn this off, or a path to another helper with the same
+`input-source current|select|ascii` commands. The fork also binds **`Ctrl+E`** to edit,
+which an input method passes through.
 
 Opening a review makes no model call. Confirming sends a normal user prompt and
 resumes the **original session**, even if the active tab changes. Empty and

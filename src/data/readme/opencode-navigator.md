@@ -42,10 +42,12 @@ Todo starts expanded. Subagents, skills, quick actions, LSP, and MCP start
 collapsed. Use `Save current layout as default` in sidebar settings to reuse the
 current visible/hidden, expanded/collapsed, and ordering states in new sessions.
 
-Supports OpenCode 1.18.30 and newer, including OpenCode 2.x. The compatibility
-matrix covers 1.18.30, 1.19.3, 2.0.21, and 2.1.0 with separate real-host checks.
-The 2.1 integration adapts its plugin API and native renderer while retaining
-the 1.x adapter. On OpenCode 2, Navigator reads the same native Todo history as
+**Only the latest stable release in each major line is supported: OpenCode
+1.19.5 and 2.2.0.** Both have separate real-host checks. Older releases are not
+part of the supported compatibility matrix. The 2.2 integration uses OpenTUI 0.7
+and public host caches, events, keymap layers, and client APIs while retaining
+the separate 1.x adapter. See [Host API boundaries](HOST_API.md) for remaining
+capability gaps and removal conditions. On OpenCode 2, Navigator reads the same native Todo history as
 the host sidebar, including completed `todowrite` calls and the current revert
 boundary. Viewing Todo needs no Navigator server plugin. OpenCode 2.1 exposes
 content and four statuses, without priorities or direct Todo CRUD. LSP is hidden on 2.x while retaining Subagents,
@@ -149,7 +151,7 @@ the uninstalled-font result remains visible rather than being documented only in
 
 ![Nerd Font without Navigator corner font](https://raw.githubusercontent.com/St1ggy/opencode-navigator/main/screenshots/35-no-corner-font-layout-preview.png)
 
-The [complete 47-state screenshot gallery](screenshots/README.md) shows every
+The [complete screenshot gallery](screenshots/README.md) shows every
 Todo and Subagent filter, sidebar section, Search and Settings tab, preset menu
 and preview, confirmation, keyboard-help, setup, and icon-fallback state.
 
@@ -436,7 +438,7 @@ account usage. Separate model-specific buckets require explicit model associatio
 Switching provider, model, session, or account invalidates stale reads and credit actions.
 In OpenCode 2.x, Limits follows the prompt's selected model immediately, before a
 message is sent, through the public reactive `ui.model.current()` API. OpenCode
-1.x, rechecked at 1.19.3, exposes only the saved session model: a newly selected prompt
+1.x, rechecked at 1.19.5, exposes only the saved session model: a newly selected prompt
 model becomes visible to Navigator when the host saves it, normally on submission.
 An immediate pre-submission switch in 1.x needs a new public host accessor or event.
 CodexBar is useful for discovering providers, but its cookie, credential-file,
@@ -444,6 +446,7 @@ and undocumented endpoint integrations are not Navigator data sources.
 
 | Source | Native measurement | Banked reset credits |
 | --- | --- | --- |
+| OpenCode Console / Go | Public host usage API: applicable workspace budgets in USD and Go allowance percentages with reset times | Read-only |
 | Codex app-server | Rate-limit windows and account ID | Available count, optional details and expiry, confirmed manual consumption |
 | MiniMax and NanoGPT | Explicit model-associated subscription windows; separate pay-as-you-go balances | Read-only |
 | GitHub Copilot | Official SDK token-scoped premium allowance, checked against the selected model's billing metadata | Read-only |
@@ -453,10 +456,17 @@ and undocumented endpoint integrations are not Navigator data sources.
 | OpenCode session statistics | Token and cost statistics, not subscription quota | Not applicable |
 | Other providers | Capability guidance until a documented source and model/account mapping are verified | No action without a documented consume API |
 
-The additional native sources use the **OpenCode 2 Navigator server plugin** already
-used for Todo. Configure it on the 2.x launch path as described in the installation
-section. OpenCode 1.x retains Codex support; additional sources need the 2.x public
-integration/HTTP APIs. Without the server plugin, Limits shows setup guidance.
+OpenCode Console and Go use OpenCode 2.2's **public usage API directly**, without
+the Navigator server plugin or credential reads. Workspace identity stays separate
+from provider account identity. Shared and per-model budgets retain their native
+scope; free models and unrelated model budgets are excluded. Missing data does
+not mean zero spend or an unlimited allowance. Authentication and request failures
+stay on the native source with explicit guidance or Retry.
+
+Other additional sources use the **OpenCode 2 Navigator server plugin** and its
+public integration/HTTP APIs. Configure it on the 2.x launch path as described in
+the installation section. Native Todo remains independent. OpenCode 1.x retains
+Codex support; sources requiring the 2.x server show setup guidance when it is absent.
 The [source inventory](PROVIDERS.md) includes audited public API references,
 permission requirements, and unsupported-source reasons.
 
@@ -466,6 +476,12 @@ use real model requests without issuing extra inference calls or consuming their
 response bodies. HTTP-only observations may be absent on WebSocket transports.
 REST reads use a short in-memory cache; Refresh bypasses it. Observed headers older
 than two minutes are marked stale instead of presented as current remaining quota.
+
+Navigator shares the host's Solid/OpenTUI runtime. Development and CI use Bun 1.4.4
+and Node 26.12.1; OpenTUI 0.7's supported Node path starts at 26.4.0. A confirmed
+pinned-snapshot update verifies its target with supported Bun (at least 1.3.14)
+or Node before switching the wrapper. If neither is available, the running snapshot
+is preserved with guidance; the updater does not install a runtime globally.
 
 Limits is visible and expanded by default, first below the session title. Change
 its visibility and order under **Settings → Sections** in Global or Current

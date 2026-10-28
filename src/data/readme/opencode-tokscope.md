@@ -10,9 +10,9 @@ Tokscope is an OpenCode V2 terminal UI plugin with:
 
 - A full-screen `/tokscope` page comparing median tokens per second for each model/provider pair.
 - A daily median trend for the selected pair, with project, time-range, and reasoning-setting filters.
-- A clickable sidebar summary of the fastest pairs over the last 24 hours.
+- A clickable sidebar summary of the fastest pairs so far today (local calendar day).
 
-![Real OpenCode session with the Tokscope widget in the sidebar: fastest model/provider pairs over the last 24 hours](https://raw.githubusercontent.com/mihaellenic/opencode-tokscope/main/docs/images/tokscope-sidebar.png)
+![Real OpenCode session with the Tokscope widget in the sidebar: fastest model/provider pairs; illustrative capture](https://raw.githubusercontent.com/mihaellenic/opencode-tokscope/main/docs/images/tokscope-sidebar.png)
 
 ![Model/provider comparison and daily trend — synthetic mockup](https://raw.githubusercontent.com/mihaellenic/opencode-tokscope/main/docs/images/tokscope-overview.png)
 
@@ -39,7 +39,7 @@ The page opens with **all projects · last 30 days · all reasoning settings**. 
 | `r` | Choose all / a recorded reasoning setting / unknown |
 | `Esc` | Return to the previous screen |
 
-**Sidebar:** shows up to three fastest pairs across **all projects on the connected instance**, each requiring at least **three measured calls in the rolling 24-hour window**. Click anywhere in the widget to open the page. It refreshes after a model step completes and once a minute while visible. Read failures retain the last successful rows; no qualifying pairs shows `No models with 3+ calls in 24h.`
+**Sidebar:** shows up to three fastest pairs across **all projects on the connected instance**, each requiring at least **three measured calls since local midnight today**. Click anywhere in the widget to open the page. It refreshes after a model step completes and once a minute while visible. Read failures retain the last successful rows; no qualifying pairs shows `No models with 3+ calls today.`
 
 ## What tok/s means
 

@@ -231,8 +231,9 @@ Thatch gives your agent:
   rest stand alone. Plus the opencode-only wrap-ups: `/thatch/compact` and
   `/thatch/exit` run a pre-flight checklist before a compaction or an exit:
   the agent flushes pending fact extraction, finishes promised memory
-  writes, and surfaces todos or follow-ups it never addressed. It ends its
-  response with a greenlight token only when the checklist is clean; thatch
+  writes, and surfaces todos or follow-ups it never addressed. When the
+  checklist is clean it greenlights by calling the zero-arg tool for that
+  command (`thatch_compact` or `thatch_exit`) -- and thatch
   then triggers the compaction or closes the session (its tab on opencode
   2, the whole app on opencode 1 - either way its watches are cancelled).
   With items outstanding, the agent lists them and nothing fires -- you

@@ -4,13 +4,39 @@ Local-first historical telemetry for opencode sessions. Track where your tokens 
 
 [![npm](https://img.shields.io/npm/v/opencode-telemetry?color=CB3837&logo=npm&logoColor=white)](https://www.npmjs.com/package/opencode-telemetry)
 
+## Requirements
+
+- **Bun >=1.3.13**, available on `PATH`. The plugin and CLI use `bun:sqlite`;
+  installing the package with npm does **not** install Bun, and Node's SQLite
+  support is not a replacement.
+- **Node >=22.5** for the CLI launcher/configuration helper, and npm or Bun to install.
+
+Install Bun ([official instructions](https://bun.sh/docs/installation)):
+
+```bash
+curl -fsSL https://bun.sh/install | bash
+export PATH="$HOME/.bun/bin:$PATH"
+bun --version
+```
+
+Services such as systemd often have a reduced PATH that does not include
+`~/.bun/bin`. Configure the service PATH, or expose Bun in a directory it searches:
+
+```bash
+sudo ln -sf "$HOME/.bun/bin/bun" /usr/local/bin/bun
+```
+
+Ensure `/usr/local/bin` is on the **service's** PATH and restart the service.
+Use the Bun installation belonging to the service user. `octm` now reports
+installation/PATH instructions if Bun cannot be started, even after an npm install.
+
 ## What it does
 
 - Logs every opencode session to a local SQLite database automatically
 - Aggregates costs across orchestration chains (conductor + all child sessions), showing the true total rather than just the parent's share
 - Forensic per-session inspection: full token trajectory, turn-by-turn context growth, identified delta drivers ("turn 32 grew by 20k tokens — likely a 41KB bash result entered history")
 - CLI binary (`octm`) generates and saves reports to disk without consuming model tokens to re-emit them
-- Zero external dependencies — your data stays on your machine, no collectors required
+- No external services — your data stays on your machine, no collectors required
 
 ## When to use this plugin
 
@@ -43,7 +69,7 @@ npm install -g opencode-telemetry
 bun add -g opencode-telemetry
 ```
 
-Add to your opencode config (`~/.config/opencode/config.json`):
+Add to your opencode config (`~/.config/opencode/opencode.json` or `opencode.jsonc`):
 
 ```json
 {
@@ -54,6 +80,97 @@ Add to your opencode config (`~/.config/opencode/config.json`):
 ```
 
 The plugin starts logging automatically. No configuration required.
+
+### OpenCode V1 → V2 / npm release 0.3.0
+
+Version 0.3.0 supports OpenCode 2.1.3 and V1 >=1.18.29 (including 1.19.4).
+The entrypoint has independent V1 `server` and V2 `setup` implementations.
+After **0.3.0 is available on npm**, install the CLI and package while still on
+OpenCode 1.19.4 (Node >=22.5, npm, and write access to your global npm prefix):
+
+```bash
+npm view opencode-telemetry@0.3.0 version
+npm install --global opencode-telemetry@0.3.0
+octm help
+node "$(npm root -g)/opencode-telemetry/scripts/configure-plugin.js" v1
+```
+
+V1 uses `"plugin": ["opencode-telemetry@0.3.0"]`, which downloads its own copy
+from npm. The script preserves unrelated settings/plugins, replaces old telemetry
+entries in both arrays, and saves the original file once as
+`<config-file>.before-octm-<installed-version>`.
+
+The helper uses `opencode.json` if present, otherwise `opencode.jsonc`; if neither
+exists it creates `opencode.json` with `$schema` and the plugin entry. It honors
+`XDG_CONFIG_HOME`. Both files support `//` comments, `/* */` comments and trailing
+commas. Targeted edits via `jsonc-parser` preserve comments and unrelated settings
+instead of reserializing the document. If an edit would remove a comment attached
+to a replaced telemetry entry, the helper stops without writing and asks you to
+move the comment outside that entry. Existing backups are never overwritten;
+new configurations have no original to back up.
+
+If **both** files exist the helper stops with a clear error and changes neither.
+The [V1 config docs](https://opencode.ai/docs/config/) and
+[V2 config docs](https://opencode.ai/v2/docs/config) describe JSON/JSONC and
+precedence across configuration locations, but do not specify an unambiguous
+same-directory `opencode.json` versus `opencode.jsonc` precedence. Consolidate
+them into one file before using this helper rather than guessing which to edit.
+
+Pause agent jobs before upgrading OpenCode with your normal V2 installation
+procedure. After installing V2, configure the plugin **before starting sessions
+or restarting the shared service**:
+
+```bash
+opencode --version  # expected: v2.x; tested with v2.1.3
+node "$(npm root -g)/opencode-telemetry/scripts/configure-plugin.js" v2
+opencode service restart
+opencode service status
+opencode run --model openai/gpt-5.6-luna --format json 'Reply only OK. Do not use tools.'
+octm sql 'select session_id,total_turns,total_input_tokens,total_output_tokens,total_cached_read,est_cost_usd from sessions order by started_at desc limit 3'
+```
+
+V2 uses the **absolute directory of the npm-installed package**, not the checkout
+or an individual file. Example for a system npm prefix:
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugins": ["/usr/lib/node_modules/opencode-telemetry"]
+}
+```
+
+OpenCode 2.1.3 local-directory discovery needs the shipped root `index.ts`;
+`main`/`exports` alone are insufficient in that release. This installed-directory
+form was tested with a globally installed tarball in a temporary npm prefix,
+outside the source checkout. V2 also recognizes npm specifications in `plugins`
+(and the legacy `plugin` alias), but the directory form avoids a second download
+and is the verified deployment path for 2.1.3.
+
+Do not run V1 against OpenCode's internal DB after V2 migrated it; the plugin's
+separate telemetry DB remains schema 5 and can be read by both versions.
+Keep the same runtime user, `XDG_DATA_HOME`, and global npm prefix used by Loom;
+`TelemetryPath = octm` needs no change. The final query must include the session ID
+printed by `opencode run`, with at least one turn and nonzero output tokens.
+
+V2 records `session.step.started`/`ended` (and failed steps with usage), tool hooks,
+parent links, and completion. The public stream is server-wide; events are filtered
+by plugin location/workspace. `est_cost_usd` uses the cost reported by V2, including
+zero for subscription-backed calls; this is **not** an equivalent pay-as-you-go price.
+Auxiliary title/generate calls are not agent turns and are not included. V1 keeps
+static pricing estimates; unknown models remain NULL. No schema change is needed.
+Optional `octm inspect --content`/content cache still use the V1 server API and
+are not ported to V2; SQL and token/cost reports read the independent telemetry DB.
+
+The release workflow publishes automatically on pushes to `main`. It uses the
+`package.json` version when it is greater than the latest stable `vX.Y.Z` tag;
+otherwise it increments that tag's patch. Prerelease tags are ignored. With no
+stable tags, it retains the previous fallback of incrementing the package patch.
+With the latest stable tag `v0.3.3` and the unchanged package version `0.3.0`,
+the next release will be **0.3.4** (tag `v0.3.4`). Wait for
+`npm view opencode-telemetry@0.3.4 version` to succeed before installing these fixes.
+The configuration helper
+reads the installed package version for the V1 npm reference and backup name;
+V2 continues to use the installed package directory.
 
 ## Quickstart
 

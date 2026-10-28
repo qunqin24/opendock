@@ -419,7 +419,9 @@ Word about data safety: Kilo's indexes (`ws-*` collections and its LanceDB direc
 
 ## Requirements
 
-- OpenCode v2 (plugin API `@opencode/plugin@2.x`).
+- OpenCode v2 (plugin API `@opencode/plugin@2.x`). Verified with OpenCode 2.2
+  and OpenTUI 0.7; the TUI takes whichever runtime the host provides, so 0.6 and
+  0.7 both work.
 - **For the terminal UI (prompt-footer indicator and `/indexing` page):** the
   `solid-js`, `@opentui/core` and `@opentui/solid` runtime that the host
   provides. The plugin installs no copy of them: the TUI imports the host's

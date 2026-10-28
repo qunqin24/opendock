@@ -89,7 +89,7 @@ flowchart TD
 
 - **No `devin/` models**: run `/connect` again. Failures are logged as `[opencode-devin] ...`; the log is at `~/.local/share/opencode/log/opencode.log`.
 - **A model is rejected even though `/models` lists it**: the account can see a uid it is not entitled to. The error names the tier.
-- **Costs look wrong or absent**: OpenCode reads cost from the pricing published to `/models`, not from the stream. Check the model has a non-zero price there.
+- **Costs look wrong or absent**: OpenCode reads cost from the pricing published to `/models`, not from the stream. Check the model has a non-zero price there — `bun scripts/devin.ts verify` dumps what the catalog actually reports.
 - **A 401 during chat**: the short-lived token is refreshed automatically. Reconnect only if the session token itself was revoked.
 - **`Plugin failed to load`**: rebuild and `opencode reload`. See the FAQ on atomic builds.
 - **A path in `plugins` is ignored**: only `name@file:<absolute-path>` links a local build.
@@ -105,6 +105,9 @@ npm run build
 
 `build` is atomic, so the plugin can be reloaded while it runs. Publishing uses
 `build:clean`, which wipes `dist/` first.
+
+Shared fixtures for the synthetic-catalog tests live in `test/helpers.ts`
+(fake JWTs, protobuf `modelConfig`/`catalogReply` encoders, `stubFetch`).
 
 ### Developing against a local build
 
@@ -131,7 +134,21 @@ opencode api provider.list   # the devin provider's "package" field
 ### Testing against the real API
 
 `bun test` runs everything except the live suite, which skips itself without a
-credential:
+credential. The dev CLI gets you one and runs the whole check end to end:
+
+```sh
+bun scripts/devin.ts all        # login (if needed) → catalog dump → live tests
+bun scripts/devin.ts login      # just the PKCE login → .devin-token.env
+bun scripts/devin.ts verify     # dump live catalog pricing
+bun scripts/devin.ts test       # run test/live.test.ts
+```
+
+The login is the same browser PKCE flow as `/connect` (loopback callback, or
+`--manual` for paste-code on headless machines). The token lands in
+`.devin-token.env`, which `verify`/`test`/`all` pick up automatically, so a
+second `all` run skips the browser entirely.
+
+Or with a token you already have:
 
 ```sh
 DEVIN_LLM_API_KEY='devin-session-token$...' bun test test/live.test.ts

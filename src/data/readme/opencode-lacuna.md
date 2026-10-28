@@ -6,6 +6,8 @@ Most context management runs on fixed rules: drop old tool output, summarise whe
 those decisions to a background archive agent forked from the main agent. It sees the current context, chooses what to summarise or keep,
 and leaves the main agent free to continue working. The main agent can bring the originals back when needed.
 
+![How Lacuna archives context](docs/animation/lacuna.webp)
+
 ## How it works
 
 1. Identifiable conversation units carry ref tags with their ID and kind:
@@ -25,7 +27,7 @@ present, the footer reports it as unresolved; `/lacuna` lists the affected block
 
 ## But this ruins the prompt cache?
 
-The archive job uses the same model and copies the primary request's prefix, appending archive instructions so it
+By default, the archive job uses the same model and copies the primary request's prefix, appending archive instructions so it
 can reuse the prompt cache. Applying summaries changes the prefix from the first archived message onward; the
 provider may need to reprocess that portion. Subsequent requests are smaller.
 
@@ -43,20 +45,38 @@ lists the tiers in each model's `cost` metadata; if yours is lower, set `archive
 
 ## Install
 
+Requires OpenCode 2.2.0 or newer.
+
 Add the package to `plugins` in `opencode.json`. OpenCode installs it from npm on the next start:
 
 ```jsonc
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugins": [{ "package": "opencode-lacuna", "options": { "archiveAt": 0.6 } }]
+  "plugins": [{
+    "package": "opencode-lacuna",
+    "options": {
+      // All options are optional.
+      "archiveAt": 0.6,
+      "archiveMode": "background", // Use "blocking" to wait before the next main request.
+      "archiveModel": {
+        "model": "provider/model#variant", // Omit to inherit the main model; #variant is optional.
+        "options": { "maxTokens": 8192 }
+      }
+    }
+  }]
 }
 ```
 
-`archiveAt` is either a fraction of the context window (`0.6`) or an absolute token count (`150000`). Default `200000`.
+`archiveAt` takes a fraction of the context window (`0.6` means 60%) or an absolute token count. Default is `200000`.
+By default, archiving runs in the background using the main model and its settings.
+Use `"blocking"` for local models when running the main agent and archiving concurrently would strain GPU memory or compute.
+`archiveModel.options` accepts generation settings such as `maxTokens`, `temperature`, and provider-specific options like `reasoningEffort`.
 
 Don't run another context pruning plugin at the same time: two plugins rewriting the same messages will conflict.
 
 ## Develop
+
+Use Node.js 26.4.0 or newer, as required by OpenTUI 0.7.
 
 ```sh
 git clone https://github.com/Trollgeir/lacuna

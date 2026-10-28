@@ -6,11 +6,11 @@ Targets **`@opencode/plugin@2.0.29`**. The published SDK, official documentation
 
 ## Install
 
-The intended npm distribution is **`@cesarus777/opencode-cgp`**. It becomes available after this repository's first publication. The unscoped `opencode-context-guard` name belongs to another project; do not install it expecting this plugin.
+The npm package is **`@cesarus777/opencode-cgp`**. The unscoped `opencode-context-guard` name belongs to another project; do not install it expecting this plugin.
 
 Minimum supported host: **OpenCode V2 2.0.29**. Versions 2.0.29 and 2.1.2 have been tested locally with a synthetic provider; V1 is unsupported.
 
-After this project's first publication, register the global package through the native manager:
+Register the global package through the native manager:
 
 ```sh
 opencode plugin add @cesarus777/opencode-cgp@latest
@@ -41,10 +41,10 @@ Global configuration is `~/.config/opencode/opencode.jsonc` (or the OpenCode con
 
 Restart/reload OpenCode and look for `context-guard: observe; diagnostics ...`. Observe mode records policy decisions and never requests compaction; OpenCode's own automatic compaction remains active. Inspect diagnostics first, then set `mode` to `enforce` to admit native compaction at runtime step boundaries. The complete [example](examples/opencode.jsonc) includes model, role, and agent policies. **Last matching rule wins**; selectors within a rule are ANDed.
 
-Pin the exact published version in the existing entry's `package` field or use the manager. Version `0.2.5` keeps the context chart continuous through pauses, retains its history between sidebar and panel, and shows confirmed compaction drops. It also adds local OpenCode 2.1.2 validation.
+Pin the exact published version in the existing entry's `package` field or use the manager. Version `0.3.0` adds a standalone terminal dashboard, offline model analytics across retained sessions, and context charts that preserve bar height and reuse the latest column during pauses. See the [changelog](CHANGELOG.md).
 
 ```sh
-opencode plugin add @cesarus777/opencode-cgp@0.2.1
+opencode plugin add @cesarus777/opencode-cgp@0.3.0
 ```
 
 Manage the configured target with the [official V2 CLI](https://dev.opencode.ai/v2/docs/plugins):
@@ -64,7 +64,7 @@ For development or unreleased Git revisions, V2 supports npm-compatible Git targ
 opencode plugin add 'github:cesarus777/opencode-cgp#master'
 ```
 
-Replace `master` with a version tag or full commit hash to pin a revision. Git installs require Bun and development dependencies to run `prepare`; unlike npm artifacts they build from source. Prefer an exact published prerelease such as `@cesarus777/opencode-cgp@0.2.0-beta.1` after publication. Git preparation has not been verified with the real plugin manager; use a built local checkout if it fails.
+Replace `master` with a version tag or full commit hash to pin a revision. Git installs require Bun and development dependencies to run `prepare`; unlike npm artifacts they build from source. Prefer an exact published npm version for reproducible installs. Git preparation has not been verified with the real plugin manager; use a built local checkout if it fails.
 
 Contributors can build and register a checkout without publishing:
 
@@ -81,6 +81,32 @@ bun run test:package
 Use `{"plugins":[{"package":"/absolute/path/to/opencode-cgp","options":{"mode":"observe"}}]}` in a disposable project's `opencode.jsonc`. Local paths are configured directly; `plugin add` does not accept local paths or tarballs. Root checkout wrappers continue to support the host's source loader. The npm package instead uses built JavaScript exports. See [build and release instructions](docs/releasing.md).
 
 If loading fails, run `opencode plugin list` and `opencode plugin check`, confirm V2 2.0.29 and the correct configuration scope, and inspect OpenCode's startup logs. A missing `@opencode/plugin` or client module indicates an incomplete package installation: remove/re-add the configured package using the manager. TUI-only missing `solid-js`/OpenTUI modules usually indicate an unsupported host or loading the TUI outside its host runtime. These optional peers are supplied by the native TUI and must share its runtime instances; do not bundle private renderer copies. Standalone renderer tests need the pinned peers and public runtime preload described in [testing](docs/testing.md). Never reset persisted safety state merely to fix loading. For remote clients, check both client installation and server registration in the session's owning location.
+
+## Standalone terminal dashboard
+
+Run the dashboard with OpenCode's native TUI closed. The server must already be running, with Context Guard registered in the owning location. The standalone command requires **Bun >=1.3.0** and the optional **`@opentui/core@0.5.17`** peer; server imports and existing diagnostic commands retain Bun >=1.1.34 support. Solid and the native TUI plugin are unnecessary for this command.
+
+For an unreleased checkout:
+
+```sh
+bun install --frozen-lockfile
+bun run build
+bun dist/cli.js dashboard tui
+bun dist/cli.js dashboard tui --server https://server.example --directory /server/project
+```
+
+For a packed artifact, install the tarball and renderer together into a separate client directory, then launch with Bun >=1.3.0:
+
+```sh
+npm install /absolute/path/cesarus777-opencode-cgp-0.3.0.tgz @opentui/core@0.5.17
+bun node_modules/.bin/context-guard dashboard tui
+```
+
+Local discovery uses the current directory by default. An explicit server requires an absolute **server-side** `--directory`; it is passed unchanged. Set `CONTEXT_GUARD_PASSWORD` and optional `CONTEXT_GUARD_USERNAME` (default `opencode`) in the environment for remote authentication. Use HTTPS except on loopback. Credentials in URLs are rejected.
+
+Use `1` overview, `2` detail, `3` history, arrows or `j/k` to navigate, `/` to search, `f` for exact agent/model filters, `l` for location, `r` to refresh, and `?` for help. History uses Left/Right for six metrics, `w` for 5m/1h/24h/7d, and `[`/`]` to inspect exact samples or requests. Detail scrolls through full IDs and every exposed snapshot field. Editors take precedence over shortcuts; Enter applies and Escape cancels. Quit with `q` or Ctrl+C.
+
+The location editor's Tab key cycles up to four remembered owning directories; this is not server-wide discovery. History shows bounded retention, partial/downsampled data and gaps. Unknown measurements stay unknown, while stale occupancy remains labeled and pressure becomes unknown. Browser delivery is a later milestone. See [terminal validation and dependency sizes](docs/validation/dashboard-terminal-2026-10-28.md).
 
 ## Thresholds
 
@@ -103,6 +129,8 @@ The TUI reads bounded snapshots over public OpenCode RPC, including when telemet
 Enabling Context Guard after work has already started also shows the last reported prompt usage for idle sessions and subagents. Opening the sidebar or panel restores it from the public session context, preserving its original age and **STALE** label. Stale usage still shows tokens and occupancy percentage. Restoration respects model changes, reverts and completed compactions; unavailable provider usage stays unknown. These reads never request compaction, and transcript content is never retained or sent through the plugin RPC.
 
 Per-session live TPS, average model throughput, average session throughput and observed TTFT appear in the selected session and child rows. Live TPS and TTFT use `~` to mark estimates; completed rates use provider totals. Configurable local history defaults to seven days with a 64 MiB total cap, independently of diagnostic telemetry. See [metric definitions and history exports](docs/configuration.md#live-performance-and-retained-history).
+
+Compare models across retained sessions with `bun run inspect models /absolute/history-directory --model provider/model` (installed: `context-guard models ...`). JSON/CSV summaries include weighted request TPS, TTFT mean/median/p95, eligibility counts and coverage limits. Use `--from`, `--to` and `--agent` to scope the analysis. This offline command precedes the planned TUI Models screen; see [analytics definitions](docs/configuration.md#offline-model-analytics).
 
 Press **c** in the Context Guard panel for retained-history terminal charts. View one metric at a time with **Left / Right**, change the time window with **[ / ]**, and select an agent instance with **Up / Down**. Press **c** to return or **q** to close the panel; controls stay visible below the scrollable content. Generate a self-contained interactive browser report with `bun run charts /absolute/history-directory --output report.html`. It includes filters, UTC timestamp tooltips, request statistics and SVG export. Installed packages expose the same command as `context-guard charts ...` (Bun required). See [chart controls and limits](docs/configuration.md#performance-charts).
 

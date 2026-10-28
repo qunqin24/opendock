@@ -37,11 +37,11 @@ Unlike standard web search tools, it returns concise, fact-checked answers accom
 - **🚀 Native OpenCode V2 Architecture**: Built strictly on OpenCode V2's `id` + `setup(ctx)` lifecycle, integrating deeply with `ctx.tool`, `ctx.websearch`, `ctx.storage`, and `context.progress`.
 - **🌐 Dual-Entry Search Architecture (WebSearch + Custom Tool)**:
   - **System WebSearch Provider (`ctx.websearch`)**: Automatically registers as an OpenCode V2 default `websearch` provider for seamless, transparent search in everyday conversations;
-  - **Custom Professional Tool (`ctx.tool`)**: Exposes `google_grounding` and `websearch_cited` under the Code Mode `search` namespace (`tools.search.google_grounding`) with full parameter control.
-- **🎯 Smart Anti-Bloat Slicing (Independent Clickable Cards)**:
+  - **Custom Professional Tool (`ctx.tool`)**: Exposes `google_grounding` under the Code Mode `search` namespace (`tools.search.google_grounding`) with full parameter control (optional legacy alias `websearch_cited` available via `enableLegacyAlias: true`).
+- **🎯 Smart Sentence-Level Anti-Bloat Slicing (Independent Clickable Cards)**:
   - Every discovered source is rendered as an independent clickable card in the UI, allowing instant navigation to any specific webpage;
-  - The first card carries the complete synthesis report, while subsequent cards extract concise cited sentence snippets—**saving ~87.5% duplicate tokens (20,000+ context tokens saved per search)**.
-- **⚡ Native Persistent Caching (`ctx.storage`)**: Sandboxed key-value caching with configurable TTL (default 10m). Repeating queries return in 0ms with zero token cost and immunity to HTTP 429 limits.
+  - The first card carries the complete synthesis report, while subsequent cards extract concise sentence-level snippets—**saving ~87.5% duplicate tokens (20,000+ context tokens saved per search)**.
+- **⚡ Multi-Dimensional Caching (`ctx.storage`) & Singleflight Deduplication**: SHA-256 caching across `query + context + model + maxSources` with configurable TTL (default 10m), plus automatic in-flight deduplication for concurrent identical queries.
 - **🔔 Live Progress Feedback (`context.progress`)**: Real-time status reporting in TUI and Web UI ("Searching Google...", "Found cached results", "Falling back to next model...").
 - **⚙️ Standardized `ctx.options` Configuration**: Structured plugin configuration via `opencode.jsonc` with support for `{env:VAR}` automatic resolution.
 - **⚡ Automatic Fallback Chain**: Built-in fault tolerance—configured with a generous 45s per-model timeout and 180s (3 min) total timeout. Automatically rotates through candidate models on rate limits (HTTP 429) or gateway blips (502/503), while immediately halting on fatal auth errors (401/403).
@@ -127,7 +127,7 @@ No cloning or manual symlinks needed. Add the plugin directly to the `plugins` a
 For local development or testing modifications:
 
 #### Global Plugin Bridge
-Create `~/.config/opencode/plugins/google-grounding.js`:
+Create `~/.config/opencode/plugins/opencode-gemini-grounding.js`:
 ```javascript
 export { default } from "file:///D:/OpenCode/opencode-gemini-grounding/index.js";
 ```

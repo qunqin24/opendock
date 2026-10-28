@@ -171,9 +171,9 @@ For local development installs, generated compatibility bundles, model defaults,
 and desktop app notes, use the dedicated install guides. Recommended sync form:
 
 ```bash
-./install.sh sync --target claude --intent hooks,settings,mcp,plugins
+./install.sh sync --target claude --intent hooks,settings,mcp           # project settings, hooks, MCP
 ./install.sh sync --target claude --intent mods                          # Claude Code mods (ycc/mods)
-./install.sh sync --target all --intent settings,rules
+./install.sh sync --target all --intent settings,rules --global          # new machine: user-global settings
 ./install.sh install --target all --only agents                         # standalone agents, no plugin
 ./install.sh install --target omp                                       # OMP via omp plugin
 ./install.sh sync --target codex,claude,opencode --intent mcp            # current project
@@ -181,15 +181,17 @@ and desktop app notes, use the dedicated install guides. Recommended sync form:
 ./install.sh sync --target opencode --intent mcp --mcps github,linear    # only these servers
 ./install.sh list mcps                                                   # managed MCP server names
 ./install.sh remove --target all --only mcp                              # undo project MCP
-./install.sh remove --target all --intent settings,rules                 # undo any intent, any target
+./install.sh remove --target all --intent settings,rules --global        # undo any intent, any target
 ./install.sh cli && ycc completion --install                             # `ycc` on PATH for other projects
 ```
 
-The `mcp` step defaults to the current project; pass `--global` for user-global
-config. `base` ships a target's whole bundle (the `ycc` plugin for Claude and
-Codex). `skills`, `agents` and `commands` instead install standalone entries,
-one per skill/agent/command, into each tool's own directories
-(`~/.claude/skills/<name>`, `~/.codex/agents/<name>.toml`, ...) with no plugin.
+The `mcp` step and the `settings` step on Claude, Codex and opencode default to
+the current project; pass `--global` for user-global config (Cursor and OMP
+settings run only with `--global`). `base` ships a target's whole bundle (the
+`ycc` plugin for Claude and Codex). `skills`, `agents` and `commands` instead
+install standalone entries, one per skill/agent/command, into each tool's own
+directories (`~/.claude/skills/<name>`, `~/.codex/agents/<name>.toml`, ...)
+with no plugin.
 On Claude, `commands` is an alias for `skills` (skills are the slash commands);
 your own entries there are never touched. `remove` undoes any intent on any target
 (`base`, `skills`, `agents`, `commands`, `settings`, `rules`, `mcp`, `hooks`,
@@ -202,8 +204,8 @@ before any of them runs.
 
 Structured config is merged rather than copied: repo-managed keys update while
 unknown and locally edited keys remain intact. First-time setup uses `install`
-(`./install.sh install --target <t> [--settings --rules --mcp --hooks]`); every
-invocation needs a command — a bare `--target ...` is rejected.
+(`./install.sh install --target <t> [--settings --rules --mcp --hooks] [--global]`);
+every invocation needs a command — a bare `--target ...` is rejected.
 
 Dedicated guides:
 

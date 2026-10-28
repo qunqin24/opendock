@@ -13,7 +13,7 @@ arguments, tool results (the outputs fed back into context) and the residual
 The package ships a **dual V1 + V2 plugin** (one entry works in both OpenCode
 generations) plus an optional TUI module (`./tui` entry) that renders a **live
 sidebar** and a **zero-LLM `/cx` breakdown panel** with measured contributors
-and a redacted export. The V2 path is **tested against opencode 2.1.4**; the
+and a redacted export. The V2 path is **tested against opencode 2.2.0**; the
 V1 path against 1.18.29+.
 
 > **V1 is feature-frozen.** It is kept working for compatibility (bug fixes
@@ -70,7 +70,8 @@ For every served request the plugin estimates how the context window is split:
   duplicate group), reported honestly as *"N redundant tool outputs ≈ X tokens"*
   — never as "the model wasted effort". Findings are per-session and **path-free
   in the persisted/exported form**.
-* The denominator is the **opencode 2.1.4 compaction ceiling**: `window =
+* The denominator is the **opencode 2.2.0 compaction ceiling** (unchanged since
+  2.1.4): `window =
   limit.input || limit.context`; `reserve = max(floor(window * 0.15), window >=
   2 * 16_000 ? 16_000 : 0)`; the ceiling is `window - reserve`. This mirrors
   `calculateCeiling()` in `packages/core/src/session/compaction.ts`. When opencode
@@ -546,14 +547,17 @@ the sidebar instead.
   indicator degrades
   gracefully (the breakdown falls back to throttled `session.messages` fetches
   and toasts keep working).
-* **OpenCode ≥ 2.0.16** for the V2 path (built and verified against
-  **2.1.4**).
+* **OpenCode ≥ 2.2.0** for the V2 path with the TUI surfaces (built and verified
+  against **2.2.0**). The server-only V2 path keeps working on 2.0.16+; the TUI
+  module pins the OpenTUI generation it was compiled against, so a host on
+  OpenTUI 0.6 (opencode ≤ 2.1.4) will not load the TUI surfaces - neither the
+  sidebar nor the `/cx` panel - from a 1.6.x install.
 * **TUI sidebar**: terminal TUI only, requires the OpenTUI rendering stack that
   ships with OpenCode. `@opentui/core` and `solid-js` are **optional** peer
   dependencies resolved by OpenCode at runtime; the main plugin installs and runs
   fine without them (the sidebar simply is not available). `@opentui/solid` is
-  instead shipped as a **pinned direct dependency** (exact `0.6.8`, matching
-  the OpenTUI stack OpenCode 2.1.4 ships): OpenCode's
+  instead shipped as a **pinned direct dependency** (exact `0.7.0`, matching
+  the OpenTUI stack OpenCode 2.2.0 ships): OpenCode's
   TUI loader does not expose a host instance of it, so for npm-installed plugins
   the JSX pragma would otherwise fail to resolve `@opentui/solid/jsx-runtime`
   (upstream: opencode issue #33884 — `node_modules` plugins are excluded from the

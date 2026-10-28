@@ -71,7 +71,7 @@ Add the package to `plugins` in your global `~/.config/opencode/opencode.jsonc`
 ```jsonc
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugins": ["opencode-provider-quota@2.0.0"]
+  "plugins": ["opencode-provider-quota@2.0.1"]
 }
 ```
 
@@ -83,7 +83,7 @@ exact versions afterwards.
 Alternatively, install it from the CLI:
 
 ```sh
-opencode plugin add opencode-provider-quota@2.0.0
+opencode plugin add opencode-provider-quota@2.0.1
 ```
 
 The CLI part loads automatically from the same entry; you do not need to add
@@ -137,14 +137,46 @@ delayed cards, percentage bars, the error state, that refreshes do not
 duplicate cards, and timer cleanup. Run `mise install` first to provision the
 test runtime.
 
+### Dependency notes
+
+`@opentui/solid` declares an exact `solid-js` peer (`1.9.12`), but `solid-js`
+1.9.7–1.9.15 pulls in a `seroval` version with open advisories. `package.json`
+therefore pins `solid-js` to a newer release and uses `overrides` to let
+`@opentui/solid` resolve to it, so that plain `npm ci` works and
+`npm audit` is clean. Revisit the override when `@opentui/solid` relaxes its
+peer range.
+
 ## Releasing
 
-```sh
-npm version <patch|minor|major>
-npm run build
-npm publish
-git push --follow-tags
-```
+Releases are published by GitHub Actions using npm
+[trusted publishing](https://docs.npmjs.com/trusted-publishers) (OIDC). No npm
+token is stored in the repository, in GitHub secrets, or on a developer
+machine, and each release carries a provenance attestation.
+
+1. Bump the version and rebuild on a branch, then merge it to `main` through a
+   pull request:
+
+   ```sh
+   npm version <patch|minor|major> --no-git-tag-version
+   npm run build
+   ```
+
+2. Tag the merge commit and push the tag:
+
+   ```sh
+   git tag -a vX.Y.Z -m "opencode-provider-quota X.Y.Z"
+   git push origin vX.Y.Z
+   ```
+
+The `Release` workflow (`.github/workflows/release.yml`) refuses to publish
+unless the tag equals `v` plus the `package.json` version and points at a
+commit on `main`. It then runs the type check, unit and UI tests, the build, a
+check that the committed `dist/` matches the source, `npm audit`, and
+`npm audit signatures`, and only afterwards publishes from a separate job that
+installs no dependencies.
+
+The trusted publisher on npmjs.com is bound to the workflow file name
+`release.yml`; if you rename the file, update that configuration too.
 
 `files` in `package.json` restricts the published tarball to `dist/`,
 `package.json`, `README.md`, and `LICENSE`.

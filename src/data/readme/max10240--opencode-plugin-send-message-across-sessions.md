@@ -72,12 +72,47 @@ workspace 配置位于根目录 `package.json` 的 `workspaces` 字段。每个 
 
 ### 发布
 
-发布由 GitHub Actions 使用 OIDC trusted publishing 完成，**不在 GitHub 保存任何 npm token**。
+只有一个发布入口，必须显式指定发布类型：
 
-- 本地完成测试后，在 commit message 中加入 `[release]` 并推送到 `main`。
-- workflow 会自动 patch 升版、构建、逐包发布，并把版本变更提交回 `main`。
-- 每个包在 npm 上配置 trusted publisher，绑定仓库、`publish.yml` 和 `npm-publish` environment。
-- 发布顺序为先 7 个插件、最后 `@max10240/opencode-plugin-unicorn`；已存在的版本会跳过。
-- GitHub 只保存仓库代码。OIDC 每次发布换取短期凭证，不能导出或复用。
+```sh
+npm run release -- --release-type=<type> [--version=<spec>]
+```
 
-`publish:all` 等本地脚本仅作应急用途；常规发布不要手动执行 `npm publish`，也不要把 npm token 存进 GitHub Secrets。
+`--release-type` 取值：
+
+| 类型 | 行为 | 2FA |
+|---|---|---|
+| `local-publish` | 本机构建并直接发布 | 浏览器 security key |
+| `local-stage` | 本机构建并 stage，之后在 npm 网站 Approve | Approve 时 2FA |
+| `ci-publish` | 本地 commit + push，GitHub Actions 构建并发布 | OIDC |
+| `ci-stage` | 本地 commit + push，GitHub Actions 构建并 stage | Approve 时 2FA |
+
+`--version` 默认 `patch`，也可以是 `minor`、`major` 或具体版本 `1.2.3`。目标版本必须严格大于每个包的 registry latest，并且不能低于本地版本。
+
+脚本会依次：
+
+1. 校验全部参数
+2. 要求工作区干净（只允许 `rules/` 同步文件未提交）
+3. 跑完整 `npm run check`
+4. 统一 bump 到目标版本并同步内部依赖
+5. 按 release-type 发布或触发 CI
+
+本地发布：
+
+```sh
+npm run release -- --release-type=local-publish
+npm run release -- --release-type=local-stage --version=minor
+```
+
+CI 发布：
+
+```sh
+npm run release -- --release-type=ci-publish
+npm run release -- --release-type=ci-stage --version=1.2.0
+```
+
+`ci-*` 模式会提交版本变更并推送 `main`，commit message 包含 `[release]` 或 `[release:stage]`。CI 不再 bump 版本。
+
+staged 审核入口是 `https://www.npmjs.com/settings/~/staged-packages`，也可以用 `npm stage list` 和 `npm stage approve <stage-id>`。
+
+本地发布成功后，提交版本变更和同步文件；`ci-*` 会自动提交并推送。新包首次发布不能用 OIDC，请使用 `local-publish` 或 `local-stage`。

@@ -72,6 +72,7 @@ Zero configuration is the default. To tune, use the object form of the plugin en
 | Variable | Purpose |
 | --- | --- |
 | `OPENCODE_MEMORY_DIR` | Store location (default `~/.config/opencode/memory`). |
+| `OPENCODE_MEMORY_ALLOW_OUTSIDE_PATHS` | Operator-only. When truthy, `memory_export`/`memory_import` accept paths anywhere on disk instead of confining themselves to the store. Off by default. See [Export and move between machines](#export-and-move-between-machines). |
 | `OPENCODE_MEMORY_INJECT_BUDGET` | Fallback for `injectBudget`. |
 | `OPENCODE_MEMORY_FRONTIER_BUDGET` | Fallback for `frontierBudget`. |
 | `OPENCODE_COMMANDS_DIR` | Where the plugin mirrors its slash commands (default `~/.config/opencode/commands`). |
@@ -197,13 +198,17 @@ Limits worth knowing:
 
 ## Export and move between machines
 
-`memory_export` writes the live store as JSONL: a machine-readable header line (`{_export, version, exportedAt, count}`) followed by one JSON object per line (`{ts,type,scope,content,status,tags,issue}`), active rows only. `memory_import` reads such a file back. Default path is `<memory-root>/exports/<timestamp>.jsonl`; pass `file` to choose one and `scope` to export a single scope.
+`memory_export` writes the live store as JSONL: a machine-readable header line (`{_export, version, exportedAt, count}`) followed by one JSON object per line (`{ts,type,scope,content,status,tags,issue}`), active rows only. `memory_import` reads such a file back. Default path is `<memory-root>/exports/<timestamp>.jsonl`; `file` must name a path **inside the store** — exports under `<memory-root>/exports` (a relative path resolves against it), imports anywhere under `<memory-root>` — and `scope` exports a single scope.
+
+Both tools are model-facing, so a path is not a privilege: an export cannot write to `~/.gitconfig` or anywhere else outside the store, and an import cannot read outside it. Symbolic links are resolved before the check — including an `exports/` directory that is itself a link — so a link cannot carry a request out of the store. Exports are written `0600` and opened `O_NOFOLLOW` (both POSIX; on Windows the check before the write is the only guard). (Hardlinks are beyond any path check: a link planted inside `exports/` shares an inode with its target. That, and a narrow window on intermediate path components, are the boundary's known limits.) To move a store between machines, copy the file in:
 
 ```
-Export my memories to ~/memories.jsonl        # memory_export
-# …copy the file to the other machine…
-Import ~/memories.jsonl                       # memory_import
+Export my memories                              # -> <memory-root>/exports/<stamp>.jsonl
+# …copy that file to the other machine's <memory-root>/…
+Import <memory-root>/memories.jsonl             # memory_import
 ```
+
+An operator running a one-off migration can restore the old anywhere-on-disk behavior with `OPENCODE_MEMORY_ALLOW_OUTSIDE_PATHS=1`. It is read from the plugin process's own environment, so a model cannot grant it to itself through a tool argument.
 
 Every imported row re-enters through the same four gates as `memory_remember` (tagged `import`, original tags preserved), and the tool reports a tally:
 

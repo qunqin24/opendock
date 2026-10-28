@@ -193,7 +193,7 @@ You are the hoster — the code the plugin asks for is one you mint yourself, ri
 
 ### 4. Connect the plugin
 
-In opencode: `/share` → **Connect to a server** → paste the server's base URL (the `https://your-host` part — not a `/s/…` share link) and the code, if private → **enrolled, token saved**. That's the one-time setup — no share exists yet. Run `/share` once more: the consent dialog, then the link is copied. Every later share is one keystroke, but the consent question itself always appears — no share is ever created silently.
+In opencode: `/share` → **Connect to a server** → paste the server's base URL (the `https://your-host` part — not a `/s/…` share link) and the code, if private → **enrolled, token saved**. That's the one-time setup — no share exists yet. Run `/share` once more: the consent dialog, then the link is copied. Every later share is one keystroke, and the consent question appears every time. One exception by design: **all mode** (no TUI part installed, or `shareMode: "all"`) publishes every NEW session automatically — that is the CI posture, and it is why all-mode installs should only point at servers you want reading everything.
 
 For CI, bundle `ci/openshare.js` and drop a config next to it:
 
@@ -278,6 +278,8 @@ Viewer internals, branding, and the vendored components: [`share-viewer/README.m
 
 ## Configuration
 
+The full config surface across every package - worker vars and secrets, branding, server-side objects and token limits, the plugin's file chain, the Bun server, and the viewer cookie - is inventoried in one place: **[CONFIGURATION.md](CONFIGURATION.md)**. This section covers the plugin's own files.
+
 Priority (highest wins, per key): `OPENSHARE_*` env > plugin options (the config's plugin array entry) > adjacent `openshare.config.json` (next to the plugin) > package-root config > `openshare.local.json` (repo walk-up) > `~/.config/opencode/openshare.config.json` (settings home) > defaults. For everyday interactive use, edit the settings home (or just use `/openshare` — that's where it writes); the earlier links in the chain exist for CI bundles and packaging. An empty string means *unset* for `workerUrl`, `createToken`, `urlFile`, and `spoolDir`; for the other string keys an explicit empty value is meaningful (`modelLabel: ""` hides the model; `authLogin`/`authPassword: ""` removes the read gate).
 
 **Where the TUI writes:** `/openshare` saves to the **global settings home** (`~/.config/opencode/openshare.config.json`) by default; any *other* config file in the chain can be chosen as the write target if it already exists on disk (Write target row — the TUI never creates deploy-time override files). Each setting row shows `[source]` when a file or env var higher in the chain overrides it, and *Where values come from* lists every attribution.
@@ -291,7 +293,6 @@ Priority (highest wins, per key): `OPENSHARE_*` env > plugin options (the config
 | `completedDelayMs` | `5000` | How long a session must stay idle before the share says **completed** (busy cancels; a graceful opencode exit flushes the pending flip). `0` = immediate. |
 | `modelLabel` | `"$Provider/$Model"` | Label template; `""` hides the model. |
 | `ttlDays` | `90` | Share lifetime (capped at the worker's `MAX_TTL_DAYS` and the token's `maxTtlDays`). |
-| `openTasksInNewTab` | `true` | Viewer: task rows open sub-pages in a new tab. |
 | `authLogin` / `authPassword` | `""` | Default read gate for share pages. |
 | `spoolDir` | XDG data | Unacked-frame buffer (one spool per session per server). |
 | `urlFile` | `openshare.urls.txt` in the session's working directory | Share-URL log (all-mode; appends; manual mode never writes it). **`"none"` disables the file entirely.** |

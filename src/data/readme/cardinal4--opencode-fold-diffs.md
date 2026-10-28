@@ -1,7 +1,7 @@
 # opencode-fold-diffs
 
 > [!NOTE]
-> **Unofficial OpenCode V2 port of [Tanner Bruhn](https://github.com/tannerbruhn)'s [`opencode-fold-diffs`](https://github.com/tannerbruhn/opencode-fold-diffs) (npm: `opencode-fold-diffs`) — the OpenCode V1 plugin.** This fork — [`cardin/opencode-fold-diffs`](https://github.com/cardin/opencode-fold-diffs), published as [`@cardinal4/opencode-fold-diffs`](https://www.npmjs.com/package/@cardinal4/opencode-fold-diffs) — ports it to **OpenCode V2** (`@opencode/cli` 2.x, `opencode v2.0.x`). Install this fork on V2, upstream on V1. Tanner has not reviewed or endorsed it; report bugs here, not upstream.
+> **Unofficial OpenCode V2 port of [Tanner Bruhn](https://github.com/tannerbruhn)'s [`opencode-fold-diffs`](https://github.com/tannerbruhn/opencode-fold-diffs) (npm: `opencode-fold-diffs`) — the OpenCode V1 plugin.** This fork — [`cardin/opencode-fold-diffs`](https://github.com/cardin/opencode-fold-diffs), published as [`@cardinal4/opencode-fold-diffs`](https://www.npmjs.com/package/@cardinal4/opencode-fold-diffs) — ports it to **OpenCode V2** (`@opencode/cli` 2.x, tested with `opencode 2.2.0`). Install this fork on V2, upstream on V1. Tanner has not reviewed or endorsed it; report bugs here, not upstream.
 
 **Every `write`, `edit` and `apply_patch` dumps the whole file or the whole diff into your transcript, and stays there.** This plugin folds those blocks down to their header line — `# Wrote 40 lines · click to expand  src/app.ts` — and opens them again on click, or with a fold/unfold-all key if you configure one.
 
@@ -33,7 +33,9 @@ Click the row to open it. If you set the `key` option, that binding folds or unf
 opencode plugin add @cardinal4/opencode-fold-diffs
 ```
 
-Then list it in your CLI config so the terminal loads the TUI entrypoint. Add it to `~/.config/opencode/cli.json` (or `$XDG_CONFIG_HOME/opencode/cli.json`):
+That installs the package and adds it to the global `opencode.json`. The package ships a server entry (`index.js`, a no-op that gives the plugin an id) and a TUI entry (`tui.js`); the TUI part loads automatically with the server entry, so no second configuration is needed.
+
+If the terminal connects to a **remote server**, list the package in `~/.config/opencode/cli.json` (or `$XDG_CONFIG_HOME/opencode/cli.json`) instead so the local TUI loads the TUI part. Do not list it in both files:
 
 ```json
 {
@@ -42,9 +44,7 @@ Then list it in your CLI config so the terminal loads the TUI entrypoint. Add it
 }
 ```
 
-This plugin's behavior is TUI-only (its server entry is a no-op that exists so OpenCode can discover it by id), so configure it in `cli.json`. TUI plugins also stay active when the terminal connects to a remote server.
-
-With options:
+Options go on the plugin entry in either file:
 
 ```json
 {
@@ -115,7 +115,7 @@ Blocks are re-scanned on V2's `session.message.content.updated`, `session.tool.s
 
 ## Status
 
-Written against **opencode v2.0.24** and re-checked against **v2.0.27**; the `session.*` events it listens to exist from v2.0.10 on, so an older V2 install gets the fix without upgrading. The tree-walking, block matching, fold/unfold and toggle logic run green against a mock renderer tree shaped like V2's (`node --test`), and the fold was checked against a real transcript: `visible = false` (Yoga `display: none`) is what actually hides a body, not `maxHeight`.
+Written against **opencode v2.0.24**, re-checked against **v2.0.27** and **v2.2.0**; the `session.*` events it listens to exist from v2.0.10 on, so an older V2 install gets the fix without upgrading. The tree-walking, block matching, fold/unfold and toggle logic run green against a mock renderer tree shaped like V2's (`node --test`), and the fold was checked against a real transcript: `visible = false` (Yoga `display: none`) is what actually hides a body, not `maxHeight`.
 
 To confirm it loaded, restart (`opencode service restart`) and check `/plugins` lists `opencode-fold-diffs` and `Ctrl+P` → **Fold / unfold file diffs** is in the palette. If nothing folds, run **Fold diffs: diagnose** — the toast reports what the plugin can see:
 
@@ -125,6 +125,8 @@ To confirm it loaded, restart (`opencode service restart`) and check `/plugins` 
 | `transcript: yes · blocks: 0` | The transcript was found but no file blocks matched — the host render tree differs from what this plugin expects. |
 | `transcript: yes · blocks: N · folded: N` | Detection and folding ran; if the blocks still look expanded, the fold did not take on the renderables. |
 | `stats: off` | Folding works but the header could not be restated (Solid owns the label node). |
+
+The diagnose dump includes up to 80 characters of text from each renderable, so it can contain prompts or tool output. Redact it before sharing; set `dump: false` to skip writing it.
 
 Edits with fewer than `min_lines` changed lines (default 6) are left expanded on purpose — a one-line change is already its own summary. Set `min_lines: 0` to fold every file block.
 
@@ -136,7 +138,7 @@ The port follows V2's new plugin API and render tree, so the V1 code could not b
 - `api.renderer` → `context.renderer`, `api.route.current.name` → `context.ui.router.current().type`, `api.event.on` → `context.data.on`, `api.ui.toast` → `context.ui.toast.show`, `api.keymap.registerLayer` → `context.keymap.layer` (called straight from `setup` on 2.0.23+, from an `app`-slot component before that).
 - Event names are V2's `session.*` events; `message.updated` / `message.part.updated` are legacy schemas that never fire.
 - Tool headers are a label node plus a path node, so detection and the stats suffix target the label.
-- `bash` defaults to `false` because V2 trims long commands itself, and config moves from `tui.json` to `cli.json`.
+- `bash` defaults to `false` because V2 trims long commands itself, and config moves from `tui.json` to `opencode.json` (or `cli.json` for a remote TUI).
 
 ## License
 
