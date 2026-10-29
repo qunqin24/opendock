@@ -138,7 +138,7 @@ The plugin registers the `scheduled-job-best-practices` skill natively, so `@sch
 On first load the plugin migrates existing jobs in place:
 
 - Invocations snapshotted with v1-only flags (`--dangerously-skip-permissions`, `--attach`, `--port`, `--share`, `--variant`, `--command`) are rebuilt from the job's prompt; `--dangerously-skip-permissions` is mapped to `--auto`.
-- Scheduler units are reinstalled to use the Node supervisor instead of the retired `supervisor.pl`.
+- Scheduler units are reinstalled to use the Node supervisor instead of the retired `supervisor.pl`. A timer that was deliberately disabled stays disabled; enabled ones keep working.
 - Unit names, scopes, logs, and history are unchanged.
 
 Because timers are `Persistent=true`, reinstalling a job whose schedule was missed fires one catch-up run right after migration. Subsequent reloads change nothing and trigger nothing.

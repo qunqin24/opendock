@@ -27,23 +27,36 @@ the router, read its [known limits](./USAGE.md#11-known-limits).
   the internal helpers (titles, summaries, compaction) get fast, low-cost models.
 - **Plan-aware.** Three plan profiles: `go`, `go-plus`, and `free`. Each profile uses the
   monthly allowance of each model to calculate how many tokens the model can supply in
-  5 hours.
+  5 hours, and each profile can reach a different set of models (see below).
 - **Automatic failover.** The `plan`, `build`, `general`, and `explore` agents each have a
   ranked list of up to 4 models. On Go and Go Plus, the last one is a free model. At 85%
-  of the shared Go allowance, or after a usage-limit error, the agents move to their free
-  model. After a rate-limit or overload error of one model, the agent moves to the next
-  model in its list.
+  of the shared Go allowance, or after a usage-limit error, the agents move to the next
+  usable model: a metered Zen model on Go Plus, or the free model. After a rate-limit or
+  overload error of one model, the agent moves to the next model in its list.
 - **Live apply.** The router changes the models in the running OpenCode session. You do
   not have to restart OpenCode after a refresh.
 - **Clear results.** A scorecard shows each model and its scores. With `--verbose`, it
   also shows the source of each score.
 
+## Plan tiers
+
+| Plan | Models the router may use |
+| :-- | :-- |
+| `free` | `opencode/*` models with `free: true` only |
+| `go` | every `opencode-go/*` model, plus `opencode/*` $0 models |
+| `go-plus` | the Go tier, plus paid `opencode/*` (pay-as-you-go) models |
+
+The router never puts a paid `opencode/*` model in a chain on the `go` or `free` plan,
+so it cannot spend pay-as-you-go money that your plan does not include. Paid Zen models
+are metered per token and do not use the shared Go allowance; the scorecard shows them
+as `paid` with `metered` in the allowance columns.
+
 ## Requirements
 
 | Item | Version or condition |
 | :-- | :-- |
-| OpenCode | A version that supports plugins (tested with plugin API 1.19) |
-| Node.js | 20 or later, on your `PATH` (the slash commands run `node`) |
+| OpenCode | OpenCode 2 (plugin API 2.x; tested with 2.2) |
+| Node.js | 20 or later, on your `PATH` (the slash commands run the router CLI) |
 | OpenCode plan | Go, Go Plus, or no subscription (free models only) |
 | Model catalog | Start OpenCode one time before you install. OpenCode then writes `~/.cache/opencode/models.json`. |
 
@@ -63,12 +76,12 @@ If you do not have the command-line tool, edit the config file:
    - macOS and Linux: `~/.config/opencode/opencode.json`
 
    If the file does not exist, make it. If you have `opencode.jsonc`, use that file.
-2. Add the plugin to the `plugin` list:
+2. Add the plugin to the `plugins` list:
 
    ```json
    {
      "$schema": "https://opencode.ai/config.json",
-     "plugin": ["@s-berdia/opencode-router"]
+     "plugins": ["@s-berdia/opencode-router"]
    }
    ```
 
@@ -109,7 +122,7 @@ npx @s-berdia/opencode-router refresh --plan go      # calculate and write openc
 npx @s-berdia/opencode-router status                 # models in use and quota use
 npx @s-berdia/opencode-router plan go-plus           # save the plan profile and rebuild
 npx @s-berdia/opencode-router cat                    # catalog file, date, model count
-npx @s-berdia/opencode-router install --scope global # write slash-command files
+npx @s-berdia/opencode-router install --scope global # prepare the config and commands folder
 npx --prefer-online @s-berdia/opencode-router@latest update # remove OpenCode's old copy
 npx @s-berdia/opencode-router --help                 # all commands and options
 ```
@@ -152,13 +165,14 @@ or a value that is not valid, the router ignores it and shows a note in the scor
 | Key | Default | Meaning |
 | :-- | :-- | :-- |
 | `plan` | detected from your catalog | `go`, `go-plus`, or `free` |
+| `mode` | `auto` | How the router picks per message: `auto` (router picks, a manual pick in the UI wins for the session), `failover` (router moves agents only after limit errors), or `off` (no per-message changes) |
 | `chainDepth` | 4 for agents, 3 for helpers | Number of models in each failover list, including the free model at the end. `roles.<role>.chainDepth` wins over it |
 | `softThreshold` | `0.85` | Move the agents to their free model when the use of the shared Go allowance reaches this part of a window's limit (0.85 = 85%) |
 | `privacy.freeModelsOk` | `true` | `false` keeps `plan`, `build`, and `general` off free models |
 | `denyModels` | `[]` | Model IDs to never use. `*` and `?` wildcards are permitted |
 | `allowModels` | `[]` | If not empty, use only these model IDs |
-| `weights.<role>` | see `model-scores.json` | Weights for `intelligence`, `speed`, and `endurance`. Use values that add up to 1 |
-| `scores.<model-id>` | see `model-scores.json` | Your own `intelligence` and `speed` values (0 to 100) |
+| `weights.<role>` | see `model-scores.json` | Weights for `intelligence`, `speed`, `endurance`, and `reliability`. Use values that add up to 1 |
+| `scores.<model-id>` | see `model-scores.json` | Your own `intelligence` and `speed` values (0 to 100). These are pins: they always win over the generated snapshot |
 | `roles.<role>` | see `model-scores.json` | Change `variant`, `chainDepth`, `requires`, `preferFree`, or `diversifyFamily` for one role |
 | `blend` | `{ "input": 0.75, "output": 0.25, "cacheRead": 0.1 }` | Token mix used to calculate the cost of one million tokens |
 | `enduranceScale` | `{ "minTokensPer5h": 0.25, "maxTokensPer5h": 40 }` | Millions of tokens per 5 hours that give an endurance score of 0 and 100 |
@@ -173,20 +187,28 @@ The [usage guide](./USAGE.md#6-change-the-router-settings) has examples for each
 score = w_intelligence * intelligence
       + w_speed        * speed
       + w_endurance    * endurance
+      + w_reliability  * reliability
       + plan preference
       - penalty for a model that has no entry in model-scores.json
 ```
 
-- **Intelligence and speed** (0 to 100) come from, in this order: your `scores`, the
-  benchmark feed (if enabled), and then name patterns in `model-scores.json`.
+- **Intelligence and speed** (0 to 100) come from, in this order: your `scores`
+  pins, the generated benchmark snapshot in `model-scores.json`, an optional
+  benchmark feed, and then name patterns. The committed snapshot is generated
+  from Artificial Analysis data published through OpenRouter. See
+  [how the router selects models](./docs/model-selection.md).
+- **Reliability** (0 to 100) is seven-day uptime from OpenCode's public status
+  page. A model the page does not follow gets a neutral prior, not a penalty.
 - **Endurance** (0 to 100) comes from your quota. The router divides the 5-hour allowance
   (20% of the monthly allowance) by the cost of one million tokens. A free model, or a
   model with no limit, gets 100.
-- **Plan preference** puts the subscription models that you pay for before free models.
-  The `explore` agent and the internal helpers prefer free models.
+- **Plan preference** puts the subscription models included in your plan before metered
+  paid models, and both before free models. The `explore` agent and the internal helpers
+  prefer free models. See [plan tiers](#plan-tiers).
 - With `--verbose`, the scorecard shows the source of each score: `override` (your
-  `scores` or `model-scores.json`), `feed`, `cap` (from quota), `heuristic` (name pattern),
-  or `default` (no match).
+  `scores` or an explicit `model-scores.json` override), `benchmark` (generated
+  intelligence), `table` (a committed speed or reliability value), `feed`, `cap` (from
+  quota), `heuristic` (name pattern), `status` (measured uptime), or `default` (no match).
 
 ## Files that the router writes
 
@@ -197,6 +219,7 @@ score = w_intelligence * intelligence
 | `~/.config/opencode/router/last-apply.json` | The result of the last live apply |
 | `~/.config/opencode/router/eval-report.md` | The report of the last `/routing-eval` |
 | `~/.config/opencode/router/update-check.json` | The time of the last update check and the newest version on npm |
+| `~/.config/opencode/router/hud.json` | The active mode, the sessions with a manual pick, and the model of the last message per session (read by the terminal widget) |
 | `opencode.json` or `opencode.jsonc` (global, or the project file with `--scope project`) | `model`, `small_model`, and `agent.<role>.model` and `variant`. Comments and all other keys stay. A file with a JSON error is not changed |
 
 If `XDG_CONFIG_HOME` is set, the router uses `$XDG_CONFIG_HOME/opencode` in place of
@@ -225,8 +248,8 @@ npm test            # run the tests
 npm run typecheck   # check the types
 ```
 
-To use your local build in OpenCode, put the absolute path of the folder in the `plugin`
-list. Example for Windows: `"plugin": ["file:///C:/code/Opencode_router"]`. Run
+To use your local build in OpenCode, put the absolute path of the folder in the `plugins`
+list. Example for Windows: `"plugins": ["file:///C:/code/Opencode_router"]`. Run
 `npm run build` after each change, then restart OpenCode.
 
 ## Contributing

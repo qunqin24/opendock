@@ -21,7 +21,7 @@ deja indexe tout, des mois en arrière compris, et donne la partie utile
 <tr>
 <td align="center" width="33%">Rappel<br><b>97.2% R@5</b> sur LongMemEval-S<br><sub>les 500 questions · MemPalace 96.6%, agentmemory 95.2%<br>mêmes 19,195 sessions : 19/100 au premier rang, le suivant 14</sub></td>
 <td align="center" width="33%">Tokens<br><b>moitié moins de tokens</b> qu'agentmemory<br><sub>53,558 contre 104,974 sur une tâche déjà résolue<br>477 tokens de définitions d'outils, le moins des sept</sub></td>
-<td align="center" width="33%">Indexation<br><b>17.6 s</b> pour indexer 19,195 sessions<br><sub>le suivant des sept : 72 s<br>26 ms jusqu'à la première réponse, recherche médiane en 97 ms</sub></td>
+<td align="center" width="33%">Indexation<br><b>13.6 s</b> pour indexer 19,195 sessions<br><sub>le suivant des sept : 72 s<br>26 ms jusqu'à la première réponse, recherche médiane en 97 ms</sub></td>
 </tr>
 </table>
 
@@ -267,7 +267,7 @@ MCP fonctionnent comme d'habitude.
 ## Preuves
 
 <p>
-<b>58 % de tokens en moins</b> sur une tâche que cette machine avait déjà résolue &middot; <b>88.1 % hit@1</b> sur LongMemEval-S (jeu nettoyé de 470 questions) &middot; <b>70.5 %</b> sur LoCoMo &middot; des requêtes en <b>millisecondes</b> sur des gigaoctets d'historique<br>
+<b>58 % de tokens en moins</b> sur une tâche que cette machine avait déjà résolue &middot; <b>88.9 % hit@1</b> sur LongMemEval-S (jeu nettoyé de 470 questions) &middot; <b>71.9 %</b> sur LoCoMo &middot; des requêtes en <b>millisecondes</b> sur des gigaoctets d'historique<br>
 <sub>Onze exécutions par bras : 53,558 tokens contre 126,222 sans rien de branché, et 52,815 contre 103,443 sur une version ultérieure, là aussi onze exécutions &middot;
 <a href="https://vshulcz.github.io/deja-vu/guide/day-zero.html">ce que coûte une tâche</a> &middot;
 les deux harnais de recherche sont dans ce dépôt et tournent sur des jeux de données publics en quelques minutes &middot;
@@ -343,7 +343,7 @@ correspondre un motif n'est pas détecter un secret : une forme inconnue peut pa
 
 Un rappel est une requête lexicale sur un index local : médiane de
 0.7–0.8 ms, et rien n'attend un modèle. Le hook ajoute le démarrage du processus et le contrôle de fraîcheur
-des stockages, soit des dizaines de millisecondes sur un stockage de plusieurs gigaoctets.
+des stockages : sur un index de 19k sessions, le hook de chaque prompt prend 107 ms en médiane.
 
 </details>
 

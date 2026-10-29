@@ -20,7 +20,7 @@ deja는 몇 달 전 기록까지 전부 색인하고, 지금 일하는 에이전
 <tr>
 <td align="center" width="33%">재현율<br>LongMemEval-S <b>97.2% R@5</b><br><sub>전체 500문항 · MemPalace 96.6%, agentmemory 95.2%<br>같은 19,195개 세션: 1순위 적중 19/100, 차순위 14</sub></td>
 <td align="center" width="33%">토큰<br>agentmemory의 <b>절반 토큰</b><br><sub>이미 해결한 작업에서 53,558 대 104,974<br>도구 정의는 턴당 477토큰, 7개 중 최소</sub></td>
-<td align="center" width="33%">색인 시간<br>19,195개 세션 인덱싱 <b>17.6초</b><br><sub>7개 도구 중 차순위: 72초<br>첫 응답 26ms, 검색 중앙값 97ms</sub></td>
+<td align="center" width="33%">색인 시간<br>19,195개 세션 인덱싱 <b>13.6초</b><br><sub>7개 도구 중 차순위: 72초<br>첫 응답 26ms, 검색 중앙값 97ms</sub></td>
 </tr>
 </table>
 
@@ -254,7 +254,7 @@ TRAE CLI · Muse Code · Junie · JetBrains AI Assistant · Devin CLI · Windsur
 ## 근거
 
 <p>
-이 컴퓨터가 이미 해결한 작업에서 <b>토큰 58% 절감</b> &middot; LongMemEval-S(470문항 정제 세트)에서 <b>hit@1 88.1%</b> &middot; LoCoMo에서 <b>70.5%</b> &middot; 수 기가바이트 기록을 <b>밀리초</b> 단위로 조회<br>
+이 컴퓨터가 이미 해결한 작업에서 <b>토큰 58% 절감</b> &middot; LongMemEval-S(470문항 정제 세트)에서 <b>hit@1 88.9%</b> &middot; LoCoMo에서 <b>71.9%</b> &middot; 수 기가바이트 기록을 <b>밀리초</b> 단위로 조회<br>
 <sub>한쪽당 11회 실행: 53,558 토큰 대 아무것도 연결하지 않았을 때의 126,222, 이후 빌드에서 다시 11회 실행: 103,443 대비 52,815 &middot;
 <a href="https://vshulcz.github.io/deja-vu/guide/day-zero.html">작업 하나를 끝내는 비용</a> &middot;
 검색 평가 하네스 두 개 모두 이 저장소에 있고 공개 데이터셋에서 몇 분이면 돕니다 &middot;
@@ -327,8 +327,8 @@ deja bench read       # 데이터베이스 기반 저장소를 읽는 비용과,
 <summary><b>에이전트가 느려지나요?</b></summary>
 
 회상 한 번은 로컬 색인에 대한 어휘 질의입니다. 중앙값 0.7–0.8 ms이고
-모델을 기다리는 것은 없습니다. 훅은 프로세스 시작과 저장소 신선도 확인을 더하는데, 수 기가바이트 저장소에서
-수십 밀리초입니다.
+모델을 기다리는 것은 없습니다. 훅은 프로세스 시작과 저장소 신선도 확인을 더하는데, 세션 19k개 색인에서
+프롬프트마다 도는 훅은 중앙값 107 ms입니다.
 
 </details>
 

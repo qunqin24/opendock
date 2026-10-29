@@ -21,7 +21,7 @@ der gerade arbeitet, den Teil, der zählt.</p>
 <tr>
 <td align="center" width="33%">Recall<br><b>97.2% R@5</b> auf LongMemEval-S<br><sub>alle 500 Fragen · MemPalace 96.6%, agentmemory 95.2%<br>dieselben 19,195 Sessions: 19/100 auf Rang eins, der Nächstbeste 14</sub></td>
 <td align="center" width="33%">Tokens<br><b>halb so viele Tokens</b> wie agentmemory<br><sub>53,558 gegen 104,974 bei einer schon gelösten Aufgabe<br>477 Tokens Tool-Definitionen, die wenigsten von sieben</sub></td>
-<td align="center" width="33%">Indexzeit<br><b>17.6 s</b> für den Index über 19,195 Sessions<br><sub>der Nächste von sieben: 72 s<br>26 ms bis zur ersten Antwort, Suche im Median 97 ms</sub></td>
+<td align="center" width="33%">Indexzeit<br><b>13.6 s</b> für den Index über 19,195 Sessions<br><sub>der Nächste von sieben: 72 s<br>26 ms bis zur ersten Antwort, Suche im Median 97 ms</sub></td>
 </tr>
 </table>
 
@@ -268,7 +268,7 @@ funktionieren lexikalische Suche und MCP-Recall wie gewohnt.
 ## Belege
 
 <p>
-<b>58 % weniger Tokens</b> bei einer Aufgabe, die diese Maschine schon gelöst hatte &middot; <b>88.1 % hit@1</b> auf LongMemEval-S (bereinigter Satz aus 470 Fragen) &middot; <b>70.5 %</b> auf LoCoMo &middot; Abfragen in <b>Millisekunden</b> über Gigabytes an Historie<br>
+<b>58 % weniger Tokens</b> bei einer Aufgabe, die diese Maschine schon gelöst hatte &middot; <b>88.9 % hit@1</b> auf LongMemEval-S (bereinigter Satz aus 470 Fragen) &middot; <b>71.9 %</b> auf LoCoMo &middot; Abfragen in <b>Millisekunden</b> über Gigabytes an Historie<br>
 <sub>Elf Läufe je Arm: 53,558 Tokens gegen 126,222 ohne angebundenes Gedächtnis, und 52,815 gegen 103,443 auf einem späteren Build, wieder elf Läufe &middot;
 <a href="https://vshulcz.github.io/deja-vu/guide/day-zero.html">was eine Aufgabe kostet</a> &middot;
 beide Retrieval-Harnesses liegen in diesem Repository und laufen in Minuten auf öffentlichen Datensätzen &middot;
@@ -344,7 +344,7 @@ keine Secret-Erkennung: eine unbekannte Form kann durchrutschen. Siehe
 
 Ein Recall ist eine lexikalische Abfrage auf einen lokalen Index: Median
 0.7–0.8 ms, und nichts wartet auf ein Modell. Der Hook fügt Prozessstart und Aktualitätsprüfung der Speicher
-hinzu — einige Dutzend Millisekunden bei einem mehrere Gigabyte großen Speicher.
+hinzu — auf einem Index von 19k Sessions braucht der Hook pro Prompt im Median 107 ms.
 
 </details>
 

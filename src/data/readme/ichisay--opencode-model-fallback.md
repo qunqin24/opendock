@@ -1,3 +1,17 @@
+# Maintenance Notice — This Fork Is No Longer Maintained
+
+> **Notice:** This fork is no longer actively maintained or developed. Its implementation is outdated with respect to current OpenCode v2 architecture. No new releases, bug fixes, or adaptations are planned.
+> It is not recommended for new installations.
+> For advanced provider routing, model fallbacks, and resilient proxy management, please consider evaluating **[OmniRoute](https://github.com/cheaper-inference/OmniRoute)**, which provides a comprehensive, modern solution for these needs.
+>
+> _Note: OmniRoute is an independent alternative and not necessarily a direct drop-in replacement. This deprecation notice applies exclusively to this fork (`tmogeid/opencode-model-fallback`), not to the original upstream project._
+
+---
+
+> **Aviso de mantenimiento:** Este fork ha dejado de recibir desarrollo y mantenimiento activo. Su implementación está desfasada respecto a la arquitectura actual de OpenCode v2 y no se planifican nuevas versiones ni adaptaciones. No se recomienda su uso en instalaciones nuevas. Se recomienda evaluar **[OmniRoute](https://github.com/cheaper-inference/OmniRoute)** como alternativa independiente y completa para enrutamiento de modelos, proveedores y gestión de fallbacks. Este aviso afecta exclusivamente a este fork personal.
+
+---
+
 # opencode-model-fallback
 
 OpenCode plugin for ordered model fallback chains, preemptive redirect, and automatic rate limit recovery.

@@ -13,8 +13,10 @@ arguments, tool results (the outputs fed back into context) and the residual
 The package ships a **dual V1 + V2 plugin** (one entry works in both OpenCode
 generations) plus an optional TUI module (`./tui` entry) that renders a **live
 sidebar** and a **zero-LLM `/cx` breakdown panel** with measured contributors
-and a redacted export. The V2 path is **tested against opencode 2.2.0**; the
-V1 path against 1.18.29+.
+and a redacted export, and an **experimental Desktop GUI part**
+(`./gui-experimental`: a side-panel tab and a composer pill). The V2 path is
+**tested against opencode 2.2.0** (the isolated load + state-write e2e was also
+re-run against the 2.2.1 Desktop CLI); the V1 path against 1.18.29+.
 
 > **V1 is feature-frozen.** It is kept working for compatibility (bug fixes
 > only); all new features land in the V2 path.
@@ -70,11 +72,11 @@ For every served request the plugin estimates how the context window is split:
   duplicate group), reported honestly as *"N redundant tool outputs ≈ X tokens"*
   — never as "the model wasted effort". Findings are per-session and **path-free
   in the persisted/exported form**.
-* The denominator is the **opencode 2.2.0 compaction ceiling** (unchanged since
-  2.1.4): `window =
-  limit.input || limit.context`; `reserve = max(floor(window * 0.15), window >=
+* The denominator is the **opencode 2.2.x compaction ceiling**: `window =
+  limit.input || limit.context`; `reserve = max(floor(window * 0.10), window >=
   2 * 16_000 ? 16_000 : 0)`; the ceiling is `window - reserve`. This mirrors
-  `calculateCeiling()` in `packages/core/src/session/compaction.ts`. When opencode
+  `calculateCeiling()` in `packages/core/src/session/compaction.ts` (the reserve
+  share is 10% since 2.2.0 / PR #51271; it was 15% up to 2.1.x). When opencode
   carries a `compaction.buffer` configured in its own settings, the plugin
   cannot read that value (it is not exposed to plugins), so the default
   reserve formula is used — set `OPENCODE_CONTEXT_INDICATOR_COMPACT_BUFFER`
@@ -372,14 +374,95 @@ an error toast.
 
 ---
 
+## Desktop panel (experimental)
+
+OpenCode Desktop has no TUI, so the sidebar above cannot exist there. The
+package therefore ships a **GUI part** (`./gui-experimental`) that renders the
+same numbers as a Desktop **side-panel tab**, plus a **composer pill** with the
+current percentage.
+
+> **Experimental.** The host API it uses (`@opencode/plugin/gui`, opencode
+> 2.2.0+) is explicitly marked experimental upstream and may change between
+> releases; the export name `./gui-experimental` says so. If the host changes
+> the API, the GUI part fails to load while the server part, the slash commands
+> and the TUI surfaces keep working.
+
+### What it shows
+
+**Context tab** (side region): the model, `ctx / usable (percent)`, the eight
+categories as value + bar + share of the context, the measurement time, the
+`source` tag (`live` / `snapshot` / `client-context` / `no-data`), a
+`stale after compaction` marker, the compaction reserve, and one line per
+subagent with its own window and percentage.
+
+**Composer pill**: `38% ctx` above the composer, amber from 65 % and red from
+85 % of the usable window; clicking it opens the panel.
+
+### Opening it
+
+| Way | Where |
+| --- | --- |
+| `+` menu of the side region | "Context" |
+| Command palette / slash command `/cx` | "Open context panel" |
+| Clicking the composer pill | opens the tab for the current session |
+
+### Where the numbers come from
+
+A Desktop window has **no filesystem access**, so it cannot read `state.json`
+the way the TUI does. The server part registers an **RPC contract**
+(`lib/rpc.js`, id `context-indicator`, method `family`) that answers with the
+root session plus every descendant, and the GUI calls it through
+`ctx.client.rpc()`. The panel **polls** every 1.5 s (the pill every 5 s) instead
+of subscribing to events: the contract stays one method, a poll costs no provider
+call (the server answers from `state.json` plus its in-memory caches once the
+session has been measured; a session this instance never observed live costs at
+most one `session.get()` per instance, not per poll), and polling recovers by
+itself when the desktop app's background server restarts.
+
+The contract is published as the `./rpc` export, so other plugins and clients
+can read the same data:
+
+```js
+import { DesktopContextRpc } from "opencode-context-indicator/rpc"
+const { rows } = await client.rpc(DesktopContextRpc).family({ sessionID })
+```
+
+### Install
+
+The Desktop part is loaded from the same plugin entry, nothing extra to
+configure:
+
+```jsonc
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugins": ["opencode-context-indicator"]
+}
+```
+
+After installing, restart the app and check **Settings > Extensions**; the
+plugin must be listed with its GUI part loaded. The `dist/gui-experimental.cjs`
+bundle in the package is prebuilt, so no build step is needed on install.
+
+### Limits
+
+* **Desktop only.** The TUI has its own sidebar and `/cx` panel, and loading a
+  GUI bundle there does nothing.
+* **Polling, not push.** A change can take up to 1.5 s to appear (5 s for the
+  pill); the numbers themselves are the same snapshot the sidebar reads.
+* **Not exercised in CI.** The GUI needs a real Desktop window: CI typechecks
+  `gui/*.tsx`, builds the bundle and validates the artifact (gate `g`), and the
+  panel and the pill are verified manually in the app before a release.
+
+---
+
 ## Surface matrix
 
-| Surface | Toast | TUI sidebar | TUI panel (/cx) | Breakdown log file | Slash commands |
-| --- | :---: | :---: | :---: | :---: | :---: |
-| OpenCode **1.x** — Desktop | ✅ | — | — | ✅ | — |
-| OpenCode **1.x** — TUI | ✅ | — | — | ✅ | — |
-| OpenCode **2.x** — TUI | — | ✅ | ✅ | ✅ | ✅ |
-| OpenCode **2.x** — Desktop | — | — | — | ✅ | ✅ |
+| Surface | Toast | TUI sidebar | TUI panel (/cx) | Desktop panel | Desktop pill | Breakdown log file | Slash commands |
+| --- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| OpenCode **1.x** — Desktop | ✅ | — | — | — | — | ✅ | — |
+| OpenCode **1.x** — TUI | ✅ | — | — | — | — | ✅ | — |
+| OpenCode **2.x** — TUI | — | ✅ | ✅ | — | — | ✅ | ✅ |
+| OpenCode **2.x** — Desktop | — | — | — | ✅ (exp) | ✅ (exp) | ✅ | ✅ |
 
 Notes — these reflect what the plugin API actually exposes today:
 
@@ -394,8 +477,13 @@ Notes — these reflect what the plugin API actually exposes today:
 * **V1 has no sidebar and no slash command.** The command/slot API (and the
   `./tui` entry) is a V2 feature; OpenCode 1.x has no equivalent, so V1 is
   toast + log only.
-* The Desktop app is TUI-less; its V2 surfaces are the log file and the
-  `/context` / `/context-breakdown` / `/context-diff` slash commands.
+* The Desktop app is TUI-less. Its V2 surfaces are the log file, the
+  `/context` / `/context-breakdown` / `/context-diff` slash commands, and the
+  **experimental** GUI part: a side-panel tab and a composer pill fed by the
+  plugin over RPC (see
+  [Desktop panel (experimental)](#desktop-panel-experimental)). That part needs
+  a host that loads `./gui-experimental` (opencode 2.2.0+); without it the log
+  file and the slash commands still work.
 
 ---
 
@@ -407,24 +495,22 @@ and `$TMPDIR` (usually `/tmp`) elsewhere:
 | File | Purpose |
 | --- | --- |
 | `context-breakdown.log` | Human-readable live snapshot + bounded final summaries |
-| `opencode-context-indicator-state.json` | Machine-readable snapshot consumed by the TUI sidebar and the `/cx` panel. Fields per entry: `sessionID`, `parentID`, `role`, `agent`, `model`, `providerID`, `ctx`, `input`, `usable` (compaction ceiling), `reserve` (tokens reserved for compaction), `limit` (context window), `reasoning`, `categories{user,assistant,reasoning,toolArgs,toolOut,system,toolSchemas,other}`, `toolOutByTool` (per-tool repeated-output estimate), `reclaim` (duplicate tool output, bounded), `cacheRead`/`cacheWrite` (provider-reported prompt-cache tokens), `compactedAt`/`compactStale`, `top` (top-5 heaviest single items, path-free), `previous` (previous distinct measurement for `/context-diff`), `updatedAt`. |
+| `opencode-context-indicator-state.json` | Machine-readable snapshot consumed by the TUI sidebar and the `/cx` panel. Fields per entry: `sessionID`, `parentID`, `role`, `agent`, `model`, `providerID`, `ctx`, `input`, `usable` (compaction ceiling), `reserve` (tokens reserved for compaction), `limit` (context window), `reasoning`, `categories{user,assistant,reasoning,toolArgs,toolOut,system,toolSchemas,other}`, `source` (provenance of the categories: `context-hook` / `compaction-hook` (V2) / `transform` / `system-transform` (V1) / `client-context` / `snapshot` - any hook-family source wins, a fallback never overwrites it), `toolOutByTool` (per-tool repeated-output estimate), `reclaim` (duplicate tool output, bounded), `cacheRead`/`cacheWrite` (provider-reported prompt-cache tokens), `compactedAt`/`compactStale`, `top` (top-5 heaviest single items, path-free), `previous` (previous distinct measurement for `/context-diff`), `updatedAt`. |
 | `context-events.log` | Raw event tap — **only** when `DEBUG_EVENTS` is flipped to `true` in the source (off by default) |
 
 The whole `context-breakdown.log` is **rewritten atomically** (temp file +
 rename, like the state file): the live snapshot is always regenerated and the
 final summaries (on `session.idle`) plus compaction notes are re-rendered from
-an in-memory buffer (bounded, last 50 per log), so the file never grows and
-concurrent plugin instances cannot observe a half-written file. A summary-only
-write (idle, compaction, command payload) re-renders the last live snapshot, so
-adding a note never blanks that section. That snapshot may predate a compaction
-or a deleted session - the leading `[<timestamp>]` line is the freshness cue.
-Both parts are **process-local**: they
-survive every rewrite and failed command delivery within the lifetime of the
-running instance, but they are dropped when the plugin instance is re-created
-(opencode restarts, or about 24 h of idling). A different instance that rewrites
-the file keeps its own view of the summary buffer; cross-instance duplicate
-summaries are prevented separately by an atomic claim marker (see
-`lib/dedup.js`).
+an in-memory buffer (bounded, last 50 blocks per instance), so the file never
+grows and concurrent plugin instances cannot observe a half-written file. A
+summary-only write (idle, compaction, command payload) re-renders the last live
+snapshot, so adding a note never blanks that section. That snapshot may predate a
+compaction or a deleted session - the leading `[<timestamp>]` line is the
+freshness cue. Each instance keeps its own buffer, so every write **merges the
+summary section already on disk** (de-duplicated by line, bounded to 400 lines):
+a note appended by the instance that handled the event survives the next
+snapshot rewrite from another instance. Cross-instance duplicate summaries are
+prevented separately by an atomic claim marker (see `lib/dedup.js`).
 
 ---
 
@@ -548,10 +634,11 @@ the sidebar instead.
   gracefully (the breakdown falls back to throttled `session.messages` fetches
   and toasts keep working).
 * **OpenCode ≥ 2.2.0** for the V2 path with the TUI surfaces (built and verified
-  against **2.2.0**). The server-only V2 path keeps working on 2.0.16+; the TUI
-  module pins the OpenTUI generation it was compiled against, so a host on
-  OpenTUI 0.6 (opencode ≤ 2.1.4) will not load the TUI surfaces - neither the
-  sidebar nor the `/cx` panel - from a 1.6.x install.
+  against **2.2.0**; the isolated load + state-write e2e also passes on the
+  **2.2.1** Desktop CLI). The server-only V2 path keeps working on
+  2.0.16+; the TUI module pins the OpenTUI generation it was compiled against,
+  so a host on OpenTUI 0.6 (opencode ≤ 2.1.4) will not load the TUI surfaces -
+  neither the sidebar nor the `/cx` panel - from a 1.6.x install.
 * **TUI sidebar**: terminal TUI only, requires the OpenTUI rendering stack that
   ships with OpenCode. `@opentui/core` and `solid-js` are **optional** peer
   dependencies resolved by OpenCode at runtime; the main plugin installs and runs
@@ -565,6 +652,12 @@ the sidebar instead.
   upstream limitation, on the **npm** path the sidebar is **auto-disabled**
   (the plugin logs one hint and registers no slot) — use a `file://` install for
   the live sidebar, see [Live sidebar: npm vs file:// install](#live-sidebar-npm-vs-file-install).
+* **Desktop GUI part** (optional, experimental): needs an OpenCode Desktop
+  release that loads the `./gui-experimental` export (opencode 2.2.0+, where the
+  GUI plugin API exists). The bundle is prebuilt and ships in the package, so it
+  adds **no** runtime dependency; `solid-js`, the GUI SDK and the client are
+  provided by the app itself. On hosts without that API the export is simply not
+  loaded and everything else keeps working.
 
 ---
 
@@ -630,15 +723,17 @@ caller.
 ### Running tests
 
 ```bash
-npm run test:prepublish       # fast gate: tarball + tui.tsx + resolve + T1-T29 unit checks
+npm run build:gui             # build dist/gui-experimental.cjs (required by the gate)
+npm run test:prepublish       # fast gate: tarball + tui.tsx + resolve + T1-T35 unit checks + GUI bundle
+npm run test:types            # tsc for the TUI entry AND the Desktop GUI part
 npm run test:e2e              # full E2E: isolated plugin load + one "Say OK" round-trip
 npm run test:e2e:quick        # E2E load-only, no LLM call
 npm run test:drift            # advisory: warns on non-breaking host drift (also in CI)
 npm run test:drift:strict     # release check: fails on ANY host drift
 ```
 
-`prepublishOnly` runs **both** gates automatically on `npm publish`
-(`node test/prepublish.mjs && node test/e2e-tui.mjs --full`) and is skipped with
+`prepublishOnly` runs **all** of it automatically on `npm publish`
+(`npm run build:gui && node test/prepublish.mjs && node test/e2e-tui.mjs --full`) and is skipped with
 `--ignore-scripts`. The whole chain takes roughly **1 minute** (fast gate ~20 s,
 isolated E2E ~10 s warm / up to ~90 s cold); the E2E is bounded by INIT 45 s +
 STEP 80 s, ~3 min total.
@@ -649,12 +744,13 @@ STEP 80 s, ~3 min total.
 
 | Step | What | Why |
 |---|---|---|
-| (a) tarball composition | `package.json` `files[]` expands to the base files plus every `lib/*` module (count asserted dynamically); `docs/` may contain images only | no test/node_modules/tsconfig in the tarball |
+| (a) tarball composition | `package.json` `files[]` expands to the base files plus every `lib/*` module (count asserted dynamically); `docs/` may contain images only; `dist/` may contain only the built GUI bundle | no test/node_modules/tsconfig in the tarball, and no published export pointing at nothing |
 | (b) pragma regression | esbuild `--jsx=automatic` → `@opentui/solid/jsx-runtime` present, `react/jsx-runtime` absent | a removed/broken pragma kills the sidebar on npm install |
 | (c) resolve chain | replica install: host-bridged + peer packages resolve; local tui.tsx relative imports resolve via node from the entry (resolve-bridge.cjs) | broken peer/optional dep or a bad local import silently breaks the sidebar |
-| (d) unit harness T1-T29 | limit/agent/state fix assertions plus measureContributors, redacted-export, shared category-helper, sanitizer/unicode, prompt-cache, waste-detector, compaction-reserve, top-consumer, diff and subagent-rollup checks (75 total) | regressions in modelLimits, writeStateFile, hydrate, contributors, export, subagent lifetime |
-| (e) corporate-identifier scan | no forbidden identifiers in the published surface (`index.js`, `tui.tsx`, `lib/*`, `README.md`, `CHANGELOG.md`, `package.json`) or the test tree | compliance |
+| (d) unit harness T1-T35 | limit/agent/state fix assertions plus measureContributors, redacted-export, shared category-helper, sanitizer/unicode, prompt-cache, waste-detector, compaction-reserve, top-consumer, diff, subagent-rollup and Desktop-RPC checks (85 total; T30 schema-vs-builder drift, T31 registration + handler, T32-T35 fallback-vs-hook category priority across the report, the shared state file and the live log, T25c/T25d compaction-hook arming, T34 cross-instance summary merge) | regressions in modelLimits, writeStateFile, hydrate, contributors, export, subagent lifetime, and a GUI/server wire mismatch |
+| (e) corporate-identifier scan | no forbidden identifiers in the published surface (`index.js`, `tui.tsx`, `lib/*`, `gui/*`, `README.md`, `CHANGELOG.md`, `package.json`, the GUI build config) or the test tree | compliance |
 | (f) non-English scan | no non-ASCII letters (`\p{L}` above U+007F) in the same published surface and test tree (`docs/` is image-only and is not text-scanned) | English-only source rule |
+| (g) Desktop GUI bundle | `dist/gui-experimental.cjs` exists and is a non-trivial single-file CJS bundle: no ESM `import`, no dynamic `import()`, no Node built-in, and every app-provided module (`solid-js`, `solid-js/web`, `@opencode/plugin/gui`, `@opencode/plugin/rpc`) still a `require()` - no bundled second copy, no React/OpenTUI/bare-`opencode` import | a stale or hand-edited bundle, or a build that inlines the app instance, breaks the Desktop panel at load time |
 
 **Isolated E2E — `test/e2e-tui.mjs`** (requires the OpenCode CLI)
 
@@ -696,11 +792,13 @@ model.
 and on a daily schedule (GitHub auto-parks scheduled workflows after 60 days of
 repo inactivity — a push or manual run re-enables them):
 
-1. `npx --no-install tsc --noEmit` — typecheck of the TUI entry (`tui.tsx` + its
-   `lib/*` imports);
-2. `test/prepublish.mjs` — the full fast gate (a)–(f), including the standalone
-   esbuild transpile check (pragmas, no React);
-3. `test/drift-watch.mjs` — compares the OpenTUI pins and the
+1. `npx --no-install tsc --noEmit` and `npx --no-install tsc -p tsconfig.gui.json --noEmit`
+   - typecheck of the TUI entry (`tui.tsx` + its `lib/*` imports) and of the
+   Desktop GUI part (`gui/*.tsx`, Solid JSX);
+2. `npm run build:gui` - build the Desktop GUI bundle before the gate inspects it;
+3. `test/prepublish.mjs` - the full fast gate (a)-(g), including the standalone
+   esbuild transpile check (pragmas, no React) and the GUI bundle check;
+4. `test/drift-watch.mjs` - compares the OpenTUI pins and the
    `@opencode/plugin` types devDependency with the **latest released** opencode.
    It is **advisory by default**: patch drift prints a `::warning::` annotation
    and exits 0, so the daily pipeline does not go red on every host patch. Only
@@ -711,7 +809,10 @@ repo inactivity — a push or manual run re-enables them):
    `npm run test:drift:strict` to fail on any drift.
 
 The Node-pty E2E is not run in CI (requires the OpenCode binary) and is skipped
-gracefully when the CLI is absent (`[SKIP] opencode CLI not found`).
+gracefully when the CLI is absent (`[SKIP] opencode CLI not found`). The Desktop
+GUI part cannot be exercised headless at all: CI typechecks it, builds the
+bundle and checks the artifact, and the panel/pill are verified manually in a
+real Desktop window before a release.
 
 ---
 

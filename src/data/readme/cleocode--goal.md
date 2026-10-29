@@ -1,8 +1,10 @@
-# opencode-goal
+# open-goal (CLEO Goal plugin)
 
 Persistent, host-verified goal mode for [OpenCode 2](https://opencode.ai). Describe what you want, let the bundled **write-goal** interview turn it into a structured contract, and the plugin keeps the session working until the host — not the model — proves every criterion.
 
-> **Status: released (`v0.5.0`).** Engine, verification and TUI are built and tested end to end against OpenCode 2.0.22 with a scripted model, and each release is proven from its own installed git tag. CLEO integrates as an optional first-class citizen (`/goal cleo`). See [docs/HANDOFF.md](docs/HANDOFF.md).
+> **Status: released (`0.9.4` on npm as `@cleocode/goal`).** Engine, verification and TUI are built and tested end to end against OpenCode 2.0.22 with a scripted model, and each release is proven from its own installed tag. CLEO integrates as an optional first-class citizen (`/goal cleo`). See [docs/HANDOFF.md](docs/HANDOFF.md).
+>
+> **Name:** this project is **open-goal** (repo `kryptobaseddev/open-goal`). It was called `opencode-goal` until 2026-10; the GitHub repo redirects the old URL, and the agent mailbox is **`open-goal-lead@macbook`**. Use `open-goal` in new code, docs, mail and instructions — not `opencode-goal`.
 
 ## Why another goal plugin
 
@@ -36,10 +38,10 @@ Or install it for every project through OpenCode itself (this writes the user-gl
 ```bash
 opencode plugin add "@cleocode/goal@<version>"
 opencode reload
-opencode plugin list        # opencode-goal should be listed
+opencode plugin list        # open-goal should be listed
 ```
 
-Pin a version. A git tag still works as a spec: `github:kryptobaseddev/opencode-goal#v<version>`.
+Pin a version. A git tag still works as a spec: `github:kryptobaseddev/open-goal#v<version>`.
 
 ### The `cleo-goal` bin
 
@@ -128,7 +130,7 @@ While a goal runs the model cannot edit the contract, files under `.opencode/goa
 Use the object form in your OpenCode config to change defaults:
 
 ```jsonc
-{ "plugins": [{ "package": "github:kryptobaseddev/opencode-goal#v0.5.0", "options": { "stallTurns": 4, "cooldownMs": 3000 } }] }
+{ "plugins": [{ "package": "github:kryptobaseddev/open-goal#v0.5.0", "options": { "stallTurns": 4, "cooldownMs": 3000 } }] }
 ```
 
 `backstopTurns` (200, only when the contract has no turn budget) · `cooldownMs` (1500) · `stallTurns` (3) · `recoveryAt` (2) · `blockerRepeats` (3) · `maxPromptFailures` (3) · `verifierAgent` ("goal-verifier") · `verifierTimeoutMs` (240000) · `liveChecks` (true) · `launchApprovalMs` (600000).

@@ -33,8 +33,9 @@ is in [`docs/market-benchmark.md`](docs/market-benchmark.md).
 - **Server** (`m3m0s serve`): HTTP API + embedded WebUI in one process. SQLite
   storage (pure Go, no cgo) with versioned migrations; embeddings from any
   OpenAI-compatible endpoint; cosine search in Go.
-- **MCP bridge** (`m3m0s mcp`): stdio MCP server for hosts such as Claude Code
-  or OpenCode; a stateless bridge to a running `serve`.
+- **MCP**: a stdio bridge (`m3m0s mcp`) for hosts such as Claude Code or
+  OpenCode, and a native Streamable HTTP endpoint (`POST /mcp` on `serve`) for
+  remote clients such as Open WebUI. Same tools on both.
 - **CLI** (`m3m0s add|search|recent|get|update|stats|forget-sweep|restore`):
   one-shot commands, also clients of `serve`.
 - **Watcher** (`m3m0s watch <dir>`): indexes `AGENTS.md`, `CLAUDE.md`,
@@ -74,6 +75,7 @@ Working today:
   context-injection preview, and a floating chat that answers from your memory and can save new memories.
 - **Claude Code plugin** (`/plugin install m3m0s-memory --marketplace rafaelvieiras/m3m0s`) or manual hooks: `SessionStart` (inject recent memory),
   `PreCompact` and `SessionEnd` (capture the transcript delta).
+- **Integrations** (`integrations/`): pi, opencode, Hermes, and an Open WebUI filter function ([D55](docs/decisions/D55-openwebui-filter.md)).
 - **Self-documentation**: the project's own docs are embedded in the binary and
   indexed into memory at boot.
 
@@ -119,6 +121,10 @@ Register the MCP bridge in your agent host as a stdio server with
 full operation list for MCP, CLI and HTTP is in
 [`docs/api-contract.md`](docs/api-contract.md).
 
+Clients that speak remote MCP can skip the bridge and connect to
+`http://localhost:19234/mcp` with the header `Authorization: Bearer <key>`;
+see [Connecting MCP clients over HTTP](docs/mcp-http-clients.md).
+
 To run without Docker: `go build ./cmd/m3m0s` (build the WebUI first with
 `npm run build` in `webui/` if you want it embedded), then `m3m0s serve`.
 
@@ -152,6 +158,8 @@ Set through environment variables (or the matching `m3m0s serve` flags).
 | `M3M0S_FILTER_RULES` | — | JSON file of rules that replace (same `id`), add or disable (`"action": "off"`) the built-in ones. Patterns must be anchored (`^`, and `$` for facts). |
 | `GOGC` | `50` (set by m3m0s when unset) | Go GC target. Lower values trade a little CPU for a lower memory peak. |
 | `GOMEMLIMIT` | — (not set) | Optional soft memory limit for the Go runtime, e.g. `600MiB` on a small host; keep it above the live size (~250 MB for 75k entries). |
+| `M3M0S_MCP_READ_ONLY` | — | `1` makes the native `/mcp` endpoint (and the stdio bridge) hide and reject the write tools ([D45](docs/decisions/D45-mcp-read-only-mode.md), [D54](docs/decisions/D54-mcp-streamable-http.md)). |
+| `M3M0S_MCP_ALLOWED_ORIGINS` | — | Comma-separated browser origins `/mcp` accepts besides its own (`*` = any). Requests with no `Origin` header (every non-browser client) always pass. |
 | `M3M0S_URL` | `http://localhost:19234` | Server URL used by the CLI, MCP bridge, watcher and hooks. |
 | `M3M0S_API_KEY` | — | API key used by those clients. |
 

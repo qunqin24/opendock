@@ -12,7 +12,7 @@ An OpenCode Desktop plugin that adds a Markdown notepad to the session side pane
 
 Highlight text anywhere in the window, such as part of a chat message. A floating bar appears above it:
 
-- **Quote** attaches the selection to your next message as a quote and opens its comment box, in one step.
+- **Quote** attaches the selection to your next message as a quote and opens its comment box, in one step. It first dispatches a cancelable, bubbling `opencode:quote` event with `detail: { text }` on the selection. A view with its own composer, such as an [opencode-side-chat](https://github.com/parzival1l/opencode-side-chat) side chat, cancels it and takes the quote instead.
 - **Add to list** adds each selected line as a checklist item. It drops list markers like `-`, `1.`, and `•`.
 - **Add to notes** appends the selection to the notes as a blockquote.
 
@@ -71,6 +71,13 @@ OpenCode installs the package and reloads plugins when the config changes.
 - The server reloads when a file in `src/` changes.
 - `bun run test` covers the note format and the file store. `bun run typecheck` runs `tsc`.
 - `bun run test:e2e` drives the highlight bar in Chrome with real mouse presses, including while the page streams and scrolls. Set `CHROME_PATH` if Chrome is not in `/Applications`.
+
+## Release
+
+1. Bump `version` in `package.json` and commit it as `Release <version>`.
+2. Push to `main`.
+
+The `Release` workflow runs the checks on every push. On `main`, it publishes the version to npm if npm does not have it yet, then creates a GitHub release `v<version>`. It publishes through npm trusted publishing, so the repo holds no npm token.
 
 ## Markdown Preview
 

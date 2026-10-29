@@ -32,7 +32,7 @@ No special UI required. AutoCode runs in OpenCode and keeps concepts and durable
 - 🗄️ **Read-only database inspection** — discover configured database tables and read one table at a time without write access.
 - 🌐 **HTTP REST client** — simulate API calls for troubleshooting.
 - 🔀 **Git tools** — inspect changes and commit updates to Git repositories.
-- 🔐 **SSH tools** — run remote commands and manage files through environment-keyed tools.
+- 🔐 **SSH tools** — run remote commands and manage files through [profile credentials](docs/credentials.md).
 - 🧪 **Sandbox isolation** — agents automatically manage and experiment in their own isolated sandboxes.
 - 🛠️ **Self-building tools** — agents create durable per-job Node `.mjs` tools, reconcile dependencies, run finite scripts, and manage long-running services.
 

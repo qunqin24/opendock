@@ -9,10 +9,9 @@ OpenCode 插件,面向 JetBrains 项目 (IntelliJ IDEA / PyCharm / WebStorm 等)
 2. **优先使用 IDE 工具** —— IDE 可用时,向模型注入 **逐项目**的引导:在哪个项目里工作,就用哪个项目前缀的工具;IDE 不可用时
    回退原生工具 (正常回退,无需声明)。
 
-> **需要项目环境的命令走 IDE 终端 / Run Configuration**:跑 `java` / `python` / `npm` 这类依赖项目配好的 JDK / Node / Python 版本的
-> **一次性命令**,用配套插件提供的 `ide_project_sdk_terminal`(它带项目 SDK 环境);**反复发生的流程**仍固化成 Run Configuration。
-> **IDE 内置的 `ide_execute_terminal_command` 继续隐藏** —— 实测它不继承项目环境,已被 `project_sdk_terminal` 取代。
-> 详见「Run Configuration 全套」与「终端全套」。
+> **需要项目环境的命令也走原生 shell**:项目配置的 JDK / Node / Go / Maven / Python 由配套插件的 `get_project_env` 取出,
+> 本插件在每条 shell 创建前注入到它的 `PATH` 与环境变量里;**反复发生的流程**仍固化成 Run Configuration。
+> **IDE 内置的 `ide_execute_terminal_command` 继续隐藏** —— 实测它不继承项目环境。详见「Run Configuration 全套」与「终端全套」。
 
 非 JetBrains 项目完全不受影响。 **手动接入**:插件启动不探测、不连接任何 IDE。三个命令管全部:
 
@@ -136,6 +135,51 @@ configure_ide_project({ path: "modelserver", ide: "pycharm" })   // 配置一个
 
 **热更新会断开**:插件源码变更会触发 V2 热重载,注册随旧实例一起释放。 **改完插件后重跑一次 `/open-in-ide`** 即可恢复。
 
+## 远程配置 (`/persist-remote-config` 与两条提示词命令)
+
+### `/persist-remote-config`
+
+把 IDE 里配置的 server 与 deployment 写进 `<项目>/.opencode/remote-shell/hosts.json`:
+
+- 读配套插件的 `get_deployment_servers`(IDE 必须连着;没连上会提示先 `/open-in-ide`)
+- **同名覆盖、项目独有保留**:IDE 有的整体更新,IDE 没有的原样留着
+- 写之前备份 `hosts.json.bak`
+- 写完整凭据(`password` / `privateKeyPath`) —— **这个文件要不要提交进 git,由你决定**,插件不改 `.gitignore`
+- 写完立刻让服务器缓存失效,紧接着的 `remote_exec` 就能用
+
+```json
+{
+  "hosts": {
+    "mbptest": {
+      "host": "yutaodeMacBook-Pro.local",
+      "port": 22,
+      "username": "yutao",
+      "authType": "PASSWORD",
+      "password": "…",
+      "deployments": [
+        {
+          "name": "mcp-test-project",
+          "localPath": "/Users/yutao/IdeaProjects/mcp-test-project",
+          "deployPath": "/Users/yutao/Desktop/data/test"
+        }
+      ]
+    }
+  }
+}
+```
+
+### `/remote-shell` 与 `/remote-deployment`
+
+这两条是**提示词命令**:不执行任何东西,只往会话里注入一段规则(和 `~/.config/opencode/commands/readonly.md` 同一个思路),
+让模型走 `remote_exec` / `remote_upload` / `remote_download`,而不是自己拼 `ssh` / `scp` / `rsync`。
+
+```
+/remote-shell mbp 看下磁盘
+/remote-deployment mcp-test-project download
+```
+
+参数原样附在提示词末尾;**没带参数时,提示词会要求模型先问清楚**(服务器 / 命令 / 哪条 deployment),不会自己挑一台。
+
 ## 按能力选工具 (直接调用引导)
 
 IDE MCP 可用时,插件通过 **系统提示注入**告诉模型 **哪些事该走 IDE**;除下面「工具参数与输出」那几处刻意的接管
@@ -168,8 +212,7 @@ IDE MCP 可用时,插件通过 **系统提示注入**告诉模型 **哪些事该
    | 批量改文件 | `ide_apply_patch` |
    | 校验 | `ide_lint_files` / `ide_get_file_problems` / `ide_build_project` |
    | 运行配置 | `ide_get_run_configurations` / `ide_execute_run_configuration`(+ 配套插件的启停工具) |
-   | 终端 | `ide_project_sdk_terminal` / `ide_terminal_read` / `ide_terminal_interrupt` / `ide_list_terminals` / `ide_execute_in_remote_host`(远程执行还要求 Ultimate + Deployment SFTP) |
-   | 部署 | `ide_list_server_deployments` / `ide_upload_to_deployment` / `ide_download_from_deployment` / `ide_get_deployment_task_status`(要求 Ultimate) |
+   | 远程执行 / 同步 | `remote_exec` / `remote_list_servers` / `remote_upload` / `remote_download`(本插件自带,凭据与路径映射来自 IDE 的 Deployment 配置,IDE 没开时退到 hosts.json);本机环境变量由 `get_project_env` + shell hook 注入 |
 
    **读、找文本、找文件、改单个文件一律用 OpenCode 自带的工具**(`read` / `grep` / `glob` / `write` / `edit`):
    这几件事走 IDE 只是多一跳,所以映射表里**不出现** `ide_search_text` / `ide_search_regex` / `ide_search_file`。
@@ -280,15 +323,20 @@ IDE 内置的 MCP Server 只能 **启动已有**的 run configuration (`execute_
 | `ide_stop_run_configuration`      | 停掉该配置的**全部**实例并等它们退出;没在跑也返回成功(幂等)                                                                                                                                                      |
 | `ide_rerun_run_configuration`     | 等同 IDE 的 **Rerun** 按钮:在跑就重启、没在跑就启动,读 `started` 判断是否真起来了                                                                                                                                |
 
-**需要项目环境的命令走 IDE 终端 / run configuration** —— 判据是这条命令 **依赖项目的运行时版本**
-(IDE 里配好的 JDK / Node / Python 等)。是 → **一次性命令**走配套插件的 `ide_project_sdk_terminal`;**会反复发生的流程 / 常驻
-服务**固化成 run configuration;不是 (看文件、git、临时脚本)→ 原生 shell。配置必须 **先在 IDEA 里存在**(由用户建),
-没有就请用户建一个再跑;要不要建、建什么,按 `idea-run-config-manager` skill 的判据走。
+**需要项目环境的命令也走原生 shell** —— 项目配置的 JDK / Node / Go / Maven / Python 由配套插件的 `get_project_env`
+取出来,再由本插件的 `shell.hook("create.before")` **注入到每个新 shell 的 `PATH` 与环境变量里**,所以 `java` / `node` /
+`go` / `mvn` / `python` 在原生 shell 里就是项目配置的版本。**会反复发生的流程 / 常驻服务**仍然固化成 run configuration;
+看文件、git、临时脚本也走原生 shell。配置必须 **先在 IDEA 里存在**(由用户建),没有就请用户建一个再跑;要不要建、建什么,
+按 `idea-run-config-manager` skill 的判据走。
 
 > **为什么内置 IDE 终端仍然隐藏**:`ide_execute_terminal_command` 之前被当成"自动继承 IDE 项目环境"的通道而保留暴露,但实测
 > **它拿不到项目配好的 JDK / Node / Python 版本**,和原生 shell 没有区别。既然没有优势,就把它从模型可见的工具表里
-> 隐藏掉 (`HIDDEN_IDE_TOOL_SUFFIXES`)。配套插件的 `project_sdk_terminal` 走的是另一条路:**主动把项目 SDK / Maven /
-> Node / Python 的路径注入终端环境**,所以它才是"需要项目环境"的那条路由。
+> 隐藏掉 (`HIDDEN_IDE_TOOL_SUFFIXES`)。
+>
+> **项目环境现在由本插件自己注入**:连接 IDE 时调一次配套插件的 `get_project_env`(不进模型可见的工具表),把返回的
+> `PATH` **前置**拼到每条新 shell 的 PATH 上,其余变量(`GOROOT` / `MAVEN_HOME` / `VIRTUAL_ENV` …)直接覆盖。所以原生
+> shell 就是"项目 shell",不需要一个单独的 `project_sdk_terminal` 工具;配套插件里那套本地终端能力已经整体移除。
+> 拉不到环境变量时连接按**没做完**处理(`env-unready`),不会静默降级成"工具有、环境是空的"。
 
 配置名有自己的文法:**`[os@]base[@env]`** —— os 段 (`win` = Windows,缺省 = macOS / Linux)、base 段 (配置本体)、env 段 (环境名,
 缺省 = 默认环境 —— 起一批时逐条解析:有 `@<env>` 用它,没有就用默认)。`win@base` 与 `base@env` 都是同一个 base 的 **变体**,档案里只登记 base。解析 **交给工具**:
@@ -405,88 +453,76 @@ opencode-idea 对这一组工具做两件事:
 事实一律先查后写:配置名来自 `ide_get_run_configurations`,`热重载` 来自运行方式,端口读不到就问用户 —— 不猜。
 **只动自己的标记块**:根 `AGENTS.md` 是共享文件 (`project-scaffold` 的宪法、项目自己的内容都在里面),标记之外一字不改。
 
-## Deployment 全套 (配套插件 `idea-mcp-enhance`)
+## 文件同步 (自带,不再依赖 IDE 的 deployment 工具)
 
-IDE 内置的 MCP Server **完全不碰部署** —— 既不报 IDE 里配了哪些 Deployment 服务器,也不能把文件传上去 / 拉下来。
-配套插件 [`idea-mcp-enhance`](https://github.com/syllr/idea-mcp-enhance)(IDEA 2026.2+,必须安装)补齐这四个:
+上传 / 下载由本插件的 `remote_upload` / `remote_download` 直接走 SFTP,不再经过 IDE 的
+`upload_to_deployment` / `download_from_deployment`:
 
-| 工具 (OpenCode 里叫 `ide_*`)     | 作用                                                                                                                                                       |
-| -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ide_list_server_deployments`    | 本项目可用的**服务器**,以及每台服务器上的 **deployment(路径映射)**。Server 是连接目标(`servers[].name` → 远程终端的 `serverName`),deployment 是挂在它上面的一条映射(`servers[].deployments[].name` → 上传 / 下载的 `deploymentName`,全局唯一)。server 可以 0 个 deployment,那样只能远程执行。另带 `level` / `accessType` / `host` / `port` / `rootFolder` / `hasCredentials` / `validationIssue` / `isDefault`、项目级 `options` 与 `warnings[]`。**只读 IDE 配置,不联网** |
-| `ide_upload_to_deployment`       | 把**一条 deployment**(本地映射目录)传到服务器(等同 IDE 的 Upload to …)。`deploymentName` 传 `servers[].deployments[].name`,**不是 `serverName`**。`mode` 默认 `mirror` —— **会删掉服务器上多出来的文件**;`upload` 则保留远端多余文件。**破坏性** |
-| `ide_download_from_deployment`   | 把**一条 deployment** 从服务器拉回本地(等同 IDE 的 Download from …),**以服务器为准**:两边都有的文件被远端覆盖(相同则不写)。同样传 `deploymentName`。**没有"保留我的版本"这个选项** |
-| `ide_get_deployment_task_status` | 用 `handle` 查一次传输的状态与计数;**永不启动任何传输**                                                                                                    |
-
-opencode-idea 对它做的是**同一套两件事**(透传 / 无条件引导),不再按工具快照裁剪文本:
-
-- **前提**:部署工具除配套插件外,还要求 `com.jetbrains.plugins.webDeployment`(**仅 Ultimate**)。引导默认它在,
-  所以「服务器文件同步」节始终出现;Community 上调用这些工具会失败 —— 这属于配套环境没装全,不做兼容判断;
-- **契约**:`DeploymentSchemas.kt` 就是这组工具的对外形状(参数名、返回字段),引导按它写,不再单独维护工具名清单。
-
-这节存在的理由是 **一条路由规则**:往服务器传 / 取文件要走这些工具 —— IDE 的连接、路径映射、排除规则都在它后面,
-手工拼的那份与 IDE 看到、管理的不是同一份。文案里同时点明两件容易读错的事:
-`mirror` 是 **默认值**且 **会删远端文件**(而 MCP 路径上没有确认步骤),下载 **以远端为准**、没有"保留我的版本"。
-
-**同步只是上半段**:每条 deployment 都属于某台 Server,传完之后在那台 Server 上启动刚传上去的二进制、重启服务、看日志,
-走 `execute_in_remote_host`(`serverName` 用服务器名,不是 deployment 名)。**这两步都不要用 `scp` / `rsync` / `ssh`
-手工顶替** —— 手工那条路既没有 IDE 的路径映射,也常常根本没有权限(实测过一次:模型拿到服务器名之后转去读
-`~/.ssh/config`、逐个试用户名,失败后回头找用户要密码,而 `execute_in_remote_host` 一直都在工具表里)。
-
-还有一个语义必须写明,否则模型会把正常的中间态当失败去重试:上传 / 下载默认**同步等结果**,传完立刻返回
-`state: "completed"`;只有超过 300 秒等待窗口还没传完,才返回 `state: "in_progress"` + `handle`,这是 **正常**的
-(它也可能以 **error 结果**回来)—— 拿 `handle` 调 `get_deployment_task_status` 接着看,**不要用重复调上传 / 下载
-来代替**(那样会再起一次传输)。`completed` 之后 `counters` 才可信,而且数的是**操作次数**,不是文件数
-(删掉整个目录也只算 1)。
-
-> **这一组没有 skill,和 run configuration 不同。** run configuration 要 skill 是因为"某种类型怎么写"是一批得逐类型实测的
-> 模板 (`assets/types/`);部署没有这层知识 —— 四个工具的 schema 已经说清 `serverName` / `deploymentName` / `mode` 怎么填,
-> 而"该不该传、传给谁"是模型当场看 `list_server_deployments` 的判断。再加一个 skill 只是把同一段话抄第二遍。
-
-## 终端全套 (配套插件 `idea-mcp-enhance`)
-
-IDE 内置的 `execute_terminal_command` **不继承项目环境**(实测拿不到项目配好的 JDK / Node / Python),所以它被隐藏。配套插件
-补上的是一个**真正的 IDE 终端**,外加远程 SSH 终端和一套"接着用同一个 tab"的读写工具:
-
-| 工具 (OpenCode 里叫 `ide_*`) | 作用 |
+| 工具 | 作用 |
 | --- | --- |
-| `ide_project_sdk_terminal` | 在本项目 SDK 终端里跑**一条**命令,返回输出 + `tab`。**默认复用**本项目的默认 tab(第一次调用创建,`list_terminals` 该组的 `default` 就是它);传 `tab` 指定、传 `newTab: true` 新开(不抢默认)、带 `env` 时强制新开(`env` 只在 shell 启动时生效)。命令跑得久时先返回 `running: true`(同一个 `tab`,命令继续跑),之后用 `ide_terminal_read` 接着看。终端环境由插件注入:项目 JDK(`PATH`)、Maven home、Node runtime / 包管理器、Go 的 `GOROOT` / `GOPATH` / `GOBIN`、Python SDK / venv(`PATH` + `VIRTUAL_ENV`),用户传的 `env` 最后覆盖 |
-| `ide_list_terminals` | 按来源分组列出 MCP tab:`mcp_project_sdk` 一组、每台远程服务器各一组;每组带一个组级 `default`(该来源的默认 tab)和组内 `tabs` 数组。用户手开的 tab 不出现 |
-| `ide_terminal_read` | 读已有 tab,**立即返回、不等待**:默认读上次之后的增量,`tail: N` 读最近 N 个命令段(本地带每段 `exitCode`),`full: true` 读整屏,`running` 表示命令还在不在跑 |
-| `ide_terminal_interrupt` | 往已有 tab 发**一次 Ctrl-C**。只在命令卡住时用 —— 执行工具会等 shell 空闲,卡住的命令会把它们一直挡住;它不接受任何文本,只能打断,不能拿来跑命令 |
-| `ide_execute_in_remote_host` | 通过本项目的一台 Deployment **SFTP** 服务器开真实 SSH 终端。`serverName` 取 `servers[].name`。**默认复用这台服务器的默认 tab**(第一次调用创建,`list_terminals` 该组的 `default` 就是它),传 `tab` 指定 / `newTab: true` 换干净 shell;新 tab 命名 `mcp-<服务器名>-<序号>`(如 `mcp-mbpmiddleware-1`)。`loginShell` 默认 `true`(套 `zsh -lic` / `bash -lc`),`strictHostKey` 默认 `false`(accept-new) |
+| `remote_upload` | 把一条 deployment 的本地目录传到远程目录。`mode` 默认 `overwrite`(只覆盖 / 新增),`mirror` 额外删掉远程多余的文件 |
+| `remote_download` | 反向拉回本地,语义相同(默认 `overwrite`,`mirror` 删本地多余) |
 
-路由:引导里写的是 **"这条命令在哪台机器上、要不要项目运行时"** 两刀切 —— 远程机器(部署机 / 开发机 / 用户点名的主机)
-走 `ide_execute_in_remote_host`(服务器名不确定先 `ide_list_server_deployments`);本机 + 要运行时(IDE 里配好的
-JDK / Node / Python / Maven / Go)走 `ide_project_sdk_terminal`;本机 + 不要运行时(`git` / `ls` / `curl` / `docker` /
-`ps`)仍走原生 `shell`。**常驻进程**(dev server / watch)有 run configuration 就用它;没有就用终端起在 tab 里,
-跑满等待窗口还没结束会返回 `running: true`,之后用 `ide_terminal_read` 跟日志。
+路径映射(本地目录 ↔ 远程目录)和服务器一样走三级配置,同名以高优先级为准:
 
-**等太久会转成异步**:命令跑得久,这次调用先返回 `running: true` + 同一个 tab,命令继续跑;之后用 `ide_terminal_read`
-每隔几秒看一眼进度,直到 `running` 变 false —— 不要因为没拿到结果就重跑一遍。超时不是调用方能设的参数,它是工具自身的
-行为(也没有"主动异步"选项)。引导里也明写了**禁止用 `shell` 的 `sleep` 干等**(实测会话里出现过 `sleep 60` /
-`sleep 120` / `sleep 1500`,全是旧版 12 秒上限逼出来的)。
+1. **IDE** —— `get_deployment_servers` 返回的 `deployments[]`(`name` / `localPath` / `deployPath`;
+   `deployPath` 已拼上 server 的 `rootFolder`,是能直接用的绝对路径)
+2. **项目级** `<项目>/.opencode/remote-shell/hosts.json` 里 host 条目下的 `deployments`
+3. **全局** `~/.config/remote-shell/hosts.json` 同上
 
-**终端默认复用**:同一台机器上的连续命令落在同一个 tab —— `cd` / `export` / 后台进程都还在,不必每条重贴 `cd ... &&`,
-也不用自己记 tab 号;要干净 shell 传 `newTab: true`,要指定某条传 `tab`。`ide_terminal_read` / `ide_terminal_interrupt`
-管的是"接着看 / 打断",不是"再跑一条"的替代。这条规则在「命令执行」和「终端」两处都写了,因为它最容易被绕成"每条命令一个 tab"。
+`remote_list_servers` 会把每条 mapping 一起列出来(`本地目录 ↔ 远程目录`)。
 
-三条容易读错的语义,引导里都点名了:
+**`mirror` 会删文件**:上传时删远程多余,下载时删本地多余,而且没有确认步骤。默认 `overwrite` 只覆盖 / 新增。
 
-- **每种来源一条默认 tab** —— 本地一条、每台服务器各一条,第一次调用自动创建,`list_terminals` 在该组的 `default` 字段里报出它;
-  不传 `tab` 就永远落在它上面(不会随使用历史漂移),默认 tab 被关掉后下次调用重建一条;一条命令要独立环境就传
-  `newTab: true` / `env`。跨服务器复用会被直接拒绝(`tab_server_mismatch`);
-- **远程没有"命令结束"信号** —— `exitCode` 永远 `null`,`running` 也可能 `null`;别等退出码,按输出判断或继续 `ide_terminal_read` 读;
-- **tab 只在这次 IDE 会话里有效** —— 关掉就失效(报 `terminal_closed` / 找不到),这时才重开一个;没有"关闭 tab"的工具,
-  用完不必主动关,用户可以直接在 IDE 里接手。
+**同步只是上半段**:每条 deployment 都属于某台服务器,传完之后在它上面启动刚传上去的二进制、重启服务、看日志,
+走 `remote_exec`。这两步都不要用 `scp` / `rsync` / `ssh` 手工顶替 —— 手工那条路既没有 IDE 的路径映射,
+也常常根本没有权限。
 
-opencode-idea 对它做的仍是**同一套两件事**(透传 / 无条件引导):本地三个工具(Terminal 插件在就有)和
-`execute_in_remote_host`(还要 `remote-run`,仅 Ultimate)都**默认齐全**,引导直接点名,不再按工具快照裁剪。
-契约以该仓库的 `TerminalSchemas.kt` 为准。
+> 配套插件里那四个 deployment 工具(`list_server_deployments` / `upload_to_deployment` /
+> `download_from_deployment` / `get_deployment_task_status`)**已经删除** —— 传输完全由这里的
+> `remote_upload` / `remote_download` 负责。
+
+## 远程执行 (自带,不再依赖 IDE 的远程终端)
+
+远程命令由本插件的 `remote_exec` 直接跑(SSH),不再经过 IDE 的 `execute_in_remote_host`:
+
+| 工具 | 作用 |
+| --- | --- |
+| `remote_exec` | 在远程服务器上跑一条命令。参数 `server` / `command` / `workingDirectory?`,返回 `[服务器名] exitCode N` 加输出 |
+| `remote_list_servers` | 列出全部可用服务器,带 `[IDE]` / `[项目]` / `[全局]` 来源标记。名字不确定时先调它 |
+
+认证方式三种都支持:`PASSWORD`(密码)、`KEY_PAIR`(私钥 + 可选口令)、`OPEN_SSH`(ssh-agent /
+`~/.ssh/config`,靠 `SSH_AUTH_SOCK`)。
+
+服务器与凭据有三级来源,同名以高优先级为准:
+
+1. **IDE** —— 配套插件的 `get_deployment_servers`(只返回 SFTP server;凭据由 IDE 进程从 Credentials 直接读出,
+   不经过任何配置文件,也不碰 Keychain)
+2. **项目级** `<项目>/.opencode/remote-shell/hosts.json`(与全局同名同格式,跟着仓库走)
+3. **全局** `~/.config/remote-shell/hosts.json`
+
+IDE 没开时自动退到 2 / 3,所以 `remote_exec` 在 IDE 之外也能用。列表缓存 60 秒;**名字找不到时会全量刷新一次**
+再匹配,仍找不到就把全部服务器列给模型 —— 不做模糊猜测(用户说 "dev1"、配置的可能是 "deploy1",猜错比列出来更糟)。
+命中但连接失败时,会刷新一次凭据再重试(应对"刚在 IDE 里改了密码"),仍失败才报错。
+
+**每条命令一条独立 SSH 连接**:`cd` / `export` 不跨命令保留,要目录就传 `workingDirectory`(内部拼
+`cd '<dir>' && <command>`);命令同步返回,没有 tab、没有增量读、没有 Ctrl-C 通道,长任务自己在远程用 `nohup` /
+`tmux`。
+
+上传 / 下载见上一节:同样是本插件的 `remote_upload` / `remote_download`,映射来自同一套三级配置。
+
+**项目环境怎么进原生 shell**:连接 IDE 时(以及 `/open-in-ide` 每一次完整连接)调 `get_project_env`,拿到
+`{ PATH, variables }` 后缓存;每条 shell 创建前由 `shell.hook("create.before")` 把 `PATH` **前置**拼上、其余变量直接覆盖。
+`PATH` 里只有五个 provider(Java / Node / Go / Maven / Python)的 bin,IDE 进程自己的 PATH 不掺进来 —— 所以 OpenCode 的
+PATH 不会丢。**env 拉不到 = 连接没做完**:`/open-in-ide` 报 `env-unready`,不会静默降级成"工具有、环境是空的"。
+
+`get_project_env` 与 `get_deployment_servers` 都是**隐藏**的(数据通道,不是模型任务),IDE 侧那套远程终端
+(`execute_in_remote_host` / `terminal_read` / `terminal_interrupt` / `list_terminals`)也一并隐藏 —— 本插件不再需要它们。
 
 ## 前置条件
 
 - **必须安装配套插件 [`idea-mcp-enhance`](https://github.com/syllr/idea-mcp-enhance)(IDEA 2026.2+)**。引导默认它的工具都在
-  (运行配置启停 / 部署 / 终端),**不做"装没装 / 有没有这个工具"的判断**;部署与远程终端还要求 Ultimate。
+  (运行配置启停 / 部署 / 环境变量),**不做"装没装 / 有没有这个工具"的判断**;部署那组还要求 Ultimate。
 - JetBrains IDE 已开启 MCP 服务 (IDE 设置里的 MCP Server / AI Assistant MCP),版本需 **2026.2+**(提供 Streamable HTTP 端点
   `/stream`);若关闭,`/open-in-ide` 会立即提示如何重新开启。
 - IDE 侧需开启 **Brave Mode**(否则需要确认的 MCP 工具调用会停下来等用户确认);MCP 未就绪时通知会同时提醒开启它。
@@ -618,15 +654,16 @@ export { default } from "/Users/yutao/IdeaProjects/opencode-idea/src/index.js";
 - skill 定义的字段名 **以 schema 为准**,不要照官方文档:`Skill.Info` 需要 `path`(AbsolutePath),文档里写的 `location`
   不存在 —— 用错会让 `ctx.skill.transform` 抛 `SchemaError`,而**任何 transform 失败都会禁用整个插件**
   (0.0.6 就是这样丢了 `/open-in-ide`)。完整字段是 `id` / `name` / `description?` / `autoinvoke?` / `path` / `content`。
-- 一批用不到的 IDE MCP 工具被硬编码隐藏(`src/plugin.js` 的 `HIDDEN_IDE_TOOL_SUFFIXES`,**共 48 个后缀**):
+- 一批用不到的 IDE MCP 工具被硬编码隐藏(`src/plugin.js` 的 `HIDDEN_IDE_TOOL_SUFFIXES`,**共 58 个后缀**):
   VCS(`git_status` / `get_repositories`)、Router 派发工具(`execute_tool`)、Debugger(全部 `xdebug_*`)、Dev Kit MCP、
-  Inspection KTS MCP、解释器环境 MCP、**IDE 内置终端**(`execute_terminal_command`:实测不继承项目环境,已由配套插件的
-  `project_sdk_terminal` 取代)、
+  Inspection KTS MCP、解释器环境 MCP、**IDE 内置终端**(`execute_terminal_command`:实测不继承项目环境)、
+  **`get_project_env`**(本插件 shell hook 的数据通道,不是模型任务)、
   **整个 Database 组**(数据源由用户在 IDE 里配置)、**有原生对应的文件搜索**(`search_text` / `search_regex` / `search_file`)、
   以及**建文件**(`create_new_file`)。配套插件自带的那个写文件工具同样隐藏。**`apply_patch` 不在隐藏列表里**。
   存的是**后缀**,清洗时按当前每个项目前缀**各删一遍** —— 只处理 `ide_` 会让子项目那几份原样送到模型面前。
-  实测(拿运行中的 IDE MCP 拉 `tools/list`,单个项目):IDE 暴露 **75** 个 → 隐藏 47 → **模型可见 28 个**,
-  而且这 28 个**恰好等于引导里点名的 28 个**。多项目就是 N × 28。
+  其中有几个后缀(`execute_in_remote_host` / `terminal_read` / `terminal_interrupt` / `list_terminals`)对应的工具
+  已经从配套插件里删掉了,留着是为了挡住**没升级**的安装。具体数字随 IDE 与配套插件版本变化,每次工具集调整都要重测;
+  判据是 **模型可见的 IDE 工具 = 引导里点名的那批**,不增不减。
 - **IDE 的「目录包含」语义(实测)**:请求路径落在某个**已打开项目的目录树内**时,IDE 会把它解析到那个项目,而不是报错。
   所以「子项目与 root 配同一个 IDE」时,只要那个 IDE 打开了 root,子项目就被判成"已打开" —— 它确实是 root 项目的一部分,
   工具能操作它的文件,但语言支持按 **root 项目**走(例如 Python 子项目被 root 的 Web 模块解析,符号检索与检查会不准)。

@@ -21,7 +21,7 @@ ao agente que está trabalhando agora.</p>
 <tr>
 <td align="center" width="33%">Recall<br><b>97.2% R@5</b> no LongMemEval-S<br><sub>todas as 500 perguntas · MemPalace 96.6%, agentmemory 95.2%<br>mesmas 19,195 sessões: 19/100 em primeiro lugar, a seguinte 14</sub></td>
 <td align="center" width="33%">Tokens<br><b>metade dos tokens</b> do agentmemory<br><sub>53,558 contra 104,974 numa tarefa já resolvida<br>477 tokens de definições de ferramentas, a menor de sete</sub></td>
-<td align="center" width="33%">Indexação<br><b>17.6 s</b> para indexar 19,195 sessões<br><sub>a seguinte de sete: 72 s<br>26 ms até a primeira resposta, mediana de busca de 97 ms</sub></td>
+<td align="center" width="33%">Indexação<br><b>13.6 s</b> para indexar 19,195 sessões<br><sub>a seguinte de sete: 72 s<br>26 ms até a primeira resposta, mediana de busca de 97 ms</sub></td>
 </tr>
 </table>
 
@@ -262,7 +262,7 @@ recall por MCP funcionam como sempre.
 ## Evidência
 
 <p>
-<b>58% menos tokens</b> numa tarefa que esta máquina já havia resolvido &middot; <b>88.1% hit@1</b> no LongMemEval-S (conjunto limpo de 470 perguntas) &middot; <b>70.5%</b> no LoCoMo &middot; consultas em <b>milissegundos</b> sobre gigabytes de histórico<br>
+<b>58% menos tokens</b> numa tarefa que esta máquina já havia resolvido &middot; <b>88.9% hit@1</b> no LongMemEval-S (conjunto limpo de 470 perguntas) &middot; <b>71.9%</b> no LoCoMo &middot; consultas em <b>milissegundos</b> sobre gigabytes de histórico<br>
 <sub>Onze execuções por braço: 53,558 tokens contra 126,222 sem nada conectado, e 52,815 contra 103,443 numa versão posterior, de novo onze execuções &middot;
 <a href="https://vshulcz.github.io/deja-vu/guide/day-zero.html">quanto custa terminar uma tarefa</a> &middot;
 os dois harnesses de recuperação estão neste repositório e rodam sobre datasets públicos em minutos &middot;
@@ -337,7 +337,7 @@ share nem ao export do sync. Casar padrão não é detectar segredo: um formato 
 
 Um recall é uma consulta léxica a um índice local: mediana de 0.7–0.8 ms
 e nada esperando um modelo. O hook acrescenta a partida do processo e a checagem de frescor dos stores —
-dezenas de milissegundos num store de vários gigabytes.
+num índice de 19k sessões, o hook de cada prompt leva 107 ms de mediana.
 
 </details>
 

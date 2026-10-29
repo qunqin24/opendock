@@ -21,7 +21,7 @@ al agente que está trabajando ahora.</p>
 <tr>
 <td align="center" width="33%">Recall<br><b>97.2% R@5</b> en LongMemEval-S<br><sub>las 500 preguntas · MemPalace 96.6%, agentmemory 95.2%<br>mismas 19,195 sesiones: 19/100 en primer lugar, la siguiente 14</sub></td>
 <td align="center" width="33%">Tokens<br><b>la mitad de tokens</b> que agentmemory<br><sub>53,558 frente a 104,974 en una tarea ya resuelta<br>477 tokens de definiciones de herramientas, la menor de siete</sub></td>
-<td align="center" width="33%">Indexado<br><b>17.6 s</b> para indexar 19,195 sesiones<br><sub>la siguiente de siete: 72 s<br>26 ms hasta la primera respuesta, 97 ms de mediana de búsqueda</sub></td>
+<td align="center" width="33%">Indexado<br><b>13.6 s</b> para indexar 19,195 sesiones<br><sub>la siguiente de siete: 72 s<br>26 ms hasta la primera respuesta, 97 ms de mediana de búsqueda</sub></td>
 </tr>
 </table>
 
@@ -265,7 +265,7 @@ y el recall por MCP funcionan como siempre.
 ## Evidencia
 
 <p>
-<b>58% menos tokens</b> en una tarea que esta máquina ya había resuelto &middot; <b>88.1% hit@1</b> en LongMemEval-S (conjunto depurado de 470 preguntas) &middot; <b>70.5%</b> en LoCoMo &middot; consultas en <b>milisegundos</b> sobre gigabytes de historial<br>
+<b>58% menos tokens</b> en una tarea que esta máquina ya había resuelto &middot; <b>88.9% hit@1</b> en LongMemEval-S (conjunto depurado de 470 preguntas) &middot; <b>71.9%</b> en LoCoMo &middot; consultas en <b>milisegundos</b> sobre gigabytes de historial<br>
 <sub>Once ejecuciones por brazo: 53,558 tokens frente a 126,222 sin nada conectado, y 52,815 frente a 103,443 en una versión posterior, otra vez once ejecuciones &middot;
 <a href="https://vshulcz.github.io/deja-vu/guide/day-zero.html">lo que cuesta terminar una tarea</a> &middot;
 los dos harnesses de recuperación están en este repositorio y corren sobre datasets públicos en minutos &middot;
@@ -340,7 +340,7 @@ puede pasar. Ver el [modelo de seguridad](../../docs/SECURITY-MODEL.md#redaction
 
 Un recall es una consulta léxica a un índice local: mediana de 0.7–0.8 ms y
 nada esperando a un modelo. El hook añade el arranque del proceso y la comprobación de frescura de los
-almacenes: decenas de milisegundos en un almacén de varios gigabytes.
+almacenes: en un índice de 19k sesiones, el hook de cada prompt tarda 107 ms de mediana.
 
 </details>
 

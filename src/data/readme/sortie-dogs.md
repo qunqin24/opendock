@@ -19,8 +19,9 @@ evidence-backed result, not more agents for their own sake.
 [![Node.js](https://img.shields.io/node/v/sortie-dogs)](https://www.npmjs.com/package/sortie-dogs)
 [![MIT License](https://img.shields.io/npm/l/sortie-dogs)](LICENSE)
 
-**Current release: [v0.14.9](https://github.com/zufall-upon/Sortie-dogs/releases/tag/v0.14.9)**
-· [Release notes](docs/release-v0.14.9.md) · [Execution vision](docs/v0.14.0-execution-vision.md)
+**Release candidate: v0.15.0** · [Release notes](docs/release-v0.15.0.md)
+· [Current published release: v0.14.9](https://github.com/zufall-upon/Sortie-dogs/releases/tag/v0.14.9)
+· [Execution vision](docs/v0.14.0-execution-vision.md)
 
 [When to use](#when-to-use-sortie-dogs) · [Quick start](#quick-start) · [Workflow](#mission-workflow) · [Models](#default-models) ·
 [Measured results](#measured-results) · [Configuration](#configuration) · [Documentation](#documentation)
@@ -123,6 +124,18 @@ assets and sets subagent depth to at least two while preserving unrelated settin
 The `v010` command, profile and configuration names remain for compatibility; they do **not** mean
 v0.10 is installed. [OpenCode setup and configuration](docs/configuration.md) ·
 [日本語](docs/guide-ja.md) · [简体中文](docs/guide-zh-CN.md).
+
+### Project Memory (OpenCode v010, opt-in)
+
+With the v0.15.0 candidate installed, run `sortie-dogs memory on .` once and reload
+the project plugin. Ordinary public turns then become pending sources; the existing
+Operator records semantic additions, corrections, withdrawals and decisions without
+another save request or a dedicated model call per turn. New sessions recall the
+current project vision and constraints as well as relevant decisions and source references.
+`sortie-dogs memory off .` stops capture and recall without deleting saved data.
+This is not a Codex natural-capture feature, execution permission, Review PASS or proof
+of completion. Existing reflection defaults and explicit settings are unchanged.
+[Scope, attachment retrieval, limits and recovery](docs/v0150-project-memory.md).
 
 ## Mission workflow
 
@@ -271,7 +284,7 @@ Install the desired package version and rerun **your host's** initializer:
 
 An OpenCode config-local bridge may resolve a separate package; npm-global update alone does not
 update it. [Global/update instructions](docs/configuration.md#global-availability).
-The current Mission asset marker is `0.14.9-optional-kofi-v1`; the Codex skill marker is
+The candidate Mission asset marker is `0.15.0-project-memory-v1`; the Codex skill marker is
 `0.14.6-codex-skill-v1`. Installed markers alone do not prove a running host reloaded the new version.
 
 There is no supported uninstall command. Remove the dependency and only known Sortie-owned paths;

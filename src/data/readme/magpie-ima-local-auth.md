@@ -1,6 +1,7 @@
 # ima.copilot（本机客户端）for magpie
 
 **把本机已登录的 ima.copilot 免费模型接进 magpie —— 不粘贴 cookie，不走 ima 的云端 agent。**
+**最适合：给 `dsh-chess-context` 这类记忆压缩/棋谱摘要做免费摘要模型；不适合当 DSH agent 后端。**
 
 ```text
 登录   本机 ima.copilot 客户端（profile 里的 DPAPI 凭证 / 种子文件）
@@ -19,6 +20,31 @@
 - **多轮会话** —— 一个 magpie 会话对应一个 ima session（30 分钟 TTL，60 轮兜底轮换）；新 session 会自动带上最近几轮上下文。
 - **省心的错误语义** —— 登录失效返回 401 + `X-Magpie-Sign-In: expired`；模型不存在返回 404；限流/业务失败原样给出 ima 的 code 与 message。
 - **不碰云端 agent** —— 只走 `robot_type=10000`（问问 ima 的普通问答）。Copilot 的 `robot_type=15` 是 ima 自己的 agent，本插件不列、不调；这正是 today 式结果被排除的原因。
+
+---
+
+## 最适合的用途：记忆压缩 / 棋谱摘要
+
+这个插件**不适合当 DSH 的 agent 后端**（ima 模型有自己的身份和工具规则，会把调用方的 system prompt + tools 当成注入），但它非常适合**单轮、结构化、无工具**的摘要任务——也就是 `dsh-chess-context` 的 fold。
+
+把 `dsh-chess-context` 的摘要模型指向它：
+
+```yaml
+summaryMode: hybrid
+summarizationProvider: magpie
+summarizationModel: ima/deepseek-v4.1-flash
+```
+
+实测（同一份 8 条失败边 + 2 条约束的合成会话，3 次采样）：
+
+| 模板 | 死路保留 | 约束保留 | 摘要长度 |
+|---|---|---|---|
+| `dsh-chess-context` 棋谱模板 + ima V4.1-Flash | **8/8（3/3 次）** | **2/2（3/3 次）** | 1,887 字符 |
+| 官方 8 段模板 | 5/8 | 0/2 | ~3,072 字符 |
+
+结论：**ima 免费模型的价值在“压缩”这一层，而不是“agent”这一层。** 它免费、长上下文、单轮输出稳定；棋谱摘要的硬事实由规则给定，模型只负责压缩表达，正好避开它的系统提示词/工具短板。
+
+> 复跑：`cd projects/dsh-chess-context && MAGPIE_MODEL=ima/deepseek-v4.1-flash node test/real-model.mjs --runs 3`
 
 ---
 
@@ -99,7 +125,7 @@ magpie plugin list
 Copilot 是 ima 的云端 agent（`robot_type=15`），不是模型通道。它的 V4.1 / Hy3 / Hy4 / GLM / MiMo / MiniMax / Kimi 目录确实存在、也支持流式思考；插件按“模型供应商”定位，不把 agent 包装成模型。
 
 **Q：支持工具调用 / 图片吗？**
-**工具调用支持**：ima 的问答接口没有原生 tools 字段，插件用文本工具协议模拟——把调用方的工具表写进问题，模型输出 `{"tool_calls":[...]}`，插件再转成 OpenAI 的 `tool_calls`；工具结果会作为 `role:"tool"` 回灌。已用 `task_plan` / `subagent_spawn` 和 DSH 的 `todo_write` / `write` 实测。图片**不支持**（`attachment: false`）。
+**工具调用仅基础模型支持**：ima 的问答接口没有原生 tools 字段，插件用文本工具协议模拟——把调用方的工具表写进问题，模型输出 `{"tool_calls":[...]}`，插件再转成 OpenAI 的 `tool_calls`；工具结果会作为 `role:"tool"` 回灌。已用 `task_plan` / `subagent_spawn` 实测。**Think 变体实测会把 DSH 工具契约当成 prompt injection，所以 `toolcall:false`，只做纯文本 chat。** 图片**不支持**（`attachment: false`）。
 
 **Q：上下文窗口是多少？**
 ima 的模型目录不下发窗口大小。插件把 `limit.context` 留 0，让 magpie 用它自己的模型库；不写一个猜的数字。

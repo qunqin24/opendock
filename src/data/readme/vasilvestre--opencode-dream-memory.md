@@ -168,6 +168,9 @@ and that flag beats the agent's pinned model. Override the file path with
 - A run takes a lock on `$DREAM_HOME/.dreams/run.lock`. A second run exits at
   once instead of interleaving writes, so the 04:30 timer cannot collide with a
   manual run.
+- The corpus goes back to each project's last successful run, and never further
+  than 24 hours. After missed nights, run `DREAM_SINCE_HOURS=96 dream` to widen
+  that window, for example to 96 hours.
 - The files are read on each request, never cached, so a nightly rewrite shows
   up in the next turn at the cost of two small reads.
 

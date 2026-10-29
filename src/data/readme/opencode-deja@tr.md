@@ -21,7 +21,7 @@ deja aylar öncesi dahil hepsini indeksler ve önemli kısmı
 <tr>
 <td align="center" width="33%">İsabet<br>LongMemEval-S'te <b>%97.2 R@5</b><br><sub>500 sorunun tamamı · MemPalace %96.6, agentmemory %95.2<br>aynı 19,195 oturumda: 100 sorudan 19'u ilk sırada, en yakını 14</sub></td>
 <td align="center" width="33%">Token<br>agentmemory'nin <b>yarısı kadar token</b><br><sub>zaten çözülmüş bir görevde 104,974'e karşı 53,558<br>tur başına 477 token araç tanımı, yedi sunucunun en azı</sub></td>
-<td align="center" width="33%">İndeksleme<br>19,195 oturumu <b>17.6 sn</b>'de indeksler<br><sub>yedi araçtan sonraki: 72 sn<br>ilk yanıta 26 ms, arama medyanı 97 ms</sub></td>
+<td align="center" width="33%">İndeksleme<br>19,195 oturumu <b>13.6 sn</b>'de indeksler<br><sub>yedi araçtan sonraki: 72 sn<br>ilk yanıta 26 ms, arama medyanı 97 ms</sub></td>
 </tr>
 </table>
 
@@ -262,7 +262,7 @@ sözcüksel arama ve MCP geri çağırma her zamanki gibi çalışır.
 ## Kanıt
 
 <p>
-Bu makinenin daha önce çözdüğü bir işte <b>%58 daha az token</b> &middot; LongMemEval-S üzerinde (470 soruluk temizlenmiş küme) <b>%88.1 hit@1</b> &middot; LoCoMo üzerinde <b>%70.5</b> &middot; gigabaytlarca geçmişte <b>milisaniyelik</b> sorgular<br>
+Bu makinenin daha önce çözdüğü bir işte <b>%58 daha az token</b> &middot; LongMemEval-S üzerinde (470 soruluk temizlenmiş küme) <b>%88.9 hit@1</b> &middot; LoCoMo üzerinde <b>%71.9</b> &middot; gigabaytlarca geçmişte <b>milisaniyelik</b> sorgular<br>
 <sub>Kol başına on bir çalıştırma: hiçbir şey bağlı değilken 126,222'ye karşı 53,558 token; sonraki bir sürümde yine on birer çalıştırma: 103,443'e karşı 52,815 &middot;
 <a href="https://vshulcz.github.io/deja-vu/guide/day-zero.html">bir işi bitirmenin maliyeti</a> &middot;
 her iki erişim değerlendirme düzeneği de bu depoda ve açık veri kümelerinde dakikalar içinde koşuyor &middot;
@@ -336,8 +336,8 @@ biçim geçebilir. [Güvenlik modeline](../../docs/SECURITY-MODEL.md#redaction-b
 <summary><b>Ajanımı yavaşlatır mı?</b></summary>
 
 Bir geri çağırma, yerel indekse yapılan sözcüksel bir sorgudur: ortanca 0.7–0.8 ms
-ve hiçbir şey model beklemez. Kanca, süreç başlatmayı ve depoların tazelik denetimini ekler; birkaç gigabaytlık
-bir depoda onlarca milisaniye.
+ve hiçbir şey model beklemez. Kanca, süreç başlatmayı ve depoların tazelik denetimini ekler; 19k oturumluk bir indekste
+her istemdeki kanca ortanca 107 ms sürer.
 
 </details>
 

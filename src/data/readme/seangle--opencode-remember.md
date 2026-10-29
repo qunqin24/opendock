@@ -61,11 +61,30 @@ whether that DSH build can install by npm name directly depends on the host.
 See the [DSH adapter guide](packages/dsh/README.md) for compatibility,
 configuration, and the snapshot lifecycle.
 
+## Explore from the terminal
+
+The agents get tools; you get an explorer. `@seangle/remember-cli` reads the same
+stores and never writes to them:
+
+```sh
+npx @seangle/remember-cli            # summary: stores, counts, snapshot sizes
+npx @seangle/remember-cli ls         # facts and notes
+npx @seangle/remember-cli browse     # interactive, alternate-screen explorer
+npm i -g @seangle/remember-cli       # then just: remember
+```
+
+`show`, `search`, `snapshot`, and `recovery` round out the command set;
+`--json` makes every listing scriptable. `snapshot` prints the injected block
+byte-for-byte, and `browse` renders note bodies as Markdown with type-to-filter
+across facts and note text. See the [CLI guide](packages/cli/README.md) for store
+discovery, key bindings, and options.
+
 ## Layout
 
 ```
 packages/core/       @seangle/remember-core       engine, no host SDK imports
 packages/migrators/  @seangle/remember-migrators  migration strategies, also host-free
+packages/cli/        @seangle/remember-cli        human-facing explorer (CLI + TUI)
 packages/dsh/        @seangle/dsh-remember        DeepSeek Harness bundle
 packages/pi/         @seangle/pi-remember         Pi extension
 packages/opencode/   @seangle/opencode-remember   OpenCode server plugin
@@ -164,14 +183,16 @@ deliberately absent rather than ported.
 
 ## Build
 
-No TypeScript toolchain and no dependencies. The build uses Node's own type
-stripping (`node:module.stripTypeScriptTypes`) and rewrites `.ts` specifiers to
-`.js`, because runtime hosts load plugins from `node_modules` where Node refuses
-to strip types.
+No TypeScript toolchain: the build uses Node's own type stripping
+(`node:module.stripTypeScriptTypes`) and rewrites `.ts` specifiers to `.js`,
+because runtime hosts load plugins from `node_modules` where Node refuses to
+strip types. Core, migrators, and the adapters have no runtime dependencies; the
+CLI adds exactly one, `@earendil-works/pi-tui`, loaded lazily only by `browse`, so
+`ls`/`show`/`search` stay dependency-light and pipe-friendly.
 
 ```sh
 npm run build     # or: node scripts/build.mjs
-npm test          # 220 tests: core + migrators + Pi and OpenCode adapters
+npm test          # 255 tests: core, migrators, CLI, Pi and OpenCode adapters
 npm run check       # build, then the same tests
 npm run test:packed # isolated tarball install + compiled adapter integration tests
 npm run pack        # validated release tarballs in artifacts/
@@ -190,8 +211,9 @@ JavaScript and dependency resolution outside the monorepo.
 
 `pnpm install` creates workspace links (`packages/*/node_modules/@seangle`).
 Package manifests use registry-compatible version ranges, linked locally
-by `linkWorkspacePackages: true`. No external runtime dependencies are needed. The DSH smoke
-script additionally needs the host packages resolvable:
+by `linkWorkspacePackages: true`. The only external runtime dependency is the
+CLI's `@earendil-works/pi-tui`; everything else uses `node:` built-ins. The DSH
+smoke script additionally needs the host packages resolvable:
 
 ```sh
 mkdir -p node_modules/@seangle
@@ -305,7 +327,7 @@ object; `@opencode/plugin` supplies types only.
 
 ## Status
 
-- 220 tests pass (187 core, 6 migrators, 12 Pi adapter, 15 OpenCode adapter).
+- 255 tests pass (187 core, 6 migrators, 35 CLI, 12 Pi adapter, 15 OpenCode adapter).
 - Adapter suites pass end to end against fake hosts: all ten tools, duplicate
   handling, update → forget → restore round-trip, workspace/root isolation,
   snapshot injection and stability, legacy detection, dry-run migration,
@@ -315,6 +337,10 @@ object; `@opencode/plugin` supplies types only.
   host packages declared as peers.
 - The Pi adapter has been exercised in a live Pi session. Its integration suite
   also runs against an isolated installation of the published-format tarballs.
+- The CLI has been exercised against this repository's own stores and inside a
+  live tmux session: filtering, scope cycling, pager/editor suspension, and
+  terminal restoration on quit and signals. Its packed-artifact run covers the
+  installed bin, JSON listing, and the non-TTY guard for `browse`.
 - The OpenCode adapter has been exercised in live OpenCode 2.2.0 sessions: the
   tools wrote a fact, a fresh session recalled it from the injected snapshot
   without calling a tool, and `/memory status` and `/memory migrate` answered

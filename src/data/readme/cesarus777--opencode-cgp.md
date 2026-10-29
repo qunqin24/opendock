@@ -41,10 +41,10 @@ Global configuration is `~/.config/opencode/opencode.jsonc` (or the OpenCode con
 
 Restart/reload OpenCode and look for `context-guard: observe; diagnostics ...`. Observe mode records policy decisions and never requests compaction; OpenCode's own automatic compaction remains active. Inspect diagnostics first, then set `mode` to `enforce` to admit native compaction at runtime step boundaries. The complete [example](examples/opencode.jsonc) includes model, role, and agent policies. **Last matching rule wins**; selectors within a rule are ANDed.
 
-Pin the exact published version in the existing entry's `package` field or use the manager. Version `0.3.0` adds a standalone terminal dashboard, offline model analytics across retained sessions, and context charts that preserve bar height and reuse the latest column during pauses. See the [changelog](CHANGELOG.md).
+Pin the exact published version in the existing entry's `package` field or use the manager. Version `0.3.1` installs the standalone dashboard renderer automatically and adds clearer command help. Version `0.3.0` introduced the standalone dashboard, offline model analytics and paused context chart fixes. See the [changelog](CHANGELOG.md).
 
 ```sh
-opencode plugin add @cesarus777/opencode-cgp@0.3.0
+opencode plugin add @cesarus777/opencode-cgp@0.3.1
 ```
 
 Manage the configured target with the [official V2 CLI](https://dev.opencode.ai/v2/docs/plugins):
@@ -82,9 +82,32 @@ Use `{"plugins":[{"package":"/absolute/path/to/opencode-cgp","options":{"mode":"
 
 If loading fails, run `opencode plugin list` and `opencode plugin check`, confirm V2 2.0.29 and the correct configuration scope, and inspect OpenCode's startup logs. A missing `@opencode/plugin` or client module indicates an incomplete package installation: remove/re-add the configured package using the manager. TUI-only missing `solid-js`/OpenTUI modules usually indicate an unsupported host or loading the TUI outside its host runtime. These optional peers are supplied by the native TUI and must share its runtime instances; do not bundle private renderer copies. Standalone renderer tests need the pinned peers and public runtime preload described in [testing](docs/testing.md). Never reset persisted safety state merely to fix loading. For remote clients, check both client installation and server registration in the session's owning location.
 
+## Run after installation
+
+From your project directory, start OpenCode:
+
+```sh
+opencode
+```
+
+Inside OpenCode, enter `/context-guard` to open the Context Guard panel. The plugin loads automatically with OpenCode after registration; there is no separate plugin process to start. Observe mode is the default. Press **c** in the panel for history charts, or **q** to close it.
+
+The installed diagnostic command is **`context-guard`** (Bun required):
+
+```sh
+context-guard --help
+context-guard dashboard tui --help
+context-guard models --help
+context-guard metrics --help
+context-guard charts --help
+context-guard help journal
+```
+
+Each command's help explains its inputs and shows an example. In a source checkout, use `bun run inspect` in place of `context-guard`, for example `bun run inspect charts --help`. OpenCode's plugin manager installs the plugin for the host; if `context-guard` is absent from your shell's PATH, you can still use the native panel. To expose the CLI separately, install the same package with your package manager, for example `npm install -g @cesarus777/opencode-cgp@0.3.1`.
+
 ## Standalone terminal dashboard
 
-Run the dashboard with OpenCode's native TUI closed. The server must already be running, with Context Guard registered in the owning location. The standalone command requires **Bun >=1.3.0** and the optional **`@opentui/core@0.5.17`** peer; server imports and existing diagnostic commands retain Bun >=1.1.34 support. Solid and the native TUI plugin are unnecessary for this command.
+Run the dashboard with OpenCode's native TUI closed. The server must already be running, with Context Guard registered in the owning location. The standalone command requires **Bun >=1.3.0**. The package automatically installs **`@opentui/core@0.5.17`** and its platform renderer; no separate OpenTUI install is needed. Keep optional dependencies enabled so OpenTUI's native platform library is installed. Server imports and existing diagnostic commands retain Bun >=1.1.34 support. Solid and the native TUI plugin are unnecessary for this command.
 
 For an unreleased checkout:
 
@@ -95,10 +118,10 @@ bun dist/cli.js dashboard tui
 bun dist/cli.js dashboard tui --server https://server.example --directory /server/project
 ```
 
-For a packed artifact, install the tarball and renderer together into a separate client directory, then launch with Bun >=1.3.0:
+For a packed artifact, install the tarball into a separate client directory, then launch with Bun >=1.3.0:
 
 ```sh
-npm install /absolute/path/cesarus777-opencode-cgp-0.3.0.tgz @opentui/core@0.5.17
+npm install /absolute/path/cesarus777-opencode-cgp-0.3.1.tgz
 bun node_modules/.bin/context-guard dashboard tui
 ```
 

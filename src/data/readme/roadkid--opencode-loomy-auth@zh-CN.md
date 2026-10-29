@@ -1,6 +1,6 @@
 # @roadkid/opencode-loomy-auth
 
-[English](./README.md) | 中文
+[English](../README.md) | 中文
 
 一个面向 Loomy（讯飞）账号的 [OpenCode](https://opencode.ai) / [magpie](https://usemagpie.ai)
 provider 插件。用 Loomy 的手机验证码登录，对话经 Loomy 的 OpenAI 兼容模型网关转发，
@@ -42,8 +42,8 @@ magpie quota                   # 积分卡片
 没有别的路可走。账号 id 是掩码手机号（`138****8000`）；Loomy 的 userid
 随凭据一并保存。
 
-账号主机会对两个登录调用校验 HMAC-SHA1 签名；插件用内置密钥对签名，
-两个环境变量都可以覆盖它。签名只属于账号平面——网关平面从不签名。
+账号主机会对两个登录调用校验 HMAC-SHA1 签名。
+签名只属于账号平面——网关平面从不签名。
 
 ## 请求
 
@@ -67,9 +67,9 @@ low/medium/high 三档 reasoning-effort 变体。网关把积分倍率拼在展�
 这么声明）不会出现在清单里：选它就是选一个失败。
 
 实时清单是唯一事实来源，一应答即生效。没有会话、应答为空或请求失败时，
-插件回落到代码里的内置表——那是上一代目录的快照，还带着已下架的 id，
-把它当地板而不是指南。下表是网关 **2026-10-28** 实际返回的目录，
-留在这里作实地参考，而非内置表的内容：
+插件回落到代码里的内置表——2026-10-28 同一份目录文本模型的快照，
+只随网关目录自身的变迁而过期。下表是网关当天实际返回的目录，
+留在这里作实地参考：
 
 | 模型 | 展示名 | 倍率 | 备注 |
 |---|---|---|---|
@@ -127,17 +127,6 @@ Settings → Usage → Plugins，随 **magpie ≥ v0.1.1083** 提供，**默认�
 先领、幂等——其中任何一项被拒绝都不碰每日签到自己的结果。新账号的第一次
 签到通常一次同时完成赠送续满与新手钱包入账。
 
-## 环境变量
-
-全部在调用时读取，而不是插件加载时，测试因此能把它们指向自己的假上游。
-
-- `LOOMY_XFYUN_BASE_URL`
-- `LOOMY_POINTS_BASE_URL`
-- `LOOMY_XFYUN_ACCESS_KEY_ID`
-- `LOOMY_XFYUN_ACCESS_KEY_SECRET`
-- `LOOMY_XFYUN_APP_ID`
-- `LOOMY_QUOTA_CACHE_FILE`
-
 ## 已知限制
 
 - **会话十四天，没有续期。** 失效后唯一的路是重新短信登录。
@@ -173,7 +162,7 @@ Settings → Usage → Plugins，随 **magpie ≥ v0.1.1083** 提供，**默认�
 ## 开发
 
 ```sh
-node --test .                    # 单元测试（node:test，本地假上游，无网络）
+node --test                       # 单元测试（node:test，本地假上游，无网络）
 node scripts/check.node.mjs      # 形状校验，与社区 CI 同一套逻辑
 ```
 

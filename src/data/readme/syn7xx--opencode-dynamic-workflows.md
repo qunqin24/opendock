@@ -282,7 +282,7 @@ The [`dynamic-workflows` skill](packages/plugin/skill/dynamic-workflows/SKILL.md
 
 | Member | What it does |
 | --- | --- |
-| `agent(prompt, opts?)` | One Unit. Returns its final text, or with `schema` a validated value. A failed Unit returns `null` and is added to `errors`; it never throws. |
+| `agent(prompt, opts?)` | One Unit. Returns its final text, or with `schema` a validated value. A failed Unit returns `null` and is added to `errors`; it never throws. With `{ receipts: true }` it returns `{ value, unitId, toolCalls }` instead — see [Asserting what a Unit did](#asserting-what-a-unit-did). |
 | `pipeline(items, ...stages)` | Each item runs through its stages on its own, with no barrier between items. Stages get `(previous, item, index)`. |
 | `parallel(thunks)` | Runs thunks concurrently and waits for all of them (a barrier). Failures become `null`. |
 | `collect(xs)` | Drops the `null`s, with the narrowed type. |
@@ -299,7 +299,8 @@ The [`dynamic-workflows` skill](packages/plugin/skill/dynamic-workflows/SKILL.md
 `agent()` options: `schema`, `label`, `phase`, `subagent` (alias `agentType`; default `general`), `model`
 (`"provider/model#variant"` or `{ providerID, modelID }`), `effort` (the variant), `retries` (repair turns, default 2),
 `timeoutMs`, `permissions`, `isolation: "worktree"` (a fresh git worktree, removed if unchanged) and `location` (another
-directory).
+directory). `{ receipts: true }` is a separate flag rather than one of these options — see
+[Asserting what a Unit did](#asserting-what-a-unit-did).
 
 `meta`: `name`, `description`, `whenToUse`, `phases`, `args` (zod), `concurrency`, `unitTimeout`, `budget` (a number,
 or `{ tokens, hard: true }` to stop at the limit), `permissions` (rules for every Unit), `limits`, and
@@ -316,12 +317,75 @@ text, then sends up to `retries` repair turns in the same session, then extracts
 call. Every Unit records which path produced its value (`resultPath`: `tool`, `text-json`, `extract`, `replay` or
 `text`) and every attempt.
 
+### Asserting what a Unit did
+
+A Unit's answer is its own account of its work. When you need proof instead, ask for a receipt: `agent(…, { receipts:
+true })` resolves to `{ value, unitId, toolCalls }`, where `toolCalls` is the tool calls the Unit's session recorded —
+`{ name, input, output, successful }`, with `input` and `output` clipped to 4 000 characters each. That is the
+engine's transcript of the session, never the model's summary of it. The engine's own tools (`workflow_result`,
+`workflow_question`) appear in it too.
+
+```ts
+async run({ agent }) {
+  const receipt = await agent("Create src/notes.txt containing exactly: migrated", {
+    label: "migrate",
+    receipts: true,
+  })
+  const calls = await receipt.toolCalls
+  if (!calls.some((call) => call.name === "write" && call.successful)) {
+    throw new Error(`the file was never written: ${receipt.value}`)
+  }
+  return { writes: calls.filter((call) => call.name === "write").length }
+}
+```
+
+`value` is exactly what `agent()` returns without `receipts` — `null` when the Unit failed — and a failed Unit still
+reports what it did: that is the raw evidence, alongside `errors` for why it dropped. Reading `toolCalls` starts the
+transcript read at the property access, not at resolve time, and memoizes it, so a Workflow that never asks pays
+nothing; what you await is a promise. It is `[]` for a Unit that ran no tools, or that never had a session to read.
+
+For a Unit **replayed on resume** — including a recorded failure that was replayed rather than re-run, and a resume of
+a resume — the receipt reads the session the original Run recorded, so a resumed Run can vouch for work the earlier Run
+did. `[]` there means one of two things: the Unit ran and called no tools, or the evidence is *unknown* — that session
+may legitimately be gone (deleted, another machine, another project, a reset database), unreadable, or absent because
+the Unit failed before it created one. That fallback is deliberate and never throws: a resumed Workflow keeps working
+exactly as it did before receipts could read evidence at all, and the Run log says when a receipt came back unknown.
+
+The strict rule belongs to Units that ran in **this** Run: a session that exists but cannot be read rejects rather than
+looking empty, so an assertion like the one above never passes on a read failure. Two consequences are worth knowing,
+because they pull in opposite directions. Reading real evidence on a resume can make an assertion that quietly passed
+on `[]` fail on the call the earlier Run actually made — that is the point, but it is a visible change. And `[]` on a
+replayed Unit is still not proof of innocence: a check that must never be skipped — "nothing ever ran a destructive
+command" — belongs on a Run that actually ran the Unit, not on a resume of one.
+
+`successful` means the call **finished** (`status: "completed"` with no error), not that the command succeeded: a
+`shell` call that exits non-zero is still a finished call. `output` is the host's raw result with nothing added, so a
+failure may or may not be readable from it — when it matters, assert on the command's **effect** instead (a file the
+Unit wrote, a `ctx.$` check afterwards). `name` is the tool's own id (the check above matches `write`, the tool the
+repo's live test exercises) — assert on the id you expect the Unit to use. And `input` is the call input rendered as
+JSON — possibly partial while the tool is still streaming, and clipped, so it is not always parseable. `receipts:
+true` has to be written inline (or on an `as const` object) for the receipt type to be inferred: a plain `boolean`
+variable does not select the receipt overload, and is a type error rather than a value typed wrongly.
+
+A receipt's `toolCalls` is not enumerable, so returning a receipt from `run()` journals `{ value, unitId }` and reads
+no transcript. That cuts both ways: `{ ...receipt }` silently drops `toolCalls` without warning (`structuredClone` and
+`Object.keys` forget it too), so if you need a plain object, copy it deliberately:
+`{ ...receipt, toolCalls: await receipt.toolCalls }`.
+
+Opting in to receipts also changes the shape of a fan-out, because a receipt is never `null`: `collect()` around a
+`parallel()` of receipts keeps the failed Units instead of dropping them (`value` is what carries the failure), so
+filter on `value` when you want only the Units that succeeded.
+
 ### Resume
 
 Every Run is journaled under `.opencode/workflows/runs/<runId>/`. A plugin reload does not stop running Runs. If the
 OpenCode service dies, the Run reads back as `interrupted`. `resume` starts a new Run that matches Units by start order
 and prompt: each Unit whose prompt is unchanged returns its recorded result at once, answers to `ask` are replayed, and
 from the first changed prompt on everything runs live. Units that failed run again.
+
+A Workflow composed of several files (its entry importing local modules, at any depth) journals the bundled module
+the Run actually executed alongside its source, so a resume replays that exact module even if those files were edited,
+moved or deleted in the meantime.
 
 ## How it works
 
@@ -346,7 +410,8 @@ flowchart LR
   Runs beyond `maxConcurrentRuns` wait, queued.
 - **Units** are ordinary OpenCode sessions, so they use your providers, subagents and permission rules. They are not
   linked into your conversation; the TUI and web app show them.
-- **The journal** records the Run, each Unit, the script source and the result, which is what resume replays.
+- **The journal** records the Run, each Unit, the script source, the bundled module a decomposed Workflow ran, and the
+  result, which is what resume replays.
 - **Clients** talk to the engine through one versioned protocol: the TUI over plugin RPC, the web app and scripts
   over the Gateway.
 

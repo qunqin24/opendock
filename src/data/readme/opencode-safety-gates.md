@@ -1,9 +1,11 @@
 # opencode-safety-gates
 
 Safety gates for [OpenCode](https://opencode.ai) — run your Claude Code
-bash-gate scripts inside OpenCode, deny self-revoking commands, and catch
-fabricated CLI syntax before it reaches a production shell. **Zero runtime
-dependencies.**
+bash-gate scripts inside OpenCode and **deny self-revoking commands before
+execution**; plus an advisory gate that **flags fabricated CLI syntax** in
+assistant replies after the turn ends. The syntax flag prompts for
+verification — it is not an execution blocker (see the gate table).
+**Zero runtime dependencies.**
 
 Built on the OpenCode **V2 plugin API** (`{ id, setup(ctx) }`). If your V1
 plugin died with *"Plugin must export a default definition with an id and an
@@ -16,7 +18,7 @@ reference for the full V1→V2 hook mapping (see
 | Gate | Default | What it does |
 |---|---|---|
 | **Bash gate** | on when gate scripts exist | Wraps the built-in bash/shell tool executor and runs your Claude Code `PreToolUse`/Bash gate scripts — unchanged, from the same `settings.json` wiring — inside OpenCode. One script, both tools. |
-| **verify-cli-syntax** | config-driven (inert without config) | After each assistant turn, scans the reply for high-risk CLI syntax claims and checks the session for verification evidence (`--help`, man page, authoritative source). Sends one corrective prompt per session when a claim is unverified. |
+| **verify-cli-syntax** | config-driven (inert without config) | After each assistant turn, scans the reply for high-risk CLI syntax claims and checks the session for verification evidence (`--help`, man page, authoritative source). Sends **one advisory corrective prompt per session** when a claim is unverified — it flags and prompts; it does not block execution. |
 | **Session-log injection** | off (`options.sessionLog`) | Injects the head of a per-project `SESSIONLOG.md` into the system prompt once per session. |
 
 ## Why
@@ -33,8 +35,10 @@ Two failure modes this plugin was built around, both from real incidents:
    CLI invocation from memory, shipped it into a doc, and later cited its own
    doc as the source. The syntax was wrong. Fabricated syntax is
    indistinguishable from correct syntax until it fails on a production
-   shell — so the gate forces verification (`--help`, man page, upstream
-   source) before a claim survives.
+   shell — so the gate sends one advisory corrective prompt per session
+   asking the model to verify (`--help`, man page, upstream source) or
+   correct the claim. It cannot block restatement; it surfaces the gap to
+   the model and the human.
 
 And one meta-lesson: **a security gate that dies silently protects no one.**
 Both real-world breakages of this plugin's private predecessor were silent —

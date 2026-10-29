@@ -46,19 +46,41 @@ plugin, so the path has to come after the removal.
 
 Run `/btw` on its own to open the window and type the question into the composer. An answer
 appears as it is written, and a thread that already holds answers is reopened as it was
-left.
+left. An answer that arrives while the window is closed is written out when the window comes
+back, and an answer already written out is there whole.
 
 ![The /btw window with two questions, two answers and the composer](docs/btw-window.png)
 
-`PageUp`, `PageDown`, `Home` and `End` move the transcript, `Delete` clears the thread, and
-`Esc` closes the window and keeps the thread. A click on `copy thread` copies the whole
-thread through the terminal clipboard.
+`PageUp`, `PageDown`, `Ctrl+Home` and `Ctrl+End` move the transcript, `Delete` clears the
+thread, and `Esc` closes the window and keeps the thread. A click on `copy thread` copies the
+whole thread through the terminal clipboard. Closing the window leaves a question that was
+asked and is still waiting to go out in the session, and it goes out the next time the window
+opens.
+
+The composer takes the keys the host's own prompt takes: `Home` and `End` for the ends of the
+text, the arrows for the cursor, and the word and selection keys of the host's input table.
+`Delete` deletes a character in front of the cursor, and clears the thread only while the
+composer is empty.
+
+`Up` and `Down` walk through the side questions asked in this session, newest first. The press
+does what the field would do first: `Up` moves a line up and `Down` a line down. At the very
+start of the text `Up` brings back the previous question, at its very end `Down` brings the next
+one, and `Down` past the newest question brings back what was typed. On the first line a press
+that is not at its start goes to the start, and on the last line one that is not at its end goes
+to the end.
 
 While a side question is being answered, the `btw` badge in the prompt row opens the
 window for it.
 
 The header of the window holds a marker that opens a list of prepared prompts, and a click on
-one of them asks it.
+one of them asks it. `Down` at the end of the last line opens the same list and leaves whatever
+is typed in the field alone. `Up` and `Down` move the pick, `Up` on the first prompt closes the
+list and puts the cursor back in the composer, and `Enter` asks the pick.
+
+`Ctrl+Up` in the session opens the window with nothing asked, and `Ctrl+Up` inside the window
+opens the same list, which the marker in the header toggles as well. `Ctrl+Down` takes the list
+down, and the window down once the list is down. `Up` and `Down` move the pick, `Enter` asks it,
+`Up` on the first prompt or `Esc` closes the list, and the field keeps whatever was typed in it.
 
 A thread belongs to the session it was asked in, and it lives in memory as long as the
 process runs.

@@ -1,6 +1,6 @@
 # @roadkid/opencode-loomy-auth
 
-English | [中文](./README.zh.md)
+English | [中文](./docs/README.zh.md)
 
 An [OpenCode](https://opencode.ai) / [magpie](https://usemagpie.ai) provider
 plugin for a Loomy (iFlytek) account. You sign in with Loomy's phone-code
@@ -44,9 +44,8 @@ the sign-in expired and magpie asks for a new SMS sign-in — there is nothing
 to renew. The account's id is the masked phone (`138****8000`); the Loomy userid
 is kept with the credential.
 
-The account host checks an HMAC-SHA1 signature on both sign-in calls; the
-plugin signs with a built-in pair that either environment variable can
-override. The signature belongs to the account plane alone — the gateway
+The account host checks an HMAC-SHA1 signature on both sign-in calls.
+The signature belongs to the account plane alone — the gateway
 planes never sign.
 
 ## Requests
@@ -75,10 +74,10 @@ selecting one is selecting a failure.
 
 The live list is the source of truth and wins the moment it answers. Without
 a session, on an empty answer or a failed ask, the plugin falls back to the
-built-in table in the code — a snapshot from an earlier generation of the
-catalog that still carries retired ids, so read it as a floor, not a guide.
-The table below is what the gateway itself served on **2026-10-28**, kept
-here as a field guide rather than the fallback's contents:
+built-in table in the code — a snapshot of this same catalog's text models
+as measured on 2026-10-28, aging only as the gateway's own catalog moves
+on. The table below is what the gateway itself served on that day, kept
+here as a field guide:
 
 | Model | Display name | Rate | Notes |
 |---|---|---|---|
@@ -150,18 +149,6 @@ among them never touches the daily claim's own result. The first check-in of
 a fresh account typically refreshes the grant and lands the newcomer purse
 in one go.
 
-## Environment overrides
-
-All of them are read when a call is made, not when the plugin loads, so tests
-can point them at a fake of their own.
-
-- `LOOMY_XFYUN_BASE_URL`
-- `LOOMY_POINTS_BASE_URL`
-- `LOOMY_XFYUN_ACCESS_KEY_ID`
-- `LOOMY_XFYUN_ACCESS_KEY_SECRET`
-- `LOOMY_XFYUN_APP_ID`
-- `LOOMY_QUOTA_CACHE_FILE`
-
 ## Known limits
 
 - **The session is fourteen days, with no refresh.** When it ends the only way
@@ -208,7 +195,7 @@ yours. An upstream protocol change can break the package at any time.
 ## Development
 
 ```sh
-node --test .                    # the unit tests (node:test, a local fake upstream, no network)
+node --test                       # the unit tests (node:test, a local fake upstream, no network)
 node scripts/check.node.mjs      # the shape check, the same logic the community CI runs
 ```
 

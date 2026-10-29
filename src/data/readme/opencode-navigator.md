@@ -491,6 +491,10 @@ available from the command palette.
 
 ![Codex quota windows and reset times](screenshots/39-provider-limits.png)
 
+![Native Console workspace budgets](screenshots/63-native-workspace-budgets.png)
+
+![Native Go allowance windows](screenshots/64-native-go-allowance.png)
+
 ### Link the intended Codex account
 
 Install a Codex CLI exposing the documented read and consume RPCs (verified with

@@ -1,17 +1,27 @@
 <div align="center">
 
-# AI-OFFICE
+<img src="docs/assets/banner.svg" width="1000" alt="AI-OFFICE — una oficina de agentes para OpenCode donde el trabajo no se detiene cuando el modelo dice «terminé»." />
 
-### Una oficina de agentes para OpenCode donde el trabajo no se detiene cuando el modelo dice «terminé».
+<br>
 
-[![npm](https://img.shields.io/npm/v/oficina-opencode?label=npm&color=cb3837)](https://www.npmjs.com/package/oficina-opencode)
-[![license](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/SOCRAMbt/AI-OFFICE/tree/main/LICENSE)
-[![node](https://img.shields.io/badge/node-%3E%3D22-339933.svg)](https://nodejs.org)
-[![tests](https://img.shields.io/badge/tests-419%20passing-22a06b.svg)](https://github.com/SOCRAMbt/AI-OFFICE/tree/main/tests)
-[![coverage](https://img.shields.io/badge/coverage-87.76%25-7c3aed.svg)](https://vitest.dev)
-[![types](https://img.shields.io/badge/typescript-strict-3178c6.svg)](https://github.com/SOCRAMbt/AI-OFFICE/blob/main/tsconfig.json)
+<a href="https://www.npmjs.com/package/oficina-opencode"><img src="https://img.shields.io/npm/v/oficina-opencode?style=for-the-badge&labelColor=0d1117&color=cb3837" alt="npm" /></a>
+<a href="https://github.com/SOCRAMbt/AI-OFFICE/blob/main/LICENSE"><img src="https://img.shields.io/badge/licencia-MIT-2ea44f?style=for-the-badge&labelColor=0d1117" alt="licencia MIT" /></a>
+<a href="https://nodejs.org"><img src="https://img.shields.io/badge/node-%3E%3D22-339933?style=for-the-badge&labelColor=0d1117" alt="node >= 22" /></a>
+<a href="https://github.com/SOCRAMbt/AI-OFFICE/tree/main/tests"><img src="https://img.shields.io/badge/tests-456%20passing-1f6feb?style=for-the-badge&labelColor=0d1117" alt="456 tests passing" /></a>
+<a href="https://github.com/SOCRAMbt/AI-OFFICE/blob/main/tsconfig.json"><img src="https://img.shields.io/badge/typescript-strict-3178c6?style=for-the-badge&labelColor=0d1117" alt="TypeScript strict" /></a>
+
+<br>
+
+[![CI](https://github.com/SOCRAMbt/AI-OFFICE/actions/workflows/ci.yml/badge.svg)](https://github.com/SOCRAMbt/AI-OFFICE/actions/workflows/ci.yml)
+[![coverage](https://img.shields.io/badge/cobertura-75%25%20lines-7c3aed?style=flat-square)](https://vitest.dev)
+[![downloads](https://img.shields.io/npm/dw/oficina-opencode?style=flat-square)](https://www.npmjs.com/package/oficina-opencode)
+[![provenance](https://img.shields.io/badge/npm-publish%20con%20provenance-2ea44f?style=flat-square)](docs/SEGURIDAD-REPO.md)
+[![security policy](https://img.shields.io/badge/seguridad-pol%C3%ADtica-2ea44f?style=flat-square)](SECURITY.md)
+[![backwards compat](https://img.shields.io/badge/opencode-v1%20%2B%20v2-232b3e?style=flat-square)](https://github.com/SOCRAMbt/AI-OFFICE/blob/main/docs/COMPATIBILITY.md)
 
 **Una malla de coordinadores + peer mesh sobre un roster de roles.**
+
+</div>
 
 <!-- BEGIN GENERATED: facts -->
 | | |
@@ -23,22 +33,52 @@
 | **Node** | >=22 |
 | **Catálogo** | 258 agentes resolubles en 18 divisiones |
 | **Divisiones** | academic, design, engineering, finance, game-development, gis, healthcare, marketing, paid-media, product, project-management, research, sales, spatial-computing, specialized, strategy, support, testing |
+<!-- Catalog source: agency-agents @ 4e3ac3c -->
 | **Límites** | 20 cards · 40 llamadas · 20 spawns · 10 agentes |
 | **Cobertura mínima** | 60% |
 <!-- END GENERATED: facts -->
 
-> **¿Preferís la versión en humano?** → [`docs/QUE-ES.md`](https://github.com/SOCRAMbt/AI-OFFICE/blob/main/docs/QUE-ES.md) — qué es, qué hace y por qué, sin jerga.
-> **¿Preferís el porqué técnico?** → [`docs/ARCHITECTURE.md`](https://github.com/SOCRAMbt/AI-OFFICE/blob/main/docs/ARCHITECTURE.md)
+<div align="center">
 
-[Documentación](#arquitectura) · [Garantías](https://github.com/SOCRAMbt/AI-OFFICE/blob/main/docs/GARANTIAS.md) · [Compatibilidad](https://github.com/SOCRAMbt/AI-OFFICE/blob/main/docs/COMPATIBILITY.md) · [Prueba E2E](https://github.com/SOCRAMbt/AI-OFFICE/blob/main/docs/PRUEBA-E2E.md) · [Instalación](#instalación) · [Uso](#uso) · [CLI](#cli-operación)
+| Documentación |
+|:---:|
+| [⚡ Inicio rápido](#inicio-rapido) · [🧩 El problema](#el-problema) · [🏛️ Qué es](#que-es) · [🏗️ Arquitectura](#arquitectura) · [🧠 Matching de roles](#capa-0) |
+| [⚙️ Dispatch](#el-equipo-se-arma) · [🔒 Scope](#el-scope-es-una-restriccion) · [🛡️ Resiliencia](#resiliencia) · [💰 Costo](#costo) · [📚 Briefing](#el-briefing) |
+| [📮 Bus](#el-bus) · [🧷 Hooks](#los-7-hooks) · [🚦 Gates](#los-7-gates) · [⚖️ Invariantes](#invariantes-duros) · [🧰 Tools](#las-16-tools) · [🤖 Agentes](#los-7-agentes) |
+| [📦 Instalación](#instalacion) · [🚀 Uso](#uso) · [🖥️ CLI](#cli-operacion) · [📁 Estructura](#estructura-de-la-corrida) · [🔐 Seguridad](#seguridad) · [🧪 Testing](#testing) · [📄 Licencia](#licencia) |
 
 </div>
 
----
+> **¿Preferís la versión en humano?** → [`docs/QUE-ES.md`](docs/QUE-ES.md) — qué es, qué hace y por qué, sin jerga.
+> **¿Preferís el porqué técnico?** → [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
+> **¿Querés saber qué promete y qué no?** → [`docs/GARANTIAS.md`](docs/GARANTIAS.md) — nada de hinted marketing: garantías verificadas y límites escritos.
 
-## El problema
+<a id="inicio-rapido"></a>
+## ⚡ Inicio rápido
 
-Working con agents tiene cinco fallas concretas. No son falta de inteligencia: son falta de **estructura**.
+Tres comandos y la oficina está corriendo dentro de OpenCode:
+
+```bash
+# 1. Instalar el paquete y desplegar los assets:
+npm install -g oficina-opencode
+oficina install --target ~/.config/opencode
+
+# 2. Habilitar la delegación de subagentes en ~/.config/opencode/opencode.json:
+#    { "experimental": { "subagent_depth": 3 } }
+
+# 3. Abrir OpenCode en tu proyecto y arrancar la oficina:
+#    /oficina Agregar autenticación JWT con refresh rotation
+```
+
+La skill se carga, el plugin registra las tools y la corrida arranca sola:
+el Comandante descompone el objetivo en cards, el dispatch crea el equipo de
+especialistas y los arranca en paralelo. Y no se detienen cuando el modelo dice
+«terminé»: se detienen cuando el estado dice que terminó.
+
+<a id="el-problema"></a>
+## 🧩 El problema
+
+Trabajar con agentes llega con cinco fallas concretas. No son falta de inteligencia: son falta de **estructura**.
 
 | Falla | Qué pasa en la práctica |
 |---|---|
@@ -48,11 +88,12 @@ Working con agents tiene cinco fallas concretas. No son falta de inteligencia: s
 | **El contexto se pierde** | Hay que repetir lo que ya se dijo, lo ya se decidió y lo ya se encontró. |
 | **Los subagentes son islands** | No se piden ayuda, no se coordinan, no se benefician del trabajo del otro. |
 
-Una skill de markdown no arregla ninguna de las cinco. Un sistema con reglas escritas en código, no: porque **no dependen de que el modelo tenga ganas de seguirlas**.
+Una skill de markdown no arregla ninguna de las cinco. Un sistema con reglas
+escritas en código, sí: porque **no dependen de que el modelo tenga ganas de
+seguirlas**.
 
----
-
-## Qué es
+<a id="que-es"></a>
+## 🏛️ Qué es
 
 **AI-OFFICE** es un plugin de OpenCode que convierte la orquestación en **código ejecutable**, no en instrucciones.
 
@@ -61,7 +102,7 @@ Skill     →  "Hacé lo que corresponda"          →  depende de que el modelo
 Plugin    →  máquina de estados + hooks         →  no depende de la buena voluntad
 ```
 
-Cuatro piezas lo hacen posible:
+Cinco piezas lo hacen posible:
 
 **1. Un hook que no deja que la sesión muera.** Cuando la sesión queda `idle` y quedan cards sin terminar, el motor manda un prompt sintético y la corrida sigue. El modelo **no puede declarar que terminó**: el estado lo dice.
 
@@ -71,13 +112,10 @@ Cuatro piezas lo hacen posible:
 
 **4. Invariantes que el código garantiza.** `gate_required_before_done` y `reviewer_neq_owner` no son recomendaciones: `assertInvariants` lanza y la transición no ocurre.
 
-Y una quinta, que es lo que hace confiable todo lo demás:
+**5. El roster se arma según el objetivo.** Los roles salen del catálogo real de agency-agents (**258 agentes, 18 divisiones**), matcheados contra lo que la card pide. Cada agente recibe un **briefing** de 10 secciones con lo que sabe, lo que no, y qué tiene que entregar.
 
-**5. El roster se arma según el objetivo.** Los roles salen del catálogo real de agency-agents (**258 agentes, 18 divisiones**), matcheados contra lo que la card pide. Y cada agente recibe un **briefing** de 10 secciones con lo que sabe, lo que no, y qué tiene que entregar.
-
----
-
-## Arquitectura
+<a id="arquitectura"></a>
+## 🏗️ Arquitectura
 
 Cuatro capas. De abajo hacia arriba.
 
@@ -109,9 +147,8 @@ Cuatro capas. De abajo hacia arriba.
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
----
-
-## Capa 0 — De dónde sale la especialidad
+<a id="capa-0"></a>
+## 🧠 Capa 0 — De dónde sale la especialidad
 
 El repo de agency-agents tiene **258 agentes en 18 divisiones**, y cada uno trae un briefing de 10 secciones. La especialidad real **no está en el `description`** del frontmatter: está en el cuerpo.
 
@@ -160,7 +197,7 @@ Reproducible: `npx tsx scripts/demo-roles.ts`
 Un matching textual puede elegir bien al rol y aun así no ser el mejor para la tarea. La pregunta no es *"¿funciona?"* sino **"¿vale la pena?"**. El benchmark compara tres estrategias sobre 21 tareas con resultados de referencia:
 
 | Estrategia | hit@1 | hit@3 | MRR |
-|---|---|---|---|
+|---|:---:|:---:|:---:|
 | **El matcher de la oficina** | **71%** | 86% | **0.778** |
 | Keywords (los pesos de la v1) | 48% | 81% | 0.623 |
 | Solo el nombre del rol | 52% | 76% | 0.639 |
@@ -231,9 +268,8 @@ Por eso la factory emite **exactamente la misma estructura**: Identity & Memory,
 
 Y lo importante: el prompt fabricado **no es genérico**. Lleva las capabilities concretas, el scope, el objetivo de la corrida, los modos de fallo del rol y el contexto de la card.
 
----
-
-## El equipo se arma
+<a id="el-equipo-se-arma"></a>
+## ⚙️ El equipo se arma
 
 El flujo completo es: **doy un objetivo → el jefe lo divide → crea los subagentes → arrancan a trabajar juntos**.
 
@@ -257,9 +293,39 @@ El resultado:
 
 Los **pares libres** son los complementos: están en la mesa, pueden recibir un pedido de ayuda, y pueden reclamar una card que quedó sin dueño.
 
----
+De aquí la vida de un agente, y el ciclo completo de la corrida:
 
-## La mesa
+```mermaid
+flowchart TD
+    OBJ["👤 Objetivo"] --> PLAN["📋 PLAN<br/>El Comandante descompone en cards"]
+    PLAN --> DEP{"Deps<br/>satisfechas?"}
+    DEP -->|sí| STANDUP["🗣️ STANDUP<br/>la card lista para trabajar"]
+    DEP -->|no| WAIT["⏸️ Espera / escalación"]
+    STANDUP --> WORK["🔧 TRABAJO<br/>owner + scope bloqueado"]
+    WORK --> ENT["📦 Entrega<br/>handoff.md + evidence.md"]
+    ENT --> REV["🔍 AUTO-REVIEW<br/>crítico ≠ owner"]
+    REV -->|rechaza| REWORK["♻️ REWORK"]
+    REWORK --> WORK
+    REV -->|aprueba| GATES["🚦 GATES<br/>7 fases · exit codes reales"]
+    GATES -->|FAIL| REWORK
+    GATES -->|PASS| DONE["✅ DONE<br/>evidencia vinculada requisito por requisito"]
+```
+
+```mermaid
+flowchart LR
+    subgraph ciclo["Ciclo de un agente"]
+        DEPLOYED --> WORKING
+        WORKING -->|terminó| IDLE["IDLE_AVAILABLE"]
+        IDLE -->|recibe ayuda| WORKING
+        WORKING --> BLOCKED
+        BLOCKED --> IDLE
+    end
+```
+
+Cuando un agente termina, **ofrece ayuda** para lo que sigue. No queda esperando.
+
+<a id="la-mesa"></a>
+### 🪑 La mesa
 
 Los subagentes son procesos aislados: no se ven, no saben quién más trabaja, no saben a quién preguntarle. La **mesa** es la vista compartida — vive en disco, así que todos la leen sin memoria compartida.
 
@@ -272,17 +338,7 @@ Los subagentes son procesos aislados: no se ven, no saben quién más trabaja, n
 
 Y cuando la sesión queda `idle`, el hook de auto-continuación inyecta esa foto en el prompt del agente que arranca. Sin esto, el peer mesh es un bus al que nadie mira.
 
-### El ciclo de un agente
-
-```
-DEPLOYED → WORKING → (terminó) → IDLE_AVAILABLE → (ayuda) → WORKING
-                            ↓                                        ↑
-                        BLOCKED ──→ IDLE_AVAILABLE ──────────────────┘
-```
-
-Cuando un agente termina, **ofrece ayuda** para lo que sigue. No queda esperando.
-
-### Hablar por el bus
+#### Hablar por el bus — el triage del receptor
 
 El que recibe un pedido de ayuda **hace su propio triage** — no acepta por cortesía:
 
@@ -296,9 +352,8 @@ El que recibe un pedido de ayuda **hace su propio triage** — no acepta por cor
 **Anti-deadlock**: máximo 2 saltos en una cadena de ayuda; después escala al Integrador.
 **Anti-monotonía**: si el par A↔B ya se ayudaron 2 veces, el tercer pedido va a un tercero.
 
----
-
-## El scope es una restricción, no una instrucción
+<a id="el-scope-es-una-restriccion"></a>
+## 🔒 El scope es una restricción, no una instrucción
 
 La versión anterior del guard comparaba strings: `"...".match(/^src\//)`. Eso se eludía por tres vías, y las tres eran reales.
 
@@ -324,11 +379,10 @@ Además:
 - **Los archivos sensibles** (`.env`, `.npmrc`, `.git/**`, claves privadas) nunca son escribibles, pase lo que pase el scope de la card.
 - **El tripwire** fotografía el árbol antes de un comando y compara después: detecta lo que el guard no pudo ver.
 
-> Lo que **no** se promete está en [`docs/GARANTIAS.md`](https://github.com/SOCRAMbt/AI-OFFICE/blob/main/docs/GARANTIAS.md). Un shell con interpreter embebido puede escribir afuera; el tripwire lo detecta después, pero no lo revierte. Preferimos decirlo a vender un aislamiento que no existe.
+> **Lo que no se promete** está en [`docs/GARANTIAS.md`](docs/GARANTIAS.md). Un shell con interpreter embebido puede escribir afuera; el tripwire lo detecta después, pero no lo revierte. Preferimos decirlo a vender un aislamiento que no existe.
 
----
-
-## Una caída no destruye la corrida
+<a id="resiliencia"></a>
+## 🛡️ Una caída no destruye la corrida
 
 La oficina escribe en disco, en varios archivos, sin transacción. Un proceso que muere en el momento equivocado deja el estado incoherente. `reconcile()` compara **estado vs artefactos vs filesystem**:
 
@@ -341,27 +395,26 @@ La oficina escribe en disco, en varios archivos, sin transacción. Un proceso qu
 | Lease de una card terminada | Se libera. |
 | Agente `working` sobre una card `done` | Se libera el agente. |
 | Card bloqueada por dependencia irresoluble | Se reporta. |
+| `state.json` corrupto | Se pone en cuarentena y se lanza `StateCorruptionError`. **No se crea una corrida vacía encima**: el operador recupera o pide explícitamente una nueva (`oficina init --force-new-run`). |
 
-Lo que **no** hace: completar cards ni inventar evidencia. Un sistema que se auto-repara inventando pruebas es peor que uno que dice *"esto está roto"*.
+Lo que **no** hace: completar cards, inventar evidencia ni auto-repararse pisando datos. Un sistema que se auto-repara inventando pruebas es peor que uno que dice *"esto está roto"*.
 
----
-
-## El costo se controla, no solo la cantidad de agentes
+<a id="costo"></a>
+## 💰 El costo se controla, no solo la cantidad de agentes
 
 Limitar el número de agentes **no** es controlar el costo: un agente que relee el mismo contexto veinte veces cuesta diez veces lo que uno que lo hace bien.
 
 - El costo real viene del motor (`AssistantMessage.cost`), no se estima.
 - Se contabiliza por **card**, por **agente** y por **fase** (implementación, review, reparación).
 - Presupuestos por corrida, por card y por fase.
-- Estimación previa a una corrida grande.
+- Estimación previa a una corrida grande (`oficina_cost` en modo `estimate`).
 - Detección de **trabajo redundante**: releer el mismo path, repetir el mismo comando.
 - **Freno de emergencia**: `oficina_stop` detiene la corrida; el auto-continuación y el despacho se niegan mientras esté detenida.
 
----
+<a id="el-briefing"></a>
+## 📚 El briefing: qué sabe cada agente antes de arrancar
 
-## Capa 1 — El briefing: qué sabe cada agente antes de arrancar
-
-Un subagente arranca con el contexto vacío. Si el Commander le pasa un prompt suelta (*"implementá el login"*), el agente tiene que adivinar: qué sabe del proyecto, qué espera de él, qué puede tocar, a quién preguntarle si se traba, y qué tiene que entregar. Adivinar es la fuente de todo el trabajo que se repite y de los agentes que se salen del scope.
+Un subagente arranca con el contexto vacío. Si el Commander le pasa un prompt suelto (*"implementá el login"*), el agente tiene que adivinar: qué sabe del proyecto, qué espera de él, qué puede tocar, a quién preguntarle si se traba, y qué tiene que entregar. Adivinar es la fuente de todo el trabajo que se repite y de los agentes que se salen del scope.
 
 El briefing es el contrato de información. Tiene **orden fijo** y **mínimo verificable**.
 
@@ -370,7 +423,7 @@ El briefing es el contrato de información. Tiene **orden fijo** y **mínimo ver
 La información llega de lo más estable a lo más cambiante. Un agente lee de arriba hacia abajo y siempre tiene lo que necesita para el paso siguiente.
 
 | # | Sección | Qué le dice |
-|---|---|---|
+|:-:|---|---|
 | 1 | **Quién sos** | Rol, especialidad de origen, de dónde viene tu briefing, tu vibe |
 | 2 | **Tu misión** | La card exacta, los criterios de aceptación numerados, el control de calidad |
 | 3 | **Lo que ya sabés** | Decisiones tomadas, restricciones descubiertas, piezas construidas, trampas |
@@ -405,9 +458,8 @@ El briefing se materializa en cuatro archivos en disco, porque un agente no "rec
 
 La sección 3 se alimenta del **contexto acumulado** de la corrida (`.oficina/context.md`), que registra decisiones, restricciones, piezas construidas y trampas. Es lo que evita que un agente repita lo que ya se decidió — y lo que convierte al bus en algo más que un tablón de avisos.
 
----
-
-## Capa 2 — El bus
+<a id="el-bus"></a>
+## 📮 El bus
 
 Los subagentes de OpenCode son **procesos aislados sin memoria compartida**. No pueden hablarse de facto. La solución coherente es un bus append-only sobre disco.
 
@@ -443,20 +495,8 @@ Los subagentes de OpenCode son **procesos aislados sin memoria compartida**. No 
 | **Broadcast** | `to: ["*"]` al pool | El primero que acepta toma el lease |
 | **Anti-deadlock** | `hops` máximo 2 | Una cadena de ayuda no se enquista |
 
-### El que recibe hace su propio triage
-
-No acepta por cortesía. Seis preguntas, en orden:
-
-1. ¿Entiendo la tarea? → si no, `HELP_DECLINE` + explicar
-2. ¿Está en mi scope? → si no, `HELP_DECLINE` + sugerir a quién
-3. ¿Puedo hacerlo **ya** sin romper mi card? → si no, `HELP_DECLINE` + «cuando termine»
-4. ¿Tengo el contexto? → si no, `HELP_QUESTION` por el bus
-5. ¿Vale la pena? → si no, `HELP_DECLINE` + alternativa
-6. ¿Tengo presupuesto? → si no, `HELP_DECLINE` + «sin presupuesto»
-
----
-
-## Los 7 hooks
+<a id="los-7-hooks"></a>
+## 🧷 Los 7 hooks
 
 Acá es donde el protocolo deja de ser una intención.
 
@@ -473,14 +513,13 @@ Acá es donde el protocolo deja de ser una intención.
 
 El hook de auto-continuación tiene guardas duras: solo reanuda si queda trabajo real, tope de 25 auto-reanudaciones por sesión, cooldown de 1,5 s entre reanudaciones, y nunca reanuda una corrida `paused`, `blocked` o `delivered`.
 
----
-
-## Los 7 gates
+<a id="los-7-gates"></a>
+## 🚦 Los 7 gates
 
 Se ejecutan de verdad; el motor interpreta los exit codes.
 
 | # | Fase | Node | Python | Go | Rust |
-|---|---|---|---|---|---|
+|:-:|---|---|---|---|---|
 | 1 | Build | `npm run build` | `python -m build` | `go build ./...` | `cargo build` |
 | 2 | Type check | `npm run typecheck` | `mypy` | `go vet ./...` | `cargo check` |
 | 3 | Lint | `npm run lint` | `ruff` | `golangci-lint` | `cargo clippy` |
@@ -494,11 +533,11 @@ Se ejecutan de verdad; el motor interpreta los exit codes.
 Los seis gates técnicos dicen que **el código está sano**. Dicen nada de si el **objetivo del usuario está cumplido**: un proyecto puede compilar, pasar todos sus tests y tener la autenticación mal porque ningún test contemplaba ese escenario.
 
 | Nivel | Qué comprueba |
-|---|---|
-| 1 — Estático | Tipos, lint, secretos, dependencias |
-| 2 — Comportamiento | Unitarias, integración, regresión, casos límite |
-| 3 — Requisitos | Cada criterio de aceptación enlazado a su evidencia |
-| 4 — Auditoría | Revisión independiente, riesgos, coherencia de la evidencia |
+|:-:|---|
+| 1 | **Estático** — tipos, lint, secretos, dependencias |
+| 2 | **Comportamiento** — unitarias, integración, regresión, casos límite |
+| 3 | **Requisitos** — cada criterio de aceptación enlazado a su evidencia |
+| 4 | **Auditoría** — revisión independiente, riesgos, coherencia de la evidencia |
 
 El gate 7 es el que cierra el círculo: **una card no se cierra si falta evidencia de un requisito obligatorio**, aunque los otros seis estén en verde.
 
@@ -523,9 +562,8 @@ Un artefacto llega a nivel 2; un test, a 2; un gate, a 1 (o 2 si es la fase `tes
 - Una fase aplicable en `FAIL` = gate `FAIL`. No se promedia
 - El escaneo de secretos corre **en TypeScript**, no shelling out a `grep` (que no existe en Windows), y **redacta** el valor: un log de gate que imprime la credencial completa la acaba de filtrar
 
----
-
-## Invariantes duros
+<a id="invariantes-duros"></a>
+## ⚖️ Invariantes duros
 
 Los implementa el código. Un prompt puede pedirle al modelo que sea cuidadoso; el motor no puede romperlos.
 
@@ -547,9 +585,8 @@ Los implementa el código. Un prompt puede pedirle al modelo que sea cuidadoso; 
 | `max_review_rejections` | 3 → escalación |
 | `max_cards` · `max_agent_calls` | 20 · 40 por corrida |
 
----
-
-## Los 3 coordinadores
+<a id="los-3-coordinadores"></a>
+## 🎙️ Los 3 coordinadores
 
 Un solo coordinador es cuello de botella y punto único de falla.
 
@@ -564,9 +601,8 @@ Un solo coordinador es cuello de botella y punto único de falla.
 
 Las preguntas de un especialista al coordinador **van por el bus**, no interrumpen al humano. Al usuario solo llega lo que ningún coordinador puede resolver.
 
----
-
-## Los 16 tools
+<a id="las-16-tools"></a>
+## 🧰 Las 16 tools
 
 Dieciséis, no treinta. Cada tool que se suma es ruido en el contexto de todos los agentes.
 
@@ -589,23 +625,21 @@ Dieciséis, no treinta. Cada tool que se suma es ruido en el contexto de todos l
 | `oficina_cost` | Tokens y USD por card, agente y fase, con los presupuestos |
 | `oficina_stop` | Freno de emergencia: detiene o reanuda la corrida |
 
----
-
-## Los 7 agentes
+<a id="los-7-agentes"></a>
+## 🤖 Los 7 agentes
 
 | Agente | Rol | Aprueba? |
-|---|---|---|
+|---|---|:---:|
 | `oficina-commander` | Scope, objetivo, prioridades | No revisa técnico |
 | `oficina-architect` | Decisiones técnicas cross-cutting | No revisa técnico |
 | `oficina-integrator` | DAG, leases, gates, presupuesto | No revisa técnico |
-| `oficina-critico` | Revisión con confianza calibrada (umbral 80) | Sí |
-| `oficina-guardian` | Secretos, inyecciones, deps, auth | Sí |
-| `oficina-verificador` | Ejecuta build/typecheck/lint/test | Sí |
+| `oficina-critico` | Revisión con confianza calibrada (umbral 80) | **Sí** |
+| `oficina-guardian` | Secretos, inyecciones, deps, auth | **Sí** |
+| `oficina-verificador` | Ejecuta build/typecheck/lint/test | **Sí** |
 | `oficina-director` | Dirección de la oficina v1 (fallback) | No |
 
----
-
-## Instalación
+<a id="instalacion"></a>
+## 📦 Instalación
 
 ### Desde npm
 
@@ -614,15 +648,9 @@ npm install -g oficina-opencode
 oficina install --target ~/.config/opencode
 ```
 
-`oficina install` copia la skill, los 7 agentes, el comando `/oficina` y el
-**entry point del plugin**.
+`oficina install` copia la skill, los 7 agentes, el comando `/oficina` y el **entry point del plugin**.
 
-> **El entry point no es un import pelado.** El loader de plugins de OpenCode
-> v2 no resuelve bare specifiers desde `~/.config/opencode/plugins/`, así que
-> un `export { default } from "oficina-opencode"` falla. El entry que instala
-> el comando **busca el paquete en runtime** —en la config, en la cache de
-> npm de OpenCode, o subiendo desde el propio archivo— y lo importa por ruta
-> absoluta. Por eso reinstalar el paquete en otro lugar no rompe nada.
+> **El entry point no es un import pelado.** El loader de plugins de OpenCode v2 no resuelve bare specifiers desde `~/.config/opencode/plugins/`, así que un `export { default } from "oficina-opencode"` falla. El entry que instala el comando **busca el paquete en runtime** —en la config, en la cache de npm de OpenCode, o subiendo desde el propio archivo— y lo importa por ruta absoluta. Por eso reinstalar el paquete en otro lugar no rompe nada.
 
 ### Local (desarrollo)
 
@@ -639,19 +667,16 @@ node /ruta/a/AI-OFFICE/dist/cli.js install --target ~/.config/opencode
 
 ### Compatibilidad con la API de plugins
 
-**OpenCode v1 y v2 tienen APIs de plugins incompatibles.** No es que cambiara
-una firma: cambió la forma (v1 exporta una función con hooks; v2 exige
-`export default { id, setup(ctx) }`).
+**OpenCode v1 y v2 tienen APIs de plugins incompatibles.** No es que cambiara una firma: cambió la forma (v1 exporta una función con hooks; v2 exige `export default { id, setup(ctx) }`).
 
-El motor no depende de ninguna de las dos: define las tools en una forma
-neutra y cada entry la traduce.
+El motor no depende de ninguna de las dos: define las tools en una forma neutra y cada entry la traduce.
 
 | Entry | Versión de OpenCode |
 |---|---|
 | `oficina-opencode` | **v2** — la principal |
 | `oficina-opencode/v1` | v1 (legacy) |
 
-Detalle completo en [`docs/COMPATIBILITY.md`](https://github.com/SOCRAMbt/AI-OFFICE/blob/main/docs/COMPATIBILITY.md).
+Detalle completo en [`docs/COMPATIBILITY.md`](docs/COMPATIBILITY.md).
 
 ### Configuración
 
@@ -675,9 +700,8 @@ oficina install --target ~/.config/opencode
 
 Instala la skill, los 7 agentes, el comando y el entry point del plugin.
 
----
-
-## Uso
+<a id="uso"></a>
+## 🚀 Uso
 
 Desde la raíz del proyecto:
 
@@ -685,28 +709,10 @@ Desde la raíz del proyecto:
 /oficina Agregar autenticación JWT con refresh rotation
 ```
 
-El comando carga la skill `oficina`, el plugin registra las tools, y la corrida arranca sola.
+El comando carga la skill `oficina`, el plugin registra las tools, y la corrida arranca sola. La oficina escribe todo en `.oficina/`: si cerrás OpenCode a mitad de camino, al volver, la corrida retoma donde quedó.
 
-El ciclo:
-
-```
-OBJETIVO → PLAN (Comandante)
-              ↓
-         STANDUP — la card con deps satisfechas
-              ↓
-         TRABAJO (owner) → handoff.md + evidence.md
-              ↓
-         AUTO-REVIEW (oficina-critico, ≠ owner)
-              ↓
-         GATES (oficina-verificador + oficina-guardian)
-              ↓
-        ┌────────┴────────┐
-      DONE            REWORK → REPLAN → ESCALADA
-```
-
----
-
-## CLI — operación
+<a id="cli-operacion"></a>
+## 🖥️ CLI — operación
 
 ```bash
 oficina init [objetivo]                    # Crea .oficina/ en el proyecto
@@ -720,9 +726,12 @@ oficina catalog --agency-root <path>       # Lista el catálogo de roles disponi
 oficina reset --force                      # Abandona la corrida
 ```
 
----
+Flags útiles: `--json` (salida máquina), `--directory <path>` (otro proyecto),
+`--agency-root <path>` (catálogo alternativo), `--force-new-run`
+(crear corrida nueva sobre un estado corrupto ya puesto en cuarentena).
 
-## Estructura de la corrida
+<a id="estructura-de-la-corrida"></a>
+## 📁 Estructura de la corrida
 
 ```
 <proyecto>/.oficina/
@@ -749,9 +758,81 @@ oficina reset --force                      # Abandona la corrida
 
 El formato de artefactos es compatible con OFICINA v1 (la skill). El plugin **migra el estado v1 automáticamente**: objetivo, cards y resultados se conservan.
 
+Si `state.json` está corrupto, no se destruye: se **pone en cuarentena** y `loadState` lanza `StateCorruptionError` con la ruta exacta del archivo preservado. Recuperar es una decisión del operador, nunca un efecto colateral.
+
+<a id="seguridad"></a>
+## 🔐 Seguridad
+
+La seguridad de la corrida y la seguridad del paquete son dos frentes distintos, y los dos están cubiertos:
+
+| Frente | Mecanismo |
+|---|---|
+| **En la corrida** | Scope guard fail-closed (`realpath` + revalidación), archivos sensibles nunca escribibles, tripwire de detección post-comando, herencia de scope en subagentes, y gates con escaneo de secretos que redacta el valor en los logs |
+| **En el estado** | Escrituras atómicas (`O_EXCL`, `.tmp`+`rename`), leases con TTL+heartbeat, locks por corrida contra doble-claim, y corrupción en cuarentena con `StateCorruptionError` — nunca una corrida vacía encima de datos recuperables |
+| **En el repo** | `CODEOWNERS` (todo el árbol requiere review del owner), Dependabot semanal, branch protection documentada y estado `state.json` de soporte → [`docs/SEGURIDAD-REPO.md`](docs/SEGURIDAD-REPO.md) |
+| **En npm** | Publicación por OIDC con **provenance SLSA** (nada de tokens de larga vida), environment `npm` protegido con aprobación manual, 2FA obligatoria — ver [`docs/SEGURIDAD-REPO.md`](docs/SEGURIDAD-REPO.md) |
+
+**¿Encontraste una vulnerabilidad?** No abras un issue público. Seguí la
+[política de seguridad](SECURITY.md): reporta por GitHub Security Advisories
+pestaña *Security → Report a vulnerability*.
+
+<a id="testing"></a>
+## 🧪 Testing
+
+```bash
+npm test           # 456 tests, 27 archivos
+npm run coverage   # cobertura por línea
+npm run docs:check # la documentación coincide con el código
+npm run bench:selection  # el matcher le gana a las alternativas simples
+npm run typecheck  # tsc --noEmit, strict
+npm run build      # tsc → dist/
+```
+
+| Suite | Cubre |
+|---|---|
+| `bus.test.ts` | Append-only, ack, TTL, idempotencia, broadcast, prioridad, atomicidad |
+| `state.test.ts` | Transiciones, invariantes duros, selección de card, ciclo de corrida |
+| `gates.test.ts` | Detección de tooling, las 7 fases, N/A con motivo, consolidación, redacción |
+| `router.test.ts` | Enrutado, rotación, reviewer ≠ owner, política de 3 golpes, presupuesto |
+| `leases.test.ts` | Adquisición, heartbeat, expiración, double-claim, reasignación |
+| `catalog.test.ts` | Frontmatter, secciones, extracción, matching ponderado, panel, factory |
+| `catalogReal.test.ts` | El catálogo real de agency-agents: estructuras, matching, división |
+| `briefing.test.ts` | Orden, mínimo, las 10 secciones, los 4 artefactos, INCOMPLETO |
+| `office.test.ts` | Ciclo completo end-to-end, invariantes, artefactos en disco |
+| `scopeGuard.test.ts` | Globs, extracción de path, enforcement de scope, fail-closed |
+| `sandbox.test.ts` | **Adversarial**: symlinks, traversal, absolutos, sensibles, shell |
+| `concurrency.test.ts` | Doble claim simultáneo, seq único, idempotencia atómica |
+| `recovery.test.ts` | Entregas perdidas, invariantes vulnerados, huérfanos, reinicio, corrupción en cuarentena |
+| `evidence.test.ts` | El grafo requisito → evidencia y los 4 niveles |
+| `cost.test.ts` | Ledger, presupuestos por fila, trabajo redundante |
+| `tripwire.test.ts` | Detección de escrituras coladas por shell, arm/check, `prune(maxAge)` real |
+| `docsync.test.ts` | La documentación coincide con el código |
+| `plugin.test.ts` | El plugin contra un host mockeado: tools, hooks, auto-resume |
+| `migration.test.ts` | Migración v1 → v2 sin pérdida de datos |
+| `cli.test.ts` | init, status, board, install, audit, reset, idempotencia, estado corrupto |
+| `dispatch.test.ts` | IDs de agente únicos por card sin colisiones, reintentos idempotentes, slugs largos |
+| `sandbox-83.test.ts` | Aserciones semánticas de canonicalización Windows 8.3 |
+
+*(27 archivos en total — los suites críticos están listados arriba, los demás cubren paths, IDs, logging y parsing.)*
+
+## 📊 Dependencias
+
+**Dos, y ninguna es del host:**
+
+| Paquete | Para qué |
+|---|---|
+| `@opencode/plugin` | Los tipos y el helper del API de plugins **v2**. Es la dependencia real. |
+| `zod` | Los schemas de los argumentos de las tools. Rango semver `^4.6.7` (mínimo 4.6.7 por CVE). |
+
+`@opencode-ai/plugin` (v1) es un **peer opcional**: solo lo necesita el entry `oficina-opencode/v1`, para los hosts que todavía corren la API vieja.
+
+El motor (`core/`, `tools/`) no importa ninguno de los dos: define las tools en una forma neutra y cada entry las traduce. Por eso el mismo motor corre en v1 y en v2.
+
+Vulnerabilidades y overrides reportados en el [informe de cierre](REMEDIATION_CLOSURE_REPORT.md): **0 en producción** (`npm audit --omit=dev`); las 2 residuales en el árbol dev-only de `@opencode-ai/plugin` quedan documentadas con su justificación técnica.
+
 ---
 
-## Código
+## 🗺️ Código
 
 33 archivos TypeScript · 19 módulos en `core/` · 1 toolset · 7 hooks.
 
@@ -794,64 +875,17 @@ src/
     └── compacting.ts
 ```
 
-### Dependencias
+<a id="licencia"></a>
+## 📄 Licencia
 
-**Dos, y ninguna es del host:**
-
-| Paquete | Para qué |
-|---|---|
-| `@opencode/plugin` | Los tipos y el helper del API de plugins **v2**. Es la dependencia real. |
-| `zod` | Los schemas de los argumentos de las tools. Rango semver `^4.6.7` (mínimo 4.6.7 por CVE). |
-
-`@opencode-ai/plugin` (v1) es un **peer opcional**: solo lo necesita el entry
-`oficina-opencode/v1`, para los hosts que todavía corren la API vieja.
-
-El motor (`core/`, `tools/`) no importa ninguno de los dos: define las tools
-en una forma neutra y cada entry las traduce. Por eso el mismo motor corre
-en v1 y en v2.
+MIT — ver [LICENSE](LICENSE).
 
 ---
 
-## Testing
+<div align="center">
 
-```bash
-npm test           # 419 tests, 26 archivos
-npm run coverage   # cobertura por línea
-npm run docs:check # la documentación coincide con el código
-npm run bench:selection  # el matcher le gana a las alternativas simples
-npm run typecheck  # tsc --noEmit, strict
-npm run build      # tsc → dist/
-```
+**El diseño se apoya en los patrones de `durable-execution` y `workflow-engine-design`: estado durable antes de los efectos, leases con TTL, transiciones nombradas explícitamente y at-least-once con reconciliación por idempotency key.**
 
-| Suite | Cubre |
-|---|---|
-| `bus.test.ts` | Append-only, ack, TTL, idempotencia, broadcast, prioridad, atomicidad |
-| `state.test.ts` | Transiciones, invariantes duros, selección de card, ciclo de corrida |
-| `gates.test.ts` | Detección de tooling, las 7 fases, N/A con motivo, consolidación, redacción |
-| `router.test.ts` | Enrutado, rotación, reviewer ≠ owner, política de 3 golpes, presupuesto |
-| `leases.test.ts` | Adquisición, heartbeat, expiración, double-claim, reasignación |
-| `catalog.test.ts` | Frontmatter, secciones, extracción, matching ponderado, panel, factory |
-| `catalogReal.test.ts` | El catálogo real de agency-agents: estructuras, matching, división |
-| `briefing.test.ts` | Orden, mínimo, las 10 secciones, los 4 artefactos, INCOMPLETO |
-| `office.test.ts` | Ciclo completo end-to-end, invariantes, artefactos en disco |
-| `scopeGuard.test.ts` | Globs, extracción de path, enforcement de scope |
-| `sandbox.test.ts` | **Adversarial**: symlinks, traversal, absolutos, sensibles, shell |
-| `concurrency.test.ts` | Doble claim simultáneo, seq único, idempotencia atómica |
-| `recovery.test.ts` | Entregas perdidas, invariantes vulnerados, huérfanos, reinicio |
-| `evidence.test.ts` | El grafo requisito → evidencia y los 4 niveles |
-| `cost.test.ts` | Ledger, presupuestos por fase, trabajo redundante |
-| `tripwire.test.ts` | Detección de escrituras coladas por shell |
-| `docsync.test.ts` | La documentación coincide con el código |
-| `plugin.test.ts` | El plugin contra un host mockeado: tools, hooks, auto-resume |
-| `migration.test.ts` | Migración v1 → v2 sin pérdida de datos |
-| `cli.test.ts` | init, status, board, install, audit, reset, idempotencia |
+Lo que **no** se promete está escrito en [`docs/GARANTIAS.md`](docs/GARANTIAS.md): un plugin de aplicación no es un sandbox, y un README que vende más de lo que el código hace es peor que uno modesto.
 
----
-
-## Licencia
-
-MIT — ver [LICENSE](https://github.com/SOCRAMbt/AI-OFFICE/tree/main/LICENSE).
-
-El diseño se apoya en los patrones de `durable-execution` y `workflow-engine-design`: estado durable antes de los efectos, leases con TTL, transiciones nombradas explícitamente y at-least-once con reconciliación por idempotency key.
-
-Lo que **no** se promete está escrito en [`docs/GARANTIAS.md`](https://github.com/SOCRAMbt/AI-OFFICE/blob/main/docs/GARANTIAS.md): un plugin de aplicación no es un sandbox, y un README que vende más de lo que el código hace es peor que uno modesto.
+</div>

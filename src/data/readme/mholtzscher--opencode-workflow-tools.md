@@ -1,6 +1,6 @@
 # OpenCode plugins
 
-Four independent Bun packages for OpenCode V2. Each plugin owns its dependencies, lockfile, and TypeScript configuration; this repository is not a Bun workspace.
+Five independent Bun packages for OpenCode V2. Each plugin owns its dependencies, lockfile, and TypeScript configuration; this repository is not a Bun workspace.
 
 ## Plugins
 
@@ -9,9 +9,12 @@ Four independent Bun packages for OpenCode V2. Each plugin owns its dependencies
 | [Classify](./classify/README.md) | Typed judgments with OpenAI Decisions, TypeSafe AI, Cloudflare Clef, Laya, or Ollama; file/code/diff evidence | Namespaced decision tool and backend-selection command; TUI picker/status. Requires explicit backend configuration. |
 | [Cache metrics](./cache-metrics/README.md) | Session input cache-hit rate, token totals, per-response history, and JSON export | TUI sidebar and history panel. History includes the root session and its subagents by default. |
 | [Quota usage](./quota-usage/README.md) | Remaining Codex and OpenCode Go account quotas | Web/TUI chat tool and automatically refreshed TUI sidebar. Uses active provider accounts on the server. |
+| [Tab shortcuts](./tab-shortcuts/README.md) | Close all or other session tabs | TUI-only commands with configurable shortcuts. |
 | [Workflow tools](./workflow-tools/README.md) | Spec planning/refinement/implementation, PR publication/metadata, feedback delivery and check investigation | Server commands; see [package.json](./workflow-tools/package.json) for OpenCode requirements. External skills and server-side authenticated `gh` as needed; no TUI entry. |
 
 Each plugin README covers setup and common use. Contributor details belong in its `docs/DEVELOPMENT.md`.
+
+Tab shortcuts is TUI-only and is configured separately in `cli.json`; follow its README rather than the server plugin installation example below.
 
 ## Install
 
@@ -64,7 +67,7 @@ For direct `bun` commands, [activate mise in your shell](https://mise.jdx.dev/ge
 
 ### Local plugins
 
-Run `bun install` inside each plugin you work on. Add its directory to `plugins`. Relative paths resolve from the containing config file. You can also use an absolute path from another project. The root install supplies lint tooling only.
+Run `bun install` inside each plugin you work on. Add its directory to `plugins`. Relative paths resolve from the containing config file. You can also use an absolute path from another project. TUI-only Tab shortcuts uses `cli.json` as documented in its README. The root install supplies lint tooling only.
 
 The repository's [`opencode.jsonc`](./opencode.jsonc) loads all four local plugins and contains operator-specific settings. See Classify's [development configuration](./classify/docs/CONFIGURATION.md#repository-development-configuration) before using hosted profiles or changing models. Inference servers are managed separately.
 
@@ -80,7 +83,7 @@ After changing plugin sources, open `/plugins` and confirm all four repository p
 
 ### Verification
 
-Run `bun run typecheck` in each affected plugin. Full repository validation is four typechecks and four test suites: run `bun test` in every plugin. Additional details:
+Run `bun run typecheck` in each affected plugin. Full repository validation covers all five typechecks and test suites: run `bun test` in every plugin. Additional details:
 
 | Plugin guide | Notes |
 | --- | --- |
@@ -93,4 +96,4 @@ From the repository root, run `bun install`, then `bun run check` for Ultracite'
 
 ## Releases
 
-Release Please manages independent versions, changelogs, tags, and GitHub releases for all four plugins. Classify, Workflow tools, Quota usage, and Cache metrics have npm publishing jobs for `@mholtzscher/opencode-classify`, `@mholtzscher/opencode-workflow-tools`, `@mholtzscher/opencode-quota-usage`, and `@mholtzscher/opencode-cache-metrics`, using GitHub Actions trusted publishing after npm-side setup. See [Releasing](./docs/RELEASING.md) for first-publish setup and the release workflow.
+Release Please manages independent versions, changelogs, tags, and GitHub releases for all five plugins. Each has an npm publishing job using GitHub Actions trusted publishing after npm-side setup. See [Releasing](./docs/RELEASING.md) for first-publish setup and the release workflow.

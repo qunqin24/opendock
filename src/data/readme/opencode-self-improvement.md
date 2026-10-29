@@ -34,7 +34,7 @@ After that, memory is just conversation: ask the agent to remember something and
 
 - **`memory_*` tools** — `memory_init`, `memory_remember`, `memory_recall`, `memory_update`, `memory_forget`, `memory_list`, `memory_undo`, `memory_status`, `memory_evidence`, `memory_export`, `memory_import`, `memory_decay`, `memory_consolidate`, `memory_merge_review`.
 - **`/repo-init`** — per-repo setup: code graph index plus build/test commands, keyed to the git head.
-- **Write gates** — code references are verified against your actual repo, near-duplicates are collapsed, contradictions with superseded memories are rejected. Blocked writes are logged with a reason in `memory_evidence`.
+- **Write gates** — code references are verified against your actual repo, near-duplicates are collapsed, contradictions with superseded memories are rejected. Blocked writes are logged with a reason in `memory_evidence`, which reads one real calendar day inside `evidence/` at a time — its `date` is a date, never a path.
 - **Memory-aware compaction** — durable memories are handed to the compaction summarizer, so a long session keeps its facts.
 - **Auto-capture (opt-in)** — on the idle and compaction triggers, one cheap model pass per trigger proposes candidates, which face the same write gates; a 5-minute cooldown per session and trigger bounds the spend ([per-trigger numbers](bench/capture-trigger-results.md)). Off by default.
 - **Repo scoping** — rows belong to the repo that wrote them; project A's facts never surface in project B.
@@ -95,24 +95,28 @@ Nothing is deleted: `memory_update` supersedes the previous row, `memory_forget`
 
 Rows are stamped with your git origin (an id that survives re-clones and moves between machines) or, without an origin, a hash of the normalized directory path. `repoPath` keeps the human-readable path, so rows written before hashing keep matching.
 
-Injection, recall, the frontier block, compaction, `memory_forget` and decay only see the current repo plus global rows. Preferences that should follow you everywhere go in with `memory_remember global: true`. Rows written before scoping existed, and rows restored through the viewer, are global — upgrading changes nothing.
+Injection, recall, the frontier block, compaction, `memory_forget` and decay only see the current repo plus global rows, resolved from the calling session's identity at flow entry. A session that reaches a plugin instance is bound to that instance's own workspace on first contact — in a process hosting several workspaces, one session never borrows the repository some other workspace's setup left behind. A session whose repository cannot be resolved at all sees global rows only; "unknown" is never "everything". Writes follow that rule in the stricter direction: a named session with no resolved repository has **no write target**, so `memory_remember`, `memory_update`, `memory_import` and auto-capture refuse it (evidence `write_refused`) and store nothing — the alternatives were stamping your private content into whichever workspace's `setup()` ran last, or publishing it to every project as an unstamped row. A caller that names no session at all (the viewer process, a restore, a script) keeps the process scope, and an explicit `global: true` is a deliberate owner. Evidence lines carry the same stamp, so `memory_evidence` answers from the caller's repo plus global lines; a line a named session wrote while its repository was unresolvable is private to that session, and only an explicitly global (or predating-stamps) line reads as global. Preferences that should follow you everywhere go in with `memory_remember global: true`. Rows written before scoping existed are global, and the viewer (an admin surface over every repo) edits and restores a row with its own repo stamp — the viewer's missing session scope never decides a row's visibility. `memory_merge_review` applies the same rule to its inputs: a session may merge exactly the rows it may read — global rows plus its own repo's, from either seat — and a row id it merely knows is not authority to retire another repo's memory. Upgrading changes nothing.
 
 ## Token cost and caching
 
-- **Epoch-frozen injection.** The relevance block is computed once per epoch — first prompt of a session, a change to the store, or a compaction — and stays byte-identical in between, so the provider's prompt cache survives ordinary turns.
+- **Section-frozen injection.** The whole memory section — standing digest, open-thread frontier, relevance block — is computed once per epoch and delivered byte-identically until something the model actually needs changes. The epoch's authority is the **rendered bytes**, not the store fingerprint: a promoted row that changes nothing visible costs no cache bust.
+- **A session never pays for bytes it is not riding.** A memory *you* saved in this session is a fact you already produced — it is in your own transcript — so it never busts your cache. The test is not "did the store change" but "would the frozen bytes still have been produced from the same inputs, minus the rows this session authored since": a correction, blocklisting, redaction or supersession of a row you are riding, and anything another session, the viewer or an import wrote, all still land on your next request.
 - **Two-concept threshold.** A free-text prompt must share at least two distinct concepts with a memory for it to be injected; keyword-length queries (one or two words) need only one. Silence on single-word coincidences is deliberate; `memory_recall` still reaches them on the pull path.
 - **Hard budgets.** Relevance block and each pull are capped at `injectBudget` characters, the frontier at `frontierBudget`, trimmed at whole-memory boundaries.
+- **Nothing volatile on the cached prefix.** The standing digest carries no row count and no latest timestamp. Both used to ride the very front of the system prompt, so every saved memory rewrote the prefix and made the next request re-bill the whole conversation; the exact numbers now live where they are free — the footer badge, `/memory`, `memory_status`, the viewer.
 - **Evidence is never injected**, and the standing system digest is two lines.
 - **Measured, not claimed.** The plugin reads each turn's `tokens.cache` accounting and displays the actual hit rate next to the badge.
 
-Deterministic workload (50 memories, 20 prompts, 3 mid-session store writes) through the plugin's real injection code:
+Deterministic workload (50 memories, 20 prompts, 3 mid-session store writes made *by the measured session*) through the plugin's real injection code. Every column is measured on the full memory section — the bytes a request actually sends — because prompt caching is a property of those bytes:
 
-| Policy | Recomputes | Injected chars (20 turns) | Avg/turn | Worst block |
-| --- | ---: | ---: | ---: | ---: |
-| A — recompute per prompt, uncapped | 20 | 25742 | 1287.1 | 1838 |
-| B — epoch freeze + 1200-char cap (shipped) | 4 | 19990 | 999.5 | 1139 |
+| Policy | Recomputes | Cache busts | Injected chars (20 turns) | Avg/turn | Worst section |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| A — recompute per prompt, uncapped (naive) | 20 | 19 | 60996 | 3049.8 | 3404 |
+| B — block frozen on store fingerprint, digest rebuilt per turn | 4 | 3 | 55478 | 2773.9 | 2867 |
+| C — section frozen on rendered bytes | 4 | 3 | 55258 | 2762.9 | 2856 |
+| D — C + riding bytes (shipped) | 1 | 0 | 53500 | 2675.0 | 2675 |
 
-Policy B injects 22.3% fewer characters, and its block is byte-identical between store changes so the prompt cache stays warm. Reproduce (byte-identical output):
+A "cache bust" is a turn whose memory-section bytes differ from the turn before — each one re-bills the entire conversation as fresh input. All three synthetic writes change what the session is shown, so B and C each pay for them; D pays nothing, because the session wrote them itself. What D still pays for is a riding row being corrected, blocklisted or redacted, or another session writing a row — that half of the contract is pinned by `test/epoch.test.ts` rather than by this table, since a benchmark that only writes never exercises it. D also injects 12.3% fewer characters than the naive policy — the denominator here is the whole section, not the relevance block alone, so it is not comparable with the block-only figure this README quoted before. Reproduce (byte-identical output):
 
 ```sh
 bun run bench
@@ -185,7 +189,7 @@ On the eval dataset the pass takes 200 rows to 52 with **R@3 52 → 53 and R@1 5
 
 ## Secret redaction
 
-One best-effort credential rule set (`src/secrets.ts`) runs over the auto-capture prompt before it leaves the plugin, at the write gate before content is hashed or analysed, and again in the final write choke point used by gated writes and the viewer's edit and restore paths.
+One best-effort credential rule set (`src/secrets.ts`) runs over the auto-capture prompt before it leaves the plugin — redacting the complete transcript before the character budget crops it, so a credential cut in half by the window still matches its pattern — at the write gate before content is hashed or analysed, again in the final write choke point used by gated writes and the viewer's edit and restore paths, and at the durable audit boundaries — every evidence line, every supersede field written into a retired row, and every deletion-audit reason — so a recognized credential cannot persist in `evidence/` or `deletions.logfmt` or a tombstoned row regardless of which path carried it.
 
 Covered: OpenAI `sk-`, GitHub `ghp_` / `gho_` / `github_pat_`, Slack `xoxb-` / `xoxp-`, AWS `AKIA`, Google `AIza`, bearer tokens containing digits, PEM private-key blocks, and high-entropy values assigned to names ending in `_KEY`, `_TOKEN`, `_SECRET` or `_PASSWORD` (plus `password`).
 
@@ -198,12 +202,12 @@ Limits worth knowing:
 
 ## Export and move between machines
 
-`memory_export` writes the live store as JSONL: a machine-readable header line (`{_export, version, exportedAt, count}`) followed by one JSON object per line (`{ts,type,scope,content,status,tags,issue}`), active rows only. `memory_import` reads such a file back. Default path is `<memory-root>/exports/<timestamp>.jsonl`; `file` must name a path **inside the store** — exports under `<memory-root>/exports` (a relative path resolves against it), imports anywhere under `<memory-root>` — and `scope` exports a single scope.
+`memory_export` writes the live store **as its caller can read it** as JSONL: from a plugin session that means its own repository plus global rows; full-store breadth belongs to a session-less caller outside the plugin (the library route — the viewer has no export route). The format is a machine-readable header line (`{_export, version, exportedAt, count}`) followed by one JSON object per line (`{ts,type,scope,content,status,tags,issue}`), active rows only. `memory_import` reads such a file back. Default path is `<memory-root>/exports/<timestamp>-<unique>.jsonl` — a unique name created exclusively, so two exports in the same second never replace each other's artifact; `file` must name a path **inside the store** - exports under `<memory-root>/exports` (a relative path resolves against it), imports anywhere under `<memory-root>` - and `scope` exports a single scope.
 
 Both tools are model-facing, so a path is not a privilege: an export cannot write to `~/.gitconfig` or anywhere else outside the store, and an import cannot read outside it. Symbolic links are resolved before the check — including an `exports/` directory that is itself a link — so a link cannot carry a request out of the store. Exports are written `0600` and opened `O_NOFOLLOW` (both POSIX; on Windows the check before the write is the only guard). (Hardlinks are beyond any path check: a link planted inside `exports/` shares an inode with its target. That, and a narrow window on intermediate path components, are the boundary's known limits.) To move a store between machines, copy the file in:
 
 ```
-Export my memories                              # -> <memory-root>/exports/<stamp>.jsonl
+Export my memories                              # -> <memory-root>/exports/<timestamp>-<unique>.jsonl
 # …copy that file to the other machine's <memory-root>/…
 Import <memory-root>/memories.jsonl             # memory_import
 ```
@@ -229,7 +233,7 @@ Same data behind each one (`memory_status`; no model call).
 **Terminal (opencode CLI)** — the plugin ships a TUI half (`@opencode/plugin/tui`) that loads automatically:
 
 - **Footer badge** — `● mem 1157/1200c · cache 96%`: the injected block against its budget, plus the measured session prompt-cache hit rate. The dot is green (stable and warm), yellow (recent recompute, or 50–90% reads) or red (last turn served almost nothing from cache); `—` until the first assistant turn.
-- **`/memory`** — session panel: **CONTEXT** (chars and estimated tokens riding now, % of budget, requests this epoch has ridden, session totals, abstentions), **CACHE** (busts this session and the measured cache-served share of prompt tokens), **INJECTED BLOCK** (the verbatim block, or an explicit abstention), **RECENT BLOCKED WRITES** (with gate reasons), **STORE** (active / superseded / open / scopes, plus `malformed` when a row's `ts` is not a valid ISO instant — those rows are skipped by every reader). Keys: `r` refresh, `f` fullscreen.
+- **`/memory`** — session panel: **CONTEXT** (chars and estimated tokens riding now, % of budget, the full memory section riding the prompt — digest + frontier + block — requests this epoch has ridden, session totals, abstentions), **CACHE** (busts this session and the measured cache-served share of prompt tokens), **INJECTED BLOCK** (the verbatim block, or an explicit abstention), **RECENT BLOCKED WRITES** (with gate reasons), **STORE** (active / superseded / open / scopes, plus `malformed` when a row's `ts` is not a valid ISO instant — those rows are skipped by every reader). Keys: `r` refresh, `f` fullscreen.
 - **Block toast** when a write is refused (`"notifyBlocked": false` to silence).
 
 **Desktop / web / IDE** — the terminal slots do not exist there, so use the self-installed **`/memory-report`** chat command: the same sections rendered in the conversation.

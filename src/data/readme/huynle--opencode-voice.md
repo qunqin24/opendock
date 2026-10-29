@@ -133,6 +133,53 @@ Optional: put the voice agent on a fast model in `~/.config/hub/config.json`:
 `"voiceModel": "anthropic/claude-haiku-4-5"` (any `provider/model` you have). Subagents keep the
 session's model.
 
+## Quick start (hubctl, before any harness)
+
+`hubctl` is a standalone, signed program (Bun and the CLI compiled into one file; no bun, node or harness needed)
+that bootstraps a machine into Hub: it enrolls the machine, then previews and applies a typed plan that installs
+pinned harnesses, edits their configs losslessly and writes hub's user services. `hub` and `hubctl` are the same
+program; the name grants nothing (only the machine credential and your consent flags do). Nothing is run through a
+shell, and the hub never gets a way to run commands here.
+
+```sh
+# 1. Download hubctl for your platform (darwin-arm64, darwin-x64, linux-x64, linux-arm64) and the signed manifest
+#    from the release, then install the binary yourself (the first apply installs the release's copy as
+#    ~/.local/bin/hubctl, with `hub` linked to it):
+curl -fsSLo hubctl https://github.com/huynle/hub/releases/download/v<version>/hubctl-darwin-arm64 && chmod +x hubctl
+curl -fsSLO https://github.com/huynle/hub/releases/download/v<version>/hubctl-manifest.json
+
+# 2. Enroll this machine (device code: approve it on the hub; Ctrl-C cancels). One identity for every spoke here.
+./hubctl machine enroll --server https://hub.example.com
+./hubctl machine status          # verified | revoked (exit 9) | offline (exit 7) | insecure (plain-http hub)
+
+# 3. Preview: discover the host and print the exact plan and any manual edits. It writes nothing.
+./hubctl setup preview --profile session-only --manifest hubctl-manifest.json --out preview.json
+
+# 4. Apply exactly that plan (rediscovered and re-planned; refused when the host changed since, exit 12).
+./hubctl setup apply --preview preview.json --manifest hubctl-manifest.json
+
+# 5. Check readiness with real probes (version, provider login, spoke connected; exit 15 when not ready),
+#    and undo whenever you like.
+hubctl setup verify
+hubctl setup rollback            # or --to <txID>; files you changed since are kept and reported
+```
+
+- Profiles: `session-only` (OpenCode), `launch-node` (+ `hub node` as a user service; give
+  `--workspace-root <dir>`), `full-harness` (OpenCode, Claude Code, Codex and their spokes), or a profile file
+  (`--profile <file>` or `-` for stdin).
+- Consent is explicit and never a default: `--confirm-activation` (load the user services; give it at preview and
+  again at apply), `--escalate` (system locations), `--allow-downgrade`.
+- `--enrollment separate` leaves enrollment to `hubctl machine enroll` (the default is inline when you pass
+  `--server` to preview). A config behind a symlink (dotfiles) is never written through: the preview prints the
+  exact edit and the file it belongs in.
+- `hubctl setup drift` reports hub's managed fields (in sync, missing, outdated, changed by you);
+  `hubctl setup recover [--resume]` finishes or rolls back an interrupted apply.
+- With `--json`, every command prints one `hub.bootstrap.result` envelope; exit codes are listed in
+  [docs/bootstrap-contracts.md](docs/bootstrap-contracts.md#311-output-envelope-and-exit-codes) (10 conflict,
+  11 artifact rejected, 12 preview invalid, 13 locked, 14 recovery required, 15 not ready).
+- Many machines: the optional Ansible role in [contrib/ansible](contrib/ansible/roles/hub_bootstrap/README.md)
+  runs the same preview and apply (`hubctl setup ansible` renders its vars; enrollment stays a separate step).
+
 ## Running the hub
 
 The hub serves the web app, pairs devices, enrolls machines, and does push and (for Voice) speech. Pick one:
@@ -608,6 +655,8 @@ for agents and scripts. The OpenCode plugin writes both launchers into the hub b
 session `hub` just works. A launcher runs the CLI bundle shipped in this package (`packages/cli/dist/hub-cli.js`)
 with the OpenCode binary itself (`BUN_BE_BUN=1 exec <opencode> hub-cli.js "$@"`), so neither bun nor node has to
 be installed; without Bun it falls back to `node`. The launchers are rewritten only when their content changes.
+When a standalone hubctl is installed as `~/.local/bin/hubctl` (what `hubctl setup` installs), the launchers run it
+instead, so shells, services and MCP clients all use that one signed program.
 
 **Name clash:** GitHub's old `hub` CLI (github/hub) uses the same name. In hub sessions ours comes first on PATH;
 elsewhere use `hubctl`, or call the bundle directly (`bun …/packages/cli/dist/hub-cli.js`).
@@ -771,7 +820,8 @@ OpenCode (Claude Desktop, Cursor, other agents). It speaks JSON-RPC 2.0, one mes
 transport; protocol revisions `2025-06-18`, `2025-03-26` and `2024-11-05`), and answers `initialize`, `ping`,
 `tools/list` and `tools/call`; notifications (`notifications/initialized`, `notifications/cancelled`, which aborts
 the call) get no answer, other methods answer `-32601`. Its tools are the CLI's verbs: `whoami`, `status`,
-`sessions`, `show`, `log`, `who`, `msg`, `ask`, `reply`, `decline`, `inbox`, `message_show` (`id`, `wait`),
+`sessions`, `show`, `log`, `who`, `archive`, `unarchive`, `pin`, `unpin` (`addr`), `archive_inactive`
+(`preview`, `inactiveFor`, `limit`, then `previewToken`, `confirm`), `msg`, `ask`, `reply`, `decline`, `inbox`, `message_show` (`id`, `wait`),
 `mute` and `unmute` (`addr`; agent-message mutes, not console notifications), `decisions` (`state`) and
 `decision_show` (`id`) (reading the Decisions you asked; no tool answers one, only the user does), and
 `webhook_create` (`url`, `events`, `label`), `webhooks`, `webhook_show` (`id`) and `webhook_delete` (`id`). Webhooks

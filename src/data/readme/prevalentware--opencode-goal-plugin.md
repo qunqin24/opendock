@@ -45,6 +45,8 @@ Common use cases:
 
 ## Install
 
+Direct Node.js hosts require Node 22.13.0 or later in the 22.x line, or Node 23.4.0 and later, for built-in SQLite coordination. Bun hosts use `bun:sqlite` and do not require a separate Node runtime to run the plugin.
+
 Choose the instructions that match the CLI you run:
 
 | OpenCode version | How to identify it | Instructions |
@@ -268,6 +270,10 @@ If `XDG_DATA_HOME` is not set, the default is:
 ```
 
 Set `OPENCODE_GOAL_STATE_PATH` to use a custom file.
+
+Writers coordinate through an adjacent `goals.json.coord.sqlite` file; goal data remains in JSON. Ownership survives a paused process and is released automatically when that process exits. A writer that cannot acquire ownership within ten seconds reports a failure without changing the JSON. Keep the coordination file in place while plugin instances are running, and restart older instances after upgrading so every writer uses the same protocol.
+
+Configure every writer with the same state-file target path. Directory symlink aliases are supported; a symlink to the JSON file itself is replaced by atomic publication and does not remain an alias of its target.
 
 The state file is written atomically through a same-directory temp file: the final path is only ever replaced by a fully-flushed file, so after a crash the state is the previous or the new valid version, never a torn one. The file is created with owner-only permissions where the host filesystem supports them, and the temp name is a random UUID opened exclusively so concurrent writers cannot collide.
 

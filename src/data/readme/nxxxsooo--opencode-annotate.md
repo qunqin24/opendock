@@ -6,10 +6,12 @@
 
 **Annotate replies, documents, or live HTML pages, then send feedback to the originating OpenCode session.**
 
-This is an **unofficial OpenCode plugin**. [Plannotator TUI](https://github.com/plannotator/plannotator-tui)
-provides text review; the [Annotate HTML-derived browser companion](browser/UPSTREAM.md)
-provides webpage review. This repository owns explicit routing, native messaging,
-session targeting, terminal handoff and confirmed feedback delivery.
+Use `/ref` to bring a previous conversation into the current session, or let the agent
+find and read it through the bundled session-reference tools.
+
+This is an **unofficial OpenCode plugin**. Its owned [terminal reviewer](tui/README.md)
+and [browser companion](browser/UPSTREAM.md) live together in this repository, alongside
+routing, native messaging, session targeting and confirmed feedback delivery.
 
 Published on npm as `@nxxxsooo/opencode-annotate`. It replaces `opencode-plannotator-tui`
 (0.4.2 and earlier); to switch, run
@@ -22,10 +24,14 @@ Published on npm as `@nxxxsooo/opencode-annotate`. It replaces `opencode-plannot
 /annotate ~/Documents/notes.txt   Review a plain-text document
 /annotate-pick                    Choose a recent reply or mid-turn progress update
 /annotate-selection               Review the message containing your last transcript selection
-/annotate-web                     Open this session for browser pairing
+/annotate-web                     Pair this session, or create an empty one from home
 /annotate-web page.html           Review the specified local HTML in Chrome
 /annotate-web https://example.com Review the specified webpage
 /annotate-web off                 Revoke this session's browser pairing
+/ref                             Choose a conversation from this project
+/ref authentication              Search conversation titles in this project
+/ref --all authentication        Search titles across projects
+/ref ses_…                       Attach a specific conversation
 ```
 
 `/annotate-last` always reviews the latest completed reply; any supplied argument is ignored.
@@ -37,61 +43,116 @@ or just the selected text when it spans messages. Numbered `/annotate N` is reti
 
 ## Install
 
-Requires **OpenCode 2.0.22+** and a separately installed `plannotator-tui` on your PATH.
-Tested with OpenCode 2.1.2 and Plannotator TUI 0.9.4 on macOS; unit tests also run on
-Linux. Windows terminal handoff has not been verified.
+Requires **OpenCode 2.2.0+**. The npm package includes **Annotate TUI**, built from
+[`tui/`](tui/README.md) for macOS arm64/x64, Linux arm64/x64 and Windows x64.
+See its [platform requirements](tui/README.md#source-and-build). The OpenCode terminal
+handoff has been tested on macOS; Windows handoff has not yet been verified.
 
-Install the upstream TUI on macOS or Linux:
-
-```sh
-brew install plannotator/tap/plannotator-tui
-```
-
-Homebrew 6 may first require `brew trust plannotator/tap`. Alternatively, use
-`cargo install plannotator-tui --locked` or the upstream
-[prebuilt binaries](https://github.com/plannotator/plannotator-tui/releases).
-
-Then install the plugin:
+Install the plugin:
 
 ```sh
 opencode plugin add @nxxxsooo/opencode-annotate@latest
 ```
 
-OpenCode detects its TUI-only entrypoint and adds it to your global **`cli.json`**.
-It does not need a server-plugin entry. Reopen the terminal client if its command
-list has not refreshed.
+Update an existing installation explicitly:
+
+```sh
+opencode plugin update @nxxxsooo/opencode-annotate@latest
+```
+
+`@latest` selects the current npm release when installing or updating; publishing a
+release does not itself replace an installed copy. Keep your existing plugin `options`.
+
+OpenCode loads the server tools and TUI commands from one entry in your global
+**`opencode.json`** or **`opencode.jsonc`**. Run `/reload` if the command list has not refreshed.
 
 Manual configuration, preserving other entries:
 
 ```json
 {
+  "$schema": "https://opencode.ai/config.json",
   "plugins": ["@nxxxsooo/opencode-annotate@latest"]
 }
 ```
+
+**Upgrading from the TUI-only package:** move its entry from `cli.json` to
+`opencode.json(c)`, retaining the whole entry and any `options`. Keep one entry so
+the TUI is loaded once. A remaining CLI-only installation provides `/ref` and annotation
+commands, but cannot register the agent tools.
+
+## Reference another conversation
+
+Run `/ref` or `/ref <title words>`, select the source, then choose **Attach reference**.
+The confirmation names both conversations and shows whether the text is an excerpt.
+The source is attached to the session where you invoked `/ref`, even if you switch tabs.
+It is queued as historical context with `resume: false`: an idle assistant stays idle
+until your next prompt. An already-running session can consume it at a later queue boundary.
+Escape cancels without attaching anything.
+
+Search defaults to the current session's project, including its worktrees. `/ref --all`
+searches every project on the connected server. Titles can be ambiguous, so title searches
+always show a chooser with directory, time and session ID. An exact `ses_…` ID selects
+that source directly, including a source in another project.
+
+The server part adds two Code Mode tools:
+
+- `annotate.session_search`: title search, with `query`, optional `allProjects`, `limit`
+  and `cursor`. It excludes the current conversation and child sessions. Repeat
+  `allProjects: true` when paging a cross-project search.
+- `annotate.session_read`: read by `sessionID`; pass `nextCursor` back as `cursor` for
+  older history. For a shortened message, pass its `messageID` and `nextOffset` as
+  `offset` to retrieve the rest.
+
+References include user text and completed assistant text, source IDs and timestamps.
+Tool payloads, reasoning, binary attachments and unfinished output are excluded. Each
+page contains at most 24,000 characters of message text, distributed across the messages;
+truncation and continuation are explicit. Historical claims may no longer match the code.
+Search matches titles, not words inside messages.
+
+**Server requirement:** the full-history read tool currently uses the official `opencode api`
+command because OpenCode 2.2's plugin context exposes only post-compaction context. The
+server must run as the managed OpenCode service with `opencode` on PATH. A process-ID
+check rejects a different discovered server; standalone and embedded servers are not
+supported by this tool. `/ref` uses the TUI's connected client directly. No separate
+transcript index or database access is needed.
+
+Permission actions are `annotate_session_search` (project ID, or `*` for cross-project
+search) and `annotate_session_read` (source session ID).
+
+### Reference verification
+
+`npm run test:references` exercises the server tools and `/ref` against source or an
+extracted npm package. The checks cover pre-compaction history, API responses larger than 256 KiB,
+pagination, long-message continuation, attachment and cancellation without a model
+turn. Unit checks also cover tab changes, permission denial and private-file cleanup.
+
+Recovery starts in `reference-command.mjs` for `/ref`, `session-tools.mjs` for agent
+tools, and `session-reference.mjs` for bounded history. `server-history.mjs` captures
+CLI output in private temporary files to avoid v2.2.0 pipe truncation, then removes
+them. Regression entrypoints are `session-reference.test.mjs`,
+`server-history.test.mjs` and `tests/references-smoke.py`; release ownership remains in
+[docs/releasing.md](docs/releasing.md).
 
 ## Antigravity (AGY) support
 
 `opencode-annotate` provides companion support for Google Antigravity CLI (`agy`) via `agy-annotate`:
 
 - **Slash commands `/annotate` & `/annotate-web`**: Built-in AGY skill at `agy/skills/annotate/` handles review directly within active AGY sessions.
-- **Interactive TUI**: Resolves the OpenCode-adapted Plannotator fork with Dracula theme inheritance, 120-column measure layout, and one-key send.
+- **Interactive TUI**: Uses the same bundled reviewer as OpenCode, with Dracula theme inheritance and one-key send.
 - **Native Delivery**: Hooks into AGY lifecycle (`SessionStart`, `PreInvocation`, `Stop`) to deliver feedback directly into the conversation turn without network listeners.
 - **CLI Commands**:
   ```sh
-  npx agy-annotate status     # View active AGY sessions and annotation pairing
-  npx agy-annotate tui        # Review latest assistant reply or markdown file
-  npx agy-annotate web        # Pair browser companion with active AGY session
-  npx agy-annotate queue      # Inspect pending delivered annotations
+  npx --package @nxxxsooo/opencode-annotate@latest agy-annotate status
+  npx --package @nxxxsooo/opencode-annotate@latest agy-annotate tui
+  npx --package @nxxxsooo/opencode-annotate@latest agy-annotate web
+  npx --package @nxxxsooo/opencode-annotate@latest agy-annotate queue
   ```
 
-### Match OpenCode's colors (fork required)
+### Match OpenCode's colors
 
-Set `"inheritTheme": true` in the plugin's `options`, alongside `binary`. It requires
-the extended color-capable Plannotator fork
-([nxxxsooo/plannotator-tui](https://github.com/nxxxsooo/plannotator-tui), branch
-`local/opencode`); upstream 0.9.4 does not support it. The same branch adds `[ui].doc_width`
-to cap the text column on wide terminals (proposed upstream in
-[plannotator/plannotator-tui#108](https://github.com/plannotator/plannotator-tui/pull/108)). See [TUI theme integration](docs/tui-theme.md).
+Set `"inheritTheme": true` in the plugin's `options`. The bundled reviewer supports the
+full palette and `[ui].doc_width` for a readable text column on wide terminals.
+See [TUI theme integration](docs/tui-theme.md).
 
 Each review uses OpenCode's current resolved colors for the canvas, text, Markdown,
 borders, highlights, cursor and selection. The plugin asks the chosen binary for its
@@ -110,7 +171,9 @@ Requirements: macOS and Chrome 116+, plus Node 22+ for the native host.
    opens no HTTP port.
 3. Reopen the OpenCode terminal client; the shared service needs no restart.
 
-Run `/annotate-web` in a target session, then open the Chrome extension. A sole live
+Run `/annotate-web`, then open the Chrome extension. From the blank home screen, it
+creates an empty session in the current directory using the selected model; no first
+prompt is needed. In an existing session, it pairs that session. A sole live
 session is shown automatically; with several sessions, choose one once. Click the
 destination beside **To** to change or refresh it. Its title stays visible beside Send,
 including while disconnected, with its directory available on hover and in the chooser.
@@ -200,22 +263,13 @@ The manifest version alone cannot identify edits to an unpacked extension.
 2. Select text by dragging, or press `v` and use movement keys.
 3. Press `c` to comment, `a` for “looks good,” or `d` to request deletion.
    Without a selection, `c` comments on the current block. Enter saves a comment.
-4. Press **`q`** to return to OpenCode.
-5. Choose **Send and continue** to submit the annotations. Escape or **Cancel**
-   cancels.
+4. Press **`q`** to send your notes and return to OpenCode.
 
-The upstream **`E`** action copies to the clipboard. This adapter's automatic
-delivery path is **q → confirm** and does not need clipboard access.
-
-With the [fork](#match-opencodes-colors-fork-required) (branch `local/opencode`; proposed
-upstream in [plannotator/plannotator-tui#109](https://github.com/plannotator/plannotator-tui/pull/109)),
-**`q`** with notes returns and submits them without the OpenCode dialog. **`Ctrl+S`**
-does the same mid-comment, saving the comment first. The header's **Send N back (q)**
+**`Ctrl+S`** does the same mid-comment, saving the comment first. The header's **Send N back (q)**
 button does the same as `q`.
 **`Ctrl+C`** returns without sending, and OpenCode asks whether to send. `E` and `S` send as well,
 following any `[keys]` rebinding, and the clipboard copy and Review menu (resend, finish, archive) are hidden
-because OpenCode owns delivery. Upstream binaries ignore the handoff and keep
-**q → confirm**.
+because OpenCode owns delivery.
 
 ### Chinese and other input methods
 
@@ -223,10 +277,10 @@ An input method holds plain letters while it composes, so review keys such as `e
 and `s`, and OpenCode's permission shortcuts, do nothing. With
 [Slash Saver](https://github.com/nxxxsooo/slash-saver) 1.1+ installed in `/Applications`,
 the plugin selects its configured ASCII source while you browse a review or answer a
-permission prompt, and restores your source afterwards. With the fork, the comment and edit
+permission prompt, and restores your source afterwards. The comment and edit
 boxes switch back to your writing source while open. Set `"inputSource": false` in the
 plugin's `options` to turn this off, or a path to another helper with the same
-`input-source current|select|ascii` commands. The fork also binds **`Ctrl+E`** to edit,
+`input-source current|select|ascii` commands. The reviewer also binds **`Ctrl+E`** to edit,
 which an input method passes through.
 
 Opening a review makes no model call. Confirming sends a normal user prompt and
@@ -237,9 +291,8 @@ cancelled reviews submit nothing.
 
 **Replies:** the latest completed text reply, with paginated history lookup.
 Reasoning, in-progress messages and tool-call commentary are excluded.
-Pass a positive integer to select the Nth most recent eligible reply: `1` is the
-default, `2` is the previous reply, and so on. If there are too few replies, the
-plugin reports that instead of opening another reply.
+Use `/annotate-pick` for an earlier reply or progress update, or `/annotate-selection`
+for selected transcript text. Numbered reply arguments are retired.
 
 **Documents:** local UTF-8 `.md`, `.mdx`, `.markdown` and `.txt` files up to 2 MiB.
 Relative paths resolve against the captured session's working directory, not the
@@ -260,8 +313,8 @@ it does not follow this repository's commits. Update just this plugin with:
 opencode plugin update @nxxxsooo/opencode-annotate@latest
 ```
 
-Reopen your terminal client to load updated package code. No shared background
-service restart is required. Check the installed version with `opencode plugin list`.
+Run `/reload` if the command list has not refreshed. Check the installed version with
+`opencode plugin list`.
 
 To remove it:
 
@@ -271,25 +324,59 @@ opencode plugin remove @nxxxsooo/opencode-annotate@latest
 
 ## Configuration
 
-Set `binary` if Plannotator TUI is installed outside the terminal client's PATH:
+### Automatically review long replies
+
+Enable auto-annotation in the plugin entry in **`opencode.jsonc`** (or `opencode.json`):
+
+```jsonc
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugins": [
+    {
+      "package": "@nxxxsooo/opencode-annotate@latest",
+      "options": {
+        "autoAnnotate": true,
+        "autoAnnotateThreshold": 2000, // Open when the reply exceeds this many characters.
+      },
+    },
+  ],
+}
+```
+
+Add these options to your existing entry, keeping any other options. Auto-annotation
+is **off by default**; set `autoAnnotate` to `false` to disable it. The threshold defaults
+to **2,000 characters** and accepts a non-negative integer; `0` reviews every non-empty
+reply. It counts Unicode characters in the trimmed reply text, including Markdown and
+code, excluding reasoning and tool output. A reply exactly at the threshold does not open.
+
+After a successful turn, a new qualifying reply in the active session opens the normal
+reviewer once. Progress updates, failed or interrupted turns, historical replies and
+background sessions do not trigger it. A reply is skipped if another review is open,
+you switch sessions before it opens, or a new turn starts. Dismissing the reviewer or
+reloading the plugin does not reopen that reply. Sending remains your explicit action.
+OpenCode reloads saved configuration automatically; use `/reload` if needed.
+
+### Reviewer binary and layout
+
+The bundled reviewer is selected automatically. Use `binary` only to override it with
+another locally built Annotate TUI executable:
 
 ```json
 {
   "plugins": [
     {
       "package": "@nxxxsooo/opencode-annotate@latest",
-      "options": { "binary": "/path/to/plannotator-tui" }
+      "options": { "binary": "/path/to/annotate-tui" }
     }
   ]
 }
 ```
 
-The adapter launches Plannotator TUI in the current terminal, not through Herdr;
-`[herdr]` placement and popup dimensions do not affect `/annotate`. Layout is
-owned by the selected binary, while font family and size belong to the terminal.
-The adapter supplies `PLANNOTATOR_TUI_THEME` to follow OpenCode's light/dark mode,
-overriding Plannotator TUI's configured theme. Use `binary` to select a custom
-build or launcher without replacing the system installation.
+The adapter launches Annotate TUI in the current terminal. Layout and key settings live
+in `~/.config/opencode-annotate/tui.toml`; font family and size belong to the terminal.
+The adapter supplies `PLANNOTATOR_TUI_THEME` to follow OpenCode's light/dark mode.
+The existing environment and annotation-field names are local protocol identifiers;
+they do not connect to or install another project.
 
 ## Draft recovery
 
@@ -302,22 +389,26 @@ store, and a status message gives its directory.
 
 ```sh
 PLANNOTATOR_DATA_DIR="<retained-directory>/data" \
-  plannotator-tui "<retained-directory>/<snapshot>"
+  npx --package @nxxxsooo/opencode-annotate annotate-tui "<retained-directory>/<snapshot>"
 ```
 
 Use the `snapshot` value from `review.json`. Press `H` to restore archived notes,
-then `E` to copy them for pasting into OpenCode. An upstream **E → F** archive is
+then `E` to copy them for pasting into OpenCode. An **E → F** archive is
 preserved even when `--export` reports “No annotations.”
 
 ## Development
 
 ```sh
 npm ci
+npm run build:tui
+npm run check:tui
 npm run check
 npm run test:smoke
+npm run test:references
 ```
 
-Unit tests use the real upstream annotation/export binary. The optional smoke test
+Rust 1.96+ is needed to build from source. Unit tests use the bundled annotation/export
+binary, including theme inheritance tests. The optional smoke test
 also requires Python 3, tmux and OpenCode. It runs a detached terminal, verifies
 commands and feedback through the actual API, then removes its test session.
 Its submission uses `resume: false`, so it makes no model call or visible window.
@@ -327,25 +418,28 @@ real configuration path. For a build with a centered 120-column viewport, also
 set `ANNOTATE_EXPECT_MARGIN=10` to assert blank margins in the 140-column smoke
 terminal. These variables configure the test, not the shipped plugin.
 
-For development loading, run `npm run install:plugin` to replace the npm entry in
-`cli.json` with this checkout's absolute directory. It backs up the CLI preferences and
-keeps `options.binary` and unrelated settings. Use only one installation at a time.
+For development loading, set the plugin entry in `opencode.json(c)` to this checkout's
+absolute directory, preserving its `options`, and run `/reload`. Remove any duplicate
+entry in `cli.json`. The older `npm run install:plugin` helper switches **only the TUI**
+entry in `cli.json`; use it only for TUI-only development. The reference smoke test loads
+both entrypoints in its own temporary location without changing your global configuration.
 
 See [release instructions](docs/releasing.md) and [changelog](CHANGELOG.md).
 
 ## 中文速用
 
-这是**非官方 OpenCode 批注插件**：文本用 Plannotator TUI，网页用 Chrome 伴随扩展。
+这是**非官方 OpenCode 批注插件**：文本用本仓库 `tui/` 中的 Annotate TUI，网页用 Chrome 伴随扩展。
 
 - `/annotate`：批注上一条完整回复。
 - `/annotate 文档.md`：批注文档，支持中文、空格和相对路径。
 - `/annotate-pick`：从最近的回复和运行中的进度说明里选一条批注。
 - `/annotate-selection`：先在会话里拖选文字，再批注包含这段文字的消息。
 - `/annotate-last`：固定批注最新一条完整回复，忽略附带参数。
-- `/annotate-web`：配对 Chrome；`/annotate-web 页面.html`、`/annotate-web https://…` 批注网页；`/annotate-web off` 撤销配对。
-- 选中文字 → `c` 写批注 → Enter 保存 → `q` 返回 →「Send and continue」。
-- 用 fork 时：有批注时按 `q` 直接返回并发送；写批注中途按 `Ctrl+S`，一步保存、返回并发送（中文输入法开着也有效）；`Ctrl+C` 不发送，返回后由 OpenCode 询问。
+- `/ref`：选择并引用同项目的历史会话；`/ref --all 关键词` 跨项目搜索；`/ref ses_…` 直接指定。确认后附加上下文，不启动空闲助手。
+- `/annotate-web`：配对 Chrome；空白首页会先创建空会话，无需先发提示词。`/annotate-web 页面.html`、`/annotate-web https://…` 批注网页；`/annotate-web off` 撤销配对。
+- 选中文字 → `c` 写批注 → Enter 保存 → `q` 发送并返回。
+- 写批注中途按 `Ctrl+S`，一步保存、返回并发送（中文输入法开着也有效）；`Ctrl+C` 返回后由 OpenCode 询问。
 - 文档采用独立快照，反馈附原文件路径，确认后发回发起批注的会话。
-- 更新：`opencode plugin update @nxxxsooo/opencode-annotate@latest`，然后重新打开终端客户端。
+- 更新：`opencode plugin update @nxxxsooo/opencode-annotate@latest`，命令未刷新时运行 `/reload`。
 
-MIT licensed. The annotation UI is maintained upstream by the Plannotator project.
+MIT licensed. Original terminal-reviewer copyright notices are preserved in [tui/LICENSE](tui/LICENSE).

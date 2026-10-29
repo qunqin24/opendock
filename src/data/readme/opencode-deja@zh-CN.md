@@ -20,7 +20,7 @@
 <tr>
 <td align="center" width="33%">召回率<br><b>97.2% R@5</b>（LongMemEval-S）<br><sub>全部 500 题 · MemPalace 96.6%，agentmemory 95.2%<br>同样 19,195 个会话：100 题中 19 题排第一，第二名 14 题</sub></td>
 <td align="center" width="33%">Token 用量<br>token 只有 agentmemory 的<b>一半</b><br><sub>已做过的任务：53,558 对比 104,974<br>工具定义每轮 477 token，七个里最少</sub></td>
-<td align="center" width="33%">索引耗时<br><b>17.6 秒</b>索引 19,195 个会话<br><sub>七个工具里第二名：72 秒<br>首次回答 26 毫秒，搜索中位数 97 毫秒</sub></td>
+<td align="center" width="33%">索引耗时<br><b>13.6 秒</b>索引 19,195 个会话<br><sub>七个工具里第二名：72 秒<br>首次回答 26 毫秒，搜索中位数 97 毫秒</sub></td>
 </tr>
 </table>
 
@@ -243,7 +243,7 @@ specify extension add deja-vu --from https://github.com/vshulcz/deja-vu/releases
 ## 证据
 
 <p>
-同一台机器已经做过的任务，<b>少花 58% 的 token</b> &middot; LongMemEval-S（470 题清理集）上 <b>88.1% hit@1</b> &middot; LoCoMo 上 <b>70.5%</b> &middot; 数 GB 历史上的查询在<b>毫秒</b>级<br>
+同一台机器已经做过的任务，<b>少花 58% 的 token</b> &middot; LongMemEval-S（470 题清理集）上 <b>88.9% hit@1</b> &middot; LoCoMo 上 <b>71.9%</b> &middot; 数 GB 历史上的查询在<b>毫秒</b>级<br>
 <sub>每组 11 次运行：53,558 token，对比未接入任何记忆时的 126,222；之后的版本上再各跑 11 次：52,815 对比 103,443 &middot;
 <a href="https://vshulcz.github.io/deja-vu/guide/day-zero.html">完成一个任务要花多少</a> &middot;
 两套检索评测都在本仓库里，几分钟即可在公开数据集上跑完 &middot;
@@ -312,7 +312,7 @@ MCP 服务端、统计、分享和同步都读这一份索引。细节见
 <summary><b>会拖慢我的智能体吗？</b></summary>
 
 一次召回是对本地索引的词法查询：中位数 0.7–0.8 ms，没有任何东西在等模型。
-钩子会额外加上进程启动和对存储的新鲜度检查——几个 GB 的存储上是几十毫秒。
+钩子会额外加上进程启动和对存储的新鲜度检查——在 19k 个会话的索引上，每次提示的钩子中位数是 107 ms。
 
 </details>
 
