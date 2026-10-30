@@ -79,7 +79,7 @@ You need [OpenCode](https://opencode.ai) 2.x and the [Claude Code CLI](https://w
 
 ## Using it
 
-**Models.** The list comes from your own `claude` CLI, so you see what your account can use and it updates when Claude Code does. Opus, Fable and some Sonnet models come in 1M-context versions. Context limits and effort levels show up in OpenCode's model details.
+**Models.** The list comes from your own `claude` CLI, so you see what your account can use and it updates when Claude Code does. Most current models run with a 1M context; Opus 4.6 also comes as a separate 1M version. Context limits and effort levels show up in OpenCode's model details. Configs and agents have to name a listed id, like `claude-code/claude-opus-5-5`: aliases such as `opus` and ids the picker doesn't show aren't models here.
 
 **Fast mode.** Models your CLI runs in [fast mode](https://code.claude.com/docs/en/fast-mode) get a second entry, like "Opus 5.5 Fast". Fast turns draw your plan limits faster. If your account can't use fast mode, the turn runs at normal speed and the log says why.
 
@@ -101,6 +101,12 @@ CLAUDE_CONFIG_DIR=~/.claude-work claude auth login --claudeai
 
 ```json
 { "plugins": [{ "package": "@openchamber/opencode-claude", "options": { "configDirs": { "~/work": "~/.claude-work" } } }] }
+```
+
+**Compacting earlier.** On 1M models OpenCode compacts a chat near 850K tokens, and every step of a long chat re-reads all of it. To compact sooner, set `compactAt` in the plugin options; Claude still has its full window for a turn that runs over:
+
+```json
+{ "plugins": [{ "package": "@openchamber/opencode-claude", "options": { "compactAt": 400000 } }] }
 ```
 
 **Model fallback.** If Claude Code declines a request on one model and retries on another (for example Fable to Opus), you'll see a note in the reasoning, and the session switches to the model that's actually answering.

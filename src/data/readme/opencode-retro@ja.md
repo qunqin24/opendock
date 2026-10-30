@@ -1,4 +1,4 @@
-<!-- translated-from: README.en.md@f654c69bf54f -->
+<!-- translated-from: README.en.md@7dcedf76bc5e -->
 # opencode-retro
 
 [Русский](README.md) | [English](README.en.md) | [简体中文](README.zh-CN.md) | [Español](README.es.md) | **日本語**
@@ -172,6 +172,8 @@ OpenCode が npm からプラグインを取得します。`opencode.json` に�
 }
 ```
 
+あるいはプラグインを丸ごと手元に置くこともできます。`~/.config/opencode/plugins/opencode-retro/` にコピーを置けば、`opencode.json` への記載は要りません。OpenCode は各設定ディレクトリの `plugin/` と `plugins/` を自分で走査します。フックはサービス単位で登録されるので、すでに動いているセッションも次のプロンプトかツール呼び出しでプラグインを読み込みます。
+
 設定するものはありません。プラグインは自分でモデルを呼ばないので、選ぶモデルも、渡す鍵も、つなぐプロバイダーもありません。分析は、それを求めたセッションのサブエージェントとして動きます。`.retro/selfcheck.md` が、それが実行されたか、実行されなかった場合はその理由を報告します。
 
 **まず npm に実際に何があるかを確かめてください。** `0.1.0` より前のバージョンはいずれも名前の placeholder です。エラーも出さずに読み込まれ、コマンドを登録せず、`.retro/` も作らず、何も知らせません。つまり最初の本当のリリースより前にこの設定をそのまま使うと、見た目は普通のセッションと、実際には存在しないプラグインが残ります。`npm view opencode-retro version` が `0.1.0` 未満なら、`package` にはチェックアウトの絶対パスを指定してください。プラグイン自体を開発するときも同じです。相対パスの場合、セッションの起動がエラーも出さずに止まったままになります。固定できるバージョンができたら、正確なバージョンを固定することもできます（`opencode-retro@0.1.0`）。
@@ -186,6 +188,18 @@ OpenCode が npm からプラグインを取得します。`opencode.json` に�
 - `maxOutput` — シャドーログに一ステップごとに保存するツール出力の文字数。既定は 8000。
 - `heartbeatMs` — セッション作業中のセルフチェック書き込みの最短間隔。既定は 60000。
 - `keepSessions` — 誰も引用していないものも含め、すべてのログを残す。既定では無効。
+
+### 権限
+
+プラグインの作業は、プラグインが登録する三つのツール——`retro_record`、`retro_propose`、`retro_decide`——を通して行われます。OpenCode は、権限が拒否されたツールを各セッションのツール一覧から取り除きます。そのため、すべてを拒否してから一覧だけを許可する設定（`{ "action": "*", "resource": "*", "effect": "deny" }` の後に許可を並べるもの）では、これらが隠れてしまいます。`/retro` は動いて引き継ぎも届き、フックもセルフチェックも動き続けますが、どの分析も結果を記録できず、提案するものもありません。拒否ルールの後で許可してください。
+
+```json
+{ "action": "retro_record",  "resource": "*", "effect": "allow" },
+{ "action": "retro_propose", "resource": "*", "effect": "allow" },
+{ "action": "retro_decide",  "resource": "*", "effect": "allow" }
+```
+
+`.retro/selfcheck.md` は `opencode.json`（プロジェクトのものとグローバルのもの）の権限ルールを読み、それがツールを隠しているときは `BROKEN tool permissions` と報告します。エージェント自身の権限は読みません。
 
 ### ディスク上に現れるもの
 

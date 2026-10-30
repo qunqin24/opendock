@@ -79,6 +79,41 @@ The main idea is simple: instead of forcing one model to do everything, the plug
 >
 > \- `xenstar1`
 
+### Merch · The Pantheon in gold
+
+The six agents as gold tarot artwork, on clothing, desk gear and prints.
+
+<table>
+  <tr>
+    <td width="25%" align="center" valign="top">
+      <a href="https://ohmyopencodeslim.com/merch/the-orchestrator-tee">
+        <img src="img/merch/the-orchestrator-tee.webp" alt="The Orchestrator in gold on a black tee" width="160"><br>
+        <sub><b>Tee</b></sub>
+      </a>
+    </td>
+    <td width="25%" align="center" valign="top">
+      <a href="https://ohmyopencodeslim.com/merch/the-oracle-hoodie">
+        <img src="img/merch/the-oracle-hoodie.webp" alt="The Oracle tarot card on the back of a black hoodie" width="160"><br>
+        <sub><b>Hoodie</b></sub>
+      </a>
+    </td>
+    <td width="25%" align="center" valign="top">
+      <a href="https://ohmyopencodeslim.com/merch/the-six-cards-framed-poster">
+        <img src="img/merch/the-six-cards-framed-poster.webp" alt="All six agent tarot cards in a black frame" width="160"><br>
+        <sub><b>Framed poster</b></sub>
+      </a>
+    </td>
+    <td width="25%" align="center" valign="top">
+      <a href="https://ohmyopencodeslim.com/merch/the-six-agents-mouse-pad">
+        <img src="img/merch/the-six-agents-mouse-pad.webp" alt="All six agents in gold on a black mouse pad" width="160"><br>
+        <sub><b>Mouse pad</b></sub>
+      </a>
+    </td>
+  </tr>
+</table>
+
+<p align="center"><a href="https://ohmyopencodeslim.com/merch"><b>Explore the collection →</b></a></p>
+
 ### Quick Start
 
 Copy and paste this prompt to your LLM agent (Claude Code, AmpCode, Cursor, etc.):
@@ -179,11 +214,14 @@ The default generated configuration includes both `openai` and `opencode-go` pre
 Presets can inherit from one base preset with `extends`: a `design` preset can
 extend `base` and override only its designer model. On v2, `/preset` lets you
 apply subagent inference settings to **Current session** or change the
-**Global default**. `/preset <name>` and manual configuration edits change
-defaults; existing work and its future subagents retain their saved
+**Global default**. `/preset <name>` applies the preset to the session you are
+in — no restart — while manual configuration edits change the default for
+future sessions; existing work and its future subagents retain their saved
 configuration until you explicitly reapply a preset to that session.
 Already-created children keep their own configuration. Main-session models,
 prompts, tools, skills and MCPs are not switched by the session action.
+The sidebar shows the current session's saved team models and variants;
+`/preset` marks its bound preset separately from the global default.
 On v1, reload OpenCode after applying a preset. See
 [Preset Switching](docs/presets/preset-switching.md) for scope and timing, and
 [Configuration](docs/configuration.md#preset-inheritance) for the inheritance
@@ -728,7 +766,8 @@ Use this section as a map: start with installation, then jump to features, confi
 | Doc | What it covers |
 |-----|----------------|
 | **[Installation Guide](docs/installation.md)** | Install the plugin, use CLI flags, reset config, and troubleshoot setup |
-| **[OpenCode v2 Compatibility](docs/opencode-v2-compatibility.md)** | Run the same plugin on `opencode2`: feature matrix, v2.0.x compatibility baseline, version pinning |
+| **[OpenCode v2 Compatibility](docs/opencode-v2-compatibility.md)** | Host contracts, feature matrix, entrypoints and package loading |
+| **[Runtime Efficiency](docs/runtime-efficiency.md)** | Shared configuration reads, request-local facts, optional implementation loading and verification |
 | **[Configuration](docs/configuration.md)** | Config file locations, JSONC support, prompt overrides, and full option reference |
 | **[Marketplace](docs/marketplace.md)** | Install, inspect, activate, and update marketplace agent packages |
 | **[Project Customization](docs/project-local-customization.md)** | Repository-specific custom agents, prompt overrides, per-agent skills, and precedence |
@@ -748,7 +787,7 @@ Use this section as a map: start with installation, then jump to features, confi
   <p><sub>Every merged contribution leaves a mark on the realm.</sub></p>
 
   <!-- ALL-CONTRIBUTORS-BADGE:START - Do not remove or modify this section -->
-[![All Contributors](https://img.shields.io/badge/all_contributors-144-orange.svg?style=flat-square)](#contributors-)
+[![All Contributors](https://img.shields.io/badge/all_contributors-146-orange.svg?style=flat-square)](#contributors-)
 <!-- ALL-CONTRIBUTORS-BADGE:END -->
 </div>
 
@@ -950,6 +989,10 @@ Use this section as a map: start with installation, then jump to features, confi
       <td align="center" valign="top" width="16.66%"><a href="https://github.com/mv2sa"><img src="https://avatars.githubusercontent.com/u/2573094?v=4?s=100" width="100px;" alt="Marcos Santanna"/><br /><sub><b>Marcos Santanna</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=mv2sa" title="Code">💻</a></td>
       <td align="center" valign="top" width="16.66%"><a href="https://codenebula.netlify.app/"><img src="https://avatars.githubusercontent.com/u/121377123?v=4?s=100" width="100px;" alt="CodeNebula"/><br /><sub><b>CodeNebula</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=gaojunran" title="Code">💻</a></td>
       <td align="center" valign="top" width="16.66%"><a href="https://github.com/BoysGameStudio"><img src="https://avatars.githubusercontent.com/u/15364305?v=4?s=100" width="100px;" alt="Alan Liu"/><br /><sub><b>Alan Liu</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=BoysGameStudio" title="Code">💻</a></td>
+    </tr>
+    <tr>
+      <td align="center" valign="top" width="16.66%"><a href="https://github.com/niheaven"><img src="https://avatars.githubusercontent.com/u/5832170?v=4?s=100" width="100px;" alt="Hsiao-nan Cheung"/><br /><sub><b>Hsiao-nan Cheung</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=niheaven" title="Code">💻</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="https://github.com/akrhin"><img src="https://avatars.githubusercontent.com/u/17483152?v=4?s=100" width="100px;" alt="akrhin"/><br /><sub><b>akrhin</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=akrhin" title="Code">💻</a></td>
     </tr>
   </tbody>
 </table>

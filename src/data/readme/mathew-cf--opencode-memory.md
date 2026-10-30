@@ -42,7 +42,7 @@ OpenCode v1:
 ```jsonc
 // opencode.jsonc
 {
-  "plugin": ["@mathew-cf/opencode-memory@2.4.0"]
+  "plugin": ["@mathew-cf/opencode-memory@2.5.0"]
 }
 ```
 
@@ -166,6 +166,13 @@ Each directory must contain `rag.toml` (or `.rag.toml`) with one or more
 <knowledge-base>/rag.toml`; `knowledge_base_search` uses `rag search --config` and
 honors that file's `[search]` settings, including `hybrid = true`. The plugin
 does not build knowledge-base indexes or write to source repositories.
+
+With rag-cli 2.1 or newer, a source entry can use
+`paths = ["../service-a/docs", "../service-b/docs"]` instead of `path = "docs"`.
+Specify exactly one field, with a nonempty list for `paths`. All directories share
+one index; result source names are relative to their canonical common ancestor.
+The plugin resolves that same root and limits reads to the selected directories.
+Existing `path` entries keep their behavior.
 
 Names must be unique. With one configured base it becomes the default
 automatically. With several, mark one `default = true` or pass `base` on each

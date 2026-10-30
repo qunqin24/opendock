@@ -4,6 +4,7 @@
 [![npm downloads](https://img.shields.io/npm/dm/@noppu-labs/opencode-cache-manager)](https://www.npmjs.com/package/@noppu-labs/opencode-cache-manager)
 [![ci](https://github.com/noppu-labs/opencode-cache-manager/actions/workflows/ci.yml/badge.svg)](https://github.com/noppu-labs/opencode-cache-manager/actions/workflows/ci.yml)
 [![license](https://img.shields.io/npm/l/@noppu-labs/opencode-cache-manager)](LICENSE)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/noppu-labs/opencode-cache-manager/badge)](https://scorecard.dev/viewer/?uri=github.com/noppu-labs/opencode-cache-manager)
 
 <p align="center">
   <img src="docs/images/social-preview.png" alt="Cache Manager, an OpenCode plugin: take control of your prompt cache. Pick a 5m, 1h or hybrid TTL per session, and keep idle caches warm with pings. A chart: after stepping away for 15 minutes, the default 5m cache has expired and the next prompt rewrites it at 1.25x; with keepalive, three pings keep it warm and the next prompt reads it at about 0.1x." width="800">

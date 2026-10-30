@@ -9,7 +9,8 @@ Three OpenCode plugins that replace the built-in `glob`, `grep` and `read` tools
 They register under the same tool IDs and accept the arguments models already
 use, so prompts and agents keep working unchanged. Behind the call, output stays
 inside the host budget and says where to continue, search processes cannot hang,
-and results come back in the same order on every run.
+and results come back in the same order on every run. The same package loads in
+OpenCode 1.x and 2.x; see [Compatibility](#-compatibility).
 
 Each plugin is published on its own. Install only the ones you want.
 
@@ -17,7 +18,7 @@ Each plugin is published on its own. Install only the ones you want.
 | --- | --- | --- |
 | [`opencode-betterglob`](./packages/opencode-betterglob) | `glob` | File discovery on top of `rg --files`, with a default limit of 500 paths, mtime or path sorting and a hard deadline. |
 | [`opencode-bettergrep`](./packages/opencode-bettergrep) | `grep` | Content search on top of ripgrep, with a GNU grep fallback, the full ripgrep filter set and SIGTERM-then-SIGKILL timeouts. |
-| [`opencode-betterread`](./packages/opencode-betterread) | `read` | Text, directories, notebooks, images, PDFs and binaries, with its own permission checks and an output budget that follows your OpenCode config. |
+| [`opencode-betterread`](./packages/opencode-betterread) | `read` | Text, directories, notebooks, images, PDFs and binaries, with its own permission checks and an output budget that follows your OpenCode config ([plugin options in OpenCode 2](#%EF%B8%8F-output-budget)). |
 
 ## 🎯 What you notice in use
 
@@ -171,16 +172,32 @@ Raise them if you want larger windows per call:
 }
 ```
 
+OpenCode v2 does not pass its config to plugins, so there `read` takes the same
+block from the plugin options instead:
+
+```json
+{
+  "plugin": [
+    ["file:///path/to/opencode-betterread", {
+      "tool_output": { "max_lines": 4000, "max_bytes": 153600 }
+    }]
+  ]
+}
+```
+
+v1 accepts this tuple form too and keeps reading the top-level block.
+
 Missing or invalid values fall back to 2,000 lines and 51,200 bytes. `grep` and
 `glob` do not read this block. They are limited per call with `max_results` and
 `limit`.
 
 ## ✅ Compatibility
 
-The plugins target the OpenCode 1.x plugin API and are built against
-`@opencode-ai/plugin` 1.18.32. Their entry points use the v1 module shape
-(`{ id, server }`). Loading them in an OpenCode v2 host has not been tested,
-because no v2 host was available.
+Each package loads in both hosts from the same entry. The default export is
+`{ id, server, setup }`: OpenCode 1.x (tested on 1.19.5) calls `server`, and
+OpenCode 2.x (tested on 2.2.2) calls `setup`, which replaces the built-in tool of
+the same name. `@opencode/plugin` is used for types only. The v2 differences are
+listed in each package's README.
 
 ## ⚠️ Known limitations
 

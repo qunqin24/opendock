@@ -19,15 +19,9 @@ LM Studio, and KoboldCpp. The Ollama probe also covers llama.cpp and LocalAI.
 The Model Scout browser, `/modelscout`, lists every discovered model and
 where each value came from.
 
-The plugin requires OpenCode 2 and is tested against OpenCode 2.1.3. If you
-used `opencode-model-scout`, see
-[Moving from opencode-model-scout](#moving-from-opencode-model-scout).
+The plugin requires OpenCode 2 and is tested against OpenCode 2.1.3.
 
 ## Quick Start
-
-Actualyze needs no provider config. The plugin adds an `actualyze` provider
-for `https://app.actualyze.ai/openai/v1`, and it appears as soon as OpenCode
-has your API key.
 
 1. Install the plugin:
 
@@ -35,23 +29,14 @@ has your API key.
    opencode plugin add opencode-actualyze
    ```
 
-2. Add your Actualyze API key in one of these ways:
-   - In the TUI, run `/actualyze`, press `k`, and paste the key. You can also
-     run `/connect` and pick **Actualyze**.
-   - From a shell, run `opencode auth login actualyze`.
-   - Set `ACTUALYZE_API_KEY` on the background service and restart it:
+2. Connect your Actualyze API key, either way:
+   - From a shell, run `opencode auth login`, pick **Actualyze**, and paste
+     the key.
+   - In OpenCode, run `/actualyze`, press `k`, and paste the key.
 
-     ```bash
-     opencode service set env ACTUALYZE_API_KEY <key>
-     opencode service restart
-     ```
-
-     The service does not see variables exported in your shell (see
-     [The background service](#the-background-service-and-environment-variables)).
-
-3. The Actualyze models appear in the model picker once discovery finishes.
-   `/actualyze` shows whether the catalog answered for your key and, if it
-   did not, what to do next.
+Your Actualyze models then appear in the model picker. No provider config is
+needed. `/actualyze` shows whether the catalog answered for your key and, if
+it did not, what to do next.
 
 For a server other than Actualyze, see
 [Other OpenAI-Compatible Servers](#other-openai-compatible-servers).
@@ -73,10 +58,15 @@ The plugin adds this provider to OpenCode's catalog:
 | `settings.baseURL` | `https://app.actualyze.ai/openai/v1`       |
 | `settings.probe`   | `actualyze`                                |
 
+When the OpenCode server's environment sets `ACTUALYZE_OPENAI_BASE_URL` to
+an http or https URL, `settings.baseURL` is that URL instead (see
+[Another Actualyze environment](#another-actualyze-environment)).
+
 It also registers an Actualyze integration, which is what `/connect` and
 `opencode auth login actualyze` offer. The integration takes a stored API key
-or the `ACTUALYZE_API_KEY` environment variable of the background service.
-Discovery and chat both use that key. The integration's ID is `actualyze`,
+or the `ACTUALYZE_API_KEY` environment variable of the background service (see
+[The background service](#the-background-service-and-environment-variables)
+for setting it). Discovery and chat both use that key. The integration's ID is `actualyze`,
 the same as the provider's, so a `providers.actualyze` config entry and
 `opencode auth login actualyze` both reach the integration the provider reads
 its key from.
@@ -101,6 +91,17 @@ key handling stay as they are:
   }
 }
 ```
+
+A tool that launches OpenCode for one run against another environment can
+set `ACTUALYZE_OPENAI_BASE_URL` instead, for example
+`https://actualyze.example.com/openai/v1`. The built-in provider then
+starts from that base URL rather than production, so neither discovery nor
+chat in that run sends the key to production. A value that is not an http
+or https URL is ignored. A `settings.baseURL` in your config takes
+precedence over the variable. Like `ACTUALYZE_API_KEY`, the variable is read
+from the environment of the OpenCode server, which for the background
+service is its own (see
+[The background service](#the-background-service-and-environment-variables)).
 
 Any `providers.actualyze` entry in your config makes OpenCode list the
 provider even without a key. Discovery then runs without credentials, and
@@ -159,10 +160,13 @@ command palette, or press `a` in `/modelscout`.
 
 The header shows the Actualyze wordmark and the endpoint: its host for an
 https endpoint, such as `app.actualyze.ai` for the built-in provider, and
-`http://host:port` for an http one. When
-`providers.actualyze.settings.baseURL` points anywhere other than the
-built-in endpoint, the header adds a `custom endpoint` badge, and every app
-link uses that endpoint's origin. The line under the header says where
+`http://host:port` for an http one. When the provider's base URL, from
+`providers.actualyze.settings.baseURL` or `ACTUALYZE_OPENAI_BASE_URL`,
+points anywhere other than the production endpoint, the header adds a
+`custom endpoint` badge, and every app link uses that endpoint's origin.
+While the provider is hidden for lack of a key, the header reads
+`ACTUALYZE_OPENAI_BASE_URL` from the terminal's own environment, which is
+the server's when you run `opencode --standalone`. The line under the header says where
 things stand, and names the key in use: the connection's label in quotes,
 `ACTUALYZE_API_KEY` for the environment variable, or `settings.apiKey`.
 
@@ -198,6 +202,7 @@ refused on every chat request.
 | `▲ Discovery was interrupted` or `▲ Discovery failed`               | The check did not finish.                                                                                                                | It runs again on the next refresh; `r` retries now.                                                                                     |
 | `▲ Discovery status unavailable`                                    | The plugin's server half did not answer, so only the connection OpenCode reports is known.                                               | `k` and `c` still work; `r` reads the catalog again.                                                                                    |
 | `○ Not managed by Model Scout`                                      | Another plugin or a models.dev catalog defines the `actualyze` provider, so the plugin does not discover it.                             | Add `"probe": "actualyze"` to `providers.actualyze.settings` to opt in.                                                                 |
+| `▲ Waiting for OpenCode to finish loading`                          | OpenCode restarted this plugin and did not report that loading finished, so the plugin sends no requests. Stored models keep working.    | Restart OpenCode to refresh models.                                                                                                     |
 
 The glyph carries the state's color; the words stay in the theme's text
 color. When the line is too narrow, the age goes first and then the key
@@ -361,8 +366,29 @@ explicit "not supported"), then models.dev, then keyword heuristics on the
 model ID, then OpenCode's defaults.
 
 Discovery never runs during plugin setup, so it does not slow OpenCode's
-startup. Inventories stored by an earlier run are served right away, before
-any network request.
+startup. It also waits until OpenCode reports that it has finished loading
+every plugin, which is when your provider config has been applied, so at
+startup a key goes only to the base URL your config gives the provider.
+Inventories stored by an earlier run are served as soon as loading
+finishes, before any network request.
+
+When OpenCode restarts plugins in a project that is already open:
+
+- **This plugin restarts without any change to the list of plugins**, for
+  example after its options change. OpenCode 2.2.0 then announces no end
+  of loading. After about 30 seconds the plugin serves the models it
+  stored before, and sends no request at all, to any endpoint, with a key
+  or without one, until OpenCode restarts or announces that loading
+  finished, which it does when the list of plugins changes. Until then
+  stored models keep working, but none are refreshed or newly discovered:
+  `/actualyze` and `/modelscout` say that OpenCode has not finished
+  loading, and a refresh is refused. Restart OpenCode to refresh models.
+- **Only plugins listed after this one restart**, for example when a
+  package install finishes. Then a key change, the periodic refresh, or a
+  refresh you start can run discovery while they load, read the provider
+  list before your config is applied again, and send a key to the base URL
+  the plugin starts from (`ACTUALYZE_OPENAI_BASE_URL`, or production)
+  rather than the one in your config.
 
 ### Configuration
 
@@ -608,6 +634,9 @@ sort.
   use, `○ waiting` until discovery has a result for the current key, or a
   failure such as `▲ key rejected`, `▲ rate limited`, or `▲ unreachable`. A
   failing provider keeps the models from its last good discovery.
+  `▲ restart needed` means OpenCode has not reported that its plugins
+  finished loading, so the plugin sends no requests; stored models keep
+  working until you restart OpenCode.
   `▲ unknown probe` means `settings.probe` names no probe: the models are
   listed, but no probe fills in their limits, prices, or capabilities. A
   failure shows in its place until it clears.
@@ -921,9 +950,10 @@ relative `{file:}` path resolves against the directory of the config file.
   or headers. The plugin keeps the 128 most recent entries.
 - **Startup.** A provider gets its stored models once the plugin has looked
   up the key that project uses (the connected key, else `settings.apiKey`)
-  and found the inventory discovered with it. That lookup runs right after
-  the plugin loads and makes no network request.
-- **Background refresh.** The plugin checks its providers when it loads;
+  and found the inventory discovered with it. That lookup runs once OpenCode
+  has finished loading plugins and makes no network request.
+- **Background refresh.** The plugin checks its providers once OpenCode has
+  finished loading plugins;
   when configuration, providers, plugins, integrations, or credentials
   change; and every `refreshIntervalMs`. A check starts discovery only for a
   provider that has no inventory for its current endpoint and key, or, with
@@ -971,44 +1001,28 @@ relative `{file:}` path resolves against the directory of the config file.
   unknown and asks for up to 32,000 output tokens, fewer when the prompt
   leaves less room.
 
-## Moving from opencode-model-scout
+## Upgrading to 3.0
 
-`opencode-actualyze` is the successor of `opencode-model-scout` and requires
-OpenCode 2. Remove the old package from your configuration and add the new
-one. `remove` takes the entry exactly as it is configured, including any
-version pin:
+Nothing in your configuration needs to change. What changes:
 
-```bash
-opencode plugin remove opencode-model-scout
-opencode plugin add opencode-actualyze
-```
-
-To do it by hand, replace the `opencode-model-scout` entry in the `plugins`
-array of `opencode.json` with `opencode-actualyze`; in object form, change
-its `package` field. An entry that points at a checkout of
-`opencode-model-scout` should point at the `dist` directory of an
-`opencode-actualyze` checkout instead (see
-[Running from a checkout](#running-from-a-checkout)). Keep only one of the
-two: each entry loads as a separate plugin.
-
-What changes:
-
-- **Plugin ID.** The plugin ID is now `opencode-actualyze`, so anything that
-  names the plugin by its ID needs the new one. That includes a client of
-  the plugin's RPC contract, which `opencode-actualyze/rpc` exports. Saved
-  discovery state starts fresh, because OpenCode keeps it under the plugin
-  ID; the discovered models appear again once the first discovery finishes,
-  usually within a few seconds.
-- **Commands.** The `/modelscout` browser keeps its name, and `/actualyze`
-  is added.
-- **Probe values.** A `settings.probe` value the plugin does not recognize
-  shows a warning in `/modelscout` and `/actualyze` that lists the accepted
-  values.
-- **Actualyze providers.** A provider entry that points at
-  `https://app.actualyze.ai/openai/v1` can be removed, because the built-in
-  `actualyze` provider covers it. Its models then appear under the
-  `actualyze` provider; connect your key with `/actualyze` or
-  `opencode auth login actualyze`.
+- **Discovery waits for OpenCode to finish loading.** The plugin sends no
+  request until OpenCode reports that every plugin has loaded, so at
+  startup a key goes only to the base URL your config gives a provider. See
+  [How discovery works](#how-discovery-works) for what happens when
+  OpenCode restarts plugins in an open project.
+- **`ACTUALYZE_OPENAI_BASE_URL`** sets the base URL the built-in
+  `actualyze` provider starts from (see
+  [Another Actualyze environment](#another-actualyze-environment)).
+- **The RPC contract that `opencode-actualyze/rpc` exports** changed in ways
+  a strict client rejects:
+  - The `catalog` payload's `schemaVersion` is `6`, and the output schema
+    requires exactly that value.
+  - Every provider record has a new required boolean, `held`: true while
+    the server half sends no requests because OpenCode has not reported
+    that its plugins finished loading. The stored inventory is still
+    served.
+  - `refresh` can answer `{ "accepted": false, "reason": "held" }`, and its
+    output schema's `reason` enum includes `"held"`.
 
 ## Contributing
 

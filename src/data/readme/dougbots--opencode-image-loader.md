@@ -20,11 +20,13 @@ Then add to your `opencode.json` plugins array:
 
 ```json
 {
-  "plugin": [
+  "plugins": [
     "@dougbots/opencode-image-loader"
   ]
 }
 ```
+
+Works with OpenCode 1 (1.18.29+) and OpenCode 2 from the same package: OpenCode 2 reads the `image-loader` definition (`id` + `setup`), OpenCode 1 calls `server()`.
 
 ## Usage
 

@@ -1,4 +1,4 @@
-<!-- translated-from: README.en.md@f654c69bf54f -->
+<!-- translated-from: README.en.md@7dcedf76bc5e -->
 # opencode-retro
 
 [Русский](README.md) | [English](README.en.md) | **简体中文** | [Español](README.es.md) | [日本語](README.ja.md)
@@ -172,6 +172,8 @@ OpenCode 会从 npm 获取插件；在 `opencode.json` 中写出包名即可：
 }
 ```
 
+或者把整个插件放进本地：将一份副本放到 `~/.config/opencode/plugins/opencode-retro/`，就不需要在 `opencode.json` 中添加条目——OpenCode 会自行扫描每个配置目录下的 `plugin/` 和 `plugins/` 目录。钩子在服务层注册，因此已在运行的会话会在下一次提示或工具调用时加载插件。
+
 无需任何配置：插件自己不调用模型，所以没有模型要挑、没有密钥要填、也没有服务商要连通。分析以请求它的那个会话的子智能体身份运行。`.retro/selfcheck.md` 会报告它是否运行过，以及失败时的原因。
 
 **先看清 npm 上实际有什么。** 所有低于 `0.1.0` 的版本都只是占位：加载时不报错，不注册命令，不创建 `.retro/`，也不提示任何信息。也就是说，在第一个真正的发布之前照抄这段配置，只会得到一个看起来正常的会话和一个其实并不存在的插件。如果 `npm view opencode-retro version` 低于 `0.1.0`，请把 `package` 指向一份检出的绝对路径——开发插件本身时也是这样运行。相对路径会使会话启动一直挂起且不报任何错误；等到有版本可钉时，也可以钉住确切版本（`opencode-retro@0.1.0`）。
@@ -186,6 +188,18 @@ OpenCode 会从 npm 获取插件；在 `opencode.json` 中写出包名即可：
 - `maxOutput` —— 影子日志中每一步保留的工具输出字符数，默认 8000。
 - `heartbeatMs` —— 会话进行中两次自检写入之间的最短间隔，默认 60000。
 - `keepSessions` —— 保留所有日志，包括无人引用的；默认关闭。
+
+### 权限
+
+插件的工作通过它注册的三个工具进行——`retro_record`、`retro_propose` 和 `retro_decide`——而 OpenCode 会从每个会话的工具集中移除权限被拒绝的工具。因此，一个先拒绝一切、再放行一份清单的配置（`{ "action": "*", "resource": "*", "effect": "deny" }`，其后是各项放行）会把它们藏起来：`/retro` 照常运行并交接，钩子和自检也照常工作，但任何分析都无法记录结果，也没有什么可以提议。请在拒绝规则之后放行它们：
+
+```json
+{ "action": "retro_record",  "resource": "*", "effect": "allow" },
+{ "action": "retro_propose", "resource": "*", "effect": "allow" },
+{ "action": "retro_decide",  "resource": "*", "effect": "allow" }
+```
+
+`.retro/selfcheck.md` 会读取 `opencode.json`（项目的和全局的）中的权限规则，当这些规则把工具藏起来时报告 `BROKEN tool permissions`。代理自身的权限不会被读取。
 
 ### 磁盘上会出现什么
 

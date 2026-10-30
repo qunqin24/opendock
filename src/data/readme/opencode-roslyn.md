@@ -65,6 +65,17 @@ nested delegation (`experimental.subagent_depth`) and `subagent` permissions. Ev
 is in [`docs/install.md`](docs/install.md) ([`docs/ru/install.md`](docs/ru/install.md)); an agent
 can perform the whole checklist from [`docs/install-prompt.md`](docs/install-prompt.md).
 
+Nothing has to be copied by hand. The role agents ship in three ready-to-copy sets — one envelope
+per harness, one body: `assets/opencode-agents/` (canonical), `assets/claude-agents/*.md`
+(`name`/`description`/`tools`) and `assets/codex-agents/*.toml`
+(`name`/`description`/`developer_instructions`). The last two are generated from the canonical assets
+by `skills/pdca/scripts/gen_host_agents.py` and checked in CI. `pdca` checks the roles before its
+first dispatch and, when one does not resolve, hands you the install prompt it ships at
+`assets/install-agents-prompt.md`: the agent copies your host's set into the agent directory, binds
+the models by tier (an OpenCode profile map, `model:` in a Claude Code agent file, or
+`model`/`model_reasoning_effort` in a Codex TOML) and verifies the result. Binding models is the one
+part a generator cannot decide — the ids must be ones the host really offers.
+
 ### From a checkout
 
 Clone the repository and copy the skill directories you want into an opencode skills directory.

@@ -149,22 +149,22 @@ Gates are decided in `execute.before` hooks; every gate has a human escape
 hatch. Full detail (guards, state fields, escape ladders, diagrams) lives in
 [`docs/architecture.md`](docs/architecture.md) (§5 Gate state machine).
 
-| Gate                   | In one line                                                                                                                                                                                                                                                                                                                                                                                             |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Plan approval          | `executor` dispatches blocked while the plans dir holds a _pending_ plan — one lacking a current plan-reviewer `VERDICT: APPROVE` (or human approval) and a durable approved-plan record; plan edits invalidate the approval, and a durable record outlives the journal replay window and prompt resets                                                                                                 |
-| Reviewer dispatch gate | `reviewer` dispatches blocked until a `GATE: PASS` **verified** by a real exit-0 test execution in this task                                                                                                                                                                                                                                                                                            |
-| Reviewer round cap     | Max 2 `reviewer` dispatches per task; waived dispatches bypass and don't count                                                                                                                                                                                                                                                                                                                          |
-| Reviewer ensemble      | A reviewer APPROVE credits the landing gate only at ≥2 unwaived reviewer dispatches                                                                                                                                                                                                                                                                                                                     |
-| Loop caps              | Per task: planner 3, plan-reviewer 3, test-runner 4, 16 total dispatches; exhaustion blocks and journals an `escalation` entry                                                                                                                                                                                                                                                                          |
-| Decomposition gate     | `executor` dispatches must cite `chunk-N` / `AC-n` when a plan has a `## Decomposition` block                                                                                                                                                                                                                                                                                                           |
-| Read horizon           | Warns at 8 whole-file `read` calls per session, blocks at 15 (prefer grep/glob)                                                                                                                                                                                                                                                                                                                         |
-| Tool-call policy       | `bash`/`shell` commands and `write`/`edit` paths matched against a configured denylist (default empty — the empty lists are the off switch)                                                                                                                                                                                                                                                             |
-| Commit-lint            | `git commit -m` subjects must be conventional commits when `gitGates.commitMessages` is on (default)                                                                                                                                                                                                                                                                                                    |
-| Landing gate           | `git push` without a credited reviewer `VERDICT: APPROVE` — blocks, then escalates to the human ask; gated by `gitGates.landingGate` (default on); the `gitGates.emptyDiffExempt` exemption (default on) additionally exempts provably no-op pushes (every refspec's branch ref-equal to its upstream; force pushes never qualify; `exempt:"empty-diff"` in the journal; `false` is the strict opt-out) |
-| Marker parsing         | `GATE:` / `VERDICT:` markers parsed from task results and child text; only marker-contracted emitters flip state — echoes are journaled `suppressed`                                                                                                                                                                                                                                                    |
-| Trace & telemetry      | JSONL journal of dispatches, gate transitions, verdicts, blocked calls, errors; `setup` heartbeat, stream-death errors                                                                                                                                                                                                                                                                                  |
-| Decoding clamps        | reviewer/plan-reviewer temperature = 0; executor/test-runner/debugger ≤ 0.2                                                                                                                                                                                                                                                                                                                             |
-| Compaction             | Injects a "preserve verbatim" instruction, then the live gate-state snapshot — de-tokenized so it can never re-parse as a marker                                                                                                                                                                                                                                                                        |
+| Gate                   | In one line                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Plan approval          | `executor` dispatches blocked while the plans dir holds a _pending_ plan — one lacking a current plan-reviewer `VERDICT: APPROVE` (or human approval) and a durable approved-plan record; plan edits invalidate the approval, and a durable record outlives the journal replay window and prompt resets                                                                                                                                                                                                               |
+| Reviewer dispatch gate | `reviewer` dispatches blocked until a `GATE: PASS` **verified** by a real exit-0 test execution in this task                                                                                                                                                                                                                                                                                                                                                                                                          |
+| Reviewer round cap     | Max 2 `reviewer` dispatches per task; waived dispatches bypass and don't count                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| Reviewer ensemble      | A reviewer APPROVE credits the landing gate only at ≥2 unwaived reviewer dispatches                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| Loop caps              | Per task: planner 3, plan-reviewer 3, test-runner 4, 16 total dispatches; exhaustion blocks and journals an `escalation` entry                                                                                                                                                                                                                                                                                                                                                                                        |
+| Decomposition gate     | `executor` dispatches must cite `chunk-N` / `AC-n` when a plan has a `## Decomposition` block                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| Read horizon           | Warns at 8 whole-file `read` calls per session, blocks at 15 (prefer grep/glob)                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| Tool-call policy       | `bash`/`shell` commands and `write`/`edit` paths matched against a configured denylist (default empty — the empty lists are the off switch)                                                                                                                                                                                                                                                                                                                                                                           |
+| Commit-lint            | `git commit -m` subjects must be conventional commits when `gitGates.commitMessages` is on (default)                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| Landing gate           | `git push` without a credited reviewer `VERDICT: APPROVE` — blocks, and under the default `escalation: "block"` re-blocks every retry (no permission ask); `escalation: "ask"` restores the interactive human ask; gated by `gitGates.landingGate` (default on); the `gitGates.emptyDiffExempt` exemption (default on) additionally exempts provably no-op pushes (every refspec's branch ref-equal to its upstream; force pushes never qualify; `exempt:"empty-diff"` in the journal; `false` is the strict opt-out) |
+| Marker parsing         | `GATE:` / `VERDICT:` markers parsed from task results and child text; only marker-contracted emitters flip state — echoes are journaled `suppressed`                                                                                                                                                                                                                                                                                                                                                                  |
+| Trace & telemetry      | JSONL journal of dispatches, gate transitions, verdicts, blocked calls, errors; `setup` heartbeat, stream-death errors                                                                                                                                                                                                                                                                                                                                                                                                |
+| Decoding clamps        | reviewer/plan-reviewer temperature = 0; executor/test-runner/debugger ≤ 0.2                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| Compaction             | Injects a "preserve verbatim" instruction, then the live gate-state snapshot — de-tokenized so it can never re-parse as a marker                                                                                                                                                                                                                                                                                                                                                                                      |
 
 State lifecycle: a new user prompt resets the session's gate state, except
 when continuation carry (default on) re-arms it for a prompt with an
@@ -172,13 +172,33 @@ unchanged worktree/branch fingerprint and earned credit. Replayed gate state
 survives a restart and the next (resume) prompt, then reverts.
 
 **Parent hands-on edits.** Parent sessions dispatch work through the
-pipeline; direct `write`/`edit` calls in the parent are always gated. The
-first parent edit per task throws `BLOCKED by turnstile:`; a repeat
-attempt escalates to a human permission ask — `always` releases the rest
-of the task, `once` releases one edit, `reject` re-blocks and re-arms on
-the next attempt. An executor-scoped `USER WAIVER:` also releases it, and
-`TURNSTILE OFF:` suspends it session-wide, but plan approval alone does
-not. A new user prompt resets the block count and any release.
+pipeline; direct `write`/`edit` calls in the parent — and in any
+non-pipeline subagent — are always gated. The
+first parent edit per task throws `BLOCKED by turnstile:`; under the default
+`escalation: "block"` a repeat attempt re-blocks — the gate releases only on
+your explicit `USER WAIVER:` (or a hands-on release carried from a prior
+`"ask"` session). `escalation: "ask"` restores the interactive ladder: the
+repeat attempt raises a human permission ask — `always` releases the rest of
+the task, `once` releases one edit, `reject` re-blocks and re-arms on the
+next attempt. `TURNSTILE OFF:` suspends it session-wide, but plan approval
+alone does not release the gate. A new user prompt resets the block count
+and any release.
+
+**Parent file-writing bash.** The hands-on gate also covers confident
+file-writing bash commands in parents and non-pipeline subagents: redirects
+from writer commands (`cat > f`, `echo x >> f`), `tee f`, `sed -i`/
+`--in-place`, and `cp`/`mv`/`dd`/`truncate`/`touch` run the same ladder as a
+parent `write`/`edit` (release, waiver, and the `once` grant all apply, and a
+`once` releases one write of any kind). Output capture never gates —
+`echo hi > /dev/null`, `npm test > log`, `git push > /dev/null` — and neither
+do heredoc-bearing commands (`cat <<EOF`: the splitter sees the heredoc body
+lines as simple commands, but they are stdin data, so the whole command is
+observed, not gated), `tee /dev/null` / fd-dup operands (`tee 2>&1`), or `dd
+of=/dev/...`; leading `NAME=value` assignments and `sudo`/`env`/`nice`/
+`command` wrappers classify by the real head (`sudo cp a b` gates). Every
+write-shaped command journals a `handsOn` telemetry row even where it
+is not gated. `toolPolicy.bashWriteGate: false` opts the gate tier out
+(telemetry continues).
 
 ## Waivers and approvals
 
@@ -197,15 +217,24 @@ what the text says.
   unscoped waiver expresses nothing there.
 - **`PLAN APPROVED:`** in your prompt approves the plan like a reviewer
   verdict, with human provenance; it replays across restart.
-- **Permission escalation.** When no approval holds, the first executor
-  dispatch escalates to you through OpenCode's permission surface — reply
-  `always` (approved for the task), `once` (one dispatch), or `reject`.
+- **Permission escalation.** Repeat-attempt escalation of the landing and
+  hands-on gates is **block-only by default** (`escalation: "block"`): a
+  retried attempt blocks again, the agent is told to stop and report, and
+  release is scoped per gate — `USER WAIVER:` covers the hands-on gate,
+  `PLAN APPROVED:` covers the plan gate only, and the landing gate releases
+  only via an earned reviewer `VERDICT: APPROVE` (or your permission reply
+  under `"ask"`). Set `escalation: "ask"`
+  to restore the interactive ladder: the repeat attempt escalates to you
+  through OpenCode's permission surface — reply `always` (approved for the
+  task), `once` (one dispatch/edit), or `reject`. The plan-gate escalation
+  (first executor dispatch with no plan approval) still asks in both modes.
   Turnstile assumes a human actually answers these asks. If the host answers
   them automatically (`session.permissions: "autoaccept"` in
-  `~/.config/opencode/cli.json`), the landing gate's human decision point,
+  `~/.config/opencode/cli.json`), the `"ask"`-mode human decision points,
   the plan-gate escalation, and the ensemble's human release are all
-  rubber-stamped and those gates degrade to delays. `opencode-turnstile
-status` prints an advisory when it detects the setting.
+  rubber-stamped and those gates degrade to delays — one reason the default
+  is `"block"`. `opencode-turnstile status` prints an advisory when it
+  detects the setting.
 
 Do not create, paste, or relay a `USER WAIVER:` / `PLAN APPROVED:` marker to
 open a gate — only the user's own prompt carries a real waiver or approval.
@@ -220,7 +249,7 @@ dispatch prompt — there is no agent-dispatchable off switch):
 
 - **`TURNSTILE OFF:`** suspends blocking for the session: enforcement
   decisions keep computing and journaling (every block that would have fired
-  is journaled as a `would-block` audit entry), but nothing throws `BLOCKED`
+  is journaled as a `suspended` audit entry with `event:"would-block"`), but nothing throws `BLOCKED`
   and no permission ask is forced. The session's gate state is cleared fresh
   and stays suspended across a restart (replayed from the journal tail).
 - **`TURNSTILE ON:`** resumes enforcement with fresh task state — no credit
@@ -230,7 +259,7 @@ When both markers appear in one prompt, the one occurring later wins. Config:
 `suspendMarker` / `resumeMarker` rename the literals (defaults
 `TURNSTILE OFF:` / `TURNSTILE ON:`), and `allowSuspend: false` disables both
 (an OFF is refused with a journaled `refused:true` entry and a surfaced
-diagnostic — the ON marker likewise). Inspect the live state with
+diagnostic, and the ON marker is refused the same way). Inspect the live state with
 `node bin/cli.mjs status` (in-repo) or `npx opencode-turnstile status`.
 
 ## Markers
@@ -240,7 +269,7 @@ are the canonical syntax; CI asserts the parser in `src/markers.ts` accepts
 exactly them.
 
 ```
-GATE: PASS tests=12 passed=11 failed=1
+GATE: PASS tests=12 passed=12 failed=0
 GATE: FAIL tests=12 passed=10 failed=2
 
 VERDICT: APPROVE crit=0 high=0 med=2 low=1
@@ -299,15 +328,17 @@ loader reads an explicit [] as unset and re-derives the list from the
 configured test-runner, reviewer, and plan-reviewer names, so the copy needs
 no edits. The key knobs most people touch:
 
-| Key                       | Default   | Meaning                                                                                 |
-| ------------------------- | --------- | --------------------------------------------------------------------------------------- |
-| `gateEvidence`            | `enforce` | `flag`/`off` revert to flip-on-trust for `GATE: PASS`                                   |
-| `gitGates.commitMessages` | `true`    | validate `git commit -m` subjects as conventional commits; `false` disables commit lint |
-| `gitGates.landingGate`    | `true`    | gate `git push` on this task reviewer `VERDICT: APPROVE`; `false` disables the gate     |
-| `reviewEnsemble`          | `enforce` | `advise` credits a single-reviewer APPROVE unconditionally                              |
+| Key                       | Default   | Meaning                                                                                                                |
+| ------------------------- | --------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `gateEvidence`            | `enforce` | `flag`/`off` revert to flip-on-trust for `GATE: PASS`                                                                  |
+| `escalation`              | `block`   | repeat landing/hands-on attempts re-block with no permission ask; `ask` restores the interactive permission-ask ladder |
+| `gitGates.commitMessages` | `true`    | validate `git commit -m` subjects as conventional commits; `false` disables commit lint                                |
+| `gitGates.landingGate`    | `true`    | gate `git push` on this task reviewer `VERDICT: APPROVE`; `false` disables the gate                                    |
+| `reviewEnsemble`          | `enforce` | `advise` credits a single-reviewer APPROVE unconditionally                                                             |
 
 | `sessionSummary` | `quiet` | one recap line at session end for active sessions (`on` adds an all-green line for idle ones; `off` disables) |
 | `toolPolicy.bashDeny` | `[]` | regex denylist for `bash`/`shell` (e.g. worktree/branch/merge ops) |
+| `toolPolicy.bashWriteGate` | `true` | gate confident file-writing bash commands (redirects from writer commands, `tee`, `sed -i`/`--in-place`, `cp`/`mv`/`dd`/`truncate`/`touch`) through the hands-on ladder; write-shaped commands always journal `handsOn` telemetry |
 | `maxReviewerRounds` / others | 2 / 3 / 3 / 4 / 16 | per-leg and total dispatch caps per task |
 | `agents.*` | stage names | rename recognition when you bring your own agents |
 | `plansDir` | `.opencode/plans` | where the decomposition scan looks |

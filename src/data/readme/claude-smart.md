@@ -13,7 +13,7 @@
     <img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg" alt="License">
   </a>
   <a href="plugin/pyproject.toml">
-    <img src="https://img.shields.io/badge/version-0.3.16-green.svg" alt="Version">
+    <img src="https://img.shields.io/badge/version-0.3.17-green.svg" alt="Version">
   </a>
   <a href="plugin/pyproject.toml">
     <img src="https://img.shields.io/badge/python-%3E%3D3.12-brightgreen.svg" alt="Python">
@@ -148,7 +148,7 @@ to resume learning. The interactive guide offers both modes for either backend.
 
 Run `/reload-plugins` in your existing Claude Code session, or use the update in your next session.
 Start a new Codex session to load the update; you can finish your existing session first. If hook trust needs review, use `/hooks`.
-Then restart OpenCode in your project so it loads the plugin from `opencode.json`. Add `--global` to install for all OpenCode projects on this machine instead.
+Then restart OpenCode in your project so it loads the plugin. The installer writes a loader into the selected scope's `plugins` directory — the project's `.opencode/plugins/` for a project install — and both OpenCode lines load the plugin from there: OpenCode 1.x auto-loads the plugins directory, and OpenCode V2 rejects the old `file://` config-entry shape. Any legacy `opencode.json` entry is removed so the package loads exactly once. `--global` installs for all OpenCode projects on this machine instead, writing the loader under your user config directory.
 
 ### Check an update
 
@@ -157,7 +157,7 @@ npx claude-smart status
 npx claude-smart status --host codex
 ```
 
-Shows the installed version and the version each recent session last used in a hook. Historical observations do not confirm that a session is still active. Codex uses `CODEX_HOME` when set; run installation and status with the same account home as your session.
+Shows the installed version and the version each recent session last used in a hook. Historical observations do not confirm that a session is still active. Codex uses `CODEX_HOME` when set; run installation and status with the same account home as your session. `status --host codex` also warns when a claude-smart hook is disabled in Codex's `config.toml` and says how to re-enable it; it never edits that file.
 
 ### Uninstall
 

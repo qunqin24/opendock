@@ -1,4 +1,4 @@
-<!-- translated-from: README.en.md@f654c69bf54f -->
+<!-- translated-from: README.en.md@7dcedf76bc5e -->
 # opencode-retro
 
 [Русский](README.md) | [English](README.en.md) | [简体中文](README.zh-CN.md) | **Español** | [日本語](README.ja.md)
@@ -173,6 +173,8 @@ OpenCode descarga el plugin desde npm; basta con nombrarlo en `opencode.json`:
 }
 ```
 
+O incluya el plugin entero: ponga una copia en `~/.config/opencode/plugins/opencode-retro/` y no hace falta ninguna entrada en `opencode.json` — OpenCode recorre por sí mismo los directorios `plugin/` y `plugins/` de cada directorio de configuración. Los hooks se registran a nivel de servicio, así que las sesiones que ya están en marcha recogen el plugin en su siguiente prompt o llamada a herramienta.
+
 No hay nada que configurar: el plugin no llama a ningún modelo propio, así que no hay modelo que elegir, ni clave que aportar, ni proveedor al que llegar. Un análisis se ejecuta como subagente de la sesión que lo pidió. `.retro/selfcheck.md` informa de si se ejecutó y de por qué falló si no lo hizo.
 
 **Mira primero qué hay realmente en npm.** Toda versión por debajo de `0.1.0` es un reservador de nombre: carga sin error, no registra ningún comando, no crea `.retro/` y no informa de nada. Es decir, seguir este fragmento antes del primer lanzamiento real deja una sesión de aspecto normal y un plugin que no está. Si `npm view opencode-retro version` está por debajo de `0.1.0`, apunta `package` a la ruta absoluta de una copia local; así se ejecuta también mientras se trabaja en el propio plugin. Una ruta relativa deja el arranque de la sesión colgado sin dar ningún error, y se puede fijar una versión exacta (`opencode-retro@0.1.0`) cuando haya alguna que fijar.
@@ -187,6 +189,18 @@ Todo lo demás es opcional:
 - `maxOutput` — caracteres de salida de herramienta que se guardan en el log paralelo por paso, por omisión 8000.
 - `heartbeatMs` — el intervalo mínimo entre escrituras de la autocomprobación mientras una sesión trabaja, por omisión 60000.
 - `keepSessions` — conservar todos los logs, incluidos los que nadie cita; desactivado por omisión.
+
+### Permisos
+
+El trabajo del plugin pasa por tres herramientas que registra — `retro_record`, `retro_propose` y `retro_decide` — y OpenCode quita del conjunto de herramientas de cada sesión toda herramienta cuyo permiso está denegado. Una configuración que lo deniega todo y luego permite una lista (`{ "action": "*", "resource": "*", "effect": "deny" }` seguido de permisos) las oculta, por tanto: `/retro` sigue ejecutándose y entregando, los hooks y el autodiagnóstico siguen funcionando, pero ningún análisis puede registrar nada y no hay nada que proponer. Permítalas después de la regla de denegación:
+
+```json
+{ "action": "retro_record",  "resource": "*", "effect": "allow" },
+{ "action": "retro_propose", "resource": "*", "effect": "allow" },
+{ "action": "retro_decide",  "resource": "*", "effect": "allow" }
+```
+
+`.retro/selfcheck.md` lee las reglas de permisos de `opencode.json` — el del proyecto y el global — e informa `BROKEN tool permissions` cuando ocultan las herramientas. Los permisos propios de un agente no se leen.
 
 ### Qué aparece en disco
 

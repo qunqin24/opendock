@@ -220,6 +220,7 @@ score = w_intelligence * intelligence
 | `~/.config/opencode/router/eval-report.md` | The report of the last `/routing-eval` |
 | `~/.config/opencode/router/update-check.json` | The time of the last update check and the newest version on npm |
 | `~/.config/opencode/router/hud.json` | The active mode, the sessions with a manual pick, and the model of the last message per session (read by the terminal widget) |
+| `~/.config/opencode/router/live-models.json` | The model ids the running OpenCode server last reported, so CLI commands do not route to a model that was removed |
 | `opencode.json` or `opencode.jsonc` (global, or the project file with `--scope project`) | `model`, `small_model`, and `agent.<role>.model` and `variant`. Comments and all other keys stay. A file with a JSON error is not changed |
 
 If `XDG_CONFIG_HOME` is set, the router uses `$XDG_CONFIG_HOME/opencode` in place of

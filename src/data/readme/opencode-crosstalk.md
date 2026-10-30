@@ -1,0 +1,492 @@
+# opencode-crosstalk
+
+Let the OpenCode sessions on one server **see each other, talk to each other, and
+lease the files they are editing**.
+
+Two agents in the same repository cannot discover each other, cannot say "I'm in
+`src/auth/` right now", and — most expensively — cannot stop each other from
+writing the same file at the same time. Which means the second agent usually
+discovers the first one's work by reading a half-applied diff during the
+postmortem. This plugin adds seven tools that make all three ordinary.
+
+```
+crosstalk_status   declare your role and see who else is here
+crosstalk_peers    who is running, what they declared, what they hold
+crosstalk_send     message a peer, a role, or everyone
+crosstalk_inbox    read replies, optionally blocking until one arrives
+crosstalk_claim    take an exclusive, expiring lease on a file
+crosstalk_wait     block until a peer is idle or a file is released
+crosstalk_heartbeat send a message to a peer on a repeating interval
+```
+
+All seven share one namespace and one permission action (`crosstalk`), so a
+project can allow or deny coordination with a single rule instead of seven.
+
+## In action
+
+Two real sessions in one checkout, with nobody relaying between them.
+`CursorGuard` wants `src/app/app/app.hpp`. `Wren` is standing on it. The entire
+negotiation:
+
+![The CursorGuard session: a crosstalk_peers call, a lease on src/app/app/app.hpp with a note and a 900s TTL, a request sent to Wren, and Wren's reply landing in an already-running turn](assets/CursorGuard.png)
+
+![The Wren session, the other half of the same exchange: the request it received, its answer naming CursorGuard, and the edit it is making in its own file while it still holds app.hpp](assets/Wren.png)
+
+Neither session stalled, and neither came to ask a human. One requested, one
+answered with a hold and a warning about the three defaults it had already
+shuffled — and both went back to their own files while the answer was in flight.
+The lease is what made that a sentence instead of a silent overwrite; the
+interesting part of these screenshots is the thing that *didn't* happen. Both
+panes also carry the sidebar portrait, the role glyph, and the live summary each
+session declared ([TUI avatars](#tui-avatars) below).
+
+## Install
+
+```sh
+git clone https://github.com/MrDoe/opencode-crosstalk
+cd opencode-crosstalk && npm install
+```
+
+### Every project on your machine
+
+```sh
+npm run setup      # symlink this checkout into ~/.opencode/plugins/crosstalk
+npm run uninstall  # remove the link again
+```
+
+The global `plugins/` directory is discovered automatically, so this needs no
+config edit, no manifest entry, and no negotiation with the plugin loader. It
+activates the plugin for every project and workspace on the machine, and it links
+rather than copies, so your edits to `src/` are live after a reload. The host
+resolves the linked directory through its root `index.ts`, so that file stays:
+remove it and the plugin is dropped silently, with no error and no opinion.
+
+Verify with `opencode api get /api/plugin` (expect `opencode.crosstalk` active);
+`opencode plugin list` shows it as `local`. The cheapest instrument is
+`crosstalk_status` itself, which ends in a self-check line — see
+[TUI avatars](#tui-avatars).
+
+Install into exactly one global root. Linking both loads the plugin twice per
+location; the second load detects the first through `globalThis`, warns, and
+registers nothing, so nothing explodes — but you are now running two installs
+that each think they own the job, which is the exact failure mode this plugin
+exists to prevent. `npm run setup` uses `~/.opencode/plugins/`; the root the V2
+docs name, `<config>/plugins/` (`~/.config/opencode/plugins/`), is honored as
+well. Set `CROSSTALK_PLUGINS_DIR` to target another directory.
+
+The package is also published to npm as
+[`opencode-crosstalk`](https://www.npmjs.com/package/opencode-crosstalk); release
+tags track that version. The symlink install above stays the recommended path
+for a checkout you edit, because your edits are live after a reload.
+
+### One specific project
+
+Point a project at it:
+
+```jsonc title="opencode.jsonc"
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugins": ["../opencode-crosstalk"]
+}
+```
+
+Or drop the package into `.opencode/plugins/` and it is discovered with no
+configuration at all:
+
+```text
+your-project/.opencode/plugins/crosstalk/   →  symlink or copy this package here
+```
+
+### Permissions
+
+No permission rule is needed to *use* the tools: OpenCode's base policy allows
+every action, so `crosstalk` already resolves to allow. Add a rule when you want
+to control the plugin rather than enable it — one rule covers all seven tools:
+
+```jsonc title="opencode.jsonc"
+{
+  "permissions": [{ "action": "crosstalk", "resource": "*", "effect": "deny" }]
+}
+```
+
+Note that a rule which *blocks* the action does not prompt and then decline — it
+removes the tools from the catalog, and the model never learns they existed. If
+you want a dialog box instead of silence, use `ask`.
+
+No build step: the host resolves the plugin directory through the root `index.ts`,
+a thin re-export of `src/index.ts`. There is no `dist/`, no bundler, and no
+sourcemap archaeology.
+
+## Using it
+
+An agent that knows other sessions exist uses this on its own — the plugin
+briefs every session in its system prompt. A session that is currently alone
+gets a compact declaration nudge, so it acquires a name and a role before a peer
+appears (an undeclared session is not addressable); as soon as one peer or one
+active lease exists, the full coordination briefing takes over. A typical
+exchange:
+
+```text
+crosstalk_status { name: "Riley", role: "migrator", goal: "port auth off sessions",
+                  summary: "moving the token handlers now" }
+crosstalk_peers {}
+→ crosstalk peers (scope project, 1 found, 1 running):
+    - ses_9f2  (Alex)  running  role=reviewer  summary="checking the token flow"  "check my auth changes"  claims /repo/src/auth/session.ts
+
+crosstalk_peers { overlap: ["src/auth/session.ts"] }
+→ crosstalk peers (scope project, 1 found, 1 running, overlap src/auth/session.ts):
+    - ses_9f2  (Alex)  ...  claims /repo/src/auth/session.ts
+
+crosstalk_claim { action: "claim", resources: ["src/auth/session.ts"] }
+→ crosstalk claim: refused — 1 resource already leased
+    - src/auth/session.ts held by ses_9f2 (reviewing), free in 4m
+  wait for them with crosstalk_wait, signal them with crosstalk_send, or pass force: true to steal.
+  nothing was claimed (atomic request).
+
+crosstalk_send { to: "Alex", kind: "request",
+                 text: "I need to rewrite session.ts. Are you done?" }
+
+crosstalk_wait { for: "peer_idle", sessionID: "ses_9f2", timeoutSeconds: 120 }
+→ crosstalk wait: peer idle after 1.2s — ses_9f2
+```
+
+A message is stored in the recipient's mailbox and, when the session is live,
+injected into its current turn — so the other agent finds out without anyone
+having to poll, remember to poll, or schedule a poll. The wait returned in 1.2
+seconds because it had something to wait on.
+
+### Talking to sessions by name
+
+Names are there for the user, too. Once the sessions declare themselves, you can
+route work in plain language — *"Talk to Ada about this first."* — and the agent
+you are talking to will address that session by name with
+`crosstalk_send { to: "Ada", … }`. A name is unique among the peers a session
+can see (a taken one is refused, with the holder named), shows up in
+`crosstalk_peers` and in the sidebar, and travels with every message, so the
+inbox always says who is speaking. Underneath the name, nothing changes: identity
+is still the session id, and that is what stops one session releasing another's
+leases. The nickname is a label, never a licence.
+
+### TUI avatars
+
+Sessions that declare themselves get a cartoon avatar in the OpenCode TUI
+sidebar, with their name, their role, and their live status summary below it —
+`🔧 CursorGuard` and `🔬 Wren` in the screenshots at the top.
+
+The avatar is picked from a bundled pool of 92 characters (DiceBear *Personas*,
+CC BY 4.0 — see [`assets/avatars/ATTRIBUTION.md`](assets/avatars/ATTRIBUTION.md);
+browse the pool by opening `assets/avatars/index.html` in a browser):
+
+- `crosstalk_status { name: "Rita", role: "coder", avatar: "👩" }` — the emoji is
+  a hint, not a request: 👩/👨 pick the character pool, and the skin tone is
+  baked into the art. There is no further negotiation.
+- `crosstalk_status { summary: "Rewriting the session store so a reload keeps its leases." }`
+  — the live status line under the avatar: one or two short sentences (200
+  characters) on what the session is doing *right now*. It is wrapped to the
+  avatar's width, falls back to the declared goal until a summary is written,
+  and lands in `crosstalk_peers` output for the other sessions. Because it is
+  pushed to the TUI on every declaration (the same debounced `changed` event,
+  see below), refreshing it with the next `crosstalk_status` call updates the
+  sidebar within a second — keep it current as your task moves. Write it for the
+  peer who will read it, not for the user, who can already see your tabs.
+- Freshness is visible, not enforced. A peer line annotates its summary's age
+  once it is more than five minutes old — `summary="handlers half done" (14m
+  ago)` — so a reader can tell a current summary from a stale one, and the
+  sidebar dims the same summary after a quarter hour of no refresh (a 30s
+  background tick, so it dims even for a session that emits nothing). A summary
+  restored from a snapshot written before this feature carries no age: it is
+  shown, annotated with nothing, and never dimmed. Archaeology at least admits to
+  being archaeology.
+- The declaring session sees its own summary's age in `crosstalk_status` output
+  from five minutes on, and is nudged — *"your summary is 15m old — refresh
+  it"* — once it crosses the same quarter-hour the sidebar dims at. A session
+  that never declared a summary is still told to declare one. Being nagged is
+  the enforcement mechanism; there is no other.
+- Every `crosstalk_status` call also returns a **self-check line**, so an
+  install problem is visible without reading server logs:
+  `self-check: snapshot v2 · storage crosstalk/fb18e52f…cd2d · 4 locations owned`.
+  It names the snapshot format the running store reports, the storage key (or
+  `persistence off`), and how many locations this process owns in-process.
+  Once the instance guard has turned a duplicate load away, the line grows a
+  `2 refused loads` tail — the tell for a plugin installed in two places at
+  once, which otherwise only shows up as one install silently clobbering the
+  other, hours later, in the worst possible way.
+- `crosstalk_peers { overlap: ["src/auth/session.ts"] }` answers *who else
+  touches these paths* in one call: a peer matches when it holds a lease on the
+  exact key or listed the path in `workingOn`. Keys are exact, like every claim
+  key — asking about a directory never matches the files inside it — and each
+  side is normalized against its own directory, so `src/x.ts` typed by a
+  session in another worktree does not match this one. An empty result says
+  how many sessions were on the channel to begin with, so "nobody overlaps" is
+  never confused with "nobody is here".
+- An avatar appears when the session has a task: the first `crosstalk_status`
+  that carries a role or a goal freezes one portrait onto the session, and
+  nothing changes it afterwards — a later role, name, or avatar hint cannot
+  move the artwork. Agents do not get a mid-session glow-up.
+- The declared role picks the character when it matches a pool seed (`coder`,
+  `reviewer`, `explorer`, …); otherwise the name hashes to a stable one. The
+  portrait is stored on the session record, so it survives reloads and
+  restarts.
+- Every avatar also carries an **emoticon** — one curated glyph for its role
+  (`coder` → 💻, `librarian` → 📚, 46 roles), chosen from tools, objects, and
+  people and never a smiley. It is derived from the manifest entry, so the same
+  character always shows the same glyph.
+- That glyph is shown beside the avatar's name in the sidebar **and** written
+  into the session title, because the tab header has no slot a plugin can render
+  into — its label *is* the title. `💻 Refactor the session store`.
+
+The title write is deliberately narrow: only a session that declared a name, and
+only one in the TUI's own directory or below it, is retitled; the write is
+idempotent (a title already carrying its glyph is left alone, so the
+`session.renamed` event it causes is a no-op), a stale glyph is replaced rather
+than stacked, and an emoji you typed yourself is never stripped. Renames are
+durable server state, so a decorated title outlives the TUI that wrote it — and
+outlives several of the bugs it could have had.
+
+The server plugin exposes the session directory over RPC (a `directory` method
+plus a debounced `changed` event); the CLI plugin in `tui.ts` / `src/tui/`
+renders it, location-scoped, into `sidebar.content`. The image uses OpenTUI's
+**block** renderer on purpose: `sidebar.content` sits inside a scrollbox and the
+terminal we target (VS Code) announces sixel support but never paints the
+payload — it is confidently and loudly wrong. On a kitty-graphics terminal,
+switching `protocol` in `src/tui/index.tsx` from `blocks` to `auto` gives crisp
+pixels.
+
+### Drop-in AGENTS.md snippet
+
+Copy this block into a project's `AGENTS.md` to teach its sessions how to
+coordinate without stalling. The `<!-- … -->` markers make it easy to find and
+replace later, so upgrading this file later is a find-and-replace rather than an
+archaeological dig.
+
+```markdown
+<!-- opencode-crosstalk:begin -->
+## OpenCode Crosstalk
+
+Other OpenCode sessions in this workspace are reachable through the
+`opencode-crosstalk` plugin: `crosstalk_status`, `crosstalk_peers`,
+`crosstalk_send`, `crosstalk_inbox`, `crosstalk_claim`, `crosstalk_heartbeat`,
+`crosstalk_wait`.
+Write in **English only** and keep everything token-tight: one short sentence
+per status, message, or claim note (who, what, where) — no reports, no
+summaries, no pleasantries. Keep working; only stop for coordination that
+prevents a real collision.
+
+- **Declare once — briefly — then keep moving.** `crosstalk_status` sets a unique
+  human name (so the user can say "tell George…" and peers can address you), your
+  role, and a goal of a few words; `crosstalk_peers` shows active sessions and
+  their leases. Work that does not overlap theirs needs no coordination.
+- **Keep a live summary under your avatar.** `crosstalk_status { summary: … }` —
+  one or two short sentences on what you are doing right now — is shown under
+  your avatar in the sidebar and read by peers through `crosstalk_peers`, so
+  refresh it whenever your task changes.
+- **Talk before you collide — as a notice, not an essay.** If you need something a
+  peer holds, `crosstalk_send` one short precise sentence (`to: "George"` or a
+  session id) and continue elsewhere; replies are injected into live turns (use
+  `crosstalk_inbox` to catch up). Never force a claim.
+- **Lease what you are editing now.** `crosstalk_claim` takes an exclusive
+  expiring lease on exact paths — no globs (`resources`, `note`, `ttlSeconds`);
+  keep the note to a few words. `renew` if the work runs long, `release` when
+  done; a refusal names the holder.
+- **Only sessions in this project are reachable** — peers marked "not addressable"
+  (location unknown or a different project) cannot receive mail, so do not try.
+
+Installed globally — `opencode api get /api/plugin` shows `opencode.crosstalk`
+active.
+<!-- opencode-crosstalk:end -->
+```
+
+## Design notes
+
+**Discovery is event-driven.** The V2 plugin context exposes a narrow slice of
+the session API: no `session.list()`, no `session.active()`.
+`ctx.event.subscribe()` is the only way a plugin learns that other sessions
+exist, so the presence registry is a reducer over `session.created`,
+`session.status`, `session.execution.*`, `session.idle`, `session.renamed`,
+`session.moved`, `session.forked`, and `session.deleted`. One consequence worth
+knowing: a session that was already mid-turn when the plugin loaded stays
+invisible until it emits something, and it shows up on its next event. It is a
+slow handshake, not a handshake failure.
+
+**Delivery is retried, not just queued.** A plugin instance belongs to one
+location, so injecting into a session owned by another location can fail. The
+message stays in the recipient's mailbox, and every crosstalk tool first retries
+any injection that is still outstanding for the calling session — so a peer
+recovers the moment it does anything at all, without anyone polling. Retries are
+bounded (50 per session) and expire with the message TTL. Mail older than a day
+is not news, it is noise with a timestamp.
+
+**Liveness has two thresholds.** An agent can sit inside one model call for
+minutes without emitting anything, so a peer is only flagged *stale* after
+`staleAfterMs` (10 min) and only *evicted* after `evictAfterMs` (1 h). Silence
+is not evidence.
+
+**A claim is a hard lease, not a note.** Paths are normalized
+(`./src/a.ts` = `src//a.ts`, and relative paths resolve against the holder's
+directory so two worktrees do not shadow each other), leases expire, and a batch
+request is atomic: one busy file means nothing is taken. The all-or-nothing part
+is the entire point — a partial claim is a claim you have to remember you hold.
+
+**A claim key is an exact path, not a glob.** This is the section people skip
+and then lose an hour to. There is no pattern matching: `src/auth/**` is stored
+as the literal key `/repo/src/auth/**` and protects nothing underneath it, so
+list the files you mean — or claim the directory itself and accept that it is
+one key, not a subtree. Leasing a directory covers the directory and nothing
+inside it, which is a sentence worth reading twice.
+
+**Messages are not persisted.** Peers and leases survive a plugin reload through
+`ctx.storage`; mailboxes do not. Replaying stale mail after a restart is worse
+than an empty inbox: the recipient cannot tell a fresh request from a two-hour-old
+one, and will act on the wrong one with complete confidence.
+
+**Sessions carry a human name, but identity stays the session id.** A session
+may give itself a unique nickname with `crosstalk_status { name: "George" }` so
+the user can say "tell George…" and peers can address it by name in
+`crosstalk_send`. Names are case-insensitively unique among visible peers — a
+taken name is refused and names the holder — and travel with each message
+(`fromName`), so the inbox shows who is talking even mid-session.
+
+**The channel is walled to sessions provably in your project.** `scope` still
+controls what a *listing* shows, but communication is stricter: a peer is
+addressable only when its project (or directory, under `scope: "location"`) is
+provably equal to yours. Unknown locations stay listed — marked
+"not addressable" — but sends, role/`all` broadcasts, `crosstalk_wait`, and
+injection retries all refuse them, so a session in another project folder can
+neither be messaged nor have mail injected into it. Listing is permissive;
+communication is not.
+
+## Options
+
+All optional; set them with the object form of `plugins`:
+
+```jsonc
+{
+  "plugins": [
+    {
+      "package": "../opencode-crosstalk",
+      "options": {
+        "scope": "project",
+        "claimTtlMs": 300000,
+        "codemode": false
+      }
+    }
+  ]
+}
+```
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `namespace` | `crosstalk` | Tool namespace. Dots are rejected: the host rewrites them to `_`. |
+| `permission` | `crosstalk` | Permission action for all seven tools. |
+| `codemode` | `false` | Expose the tools through Code Mode instead of directly. |
+| `scope` | `project` | Peer visibility: `project`, `location`, or `server`. |
+| `staleAfterMs` | `600000` | Silence after which a peer is flagged stale. |
+| `evictAfterMs` | `3600000` | Silence after which a peer is dropped. Never below `staleAfterMs`. |
+| `maxMessages` | `100` | Retained messages per mailbox. |
+| `messageTtlMs` | `86400000` | Message lifetime. |
+| `claimTtlMs` | `300000` | Default lease duration. |
+| `maxWaitMs` | `120000` | Ceiling on any blocking call. |
+| `pollMs` | `1000` | Poll interval for the barrier waits. |
+| `heartbeatMs` | `10000` | Progress heartbeat while blocked; `0` disables. |
+| `persist` | `true` | Persist peers and leases through `ctx.storage`. |
+| `storageKey` | `crosstalk` | Storage key prefix. |
+| `announce` | `true` | Brief every session in the system prompt; compact while the session is alone. |
+
+Bad values degrade to the default with a warning; a typo never costs an agent
+its tools mid-session. `parseOptions` never throws — a missing bracket is a log
+line, not an outage, because losing your tools halfway through a turn is a worse
+outcome than losing a setting.
+
+### How the permission action and `codemode` are used
+
+Both were confirmed against the host's own tool snapshot, which reads roughly
+`tool.options?.permission ?? <effective tool name>` when it filters the catalog,
+and splits tools on `options.codemode === false` (direct) versus everything else
+(Code Mode catalog). So:
+
+- `permission: "crosstalk"` makes the action that gates all seven tools. Without
+  it, the action would fall back to the effective tool name — `crosstalk_status`,
+  `crosstalk_claim`, and so on — needing seven rules instead of one.
+- `codemode: false` is what makes the tools directly callable. Setting it to
+  `true` moves them into the Code Mode catalog only, where they are reached
+  through `execute` rather than called by name. That adds a second gate: the
+  `execute` action with resource `*` decides whether Code Mode is available at
+  all, so blocking either one is enough to make the tools unreachable.
+- A rule that *blocks* the action keeps the tools out of the catalog entirely,
+  so the model never sees them — no prompt, no fallback, just a plugin-shaped
+  silence. `ask` behaves as usual and prompts.
+
+## Development
+
+```sh
+npm install
+npm run check     # the gate: typecheck + 280 unit tests, both always run
+npm run test:e2e  # live smoke test, needs OPENCODE_E2E=1 and a usable model
+npm run setup     # link the plugin in globally
+```
+
+`npm run check` is the whole gate and is what to keep green before pushing. It
+calls `scripts/check.mjs`, which runs the typecheck and the test suite
+**independently** — one failing never suppresses the other's output — and exits
+non-zero if either failed, naming both codes. `npm test` and `npm run typecheck`
+remain available for a single leg. The tests need no network and no server.
+
+The e2e test skips with a reason — rather than failing — when the configured
+provider cannot serve the request, so a credits problem never looks like a
+plugin regression. It spawns real `opencode run` sessions and spends real money,
+so it stays behind `OPENCODE_E2E=1` and wants `OPENCODE_E2E_MODEL` pointed at a
+specific model.
+
+`src/core` imports nothing from OpenCode: the presence registry, mailboxes, and
+claim table take an injected clock and are tested directly. `src/index.ts`
+(server) and `src/tui/index.tsx` (CLI) are the only places that talk to the
+host; `src/rpc.ts` is the shared contract and imports only types. `scripts/setup.mjs`
+and `scripts/check.mjs` are plain JavaScript sitting outside `tsconfig.json`,
+so neither is part of the typecheck.
+
+### Releasing
+
+Release publishing is staged by CI and approved by a human, using npm
+**trusted publishing** — no long-lived token, and no terminal 2FA prompt:
+
+```sh
+npm version minor        # bumps package.json + package-lock.json
+git push --follow-tags   # the tag triggers .github/workflows/publish.yml
+```
+
+The workflow installs npm 12, runs `npm run check`, verifies that the tag
+matches `package.json`, and runs `npm stage publish` with an OIDC token.
+Approve the staged version in the npm web UI (2FA in the browser). Staging never
+needs 2FA; approving always does.
+
+One-time setup on [npmjs.com](https://www.npmjs.com/package/opencode-crosstalk):
+package **Settings → Trusted publishing → GitHub Actions**, with
+`MrDoe` / `opencode-crosstalk` / `publish.yml`. Staged publishing is always
+allowed for a trusted publisher; direct `npm publish` is a separate opt-in.
+A new trusted publisher must complete its first publish within **2 days** or the
+configuration expires.
+
+`workflow_dispatch` stages whatever version is in `package.json`, without a tag.
+`npm stage list` and `npm stage approve` require interactive authentication, so
+they cannot run from the workflow — use them locally only where an OTP works.
+
+## Skills
+
+`.opencode/skills/` carries four project skills OpenCode advertises to every
+session here; load one with the `skill` tool when it fits:
+
+| Skill | Use it for |
+| --- | --- |
+| `crosstalk-coordination` | running several sessions — assigning phases, relaying findings, push waves |
+| `crosstalk-team-workflow` | executing an assignment — leases, a green gate, honest landing reports |
+| `test-driven-development` | any new code: failing test first, watch it fail, then minimal code |
+| `requesting-code-review` | dispatching a reviewer on a commit range before merging |
+
+The first two are written for this repository. The last two are vendored from
+[obra/superpowers](https://github.com/obra/superpowers) under MIT; each file
+carries its attribution footer and any edits made while vendoring.
+`.opencode/skills/README.md` is the index.
+
+## License
+
+MIT © 2026 Christoph Döllinger — see [LICENSE](LICENSE).

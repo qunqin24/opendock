@@ -51,7 +51,7 @@ Figma 比較は「あるキャンバス幅での再現」しか見ないため�
 - **`viewport_overflow_x`:** `x < 0` または `x+w > viewport_width`（1px の丸めは許容）。ビューポート高さ超えはページスクロールとして扱い、失敗にしません。
 - **`parent_overflow`:** 子ボックスが親ボックスからいずれかの辺で 1px 超えてはみ出す。親が JSON に無い場合はこの検査をスキップし、解決できない `parent` は `status` を変えず `unresolved_parent_refs`（例: `Web: '#missing'`）として応答します（`layout_tree` と同じラベル形式。`ignore_nodes` で除外した親は誤検知しません）。
 - **合否:** 崩れ 0 件 → `success` / 1 件以上 → `mismatch` / 検査対象がすべて除外 → `skipped`。Web ノードが 1 件もない、または全ノードで `w`/`h` が 0 以下（`width`/`height` 等のキー名ミス疑い）の場合も `mismatch` です。`match_rate` は返しません。
-- **応答:** `status`, `mode`, `viewport_width`, `viewport_height`, `checked_nodes`, `issue_count`, `details`, `ignored_count`。崩れがあるとき `issues`（`type` / `selector` / `detail`）。`viewport_preset` を渡したときはエコーします。`unmatched_ignores` / `unmatched_ignore_regions` / `unresolved_parent_refs` は該当時のみ。
+- **応答:** `status`, `mode`, `viewport_width`, `viewport_height`, `checked_nodes`, `issue_count`, `details`, `ignored_count`。崩れがあるとき `issues`（`type` / `selector` / `detail`）。`viewport_preset` を渡したときはエコーします。`ignored_nodes`（`web:<selector>`。件数は `ignored_count` と一致）/ `unmatched_ignores` / `unmatched_ignore_regions` / `unresolved_parent_refs` は該当時のみ。
 
 横向きを検査するときは、ブラウザを **1024×768 にリサイズしたあと** の DOM 座標を渡してください。縦向きで撮った座標に横向きの幅を当てても意味がありません。
 
@@ -81,11 +81,12 @@ image A / B のいずれかが一様と検出された場合、status / match_ra
 
 - `figma_layout` / `web_layout` は string に加えてノードの JSON 配列をそのまま受け付けます（文字列化したものと同じ経路で処理）。JSON オブジェクトを渡すと `Layout tree mode input error: figma_layout must be a JSON array of node objects (a JSON object is not supported); pass the nodes as an array`（`layout_integrity` では同じ文面に `Layout integrity mode input error: ` が付く）になり、数値・真偽値・`null` などのその他の型では `Layout tree mode input error: figma_layout must be a JSON-encoded string or a JSON array` になります（`web_layout` や `layout_integrity` ではモード名と引数名が対応して変わります）。
 - `ignore_nodes` はカンマ区切り文字列に加えて文字列要素の JSON 配列を受け付けます。それ以外の型（数値・オブジェクト・`null`、文字列以外の要素を含む配列）は `argument 'ignore_nodes' must be a string or a JSON array of strings` のツール実行エラーになります。
-- 上記以外の string 型パラメータ（`image_path_a` / `image_path_b` / `image_a_base64` / `image_b_base64` / `figma_layout_path` / `web_layout_path` / `ignore_region` / `viewport_preset`）は、string 以外を渡すと空文字へ黙って落とさず `argument 'X' must be a string` のツール実行エラーになります。
+- `ignore_region` はセミコロン区切り文字列に加えて、各要素が `x,y,w,h` の文字列 JSON 配列を受け付けます。それ以外の型は `argument 'ignore_region' must be a string or a JSON array of strings` のツール実行エラーになります。
+- 上記以外の string 型パラメータ（`image_path_a` / `image_path_b` / `image_a_base64` / `image_b_base64` / `figma_layout_path` / `web_layout_path` / `viewport_preset`）は、string 以外を渡すと空文字へ黙って落とさず `argument 'X' must be a string` のツール実行エラーになります。
 
 `number` / `boolean` も変換不能な値は同様にエラーで、それぞれ `argument 'X' must be a number`（`max_details` は整数のみなので `argument 'X' must be an integer`）、`argument 'X' must be a boolean` を返します。
 
-ツールの JSON Schema では `figma_layout` / `web_layout` / `ignore_nodes` をいずれも string 型として宣言しているため、引数をスキーマで検証する MCP クライアントでは配列が拒否される場合があります。その場合は文字列で渡してください（`ignore_nodes` はカンマ区切り、レイアウトは JSON 文字列）。サーバー側のハンドラは上記のとおり配列も受け付けます。
+ツールの JSON Schema では `figma_layout` / `web_layout` / `ignore_nodes` / `ignore_region` をいずれも string 型として宣言しているため、引数をスキーマで検証する MCP クライアントでは配列が拒否される場合があります。その場合は文字列で渡してください（`ignore_nodes` はカンマ区切り、`ignore_region` はセミコロン区切り、レイアウトは JSON 文字列）。サーバー側のハンドラは上記のとおり配列も受け付けます。
 
 ### 入力データ
 
@@ -110,12 +111,12 @@ image A / B のいずれかが一様と検出された場合、status / match_ra
 | `threshold` | number | `perceptual` | 1.0–100.0 | 98.0 | 後方互換のため `min_match`（一致率%）のエイリアスとして受け付ける。1.0 未満は strict モードの 0.0–1.0 スケールとの混同を防ぐためエラーになる。`min_match` との同時指定もエラー。**`min_match` の使用を推奨。** |
 | `threshold` | number | `strict` | 0.0–1.0 | 0.1 | 色差の許容度（pixelmatch の color diff tolerance）。 |
 | `min_match` | number | `perceptual` | 0.0–100.0 | 98.0 | 合格に必要な最低一致率（%）。実効値（`threshold` エイリアス解決後を含む）は応答の `min_match` として常に返される。判定は表示桁（小数第2位）に丸めた一致率に対して行う。 |
-| `min_match` | number | `strict` | 0.0–100.0 | なし | 合格に必要な最低一致率（%）。未指定なら判定に使わず `max_diff_pixels` のみで判定する。指定時は `max_diff_pixels` と併用され、どちらか一方でも超過すると `mismatch`。`max_diff_pixels` を省略したまま指定すると既定 0 が判定を支配するため、status / match_rate は変えず応答へ `warnings` を付ける。判定は表示桁（小数第2位）に丸めた一致率に対して行う。 |
+| `min_match` | number | `strict` | 0.0–100.0 | なし | 合格に必要な最低一致率（%）。未指定なら判定に使わず `max_diff_pixels` のみで判定する。指定時は `max_diff_pixels` と併用され、どちらか一方でも超過すると `mismatch`。`max_diff_pixels` を省略したまま指定し、既定 0 が判定を支配して `mismatch` になったときだけ（一致率は `min_match` 以上なのに差分ピクセルで落ちた場合）、status / match_rate は変えず応答へ `warnings` を付ける。合格時（差分 0 など）には付けない。判定は表示桁（小数第2位）に丸めた一致率に対して行う。 |
 | `pass_rate` | number | `layout_tree` | 0.0–100.0 | 98.0 | 合格に必要な最低一致率（%）。判定は表示桁（小数第2位）に丸めた一致率に対して行う。 |
 | `max_diff_pixels` | number | `strict` | 0 以上 | 0 | 許容される差分ピクセル数の上限。デフォルトの 0 は「1px でも差分があれば `mismatch`」を意味する。 |
 | `include_aa` | boolean | `strict` | true / false | false | `true` の場合、アンチエイリアス境界ピクセルも差分として数える（pixelmatch の IncludeAntiAlias）。既定 `false` は現行どおり AA 境界を差分カウントから除外する。 |
 | `ignore_nodes` | string / string[] | `layout_tree` / `layout_integrity` | — | 空 | 比較から除外する識別子。カンマ区切り文字列、または文字列要素の JSON 配列（例: `["nav", "#footer"]`）。`layout_tree` では Figma Node ID / Node Name / Web Selector、`layout_integrity` では Web Selector。末尾が `*` のエントリはプレフィックス一致（例: `.ad-*` は `.ad-banner` に一致）として扱われ、命名規則に従うグループを列挙なしで除外できる。どのノードにも一致しなかった除外エントリは `unmatched_ignores` として応答される（プレフィックスエントリは一致ノードが1つも無い場合のみ報告）。全ノードが除外されて比較ペアがなくなった場合は比較を実施せず、status は `skipped`（比較未実施）になる。string / string[] 以外は `argument 'ignore_nodes' must be a string or a JSON array of strings` のエラー。ツールスキーマ上は string 型の宣言なので、スキーマ検証を行うクライアントではカンマ区切り文字列を使う。 |
-| `ignore_region` | string | 全モード | — | 空 | 除外する矩形領域。`x,y,w,h`（px 単位、`x,y >= 0`・`w,h > 0`）をセミコロン区切りで列挙（例: `10,20,100,50;200,300,80,60`）。各値は小数可で、格納時に整数へ丸められる。`perceptual` / `strict` では比較前に両画像を白でマスクし、パースできた領域数は応答の `ignored_regions` に常に含まれる。画像と全く交差しない領域は `out_of_bounds_regions` として応答される。`perceptual` で両画像のサイズが異なる場合、同じ `x,y,w,h` は各画像自身のピクセル座標として適用されるため別の領域をマスクし得る（範囲内なら `out_of_bounds_regions` は出ない）。`details` に注記し、`warnings` にも同じ注意を付ける。`layout_tree` / `layout_integrity` では BoundingBox の中心点が領域内にあるノードを除外し（`layout_tree` では両側から、`layout_integrity` では Web ノードを）、除外数は `ignored_count` に加算される（全件除外時は `skipped`）。どのノード中心とも重ならない領域は `unmatched_ignore_regions` として応答される。`layout_tree` では Figma 側・Web 側に同一の領域座標が適用される（Figma キャンバスにオフセットがある場合は要座標合わせ）。 |
+| `ignore_region` | string / string[] | 全モード | — | 空 | 除外する矩形領域。`x,y,w,h`（px 単位、`x,y >= 0`・`w,h > 0`）をセミコロン区切りで列挙（例: `10,20,100,50;200,300,80,60`）、または各要素が `x,y,w,h` の文字列 JSON 配列（例: `["10,20,100,50","200,300,80,60"]`）。各値は小数可で、格納時に整数へ丸められる。`perceptual` / `strict` では比較前に両画像を白でマスクし、パースできた領域数は応答の `ignored_regions` に常に含まれる。画像と全く交差しない領域は `out_of_bounds_regions` として応答される。`perceptual` で両画像のサイズが異なる場合、同じ `x,y,w,h` は各画像自身のピクセル座標として適用されるため別の領域をマスクし得る（範囲内なら `out_of_bounds_regions` は出ない）。`details` に注記し、`warnings` にも同じ注意を付ける。`layout_tree` / `layout_integrity` では BoundingBox の中心点が領域内にあるノードを除外し（`layout_tree` では両側から、`layout_integrity` では Web ノードを）、除外数は `ignored_count` に加算される（全件除外時は `skipped`）。どのノード中心とも重ならない領域は `unmatched_ignore_regions` として応答される。`layout_tree` では Figma 側・Web 側に同一の領域座標が適用される（Figma キャンバスにオフセットがある場合は要座標合わせ）。string / string[] 以外は `argument 'ignore_region' must be a string or a JSON array of strings` のエラー。ツールスキーマ上は string 型の宣言なので、スキーマ検証を行うクライアントではセミコロン区切り文字列を使う。 |
 | `viewport_preset` | string | `layout_integrity` | `ipad_portrait` / `ipad_landscape` | 未指定時は縦向き相当 | iPad 既定サイズ。`ipad_portrait` = 768×1024、`ipad_landscape` = 1024×768。 |
 | `viewport_width` | number | `layout_integrity` | 0 より大 | 768 | CSS ピクセルのビューポート幅。指定時は `viewport_preset` の幅を上書きする。 |
 | `viewport_height` | number | `layout_integrity` | 0 より大 | 1024 | CSS ピクセルのビューポート高さ。指定時は `viewport_preset` の高さを上書きする。 |
@@ -143,8 +144,10 @@ image A / B のいずれかが一様と検出された場合、status / match_ra
 | フィールド | 型 | 必須 | 説明 |
 | :--- | :--- | :--- | :--- |
 | `selector` | string | ○ | 要素識別子（CSS セレクタ等）。`parent` の参照先、および `ignore_nodes` の除外対象としても使用される。 |
-| `x` / `y` / `w` / `h` | number | ○ | 要素の BoundingBox（ページ上の絶対座標とサイズ）。 |
+| `x` / `y` / `w` / `h` | number | ○ | 要素の BoundingBox（**絶対 CSS px**。ドキュメント／ページ共通の座標空間。キー名は `w` / `h` であり `width` / `height` ではない）。 |
 | `parent` | string | — | 親要素の `selector`。省略時は親なしとして扱われる。入力内のどの `selector` にも一致しない場合は絶対座標比較へフォールバックし、応答に `unresolved_parent_refs` が付く。 |
+
+DOM からの抽出手順（`getBoundingClientRect()` + `window.scrollX` / `window.scrollY` で絶対 CSS px にするコピペ用スニペット、親相対オフセットを `x` / `y` に入れない注意、`layout_integrity` でも同じ WebNode JSON を使うこと）は [`skills/design-compare/SKILL.md`](skills/design-compare/SKILL.md) の **Step 2** を参照してください。
 
 最小例 — `figma_layout`（`figma_layout_path` で指定するファイルも同じ形式）:
 
@@ -205,7 +208,7 @@ image A / B のいずれかが一様と検出された場合、status / match_ra
 | `matched_nodes` | number | ○ | 一致したノード対数。 |
 | `total_nodes` | number | ○ | 分母（比較ペア数。`count_extra_web=true` なら余分な Web ノードも含む）。 |
 | `ignored_count` | number | ○ | `ignore_nodes` / `ignore_region` で除外したノード数。 |
-| `ignored_nodes` | string[] | 非空時のみ | 除外したノードの識別子（例: `figma:1:23`, `web:#date-banner`）。件数は `ignored_count` と一致する。 |
+| `ignored_nodes` | string[] | 非空時のみ | 除外したノードの識別子（例: `figma:1:23`, `web:#date-banner`）。件数は `ignored_count` と一致する。`layout_integrity` でも同フィールドを `web:<selector>` 形式で返す（件数は `ignored_count` と一致）。 |
 | `effective_threshold` | number | ○ | 判定に使った BoundingBox 許容差（未指定時は既定 0.15）。 |
 | `pass_rate` | number | ○ | 合格に使った最低一致率 %（未指定時は既定 98.0）。 |
 | `count_extra_web` | boolean | ○ | 余分な Web ノードを一致率の分母に加算したか（未指定時は既定 `false`）。 |
@@ -245,14 +248,14 @@ image A / B のいずれかが一様と検出された場合、status / match_ra
 | `image_size` | string | ○ | 両画像共通のピクセル寸法。 |
 | `effective_threshold` | number | ○ | 判定に使った色差許容（未指定時は既定 0.1）。 |
 | `ignored_regions` | number | ○ | パースできた `ignore_region` の件数。 |
-| `warnings` | string[] | 条件付き | 両画像が単色ベタ塗りで差分 0 のとき（空洞比較）、および `min_match` のみ指定し `max_diff_pixels` を省略したとき（既定 0 が判定を支配する旨）。 |
+| `warnings` | string[] | 条件付き | 両画像が単色ベタ塗りで差分 0 のとき（空洞比較）、および `min_match` のみ指定し `max_diff_pixels` を省略したうえで既定 0 が判定を支配して `mismatch` になったとき（既定 0 が判定を支配する旨。合格時は付けない）。 |
 | `out_of_bounds_regions` | string[] | 非空時のみ | 画像と交差しない `ignore_region`。 |
 | `diff_regions` | object[] | 非空時のみ | 赤い差分ピクセルの bounding box（`generate_diff` が true のとき）。 |
 | `max_diff_pixels` | number | ○ | 判定に使った許容差分ピクセル数（省略時は既定 0）。 |
 
 ### `layout_integrity`
 
-§1 の「応答」と同じ。`status` / `mode` / `viewport_width` / `viewport_height` / `checked_nodes` / `issue_count` / `details` / `ignored_count`。崩れがあるとき `issues`。`viewport_preset` 指定時はエコー。`unmatched_ignores` / `unmatched_ignore_regions` / `unresolved_parent_refs` は該当時のみ。
+§1 の「応答」と同じ。`status` / `mode` / `viewport_width` / `viewport_height` / `checked_nodes` / `issue_count` / `details` / `ignored_count`。崩れがあるとき `issues`。`viewport_preset` 指定時はエコー。`ignored_nodes`（`web:<selector>`。件数は `ignored_count` と一致）/ `unmatched_ignores` / `unmatched_ignore_regions` / `unresolved_parent_refs` は該当時のみ。
 
 ---
 

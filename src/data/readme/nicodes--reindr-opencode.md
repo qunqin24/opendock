@@ -1,3 +1,5 @@
+<!-- Generated from private documentation source. Do not edit directly. Source SHA256: 3a991601ee74dfba0f4cd0077c029ec8e0a780ab56cb325d4afb74b330ce3838 -->
+
 # reindr
 
 A generative interface runtime that gives an agent session editable HTML canvases and displays them in a companion browser panel. The files are the interfaces: the agent uses normal filesystem tools to write HTML, CSS, and JavaScript, while Reindr handles discovery, live reload, sandboxing, session routing, and browser-to-agent interactions.
@@ -33,7 +35,6 @@ Add the published [`@nicodes/reindr-opencode`](https://www.npmjs.com/package/@ni
 
 OpenCode installs the package and its `@nicodes/reindr-core` dependency automatically with Bun at startup. Quit and restart OpenCode after changing the plugin list. Do not also install a local source copy, because OpenCode loads local and npm plugins separately.
 
-For repository development, the tracked `.opencode/plugins/reindr.ts` shim loads `packages/opencode/src/index.ts` directly after `bun install` and `bun run build:core`.
 
 ### Persistent Access To Reindr Files
 
@@ -64,14 +65,18 @@ See the [OpenCode permissions documentation](https://opencode.ai/docs/permission
 
 ## Install For Claude Code
 
+Clone `https://github.com/nicodes/reindr.git`, run `python3 scripts/prepare-runtime.py` in that checkout, then add the local marketplace using its absolute path. Keep this prepared checkout available for plugin updates.
+
+
+
 Add the repository marketplace and install its Reindr plugin:
 
 ```text
-/plugin marketplace add nicodes/reindr
+/plugin marketplace add /absolute/path/to/reindr
 /plugin install reindr@nicodes
 ```
 
-Restart Claude Code, then ask it to build an interface or invoke `/reindr:interface`. The plugin includes a self-contained MCP runtime, session hook, interaction monitor, and research-preview channel declaration. See [`packages/claude/README.md`](packages/claude/README.md) for channel testing details.
+Restart Claude Code, then ask it to build an interface or invoke `/reindr:interface`. The plugin includes a self-contained MCP runtime, session hook, interaction monitor, and research-preview channel declaration. See [`packages/claude/README.md`](https://github.com/nicodes/docs/blob/main/nicodes/reindr/history/readme-only-2026-10-29/reindr/packages/claude/README.md) for channel testing details.
 
 ## Use
 
@@ -280,46 +285,6 @@ The CSP blocks `fetch`, WebSocket, form submission, and similar connection APIs.
 
 Capability URLs expire when the OpenCode process exits. The current URL is reinjected into agent instructions and `REINDR_UI_URL` after restart.
 
-## Develop
-
-### Local OpenCode Integration
-
-Do not install this feature globally or launch both the published adapter and the local shim. From the source checkout, install dependencies and build core first (`bun install --frozen-lockfile && npm run build:core`). If Bun is unavailable, `npm install --package-lock=false` is an npm fallback; it resolves current compatible dependencies rather than reproducing `bun.lock` exactly. `npm run check` runs typechecking, builds, all tests, and dry-run package checks without publishing.
-
-From your Reindr source checkout, run the following when ready for live integration:
-
-```sh
-mkdir -p /tmp/opencode/reindr-tabs-local/config
-env -u OPENCODE_CONFIG -u OPENCODE_CONFIG_CONTENT -u OPENCODE_CONFIG_DIR \
-  XDG_CONFIG_HOME=/tmp/opencode/reindr-tabs-local/config \
-  REINDR_DIRECTORY=/tmp/opencode/reindr-tabs-local/sessions \
-  REINDR_TEMPLATE_DIRECTORY=/tmp/opencode/reindr-tabs-local/templates \
-  REINDR_AUTORAISE=0 REINDR_PORT=0 \
-  opencode
-```
-
-The local `.opencode/plugins/reindr.ts` shim loads `packages/opencode/src/index.ts`; it needs built core but does not require building/publishing the adapter. The alternate `XDG_CONFIG_HOME` avoids loading the normally installed global configuration; the command does not modify it. Keep this config directory empty or supply only settings you deliberately want for the test. Provider/agent configuration from your normal global config will not be present. This does **not** isolate OpenCode authentication/session storage: `XDG_DATA_HOME` is intentionally unchanged so existing provider authentication can remain available. To isolate that too, set a separate `XDG_DATA_HOME` and authenticate/configure providers there yourself. Do not copy secrets into source files.
-
-Explicit Reindr directory overrides keep test canvases, templates, and panel registry separate from `~/.local/share/reindr` and existing panels. `REINDR_PORT=0` requests a free runtime port; `REINDR_AUTORAISE=0` prevents unsolicited browser windows. Open the panel URL returned by `reindr_open` or exposed as `REINDR_UI_URL`; it is a bearer credential, so do not publish it. No global config edits are required. Quit/restart OpenCode after adapter/config changes; restart persistence tests should use the same Reindr directories.
-
-Try a zero-canvas session first, then ask for two named tabs, edit each, hide/show Nav and Agent, switch tabs with drafts, send a host prompt with a selected agent/model, run a registered command, and confirm abort. Finally restart/resume to check that saved tabs render and run their scripts automatically without an activation prompt. Local browser tests use a deterministic SDK harness; they do not replace this live integration check.
-
-Install test dependencies with Bun:
-
-```sh
-bun install
-```
-
-Run static checks and tests:
-
-```sh
-bun run typecheck
-bun run test
-bun run pack:check
-```
-
-The core suite runs the real OpenCode plugin through an HTTP/WebSocket Bun adapter and verifies discovery across separate plugin ports. The browser suites launch `/usr/bin/chromium` and verify file-backed live reload, cross-port session navigation, configurable styles, state preservation, CSP enforcement, private bridge delivery, Claude MCP startup, sandboxing, synthetic-interaction rejection, and trusted interaction delivery.
-
 ## Publish
 
 The **Release** GitHub Actions workflow is manually triggerable from the `main` branch. Choose `all`, `core`, or `opencode`; dry-run mode is enabled by default. A real publish reruns every release check, refuses an existing version, publishes core before the OpenCode adapter when `all` is selected, and records npm provenance.
@@ -335,3 +300,13 @@ The Claude plugin is not an npm release target. Its versioned marketplace files 
 - Full-file updates preserve basic form/focus/scroll state, not JavaScript heap state or event state.
 - Full-document normalization preserves head/body contents and escaped `class` attributes for Tailwind; other original `html` and `body` attributes are discarded.
 - CDN assets require explicit trusted-host configuration.
+
+## Prepare runtime files
+
+After cloning this repository, run the following with Python 3 before loading its skills, agents, or plugins:
+
+```sh
+python3 scripts/prepare-runtime.py
+```
+
+This creates the native discovery files from the tracked functional inputs. Run it again after pulling an update; if a generated file has local edits, preserve those edits before replacing it.

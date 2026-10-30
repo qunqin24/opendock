@@ -16,7 +16,7 @@ sidebar** and a **zero-LLM `/cx` breakdown panel** with measured contributors
 and a redacted export, and an **experimental Desktop GUI part**
 (`./gui-experimental`: a side-panel tab and a composer pill). The V2 path is
 **tested against opencode 2.2.0** (the isolated load + state-write e2e was also
-re-run against the 2.2.1 Desktop CLI); the V1 path against 1.18.29+.
+re-run against the 2.2.1 and 2.2.2 Desktop CLI); the V1 path against 1.18.29+.
 
 > **V1 is feature-frozen.** It is kept working for compatibility (bug fixes
 > only); all new features land in the V2 path.
@@ -32,7 +32,7 @@ re-run against the 2.2.1 Desktop CLI); the V1 path against 1.18.29+.
 For every served request the plugin estimates how the context window is split:
 
 ```
-[2026-…] session=ses_abc model=… ctx=45.2k/120k (38%) … input=44.1k
+[2026-…] session=ses_abc model=… ctx=45.2k/120k (37.7%) count=45.2k usable=… limit=… maxOutput=… reserved=… input=44.1k
   user        4.2k (est tokens)
   assistant   3.1k (est tokens)
   reasoning   0.8k (est tokens) (exact 1.2k)
@@ -42,7 +42,7 @@ For every served request the plugin estimates how the context window is split:
   tool schemas 1.4k (est tokens)
   other       5.6k (= input - sum of estimates)
   source      context-hook
-  prompt cache read=12.0k (27% of input) write=1.1k (provider-reported)
+  prompt cache read=12.0k write=1.1k (provider-reported; subset of input)
   reclaim     ~9.8k redundant tool output (3 duplicate(s) — estimate)
   subagents   2 session(s): in=8.1k out=2.3k r=1.0k worst=12%
 ```
@@ -61,7 +61,9 @@ For every served request the plugin estimates how the context window is split:
   `input + output + cache.read + cache.write`. Percentages are **not clamped**
   at 100% — exceeding the window stays visible.
 * `prompt cache` is **provider-reported and exact** (`tokens.cache.read` /
-  `tokens.cache.write`), shown as a share of `input`. It is a *subset* of input,
+  `tokens.cache.write`). The live snapshot prints the raw read/write counts;
+  `/context` and `/context-breakdown` also append the read share of `input`
+  when the provider reported it. It is a *subset* of input,
   so it is deliberately **not** added to the category sum: a cache read means the
   provider served those prompt tokens from its prompt cache, not that they are
   absent from the window. `n/a` when the provider reports nothing.
@@ -72,11 +74,13 @@ For every served request the plugin estimates how the context window is split:
   duplicate group), reported honestly as *"N redundant tool outputs ≈ X tokens"*
   — never as "the model wasted effort". Findings are per-session and **path-free
   in the persisted/exported form**.
-* The denominator is the **opencode 2.2.x compaction ceiling**: `window =
-  limit.input || limit.context`; `reserve = max(floor(window * 0.10), window >=
+* The denominator is the **opencode 2.x compaction ceiling**: `window =
+  limit.input || limit.context`; `reserve = max(floor(window * 0.15), window >=
   2 * 16_000 ? 16_000 : 0)`; the ceiling is `window - reserve`. This mirrors
-  `calculateCeiling()` in `packages/core/src/session/compaction.ts` (the reserve
-  share is 10% since 2.2.0 / PR #51271; it was 15% up to 2.1.x). When opencode
+  `calculateCeiling()` in `packages/core/src/session/compaction.ts`, whose
+  `RESERVE_SHARE` is 0.15 in every released host from 2.1.4 through 2.2.2 (the
+  unreleased `v2` branch has a different share; the plugin follows the release,
+  not the branch). When opencode
   carries a `compaction.buffer` configured in its own settings, the plugin
   cannot read that value (it is not exposed to plugins), so the default
   reserve formula is used — set `OPENCODE_CONTEXT_INDICATOR_COMPACT_BUFFER`
@@ -125,13 +129,13 @@ commands:
 
 | Command | Scope | Delivery | Agent turn? |
 | --- | --- | --- | :---: |
-| `/context` | **this session only** (no subagents); cache + `state.json` only | `resume:true` — the model echoes the 3-line summary into the transcript | yes |
+| `/context` | **this session only** (no subagents); cache + `state.json` only | `resume:true` - the model echoes the short summary into the transcript | yes |
 | `/context-breakdown` | this session **+ all subagent descendants** | `resume:true` — the model echoes the table into the transcript | yes |
 | `/context-diff` | **this session only**; previous measurement vs current | `resume:true` — the model echoes the delta table into the transcript | yes |
 
 #### `/context` — quick summary (main session only)
 
-A 3-line summary of the current session, built purely from the in-memory cache
+A short summary of the current session, built purely from the in-memory cache
 and the `state.json` snapshot: **no subagent traversal and no live RPC**, so
 collection is instant (delivery itself still runs an agent turn — see below).
 The synthetic notice chip shows a self-contained one-liner (label =
@@ -155,6 +159,7 @@ instructions to follow.
 <context-summary>
 **Context** — your-model · 41.5k / 168k (25%)
 usr 2.3k · asst 285 · rsn 9.6k · tool 2.1k · out 24.7k · sys 8.5k · schm 3.8k · oth 4.1k
+compact at 143k (25.0k reserve)
 updated 12:36:16 (snap)
 </context-summary>
 ```
@@ -264,7 +269,8 @@ the content is visible in the Desktop (the chip only shows `description`).
 `CONTEXT_BREAKDOWN_RESUME` controls `/context-breakdown` back to a plain
 notice if needed.
 
-> **E2E note (Desktop 2.0.19, local model `llama3.2:latest`, `build` agent).**
+> **E2E note (historical run on Desktop 2.0.19, local model `llama3.2:latest`,
+> `build` agent).**
 > `resume:true` behaved as designed: the synthetic item was drained into
 > `/message` and a turn ran; the assistant message contained the table verbatim
 > (the trailing `_…_` note line was dropped by the model). Because `resume:true`
@@ -599,19 +605,21 @@ Add the package name to the `plugin` array in your `opencode.json`:
 Copy `index.js` and the whole `lib/` directory into
 `~/.config/opencode/plugins/`, keeping the `lib/` subdirectory next to the
 plugin file so the plugin's relative imports resolve. The `lib/` folder is
-support code, not a separate plugin entry:
+support code, not a separate plugin entry; copy **every** module in it
+(`cache.js`, `commands.js`, `contributors.js`, `dedup.js`, `desktop.js`,
+`estimate.js`, `format.js`, `limits.js`, `rpc.js`, `state.js`, `tui-data.js`,
+`tui-panel.tsx`, `tui-sidebar.tsx`, `tui-theme.js`, `v1.js`, `v2.js`) — a
+missing module only disables the surface that imports it, but the server part
+stops loading if one of its own imports is absent:
 
 ```
-~/.config/opencode/plugins/context-indicator.js
-~/.config/opencode/plugins/lib/cache.js
-~/.config/opencode/plugins/lib/commands.js
-~/.config/opencode/plugins/lib/dedup.js
-~/.config/opencode/plugins/lib/estimate.js
-~/.config/opencode/plugins/lib/limits.js
-~/.config/opencode/plugins/lib/state.js
-~/.config/opencode/plugins/lib/v1.js
-~/.config/opencode/plugins/lib/v2.js
+~/.config/opencode/plugins/context-indicator.js   (this package's index.js)
+~/.config/opencode/plugins/lib/*.js
+~/.config/opencode/plugins/lib/*.tsx
 ```
+
+`tui.tsx` (the `./tui` entry, at the package root) is only needed for the
+terminal TUI surfaces and is resolved from a `file://` install — see below.
 
 To use the sidebar locally as well, point OpenCode at a `file://` copy of the
 package that lives **outside any `node_modules`** (see
@@ -635,7 +643,8 @@ the sidebar instead.
   and toasts keep working).
 * **OpenCode ≥ 2.2.0** for the V2 path with the TUI surfaces (built and verified
   against **2.2.0**; the isolated load + state-write e2e also passes on the
-  **2.2.1** Desktop CLI). The server-only V2 path keeps working on
+  **2.2.2** Desktop CLI, the latest at the time of writing). The server-only V2
+  path keeps working on
   2.0.16+; the TUI module pins the OpenTUI generation it was compiled against,
   so a host on OpenTUI 0.6 (opencode ≤ 2.1.4) will not load the TUI surfaces -
   neither the sidebar nor the `/cx` panel - from a 1.6.x install.
@@ -724,7 +733,7 @@ caller.
 
 ```bash
 npm run build:gui             # build dist/gui-experimental.cjs (required by the gate)
-npm run test:prepublish       # fast gate: tarball + tui.tsx + resolve + T1-T35 unit checks + GUI bundle
+npm run test:prepublish       # fast gate: tarball + tui.tsx + resolve + T1-T36 unit checks + GUI bundle
 npm run test:types            # tsc for the TUI entry AND the Desktop GUI part
 npm run test:e2e              # full E2E: isolated plugin load + one "Say OK" round-trip
 npm run test:e2e:quick        # E2E load-only, no LLM call
@@ -747,7 +756,7 @@ STEP 80 s, ~3 min total.
 | (a) tarball composition | `package.json` `files[]` expands to the base files plus every `lib/*` module (count asserted dynamically); `docs/` may contain images only; `dist/` may contain only the built GUI bundle | no test/node_modules/tsconfig in the tarball, and no published export pointing at nothing |
 | (b) pragma regression | esbuild `--jsx=automatic` → `@opentui/solid/jsx-runtime` present, `react/jsx-runtime` absent | a removed/broken pragma kills the sidebar on npm install |
 | (c) resolve chain | replica install: host-bridged + peer packages resolve; local tui.tsx relative imports resolve via node from the entry (resolve-bridge.cjs) | broken peer/optional dep or a bad local import silently breaks the sidebar |
-| (d) unit harness T1-T35 | limit/agent/state fix assertions plus measureContributors, redacted-export, shared category-helper, sanitizer/unicode, prompt-cache, waste-detector, compaction-reserve, top-consumer, diff, subagent-rollup and Desktop-RPC checks (85 total; T30 schema-vs-builder drift, T31 registration + handler, T32-T35 fallback-vs-hook category priority across the report, the shared state file and the live log, T25c/T25d compaction-hook arming, T34 cross-instance summary merge) | regressions in modelLimits, writeStateFile, hydrate, contributors, export, subagent lifetime, and a GUI/server wire mismatch |
+| (d) unit harness T1-T36 | limit/agent/state fix assertions plus measureContributors, redacted-export, shared category-helper, sanitizer/unicode, prompt-cache, waste-detector, compaction-reserve, top-consumer, diff, subagent-rollup and Desktop-RPC checks (86 total; T30 schema-vs-builder drift, T31 registration + handler, T32-T36 fallback-vs-hook category priority across the report, the shared state file and the live log (T36: a counter-less hook entry borrows the snapshot or prints `?`), T25c/T25d compaction-hook arming, T34 cross-instance summary merge) | regressions in modelLimits, writeStateFile, hydrate, contributors, export, subagent lifetime, and a GUI/server wire mismatch |
 | (e) corporate-identifier scan | no forbidden identifiers in the published surface (`index.js`, `tui.tsx`, `lib/*`, `gui/*`, `README.md`, `CHANGELOG.md`, `package.json`, the GUI build config) or the test tree | compliance |
 | (f) non-English scan | no non-ASCII letters (`\p{L}` above U+007F) in the same published surface and test tree (`docs/` is image-only and is not text-scanned) | English-only source rule |
 | (g) Desktop GUI bundle | `dist/gui-experimental.cjs` exists and is a non-trivial single-file CJS bundle: no ESM `import`, no dynamic `import()`, no Node built-in, and every app-provided module (`solid-js`, `solid-js/web`, `@opencode/plugin/gui`, `@opencode/plugin/rpc`) still a `require()` - no bundled second copy, no React/OpenTUI/bare-`opencode` import | a stale or hand-edited bundle, or a build that inlines the app instance, breaks the Desktop panel at load time |

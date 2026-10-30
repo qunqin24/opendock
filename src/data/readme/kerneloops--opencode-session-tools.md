@@ -1,15 +1,17 @@
 # opencode-session-tools
 
-Session tools for [OpenCode](https://opencode.ai) **v2**, as two local plugins:
+Session tools for [OpenCode](https://opencode.ai) **2.2**, as two local plugins (or one npm package):
 
 - **`opencode-meta`**
   - `opencode_meta`: bounded, read-only session metadata (a session, its parent and children, message and tool statistics, recent sessions, tool usage).
-  - `send_message`: cross-session messaging, in the style of Claude Code's. One session sends plain text to another by ID or title; by default the target receives it at its next step boundary, marked as coming from a peer (not from its user, and never an approval), with the address to reply to.
+  - `send_message`: cross-session messaging, in the style of Claude Code's. One session sends plain text to another by ID or title; by default the target receives it at its next step boundary, marked as coming from a peer (not from its user, and never an approval), with the address to reply to. Messages carry a `priority` (`normal` or `urgent`, which needs a reason) and an optional typed `receipt`.
+  - `peer_inbox`: the calling session's own inbox of passive FYI receipts (stored without waking it) and held digest messages; list, read and acknowledge them.
+  - Digest mode (`opencode_meta` `message_digest`): a busy session can batch routine incoming messages into one prompt every 5–60 minutes, while urgent ones still arrive at once.
 - **`opencode-recall-lite`**
   - `recall` / `recall_get`: search earlier sessions across projects, and read one back.
   - A short system reminder to search history before answering questions about it.
 
-Both plugins use only OpenCode v2's public plugin API. They share a small session index, kept in plugin storage, which is built from session events.
+Both plugins use only OpenCode's public plugin API and are checked against the published `@opencode/plugin` 2.2.0. They share a small session index, kept in plugin storage, which is built from session events.
 
 ## Install
 
@@ -30,7 +32,7 @@ OpenCode v2 loads every directory under `plugins/`. Keep the two side by side: `
 Optionally, allow the tools without a permission prompt in `opencode.json`:
 
 ```json
-{ "permission": { "opencode_meta": "allow", "send_message": "allow", "recall": "allow", "recall_get": "allow" } }
+{ "permission": { "opencode_meta": "allow", "send_message": "allow", "peer_inbox": "allow", "recall": "allow", "recall_get": "allow" } }
 ```
 
 ## Limits
@@ -38,14 +40,17 @@ Optionally, allow the tools without a permission prompt in `opencode.json`:
 - The index only covers sessions seen since the plugins first ran. Plugins get live events, not history. Tools can still address any session directly by ID.
 - `recall` ranks by term matches in titles and transcripts; it is not semantic search.
 - `send_message` finds a session by title only among indexed sessions. An ambiguous title returns the candidates, so pass the ID.
+- Plugin storage holds the index (session titles, directories and recent transcript text from every project on the server) and every peer message and receipt. It is never expired or garbage-collected, so it grows with use; treat it as sensitive. Directory filters in `recall` are a convenience, not access control.
+- The peer inbox has no total size limit. Each message is capped at 40 KiB, but every distinct message stays on disk and in the server's memory, even after it is acknowledged or archived, and all of them are loaded at startup. A sender stuck in a loop of passive reports can use up disk or memory. Acknowledge or archive entries to keep the inbox views short; this does not free space. Watch `stored_bytes` in `peer_inbox status`.
+- Digest and peer-inbox state assume one OpenCode server owns the plugin storage. Two servers sharing the same storage are not supported.
+- If the recipient session runs on a provider with the ID `claude-code` (a Claude Code CLI bridge), the reply hint names `mcp__opencode__send_message` instead of `send_message`. Nothing else depends on it.
 
 See each plugin's README for details and options.
 
 ## Tests
 
 ```sh
-cd plugins/opencode-meta && bun test
-cd plugins/opencode-recall-lite && bun test
+bun test
 ```
 
 ## Acknowledgements

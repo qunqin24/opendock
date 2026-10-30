@@ -2,7 +2,7 @@
 
 > Ultimate opencode setup for Go users
 
-> LaCode 1.0.0 ships on the npm **`latest`** dist-tag. Prereleases use
+> LaCode 1.2.0 ships on the npm **`latest`** dist-tag. Prereleases use
 > `beta`: install `@lawaty/lacode@beta`, or pin an exact version.
 
 LaCode is an opencode plugin. It routes delegated work onto a weighted pool of
@@ -145,7 +145,7 @@ option is optional:
 | Option | Default | Meaning |
 | --- | --- | --- |
 | `enabled` | `true` | The single off switch. `false` injects nothing at all and does no writes. |
-| `models` | — | An inline slot list. Highest-priority source. |
+| `models` | — | An inline slot list; `weight` is that line's budget and cap, a model may repeat, and there is no slot cap. Highest-priority source. |
 | `modelsFile` | — | An explicit slot file; short-circuits the [resolution chain](docs/CONFIGURATION.md#pool-preset-resolution). |
 | `reapMs` | `30000` | Hang-reaper interval. |
 | `probeMs` | `900000` | How often benched models are checked by actually using them. `0` turns the periodic check off and leaves the `pool_recheck` tool as the only way to ask. |
@@ -170,7 +170,7 @@ The running session keeps its loaded code; the new version takes effect on the
 next start, and the log says so. Run `lacode update` to do it on demand, or
 `lacode update --check` to just report.
 
-1.0.0 is published to the `latest` dist-tag; prereleases use `beta`. This check
+1.2.0 is published to the `latest` dist-tag; prereleases use `beta`. This check
 follows `latest`. A beta install is therefore reported as current even when a
 newer beta exists,
 and `lacode update` will not move it: pin the version you want in the `plugin`
@@ -186,7 +186,7 @@ lacode version
 ```
 
 ```
-version    1.0.0
+version    1.2.0
 root       /home/you/lacode
 source     checkout
 commit     <hash> (dirty)
@@ -213,11 +213,17 @@ When it reports `stale`, rebuild with `npm run build`. No network is touched;
 ## What you get
 
 Three pooled agents: `explore`, `implement` and `context`. You spawn the base
-name and the pool picks a cheap model slot for it. Behind each base sits up to
-four hidden variants — one per slot — and a spawn of the bare name is the only
-thing that works: a hand-named variant such as `explore-1` is coerced to its
-base and routed by the pool, so naming one cannot pin a provider or skip
-ordered slot filling.
+name and the pool picks a cheap model slot for it. Behind each base sits one
+hidden variant per slot — however many the pool declares — and a spawn of the
+bare name is the only thing that works: a hand-named variant such as `explore-1`
+is coerced to its base and routed by the pool, so naming one cannot pin a
+provider or skip ordered slot filling.
+
+A slot's `weight` is both its concurrency budget and its cap: the pool fills
+slots in declaration order in one pass, then overflows to the least-loaded slot.
+There is no slot cap, and a model may appear on more than one line — each line
+is a separate slot with its own weight — so to give a model more capacity, list
+it again.
 
 A model that rate-limits or runs out of quota is benched until its window ends,
 so one sick provider does not take the pool with it.
@@ -235,9 +241,9 @@ serve at all is benched for the quota cap and named in the report.
 A change is reported as a toast and a log line; a pass that finds nothing changed says
 nothing at all.
 
-Nine commands: `/context-init`, `/context-update`, `/context-review`,
-`/lacode-doctor`, `/agent-instructions`, `/pool`, `/pool-recheck`, `/image-in-cb`
-and `/image`. Everything is added **only when your config does not already
+Ten commands: `/context-init`, `/context-update`, `/context-review`,
+`/lacode-doctor`, `/agent-instructions`, `/pool`, `/pool-recheck`,
+`/reprocess-timeline`, `/image-in-cb` and `/image`. Everything is added **only when your config does not already
 define it** — an agent or command you wrote yourself is left byte-identical,
 never patched or partially merged. `{"enabled": false}` turns the whole thing off
 without leaving a trace. The exact injection list, and the five keys that are
@@ -391,6 +397,12 @@ to emit a number they cannot derive — an unpriced model reports `unknown`, nev
 `0`. How the two modes differ is in [docs/BENCHMARKS.md](docs/BENCHMARKS.md),
 which explains the harness and deliberately contains no results.
 
+`npm run score` is the other measurement: it probes each configured provider's
+free models with one tiny request and ranks them by measured latency, context and
+output limit. It prints a suggested `pool.txt` but never edits it, and writes the
+raw rows to `~/.config/lacode/model-scores.json`. Run it every few days — free
+models and quota windows move.
+
 ## Remote hosts
 
 Notifications raised on a remote host need a way back to your desktop. The
@@ -445,6 +457,7 @@ want it.
 npm run build          # esbuild -> dist/ (what the tarball ships)
 npm test               # node --test tests/ — offline, no network, no running server
 npm run benchmark      # the cost harness; see docs/BENCHMARKS.md
+npm run score          # rank free models by context, output and measured latency
 ```
 
 Node ≥ 22.18.
