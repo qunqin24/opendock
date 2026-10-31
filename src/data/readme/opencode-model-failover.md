@@ -22,6 +22,8 @@ v2-native.
   a prompt is a state-changing action.
 - **Cooldown.** A model whose switch fails is skipped for `cooldownMs`, so a
   broken target is not retried on every failure.
+- **Forward progress.** Each failure advances along your chain instead of
+  re-selecting the entry that just failed, so later providers are reachable.
 
 ## Requirements
 
@@ -88,40 +90,67 @@ plugin entry in your OpenCode config:
 }
 ```
 
-| Option           | Type       | Default | Description                                     |
-| ---------------- | ---------- | ------- | ----------------------------------------------- |
-| `fallbackModels` | `string[]` | `[]`    | Ordered `provider/model` chain, tried in order. |
-| `maxAttempts`    | `number`   | `2`     | Failovers per session before giving up.         |
-| `cooldownMs`     | `number`   | `60000` | Skip a model this long after a failed switch.   |
-| `autoRetry`      | `boolean`  | `false` | Replay the last user message after switching.   |
-| `notify`         | `boolean`  | `true`  | Log each failover to stderr.                    |
-| `logFile`        | `string`   | `""`    | Also append log lines to this file.             |
+| Option           | Type       | Default | Description                                       |
+| ---------------- | ---------- | ------- | ------------------------------------------------- |
+| `fallbackModels` | `string[]` | `[]`    | Ordered `provider/model` chain, tried in order.   |
+| `maxAttempts`    | `number`   | `2`     | Failovers per failure sequence before giving up.  |
+| `cooldownMs`     | `number`   | `60000` | Skip a model this long after a failed switch.     |
+| `autoRetry`      | `boolean`  | `false` | Replay the last user message after switching.     |
+| `notify`         | `boolean`  | `true`  | Log each failover to stderr.                      |
+| `logFile`        | `string`   | `""`    | Also append log lines to this file.               |
 
 A `provider/model` string is split on the first `/`. Entries without a `/` are
 dropped from the chain.
 
 ## How it works
 
-The plugin subscribes to the v2 event stream and reacts to one event type:
+The plugin subscribes to the v2 event stream:
 
 ```js
 ctx.event.subscribe({ signal })
-// session.execution.failed
-//   -> { data: { sessionID, error: { type, message } } }
+// session.execution.failed        -> { data: { sessionID, error: { type, message } } }
+// session.execution.succeeded     -> { data: { sessionID } }
+// session.execution.interrupted   -> { data: { sessionID } }
+// session.model.selected          -> { data: { sessionID, model: { providerID, id } } }
+// session.step.started            -> { data: { sessionID, model: { providerID, id } } }
+// session.deleted                 -> { data: { sessionID } }
 ```
 
-On a retryable failure it:
+On a retryable `session.execution.failed` it:
 
 1. reads the models that actually resolve with `ctx.model.list()`;
-2. picks the first chain entry that resolves and is not cooling down;
+2. picks the first chain entry that resolves, is not cooling down, is not the
+   model the session is already on, and has not been tried in this failure
+   sequence;
 3. moves the session with `ctx.session.switchModel({ sessionID, model })`.
 
 If `autoRetry` is on, it then reads the transcript with
 `ctx.session.context({ sessionID })` and replays the last user message with
 `ctx.session.prompt({ sessionID, text })`.
 
-The `id`/`setup` plugin shape, the `plugins` config key, and the four methods
-above are the whole v2 surface it uses.
+### Progression and reset
+
+`maxAttempts` counts failovers within one failure sequence, not per session
+lifetime, and each completed switch is remembered so the next failure moves to
+the entry after it. That is what lets a session reach a later provider: without
+it every failure re-selected the first available entry.
+
+- A failed `switchModel` is a provider problem, not a failed inference: the
+  model is cooled down for `cooldownMs`, but no attempt is used and the chain
+  position does not move.
+- A failed *inference* does not cool the model down. It advances this session's
+  position instead, so a sibling session can still land on that model: the
+  failure is the model's problem for this request, and a process-wide cooldown
+  would take a working model away from everyone.
+- `session.execution.succeeded` and `session.execution.interrupted` end the
+  sequence, so the next failure starts at the top of the chain again.
+- `session.model.selected` and `session.step.started` record the model the
+  session is on, so a failure never selects that model again in the same
+  sequence.
+- `session.deleted` drops the session's state.
+
+The `id`/`setup` plugin shape, the `plugins` config key, and the methods above
+are the whole v2 surface it uses.
 
 ## Observing it
 
@@ -177,9 +206,11 @@ publisher per package; the workflow filename must stay `ci.yml`):
 
 - `test` — lint + plugin tests on `main` and PRs (Node 24).
 - push to `main` → `publish` job publishes the next patch to `latest`, pushes a
-  `vX.Y.Z` tag, and opens a GitHub release. The version is derived from the last
-  published `latest`, so repeated merges never collide; an intentional
-  minor/major bump in `package.json` is honored.
+  `vX.Y.Z` tag, and opens a GitHub release. The version is the highest of the
+  newest stable `vX.Y.Z` tag and the registry's `latest`, plus a patch, so
+  repeated merges never collide; an intentional minor/major bump in
+  `package.json` is honored. A publish that hits `E409` bumps a patch and
+  retries (bounded), because the registry read can lag a fresh publish.
 - tag `v*-beta*` → `publish` job publishes `beta` plus a prerelease GitHub
   release.
 - every PR push → `prerelease` job publishes `<version>-beta.<run_number>` to

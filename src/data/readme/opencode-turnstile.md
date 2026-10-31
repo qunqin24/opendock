@@ -77,8 +77,9 @@ with the planner.
 An [OpenCode](https://opencode.ai) v2 plugin that mechanically enforces an
 agent pipeline: planner → plan-reviewer → executor → test-runner → reviewer.
 The orchestrator policy is injected at runtime by the plugin (nothing is
-written to any instructions file), and turnstile **blocks the dispatches
-that violate it**.
+written to any instructions file) — appended to the parent session's system
+prompt at the pre-first-model-call context hook, with the task-result prepend
+as fallback — and turnstile **blocks the dispatches that violate it**.
 
 **1. Start a task by invoking the planner.** Paste an issue or a topic into
 your prompt and ask for a plan:
@@ -151,7 +152,7 @@ hatch. Full detail (guards, state fields, escape ladders, diagrams) lives in
 
 | Gate                   | In one line                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Plan approval          | `executor` dispatches blocked while the plans dir holds a _pending_ plan — one lacking a current plan-reviewer `VERDICT: APPROVE` (or human approval) and a durable approved-plan record; plan edits invalidate the approval, and a durable record outlives the journal replay window and prompt resets                                                                                                                                                                                                               |
+| Plan approval          | `executor` dispatches blocked while the plans dir holds a _pending_ plan — one lacking a current plan-reviewer `VERDICT: APPROVE` (or human approval) and a durable approved-plan record; the approval key covers the plan's **spec region** (`# Objective` onward — the leading `# Progress` section is pipeline-maintained and excluded, so progress-note edits keep the approval live), spec edits invalidate it, and a durable record outlives the journal replay window and prompt resets                        |
 | Reviewer dispatch gate | `reviewer` dispatches blocked until a `GATE: PASS` **verified** by a real exit-0 test execution in this task                                                                                                                                                                                                                                                                                                                                                                                                          |
 | Reviewer round cap     | Max 2 `reviewer` dispatches per task; waived dispatches bypass and don't count                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | Reviewer ensemble      | A reviewer APPROVE credits the landing gate only at ≥2 unwaived reviewer dispatches                                                                                                                                                                                                                                                                                                                                                                                                                                   |
@@ -171,6 +172,18 @@ when continuation carry (default on) re-arms it for a prompt with an
 unchanged worktree/branch fingerprint and earned credit. Replayed gate state
 survives a restart and the next (resume) prompt, then reverts.
 
+**Maintenance dispatches.** A bookkeeping-only executor dispatch — the prompt
+names the live approved plan file plus the word "maintenance", and the current
+working-tree diff touches only non-src surfaces (the plan file itself,
+`docs/*.md`, `README.md`, `CONTRIBUTING.md`, `agents/*.md` prose; the
+marker-validated ones qualify only while the repo's `scripts/check-markers.mjs`
+guard passes) — skips the plan-approval and decomposition gates: no
+plan-reviewer re-approval cycle for progress notes and doc prose. It journals
+a `{type:"maintenance"}` row (MNT column in `status`) and is capped at **4
+per plan**; a cap-exceeded attempt blocks like any other dispatch, and any
+`src/`, `tests/`, `bin/`, `scripts/`, or config/schema/example touch in the
+diff gates the dispatch as ordinary implementation work.
+
 **Parent hands-on edits.** Parent sessions dispatch work through the
 pipeline; direct `write`/`edit` calls in the parent — and in any
 non-pipeline subagent — are always gated. The
@@ -182,7 +195,11 @@ repeat attempt raises a human permission ask — `always` releases the rest of
 the task, `once` releases one edit, `reject` re-blocks and re-arms on the
 next attempt. `TURNSTILE OFF:` suspends it session-wide, but plan approval
 alone does not release the gate. A new user prompt resets the block count
-and any release.
+and any release. One exemption: a `write`/`edit` whose target path resolves
+under the platform temp directory is scratch — zero-governance work (not
+implementation, not project I/O) — so it is allowed with a journaled audit
+row (`scratch: true`, target path) and never reaches the ladder or burns a
+pending `once` grant; a configured `pathDeny` still wins first.
 
 **Parent file-writing bash.** The hands-on gate also covers confident
 file-writing bash commands in parents and non-pipeline subagents: redirects
@@ -227,7 +244,10 @@ what the text says.
   to restore the interactive ladder: the repeat attempt escalates to you
   through OpenCode's permission surface — reply `always` (approved for the
   task), `once` (one dispatch/edit), or `reject`. The plan-gate escalation
-  (first executor dispatch with no plan approval) still asks in both modes.
+  (first executor dispatch with no plan approval) follows the same mode:
+  under `"block"` the dispatch blocks with the stop-and-report instruction
+  and release flows via `PLAN APPROVED:` (or a waiver); under `"ask"` it
+  surfaces the permission prompt instead.
   Turnstile assumes a human actually answers these asks. If the host answers
   them automatically (`session.permissions: "autoaccept"` in
   `~/.config/opencode/cli.json`), the `"ask"`-mode human decision points,

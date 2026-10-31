@@ -234,7 +234,7 @@ Registers `ctx.tool.hook("execute.after", ...)` via `Plugin.define` from `@openc
 
 - **Lists, doesn't promote** — nested `SKILL.md` files become visible as files; the harness still loads only the top-level skill.
 - **Lists dotfiles** — the walk doesn't filter leading dots, matching core's own `dot: true` scan.
-- **No ignore-glob filtering** — a `node_modules`-style tree under a skill directory is **not** excluded; it counts against `maxFiles`.
+- **No general ignore-glob filtering** — only the hardcoded `SKIP_DIRS` set (`node_modules`, `.git`) is excluded from the walk; any other large tree counts against `maxFiles`.
 - **500-file cap** — a ceiling, not a sample. Raise or lower it via `maxFiles`.
 
 ## Safety notes

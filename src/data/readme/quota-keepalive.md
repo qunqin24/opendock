@@ -1,8 +1,32 @@
+<div align="center">
+
 # quota-keepalive
 
 面向 Magpie 全部已登录供应商的额度签到、真实对话保活、执行留痕和额度趋势页面。
-插件不接管任何供应商的登录，也不会把页面伪装成单一供应商专属功能；登录、模型、
-额度和签到 Hook 仍由各供应商插件维护，本插件负责统一检测、调度、执行和展示。
+
+[![License](https://img.shields.io/badge/License-MIT-3B82F6?style=for-the-badge)](./LICENSE)
+[![npm](https://img.shields.io/npm/v/quota-keepalive?style=for-the-badge&logo=npm&logoColor=white)](https://www.npmjs.com/package/quota-keepalive)
+[![Magpie](https://img.shields.io/badge/Magpie-Plugin-0EA5A4?style=for-the-badge)](https://github.com/sljdxde/quota-keepalive)
+[![Unofficial](https://img.shields.io/badge/Status-Unofficial-F59E0B?style=for-the-badge)](#非官方插件声明)
+
+中文 · [English](./README.en.md)
+
+</div>
+
+---
+
+quota-keepalive 不接管任何供应商的登录，也不会把页面伪装成单一供应商专属功能。
+登录、模型、额度和签到 Hook 仍由各供应商插件维护；本插件负责统一检测、调度、
+执行和展示。
+
+> **非官方插件声明**
+>
+> 本项目不是 Magpie 官方插件。签到优先调用供应商插件公开的签到接口；真实对话
+> 保活不是供应商授权或保证支持的功能。保活请求通过本机已登录的供应商签名适配器
+> 直接发往供应商，不经过第三方服务器，也不会导出令牌，因此降低了凭据泄露风险，
+> 但不等于厂商风控风险为零。自动化合成消息仍可能被供应商识别为异常流量，并触发
+> 限流、额度冻结、账号限制或封禁。默认关闭保活，仅在理解风险后按需启用，并由
+> 使用者自行承担相关后果。
 
 ## 功能
 
@@ -10,6 +34,8 @@
 - 一键签到：通过各供应商登录插件公开的 `auth.checkin` 接口执行，尊重供应商、
   账号两级启停；页面会明确显示未适配或未登录的账号，不会静默跳过。
 - 真实对话保活：通过各供应商自己的登录插件取得签名请求，发送一条真实消息。
+  默认使用“真实活跃对话”，WorkBuddy CN 会按 dsh 实测语义填充约 25k 输入 token
+  并消耗额度；只想做低成本连通性检查时才切换到“短探活”。
 - 模型选择：只从该账号实际列出的模型中选择。默认优先近期真实保活成功过的模型，
   再按成功率、成功时间和失败次数排序；没有历史记录时沿用供应商自己的模型顺序，
   不再按免费或价格抢先选择。第一个模型不可用时自动换下一档，全部不可用才记失败。
@@ -39,16 +65,48 @@
 
 ## 安装
 
-从 GitHub 安装：
+npm 安装（推荐，支持 Magpie 自动检查更新）：
+
+```sh
+magpie plugin add quota-keepalive
+```
+
+安装后的插件规格会显示为 `quota-keepalive@latest`。Magpie 会在启动后和之后每小时
+检查一次更新，并在插件页面提示新版本。更新方式：
+
+```sh
+# 更新全部 npm/git 插件
+magpie plugin update
+
+# 只更新这个插件
+magpie plugin add quota-keepalive
+```
+
+页面中的 `Update all` 与 `magpie plugin update` 等价。重新添加同一个 npm 包会替换
+旧版本，并保留插件 options、启用/停用状态和供应商偏好。已固定版本
+`quota-keepalive@0.1.x` 也会在更新时升级到最新版并解除固定。
+
+从 GitHub 安装（不经过 npm）：
 
 ```sh
 magpie plugin add github:sljdxde/quota-keepalive
 ```
 
-从本地目录安装：
+从本地目录安装（仅用于开发调试）：
 
 ```sh
 magpie plugin add "$(pwd)"
+```
+
+目录安装会直接读取当前源码，适合修改后立即调试，但不会进入 npm 的版本检查，也不会
+被 `magpie plugin update` 更新。开发完成后应切换到 npm 安装。切换前先保存 npm
+条目中的 options，再停用目录条目：
+
+```sh
+magpie plugin add quota-keepalive
+magpie plugin options quota-keepalive '<原来的 options JSON>'
+magpie plugin off '<目录插件的 spec>'
+magpie plugin rm '<目录插件的 spec>'
 ```
 
 插件不需要接管 provider。供应商登录仍由 Magpie 已安装的对应社区插件提供；本插件
@@ -59,11 +117,27 @@ magpie plugin add "$(pwd)"
 安装后在 Magpie 左侧 `Plugins` 分组打开“额度签到”。如果页面文件刚更新，
 重新打开一次插件页即可刷新清单，不需要重启 Magpie。
 
-发布到 npm 后也可以按包名安装：
+### 发布新版本
+
+仓库包含 `.github/workflows/publish.yml`，使用 npm Trusted Publishing，不需要把
+npm token 写进仓库或 GitHub Secrets：
+
+1. 更新 `package.json` 版本并提交改动。
+2. 创建同名 Git tag，例如版本 `0.1.2` 对应 `v0.1.2`。
+3. 推送 `main` 和 tag。
+4. 在 GitHub 创建并发布对应的 Release。
+5. Release 发布后，工作流会重新跑测试、语法检查和 `npm pack`，再通过 OIDC
+   发布到 npm。
+6. 本机等待 Magpie 的更新提示，或执行 `magpie plugin add quota-keepalive` /
+   `magpie plugin update`。
+
+本地手动发布时，npm 如果启用了双因素认证，需要附加当前动态码：
 
 ```sh
-magpie plugin add quota-keepalive
+npm publish --access public --otp=<6 位动态码>
 ```
+
+不要把动态码、npm token 或恢复码写进仓库、README 或聊天记录。
 
 ## 页面操作
 
@@ -74,9 +148,12 @@ magpie plugin add quota-keepalive
 - 账号后的“执行签到/执行保活”：只对当前账号立即执行一次；执行保活会先弹出确认框。
 - 连续切换多个开关时会合并成最后一次状态写入，并按 Magpie 的页面配置限频串行保存，
   不会因为快速连续点击触发“每秒只能写入一次”的报错。
-- 圆形刷新按钮：立即刷新全部启用供应商额度；供应商卡片内的刷新按钮只刷新该供应商。
+- `刷新额度`按钮：立即刷新全部启用供应商额度；供应商卡片内的刷新按钮只刷新该供应商。
 - `保存计划`：设置统一执行间隔和任务类型。计划默认关闭，防止无意间消耗积分。
-- 定时计划保存或修改后，从下一个间隔开始执行；需要立即执行时使用页面顶部的手动按钮。
+- `真实活跃对话/短探活`：真实活跃对话按 `inputTokens` 填充请求，能增加上活跃记录
+  的概率并可能消耗积分；短探活风险、耗时和额度消耗更低，但不保证供应商记录为一次对话。
+- 定时计划保存或修改后，从下一个间隔开始执行；下次执行时间会持久化，Magpie 重启或
+  电脑休眠后会补跑已经到期的任务。需要立即执行时使用页面顶部的手动按钮。
 
 页面每 5 秒读取一次本地快照；插件后台每 1 分钟刷新启用中供应商的额度，停用项会
 跳过。额度刷新仍写入后台诊断日志，但不会出现在页面的签到/保活执行记录中。
@@ -94,9 +171,10 @@ magpie plugin add quota-keepalive
 3. 账号没有记录时，优先该供应商其他账号成功过的模型；仍无记录则跟随供应商模型列表顺序。
 4. 已知失败的模型排在未验证模型之后；单个账号最多尝试配置数量的候选模型。
 5. 模型不存在、额度拒绝、上游不可用或空回复时切换下一个候选。
-6. WorkBuddy CN 按 dsh 的 probe 语义，HTTP 2xx 表示上游已经接受并记录一次真实对话；
-   `max_tokens` 为 1 时可能只有 `[DONE]`、usage 或空正文，仍算成功。JSON 业务错误、
-   HTML 登录页和超时不算成功。
+6. WorkBuddy CN 的真实活跃对话按 dsh 的 probe 语义发送约 25k 输入和 1 个输出 token。
+   活动模式要求响应里出现模型正文，或 usage/credit/prompt token 证据；只有 `[DONE]`、
+   空 200、JSON 业务错误、HTML 登录页和超时都不算成功。短探活仍保留低成本兼容模式，
+   但不会声称已经留下真实活跃记录。
 
 账号卡片会优先显示最近一次真实保活实际使用的模型（`实际模型`）；没有执行历史时，
 依次显示用户指定的 `所选模型` 或自动排序出的 `自动首选`。供应商设置行也会汇总
@@ -120,6 +198,8 @@ magpie plugin options quota-keepalive '{
     "codearts": "deepseek-v4.1-flash"
   },
   "modelCandidates": 4,
+  "probeMode": "activity",
+  "probeMessage": "Magpie daily connectivity check. Reply with OK.",
   "inputTokens": 25000,
   "maxAttempts": 3,
   "timeoutMs": 90000,
@@ -136,27 +216,36 @@ magpie plugin options quota-keepalive '{
   WorkBuddy CN 默认优先 `deepseek-v4.1-flash`，这是 dsh 实测较稳定的真实对话模型；
   其他供应商按近 5 天可用性排序，没有成功记录时按供应商模型顺序选择，不按免费或倍率抢先选择。
 - `modelCandidates`：每个账号每次最多尝试的模型数，默认 4，范围 1–12。
-- `inputTokens`：真实请求的输入规模，默认 25000，范围 1000–25000。
+- `probeMode`：`activity`（默认）发送真实活跃对话，约 25k 输入；`short` 只发短消息；
+  `context` 是旧版配置的兼容别名，行为与 `activity` 相同。
+- `probeMessage`：短探活消息，最多 500 字符；留空时使用默认连通性检查文本。
+- `inputTokens`：`activity`/`context` 模式的长输入规模，默认 25000，范围 1000–25000。
 - `maxAttempts`：每个账号每个北京时间日最多保活尝试轮数，默认 3。
 - `timeoutMs`：单个模型请求的整体截止时间，默认 90 秒，范围 10–180 秒。WorkBuddy
   CN 的 25k 输入请求可能先返回响应头、再继续流式读取；90 秒比 25 秒更接近 dsh 的
   probe 容忍度，同时仍避免任务无限挂起。即使供应商
   登录插件内部忽略中止信号，外层也会结束该候选并继续回退；账号较多时不要调得过大。
 - `logMaxBytes`：单个日志上限，默认 2 MiB，超出后轮转一份 `.1`。
-- `statePath`、`logPath`、`snapshotPath`、`commandPath`：可选绝对路径。
+- `statePath`、`logPath`、`snapshotPath`、`commandPath`、`schedulePath`：可选绝对路径。
+
+升级提示：旧版本如果已经显式保存过 `probeMode: "short"`，新版本会尊重这项用户设置，
+不会静默改成 `activity`。需要点亮 WorkBuddy 活跃记录时，请在页面选择“真实活跃对话”
+并保存计划，或者执行 `magpie plugin options quota-keepalive` 更新配置。
 
 ## 执行周期与失败
 
 Magpie 自己的每日签到调度仍会在启动后约 2 分钟进行首轮，之后约每 30 分钟巡检；
 失败约 30 分钟后重试。本插件的定时任务是额外的统一调度，默认关闭，适合需要更
 频繁签到或保活的场景。本插件的定时任务不会在保存后立即执行，也不会在修改后
-重启 Magpie；修改配置会替换运行中的定时器，并从新的间隔重新计时。
+重启 Magpie；修改配置会替换运行中的定时器，并从新的间隔重新计时。调度状态保存在
+`quota-keepalive-schedule.json`，Magpie 重启后会读取上次执行时间和下次执行时间，
+已到期的任务会补跑，不会因为反复重启而一直错过执行。
 
 保活失败会按 `maxAttempts` 重试；达到上限后当天不再自动发送。网络失败、登录过期、
 模型不可用和空回复都会进入日志。遇到明确的 HTTP 402/429 额度耗尽或免费额度用尽时，
-当天停止自动重试，避免持续发送无效请求。手动“发送保活”或账号级“执行保活”可以重试
-当天失败或额度耗尽的账号；签到或保活当天已经成功时，即使手动触发也会跳过，不会重复
-发送。供应商整体停用时，账号级手动按钮也会禁用。
+当天停止自动重试，避免持续发送无效请求。当天已经成功后，自动任务和手动触发都会
+跳过，不会重复发送；手动“发送保活”只能在当天尚未成功时重试失败账号。供应商整体
+停用时，账号级手动按钮也会禁用。
 
 ## 日志
 
@@ -180,7 +269,8 @@ node ./bin/daily-keepalive-log.js --json
 ## 安全
 
 - 状态和日志文件以 `0600` 创建，写入使用临时文件和原子 rename。
-- `plugin-auth.json` 的更新使用短锁，避免与 Magpie 或另一个任务并发写坏登录。
+- `plugin-auth.json` 的更新使用短锁、文件指纹校验和冲突重试。若 Magpie 或其他
+  供应商插件在读取后改动了凭据文件，本插件会重新读取并合并，不会直接覆盖新内容。
 - 模型回复不会写入状态或日志。
 - 日志和页面显示会对令牌、Bearer、API key 和账号标识做脱敏。
 - 未安装对应供应商插件、未登录或没有可用模型时，会明确记为跳过或失败。

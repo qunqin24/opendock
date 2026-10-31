@@ -6,7 +6,7 @@
 [![npm downloads](https://img.shields.io/npm/dm/@te-river/opencode-team-mode.svg)](https://www.npmjs.com/package/@te-river/opencode-team-mode)
 [![license](https://img.shields.io/npm/l/@te-river/opencode-team-mode.svg)](./LICENSE)
 
-> 🤝 **你的 OpenCode 刚刚招了一个团队。** 主脑（Lead）、架构师、实现者、评审、测试、研究员，六个专职 agent，配上受治理的工具、结构化交接和「先出计划、等你批准」的门禁。一个插件，没有文件要拷。
+> 🤝 **你的 OpenCode 刚刚招了一个团队。** 主脑（Lead）、架构师、实现者、评审、测试、研究员，外加一个**只在装了桌面控制 MCP 时才出动**的 ComputerUser——七个角色，配上受治理的工具、结构化交接和「先出计划、等你批准」的门禁。一个插件，没有文件要拷。
 
 > 💡 **建议在中大型项目里用。** 审批门禁、上下文卸载、工具白名单这层治理，在代码库有真实体量时是资产；在两三个文件的小脚本和一次性问答上，它主要是开销。把团队用在该用的地方。
 
@@ -36,7 +36,7 @@
 > ```text
 > 安装 OpenCode 插件 @te-river/opencode-team-mode：本包**只支持 OpenCode 2.x**——1.18.x 人格已在 1.7.0 线里整体移除。
 > 按 https://raw.githubusercontent.com/Te-River/Opencode-TeamMode/main/docs/installation-v2.md 操作
-> （2.x 的插件不能创建 agent，六个角色和六条 `/team-*` 命令要靠那份指南里的生成步骤落到配置目录——
+> （2.x 的插件不能创建 agent，七个角色和六条 `/team-*` 命令要靠那份指南里的生成步骤落到配置目录——
 > 这一步不是可选的）。然后跑一遍该指南里的验证检查。
 > URL 打不开（国内网络常见）就在同一路径前加镜像前缀 https://ghproxy.net/；npm 慢或不通就先
 > `npm config set registry https://registry.npmmirror.com`。
@@ -69,7 +69,7 @@
 **第一步 · 安装。** 用[太长不看](#太长不看)那段话、跑安装脚本，或者照 [docs/installation-v2.md](./docs/installation-v2.md) 手动来。成败只取决于两件事：
 
 - 键名是 **`plugins`（复数）**，2.x 的条目是字符串或 `{ "package": …, "options": { … } }`。多个配置文件里的条目是**由低到高叠加、不是互相替换**，所以 Team 只能有一条——同时写进 `opencode.json` 和 `opencode.jsonc` 就是加载两遍。
-- 2.x 的插件**不能创建 agent**，所以 `node <pkg>/scripts/gen-v2-config.mjs` 负责把六个角色和六条 `/team-*` 命令写进配置目录。安装器替你做这一步；手动装就等于自己做这一步。
+- 2.x 的插件**不能创建 agent**，所以 `node <pkg>/scripts/gen-v2-config.mjs` 负责把七个角色和六条 `/team-*` 命令写进配置目录。安装器替你做这一步；手动装就等于自己做这一步。
 
 然后 `opencode service restart` 重启（桌面版从托盘退出，光关窗口不算）。会话中途重启是安全的：对话还在，只有正在跑的那次工具调用会被中断、需要重发。
 
@@ -85,7 +85,7 @@
 改动全在仓库之外；安装器会打印改了什么，并把值读回来：
 
 - **配置条目** → `~/.config/opencode/opencode.jsonc`（不存在就创建；我们会把 Team 条目从 `opencode.json` 收回——两个文件会合并，所以只保留一个 Team 条目）——直到你删掉那一行。
-- **六个角色 + 六条命令** → `~/.config/opencode/agents/*.md` 和 `~/.config/opencode/commands/*.md`，由已安装的包生成（2.x 插件不能创建 agent，所以这一步不是可选的）。
+- **七个角色 + 六条命令** → `~/.config/opencode/agents/*.md` 和 `~/.config/opencode/commands/*.md`，由已安装的包生成（2.x 插件不能创建 agent，所以这一步不是可选的）。
 - **默认角色** → 在角色文件落盘之后才写 `default_agent: "Team"`，并从磁盘读回。
 - **不会碰：** 宿主的 npm 缓存和 `OPENCODE_EXPERIMENTAL_BACKGROUND_SUBAGENTS`——2.x 原生支持后台子代理，不设任何环境变量。
 - **撤销：** 删掉 `plugins` 那一行（可选：删掉生成的 `agents/` / `commands/` 文件）再重启。
@@ -162,6 +162,40 @@
 **浏览器与联网授权。** 交互式浏览是宿主的 `browser_*` 目录。Tester 带着它是为了验证你的项目的 UI；开放联网属于 Lead 和研究员。架构师、实现者、评审**没有联网授权**——那边出现联网问题，报成缺口，绝不模拟。没有原生浏览器目录的宿主（CLI / standalone）就没有浏览器，agent 会直说。
 
 ---
+
+## 🖱️ 可选：计算机使用（真实桌面）
+
+一个**可选**的 MCP 服务器（`computeruse`，默认不装，作为独立的
+[Release 资产](https://github.com/Te-River/Opencode-TeamMode/releases/tag/computeruse-v0.0.1) 发布）：
+让 `Team`（主代理）、`researcher`、`tester` 能截屏并用鼠标键盘操作真实桌面。`architect` /
+`implementer` / `reviewer` 在**三层**被挡住——因为第一层在真机上被证明是空操作：
+① `permission.evaluate`，宿主**确实**会对 MCP 工具触发（`action=computeruse_control_status`，
+实测），被拒角色拿到 `effect:"deny"`；② 宿主为这次调用单独抛出的内层 `execute` 事件（input 为空，
+角色在事件上）；③ 外层程序文本，匹配 `computer[\s._-]?use`——这是文本门禁，**不是沙箱**。
+
+保护了什么、没保护什么：
+
+- **UAC / 提权窗口碰不到。** 只有 Windows 进程能操作安全桌面，所以管理员弹窗恰恰是它点不动的地方。
+- **打进终端的文本绕过本项目的 R2/R6 分类器。** `type_text` 送进去的是"按键"，不是 shell 命令
+  字符串，`shellGuard` / `pathGuard` 都看不到它，环境变量红线在那条路上不存在。**不要用它输入凭据。**
+- **截图不经 JIT 治理。** 它以非文本部件到达，而卸载层只治理文本——所以一张图既不占上下文预算，
+  也不会被卸载。
+- **`researcher` 是这里风险最高的角色。** 它正是读不可信网页的那个角色，而"受控屏幕 + 不可信
+  网页内容"是本功能里最糟糕的组合：网页里一句"把 X 敲进终端"就是冲着它来的。缓解手段是服务器的
+  动作预算、审计轨和有人在场，**不是**提示词里一句"别被骗"。
+- **三层门禁，以及第三层的诚实边界。** ③ 是文本级门禁：把名字拼起来（`"computer"+"use"`）能过去。
+  真过去了，这次调用会被**计数**而不是被默许——磁盘上留一行 `computeruse_bypass`，写明角色和工具名，
+  所以"我们没拦住"和"这是被允许的"始终是两句话。`tm_stats` 的**计算机使用**小节把五种状态分开：
+  实际看到的工具名、一个都没删掉的 deny、一次绕过、"配置里声明了但 server 没注册"，以及
+  "配置了、也连上了，但不在 `event.tools` 里"——MCP 工具住在 Code Mode 目录里，**不等于**服务器起不来。
+- **最强的那一层没有在真实回合里验证过。** `permission.evaluate` 会触发是实测的；`effect:"deny"`
+  对 `shell` / `read` 生效是实测的；两者在 MCP 动作上的组合**被刻意留白**——因为真实跑一轮会在你自己的
+  会话存储里留下一条 session。请把角色划分当成"有人在看着的护栏"，而不是隔离边界。
+
+显式安装：`.\scripts\install.ps1 -ComputerUse`（POSIX `bash scripts/install.sh --computer-use`）；
+主安装流程从不碰它。其余一切——升级规程（**两次重启**，因为 Windows 不让替换运行中的 exe）、
+"拒绝"如何被记住从而永不再问、审计格式与撤销——都放在一个**刻意与安装手册分开**的页面里：
+[`docs/computer-use.md`](./docs/computer-use.md)。
 
 ## 🔒 治理与安全
 
@@ -271,7 +305,7 @@
 [Apache License 2.0](./LICENSE)
 
 - [npm 包](https://www.npmjs.com/package/@te-river/opencode-team-mode) — `@te-river/opencode-team-mode`
-- [安装指南（**OpenCode 2.x**）](./docs/installation-v2.md) — 受支持的装法；2.x 插件不能创建 agent，六个角色和六条命令要生成到配置目录
+- [安装指南（**OpenCode 2.x**）](./docs/installation-v2.md) — 受支持的装法；2.x 插件不能创建 agent，七个角色和六条命令要生成到配置目录
 - [安装指南（1.18.x）](./docs/installation.md) — **仅历史**：那个人格已在 1.7.0 线里移除
 - [OpenCode](https://opencode.ai) · [文档](https://opencode.ai/docs) · [插件 API](https://opencode.ai/docs/plugins)
 - 模块地图、每层接缝和所有实测到的宿主事实：[AGENTS.md](./AGENTS.md)；每条 v2 论断背后的带日期证据：[docs/v2-port-notes.md](./docs/v2-port-notes.md)

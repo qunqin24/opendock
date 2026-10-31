@@ -9,15 +9,15 @@ ACP 是 [OpenCode](https://opencode.ai) 的上下文管理插件。它向模型�
 需要 OpenCode **>=2.1.4 且 <3**。通过 npm 包全局安装（已包含预构建代码，无需从 Git 构建）：
 
 ```bash
-opencode plugin add @infituit/opencode-acp@2.0.0-alpha.1
+opencode plugin add @infituit/opencode-acp@2.0.0-beta.1
 ```
 
-也可使用 `opencode plugin add @infituit/opencode-acp@alpha` 跟随 Alpha 渠道，或者在 `opencode.json(c)` 中添加固定版本：
+也可使用 `opencode plugin add @infituit/opencode-acp@beta` 跟随 Beta 渠道，或者在 `opencode.json(c)` 中添加固定版本：
 
 ```json
 {
     "$schema": "https://opencode.ai/config.json",
-    "plugins": ["@infituit/opencode-acp@2.0.0-alpha.1"]
+    "plugins": ["@infituit/opencode-acp@2.0.0-beta.1"]
 }
 ```
 
@@ -91,7 +91,7 @@ ACP 使用自己的配置文件，按以下顺序加载：
 
 每一层覆盖前一层，因此项目设置优先于全局设置。修改 ACP 配置后请重启 OpenCode。
 
-完整字段结构见 [`acp.schema.json`](./acp.schema.json)，默认值见 [`lib/config.ts`](./lib/config.ts) 中的 `defaultConfig`。不需要在配置文件中复制所有默认值，只填写需要覆盖的字段。
+完整字段结构见 [`acp.schema.json`](./acp.schema.json)，默认值见 [`src/config.ts`](./src/config.ts) 中的 `defaultConfig`。不需要在配置文件中复制所有默认值，只填写需要覆盖的字段。
 
 ### 配置示例
 

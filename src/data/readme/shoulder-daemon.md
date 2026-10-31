@@ -44,6 +44,29 @@ having to ask for it.
 
 ## Install
 
+**Let your agent do it.** Paste one line into the agent you use and it installs
+the hooks, fetches the daemon, asks which model should decide, writes the
+settings file, starts the daemon and proves the result with `shoulderd doctor`.
+It never takes an API key through the chat: it hands you the one command to
+type, and reports which files hold what when it is done.
+
+Claude Code:
+
+```
+Fetch https://gitlab.com/quittymr/shoulder-daemon/-/raw/main/docs/AGENT-SETUP.md and follow it for Claude Code.
+```
+
+OpenCode:
+
+```
+Fetch https://gitlab.com/quittymr/shoulder-daemon/-/raw/main/docs/AGENT-SETUP.md and follow it for OpenCode.
+```
+
+The same file is on GitHub at
+`https://raw.githubusercontent.com/QuittyMR/shoulder-daemon/main/docs/AGENT-SETUP.md`,
+and it is readable by a person too: [docs/AGENT-SETUP.md](docs/AGENT-SETUP.md).
+The rest of this section is the same install by hand.
+
 **Claude Code** - the plugin is the whole install. On first start it fetches the
 daemon for your platform from the latest release, verifies the checksum, links
 it into `~/.local/bin` so `shoulderd` works in a terminal, and starts it; after
@@ -139,8 +162,13 @@ from being invisible to the process that needs it.
 
 Use `shoulderd doctor` to verify the validity of your installation and setup.
 It fails when the daemon has no decision model (a triage on its own passes),
-when its store failed to open, and when it runs another model or store than this file asks for because it
-started before the file was edited or from another file.
+when the model it has refuses to answer (a dead key, say), when its store
+failed to open, and when it runs another model or store than this file asks
+for because it started before the file was edited or from another file. The
+daemon asks its model one question when it starts and keeps the last word of
+every call after that, so doctor reports a refusal with its cause and since
+when, and a Claude Code session that starts under a refusing model says so
+before the first prompt.
 
 Running from a checkout, a container or a service manager is covered in
 [docs/INSTALL.md](docs/INSTALL.md), along with every setting.
@@ -148,11 +176,23 @@ Running from a checkout, a container or a service manager is covered in
 ### Updating
 
 ```bash
-git pull
-make update
+shoulderd update
 ```
 
-Then restart your editor and run `shoulderd doctor`.
+That brings the daemon to the newest release: a plugin or release install has
+its binary replaced after a checksum check, a `go install` build is installed
+again, and a checkout or a container is told the command for it (`git pull &&
+make update`; pull the image and recreate). The daemon that is running keeps
+the old code until it is restarted; it exits by itself once no session has
+used it for a while, or `pkill -x shoulderd` now and the next hook event
+starts the new one. `shoulderd update --check` only asks.
+
+A Claude Code session says at start, once a day, when a newer release is out.
+It does not install it yet; you run the command. The plugin itself updates by
+the harness: `claude plugin update shoulder-daemon@shoulder-daemon` for Claude
+Code, and for OpenCode copy the plugin file again as under Install. Then
+restart your editor and run `shoulderd doctor`. The whole flow per install is
+in [docs/INSTALL.md](docs/INSTALL.md#updating).
 
 ## Use it
 
@@ -231,16 +271,18 @@ shoulderd monitor
 
 This follows the daemon's log and shows only the facts moving: stored,
 superseded, merged, dropped, refused, and advice queued and injected, one line
-each with the text. It opens on the last twenty and waits for more; `--all`
+each with the text, and every decision the model refused, since that is what
+stops the rest. It opens on the last twenty and waits for more; `--all`
 shows the whole file, `--no-follow` prints and exits, `--json` passes the raw
 records through.
 
 ```
-14:02:11  stored      local shoulder-daemon     (fact) "main branch is master"  id=mem_12
-14:09:40  queued      session 3f9a1c07 event 6  "the branch is master, not main"  id=adv_4
-14:09:41  injected    session 3f9a1c07 UserPromptSubmit  "the branch is master, not main"  id=adv_4
-14:31:05  superseded  global                   [cli]  (preference) "terse answers, no preamble"  supersedes=mem_2
-14:40:00  merged      local shoulder-daemon     "integration tests need a live Postgres"  kept=mem_5  replaced=mem_7,mem_9
+2026-09-05 14:02:11  stored      local shoulder-daemon     (fact) "main branch is master"  id=mem_12
+2026-09-05 14:09:40  queued      session 3f9a1c07 event 6  "the branch is master, not main"  id=adv_4
+2026-09-05 14:09:41  injected    session 3f9a1c07 UserPromptSubmit  "the branch is master, not main"  id=adv_4
+2026-09-05 14:31:05  superseded  global                   [cli]  (preference) "terse answers, no preamble"  supersedes=mem_2
+2026-09-05 14:40:00  merged      local shoulder-daemon     "integration tests need a live Postgres"  kept=mem_5  replaced=mem_7,mem_9
+2026-09-05 15:02:17  failed      session 3f9a1c07          err=gemini status 400: [{ "error": { "message": "Please pass a valid API key" } }]  (decision failed; session unaffected)
 ```
 
 The log itself is `~/.local/share/shoulder-daemon/shoulderd.log`, JSON, one
@@ -250,6 +292,23 @@ default `info` level it holds every movement above and nothing per hook;
 file, and `SHOULDER_LOG=stderr` switches it off for a daemon whose output something
 else collects, which is also the one case `monitor` cannot watch. Counters for
 the same events are at `/metrics` on the daemon's address.
+
+### Notifications
+
+What the daemon does shows up in the editor as it happens: Claude Code shows
+it as a notice beside the conversation, and OpenCode as a toast. The model
+never sees any of it. By default that is errors, injections with the text
+injected, facts stored with the text stored, and facts superseded. Two more
+kinds are off until named: `warnings` (a fact the model wanted that could not
+be kept, and why) and `maintenance` (the store's tidying passes, with counts).
+
+```bash
+shoulderd env set SHOULDER_NOTIFY on,warnings
+```
+
+Name what you want, in any mix: `on` is the default four, `errors,stored`,
+`all`, or `off` for silence; the daemon reads it at start. `shoulderd doctor`
+prints the setting in use.
 
 ### Storage backend
 
@@ -297,6 +356,7 @@ you use on
 ## Docs
 
 - [How it works](docs/ARCHITECTURE.md) - the hot path, the injection budget, why a hook can't block
+- [Setup by an agent](docs/AGENT-SETUP.md) - the procedure a coding agent follows to install and configure it for you, in Claude Code or OpenCode
 - [Install and configure](docs/INSTALL.md) - the whole install, every setting, and how the built-in store measures up against a memory service
 - [Performance](docs/PERFORMANCE.md) - what each ranker recalls, what it costs in latency and memory, and how to measure it
 - [Advisor protocol](docs/ADVISOR.md) - bring your own decision model

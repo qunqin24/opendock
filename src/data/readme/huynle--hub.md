@@ -155,11 +155,13 @@ curl -fsSLO https://github.com/huynle/hub/releases/download/v<version>/hubctl-ma
 # 3. Preview: discover the host and print the exact plan and any manual edits. It writes nothing.
 ./hubctl setup preview --profile session-only --manifest hubctl-manifest.json --out preview.json
 
-# 4. Apply exactly that plan (rediscovered and re-planned; refused when the host changed since, exit 12).
+# 4. Apply exactly that plan (rediscovered and re-planned; refused when the host changed since, exit 12). A harness
+#    that is installed and runs but still waits on you (provider login, spoke not started) is committed as
+#    "installed, not ready" with the next steps; --require-ready fails (exit 15) and rolls back instead.
 ./hubctl setup apply --preview preview.json --manifest hubctl-manifest.json
 
-# 5. Check readiness with real probes (version, provider login, spoke connected; exit 15 when not ready),
-#    and undo whenever you like.
+# 5. Do the next steps it printed (e.g. `opencode auth login`, start OpenCode), then check readiness with real
+#    probes (version, provider login, spoke connected; exit 15 when not ready), and undo whenever you like.
 hubctl setup verify
 hubctl setup rollback            # or --to <txID>; files you changed since are kept and reported
 ```
@@ -179,6 +181,26 @@ hubctl setup rollback            # or --to <txID>; files you changed since are k
   11 artifact rejected, 12 preview invalid, 13 locked, 14 recovery required, 15 not ready).
 - Many machines: the optional Ansible role in [contrib/ansible](contrib/ansible/roles/hub_bootstrap/README.md)
   runs the same preview and apply (`hubctl setup ansible` renders its vars; enrollment stays a separate step).
+
+### Start a launch from a terminal
+
+On a machine set up with `hubctl setup` (or the OpenCode plugin), `hub` is on your PATH: `~/.local/bin/hub` links to
+hubctl, or (plugin only) to the plugin's launcher; if `~/.local/bin` is not on your PATH, both say so once. A machine
+enrollment identifies the **machine**, never you, so launching from your own shell needs a user login first:
+
+```sh
+hub login --scope sessions:launch        # prints a link and a code; approve it in the console as yourself
+                                          # (the page lists the scopes; tick "sessions:launch" if you did not ask)
+hub launch --repo ~/projects/app --branch feat/x --prompt "Fix the flaky test"
+```
+
+`hub login` without `--token` is a device code (Ctrl-C cancels); its URL defaults to `HUB_URL`, your last login, else
+this machine's enrollment. You get an app token with the scopes you approved (default `sessions:read`,
+`messages:send`, `messages:read`), stored owner-only in `~/.config/hub/cli.json`, and revocable in Settings → Agents.
+An app token launches only under a **grant** with verb `launch` covering the repo: create it in Settings → Agents, or
+ask for it from the terminal (`hub grant request --project ~/projects/app --allow launch --why "…"`) and approve it.
+Without a user login, `hub launch` on an enrolled machine says so (`this machine is enrolled (mch_…), but launching
+needs a user login: run hub login`). `hub login --token <app token>` (or a token piped on stdin) still works.
 
 ## Running the hub
 
@@ -656,7 +678,11 @@ session `hub` just works. A launcher runs the CLI bundle shipped in this package
 with the OpenCode binary itself (`BUN_BE_BUN=1 exec <opencode> hub-cli.js "$@"`), so neither bun nor node has to
 be installed; without Bun it falls back to `node`. The launchers are rewritten only when their content changes.
 When a standalone hubctl is installed as `~/.local/bin/hubctl` (what `hubctl setup` installs), the launchers run it
-instead, so shells, services and MCP clients all use that one signed program.
+instead, so shells, services and MCP clients all use that one signed program. For your own terminals the plugin also
+links `~/.local/bin/hub` to its `hub` launcher, with the setup's rule for `~/.local/bin`: only when nothing is there or
+it is hub's own link, never when another `hub` is on PATH (then it prints where hub's is), and only from the default
+state dir (not with `HUB_STATE_DIR`). `hubctl setup`'s `hub` → `hubctl` link is kept; `~/.local/bin/hubctl` is left to
+`hubctl setup`. When `~/.local/bin` is not on PATH it prints one hint.
 
 **Name clash:** GitHub's old `hub` CLI (github/hub) uses the same name. In hub sessions ours comes first on PATH;
 elsewhere use `hubctl`, or call the bundle directly (`bun …/packages/cli/dist/hub-cli.js`).
@@ -706,7 +732,8 @@ hub codex-spoke install|uninstall [--dry-run] · hub codex-spoke status   the Co
 hub preset list · hub preset check <name|file>
 hub preset run <name|file> [--socket <name> | --current] [--cwd <dir>] [--resume <id>] [--no-hub] [-- args…]
 hub mcp                                   an MCP server on stdio (see below)
-hub login [--url URL] [--token APP_TOKEN] · hub logout
+hub login [--url URL] [--scope S]... [--name N]   device code: approve it in the console, choose the scopes
+hub login [--url URL] --token APP_TOKEN|- · hub logout
 hub help · hub --version
 ```
 

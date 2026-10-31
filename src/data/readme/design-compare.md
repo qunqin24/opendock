@@ -49,9 +49,11 @@ Figma 比較は「あるキャンバス幅での再現」しか見ないため�
 - **既定ビューポート:** 768×1024 CSS px（`viewport_preset` 未指定 = `ipad_portrait`）。
 - **横向き:** `viewport_preset=ipad_landscape`（1024×768）。任意サイズは `viewport_width` / `viewport_height`（0 より大きい値。指定時はプリセットを上書き）。
 - **`viewport_overflow_x`:** `x < 0` または `x+w > viewport_width`（1px の丸めは許容）。ビューポート高さ超えはページスクロールとして扱い、失敗にしません。
-- **`parent_overflow`:** 子ボックスが親ボックスからいずれかの辺で 1px 超えてはみ出す。親が JSON に無い場合はこの検査をスキップし、解決できない `parent` は `status` を変えず `unresolved_parent_refs`（例: `Web: '#missing'`）として応答します（`layout_tree` と同じラベル形式。`ignore_nodes` で除外した親は誤検知しません）。
-- **合否:** 崩れ 0 件 → `success` / 1 件以上 → `mismatch` / 検査対象がすべて除外 → `skipped`。Web ノードが 1 件もない、または全ノードで `w`/`h` が 0 以下（`width`/`height` 等のキー名ミス疑い）の場合も `mismatch` です。`match_rate` は返しません。
-- **応答:** `status`, `mode`, `viewport_width`, `viewport_height`, `checked_nodes`, `issue_count`, `details`, `ignored_count`。崩れがあるとき `issues`（`type` / `selector` / `detail`）。`viewport_preset` を渡したときはエコーします。`ignored_nodes`（`web:<selector>`。件数は `ignored_count` と一致）/ `unmatched_ignores` / `unmatched_ignore_regions` / `unresolved_parent_refs` は該当時のみ。
+- **`parent_overflow`:** 子ボックスが親ボックスからいずれかの辺で 1px 超えてはみ出す。親が JSON に無い場合、または親の `w`/`h` が 0 以下の場合はこの検査をスキップします（`status` は変えず、前者は `unresolved_parent_refs`、後者は `parent_overflow_skipped_zero_geom` と `details` 要約で可視化）。親キーが無い／解決できない／親がゼロ幾何だけのときは `parent_checked_nodes=0` になり、`details` の要約行に未適用注記が付きます。`ignore_nodes` / `ignore_region` で除外した親でも、親に非ゼロ幾何があれば子の `parent_overflow` は引き続き検査します。
+- **合否:** 崩れ 0 件 → `success` / 1 件以上 → `mismatch` / 検査対象がすべて除外 → `skipped`。Web ノードが 1 件もない、または全ノードで `w`/`h` が 0 以下（`width`/`height` 等のキー名ミス疑い）の場合も `mismatch` です。`match_rate` は返しません。`success` でも `parent_checked_nodes=0` のときは親はみ出しを検証していないため、DOM キャプチャに正しい `parent` を含めて再実行してください。
+- **応答:** `status`, `mode`, `viewport_width`, `viewport_height`, `checked_nodes`, `parent_checked_nodes`, `issue_count`, `details`, `ignored_count`。崩れがあるとき `issues`（`type` / `selector` / `detail`）。`viewport_preset` を渡したときはエコーします。`ignored_nodes`（`web:<selector>`。件数は `ignored_count` と一致）/ `unmatched_ignores` / `unmatched_ignore_regions` / `unresolved_parent_refs` / `parent_overflow_skipped_zero_geom` は該当時のみ。
+
+意図的な横スクロール領域（カルーセル、`overflow-x: auto` の表、マーキーなど）では、スクロールコンテナ自身はビューポート内に収まっていても、子要素のボックスが `viewport_width` を越えると `viewport_overflow_x` として検出されます。これは崩れではないため CSS で「直す」対象ではなく、`ignore_nodes`（例: `.carousel-*`）や `ignore_region` で明示的に除外し、除外が効いたかは `unmatched_ignores` / `unmatched_ignore_regions` で確認してください（除外がすべて一致していればこれらのフィールドは出ません）。
 
 横向きを検査するときは、ブラウザを **1024×768 にリサイズしたあと** の DOM 座標を渡してください。縦向きで撮った座標に横向きの幅を当てても意味がありません。
 
@@ -247,6 +249,7 @@ DOM からの抽出手順（`getBoundingClientRect()` + `window.scrollX` / `wind
 | `diff_image` | string | ○ | pixelmatch 差分画像の base64 data URI。生成しない場合は空文字列。 |
 | `image_size` | string | ○ | 両画像共通のピクセル寸法。 |
 | `effective_threshold` | number | ○ | 判定に使った色差許容（未指定時は既定 0.1）。 |
+| `include_aa` | boolean | ○ | 判定に使った AA 境界の扱い（未指定時は既定 false。`diff_pixels` が AA 除外後か含むかを示す）。 |
 | `ignored_regions` | number | ○ | パースできた `ignore_region` の件数。 |
 | `warnings` | string[] | 条件付き | 両画像が単色ベタ塗りで差分 0 のとき（空洞比較）、および `min_match` のみ指定し `max_diff_pixels` を省略したうえで既定 0 が判定を支配して `mismatch` になったとき（既定 0 が判定を支配する旨。合格時は付けない）。 |
 | `out_of_bounds_regions` | string[] | 非空時のみ | 画像と交差しない `ignore_region`。 |
@@ -255,7 +258,23 @@ DOM からの抽出手順（`getBoundingClientRect()` + `window.scrollX` / `wind
 
 ### `layout_integrity`
 
-§1 の「応答」と同じ。`status` / `mode` / `viewport_width` / `viewport_height` / `checked_nodes` / `issue_count` / `details` / `ignored_count`。崩れがあるとき `issues`。`viewport_preset` 指定時はエコー。`ignored_nodes`（`web:<selector>`。件数は `ignored_count` と一致）/ `unmatched_ignores` / `unmatched_ignore_regions` / `unresolved_parent_refs` は該当時のみ。
+| フィールド | 型 | 出現条件 | 説明 |
+| :--- | :--- | :--- | :--- |
+| `status` | string | 常時 | `success` / `mismatch` / `skipped` |
+| `mode` | string | 常時 | 常に `layout_integrity` |
+| `viewport_width` / `viewport_height` | number | 常時 | 実効ビューポート（CSS px） |
+| `viewport_preset` | string | 指定時 | 渡したプリセット名のエコー |
+| `checked_nodes` | number | 常時 | 検査したノード数（除外・ゼロ幾何を除く） |
+| `parent_checked_nodes` | number | 常時 | `parent` を解決して包含検査した件数。0 なら `parent_overflow` 未適用（`details` の要約行に注記。`layout_tree` の `absolute_mode_pairs` と同種） |
+| `issue_count` | number | 常時 | 検出した崩れ件数 |
+| `issues` | object[] | 崩れあり | 各件の `type` / `selector` / `detail` |
+| `details` | string[] | 常時 | 要約行＋各 issue の detail。`parent_overflow` スキップ時は要約に件数を追記。`parent_checked_nodes=0` のときは未適用注記を同じ要約行に追記（`max_details` の切り詰めで issue の detail を押し出さないため） |
+| `ignored_count` | number | 常時 | `ignore_nodes` / `ignore_region` で除外したノード数 |
+| `ignored_nodes` | string[] | 非空時のみ | 除外したノード（`web:<selector>`。件数は `ignored_count` と一致） |
+| `unmatched_ignores` | string[] | 非空時のみ | どのノードにも一致しなかった `ignore_nodes` エントリ |
+| `unmatched_ignore_regions` | string[] | 非空時のみ | どのノード中心とも重ならなかった `ignore_region` |
+| `unresolved_parent_refs` | string[] | 非空時のみ | 入力に無い `parent` 参照（例: `Web: '.foo'`）。`status` は変えない |
+| `parent_overflow_skipped_zero_geom` | number | 1 以上のとき | 親の `w`/`h` が 0 以下のため `parent_overflow` をスキップした子の件数 |
 
 ---
 
@@ -270,6 +289,8 @@ DOM からの抽出手順（`getBoundingClientRect()` + `window.scrollX` / `wind
 ```bash
 go build -o design-compare
 ```
+
+コミット前に `gofmt -w .` で整形してください（CI でも `gofmt -l .` を検査します）。
 
 ### CLI ワンショット比較
 
@@ -294,13 +315,21 @@ go build -o design-compare
 go test -v ./...
 ```
 
-拡張機能の MCP クライアント（timeout / abort / 子プロセス回収）は Node 組み込みの test runner で検証します。実バイナリ比較ケースのため、先に `go build -o design-compare .` が必要です。
+拡張機能の MCP クライアント（timeout / abort / 子プロセス回収）は Node 組み込みの test runner で検証します。`npm test` は実バイナリ比較ケース用に `go build -o design-compare .` を実行してからテストします（Node 22.18 以降が必要です）。
 
 ```bash
-go build -o design-compare .
-npm run test:ext
-# または: node --test extensions/design-compare/mcp-client.test.ts
+npm test
+# または: go build -o design-compare . && node --test extensions/design-compare/mcp-client.test.ts
 ```
+
+### npm への自動リリース
+`main` に取り込まれた変更が **10 件**たまるたびに、`.github/workflows/release.yml` が npm へ自動でリリースします。手動でのバージョン更新や `npm publish` は不要です。
+
+- **発火条件:** `main` への push から始まった `ci.yml` が成功したときだけです。PR の CI 完了やフォークリポジトリからの実行では起動しません。`workflow_dispatch` で手動実行する場合は `main` 上で起動してください（他のブランチを指定しても実行されません）。失敗したコミットはリリース対象になりません。
+- **件数の数え方:** 直近の `v*` タグ以降のコミット数。`v*` タグがまだ無いリポジトリでは初回コミット以降の全コミットを数えます。CI 完了からリリース処理までの間に `main` が進んでいた場合は公開せずスキップし、最新の `main` の CI 完了時に改めて判定します。
+- **版番号:** `package.json` と npm の最新公開版のうち大きい方のパッチを 1 つ上げ、`plugin.yaml`、`.codex-plugin/plugin.json`、各 `marketplace.json` の `plugins[].version` も同じ値に揃えます（marketplace 最上位の `version` は形式の版なので更新しません）。
+- **処理順:** 公開が成功してから `chore: release vX.Y.Z [skip ci]` を `main` にコミットし、`vX.Y.Z` タグと GitHub リリースを作成します（レジストリとタグのずれを避けるため）。
+- **必要な設定:** リポジトリシークレット `NPM_TOKEN`（npm の automation token）。未設定のときは公開だけをスキップし、実行ログに警告を出します。`main` に PR 必須のブランチ保護をかけている場合は、`github-actions[bot]` からの直接 push が拒否されるため、リリース用の bypass を許可するか保護の対象外にしてください。
 
 ---
 
@@ -359,14 +388,17 @@ pi remove npm:design-compare   # アンインストール
 > 「Figmaのこのデザイン（Figma URL）と、ローカルの http://localhost:3000/dashboard を比較して。テンプレート（配置）が同じかどうかを検証したい」
 
 ### AIの自律的な処理フロー:
+実行ごとに一意な作業ディレクトリ（例: `/tmp/design-compare-<一意な接尾辞>/`）を作り、成果物はそこにだけ保存する。`/tmp` 直下の固定名は使わない（並列呼び出しや縦横の取り直しでキャプチャが混ざるのを防ぐ）。
+
 1. **デザインデータの取得:**
-   AIが `figma` MCPを使ってデザイン画像やレイアウト座標（JSON）を取得。
+   AIが `figma` MCPを使ってデザイン画像やレイアウト座標（JSON）を取得し、例として `$RUN/figma.png` に保存する。
 2. **実装データの取得:**
-   AIが `chrome-devtools` MCP等を使ってWebページを自動操作（必要なら自動ログイン）し、実装された要素のスクショやDOM座標（JSON）を取得。
+   AIが `chrome-devtools` MCP等を使ってWebページを自動操作（必要なら自動ログイン）し、実装された要素のスクショやDOM座標（JSON）を取得し、例として `$RUN/web.png` に保存する。
 3. **比較の実行:**
    AIが本ツールの `compare_design` を呼び出して比較を実行。
    * 例: `compare_design(mode="layout_tree", figma_layout="...", web_layout="...", pass_rate=95.0)`
-   * 加えて、ブラウザを iPad 縦向き 768×1024 と横向き 1024×768 にリサイズして DOM を取り直し、`mode="layout_integrity"`（横向きは `viewport_preset="ipad_landscape"`）で崩れを検査する。
+   * 画像比較の例: `compare_design(mode="perceptual", image_path_a="$RUN/figma.png", image_path_b="$RUN/web.png")`（`strict` も同じパス）
+   * 加えて、ブラウザを iPad 縦向き 768×1024 と横向き 1024×768 にリサイズして DOM を取り直し、向きごとに別名で保存する（例: `$RUN/web-portrait.json` / `$RUN/web-landscape.json`）。`mode="layout_integrity"` をそれぞれ別ファイルで呼び出す（横向きは `viewport_preset="ipad_landscape"`）。縦向きの座標やファイルを横向き検査に使い回さない。
 4. **結果の分析とコード修正:**
    AIが一致率や差分を分析し、レイアウトがズレているCSSやHTMLを自動で修正・再検証します。
 
@@ -382,7 +414,7 @@ pi remove npm:design-compare   # アンインストール
    Retinaディスプレイ環境と非Retina環境では、スクリーンショットの画素数や縮小処理時のブレンドピクセルが変化します。
 3. **GPUハードウェアアクセラレーションの差:**
    ブラウザのGPUレンダリングによって、グラデーションや色の境界部分で数カラー値の微差が生じることがあります。
-4. **巨大画像:** 画像入力の唯一の通過点で、PNG（IHDR）と GIF（Logical Screen Descriptor）の先頭バイトから各辺 8192px 超をデコード前に拒否する（JPEG・WebP はヘッダ解析が複雑なためこの段階では対象外。後段の `DecodeConfig` / 展開後チェックが担保する）。あわせてフルデコード前にヘッダ寸法を確認し、各辺 30,000px または総ピクセル 50,000,000 を超える入力は展開せずエラーにする（フルページ撮り直しミスなどによる OOM 防止）。超過時はリサイズまたは切り出しが必要。
+4. **巨大画像:** 画像入力の唯一の通過点で、PNG（IHDR）と GIF（Logical Screen Descriptor）の先頭バイトから各辺 8192px 超をデコード前に拒否する（JPEG・WebP はヘッダ解析が複雑なためこの段階では対象外。後段の `DecodeConfig` / 展開後チェックが担保する）。あわせてフルデコード前にヘッダ寸法を確認し、各辺 30,000px または総ピクセル 50,000,000 を超える入力は展開せずエラーにする（フルページ撮り直しミスなどによる OOM 防止）。超過時はリサイズまたは切り出しが必要。パス入力では読み込み前にファイルサイズも確認し、512 MiB 超は拒否する（8192×8192 画像を符号化した現実的な最大より十分大きい安全網で、正常な入力は拒否しない）。
 
 ---
 

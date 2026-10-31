@@ -21,7 +21,7 @@ The plugin provides two independent providers that can be used individually or t
 | **Image generation** | Nano Banana models, for Magpie's image generation (Magpie v0.1.2075+, see below) | Not supported |
 | **Sign-in method** | Sign in directly in an isolated popup browser window | Copy `cookie` from a private/incognito window |
 | **Usage cards** | Shows models currently on cooldown and recovery times | Syncs **5-hour** & **weekly** usage and reset times from the web |
-| **Local backend** | AIStudio2API (`v0.2.17`) | gemini-web2api-go (`4.26.0-magpie.1` optimized build) |
+| **Local backend** | AIStudio2API (`v0.2.18`) | gemini-web2api-go (`4.26.0-magpie.1` optimized build) |
 
 ---
 
@@ -33,7 +33,7 @@ Install **magpie-gemini-web** from the Magpie plugin market, then sign in to eit
 
 1. Sign in to **Google AI Studio** in Magpie and choose **「用 Google 账号登录（推荐）」** (Sign in with a Google account).
 2. Sign in to your Google account in the separate login window that opens (your regular browser is unaffected), then close the window.
-   > On first run, the local service (~30 MB) and the login browser Camoufox (~300 MB) are downloaded first, so the window may take a few minutes to appear. While they download, Magpie opens a progress page in your browser. Magpie waits at most 10 minutes, downloads included, so finish signing in promptly; if GitHub is unreachable, set `studio.proxy` first (see plugin options and proxy settings below).
+   > On first run, the local service (~40 MB) and the login browser Camoufox (~300 MB) are downloaded first, so the window may take a few minutes to appear. While they download, Magpie opens a progress page in your browser. Magpie waits at most 10 minutes, downloads included, so finish signing in promptly; if GitHub is unreachable, set `studio.proxy` first (see plugin options and proxy settings below).
 3. **Managing accounts:** Choose "Sign in with a Google account" again at any time to **add a new account**, create a card for an existing local account, or **re-authenticate** an expired account.
 
 ### Option 2: Gemini Web (`gemini-web`)
@@ -67,10 +67,15 @@ Install **magpie-gemini-web** from the Magpie plugin market, then sign in to eit
 
 `ai-studio` lists the Nano Banana image models your account can use (such as `gemini-3.1-flash-image` and `gemini-3-pro-image`), for Magpie's image generation. **This needs Magpie v0.1.2075 or later**, the first to take a plugin's Gemini image models as models that draw.
 
-- **No need to tick them, or to pick them for a chat:** Magpie's Settings list them under **Images → Image generation**. Pick one there, or leave it on Automatic.
-- **How agents draw:** an agent calls Magpie's `generate_image` tool (the Magpie Image MCP from the Library), which draws with the model picked there; reference images make it an edit. To try it from the command line: `magpie tool generate_image "a magpie on a branch, watercolour" --size 16:9 -o magpie.png`.
+**Drawing from an agent** (pi, Claude Code, Codex and the rest alike):
+
+1. **Pick the model to draw with:** Magpie's Settings list these models under **Images → Image generation**. Pick one (such as `ai-studio/gemini-nano-banana-2.1`), or leave it on Automatic. There's no need to tick them in any model list.
+2. **Give the agent the drawing tool:** click **Give agents Magpie Image…** under that row, tick the agents that should draw in the Library it opens, then start a new session in the agent. With the Library turned off, the row says **Turn on the Library** instead: click that first. From the command line: `magpie library mcp add magpie-image magpie mcp image agents=pi` (several agents separated by commas, as in `agents=pi,claude`).
+3. **Chat as usual:** keep the agent on its usual chat model and ask it to draw something. It calls the `generate_image` tool, which draws with the model from step 1 and saves the image in the project's `generated-images/` folder; reference images make it an edit.
+
+- **Don't pick an image model as the chat model:** Magpie still keeps a plugin's models that draw in its chat model lists ([yetone/magpie#2792](https://github.com/yetone/magpie/issues/2792)). Picked there, they show no picture: an agent such as pi has no place for an image in the model's reply, so the image the model draws is dropped, while the model believes it was shown. They take no tool calls either, and have 32K–128K context windows.
+- **Drawing from the command line:** `magpie tool generate_image "a magpie on a branch, watercolour" --size 16:9 -o magpie.png`; add `--model ai-studio/gemini-3-pro-image` to draw with another model this once. If the terminal can't find the `magpie` command (step 2's command too), click **Add to PATH** on the **Command line** row of Magpie's Settings, then open a new terminal.
 - **Size:** `size` gives the aspect ratio. A ratio (such as `16:9` or `1:4`) is used as it is when the model takes it, else the nearest one it does; a size such as `1536x1024` is made the nearest usual ratio by Magpie first. `quality` makes no difference for these models.
-- **Don't tick them as chat models:** Magpie still keeps a plugin's models that draw in its chat model lists ([yetone/magpie#2792](https://github.com/yetone/magpie/issues/2792)). They take no tool calls and have 32K–128K context windows, so they make poor chat models for agents.
 - If you don't want the image models, turn them off with `studio.imageModels` (see the options below).
 
 ---
@@ -167,7 +172,7 @@ When a plugin error asks you to run a command, it includes the full ready-to-cop
 - Concurrency is capped at 1, but Google account rate-limiting or flagging cannot be completely ruled out—use at your own risk.
 
 **AI Studio upgrades and model selection:**
-- The plugin pins SHA-256-verified `v0.2.17-magpie.1`, based on upstream `v0.2.17`. Upgrade the plugin to update the backend. Official releases at or below that upstream version, and managed backends an older plugin installed, are upgraded on the next managed startup, preserving accounts, port and sign-in credentials.
+- The plugin pins SHA-256-verified `v0.2.18-magpie.1`, based on upstream `v0.2.18`. Upgrade the plugin to update the backend. Official releases at or below that upstream version, and managed backends an older plugin installed, are upgraded on the next managed startup, preserving accounts, port and sign-in credentials.
 - **Online updates are disabled in the managed backend on macOS, Linux, and Windows.** The admin page says updates are managed by magpie-gemini-web; the update endpoint returns HTTP 409 and update checks do not contact GitHub. Independently managed external servers are unaffected. See [docs/studio-release.md](docs/studio-release.md) for how the managed build is made and reproduced.
 - Managed Unix installs still attempt to set `package/` to `0555` as additional file protection. Permission failures do not block service, and disabling online updates does not depend on permissions. To reset by manually deleting the data directory, stop the service first, then run `chmod -R u+w "<data-dir>/package"` before deleting it; replace `<data-dir>` with the actual path.
 - If a newer or custom version is installed, the plugin reports a conflict with `stop`, `install`, and `start` commands carrying the correct `--data-dir`. Stop can recover a changed listener PID and verifies its executable path before signaling it. If HTTP is down but the process is still alive, the plugin refuses to reinstall or launch a second process.

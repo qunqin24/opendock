@@ -2,7 +2,7 @@
 
 把 [antongulin/opencode-skill-creator](https://github.com/antongulin/opencode-skill-creator) 改写成**中文 + 单 CLI 工具**的 OpenCode 插件：一个工具、一个 `args` 字符串、一套中文帮助与错误文案。
 
-> 当前状态：**B0–B6 全部完成**，7 个子命令均已可用，`npm test` 可跑（287 例全绿，Node 22.3+ 与 24 均实测）；上游继承缺陷台账目前是**已修 7 条 + 待修 0 条**（见 [docs/design/上游携带缺陷台账.md](docs/design/上游携带缺陷台账.md)）；**CI 已补**（`.github/workflows/ci.yml`：push / PR 跑 typecheck + test + `npm pack --dry-run`）。**npm 发布尚未做**：由用户手动执行 `npm publish`。落地批次与实测结论见 [docs/ROADMAP.md](docs/ROADMAP.md)。
+> 当前状态：**B0–B6 全部完成**，7 个子命令均已可用，`npm test` 可跑（294 例全绿，Node 22.3+ 与 24 均实测）；**独立 shell 入口 `skill-zh`（bin）已补**，长评测可在独立终端跑、不占会话；上游继承缺陷台账目前是**已修 7 条 + 待修 0 条**（见 [docs/design/上游携带缺陷台账.md](docs/design/上游携带缺陷台账.md)）；**CI 已补**（`.github/workflows/ci.yml`：push / PR 跑 typecheck + test + `npm pack --dry-run`）。**npm 发布尚未做**：由用户手动执行 `npm publish`。落地批次与实测结论见 [docs/ROADMAP.md](docs/ROADMAP.md)。
 
 ## 是什么
 
@@ -28,6 +28,7 @@
 | 描述极简 | 工具 description ≤ **60** 字符，只讲做什么，不讲用法（用法交给 `help`） |
 | 失败可修 | 错误统一三段式：`错误：` / `改法：` / `可用：skill_zh help` |
 | 自包含 | 文案与文档不指向其它技能目录 |
+| 终端等价 | 同包提供 bin `skill-zh`，在任意 shell 里复用同一套子命令（不新增工具） |
 
 ## 安装
 
@@ -51,6 +52,17 @@ npm i -g @xiaoqiong0v0/opencode-skill-creator-zh
 
 适合开发调试或离线环境：先 `npm run build` 产出 `dist/`，再让 OpenCode 从本地路径加载该插件目录，重启 OpenCode。
 
+### 独立终端：`skill-zh`（bin）
+
+全局安装后（或用 `npx @xiaoqiong0v0/opencode-skill-creator-zh`）可直接在 shell 里跑同一套子命令，长评测不占 OpenCode 会话：
+
+```sh
+cd /path/to/your/project
+skill-zh eval ./skills/api-doc-writer --runs 3 --workers 4
+```
+
+目录基准是当前 cwd（不向上查找）；成功写 stdout / 退出码 0，失败写 stderr / 退出码 1。细节见 [docs/installation.md](docs/installation.md#独立终端入口-skill-zhbin)。
+
 ### 技能装在哪
 
 插件 npm 包内自带唯一一份 `skill/`（与 `dist/` 平级）。安装后技能落在 `~/.config/opencode/skills/opencode-skill-creator-zh/`，与上游英文版技能（`opencode-skill-creator/`）**目录名不同、可共存**。为什么入包、配套约束是什么，见 [docs/design/技能打包决策.md](docs/design/技能打包决策.md)。
@@ -62,8 +74,8 @@ npm i -g @xiaoqiong0v0/opencode-skill-creator-zh
 | 子命令 | 作用 | 示例 |
 |---|---|---|
 | `help` | 打印完整用法与全部示例 | `skill_zh help` |
-| `new` | 按中文模板生成技能骨架（`SKILL.md` + `references/`） | `skill_zh new api-doc-writer --dir ./skills` |
-| `validate` | 校验 `SKILL.md` 结构、frontmatter 字段与 description 长度（`--strict` 把长度与命名从提示升为错误） | `skill_zh validate ./skills/api-doc-writer` |
+| `new` | 按中文模板生成技能骨架（`SKILL.md` + `references/` + 可跑的 `eval_set.json` 骨架；`--force` 不覆盖已有评测集） | `skill_zh new api-doc-writer --dir ./skills` |
+| `validate` | 校验 `SKILL.md` 结构、frontmatter 字段、description 长度与占位文案（`--strict` 把提示升为错误） | `skill_zh validate ./skills/api-doc-writer` |
 | `eval` | 跑触发率评测，给通过率、失败用例与汇总数据 | `skill_zh eval ./skills/api-doc-writer --runs 3 --workers 4` |
 | `optimize` | 按评测失败迭代改写 description（训练/测试集切分） | `skill_zh optimize ./skills/api-doc-writer --iterations 5` |
 | `package` | 只导出可分发技能目录（`--out` 必填；npm 发布由用户手动执行） | `skill_zh package ./skills/api-doc-writer --out ./skills-package/api-doc-writer` |
@@ -77,10 +89,11 @@ npm i -g @xiaoqiong0v0/opencode-skill-creator-zh
 npm run build      # prebuild 先清 dist/，再由 tsc 直出 dist/
 npm test           # node --test --experimental-test-module-mocks（要求 Node >= 22.3）
 npm run typecheck  # tsc --noEmit
+node dist/cli/main.js help  # 直接跑 bin 产物（等价于全局安装后的 skill-zh）
 ```
 
 - `dist/` 不入库（`.gitignore` 已忽略），发布产物只有 `dist/`、`skill/`、`templates/`、`README.md` 四部分（`templates/` 是 `new` 生成骨架的运行必需）。
-- 上述命令在本仓当前可直接运行（要求 Node ≥ 22.3）；`npm test` 287 例全绿。
+- 上述命令在本仓当前可直接运行（要求 Node ≥ 22.3）；`npm test` 294 例全绿。
 - 编码规范见 [docs/CONVENTIONS.md](docs/CONVENTIONS.md)，需求与验收口径见 [docs/SPEC.md](docs/SPEC.md)。
 
 ## 与上游区别

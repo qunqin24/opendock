@@ -1,6 +1,7 @@
 # Spicrawl agent plugins: web scraping for Claude Code, Cursor, Codex and Gemini CLI
 
 [![smithery badge](https://smithery.ai/badge/spicrawl/web-scraper)](https://smithery.ai/servers/spicrawl/web-scraper)
+[![M8ven Score](https://m8ven.ai/badge/mcp/officialspicrawl-agent-plugins-1wxo06?v=e14d0b2e7bd0e766d550131b0f3a0b3e)](https://m8ven.ai/mcp/officialspicrawl-agent-plugins-1wxo06?s=readme)
 
 **How do I give Claude Code, Cursor, Codex or Gemini CLI web scraping?** Connect the agent to
 Spicrawl's hosted [Model Context Protocol](https://modelcontextprotocol.io/) (MCP) server at
@@ -42,6 +43,7 @@ tool under [Install](#install).
 | Factory Droid | `droid plugin marketplace add OfficialSpicrawl/agent-plugins && droid plugin install spicrawl@spicrawl-plugins --scope user` | plugin (MCP server + skill); reads `SPICRAWL_AUTH` |
 | GitHub Copilot CLI | `copilot plugin marketplace add OfficialSpicrawl/agent-plugins && copilot plugin install spicrawl@spicrawl-plugins` | plugin (skill), plus one command for the MCP server (see [GitHub Copilot CLI](#github-copilot-cli)) |
 | Devin | `devin plugins install --local ./plugins/spicrawl` | plugin (MCP server + skill), run from a clone of this repository |
+| OpenBot | Marketplace → Apps, search "Spicrawl" | Marketplace app (MCP server + API key auth); see [OpenBot](#openbot) |
 | Dify | Plugins, Marketplace, search "Spicrawl" | plugin (Scrape, Extract and Batch scrape tools), from the [Dify Marketplace](https://marketplace.dify.ai/plugin/spicrawl/spicrawl) |
 | n8n | `npm install n8n-nodes-spicrawl` in `~/.n8n/nodes`, or Settings, Community Nodes, Install | community node `n8n-nodes-spicrawl` (Scrape URL and Batch Scrape), on npm; source in [OfficialSpicrawl/n8n-nodes-spicrawl](https://github.com/OfficialSpicrawl/n8n-nodes-spicrawl) |
 | Any tool that reads Agent Skills | `npx skills add OfficialSpicrawl/agent-plugins` | the skill only |
@@ -221,6 +223,22 @@ copilot mcp add --transport http spicrawl https://mcp.spicrawl.com/mcp \
 Your shell expands the variable, so the key is written to Copilot's MCP config file on your
 machine.
 
+### OpenBot
+
+In OpenBot, go to **Marketplace → Apps**, search for **Spicrawl**, and connect it. OpenBot asks for
+a Spicrawl API key and forwards it as `Authorization: Bearer <key>` to the hosted MCP server at
+`https://mcp.spicrawl.com/mcp`.
+
+Until the listing is live in OpenBot's catalog, add the server manually in **Server settings → MCP
+servers**:
+
+| Setting | Value |
+|---|---|
+| Name | `spicrawl` |
+| Transport | HTTP |
+| URL | `https://mcp.spicrawl.com/mcp` |
+| Header | `Authorization: Bearer <your key>` |
+
 ### Dify
 
 The Dify plugin (source in [`dify/`](dify)) adds three tools to workflows and agents: Scrape,
@@ -357,15 +375,15 @@ account and an API key.
 The API key is sent only to Spicrawl: to `mcp.spicrawl.com` in the `Authorization` header of MCP
 requests, and, for the Dify plugin and the n8n node, to `api.spicrawl.com` in the `Authorization`
 header of API requests. Nothing here contains a key. The plugins for Claude Code, Codex and ChatGPT, Cursor, Factory Droid,
-Devin, Gemini CLI and Copilot CLI run no code of their own: they are JSON manifests, a skill file
+Devin, Gemini CLI, Copilot CLI and OpenBot run no code of their own: they are JSON manifests, a skill file
 (Markdown) and a logo. The OpenCode plugin is a small JavaScript package (`opencode/`) that reads
 `SPICRAWL_API_KEY` and hands it to OpenCode as the MCP header; it makes no network requests
 itself. The Dify plugin (`dify/`, Python) and the n8n node ([its own repository](https://github.com/OfficialSpicrawl/n8n-nodes-spicrawl), TypeScript) make HTTPS requests to
 `https://api.spicrawl.com` and nowhere else; they read the key from Dify's plugin authorization
 and from an n8n credential. Each tool reads the key from where its format allows: a sensitive
 plugin setting (Claude Code, Gemini CLI), a plugin variable you set in Cursor, an environment variable (Codex, through
-your own `config.toml` entry; Factory Droid; OpenCode), a credential you enter in Devin, or the
-command you type (Copilot CLI, any MCP client).
+your own `config.toml` entry; Factory Droid; OpenCode), a credential you enter in Devin or OpenBot,
+or the command you type (Copilot CLI, any MCP client).
 
 The pages an agent asks Spicrawl to scrape, and the results, go through the same server.
 

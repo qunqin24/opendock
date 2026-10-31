@@ -1,42 +1,35 @@
 # oc-collections
 
-The single source for nathwn12's OpenCode plugins and MCP servers, each installable on its own.
+OpenCode plugins, MCP servers and tooling by nathwn12.
 
-## Install
+Each package installs on its own. There is no bundle and no all-in-one — you take one thing, not the set.
 
-**OpenCode plugins.** Add the package name to the `plugins` array in `opencode.jsonc`, then restart OpenCode:
+## Start here
 
-```json
-{ "plugins": ["@nathwn12/oc-bifrost"] }
-```
+**[Browse `packages/`](https://github.com/nathwn12/oc-collections/tree/main/packages)**
 
-Use `oc-flight-deck` in the same position for the sidebar panel.
+Every package is a folder with its own README. Open the one you want; its README carries the install steps for that package and nothing else. Nothing here requires the whole repo.
 
-**Command-line tools.** Run:
+## What's in it
 
-```sh
-npx -y oc-harness-setup setup
-```
+| Package | Kind | Version | What it does | Install |
+| --- | --- | --- | --- | --- |
+| oc-bifrost | plugin | `1.6.13` | Runs older OpenCode plugins on the current runtime. | Add `@nathwn12/oc-bifrost` to your `plugins`. |
+| oc-flight-deck | plugin | `0.21.0` | Live session telemetry in the OpenCode sidebar. | Add `oc-flight-deck` to your `plugins`. |
+| oc-harness-setup | CLI | `1.0.0` | Installs the Windows agent harness. | `npx -y oc-harness-setup setup` |
+| oc-session-driver | plugin | not published | Cross-session talk: list live sessions, send one message to a peer, read its reply. | Not published yet, so nothing installs it. |
+| rea-shim | MCP | `0.2.2` | Launcher for the rea reverse-engineering server. | `npx -y rea-shim --doctor` |
+| oc-collections | repo | — | This index and npm-workspaces monorepo. | — |
 
-**MCP servers.** Run:
+Each package's own README has the full steps, options and requirements. This page only tells you which folder to open.
 
-```sh
-npx -y rea-shim --doctor
-npx -y gladius-mcp
-npx -y puppet-mcp
-```
+The `gladius` and `puppet` MCP servers are not in this repo — they live in their own repositories. Their launchers fetch engine binaries from those repositories' release assets on first run.
 
-The gladius and puppet launchers download their engine binaries from the `gladius` and `puppet` repositories' release assets on first run.
+`oc-session-driver` is in the tree but not published, so it is not an install target yet.
 
-## Packages
+## Requirements
 
-| Package | What it does | Version | Links |
-| --- | --- | --- | --- |
-| oc-bifrost | Runs V1-era OpenCode plugins on the V2 runtime. | `1.6.13` | [repo](https://github.com/nathwn12/oc-collections) · [npm](https://www.npmjs.com/package/@nathwn12%2Foc-bifrost) |
-| oc-flight-deck | Live session telemetry in the OpenCode sidebar. | `0.20.6` | [repo](https://github.com/nathwn12/oc-collections) · [npm](https://www.npmjs.com/package/oc-flight-deck) |
-| oc-harness-setup | Installs and orchestrates the Windows harness. | `0.6.0` | [repo](https://github.com/nathwn12/oc-collections) · [npm](https://www.npmjs.com/package/oc-harness-setup) |
-| rea-shim | One-line MCP launcher and explicit bootstrapper for rea. | `0.2.2` | [repo](https://github.com/nathwn12/oc-collections) · [npm](https://www.npmjs.com/package/rea-shim) |
-| oc-collections | This index and npm-workspaces monorepo. | `this index` | [repo](https://github.com/nathwn12/oc-collections) |
+Windows. Every package here targets Windows and none of them claims support elsewhere.
 
 ## Development
 
@@ -45,13 +38,12 @@ From the repo root:
 ```sh
 npm install
 npm run check
-npm test
 npm run pack:check
 ```
 
-`npm run check` runs the documentation checker, its self-test, and the workspace checks — not the index checks, which are separate steps in `.github/workflows/check.yml` and can be run by hand with `pwsh -NoProfile -File scripts/check-index.ps1 --structural`. `pack:check` runs check and build, then verifies every tarball.
+`npm run check` runs the docs checker, its self-test, and every workspace's own check. `pack:check` runs check and build, then verifies each tarball.
 
-Package releases use tags `<package>@<version>`. The `release` workflow is OIDC-only; `dry_run` defaults to true. The lane has run: all four packages are published through OIDC with provenance, and the post-publish verification retries npm propagation lag.
+Releases use tags of the form `<package>@<version>`. The release workflow publishes over OIDC with provenance and no stored token.
 
 ## Licence
 

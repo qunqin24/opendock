@@ -38,7 +38,7 @@ TUI plugins go in `~/.config/opencode/cli.json`. Name the package, pinned to a v
 ```json
 {
   "plugins": [
-    "@kud/opencode-statusline@0.1.0",
+    "@kud/opencode-statusline@0.1.1",
     "@kud/opencode-shell-highlighting@0.1.0"
   ]
 }

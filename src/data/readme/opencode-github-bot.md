@@ -24,7 +24,7 @@ jobs:
       issues: write
     steps:
       - uses: actions/checkout@v4
-      - uses: link-seek/opencode-github-bot@v0.1.0
+      - uses: link-seek/opencode-github-bot@v0.2.9
         with:
           model: ${{ vars.OPENCODE_REVIEW_MODEL }}
           github-token: ${{ secrets.AGENT_GITHUB_TOKEN }}
@@ -40,13 +40,13 @@ Add to `opencode.json(c)`:
 
 ```jsonc
 {
-  "$schema": "https://opencode.ai/config.json",
+  "": "https://opencode.ai/config.json",
   "plugins": ["opencode-github-bot"]
 }
 ```
 
-Registers tools: `gh-pr-comment`, `gh-pr-review`, `gh-pr-create`. Skills: `pr-review`, `issue-fix`.
+Registers tools: `gh-pr-comment`, `gh-pr-review`, `finish-review`, `finish-fix`. Skills: `pr-review`, `issue-fix`.
 
 ## Status
 
-MVP (v0.1.0): PR review only. Issue-fix in progress.
+v0.2.9: PR review + issue fix both working. Plugin self-contained (model only edits code, tools handle git/PR). 59 unit tests + typecheck + CI smoke test. Trusted Publishing (OIDC) enabled.

@@ -21,7 +21,7 @@
 | **图片生成** | Nano Banana 系列模型，供 Magpie 的图片生成使用（需要 Magpie v0.1.2075+，见下文） | 不支持 |
 | **登录方式** | 弹出独立浏览器窗口直接登录 Google | 用无痕窗口登录并复制 `cookie` |
 | **额度卡片** | 显示冷却中的模型与恢复时间 | 同步网页版 **5 小时** 与 **每周** 用量及重置时间 |
-| **本地后端** | AIStudio2API (`v0.2.17`) | gemini-web2api-go (`4.26.0-magpie.1` 优化版) |
+| **本地后端** | AIStudio2API (`v0.2.18`) | gemini-web2api-go (`4.26.0-magpie.1` 优化版) |
 
 ---
 
@@ -33,7 +33,7 @@
 
 1. 在 Magpie 中登录 **Google AI Studio**，选择 **「用 Google 账号登录（推荐）」**。
 2. 在弹出的独立登录窗口中登录 Google 账号（不影响日常浏览器），完成后直接关闭窗口。
-   > 首次使用要先下载本地服务（约 30 MB）和登录浏览器 Camoufox（约 300 MB），弹窗可能需要等几分钟才出现。需要下载时，Magpie 会在浏览器里打开一个进度页，显示下载进度。Magpie 最多等 10 分钟（下载的时间也算在内），请尽快完成登录；连不上 GitHub 时，先按下面「插件选项与代理配置」设置 `studio.proxy`。
+   > 首次使用要先下载本地服务（约 40 MB）和登录浏览器 Camoufox（约 300 MB），弹窗可能需要等几分钟才出现。需要下载时，Magpie 会在浏览器里打开一个进度页，显示下载进度。Magpie 最多等 10 分钟（下载的时间也算在内），请尽快完成登录；连不上 GitHub 时，先按下面「插件选项与代理配置」设置 `studio.proxy`。
 3. **后续管理**：再次点击「用 Google 账号登录」，可选择**添加新账号**、为本机已有账号建卡，或为过期账号**重新登录**。
 
 ### 方式二：Gemini Web (`gemini-web`)
@@ -67,10 +67,15 @@
 
 `ai-studio` 会列出账号可用的 Nano Banana 系列图像模型（如 `gemini-3.1-flash-image`、`gemini-3-pro-image`），供 Magpie 的图片生成使用。**需要 Magpie v0.1.2075 及以上**：从这个版本起，Magpie 才会把插件的 Gemini 图像模型列为出图模型。
 
-- **不用勾选，也不用在对话里选它们**：Magpie 设置的 **Images → Image generation** 会直接列出这些模型，选中一个，或保持 Automatic（自动）即可。
-- **Agent 怎么出图**：Agent 调用 Magpie 的 `generate_image` 工具（Library 里的 Magpie Image MCP），Magpie 用上面选的模型出图；带参考图就是改图。也可以在命令行试：`magpie tool generate_image "a magpie on a branch, watercolour" --size 16:9 -o magpie.png`。
+**让 Agent 出图**（pi、Claude Code、Codex 等都一样）：
+
+1. **选画图模型**：Magpie 设置的 **Images → Image generation** 会直接列出这些模型，选中一个（如 `ai-studio/gemini-nano-banana-2.1`），或保持 Automatic（自动）。不用在模型列表里勾选它们。
+2. **把画图工具交给 Agent**：点这一行下面的 **Give agents Magpie Image…**，在打开的 Library 里勾选要出图的 Agent，然后新开一个 Agent 会话。Library 被关掉时，这里显示的是 **Turn on the Library**，先点它。也可以用命令行：`magpie library mcp add magpie-image magpie mcp image agents=pi`（多个 Agent 用逗号隔开，如 `agents=pi,claude`）。
+3. **照常对话**：Agent 继续用平常的对话模型，跟它说「画一张……」就行。它会调用 `generate_image` 工具，用第 1 步选的模型出图，图片存进项目的 `generated-images/` 文件夹；带参考图就是改图。
+
+- **别把图像模型选成对话模型**：Magpie 目前会把能出图的插件模型也留在对话模型列表里（[yetone/magpie#2792](https://github.com/yetone/magpie/issues/2792)）。选了也看不到图：pi 等 Agent 的回复里放不下图片，模型画出的图会被直接丢掉，模型却以为已经发出去了。它们也不支持工具调用，上下文只有 32K–128K。
+- **在命令行出图**：`magpie tool generate_image "a magpie on a branch, watercolour" --size 16:9 -o magpie.png`，加 `--model ai-studio/gemini-3-pro-image` 可以临时换模型。终端里找不到 `magpie` 命令时（第 2 步的命令也一样），在 Magpie 设置的 **Command line** 一行点 **Add to PATH**，再开一个新终端。
 - **尺寸**：`size` 决定宽高比：写比例（如 `16:9`、`1:4`）时，模型支持就照用，不支持就取它支持的最接近的比例；写 `1536x1024` 这样的尺寸时，Magpie 先换成最接近的常用比例。`quality` 对这些模型不起作用。
-- **别把它们勾进对话模型**：Magpie 目前会把能出图的插件模型也留在对话模型列表里（[yetone/magpie#2792](https://github.com/yetone/magpie/issues/2792)）。它们不支持工具调用，上下文也只有 32K–128K，不适合当 Agent 的对话模型。
 - 不需要图像模型时，可以用 `studio.imageModels` 关掉（见下方选项）。
 
 ---
@@ -167,7 +172,7 @@ magpie plugin options magpie-gemini-web '{"studio":{"proxy":"http://127.0.0.1:78
 - 插件将请求并发限制为 1，但仍无法完全排除 Google 账号风控风险，请自行评估使用。
 
 **AI Studio 升级与模型范围：**
-- 插件固定使用经过 SHA-256 校验的 `v0.2.17-magpie.1`（基于上游 `v0.2.17`），通过升级插件更新后端。同基线或更旧的官方版、以及旧版插件装的托管后端，在下次管理启动时自动升级，保留账号、端口与登录凭据。
+- 插件固定使用经过 SHA-256 校验的 `v0.2.18-magpie.1`（基于上游 `v0.2.18`），通过升级插件更新后端。同基线或更旧的官方版、以及旧版插件装的托管后端，在下次管理启动时自动升级，保留账号、端口与登录凭据。
 - **托管后端已在 macOS、Linux、Windows 统一禁用在线更新**：管理页提示“更新由 magpie-gemini-web 管理”，更新接口返回 HTTP 409，检查更新也不会访问 GitHub。用户自行连接的外部服务不受影响。托管构建方式和可复现构建流程见 [docs/studio-release.md](docs/studio-release.md)。
 - Unix 的 `package/` 仍尽力设置为 `0555`，作为额外的文件保护；权限设置失败不阻断服务，在线更新的禁用也不依赖该权限。若要手动删除数据目录来重置，请先停止服务，再运行 `chmod -R u+w "<数据目录>/package"` 恢复可写权限，然后删除；将 `<数据目录>` 替换为实际路径。
 - 若自行更新到更新版或定制版，插件会提示版本冲突，并提供带正确 `--data-dir` 的 `stop`、`install`、`start` 命令。停止时会找回更新后的监听进程 PID，并核对可执行文件路径；无法核实身份就不会发送终止信号。HTTP 端口关闭但进程尚未退出时，插件不会重装或启动第二个进程。

@@ -348,7 +348,7 @@ records, if you want to compute something else.
 | --- | --- |
 | **Platform** | **Linux** |
 | **App** | **OpenCode V2 Desktop** — the terminal client is not enough |
-| OpenCode version | V2 (developed against 2.0.14, 2.0.16, 2.0.18, 2.0.19 and 2.0.26) |
+| OpenCode version | V2 (developed against 2.0.14, 2.0.16, 2.0.18, 2.0.19, 2.0.26 and 2.2.5) |
 | Node | 18 or newer, for the plugin |
 | Python | **not needed any more** |
 | Packages to install | **none** |
@@ -608,7 +608,7 @@ To install a copy of the checkout instead, drop the `--link`. To put it somewher
 ### Development
 
 ```bash
-npm test                 # 493 checks
+npm test                 # 494 checks
 npm run test:compat      # the compatibility check's own logic
 npm run compat           # this plugin against the pinned OpenCode API
 node selftest.mjs        # can this machine show the readout?

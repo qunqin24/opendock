@@ -15,7 +15,7 @@
 
 <br>
 
-Finished lists from the live web for your agent, every row with its source, priced before anything runs. Ask for the list you need in plain words and get all of it: only the matches, each with the page it came from, kept current and sent where you work. You pay only for the matches.
+Finished lists from the live web for your agent, every row with its source, priced before anything runs. Ask for the list you need in plain words and get all of it: only the matches, each with the page it came from, kept current and sent where you work. You pay for each result delivered.
 
 Your agent asks for "food banks in Texas, with their annual revenue" and gets rows it can cite, each with the page behind it. It sees the price first, and a search that finds nothing costs nothing.
 

@@ -6,7 +6,7 @@
 [![npm downloads](https://img.shields.io/npm/dm/@te-river/opencode-team-mode.svg)](https://www.npmjs.com/package/@te-river/opencode-team-mode)
 [![license](https://img.shields.io/npm/l/@te-river/opencode-team-mode.svg)](./LICENSE)
 
-> 🤝 **Your OpenCode just hired a team.** Six specialised agents — a Lead, an Architect, an Implementer, a Reviewer, a Tester and a Researcher — with governed tools, structured handoffs and a plan-first approval gate. One plugin, no files to copy.
+> 🤝 **Your OpenCode just hired a team.** Seven roles — a Lead, an Architect, an Implementer, a Reviewer, a Tester, a Researcher and a **ComputerUser** (dispatched only when a desktop-control MCP is present) — with governed tools, structured handoffs and a plan-first approval gate. One plugin, no files to copy.
 
 > 💡 **Best for medium-to-large projects.** The governance layer (approval gate, context offload, tool allowlists) is an asset once a codebase has real surface area — and mostly overhead on tiny scripts and one-off questions. Use it where the work is.
 
@@ -164,6 +164,52 @@ Sub-agents cannot message each other live, so coordination is a **structured rep
 **Browser and network grants.** Interactive browsing is the host's `browser_*` catalog. The Tester carries it for UI verification of your project; open web belongs to the Lead and the Researcher. Architect, Implementer and Reviewer have **no network grant** — a web question there is reported as a gap, never simulated. A host with no browser catalog (CLI / standalone) has no browser at all, and the agent says so.
 
 ---
+
+## 🖱️ Optional: computer use (real desktop)
+
+An **optional** MCP server (`computeruse`, off by default, shipped as its own
+[release asset](https://github.com/Te-River/Opencode-TeamMode/releases/tag/computeruse-v0.0.1))
+that lets `Team` (the lead), `researcher` and `tester` take screenshots and drive the
+mouse/keyboard on the real desktop. `architect`, `implementer` and `reviewer` are turned away at
+**three** layers — because the first one we built turned out to be a no-op on a live host:
+① `permission.evaluate`, which the host **does** fire for MCP tools
+(`action=computeruse_control_status`, measured) and where a denied role is answered with
+`effect:"deny"`; ② the inner `execute` event the host raises for the call itself (empty input,
+role carried on the event); ③ the outer program text, matching `computer[\s._-]?use` — a text
+gate, **not** a sandbox.
+
+What is and is not protected:
+
+- **Elevated (UAC) windows are unreachable.** Only a Windows process can drive the secure
+  desktop, so an admin prompt is exactly the place this cannot click.
+- **Typed text bypasses this project's R2/R6 classifiers.** `type_text` is delivered as
+  keystrokes, not a shell command string, so `shellGuard` / `pathGuard` never see it and the
+  env-variable red line does not exist on that path. Never type credentials with it.
+- **Screenshots are not JIT-governed.** They arrive as non-text parts, and the offload layer
+  only governs text — so an image neither enters the context budget nor gets offloaded.
+- **`researcher` is the highest-risk role here.** It is the one that reads untrusted web pages,
+  and screen control plus untrusted page content is the worst combination in this feature: a
+  page saying "type X into the terminal" is aimed straight at it. The mitigations are the
+  server's action budget, its audit trail and a human watching — not a prompt sentence.
+- **Three layers, and the honest limit of the last one.** ③ is a text-level gate: a program that
+  assembles the name (`"computer"+"use"`) gets past it. When that happens the call is **counted**,
+  not silently allowed — one `computeruse_bypass` row on disk naming the role and the tool, so
+  "we did not stop it" and "it is allowed" stay different claims. The computer-use section of
+  `tm_stats` separates five states: the tool names actually seen, a deny that matched nothing, a
+  bypass, "configured but the server never registered", and "configured and connected but absent
+  from `event.tools`" — MCP tools live in the Code Mode catalog, which is **not** the same as a
+  server that failed to start.
+- **The strongest layer is not verified on a live turn.** `permission.evaluate` firing is
+  measured; `effect:"deny"` working is measured for `shell` and `read`; the composition on an MCP
+  action was deliberately left untested, because a live turn writes a session into your own store.
+  Treat the role split as a guardrail under observation, not as an isolation boundary.
+
+Install it explicitly: `.\scripts\install.ps1 -ComputerUse` (POSIX
+`bash scripts/install.sh --computer-use`); the installer's main flow never touches it.
+Everything else — the upgrade procedure (**two restarts**, because Windows will not replace a
+running exe), how a "no" is remembered so you are never asked twice, the audit format and the
+undo — lives in a page kept deliberately apart from the install guide:
+[`docs/computer-use.md`](./docs/computer-use.md).
 
 ## 🔒 Governance & security
 

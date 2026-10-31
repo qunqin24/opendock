@@ -292,14 +292,16 @@ The [`dynamic-workflows` skill](packages/plugin/skill/dynamic-workflows/SKILL.md
 | `ask(questions, { fallback, graceMs? })` | Ask a person. The `fallback` answers at once when nobody is attached, so a Run never hangs. |
 | `budget` | `{ total, spent(), remaining() }` in output tokens. |
 | `signal` | The Run's `AbortSignal`. |
+| `model` | The launching session's model as `"provider/model#variant"`, or `null` for a headless/synthetic caller. What `agent(…, { model: "inherit" })` and a bare `effort` inherit. |
 | `$`, `file`, `fetch` | Shell, files and HTTP, confined to the project and recorded in the Run's activity. |
 | `workflow(name, args?)` | Run a saved Workflow as one step of this Run (one level deep). |
 | `worktrees()` | The git worktrees kept by `isolation: "worktree"` Units that changed files. |
 
 `agent()` options: `schema`, `label`, `phase`, `subagent` (alias `agentType`; default `general`), `model`
-(`"provider/model#variant"` or `{ providerID, modelID }`), `effort` (the variant), `retries` (repair turns, default 2),
-`timeoutMs`, `permissions`, `isolation: "worktree"` (a fresh git worktree, removed if unchanged) and `location` (another
-directory). `{ receipts: true }` is a separate flag rather than one of these options — see
+(`"provider/model#variant"`, `{ providerID, modelID }`, or `"inherit"` for the launching session's model), `effort`
+(the reasoning variant; with no `model` the Unit inherits the caller's model at that effort), `retries` (repair turns,
+default 2), `timeoutMs`, `permissions`, `isolation: "worktree"` (a fresh git worktree, removed if unchanged) and
+`location` (another directory). `{ receipts: true }` is a separate flag rather than one of these options — see
 [Asserting what a Unit did](#asserting-what-a-unit-did).
 
 `meta`: `name`, `description`, `whenToUse`, `phases`, `args` (zod), `concurrency`, `unitTimeout`, `budget` (a number,

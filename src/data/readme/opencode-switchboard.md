@@ -83,6 +83,8 @@ Run `/switchboard`, press **Ctrl+X, then I** (`<leader>i`), or pick **Open switc
 palette.
 
 - The first time you open it from a conversation, it adds that conversation's project.
+- Starting with `--session` or reopening the panel adopts the conversation you are actually viewing,
+  including when a different session was selected previously.
 - Pressing it again while the panel is open moves the cursor to the conversation you are viewing.
 - **Esc** closes the panel. Until you open it again, the switchboard does not track the sessions you open.
 
@@ -112,7 +114,8 @@ name on a second line.
 | `•`       | Unread: finished since you last looked, or marked unread                           |
 | `~`       | Approvals and questions for this workspace could not be read; press `d` for detail |
 
-A folded project or Later heading sums up what it hides: `? 2` waiting on you, `⠿ 1` running, `• 3` unread.
+A folded project or Later heading sums up what it hides: `? 2` waiting on you, a spinner and count for running
+or queued sessions, and `• 3` unread. Group and session spinners use the same animation and running color.
 
 Unread is independent of placement: mark a session unread to come back to it, whether it is Active or Later.
 
@@ -125,6 +128,7 @@ Unread is independent of placement: mark a session unread to come back to it, wh
 | `u`       | Toggle read/unread                                     |
 | `a` / `l` | Move to Active / Later                                 |
 | `x`       | Close session or project (keeps its saved state)       |
+| Ctrl+X, then W | Close the current conversation's row from either pane |
 | `r`       | Refresh                                                |
 | `d`       | Show details of the last refresh, including any errors |
 | `?`       | Help                                                   |
@@ -138,6 +142,10 @@ With the mouse:
 
 Opening a session, with Enter or a click, moves focus to its conversation so you can type right away. Press
 **Ctrl+X, then I** to return to the panel.
+
+**Ctrl+X, then W** (`<leader>w`) closes the conversation you are viewing, independently of the panel cursor,
+and returns to another open session. It is active while Switchboard is open; closing the panel restores the
+native shortcut behavior. Rebind it with `opencode-switchboard.close-current` in `cli.json`.
 
 **The switchboard never deletes, archives, or stops sessions.** Closing removes a session from the panel;
 opening it again brings it back. A closed project keeps its sessions for when you reopen it. Delete sessions
@@ -162,14 +170,18 @@ reading it, but does not clear a session you marked unread.
 **`/switchboard` is missing right after you added the plugin.** OpenCode installs npm plugins automatically,
 which can take a moment. Restart the TUI.
 
-**npm refuses a new release because of `min-release-age`.** If your npm config sets `min-release-age`, a
-version published more recently than that window does not install. Exempt this package in your `.npmrc`:
+**`NpmInstallFailedError` with npm `min-release-age` set.** OpenCode 2.2 applies `min-release-age` to plugins
+but ignores `min-release-age-exclude` ([anomalyco/opencode#60567](https://github.com/anomalyco/opencode/issues/60567)),
+so a release newer than your window does not install. On each machine that shows the error, clear the cached
+copy and install it once with the window turned off, then restart the TUI:
 
-```ini
-min-release-age-exclude[]=opencode-switchboard
+```sh
+rm -rf ~/.cache/opencode/npm/opencode-switchboard@latest
+npm_config_min_release_age=0 opencode plugin add opencode-switchboard
 ```
 
-Only this package is exempt; its dependency (Zod) still follows your policy.
+OpenCode reuses that copy afterwards; your policy still applies to everything else. `plugin add` also lists
+the package in your global `opencode.json(c)`, as Install step 1 does.
 
 **The panel shows "Switchboard error".** Click the message to retry. The full error is appended to
 `opencode-switchboard-errors.log` in the TUI machine's temp directory (`$TMPDIR`, often `/tmp`). Please

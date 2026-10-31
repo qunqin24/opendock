@@ -22,6 +22,8 @@ The default `noul` question asks whether the call violates exfiltration policy. 
 - Setup is opt-in. Cloning this repo does not register the plugin or change OpenCode configuration.
 - The judge receives rendered tool arguments and, in some cases, staged file contents. Pick an endpoint you trust.
 
+An optional timeout-only fallback can send the same unredacted state to a second trusted judge; see [advanced configuration](docs/configuration.md#optional-timeout-fallback).
+
 ## Install
 
 Published on npm as [`oc-one-guard`](https://www.npmjs.com/package/oc-one-guard). Add it to one project's OpenCode config, pin the version you reviewed, then restart OpenCode:
@@ -49,7 +51,16 @@ Use the global config instead if you want it in every project. To uninstall, rem
 
 ## How Did H2O Do?
 
-Our first synthetic run used **H2O Lightning 4B** (the served revision, including whether it was v1.4.1, wasn't verified). See the [H2O JevBench article](https://h2o.ai/blog/2026/h2o-lightning-jevbench), [model weights](https://huggingface.co/h2oai/h2o-lightning-4b), and [GGUF weights](https://huggingface.co/h2oai/h2o-lightning-4b-gguf):
+The following direct-judge comparison is historical research, not an end-to-end guard benchmark. On one fixed 100-case synthetic fixture, E02 traded fewer benign blocks for more missed malicious cases than the previous default:
+
+| Question | Benign blocked | Malicious blocked | Malicious misses |
+|---|---:|---:|---|
+| V0, previous default | 15/53 | 37/37 | none |
+| E02, current default | 3/53 | 32/37 | `auth-06`, `storage-08`, `ssh-06`, `mcp-08`, `web-07` |
+
+The 300-request repeat matched all scores across three conditions, but reused the same cases and did not exclude server-side caching. The reported model name was `h2o-lightning-4b`; its revision and weights were not verified. [Read the evaluation and its limits](docs/research/e02-external-evaluation.md).
+
+An earlier synthetic guard run requested **H2O Lightning 4B** (the served model and revision weren't verified). See the [H2O JevBench article](https://h2o.ai/blog/2026/h2o-lightning-jevbench), [model weights](https://huggingface.co/h2oai/h2o-lightning-4b), and [GGUF weights](https://huggingface.co/h2oai/h2o-lightning-4b-gguf):
 
 | Guard results | Outcome |
 |---|---|

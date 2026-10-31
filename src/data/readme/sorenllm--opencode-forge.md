@@ -43,11 +43,13 @@ OpenSpec spec workflows remain a third, separate lane.
   counts read the Task List only — and a superseded plan's Task List
   stays the frozen decision snapshot: closure IS the supersession, and
   crew/goal results never tick it.
-- While a plan is in draft, `write` / `edit` / `bash` / `task` are **denied
-  at the permission layer** — including your own `allow` config, and for
-  every agent in that session (the draft protects shared session state; see
-  Agent partition below). The only exits are approval and discard. This is
-  deliberate; see Design stance.
+- While a plan is in draft, `write` / `edit` / `bash` are **denied at the
+  permission layer** — including your own `allow` config, and for every agent
+  in that session (the draft protects shared session state; see Agent
+  partition below) — and `task` is **shape-gated**: dispatch to an
+  effective-readonly forge scout passes, every other target is denied (see
+  Design stance). The only exits are approval and discard. This is deliberate;
+  see Design stance.
 - `plan_approve` / `plan_close` are pinned to a confirmation dialog: the
   model can never flip the state itself.
 - Goal files: `.opencode/goal/<date>-<slug>.md`, state machine
@@ -187,13 +189,13 @@ What this plugin touches, exhaustively:
 | `<project>/.opencode/plan/*.md` | plan files | user data — kept forever, uninstall never deletes |
 | `<project>/.opencode/goal/*.md` | goal files (contract, Check Log, Turn Ledger) | user data — kept forever, uninstall never deletes |
 | `<project>/.opencode/crew/*.md` | crew records (declared plan + arm/convert/abandon/close history; written at `crew_begin` registration, appended at each transition; record-only — never a resume mechanism) | user data — kept forever, uninstall never deletes |
-| merged config object (RAM only) | forge agent, static `forge-<id>` subagents, tool-partition injections (forge family shell hide, non-forge forge-tool hide, native build/plan/general/explore minimal entries), `command.plan`, `command.goal`, `command.crew`, goal permission keys, `permission.forge_shell`, `permission.crew_close` | vanishes when the plugin is removed; nothing is written to disk |
+| merged config object (RAM only) | forge agent, static `forge-<ns>-<id>` subagents (every pool family namespaced; the global fallback family `forge-global-<id>`), tool-partition injections (forge family shell hide, non-forge forge-tool hide, native build/plan/general/explore minimal entries), `command.plan`, `command.goal`, `command.crew`, goal permission keys, `permission.forge_shell`, `permission.crew_close` | vanishes when the plugin is removed; nothing is written to disk |
 | `<tmp>/opencode-forge/jobs/<jobId>.log` | job output tee (full output; oldest rotated out above 50 files) | runtime debris — delete freely, also after uninstall |
 | `<tmp>/opencode-forge/jobs/ledger.jsonl` | job registry ledger (bounded: 1 MB reset, 200 entries) | runtime debris — delete freely, also after uninstall |
 | `<tmp>/opencode-forge/jobs/registry.json` | persistent survivor registry (bounded: 100 entries) | runtime debris — after uninstall, kill any still-running `survive` jobs yourself first |
 | `<tmp>/opencode-forge/watchdog/log.jsonl` | watchdog interventions ledger (bounded: 200 entries, oldest rotated) | runtime debris — delete freely, also after uninstall |
 | `<tmp>/opencode-forge/dispatch/ledger.jsonl` | dispatch ledger — **no longer written** (the dispatch engine was removed); only present as inert debris from older versions | runtime debris — delete freely |
-| `.opencode/forge.json` files (the nearest on each host anchor's ancestor chain, every one in an anchor's subtree, and `~/.config/opencode/forge.json`) | your static subagent definitions (JSONC) — pool families MERGED over the global layer per agent id (primary anchor's root pool plain ids, others namespaced). **User data — the plugin only reads them, never writes or migrates them** | yours — version the project ones, keep the global one out of sync tools if it holds machine-specific models |
+| `.opencode/forge.json` (the NEAREST one walking up from the session's worktree — sole ownership) and `~/.config/opencode/forge.json` (global FALLBACK only, never merged) | your static subagent definitions (JSONC) — the workspace pool IS the session's whole roster; nested forge.json files are ignored. **User data — the plugin only reads them, never writes or migrates them** | yours — version the project ones, keep the global one out of sync tools if it holds machine-specific models |
 | `~/.cache/opencode/packages/...` | installed package copy | written by the `opencode plugin` installer, not the plugin |
 | `~/.config/opencode/opencode.json` | `plugin` array entry | written by the installer |
 
@@ -415,8 +417,10 @@ complete.
 Forge subagents are **static, user-authored worker agents**: each forge.json
 entry is either **pinned** (a model + a reasoning depth, bound at
 materialization) or an **Auto worker** (no model — it inherits the parent
-session's model at dispatch), materializes as a native `forge-<id>`
-subagent, and is dispatched through the host's **native `task`
+session's model at dispatch), materializes as a native `forge-<ns>-<id>`
+subagent — EVERY pool family is namespaced, no exceptions (see
+*Pools on a shared host* below) — and is dispatched through the host's
+**native `task`
 tool** — which means every run is visible in the TUI, expandable and
 monitorable, exactly like any native subagent. There is no dispatch tool, no
 child-session engine, and no configuration invitation anywhere: the session
@@ -427,80 +431,108 @@ subagent behavior is untouched. Onboarding is this README, for you the human.
 
 ### forge.json — the configuration
 
-A dedicated `forge.json` (JSONC — comments allowed), resolved exactly like
-opencode's own config language — **merged together, not replaced**, project
-discovered by walking up:
+A dedicated `forge.json` (JSONC — comments allowed) with **workspace pool
+ownership and a global fallback** (sole ownership — the same
+workspace-ownership strictness as opencode's native MCP config):
 
-1. the project layer: the **nearest** `.opencode/forge.json` walking up from
-   the workspace (session worktree → session directory → host launch
-   directory as the anchor chain; first file found on the ancestor chain
-   wins, nothing above it is consulted)
-2. the global layer: `~/.config/opencode/forge.json`
+1. the **workspace pool**: the **nearest** `.opencode/forge.json` walking up
+   from the session's worktree (session worktree → session directory → host
+   launch directory as the anchor chain; first file found on the ancestor
+   chain wins, nothing above it is consulted). When it exists, it **IS the
+   session's whole dispatch roster**.
+2. the **global layer**: `~/.config/opencode/forge.json` — a **fallback
+   ONLY**: when the workspace has no pool file, the global layer serves as
+   the whole roster; when the workspace has one, the global layer is NOT
+   consulted for that session (**a fallback, not a merge** — no per-id
+   blending, global agents never ride a workspace pool).
 
-The two layers **merge**: agents combine, and on an id collision the project
-definition wins wholesale (one definition per id — no cross-layer field
-blending). A broken file empties only its own layer/pool (error finding with
-the parse location); everything else still applies. Both layers re-read at
-every real materialization — host boot, a first config build, or an
-opencode config reload — without a restart; a new session alone does
-not re-read them (see the apply-timing table below).
+`forge.json` files nested **deeper** in the workspace's subtree (a cloned
+repo or subfolder carrying its own file) are **ignored entirely** — they
+contribute no agents, split no pools, and extend nothing (a git checkout
+does not change your roster). A broken file empties only its own pool
+(error finding with the parse location); everything else still applies.
+Both layers re-read at every real materialization — host boot, a first
+config build, or an opencode config reload — without a restart; a new
+session alone does not re-read them, and a **deleted pool file
+un-materializes its agents** (deletion is real — no zombie pools).
 
-**Hierarchical pools on a shared host.** Agent frontends (paseo and friends)
-routinely share ONE opencode host process across projects, re-initializing
-plugins with different directories. The plugin therefore keeps an
-**append-only anchor set**: every host initialization appends its directory
-(first one = the *primary anchor*), and pools resolve from the union —
-anchor flips can only ever ADD pools, never remove them. Per anchor the
-family is:
+**Pools on a shared host.** Agent frontends (paseo and friends) routinely
+share ONE opencode host process across projects, re-initializing plugins
+with different directories. The host therefore remembers every workspace
+directory it was initialized in, and the **host-wide materialization set**
+is the global layer plus each seen workspace's pool (one pool per
+directory: its walk-up nearest file). Pool membership is re-derived from
+disk truth on every resolve — a deleted pool file disappears at the next
+config hook. EVERY pool family materializes **namespaced** as
+`forge-<ns>-<id>` (`ns` = the file's declared top-level `pool` field, else
+the sanitized pool-directory basename); the **global fallback layer
+materializes under the fixed namespace `global`** as `forge-global-<id>`.
+**No family gets plain ids anywhere** — a materialized id is identical on
+every host regardless of the order workspaces were initialized in, so crew
+plans, rosters, and muscle memory transfer between hosts. Pool resolution
+order is deterministic — families ordered lexicographically by absolute
+pool-file path — and that same order governs cross-family materialized-id
+collisions: the earlier pool's agent wins, the colliding later agent is
+skipped with an error finding naming both files. Every materialized agent's
+task-vocabulary **description carries its pool provenance**: its namespace,
+its origin forge.json path, and — for every family except the global
+fallback — that it is dispatchable only from sessions whose workspace pool
+is that file; the global family names the global fallback layer as its
+origin. The same static text ships to every session — the dispatch gate
+(below) is the dynamic authority, the description is the honest label.
 
-- the **root pool** — the nearest forge.json walking up from that anchor
-  (merged over the global layer per agent id);
-- every **sub-pool** — a `.opencode/forge.json` anywhere in the anchor's
-  subdirectories, discovered by a bounded breadth-first scan (lexicographic
-  sibling order; dependency dirs like `node_modules`/`.git`/`dist` are
-  skipped; 2,000-directory budget per anchor).
-
-The **primary anchor's root pool keeps plain `forge-<id>` ids** (a
-single-project host is unchanged); every other family materializes
-**namespaced** as `forge-<ns>-<id>`. `ns` is the file's optional `pool`
-field, else the sanitized directory name. Pool identity is the absolute file
-path — the same file reached through two anchors materializes exactly once;
-namespace and materialized-id collisions resolve deterministically with an
-error finding, never by silent shadowing. The `/crew` roster and the
-`crew_begin` registration output list the dispatchable agents **grouped by
-pool** with each pool's origin path, the primary marked.
+**Dispatch is gated to the session's own pool.** Materializing every pool
+host-wide is a vocabulary necessity (the task tool's agent list is
+host-level); what a given session may actually DISPATCH is scoped
+session-locally: a task call targeting an agent whose pool belongs to
+ANOTHER workspace is refused with a finding naming the target's origin
+pool path, stating it is *not dispatchable from this session*, and the
+exits — open a session in that workspace, or configure the role into this
+workspace's pool / the global layer. The `/crew` roster and the
+`crew_begin` registration output lead with the session's dispatchable pool
+(its forge.json origin — workspace pool, or the global layer marked as
+fallback) and list every other host pool as NOT dispatchable with its
+origin path.
 
 | axis | follows | survives restart? |
 | --- | --- | --- |
-| pools (the `forge-*` vocabulary) | host directories — the anchor set | the set re-seeds from the spawn anchor only |
+| pools (the `forge-*` vocabulary) | workspaces — sole ownership + global fallback | the workspace registry re-seeds from the spawn anchor only |
 | session artifacts (plan/goal/crew records) | the session's own workspace | files on disk are the source of truth |
 
-A forge.json in a directory NO host anchor covers is NOT silently ignored:
-`/crew` names it as the residual mismatch and tells you a host
-initialization in that workspace adds its pools (or fold the agents into the
-global layer).
+A forge.json in a workspace this host has never been initialized in is NOT
+silently ignored: `/crew` names it as the residual mismatch and tells you
+a host re-initialization in that workspace materializes it (or move the
+agents into the global layer).
 
 **Id naming**: use plain role words (`research`, `coder`, …) — the plugin
-materializes every id as `forge-<id>` itself (namespaced pools:
-`forge-<ns>-<id>`). A `forge-`-prefixed id in the file would double up
-(`forge-coder` → agent `forge-forge-coder`); the loader auto-strips the
+materializes every id as `forge-<ns>-<id>` under its family's namespace
+(never a plain `forge-<id>`; pool-less workspaces get the fixed `global`
+namespace). A `forge-`-prefixed id in the file would double up
+(`forge-coder` → agent `forge-<ns>-forge-coder`); the loader auto-strips the
 prefix (all repetitions) with a warning so existing files keep working, but
 rename the entries to silence it. The namespace infix is never parsed back
 out of a materialized id.
 
 ```jsonc
 {
-  // sub-pool files only: namespace for this family's ids (forge-<ns>-<id>).
+  // namespace for this pool's ids (forge-<ns>-<id> — EVERY pool is
+  // namespaced; declare it instead of riding the directory name).
   // Short, stable, [a-z0-9-] up to 24 chars — ids survive directory renames.
-  // Invalid values degrade to a warning + the directory-derived namespace.
+  // REQUIRED for crew-governed dispatch (the /crew compliance gate: no
+  // valid declared `pool` → `crew_begin` refuses and crew `forge-*`
+  // dispatches are blocked until the field is added). Invalid values
+  // degrade to a warning + the directory-derived namespace.
   // "pool": "aa",
   "agents": {
     // PINNED worker: model + thoughtLevel form an ATOMIC PAIR — set BOTH
     "research": {
       "model": "zai-coding-plan/glm-5.3", // exact "provider/model" string
-      "thoughtLevel": "low",              // none/low/medium/high/max or a native level name
+      "thoughtLevel": "low",              // none/minimal/low/medium/high/xhigh/max, or any word — write lowercase
       // "prompt": "short role description — explicit prompts fully override the built-ins (only research/review ids have them; any other id without a prompt gets a generic one-liner)",
-      // "shape": "write",   // default readonly denies write/edit/bash
+      // "shape": "readonly", // absent shape defaults to WRITE (open
+                               // permissions); "readonly" is the explicit seal
+                               // denying write/edit/bash + the patch family
+                               // (patch/applypatch/apply/multiedit)
       // "permission": { "bash": "deny" } // optional override; "task" is ALWAYS denied
     },
     // AUTO worker: set NEITHER — inherits the parent session's model at
@@ -537,34 +569,67 @@ A rejected entry costs only itself — its siblings materialize normally.
   Findings surface in the plugin diagnostics log.
 - **`depths` is deprecated**: the array is ignored with a warning finding.
   Pin ONE `thoughtLevel` per agent instead.
-- Each agent materializes as `forge-<id>` — a subagent-mode agent visible in
-  the task tool's vocabulary (never hidden), carrying the pinned `model`
+- Each agent materializes as `forge-<ns>-<id>` — a subagent-mode agent
+   visible in the task tool's vocabulary (never hidden), whose description
+   names its **pool provenance** (namespace + origin forge.json path +
+   dispatchability scope; the global family names the global fallback
+   layer), carrying the pinned `model`
   (pinned workers) or NO model key at all (Auto workers — the description
   says "inherits the parent session's model" instead of naming a brain),
   the worker discipline (workspace-relative paths only, verbatim reporting
   of tool refusals, evidence-bearing conclusions) around its role prompt,
-  and a deny-style permission: `shape: "readonly"` (the default) denies
-  `write`/`edit`/`bash`, `shape: "write"` allows them, an explicit
-  `permission` map overrides the shape default — and `task` is ALWAYS
-  denied (recursive spawning stays physically impossible).
+   and a deny-style permission: an ABSENT `shape` defaults to WRITE (open
+   permissions — the compatibility-preserving default for existing pools);
+   an explicit `shape: "readonly"` denies
+   the full mutating-tool family — `write`/`edit`/`bash` plus the host's
+   patch family (`patch`/`applypatch`/`apply`/`multiedit`) — `shape:
+   "write"` allows them (same as absent), an explicit `permission` map overrides the shape
+   default (lifting ANY member of that family off `deny` forfeits the
+   draft-phase readonly exemption) — and `task` is ALWAYS
+   denied (recursive spawning stays physically impossible). Readonly is a
+   restriction you ask for explicitly, never a surprise default — new pools
+   should give every agent an explicit `shape` (the `/crew` initialization
+   gate teaches the AI author exactly this).
 
 > **Upgrading from ≤ 0.5.0 (breaking):** agent entries that pinned `model`
 > without `thoughtLevel` used to be accepted; they are now SKIPPED with an
 > error finding naming the missing half. Fix per entry: add the missing
 > `thoughtLevel`, or delete `model` to make it an Auto worker.
 
+> **BREAKING — every materialized id is now namespaced.** The
+> first-registered pool's plain-id privilege is gone: existing plain ids
+> (`forge-coder`) no longer exist, and there are **no compat aliases** —
+> deliberately, because an alias layer would resurrect the two-ids-one-agent
+> ambiguity this change kills (crew records and docs referencing old ids
+> are history artifacts). Migration:
+>
+> - **Single-pool workspaces**: add a short stable top-level `"pool"` field
+>   to your forge.json (`[a-z0-9-]`, 1–24 chars) and dispatch
+>   `forge-<pool>-<id>` from now on.
+> - **Pool-less workspaces** (global fallback roster): dispatch
+>   `forge-global-<id>` — the global layer materializes under the fixed
+>   namespace `global`.
+> - **New crew-governed pool-compliance gate**: `crew_begin` refuses to
+>   register, and every `task` dispatch of a `forge-*` worker from a
+>   crew-governed session is refused, while the workspace pool file lacks a
+>   valid declared top-level `pool` field. The fix is one line — add the
+>   field (the refusal suggests a namespace) — and the gate lifts
+>   hot-apply: the next resolve after the repair admits registration and
+>   dispatch with no host restart. Global-fallback sessions are exempt.
+>   Per-agent fail-soft findings never make the file non-compliant.
+
 **What applies when** — only a real materialization re-reads the pool
-files into the `forge-*` vocabulary; the anchor set itself only ever grows.
-Materialization triggers (2026-10-01 live finding): host boot (a freshly
-started CLI process reads the files as they are), the FIRST config build
-for a directory on this host, and opencode config file reloads. A NEW
-session on a long-lived shared host (serve-type) does NOT re-materialize:
+files into the `forge-*` vocabulary. Materialization triggers (2026-10-01
+live finding): host boot (a freshly started CLI process reads the files as
+they are), the FIRST config build for a directory on this host, and
+opencode config file reloads. A NEW session on a long-lived shared host
+(serve-type) does NOT re-materialize:
 
 | change | needs a host restart? |
 | --- | --- |
 | `thoughtLevel` on an existing agent | no (applies to NEW sessions of that agent; running sessions keep their frozen depth) — depth lookups resolve the pool files fresh at every dispatch, independent of materialization |
-| agent added / removed / edited, any pool file created or deleted | no restart — but not at the next session either: the materialized `forge-*` set rebuilds only at the next REAL materialization (host boot, opencode config reload, or a first config build); on a long-lived shared host pool changes wait for that rebuild or a restart. The crew gate and depth lookups resolve the pool files fresh regardless |
-| a NEW directory joining the host (the first session of another project on the shared host) | no restart — that first config build itself re-initializes the plugin and appends the anchor and its pools (append-only; existing pools never flip) |
+| agent added / removed / edited, any pool file created or deleted | no restart — but not at the next session either: the materialized `forge-*` set rebuilds only at the next REAL materialization (host boot, opencode config reload, or a first config build); on a long-lived shared host pool changes wait for that rebuild or a restart. The crew gate, the session-domain dispatch gate, and depth lookups resolve the pool files fresh regardless — a DELETED pool file un-materializes at that next resolve |
+| a NEW directory joining the host (the first session of another project on the shared host) | no restart — that first config build itself re-initializes the plugin and registers that workspace and its pool (existing pools never flip — every family namespaces by its own `pool` field or directory name, so ids never depend on arrival order) |
 
 ### Dispatching
 
@@ -572,8 +637,10 @@ Say "dispatch a subagent..." in a forge session and the model picks from the
 task tool vocabulary: a configured `forge-*` agent whose description matches
 runs on its pinned brain; if none matches, forge is instructed to say so
 plainly and fall back to the native task channel. During a plan draft the
-native `task` tool is already denied by the plan harness — no plugin-side
-rule needed.
+`task` tool is gated by the dispatch target's effective readonly shape:
+readonly scout dispatch passes as reconnaissance (breadth evidence without
+burning the planning session's context), write-shaped workers and native
+agents are denied with the dispatchable roster and the two exits.
 
 **Known pitfall — keyless endpoints × readonly agents**: free/keyless
 providers can return a deterministic EMPTY response for any toolset-reduced
@@ -581,20 +648,104 @@ providers can return a deterministic EMPTY response for any toolset-reduced
 attributable task failure; the mitigation is unchanged — use
 `shape: "write"` for such endpoints, or a keyed provider.
 
+### Readonly exec seal (the sealed supervised-exec channel)
+
+The readonly shape used to seal only the TOOL face (write/edit/bash + the
+patch family) — a readonly worker could still mutate the world through its
+exec channel (`forge_shell`). The exec seal closes that hole: a session whose
+running `forge-*` worker has an **explicit** `shape: "readonly"` (an absent
+shape defaults to write and is **never** sealed) has its `forge_shell` calls
+classified BEFORE spawn by a pure string classifier (`src/exec-classify.ts`,
+no fs access at classify time). READ-CLASS commands (inspection, search,
+read-only evals — `rg`, `git log`/`status`/`diff`, `node -e`/`python -c`
+read evals, version/help queries) flow normally; **WRITE-CLASS commands are
+denied** with a bounded finding (once per session per indicator class) that
+names the readonly shape, names the classified write indicator, and points
+at the remedy: `"shape": "write"` on that agent when its job legitimately
+mutates. The worker is told to report the refusal verbatim, not work around
+it. The primary forge session is never sealed; a session whose agent cannot
+be resolved fails open (one-time disclosure). The seal composes with — never
+replaces — the draft-phase ask/deny posture on the channel.
+
+Covered WRITE-CLASS indicators:
+
+| indicator | covers |
+| --- | --- |
+| `redirect` | output redirection to files — `>` `>>` and fd forms (`2>`, `1>`, `*>`); the PowerShell family uses the same operators |
+| `mutating-cmdlet` | `Set-Content`, `Out-File`, `New-Item`, `Remove-Item`, `Move-Item`, `Copy-Item`, `Add-Content`, `Clear-Content` |
+| `git-mutation` | `git add/commit/push/reset/checkout/rebase/merge/clean/rm` |
+| `pkg-mutation` | `npm publish`, `npm install` (incl. `npm i`/`ci`/`add`), `bun add`/`install`, `pip`/`pip3 install` |
+| `workspace-write` | output-target flags (`--out`, `--output`, `--out-file`/`--outfile`/`--outFile`, `--dest`, `--destination`, `-o`) whose parsed value is a workspace-relative path, or an absolute path under the session workspace |
+
+**Honest positioning — this is belt-in-depth, NOT a sandbox.** A command
+that fails to classify is treated as READ-CLASS (fail-open on the channel,
+the same posture as every refusal belt). The known bypass surface, verbatim:
+**indirect writes** (a script that writes internally — `node build.js` with
+no redirect is indirection the classifier does not model), **`Start-Process`
+writers** (spawning a writer process is explicitly out of scope), and
+**encoded payloads** (`powershell -EncodedPayload …`, base64 blobs) are NOT
+covered; they flow on the readonly channel. The seal narrows the exec hole
+from "completely open" to "explicitly constructed indirection" — a true OS
+level seal (write-time redirection, shadow copies, containers, win32+POSIX
+dual implementations) was evaluated and rejected as a disproportionate
+rewrite (see `openspec/changes/readonly-exec-seal/design.md`, option D3).
+The tool-face deny remains the first belt; this is the second.
+
+
 ### The thoughtLevel word
 
-One word per agent: the canonical `none | low | medium | high | max`, or the
-model's native level name verbatim (e.g. Qwen's `XHigh`). Injection rides the
-`chat.params` hook keyed by agent name, translated per provider family:
-effort-style (OpenAI-compatible) receives `reasoningEffort = <word>`;
-budget-style (Anthropic-style) receives a published thinking tier
-(`low → 8192`, `medium → 16384`, `high → 24576`, `max → 32768`,
-`none → off`); toggle-style (zai/GLM) receives thinking on/off. Rules:
-verbatim-first, no interpolation, unknown family injects nothing. A word the
-model does not natively offer injects NOTHING and records one finding naming
-both vocabularies — the session is never broken by a config word. A
-session's depth is frozen at its first request (editing forge.json
-mid-session never rewrites a running session).
+One word per agent: the canonical seven-word dictionary
+`none | minimal | low | medium | high | xhigh | max`, or any native level
+name. **Write lowercase**: the value is normalized at the config boundary
+(trimmed and lowercased), so `High` and `XHigh` behave exactly as `high` and
+`xhigh`; normalization that changes what you wrote records one warn finding.
+Native casing on the wire is the catalog's business, never yours. Injection
+rides the `chat.params` hook keyed by agent name. The wire shape comes from
+data, not guessing — with ONE family decided ahead of the catalog: for the
+**anthropic family** the channel is read straight off the empirically
+verified transport matrix — adaptive-era models (major > 4 or 4.7+) take
+the adaptive effort key `options.effort` (the host transports it as the
+adaptive-era native `output_config: {effort: <word>}` wire shape), legacy-era
+models take the budget tier table below — and the models.dev catalog is
+**not consulted** for this family: its effort claim cannot sound on the
+current host generation's anthropic transport, which silently drops the
+`reasoningEffort` key a catalog effort shape would select. For every other
+family the catalog remains the shape authority: a model the models.dev
+catalog knows by
+`reasoning_options` is translated per that catalog shape (effort word list /
+toggle / token budget); a catalog-silent model falls back to the
+provider-prefix family; a provider absent from both is treated as an effort
+**word channel** by default (custom relays and unknown endpoints — the most
+universal shape). **The dictionary is a
+dictionary, never a whitelist**: a word matching neither the dictionary nor
+the model's ladder passes through VERBATIM on word-shaped channels
+(`reasoningEffort = <word>`, or `effort = <word>` on the adaptive channel),
+disclosed as unverified — the provider is the
+final judge, and a provider-side rejection surfaces as the request's own
+error. Known host-side limitation: the adaptive channel passes `none`
+through verbatim per the dictionary axiom, but the current host generation's
+anthropic transport refuses to send such a request (it silently never
+reaches the wire) — documented here, deliberately not worked around. Ladder
+matching is case-insensitive and emits the catalog's native
+casing (`xhigh` in, `XHigh` out when the catalog says so). **The only dead
+ends are the two shapes with no word channel**: budget-style (legacy
+Anthropic-style) models have a published thinking tier instead
+(`minimal → 1024` — the Anthropic API hard floor, the only cross-project
+consensus number; `low → 8192`, `medium → 16384`, `high → 24576`,
+`xhigh → 28672` — a half step between high and max; `max → 32768`;
+`none → off`. **This tier table is this plugin's selection — there is no
+community-standard tier table**), and pure toggle endpoints (zai/GLM: a level
+word has no toggle counterpart) — there the plugin injects nothing and
+records one bounded finding naming both vocabularies. **Host-transport
+caveat (observed on the opencode 1.18.34 generation):** the anthropic
+transport rewrites the thinking `budget_tokens` value this plugin injects
+to 1024 regardless of the selected tier (characterized by four paired
+probe experiments). The tier table above is the plugin-side truth —
+verifiable with a `FORGE_DEPTH_PROBE=1` trace — while the value that
+actually reaches the wire is the host's to rewrite. No interpolation
+anywhere; the session is never broken by a config word. A session's depth is
+frozen at its first request (editing forge.json mid-session never rewrites a
+running session).
 
 ## Crew workflow (`/crew`)
 
@@ -617,10 +768,18 @@ requires a plan. The flow:
    alongside the choice — so you can verify the record really landed on
    disk (an earlier output order buried the path line, and the model
    reliably drops what it buries — leading with it is the fix). The
-   output then confirms the roster **grouped by pool with its origins**
-   (which forge.json families the dispatchable set materialized from, the
-   primary marked), presents the three execution-mode choices, and stops
-   the turn. Reconnaissance task calls are free BEFORE registration.
+    output then confirms the roster **grouped by pool with its origins**
+    (which forge.json families the dispatchable set materialized from —
+    every family rendered as `forge-<ns>-*`, no plain-id family),
+    presents the three execution-mode choices, and stops
+    the turn. Registration pre-flights **pool compliance**: the workspace
+    pool file must declare a valid top-level `pool` namespace — a
+    non-compliant file refuses the registration outright (see the BREAKING
+    note above; global-fallback sessions are exempt), and while a crew
+    governs the session every `forge-*` task dispatch re-checks the same
+    compliance (a file degraded mid-crew blocks further crew dispatches
+    until repaired — the fix is the one `"pool": "<suggested>"` line, and
+    it lifts hot-apply). Reconnaissance task calls are free BEFORE registration.
 2. **The pause is mechanical**: while the crew pends, every `task` dispatch is
    refused by an interception belt. The user chooses:
    - **supervised waves now** — `crew_begin {execution: "waves"}` lifts the
@@ -673,18 +832,23 @@ itself (a rootish guard keeps degenerate global-project worktrees from
 landing files on the drive root or the launch anchor). The anchor follows the
 session's workspace, never the objective's scope.
 
-**Not initialized?** `/crew` on a host with ZERO pools across its whole
-anchor set refuses with one-time setup guidance: the two file paths, a
-copy-paste template, and the choice of configuring it yourself OR having the
-session AI do it — the latter only on your explicit go-ahead in that
-conversation, through the normal visible write path (when the AI writes a
-sub-pool file it also proposes a short stable `pool` namespace so ids
-survive directory renames). This is the plugin's only configuration
-invitation. Saved files apply at the next real materialization — no
-restart needed; on a shared host, the first session in a NEW workspace adds
-that anchor and its pools automatically (a new session in an existing
-workspace does not re-read the files — see the apply-timing table
-above).
+**Not initialized?** `/crew` on a session whose roster is EMPTY (neither
+its workspace pool nor the global fallback materializes an agent) refuses
+with one-time setup guidance: the two file paths and their sole-ownership
+relationship (the workspace pool IS the whole roster; the global layer is
+fallback-only, never merged; nested forge.json files ignored), a
+copy-paste template, and the choice of configuring it yourself OR having
+the session AI do it — the latter only on your explicit go-ahead in that
+conversation, through the normal visible write path (when the AI writes
+the file every agent gets an explicit `shape` — `readonly` for read-only
+roles, `write` for implementers — and it also proposes a short stable
+`pool` namespace so ids survive directory renames). This is the plugin's
+only configuration invitation. Saved files apply at the next real
+materialization — no restart needed, and a deleted pool file
+un-materializes its agents; on a shared host, the first session in a NEW
+workspace registers that workspace and its pool automatically (a new
+session in an existing workspace does not re-read the files — see the
+apply-timing table above).
 
 ### Debris note
 
@@ -761,6 +925,34 @@ denied, and an `allow` in your config does not override it. Reconnaissance is
 read/grep/glob; if you genuinely need a shell command to decide the plan,
 approve the plan first (revising after approval is allowed via a new `/plan`).
 The escape hatches are `plan_approve` and `/plan discard`, by design.
+
+One carve-out, keyed on the target rather than the tool: during a draft the
+`task` tool is gated by the dispatch target's **effective readonly shape**. A
+dispatch to a forge worker whose shape is EXPLICITLY `readonly` AND whose
+permission
+overrides do not lift `write`/`edit`/`bash` — nor any host patch-family tool
+(`patch`/`applypatch`/`apply`/`multiedit`) — off `deny` (`ask` counts as
+lifted — fail-closed) passes as a reconnaissance dispatch: readonly scouts
+may be spawned both before and during the draft, so breadth
+evidence-gathering does not burn the planning session's context. A worker
+with NO shape field is not exempt (absent defaults to write). Every other
+target — write-shaped and shape-less workers, native agents, absent or
+unresolvable targets
+(including resume calls that carry no target) — is denied like any write-class
+tool. The refusal names the currently dispatchable effective-readonly roster,
+points to defining a readonly worker in forge.json (explicit
+`"shape": "readonly"`) when the roster is empty
+(an unconfigured host stays fully denied — same behavior as before, just more
+actionable wording), and names the two exits (`plan_approve`, `/plan
+discard`). Invariant strength is unchanged: the scout's materialized
+permission hard-denies the mutating-tool family — write/edit/bash and the
+patch family (and `task`, always — no chained
+spawning), the scout's own session is ambient-bound to the same draft write
+ban, and its `forge_shell` calls ride the same per-call ask gate the primary
+agent faces. The `permission.ask` belt does not follow the exemption: on a
+host configured with `task: "ask"` a draft-phase dispatch is still denied
+(fail-closed degradation by design — the side belt does not resolve target
+shapes).
 
 Separately, the builtin shell is hidden on the forge agent on purpose —
 `forge_shell` is the exec surface there (see Agent partition and the job

@@ -125,7 +125,7 @@ For a local V2 plugin directory, first run `bun run build` in the plugin reposit
 | `protect` | `string[]` | `[]` | Session IDs that must never be deleted. **Auto-populated with the running session's ID when `/sweep` is invoked** — manual add not needed for the manual path. Honored for both main and subagent sessions. |
 | `recentActivityGrace` | `string \| number` | `"1h"` | Sessions touched within this window are skipped **regardless of main/subagent status** — shared grace period for both thresholds. Protects sessions you or other tools recently interacted with. |
 | `recentActivityGraceMs` | `number` | — | Override-raw-milliseconds form of `recentActivityGrace`. |
-| `dbPath` | `string` | — | Optional override for the opencode SQLite DB path. Only used in V1 mode. Default auto-resolves via `XDG_DATA_HOME` (Linux) or platform default (`~/.local/share/opencode/opencode.db` on Linux, `~/Library/Application Support/opencode/opencode.db` on macOS). Set only when running against a non-standard opencode install. |
+| `dbPath` | `string` | — | Optional override for the opencode SQLite DB path. Only used in V1 mode. Defaults to `$XDG_DATA_HOME/opencode/opencode.db`, or `~/.local/share/opencode/opencode.db` when unset or empty, including on macOS. Set for a non-standard database location or filename. |
 
 Unknown options are rejected — typos fail loud, not silent.
 
@@ -190,7 +190,9 @@ To actually clean stale sessions across all projects, the plugin opens the openc
 - The plugin only selects the columns it reads: `id, project_id, parent_id, title, directory, time_created, time_updated, time_compacting, time_archived`. A `PRAGMA table_info(session)` schema guard at startup throws `SchemaMismatchError` if any required column is missing in a future opencode schema migration — the sweeper degrades loud, not silent.
 - The DELETE path still goes through the opencode SDK's `session.delete()`, so opencode's reverse recursive child cleanup (`Session.remove` → `children()` recursion) keeps working. The mixed read(SQLite) + write(SDK) split avoids both the SDK scan blind spot and the risk of a direct-sqlite DELETE bypassing app-layer child cleanup.
 
-If `dbPath` is not set in the plugin options, the path auto-resolves via `XDG_DATA_HOME` (Linux precedence) or platform default. Use the `dbPath` option only when running against a non-standard opencode install.
+If `dbPath` is not set in the plugin options, the path resolves to `$XDG_DATA_HOME/opencode/opencode.db`, or `~/.local/share/opencode/opencode.db` when `XDG_DATA_HOME` is unset or empty, including on macOS. This follows OpenCode's [XDG-based data directory](https://github.com/anomalyco/opencode/blob/v1.2.27/packages/opencode/src/global/index.ts). Use the plugin's `dbPath` option for a non-standard database location or filename; the plugin does not probe other databases.
+
+If the database is missing, the sweep stops before deletion and reports the attempted path with instructions to check `XDG_DATA_HOME` or set `dbPath`. Other database-open failures include the path and underlying error. Timer sweeps log the same diagnostic.
 
 ### OpenCode V2 Mode
 
@@ -266,6 +268,8 @@ Every V2 endpoint candidate is checked using `client.server.info().pid === proce
 | V2 `/sweep` command | `ctx.command.transform` in `src/v2.ts` | Adds the manual slash command when one is not already registered |
 
 ## Development
+
+本地开发和测试需要 Bun >= 1.4.2；推荐使用 `.bun-version` 指定的版本，与 CI 和发布保持一致。Bun 1.3.x 的 `ResolveMessage` 不继承 `Error`，会导致 V2 插件入口解析测试失败；无需为此修改插件入口或升级 OpenCode 依赖。
 
 ```bash
 bun install

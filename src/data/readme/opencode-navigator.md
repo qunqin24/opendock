@@ -29,6 +29,7 @@ See the [changelog](CHANGELOG.md) for release-by-release changes.
 - Show or hide each sidebar section independently
 - Hide the session title or its creation date independently in OpenCode 1.x without losing the settings control
 - Configure section visibility and order from the sidebar settings button
+- Open Settings → About for the running version, update checks, versioned release history, and editable GitHub Bug reports
 - Separate adjacent sections with quiet theme-aware dividers instead of background cards
 - Save visibility, expansion, and order globally or for the current worktree
 - Copy the selected scope's layout and MCP states as versioned JSON, then validate and preview imports
@@ -43,8 +44,8 @@ collapsed. Use `Save current layout as default` in sidebar settings to reuse the
 current visible/hidden, expanded/collapsed, and ordering states in new sessions.
 
 **Only the latest stable release in each major line is supported: OpenCode
-1.19.5 and 2.2.0.** Both have separate real-host checks. Older releases are not
-part of the supported compatibility matrix. The 2.2 integration uses OpenTUI 0.7
+1.19.5 and 2.2.5.** Both have separate real-host checks. Older releases are not
+part of the supported compatibility matrix. The 2.2 integration uses OpenTUI 0.8
 and public host caches, events, keymap layers, and client APIs while retaining
 the separate 1.x adapter. See [Host API boundaries](HOST_API.md) for remaining
 capability gaps and removal conditions. On OpenCode 2, Navigator reads the same native Todo history as
@@ -394,16 +395,30 @@ Choose a base icon in the searchable picker, then select **Pin to toolbar**.
 The manager lets you change icons, move buttons, or unpin them. Cancelling the
 picker returns to the draft; cancelling the draft discards its changes.
 
+For each button, **Icons and text…** lets you choose **zero to three ordered icons**
+and an optional custom single-line label. Use **Base icons…** to add, replace or
+remove icons, and **Text…** for the label. Zero icons produces a text-only button;
+an entirely empty appearance cannot be saved. Labels accept up to 128 characters
+and are clipped to the available cells without overwriting the rounded ends.
+State-specific icon groups retain the existing per-state choices. Nested edits
+remain drafts until the final **Pin to toolbar** or **Save** action.
+
 Where the host exposes a state, the same button can use a different icon for each
 state: auto-approve On/Off on OpenCode 1.x, and Idle/Compacting on OpenCode 2.x.
 The 2.x permissions button opens host Settings and uses its base icon. Hover or
 keyboard focus shows the button's name, observed state, or unavailable reason.
+The hint uses the existing gap beneath the toolbar, so appearing or disappearing
+does not move Limits or any other section. Default single-icon buttons stay
+centered in uniform three-cell controls in both Nerd Font and Text modes.
 Skill buttons retain confirmation and trust settings; a missing or ambiguous
 source stays pinned but cannot run.
 
 **Behavior → Toolbar overflow** switches between one row with a **More** menu
 (the default) and wrapping rows. Left/Right moves along a row; Up/Down moves
 between rows. The setting follows Global/Worktree scope and portable defaults.
+Overflow uses actual bounded button widths. The largest configured state appearance
+reserves the button's width so changing state does not reshuffle the toolbar.
+Default single-icon buttons remain three cells wide.
 Pins, their order, icons, and exact Skill sources are private user-wide preferences
 and are excluded from portable exports. Use **Reload settings from file** in other
 running sessions after saving changes in another instance.
@@ -420,6 +435,46 @@ startup mode is respected. OpenCode 2.x owns this setting: use the host Settings
 dialog for the current session and `session.permissions` in the user-wide
 `cli.json` (`"prompt"` or `"autoaccept"`) for its startup default. Restart
 OpenCode after changing `cli.json`.
+
+### About, release history, and support
+
+Open **Navigator Settings → About** with the settings control or `Ctrl+,`.
+The tab shows the running Navigator and OpenCode versions, the last update-check
+result, and **Check for updates**. A failed check is reported as a failure rather
+than an up-to-date result. **Update Navigator…** uses the same confirmation,
+installation method/scope, stale-target guards and restart guidance as the footer
+and Navigator shortcuts.
+
+**Changelog by version…** browses the `CHANGELOG.md` shipped with the plugin.
+Choose a version to read its scrollable notes; Escape returns to the selected
+version and then to About. Technical-only versions have an explicit empty state.
+Manual browsing does not consume or reset the one-time upgrade notes shown after
+an update.
+
+**Report a bug…** opens an editable title and Markdown body. The visible default
+context contains software versions, platform and runtime only. Navigator does
+not collect chat, source, workspace paths, logs or credentials for the report.
+
+- **Send to GitHub…** uses an installed, already authenticated [GitHub CLI](https://cli.github.com/)
+  with support for `gh issue create --type`. A separate preview confirms the
+  repository, the real **Bug** issue type, title and body before sending. GitHub
+  credentials stay with `gh`, never in Navigator preferences.
+- **Open in browser** opens the same draft in the repository's Bug issue form,
+  independently of CLI installation or authentication. Large reports use an
+  explicit **Copy report & open browser** action; browser-launch failures offer
+  a copyable link without discarding the draft.
+- A partial result retains its issue URL. An uncertain outcome opens the issues
+  list for review and requires an explicit **Retry after checking GitHub** before
+  another confirmed send. Navigator never automatically retries issue creation.
+
+Enter inserts a newline in the body; Tab moves between fields and actions, and
+`Ctrl+Enter` opens the send preview. Escape/Cancel returns to the previous screen
+with the draft retained for the current Settings flow. Reports are not saved in
+private preferences.
+
+Quick Actions also keep their mounted rows while ordinary prompt typing updates
+the host's command state. Live labels, availability and real source updates still
+refresh immediately.
 
 ## Limits: provider quotas and banked resets
 
@@ -478,7 +533,7 @@ REST reads use a short in-memory cache; Refresh bypasses it. Observed headers ol
 than two minutes are marked stale instead of presented as current remaining quota.
 
 Navigator shares the host's Solid/OpenTUI runtime. Development and CI use Bun 1.4.4
-and Node 26.12.1; OpenTUI 0.7's supported Node path starts at 26.4.0. A confirmed
+and Node 26.12.1; OpenTUI 0.8's supported Node path starts at 26.4.0. A confirmed
 pinned-snapshot update verifies its target with supported Bun (at least 1.3.14)
 or Node before switching the wrapper. If neither is available, the running snapshot
 is preserved with guidance; the updater does not install a runtime globally.
