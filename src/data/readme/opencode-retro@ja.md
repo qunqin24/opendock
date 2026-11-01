@@ -1,4 +1,4 @@
-<!-- translated-from: README.en.md@7dcedf76bc5e -->
+<!-- translated-from: README.en.md@1d591a2573ea -->
 # opencode-retro
 
 [Русский](README.md) | [English](README.en.md) | [简体中文](README.zh-CN.md) | [Español](README.es.md) | **日本語**
@@ -172,7 +172,9 @@ OpenCode が npm からプラグインを取得します。`opencode.json` に�
 }
 ```
 
-あるいはプラグインを丸ごと手元に置くこともできます。`~/.config/opencode/plugins/opencode-retro/` にコピーを置けば、`opencode.json` への記載は要りません。OpenCode は各設定ディレクトリの `plugin/` と `plugins/` を自分で走査します。フックはサービス単位で登録されるので、すでに動いているセッションも次のプロンプトかツール呼び出しでプラグインを読み込みます。
+あるいはプラグインを丸ごと手元に置くこともできます。`~/.config/opencode/plugins/opencode-retro/` にコピーを置けば、`opencode.json` への記載は要りません。OpenCode は各設定ディレクトリの `plugin/` と `plugins/` を自分で走査します。
+
+どちらの場合も再起動は要りません。`opencode.json` かプラグイン自身のファイルが変わると OpenCode が自分でプラグインを読み込み直し、すでに開いているセッションも（いま作業しているものを含めて）次のステップでツールごと取り込みます。`opencode service restart` は何の役にも立たず、サービス上で動いているすべてのセッションを閉じてしまいます。
 
 設定するものはありません。プラグインは自分でモデルを呼ばないので、選ぶモデルも、渡す鍵も、つなぐプロバイダーもありません。分析は、それを求めたセッションのサブエージェントとして動きます。`.retro/selfcheck.md` が、それが実行されたか、実行されなかった場合はその理由を報告します。
 
@@ -199,7 +201,7 @@ OpenCode が npm からプラグインを取得します。`opencode.json` に�
 { "action": "retro_decide",  "resource": "*", "effect": "allow" }
 ```
 
-`.retro/selfcheck.md` は `opencode.json`（プロジェクトのものとグローバルのもの）の権限ルールを読み、それがツールを隠しているときは `BROKEN tool permissions` と報告します。エージェント自身の権限は読みません。
+`.retro/selfcheck.md` は `opencode.json`（プロジェクトのものとグローバルのもの）の権限ルールを読み、それがツールを隠しているときは `BROKEN tool permissions` と報告します。エージェント自身の権限は読みませんし、ツール構成も読みません。OpenCode の `explore` エージェントはプラグインのツールを一つも持たないので、引き継ぎでは各分析を `general` として起動するよう求めています。
 
 ### ディスク上に現れるもの
 

@@ -26,16 +26,14 @@
 <!-- BEGIN GENERATED: facts -->
 | | |
 |---|---|
-| **Paquete** | `oficina-opencode` v3.0.5 |
-| **Tools** | 16 |
+| **Paquete** | `oficina-opencode` v3.1.2 |
+| **Tools** | 15 |
 | **Hooks** | 7 |
 | **API de plugin** | `@opencode/plugin@2.1.2` |
 | **Node** | >=22 |
 | **Catálogo** | 258 agentes resolubles en 18 divisiones |
 | **Divisiones** | academic, design, engineering, finance, game-development, gis, healthcare, marketing, paid-media, product, project-management, research, sales, spatial-computing, specialized, strategy, support, testing |
 <!-- Catalog source: agency-agents @ 4e3ac3c -->
-| **Límites** | 20 cards · 40 llamadas · 20 spawns · 10 agentes |
-| **Cobertura mínima** | 60% |
 <!-- END GENERATED: facts -->
 
 <div align="center">

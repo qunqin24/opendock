@@ -117,9 +117,10 @@ These add a page to magpie's window, in the app and in `magpie web`, under Plugi
 | [usage](packages/usage) | Usage glance: calls, errors, tokens and cost for today, 7 or 30 days, and the models behind them | `usage:summary` |
 | [powercontext](packages/powercontext) | Connection settings for an independently deployed PowerContext service | None |
 | [nowledge-mem](packages/nowledge-mem) | Connection settings, recall and capture switches, a real connection test, and the scope of what is sent | None |
-| [agent-office](packages/agent-office) | What are my agents doing: live sessions as workers in a voxel office (3D/2D) or a list, with status, current step and resume commands | no `magpie.read`; its host part reads the local session files of Claude Code, Codex, dsh, Gemini CLI, Qwen Code, Pi, omp, Qoder, WorkBuddy and CodeBuddy, including prompts, replies and tool commands (`text:false` keeps statuses and tool names only) |
+| [agent-office](packages/agent-office) | What are my agents doing: a real WebGL 3D office with six scenes, an isometric/2D office, grouped workbench, Today usage and recent conversations | no `magpie.read`; its host part reads local session files of Claude Code, Codex, Copilot CLI, Kimi Code, dsh, Gemini CLI, Qwen Code, Pi, omp, Qoder, WorkBuddy, CodeBuddy and Grok Build, including prompts, replies and tool commands (`text:false` keeps statuses and tool names only) |
 | [fingerprint](packages/fingerprint) | Numeric response fingerprints to investigate suspected model substitution across providers, with shared challenges, candidate rankings, local evidence and JSON export | none (its local service calls magpie’s gateway; sampling uses provider quota) |
 | [chat](packages/chat) | Chat with magpie's models, your MCP servers, instructions and skills, by Magic_zero ([Magiczerowxy](https://github.com/Magiczerowxy)). Has a host part: a local service the page goes to | none (its service calls magpie's gateway) |
+| [agent-console](packages/agent-console) | Drive the Agent CLIs on this computer (Claude Code, Codex, Cursor, Copilot, OpenCode, Pi, Devin, dsh) with a timeline, Git changes, files and a terminal, by [qingnian108](https://github.com/qingnian108). Has a host part: a gate and a daemon on 127.0.0.1, started when the page opens | none (its daemon runs the Agent CLIs you pick, in the projects you open) |
 
 ```sh
 magpie plugin add @magpie-community/page-<name>
@@ -141,6 +142,8 @@ Like middleware, these run on the requests agents send, but in magpie's Bun host
 | [powercontext](packages/powercontext) | [PowerContext](https://github.com/oceanbase/powercontext) recall and opt-in completed-conversation capture; no client MCP or skill required |
 | [nowledge-mem](packages/nowledge-mem) | [Nowledge Mem](https://mem.nowledge.co) recall, Context Bundle or Working Memory, per-harness provenance and opt-in conversation import as Mem Threads, automatic for every harness behind Magpie |
 | [aelios](packages/aelios) | [Aelios](https://github.com/wusaki0723/Aelios) recall before each turn from your own Aelios on Cloudflare, and opt-in recording of each turn so Aelios can remember it |
+| [respire-memory](packages/respire-memory) | [Respire](https://github.com/risense-ai/respire-magpie): per-turn recall and complete policy reads, automatic process diaries, and grounded experience archival with readback; storage runs after reply completion |
+| [notify](packages/notify) | A push to ntfy, Bark, Server酱, Feishu, DingTalk, WeCom, Telegram or a webhook when an agent's turn is done or fails, after it ran `minMinutes` or longer |
 
 Use the same plugin management commands as middleware:
 
@@ -148,6 +151,7 @@ Use the same plugin management commands as middleware:
 magpie plugin add @magpie-community/gateway-powercontext
 magpie plugin add @magpie-community/gateway-nowledge-mem
 magpie plugin add @magpie-community/gateway-aelios
+magpie plugin add @magpie-community/gateway-notify
 ```
 
 Installed plugins use **Plugins › Installed › Options** and the normal on/off

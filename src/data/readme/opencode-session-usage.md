@@ -2,9 +2,10 @@
 
 A TUI sidebar panel for [OpenCode](https://opencode.ai) that shows:
 
-- an **estimated session cost** at model catalog prices, and
+- an **estimated session cost** at model catalog prices, including every
+  subagent session in the tree, and
 - your **OpenCode Go / Console usage meters** — rolling, weekly and monthly —
-  with reset countdowns and progress bars.
+  with reset countdowns, threshold-coloured progress bars and percentages.
 
 ```text
 Usage
@@ -100,8 +101,8 @@ The bottom slot only gets one row before the prompt area, so use
 | `showBars` | `true` | Show progress bars. Set `false` for a compact text-only panel. |
 | `barWidth` | `22` | Bar width in cells, 8–60. |
 | `showReset` | `true` | Show the time until each window resets. |
-| `warnAt` | `70` | Percentage where the bar turns warning-coloured. |
-| `criticalAt` | `90` | Percentage where the bar turns error-coloured. Must be ≥ `warnAt`. |
+| `warnAt` | `70` | Percentage where the percentage text and bar turn warning-coloured. |
+| `criticalAt` | `90` | Percentage where the percentage text and bar turn error-coloured. Must be ≥ `warnAt`. |
 
 Plugin options in `cli.json` override the file, which is useful for a
 machine-specific setting without editing the shared config:
@@ -156,14 +157,18 @@ Exact parity would require OpenCode to expose raw spend or a fractional percent.
 
 ### Session estimate
 
-The total covers **every** message in the session, paginating the message API
-instead of using only the page the TUI has loaded. That keeps the figure correct
-after closing and resuming a long conversation.
+The total covers **every** message in the session and in every subagent/child
+session in its tree, paginating the message API instead of using only the page
+the TUI has loaded. That keeps the figure correct after closing and resuming a
+long conversation, and means delegated work is not invisible.
 
-If any assistant message carries a positive provider-reported `cost`, the panel
-sums those values. This is exactly what the built-in usage statistics show, so
-the two agree. Providers on a subscription such as OpenCode Go report `0`; when
-every message is zero, the panel falls back to catalog pricing for all messages:
+Each session is priced independently. If an assistant message in that session
+carries a positive provider-reported `cost`, the panel sums those values. This is
+exactly what the built-in usage statistics show, so the two agree. Providers on a
+subscription such as OpenCode Go report `0`; when every message in a session is
+zero, that session falls back to catalog pricing for all its messages. A parent
+with reported costs therefore does not hide a subagent that needs the catalog
+estimate:
 
 ```text
 (input × input price
@@ -183,21 +188,30 @@ turn reads the Console/Go metering endpoints. It reads only the three
 `go.rolling`, `go.weekly` and `go.monthly` objects (`percent`, `limited`,
 `resetsAt`).
 
+Below `warnAt` the percentage and filled bar use the success colour. At or above
+`warnAt` they switch to warning, and at or above `criticalAt` (or when the meter
+reports `limited`) to error. The row is rebuilt when the severity changes so the
+new colour applies to the already-rendered text and bar.
+
 ### Refresh behaviour
 
 - A 15-second timer moves the reset countdowns.
 - The network read is throttled by `refreshMs` (default 2 minutes).
 - `session.usage.updated` and `session.execution.succeeded` force an immediate
   read, coalesced to at most one per second, so a finished turn updates at once.
+  Events from subagent sessions in the current tree refresh the parent panel too.
+- `session.created` adds a new child session to the tree; `session.deleted`
+  removes it.
 - `refreshMs: 0` disables periodic polling; events still refresh.
-- Switching sessions clears the previous meters and reloads.
+- Switching sessions clears the previous total and meters and reloads.
 
 ### Network and cost
 
-The only network request is the read-only `usage.limits` GET. The plugin never
-calls a model, a tool, or a prompt, sends no telemetry, and stores no
-credentials. A usage read does not consume Go allowance. Errors are swallowed
-and simply hide the meters.
+The only external network request is the read-only `usage.limits` GET; session
+and message data comes from the local OpenCode server. The plugin never calls a
+model, a tool, or a prompt, sends no telemetry, and stores no credentials. A
+usage read does not consume Go allowance. Errors are swallowed and simply hide
+the meters.
 
 ## Troubleshooting
 
@@ -206,9 +220,10 @@ and simply hide the meters.
   `~/.local/share/opencode/log/opencode.log`.
 - **No meters:** see
   [Enabling Console usage metrics](#enabling-console-usage-metrics).
-- **Estimate is lower/higher than expected:** it uses catalog list prices, not
-  provider-reported costs, discounts, or peak/off-peak pricing. Token counts
-  include reasoning and cache usage as reported by OpenCode.
+- **Estimate is lower/higher than expected:** it includes the session and all of
+  its subagents, and uses catalog list prices for sessions without reported
+  costs — not discounts or peak/off-peak pricing. Token counts include reasoning
+  and cache usage as reported by OpenCode.
 - **`position` ignored:** it is applied at setup; reload after changing it.
 
 ## Development
@@ -228,7 +243,7 @@ Source layout:
 ```text
 src/tui.tsx      plugin entry, slot registration, Solid/OpenTUI panel
 src/config.ts    config file discovery, validation, hot reload
-src/estimate.ts  whole-session cost (reported cost, catalog fallback)
+src/estimate.ts  session-tree cost (reported cost, catalog fallback)
 src/usage.ts     pure cost, reset and bar helpers
 src/*.test.ts    Vitest coverage for the pure helpers and config
 ```

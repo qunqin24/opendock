@@ -137,11 +137,16 @@ Both install from the single npm package `open-code-war`.
 pi install npm:open-code-war
 ```
 
-For OpenCode, add it to the `plugin` array in `opencode.json` (auto-installs on startup):
+For OpenCode, add it to the `plugins` array in `opencode.json(c)` (auto-installs on startup).
+`plugins` is the OpenCode 2 field name; 1.x's `plugin` keeps working.
 
-```json
-{ "plugin": ["open-code-war"] }
+```jsonc
+{ "plugins": ["open-code-war"] }
 ```
+
+> ℹ️ OpenCode 2 does not run V1 plugins. This package exports both APIs, so it collects on 1.x and
+> 2.x alike. If counting stops, check `~/.local/share/opencode/log/opencode.log` for
+> `failed to load plugin`.
 
 All four add up under the same `userId`; the per-agent split shows on your profile chart.
 See [`adapters/README.md`](adapters/README.md) for requirements and counting rules.

@@ -1,6 +1,6 @@
 # codar-magpie
 
-把 **Codar 科搭（SpeedAI）** 接进 magpie / OpenCode：微信扫码登录一次，16 个模型就能被所有 agent 用，
+把 **Codar 科搭（SpeedAI）** 接进 magpie / OpenCode：微信扫码登录一次，50+ 个模型就能被所有 agent 用，
 附带点数余额、每日签到和新用户免费模型领取。
 
 > 非官方插件。登录用的是 Codar 自己的扫码接口，Token 存在 magpie 的 `plugin-auth.json`（权限 600）。
@@ -186,7 +186,7 @@ Token 是上游签发的 HS256 JWT，**7 天有效**。到期后上游返回 401
 ## 用起来
 
 ```bash
-magpie plugin                    # codar (Codar 科搭, 16 models)  signed in
+magpie plugin                    # codar (Codar 科搭, 50+ models)  signed in
 magpie provider test codar auto  # 发一个最小请求验证链路
 magpie quota                     # 点数余额 + 免费期
 magpie models                    # agent 能选的模型
@@ -196,8 +196,18 @@ agent 里用 `<供应商>/<模型>` 指代，例如 `codar/auto`、`codar/claude
 
 ### 模型与协议
 
-目录来自 `GET /v1/codar/models`（登录后每次刷新，取不到就用内置快照）。模型 id 以目录为准，
-协议按目录里的 `protocol` 字段分流，和官方客户端一致：
+模型列表来自两份上游目录（登录后每次刷新，取不到就用内置快照）：
+
+- `GET /v1/codar/models`：官方精选目录（16 个），带协议、定价和请求 schema，优先使用
+- `GET /v1/models`：上游全量清单（61 个），用来补齐精选目录没列的对话模型；
+  画图 / 向量 / 音频类（`*-image*`、`nano-banana`、`embedding` 等）会被排除
+
+合并后约 52 个。精选目录里的模型按 `protocol` 字段分流；补充进来的 `claude-*` 走
+Anthropic Messages，其余走 OpenAI 兼容的 Chat Completions。
+
+上游目录偶尔会慢到 10s 以上；插件成功读到后会缓存 5 分钟，超时则沿用上次结果，
+最坏退回内置的 52 模型快照。**列表不会因为一次读失败而缩水**（否则 magpie 会把
+「消失」的模型取消勾选）。常用模型：
 
 | 模型 | API | 备注 |
 |---|---|---|
@@ -214,6 +224,23 @@ agent 里用 `<供应商>/<模型>` 指代，例如 `codar/auto`、`codar/claude
 
 所有模型都声明 `tool_call`，实际工具调用由上游完成。**图片输入不要用**：目录写着支持，
 但实测返回 400，插件里已经统一声明成纯文本。
+
+### 客户端身份句替换（403 client_not_supported）
+
+Codar 网关会扫描请求体里的 system prompt，命中某些 agent 客户端的身份句时拒绝登录凭证：
+
+```
+403 {"detail":{"code":"client_not_supported",
+     "message":"This login credential is restricted to Codar. Use an API key for other clients."}}
+```
+
+实测是**整句精确匹配**——请求里出现 "Claude Code"、"Anthropic"、`claude-cli` UA 都不触发，
+只有完整那一句会。插件在 `loader` 的 fetch 钩子里发请求前做一次字符串替换，
+只动命中的句子，其余字节（含 SSE 流式）原样透传。非 UTF-8 的 body（压缩、二进制）不碰。
+所以 Claude Code / Codex / OpenCode 等 agent 直连 Codar 也能用了，无需再单独跑一个本地修复代理。
+
+> Codar 没有自助 API Key（`/api/keys` 需要管理员），所以上游错误提示里的
+> "Use an API key" 对普通用户是条死路——替换句子是让登录凭证继续可用的唯一办法。
 
 ### 用量（`auth.usage`）
 
@@ -326,6 +353,7 @@ magpie 的插件页面跑在 `sandbox="allow-scripts"` + `connect-src 'none'` �
 | 现象 | 处理 |
 |---|---|
 | `401` / 账号被标「需要重新登录」 | JWT 过期（7 天）→ `magpie plugin login codar` 重扫 |
+| `403 client_not_supported` | 请求里的身份句变了、上游加了新匹配句 → 把新句子加进 `index.mjs` 的 `PROMPT_SUBSTITUTIONS`（0.5.1 起内置一句，覆盖 Claude Code） |
 | 扫码页打开是二维码图片 | 正常，直接用微信扫 |
 | 登录时提示要手机号验证 | 新 IP 或未绑手机，去网页控制台完成一次，再用「粘贴 Token」 |
 | `No available channel for model 'X'` | 模型名大小写敏感，用 `magpie models` 里的精确 id |

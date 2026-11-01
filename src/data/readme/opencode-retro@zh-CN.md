@@ -1,4 +1,4 @@
-<!-- translated-from: README.en.md@7dcedf76bc5e -->
+<!-- translated-from: README.en.md@1d591a2573ea -->
 # opencode-retro
 
 [Русский](README.md) | [English](README.en.md) | **简体中文** | [Español](README.es.md) | [日本語](README.ja.md)
@@ -172,7 +172,9 @@ OpenCode 会从 npm 获取插件；在 `opencode.json` 中写出包名即可：
 }
 ```
 
-或者把整个插件放进本地：将一份副本放到 `~/.config/opencode/plugins/opencode-retro/`，就不需要在 `opencode.json` 中添加条目——OpenCode 会自行扫描每个配置目录下的 `plugin/` 和 `plugins/` 目录。钩子在服务层注册，因此已在运行的会话会在下一次提示或工具调用时加载插件。
+或者把整个插件放进本地：将一份副本放到 `~/.config/opencode/plugins/opencode-retro/`，就不需要在 `opencode.json` 中添加条目——OpenCode 会自行扫描每个配置目录下的 `plugin/` 和 `plugins/` 目录。
+
+两种方式都不需要重启。`opencode.json` 或插件自身的文件发生变化时，OpenCode 会自行重新加载插件；已经打开的会话——包括你正在使用的这个——会在下一步连同工具一起加载它。`opencode service restart` 没有任何帮助，反而会关闭服务上运行的所有会话。
 
 无需任何配置：插件自己不调用模型，所以没有模型要挑、没有密钥要填、也没有服务商要连通。分析以请求它的那个会话的子智能体身份运行。`.retro/selfcheck.md` 会报告它是否运行过，以及失败时的原因。
 
@@ -199,7 +201,7 @@ OpenCode 会从 npm 获取插件；在 `opencode.json` 中写出包名即可：
 { "action": "retro_decide",  "resource": "*", "effect": "allow" }
 ```
 
-`.retro/selfcheck.md` 会读取 `opencode.json`（项目的和全局的）中的权限规则，当这些规则把工具藏起来时报告 `BROKEN tool permissions`。代理自身的权限不会被读取。
+`.retro/selfcheck.md` 会读取 `opencode.json`（项目的和全局的）中的权限规则，当这些规则把工具藏起来时报告 `BROKEN tool permissions`。代理自身的权限不会被读取，代理的工具集也不会：OpenCode 的 `explore` 代理不带插件的任何工具，所以交接内容要求每个分析都以 `general` 启动。
 
 ### 磁盘上会出现什么
 

@@ -20,6 +20,10 @@ behavior.
 
 This package targets opencode **v2**. It has no v1 entrypoint.
 
+Every gated call is recorded in a SQLite event log, and the derived counters are exposed over
+RPC. A bundled TUI part renders them in the sidebar: allow/deny/ask totals, cache hits, deny
+categories, judge errors, and total judge wait time.
+
 ## Install
 
 Add the package to the `plugins` array in your `opencode.json`, using the object form so its
@@ -41,7 +45,9 @@ options are passed through:
 ```
 
 opencode installs npm plugins with Bun at startup. No build step: the package ships TypeScript,
-which Bun loads natively.
+which Bun loads natively. The package also ships a TUI part, which opencode loads automatically
+so the sidebar appears without extra config. It declares `@opentui/core`, `@opentui/solid`, and
+`solid-js` as peer dependencies.
 
 ## Config
 
@@ -52,10 +58,9 @@ loudly at startup instead of silently using a default.
 | --- | --- |
 | `providerID` | provider that serves the judge model (required) |
 | `modelID` | model that judges the commands (required) |
-| `failure` | behavior when the judge is unavailable: `deny` (default), `allow`, or `ask` |
+| `failure` | behavior when the judge is unavailable: `ask` (default), `allow`, or `deny` |
 | `timeoutMs` | how long to wait for a verdict before treating the judge as unavailable (default `10000`) |
-| `ttlHours` | verdict cache TTL in hours (default `24`) |
-| `cachePath` | override the verdict database path (default under `XDG_CACHE_HOME`/`~/.cache`) |
+| `dbPath` | override the event database path (default `$XDG_CACHE_HOME/shield-bash/sqlite.db`) |
 
 `failure` maps to real behavior in v2:
 
@@ -83,16 +88,38 @@ optionally a safer alternative. Categories, in short:
 
 Whole pipelines are judged, so one bad segment denies the chain.
 
-## Caching
+## Event log and caching
 
-Verdicts are cached in a SQLite database at `~/.cache/shield-bash/verdicts.db` (respecting
-`XDG_CACHE_HOME`), keyed by `(root session id, command)`. A cache hit skips the judge
-entirely, so a command judged once is not re-judged on every repeat within the same root
-session; a new session re-judges it, by design.
+Every gated call is one row in `shield_events`, a SQLite table at
+`~/.cache/shield-bash/sqlite.db` (respecting `XDG_CACHE_HOME`). The same table backs the dedup
+cache, keyed by `(root session id, command)`. A cache hit skips the judge entirely, so a
+command judged once is not re-judged on every repeat within the same root session; a new
+session re-judges it, by design.
 
-Rows are deleted when their root session is deleted (`session.deleted` event), so the cache
-never outlives the session it was judged for. The TTL and the 1000-row cap are a safety net
-for rows that never get that signal (e.g. a crash), not the primary eviction path.
+Rows are deleted when their root session is deleted (`session.deleted`). On startup the plugin
+also sweeps rows whose session the server no longer knows about, which clears crash orphans and
+manual deletions. There is no TTL or row cap.
+
+## Metrics and the sidebar
+
+The bundled TUI part renders the counters in the sidebar:
+
+```
+🛡 shield-bash
+ 42 ✓   3 ✕   2 ?
+ cached:  30✓  2✕
+ denied:  DG1×2 DG8×1
+ asked:   1 once  1 always  0 reject
+ errors:  1 timeout  2 inference
+ wait:    12.3s
+```
+
+Counters come from the event log, so they survive a server restart. The TUI reads them over
+RPC (`shield-bash.stats`) and follows live updates from the `verdict` event.
+
+The RPC route resolves to the server's default location unless the call names one. The TUI part
+passes the session's location, so the sidebar works whether the plugin is installed globally or
+per project.
 
 ## Development
 
@@ -110,8 +137,10 @@ covers plugin loading, `session.create` with a `parentID`, the context-hook poli
 and `execute.before` denial. Point it at a specific binary with `SHIELD_BASH_TEST_OPENCODE`; it
 skips when `opencode` is not on `PATH`.
 
-The repo's own `opencode.json` loads the plugin from source via `@acramsay/opencode-shield-bash@file:.`,
-so running `opencode` from this directory exercises the working tree.
+The repo's own `opencode.json` disables the published package and loads the source dev entry
+(`./src/dev`), so running `opencode` from this directory exercises the working tree. The dev
+entry registers under `shield-bash-dev` (server) and `shield-bash-tui-dev` (TUI) so it can load
+alongside the published plugin without an id collision.
 
 ## Releases
 

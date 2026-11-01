@@ -1,7 +1,7 @@
 <div align="center">
   <h1>⚡ Modded OpenCode</h1>
   <p>Требуется OpenCode — Desktop, Terminal и CLI читают один и тот же конфиг.</p>
-  <p><strong>105 навыков · 13 агентов · 19 команд · 6 плагинов — всё готово при запуске</strong></p>
+  <p><strong>106 навыков · 13 агентов · 18 команд · 6 плагинов — всё готово при запуске</strong></p>
   <p>
     <a href="README.md">🇬🇧 English</a> ·
     <a href="README.tr.md">🇹🇷 Türkçe</a>
@@ -78,7 +78,7 @@ chmod +x setup.sh scripts/*.sh
 
 ---
 
-## 🔥 Навыки (105 шт.)
+## 🔥 Навыки (106 шт.)
 
 ### Язык и фреймворки
 

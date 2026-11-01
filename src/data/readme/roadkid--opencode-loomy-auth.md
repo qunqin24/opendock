@@ -66,7 +66,9 @@ become the tool / reasoning / image bits, the context and output limits pass
 through, and every model carries the low/medium/high reasoning-effort
 variants. The gateway prints each model's point rate as a suffix on its
 display name (`MiniMax M3 （x4.0）` — ASCII and full-width brackets both
-occur); the plugin splits that off and keeps it out of the name. A model the
+occur); the plugin splits that off — the name stays clean, and the rate
+rides the model record, the field the host's picker reads the multiplier
+from. A model the
 upstream itself declares free — the words 免费 in the name, or a rate of
 exactly zero — carries a `free` bit; no rate at all is not free. Rows that
 aren't chat models (the image generators say so) are left off the list:
@@ -76,8 +78,10 @@ The live list is the source of truth and wins the moment it answers. Without
 a session, on an empty answer or a failed ask, the plugin falls back to the
 built-in table in the code — a snapshot of this same catalog's text models
 as measured on 2026-10-28, aging only as the gateway's own catalog moves
-on. The table below is what the gateway itself served on that day, kept
-here as a field guide:
+on; the snapshot's rates and free bits go back to the host with it, and a
+failed ask is marked as one, so the editor knows the list is the plugin's
+defaults and not the account's. The table below is what the gateway itself
+served on that day, kept here as a field guide:
 
 | Model | Display name | Rate | Notes |
 |---|---|---|---|

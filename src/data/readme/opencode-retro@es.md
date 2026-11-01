@@ -1,4 +1,4 @@
-<!-- translated-from: README.en.md@7dcedf76bc5e -->
+<!-- translated-from: README.en.md@1d591a2573ea -->
 # opencode-retro
 
 [Русский](README.md) | [English](README.en.md) | [简体中文](README.zh-CN.md) | **Español** | [日本語](README.ja.md)
@@ -173,7 +173,9 @@ OpenCode descarga el plugin desde npm; basta con nombrarlo en `opencode.json`:
 }
 ```
 
-O incluya el plugin entero: ponga una copia en `~/.config/opencode/plugins/opencode-retro/` y no hace falta ninguna entrada en `opencode.json` — OpenCode recorre por sí mismo los directorios `plugin/` y `plugins/` de cada directorio de configuración. Los hooks se registran a nivel de servicio, así que las sesiones que ya están en marcha recogen el plugin en su siguiente prompt o llamada a herramienta.
+O incluya el plugin entero: ponga una copia en `~/.config/opencode/plugins/opencode-retro/` y no hace falta ninguna entrada en `opencode.json` — OpenCode recorre por sí mismo los directorios `plugin/` y `plugins/` de cada directorio de configuración.
+
+En ningún caso hace falta reiniciar. OpenCode recarga el plugin por sí mismo cuando cambian `opencode.json` o los archivos del propio plugin, y las sesiones ya abiertas — la suya incluida — lo recogen, con sus herramientas, en su siguiente paso. `opencode service restart` no aporta nada y cierra todas las sesiones que corren en el servicio.
 
 No hay nada que configurar: el plugin no llama a ningún modelo propio, así que no hay modelo que elegir, ni clave que aportar, ni proveedor al que llegar. Un análisis se ejecuta como subagente de la sesión que lo pidió. `.retro/selfcheck.md` informa de si se ejecutó y de por qué falló si no lo hizo.
 
@@ -200,7 +202,7 @@ El trabajo del plugin pasa por tres herramientas que registra — `retro_record`
 { "action": "retro_decide",  "resource": "*", "effect": "allow" }
 ```
 
-`.retro/selfcheck.md` lee las reglas de permisos de `opencode.json` — el del proyecto y el global — e informa `BROKEN tool permissions` cuando ocultan las herramientas. Los permisos propios de un agente no se leen.
+`.retro/selfcheck.md` lee las reglas de permisos de `opencode.json` — el del proyecto y el global — e informa `BROKEN tool permissions` cuando ocultan las herramientas. Los permisos propios de un agente no se leen, ni tampoco su conjunto de herramientas: el agente `explore` de OpenCode no lleva ninguna de las herramientas del plugin, y por eso el traspaso pide que cada análisis se inicie como `general`.
 
 ### Qué aparece en disco
 

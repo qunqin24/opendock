@@ -36,16 +36,16 @@
 - **赤いピクセル**: 両画像で色差が `threshold` を超えた差分ピクセル（差分カウント `diff_pixels` の対象）。
 - **黄色いピクセル**: アンチエイリアス境界由来と判定され、差分カウントから自動除外されたピクセル（`include_aa=false` の既定時）。`include_aa=true` では AA 境界も差分として数え、黄色除外は行われません。
 - **それ以外の領域**: 差分がなかった箇所で、image A（Figma側）の輝度をグレースケール化して白寄りに薄めた階調で表示されます。
-- `generate_diff` を `false` に指定した場合は差分画像を生成せず、`diff_image` は空文字列で返されます。このとき算出対象の差分画像が存在しないため、`diff_regions` も応答に含まれません。
+- `generate_diff` を `false` に指定した場合は差分画像の PNG/base64 化を行わず、`diff_image` は空文字列で返されます。差分マスク自体はメモリ上で計算するため、`diff_regions` は `generate_diff=true` のときと同じく返ります（巨大な base64 を避けつつ位置情報だけ得る用途向け）。
 - `diff_on_mismatch` を `true` に指定した場合、判定が `success` なら `diff_image` は空文字列、`mismatch` なら差分画像が返されます。
 - `diff_image_content` を `true` に指定し、かつ `diff_image` が空でない場合、MCP 応答の `content[0]`（JSON テキスト）の後に `image/png` の image コンテンツが付きます。既定は `false` で、既存クライアントは `content[0]` だけを読めば足ります。
-- 差分ピクセルがある場合（`generate_diff` が true のとき）、応答に機械可読な `diff_regions`（例: `[{"x": 0, "y": 0, "w": 100, "h": 100, "diff_pixels": 10000}]`）が付きます。pixelmatch 差分画像の赤いピクセルを 4 近傍連結成分に分割し、bounding box と差分ピクセル数を算出します。差分ピクセル数の多い順に最大 10 件で、座標は画像のピクセル座標です。黄色いアンチエイリアス除外ピクセルは含めません。
+- 差分ピクセルがある場合、応答に機械可読な `diff_regions`（例: `[{"x": 0, "y": 0, "w": 100, "h": 100, "diff_pixels": 10000}]`）が付きます。pixelmatch 差分ラスタの赤いピクセルを 4 近傍連結成分に分割し、bounding box と差分ピクセル数を算出します。差分ピクセル数の多い順に最大 10 件で、座標は画像のピクセル座標です。黄色いアンチエイリアス除外ピクセルは含めません。`generate_diff=false` でも返します。
 
 ### `layout_integrity` モードの検査内容とレスポンス
 
 Figma 比較は「あるキャンバス幅での再現」しか見ないため、iPad 縦向き・横向きのような別幅での崩れは見逃します。`layout_integrity` は **Web の Bounding Box だけ**を見て、指定した CSS ビューポートではみ出していないかを判定します。
 
-- **入力:** `web_layout` または `web_layout_path`（`layout_tree` と同じ WebNode JSON）。`figma_*`・画像・`threshold` / `min_match` / `pass_rate` / `max_diff_pixels` / `include_aa` / `generate_diff` / `diff_image_content` / `count_extra_web` は非対応です。`max_details` は `layout_tree` と同様に `details` の件数上限に使えます（`issue_count` / `issues` は全件のまま）。
+- **入力:** `web_layout` または `web_layout_path`（`layout_tree` と同じ WebNode JSON）。`figma_*`・画像・`threshold` / `min_match` / `pass_rate` / `max_diff_pixels` / `include_aa` / `generate_diff` / `diff_on_mismatch` / `diff_image_content` / `count_extra_web` は非対応です。`max_details` は `layout_tree` と同様に `details` の件数上限に使えます（`issue_count` / `issues` は全件のまま）。
 - **既定ビューポート:** 768×1024 CSS px（`viewport_preset` 未指定 = `ipad_portrait`）。
 - **横向き:** `viewport_preset=ipad_landscape`（1024×768）。任意サイズは `viewport_width` / `viewport_height`（0 より大きい値。指定時はプリセットを上書き）。
 - **`viewport_overflow_x`:** `x < 0` または `x+w > viewport_width`（1px の丸めは許容）。ビューポート高さ超えはページスクロールとして扱い、失敗にしません。
@@ -124,7 +124,7 @@ image A / B のいずれかが一様と検出された場合、status / match_ra
 | `viewport_height` | number | `layout_integrity` | 0 より大 | 1024 | CSS ピクセルのビューポート高さ。指定時は `viewport_preset` の高さを上書きする。 |
 | `count_extra_web` | boolean | `layout_tree` | true / false | false | `true` の場合、どの Figma ノードにもマッチしなかった Web ノード（実装側の余分な要素）を一致率の分母に加算して一致率を下げる。 |
 | `max_details` | number | `layout_tree` / `layout_integrity` | 0 以上 | 0 | `details` の最大件数。0（未指定）は無制限。1 以上のとき先頭の summary 行を残したまま指定件数に切り詰め、末尾に `... and N more details omitted (max_details=M)` を付ける。`layout_integrity` では `issue_count` / `issues` は全件のまま。 |
-| `generate_diff` | boolean | `perceptual` / `strict` | true / false | true | `false` の場合は差分画像を生成せず、`diff_image` は空文字列で返される。`strict` の `diff_regions` も差分画像が無いため含まれない。 |
+| `generate_diff` | boolean | `perceptual` / `strict` | true / false | true | `false` の場合は差分画像の PNG/base64 化を行わず、`diff_image` は空文字列で返される。`strict` の `diff_regions` は in-memory マスクから算出するため `false` でも返る。 |
 | `diff_on_mismatch` | boolean | `perceptual` / `strict` | true / false | false | `true` かつ判定が `success` の場合、応答の `diff_image` を空文字列にする（失敗時の分析用に差分画像は残しつつ、成功時のトークン消費を抑える）。`generate_diff=false` のときはもともと空。 |
 | `diff_image_content` | boolean | `perceptual` / `strict` | true / false | false | `true` かつ `diff_image` が空でない場合、JSON テキストの後に MCP image コンテンツ（`image/png`）を付ける。既定は JSON のみ。 |
 
@@ -253,7 +253,7 @@ DOM からの抽出手順（`getBoundingClientRect()` + `window.scrollX` / `wind
 | `ignored_regions` | number | ○ | パースできた `ignore_region` の件数。 |
 | `warnings` | string[] | 条件付き | 両画像が単色ベタ塗りで差分 0 のとき（空洞比較）、および `min_match` のみ指定し `max_diff_pixels` を省略したうえで既定 0 が判定を支配して `mismatch` になったとき（既定 0 が判定を支配する旨。合格時は付けない）。 |
 | `out_of_bounds_regions` | string[] | 非空時のみ | 画像と交差しない `ignore_region`。 |
-| `diff_regions` | object[] | 非空時のみ | 赤い差分ピクセルの bounding box（`generate_diff` が true のとき）。 |
+| `diff_regions` | object[] | 非空時のみ | 赤い差分ピクセルの bounding box（`generate_diff=false` でも返す）。 |
 | `max_diff_pixels` | number | ○ | 判定に使った許容差分ピクセル数（省略時は既定 0）。 |
 
 ### `layout_integrity`

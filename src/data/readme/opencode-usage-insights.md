@@ -33,7 +33,8 @@ written by the server-side recorder and read by the TUI.
   whether it is the whole session or a window of a long one:
   `16:54 opencode-go` / `deepseek-v4.1-flash max` /
   `in 1.7k (427.3k) · out 1.06k` / `hit 99.7% · 1.2k/s · $0.0006`.
-- **The record** (server entry): every assistant step with tokens, cost,
+- **The record** (server entry): every assistant step with tokens, charged cost,
+  the list-price estimate when the host reported `$0`,
   timings, finish reason, the provider and model it ran as, and its session and
   parent ids; prompts, session lifecycle and compaction events too.
 - **Portable data** (from a checkout): `bun run report --ndjson` exports the
@@ -55,10 +56,7 @@ written by the server-side recorder and read by the TUI.
 
 ## Install
 
-> [!IMPORTANT]
-> **Not on the npm registry yet.** Until the first release is published,
-> `opencode plugin add` and the package-name form below cannot resolve it — use
-> the local checkout, the last form of this section.
+The plugin is published on npm as `opencode-usage-insights`.
 
 ```sh
 opencode plugin add opencode-usage-insights
@@ -126,16 +124,129 @@ turn finishes, and `/usage` (alias `/insights`) opens the panel.
 | `opencode-go/deepseek-v4.1-flash max` | The identity of the turn: the provider the model ran through, as OpenCode is configured, and the model (the variant as a trailing word; `fields.model`/`fields.variant` hide either). Yellow with `changed` when the provider differs from the previous prompt, `model changed` when only the model does. |
 | `in 85.4k (1.62M), cached 1.53M, out 3.7k, cost $0.21` | `in` is the uncached part of the prompt (fresh input + cache writes), the parenthesised value the whole prompt — shown only when the two differ — `cached` its cached part, `out` everything generated (visible output + reasoning), and `cost` what the turn was billed. With several steps the segment reads `3 steps · …` and reports the step the turn ended with (`latest`) for the tokens, while the cost is always the turn's own — every step is paid for; `turnTotals: "sum"` adds every step's tokens instead. |
 | `cost $0.21` | Money, not tokens: a turn sums every step's cost whatever the token view shows. A cost of zero is left out, so a free model reads as free. `fields.cost: false` hides it. |
-| `sess in 2.1M (14.5M), cached 12.4M, out 88k, cost $1.90` | The session totals reported by the host, in the same buckets, with the cost of the whole session. |
+| `cost ≈ $0.21` | A **list-price estimate**, not money charged. When the host reports `cost: 0` for a paid model (OpenCode 2.2.0+ with an OpenCode Go subscription), the plugin prices the step from the host's model list. A turn mixing covered and paid steps keeps both parts visible: `cost $0.12 + ≈ $3.40`. `pricing: "off"` hides estimates everywhere; `fields.cost: false` hides both. |
+| `sess in 2.1M (14.5M), cached 12.4M, out 88k, cost $1.90` | The session totals: tokens and charged money come from the host, and the list estimate comes from the steps the plugin recorded. A Go session reads `cost ≈ $3.40`; a session mixing charged and covered steps keeps both parts, `cost $0.12 + ≈ $3.40`. |
 | `⚠ cache expired (−11.7k)` | Yellow. The prompt cache read fell by that many tokens against a comparable previous step; `×N` when several steps in the turn lost cache. |
 
 The turn segment carries no label by default — the numbers are the turn's, and
 `sess` marks the session's; `labels.turn` (e.g. `"turn"`) brings a prefix back.
 
+`≈` is an estimate at the host's list price, never a charge. It appears when
+OpenCode reports a step at `$0` — subscription-covered Go requests, or a provider
+that stopped reporting a cost — and the host's model list still has a price. A
+genuinely free model has no price and therefore no estimate; it is recorded as
+known free rather than as an unknown price. The estimate is stored per step, so
+the line's `sess` segment, the panel, the sidebar, the NDJSON export and the CLI
+report all show the same number. The `db` view lists how many `$0` steps still
+lack one; `e` backfills them using today's model list.
+
 A turn is every consecutive assistant step after a prompt. Compaction, shell,
 `idle` and info messages do not split a turn; `user`, `synthetic` and `system`
 messages do. From a checkout, `bun run demo` prints one example per case,
 including the streaming one and both turn-total views.
+
+## How costs are calculated
+
+**Charged money is never recalculated by the plugin.** `steps.cost` is what the
+host reports for the step (possibly `0` for an OpenCode Go subscription). When
+that number is `0` or missing and the model has a price in the host's model
+list, the plugin computes a **list-price estimate** and stores it in
+`steps.list_cost`. Prices are USD per 1,000,000 tokens.
+
+The price source is the model list exposed by the OpenCode process that is
+currently serving the session, already resolved by the host (provider config,
+overrides, Zen/Go pricing):
+
+| Surface | Where the price comes from |
+| --- | --- |
+| Server recorder | `ctx.model.list()` → `ModelInfo.cost` |
+| Live turn / backfill | `ctx.data.location.model.list(ctx.location)` → `ModelInfo.cost` |
+| Panel, sidebar, NDJSON, CLI report | stored `steps.list_cost` |
+| `sess` segment | `SUM(list_cost)` from the plugin database |
+
+The plugin does **not** read `~/.cache/opencode/models.json`, does **not** use
+`opencode models` for prices (it lists model IDs only), and makes no network
+call of its own. Each `ModelInfo` carries the prices as
+`cost: Array<{ input, output, cache: { read, write }, tier? }>` in USD per
+1,000,000 tokens.
+
+The estimate uses the host's own fallback formula:
+
+```text
+input       fresh (uncached) prompt tokens
+cache.read  prompt tokens read from the provider cache
+cache.write prompt tokens written to the provider cache
+output      visible output tokens
+reasoning   reasoning tokens
+
+prompt = input + cache.read + cache.write
+cost   = (input * inputPrice
+          + (output + reasoning) * outputPrice
+          + cache.read * cacheReadPrice
+          + cache.write * cacheWritePrice) / 1_000_000
+```
+
+Reasoning is billed at the output price. For models with context tiers, the
+tier applies only when the whole prompt is **strictly greater** than the tier
+size; at exactly the threshold the untiered price applies. An unknown model or
+no applicable price means no estimate; an all-zero price means the model is
+known to be free.
+
+The buckets behind the line are the same ones the estimate uses, but folded for
+display:
+
+```text
+in     = input + cache.write   (the uncached part of the prompt)
+cached = cache.read
+out    = output + reasoning
+prompt = in + cached
+```
+
+`list_cost` has three meanings: `NULL` means the step was charged or its price
+is unknown; `0` means the model is known to be free; a positive value is the
+estimate. That is why a free model reads as `$0`, while an older model the
+host's model list no longer contains stays without a price.
+
+A worked example, using the prices of `opencode-go/deepseek-v4.1-flash`
+(`input 0.15`, `output 0.6`, `cache.read 0.003`):
+
+```text
+2,591 × 0.15 + (564 + 3,239) × 0.6 + 514,944 × 0.003
+= 4,215.282 per 1,000,000 tokens
+= $0.004215282
+```
+
+What each surface shows:
+
+| Situation | Line | Panel |
+| --- | --- | --- |
+| Charged | `cost $0.12` | `$0.12` |
+| Subscription-covered (host `0`, host model price known) | `cost ≈ $3.40` | `≈$3.40` |
+| Mixed (some charged, some covered) | `cost $0.12 + ≈ $3.40` | overview `$0.12 + ≈ $3.40`; table cell `≈$3.52` (charged + estimate) |
+| Known free model | cost omitted | `$0` |
+| Price unknown | cost omitted | `$0` |
+
+The **turn** estimate on the live line uses the model list the TUI currently
+has. The **`sess`** segment uses the estimate recorded per step and summed for
+the session, as do the panel, the sidebar, the NDJSON export and the CLI report.
+If a price changes after a step is recorded, the live turn can therefore differ
+from the stored history; `list_cost` freezes the price from the recording time.
+The server loads its model list in the background, refreshes it on
+`model.updated` and keeps the previous table if a refresh fails; the TUI
+invalidates its table on the same event and refreshes it on a coarse TTL.
+
+For a session, the charged total is the host's; the estimate is
+`SUM(list_cost)` over the steps the plugin recorded. If the plugin started
+recording in the middle of a session, the estimate covers only the recorded
+steps; the charged total still follows the host. When the database is
+unavailable, the line falls back to the host's charged total with no estimate.
+
+The `db` view counts the `$0` steps that have no known price yet. `e` retries
+them with today's host model list: free models become `0`, models still in that
+list get an estimate, and models the list no longer contains stay unknown. Steps
+without a provider/model or without tokens have nothing to price and are not
+counted. `pricing: "off"` stops new estimates, hides stored ones everywhere and
+disables the backfill, without deleting the data.
 
 ## The panel
 
@@ -169,6 +280,7 @@ a help overlay that repeats the keys and defines every number.
 | `m` `p` | Filter by model or by **provider** (a picker of the values actually observed). |
 | `x` | Clear the filters. |
 | `r` | Re-read the database. |
+| `e` | `db`: backfill list-price estimates for the `$0` steps that have none (asks first; uses today's model list). |
 | `v` | `db`: compact the file, giving the space of deleted rows back. |
 | `?` | Help overlay. |
 | `f` / `escape` | Full screen / close. |
@@ -188,12 +300,15 @@ durable storage, so the panel reopens where it was left.
 | `latency` | Wall time, streaming window and throughput as p50/p90/p99 overall and per model (per provider when a model is filtered). `n < 5` is dimmed. |
 | `sessions` | Each session with steps, prompts, tokens, `hit`, cost, its directory and how many models it used; subagent sessions are indented under their parent and rolled up. |
 | `turns` | The per-prompt history: one line per finished turn, rendered exactly like the live line. `a` widens it to every session, titled. |
-| `db` | Where the file lives, what it holds and how much of it is old. The retention table lists, per preset (`30`/`90`/`365` days), how many steps a prune would remove and the cutoff date it prunes from — pick one with `↑`/`↓` and `enter` prunes it (a confirmation first); `v` gives the space back. |
+| `db` | Where the file lives, what it holds and how much of it is old. The retention table lists, per preset (`30`/`90`/`365` days), how many steps a prune would remove and the cutoff date it prunes from — pick one with `↑`/`↓` and `enter` prunes it (a confirmation first); `v` gives the space back. It also counts the `$0` steps with no list estimate; `e` backfills them at today's list price. |
 
 The panel sums the stored per-step buckets over the selected range, so a number
 read in one place means the same in the other: `prompt` is everything the
 provider saw (`cached + fresh + writes`), `in` the uncached part, `hit` is
 `cached / prompt`, and `out` everything generated (visible output + reasoning).
+A `cost` cell marked `≈` includes list-price estimates for steps the host
+reported as `$0`; the overview and the sidebar keep a mixed total in two parts
+(`$0.12 + ≈ $3.40`) so charged money is never mistaken for the estimate.
 
 The identity of a step is the **provider the model ran through** — `opencode`,
 `opencode-go`, `deepseek`, whatever the provider is called in the OpenCode
@@ -226,6 +341,7 @@ Options apply to both entries (each side reads the ones it needs):
 | `enabled` | `true` | `false` disables that side completely — no line, no panel, no recording. |
 | `db` | per-OS state path | SQLite path override. Must match between the server and TUI entries. |
 | `turnTotals` | `"latest"` | How the turn segment counts prompt usage: `latest` shows the prompt size the turn ended with; `sum` adds every step of the turn. |
+| `pricing` | `"auto"` | `"off"` disables list-price estimates everywhere: no new `list_cost` records, no `≈` on the line, in the panel or in the sidebar, and no historical backfill. Charged money is unaffected. |
 | `sidebar` | `true` | Show the session summary and the per-prompt history — cache hit and cost per turn — in the session sidebar (the slot is invisible while the sidebar is hidden). |
 | `sidebarTurns` | `5` | How many turns the sidebar history shows. |
 | `panel` | `true` | Show the `/usage` statistics panel and its command. `false` keeps the line and the sidebar. |
@@ -239,7 +355,7 @@ Options apply to both entries (each side reads the ones it needs):
   "options": {
     "fields": { "clock": true, "delta": true, "model": true, "variant": true, "turn": true, "session": true, "reasoning": false, "cost": true, "cacheExpiry": true },
     "turnTotals": "latest",
-    "labels": { "delta": "Δ", "turn": "", "session": "sess", "step": "step", "steps": "steps", "input": "in", "cached": "cached", "output": "out", "reasoning": "reason", "cost": "cost", "cacheExpired": "cache expired", "providerChanged": "changed", "modelChanged": "model changed" }
+    "labels": { "delta": "Δ", "turn": "", "session": "sess", "step": "step", "steps": "steps", "input": "in", "cached": "cached", "output": "out", "reasoning": "reason", "cost": "cost", "estimate": "≈", "cacheExpired": "cache expired", "providerChanged": "changed", "modelChanged": "model changed" }
   }
 }
 ```
@@ -259,15 +375,17 @@ The recorder writes to the per-user state directory:
 
 `OPENCODE_USAGE_INSIGHTS_DB=/path/to/usage.db` overrides the path, and the `db`
 option overrides both. The file is private to the user: its directory is created
-`0700` and the file `0600` (POSIX), re-applied on every open. The TUI reads
-through a read-only connection, so it can never write, migrate or take the
-recorder's lock.
+`0700` and the file `0600` (POSIX), re-applied on every open. The TUI's views
+read through a read-only connection, so they never write, migrate or take the
+recorder's lock; prune, backfill and compact use a separate short-lived writer.
+The server entry applies schema migrations on open; after an upgrade, start it
+once before opening the panel if the file predates the new schema.
 
-Per step the database holds tokens, cost, timings, finish reason, the provider
-and the model it ran as, and the session title and working directory. **Prompts
-and responses are not stored**, and nothing leaves the machine. The schema, the
-indexes, the identity rules and the security notes live in
-[docs/internals.md](docs/internals.md).
+Per step the database holds tokens, charged cost, the list-price estimate when
+the host reported `$0`, timings, finish reason, the provider and the model it ran
+as, and the session title and working directory. **Prompts and responses are not
+stored**, and nothing leaves the machine. The schema, the indexes, the identity
+rules and the security notes live in [docs/internals.md](docs/internals.md).
 
 ## CLI report
 
@@ -280,6 +398,7 @@ bun run report all                      # every view
 bun run report providers --model deepseek-v4.1-flash
 bun run report periods --granularity month
 bun run report models --provider opencode-go
+bun run report --no-estimates           # charged money only, like pricing: "off"
 bun run report --json                   # raw rows and every analysis, for scripting
 bun run report --ndjson > backup.jsonl  # export the whole database
 bun run report --import backup.jsonl    # merge an export (idempotent)

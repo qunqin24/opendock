@@ -1,6 +1,6 @@
 # HR: Agent Seat Matching and Capability Benchmarking
 
-Unified harness that matches autonomous LLM coding agents to task-appropriate seats, runs capability benchmarks across model fleets, and emits deployment verdicts. One Python engine on PyPI (`aihr`), two OpenCode plugins on npm, one database schema, and 23 CLI commands.
+Unified harness that matches autonomous LLM coding agents to task-appropriate seats, runs capability benchmarks across model fleets, and emits deployment verdicts. One Python engine on PyPI (`aihr`), two OpenCode plugins on npm, one database schema, and 34 CLI commands.
 
 The English version is canonical. The Chinese version (`README.zh-CN.md`) is a faithful mirror. When the two diverge, the English text governs.
 
@@ -219,7 +219,7 @@ Live benchmarks (`hr bench`, `hr discover`) additionally read provider credentia
 
 ## CLI Map
 
-Twenty-three commands, each targeting a specific concern: 13 core commands, 4 `apply-*` transactional-preset commands, and 6 `release-*` lifecycle commands. Legacy v1 commands (`evaluate`, `report`, `run_all`) were retired. `hr verdict` supersedes the retired evaluation path.
+Thirty-four commands, each targeting a specific concern: 16 core commands, 4 `db-*` database-lifecycle commands, 4 `apply-*` transactional-preset commands, 6 `release-*` lifecycle commands, and 4 installer/support tools. A guard test (`tests/test_cli.py`) pins every count claim in this file to the live command registry, so these numbers cannot silently drift. Legacy v1 commands (`evaluate`, `report`, `run_all`) were retired. `hr verdict` supersedes the retired evaluation path.
 
 | Command | Purpose |
 |---------|---------|
@@ -246,6 +246,17 @@ Twenty-three commands, each targeting a specific concern: 13 core commands, 4 `a
 | `hr release-rollback` | Roll back to the pre-activation symlink + config state |
 | `hr release-list` | List releases, newest first |
 | `hr release-prune` | Enforce bounded release retention (newest-valid + active preserved) |
+| `hr parity` | Flag calibration-anchor generation drift against a live fleet roster (exit 1 when reseating is needed) |
+| `hr preflight` | S3 first-shot gate: budgeted control session; gates = non-empty responses, anchor bands, store-then-read-back (exit 1 chain broken, 2 cannot-answer) |
+| `hr db-up` | Bring up the AIHR-owned PostgreSQL container and initialize the schema |
+| `hr db-down` | Stop the AIHR database container (`--purge --yes` also drops its volume) |
+| `hr db-status` | Container state + live SQL probe + hr-schema stats (secrets masked) |
+| `hr db-dsn` | Show which resolution step supplies the database connection |
+| `hr setup` | Install the latest OpenCode plugins and register them (one-shot bootstrap) |
+| `hr install-post` | Wire an extracted turnkey bundle into this machine (idempotent) |
+| `hr self-uninstall` | Undo install-post via the receipt, delete D, print the residual manifest |
+| `hr support-bundle` | Write a redacted diagnostics tar.gz for shipping to the maintainers |
+| `hr py-fetch` | Fetch the on-demand code-gen interpreter into the bundle dir (posix) |
 
 The CLI has no global `--config` flag: configuration is resolved from the environment (see the table above) and from `configs/` relative to HR_HOME. Run `hr --help` and `hr <command> --help` for the full per-command flag list.
 

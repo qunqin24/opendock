@@ -54,7 +54,7 @@ project-tracker/
 │   ├── new-ticket.sh
 │   ├── shared-auth.sh
 │   └── status-report.sh
-└── sub-skills/
+└── skills/
     ├── calendar-scheduling/
     │   ├── SKILL.md
     │   ├── reference/
@@ -97,14 +97,14 @@ Note: file list is sampled.
 <file>scripts/new-ticket.sh</file>
 <file>scripts/shared-auth.sh</file>
 <file>scripts/status-report.sh</file>
-<file>sub-skills/calendar-scheduling/reference/business-hours.md</file>
-<file>sub-skills/calendar-scheduling/reference/timezones.md</file>
-<file>sub-skills/calendar-scheduling/scripts/find-slots.sh</file>
-<file>sub-skills/calendar-scheduling/templates/invite.md</file>
+<file>skills/calendar-scheduling/reference/business-hours.md</file>
+<file>skills/calendar-scheduling/reference/timezones.md</file>
+<file>skills/calendar-scheduling/scripts/find-slots.sh</file>
+<file>skills/calendar-scheduling/templates/invite.md</file>
 </skill_files>
 ```
 
-The agent sees `sub-skills/calendar-scheduling/templates/invite.md` and `scripts/shared-auth.sh` — files from one sub-skill and the root — but nothing that says `reporting/` or `task-creation/` exist at all. Their `SKILL.md` entry points, and every supporting file beneath them, are gone.
+The agent sees `skills/calendar-scheduling/templates/invite.md` and `scripts/shared-auth.sh` — files from one sub-skill and the root — but nothing that says `reporting/` or `task-creation/` exist at all. Their `SKILL.md` entry points, and every supporting file beneath them, are gone.
 
 **After — the plugin lists all 22.** Core's block above is untouched; the marker and the plugin's block are spliced immediately before `</skill_files>`:
 
@@ -113,7 +113,7 @@ Note: file list is sampled.
 <skill_files>
 <file>reference/api-limits.md</file>
 <!-- …core's other 8 entries… -->
-<file>sub-skills/calendar-scheduling/templates/invite.md</file>
+<file>skills/calendar-scheduling/templates/invite.md</file>
 <!-- recursive-skills: recursive list (22 files) -->
 <file>SKILL.md</file>
 <file>reference/api-limits.md</file>
@@ -122,21 +122,21 @@ Note: file list is sampled.
 <file>scripts/new-ticket.sh</file>
 <file>scripts/shared-auth.sh</file>
 <file>scripts/status-report.sh</file>
-<file>sub-skills/calendar-scheduling/SKILL.md</file>
-<file>sub-skills/calendar-scheduling/reference/business-hours.md</file>
-<file>sub-skills/calendar-scheduling/reference/timezones.md</file>
-<file>sub-skills/calendar-scheduling/scripts/find-slots.sh</file>
-<file>sub-skills/calendar-scheduling/templates/invite.md</file>
-<file>sub-skills/reporting/SKILL.md</file>
-<file>sub-skills/reporting/queries/weekly-rollup.md</file>
-<file>sub-skills/reporting/reference/metric-definitions.md</file>
-<file>sub-skills/reporting/templates/exec-summary.md</file>
-<file>sub-skills/task-creation/SKILL.md</file>
-<file>sub-skills/task-creation/examples/completed-task.md</file>
-<file>sub-skills/task-creation/examples/duplicate-check.md</file>
-<file>sub-skills/task-creation/reference/priority-rubric.md</file>
-<file>sub-skills/task-creation/templates/label.md</file>
-<file>sub-skills/task-creation/templates/task.md</file>
+<file>skills/calendar-scheduling/SKILL.md</file>
+<file>skills/calendar-scheduling/reference/business-hours.md</file>
+<file>skills/calendar-scheduling/reference/timezones.md</file>
+<file>skills/calendar-scheduling/scripts/find-slots.sh</file>
+<file>skills/calendar-scheduling/templates/invite.md</file>
+<file>skills/reporting/SKILL.md</file>
+<file>skills/reporting/queries/weekly-rollup.md</file>
+<file>skills/reporting/reference/metric-definitions.md</file>
+<file>skills/reporting/templates/exec-summary.md</file>
+<file>skills/task-creation/SKILL.md</file>
+<file>skills/task-creation/examples/completed-task.md</file>
+<file>skills/task-creation/examples/duplicate-check.md</file>
+<file>skills/task-creation/reference/priority-rubric.md</file>
+<file>skills/task-creation/templates/label.md</file>
+<file>skills/task-creation/templates/task.md</file>
 </skill_files>
 ```
 

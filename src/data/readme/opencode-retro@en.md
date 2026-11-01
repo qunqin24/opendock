@@ -169,7 +169,9 @@ OpenCode fetches the plugin from npm; name it in `opencode.json`:
 }
 ```
 
-Or vendor the whole plugin: put a copy in `~/.config/opencode/plugins/opencode-retro/` and no entry in `opencode.json` is needed — OpenCode scans the `plugin/` and `plugins/` directories in every config directory itself. Hooks are registered at service level, so sessions already running pick the plugin up at their next prompt or tool call.
+Or vendor the whole plugin: put a copy in `~/.config/opencode/plugins/opencode-retro/` and no entry in `opencode.json` is needed — OpenCode scans the `plugin/` and `plugins/` directories in every config directory itself.
+
+No restart is needed either way. OpenCode reloads the plugin by itself when `opencode.json` or the plugin's own files change, and sessions already open — the one you are in included — pick it up, tools and all, at their next step. `opencode service restart` brings nothing and closes every session running on the service.
 
 There is nothing to configure: the plugin calls no model of its own, so there is no model to pick, no key to supply and no provider to reach. An analysis runs as a subagent of the session that asked for it. `.retro/selfcheck.md` reports whether one ran, and why it failed if it did not.
 
@@ -196,7 +198,7 @@ The plugin's work runs through three tools it registers — `retro_record`, `ret
 { "action": "retro_decide",  "resource": "*", "effect": "allow" }
 ```
 
-`.retro/selfcheck.md` reads the permission rules in `opencode.json` — the project's and the global one — and reports `BROKEN tool permissions` when they hide the tools. An agent's own permissions are not read.
+`.retro/selfcheck.md` reads the permission rules in `opencode.json` — the project's and the global one — and reports `BROKEN tool permissions` when they hide the tools. An agent's own permissions are not read, and neither is its toolset: OpenCode's `explore` agent carries none of the plugin's tools, which is why the hand-over asks for each analysis to be started as `general`.
 
 ### What appears on disk
 

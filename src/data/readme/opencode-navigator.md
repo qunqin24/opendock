@@ -197,8 +197,22 @@ OpenCode 2.x CLI plugins are global terminal settings; there is no project-local
 plugin overrides are required. OpenCode validates `cli.json` strictly, so keep it
 within the linked schema and restart OpenCode after changing it.
 
-OpenCode 2.1's built-in Todo tool is opt-in. Enable it in the OpenCode server
-configuration used by that host, then restart OpenCode:
+OpenCode 2's built-in Todo tool is opt-in. When its effective configuration
+disables the tool, Navigator offers **Enable Todo…** in the section and
+**Enable native Todo** in the command palette. Choose an existing discovered
+server configuration file, review `experimental.todo → true`, then confirm
+**Enable Todo**. Cancel and Escape preserve the file. Navigator retains JSONC
+comments, formatting and unrelated settings, and checks for changed files,
+configuration sources, sessions and workspaces before writing.
+
+The check uses the host configuration, not the presence or absence of tasks.
+An enabled empty list therefore says **No tasks yet** without another enable
+offer. Configuration read failures have their own Retry action. Remote file
+operations stay on the connected server; no model or Todo mutation is used for
+setup. Refresh or restart OpenCode if a saved flag has not yet been applied.
+See [Host API boundaries](HOST_API.md) for precedence and conditional-write limits.
+
+Alternatively, enable the tool manually in the server configuration used by that host:
 
 ```json
 {
@@ -215,6 +229,10 @@ model requests from Todo controls. Running or failed writes leave the last
 completed list visible; a completed write with an empty array clears it.
 Native tasks have `content` and one of `pending`, `in_progress`, `completed`, or
 `cancelled`; priorities remain unavailable in OpenCode 2's native schema.
+
+![Disabled native Todo offers enablement](screenshots/84-native-todo-disabled.png)
+
+![Review the server configuration change before enabling Todo](screenshots/86-native-todo-enable-preview.png)
 
 The optional **server** half of Navigator is used for provider-native quotas and
 read-only access to the previous Navigator Todo archive. Add it to the server
@@ -349,15 +367,21 @@ opencode
 OpenCode reads TUI configuration at startup. Restart it after changing the
 plugin or `tui.json`.
 
-On first launch, a seven-step setup wizard introduces monitoring, Search Everything,
-Skills, Quick Actions, LSP, MCP controls, presets, and workspace customization
-before letting you choose which sections to show. The guide is shown once and can be opened again
+On first launch, a seven-step setup wizard introduces monitoring and native Todo
+enablement, provider/account limits, Search Everything and Skills, Actions and
+private toolbar pins, host-supported language tools, MCP, and customization.
+It includes About, release history and Bug reports before the final section picker.
+Descriptions match each host's permissions/LSP capabilities. Long content and
+section choices scroll with the mouse or PageUp/PageDown while headings and
+Back/Next/Finish stay visible. The guide is shown once and can be opened again
 later from the sidebar settings button. The settings dialog also selects global
 or current-worktree scope, manages named layout presets, and controls section
 order, MCP state persistence, icon style, and the sidebar shortcuts without
 a restart. Settings are grouped into tabs; use `Tab` and `Shift+Tab` to switch
 tabs. In the Sections tab, use `Left`/`Right` or `Shift+Up`/`Shift+Down` to
 reorder the selected section.
+
+![Setup navigation remains visible in a short terminal](screenshots/94-setup-short.png)
 
 The Sections tab combines visibility, ordering, and the number of visible items
 for each section. Click `Items: All` / `Items: N`, or press `L` on the selected
@@ -427,6 +451,10 @@ running sessions after saving changes in another instance.
 
 ![Searchable toolbar icon picker](https://raw.githubusercontent.com/St1ggy/opencode-navigator/main/screenshots/57-toolbar-icon-picker.png)
 
+![Toolbar buttons with multiple icons and optional text](screenshots/81-toolbar-icons-and-text.png)
+
+![Toolbar appearance configuration](screenshots/83-toolbar-appearance.png)
+
 In OpenCode 1.x, Navigator saves changes to the auto-approve mode as a user-wide
 default, including changes made through OpenCode's own command palette. Set the
 default under **Navigator Settings → Behavior → Default auto-approve permissions**;
@@ -475,6 +503,10 @@ private preferences.
 Quick Actions also keep their mounted rows while ordinary prompt typing updates
 the host's command state. Live labels, availability and real source updates still
 refresh immediately.
+
+![About with versions and update status](screenshots/67-settings-about.png)
+
+![Bug report preview before sending](screenshots/74-bug-report-confirmation.png)
 
 ## Limits: provider quotas and banked resets
 
@@ -942,7 +974,8 @@ session or workspace dismisses the entire search dialog chain.
 
 ## Scripts
 
-Development requires Bun 1.4.2 and Node.js 24.16 or newer. Install dependencies with
+Development uses Bun 1.4.4 and stable TypeScript 7. Standalone Node/OpenTUI paths
+require Node.js 26.4 or newer; CI pins Node 26.12.1. Install dependencies with
 `bun install --frozen-lockfile`.
 
 Oxlint uses the `solid-ox` preset from
@@ -951,6 +984,9 @@ Oxlint uses the `solid-ox` preset from
 OpenTUI callbacks, SDK compatibility, and test fixtures. Type-aware analysis uses
 `oxlint-tsgolint`; `tsconfig.lint.json` covers application code, tests, build scripts,
 and configuration files. Formatter exclusions are maintained in `oxfmt.config.ts`.
+The resolved dependency tree contains TS7 only. The approved removal of
+incompatible SonarJS checks and native replacements is documented in
+[Lint coverage](LINT_COVERAGE.md); compatible Solid and other JS checks remain.
 
 ```sh
 bun run test

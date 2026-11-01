@@ -22,7 +22,8 @@ This plugin lets you write in your language while the model works in English —
 
 ## Install
 
-Version 2 of this plugin uses OpenCode's **v2 public plugin API**. Verified releases are OpenCode **2.0.3** and **2.0.16**.
+Version 2 of this plugin uses OpenCode's **v2 public plugin API**. Verified releases are OpenCode **2.0.3**,
+**2.0.16**, and **2.2.5**. `/goal` support needs OpenCode 2.2.1 or later.
 For OpenCode v1, use `opencode-translate@1`.
 Start a fresh v2 session when upgrading: v1 activation metadata and historical bilingual trailers are not migrated.
 
@@ -50,8 +51,9 @@ Add to `~/.config/opencode/opencode.jsonc`:
 }
 ```
 
-Quit and restart OpenCode after changing the plugin configuration. For a local build, run `bun install && bun run build`
-and set `package` to the absolute **directory** `/path/to/opencode-translate/dist`.
+Quit and restart OpenCode after changing the plugin configuration. A pinned `package` such as
+`opencode-translate@2.0.10` keeps loading that release until you change the pin. For a local build, run
+`bun install && bun run build` and set `package` to the absolute **directory** `/path/to/opencode-translate/dist`.
 
 ## Usage
 
@@ -69,6 +71,7 @@ All subsequent messages in the same session are translated automatically — no 
 - English assistant text streams normally; a translated Markdown section is appended when the text segment completes.
 - Both the **terminal and web UI** display the same persisted bilingual assistant text. No UI-specific plugin is needed.
 - Question forms are translated, with selected labels and custom answers converted back to English for the model.
+- `/goal` objectives reach the model in English, while the goal status and transcript keep your text ([below](#goal)).
 - Translation activates only in root sessions. Its state survives plugin/server restarts.
 
 Before model requests, the plugin removes its recorded display translations from context. It does not remove arbitrary
@@ -76,6 +79,19 @@ Markdown based on its appearance. On inbound translation failure, the transcript
 error reason. The main model receives the original text without `$en` or the diagnostic; failed first-time activation
 remains inactive, so retry with `$en` after fixing the error. On outbound failure, the English response is retained with
 a translation-unavailable notice.
+
+### `/goal`
+
+OpenCode's native `/goal` command (2.2.1 and later) keeps working until an objective is met, and restates the objective
+in every kickoff, continuation, reminder, and reviewer request. Commands do not pass through the prompt hook, so the
+plugin translates the objective where those requests are built: once per objective, with the English saved for later
+requests. The goal status, its `Goal:` notice, the transcript, and the session title keep your original text. Replies
+during the goal are translated like any other reply; the reviewer's verdicts are not, so the goal loop can read them.
+
+Translation must already be active in the session. `$en` inside `/goal` becomes part of the objective rather than
+activating translation, so send a normal `$en` message first. The reviewer's reasons shown in the goal status stay in
+English. If the objective cannot be translated, the model receives it unchanged, the server logs
+`[opencode-translate] goal objective translation failed`, and the next request retries.
 
 ### If `$en` has no effect
 
@@ -106,9 +122,12 @@ If there is neither an activation confirmation nor a failure notice, inspect the
 same directory as the session:
 
 ```sh
-opencode api v2.plugin.awaitActivation --param 'location[directory]=/absolute/path/to/project'
-opencode api v2.plugin.list --param 'location[directory]=/absolute/path/to/project'
+opencode api plugin.list --param 'location[directory]=/absolute/path/to/project'
 ```
+
+On OpenCode 2.0.3 the operation is `v2.plugin.list`; run `opencode api v2.plugin.awaitActivation` with the same
+parameter first. Later releases have no separate wait, so if `opencode-translate` is missing while the server is still
+starting, list again.
 
 Find `opencode-translate`, check `source.version` and `state.status`, and inspect `state.error` if setup failed. If the UI
 uses a remote or explicitly selected server, pass `--server` with that same server URL. A client version or a globally
@@ -219,11 +238,12 @@ bun test
 bun run build
 bun run test:package
 
-# Requires OpenCode 2.0.16: native OpenAI plus multi-auth-style AI SDK providers,
+# Requires OpenCode 2.0.16 or later: native OpenAI plus multi-auth-style AI SDK providers,
 # both plugin orders, duplicate prevention, and English-only follow-up context.
 OPENCODE_BINARY=/path/to/opencode bun run test:openai
 
 # Requires Node 24 and an OpenCode v2 binary; uses an isolated server and fake provider.
+# On OpenCode 2.2.1+ it also runs /goal; older hosts skip those checks.
 OPENCODE_BINARY=/path/to/opencode bun run test:host
 
 # Exercise a registry-installed package through OpenCode's actual package loader.
@@ -241,12 +261,16 @@ rotates a test credential in an isolated SQLite database, checks bilingual persi
 requests, and restarts the server to verify recovery. It does not use your live server, credentials, or paid models.
 It also executes the real Question tool, checks translated form fields, submits selected options and a Korean custom
 answer, and verifies that the next model request contains the original English questions and English answers.
-CI covers both configuration formats and both generation paths. The publish workflow tests the candidate before
-publishing, then installs the exact version from npm in OpenCode before creating its GitHub release.
-The OpenAI compatibility smoke runs before and after publishing on 2.0.16. Its fake auth plugin reproduces
+On hosts with `/goal`, it runs two goals through the real goal loop, one with an attached file, and checks that every
+kickoff, continuation, and reviewer request carries only the English objective, that each objective is translated
+once, and that the transcript and goal state keep the original.
+CI covers both configuration formats and both generation paths on 2.0.3 and 2.2.5, where the `/goal` checks also run.
+The publish workflow tests the candidate before publishing, then installs the exact version from npm in OpenCode before
+creating its GitHub release.
+The OpenAI compatibility smoke runs before and after publishing on 2.0.16 and 2.2.5. Its fake auth plugin reproduces
 `oc-codex-multi-auth` 6.24.0's SDK/fetch/model wrapping without live credentials or external model requests.
 
-The old `opencode2 v0.0.0-dev-18322` binary does not pass this migration's host smoke test. Use the verified 2.0.3 release
+The old `opencode2 v0.0.0-dev-18322` binary does not pass this migration's host smoke test. Use a verified release
 rather than assuming that any binary named `opencode2` exposes the current plugin API.
 
 ## Options

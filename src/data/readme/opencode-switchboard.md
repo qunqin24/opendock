@@ -3,7 +3,7 @@
 A better session tabs panel for OpenCode: sessions grouped by project and worktree, unread marks, and a
 Later fold to snooze work until you come back to it.
 
-<!-- DEMO: add the demo video or GIF here before the launch post. -->
+https://github.com/user-attachments/assets/2280657f-866c-4185-917f-e33c25de1ee0
 
 OpenCode's native tabs are a flat strip of open sessions. Once you run several agents across a few projects,
 it gets hard to tell what is still working, what is waiting on you, and what finished while you were
@@ -19,6 +19,33 @@ elsewhere. The switchboard replaces the tabs with a panel built for that:
 - **Nothing is deleted.** Closing a session or a project only hides it from the panel.
 - **Follows you across TUIs.** The switchboard lives on the OpenCode server, so every TUI connected to it sees
   the same projects, sessions, and unread marks.
+
+### Coming next
+
+- Reorder projects, and sessions within a project, with keys or by dragging
+  ([#9](https://github.com/abeisleem/opencode-switchboard/issues/9)).
+- The working directory and git branch at the bottom of the panel
+  ([#42](https://github.com/abeisleem/opencode-switchboard/issues/42)).
+
+### Tour
+
+Projects group their sessions, and each row shows its state: running, waiting for approval, asking a question,
+failed, or unread. A worktree's sessions show its name.
+
+![Projects with sessions in every state](docs/media/switchboard-states.gif)
+
+`l` moves a session to its project's Later fold, and `a` brings it back. A folded Later shows how many sessions it
+holds.
+
+![Moving sessions between Active and Later](docs/media/switchboard-later.gif)
+
+`u` marks a session unread, and marks it read again.
+
+![Marking a session unread and read](docs/media/switchboard-unread.gif)
+
+A folded project sums up its sessions' states in badges.
+
+![Folding a project](docs/media/switchboard-folded.gif)
 
 > **Status:** early preview (0.x). Requires OpenCode 2.2.0. OpenCode plugins can only add panels on the right
 > side of a session, so the switchboard opens there rather than where the native tabs sit.
@@ -79,8 +106,8 @@ OpenCode installs npm plugins automatically. If `/switchboard` does not appear, 
 
 ### Open the panel
 
-Run `/switchboard`, press **Ctrl+X, then I** (`<leader>i`), or pick **Open switchboard** in the command
-palette.
+Run `/switchboard`, press `<leader>i` (**Ctrl+X, then I** by default), or pick **Open switchboard** in the
+command palette.
 
 - The first time you open it from a conversation, it adds that conversation's project.
 - Starting with `--session` or reopening the panel adopts the conversation you are actually viewing,
@@ -105,34 +132,34 @@ Projects are listed by name. Under each one come its Active sessions, then a **L
 you are viewing has a bold title. A session in a worktree or another folder of the project shows that folder's
 name on a second line.
 
-| Indicator | Meaning                                                                            |
-| --------- | ---------------------------------------------------------------------------------- |
-| `!`       | Waiting for your approval                                                          |
-| `?`       | Waiting for your answer to a question                                              |
-| Spinner   | Running or queued                                                                  |
-| `×`       | The last run failed                                                                |
-| `•`       | Unread: finished since you last looked, or marked unread                           |
-| `~`       | Approvals and questions for this workspace could not be read; press `d` for detail |
+| Indicator | Meaning                                                                                        |
+| --------- | ---------------------------------------------------------------------------------------------- |
+| `!`       | Waiting for your approval                                                                      |
+| `?`       | Waiting for your answer to a question                                                          |
+| Spinner   | Running or queued                                                                              |
+| `×`       | The last run failed                                                                            |
+| `•`       | Unread: finished since you last looked, or marked unread                                       |
+| `~`       | Approvals and questions for this workspace could not be read; click the error line for details |
 
-A folded project or Later heading sums up what it hides: `? 2` waiting on you, a spinner and count for running
-or queued sessions, and `• 3` unread. Group and session spinners use the same animation and running color.
+A folded project sums up what it hides: `? 2` waiting on you, a spinner and count for running or queued
+sessions, and `• 3` unread. Group and session spinners use the same animation and running color. A folded Later
+shows only how many sessions it holds, as `Later · 3`, so parked work stays quiet.
 
 Unread is independent of placement: mark a session unread to come back to it, whether it is Active or Later.
 
 ### Keys
 
-| Key       | Action                                                 |
-| --------- | ------------------------------------------------------ |
-| ↑/↓, j/k  | Move                                                   |
-| Enter     | Open session, or fold/unfold heading                   |
-| `u`       | Toggle read/unread                                     |
-| `a` / `l` | Move to Active / Later                                 |
-| `x`       | Close session or project (keeps its saved state)       |
-| Ctrl+X, then W | Close the current conversation's row from either pane |
-| `r`       | Refresh                                                |
-| `d`       | Show details of the last refresh, including any errors |
-| `?`       | Help                                                   |
-| Esc       | Close the panel                                        |
+| Key                                     | Action                                                |
+| --------------------------------------- | ----------------------------------------------------- |
+| ↑/↓, j/k                                | Move                                                  |
+| Enter                                   | Open session, or fold/unfold heading                  |
+| ←/→                                     | Fold / unfold heading                                 |
+| `u`                                     | Toggle read/unread                                    |
+| `a` / `l`                               | Move to Active / Later                                |
+| `x`                                     | Close session or project (keeps its saved state)      |
+| `<leader>w` (Ctrl+X, then W by default) | Close the current conversation's row from either pane |
+| `?`                                     | Help                                                  |
+| Esc                                     | Close the panel                                       |
 
 With the mouse:
 
@@ -141,11 +168,11 @@ With the mouse:
 - Click **? help** at the bottom for the key reference.
 
 Opening a session, with Enter or a click, moves focus to its conversation so you can type right away. Press
-**Ctrl+X, then I** to return to the panel.
+`<leader>i` (**Ctrl+X, then I** by default) to return to the panel.
 
-**Ctrl+X, then W** (`<leader>w`) closes the conversation you are viewing, independently of the panel cursor,
-and returns to another open session. It is active while Switchboard is open; closing the panel restores the
-native shortcut behavior. Rebind it with `opencode-switchboard.close-current` in `cli.json`.
+`<leader>w` (**Ctrl+X, then W** by default) closes the conversation you are viewing, independently of the panel
+cursor, and returns to another open session. It is active while Switchboard is open; closing the panel restores
+the native shortcut behavior. Rebind it with `opencode-switchboard.close-current` in `cli.json`.
 
 **The switchboard never deletes, archives, or stops sessions.** Closing removes a session from the panel;
 opening it again brings it back. A closed project keeps its sessions for when you reopen it. Delete sessions
@@ -187,8 +214,9 @@ the package in your global `opencode.json(c)`, as Install step 1 does.
 `opencode-switchboard-errors.log` in the TUI machine's temp directory (`$TMPDIR`, often `/tmp`). Please
 include it when you [open an issue](https://github.com/abeisleem/opencode-switchboard/issues).
 
-**A `~` indicator, or "Attention needs refresh" at the bottom.** The switchboard could not read approvals or
-questions for a workspace, or the workspace no longer exists. Press `d` for details and `r` to retry.
+**A `~` indicator, or "Attention unavailable" at the bottom.** The switchboard could not read approvals or
+questions for a workspace, or the workspace no longer exists. Click the message for details. The panel retries
+on its own every 15 seconds.
 
 ## Contributing
 

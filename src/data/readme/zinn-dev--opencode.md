@@ -55,11 +55,24 @@ bun run dev -- task list
 
 ## Packages
 
-| Package                                     | Purpose                           |
-| ------------------------------------------- | --------------------------------- |
-| [`@zinn-dev/cli`](packages/cli/README.md)   | The `zinn` command-line interface |
-| [`@zinn-dev/core`](packages/core/README.md) | Shared operations and storage     |
-| [`@zinn-dev/tui`](packages/tui/README.md)   | Terminal interface stub           |
+| Package                                                           | Purpose                                 |
+| ----------------------------------------------------------------- | --------------------------------------- |
+| [`@zinn-dev/cli`](packages/cli/README.md)                         | The `zinn` command-line interface       |
+| [`@zinn-dev/core`](packages/core/README.md)                       | Shared operations and storage           |
+| [`@zinn-dev/opencode`](integrations/opencode/inspector/README.md) | Zinn task inspector in the OpenCode TUI |
+| [`@zinn-dev/tui`](packages/tui/README.md)                         | Terminal interface stub                 |
+
+## OpenCode inspector
+
+The [`@zinn-dev/opencode`](integrations/opencode/inspector/README.md) package adds task inspection to the OpenCode TUI. It requires OpenCode 2.2.0 and Zinn CLI 0.41.0 or newer on `PATH`. OpenCode loads it from the `plugins` array in `~/.config/opencode/cli.json`:
+
+```json
+{
+	"plugins": [{ "package": "@zinn-dev/opencode@0.1.0" }]
+}
+```
+
+See the [OpenCode inspector guide](https://zinn.sh/integrations/opencode/inspector) for requirements, options, updates, and removal.
 
 ## License
 

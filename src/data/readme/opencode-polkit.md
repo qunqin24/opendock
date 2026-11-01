@@ -1,28 +1,17 @@
 # opencode-polkit
 
-Redirect `sudo`/`doas` to `pkexec` in [OpenCode](https://opencode.ai).
-Triggers the system's native polkit authentication dialog (KDE, GNOME, etc.)
-instead of requiring a terminal for password input.
+Redirects `sudo` and `doas` to `pkexec` inside OpenCode, so authorisation goes
+through the desktop's polkit agent (KDE, GNOME, …) instead of a terminal the
+shell tool does not have. Applies to commands run by the shell tool; `sudo` in
+other terminals is unchanged.
 
-Like CachyOS Hello, the plugin does not check for a polkit agent up front:
-`sudo` is always redirected to `pkexec` at execution time, and polkitd routes
-the request to whatever agent is currently registered. Without an agent,
-`pkexec` fails fast with `Error creating textual authentication agent`
-(no TTY); the plugin reports that as a clear denial. A hang (dialog never
-appears) is bounded by the shell tool's own timeout (default 2 min,
-configurable per call) and left untranslated — it cannot be told
-apart from a long-running command.
-
-Requires OpenCode >= 2.0 (the plugin uses the `@opencode/plugin` v2 API and
-is skipped by older versions).
-
-## Install
+## Installation
 
 ```sh
 opencode plugin add opencode-polkit
 ```
 
-Or add to `opencode.json` / `~/.config/opencode/opencode.jsonc`:
+Or add it to `opencode.json` / `~/.config/opencode/opencode.jsonc`:
 
 ```json
 {
@@ -30,8 +19,7 @@ Or add to `opencode.json` / `~/.config/opencode/opencode.jsonc`:
 }
 ```
 
-For local development, build once (`npm run build` — the local entrypoint
-re-exports `dist/`) and point opencode at the project directory instead:
+For a local checkout, run `npm run build` once, then reference the directory:
 
 ```json
 {
@@ -41,51 +29,54 @@ re-exports `dist/`) and point opencode at the project directory instead:
 
 ## Behavior
 
-| Command               | result                                                |
-|-----------------------|-------------------------------------------------------|
-| `sudo xxx`            | redirects to `pkexec xxx`                             |
-| `doas xxx`            | redirects to `pkexec xxx`                             |
-| `sudo -n xxx`         | blocked: pkexec has no short options (unclear failure)|
-| `cat x \| sudo tee y` | redirects to `cat x \| pkexec tee y` (mid-command)    |
-| `pkexec xxx`          | passes through                                        |
-| `sudoedit` / `visudo` | blocked                                               |
+| Command                | Result                                      |
+|------------------------|---------------------------------------------|
+| `sudo apt install x`   | polkit dialog, then runs as root            |
+| `sudo -u bob …`        | as above, as `bob`                          |
+| `cat x \| sudo tee y`  | dialog for `tee`                            |
+| `sudo -n …`            | refused: pkexec has no non-interactive mode |
+| `sudo -i`, `-s`, `-b`  | refused, with the equivalent command        |
+| `sudoedit`, `visudo`   | refused, with the alternative               |
+| `pkexec …`             | passed through                              |
 
-### Minimal intervention
+Refused invocations exit with status 64 and one line naming the alternative.
 
-The command is rewritten **only** by replacing `sudo`/`doas` with
-`pkexec` — its shape is otherwise untouched, so the agent always sees a
-command that behaves like the one it wrote. Privilege keywords are found
-by a lexical scanner (quote/escape/heredoc aware): `sudo` inside string
-literals, comments or heredocs is ignored; `sudo` in any executable
-position (leading, after `&&`/`||`/`|`, in `$(...)` or subshells, after
-an env assignment like `FOO=1 sudo x`) is rewritten, while the same word
-in argument position (`--name sudo bash`) is left alone. `sudo a && sudo b`
-rewrites both.
+## How it works
 
-### Failures
+`sudo` and `doas` stand-ins are placed first on `PATH`, so the shell resolves
+those instead of the system binaries, and they forward the command to `pkexec`.
+Command text is never rewritten, so quoting, pipes and subshells need no special
+handling.
 
-Unambiguous authentication failures are reported as clear errors and the
-command is remembered so a retry is rejected without prompting again
-(cleared when opencode restarts): `Not authorized`, `Error executing
-command as another user`, `Error creating textual authentication agent`
-(no polkit agent + no TTY). A hang (dialog never appears) is bounded by
-the shell tool's own timeout (default 2 min, configurable per call)
-and is left untranslated — it cannot be told apart from a long-running
-command.
+## Authorisation
 
-Options pkexec does not accept (all short options, plus any long option
-outside `--user`, `--keep-cwd`, `--disable-internal-agent`, `--help`,
-`--version`) are rejected before execution with a clear message, since
-the rewrite would otherwise surface pkexec's own confusing
-`Cannot run program -n` error. `sudo --` and options after the program
-name are left alone.
+`polkitd` decides whether a password is required. These commands always require
+one; other actions may not, according to policy. The plugin takes no part in
+that decision.
 
-## i18n
+## Limitations
 
-Messages adapt to `$LC_MESSAGES` / `$LANG`. Currently supports:
-en, zh, ja, ko, de, fr, es, pt, ru, tr, uk.
+- Absolute paths (`/usr/bin/sudo`) and relative ones (`./sudo`) bypass `PATH`.
+- Commands that reset `PATH` (`env -i`, `PATH=/usr/bin …`) bypass it as well.
+- Programs that invoke `sudo` with a scrubbed environment bypass it.
 
-PRs welcome for additional translations.
+These bypass the redirect, not polkit, which still decides whether the command
+runs.
+
+## Requirements
+
+`polkit` and a registered authentication agent. Desktop environments start one;
+without one, `pkexec` fails instead of prompting.
+
+## Exit status
+
+| Status | Meaning                                      |
+|--------|----------------------------------------------|
+| 126    | the polkit dialog was dismissed              |
+| 127    | not authorised, or the program could not run |
+| 64     | the plugin refused the invocation            |
+
+Messages are in English.
 
 ## License
 

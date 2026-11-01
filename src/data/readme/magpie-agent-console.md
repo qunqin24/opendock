@@ -1,5 +1,19 @@
 # Agent Console
 
+**把终端里的 Agent CLI 搬进 magpie 窗口，直接对话使用。**
+
+作者 qingnian108，源码在 [qingnian108/magpie-agent-console](https://github.com/qingnian108/magpie-agent-console)，欢迎提问题和建议。
+
+支持 Claude Code、Codex、Cursor 等，直接用你电脑上已安装的 CLI。左边是项目和对话，中间聊天，右边看改动、文件和终端。
+
+**Use your terminal Agent CLIs right inside magpie, by chat.**
+
+By qingnian108. Source: [qingnian108/magpie-agent-console](https://github.com/qingnian108/magpie-agent-console). Issues welcome.
+
+Works with Claude Code, Codex, Cursor and more, using the CLIs you already have.
+
+---
+
 A Magpie page plugin that drives real local Agent CLIs (Claude Code, Codex, Cursor, Copilot, OpenCode, Pi, Devin, dsh). Each conversation is a **persistent Agent session** on a standalone Node daemon. Close or refresh the page — the Agent keeps running while Magpie is open. Reopen the page and you pick up where you left off. When Magpie quits, the daemon and its Agents stop; threads are persisted and can be resumed next time.
 
 ## Install
@@ -14,9 +28,11 @@ Or in Magpie: **Settings → Plugins → Add plugin**, enter `magpie-agent-conso
 
 Install the Agent CLIs you want to use (for example `claude` or `codex`). Missing CLIs show an install hint in Settings.
 
+A cold install is about **46 MB** of `node_modules`, mostly `node-pty`'s native terminal module (~26 MB). Claude Code is **not** bundled: to use the Claude Code Agent, install the `claude` CLI yourself (`npm i -g @anthropic-ai/claude-code` or Anthropic's native installer). / 冷安装约占 **46 MB** 的 `node_modules`，主要是 `node-pty` 原生终端模块（约 26 MB）。插件**不**附带 Claude Code：要用 Claude Code Agent，请自行安装 `claude` CLI（`npm i -g @anthropic-ai/claude-code` 或 Anthropic 的原生安装器）。
+
 ---
 
-This is not a gateway chat box. The daemon talks to the real CLIs through `@anthropic-ai/claude-agent-sdk`, `codex app-server`, and ACP, normalizes a structured event stream (tool calls, thinking, permission requests, usage), and pushes it to the React page over WebSocket.
+This is not a gateway chat box. The daemon talks to the real CLIs through `claude -p --input-format stream-json --output-format stream-json` (the user's own `claude`, with its control messages for permissions, interrupt, model and mode), `codex app-server`, and ACP, normalizes a structured event stream (tool calls, thinking, permission requests, usage), and pushes it to the React page over WebSocket.
 
 UI principle: **obvious at a glance, nothing extra**. Three columns — sidebar (projects × threads), conversation timeline, and a right panel (changes / files / terminal).
 
@@ -30,6 +46,7 @@ UI principle: **obvious at a glance, nothing extra**. Three columns — sidebar 
 - **Changes panel**: git status refresh every 3s, unified per-file diffs; discarded untracked files go to trash instead of a hard delete
 - **Files panel**: lazy directory tree (respects `.gitignore`), syntax-highlighted preview
 - **Terminal panel**: real PTY via node-pty (pwsh / powershell); reconnects after reopening the page; degrades if PTY is unavailable
+- **Images**: attach or paste images (and text files). Only PNG, JPEG, GIF and WebP are sent as images. Claude Code and Codex take them natively; Claude Code gets a text file (up to 1 MB) as a plain-text document, Codex gets its path; any other file (SVG, binaries, images over Claude's 5 MB limit) goes by path, with a notice. An ACP Agent (Cursor, Copilot, OpenCode, Pi, Devin CLI, dsh) gets image blocks when its ACP `initialize` advertises `promptCapabilities.image`; otherwise it gets each image's file path (as text and a `resource_link`), so it can open it with its file tools, and the timeline says it can't see the image itself. The composer says so before you send once the Agent has been asked. dsh answers `initialize` for the route its ACP starts on (its `acp` config row, which ships as a model dsh's catalog doesn't have) and refuses image blocks otherwise, so Agent Console starts dsh with a `--patch` overlay that puts that row on the conversation's model: on a model that sees images (Magpie writes those as `input: [text, image]`) dsh then takes image blocks; after a switch to another model in the same chat, images go by path and dsh opens them with its `read_image` tool. Checked on 2026-10-31 with the real CLIs, a throwaway HOME, no sign-in and a local stand-in for the model API (`npm run test:real`, see `test/real/`): the image reaches the model request from Claude Code 2.1.316 (stream-json), Codex 0.165.0, Copilot 1.0.105 (BYOK), OpenCode 1.19.5, Pi (pi-acp 0.0.34 + pi 1.4.0) and dsh 0.2.1-rc.5; Devin CLI 3000.11.234 and Cursor 2026.10.22 advertise images and Devin gets the image block, but both need a sign-in to run a model. Inline media is capped at 10 MB per file and 16 MB per message (an ACP SDK peer refuses messages over 32 MB); larger images go by path
 - **Import history**: import matching sessions from `~/.claude/projects` and `~/.codex/sessions` as new threads (resumable)
 - **Thread management**: search (Ctrl+K), pin, rename, archive, delete (trash), export Markdown, thread info (usage / cost / session ID)
 - **Mock Agent**: `AGENT_CONSOLE_MOCK=1` registers a demo Agent with 8 scripts (`default` / `perm` / `plan` / `ask` / `slow` / `error` / `long` / `exit`) so UI work does not burn tokens
@@ -65,12 +82,14 @@ The daemon can run Agents with full access to your machine, so the token that un
 - **Host is checked on every request and WebSocket upgrade** (gate and daemon): it must be `127.0.0.1:<port>` or `localhost:<port>` with the actually bound port, otherwise 421. This blocks DNS rebinding, where the attacker's requests carry no `Origin` at all.
 - The gate answers only `GET /open?k=<gate key>` (the daemon token is not accepted there), refuses any request that carries an `Origin` header, and sends `Cache-Control: no-store`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`.
 - WebSocket connections must send `hello` with the token within 5 seconds, otherwise they are closed with code 4401.
+- **Coming back after a plugin host restart.** Magpie restarts its plugin host from time to time; the old host's daemon exits with it and the new host has a new gate key. `boot.js` passes its own page URL to the gate as `back`; the gate accepts it only if it is a loopback `/_magpie/plugin/<id>/index.html` URL and forwards it **only in the fragment** (`#t=…&b=…`). When the daemon page can't reconnect for 5 seconds (or on 重试 / Retry) it navigates back to that page, which reads the fresh `session.js` and opens the new gate. To tell a live host's `session.js` from one a killed host left behind (a hard kill can't delete it), the file carries `ts` and `beat`: from the first page open on, the host rewrites it every 4 s, and after a lost connection `boot.js` only takes a file written after the loss; a host that was never opened doesn't rewrite it, and a new host deletes a file whose writer (pid in `session-owner.json`, outside the page folder) is gone before Magpie serves the page. The daemon page checks the URL again before following it, so it is never an open redirect, and the token never leaves its own fragment.
 
 ## Lifecycle
 
 - Importing `index.mjs` has no side effects (no port, no process, no files).
 - `server()` (called by Magpie's plugin host at host start-up — this includes short-lived hosts started by CLI commands such as `magpie plugin add` or `magpie plugin list`) binds the gate and writes `page/session.js`. If the port is busy it retries every 2 s in the background without blocking the host; a detached 0.1.0 daemon still holding the port is shut down once, only after it proves its identity by answering `/api/ping` with the token from `daemon.json`.
 - The daemon starts when the page is opened for the first time and is reused for later opens. It is a normal (non-detached) child of the plugin host.
+- `server()` waits ~1.2 s before binding the gate (`AGENT_CONSOLE_BIND_DELAY_MS`), so the short-lived hosts started by `magpie` CLI commands usually exit before they take the gate or write `session.js`; a gate port held by the long-lived host is logged only if it stays busy for ~10 s.
 - The daemon exits when its stdin pipe closes or its parent pid disappears (checked every 2 s) — i.e. when Magpie quits or the plugin host restarts — and after 60 minutes idle.
 - Magpie's plugin host treats the value returned by `server()` as OpenCode hooks and never calls `stop()`; it exits the Bun process when Magpie closes its stdin. A synchronous `exit` handler therefore closes the daemon's lifeline, signals it, and removes the `session.js` this host wrote. `stop()` (used by tests and other hosts) closes the gate, ends the daemon (graceful, then forced) and removes `session.js`.
 - Agents stop with the daemon. Threads are persisted and can be resumed after reopening the page. On macOS/Linux every Agent CLI, the Codex app-server and the no-PTY shell run in their own process group, so stopping one ends everything it started; on Windows the same is done with `taskkill /T`. A process `exit` hook reaps any tree still alive when the daemon exits.
@@ -81,7 +100,7 @@ The plugin runs wherever Magpie runs (Windows, macOS, Linux). It needs **Node.js
 
 - **Finding Agent CLIs.** `PATH` is scanned in JavaScript (no `where.exe`/`which`; `where.exe` prints in the console code page, which garbled Chinese user names). The first hit in `PATH` order wins. Common install dirs are also searched because a GUI app may start with a minimal `PATH` (Magpie adds the login-shell `PATH` itself; this is a fallback): Homebrew (`/opt/homebrew/bin`, `/usr/local/bin`), `~/.local/bin`, npm global, Volta, Bun, `~/.claude/local`, `%APPDATA%\npm`.
 - **Windows shims.** `.exe` runs directly; npm `.cmd` shims run their `cli.js` with Node; `.ps1`-only shims run with `powershell -NoProfile -ExecutionPolicy Bypass -File`; any other `.cmd`/`.bat` runs through `cmd.exe` with cross-spawn-style escaping (spaces, `&`, `%`, quotes and Chinese in paths and arguments are safe).
-- **Terminal.** `node-pty` prebuilds cover win32/darwin/linux × x64/arm64 (Linux prebuilds are glibc only). Default shell: Windows `pwsh` → `powershell` → `cmd`; macOS/Linux `$SHELL` if it exists, else `zsh` (macOS) / `bash` / `sh`. If `node-pty` cannot load, a simple non-PTY terminal is used. On macOS the exec bit of `node-pty`'s `spawn-helper` is restored if the package extraction dropped it.
+- **Terminal.** `node-pty` prebuilds cover win32/darwin/linux × x64/arm64 (Linux prebuilds are glibc only). Default shell: Windows `pwsh` → `powershell` → `cmd`; macOS/Linux `$SHELL` if it exists, else `zsh` (macOS) / `bash` / `sh`. If `node-pty` cannot load, a simple non-PTY terminal is used ([details](#when-node-pty-cant-be-loaded)). On macOS the exec bit of `node-pty`'s `spawn-helper` is restored if the package extraction dropped it.
 - **Folder picker.** Windows: PowerShell `FolderBrowserDialog`; macOS: `osascript` "choose folder"; Linux: `zenity` or `kdialog` when a graphical session exists; otherwise type the path.
 - **Paths.** Project paths are compared case-insensitively on Windows and macOS (and NFC-normalized on macOS); `realpath.native` resolves 8.3 short names and `subst` drives; UNC paths work. Discarding an untracked file moves it to the trash with a copy fallback when the project and data dir are on different drives.
 - **Encoding.** Agent output is decoded as UTF-8; the folder picker falls back to GBK (CP936); the file preview tries UTF-8, then GBK. Git runs with `core.quotepath=false` so Chinese file names show as-is.
@@ -103,10 +122,33 @@ npm run verify:build                   # rebuilds into a temp dir, byte-compares
 
 ## Dependencies
 
-All dependencies and devDependencies are pinned to exact versions, and `package-lock.json` matches them (`npm ci` succeeds). Runtime dependencies: `@agentclientprotocol/sdk`, `@anthropic-ai/claude-agent-sdk`, `@tanstack/react-virtual`, `@xterm/addon-fit`, `@xterm/xterm`, `clsx`, `dompurify`, `highlight.js`, `ignore`, `lucide-react`, `marked`, `node-pty`, `react`, `react-dom`, `ws`, `zod`, `zustand` (most of the UI packages are bundled into `app/app.js`; the daemon loads its packages from `node_modules`).
+All dependencies and devDependencies are pinned to exact versions, and `package-lock.json` matches them (`npm ci` succeeds).
 
-- `node-pty` is a native module and ships prebuilt binaries. Magpie installs plugins with install scripts disabled; if the binary cannot load, the terminal panel degrades to a simple non-PTY terminal.
-- `@anthropic-ai/claude-agent-sdk` is distributed under Anthropic's commercial terms.
+- **Installed for users** (`dependencies`): `@agentclientprotocol/sdk`, `ignore`, `ws`, `zod`. These are what `daemon/dist/main.js` imports (esbuild bundles it with `packages: "external"`, so every package it imports is loaded from `node_modules`); `index.mjs` itself only imports `ws`.
+- **Optional** (`optionalDependencies`): `node-pty`, for the terminal panel only (see below).
+- **Build only** (`devDependencies`): the UI packages `react`, `react-dom`, `@xterm/xterm`, `@xterm/addon-fit`, `lucide-react`, `marked`, `dompurify`, `highlight.js`, `zustand`, `@tanstack/react-virtual` and `clsx` are bundled into `app/app.js` and never loaded from `node_modules` at run time, plus esbuild, TypeScript, vitest and type packages.
+- No Claude Code or Anthropic package is installed or bundled: the Claude Code Agent is the user's own `claude` CLI, started per conversation and driven over its stream-json protocol (`daemon/src/providers/claude/cli.ts`).
+
+### Why `node-pty` is `1.2.0-beta.15`
+
+Magpie installs a plugin with `bun add` and does not run its dependencies' install scripts (usemagpie.ai/docs/plugins, "Installing"). `node-pty`'s own `install` script (`node scripts/prebuild.js || node-gyp rebuild`) therefore never runs, so the only binary a user gets is the one inside `node-pty`'s npm tarball under `prebuilds/<platform>-<arch>/`.
+
+- `node-pty@1.1.0`, the current `latest`, ships prebuilds for `darwin-x64`, `darwin-arm64`, `win32-x64` and `win32-arm64` only. On Linux it has no binary at all unless `node-gyp` compiles one at install time, which Magpie never does.
+- `node-pty@1.2.0-beta.2` and later add `linux-x64` and `linux-arm64` prebuilds (glibc 2.28 or newer). `1.2.0-beta.15` is the beta this plugin is built and tested against, pinned exactly so a later, untested beta is never picked up (`beta.16`–`beta.18` came out on 2026-10-22/23). It also drops winpty, which more than halves the tarball (27 MB unpacked, against 64 MB for 1.1.0).
+- The prebuilds are N-API addons, so one binary works on every Node version from 20 up; Node upgrades need no rebuild.
+
+Checked with `npm view node-pty versions dist-tags` and by listing `prebuilds/` in the `1.1.0`, `1.2.0-beta.1` … `beta.15` tarballs. Once a stable `node-pty` release ships the Linux prebuilds, the pin moves to it.
+
+### When `node-pty` can't be loaded
+
+Only the terminal panel is affected; the daemon, the Agents and everything else keep working.
+
+- No prebuild for the machine (for example Linux on musl/Alpine, 32-bit ARM, or glibc older than 2.28), a binary that fails to load, or `node-pty` missing because an install that does run scripts failed to build it: `node-pty` is loaded lazily, only when a terminal is opened, and the load error is caught and logged (`node-pty 加载失败，终端退化无 PTY 方案` in `logs/`).
+- `pty.spawn` throwing (for example macOS `posix_spawnp failed`) is caught the same way. On macOS the exec bit of `spawn-helper` is restored first, since some extractions drop it.
+- In both cases the terminal opens as a plain shell over pipes, and the panel shows "Simple terminal (no full TTY programs)". Commands run and print, but full-screen programs (vim, top, less) and line editing need a real TTY and don't work there.
+- `node-pty` is an `optionalDependency`, so an `npm install` that runs install scripts and can't build it still installs the plugin.
+
+`test/v1/terminal-fallback.test.ts` covers both cases: `node-pty` failing to import and `pty.spawn` throwing.
 
 ## Data directory
 
@@ -125,6 +167,8 @@ $XDG_CONFIG_HOME/magpie/agent-console/   (default ~/.config/magpie/agent-console
 Magpie in portable mode keeps its own config next to the executable, but this plugin still uses the directory above (it follows `XDG_CONFIG_HOME`).
 
 ## Development
+
+After `npm ci`:
 
 ```bash
 npm run build      # daemon esm + web iife (app/ and daemon/dist are committed)
@@ -153,6 +197,6 @@ Daemon CLI: `node daemon/dist/main.js [--port N|0] [--data DIR] [--token T] [--p
 
 ## License
 
-MIT (see LICENSE). Third-party licenses are in THIRD-PARTY-NOTICES.md: 16 runtime packages (mostly MIT; DOMPurify MPL-2.0/Apache-2.0, highlight.js BSD-3-Clause, lucide-react ISC; `@anthropic-ai/claude-agent-sdk` is Anthropic's commercial terms). Build/test: esbuild, vitest, TypeScript, playwright-core.
+MIT (see LICENSE). Third-party licenses are in THIRD-PARTY-NOTICES.md: the 5 installed packages and the 11 bundled into `app/app.js` (mostly MIT; DOMPurify MPL-2.0/Apache-2.0, highlight.js BSD-3-Clause, lucide-react ISC). Build/test: esbuild, vitest, TypeScript, playwright-core.
 
 Architecture takes cues from Paseo (persistent daemon + provider abstraction) and T3 Code (timeline shape and three-column layout) — ideas only, no copied code.

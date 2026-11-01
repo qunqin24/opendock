@@ -1,7 +1,7 @@
 <div align="center">
   <h1>⚡ Modded OpenCode</h1>
   <p>OpenCode gerektirir — Desktop, Terminal ve CLI hepsi aynı config'i okur.</p>
-  <p><strong>105 skill · 13 agent · 19 command · 6 plugin — açılışta her şey hazır</strong></p>
+  <p><strong>106 skill · 13 agent · 18 command · 6 plugin — açılışta her şey hazır</strong></p>
   <p>
     <a href="README.md">🇬🇧 English</a> ·
     <a href="README.ru.md">🇷🇺 Русский</a>
@@ -78,7 +78,7 @@ Auto-continue ayarları (`<proje>/.opencode/auto-continue.json`):
 
 ---
 
-## 🔥 Skill'ler (105 adet)
+## 🔥 Skill'ler (106 adet)
 
 ### Dil & Framework
 

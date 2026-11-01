@@ -15,8 +15,9 @@ generations) plus an optional TUI module (`./tui` entry) that renders a **live
 sidebar** and a **zero-LLM `/cx` breakdown panel** with measured contributors
 and a redacted export, and an **experimental Desktop GUI part**
 (`./gui-experimental`: a side-panel tab and a composer pill). The V2 path is
-**tested against opencode 2.2.0** (the isolated load + state-write e2e was also
-re-run against the 2.2.1 and 2.2.2 Desktop CLI); the V1 path against 1.18.29+.
+**tested against opencode 2.2.5 / OpenTUI 0.8** (the isolated load + state-write
+e2e was also re-run against the 2.2.0-2.2.4 Desktop CLI); the V1 path against
+1.18.29+.
 
 > **V1 is feature-frozen.** It is kept working for compatibility (bug fixes
 > only); all new features land in the V2 path.
@@ -75,10 +76,11 @@ For every served request the plugin estimates how the context window is split:
   — never as "the model wasted effort". Findings are per-session and **path-free
   in the persisted/exported form**.
 * The denominator is the **opencode 2.x compaction ceiling**: `window =
-  limit.input || limit.context`; `reserve = max(floor(window * 0.15), window >=
+  limit.input && limit.context ? min(limit.input, limit.context) : limit.input
+  || limit.context`; `reserve = max(floor(window * 0.15), window >=
   2 * 16_000 ? 16_000 : 0)`; the ceiling is `window - reserve`. This mirrors
   `calculateCeiling()` in `packages/core/src/session/compaction.ts`, whose
-  `RESERVE_SHARE` is 0.15 in every released host from 2.1.4 through 2.2.2 (the
+  `RESERVE_SHARE` is 0.15 in every released host from 2.1.4 through 2.2.5 (the
   unreleased `v2` branch has a different share; the plugin follows the release,
   not the branch). When opencode
   carries a `compaction.buffer` configured in its own settings, the plugin
@@ -87,6 +89,9 @@ For every served request the plugin estimates how the context window is split:
   to override the reserve for testing or custom setups (non-negative integer <=
   1e9; invalid values are silently ignored; a buffer that is **not smaller than
   the window** is ignored, exactly like core, so it can never leave zero room).
+  Since opencode 2.2.5 that setting also accepts a percentage (`"buffer": "20%"`),
+  which the plugin cannot read either, so a percentage buffer is **not**
+  reflected in the "compact at" line until it is mirrored from core.
 
 ### Toast (V1 only)
 
@@ -118,9 +123,9 @@ other          5.6k   12%
 updated 12:30:01
 ```
 
-> Requires a `file://` install from a path outside `node_modules`; on the npm
-> path the sidebar is auto-disabled. See
-> [Live sidebar: npm vs file:// install](#live-sidebar-npm-vs-file-install).
+> Works on **every** install path, including the npm one — the TUI surfaces are
+> built without JSX precisely so `node_modules` installs stay live. See
+> [Live sidebar](#live-sidebar).
 
 ### Slash commands (V2)
 
@@ -366,9 +371,8 @@ carries its tool name); tool **result outputs** are counted here but not by the
 server's categories — which is why the residual `other` can look large. Top 5
 are shown. Empty state: `no messages yet`.
 
-Live only for a `file://` install from a path outside `node_modules`; the npm
-path auto-disables it (upstream `#33884`). The Desktop has no TUI, so it uses
-`/context`, `/context-breakdown` and `/context-diff` instead.
+Live on every install path (npm and `file://`). The Desktop has no TUI, so it
+uses `/context`, `/context-breakdown` and `/context-diff` instead.
 
 #### Export (redacted)
 
@@ -477,9 +481,8 @@ Notes — these reflect what the plugin API actually exposes today:
   therefore delivers everything through the log file, the TUI sidebar, the
   `/cx` session panel and the `/context` / `/context-breakdown` / `/context-diff` slash commands. The sidebar is a TUI-process
   slot and does not exist in the Desktop app; the slash commands work in **both**.
-  The TUI sidebar is **live only for a `file://` install** from a path outside
-  `node_modules`; on the npm path it is auto-disabled (upstream `#33884`) — see
-  [Live sidebar: npm vs file:// install](#live-sidebar-npm-vs-file-install).
+  The TUI sidebar is live on **every** install path, npm included — see
+  [Live sidebar](#live-sidebar).
 * **V1 has no sidebar and no slash command.** The command/slot API (and the
   `./tui` entry) is a V2 feature; OpenCode 1.x has no equivalent, so V1 is
   toast + log only.
@@ -541,8 +544,8 @@ or add it to `opencode.jsonc`:
 ```
 
 The `./tui` sidebar entry is loaded automatically alongside the main plugin in
-the terminal TUI — but its live behaviour depends on the install method, see
-[Live sidebar: npm vs file:// install](#live-sidebar-npm-vs-file-install) below.
+the terminal TUI, on every install method — see [Live sidebar](#live-sidebar)
+below.
 For a CLI-only setup against remote servers, the package can also be listed in
 [`cli.json`](https://opencode.ai/v2/docs/cli/plugins):
 
@@ -550,45 +553,38 @@ For a CLI-only setup against remote servers, the package can also be listed in
 { "plugins": ["opencode-context-indicator"] }
 ```
 
-### Live sidebar: npm vs file:// install
+### Live sidebar
 
-The TUI sidebar is a **TUI-process slot**. On OpenCode 2.x it behaves
-differently depending on **how the plugin was installed** — an upstream OpenCode
-limitation (`anomalyco/opencode#33884`), not a plugin bug: OpenCode's TUI loader
-skips the host Solid transform for any path inside a `node_modules` directory, so
-a slot mounted from an npm install renders once and then never live-updates.
+The TUI sidebar and the `/cx` panel are **TUI-process slots**, live on every
+install path — npm (`opencode plugin add opencode-context-indicator`), `file://`
+and the local `plugins/` copy alike.
 
-| Install | Desktop | TUI commands | TUI live sidebar | TUI panel (/cx) |
+That used to be false: OpenCode skips its Solid/JSX transform for any file inside
+a `node_modules` directory (upstream `anomalyco/opencode#33884`), so a JSX-built
+slot mounted from an npm install rendered once and then froze on
+"no data yet". Since **1.8.0** the plugin ships **no JSX at all**: the tree is
+built with `jsx()` and getter props (`lib/tui-h.ts`), which needs no transform,
+and the host rewrites the literal `@opentui/solid/jsx-runtime` import to its own
+in-process module. The package therefore also declares **no runtime
+dependencies** — nothing is installed next to it, so there is no second
+Solid/OpenTUI instance to fight with.
+
+| Install | Desktop | TUI commands | TUI live sidebar | TUI panel (`/cx`) |
 | --- | :---: | :---: | :---: | :---: |
-| npm (`opencode plugin add opencode-context-indicator`) | ✅ | ✅ | ❌ auto-disabled (upstream #33884) | ❌ auto-disabled |
-| `file://` (path **outside** any `node_modules`) | ✅ | ✅ | ✅ live | ✅ live |
+| npm | ✅ | ✅ | ✅ live | ✅ live |
+| `file://` (any path) | ✅ | ✅ | ✅ live | ✅ live |
 
-On the **npm** path the plugin detects that it lives under `node_modules` and
-**disables the sidebar and the panel gracefully** — it logs a single hint and
-registers no slot, so you never see a frozen "no data yet" panel. The `/context`
-/ `/context-breakdown` / `/context-diff` slash commands and the breakdown log file keep working on
-every install.
+`/context`, `/context-breakdown`, `/context-diff` and the breakdown log file work
+on every install regardless.
 
-#### Getting the live sidebar (`file://` install)
+> If a sidebar shows "no data yet" forever on 1.8.0+, that is a bug — please
+> report it with the host version. On 1.7.x and older, the npm path was disabled
+> by design; upgrading is the fix.
 
-1. Put the package **outside** any `node_modules`: clone the repository, or
-   unpack the npm tarball (`npm pack opencode-context-indicator`, then extract
-   the `.tgz`) — e.g. into `C:\Users\you\plugins\opencode-context-indicator`.
-   Double-check that the chosen path contains **no `node_modules` segment**
-   (e.g. `C:\Users\you\plugins\...`, not `.../node_modules/...`).
-2. Point OpenCode at that directory in `~/.config/opencode/opencode.jsonc`:
-
-   ```jsonc
-   {
-     "plugins": ["file:///C:/Users/you/plugins/opencode-context-indicator"]
-   }
-   ```
-
-3. Restart OpenCode. The sidebar is now live and updates as context grows.
-
-> ⚠️ The `file://` path must **not** contain a `node_modules` segment. If it
-> does, OpenCode skips the Solid transform and the sidebar will not update; the
-> plugin auto-disables it and logs the hint above.
+`test/e2e-tui.mjs` Check C proves this end to end: it runs `npm pack`, extracts
+the tarball into a throwaway `node_modules/opencode-context-indicator`, boots an
+isolated `--standalone` TUI from there and asserts that a getter-driven probe
+node actually re-renders (a frozen tree writes the same value forever).
 
 ### OpenCode 1.x (V1)
 
@@ -608,24 +604,25 @@ plugin file so the plugin's relative imports resolve. The `lib/` folder is
 support code, not a separate plugin entry; copy **every** module in it
 (`cache.js`, `commands.js`, `contributors.js`, `dedup.js`, `desktop.js`,
 `estimate.js`, `format.js`, `limits.js`, `rpc.js`, `state.js`, `tui-data.js`,
-`tui-panel.tsx`, `tui-sidebar.tsx`, `tui-theme.js`, `v1.js`, `v2.js`) — a
+`tui-data.d.ts`, `tui-h.ts`, `tui-panel.ts`, `tui-sidebar.ts`, `tui-theme.js`,
+`v1.js`, `v2.js`) — a
 missing module only disables the surface that imports it, but the server part
 stops loading if one of its own imports is absent:
 
 ```
 ~/.config/opencode/plugins/context-indicator.js   (this package's index.js)
 ~/.config/opencode/plugins/lib/*.js
-~/.config/opencode/plugins/lib/*.tsx
+~/.config/opencode/plugins/lib/*.ts
 ```
 
-`tui.tsx` (the `./tui` entry, at the package root) is only needed for the
-terminal TUI surfaces and is resolved from a `file://` install — see below.
+`tui.ts` (the `./tui` entry, at the package root) is only needed for the
+terminal TUI surfaces; it imports `lib/tui-h.ts`, `lib/tui-sidebar.ts` and
+`lib/tui-panel.ts` by their `.ts` file names, so copy those alongside the `.js`
+modules.
 
 To use the sidebar locally as well, point OpenCode at a `file://` copy of the
-package that lives **outside any `node_modules`** (see
-[Live sidebar: npm vs file:// install](#live-sidebar-npm-vs-file-install)) — that
-is the only install path that keeps the sidebar live. An npm install auto-disables
-the sidebar instead.
+package — the sidebar is live there too, exactly as with an npm install (see
+[Live sidebar](#live-sidebar)).
 
 ---
 
@@ -641,26 +638,22 @@ the sidebar instead.
   indicator degrades
   gracefully (the breakdown falls back to throttled `session.messages` fetches
   and toasts keep working).
-* **OpenCode ≥ 2.2.0** for the V2 path with the TUI surfaces (built and verified
-  against **2.2.0**; the isolated load + state-write e2e also passes on the
-  **2.2.2** Desktop CLI, the latest at the time of writing). The server-only V2
-  path keeps working on
-  2.0.16+; the TUI module pins the OpenTUI generation it was compiled against,
-  so a host on OpenTUI 0.6 (opencode ≤ 2.1.4) will not load the TUI surfaces -
-  neither the sidebar nor the `/cx` panel - from a 1.6.x install.
+* **OpenCode ≥ 2.2.3** for the V2 path with the TUI surfaces (built and verified
+  against **2.2.5**, the latest at the time of writing, which still ships OpenTUI
+  **0.8**; the isolated load + state-write e2e also passes on the 2.2.0-2.2.4
+  Desktop CLI). The server-only V2 path keeps working on
+  2.0.16+. The TUI module is typed against the OpenTUI generation the host ships,
+  so a host on an older OpenTUI (0.7 for opencode 2.2.0-2.2.2, 0.6 for
+  opencode ≤ 2.1.4) may not load the TUI surfaces - neither the sidebar nor the
+  `/cx` panel - from a 1.8.x install.
 * **TUI sidebar**: terminal TUI only, requires the OpenTUI rendering stack that
-  ships with OpenCode. `@opentui/core` and `solid-js` are **optional** peer
-  dependencies resolved by OpenCode at runtime; the main plugin installs and runs
-  fine without them (the sidebar simply is not available). `@opentui/solid` is
-  instead shipped as a **pinned direct dependency** (exact `0.7.0`, matching
-  the OpenTUI stack OpenCode 2.2.0 ships): OpenCode's
-  TUI loader does not expose a host instance of it, so for npm-installed plugins
-  the JSX pragma would otherwise fail to resolve `@opentui/solid/jsx-runtime`
-  (upstream: opencode issue #33884 — `node_modules` plugins are excluded from the
-  host Solid transform and get an isolated OpenTUI copy). Because of that same
-  upstream limitation, on the **npm** path the sidebar is **auto-disabled**
-  (the plugin logs one hint and registers no slot) — use a `file://` install for
-  the live sidebar, see [Live sidebar: npm vs file:// install](#live-sidebar-npm-vs-file-install).
+  ships with OpenCode. `@opentui/core`, `@opentui/solid` and `solid-js` are
+  resolved by OpenCode at runtime from its **own** modules (the TUI loader
+  rewrites those imports to in-process instances), so the package declares them
+  as optional peers only and installs **no runtime dependencies at all**. This is
+  what makes the sidebar live for npm installs as well
+  (see [Live sidebar](#live-sidebar)); `@opentui/solid` sits in
+  `devDependencies` purely for local typechecking.
 * **Desktop GUI part** (optional, experimental): needs an OpenCode Desktop
   release that loads the `./gui-experimental` export (opencode 2.2.0+, where the
   GUI plugin API exists). The bundle is prebuilt and ships in the package, so it
@@ -733,10 +726,11 @@ caller.
 
 ```bash
 npm run build:gui             # build dist/gui-experimental.cjs (required by the gate)
-npm run test:prepublish       # fast gate: tarball + tui.tsx + resolve + T1-T36 unit checks + GUI bundle
+npm run test:prepublish       # fast gate: tarball + JSX-free TUI + resolve + T1-T36 unit checks + GUI bundle
 npm run test:types            # tsc for the TUI entry AND the Desktop GUI part
-npm run test:e2e              # full E2E: isolated plugin load + one "Say OK" round-trip
+npm run test:e2e              # full E2E: plugin load + one "Say OK" round-trip + npm-layout liveness
 npm run test:e2e:quick        # E2E load-only, no LLM call
+npm run test:e2e -- --check-c # E2E npm-layout liveness only, no LLM call
 npm run test:drift            # advisory: warns on non-breaking host drift (also in CI)
 npm run test:drift:strict     # release check: fails on ANY host drift
 ```
@@ -745,7 +739,7 @@ npm run test:drift:strict     # release check: fails on ANY host drift
 (`npm run build:gui && node test/prepublish.mjs && node test/e2e-tui.mjs --full`) and is skipped with
 `--ignore-scripts`. The whole chain takes roughly **1 minute** (fast gate ~20 s,
 isolated E2E ~10 s warm / up to ~90 s cold); the E2E is bounded by INIT 45 s +
-STEP 80 s, ~3 min total.
+STEP 80 s + PROBE 45 s, ~4 min total.
 
 ### What the gates check
 
@@ -754,10 +748,10 @@ STEP 80 s, ~3 min total.
 | Step | What | Why |
 |---|---|---|
 | (a) tarball composition | `package.json` `files[]` expands to the base files plus every `lib/*` module (count asserted dynamically); `docs/` may contain images only; `dist/` may contain only the built GUI bundle | no test/node_modules/tsconfig in the tarball, and no published export pointing at nothing |
-| (b) pragma regression | esbuild `--jsx=automatic` → `@opentui/solid/jsx-runtime` present, `react/jsx-runtime` absent | a removed/broken pragma kills the sidebar on npm install |
-| (c) resolve chain | replica install: host-bridged + peer packages resolve; local tui.tsx relative imports resolve via node from the entry (resolve-bridge.cjs) | broken peer/optional dep or a bad local import silently breaks the sidebar |
+| (b) JSX-free TUI | no `.tsx`/`.jsx` in the TUI surface (root + `lib/`), every TUI source parses with esbuild `loader:"ts"` (JSX syntax fails), no `@jsx*` pragma, imports stay inside the host-bridgeable allowlist, relative imports carry a file extension | OpenCode skips its Solid transform under `node_modules` (#33884): one JSX file freezes the npm-installed sidebar |
+| (c) resolve chain | walks the real TUI import graph (`resolve-bridge.cjs`): every bare specifier is host-bridged, every relative one resolves to a shipped file, and **no host-bridged module is a production dependency** (a second Solid/OpenTUI instance freezes the surfaces) | an accidental runtime dependency, or a bad local import, silently breaks the sidebar |
 | (d) unit harness T1-T36 | limit/agent/state fix assertions plus measureContributors, redacted-export, shared category-helper, sanitizer/unicode, prompt-cache, waste-detector, compaction-reserve, top-consumer, diff, subagent-rollup and Desktop-RPC checks (86 total; T30 schema-vs-builder drift, T31 registration + handler, T32-T36 fallback-vs-hook category priority across the report, the shared state file and the live log (T36: a counter-less hook entry borrows the snapshot or prints `?`), T25c/T25d compaction-hook arming, T34 cross-instance summary merge) | regressions in modelLimits, writeStateFile, hydrate, contributors, export, subagent lifetime, and a GUI/server wire mismatch |
-| (e) corporate-identifier scan | no forbidden identifiers in the published surface (`index.js`, `tui.tsx`, `lib/*`, `gui/*`, `README.md`, `CHANGELOG.md`, `package.json`, the GUI build config) or the test tree | compliance |
+| (e) corporate-identifier scan | no forbidden identifiers in the published surface (`index.js`, `tui.ts`, `lib/*`, `gui/*`, `README.md`, `CHANGELOG.md`, `package.json`, the GUI build config) or the test tree | compliance |
 | (f) non-English scan | no non-ASCII letters (`\p{L}` above U+007F) in the same published surface and test tree (`docs/` is image-only and is not text-scanned) | English-only source rule |
 | (g) Desktop GUI bundle | `dist/gui-experimental.cjs` exists and is a non-trivial single-file CJS bundle: no ESM `import`, no dynamic `import()`, no Node built-in, and every app-provided module (`solid-js`, `solid-js/web`, `@opencode/plugin/gui`, `@opencode/plugin/rpc`) still a `require()` - no bundled second copy, no React/OpenTUI/bare-`opencode` import | a stale or hand-edited bundle, or a build that inlines the app instance, breaks the Desktop panel at load time |
 
@@ -767,6 +761,7 @@ STEP 80 s, ~3 min total.
 |---|---|---|
 | A — plugin load | spins a private `opencode --standalone` PTY against an **isolated global config** (`OPENCODE_CONFIG_DIR` → `%TEMP%/oci-e2e-config`, sole plugin entry = this checkout's `file://` URL), then asserts **from the host opencode log** (atomic lines, immune to PTY interleaving) that the plugin loaded and its `entrypoint` is **this checkout's `index.js`** — both fail-closed | catches a plugin that no longer imports cleanly, or an isolated config the host did not honor |
 | B — live update | one `opencode run "Say OK" --standalone` round-trip; asserts the LLM answered **and** the isolated `state.json` gained a session with `ctx > 0` | catches a regression in the `session.idle` → `writeStateFile` path |
+| C — npm-layout liveness | `npm pack` → extract into a throwaway `node_modules/opencode-context-indicator` → isolated `--standalone` TUI from there; an env-gated probe node (getter-driven `ref`) must produce three different rendered texts | proves the #33884 workaround: the packaged install stays **reactive** from a `node_modules` path, where the host skips the Solid transform |
 
 The E2E is fully **non-invasive** to your running OpenCode Desktop:
 
@@ -783,6 +778,8 @@ The E2E is fully **non-invasive** to your running OpenCode Desktop:
   Check B uses your real global config read-only (the round-trip needs the
   provider/model defined there). Your real config is never modified;
 - `OPENCODE_DISABLE_PROJECT_CONFIG=1` avoids project-level config;
+- Check C uses its own private config, XDG roots, DB and state file under
+  `%TEMP%/oci-check-c` (nothing is shared with Check A or with your install);
 - any `opencode-cli` instance the test itself spawned is force-killed after each
   check (`serve --service` — your Desktop background service — is never touched);
 - exactly **one** minimal LLM call (`Say OK`) is made, in the isolated session.
@@ -802,7 +799,7 @@ and on a daily schedule (GitHub auto-parks scheduled workflows after 60 days of
 repo inactivity — a push or manual run re-enables them):
 
 1. `npx --no-install tsc --noEmit` and `npx --no-install tsc -p tsconfig.gui.json --noEmit`
-   - typecheck of the TUI entry (`tui.tsx` + its `lib/*` imports) and of the
+   - typecheck of the TUI entry (`tui.ts` + its `lib/*` imports) and of the
    Desktop GUI part (`gui/*.tsx`, Solid JSX);
 2. `npm run build:gui` - build the Desktop GUI bundle before the gate inspects it;
 3. `test/prepublish.mjs` - the full fast gate (a)-(g), including the standalone

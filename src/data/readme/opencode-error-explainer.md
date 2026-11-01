@@ -4,7 +4,7 @@
 [![license](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 [![tests](https://github.com/zademy/opencode-error-explainer/actions/workflows/ci.yml/badge.svg)](https://github.com/zademy/opencode-error-explainer/actions/workflows/ci.yml)
 
-> An [OpenCode](https://opencode.ai) plugin that detects failed terminal commands, **explains them to the AI in real time**, and writes a **private, Sentry-style event** for every error — stack frames with source preview, OS/runtime/git context, breadcrumbs, and grouping frequency. **100% local. Nothing is ever transmitted.**
+> An [OpenCode](https://opencode.ai) plugin that detects failed terminal commands **and model/agent-layer errors** (provider failures, permission denials, session shell), **explains them to the AI in real time**, teaches from repeats, and writes a **private, Sentry-style event** for every error — stack frames with source preview, OS/runtime/git context, breadcrumbs, and grouping frequency. **100% local. Nothing is ever transmitted.**
 
 ## Table of contents
 
@@ -63,6 +63,33 @@ machine.
    - injects a structured classification into `output.metadata`.
 4. **Persists** a **private, Sentry-style event** to `last-error.{md,json}` (and
    a rotating history), with secrets redacted before anything is written to disk.
+5. **Listens to the event bus** (v0.5): model/agent-layer failures, session
+   shell commands, and permission denials flow through the same pipeline —
+   and repeated errors teach (see below).
+
+## Event bus capture (v0.5)
+
+Beyond terminal-tool failures, the plugin subscribes — read-only — to the
+OpenCode event bus:
+
+- **Model/agent layer:** `session.execution.failed`,
+  `session.retry.scheduled` (provider rate limits, auth, overload),
+  `session.compaction.failed`. New pattern families classify them
+  (`provider_rate_limited`, `provider_auth_failed`,
+  `provider_context_overflow`, `provider_overloaded`, `compaction_failed`).
+- **Permissions:** `permission.asked`/`permission.replied` joined by request
+  ID — only denials are classified (`permission_denied`).
+- **Session shell:** `session.shell.started/ended` become breadcrumbs and
+  (non-zero exit) classifications; a dedup layer keeps a command that already
+  went through the terminal tool from being counted twice.
+
+**Noise contract (binding):** one brief line per error; lesson lines only from
+`lessonThreshold` (default 2nd occurrence) and only one per tool result; the
+session-start digest appears once, capped at 8 lines, main sessions only; the
+plugin never sends messages on its own initiative — injections ride an
+existing tool result or are prepended to a prompt already being submitted.
+Every behavior is switchable: `captureEvents: false` (bus off),
+`lessonThreshold: 1` (lessons off), `sessionMemory: false` (digest off).
 
 ## Requirements
 
@@ -159,25 +186,28 @@ All options are optional and passed via the object form shown in [Install](#inst
 Defaults are safe; invalid values silently fall back so a bad config never breaks
 your session.
 
-| Option                 | Type                           | Default                                | Description                                                                                                           |
-| ---------------------- | ------------------------------ | -------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| `enabled`              | `boolean`                      | `true`                                 | Master switch.                                                                                                        |
-| `outputDir`            | `string`                       | `<worktree>/.opencode/error-explainer` | Where artifacts are written (relative to worktree, or absolute).                                                      |
-| `historyLimit`         | `number`                       | `10`                                   | How many recent errors to keep. `0` disables history.                                                                 |
-| `stacks`               | `Stack[]`                      | all                                    | Restrict activation to these stacks (e.g. `["java","typescript"]`).                                                   |
-| `verbosity`            | `"concise" \| "detailed"`      | `"concise"`                            | Detail of the full report (artifact + `explain_error`).                                                               |
-| `redact`               | `boolean`                      | `true`                                 | Strip likely secrets from persisted output and source previews.                                                       |
-| `appendMode`           | `"minimal" \| "full" \| "off"` | `"minimal"`                            | What to append inline to the tool output the AI sees. The full report always lives in the artifact + `explain_error`. |
-| `sourcePreview`        | `boolean`                      | `true`                                 | Read `±sourceContextLines` around each in-app frame from the worktree.                                                |
-| `sourceContextLines`   | `number`                       | `5`                                    | Lines of source captured on each side of the error line.                                                              |
-| `breadcrumbs`          | `boolean`                      | `true`                                 | Gather prior tool calls of the session as breadcrumbs.                                                                |
-| `breadcrumbLimit`      | `number`                       | `15`                                   | How many breadcrumbs to retain.                                                                                       |
-| `gitContext`           | `boolean`                      | `true`                                 | Capture git branch/commit/dirty.                                                                                      |
-| `runtimeContext`       | `boolean`                      | `true`                                 | Capture OS + runtime versions.                                                                                        |
-| `fingerprint`          | `boolean`                      | `true`                                 | Compute a grouping fingerprint + per-fingerprint frequency.                                                           |
-| `skipReadOnlyCommands` | `boolean`                      | `true`                                 | Skip read-only commands (cat/grep/less…) so inspecting a log isn't flagged.                                           |
-| `readOnlyCommands`     | `string[]`                     | built-in list                          | Override the set of read-only command prefixes.                                                                       |
-| `customPatternsPath`   | `string`                       | `.error-patterns.json`                 | Path (relative to worktree) to your custom patterns file. `null` disables.                                            |
+| Option                 | Type                           | Default                                | Description                                                                                                                                              |
+| ---------------------- | ------------------------------ | -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `enabled`              | `boolean`                      | `true`                                 | Master switch.                                                                                                                                           |
+| `outputDir`            | `string`                       | `<worktree>/.opencode/error-explainer` | Where artifacts are written (relative to worktree, or absolute).                                                                                         |
+| `historyLimit`         | `number`                       | `10`                                   | How many recent errors to keep. `0` disables history.                                                                                                    |
+| `stacks`               | `Stack[]`                      | all                                    | Restrict activation to these stacks (e.g. `["java","typescript"]`).                                                                                      |
+| `verbosity`            | `"concise" \| "detailed"`      | `"concise"`                            | Detail of the full report (artifact + `explain_error`).                                                                                                  |
+| `redact`               | `boolean`                      | `true`                                 | Strip likely secrets from persisted output and source previews.                                                                                          |
+| `appendMode`           | `"minimal" \| "full" \| "off"` | `"minimal"`                            | What to append inline to the tool output the AI sees. The full report always lives in the artifact + `explain_error`.                                    |
+| `sourcePreview`        | `boolean`                      | `true`                                 | Read `±sourceContextLines` around each in-app frame from the worktree.                                                                                   |
+| `sourceContextLines`   | `number`                       | `5`                                    | Lines of source captured on each side of the error line.                                                                                                 |
+| `breadcrumbs`          | `boolean`                      | `true`                                 | Gather prior tool calls of the session as breadcrumbs.                                                                                                   |
+| `breadcrumbLimit`      | `number`                       | `15`                                   | How many breadcrumbs to retain.                                                                                                                          |
+| `gitContext`           | `boolean`                      | `true`                                 | Capture git branch/commit/dirty.                                                                                                                         |
+| `runtimeContext`       | `boolean`                      | `true`                                 | Capture OS + runtime versions.                                                                                                                           |
+| `fingerprint`          | `boolean`                      | `true`                                 | Compute a grouping fingerprint + per-fingerprint frequency.                                                                                              |
+| `skipReadOnlyCommands` | `boolean`                      | `true`                                 | Skip read-only commands (cat/grep/less…) so inspecting a log isn't flagged.                                                                              |
+| `readOnlyCommands`     | `string[]`                     | built-in list                          | Override the set of read-only command prefixes.                                                                                                          |
+| `captureEvents`        | `boolean`                      | `true`                                 | Subscribe to the OpenCode event bus — model/agent-layer errors, session shell commands, permission denials.                                              |
+| `lessonThreshold`      | `number`                       | `2`                                    | From the Nth occurrence of the same error in a session, the inline diagnosis becomes a lesson line ("3rd X; last resolved by: …"). `1` disables lessons. |
+| `sessionMemory`        | `boolean`                      | `true`                                 | Prepend a capped digest (≤ 8 lines) of the worktree's recent errors to the first prompt of main sessions.                                                |
+| `customPatternsPath`   | `string`                       | `.error-patterns.json`                 | Path (relative to worktree) to your custom patterns file. `null` disables.                                                                               |
 
 **`Stack` values** (`stacks` / a pattern's `stack`): `node`, `typescript`,
 `python`, `java`, `go`, `rust`, `docker`, `kubernetes`, `git`, `sql`, `shell`,

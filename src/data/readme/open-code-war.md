@@ -147,11 +147,16 @@ codex plugin add open-code-war@opencodewar
 pi install npm:open-code-war
 ```
 
-OpenCode 는 `opencode.json` 의 `plugin` 배열에 추가하면 시작 시 자동 설치됩니다.
+OpenCode 는 `opencode.json(c)` 의 `plugins` 배열에 추가하면 시작 시 자동 설치됩니다.
+(OpenCode 2 필드명은 `plugins` — 1.x 의 `plugin` 도 계속 동작합니다.)
 
-```json
-{ "plugin": ["open-code-war"] }
+```jsonc
+{ "plugins": ["open-code-war"] }
 ```
+
+> ℹ️ OpenCode 2 는 V1 플러그인 API 를 실행하지 않습니다. 이 패키지는 두 API 를 함께 내보내므로
+> 1.x·2.x 어디서든 집계됩니다. 집계가 안 되면 `~/.local/share/opencode/log/opencode.log` 에서
+> `failed to load plugin` 을 확인하세요.
 
 넷 다 같은 `userId` 로 합산되며, 에이전트별 내역은 프로필 그래프에서 따로 볼 수 있습니다.
 자세한 동작 요건과 집계 기준은 [`adapters/README.md`](adapters/README.md) 참고.

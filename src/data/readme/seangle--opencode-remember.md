@@ -117,11 +117,20 @@ directories it is handed.
   notes/<YYYY-MM-DD>-<slug>.md      # frontmatter: description, memory-id, created-date, last-modified-date (minute-precision ISO)
   remember.json                     # {"version": 1} store marker
   recovery/<8hex>.json              # undo records for updates and deletions
+  recovery/.gitignore               # * (created lazily before writing recovery)
 ```
 
 `dirName` is configurable; both adapters default to `.agents`, so the workspace
 store is shared. A store with content but no `remember.json` is never adopted
 silently: core reports it as needing an explicit migration.
+
+Before writing recovery, core creates `recovery/.gitignore` containing `*` if
+missing, including in existing stores. Existing ignore rules are never
+overwritten. Reads, initialization, and no-op mutations do not create it.
+Recovery records can contain removed information; this default prevents
+accidental Git additions, but does not untrack committed files or remove them
+from Git history. The rule also ignores itself and is recreated on the next
+recovery write if missing.
 
 Two harnesses writing one store concurrently is serialized per process, not
 across processes. The append path is atomic per write, but a race can still lose

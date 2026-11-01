@@ -20,13 +20,13 @@ bay, live, is on the [site](https://cockpit.codestz.dev/).*
 **OpenCode 1**
 
 ```sh
-opencode plugin opencode-cockpit@0.11.1 --global --force
+opencode plugin opencode-cockpit@0.11.2 --global --force
 ```
 
 **OpenCode 2**
 
 ```sh
-opencode plugin add opencode-cockpit@0.11.1
+opencode plugin add opencode-cockpit@0.11.2
 opencode service restart    # after installing, and after every update
 ```
 
