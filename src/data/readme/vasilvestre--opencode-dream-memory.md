@@ -10,6 +10,11 @@ Two pieces that give an OpenCode agent memory across sessions:
 summarizes the conversation and the instructions file goes with it. A plugin
 hook runs on every agent-loop request, so the same block is re-sent each turn.
 
+The plugin also registers the `compaction` hook, so the memory reaches the
+request that writes the summary. The model still writes the summary; the plugin
+only adds context. Without that hook, a long session could compact away the
+memory it just read.
+
 ## Install
 
 Requirements: `opencode` and `jq` on `PATH`, `curl` or `wget` to download, and
@@ -197,10 +202,11 @@ the same thing as the two subcommands.
 npm test
 ```
 
-The plugin checks: the hook registers, missing files inject nothing, shared
+The plugin checks: both hooks register, missing files inject nothing, shared
 memory alone injects one block, the current project's file is appended after it
 while another project's stays out, an oversized file is truncated without the
-whole block growing, and titles are dropped. Then the corpus checks: the dream's
+whole block growing, titles are dropped, the `compaction` hook injects the same
+block as the `context` hook, and it never sets `result`. Then the corpus checks: the dream's
 own sessions stay out, a labelled secret is redacted, a torn session export is
 skipped instead of fatal, and a git data directory gets a preimage commit before
 the deep pass.

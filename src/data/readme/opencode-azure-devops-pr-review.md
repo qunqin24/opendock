@@ -47,7 +47,7 @@ is an actual capture excerpt with identifying UI removed and its text unchanged.
    [company networks](docs/ENTERPRISE.md#company-networks) first):
 
    ```sh
-   opencode plugin add opencode-azure-devops-pr-review@0.3.3
+   opencode plugin add opencode-azure-devops-pr-review@0.3.4
    ```
 
 2. Follow the [quickstart](docs/QUICKSTART.md) to save your PAT in a private
@@ -263,14 +263,14 @@ Azure DevOps REST API with the runtime's built-in `fetch`.
 Install the npm package with OpenCode's plugin manager:
 
 ```sh
-opencode plugin add opencode-azure-devops-pr-review@0.3.3
+opencode plugin add opencode-azure-devops-pr-review@0.3.4
 ```
 
 The same release is also a versioned Git package, which needs Git but not the
 npm registry:
 
 ```sh
-opencode plugin add 'github:WTLAIB/opencode-azure-devops-pr-review-v2#v0.3.3'
+opencode plugin add 'github:WTLAIB/opencode-azure-devops-pr-review-v2#v0.3.4'
 ```
 
 Add only one of them. OpenCode 2.2.4 loads the plugin into a running OpenCode
@@ -284,7 +284,7 @@ To select another configuration file, use an absolute path in the host config:
 ```json
 {
   "plugins": [{
-    "package": "opencode-azure-devops-pr-review@0.3.3",
+    "package": "opencode-azure-devops-pr-review@0.3.4",
     "options": { "settingsFile": "/absolute/path/to/azpr/settings.json" }
   }]
 }
@@ -309,7 +309,7 @@ For an entry that `opencode plugin add` created, add the new version and,
 only when that succeeds, remove the previous one:
 
 ```sh
-opencode plugin add opencode-azure-devops-pr-review@0.3.3 &&
+opencode plugin add opencode-azure-devops-pr-review@0.3.4 &&
   opencode plugin remove opencode-azure-devops-pr-review@PREVIOUS_VERSION
 ```
 
@@ -332,7 +332,7 @@ configuration needs no new `/pr-setup`. `opencode plugin list` should then
 show a single `azpr` row with the new version (from 0.3.1, `/pr-check` names
 it too); if it still shows the previous one, run `opencode service restart`.
 Exact versions stay pinned, so `opencode plugin update` leaves them unchanged.
-See the [0.3.3 release notes](docs/releases/v0.3.3.md) for what changed and the
+See the [0.3.4 release notes](docs/releases/v0.3.4.md) for what changed and the
 [0.2.0 release notes](docs/releases/v0.2.0.md) for automatic comments, which
 remain disabled unless you configure `afterReview` or request them with a
 review command flag.
@@ -342,8 +342,8 @@ review command flag.
 <details>
 <summary>Source installation and replacement</summary>
 
-Download the [v0.3.3 source archive](https://github.com/WTLAIB/opencode-azure-devops-pr-review-v2/archive/refs/tags/v0.3.3.tar.gz)
-and extract it, or check out tag `v0.3.3`. The installer needs POSIX `sh` and
+Download the [v0.3.4 source archive](https://github.com/WTLAIB/opencode-azure-devops-pr-review-v2/archive/refs/tags/v0.3.4.tar.gz)
+and extract it, or check out tag `v0.3.4`. The installer needs POSIX `sh` and
 Python 3's standard library. From that source directory:
 
 ```sh
@@ -475,7 +475,14 @@ never blocks `/pr-review`. Comment planning uses the review's risk model
 | `quick.reviewer` | `/pr-quick` only: both focuses in one session per shard, its own source checks, and comment planning for quick reviews. Strong code comprehension, evidence judgment and reliable tool use. |
 
 A role's focus orders its attention and is not a filter: every reviewer files
-every concrete defect it finds, in any area, as a finding.
+every concrete defect it finds, in any area, as a finding. Concrete gaps the
+change leaves are findings too, usually low: a changed behavior no test would
+catch where the project already tests comparable code, a test that cannot fail,
+a comment or document that now contradicts the code, and duplicated or dead
+code the change adds. A mistake repeated in places that each need their own fix
+is one finding per place. Identical copies of one file count as one place when
+one reviewer has them; in a large PR split into shards, copies that different
+reviewers get can each produce a finding.
 
 ### All settings and defaults
 
@@ -761,8 +768,8 @@ and a loopback fake Azure DevOps REST service in disposable directories under
 Uninstall without `--apply` previews; `--apply` archives only this package under
 `azpr-v2-backups` and leaves the private state directory for you to delete.
 For a native installation, remove the entry you added, for example
-`opencode plugin remove opencode-azure-devops-pr-review@0.3.3` or
-`opencode plugin remove 'github:WTLAIB/opencode-azure-devops-pr-review-v2#v0.3.3'`;
+`opencode plugin remove opencode-azure-devops-pr-review@0.3.4` or
+`opencode plugin remove 'github:WTLAIB/opencode-azure-devops-pr-review-v2#v0.3.4'`;
 the external settings, PAT file and private review state remain available.
 
 [Architecture](docs/ARCHITECTURE.md), [commenting](docs/COMMENTING.md),
@@ -775,7 +782,7 @@ or personal model selections.
 ## License and releases
 
 [MIT](LICENSE), copyright 2026 WTLAIB. See the [changelog](CHANGELOG.md) for the
-release scope, [v0.3.3](https://github.com/WTLAIB/opencode-azure-devops-pr-review-v2/releases/tag/v0.3.3)
+release scope, [v0.3.4](https://github.com/WTLAIB/opencode-azure-devops-pr-review-v2/releases/tag/v0.3.4)
 for downloads, the [npm package](https://www.npmjs.com/package/opencode-azure-devops-pr-review),
 [v0.2.0](https://github.com/WTLAIB/opencode-azure-devops-pr-review-v2/releases/tag/v0.2.0)
 for the recorded demonstration, and [releasing](docs/RELEASING.md) for the

@@ -87,7 +87,7 @@ Trustoken（trustoken.cn）是 AiPy 的官方 token 分发商，`api.trustoken.c
 magpie plugin add github:MYCF711/magpie-trustoken-auth
 
 # 本地目录（自己改了代码）
-magpie plugin add D:\主工作区\projects\magpie-trustoken-auth
+magpie plugin add <WORKSPACE>\projects\magpie-trustoken-auth
 ```
 
 装完在 magpie 里：

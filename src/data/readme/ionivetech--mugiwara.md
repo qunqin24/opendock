@@ -4,372 +4,161 @@
 [![npm downloads](https://img.shields.io/npm/dm/@ionivetech%2fmugiwara)](https://www.npmjs.com/package/@ionivetech/mugiwara)
 [![License: MIT](https://img.shields.io/github/license/ionivetech/mugiwara)](https://github.com/ionivetech/mugiwara/blob/main/LICENSE)
 
-**Your AI agent already writes the code. Mugiwara makes it reviewable.**
+**A review discipline for AI coding agents. For risky changes, it plans first, checks its own work, and leaves one report a human can review.**
 
-A crew of 12 specialists with roles and evidence at every step. The
-process sizes itself to the work: a typo costs nothing, an auth migration gets
-all nine stages and a security review. No runtime, no API keys, no servers.
-Markdown your agent knows how to read.
-
-Works on 12 platforms, including Claude Code and opencode.
+An agent can write 400 lines in five minutes, say "tests pass", and leave nothing you can open or attach to a PR. Mugiwara gives the agent a crew of named roles, a process that grows with the risk of the change, and a closing report. It is markdown your agent already reads: no runtime, no server, no API keys of its own.
 
 ![Mugiwara banner](assets/banner.png)
 
----
+## What it looks like
 
-## The problem
+You ask for something risky. The crew sizes the work, says what it will do, and stops to ask what it cannot guess. A real first reply (shortened) to `/mugiwara add role-based access control: admin, editor, viewer` in a small repo:
 
-An AI agent can write 400 lines in five minutes. It says "tests pass" and
-leaves nothing you can open, read, or attach to a PR. Review becomes a
-formality, and a formality launders the change through a human name.
+```text
+Crew: Luffy triages, Usopp clarifies, Nami plans, Zoro builds, Robin and Jinbe review, Sanji and Franky gate.
 
-## What you get back
+Access control touches security, so this gets the full pipeline. Mode is guided, so I need
+your go at each stage. I'm stopping before any code because the request is too vague to plan.
 
-Every mission closes with one file your reviewer reads:
+Result
+- There is no user model, auth, session or request layer, so RBAC has nothing to attach to yet.
+- The existing test "formats as ISO date" fails on a bug unrelated to RBAC. I'll flag it so it
+  isn't blamed on this work.
+
+Choices
+1. Where does identity come from: an IdP or JWT, a local user store, or the caller passes a role?
+2. Which resources are protected: only invoices, or more?
+3. What do the roles mean? My default: admin does everything, editor reads and writes, viewer reads.
+...
+Reply with answers or "use your defaults".
+```
+
+Answer "use your defaults", switch to `auto` mode, and the crew builds it, runs the tests, lists what it did not do, and closes the mission with a report at `.mugiwara/missions/<mission>/report.md`. A shortened example of a fully folded report (`[...]` marks cuts; numbers are illustrative; the full file is `test/fixtures/report-sample.md`):
 
 ```markdown
 # Mission: invitation-accepted-flow
-2026-09-03 · you · branch `feature/invitation-flow` · lane **full** · mode guided
+
+Invitation acceptance now signs the user in, returns them to the page they came from, and expires the invitation after one use.
+
+11 files changed (+340 / -82) on branch `feature/invitation-flow`, closed 2026-10-19. Sensitive paths touched: `src/auth/invitation.ts`.
 
 ## Verdict
-**GO** — all gates passed. 1 finding deferred with an owner.
 
-## What changed
-11 files, +340 / -82.
-Sensitive paths touched: `src/auth/invitation.ts`, `migrations/004.sql`
+**Ready for review.** All gates passed. 1 finding deferred, with an owner.
 
-## Gates
-| Gate | Verdict | Evidence |
-|---|---|---|
-| Checkpoint (Flow 4) | PASS | `flows/02-audit.md` |
-| Quality (Flow 5) | PASS | `flows/03-quality.md` |
-| Coverage (Flow 6) | PASS | new 94% / modified 87% |
-| Security (Flow 7) | PASS | STRIDE, 0 high -> `review/security.md` |
+[...]
 
-## Cost
-Used **8,781** of 12,000 tokens (73%). Lane `lean`. 1 heal cycle.
+## Coverage
+
+Coverage on new code is 94%, on modified code 87%. The build exits 0.
+
+[...]
+
+## Not verified
+
+- e2e: the repo has no e2e setup. Logged, not waived silently.
+
+[...]
 ```
 
-*Generated from fixture `test/fixtures/report-sample.md` — 2026-09-03.*
+## When it runs, and when it stays out of the way
 
-### Without Mugiwara
-
-> **Agent:** Done: refactored auth, all tests pass.
->
-> **You:** ...which tests? Did anything touch the token check?
->
-> **Agent:** *(the context is gone)*
-
-### With Mugiwara
-
-One file per PR: files changed, gates passed with evidence locations, decisions made, plus **what was not verified**.
-
-## The process fits the work
-
-| Your change | Lane | What runs |
-|---|---|---|
-| Typo, one file | **Direct** | nothing, fix it directly |
-| Small bug | **Lean** | execute -> quality |
-| A feature | **Standard** | plan -> execute -> audit -> quality -> review |
-| Touches `auth/`, `payments/`, migrations | **Full** | all 9 flow stages + security review |
-| Requirements still fuzzy | **Spike** | brainstorm first, then re-size |
-
-The lane is computed from `git diff`, never guessed, and it only ever rises.
-
-## What is Mugiwara? (30 seconds)
-
-AI agents are fast. They are also **unverified**: no audit trail, no review, no
-"who checked this?" when something breaks.
-
-Mugiwara wraps your agent in a **Straw Hat crew** of named roles
-(Luffy, Nami, Zoro, Chopper, …) with a **ruled pipeline**, **evidence at every
-gate**, and a **cost governor** keeping spend visible and bounded.
-
-Three things it does for you:
-
-| You get | Meaning |
+| You ask | What happens |
 |---|---|
-| **Evidence, not claims** | Every flow stage re-runs checks and shows output. "Done" = proof. |
-| **Process that sizes itself** | A typo costs nothing. An auth migration gets the full pipeline. |
-| **Visible cost** | Per-lane budgets, a live [slop](docs/concepts/cost.md) governor, and a `mugiwara cost` ledger. |
+| `/mugiwara <risky change>`: auth, payments, migrations, many files | The crew engages: plan, build, check, review, security, report. On Claude Code the stop hook compares your real diff with what happened. If the change is risky and no mission was recorded, it blocks the end of the turn and the model continues (at most twice per session, then a warning). |
+| `/mugiwara <small fix>` | The crew sizes it, usually decides "direct" and fixes it on the spot. No mission, no report. |
+| A plain request with no `/mugiwara` | The crew usually does not engage. You get your agent's normal behavior. |
+| `/mugiwara-review` or `/mugiwara-security` | A read-only review or security audit of your diff. |
 
-It runs **inline in your chat**.
+This is deliberate: a typo should not cost a pipeline. To put the crew on a small change, say so: `/mugiwara <request>, use the full crew`.
 
-→ [Why mugiwara vs asking unaided](docs/concepts/features.md#outcome-honesty-including-what-is-missing)
+## What it can do
 
----
-
-## Quick start (5 minutes)
-
-Add the plugin, then ask something non-trivial:
-
-```bash
-# opencode: add to opencode.json, then restart
-{ "plugin": ["@ionivetech/mugiwara"] }
-
-# Claude Code
-/plugin marketplace add ionivetech/mugiwara && /plugin install mugiwara
-
-# Any platform via npm
-npx @ionivetech/mugiwara@latest install --target all --yes
-```
-
-First run writes `.mugiwara/config`. Then ask, in chat or `/mugiwara <request>`, never `@agent`:
-
-```
-> add role-based access control: admin, editor, viewer
-> audit the auth middleware for security gaps
-> review the last PR for breaking changes
-> split this feature across the team: payment gateway, ledger, fraud
-```
-
-You ask; the crew routes. A Standard-lane mission ends with test-first commits,
-an audit report, a security review, and a PR summary, visible at every step.
-
-| You say                                        | What happens |
-| ---------------------------------------------- | ------------------------------------------------------- |
-| `add search bar to products page`              | Triage, plan, execute, audit, gate, review, then a PR summary |
-| `split payment system: gateway, ledger, fraud` | One plan split into sub-missions, each dev resumes only their own |
-| `Brook, fix the failing login test`            | Healer reads the failure ledger, root-cause fixes, proves it in ≤3 cycles |
-| `Jinbe, audit auth middleware`                 | STRIDE + OWASP + dependency audit. Read-only, never touches code |
-
-→ [Full walkthrough](docs/getting-started.md)
-
----
-
-## How it works (the short version)
-
-Four ideas explain almost everything:
-
-### 1. The crew pipeline
-A mission runs as **flow stages**, each owned by one crew member: triage,
-brainstorm, plan, execute, audit, quality, gates, review, heal, closure. Plans
-record a preflight baseline (`bun test`, `tsc --noEmit`) before executing.
-
-→ [Full pipeline](docs/concepts/workflow.md) · [The crew](docs/concepts/agents.md)
-
-### 2. Lanes: process sizes itself
-Work is sized to the diff. A typo gets no pipeline; an auth migration gets all
-nine stages.
-
-| Lane | Flow stages | Typical tokens | Budget |
-| ---- | :---: | :---: | :---: |
-| Direct (typo) | 0 | ~0 | — |
-| Lean (small bug) | 2 | ~8k | 12k |
-| Standard (feature) | 5–7 | ~13k | 25k |
-| Full (architecture) | 9–11 | ~22k | 50k |
-
-→ [Lanes](docs/concepts/lanes.md)
-
-### 3. Modes: how much you participate
-`guided` (approve every step), `semi` (approve the plan, then auto), `auto`
-(full autonomy within your scope).
-
-→ [Modes](docs/concepts/modes.md)
-
-### 4. Cost Governor: what is safe to spend
-Per-lane budgets, a **live slop governor** that flags wasted cost and
-attributes it to the crew member that caused it, and a `mugiwara cost` ledger.
-Four host capabilities ride alongside, named for the job with the native name in brackets: terse-output [anti-stuff], minimal-diff [just-enough], waste-guard [anti-slop], scan-format [have-adhd]. They ship with the host, not here.
-
-→ [Cost model](docs/concepts/cost.md)
-
-### Adaptive execution
-[Control mode](docs/concepts/modes.md), [execution posture](docs/concepts/workflow.md), and [Cost Governor](docs/concepts/cost.md) stay **independent**. The
-crew picks the posture from evidence at each flow boundary. Inline is the default.
-
-→ [Adaptive execution](docs/concepts/workflow.md)
-
----
-
-## What Mugiwara does
-
-| Feature | One line |
+| Capability | In one line |
 |---|---|
-| Lane sizing | Process scales to the work. Computed from `git diff`, never guessed. |
-| Evidence gates | A stage passes only if the check actually ran. No output, no pass. |
-| Team split | One shared plan, per-person state, file conflicts caught before merge. |
-| Resume | Session died? Continues from the exact stage. Never restarts. |
-| Feature flags | `features=` selects the skill set; `mugiwara features explain` shows why each feature loads. |
-| 12 platforms | 11 agents (+3 internal) on 12 harnesses: 9 install full bodies, 3 via marketplace manifest. |
+| Sizing by risk | The process comes from `git diff`, not a guess, and only rises: Direct, Lean, Standard, Full. |
+| Plan before code | A plan with acceptance checks, and tasks that can run in parallel without touching the same files. |
+| Evidence at every stage | A stage passes only when its check actually ran. No output, no pass. |
+| Quality and coverage gates | Format, lint, tests, duplication, complexity, and a coverage floor you set. |
+| Security review | Threat model (STRIDE), OWASP Top 10, secrets and dependency checks on sensitive paths. |
+| Healing with a cap | A failed check goes to a root-cause fix a fixed number of times, then to you. |
+| Resume | A dead session continues from the exact stage, not from the start. |
+| Team missions | One plan, per-person state, file conflicts caught before merge. |
+| Guard rails | Merging, deploying and other irreversible commands are blocked on Claude Code. |
+| Cost ledger | Process budget per lane, plus the provider-reported token total on Claude Code. |
+| Policy as code | An org-wide file that raises scrutiny floors. |
+| Closing report | One file: verdict, what changed, checks with evidence, what was not verified. |
 
-→ all features: [Every feature](docs/concepts/features.md)
-
----
-
-## Team collaboration
-
-Built for a team sharing one repo. Identity is **(mission, member)**, never
-branch, so parallel work never collides.
-Solo by default (`team=off`); the first shared mission flips it on at Flow 0.
-
-```bash
-/mugiwara continue                      # list every in-flight mission for YOU
-/mugiwara continue payment-gateway      # solo → resume; team → list members
-/mugiwara continue payment-gateway patty # resume exactly patty's work
-mugiwara status                         # computed per-mission position
-```
-
-Auto mode runs your **member scope only**: your sub-mission ships alone.
-
-→ [Multi-actor reference](references/multi-actor.md) · [Adoption guide](docs/reference/adoption-guide.md)
-
----
-
-## When not to use Mugiwara
-
-- **Throwaway prototype you will delete tonight**: skip the crew; the trail outlives the code otherwise.
-- **Unattended multi-hour runs with nobody watching chat**: the crew runs inline so you can interrupt it; use a batch runner instead.
-- **Solo script with no reviewer, no PR, no future reader**: the trail has no audience, so it is pure overhead.
-- **Harnesses without agent dispatch** (Gemini, Codex, tier 3): you get the workflow and the trail, not enforced role boundaries.
-
----
-
-## Configuration
-
-Switch mode any time: say `mugiwara mode <guided|semi|auto>` in session.
-
-| Key | Default | What |
-|---|---|---|
-| `mode` | guided | guided / semi / auto |
-| `verbosity` | normal | normal / full |
-| `branch` | `feature/{type}-{issue}-{slug}` | Branch naming |
-| `commit` | conventional | conventional / gitmoji / plain / template |
-| `auto_commit` | off | off hands you an uncommitted tree in guided/semi |
-| `coverage_new` | 85 | Coverage threshold for new files (%) |
-| `coverage_modified` | 90 | Coverage threshold for modified files (%) |
-| `review_depth` | full | full / standard / quick |
-| `quality_depth` | full | full / standard / quick |
-| `verify_merged` | off | re-verify the merged tree before closing |
-| `delegate_threshold` | 60 | % of budget at which remaining tasks dispatch to workers |
-| `heal_max_cycles` | 3 | Max heal-loop cycles before human escalation |
-
-Project config (`.mugiwara/config`) overrides global (`~/.mugiwara/config`).
-Commented optionals (`features=`, `team=`, `sign=`, `enforce=`, scope, budgets,
-investigation limits) stay off until set.
-
-→ [All config keys](docs/concepts/config.md)
-
----
-
-## Quick reference
-
-| Need | Command / Doc |
-|---|---|
-| Review a PR diff | `/mugiwara-review` or "review this PR" |
-| Security audit | `/mugiwara-security` or "Jinbe, audit X" |
-| Resume a mission | `/mugiwara continue <mission> [member]` |
-| See mission position | `mugiwara status` |
-| See cost + live slop | `mugiwara cost` |
-| Explain the feature mix | `mugiwara features explain` |
-| Close out a mission | `mugiwara archive <mission>` |
-| Switch mode | `mugiwara mode <guided\|semi\|auto>` (in session) |
-| All docs | [docs/](docs/) |
-
----
+Every capability with its command or page: [capabilities](docs/capabilities.md).
 
 ## Install
 
-<details>
-<summary><b>Claude Code</b></summary>
+Claude Code, in the chat:
 
-```bash
-/plugin marketplace add ionivetech/mugiwara && /plugin install mugiwara
+```text
+/plugin marketplace add ionivetech/mugiwara
+/plugin install mugiwara
 ```
 
-Full guide: [docs/install/claude.md](docs/install/claude.md).
+opencode, in `opencode.json` (then restart):
 
-</details>
-
-<details>
-<summary><b>OpenCode</b></summary>
-
-Add `"plugin": ["@ionivetech/mugiwara"]` to `opencode.json` and restart.
-
-Full guide: [docs/install/opencode.md](docs/install/opencode.md).
-
-</details>
-
-<details>
-<summary><b>Gemini CLI / Codex / Copilot / Cursor / Antigravity / Kimi / Pi</b></summary>
-
-Each has its own guide: [Gemini](docs/install/gemini.md) ·
-[Codex](docs/install/codex.md) · [Copilot](docs/install/copilot.md) ·
-[Cursor](docs/install/cursor.md) · [Antigravity](docs/install/antigravity.md) ·
-[Kimi](docs/install/kimi.md) · [Pi](docs/install/pi.md).
-
-</details>
-
-<details>
-<summary><b>Any platform via CLI</b></summary>
-
-```bash
-npx @ionivetech/mugiwara@latest install --target <id> --yes   # windsurf, cline, kilo, codex
+```json
+{ "plugin": ["@ionivetech/mugiwara"] }
 ```
 
-Full guide: [docs/install/cli.md](docs/install/cli.md).
-
-</details>
-
-Compact (tier-3) targets install stub pointers, not full bodies; each install
-page names its side. See the [harness matrix](docs/reference/harness-matrix.md).
-
----
-
-## CLI
+Any other platform, from your repo:
 
 ```bash
-mugiwara install                              # wizard (interactive)
-mugiwara install --target all --yes           # non-interactive
-mugiwara update --target <id> --yes           # overwrite to latest
-mugiwara uninstall                            # remove installed files
-mugiwara list [--check]                       # show / health-check installations
-mugiwara status                               # computed mission state
-mugiwara continue [mission] [member]          # resume / list in-flight (read-only)
-mugiwara cost [--mission <id>] [--json]       # cost ledger, avoided work, live slop
-mugiwara features explain|list                # which skills load, and why
-mugiwara archive <mission>                    # fold the trail into report.md
-mugiwara clean [--all] [--before <date>]      # batch-archive closed missions
-mugiwara blame <path>                         # provenance on the last commit touching path
-mugiwara handoff <mission>                    # engineer-to-engineer handoff report
-mugiwara sign <mission> [--verify]            # optional report attestation
-mugiwara reset --keep-logs                    # wipe state, keep lessons
+npx -y @ionivetech/mugiwara@latest install --target <id> --yes
 ```
 
----
+Then install the CLI once: `npm i -g @ionivetech/mugiwara`. Without it the crew falls back to `npx` and shell scripts, and the closing report comes out shorter because the `archive` step that folds the whole trail does not run.
 
-## Docs
+Claude Code and opencode are tested end to end. A Codex CLI risky-task run entered the full workflow and passed focused tests, but reviewer dispatch failed because the benchmark used ephemeral sessions; its default is fixed, pending a fresh end-to-end run. Cursor has not been run in its host. The rest are community, best effort. Details: [install](docs/install.md).
 
-**Start here:** [Getting started](docs/getting-started.md) · [What mugiwara replaces](docs/concepts/features.md#outcome-honesty-including-what-is-missing)
+## Your first 10 minutes
 
-**Concepts:** [Workflow](docs/concepts/workflow.md) · [Lanes](docs/concepts/lanes.md) · [Modes](docs/concepts/modes.md) · [Git strategy](docs/concepts/git-strategy.md) · [Config](docs/concepts/config.md) · [Cost](docs/concepts/cost.md) · [Audit trail](docs/concepts/audit-trail.md) · [Security](docs/concepts/security.md) · [Provenance](docs/concepts/provenance.md) · [Policy as code](docs/concepts/policy-as-code.md) · [Closure tools](docs/concepts/closure-tools.md) · [Permissions](docs/concepts/permissions.md) · [Memory](docs/concepts/memory.md)
+1. Install, then open your repo in your agent.
+2. Run `/mugiwara add input validation to the signup form`, or any change that touches a sensitive path. Pick something you would want reviewed.
+3. Answer the questions, or say "use your defaults".
+4. Read `.mugiwara/missions/<mission>/report.md` and attach it to your PR. If it is missing, run `mugiwara archive <mission>`.
+5. `mugiwara status` shows where a mission is, `mugiwara cost` what it spent, and `mugiwara doctor` why something is not working.
 
-**Crew:** [Agents](docs/concepts/agents.md) · [Skills](docs/concepts/skills.md) · [Adaptive execution](docs/concepts/workflow.md)
+A step-by-step with real output: the [first mission runbook](docs/runbooks/solo-mission.md).
 
-**Reference:** [Adoption guide](docs/reference/adoption-guide.md) · [Glossary](docs/reference/glossary.md) · [Harness matrix](docs/reference/harness-matrix.md) · [Compliance matrix](docs/reference/compliance-matrix.md)
+## The crew
 
-**Install:** [Overview](docs/install/index.md) · [Claude](docs/install/claude.md) · [opencode](docs/install/opencode.md) · [Gemini](docs/install/gemini.md) · [Codex](docs/install/codex.md) · [Copilot](docs/install/copilot.md) · [Cursor](docs/install/cursor.md) · [Antigravity](docs/install/antigravity.md) · [Kimi](docs/install/kimi.md) · [Pi](docs/install/pi.md) · [CLI targets](docs/install/cli.md)
+11 agents (+2 internal), 14 skills. Names stay visible: you can say "Brook, fix the failing login test".
 
-**Runbooks:** [Solo mission](docs/runbooks/solo-mission.md) · [Team mission](docs/runbooks/team-mission.md) · [Joining mid-mission](docs/runbooks/joining-a-mission.md) · [Resume after crash](docs/runbooks/resume-after-crash.md) · [Monorepo](docs/runbooks/monorepo.md) · [Signing](docs/runbooks/signing-and-attestation.md) · [Policy](docs/runbooks/policy-for-a-team.md) · [Troubleshooting](docs/runbooks/troubleshooting.md)
+**Luffy** sizes the work and closes it. **Usopp** questions a vague idea. **Nami** plans. **Zoro** builds, one commit per task. **Chopper** re-runs the checks. **Sanji** runs format, lint and tests. **Franky** applies coverage and build gates. **Robin** reviews the diff. **Jinbe** checks security. **Brook** fixes failures. A **wave** is an ordered group of tasks Zoro runs together.
 
----
+Most of the crew runs inside your conversation. The exception is review: on Claude Code, for a full-lane mission or a sensitive path, Robin and Jinbe run as separate subagents with a fresh context (`independent_review=on`, the default). That costs real tokens: this repo measured about 132k per dispatch against about 5k inline. On smaller missions, with `independent_review=off`, or on a host that cannot dispatch, the review runs inline and is the same model checking its own work. The report says which one happened, from a record of real dispatches rather than from what the model wrote. On Claude Code, archive refuses to close a full-lane or sensitive-path mission without that record. More: [the crew](docs/concepts/crew.md).
 
 ## What is measured, and what is not
 
 | Claim | Status |
 |---|---|
-| Retrieval routing rank-1 | **95.6%**, 272 probes (180 positive, 86 negative, 6 no-skill), in CI |
-| Reference pointers resolve | **166/166**, 9 targets, in CI |
-| Index size published vs measured | **doc-gated**: validator fails on drift, in CI |
-| Lane constants match content load | **verified**, in CI |
-| Slop verdicts | in `mugiwara cost` and the closing report: [Cost](docs/concepts/cost.md) |
-| Write-scope enforcement | **opencode only**, rules-based elsewhere |
-| Cross-harness mission behavior | **12/12 platforms**, in CI |
-| Outcome vs other approaches | **not measured** |
+| Skill routing | Retrieval routing rank-1 **96.7%**, 268 probes (174 of the 180 positive cases route to the right skill), checked in CI |
+| Reference pointers resolve | **300/300**, 10 targets, checked in CI |
+| Lane budgets match the content they load | verified in CI |
+| Independent review | Claude Code only: on the full lane or a sensitive path, `mugiwara archive` refuses to close unless a hook ledger shows Robin and Jinbe ran as separate agents (`--force` closes anyway, labeled inline). The label proves a separate agent ran, not that the review was good. Stage order is not enforced. Other hosts have no ledger |
+| Write-scope enforcement | opencode only. Claude Code blocks irreversible commands. Elsewhere it is written rules |
+| Cost and results against an unaided agent | **small tasks: no benefit; risky tasks: a gain at about 4 times the cost**: on 3 risky tasks where plain failed, hidden checks passed in 12 of 30 crew runs against 1 of 30 plain (intervals do not overlap), with separate reviewers in every crew run, but only one task moved much (refund 10 of 10 against 1 of 10) and two did not. On small tasks the crew costs about 10% more and a plain prompt with one extra sentence did as well. Not a general claim. See the [benchmark](docs/contributing/benchmark.md) |
 
-Numbers here are produced by `bun run gate`. Nothing in this table is an estimate.
+Nothing in this table is an estimate. Budgets count the process Mugiwara adds, not your provider's bill, and nothing here claims savings.
 
----
+## When not to use it
+
+- A throwaway prototype you will delete tonight.
+- A solo script with no reviewer, no PR and no future reader.
+- Unattended multi-hour runs with nobody watching the chat. The crew runs inline so you can interrupt it.
+- Small, safe edits. The crew stays out of the way there anyway.
+
+## Docs
+
+[Capabilities](docs/capabilities.md) · [Getting started](docs/getting-started.md) · [Install](docs/install.md) · [Mission flow](docs/concepts/mission-flow.md) · [The crew](docs/concepts/crew.md) · [Config](docs/concepts/config.md) · [Cost](docs/concepts/cost.md) · [The trail](docs/concepts/trail.md) · [CLI](docs/reference/cli.md) · [Runbooks](docs/runbooks/README.md)
+
+Optional: [signed reports and provenance](docs/optional/signing.md).
 
 ## License
 

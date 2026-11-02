@@ -2,7 +2,10 @@
 
 Plugins that let Claude, Claude Code, Codex and OpenCode make cinematic product demo videos with [Lumora](https://lumora.video): a screen recording, screenshot or website in, a short trailer with camera moves, callouts, captions and music out.
 
-The plugin lives in [`lumora-plugin/`](lumora-plugin/). It connects to Lumora's hosted MCP server (`https://lumora.video/mcp`, sign in with your Lumora account) and adds a skill that directs the video. See its [README](lumora-plugin/README.md) for the tools and what data goes where.
+Each plugin connects to Lumora's hosted MCP server (`https://lumora.video/mcp`, sign in with your Lumora account) and adds a skill that directs the video:
+
+- [`lumora-plugin/`](lumora-plugin/): Claude Code and Codex. See its [README](lumora-plugin/README.md) for the tools and what data goes where.
+- [`opencode/`](opencode/): OpenCode 2 and 1.x, published on npm as [`opencode-lumora`](https://www.npmjs.com/package/opencode-lumora). See its [README](opencode/README.md) for install, sign-in and usage.
 
 ## Install
 
@@ -27,7 +30,7 @@ codex plugin add lumora@lumora
 opencode plugin add opencode-lumora
 ```
 
-or straight from GitHub: `opencode plugin add github:synthentica/lumora-plugins`. Then run `opencode mcp auth lumora` to sign in. On OpenCode 1.x, add `"plugin": ["opencode-lumora"]` to `opencode.json` instead. The OpenCode plugin lives in [`opencode/`](opencode/) and loads the same skill and hosted MCP server as the Claude and Codex plugin.
+or straight from GitHub: `opencode plugin add github:synthentica/lumora-plugins`. Then run `opencode mcp auth lumora` to sign in. On OpenCode 1.x, add `"plugin": ["opencode-lumora"]` to `opencode.json` instead. Full OpenCode guide: [`opencode/README.md`](opencode/README.md).
 
 **Claude, ChatGPT and other MCP clients:** add a custom connector with the address `https://lumora.video/mcp` and sign in when asked.
 

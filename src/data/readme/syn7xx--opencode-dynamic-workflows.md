@@ -7,6 +7,7 @@
   <a href="https://github.com/syn7xx/opencode-dynamic-workflows/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/syn7xx/opencode-dynamic-workflows/actions/workflows/ci.yml/badge.svg"></a>
   <a href="LICENSE"><img alt="MIT license" src="https://img.shields.io/badge/license-MIT-9d7cd8"></a>
   <img alt="OpenCode 2.1.0 or newer" src="https://img.shields.io/badge/OpenCode-%E2%89%A5%202.1.0-7fd88f">
+  <img alt="OpenCode Desktop 2.2.0 or newer" src="https://img.shields.io/badge/OpenCode%20Desktop-%E2%89%A5%202.2.0-7fd88f">
   <img alt="macOS, Linux, Windows" src="https://img.shields.io/badge/platforms-macOS%20%C2%B7%20Linux%20%C2%B7%20Windows-808080">
   <a href="docs/integrating.md"><img alt="Protocol v1, OpenAPI 3.1" src="https://img.shields.io/badge/protocol-v1%20%C2%B7%20OpenAPI%203.1-56b6c2"></a>
 </p>
@@ -57,7 +58,7 @@ and permission requests while it runs, and every Unit is journaled so a stopped 
         <li><b>Plain TypeScript.</b> <code>agent()</code> starts a Unit; <code>pipeline</code>, <code>parallel</code> and ordinary code combine the results.</li>
         <li><b>Typed results.</b> Pass a zod schema (or a JSON Schema) and get a validated value back. When a model answers in prose, the engine repairs or extracts the value.</li>
         <li><b>Any model per Unit.</b> <code>model: "provider/model#variant"</code> puts different models in one Run, for example an independent verifier.</li>
-        <li><b>Watch and steer.</b> A TUI panel and a web app show phases, Units and transcripts. Stop a Run, restart a Unit, answer a question.</li>
+        <li><b>Watch and steer.</b> A TUI panel, a desktop-app panel and a web app show phases, Units and transcripts. Stop a Run, restart a Unit, answer a question.</li>
         <li><b>Build on it.</b> A versioned protocol with an OpenAPI 3.1 spec: any app can list, start, follow and answer Workflows, no TUI needed.</li>
         <li><b>Never hangs headless.</b> Questions carry a fallback answer, and permission requests are denied with a message when nobody is watching.</li>
         <li><b>Resumable.</b> Every Run is journaled. Resume replays the finished Units and runs the rest live.</li>
@@ -114,7 +115,7 @@ it writes a Workflow for the task at hand and runs it with `workflow_inline` onc
 ## Requirements
 
 - [OpenCode](https://opencode.ai) **2.1.0** or later. The plugin uses the V2 plugin API and does not work with
-  OpenCode V1.
+  OpenCode V1. The desktop-app panel (the GUI half) needs **2.2.0** or later; the server, tools and TUI work on 2.1.0.
 - Any model OpenCode can use. Typed results work best with models that call tools reliably; for the others the engine
   falls back to JSON in the reply, repair turns and an extraction call.
 - macOS, Linux or Windows. Development and live testing happen on macOS; if something breaks on Linux or Windows,
@@ -166,6 +167,19 @@ preview arrives in the session that started it (plugin option `notify`).
 - Every durable Workflow also gets its own command, `/<key>`, with namespaces written with `/` (`team:review` becomes
   `/team/review`). The commands follow your Workflow files as they change. Both kinds hand the request to the model,
   which calls `workflow` with the matching `args`.
+
+### Where you run and watch it
+
+One engine, three surfaces — install once, they all come together:
+
+| Surface | How you open it |
+| --- | --- |
+| **TUI** | `/workflows` in the terminal, a session strip and panel |
+| **Desktop app** | a **Workflows** side panel, a session-header strip and a composer badge (OpenCode Desktop 2.2+) |
+| **Browser** | the web app served by the plugin's Gateway, and any app over the [protocol](docs/integrating.md) |
+
+All three show the same Runs, phases, Units and transcripts, and all three can stop a Run, restart a Unit and answer a
+question. Details per surface below.
 
 ### In the TUI
 
@@ -220,6 +234,34 @@ one-use code.
   <a href="assets/web-unit.webp"><img src="assets/web-unit.webp" alt="A Unit page: the Unit's subagent, phase, model, result path, tokens and cost, then its transcript with every tool call, including the workflow_result call that carried the typed value" width="100%"></a><br>
   <sub>A Unit and its transcript, down to the <code>workflow_result</code> call that delivered its typed value (Output and Prompt panels omitted).</sub>
 </p>
+
+### In the desktop app
+
+OpenCode's desktop app shows Workflows too. It is the same engine and the same protocol as the TUI, so there is
+nothing to configure: on OpenCode 2.2+ the GUI half loads beside the TUI half, and both keep working.
+
+<table>
+  <tr>
+    <td width="50%"><a href="assets/gui-library.webp"><img src="assets/gui-library.webp" alt="The desktop app's Workflows side panel: the run library with saved and recent Runs, their status, phases, Units, tokens, cost and elapsed time, and the actions to run a saved Workflow, start it now or open a Run" width="100%"></a></td>
+    <td width="50%"><a href="assets/gui-run.webp"><img src="assets/gui-run.webp" alt="A Run in the desktop app's Workflows panel: its phases, Units and activity, and a Unit's prompt, output and transcript, with the panel's actions to stop, resume, save or delete Unit sessions" width="100%"></a></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>The Workflows panel: the run library, kept live like the TUI and the web app.</sub></td>
+    <td align="center"><sub>A Run and a Unit in the panel: the same phases, Units and result as the other surfaces.</sub></td>
+  </tr>
+</table>
+
+- **A side panel.** Open the **Workflows** panel from the side region (or run the **Workflows: open the run
+  library** command): the run library, a Run's phases, Units, result and activity, and a Unit's prompt and output —
+  the same views as the TUI. Switch a saved Workflow between *run in session* (the agent builds the args) and
+  *start now*.
+- **A header strip.** While a session has live Runs, a one-line summary sits on its header; a click opens the panel.
+- **Commands.** The palette lists the Workflows commands (open the library, answer a waiting question, clean up
+  finished Runs, pair a browser), and the panel's own actions (stop, resume, save, delete Unit sessions, open a
+  Unit's or the Run's session).
+
+The GUI half is not shipped for very old desktop builds: it needs a desktop app that hosts `./gui-experimental`
+bundles (OpenCode 2.2.0+). The server and TUI halves still work on 2.1.0.
 
 ### Where Workflows live
 
@@ -403,6 +445,7 @@ flowchart LR
   units -->|"workflow_result"| engine
   engine --> journal[("Run journal<br/>.opencode/workflows/runs")]
   engine <-->|plugin RPC| tui["TUI plugin<br/>/workflows, run panel"]
+  engine <-->|plugin RPC| gui["GUI plugin<br/>desktop side panel"]
   engine <-->|"Gateway: HTTP + SSE"| web["Web app, scripts"]
 ```
 
@@ -411,11 +454,11 @@ flowchart LR
   (and any per-provider cap), then creates a Unit session, prompts it, waits for it to finish and reads its result.
   Runs beyond `maxConcurrentRuns` wait, queued.
 - **Units** are ordinary OpenCode sessions, so they use your providers, subagents and permission rules. They are not
-  linked into your conversation; the TUI and web app show them.
+  linked into your conversation; the TUI, the desktop panel and the web app show them.
 - **The journal** records the Run, each Unit, the script source, the bundled module a decomposed Workflow ran, and the
   result, which is what resume replays.
-- **Clients** talk to the engine through one versioned protocol: the TUI over plugin RPC, the web app and scripts
-  over the Gateway.
+- **Clients** talk to the engine through one versioned protocol: the TUI and the desktop panel over plugin RPC, the
+  web app and scripts over the Gateway.
 
 ## Security
 
@@ -471,6 +514,7 @@ protocol is missing.
 | Inline Workflows are refused in `opencode run`. | Nobody can approve them headless. Approve "always for this project" once from the TUI or web app, save the script as a durable Workflow, or set `inline: "allow"`. |
 | A Unit fails with "exceeded its step limit". | The Unit made more model requests than `limits.maxUnitSteps` (a loop guard, 250 by default). Raise the limit for Workflows whose Units do long work. |
 | The web app is not at port 4320. | Another process holds the port, so the Gateway took the next free one. Tool results and the TUI show the real URL. |
+| The desktop app shows no Workflows panel. | The GUI half needs OpenCode 2.2.0+ (a desktop build that hosts `./gui-experimental` bundles). Run `bun run build:gui` after a checkout build, and restart OpenCode: a bundle change is not picked up by a location reload. |
 
 Still stuck? [Open an issue](https://github.com/syn7xx/opencode-dynamic-workflows/issues) with your OS, OpenCode
 version and, if you can, the Run's journal (`.opencode/workflows/runs/<runId>/`).
@@ -482,7 +526,7 @@ git clone https://github.com/syn7xx/opencode-dynamic-workflows
 cd opencode-dynamic-workflows
 bun install
 bun run check        # formatting, lint, types, tests (no OpenCode needed)
-bun run build        # dist/tui.js, dist/web, protocol schema check
+bun run build        # dist/tui.js, dist/gui-experimental.cjs, dist/web, protocol schema check
 bun run pack         # build, then the publishable tarball
 bun run verify:live  # real OpenCode on a private server
 ```
@@ -491,7 +535,7 @@ The live tests start `opencode serve` with its own database under `$TMPDIR/openc
 configuration. `WF_LIVE_MODEL` picks the model (default `claude-work/claude-opus-5-5`).
 
 The repository has two packages: [`packages/plugin`](packages/plugin) (the published package: server plugin, TUI
-plugin, authoring API, protocol and Gateway) and [`packages/web`](packages/web) (the web app, built into
+plugin, GUI plugin for the desktop app, authoring API, protocol and Gateway) and [`packages/web`](packages/web) (the web app, built into
 `packages/plugin/dist/web`). `packages/plugin/README.md` is generated from this file for npm; after editing this
 README, run `bun run packages/plugin/script/sync-readme.ts`.
 

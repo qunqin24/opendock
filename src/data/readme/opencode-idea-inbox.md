@@ -1,7 +1,7 @@
 # opencode-idea-inbox
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
-[![opencode](https://img.shields.io/badge/opencode-v2%20%E2%89%A52.0.20-blue)](https://opencode.ai)
+[![opencode](https://img.shields.io/badge/opencode-v2%20%E2%89%A52.2.3-blue)](https://opencode.ai)
 [![npm](https://img.shields.io/npm/v/opencode-idea-inbox)](https://www.npmjs.com/package/opencode-idea-inbox)
 
 **English** | [Русский](./README.ru.md)
@@ -40,7 +40,7 @@ There are two lines of this package, one per major version of opencode:
 
 | Your opencode              | Install                            | Where it lives |
 | -------------------------- | ---------------------------------- | -------------- |
-| **v2** (≥ 2.0.20)         | `opencode-idea-inbox` (`latest`)   | branch [`master`](https://github.com/apilot/opencode-idea-inbox/tree/master) (default) |
+| **v2** (≥ 2.2.3)          | `opencode-idea-inbox` (`latest`)   | branch [`master`](https://github.com/apilot/opencode-idea-inbox/tree/master) (default) |
 | **v1**                    | `opencode-idea-inbox@legacy-v1` (currently 0.3.5) | branch [`legacy-v1`](https://github.com/apilot/opencode-idea-inbox/tree/legacy-v1) |
 
 Not sure what you're running? Check `opencode --version`.

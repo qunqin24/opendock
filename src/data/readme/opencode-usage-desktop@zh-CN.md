@@ -9,7 +9,7 @@ OpenCode Desktop 的用量、配额和性能侧边栏。功能上覆盖 OpenCham
 
 ## 功能
 
-- 侧边栏固定的 **Usage** tab（pinned），不占用 composer 上方空间
+- 侧边栏 **Usage** tab，默认 pinned；取消固定后可关闭、拖动，或从 session panel 菜单重新打开
 - 5h / 1w / 1mo 配额，支持 **used / remaining** 切换
 - 阈值颜色：默认 50% warning、80% danger，可在设置里改
 - 配额 **pace**：进度条上的竖线表示窗口已过去的时间；下方显示 `time %` 和 `on pace / x% under pace / x% over pace`
@@ -23,7 +23,7 @@ OpenCode Desktop 的用量、配额和性能侧边栏。功能上覆盖 OpenCham
   - `Usage: open stats`（7d / 30d / 90d / all 统计对话框）
   - `Usage: refresh`
   - `Usage: copy performance metrics`
-- 设置页：显示模式、阈值、Live TPS 开关、配额通知开关
+- 设置页：显示模式、侧边栏固定、阈值、Live TPS 开关、配额通知开关
 - 配额到 danger 阈值时发系统通知（带 session，可去重）
 
 ## 数据与算法

@@ -1,12 +1,16 @@
 # opencode-output-styles
 
-Opt-in output styles for OpenCode: system prompts injected via the `experimental.chat.system.transform` hook, activated only via tuple config.
+[![CI](https://github.com/felipeverse/opencode-output-styles/actions/workflows/ci.yml/badge.svg)](https://github.com/felipeverse/opencode-output-styles/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/opencode-output-styles)](https://www.npmjs.com/package/opencode-output-styles)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
+Opt-in output styles for OpenCode: system prompts injected alongside the base system, activated only via tuple config. Works on OpenCode 1.x and 2.x.
 
 ## How it works
 
-Styles are system prompts injected via the `experimental.chat.system.transform` hook. Each style is an entry in an internal map that returns a block of instructions to append to the system prompt — or `undefined` to inject nothing.
+Styles are system prompts placed alongside the base system. A style injects a block of instructions, or `undefined` to inject nothing. Two entry points, same outcome: a hook for 1.x, an agent transform for 2.x.
 
-Styles are opt-in: they only reach the system prompt when activated by a tuple `[name, { options }]` in your `opencode.json` / `opencode.jsonc`. Installing by bare name or auto-loading a local file activates the neutral `default` fallback: the plugin loads but changes nothing. New styles are added as entries in the internal `STYLES` map.
+Styles are opt-in: they apply only when activated by a tuple `[name, { options }]` in `opencode.json` / `opencode.jsonc`. Bare name or auto-load means the neutral `default` (no-op).
 
 ## Styles
 
@@ -41,8 +45,14 @@ Absolute paths are used as-is; relative paths resolve against the current workin
 Notes:
 
 - Styles are Markdown text only (no code execution). Safe against broken or malicious files.
-- Styles are discovered once per process; new files require restarting OpenCode.
+- Style files are cached by mtime: edits are picked up automatically without restarting OpenCode. An empty or unreadable style file logs a warning and injects nothing.
 - `insights` is specific to the built-in `learning` style; custom styles are static text.
+
+### Options
+
+- `style`: the style to activate (a built-in name, a discovered name, or a path).
+- `insights`: set `false` to drop the `★ Insight` block from the `learning` style.
+- `agent`: which agent receives the style. An agent id (default `build`), or `all`. On OpenCode 1.x the hook cannot scope by agent, so the style reaches whichever agent is running.
 
 ## Installation
 
@@ -54,11 +64,9 @@ Add the tuple to `opencode.json` (or `opencode.jsonc`) in your project, or to th
 }
 ```
 
-Only a tuple activates a style. Bare name or auto-load means `default` (no-op).
-
 ## Warning — token cost
 
-Injected instructions run on **every LLM call** of every session, including title generation of the first message (the hook fires there too). Measured: about 498 tokens per call. Same upfront cost the original plugin declares explicitly. Consider before enabling on long or high-volume sessions.
+Runs on **every LLM call** of every session, including title generation of the first message. About 498 tokens per call. Consider before enabling on long or high-volume sessions.
 
 ## Uninstallation
 
@@ -66,8 +74,9 @@ Remove the tuple from `opencode.json` / `opencode.jsonc`. To remove the package:
 
 ## Limitations
 
-- `experimental.chat.system.transform` is experimental in the OpenCode plugin API; its signature may change between versions. Minimum: `engines.opencode >=1.18.0`; tested with OpenCode 1.18.35.
-- The plugin cannot distinguish title calls from build calls: instructions reach the title model on the first message of every session. Small cost, accepted and documented here.
+- Supports OpenCode 1.x and 2.x (hook on 1.x, agent transform on 2.x). Minimum `engines.opencode >=1.18.0`. Tested with 1.18.35 (1.x) and 2.2.5 (2.x).
+- On OpenCode 2.x the project directory is taken from `process.cwd()` (the v2 plugin context exposes no directory). Opening a project from a different working directory may resolve project styles against the wrong root.
+- The plugin cannot distinguish title calls from build calls: instructions reach the title model on the first message of every session.
 - `input.model` does not reliably expose the model identifier at runtime; no model-based filtering.
 
 ## Attribution
@@ -86,12 +95,20 @@ Plugin: injects nothing; OpenCode behaves as usual.
 
 User: "Implement a retry function with backoff in TypeScript"
 
-Plugin: prepares the `RetryOptions` interface and signature `export async function retry<T>(...)`, inserts `// TODO: backoff policy and attempt limit`, outlines 2-3 approaches (fixed exponential backoff, jitter, circuit breaker) with trade-offs, and stops. Never reveals the solution in prose. Waits for you to write the missing lines.
+Plugin: scaffolds `RetryOptions` + `retry<T>(...)`, inserts `// TODO: backoff policy`, outlines 2-3 approaches with trade-offs, then stops. Never reveals the solution; waits for you to write it.
 
 User: "Create the package.json for the project"
 
-Plugin: implements directly, no contribution requested — not a relevant code decision.
+Plugin: implements directly, no contribution requested.
 
 User: "How do you decide between LRU and TTL cache here?"
 
 Plugin: `★ Insight` block with codebase-specific points (e.g. lazy `TTLCache` scan, `cache.ts:9`, `Map.get` O(1)), not generic concepts.
+
+## Contributing
+
+Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, the commit convention and the PR flow. By participating, you agree to the [Code of Conduct](CODE_OF_CONDUCT.md).
+
+## Security
+
+Report vulnerabilities privately via [GitHub Security Advisories](https://github.com/felipeverse/opencode-output-styles/security/advisories). See [SECURITY.md](SECURITY.md) for the support policy.

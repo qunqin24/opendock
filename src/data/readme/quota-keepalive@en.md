@@ -23,6 +23,12 @@ It does not take over provider sign-in. Magpie and the installed provider plugin
 keep owning credentials, model lists, quotas, and the provider's own `auth.checkin`
 hook. This plugin only coordinates those capabilities and presents the results.
 
+> **Current status: real-chat keepalive paused**
+>
+> The page hides the global keepalive action, account-level keepalive controls, and
+> model selection. Scheduled jobs now run check-in only. Existing keepalive records
+> remain available as history while the backend code stays in place for a later release.
+
 ## Unofficial plugin notice
 
 > This project is not an official Magpie plugin.
@@ -36,6 +42,13 @@ hook. This plugin only coordinates those capabilities and presents the results.
 > Automated synthetic messages may be classified as abnormal traffic and can lead to
 > rate limits, credit freezes, account restrictions, or bans. Keepalive is disabled by
 > default. Enable it only if you understand the risk and accept the consequences.
+
+> **Installation**
+>
+> This project is not listed in Magpie's official plugin marketplace. Install it with
+> `magpie plugin add quota-keepalive`; see
+> [Install outside the official marketplace](#install-outside-the-official-marketplace).
+> Read [the installation risks](#installation-risks) before proceeding.
 
 ## Features
 
@@ -57,57 +70,166 @@ hook. This plugin only coordinates those capabilities and presents the results.
 - Persist the next scheduled run so an overdue task can catch up after a Magpie
   restart or computer sleep.
 - Show today's result, a five-day account history, run details, and quota trends.
-- Keep refresh-only events out of the check-in/keepalive run list.
+- Label quota rows explicitly as remaining versus total, show used amounts and
+  percentages separately, and keep vendor-only displays uninterpreted.
+- Keep refresh-only events out of the check-in/keepalive run list. By default,
+  the run list shows only successful and failed runs with real outcomes; skipped-only
+  runs stay collapsed behind **View all logs for today**, including every run from
+  the current Beijing day.
 - Refresh quotas every minute for enabled providers, and support per-provider or
   refresh-all actions.
 - Keep only hashed account tags, sanitized errors, model names, and status fields in
   logs. Tokens, full account identifiers, enterprise identifiers, and model replies
   are never stored.
 
-## Install
+## Install (outside the official marketplace)
 
-Install from npm. This is the recommended path and supports Magpie update checks:
+This project is not listed in Magpie's official plugin marketplace. The package is
+published to npm, so other users do not need to clone the repository or wait for a
+marketplace listing.
+
+- npm package: `quota-keepalive`
+- Repository: <https://github.com/sljdxde/quota-keepalive>
+
+### Installation risks
+
+This project is not reviewed through Magpie's official marketplace. Before installing:
+
+- **Supply chain**: Installing trusts this repository and npm publisher. If the npm
+  account or GitHub repository is compromised, a later release could contain
+  malicious code. Install only from the npm package name or GitHub repository above,
+  not an unknown mirror. GitHub installs track the default branch and may load
+  unreleased code; prefer npm for normal use.
+- **Local permissions**: `magpie.permissions` limits what the plugin page can read; it
+  is not a sandbox for the plugin backend. The backend runs with your user privileges
+  and reads files such as `~/.config/magpie/plugin-auth.json` to reuse existing Magpie
+  sessions and send requests. The current code does not export tokens and redacts
+  logs, but that is implementation behavior, not an official security endorsement.
+  Review the source if you need stronger assurance.
+- **Updates**: New versions of unofficial npm plugins are reported as pending updates,
+  not installed automatically like `@magpie-community/*` packages. However,
+  `magpie plugin update` or **Update all** upgrades every plugin and unpins an exact
+  version. For controlled upgrades, install a specific `quota-keepalive@x.y.z`
+  version, defer bulk updates, and review Release notes and code changes first.
+- **Vendor risk**: Automated check-ins and keepalive send real requests and may consume
+  credits, trigger rate limits, or be classified as abnormal traffic, leading to
+  credit freezes, account restrictions, or bans. Keepalive is disabled by default;
+  evaluate provider terms before enabling even check-in.
+- **Compatibility and support**: This project has no Magpie compatibility certification
+  or official support. Changes to Magpie or provider plugin interfaces may break it.
+  Use logs to diagnose failures and report them in
+  [GitHub Issues](https://github.com/sljdxde/quota-keepalive/issues). Use the
+  uninstall command for the installation method below if you do not accept these
+  risks.
+
+### Option 1: npm (recommended)
+
+Prerequisite: Magpie is installed and `magpie` is available in your terminal.
 
 ```sh
+magpie --version
 magpie plugin add quota-keepalive
 ```
 
-Magpie checks installed npm/git plugins shortly after startup and then every hour.
-When a newer version is available, Plugins shows an update badge and an update action.
-
-Update every npm/git plugin:
+Verify the installation:
 
 ```sh
-magpie plugin update
+magpie plugin list
 ```
 
-Update only this plugin:
+The list should include `quota-keepalive@latest`. Then open **Plugins → Quota
+Keepalive** in Magpie.
 
-```sh
-magpie plugin add quota-keepalive
-```
+### Option 2: GitHub (without npm)
 
-Re-adding the same npm package replaces the old version while preserving plugin
-options, provider preferences, and enabled/disabled state. Updating also unpins an
-older `quota-keepalive@x.y.z` spec.
-
-Install from GitHub without npm:
+Use this when npm is unavailable or you want to track the repository directly:
 
 ```sh
 magpie plugin add github:sljdxde/quota-keepalive
 ```
 
-Install from a local folder only for development:
+This installation can also be updated with `magpie plugin update`. If npm is
+unreliable on your network, check `magpie plugin registry` or use this option.
+
+### Option 3: Local folder (development only)
+
+Run this from the repository root:
 
 ```sh
 magpie plugin add "$(pwd)"
 ```
 
-A folder plugin loads the working tree directly and is not included in Magpie's
-version checks or `magpie plugin update`. Switch back to npm before shipping.
+A folder plugin loads the working tree directly. It is not included in Magpie's
+version checks or `magpie plugin update`. Before switching back to npm, copy the
+folder entry's options, turn the folder entry off, add the npm entry, restore the
+options, and then remove the folder entry:
 
-After installation, open **Plugins → Quota Keepalive** in Magpie. Reopen the page
-after a UI-only update; restarting all of Magpie is not required.
+```sh
+# still in the repository root
+magpie plugin options "$(pwd)"   # copy the output; skip restore if it says No options set
+magpie plugin off "$(pwd)"
+magpie plugin add quota-keepalive
+magpie plugin options quota-keepalive '<copied options JSON>'
+magpie plugin rm "$(pwd)"
+```
+
+If viewing the options prints `No options set.`, skip the restore line.
+
+### Verify after installation
+
+1. `magpie plugin list` shows this plugin's spec: `quota-keepalive@latest` for npm,
+   `github:sljdxde/quota-keepalive` for GitHub, or an absolute folder path.
+2. **Plugins** includes **Quota Keepalive**.
+3. At least one provider plugin is installed and signed in (WorkBuddy, Qoder, Trae,
+   and others). This plugin does not own sign-in; it only reads Magpie's existing
+   sessions.
+4. Open the page and click **Detect** to confirm providers and accounts are found.
+
+### Update
+
+```sh
+# Update every npm/git plugin
+magpie plugin update
+
+# npm install: update only this plugin
+magpie plugin add quota-keepalive
+```
+
+There is no separate update command for a GitHub install; use
+`magpie plugin update` above. Running `magpie plugin add quota-keepalive` switches to
+the npm version rather than updating the current Git checkout.
+Re-adding the same npm package replaces the old version while preserving plugin
+options, provider preferences, and enabled/disabled state. Updating also unpins an
+older `quota-keepalive@x.y.z` spec. **Update all** in the page is equivalent to
+`magpie plugin update`.
+
+### Uninstall
+
+```sh
+# npm install
+magpie plugin rm quota-keepalive
+
+# GitHub install
+magpie plugin rm github:sljdxde/quota-keepalive
+
+# local folder install (run from the original repository root)
+magpie plugin rm "$(pwd)"
+```
+
+### Troubleshooting
+
+- Not found in the official marketplace: expected. This project is not listed there;
+  use the npm or GitHub command above.
+- Not found in the unofficial GitHub list: search for `quota` or `quota-keepalive`
+  and check the spelling. That list loads asynchronously from GitHub; if it is
+  temporarily empty, choose **Show all** or reopen the **Plugins** page. If it is
+  still missing, install it directly with `magpie plugin add quota-keepalive`.
+- `magpie: command not found`: confirm Magpie is installed and `magpie` is on `PATH`;
+  alternatively use the CLI executable inside the Magpie installation directory.
+- The page is missing after installation: run `magpie plugin list` again, confirm the
+  plugin is loaded, then reopen the **Plugins** page.
+- The page opens but no accounts are detected: install and sign in to the relevant
+  provider plugin first. This plugin only reads existing Magpie sessions.
 
 ## Quick start
 
@@ -133,6 +255,8 @@ enable automatic keepalive by default.
   Manual keepalive asks for confirmation and still requires the provider to be enabled.
 - **Refresh quota**: refresh all enabled providers; each provider row also has a
   provider-only refresh button.
+- **View all logs for today**: switch the run list to every task from the current
+  Beijing day, including skipped-only runs that are hidden by default.
 - **Save schedule**: set the shared interval and action type.
 - **Real activity / Short probe**: real activity fills the configured input and
   can leave an activity record, but consumes credits. A short probe is cheaper
@@ -185,7 +309,8 @@ The page writes plugin-level options. The same values can be changed from the CL
 magpie plugin options quota-keepalive '{
   "scheduleEnabled": true,
   "scheduleMinutes": 60,
-  "scheduleAction": "all",
+  "scheduleAction": "checkin",
+  "keepaliveEnabled": false,
   "modelPreferences": {
     "workbuddy": "deepseek-v4.1-flash",
     "codearts": "deepseek-v4.1-flash"
@@ -203,6 +328,8 @@ magpie plugin options quota-keepalive '{
 - `scheduleEnabled`: enable the plugin scheduler. Default `false`.
 - `scheduleMinutes`: shared interval, default `60`, range 5 minutes to 7 days.
 - `scheduleAction`: `checkin`, `keepalive`, or `all`. Default `checkin`.
+- `keepaliveEnabled`: backend keepalive switch. Default `false`. The page hides all
+  keepalive controls, and old `keepalive` / `all` schedules fall back to check-in.
 - `model`: optional preferred model; it is not a hard allowlist.
 - `modelPreferences`: preferred model per provider.
 - `modelCandidates`: maximum fallback candidates per account, default `4`.
@@ -217,9 +344,8 @@ magpie plugin options quota-keepalive '{
 - `statePath`, `logPath`, `snapshotPath`, `commandPath`, `schedulePath`: optional
   absolute paths.
 
-Upgrade note: an old installation that explicitly saved `probeMode: "short"` keeps
-that choice. Select **Real activity** and save the schedule (or update plugin
-options) when you want WorkBuddy activity records to be written.
+Upgrade note: old schedules saved as `all` or `keepalive` automatically fall back
+to check-in, so no page change is required. Keepalive options remain for compatibility.
 
 ## Logs
 
@@ -240,6 +366,18 @@ node ./bin/daily-keepalive-log.js --json
 Agents can use the `quota-keepalive_logs` tool. Logs contain stable hashes of account
 identifiers, provider IDs, status, model names, and sanitized errors. They never
 contain tokens, full account identifiers, enterprise identifiers, or model replies.
+
+### Storage and automatic cleanup
+
+- JSONL logs keep only the current file and one rotated `.1` copy. The next rotation
+  replaces and removes the older copy automatically. At the default 2 MiB limit, the
+  two files normally stay under about 4 MiB.
+- The state file keeps only the latest 32 days of account records; older entries are
+  pruned when state is written.
+- Page snapshots `data.js` and `data.json` are overwritten, not appended. The
+  all-logs-for-today view is derived from the current snapshot and does not create
+  additional history files.
+- Magpie-owned files such as `quota-history.json` are read-only to this plugin.
 
 ## Security
 

@@ -10,13 +10,43 @@
   <img src="docs/images/social-preview.png" alt="Cache Manager, an OpenCode plugin: take control of your prompt cache. Pick a 5m, 1h or hybrid TTL per session, and keep idle caches warm with pings. A chart: after stepping away for 15 minutes, the default 5m cache has expired and the next prompt rewrites it at 1.25x; with keepalive, three pings keep it warm and the next prompt reads it at about 0.1x." width="800">
 </p>
 
-An [OpenCode](https://opencode.ai) plugin for the prompt cache of Claude and OpenAI GPT-5.6+. Pick the cache TTL per session (5 minutes, 1 hour, or a hybrid of the two) from inside the TUI, keep idle sessions' caches warm with hidden pings so they don't expire while you're away, and watch the cache state in the sidebar.
+An [OpenCode](https://opencode.ai) plugin for managing your prompt cache. Keep the cache of idle sessions warm with hidden pings so they don't expire while you're away. The TUI gives you a way to visualise your cache state and savings from your cache keepalive runs. This plugin is highly configurable and especially tuned for Claude and OpenAI GPT-5.6+.
 
-It works with Claude through the Anthropic API, through proxies that speak the Anthropic Messages API, and through OpenAI-compatible endpoints such as OpenRouter and proxies like OmniRoute. GPT-5.6 and later work through OpenAI's own endpoint (Responses) and through the same OpenAI-compatible endpoints. For other models (older GPT, DeepSeek, Gemini, …), it shows how much of each prompt was cached and leaves the cache alone.
+Pick a cache TTL per session (5 minutes, 1 hour, or a hybrid of the two). Pings are timed to land just before it expires.
 
 <p align="center">
-  <img src="docs/images/sidebar.svg" alt="The Cache section of the OpenCode sidebar: status warm, cached 92% · 141k / 153k, expires 14:52 (52m), ttl 1h (detected), next ping 14:42 (42m), pings 2/5 ✓ hit" width="420">
+  <img src="docs/images/sidebar.svg" alt="The Cache section of the OpenCode sidebar: status warm, cached 92% · 141k / 153k, expires 14:52 (52m), ttl 1h (detected), next ping 14:42 (42m), pings 2/5 ✓ hit ($0.05), saved $0.42 · 2 rewrites, return 9× ping cost" width="420">
 </p>
+
+## Quickstart
+
+```sh
+opencode plugin add @noppu-labs/opencode-cache-manager
+```
+
+## Supported models
+
+- It works with Claude and OpenAI models through their official API or through proxies such as OpenRouter or OmniRoute (via Anthropic Messages API or OpenAI-compatible endpoints).
+- It can work with other models as long as they support Claude/OpenAI style of cache breakpoints, with some [additional configuration](#settings).
+- For incompatible/unconfigured models (e.g. older GPT, Gemini, or DeepSeek), the plugin shows how much of each prompt was cached and performs no keepalive mechanics (because you'd get no benefit from it).
+
+---
+
+## Contents
+
+- [Why](#why)
+- [The three modes](#the-three-modes)
+  - [Modes per provider](#modes-per-provider)
+- [Supported providers and endpoints](#supported-providers-and-endpoints)
+- [Install](#install)
+- [Usage](#usage)
+  - [Per-model override](#per-model-override)
+  - [Proxies and other provider ids](#proxies-and-other-provider-ids)
+- [Keepalive](#keepalive)
+- [Settings](#settings)
+- [Sidebar](#sidebar)
+  - [Savings](#savings)
+- [Contributing](#contributing)
 
 ## Why
 
@@ -60,19 +90,29 @@ The plugin handles the Anthropic Messages API (`POST …/messages`), OpenAI Chat
 
 ## Install
 
-Add the package to the `plugins` array in `~/.config/opencode/opencode.jsonc`. OpenCode installs it at startup; there is no manual `npm install`:
+### Via CLI
+
+```sh
+opencode plugin add @noppu-labs/opencode-cache-manager
+```
+
+### Manually registered
+
+Add the package to the `plugins` array in `~/.config/opencode/opencode.jsonc`. OpenCode installs it at startup:
 
 ```jsonc
 {
   "$schema": "https://opencode.ai/config.json",
   "plugins": [
-    "@noppu-labs/opencode-cache-manager@^0.6.1",
-    // or: "opencode-cache-manager@^0.6.1" -- same package, unscoped name
+    "@noppu-labs/opencode-cache-manager",
+    // or: "opencode-cache-manager" -- same package, unscoped name
   ],
 }
 ```
 
-To run from a clone instead, see [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md). Upgrading from 0.1.x? See [docs/UPGRADE.md](docs/UPGRADE.md).
+### From clone
+
+To run from a local clone, see [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md). Upgrading from 0.1.x? See [docs/UPGRADE.md](docs/UPGRADE.md).
 
 ## Usage
 
@@ -81,7 +121,7 @@ Run `/cache-manager` in the TUI. It's also in the palette as "Cache Manager".
 With no argument it opens a picker with a Session section (only shown inside a session) and a Global section:
 
 <p align="center">
-  <img src="docs/images/picker.png" alt="The Cache Manager picker: a Session section with TTL mode 5m · global, Keepalive on · global, Pings per idle 5 · global, Min context 50k · global and Reset session to global; a Global section with TTL mode 5m, Keepalive on, Pings per idle 5, Min context 50k" width="640">
+  <img src="docs/images/picker.svg" alt="The Cache Manager picker: a Session section with TTL mode 5m · global, Keepalive on · global, Pings per idle 5 · global, Min context 50k · global, Savings on · global and Reset session to global; a Global section with TTL mode 5m, Keepalive on, Pings per idle 5, Min context 50k, Savings on" width="640">
 </p>
 
 Session rows that show `· global` inherit the global value; a row without it has a session override. Picking a row opens a list of values, and the numeric settings also offer "Custom…" for a typed value.
@@ -95,6 +135,7 @@ With an argument, the command edits the **current session only**, never the glob
 /cache-manager keepalive on|off  -> turn keepalive on or off for this session
 /cache-manager pings 3           -> at most 3 pings per idle stretch (0-100)
 /cache-manager min 50k           -> minimum context size to ping (50000 or 50k)
+/cache-manager savings on|off    -> show or hide the savings rows for this session
 /cache-manager reset             -> drop the session's overrides
 /cache-manager status            -> toast with the session's effective settings
 ```
@@ -164,6 +205,8 @@ Plugin options set the defaults. They live in the plugin entry in `~/.config/ope
           "maxPings": 5, // default 5
           "minContextTokens": 50000, // default 50000
         },
+        "savings": true, // default true
+        "modelsDevPrices": false, // default false
         "openaiCompatible": true, // default true
         "cacheProfiles": { "opus": "anthropic", "gpt": "implicit" },
       },
@@ -172,14 +215,16 @@ Plugin options set the defaults. They live in the plugin entry in `~/.config/ope
 }
 ```
 
-| Option                       | Default | Meaning                                                                                                                                                                |
-| ---------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `defaultMode`                | `"5m"`  | TTL mode when nothing else is set                                                                                                                                      |
-| `keepalive.enabled`          | `true`  | Whether keepalive runs                                                                                                                                                 |
-| `keepalive.maxPings`         | `5`     | Pings per idle stretch                                                                                                                                                 |
-| `keepalive.minContextTokens` | `50000` | Smallest context worth pinging                                                                                                                                         |
-| `openaiCompatible`           | `true`  | Handle OpenAI Chat Completions and Responses requests. `false` leaves them untouched, except that a model variant's `x-cache-ttl` header is still applied and stripped |
-| `cacheProfiles`              | `{}`    | Which cache profile manages a model, by pattern (see below)                                                                                                            |
+| Option                       | Default | Meaning                                                                                                                                                                          |
+| ---------------------------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `defaultMode`                | `"5m"`  | TTL mode when nothing else is set                                                                                                                                                |
+| `keepalive.enabled`          | `true`  | Whether keepalive runs                                                                                                                                                           |
+| `keepalive.maxPings`         | `5`     | Pings per idle stretch                                                                                                                                                           |
+| `keepalive.minContextTokens` | `50000` | Smallest context worth pinging                                                                                                                                                   |
+| `savings`                    | `true`  | Show the `saved` and `return` rows and the ping cost in the sidebar. The ledger keeps counting while hidden. Also in the picker and as `/cache-manager savings on\|off`          |
+| `modelsDevPrices`            | `false` | Price models the OpenCode catalog has no price for from models.dev (see [Savings](#savings)). Off means no network calls of the plugin's own. Read at startup; not in the picker |
+| `openaiCompatible`           | `true`  | Handle OpenAI Chat Completions and Responses requests. `false` leaves them untouched, except that a model variant's `x-cache-ttl` header is still applied and stripped           |
+| `cacheProfiles`              | `{}`    | Which cache profile manages a model, by pattern (see below)                                                                                                                      |
 
 `cacheProfiles` maps a pattern to a profile. Patterns are matched against `<providerID>/<modelID>`, in order, and the first match wins:
 
@@ -198,7 +243,7 @@ The effective value of each setting is the first one set, in this order:
 
 1. the session's override (`/cache-manager` typed argument, or the picker's Session section)
 2. the global value stored from the picker's Global section
-3. the plugin option (`defaultMode` or `keepalive.*`)
+3. the plugin option (`defaultMode`, `keepalive.*` or `savings`)
 4. the built-in default
 
 A global value stored from the picker overrides the plugin option for the same setting, so changing `defaultMode` in `opencode.jsonc` has no effect once the picker has stored a global value for that setting.
@@ -218,7 +263,9 @@ Cache
   expires     14:52 (52m)
   ttl         1h (detected)
   next ping   14:42 (42m)
-  pings       2/5 ✓ hit
+  pings       2/5 ✓ hit ($0.05)
+  saved       $0.42 · 2 rewrites
+  return      9× ping cost
 ```
 
 - `status` is `warm` with a green bullet, amber once the pings are used up, and `expired` with a red bullet once the cache has expired (then `expired 12m ago` replaces the `expires` row).
@@ -227,12 +274,14 @@ Cache
 - `cached` describes the latest primary turn: the share of its prompt that was read from cache, then the tokens read / the prompt total, such as `92% · 14.8k / 16.1k`. Pings, titles and other one-off requests don't change it. It shows for every session with cache usage, Claude or not, once a response has arrived.
 - `next ping` is when the next ping goes out. It reads `none` once the limit is reached.
 - `pings 2/5` counts pings used in this idle stretch, followed by the last result: `✓ hit`, `✗ miss` or `✗ failed`. No result is shown before the first ping.
+- `pings` also shows what the pings of the current idle stretch cost, such as `($0.05)`, when every ping in the session was priced.
+- `saved` and `return` are the session's savings totals; see [Savings](#savings).
 - When keepalive isn't running, a `keepalive` row says why: `off · 31k < 50k` (context below the minimum), `off · disabled`, `waiting · session busy` (waiting on a tool call), or `stopped · last ping missed`.
 
 Every other state the section can show:
 
 <p align="center">
-  <img src="docs/images/sidebar-states.svg" alt="Eleven captioned Cache sections: before the first response; a 5m cache with the first ping pending; an OpenAI GPT-5.6+ 30m cache (ttl 30m (requested), cached 90% · 88k / 97k, next ping 14:21 (21m)); a ping that failed and retries in 30s; pings used up with next ping none; last ping missed with keepalive stopped; waiting on a tool call; context below the minimum (off · 31k < 50k); keepalive turned off; a provider-managed cache with cached 87% · 14k / 16k and keepalive n/a · implicit cache; and an expired cache (expired 12m ago)" width="520">
+  <img src="docs/images/sidebar-states.svg" alt="Fifteen captioned Cache sections: before the first response; a 5m cache with the first ping pending; an OpenAI GPT-5.6+ 30m cache (ttl 30m (requested), cached 90% · 88k / 97k, next ping 14:21 (21m)); a ping that failed and retries in 30s; pings used up with next ping none; last ping missed with keepalive stopped; waiting on a tool call; context below the minimum (off · 31k < 50k); keepalive turned off; a provider-managed cache with cached 87% · 14k / 16k and keepalive n/a · implicit cache; an expired cache (expired 12m ago); savings in dollars; savings without a model price (saved 2 rewrites · 282k); nothing saved yet (saved nothing yet); and savings turned off (no saved or return rows)" width="520">
 </p>
 
 For a model with an implicit cache (anything that isn't Claude, see [Supported providers and endpoints](docs/SUPPORTED_PROVIDERS.md)) there's no TTL or expiry to show, so the section is the `cached` row and a keepalive row:
@@ -244,6 +293,27 @@ Cache
 ```
 
 The section is hidden for subagent sessions and for sessions with no cache activity.
+
+### Savings
+
+Below `pings`, the sidebar shows what keepalive has saved in this session. The first ping creates the rows; before that they are absent. They are also absent for implicit-cache models, which are never pinged.
+
+A rewrite counts as saved when all three hold:
+
+- at least one ping in the idle stretch was a hit;
+- your next prompt (or a compaction) came more than 30 seconds after the cache would have expired without pings;
+- that request read at least 90% of the context from cache.
+
+Anything else is ping cost only: a session you never came back to, a return before the cache would have expired, a return after it expired anyway, a return on a different model, which usually doesn't read the old cache. The count errs low on purpose; when a case is unclear, it counts less. The avoided amount is what writing the cached tokens at the stretch's TTL would have cost, minus what reading them cost. On `hybrid`, only the message tail would have expired, so only the tokens past the long-lived prefix count. A restart in the middle of a stretch means that stretch's return isn't counted; pings already paid stay paid, and after the restart a session's totals reappear after its next request.
+
+- `saved` is the session total. In dollars it is net: avoided cost minus the cost of every ping, wasted ones included. Without a price it is `2 rewrites · 282k`, the rewrites and the tokens they avoided. `saved nothing yet` shows once you've paid for a ping and nothing has been saved.
+- `return` is avoided cost divided by ping cost, such as `9× ping cost`. It appears after the first save. The label may change.
+
+Dollars need a price for every model the session used. OpenCode's catalog prices the models of known providers. For a model under a custom provider, add `cost` to the model in `opencode.jsonc` (`input`, `output`, `cache.read`, `cache.write`, in dollars per million tokens; `cache.write` prices 5m and 30m writes, while 1h and 12h writes are priced from `input` at 2x and 2.5x); [the OpenAI-compatible example](docs/examples/opencode.openai-compatible.jsonc) shows where. Or set `modelsDevPrices` to `true` to look up models the catalog has no price for in models.dev. That is the only network call the plugin makes, once a day at most (within one run of OpenCode, a failed fetch is retried after 15 minutes at the earliest; that wait isn't kept across restarts), and a price from there is the list price at the model's base tier, with no long-context tier, which may differ from what a subscription-backed route charges you. A failed lookup, or a model with no clear match, leaves the model unpriced. If OpenCode's model catalog can't be loaded, events are unpriced and models.dev is not consulted.
+
+If any event in a session has no price, the whole session shows the unit-free form, since a partial dollar figure would mislead. Each event is priced with the model that served it, so a session that switches models still adds up. Dollar amounts round to the cent, with `<$0.01` for a non-zero amount below a cent and a minus sign (`-$0.02`) for a negative net.
+
+Turn the rows off with `savings` in the plugin options, in the picker, or with `/cache-manager savings off` for one session. The ledger keeps counting while they are hidden. Totals are kept when a session becomes implicit. Totals of deleted sessions are removed at the next startup.
 
 ## Contributing
 

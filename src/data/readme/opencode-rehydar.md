@@ -75,6 +75,42 @@ NER 推理通过 ONNX Runtime 在本地执行（量化模型约 280 MB）。不�
 - **密钥而不只是 PII**：除姓名、邮箱、电话外，还能检测 API Key（OpenAI、Anthropic、Stripe、AWS、GitHub 等）、JWT、私钥、数据库连接串和 `.env` 密钥。
 - **机器翻译的语义增强**：PII 标签上的可选性别和范围属性（`<PII type="PERSON" gender="male" id="1"/>`、`<PII type="LOCATION" scope="city" id="2"/>`）为下游系统保留语法上下文。
 
+## 形状级识别器与默认关闭
+
+有些识别器只要**形状**像敏感信息就会命中，在代码、命令与文档里误报率很高。Pi 扩展因此默认关闭这三类：银行标识码（BIC/SWIFT）、英国邮编、通用日期。需要它们时在配置里恢复：
+
+```json
+{
+  "rehydra": {
+    "disableTypes": ["URL", "IP_ADDRESS"]
+  }
+}
+```
+
+即便显式启用，银行标识码仍要求值前 32 字符内出现完整的银行语境词（`bic`、`swift`、`bank`、`银行`、`bankleitzahl`），否则 8 位大写常量仍会被误判。
+
+业务编号（`CASE_ID`）要求显式前缀词加分隔符且编号含数字，例如 `Az. 2024/1234`；裸结构（`AB/1234`、`2024/1234`）不再命中。
+
+## 环境文件与策略配置
+
+`.env` 里只有**敏感字段**的值会进入全局已知值集合：项目名、端口这类普通配置值不会在后续文本里被替换。显式配置的 `redactValues` 按你的意图保留，不受这条筛选影响。
+
+`policy` 里的集合类字段可以写成数组、阈值写成对象（程序化调用也可用 `Set` / `Map`）；字段类型不合法时启动会报错并指出字段名，不会静默丢掉保护规则。
+
+## 请求级脱敏记录
+
+Pi 扩展支持逐请求记录脱敏结果，便于核对误遮蔽：
+
+```json
+{
+  "rehydra": {
+    "record": { "enabled": true, "includeOriginal": true }
+  }
+}
+```
+
+`/rehydra log` 看当前会话最近记录，`/rehydra log <id>` 看命中与字段级 before/after 对照，`/rehydra clear --all` 清空。记录默认关闭；开启后写入 `~/.pi/agent/rehydra/records/`（0700 / 0600），按天与总量裁剪。`includeOriginal: false` 时只保留类型、检测器、占位符与偏移，不写原值。
+
 ## 地址识别说明
 
 默认正则注册表检测英国邮编语法和带门牌号的英文街道地址，例如 `34a Friskin Road`。当公寓标识与街道地址相邻时会被包含，例如 `Flat 1\n34a Friskin Road`。以邮编结尾的连续英国地址块会被整体遮盖为一个 `ADDRESS`；独立的邮编使用 `POSTAL_CODE`。裸公寓号、无门牌号的建筑以及其他国家的邮编格式需要自定义识别器或 NER。邮编匹配只检查语法，不验证该邮编当前是否仍在使用。

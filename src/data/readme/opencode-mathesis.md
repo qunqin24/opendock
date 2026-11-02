@@ -98,8 +98,10 @@ thinking while a question form is open, transcribe it, and add it to the thinkin
 open question aloud. Both are off until you set them in `cli.json`. They run in the TUI process, so with a local
 model your audio never leaves your machine.
 
-- **Dictate:** `ctrl+x v` starts recording, `ctrl+x v` again stops it. A toast shows the transcript, and a line above
-  the form shows the recording state and how many dictations are attached; `ctrl+x z` removes the last one. When you
+- **Dictate:** `ctrl+x v` starts recording, `ctrl+x v` again stops it (the form's thinking field reminds you of the
+  key). A line above the form shows a recording timer, then the start of what was heard and how many dictations are
+  attached; `ctrl+x z` removes the last one. If the transcription server isn't running, the error says which address
+  it tried. When you
   submit the form, they are added to your thinking as `Spoken: …`, after anything you typed. It goes to the model with your
   answer and into the session note (`sessions/<date>-<topic>-<kind>.md`). It does not appear in the form itself
   (opencode forms can't be changed once shown), and it only works on Mathesis questions, not on opencode's built-in
@@ -191,6 +193,7 @@ kind: proposition
 requires: [derivative-as-local-slope]
 created: 2026-10-30
 srs: {state: review, due: 2026-11-04T09:12:00.000Z, stability: 6.2, difficulty: 5.1, reps: 3, lapses: 0, ...}
+due: 2026-11-04
 ---
 
 Topic: [calculus](../topics/calculus.md)
@@ -218,7 +221,11 @@ graph LR
 The notes link to each other with plain Markdown links, so Obsidian's graph view (or any Markdown tool) shows the
 structure: a card links its topic and the cards it builds on; a topic links its cards and, under **Related topics**,
 other topics whose cards it builds on or that build on it; a session note links its topic and the cards it created,
-reviewed or recorded as misconceptions.
+reviewed or recorded as misconceptions. In a topic's plan list, each step that already has a card links to it.
+
+In Obsidian, `srs` (and a topic's `plan`) show as raw text in the Properties panel, because Obsidian can't display
+nested values. Don't edit them there. `due` repeats the next review date as a plain date that Obsidian can show, sort
+and filter; Mathesis only writes it, and `srs` decides.
 
 When an idea is a structure or a flow, the model draws it: a small Unicode diagram in the chat (the terminal does not
 render mermaid), and a mermaid diagram in the card's **Picture** section, which Obsidian renders.

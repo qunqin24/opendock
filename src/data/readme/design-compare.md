@@ -173,7 +173,7 @@ DOM からの抽出手順（`getBoundingClientRect()` + `window.scrollX` / `wind
 
 `id` / `name`（Figma）と `selector`（Web）は空文字を拒否します。`x` / `y` / `w` / `h` はキー欠落を拒否します（明示的な `0` は許可）。欠落や空識別子はツール実行エラーになり、メッセージにノードインデックスとフィールド名が含まれます（例: `Figma layout node at index 1 is missing required field 'w'`）。
 
-必須キーは揃っているが Figma または Web のいずれかで過半数のノードが幅・高さともに 0 の場合、`status` は変えず応答に `zero_geometry_warning` を付けます（`unmatched_ignores` と同様の誤用検出）。
+必須キーは揃っているが Figma または Web のいずれかで過半数のノードが幅・高さともに 0 の場合、`status` は変えず応答に `zero_geometry_warning` を付けます（`unmatched_ignores` と同様の誤用検出）。`layout_integrity` でも Web 側だけで同じ過半数判定を行い、警告に加えて `details` へ `checked_nodes` と入力ノード数の差を 1 行で説明します（全ノードが 0 の既存 `mismatch` はそのまま）。
 
 ---
 
@@ -268,13 +268,14 @@ DOM からの抽出手順（`getBoundingClientRect()` + `window.scrollX` / `wind
 | `parent_checked_nodes` | number | 常時 | `parent` を解決して包含検査した件数。0 なら `parent_overflow` 未適用（`details` の要約行に注記。`layout_tree` の `absolute_mode_pairs` と同種） |
 | `issue_count` | number | 常時 | 検出した崩れ件数 |
 | `issues` | object[] | 崩れあり | 各件の `type` / `selector` / `detail` |
-| `details` | string[] | 常時 | 要約行＋各 issue の detail。`parent_overflow` スキップ時は要約に件数を追記。`parent_checked_nodes=0` のときは未適用注記を同じ要約行に追記（`max_details` の切り詰めで issue の detail を押し出さないため） |
+| `details` | string[] | 常時 | 要約行＋各 issue の detail。`parent_overflow` スキップ時は要約に件数を追記。`parent_checked_nodes=0` のときは未適用注記を同じ要約行に追記（`max_details` の切り詰めで issue の detail を押し出さないため）。過半数ゼロ幾何のときは `checked_nodes` と入力差の 1 行も付く |
 | `ignored_count` | number | 常時 | `ignore_nodes` / `ignore_region` で除外したノード数 |
 | `ignored_nodes` | string[] | 非空時のみ | 除外したノード（`web:<selector>`。件数は `ignored_count` と一致） |
 | `unmatched_ignores` | string[] | 非空時のみ | どのノードにも一致しなかった `ignore_nodes` エントリ |
 | `unmatched_ignore_regions` | string[] | 非空時のみ | どのノード中心とも重ならなかった `ignore_region` |
 | `unresolved_parent_refs` | string[] | 非空時のみ | 入力に無い `parent` 参照（例: `Web: '.foo'`）。`status` は変えない |
 | `parent_overflow_skipped_zero_geom` | number | 1 以上のとき | 親の `w`/`h` が 0 以下のため `parent_overflow` をスキップした子の件数 |
+| `zero_geometry_warning` | string | 非空時のみ | 過半数ノードの `w`/`h` が 0 のときの誤用検出（`status` / `issue_count` は変えない。`details` に `checked_nodes` と入力差の 1 行も付く） |
 
 ---
 

@@ -32,6 +32,7 @@ OpenCode 侧边栏的**用户提问时间线**：按日期分组列出当前会�
 | **日期切换** | `◀` / `▶` 在日期之间跳，时间线滚到那天第一条 |
 | **跨度统计** | 显示这段会话跨了多久、共多少条 |
 | **悬停预览** | 鼠标停在节点上，标题下方展开两行完整内容 |
+| **摘要自适应** | 摘要按面板实际宽度截断，不硬编码列数，侧边栏拉宽拉窄都跟得上 |
 | **贴底联动** | 主会话回到底部（如 jump to latest）时，时间线也回到最新 |
 | **可调步长** | 滚轮每格 1/2/3/5 行，用命令切换 |
 | **细滚动条** | 右侧 1 列宽，只在内容超出时出现 |
@@ -87,18 +88,18 @@ opencode plugin add github:你的用户名/opencode-footprints
 
 ## 配色
 
-固定色板，不跟随 OpenCode 主题：
+跟随 OpenCode 当前主题，但会把主题色的饱和度压到 0.28 以下再显示，避免高饱和主题（Dracula、Solarized）刺眼。
 
-| 用途 | 色值 |
-|---|---|
-| 强调（标题 / 圆点 / 滚动条 / 日期） | `#e0a458` 琥珀 |
-| 正文 | `#ece3d4` 暖白 |
-| 悬停摘要 | `#8a7d6a` 暖灰棕 |
-| 次要（时间 / 计数 / 跨度） | `#9a9088` 暖灰 |
-| 分隔线 | `#4a4238` 暖灰 |
-| 跳转遮罩 | `#2a2622` 暖深灰 |
+| 用途 | 取自主题 | 兜底 |
+|---|---|---|
+| 强调（标题 / 圆点 / 滚动条 / 日期） | `text.action.primary` 的 selected 状态 | `#e0a458` 琥珀 |
+| 正文 | `text.base` | `#ece3d4` 暖白 |
+| 悬停摘要 | `text.faint` | `#8a7d6a` 暖灰棕 |
+| 次要（时间 / 计数 / 跨度） | `text.muted` | `#9a9088` 暖灰 |
+| 分隔线 | `border.base` | `#4a4238` 暖灰 |
+| 跳转遮罩 | `background.raised.base` | `#2a2622` 暖深灰 |
 
-面板本身透明，用终端自己的底色。
+主题缺字段时退回上面那套暖色兜底，不会退化成纯白或纯黑。面板本身透明，用终端自己的底色。
 
 ## 与上游的差异
 
@@ -125,6 +126,9 @@ opencode plugin add github:你的用户名/opencode-footprints
 ```bash
 npm install
 npm run build     # babel src -> dist
+npm run typecheck # tsc --noEmit，babel 不做类型检查
+npm test          # node:test，31 + 18 个用例
+npm run verify    # typecheck + build + test，发版前跑这个
 ```
 
 改完 `dist` 后，OpenCode 会热重载本地插件目录（不行就重启）。

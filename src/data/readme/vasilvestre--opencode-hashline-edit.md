@@ -39,23 +39,18 @@ The AI will read files with `LINE#ID` anchors and call the tool on its own. 36#B
  39#PB
 ### As a library (embed in your own plugin) 40#ZW
  41#XT
-If you're writing **your own OpenCode plugin** and want to include this tool: 42#QP
+The package exports the plugin definition as its default export. There is no `createHashlineEditTool` factory. 42#QP
  43#WH
 ```typescript 44#PX
-import { createHashlineEditTool } from "@vasilvestre/opencode-hashline-edit" 45#PW
-import { definePlugin } from "@opencode/plugin" 46#SB
- 47#BV
-export default definePlugin({ 48#NM
-  name: "my-plugin", 49#ZX
-  tools: { 50#HS
-    hashline_edit: createHashlineEditTool(), 51#VY
-  }, 52#XX
-}) 53#MS
-``` 54#WM
+import hashlineEdit from "@vasilvestre/opencode-hashline-edit" 45#PW
+ 46#SB
+export default hashlineEdit 47#BV
+``` 53#MS
+ 54#WM
  55#TT
 ## LINE#ID Format 56#YQ
  57#HB
-When you read a file, each line shows its LINE#ID: 58#PX
+When you read a file, each line shows its LINE#ID after the content: 58#PX
 ``` 59#MS
 const x = 1          1#ZP 60#ZS
 function foo() {     2#AB 61#QH
@@ -63,6 +58,8 @@ function foo() {     2#AB 61#QH
 }                    4#EF 63#QZ
 ``` 64#WQ
  65#TT
+The hash covers the line and its neighbors. It is 2 characters by default; pass `hashLength: 3` or `4` for longer hashes.
+The tag never appears in the file on disk: the tool strips it before editing and writes the plain content back.
 ## Edit Examples 66#YK
  67#ZX
 ### Replace single line 68#PK
@@ -123,22 +120,6 @@ Use these fresh anchors directly in the next edit call without re-reading. 122#S
  123#RR
 ## API 124#JV
  125#PZ
-### `createHashlineEditTool(pluginCtx?)` 126#SP
-Creates the tool definition for OpenCode plugin system. 127#VV
- 128#JQ
-```typescript 129#PX
-import { createHashlineEditTool } from "@vasilvestre/opencode-hashline-edit" 130#PW
- 131#RK
-const tool = createHashlineEditTool({ 132#BS
-  client: opencodeApiClient, // for formatters 133#KN
-}) 134#TS
-``` 135#WM
- 136#TT
-### Types 137#HM
-```typescript 138#BS
-import type { RawHashlineEdit, HashlineEdit, HashlineApplyReport } from "@vasilvestre/opencode-hashline-edit" 139#MV
-``` 140#RH
- 141#TT
 ### Configuration Options (via args) 142#WR
 - `hashLength`: 2-4 (default: 2) — characters per line hash 143#HJ
  144#HH

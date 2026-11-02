@@ -17,11 +17,11 @@ The plugin provides two independent providers that can be used individually or t
 | **Best for** | **Coding agents (recommended)** | General chat, web-only models & web quota |
 | **Tool calling** | **Native Function Calling**, reliable | Prompt-emulated (experimental; Flash often skips tools) |
 | **Thinking levels** | Supported levels from the model catalog: `minimal` / `low` / `medium` / `high` | `low` (base) / `medium` (`-thinking-medium`, `gemini-4-argon` only) / `high` (`-thinking` extended thinking) |
-| **Image input** | On by default; chat models read images | Off by default; needs a signed-in cookie once on (see below) |
+| **Image input** | On by default; chat models read images | On by default; chat models read images (needs a signed-in cookie) |
 | **Image generation** | Nano Banana models, for Magpie's image generation (Magpie v0.1.2075+, see below) | Not supported |
 | **Sign-in method** | Sign in directly in an isolated popup browser window | Copy `cookie` from a private/incognito window |
 | **Usage cards** | Shows models currently on cooldown and recovery times | Syncs **5-hour** & **weekly** usage and reset times from the web |
-| **Local backend** | AIStudio2API (`v0.2.18`) | gemini-web2api-go (`4.26.0-magpie.2` optimized build) |
+| **Local backend** | AIStudio2API (`v0.2.19`) | gemini-web2api-go (`4.26.0-magpie.2` optimized build) |
 
 ---
 
@@ -87,11 +87,11 @@ Install **magpie-gemini-web** from the Magpie plugin market, then sign in to eit
 
 <br>
 
-Tool calling is enabled by default. Image input is on by default for AI Studio and off for Gemini Web. Configure plugin options via the CLI:
+Tool calling and image input are enabled by default. Configure plugin options via the CLI:
 
 ```bash
-# Turn image input on for both providers
-magpie plugin options magpie-gemini-web '{"allowImages":true}'
+# Turn image input off only for Gemini Web, keeping it on for AI Studio
+magpie plugin options magpie-gemini-web '{"allowImages":false,"studio":{"allowImages":true}}'
 
 # Turn image input off for AI Studio
 magpie plugin options magpie-gemini-web '{"studio":{"allowImages":false}}'
@@ -107,7 +107,7 @@ magpie plugin options magpie-gemini-web '{"studio":{"proxy":"http://127.0.0.1:78
 | Option | Default | Scope | Description |
 | :--- | :--- | :--- | :--- |
 | `allowTools` | `true` | Shared (override via `studio.allowTools`) | Allow tool calls. When `false`, requests with tools return 400 |
-| `allowImages` | Web: `false`; Studio: `true` | Shared (override via `studio.allowImages`) | Allow image input in a chat (an image model's reference images don't need it). Gemini Web reads images only when signed in and returns 400 otherwise; in testing, `gemini-3.6-flash` waited until the timeout on a chat with an image, while `gemini-3.5-flash-lite` and `gemini-3.8-flash` answered |
+| `allowImages` | `true` | Shared (override via `studio.allowImages`) | Allow image input in a chat (an image model's reference images don't need it). Gemini Web reads images only when signed in and returns 400 otherwise |
 | `requestTimeoutMs` / `modelTimeoutMs` | Web: `570000` / `10000`; Studio: `1800000` / `10000` | Shared (override via `studio.*`) | Timeout (ms) per backend wait or model list fetch; resets on stream data, explicit settings take precedence |
 | `stripCitations` | `true` | `gemini-web` only | Strip `[cite: 1]` and `[cite_start]` markers from replies and tool arguments (not supported on AI Studio) |
 | `proxy` | none | `gemini-web` only | Proxy for the managed Gemini Web backend to reach Google (`http` / `https` / `socks5` / `socks5h`), or set `GEMINI_WEB_PROXY` env var / enter during sign-in |
@@ -172,7 +172,9 @@ When a plugin error asks you to run a command, it includes the full ready-to-cop
 - Gemini Web takes at most 2 requests at once per sign-in (AI Studio 1), adjustable in Magpie's provider settings. Google account rate-limiting or flagging cannot be completely ruled out—use at your own risk.
 
 **AI Studio upgrades and model selection:**
-- The plugin pins SHA-256-verified `v0.2.18-magpie.1`, based on upstream `v0.2.18`. Upgrade the plugin to update the backend. Official releases at or below that upstream version, and managed backends an older plugin installed, are upgraded on the next managed startup, preserving accounts, port and sign-in credentials.
+- The plugin pins SHA-256-verified `v0.2.19-magpie.1`, based on upstream `v0.2.19`. Upgrade the plugin to update the backend. Official releases at or below that upstream version, and managed backends an older plugin installed, are upgraded on the next managed startup, preserving accounts, port and sign-in credentials.
+- Account bindings and hedge model selections from 0.2.19 are preserved. Settings saved in the admin page, including upstream defaults, survive plugin restarts. Hedge requests remain off by default; enable them and select models in the admin page if needed.
+- For users upgrading from 0.2.18 with `auto` enabled, hedging now applies only to `FIRST_EVENT_HEDGE_MODELS`, defaulting to Argon when that list is absent. Saving in the admin page fixes the current defaults in the file; later upstream default changes require manual adjustment. When taking over an official 0.2.19 sparse configuration, missing settings follow the plugin's initialization rules (for example, hedging becomes `off`). See the [upgrade compatibility notes](docs/studio-release.md#0219-升级兼容).
 - **Online updates are disabled in the managed backend on macOS, Linux, and Windows.** The admin page says updates are managed by magpie-gemini-web; the update endpoint returns HTTP 409 and update checks do not contact GitHub. Independently managed external servers are unaffected. See [docs/studio-release.md](docs/studio-release.md) for how the managed build is made and reproduced.
 - Managed Unix installs still attempt to set `package/` to `0555` as additional file protection. Permission failures do not block service, and disabling online updates does not depend on permissions. To reset by manually deleting the data directory, stop the service first, then run `chmod -R u+w "<data-dir>/package"` before deleting it; replace `<data-dir>` with the actual path.
 - If a newer or custom version is installed, the plugin reports a conflict with `stop`, `install`, and `start` commands carrying the correct `--data-dir`. Stop can recover a changed listener PID and verifies its executable path before signaling it. If HTTP is down but the process is still alive, the plugin refuses to reinstall or launch a second process.

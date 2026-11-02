@@ -26,7 +26,9 @@ open.
   when turnstile finds a journaled exit-0 test execution behind it; a bare
   claim stays unverified and the gate holds.
 - **Plan approval journaled** — every verdict, waiver, block, and gate flip
-  is appended to `turnstile.jsonl`; the evidence trail outlives the session
+  is appended to the JSONL journal (per parent session under
+  `sessions/<parentID>.jsonl`, shared fallback `turnstile.jsonl`); the
+  evidence trail outlives the session
   and the replay window.
 - **Restart-safe replay** — restart OpenCode mid-task and earned gate state
   comes back from the journal; the pipeline resumes where the evidence
@@ -121,8 +123,14 @@ reviewer dispatches (ensemble); once credited, the landing gate releases
 `git push`. The `emptyDiffExempt` exemption (default on) additionally lets
 provably no-op pushes through without a verdict — set
 `emptyDiffExempt: false` for the strict behavior where every push waits for
-review. Each gate is always enforced — there is no audit-only mode. The
-opt-outs are deliberate and per-feature: `gitGates.commitMessages: false`
+review. Each gate is always enforced once the pipeline is engaged — there
+is no audit-only mode. Enforcement itself is dormant until engaged by
+default: turnstile arms when your prompt provides a plan (a `PLAN APPROVED:`
+marker or a plan-file reference) or asks to run the planner/pipeline, and
+sleeps again on task completion, `TURNSTILE OFF:`, or a prompt with no
+continuation credit (`alwaysEnforce: true` restores the legacy always-armed
+behavior). The opt-outs are deliberate and per-feature:
+`gitGates.commitMessages: false`
 turns off commit lint, `gitGates.landingGate: false` turns off the landing
 gate, an empty denylist leaves the tool policy idle, and `TURNSTILE OFF:`
 suspends the whole plugin for a session (the `turnstile-suspend` skill).
@@ -291,6 +299,17 @@ When both markers appear in one prompt, the one occurring later wins. Config:
 diagnostic, and the ON marker is refused the same way). Inspect the live state with
 `node bin/cli.mjs status` (in-repo) or `npx opencode-turnstile status`.
 
+### `opencode-turnstile log`
+
+Prints a chronological, human-readable timeline of one session's turnstile
+journal — dispatches, gate results, blocks, waivers, verdicts, suppressions,
+and marker retries — ending with a summary line (blocks by reason, dispatch
+and waiver counts, final gate state). Read-only; never writes or blocks.
+
+    opencode-turnstile log                 # most recent session
+    opencode-turnstile log <sessionID>     # a specific session
+    opencode-turnstile log --json          # machine-readable output
+
 ## Markers
 
 Subagents must emit these as the first line of their output. These examples
@@ -362,13 +381,14 @@ loader reads an explicit [] as unset and re-derives the list from the
 configured test-runner, reviewer, and plan-reviewer names, so the copy needs
 no edits. The key knobs most people touch:
 
-| Key                       | Default   | Meaning                                                                                                                |
-| ------------------------- | --------- | ---------------------------------------------------------------------------------------------------------------------- |
-| `gateEvidence`            | `enforce` | `flag`/`off` revert to flip-on-trust for `GATE: PASS`                                                                  |
-| `escalation`              | `block`   | repeat landing/hands-on attempts re-block with no permission ask; `ask` restores the interactive permission-ask ladder |
-| `gitGates.commitMessages` | `true`    | validate `git commit -m` subjects as conventional commits; `false` disables commit lint                                |
-| `gitGates.landingGate`    | `true`    | gate `git push` on this task reviewer `VERDICT: APPROVE`; `false` disables the gate                                    |
-| `reviewEnsemble`          | `enforce` | `advise` credits a single-reviewer APPROVE unconditionally                                                             |
+| Key                       | Default   | Meaning                                                                                                                                                                      |
+| ------------------------- | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `alwaysEnforce`           | `false`   | dormant-until-engaged: enforcement arms on a plan (`PLAN APPROVED:` / plan-file reference) or a planner/pipeline request; `true` restores always-armed from the first prompt |
+| `gateEvidence`            | `enforce` | `flag`/`off` revert to flip-on-trust for `GATE: PASS`                                                                                                                        |
+| `escalation`              | `block`   | repeat landing/hands-on attempts re-block with no permission ask; `ask` restores the interactive permission-ask ladder                                                       |
+| `gitGates.commitMessages` | `true`    | validate `git commit -m` subjects as conventional commits; `false` disables commit lint                                                                                      |
+| `gitGates.landingGate`    | `true`    | gate `git push` on this task reviewer `VERDICT: APPROVE`; `false` disables the gate                                                                                          |
+| `reviewEnsemble`          | `enforce` | `advise` credits a single-reviewer APPROVE unconditionally                                                                                                                   |
 
 | `sessionSummary` | `quiet` | one recap line at session end for active sessions (`on` adds an all-green line for idle ones; `off` disables) |
 | `toolPolicy.bashDeny` | `[]` | regex denylist for `bash`/`shell` (e.g. worktree/branch/merge ops) |

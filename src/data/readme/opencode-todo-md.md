@@ -94,25 +94,31 @@ Search and press Enter (open, high, #12, @tag)
 - State tabs carry counters; `Tag:` cycles the tags found in the file; `Sort:` cycles status, due, priority, created,
   done and id.
 - `＋ New task` opens a prompt for the text and a picker for the priority, then appends to `TODO.md`.
-- `▲`/`▼` page through the list, `pageSize()` rows per page (4 to 8, from the terminal height).
+- `▲`/`▼` page through the list, `pageSize()` tasks per page (4 to 12, from the terminal height).
 - Search applies on Enter and understands `open`, `done`, `cancelled`, `high`, `medium`, `low`, `#12`, `@tag` and free
   text.
-- Click a cell: `#id` edits, `st` and description toggle completed, `prio` cycles, `due` asks for a date, `tag` filters
-  by that task's first tag.
+- One line per task, description last and clipped with `…` when the panel is narrow. Click `#id` to edit, `st` or the
+  description to toggle completed, `prio` to cycle, `due` to ask for a date, `tag` to filter by that task's first tag.
 - Click the `#id`, `prio`, `created`, `due` or `done` header to sort by that column; the sorted column is marked with
   `▲`, a second click restores the default order.
-- `↑`/`↓` move the cursor, `space` toggles, `enter` edits, `ctrl+d` deletes, `Esc` closes.
+- The list has a cursor (`▸`): `↑`/`↓` move it, and walking past the last row of a page turns the page, so the cursor
+  never stops at the edge. `space` toggles the selected task, `ctrl+e` edits it, `PgUp`/`PgDn` change page, `Home`/`End`
+  jump to the first or last page.
+- `ctrl+d` arms the selected task and shows `ctrl+d again to delete`: the second press removes the line, no dialog.
+- `/` gives the keyboard to the search box; `Enter` applies the query and gives the keyboard back to the list. `Esc`
+  closes the dialog.
 
 When the editor closes, the list reopens, so editing several tasks in a row is one flow. The dialog state (filter,
 tag, sort, page) restarts when you come back from the editor.
 
-The editor itself (`#id` cell or `enter`) has the task text in a focused input, a row of priority chips and a row of
+The editor itself (the `#id` cell) has the task text in a focused input, a row of priority chips and a row of
 due chips (`none`, `today`, `+7d`, `+30d`). `✎ due` swaps focus to a second input where any `YYYY-MM-DD` can be typed;
 `Tab` cycles the priority, `Enter` saves, `Esc` cancels and returns to the list. Status, created and done dates are
 kept; marking a task completed stamps `done` with the current date, reopening clears it.
 
-The dialog asks the host for the `xlarge` size, but the final width is the host's. When the terminal is narrower than
-the table (109 characters plus margins) the `description` column is the one that gets clipped.
+The dialog asks the host for the `xlarge` size (116 columns) and re-applies it when it mounts, because on this build a
+size set before `show()` is ignored. The final width is still capped by the terminal: below ~118 columns the
+`description` column is the one that gets clipped.
 
 ### Sidebar
 
@@ -178,6 +184,23 @@ The plugins live in the same repository as the sources; OpenCode resolves `@open
 to be installed locally to try a change.
 
 ## Changelog
+
+### 0.1.5
+
+- `ctrl+e` opens the selected task in the editor, so the whole list is reachable without the mouse.
+
+### 0.1.4
+
+- `PgUp`/`PgDn` and `Home`/`End` move through pages, `↑`/`↓` still turn the page at the row edges.
+
+### 0.1.3
+
+- Clicks work again: the dialog size is applied when it mounts, so the mouse hit grid matches the panel.
+- `/` gives the keyboard to the search box, `Enter` applies the query, `Esc` closes. `↑`/`↓` keep the list cursor and
+  turn the page at the edges.
+- `ctrl+d` twice deletes the selected task without a dialog; the first press shows `ctrl+d again to delete`.
+- The current row is marked with `▸` and bold cells.
+- The description is a column again, on one line, and is clipped only when the terminal is narrower than the dialog.
 
 ### 0.1.2
 

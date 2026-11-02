@@ -102,7 +102,7 @@ The plugin only reads the title, **not the conversation**; the title model is th
 
 ### Behaviours worth knowing
 
-- **Manual moves are corrected.** The rules always win. If you drag a session elsewhere, the plugin puts it back the next time it checks that session (on its next title change or turn end) or in the periodic sweep.
+- **Manual moves into your own folders are kept.** A session you place in a folder that is not one of your rules' folders (say, "Postponed") is left there. Sessions in no folder, or in another rule's folder, are still moved to their tagged folder: if you drag one between rule folders, the plugin puts it back the next time it checks that session (on its next title change or turn end) or in the periodic sweep.
 - **A session marked `[Unfiled]`, or whose title has no recognized tag, is left where it is**, not moved out of a folder you chose.
 - **Archived sessions are skipped.**
 - **Sessions with a parent (`parentID`), including subagent sessions,** follow their **root** session: the child's own title is ignored and the root's title is classified. Set `includeSubagents` to `false` to leave children alone. A fork without `parentID` is classified independently.
@@ -148,10 +148,10 @@ bun run build
 npm pack --dry-run
 ```
 
-**Publishing the scoped name** is a first publish of a new package, not a rename of the existing one on the registry. First authenticate and confirm rights to `@jlhalej`: it must be your npm username or an npm organization where you have publishing rights. Your GitHub username alone grants no npm rights. Check the authenticated npm username with `npm whoami`; for an organization scope, check its membership separately with `npm org ls jlhalej`. Then publish:
+**Publishing** needs an npm account with publishing rights on the `@jlhalej` scope: the scope is the `jlhalej` npm organization, so your GitHub username alone grants nothing. Check with `npm whoami` and `npm org ls jlhalej`, commit and tag the release, then publish (`publishConfig.access` is already `public`):
 
 ```bash
 npm publish --access public
 ```
 
-(`publishConfig.access` is already `public`.) Do not deprecate the unscoped `opencode-session-autofile` until the scoped package is published and verified to load; deprecate it afterwards with a message pointing to the new name.
+A new version loads on a running OpenCode as a fresh package; new code under an already-loaded path needs an OpenCode/OpenChamber restart. The old unscoped `opencode-session-autofile` is deprecated in favor of this package.

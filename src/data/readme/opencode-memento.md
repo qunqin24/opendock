@@ -1,5 +1,10 @@
 # leonard-memento
 
+[![npm](https://img.shields.io/npm/v/@leonard-memento/core?label=%40leonard-memento%2Fcore)](https://www.npmjs.com/package/@leonard-memento/core)
+[![npm](https://img.shields.io/npm/v/opencode-memento?label=opencode-memento)](https://www.npmjs.com/package/opencode-memento)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
+[![Node](https://img.shields.io/badge/node-%E2%89%A520-brightgreen)](https://github.com/NemeZZiZZ/leonard-memento)
+
 **Amnesia insurance for your coding agents.**
 
 When a coding agent compacts its context, the summarizer keeps only what it is shown — everything else evaporates. `leonard-memento` is a family of zero-dependency adapters that puts your project's curated Markdown memory index back in at that exact moment, in whatever agent you run: Total Recall, no trip to Rekall required.
@@ -76,9 +81,12 @@ memento path [--project DIR]    # absolute index path (exit 1 if absent)
 memento inject [--project DIR]  # the injection block (silent, exit 0 when absent)
 memento init <agent>            # idempotent setup
 memento init --list             # supported agents
+memento sync claude [--project DIR] [--dry-run] [--claude-dir DIR]
+                                 # share facts with Claude Code auto memory, both ways
+                                 # (@leonard-memento/core >= 0.2.0)
 ```
 
-Environment: `MEMENTO_MEMORY_ROOT` overrides the root; `MEMENTO_INDEX_FILE` overrides the index file name.
+Environment: `MEMENTO_MEMORY_ROOT` overrides the root; `MEMENTO_INDEX_FILE` overrides the index file name. On Windows, hook commands resolve through npm's `.cmd` shims (keep the global npm bin directory on `PATH`); sync and the rest of the CLI are path-separator safe.
 
 ## Migrating from opencode-memento v1.0.0
 
@@ -91,7 +99,11 @@ No re-inking required.
 
 - Predecessor (archived): [opencode-memento](https://github.com/NemeZZiZZ/opencode-memento)
 - Release checklist: [RELEASE.md](RELEASE.md)
-- Design spec: kept locally (not published with the repo).
+- Comparison against mem0, claude-mem, Basic Memory, and native memory features: [docs/comparison.md](docs/comparison.md)
+- Sharing facts with Claude Code's native auto memory: [docs/claude-code-interop.md](docs/claude-code-interop.md)
+- Support matrix and how the guarantees are tested: [COMPATIBILITY.md](COMPATIBILITY.md)
+
+If memento saved your agent from amnesia, a ⭐ helps other builders find it.
 
 ## License
 

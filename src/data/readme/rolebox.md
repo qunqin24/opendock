@@ -116,14 +116,14 @@ The `Risk and gaps` list keeps three things open on purpose: the one judgment ca
 ### 4 · One brief in, one outcome out
 
 <p align="center">
-  <img alt="A graph worker one-shot session running its brief with graph_worker_exec and settling its node with graph_submit_outcome" src="assets/screenshots/graph-worker.png" width="900">
+  <img alt="A graph worker one-shot session running its assigned brief and settling its node with graph_submit_outcome" src="assets/screenshots/graph-worker.png" width="900">
 </p>
 
 <p align="center">
   <em>One brief in, one outcome out: the worker makes the scoped edits, runs both checks, and settles node <code>change</code> with the <code>done</code> outcome.</em>
 </p>
 
-The dsh worker shown here is a one-shot session using `graph_worker_exec` for reads, commands and permitted edits, and `graph_submit_outcome` to settle its node. Workers inherit the parent’s authorized task tools; nodes can restrict that catalog and choose native, discovery or code presentation. Supported hosts default to discovery; see [Worker tools](docs/worker-tools.md). Workers cannot read or steer graph state. Here the worker's whole record is `cat` of its host handoff, the scoped edits, `cat -n` verification of the edited files, the sample project’s test command and `tsc --noEmit`. It notes that this was not a repair round (no revise input was delivered), makes the three scoped edits, reports `6 pass / 0 fail, tsc exit 0`, and closes on `Outcome done accepted (verdict committed, no refusals) — node change is settled`. The banner across the bottom is the one-shot contract: the record does not accept follow-ups.
+The recording shows a dsh worker completing its assigned brief and using `graph_submit_outcome` to settle its node. Current workers use the host's native command and file tools. Workers inherit the parent’s authorized task tools with native schemas exposed by default. Node tool lists do not restrict them; discovery and code presentation remain optional; see [Worker tools](docs/worker-tools.md). Workers cannot read or steer graph state. Here the worker's whole record is `cat` of its host handoff, the scoped edits, `cat -n` verification of the edited files, the sample project’s test command and `tsc --noEmit`. It notes that this was not a repair round (no revise input was delivered), makes the three scoped edits, reports `6 pass / 0 fail, tsc exit 0`, and closes on `Outcome done accepted (verdict committed, no refusals) — node change is settled`. The banner across the bottom is the one-shot contract: the record does not accept follow-ups.
 
 ### 5 · Watch the engine while it runs
 
@@ -366,7 +366,7 @@ Unrecognized values pass through unchanged with a warning. Full resolution chain
 
 ---
 
-> **Upgrading from 0.x or 1.x?** rolebox 2.x (`package.json` currently reads `2.1.0`) runs work through the **graph outcome protocol**: `graph_declare` persists a version-3 declaration, and a node advances only through an outcome its worker submits with `graph_submit_outcome`. An existing (legacy) declaration must be rewritten for the version-3 grammar and started as a new run. A persisted legacy state body stays readable but is never advanced, and this protocol has no incremental node or edge construction tool. See [docs/graph-outcome-protocol.md](docs/graph-outcome-protocol.md).
+> **Upgrading from 0.x or 1.x?** rolebox 2.x (`package.json` currently reads `2.2.0`) runs work through the **graph outcome protocol**: `graph_declare` persists a version-3 declaration, and a node advances only through an outcome its worker submits with `graph_submit_outcome`. An existing (legacy) declaration must be rewritten for the version-3 grammar and started as a new run. A persisted legacy state body stays readable but is never advanced, and this protocol has no incremental node or edge construction tool. See [docs/graph-outcome-protocol.md](docs/graph-outcome-protocol.md).
 
 ---
 

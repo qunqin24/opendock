@@ -1,7 +1,7 @@
 # opencode-idea-inbox
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
-[![opencode](https://img.shields.io/badge/opencode-v2%20%E2%89%A52.0.20-blue)](https://opencode.ai)
+[![opencode](https://img.shields.io/badge/opencode-v2%20%E2%89%A52.2.3-blue)](https://opencode.ai)
 [![npm](https://img.shields.io/npm/v/opencode-idea-inbox)](https://www.npmjs.com/package/opencode-idea-inbox)
 
 [English](./README.md) | **Русский**
@@ -39,7 +39,7 @@
 
 | Ваш opencode           | Устанавливать                          | Где живёт |
 | ---------------------- | -------------------------------------- | --------- |
-| **v2** (≥ 2.0.20)      | `opencode-idea-inbox` (`latest`)       | ветка [`master`](https://github.com/apilot/opencode-idea-inbox/tree/master) (по умолчанию) |
+| **v2** (≥ 2.2.3)       | `opencode-idea-inbox` (`latest`)       | ветка [`master`](https://github.com/apilot/opencode-idea-inbox/tree/master) (по умолчанию) |
 | **v1**                 | `opencode-idea-inbox@legacy-v1` (сейчас 0.3.5) | ветка [`legacy-v1`](https://github.com/apilot/opencode-idea-inbox/tree/legacy-v1) |
 
 Не уверены, что у вас? Проверьте `opencode --version`.

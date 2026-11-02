@@ -1,3 +1,5 @@
+<img src=".github/assets/logo.svg" width="96" align="right" alt="">
+
 # opencode-oauth
 
 An [OpenCode](https://opencode.ai) plugin that signs in to an OpenAI-compatible
@@ -11,18 +13,25 @@ OpenCode opens the browser for the authorization code grant with PKCE
 them with the refresh token, and sends the access token to the provider as its
 bearer. Nothing in the plugin is specific to one identity provider.
 
+![Signing in through an identity provider with /connect, then chatting with the provider in OpenCode](.github/assets/demo.gif)
+
 ## Requirements
 
 - **OpenCode 2.** The plugin uses the v2 plugin API (`@opencode/plugin` 2.0.32 or
   later); OpenCode 1.x does not load it.
-- **An authorization server** (identity provider) with a client that:
-  - is public (no client secret) and may use the authorization code grant with
-    PKCE (`S256`) and the refresh token grant;
+- **An authorization server** (identity provider) that your browser and OpenCode
+  can both reach. It need not be on the internet: a LAN or a VPN is enough, since
+  the server never connects to your machine. It needs a client that:
+  - is public, in OAuth's sense of having no client secret, and may use the
+    authorization code grant with PKCE (`S256`) and the refresh token grant;
   - allows the redirect URI `http://127.0.0.1:<port>/callback`. A server that
     follows RFC 8252 section 7.3 accepts a loopback redirect on any port, so
     `port` can stay unset; otherwise register a fixed port and set `port` to it;
-  - is issued refresh tokens, often by granting it the `offline_access` scope,
-    with token responses that include `expires_in`.
+  - is issued refresh tokens, often by granting it the `offline_access` scope;
+  - is issued Bearer access tokens: token responses must include `token_type`
+    `Bearer` (in any case) and `expires_in`. A token of another type, such as a
+    DPoP-bound one, is refused, because OpenCode sends the token as a Bearer
+    token.
 - **A provider that accepts the access token** as `Authorization: Bearer …`, such
   as an OpenAI-compatible server behind a gateway that validates the token (for
   example oauth2-proxy with `--skip-jwt-bearer-tokens`).
@@ -37,7 +46,7 @@ Add the plugin and the provider to your OpenCode config
   "$schema": "https://opencode.ai/config.json",
   "plugins": [
     {
-      "package": "opencode-oauth@0.1.0", // x-release-please-version
+      "package": "opencode-oauth@latest",
       "options": {
         "provider": "my-llm",
         "clientID": "opencode",
@@ -67,6 +76,15 @@ OpenCode renews the token on its own from then on.
 
 Each plugin entry signs in to one provider, and replaces that provider's API key
 method with the sign-in.
+
+### Updates
+
+OpenCode checks for a new plugin release when it starts and daily, and shows
+"update available" in `/plugins`. Press `ctrl+u` there, or run
+`opencode plugin update`. If the plugin then fails to load, `/plugins` shows
+why: the release may need a newer OpenCode or a changed option.
+
+Pinning a version (`opencode-oauth@<version>`) turns update checks off.
 
 ### Options
 
@@ -126,32 +144,15 @@ The SearXNG instance must allow JSON output (`json` in `search.formats` in its
   `state`; anything else on the port is refused without ending the sign-in.
 - Concurrent renewals of one refresh token share a single request, so a server
   that revokes a reused rotated refresh token does not sign you out.
-- Error messages carry an HTTP status and the OAuth error code, never a response
-  body.
+- Error messages carry an HTTP status and, only when it is short plain text, the
+  server's OAuth error code, error description or refused token type; never a
+  response body.
 
 Report vulnerabilities privately, as [SECURITY.md](SECURITY.md) describes.
 
 ## Development
 
-```sh
-bun install
-bun run typecheck
-bun test
-bun run build
-```
-
-To try a checkout in OpenCode as npm would install it, run `bun pm pack` and set
-the plugin's `package` to `opencode-oauth@file:/absolute/path/to/opencode-oauth-<version>.tgz`.
-
-The tests run on the Bun release that OpenCode compiles in (`packageManager` in
-`package.json`). When you bump `@opencode/plugin`, set `effect` to the version it
-depends on, since OpenCode hands plugins its own copy, and set `packageManager`
-and `@types/bun` to the Bun that OpenCode release uses.
-
-Commits follow [Conventional Commits](https://www.conventionalcommits.org).
-[release-please](https://github.com/googleapis/release-please) turns them into a
-release pull request; merging it tags the release and publishes it to npm through
-trusted publishing, with provenance.
+See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 

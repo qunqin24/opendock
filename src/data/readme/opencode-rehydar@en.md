@@ -75,6 +75,42 @@ NER inference runs locally via ONNX Runtime (~280 MB quantized model). No API ca
 - **Secrets, not just PII**: beyond names, emails, and phone numbers, Rehydra detects API keys (OpenAI, Anthropic, Stripe, AWS, GitHub...), JWTs, private keys, database connection strings, and `.env` secrets.
 - **Semantic enrichment for machine translation**: optional gender and scope attributes on PII tags (`<PII type="PERSON" gender="male" id="1"/>`, `<PII type="LOCATION" scope="city" id="2"/>`) preserve grammatical context for downstream systems.
 
+## Shape-based recognizers are off by default
+
+Some recognizers fire on **shape alone**, which misfires badly in code, shell commands and documents. The Pi extension therefore disables three of them by default: bank identifiers (BIC/SWIFT), UK postcodes, and generic dates. Restore them in the configuration:
+
+```json
+{
+  "rehydra": {
+    "disableTypes": ["URL", "IP_ADDRESS"]
+  }
+}
+```
+
+Even when explicitly enabled, a bank identifier still requires a complete banking context word (`bic`, `swift`, `bank`, `银行`, `bankleitzahl`) within the 32 characters before it, so 8-character uppercase constants are not mistaken for one.
+
+Business ids (`CASE_ID`) require an explicit prefix word plus a separator and a number in the id, such as `Az. 2024/1234`; bare structures (`AB/1234`, `2024/1234`) no longer match.
+
+## Env files and policy configuration
+
+Only the values of **sensitive fields** in an `.env` file enter the global known-value set: project names, ports and other ordinary configuration values are not replaced later in the text. Explicitly configured `redactValues` keep your intent and are not affected by that filter.
+
+Collection fields in `policy` may be written as arrays and thresholds as plain objects (programmatic callers may use `Set` / `Map`); an invalid field type fails at startup with the field name instead of silently dropping the protection rule.
+
+## Per-request masking records
+
+The Pi extension can record masking results per request so you can check for false positives:
+
+```json
+{
+  "rehydra": {
+    "record": { "enabled": true, "includeOriginal": true }
+  }
+}
+```
+
+`/rehydra log` shows recent records for the session, `/rehydra log <id>` shows hits with field-level before/after, `/rehydra clear --all` removes them. Recording is off by default; when enabled it writes to `~/.pi/agent/rehydra/records/` (0700 / 0600) and trims by age and total size. With `includeOriginal: false` only the type, detector, placeholder and offsets are kept.
+
 ## Address detection
 
 The default regex registry detects UK postcode syntax and numbered English-language street addresses such as `34a Friskin Road`. Apartment identifiers are included when adjacent to a street address, as in `Flat 1\n34a Friskin Road`. A contiguous UK address block ending in a postcode is masked as one `ADDRESS`; a standalone postcode uses `POSTAL_CODE`. Bare apartment numbers, unnumbered buildings, and other countries' postal formats need custom recognizers or NER. Postcode matching checks syntax, not whether a postcode is currently assigned.

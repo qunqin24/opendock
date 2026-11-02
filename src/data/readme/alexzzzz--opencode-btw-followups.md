@@ -45,21 +45,27 @@ plugin, so the path has to come after the removal.
 ```
 
 Run `/btw` on its own to open the window and type the question into the composer. An answer
-appears as it is written, and a thread that already holds answers is reopened as it was
-left. An answer that arrives while the window is closed is written out when the window comes
-back, and an answer already written out is there whole.
+appears as it is written, and a long answer holds its first line at the top of the window while
+it is written out, so the beginning never scrolls out of view. A thread that already holds
+answers is reopened as it was left. An answer that arrives while the window is closed is written
+out when the window comes back, and an answer already written out is there whole.
 
 ![The /btw window with two questions, two answers and the composer](docs/btw-window.png)
 
 `PageUp`, `PageDown`, `Ctrl+Home` and `Ctrl+End` move the transcript, `Delete` clears the
-thread, and `Esc` closes the window and keeps the thread. A click on `copy thread` copies the
-whole thread through the terminal clipboard, and a click on one paragraph, list or fenced block
-of an answer copies that piece alone, as its plain text: a command arrives without the backticks
-around it, and the toast names what went in. The rail in the left gutter marks the piece the
-pointer is on, so what a click would take is the piece the reader sees marked, and it stays down
-while text is being selected or is selected. Closing the window leaves a question that was
-asked and is still waiting to go out in the session, and it goes out the next time the window
-opens.
+thread, and `Esc` closes the window and keeps the thread. The footer names only the keys a reader
+would not find by habit: `ctrl+up/down` opens the prepared prompts, `ctrl+home/end` is the only way
+to jump the transcript, because `Home` and `End` belong to the composer, `Delete` clears the
+thread, and `enter queues` says that a question typed while an answer arrives waits its turn. The
+page keys, the wheel and `Enter` to send mean here what they mean in the prompt of the session, so
+the row leaves them out. A click on `copy thread` copies the whole thread through the terminal
+clipboard, and a click on one paragraph, list or fenced block of an answer copies that piece alone,
+as its plain text: a command arrives without the backticks around it, and the toast names what
+went in. The rail in
+the left gutter marks the piece the pointer is on, so what a click would take is the piece the
+reader sees marked, and it stays down while text is being selected or is selected. Closing the
+window leaves a question that was asked and is still waiting to go out in the session, and it
+goes out the next time the window opens.
 
 The composer takes the keys the host's own prompt takes: `Home` and `End` for the ends of the
 text, the arrows for the cursor, and the word and selection keys of the host's input table.
@@ -83,7 +89,9 @@ and `Enter` asks the pick.
 `Ctrl+Up` in the session opens the window with nothing asked, and `Ctrl+Up` inside the window
 opens the same list, which the marker in the header toggles as well. `Ctrl+Down` takes the list
 down, and the window down once the list is down. `Up` and `Down` move the pick and wrap, `Enter`
-asks it, `Esc` closes the list, and the field keeps whatever was typed in it.
+asks it, `Esc` closes the list. A question already typed into the field stays there when a pick
+is asked, and goes out on `Enter` once the list is down: the open list is the decision to pick,
+not a reason to throw away what was written.
 
 A thread belongs to the session it was asked in, and it lives in memory as long as the
 process runs.

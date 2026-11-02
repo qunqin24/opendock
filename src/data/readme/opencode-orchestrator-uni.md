@@ -8,13 +8,18 @@ ships the **orchestrator agent kit**:
 - `orchestrator` — the root orchestrator (primary agent) with the audit loop as a
   built-in mode;
 - read-only audit subagents — `factcheck`, `empiric`, `invariant`,
-  `arbiter`, `meta`, `redteam`;
+  `arbiter`, `meta`, `redteam`, `context-lint`;
 - `fix-runner` — the only writing subagent (applies the "to close" list);
 - the kit's process documents, exposed as the **`audit-kit` reference**
   (`call-mechanics.md`, `process-ready-loop.md`, `root-runbook.md`,
-  `instruction-other-session.md`);
-- three deterministic, read-only tools — `orch_uni_validate_report`, `orch_uni_snapshot`,
-  `orch_uni_sessions` (see [Tools](#tools)).
+  `instruction-other-session.md`, `context-efficiency.md`);
+- four deterministic, read-only tools — `orch_uni_validate_report`, `orch_uni_context_lint`,
+  `orch_uni_snapshot`, `orch_uni_sessions` (see [Tools](#tools));
+- two slash commands — `/agents-md` and `/spec` (see [Commands](#commands)).
+
+Read-only audit agents are enforced by `edit: deny` plus the prompt ban; their shell
+permission stays allowed so they can run verification commands (an accepted risk, no
+permission is relaxed).
 
 The package is loaded directly from TypeScript: `exports` points at
 [`index.ts`](./index.ts). There is **no build step and no `dist/`** — OpenCode's
@@ -34,31 +39,47 @@ On setup (`ctx.agent.transform` / `ctx.reference.transform`):
 | `arbiter`   | `subagent` | Read-only: resolves disputed findings only               |
 | `meta`      | `subagent` | Read-only: meta-audit of reports (pass/fail gate)        |
 | `redteam`   | `subagent` | Read-only: acceptance red team (release gates)           |
+| `context-lint` | `subagent` | Read-only: audits AGENTS.md/SPEC.md for token efficiency |
 | `fix-runner`      | `subagent` | Writer: applies the fix list and proves closure          |
 
 All agents ship **without a model**: models are deployment configuration (see
 [Models](#models)). Definitions live in [`agents/`](./agents) as plain Markdown agent
 files and are parsed at setup time — the files are the single source of truth.
 
+"Read-only" here means `edit` is denied and the prompt forbids writes; `shell` stays
+allowed so an auditor can run the verification commands it needs (accepted risk
+I-M15). The audit loop treats that as a contract, not as a sandbox.
+
 The `audit-kit` reference points at this package's per-locale `docs/<locale>/`
 directory (see [Locale](#locale)). OpenCode lists it in session context as an
 additional local directory, so the orchestrator (and any other agent) can read
 the process documents directly, for example `<reference path>/call-mechanics.md`.
 
-The plugin also registers three deterministic, **read-only** tools in the `orch_uni`
-namespace — see [Tools](#tools).
+The plugin also registers four deterministic, **read-only** tools in the `orch_uni`
+namespace and two slash commands — see [Tools](#tools) and [Commands](#commands).
+
+## Commands
+
+| Command | What it does |
+| --- | --- |
+| `/agents-md` | Injects the AGENTS.md audit/draft workflow: `context-efficiency.md` template, `orch_uni_context_lint`, `context-lint`, approval before writing. |
+| `/spec` | Injects the SPEC.md workflow: brief, clarifying questions, EARS/AC/traceability, `orch_uni_context_lint`, `context-lint`, approval before writing. |
+
+A command is a prompt, not a writer: its handler injects a workflow prompt into the
+current session. The orchestrator then follows the usual evidence and approval rules.
 
 ## Tools
 
 | Effective name           | Read-only | What it does                                                                  |
 | ------------------------ | --------- | ----------------------------------------------------------------------------- |
 | `orch_uni_validate_report`  | yes       | Extract the SGR JSON block of a report, resolve its schema, validate it        |
+| `orch_uni_context_lint`     | yes       | Deterministic audit of AGENTS.md/SPEC.md: budget, vague phrases, links, sections |
 | `orch_uni_snapshot`         | yes       | Deterministic revision of a directory tree (per-file sha256 + aggregate hash)  |
 | `orch_uni_sessions`         | yes       | Child sessions of a session: agent, model, cost, tokens, time                  |
 
 Every tool answers with a JSON text body. Failures are **typed codes** inside the body
 (`E_INPUT`, `E_NO_JSON`, …) instead of thrown tool errors, so an agent can branch on the
-code without parsing prose. None of the three writes to the workspace, the session store
+code without parsing prose. None of the four writes to the workspace, the session store
 or the configuration.
 
 ### `orch_uni_validate_report`
@@ -98,11 +119,89 @@ invariant that is `violated` without a counterexample, an uncovered mandatory
 `lines_checked` line, `meta`'s `verdict` diverging from its `gate`, and
 `redteam`'s `closing_list`/`verdict` invariants.
 
-The seven schemas ship as `schemas/*.json` and are derived **strictly** from the SGR
+The schemas ship as `schemas/*.json` and are derived **strictly** from the SGR
 sections of `agents/*.md`, which stay the source of truth: the test suite parses every
 agent's SGR template and fails when a prompt field or enum value is not accepted by its
-schema. Schemas set `additionalProperties` permissively — agents may add fields of their
+schema. `context-lint-failure/v1` is the typed failure envelope of
+`orch_uni_context_lint` — it has no agent template and is never a report. Schemas set
+`additionalProperties` permissively — agents may add fields of their
 own (`verdict_label`, `check`, …).
+
+### `orch_uni_context_lint`
+
+```jsonc
+{ "path": "AGENTS.md" }                  // file or directory, relative to the location
+{ "path": ".", "max_lines": 150, "max_tokens": 2000 }
+{ "path": ".", "max_words": 2000 }       // SPEC word budget; default 1500 (target), ceiling 2000
+{ "path": ".", "max_file_bytes": 500000, "max_files": 100, "max_findings": 50, "max_total_findings": 500 }
+```
+
+Deterministic, read-only audit of `AGENTS.md`, `SPEC.md` and `CLAUDE.md`. It returns
+`{ schema: "context-lint/v1", ok: true, verdict, closing_list, files, summary, truncated? }`;
+each finding carries `id`, `severity`, `kind`, `evidence`, `detail` and `fix`. Checks:
+line/token/word budget, distinct vague phrases, duplicate lines, broken relative links,
+placeholders, dates/versions in the first three lines, required sections and AC test
+columns. Links and explicit targets are confined by their **real** path: a symlink or
+junction that resolves outside the root is skipped, and such a target is refused
+(`E_OUT_OF_ROOT`). Code fences, inline code and HTML comments are masked, so a sample is
+never a rule: structural checks (commands, boundaries, verification) read the full mask,
+while requirements, AC ids and non-goals read the fence mask. Link targets are
+streamed from the line scanner one at a time (no candidate array), so memory does
+not grow with the number of links; checks are capped per file at 50 000
+candidates, the signal is checked per line and every 100 candidates, and the
+link caches keep at most 5 000 entries, so an abort wins; 2001 links are checked
+normally, 50 000 valid links still pass, and the 50 001st candidate makes the list
+incomplete (`truncated: true` plus a MAJOR `link candidates truncated` marker in
+`closing_list`), so a capped run can never pass. Broken
+links have no separate per-file cap: the finding caps bound the output and report the
+overflow. A line is scanned however long it is: the link scanner and the placeholder regex
+are linear, so a 4100-character line is checked like any other and a broken link or
+placeholder on it is the real finding, not a marker. Duplicate lines have no inner cap.
+UNC/network targets are never probed. Measured (bun 1.4.2, Windows, fresh
+process): 50 001 broken links with `max_findings: 2` → ~1.4 s and ~67 MB peak
+RSS; 50k plain lines → ~0.14 s / ~65 MB; a 2 MB single line with links →
+~3.1 s / ~116 MB (~41 MB without links). Masking reuses a line as-is when it
+has no backtick and no `<pre>`/`<code>`/`<!--`, so it never copies a line
+character by character, and a 2 MB single line stays capped at 50 000
+candidates instead of materializing every link.
+Limits: ≤ 2 MB per file, ≤ 500 files per scan. `max_findings` (per file) is N per
+severity: up to N MAJOR and N MINOR/INFO are kept, and any excess is replaced by one
+marker (MAJOR when a MAJOR was dropped, otherwise INFO); a MAJOR marker stays in
+`closing_list`. `max_total_findings` (global, default 1000) keeps MAJOR
+findings first; when MAJOR overflow, `max_total` findings plus one MAJOR `truncated`
+marker are kept. A capped list sets `truncated: true` instead of hiding findings.
+Markers are additional to `max_findings` and do not consume its budget: a capped
+link-candidate list and a capped findings list report one marker each in the same run, so
+`max_findings: 2` over 20 001 broken links yields 2 kept findings plus 2 markers. Cap
+markers point at `file:1` in `evidence`.
+Non-goals are counted as top-level items: a wrapped paragraph is one item, inline
+`;`/`,`/`and`/`и` split only at the top level (not inside `(…)`, `[…]`, backticks of any
+width or `<code>`), and a bullet at 0–4 spaces under the label is an item — fenced,
+`<pre>` and deeper-indented code is not.
+Placeholders are `<...>` (three or more dots) and `TODO`/`TBD`/`FIXME`; `<DoD>` and
+`<name>` are markup.
+`max_lines` is the single 200-line root budget the tool applies: the 60/200/100
+per-level figures in [`docs/`](./docs) are authoring guidance, not separate tool limits.
+`max_words` defaults to the 1500-word SPEC target; pass `max_words: 2000` to enforce the
+documented ceiling instead.
+Typed failures: `E_INPUT`, `E_NOT_FOUND`, `E_NO_FILES`, `E_IO`, `E_ABORTED`,
+`E_LIMIT_FILE`, `E_LIMIT_FILES`, `E_OUT_OF_ROOT`.
+A failure is a typed payload `{schema:"context-lint-failure/v1", ok:false, code, message, path?, bytes?, files?, max?}`
+that validates only against `context-lint-failure/v1`; a report is
+`{schema:"context-lint/v1", ok, verdict, closing_list, files, summary, truncated?}` and every file carries `lines`,
+`words`, `chars` and `tokens_est` (tokens are estimated as Cyrillic/3 + the rest/4). A directory
+target is scanned to depth 3, and `max_files` refuses early: the walk stops at the first file above
+the limit. Nothing is dropped silently: a directory below the depth limit, a link or junction that
+resolves outside the workspace root, and an unclosed fence, `<pre>` or HTML comment are INFO
+findings, so a `pass` never hides an unchecked region. An unclosed `<code>` is a
+line-local mask: it hides the rest of its line and is not reported (only fence,
+`<pre>` and HTML comments span lines and get an INFO marker). An abort is observed
+between files, every 2048 lines of a line-oriented check and at each gate, so the
+worst-case latency is one mask pass over a file capped by `max_file_bytes` (tens of
+milliseconds per 2 MB), not the whole scan. Commands count only inside code, a Task table
+or a Commands section, an HTML comment such as `<!-- npm install -->` is not a command, and `make`
+needs a target, so prose such as "Make sure …" is not a command. A scan started at the root also
+picks up fixture trees such as `eval/`; pass an explicit path for the canonical files.
 
 ### `orch_uni_snapshot`
 
@@ -309,7 +408,7 @@ npm run lint:fix     # biome check --write . (applies safe fixes)
 
 The `check:locales` and `verify:kit` scripts need a git checkout of the kit — the npm package ships no `tools/` directory, so in an installed package they are unavailable (`stand: unavailable` plus your own reproducible checks).
 
-`npm test` scans only `./test/` — the shipped suite (93 tests in 8 files, up from
+`npm test` scans only `./test/` — the shipped suite (289 tests in 9 files, up from
 72 in 5 before the identifier guards). A bare `bun test` from the repository root is red by
 design: the positional argument of `bun test` is a path substring filter, so the
 bare command also picks up the intentionally failing fixtures under `eval/cases/`

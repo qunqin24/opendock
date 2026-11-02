@@ -152,6 +152,30 @@ In opencode v1 the hook must mutate `output.system` in place: a reassignment is 
 
 Note: v1 support needs opencode 1.18.29 or later (object-style plugin entrypoints).
 
+### Hiding tools from review agents
+
+The v2 `context` hook also receives the agent id and the tool map. The plugin
+can remove writing tools from an agent that only reads. A tool the model cannot
+see is a tool it cannot call.
+
+| Option | Effect |
+| --- | --- |
+| `"warn"` (default) | Logs which tools it would remove. Changes nothing. |
+| `"enforce"` | Removes `write`, `edit` and `patch` from agents whose id matches `rev`, `review`, `audit` or `plan`. |
+
+```json
+{
+  "plugins": [
+    ["@vasilvestre/opencode-plain-style", { "agentTools": "enforce" }]
+  ]
+}
+```
+
+Start with `warn` and read the log for a day. Removing a tool an agent really
+uses blocks it mid-task. The `permissions` list in the agent file stays the real
+guard; this option only keeps the tool out of the prompt. It has no effect on
+opencode v1.
+
 ## Example output
 
 Same blind prompt, same model, same agent: "Describe what happens when an HTTP request reaches an Express server."

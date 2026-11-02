@@ -1,30 +1,33 @@
 # opencode-v2-security
 
-OpenCode v2 全自动执行边界安全插件。Linux 原生 shell 与内置文件工具采用静态 ALLOW/ASK 和统一动态授权；workspace-write 是审查基准，读写会话的获准命令单次直接执行，不再被插件沙箱二次否决。没有等待人工确认的判定分支。插件使用 v2 effect 插件 API（`{ id, effect(ctx) }`，`effect` 返回 `Effect.Effect`）。
+> **原生 Windows 后端已通过所选范围的真实验收：PowerShell 7 与 cmd。** 包含文件／网络隔离、只读、并发授权、取消和 ACL 恢复；本轮 Windows 宿主链路分批通过 12 项检查，1 项外部网络放行检查未重测。Git Bash／MSYS／Cygwin 和 Windows PowerShell 5.1 明确拒绝，不自动裸跑。真实 OpenCode 服务与在线 SystemOne 的端到端部署尚未验收。
+
+OpenCode v2 全自动执行边界安全插件。Linux 与原生 Windows shell、内置文件工具采用静态审查和统一动态授权；workspace-write 是审查基准。Linux 在运行时观察越界，Windows 启动前审查后保留 LPAC、受限令牌与 Job Object 的系统边界。没有等待人工确认的判定分支。插件使用 v2 effect 插件 API（`{ id, effect(ctx) }`，`effect` 返回 `Effect.Effect`）。
 
 1.5.0 保持现有配置和 category 名称兼容；研究和冻结验证依据见 [RESEARCH-v1.5.0.md](./RESEARCH-v1.5.0.md)。授权针对同一命令与事实报告，不把未选项的绝对概率、弱提示或批准后的随机重审当成新的拒绝理由。
 
-## 1.8.0 本地源码后端（尚未发布到 npm）
+## 1.10.0 Windows 沙箱与可信审查上下文
 
-- **范围**：Linux shell 和 OpenCode 内置文件工具。全部 codemode 工具、MCP、其他直连自定义工具不纳入新链路；本轮不实现 Windows 文件或网络沙箱。TUI 只负责当前模式与授权状态展示。
+- **范围**：Linux shell、原生 Windows PowerShell 7／cmd 和 OpenCode 内置文件工具。内置文件工具使用真实路径与权限检查，不宣称在宿主内建立 OS 沙箱。全部 codemode 工具、MCP、其他直连自定义工具不纳入这条链路。TUI 负责当前模式与授权状态展示。
+- **平台兼容前提**：新增 Windows 沙箱不改变原有 Linux 默认值、路径含义、静态规则优先级、运行时观察、执行路线或失败输出语义；WSL 仍走 Linux 链路，不因调用 `.exe` 而自动切换原生 Windows 沙箱。Windows 专用改动必须按实际平台分流，后续 Linux 沙箱更新先检查这一基线。另行要求的 SystemOne／AGENTS／skill 授权上下文增强是独立的全平台策略更新，不属于“Linux 行为完全未变”的声明。
 - **三种模式**：TUI 统一显示 `[Read only]`、`[Auto mode]`、`[Bypass mode]`。Auto 可追加 `, bypassing: filesystem,network` 和 `, custom bypassing on`；custom 授权正文不显示在状态栏。
 - **用户切换**：`/perm r`、`ro`、`readonly`、`read-only` 选择 Read only；`/perm w`、`rw`、`auto` 选择 Auto；`/perm bypass` 选择 Bypass。`/bypass all`、`*`、`ALL`、`yolo` 也选择 Bypass，不再表示“全部类别”。类别和 custom 豁免属于 Auto 的附加授权，祖先只读上限仍优先。
 - **单一策略**：HARD 策略已移除，不能通过配置或旧审查器选择。旧 `strictness: "LOOSE"` 仅作为单一策略的兼容拼写，不是另一种模式。
 - **审查基准**：工作区与配置的临时目录可写，其他位置的写入以及进程、远端、权限和明确凭据效果进入静态审查。内置文件工具使用真实路径检查，而不是宣称在宿主进程内建立 OS 沙箱。
-- **静态层**：运行时边界复核使用 ALLOW/ASK：known-safe 放行，不能证明则交给 JEV。启动前真实 Shell 命令的闭合底线、独立 `/perm` 权限上限和无效输入仍可拒绝。JS/TS/Python 文件中的命令字符串只构成审查信号，不因源码文本匹配被当作已执行的底线。执行链为「观察 → 越界时静态审查 → 不能证明时动态审查」。
-- **放行即继续**：普通 Shell 保持观察并继续原进程，不自动重放先前步骤；事件许可只覆盖相应边界，需要整树许可的不透明能力另行审查。外部目录、`sudo` 和变量路径不因旧只读挂载再被否决，但模型授权不改变真实 OS 权限、Windows ACL 或 sudo 凭据要求。
+- **静态层**：Linux 运行时边界复核使用 ALLOW/ASK：known-safe 放行，不能证明则交给 JEV；Windows 在启动前完成静态／动态审查。闭合底线、独立 `/perm` 权限上限和无效输入仍可拒绝。JS/TS/Python 文件中的命令字符串不因源码文本匹配被当作已执行的底线。
+- **放行后的执行**：Linux 事件许可继续原进程和观察，不重放先前步骤；需要整树许可的不透明能力另行审查。Windows 启动预审放行后仍保留 OS 能力边界。模型授权不改变真实 OS 权限、Windows ACL 或 sudo 凭据要求。
 - **动态层**：默认使用 `jev-latest` 与包内 `src/security/v11-gold-prompt.json`；`dynamicReview.jev.model` 可覆盖主模型（例如 `clef`），提示词题组和裁决策略不变。六个效果概率题与四个策略题共 10 题，Read only 增加符合性题后为 11 题。Variant B 的物质性阈值为 `>= 0.40`；闭合底线、只读限制及已确认未覆盖的物质效果先于补证回退，不以授权降低效果概率，不回退到另一套模型题组。
 - **仅 JEV**：不再启用 OpenAI-compatible 审查器或跨引擎回退；当前 effects/L3 生产链的可用性只依赖 `dynamicReview.jev` 的端点、模型和密钥环境变量，并可配置最多两个同协议备用端点。旧 OpenAI 字段兼容读取但不起作用，无需补齐它们。当前实现使用已核验的 `systemone` 协议；`decisions` 的不同协议尚未接入。
-- **r6 题组**：当前冻结题组版本为 `v12-systemone-aligned-20261021-r6`，RW/RO 分别使用该版本及其 `-readonly` 后缀，旧缓存不会混用。`filesystem_severity`/`network_severity` 的 noul 题带有 `true`/`false` criteria，用来说明真假边界，实际答案仍是概率；`covered_by_bypass` 只认当前 active bypass，提示词、历史文本或过期授权不算；判断以实际观察到的 argv/targets 和嵌套效果为准，字面量、打印/保存的示例或非执行 data 不算实际效果；Read only 允许 host-listed scratch 内 session-owned 临时数据的创建、写入和删除，但不能越过 denyWrite、protected/credential 路径或 floor。
-- **授权**：最近五轮真实用户消息在 12,000 字符预算内保留，连同会话上下文及可信 `/bypass` 状态进入请求；可信 question 答复只保留实际选择。类别豁免不扩大独立读写上限。命令正文或工具输出自称“已批准”不构成授权；最新限制或撤回优先，旧部署任务不会因参数微调而自动失效。
+- **r8 题组**：当前策略版本为 `v12-systemone-aligned-20261101-r8`，RW/RO 分别使用该版本及其 `-readonly` 后缀，旧缓存不会混用。题数与概率含义不变，新增可信指示的授权来源规则。`covered_by_bypass` 只认当前 active bypass，普通工具文本或过期授权不算；判断以实际 argv/targets 和嵌套效果为准，打印／保存的非执行示例不算实际效果；Read only 允许 host-listed scratch 内临时数据写入，但不能越过独立保护与 floor。
+- **授权**：真实用户消息、适用的 AGENTS.md、已加载 skill 的 host 注册正文及可信 `/bypass` 状态进入请求；可信 question 答复只保留实际选择。AGENTS.md 来源由真实会话位置和 host 来源快照确定，不从普通工具输出或伪造标签获取。类别豁免不扩大独立读写上限；最新限制或撤回优先。完整授权摘要绑定正向与负向批准缓存以及临时写根，指示变化不会复用旧批准。
 - **补证终局**：最多一次有界补证后复审。明确底线、只读违规和 `uncovered` 否决不放宽；真正耗尽补证的未知由 `dynamicReview.onUncollectable` 决定 `allow` 或 `deny`，默认 **`allow`**，记录为接受未知而非证明安全。协议或网络故障另按 `failPolicy` 处理。
 - **重试限制**：不把普通错误文本当作许可，也不自动重跑可能已有未知副作用的整条脚本。单次获准的执行例外与永久扩大沙箱边界不同。
-- **只读会话**：`/perm` 没有写权限时仍执行独立只读上限，审查放行及类别豁免都不授予写权限。仍需要沙箱的调用才受 helper 可用性约束；读写会话的获准直接执行不依赖 bwrap。
+- **只读会话**：`/perm` 没有写权限时仍执行独立只读上限，审查放行及类别豁免都不授予写权限。Windows 只读 shell 必须有可用原生隔离；Linux 获准的读写直接执行路线不依赖 bwrap。
 - **隐私范围**：普通日志与 `.bash_history`、`.zsh_history` 不因文件名被当作隐私。具体密钥、令牌和敏感环境变量仍受保护；“只读”不能自动豁免真正的凭据披露。日志的修改、删除、伪造或内容外传与普通只读诊断分开判断。
 - **脚本证据与凭据遮盖**：首次审查前附加有界执行脚本正文，并优先按观察到的 argv 与进程 CWD 解析，避免 `cd nested` 后附加根目录同名文件。审查 argv 的敏感赋值、参数值及 URL 全部 userinfo 显示为 `[redacted]`；缓存仍绑定原始参数摘要。
 - **审查诊断**：`logReviewerTrace: true` 启用 `~/.opencode/reviewer-trace.jsonl`，记录明文 `command`、原始边界参数与完整 `effects`／原始 JEV 答案。一轮 request/result/outcome 不是三次 JEV 请求。此日志可能含敏感参数，不能提交或随意分享；新建文件为 `0600`，既有文件权限不会自动改变。后台停止在释放授权前记录 `effects_background_blocked`；关闭详细追踪时也向 scratch 写最小通知，但不写原始命令。前台说明使用 `Tool.Error`，迟到的后台拒绝通过同会话待发通知交付；两者都不写入被执行进程 stdout/stderr。
 - **Auto 常规写入范围**：项目、配置的 scratch，加 `~/.cache` 与 `~/.npm/_cacache`。这是有限的缓存范围扩展，不包含整个 HOME、用户设置、用户状态或 Windows 目录；缓存根及目标的符号链接越界不继承这个放行，凭据/系统路径判定优先。Read only 不获得缓存写权限。
-- **全局临时目录**：Linux `/tmp` 与原生 Windows `$env:TEMP` 的目录本身和全部真实后代，在所有模式下无条件可写，不受文件名、工作区、denyWrite 或控制面写保护例外影响；敏感读取仍独立审查，外部链接目标不在授权内。其余临时根（配置的 scratch、`/var/tmp`、`TMPDIR` 及 WSL 的 Windows 临时目录）保留规范路径与 HOME/工作区限制；显式 scratch 可以尚未创建。Windows 路径从继承环境或常规用户目录推导，不为探测启动 `cmd.exe`。内部 broker 已迁至 `~/.opencode/run`。
+- **临时目录**：Linux `/tmp` 与宿主文件工具对原生 Windows `$env:TEMP` 的共享写授权保持不变，外部链接目标不继承授权。Windows 沙箱 shell 另外使用每次调用新建的私有 HOME／TEMP／scratch，不授予已有 TEMP 全树；只读允许该私有临时区写入，不允许持久根写入。其余 Linux 临时根保留规范路径与 HOME／工作区限制。内部 broker 位于 `~/.opencode/run`，Windows 原生恢复状态另存于受保护的 `%LOCALAPPDATA%\opencode-windows-sandbox-state`。
 - **插件开发目录**：会话工作区明确位于当前插件包目录内时，允许正常开发写入；其他工作区仍保护插件安装目录。运行中的观察器二进制与 broker 通信目录不随开发豁免放开。
 
 只调整补证终局时，在现有配置的 `dynamicReview` 对象内加入：
@@ -41,7 +44,7 @@ OpenCode v2 全自动执行边界安全插件。Linux 原生 shell 与内置文�
 |---|---|---|
 | 函数插件 `{ id, server }` | `export default { id, effect(ctx) }`，`effect` 返回 `Effect.Effect<void>` | v2 effect 插件形状（阻断为单次调用的 typed `Tool.Error` 失败；hook 回调返回 `Effect`） |
 | `config` hook（覆写 config.shell） | `ctx.shell.hook("create.before")` | spawn 前改写 `ev.shell`/`ev.env` |
-| `shell.env`（注入 `OPENCODE_REAL_BASH`） | 同上（`ev.env.OPENCODE_REAL_BASH = ev.shell`） | 仅 Windows 且 supervisor 二进制存在时生效 |
+| `shell.env`（注入真实解释器） | `create.before` 传递受保护的真实 shell 路径 | Linux 使用观察器；Windows 使用独立原生沙箱，不把旧 supervisor 当作隔离 |
 | `tool.execute.before` | `ctx.tool.hook("execute.before")` | 静态 + 动态审查管线；`ev.input` 可变（`timeout`/`command`） |
 | `tool.execute.after` | `ctx.tool.hook("execute.after")` | 子会话权限继承；已退场的 HARD 失败裁决不再参与 |
 | 工具名 `bash` / `apply_patch` | `shell`（兼容 `bash`）/ `patch`（兼容 `apply_patch`） | `patch` 检查 `input.patchText` |
@@ -53,7 +56,7 @@ OpenCode v2 全自动执行边界安全插件。Linux 原生 shell 与内置文�
 
 ## 安装
 
-新后端尚未发布到 npm；在 `opencode.json` 的 `plugins` 数组引用本地源码目录。下列目录名是配置示例，请换为实际源码路径：
+可在 `opencode.json` 的 `plugins` 数组引用 `opencode-v2-security@1.10.0`，或引用本地源码目录。下列目录名是本地安装的配置示例，请换为实际源码路径：
 
 ```json
 {
@@ -193,7 +196,7 @@ arm 后命令不会被静态层直接 ALLOW：豁免对应检查后以 `bypass.s
 
 公开界面只有 Read only、Auto、Bypass 三种模式；内部 r/w 能力上限仍与所有祖先相交，x 仅保留兼容且不展示。用户可选择模式；代理对直接子会话只能收紧为 Read only 或 Auto，不能开启 Bypass。声明 Auto 的子会话和它的后代不会越过该声明继承更上层的 Bypass。
 
-本插件实际限制的是 Linux 原生 read/grep/glob 与 write/edit/patch、shell。Read only 的原生写动作被拒绝（全局临时目录除外），shell 仍执行独立只读上限；范围外的工具保留宿主原有处理。
+本插件实际限制的是 Linux／原生 Windows 的内置 read/grep/glob、write/edit/patch 与受支持 shell。Read only 的原生写动作被拒绝（宿主临时目录例外仍按共享路径策略处理），Windows shell 则只允许私有临时区写入；范围外的工具保留宿主原有处理。
 
 ### 执行面
 
@@ -248,7 +251,7 @@ UI 不再展示 rwx/x/YOLO 字样。状态尚未同步时显示未知状态，�
 - **无需审批的拒绝（errno 注入）**：观察器把某些 syscall 在入口改为空操作并在出口返回错误码，只减少能力、不放行，整棵树继续受观察：`io_uring_setup` → `ENOSYS`（libuv/Node、Bun、tokio 回退到 epoll/线程池）；连接 nscd 套接字 → `ENOENT`（glibc 自行读取用户/组数据库，`ls -l`、`ps`、`id`、`stat` 不再越界）；读取 watcher 自身 `/proc/<pid>/*`（cmdline 含 broker token）与 root 所有的 procps `ps` 扫描其他进程 environ → `EACCES`。其他程序读其他进程 environ 仍是 read 边界。
 - **直接放行**：信号 0（只探测存在，uutils `tail` 的 `kill(0,0)`）；连接 root 所有、目录不可写的 `/run/systemd/userdb/*`；发往内核（`nl_pid` 0）的 netlink（`getifaddrs` 等查询；非 root 的 tracee 无法获得修改网络状态的能力）。
 - **interop 判定**：按 binfmt_misc 规则读文件头 `MZ`，不看文件名：ELF 格式的 `bun.exe`、`opencode.exe` 原生执行，不再是 interop 事件；改名的 PE 仍是。读不到文件头时退回 `.exe` 后缀判定。所有运行时观察的调用设置 `GIT_OPTIONAL_LOCKS=0`，只读 Git 命令不再在 worktree 的主仓库 gitdir 写 `index.lock`。
-- **缓存范围**：L1 按 (会话、securitySnapshot、边界核心摘要) 键控——核心摘要是越界本身而不是命令文本：事件 kind/syscall/operation/写入效果、目标稳定身份（canonical path、domain、exists、dev/ino/mode、父目录 dev:ino，不含 size/mtime/ctime）、执行映像身份与 basename、跨越进程 argv 摘要（bash/sh/dash/zsh/ksh/fish/busybox sh 等 shell 解释器除外——其 argv 是整条命令行）、运行 cwd、只读/可写审查政策版本与活动豁免面。`| tail -30` 改成 `| tail -20` 或追加 `; echo x` 命中同一越界的 L1；原生文件工具同理按 (工具 + 解析目标 + 身份 + 模式) 而非原始输入键控。正向条目（allow，L1 与 L2）TTL 20 分钟且**滑动续期**（每次命中重置），只绑定安全快照——新用户消息不再使其失效，任何安全状态变化（/perm、/bypass、kill switch、租约到期）清空该会话全部缓存；负向条目（deny，仅 L1）TTL 5 分钟不滑动，仍绑定 adjudicated 时的用户消息摘要——新消息可能授权曾被拒绝的操作，故拒绝在新消息后未命中。L2 只给非 fullApproval 的 write 级操作，按 (path, 父目录 dev:ino) + 对象身份（dev/ino/mode——同 inode 的 chmod 即失效，内容 mtime 不失效）绑定，调用结束（含非零退出码，不含被拦截）后推进到落盘对象。L2 还绑定写入效果并且不会放宽：`replace`（O_TRUNC/truncate/creat）⊃ `overwrite` ⊃ `append` ⊃ `fd-write`，`mkdir` 单列；符号链接、硬链接、设备节点不进入 L2。旧快照范围的查询只是未命中，不会清空当前缓存；最多保留 64 个会话的缓存状态。ReadOnly 会话也复用 read/network 越界的审查结果。opaque/requiresFullApproval 事件**完全不缓存正向**（exe 未变不等于同一动作；间接可变输入无法绑定），deny 结果仍可缓存。
+- **缓存范围**：L1 按会话、安全快照和边界核心键控；核心包含真实目标及稳定对象身份、效果、执行映像／参数、cwd、策略版本和活动豁免，不按整段命令文本或 mtime 键控。L1/L2 的正向批准与负向拒绝现在都绑定完整授权摘要：用户消息、可信 AGENTS.md 或 skill 指示变化后不复用旧裁决。正向 TTL 20 分钟，命中滑动续期；负向 TTL 5 分钟，不滑动。安全状态变化清空会话缓存。L2 仅复用同对象、不扩大效果的常规写入：`replace` ⊃ `overwrite` ⊃ `append` ⊃ `fd-write`，`mkdir` 单列；链接、设备节点和 requiresFullApproval 不获得 L2。调用结束后只在相同授权下推进对象身份。opaque/requiresFullApproval 不缓存正向许可；网络缓存还必须绑定完整实际端点。最多保留 64 个会话。Windows shell 启动预审不借用 Linux 的逐越界缓存来扩大进程能力。
 - **审查文本脱敏**：复核收到遮盖敏感值后的 argv、command 和证据命令文本；带空格的单／双引号参数和赋值同样显示为 `[redacted]`。原始 argv 摘要只供宿主缓存使用；显式详细追踪仍可能记录原始命令和边界参数，须按敏感本地日志保护，不能把它当作已脱敏的复核请求。
 - **环境继承取舍**：payload 原样继承宿主环境（含密钥）。启动代码钩子（`BASH_ENV`、`ENV`、`BASH_FUNC_*`、`SHELLOPTS`、`PROMPT_COMMAND`、`LD_*` 等）在外层 shell 被改名为 `OPENCODE_DEFER<N>_*`（置原名空串——已核实宿主 `packages/core/src/shell.ts` 在 hook 前物化 env 且 spawner 不合并父 env，空串语义稳妥），存储名与原名以 `--defer <storage>=<name>` 显式对传给 helper：traced child 只恢复被声明的对子，用户自有同前缀变量原样透传。**槽位耗尽即拒绝启动**（任一钩子拿不到空闲存储名或超 256 对上限→ 命令在 payload 存在前被 sandboxDenyCommand 拦截，外层固定 /bin/sh，不保留原钩子、不静默丢值）。
 - **NOFOLLOW-last**：unlink/rmdir/rename/lchown/l*xattr/linkat 目的端等操作按 canonical(parent)+basename 判定——删除指向外部的根内符号链接不是外部删除；rename/link 事件同时携带源与目标两个 target（硬链接会改源 inode 元数据）。路径解析遵守内核遍历顺序：realpath 先跟符号链接再处理 `..`，不做词法折叠——`a/link/../f` 与 `a/f` 可能是不同对象；linkat 源端仅在 `AT_SYMLINK_FOLLOW` 时 follow。
@@ -281,7 +284,7 @@ UI 不再展示 rwx/x/YOLO 字样。状态尚未同步时显示未知状态，�
 
 候选不能覆盖工作区或已有根，也不能与凭据、denyWrite、protect 或控制面重叠。候选的名称扫描不超过三层、5000 项；凭据样式名称、数据库、任何类型的 `.git` 条目（包括 linked worktree 的指针文件）、扫描截断或错误均不能带来授权。像 `~/.local/share/opencode` 中的 `auth.json` 和 `opencode.db` 会淘汰宽根，而纯日志子目录仍可候选。JEV 只能选择给定候选或 `none`，不根据概率改写答案；上下文不支持继续使用工具，或写入是任务操作而非例行日志/缓存/锁等附随活动时应选 `none`。
 
-获准根仅存在于当前会话内存，20 分钟到期、最新真实用户消息摘要变化或安全快照变化后，在下次使用时失效；Read only 不使用 L3。新 shell 调用加入有效根；临时根同时保留观察器的逐写入事件，用本地有效期/排除检查直接回复 `continue`，不走静态/JEV 复审，也不会让长命令沿用已到期的根。L3 的模型、协议、扫描错误只意味着不扩根，绝不因此拒绝命令。审计事件为 `l3_root_request/granted/declined/error/expired`，只保留命令 SHA-256 和目录路径，不记录原始命令或凭据。
+获准根仅存在于当前会话内存，20 分钟到期、完整用户／可信指示授权摘要变化或安全快照变化后，在下次使用时失效；Read only 不使用 L3。新 Linux shell 调用加入有效根；临时根保留逐写入事件，用有效期／排除检查直接回复 `continue`，不走静态/JEV 复审，也不会让长命令沿用已到期根。L3 故障只意味着不扩根。Windows 不使用逐越界扩根。审计事件为 `l3_root_request/granted/declined/error/expired`，只记录命令摘要和目录路径，不记录原始命令或凭据。
 
 会话删除会清除 L3 授权和重复记录，并阻止在途建议重新安装授权；超过窗口的目录记录在访问时及现有维护定时器中清理。
 
@@ -370,7 +373,7 @@ v1.4.0 的静态放行、RO 修复与验证方法见 [v1.4.0 研究与验证摘�
 | `slowCommands` | boolean | `true` | 拦截安全但必耗时的命令（系统/挂载树的无界扫描、`-f` 流式、超长 `sleep`），除非调用方显式给了 timeout。底层默认参数：`maxDepth=16`（find/rg/fd 的 `-maxdepth` 阈值，超过才拦）、`sleepThresholdSeconds=120`（sleep 阻断阈值，`>=` 即拦）、`allowExplicitTimeout=true`（调用方传入工具参数 timeout 时不拦） |
 | `logReviewerTrace` | boolean | `false` | 完整审计轨迹开关。每轮动态审查写请求与结果/错误，另写最终裁决；不含原始命令或凭据。故障放行始终记录 `fail_open_pass` 和简短故障码：开启时写入 `~/.opencode/reviewer-trace.jsonl`，关闭时仅写入 `sandbox.scratch/reviewer-trace.jsonl`。可用时附加非阻断 metadata；日志写入失败不阻断调用 |
 | `trustedCommands` | string[] | `[]` | 用户信任的命令及参数前缀，支持 `*` / `?`。读写会话中，整条 shell 调用仅含匹配命令且静态检查通过时，命令自身及其子进程的边界行为免动态审查。外部文件重定向、替换执行或未列入的附加命令不获此豁免；只读和显式保护仍优先。裸名不匹配 `./tool`；条目不能包含 shell 语法。详见下节 |
-| `supervisorEnabled` | boolean | Windows 下 `true` | 使用原生 shell supervisor |
+| `supervisorEnabled` | boolean | Windows 下 `true` | 旧字段兼容保留；新 Windows 边界使用独立沙箱，不以旧 supervisor 代替隔离 |
 | `supervisorPath` | string | 包内默认 | supervisor `bash.exe` 路径 |
 | `BypassClassifier` | string[] | `[]` | 永久豁免类别列表：`filesystem`/`host`/`privilege`/`secret`/`network`/`remote`/`indirection`/`dynamic`/`sandbox`/`slow`；未知类别警告并忽略 |
 | `bypassLeaseTtlMs` | number | `0`（不限时） | 临时豁免与 Bypass 模式租约的默认时长（无 timeout 时使用）；`0` 表示不自然过期；否则到期为固定时刻，活动不续期，范围 60000–86400000 |
@@ -420,19 +423,32 @@ v1.4.0 的静态放行、RO 修复与验证方法见 [v1.4.0 研究与验证摘�
 3. **目录解析**：v2 ctx 无 `directory/worktree`，按会话从 `ctx.session.get().location.directory` 解析（带 30 分钟 TTL 与 512 条目上限的缓存），失败回退 `process.cwd()`。effect ctx 下 `ctx.session.*` 返回 `Effect`，经插件内部捕获的宿主 runtime 桥接运行，保留宿主服务。
 4. **会话清理**：`session.deleted` 事件经 `ctx.event.subscribe()`（`Stream`）以 `Stream.runForEach` + `Effect.forkScoped` 消费；插件 scope 关闭时中断 fiber，事件形状为 `{ type, data: { sessionID } }`。
 
-## Windows 进程 supervisor
+## 原生 Windows 沙箱
 
-与 v1 相同：Windows 下若 `native/windows-bash-supervisor/target/release/bash.exe` 存在，则把真实 shell 放入 Job Object，避免后台子进程持有输出管道导致 opencode 挂起。真实 shell 经 `create.before` 注入 `OPENCODE_REAL_BASH`（取 v2 已解析的 `ev.shell`，无硬编码回退；缺失时 supervisor 以状态 125 退出）。非 Windows 平台自动跳过。
+Windows 默认使用随包的 `bin/opencode-windows-sandbox.exe`。该后端结合独立 LPAC 身份、额外 restricting SID、按对象授予的 ACL 和不可脱离的 Job Object。构建、机制与平台限制见 [Windows 沙箱说明](native/windows-sandbox/README.md)。旧 `windows-bash-supervisor` 只保留为独立历史组件，不提供文件或网络隔离，也不是失败后的备用执行路线。
 
-重新构建 supervisor：
+真实 Windows 原生矩阵已通过：工作区读写及原子替换／删除，外部读写和 denyRead/denyWrite 拒绝，只读与私有 scratch，IPv4／IPv6／环回网络禁止，并发授权，正常完成／launcher 被杀／部分取消帧下的子树终止，以及最终 ACL／临时数据恢复。宿主矩阵 `tests/windows-host-integration.test.ts` 的 9 项检查也已通过，包含显式网络授权、后台撤权、junction 目标检查和失败路径的底线保护；其中审查答案使用注入，不宣称在线 JEV 或真实 OpenCode 服务部署已验收。完整宿主检查需设置 `OPENCODE_WINDOWS_RUN_ACCEPTANCE=1`，正向连接检查另接受明确授权的 `OPENCODE_WINDOWS_TEST_ENDPOINT`。
+
+- **启动前审查**：使用 host 实际解析的 shell、CWD、字面目标与有界脚本证据，必要时交给同一 SystemOne 审查器。支持 PowerShell 7（`pwsh.exe`）与 cmd；Git Bash 等 MSYS／Cygwin shell 因全局命名对象权限冲突拒绝，Windows PowerShell 5.1 因旧 CLR／ALPC 启动阻塞拒绝。Windows 不宣称提供 Linux 式逐系统调用观察。
+- **批准不撤隔离**：Auto 授予工作区、每调用私有临时区和准确获准的额外目标；支持工作区内正常替换、重命名和删除。无法安全表达的新建外部目标不会自动扩成父目录授权；未知目标仍可能被 OS 拒绝。原生启动失败不重放、不再次裸跑。
+- **只读与撤权**：Read only 保留独立写上限；缺少强制隔离时拒绝，不以 fail-open 代替只读保证。后台命令保留独立控制管道，取消、会话删除或权限撤回会终止受监管进程树。
+- **明确的绕过与降级**：用户主动选择 Bypass 或关闭沙箱会使用无隔离路线；普通模型批准不关闭沙箱。读写会话的准备故障仍遵循现有 `failPolicy`，默认 fail-open 可能降级为未包裹路线。要求强制不降级的安装应设置 `failPolicy: "fail_close"`；原生进程已启动后的失败不会重放。
+- **故障与底线分开**：`contractFailure:true`、真实审查否决、权限上限和已确认底线不能 fail-open。驱动根删除等底线不能被更早的普通风险信号遮蔽；单纯 `TcpClient` 连接也不再被误报为反向 Shell。
+- **不是整机容器**：同一 Windows 内核、宿主文件工具的路径检查以及 MCP／Code Mode 的范围，与 shell 的 OS 隔离必须分别理解。
+- **平台范围**：这是原生 Windows 宿主后端；WSL → Windows 互操作仍走现有整树审查路线，不等于已自动接入这套 Windows 内核边界。环境不复制服务变量或凭据，其他工具可能需要显式可执行文件路径及获准读目标；网络开启后仍可能受到 Windows 的环回或防火墙限制。
+- **ACL 元数据说明**：每调用的临时 ALLOW／DENY 条目均清理；Windows 在 DACL 写入时可能清除 `SE_DACL_AUTO_INHERITED` 信息位，不承诺所有运行库的 SDDL 字符串逐字不变。旧实验残留已在保留备份后清理，其他 ACE／owner 比对无变化；临时维护脚本的崩溃及元数据副作用见原生说明。
+
+调研依据：Codex 本地 `codex-rs/windows-sandbox-rs` 区分受限令牌写约束与提权账户隔离；其普通令牌和代理环境变量不能替代读／网络隔离。[Claude Code 官方说明](https://code.claude.com/docs/en/sandboxing)明确原生 Windows 命令不使用其沙箱，Windows 用户需在 WSL2 内使用 Linux 沙箱。实现不将这些不同层次混为“完整隔离”。
+
+重新构建 Windows 沙箱（使用 Windows Rust 工具链）：
 
 ```bash
-cargo build --release --manifest-path native/windows-bash-supervisor/Cargo.toml
+cargo build --release --manifest-path native/windows-sandbox/Cargo.toml
 ```
 
 ## 安全边界
 
-- 这是纵深防御：静态分类器、动态审查器、Linux OS sandbox（启用时）、r/w 权限层与 opencode 原生权限共同构成边界。
+- 这是纵深防御：静态分类器、动态审查器、平台 OS 边界、r/w 权限层与 opencode 原生权限共同构成边界；Linux 观察器与 Windows LPAC 的能力和兼容限制不同。
 - `sandbox` 类别可逐次移除当前 shell 调用的 Linux OS sandbox；其他静态、动态、permission 与原生权限层仍在。`sandbox` 不是关闭整个插件的别名。
 - `privilege` 类别与 OS 沙箱的一致性：bwrap 无条件设置 NO_NEW_PRIVS 并丢弃 capabilities，`sudo`/`chown` 在沙箱内会**静默失败**。因此当生效豁免集合含 `privilege` 且命令需要特权时，该次调用不以沙箱包裹（host-direct）；无法去沙箱（ro profile）时显式终止（fail-loud）。生效集合不含 `privilege` 时，即使审查器 ALLOW 也在动态审查前显式终止，并提示用 `/bypass privilege` 或在提权时附加 `privilege`——绝不静默运行时失败。
 - 静态分类与 LLM 审查都会出错；`ALLOW` 只是风险降低，不保证安全。

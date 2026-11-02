@@ -1,9 +1,13 @@
 # opencode-todo
 
+> **OpenCode v2 only.** This is the `main` line of `opencode-todo`, built for
+> the OpenCode 2 plugin API (2.0.20+). For OpenCode 1.x use the
+> [`v1` branch](https://github.com/ainformatico/opencode-todo/tree/v1).
+
 A personal task backlog for [OpenCode](https://opencode.ai), for you, not the
 agent.
 
-![Adding, running, and clearing tasks](assets/demo.gif)
+![Parking follow-up tasks while the agent works, running one, and clearing the rest](assets/demo.gif)
 
 ## The problem
 
@@ -25,11 +29,11 @@ plugin. It is deliberately the simplest thing that works.
 ## Install
 
 ```sh
-opencode plugin opencode-todo --global
+opencode plugin add opencode-todo
 ```
 
-Restart opencode. Done. Requires OpenCode 1.18+; drop `--global` for a
-project-local install.
+Restart opencode. Done. Requires OpenCode 2.0.20+; OpenCode 1.x users should
+use the [`v1` branch](https://github.com/ainformatico/opencode-todo/tree/v1).
 
 ## Commands
 
@@ -69,5 +73,9 @@ appear in `/` autocomplete once installed; nothing else to set up.
 npm test && npm run lint && npm run typecheck
 ```
 
-For local hacking: `opencode.json` → `{ "plugin": ["./src/server.ts"] }`,
-`.opencode/tui.json` → `{ "plugin": ["../src/tui.tsx"] }`. MIT licensed.
+For local hacking, opencode discovers the plugin automatically from
+`.opencode/plugins/opencode-todo/`, which wires this checkout into a running
+OpenCode (`.ts`/`.tsx` files are loaded directly). The published package
+ships a compiled TUI entry (`dist/tui.js`, built on `npm pack` by
+`npm run build:tui`) because OpenCode does not compile `.tsx` inside
+`node_modules`. MIT licensed.

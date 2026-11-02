@@ -51,6 +51,8 @@ Daily memory writes publish a complete replacement file under that lock, so conc
 
 Memory is stored outside every repository, under `~/.config/opencode/memory` by default (override with `OPENCODE_MEMORY_DIR`). To start over, delete that directory.
 
+On POSIX systems, new store directories use owner-only `0700` permissions and new files use `0600` (subject to a more restrictive umask). This includes temporary replacements, snapshots, locks, status files, and append-only logs. Accessing an existing store attempts to remove group/other permissions from its root; existing directories and appended/status files are tightened when written, without adding owner permissions. Old descendants are not recursively migrated: a successfully tightened root prevents other users from traversing to them. If directory chmod reports `EPERM`, `EROFS`, `EOPNOTSUPP`, or `ENOSYS` (for example an immutable or foreign-owned root, or a mount without chmod support), reads remain available with the existing permissions: owner-only traversal is not guaranteed. Correct ownership, mount support, or permissions outside the plugin when that privacy guarantee is required. File permission enforcement on writes remains unchanged. Existing ancestors outside the store are left unchanged. A store root that is itself a symlink is refused; configure its real directory instead. These modes do not revoke already-open handles or protect copies/hard links outside the private root. On Windows, privacy depends on the directory's ACL; the plugin does not change Windows ACLs.
+
 ## Options
 
 Zero configuration is the default. To tune, use the object form of the plugin entry in `opencode.json(c)`:

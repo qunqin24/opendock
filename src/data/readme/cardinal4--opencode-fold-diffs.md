@@ -117,7 +117,7 @@ Blocks are re-scanned on V2's `session.tool.called`, `session.tool.progress`, `s
 
 ## Status
 
-Written against **opencode v2.0.24**, re-checked against **v2.0.27** and **v2.2.0**, and API-checked against **v2.2.3** / OpenTUI 0.8.x; the `session.*` events it listens to exist from v2.0.10 on, so an older V2 install gets the fix without upgrading. The tree-walking, block matching, fold/unfold and toggle logic run green against a mock renderer tree shaped like V2's (`node --test`), and the fold was checked against a real transcript: `visible = false` (Yoga `display: none`) is what actually hides a body, not `maxHeight`.
+Written against **opencode v2.0.24**, re-checked against **v2.0.27** and **v2.2.0**, and API-checked against **v2.2.3** / OpenTUI 0.8.x; the `session.*` events it listens to exist from v2.0.10 on, which is the `engines.opencode` floor (`>=2.0.10`). The tree-walking, block matching, fold/unfold and toggle logic run green against a mock renderer tree shaped like V2's (`node --test`), and the fold was checked against a real transcript: `visible = false` (Yoga `display: none`) is what actually hides a body, not `maxHeight`.
 
 To confirm it loaded, restart (`opencode service restart`) and check `/plugins` lists `opencode-fold-diffs` and `Ctrl+P` → **Fold / unfold file diffs** is in the palette. If nothing folds, run **Fold diffs: diagnose** — the toast reports what the plugin can see:
 

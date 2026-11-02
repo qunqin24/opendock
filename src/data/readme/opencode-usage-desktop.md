@@ -9,7 +9,7 @@ Usage, quota, TPS/TTFT and session statistics for OpenCode Desktop. It covers th
 
 ## Features
 
-- Pinned **Usage** tab in the session sidebar, without taking space above the composer
+- **Usage** tab in the session sidebar, pinned by default; unpin it to close, drag, or reopen it from the session panel menu
 - 5h / 1w / 1mo quota with **used / remaining** toggle
 - Quota **pace**: a marker on the bar shows elapsed window time, with `on pace`, `x% under pace`, `x% over pace`
 - Threshold colors: 50% warning and 80% danger by default, configurable in settings
@@ -30,7 +30,7 @@ Usage, quota, TPS/TTFT and session statistics for OpenCode Desktop. It covers th
   - `Usage: open stats`
   - `Usage: refresh`
   - `Usage: copy performance metrics`
-- Settings page: display mode, thresholds, live TPS card and quota notifications
+- Settings page: display mode, sidebar pin, thresholds, live TPS card and quota notifications
 - Desktop notification when a quota crosses the danger threshold
 
 ## Install
@@ -76,7 +76,7 @@ The repository commits `dist/`, so a GitHub install does not need a local build.
 
 On Windows, use a path such as `D:\\work\\opencode-usage-desktop`.
 
-After changing the config, restart OpenCode Desktop, or open **Settings → Extensions → Plugins** and press **Reload**. The pinned **Usage** tab appears in the session sidebar.
+After changing the config, restart OpenCode Desktop, or open **Settings → Extensions → Plugins** and press **Reload**. The **Usage** tab appears in the session sidebar, pinned by default.
 
 ### Requirements
 
@@ -160,7 +160,7 @@ Additional sections:
 
 | Command | What it does |
 | --- | --- |
-| `Usage: open details` | Opens the pinned Usage panel |
+| `Usage: open details` | Opens the Usage panel |
 | `Usage: open stats` | Opens the stats dialog |
 | `Usage: refresh` | Refreshes quota and usage data |
 | `Usage: copy performance metrics` | Copies the current performance snapshot as JSON |

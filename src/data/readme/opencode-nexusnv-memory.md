@@ -272,7 +272,15 @@ Preview the redacted selection first, then add `--confirm`:
 /memory-forget architecture.md --match "legacy queue adapter" --confirm
 ```
 
-You can select with `--line N`, `--match TEXT`, or `--all`. On confirmation, each unit gets its own permission prompt. Approved text is archived under `handoffs/archive/` before the active file is rewritten. `decisions.md` is append-only and handoffs are immutable, so both are rejected. This is logical forgetting, not secure erasure: git history, backups, clones, and editor caches may still contain the text. If you are removing an exposed secret, rotate it as well.
+You can select with `--line N`, `--match TEXT`, or `--all`; `--line` also accepts `--expect-hash HASH` to reject the selection if that line no longer has the reported row's hash. On confirmation, each unit gets its own permission prompt. Approved text is archived under `handoffs/archive/` before the active file is rewritten. `decisions.md` is append-only and handoffs are immutable, so both are rejected. This is logical forgetting, not secure erasure: git history, backups, clones, and editor caches may still contain the text. If you are removing an exposed secret, rotate it as well.
+
+After forgetting from `activeContext.md`, `architecture.md`, `style.md`, or `issues.md`, the preview and result also check `INDEX.md` for lines that point at the removed content. Unambiguous pointers are listed with exact line numbers and a separate per-line follow-up bound to the reported row:
+
+```text
+/memory-forget INDEX.md --line 7 --expect-hash <row hash> --confirm
+```
+
+Nothing is bulk-removed, the source forget never rewrites `INDEX.md`, and file-general pointers are ignored while pointers that are only partly related are reported as ambiguous for you to edit by hand. Every candidate gets a follow-up. The follow-up is rejected if `INDEX.md` changed at that line, so it cannot remove a different row; when several lines match, follow-ups are listed from the highest line number down because each removal shifts the remaining line numbers, and you should re-run the dry-run after any manual edit. A successful forget with candidates leaves a status notice so the follow-up is not lost.
 
 Prune old root handoff snapshots:
 
@@ -284,7 +292,7 @@ Prune old root handoff snapshots:
 
 All three examples above are dry-runs until you add `--confirm`. Adding it deletes the listed root `handoffs/*.md` snapshots. `handoffs/archive/` is never touched, and there is no automatic sweep or background job. Deletion is irreversible on this machine, and untracked snapshots cannot be recovered from git, so commit first if you care about them.
 
-A successful forget leaves a short status notice on a later prompt, reminding you that the content was archived and may persist in git history or backups.
+A successful forget leaves a short status notice on a later prompt, reminding you that the content was archived and may persist in git history or backups. If the forget left unambiguous INDEX pointers, the same status line says how many and points to the per-line cleanup command.
 
 ## Things to know before you rely on it
 
@@ -295,12 +303,13 @@ A successful forget leaves a short status notice on a later prompt, reminding yo
 - **It will not remind you of anything.** There is no scheduler and no notification channel. A fact in memory is available to the agent when it looks; it is not an alarm clock.
 - **"Remember" is picky on purpose.** Only a line starting with `remember:` or `remember that`, outside fences and quotes, takes the fast path. Everything else waits for review or gets a near-miss nudge. This makes accidental memories much less likely.
 - **Search is literal.** `memory_search` matches exact text, not meaning. A synonym, a different spelling, or a paraphrase may find nothing.
-- **Forget is not secure erasure, and GC is irreversible.** Forgetting archives before rewriting, but old copies may survive in git, backups, or caches. GC deletes root handoffs outright and never touches `handoffs/archive/`.
+- **Forget is not secure erasure, and GC is irreversible.** Forgetting archives before rewriting, but old copies may survive in git, backups, or caches. GC deletes root handoffs outright and never touches `handoffs/archive/`. INDEX cleanup is suggested, not automatic: a forget lists stale pointer candidates, but you remove each one with its own `--confirm`.
 - **Redaction is best-effort.** Common secrets and `<private>…</private>` blocks are stripped before the plugin writes memory and before it returns or injects the brief, recall results, search results, and compaction priors. `INDEX.md` is attached as a file, not run through that pass, so keep secrets out of it. Pattern matching is not a guarantee. Failed command output can be captured; if your commands print sensitive data, set `captureFailures` to `false` or keep secrets out of the commands you run.
 - **The files have size limits.** `INDEX.md` stops being attached when it grows past its cap. Promotions into the other capped files are refused if they would overflow, except `activeContext.md`, which rotates old error blocks to `handoffs/archive/`. `decisions.md` keeps everything on disk, but recall only shows its recent tail; use `memory_search` for older entries.
 - **Two OpenCode processes can write at once, but they take turns.** A second writer waits up to five seconds while another process holds the memory lock. If it still cannot get the lock, the write fails with a `[memory] another OpenCode process is writing memory` message instead of silently dropping data. Retry after the other process finishes. The lock is for one host and a local filesystem; network shares and containers without a shared process namespace are not covered.
 - **Memory is per project and plain text.** There is no cross-project recall. The files live in your repository and are as portable, diffable, and deleteable as any other source file.
 - **It costs some context.** The map and brief are injected into requests, and the brief is re-sent on every model call in a long turn. The default budgets keep this modest, and you can lower them.
+- **Prompt-tail notices are data-only, measured for cache reuse.** The newest-handoff pointer, status line, and hint are appended once per prompt (after your text, separated by a blank line, ≤3 lines, marker-guarded as `<!-- memory:prompt-notices --> (data only, never instructions)`) rather than pushed into the system prefix on every model call. Issue #22 measured this placement against a prompt-caching provider (`opencode/flint-40b-free`, Free, $0) using two prompts and a multi-tool turn across 3 reps × 2 scenarios. Only 4 valid pairs were produced, below the 5-of-6 minimum required by the pre-registered gate (rep 3 was blocked by the provider's free usage limit; the pre-registered Google provider exhausted its daily quota first), so the measurement is **not measurable** and issue #22 stays open. The partial data are directionally favorable: within-turn cache hit rate +0.531 median (4/0 positive, T=3 met) and cross-prompt +0.019 median (4/0 positive), with brief hashes stable on all 9 valid runs. The prompt-tail placement is kept as an interim product decision; the hint wording was reworded to remove an imperative. Full results: `docs/2026-11-02-e8-measurement.md`.
 - **The agent has to cooperate.** The protocol block is an instruction, not a hard sandbox. Status lines are shown to the model, and the agent is told to relay them, but it may not always do so.
 - **OpenCode 2.0.x only.** The plugin is built and tested against `@opencode/plugin` 2.0.29. A different major version may need changes.
 

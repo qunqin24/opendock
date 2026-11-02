@@ -17,11 +17,11 @@
 | **适用场景** | **推荐 Coding Agent 使用** | 日常对话、使用网页版专属模型与额度 |
 | **工具调用** | **原生 Function Calling**，稳定可靠 | 提示词模拟（实验性，Flash 系列常不调工具） |
 | **思考档位** | 按模型目录提供 `minimal` / `low` / `medium` / `high` 中支持的档位 | `low`（普通）/ `medium`（`-thinking-medium`，仅 `gemini-4-argon`）/ `high`（`-thinking` 扩展思考） |
-| **图片输入** | 默认开启，对话模型可以读图 | 默认关闭；开启后需要登录（挂 Cookie），见下文 |
+| **图片输入** | 默认开启，对话模型可以读图 | 默认开启，对话模型可以读图（需登录态挂 Cookie） |
 | **图片生成** | Nano Banana 系列模型，供 Magpie 的图片生成使用（需要 Magpie v0.1.2075+，见下文） | 不支持 |
 | **登录方式** | 弹出独立浏览器窗口直接登录 Google | 用无痕窗口登录并复制 `cookie` |
 | **额度卡片** | 显示冷却中的模型与恢复时间 | 同步网页版 **5 小时** 与 **每周** 用量及重置时间 |
-| **本地后端** | AIStudio2API (`v0.2.18`) | gemini-web2api-go (`4.26.0-magpie.2` 优化版) |
+| **本地后端** | AIStudio2API (`v0.2.19`) | gemini-web2api-go (`4.26.0-magpie.2` 优化版) |
 
 ---
 
@@ -87,11 +87,11 @@
 
 <br>
 
-工具调用默认开启。图片输入在 AI Studio 默认开启，在 Gemini Web 默认关闭。可通过命令行修改插件配置：
+工具调用与图片输入默认开启。可通过命令行修改插件配置：
 
 ```bash
-# 两个 Provider 都开启图片输入
-magpie plugin options magpie-gemini-web '{"allowImages":true}'
+# 仅关闭 Gemini Web 的图片输入，保留 AI Studio 的图片输入
+magpie plugin options magpie-gemini-web '{"allowImages":false,"studio":{"allowImages":true}}'
 
 # 关闭 AI Studio 的图片输入
 magpie plugin options magpie-gemini-web '{"studio":{"allowImages":false}}'
@@ -107,7 +107,7 @@ magpie plugin options magpie-gemini-web '{"studio":{"proxy":"http://127.0.0.1:78
 | 选项 | 默认值 | 适用范围 | 说明 |
 | :--- | :--- | :--- | :--- |
 | `allowTools` | `true` | 共用（可用 `studio.allowTools` 单独覆盖） | 允许工具调用。设为 `false` 时带工具的请求返回 400 |
-| `allowImages` | Web：`false`；Studio：`true` | 共用（可用 `studio.allowImages` 单独覆盖） | 允许对话中的图片输入（图像模型的参考图不受它限制）。Gemini Web 读图需要登录，未登录时返回 400；实测 `gemini-3.6-flash` 带图请求会一直等到超时，`gemini-3.5-flash-lite`、`gemini-3.8-flash` 正常 |
+| `allowImages` | `true` | 共用（可用 `studio.allowImages` 单独覆盖） | 允许对话中的图片输入（图像模型的参考图不受它限制）。Gemini Web 读图需要登录，未登录时返回 400 |
 | `requestTimeoutMs` / `modelTimeoutMs` | Web：`570000` / `10000`；Studio：`1800000` / `10000` | 共用（`studio.*` 可覆盖） | 单次等待后端 / 拉取模型列表的超时（毫秒）；收到流数据后重新计时，显式配置优先 |
 | `stripCitations` | `true` | 仅 `gemini-web` | 剥离回复与工具参数中的 `[cite: 1]`、`[cite_start]` 标记（AI Studio 不支持剥离） |
 | `proxy` | 无 | 仅 `gemini-web` | 一键配置后端访问 Google 的代理（`http` / `https` / `socks5` / `socks5h`），也可用环境变量 `GEMINI_WEB_PROXY` 或在登录第一步填写 |
@@ -172,7 +172,9 @@ magpie plugin options magpie-gemini-web '{"studio":{"proxy":"http://127.0.0.1:78
 - Gemini Web 每个登录同时最多 2 个请求（AI Studio 为 1），可在 Magpie 的 provider 设置里调整；仍无法完全排除 Google 账号风控风险，请自行评估使用。
 
 **AI Studio 升级与模型范围：**
-- 插件固定使用经过 SHA-256 校验的 `v0.2.18-magpie.1`（基于上游 `v0.2.18`），通过升级插件更新后端。同基线或更旧的官方版、以及旧版插件装的托管后端，在下次管理启动时自动升级，保留账号、端口与登录凭据。
+- 插件固定使用经过 SHA-256 校验的 `v0.2.19-magpie.1`（基于上游 `v0.2.19`），通过升级插件更新后端。同基线或更旧的官方版、以及旧版插件装的托管后端，在下次管理启动时自动升级，保留账号、端口与登录凭据。
+- 0.2.19 的账号绑定与备用请求模型设置会保留；管理页保存的默认值不会在重启后被改回插件默认值。备用请求默认关闭，需要时可在管理页开启并选择模型。
+- 从 0.2.18 升级且已开启 `auto` 时，备用请求从所有模型缩为 `FIRST_EVENT_HEDGE_MODELS` 中的模型，未配置该列表时仅有 Argon。管理页完整保存会固定当时的默认值，后续上游默认值变化需要手动调整。接管官方 0.2.19 的稀疏配置时，缺失项会按插件规则补齐（例如备用请求变为 `off`）；详见[升级兼容说明](docs/studio-release.md#0219-升级兼容)。
 - **托管后端已在 macOS、Linux、Windows 统一禁用在线更新**：管理页提示“更新由 magpie-gemini-web 管理”，更新接口返回 HTTP 409，检查更新也不会访问 GitHub。用户自行连接的外部服务不受影响。托管构建方式和可复现构建流程见 [docs/studio-release.md](docs/studio-release.md)。
 - Unix 的 `package/` 仍尽力设置为 `0555`，作为额外的文件保护；权限设置失败不阻断服务，在线更新的禁用也不依赖该权限。若要手动删除数据目录来重置，请先停止服务，再运行 `chmod -R u+w "<数据目录>/package"` 恢复可写权限，然后删除；将 `<数据目录>` 替换为实际路径。
 - 若自行更新到更新版或定制版，插件会提示版本冲突，并提供带正确 `--data-dir` 的 `stop`、`install`、`start` 命令。停止时会找回更新后的监听进程 PID，并核对可执行文件路径；无法核实身份就不会发送终止信号。HTTP 端口关闭但进程尚未退出时，插件不会重装或启动第二个进程。
