@@ -2,25 +2,31 @@
   <a href="https://github.com/shyrz/mechanicus/stargazers">
     <img src="img/v3-beta.webp" alt="mechanicus V3 Beta Release" style="border-radius: 10px;">
   </a>
-  <h3>✨ mechanicus ✨</h3>
-
-  <p><i>Seven divine beings emerged from the dawn of code, each an immortal master of their craft,<br>awaiting your command to forge order from chaos and build what was once thought impossible.</i></p>
-
-  <p><b>Opencode Multi Agent Suite</b> · Mix any models · Auto delegate tasks</p>
-  <p><sub>by <b>Boring Dystopia Development</b></sub></p>
-  <p>
-    <a href="https://boringdystopia.ai/"><img src="https://img.shields.io/badge/boringdystopia.ai-111111?style=for-the-badge&logo=vercel&logoColor=white" alt="boringdystopia.ai"></a>&nbsp;
-    <a href="https://x.com/alvinunreal"><img src="https://img.shields.io/badge/X-@alvinunreal-000000?style=for-the-badge&logo=x&logoColor=white" alt="X @alvinunreal"></a>&nbsp;
-    <a href="https://t.me/boringdystopiadevelopment"><img src="https://img.shields.io/badge/Telegram-Join%20channel-2CA5E0?style=for-the-badge&logo=telegram&logoColor=white" alt="Telegram Join channel"></a>&nbsp;
-  </p>
-
-  <p>
-    <b>English</b> | <a href="README.zh-CN.md">简体中文</a> | <a href="README.ja-JP.md">日本語</a> | <a href="README.ko-KR.md">한국어</a> | <a href="README.fa-IR.md">فارسی</a>
-  </p>
-
-  <p><sub>✦ ✦ ✦</sub></p>
-
+  
 </div>
+
+# ✨ Mechanicus ✨
+
+> "There is no truth in flesh, only betrayal."<br>
+> "There is no strength in flesh, only weakness."<br>
+> "There is no constancy in flesh, only decay."<br>
+> "There is no certainty in flesh but death."<br>
+> — Credo Omnissiah
+
+<p><b>Opencode Multi Agent Suite</b> · Mix any models · Auto delegate tasks</p>
+<p><sub>by <b>Boring Dystopia Development</b></sub></p>
+
+<p>
+<a href="https://boringdystopia.ai/"><img src="https://img.shields.io/badge/boringdystopia.ai-111111?style=for-the-badge&logo=vercel&logoColor=white" alt="boringdystopia.ai"></a>&nbsp;
+<a href="https://x.com/alvinunreal"><img src="https://img.shields.io/badge/X-@alvinunreal-000000?style=for-the-badge&logo=x&logoColor=white" alt="X @alvinunreal"></a>&nbsp;
+<a href="https://t.me/boringdystopiadevelopment"><img src="https://img.shields.io/badge/Telegram-Join%20channel-2CA5E0?style=for-the-badge&logo=telegram&logoColor=white" alt="Telegram Join channel"></a>&nbsp;
+</p>
+
+<p>
+<b>English</b> · <a href="README.zh-CN.md">简体中文</a> · <a href="README.ja-JP.md">日本語</a> · <a href="README.ko-KR.md">한국어</a> · <a href="README.fa-IR.md">فارسی</a>
+</p>
+
+<div align="center"><p><sub>✦ ✦ ✦</sub></p></div>
 
 ## What's This Plugin
 
@@ -30,11 +36,11 @@ The main idea is simple: instead of forcing one model to do everything, the plug
 
 ### ✨ Highlights
 
-- **[Seven specialized agents](#meet-the-pantheon)** - Orchestrator, Explorer,
-  Oracle, Council, Librarian, Designer, and Fixer. Each part of the job goes to
+- **[Seven specialized agents](#meet-the-pantheon)** - Omnissiah, Magos,
+  Dominus, Council, Logis, Artisan, and Genetor. Each part of the job goes to
   the agent best suited for it - mix any models across any providers.
 - **[Background orchestration](docs/background-orchestration.md)** - the
-  Orchestrator dispatches specialists as background tasks, tracks them, and
+  Omnissiah dispatches specialists as background tasks, tracks them, and
   reconciles results before continuing - parallel work by default.
 - **[Bundled skills](#skills)** - prompt-based workflows like `deepwork`,
   `codemap`, `verification-planning`, and `reflect`, assigned per agent.
@@ -45,7 +51,8 @@ The main idea is simple: instead of forcing one model to do everything, the plug
 - **[Multiplexer integration](docs/multiplexer-integration.md)** - watch agents
   work live in Tmux, Zellij, Herdr, cmux, or kitty panes.
 - **[Preset switching](docs/preset-switching.md)** - swap the whole team's
-  models at runtime with `/preset`.
+models with `/preset`, reuse base presets, and edit local overrides while
+preserving JSONC comments.
 - **[Code intelligence tools](docs/tools.md)** - LSP tools, AST-aware search
   across 25 languages, and built-in MCPs for docs and GitHub code
   search.
@@ -80,11 +87,9 @@ The main idea is simple: instead of forcing one model to do everything, the plug
 
 Copy and paste this prompt to your LLM agent (Claude Code, AmpCode, Cursor, etc.):
 
-
 ```
 Install and configure mechanicus: https://raw.githubusercontent.com/shyrz/mechanicus/refs/heads/master/README.md
 ```
-
 
 ### Manual Installation
 
@@ -140,11 +145,13 @@ Then:
    ```bash
    opencode auth login
    ```
+
 2. **Refresh and list the models OpenCode can see**:
 
    ```bash
    opencode models --refresh
    ```
+
 3. **Open your plugin config** at `~/.config/opencode/mechanicus.json`
 
 4. **Update the models you want for each agent**
@@ -163,12 +170,42 @@ The default generated configuration includes both `openai` and `opencode-go` pre
   "preset": "openai",
   "presets": {
     "openai": {
-      "orchestrator": { "model": "openai/gpt-5.6-terra", "variant": "high", "skills": ["*"], "mcps": ["*", "!context7"] },
-      "oracle": { "model": "openai/gpt-5.6-sol", "variant": "high", "skills": ["simplify"], "mcps": [] },
-      "librarian": { "model": "openai/gpt-5.6-luna", "variant": "low", "skills": [], "mcps": ["context7", "gh_grep"] },
-      "explorer": { "model": "openai/gpt-5.6-luna", "variant": "low", "skills": [], "mcps": [] },
-      "designer": { "model": "openai/gpt-5.6-luna", "variant": "medium", "skills": [], "mcps": [] },
-      "fixer": { "model": "openai/gpt-5.6-luna", "variant": "high", "skills": [], "mcps": [] }
+      "orchestrator": {
+        "model": "openai/gpt-5.6-terra",
+        "variant": "high",
+        "skills": ["*"],
+        "mcps": ["*", "!context7"]
+      },
+      "oracle": {
+        "model": "openai/gpt-5.6-sol",
+        "variant": "high",
+        "skills": ["simplify"],
+        "mcps": []
+      },
+      "librarian": {
+        "model": "openai/gpt-5.6-luna",
+        "variant": "low",
+        "skills": [],
+        "mcps": ["context7", "gh_grep"]
+      },
+      "explorer": {
+        "model": "openai/gpt-5.6-luna",
+        "variant": "low",
+        "skills": [],
+        "mcps": []
+      },
+      "designer": {
+        "model": "openai/gpt-5.6-luna",
+        "variant": "medium",
+        "skills": [],
+        "mcps": []
+      },
+      "fixer": {
+        "model": "openai/gpt-5.6-luna",
+        "variant": "high",
+        "skills": [],
+        "mcps": []
+      }
     }
   }
 }
@@ -340,8 +377,7 @@ If any agent fails to respond, check your provider authentication and config fil
 
 ### 04. Council: The Chorus of Minds
 
-> [!NOTE]
-> **Why doesn't Orchestrator auto-call Council more often?** This is intentional. Council runs multiple models at once, so automatic delegation is kept strict because it is usually the highest-cost path in the system. In practice, Council is meant to be used manually when you want it, for example: <code>@council compare these two architectures</code>.
+> [!NOTE] > **Why doesn't Orchestrator auto-call Council more often?** This is intentional. Council runs multiple models at once, so automatic delegation is kept strict because it is usually the highest-cost path in the system. In practice, Council is meant to be used manually when you want it, for example: <code>@council compare these two architectures</code>.
 
 <table>
   <tr>
@@ -514,8 +550,7 @@ If any agent fails to respond, check your provider authentication and config fil
 
 ### Observer: The Silent Witness
 
-> [!NOTE]
-> **Why a separate agent?** If your Orchestrator model is not multimodal, enable Observer to handle images, screenshots, and other visual files. Observer is disabled by default and gives the Orchestrator a dedicated multimodal reader without forcing you to change your main reasoning model. Set `disabled_agents: []` and an `observer` model in your configuration. The bundled `opencode-go` install preset does this automatically because its GLM Orchestrator is not multimodal. Omitting `image_routing` preserves existing conditional Observer behavior. Set `image_routing: "auto"` only when Observer is enabled, or `"direct"` to always pass image attachments to the Orchestrator.
+> [!NOTE] > **Why a separate agent?** If your Orchestrator model is not multimodal, enable Observer to handle images, screenshots, and other visual files. Observer is disabled by default and gives the Orchestrator a dedicated multimodal reader without forcing you to change your main reasoning model. Set `disabled_agents: []` and an `observer` model in your configuration. The bundled `opencode-go` install preset does this automatically because its GLM Orchestrator is not multimodal. Omitting `image_routing` preserves existing conditional Observer behavior. Set `image_routing: "auto"` only when Observer is enabled, or `"direct"` to always pass image attachments to the Orchestrator.
 
 <table>
   <tr>
@@ -531,29 +566,30 @@ If any agent fails to respond, check your provider authentication and config fil
 - PDFs and binary documents → `read` tool (text + structure extraction)
 - **Disabled by default** - enable with `"disabled_agents": []` and configure a vision-capable model; installing with `--preset=opencode-go` enables it with `opencode-go/mimo-v2.5`. Image attachments route to Observer by default when it is enabled; set `"image_routing": "direct"` to keep them on the Orchestrator.
 
-    </td>
-  </tr>
-  <tr>
-    <td colspan="2">
-      <b>Prompt:</b> <a href="src/agents/observer.ts"><code>observer.ts</code></a>
-    </td>
-  </tr>
-  <tr>
-    <td colspan="2">
-      <b>Default Model:</b> <code>openai/gpt-5.6-luna</code> - <i>configure a vision-capable model to enable</i>
-    </td>
-  </tr>
-  <tr>
-    <td colspan="2">
-      <b>Recommended Models:</b> <code>mimo-v2.5</code> <code>qwen3.5-plus</code>
-    </td>
-  </tr>
-  <tr>
-    <td colspan="2">
-      <b>Model Guidance:</b> Choose a vision-capable model if you want the agent to read screenshots, images, PDFs, and other visual files.
-    </td>
-  </tr>
-</table>
+      </td>
+
+    </tr>
+    <tr>
+      <td colspan="2">
+        <b>Prompt:</b> <a href="src/agents/observer.ts"><code>observer.ts</code></a>
+      </td>
+    </tr>
+    <tr>
+      <td colspan="2">
+        <b>Default Model:</b> <code>openai/gpt-5.6-luna</code> - <i>configure a vision-capable model to enable</i>
+      </td>
+    </tr>
+    <tr>
+      <td colspan="2">
+        <b>Recommended Models:</b> <code>mimo-v2.5</code> <code>qwen3.5-plus</code>
+      </td>
+    </tr>
+    <tr>
+      <td colspan="2">
+        <b>Model Guidance:</b> Choose a vision-capable model if you want the agent to read screenshots, images, PDFs, and other visual files.
+      </td>
+    </tr>
+  </table>
 
 ---
 
@@ -564,7 +600,7 @@ If any agent fails to respond, check your provider authentication and config fil
 Skills are prompt-based instructions injected into an agent's system prompt to
 guide decisions, workflows, and tool use. Unlike MCPs (which are running
 servers), a skill runs no process — it is a focused playbook an agent activates
-when the task calls for it. The installer bundles eight skills and keeps them
+when the task calls for it. The installer bundles eleven skills and keeps them
 updated on plugin auto-update; local customizations are preserved.
 
 > [!TIP]
@@ -572,16 +608,16 @@ updated on plugin auto-update; local customizations are preserved.
 > `bunx mechanicus install --skills=force`. This deliberately replaces
 > installed bundled skills with the package versions.
 
-| Skill | Purpose | Default agent | How to invoke |
-|:-----:|---------|---------------|---------------|
-| <img src="img/skills/codemap.webp" width="120" alt="Codemap artifact"><br>[`codemap`](src/skills/codemap/SKILL.md) | Hierarchical repository maps so agents understand codebases without re-reading everything | `orchestrator` | `run codemap` |
-| <img src="img/skills/deepwork.webp" width="120" alt="Deepwork artifact"><br>[`deepwork`](src/skills/deepwork/SKILL.md) | Structured workflow for large, risky, multi-phase coding sessions with review gates | `orchestrator` | `/deepwork <task>` |
-| <img src="img/skills/verification-planning.webp" width="120" alt="Verification Planning artifact"><br>[`verification-planning`](src/skills/verification-planning/SKILL.md) | Plans a project-specific evidence path before non-trivial changes | `orchestrator` | automatic before non-trivial work |
-| <img src="img/skills/simplify.webp" width="120" alt="Simplify artifact"><br>[`simplify`](src/skills/simplify/SKILL.md) | Behavior-preserving simplification for readability and maintainability | `oracle` | ask for simplification or during review |
-| <img src="img/skills/worktrees.webp" width="120" alt="Worktrees artifact"><br>[`worktrees`](src/skills/worktrees/SKILL.md) | Git worktrees as safe, isolated coding lanes for risky or parallel work | `orchestrator` | `work in a worktree` |
-| <img src="img/skills/clonedeps.webp" width="120" alt="Clonedeps artifact"><br>[`clonedeps`](src/skills/clonedeps/SKILL.md) | Clones dependency source locally so agents can inspect library internals | `orchestrator` | `clone dependencies` |
-| <img src="img/skills/reflect.webp" width="120" alt="Reflect artifact"><br>[`reflect`](src/skills/reflect/SKILL.md) | Turns repeated workflow friction into reusable skills, agents, or config | `orchestrator` | `/reflect` |
-| <img src="img/skills/mechanicus.webp" width="120" alt="mechanicus artifact"><br>[`mechanicus`](src/skills/mechanicus/SKILL.md) | Configures and safely improves the plugin setup itself | `orchestrator` | ask to tune your setup |
+|                                                                                   Skill                                                                                    | Purpose                                                                                   | Default agent  | How to invoke                           |
+| :------------------------------------------------------------------------------------------------------------------------------------------------------------------------: | ----------------------------------------------------------------------------------------- | -------------- | --------------------------------------- |
+|                             <img src="img/skills/codemap.webp" width="120" alt="Codemap artifact"><br>[`codemap`](src/skills/codemap/SKILL.md)                             | Hierarchical repository maps so agents understand codebases without re-reading everything | `orchestrator` | `run codemap`                           |
+|                           <img src="img/skills/deepwork.webp" width="120" alt="Deepwork artifact"><br>[`deepwork`](src/skills/deepwork/SKILL.md)                           | Structured workflow for large, risky, multi-phase coding sessions with review gates       | `orchestrator` | `/deepwork <task>`                      |
+| <img src="img/skills/verification-planning.webp" width="120" alt="Verification Planning artifact"><br>[`verification-planning`](src/skills/verification-planning/SKILL.md) | Plans a project-specific evidence path before non-trivial changes                         | `orchestrator` | automatic before non-trivial work       |
+|                           <img src="img/skills/simplify.webp" width="120" alt="Simplify artifact"><br>[`simplify`](src/skills/simplify/SKILL.md)                           | Behavior-preserving simplification for readability and maintainability                    | `oracle`       | ask for simplification or during review |
+|                         <img src="img/skills/worktrees.webp" width="120" alt="Worktrees artifact"><br>[`worktrees`](src/skills/worktrees/SKILL.md)                         | Git worktrees as safe, isolated coding lanes for risky or parallel work                   | `orchestrator` | `work in a worktree`                    |
+|                         <img src="img/skills/clonedeps.webp" width="120" alt="Clonedeps artifact"><br>[`clonedeps`](src/skills/clonedeps/SKILL.md)                         | Clones dependency source locally so agents can inspect library internals                  | `orchestrator` | `clone dependencies`                    |
+|                             <img src="img/skills/reflect.webp" width="120" alt="Reflect artifact"><br>[`reflect`](src/skills/reflect/SKILL.md)                             | Turns repeated workflow friction into reusable skills, agents, or config                  | `orchestrator` | `/reflect`                              |
+|                       <img src="img/skills/mechanicus.webp" width="120" alt="mechanicus artifact"><br>[`mechanicus`](src/skills/mechanicus/SKILL.md)                       | Configures and safely improves the plugin setup itself                                    | `orchestrator` | ask to tune your setup                  |
 
 Skill assignments are permission grants — an agent can only activate skills it
 has been given. Configure them per agent with the `skills` array in
@@ -627,32 +663,32 @@ Use this section as a map: start with installation, then jump to features, confi
 
 ### ✨ Features & Workflows
 
-| Doc | What it covers |
-|-----|----------------|
-| **[Council](docs/council.md)** | Run multiple models in parallel and synthesize a single answer with `@council` |
-| **[Custom Agents](docs/configuration.md#custom-agents)** | Define your own specialists with custom prompts, models, MCP access, and Orchestrator delegation rules |
-| **[ACP Agents](docs/acp-agents.md)** | Connect external ACP-compatible agents such as Claude Code ACP or Gemini ACP as delegatable subagents |
-| **[Multiplexer Integration](docs/multiplexer-integration.md)** | Watch agents work live in Tmux, Zellij, Herdr, cmux, or kitty panes |
-| **[Codemap](docs/codemap.md)** | Generate hierarchical codemaps to understand large codebases faster |
-| **[Clonedeps](docs/clonedeps.md)** | Clone selected dependency source into an ignored local workspace for inspection |
-| **[Worktrees](docs/worktrees.md)** | Use `.slim/worktrees/` lanes for isolated parallel or risky coding work |
-| **[Preset Switching](docs/preset-switching.md)** | Switch agent model presets at runtime with `/preset` |
-| **[Interview](docs/interview.md)** | Turn rough ideas into a structured markdown spec through a browser-based Q&A flow |
-| **[Companion](docs/companion.md)** | Floating window companion for parsing, help, and types |
+| Doc                                                            | What it covers                                                                                         |
+| -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| **[Council](docs/council.md)**                                 | Run multiple models in parallel and synthesize a single answer with `@council`                         |
+| **[Custom Agents](docs/configuration.md#custom-agents)**       | Define your own specialists with custom prompts, models, MCP access, and Orchestrator delegation rules |
+| **[ACP Agents](docs/acp-agents.md)**                           | Connect external ACP-compatible agents such as Claude Code ACP or Gemini ACP as delegatable subagents  |
+| **[Multiplexer Integration](docs/multiplexer-integration.md)** | Watch agents work live in Tmux, Zellij, Herdr, cmux, or kitty panes                                    |
+| **[Codemap](docs/codemap.md)**                                 | Generate hierarchical codemaps to understand large codebases faster                                    |
+| **[Clonedeps](docs/clonedeps.md)**                             | Clone selected dependency source into an ignored local workspace for inspection                        |
+| **[Worktrees](docs/worktrees.md)**                             | Use `.slim/worktrees/` lanes for isolated parallel or risky coding work                                |
+| **[Preset Switching](docs/preset-switching.md)**               | Switch agent model presets at runtime with `/preset`                                                   |
+| **[Interview](docs/interview.md)**                             | Turn rough ideas into a structured markdown spec through a browser-based Q&A flow                      |
+| **[Companion](docs/companion.md)**                             | Floating window companion for parsing, help, and types                                                 |
 
 ### ⚙️ Config & Reference
 
-| Doc | What it covers |
-|-----|----------------|
-| **[Installation Guide](docs/installation.md)** | Install the plugin, use CLI flags, reset config, and troubleshoot setup |
-| **[OpenCode v2 Compatibility](docs/opencode-v2-compatibility.md)** | Run the same plugin on `opencode2`: feature matrix, v2.0.x compatibility baseline, version pinning |
-| **[Configuration](docs/configuration.md)** | Config file locations, JSONC support, prompt overrides, and full option reference |
-| **[Project Customization](docs/project-local-customization.md)** | Repository-specific custom agents, prompt overrides, per-agent skills, and precedence |
-| **[Background Orchestration](docs/background-orchestration.md)** | Scheduler-first orchestrator model built around native background subagents |
-| **[Maintainer Guide](docs/maintainers.md)** | Issue triage rules, label meanings, support routing, and repo maintenance workflow |
-| **[Skills](docs/skills.md)** | Bundled skills such as `simplify`, `codemap`, `clonedeps`, `deepwork`, `verification-planning`, `reflect`, `worktrees`, and `mechanicus` |
-| **[MCPs](docs/mcps.md)** | `context7`, `gh_grep`, and how MCP permissions work per agent |
-| **[Tools](docs/tools.md)** | Built-in tool capabilities like `webfetch`, LSP tools, code search, and formatters |
+| Doc                                                                | What it covers                                                                                                                           |
+| ------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| **[Installation Guide](docs/installation.md)**                     | Install the plugin, use CLI flags, reset config, and troubleshoot setup                                                                  |
+| **[OpenCode v2 Compatibility](docs/opencode-v2-compatibility.md)** | Run the same plugin on `opencode2`: feature matrix, v2.0.x compatibility baseline, version pinning                                       |
+| **[Configuration](docs/configuration.md)**                         | Config file locations, JSONC support, prompt overrides, and full option reference                                                        |
+| **[Project Customization](docs/project-local-customization.md)**   | Repository-specific custom agents, prompt overrides, per-agent skills, and precedence                                                    |
+| **[Background Orchestration](docs/background-orchestration.md)**   | Scheduler-first orchestrator model built around native background subagents                                                              |
+| **[Maintainer Guide](docs/maintainers.md)**                        | Issue triage rules, label meanings, support routing, and repo maintenance workflow                                                       |
+| **[Skills](docs/skills.md)**                                       | Bundled skills such as `simplify`, `codemap`, `clonedeps`, `deepwork`, `verification-planning`, `reflect`, `worktrees`, and `mechanicus` |
+| **[MCPs](docs/mcps.md)**                                           | `context7`, `gh_grep`, and how MCP permissions work per agent                                                                            |
+| **[Tools](docs/tools.md)**                                         | Built-in tool capabilities like `webfetch`, LSP tools, code search, and formatters                                                       |
 
 ---
 
@@ -663,7 +699,9 @@ Use this section as a map: start with installation, then jump to features, confi
   <p><sub>Every merged contribution leaves a mark on the realm.</sub></p>
 
   <!-- ALL-CONTRIBUTORS-BADGE:START - Do not remove or modify this section -->
+
 [![All Contributors](https://img.shields.io/badge/all_contributors-115-orange.svg?style=flat-square)](#contributors-)
+
 <!-- ALL-CONTRIBUTORS-BADGE:END -->
 </div>
 

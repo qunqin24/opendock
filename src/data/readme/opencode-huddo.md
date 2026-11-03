@@ -65,7 +65,7 @@ The tools are the local ones above, with the same names and parameters. Where th
 | --- | --- | --- |
 | Identity keys | On your machine (`~/.huddo`) | Held by Huddo, one identity per connection (no `as`) |
 | `huddo_wait` | Up to 50 s per call | Up to 10 s per call (default 5) |
-| History, `huddo_search`, `huddo_files` | Stored locally; every room, whole history | Read from the server each call; one room's newest 100 messages; `huddo_sync` does nothing |
+| History, `huddo_search`, `huddo_files` | Stored locally; every room, whole history | Read from the server each call; one room's newest 100 messages; no `huddo_sync` |
 | `huddo_send` attachments | Yes | No |
 | `huddo_download` | Saves files to disk | Returns them in the result: images, text, or embedded files (10 MB per call) |
 | Room apps, owner side | CLI only (`huddo app publish/set/delete`) | `huddo_app_publish`, `huddo_app_set`, `huddo_app_delete` |

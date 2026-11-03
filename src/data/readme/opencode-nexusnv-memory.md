@@ -33,7 +33,7 @@ No account. No server to run. No separate database. No embeddings. Memory is sto
 
 ## How it works
 
-The plugin keeps six Markdown files in `.opencode/memory/`, plus a `handoffs/` folder for session snapshots.
+The plugin keeps six Markdown files in `.opencode/memory/`, plus a `handoffs/` folder for session snapshots. `/memory-init` creates them; the plugin never writes there before it exists.
 
 | File                | What it holds                                                                                | How it is used                                                                                                                       |
 | ------------------- | -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
@@ -50,7 +50,7 @@ The files are deliberately small. A small, trustworthy map is more useful than a
 
 ### The memory loop
 
-1. **You work normally.** The plugin listens for useful moments: a failed command, an idle session, a compaction (when OpenCode summarizes a long conversation to save space), an explicit instruction to remember something.
+1. **You work normally.** Once memory is initialized, the plugin listens for useful moments: a failed command, an idle session, a compaction (when OpenCode summarizes a long conversation to save space), an explicit instruction to remember something.
 2. **Scratchpad first.** Most captured material lands in `activeContext.md` or a handoff (a short note about where the session left off). It is useful, but it is not yet treated as a permanent decision.
 3. **You review.** When you run `/memory-review`, the agent reads the scratchpad and proposes a table of specific lines that could be promoted into the longer-lived files. It writes nothing at this stage.
 4. **You approve.** Each approved line goes through a permission prompt before it is appended. Once approved, the agent can recall or search it in later sessions.
@@ -58,6 +58,8 @@ The files are deliberately small. A small, trustworthy map is more useful than a
 In short: **capture is automatic, permanence is not.** Nothing important becomes durable just because it was discussed. If you later want something gone from the editable files, `/memory-forget` and `/memory-gc` are separate, explicit cleanup steps; `decisions.md` is append-only, so corrections there are new entries rather than deletions.
 
 ### What happens without you lifting a finger
+
+These begin after `/memory-init`; before that, hooks inject and capture nothing.
 
 - At the start of a prompt, `INDEX.md` is attached if it is within its size limit.
 - The current brief is re-sent every time the model is asked to act, so a long turn with several tool calls keeps seeing the goal and next steps.
@@ -108,11 +110,19 @@ Use `.opencode/opencode.jsonc` (recommended) or an `opencode.jsonc` at the repos
 
 The permission rule is not optional decoration. It is what makes the plugin ask before applying a reviewed line, a forget, or a GC batch. Add it **at the end** of your `permissions` list, because OpenCode uses the last matching rule and a broad `allow` later in the list would override it.
 
-### 3. Start OpenCode once
+### 3. Initialize memory
 
-Open the project in OpenCode. On first run, the plugin creates `.opencode/memory/` with the six starter files and the `handoffs/` folders. It also prints one consolidated install checklist: the required permission rule, the protocol block for `AGENTS.md`, the optional configuration snippet, and a pointer to `/memory-status`.
+Open the project in OpenCode and run:
 
-The plugin cannot inspect your effective permissions, so it keeps warning about the `memory_write → ask` rule on later starts even when the rule is present. If you have added the rule, you can ignore the warning. If you are not sure, check your config or run `/memory-status`.
+```text
+/memory-init
+```
+
+It creates `.opencode/memory/` with the six starter files and the `handoffs/` folders, then prints one consolidated install checklist: the required permission rule, the protocol block for `AGENTS.md`, the optional configuration snippet, and a pointer to `/memory-status`.
+
+Until you run it, the plugin is inert: it does not scaffold, inject, capture, or write anything. A project is initialized when `.opencode/memory/INDEX.md` exists as a regular file, so an existing install activates automatically. Deleting that file makes the plugin inert again without a restart. Running `/memory-init` again is safe: it only creates missing paths, never overwrites, and repairs a partial scaffold.
+
+The plugin cannot inspect your effective permissions, so on later starts it keeps warning about the `memory_write → ask` rule even when the rule is present. If you have added the rule, you can ignore the warning. If you are not sure, check your config or run `/memory-status`.
 
 ### 4. Teach your agent to use the memory
 
@@ -137,7 +147,7 @@ Without this block, the agent has the tools but not the habit of using them. The
 /memory-status
 ```
 
-The status report checks the memory directory, whether `INDEX.md` can be attached, the `AGENTS.md` protocol block, the `memory_write → ask` rule, the optional `memory-manager` agent, capture activity, budgets, and next actions. The permission scan is advisory: it looks for a declaration in known config locations, not the effective runtime policy.
+The status report checks the initialization state, whether `INDEX.md` can be attached, the `AGENTS.md` protocol block, the `memory_write → ask` rule, the optional `memory-manager` agent, capture activity, budgets, and next actions. A healthy install shows `| initialization | initialized |`. If it shows `| initialization | not initialized — run /memory-init |`, run `/memory-init` and re-check. The permission scan is advisory: it looks for a declaration in known config locations, not the effective runtime policy.
 
 If `/memory-status` is not available, the plugin did not load for this project. Check that the package is installed, that the config file is in a supported location, and restart OpenCode.
 
@@ -164,9 +174,19 @@ Most people do not need this. `/memory-review` works in the current session.
 
 ## Using it
 
+### Initialize or repair the store
+
+```text
+/memory-init
+```
+
+Run it the first time to create `.opencode/memory/`. It is also the repair command: run it again after deleting a template (or after an init that failed partway) and it recreates only what is missing. It never overwrites an existing file. `INDEX.md` is written last, so a failed repair leaves the project uninitialized rather than half-active.
+
+Before initialization, every other memory command and tool is blocked and returns `[memory] not initialized; run /memory-init to create .opencode/memory` for any actual operation. Only `/memory-init`, `/memory-status`, and `memory_status` work; commands with a help path still render `--help`/`-h` usage.
+
 ### Let it do its thing
 
-For everyday work, you do not need to run anything. The agent gets the map and brief, and the plugin records useful scraps as you go. The memory becomes more valuable as you review those scraps and let the longer files grow.
+Once memory is initialized, you do not need to run anything for everyday work. The agent gets the map and brief, and the plugin records useful scraps as you go. The memory becomes more valuable as you review those scraps and let the longer files grow.
 
 ### Tell it something worth keeping
 
@@ -232,7 +252,7 @@ Hints are exact-match only. If your message mentions a term from `INDEX.md`, the
 /memory-status
 ```
 
-This is a read-only health report. It covers the memory directory, `INDEX.md` attachability, the `AGENTS.md` protocol block, the permission rule, the optional `memory-manager` agent, capture activity, file budgets, and next actions. It writes nothing and does not change the counters.
+This is a read-only health report. It covers the initialization state, `INDEX.md` attachability, the `AGENTS.md` protocol block, the permission rule, the optional `memory-manager` agent, capture activity, file budgets, and next actions. It writes nothing and does not change the counters.
 
 ### See what the plugin has been doing
 
@@ -297,7 +317,8 @@ A successful forget leaves a short status notice on a later prompt, reminding yo
 ## Things to know before you rely on it
 
 - **The permission rule is the safety gate.** Without `{ "action": "memory_write", "resource": "*", "effect": "ask" }`, OpenCode's default policy can apply a reviewed line, a forget, or a GC batch without asking you. Add the rule last in your permissions list, and do not let a later wildcard override it.
-- **The startup warning is expected.** The plugin prints the permission warning even when the rule is installed. It cannot see your effective rules. Check your config or `/memory-status` if you are unsure.
+- **Nothing happens until you initialize.** Setup writes no files, and hooks, the event loop, tools, and commands stay inert until `.opencode/memory/INDEX.md` exists (gated commands still render `--help`/`-h` usage). A `remember:` line written before then is ignored rather than buffered. Run `/memory-status` if you are not sure.
+- **The startup warning is expected.** In an initialized project, the plugin prints the permission warning even when the rule is installed. It cannot see your effective rules. Check your config or `/memory-status` if you are unsure.
 - **Memory becomes model input.** The plugin makes no network calls, but it puts memory into prompts and system context. OpenCode sends those requests to your configured model provider; with a hosted provider, that content leaves your machine. Treat memory as something your model provider can see.
 - **Talking about something does not make it permanent.** Captures sit in the scratchpad until you review them. If you never review, the longer files stay thin.
 - **It will not remind you of anything.** There is no scheduler and no notification channel. A fact in memory is available to the agent when it looks; it is not an alarm clock.
@@ -362,18 +383,18 @@ A few notes:
 
 ## Troubleshooting
 
-| What you see                                                   | What to try                                                                                                                                                                                                                                                                                                                    |
-| -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| The agent does not seem to know the project.                   | Run `/memory-status` and fix its next actions. Make sure the protocol block is in the root `AGENTS.md` and `.opencode/memory/` exists. If `/memory-status` is unavailable, the plugin did not load: check the package install and config path, then restart OpenCode. Memory also has to be written before it can be recalled. |
-| The permission prompt never appears when applying memory.      | Add the `memory_write → ask` rule at the end of your `permissions` list and restart OpenCode. Check that no later wildcard rule overrides it.                                                                                                                                                                                  |
-| The agent mentions a `[memory]` status line.                   | It is reporting something real: the INDEX is over its cap, blocks were rotated, a capture was skipped, a forget completed, or a review is due. Trim the file, run `/memory-review`, or check the file permissions.                                                                                                             |
-| `/memory-review` shows a table but nothing is saved.           | That is the design. Proposals are not writes. Approve the lines you want; each approved line prompts for permission before it is appended.                                                                                                                                                                                     |
-| The agent forgot the start of a long session after compaction. | Compaction replaces detail with a summary. The plugin saves a handoff and injects prior context, but it is not a transcript. Read the newest handoff or the decision log for the details.                                                                                                                                      |
-| Memory is not updating.                                        | Run `/memory-status` and check the file sizes against the caps. `INDEX.md` over its cap is not attached, and over-cap files reject writes. Run `/memory-review` to see what is blocked.                                                                                                                                        |
-| Search finds nothing.                                          | Search is exact literal text, not semantic. Try a shorter phrase, check spelling, or search a specific file. Case-insensitive is the default.                                                                                                                                                                                  |
-| A write says another OpenCode process is writing memory.       | Wait for the other process to finish, then retry. The lock is held briefly; retrying is safe.                                                                                                                                                                                                                                  |
-| I forgot a line but it still appears in git history.           | Expected. Forgetting is logical, not secure erasure. Rewrite history or rotate any exposed secret if the old content matters.                                                                                                                                                                                                  |
-| I want to edit memory by hand.                                 | Go ahead. The files are Markdown. Keep `INDEX.md` short, keep the other files within their caps, and use `/memory-review` to validate changes when you want a second pair of eyes.                                                                                                                                             |
+| What you see                                                   | What to try                                                                                                                                                                                                                                                                                                                                                 |
+| -------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| The agent does not seem to know the project.                   | Run `/memory-status`. If it reports `not initialized`, run `/memory-init`; otherwise fix its next actions. Make sure the protocol block is in the root `AGENTS.md`. If `/memory-status` is unavailable, the plugin did not load: check the package install and config path, then restart OpenCode. Memory also has to be written before it can be recalled. |
+| The permission prompt never appears when applying memory.      | Add the `memory_write → ask` rule at the end of your `permissions` list and restart OpenCode. Check that no later wildcard rule overrides it.                                                                                                                                                                                                               |
+| The agent mentions a `[memory]` status line.                   | It is reporting something real: the INDEX is over its cap, blocks were rotated, a capture was skipped, a forget completed, or a review is due. Trim the file, run `/memory-review`, or check the file permissions.                                                                                                                                          |
+| `/memory-review` shows a table but nothing is saved.           | That is the design. Proposals are not writes. Approve the lines you want; each approved line prompts for permission before it is appended.                                                                                                                                                                                                                  |
+| The agent forgot the start of a long session after compaction. | Compaction replaces detail with a summary. The plugin saves a handoff and injects prior context, but it is not a transcript. Read the newest handoff or the decision log for the details.                                                                                                                                                                   |
+| Memory is not updating.                                        | Run `/memory-status` and check the file sizes against the caps. `INDEX.md` over its cap is not attached, and over-cap files reject writes. Run `/memory-review` to see what is blocked.                                                                                                                                                                     |
+| Search finds nothing.                                          | Search is exact literal text, not semantic. Try a shorter phrase, check spelling, or search a specific file. Case-insensitive is the default.                                                                                                                                                                                                               |
+| A write says another OpenCode process is writing memory.       | Wait for the other process to finish, then retry. The lock is held briefly; retrying is safe.                                                                                                                                                                                                                                                               |
+| I forgot a line but it still appears in git history.           | Expected. Forgetting is logical, not secure erasure. Rewrite history or rotate any exposed secret if the old content matters.                                                                                                                                                                                                                               |
+| I want to edit memory by hand.                                 | Go ahead. The files are Markdown. Keep `INDEX.md` short, keep the other files within their caps, and use `/memory-review` to validate changes when you want a second pair of eyes.                                                                                                                                                                          |
 
 ## Uninstall
 
@@ -394,6 +415,8 @@ Your memory files are **not** deleted automatically. Keep them, commit them, or 
 git rm -r .opencode/memory   # if the files are tracked
 rm -rf .opencode/memory      # if they are not
 ```
+
+You do not have to uninstall the plugin to deactivate it. Delete `.opencode/memory/INDEX.md` (or the whole directory) and the plugin becomes inert on its next operation, with no restart. Re-running `/memory-init` re-creates only what is missing; it never overwrites surviving files.
 
 Before uninstalling, you can run `/memory-metrics reset confirm` if you want to clear the local counters. The plugin's internal storage is otherwise orphaned but harmless; it is just unused local data. Search and status add no storage of their own, so there is nothing extra to purge. There is no daemon to stop, no server to shut down, no key to revoke, and no index to rebuild.
 

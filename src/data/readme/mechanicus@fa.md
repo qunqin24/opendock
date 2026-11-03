@@ -579,7 +579,7 @@ ping all agents
 Skillها مجموعه‌ای از دستورهای مبتنی بر Prompt هستند که به system prompt یک Agent تزریق می‌شوند تا
 تصمیم‌گیری، workflow و استفاده از ابزارها را هدایت کنند. برخلاف MCPها که سرورهای در حال اجرا هستند،
 یک Skill هیچ process جداگانه‌ای اجرا نمی‌کند؛ بلکه playbook متمرکزی است که Agent
-هر زمان task مناسب باشد آن را فعال می‌کند. Installer هشت Skill را همراه Plugin نصب می‌کند و در
+هر زمان task مناسب باشد آن را فعال می‌کند. Installer یازده Skill را همراه Plugin نصب می‌کند و در
 auto-updateهای Plugin آن‌ها را به‌روز نگه می‌دارد؛ customizationهای محلی حفظ می‌شوند.
 </p>
 

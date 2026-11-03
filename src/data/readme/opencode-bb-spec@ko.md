@@ -44,11 +44,12 @@
 /plugin install bb-spec-workflow@0xbb2b
 ```
 
-일상적으로 직접 입력하는 5개 명령:
+일상적으로 직접 입력하는 6개 명령:
 
 | 명령 | 무엇을 하는가 | 언제 사용 |
 |---|---|---|
 | `/prd` | 질의→명확화→분해, PRD + AGENTS.md를 작성한 뒤 읽고 한 번 승인하면 plan → exec → doc-update를 자동 실행 | 새 요구사항 착수 시, 머지된 기능의 동작을 바꿀 때 |
+| `/prototype` | 공통 블루프린트 외곽으로 HTML 프로토타입을 만들고 승인될 때까지 수정. `/prd`·`/revise`가 UI 변경 시 자동 호출 | 요구사항 흐름 없이 먼저 화면을 보고 싶을 때 |
 | `/revise` | 근본 원인 진단→표적 수정→회귀 검증, 완료 후 doc-update 자동 실행 | 버그나 기대와 다른 결과가 나왔을 때 |
 | `/git-push` | pre-review 자가 점검 + push + PR 생성 | PR을 올릴 때 |
 | `/exec` | 중단된 지점부터 plan 실행 재개 | 중단이나 `/clear` 이후 |
@@ -143,7 +144,7 @@
 **동봉되는 것**
 
 - **5개 오케스트레이션 subagent**(위 단계에 의해 구동): `test-engineer` / `impl-engineer` / `prd-reviewer` / `webview-test-runner` / `pre-reviewer`
-- **4개 수동 hook**(자동 발동): npm/yarn 차단, main 커밋 차단, 의존성 버전 자가 점검, Stop 시 4항목 자가 점검
+- **4개 수동 hook**(자동 발동): npm/yarn 차단, main 커밋 차단, 의존성 버전 자가 점검, 백그라운드 스크립트 완료 대기
 
 ---
 
@@ -253,6 +254,7 @@ claude plugin update bb-spec-workflow@0xbb2b   # 터미널에서 특정 서브 p
 | `block-non-bun-pm` | bb-spec-frontend | PreToolUse(Bash) | `npm` / `yarn` / `pnpm`의 패키지 관리 동작을 차단하고 `bun` 강제; 기존 프로젝트에 매칭되는 lockfile(예: `package-lock.json`)이 존재할 경우 통과 |
 | `git-workflow-guard` | bb-spec-core | PreToolUse(Bash) | `main` / `master` 브랜치의 `git commit` 차단; 다른 git 흐름 동작(브랜치 생성 / push / worktree / merge / PR)은 통과시키고 git-workflow 규율과 실시간 git 상태 주입 |
 | `dep-version-check` | bb-spec-core | PostToolUse(Write\|Edit) | 의존성 파일 편집 후 "공식 최신 버전 먼저 확인" 자가 점검 리마인더 주입 |
+| `background-script-wait` | bb-spec-core | Stop | 이 세션에서 아직 알리지 않은 실행 중 백그라운드 명령을 발견하면 한 번 알림:Claude는 끝나는 스크립트는 포그라운드 루프로 기다리고, 상주 서비스는 기다리지 않음 |
 ---
 
 ## 🧪 테스트
@@ -291,7 +293,7 @@ base_dir: my/bb  # → my/bb/docs/{prd,plan,test}/ 와 my/bb/.cache/ ; ./을 지
 |---|---|
 | 일시적으로 npm / yarn / pnpm 허용 | `bb-spec-frontend`를 일시적으로 비활성화 |
 | 일시적으로 main commit 허용 | `bb-spec-core`를 일시적으로 비활성화 |
-| Stop 자가 점검 건너뛰기 | 스위치 없음 —— 이것은 핵심 철칙, 건너뛰기 권장하지 않음 |
+| 백그라운드 스크립트 대기 알림 건너뛰기 | `bb-spec-core`를 일시적으로 비활성화 |
 
 ---
 

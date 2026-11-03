@@ -41,7 +41,7 @@ Add Waymark to the `plugin` list in `opencode.json` (project) or `~/.config/open
 
 Restart opencode. It installs the package on startup. opencode loads plugin code once per process, so restart it after updating too.
 
-New to Waymark? The [guide](docs/guide.md) explains its words, every command, the settings and where memories live.
+New to Waymark? The [guide](docs/guide.md) explains its words, every command, the settings and where memories live. [What belongs in a memory](docs/memory-policy.md) says what is worth saving and what is better left to the code.
 
 ### From source
 

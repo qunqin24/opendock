@@ -2,7 +2,7 @@
   <a href="https://github.com/shyrz/mechanicus/stargazers">
     <img src="img/v2.jpg" alt="mechanicus V2 Release" style="border-radius: 10px;">
   </a>
-  <h3>✨ mechanicus ✨</h3>
+  <h3>✨ Mechanicus ✨</h3>
 
   <p><i>七位神圣存在从代码黎明中现身，各自是不朽的工艺大师，<br>等待你的号令，将混沌锻造成秩序，并构建曾被认为不可能之物。</i></p>
 
@@ -36,7 +36,7 @@ mechanicus 是一个用于 OpenCode 的智能体编排插件。它内置了一�
 - **[Council](docs/council.md)** —— 使用 `@council` 针对同一问题并行运行多个模型，并综合为一个答案。
 - **[Companion](docs/companion.md)** —— 可选的浮动桌面窗口，显示哪些智能体正在运行，包括并行后台专家。
 - **[多路复用器集成](docs/multiplexer-integration.md)** —— 在 Tmux、Zellij、Herdr 或 cmux 窗格中实时观察智能体工作。
-- **[预设切换](docs/preset-switching.md)** —— 使用 `/preset` 在运行时更换整支团队的模型。
+- **[预设切换](docs/preset-switching.md)** —— 使用 `/preset` 选择团队模型，继承基础预设并编辑本地覆盖，保留 JSONC 注释。
 - **[代码智能工具](docs/tools.md)** —— LSP 工具、支持 25 种语言的 AST 感知搜索，以及用于文档和 GitHub 代码搜索的内置 MCP。
 - **[完全可定制](docs/configuration.md)** —— 自定义智能体、提示词覆盖、按智能体控制的 Skill/MCP 权限，以及[项目本地定制](docs/project-local-customization.md)。
 
@@ -546,13 +546,16 @@ ping all agents
 
 ## 🧩 Skills
 
-Skills 是注入智能体系统提示词的、基于提示词的指令，用于引导决策、工作流和工具使用。与 MCP（运行中的服务器）不同，Skill 不运行任何进程——它是智能体在任务需要时激活的专用操作手册。安装程序内置八个 Skill，并在插件自动更新时保持更新；本地自定义内容会被保留。
+Skills 是注入智能体系统提示词的、基于提示词的指令，用于引导决策、工作流和工具使用。与 MCP（运行中的服务器）不同，Skill 不运行任何进程——它是智能体在任务需要时激活的专用操作手册。安装程序内置十一个 Skill，并在插件自动更新时保持更新；本地自定义内容会被保留。
 
 | Skill | 用途 | 默认智能体 | 调用方式 |
 |:-----:|------|------------|----------|
 | <img src="img/skills/codemap.webp" width="120" alt="Codemap artifact"><br>[`codemap`](src/skills/codemap/SKILL.md) | 分层仓库地图，让智能体无需反复阅读全部内容也能理解代码库 | `orchestrator` | `run codemap` |
 | <img src="img/skills/deepwork.webp" width="120" alt="Deepwork artifact"><br>[`deepwork`](src/skills/deepwork/SKILL.md) | 面向大型、高风险、多阶段编码会话的结构化工作流，包含审查关卡 | `orchestrator` | `/deepwork <task>` |
 | <img src="img/skills/verification-planning.webp" width="120" alt="Verification Planning artifact"><br>[`verification-planning`](src/skills/verification-planning/SKILL.md) | 在非平凡变更前规划项目特定的证据路径 | `orchestrator` | 非平凡工作前自动调用 |
+| [`step-back`](src/skills/step-back/SKILL.md) | 补丁和临时处理不断累积时，重新评估实现方向 | `orchestrator` | 请求重新评估方案 |
+| [`deanchor`](src/skills/deanchor/SKILL.md) | 提炼示例的意图和约束，再生成原创结果 | `orchestrator` | 提供示例或参考输出 |
+| [`ai-estimates`](src/skills/ai-estimates/SKILL.md) | 估时区分 AI 工作、人工决策和外部等待 | `orchestrator` | 请求估算完成时间 |
 | <img src="img/skills/simplify.webp" width="120" alt="Simplify artifact"><br>[`simplify`](src/skills/simplify/SKILL.md) | 保持行为不变地简化代码，提升可读性和可维护性 | `oracle` | 请求简化或在审查期间调用 |
 | <img src="img/skills/worktrees.webp" width="120" alt="Worktrees artifact"><br>[`worktrees`](src/skills/worktrees/SKILL.md) | 将 Git worktree 用作安全、隔离的编码通道，适合高风险或并行工作 | `orchestrator` | `work in a worktree` |
 | <img src="img/skills/clonedeps.webp" width="120" alt="Clonedeps artifact"><br>[`clonedeps`](src/skills/clonedeps/SKILL.md) | 在本地克隆依赖源码，供智能体检查库内部实现 | `orchestrator` | `clone dependencies` |

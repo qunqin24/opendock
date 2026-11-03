@@ -9,8 +9,7 @@ DeepSeek Search & Fetch as an OpenCode V2 plugin: **the built-in `websearch` too
 Markdown fetch tool, local usage/cost stats, a **persisted** backend switch, and **TUI + desktop sidebars** that show
 the state and the numbers and flip the takeover with one click.
 
-Ways back to native search: the sidebar switch, the `mode` option, a `deepseek_mode` call, or
-`tools/switch-mode.ps1` from the repo.
+Ways back to native search: the sidebar switch, the `mode` option, or a `deepseek_mode` call.
 中文说明见 [docs/README.zh-CN.md](https://github.com/QThinkerJR/opencode-deepseek-search/blob/main/docs/README.zh-CN.md)。
 
 Differs from the existing same-named V1 package: this one targets the **V2 plugin API**, switches backends **at
@@ -60,6 +59,8 @@ With options (recommended — this is where `mode` and friends live):
       "package": "@qthinker/opencode-deepseek-search",
       "options": {
         "mode": "deepseek",
+        // "en" | "ja" | "zh-CN"; omit it to follow LC_ALL/LANG, then English
+        "language": "en",
         "count": 5,
         "apiKey": "{env:DEEPSEEK_API_KEY}"
       }
@@ -90,10 +91,20 @@ The other two halves are clients: restart the **TUI**, and reload the **desktop 
 | Option | Type | Default | Meaning |
 |---|---|---|---|
 | `mode` | `"deepseek" \| "native"` | `deepseek` | Default backend for `websearch`; a persisted `deepseek_mode` switch overrides it |
+| `language` | `"en" \| "ja" \| "zh-CN"` | auto | UI language for the sidebars, the desktop panel, `deepseek_*` tool output and errors. Auto reads `LC_ALL`, then `LANG`, then English |
 | `apiKey` | string | `DEEPSEEK_API_KEY` | Usually `"{env:DEEPSEEK_API_KEY}"`; unset env becomes `""` |
 | `count` | 1–50 | `5` | Results per search (does not change the price) |
 | `fetchMaxChars` | 500–200000 | `30000` | Truncation limit for `deepseek_fetch`, with an explicit notice |
 | `pricePerThousand` | 0–10000 | `5` | CNY per 1000 requests (integer), used only for the local cost estimate |
+
+**UI languages.** The plugin ships `en`, `ja` and `zh-CN`; English is the default and the fallback. The server resolves
+the language once — `options.language`, else the `LC_ALL`/`LANG` prefix (`ja*` → `ja`, `zh*` → `zh-CN`), else English —
+and the same value drives the tool output and both sidebars, so they can never disagree. An unknown value logs a
+warning and falls back to auto-detection instead of failing. The change reaches the sidebars with their next status
+read (saving the config re-runs the server half; a restart always works). Model-facing text stays English in every
+language — tool descriptions, the `## [title](url)` result format, `Published:` and the empty-result notice — so the
+rerouted `websearch` keeps the built-in tool's shape. Docs stay English and Chinese: the Japanese UI does not add a
+Japanese README.
 
 ## Tools
 
@@ -114,10 +125,9 @@ and `need_content` is never requested.
 
 | Way | How | Persisted | Use it for |
 |---|---|---|---|
-| Sidebar | Click the action on the TUI card (`[停用]` / `[启用]`), or the panel's button | Yes (plugin storage `mode/v1`) | While you are working |
+| Sidebar | Click the action on the TUI card (English UI: `[Disable]` / `[Enable]`; Chinese UI: `[停用]` / `[启用]`), or the panel's button | Yes (plugin storage `mode/v1`) | While you are working |
 | Config | Edit `options.mode`; applies on save | Yes (in the config file) | The long-term default |
 | Tool | Ask the model to call `deepseek_mode`, or call it yourself | Yes (plugin storage `mode/v1`) | Switching mid-session without touching files |
-| Script | `.\tools\switch-mode.ps1 native` | Yes (the script edits the config) | Quick switch from a terminal, no editor |
 
 `deepseek_mode` actions:
 
@@ -159,8 +169,8 @@ The plugin also shows up where you work, and can be switched without the model o
 
 | Surface | What you get | How to switch |
 |---|---|---|
-| TUI | A DeepSeek block appended to the session sidebar: state, then 今日 / 本月 / 累计 rows (`Search` · `Fetch` · `¥` estimate); it degrades to abbreviations and then to fewer columns as the sidebar narrows | Click the action at the right of the title, or run the `/deepseek` slash command for a menu |
-| Desktop | A **DeepSeek** tab in a session's side region, listed in the side region's *New tab* page and its `+` menu, and openable with the `DeepSeek: 打开统计面板` command | The panel's button, plus a refresh control |
+| TUI | A DeepSeek block appended to the session sidebar: state, then Today / Month / Total rows (`Search` · `Fetch` · `¥` estimate) in the resolved UI language; it degrades to abbreviations and then to fewer columns as the sidebar narrows | Click the action at the right of the title, or run the `/deepseek` slash command for a menu |
+| Desktop | A **DeepSeek** tab in a session's side region, listed in the side region's *New tab* page and its `+` menu, and openable with the `DeepSeek: Open usage panel` command (localized) | The panel's button, plus a refresh control |
 
 - Both surfaces read the same ledger and the same stored switch as `deepseek_usage` / `deepseek_mode`: a single
   server-side source, reached over the plugin's own RPC, so the numbers never diverge between TUI and desktop.
@@ -168,8 +178,8 @@ The plugin also shows up where you work, and can be switched without the model o
   It is not an uninstall: `deepseek_fetch`, `deepseek_usage` and `deepseek_mode` stay registered, and the state is
   persisted in `mode/v1` like any other switch.
 - The action row always says what a click does. When no API key is configured there is no action to take, so it shows
-  the fix instead (`DEEPSEEK_API_KEY`); when the built-in tool could not be patched it reports 未接管 rather than
-  pretending to be enabled.
+  the fix instead (`DEEPSEEK_API_KEY`); when the built-in tool could not be patched it reports *not taken over* rather
+  than pretending to be enabled.
 - Stats refresh on a `changed` event emitted after every tally and every switch, with a 10-second reread as a
   fallback in both surfaces.
 
@@ -216,7 +226,7 @@ contain text that tries to steer the model.
 |---|---|
 | Unsure which backend search uses | Call `deepseek_mode` — it reports the backend **and** its source |
 | Config edit seems ignored | A persisted switch is present (the source says so); clear it with `deepseek_mode({"mode": "config"})` |
-| `未配置 DeepSeek API Key` (missing key) | Set `DEEPSEEK_API_KEY`, restart the OpenCode service once so the new process inherits it |
+| `未配置 DeepSeek API Key` (zh-CN UI; `API key missing` elsewhere) | Set `DEEPSEEK_API_KEY`, restart the OpenCode service once so the new process inherits it |
 | `401` invalid key | Check the key and that `apiKey`/env points at it |
 | `402` insufficient balance | Top up; failed requests are not billed |
 | `429` rate limited | Backed off once already; retry later |
@@ -224,7 +234,7 @@ contain text that tries to steer the model.
 | Search still hits the native backend | `mode` or the persisted switch is `native`; if both are `deepseek`, the built-in `websearch` tool was not found — use config `"websearch": { "provider": "deepseek" }` |
 | TUI sidebar has no DeepSeek card | Check `opencode plugin list`: the card comes from the **active server plugin**, so `opencode.json(c)` is what matters — `cli.json` does not need it. Restart the TUI after installing |
 | Desktop has no DeepSeek entry in the *New tab* list | The desktop reads plugins from the **global** `opencode.jsonc`, and its bundle must exist — run `npm run build:gui` when working from a clone, then reload the window |
-| Sidebar says `读取失败` | The half cannot reach the RPC: check `opencode plugin list` reports `deepseek-search` as active, then look for `/api/rpc/deepseek-search/status` in `~/.local/share/opencode/log/opencode.log`. A `400 rpc.invalid_input` means a half and the server disagree on the contract — reload that client |
+| Sidebar says `读取失败` (zh-CN UI; `Read failed` elsewhere) | The half cannot reach the RPC: check `opencode plugin list` reports `deepseek-search` as active, then look for `/api/rpc/deepseek-search/status` in `~/.local/share/opencode/log/opencode.log`. A `400 rpc.invalid_input` means a half and the server disagree on the contract — reload that client |
 
 ## Local development
 
@@ -239,33 +249,13 @@ npm run smoke         # real API smoke; skipped without DEEPSEEK_API_KEY
 npm pack --dry-run    # audit the publish artifacts — run build:gui first, `pack` does not build the bundle
 ```
 
-One-command switch (repo-only helper; edits `options.mode` in `opencode.jsonc`, backing it up to `opencode.jsonc.bak-switch`):
-
-```powershell
-.\tools\switch-mode.ps1 status
-.\tools\switch-mode.ps1 native
-.\tools\switch-mode.ps1 deepseek
-```
-
-If ExecutionPolicy blocks it:
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\switch-mode.ps1 native
-```
-
-Shorter, via an alias in `$PROFILE`:
-
-```powershell
-function dsmode { & "D:\repos\opencode-deepseek-search\tools\switch-mode.ps1" @args }
-```
-
 Layout:
 
 ```
 index.ts              # directory-plugin entry, re-exports src/index.ts
 tui.ts                # TUI entry, re-exports src/tui/main.ts
 src/index.ts          # plugin: options, registration, websearch patch, three tools
-src/deepseek.ts       # HTTP core: timeout/cancel, single backoff retry, Chinese errors, mapping
+src/deepseek.ts       # HTTP core: timeout/cancel, single backoff retry, localized errors, mapping
 src/usage.ts          # pure ledger: micro-CNY pricing, 60-day prune, defensive parse, formatting
 src/rpc.ts            # RPC contract shared by the server, TUI and desktop halves
 src/status-view.ts    # pure view model both sidebars derive their copy from
@@ -275,7 +265,6 @@ vite.config.ts        # builds src/gui into the root gui-experimental.cjs bundle
 test/*.test.ts        # pure-function tests
 scripts/smoke.ts      # real-API smoke (5 steps)
 scripts/check-gui-bundle.ts # bundle shape check, run in CI after build:gui
-tools/switch-mode.ps1 # terminal backend switch
 .github/workflows/    # ci (build + typecheck + test + bundle check) / release
 ```
 

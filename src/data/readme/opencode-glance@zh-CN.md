@@ -5,7 +5,7 @@
 一个 OpenCode v2 插件，用一条胶囊状态条展示当前会话的关键指标：
 
 ```
-◷ 7 轮 135 步 · 126 tok/s        ▤ 16.2M tok · 缓存命中 94%        ◔ 18%
+◷ 7 轮 135 步        ›_ bash 8s        ▤ 16.2M tok · 缓存命中 94%        ◔ 18%
 ```
 
 同一个包同时提供 **GUI** 和 **TUI** 两个 part，指标口径一致：
@@ -13,6 +13,7 @@
 | 指标 | 口径 |
 | --- | --- |
 | 轮 / 步 | 当前会话的 user 消息数 / assistant 消息数（可改为工具调用数） |
+| 当前活动 | 当前正在运行的工具及耗时，或实时生成状态 |
 | tok/s | `Σ(output + reasoning) / Σ(step 结束 - step 开始)`，只统计已完成的 step |
 | 总 tok | 当前会话及已知子 agent 会话的 `input + output + reasoning + cache.read + cache.write` |
 | 缓存命中 | `cache.read / (input + cache.read + cache.write)` |
@@ -133,7 +134,7 @@ GUI 的内置 Context 指示器属于 app 内置插件，**第三方 GUI 插件�
 | `show` | `true` | 启动时是否显示状态条；之后可用命令切换 |
 | `steps` | `"assistant"` | `"assistant"` 按 assistant 消息计步，`"tool"` 按工具调用计步 |
 | `rate` | `"auto"` | `"auto"` 运行中用流式文本估算实时速度（带 `~`），空闲显示最近一步真实速度；`"average"` 始终用全历史平均；`"last"` 始终用最近一步真实速度 |
-| `icons` | `true` | TUI 是否显示 `◷ ▤ ◔` 图标 |
+| `icons` | `true` | TUI 是否显示 `◷ ›_ ▤ ◔` 图标 |
 | `locale` | `"auto"` | TUI 文案：`"auto"` 跟随系统语言，也可指定 `zh`、`zht`、`en`、`ja`、`ko`、`de`、`fr`、`es`、`pt`、`it`。GUI 跟随 app 语言 |
 
 ## 国际化
@@ -148,7 +149,7 @@ GUI 的内置 Context 指示器属于 app 内置插件，**第三方 GUI 插件�
 
 - `steps` 默认按 OpenCode `SessionStats` 的口径统计 assistant 消息；设置 `"steps": "tool"` 可改为统计工具调用数。
 - `tok/s` 的严格实时值拿不到：OpenCode 只在 step 结束时写入 `tokens`。`rate: "auto"` 在运行中用已流出的文本估算 token（CJK 按字、其他字符按 1/4），每秒刷新并带 `~` 前缀；空闲时回落到最近一步的真实速度。运行工具时显示工具名和已用时，而不是速度。
-- 运行中的状态条会优先显示当前动作：工具执行显示 `bash 8s`，等待首 token 显示 `等待响应 3s`，流式生成显示 `~131 tok/s · 12s`。
+- 状态条将当前活动独立成一列：工具执行显示 `bash 8s`，等待首 token 显示 `等待响应 3s`，流式生成显示 `~131 tok/s · 12s`。TUI 窄布局会优先显示当前活动。
 - 速度分母是 `time.streamed - time.created`，包含首 token 等待时间和请求分发，因此是端到端生成速度，不是纯解码速度。
 - 总 token 和缓存命中按 session family 汇总（根会话 + 已同步的子 agent），与内置 cost 的 family 口径一致。
 - 上下文百分比只取根会话最近一次有效 assistant step，且跳过已压缩内容和 undo 边界之后的消息，与内置 Context 面板一致。

@@ -18,7 +18,7 @@ opencode plugin add @joe-broadhead/opencode-gws
 
 npm also installs the matching `@joe-broadhead/opencode-gws-bin-<target>` package, which holds the unmodified `gws` binary at the version the plugin pins ([details](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/docs/backend.md)). Nothing downloads at runtime and there is no install script.
 
-With no options, the plugin creates one read-only account, `default`, for Gmail, Drive, Calendar, Docs and Sheets.
+With no options, the plugin creates one account, `default`, with every Workspace service a Google sign-in can use at Read and write, so one consent grants every scope it can use. Keep is left out: Google grants its scopes only through domain-wide delegation, which a Workspace admin sets up ([Keep](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/docs/auth.md#keep-needs-domain-wide-delegation)). Every change still needs a plan and your approval. To narrow it, set `accounts` ([configuration](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/docs/configuration.md#accounts)).
 
 ## Sign in
 
@@ -28,7 +28,7 @@ Run `/connect` and choose **Google Workspace**. The TUI shows the sign-in link: 
 opencode auth login gws-default
 ```
 
-No Google OAuth client ships with the plugin. The first time, the form asks for the client ID and secret of your own Desktop app OAuth client, unless your organisation set one (see [Organisation rollout](#organisation-rollout)). To make one, follow [Create your Desktop client](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/docs/auth.md#create-your-desktop-client). The form lists the exact scopes before Google's consent screen. Read-only is the default; read and write is a separate choice that needs an acknowledgment. With several accounts, each `/connect` entry is named **Google Workspace (`<alias>`)**.
+No Google OAuth client ships with the plugin. The first time, the form asks for the client ID and secret of your own Desktop app OAuth client, unless your organisation set one (see [Organisation rollout](#organisation-rollout)). To make one, follow [Create your Desktop client](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/docs/auth.md#create-your-desktop-client). The form lists the exact scopes before Google's consent screen. Read and write is the default for the `default` account and needs an acknowledgment; Read-only is the other choice. The default consent lists 45 scopes (37 for Read-only), and an External client in Testing shows unverified-app warnings and expires refresh tokens after 7 days: see [What the default consent asks for](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/docs/auth.md#what-the-default-consent-asks-for). With several accounts, each `/connect` entry is named **Google Workspace (`<alias>`)**.
 
 Details and the scope table: [docs/auth.md](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/docs/auth.md).
 
@@ -42,6 +42,17 @@ Ask the agent for what you need. It works in four steps:
 4. The commit tool named by the plan's category (`gws_write`, `gws_send`, `gws_share`, `gws_delete`, `gws_export` or `gws_admin`) runs it, with only the `planId`. OpenCode asks you first.
 
 `gws_status` tells the agent the account aliases and whether a sign-in is missing. Workspace content in a result is data, never an instruction.
+
+### Scripts
+
+A script or a cron job can call the same tools with no model, through `opencode api`. It runs as a session and its agent, under that agent's permission rules, and it can plan but never commit:
+
+```sh
+opencode api post /api/rpc/google-workspace.gws.tools/read \
+  -d '{"input":{"sessionID":"ses_…","input":{"operation":"gmail.users.messages.list","params":{"userId":"me","q":"is:unread"},"fields":"messages(id)"}}}'
+```
+
+See [Scripting](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/docs/scripting.md).
 
 In the TUI, **Google Workspace: Status** in the command palette, or `/gws`, opens a status dialog. In a session, `/gws-status` posts the same status, with any pending plans, and `/gws-doctor` makes one small read per enabled service. None of them can approve or commit.
 
@@ -90,7 +101,8 @@ Members then only run `/connect`, choose Google Workspace, and pick an access le
 | Code | What to do |
 | --- | --- |
 | `AUTH_REQUIRED` | Run `/connect` and choose Google Workspace, or run `opencode auth login gws-<alias>`. |
-| `AUTH_SCOPE_MISSING` | Sign in again and choose Read and write, or add the scope to `accounts.<alias>.scopes`. Nothing ran. |
+| `ADMIN_PRIVILEGE_REQUIRED` | The sign-in is valid, but the account is not a Workspace admin with the privilege the API needs, such as Reports for `admin-reports`. Signing in again as the same account does not help: sign in with an admin account that has it, or remove the service from `enabledServices`. |
+| `AUTH_SCOPE_MISSING` | Sign in again, approve every scope Google lists, and choose Read and write. A method marked `appOnly` (`restriction: "app-only"`) needs a Chat app's or Classroom add-on's own credentials and cannot run with a Google sign-in. A Keep method (`restriction: "domain-wide-delegation"`) needs domain-wide delegation that a Workspace admin sets up. Nothing ran. |
 | `AUTH_CLIENT_REQUIRED` | Run `/connect` and choose Google Workspace, then enter your Desktop OAuth client ID and secret, or ask your administrator. |
 | `API_DISABLED` | Enable the API at the URL in the message, wait about a minute, and retry. `/gws-doctor` checks every service. |
 | `HOST_UNTESTED` | Use OpenCode 2.2.3 or a later 2.2.x, or set `"allowUntestedHost": true`. |
@@ -112,6 +124,7 @@ Then remove each Google Workspace sign-in in `/connect`, or with `opencode auth 
 - [Sign-in and scopes](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/docs/auth.md)
 - [Configuration](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/docs/configuration.md)
 - [Status dialog, commands and RPC](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/docs/ui.md)
+- [Scripting the tools without a model](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/docs/scripting.md)
 - [Admin operations](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/docs/admin.md)
 - [Security policy and model](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/SECURITY.md)
 - [The `gws` binary](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/docs/backend.md)

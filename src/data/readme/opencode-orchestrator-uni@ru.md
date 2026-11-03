@@ -12,11 +12,11 @@
 - `fix-runner` — единственный пишущий субагент (применяет список «к закрытию»);
 - процессные документы комплекта, доступные как **reference `audit-kit`**
   (`call-mechanics.md`, `process-ready-loop.md`, `root-runbook.md`,
-  `instruction-other-session.md`, `context-efficiency.md`);
-- четыре детерминированных read-only инструмента — `orch_uni_validate_report`,
-  `orch_uni_context_lint`, `orch_uni_snapshot`, `orch_uni_sessions`
-  (см. [Инструменты](#инструменты));
-- две слэш-команды — `/agents-md` и `/spec` (см. [Команды](#команды)).
+  `instruction-other-session.md`, `context-efficiency.md`, `session-discipline.md`);
+- пять детерминированных read-only инструментов — `orch_uni_validate_report`,
+  `orch_uni_context_lint`, `orch_uni_snapshot`, `orch_uni_sessions`,
+  `orch_uni_session_stats` (см. [Инструменты](#инструменты));
+- три слэш-команды — `/agents-md`, `/spec` и `/handoff` (см. [Команды](#команды)).
 
 Read-only аудиторы держатся на `edit: deny` плюс запрете в промпте; shell-разрешение
 остаётся, чтобы запускать проверки (принятый риск, ни одно разрешение не ослаблено).
@@ -57,8 +57,8 @@ Reference `audit-kit` указывает на per-locale каталог `docs/<l
 может читать процессные документы напрямую, например
 `<reference path>/call-mechanics.md`.
 
-Плагин также регистрирует четыре детерминированных **read-only** инструмента в
-пространстве имён `orch_uni` и две слэш-команды — см. [Инструменты](#инструменты)
+Плагин также регистрирует пять детерминированных **read-only** инструментов в
+пространстве имён `orch_uni` и три слэш-команды — см. [Инструменты](#инструменты)
 и [Команды](#команды).
 
 ## Команды
@@ -67,6 +67,7 @@ Reference `audit-kit` указывает на per-locale каталог `docs/<l
 | --- | --- |
 | `/agents-md` | Вставляет workflow аудита/черновика AGENTS.md: шаблон `context-efficiency.md`, `orch_uni_context_lint`, `context-lint`, подтверждение перед записью. |
 | `/spec` | Вставляет workflow SPEC.md: бриф, уточняющие вопросы, EARS/AC/трассировка, `orch_uni_context_lint`, `context-lint`, подтверждение перед записью. |
+| `/handoff` | Вставляет workflow закрытия среза: факты сессии и рабочего дерева, шаблон handoff из `session-discipline.md`, запись `docs/planning/handoff-<YYYY-MM-DD>.md`. |
 
 Команда — это промпт, а не писатель: обработчик вставляет workflow-промпт в
 текущую сессию. Дальше оркестратор работает по обычным правилам evidence и
@@ -80,10 +81,11 @@ Reference `audit-kit` указывает на per-locale каталог `docs/<l
 | `orch_uni_context_lint`     | да        | Детерминированный аудит AGENTS.md/SPEC.md: бюджет, vague, ссылки, секции       |
 | `orch_uni_snapshot`        | да        | Детерминированная ревизия дерева каталогов (sha256 на файл + агрегатный хэш)  |
 | `orch_uni_sessions`        | да        | Дочерние сессии сессии: агент, модель, стоимость, токены, время               |
+| `orch_uni_session_stats`   | да        | Счётчики протокола сессии: промпт, компакции, тулы/ход, урезанные выводы       |
 
 Каждый инструмент отвечает JSON-текстом. Ошибки — **типизированные коды** внутри
 тела (`E_INPUT`, `E_NO_JSON`, …), а не исключения, чтобы агент мог ветвиться по
-коду, не разбирая прозу. Ни один из четырёх ничего не пишет в воркспейс, хранилище
+коду, не разбирая прозу. Ни один из пяти ничего не пишет в воркспейс, хранилище
 сессий или конфигурацию.
 
 ### `orch_uni_validate_report`
@@ -263,6 +265,136 @@ Commands, HTML-комментарий вроде `<!-- npm install -->` кома
 `E_INPUT` при некорректных аргументах, `E_NOT_FOUND`, когда родительской сессии
 нет, `E_ABORTED`, когда сессия остановлена.
 
+### `orch_uni_session_stats`
+
+```jsonc
+{}                                  // счётчики вызывающей сессии
+{ "sessionID": "ses_…" }            // любая сессия на этом сервере, не только дочерняя
+```
+
+```jsonc
+{ "ok": true, "sessionID": "ses_…",
+  "counters": {
+    "requests": 12, "promptTokensLast": 151204, "promptTokensMax": 161002,
+    "promptTokensMedian": 148900, "band": 1, "compactions": 1,
+    "compactionAttempts": 1, "compactionFailures": 0, "compactionSource": "event",
+    "reminders": 2, "toolCalls": 31, "outputsCapped": 1,
+    "outputCharsSaved": 18422, "errors": 0,
+    "toolCallsByTool": { "shell": 18, "bash": 6, "webfetch": 2, "read": 5 },
+    "toolOutputsCappedByTool": { "shell": 1, "bash": 0, "webfetch": 0, "read": 0 }
+  },
+  "limits": { "promptTokensSoft": 150000, "maxCompactions": 1, "maxToolOutputChars": 20000 },
+  "overBudget": true, "compactionLimitReached": true, "toolsPerTurn": 2.58,
+  "tracked": true,
+  "guard": { "available": true, "hooksRegistered": true, "sessionEnabled": true,
+             "toolOutputEnabled": true,
+             "toolOutputTools": ["shell", "bash", "webfetch"],
+             "compactionSource": "event", "eventLive": true,
+             "streamFailures": 0, "unkeyedCalls": 0 } }
+```
+
+`sessionID` может называть **любую сессию на этом сервере**, не только дочернюю
+вызывающего; это осознанно — по отчёту оркестратор контролирует все свои срезы.
+Счётчики принадлежат инстансу плагина, а `tracked` равен `true`, как только сессию
+наблюдало любое событие или хук; событие `session.deleted` её забывает. `band` —
+максимум достигнутого уровня бюджета (`0` ниже мягкого порога);
+`promptTokensMedian` — медиана по окну последних 256 запросов; `toolCalls` и
+per-tool счётчики включают вложенные вызовы Code Mode; `toolCallsByTool` и
+`toolOutputsCappedByTool` разносят вызовы и урезанные выводы по нормализованному
+имени инструмента (namespace снят, регистр нижний); `outputCharsSaved` — число
+символов, не байтов, и верхняя оценка (внедрённая заглушка вычитается).
+`compactions` считает только подтверждённые `session.compaction.ended`;
+`compactionAttempts` — каждый вызов хука `session.compaction`, поэтому на хосте с
+умершим или отсутствующим потоком событий попытки растут, а `compactions` и
+`compactionLimitReached` стоят (неудачная попытка не становится стоп-сигналом).
+Умерший поток событий один раз виден в `guard.streamFailures`; per-session
+`errors` считает только ошибки хуков, поэтому транспортная авария не
+приписывается каждой сессии. Дубликаты событий компакции считаются один раз
+только при наличии `event.id` или durable-позиции; без identity повторная
+доставка может пересчитать событие (fail-open в сторону счёта).
+Сессия, которую не отдаёт хранилище и не наблюдал этот инстанс, — `E_NOT_FOUND`
+(распознаётся по типизированным `_tag`/`name`/`code` — `Session.NotFoundError`,
+`SessionNotFoundError`, `NotFoundError`, `ENOENT` — с узким fallback по сообщению);
+`session.get`, вернувший `undefined` для ненаблюдаемой сессии, — тот же ответ
+«не найдено»; transient-ошибка `session.get` (блокировка, права, `unknown
+database`) — `E_INTERNAL`; известная сессия без запросов — валидный отчёт с
+`tracked: false`. Без `session.get` ненаблюдаемая сессия —
+`E_NO_API`, наблюдаемая — `ok` с `session: null` и записью в `limitations`.
+Коды: `E_INPUT`, `E_NOT_FOUND`, `E_INTERNAL`, `E_NO_API`, `E_UNAVAILABLE`
+(guard не зарегистрирован или его хуки не установились), `E_ABORTED`.
+
+## Гигиена сессии
+
+Плагин реализует протокол [`session-discipline.md`](./docs/ru/session-discipline.md):
+сессия = один срез, бюджет промпта ≤150k токенов, ≤1 компакция, вывод инструментов
+— в файл, в конце среза — handoff.
+
+Runtime-часть — три хука (`session.context`, `session.compaction`,
+`tool.execute.after`) и подписка на события компакции:
+
+- `session.context` — оценивает промпт (system + messages) и при переходе на
+  новый уровень бюджета добавляет одно короткое напоминание. Напоминание
+  инжектится **один раз при переходе уровня**, а не в каждом запросе; внутри
+  уровня текст стабилен, поэтому префикс-кэш не рвётся.
+- события компакции — хук `session.compaction` регистрируется **всегда**: он
+  считает попытки (`compactionAttempts`) и отдаёт tentative-напоминание ближайшему
+  запросу; напоминание не называет номер компакции и не заявляет лимит.
+  Подтверждает компакцию только `session.compaction.ended` (дедуп по `event.id`
+  или durable-позиции) и выставляет confirmed-note с номером и лимитом;
+  `session.compaction.failed` увеличивает `compactionFailures`, снимает
+  tentative-note и сохраняет confirmed-note, ещё ждущий доставки. Если поток
+  событий завершился или упал, `guard.eventLive` становится `false`,
+  `guard.compactionSource` — `"hook"`, а `guard.streamFailures` — `1`
+  (per-session `errors` остаётся `0`); хук продолжает считать попытки, но
+  подтверждённых компакций и ложного «лимит исчерпан» на этом пути нет.
+- `tool.execute.after` — для `shell`, `bash`, `webfetch` урезает вывод больше
+  `maxChars`: полный текст пишется в приватный корень на инстанс плагина
+  `os.tmpdir()/opencode-tool-output-<random>/` (POSIX: 0700 на корень и каталог
+  сессии, 0600 на файл), модель получает голову и путь. На Windows mode не
+  действует (замер: 0666), приватность там держится только на ACL каталога
+  `os.tmpdir()` и кодом не проверяется. Корень создаётся `mkdtemp` при setup,
+  поэтому заранее созданный каталог или
+  junction `opencode-tool-output` не используется; на POSIX корень обязан
+  принадлежать текущему uid и не давать доступа group/other, иначе guard
+  отключается с warning (fail-open: результат не трогается). Каталог сессии
+  (`s-<uuid>`) и файл (`c-<uuid>.txt`, запись `wx`) — случайные, их `realpath`
+  проверяется внутри корня. При выгрузке плагина корень удаляется best effort.
+  Строка с lone surrogate нормализуется один раз (U+FFFD), поэтому файл, голова и
+  счётчики описывают одну и ту же строку. Остаточный риск принят: same-user
+  атакующий всё ещё может подменить каталог
+  сессии между `realpath` и `writeFile` (в Node нет `openat`). Если `TMPDIR`
+  указывает внутрь воркспейса, файлы попадут туда. `read`, `write`, `edit`,
+  `execute` и инструменты комплекта не урезаются; kit-имя без namespace
+  (`session_stats`) отбрасывается в конфиге с warning.
+
+`maxCompactions: 0` отключает лимит компакций. `guard.toolOutputEnabled` равен
+`true` только когда приватный корень создан **и** эффективный список инструментов
+непуст; `guard.toolOutputTools` — этот список, `guard.unkeyedCalls` — вызовы
+хуков без непустого `sessionID` (отбрасываются, а не сливаются в бакет `""`).
+Пустой `tools` выключает кап с warning. Guard fail-open: ошибка хука не
+ломает запрос и не портит результат. Отключается флагами `enabled`:
+
+```jsonc
+{
+  "plugins": [
+    {
+      "package": "opencode-orchestrator-uni",
+      "options": {
+        "sessionGuard": { "enabled": true, "promptTokensSoft": 150000, "maxCompactions": 1 },
+        "toolOutputGuard": {
+          "enabled": true,
+          "maxChars": 20000,
+          "headChars": 4000,
+          "tools": ["shell", "bash", "webfetch"]
+        }
+      }
+    }
+  ]
+}
+```
+
+Метрики среза — `orch_uni_session_stats`; закрытие среза — команда `/handoff`.
+
 ## Модели
 
 Определения агентов не несут `model`; модели настраиваются у записи плагина в
@@ -414,7 +546,7 @@ npm run lint:fix     # biome check --write . (применяет безопас�
 
 Команды `check:locales` и `verify:kit` требуют git-чекаута комплекта — в npm-пакете каталог `tools/` не поставляется, поэтому в установленном пакете они недоступны (`stand: unavailable` и собственные воспроизводимые проверки).
 
-`npm test` сканирует только `./test/` — поставляемый набор (289 тестов в 9 файлах;
+`npm test` сканирует только `./test/` — поставляемый набор (400 тестов в 10 файлах;
 до стражей идентификаторов было 72 в 5). Голый `bun test` из корня репозитория
 красный по замыслу: позиционный аргумент `bun test` — это фильтр-подстрока пути,
 поэтому голая команда подхватывает и специально падающие фикстуры в

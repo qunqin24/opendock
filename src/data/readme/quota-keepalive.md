@@ -6,7 +6,7 @@
 
 [![License](https://img.shields.io/badge/License-MIT-3B82F6?style=for-the-badge)](./LICENSE)
 [![npm](https://img.shields.io/npm/v/quota-keepalive?style=for-the-badge&logo=npm&logoColor=white)](https://www.npmjs.com/package/quota-keepalive)
-[![Magpie](https://img.shields.io/badge/Magpie-Plugin-0EA5A4?style=for-the-badge)](https://github.com/sljdxde/quota-keepalive)
+[![Magpie](https://img.shields.io/badge/Magpie-Plugin-0EA5A4?style=for-the-badge)](https://github.com/sljdxde/quota-keepalive-magpie-plugin)
 [![Unofficial](https://img.shields.io/badge/Status-Unofficial-F59E0B?style=for-the-badge)](#非官方插件声明)
 
 中文 · [English](./README.en.md)
@@ -82,7 +82,7 @@ quota-keepalive 不接管任何供应商的登录，也不会把页面伪装成�
 仓库，也不需要等待官方市场上架，直接用 Magpie CLI 安装即可。
 
 - npm 包名：`quota-keepalive`
-- 仓库地址：<https://github.com/sljdxde/quota-keepalive>
+- 仓库地址：<https://github.com/sljdxde/quota-keepalive-magpie-plugin>
 
 ### 安装风险
 
@@ -105,7 +105,7 @@ quota-keepalive 不接管任何供应商的登录，也不会把页面伪装成�
   签到，也应按供应商条款自行评估。
 - **兼容与支持风险**：本项目没有 Magpie 官方兼容性认证，也没有官方支持。Magpie 或
   供应商插件修改公开接口后，本插件可能失效；请通过日志定位问题，并在
-  [GitHub Issues](https://github.com/sljdxde/quota-keepalive/issues) 反馈。无法接受
+  [GitHub Issues](https://github.com/sljdxde/quota-keepalive-magpie-plugin/issues) 反馈。无法接受
   这些风险时，可按安装方式使用下方的卸载命令移除。
 
 ### 方式一：npm（推荐）
@@ -131,7 +131,7 @@ magpie plugin list
 npm 不可用，或希望直接跟踪仓库代码时：
 
 ```sh
-magpie plugin add github:sljdxde/quota-keepalive
+magpie plugin add github:sljdxde/quota-keepalive-magpie-plugin
 ```
 
 这种方式同样可以用 `magpie plugin update` 更新。如果当前网络访问 npm 不稳定，
@@ -163,7 +163,7 @@ magpie plugin rm "$(pwd)"
 ### 安装后检查
 
 1. `magpie plugin list` 能看到本插件的 spec：npm 安装为 `quota-keepalive@latest`，
-   GitHub 安装为 `github:sljdxde/quota-keepalive`，目录安装为绝对路径。
+   GitHub 安装为 `github:sljdxde/quota-keepalive-magpie-plugin`，目录安装为绝对路径。
 2. Magpie 的 `Plugins` 分组中出现“额度签到”。
 3. 至少安装并登录一个供应商插件（WorkBuddy、Qoder、Trae 等）；本插件不接管登录，只读取 Magpie 中已有的登录状态。
 4. 打开页面后点击“一键检测”，确认供应商和账号被识别。
@@ -191,7 +191,7 @@ GitHub 安装没有单独的更新命令，使用上面的 `magpie plugin update
 magpie plugin rm quota-keepalive
 
 # GitHub 安装
-magpie plugin rm github:sljdxde/quota-keepalive
+magpie plugin rm github:sljdxde/quota-keepalive-magpie-plugin
 
 # 本地目录安装（在原来的仓库根目录执行）
 magpie plugin rm "$(pwd)"

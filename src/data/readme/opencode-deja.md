@@ -17,6 +17,7 @@ deja indexes all of it locally and hands the relevant history back over MCP and 
 </p>
 
 <p align="center">
+  <a href="https://github.com/vshulcz/deja-vu/stargazers"><img src="https://img.shields.io/github/stars/vshulcz/deja-vu?style=flat&color=f59e0b" alt="GitHub Stars"></a>
   <a href="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml"><img src="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml/badge.svg?branch=main&event=push" alt="CI"></a>
   <a href="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml"><img src="https://img.shields.io/badge/coverage-88%25-brightgreen" alt="Coverage"></a>
   <a href="https://github.com/vshulcz/deja-vu/releases"><img src="https://img.shields.io/github/v/release/vshulcz/deja-vu" alt="Release"></a>
@@ -85,7 +86,7 @@ Open a new session in any wired agent and it already knows what you solved in th
 <details>
 <summary><b>Homebrew, Windows (Scoop / winget), npm, plugin marketplaces, and binary-only setup</b></summary>
 
-`brew install deja-vu`, `go install github.com/vshulcz/deja-vu/cmd/deja@latest`,
+`brew install deja-vu`, `nix run github:numtide/llm-agents.nix#deja-vu`, `go install github.com/vshulcz/deja-vu/cmd/deja@latest`,
 or `npx @vshulcz/deja-vu "query"` to try it without installing anything. Desktop apps that
 take MCP servers as bundles can open the `.mcpb` from the
 [latest release](https://github.com/vshulcz/deja-vu/releases/latest); it carries the binary.
@@ -341,6 +342,8 @@ for people who install extensions there rather than from a CLI:
 | pi (and omp) | npm `@vshulcz/pi-deja` | `pi install npm:@vshulcz/pi-deja` |
 | Hermes | memory provider `deja-memory`, in the Hermes plugin catalog | `hermes plugins install deja-memory`, or from GitHub: `hermes plugins install vshulcz/deja-vu/extensions/hermes` |
 | Magpie | npm `@vshulcz/magpie-deja` | `magpie plugin add @vshulcz/magpie-deja` |
+| VS Code / Cursor / Windsurf | status bar extension `vshulcz.deja-status` | `code --install-extension vshulcz.deja-status` |
+| Raycast | Raycast extension `deja-vu` | `cd extensions/raycast && npm install && npx ray develop` |
 | CC Switch | 1-click MCP &amp; Skill Repo import (`ccswitch://`) | [Add MCP to CC Switch](ccswitch://v1/import?resource=mcp&apps=claude,codex,gemini,opencode&config=eyJtY3BTZXJ2ZXJzIjp7ImRlamEiOnsiY29tbWFuZCI6Im5weCIsImFyZ3MiOlsiLXkiLCJAdnNodWxjei9kZWphLXZ1Iiwic2VydmUiXX19fQ==) · [Switching guide](https://vshulcz.github.io/deja-vu/guide/switch-agents-without-losing-context.html) |
 
 Either path works alone, and both together double nothing: each package reads what
@@ -616,7 +619,7 @@ Bugs and questions go to [issues](https://github.com/vshulcz/deja-vu/issues).
 Anything you think is exploitable goes through the private advisory link in
 [SECURITY.md](SECURITY.md) instead. What deja reads, what it never sends
 anywhere, and how to exclude a project or forget a session is under
-[Privacy](#privacy).
+[Privacy](#privacy). Found it useful? [Star deja-vu on GitHub](https://github.com/vshulcz/deja-vu).
 
 ## License
 

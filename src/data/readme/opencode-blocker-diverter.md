@@ -44,7 +44,7 @@ That's it. The `postinstall` script automatically:
 1. **Patches `opencode.jsonc`** (or `opencode.json`) in your project root to add `"./node_modules/opencode-blocker-diverter"` to `plugin` — creates the file if neither exists.
 2. **Patches `.opencode/tui.jsonc`** (or `.opencode/tui.json`) to add `"../node_modules/opencode-blocker-diverter"` so Ctrl+P/TUI commands load.
 3. Seeds `.opencode/blocker-diverter.json` — default config (edit freely).
-4. Seeds `.opencode/commands/blockers.*.md` — slash-command templates.
+4. Seeds `.opencode/commands/blockers.list.md` and `blockers.clarify.md` — slash-command templates. `/blockers.on`, `/blockers.off`, `/blockers.stop` and `/blockers.status` are plugin commands on 2.x and are not seeded, because a markdown command of the same name would shadow them.
 
 Then **restart OpenCode** and the plugin is active.
 
@@ -92,6 +92,40 @@ npm link /path/to/opencode-blocker-diverter
 ```
 
 </details>
+
+## OpenCode 1.x and 2.x
+
+Branches: `main` targets the latest OpenCode (2.x) and also still loads on 1.x. The `opencode-1.x` branch delivers the 1.x-only line. Version numbers are plain semver and do not track OpenCode versions. The TUI controls, toasts and Ctrl+B are 1.x only. A guard-triggered stop turns divert off, because OpenCode reports it as a user interrupt.
+
+Versions 0.3.x ship one package for both OpenCode lines. The default export has `{ id, server, setup }`: `server` is the 1.x entry, `setup` is the 2.x entry.
+
+**OpenCode 1.x** (path spec, unchanged): in `opencode.jsonc`
+
+```jsonc
+{ "plugin": ["./node_modules/opencode-blocker-diverter"] }
+```
+
+The TUI part (Ctrl+B, `Ctrl+P` commands) stays registered through `.opencode/tui.jsonc` as above.
+
+**OpenCode 2.x** (object form): in `opencode.jsonc`
+
+```jsonc
+{
+  "plugins": [
+    { "package": "./node_modules/opencode-blocker-diverter", "options": {} }
+  ]
+}
+```
+
+Notes for 2.x:
+- Plugin specs resolve against the config file's directory and must name a package folder.
+- Settings come from `blocker-diverter.json` in the global config dir (`OPENCODE_CONFIG_DIR`, else `$XDG_CONFIG_HOME/opencode`) or from the project's `.opencode/blocker-diverter.json`. Keys in `options` override the file. Defaults are unchanged (`defaultDivertBlockers: false`).
+- Slash commands work: `/blockers.on`, `/blockers.off`, `/blockers.stop`, `/blockers.status`. `/blockers.list` and `/blockers.clarify` are markdown templates.
+- The TUI part is not ported. Ctrl+B and the Ctrl+P entries are 1.x only. There is no toast on 2.x; the reply text is sent into the session.
+- Logs: `$XDG_STATE_HOME/opencode/blocker-diverter.log` (default `~/.local/state`).
+- Design notes: `docs/adr/opencode-v2-port.md`.
+
+**Check the plugin loaded.** Plugin loading is fail-open. If the plugin fails to load, OpenCode logs `failed to load plugin` and keeps running without it. Check the logs for that line. Do not rely on `opencode plugin list` right after startup: on OpenCode 2.2.x it can print "No plugins found" before the plugin activates.
 
 ## Ship Checklist (Quick Verification)
 

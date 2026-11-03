@@ -56,14 +56,19 @@ specific policy, and leaves planning, code generation, and correction with the
 coding agent.
 
 > [!WARNING]
-> JevGuard is in active development. The OpenCode plugin targets OpenCode `1.18.32`
-> and the Claude Code plugin is distributed through this repository's marketplace.
-> Both evaluate every rule block declared in `.jev/rules.md` plus the `SCOPE-CREEP`
-> and `COMPLEXITY` built-ins. Reviews are background and observe-only: they report
-> results but never alter the agent context or block a task. When remediation is
-> enabled and a review has any `FAIL`, JevGuard drafts a strategy-only proposal; it
-> never edits code. The sections below describe the OpenCode plugin; the Claude Code
-> plugin's differences are documented in the
+> JevGuard is in active development. The OpenCode plugin targets OpenCode `2.2.x`
+> (minimum `2.2.2`, `>=2.2.2 <2.3`) through the V2 plugin API and evaluates every rule
+> block declared in `.jev/rules.md` plus the `SCOPE-CREEP` and `COMPLEXITY` built-ins.
+> Reviews are background and observe-only: they report results but never alter the
+> agent context or block a task. When remediation is enabled and a review has any
+> `FAIL`, the plugin asks for a proposal in an isolated, deny-all child session; the
+> proposal never edits code. See [OpenCode 2.2.x limitations](#opencode-22x-limitations).
+> On Claude Code and OpenCode, a user who opts in with `mode: remediate` in their own
+> `claude-code.yaml` or `opencode.yaml` gets a bounded chain of at most 3 visible
+> correction messages to the agent; see
+> [Remediation proposals](docs/configuration.md#remediation-proposals) and
+> [OpenCode `mode: remediate`](docs/configuration.md#opencode-mode-remediate-bounded-chain).
+> The Claude Code plugin is distributed through this repository's marketplace; see the
 > [Claude Code guide](./docs/configuration.md#claude-code).
 
 ## Why JevGuard
@@ -196,9 +201,12 @@ concurrency limit caps the plugin instance at two Jev requests in flight, counti
 built-in batch as a single request. Results join the same aggregate in a fixed order:
 rules in source order, then `SCOPE-CREEP`, then `COMPLEXITY`.
 
-Reviews run in the background. The idle event returns as soon as the serialized
-attribution step is scheduled; policy reads, Jev calls, and presentation never sit on
-the agent's critical path.
+Reviews run in the background. The unit of review is one session execution, from
+`session.execution.started` to `session.execution.succeeded`; the event handler returns
+as soon as the serialized attribution step is scheduled, so policy reads, Jev calls,
+and presentation never sit on the agent's critical path. An `interrupted` or `failed`
+execution is not reviewed: the plugin discards it and logs `JevGuard skipped ·
+interrupted|failed`.
 
 ## Safe auto-propose remediation
 
@@ -209,7 +217,7 @@ delivered entirely by the same server plugin.
 
 When `.jev/config.yaml` enables remediation (it is enabled by default) and a review
 contains any `FAIL`, the plugin, after presenting the review, sends one aggregate
-proposal request to a hidden `jevguard-proposer` subagent:
+proposal request to an isolated child session:
 
 - The request aggregates every `FAIL` finding in the review — local `error` rules and
   the `SCOPE-CREEP` built-in — together with the turn's task and its **complete, safe,
@@ -219,28 +227,33 @@ proposal request to a hidden `jevguard-proposer` subagent:
   attributed file is blocked or the patch is oversized, the plugin records no proposal
   at all — even when a rule-scoped `FAIL` exists — because there is no complete safe
   evidence to send. It never falls back to a repository or global diff.
-- The request is sent in an isolated child session parented to the source session. The
-  `jevguard-proposer` subagent has wildcard-deny permissions and wildcard-disabled
-  tools, so it cannot call a tool, edit a file, or produce a patch. It returns a
-  strategy and one manual apply instruction only.
-- `remediation.model` is optional. When set in `.jev/config.yaml`, it selects the
-  proposer model; when it is absent, the proposer inherits the host's model.
-- A generic toast reports that the proposal is ready in the child session. It carries
-  no rule, task, diff, finding, or credential.
+- The request is sent in an isolated child session parented to the source session.
+  The child session is created with wildcard-deny permissions, so it cannot call a
+  tool, edit a file, or produce a patch. It returns a strategy and one manual apply
+  instruction only. No agent is registered for it.
+- The child session always gets an explicit model: `remediation.model` from
+  `.jev/config.yaml` when set, otherwise the model of the source session. When neither
+  is known, no proposal is created and the plugin logs
+  `REMEDIATION_PROPOSAL_SKIPPED_NO_MODEL`.
+- A proposal that does not finish within 120 seconds is interrupted and logged as
+  `REMEDIATION_PROPOSAL_TIMEOUT`.
+- The server plugin has no toast or TUI channel on OpenCode `2.2.x`, so readiness is
+  reported through the structured log only. It carries no rule, task, diff, finding,
+  or credential.
 
 The plugin creates at most one proposal per evaluated turn, and the child session is
 excluded from review for the plugin lifetime, so a proposal can never recurse or
 trigger a second one. A host, model, or toast failure is contained and never changes
 the review. A contained proposal failure — an invalid model specifier, a child-session
-failure, or a prompt failure — shows a generic error toast and writes one structured
+failure, a prompt failure, or a timeout — writes one structured
 `error` log entry carrying only a typed reason code, never any task, diff, finding,
 path, or credential.
 
 The proposer is a strategy step, not an apply step: it never edits code, and nothing
 is applied automatically. You read the proposal, copy its manual apply instruction
-into your normal coding agent, and apply it there. That apply is an ordinary completed
-assistant turn, so the server plugin reviews it normally on the next idle — exactly
-like any other turn.
+into your normal coding agent, and apply it there. That apply is an ordinary
+execution, so the server plugin reviews it normally when it succeeds — exactly like any
+other turn.
 
 The proposal prompt treats the task, paths, diff, rules, and findings as untrusted
 data, and requires a separate explicit confirmation before proposing changes to tests,
@@ -250,8 +263,14 @@ or secret is logged.
 ## Install
 
 Installing `@pablozrrrr/jevguard` does **not** register it with OpenCode by itself.
-OpenCode only loads plugins listed in `plugin: [...]` in `opencode.json`, so register
-the plugin from the installed CLI:
+OpenCode `2.2.x` only loads plugins listed in `plugins: [...]` in `opencode.json`.
+
+> [!WARNING]
+> The `jevguard install` command below still writes the OpenCode `1.x` `plugin` key.
+> Until it is migrated, register the plugin on `2.2.x` with the manual `plugins`
+> entry shown after it.
+
+The installer is run from the installed CLI:
 
 ```sh
 # global config: ~/.config/opencode/opencode.json
@@ -261,10 +280,12 @@ jevguard install
 jevguard install --project
 ```
 
-The installer asks for confirmation, edits only the `plugin` array, and is
-idempotent. It only edits a `plugin` array of plain strings, so OpenCode's
-`[["pkg", { "options": {} }]]` tuple form is a known limitation: the installer leaves
-the file unchanged and prints the manual snippet instead. If `jevguard` is not on
+The installer asks for confirmation, edits only the `plugins` array, and is
+idempotent. It never writes the legacy `plugin` key, but an entry already there counts
+as installed. It only edits a `plugins` array of package strings or
+`{ "package": "..." }` objects; any other shape is left unchanged and the installer
+prints the manual snippet instead. `jevguard doctor` also checks that
+`opencode --version` is in the supported range `>=2.2.2 <2.3`. If `jevguard` is not on
 `PATH`, run it through `bunx`:
 
 ```sh
@@ -274,7 +295,7 @@ bunx --package @pablozrrrr/jevguard jevguard install
 The manual alternative is one entry in `opencode.json`:
 
 ```json
-{ "plugin": ["@pablozrrrr/jevguard"] }
+{ "plugins": ["@pablozrrrr/jevguard"] }
 ```
 
 OpenCode resolves the package from the npm registry or its cache and loads it on the
@@ -313,12 +334,12 @@ does not vendor them and does not promise an offline install.
 
 ### Load the plugin
 
-OpenCode `1.18.32` resolves a **bare** `opencode.json` `plugin` entry from the npm
+OpenCode `2.2.x` resolves a **bare** `opencode.json` `plugins` entry from the npm
 registry or its cache:
 
 ```json
 {
-  "plugin": ["@pablozrrrr/jevguard"]
+  "plugins": ["@pablozrrrr/jevguard"]
 }
 ```
 
@@ -332,18 +353,19 @@ bun add /path/to/pablozrrrr-jevguard-<version>.tgz
 
 ```ts
 // .opencode/plugins/jevguard.ts
-export { JevGuardPlugin } from "@pablozrrrr/jevguard";
+export { default } from "@pablozrrrr/jevguard";
 ```
 
 OpenCode loads `.opencode/plugins/` with its bundled Bun runtime. The shim runs as
 a local plugin module and resolves `@pablozrrrr/jevguard` from
-`.opencode/node_modules`. Use either the bare `plugin` entry or the local shim, not
+`.opencode/node_modules`. Use either the bare `plugins` entry or the local shim, not
 both.
 
-Remediation is built into the same server plugin: the `config` hook registers the
-hidden `jevguard-proposer` subagent, so no second entrypoint or shim is needed. The
-server plugin reviews and reports turns, and — when remediation is enabled and a review
-fails — creates the proposal child session automatically.
+The package's default export is the V2 plugin object (`{ id: "jevguard", setup }`).
+Remediation is built into the same server plugin, so no second entrypoint or shim is
+needed: it reviews and reports executions, and — when remediation is enabled and a
+review fails — creates the proposal child session automatically. The bundled skills are
+registered through the host skill editor (`skill.transform`).
 
 ### Claude Code
 
@@ -409,10 +431,35 @@ jevguard login
 
 Known limitations:
 
-- Target host is OpenCode `1.18.32`. Exact `1.18.32` runtime smoke is still
-  pending; a local `1.18.28` run worked.
+- Target host is OpenCode `2.2.x` (minimum `2.2.2`). The plugin does not load on
+  `2.1.x` or `1.x`. A real-host smoke on `2.2.2` (2026-11-02) covered observe
+  and `remediate` (FAIL review, deny-all proposer, attempt 1/2, `RESOLVED`).
+- OpenCode `2.2.2` does not install dependencies for a `file:` plugin spec. Use
+  the registry package; a local `file:` build needs its dependencies installed
+  next to it.
 - The plugin and CLI run on Bun, and the packed `jevguard` bin keeps a Bun
   shebang. Install and run the artifact with the Bun runtime.
+
+### OpenCode 2.2.x limitations
+
+- **Minimum version `2.2.2`.** The plugin declares `engines.opencode` `>=2.2.2 <2.3`
+  and is pinned to the `2.2.x` plugin API.
+- **Git-ignored files are out of scope.** The execution snapshot comes from the host's
+  working-tree diff, which leaves out files ignored by Git; a write the diff cannot
+  show makes the execution `UNAVAILABLE` (`INCOMPLETE_FILE_DIFF`) instead of reviewing
+  a partial patch.
+- **Interrupted or failed executions are not reviewed.** Their writes stay on disk and
+  count as pre-existing changes for the next execution's snapshot, so they are not
+  attributed to it.
+- **`opencode run --standalone`.** The review runs after the execution succeeds; a
+  standalone run can exit before it finishes. JevGuard reviews reliably in the TUI or
+  with `opencode serve` plus `opencode run --server`.
+- **Concurrent executions.** When two sessions run at once, or an execution starts
+  while the previous one is still being finished, the review is `UNAVAILABLE`
+  (`CONCURRENT_SESSIONS`, `BOUNDARY_RACE`) instead of mixing changes. Nested child
+  sessions count as part of their parent execution.
+- **No toast or TUI routing.** The server plugin reports through structured logs
+  written to the host's stderr capture.
 
 ## Connect Jev
 
@@ -438,8 +485,8 @@ JevGuard FAIL
 pass 1 · warn 1 · fail 1 · skipped 0 · unavailable 0
 ```
 
-One toast per turn shows the aggregate outcome and the outcome counts; the
-structured log carries every rule's result, its raw violation probability or typed
+The structured log (and, on hosts with a toast channel, one toast per turn) shows
+the aggregate outcome and the outcome counts; the structured log carries every rule's result, its raw violation probability or typed
 reason, and its scoped paths. The counts include every entry, including the single
 synthetic entry a review-level failure produces.
 
@@ -573,20 +620,20 @@ The current release implements the full local review path:
   attributed patch a built-in is `SKIPPED`; blocked or oversized evidence is
   `UNAVAILABLE`; a rule, policy-load, or config failure never suppresses the batch, and
   one built-in's answer never suppresses the other.
-- Reviews run in the background. The idle event resolves as soon as the serialized
-  attribution step is scheduled, so policy reads, Jev calls, and presentation do not
-  block the agent.
+- Reviews run in the background. The `session.execution.succeeded` handler returns
+  as soon as the serialized attribution step is scheduled, so policy reads, Jev calls,
+  and presentation do not block the agent.
 - The local gate maps each rule to `PASS`, `WARN`, or `FAIL`; a rule with no
   applicable scope is `SKIPPED`, and a rule that cannot be safely evaluated is
   `UNAVAILABLE`.
-- One aggregate TUI toast and one structured log entry report the turn. The log
+- One structured log entry reports the turn (the `2.2.x` server plugin has no toast
+  channel). The log
   carries every entry's outcome, raw probability, or reason, including the built-in
   results and the synthetic review-level entry when there is one. The fixed result
   order is rules in source order, then `SCOPE-CREEP`, then `COMPLEXITY`.
 - After presentation, when remediation is enabled and the review contains any `FAIL`,
-  at most one aggregate proposal request is sent to the hidden `jevguard-proposer`
-  subagent in an isolated child session parented to the source session, and a generic
-  toast reports that the proposal is ready. The request carries every `FAIL` finding
+  at most one aggregate proposal request is sent to an isolated, deny-all child
+  session parented to the source session, with an explicit model. The request carries every `FAIL` finding
   (local `error` rules and the `SCOPE-CREEP` built-in), the task, and the complete,
   safe, full attributed patch; a blocked or oversized patch records no proposal. A
   notifier or host failure never affects the review, presentation, or later turns.
@@ -615,8 +662,8 @@ V1    Claude Code and Codex adapters                          Claude Code done, 
 ```
 
 The auto-propose slice is implemented: after a review with a `FAIL`, an enabled
-configuration asks the hidden `jevguard-proposer` subagent for a strategy in an
-isolated child session, and never applies a change. The `V0.6` entry remains the
+configuration asks for a strategy in an isolated, deny-all child session, and never
+applies a change. The `V0.6` entry remains the
 future, unattended corrective loop; the proposer is a bounded, strategy-only step, not
 that loop.
 
@@ -657,18 +704,18 @@ loads in OpenCode, attributes one completed turn, parses every rule block in
 the `SCOPE-CREEP`
 and `COMPLEXITY` built-ins over the complete attributed patch behind one shared
 concurrency limit, applies the local gate to each, and presents one aggregate result
-as a transient TUI toast and a structured log entry.
+as a structured log entry.
 
 The local, private tarball (`pnpm artifact:build`, `pnpm artifact:pack`) packages
 that slice so a clean consumer can install it without workspace links.
 
-OpenCode sees only transient toasts, structured logs, and — when remediation is
-enabled and a review has a `FAIL` — one proposal child session and a generic toast.
+OpenCode sees only structured logs and — when remediation is enabled and a review
+has a `FAIL` — one proposal child session.
 The review does not inject anything into the agent context, prompt the source session,
 add session messages, or block a task. The proposal is a separate, configurable,
 strategy-only workflow delivered by the server plugin; it never edits code and never
-applies a change. Real-host validation against exact OpenCode `1.18.32` is still
-pending.
+applies a change. A real-host smoke on OpenCode `2.2.2` passed; see
+[OpenCode 2.2.x limitations](#opencode-22x-limitations).
 
 The Claude Code plugin reuses the same core, policy files, gate, and local history. It
 reviews closed units of work in a detached worker and shows results in the session

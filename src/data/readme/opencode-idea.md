@@ -1,25 +1,22 @@
 # opencode-idea
 
-OpenCode 插件,面向 JetBrains 项目 (IntelliJ IDEA / PyCharm / WebStorm 等),做两件事:
+OpenCode 插件,面向 JetBrains 项目 (IntelliJ IDEA),做两件事:
 
-1. **接入 IDE MCP** —— 把项目在 **它自己的 IDE** 里打开,并把这些 IDE 的 MCP 工具注册进 OpenCode。一个 OpenCode 会话可以
-   同时接入 **多个项目**:root 本身,以及 root 下任意层级的 **子项目**;子项目可以用与 root **不同**的 IDE 打开 (root 在
-   IDEA、`modelserver` 在 PyCharm 是常态)。每个项目注册成独立的 MCP server, **工具名前缀就是它**:
-   root 是 `ide_*`,子项目是 `<目录名>_*`(例如 `modelserver_search_symbol`)。
-2. **优先使用 IDE 工具** —— IDE 可用时,向模型注入 **逐项目**的引导:在哪个项目里工作,就用哪个项目前缀的工具;IDE 不可用时
+1. **接入 IDE MCP** —— 把当前 JetBrains 项目在它的 IDE 里打开,并把这些 IDE 的 MCP 工具注册进 OpenCode。
+   一个 OpenCode 会话只接入 **一个** 项目(当前 workspace root),MCP server 固定叫 `ide`,工具前缀固定 `ide_*`。
+2. **优先使用 IDE 工具** —— IDE 可用时,向模型注入引导:原生工具做不到的事才用 IDE 工具;IDE 不可用时
    回退原生工具 (正常回退,无需声明)。
 
 > **需要项目环境的命令也走原生 shell**:项目配置的 JDK / Node / Go / Maven / Python 由配套插件的 `get_project_env` 取出,
 > 本插件在每条 shell 创建前注入到它的 `PATH` 与环境变量里;**反复发生的流程**仍固化成 Run Configuration。
 > **IDE 内置的 `ide_execute_terminal_command` 继续隐藏** —— 实测它不继承项目环境。详见「Run Configuration 全套」与「终端全套」。
 
-非 JetBrains 项目完全不受影响。 **手动接入**:插件启动不探测、不连接任何 IDE。三个命令管全部:
+非 JetBrains 项目完全不受影响。 **手动接入**:插件启动不探测、不连接任何 IDE。两个命令管接入:
 
 | 命令 | 作用 |
 | --- | --- |
-| `/open-in-ide [ide]` | 接入 root 及其全部已登记子项目;第一次**没有配置**时由 AI 问用户 root 用哪个 IDE |
-| `/add-sub-module-in-ide <路径>` | 登记一个子项目(相对 root 的路径);随后由 AI 问用户它用哪个 IDE |
-| `/delete-in-ide` | 删掉**整个**配置(root + 全部子项目)并注销全部 IDE MCP |
+| `/open-in-ide` | 接入当前项目:在 IntelliJ IDEA 里打开它,并把 IDE MCP 工具注册进来 |
+| `/delete-in-ide` | 删除配置并注销 IDE MCP |
 
 配置持久化在 `ctx.storage`(`project/<root 路径>`),重启 OpenCode 后仍在。之后**没有任何后台轮询**——恢复完全靠请求驱动:
 插件发现"该有 IDE 工具却没有"(新实例)或"IDE 工具调用失败"(掉线)时,**在下一条消息发出前静默接回**(用户无感)。
@@ -33,134 +30,86 @@ OpenCode 插件,面向 JetBrains 项目 (IntelliJ IDEA / PyCharm / WebStorm 等)
 
 ```text
 setup(启动, 每 root 一次):
-  a. 读配置(ctx.storage: project/<root 路径>)—— root 用哪个 IDE,登记了哪些子项目、各自用哪个 IDE
-  b. 注册 3 个命令 + session context/prompt 钩子 + tool 钩子 + configure_ide_project 工具
+  a. 读配置(ctx.storage: project/<root 路径>)—— 只记"用户已接入过"
+  b. 注册 2 个命令 + session context/prompt 钩子 + tool 钩子
   不探测、不注册任何 MCP
 
 /open-in-ide(手动触发, 阻塞到就绪):
-  1. 还没有配置时:
-     - 带了 ide 参数 → 直接写入 root 的 IDE(直通逃生口,不经过模型)
-     - 没带参数   → 发给模型一条**任务**:请它问用户 root 用 IDEA 还是 PyCharm,拿到答复后调用
-                    configure_ide_project 回写;本次到此为止。**只有第一次要问**
-  2. 有配置时,对**每个**已登记项目:
-     - 在**该项目自己 IDE 的固定端口**上问「你认得这个项目吗」(`get_project_modules`,带项目路径)
-       · 认得   → 就用那个端口(这就是"哪个 IDE 打开着它"的判定)
-       · 不认得 → `open -a <该项目自己的 IDE> <项目目录>`,再轮询等到认得(上限 60s)
-  3. **先注销全部旧注册,再按项目各注册一个 MCP server**
-     (server 名 = 工具前缀:root 是 `ide`,子项目是目录名;`type: "remote"` 指向
-      `http://127.0.0.1:<port>/stream`,项目路径走请求头)
-  4. 等 IDE 工具进入注册表;按每个项目实际提供的工具同步 skill;启用逐项目引导
-  5. 发结果通知(用户看到干净气泡,模型只回"收到")
-
-/add-sub-module-in-ide <路径>(手动触发):
-  1. 没有配置 → 直接报错,提示先执行 /open-in-ide(不提问、不写任何东西)
-  2. 有配置   → 校验路径:必须在 root 下、目录存在、目录名合法、前缀不与已登记项目重名
-  3. 通过     → 发给模型一条**任务**:请它问用户这个子项目用哪个 IDE,答复后调用
-                configure_ide_project 回写。(带多个参数 = 报错,不猜)
+  1. 没有配置 → 写标记(只表示"用户已接入过")
+  2. 在 IntelliJ IDEA 的固定端口上调用 get_project_env,比较返回的 projectPath 与当前项目路径
+       · 完全一致 → 已打开
+       · 不一致 / 没打开 → open -a "IntelliJ IDEA" <项目目录>,再轮询等到一致(上限 60s)
+  3. 注册一个 MCP server(名字固定 `ide`)
+  4. 等 IDE 工具进入注册表;拉项目环境;启用引导
+  5. 发结果通知
 
 /delete-in-ide(手动触发):
-  1. 删除**整个**配置(root + 全部子项目) + 注销全部 IDE MCP + 清空注入的环境
+  1. 删除配置 + 注销 IDE MCP + 清空注入的环境
   2. 发结果通知
 
 工具失败触发(仅在有配置的 root 里):
-  IDE 工具调用失败 → tool execute.after 钩子**分类**:
+  IDE 工具调用失败 → tool execute.after 钩子分类:
     - IDE MCP 不可用(掉了)→ 重跑接入流程
-    - IDE 在、但项目没打开("Unable to determine the target project" / "doesn't correspond to any open project")
-      → 让**这个工具所属项目**的 IDE 重新打开它(不会去动别的项目)
+    - IDE 在、但项目没打开 → 让 IDE 重新打开它
     - 普通业务错误(File not found 等)→ 不动作
-  触发成功 → 把该错误改写为"已重连 / 已重新打开,请重试",模型同一回合重试;失败 → 保持原错误
 
-请求驱动的恢复(没有后台轮询;每个 Location(项目)各一份插件实例):
-  prompt / context / execute.after 三个钩子各管一件事,只在**确实有事发生**时动;
-  没人用这个项目时,插件完全静止。三个钩子分别做什么见「行为」。
+请求驱动的恢复(没有后台轮询;每个 Location 各一份插件实例):
+  prompt / context / execute.after 三个钩子只在确实有事发生时动。
 ```
 
-## 接入 (`/open-in-ide` 与 `/add-sub-module-in-ide`)
+## 接入 (`/open-in-ide`)
 
-### `/open-in-ide [ide]`
+输入 `/open-in-ide`,接入**当前 workspace root**。工具前缀固定 `ide_`,一个 OpenCode 会话只对应一个 IDE 项目。
 
-输入 `/open-in-ide`,把 root 及其 **全部已登记子项目**接入。每个项目都用 **它自己配置的 IDE** 打开:
+**目录必须完全一致**:IDE 打开的项目目录必须等于 workspace root。IDE 打开父目录不算接入 ——
+插件的判定方式是调用 `get_project_env`,比较它返回的 `projectPath` 与当前项目路径。
 
-1. **第一次 (还没有配置)** —— 插件不猜:
-    - 不带参数 → 插件先按 **安装目录**探一次本机装了哪些 IDE (macOS 是 `/Applications` 与 `~/Applications`,
-      Windows / Linux 按各自的常见位置),把结论写进任务文本,再让模型问用户。 **不让模型自己去翻进程** ——
-      `ps aux | grep` 只看得见 **正在运行**的 IDE,装了没开就漏 (实测踩过:PyCharm 明明装着,却被报成"未发现"),
-      而且慢。 **只有这一次**需要用户回答;
-    - 带参数 (`/open-in-ide pycharm`)→ 直通写入,不经过模型 (模型不配合时的逃生口)。
+1. **第一次** —— 写标记（表示"用户已接入过"），然后继续往下走。**不需要问用户任何事**：只支持 IntelliJ IDEA。
+2. **接着** —— 在 IntelliJ IDEA 的固定端口上问「你打开着这个项目吗」:
+    - 是 → 直接用;
+    - 否 → `open -a "IntelliJ IDEA" <项目目录>` (复用已运行实例),再轮询到确认 (上限 60s)。
+3. 就绪后注册 MCP server (`ide`),重读项目环境,启用引导,并等 IDE 工具进入注册表才返回。
 
-   探测结果只用来"帮用户做选择",不决定"哪个 IDE 正开着这个项目" —— 后者始终由用户回答。探不到时 (非 mac、或路径未知)
-   那句提示干脆不出现,照常问用户。
+> **非 macOS**:自动打开被跳过 (没有对应的启动命令),请先手动打开 IDE 和项目,再执行本命令。
 
-2. **有配置后** —— 对每个已登记项目,在 **它自己 IDE 的固定端口**上问「你认得这个项目吗」 (`get_project_modules`,带项目路径
-   header):
-    - 认得 → 用那个端口。这同时就是"这个项目被哪个 IDE 打开着"的判定 (IDEA 与 PyCharm 是两个进程、两个端口);
-    - 不认得 → `open -a "<该项目自己的 IDE>" <项目目录>`(**复用已运行实例**),再轮询等到认得 (冷启动数十秒,上限 60s)。
-3. 就绪后 **先注销全部旧注册 → 再按项目各注册一个 MCP server**(server 名 = 工具前缀),然后重读 IDE 环境、启用逐项目引导,
-   并 **等到 IDE 工具进入注册表**才返回。
-
-> **非 macOS**:第 2 步的自动打开被跳过 (没有对应的启动命令),请 **先手动打开 IDE 和项目**,再执行本命令 ——
-> 端口在监听、项目被认得就会正常接入。
-
-> **通知不触发 AI 干活**:默认 `feedback: "message"` 把结果作为一条 **标注清楚的通知**发到会话里 —— 用户看到干净的通知气泡
-> (经 `metadata.displayText`),模型只看到"这是通知,请只回复『收到』"的指令,因此不会执行任何操作、不会调用工具。
-> `feedback: false` 则完全静默。 **唯一例外**是上面"问用户用哪个 IDE"那条:它是 **任务不是通知**,模型必须问完并调用工具才算完成。
-
-**可重入 / 启动保护**:IDE 冷启动、索引或等待「Trust and Open Project」弹窗期间探测会失败。命令只发一次 MCP/Brave Mode 提示并
-fast-fail,不会在后台轮询;重复触发共享同一次打开请求, **每个项目各自维护** `lastSpawnAt` / `attempts`,避免重复 spawn。
-
-### `/add-sub-module-in-ide <路径>`
-
-把一个子项目登记进配置。参数是 **相对 root 的路径**(例如 `modelserver`),而且 **只接受一个参数**:
-
-1. 没有配置 → 直接报错,提示先执行 `/open-in-ide`(不提问、不写任何东西);
-2. 校验:必须位于 root 之下、目录真实存在、**目录名合法**(规则见「限制」)、前缀不与已登记项目重名;
-3. 通过后发给模型一条 **任务**:请它问用户这个子项目用哪个 IDE,答复后调用 `configure_ide_project` 回写。
-
-### 让模型回写:`configure_ide_project`
-
-插件注册的一个 **自己的**工具,是"用户选的 IDE"回到配置里的 **唯一通道**(插件不能弹选择框,也不能挂起等回答):
-
-```text
-configure_ide_project({ ide: "<idea|pycharm>" })                 // 配置 root
-configure_ide_project({ path: "modelserver", ide: "pycharm" })   // 配置一个子项目
-```
-
-它常驻在工具列表里 (一个工具的 schema 只有几百 token,不值得为它做一套注册/撤销的状态机);
-该不该被调用由工具描述约束 —— "仅当用户明确回答了用哪个 IDE 之后调用"。
+> **通知不触发 AI 干活**:默认 `feedback: "message"` 把结果作为通知发到会话里;用户看到干净气泡,模型只回"收到"。
+> `feedback: false` 则完全静默。
 
 ## 删除接入 (`/delete-in-ide`)
 
-输入 `/delete-in-ide`:**注销全部 IDE MCP** + 删除 **整个**配置 (root 与全部子项目,持久化 + 内存缓存一并清),
-并清空注入的环境变量。之后 IDE 工具不再可用,也不会再因失败自动接入。想重新接入,再次执行 `/open-in-ide`。
+输入 `/delete-in-ide`:注销 IDE MCP + 删除配置 (持久化 + 内存缓存一并清),并清空注入的环境变量。
+之后 IDE 工具不再可用,也不会再因失败自动接入。想重新接入,再次执行 `/open-in-ide`。
 
-**热更新会断开**:插件源码变更会触发 V2 热重载,注册随旧实例一起释放。 **改完插件后重跑一次 `/open-in-ide`** 即可恢复。
+**热更新会断开**:插件源码变更会触发 V2 热重载,注册随旧实例一起释放。**改完插件后重跑一次 `/open-in-ide`** 即可恢复。
 
-## 远程配置 (`/persist-remote-config` 与两条提示词命令)
+## 远程配置 (`/sync-remote-config` / `/manage-remote-config`)
 
-### `/persist-remote-config`
+### `/sync-remote-config`
 
-把 IDE 里配置的 server 与 deployment 写进 `<项目>/.opencode/remote-shell/hosts.json`:
+双向对齐:
 
-- 读配套插件的 `get_deployment_servers`(IDE 必须连着;没连上会提示先 `/open-in-ide`)
-- **同名覆盖、项目独有保留**:IDE 有的整体更新,IDE 没有的原样留着
-- 写之前备份 `hosts.json.bak`
-- 写完整凭据(`password` / `privateKeyPath`) —— **这个文件要不要提交进 git,由你决定**,插件不改 `.gitignore`
-- 写完立刻让服务器缓存失效,紧接着的 `remote_exec` 就能用
+- **server**:IDE 的 SSH 配置 → `hosts.json`(只写连接字段;`alias` / `deployments` / `exclude` 原样保留)
+- **deployment**:`hosts.json` → IDE 的 Deployment 面板(调配套插件的 `sync_deployments`;只增/改,**不删**)
+
+IDE 必须连着;没连上会提示先 `/open-in-ide`。写完整凭据(`password` / `privateKeyPath`) ——
+**这个文件要不要提交进 git,由你决定**,插件不改 `.gitignore`。
 
 ```json
 {
   "hosts": {
-    "mbptest": {
+    "mbp": {
       "host": "yutaodeMacBook-Pro.local",
       "port": 22,
       "username": "yutao",
       "authType": "PASSWORD",
       "password": "…",
+      "exclude": ["node_modules"],
       "deployments": [
         {
           "name": "mcp-test-project",
-          "localPath": "/Users/yutao/IdeaProjects/mcp-test-project",
-          "deployPath": "/Users/yutao/Desktop/data/test"
+          "localPath": ".",
+          "deployPath": "/Users/yutao/Desktop/data/test",
+          "exclude": ["target", "logs/app.log"]
         }
       ]
     }
@@ -168,28 +117,47 @@ configure_ide_project({ path: "modelserver", ide: "pycharm" })   // 配置一个
 }
 ```
 
-### `/remote-shell` 与 `/remote-deployment`
+`localPath` 按来源强制:
 
-这两条是**提示词命令**:不执行任何东西,只往会话里注入一段规则(和 `~/.config/opencode/commands/readonly.md` 同一个思路),
-让模型走 `remote_exec` / `remote_upload` / `remote_download`,而不是自己拼 `ssh` / `scp` / `rsync`。
+- **项目级** `<项目>/.opencode/remote-shell/hosts.json`:只能写**相对项目根目录**的路径(`.` 表示项目根,
+  也可以是 `references/middleware` 这种子目录);写绝对路径会直接报错
+- **全局** `~/.config/remote-shell/hosts.json`:被多个项目共用,只能写**绝对路径**
+
+`exclude` 只接受**路径前缀**或**精确文件**(`node_modules`、`target`、`logs/app.log`),不支持 `*` / `?`;
+server 级作用于此机器所有 deployment,deployment 级叠加在它之上。
+
+### `/manage-remote-config`
+
+提示词命令:让 AI 直接改 `hosts.json`(加 server / 加 deployment / 调 `exclude`)。改完由插件的指纹对账
+**静默**推到 IDE —— 不需要再敲 `/sync-remote-config`,也不会往会话里插提示。
+
+### `/remote-shell`、`/remote-sync` 与 `/remote-deployment`
+
+三条都是**提示词命令**:不执行任何东西,只往会话里注入一段规则(和 `~/.config/opencode/commands/readonly.md` 同一个思路)。
+
+- **`/remote-shell`** — 只负责远程命令:`remote_list_servers` + `remote_exec`,不要自己拼 `ssh`
+- **`/remote-sync`** — 只负责文件上传 / 下载:`remote_upload` / `remote_download`,不启动进程
+- **`/remote-deployment`** — 负责部署:`deploy_remote_process`(同步 + 启动 + 打开 Run 标签页)
 
 ```
 /remote-shell mbp 看下磁盘
-/remote-deployment mcp-test-project download
+/remote-sync mcp-test-project download
+/remote-deployment aidata-api
 ```
 
-参数原样附在提示词末尾;**没带参数时,提示词会要求模型先问清楚**(服务器 / 命令 / 哪条 deployment),不会自己挑一台。
+参数原样附在提示词末尾;**没带参数时,提示词会要求模型先问清楚**(服务器 / 命令 / deployment / 配置名),
+不会自己挑一台。部署要的是 **Remote Process 配置名**,不是 deployment 名。
 
 ## 按能力选工具 (直接调用引导)
 
 IDE MCP 可用时,插件通过 **系统提示注入**告诉模型 **哪些事该走 IDE**;除下面「工具参数与输出」那几处刻意的接管
-(只做减法:从 schema 里删掉一个参数),不修改任何工具 (原生或 IDEA) 的定义、描述或可用性:
+(删一个参数、换一个描述),不修改任何工具 (原生或 IDEA) 的定义或可用性:
 
 1. **系统提示注入**:通过 `ctx.session.hook("context", …)` 往每次请求的 system 里追加一段引导。
    **文本本身在 `src/ide-guidance.template.md`** —— 它是一份要给人 review 的提示词文档,纯 Markdown,只有每条工具后面的
    命令名(`{{cmd_xxx}}`)由代码填;`src/template.js` 是渲染器(支持 `{{var}}`,`{{#if}}` 仍在实现里但引导模板不再使用;
    **不做 HTML 转义** —— 输出是 Markdown,`<jar>!/<entry>` 和反引号必须原样过)。
-   含工具名(`<项目前缀>_<name>`;root 是 `ide_*`,子项目是 `<目录名>_*`)与关键参数名。
+   含工具名(`ide_<name>`)与关键参数名。
 
    > **配套插件 `idea-mcp-enhance` 是硬前提**:引导默认它一定装了,所以配套插件的工具 (运行配置启停 / 部署 / 终端)
    > **不做"有没有装 / 有没有这个工具"的判断**,直接写进引导。
@@ -212,7 +180,7 @@ IDE MCP 可用时,插件通过 **系统提示注入**告诉模型 **哪些事该
    | 批量改文件 | `ide_apply_patch` |
    | 校验 | `ide_lint_files` / `ide_get_file_problems` / `ide_build_project` |
    | 运行配置 | `ide_get_run_configurations` / `ide_execute_run_configuration`(+ 配套插件的启停工具) |
-   | 远程执行 / 同步 | `remote_exec` / `remote_list_servers` / `remote_upload` / `remote_download`(本插件自带,凭据与路径映射来自 IDE 的 Deployment 配置,IDE 没开时退到 hosts.json);本机环境变量由 `get_project_env` + shell hook 注入 |
+   | 远程执行 / 同步 | `remote_exec` / `remote_list_servers` / `remote_upload` / `remote_download`(本插件自带,凭据来自 IDE 的 SSH 配置,路径映射来自 hosts.json);本机环境变量由 `get_project_env` + shell hook 注入 |
 
    **读、找文本、找文件、改单个文件一律用 OpenCode 自带的工具**(`read` / `grep` / `glob` / `write` / `edit`):
    这几件事走 IDE 只是多一跳,所以映射表里**不出现** `ide_search_text` / `ide_search_regex` / `ide_search_file`。
@@ -281,10 +249,13 @@ IDE MCP 可用时,插件通过 **系统提示注入**告诉模型 **哪些事该
 | 从模型的工具 schema 里**删掉** | `ctx.tool.transform` 改 input schema | 模型会设它、会据此推理,而那个值被无声丢弃 |
 | 每次调用**设成固定值** | `ctx.tool.hook("execute.before")` | 模型不传时拿到的是那个可能出错的默认值本身 |
 
-两半由 `src/mcp/idea-tool-defaults.js` 的**同一张表** `FORCED_ARGUMENTS` 驱动,所以不会漂移。目前一条:
-`ide_build_project` 的 `rebuild` 强制为 `true` —— 增量构建比对的是**IDE 自己那份文件新鲜度**,IDE 外部改的代码
-可能被判成"没有脏文件",构建于是变成 no-op 并报成功(实测 IntelliJ 2026.2.3:`build_project` 落到
-`ProjectTaskManager.createAllModulesBuildTask(project, isIncrementalBuild = !rebuild)`,6 个场景全部识别到外部改动)。
+两半由 `src/mcp/idea-tool-defaults.js` 的**同一张表** `FORCED_ARGUMENTS` 驱动,所以不会漂移。目前两条:
+
+- `ide_build_project` 的 `rebuild` 强制为 `true` —— 增量构建比对的是**IDE 自己那份文件新鲜度**,IDE 外部改的代码
+  可能被判成"没有脏文件",构建于是变成 no-op 并报成功(实测 IntelliJ 2026.2.3:`build_project` 落到
+  `ProjectTaskManager.createAllModulesBuildTask(project, isIncrementalBuild = !rebuild)`,6 个场景全部识别到外部改动)。
+- `ide_search_symbol` 的 `include_external` 强制为 `true` —— 它默认只搜项目符号,要搜 SDK / 依赖库得调用方
+  自己记得带这个开关。我们恒定打开并把参数从 schema 里拿掉:模型看不到这个旋钮,但拿到的永远是全的结果。
 
 - **强制**而不是"缺省才补":`rebuild: false` 请求的正是那个可能出错的答案,而调用方从结果里分辨不出来;`rebuild: true`
   唯一的代价是时间。调用方自己传了非空 `filesToRebuild` 时 IDE 走另一条分支、根本不读 `rebuild`,所以设不设都无副作用。
@@ -294,6 +265,23 @@ IDE MCP 可用时,插件通过 **系统提示注入**告诉模型 **哪些事该
 - **这是对早先「绝不改工具定义」那条规则的一次有意例外**,且刻意收得很窄:这里**只做减法,不发明、不解释** ——
   schema 变换**绝不能**用来加建议,那是引导文本的职责。
 - 只对**点名的工具**生效,其余工具的参数一字不改。两半都**不依赖项目配置**。
+
+### 描述覆盖（`DESCRIPTION_OVERRIDES`）
+
+除了参数,插件还**整段替换**一部分 IDE 自带工具的描述 —— 只在**原文说错了**、或者**该说清的关键事实没提**时才改。
+
+- **整段替换,不和原文拼接**:半原文半我们的句子读起来像两套口径,容易自相矛盾。
+- **只写事实**:这个工具做什么、返回什么、什么时候用不上。"你应该怎么用"是引导文本的职责。
+- 每条覆盖都记着**为什么必须改它**(例如 `search_symbol` 原文说"默认只搜项目符号" —— 我们恒定开着
+  `include_external`,那句话就成了假话)。
+- 覆盖的表在 `src/mcp/idea-tool-defaults.js` 的 `DESCRIPTION_OVERRIDES`,由 `applyDescriptionOverrides()`
+  在同一个 `ctx.tool.transform` 里应用,和隐藏工具、删参数是同一条路径。
+
+覆盖清单(**15 条**):`search_symbol`、`read_file`、`build_project`、`list_directory_tree`、`apply_patch`、
+`rename_refactoring`、`lint_files`、`get_file_problems`、`analyze_calls`、`get_symbol_info`、`reformat_file`、
+`get_all_open_file_paths`、`open_file_in_editor`、`execute_run_configuration`、`get_run_configurations`。
+
+`get_project_modules` / `get_project_dependencies` 保持 IDE 原文 —— 它们的描述没有说错的地方。
 
 ### 另两处只"抬下限 / 补提示",不固定值
 
@@ -412,9 +400,8 @@ opencode-idea 对这一组工具做两件事:
 **每个字段名都来自真实文件,不靠猜** —— `js.build_tools.npm`(属性 + 自定义元素)、`ShConfigurationType`(`<option>` 子元素)、
 `NodeJSConfigurationType`(全属性)三种写法并存,套错就是静默失效。
 
-**这个档案块以带前缀的工具为准**,不围绕 IDE 界面说话:各项目各有自己的前缀(root 是 `ide`,子项目是它的目录名),
-枚举与执行都用**它自己那个前缀**的 `<前缀>_get_run_configurations` / `<前缀>_execute_run_configuration` …;
-**条目标题括号里写的就是这个前缀**。
+**这个档案块以带前缀的工具为准**,工具前缀固定 `ide_`;
+枚举与执行都用 `ide_get_run_configurations` / `ide_execute_run_configuration` …。
 
 **别的文档都指向这里**:引导文本碰到"要建 / 删 / 改一个配置",不再让模型现编流程,而是让它加载本 skill。
 **两个 skill 都是模型可自取的**(frontmatter 不带 `metadata: opencode/autoinvoke: false`):模型判断到场景就加载。
@@ -463,12 +450,13 @@ opencode-idea 对这一组工具做两件事:
 | `remote_upload` | 把一条 deployment 的本地目录传到远程目录。`mode` 默认 `overwrite`(只覆盖 / 新增),`mirror` 额外删掉远程多余的文件 |
 | `remote_download` | 反向拉回本地,语义相同(默认 `overwrite`,`mirror` 删本地多余) |
 
-路径映射(本地目录 ↔ 远程目录)和服务器一样走三级配置,同名以高优先级为准:
+路径映射(本地目录 ↔ 远程目录)只来自 `hosts.json`:
 
-1. **IDE** —— `get_deployment_servers` 返回的 `deployments[]`(`name` / `localPath` / `deployPath`;
-   `deployPath` 已拼上 server 的 `rootFolder`,是能直接用的绝对路径)
-2. **项目级** `<项目>/.opencode/remote-shell/hosts.json` 里 host 条目下的 `deployments`
-3. **全局** `~/.config/remote-shell/hosts.json` 同上
+1. **项目级** `<项目>/.opencode/remote-shell/hosts.json` 里 host 条目下的 `deployments`
+2. **全局** `~/.config/remote-shell/hosts.json` 同上
+
+IDE 只提供 SSH 配置与凭据;deployment 由 `hosts.json` 维护,再由 `/sync-remote-config` 推到 IDE 的
+Deployment 面板。两边不再是"IDE 为数据源",而是同一份配置的两个视图。
 
 `remote_list_servers` 会把每条 mapping 一起列出来(`本地目录 ↔ 远程目录`)。
 
@@ -496,7 +484,7 @@ opencode-idea 对这一组工具做两件事:
 
 服务器与凭据有三级来源,同名以高优先级为准:
 
-1. **IDE** —— 配套插件的 `get_deployment_servers`(只返回 SFTP server;凭据由 IDE 进程从 Credentials 直接读出,
+1. **IDE** —— 配套插件的 `get_ssh_servers`(只返回 SSH 配置;凭据由 IDE 进程从 PasswordSafe 直接读出,
    不经过任何配置文件,也不碰 Keychain)
 2. **项目级** `<项目>/.opencode/remote-shell/hosts.json`(与全局同名同格式,跟着仓库走)
 3. **全局** `~/.config/remote-shell/hosts.json`
@@ -511,12 +499,69 @@ IDE 没开时自动退到 2 / 3,所以 `remote_exec` 在 IDE 之外也能用。�
 
 上传 / 下载见上一节:同样是本插件的 `remote_upload` / `remote_download`,映射来自同一套三级配置。
 
+## 远端进程 (直接用 IDE 的 run configuration)
+
+远端进程**不在 opencode 侧重写**：启停、查重、deployment 同步、日志全部由 IDE 的 `Remote Process` 配置实现，
+opencode 直接调 IDE MCP 的 run configuration 工具（工具名带 `ide_` 前缀）。
+
+| 动作 | IDE 工具 |
+| --- | --- |
+| 启动 / 重启 | `rerun_run_configuration`(没在跑就启动,在跑就先停再启) |
+| 停止 | `stop_run_configuration` |
+| 查看 Run 会话 | `list_running_configurations`(`type=RemoteProcess` 的条目；Deploy 打开的标签页也在) |
+| 查看远端存活状态 | `list_remote_processes`(无状态,遍历所有 Remote Process 配置并查远端) |
+| 部署(发布语义,打开 Run 标签页) | `deploy_remote_process` |
+
+`deploy_remote_process` 和配置页里的 **Deploy 按钮完全一致**：同步 deployment → 启动进程 / 容器 →
+打开一个 **Run 标签页**，用户能在里面看日志。区别只在语义：
+
+- 它被标记为 deploy-only：点 Run 标签页的 **Stop 只关闭日志跟随，不 kill 远端进程 / 不删除容器**
+- 返回 **`fullOutputPath`**（本机聚合日志：`[启动]` / `[同步]` 进度 + 远端 stdout/stderr，和
+  `rerun_run_configuration` 的字段、格式一致）
+- 应用自己的业务日志（`app.log` / `admin.log` 等）在配置的 **Application log directory** 里，
+  用 `remote_exec` 查看
+
+因为它确实是一个 Run 会话，开着 Run 标签页时 `list_running_configurations` 也会看到它。
+
+MCP 触发时如果远端已经在跑，**直接替换、不弹窗**（避免把整个 agent 调用卡在模态框上）；
+配置页里手动点 Deploy 仍然会弹窗确认。
+
+`list_remote_processes` 是无状态的：每次调用都遍历项目里所有 `Remote Process` 配置，按 `kind` 查远端，
+没在跑的也列出来（`status: stopped`）。它不区分 Run 和 Deploy —— 同一个远端身份只会有一条。
+
+所以远端进程**先要在 IDE 里配成 `Remote Process`**,`hosts.json` 里不再保存进程表：进程的事实以 IDE / 远端为准。
+
+### IDE 里的 `Remote Process`
+
+配套插件注册了一个 `Remote Process` run configuration:
+
+- **SSH configuration**:下拉,选项来自 IDE 的 SSH 配置(不手填 host)
+- **Deployment**:下拉,选项来自 `hosts.json`;`process` 必填(启动前要同步),`docker` 可不选
+- **Command**:启动命令(必填;`docker` 类型写完整的 `docker run`)
+- **Working directory**:留空时用 deployment 的 `deployPath`
+- **Application log directory**:应用自己写日志的目录（如 log4j 的 `logs/`），**仅用于查询，不影响启动**。
+  `process` 填远端宿主机路径（相对 Working directory 或绝对路径）；`docker` 填容器内路径。
+  进程的 stdout/stderr 由插件固定写到 `<working>/.opencode/output-<name>.log`，不受这个字段影响
+
+- **Kind**:`process` / `docker`,留空则从 Command 推断(`docker run` → docker)
+- **Container**:`docker` 类型**必填**;启动时自动把 `docker run` 的 `--name` 对齐成这个名字,
+  状态查询就是看 `docker ps -f name=^<container>$`;docker 日志统一走 `docker logs`
+
+| 动作 | 行为 |
+| --- | --- |
+| Run | 已在运行时先弹窗确认 → 同步 deployment → 启动(process / docker) → Run 窗口显示日志 |
+| Stop | Run 语义:进程 TERM → KILL;容器 stop + rm |
+| Deploy 按钮 | 发布语义:产生 Run 会话,但 Stop 只关闭日志,**不 kill 远端进程 / 不删除容器**;IDE 关闭也不影响 |
+| Deploy 查重 | 进程 / 容器已在运行时先弹窗,确认后才重建 |
+
+远端状态每 10 秒刷新一次,配置页上的状态标签会显示 `running` / `stopped`。
+
 **项目环境怎么进原生 shell**:连接 IDE 时(以及 `/open-in-ide` 每一次完整连接)调 `get_project_env`,拿到
 `{ PATH, variables }` 后缓存;每条 shell 创建前由 `shell.hook("create.before")` 把 `PATH` **前置**拼上、其余变量直接覆盖。
 `PATH` 里只有五个 provider(Java / Node / Go / Maven / Python)的 bin,IDE 进程自己的 PATH 不掺进来 —— 所以 OpenCode 的
 PATH 不会丢。**env 拉不到 = 连接没做完**:`/open-in-ide` 报 `env-unready`,不会静默降级成"工具有、环境是空的"。
 
-`get_project_env` 与 `get_deployment_servers` 都是**隐藏**的(数据通道,不是模型任务),IDE 侧那套远程终端
+`get_project_env`、`get_ssh_servers` 与 `sync_deployments` 都是**隐藏**的(数据通道,不是模型任务),IDE 侧那套远程终端
 (`execute_in_remote_host` / `terminal_read` / `terminal_interrupt` / `list_terminals`)也一并隐藏 —— 本插件不再需要它们。
 
 ## 前置条件
@@ -537,7 +582,7 @@ PATH 不会丢。**env 拉不到 = 连接没做完**:`/open-in-ide` 报 `env-unr
 }
 ```
 
-项目通过 `IJ_MCP_SERVER_PROJECT_PATH` 头选择,所以一个 IDE 能同时服务多个项目,而 **不需要为每个项目起一个子进程**。
+项目通过 `IJ_MCP_SERVER_PROJECT_PATH` 头选择,所以一个 IDE 能服务多个项目,而 **不需要为每个项目起一个子进程**。
 
 > **为什么不用 IDE 的 stdio 桥**(`idea stdioMcpServer`,子进程管道):它的故障是"沉默"的——IDE 连接断掉后子进程只挂起、
 > 不回任何错误,只能靠后台心跳兜;而 Location 空闲 60 分钟被驱逐时,桥进程与注册一起消失—— **两种传输都躲不过**。
@@ -548,7 +593,7 @@ PATH 不会丢。**env 拉不到 = 连接没做完**:`/open-in-ide` 报 `env-unr
 > SSE (POST 返回 405),V2 连不上。插件对 IDE 的 **探测**也走 `/stream`(一次项目作用域的 `get_project_modules` 调用),
 > 用来确认"这个 IDE 里打开着这个项目"。
 
-**端口是产品常量,不开放配置**:IDEA 的 MCP 在 **64342**,PyCharm 在 **64462**(见 `src/ide-projects.js` 的 `IDE_PORTS`)。
+**端口是产品常量,不开放配置**:IntelliJ IDEA 的 MCP 在 **64342**(见 `src/ide-projects.js` 的 `IDE_PORTS`)。
 "哪个 IDE 在哪个端口"跨版本不变,所以插件不需要扫描候选端口 —— 探哪个端口,由项目的 IDE 唯一决定,用户不需要填任何东西。
 
 ## 安装
@@ -608,9 +653,9 @@ export { default } from "/Users/yutao/IdeaProjects/opencode-idea/src/index.js";
     {
       "package": "opencode-idea",
       "options": {
-        "injectGuidance": true, // IDE 可用时注入逐项目的「优先使用 IDE 工具」引导
+        "injectGuidance": true, // 是否注入「工具使用规则」引导
         "openInIde": true, // 是否允许自动拉起 IDE;false 只连已运行的端点
-        "launchCooldownMs": 120000, // 启动保护冷却(按项目各自计)
+        "launchCooldownMs": 120000, // 启动保护冷却
         "launchMaxAttempts": 5,
         "mcpProbeTimeoutMs": 1000, // 单次「这个 IDE 里打开着这个项目吗」探测的超时
         "executionTimeoutMs": 600000, // 单次 IDE 工具调用硬上限;默认 10 分钟(OpenCode 默认 12 小时)
@@ -625,27 +670,27 @@ export { default } from "/Users/yutao/IdeaProjects/opencode-idea/src/index.js";
 
 | 选项                 | 类型         | 默认     | 说明                                                                                           |                                                                  |
 | -------------------- | ------------ | -------- | ---------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| `injectGuidance`     | `boolean`    | `true`   | IDE 可用时是否注入逐项目的「优先使用 IDE 工具」引导                                            |                                                                  |
-| `openInIde`          | `boolean`    | `true`   | 是否允许自动拉起 IDE;`false` 时仍会连接**已经运行**的端点。**用哪个 IDE 由每个项目的配置决定** |                                                                  |
-| `launchCooldownMs`   | `number`     | `120000` | 启动保护冷却:冷却期内不重复 spawn(每个项目各算各的)                                            |                                                                  |
-| `launchMaxAttempts`  | `number`     | `5`      | 单次会话内最多 spawn 次数,超出后停止重试(每个项目各算各的)                                     |                                                                  |
+| `injectGuidance`     | `boolean`    | `true`   | 是否注入「工具使用规则」引导(IDE 段只在 IDE 可用时出现)                                      |                                                                  |
+| `openInIde`          | `boolean`    | `true`   | 是否允许自动拉起 IDE;`false` 时仍会连接**已经运行**的端点                                  |                                                                  |
+| `launchCooldownMs`   | `number`     | `120000` | 启动保护冷却:冷却期内不重复 spawn                                                              |                                                                  |
+| `launchMaxAttempts`  | `number`     | `5`      | 单次会话内最多 spawn 次数,超出后停止重试                                                       |                                                                  |
 | `mcpProbeTimeoutMs`  | `number`     | `1000`   | 单个 MCP 端口的短探测超时                                                                      |                                                                  |
 | `executionTimeoutMs` | `number`     | `600000` | 单次 IDE 工具调用的硬上限(毫秒);防止端点卡住后无限等待(OpenCode 默认 12 小时)                  |                                                                  |
 | `feedback`           | `"message" \ | false`   | `"message"`                                                                                    | 结果反馈:`message` 会话通知(用户可见,AI 只回"收到");`false` 静默 |
 
 ## 行为
 
-- **未配置的 root**:不改环境、不注册、不注入任何 IDE 提示(每请求零开销;setup 时只做一次配置读取)。
-- **已配置的 root**:启动读回配置,全部 IDE MCP 由 `/open-in-ide` 注册。
+- **未配置的项目**:不改环境、不注册、不注入任何 IDE 提示(每请求零开销;setup 时只做一次配置读取)。
+- **已配置的项目**:启动读回配置,IDE MCP 由 `/open-in-ide` 注册。
 - **`context` 钩子是请求的纯函数**:按「每次模型调用」触发(含工具续跑),只看本次请求自带的工具快照 ——
-  有任一项目前缀的工具就**按每个前缀**剥离隐藏工具并注入**逐项目**引导;没有则只在已配置时给恢复提示。
+  请求里带 IDE 工具就剥离隐藏工具并注入引导;没带则只在已配置时给恢复提示。
   该钩子本身**不做任何 I/O**。
 - **错误分类只认传输层专有标记**(`MCP server "<名>" is not available` / `MCP server is not connected` /
   `Error POSTing to endpoint`),**不认**工具输出里出现的通用串(例如 SQL 工具报的 `Connection refused`) ——
   MCP 工具错误的 message 就是工具自己的输出,认通用串会把正常业务失败误判成掉线并重建。
-  业务错误(`File not found` 等)、非 IDE 工具、未配置的 root 都不动作。
+  业务错误(`File not found` 等)、非 IDE 工具、未配置的项目都不动作。
 - 恢复是**每个 Location(项目)各一份**;没有任何定时器,插件在不使用时完全静止。
-  启动保护(`launchCooldownMs` / `launchMaxAttempts`)限制重复拉起 IDE,**按项目各自计**。
+  启动保护(`launchCooldownMs` / `launchMaxAttempts`)限制重复拉起 IDE。
 
 ## 限制
 
@@ -660,21 +705,19 @@ export { default } from "/Users/yutao/IdeaProjects/opencode-idea/src/index.js";
   **`get_project_env`**(本插件 shell hook 的数据通道,不是模型任务)、
   **整个 Database 组**(数据源由用户在 IDE 里配置)、**有原生对应的文件搜索**(`search_text` / `search_regex` / `search_file`)、
   以及**建文件**(`create_new_file`)。配套插件自带的那个写文件工具同样隐藏。**`apply_patch` 不在隐藏列表里**。
-  存的是**后缀**,清洗时按当前每个项目前缀**各删一遍** —— 只处理 `ide_` 会让子项目那几份原样送到模型面前。
+  存的是**后缀**,清洗时按当前前缀 `ide_` 展开成完整工具名。
   其中有几个后缀(`execute_in_remote_host` / `terminal_read` / `terminal_interrupt` / `list_terminals`)对应的工具
   已经从配套插件里删掉了,留着是为了挡住**没升级**的安装。具体数字随 IDE 与配套插件版本变化,每次工具集调整都要重测;
-  判据是 **模型可见的 IDE 工具 = 引导里点名的那批**,不增不减。
-- **IDE 的「目录包含」语义(实测)**:请求路径落在某个**已打开项目的目录树内**时,IDE 会把它解析到那个项目,而不是报错。
-  所以「子项目与 root 配同一个 IDE」时,只要那个 IDE 打开了 root,子项目就被判成"已打开" —— 它确实是 root 项目的一部分,
-  工具能操作它的文件,但语言支持按 **root 项目**走(例如 Python 子项目被 root 的 Web 模块解析,符号检索与检查会不准)。
-  这是 IDE 的语义,绕过不了;要让子项目按自己的模块解析,就得让它在那个 IDE 里**单独打开**成一个项目。
+  判据是 **模型可见的 IDE 工具都带 `ide_` 前缀,并且不在隐藏列表里**。
+- **严格同目录**:IDE 会把"落在某个已打开项目目录树内"的路径解析到那个项目,所以父目录打开时,当前项目也可能被解析成功。
+  插件因此不只看工具调用是否成功,而是调用 `get_project_env` 比较它返回的 `projectPath`:只有和当前项目路径完全一致才算接入。
+  打开父目录不算接入,这是刻意的 —— 避免相对路径和语言支持落到父项目上。
 - **项目路径按 IDE 的写法归一化**:IDE 收的是系统无关形式(正斜杠),OpenCode 的 `location` 在 Windows 上是原生反斜杠,
   所以 `src/mcp/idea.js` 的 `ideProjectPath()` 把它转成正斜杠,**注册与探测走同一个函数**,两者必须一致,
   否则会用一种写法注册、又用另一种写法去问,永远匹配不上。macOS 上是原样透传。
-- 配置存在插件名下 KV(`plugin:opencode-idea:project/<root 路径>`),内容是
-  `{ root: { path, app }, children: [{ path, app }] }`。插件实例按 **Location**(项目/打开目录)创建,配置按 **root 路径**共享。
-- **目录名就是工具前缀,不合规一律拒绝**:必须匹配 `^[a-z0-9][a-z0-9_-]*$`、不与已登记项目重名、不占用保留名 `ide`。
-  插件**绝不**自动改名或自动消歧 —— 静默改一个名字,等于用户的目录和模型看到的工具名对不上,而且没人会发现。
+- 配置存在插件名下 KV(`plugin:opencode-idea:project/<root 路径>`),内容是 `{ version: 3, path, app }`。
+  插件实例按 **Location**(项目/打开目录)创建,配置按 **root 路径**共享。
+- 不再有按目录名生成的工具前缀:前缀固定 `ide_`,一个会话只对应一个项目。
 - 插件**完全不再检查 `.idea` 目录**:是不是 IDE 项目只由配置决定(`/open-in-ide` 会让 IDE 打开并导入该项目,
   `.idea` 由 IDE 自己生成)。
 - **自动拉起 IDE 仅实现 macOS**(`open -a`)。其他平台(包括 Windows)没有对应的启动命令,**请手动打开 IDE 和项目**,
@@ -682,7 +725,8 @@ export { default } from "/Users/yutao/IdeaProjects/opencode-idea/src/index.js";
   IDE MCP 没有「打开项目」工具,因此打开动作走 OS/CLI,而非 MCP。
 - 插件热重载会断开 IDE 连接,需重跑 `/open-in-ide`。
 - IDE 工具以 `<项目前缀>_*` 直接暴露给模型(`codemode: false`),不用 `execute` 包裹;
-  插件不修改任何**它不接管**的工具定义或描述,唯一的例外是 `rebuild` 参数(见「工具参数与输出」)。
+  插件不修改任何**它不接管**的工具定义或描述,例外只有两条:`rebuild` / `include_external` 两个参数,以及
+  15 条描述覆盖(见「工具参数与输出」)。
 
 ## License
 

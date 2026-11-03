@@ -4,8 +4,9 @@ An [OpenCode](https://opencode.ai) **V2** plugin that gives every session a real
 todo list — and then keeps the agent working on it. A live progress strip in the
 composer (`📋 ███░░░░░ 8/17 open`) tracks the list.
 
-- `todo_write` / `todo_read` / `todo_add` / `todo_remove` / `todo_settings` tools
-  (V2 ships none), stored per session, with stable per-item ids;
+- `todo_write` / `todo_read` / `todo_add` / `todo_remove` / `todo_settings` /
+  `todo_pause` tools (V2 ships none), stored per session, with stable per-item
+  ids;
 - a **supervisor** that re-prompts an idle session while its list still has open
   items — and stays quiet while the agent is actually working (thinking,
   preparing a tool, a running tool or `task` subagent, background shells, child
@@ -87,7 +88,7 @@ and makes finishing it the path of least resistance:
 
 ## Tools
 
-Seven tools, all registered with `codemode: true` so Code Mode agents can call
+Eight tools, all registered with `codemode: true` so Code Mode agents can call
 them too. Together they are the whole interface the model uses.
 
 Every item has a **stable id** (a number, e.g. `3`), assigned when the item is
@@ -125,7 +126,8 @@ Replaces the session's list.
   option](#options)), every `in_progress` item is kept instead.
 - Content is trimmed, empty entries dropped, duplicates removed.
 - Returns the summary plus the canonical list (with ids), and resets the
-  supervisor's no-progress counter and any pause.
+  supervisor's no-progress counter and any interrupt/no-progress pause (a
+  `todo_pause` or UI disable stays in effect until resumed).
 
 ### `todo_add`
 
@@ -175,6 +177,22 @@ With it on, `todo_write` keeps every `in_progress` item, `todo_add` does not
 demote the previous active item, and the injected context block tells the model
 that several items may be active at once.
 
+### `todo_pause`
+
+```json
+{ "paused": "boolean" }
+```
+
+Pauses or resumes supervision for this session. With no arguments (or
+`paused: true`) the supervisor stops sending automatic nudges; the list and the
+other todo tools keep working. `paused: false` resumes nudging.
+
+The pause is sticky until it is resumed — rewriting the list does not clear a
+`todo_pause` pause (reason `manual`). Pressing `esc` to interrupt a running turn
+also pauses supervision (reason `interrupt`), and a real user message resumes it.
+The composer strip shows `⏸ paused (<reason>)` and the panel header shows the
+same state, so a paused session is never silently unsupervised.
+
 ### `todo_subscribe`
 
 ```json
@@ -208,8 +226,9 @@ effective set is `config.markdownFiles ∪ stored files − removed` per session
 
 ## TUI
 
-- **Composer strip** (`session.composer.top`): `📋 ███░░░░░ 8/17 open` (plus `⏸`
-  while paused), hidden when there is neither a list nor a subscription.
+- **Composer strip** (`session.composer.top`): `📋 ███░░░░░ 8/17 open`
+  (`· ⏸ paused (<reason>)` while paused), hidden when there is neither a list nor
+  a subscription.
 - **Popover** (`/todos`, palette "Todo: open todos"): a centered overlay dialog,
   opened at the widest preset. The body fills at least 60% of its budget (so a
   short list is not a sliver) and grows up to the budget for longer lists; the
@@ -426,7 +445,7 @@ There is no filesystem watcher. Instead:
   (source edits and config content changes; `touch` alone does not).
 - `opencode2 reload` forces reconciliation; `opencode2 service restart` only as a
   last resort (it interrupts sessions).
-- Tests: `bun test` (130 tests across parser, storage, tools, RPC, state machine,
+- Tests: `bun test` (141 tests across parser, storage, tools, RPC, state machine,
   panel helpers).
 - Watch logs: `tail -f ~/.local/share/opencode/log/todo-supervisor.log`.
 
@@ -439,8 +458,11 @@ There is no filesystem watcher. Instead:
 - Markdown write-back edits your files: `x` on a markdown row rewrites that
   checkbox in place (temp file + atomic rename, only for subscribed paths). Use
   the panel filter and `d` if you only want to read.
-- `pauseOnInterrupt` relies on the execution-interrupted event: after an
-  interrupt, supervision resumes on the next `todo_write`/status event.
+- `pauseOnInterrupt` relies on the execution-interrupted event: only a
+  user-initiated interrupt (`reason: "user"`, e.g. `esc`) pauses; shutdown,
+  superseded and inactivity interrupts do not. After an interrupt, supervision
+  resumes on the next real user message, `todo_pause { "paused": false }`, or a
+  list change.
 - No filesystem watcher: external edits are picked up at the next evaluation, the
   next UI read, or the panel's 3 s poll (see Freshness).
 - Subscription reads can briefly lag across roles right after a write;

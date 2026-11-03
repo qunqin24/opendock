@@ -23,15 +23,13 @@ Published to [npmjs](https://www.npmjs.com/package/@madcat-os/opencode-madcat).
 
 Runtime configuration lives in `~/.config/madcat/config.toml` (`[mesh.*]`,
 `[database]`, `[embedding]`, `[tts]`, …); the package ships no host-specific
-data. The Kindle skills read `MADCAT_MAIL_SENDER`, `MADCAT_KINDLE_EMAIL` and
-`MADCAT_MAIL_DISPLAY` from the environment.
+data.
 
 ## Tool namespaces
 
-Memory (EEMS), sessions, whoami, cart, TTS, Signal, WhatsApp, PRIME locks,
-cross-session messaging, session control, infra,
-indexing/ingest, and more — one file per namespace under
-`src/tools/`.
+Memory (EEMS), sessions, whoami, TTS, PRIME locks, cross-session
+messaging, session control, infra, indexing/ingest, and more — one file
+per namespace under `src/tools/`.
 
 ## EEMS memory and index
 

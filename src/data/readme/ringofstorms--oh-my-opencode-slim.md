@@ -183,6 +183,7 @@ Then:
    ```bash
    opencode models --refresh
    ```
+   On OpenCode v2, use `opencode models` instead.
 3. **Open your plugin config** at `~/.config/opencode/oh-my-opencode-slim.json`
 
 4. **Update the models you want for each agent**
@@ -280,6 +281,11 @@ If any agent fails to respond, check your provider authentication and config fil
 <a id="meet-the-pantheon"></a>
 
 ## 🏛️ Meet the Pantheon
+
+> [!TIP]
+> **The Pantheon has a saga.** *The Chronicle of the Pantheon* tells where
+> these agents came from, starting in the emptiness before the world.
+> Read it at [ohmyopencodeslim.com/lore](https://ohmyopencodeslim.com/lore).
 
 ### 01. Orchestrator: The Embodiment Of Order
 

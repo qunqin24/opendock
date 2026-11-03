@@ -66,8 +66,8 @@ a chat-with-your-agent relay, it never injects text into your sessions.
   value and multiselect fields send a one-item array. Other question types stay
   notify-only with the terminal pointer, and pending questions survive restarts
   (`question.list` recovery). When the host exposes no reply surface (the
-  OpenCode 2.1.x plugin context currently exposes none for forms — tracked
-  upstream in
+  current OpenCode v2 plugin context through 2.2.5 exposes none for forms —
+  tracked upstream in
   [anomalyco/opencode#51108](https://github.com/anomalyco/opencode/issues/51108)),
   the message is notify-only with the terminal pointer instead of showing dead
   buttons.
@@ -91,7 +91,7 @@ a chat-with-your-agent relay, it never injects text into your sessions.
 
 ## Requirements
 
-- OpenCode **v2** (tested on 2.1.4; the 2.0.x line is also supported) or **v1.18+**
+- OpenCode **v2** (tested on 2.2.5; the 2.0.x line is also supported) or **v1.18+**
   (the hooks-based `@opencode-ai/plugin` contract, e.g. the 1.18/1.19 line).
   v1 has no per-plugin options, so its configuration is environment-driven only.
 - A Telegram bot token (via [@BotFather] — takes one minute) and the chat id of

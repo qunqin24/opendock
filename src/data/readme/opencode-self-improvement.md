@@ -326,6 +326,18 @@ Use Bun **1.4.4** for development checks, matching CI. `bun run test` and `bun r
 
 `e2e/` boots the **real opencode CLI** against each candidate in a fully isolated instance (fresh config, fresh db, fresh memory store, empty `HOME`) driven by a scripted OpenAI-compatible fake model — no API keys. It covers loading from the source tree and from the packed npm artifact installed runtime-deps-only, plus BDD flows for remember, recall, exact and near duplicates, ungrounded claims, and forget. Needs `opencode` on `PATH` locally, or set `OPENCODE_BIN`. A `test-windows` leg also runs the suite on Windows; it reports without gating merges.
 
+### Mutation sweep
+
+```sh
+bun run sweep:test
+```
+
+`bun run sweep:test` (`scripts/test-sweep.ts`) audits the test suite rather than testing the plugin. Each mutant breaks exactly one claimed invariant in a detached `git worktree` of HEAD, runs the `test/` suite (unit + scenario) against that mutated tree, and reports whether the suite noticed. A mutant no test kills is an unpinned invariant: the test titles may claim coverage, but nothing died with the invariant. The clean tree is measured first and its failing tests are subtracted from every mutant run, so only new failures count as a kill and a flake never masquerades as one. Mutants are applied only to scratch worktrees beside the checkout, never to the working tree under your feet.
+
+The output is a canonical mutation score — killed over total, with equivalent mutants and load errors excluded from the denominator — plus the survivors, the unpinned invariants. Survivors are the audit's output, not a scandal: some mutants are expected to survive and become entries on the unpinned list rather than red CI.
+
+Run it when you want to know whether the suite still has teeth — after changing tests or coverage, or as a pre-release gate with `bun scripts/test-sweep.ts --fail-on-survivors`, which exits 4 when anything survives. Two cheaper checks come first: `bun scripts/test-sweep.ts --validate` confirms every mutation pattern still lands on exactly one source site without running the suite, and `bun scripts/test-sweep.ts --selftest` plants a mutation in a trivially-tested pure function and fails unless the suite kills it — proof the instrument itself can go red.
+
 ## Troubleshooting
 
 | Problem | Fix |

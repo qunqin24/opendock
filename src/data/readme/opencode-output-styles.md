@@ -4,13 +4,13 @@
 [![npm](https://img.shields.io/npm/v/opencode-output-styles)](https://www.npmjs.com/package/opencode-output-styles)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-Opt-in output styles for OpenCode: system prompts injected alongside the base system, activated only via tuple config. Works on OpenCode 1.x and 2.x.
+Opt-in output styles for OpenCode: system prompts injected alongside the base system, activated only via config. Works on OpenCode 1.x and 2.x.
 
 ## How it works
 
-Styles are system prompts placed alongside the base system. A style injects a block of instructions, or `undefined` to inject nothing. Two entry points, same outcome: a hook for 1.x, an agent transform for 2.x.
+Styles are system prompts placed alongside the base system. A style injects a block of instructions, or nothing at all. Two entry points, same outcome: a hook for 1.x, an agent transform for 2.x.
 
-Styles are opt-in: they apply only when activated by a tuple `[name, { options }]` in `opencode.json` / `opencode.jsonc`. Bare name or auto-load means the neutral `default` (no-op).
+Styles are opt-in: they apply only when activated by `["opencode-output-styles", { options }]` in `opencode.json` / `opencode.jsonc`. Without options, the neutral `default` applies (no-op).
 
 ## Styles
 
@@ -24,7 +24,7 @@ Drop a Markdown file into a `styles/` directory and it becomes a style named aft
 - Global: `~/.config/opencode/styles/*.md` (respects `XDG_CONFIG_HOME`)
 - Project: `{project}/.opencode/styles/*.md`
 
-Singular `style/` is also supported for backwards compatibility with OpenCode's own convention. Precedence on name collision: built-in < global < project (a project file can override a built-in such as `learning`).
+Singular `style/` is also searched (OpenCode convention). On collision, project > global > built-in: a project `learning.md` replaces the built-in `learning`.
 
 ```json
 {
@@ -46,13 +46,18 @@ Notes:
 
 - Styles are Markdown text only (no code execution). Safe against broken or malicious files.
 - Style files are cached by mtime: edits are picked up automatically without restarting OpenCode. An empty or unreadable style file logs a warning and injects nothing.
-- `insights` is specific to the built-in `learning` style; custom styles are static text.
 
-### Options
+## Options
 
-- `style`: the style to activate (a built-in name, a discovered name, or a path).
-- `insights`: set `false` to drop the `★ Insight` block from the `learning` style.
-- `agent`: which agent receives the style. An agent id (default `build`), or `all`. On OpenCode 1.x the hook cannot scope by agent, so the style reaches whichever agent is running.
+- `style` (string, default `default`): the mode to activate — built-in (`learning`, `default`), a discovered name from `styles/` dirs (project overrides global, which overrides built-in), or a file path (absolute or relative to the working directory).
+- `insights` (boolean, default `true`): `learning` only. Set `false` to drop the `★ Insight` block. Custom styles are static text and ignore this option.
+- `agent` (string, default `build`): which agent receives the style — an agent id from your OpenCode config (built-in or custom), or `all`. On OpenCode 1.x the hook cannot scope by agent, so the style reaches whichever agent is running.
+
+```json
+{
+  "plugin": [["opencode-output-styles", { "style": "learning", "insights": false, "agent": "all" }]]
+}
+```
 
 ## Installation
 
@@ -76,7 +81,7 @@ Remove the tuple from `opencode.json` / `opencode.jsonc`. To remove the package:
 
 - Supports OpenCode 1.x and 2.x (hook on 1.x, agent transform on 2.x). Minimum `engines.opencode >=1.18.0`. Tested with 1.18.35 (1.x) and 2.2.5 (2.x).
 - On OpenCode 2.x the project directory is taken from `process.cwd()` (the v2 plugin context exposes no directory). Opening a project from a different working directory may resolve project styles against the wrong root.
-- The plugin cannot distinguish title calls from build calls: instructions reach the title model on the first message of every session.
+- The plugin cannot distinguish call types — title generation receives the same instructions as chat.
 - `input.model` does not reliably expose the model identifier at runtime; no model-based filtering.
 
 ## Attribution
@@ -85,7 +90,7 @@ Ports behaviors from Claude Code's [Learning Output Style Plugin](https://github
 
 ## Example interaction
 
-### With `default` (or no tuple at all)
+### With `default` (or no config)
 
 User: any request
 

@@ -1,6 +1,8 @@
 # HR: Agent Seat Matching and Capability Benchmarking
 
-Unified harness that matches autonomous LLM coding agents to task-appropriate seats, runs capability benchmarks across model fleets, and emits deployment verdicts. One Python engine on PyPI (`aihr`), two OpenCode plugins on npm, one database schema, and 34 CLI commands.
+**English** | [简体中文](README.zh-CN.md)
+
+Unified harness that matches autonomous LLM coding agents to task-appropriate seats — a seat is a named job role an agent fills (for example "backend implementer" or "test fixer"), each with its own required capability profile — runs capability benchmarks across model fleets, and emits deployment verdicts. One Python engine on PyPI (`aihr`), two OpenCode plugins on npm, one database schema, and 34 CLI commands.
 
 The English version is canonical. The Chinese version (`README.zh-CN.md`) is a faithful mirror. When the two diverge, the English text governs.
 
@@ -92,7 +94,21 @@ own; the recipe above protects the first hop.
 
 Flags: `--version X.Y.Z` pins the release · `--bundle <path>` installs from a local bundle instead of downloading · `--port N` sets the database port · `--reinstall` re-runs over an existing install (idempotent: the data directory, database included, stays intact). Open a fresh shell so the `~/.aihr/bin` shim is on PATH, then `hr db-up && hr status`.
 
-Everything the installer places lives in ONE directory it owns: `~/.aihr` (Linux/macOS) or `%LOCALAPPDATA%\aihr` (Windows) — `app/` the bundled runtime (no Python needed on the target), `pg/` the vendored PostgreSQL, `bin/` the PATH shim, `data/pgdata` the database itself, `db.env` the first-boot random password written with `0600` permissions, `share/aihr` the packaged configuration, and `receipt.json` the record of every written path. Outside the owned directory the installer touches exactly two things: a clearly-marked block in your shell rc pointing PATH at the shim, and the two opencode config arrays it registers plugins into; all of it is on the receipt. npm is NOT an install step: the installer tail `hr install-post` registers the plugin packages in opencode's config arrays (the main `plugin` array in `opencode.jsonc`, plus `tui.json` for the FastDraw TUI half), and opencode/bun auto-fetches those npm packages at startup. `hr db-up` needs no Docker. It decides its backend automatically among the embedded vendored Postgres (the bundle default), a compose container (the existing lane, kept), or a BYO PostgreSQL described by `HR_DSN` / `hr.toml`; `hr db-status` reports which backend is live. The Docker-free turnkey install lands with **aihr 0.4.0 (2026-09)**; the 0.3.0 era in which `hr db-up` required a preinstalled Docker (the "docker not found" era) is superseded.
+Everything the installer places lives in ONE directory it owns: `~/.aihr` (Linux/macOS) or `%LOCALAPPDATA%\aihr` (Windows). Inside it:
+
+- `app/` — the bundled runtime (no Python needed on the target)
+- `pg/` — the vendored PostgreSQL
+- `bin/` — the PATH shim
+- `data/pgdata` — the database itself
+- `db.env` — the first-boot random password, written with `0600` permissions
+- `share/aihr` — the packaged configuration
+- `receipt.json` — the record of every written path
+
+Outside the owned directory the installer touches exactly two things: a clearly-marked block in your shell rc pointing PATH at the shim, and the two opencode config arrays it registers plugins into; all of it is on the receipt.
+
+npm is NOT an install step: the installer tail `hr install-post` registers the plugin packages in opencode's config arrays (the main `plugin` array in `opencode.jsonc`, plus `tui.json` for the FastDraw TUI half), and opencode/bun auto-fetches those npm packages at startup.
+
+`hr db-up` needs no Docker. It decides its backend automatically among the embedded vendored Postgres (the bundle default), a compose container (the existing lane, kept), or a BYO PostgreSQL described by `HR_DSN` / `hr.toml`; `hr db-status` reports which backend is live. The Docker-free turnkey install lands with **aihr 0.4.0 (2026-09)**; the 0.3.0 era in which `hr db-up` required a preinstalled Docker (the "docker not found" era) is superseded.
 
 ### Uninstall
 
@@ -314,7 +330,7 @@ harness/hr/               # repo root (pip install -e .)
     bench/                # benchmark batteries + stage0/stage1 sweep engines
     graders/              # grading functions (factuality, reasoning, vision, tools)
     items/                # item loaders for benchmark questions
-    scheduler/            # task scheduling (kept per Metis C1)
+    scheduler/            # task scheduling
     seats/                # seat taxonomy and profile helpers
     stats/                # statistical aggregation for sweep results
   itemrepo/               # git-versioned benchmark item repository by category
@@ -365,7 +381,16 @@ hr bench --model gpt-4o --battery reasoning
 
 This codebase targets the general class of autonomous LLM coding agents, not a specific product. The seat taxonomy (tier 1 through tier 4), the benchmark item categories (factuality, reasoning, vision, tool_a, tool_b), and the verdict pipeline (discover, bench, assign, verdict) apply to any agent that consumes LLM output and produces code artifacts.
 
-Provider-specific hardcoding was removed during unification. The model fleet is derived at RUNTIME from opencode's live config (`opencode.jsonc` provider blocks: every `provider.*.models` entry becomes a fleet model, and the `npm` field derives the wire type); `configs/fleet.yaml` holds only OPTIONAL overrides (`wire_overrides` for registry-only providers, `scope_excludes`, `gateway_urls`), and `configs/deployable.yaml` `extra_deployable` is the only hand-maintained model list (models served outside the opencode config). Add a model to opencode's config and it flows into the sweep pools, discover and routing with zero file edits here. Knowledge data lives in `configs/models.yaml` (pricing/capabilities) and `configs/knowledge.yaml` (reference scores, findings), both with safe defaults for unknown models.
+Provider-specific hardcoding was removed during unification. The model fleet is derived at RUNTIME from opencode's live config (`opencode.jsonc` provider blocks: every `provider.*.models` entry becomes a fleet model, and the `npm` field derives the wire type).
+
+`configs/fleet.yaml` holds only OPTIONAL overrides (`wire_overrides` for registry-only providers, `scope_excludes`, `gateway_urls`), and `configs/deployable.yaml` `extra_deployable` is the only hand-maintained model list (models served outside the opencode config). Add a model to opencode's config and it flows into the sweep pools, discover and routing with zero file edits here.
+
+Knowledge data lives in `configs/models.yaml` (pricing/capabilities) and `configs/knowledge.yaml` (reference scores, findings), both with safe defaults for unknown models.
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the development setup and the
+gates every change must pass.
 
 ## License
 

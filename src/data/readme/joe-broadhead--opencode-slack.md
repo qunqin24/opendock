@@ -21,7 +21,7 @@ opencode plugin add @joe-broadhead/opencode-slack
 
    If your organisation already set the client ID for you (see [Organisation rollout](#organisation-rollout)), there is no **Slack app** entry; go straight to step 2.
 2. **Sign in to Slack.** Run `/connect` and choose **Slack**. In the TUI, press `o` or Enter to open the sign-in page in your browser. In a terminal, `opencode mcp auth slack` opens the browser automatically. `/mcps` → `slack` is an equivalent way in.
-3. Slack shows the workspace, the account and what the app asks for. Approve it. Slack sends the browser back to `http://localhost:8765/callback`, and OpenCode finishes the sign-in.
+3. Slack shows the workspace, the account and what the app asks for. Approve it. Slack sends the browser back to the callback, `http://localhost:8765/callback` unless you set another, and OpenCode finishes the sign-in.
 
 `/slack-status` now shows `connected` and the Slack tools it found. OpenCode stores the credential and refreshes it. To sign out, run `opencode mcp logout slack`.
 
@@ -106,7 +106,7 @@ Do not put this block in the top-level `permissions`. OpenCode adds top-level ru
 
 ## Configure
 
-Everything works without options. Options set the client ID for everyone (instead of `/connect`), the callback URL, the scopes, a client secret for apps without PKCE, the server name and the host check. To pass them, use the object form of the `plugins` entry:
+Everything works without options. Options set the client ID for everyone (instead of `/connect`), the callback URL and its local port, the scopes, a client secret for apps without PKCE, the server name and the host check. To pass them, use the object form of the `plugins` entry:
 
 ```jsonc
 {
@@ -115,6 +115,14 @@ Everything works without options. Options set the client ID for everyone (instea
   ]
 }
 ```
+
+**OpenCode on another machine.** The default callback, `http://localhost:8765/callback`, works only when the browser runs on OpenCode's machine. Otherwise use a hosted callback: an `https:` address the browser can reach, which a reverse proxy forwards to OpenCode's local listener on `oauth.callback_port`:
+
+```jsonc
+"oauth": { "client_id": "YOUR_SLACK_CLIENT_ID", "redirect_uri": "https://host.example/oauth/return", "callback_port": 8766 }
+```
+
+Add the address to the Slack app's **OAuth & Permissions → Redirect URLs** (or `oauth_config.redirect_urls` in the [manifest](https://github.com/joe-broadhead/opencode-slack/blob/HEAD/docs/slack-app-manifest.json)). Slack matches the host and port exactly. [The callback: loopback or hosted](https://github.com/joe-broadhead/opencode-slack/blob/HEAD/docs/configuration.md#the-callback-loopback-or-hosted) explains the proxy and how two sign-ins on one machine avoid colliding on port 8765.
 
 [docs/configuration.md](https://github.com/joe-broadhead/opencode-slack/blob/HEAD/docs/configuration.md) lists every option, the scopes each tool needs, the permission rules and the status model.
 
@@ -165,6 +173,8 @@ If status itself cannot be read, `/slack-status` says `STATUS_UNAVAILABLE`; run 
 - **Slack asks you to request approval:** your workspace requires admin approval for apps or scopes. Ask an admin to approve the app, then sign in again.
 - **Slack refuses the app for MCP:** turn on **Agents → Slack Model Context Protocol (MCP) Server** in the app settings. The app must be internal to your organisation or published in the Slack Marketplace.
 - **The browser cannot open `localhost:8765` after Slack approves:** OpenCode listens for the callback on `127.0.0.1` only. If your browser tries IPv6 for `localhost`, replace `localhost` with `127.0.0.1` in the address bar. To avoid it, register `http://127.0.0.1:8765/callback` in the app and set it as `oauth.redirect_uri`.
+- **The browser cannot open `localhost:8765` because OpenCode runs on another machine:** the browser's `localhost` is not OpenCode's. Use a [hosted callback](https://github.com/joe-broadhead/opencode-slack/blob/HEAD/docs/configuration.md#the-callback-loopback-or-hosted).
+- **Sign-in fails because the callback port is in use:** another sign-in on this machine is waiting on port 8765. Finish it first, or give this OpenCode its own callback, such as `http://localhost:8767/callback`, registered in the Slack app too.
 
 **A Slack tool fails**
 

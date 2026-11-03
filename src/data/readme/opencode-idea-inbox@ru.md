@@ -24,12 +24,12 @@
 
 Сайдбар в середине сессии выглядит так:
 
-<img src="https://raw.githubusercontent.com/apilot/opencode-idea-inbox/master/assets/demo.png" alt="Сессия opencode с сайдбаром Idea Inbox: три идеи с разными статусами" width="640">
+<img src="https://raw.githubusercontent.com/apilot/opencode-idea-inbox/master/assets/demo.png" alt="Сессия opencode с сайдбаром Idea Inbox: идеи в бэклоге с живыми статусами" width="640">
 
 <details>
 <summary>▶ Посмотреть весь цикл — захват идеи, отправка в работу, завершение (GIF, ~10 с)</summary>
 
-<img src="https://raw.githubusercontent.com/apilot/opencode-idea-inbox/master/assets/demo.gif" alt="GIF: leader+z захватывает мысль в сайдбар, затем идея отправляется из палитры и статус меняется на done" width="640">
+<img src="https://raw.githubusercontent.com/apilot/opencode-idea-inbox/master/assets/demo.gif" alt="GIF: leader+z паркует мысли в сайдбар, leader+i отправляет идею агенту, статус доезжает до done" width="640">
 
 </details>
 
@@ -219,6 +219,13 @@ bun test            # полный набор: store, tools, server, commands, T
 
 Issues и PR приветствуются:
 <https://github.com/apilot/opencode-idea-inbox>.
+
+## Поддержка
+
+Если плагин вам полезен — поставьте ⭐. Когда у репо наберётся **25+
+звёзд**, он проходит по критериям курируемого листа
+[awesome-opencode](https://github.com/awesome-opencode/awesome-opencode):
+PR на добавление примут, и плагин станет частью экосистемы opencode.
 
 ## Лицензия
 

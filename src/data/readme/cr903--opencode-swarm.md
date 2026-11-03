@@ -24,10 +24,12 @@ opencode service restart
 ```bash
 /swarm-init      # 安装配套文件到本项目：agents/*.md + .opencode/review/_default.md（已存在的不覆盖；skills 随插件自动注册）
 /swarm-up --planner-model <p> --dev-model <d> --tester-model <t> --name <需求名>
-# planner 会话里：
+# 默认主会话即 planner：直接在当前窗口
 #plan 拆解 <需求或PRD路径>
-/swarm-start     # 派发（默认 hybrid：dev 常驻会话唤醒，test/reviewer 走子代理）
+/swarm-start     # 必须显式派发（up 只开轮不派发；未 start 前 dev/test 认领会被拒）
 ```
+
+> 想恢复「另建一个 plan 会话」的旧行为：`/swarm-up ... --plan-session new`。
 
 完整操作手册见 [`docs/swarm-使用手册.md`](docs/swarm-使用手册.md)，设计说明见 [`docs/swarm-SPEC.md`](docs/swarm-SPEC.md)。
 
@@ -67,8 +69,12 @@ opencode service restart
 
 ```
 .swarm/runs/<runId>/{queue.jsonl,timeline.jsonl,events.jsonl,round.json,meta.json}
+  round.json = { name, sessions:{plan,dev,test}, members:{<sessionID>: {role, at}} }
+               members 记录主会话/子代理等非角色会话，供「会话 → run」反查（footer 跟随 / sidebar 高亮）
+  meta.json  = { name, createdAt, executor, roleModels, startedAt?, pendingStart? }
+               pendingStart=true 表示「up 已开轮、尚未 /swarm-start」，dev/test 认领会被拒
 .swarm/secret-baseline.json   # secret 门基线（只报新增）
-.swarm/current                # 当前轮指针
+.swarm/current                # 当前轮指针（并行多轮时仅作兜底：run 解析优先会话/任务归属）
 .swarm/eval/<month>.jsonl     # /swarm-eval 导出
 ```
 
@@ -77,6 +83,14 @@ opencode service restart
 ```bash
 npm test   # node --test tests/（单元 + 端到端 + board 数据层，随功能增长）
 ```
+
+## 1.1.0 行为变更（并行多轮修复）
+
+- **默认主会话即 planner**：`/swarm-up` 不再另建 plan 会话（`plan = 发起命令的会话`）；旧行为用 `--plan-session new`。
+- **`/swarm-start` 是唯一派发授权**：`/swarm-up` 只开轮不派发；`pendingStart` 期间 `swarm_claim / swarm_next` 拒收（`force:true` 逃生）。
+- **run 解析不再只看全局指针**：`显式 run > 任务归属（task_id）> 会话绑定 > .swarm/current`，并行两轮互不抢指针。
+- **命名/跟随**：`round.name` 与 `meta.name` 同步双写；sidebar 以 `meta.name` 为规范名；footer/sidebar 高亮按 `round.sessions + round.members`（主会话、子代理）跟随。
+- 空入队（全部被校验拒）不再改轮名。
 
 ## 版本与兼容
 

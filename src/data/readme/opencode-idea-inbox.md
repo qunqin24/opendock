@@ -25,12 +25,12 @@ its status tick over:
 
 The sidebar mid-session looks like this:
 
-<img src="https://raw.githubusercontent.com/apilot/opencode-idea-inbox/master/assets/demo.png" alt="opencode session with the Idea Inbox sidebar showing three ideas with different statuses" width="640">
+<img src="https://raw.githubusercontent.com/apilot/opencode-idea-inbox/master/assets/demo.png" alt="opencode session with the Idea Inbox sidebar showing parked ideas with live statuses" width="640">
 
 <details>
 <summary>▶ Watch the full loop — capture an idea, dispatch it, watch it finish (GIF, ~10 s)</summary>
 
-<img src="https://raw.githubusercontent.com/apilot/opencode-idea-inbox/master/assets/demo.gif" alt="GIF: pressing leader+z to capture a thought into the sidebar, then dispatching it from the palette and watching the status flip to done" width="640">
+<img src="https://raw.githubusercontent.com/apilot/opencode-idea-inbox/master/assets/demo.gif" alt="GIF: pressing leader+z to capture stray thoughts into the sidebar, dispatching one with leader+i, and watching the agent flip it to done" width="640">
 
 </details>
 
@@ -222,6 +222,14 @@ reference).
 
 Issues and PRs are welcome at
 <https://github.com/apilot/opencode-idea-inbox>.
+
+## Support
+
+If idea-inbox is useful to you, give it a ⭐. Once the repo reaches **25+
+stars**, it qualifies for the curated
+[awesome-opencode](https://github.com/awesome-opencode/awesome-opencode)
+list — a PR adding it there gets accepted, making it part of the opencode
+ecosystem.
 
 ## License
 

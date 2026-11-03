@@ -18,7 +18,9 @@ The default `noul` question asks whether the call violates exfiltration policy. 
 
 ## Quick Heads-Up
 
-- OpenCode v1 only. Version 1.19.4 is tested; v2 is not supported.
+- Branches: `main` targets the latest OpenCode (2.x) and also still loads on 1.19.4. The `opencode-1.x` branch delivers the 1.x-only line. Version numbers are plain semver and do not track OpenCode versions.
+- OpenCode 2.2.x (`setup` entry) was tested end to end on 2.2.5 with a scripted model and judge: allowed and blocked calls, judge outage, staged scripts and the load check. Subagent and MCP calls are not tested yet. OpenCode 1.19.4 (`server` entry) is the tested v1 host. Unsupported before 1.19.4.
+- OpenCode 2.x does not log decisions or show toasts. A load failure is logged as `failed to load plugin`, so [check it loaded](docs/installation.md#verify-it-loaded).
 - Setup is opt-in. Cloning this repo does not register the plugin or change OpenCode configuration.
 - The judge receives rendered tool arguments and, in some cases, staged file contents. Pick an endpoint you trust.
 
@@ -32,7 +34,7 @@ Published on npm as [`oc-one-guard`](https://www.npmjs.com/package/oc-one-guard)
 {
   "plugin": [
     [
-      "oc-one-guard@0.1.1",
+      "oc-one-guard@0.2.0",
       {
         "endpoint": "http://127.0.0.1:8081/v1/systemone",
         "model": "h2o-lightning-4b"
@@ -42,7 +44,7 @@ Published on npm as [`oc-one-guard`](https://www.npmjs.com/package/oc-one-guard)
 }
 ```
 
-Use the global config instead if you want it in every project. To uninstall, remove that entry and restart. Full details and the local-checkout option: [installation](https://github.com/HumanFace-Tech/oc-one-guard/blob/main/docs/installation.md).
+OpenCode 2.x uses the `plugins` key with an object entry instead; see [installation](https://github.com/HumanFace-Tech/oc-one-guard/blob/main/docs/installation.md). Use the global config instead if you want it in every project. To uninstall, remove that entry and restart. Full details and the local-checkout option: [installation](https://github.com/HumanFace-Tech/oc-one-guard/blob/main/docs/installation.md).
 
 ## How Does the Check Work?
 
@@ -80,7 +82,7 @@ The run was **incomplete**: 45 requests timed out across the direct and guard te
 
 ## What's Next?
 
-These are ideas, not current features: support for OpenCode v2, plus a simpler setup and calibration path that stays conservative by default. The current release supports v1 only.
+These are ideas, not current features: a simpler setup and calibration path that stays conservative by default, and end-to-end tool-call tests on OpenCode 2.x. Version 0.2.0 adds the OpenCode 2.x entry; see [ADR 0011](https://github.com/HumanFace-Tech/oc-one-guard/blob/main/docs/adr/0011-opencode-v2-adapter.md).
 
 ## License
 

@@ -13,8 +13,8 @@ subscription. Claude Code becomes one more model in OpenCode; Claude does the th
 >   [Upgrading from 0.8.x](#upgrading-from-08x-opencode-v1)).
 > - **Tested with:**
 >   - OpenCode 2.1.1;
->   - `@agentclientprotocol/claude-agent-acp` 0.31.x;
->   - Claude Code CLI 2.1.119.
+>   - `@agentclientprotocol/claude-agent-acp` 0.31.x and 0.99.x;
+>   - Claude Code CLI 2.1.308.
 >
 > Check your version with `opencode --version`.
 
@@ -179,7 +179,8 @@ agent reports. At the time of writing, on a Max account:
 - You can also use full ids such as `claude-sonnet-4-6`.
 
 **All models and effort levels share one agent process.** The model is applied per session
-with `session/set_model`, so switching `opus` → `sonnet` mid-conversation keeps the session: no
+with `session/set_model` (the `model` config option on claude-agent-acp ≥ 0.99, which dropped
+that method), so switching `opus` → `sonnet` mid-conversation keeps the session: no
 replay, no new process. The same goes for the agent's mode (`session/set_mode`) and effort.
 
 **Effort** (how hard Claude thinks) is exposed as model **variants**: `acp/sonnet#low` …
@@ -372,7 +373,7 @@ start (model `acp/default`; `claude-default` comes first):
 | `claude-plan` | `plan` | Claude **plans** (researches, reads, writes the plan) without making changes until you approve it. Effort variant `high`. |
 | `claude-acceptedits` | `acceptEdits` | Native edits are accepted without asking. |
 | `claude-auto` | `auto` | Claude Code's classifier approves or denies each native action. |
-| `claude-dontask` | `dontAsk` | Native actions not pre-approved are denied, never asked. |
+| `claude-dontask` | `dontAsk` | Native actions not pre-approved are denied, never asked. claude-agent-acp ≥ 0.99 no longer reports this mode, so the agent isn't created there. |
 | `claude-bypasspermissions` | `bypassPermissions` | Never asks: the permission bridge is skipped. |
 
 They share the same native toolset and differ only in their starting mode. **The mode only

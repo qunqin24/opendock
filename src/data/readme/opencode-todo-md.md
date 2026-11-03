@@ -49,16 +49,24 @@ checkout. Restart the TUI (or run `/reload`) to load the TUI half after an updat
 
 ### Agent tools
 
-`todo_write` takes the complete list, which replaces the previous one:
+`todo_write` merges by default, so nothing is deleted unless you ask for it.
+
+Add a task (no `id`) or update one (with `id`):
 
 ```json
 { "todos": [{ "content": "Fix login redirect", "status": "in_progress", "priority": "high" }] }
 ```
 
-or a patch list, where each item carries an `id` plus only the fields to change:
+Patch only the fields that change:
 
 ```json
 { "todos": [{ "id": 3, "status": "completed" }] }
+```
+
+Replace the whole list, the only way to delete tasks; an empty list clears the file:
+
+```json
+{ "mode": "replace", "todos": [] }
 ```
 
 `todo_read` prints the list with ids, priority, due, done and created dates. Ids are assigned on first appearance and
@@ -73,6 +81,7 @@ never reused, so a patch cannot hit the wrong task after a reorder.
 | `/todo done <id>` | Marks a task completed |
 | `/todo init` | Creates `TODO.md` with `## To do` and `## Done` |
 | `/todo import` | Adopts a hand-written list: plain `-`, `*` and `1.` items become checkboxes, after a preview |
+| `/todo renumber` | Rewrites ids as 1..N, highest priority first then nearest due date, after a warning |
 | `/todo help` | Lists the subcommands (they are arguments of `/todo`, so the palette shows only `/todo`) |
 
 ### Dialog
@@ -102,7 +111,7 @@ Search and press Enter (open, high, #12, @tag)
 - Click the `#id`, `prio`, `created`, `due` or `done` header to sort by that column; the sorted column is marked with
   `▲`, a second click restores the default order.
 - The list has a cursor (`▸`): `↑`/`↓` move it, and walking past the last row of a page turns the page, so the cursor
-  never stops at the edge. `space` toggles the selected task, `ctrl+e` edits it, `PgUp`/`PgDn` change page, `Home`/`End`
+  never stops at the edge. `space` toggles the selected task, `ctrl+e` edits it, `ctrl+n` adds a task, `PgUp`/`PgDn` change page, `Home`/`End`
   jump to the first or last page.
 - `ctrl+d` arms the selected task and shows `ctrl+d again to delete`: the second press removes the line, no dialog.
 - `/` gives the keyboard to the search box; `Enter` applies the query and gives the keyboard back to the list. `Esc`
@@ -138,9 +147,10 @@ agent should keep the plan in this file instead of the conversation, and that is
 Project-local `AGENTS.md`, at the repository root:
 
 ```markdown
-If the project has a TODO.md at the root, keep it updated with todo_write: run todo_read first, then send the complete
-list. Do not edit the checkboxes by hand, the id/priority/created/done metadata lives in the trailing HTML comment.
-Projects without TODO.md have no list to keep.
+If the project has a TODO.md at the root, keep it updated with todo_write instead of editing the file by hand: the
+id/priority/due/created metadata lives in the trailing HTML comment. A write merges by default, so send only the new
+tasks (no id) or the ones to change (with id); use mode "replace" with the full list only to delete tasks. Never use
+mode "replace" to add a task: it deletes every task you did not list. Projects without TODO.md have no list to keep.
 ```
 
 Global, so every project inherits it, in `~/.agents/AGENTS.md`:
@@ -184,6 +194,26 @@ The plugins live in the same repository as the sources; OpenCode resolves `@open
 to be installed locally to try a change.
 
 ## Changelog
+
+### 0.1.10
+
+- Fix the plugin failing to load with `ReferenceError: TODO_STATUSES is not defined`: `src/index.ts` used
+  `TODO_STATUSES` and `TODO_PRIORITIES` without importing them, so 0.1.8 registered no tools at all.
+
+### 0.1.8
+
+- `todo_write` merges by default: items without an `id` are appended and items with an `id` are updated, so a partial
+  write can no longer wipe the rest of the list. `mode: "replace"` is the only way to delete tasks.
+- The list returned by `todo_write` is the one actually stored in `TODO.md`.
+
+### 0.1.7
+
+- `/todo renumber` rewrites ids as 1..N, highest priority first and then by due date; it warns first, because ids are
+  stable by design and old references will point at another task.
+
+### 0.1.6
+
+- `ctrl+n` opens the new-task flow from the keyboard, so the whole list is reachable without the mouse.
 
 ### 0.1.5
 

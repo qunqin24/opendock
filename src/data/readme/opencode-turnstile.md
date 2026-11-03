@@ -133,7 +133,8 @@ behavior). The opt-outs are deliberate and per-feature:
 `gitGates.commitMessages: false`
 turns off commit lint, `gitGates.landingGate: false` turns off the landing
 gate, an empty denylist leaves the tool policy idle, and `TURNSTILE OFF:`
-suspends the whole plugin for a session (the `turnstile-suspend` skill).
+suspends the whole plugin for a session (the `turnstile-off` /
+`turnstile-on` skills compose the copy-ready prompt for you to send).
 
 When a gate fires early, the block message names the reason:
 

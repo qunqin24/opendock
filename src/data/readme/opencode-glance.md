@@ -5,7 +5,7 @@
 A glanceable status bar for OpenCode v2, in both the terminal and Desktop:
 
 ```
-◷ 7 turns 135 steps · 126 tok/s        ▤ 16.2M tok · 94% cached        ◔ 18%
+◷ 7 turns 135 steps        ›_ bash 8s        ▤ 16.2M tok · 94% cached        ◔ 18%
 ```
 
 One package ships a **GUI** and a **TUI** part with the same metrics:
@@ -13,6 +13,7 @@ One package ships a **GUI** and a **TUI** part with the same metrics:
 | Metric | Definition |
 | --- | --- |
 | Turns / steps | User messages / assistant messages in the session (steps can count tool calls instead) |
+| Activity | Current tool and its elapsed time, or live generation status |
 | tok/s | `Σ(output + reasoning) / Σ(step end - step start)` over completed steps; live estimation while streaming |
 | Total tokens | `input + output + reasoning + cache.read + cache.write` across the session family |
 | Cache hit | `cache.read / (input + cache.read + cache.write)` |
@@ -67,7 +68,7 @@ The server part is loaded from `opencode.json(c)`, which also makes the TUI part
 | `show` | `true` | Show the bar at startup; toggle it from the command palette |
 | `steps` | `"assistant"` | `"assistant"` counts assistant messages; `"tool"` counts tool calls |
 | `rate` | `"auto"` | `"auto"`: live estimate while streaming, last exact step while idle. `"average"`: session average. `"last"`: last exact step |
-| `icons` | `true` | TUI icons (`◷ ▤ ◔`) |
+| `icons` | `true` | TUI icons (`◷ ›_ ▤ ◔`) |
 | `locale` | `"auto"` | TUI locale; `auto` follows the system language. GUI follows the app language |
 
 ## i18n

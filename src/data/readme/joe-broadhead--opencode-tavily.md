@@ -30,10 +30,11 @@ Run `/connect` and choose **Tavily MCP**. That is all most people need.
 | **Tavily** | OpenCode's own API-key entry. Paste a key from [app.tavily.com](https://app.tavily.com). | OpenCode's `websearch` tool, and the five Tavily tools too: while a key is connected, the plugin uses it instead of OAuth, and **Tavily MCP** is not listed. |
 
 - **The browser.** In the TUI, `/connect` shows Tavily's sign-in link; press `o` or Enter to open it in your browser. On the command line, `opencode mcp auth tavily` opens the browser automatically.
-- **An API key instead.** Choose **Tavily** in `/connect`, run `opencode auth login tavily`, or set `TAVILY_API_KEY` in OpenCode's environment. A key you connect wins over `TAVILY_API_KEY`. Remove the key to go back to OAuth. The plugin switches without a restart.
+- **An API key instead.** Choose **Tavily** in `/connect`, or run `opencode auth login tavily`. A key you connect wins over `TAVILY_API_KEY`. Remove the key to go back to OAuth. The plugin switches without a restart.
+- **`TAVILY_API_KEY`** works only in the environment of the OpenCode server, which is usually the background service. A key exported in your shell does not reach a service that is already running, so the plugin keeps using OAuth. Use `/connect`, or `opencode service set env TAVILY_API_KEY <key>`; see [TAVILY_API_KEY and the background service](https://github.com/joe-broadhead/opencode-tavily/blob/HEAD/docs/configuration.md#tavily_api_key-and-the-background-service).
 - `/mcps` → `tavily` is the same OAuth sign-in as **Tavily MCP**.
 
-Run `/tavily-status` to see which one is in use.
+Run `/tavily-status` to see which one is in use. With a key, it also shows whether Tavily accepts the key. Tavily's MCP server connects with any key, so the plugin asks Tavily's usage endpoint once per key, which costs no credits.
 
 ## Use
 
@@ -102,7 +103,7 @@ An organisation can install the plugin for every user on a machine through OpenC
 }
 ```
 
-There is no client ID to set: OpenCode registers itself with Tavily's sign-in. Each member then runs `/connect` and chooses **Tavily MCP**. To use one organisation key instead, set `TAVILY_API_KEY` in OpenCode's environment through your device management. Never put a key in `opencode.json`.
+There is no client ID to set: OpenCode registers itself with Tavily's sign-in. Each member then runs `/connect` and chooses **Tavily MCP**. To use one organisation key instead, set `TAVILY_API_KEY` in the environment of the OpenCode server process, for example with `opencode service set env TAVILY_API_KEY <key>` for the background service. A key in a login shell does not reach the service. Never put a key in `opencode.json`.
 
 ## Troubleshooting
 
@@ -110,15 +111,19 @@ Run `/tavily-status` first. It always ends with one next step, `Nothing to do.` 
 
 | Connection | What to do |
 | --- | --- |
-| `sign-in required` | Run `/connect` and choose **Tavily MCP**. With a key, Tavily rejected it: replace it in `/connect` → **Tavily**, which then shows "Sign in required", or replace `TAVILY_API_KEY` and restart OpenCode. |
+| `sign-in required` | Run `/connect` and choose **Tavily MCP**, or choose **Tavily** to use an API key. |
 | `failed` | Run `opencode mcp list` to see the error, and check your network. |
 | `connecting` | Wait a few seconds and run `/tavily-status` again. |
 | `disabled` | Enable `tavily` in `/mcps`, or remove `"disabled": true` from `mcp.servers.tavily` in `opencode.json`. |
 | `not configured` | Another plugin or a policy removed the `tavily` server. Remove that, then run `opencode reload`. |
 
+Sign-in `…, rejected by Tavily` means that Tavily does not accept the key, though the connection shows `connected`: every tool call answers `Unauthorized: missing or invalid API key`. Replace the key in `/connect` → **Tavily**, which shows "Sign in required" meanwhile, or replace `TAVILY_API_KEY` for the OpenCode server.
+
+Sign-in `OAuth` although you set `TAVILY_API_KEY` means that the variable is in your shell but not in the OpenCode server's environment. The **Tavily: Status** dialog then shows a **Terminal key** row. Run `/connect` and choose **Tavily** to connect the key, or see [TAVILY_API_KEY and the background service](https://github.com/joe-broadhead/opencode-tavily/blob/HEAD/docs/configuration.md#tavily_api_key-and-the-background-service).
+
 Sign-in `your own tavily server in opencode.json` means that your config already defines an MCP server named `tavily`. The plugin leaves it unchanged; its key handling and timeout do not apply to it, but the permission block does.
 
-A 401 from a Tavily tool means the sign-in expired or the key is wrong. A 429 is Tavily's rate limit or your plan's limit; the plugin does not retry.
+A 401 from a Tavily tool, or `Unauthorized: missing or invalid API key` in its result, means the sign-in expired or the key is wrong. A 429 is Tavily's rate limit or your plan's limit; the plugin does not retry.
 
 The plugin's errors and warnings start with a code. Each ends with one next step.
 

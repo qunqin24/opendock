@@ -44,11 +44,12 @@
 /plugin install bb-spec-workflow@0xbb2b
 ```
 
-日常的に手動で打つ 5 コマンド:
+日常的に手動で打つ 6 コマンド:
 
 | コマンド | 何をするか | いつ使うか |
 |---|---|---|
 | `/prd` | 質疑→明確化→分解、PRD + AGENTS.md を書き出して読んだうえで 1 回承認すると、plan → exec → doc-update を自動実行 | 新規要件の着手時、マージ済み機能の振る舞いを変える時 |
+| `/prototype` | 共通のブループリント外枠で HTML プロトタイプを作り、承認されるまで修正。`/prd`・`/revise` が UI 変更時に自動で呼び出す | 要件フローを通さず、まず見た目を確認したい時 |
 | `/revise` | 根本原因で診断→的を絞った修正→回帰検証、完了後に doc-update を自動実行 | バグや期待と異なる結果が出た時 |
 | `/git-push` | pre-review セルフチェック + push + PR 作成 | PR を出す時 |
 | `/exec` | 中断箇所から plan の実行を再開 | 中断や `/clear` の後 |
@@ -143,7 +144,7 @@
 **同梱されるもの**
 
 - **5 個のオーケストレーションサブエージェント**(上記ステージに駆動される):`test-engineer` / `impl-engineer` / `prd-reviewer` / `webview-test-runner` / `pre-reviewer`
-- **4 つの受動 hook**(自動発動):npm/yarn ブロック、main コミットブロック、依存バージョンセルフチェック、Stop 時の 4 項目セルフチェック
+- **4 つの受動 hook**(自動発動):npm/yarn ブロック、main コミットブロック、依存バージョンセルフチェック、バックグラウンドスクリプトの完了待ち
 
 ---
 
@@ -253,6 +254,7 @@ claude plugin update bb-spec-workflow@0xbb2b   # ターミナルから特定の�
 | `block-non-bun-pm` | bb-spec-frontend | PreToolUse(Bash) | `npm` / `yarn` / `pnpm` のパッケージ管理動作をブロックし `bun` を強制;既存プロジェクトで対応する lockfile(例 `package-lock.json`)がある場合は通過 |
 | `git-workflow-guard` | bb-spec-core | PreToolUse(Bash) | `main` / `master` ブランチでの `git commit` をブロック;他の git フロー動作(ブランチ作成 / push / worktree / merge / PR)は通過させ git-workflow 規律とリアルタイム git ステータスを注入 |
 | `dep-version-check` | bb-spec-core | PostToolUse(Write\|Edit) | 依存ファイル編集後に「公式最新版を先に確認」セルフチェックリマインダを注入 |
+| `background-script-wait` | bb-spec-core | Stop | このセッションで未通知の実行中バックグラウンドコマンドを見つけたとき 1 回だけ通知:Claude は終了するスクリプトをフォアグラウンドのループで待ち、常駐サービスは待たない |
 ---
 
 ## 🧪 テスト
@@ -291,7 +293,7 @@ base_dir: my/bb  # → my/bb/docs/{prd,plan,test}/ と my/bb/.cache/ ; ./ を指
 |---|---|
 | 一時的に npm / yarn / pnpm を許可 | `bb-spec-frontend` を一時的に無効化 |
 | 一時的に main commit を許可 | `bb-spec-core` を一時的に無効化 |
-| Stop セルフチェックをスキップ | スイッチなし —— これはコアの鉄則、スキップは推奨されない |
+| バックグラウンドスクリプト待ちの通知をスキップ | `bb-spec-core` を一時的に無効化 |
 
 ---
 

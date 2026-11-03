@@ -1,5 +1,10 @@
 # opencode-history-search-v2
 
+> **Superseded:** this plugin is frozen at 1.0.0 and still works, but the
+> maintained, harness-agnostic successor is
+> **[agent-history-search](https://github.com/marioschweiger/agent-history-search)**
+> (same searches, plus pi session history, one CLI, skills-based install).
+
 OpenCode **V2** plugin that gives the AI model a `history_search` tool: search past
 conversation sessions by keyword, fuzzy term, multi-term AND, or file touch history.
 

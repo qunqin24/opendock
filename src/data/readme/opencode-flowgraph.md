@@ -1,4 +1,4 @@
-# opencode-agent-workflows
+# opencode-flowgraph
 
 An OpenCode V2 plugin for user-defined multi-agent workflows.
 
@@ -19,7 +19,7 @@ Install from npm by adding the plugin to `opencode.jsonc`:
 ```jsonc
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugins": ["opencode-agent-workflows"]
+  "plugins": ["opencode-flowgraph"]
 }
 ```
 
@@ -27,7 +27,7 @@ Pin a version when reproducibility matters:
 
 ```jsonc
 {
-  "plugins": ["opencode-agent-workflows@0.1.1"]
+  "plugins": ["opencode-flowgraph@0.3.0"]
 }
 ```
 
@@ -44,13 +44,25 @@ For local development, point at this repository:
 
 A local directory needs a root `index.ts` (server) and `rpc.ts` (shared contract); this repository provides both. Release automation is documented in [`docs/releasing.md`](docs/releasing.md).
 
+## Migrating from 0.1.x
+
+Version `0.2.1` is a full rename:
+
+- npm package: `opencode-agent-workflows` → `opencode-flowgraph`
+- plugin ID: `agent-workflows` → `flowgraph`
+- RPC ID: `agent_workflows` → `flowgraph`
+- reporting tool: `agent_workflows_report` → `flowgraph_report`
+
+Update the plugin entry in `opencode.json(c)` and any agent prompts that call the reporting tool. Runs stored under the old plugin ID are not visible to `0.2.1`; start new runs.
+
 ## Agent requirements
 
 Workflow nodes reference native OpenCode agent IDs. Agents must be:
 
 - Not hidden
 - `mode: primary` or `mode: all`
-- Able to use tools, because conditional nodes report through the `agent_workflows_report` tool
+- Able to use tools, because conditional nodes report through the `flowgraph_report` tool
+- Given a `model`, or covered by a global `model` in `opencode.json(c)`
 
 `mode: subagent` agents are rejected by the MVP. The documented native contract runs subagents only through the `subagent` tool, and directly selecting one from a workflow would bypass that gate. Change the native agent to `mode: all` if you want it in a workflow.
 
@@ -62,6 +74,7 @@ Example:
 ---
 description: Reviews changes for correctness and missing tests
 mode: primary
+model: opencode-go/deepseek-v4.1-flash
 permissions:
   - action: edit
     resource: "*"
@@ -127,7 +140,7 @@ Rules:
 
 V2 session prompts do not support a native response schema. The plugin registers a typed tool:
 
-`agent_workflows_report`
+`flowgraph_report`
 
 At the end of each node the agent calls it with:
 
@@ -150,7 +163,7 @@ The tool is registered for the whole location because OpenCode plugin tools are 
 
 ## RPC
 
-The shared contract is exported from `opencode-agent-workflows/rpc`.
+The shared contract is exported from `opencode-flowgraph/rpc`.
 
 | Method | Purpose |
 |---|---|
@@ -163,6 +176,7 @@ The shared contract is exported from `opencode-agent-workflows/rpc`.
 | `startRun` | Start a run with an objective and idempotency key |
 | `listRuns` | List project runs |
 | `getRun` | Current state, step summaries, Mermaid, live permissions |
+| `getRunGraph` | Structured graph, run and run-session IDs, active node, node sessions, Mermaid mapping, controls |
 | `getRunStep` | Full persisted step result |
 | `pauseRun` | Safe pause between nodes |
 | `resumeRun` | Resume, with explicit confirmation for ambiguous retries |
@@ -172,10 +186,10 @@ Event: `runUpdated` with project, run, workflow, status, current node, revision,
 
 ```ts
 import { OpenCode } from "@opencode/client"
-import { AgentWorkflowsRpc } from "opencode-agent-workflows/rpc"
+import { FlowgraphRpc } from "opencode-flowgraph/rpc"
 
 const client = OpenCode.make({ baseUrl, headers })
-const workflows = client.rpc(AgentWorkflowsRpc)
+const workflows = client.rpc(FlowgraphRpc)
 
 const result = await workflows.listWorkflows(undefined, {
   location: { directory: "/workspace/project" },
@@ -187,7 +201,8 @@ All methods are location-scoped. The plugin rejects runs that belong to another 
 ## Execution and recovery
 
 - MVP execution is sequential: one node session at a time.
-- One active workflow per canonical project tree.
+- One active workflow per canonical project tree. Separate canonical trees can run concurrently.
+- The TUI page and Desktop run picker list runs from every project and worktree on the connected server.
 - Each node runs in a fresh native child session of a stable workflow-run session.
 - Run and step records are stored in OpenCode plugin storage, keyed by project.
 - Completed nodes are never rerun merely because the server restarted.
@@ -209,7 +224,22 @@ Storage has no transactions or compare-and-swap. The plugin uses a host-local pr
 - The plugin adds no Git side effects: no branches, commits, pushes, pull requests, worktrees, or release process.
 - Agents may use Git under their own native permissions and project policy.
 - Background `subagent` and `shell` calls are rejected inside workflow sessions by default because they would outlive the sequential node. Set the plugin option `allowBackgroundWork: true` to opt out.
+- Workflow nodes cannot modify protected configuration paths: `.opencode`, `opencode.json`, `opencode.jsonc`, `AGENTS.md`, `.git`, and `.github`. File edits are blocked directly; destructive shell commands are blocked by a command-text guard. Reads remain allowed.
+- Add project-specific protected paths with the plugin option `protectedPaths: ["infra", ".env"]`. The shell guard is heuristic; native permissions remain the security boundary.
 - Workflow file writes are restricted to `.opencode/workflows`, reject symlinks/path traversal, use atomic replacement, and require the current content hash.
+
+## TUI and Desktop GUI
+
+The package ships optional UI parts beside the server part:
+
+- `./tui` adds a full-screen `Workflow` page, a `Workflow graph` session panel, a `/workflow` command, active-node highlighting, and keyboard controls. See [`docs/tui.md`](docs/tui.md).
+- The TUI page needs no session open. It lists every run visible on the connected server, including runs in other projects and worktrees.
+- `/workflow` accepts arguments: `graph`/`visuals` to view, `runs` to pick a run, `list` to list workflows, `run <id> <objective...>` to start a run, and `<id> <objective...>` as shorthand.
+- `./gui-experimental` adds an experimental OpenCode Desktop panel that renders the Mermaid graph, highlights the active node, and opens node sessions on click. Use the `Workflow` command to pick a run from any project or worktree; each run opens in its own session tab with its own graph. See [`docs/gui.md`](docs/gui.md).
+
+The TUI renders a structured terminal graph rather than Mermaid. The Desktop GUI renders Mermaid. Neither requires a separate server or web app.
+
+`getRunGraph` is the shared read model for both surfaces. It returns node states, node session IDs, edges, the Mermaid source, Mermaid node IDs, and the active node.
 
 ## Mermaid
 
@@ -262,6 +292,7 @@ Releases are tag-driven GitHub Actions using npm Trusted Publishing (OIDC): type
 - Cost and token usage are provider-reported estimates, not enforced spending caps.
 - Subagent-only native agents are not supported directly.
 - Interactive question forms are outside the MVP; a waiting question may look like a running node until timeout.
+- There is no browser/web UI part. The graphical surfaces are the TUI panel and the experimental Desktop GUI panel.
 
 ## License
 

@@ -4,16 +4,74 @@
 
 Use it to run tests after edits, lint changed files, block risky commands before they run, or trigger local automation without another LLM step.
 
+## Runtime compatibility
+
+This package ships a single default export with two entrypoints: `server()` for OpenCode v1 and `setup()` for OpenCode v2. Each runtime calls the entrypoint it understands and ignores the other key.
+
+| | OpenCode v1 | OpenCode v2 |
+|---|---|---|
+| Supported versions | `>=1.18.29 <2` | 2.0.x (verified against 2.0.18) |
+| Plugin config key | `plugin` | `plugins` (legacy `plugin` also accepted) |
+| Entrypoint | `server()` | `setup()` |
+| Failure notification | `client.tui.showToast` | same-package `./tui` entry via the `hookFailed` RPC event, with a server-log fallback |
+
+OpenCode documents v1 object entrypoints as supported from 1.18.29. A 1.16.0 build was observed to load this package during testing, but it is outside the declared range and the behavior of the object entrypoint on older v1 releases is not verified.
+
 ## Install
+
+### OpenCode v1
 
 Register it in your `opencode.json`:
 
 ```json
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugin": ["opencode-yaml-hooks"]
+  "plugin": ["@expnn/opencode-yaml-hooks"]
 }
 ```
+
+### OpenCode v2
+
+Register it in your `opencode.json(c)`:
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugins": ["@expnn/opencode-yaml-hooks"]
+}
+```
+
+v2 accepts both the legacy `plugin` key and the new `plugins` key. When the package is configured, the CLI also loads its TUI companion entry automatically (the package exposes `./tui`), so no `cli.json` entry is needed.
+
+### Local directory installs
+
+You can run the plugin from a local directory instead of the npm package.
+
+v1 auto-discovers local plugin files in `.opencode/plugin/` (the v1 loader also scans `.opencode/plugins/`). Place the built server entry there, for example:
+
+```
+.opencode/plugin/opencode-yaml-hooks.js   # built from index.js
+```
+
+v2 discovers local plugins under `.opencode/plugins/` (plural) and `.opencode/plugin/` (singular), and also loads a plugin directory referenced by path in `opencode.json(c)`. Relative paths, absolute paths, `file://` URLs, and the `{ "package": ... }` object form are all accepted:
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugins": ["/path/to/opencode-yaml-hooks"]
+}
+```
+
+A plugin directory must expose its entries as files at the **directory root**: opencode v2 resolves a directory plugin by looking for a root-level code file (`index.*` is preferred) and does not read `main`/`exports` from the directory's `package.json`, so a package layout that keeps its bundles only in `dist/` is skipped silently:
+
+```
+opencode-yaml-hooks/
+├── index.js   # server entry: v1 server() + v2 setup()
+├── tui.js     # v2 TUI companion entry (toast bridge)
+└── rpc.js     # plugin RPC entry
+```
+
+`bun run build` writes these three files to the package root and leaves type declarations in `dist/`, so this repository can be referenced by path directly. To vendor the plugin into a project instead, copy `index.js` and `tui.js` from the package root into `.opencode/plugins/opencode-yaml-hooks/`. In v2, do not place the server file in both `.opencode/plugin/` and `.opencode/plugins/`; duplicate loads are de-duplicated, but do not rely on it.
 
 ## Quick start
 
@@ -110,7 +168,7 @@ Validation rules enforced by the runtime:
 |---|---|
 | `session.created` | When OpenCode creates a session |
 | `session.deleted` | When OpenCode deletes a session |
-| `session.idle` | When a session becomes idle |
+| `session.idle` | When a work turn ends: v1 emits `session.idle`; v2 emits `session.execution.succeeded`, `session.execution.failed`, or `session.execution.interrupted` (interrupts caused by shutdown are excluded) |
 | `file.changed` | After a supported mutation tool reports file changes |
 
 ### Tool events
@@ -139,7 +197,7 @@ Use `file.changed` when your automation depends on changed files.
 
 Why it is preferred:
 
-- it only fires for supported mutation tools: `write`, `edit`, `multiedit`, `patch`, and `apply_patch`
+- it only fires for supported mutation tools: `write`, `edit`, `patch`, and `apply_patch` (`multiedit` is kept as a historical alias for existing `hooks.yaml` files, but neither v1 nor v2 currently emits that tool name)
 - it includes `files` and structured `changes` metadata
 - it avoids catch-all after-hook ambiguity
 - it is the recommended path for linting, formatting, indexing, and atomic commit workflows
@@ -273,7 +331,7 @@ Example `file.changed` payload:
 Only `tool.before.*` and `tool.before.<name>` hooks can block execution.
 
 - a bash action that exits with `2` blocks the tool
-- `action: stop` escalates a blocking pre-tool hook into a best-effort `session.abort(...)` for the active session
+- `action: stop` escalates a blocking pre-tool hook into a best-effort session abort for the active session (v1 `session.abort`, v2 `session.interrupt`)
 - `tool.after.*`, `tool.after.<name>`, `file.changed`, and session hooks do not block execution
 - non-blocking failures are logged and later actions continue
 
@@ -295,6 +353,33 @@ hooks:
               ;;
           esac
 ```
+
+## Failure visibility
+
+A bash action that fails or times out produces one notification (no aggregation or rate limiting):
+
+| Runtime | Notification |
+|---|---|
+| OpenCode v1 | `client.tui.showToast` (warning on timeout, error otherwise) |
+| OpenCode v2 with TUI | the same-package `./tui` entry receives the `hookFailed` RPC event and shows a toast |
+| OpenCode v2 headless / web | server log only; no toast surface is available |
+
+In v2 the server plugin always writes the failure to the server log as a fallback and additionally emits the `hookFailed` RPC event. The TUI entry is loaded automatically when the package is configured in `opencode.json(c)`; no `cli.json` entry is required. Headless runs (`opencode run`) and the web UI do not show toasts.
+
+Blocking failures are independent of toasts: a `tool.before.*` hook that exits with code `2` returns the error to the session as a tool error.
+
+## Logs
+
+### v2 server logs
+
+v2 server plugins have no `app.log` equivalent, so plugin logs go to the OpenCode server log:
+
+- default install: `~/.local/share/opencode/log/opencode.log` (entries carry `role=server`)
+- isolated/XDG installs: `$XDG_DATA_HOME/opencode/log/opencode.log`
+
+### v1 logs
+
+v1 plugin logs go through `client.app.log` and appear in the same OpenCode log locations.
 
 ## Execution behavior on this branch
 
@@ -346,7 +431,36 @@ This package does **not** currently try to:
 ## Development
 
 ```bash
-npm install
-npm run build
-npm test
+bun install
+bun run typecheck
+bun run test
+bun run build
 ```
+
+`bun run build` writes the bundles to the package root (`index.js`, `tui.js`, `rpc.js`) and the type declarations to `dist/`; both are git-ignored, and both are rebuilt by the publish workflow before packing.
+
+## Releasing
+
+Releases are published by pushing a `v*` tag. The tag push runs [`.github/workflows/publish.yml`](.github/workflows/publish.yml), which verifies that the tag names the checked-out commit and matches `package.json`, reruns the checks, and publishes with [npm trusted publishing](https://docs.npmjs.com/trusted-publishers) (OIDC, automatic provenance). No `NPM_TOKEN` secret is involved, and a token must not be configured: a `.npmrc` token makes npm skip the OIDC exchange.
+
+One-time setup on npmjs.com — **Packages → `@expnn/opencode-yaml-hooks` → Settings → Trusted publishing → GitHub Actions**:
+
+- organization or user: `expnn`
+- repository: `opencode-yaml-hooks`
+- workflow filename: `publish.yml`
+- allowed actions: direct `npm publish` (configurations created after 2026-09-03 default to `npm stage publish` only, so a plain `npm publish` fails until this is enabled)
+
+A new trusted-publisher configuration must complete its first publish within two days or it expires and has to be recreated.
+
+To cut a release:
+
+1. set `version` in `package.json` and in both places in `package-lock.json` (the root field and `packages[""].version`)
+2. commit it, then tag that commit and push the tag:
+
+   ```bash
+   jj describe -m "Bump version to 2.1.1"   # @ is now the release commit
+   jj tag set v2.1.1 -r @
+   jj git push --tag v2.1.1
+   ```
+
+The workflow then checks that the ref is `refs/tags/v*`, that `HEAD` is exactly that tag, and that the tag equals the package version; runs `bun install --frozen-lockfile`, `bun run typecheck`, `bun run test`, and `bun run build`; inspects the packed tarball with `npm pack --dry-run`; and publishes over OIDC. To re-run an existing tag, dispatch the workflow against the tag itself: `gh workflow run publish.yml --ref v2.1.1`.

@@ -22,9 +22,12 @@
 | 远程指令 | `/new /stop /status /sessions /history /model /agent /rename /watch /mirror /progress /queue /send` |
 | 富媒体 | 收图（原生附件给 AI 看图）；**收语音**（QQ 内置 ASR 免费转文字进 prompt）；**发图/发文件**（AI 回复含 `QQ_SEND_FILE: <路径>` 标记或 `/send <路径>` 指令，20MB 上限） |
 | 引用上下文 | 长按引用某条消息提问，AI 能感知被引用的内容（我方回复也会入索引缓存） |
-| 长任务不丢 | 前台 30min 超时 → 后台等待（SSE + 轮询，最长 24h）；停滞 30min 主动提醒"可能桌面端在等弹窗" |
-| 自恢复 | 开机竞态退避、端口漂移自动发现与热换基、巡检告警（QQ 主动消息）、看门狗进程守护、网关重投去重 + QQ msgId 跨进程/重启认领 |
-| 安全 | fail-closed 名单准入（名单外一律拒绝）、下载域白名单、日志密钥打码、推送内容脱敏 |
+| 长任务不丢 | 前台 30min 超时 → 后台等待（SSE + 轮询，最长 24h）；停滞 30min 主动提醒（带「已停滞/状态不明/已终结未回传」状态位 + 最近工具动作 + 无进展时长） |
+| 投递幂等 | 双层去重：同 msgId 跨进程原子占位 + 同内容在途指纹（窗口=并发在途；已完成消息的重发按重发处理）；同文长回复 24h 出站去重；「已收到」受理回执默认关（`QQ_ACK_RECEIPT=1` 调试召回） |
+| 重启恢复 | 网关 session/seq 落盘，重启优先 RESUME（服务端只补断线窗口，不重放 backlog）；在途台账启动对账——已答补投、在跑重挂、排队挂失只通知永不误派 |
+| 渲染保真 | 出站有序列表 `1.` 自动转 `1、`（QQ 渲染器对 `N.` 型会跨段续编，实测 `N、`/`一、` 完全保真），代码块内不动、幂等 |
+| 自恢复 | 开机竞态退避、端口漂移自动发现与热换基、巡检告警（QQ 主动消息）、看门狗进程守护、单实例锁心跳 + 60s 周期自检（锁被他人接管/锁文件消失 → 自杀退出，杜绝多实例暗跑） |
+| 安全 | fail-closed 名单准入（名单外一律拒绝）、下载域白名单、日志密钥打码、推送内容脱敏、危险命令审批由 opencode 权限表驱动（QQ 端四键直达） |
 
 ## 快速开始
 
@@ -63,7 +66,6 @@ ALLOWED_USERS=你的QQ openid   # fail-closed：必填，非名单用户一律�
 OPENCODE_BASE_URL=http://127.0.0.1:<端口>/api   # opencode 桌面服务地址（2.1.x 端口动态；失联时 bot 启动会自动发现）
 OPENCODE_PASSWORD=opencode 服务密码（桌面端服务配置的 Basic auth 密码）
 QQ_SANDBOX=false
-MAX_REPLY_LENGTH=3000
 ```
 
 ### 启动
@@ -156,6 +158,8 @@ launchctl load ~/Library/LaunchAgents/net.opencode-qqbot.plist
 | `QQ_SESSION_IDLE_HOURS` | 6 | 闲置会话回收阈值 |
 | `QQ_INTERACTION_WATCH_SECONDS` | 12 | 常驻交互监听轮询间隔（0=关闭） |
 | `QQ_REDISPATCH_MAX_AGE_MS` | 7200000 | 启动对账时丢失消息的自动重派窗口（0=关闭自动重派只通知；受台账 24h 清账线封顶） |
+| `QQ_ACK_RECEIPT` | 关 | 受理即回执气泡「已收到，正在处理」（调试期设 `true`/`on`/`1` 开启） |
+| `QQ_GATEWAY_STATE_MAX_HOURS` | 6 | 网关会话持久化恢复窗口（超龄 / RESUME 被拒自动回退 IDENTIFY） |
 | `QQ_EVENT_PROBE` | 关 | 插件侧事件探针（`true` 时全量事件类型落 `~/.openqq/opencode-events.jsonl`，诊断用） |
 | `OPENCODE_TURN_TIMEOUT_MINUTES` | 30 | 前台回合时限（超时转后台等待） |
 | `QQ_DIGEST_ANSWER_MAX_CHARS` | 0（全文） | 摘要卡答案截断上限 |
@@ -169,14 +173,14 @@ launchctl load ~/Library/LaunchAgents/net.opencode-qqbot.plist
 ```
 src/qq/        QQ 传输层（WS 网关 / REST API / 发送器 / 媒体）
 src/opencode/  opencode V2 客户端（REST + SSE 事件流 / 会话 / 历史渲染）
-src/core/      业务域（审批/卡片/表单桥/投递/镜像/巡检/端口发现/限额/上下文缓存/发文件）
+src/core/      业务域（审批/卡片/表单桥/投递/镜像/巡检/端口发现/限额/上下文缓存/发文件，及投递幂等 inbound-dedupe、网关持久化 gateway-state、在途台账 inflight-journal、单实例锁 instance-lock）
 src/bridge.ts  编排门面 + 命令系统 commands.ts + 入口 index.ts
 ```
 
 ## 测试
 
 ```bash
-npm run verify        # tsc + 23 个单元套件
+npm run verify        # tsc + 28 个单元套件（受理幂等/网关持久化/回合归属/渲染适配/台账恢复等）
 npm run test:e2e      # 五套 e2e（需 opencode 服务在跑）
 ```
 
@@ -186,7 +190,8 @@ npm run test:e2e      # 五套 e2e（需 opencode 服务在跑）
 |---|---|
 | QQ 无响应 | 日志 `%TEMP%\opencode\openqqNN.log`；看门狗 `%TEMP%\opencode\watchdog.log` |
 | ECONNREFUSED | 桌面服务端口漂移——重启 bot 会自动发现新端口（`~/.openqq/last-discovered.json` 留痕） |
-| 桌面弹窗卡住任务 | 后台停滞 30 分钟会主动提醒；`/stop` 可终止 |
+| 桌面弹窗卡住任务 | 后台等待会发带任务的停滞通告（含最近动作与无进展时长）；`/stop` 可终止 |
+| 日志见「已有实例待命」 | 单实例锁生效中——另一实例持锁（60s 自检会在锁异动时收敛双活，正常无需处理） |
 
 ## License
 

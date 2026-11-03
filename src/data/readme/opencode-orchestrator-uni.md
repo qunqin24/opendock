@@ -12,10 +12,10 @@ ships the **orchestrator agent kit**:
 - `fix-runner` — the only writing subagent (applies the "to close" list);
 - the kit's process documents, exposed as the **`audit-kit` reference**
   (`call-mechanics.md`, `process-ready-loop.md`, `root-runbook.md`,
-  `instruction-other-session.md`, `context-efficiency.md`);
-- four deterministic, read-only tools — `orch_uni_validate_report`, `orch_uni_context_lint`,
-  `orch_uni_snapshot`, `orch_uni_sessions` (see [Tools](#tools));
-- two slash commands — `/agents-md` and `/spec` (see [Commands](#commands)).
+  `instruction-other-session.md`, `context-efficiency.md`, `session-discipline.md`);
+- five deterministic, read-only tools — `orch_uni_validate_report`, `orch_uni_context_lint`,
+  `orch_uni_snapshot`, `orch_uni_sessions`, `orch_uni_session_stats` (see [Tools](#tools));
+- three slash commands — `/agents-md`, `/spec` and `/handoff` (see [Commands](#commands)).
 
 Read-only audit agents are enforced by `edit: deny` plus the prompt ban; their shell
 permission stays allowed so they can run verification commands (an accepted risk, no
@@ -55,8 +55,8 @@ directory (see [Locale](#locale)). OpenCode lists it in session context as an
 additional local directory, so the orchestrator (and any other agent) can read
 the process documents directly, for example `<reference path>/call-mechanics.md`.
 
-The plugin also registers four deterministic, **read-only** tools in the `orch_uni`
-namespace and two slash commands — see [Tools](#tools) and [Commands](#commands).
+The plugin also registers five deterministic, **read-only** tools in the `orch_uni`
+namespace and three slash commands — see [Tools](#tools) and [Commands](#commands).
 
 ## Commands
 
@@ -64,6 +64,7 @@ namespace and two slash commands — see [Tools](#tools) and [Commands](#command
 | --- | --- |
 | `/agents-md` | Injects the AGENTS.md audit/draft workflow: `context-efficiency.md` template, `orch_uni_context_lint`, `context-lint`, approval before writing. |
 | `/spec` | Injects the SPEC.md workflow: brief, clarifying questions, EARS/AC/traceability, `orch_uni_context_lint`, `context-lint`, approval before writing. |
+| `/handoff` | Injects the slice-closing workflow: session and working-tree facts, the `session-discipline.md` handoff template, writes `docs/planning/handoff-<YYYY-MM-DD>.md`. |
 
 A command is a prompt, not a writer: its handler injects a workflow prompt into the
 current session. The orchestrator then follows the usual evidence and approval rules.
@@ -76,10 +77,11 @@ current session. The orchestrator then follows the usual evidence and approval r
 | `orch_uni_context_lint`     | yes       | Deterministic audit of AGENTS.md/SPEC.md: budget, vague phrases, links, sections |
 | `orch_uni_snapshot`         | yes       | Deterministic revision of a directory tree (per-file sha256 + aggregate hash)  |
 | `orch_uni_sessions`         | yes       | Child sessions of a session: agent, model, cost, tokens, time                  |
+| `orch_uni_session_stats`    | yes       | Session protocol counters: prompt, compactions, tools/turn, capped outputs      |
 
 Every tool answers with a JSON text body. Failures are **typed codes** inside the body
 (`E_INPUT`, `E_NO_JSON`, …) instead of thrown tool errors, so an agent can branch on the
-code without parsing prose. None of the four writes to the workspace, the session store
+code without parsing prose. None of the five writes to the workspace, the session store
 or the configuration.
 
 ### `orch_uni_validate_report`
@@ -261,6 +263,134 @@ picks up fixture trees such as `eval/`; pass an explicit path for the canonical 
 `E_INPUT` for malformed arguments, `E_NOT_FOUND` when the parent session does not exist,
 `E_ABORTED` when the session is stopped.
 
+### `orch_uni_session_stats`
+
+```jsonc
+{}                                  // counters of the calling session
+{ "sessionID": "ses_…" }            // any session on this server, not only a child
+```
+
+```jsonc
+{ "ok": true, "sessionID": "ses_…",
+  "counters": {
+    "requests": 12, "promptTokensLast": 151204, "promptTokensMax": 161002,
+    "promptTokensMedian": 148900, "band": 1, "compactions": 1,
+    "compactionAttempts": 1, "compactionFailures": 0, "compactionSource": "event",
+    "reminders": 2, "toolCalls": 31, "outputsCapped": 1,
+    "outputCharsSaved": 18422, "errors": 0,
+    "toolCallsByTool": { "shell": 18, "bash": 6, "webfetch": 2, "read": 5 },
+    "toolOutputsCappedByTool": { "shell": 1, "bash": 0, "webfetch": 0, "read": 0 }
+  },
+  "limits": { "promptTokensSoft": 150000, "maxCompactions": 1, "maxToolOutputChars": 20000 },
+  "overBudget": true, "compactionLimitReached": true, "toolsPerTurn": 2.58,
+  "tracked": true,
+  "guard": { "available": true, "hooksRegistered": true, "sessionEnabled": true,
+             "toolOutputEnabled": true,
+             "toolOutputTools": ["shell", "bash", "webfetch"],
+             "compactionSource": "event", "eventLive": true,
+             "streamFailures": 0, "unkeyedCalls": 0 } }
+```
+
+`sessionID` may name **any session on this server**, not only a child of the caller;
+that is deliberate — the orchestrator uses the report to control every slice it runs.
+Counters are per plugin instance, and `tracked` is `true` once any event or hook
+observed the session; a `session.deleted` event forgets it. `band` is the highest
+budget level reached (`0` below the soft threshold); `promptTokensMedian` is the
+median over the last 256 requests; `toolCalls` and the per-tool counters include
+nested Code Mode calls; `toolCallsByTool` and `toolOutputsCappedByTool` split calls
+and capped outputs by the normalized tool name (namespace stripped, lower-case);
+`outputCharsSaved` is a character count, not bytes, and an upper estimate (the
+injected stub is subtracted). `compactions` counts confirmed
+`session.compaction.ended` events only; `compactionAttempts` counts every
+`session.compaction` hook call, so on a host with a dead or absent event stream
+attempts keep growing while `compactions` and `compactionLimitReached` stay put (a
+failed attempt is never a stop signal). A dead stream is reported once in
+`guard.streamFailures`; the per-session `errors` counts hook failures only, so a
+transport incident is not attributed to every session. Duplicate compaction events
+are counted once only when the host supplies `event.id` or a durable position;
+without either identity a re-delivered event may be counted again (fail-open in the
+direction of counting). A
+session the store does not return and this instance never observed is
+`E_NOT_FOUND` (recognized by the typed `_tag`/`name`/`code` — `Session.NotFoundError`,
+`SessionNotFoundError`, `NotFoundError`, `ENOENT` — with a narrow message fallback);
+`session.get` returning `undefined` for an untracked session is the same not-found
+answer; a transient `session.get` failure (a lock, permission, `unknown database`) is
+`E_INTERNAL`; a known session with zero requests is a valid report with
+`tracked: false`. Without `session.get`,
+an untracked session is `E_NO_API`, a tracked one is `ok` with `session: null` and a
+`limitations` entry. Codes: `E_INPUT`, `E_NOT_FOUND`, `E_INTERNAL`, `E_NO_API`,
+`E_UNAVAILABLE` (the guard is not registered or its hooks failed), `E_ABORTED`.
+
+## Session hygiene
+
+The plugin implements the [`session-discipline.md`](./docs/en/session-discipline.md)
+protocol: a session is one slice, the prompt budget is ≤150k tokens, at most one
+compaction, tool output goes to a file, and a slice ends with a handoff.
+
+The runtime part is three hooks (`session.context`, `session.compaction`,
+`tool.execute.after`) plus a compaction-event subscription:
+
+- `session.context` — estimates the prompt (system + messages) and, when it crosses
+  a budget level, adds one short reminder. The reminder is injected **once, when a
+  new level is crossed**, not on every request; within a level the text is stable,
+  so the prefix cache is not broken.
+- compaction events — the `session.compaction` hook is registered on **every** host:
+  it counts attempts (`compactionAttempts`) and sends a tentative note to the
+  nearest request; the note names no compaction number and claims no limit. Only
+  `session.compaction.ended` confirms a compaction (deduplicated by `event.id` or
+  the durable position) and raises a confirmed note with the number and the limit;
+  `session.compaction.failed` increments `compactionFailures`, drops the tentative
+  note and keeps a confirmed note that is still waiting for delivery. If the event
+  stream ends or throws, `guard.eventLive` turns `false`,
+  `guard.compactionSource` becomes `hook` and `guard.streamFailures` becomes `1`
+  (the per-session `errors` stays `0`); the hook keeps counting attempts, but no
+  confirmed compaction and no false "limit reached" is invented on that path.
+- `tool.execute.after` — for `shell`, `bash`, `webfetch` it caps output over
+  `maxChars`: the full text goes to a private per-process root
+  `os.tmpdir()/opencode-tool-output-<random>/` (POSIX 0700 for the root and the
+  session directory, 0600 for the file). Windows ignores mode (measured: 0666),
+  so privacy there rests on the ACL of `os.tmpdir()` and is not checked by code.
+  The model gets a head and the path; the root is created with `mkdtemp` at plugin
+  setup, so a
+  pre-created `opencode-tool-output` directory or junction is never used; on POSIX
+  the root must belong to the current uid with no group/other access, otherwise
+  the guard disables itself with a warning (fail-open: results are untouched).
+  Session directories (`s-<uuid>`) and files (`c-<uuid>.txt`, written with `wx`)
+  are random, and each `realpath` is proven inside the root. The root is removed
+  when the plugin unloads (best effort). A lone surrogate is normalized once
+  (U+FFFD), so the file, the head and the counters describe the same string.
+  Residual risk accepted: a same-user
+  attacker can still swap a session directory between `realpath` and `writeFile`
+  (Node has no `openat`). If `TMPDIR` points inside the workspace, the files land
+  there instead. `read`, `write`, `edit`, `execute` and the kit's own tools are
+  not capped, and a kit tool named without its namespace (`session_stats`) is
+  refused in the config with a warning.
+
+`maxCompactions: 0` disables the compaction limit. The guard is fail-open: a hook
+error neither breaks the request nor corrupts the result. Either part can be
+disabled with its `enabled` flag:
+
+```jsonc
+{
+  "plugins": [
+    {
+      "package": "opencode-orchestrator-uni",
+      "options": {
+        "sessionGuard": { "enabled": true, "promptTokensSoft": 150000, "maxCompactions": 1 },
+        "toolOutputGuard": {
+          "enabled": true,
+          "maxChars": 20000,
+          "headChars": 4000,
+          "tools": ["shell", "bash", "webfetch"]
+        }
+      }
+    }
+  ]
+}
+```
+
+Slice metrics — `orch_uni_session_stats`; closing a slice — the `/handoff` command.
+
 ## Models
 
 Agent definitions carry no `model`; models are configured on the plugin entry in
@@ -408,7 +538,7 @@ npm run lint:fix     # biome check --write . (applies safe fixes)
 
 The `check:locales` and `verify:kit` scripts need a git checkout of the kit — the npm package ships no `tools/` directory, so in an installed package they are unavailable (`stand: unavailable` plus your own reproducible checks).
 
-`npm test` scans only `./test/` — the shipped suite (289 tests in 9 files, up from
+`npm test` scans only `./test/` — the shipped suite (400 tests in 10 files, up from
 72 in 5 before the identifier guards). A bare `bun test` from the repository root is red by
 design: the positional argument of `bun test` is a path substring filter, so the
 bare command also picks up the intentionally failing fixtures under `eval/cases/`

@@ -223,6 +223,13 @@ Summary:
   unreachable to group/other regardless of umask — v1.4.0 private-dir law) —
   role homes, transcripts, pidfiles, CHECKSUMS.
 - Voter/worker turns run with `bash`, `edit`, and `write` disabled per prompt.
+- Supply-chain seating (v1.6.0): actions SHA-pinned, CI installs with
+  `--ignore-scripts`, weekly scheduled `npm audit` witnessed server-side by the
+  pre-publish liveness gate (fresh green run bound to the released commit).
+  Honest status ledger of every vector, open or closed: [OPEN-VECTORS.md](OPEN-VECTORS.md).
+- Engine sessions this product spawns are retained under bounded ages
+  (`npm run reap`, dry-run by default; audit conveners >= 90 days per owner
+  ruling, reconciliation face preserved in the sealed manifest).
 
 ## Architecture (`src/`)
 
@@ -282,7 +289,8 @@ PLAN→MINT→DISPATCH→AGGREGATE pipeline over ordinary child sessions.
 
 ```bash
 npm run typecheck   # tsc --noEmit, strict + noUncheckedIndexedAccess + exactOptionalPropertyTypes
-npm test            # full unit suite, fully offline (no network, no LLM; 480 at v1.5.0 — the run prints the exact count)
+npm test            # full unit suite, fully offline (no network, no LLM; 497 at v1.6.0 — the run prints the exact count)
+npm run reap        # session-retention reaper: dry-run manifest by default; -- --apply deletes via the engine API
 npm run coverage    # offline suite + coverage floor ratchet (lines 55 / branches 80 / funcs 90 — floors only move up; CI door)
 npm run build       # esbuild bundle → dist/index.js + dist/cli.js (ESM)
 node smoke/run-smoke.mjs   # offline smoke of the shipped surface (see smoke/README.md)

@@ -10,6 +10,9 @@ you can see exactly how much you have left and when the window resets.
 It reads your subscription quota **natively** without an external quota
 plugin, then adds the enforcement layer: a hard stop plus a live sidebar bar.
 
+**Works on OpenCode 2.x and 1.x.** Since 0.19.0 one package serves both major
+versions, and `install` detects which one you run. See [OpenCode 2.x](#opencode-2x).
+
 ## Why you might want this
 
 Quota runs out at the worst possible time. Two common situations this is built for:
@@ -83,6 +86,32 @@ token of its own. Answering either way is remembered in
 again. To never see it: pass `--no-star`, or set `OPENCODE_QUOTA_NO_STAR=1`
 (`CI` is honored too). Without `gh` installed or authenticated it just prints
 the URL.
+
+## OpenCode 2.x
+
+Since 0.19.0 the plugin runs natively on OpenCode 2.x (tested on 2.2.5), and the
+same package still serves 1.x (1.18.29 or newer). OpenCode 2 does not run 1.x
+plugins and reads a different config key. The easiest path is
+`npx opencode-hard-limit install`, which picks the right key. To do it by hand
+on 2.x, add the package to `plugins` (not `plugin`) in
+`~/.config/opencode/opencode.json(c)`:
+
+```jsonc
+{
+  "plugins": ["opencode-hard-limit"]
+}
+```
+
+That single entry loads both parts: the hard stop (a gate on the `context`,
+`compaction` and `generate` model requests) and the sidebar (exported as
+`opencode-hard-limit/tui`). Do not also list the sidebar in `cli.json`, and
+remove any old `quota-sidebar.tsx` entry there, or it shows twice. For a local
+checkout, use the absolute path of the repo directory instead of the package
+name. Config changes apply without a restart. `opencode-hard-limit install`
+does this for you: it detects the OpenCode version, writes `plugins` on 2.x and
+`plugin` on 1.x, and on 2.x also removes the old 1.x sidebar copy and its
+`tui.json`/`cli.json` entries. It writes `opencode.json`; if you keep your
+config in `opencode.jsonc`, add the entry there by hand instead.
 
 ## What's new in 0.18.0
 

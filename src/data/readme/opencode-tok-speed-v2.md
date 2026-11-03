@@ -44,6 +44,28 @@ git clone https://github.com/lcssos/opencode-tok-speed-v2 \
 opencode plugin list
 ```
 
+## 开发与构建
+
+入口 `tui.tsx` 是源码，**发布入口是预编译的 `tui.js`**。改完源码必须重新构建并提交产物：
+
+```bash
+npm install
+npm run build     # tui.tsx → tui.js
+```
+
+`tui.js` 要一起提交，`publish.yml` 与 `release.sh` 都会校验两者同步，落后就中止发布。
+
+### 为什么必须预编译
+
+OpenCode 的 solid JSX 转译插件只处理 `node_modules` 之外的文件（`bun-plugin-solid` 的 onLoad filter 显式排除了 `node_modules`）。插件从 npm 装进来时入口就位于 `node_modules/opencode-tok-speed-v2/` 内，如果 `exports["./tui"]` 直接指向 `.tsx`，JSX 不会被转译，运行时会去解析 `@opentui/solid/jsx-dev-runtime` 并失败：
+
+```
+Cannot find package '@opentui/solid' imported from
+  ~/.cache/opencode/npm/opencode-tok-speed-v2@latest/.../opencode-tok-speed-v2/tui.tsx
+```
+
+这个报错看起来像「少了 peer 依赖」，实际是「入口没被转译」。把 `.tsx` 编译成 `.js`（与宿主同样的 `babel-preset-solid` + `generate: "universal"`）后即可正常加载。
+
 ## 为什么不用内置的 `session.tps`
 
 `cli.json` 里的 `session.tps: true` 只在**助手消息底部**显示这一轮的平均速率，不进状态栏。
@@ -91,7 +113,7 @@ opencode plugin list
 
 ## 配置
 
-都在 `tui.tsx` 顶部：
+都在 `tui.tsx` 顶部（改完记得 `npm run build`）：
 
 | 常量 | 默认 | 说明 |
 | --- | --- | --- |
@@ -127,15 +149,16 @@ npm run release 1.2.3    # 指定版本号
 
 推送 tag 后由 GitHub Actions（`.github/workflows/publish.yml`）自动发布到 npm。
 
-发布前会做三道检查，任何一道不满足都会直接退出：
+发布前会做四道检查，任何一道不满足都会直接退出：
 
 | 检查 | 说明 |
 | --- | --- |
 | 工作区干净 | 有未提交改动就拒绝，避免把无关改动混进发布提交 |
 | 当前在 `main` | 其他分支拒绝 |
+| `tui.js` 与 `tui.tsx` 同步 | 落后会重新构建并把差异报出来，提示先提交 |
 | 版本号格式 | 只接受 `patch` / `minor` / `major` 或 `X.Y.Z` |
 
-CI 侧还会校验 tag 与 `package.json` 版本一致、npm 上该版本是否已存在、`tui.tsx` 能否被 esbuild 打包。
+CI 侧还会校验 tag 与 `package.json` 版本一致、npm 上该版本是否已存在、`tui.js` 与 `tui.tsx` 是否同步、入口有无残留 JSX。
 
 查看发布进度：
 

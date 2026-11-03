@@ -3,12 +3,15 @@
 把 DeepSeek Search / Fetch 接进 OpenCode V2：**内置 `websearch` 工具直接走 DeepSeek**，另带干净的 Markdown
 抓取、本地用量/费用统计、一个**持久化**的后端开关，以及**TUI 与桌面侧边栏**——直接显示状态与数字，一点就切换接管。
 
-切回原生：侧边栏开关、改配置 `mode`、让模型调 `deepseek_mode`、或跑仓库里的 `tools/switch-mode.ps1`。
+切回原生：侧边栏开关、改配置 `mode`，或让模型调 `deepseek_mode`。
 
 与已占用的同名 V1 包的区别：本项目面向 **V2 插件 API**、支持**运行时切换后端**、自带**本地用量与费用估算**。
 
 > 已在 `opencode 2.2.5` + `@opencode/plugin@2.2.5`（Windows）实测。Search/Fetch 的接口事实来自
 > <https://api-docs.deepseek.com/zh-cn/guides/search>。
+
+English: [README.md](https://github.com/QThinkerJR/opencode-deepseek-search/blob/main/README.md)。界面语言支持
+`en` / `ja` / `zh-CN`（默认英文，可用 `options.language` 指定），文档只提供英文与中文两版。
 
 ## 前置条件
 
@@ -78,10 +81,18 @@ opencode service restart   # User 变量只进新进程
 | 选项 | 类型 | 默认 | 说明 |
 |---|---|---|---|
 | `mode` | `"deepseek" \| "native"` | `deepseek` | `websearch` 的缺省后端；被 `deepseek_mode` 的持久化开关覆盖 |
+| `language` | `"en" \| "ja" \| "zh-CN"` | 自动 | 侧边栏、桌面面板、工具输出与错误的显示语言。自动模式依次读 `LC_ALL`、`LANG`，都没有则英文 |
 | `apiKey` | string | `DEEPSEEK_API_KEY` | 通常写 `"{env:DEEPSEEK_API_KEY}"`；环境变量未设置时为 `""` |
 | `count` | 1–50 | `5` | 每次返回条数（不影响单价） |
 | `fetchMaxChars` | 500–200000 | `30000` | `deepseek_fetch` 截断上限，截断处有明示 |
 | `pricePerThousand` | 0–10000 | `5` | 元/千次（整数），仅用于本地费用估算 |
+
+**界面语言。** 插件提供 `en`、`ja`、`zh-CN` 三种界面语言，英文是默认值与兜底。语言由服务端解析一次
+（`options.language` → `LC_ALL`/`LANG` 前缀，`ja*` 为 `ja`、`zh*` 为 `zh-CN` → 英文），同一个值同时决定工具输出与
+两侧边栏，三处不会分叉。填了不认识的值只会打一条警告并按自动模式处理，不会让插件加载失败；改动会随边栏下一次
+读取状态生效（保存配置会让服务端半边原地重跑），重启则一定生效。模型可见的文本在所有语言下保持英文——工具描述、
+`## [title](url)` 结果格式、`Published:` 与空结果提示——以保持内置 `websearch` 的输出形状。文档只有英文与中文两版，
+日文界面不附日文文档。
 
 ## 提供的工具
 
@@ -101,10 +112,9 @@ opencode service restart   # User 变量只进新进程
 
 | 方式 | 操作 | 持久化 | 适用 |
 |---|---|---|---|
-| 侧边栏 | 点 TUI 卡片上的动作（`[停用]` / `[启用]`），或桌面面板的按钮 | 是（插件存储 `mode/v1`） | 正在干活时随手切 |
+| 侧边栏 | 点 TUI 卡片上的动作（中文界面 `[停用]` / `[启用]`，默认英文界面 `[Disable]` / `[Enable]`），或桌面面板的按钮 | 是（插件存储 `mode/v1`） | 正在干活时随手切 |
 | 配置 | 改 `options.mode`，保存即生效 | 是（在配置文件里） | 长期默认值 |
 | 工具 | 让模型调 `deepseek_mode`，或自己调 | 是（插件存储 `mode/v1`） | 临时/在会话里切，不用改文件 |
-| 脚本 | `.\tools\switch-mode.ps1 native` | 是（脚本改配置文件） | 命令行快速切，不用开编辑器 |
 
 `deepseek_mode` 的四个动作：
 
@@ -144,7 +154,7 @@ deepseek_mode 开关（storage: mode/v1）  >  options.mode  >  内置默认
 | 面 | 你会看到 | 怎么切 |
 |---|---|---|
 | TUI | 会话侧边栏末尾追加一块 DeepSeek：状态行 + 今日 / 本月 / 累计（`Search` · `Fetch` · `¥` 估算）；侧边栏变窄时先退化到缩写、再逐个减列，不会折行 | 点标题右端的动作，或用 `/deepseek` 斜杠命令打开菜单 |
-| 桌面 | 会话侧区域的 **DeepSeek** 页签，出现在侧区域的 *New tab* 列表与 `+` 菜单里，也可用命令 `DeepSeek: 打开统计面板` | 面板上的按钮，另有刷新按钮 |
+| 桌面 | 会话侧区域的 **DeepSeek** 页签，出现在侧区域的 *New tab* 列表与 `+` 菜单里，也可用命令打开面板（中文界面 `DeepSeek: 打开统计面板`，默认英文界面 `DeepSeek: Open usage panel`） | 面板上的按钮，另有刷新按钮 |
 
 - 两个面读的是同一份账本和同一个持久化开关（与 `deepseek_usage` / `deepseek_mode` 完全一致）：数据只有服务端
   一份真相，经插件自己的 RPC 取用，TUI 与桌面的数字不会分叉。
@@ -217,33 +227,13 @@ npm run smoke         # 真实调用冒烟，无 DEEPSEEK_API_KEY 自动 skip
 npm pack --dry-run    # 发布前产物审计——先跑 build:gui，`pack` 本身不会构建 bundle
 ```
 
-一键切换（仓库内脚本，改的是 `opencode.jsonc` 的 `options.mode`，写前备份 `opencode.jsonc.bak-switch`）：
-
-```powershell
-.\tools\switch-mode.ps1 status
-.\tools\switch-mode.ps1 native
-.\tools\switch-mode.ps1 deepseek
-```
-
-被 ExecutionPolicy 拦住时：
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\switch-mode.ps1 native
-```
-
-加个别名更省事（`$PROFILE`）：
-
-```powershell
-function dsmode { & "D:\repos\opencode-deepseek-search\tools\switch-mode.ps1" @args }
-```
-
 目录结构：
 
 ```
 index.ts              # 目录型插件入口，re-export src/index.ts
 tui.ts                # TUI 入口，re-export src/tui/main.ts
 src/index.ts          # 插件本体：选项、注册、接管 websearch、三个工具
-src/deepseek.ts       # HTTP 核心：超时/取消、单次退避重试、中文错误、结果映射
+src/deepseek.ts       # HTTP 核心：超时/取消、单次退避重试、本地化错误、结果映射
 src/usage.ts          # 纯账本：微元计价、60 天裁剪、防御性解析、格式化
 src/rpc.ts            # 服务端 / TUI / 桌面三端共享的 RPC 契约
 src/status-view.ts    # 纯视图模型：两个侧边栏的文案都从这里派生
@@ -253,7 +243,6 @@ vite.config.ts        # 把 src/gui 构建成根目录的 gui-experimental.cjs
 test/*.test.ts        # 纯函数单测
 scripts/smoke.ts      # 真实 API 冒烟（5 步）
 scripts/check-gui-bundle.ts # bundle 形态检查，CI 里在 build:gui 之后跑
-tools/switch-mode.ps1 # 命令行切换后端
 .github/workflows/    # ci（构建 + typecheck + test + bundle 检查）/ release
 ```
 

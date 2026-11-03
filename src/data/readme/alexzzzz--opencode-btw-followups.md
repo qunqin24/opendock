@@ -45,8 +45,8 @@ plugin, so the path has to come after the removal.
 ```
 
 Run `/btw` on its own to open the window and type the question into the composer. An answer
-appears as it is written, and a long answer holds its first line at the top of the window while
-it is written out, so the beginning never scrolls out of view. A thread that already holds
+appears as it is written, and a long answer holds its question at the top of the window while it
+is written out, so the question never scrolls out of view. A thread that already holds
 answers is reopened as it was left. An answer that arrives while the window is closed is written
 out when the window comes back, and an answer already written out is there whole.
 

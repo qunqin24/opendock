@@ -98,12 +98,14 @@ opencode plugin add @javierkaiser/opencode-indexing
 ```
 
 OpenCode downloads the package into its own cache and records it in the global
-`plugins` array, and it loads both halves of the plugin: the server side
-(`index.ts`, which registers the tools) and the terminal UI (`tui.ts`, which
-adds the prompt-footer indicator and the `/indexing` page). It brings `plugin
-check`, `plugin update` and `plugin remove` with it, but it cannot write
-permission rules — add this one to `opencode.json` to keep the host asking
-before the only tool that writes your settings file:
+`plugins` array, and the host loads the parts the client runs: the server side
+(`index.ts`, which registers the tools), the terminal UI (`tui.ts`, which adds
+the prompt-footer indicator and the `/indexing` page), and — in OpenCode
+Desktop — the GUI part (`dist/gui-experimental.cjs`, which adds the settings
+page, palette commands and composer pill). It brings `plugin check`, `plugin
+update` and `plugin remove` with it, but it cannot write permission rules — add
+this one to `opencode.json` to keep the host asking before the only tool that
+writes your settings file:
 
 ```jsonc
 {
@@ -121,12 +123,25 @@ write them out only if you want to tighten the set.
 `-Local`, `-Package`, `-Spec`, `-SkipDeps`, `-NoRestart` and `-WithCodegraph`.
 
 `--package` deletes any copied plugin it finds: both sources define the same
-plugin id and the config directory is scanned automatically, so leaving both
-would load the plugin twice.
+plugin id (`javierkaiser.indexing`) and the config directory is scanned
+automatically, so leaving both would load the plugin twice.
 
 If no package manager is available, a `--local` install still copies the files
 and the plugin runs with reduced features (line chunker instead of tree-sitter,
 no LanceDB).
+
+### Upgrading from 0.5.x
+
+0.6.0 changes the plugin id from `opencode.indexing` to
+`javierkaiser.indexing`, because OpenCode reserves the `opencode` namespace for
+its own plugins. The host stores this plugin's file manifest under its plugin
+id, so the manifest written by 0.5.x is not visible to 0.6.0. The own index is
+reindexed once: the workspace is rescanned and every indexed file is embedded
+again. No vectors are deleted, and Kilo's index is untouched; with the bundled
+local model no API calls are involved, while a cloud provider bills one full
+embedding run. The TUI command ids (`opencode.indexing.settings`, `.dialogs`,
+`.toggle`, …) keep their old prefix: they are a keybinding contract independent
+of the plugin id, so existing `cli.json` bindings keep working.
 
 ### Manual
 
@@ -170,11 +185,16 @@ OpenCode ──► codegraph_*  ───────► codegraph's graph (its 
 
 ## Settings
 
-Three surfaces write the same file through the server plugin's RPC; a fourth, read-only one reports it.
+The terminal page and its dialog editor write the same file through the server
+plugin's RPC; `/indexing-config set` writes it from the server. The Desktop
+settings page writes it too: provider and model from the catalog, vector store,
+credentials, search limits and the booleans, plus a one-click local setup. The
+`indexing_config` tool reports the configuration without writing it, and refuses
+credentials because a tool call is recorded in the conversation.
 
 ### `/indexing-config` — slash command
 
-Registered as a server command, so the host lists it in every client. Whether typing it *runs* it depends on the client: the terminal TUI and the Desktop app submit the line to the model instead of dispatching the command, so there it does nothing. To read the configuration from those, ask the assistant — it calls `indexing_config`, which returns the same report. The subcommands below apply wherever the command is dispatched.
+Registered as a server command, so the host lists it in every client. Whether typing it *runs* it depends on the client: the terminal TUI and the Desktop app submit the line to the model instead of dispatching the command, so there it does nothing. To read the configuration from those, ask the assistant — it calls `indexing_config`, which returns the same report — or, in Desktop, open the plugin's settings page. The subcommands below apply wherever the command is dispatched.
 
 | Subcommand | Purpose |
 | --- | --- |
@@ -231,35 +251,51 @@ The terminal footer shows whether the current workspace is indexed, in one glyph
 
 *Indexing: start, pause or resume indexing* in the command palette — or `/indexing-config set enabled=false` — controls it. The footer is a status line only: the host's `prompt.footer` slot exposes no interaction surface, so it is not clickable. Pausing leaves `indexing_search` working (it still reads Kilo's index), but `indexing_build`, `indexing_refresh`, `indexing_import` and auto-refresh refuse to write until you resume. The command has a stable id, so a key can be assigned in `cli.json`.
 
-The indicator is terminal-only, and that is a host limitation rather than a missing feature. Every slot that renders status (`prompt.footer`, `sidebar.content`, `session.panel`, …) belongs to a **CLI plugin**, and the Desktop app does not load CLI plugins at all — its palette shows none of this plugin's entries, and it has no status area under the prompt. A server plugin has no UI surface of its own: the SDK's toast lives in the TUI context, and plugins can only subscribe to events, never publish one.
+The footer itself is terminal-only: `prompt.footer` is a TUI slot, and OpenCode
+Desktop has no equivalent status line under its composer. Desktop does not load
+the TUI part; it loads the package's separate `./gui-experimental` part instead.
+That part adds a **settings page** with the full configuration — provider and
+model chosen from the catalog, vector store, Qdrant and LanceDB locations,
+credentials, search limits and the indexing switches — plus a one-click local
+setup, Build and Refresh actions, **palette commands** for those two index
+actions, and a **composer pill** that carries the index state beside the
+composer. They share
+the same server-side state through the plugin's RPC, so the terminal page, the
+Desktop page and the tools share one settings file and one index. The footer and
+the composer pill are two expressions of the same state, not two indexes. The
+GUI export keeps the `-experimental` suffix because the Desktop GUI SDK is still
+experimental and may change between OpenCode releases.
 
-What works in every client instead is the tool layer:
+The tool layer works in every client as well:
 
 - **Status** — every `indexing_search` result ends with a line like `Index: ◐ index stale · own 2.2k pts · /path/to/project`, using the same glyphs as the footer. It costs no extra message and adds no noise: a reader who ignores it sees exactly the output they saw before. It refreshes on every search.
 - **Read** — `indexing_config`.
-- **Change** — `indexing_config_set { key, value }`, validated by the same rules as `/indexing-config set`. Credentials are refused: a tool call is recorded in the conversation, and the settings file never stores keys in plain text.
+- **Change** - `indexing_config_set { key, value }`, validated by the same rules as `/indexing-config set`. Credentials are refused: a tool call is recorded in the conversation. Set them from the TUI or the Desktop page, or through the environment or plugin options.
 
-The index-state vocabulary is shared, so the footer and the chat line can never describe the same state differently.
+The index-state vocabulary is shared, so the footer, the composer pill and the chat line can never describe the same state differently.
 
-### Editing settings
+### Editing settings (terminal)
 
-Settings are edited in a dialog-based flow, reachable three ways:
+The terminal dialog-based flow is reachable three ways:
 
 - Press `e` from the `/indexing` page.
 - The command **Indexing: settings (dialogs)** in the command palette (a manual escape hatch if the page ever fails to render).
 - Automatically: if the host cannot resolve the TUI runtime modules the page
   needs, `/indexing` opens this flow instead of the page.
 
+OpenCode Desktop has a settings page for the same configuration: provider and model from the catalog, vector store, credentials, search limits and the switches, with Build and Refresh actions. Credentials typed there are stored in the settings file; the environment and plugin options keep them out of it.
+
 `indexing_config` (the tool) reports the same configuration as `/indexing-config` and works in every client, because tools run server-side, and `indexing_config_set` changes a value the same way. Together they are the whole configuration surface for clients that do not dispatch slash commands.
 
-Configurable from all three:
+Configurable from all four surfaces (the three above plus the Desktop settings page):
 
 - **Vector store** for the own index: Qdrant or LanceDB.
 - **Qdrant URL + API key** (local or remote) with connection test.
 - **LanceDB directory** with availability test.
-- **Embedding provider/model** (mistral, openai, ollama, openai-compatible, gemini, voyage, openrouter) and **API key**. The model is chosen from a catalog rather than typed blind. The model is chosen from a catalog rather than typed blind.
+- **Embedding provider/model** (local, mistral, openai, ollama, openai-compatible, gemini, voyage, openrouter) and **API key**. The model is chosen from a catalog rather than typed blind.
 - **Import from Kilo** toggle with live source detection ("Qdrant ws-… (31,261 pts) · LanceDB …").
 - **Auto-refresh on search** toggle.
+- **Search limits and file extensions.**
 - Build / refresh / import actions and a status summary.
 
 ### Embedding providers
@@ -410,7 +446,7 @@ registry and can never be imported; `indexing_config` says which is which. If
 your Kilo index uses a different model, set the same provider and model here and
 the import costs nothing.
 
-Settings are stored in `~/.config/opencode/indexing.json` (plugin options → `indexing.json` → environment → defaults). Plugin options in `opencode.json` still work and take precedence. API keys are never written to `indexing.json` in plain text; set them through the environment or plugin options.
+Settings are stored in `~/.config/opencode/indexing.json` (plugin options → `indexing.json` → environment → defaults). Plugin options in `opencode.json` still work and take precedence. API keys set from the TUI or the Desktop page are written to `indexing.json` in plain text; using the environment (`KILO_INDEX_*`) or plugin options keeps them out of that file.
 
 `~/.config/kilo/kilo.jsonc` is still read, and still supplies the embedding provider, model, dimensions and API keys — and it still says where *Kilo* keeps its index. It no longer decides where this plugin's own index is written; that stopped being coupled so that the default could actually take effect for people running Kilo. See [Where each index lives](#where-each-index-lives).
 
@@ -476,6 +512,12 @@ Word about data safety: Kilo's indexes (`ws-*` collections and its LanceDB direc
   The three remain declared as dev dependencies and optional peers, never as
   installable dependencies. Without the host runtime the settings page degrades
   to dialogs and the footer is simply absent.
+- **For the Desktop GUI (settings page, palette commands and composer pill):**
+  nothing to build or install. The package ships `dist/gui-experimental.cjs`, a
+  prebuilt CommonJS bundle; Vite, vite-plugin-solid and SolidJS are build-time
+  toolchain, not installable dependencies, and users never install them.
+  OpenCode Desktop provides the GUI SDK (`@opencode/plugin/gui`) and the Solid
+  runtime that the bundle imports.
 - **For embeddings: nothing to install or run by default.** With no cloud key the
   plugin uses the bundled static model (English-only, ~2 MB, no network). The
   catalog also offers a multilingual static model that is downloaded once

@@ -6,7 +6,7 @@ Multi-provider quota check-in, real-chat keepalive, run history, and quota trend
 
 [![License](https://img.shields.io/badge/License-MIT-3B82F6?style=for-the-badge)](./LICENSE)
 [![npm](https://img.shields.io/npm/v/quota-keepalive?style=for-the-badge&logo=npm&logoColor=white)](https://www.npmjs.com/package/quota-keepalive)
-[![Magpie](https://img.shields.io/badge/Magpie-Plugin-0EA5A4?style=for-the-badge)](https://github.com/sljdxde/quota-keepalive)
+[![Magpie](https://img.shields.io/badge/Magpie-Plugin-0EA5A4?style=for-the-badge)](https://github.com/sljdxde/quota-keepalive-magpie-plugin)
 [![Unofficial](https://img.shields.io/badge/Status-Unofficial-F59E0B?style=for-the-badge)](#unofficial-plugin-notice)
 
 [中文](./README.md) · English
@@ -89,7 +89,7 @@ published to npm, so other users do not need to clone the repository or wait for
 marketplace listing.
 
 - npm package: `quota-keepalive`
-- Repository: <https://github.com/sljdxde/quota-keepalive>
+- Repository: <https://github.com/sljdxde/quota-keepalive-magpie-plugin>
 
 ### Installation risks
 
@@ -118,7 +118,7 @@ This project is not reviewed through Magpie's official marketplace. Before insta
 - **Compatibility and support**: This project has no Magpie compatibility certification
   or official support. Changes to Magpie or provider plugin interfaces may break it.
   Use logs to diagnose failures and report them in
-  [GitHub Issues](https://github.com/sljdxde/quota-keepalive/issues). Use the
+  [GitHub Issues](https://github.com/sljdxde/quota-keepalive-magpie-plugin/issues). Use the
   uninstall command for the installation method below if you do not accept these
   risks.
 
@@ -145,7 +145,7 @@ Keepalive** in Magpie.
 Use this when npm is unavailable or you want to track the repository directly:
 
 ```sh
-magpie plugin add github:sljdxde/quota-keepalive
+magpie plugin add github:sljdxde/quota-keepalive-magpie-plugin
 ```
 
 This installation can also be updated with `magpie plugin update`. If npm is
@@ -178,7 +178,7 @@ If viewing the options prints `No options set.`, skip the restore line.
 ### Verify after installation
 
 1. `magpie plugin list` shows this plugin's spec: `quota-keepalive@latest` for npm,
-   `github:sljdxde/quota-keepalive` for GitHub, or an absolute folder path.
+   `github:sljdxde/quota-keepalive-magpie-plugin` for GitHub, or an absolute folder path.
 2. **Plugins** includes **Quota Keepalive**.
 3. At least one provider plugin is installed and signed in (WorkBuddy, Qoder, Trae,
    and others). This plugin does not own sign-in; it only reads Magpie's existing
@@ -210,7 +210,7 @@ older `quota-keepalive@x.y.z` spec. **Update all** in the page is equivalent to
 magpie plugin rm quota-keepalive
 
 # GitHub install
-magpie plugin rm github:sljdxde/quota-keepalive
+magpie plugin rm github:sljdxde/quota-keepalive-magpie-plugin
 
 # local folder install (run from the original repository root)
 magpie plugin rm "$(pwd)"
@@ -428,7 +428,7 @@ Never put an OTP, npm token, or recovery code in a repository, README, or chat.
 
 ## Links
 
-- [GitHub](https://github.com/sljdxde/quota-keepalive)
+- [GitHub](https://github.com/sljdxde/quota-keepalive-magpie-plugin)
 - [npm](https://www.npmjs.com/package/quota-keepalive)
-- [Releases](https://github.com/sljdxde/quota-keepalive/releases)
+- [Releases](https://github.com/sljdxde/quota-keepalive-magpie-plugin/releases)
 - [License](./LICENSE)
