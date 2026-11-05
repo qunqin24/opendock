@@ -1,10 +1,10 @@
 <div align="center">
-  <img src="https://raw.githubusercontent.com/moutazideal/opencode-vitals/main/docs/readout.png" width="900" alt="The OpenCode Vitals readout inside OpenCode's own composer: a dark prompt box with the placeholder Ask anything, / for commands, @ for context… and, on the row below it beside the agent, model and send controls, the readings 1 turns, 1 steps, 200 tok/s and 200 last10">
+  <img src="https://raw.githubusercontent.com/moutazideal/opencode-vitals/main/docs/readout.png" width="900" alt="The OpenCode Vitals readout inside OpenCode's own composer: a dark prompt box with the placeholder Ask anything, / for commands, @ for context… and, on the row below it beside the agent, model and send controls, the readings 1 turns, 1 steps, 200 tok/s and 200 last1">
   <h1>OpenCode Vitals</h1>
   <p><strong>Stop guessing how fast your model is. Watch it.</strong></p>
   <p>One honest line for the session you are working in, drawn inside OpenCode's own composer:
-  turns, steps, the average streaming tokens per second, and the average of the last ten
-  responses beside it.</p>
+  turns, steps, the average streaming tokens per second, and the latest response's rate
+  beside it.</p>
   <p><strong>OpenCode V2 Desktop on Linux.</strong> The readout is drawn by the app's own window, so
   it is the desktop app and not the terminal that has to be running. macOS and Windows are not
   supported yet — see <a href="#platform-support">Platform support</a> for exactly what is missing.</p>
@@ -28,9 +28,9 @@
 </div>
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/moutazideal/opencode-vitals/main/docs/desktop.png" width="900" alt="A real OpenCode window on a Linux desktop with the vitals readout in its composer, reading 1 turns, 1 steps, 200 tok/s and 200 last10, on the same row as the agent, model and send controls">
+  <img src="https://raw.githubusercontent.com/moutazideal/opencode-vitals/main/docs/desktop.png" width="900" alt="A real OpenCode window on a Linux desktop with the vitals readout in its composer, reading 1 turns, 1 steps, 200 tok/s and 200 last1, on the same row as the agent, model and send controls">
 </p>
-<p align="center"><em>A live session on a real desktop, with the numbers where you already look: 1 turn · 1 step · 200 tok/s · 200 last10.</em></p>
+<p align="center"><em>A live session on a real desktop, with the numbers where you already look: 1 turn · 1 step · 200 tok/s · 200 last1.</em></p>
 
 ---
 
@@ -231,7 +231,7 @@ OpenCode Vitals puts that number on your screen, in the corner, all session long
 ## What you get
 
 ```
-+  Build ▾   Space Bunny Free ▾   Max ▾      1 turns  1 steps  200 tok/s  200 last10  [↑]
++  Build ▾   Space Bunny Free ▾   Max ▾      1 turns  1 steps  200 tok/s  200 last1  [↑]
 ```
 
 On the row you already look at, inside the app.
@@ -241,7 +241,7 @@ Every feature, in one place:
 | Feature | What it does |
 | --- | --- |
 | **Session average** | Turns, steps and average streaming tok/s for the session you are looking at, so one fast reply cannot flatter a long session. |
-| **Last ten responses** | `· N last10` is the mean of the rates of the last ten completed **responses**, next to the session average. The session average is the whole session divided as one sum; this one moves as soon as a slow reply lands, which is what tells you the session just changed character. A response with no honest rate is skipped, not counted as a zero. It counts responses, not steps: the steps inside one reply are not ten separate answers, and averaging them would answer a question nobody asked. |
+| **Latest response** | `· N last1` is the streaming rate of the most recent completed **response**, next to the session average. The session average is the whole session divided as one sum; this one moves as soon as a reply lands, so it tells you what the work you just watched actually ran at. A response with no honest rate is skipped instead of showing zero, so the reading stays on the last response that had a rate. It is a response, not a step: the steps inside one reply are not separate answers. |
 | **Subagent work is counted** | A subagent runs as a session of its own, so its steps and tokens are added to the session that delegated the work. Its own streaming time is **not** — the session's tok/s stays a speed that session actually ran at, and the subagent's own rate stays on its own session. |
 | **Inside your app** | The numbers sit in OpenCode's own composer, in the row that already holds your agent and model. No window on top of your work, no taskbar entry, no focus steal. |
 | **It follows your tab** | Switch sessions in the app and the numbers switch with them. The readout asks for the session the window says it is showing, so switching project switches the numbers with it — it can never show another project's totals. |
@@ -251,7 +251,7 @@ Every feature, in one place:
 | **Arabic reads correctly** | The same copy of the renderer also carries a small fix for Arabic text: message blocks and the prompt box read and align right-to-left by their own content, while code, diffs and shell output stay left-to-right. See [Arabic text](#arabic-text). |
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/moutazideal/opencode-vitals/main/docs/readout-close.png" width="640" alt="The readout close up: 1 turns, 1 steps, 200 tok/s and 200 last10, in the app's own muted and bright text colours">
+  <img src="https://raw.githubusercontent.com/moutazideal/opencode-vitals/main/docs/readout-close.png" width="640" alt="The readout close up: 1 turns, 1 steps, 200 tok/s and 200 last1, in the app's own muted and bright text colours">
 </p>
 
 ## Arabic text
@@ -488,7 +488,7 @@ With it off the plugin makes no network calls at all, which is what this section
 updater existed.
 
 - **Prompts and responses are never stored.** Only counts, timings, model and agent names, and
-  session/message identifiers. The last-ten reading is a list of numbers and nothing else.
+  session/message identifiers. The last1 reading is a number and nothing else.
 - **The readout asks the window which session it is showing,** and the answer comes from the app's
   own titlebar. Nothing is read out of the app's state database any more, and no draft text is read
   at any point.

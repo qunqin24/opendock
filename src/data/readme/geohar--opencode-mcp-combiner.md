@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="docs/assets/logo.svg" alt="mcp-companion logo" width="440" height="252">
+  <img src="docs/assets/logo.svg" alt="mcp-combiner logo" width="440" height="252">
 </p>
 
-# mcp-companion
+# mcp-combiner
 
 An MCP aggregator (combiner) and editor integration that aggregates multiple
 [Model Context Protocol](https://modelcontextprotocol.io) servers behind a
@@ -14,15 +14,21 @@ connect to it over HTTP. The Lua plugin layer adds Neovim-specific features:
 tool registration, editor context, slash commands, ACP forwarding, and a status
 UI.
 
-> ⚠️ **The combiner was renamed `mcp-bridge` → [`mcp-combiner`](https://github.com/georgeharker/mcp-companion/tree/main/combiner).** The Python package,
+> ⚠️ **The combiner was renamed `mcp-bridge` → [`mcp-combiner`](https://github.com/georgeharker/mcp-combiner/tree/main/combiner).** The Python package,
 > command, and import are now `mcp-combiner` / `mcp-combiner` / `mcp_combiner`; its admin tools are
 > `combiner__*`; config env vars are `MCP_COMBINER_*` (and `MCP_COMPANION_COMBINER_URL` →
 > `MCP_COMPANION_COMBINER_URL`). If you ran an earlier build, see
-> [`combiner/README.md`](https://github.com/georgeharker/mcp-companion/blob/main/combiner/README.md) to migrate (reinstall + a one-off OAuth re-auth). The
-> `mcp-companion` repo and Neovim plugin keep their name.
+> [`combiner/README.md`](https://github.com/georgeharker/mcp-combiner/blob/main/combiner/README.md) to migrate (reinstall + a one-off OAuth re-auth).
+
+> ℹ️ **The repository is now `mcp-combiner`** (formerly `mcp-companion`; GitHub
+> redirects the old URLs). Update plugin specs to `georgeharker/mcp-combiner` when
+> convenient. The Neovim plugin's Lua module is still `mcp_companion`, so
+> `require("mcp_companion")`, existing configs, `.mcp-companion.json` project
+> files and the Claude Code marketplace name (`mcp-combiner@mcp-companion`) are
+> unchanged.
 
 > 📖 Rendered documentation:
-> [docs.georgeharker.com/mcp-companion](https://docs.georgeharker.com/mcp-companion/)
+> [docs.georgeharker.com/mcp-combiner](https://docs.georgeharker.com/mcp-combiner/)
 
 ## Overview
 
@@ -78,7 +84,7 @@ owned by `runtime.CombinerRuntime` and mutated only through its methods.
 The `mcp-combiner` CLI is a pure client of the management plane; the
 `mockserver` module is the instrumentable test upstream. Full internal
 design notes live in
-[`docs/design.md`](https://github.com/georgeharker/mcp-companion/blob/main/docs/design.md).
+[`docs/design.md`](https://github.com/georgeharker/mcp-combiner/blob/main/docs/design.md).
 
 ### Control CLI
 
@@ -185,7 +191,7 @@ curl -X POST http://127.0.0.1:9741/mcp \
 
 Outside CodeCompanion, install a plugin so your agent runs and registers the
 combiner itself (one refcounted process shared across clients). All three plugins live
-in this repo — **[`plugins/`](https://github.com/georgeharker/mcp-companion/blob/main/plugins/README.md)**.
+in this repo — **[`plugins/`](https://github.com/georgeharker/mcp-combiner/blob/main/plugins/README.md)**.
 
 Prerequisites (once, for any plugin): [`uv`](https://docs.astral.sh/uv/),
 `cargo install sharedserver`, and a `servers.json` at
@@ -194,7 +200,7 @@ Prerequisites (once, for any plugin): [`uv`](https://docs.astral.sh/uv/),
 **You do not need to install the combiner itself** — with `uv` present the plugins fetch a
 pinned release from PyPI on demand. Then:
 
-- **Claude Code:** `/plugin marketplace add georgeharker/mcp-companion` →
+- **Claude Code:** `/plugin marketplace add georgeharker/mcp-combiner` →
   `/plugin install mcp-combiner@mcp-companion` → restart the session; verify
   with `/mcp` (an `mcp-combiner` server with prefixed tools).
 - **OpenCode:** add `"@geohar/opencode-mcp-combiner@latest"` to your `opencode.json`
@@ -204,9 +210,9 @@ pinned release from PyPI on demand. Then:
   the combiner **and speaks MCP to it itself** (no second package).
   [`pi-mcp-adapter`](https://pi.dev/packages/pi-mcp-adapter) is optional — the
   extension auto-defers when it's present (see
-  [`plugins/pi/README.md`](https://github.com/georgeharker/mcp-companion/tree/main/plugins/pi#readme)).
+  [`plugins/pi/README.md`](https://github.com/georgeharker/mcp-combiner/tree/main/plugins/pi#readme)).
 
-See **[plugins/README.md](https://github.com/georgeharker/mcp-companion/blob/main/plugins/README.md)** for the full walkthrough (config discovery order, env
+See **[plugins/README.md](https://github.com/georgeharker/mcp-combiner/blob/main/plugins/README.md)** for the full walkthrough (config discovery order, env
 knobs, troubleshooting) and the host-owned (`MCP_COMPANION_COMBINER_URL`)
 behaviour.
 
@@ -265,9 +271,81 @@ format is supported:
 | `auth`         | `string\|object`   | Authentication config (see below)                                                                                                                  |
 | `sharedServer` | `string`           | Name of a `sharedServers` entry to start before connecting (see below)                                                                             |
 | `toolFilter`   | `string[]`         | Glob patterns; only matching tool names are exposed (empty = all)                                                                                  |
+| `resourceFilter` | `string[]`       | Glob patterns on resource URIs (templates: URI templates) as the server names them; only matching ones are listed (empty = all). `["ui://*"]` keeps just interactive widgets — see [Large lists](#large-lists-paging-and-resourcefilter) |
 | `permissions`  | `object`           | Opt-in per-call allow/deny/elicit policy for this server's tools — see [Combiner-side tool-call permissions](#combiner-side-tool-call-permissions) |
 | `isolate`      | `boolean`          | Give each chat its own upstream MCP session (HTTP/SSE) or subprocess (stdio) — see [isolate](#isolate--per-chat-sessions)                          |
 | `externalServer` | `string`         | Name of an `externalServers` entry — a non-owned process (e.g. a `docker run` container) — see [externalServer](#externalserver--non-owned-processes)                                                           |
+| `protocol`     | `string`           | `auto` (default), `legacy` or `2026` — which MCP protocol revision the combiner speaks to this server; see [protocol](#protocol--which-mcp-revision-to-speak-upstream) |
+
+### Large lists: paging and resourceFilter
+
+Some servers list thousands of resources — a metrics server exposing one per
+metric. The combiner pages its aggregate `tools/list`, `resources/list`,
+`resources/templates/list` and `prompts/list` responses at
+`MCP_COMBINER_LIST_PAGE_SIZE` items (default 1000; `0` turns paging off), so no
+single response grows past a client's limit; clients follow `nextCursor`
+(the Neovim plugin, pi, Claude Code and OpenCode all do). The later pages of a
+`resources/list` walk come from the first page's listing, so upstreams are
+asked once per walk.
+
+Paging keeps the response sizes bounded but still moves every entry to every
+client. For a server whose resources aren't useful as context, list fewer:
+
+```json
+"gcloud-prometheus": {"url": "…", "resourceFilter": ["ui://*"]}
+```
+
+Its tools are unaffected, and a resource read by URI still works.
+
+### protocol — which MCP revision to speak upstream
+
+MCP has two revisions in use: the stateful `initialize` handshake (a session per
+connection, `Mcp-Session-Id`) and the stateless 2026-07-28 revision (each request
+stands alone; a server that keeps state takes an explicit session id on its tools).
+
+- `auto` (default): before mounting the server, the combiner asks it
+  (`server/discover`). A server that lists 2026-07-28 is treated as handling its
+  own sessions and is spoken to on that revision over one shared connection —
+  `isolate` is ignored for it. Servers that can't be asked here (stdio,
+  OAuth-protected, unreachable at startup) use the handshake.
+- `legacy`: always the handshake. **Use this for a server that answers discover
+  with 2026 but still keeps per-connection state** — every server built on mcp 2
+  answers that way unless it pins itself to the handshake.
+- `2026`: always the 2026-07-28 revision.
+
+Clients and servers on different revisions are bridged both ways: a
+handshake-era client calling a 2026 server that asks for input mid-call is asked
+live and the call is retried with the answer; a 2026-era client calling a
+handshake server that elicits mid-call has the call held open across its retry.
+
+**Sessions on 2026 servers.** A 2026 server that keeps state hands out its own
+session ids (svg-mcp: `create_session`, then `session_id` on every call). The
+combiner passes them through untouched and never injects or hides one. The id
+is the only key: any chat that knows it can use that session — handy for
+passing a drawing between chats, and the reason not to paste ids where they
+shouldn't go.
+
+**Changes between calls.** A 2026 server can only answer requests, so the
+combiner keeps one `subscriptions/listen` stream open to each 2026 upstream:
+tool, prompt and resource list changes always (a tool change refreshes that
+server's tools for every chat), and resource updates for the URIs some chat
+watches — a handshake chat's `resources/subscribe` or the URIs on a 2026
+chat's own listen stream. A dropped stream reopens with backoff. A server that
+doesn't serve `subscriptions/listen` is noted in the log and otherwise works.
+Upstreams on the handshake push over their session as before.
+
+#### Offering 2026 to clients
+
+The combiner itself answers clients on the handshake unless started with
+`MCP_COMBINER_OFFER_2026=1` — until then a client that would negotiate
+2026-07-28 (Claude Code does by default) falls back to the handshake. With the
+offer on, 2026 clients get per-chat `subscriptions/listen` streams, permission
+prompts as `InputRequiredResult`, and calls to handshake upstreams that ask
+mid-call held open for up to `MCP_COMBINER_HOLD_TIMEOUT` seconds (default 3600)
+awaiting the client's answer. Not bridged yet: an upstream's mid-call sampling
+or roots request to a 2026 client, and non-form questions (URL mode, sampling)
+from a 2026 upstream to a handshake client — those calls fail with an error
+saying so.
 
 ### isolate — per-chat sessions
 
@@ -665,15 +743,22 @@ authorization link to the MCP client instead:
 ```json
 {
   "oauth": {
-    "public_url": "https://combiner.your-tailnet.ts.net",
+    "public_url": "auto",
     "prompt": "both"
   }
 }
 ```
 
-- **`public_url`** — the combiner's externally reachable base URL (for example
-  its `tailscale serve` address). OAuth redirects then come back to
-  `<public_url>/oauth/callback/<server>`, served by the combiner itself.
+- **`public_url`** — the combiner's externally reachable base URL. `auto` is
+  this machine's tailnet name on the combiner's port
+  (`http://box.your-tailnet.ts.net:9741`), or unset when there's no tailnet;
+  `https://{auto}` is the `tailscale serve` address; any literal URL works too.
+  `MCP_COMBINER_OAUTH_PUBLIC_URL` (a literal URL) overrides it. OAuth
+  redirects then come back to `<public_url>/oauth/callback/<server>`, served
+  by the combiner itself. A server that has to be told that URI (one set up
+  with the combiner as its OAuth client) can be given `{oauth_redirect}` in its
+  entry's `args`, `env`, `headers` or `url` — or in the `sharedServers` /
+  `externalServers` entry it uses, when only that server uses it.
   Register that redirect URI with the OAuth client; for Google this needs a
   **Web application** client (Desktop clients only allow loopback redirects).
   The callback route needs no bearer token — the browser has none — and is
@@ -697,6 +782,28 @@ issues a fresh one.
 `elicit` without `public_url` still works, with a startup warning: the link
 redirects to the loopback callback, so it only completes from a browser on the
 combiner host (a local chat), not from another device.
+
+#### Authorizing from another device over Tailscale
+
+Servers that register their own OAuth client (dynamic registration — most MCP
+servers, and the mock) need only `"public_url": "auto"`: their redirect is
+registered automatically. Providers with a **static** client, like Google, need
+an `https` redirect (plain `http` is accepted only for `localhost`) registered
+in advance. With Tailscale, serve the combiner's `/oauth` routes on the
+machine's tailnet name (tailnet-only; `tailscale funnel` is the public one):
+
+```sh
+tailscale serve --bg --set-path /oauth http://127.0.0.1:9741/oauth
+```
+
+```json
+"oauth": {"public_url": "https://{auto}", "prompt": "both"}
+```
+
+Then add `https://<machine>.<tailnet>.ts.net/oauth/callback/<server>` for each
+such server to the provider's allowed redirect URIs (for Google, on a **Web
+application** client). Every machine that runs the combiner registers its own
+callbacks; the config itself stays the same everywhere.
 
 ### External OAuth provider mode
 
@@ -822,6 +929,35 @@ require("mcp_companion").setup({
 When you change the encryption key, existing cached tokens become unreadable and you'll
 need to re-authenticate with OAuth servers.
 
+### Bind addresses
+
+The combiner listens on `127.0.0.1` by default. To reach it from elsewhere — a
+remote widget renderer over Tailscale, say — set `bind.host` in servers.json to
+an address or a **list** of them:
+
+```json
+"bind": {"host": ["127.0.0.1", "auto"]}
+```
+
+`auto` is this machine's tailnet address, looked up at startup; `0.0.0.0`
+(or `::`) is every interface. An address that isn't up when the combiner
+starts is skipped with a warning (restart once it's back); startup fails only
+if none bind. `--host` and `MCP_COMBINER_HOST` override the config and take
+comma-separated lists. Binding anything beyond loopback without a bearer token
+(below) logs a warning.
+
+Binding is about addresses; what remote widget renderers are *told* to connect
+to is separate: `MCP_COMBINER_UI_ADVERTISE` — `auto` (default: this machine's
+MagicDNS name, e.g. `box.your-tailnet.ts.net`, else its tailnet IP, else
+loopback), `loopback`, or an explicit `http://host[:port]`.
+
+**`auto` and `{auto}`.** Every setting that names this machine on the tailnet —
+`bind.host` entries, `MCP_COMBINER_UI_ADVERTISE`, `oauth.public_url` — takes
+`auto` as its whole value, and URL-valued ones also take `{auto}` as the host
+(`https://{auto}` behind `tailscale serve`), so one servers.json works on every
+machine. Braces can't appear in a real host name, so a host that happens to be
+called `auto` is never mistaken for it.
+
 ### Inbound authentication (locking down `/mcp`)
 
 The above is backend auth (combiner → upstream servers). Separately, the combiner's
@@ -913,9 +1049,9 @@ binary automatically on first sync.
 
 ### Installation (lazy.nvim)
 
-Install sharedserver and mcp-companion as separate top-level plugin entries so
+Install sharedserver and mcp-combiner as separate top-level plugin entries so
 lazy.nvim runs the build steps independently, then declare sharedserver as a
-dependency of mcp-companion so load order is correct:
+dependency of mcp-combiner so load order is correct:
 
 ```lua
 -- sharedserver: builds the Rust binary that manages combiner process lifecycle
@@ -925,9 +1061,9 @@ dependency of mcp-companion so load order is correct:
     lazy = false,
 },
 
--- mcp-companion: the combiner + Neovim plugin
+-- mcp-combiner: the combiner + Neovim plugin
 {
-    "georgeharker/mcp-companion",
+    "georgeharker/mcp-combiner",
     lazy = false,
     dependencies = {
         "olimorris/codecompanion.nvim",
@@ -999,7 +1135,7 @@ reinstall; `:MCPInstall /path/to/venv` targets a specific venv).
 
 **Sharing the combiner with standalone Claude Code.** Only relevant if you opt into a shared
 `combiner.venv`. Put its `bin/` on `PATH` (or `uv tool install <plugin>/combiner` for a global
-`mcp-combiner`), and the [`mcp-combiner`](https://github.com/georgeharker/mcp-companion/tree/main/plugins/claude)
+`mcp-combiner`), and the [`mcp-combiner`](https://github.com/georgeharker/mcp-combiner/tree/main/plugins/claude)
 plugin will find `mcp-combiner` directly — Neovim and standalone Claude then share one combiner
 process.
 
@@ -1696,7 +1832,7 @@ actually needs.
 
 ```json
 {
-  "$schema": "https://raw.githubusercontent.com/georgeharker/mcp-companion/main/docs/schemas/project.schema.json",
+  "$schema": "https://raw.githubusercontent.com/georgeharker/mcp-combiner/main/docs/schemas/project.schema.json",
   "allowed_servers": ["github", "gws"]
 }
 ```
@@ -1705,7 +1841,7 @@ Or hide specific servers from an otherwise-default project:
 
 ```json
 {
-  "$schema": "https://raw.githubusercontent.com/georgeharker/mcp-companion/main/docs/schemas/project.schema.json",
+  "$schema": "https://raw.githubusercontent.com/georgeharker/mcp-combiner/main/docs/schemas/project.schema.json",
   "disabled_servers": ["clickup"]
 }
 ```
@@ -1721,7 +1857,7 @@ Example with per-adapter overrides:
 
 ```json
 {
-  "$schema": "https://raw.githubusercontent.com/georgeharker/mcp-companion/main/docs/schemas/project.schema.json",
+  "$schema": "https://raw.githubusercontent.com/georgeharker/mcp-combiner/main/docs/schemas/project.schema.json",
   "allowed_servers": ["github", "gws"],
   "adapters": {
     "moonshot-ai": {
@@ -1903,7 +2039,7 @@ combiner = {
 Setting `token_in_url = true` forces the URL token everywhere (including the
 HTTP-adapter client), i.e. belt-and-braces. If an ACP agent still fails to see
 tools with the auto default, please open an issue at
-<https://github.com/georgeharker/mcp-companion/issues> with the agent name and
+<https://github.com/georgeharker/mcp-combiner/issues> with the agent name and
 version.
 
 ---
@@ -1940,6 +2076,24 @@ combiner behavior:
 ```bash
 python -m mcp_combiner.mockserver --name mock --transport http --port 9760
 curl http://127.0.0.1:9760/stats
+```
+
+Mock options for the newer paths: `--offer-2026` (offer the 2026 revision on
+`server/discover`; by default the mock pins itself to the handshake, since it
+keeps per-connection state), `--sessions` (own sessions like a 2026 stateful
+server: `mock__create_session` / `mock__end_session` and a `session_id` on
+`mock__remember` / `mock__recall`), `--oauth` (act as its own OAuth
+authorization server; `POST /control/oauth/revoke` forces re-authorization) and
+`--issuer URL|auto` (the authorization-server URL it advertises, so a phone
+can reach its login page). `POST /control/resource-updated {"uri": ...}` emits
+a resource update in both revisions; `/stats` lists open listen streams.
+
+Live tests drive the installed Claude Code through the Agent SDK. They are
+opt-in and never run in CI:
+
+```bash
+cd combiner
+MCP_COMBINER_LIVE_CLAUDE=1 uv run --with 'claude-agent-sdk>=0.2.176' pytest tests/test_live_claude.py
 ```
 
 sharedserver-backed e2e tests run when the `sharedserver` binary is on PATH

@@ -1,1 +1,1 @@
-{"versions":[{"v":"0.1.0","t":"2026-10-17T08:28:07.588Z"},{"v":"0.0.0-stage","t":"2026-10-17T08:24:55.248Z"}],"releases":[],"issues":[],"sharedRepo":false}
+{"versions":[{"v":"0.1.0","t":"2026-10-17T08:28:07.588Z"},{"v":"0.0.0-stage","t":"2026-10-17T08:24:55.248Z"}],"releases":[],"issues":[{"number":1,"title":"Quota parsing broken: Z.ai API now returns type \"CREDIT_LIMIT\" instead of \"TOKENS_LIMIT\"","url":"https://github.com/robindubreuil/opencode-zai-usage/issues/1","state":"open","comments":1,"date":"2026-11-03T19:47:49Z"}],"sharedRepo":false}

@@ -182,7 +182,7 @@ Most people do not need this. `/memory-review` works in the current session.
 
 Run it the first time to create `.opencode/memory/`. It is also the repair command: run it again after deleting a template (or after an init that failed partway) and it recreates only what is missing. It never overwrites an existing file. `INDEX.md` is written last, so a failed repair leaves the project uninitialized rather than half-active.
 
-Before initialization, every other memory command and tool is blocked and returns `[memory] not initialized; run /memory-init to create .opencode/memory` for any actual operation. Only `/memory-init`, `/memory-status`, and `memory_status` work; commands with a help path still render `--help`/`-h` usage.
+Before initialization, every other memory command and tool is blocked and returns `[memory] not initialized; run /memory-init to create .opencode/memory` for any actual operation. Only `/memory-init`, `/memory-status`, `memory_status`, and the read-only TUI sidebar status line work; commands with a help path still render `--help`/`-h` usage. The sidebar line itself reads `○ memory · run /memory-init`.
 
 ### Let it do its thing
 
@@ -253,6 +253,22 @@ Hints are exact-match only. If your message mentions a term from `INDEX.md`, the
 ```
 
 This is a read-only health report. It covers the initialization state, `INDEX.md` attachability, the `AGENTS.md` protocol block, the permission rule, the optional `memory-manager` agent, capture activity, file budgets, and next actions. It writes nothing and does not change the counters.
+
+### Read the sidebar status
+
+The TUI sidebar shows one passive memory line in its footer:
+
+| Line                          | Meaning                                                                                                                                                              |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `○ memory · run /memory-init` | This project has no `.opencode/memory/INDEX.md` yet.                                                                                                                 |
+| `● memory · healthy`          | Initialized, INDEX within its cap and inspectable, no pending captures, and no actionable notice.                                                                    |
+| `◐ memory · {n} pending`      | `{n}` scratchpad captures are waiting for review.                                                                                                                    |
+| `▲ memory · needs attention`  | INDEX is unreadable or over its cap, or an over-cap, stale-INDEX-pointer, or skipped-capture notice is waiting. (A missing INDEX is reported by the `○` line above.) |
+
+The line is read-only and project-wide. It never consumes the notices that the agent's `[memory]`
+status line reports, so it can return to healthy once the agent relays them. If no line appears, the
+TUI half or the RPC is unavailable, or the last snapshot failed; `/memory-status` still reports the
+install.
 
 ### See what the plugin has been doing
 
@@ -388,6 +404,7 @@ A few notes:
 | The agent does not seem to know the project.                   | Run `/memory-status`. If it reports `not initialized`, run `/memory-init`; otherwise fix its next actions. Make sure the protocol block is in the root `AGENTS.md`. If `/memory-status` is unavailable, the plugin did not load: check the package install and config path, then restart OpenCode. Memory also has to be written before it can be recalled. |
 | The permission prompt never appears when applying memory.      | Add the `memory_write → ask` rule at the end of your `permissions` list and restart OpenCode. Check that no later wildcard rule overrides it.                                                                                                                                                                                                               |
 | The agent mentions a `[memory]` status line.                   | It is reporting something real: the INDEX is over its cap, blocks were rotated, a capture was skipped, a forget completed, or a review is due. Trim the file, run `/memory-review`, or check the file permissions.                                                                                                                                          |
+| The sidebar has no memory line.                                | The line is hidden when the TUI part or RPC is unavailable, or when the last snapshot failed. It is always shown while the plugin is installed; to remove it, remove the plugin from your config and restart OpenCode. `/memory-status` still reports the install.                                                                                          |
 | `/memory-review` shows a table but nothing is saved.           | That is the design. Proposals are not writes. Approve the lines you want; each approved line prompts for permission before it is appended.                                                                                                                                                                                                                  |
 | The agent forgot the start of a long session after compaction. | Compaction replaces detail with a summary. The plugin saves a handoff and injects prior context, but it is not a transcript. Read the newest handoff or the decision log for the details.                                                                                                                                                                   |
 | Memory is not updating.                                        | Run `/memory-status` and check the file sizes against the caps. `INDEX.md` over its cap is not attached, and over-cap files reject writes. Run `/memory-review` to see what is blocked.                                                                                                                                                                     |

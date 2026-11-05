@@ -27,10 +27,12 @@ The installer does three things in order:
 1. Installs the `archdev` CLI and verifies its SHA-256 against the release.
 2. Signs you in with GitHub in your browser.
 3. Runs `archdev setup` to install the ArchDev skill and session hooks.
-   Inside a Git repository it asks where they go; anywhere else they are
-   installed globally:
+   It asks where they go before installing hooks, even outside a Git repository
+   or when Node.js is missing:
    - **Globally:** personal setup across every repository you work in.
-   - **This repository:** shareable setup files for your teammates.
+   - **This repository:** shareable setup files for your teammates. Run from
+     inside a Git repository with Node.js on PATH. If either is missing, setup
+     explains the prerequisite and stops; it never switches to global hooks.
 
 Session hooks report activity and findings to your organization's shared
 stream, visible to its members; the installer says so before setup runs. Each
@@ -43,9 +45,10 @@ When it finishes, go to a repository you work in and tell your coding agent:
 Set up this repository with ArchDev.
 ```
 
-Without a terminal (CI, or a coding agent running the command) the installer
-never prompts: once signed in (`ARCHDEV_TOKEN`), it installs globally. Pass
-`--scope repository` to install into the current repository instead:
+Without a terminal (CI, or a coding agent running the command), the installer
+never prompts and requires an explicit scope before setup. `--yes` does not
+choose a scope. Once signed in (`ARCHDEV_TOKEN`), pass `--scope user` for global
+hooks or `--scope repository` for the current repository. For example:
 
 ```sh
 curl -fsSL https://archdev.ai/install.sh | bash -s -- --scope repository
@@ -55,6 +58,7 @@ curl -fsSL https://archdev.ai/install.sh | bash -s -- --scope repository
 $env:ARCHDEV_INSTALL_SCOPE = "repository"; irm https://archdev.ai/install.ps1 | iex
 ```
 
+Use `--skip-setup` (PowerShell: `-SkipSetup`) to install the CLI without hooks.
 `bash -s -- --help` lists every option. Homebrew users can run
 `brew install ArchAstro/tools/archdev` and then `archdev setup`.
 

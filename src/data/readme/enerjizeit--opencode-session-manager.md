@@ -25,6 +25,19 @@ Lost an important AI chat? Can't find that session from last week? Sessions pili
 - 🔍 **Search** — find sessions by title substring.
 - ⚙️ **Configure** — cleanup / retention settings; set once and forget.
 
+## OpenCode versions
+
+The package supports both the 1.x and the 2.x plugin APIs from one build:
+
+| opencode | API | What loads |
+|---|---|---|
+| 1.18.29 and newer (1.x) | V1 | `server()` from the default export — tools and the `tool.execute.before` hook |
+| 2.x | V2 | `id` + `setup(ctx)` from the default export — tools registered through `ctx.tool.transform` and the hook through `ctx.tool.hook("execute.before", ...)` |
+
+Tool names, descriptions, arguments and behaviour are identical in both. No
+separate package version is needed, and no configuration differs: the same
+entry in `plugin[]` (`opencode.json`) or `plugins[]` (`opencode 2`) works.
+
 ## Installation
 
 Add the scoped package to your `opencode.json` plugin array — opencode will install it from npm automatically:
@@ -67,10 +80,10 @@ See [USAGE.md](https://github.com/EnerJizeIT/opencode-session-manager/blob/maste
 
 ## Architecture
 
-- **CLI-first** — all session operations go through `opencode` CLI, not direct SQL.
+- **DB read + CLI write** — the session list is a direct readonly read of the opencode database (all projects; `opencode session list` only sees the current directory; reads `session_v2` on opencode 2.x and the legacy `session` table on 1.x). export/import/delete go through the `opencode` CLI (`session export|import` on 2.x). No write-SQL.
 - **Backup-then-delete** — sessions are only removed after a successful backup.
 - **Backup envelope** — format: `{version, exportedAt, backupOf, session}`; formalized in `backup-schema.json`.
-- **Protected backups** — pinned and orphaned backups (session no longer in DB) are protected forever.
+- **Protected backups** — pinned backups are protected forever; orphaned backups (session no longer in DB) expire after `orphanBackupRetentionDays` (default 30; 0 = forever).
 - **Hooks** — `session.idle` triggers auto-cleanup and retention (1h debounce); `session.deleted` cleans the pinned list.
 - **Migration** — `version` field in state + `migrateState` for future schema changes.
 

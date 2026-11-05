@@ -58,6 +58,18 @@ The plugin connects to Linear's **read-only** server by default (`https://mcp.li
 only tools that read, and Linear refuses changes through it. To let the model make changes, set the option
 `"access": "write"`; see [Configure](#configure).
 
+### Scripts
+
+A script or a cron job can call Linear's read tools with no model, through `opencode api`. It runs as a session and its
+agent, under that agent's permission rules and the session's own. Write tools are never available to scripts:
+
+```sh
+opencode api post /api/rpc/linear.workspace.tools/get_issue \
+  -d '{"input":{"sessionID":"ses_…","input":{"id":"ENG-123"}}}'
+```
+
+See [Scripting](https://github.com/joe-broadhead/opencode-linear/blob/HEAD/docs/scripting.md).
+
 ## Permissions
 
 The plugin adds these rules to every agent, directly after the agent's base rule that allows everything:
@@ -141,6 +153,9 @@ Run `/linear-status` first. Its last line is the next step.
 | `HOST_UNTESTED` | Your OpenCode is outside `>=2.2.3 <2.3.0`. Use a tested OpenCode, or set `"allowUntestedHost": true` to try anyway. |
 | `STATUS_UNAVAILABLE` | The status could not be read, or the plugin is not running. Follow the next step in the message. |
 | `SKILLS_INVALID` | A skill file in the package is missing or broken. Reinstall the plugin. |
+
+A script's errors from the tools RPC have their own codes, listed in
+[Scripting](https://github.com/joe-broadhead/opencode-linear/blob/HEAD/docs/scripting.md#errors).
 
 ## Uninstall
 

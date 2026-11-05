@@ -104,12 +104,15 @@
 
 ## 模型
 
-站点 `/api/model-service/v1/models` 实测返回 22 条：17 条 `type: "text"`（插件列这些），
-5 条图像 / 视频生成模型（`opc-image-*`、`opc-video-*`、`sensenova-u1-fast`，插件不列进 chat）。
+站点 `/api/model-service/v1/models` 实测（2026-11-04）返回 21 条：16 条 `type: "text"`
+（插件列这些），5 条图像 / 视频生成模型（`opc-image-*`、`opc-video-*`、`sensenova-u1-fast`，插件不列进 chat）。
+
+> ⚠ `deepseek-v4-1-flash-1017` 已被站点**从目录里下线**（2026-11-04 实测：目录里 21 条没有它，
+> 请求它回 `404` + 站点 SPA 的 HTML 落地页）。插件已把它从静态表删掉；如果你之前在 magpie 里
+> 选过它，到供应商编辑器里换成下面任意一个仍在线的模型即可。
 
 | 模型 | 能收图 | 工具 | 站点倍率 |
 |---|---|---|---|
-| `deepseek-v4-1-flash-1017` | ✓ | ✓ | 2x |
 | `deepseek-v4-pro` | ✓ | ✓ | 5x |
 | `deepseek-v4-flash` | ✓ | ✓ | 3x |
 | `deepseek-v4-flash-0731` | ✓ | ✓ | 2x |

@@ -19,7 +19,7 @@ Install from npm by adding the plugin to `opencode.jsonc`:
 ```jsonc
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugins": ["opencode-flowgraph"]
+  "plugins": ["@alvarolorentedev/opencode-flowgraph"]
 }
 ```
 
@@ -27,7 +27,7 @@ Pin a version when reproducibility matters:
 
 ```jsonc
 {
-  "plugins": ["opencode-flowgraph@0.3.0"]
+  "plugins": ["@alvarolorentedev/opencode-flowgraph@0.8.0"]
 }
 ```
 
@@ -163,7 +163,7 @@ The tool is registered for the whole location because OpenCode plugin tools are 
 
 ## RPC
 
-The shared contract is exported from `opencode-flowgraph/rpc`.
+The shared contract is exported from `@alvarolorentedev/opencode-flowgraph/rpc`.
 
 | Method | Purpose |
 |---|---|
@@ -186,7 +186,7 @@ Event: `runUpdated` with project, run, workflow, status, current node, revision,
 
 ```ts
 import { OpenCode } from "@opencode/client"
-import { FlowgraphRpc } from "opencode-flowgraph/rpc"
+import { FlowgraphRpc } from "@alvarolorentedev/opencode-flowgraph/rpc"
 
 const client = OpenCode.make({ baseUrl, headers })
 const workflows = client.rpc(FlowgraphRpc)
@@ -232,12 +232,12 @@ Storage has no transactions or compare-and-swap. The plugin uses a host-local pr
 
 The package ships optional UI parts beside the server part:
 
-- `./tui` adds a full-screen `Workflow` page, a `Workflow graph` session panel, a `/workflow` command, active-node highlighting, and keyboard controls. See [`docs/tui.md`](docs/tui.md).
+- `./tui` adds a full-screen `Workflow` page, a `Workflow graph` session panel, a `/flowgraph` command, active-node highlighting, and keyboard controls. See [`docs/tui.md`](docs/tui.md).
 - The TUI page needs no session open. It lists every run visible on the connected server, including runs in other projects and worktrees.
-- `/workflow` accepts arguments: `graph`/`visuals` to view, `runs` to pick a run, `list` to list workflows, `run <id> <objective...>` to start a run, and `<id> <objective...>` as shorthand.
+- `/flowgraph` accepts arguments: `graph`/`visuals` to view, `runs` to pick a run, `list` to list workflows, `run <id> <objective...>` to start a run, and `<id> <objective...>` as shorthand.
 - `./gui-experimental` adds an experimental OpenCode Desktop panel that renders the Mermaid graph, highlights the active node, and opens node sessions on click. Use the `Workflow` command to pick a run from any project or worktree; each run opens in its own session tab with its own graph. See [`docs/gui.md`](docs/gui.md).
 
-The TUI renders a structured terminal graph rather than Mermaid. The Desktop GUI renders Mermaid. Neither requires a separate server or web app.
+The TUI renders a boxed terminal diagram from the structured run graph, with state colours and a pulsing active node; it does not render Mermaid. When the diagram does not fit the panel, it falls back to a compact text list. The Desktop GUI renders Mermaid. Neither requires a separate server or web app.
 
 `getRunGraph` is the shared read model for both surfaces. It returns node states, node session IDs, edges, the Mermaid source, Mermaid node IDs, and the active node.
 

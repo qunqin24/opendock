@@ -18,6 +18,7 @@ Every package is a folder with its own README. Open the one you want; its README
 | oc-bifrost | plugin | `1.6.13` | Runs older OpenCode plugins on the current runtime. | Add `@nathwn12/oc-bifrost` to your `plugins`. |
 | oc-flight-deck | plugin | `0.21.1` | Live session telemetry in the OpenCode sidebar. | Add `oc-flight-deck` to your `plugins`. |
 | oc-harness-setup | CLI | `1.0.0` | Installs the Windows agent harness. | `npx -y oc-harness-setup setup` |
+| oc-plugin-view | plugin | `0.1.0` | Installed plugin list in the OpenCode sidebar. | Add `oc-plugin-view` to your `plugins`. |
 | oc-talk | plugin | `0.1.8` | Cross-session talk: list live sessions, send one message to a peer, read its reply. | Add `oc-talk` to your `plugins`. |
 | rea-shim | MCP | `0.2.2` | Launcher for the rea reverse-engineering server. | `npx -y rea-shim --doctor` |
 | oc-collections | repo | — | This index and npm-workspaces monorepo. | — |

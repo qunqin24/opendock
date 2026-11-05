@@ -27,6 +27,19 @@
 - 🔍 **Поиск** — находи сессии по подстроке в названии.
 - ⚙️ **Настройка** — cleanup / retention; настроил и забыл.
 
+## Версии OpenCode
+
+Пакет поддерживает обе версии API плагинов одной сборкой:
+
+| opencode | API | Что загружается |
+|---|---|---|
+| 1.18.29 и новее (1.x) | V1 | `server()` из default-экспорта — инструменты и хук `tool.execute.before` |
+| 2.x | V2 | `id` + `setup(ctx)` из default-экспорта — инструменты через `ctx.tool.transform`, хук через `ctx.tool.hook("execute.before", ...)` |
+
+Имена, описания, аргументы и поведение инструментов совпадают. Отдельная
+версия пакета не нужна, конфиг тоже не отличается: одна и та же запись в
+`plugin[]` (`opencode.json`) или `plugins[]` (opencode 2) подходит для обеих.
+
 ## Установка
 
 Добавьте scoped-пакет в массив `plugin` файла `~/.config/opencode/opencode.json` — opencode сам установит его из npm:
@@ -66,10 +79,10 @@ State-файл `session-manager.json` хранит pinned-список и нас
 Запись атомарная: `.tmp` → `rename`. Бэкапы в `backups/<id>.json`.
 Всё лежит вне БД opencode — переживёт переустановку.
 
-### CLI-first
+### Чтение БД + запись через CLI
 
-Все операции с сессиями идут через `opencode` CLI (Bun shell `$`), не через прямой SQL.
-Write-SQL запрещён. `parseJson` терпит `[page-assist]`-шум в stdout.
+Список сессий — прямое readonly-чтение из базы opencode (`bun:sqlite`), все проекты сразу: на opencode 2.x читается `session_v2` (legacy-таблица `session` — для 1.x); `opencode session list` отдаёт только сессии текущего каталога, и плагин терял остальные.
+Export/import/delete — через `opencode` CLI (`session export|import` на 2.x). Write-SQL запрещён. `parseJson` терпит `[page-assist]`-шум в stdout.
 
 ### Backup envelope
 
@@ -83,7 +96,7 @@ Write-SQL запрещён. `parseJson` терпит `[page-assist]`-шум в s
 
 ### Protected backups
 
-Pinned-бэкапы и orphaned (сессии уже нет в БД — это единственная копия) защищены навсегда.
+Pinned-бэкапы защищены навсегда; orphaned (сессии уже нет в БД) удаляются через `orphanBackupRetentionDays` (по умолчанию 30 дней; `0` — хранить навсегда).
 Corrupt-файлы переименовываются в `.corrupt`.
 
 ### Хуки

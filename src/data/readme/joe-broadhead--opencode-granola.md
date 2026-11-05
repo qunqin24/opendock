@@ -60,6 +60,19 @@ To see the connection, the workspace, the tools and the next step:
 The workspace name comes from the most recent Granola account read since OpenCode started, and is kept in memory
 only. Until then, status says the workspace is unknown; ask the agent to check your Granola account.
 
+### Scripts
+
+A script or a cron job can call Granola's ten read tools with no model, through `opencode api`. It runs as a session
+and its agent, under that agent's permission rules and the session's own. Writes, `sign_out` and `export_markdown` are
+never available to scripts:
+
+```sh
+opencode api post /api/rpc/granola.meetings.tools/list_meetings \
+  -d '{"input":{"sessionID":"ses_…","input":{"limit":10}}}'
+```
+
+See [Scripting](https://github.com/joe-broadhead/opencode-granola/blob/HEAD/docs/scripting.md).
+
 ## Permissions
 
 | Kind | Tools | Default |
@@ -147,6 +160,9 @@ overwrites it. An entry for Granola's official URL is used as it is.
 
 **Status lists Agents without default rules.** See [Permissions](#permissions).
 
+**A script gets an error.** The tools RPC has its own codes, listed in
+[Scripting](https://github.com/joe-broadhead/opencode-granola/blob/HEAD/docs/scripting.md#errors).
+
 Granola uses the workspace that is active in your Granola app; meetings in other workspaces do not appear. The plugin
 supports one Granola account.
 
@@ -163,6 +179,7 @@ Restart OpenCode afterwards. Files you exported stay in your export folder.
 
 - [Configuration](https://github.com/joe-broadhead/opencode-granola/blob/HEAD/docs/configuration.md)
 - [Architecture](https://github.com/joe-broadhead/opencode-granola/blob/HEAD/docs/architecture.md)
+- [Scripting](https://github.com/joe-broadhead/opencode-granola/blob/HEAD/docs/scripting.md)
 - [Contributing](https://github.com/joe-broadhead/opencode-granola/blob/HEAD/CONTRIBUTING.md)
 - [Security](https://github.com/joe-broadhead/opencode-granola/blob/HEAD/SECURITY.md)
 - [Changelog](https://github.com/joe-broadhead/opencode-granola/blob/HEAD/CHANGELOG.md)

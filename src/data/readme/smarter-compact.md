@@ -26,7 +26,7 @@ The agent searches the store with `smart_compact_search`, `smart_compact_sql`, a
 </picture>
 </p>
 
-The stored text still uses the OpenMem wire format (`[openmem: …]`, `<openmem-recall>`). Memory recall on a trim is off unless you set `CONTEXT_COMPACTION_RECALL=1`.
+The stored text still uses the OpenMem wire format (`[smarter-compact: …]`, `<smarter-compact-recall>`). Memory recall on a trim is off unless you set `CONTEXT_COMPACTION_RECALL=1`.
 
 You need Node 24 or newer (for `node:sqlite`) and, for agents that trim through the proxy, the LiteLLM dev build `v1.109.0-dev.1` on `PATH` as `litellm`. The plugin has no API key of its own. Your agent keeps its own login.
 
@@ -157,7 +157,7 @@ A fail-open sends the request on untrimmed and records the error. The request is
 
 ## Where state lives
 
-`OPENMEM_STATE_DIR` defaults to `~/.local/share/smarter-compact` for smarter-compact and the plugin. The store is `$OPENMEM_STATE_DIR/context`. Schema and file layout: [docs/context-store.md](docs/context-store.md).
+`SMARTER_COMPACT_STATE_DIR` defaults to `~/.local/share/smarter-compact` for smarter-compact and the plugin. The store is `$SMARTER_COMPACT_STATE_DIR/context`. Schema and file layout: [docs/context-store.md](docs/context-store.md).
 
 | Variable | Default | Effect |
 | --- | --- | --- |
@@ -199,7 +199,7 @@ python3 -m unittest discover -s proxy/tests
 node --test tests/plugin.test.mjs
 ```
 
-The Python package is still `openmem_context`. `plugin/lib/context-trim.mjs` is the OpenCode port of that package; the two stay on the same store contract.
+The Python package is still `smarter_compact`. `plugin/lib/context-trim.mjs` is the OpenCode port of that package; the two stay on the same store contract.
 
 ### Optional: Cursor and Copilot
 

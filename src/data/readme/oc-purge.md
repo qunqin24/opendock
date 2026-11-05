@@ -75,7 +75,17 @@ msg="loading plugin" id=/path/to/oc-purge entrypoint=file:///path/to/oc-purge/sr
 | 审批自动放行 | `permission.hook("evaluate")` | 改 `user-approval` 默认值 |
 | 工具调用链改写 | `tool.execute.before` | 改 `fs-observation-policy` |
 | 网络作用域闸门 | 命令/URL 参数检查 | `lib/net-scope.js` |
-| 新增工具 | `tool.transform` + 4 个 `purge_*` | 自带 HTTP bridge |
+| 新增工具 | `tool.transform` + 5 个 `purge_*` | 自带 HTTP bridge |
+| 证据账本（内容寻址） | `src/evidence.js`，`ev_<sha256>` | `lib/redteam/evidence-ledger.mjs` |
+| 自动落账 | `tool.execute.after` → 账本 | 手动 record |
+| 重试判定 | `session.hook("retry")` | `lib/continue-retry.js` |
+| 能力选用协议 | `src/capability.js` 注入 | `lib/capability-protocol.js` |
+| 分层自检 | `src/selfcheck.js` + `purge_doctor` | `lib/selfcheck.js`（社区版） |
+| 拒绝检测 | `src/refusal.js` | `lib/refusal-retry.js`（社区版） |
+| 复现材料 | `src/replay.js` + `purge_replay` | `lib/redteam/report-replay.js` |
+| 原子写 / 路径围栏 | `src/fsx.js` | `lib/atomic-files.js` + `path-boundary.js`（社区版） |
+| shell 执行前改写 | `shell.hook("create.before")` | `lib/net-scope.js` 的出网拦截 |
+| 历史消息减压 | `session.hook("context")` → `messages` | 无（OpenCode 独有） |
 
 核心差异：dsh-purge 62 条补丁里，一大半（`extract-asar`、`restart-desktop`、`official-update`…）是因为 DSH 没有插件级扩展点才被迫改宿主。OpenCode 有正式扩展点，**这类补丁直接消失**。
 
@@ -117,6 +127,12 @@ oc-purge/
 | `scope` | 关 | `{enabled, allow, deny}`；**只拦工具出网，不拦模型 API** |
 | `dropTools` | `[]` | 从工具表删掉的工具名 |
 | `postPrompt` | `""` | 追加在注入文本末尾 |
+| `capabilityProtocol` | `true` | 注入"先查 skill/MCP 目录再动手"的协议 |
+| `autoEvidence` | `true` | 从 `tool.execute.after` 自动落账 |
+| `retry` | `{autoRetry:true, retryMax:3}` | 重试策略，见 `src/retry.js` |
+| `commands` | `true` | 注册 `/purge-status` 等命令 |
+| `shell` | `{declareEnv:{}, aliases:{}, prepend:"", proxy:"", deny:[]}` | 命令执行前改写，见 `src/shexec.js` |
+| `compact` | `{enabled:false, maxToolOutputChars:8000}` | 派发前减压历史消息 |
 
 环境变量：
 
@@ -133,6 +149,16 @@ oc-purge/
 | `purge_rules` | `list` / `add` / `toggle` / `remove` |
 | `purge_inject` | 读写自由注入文本 |
 | `purge_scope` | 判定某主机是否在作用域内 |
+| `purge_evidence` | 证据 `record` / `verify` / `list` / `stats` / Residual Unknown 全流程 |
+| `purge_doctor` | 11 层自检：哪层真的跑了、哪层还 pending、哪层 failed |
+| `purge_replay` | 把证据变成可跑的 curl / HTTP 报文，合成内容标 `synthesized: true` |
+
+命令：`/purge-status`、`/purge-evidence`、`/purge-release`、`/purge-doctor`、`/purge-replay`。
+
+证据账本按**语义哈希**寻址：同样内容同一个 `ev_` id，改一个字就变。
+所以子智能体回报的 `claimed` 可以被指挥侧用 `verify` 精确比对。
+
+细节见 [docs/UPGRADE-0.3.md](docs/UPGRADE-0.3.md)、[docs/UPGRADE-0.4.md](docs/UPGRADE-0.4.md)、[docs/UPGRADE-0.5.md](docs/UPGRADE-0.5.md)。
 
 ---
 
@@ -160,7 +186,7 @@ oc-purge/
 
 ```bash
 npm install        # 只装 effect
-npm test           # 13 项
+npm test           # 115 项
 node --check src/index.js
 ```
 

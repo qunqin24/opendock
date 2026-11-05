@@ -59,6 +59,7 @@ These packages aren't OpenCode plugins. magpie runs them in its gateway, on the 
 | [antigravity-cloak](packages/antigravity-cloak) | Claude Code and Claude Desktop on Antigravity: break the words Antigravity turns their system prompt away for, in what Antigravity alone is sent |
 | [codex-history](packages/codex-history) | Opt-in Responses history compatibility after switching providers: remove historical ciphertext and optional item IDs while preserving readable content and tool-call pairing |
 | [history-trim](packages/history-trim) | Send a request's history smaller: fold a run of blank lines, drop a system prompt written twice and a message repeated right after itself, and cut a past tool result longer than `maxToolLength` at a word boundary |
+| [agentcompass](packages/agentcompass) | [AgentCompass](https://github.com/akiiwa-games/AgentCompass) multi-dimensional task profiling, capability floor, Model DNA (`divergence`, `global_rigor`, `module_precision`), subscription quota opportunity-cost, and session-affinity routing (`magpie.middleware` + opt-in `/v1/systemone`) |
 
 ```sh
 magpie plugin add @magpie-community/middleware-<name>
@@ -112,6 +113,35 @@ A tools package is a folder under `packages/<name>/` with:
 - **`index.mjs`**: exports one async plugin function that returns a `tool` hook, `{tool: {<name>: {description, args, execute(args)}}}` ([the reference](https://usemagpie.ai/docs/plugins#tools)). `args` is JSON Schema, and magpie passes the arguments on as they came, so `execute` checks them itself. A string it returns is sent as text, anything else as its JSON. Every function the module exports is taken as a plugin, so helpers go in another file.
 - a test of each tool's `execute`. `bun scripts/check.mjs` loads the plugin and checks each tool's name, description and `args`.
 
+## Web search APIs
+
+A tools package can also give magpie a web search API. It is listed in Settings › Models › Web search under its own name, after Tavily, Brave and the rest, and is added, keyed, switched off and ordered like them. magpie keeps the keys (several are tried in turn; a refused one rests), masks the query, and logs the call. magpie's own `search` hook; OpenCode ignores it. There is no package for one yet: this is the template.
+
+```js
+// index.mjs of @magpie-community/tools-<name>
+export const MySearch = async () => ({
+  search: {
+    myvendor: {                    // [a-z0-9-], at most 32; listed as `<name>:myvendor`
+      name: "My vendor",
+      keysURL: "https://example.com/keys",   // optional "Get a key" link
+      keyOptional: false,                    // true: it answers with no key
+      url: false,                            // true: the user gives its address, as for SearXNG
+      async execute({ query, count, key, url }, ctx) {
+        const r = await fetch(`https://example.com/search?q=${encodeURIComponent(query)}&n=${count}`, {
+          headers: { authorization: `Bearer ${key}` },
+          signal: ctx.abort,
+        })
+        // a throw with a numeric `status` is the vendor refusing the key (401, 402, 403, 429 rest it)
+        if (!r.ok) throw Object.assign(new Error(await r.text()), { status: r.status })
+        return (await r.json()).results.map((x) => ({ title: x.title, url: x.url, text: x.snippet }))
+      },
+    },
+  },
+})
+```
+
+`execute` returns `[{title, url, text?, age?}]` or `{results: [...]}`; pages with no url are dropped, and magpie strips tags and cuts the text. Any other throw is a failure and the next search API is asked. It has a quarter of a search's limit, and `ctx.abort` fires then. magpie reads the list a plugin gives from the last time the plugin loaded, so a plugin just added is listed once it has loaded. [The reference](https://usemagpie.ai/docs/plugins) does not have this yet.
+
 ## Pages
 
 These add a page to magpie's window, in the app and in `magpie web`, under Plugins in the sidebar.
@@ -146,7 +176,7 @@ Like middleware, these run on the requests agents send, but in magpie's Bun host
 |---|---|
 | [powercontext](packages/powercontext) | [PowerContext](https://github.com/oceanbase/powercontext) recall and opt-in completed-conversation capture; no client MCP or skill required |
 | [nowledge-mem](packages/nowledge-mem) | [Nowledge Mem](https://mem.nowledge.co) recall, Context Bundle or Working Memory, per-harness provenance and opt-in conversation import as Mem Threads, automatic for every harness behind Magpie |
-| [aelios](packages/aelios) | [Aelios](https://github.com/wusaki0723/Aelios) recall before each turn from your own Aelios on Cloudflare, and opt-in recording of each turn so Aelios can remember it |
+| [aelios](packages/aelios) | [Aelios](https://github.com/Aelios-project/Aelios) recall before each turn from your own Aelios on Cloudflare, and opt-in recording of each turn so Aelios can remember it |
 | [respire-memory](packages/respire-memory) | [Respire](https://github.com/risense-ai/respire-magpie): per-turn recall and complete policy reads, automatic process diaries, and grounded experience archival with readback; storage runs after reply completion |
 | [OpenViking](https://github.com/volcengine/OpenViking/tree/main/examples/magpie-memory-plugin) | OpenViking context recall and opt-in completed-conversation capture using existing OpenViking configuration; published as `@openviking/magpie-plugin` and maintained in the OpenViking repository |
 | [notify](packages/notify) | A push to ntfy, Bark, Gotify, Server酱, Feishu, DingTalk, WeCom, Telegram or a webhook when an agent's turn is done or fails, after it ran `minMinutes` or longer |
@@ -204,6 +234,7 @@ it off puts the config back.
 | Package | Agent |
 |---|---|
 | [aider](packages/aider) | [Aider](https://aider.chat): `~/.aider.conf.yml`, through litellm's `openai/` prefix |
+| [reasonix-desktop](packages/reasonix-desktop) | [Reasonix 1.x](https://github.com/esengine/DeepSeek-Reasonix/tree/main-v2) Desktop and CLI: reversible global TOML/dotenv bridge; restart Reasonix after choosing a model. Separate from the built-in Studio 2.x adapter |
 | [bub](packages/bub) | [Bub](https://bub.build): `~/.bub/config.yml`, as the `magpie:` provider (needs Bub 0.5.1 or later) |
 | [kilo](packages/kilo) | [Kilo Code](https://kilo.ai): `~/.config/kilo/kilo.jsonc`, through an OpenAI-compatible provider |
 | [junie](packages/junie) | [Junie CLI](https://junie.jetbrains.com/): an explicit `/v1/models` seed for its full picker and Magpie's selected model as the launch default; no LiteLLM |

@@ -54,6 +54,17 @@ await tools.utilities.speech_synthesize({ text: "hello", path: "out.wav" })
 - `utilities_status` gives the model the same view, with those agents as a count.
 - `/utilities-speech-install` downloads the speech files after asking.
 
+### Scripts
+
+A script or a cron job can call the tools that change nothing (time, timer reads, weather, speech cleanup and transcription, and status) with no model, through `opencode api`. It runs as a session and its agent, under that agent's permission rules and the session's own. Weather and the speech download ask by default, and a script cannot answer a prompt, so they need an allow rule. Timer writes and synthesis are never scriptable.
+
+```sh
+opencode api post /api/rpc/utilities.tools.tools/time_now \
+  -d '{"input":{"sessionID":"ses_…","input":{"timezones":["Asia/Tokyo"]}}}'
+```
+
+See [Scripting](https://github.com/joe-broadhead/opencode-utilities/blob/HEAD/docs/scripting.md).
+
 ### Speech files
 
 The engine is `utilities-speech-<platform>`. The models are `ggml-tiny-q5_1.bin` (Whisper tiny, for transcription) and `kitten_tts_nano_v0_8.onnx`, `kitten_tts_nano_v0_8-voices.npz` and `kitten_tts_nano_v0_8-config.json` (Kitten TTS, for synthesis). Every file is checked against a SHA-256 shipped in the package. A download goes to a temporary file and is renamed into place only when its size and hash match, so a failed or tampered file never runs.
@@ -170,7 +181,7 @@ Start with `/utilities` or `/utilities-status`. They end with one next step. Err
 | `WAV_INVALID`, `WAV_UNSUPPORTED`, `SOURCE_REJECTED` | Convert the audio to a PCM16 WAV file of at most 20 MiB, not a symbolic link. |
 | Agents without default rules | Put the block shown by `/utilities-status` first in those agents' own permissions. See [Permissions](#permissions). |
 
-The full list of codes is in [docs/configuration.md](https://github.com/joe-broadhead/opencode-utilities/blob/HEAD/docs/configuration.md#errors). The plugin does not log tool input, paths, transcripts or timer text.
+The full list of codes is in [docs/configuration.md](https://github.com/joe-broadhead/opencode-utilities/blob/HEAD/docs/configuration.md#errors). A script's errors from the tools RPC add a few codes of their own, listed in [Scripting](https://github.com/joe-broadhead/opencode-utilities/blob/HEAD/docs/scripting.md#errors). The plugin does not log tool input, paths, transcripts or timer text.
 
 ## Uninstall
 

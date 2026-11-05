@@ -26,6 +26,8 @@ The values in the image above are illustrative examples, not a record of a speci
 opencode plugin add opencode-hush
 ```
 
+Compatibility: Node.js 22.18+ and OpenCode 2.1.x.
+
 Restart OpenCode after installing. The first load can take close to a minute while the host downloads and precompiles the plugin.
 
 ## What the panel shows
@@ -33,6 +35,7 @@ Restart OpenCode after installing. The first load can take close to a minute whi
 - **Context** — a compact pressure bar and the percentage of context remaining. The measurement comes from the latest assistant message with usage, compared with the model context limit when the host provides it.
 - **Git** — the current branch from the host's VCS data. This row appears only when OpenCode is running inside a Git repository.
 - **Meta** — the model, family cost, family processed tokens, cached tokens, session age, and active reasoning state.
+- **Session Awareness** — the current running or idle state, pending permissions or forms, active tools, and recent execution errors when OpenCode provides them.
 
 Each metadata row has a distinct terminal-friendly symbol. Missing values hide their row, and an empty section is not rendered. Hush does not estimate metrics or make external telemetry calls; all values come from the OpenCode plugin context and host store.
 
@@ -42,20 +45,6 @@ Each metadata row has a distinct terminal-friendly symbol. Missing values hide t
 - **`/hush-update`** — available in the prompt.
 
 The command asks the host's plugin API whether a newer `opencode-hush` release is available. After confirmation, the host installs the update. Restart OpenCode to load the new plugin code.
-
-## Requirements
-
-- Node.js 22.18 or newer
-- OpenCode 2.1.x
-
-## Development
-
-```sh
-pnpm install
-pnpm test
-pnpm build
-pnpm verify:pack
-```
 
 ## License
 

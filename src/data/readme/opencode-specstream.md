@@ -15,9 +15,14 @@
 
 <br>
 
-Live web data for your agent. Describe the data in plain words and get structured rows. Source URL and read time on every value. The most a run can cost is set before anything runs, and you pay only for rows that meet the request. A saved request reruns on a schedule and sends each change where you work.
+One platform to build, search, extract, enrich, map, and monitor data across the entire web.
 
-Your agent asks for "food banks in Texas, with their annual revenue" and gets rows it can cite, each with the page behind it. It sees the price first, and a search that finds nothing costs nothing.
+Ask for any dataset in plain words, and SpecStream builds it from the entire live web: every match found, extracted and enriched into structured records, then monitored for change. It runs through the API and MCP, and inside Sheets, CRMs, Slack, n8n, Zapier and the other tools teams already use.
+
+- Source URL and read time on every value.
+- The most a run can cost is shown and approved before it runs. Only delivered rows are billed, and a run that finds nothing costs nothing.
+- A saved request reruns hourly to yearly, and each row is labeled changed, unchanged or no longer matching.
+- Your agent works on your account, inside the spending limits you set.
 
 ![A request, its price, and the rows with their sources](assets/readme-demo.gif)
 
@@ -48,8 +53,8 @@ This repository holds what you install around SpecStream: MCP client setup, agen
 | [`integrations/opencode/`](integrations/opencode) | `opencode-specstream`: OpenCode plugin (MCP server and the four skills) |
 | [`integrations/openclaw/`](integrations/openclaw) | `@specstream/openclaw-plugin`: OpenClaw plugin (find a list, read its rows, four skills) |
 | [`integrations/pi/`](integrations/pi) | `@specstream/pi-package`: Pi package (the hosted MCP server and four skills) |
-| [`integrations/obsidian/`](integrations/obsidian) | Obsidian plugin: ask for a list in a note, approve the price, get a Markdown table with sources |
-| [`integrations/open-webui/`](integrations/open-webui) | Open WebUI tool: quote, approve and read lists from a chat, plus the native MCP route |
+| [`integrations/obsidian/`](integrations/obsidian) | Obsidian plugin: ask for data in a note, approve the price, get a Markdown table with a source for each value |
+| [`integrations/open-webui/`](integrations/open-webui) | Open WebUI tool: quote, approve and read results from a chat, plus the native MCP route |
 | [`integrations/anythingllm/`](integrations/anythingllm) | AnythingLLM agent skill, plus the MCP route |
 | [`integrations/convex/`](integrations/convex) | Convex component (`@specstream/convex`): live web data as records in your Convex tables, a source for every value |
 | [`integrations/fivetran/`](integrations/fivetran) | Fivetran Connector SDK connector: your lists, records and each value with its source page in your warehouse |
@@ -65,7 +70,7 @@ This repository holds what you install around SpecStream: MCP client setup, agen
 
 ## Connect an agent
 
-The MCP server is `https://api.specstream.ai/mcp` (Streamable HTTP, 97 tools). Your agent works on your account: the same balance, permissions and spending limits you have.
+The MCP server is `https://api.specstream.ai/mcp` (Streamable HTTP). Your agent works on your account: the same balance, permissions and spending limits you have.
 
 1. Open **Agents & API** in the [workspace](https://specstream.ai/workspace) and create an API key. Give it only what the task needs: read, prepare, or execute, the projects it may use, an expiry, and a spending limit.
 2. Put it in an environment variable, so no file holds it:
@@ -267,11 +272,11 @@ Lovable, Gumloop, Relevance AI, Lindy, Manus, Genspark and the rest: add a remot
 
 ### Agents that speak A2A
 
-SpecStream is also an [A2A](https://a2a-protocol.org) agent. The Agent Card is at `https://api.specstream.ai/.well-known/agent-card.json` (A2A 1.0, with the 0.3 fields) and the JSON-RPC endpoint is `https://api.specstream.ai/a2a`. Without a key, it reads the request back and prices it:
+SpecStream is also an [A2A](https://a2a-protocol.org) agent. The Agent Card is at `https://api.specstream.ai/.well-known/agent-card.json` (A2A 1.0, with the 0.3 fields) and the JSON-RPC endpoint is `https://api.specstream.ai/a2a`. Without a key, the reply shows how SpecStream read the request, the columns and the most it can cost:
 
 ```bash
 curl -s https://api.specstream.ai/a2a -H 'Content-Type: application/json' -H 'A2A-Version: 1.0' \
-  -d '{"jsonrpc":"2.0","id":1,"method":"SendMessage","params":{"message":{"messageId":"m1","role":"ROLE_USER","parts":[{"text":"Plumbers in Denver with a phone number"}]}}}'
+  -d '{"jsonrpc":"2.0","id":1,"method":"SendMessage","params":{"message":{"messageId":"m1","role":"ROLE_USER","parts":[{"text":"Clinical trials recruiting in Germany for type 2 diabetes, with their sponsor"}]}}}'
 ```
 
 With `Authorization: Bearer $SPECSTREAM_API_KEY` (or an OAuth token), the reply is a task waiting for approval. Reply on the task with a data part `{"confirm_max_cents": N}`, where N is the quoted maximum, to run it; `GetTask` returns the rows, each value with its `source_url`.
@@ -293,7 +298,7 @@ from langchain_specstream import specstream_tools
 agent = create_agent("anthropic:claude-sonnet-5-5", tools=specstream_tools(max_price_usd=5))
 ```
 
-Two tools and a retriever. The agent writes the request and picks how many rows; the price cap stays in your code, where the model can't raise it. Every row comes back with the page it was read from. Details in [`packages/langchain-specstream`](packages/langchain-specstream).
+Two tools and a retriever. The agent writes the request and picks how many rows; the price cap stays in your code, where the model can't raise it. Source URL and read time on every value. Details in [`packages/langchain-specstream`](packages/langchain-specstream).
 
 To load every SpecStream tool over MCP instead:
 
@@ -339,7 +344,7 @@ from crewai import Agent
 from crewai_specstream import specstream_tools
 
 analyst = Agent(role="Funding analyst", goal="Answer with a source for every claim",
-                backstory="You work from lists, not from memory.", tools=specstream_tools(max_price_usd=5))
+                backstory="You work from data, not from memory.", tools=specstream_tools(max_price_usd=5))
 ```
 
 The same two tools as CrewAI tools, with the key kept as a secret and async crews left unblocked. Details in [`packages/crewai-specstream`](packages/crewai-specstream).
@@ -358,7 +363,7 @@ const { text } = await generateText({
   model: "openai/gpt-5-mini",
   tools: specstreamTools({ maxPriceUsd: 5 }),
   stopWhen: stepCountIs(5),
-  prompt: "Find dental clinics in Lisbon with online booking, with their website.",
+  prompt: "Find open-source vector databases on GitHub with more than 5,000 stars, with their license.",
 });
 ```
 
@@ -379,8 +384,8 @@ async with MCPServerStreamableHttp(
     },
     cache_tools_list=True,
 ) as server:
-    agent = Agent(name="Researcher", instructions="Use SpecStream for lists.", mcp_servers=[server])
-    result = await Runner.run(agent, "Food banks in Texas, with their annual revenue. Show me the price first.")
+    agent = Agent(name="Researcher", instructions="Use SpecStream when you need data from the live web.", mcp_servers=[server])
+    result = await Runner.run(agent, "Papers on retrieval-augmented generation published this year, with their authors and DOI. Show me the price first.")
 ```
 
 A full agent is in [`examples/openai-agents-sdk`](examples/openai-agents-sdk).
@@ -389,7 +394,7 @@ Any other client that speaks remote MCP over Streamable HTTP works with the addr
 
 ## What the agent does, in order
 
-Nothing is spent until a person – or an agent inside a limit a person set – approves a price.
+Nothing is spent until a person, or an agent inside a limit a person set, approves a price.
 
 1. `compile` reads the request and returns how SpecStream understood it: the kind of thing, the conditions every result must meet, the facts to bring back.
 2. `quote_capacity_work` returns the price and the most the work can cost. A price lasts 30 minutes.
@@ -397,7 +402,7 @@ Nothing is spent until a person – or an agent inside a limit a person set – 
 4. `get_find` shows progress while rows arrive. `list_find_rows` returns results with the reason and the source for each fact.
 5. `export_find`, `share_find`, and `send_to_destination` move results on. Reading, exporting, and sharing cost nothing.
 
-Each delivered result costs 10 cents, 30 cents or $1 depending on how many facts it carries. A search that finds nothing is free. See [pricing](https://specstream.ai/pricing).
+Each delivered row costs 5 cents, 15 cents or $1 depending on how much it needs, plus 5 cents for a person's email and 15 cents for a phone. A run that finds nothing costs nothing. See [pricing](https://specstream.ai/pricing).
 
 The four skills in [`skills/`](skills) teach an agent this order and where to stop and ask: `compile`, `review-work`, `approve-work`, `continue-work`.
 
@@ -444,20 +449,11 @@ Working scripts that run a request end to end are in [`examples/python-sdk`](exa
 
 The step stops if the price is above `confirm_max_usd`.
 
-## Three requests
+## What comes back
 
-Say what you need the way you would to a colleague. These come from the request templates in the product.
+Structured rows for any kind of record: companies, local businesses, grants, tenders, clinical trials, papers, datasets, regulations, vulnerabilities, apps, repositories, packages, podcasts and books. Each condition you wrote is checked against the result's own words and numbers, and a row that fails is not delivered. Facts from many sites join into one record.
 
-**Software companies in Germany with 50 to 500 employees that are hiring salespeople. Include the job post and contact email.**
-One row per company, with its size, the sales job post and the contact email the company published. Each row says in one line why it fits, with the page each fact came from. Companies SpecStream could not confirm are listed apart, and they cost nothing.
-
-**Open tenders on SAM.gov for translation services with a deadline after November 1. Include the buyer and the estimated value.**
-One row per notice, with the buyer, the estimated value, the deadline and a link to the notice. Code compares the deadline with the date you gave.
-
-**Rust command-line tools on GitHub with more than 1,000 stars, pushed to in the last month, under an MIT or Apache license.**
-One row per repository, with its stars, last push and license. Code compares the stars and the date with your numbers, and each row links to the repository.
-
-Reading goes where those things live: registries and official APIs, maps and directories, job boards, research indexes, news, and each result's own site. SpecStream reads at the moment you ask.
+SpecStream reads registries and official APIs, maps and directories, job boards, research indexes, news and each result's own site at the moment you ask.
 
 ## Docs and support
 

@@ -6,7 +6,7 @@ Unofficial; not affiliated with Slack. Slack is a trademark of Slack Technologie
 
 ## Requirements
 
-- OpenCode `>=2.2.3 <2.3.0`, tested on 2.2.3 and 2.2.4; macOS and Linux.
+- OpenCode `>=2.2.3 <2.3.0`, tested on 2.2.3, 2.2.4 and 2.2.5; macOS and Linux. Outside that range the plugin sets nothing up and `/slack-status` says why, unless you set `allowUntestedHost`.
 - A Slack app that your organisation owns, with Slack's MCP server turned on. Slack lets only internal apps and Slack Marketplace apps use its MCP server. If your organisation has none, someone who can create apps in your workspace makes one from the [app manifest](https://github.com/joe-broadhead/opencode-slack/blob/HEAD/docs/slack-app-manifest.json): see [Create the Slack app](https://github.com/joe-broadhead/opencode-slack/blob/HEAD/docs/configuration.md#create-the-slack-app).
 
 ## Install
@@ -14,6 +14,10 @@ Unofficial; not affiliated with Slack. Slack is a trademark of Slack Technologie
 ```sh
 opencode plugin add @joe-broadhead/opencode-slack
 ```
+
+Run `opencode reload`, or restart OpenCode. Then run `/slack-status`: it shows `not configured` until you give OpenCode your Slack app's client ID (see [Sign in](#sign-in)).
+
+**Update** with `opencode plugin update @joe-broadhead/opencode-slack`, then run `opencode reload`. An entry pinned to a version, such as `@joe-broadhead/opencode-slack@0.0.2`, does not update: remove the `@version` from its `plugins` entry first.
 
 ## Sign in
 
@@ -29,7 +33,7 @@ opencode plugin add @joe-broadhead/opencode-slack
 
 Ask in plain words, for example "find what we decided about the launch date in #release, with links". The `slack-search` skill guides the agent: search public channels first, read the thread for context, cite permalinks, never claim it searched everything, and treat Slack content as data, not instructions.
 
-The Slack tools are Slack's own. With Code Mode, which is on by default, agents call them as `tools.slack.<tool>` inside `execute`, for example `tools.slack.slack_search_public({ natural_language_query: "When is the launch?", keywords: ["launch"] })`. Their names and permission actions are `slack_<tool>`, for example `slack_slack_search_public`.
+The Slack tools are Slack's own. With Code Mode, which is on by default, agents call them as `tools.slack.<tool>` inside `execute`, for example `tools.slack.slack_search_public({ query: "launch date in:#release", limit: 10 })`. Their names and permission actions are `slack_<tool>`, for example `slack_slack_search_public`.
 
 **Status.** In the TUI, `/slack` (or **Slack: Status** in the command palette) opens a dialog. Press `r` to refresh and `Esc` to close; it also refreshes when the connection, agents or saved client change. If it shows 0 tools just after connecting, press `r`. `/slack-status` posts the same status into the session without starting a model turn. Status shows these rows, in order:
 
@@ -38,9 +42,20 @@ The Slack tools are Slack's own. With Code Mode, which is on by default, agents 
 - `Access`: what runs without asking, what asks first, and how to allow it;
 - `Server`, `Client`, `Callback` and `Scopes`: the Slack server, the client ID and where it came from, the callback URL to register, and the requested scopes;
 - `Tools`: the Slack tools found, counted by class, with any unknown tools named;
-- `Agents without default rules`: agents that run Slack tools without asking, with the rules to paste (see [Agents without the default rules](#agents-without-the-default-rules));
-- `OpenCode`: the version and the tested range;
+- `Agents without default rules`: agents that run Slack tools without asking, with the rules to paste (see [Agents without the default rules](#agents-without-the-default-rules)), or `none`;
+- `OpenCode`: the version, whether it is tested (2.2.3, 2.2.4 and 2.2.5), and the supported range;
 - `Next step`: exactly one, or `Nothing to do.`
+
+### Scripts
+
+A script or a cron job can call Slack's fourteen read tools with no model, through `opencode api`. It runs as a session and its agent, under that agent's permission rules and the session's own. The private search and the file read ask by default, so a script needs an allow rule for them. Writes and sends are never available to scripts:
+
+```sh
+opencode api post /api/rpc/slack.workspace.tools/slack_search_public \
+  -d '{"input":{"sessionID":"ses_…","input":{"query":"launch date","limit":10}}}'
+```
+
+See [Scripting](https://github.com/joe-broadhead/opencode-slack/blob/HEAD/docs/scripting.md).
 
 ## Permissions
 
@@ -155,16 +170,18 @@ Run `/slack-status` (or `/slack` in the TUI) first. Its `Connection` row shows a
 | `not configured` | `CLIENT_ID_MISSING` | No Slack app client ID is set, so the Slack server is not added. | Run `/connect` and choose **Slack app**, then paste your Slack app's client ID. |
 | `not configured` | `CLIENT_ID_INVALID` | The client ID saved in the `/connect` **Slack app** entry is empty or has spaces. | Run `/connect` and choose **Slack app**, then paste the client ID again. |
 | `sign-in required` | `AUTH_REQUIRED` | Nobody has signed in yet, or the sign-in expired. | Run `/connect` and choose **Slack**, then press `o` or Enter to open the sign-in page. `opencode mcp auth slack` opens the browser automatically. |
-| `connecting` | none | OpenCode is connecting to Slack. | Wait a few seconds, then refresh. |
+| `connecting` | none | OpenCode is connecting to Slack. | Wait a few seconds, then run `/slack-status` again (or press `r` in `/slack`). |
 | `disabled` | `SERVER_DISABLED` | The server is turned off. | Turn on `slack` in `/mcps`. |
-| `failed` | `CONNECTION_FAILED` | The connection failed. Status includes OpenCode's error text. | Fix the error shown, then reconnect `slack` in `/mcps`. |
+| `failed` | `CONNECTION_FAILED` | The connection failed. Status shows OpenCode's reason, shortened to one line. | Fix the error shown, then reconnect `slack` in `/mcps`. |
 | `conflict` | `SERVER_NAME_IN_USE` | Another MCP server already uses the name `slack`. | Remove `mcp.servers.slack` from your config, or set the `server` option to another name. |
 | `failed` | none | OpenCode has not loaded the server. | Run `opencode reload`, then check again. |
 | `not configured` | `OPTIONS_INVALID` | An option is invalid. Status names the field. | Follow the next step. |
-| `host untested` | `HOST_UNTESTED` | This OpenCode version is outside `>=2.2.3 <2.3.0`, so Slack is not set up. | Use OpenCode `>=2.2.3 <2.3.0`, or set `"allowUntestedHost": true` in the plugin's options. |
+| `host untested` | `HOST_UNTESTED` | This OpenCode version is outside the supported range `>=2.2.3 <2.3.0`, so Slack is not set up. A release inside the range that is not 2.2.3, 2.2.4 or 2.2.5 runs normally; the `OpenCode` row calls it untested. | Use OpenCode `>=2.2.3 <2.3.0`, or set `"allowUntestedHost": true` in the plugin's options. |
 | `connected` | none | Ready. The next step reads `Nothing to do.` | If status names agents without default rules, put the default rules first in their own permissions (see above). |
 
 If status itself cannot be read, `/slack-status` says `STATUS_UNAVAILABLE`; run it again in a moment.
+
+A script's errors from the tools RPC have their own codes, listed in [Scripting](https://github.com/joe-broadhead/opencode-slack/blob/HEAD/docs/scripting.md#errors).
 
 **Slack shows an error during sign-in**
 
@@ -188,10 +205,13 @@ If status itself cannot be read, `/slack-status` says `STATUS_UNAVAILABLE`; run 
 
 ## Uninstall
 
-1. Run `opencode plugin remove @joe-broadhead/opencode-slack`.
-2. Sign out of Slack: `opencode mcp logout slack`.
-3. If you saved a client ID, remove the **Slack app** entry: in `/connect`, choose **Slack app** and delete the account, or run `opencode auth logout slack-app`.
-4. Remove any Slack rules you copied into your agents' own `permissions`.
+Sign out while the plugin is still installed: once it is removed, OpenCode no longer knows the `slack` server or the **Slack app** entry, so it cannot remove their credentials, and `opencode auth list` stops showing them.
+
+1. Sign out of Slack: `opencode mcp logout slack`.
+2. If you saved a client ID in `/connect`, remove it: `opencode auth logout slack-app`, and choose the **Slack app** account. Without a terminal, name it: `opencode auth logout slack-app "Slack app"`.
+3. Check: `opencode auth list` lists neither **Slack** nor **Slack app**.
+4. Remove the plugin: `opencode plugin remove @joe-broadhead/opencode-slack`, then `opencode reload`. `opencode mcp list` no longer lists `slack`.
+5. Remove any Slack rules you copied into your agents' own `permissions`.
 
 ## Links
 

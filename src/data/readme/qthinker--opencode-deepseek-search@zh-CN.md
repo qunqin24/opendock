@@ -1,14 +1,15 @@
 # OpenCode V2 的 DeepSeek 搜索插件
 
 把 DeepSeek Search / Fetch 接进 OpenCode V2：**内置 `websearch` 工具直接走 DeepSeek**，另带干净的 Markdown
-抓取、本地用量/费用统计、一个**持久化**的后端开关，以及**TUI 与桌面侧边栏**——直接显示状态与数字，一点就切换接管。
+抓取、本地用量/费用统计、**账户余额实时显示**、一个**持久化**的后端开关，以及**TUI 与桌面侧边栏**——直接显示状态、数字与余额，一点就切换接管。
 
 切回原生：侧边栏开关、改配置 `mode`，或让模型调 `deepseek_mode`。
 
 与已占用的同名 V1 包的区别：本项目面向 **V2 插件 API**、支持**运行时切换后端**、自带**本地用量与费用估算**。
 
 > 已在 `opencode 2.2.5` + `@opencode/plugin@2.2.5`（Windows）实测。Search/Fetch 的接口事实来自
-> <https://api-docs.deepseek.com/zh-cn/guides/search>。
+> <https://api-docs.deepseek.com/zh-cn/guides/search>；余额查询接口来自
+> <https://api-docs.deepseek.com/zh-cn/api/get-user-balance>。
 
 English: [README.md](https://github.com/QThinkerJR/opencode-deepseek-search/blob/main/README.md)。界面语言支持
 `en` / `ja` / `zh-CN`（默认英文，可用 `options.language` 指定），文档只提供英文与中文两版。
@@ -153,7 +154,7 @@ deepseek_mode 开关（storage: mode/v1）  >  options.mode  >  内置默认
 
 | 面 | 你会看到 | 怎么切 |
 |---|---|---|
-| TUI | 会话侧边栏末尾追加一块 DeepSeek：状态行 + 今日 / 本月 / 累计（`Search` · `Fetch` · `¥` 估算）；侧边栏变窄时先退化到缩写、再逐个减列，不会折行 | 点标题右端的动作，或用 `/deepseek` 斜杠命令打开菜单 |
+| TUI | 会话侧边栏末尾追加一块 DeepSeek：状态行 + 今日 / 本月 / 累计（`Search` · `Fetch` · `¥` 估算）+ 账户余额；侧边栏变窄时先退化到缩写、再逐个减列，不会折行 | 点标题右端的动作，或用 `/deepseek` 斜杠命令打开菜单 |
 | 桌面 | 会话侧区域的 **DeepSeek** 页签，出现在侧区域的 *New tab* 列表与 `+` 菜单里，也可用命令打开面板（中文界面 `DeepSeek: 打开统计面板`，默认英文界面 `DeepSeek: Open usage panel`） | 面板上的按钮，另有刷新按钮 |
 
 - 两个面读的是同一份账本和同一个持久化开关（与 `deepseek_usage` / `deepseek_mode` 完全一致）：数据只有服务端
@@ -163,6 +164,15 @@ deepseek_mode 开关（storage: mode/v1）  >  options.mode  >  内置默认
 - 动作行只说点击真的会做什么。没有配置 API Key 时没有可做的动作，就显示该怎么修（`DEEPSEEK_API_KEY`）；
   内置工具没能打上补丁时显示「未接管」，而不是假装已启用。
 - 每次记账与每次切换后都会发 `changed` 事件触发刷新，两个面另有 10 秒重读作为兜底。
+- **正文末行是你的账户余额**（服务端用同一个 Key 调官方查询余额接口 `GET /user/balance`，来源：
+  <https://api-docs.deepseek.com/zh-cn/api/get-user-balance>；缓存 60 秒、失败保留上次值）：
+  三行用量读作小票，账户真相落在下面。仅在接管启用或原生模式这两态显示——只有这两态卡片真正指向账户。
+  余额不足时金额转警示色；侧边栏太窄（约 12 列以下）宁可整行省略也不挤压。桌面面板把它放成用量表下方的
+  账户块，悬停可看赠金/充值细分（仅两者都非零时）。手动刷新（桌面刷新按钮、TUI 菜单里的「刷新」、失败重试）
+  会强制重探，10 秒轮询不会。
+  手动刷新（桌面刷新按钮、TUI 菜单里的「刷新」、失败重试）会强制重探，10 秒轮询不会。
+- **显示阶梯以金额为先**：变窄时费用数字比文字标签活得更久；低于数字下限后三行用量并作一行、仍然带数字，
+  不会出现三个光秃秃的标签。
 
 桌面半边以预构建的 CommonJS bundle（`gui-experimental.cjs`）发布：npm 安装自带；如果你从源码目录跑，需要构建一次
 （TUI 半边零构建，和服务端一样直接加载 TypeScript）：

@@ -74,6 +74,17 @@ The skills are `opencode-plaud` (the tools and Plaud's data model), `opencode-pl
 
 See [SECURITY.md](https://github.com/joe-broadhead/opencode-plaud/blob/HEAD/SECURITY.md) for saved approvals and other risks.
 
+### Scripts
+
+A script or a cron job can call Plaud's five read tools with no model, through `opencode api`. It runs as a session and its agent, under that agent's permission rules and the session's own. Add `"account": "<alias>"` to read another account. Exports and every other Plaud tool are never available to scripts, and a script never gets a signed link:
+
+```sh
+opencode api post /api/rpc/plaud.recordings.tools/list_files \
+  -d '{"input":{"sessionID":"ses_…","input":{"page_size":10}}}'
+```
+
+See [Scripting](https://github.com/joe-broadhead/opencode-plaud/blob/HEAD/docs/scripting.md).
+
 ## Permissions
 
 The plugin adds default rules to each agent: Plaud's read tools run without a prompt, and `plaud_export` and any other Plaud tool ask first. "Always allow" on an export remembers only that account and kind, such as `default:transcript`. Your own `permissions` rules win over the defaults.
@@ -134,7 +145,7 @@ Members then only sign in, once per account: run `/connect` and choose **Plaud**
 | `/plaud-status` and the palette command are missing | The plugin did not start. Open `/plugins` to see the error. |
 | `Permission plaud_export needs approval` | The run cannot ask. Add an `allow` rule for that export. |
 
-Errors from the plugin read `CODE: what happened. Next step: What to do.` Every code is listed in [Errors](https://github.com/joe-broadhead/opencode-plaud/blob/HEAD/docs/configuration.md#errors).
+Errors from the plugin read `CODE: what happened. Next step: What to do.` Every code is listed in [Errors](https://github.com/joe-broadhead/opencode-plaud/blob/HEAD/docs/configuration.md#errors). A script that uses the tools RPC has its own codes, listed in [Scripting](https://github.com/joe-broadhead/opencode-plaud/blob/HEAD/docs/scripting.md#errors).
 
 ## Uninstall
 
@@ -151,6 +162,7 @@ Run `opencode mcp logout plaud-<alias>` for each extra account too, before you r
 
 - [Configuration](https://github.com/joe-broadhead/opencode-plaud/blob/HEAD/docs/configuration.md)
 - [Architecture](https://github.com/joe-broadhead/opencode-plaud/blob/HEAD/docs/architecture.md)
+- [Scripting](https://github.com/joe-broadhead/opencode-plaud/blob/HEAD/docs/scripting.md)
 - [Contributing](https://github.com/joe-broadhead/opencode-plaud/blob/HEAD/CONTRIBUTING.md)
 - [Security](https://github.com/joe-broadhead/opencode-plaud/blob/HEAD/SECURITY.md)
 - [Changelog](https://github.com/joe-broadhead/opencode-plaud/blob/HEAD/CHANGELOG.md)

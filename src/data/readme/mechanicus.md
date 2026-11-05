@@ -5,13 +5,13 @@
   
 </div>
 
-# ✨ Mechanicus ✨
+# ⚙️ Mechanicus 🛠️
 
 > "There is no truth in flesh, only betrayal."<br>
 > "There is no strength in flesh, only weakness."<br>
 > "There is no constancy in flesh, only decay."<br>
 > "There is no certainty in flesh but death."<br>
-> — Credo Omnissiah
+>           — Credo Omnissiah (Warhammer 40000)
 
 <p><b>Opencode Multi Agent Suite</b> · Mix any models · Auto delegate tasks</p>
 <p><sub>by <b>Boring Dystopia Development</b></sub></p>
@@ -26,17 +26,17 @@
 <b>English</b> · <a href="README.zh-CN.md">简体中文</a> · <a href="README.ja-JP.md">日本語</a> · <a href="README.ko-KR.md">한국어</a> · <a href="README.fa-IR.md">فارسی</a>
 </p>
 
-<div align="center"><p><sub>✦ ✦ ✦</sub></p></div>
+<div align="center"><p><sub>＊ ＊ ＊</sub></p></div>
 
 ## What's This Plugin
 
-mechanicus is an agent orchestration plugin for OpenCode. It includes a built-in team of specialized agents that can scout a codebase, look up fresh documentation, review architecture, handle UI work, and execute well-scoped implementation tasks under one orchestrator.
+`mechanicus` is an agent orchestration plugin for OpenCode, based on `oh-my-opencode-slim`. It includes a built-in team of specialized agents that can scout a codebase, look up fresh documentation, review architecture, handle UI work, and execute well-scoped implementation tasks under one orchestrator.
 
 The main idea is simple: instead of forcing one model to do everything, the plugin routes each part of the job to the agent best suited for it, balancing **quality, speed and cost**. The Orchestrator plans the work graph, dispatches specialists as background tasks, and reconciles their results before continuing.
 
 ### ✨ Highlights
 
-- **[Seven specialized agents](#meet-the-pantheon)** - Omnissiah, Magos,
+- **[Seven specialized agents](#meet-the-adeptus-mechanicus)** - Omnissiah, Magos,
   Dominus, Council, Logis, Artisan, and Genetor. Each part of the job goes to
   the agent best suited for it - mix any models across any providers.
 - **[Background orchestration](docs/background-orchestration.md)** - the
@@ -248,11 +248,11 @@ If any agent fails to respond, check your provider authentication and config fil
 
 ---
 
-<a id="meet-the-pantheon"></a>
+<a id="meet-the-adeptus-mechanicus"></a>
 
-## 🏛️ Meet the Pantheon
+## 🏛️ Meet the Adeptus Mechanicus
 
-### 01. Orchestrator: The Embodiment Of Order
+### 01. Omnissiah: The Embodiment Of Order
 
 <table>
   <tr>

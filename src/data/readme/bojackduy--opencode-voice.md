@@ -56,29 +56,32 @@ That's it. Press `Ctrl+X` then `[` to start recording.
 
 ## Features
 
-| Feature                 | What you get                                                 |
-| ----------------------- | ------------------------------------------------------------ |
-| Streaming dictation     | Live waveform + live transcript above the prompt             |
-| Code-aware TTS          | Piper, Chatterbox, or VieNeu — per-sentence language routing |
-| Bilingual vi + en       | VieNeu-TTS code-switches in one utterance, 25 voices         |
-| Hands-free conversation | Auto-silence finalize, auto-listen after reply, barge-in     |
-| Local-first             | whisper-cpp + sox + Piper on your machine                    |
-| Remote audio            | Use your phone as a mic over SSH                             |
-| Playback controls       | Pause, rewind, forward, speed 0.75x–2x, replay               |
-| 19 commands             | Palette + slash + leader keybinds on both hosts              |
+| Feature                 | What you get                                                         |
+| ----------------------- | -------------------------------------------------------------------- |
+| Streaming dictation     | Live waveform + live transcript above the prompt                     |
+| Code-aware TTS          | Piper, Chatterbox, VieNeu, or Kokoro — per-sentence language routing |
+| Bilingual vi + en       | VieNeu-TTS code-switches in one utterance, 25 voices                 |
+| Hands-free conversation | Auto-silence finalize, auto-listen after reply, barge-in             |
+| Local-first             | whisper-cpp + sox + Piper on your machine                            |
+| Remote audio            | Use your phone as a mic over SSH                                     |
+| Playback controls       | Pause, rewind, forward, speed 0.75x–2x, replay                       |
+| 19 commands             | Palette + slash + leader keybinds on both hosts                      |
 
 ## Commands
 
-| Command               | What it does                                    |
-| --------------------- | ----------------------------------------------- |
-| `/stt-record`         | Start / stop recording + transcribe             |
-| `/tts-speak`          | Read last response aloud                        |
-| `/voice-conversation` | Toggle hands-free conversation mode             |
-| `/tts-engine`         | Switch TTS engine (Piper / Chatterbox / VieNeu) |
-| `/tts-vieneu-voice`   | Pick from 25 VieNeu voices                      |
-| `/stt-mic`            | Choose microphone (local or remote)             |
+| Command               | What it does                                             |
+| --------------------- | -------------------------------------------------------- |
+| `/stt-record`         | Start / stop recording + transcribe                      |
+| `/tts-speak`          | Read last response aloud                                 |
+| `/voice-conversation` | Toggle hands-free conversation mode                      |
+| `/tts-engine`         | Switch TTS engine (Piper / Chatterbox / VieNeu / Kokoro) |
+| `/tts-vieneu-voice`   | Pick from 25 VieNeu voices                               |
+| `/tts-kokoro-voice`   | Pick a Kokoro voice                                      |
+| `/stt-mic`            | Choose microphone (local or remote)                      |
 
 Full command list: [technical docs](docs/technical.md#commands).
+
+Options (under the plugin entry in `tui.json`): `ttsKokoroPython` (python binary for the Kokoro sidecar), `ttsKokoroVoice` (Kokoro voice id, default `af_heart`), alongside the existing `ttsVieneuPython` / `ttsVieneuVoice`.
 
 ## Landing page
 

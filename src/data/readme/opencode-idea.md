@@ -82,9 +82,9 @@ setup(启动, 每 root 一次):
 
 **热更新会断开**:插件源码变更会触发 V2 热重载,注册随旧实例一起释放。**改完插件后重跑一次 `/open-in-ide`** 即可恢复。
 
-## 远程配置 (`/sync-remote-config` / `/manage-remote-config`)
+## 远程配置 (`/remote-config-sync` / `/remote-config-manage`)
 
-### `/sync-remote-config`
+### `/remote-config-sync`
 
 双向对齐:
 
@@ -126,23 +126,23 @@ IDE 必须连着;没连上会提示先 `/open-in-ide`。写完整凭据(`passwor
 `exclude` 只接受**路径前缀**或**精确文件**(`node_modules`、`target`、`logs/app.log`),不支持 `*` / `?`;
 server 级作用于此机器所有 deployment,deployment 级叠加在它之上。
 
-### `/manage-remote-config`
+### `/remote-config-manage`
 
 提示词命令:让 AI 直接改 `hosts.json`(加 server / 加 deployment / 调 `exclude`)。改完由插件的指纹对账
-**静默**推到 IDE —— 不需要再敲 `/sync-remote-config`,也不会往会话里插提示。
+**静默**推到 IDE —— 不需要再敲 `/remote-config-sync`,也不会往会话里插提示。
 
-### `/remote-shell`、`/remote-sync` 与 `/remote-deployment`
+### `/remote-shell`、`/remote-files` 与 `/remote-deploy`
 
 三条都是**提示词命令**:不执行任何东西,只往会话里注入一段规则(和 `~/.config/opencode/commands/readonly.md` 同一个思路)。
 
 - **`/remote-shell`** — 只负责远程命令:`remote_list_servers` + `remote_exec`,不要自己拼 `ssh`
-- **`/remote-sync`** — 只负责文件上传 / 下载:`remote_upload` / `remote_download`,不启动进程
-- **`/remote-deployment`** — 负责部署:`deploy_remote_process`(同步 + 启动 + 打开 Run 标签页)
+- **`/remote-files`** — 只负责文件上传 / 下载:`remote_upload` / `remote_download`,不启动进程
+- **`/remote-deploy`** — 负责部署:`deploy_remote_process`(同步 + 启动 + 打开 Run 标签页)
 
 ```
 /remote-shell mbp 看下磁盘
-/remote-sync mcp-test-project download
-/remote-deployment aidata-api
+/remote-files mcp-test-project download
+/remote-deploy aidata-api
 ```
 
 参数原样附在提示词末尾;**没带参数时,提示词会要求模型先问清楚**(服务器 / 命令 / deployment / 配置名),
@@ -153,11 +153,12 @@ server 级作用于此机器所有 deployment,deployment 级叠加在它之上�
 IDE MCP 可用时,插件通过 **系统提示注入**告诉模型 **哪些事该走 IDE**;除下面「工具参数与输出」那几处刻意的接管
 (删一个参数、换一个描述),不修改任何工具 (原生或 IDEA) 的定义或可用性:
 
-1. **系统提示注入**:通过 `ctx.session.hook("context", …)` 往每次请求的 system 里追加一段引导。
-   **文本本身在 `src/ide-guidance.template.md`** —— 它是一份要给人 review 的提示词文档,纯 Markdown,只有每条工具后面的
-   命令名(`{{cmd_xxx}}`)由代码填;`src/template.js` 是渲染器(支持 `{{var}}`,`{{#if}}` 仍在实现里但引导模板不再使用;
-   **不做 HTML 转义** —— 输出是 Markdown,`<jar>!/<entry>` 和反引号必须原样过)。
-   含工具名(`ide_<name>`)与关键参数名。
+1. **系统提示注入**:通过 `ctx.session.hook("context", …)` 往每次请求的 system 里追加引导。
+   **文本本身在两份文件里** —— `src/tool-guidance.template.md`(原生工具 + 远端工具,始终注入)与
+   `src/ide-guidance.template.md`(IDE 工具,只在本次请求真的带着 IDE 工具时注入)。两份都是要给人 review 的
+   提示词文档,纯 Markdown,只有每条工具后面的命令名(`{{cmd_xxx}}`)由代码填;`src/template.js` 是渲染器(支持
+   `{{var}}`,`{{#if}}` 仍在实现里但引导模板不再使用;**不做 HTML 转义** —— 输出是 Markdown,`<jar>!/<entry>`
+   和反引号必须原样过)。含工具名(`ide_<name>`)与关键参数名。
 
    > **配套插件 `idea-mcp-enhance` 是硬前提**:引导默认它一定装了,所以配套插件的工具 (运行配置启停 / 部署 / 终端)
    > **不做"有没有装 / 有没有这个工具"的判断**,直接写进引导。
@@ -295,116 +296,110 @@ IDE MCP 可用时,插件通过 **系统提示注入**告诉模型 **哪些事该
 
 前者不依赖模型知道这个语义,后者不依赖模型读提示词 —— 两边都是"即使模型不配合也不会被骗"。
 
-## Run Configuration 全套 (配套插件 `idea-mcp-enhance`)
+## Run Configuration (配套插件 `idea-mcp-enhance`)
 
-IDE 内置的 MCP Server 只能 **启动已有**的 run configuration (`execute_run_configuration`), **不能新建、不能停止、不能重启、
-也查不到运行状态**。配套的 IDEA 插件 [`idea-mcp-enhance`](https://github.com/syllr/idea-mcp-enhance)(IDEA 2026.2+,必须安装)
-补齐这一族 —— 「定义态 (查 / 建 / 改 / 删)」加「运行态 (看 / 停 / 重启)」:
+IDE 内置的 MCP Server 只能 **启动已有**的 run configuration, **不能停、不能重启、也查不到运行状态**。配套的 IDEA 插件
+[`idea-mcp-enhance`](https://github.com/syllr/idea-mcp-enhance)(IDEA 2026.2+,必须安装) 补齐运行态与定义态的**读**:
 
-| 工具 (OpenCode 里叫 `ide_*`)      | 作用                                                                                                                                                                                                             |
-| --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ide_inspect_run_configuration`   | 看**一个**配置的全貌:定义(options / envs / before-launch)、**命名解析**(platform / base / env)、活实例、历史运行及各自的日志文件路径                                                                             |
-| `ide_create_run_configuration`    | 新建**任意类型**的项目级配置:内容来源三选一 —— `cloneFrom`(复制现成的,最稳)/ `configurationXml` / 平台模板 + `options` / `attributes` / `envs` 补丁。**项目资产 —— 只给会重复发生的流程建,且必须先征得用户同意** |
-| `ide_update_run_configuration`    | 改字段或改名:字段走补丁(`null` = 删),`newName` 改名并**连带更新别人对它的引用**、迁移历史日志的键                                                                                                                |
-| `ide_delete_run_configuration`    | 删配置:在跑或被人引用时拒绝,`force = true` 才连引用一起清掉                                                                                                                                                      |
-| `ide_list_running_configurations` | **当前真正在跑**的配置:几个实例 / 各自 pid / 退出码。`>1` 个实例就是端口漂移的信号                                                                                                                               |
-| `ide_stop_run_configuration`      | 停掉该配置的**全部**实例并等它们退出;没在跑也返回成功(幂等)                                                                                                                                                      |
-| `ide_rerun_run_configuration`     | 等同 IDE 的 **Rerun** 按钮:在跑就重启、没在跑就启动,读 `started` 判断是否真起来了                                                                                                                                |
+| 工具 (OpenCode 里叫 `ide_*`) | 作用 |
+| --- | --- |
+| `ide_get_run_configurations` | 列出 IDE 认到的配置 (名字 + 描述) |
+| `ide_inspect_run_configuration` | 看**一个**配置的全貌:`typeKnown` / `canRun` / `warnings` / `options` / `configurationXml` / 活实例 / 历史日志 |
+| `ide_execute_run_configuration` | 跑完**等退出** —— 只用于一次性任务 |
+| `ide_rerun_run_configuration` | 在跑就重启、没在跑就启动;长驻进程只走这一条 |
+| `ide_stop_run_configuration` | 停掉该配置的**全部**实例 |
+| `ide_list_running_configurations` | 当前 Run 会话的索引 (pid / 状态 / 日志) |
+| `ide_list_remote_processes` | 远端**真实**状态,含 `stopped` / `invalid` |
+| `ide_deploy_remote_process` | 部署:同步 + 启动 + 打开 Run 标签页 (deploy-only) |
 
-**需要项目环境的命令也走原生 shell** —— 项目配置的 JDK / Node / Go / Maven / Python 由配套插件的 `get_project_env`
-取出来,再由本插件的 `shell.hook("create.before")` **注入到每个新 shell 的 `PATH` 与环境变量里**,所以 `java` / `node` /
-`go` / `mvn` / `python` 在原生 shell 里就是项目配置的版本。**会反复发生的流程 / 常驻服务**仍然固化成 run configuration;
-看文件、git、临时脚本也走原生 shell。配置必须 **先在 IDEA 里存在**(由用户建),没有就请用户建一个再跑;要不要建、建什么,
-按 `idea-run-config-manager` skill 的判据走。
+**没有 create / update / delete 工具** —— 新建、修改、删除就是改项目根的 `.run/<名字>.run.xml`。配置是**项目资产**,
+文件本身就是真相:可 review、可提交、可 diff,和 IDE 自己写出来的格式完全一致。
 
-> **为什么内置 IDE 终端仍然隐藏**:`ide_execute_terminal_command` 之前被当成"自动继承 IDE 项目环境"的通道而保留暴露,但实测
-> **它拿不到项目配好的 JDK / Node / Python 版本**,和原生 shell 没有区别。既然没有优势,就把它从模型可见的工具表里
-> 隐藏掉 (`HIDDEN_IDE_TOOL_SUFFIXES`)。
->
-> **项目环境现在由本插件自己注入**:连接 IDE 时调一次配套插件的 `get_project_env`(不进模型可见的工具表),把返回的
-> `PATH` **前置**拼到每条新 shell 的 PATH 上,其余变量(`GOROOT` / `MAVEN_HOME` / `VIRTUAL_ENV` …)直接覆盖。所以原生
-> shell 就是"项目 shell",不需要一个单独的 `project_sdk_terminal` 工具;配套插件里那套本地终端能力已经整体移除。
-> 拉不到环境变量时连接按**没做完**处理(`env-unready`),不会静默降级成"工具有、环境是空的"。
+### 为什么写文件,而不是给 IDE 加写工具
 
-配置名有自己的文法:**`[os@]base[@env]`** —— os 段 (`win` = Windows,缺省 = macOS / Linux)、base 段 (配置本体)、env 段 (环境名,
-缺省 = 默认环境 —— 起一批时逐条解析:有 `@<env>` 用它,没有就用默认)。`win@base` 与 `base@env` 都是同一个 base 的 **变体**,档案里只登记 base。解析 **交给工具**:
-`ide_inspect_run_configuration` 的 `naming` 字段把名字拆成 platform / base / env,规则是从两头往中间收 (末段是环境;首段只有
-恰好是 `win` 才算平台,不是就并进 base),所以 `a@b@c` 会解析成 base=`a@b`、env=`c`,不会丢段。
+- **可验证**:写完 `ide_inspect_run_configuration` 立刻告诉你 `type` 认不认 (`typeKnown`)、能不能跑
+  (`canRun` / `canRunBlockedReason`)、字段有没有被静默吞掉 (`warnings` / `options`)
+- **可回滚**:改坏了 `git checkout` 就回来
+- **不用适配**:每种类型的写 API 都不一样,XML 只有一种
+- **代价可控**:唯一风险是字段写错被静默忽略 —— 模板 + `inspect` 正好覆盖这一层
 
-opencode-idea 对这一组工具做两件事:
+### Remote Process
 
-1. **透传**:IDE MCP server 以 `codemode: false` 注册,工具目录整体转发,所以这七个工具自动以 `ide_*` 出现在模型的
-   工具表里 —— 插件侧不需要单独声明,也不需要判断它们在不在;
-2. **无条件引导**:这七个工具**默认都在**(配套插件是硬前提),「运行配置」节直接逐个点名。其中一条值得单独说:
-   **启动 / 重启常驻进程就用 `ide_rerun_run_configuration`,不要用 `pkill` / `kill` / shell** —— 这正是它要解决的问题:
-   外部杀掉的进程 IDE 并不知道,Run 窗口仍显示运行中,下次启动就会撞端口。
+`type="RemoteProcess"` 是唯一"跑在别的机器上"的类型:
 
-> **前提**:配套插件 `idea-mcp-enhance` 必须装在每个接入的 IDE 上。没装时引导仍会点名这些工具、调用会失败 —— 这是
-> 刻意选择的硬前提,不做兼容判断。
+| 字段 | 含义 |
+| --- | --- |
+| `server` | IDE SSH 配置名,且必须在 `hosts.json` 里 |
+| `deployment` | 启动前要差量同步的 deployment (`process` 必填) |
+| `command` | 远端要跑的命令 |
+| `workingDirectory` | 远端 `cd` 的目标目录 |
+| `logDir` | 应用自己的日志目录,仅用于查询 |
+| `kind` | `process` / `docker` (留空按命令推断) |
+| `container` | 容器名 (`docker` 必填) |
 
-## Run Configuration:文件由工具写,档案由 skill 写
+**Run 与 Deploy 是两套语义**:
 
-内置 MCP 只能**查**(`get_run_configurations`)和**执行**(`execute_run_configuration`);增 / 删 / 改 / 改名 / 查详情
-靠配套插件的那一族(见上面的「Run Configuration 全套」)。
+- **Run** (`rerun`) —— 调试。Stop **会 kill 远端进程**
+- **Deploy** (`deploy_remote_process`) —— 发布。同步 + 启动 + 打开 Run 标签页;**Stop 只关日志,不 kill 远端**
 
-**运行配置只有工具写** —— `ide_create_run_configuration` / `ide_update_run_configuration` / `ide_delete_run_configuration`
-是唯一写入口。理由不是"不许写",而是 **手写失败时是静默的**:`type` 写错 IDE 整个忽略那个文件,字段名拼错则静默用默认值。
+三条铁律:
 
-> **曾经有一个 `idea-run-config` skill 教模型凭记忆手写配置文件,已经删掉。** 理由不是"不许写",而是
-> **不许凭空写** —— `type` 写错 IDE 会**静默忽略整个文件、日志里也不报**。现在这件事由 `idea-run-config-manager` 接手。
+1. **远程配置不得自行触发** —— 一次 run = 同步 (overwrite) + 远端启动,误触发就是线上被替换
+2. **不要自己拼 `nohup` / `docker run`** —— 那是把配置绕过去了,IDE 不知道有个进程在外面跑
+3. **只同步文件用 `remote_upload` / `remote_download`** —— Remote Process 的 run 一定会启动进程,同步只是
+   前置动作。判据:**这条配置会启动一个进程吗?不会就不是 Remote Process。**
 
-`idea-run-config-manager` skill 做三件事:
+### 命名文法 `base@env`
 
-1. **建 / 改 / 删** —— 直接动手,**走工具不手写文件**。建之前先问用户要不要建:run configuration 是**项目资产**,
-   一个项目通常只建几个。判据是 **这件事以后会不会以同样形态再发生**:会就该建、模型**主动**向用户提议
-   (摊开配置名 / 实际命令 / 工作目录 / 理由),同意才动手;不会就裸 `shell` 跑完算。
-   字段名不确定时走 `cloneFrom` —— 复制一个同类型的现成配置再 patch 它,这是唯一可靠的路子。
-   建完看工具的返回值:`canRun` 是"现在能不能跑"的权威答案,`unknownOptions` 非空就是字段名拼错了。
-2. **建档** —— 过滤后剩下的每条配置在项目根 `AGENTS.md` 的标记块里占一个条目,五项固定
-   (`when` / `before run` / `run` / `after run` / `desc`);只登记 base(`win@base` / `base@env` 是同一个 base 的变体,
-   写进 `desc`)。`when` 回答"谁能起它":`用户授权触发` / `AI 自己触发` **进条目**,`用户手动触发` 只在块末尾登记名字、不进条目。
-   每一项各选一种写法(行内 / 子列表),同一配置里混用是常态 —— 判据只有"这一项自己有几句话"。
-3. **过滤** —— 服务化(常驻应用)的配置归 `idea-standalone` 的块,**两个块永不重叠**。
+`base` 是配置本体 (不含 `@`),`env` 是跑在哪台机器 —— 一台服务器、一台本地电脑,都算一个 env:
 
-这个档案块的用途是**能被下次读到**:要办同类事情时先查它,有现成的就用,不再重复建 —— 所以 **联动是硬要求**:
-配置被**新建 / 删除 / 修改**(无论谁做的:工具建的、用户自己建的、用户删掉的)都要在文档里同步
-**加条目 / 删条目 / 改条目**,否则它就开始骗人。**档案和项目里的配置对不上,比没有档案更糟。**
+- `console-web@ytmac` / `console-web@ytwin` —— 同一应用在 Mac / Windows 各一条
+- `aidata-api@mbp` / `aidata-api@handwrite` —— 同一应用在两台服务器各一条
+- `console-web` —— 不写 env = 所有环境通用
 
-每项怎么写、两种写法各长什么样、两个示例,都在模板的生成提示里,这里不再抄一遍。
-**两个块都是条目式**(一条一个条目,每项一行):`desc` 常是一段话,塞进表格格子里既难读、又要靠补空格维持对齐。
-两边靠**同名同序的四项**(`before run` / `run` / `after run` / `desc`)加各自独有的项 —— 在 `AGENTS.md` 里一眼就能看出
-哪几条是服务、哪几条是固定流程。
+旧的 `win@base` 写法已废弃,统一写 `base@ytwin` (IDE 侧仍兼容旧写法)。**档案按这个结构组织:应用 → 环境** ——
+每个应用一个章节,应用下每个环境一个小节,配置名写在小节标题里。
 
-**SKILL.md 只有一份五步流程**(读 → 枚举 → 建 / 删 / 改 → 同步 → 核对),外加**支持矩阵**与**硬性契约**
-(落地位置、固定信封、复查、路径宏、不要写模板外的字段)—— 它自己就带着规矩;两类内容另放在两个地方,各管一段:
+## Run Configuration:文件由 skill 写,档案也由 skill 写
+
+`idea-run-config-manager` skill 是唯一的增删改入口,它做三件事:
+
+1. **写 `.run/*.run.xml`** —— 照 `assets/types/<类型>.md` 的模板写;先 `ide_get_run_configurations` 查重
+   (按 `(base, env)` 比),再 `ide_inspect_run_configuration` 做静态检查,最后真跑一次
+2. **建档** —— 过滤后剩下的每条配置在项目根 `AGENTS.md` 的标记块里占一个条目;远程配置多一个 `env` 项
+   (逐环境写 `server` / `deployment` / 日志目录),`when` 一律只能是"用户授权触发"
+3. **过滤** —— 服务化(常驻应用)的配置归 `idea-standalone` 的块,**两个块永不重叠**
+
+档案块的用途是**能被下次读到**:要办同类事情时先查它,有现成的就用,不再重复建 —— 所以 **联动是硬要求**:
+配置被**新建 / 删除 / 修改**(无论谁做的)都要同步**加条目 / 删条目 / 改条目**,否则它就开始骗人。
+**档案和项目里的配置对不上,比没有档案更糟。**
 
 | 模板 | 装什么 |
 | --- | --- |
-| `skills/idea-run-config-manager/assets/types/<类型>.md` | **一个类型一份**:那个类型的实测样本 + 字段表 + 坑(索引就是 SKILL.md 里的**支持矩阵**) |
-| `skills/idea-run-config-manager/assets/AGENTS.template.md` | 产物(档案)的骨架:条目怎么写、五项分别写什么、枚举与过滤的要求,都在它的生成提示里 |
+| `skills/idea-run-config-manager/assets/types/remote-process.md` | Remote Process 的 7 个字段、process / docker 两种 XML、已废弃字段、路径不能用 IDE 宏 |
+| `skills/idea-run-config-manager/assets/types/<类型>.md` | 本地类型各一份:实测样本 + 字段表 + 坑(索引就是 SKILL.md 的**支持矩阵**) |
+| `skills/idea-run-config-manager/assets/AGENTS.template.md` | 档案骨架:按「应用 → 环境」两级组织,每个环境小节写 `when` / `before run` / `run` / `after run` / `说明` |
 
-**支持矩阵 (7 份已落、2 份待实物)**:
+**支持矩阵**:
 
 | 类型 | `type` id | 验证 |
 | --- | --- | --- |
+| **Remote Process** | `RemoteProcess` | ✅ 字段来自当前插件源码 |
 | Shell Script | `ShConfigurationType` | ✅ 本机 6 例(含 Windows) |
 | Maven / Gradle / npm / Python / Go Build | `MavenRunConfiguration` / `GradleRunConfiguration` / `js.build_tools.npm` / `PythonConfigurationType` / `GoApplicationRunConfiguration` | ✅ 实物 |
 | Node.js | `NodeJSConfigurationType` | ⚠️ 三个属性已验证,其余字段未验证 |
-| Application / JAR | `Application` / `JarApplication` | ⏳ type 已验证,**字段层无实物 → 暂不写模板,交给用户** |
+| Application / JAR | `Application` / `JarApplication` | ❌ 无实物,已移除 |
 
-矩阵之外(JUnit / TestNG / Kotlin / Docker / Spring Boot / Tomcat / Flyway / Liquibase / HTTP Request …)一律
-**没有模板** → 交给用户在 IDE 里配。
+矩阵之外(JUnit / TestNG / Kotlin / Docker Compose / Spring Boot / Tomcat …)一律**没有模板** → 用 `inspect`
+复制一条同类型现成配置的 `configurationXml`;连现成的都没有,交给用户在 IDE 里建。
 
 **给某个类型补模板的流程**:在 IDE 里建一个最简配置 → 勾 Store as project file → 用 `ide_inspect_run_configuration`
-读它的 `configurationXml` 照抄结构 → 标清哪些字段实测 → 把矩阵里那个类型从 ⏳ 改成 ✅。
+读它的 `configurationXml` 照抄结构 → 标清哪些字段实测 → 把矩阵里那个类型从 ⚠️ 改成 ✅。
 **每个字段名都来自真实文件,不靠猜** —— `js.build_tools.npm`(属性 + 自定义元素)、`ShConfigurationType`(`<option>` 子元素)、
 `NodeJSConfigurationType`(全属性)三种写法并存,套错就是静默失效。
 
-**这个档案块以带前缀的工具为准**,工具前缀固定 `ide_`;
-枚举与执行都用 `ide_get_run_configurations` / `ide_execute_run_configuration` …。
-
 **别的文档都指向这里**:引导文本碰到"要建 / 删 / 改一个配置",不再让模型现编流程,而是让它加载本 skill。
-**两个 skill 都是模型可自取的**(frontmatter 不带 `metadata: opencode/autoinvoke: false`):模型判断到场景就加载。
+**skill 是模型可自取的**(frontmatter 不带 `metadata: opencode/autoinvoke: false`):模型判断到场景就加载。
 「该不该建」的判断留在引导文本里(它每次请求都在),skill 负责动手时的流程与写法。
 
 ### skill 怎么加载
@@ -433,9 +428,9 @@ opencode-idea 对这一组工具做两件事:
 1. **什么是 standalone 模式** —— 启动收口只有 IDEA run configuration。唯一绝对的约束是"入口唯一";形态不限 (本机进程 / 容器 /
    部署到远端,哪些应用不在本机跑要单独写明);跑应用一律 `ide_rerun_run_configuration`(在跑就重启、没在跑就启动),
    **不用** `execute`、不绕开 IDE 用裸命令或 `kill`/`pkill`,重启前也不必先问 —— 这条链是无人化的。
-2. **启动哪些服务** —— 一条服务化配置一条 (base 名), **应用只是它的一个属性**:同一个应用有多条配置 (前端 dev server +
-   后端服务) 就写多条。每条写:应用、端口、`热重载` (有 HMR 就不用提示重启,没有就必须点名重启)、before / after run、
-   `desc`,外加"哪条必须先起来"这类依赖关系。
+2. **应用与环境** —— **按应用分章节,应用下按环境分小节**,不要按配置平铺。应用级写 `是什么` / `依赖`
+   (部署型才多一条 `产物`:构建命令与产物路径;本地 run / debug 直接吃源码,不需要产物)。每个环境小节写配置名、端口、
+   `热重载` (有 HMR 就不用提示重启,没有就必须点名重启)、before / after run。
 
 事实一律先查后写:配置名来自 `ide_get_run_configurations`,`热重载` 来自运行方式,端口读不到就问用户 —— 不猜。
 **只动自己的标记块**:根 `AGENTS.md` 是共享文件 (`project-scaffold` 的宪法、项目自己的内容都在里面),标记之外一字不改。
@@ -455,7 +450,7 @@ opencode-idea 对这一组工具做两件事:
 1. **项目级** `<项目>/.opencode/remote-shell/hosts.json` 里 host 条目下的 `deployments`
 2. **全局** `~/.config/remote-shell/hosts.json` 同上
 
-IDE 只提供 SSH 配置与凭据;deployment 由 `hosts.json` 维护,再由 `/sync-remote-config` 推到 IDE 的
+IDE 只提供 SSH 配置与凭据;deployment 由 `hosts.json` 维护,再由 `/remote-config-sync` 推到 IDE 的
 Deployment 面板。两边不再是"IDE 为数据源",而是同一份配置的两个视图。
 
 `remote_list_servers` 会把每条 mapping 一起列出来(`本地目录 ↔ 远程目录`)。

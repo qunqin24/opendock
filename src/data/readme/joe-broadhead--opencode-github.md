@@ -82,6 +82,17 @@ Three skills come with it:
 
 Each skill reports findings and changes nothing on GitHub unless you ask.
 
+**Scripts.** A script or a cron job can call GitHub's read tools and `github_api`'s reads with no model, through
+`opencode api`. It runs as a session and its agent, under that agent's permission rules and the session's own.
+Scripts can never change anything on GitHub:
+
+```sh
+opencode api post /api/rpc/github.platform.tools/pull_request_read \
+  -d '{"input":{"sessionID":"ses_…","input":{"method":"get","owner":"OWNER","repo":"REPO","pullNumber":42}}}'
+```
+
+See [Scripting](https://github.com/joe-broadhead/opencode-github/blob/HEAD/docs/scripting.md).
+
 **Status.** `/github` in the TUI, or **GitHub: Status** in the command palette, opens a dialog with the state, the
 account and access, the tools (with the names of any the plugin does not know yet), the agents that miss the default
 rules with the rules to paste, the OpenCode check and the next step. `r` refreshes it and `Esc` closes it. It also
@@ -224,6 +235,9 @@ Error codes:
 | `OPTIONS_INVALID` | An option is unknown or has a wrong value; the message names it. Fix that option for the plugin in `opencode.json`. |
 | `SIGN_IN_…`, `TOKEN_…`, `DEVICE_…`, `CLIENT_ID_UNKNOWN` | Sign-in failed. The message ends with the next step; [the error codes](https://github.com/joe-broadhead/opencode-github/blob/HEAD/docs/configuration.md#errors) list them all. |
 
+A script's errors from the tools RPC have their own codes, listed in
+[Scripting](https://github.com/joe-broadhead/opencode-github/blob/HEAD/docs/scripting.md#errors).
+
 Other problems:
 
 | You see | What to do |
@@ -245,6 +259,8 @@ Other problems:
 
 - [Configuration](https://github.com/joe-broadhead/opencode-github/blob/HEAD/docs/configuration.md): options,
   toolsets, permission rules and error codes.
+- [Scripting](https://github.com/joe-broadhead/opencode-github/blob/HEAD/docs/scripting.md): calling GitHub's reads
+  from scripts, with no model.
 - [Security](https://github.com/joe-broadhead/opencode-github/blob/HEAD/SECURITY.md): network endpoints,
   credentials, untrusted content and reporting a vulnerability.
 - [Contributing](https://github.com/joe-broadhead/opencode-github/blob/HEAD/CONTRIBUTING.md): development, checks

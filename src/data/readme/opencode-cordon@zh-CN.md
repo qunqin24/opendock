@@ -178,6 +178,8 @@ Glob：`*`（路径模式下不跨 `/`）、`**`（跨目录，`**/` 可匹配�
 
 求值顺序：**用户规则按声明顺序，然后 preset 规则；首个命中生效。** 没命中就不碰原生判定。
 
+命令规则还会再对 `bash -c`、`sh -c`、`powershell -Command`、`cmd /c` 里面的文本匹配一次，包括 `/bin/bash` 这种带路径的写法。原始命令仍然会测，包装层只会多一次命中机会。管道保持整句匹配，`curl * | *sh*` 对得上完整字符串。`git -C repo push --force` 仍然对不上 force-push 规则，因为 cordon 不会重排 git 的全局参数。
+
 ### Preset
 
 | Preset | 额外内容 |
@@ -194,7 +196,7 @@ Glob：`*`（路径模式下不跨 `/`）、`**`（跨目录，`**/` 可匹配�
 | --- | --- | --- |
 | `check [--policy f] [--json]` | 校验策略、打印生效规则 | 0 通过，2 无效 |
 | `evaluate --action a [--command c] [--path p] [--tool t] [--agent id]` | 判定单条调用 | 0 pass，10 ask，20 deny |
-| `audit --log f [--html out] [--open] [--json]` | 汇总日志、生成 HTML | 0 成功，4 日志缺失 |
+| `audit --log f [--html out] [--open] [--json]` | 汇总日志、检查哈希链、生成 HTML | 0 成功，4 日志缺失，5 链断裂 |
 | `init [--preset p] [--out f] [--force]` | 生成起始策略 | 0 成功，1 已存在/用法错误 |
 | `redact [file]` | 从文件或 stdin 脱敏 | 0 |
 
@@ -206,16 +208,16 @@ JSONL 每行一个事件（`decision` / `tool` / `shell`）：
 {"v":1,"ts":"2026-11-03T03:57:37.927Z","event":"decision","sessionID":"ses_…","agent":"build","action":"shell","decision":"deny","nativeEffect":"allow","effect":"deny","rule":"deny-rm","reason":"regression: no destructive rm","command":"rm -rf ./scratch","commandHash":"dfc8ec3b…"}
 ```
 
-字段：`ts`、`event`、`sessionID`、`agent`、`action`、`tool`、`decision`（deny/ask/allow/pass）、`nativeEffect`、`effect`、`rule`、`reason`、`paths`、`command`（已脱敏）、`commandHash`、`redactions`，以及工具事件的 `status` / `durationMs`。
+字段：`ts`、`event`、`sessionID`、`agent`、`action`、`tool`、`decision`（deny/ask/allow/pass）、`nativeEffect`、`effect`、`rule`、`reason`、`paths`、`command`（已脱敏）、`commandHash`、`redactions`、`prev`、`hash`，以及工具事件的 `status` / `durationMs`。`prev` 和 `hash` 从 0.1.5 起写入。
 
-`cordon audit --html report.html` 会生成带摘要卡、规则排行、可筛选时间线的单文件报告。敏感值在落盘前脱敏，命令始终带稳定哈希，方便在不保留明文的前提下对账。
+`cordon audit --html report.html` 会生成带摘要卡（含哈希链）、规则排行、可筛选时间线的单文件报告。敏感值在落盘前脱敏，命令始终带稳定哈希，方便在不保留明文的前提下对账。同一个进程顺序追加这条链。没有哈希的旧日志仍然按成功汇总。
 
 ## 已验证
 
 | 项 | 结果 |
 | --- | --- |
 | 真机回归 | **OpenCode 2.2.5 通过**（2026-11-03）：`--auto` 下 `.env` 读取被 `ask → deny`、`rm -rf ./scratch` 被 `allow → deny`，两次都落盘，目标文件保留 —— [`REGRESSION.md`](REGRESSION.md) |
-| 单元 + 适配层测试 | **57 个全部通过**（`node --test test/guard.test.mjs test/plugin.test.mjs`），其中一套用真实 `@opencode/plugin` 钩子 + 假 context 驱动插件 |
+| 单元 + 适配层测试 | **61 个全部通过**（`node --test test/guard.test.mjs test/plugin.test.mjs`），其中一套用真实 `@opencode/plugin` 钩子 + 假 context 驱动插件 |
 | 打包 | 已发布 [`opencode-cordon`](https://www.npmjs.com/package/opencode-cordon)，`npx opencode-cordon --version` 可用 |
 | CI | Node 20/22/24 × Ubuntu/Windows |
 
@@ -224,7 +226,7 @@ JSONL 每行一个事件（`decision` / `tool` / `shell`）：
 - **不是沙箱。** 不做进程、文件系统、网络隔离；它只看 OpenCode 的 permission 决策和工具/命令事件，你在终端里绕过 OpenCode 跑的东西不在范围内。
 - **不是原生 permission 的替代。** 只收紧、不放宽；想放宽只能改 OpenCode 自己的 permission 配置。
 - **不是 secrets manager / DLP 产品。** `redact` 是基于规则的最佳努力；最稳的做法仍然是用规则把密钥路径挡在上下文之外。
-- **不是密码学防篡改。** 这里的“可审计”指：每条记录绑定规则和原因、远程命令只存哈希、敏感值默认脱敏、日志只追加。本地有写权限的人仍能改删，要更强保证就把 JSONL 送到外部。
+- **不是密码学防篡改。** 新记录带 `prev` 和 `hash`，`cordon audit` 能发现被改过、删过或调换过的一行（退出码 5）。能整文件重写的人也可以重算这条链。要更强保证，就把 JSONL 送到外部只追加的存储。
 - **不是 V1 兼容层。** 1.18.x 没有对应的 permission 钩子。
 - **不是把判定交给 LLM 的插件。** 判定是本地、确定性的规则：不花 token、不引入网络调用。
 
@@ -235,7 +237,7 @@ JSONL 每行一个事件（`decision` / `tool` / `shell`）：
 - [x] OpenCode 2.2.5 真机回归 + 钩子 payload 样例
 - [ ] `session.panel` TUI 面板：实时显示“现在正在拦什么”
 - [ ] `cordon check --explain`：解释为什么命中、改哪条会怎样
-- [ ] 审计哈希链 + `cordon audit --verify`
+- [x] 审计哈希链，由 `cordon audit` 检查（链断裂时退出码 5）
 - [ ] GitHub Action：PR 删掉危险规则时失败
 - [ ] 社区策略模板
 

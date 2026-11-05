@@ -6,8 +6,8 @@
 [![opencode](https://img.shields.io/badge/opencode-%E2%89%A52.2.5-black)](https://opencode.ai)
 
 DeepSeek Search & Fetch as an OpenCode V2 plugin: **the built-in `websearch` tool routes to DeepSeek**, plus a clean
-Markdown fetch tool, local usage/cost stats, a **persisted** backend switch, and **TUI + desktop sidebars** that show
-the state and the numbers and flip the takeover with one click.
+Markdown fetch tool, local usage/cost stats, your **live account balance**, a **persisted** backend switch, and
+**TUI + desktop sidebars** that show the state, the numbers and the balance, and flip the takeover with one click.
 
 Ways back to native search: the sidebar switch, the `mode` option, or a `deepseek_mode` call.
 中文说明见 [docs/README.zh-CN.md](https://github.com/QThinkerJR/opencode-deepseek-search/blob/main/docs/README.zh-CN.md)。
@@ -16,7 +16,8 @@ Differs from the existing same-named V1 package: this one targets the **V2 plugi
 runtime**, and reports **local usage and estimated cost**.
 
 > Verified against `opencode 2.2.5` with `@opencode/plugin@2.2.5` on Windows. Search/Fetch API facts come from
-> <https://api-docs.deepseek.com/zh-cn/guides/search>.
+> <https://api-docs.deepseek.com/zh-cn/guides/search>; the balance endpoint from
+> <https://api-docs.deepseek.com/zh-cn/api/get-user-balance>.
 
 ## Requirements
 
@@ -182,6 +183,18 @@ The plugin also shows up where you work, and can be switched without the model o
   than pretending to be enabled.
 - Stats refresh on a `changed` event emitted after every tally and every switch, with a 10-second reread as a
   fallback in both surfaces.
+- The body closes with your **account balance**, read from `GET /user/balance` with the same API key
+  (<https://api-docs.deepseek.com/zh-cn/api/get-user-balance>) — the usage rows read as the receipt and the account
+  truth lands under them. It shows in the two states where the card
+  actually points at the account (takeover enabled, or native mode); an unavailable balance gets a warning-colored
+  amount, and below ~12 columns the row is dropped rather than squeezed. The server serves a snapshot cached for
+  60 seconds — at most one upstream request per minute, failures keep the last value — and only a manual refresh
+  (the desktop refresh button, the TUI menu's *Refresh*, both retry paths) forces a re-probe; the 10-second polls
+  never do. The desktop panel shows it as an account block below the usage table, with the granted/topped-up
+  split on hover (when the split is meaningful).
+- The usage ladder puts **money before words**: as the sidebar narrows, the cost survives longer than the wordy
+  labels, and below the numeric floor the three usage rows collapse into one row that still carries a number
+  instead of three bare labels.
 
 The desktop half ships as a prebuilt CommonJS bundle (`gui-experimental.cjs`). Published packages include it; if you
 run the plugin from a clone, build it once — the TUI half needs no build and loads from TypeScript like the server half:

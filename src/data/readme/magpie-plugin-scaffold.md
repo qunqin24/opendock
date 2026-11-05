@@ -149,6 +149,7 @@ CI 在功能分支与 PR 上跑合规、语义测试和 `npm pack --dry-run`（`
 ## 目录
 
 - [说明书主线](./GUIDE.md) —— **30 分钟，从官方指导文件到 80 分插件；第一次做插件从这份开始**
+- [在用插件回收记录](./RECYCLING.md) —— **17 个真实启用项、通用代码来源与择优/排除边界**
 - [官方引用索引](./OFFICIAL-SOURCES.md) —— **官方 22 个锚点逐条映射到本仓库；每条结论都能追到官方原文和版本**
 - [80 分评分卡](./SCORING.md) —— **100 分怎么算、80 分卡在哪、`node scripts/score.mjs` 一条命令跑出来**
 - [给 AI 的入口](./AGENTS.md) —— **按「你在哪一步」给阅读顺序，外加十几条静默出错的坑（症状→判据→出处）**
@@ -279,11 +280,18 @@ package.json    → 版本、许可证、repository 链接（卡片上自动显�
 
 | 模块 | 解决什么 | 一个必须知道的实测 |
 |---|---|---|
+| [`src/http.mjs`](./src/http.mjs) | 公共请求头、OpenAI 错误 Response、异构错误摘要、保守 401/403 判定、Retry-After | 401 纯模型错误不杀账号；403 只有明确登录文本才算 expired；429 等待钳制在 1–60 秒 |
+| [`src/status.mjs`](./src/status.mjs) | 400/422 的余额 / 超时(504) / 暂不可用(503) / 渠道 / 模型 / 限流分类与安全改写 | 只读 clone；200/SSE 原对象返回且零 pull；schema 与上下文过长不换号 |
+| [`src/credential.mjs`](./src/credential.mjs) | 凭据读取、SHA-256 指纹、种类识别与 uid | 种类顺序 cached → metadata → shape；不要按 `auth.type` 猜 Cookie 还是 API Key |
+| [`src/oauth-device.mjs`](./src/oauth-device.mjs) | RFC 8628 设备码申请、轮询、刷新 | `slow_down` 后续间隔 +5 秒；总预算取 maxWait/expires_in 较小值；网络失败不冒充登录失效 |
+| [`src/checkin.mjs`](./src/checkin.mjs) | 签到前后账单差集对账、一次性奖励防双计 | 没有 before 快照时保守 `done`，不能把历史账单算成本次新奖励 |
+| [`src/stream-reader.mjs`](./src/stream-reader.mjs) | 通用 reader 的空闲超时、abort、结束/错误重放 | 超时只摘除等待者；在飞 `read()` 的数据块必须排队，不能丢首块 |
 | [`src/refresh-lock.mjs`](./src/refresh-lock.mjs) | 一次性 refresh_token 的并发闸：同 key 合并 in-flight、成功回放 60 秒、失败不缓存 | 键必须是**凭据身份**（refresh_token / account），不能用 provider id —— 否则同渠道多账号会共享一次刷新结果 |
 | [`src/oauth-pkce.mjs`](./src/oauth-pkce.mjs) | OAuth 2.0 PKCE（S256）+ 本机 127.0.0.1 loopback 回调 | state 必须恰好出现一次且匹配；错误 path 404、错误 state 400 都**不结束**等待；超时 / abort / close 必须 reject |
 | [`src/model-context.mjs`](./src/model-context.mjs) | 查 magpie 自己的 `~/.cache/magpie/models.json` 拿真实上下文窗口 | 查不到返回调用方 fallback，否则 `undefined` —— **不猜**；填 256K 而实际 1M 会让 agent 提前压缩 |
-| [`src/openai-sse.mjs`](./src/openai-sse.mjs) | OpenAI 兼容 SSE 解析 / 非流折叠：CRLF、多行 data、BOM、`[DONE]`、UTF-8 跨块、32 MiB 上限 | 只解析与折叠，不默认改写请求；`foldOpenAI` 合并 tool_calls 分片并保留 `choices: []` 的 usage 帧 |
-| [`src/usage-cache.mjs`](./src/usage-cache.mjs) | 按凭据 key 缓存 `usage()`：成功 60 秒 / 失败 5 秒、同 key 并发合并；`publicUsage` / `exhausted` | 失败缓存 60 秒会让用户点重试也没反应；无窗口/无余额读数时 `exhausted` 必须放行，不能把好号挡住 |
+| [`src/models.mjs`](./src/models.mjs) | 模型过滤/降级、稳定 slug ↔ 上行 code、同 id 静态元数据合并 | 未知模型不继承第一条能力，也不把静态权限表补回 live 列表 |
+| [`src/openai-sse.mjs`](./src/openai-sse.mjs) | OpenAI 兼容 SSE 解析 / 非流折叠：CRLF、多行 data、BOM、`[DONE]`、UTF-8 跨块、32 MiB 上限 | 合并 tool_calls 分片并保留 usage；流末仍无名的调用不向外发送，整轮只有它时给 502 |
+| [`src/usage-cache.mjs`](./src/usage-cache.mjs) | 按凭据 key 缓存 `usage()`：成功 60 秒 / 失败 5 秒、同 key 并发合并、stale-while-revalidate | 旧成功值可立即返回并后台单飞刷新；失败保留 stale，无旧值时有界等待，不串账号 |
 | [`src/request-rewrite.mjs`](./src/request-rewrite.mjs) | JSON 请求体改写管道：identity 快路径、`ensureStreamUsage`、`clampMaxTokens`、`stripModelPrefix`、`stripHopHeaders` | 改 body 后不去掉 `content-length` / `content-encoding` 会截断/解码失败；工具 schema 的 `additionalProperties:false` 绝不能碰 |
 | [`src/tool-schema.mjs`](./src/tool-schema.mjs) | 工具名超长截断（保持唯一）+ 工具 schema 兼容改写（`additionalProperties` 非布尔→`true`、删 `items:{}`、`items` 子树摊平且不留空 `{}`） | **默认关闭、只作显式 adapter**：会放宽模型看到的工具约束；`request-rewrite.mjs` 的「工具 schema 不动」铁律不变，两者不要同时挂 |
 | [`src/rotation-captcha.mjs`](./src/rotation-captcha.mjs) | 旋转图片验证码：角度编码、WAF cookie、取图→判角→提交重试 | `/captcha/generate` 回的 `set-cookie: acw_tc=…` 必须带回 verify，否则 `2000 客户端信息不匹配`（Node fetch 默认没有 cookie 罐） |
@@ -291,6 +299,7 @@ package.json    → 版本、许可证、repository 链接（卡片上自动显�
 | [`src/local-browser.mjs`](./src/local-browser.mjs) | 从本机浏览器 localStorage（LevelDB）读登录态 | 必须按 origin 截断：A 站的 jwt 配到 B 站的 org 就是「登录成功却拿错号」 |
 | [`src/browser-login.mjs`](./src/browser-login.mjs) | 受控 Chromium 登录：候选浏览器（含 360/QQ/搜狗等国产壳）+ CDP 抓 Cookie | Chrome/Edge 之外也得能选；Windows 注册表 App Paths 优先，退出码不可靠，以 CDP 端口连上为准 |
 | [`src/tempmail-client.mjs`](./src/tempmail-client.mjs) | 一次性邮箱建址 + 收验证码 | 域名有黑名单：`maxxspace.com` 会被部分上游拒，`yzcalo.com` / 常见邮箱域可过 —— 换厂商先用真实请求确认 |
+| [`src/catalog-union.mjs`](./src/catalog-union.mjs) | 两份模型目录合并：`catalogRows` 归一化、`isChatLike` 过滤非聊天行、`mergeCatalogs` 定主次 | 厂商的「客户端配置」更新慢、「控制台/网页」那份带完整元数据 —— 只读一份会让插件里的模型比网页上少几个、倍率还是旧的（坑 37） |
 
 表里的模块都有 `tests/*.test.mjs` 语义锁，`node --test` 全跑，照着测就能改。
 
@@ -382,7 +391,7 @@ rm -rf .git && git init    # 换掉历史
 ### 方式三：一条命令生成（身份自动改对）
 
 ```bash
-npx --yes github:MYCF711/magpie-plugin-scaffold#v0.3.6 create \
+npx --yes github:MYCF711/magpie-plugin-scaffold#v0.3.12 create \
   --dir my-provider \
   --provider huawei \
   --name "华为云 HUAWEI" \
@@ -409,14 +418,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: MYCF711/magpie-plugin-scaffold/.github/actions/check@v0.3.6
+      - uses: MYCF711/magpie-plugin-scaffold/.github/actions/check@v0.3.12
         with:
           target: .
 ```
 
 这个复合动作直接跑动作仓库里的 `scripts/check.mjs`，不下载 npm 包、不装依赖、不写你的目录。
-本地等价命令：`npx --yes github:MYCF711/magpie-plugin-scaffold#v0.3.6 check .`。
-上面的 `#v0.3.6` / `@v0.3.6` 是写这份文档时的最新 Release；固定 tag 能让行为可复现，
+本地等价命令：`npx --yes github:MYCF711/magpie-plugin-scaffold#v0.3.12 check .`。
+上面引用里的 tag 是写这份文档时的最新 Release；固定 tag 能让行为可复现，
 想跟随最新可以换成 `#main`（Action 的 `@main` 同理，但固定 tag 更安全）。
 
 ### 建好仓库后：四件 check 查不到的事
@@ -749,10 +758,68 @@ magpie-bun install
 
 ### 3. User-Agent 常常是硬校验
 
-很多厂商校验客户端身份。照抄官方客户端的 User-Agent 形状，
-不要用自己的包名。
+很多厂商校验客户端身份。**照抄官方客户端的 User-Agent**，不要用自己的包名，
+也不要留运行时默认值。
 
 例：CodeBuddy 不是 `CodeBuddyIDE/<version>` 形状就返回 10085（拒绝服务）。
+
+#### 3.1 为什么这条会静默出事
+
+上游网关会按 **`<product>/<version>`** 这个形态识别「第三方客户端」，命中就回
+
+```
+403 {"error_code":"TM.00000001","error_msg":"网络繁忙，请稍后重试"}
+```
+
+**文案说的是「网络繁忙」** —— 用户会去重试、去换账号、去看上游状态页，全都修不好；
+你在日志里也只看到 403，看不出是 UA 的锅。
+
+实测（同一 AK/SK、同一签名、同一请求体，只换 `User-Agent`，交替 3 轮）：
+
+| User-Agent | 结果 |
+|---|---|
+| `<产品名>/0.2.1-rc.2 (+https://github.com/…/…)` | **403** `TM.00000001` |
+| `<产品名>/0.2.1-rc.2` | **403** `TM.00000001` |
+| `<产品名>`（无版本号） | 200 |
+| `curl/8.7.1` / `Mozilla/5.0` / 不发 UA | 200 |
+
+#### 3.2 还有一半在宿主那边：不设 UA = 透传 `magpie/<version>`
+
+magpie 给插件的请求带 `User-Agent: magpie/<version>`（插件型 provider 一律改写成它）。
+**插件不显式设 UA，就把它原样转给上游** —— 那同样是 `<product>/<version>` 形态，一样命中。
+
+所以规矩是两条，缺一都不算过：
+
+1. 每个打上游的 `fetch` **显式**带 `User-Agent`；
+2. 值是**该服务官方客户端**的 UA。
+
+`loader` 的 `fetch` 包装里，`"user-agent"` 必须在**跳过名单**里（否则客户端传来的 UA 会穿透），
+再由插件自己补上官方值。
+
+#### 3.3 官方 UA 怎么取（按优先级）
+
+| # | 情形 | 取什么 |
+|---|---|---|
+| ① | 仓库 / 抓包里已经有过官方 UA | **逐字节照抄**，别改版本号，别「顺手美化」 |
+| ② | 厂商有 App / CLI / Electron 客户端 | 那个客户端自己的 token：`WorkBuddy/<app> … CLI/<ver>`、`aipy-pro/2.1.1 … Electron/34.3.3`、`Loomy\|Desktop\|Electron\|macOS`、`okhttp/4.12.0`、`cnb-cli/<ver>` |
+| ③ | 官方就是网页（Cookie / 网页会话） | **完整合法**的 Chrome UA：`Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36` |
+
+③ 必须是**完整**的一条 —— 截断的 `Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36`
+（缺 `(KHTML, like Gecko) Chrome/… Safari/537.36`）是残句，等于自报「不是浏览器」。
+模板里把它固化成了 `src/http.mjs` 的 `OFFICIAL_UA`，派生仓库直接引用、按需覆盖。
+
+#### 3.4 判据
+
+```bash
+node scripts/check-ua.mjs        # 0 = 合规；2 = 有违规（打印 文件:行 + 值 + 修法）
+node scripts/check-ua.mjs ../my-plugin
+```
+
+`npm run check` 也卡这一条。它查四类：自产品名形态（`magpie/…`、`magpie-xxx/<ver>`、
+`alysis-magpie/…`）、运行时默认（`node` / `Bun/…` / `undici`）、截断的 Mozilla、
+以及「打非本机上游却没设 UA」（这一类是警告：静态拼不出来的，在 CHECKLIST A 表人工确认）。
+
+查不到的：UA 在运行期才拼出来、或从配置读的 —— 那部分只能靠 A 表那条人工过一遍。
 
 ### 4. 一次性 refresh_token 必须串行
 

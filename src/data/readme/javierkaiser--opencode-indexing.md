@@ -439,6 +439,14 @@ Two things worth knowing before switching:
   *before* that happens. Re-embedding a repository is cheap — well under a
   couple of dollars at any paid provider — but a large one takes a while.
 
+**When Kilo's index cannot be embedded here.** Search reads both indexes, so it
+refuses to answer when one of them holds points built with a profile this machine
+cannot embed — an expired cloud key, an exhausted budget, a provider that is not
+configured. That refusal is deliberate: half an answer looks exactly like a
+complete one. `searchKilo: false` (or `KILO_INDEX_SEARCH_KILO=false`) answers
+from the own index only, which is what makes a local model usable in a workspace
+that still has a Kilo collection.
+
 **Which models can import from Kilo.** Kilo's registry is mirrored entry for
 entry, because an import is accepted only when provider, model id and dimension
 match exactly. Models marked *ours* in the table above are not in Kilo's
@@ -472,6 +480,7 @@ Settings are stored in `~/.config/opencode/indexing.json` (plugin options → `i
 | `qdrantUrl` / `qdrantApiKey` | Qdrant connection |
 | `provider` / `model` / `dimension` | Embedding profile, overriding the resolved one |
 | `importFromKilo` | Import a compatible Kilo index on build instead of re-embedding |
+| `searchKilo` | Search Kilo's index alongside the own one. `false` answers from the own index only — the escape hatch when Kilo's profile cannot be embedded here |
 | `autoRefresh` | Refresh inline on search when few files changed |
 | `enabled` | Master switch: when false the own index is neither written nor refreshed |
 | `ignoreKiloConfig` | Stop reading `~/.config/kilo/kilo.jsonc` entirely |
@@ -488,6 +497,7 @@ precedence, with plugin options winning.
 | Variable | Meaning |
 | --- | --- |
 | `KILO_INDEX_VECTOR_STORE` | `lancedb` (default) or `qdrant` for the own index |
+| `KILO_INDEX_SEARCH_KILO` | `false` searches only the own index (see `searchKilo`) |
 | `KILO_INDEX_QDRANT_URL` / `KILO_INDEX_QDRANT_API_KEY` | Qdrant connection |
 | `KILO_INDEX_LANCEDB_DIR` | Base directory for the own LanceDB stores |
 | `KILO_INDEX_KILO_LANCEDB_DIR` | Override Kilo's LanceDB directory (import source) |

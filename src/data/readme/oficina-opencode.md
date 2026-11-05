@@ -27,7 +27,7 @@
 | | |
 |---|---|
 | **Paquete** | `oficina-opencode` v3.1.2 |
-| **Tools** | 15 |
+| **Tools** | 18 |
 | **Hooks** | 7 |
 | **API de plugin** | `@opencode/plugin@2.1.2` |
 | **Node** | >=22 |

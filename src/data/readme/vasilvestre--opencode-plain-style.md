@@ -24,7 +24,7 @@ Rules include:
 - `must` for requirements, stated as facts without softening.
 - No vague intensifiers or words that signal laziness or condescension.
 - Lists and headings over walls of text, conclusion first.
-- A "Next:" line at the end that gives the next step as runnable commands in a fenced code block.
+- A "Next:" line at the end of documentation (READMEs, docs, PR descriptions) that gives the reader's next step as runnable commands.
 - No em dashes as punctuation, no "please" in instructions, no "etc.".
 
 Because the injection happens per request, the rules survive context compaction.
@@ -75,6 +75,10 @@ Decisions from the English Language proposal (2026-08-02):
 | Avoid passive voice                                        | Kept     | Already covered by Rule 1                      |
 | American English, title case, no Oxford commas,            | Not      | Not checkable by the scorer, and each injected |
 | gender-neutral pronouns, contractions allowed              | injected | rule costs ~2.2 points of dilution             |
+
+2026-11-03: rule 16 now applies to documentation only. The "Next:" line no
+longer applies to chat replies. In chat it made agents hand back commands they
+could run themselves, which a style rulebook must not dictate.
 
 One design lesson shapes the phrasing: never list banned words in the rulebook.
 Weaker models echo the list and produce more violations, not fewer.

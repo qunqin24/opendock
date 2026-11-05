@@ -68,7 +68,7 @@ First-time setup: `/git-clone` (pull a remote project locally + write `.bb-spec.
  what     how       Red→Green docs sync       pre-review+open PR
  (the only approval) →Review
 
- ══► chained automatically (stops only for new third-party deps or design calls)
+ ══► chained automatically (stops only for new tech or design calls)
  ──► triggered by you
 
  (opt) /test-webview · /test-api — an extra check before the PR:
@@ -99,12 +99,12 @@ First-time setup: `/git-clone` (pull a remote project locally + write `.bb-spec.
 
 - **`/plan`** — PRD → self-contained, **function-level** plan. Answers **"how to build it."**
   - One independent problem per file, down to function names and responsibilities; declarative artifacts (DDL / API contracts / config) are **inlined in final form** for exec to write verbatim
-  - Auto-invoked by `/prd` and hands off straight to `/exec`; it stops only when a **new third-party dependency** is needed, and your consent there counts as the authorization version-policy requires
+  - Auto-invoked by `/prd` and hands off straight to `/exec`; it stops only when **new tech** is needed, listing each item with its reasons for a single approval, and that approval counts as the authorization version-policy requires
   - Plans exist only while executing — `/exec` deletes them once everything is done, so they never duplicate the PRD
 
 - **`/exec`** — **Three-agent isolated execution**, the core anti-cheat design.
   - *Test* agent reads PRD constraints only, writes failing tests (Red)
-  - *Impl* agent **never sees the PRD**, only the tests + function list, so it can't quietly "teach to intent"; new third-party libs capped by the plan's approved list
+  - *Impl* agent **never sees the PRD**, only the tests + function list, so it can't quietly "teach to intent"; new tech capped by the plan's approved new-tech table
   - *Review* agent checks against the PRD acceptance criteria and AGENTS.md plus a robustness/security pass, read-only
   - Progress written to `PROGRESS.md` after every step — **token-exhausted runs resume losslessly**
   - If the plan turns out to be wrong mid-implementation, it stops and lets you pick: change the code / change this PRD / pause; small changes are made in place, big ones go back to `/prd` for re-approval
@@ -144,7 +144,7 @@ First-time setup: `/git-clone` (pull a remote project locally + write `.bb-spec.
 **Ships with**
 
 - **5 orchestration subagents** driven by the stages above: `test-engineer` / `impl-engineer` / `prd-reviewer` / `webview-test-runner` / `pre-reviewer`
-- **4 passive hooks** (automatic): block npm/yarn, block main commit, dependency version self-check, wait for background scripts to finish
+- **3 passive hooks** (automatic): block main commit, dependency version self-check, wait for background scripts to finish
 
 ---
 
@@ -155,7 +155,7 @@ These feed rules into the pipeline above — install only the layers you need.
 ### bb-spec-core — universal discipline
 
 - **`tdd-workflow`** — Red-Green-Refactor discipline with standard flows for the add / modify / delete scenarios
-- **`version-policy`** — Standard/official libraries first — importing a new third-party library requires explicit user consent (a dependency list you consented to during `/plan` counts); check a dependency's official latest version before pinning it; never trust training memory
+- **`version-policy`** — Standard library first — before bringing in any tech the project doesn't already use (libraries, frameworks, languages, databases, middleware, tools, images, CI Actions, external services), list each item with its purpose and why nothing else will do, and use it only after user approval, plugin defaults and user-named picks included (the new-tech table approved during `/plan` counts); check a dependency's official latest version before pinning it; never trust training memory
 - **`git-workflow`** — Branch decisions, incremental commits, the six-section PR description, post-merge cleanup
 
 ### bb-spec-backend — backend stack constraints
@@ -172,7 +172,7 @@ These feed rules into the pipeline above — install only the layers you need.
 
 ### bb-spec-frontend — frontend stack constraints
 
-- **`vue-constraints`** — Vue 3 + TypeScript + Vite + Tailwind + bun hard stack constraints
+- **`vue-constraints`** — Vue 3 + TypeScript + Vite + Tailwind + bun stack constraints (defaults need user approval before being introduced, and the user can veto them)
 - **`frontend-constraints`** — Conventions: one unified request client, centralized error-code → UI mapping, UX-only route guards, types from the contract
 
 ---
@@ -194,7 +194,7 @@ Then install whichever layers you want:
 | **bb-spec-core** _(recommended base)_ | TDD / version-policy / git-workflow discipline + 3 passive hooks | `/plugin install bb-spec-core@0xbb2b` |
 | **bb-spec-workflow** _(core)_ | prd → plan → exec → doc-update → revise → git-push (+ opt test-webview / test-api e2e), git-clone one-shot init + 5 subagents | `/plugin install bb-spec-workflow@0xbb2b` |
 | **bb-spec-backend** | Go / REST API / DB / authN / authZ / observability / service / config constraints | `/plugin install bb-spec-backend@0xbb2b` |
-| **bb-spec-frontend** | Vue 3 + TS + Vite + Tailwind + bun stack & engineering conventions (+ bun hook) | `/plugin install bb-spec-frontend@0xbb2b` |
+| **bb-spec-frontend** | Vue 3 + TS + Vite + Tailwind + bun stack & engineering conventions | `/plugin install bb-spec-frontend@0xbb2b` |
 
 Pick by need — e.g. just the disciplines and workflow without any stack opinions: install `bb-spec-core` + `bb-spec-workflow`. Want everything: install all four.
 
@@ -251,9 +251,8 @@ Each hook ships with the sub-plugin that owns its concern — install that plugi
 
 | Hook | Sub-plugin | Trigger | Effect |
 |---|---|---|---|
-| `block-non-bun-pm` | bb-spec-frontend | PreToolUse(Bash) | Blocks `npm` / `yarn` / `pnpm` package-manager actions, enforcing `bun`; existing projects with a matching lockfile (e.g. `package-lock.json`) are allowed through |
 | `git-workflow-guard` | bb-spec-core | PreToolUse(Bash) | Blocks `git commit` on `main` / `master`; for other git flow actions (branch / push / worktree / merge / PR) allows them through and injects the git-workflow discipline plus live git status |
-| `dep-version-check` | bb-spec-core | PostToolUse(Write\|Edit) | After editing a dependency file, injects a "check the official latest version first" reminder |
+| `dep-version-check` | bb-spec-core | PostToolUse(Write\|Edit) | After editing a dependency file, injects a "check the official latest version first" reminder, plus a reminder to revert any unapproved new tech and list it for approval first |
 | `background-script-wait` | bb-spec-core | Stop | When a running background command not yet flagged in this session is found, prompts once: Claude uses a foreground loop to wait for scripts that will finish, and does not wait for long-running services |
 ---
 
@@ -291,7 +290,6 @@ Reference template: [`.bb-spec.template.yaml`](./.bb-spec.template.yaml).
 
 | Scenario | Switch |
 |---|---|
-| Temporarily allow npm / yarn / pnpm | Disable `bb-spec-frontend` temporarily |
 | Temporarily allow main commit | Disable `bb-spec-core` temporarily |
 | Skip the background-script wait prompt | Disable `bb-spec-core` temporarily |
 

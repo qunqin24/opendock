@@ -1,11 +1,11 @@
 <div align="center">
   <img src="https://raw.githubusercontent.com/wangyuchen5110/opencode-cordon/main/docs/assets/banner.svg" alt="opencode-cordon — a permission cordon for OpenCode 2" width="100%" />
 
-  <h3>Declarative permission policy with an audit trail for OpenCode 2.</h3>
+  <h3>Git-committable rules that can force-deny even when OpenCode allows.</h3>
 
   <p>
-    Rules live in your repo. Decisions are enforced at <code>permission.evaluate</code>.<br/>
-    Every decision is logged, redacted, and one command away from a shareable HTML report.
+    A lightweight policy layer for OpenCode 2.<br>
+    Rules live in your repo. They only tighten. Every decision is logged.
   </p>
 
   <p>
@@ -20,34 +20,35 @@
 
 ---
 
-**The problem in one paragraph.** An OpenCode agent reads files, runs shell commands, edits code and pushes branches. Native permissions are a coarse global switch, they are not reviewable per repository, and after a session there is no record of *which rule allowed what*. A `.env` read silently becomes a provider call. A `rm -rf` succeeds and nobody can reconstruct why.
+**What this is.**  
+OpenCode's native permissions are a coarse global switch. You can't commit them with the repo, you can't review them in a PR, and after a session there is no record of which decision came from which rule.
 
-**What this adds.** A small policy file that lives in your repo (`opencode-cordon`), enforced at the plugin hook and written to an append-only log. It **only tightens, never loosens**: `deny` always wins, `ask` only upgrades an `allow`, and a rule miss leaves OpenCode's own decision untouched. A misconfiguration can make the agent too strict — it can never silently open a door.
+`opencode-cordon` adds a small policy file (`.opencode/cordon.jsonc`) that lives in git. It hooks `permission.evaluate` and can **force-deny** actions that native permissions would have allowed. It never loosens anything.
 
-```console
-$ cordon evaluate --action shell --command "rm -rf /tmp/x"
-deny  rule preset:destructive — irreversible shell command
+**What it is not.**  
+Not a sandbox. Not a replacement for OpenCode's own permissions. Not a secrets manager. It only sees what goes through OpenCode's permission system.
 
-$ cordon audit --log .opencode/cordon/audit.jsonl --html report.html
-cordon audit …  decisions 7  deny 2 · ask 0 · pass 5  …  html report.html
+### Real example (OpenCode 2.2.5, `--auto` on)
+
+| Attempt | Native | cordon | Result |
+| --- | --- | --- | --- |
+| `read .env` | `ask` | **`deny`** | blocked — secrets stay out of context |
+| `rm -rf ./scratch` | `allow` | **`deny`** | blocked — file survived |
+
+Both decisions were written to the JSONL log with the exact rule id and reason.
+
+```bash
+npx opencode-cordon init
+npx opencode-cordon evaluate --action shell --command "rm -rf ./build"   # exit 20 = deny
 ```
 
 ## See it in action
-
-The screenshot below is the real report from a live OpenCode 2.2.5 session (see [`docs/REGRESSION.md`](docs/REGRESSION.md)):
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/wangyuchen5110/opencode-cordon/main/docs/assets/audit-report.png" alt="opencode-cordon HTML audit report: 25 events, 2 denied" width="92%" />
 </p>
 
-In that run the agent was told to read `.env` and run `rm -rf ./scratch`, with `--auto` on (so the native decision was "allow" for `rm` and an auto-approved "ask" for `.env`):
-
-| Attempt | Native | cordon | Result |
-| --- | --- | --- | --- |
-| `read .env` | `ask` | **`deny`** | `permission.rejected — regression: env files are off limits` |
-| `shell: rm -rf ./scratch` | `allow` | **`deny`** | `Unable to execute command`, `scratch/keep.txt` survived |
-
-Both decisions were written to the JSONL log with rule id and reason. That is the whole point: **the agent is stopped, and you can prove who stopped it.**
+The report above is from a live session (see [`docs/REGRESSION.md`](docs/REGRESSION.md)). The agent was told to read `.env` and run `rm -rf ./scratch`. Both were denied by cordon rules even though native permissions would have allowed or auto-approved them.
 
 ## How it works
 
@@ -55,13 +56,13 @@ Both decisions were written to the JSONL log with rule id and reason. That is th
   <img src="https://raw.githubusercontent.com/wangyuchen5110/opencode-cordon/main/docs/assets/architecture.svg" alt="agent tool call → permission.evaluate → cordon policy decision → deny/ask or native decision untouched → JSONL audit → HTML report" width="100%" />
 </p>
 
-The plugin is an OpenCode 2 server part that registers four hooks:
+The plugin registers four hooks:
 
-- `permission.evaluate` — evaluates the policy and tightens the effect before OpenCode acts;
-- `tool.execute.before` / `tool.execute.after` — records every tool call and its outcome;
-- `shell.create.before` — records every shell command that is created.
+- `permission.evaluate` — evaluates the policy and can tighten the effect before OpenCode acts
+- `tool.execute.before` / `tool.execute.after` — records every tool call and its outcome
+- `shell.create.before` — records every shell command that is created
 
-### The one rule that matters: tighten only
+### Tighten only
 
 | native `effect` | cordon `deny` | cordon `ask` | cordon `allow` / no match |
 | --- | --- | --- | --- |
@@ -69,11 +70,11 @@ The plugin is an OpenCode 2 server part that registers four hooks:
 | `ask` | **deny** | ask (untouched) | ask (untouched) |
 | `deny` | deny (untouched) | deny (untouched) | deny (untouched) |
 
-A user rule with `effect: "allow"` never widens anything — it *exempts* a matching call from later cordon rules. That is the supported way to carve exceptions out of a preset.
+A user rule with `effect: "allow"` never widens anything — it only exempts a matching call from later cordon rules. A misconfiguration can make the agent too strict. It can never silently open a door.
 
 ## Install
 
-Requires **OpenCode 2.2.x** for the plugin part, and **Node ≥ 20** for the CLI (ESM, zero runtime dependencies).
+Requires **OpenCode 2.2.x** for the plugin, and **Node ≥ 20** for the CLI (zero runtime dependencies).
 
 ```bash
 # plugin (loaded by OpenCode on next start)
@@ -83,9 +84,9 @@ opencode plugin add opencode-cordon
 npm install -g opencode-cordon    # short alias: cordon
 ```
 
-The CLI works on its own: policy validation and audit reports do not need a running OpenCode.
+The CLI works on its own for policy validation and audit reports.
 
-## Quick start (5 minutes)
+## Quick start
 
 ```bash
 # 1. create a policy for the current project
@@ -95,7 +96,7 @@ npx opencode-cordon init
 # 2. validate it — 0 = ok, 2 = invalid
 npx opencode-cordon check
 
-# 3. try decisions and their exit codes
+# 3. try decisions
 npx opencode-cordon evaluate --action shell --command "rm -rf ./build"        # 20 = deny
 npx opencode-cordon evaluate --action shell --command "git push origin main"  # 10 = ask
 npx opencode-cordon evaluate --action read  --path "/repo/README.md"          #  0 = pass
@@ -105,8 +106,6 @@ npx opencode-cordon audit --log .opencode/cordon/audit.jsonl --html audit.html -
 ```
 
 ## Policy file
-
-Two locations, same format:
 
 | Location | Purpose |
 | --- | --- |
@@ -122,12 +121,12 @@ Two locations, same format:
     "path": ".opencode/cordon/audit.jsonl",
     "redact": true,
     "storeCommand": true,
-    "commandHash": false           // true = only sha256 of the command, no plaintext
+    "commandHash": false
   },
   "rules": [
     {
       "id": "no-destructive",
-      "effect": "deny",            // deny | ask | allow
+      "effect": "deny",
       "match": { "action": "shell", "command": "rm -rf *" },
       "reason": "destructive shell command"
     },
@@ -147,109 +146,83 @@ Two locations, same format:
 }
 ```
 
-### Fields
-
-| Field | Type | Notes |
-| --- | --- | --- |
-| `version` | number | currently `1` |
-| `preset` | string | `balanced` (default) / `strict` / `relaxed` |
-| `audit.enabled` | boolean | write the JSONL log (default `true`) |
-| `audit.path` | string | default `.opencode/cordon/audit.jsonl` |
-| `audit.redact` | boolean | redact secrets before writing (default `true`) |
-| `audit.storeCommand` | boolean | store redacted command text (default `true`) |
-| `audit.commandHash` | boolean | store only the SHA-256 of commands (default `false`) |
-| `rules` | array | user rules, evaluated before preset rules |
-
-A policy without `preset` falls back to `balanced`. **No policy file at all means the plugin stays idle** — it logs one line and invents no rules.
+**No policy file means the plugin stays idle** — it logs one line and invents no rules.
 
 ### Matching
 
-`match` supports five fields; every field present must match (AND), array values are OR:
+`match` fields (all present must match):
 
-| Field | Matches against | Path mode |
+| Field | Matches | Notes |
 | --- | --- | --- |
-| `action` | the permission action (`shell`, `read`, `edit`, …) | no |
-| `tool` | the tool name (falls back to `action`) | no |
-| `command` | the shell command(s) of the request | no (`*` crosses spaces) |
-| `path` | file paths of the request | yes (`*` stays in one segment) |
-| `agent` | the agent id | no |
+| `action` | permission action (`shell`, `read`, `edit`, …) | `a|b` for alternatives |
+| `tool` | tool name | falls back to `action` |
+| `command` | shell command | `*` crosses spaces |
+| `path` | file paths | `*` stays in one segment |
+| `agent` | agent id | |
 
-Globs: `*` (any characters except `/` in path mode), `**` (across directories, `**/` may match zero directories), `?` (one character), `{a,b}` (alternatives), `a|b` (alternatives for action/tool/agent). Matching is case-insensitive.
+Globs: `*`, `**`, `?`, `{a,b}`, `a|b`. Case-insensitive. User rules are evaluated first, then preset rules; first match wins. A miss leaves the native decision untouched.
 
-Evaluation order: **user rules in declaration order, then preset rules; first match wins.** A miss leaves the native decision untouched.
+A command rule is also tried against the text inside `bash -c`, `sh -c`, `powershell -Command` and `cmd /c`, including a path prefix such as `/bin/bash`. The raw command is still tested, so a wrapper can only add a match. The destructive preset also denies split `rm` flags, `Remove-Item -Recurse`, `rmdir /s`, and a force-push whose `--force` or `-f` comes after the remote. `git push origin main` still asks. `git -C repo push --force` still misses those globs.
 
 ### Presets
 
 | Preset | What it adds |
 | --- | --- |
-| `relaxed` | denies secret paths and irreversible shell commands; asks for outbound network commands |
-| `balanced` | `relaxed` + asks for `git push`, publish/release commands and web fetch |
+| `relaxed` | denies secret paths and irreversible shell commands; asks for outbound network |
+| `balanced` | `relaxed` + asks for `git push`, publish/release, and web fetch |
 | `strict` | `balanced` + asks for every shell command and every edit |
-
-Run `cordon check` to see how many user and preset rules are active.
 
 ## CLI
 
-| Command | What it does | Exit codes |
-| --- | --- | --- |
-| `check [--policy f] [--json]` | validate the policy, print effective rules | 0 ok, 2 invalid |
-| `evaluate --action a [--command c] [--path p] [--tool t] [--agent id]` | decide a single call | 0 pass, 10 ask, 20 deny |
-| `audit --log f [--html out] [--open] [--json]` | summarise a log, render HTML | 0 ok, 4 missing log |
-| `init [--preset p] [--out f] [--force]` | write a starter policy | 0 ok, 1 exists/usage |
-| `redact [file]` | redact secrets from a file or stdin | 0 |
+| Command | Exit codes |
+| --- | --- |
+| `check [--policy f] [--json]` | 0 ok, 2 invalid |
+| `evaluate --action a [--command c] [--path p]` | 0 pass, 10 ask, 20 deny |
+| `audit --log f [--html out] [--open] [--json]` | 0 ok, 4 missing log, 5 broken chain |
+| `init [--preset p] [--out f] [--force]` | 0 ok, 1 exists |
+| `redact [file]` | 0 |
 
-## Audit log and report
+## Audit log
 
-Each JSONL line is one event (`decision`, `tool` or `shell`):
+Each JSONL line is one event:
 
 ```json
 {"v":1,"ts":"2026-11-03T03:57:37.927Z","event":"decision","sessionID":"ses_…","agent":"build","action":"shell","decision":"deny","nativeEffect":"allow","effect":"deny","rule":"deny-rm","reason":"regression: no destructive rm","command":"rm -rf ./scratch","commandHash":"dfc8ec3b…"}
 ```
 
-Fields: `ts`, `event`, `sessionID`, `agent`, `action`, `tool`, `decision` (deny/ask/allow/pass), `nativeEffect`, `effect`, `rule`, `reason`, `paths`, `command` (redacted), `commandHash`, `redactions`, and `status` / `durationMs` for tool events.
-
-`cordon audit --html report.html` renders summary cards, the rules that fired, and a filterable timeline. Secrets are redacted before they reach the log, and every command always gets a stable hash, so records can be correlated without the plaintext.
+Secrets are redacted before writing. Every command gets a stable hash so records can be correlated without plaintext. Logs written by 0.1.5 and later also store `prev` and `hash`. `cordon audit` exits 5 when that chain breaks. Older logs have no hashes and still audit as success.
 
 ## Verified
 
 | Check | Result |
 | --- | --- |
-| Live regression | **Passed on OpenCode 2.2.5** (2026-11-03): `.env` read tightened `ask → deny`, `rm -rf ./scratch` tightened `allow → deny` under `--auto`, both logged, target file survived — [`docs/REGRESSION.md`](docs/REGRESSION.md) |
-| Unit + adapter tests | **57 passing** (`node --test test/guard.test.mjs test/plugin.test.mjs`), including a suite that drives the real `@opencode/plugin` hooks through a fake context |
-| Packaging | published as [`opencode-cordon`](https://www.npmjs.com/package/opencode-cordon); `npx opencode-cordon --version` works |
+| Live regression | Passed on OpenCode 2.2.5: `.env` and `rm -rf` both force-denied under `--auto` — [`docs/REGRESSION.md`](docs/REGRESSION.md) |
+| Unit + adapter tests | 61 passing |
+| Packaging | `npx opencode-cordon --version` works |
 | CI | Node 20/22/24 × Ubuntu/Windows |
 
-## What it is not
+## Limits
 
-- **Not a sandbox.** No process, filesystem or network isolation. It sees what goes through OpenCode's permission decisions and tool/shell events; commands you run outside OpenCode are out of scope.
-- **Not a replacement for native permissions.** It only tightens. To loosen something, edit OpenCode's own permission config.
-- **Not a secrets manager / DLP product.** `redact` is best effort by pattern; the reliable move is a rule that keeps secret paths out of the context window.
-- **Not cryptographically tamper-proof.** "Tamper-evident" means each record is bound to a rule and reason, remote commands are hashed, secrets are redacted, and the file is append-only. Anyone with local write access can still edit it — ship the JSONL to an external sink if you need real guarantees.
-- **Not a V1 compatibility layer.** OpenCode 1.18.x has no equivalent permission hook.
-- **Not an LLM permission reviewer.** Decisions are local, deterministic rules: no tokens, no network calls.
+- Not a sandbox. Commands you run outside OpenCode are out of scope.
+- Not a replacement for native permissions. It only tightens.
+- `redact` is best-effort by pattern. The reliable move is a rule that keeps secret paths out of context.
+- The hash chain detects an edited, deleted or reordered line. A full rewrite can be recomputed, so the log is not tamper-proof. Ship it to an external sink if you need a stronger guarantee.
+- OpenCode 1.x has no equivalent permission hook.
 
-Full threat model and vulnerability reporting: [SECURITY.md](SECURITY.md).
+Full threat model: [SECURITY.md](SECURITY.md).
 
 ## Roadmap
 
-- [x] Live regression on OpenCode 2.2.5 and a recorded fixture of hook payloads
-- [ ] `session.panel` TUI part: a live "what is being blocked right now" panel
-- [ ] `cordon check --explain`: why a call matched, and what to change
-- [ ] Hash-chained audit entries plus `cordon audit --verify`
+- [x] Live regression on OpenCode 2.2.5
+- [ ] Live "what is being blocked right now" TUI panel
+- [ ] `cordon check --explain`
+- [x] Hash-chained audit entries, checked by `cordon audit` (exit 5 when the chain breaks)
 - [ ] GitHub Action that fails a PR when dangerous rules are removed
 - [ ] Community policy templates
 
-## Research
-
-This project started from a survey of the OpenCode ecosystem; the raw reports are committed:
-
-- [`docs/research/scout-tooling.md`](docs/research/scout-tooling.md) — tooling, security, DB ops, migration
-- [`docs/research/scout-visual.md`](docs/research/scout-visual.md) — TUI/visual plugins and the gaps
-- [`docs/WHY.md`](docs/WHY.md) — why a policy engine + audit trail, and what a cordon is not
-
 ## Contributing
 
-Issues and pull requests are welcome. Run `npm ci && node --test test/guard.test.mjs test/plugin.test.mjs` before sending a PR; keep the package dependency-free (`node:` built-ins only) and add a test for every new rule matcher or redaction pattern.
+Issues and PRs welcome. Run `npm ci && node --test test/guard.test.mjs test/plugin.test.mjs` before sending. Keep the package dependency-free (`node:` built-ins only).
 
 ## License
 

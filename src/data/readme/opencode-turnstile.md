@@ -279,6 +279,32 @@ open a gate — only the user's own prompt carries a real waiver or approval.
 Full lifecycle semantics (waiver allowances, ensemble interaction, prompt
 channels): [`docs/usage.md`](docs/usage.md#waivers-and-approvals).
 
+## User plan review (opt-in)
+
+By default the pipeline runs fully automated: planner → plan-reviewer →
+executor → … With `planUserReview: true` in the config, turnstile inserts a
+human checkpoint between the planner and the plan-reviewer: once the planner
+dispatch is admitted, the plan-reviewer dispatch is blocked with a
+`BLOCKED by turnstile:` message naming the plans directory, and you decide
+the outcome from your own prompt:
+
+- **`PLAN REVIEWED:`** accepts the written plan — edit the plan file first if
+  you wish; the edited file is what the reviewer reads at dispatch time. The
+  pause clears and the pipeline continues.
+- **`PLAN REJECTED:`** rejects it — the task scope is retired with no counted
+  plan-reviewer dispatch; a new planner dispatch re-arms the pause.
+
+The literals work only in your own prompt (never in an agent's dispatch
+prompt), waivers do not bypass the pause, and the pending state survives both
+a restart (journal replay) and the next prompt's task-scope boundary — a
+prompt carrying neither literal leaves the pause armed, so a lost accept
+never dispatches an unreviewed plan. A pause armed by an earlier planner
+dispatch stays armed until you accept or reject, even if you switch to a plan
+you wrote yourself (`PLAN APPROVED:`) — the pending accept/reject literal is
+still required before the next plan-reviewer dispatch. Config: `planReviewAcceptMarker` /
+`planReviewRejectMarker` rename the literals (defaults `PLAN REVIEWED:` /
+`PLAN REJECTED:`).
+
 ## Suspend and resume
 
 You can pause turnstile's gate enforcement for the whole session with two
@@ -382,14 +408,15 @@ loader reads an explicit [] as unset and re-derives the list from the
 configured test-runner, reviewer, and plan-reviewer names, so the copy needs
 no edits. The key knobs most people touch:
 
-| Key                       | Default   | Meaning                                                                                                                                                                      |
-| ------------------------- | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `alwaysEnforce`           | `false`   | dormant-until-engaged: enforcement arms on a plan (`PLAN APPROVED:` / plan-file reference) or a planner/pipeline request; `true` restores always-armed from the first prompt |
-| `gateEvidence`            | `enforce` | `flag`/`off` revert to flip-on-trust for `GATE: PASS`                                                                                                                        |
-| `escalation`              | `block`   | repeat landing/hands-on attempts re-block with no permission ask; `ask` restores the interactive permission-ask ladder                                                       |
-| `gitGates.commitMessages` | `true`    | validate `git commit -m` subjects as conventional commits; `false` disables commit lint                                                                                      |
-| `gitGates.landingGate`    | `true`    | gate `git push` on this task reviewer `VERDICT: APPROVE`; `false` disables the gate                                                                                          |
-| `reviewEnsemble`          | `enforce` | `advise` credits a single-reviewer APPROVE unconditionally                                                                                                                   |
+| Key                       | Default   | Meaning                                                                                                                                                                                              |
+| ------------------------- | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `alwaysEnforce`           | `false`   | dormant-until-engaged: enforcement arms on a plan (`PLAN APPROVED:` / plan-file reference) or a planner/pipeline request; `true` restores always-armed from the first prompt                         |
+| `gateEvidence`            | `enforce` | `flag`/`off` revert to flip-on-trust for `GATE: PASS`                                                                                                                                                |
+| `escalation`              | `block`   | repeat landing/hands-on attempts re-block with no permission ask; `ask` restores the interactive permission-ask ladder                                                                               |
+| `gitGates.commitMessages` | `true`    | validate `git commit -m` subjects as conventional commits; `false` disables commit lint                                                                                                              |
+| `gitGates.landingGate`    | `true`    | gate `git push` on this task reviewer `VERDICT: APPROVE`; `false` disables the gate                                                                                                                  |
+| `reviewEnsemble`          | `enforce` | `advise` credits a single-reviewer APPROVE unconditionally                                                                                                                                           |
+| `planUserReview`          | `false`   | pause the pipeline after the planner until the user accepts (`PLAN REVIEWED:`) or rejects (`PLAN REJECTED:`) the written plan via their own prompt; see [User plan review](#user-plan-review-opt-in) |
 
 | `sessionSummary` | `quiet` | one recap line at session end for active sessions (`on` adds an all-green line for idle ones; `off` disables) |
 | `toolPolicy.bashDeny` | `[]` | regex denylist for `bash`/`shell` (e.g. worktree/branch/merge ops) |

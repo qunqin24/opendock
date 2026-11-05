@@ -71,8 +71,9 @@ opencode service restart
 .swarm/runs/<runId>/{queue.jsonl,timeline.jsonl,events.jsonl,round.json,meta.json}
   round.json = { name, sessions:{plan,dev,test}, members:{<sessionID>: {role, at}} }
                members 记录主会话/子代理等非角色会话，供「会话 → run」反查（footer 跟随 / sidebar 高亮）
-  meta.json  = { name, createdAt, executor, roleModels, startedAt?, pendingStart? }
-               pendingStart=true 表示「up 已开轮、尚未 /swarm-start」，dev/test 认领会被拒
+  meta.json  = { name, createdAt, executor, roleModels{dev,dev_backend,dev_frontend,test,reviewer}, startedAt?, pendingStart?, prdPath? }
+               pendingStart=true 表示「up 已开轮、尚未 /swarm-start」，dev/test 认领会被拒；
+               roleModels 按需：backend→dev_backend、frontend→dev_frontend（legacy dev 通配），test/reviewer 按需索要
 .swarm/secret-baseline.json   # secret 门基线（只报新增）
 .swarm/current                # 当前轮指针（并行多轮时仅作兜底：run 解析优先会话/任务归属）
 .swarm/eval/<month>.jsonl     # /swarm-eval 导出

@@ -68,7 +68,7 @@
  何を作るか どう作るか Red→Green ドキュメント同期 pre-review+PR 作成
  (唯一の承認)       →Review
 
- ══► 自動で接続(新規第三者依存の追加や設計判断が必要な時のみ停止)
+ ══► 自動で接続(新技術の導入や設計判断が必要な時のみ停止)
  ──► ユーザーが手動で実行
 
  (任意) /test-webview · /test-api — PR 前の追加チェック:
@@ -99,12 +99,12 @@
 
 - **`/plan`** — PRD → 自己完結型・**関数レベル**の実装計画、**「どう作るか」**に答える。
   - 1 ファイル 1 独立問題、関数名と責務まで詳細化;宣言的成果物(DDL / API 契約 / 設定)は**最終成果物を直接インライン**、exec がそのまま書き出す
-  - `/prd` から自動呼び出し、生成後そのまま `/exec` を実行;**新規第三者依存の追加**が必要な時だけ止まってユーザーの同意を求め、同意は version-policy が要求する承認とみなす
+  - `/prd` から自動呼び出し、生成後そのまま `/exec` を実行;**新技術の導入**が必要な時だけ止まり、項目ごとに理由を挙げてユーザーに一度で承認を求め、承認は version-policy が要求する承認とみなす
   - plan は実行中だけ存在し、全完了後に `/exec` が削除 —— PRD との重複を避ける
 
 - **`/exec`** — **3 エージェント隔離実行**、不正対策のコア設計。
   - *Test* エージェントは PRD の制約のみ読んで失敗テストを書く(Red)
-  - *Impl* エージェントは **PRD を見ない**、テスト + 関数リストのみ見て実装を書く(Green)、「意図に合わせて不正」できない;新規追加の第三者ライブラリは plan で承認された依存リストに制限
+  - *Impl* エージェントは **PRD を見ない**、テスト + 関数リストのみ見て実装を書く(Green)、「意図に合わせて不正」できない;新技術の導入は plan で承認された「新規技術」表に制限
   - *Review* エージェントは PRD の受け入れ基準と AGENTS.md に照合し、堅牢性/セキュリティの観点でもチェック、読み取り専用
   - 各ステップの進捗を `PROGRESS.md` に記録、token 枯渇でも**ロスレス再開**可能
   - 実装中に方針の問題が見つかったら止まって選択を求める:コードを直す / 今回の PRD を直す / 一時停止;小さな変更はその場で修正、大きな変更は `/prd` に戻って再承認
@@ -144,7 +144,7 @@
 **同梱されるもの**
 
 - **5 個のオーケストレーションサブエージェント**(上記ステージに駆動される):`test-engineer` / `impl-engineer` / `prd-reviewer` / `webview-test-runner` / `pre-reviewer`
-- **4 つの受動 hook**(自動発動):npm/yarn ブロック、main コミットブロック、依存バージョンセルフチェック、バックグラウンドスクリプトの完了待ち
+- **3 つの受動 hook**(自動発動):main コミットブロック、依存バージョンセルフチェック、バックグラウンドスクリプトの完了待ち
 
 ---
 
@@ -155,7 +155,7 @@
 ### bb-spec-core — 汎用規律
 
 - **`tdd-workflow`** — Red-Green-Refactor 規律、追加 / 修正 / 削除 3 シナリオの標準フローをカバー
-- **`version-policy`** — 標準 / 公式ライブラリ優先、新規第三者ライブラリ導入はユーザーの明示的同意が必要(`/plan` 段階でユーザーが同意した依存リストは同意とみなす);バージョン固定前に依存の公式最新版を確認、訓練記憶に頼ることを禁止
+- **`version-policy`** — 標準ライブラリ優先、プロジェクトにまだない新技術(ライブラリ、フレームワーク、言語、データベース、ミドルウェア、ツール、イメージ、CI Action、外部サービス)を導入する前に、項目ごとに用途とそれでなければならない理由を挙げ、ユーザー承認後にのみ使用、プラグインのデフォルトスタックやユーザー指名のものも同様(`/plan` 段階で承認された「新規技術」表は承認済みとみなす);バージョン固定前に依存の公式最新版を確認、訓練記憶に頼ることを禁止
 - **`git-workflow`** — ブランチ決定、段階的 commit、6 セクション PR 説明、マージ後クリーンアップ
 
 ### bb-spec-backend — バックエンドスタック制約
@@ -172,7 +172,7 @@
 
 ### bb-spec-frontend — フロントエンドスタック制約
 
-- **`vue-constraints`** — Vue 3 + TypeScript + Vite + Tailwind + bun スタック強制制約
+- **`vue-constraints`** — Vue 3 + TypeScript + Vite + Tailwind + bun スタック制約(デフォルトスタックは導入前にユーザー承認が必要、ユーザーは否決可能)
 - **`frontend-constraints`** — エンジニアリング規約:統一リクエスト client、エラーコード→UI マッピング集中、UX のみのルートガード、契約由来の型
 
 ---
@@ -194,7 +194,7 @@ BB-Spec は**4 つの独立インストール可能なサブ plugin** に分割 
 | **bb-spec-core** _(推奨ベース)_ | TDD / バージョンポリシー / Git 規律 + 3 つの受動 hook | `/plugin install bb-spec-core@0xbb2b` |
 | **bb-spec-workflow** _(コア機能)_ | prd → plan → exec → doc-update → revise → git-push(+ 任意 test-webview / test-api e2e)、git-clone ワンショット初期化 + 5 サブエージェント | `/plugin install bb-spec-workflow@0xbb2b` |
 | **bb-spec-backend** | Go / REST API / DB / 認証 / 認可 / 可観測性 / サービスガバナンス / 設定制約 | `/plugin install bb-spec-backend@0xbb2b` |
-| **bb-spec-frontend** | Vue 3 + TS + Vite + Tailwind + bun スタック & エンジニアリング規約(bun hook 付き) | `/plugin install bb-spec-frontend@0xbb2b` |
+| **bb-spec-frontend** | Vue 3 + TS + Vite + Tailwind + bun スタック & エンジニアリング規約 | `/plugin install bb-spec-frontend@0xbb2b` |
 
 必要に応じて選択 —— 例えば規律とワークフローのみでスタック意見なし:`bb-spec-core` + `bb-spec-workflow`;フルセット:4 つすべて。
 
@@ -251,9 +251,8 @@ claude plugin update bb-spec-workflow@0xbb2b   # ターミナルから特定の�
 
 | Hook | 所属サブ plugin | トリガータイミング | 効果 |
 |---|---|---|---|
-| `block-non-bun-pm` | bb-spec-frontend | PreToolUse(Bash) | `npm` / `yarn` / `pnpm` のパッケージ管理動作をブロックし `bun` を強制;既存プロジェクトで対応する lockfile(例 `package-lock.json`)がある場合は通過 |
 | `git-workflow-guard` | bb-spec-core | PreToolUse(Bash) | `main` / `master` ブランチでの `git commit` をブロック;他の git フロー動作(ブランチ作成 / push / worktree / merge / PR)は通過させ git-workflow 規律とリアルタイム git ステータスを注入 |
-| `dep-version-check` | bb-spec-core | PostToolUse(Write\|Edit) | 依存ファイル編集後に「公式最新版を先に確認」セルフチェックリマインダを注入 |
+| `dep-version-check` | bb-spec-core | PostToolUse(Write\|Edit) | 依存ファイル編集後に「公式最新版を先に確認」セルフチェックリマインダを注入し、未承認の新技術は取り消してリストを出し承認を求めるよう促す |
 | `background-script-wait` | bb-spec-core | Stop | このセッションで未通知の実行中バックグラウンドコマンドを見つけたとき 1 回だけ通知:Claude は終了するスクリプトをフォアグラウンドのループで待ち、常駐サービスは待たない |
 ---
 
@@ -291,7 +290,6 @@ base_dir: my/bb  # → my/bb/docs/{prd,plan,test}/ と my/bb/.cache/ ; ./ を指
 
 | シナリオ | スイッチ |
 |---|---|
-| 一時的に npm / yarn / pnpm を許可 | `bb-spec-frontend` を一時的に無効化 |
 | 一時的に main commit を許可 | `bb-spec-core` を一時的に無効化 |
 | バックグラウンドスクリプト待ちの通知をスキップ | `bb-spec-core` を一時的に無効化 |
 

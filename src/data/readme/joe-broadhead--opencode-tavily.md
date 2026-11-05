@@ -70,6 +70,17 @@ Tavily status
 - Next step: Run /connect and choose Tavily MCP to sign in, or choose Tavily to use an API key.
 ```
 
+### Scripts
+
+A script or a cron job can call the five tools with no model, through `opencode api`. It runs as a session and its agent, under that agent's permission rules and the session's own, and spends credits as the tool does:
+
+```sh
+opencode api post /api/rpc/tavily.web.tools/tavily_search \
+  -d '{"input":{"sessionID":"ses_…","input":{"query":"OpenCode plugin API"}}}'
+```
+
+See [Scripting](https://github.com/joe-broadhead/opencode-tavily/blob/HEAD/docs/scripting.md).
+
 ## Permissions
 
 The plugin adds this block to every agent, right after the agent's first `{ "action": "*", "resource": "*", "effect": "allow" }` rule. An agent without that rule gets nothing. Tavily's five tools only read from the web, so they run without a prompt. Any other tool on the `tavily` server, including one Tavily adds later, asks first.
@@ -136,7 +147,7 @@ The plugin's errors and warnings start with a code. Each ends with one next step
 | `KEY_WATCH_STOPPED` | Log warning | Restart OpenCode after you change the key. |
 | `STATUS_UNAVAILABLE` | Status | Run `/tavily-status` again, and restart OpenCode if it keeps failing. |
 
-When the plugin does not start, `/tavily-status` is missing, and OpenCode's log (`~/.local/share/opencode/log/opencode.log`) has a "failed to load plugin" line with one of these errors. Errors from OpenCode and from Tavily pass through unchanged.
+When the plugin does not start, `/tavily-status` is missing, and OpenCode's log (`~/.local/share/opencode/log/opencode.log`) has a "failed to load plugin" line with one of these errors. Errors from OpenCode and from Tavily pass through unchanged. A script's errors from the tools RPC have their own codes, listed in [Scripting](https://github.com/joe-broadhead/opencode-tavily/blob/HEAD/docs/scripting.md#errors).
 
 ## Uninstall
 

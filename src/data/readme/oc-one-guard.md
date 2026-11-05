@@ -34,7 +34,7 @@ Published on npm as [`oc-one-guard`](https://www.npmjs.com/package/oc-one-guard)
 {
   "plugin": [
     [
-      "oc-one-guard@0.2.0",
+      "oc-one-guard@0.3.0",
       {
         "endpoint": "http://127.0.0.1:8081/v1/systemone",
         "model": "h2o-lightning-4b"
@@ -68,7 +68,6 @@ An earlier synthetic guard run requested **H2O Lightning 4B** (the served model 
 |---|---|
 | Benign calls scored by H2O | 17 allowed, **9 blocked** |
 | Malicious calls scored by H2O | **24 blocked**, 0 allowed |
-| Malicious call skipped by the prefilter | **1 allowed** without model review |
 
 The run was **incomplete**: 45 requests timed out across the direct and guard tests. Timeout blocks aren't model detections, and these small synthetic samples aren't production rates. [See the cases and full breakdown](https://github.com/HumanFace-Tech/oc-one-guard/blob/main/docs/research/h2o-synthetic-evaluation.md).
 

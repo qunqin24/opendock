@@ -79,6 +79,7 @@ A passing check establishes its stated properties under its assumptions and boun
 - [Plugin updates](docs/reference.md#plugin-updates)
 - [Verification workflow](skills/formal-verify/SKILL.md)
 - [Release history](CHANGES.md)
+- [Agent instructions](AGENTS.md)
 
 ## Data handling
 
