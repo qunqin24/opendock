@@ -77,10 +77,7 @@ jobs:
             exit 0
           fi
           git commit -m "chore(data): refresh plugin snapshot $(date -u +%F)"
-          # Rebase first: a manual push during the crawl would otherwise
-          # reject this one and lose a day of history.
-          git pull --rebase origin "${GITHUB_REF_NAME}"
-          git push origin "HEAD:${GITHUB_REF_NAME}"
+          bash scripts/push-snapshot.sh "${GITHUB_REF_NAME}"
           echo 'pushed=true' >> "$GITHUB_OUTPUT"
 
       # Tells Bing & co. which pages changed, once the push has deployed.

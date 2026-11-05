@@ -210,7 +210,11 @@ test('repeated per-text failures eventually open the breaker', async () => {
   assert.equal(bing.calls.post, posts);
 });
 
-test('timeouts surface as failures, not hangs', async () => {
+test('timeouts surface as failures, not hangs', { timeout: 2000 }, async (ctx) => {
+  // AbortSignal.timeout() is unref'ed. Unlike a real HTTP socket, the mocked
+  // pending fetch does not keep Node 22 alive while we wait for its abort.
+  const keepAlive = setInterval(() => {}, 1000);
+  ctx.after(() => clearInterval(keepAlive));
   const bing = fakeBing({ post: (_p, _u) => new Promise(() => {}) });
   // fetch ignores the signal here, so wrap it the way real fetch behaves.
   const fetch = (url, init) =>
