@@ -6,7 +6,7 @@ Unofficial; not affiliated with Tavily.
 
 ## Requirements
 
-- OpenCode `>=2.2.3 <2.3.0`, tested on 2.2.3 and 2.2.4. On any other version the plugin does not start, unless you set [`allowUntestedHost`](https://github.com/joe-broadhead/opencode-tavily/blob/HEAD/docs/configuration.md#options).
+- OpenCode `>=2.2.3 <2.3.0`, tested on 2.2.3, 2.2.4 and 2.2.5. A later 2.2 release works, and `/tavily-status` calls it untested. Outside `>=2.2.3 <2.3.0` the plugin does not start, unless you set [`allowUntestedHost`](https://github.com/joe-broadhead/opencode-tavily/blob/HEAD/docs/configuration.md#options).
 - macOS or Linux.
 - A Tavily account. The plugin adds no tools of its own; each call uses your Tavily credits.
 
@@ -17,6 +17,15 @@ opencode plugin add @joe-broadhead/opencode-tavily
 ```
 
 Run `opencode reload`, or restart OpenCode. Then run `/tavily-status` in a session.
+
+### Update
+
+```sh
+opencode plugin update @joe-broadhead/opencode-tavily
+opencode reload
+```
+
+An entry pinned to a version, such as `@joe-broadhead/opencode-tavily@0.0.2`, does not update: remove the `@version` from `plugins` in `opencode.json`.
 
 ## Sign in
 
@@ -96,9 +105,7 @@ The plugin adds this block to every agent, right after the agent's first `{ "act
 ]
 ```
 
-- The last matching rule wins, so the agent's own later rules, your `permissions` in `opencode.json` and your saved "Always allow" answers all win over the block. Plan and Explore keep their own limits.
-- In `opencode run`, nobody can answer a prompt, so the five tools run and any other Tavily tool is refused.
-- **Agents that you define only in your config do not get the block**, because OpenCode creates them after plugins run. `/tavily-status` and the dialog name these agents and show the block. Put the block first in each such agent's own `permissions`, followed by your top-level `permissions` rules for `tavily_*` actions. Do not add it to the top-level `permissions`: that would let Explore use Tavily tools.
+The last matching rule wins, so your own rules and saved "Always allow" answers win over the block. **Agents that you define only in your config do not get it**: `/tavily-status` names them, and its next step says what to paste where. [Configuration](https://github.com/joe-broadhead/opencode-tavily/blob/HEAD/docs/configuration.md#permissions) has the rule order and an example.
 
 ## Configure
 
@@ -128,34 +135,46 @@ Run `/tavily-status` first. It always ends with one next step, `Nothing to do.` 
 | `disabled` | Enable `tavily` in `/mcps`, or remove `"disabled": true` from `mcp.servers.tavily` in `opencode.json`. |
 | `not configured` | Another plugin or a policy removed the `tavily` server. Remove that, then run `opencode reload`. |
 
-Sign-in `…, rejected by Tavily` means that Tavily does not accept the key, though the connection shows `connected`: every tool call answers `Unauthorized: missing or invalid API key`. Replace the key in `/connect` → **Tavily**, which shows "Sign in required" meanwhile, or replace `TAVILY_API_KEY` for the OpenCode server.
+Sign-in `…, rejected by Tavily` means that Tavily does not accept the key, though the connection shows `connected`: every tool call fails with `UPSTREAM_ERROR: … Tavily answered with error 401: … Unauthorized: missing or invalid API key`. Replace the key in `/connect` → **Tavily**, which shows "Sign in required" meanwhile, or replace `TAVILY_API_KEY` for the OpenCode server.
 
 Sign-in `OAuth` although you set `TAVILY_API_KEY` means that the variable is in your shell but not in the OpenCode server's environment. The **Tavily: Status** dialog then shows a **Terminal key** row. Run `/connect` and choose **Tavily** to connect the key, or see [TAVILY_API_KEY and the background service](https://github.com/joe-broadhead/opencode-tavily/blob/HEAD/docs/configuration.md#tavily_api_key-and-the-background-service).
 
-Sign-in `your own tavily server in opencode.json` means that your config already defines an MCP server named `tavily`. The plugin leaves it unchanged; its key handling and timeout do not apply to it, but the permission block does.
+Skills `tavily replaced by <path>` means that a skill of yours with the same id, for example in `~/.config/opencode/skills/`, loads instead of the plugin's. Rename or move that file.
 
-A 401 from a Tavily tool, or `Unauthorized: missing or invalid API key` in its result, means the sign-in expired or the key is wrong. A 429 is Tavily's rate limit or your plan's limit; the plugin does not retry.
+Sign-in `your own tavily server in opencode.json` means that your config already defines an MCP server named `tavily`. The plugin leaves it unchanged; its key handling and timeout do not apply to it, but the permission block does. Scripts can use it only when its `url` is Tavily's, `https://mcp.tavily.com/mcp/`: the tools RPC calls no other server, and answers `SERVER_CONFLICT`. Status then says so in its next step. Point the server at that URL, or remove it from `opencode.json`, to use the tools RPC.
+
+A 401 or 403 from a Tavily tool means the sign-in expired or the key is wrong. A 429 is Tavily's rate limit; 432 and 433 are your plan's limits. Tavily's server sends some of these as an ordinary result, an object such as `{"error":"Map failed","status":429,…}`. The plugin turns that into an `UPSTREAM_ERROR` with a next step, for the model and for scripts. It does not retry.
 
 The plugin's errors and warnings start with a code. Each ends with one next step.
 
 | Code | When | Next step |
 | --- | --- | --- |
-| `HOST_UNTESTED` | Start-up, outside `>=2.2.3 <2.3.0` | Use OpenCode 2.2.3 or a later 2.2 release, or set `allowUntestedHost`. With it, this is a warning. |
+| `HOST_UNTESTED` | Start-up, outside `>=2.2.3 <2.3.0` | Use OpenCode 2.2.3, 2.2.4 or 2.2.5, or set `allowUntestedHost`. With it, this is a warning. |
 | `OPTIONS_INVALID` | Start-up | Fix the plugin's options in `opencode.json`. The message names the option. |
 | `SKILLS_INVALID` | Start-up | Reinstall the plugin. |
-| `KEY_UNAVAILABLE` | Log warning | Run `/connect`, choose **Tavily** and connect the key again. |
+| `KEY_UNAVAILABLE` | Log warning | Run `/connect` and choose **Tavily**, then connect the key again. |
 | `KEY_WATCH_STOPPED` | Log warning | Restart OpenCode after you change the key. |
 | `STATUS_UNAVAILABLE` | Status | Run `/tavily-status` again, and restart OpenCode if it keeps failing. |
+| `UPSTREAM_ERROR` | A Tavily tool's result is Tavily's error object | The one in the message, by Tavily's status: 401 or 403, `/tavily-status`; 429, wait and retry; 432 or 433, your plan's limits; 5xx, wait and retry; any other, the input. |
 
-When the plugin does not start, `/tavily-status` is missing, and OpenCode's log (`~/.local/share/opencode/log/opencode.log`) has a "failed to load plugin" line with one of these errors. Errors from OpenCode and from Tavily pass through unchanged. A script's errors from the tools RPC have their own codes, listed in [Scripting](https://github.com/joe-broadhead/opencode-tavily/blob/HEAD/docs/scripting.md#errors).
+When the plugin does not start, `/tavily-status` is missing, and OpenCode's log (`~/.local/share/opencode/log/opencode.log`) has a "failed to load plugin" line with one of the start-up errors. Other errors from OpenCode and from Tavily pass through unchanged. A script's errors from the tools RPC have their own codes, listed in [Scripting](https://github.com/joe-broadhead/opencode-tavily/blob/HEAD/docs/scripting.md#errors).
 
 ## Uninstall
 
-```sh
-opencode plugin remove @joe-broadhead/opencode-tavily
-```
+Sign out first, while the plugin is installed: once it is removed, `opencode mcp logout tavily` can no longer find the server, and the Tavily MCP sign-in stays stored.
 
-To remove a stored sign-in or key as well, open `/connect`, choose the entry and remove the account. On the command line, `opencode auth list` shows them and `opencode auth logout` removes one.
+1. If you connected an API key, log out of it: `opencode auth logout tavily`, and choose the key. Skip this if OpenCode's own `websearch` should keep using the key. Wait until `/connect` lists **Tavily MCP** again, a few seconds: while a key is connected, the server has no Tavily MCP sign-in to log out of.
+2. Log out of Tavily MCP: `opencode mcp logout tavily`. Without a stored sign-in it says `No stored credentials for tavily`.
+3. Remove the plugin, then reload:
+
+   ```sh
+   opencode plugin remove @joe-broadhead/opencode-tavily
+   opencode reload
+   ```
+
+4. The plugin keeps no data of its own. Remove the permission block from any agent's own `permissions` where you copied it.
+
+`opencode auth list` should then list no Tavily entry, and `opencode mcp list` no `tavily` server.
 
 ## Links
 

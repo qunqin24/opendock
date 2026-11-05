@@ -76,6 +76,10 @@ opencode agent list | grep -E '^(explore|implement|context)'
 You should see `explore`, `implement` and `context`, each with hidden `-1`..`-4`
 pool variants alongside. That is the whole install, and you are done.
 
+Each pool slot controls the rate-limit-reset desktop notice: it is on by
+default for `opencode` and `opencode-go` slots, and other providers need
+`notify:on` in `pool.txt` or `"notify": true` in `pool.json` to opt in.
+
 **If that prints nothing, the plugin did not load** — and opencode will not tell
 you: it starts normally, logs nothing, and the agents are simply absent. A
 plugin that fails to load is silent by design of the host, so this check is the

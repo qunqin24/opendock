@@ -202,7 +202,17 @@
   会话存储里留下一条 session。请把角色划分当成"有人在看着的护栏"，而不是隔离边界。
 
 显式安装：`.\scripts\install.ps1 -ComputerUse`（POSIX `bash scripts/install.sh --computer-use`）；
-主安装流程从不碰它。其余一切——升级规程（**两次重启**，因为 Windows 不让替换运行中的 exe）、
+主安装流程从不碰它。
+
+**升级只要一次重启——而一次重启就是下限。** 新版本写进它自己的、带版本号的独立目录，所以任何正在运行的
+文件都不会被替换：安装这一步本身就能在 OpenCode 开着的时候做完。那一次重启只是为了让宿主加载新的
+command；完全零重启做不到——宿主只在启动时读 MCP 连接，而本安装器从不杀进程。
+
+0.0.6 之后新增两个用户可见的旋钮：`CU_AUDIT_MAX_BYTES`（默认 64 MiB——审计轨的总量上限，`0` = 不设上限）
+与 `CU_IMAGE_BUDGET_BYTES`（默认 4 MiB——本进程允许随回复附出的 JPEG 总预算；一张图没附出，既不等于屏幕是
+空的，也不等于画面没变化）。
+
+其余一切——带版本的目录如何回收、
 "拒绝"如何被记住从而永不再问、审计格式与撤销——都放在一个**刻意与安装手册分开**的页面里：
 [`docs/computer-use.md`](./docs/computer-use.md)。
 
@@ -257,7 +267,7 @@
 |---|---|---|
 | `defaultAgent` | `true` | 检查并报告安装器写的 `default_agent` 指向谁。2.x 插件 ctx 没有 `agent.default`，插件没法替你设默认角色；`false` 只是跳过这项检查。 |
 | `autoCreate` | `true` | 全局文件缺失时，启动写一份惰性模板。 |
-| `envProtect` | `true` | 全插件总开关；`false` 把 R6 模式解析成 `off`。 |
+| `envProtect` | `true` | `false`/`"off"` 的管辖面：R6 **细粒度 ask 面 + extra-deny**。它**不**抬 env 文件路径红线与地址红线——红线没有同意路径（`65f738f`）。 |
 
 2.x 的条目是字符串**或**带 `package`、`options` 的对象；1.x 的元组写法会被直接拒绝。选项确实送得到——boot 行读的就是对象形式。保留期属于配置而不是插件选项：`blackboardTtlDays`（默认 7）同时决定黑板和句柄的 TTL。
 

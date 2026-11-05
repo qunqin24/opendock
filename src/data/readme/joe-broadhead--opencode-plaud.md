@@ -6,7 +6,7 @@ Unofficial; not affiliated with Plaud.
 
 ## Requirements
 
-- OpenCode `>=2.2.3 <2.3.0`, tested on 2.2.3 and 2.2.4. On any other version the plugin does not start, unless you set [`allowUntestedHost`](https://github.com/joe-broadhead/opencode-plaud/blob/HEAD/docs/configuration.md#options).
+- OpenCode `>=2.2.3 <2.3.0`, tested on 2.2.3, 2.2.4 and 2.2.5. Another release inside that range starts, and `/plaud-status` calls it untested. Outside the range the plugin does not start, unless you set [`allowUntestedHost`](https://github.com/joe-broadhead/opencode-plaud/blob/HEAD/docs/configuration.md#options).
 - macOS or Linux.
 - A Plaud account. Plaud's hosted MCP server, `https://mcp.plaud.ai/mcp`, is in the US; accounts in other regions are untested. If Plaud gives you another address, set it with the [`url`](https://github.com/joe-broadhead/opencode-plaud/blob/HEAD/docs/configuration.md#options) option.
 
@@ -17,6 +17,10 @@ The plugin is plain JavaScript. It bundles no Node runtime or Plaud software, do
 ```sh
 opencode plugin add @joe-broadhead/opencode-plaud
 ```
+
+Run `opencode reload`, or restart OpenCode. Then run `/plaud-status`: it shows `sign-in required` until you sign in.
+
+**Update** with `opencode plugin update @joe-broadhead/opencode-plaud`, then run `opencode reload`. An entry pinned to a version, such as `@joe-broadhead/opencode-plaud@<version>`, does not update: remove the `@version` from its `plugins` entry first.
 
 ## Sign in
 
@@ -39,10 +43,11 @@ Ask about your recordings, for example "what did I record this week?" or "save t
 | Tool | Code Mode | What it does | Permission |
 | --- | --- | --- | --- |
 | `plaud_list_files` | `tools.plaud.list_files` | List or search recordings | runs |
-| `plaud_get_file` | `tools.plaud.get_file` | One recording's details | runs |
-| `plaud_get_transcript` | `tools.plaud.get_transcript` | One transcript block, a page at a time | runs |
 | `plaud_get_note` | `tools.plaud.get_note` | The recording's notes, such as its summary | runs |
+| `plaud_get_transcript` | `tools.plaud.get_transcript` | One transcript block, a page at a time | runs |
+| `plaud_get_file` | `tools.plaud.get_file` | One recording in full: 150 to 320 KB, mostly the raw transcript and the notes again. The skill and Code Mode's description steer the model away from it, to the notes, the transcript, or `plaud_export` for audio | runs |
 | `plaud_get_current_user` | `tools.plaud.get_current_user` | The signed-in account | runs |
+| `plaud_recent` | `tools.plaud.recent` | The newest recordings, one line each: title, start time and length | runs |
 | `plaud_export` | `tools.plaud.export` | Save audio, a transcript or a note as a file | asks |
 
 Plaud maintains the read tools and their arguments. Plaud has no write API: nothing here can create, rename, delete, upload, share or send a recording. Any other tool on a Plaud server asks before it runs.
@@ -76,7 +81,7 @@ See [SECURITY.md](https://github.com/joe-broadhead/opencode-plaud/blob/HEAD/SECU
 
 ### Scripts
 
-A script or a cron job can call Plaud's five read tools with no model, through `opencode api`. It runs as a session and its agent, under that agent's permission rules and the session's own. Add `"account": "<alias>"` to read another account. Exports and every other Plaud tool are never available to scripts, and a script never gets a signed link:
+A script or a cron job can call Plaud's five read tools and `plaud_recent` with no model, through `opencode api`. It runs as a session and its agent, under that agent's permission rules and the session's own. Add `"account": "<alias>"` to read another account. Exports and every other Plaud tool are never available to scripts, and a script never gets a signed link:
 
 ```sh
 opencode api post /api/rpc/plaud.recordings.tools/list_files \
@@ -87,7 +92,7 @@ See [Scripting](https://github.com/joe-broadhead/opencode-plaud/blob/HEAD/docs/s
 
 ## Permissions
 
-The plugin adds default rules to each agent: Plaud's read tools run without a prompt, and `plaud_export` and any other Plaud tool ask first. "Always allow" on an export remembers only that account and kind, such as `default:transcript`. Your own `permissions` rules win over the defaults.
+The plugin adds default rules to each agent: Plaud's read tools and `plaud_recent` run without a prompt, and `plaud_export` and any other Plaud tool ask first. "Always allow" on an export remembers only that account and kind, such as `default:transcript`. Your own `permissions` rules win over the defaults.
 
 `opencode run` and other runs where nobody can answer refuse an export unless a rule allows it. To export without a prompt, or to block some exports, see [Permissions](https://github.com/joe-broadhead/opencode-plaud/blob/HEAD/docs/configuration.md#permissions).
 
@@ -139,7 +144,8 @@ Members then only sign in, once per account: run `/connect` and choose **Plaud**
 | You see | Do this |
 | --- | --- |
 | `AUTH_REQUIRED` from an export | That account's server is not connected or not signed in. Sign in from `/connect`, then retry. |
-| Status names agents that lack the default rules | Agents defined only in your config miss the rules. Put the rules it shows first in **that agent's own** `permissions`, then repeat your top-level rules for Plaud tools after them. Never add them to the top-level `permissions`. See [the example](https://github.com/joe-broadhead/opencode-plaud/blob/HEAD/docs/configuration.md#agents-defined-in-your-config). |
+| Status names agents that lack the default rules | Agents defined only in your config miss the rules; status lists those whose own rules would run Plaud tools without asking. Put the rules it shows first in **that agent's own** `permissions`, then repeat your top-level rules for Plaud tools after them. Never add them to the top-level `permissions`. See [the example](https://github.com/joe-broadhead/opencode-plaud/blob/HEAD/docs/configuration.md#agents-defined-in-your-config). |
+| Status names a shadowed skill | A skill of your own, or a project's, has the id of one of the plugin's skills, so OpenCode loads it instead. Move or rename the file status names, then run `opencode reload`. |
 | `OPTIONS_INVALID` | An option is wrong; the message names each one. Fix it in the plugin's `options`. |
 | `HOST_UNTESTED` | Your OpenCode is outside `>=2.2.3 <2.3.0`. Install a tested release, or set `allowUntestedHost`. |
 | `/plaud-status` and the palette command are missing | The plugin did not start. Open `/plugins` to see the error. |
@@ -149,14 +155,13 @@ Errors from the plugin read `CODE: what happened. Next step: What to do.` Every 
 
 ## Uninstall
 
-Sign out of each account, then remove the plugin:
+Sign out while the plugin is still installed: once it is removed, OpenCode no longer knows the `plaud` and `plaud-<alias>` servers, so it cannot remove their sign-ins, and `opencode auth list` stops showing them.
 
-```sh
-opencode mcp logout plaud
-opencode plugin remove @joe-broadhead/opencode-plaud
-```
-
-Run `opencode mcp logout plaud-<alias>` for each extra account too, before you remove the plugin.
+1. Sign out of each account: `opencode mcp logout plaud`, and `opencode mcp logout plaud-<alias>` for each account in `accounts`. If one answers `MCP server not found` while the plugin is still installed, OpenCode is still loading the plugin for that folder: wait a few seconds and run it again.
+2. Check: `opencode auth list` lists no **Plaud** entry.
+3. Remove the plugin: `opencode plugin remove @joe-broadhead/opencode-plaud`, then `opencode reload`.
+4. Your exports stay in your export roots (`~/Plaud` by default); delete them if you no longer want them. The plugin keeps no other data.
+5. Remove any Plaud rules you copied into your agents' own `permissions`.
 
 ## Links
 

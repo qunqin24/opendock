@@ -50,6 +50,7 @@ Restart the TUI and the **Shell** panel appears at the bottom of the sidebar.
 | `/shell-magazine-version` | Show the plugin version |
 | `/shell-magazine-lang` | Choose the language |
 | `/shell-magazine-max` | Choose how many entries are shown |
+| `/shell-magazine-history-limit` | Choose how many commands are kept per session |
 | `/shell-magazine-order` | Choose the sort order |
 | `/shell-magazine-scroll` | Choose the paging mode |
 | `/shell-magazine-time-format` | Choose the elapsed-time format |
@@ -76,6 +77,7 @@ Restart the TUI and the **Shell** panel appears at the bottom of the sidebar.
 | Setting | Default | Notes |
 | --- | --- | --- |
 | Max entries | 10 | Entries shown at once (paged) |
+| History limit | 100 | Entries kept per session; newest win and running commands are never dropped |
 | Order | Descending | Newest first |
 | Scroll | Wheel | Wheel / click paging |
 | Time format | `short` | short / decimal / clock / compact / seconds |
@@ -106,6 +108,11 @@ sessions therefore cannot accumulate large history stores in the host reload loo
 Compression/decompression uses asynchronous workers rather than the rendering thread.
 Unchanged registry polls do not rewrite history, and completed panels stop their clock.
 
+Only the newest `History limit` entries are kept per session (100 by default). Running
+commands are never dropped. Raising the limit rescans the OpenCode session messages and
+restores commands that are still available there; lowering it drops the oldest finished
+entries immediately. `Max entries` remains only the number of rows rendered at once.
+
 Older versions used one `shell_magazine.session_data` JSON string for every session.
 On first access to each session, the plugin imports its record from that file without
 registering the large legacy file with OpenCode's live-reloaded storage. The original
@@ -125,6 +132,47 @@ OpenCode 2.0.22–2.0.24 retains previously registered stores even after plugin 
 the plugin cannot unregister that old store through the public API. The background
 service and sessions do not need to be restarted. Newly opened TUIs load only the new
 per-session stores.
+
+## Reclaiming disk space
+
+Outputs, large commands and errors are stored as immutable, content-addressed blobs and
+are never deleted at runtime. When entries are trimmed by the history limit or removed
+with `/shell-magazine-clear`, their blobs can become unreachable from any session record
+and stay on disk. The package ships a standalone maintenance command that finds and
+optionally deletes those orphans.
+
+The command is a dry-run by default; it only reads state and prints what it would remove:
+
+```bash
+npx --package=opencode-shell-magazine opencode-shell-magazine-prune
+# or, from a checkout:
+node scripts/prune-blobs.mjs
+```
+
+**Close every OpenCode instance before using `--apply`.** A live TUI can publish new blobs
+while the script scans, and a record trimmed from memory may still reference a blob that
+the script considers orphaned. Delete only after all instances are closed:
+
+```bash
+npx --package=opencode-shell-magazine opencode-shell-magazine-prune --apply
+```
+
+The run aborts without deleting anything if a manifest or a record blob cannot be read or
+parsed, so a partially corrupted state never causes extra data loss. Missing referenced
+blobs are reported but do not block the run.
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `--apply` | off | Delete eligible orphan blobs; without it the command is a dry-run |
+| `--verbose` | off | List every planned orphan instead of the first 20 |
+| `--channel <name>` | `latest` | OpenCode release channel |
+| `--state-dir <path>` | `$XDG_STATE_HOME` or `~/.local/state` | State root |
+| `--tui-dir <path>` | `<state>/opencode/<channel>/tui` | Directory containing the session manifests |
+| `--blob-dir <path>` | `<state>/opencode/<channel>/shell-magazine/text` | Content-addressed blob directory |
+| `--min-age-hours <n>` | `24` | Only delete blobs older than n hours; `0` disables the age guard |
+
+Run with `--help` for the same summary. For local development, `npm run prune:blobs`
+forwards to the same script.
 
 ## Development
 

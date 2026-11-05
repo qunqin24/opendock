@@ -65,6 +65,14 @@ A per-session memo that survives compaction and can be edited in place, keeping 
 
 ![DCP memo view](docs/screenshots/dcp-memo.png)
 
+### Skills — immediate loading, stable protected context
+
+The native `skill` tool still loads skills through OpenCode. A successful load immediately marks the skill loaded; loading it again fails unless `force: true` is supplied. A failed load leaves it unloaded, including a failed forced reload. `unload_skill` removes a skill from the loaded list. Both tools are allowed during housekeeping, subject to OpenCode permissions, and entry guidance lists the loaded skills.
+
+The protected list is separate: only a successful `leave_housekeeping` copies the loaded list into it. Protected skill calls and results are injected immediately after the memo, or at the same context anchor when there is no memo. Loading or unloading during housekeeping does not change that injected prefix until leave succeeds. Reverting housekeeping restores its protected list without rolling back immediate loaded status. Skill management alone does not satisfy the leave guard.
+
+Skills are not blanket-protected by default. Unloading stops the protected injection after the next successful leave; original skill messages remain in history and can be compressed normally. Explicit `protectedTools` configuration is still respected. Existing sessions start with both lists empty rather than inferring loads from old tool calls. Native interception targets OpenCode's `v1` hook behavior.
+
 ## Installation
 
 OpenCode installs plugins directly from npm by name — no local build required.

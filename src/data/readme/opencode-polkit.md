@@ -48,8 +48,16 @@ For a local checkout, run `npm run build` once, then reference the directory:
 | `sudo apt install x`   | polkit dialog, then runs as root            |
 | `sudo -u bob …`        | as above, as `bob`                          |
 | `cat x \| sudo tee y`  | dialog for `tee`                            |
-| `sudo -n …`            | refused: pkexec has no non-interactive mode |
-| `sudo -i`, `-s`, `-b`  | refused, with the equivalent command        |
+| `sudo -n …`            | runs only if polkit would authorise without asking; otherwise exit 1 with `sudo: a password is required` |
+| `sudo -v`              | performs the authentication, as `sudo -v` does |
+| `sudo -l`              | prints the polkit policy and this session's temporary authorizations |
+| `sudo -k`, `-K`        | revokes polkit's temporary authorizations   |
+| `sudo -H`, `-N`, `-P`  | accepted: pkexec already does what they ask |
+| `sudo -s CMD`          | runs `CMD` through a shell, as root         |
+| `sudo -E …`            | runs with the caller's environment          |
+| `sudo -b …`            | starts the command in the background        |
+| `sudo --help`, `-V`    | answered by the real sudo; nothing elevates |
+| `sudo -i`, `-S`, `-A`  | refused, with the equivalent command        |
 | `sudoedit`, `visudo`   | refused, with the alternative               |
 | `su -c 'id'`           | dialog, then runs as root                   |
 | `su -c 'id' bob`       | as above, as `bob` (administrator password) |
@@ -57,7 +65,9 @@ For a local checkout, run `npm run build` once, then reference the directory:
 | `su -m`, `-s`, `-g`, `-w`, `--pty` | refused, with the alternative   |
 | `pkexec …`             | passed through                              |
 
-Refused invocations exit with status 64 and one line naming the alternative.
+An option is refused only when polkit cannot express it: it needs a terminal, a
+password channel polkit does not have, or an editor. Refusals exit with status 64
+and one line naming the alternative.
 
 ## How it works
 
@@ -65,6 +75,16 @@ Refused invocations exit with status 64 and one line naming the alternative.
 resolves those instead of the system binaries, and they forward the command to
 `pkexec`. Command text is never rewritten, so quoting, pipes and subshells need
 no special handling.
+
+The `create.before` shell hook prepends the stand-in directory to the spawned
+`PATH`. The directory lives in `$XDG_RUNTIME_DIR` (falling back to `/tmp`) as
+`0700`, is removed when the plugin is unloaded, and also holds
+`opencode-polkit-env`, the helper `sudo -E` uses to re-export an environment
+pkexec stripped.
+
+The shell tool's description gains one sentence about the redirect, so the model
+plans privilege with the real contract instead of learning it from a failed
+call.
 
 ## Authorisation
 
@@ -79,6 +99,21 @@ session then runs without a dialog. That cache belongs to the agent: another
 agent, a restarted agent or a dismissed dialog means the next command prompts
 again, so do not rely on it.
 
+Measured on polkit 128 with `polkit-gnome`'s agent: after a successful `pkexec`,
+`pkcheck --list-temp` prints nothing and a non-interactive `pkcheck` still
+reports that authentication is required. polkit records no temporary
+authorization for this action, so the silent second run is the agent answering
+from its own copy of the password, and no user-space query can predict it. That
+is why `sudo -n` reports what the policy says rather than guessing whether a
+dialog would appear, and why `sudo -k` can only clear polkit's own record.
+
+The plugin keeps no authorization state of its own: `sudo -v` verifies once and
+writes nothing, `sudo -n` assumes nothing, and `sudo -k` only clears polkit's
+record. Authorising one command therefore leaves the next one to be decided
+again, which is the point — the person who allowed an upgrade can still refuse
+the deletion that follows. What widens that window is the agent's password
+cache, not this plugin, and nothing here can revoke it.
+
 ## Limitations
 
 - Absolute paths (`/usr/bin/sudo`) and relative ones (`./sudo`) bypass `PATH`.
@@ -87,6 +122,11 @@ again, so do not rely on it.
 - `su -c … USER` authenticates an administrator (polkit), not `USER`, so an
   account that real `su` would allow can be refused here.
 - `su -c` runs the command with `sh -c`, not with the target user's login shell.
+- `sudo -E` re-exports the environment through `pkexec`'s argument list, so the
+  values are visible in `ps` while the command starts. Exported shell functions
+  are skipped, and `PATH` loses the shim directories.
+- `sudo -k` cannot clear the password a desktop agent holds; only polkit's
+  temporary authorizations are revoked.
 
 These bypass the redirect, not polkit, which still decides whether the command
 runs.
@@ -98,11 +138,12 @@ without one, `pkexec` fails instead of prompting.
 
 ## Exit status
 
-| Status | Meaning                                      |
-|--------|----------------------------------------------|
-| 126    | the polkit dialog was dismissed              |
-| 127    | not authorised, or the program could not run |
-| 64     | the plugin refused the invocation            |
+| Status | Meaning                                                |
+|--------|--------------------------------------------------------|
+| 1      | `-n` or `-v` could not be satisfied: polkit requires authentication, or refuses |
+| 126    | the polkit dialog was dismissed                        |
+| 127    | not authorised, or the program could not run           |
+| 64     | the plugin refused the invocation                      |
 
 Messages are in English.
 

@@ -216,9 +216,21 @@ What is and is not protected:
 
 Install it explicitly: `.\scripts\install.ps1 -ComputerUse` (POSIX
 `bash scripts/install.sh --computer-use`); the installer's main flow never touches it.
-Everything else — the upgrade procedure (**two restarts**, because Windows will not replace a
-running exe), how a "no" is remembered so you are never asked twice, the audit format and the
-undo — lives in a page kept deliberately apart from the install guide:
+
+**Upgrading takes one restart — and one restart is the floor.** A new version is written into its
+own versioned directory, so no file the host is running gets replaced: the install itself happens
+while OpenCode is up. That one restart is only what lets the host load the new command, and a
+fully zero-restart upgrade is impossible — the host reads its MCP connections at startup, and this
+installer never kills a process.
+
+Two user-visible knobs since 0.0.6: `CU_AUDIT_MAX_BYTES` (default 64 MiB — the total-size cap on
+the audit trail, `0` = no cap) and `CU_IMAGE_BUDGET_BYTES` (default 4 MiB — the per-process budget
+for JPEGs allowed to ride replies; an image left out of a reply is not a blank screen and not
+"nothing changed").
+
+Everything else — how the release directory you left behind gets reclaimed, how a "no" is
+remembered so you are never asked twice, the audit format and the undo — lives in a page kept
+deliberately apart from the install guide:
 [`docs/computer-use.md`](./docs/computer-use.md).
 
 ## 🔒 Governance & security
@@ -272,7 +284,7 @@ That walk and precedence are the host's own config-layering rule, copied rather 
 |---|---|---|
 | `defaultAgent` | `true` | Check and report which agent the installer's `default_agent` names. The 2.x plugin ctx has no `agent.default`, so the plugin cannot promote anything; `false` skips the check. |
 | `autoCreate` | `true` | Write the inert global `team-mode.jsonc` at boot when absent. |
-| `envProtect` | `true` | Plugin-wide kill switch; `false` resolves the R6 mode to `off`. |
+| `envProtect` | `true` | Scope of `false`/`"off"`: the R6 **fine-grained ask face + extra-deny**. It does NOT lift the env-file path red line or the address red lines — a red line has no consent path (`65f738f`). |
 
 On 2.x an entry is a string **or** an object with `package` and `options`; the 1.x tuple form is rejected outright. Options do arrive — the object form is what the boot row reads back. Retention is configuration rather than an option: `blackboardTtlDays` (default 7) sets the blackboard and handle TTL.
 

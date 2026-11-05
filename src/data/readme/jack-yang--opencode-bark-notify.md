@@ -1,12 +1,11 @@
 # opencode-bark-notify
 
-Focus-aware [Bark](https://github.com/Finb/Bark) push notifications for [OpenCode](https://opencode.ai).
+[Bark](https://github.com/Finb/Bark) push notifications for [OpenCode](https://opencode.ai).
 
-Get **detailed agent messages** on your iPhone when you step away from your computer. When you're at the terminal, notifications are suppressed — no spam.
+Get **detailed agent messages** on your iPhone: task finished, permission needed, or a question waiting for you.
 
 ## Features
 
-- **Focus-aware** — Suppresses notifications when your terminal is the frontmost app
 - **Detailed content** — Sends the agent's actual last message, not just "task completed"
 - **Category badges** — iOS subtitle shows what happened: ✅ Responded / 🔐 Wait for Permission / ❓ Input Needed
 - **Session-aware** — Includes the session title in every notification
@@ -59,7 +58,6 @@ Restart OpenCode.
 | `barkUrl` | string | `https://api.day.app` | Bark server URL (for self-hosted) |
 | `level` | string | `timeSensitive` | iOS notification level |
 | `group` | string | `opencode` | iOS notification group |
-| `terminals` | string[] | `["Ghostty", "Terminal", "iTerm2", ...]` | Terminal app names for focus detection |
 
 ### Example with all options
 
@@ -70,24 +68,17 @@ Restart OpenCode.
       "barkKey": "YOUR_KEY",
       "barkUrl": "https://your-bark-server.com",
       "level": "active",
-      "group": "my-agent",
-      "terminals": ["Ghostty", "WezTerm"]
+      "group": "my-agent"
     }]
   ]
 }
 ```
 
-## How focus detection works
-
-On macOS, the plugin uses `osascript` to check if a terminal app is the frontmost application. If it is, notifications are suppressed — you're already looking at the terminal. If you've switched to another app or stepped away, notifications fire.
-
-On non-macOS, focus detection is disabled (notifications always fire).
-
 ## Notification types
 
 | Event | Badge | Body |
 |-------|-------|------|
-| Session complete | **✅ Responded** | Agent's last message (up to 500 chars) |
+| Session complete | **✅ Responded** | The agent's last reply (up to 500 chars) |
 | Permission request | **🔐 Wait for Permission** | Permission type + patterns |
 | Question | **❓ Input Needed** | The question text |
 
@@ -95,10 +86,10 @@ On non-macOS, focus detection is disabled (notifications always fire).
 
 This plugin complements [@mohak34/opencode-notifier](https://github.com/mohak34/opencode-notifier) (desktop notifications). Use both together:
 
-- **Desktop** (osascript/sound/bell) → when at computer but in another app
-- **Bark** (iPhone push) → when away from computer entirely
+- **Desktop** (osascript/sound/bell) → on the computer
+- **Bark** (iPhone push) → on your phone
 
-Both independently check focus, so there's no conflict.
+This plugin always sends; if you want desktop notifications only when the terminal is in the background, set `suppressWhenFocused` in opencode-notifier.
 
 ## License
 

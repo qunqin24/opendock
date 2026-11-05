@@ -139,11 +139,12 @@ codex plugin add ycc-mcp@ycc
 agent plugin marketplace add https://github.com/yandy-r/ystack   # then pick packages in /plugins
 ```
 
-Rules, instructions, settings, and Codex custom agents stay on `install.sh`.
-Already installed through `install.sh`? Preview the move onto the native
-packages with `./install.sh migrate --target codex` (or `--target claude` /
-`--target cursor`; see
-[Migrating To Native Packages](docs/install/README.md#migrating-to-native-packages)).
+Rules, instructions, settings, and Codex custom agents come from `install.sh`.
+From a checkout, `./install.sh install --target <claude|codex|cursor|omp>`
+installs the same native packages through each runtime's plugin CLI. It also
+retires copies an older `install.sh` wrote, removing only entries it can prove
+it owns (see
+[Automatic Legacy Cleanup](docs/install/README.md#automatic-legacy-cleanup)).
 
 Or enable in `~/.claude/settings.json`:
 
@@ -171,32 +172,33 @@ For local development installs, generated compatibility bundles, model defaults,
 and desktop app notes, use the dedicated install guides. Recommended sync form:
 
 ```bash
-./install.sh sync --target claude --intent hooks,settings,mcp           # project settings, hooks, MCP
+./install.sh sync --target claude --intent base,mcp,hooks,settings      # ycc, ycc-mcp, ycc-hooks plugins + project settings
 ./install.sh sync --target claude --intent mods                          # Claude Code mods (ycc/mods)
 ./install.sh sync --target all --intent settings,rules --global          # new machine: user-global settings
-./install.sh install --target all --only agents                         # standalone agents, no plugin
+./install.sh install --target codex                                     # ycc@ycc + ycc-mcp@ycc + custom agents
+./install.sh install --target cursor --rules --mcp --hooks              # register the marketplace + /plugins hint
 ./install.sh install --target omp                                       # OMP via omp plugin
-./install.sh sync --target codex,claude,opencode --intent mcp            # current project
-./install.sh sync --target codex,claude,opencode --intent mcp --global   # user-global
-./install.sh sync --target opencode --intent mcp --mcps github,linear    # only these servers
+./install.sh sync --target claude,opencode --intent mcp                  # current project
+./install.sh sync --target claude,opencode --intent mcp --global         # user-global
+./install.sh sync --target opencode --intent mcp --mcps github,linear    # only these servers (opencode)
 ./install.sh list mcps                                                   # managed MCP server names
-./install.sh remove --target all --only mcp                              # undo project MCP
+./install.sh remove --target claude,opencode --only mcp                  # undo project MCP
 ./install.sh remove --target all --intent settings,rules --global        # undo any intent, any target
 ./install.sh cli && ycc completion --install                             # `ycc` on PATH for other projects
 ```
 
-The `mcp` step and the `settings` step on Claude, Codex and opencode default to
-the current project; pass `--global` for user-global config (Cursor and OMP
-settings run only with `--global`). `base` ships a target's whole bundle (the
-`ycc` plugin for Claude and Codex). `skills`, `agents` and `commands` instead
-install standalone entries, one per skill/agent/command, into each tool's own
-directories (`~/.claude/skills/<name>`, `~/.codex/agents/<name>.toml`, ...)
-with no plugin.
-On Claude, `commands` is an alias for `skills` (skills are the slash commands);
-your own entries there are never touched. `remove` undoes any intent on any target
-(`base`, `skills`, `agents`, `commands`, `settings`, `rules`, `mcp`, `hooks`,
-`plugins`, `mods`), taking back only what the installer owns and leaving your
-own keys, files and servers alone. See
+Claude, Codex, Cursor and OMP install whole native packages: on Claude the
+`mcp` and `hooks` intents install `ycc-mcp@ycc` and `ycc-hooks@ycc` (project
+scope by default, user scope with `--global`), and `skills`, `agents` and
+`commands` map to the `ycc@ycc` plugin. opencode and the cross-tool `agents`
+target have no native route; there `base` copies the bundle and `skills`,
+`agents` and `commands` install standalone entries, narrowed by `--skills`,
+`--agents`, `--commands` and `--mcps`. The `settings` step on Claude, Codex
+and opencode defaults to the current project; pass `--global` for user-global
+config (Cursor and OMP settings run only with `--global`). `remove` undoes any
+intent on any target (`base`, `skills`, `agents`, `commands`, `settings`,
+`rules`, `mcp`, `hooks`, `plugins`, `mods`), taking back only what the
+installer owns and leaving your own keys, files and servers alone. See
 [Project Vs Global Scope](docs/install/README.md#project-vs-global-scope).
 
 `--target` takes a comma-separated list (or `all`); every target is validated
@@ -209,16 +211,16 @@ every invocation needs a command — a bare `--target ...` is rejected.
 
 Dedicated guides:
 
-| Runtime                        | Install guide                                            |
-| ------------------------------ | -------------------------------------------------------- |
-| Claude Code / Claude Desktop   | [`docs/install/claude.md`](docs/install/claude.md)       |
-| Cursor                         | [`docs/install/cursor.md`](docs/install/cursor.md)       |
-| Codex / Codex Desktop          | [`docs/install/codex.md`](docs/install/codex.md)         |
-| opencode                       | [`docs/install/opencode.md`](docs/install/opencode.md)   |
-| `~/.agents/skills` (Zed etc)   | [`docs/install/agents.md`](docs/install/agents.md)       |
-| OMP (oh-my-pi)                 | [`docs/install/omp.md`](docs/install/omp.md)             |
-| Shared installer concepts      | [`docs/install/README.md`](docs/install/README.md)       |
-| Native packages (all runtimes) | [`docs/install/v6/README.md`](docs/install/v6/README.md) |
+| Runtime                      | Install guide                                            |
+| ---------------------------- | -------------------------------------------------------- |
+| Claude Code / Claude Desktop | [`docs/install/claude.md`](docs/install/claude.md)       |
+| Cursor                       | [`docs/install/cursor.md`](docs/install/cursor.md)       |
+| Codex / Codex Desktop        | [`docs/install/codex.md`](docs/install/codex.md)         |
+| opencode                     | [`docs/install/opencode.md`](docs/install/opencode.md)   |
+| `~/.agents/skills` (Zed etc) | [`docs/install/agents.md`](docs/install/agents.md)       |
+| OMP (oh-my-pi)               | [`docs/install/omp.md`](docs/install/omp.md)             |
+| Shared installer concepts    | [`docs/install/README.md`](docs/install/README.md)       |
+| Native package reference     | [`docs/install/v6/README.md`](docs/install/v6/README.md) |
 
 ## Workflow composition
 
@@ -325,8 +327,8 @@ ystack/
 │   ├── AGENTS.md              # generated rules file (transformed from CLAUDE.md)
 │   └── opencode.json          # generated config: $schema + default model + MCP
 ├── mcp-configs/
-│   └── mcp.json               # shared MCP servers; merged/copied by install.sh
-├── install.sh                 # sync Claude, Cursor, Codex, opencode, agents, and OMP targets
+│   └── mcp.json               # shared MCP servers (ycc-mcp packages; opencode merge)
+├── install.sh                 # install Claude, Codex, Cursor and OMP packages; sync opencode and agents
 ├── scripts/
 │   ├── generate-codex-skills.sh    # wrapper → generate_codex_skills.py
 │   ├── generate_codex_skills.py    # ycc/skills → .codex-plugin/ycc/skills

@@ -160,6 +160,14 @@ Handoff:    Coordinator → Worker (same unit, retained edits/context/checks/bud
 The default Mission profile is serial. Background responsiveness and status observations do not
 add parallel writers, replay unknown commands or imply completion. More agents are not the goal.
 
+Goal history normally uses a single ledger file. If large evidence would exceed the ledger's
+16 MiB document limit, a successful append moves large logical events into immutable,
+hash-verified chunks alongside that file, without changing their event hashes or history. When
+backing up or moving such a ledger, keep its `<ledger>.blobs` directory together with the ledger
+and take a consistent snapshot; missing or altered chunks prevent recovery. The storage format
+is versioned: older runtimes reject a migrated ledger rather than writing it. The index and event
+count limits still apply, and failed writes may leave unreferenced chunks.
+
 Whole-request workload appears as `全体作業量 n/100（概算）`, using ordinary plans and native
 work observations, not budget consumption or fixed stage shares. Calculation adds no model
 request or verification; formal acceptance still owns `100/100`.

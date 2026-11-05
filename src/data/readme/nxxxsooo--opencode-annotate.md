@@ -261,8 +261,12 @@ The manifest version alone cannot identify edits to an unpacked extension.
 
 1. Run `/annotate` or `/annotate path/to/file.md` in a session.
 2. Select text by dragging, or press `v` and use movement keys.
-3. Press `c` to comment, `a` for “looks good,” or `d` to request deletion.
-   Without a selection, `c` comments on the current block. Enter saves a comment.
+3. Press `c` to comment, `w` for **what?**, `a` for “looks good,” or `d` to request deletion.
+   **what?** marks a passage you don't understand with a short `what?` note
+   ([what? notes](#what-notes)). Without a selection, `c` comments on the current block.
+   Enter saves a comment.
+   Selecting never touches the clipboard; press `y` (or click **copy**) to copy the
+   selected source, and the selection stays for annotating.
 4. Press **`q`** to send your notes and return to OpenCode.
 
 **`Ctrl+S`** does the same mid-comment, saving the comment first. The header's **Send N back (q)**
@@ -355,6 +359,30 @@ background sessions do not trigger it. A reply is skipped if another review is o
 you switch sessions before it opens, or a new turn starts. Dismissing the reviewer or
 reloading the plugin does not reopen that reply. Sending remains your explicit action.
 OpenCode reloads saved configuration automatically; use `/reload` if needed.
+
+### What? notes
+
+A `what?` note stays short in the review. When you send, the feedback adds one
+instruction after all the notes: explain each marked passage in plain language with more
+detail and a concrete example where it helps, relate it to the current task, and hold any
+pending action until you confirm. Change or remove that instruction in
+`~/.config/opencode-annotate/tui.toml`; an empty string sends the notes alone:
+
+```toml
+[prompts]
+what = "Explain each passage marked what? in two sentences, then stop."
+```
+
+If OpenCode has a skill with ID `what`, the plugin attaches it to the sent feedback, the
+same as mentioning `@what`. That skill can then hold pending work and ask whether to
+continue. Choose another skill or turn this off with the `whatSkill` plugin option:
+
+```jsonc
+"options": { "whatSkill": "explain" } // or false
+```
+
+A missing default `what` skill is skipped. A missing skill that you set yourself stops the
+send with an error and keeps the draft and `feedback.md`.
 
 ### Reviewer binary and layout
 

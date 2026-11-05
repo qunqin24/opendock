@@ -13,10 +13,10 @@ edge of what you already understand, and then keeps it in your memory with space
 
 Everything you learn is plain Markdown in a folder (default `~/mathesis`) that you can read and edit in any editor.
 
-> **Disclaimer: this is a heavily AI-assisted port.** Mathesis ports the learning method of
+> **Disclaimer: this is a heavily AI-assisted port (A lot of slop but it works for me).** Mathesis ports the learning method of
 > [LearnHarness](https://github.com/amosblomqvist/learnharness) to opencode and adds spaced repetition. The design and
 > the decisions are the maintainer's, but most of the code, prompts, tests and documents were written by an AI model
-> (Claude, in Claude Code), reviewed by separate AI review agents and checked by hand in the opencode TUI. It is early
+> reviewed by separate AI review agents and checked by hand in the opencode TUI. It is early
 > software: expect rough edges, read `docs/history.md` for what was and was not verified, and please report problems.
 
 ## Requirements
@@ -59,7 +59,7 @@ With options. opencode passes options to each part from its own config file: the
 // ~/.config/opencode/cli.json
 {
   "plugins": [
-    { "package": "opencode-mathesis", "options": { "notify": true, "panelKey": "ctrl+x m" } }
+    { "package": "opencode-mathesis", "options": { "notify": true, "panelKey": "<leader>p" } }
   ]
 }
 ```
@@ -76,7 +76,7 @@ the TUI part into `dist/`), then put the absolute path of the checkout in `plugi
 | `/recall [topic]` | Spaced review of the cards due today, interleaved across topics (at most 20 per session). |
 | `/practice [topic]` | Interleaved practice problems built from the cards you hold, weakest first. |
 | `/mathesis` | Status: cards due per topic (or the next review date), recent lapses, misconceptions, and your calibration: how often you were right at each confidence you gave. |
-| `/mathesis panel`, `/mathesis-panel` | Toggles the side panel: what this session did so far, the plan with its progress ("3 of 7 steps have a card") and the current node, and the cards due today. |
+| `/mathesis panel`, `/mathesis-panel` | Toggles the side panel (key `ctrl+x p`, which is `<leader>p`; change it with the `panelKey` option, `false` unbinds): what this session did so far, the plan as numbered steps in layers (Start / Then / Later / Goal) with a progress bar and coloured marks, the same plan drawn as boxes, and the cards due today. It opens by itself whenever the plan is set or changed in the session you are viewing. |
 
 You don't need the commands every time: switch to the `mathesis` agent and say what you want to learn.
 
@@ -98,8 +98,7 @@ thinking while a question form is open, transcribe it, and add it to the thinkin
 open question aloud. Both are off until you set them in `cli.json`. They run in the TUI process, so with a local
 model your audio never leaves your machine.
 
-- **Dictate:** `ctrl+x v` starts recording, `ctrl+x v` again stops it (the form's thinking field reminds you of the
-  key). A line above the form shows a recording timer, then the start of what was heard and how many dictations are
+- **Dictate:** `ctrl+x v` starts recording, `ctrl+x v` again stops it (the form's thinking field says so). A line above the form shows a recording timer, then the start of what was heard and how many dictations are
   attached; `ctrl+x z` removes the last one. If the transcription server isn't running, the error says which address
   it tried. When you
   submit the form, they are added to your thinking as `Spoken: …`, after anything you typed. It goes to the model with your

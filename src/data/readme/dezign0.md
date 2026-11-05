@@ -6,7 +6,7 @@ tools, and packages them as a native OpenCode 2 / OpenChamber plugin plus
 installers for other harnesses.
 
 **Status:** alpha. The kit, plugin, installer and review tools are usable today.
-The CLI, local studio and additional adapter integrations are next.
+The CLI and local studio are next.
 
 ## What is inside
 
@@ -26,13 +26,13 @@ The CLI, local studio and additional adapter integrations are next.
 
 ## Compatibility
 
-- Core `dezign0` 0.9.1 pairs with addon pack `dezign0-design-languages` 0.2.1.
+- Core `dezign0` 0.10.0 pairs with addon pack `dezign0-design-languages` 0.2.2.
 - The pack is optional; core skills and tools work without it.
 - Design-system discovery checks the project `design-systems/`, an installed pack, and the sibling source checkout.
 
 ## Interfaces
 
-- **CLI:** `npx dezign0 lint|measure|audit|doctor|systems|addons|new|export`
+- **CLI:** `npx dezign0 init|lint|measure|audit|doctor|systems|addons|new|export|mcp`
   with `--json`, stable exit codes and no dependencies.
 - **MCP server:** `npx dezign0 mcp` exposes lint, measure, doctor, systems,
   addons, content lint and token export over stdio.
@@ -46,25 +46,37 @@ The CLI, local studio and additional adapter integrations are next.
 
 ## Quick start
 
+### One command (any harness)
+
+```bash
+npx dezign0 init --harness=agents --client=claude
+```
+
+This copies the kit to `.design-os/`, installs the skills to the adapter's path,
+writes the instruction block and merges an MCP server into `.mcp.json` (or
+`.cursor/mcp.json` / `.gemini/settings.json`). Use `--client=agents` to print the
+snippet instead, `--dry-run` to inspect without writing, and `--json` for machine
+output. Existing MCP servers and an existing `dezign0` entry are preserved.
+`--harness` accepts any adapter id from `design-os/adapters/`.
+
 ### OpenChamber / OpenCode 2 (native plugin)
 
 In **Settings → Plugins → Add plugin**:
 
 - **From local path:** the absolute path to this repo directory.
 - **From npm:** `dezign0` — live at
-  [npmjs.com/package/dezign0](https://www.npmjs.com/package/dezign0). The live
-  `0.9.0` release is live; `0.9.1` removes the last branding comments from the
-  core tarball.
-- **From git (no npm publish needed):** `github:Paatricious/Dezign0#v0.9.1`.
+  [npmjs.com/package/dezign0](https://www.npmjs.com/package/dezign0). The current
+  release is `0.10.0`.
+- **From git (no npm publish needed):** `github:Paatricious/Dezign0#v0.10.0`.
   This is the current tool-enabled version; the repository is public.
 
 Optional addon pack — 152 design languages plus templates, Figma bridge, handoff, review and media prompts. Install the release tarball in the project:
 
 ```bash
-npm install https://github.com/Paatricious/Dezign0/releases/download/v0.9.1/dezign0-design-languages-0.2.1.tgz
+npm install https://github.com/Paatricious/Dezign0/releases/download/v0.10.0/dezign0-design-languages-0.2.2.tgz
 ```
 
-Once `dezign0-design-languages@0.2.1` is published, `npm install dezign0-design-languages` is equivalent.
+The pack is published as `dezign0-design-languages@0.2.2`; `npm install dezign0-design-languages` is equivalent.
 
 Or use the sibling `design-languages/` folder in a source checkout.
 
@@ -93,8 +105,12 @@ If your DSH build only discovers global skills, add `--scope=global`.
 
 ### Other harnesses
 
-The installer supports 12 targets (OpenCode, Claude Code, Codex, Cursor,
-Windsurf/Devin, Cline, Roo, OpenHands, Aider, DSH, Gemini CLI, files-only):
+The installer supports 23 adapters: OpenCode, Claude Code, Codex, Cursor,
+Gemini CLI, Windsurf/Devin, Cline, Copilot, Zed, Kiro, Augment Code, JetBrains
+Junie, OpenHands, Agent Skills (`.agents`), DSH, Continue, Amp, Warp, Kilo Code,
+Qwen Code, Roo (deprecated), Aider and files-only. See
+[docs/COMPATIBILITY.md](docs/COMPATIBILITY.md) for skill paths, instruction
+files and MCP config paths.
 
 ```bash
 node design-os/install.mjs --target=../my-app --harness=cursor --with-agents
@@ -147,7 +163,7 @@ node .design-os/tools/measure-artifact.mjs path/to/artifact.html --strict
 
 The **core** package does not bundle third-party design systems, templates,
 fonts, images or skill bodies. The optional [design-languages](design-languages/README.md)
-pack adds all 152 the upstream catalog design systems with their Apache-2.0 license and
+pack adds all 152 OpenDesign design systems with their Apache-2.0 license and
 attribution. Install it separately when you want the catalog.
 
 Use the design-system extraction skill to create a `DESIGN.md` and `tokens.css`
@@ -162,10 +178,11 @@ for a brand, or select a prebuilt language with the `design-language` skill.
 | [server.js](server.js) | Directory plugin entrypoint used by OpenCode |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Product layers, content strategy and roadmap |
 | [docs/ADOPTION.md](docs/ADOPTION.md) | Install and daily-loop instructions per harness |
+| [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md) | Adapter paths, statuses and generic client coverage |
 | [docs/PUBLISHING.md](docs/PUBLISHING.md) | Publish to npm and install from OpenChamber's "From npm" field |
 | [docs/VERIFICATION.md](docs/VERIFICATION.md) | What was tested, on which versions, and what is still a limit |
 | [docs/figma.md](docs/figma.md) | Optional Figma MCP bridge and evidence rules |
-| [design-languages/](design-languages/README.md) | Optional 152-package design-language pack from the upstream catalog |
+| [design-languages/](design-languages/README.md) | Optional 152-package design-language pack from OpenDesign |
 | [CHANGELOG.md](CHANGELOG.md) | Release history |
 | [SECURITY.md](SECURITY.md) | Threat model and reporting |
 
@@ -185,5 +202,5 @@ The repository is Apache-2.0 (see [LICENSE](LICENSE)). Prior-art credits are in
 [design-os/ATTRIBUTION.md](design-os/ATTRIBUTION.md).
 
 No third-party application code is included in the core package. The optional
-design-languages pack contains the upstream catalog under its own license and
+design-languages pack contains the OpenDesign catalog under its own license and
 notice.

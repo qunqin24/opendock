@@ -34,7 +34,7 @@ curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | s
 deja install --auto
 ```
 
-<p align="center"><sub>macOS and Linux &middot; <a href="#install">Windows, Homebrew, npm and plugin marketplaces</a> &middot; Or check what is already on your disk without installing: <code>npx @vshulcz/deja-vu sources</code> &middot; <a href="https://vshulcz.github.io/deja-vu/view/">Try in browser →</a></sub></p>
+<p align="center"><sub>Or with Homebrew: <code>brew install deja-vu &amp;&amp; deja install --auto</code> &middot; Claude Code plugin: <code>claude plugin marketplace add vshulcz/deja-vu &amp;&amp; claude plugin install deja-vu@deja-vu</code> &middot; Agent Skills: <code>npx skills add vshulcz/deja-vu</code><br><a href="#install">Windows (Scoop / winget), Codex, OpenCode, OpenClaw and more</a> &middot; Try without installing: <code>npx @vshulcz/deja-vu sources</code> &middot; <a href="https://vshulcz.github.io/deja-vu/view/">Live demo →</a></sub></p>
 
 <table align="center">
 <tr>
@@ -94,7 +94,7 @@ take MCP servers as bundles can open the `.mcpb` from the
 Codex CLI, opencode, Claude Code, Qwen and OpenClaw can also install the plugin
 bundle directly from their own marketplaces or registries (see
 [Harnesses with a package of their own](#harnesses-with-a-package-of-their-own),
-plus [`cursor-plugin/`](cursor-plugin/) for Cursor). Copilot CLI installs the
+plus [`cursor-plugin/`](cursor-plugin/) for Cursor and [`antigravity-plugin/`](antigravity-plugin/) for Antigravity). Copilot CLI installs the
 marketplace bundle too, though it takes only the skill there — use
 `deja install copilot-auto` for hooks and MCP:
 
@@ -336,6 +336,8 @@ for people who install extensions there rather than from a CLI:
 | DeepSeek Harness | npm `dsh-deja` | `dsh plugin --profile web add dsh-deja` |
 | Zed | `deja-context-server` | Zed → Extensions → deja |
 | Kimi Code | plugin `deja` | `/plugins install https://github.com/vshulcz/deja-vu` |
+| Gemini CLI | extension `@vshulcz/deja`, in the [Gemini CLI Extensions Gallery](https://geminicli.com/extensions/) | `gemini extensions install https://github.com/vshulcz/deja-vu` |
+| Antigravity | plugin `deja-vu` ([`antigravity-plugin/`](antigravity-plugin/)) | `agy plugin install deja-vu` |
 | Codex CLI | plugin `deja-vu` | `codex plugin marketplace add https://github.com/vshulcz/deja-vu` then `codex plugin add deja-vu@deja-vu` |
 | Grok Build | plugin `deja` | `grok plugin marketplace add vshulcz/deja-vu` then `grok plugin install deja` |
 | OpenClaw | ClawHub and npm `@vshulcz/openclaw-deja` | `openclaw plugins install clawhub:@vshulcz/openclaw-deja` |
@@ -556,11 +558,21 @@ file is gone, and the weekly note at session start says how many it kept, with a
 </details>
 
 <details>
-<summary><b>Can I stop it reindexing on its own, or index for search only?</b></summary>
+<summary><b>What files live in ~/.config/deja, and what can I set in them?</b></summary>
 
-Yes. `DEJA_NO_AUTO_INDEX=1` or `"auto_index": false` in `~/.config/deja/policy.json` stops every automatic update; search, MCP recall and hooks answer from the last finished index.
+Under `~/.config/deja` (or `$XDG_CONFIG_HOME/deja`):
 
-`DEJA_SEARCH_ONLY=1` or `"search_only": true` in `~/.config/deja/policy.json` skips mining fixes, commands and co-occurrence (~20% of a build's CPU). The `DEJA_INDEX_*` switches that keep commands, tool output, paths and edits out of the index are in the [commands guide](https://vshulcz.github.io/deja-vu/guide/commands.html#what-the-index-keeps).
+- **`policy.json`** (`DEJA_POLICY_FILE` moves it) — JSON object with four optional keys:
+  - `"activations"`: per-surface origin rules for `"search"`, `"mcp"` and `"auto"` (hooks), keyed by `"local"`, `"imported"`, `"imported:<group>"` or `"*"` (`true`/`false`). `DEJA_AUTORECALL_LOCAL_ONLY=1` sets `activations.auto.imported` to `false`.
+  - `"ignore"`: array of shell globs matched against session path and project to exclude from recall and `sync` (default `["*/.claude/jobs/*"]`).
+  - `"auto_index"`: `false` stops automatic index updates on search, MCP recall and hooks (same as `DEJA_NO_AUTO_INDEX=1`).
+  - `"search_only"`: `true` skips mining fixes, commands and co-occurrence, saving ~20% of build CPU (same as `DEJA_SEARCH_ONLY=1`).
+- **`exclude`** — one project name or path pattern per line to skip at index time and `sync export`, or `harness:<name>` (e.g. `harness:opencode`) to skip a store (`DEJA_EXCLUDE_PROJECTS`, `DEJA_EXCLUDE_HARNESSES`).
+- **`projects`** — one `<path> = <name>` per line to group multiple checkouts or worktrees as one project.
+- **`rules.md`** — standing instructions copied into each installed agent's global rules file by `deja rules sync`.
+- **State files written by deja** — `peers.json` (`deja sync ssh`), `settled.json` (`deja friction --settle`), `tombstones` (`deja forget`), `wiring.json` and `bin/deja-hook` (`deja install`).
+
+Hook recall mode is set by `DEJA_RECALL`: `safe` (default, 2 KB cap and up to 3 sessions from the current project at session start), `aggressive` (4 KB cap and up to 6 sessions across projects), or `off` (silences all hooks). The `DEJA_INDEX_*` switches and full configuration table are in the [commands guide](https://vshulcz.github.io/deja-vu/guide/commands.html#configuration).
 
 </details>
 

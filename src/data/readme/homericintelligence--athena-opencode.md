@@ -127,7 +127,7 @@ sequentially with the current agent.
 ## Develop
 
 Prerequisites are Git, uv, Just, and Python 3.12 or newer for repository validation only. The checked-in
-`.python-version` file pins the default repository-tooling interpreter to Python 3.14.8.
+`.python-version` file pins the default repository-tooling interpreter to Python 3.14.10.
 Set `UV_PYTHON` to another interpreter within the `>=3.12,<3.15` contract for compatibility
 tests.
 [Full environment setup lives in CONTRIBUTING.md](CONTRIBUTING.md#environment-setup).

@@ -19,23 +19,37 @@ This repo was created to provide a simple solution for managing AI models for ev
 
 ## Installation
 
-This branch is the OpenCode v1 line and requires OpenCode 1.18.0 or later. Pin 0.1.0 explicitly so a future v2 release on the latest dist-tag is never installed into a v1 host:
+If you have OpenCode 1.18.0 or later, install the plugin with:
 
 ```
-opencode plugin opencode-models-manager@0.1.1
+opencode plugin add opencode-models-manager@opencode-v1
 ```
 
-Once the opencode-v1 dist-tag is published, `opencode-models-manager@opencode-v1` resolves to this line and can replace the pinned version above.
+If you want the plugin for OpenCode v2, install it with:
+
+```
+opencode plugin add opencode-models-manager@latest
+```
 
 Restart OpenCode after installation.
 
 ## Manual installation
 
-Add to `~/.config/opencode/opencode.json` (global) or `opencode.json` (project):
+Add to `~/.config/opencode/opencode.json` (global) or `opencode.json` (project).
+
+For OpenCode 1.18.0 or later:
 
 ```json
 {
-  "plugin": ["opencode-models-manager@0.1.1"]
+  "plugin": ["opencode-models-manager@opencode-v1"]
+}
+```
+
+For OpenCode v2:
+
+```json
+{
+  "plugins": ["opencode-models-manager@latest"]
 }
 ```
 
@@ -70,4 +84,17 @@ The `agent` section targets agents in `.opencode/agent` and the `commands` secti
 
 Invalid entries are logged and skipped. Restart OpenCode after changing `models.json` so the config hook runs again.
 
-Actually Opencode v1 is supported.
+## OpenCode v2
+
+OpenCode v2 requires a default plugin definition object. The v2 implementation is published on the `latest` dist-tag (currently the `0.2.x` line).
+
+Use the v2 configuration key (`plugins`, plural):
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugins": ["opencode-models-manager@latest"]
+}
+```
+
+Agent models in `.opencode/models.json` are applied through the agent transform API. Command models are applied by registering command overrides through the v2 add-only command API; the runtime must expose both `ctx.command.transform` and `ctx.session.prompt`.

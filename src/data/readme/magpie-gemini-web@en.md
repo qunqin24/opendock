@@ -21,7 +21,7 @@ The plugin provides two independent providers that can be used individually or t
 | **Image generation** | Nano Banana models, for Magpie's image generation (Magpie v0.1.2075+, see below) | Not supported |
 | **Sign-in method** | Sign in directly in an isolated popup browser window | Copy `cookie` from a private/incognito window |
 | **Usage cards** | Shows models currently on cooldown and recovery times | Syncs **5-hour** & **weekly** usage and reset times from the web |
-| **Local backend** | AIStudio2API (`v0.2.19`) | gemini-web2api-go (`4.27.0-magpie.1` optimized build) |
+| **Local backend** | AIStudio2API (`v0.2.19`) | gemini-web2api-go (`4.27.0-magpie.2` optimized build) |
 
 ---
 
@@ -152,6 +152,7 @@ When a plugin error asks you to run a command, it includes the full ready-to-cop
 | :--- | :--- |
 | `npm run studio:status` | Show local service and account status |
 | `npm run studio:start` / `studio:stop` | Start / stop the local service |
+| `npm run studio:clean` | Stop the service and remove downloaded binaries & Camoufox (keeps accounts & config) |
 | `npm run studio:login` | Add a Google account |
 | `npm run studio:relogin -- [<account>]` | Re-authenticate an expired account (argument optional if only one) |
 | `npm run studio:install -- --archive <file>` | Offline install from a pre-downloaded archive |
@@ -169,6 +170,9 @@ When a plugin error asks you to run a command, it includes the full ready-to-cop
 - Both backends listen on `127.0.0.1` only. Cookies and sessions remain on your machine; Magpie stores only a locally generated API key.
 - **Gemini Web data directory:** `~/.local/share/magpie-gemini-web` (override with `GEMINI_WEB_DATA_DIR`), logs at `backend.log`. Supports macOS, Linux, and Windows (x64 / arm64).
 - **AI Studio data directory:** `~/.local/share/magpie-ai-studio` (override with `AI_STUDIO_DATA_DIR`), logs at `backend.log` (rotated on next start after exceeding 10 MB). Uses port 2048 by default (or picks a free port and saves it in `config.json`). Supports macOS, Linux (x64 / arm64), and Windows x64.
+- **Uninstalling & cleaning downloaded assets:** Removing the plugin in Magpie (or running `npm run studio:clean` / `npm run backend:clean`) stops the local services and deletes the downloaded `AIStudio2API`, `Camoufox`, and `gemini-web2api-go` binaries and archives.
+  - `auth/`, `gemini.db`, `config.json`, `.env`, and `secrets.json` are kept so reinstalling the plugin or sending a new request restores the backend on demand without signing in or importing cookies again; to prevent automatic reinstallation permanently, remove the sign-in in Magpie or delete `config.json` / `secrets.json`.
+  - Default data directories are shared per OS user; set separate `AI_STUDIO_DATA_DIR` and `GEMINI_WEB_DATA_DIR` when running multiple isolated Magpie config directories so removing the plugin in one does not clean another's shared binaries.
 - Gemini Web takes at most 2 requests at once per sign-in (AI Studio 1), adjustable in Magpie's provider settings. Google account rate-limiting or flagging cannot be completely ruled out—use at your own risk.
 
 **AI Studio upgrades and model selection:**
@@ -184,7 +188,7 @@ When a plugin error asks you to run a command, it includes the full ready-to-cop
 - Models with `-build` or `assistant_route` are filtered out: they inject the Build coding assistant's own system prompt and are not offered as ordinary Agent models. Refresh with `magpie provider models ai-studio` after upgrading.
 
 **Gemini Web optimized backend upgrades & rollback:**
-- One-click setup uses [4.27.0-magpie.1](https://github.com/BUKOWSKIREAL/magpie-gemini-web/releases/tag/backend-v4.27.0-magpie.1) by default (built from pinned upstream v4.27.0 with XSRF caching, request cancellation propagation, early tool-call completion, and Argon model verification). Chat requests are timed by silence: while Google queues a request it sends a heartbeat every 60 s, and the backend waits through it for the first words. A try is given up, and retried, only after Google has sent nothing for `request_timeout_sec` (180 s by default), so a long reply that keeps coming is never cut off either.
+- One-click setup uses [4.27.0-magpie.2](https://github.com/BUKOWSKIREAL/magpie-gemini-web/releases/tag/backend-v4.27.0-magpie.2) by default (built from pinned upstream v4.27.0 with XSRF caching, request cancellation propagation, early tool-call completion, and Argon model verification). Chat requests are timed by silence: while Google queues a request it sends a heartbeat every 60 s, and the backend waits through it for the first words. A try is given up, and retried, only after Google has sent nothing for `request_timeout_sec` (180 s by default), so a long reply that keeps coming is never cut off either.
 - **Upgrading:** Running backends are not interrupted automatically. Stop the existing process (PID in `backend.pid` inside the data directory); the next Magpie launch or request will upgrade the binary while preserving config and cookies.
 - **Rollback to upstream / restore optimized build** (run in the plugin directory after stopping the backend):
   ```bash

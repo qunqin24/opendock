@@ -12,6 +12,7 @@ Plugins for [OpenCode 2](https://opencode.ai/v2/docs/build/plugins). Each direct
 | [`@r3nic1e/opencode-litellm-cache-scrub`](packages/litellm-cache-scrub) | Removes Anthropic prompt-cache fields from requests to gateways that reject them. | server |
 | [`@r3nic1e/opencode-meridian-quota`](packages/meridian-quota) | Serves [Meridian](https://www.npmjs.com/package/@rynfar/meridian) quota to [`@slkiser/opencode-quota`](https://www.npmjs.com/package/@slkiser/opencode-quota). | server |
 | [`@r3nic1e/opencode-openai-decisions`](packages/openai-decisions) | Adds an `openai_decisions` tool for the OpenAI Decisions API. | server |
+| [`@r3nic1e/opencode-remove-tools`](packages/remove-tools) | Removes configured tools, including built-in ones such as `session_move`, from every session. | server |
 
 ## Install
 

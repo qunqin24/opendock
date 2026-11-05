@@ -193,6 +193,37 @@ npm run test:e2e      # 五套 e2e（需 opencode 服务在跑）
 | 桌面弹窗卡住任务 | 后台等待会发带任务的停滞通告（含最近动作与无进展时长）；`/stop` 可终止 |
 | 日志见「已有实例待命」 | 单实例锁生效中——另一实例持锁（60s 自检会在锁异动时收敛双活，正常无需处理） |
 
+## 平台注意事项
+
+以下发现来自真实部署（Windows 11 / OpenCode v2.2.2），插件无法修复但会反复绊倒用户，集中存档：
+
+**QQ 平台侧**
+
+1. token 接口 `POST https://bots.qq.com/app/getAppAccessToken` 的参数是 **`clientSecret`**（旧文档写作 `appSecret`）；报错 `100016 invalid appid or secret` 极具误导性——先核对字段名，别急着重置密钥。
+2. token 与正式/沙箱无关，统一走正式域名 `bots.qq.com`；**沙箱域名 `sandbox.api.sgroup.qq.com` 没有 token 端点**（请求会返回 `11001 不支持的调用`）。
+3. 沙箱 bot 有独立网关：`GET https://sandbox.api.sgroup.qq.com/gateway` → `wss://sandbox.api.sgroup.qq.com/websocket`；沙箱 bot 连正式网关会被 4914 拒绝。
+
+**OpenCode 侧**
+
+4. `opencode plugin add` 偶发无输出挂起（>3min），重试通常成功。
+5. `opencode reload` **只增不删**：plugins 数组移除的条目在服务端内存不卸载（旧插件的定时器仍存活），彻底生效需重启服务。
+6. 全局插件目录扫描器只认根级入口（package.json exports 指向 `./dist` 子路径会被跳过），**仅影响本地目录形态**；npm 包形态无此限制。
+7. `opencode plugin update` 必须带 scope 全名（`@linjz/opencode-qqbot`），裸写包短名报 `Plugin is not configured`。
+8. npm 插件缓存在 `~/.cache/opencode/npm/<pkg>@<tag>/<时间戳>/`，update 会新建时间戳目录——对「在缓存文件上打本地补丁」的用户，补丁会静默失效；请避免在缓存副本上打补丁。
+
+## 与 OpenCode 桌面版能力对齐矩阵
+
+QQ 桥的本质是「opencode 交互事件 → QQ 交互原语」的适配器。桌面版 TUI 能处理的每类阻塞式交互，QQ 侧应有对应物（桥接或明确降级）：
+
+| 桌面端交互类型 | QQ 侧现状 | 差距 |
+|---|---|---|
+| 权限审批（PermissionRequest） | ✅ 四键卡片（允许一次/总是/拒绝/忽略）+ 文字回复 + 桌面端挂起的审批同样推送（常驻监听 12s） | 无 |
+| 单字段 Form（单选/多选/布尔/文本） | ✅ 字母按钮卡片 + 文本解析 + 30min TTL + form-journal 持久化 | 无 |
+| **多字段 Form（Questions）** | ⚠️ 回退「请在桌面端完成」（明确降级） | 逐字段向导为候选增强（见提案，未实施） |
+| 未来 opencode 新增交互类型 | ⚠️ 无对齐机制，只能事后逐个补 | 按矩阵验收：要么随版本桥接、要么登记为「明确降级」，不允许出现未定义状态 |
+
+原则：未支持的类型永远给出明确文案 + 桌面端指引，不允许静默丢弃；多字段向导等增强按最小侵入接入。
+
 ## License
 
 MIT

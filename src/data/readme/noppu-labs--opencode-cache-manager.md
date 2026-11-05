@@ -181,7 +181,7 @@ Keepalive skips:
 - sessions with keepalive turned off
 - sessions where no cache activity has been seen, such as sessions on models without prompt caching
 
-All eligible top-level sessions are kept warm at once, not only the one in view. Timers live in memory and are not restored when OpenCode restarts.
+All eligible top-level sessions are kept warm at once, not only the one in view. A schedule survives OpenCode reloading the plugin (a config save, for example) and restarting, as long as the cache has not expired in the meantime: the next ping goes out at its original time, and pings already used still count. The conversation bytes a ping reuses are never stored, so pings after a reload use the session's context as OpenCode assembles it until the session's next request. That reads the cache just as well unless another plugin rewrites the history, in which case the first such ping can miss and keepalive stops for the session (`stopped · last ping missed`) until its next request.
 
 **Detected TTL.** The schedule uses the TTL the provider actually granted, read from the cache-write breakdown in the response usage. Some providers (for example Claude Code-backed ones) grant 1h regardless of the mode requested. If a response has both 5m and 1h writes, the shorter one wins. Reads don't change the TTL. When the provider gives no breakdown, the requested mode is used. The sidebar labels the source as `detected` or `requested`.
 
@@ -270,7 +270,7 @@ Cache
 
 - `status` is `warm` with a green bullet, amber once the pings are used up, and `expired` with a red bullet once the cache has expired (then `expired 12m ago` replaces the `expires` row).
 - `expires` is the clock time and time left until the cache expires.
-- `ttl` is the TTL being scheduled and where it came from (`detected` or `requested`). OpenAI's usage doesn't say which lifetime it granted, so OpenAI sessions always show `(requested)`, as `30m` or `12h`. Before the first response, including right after a restart, the section reads `waiting for first response`.
+- `ttl` is the TTL being scheduled and where it came from (`detected` or `requested`). OpenAI's usage doesn't say which lifetime it granted, so OpenAI sessions always show `(requested)`, as `30m` or `12h`. Before the first response the section reads `waiting for first response`; so does a session with no armed ping right after a restart, until its next response.
 - `cached` describes the latest primary turn: the share of its prompt that was read from cache, then the tokens read / the prompt total, such as `92% · 14.8k / 16.1k`. Pings, titles and other one-off requests don't change it. It shows for every session with cache usage, Claude or not, once a response has arrived.
 - `next ping` is when the next ping goes out. It reads `none` once the limit is reached.
 - `pings 2/5` counts pings used in this idle stretch, followed by the last result: `✓ hit`, `✗ miss` or `✗ failed`. No result is shown before the first ping.
@@ -304,7 +304,7 @@ A rewrite counts as saved when all three hold:
 - your next prompt (or a compaction) came more than 30 seconds after the cache would have expired without pings;
 - that request read at least 90% of the context from cache.
 
-Anything else is ping cost only: a session you never came back to, a return before the cache would have expired, a return after it expired anyway, a return on a different model, which usually doesn't read the old cache. The count errs low on purpose; when a case is unclear, it counts less. The avoided amount is what writing the cached tokens at the stretch's TTL would have cost, minus what reading them cost. On `hybrid`, only the message tail would have expired, so only the tokens past the long-lived prefix count. A restart in the middle of a stretch means that stretch's return isn't counted; pings already paid stay paid, and after the restart a session's totals reappear after its next request.
+Anything else is ping cost only: a session you never came back to, a return before the cache would have expired, a return after it expired anyway, a return on a different model, which usually doesn't read the old cache. The count errs low on purpose; when a case is unclear, it counts less. The avoided amount is what writing the cached tokens at the stretch's TTL would have cost, minus what reading them cost. On `hybrid`, only the message tail would have expired, so only the tokens past the long-lived prefix count. A stretch that crosses a restart still counts if its ping was armed at the time; otherwise its return isn't counted. Pings already paid stay paid, and after a restart a session's totals reappear after its next request.
 
 - `saved` is the session total. In dollars it is net: avoided cost minus the cost of every ping, wasted ones included. Without a price it is `2 rewrites · 282k`, the rewrites and the tokens they avoided. `saved nothing yet` shows once you've paid for a ping and nothing has been saved.
 - `return` is avoided cost divided by ping cost, such as `9× ping cost`. It appears after the first save. The label may change.

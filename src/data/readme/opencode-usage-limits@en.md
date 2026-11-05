@@ -27,7 +27,7 @@ Monthly                         60%
 ███████████████████░░░░░░░░░░░░░░░░░
 ↻ 7d 14h
 
-deepseek-v4.1-flash         $80/$160
+deepseek-v4.1-flash        $100/$200
 ```
 
 ## Features
@@ -36,7 +36,7 @@ deepseek-v4.1-flash         $80/$160
 - **Three windows**: rolling 5 hours / weekly / monthly, with percentage, bar and reset countdown.
 - **Green / yellow / red**: < 50% green, 50–79% yellow, ≥ 80% red (thresholds live in `core.ts`).
 - **Spend display**: ClinePass shows `used / limit` (caps read live from `/users/me/plan`, $10 / $25 / $50);
-  OpenCode Go shows percentages only, with the selected model's allowance (e.g. `$80/$160`) noted at the bottom
+  OpenCode Go shows percentages only, with the selected model's allowance (e.g. `$100/$200`) noted at the bottom
   as a reference.
 - **Collapsible**: click the title row to collapse to a single line; the state is persisted.
 - **Unobtrusive**: nothing is rendered for any other provider, so it never takes up space.
@@ -129,13 +129,21 @@ and needs no key at all.
 
 | File | Purpose |
 | --- | --- |
-| [`tui.tsx`](./tui.tsx) | The TUI plugin itself |
+| [`tui.tsx`](./tui.tsx) | The TUI plugin itself (JSX source) |
 | [`core.ts`](./core.ts) | Auth, API client, formatting, thresholds (pure logic, no JSX) |
 | [`index.ts`](./index.ts) | Server entrypoint (no-op) |
-| [`tui.ts`](./tui.ts) | Discovery entrypoint, re-exports `tui.tsx` |
+| [`tui.ts`](./tui.ts) | Local-development discovery entry, re-exports `tui.tsx` |
+| [`dist/tui.js`](./dist/tui.js) | **Published artifact**: `tui.tsx` compiled and bundled (`exports["./tui"]` points here) |
+| [`scripts/build.mjs`](./scripts/build.mjs) | Build script (babel-preset-solid + esbuild) |
 | [`preview.mjs`](./preview.mjs) | Offline preview script |
 | [`AGENTS.md`](./AGENTS.md) | Development conventions |
 | [`CHANGELOG.md`](./CHANGELOG.md) | Changelog |
+
+> Why the package ships compiled output: OpenCode only applies its Solid JSX transform to plugin files
+> **outside** `node_modules`. Shipping raw `.tsx` meant Bun transpiled the plugin on the user's machine,
+> injecting an unresolvable `@opentui/solid/jsx-dev-runtime` import, so the plugin failed at load time
+> (see [#2](https://github.com/GamingNowEdward/opencode-usage-limits/issues/2)). After editing `tui.tsx`,
+> run `npm run build` and commit `dist/tui.js`.
 
 ## Offline preview
 
@@ -149,8 +157,12 @@ node preview.mjs cline-pass  # a single source
 ## Troubleshooting
 
 1. Make sure the current model belongs to `opencode-go` or `cline-pass`.
-2. Plugin files **hot reload on save** — no restart needed. Only adding or removing an imported file requires restarting the TUI.
+2. When developing from a local directory, plugin files **hot reload on save**, but the bundle must be
+   rebuilt first: run `npm run dev` to watch the source and update `dist/tui.js`. The host loads that
+   artifact, not `tui.tsx`.
 3. Check the log: `~/.local/share/opencode/log/opencode.log`, filter by `role=cli` and `plugin`.
+   A `stage=load` failure mentioning `Cannot find package '@opentui/solid'` means you are on 0.3.1 or
+   earlier; upgrading to 0.3.2+ fixes it (see the [CHANGELOG](./CHANGELOG.en.md)).
 4. If the panel shows **API key not found**, check the login first:
 
    ```sh

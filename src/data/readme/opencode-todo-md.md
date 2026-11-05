@@ -107,12 +107,13 @@ Search and press Enter (open, high, #12, @tag)
 - `▲`/`▼` scroll the list by one screen (4 to 12 rows, from the terminal height); the mouse wheel works too.
 - Search applies on Enter and understands `open`, `done`, `cancelled`, `high`, `medium`, `low`, `#12`, `@tag` and free
   text.
-- One line per task, description last and clipped with `…` when the panel is narrow. Click `#id` to edit, `st` or the
-  description to toggle completed, `prio` to cycle, `due` to ask for a date, `tag` to filter by that task's first tag.
+- One line per task, description last and clipped with `…` when the panel is narrow. Click `#id` or the description to
+  edit, `st` to cycle pending → in progress → completed, `prio` to cycle, `due` to ask for a date, `tag` to filter by
+  that task's first tag.
 - Click the `#id`, `prio`, `created`, `due` or `done` header to sort by that column; the sorted column is marked with
   `▲`, a second click restores the default order.
 - The list has a cursor (`▸`): `↑`/`↓` move it and the list scrolls just enough to keep it visible, so the cursor
-  never stops at the edge. `space` toggles the selected task, `ctrl+e` edits it, `ctrl+n` adds a task, `PgUp`/`PgDn` scroll one
+  never stops at the edge. `space` cycles the selected task's state, `ctrl+e` edits it, `ctrl+n` adds a task, `PgUp`/`PgDn` scroll one
   screen, `Home`/`End` jump to the first or last task.
 - `ctrl+d` arms the selected task and shows `ctrl+d again to delete`: the second press removes the line, no dialog.
 - `/` gives the keyboard to the search box; `Enter` applies the query and gives the keyboard back to the list. `Esc`
@@ -121,7 +122,10 @@ Search and press Enter (open, high, #12, @tag)
 When the editor closes, the list reopens, so editing several tasks in a row is one flow. The dialog state (filter,
 tag, sort, scroll position) restarts when you come back from the editor.
 
-The editor itself (the `#id` cell) has the task text in a focused input, a row of priority chips and a row of
+![The todo editor](screen/editor.png)
+
+The editor itself (the `#id` cell) has the task text in a focused seven-line box that wraps long text instead of
+scrolling it sideways (a pasted newline becomes a space, so a task stays one line), a row of priority chips and a row of
 due chips (`none`, `today`, `+7d`, `+30d`). `✎ due` swaps focus to a second input where any `YYYY-MM-DD` can be typed;
 `Tab` cycles the priority, `Enter` saves, `Esc` cancels and returns to the list. Status, created and done dates are
 kept; marking a task completed stamps `done` with the current date, reopening clears it.
@@ -138,6 +142,9 @@ The strip shows the open tasks of the session's project with ids, a priority col
 turns red when something is overdue and shows the highest priority among the open tasks. Clicking the header or a row
 opens `/todo`, clicking the arrow collapses or expands the list (it starts collapsed above 3 open tasks). A file with
 no checkboxes shows `Todo · no tasks` instead of nothing. Long task texts are clipped to one line instead of wrapping.
+
+Markers: `•` in progress, `[·]` due today or within two days, `[!]` overdue. The row colour is the priority (red for
+high, yellow for medium, muted for low); an overdue task is red regardless of priority.
 
 ## Settings
 
@@ -236,6 +243,23 @@ The plugins live in the same repository as the sources; OpenCode resolves `@open
 to be installed locally to try a change.
 
 ## Changelog
+
+### 0.1.15
+
+- Clicking the state cell, or the description, cycles a task pending → in progress → completed; `space` cycles the
+  selected task.
+- The state tabs gain an `in progress` filter.
+- The editor opens the description in a seven-line box that wraps long text instead of scrolling it sideways; a
+  pasted newline becomes a space, so a task stays one line.
+- Due chips use English labels (`today`, `+7d`, `+30d`), and the editor hint fits the dialog width.
+
+### 0.1.14
+
+- `todo_write` with `mode: "replace"` accepts tasks without `status` and defaults them to `pending`, like merge.
+- The sidebar marks tasks due today or within two days with `[·]`; `[!]` stays for overdue, and the high-priority `!`
+  is gone because the colour already carries it.
+- The help dialog lists the sidebar symbols.
+- Render errors in the sidebar and the dialogs are caught and appended to `~/.local/state/opencode/todo-md-errors.log`.
 
 ### 0.1.13
 

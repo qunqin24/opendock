@@ -1,42 +1,84 @@
+<a id="readme-top"></a>
+
+<!-- PROJECT SHIELDS -->
+[![OpenCode V2][opencode-shield]][opencode-url]
+[![npm][npm-shield]][npm-url]
+[![CI][ci-shield]][ci-url]
+[![MIT License][license-shield]][license-url]
+[![Bun][bun-shield]][bun-url]
+[![TypeScript][typescript-shield]][typescript-url]
+[![Biome][biome-shield]][biome-url]
+[![Stars][stars-shield]][stars-url]
+[![Forks][forks-shield]][forks-url]
+[![Issues][issues-shield]][issues-url]
+
+<br />
+
 <div align="center">
 
 # opencode-mail-exchange
 
 Плагин OpenCode V2 для on-prem Exchange: почта, календарь и контакты через EWS + NTLM.
 
-![OpenCode V2](https://img.shields.io/badge/OpenCode-V2-black)
-![npm](https://img.shields.io/npm/v/opencode-mail-exchange)
-![Bun](https://img.shields.io/badge/Bun-1.4-black)
-![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue)
-![Biome](https://img.shields.io/badge/Biome-2.5-green)
-![License](https://img.shields.io/badge/license-MIT-blue)
+<a href="#использование"><strong>Документация »</strong></a>
+<br />
+<br />
+<a href="https://www.npmjs.com/package/opencode-mail-exchange">npm</a>
+&middot;
+<a href="docs/roadmap.md">План развития</a>
+&middot;
+<a href="https://github.com/OniVe/opencode-mail-exchange/issues/new?labels=bug">Сообщить об ошибке</a>
+&middot;
+<a href="https://github.com/OniVe/opencode-mail-exchange/issues/new?labels=enhancement">Предложить функцию</a>
 
 [English](README.md) · **Русский**
 
 </div>
 
-## Содержание
+<!-- TABLE OF CONTENTS -->
+<details>
+  <summary>Содержание</summary>
+  <ol>
+    <li>
+      <a href="#о-проекте">О проекте</a>
+      <ul>
+        <li><a href="#возможности">Возможности</a></li>
+        <li><a href="#стек">Стек</a></li>
+      </ul>
+    </li>
+    <li>
+      <a href="#начало-работы">Начало работы</a>
+      <ul>
+        <li><a href="#требования">Требования</a></li>
+        <li><a href="#установка">Установка</a></li>
+        <li><a href="#конфигурация">Конфигурация</a></li>
+      </ul>
+    </li>
+    <li>
+      <a href="#использование">Использование</a>
+      <ul>
+        <li><a href="#инструменты">Инструменты</a></li>
+        <li><a href="#вложения">Вложения</a></li>
+        <li><a href="#удаление">Удаление</a></li>
+        <li><a href="#поля-письма">Поля письма</a></li>
+        <li><a href="#получатели">Получатели</a></li>
+        <li><a href="#ошибки">Ошибки</a></li>
+        <li><a href="#синхронизация">Синхронизация</a></li>
+        <li><a href="#хранение">Хранение</a></li>
+        <li><a href="#лимиты">Лимиты</a></li>
+        <li><a href="#не-реализовано">Не реализовано</a></li>
+      </ul>
+    </li>
+    <li><a href="#план-развития">План развития</a></li>
+    <li><a href="#участие">Участие</a></li>
+    <li><a href="#лицензия">Лицензия</a></li>
+    <li><a href="#контакты">Контакты</a></li>
+    <li><a href="#благодарности">Благодарности</a></li>
+  </ol>
+</details>
 
-- [О плагине](#о-плагине)
-- [Возможности](#возможности)
-- [Начало работы](#начало-работы)
-  - [Требования](#требования)
-  - [Установка](#установка)
-  - [Конфигурация](#конфигурация)
-- [Использование](#использование)
-  - [Инструменты](#инструменты)
-  - [Получатели](#получатели)
-  - [Ошибки](#ошибки)
-  - [Синхронизация](#синхронизация)
-- [Хранение](#хранение)
-- [Лимиты](#лимиты)
-- [Не реализовано](#не-реализовано)
-- [Roadmap](#roadmap)
-- [Риски](#риски)
-- [Разработка](#разработка)
-- [Лицензия](#лицензия)
-
-## О плагине
+<!-- ABOUT THE PROJECT -->
+## О проекте
 
 Читает и отправляет почту, показывает события календаря и контакты on-prem ящика Exchange через EWS с NTLM.
 Работает внутри OpenCode V2 как нативный TypeScript-плагин: Bun исполняет `src/index.ts` напрямую, сборка не нужна.
@@ -44,7 +86,7 @@
 Проверено на Exchange 2016 (build 15.1.2507.6), NTLMv2, внутренний CA. Bun 1.4.2, `@opencode/plugin` 2.0.26.
 Извлечение вложений — pure JS (без нативных модулей); CI на Linux, Windows и macOS. 276 тестов.
 
-## Возможности
+### Возможности
 
 - 14 `mail_*` tools: аккаунты, папки, список, поиск, чтение, чтение вложения, сохранение вложения, удаление, очистка «Удаленных», sync, черновик, отправка, календарь, контакты.
 - Несколько ящиков в одном процессе: свои credentials и SQLite на аккаунт.
@@ -52,6 +94,8 @@
 - EWS/NTLM с явным XML-экранированием, валидацией получателей и лимитами вложений.
 - Извлечение текста вложений: `.docx`/`.docm`, `.xlsx`/`.xlsm`, `.pdf` (текстовый слой) и plain text.
 - Таймаут и отмена запроса через `context.signal`; маршрутизация аккаунтов через `AsyncLocalStorage`.
+
+<p align="right">(<a href="#readme-top">наверх</a>)</p>
 
 ### Стек
 
@@ -64,6 +108,9 @@
 - [`saxes`](https://github.com/lddubeau/saxes) 6 (линейный OOXML SAX) + [`word-extractor`](https://github.com/morungos/node-word-extractor) 1.0 (legacy `.doc`) + [`@e965/xlsx`](https://www.npmjs.com/package/@e965/xlsx) 0.20 (legacy `.xls`)
 - SQLite + FTS5 через `bun:sqlite`
 
+<p align="right">(<a href="#readme-top">наверх</a>)</p>
+
+<!-- GETTING STARTED -->
 ## Начало работы
 
 ### Требования
@@ -188,6 +235,9 @@ URL, логин и пароль не имеют значений по умолч
 `dataDir` должен быть обычным путём: extended-length (`\\?\`) и device (`\\.\`) namespace отвергаются с
 `ConfigError`.
 
+<p align="right">(<a href="#readme-top">наверх</a>)</p>
+
+<!-- USAGE EXAMPLES -->
 ## Использование
 
 ### Инструменты
@@ -215,23 +265,6 @@ URL, логин и пароль не имеют значений по умолч
 (`mail_delete` без `hard`).
 `account` выбирает ящик; по умолчанию первый аккаунт.
 `codemode: false` (default) — tools видны напрямую; `codemode: true` — только через `execute`.
-
-### Удаление
-
-`mail_delete` по умолчанию переносит письма в «Удаленные»; `hard: true` удаляет их безвозвратно.
-`mail_empty_deleted` безвозвратно удаляет элементы верхнего уровня «Удаленных»; подпапки остаются.
-Обоим нужно право `mail.delete`; `mail_empty_deleted` дополнительно требует `confirm: true`.
-
-В локальном индексе оба режима помечают затронутые строки tombstone. Exchange присваивает новый ItemId при
-переносе в «Удаленные», поэтому старый id становится недействительным: выполните `mail_sync` для `deleted`,
-чтобы получить новый id; обычный `mail_list` может отдать свежий кэш и не показать новую строку до
-следующего интервала sync. `mail_get`/`mail_delete` по старому id будут падать до синхронизации. Очистка также помечает tombstone все проиндексированные строки `deleted`. Если EWS отклонил весь пакет,
-индекс не меняется; при ошибках по части элементов применяются только подтверждённые удаления, а вызов
-падает со счётчиками и первой причиной. Транспортная ошибка после запроса может оставить исход неизвестным:
-перед повтором выполните `mail_sync`.
-
-Id передаются в EWS `DeleteItem`, поэтому передавайте только mail-id. Если передан id встречи, EWS удалит её
-с `SendToNone` (участники не получат отмену); плагин не различает классы элементов до удаления.
 
 ### Вложения
 
@@ -265,6 +298,23 @@ Bun не ограничивается: пик пропорционален вх�
 `hasAttachments`/`attachmentCount`; заменённое вложение с тем же количеством может сохранить старый текст.
 `storage: metadata` и `off` этот кэш не пишут; переключение с `full` удаляет сохранённый текст
 (`attachment_text`/`attachment_fts`), поэтому возврат в `full` снова начинает с холодных чтений.
+
+### Удаление
+
+`mail_delete` по умолчанию переносит письма в «Удаленные»; `hard: true` удаляет их безвозвратно.
+`mail_empty_deleted` безвозвратно удаляет элементы верхнего уровня «Удаленных»; подпапки остаются.
+Обоим нужно право `mail.delete`; `mail_empty_deleted` дополнительно требует `confirm: true`.
+
+В локальном индексе оба режима помечают затронутые строки tombstone. Exchange присваивает новый ItemId при
+переносе в «Удаленные», поэтому старый id становится недействительным: выполните `mail_sync` для `deleted`,
+чтобы получить новый id; обычный `mail_list` может отдать свежий кэш и не показать новую строку до
+следующего интервала sync. `mail_get`/`mail_delete` по старому id будут падать до синхронизации. Очистка также помечает tombstone все проиндексированные строки `deleted`. Если EWS отклонил весь пакет,
+индекс не меняется; при ошибках по части элементов применяются только подтверждённые удаления, а вызов
+падает со счётчиками и первой причиной. Транспортная ошибка после запроса может оставить исход неизвестным:
+перед повтором выполните `mail_sync`.
+
+Id передаются в EWS `DeleteItem`, поэтому передавайте только mail-id. Если передан id встречи, EWS удалит её
+с `SendToNone` (участники не получат отмену); плагин не различает классы элементов до удаления.
 
 ### Поля письма
 
@@ -326,7 +376,7 @@ Runtime-оговорка: имена tools, видимость `codemode` и per
 (`MoreChangesAvailable` всё ещё true), вызовите снова. Неиндексируемые папки и `storage: "off"` возвращают
 `{synced: 0, complete: true, skipped: "not-indexed" | "storage-off"}`.
 
-## Хранение
+### Хранение
 
 SQLite (`bun:sqlite`, WAL, FTS5) в `dataDir`; при `accounts` — `<dataDir>/<id>/mail.db`.
 
@@ -339,7 +389,7 @@ plaintext-индекс окажется там. Держите его вне п�
 принуждает. Extended-length и device namespace отвергаются (см. «Конфигурация»). Для шифрования диска
 используйте BitLocker/EFS. Шифрование индекса — в плане [docs/roadmap.md](docs/roadmap.md) (R1).
 
-## Лимиты
+### Лимиты
 
 - HTML-тело: subject, body, имена получателей и вложений экранируются; без этого HTML сохраняется пустым
   без ошибки.
@@ -352,23 +402,39 @@ plaintext-индекс окажется там. Держите его вне п�
   ~0.45 с (live).
 - Несколько ящиков: один процесс, свои credentials и SQLite на аккаунт, маршрутизация через `AsyncLocalStorage`.
 
-## Не реализовано
+### Не реализовано
 
 - OCR сканированных PDF.
 - `mail_move`, флаги, reply/forward.
 - Graph-бэкенд для Exchange Online.
 - EPA `Require` на FE EWS: NTLM без channel binding не пройдёт.
 
-## Roadmap
+<p align="right">(<a href="#readme-top">наверх</a>)</p>
+
+<!-- ROADMAP -->
+## План развития
 
 См. [docs/roadmap.md](docs/roadmap.md): шифрование SQLite с поиском по телу, Graph-бэкенд для Exchange Online.
+Живая проверка в сессии OpenCode — R5 — там же, пока не выполнена.
 
-## Риски
+Известные риски — plaintext SQLite, поддержка библиотек, EWS retirement в Exchange Online — собраны в
+[risks.md](risks.md).
 
-См. [risks.md](risks.md) — полный список (plaintext SQLite, поддержка библиотеки, EWS retirement в Exchange
-Online).
+<p align="right">(<a href="#readme-top">наверх</a>)</p>
 
-## Разработка
+<!-- CONTRIBUTING -->
+## Участие
+
+Участие приветствуется. Форкните репозиторий, создайте ветку, закоммитьте изменения, запушьте ветку и откройте
+pull request. Для багов и идей используйте issue tracker.
+
+1. Форкните проект
+2. Создайте ветку (`git checkout -b feature/AmazingFeature`)
+3. Закоммитьте изменения (`git commit -m 'Add some AmazingFeature'`)
+4. Запушьте ветку (`git push origin feature/AmazingFeature`)
+5. Откройте Pull Request
+
+Локальные проверки перед pull request:
 
 ```bash
 bun install
@@ -379,6 +445,52 @@ bun run lint
 
 Живой smoke (read-only): `lab/smoke.ts`; env и CA: `lab/spike-ews/README.md`.
 
+<p align="right">(<a href="#readme-top">наверх</a>)</p>
+
+<!-- LICENSE -->
 ## Лицензия
 
-MIT. См. [LICENSE](LICENSE).
+Распространяется по лицензии MIT. См. [LICENSE](LICENSE).
+
+<p align="right">(<a href="#readme-top">наверх</a>)</p>
+
+<!-- CONTACT -->
+## Контакты
+
+OniVe — [github.com/OniVe](https://github.com/OniVe)
+
+Ссылка на проект: [https://github.com/OniVe/opencode-mail-exchange](https://github.com/OniVe/opencode-mail-exchange)
+
+<p align="right">(<a href="#readme-top">наверх</a>)</p>
+
+<!-- ACKNOWLEDGMENTS -->
+## Благодарности
+
+- [Best-README-Template](https://github.com/othneildrew/Best-README-Template) — за структуру README.
+- [OpenCode](https://opencode.ai/v2/docs/), [Bun](https://bun.sh/) и [Biome](https://biomejs.dev/) — за рантайм и инструменты.
+- [`ews-javascript-api`](https://github.com/gautamsi/ews-javascript-api), [`fflate`](https://github.com/101arrowz/fflate), [`yauzl`](https://github.com/thejoshwolfe/yauzl), [`unpdf`](https://github.com/unjs/unpdf), [`saxes`](https://github.com/lddubeau/saxes), [`word-extractor`](https://github.com/morungos/node-word-extractor) и [`@e965/xlsx`](https://www.npmjs.com/package/@e965/xlsx) — за основную работу.
+
+<p align="right">(<a href="#readme-top">наверх</a>)</p>
+
+<!-- MARKDOWN LINKS & IMAGES -->
+<!-- https://www.markdownguide.org/basic-syntax/#reference-style-links -->
+[opencode-shield]: https://img.shields.io/badge/OpenCode-V2-black?style=for-the-badge
+[opencode-url]: https://opencode.ai/v2/docs/
+[npm-shield]: https://img.shields.io/npm/v/opencode-mail-exchange?style=for-the-badge
+[npm-url]: https://www.npmjs.com/package/opencode-mail-exchange
+[ci-shield]: https://img.shields.io/github/actions/workflow/status/OniVe/opencode-mail-exchange/ci.yml?branch=main&style=for-the-badge&label=CI
+[ci-url]: https://github.com/OniVe/opencode-mail-exchange/actions/workflows/ci.yml
+[license-shield]: https://img.shields.io/github/license/OniVe/opencode-mail-exchange?style=for-the-badge
+[license-url]: https://github.com/OniVe/opencode-mail-exchange/blob/main/LICENSE
+[bun-shield]: https://img.shields.io/badge/Bun-1.4-black?style=for-the-badge&logo=bun&logoColor=white
+[bun-url]: https://bun.sh/
+[typescript-shield]: https://img.shields.io/badge/TypeScript-5.9-blue?style=for-the-badge&logo=typescript&logoColor=white
+[typescript-url]: https://www.typescriptlang.org/
+[biome-shield]: https://img.shields.io/badge/Biome-2.5-green?style=for-the-badge&logo=biome&logoColor=white
+[biome-url]: https://biomejs.dev/
+[stars-shield]: https://img.shields.io/github/stars/OniVe/opencode-mail-exchange?style=for-the-badge
+[stars-url]: https://github.com/OniVe/opencode-mail-exchange/stargazers
+[forks-shield]: https://img.shields.io/github/forks/OniVe/opencode-mail-exchange?style=for-the-badge
+[forks-url]: https://github.com/OniVe/opencode-mail-exchange/network/members
+[issues-shield]: https://img.shields.io/github/issues/OniVe/opencode-mail-exchange?style=for-the-badge
+[issues-url]: https://github.com/OniVe/opencode-mail-exchange/issues

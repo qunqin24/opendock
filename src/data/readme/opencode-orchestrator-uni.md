@@ -6,10 +6,11 @@ A native [OpenCode V2](https://opencode.ai/v2/docs/build/plugins) package plugin
 ships the **orchestrator agent kit**:
 
 - `orchestrator` — the root orchestrator (primary agent) with the audit loop as a
-  built-in mode;
+  built-in mode; it delegates every code/doc/test edit and writes only audit and
+  session-state artifacts;
 - read-only audit subagents — `factcheck`, `empiric`, `invariant`,
   `arbiter`, `meta`, `redteam`, `context-lint`;
-- `fix-runner` — the only writing subagent (applies the "to close" list);
+- `fix-runner` — the only writing subagent of the kit (applies the "to close" list);
 - the kit's process documents, exposed as the **`audit-kit` reference**
   (`call-mechanics.md`, `process-ready-loop.md`, `root-runbook.md`,
   `instruction-other-session.md`, `context-efficiency.md`, `session-discipline.md`);
@@ -17,9 +18,13 @@ ships the **orchestrator agent kit**:
   `orch_uni_snapshot`, `orch_uni_sessions`, `orch_uni_session_stats` (see [Tools](#tools));
 - three slash commands — `/agents-md`, `/spec` and `/handoff` (see [Commands](#commands)).
 
-Read-only audit agents are enforced by `edit: deny` plus the prompt ban; their shell
-permission stays allowed so they can run verification commands (an accepted risk, no
-permission is relaxed).
+Read-only audit agents are enforced at the tool level for `edit`/`write`/`patch`
+(`edit: deny`) and by the prompt ban for everything else; their `shell` permission
+stays allowed so they can run verification commands. A write through shell (redirect,
+`sed -i`, `tee`) is forbidden by the prompt, not by a sandbox — an accepted risk, same
+as I-M15; no permission is relaxed.
+
+The orchestrator itself has `edit` denied on `*`; the flat `permissions` are only a narrow fallback allowlist for audit/state artifacts, and the real guard is the `permission.hook("evaluate")` hook in `lib/write-guard.ts` with path-root semantics. The session directory is read per event (`session.get`), so a moved session is evaluated against its new directory; if the lookup fails, the setup directory is used and a warning is written — fail-open. A resource outside the session directory is denied: the guard is the workspace boundary, so `reports/`, `docs/planning/` and `audit-*` are not writable outside it. Inside it the first **root** segment decides. `reports/` is a reserved artifact root — the whole subtree is writable (even `reports/src/x.ts`), so project code must not live there (a `packages/reports/**` path counts as an artifact by contract); `docs/planning/**/*.md` is allowed (nested Markdown at any depth; a `.ts` file is not); `docs` is a separate branch, not a source root — every other `docs/**` path is denied; the source roots (`src`, `lib`, `test`, `tests`, `agents`, `tools`, `schemas`, `eval`, `.github`) are denied even under an artifact-looking prefix (`src/reports/x.ts`, `src/docs/planning/x.md`). Root artifact files (`case-*`, `risks-*`, `handoff-*`, `decisions-*`, `state.md`) are allowed only in the location root, under `reports/`, `docs/planning/` or an `audit-*` directory — `app/state.md` is denied. The hook runs after the flat rules, so a local `edit: allow` for `orchestrator` is closed too. The flat fallback carries only that artifact set as location-root rules (`reports/*`, `case-*.md`, `risks-*.md`, `handoff-*.md`, `decisions-*.md`, `state.md`, `docs/planning/*.md`) plus `audit-*/…`; the broad `*/state.md`-style patterns are gone, so `src/state.md` is denied even without the hook, but last-match still cannot express root priority everywhere (`audit-x/src/case-y.md`) — a warning is written. The fallback is narrower than the hook for nested artifact roots: `lab/x/reports/*` and similar paths are written only with the hook (the root rules cover `reports/*` at the location root only). A failing or timed-out session lookup (250 ms bound) falls back to the setup directory and writes the warning once per guard; for a moved session an absolute artifact path may then be denied (fail-closed for that class). A single `sessionWarned` flag without a counter is accepted: failures after the first warning stay silent. `shell` stays allowed for git and checks; a shell write and symlinks/junctions (the host matches the normalized lexical path, not `realpath`) are accepted risks, as is fail-open (a broken guard never breaks the session), governed by the prompt rather than a sandbox. A tool denial is a role rule — the edit goes to a subagent.
 
 The package is loaded directly from TypeScript: `exports` points at
 [`index.ts`](./index.ts). There is **no build step and no `dist/`** — OpenCode's
@@ -32,7 +37,7 @@ On setup (`ctx.agent.transform` / `ctx.reference.transform`):
 
 | Agent             | Mode       | Role                                                     |
 | ----------------- | ---------- | -------------------------------------------------------- |
-| `orchestrator`    | `primary`  | Root orchestrator; audit loop as a built-in mode         |
+| `orchestrator`    | `primary`  | Root orchestrator; delegates edits; writes audit/state artifacts |
 | `factcheck` | `subagent` | Read-only: staleness pre-pass (already done / outdated)  |
 | `empiric`   | `subagent` | Read-only: reproductions, measurements, first sources    |
 | `invariant` | `subagent` | Read-only: states, cancels, races, hostile input         |

@@ -79,7 +79,8 @@ You normally never need to set any option, the defaults are sane. Common tweaks:
         "topN": 3, // how many cheapest providers stay routable
         "keepAtLeastN": 1, // rescue floor; 0 disables
         "debug": true, // verbose logging while you tune
-        "noTUI": false, // false = show error toasts for routing failures
+        "noTUI": false, // false = show error toasts for routing failures in the TUI
+        "noGUI": false, // false = show error toasts for routing failures on desktop/web
         "extraIgnore": [], // provider slugs to always blacklist, e.g. "chutes"
       },
     },
@@ -100,7 +101,8 @@ You normally never need to set any option, the defaults are sane. Common tweaks:
 | `maxToolCallErrorRate`                                            | `1`                         | Provider Tool Call Error Rate cap in percent; providers above it are filtered out and blacklisted. `100` disables                                                                                     |
 | `requireToolSupport`                                              | `true`                      | Require `tools`+`tool_choice` params                                                                                                                                                                  |
 | `injectSort`                                                      | `true`                      | Add `provider.sort: "price"`                                                                                                                                                                          |
-| `noTUI`                                                           | `false`                     | Disable the TUI part (no routing-failure toasts); server routing is unaffected                                                                                                                        |
+| `noTUI`                                                           | `false`                     | Disable the TUI part (no routing-failure toasts in the terminal); server routing is unaffected                                                                                                        |
+| `noGUI`                                                           | `false`                     | Disable the GUI part (no routing-failure toasts in desktop app windows / web tabs); server routing is unaffected                                                                                      |
 | `rankingWaitMs`                                                   | `15000`                     | Max time a first request waits for its initial ranking; `0` disables waiting (pass through immediately)                                                                                               |
 | `fallbackAvgInput` / `fallbackAvgOutput` / `fallbackCacheHitRate` | `20000` / `800` / `0.2`     | Fallback profile until stats exist                                                                                                                                                                    |
 | `preferFreeProviders`                                             | `true`                      | $0 providers ("free mode") always stay routable; paid providers get blacklisted; the rescue floor also prefers free providers when none pass the filters                                              |
@@ -152,17 +154,21 @@ session transcript naming the model and the reason (no ranking available, no end
 passed the filters and none could be kept by the `keepAtLeastN` floor, non-JSON body,
 routing error), once per session/model/reason.
 
-The package also ships a TUI part at the `./tui` export that raises an error toast for
-each of those messages, so the failure is visible even when you are not reading the
-transcript. It needs no extra configuration: one `plugins` entry loads every part of
-the package, OpenCode's TUI host resolves the `./tui` subpath export of the loaded
-plugin automatically and runs it in the TUI process, where `@opentui/*` is already
-provided as peer dependencies. There is no `tui` key in `opencode.jsonc`; if you ever
-want only the TUI part (no server routing), reference the subpath directly, e.g.
+The package also ships client parts that raise an error toast for each of those messages,
+so the failure is visible even when you are not reading the transcript, and they need no
+extra configuration: one `plugins` entry loads every part of the package. The OpenCode
+TUI host resolves the `./tui` subpath export of the loaded plugin automatically and runs
+it in the TUI process, where `@opentui/*` is already provided as peer dependencies.
+OpenCode Desktop resolves the `./gui-experimental` export the same way and runs it in
+every desktop app window (desktop app and web tabs alike), where `solid-js` is provided.
+There is no `tui` or `gui` key in `opencode.jsonc`; if you ever want only the TUI part
+(no server routing), reference the subpath directly, e.g.
 `"plugins": ["opencode-openrouter-optimizer/tui"]` in the TUI's `cli.json`.
 
-The `noTUI` option disables this part instead: set it to `true` and the TUI part
+The `noTUI` option disables the TUI part instead: set it to `true` and the TUI part
 registers nothing, so no toasts are raised while the server routing keeps running.
+`noGUI` does the same for the desktop/web part; both are separate switches, so you can
+for example keep toasts only in the terminal with `"noGUI": true`.
 
 ## Cost model
 
@@ -209,13 +215,15 @@ feeds the same stats.
 
 ## Package layout
 
-The published package exposes two parts, both compiled to ESM JavaScript with type
-declarations:
+The published package exposes three parts. The server part is compiled to ESM
+JavaScript with type declarations, the TUI part likewise, and the GUI part is compiled
+to a single prebuilt CommonJS bundle (desktop app windows cannot load a second chunk):
 
-| Export                              | Part   | Runs in             |
-| ----------------------------------- | ------ | ------------------- |
-| `opencode-openrouter-optimizer`     | server | the OpenCode server |
-| `opencode-openrouter-optimizer/tui` | TUI    | the OpenCode TUI    |
+| Export                                           | Part   | Runs in                  |
+| ------------------------------------------------ | ------ | ------------------------ |
+| `opencode-openrouter-optimizer`                  | server | the OpenCode server      |
+| `opencode-openrouter-optimizer/tui`              | TUI    | the OpenCode TUI         |
+| `opencode-openrouter-optimizer/gui-experimental` | GUI    | OpenCode Desktop windows |
 
 ## Development
 
@@ -225,7 +233,7 @@ bun test           # unit tests: pricing formula, ranking, stats merge, db round
 bun run typecheck
 bun run lint
 bun run fmt:check
-bun run build      # compiles src/ to dist/ (JavaScript, .d.ts and source maps)
+bun run build      # compiles src/ to dist/ (JavaScript, .d.ts, source maps) and bundles src/gui.tsx into dist/gui-experimental.cjs with the @opencode/plugin/gui vite preset
 bun run verify     # format check, lint, typecheck and tests, the way CI runs them
 ```
 

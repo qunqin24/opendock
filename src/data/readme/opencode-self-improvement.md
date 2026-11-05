@@ -83,6 +83,7 @@ Zero configuration is the default. To tune, use the object form of the plugin en
 | `OPENCODE_MEMORY_FRONTIER_BUDGET` | Fallback for `frontierBudget`. |
 | `OPENCODE_COMMANDS_DIR` | Where the plugin mirrors its slash commands (default `~/.config/opencode/commands`). |
 | `OPENCODE_CBM_BIN` | Path to a `codebase-memory-mcp` binary. See [Code graph](#code-graph-optional). |
+| `OPENCODE_VIEWER_HOST` | Interface the editor binds to (default `127.0.0.1`). A non-loopback bind serves the store over plain HTTP with no authentication — only do it on a network you control. See [Surfaces](#surfaces). |
 | `OPENCODE_VIEWER_PORT` | Admin editor port (default `8787`). |
 | `OPENCODE_VIEWER_ALLOWED_HOSTS` | Comma-separated hosts beyond loopback. See [Surfaces](#surfaces). |
 
@@ -326,6 +327,8 @@ bun run format        # apply the shared two-space TypeScript/TSX style
 bun run format:check  # check formatting without changing files
 ```
 
+`bun run typecheck` runs `tsc --noEmit` on its own. In CI it runs inside the job named `lint`, so a green `lint` check silently implies tsc. The rest of the mapping: `bun run test` is the `test` job (re-run in `test-windows`, which reports but cannot gate merges), and `bun run test:e2e` is the `smoke` job.
+
 `bun run lint` checks lint rules and TypeScript/TSX formatting; CI calls the same command. Lint warnings remain advisory, while formatting differences fail the check. Markdown commands, prose, JSON data and historical benchmark records are outside the formatter's scope.
 
 Use Bun **1.4.4** for development checks, matching CI. `bun run test` and `bun run test:e2e` run files across at most four worker processes with Bun's file isolation; cases inside each file stay sequential because fixtures share environment variables and module state. The local gate uses those same scripts. To diagnose order-dependent failures in the original shared-process mode, run `bun test ./test/` or `bun test ./e2e/ --timeout 240000` directly.
@@ -333,6 +336,8 @@ Use Bun **1.4.4** for development checks, matching CI. `bun run test` and `bun r
 **Feature order is BDD-first.** A new feature starts by adding or fixing a scenario in `e2e/` that describes the behavior as a user would observe it — before implementation code and before unit tests. Then the unit tests for the pieces, then the code until everything is green. If no scenario turns red first, the feature has no observable contract.
 
 `e2e/` boots the **real opencode CLI** against each candidate in a fully isolated instance (fresh config, fresh db, fresh memory store, empty `HOME`) driven by a scripted OpenAI-compatible fake model — no API keys. It covers loading from the source tree and from the packed npm artifact installed runtime-deps-only, plus BDD flows for remember, recall, exact and near duplicates, ungrounded claims, and forget. Needs `opencode` on `PATH` locally, or set `OPENCODE_BIN`. A `test-windows` leg also runs the suite on Windows; it reports without gating merges.
+
+**The published surface is defined in `package.json`.** `exports` is the only import surface other code can reach (`.` → `index.ts`, `./tui` → `src/tui/panel.tsx`); `files` is the packaging list. `files` covers `src/`, so anything reachable from an `exports` target ships, but a new top-level file or directory — or anything the plugin reads at runtime outside those paths — must be added to `files` or it works from the checkout and vanishes from the npm artifact. The packed-artifact load in `e2e/` turns that miss red.
 
 ### Mutation sweep
 

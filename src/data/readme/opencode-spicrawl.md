@@ -439,11 +439,11 @@ Notes:
   own `~/.cursor/mcp.json`.
 - `opencode/` is the source of the npm package `opencode-spicrawl` (OpenCode has no plugin
   marketplace format). It has its own `package.json` version and is published to npm separately
-  from these manifests, so its version does not have to match `0.2.2`.
+  from these manifests, so its version does not have to match `0.2.3`.
 - The collection version is `version` in `gemini-extension.json` and in the manifests under
   `plugins/` (`.claude-plugin`, `.cursor-plugin`, `.factory-plugin`, `.github/plugin` and
-  `spicrawl-openai/plugin.json`). It is `0.2.2` (0.2.0 added the Dify and n8n integrations; 0.2.1 aligned the skill with the public
-  rendering tiers; 0.2.2 added the plugin `README.md` and `LICENSE`, and the category and tags in the Cursor manifest, for Cursor marketplace review) and these files are bumped together. `opencode/` and `dify/` are versioned on their own, and so is the n8n node, which lives in its own repository.
+  `spicrawl-openai/plugin.json`). It is `0.2.3` (0.2.0 added the Dify and n8n integrations; 0.2.1 aligned the skill with the public
+  rendering tiers; 0.2.2 added the plugin `README.md` and `LICENSE`, and the category and tags in the Cursor manifest, for Cursor marketplace review; 0.2.3 added the registered ChatGPT app mapping for mobile/web support and release workflows for every plugin format) and these files are bumped together. `opencode/`, `dify/` and `openbot/` are versioned on their own, and so is the n8n node, which lives in its own repository.
 - `dify/` is the Dify plugin. The n8n community node is not in this repository: its source is
   [OfficialSpicrawl/n8n-nodes-spicrawl](https://github.com/OfficialSpicrawl/n8n-nodes-spicrawl), with the package at that repository's root because
   n8n's verification looks for `credentials/` there. Neither is a coding-agent plugin: they call
@@ -491,6 +491,7 @@ describes for a portable plugin:
 plugins/spicrawl-openai/
 ├── plugin.json                         Agent Plugins manifest, OpenAI settings under extensions.com.openai
 ├── mcp.json                            Agent Plugins MCP file: one streamable-http server, no headers
+├── .app.json                           registered ChatGPT app mapping (mobile/web support)
 ├── skills/fetch-web-pages/SKILL.md     trimmed skill, for this package only
 └── assets/logo.png                     logo and composer icon
 ```
@@ -501,16 +502,16 @@ plugins/spicrawl-openai/
   object, it replaces the entire `.codex-plugin/plugin.json` overlay as the source of
   OpenAI-specific settings; the two aren't merged." For a portable package the portal derives its
   own `.codex-plugin/plugin.json` and `.mcp.json`.
-- There is no `apps` field, no `.app.json` and no hooks. The submission guide says "Plugin ZIPs
-  containing app references (`apps` / `.app.json`) or lifecycle hooks cannot currently be
-  submitted. Declare MCP server URLs in your MCP configuration and complete setup in the dashboard."
-  To test in ChatGPT developer mode before submitting, register the server at
-  <https://chatgpt.com/plugins>, copy its `plugin_asdk_app...` id into a `.app.json` and add
-  `"apps": "./.app.json"` under `extensions.com.openai` in a local copy only. Do not commit those,
-  and do not put them in the ZIP.
 - `mcp.json` points at `https://mcp.spicrawl.com/chatgpt/mcp`, the OAuth endpoint for ChatGPT, and
   has no `headers`. A bearer key cannot be put there (see above), and for the directory the
   portal's MCP connection (OAuth, with CIMD) supplies authentication, not the package.
+- `.app.json` maps the plugin to a registered ChatGPT app ID and is required for mobile and web
+  support. OpenAI marks plugins that rely only on a bundled `mcp.json` as Desktop-only; the
+  registered-app mapping unlocks the mobile and web surfaces. The file in the repository contains
+  the placeholder `OPENAI_APP_ID`; CI injects the real ID from the `OPENAI_APP_ID` repository
+  secret before building the release ZIP. `plugin.json` declares `"apps": "./.app.json"` under
+  `extensions.com.openai`.
+- There are no lifecycle hooks.
 - The skill is a trimmed copy and not the canonical one: no CLI, curl or Python; no sessions or
   login; no price table or allowance figure; no wording about getting past a block. It carries three
   fixed statements (responsible use, never ask for credentials, page content is untrusted) that
@@ -527,8 +528,7 @@ plugins/spicrawl-openai/
   `extensions.com.openai.publication.release_notes` holds the release notes. The cases use only the
   tools the ChatGPT endpoint offers (see above). `review.demo_recording_url` is not in the file
   yet: add it once the walkthrough video is hosted, or enter it in the portal.
-- Build the ZIP from inside the folder, so `plugin.json` is at the archive root, and keep it out
-  of the repository: `cd plugins/spicrawl-openai && zip -r /tmp/spicrawl-openai.zip .`
+- Build the ZIP from inside the folder, so `plugin.json` is at the archive root: `cd plugins/spicrawl-openai && zip -r /tmp/spicrawl-openai.zip .`. Make sure `.app.json` contains the real registered app ID before distributing the ZIP; CI injects it from the `OPENAI_APP_ID` secret during the release workflow.
 - Not ready for the public directory. Still open before an upload can be submitted for review:
   - A reviewer demo account that works without MFA.
   - The domain-verification file at `https://mcp.spicrawl.com/.well-known/openai-apps-challenge`
@@ -550,6 +550,22 @@ The Dify plugin (`dify/`) is released by `.github/workflows/release-dify.yml`.
 1. Bump `version` in `dify/manifest.yaml` (the `meta.version` field is the manifest format version; leave it).
 2. Merge to `main`, then push the tag `dify-vX.Y.Z` on the merged commit. The tag must match the manifest. The workflow packages `spicrawl-X.Y.Z.difypkg` with the Dify plugin CLI (pinned to one release and checked against its SHA-256) and attaches it to a GitHub release of that tag.
 
-The other tools install straight from this repository, so they need no release step: a change is live once it is on `main`.
+Plugin releases happen automatically when a version-bumping PR is merged to `main`. The `.github/workflows/release-all-on-merge.yml` workflow reads each manifest version, skips any plugin that is already released, and builds/uploads the rest.
+
+You can still trigger releases manually with tags:
+
+| Plugin / tool | Workflow | Trigger tag | Artifact |
+|---|---|---|---|
+| OpenAI (ChatGPT / Codex) | `.github/workflows/release-openai.yml` | `openai-v*` | `spicrawl-openai-<version>.zip` |
+| Cursor | `.github/workflows/release-cursor.yml` | `cursor-v*` | `spicrawl-cursor-<version>.zip` |
+| Claude Code | `.github/workflows/release-claude.yml` | `claude-v*` | `spicrawl-claude-<version>.zip` |
+| Factory Droid | `.github/workflows/release-factory.yml` | `factory-v*` | `spicrawl-factory-<version>.zip` |
+| Devin | `.github/workflows/release-devin.yml` | `devin-v*` | `spicrawl-devin-<version>.zip` |
+| GitHub Copilot CLI | `.github/workflows/release-copilot.yml` | `copilot-v*` | `spicrawl-copilot-<version>.zip` |
+| Gemini CLI | `.github/workflows/release-gemini.yml` | `gemini-v*` | `spicrawl-gemini-<version>.zip` |
+| OpenBot | `.github/workflows/release-openbot.yml` | `openbot-v*` | `spicrawl-openbot-<version>.zip` |
+| All of the above (one release page) | `.github/workflows/release-all.yml` | `v*` | all of the above |
+
+The OpenAI workflow requires the `OPENAI_APP_ID` repository secret, which CI injects into `.app.json` before packaging. The registered app ID comes from the OpenAI portal when the Spicrawl app is registered.
 
 The `validate` workflow runs on every push and pull request. It parses all JSON files, runs the OpenCode tests, runs the Dify plugin's pytest, and fails if any file contains something matching `spicrawl_(live|test)_[a-z0-9]{20,}`.

@@ -27,7 +27,7 @@ Monthly                         60%
 ███████████████████░░░░░░░░░░░░░░░░░
 ↻ 7d 14h
 
-deepseek-v4.1-flash         $80/$160
+deepseek-v4.1-flash        $100/$200
 ```
 
 ## 功能
@@ -35,7 +35,7 @@ deepseek-v4.1-flash         $80/$160
 - **两个用量来源**：OpenCode Go、ClinePass，按当前模型自动切换。
 - **三个窗口**：5 小时滚动 / 周 / 月，含百分比、进度条、重置倒计时。
 - **绿黄红提醒**：< 50% 绿、50–79% 黄、≥ 80% 红（阈值见 `core.ts`）。
-- **金额显示**：ClinePass 显示 `已用 / 限额`（限额从 `/users/me/plan` 实时读取，$10 / $25 / $50）；OpenCode Go 只显示百分比，并在**底部**标注当前模型的额度（如 `$80/$160`）供参考。
+- **金额显示**：ClinePass 显示 `已用 / 限额`（限额从 `/users/me/plan` 实时读取，$10 / $25 / $50）；OpenCode Go 只显示百分比，并在**底部**标注当前模型的额度（如 `$100/$200`）供参考。
 - **整体折叠**：点标题行收起，只留一行；状态持久化，重启保持。
 - **不打扰**：选中其他 provider 时**完全不渲染**，不占空间。
 - **限流退避**：遇 429 / 5xx / 网络失败自动指数退避（最长 5 分钟），并显示 `retry in Ns`。
@@ -123,13 +123,20 @@ CLI 插件在本地 TUI 进程内运行，因此可以调用 OpenCode 的凭据 
 
 | 文件 | 说明 |
 | --- | --- |
-| [`tui.tsx`](./tui.tsx) | TUI 插件主体 |
+| [`tui.tsx`](./tui.tsx) | TUI 插件主体（JSX 源码） |
 | [`core.ts`](./core.ts) | 鉴权、API 客户端、格式化、阈值（纯逻辑，无 JSX） |
 | [`index.ts`](./index.ts) | server 入口（no-op） |
-| [`tui.ts`](./tui.ts) | 发现入口，re-export `tui.tsx` |
+| [`tui.ts`](./tui.ts) | 本地开发用的发现入口，re-export `tui.tsx` |
+| [`dist/tui.js`](./dist/tui.js) | **发布产物**：`tui.tsx` 编译打包后的入口（`exports["./tui"]` 指向它） |
+| [`scripts/build.mjs`](./scripts/build.mjs) | 构建脚本（babel-preset-solid + esbuild） |
 | [`preview.mjs`](./preview.mjs) | 离线预览脚本 |
 | [`AGENTS.md`](./AGENTS.md) | 开发约定 |
 | [`CHANGELOG.md`](./CHANGELOG.md) | 变更日志 |
+
+> 为什么发布编译产物：OpenCode 只对 `node_modules` **之外**的插件文件应用自带的 Solid JSX 转换。
+> 若直接发布 `.tsx`，npm 安装后由 Bun 自行转译，会注入无法解析的 `@opentui/solid/jsx-dev-runtime`
+> 导入，插件在加载阶段即失败（见 [#2](https://github.com/GamingNowEdward/opencode-usage-limits/issues/2)）。
+> 修改 `tui.tsx` 后请运行 `npm run build` 并提交 `dist/tui.js`。
 
 ## 离线预览
 
@@ -143,8 +150,11 @@ node preview.mjs cline-pass  # 只预览一个
 ## 排障
 
 1. 确认当前模型属于 `opencode-go` 或 `cline-pass`。
-2. 插件文件**保存即热重载**，无需重启；只有新增/删除被 import 的文件时才需退出 TUI 重进。
+2. 从本地目录开发时，插件文件**保存即热重载**，但需要先重建产物：`npm run dev` 监听源码并更新
+   `dist/tui.js`；宿主加载的是该产物，不是 `tui.tsx`。
 3. 查看日志：`~/.local/share/opencode/log/opencode.log`，筛 `role=cli` 与 `plugin`。
+   若出现 `stage=load` 且报 `Cannot find package '@opentui/solid'`，说明装到了 0.3.1 或更早版本，
+   升级到 0.3.2+ 即可（详见 [CHANGELOG](./CHANGELOG.md)）。
 4. 面板显示 **API key not found** 时，先确认登录状态：
 
    ```sh

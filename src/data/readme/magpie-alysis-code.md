@@ -44,7 +44,7 @@ node src/index.mjs
 
 ```bash
 # npm（发布后）
-magpie plugin add magpie-alysis-auth
+magpie plugin add magpie-alysis-code
 
 # 或从仓库源码（拿最新代码）
 magpie plugin add github:MYCF711/magpie-alysis-auth
@@ -70,7 +70,7 @@ magpie plugin add github:MYCF711/magpie-alysis-auth
 
 ```bash
 magpie plugin list
-# magpie-alysis-auth  on
+# magpie-alysis-code  on
 #   alysis (Alysis Code 免费额度, 6 models)  signed in as Alysis Code
 ```
 

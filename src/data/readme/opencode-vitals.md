@@ -3,7 +3,7 @@
   <h1>OpenCode Vitals</h1>
   <p><strong>Stop guessing how fast your model is. Watch it.</strong></p>
   <p>One honest line for the session you are working in, drawn inside OpenCode's own composer:
-  turns, steps, the average streaming tokens per second, and the latest response's rate
+  turns, steps, the average tokens per second, and the latest response's rate
   beside it.</p>
   <p><strong>OpenCode V2 Desktop on Linux.</strong> The readout is drawn by the app's own window, so
   it is the desktop app and not the terminal that has to be running. macOS and Windows are not
@@ -240,9 +240,9 @@ Every feature, in one place:
 
 | Feature | What it does |
 | --- | --- |
-| **Session average** | Turns, steps and average streaming tok/s for the session you are looking at, so one fast reply cannot flatter a long session. |
-| **Latest response** | `· N last1` is the streaming rate of the most recent completed **response**, next to the session average. The session average is the whole session divided as one sum; this one moves as soon as a reply lands, so it tells you what the work you just watched actually ran at. A response with no honest rate is skipped instead of showing zero, so the reading stays on the last response that had a rate. It is a response, not a step: the steps inside one reply are not separate answers. |
-| **Subagent work is counted** | A subagent runs as a session of its own, so its steps and tokens are added to the session that delegated the work. Its own streaming time is **not** — the session's tok/s stays a speed that session actually ran at, and the subagent's own rate stays on its own session. |
+| **Session average** | Turns, steps and average tok/s for the session you are looking at, so one fast reply cannot flatter a long session. |
+| **Latest response** | `· N last1` is the rate of the most recent completed **response**, next to the session average. The session average is the whole session divided as one sum; this one moves as soon as a reply lands, so it tells you what the work you just watched actually ran at. A response with no honest rate is skipped instead of showing zero, so the reading stays on the last response that had a rate. It is a response, not a step: the steps inside one reply are not separate answers. |
+| **Subagent work is counted** | A subagent runs as a session of its own, so its steps and tokens are added to the session that delegated the work. Its own provider-active time is **not** — the session's tok/s stays a speed that session actually ran at, and the subagent's own rate stays on its own session. |
 | **Inside your app** | The numbers sit in OpenCode's own composer, in the row that already holds your agent and model. No window on top of your work, no taskbar entry, no focus steal. |
 | **It follows your tab** | Switch sessions in the app and the numbers switch with them. The readout asks for the session the window says it is showing, so switching project switches the numbers with it — it can never show another project's totals. |
 | **Nothing to clean up** | It is drawn by OpenCode's own window, so there is no second process, no lock, and nothing left on screen when you close the app. |
@@ -294,33 +294,44 @@ No estimates, no invented numbers. Every value is read from OpenCode's own event
 | --- | --- |
 | **turns** | Responses completed in this session. |
 | **steps** | Model steps across those responses, so a response that called tools five times is not mistaken for a fast one. |
-| **tok/s** | `generated tokens ÷ active stream time`, where generated tokens are output plus reasoning tokens, and active stream time is the time the model was actually streaming. Tool executions between steps stay **out** of the denominator. |
+| **tok/s** | `generated tokens ÷ provider-active time`, where generated tokens are output plus reasoning tokens, and provider-active time is the sum of each step's own `step.started` → `step.streamed` duration. Tool executions between steps stay **out** of the denominator. |
 
 How the denominator is chosen, and what each record says about it (`rateSource`):
 
-| `rateSource` | The stream time used |
+| `rateSource` | The time used |
 | --- | --- |
-| `stream-span` | The real streaming span: from the first delta of a message to its last, summed over the messages of that response. |
-| `first-to-last` | The reply arrived as one piece with no measurable span, so the time from its first token to its last is used. |
-| `single-message-total` | The same, and the whole turn was that one message and one step: its own wall time is used. |
-| `unavailable` | No honest denominator exists (a multi-message or multi-step response with no measurable stream, i.e. mostly tool time), so `tok/s` stays `–`. |
+| `step-provider` | Every counted step has a request-dispatch time and a provider response-body boundary (`session.step.started` → `session.step.streamed`). This is the preferred denominator: it includes time to first token, excludes tool execution, and covers every step, including a failed step whose token record is absent. |
+| `step-ended` | At least one step had no `step.streamed`, so its `session.step.ended` time was used instead. That boundary can include time a tool took to settle. |
+| `unavailable` | No honest denominator exists — a multi-step response where only some steps have timing, a step that restarted (retries carry no attempt id), or a turn with no token record. `tok/s` stays `–` rather than dividing all tokens by a partial time. |
 
 What counts as model time, and what does not:
 
 | Measured as model time | Not measured |
 | --- | --- |
-| Text deltas (`session.text.delta`) | Running a tool (`session.tool.called`/`success`), however fast or slow |
-| Thinking deltas (`session.reasoning.delta`) | Waiting in a queue, compaction, synthetic items |
-| The model writing a tool call's arguments (`session.tool.input.delta`) | Anything the provider never reports |
+| A step's provider-active interval (`step.started` → `step.streamed`) | Running a tool (`session.tool.called`/`success`), however fast or slow |
+| Text and thinking the step produced | Waiting in a queue, compaction, synthetic items |
+| The model writing a tool call's arguments | Time between steps, including tool execution |
 
-That last row is what makes the number honest: a step's token count includes the tokens it spends
-writing a tool call, so the time spent writing them has to be in the denominator too. Skipping it
-used to print `4686 tok/s` on a real turn whose only visible text was 80 characters.
+A step's token count includes the tokens it spends writing a tool call, so the time spent writing
+them is inside that step's provider-active interval. Skipping it used to print `4686 tok/s` on a real
+turn whose only visible text was 80 characters.
 
-A silence longer than 30 seconds under one message is a dropped connection coming back, not a slow
-model, so the span restarts there instead of counting the gap. Session totals are replaced as a whole
-snapshot rather than field by field: the tokens of one moment are never divided by the stream time of
-another.
+Deltas are not a clock. A provider that sends one final chunk, or a few bursty chunks, can spend
+seven seconds generating a reply while delivering it in six milliseconds of events. Delta spans are
+kept only as diagnostics (`streamSpanMs`); they are never used as a divisor. A silence longer than
+30 seconds inside a diagnostic span is treated as a dropped connection and restarts the span.
+
+A response with no honest rate still counts in turns, steps and tokens, but its tokens do not enter
+the session average — there is no time to divide them by. Session totals are replaced as a whole
+snapshot rather than field by field: the tokens of one moment are never divided by the time of
+another. A step that restarts is deliberately not rated: the event stream has no attempt id, and
+pairing an old terminal with a new interval is exactly how a wrong high number is made.
+
+Rates measured before the step-time denominator existed, or with a delta-span denominator, are not
+comparable with the new ones. On load, an old snapshot keeps its turns, steps and tokens but its
+stored rate and `last1` reading are dropped instead of being averaged into the new measurement. A
+rate is only trusted when it carries both the current metric marker and one of the allowed
+`rateSource` values.
 
 Deliberately excluded, because including them would flatter the number:
 
@@ -608,7 +619,7 @@ To install a copy of the checkout instead, drop the `--link`. To put it somewher
 ### Development
 
 ```bash
-npm test                 # 494 checks
+npm test                 # 535 checks
 npm run test:compat      # the compatibility check's own logic
 npm run compat           # this plugin against the pinned OpenCode API
 node selftest.mjs        # can this machine show the readout?

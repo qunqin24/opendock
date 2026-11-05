@@ -1,42 +1,84 @@
+<a id="readme-top"></a>
+
+<!-- PROJECT SHIELDS -->
+[![OpenCode V2][opencode-shield]][opencode-url]
+[![npm][npm-shield]][npm-url]
+[![CI][ci-shield]][ci-url]
+[![MIT License][license-shield]][license-url]
+[![Bun][bun-shield]][bun-url]
+[![TypeScript][typescript-shield]][typescript-url]
+[![Biome][biome-shield]][biome-url]
+[![Stars][stars-shield]][stars-url]
+[![Forks][forks-shield]][forks-url]
+[![Issues][issues-shield]][issues-url]
+
+<br />
+
 <div align="center">
 
 # opencode-mail-exchange
 
 OpenCode V2 plugin for on-prem Exchange: mail, calendar and contacts over EWS + NTLM.
 
-![OpenCode V2](https://img.shields.io/badge/OpenCode-V2-black)
-![npm](https://img.shields.io/npm/v/opencode-mail-exchange)
-![Bun](https://img.shields.io/badge/Bun-1.4-black)
-![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue)
-![Biome](https://img.shields.io/badge/Biome-2.5-green)
-![License](https://img.shields.io/badge/license-MIT-blue)
+<a href="#usage"><strong>Explore the docs »</strong></a>
+<br />
+<br />
+<a href="https://www.npmjs.com/package/opencode-mail-exchange">npm</a>
+&middot;
+<a href="docs/roadmap.md">Roadmap</a>
+&middot;
+<a href="https://github.com/OniVe/opencode-mail-exchange/issues/new?labels=bug">Report Bug</a>
+&middot;
+<a href="https://github.com/OniVe/opencode-mail-exchange/issues/new?labels=enhancement">Request Feature</a>
 
 **English** · [Русский](README.ru.md)
 
 </div>
 
-## Table of Contents
+<!-- TABLE OF CONTENTS -->
+<details>
+  <summary>Table of Contents</summary>
+  <ol>
+    <li>
+      <a href="#about-the-project">About The Project</a>
+      <ul>
+        <li><a href="#features">Features</a></li>
+        <li><a href="#built-with">Built With</a></li>
+      </ul>
+    </li>
+    <li>
+      <a href="#getting-started">Getting Started</a>
+      <ul>
+        <li><a href="#prerequisites">Prerequisites</a></li>
+        <li><a href="#installation">Installation</a></li>
+        <li><a href="#configuration">Configuration</a></li>
+      </ul>
+    </li>
+    <li>
+      <a href="#usage">Usage</a>
+      <ul>
+        <li><a href="#tools">Tools</a></li>
+        <li><a href="#attachments">Attachments</a></li>
+        <li><a href="#deleting">Deleting</a></li>
+        <li><a href="#message-fields">Message fields</a></li>
+        <li><a href="#recipients">Recipients</a></li>
+        <li><a href="#errors">Errors</a></li>
+        <li><a href="#sync">Sync</a></li>
+        <li><a href="#storage">Storage</a></li>
+        <li><a href="#limits">Limits</a></li>
+        <li><a href="#not-implemented">Not Implemented</a></li>
+      </ul>
+    </li>
+    <li><a href="#roadmap">Roadmap</a></li>
+    <li><a href="#contributing">Contributing</a></li>
+    <li><a href="#license">License</a></li>
+    <li><a href="#contact">Contact</a></li>
+    <li><a href="#acknowledgments">Acknowledgments</a></li>
+  </ol>
+</details>
 
-- [About](#about)
-- [Features](#features)
-- [Getting Started](#getting-started)
-  - [Prerequisites](#prerequisites)
-  - [Installation](#installation)
-  - [Configuration](#configuration)
-- [Usage](#usage)
-  - [Tools](#tools)
-  - [Recipients](#recipients)
-  - [Errors](#errors)
-  - [Sync](#sync)
-- [Storage](#storage)
-- [Limits](#limits)
-- [Not Implemented](#not-implemented)
-- [Roadmap](#roadmap)
-- [Risks](#risks)
-- [Development](#development)
-- [License](#license)
-
-## About
+<!-- ABOUT THE PROJECT -->
+## About The Project
 
 Reads and sends mail, lists calendar events and contacts from an on-prem Exchange mailbox through EWS with
 NTLM. Runs inside OpenCode V2 as a native TypeScript plugin: Bun executes `src/index.ts` directly, no build step.
@@ -44,7 +86,7 @@ NTLM. Runs inside OpenCode V2 as a native TypeScript plugin: Bun executes `src/i
 Verified on Exchange 2016 (build 15.1.2507.6), NTLMv2, internal CA. Bun 1.4.2, `@opencode/plugin` 2.0.26.
 Attachment extraction is pure JS (no native modules); CI runs on Linux, Windows and macOS. 276 tests.
 
-## Features
+### Features
 
 - 14 `mail_*` tools: accounts, folders, list, search, get, read-attachment, save-attachment, delete/empty-deleted, sync, draft, send, calendar, contacts.
 - Multiple mailboxes in one process with per-account credentials and SQLite.
@@ -52,6 +94,8 @@ Attachment extraction is pure JS (no native modules); CI runs on Linux, Windows 
 - EWS/NTLM with explicit XML escaping, recipient validation and attachment limits.
 - Attachment text extraction: `.docx`/`.docm`, `.xlsx`/`.xlsm`, `.pdf` (text layer) and plain text.
 - Request timeout and cancellation via `context.signal`; multi-account routing with `AsyncLocalStorage`.
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 ### Built With
 
@@ -64,6 +108,9 @@ Attachment extraction is pure JS (no native modules); CI runs on Linux, Windows 
 - [`saxes`](https://github.com/lddubeau/saxes) 6 (linear OOXML SAX) + [`word-extractor`](https://github.com/morungos/node-word-extractor) 1.0 (legacy `.doc`) + [`@e965/xlsx`](https://www.npmjs.com/package/@e965/xlsx) 0.20 (legacy `.xls`)
 - SQLite + FTS5 via `bun:sqlite`
 
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+<!-- GETTING STARTED -->
 ## Getting Started
 
 ### Prerequisites
@@ -188,6 +235,9 @@ Top-level options are inherited by `accounts[]`; per-account values win, except 
 `dataDir` must be a normal path: extended-length (`\\?\`) and device (`\\.\`) namespaces are rejected with
 `ConfigError`.
 
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+<!-- USAGE EXAMPLES -->
 ## Usage
 
 ### Tools
@@ -215,23 +265,6 @@ model-level guard, while the effective gate is the `mail.delete` permission. Pre
 (`mail_delete` without `hard`) for everything else.
 `account` selects the mailbox; the first account is the default.
 `codemode: false` (default) lists tools directly; `codemode: true` exposes them only through `execute`.
-
-### Deleting
-
-`mail_delete` moves messages to Deleted Items by default; `hard: true` permanently deletes them.
-`mail_empty_deleted` permanently deletes the top-level items in Deleted Items; subfolders are left in place.
-Both need the `mail.delete` permission; `mail_empty_deleted` additionally requires `confirm: true`.
-
-In a configured local index both delete modes tombstone the affected rows. Exchange assigns a new ItemId
-when an item is moved to Deleted Items, so the old id becomes invalid: run `mail_sync` for `deleted` to get the
-new id; a plain `mail_list` may serve a fresh cache and not show the new row until the sync interval.
-`mail_get`/`mail_delete` by an old id will fail until that sync. Emptying also tombstones
-every indexed row in `deleted`. If EWS rejects the whole batch, the index is left unchanged; per-item failures
-apply only the confirmed deletions and the call fails with the counts and the first reason. A transport
-failure after the request may leave the outcome unknown: run `mail_sync` before retrying.
-
-Ids are passed to EWS `DeleteItem`, so pass mail ids only. If a meeting id is supplied, EWS deletes it with
-`SendToNone` (attendees are not notified); the plugin does not distinguish item classes before deleting.
 
 ### Attachments
 
@@ -264,6 +297,23 @@ background download) for messages already present in the local index (run `mail_
 `hasAttachments`/`attachmentCount`; a replaced attachment with the same count can keep stale text.
 `storage: metadata` and `off` never write this cache; switching away from `full` deletes the cached
 text (`attachment_text`/`attachment_fts`), so returning to `full` starts with cold reads again.
+
+### Deleting
+
+`mail_delete` moves messages to Deleted Items by default; `hard: true` permanently deletes them.
+`mail_empty_deleted` permanently deletes the top-level items in Deleted Items; subfolders are left in place.
+Both need the `mail.delete` permission; `mail_empty_deleted` additionally requires `confirm: true`.
+
+In a configured local index both delete modes tombstone the affected rows. Exchange assigns a new ItemId
+when an item is moved to Deleted Items, so the old id becomes invalid: run `mail_sync` for `deleted` to get the
+new id; a plain `mail_list` may serve a fresh cache and not show the new row until the sync interval.
+`mail_get`/`mail_delete` by an old id will fail until that sync. Emptying also tombstones
+every indexed row in `deleted`. If EWS rejects the whole batch, the index is left unchanged; per-item failures
+apply only the confirmed deletions and the call fails with the counts and the first reason. A transport
+failure after the request may leave the outcome unknown: run `mail_sync` before retrying.
+
+Ids are passed to EWS `DeleteItem`, so pass mail ids only. If a meeting id is supplied, EWS deletes it with
+`SendToNone` (attendees are not notified); the plugin does not distinguish item classes before deleting.
 
 ### Message fields
 
@@ -326,7 +376,7 @@ retrying may duplicate the message. A copy is saved in Sent Items by default and
 (`MoreChangesAvailable` still true) — call it again. Non-indexable folders and `storage: "off"` return
 `{synced: 0, complete: true, skipped: "not-indexed" | "storage-off"}`.
 
-## Storage
+### Storage
 
 SQLite (`bun:sqlite`, WAL, FTS5) under `dataDir`; with `accounts`, `<dataDir>/<id>/mail.db`.
 
@@ -339,7 +389,7 @@ the index (plaintext) will land there. Keep it outside; `.gitignore` covers `mai
 not enforce it. Extended-length and device namespaces are rejected (see Configuration). Use BitLocker/EFS if disk
 encryption is required. Encryption is planned in [docs/roadmap.md](docs/roadmap.md) (R1).
 
-## Limits
+### Limits
 
 - HTML body: subject, body, recipient names and attachment names are XML-escaped; without this, HTML is stored
   empty without an error.
@@ -352,23 +402,39 @@ encryption is required. Encryption is planned in [docs/roadmap.md](docs/roadmap.
 - Cold start: EWS import ~0.3 s; full plugin load ~0.4 s, RSS ~105 MB; first EWS call adds ~0.45 s (live).
 - Multiple mailboxes: one process, per-account credentials and SQLite, `AsyncLocalStorage` routing.
 
-## Not Implemented
+### Not Implemented
 
 - OCR for scanned PDFs.
 - `mail_move`, flags, reply/forward.
 - Graph backend for Exchange Online.
 - EPA `Require` on FE EWS: NTLM without channel binding will fail.
 
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+<!-- ROADMAP -->
 ## Roadmap
 
 See [docs/roadmap.md](docs/roadmap.md): SQLite encryption with body search, Graph backend for Exchange Online.
+Live OpenCode session verification is tracked there as R5 and is not done yet.
 
-## Risks
+Known risks — plaintext SQLite, library maintenance, EWS retirement in Exchange Online — are tracked in
+[risks.md](risks.md).
 
-See [risks.md](risks.md) for the full list (plaintext SQLite, library maintenance, EWS retirement in Exchange
-Online).
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
 
-## Development
+<!-- CONTRIBUTING -->
+## Contributing
+
+Contributions are welcome. Fork the repository, create a feature branch, commit your changes, push the branch
+and open a pull request. For bugs and feature ideas, use the issue tracker.
+
+1. Fork the Project
+2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the Branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
+
+Local checks before a pull request:
 
 ```bash
 bun install
@@ -379,6 +445,52 @@ bun run lint
 
 Live smoke (read-only): `lab/smoke.ts`; env and CA setup: `lab/spike-ews/README.md`.
 
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+<!-- LICENSE -->
 ## License
 
-MIT. See [LICENSE](LICENSE).
+Distributed under the MIT License. See [LICENSE](LICENSE) for more information.
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+<!-- CONTACT -->
+## Contact
+
+OniVe — [github.com/OniVe](https://github.com/OniVe)
+
+Project Link: [https://github.com/OniVe/opencode-mail-exchange](https://github.com/OniVe/opencode-mail-exchange)
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+<!-- ACKNOWLEDGMENTS -->
+## Acknowledgments
+
+- [Best-README-Template](https://github.com/othneildrew/Best-README-Template) for the README structure.
+- [OpenCode](https://opencode.ai/v2/docs/), [Bun](https://bun.sh/) and [Biome](https://biomejs.dev/) for the runtime and tooling.
+- [`ews-javascript-api`](https://github.com/gautamsi/ews-javascript-api), [`fflate`](https://github.com/101arrowz/fflate), [`yauzl`](https://github.com/thejoshwolfe/yauzl), [`unpdf`](https://github.com/unjs/unpdf), [`saxes`](https://github.com/lddubeau/saxes), [`word-extractor`](https://github.com/morungos/node-word-extractor) and [`@e965/xlsx`](https://www.npmjs.com/package/@e965/xlsx) for the heavy lifting.
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+<!-- MARKDOWN LINKS & IMAGES -->
+<!-- https://www.markdownguide.org/basic-syntax/#reference-style-links -->
+[opencode-shield]: https://img.shields.io/badge/OpenCode-V2-black?style=for-the-badge
+[opencode-url]: https://opencode.ai/v2/docs/
+[npm-shield]: https://img.shields.io/npm/v/opencode-mail-exchange?style=for-the-badge
+[npm-url]: https://www.npmjs.com/package/opencode-mail-exchange
+[ci-shield]: https://img.shields.io/github/actions/workflow/status/OniVe/opencode-mail-exchange/ci.yml?branch=main&style=for-the-badge&label=CI
+[ci-url]: https://github.com/OniVe/opencode-mail-exchange/actions/workflows/ci.yml
+[license-shield]: https://img.shields.io/github/license/OniVe/opencode-mail-exchange?style=for-the-badge
+[license-url]: https://github.com/OniVe/opencode-mail-exchange/blob/main/LICENSE
+[bun-shield]: https://img.shields.io/badge/Bun-1.4-black?style=for-the-badge&logo=bun&logoColor=white
+[bun-url]: https://bun.sh/
+[typescript-shield]: https://img.shields.io/badge/TypeScript-5.9-blue?style=for-the-badge&logo=typescript&logoColor=white
+[typescript-url]: https://www.typescriptlang.org/
+[biome-shield]: https://img.shields.io/badge/Biome-2.5-green?style=for-the-badge&logo=biome&logoColor=white
+[biome-url]: https://biomejs.dev/
+[stars-shield]: https://img.shields.io/github/stars/OniVe/opencode-mail-exchange?style=for-the-badge
+[stars-url]: https://github.com/OniVe/opencode-mail-exchange/stargazers
+[forks-shield]: https://img.shields.io/github/forks/OniVe/opencode-mail-exchange?style=for-the-badge
+[forks-url]: https://github.com/OniVe/opencode-mail-exchange/network/members
+[issues-shield]: https://img.shields.io/github/issues/OniVe/opencode-mail-exchange?style=for-the-badge
+[issues-url]: https://github.com/OniVe/opencode-mail-exchange/issues

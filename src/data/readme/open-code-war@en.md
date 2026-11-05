@@ -31,8 +31,17 @@ Open Code War **never collects prompt content.** It only counts the number of su
 | Prompt **character count** (a single integer) | Email · real name or other PII |
 | **Agent type** used (Claude Code·Codex etc., a single label) | Raw IP storage |
 | (server-side) request country `cf.country` | |
+| **Barracks chat · guestbook** — text you write yourself for others to read | Prompts · tool calls · commands · file paths (never part of the work status either) |
+| **Barracks work status** — a single `working` / `idle` value | |
 
 > Even though the hook receives the raw prompt, it **computes only the character count and sends that — never the text.** It runs **fail-open** (short timeout + background fire-and-forget) so it never blocks or slows down your agent, even if the network fails.
+
+**What the barracks (`/space`) adds** (Claude Code 2.1.287 or later)
+- **Work status**: while Claude Code is open, it sends only a `working` / `idle` value at session start, at the start and end of a turn, and every 2 minutes. As a result **your barracks door lights up in the plaza and "working" is public.** Opt out with `/space presence off`. Nothing is sent while `/ocw disable` is on.
+- **Chat**: visible to the people in that room. Each room keeps the latest 50 lines, **deleted automatically after 24 hours**.
+- **Guestbook**: visible to everyone who enters that barracks. Each barracks keeps the latest 100 lines, **until the owner clears them (`/space guestbook clear`) or bans the author**.
+- **Visit log**: each barracks keeps nicknames and times from the last 7 days for the owner's "N people dropped by" briefing line.
+- Deleting your account also deletes your barracks' chat, guestbook, visit log and ban list. Guestbook lines you left in someone else's barracks stay until that owner clears them.
 
 ---
 
@@ -167,6 +176,20 @@ Register a nickname / check status / turn collection on-off:
 /ocw enable | disable    # turn collection on/off
 ```
 
+Barracks:
+
+```
+/space                   # open the plaza (a/d walk · e enter a door · t chat · g guestbook · Esc close)
+/space home              # go straight to your barracks
+/space kick <nick>       # remove someone from your barracks (blocked for 10 minutes)
+/space ban <nick>        # ban (unban <nick> to lift · bans to list)
+/space close | open      # lock · unlock your barracks
+/space guestbook clear   # clear your guestbook
+/space presence off | on # stop · resume sending your work status
+```
+
+The plaza is also on the web at [`/plaza`](https://opencodewar.dev/plaza): sign in to walk and talk, or watch without signing in. In-game text is Korean for now. The terminal client needs Claude Code 2.1.287+ and Node 22+.
+
 When a session starts you get a **one-line briefing** in the terminal — just the single thing worth
 knowing right now (your streak is about to break, the next rank is close, how far the person above you is).
 If nothing changed, it stays quiet.
@@ -204,6 +227,10 @@ Serve `web/index.html` with any static server (it connects to the backend read A
 | `POST` | `/register` | register/change nickname (uniqueness · profanity check) |
 | `GET`  | `/leaderboard?type=daily\|weekly\|weekend&metric=prompts\|chars&limit=100` | ranking (snapshot cache) |
 | `GET`  | `/countries?type=…` | per-country totals (for the globe) |
+| `POST` | `/space/ticket` | 60-second barracks entry ticket (terminal) |
+| `POST` | `/space/status` | owner work-status heartbeat |
+| `POST` | `/space/admin` | owner controls: kick · ban · lock · clear guestbook |
+| `GET`  | `/space/ws?room=plaza\|<public_id>` | plaza · barracks WebSocket |
 
 All aggregation windows are **KST (UTC+9)**; weekend = Fri · Sat · Sun.
 

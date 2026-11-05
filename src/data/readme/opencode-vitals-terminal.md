@@ -1,3 +1,10 @@
+> [!IMPORTANT]
+> **This repository has moved to [skatkov/session-vitals-plugin](https://github.com/skatkov/session-vitals-plugin).**
+>
+> Development continues there, in the [`opencode/`](https://github.com/skatkov/session-vitals-plugin/tree/main/opencode) directory, alongside a sibling plugin for Claude Code. The npm package is unchanged: `opencode-vitals-terminal` still installs the same plugin.
+>
+> This repository is archived and read-only. Its full history came across, so nothing here is lost. Please open issues and pull requests on the new repository.
+
 # OpenCode Vitals Terminal
 
 **Session usage, below your prompt and in your sidebar.**
