@@ -10,11 +10,16 @@
 Use your own OpenCode models to review code, inspect the proposed comments,
 and choose what gets published. No MCP server or CI pipeline setup is required.
 
+On Martian's open [Code Review Bench](#benchmark-results), `/pr-deep` found
+more of the listed issues in 50 real pull requests than any of the 21 tools on
+the benchmark's dashboard.
+
 AZPR is an independent community project. It is not built by or affiliated with
 the OpenCode team.
 
-[Get started](#your-first-review) · [15-second recording](#watch-the-workflow) ·
-[Full demo](docs/DEMO.md) · [Documentation](#documentation)
+[Get started](#your-first-review) · [Benchmark](#benchmark-results) ·
+[15-second recording](#watch-the-workflow) · [Full demo](docs/DEMO.md) ·
+[Documentation](#documentation)
 
 ## See the review in Azure DevOps
 
@@ -117,6 +122,72 @@ to your selected model providers, and review records are saved locally. See
 [team setup and data handling](docs/ENTERPRISE.md) and
 [content-search limits](docs/AZURE_DEVOPS.md#who-calls-what).
 
+## Benchmark results
+
+On Martian's open [Code Review Bench](https://codereview.withmartian.com),
+which evaluates AI code reviewers on 50 real-world pull requests from
+**cal.com, Discourse, Grafana, Keycloak and Sentry**, **AZPR (`v0.3.5`,
+`/pr-deep`) found more of the benchmark's expected issues than any of the 21
+tools on its public dashboard.**
+
+- **Highest recall on the dashboard (67.7%):** AZPR caught more of the
+  expected issues than every tool listed there.
+- **Highest High and Critical recall, tied (74.2%):** level with
+  qodo-extended-v2 and augment on the most severe issues.
+- **Built for interactive triage (F2 54.1, would rank 6th):** `/pr-deep`
+  reports every defect it confirms instead of holding findings back, and you
+  choose which ones to publish.
+
+| Tool | Issues found (recall) | High and Critical found | Precision | F2 |
+| :--- | ---: | ---: | ---: | ---: |
+| **AZPR 0.3.5 (`/pr-deep`, Claude Opus 5.5)** | **67.7%** 🏆 | **74.2%** 🏆 | **30.0%** | **54.1** |
+| copilot-v2 | 66.5% | 71.2% | 38.5% | 58.0 |
+| cubic-v2 | 65.8% | 72.7% | 61.5% | 64.9 |
+| augment | 65.2% | 74.2% 🏆 | 59.5% | 64.0 |
+| qodo-extended-v2 | 64.6% | 74.2% 🏆 | 67.1% | 65.1 |
+| qodo-v2 | 62.0% | 71.2% | 55.4% | 60.6 |
+| coderabbit | 59.5% | 63.6% | 32.6% | 51.1 |
+
+*Data as of 2026-11-06: AZPR 0.3.5 reviewed the PRs on 2026-11-05 and was
+scored on 2026-11-06. Other tools: the six with the highest recall in the
+default view of Martian's dashboard (core issues, judged by Claude Opus 4.5;
+published results of 2026-08-30, still the latest on 2026-11-06), sorted by
+recall. The dashboard includes tools based on their public GitHub review
+activity, and AZPR reviews **Azure DevOps** pull requests, so we ran the
+official benchmark pipeline and judge ourselves, as Martian invites.*
+
+### Why `/pr-deep` favors recall
+
+Bots that comment on every pull request usually keep the number of comments
+low to avoid noise. AZPR posts nothing until you decide: **you review every
+finding in a preview and publish only the comments you want.**
+
+The benchmark's precision also counts accurate comments it does not list:
+
+1. **Unlisted issues count as false positives.** Code Review Bench lists about
+   three issues per PR and counts every comment that matches none of them as a
+   false positive. `/pr-deep` comments on every defect its verifier confirms
+   (6.5 per PR in this run).
+2. **Most unmatched findings were accurate.** We checked a random sample of 40
+   AZPR findings that matched no expected issue against the source code:
+   **36 were accurate**, and **18 were genuine defects** introduced or exposed
+   by the PR that the benchmark's list does not include.
+
+### Model and effort recommendations
+
+To find the best setup for `/pr-deep`, we compared **12 combinations of models
+and reasoning effort** on the same 50 PRs:
+
+- **Recommended: `claude-agent/opus#medium`.** Claude Opus 5.5 at medium effort
+  for all three review roles scored best. Its full 50-PR run took about 35
+  minutes, four PRs at a time.
+- **Why not higher or lower?** `high` scored about the same at a higher cost,
+  `xhigh` added more marginal findings, and `low` missed more issues, including
+  High-severity ones.
+
+The full method, the comparison of all 12 combinations and the limits are in
+the [validation record](docs/VALIDATION.md#martian-code-review-bench-2026-11-05-and-06).
+
 ## Watch the workflow
 
 [![Real OpenCode run: exclude one finding, lower another to low, inspect the new preview, then publish and read the comments back from Azure DevOps.](docs/assets/adjust-findings-teaser.gif)](docs/DEMO.md#adjust-findings-before-publishing)
@@ -164,8 +235,9 @@ code or running the project's tests, use a local checkout for that work.
 The [validation record](docs/VALIDATION.md) includes real model/Azure runs, a
 316-file test PR, isolated OpenCode host checks, and an offline test suite for
 runtime and packaging behavior. It also records missed defects and untested
-environments. The demo shows the workflow; these checks do not establish a
-general review-accuracy score.
+environments. The demo shows the workflow; for review quality, see the
+[benchmark results](#benchmark-results), and expect findings to vary between
+models and runs.
 
 ## Compatibility
 
@@ -462,7 +534,8 @@ form (for example `provider/model#high`); `/pr-check` reports a variant the
 model does not offer. Without a variant the model's default is used. `/pr-deep`
 needs all three deep models and never falls back to the review models; choose
 models stronger than the review models there, since the models are the only
-difference from `/pr-review`. Likewise `/pr-quick` needs `models.quick.reviewer`,
+difference from `/pr-review`. The [benchmark results](#benchmark-results)
+include a measured choice for `models.deep`. Likewise `/pr-quick` needs `models.quick.reviewer`,
 and a command checks only the models it uses, so an unavailable quick model
 never blocks `/pr-review`. Comment planning uses the review's risk model
 (`models.deep.risk` for a deep review, the quick reviewer for a quick review).

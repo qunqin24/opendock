@@ -651,7 +651,7 @@ npm run build   # compile TypeScript -> dist/
 npm test        # run the vitest suite
 ```
 
-If you add or change a command, update `src/help.ts`'s `COMMANDS_HELP` and then run `npm run sync-readme` to regenerate the table above — CI fails (`node scripts/sync-readme.mjs --check`) if it's out of sync.
+If you add or change a command, update `src/help.ts`'s `COMMANDS_HELP` and then run `npm run sync-readme` to regenerate the table above and `npm run emit-commands` to regenerate `commands.json` (the machine-readable copy the website's /docs list is built from) — CI fails (`node scripts/sync-readme.mjs --check`, and `tests/commands-json.test.ts`) if either is out of sync.
 
 Full reference, including personal API tokens, the public REST API, and the MCP server: **https://www.ahood.dev/docs**
 

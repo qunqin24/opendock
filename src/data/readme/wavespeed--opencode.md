@@ -43,7 +43,7 @@ If you already have an MCP server named `wavespeed` in your config (for example 
 
 ## Other agents
 
-The same MCP server and skill are packaged for [Claude Code](https://github.com/WaveSpeedAI/claude-plugins), [Codex](https://github.com/WaveSpeedAI/codex-plugin-wavespeed-cli), [Gemini CLI](https://github.com/WaveSpeedAI/wavespeed-gemini-extension) and others; see [wavespeed.ai/cli](https://wavespeed.ai/cli).
+The same MCP server and skill are packaged for [Claude Code](https://github.com/WaveSpeedAI/claude-plugins), [Codex](https://github.com/WaveSpeedAI/codex-plugins), [Gemini CLI](https://github.com/WaveSpeedAI/wavespeed-gemini-extension) and others; see [wavespeed.ai/cli](https://wavespeed.ai/cli).
 
 ## Development
 

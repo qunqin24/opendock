@@ -11,6 +11,14 @@ An [OpenCode v2](https://github.com/sst/opencode) TUI plugin that adds a NanoGPT
 - **Auto-refresh** — Updates every 60s, and also refreshes when sessions complete/fail.
 - **Manual refresh** — Use the Command Palette: `Refresh NanoGPT usage`.
 
+## Screenshots
+
+The panel lives in OpenCode's right sidebar and updates automatically.
+
+![NanoGPT Usage panel in the OpenCode sidebar](./images/fullscreen.png)
+
+![Close-up of the NanoGPT Usage panel](./images/snippet.png)
+
 ## Installation
 
 ### From npm (recommended)

@@ -206,6 +206,7 @@ STORE
 - **No prompt content is stored.** The ledger keeps a scan-truncated string from the *memory* side, never your message.
 - **Reinforcement is a tie-break only** (`useBoost ≤ 1.0`): a recently used row wins a tie and can never outrank a real score gap. In consolidation the most recently used member of a cluster is never the merge loser.
 - **`never retrieved` is stated, not acted on.** Pruning is your decision. Retired rows cannot inherit reinforcement: ledger rows are verified against the store on read.
+- **Aggregate STORE counts are machine-wide by decision (#213 B).** They count every repository's rows in the shared store on this machine, never just the reading session's repository — the numbers describe the store, not your slice of it. Privacy applies to the content surfaces instead: `memory_evidence` and the recent-blocked-writes list in `memory_status` and `/memory` follow each reader's repository visibility (#306).
 - **Capture lag** is how stale the newest message was when auto-capture fired. The line prints only when at least one `capture_lag` sample exists, which needs auto-capture to have fired — see [Auto-capture is experimental](#auto-capture-is-experimental).
 
 ## Consolidation
@@ -350,6 +351,8 @@ bun run sweep:test
 The output is a canonical mutation score — killed over total, with equivalent mutants and load errors excluded from the denominator — plus the survivors, the unpinned invariants. Survivors are the audit's output, not a scandal: some mutants are expected to survive and become entries on the unpinned list rather than red CI.
 
 Run it when you want to know whether the suite still has teeth — after changing tests or coverage, or as a pre-release gate with `bun scripts/test-sweep.ts --fail-on-survivors`, which exits 4 when anything survives. Two cheaper checks come first: `bun scripts/test-sweep.ts --validate` confirms every mutation pattern still lands on exactly one source site without running the suite, and `bun scripts/test-sweep.ts --selftest` plants a mutation in a trivially-tested pure function and fails unless the suite kills it — proof the instrument itself can go red.
+
+**Pre-release ritual (decided 2026-11-04, #72):** before pushing a release commit, a human runs `--validate`, then `--selftest`, then `--fail-on-survivors`, and records the mutation score and the survivor list in `bench/RESULTS.md` beside the published evidence. Cadence is pre-release only, run by a person: the sweep is a full suite per mutant and never belongs in CI, where it would cost more than it informs. Survivors become entries on the unpinned-invariant list, not red checks.
 
 ## Troubleshooting
 

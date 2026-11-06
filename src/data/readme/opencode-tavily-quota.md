@@ -2,13 +2,18 @@
 
 See how many Tavily API credits you have left without leaving OpenCode.
 
-![The Tavily quota section in the OpenCode session sidebar](https://raw.githubusercontent.com/cardin/opencode-tavily-quota/main/docs/sidebar.png)
+![A rendered view of the Tavily quota section in the OpenCode session sidebar](https://raw.githubusercontent.com/cardin/opencode-tavily-quota/main/docs/sidebar.png)
 
 The plugin adds a **Tavily** section to the session sidebar with:
 
-- a progress bar and the percentage of credits remaining,
-- a countdown to the monthly reset,
+- a single color-coded line: progress bar, percentage remaining, and monthly reset countdown,
+- an optional `┃` even-use mark showing where even use would leave the quota,
 - a one-command refresh.
+
+The bar ends alongside opencode-quota's bars. Compact, right-aligned
+labels such as `98%  25.3d` fill the measured sidebar width (currently 37 columns
+with a 25-cell bar). The six-column countdown field shares opencode-quota's right edge. Shorter resets
+use `23h`, `4h32m`, or `59m`. The refresh toast keeps its more detailed countdown.
 
 It works with the Tavily account already connected to OpenCode, so in most cases
 you do not need to paste a key.
@@ -24,7 +29,7 @@ you do not need to paste a key.
 opencode plugin add opencode-tavily-quota
 ```
 
-Restart or reload OpenCode after installing. If you previously copied the plugin
+Run OpenCode's **Reload Configurations** command after installing. If you previously copied the plugin
 into `~/.config/opencode/plugins/opencode-tavily-quota/`, remove that copy so it
 is not loaded twice.
 
@@ -72,10 +77,46 @@ cannot bypass the 65-second minimum or an active rate-limit cooldown.
 
 ## Configuration
 
-Options go on the plugin entry in `cli.json` or `opencode.json`:
+Display options and `refreshMs` go on the terminal plugin entry in
+`~/.config/opencode/cli.json`. Keep the plugin installed in `opencode.json(c)`
+as well so its server RPC is available. OpenCode 2.2.5 does not forward server
+plugin options to the automatically loaded TUI half; a matching CLI entry
+supplies its options without rendering a second sidebar section.
 
 ```json
 {
+  "$schema": "https://opencode.ai/v2/cli.json",
+  "plugins": [
+    {
+      "package": "opencode-tavily-quota",
+      "options": {
+        "colors": {
+          "enabled": true,
+          "warningBelow": 50,
+          "lowBelow": 20
+        },
+        "evenUse": false
+      }
+    }
+  ]
+}
+```
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `apiKey` | unset | Server-only option in `opencode.json(c)`. `{file:...}` and `{env:...}` are expanded by the plugin, so the raw key can stay out of the file. |
+| `refreshMs` | `600000` | How often to refresh, in milliseconds. Values below `60000` or above the 32-bit timer maximum fall back to the default. Tavily allows 10 requests per 10 minutes, so keep this at or above `600000`. |
+| `colors.enabled` | `true` | Color the bar fill and percentage green, yellow, or red. Set to `false` for a monochrome line. |
+| `colors.warningBelow` | `50` | Percentage remaining below which the line turns yellow. Must be a number from `0` to `100`. |
+| `colors.lowBelow` | `20` | Percentage remaining below which the line turns red. Must be a number from `0` to `100` and no higher than `warningBelow`. |
+| `evenUse` | `false` | Show the `┃` even-use mark in the bar. |
+
+If you need a plugin-specific key instead of OpenCode's saved Tavily connection,
+set `apiKey` on the **server** entry in `opencode.json(c)`, not `cli.json`:
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
   "plugins": [
     {
       "package": "opencode-tavily-quota",
@@ -87,10 +128,17 @@ Options go on the plugin entry in `cli.json` or `opencode.json`:
 }
 ```
 
-| Option | Default | Description |
-| --- | --- | --- |
-| `apiKey` | unset | Tavily API key, read by the OpenCode server. `{file:...}` and `{env:...}` are expanded by the plugin, so the raw key can stay out of the file. |
-| `refreshMs` | `600000` | How often to refresh, in milliseconds. Values below `60000` or above the 32-bit timer maximum fall back to the default. Tavily allows 10 requests per 10 minutes, so keep this at or above `600000`. |
+The color bands are green at or above `warningBelow`, yellow from `lowBelow` up
+to but not including `warningBelow`, and red below `lowBelow`. Invalid threshold
+settings fall back to the default `50`/`20` pair without hiding the quota.
+
+When `colors.enabled` is `false`, the whole line uses the theme's normal muted
+monochrome text; the `┃` marker stays visible through its distinct glyph.
+
+After changing any display option, run OpenCode's **Reload Configurations**
+command. A full OpenCode restart is not required. A full configuration reload
+can also refresh quota through OpenCode's existing integration/refresh lifecycle;
+normal cache and rate-limit protections remain in effect.
 
 `{file:PATH}` reads a file's trimmed contents; `~/` expands to your home
 directory. `{env:NAME}` reads an environment variable. A missing or unreadable
@@ -115,6 +163,10 @@ server's Tavily connection, install the plugin on the server as well.
 - Tavily resets credits on the first day of each month. The API does not report
   the exact reset time, so the countdown assumes `00:00 UTC` and may differ from
   your local reset by a few hours.
+- The `┃` mark shows where even use would leave the quota at the current point
+  in the UTC month. A mark to the right of the fill means you are using quota
+  faster than an even pace; a mark inside the fill means you have more quota
+  left than an even pace.
 - Only quota numbers are sent back to the terminal; the API key stays with the
   code that talks to Tavily.
 - The server caches the last snapshot for up to five minutes, enforces a
@@ -136,8 +188,10 @@ server's Tavily connection, install the plugin on the server as well.
 
 Source lives in `index.ts` (OpenCode server), `quota-cache.ts` (shared cache,
 inter-process locking and rate-limit backoff), `refresh.ts` (TUI refresh policy),
-`usage.ts` (Tavily client and formatting), and `tui.tsx` (sidebar and command). Run `npm install`,
-`npm test`, `npm run typecheck`, and `npm run build`.
+`usage.ts` (Tavily client and formatting), `display.ts` (display settings, levels,
+even-use math and line composition), and `tui.tsx` (sidebar and command). Tests
+live in `tests/`. Run `npm install`, `npm test`, `npm run typecheck`, and
+`npm run build`.
 
 Tests use sandboxed cache directories and mocked HTTP, including the
 separate-process regressions. They do not need Tavily credentials or a browser.

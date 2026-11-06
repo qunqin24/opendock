@@ -72,14 +72,14 @@ Memory and tasks stay on your devices; devices sync directly.
 <table width="100%">
   <thead>
     <tr>
-      <th align="left" width="30%">Desktop app · v0.3.0</th>
+      <th align="left" width="30%">Desktop app · v0.3.2</th>
       <th align="left">Download &amp; first launch</th>
     </tr>
   </thead>
   <tbody>
     <tr>
       <td><strong>Unsigned release</strong><br><sub>macOS Universal · Windows x64 · Linux x64</sub></td>
-      <td><a href="https://github.com/Windsander/Mebular/releases/tag/v0.3.0">Download from GitHub Releases</a><br><sub>Verify with <code>SHA256SUMS.txt</code>. macOS: right-click → <strong>Open</strong>. Windows: <strong>More info → Run anyway</strong>. Bundles Electron and its runtime.</sub></td>
+      <td><a href="https://github.com/Windsander/Mebular/releases/tag/v0.3.2">Download from GitHub Releases</a><br><sub>Verify with <code>SHA256SUMS.txt</code>. macOS: right-click → <strong>Open</strong>. Windows: <strong>More info → Run anyway</strong>. Bundles Electron and its runtime.</sub></td>
     </tr>
   </tbody>
 </table>
@@ -146,7 +146,7 @@ mebular print-config --client opencode         # MCP config
 
 <p align="center"><strong>Use with DSH</strong><br>
 Install the plugin from npm into DSH's web profile:<br>
-<code>dsh plugin --profile web add @mebular/dsh-plugin@0.3.0</code><br>
+<code>dsh plugin --profile web add @mebular/dsh-plugin@0.3.2</code><br>
 The App and the DSH Plugin are two equal entries to one local Mebular runtime: the plugin defaults to <code>attach</code> and connects to an existing App/CLI/service without starting or downloading anything. If no runtime exists, the panel explicitly offers a pinned shared-runtime install. The sidebar panel embeds the same Console through <code>?embed=dsh</code> (loopback only), and the official MCP client reaches the same graph. The plugin is an independent adapter with its code isolated in <code>packages/dsh-plugin</code>; it is published by its own npm job, while its version follows the unified release train. For plugin development, install from <code>packages/dsh-plugin</code> instead.<br>
 Listed on <a href="https://github.com/awesome-dsh-plugin/awesome-dsh-plugin">awesome-dsh-plugin</a> under <code>memory</code>.<br>
 <a href="packages/dsh-plugin/README_EN.md">DSH plugin guide →</a> · <a href="docs/integrations/DSH.md">Integration notes →</a></p>
@@ -183,6 +183,6 @@ Runnable examples: [`examples/quickstart`](examples/quickstart/index.mjs) writes
 
 <div align="center">
 
-v0.3.0 · early · MIT · © 2026 Sobert Li
+v0.3.2 · early · MIT · © 2026 Sobert Li
 
 </div>

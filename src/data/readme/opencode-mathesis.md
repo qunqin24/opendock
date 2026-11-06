@@ -172,6 +172,32 @@ in `apiKeyEnv` and is never stored. Your audio (and, for speech, the question te
 - opencode's own voice feature (realtime voice sessions with OpenAI, xAI or Google) is cloud-only and not available to
   the TUI, so Mathesis does not use it.
 
+## Desktop app (experimental)
+
+Mathesis also runs in the [opencode Desktop app](https://opencode.ai), where it isn't limited by the terminal. It needs
+no extra setup: Desktop loads the plugin from `opencode.jsonc`, so keep `opencode-mathesis` in `plugins` there. It does
+not load in the browser UI of `opencode serve`.
+
+- **Plan map:** a drawn map with a progress bar, coloured by what you have learned, what is due and where you are.
+- **Questions** open by themselves in a side tab, so you can read the chat while you answer. Math renders. Leaving the
+  tab keeps your draft; **Skip** drops the question.
+- **Speak** into the answer or the thinking, and edit the text afterwards. It needs `voice.stt` in the plugin options in
+  `opencode.jsonc` (not only in `cli.json`), and the app needs microphone access.
+- **Commands:** `/learn`, `/recall`, `/practice`, `/mathesis`, `/mathesis-setup`, and a due count above the composer.
+
+| Keys | Action |
+| --- | --- |
+| `⌘⌥V` | Start or stop dictation in the field the cursor is in |
+| `⌘⌥Z` | Remove the last dictation |
+| `⌘⇧M` | Toggle the panel; with a question open, flip between it and the plan |
+
+Change them in Settings > Shortcuts. `ctrl+x` keys are TUI-only: Desktop has no leader key.
+
+Limits for now: read-aloud is TUI-only. `/learn` from an empty tab starts in the server's default folder, so start it
+from a session in the project you want. Desktop and the TUI share one background service: Desktop answers only for
+sessions open in it, so a session open in both goes to whichever claims the question first. This uses opencode's
+experimental GUI plugin API, which can change between releases; tested with Desktop 2.2.5.
+
 ## The vault
 
 ```

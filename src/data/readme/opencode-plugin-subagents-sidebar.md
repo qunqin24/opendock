@@ -13,8 +13,30 @@ open its session without losing sight of the rest of the session tree.
 [Compatibility](docs/compatibility.md) · [Contributing](CONTRIBUTING.md) ·
 [Report a bug](https://github.com/andy-takker/opencode-plugin-subagents-sidebar/issues/new?template=bug_report.yml)
 
-**GitHub release: [v0.2.1](https://github.com/andy-takker/opencode-plugin-subagents-sidebar/releases/tag/v0.2.1).**
-See [installation](#installation) for archive and npm distribution details.
+**Available on [npm](https://www.npmjs.com/package/opencode-plugin-subagents-sidebar/v/0.2.1) and as a [GitHub release](https://github.com/andy-takker/opencode-plugin-subagents-sidebar/releases/tag/v0.2.1).**
+
+## Quick start
+
+Tested with **OpenCode V2 2.2.5**. Back up `~/.config/opencode/cli.json`
+(or `$XDG_CONFIG_HOME/opencode/cli.json`) and append
+`"opencode-plugin-subagents-sidebar@0.2.1"` to its existing `plugins` array:
+
+```json
+{
+  "$schema": "https://opencode.ai/v2/cli.json",
+  "plugins": ["opencode-plugin-subagents-sidebar@0.2.1"],
+  "session": { "sidebar": "auto" }
+}
+```
+
+Merge these values with your settings; preserve other plugins. If you already
+use a local copy of this plugin, replace that entry rather than enabling both.
+This is a **TUI-only plugin**: configure it in `cli.json`, not `opencode.json`.
+
+Use `/reload` if the section does not appear after saving. Open a session and
+expand **Subagents**, or run `/subagents` to search tasks even with the sidebar
+hidden. An empty tree shows `No subagents`. See [installation](#installation)
+for archive and source-checkout alternatives.
 
 ## Demo
 
@@ -212,12 +234,10 @@ sidebar to appear. Expand `Subagents` to see the list, or `No subagents` when em
 
 ### npm installation
 
-Check [npm](https://www.npmjs.com/package/opencode-plugin-subagents-sidebar) for
-registry availability; GitHub releases and npm publications are separate steps.
-When `0.2.1` is available, add `"opencode-plugin-subagents-sidebar@0.2.1"` to the
-same `cli.json` array instead of the local path. Do not add both entries.
-If it is not available in the registry yet, use the GitHub archive above.
-This is a TUI-only plugin; it does not go in the server's `opencode.json`.
+Version **0.2.1 is published and verified by npm-name loading in OpenCode 2.2.5
+on macOS arm64**. Follow [Quick start](#quick-start) to add the pinned package
+name to `cli.json`. OpenCode resolves the package; a separate `npm install` in
+your project is not needed. Do not enable both the npm package and a local copy.
 
 Version 0.2.0's raw TSX fails when installed by npm name in OpenCode 2.2.5
 (`Cannot find package 'react'`). Use 0.2.1's precompiled package; installing React

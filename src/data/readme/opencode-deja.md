@@ -67,6 +67,7 @@ Prefer a browser? `deja view` exports the store — sessions, the recall audit t
 - **Survives compaction.** Over 43 measured compactions, summaries kept 77% of decisions and 0.2% of commands; deja hands back the rest ([how](docs/compaction.md)).
 - **Indexes code changes, not just chat.** Tracks opened files, commands with exit codes, and exact `Edit` spans (`deja blame <file>:<line>`, `deja restore <path>`).
 - **Tracks decision lifecycle & staleness.** `deja promote <id> --state rejected` marks a reverted approach so later hits warn why it was dropped (`--state accepted` takes the mark back), and hits report when files touched by a session have changed since.
+- **Travels with the repository.** `deja repo add` commits the decisions and dead ends you pick into `.deja/memory.jsonl`; a teammate's agent recalls them after a clone ([repo memory](#memory-in-the-repository)).
 - **Local and private by default.** Zero LLM calls, no cloud account, and automatic credential redaction at index time ([privacy](#privacy)).
 
 ### Your own work, wrapped
@@ -139,6 +140,29 @@ Install also writes user-level guidance for the harnesses it detects: Claude Cod
 
 </details>
 
+## Memory in the repository
+
+Sync moves history between your own machines. To hand the people you work with the
+few things your agents learned the hard way, put them in the repository:
+
+```text
+$ deja repo candidates
+4cd7e7bb9c rejected Reverted the retry with jitter: it broke idempotency because the sender re-signs each attempt with a new delivery id.  (session s1, claude 2026-08-03)
+$ deja repo add 4cd7e7bb9c
+added 1 entry to .deja/memory.jsonl
+nothing is committed: review with `git diff .deja/` and commit it like code
+```
+
+Candidates come from this project's history in every agent: promoted and remembered
+notes, reversals reported in a session, and what sessions settled. Nothing is written
+until you pick, every entry is redacted on the way in, and one that still matches a secret
+rule is refused. The file is JSON lines sorted by a content hash, with a
+`merge=union` attribute beside it, so parallel additions merge; deleting a line removes
+an entry. After a clone, the entries come back at session start and in recall, in any agent
+deja is wired into, marked as from the repository and framed as untrusted like the rest.
+`{"activations":{"auto":{"repo":false}}}` in the trust policy keeps them out of the hooks.
+[More](https://vshulcz.github.io/deja-vu/guide/repo-memory.html).
+
 ## Privacy
 
 Indexing and search are local. The network is used only by `deja update`, `deja sync ssh`,
@@ -181,6 +205,8 @@ $ deja "jwt refresh token"
 | `deja` | In a terminal, the full-screen search above. `deja brief` prints the text summary instead: today's sessions, what deja served, recent work and a search to try. |
 | `deja wip` | What the last session in this directory was doing: the task, what it settled, the files in flight, the last command and whether it failed — derived from the transcript, not from a note someone remembered to write. |
 | `deja blame <path>[:line]` | Which sessions discussed a file, what was decided, and why. With a line: the commit that last changed it, and the session that wrote that line or the text the commit replaced. `--attribution` prints the line answer alone, as JSON with `--json`, and `--git-note` records it in `refs/notes/deja`. |
+| `deja origin [rev\|range]` | Which session and user turn produced a commit or commit range, matched against recorded edit spans (`attributed`, `uncertain`, or `unknown`). |
+| `deja review [rev\|range]` | Prior sessions and settled notes (`.deja/notes.jsonl` and personal notes) for the files changed in a working-tree diff, commit, or range. |
 | `deja files <topic>` | The other direction: which files the work on a subject actually touched. |
 | `deja how <tool>` | How this machine actually runs a thing, with the real flags, from what agents ran before. |
 | `deja fix <error>` | What this machine ran after that same error before, when the error did not come back. Never a merge, a force push or a deletion. |
@@ -201,7 +227,7 @@ as usual. `deja search <query>` skips the suggestion.
 | `deja recall <words>` | The page the MCP recall tool gives an agent: about 4 KB, this project first (`DEJA_RECALL_GLOBAL=1` ranks every project the same). For skills and scripts that run deja through the shell. |
 | `deja resume <id>` | Reopen a found session in its native harness. `--app` opens a Codex session in the ChatGPT desktop app. |
 | `deja restore <path>` | Hand back a span an agent replaced, from the `old_string` its edit recorded. Never writes over the original. |
-| `deja promote <id>` | Distill a session into a curated note with provenance, tags and a lifecycle state. Notes outrank raw transcripts. |
+| `deja promote <id>` | Distill a session into a curated note with provenance, tags and a lifecycle state (`--repo` writes to `<repo>/.deja/notes.jsonl` for the team). Notes outrank raw transcripts. |
 | `deja share <id>` | A sanitized session digest for a colleague, with secrets already scrubbed. |
 
 **Move it and check it**
@@ -209,11 +235,12 @@ as usual. `deja search <query>` skips the suggestion.
 | Command | What it does |
 | --- | --- |
 | `deja sync export/import/ssh` | Move memory between machines. Watermarked, append-only, idempotent. |
+| `deja repo candidates`, `deja repo add <id>` | Move memory between people: write the decisions and dropped approaches you pick into the repository's `.deja/memory.jsonl`, redacted, for review and commit. Whoever clones it gets them in recall. |
 | `deja view` | Your whole memory as one local HTML file ([live demo](https://vshulcz.github.io/deja-vu/view/)). No server, and the file never leaves the machine. |
 | `deja stats` | Your agent work, wrapped. `--card` draws it in the terminal, `--card <file>.svg` writes one for a profile, `--html` a browsable timeline. |
 | `deja secrets [--scrub]` | Which sessions' source transcripts carry credentials, and what kind. Never prints a value. `--scrub` rewrites the ones it can, original kept beside the file. |
 | `deja rules [sync]` | Keep your standing rules in `~/.config/deja/rules.md`; `sync` copies them as a marked block into every installed agent's global rules file. |
-| `deja rules candidates [--json] [--limit n] [--since 90d]` | The turns where you corrected an agent, across every tool, numbered with their session. Ask your agent to suggest rules and it groups them; nothing is written until you pick. |
+| `deja rules candidates [--json] [--limit n] [--since 90d] [--project name] [--repo]` | The turns where you corrected an agent, across every tool (or scoped to `--repo` / `--project`), numbered with their session. Ask your agent to suggest rules and it groups them; nothing is written until you pick. |
 | `deja doctor [--deep]` | Self-diagnosis, and with `--deep`, proof of the index against the sources. |
 | `deja mcp` | The stdio MCP server, which is what `deja install` wires in. |
 
@@ -250,7 +277,7 @@ whether or not the tool is called.
 | `fix` | the failing output, verbatim | `limit?` | What this machine ran, or changed, after that same error before. |
 | `how` | the tool or target, e.g. `go test` | `project?`, `limit?` | The real invocation, from what agents ran here. |
 | `orient` | nothing — it asks about the project | `project?`, `limit?` | The commands past sessions ran here and the files they worked in. |
-| `remember` | one durable fact or decision | `project?`, `tags?` | Stores a durable decision for later recall. |
+| `remember` | one durable fact or decision | `project?`, `tags?` | Stores a durable decision for later recall. `project` `repo:` (or `repo:rejected`, `repo:gotcha`) writes it into this repository's `.deja/memory.jsonl` instead, uncommitted. |
 | `handoff` | a session id or harness name; empty for the newest session here | `harness?` | Another session's goal, standing instructions, latest conclusions, passed checks and where it stopped, to continue it. |
 
 </details>

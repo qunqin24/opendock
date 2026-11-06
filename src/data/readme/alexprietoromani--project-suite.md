@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.6.6-111111?style=flat-square" alt="Version">
+  <img src="https://img.shields.io/badge/version-1.7.0-111111?style=flat-square" alt="Version">
   <img src="https://img.shields.io/badge/works%20with-Claude%20Code%20%7C%20opencode%20%7C%20Antigravity-111111?style=flat-square" alt="Works with Claude Code, opencode and Antigravity">
   <img src="https://img.shields.io/badge/skills-22-111111?style=flat-square" alt="22 skills">
   <img src="https://img.shields.io/badge/commands-6-111111?style=flat-square" alt="6 commands">
@@ -150,11 +150,23 @@ It asks at install time: default documentation language (`es | en`) and whether 
 
 ### opencode
 
-**From npm (recommended):**
+project-suite ships a **dual-contract plugin**: it loads natively in BOTH **OpenCode v2** and **OpenCode v1** — same package, no extra config.
+
+**OpenCode v2:**
+
+```json
+{ "plugins": ["@alexprietoromani/project-suite"] }
+```
+
+in `opencode.json` (or `cli.json`), or from the CLI: `opencode plugin add @alexprietoromani/project-suite`.
+
+**OpenCode v1:**
 
 ```json
 { "plugin": ["@alexprietoromani/project-suite"] }
 ```
+
+One default export (`.opencode/plugins/project-suite.mjs`) serves both APIs: v2 reads `id` + `setup(ctx)` (skill/command transforms via `ctx.skill.transform` / `ctx.command.transform`, session hooks via `ctx.session.hook('context' | 'compaction')` that inject the ambient mode reminder), v1 calls `server()`.
 
 **From a local checkout:**
 
@@ -162,10 +174,12 @@ The repo ships a tree generated from the same source:
 
 - `.opencode/skills/` — the 22 skills (native opencode SKILL.md)
 - `.opencode/command/` — `/init`, `/nueva-fase`, `/modo`, `/track`, `/fase`, `/review`, `/audit`, `/help`
-- `.opencode/plugins/project-suite.mjs` — plugin that registers commands, skills and the system prompt
+- `.opencode/plugins/project-suite.mjs` — the dual-contract plugin (v1 `server()` + v2 `setup(ctx)`)
+- `.opencode/plugins/index.js` — autodiscovery entrypoint for OpenCode v2 (re-exports the plugin; v2 discovers local plugins by convention without any JSON registration)
+- `.opencode/plugins/project-suite-frontmatter.cjs` — standalone CJS frontmatter parser (CRLF + YAML block scalars) used by the `.mjs`
 - `opencode.json` — registers the plugin; no MCP servers (see [MCP servers](#mcp-servers))
 
-Open opencode inside the repo (it reads `.opencode/` + `opencode.json`), or copy `.opencode/*` to `~/.config/opencode/` and merge the `mcp` block.
+Open opencode inside the repo (it reads `.opencode/` + `opencode.json`), or copy `.opencode/*` to `~/.config/opencode/` — there, autodiscovery works through `index.js`, no edit needed.
 
 > `.opencode/` and `opencode.json` are **generated**, do not edit them by hand. After touching `skills/`, `commands/` or `.mcp.json`: `python scripts/sync_opencode.py`. Verify with `python scripts/validate_plugin.py`.
 
@@ -247,7 +261,7 @@ If the package is private, use an internal registry and change `publishConfig.ac
 | Agent | Status | Installation |
 |---|---|---|
 | Claude Code | ✅ | `/plugin marketplace add AlexPrietoRomani/project-suite` |
-| opencode | ✅ | `{ "plugin": ["@alexprietoromani/project-suite"] }` |
+| opencode | ✅ | v2: `{ "plugins": [...] }` in `opencode.json`/`cli.json` or `opencode plugin add`; v1: `{ "plugin": [...] }` |
 | Antigravity CLI | ✅ | `agy plugin install https://github.com/AlexPrietoRomani/project-suite` |
 | Gemini CLI | ⚠️ Legacy (enterprise / API keys) | `gemini extensions install https://github.com/AlexPrietoRomani/project-suite` |
 | Codex | 🔜 Coming soon | Requires `.codex-plugin/` |

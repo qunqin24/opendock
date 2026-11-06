@@ -167,6 +167,87 @@ All options go under the plugin entry's `options`:
 | `digest.maxChars` | `1200` | digest cap |
 | `logDecisions` | `true` | log decisions to plugin storage |
 | `omoslimPath` / `omoslimPreset` | auto | override OMO-Slim config path / active preset |
+| `budget.enabled` | `true` | plan-aware picking (skip models that are out of allowance) |
+| `budget.plan` | `"go"` | `"go"` \| `"go-plus"` \| `"go-teams"` — sets each model's monthly allowance |
+| `budget.floorUsd` | `0.5` | skip a model when less than this much USD is left this month |
+| `budget.floorPct` | `3` | …or when less than this % of its monthly cap is left |
+| `budget.windowAware` | `true` | also honour the 5-hour (20%) and weekly (50%) caps |
+| `budget.capacityAware` | `true` | measure room in *tasks* (a model must be able to absorb another task this size) |
+| `budget.minTasks` | `1` | reserve: how many more such tasks a model must be able to absorb |
+
+## 💸 Plan-aware picking (OpenCode Go)
+
+Subscriptions like OpenCode Go meter **per model**: each family gets its own
+monthly dollar allowance, with 5-hour and weekly caps at 20% and 50% of that
+number. A “best” model that just ran dry is worse than the second-best model
+that still has room — exactly the situation where a delegation hangs and you
+find out at the worst moment.
+
+With `budget` enabled the picker reads that picture before it chooses:
+
+- **Allowances** come from the built-in Go / Go Plus / Go Teams tables
+  (per-model monthly USD caps and token prices).
+- **Usage** is read live from OpenCode's own session database — one
+  read-only aggregate per model, ~120 ms on a 400 MB DB, cached for a minute.
+- **Saturated models are withheld** from the candidate set (and logged), so
+  Jev never picks a bucket that cannot absorb the task. If *everything* is
+  saturated, all candidates are offered anyway — a starved pick still beats
+  falling back to an equally exhausted model — and the questions say so.
+- Candidates that remain carry their remaining budget in the picker's criteria
+  (`"$42.30/$60 left this month"`), so the decision model can weigh it.
+- The transcript footer shows the pick's remaining allowance, and
+  `/jev_status` lists every model's usage for the period.
+
+### Capacity-aware allocation
+
+A dollar of allowance is not worth the same on every model. Your Go sheet
+makes it concrete — how many tokens a month's allowance actually *buys*:
+
+| model | monthly cap | $/MTok in | **input tokens bought** |
+| --- | --- | --- | --- |
+| Muse Spark 1.3 | $60 | $0.10 | **600 M** |
+| DeepSeek V4.1 Flash | $100 | $0.15 | 667 M |
+| GLM-5.3-Flash | $60 | $0.15 | 400 M |
+| GLM-5.2 | $60 | $1.40 | 43 M |
+| Gemini 4 Argon | $30 | $2.00 | 15 M (7.5 M after the Nov 30 discount) |
+| Kimi K3 | $15 | $3.00 | 5 M |
+
+So the picker does not just ask "is this model exhausted" — it asks
+**"can this model absorb a task of this size?"**:
+
+1. **Per-lane demand** is measured from your own session database: the average
+   input / output / cached-read tokens a `fixer`, `explorer`, `oracle`… task
+   really costs. Cached reads dominate real agent traffic, so cost per task
+   tracks the cached-read price, not the headline input price.
+2. Each candidate gets a **tasks-left** estimate for that lane
+   (`~41 tasks left`, `cannot absorb another task`), shown in the picker's
+   criteria next to the remaining dollars.
+3. Candidates that cannot absorb another such task are withheld (and logged),
+   so expensive low-capacity models stay available for work that needs them,
+   while cheap deep buckets take everything else.
+4. The picker is also told, in its instructions, to spend premium models only
+   on work that clearly demands them.
+
+```jsonc
+"budget": {
+  "enabled": true, "plan": "go",
+  "floorUsd": 0.5, "floorPct": 3, "windowAware": true,
+  "capacityAware": true, "minTasks": 1
+}
+```
+
+`capacityAware: false` falls back to the pure dollar-floor rule. Raising
+`minTasks` keeps a reserve (e.g. only offer a model that can absorb 3 more
+tasks of this size).
+
+`/jev-plan` in the TUI switches the plan and floor at runtime without editing
+JSON (it lands in the shared bridge state, same as the model allow-list).
+
+**Accuracy note:** the session database stores cumulative per-session totals,
+so a long-lived session is charged to the current period in full. That makes
+the estimator deliberately pessimistic for long-lived sessions — which is the
+right bias for this feature, since those are exactly the sessions where a user
+runs out quickly without noticing. Set `budget.enabled: false` to disable.
 
 ## 🔌 Backends
 

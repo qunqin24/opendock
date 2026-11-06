@@ -29,6 +29,7 @@ subscription and makes its requests. The packages work in OpenCode and in
 | [kimi-work](packages/kimi-work) | Ordinary Kimi desktop Work subscription, through the desktop app's local sign-in; separate from Kimi Code | `kimi-work` |
 | [kiro](packages/kiro) | Kiro (Free, Pro, Pro+, Power), with Kiro's sign-in, kiro-cli's or the IDE's, or an API key | `kiro` |
 | [loomy](packages/loomy) | iFlytek's Loomy (loomyad.xunfei.cn), with SMS sign-in | `loomy` |
+| [mclaw](packages/mclaw) | China Mobile Cloud's MClaw agent (ai.yun.139.com), with a browser sign-in that harvests the ticket and auto-fetches the llm key: live models with token multipliers, aitokens pool usage, auto renewal (unofficial) | `mclaw` |
 | [minimax](packages/minimax) | MiniMax Code (China): account credits and M Plan, with MiniMax Code's device sign-in | `minimax-code` |
 | [minimax](packages/minimax) | MiniMax Code (international): account credits and M Plan, with MiniMax Code's device sign-in | `minimax-code-global` |
 | [mimo](packages/mimo) | Xiaomi MiMo, with a Xiaomi account | `mimo-app` |
@@ -57,7 +58,7 @@ These packages aren't OpenCode plugins. magpie runs them in its gateway, on the 
 | [model-map](packages/model-map) | New API's 模型重定向 (`model_mapping`): send a model under another name, by name or `/pattern/`; replies name the model asked for |
 | [system-prompt](packages/system-prompt) | Your own system prompt on every request, or on some agents' or models', in each API's own place |
 | [word-guard](packages/word-guard) | New API's 敏感词过滤: turn away or mask words and patterns in what users send, and in replies |
-| [think-tags](packages/think-tags) | Take `<think>…</think>` out of a reply's text, or put a Chat reply's `reasoning_content` into it (`thinking_to_content`) |
+| [think-tags](packages/think-tags) | Take a leading `<think>`, `<thinking>` or `<thought>` block out of a reply's text, or put a Chat reply's `reasoning_content` into it (`thinking_to_content`) |
 | [antigravity-cloak](packages/antigravity-cloak) | Claude Code and Claude Desktop on Antigravity: break the words Antigravity turns their system prompt away for, in what Antigravity alone is sent |
 | [codex-history](packages/codex-history) | Opt-in Responses history compatibility after switching providers: remove historical ciphertext and optional item IDs while preserving readable content and tool-call pairing |
 | [history-trim](packages/history-trim) | Send a request's history smaller: fold a run of blank lines, drop a system prompt written twice and a message repeated right after itself, and cut a past tool result longer than `maxToolLength` at a word boundary |
@@ -121,7 +122,7 @@ A tools package can also give magpie a web search API. It is listed in Settings 
 
 | Package | Search APIs |
 |---|---|
-| [magpie-websearch](https://github.com/guotree/magpie-websearch) | AnySearch, Keenable, Linkup, Metaso, Parallel, Querit and TinyFish; published as `@guotree/magpie-websearch` and maintained in its own repository |
+| [magpie-websearch](https://github.com/guotree/magpie-websearch) | AnySearch, Bocha, Jina, Kagi, Keenable, Linkup, Metaso, Moonshot, Moonshot CN, Ollama, Parallel, Perplexity, Querit, SerpApi, Serper, StepFun, TinyFish, Z.ai and Zhipu; published as `@guotree/magpie-websearch` and maintained in its own repository |
 
 Install magpie-websearch:
 

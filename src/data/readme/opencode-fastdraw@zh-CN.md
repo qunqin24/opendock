@@ -131,6 +131,7 @@ pip install "aihr[vision]"
 - **发布这两个包的维护者**仍需要 npm 本身；建议用户级前缀（`npm config set prefix ~/.npm-global`，用 nvm 则跳过），让 `npm login`/`npm publish` 永远不需要 sudo。
 
 安全模型与信任假设：docs/PLUGIN_SECURITY.md
+发布流程（维护者）：docs/PUSH.md —— 已发布版本的撤回与废弃：docs/RELEASE-ROLLBACK.md
 
 从本仓库源码安装（source/editable）同样支持：
 

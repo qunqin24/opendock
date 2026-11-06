@@ -31,7 +31,7 @@ Open Code War **never collects prompt content.** It only counts the number of su
 | Prompt **character count** (a single integer) | Email · real name or other PII |
 | **Agent type** used (Claude Code·Codex etc., a single label) | Raw IP storage |
 | (server-side) request country `cf.country` | |
-| **Barracks chat · guestbook** — text you write yourself for others to read | Prompts · tool calls · commands · file paths (never part of the work status either) |
+| **Barracks chat · guestbook · sign** — text you write yourself for others to read | Prompts · tool calls · commands · file paths (never part of the work status either) |
 | **Barracks work status** — a single `working` / `idle` value | |
 
 > Even though the hook receives the raw prompt, it **computes only the character count and sends that — never the text.** It runs **fail-open** (short timeout + background fire-and-forget) so it never blocks or slows down your agent, even if the network fails.
@@ -41,7 +41,8 @@ Open Code War **never collects prompt content.** It only counts the number of su
 - **Chat**: visible to the people in that room. Each room keeps the latest 50 lines, **deleted automatically after 24 hours**.
 - **Guestbook**: visible to everyone who enters that barracks. Each barracks keeps the latest 100 lines, **until the owner clears them (`/space guestbook clear`) or bans the author**.
 - **Visit log**: each barracks keeps nicknames and times from the last 7 days for the owner's "N people dropped by" briefing line.
-- Deleting your account also deletes your barracks' chat, guestbook, visit log and ban list. Guestbook lines you left in someone else's barracks stay until that owner clears them.
+- **Sign**: a 30-character line the owner hangs in their barracks. Visible to everyone who enters, **until the owner takes it down (`/space sign clear`) or deletes the account**.
+- Deleting your account also deletes your barracks' chat, guestbook, sign, visit log and ban list. Guestbook lines you left in someone else's barracks stay until that owner clears them.
 
 ---
 
@@ -185,7 +186,9 @@ Barracks:
 /space ban <nick>        # ban (unban <nick> to lift · bans to list)
 /space close | open      # lock · unlock your barracks
 /space guestbook clear   # clear your guestbook
+/space sign <text> | clear # hang a sign in your barracks (30 chars) · take it down
 /space presence off | on # stop · resume sending your work status
+/space lang ko | en      # change the barracks display language
 ```
 
 The plaza is also on the web at [`/plaza`](https://opencodewar.dev/plaza): sign in to walk and talk, or watch without signing in. In-game text is Korean for now. The terminal client needs Claude Code 2.1.287+ and Node 22+.

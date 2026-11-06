@@ -147,6 +147,8 @@ workspace.sf                                3 conversation(s) · latest: ...
 3. Picking an existing conversation switches and opens that conversation.
 4. Before switching away from the main conversations the first time, the current
    set is parked into `main.sf` so `/session-main` can bring it back.
+5. Switching directly from one library to another first writes everything you
+   typed back into the open library's `.sf` — nothing is dropped.
 
 ```
 /session-load                  # pick from the list
@@ -157,14 +159,14 @@ workspace.sf                                3 conversation(s) · latest: ...
 ### `/session-main`
 
 Switches back to the conversations that were live before a library was opened,
-then opens a new conversation tab so you can keep working immediately.
+then lands you on your most recent conversation so you can keep working immediately.
 
 While a library is open:
 
 1. The live conversations are written **back into** the library, so nothing you
    typed is lost.
 2. The parked main conversations are transplanted back into the live database.
-3. `state.json` is removed; a new conversation tab opens.
+3. `state.json` is removed; the TUI lands on the most recent main conversation.
 
 ```
 /session-main
@@ -179,7 +181,7 @@ All three commands are also available in the command palette.
 | Group | Tables | Touched by a switch? |
 | --- | --- | --- |
 | Configuration | `credential`, `kv`, `permission`, `instruction_*`, `account*`, … | **no** |
-| Conversations | `session_message`, `session_inbox`, `session_pending`, `session_v2`, `project`, `project_directory`, `worktree`, `event` | **yes** |
+| Conversations | `session_v2`, `session_message`, `session_part`, `session_inbox`, `session_share`, `blob`, `blob_ref`, `todo`, `schedule`, `project`, `project_directory`, `worktree`, `event` — restricted to the tables both databases actually have, so upstream schema changes don't break a switch | **yes** |
 | Write counters | `event_sequence` | rebuilt, never emptied |
 
 A switch is therefore not a file swap — it is one transaction that replaces the
@@ -290,7 +292,7 @@ times — one library, many instances.
 write the live conversations back into the open library   (nothing you typed is lost)
 transplant(live ← main.sf)                                restore the main conversations
 delete state.json                                          forget the library
-open a fresh conversation tab
+land on your most recent conversation (or a fresh tab)
 ```
 
 The write-back keeps the library current, so you can leave and return as many
@@ -305,7 +307,10 @@ times as you like.
 ```
 
 `main.sf` is written once, the first time you leave the main conversations. It is
-**the only copy** of them while a library is open, so treat it like a backup.
+**the only copy** of them while a library is open, so treat it like a backup. It
+holds **conversations only** — private tables (`credential`, `kv`, `permission`,
+accounts, instructions) are stripped when it is parked, so your API keys never
+sit in a second plain file.
 
 Files the plugin creates elsewhere:
 
@@ -323,23 +328,20 @@ Deleting the plugin removes the commands, not the data. You end up with:
 - `main.sf` still holding your **original** conversations,
 - `state.json` left behind, now meaningless.
 
-`main.sf` is a valid OpenCode database, so restoring it is a plain file swap.
-**Stop the service first** — replacing a database file under a running service
-is the one thing this plugin avoids.
+`main.sf` holds **only the conversation tables** — credentials and settings are
+stripped when it is parked — so do not restore it with a plain file copy; that
+would log you out of every provider. The easy path is to bring the commands back
+and let the plugin do the restore:
 
 ```sh
-opencode service stop
-
-# keep the current state, whatever it is
-cp ~/.local/share/opencode/opencode.db ~/.local/share/opencode/opencode.db.library
-
-# stale WAL/SHM must go, or they get replayed over the restored file
-rm -f ~/.local/share/opencode/opencode.db-wal ~/.local/share/opencode/opencode.db-shm
-
-cp ~/.local/share/sessions-forever/main.sf ~/.local/share/opencode/opencode.db
-
-opencode service start
+opencode plugin add opencode-sessions-forever   # or: npm install -g opencode-sessions-forever
+opencode                                        # then run /session-main inside
 ```
+
+To do it by hand instead: **stop the service first**, back up `opencode.db`, then
+use `sqlite3` to `ATTACH` `main.sf` and copy the conversation tables listed under
+"How it works" (`DELETE` from the live table, `INSERT … SELECT` from `main.sf`),
+rebuilding `event_sequence` from `MAX(session_message.seq)` per session.
 
 To go the other way — keep the library and discard the old conversations — do
 nothing: the live database already holds them. Copy `opencode.db` somewhere
@@ -355,8 +357,8 @@ These are properties of the design, not bugs:
 - **Tabs from another library stop resolving.** A tab remembers a `sessionID`,
   and that id is not in the database while a different library is open. The tab
   works again after switching back. There is no tab API to close or retarget it.
-- **Don't switch while a conversation is generating.** `session_inbox` and
-  `session_pending` are part of the swap, so an in-flight run loses its queue.
+- **Don't switch while a conversation is generating.** `session_inbox` is part
+  of the swap, so an in-flight run loses its queue.
 - **Only one library is live at a time.** That is what "swap" means; there is no
   merge.
 - Switch operations write to the live database, so keep a backup of
@@ -369,7 +371,8 @@ These are properties of the design, not bugs:
 
 ## Requirements
 
-- OpenCode **v2** with the terminal UI (developed against **2.1.3**).
+- OpenCode **v2** with the terminal UI (developed against **2.1.3**, verified
+  against **2.2.5**; swaps adapt to schema changes dynamically).
 - `bun:sqlite` — bundled with OpenCode, nothing to install.
 - The `opencode` executable — the plugin reuses the running binary through
   `process.execPath`.

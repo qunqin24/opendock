@@ -53,7 +53,7 @@ await tools.utilities.speech_synthesize({ text: "hello", path: "out.wav" })
 - **Weather.** Six tools: geocode, current, daily, hourly, a demand signal and a summary. Every result carries `Weather data by Open-Meteo.com (CC BY 4.0)`. Show it when you present the data. Responses are cached under `~/.cache/opencode-utilities/weather`: a forecast for 30 minutes, a place search for 30 days.
 - **Speech.** `speech_transcribe` reads a PCM16 WAV, mono or stereo, 8–48 kHz, up to 20 MiB and ten minutes. `speech_synthesize` writes a WAV file and returns its path; without `path` it goes under the plugin's state directory and is removed after 7 days.
 
-`utilities_time_now`, `utilities_time_convert` and `utilities_weather_current` are pinned. The model finds the others through the namespace. Three skills cover the same ground: `utilities-time`, `utilities-weather` and `utilities-speech`. Each is offered only while its module is available, so macOS x64, which has no speech engine, has no `utilities-speech`.
+`utilities_time_now`, `utilities_time_convert` and `utilities_weather_current` are pinned. The `utilities` namespace text lists the call of every tool that is registered, with its input keys, so in Code Mode the model can call the others without a search first. Three skills cover the same ground: `utilities-time`, `utilities-weather` and `utilities-speech`. Each is offered only while its module is available, so macOS x64, which has no speech engine, has no `utilities-speech`.
 
 ### Status
 

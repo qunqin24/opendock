@@ -43,9 +43,64 @@ Source and issues: [github.com/aenemo/opencodev2-cursor](https://github.com/aene
    - **Log in with cursor-agent (browser)**. Run `cursor-agent login` first if you have not.
    - **API key**. Paste a key from [cursor.com/settings](https://cursor.com/settings), or set `CURSOR_API_KEY` in your environment.
    - **Cursor account (native OAuth)**. Sign in through the browser. The plugin mints and caches a Cursor user API key for the SDK.
-5. Pick a model from the **Cursor** provider. `Auto-Cursor-Balanced`, `Auto-Cursor-Cost`, and `Auto-Cursor-Intelligence` use Cursor's Auto Router. The list also includes your other Cursor models.
+5. Pick a model from the **Cursor** provider. See [Models and the Thinking menu](#models-and-the-thinking-menu) for how context size, reasoning, and fast mode are chosen.
 
 Install it **once**, in the global config. Do not also copy the plugin into the `plugins` folder under the OpenCode config folder, and do not list it in more than one config file. OpenCode loads that folder automatically, and a second copy fails activation.
+
+## Models and the Thinking menu
+
+Cursor lists every combination of context size, reasoning, thinking, and fast mode as its own model id. The plugin groups those into one picker row per model and context size, and puts the rest in OpenCode's **Thinking** menu (the same menu Claude and other providers use for effort).
+
+**Context size stays on the model.** OpenCode reads the context limit from the model itself, and that limit drives compaction and the token meter. A Thinking-menu choice cannot change it. A family that Cursor offers at two sizes is therefore two rows, each with the size Cursor reports:
+
+- `GPT-5.6 Sol` at 272K and at 1M
+- `Grok 4.7` at 256K and at 500K
+- Claude models at the sizes Cursor lists (200K, 300K, or 1M)
+
+`opencode models` shows the grouped id, for example `cursor/gpt-5.6-sol[context=272k]`, not every combination.
+
+**Reasoning, thinking, and fast are Thinking-menu variants.** Open the menu on a Cursor model and pick one. Names are built from the options that actually differ for that model:
+
+| What Cursor offers | Menu entries |
+| --- | --- |
+| Reasoning only (`low` through `max`, `xhigh`, `extra-high`, `none`, `minimal`) | `low`, `medium`, `high`, … |
+| A fast toggle as well | `medium` and `medium-fast`, `high` and `high-fast`, … |
+| Claude thinking on/off | `medium` and `medium-thinking`, plus `-fast` when speed is also a choice |
+| Fast only (Composer) | `standard` and `fast` |
+
+A parameter that is the same on every variant of a model (for example `cyber=false`) is left out of the name. The plugin still sends it.
+
+**The default is medium, fast off, thinking on** when you leave the menu on `default`. If Cursor marks one variant as its own default, that one is used instead. The three Auto Router rows stay separate models, because each one is a different routing mode rather than an effort level:
+
+- `Auto-Cursor-Balanced`
+- `Auto-Cursor-Cost`
+- `Auto-Cursor-Intelligence`
+
+The raw `auto-smart` and `default` ids are hidden so they do not duplicate those three rows. `cursor/auto` still routes to Balanced.
+
+**Picker labels for Cursor models start with the provider**, for example `Cursor - Claude Opus 5.5`. This is always on. It keeps Cursor's Claude rows apart from the same models offered by another provider, such as Claude Code, which bills a different account. OpenChamber also shows the context size on the model line.
+
+**Label every other provider the same way** with `labelAllProviders`. It is off by default, because it renames models that other plugins publish. With it on, Claude Code's `Opus 5.5` becomes `Claude Code - Opus 5.5`, and OpenCode's own models pick up an `OpenCode -` prefix too.
+
+`opencode plugin add opencodev2-cursor` writes a plain string entry and does not turn the option on. If the entry is already an object, running `plugin add` again replaces it and drops the option. Add it by hand in the global config:
+
+```jsonc
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugins": [
+    { "package": "opencodev2-cursor", "options": { "labelAllProviders": true } }
+  ]
+}
+```
+
+| | Global config file |
+| --- | --- |
+| Windows | `%USERPROFILE%\.config\opencode\opencode.json` |
+| macOS and Linux | `~/.config/opencode/opencode.json` |
+
+A provider you define yourself under `providers` in that file keeps the `name` you wrote. The option does not rename those rows. Put the provider in the name there, for example `"name": "JJS AI - jjs-code"`.
+
+Restart OpenChamber or OpenCode after changing the option so it reloads the model list. The cache at `models.json` keeps the previous list until the next discovery.
 
 ## Updates
 
@@ -78,6 +133,7 @@ Or delete the `opencodev2-cursor` entry from `opencode.json`. Restart afterwards
 - **"Cursor SDK needs Node.js 22.13 or newer".** Install a newer Node, or set `CURSOR_ACP_NODE_BIN` to its path.
 - **"Agent … already has active run".** Send the message again. A new turn cancels the stuck run.
 - **Sign-in with cursor-agent fails.** Run `cursor-agent login` in a terminal, then retry `/connect`.
+- **Still stuck?** Open a [Bug report](https://github.com/aenemo/opencodev2-cursor/issues/new?template=bug_report.yml). It asks for OS, surface, Node version, and sign-in method so install problems can be separated from auth problems. Do not paste API keys or tokens.
 
 ## Where files live
 

@@ -1,10 +1,14 @@
 # magpie-websearch
 
+<p align="center">
+  <img src="assets/magpie-websearch-hero.png" alt="magpie-websearch — One plugin. Many sources." width="100%">
+</p>
+
 [中文说明](README.md) | [English](README.en.md)
 
 为 [magpie](https://usemagpie.ai) 增加的第三方多源网页搜索 API 插件。安装后，这些 API 会出现在 **设置 › 模型 › 网页搜索** 中，由 Magpie 统一管理密钥、启用开关与请求顺序。
 
-当前支持 **AnySearch、Keenable、Linkup、Metaso、Moonshot、Moonshot CN、Parallel、Perplexity、Querit、SerpApi、StepFun、TinyFish、Z.ai、Zhipu**。其中 AnySearch、Keenable、Parallel 和 TinyFish 支持免 Key 匿名访问；其余十家需要 API Key。
+当前支持 **AnySearch、Bocha、Jina、Kagi、Keenable、Linkup、Metaso、Moonshot、Moonshot CN、Ollama、Parallel、Perplexity、Querit、SerpApi、Serper、StepFun、TinyFish、Z.ai、Zhipu**。其中 AnySearch、Keenable、Parallel 和 TinyFish 支持免 Key 匿名访问；其余十五家需要 API Key。
 
 ## 安装
 
@@ -31,14 +35,22 @@ magpie search add magpie-websearch:linkup <key>
 magpie search
 ```
 
-默认注册全部 14 个 API，无需设置插件选项。Magpie 的网页搜索设置决定实际使用哪些 API。
+默认注册全部 19 个 API，无需设置插件选项。Magpie 的网页搜索设置决定实际使用哪些 API。
+
+Magpie v0.1.3062 起，Agent 可在调用 `web_search` 时指定 `count`（1–20，默认 6）；命令行示例：
+
+```sh
+magpie tool web_search "OpenAI API documentation" --count 20
+```
+
+插件未配置数量上限时跟随宿主 `count`，并遵守各供应商限制；所有供应商统一使用可选的 `resultLimit` 或 `*_RESULT_LIMIT` 环境变量设置用户上限。供应商可能返回更少结果，插件不追加请求补足条数。旧选项保留兼容，迁移与数量策略见[技术参考](docs/technical-reference.md#configuration)。
 
 使用官方服务时，将 **Base URL** 留空；自定义地址应填写完整端点，插件不会追加路径。详见[自定义 Base URL](docs/technical-reference.md#custom-base-url)。
 
 如需调整供应商参数，可在 **Plugins → Installed → Options** 配置，或运行：
 
 ```sh
-magpie plugin options magpie-websearch '{"linkup":{"depth":"deep","maxResults":4}}'
+magpie plugin options magpie-websearch '{"linkup":{"depth":"deep","resultLimit":4}}'
 ```
 
 每次命令会替换已保存的完整选项对象，需包含希望保留的所有选项。保存后插件宿主会自动重载。完整参数和注册过滤见[技术参考](docs/technical-reference.md#configuration)。
@@ -48,21 +60,26 @@ magpie plugin options magpie-websearch '{"linkup":{"depth":"deep","maxResults":4
 | 供应商 | Vendor ID | Key 需求 | 主要能力 |
 |---|---|---|---|
 | AnySearch | `magpie-websearch:anysearch` | 可选 | 意图路由、`cn`／`intl` 分区、Markdown／JSON 输出 |
+| Bocha | `magpie-websearch:bocha` | 必填 | 博查中文搜索，默认普通摘要、可选生成摘要与时效筛选 |
+| Jina | `magpie-websearch:jina` | 必填 | Jina Search 专用端点，默认摘要、可选全文正文截断与时效映射 |
+| Kagi | `magpie-websearch:kagi` | 必填 | Kagi Search API 公开 Preview，支持 Lens、时间与地区过滤 |
 | Keenable | `magpie-websearch:keenable` | 可选 | 匿名或带 Key 搜索，支持 `pro`／`realtime` 模式 |
 | Linkup | `magpie-websearch:linkup` | 必填 | 查询相关摘录，支持四档检索深度 |
 | Metaso | `magpie-websearch:metaso` | 必填 | 秘塔搜索，支持网页、论文等搜索范围 |
 | Moonshot | `magpie-websearch:moonshot` | 必填 | 国际站 Basic 网页搜索，默认摘要、可选页面正文 |
 | Moonshot CN | `magpie-websearch:moonshot-cn` | 必填 | 国内站 Basic 网页搜索，默认摘要、可选页面正文 |
+| Ollama | `magpie-websearch:ollama` | 必填 | Ollama 官方云端网页搜索，需账户 API Key，支持本地正文截断 |
 | Parallel | `magpie-websearch:parallel` | 可选 | 匿名 MCP（`fast`）或带 Key REST；最多 20 条 |
 | Perplexity | `magpie-websearch:perplexity` | 必填 | 官方独立 Search API，支持 `web`／`fast` 模式、时效与国家／语言筛选 |
 | Querit | `magpie-websearch:querit` | 必填 | 摘要或句子级匹配内容 |
 | SerpApi | `magpie-websearch:serpapi` | 必填 | Google 自然搜索，支持地区、语言和安全搜索配置 |
+| Serper | `magpie-websearch:serper` | 必填 | Google 自然搜索备用渠道，当前单页 10 条、支持地区语言与 tbs 筛选 |
 | StepFun | `magpie-websearch:stepfun` | 必填 | 阶跃星辰国内站独立 REST 搜索，支持场景偏好、摘要／正文选择 |
 | TinyFish | `magpie-websearch:tinyfish` | 可选 | 匿名 MCP 或带 Key REST；网页、新闻和论文搜索（论文需 Key） |
 | Z.ai | `magpie-websearch:zai` | 必填 | 智谱国际站独立 REST 搜索，使用 `search-prime` |
 | Zhipu | `magpie-websearch:zhipu` | 必填 | 智谱国内站独立 REST 搜索，支持 `search_std`／`search_pro`、搜狗和夸克引擎 |
 
-搜索项在 Magpie 中显示为 `<Provider> (magpie-websearch)`。Vendor ID 保持为 `magpie-websearch:<id>`；插件选项和注册过滤使用 `linkup` 等短 ID。完整支持状态和待评估供应商见 [PROVIDERS.md](PROVIDERS.md)。
+搜索项在 Magpie 中显示为 `<Provider> (magpie-websearch)`。Vendor ID 保持为 `magpie-websearch:<id>`；插件选项和注册过滤使用 `linkup` 等短 ID。完整支持状态与接入规划见 [PROVIDERS.md](PROVIDERS.md)。
 
 ## 隐私与安全
 
@@ -80,7 +97,7 @@ magpie plugin options magpie-websearch '{"linkup":{"depth":"deep","maxResults":4
 | [自定义 Base URL](docs/technical-reference.md#custom-base-url) | 精确端点规则、URL 校验、MCP／REST 切换 |
 | [命令行管理](docs/technical-reference.md#cli) | 添加 API、多个 Key、排序、启停与移除 |
 | [匿名搜索与限流](docs/technical-reference.md#anonymous-search) | 匿名端点、切换访问模式、429 冷却与回退 |
-| [供应商协议](docs/technical-reference.md#parallel-search) | Parallel、[TinyFish](docs/technical-reference.md#tinyfish-search)、[SerpApi](docs/technical-reference.md#serpapi-search)、[Moonshot](docs/technical-reference.md#moonshot-search)、[StepFun](docs/technical-reference.md#stepfun-search)、[Perplexity](docs/technical-reference.md#perplexity-search)、[Zhipu 与 Z.ai](docs/technical-reference.md#zhipu-search) 的端点、能力限制与验证记录 |
+| [供应商协议](docs/technical-reference.md#parallel-search) | Parallel、[TinyFish](docs/technical-reference.md#tinyfish-search)、[SerpApi](docs/technical-reference.md#serpapi-search)、[Moonshot](docs/technical-reference.md#moonshot-search)、[Zhipu 与 Z.ai](docs/technical-reference.md#zhipu-search)、[StepFun](docs/technical-reference.md#stepfun-search)、[Perplexity](docs/technical-reference.md#perplexity-search)、[Bocha](docs/technical-reference.md#bocha-search)、[Ollama](docs/technical-reference.md#ollama-search)、[Jina](docs/technical-reference.md#jina-search)、[Kagi](docs/technical-reference.md#kagi-search)、[Serper](docs/technical-reference.md#serper-search) 的端点、能力限制与验证记录 |
 | [结果处理](docs/technical-reference.md#result-processing) | 结果数、文本清理、日期与错误状态 |
 | [完整配置参考](docs/technical-reference.md#configuration) | 参数表、环境变量、优先级、缓存与超时 |
 | [注册过滤](docs/technical-reference.md#registration-filters) | `enable`／`disable` 的规则与示例 |
@@ -88,7 +105,7 @@ magpie plugin options magpie-websearch '{"linkup":{"depth":"deep","maxResults":4
 
 ## 接入规划
 
-[PROVIDERS.md](PROVIDERS.md#planned) 列出了 Magpie 尚未接入的独立网页搜索 API 候选。仅有同厂商的模型预设或模型内置搜索能力，不构成排除其独立搜索 API 的理由。新增接入前会重新核对 Magpie 官方的搜索支持情况。
+第三批规划的独立网页搜索 API（Jina、Kagi、Serper）现已全部接入；接入规划见 [PROVIDERS.md](PROVIDERS.md#planned)。仅有同厂商的模型预设或模型内置搜索能力，不构成排除其独立搜索 API 的理由。新增接入前会重新核对 Magpie 官方的搜索支持情况。
 
 ## 鸣谢
 

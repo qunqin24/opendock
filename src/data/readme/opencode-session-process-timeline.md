@@ -4,6 +4,14 @@ Show the **operation timeline** of an OpenCode session — shell commands plus `
 
 一个 OpenCode 插件：在一个会话（session）里展示 agent 用 `shell`、`grep`、`read`、`write`、`edit`（及 `glob`）跑过的**操作时间线**，支持 TUI 和 Desktop GUI。
 
+## Screenshots / 截图
+
+The TUI `/procs` panel (left) and the Desktop Timeline panel (right). Every shell / file / search operation is one row with a type badge, a `working → closed` status, and the agent's intent as the headline.
+
+| TUI `/procs` | Desktop Timeline |
+| --- | --- |
+| ![TUI process timeline](docs/tui.svg) | ![Desktop timeline](docs/gui.svg) |
+
 ## Features / 功能
 
 - **One row per operation, with a type marker** — every shell command and every file/search tool call becomes a single timeline row that goes `working` → `closed`, with a type badge (`›` shell, `⌕` grep, `▤` read, `✎` write, `≡` edit, `*` glob). Once closed the duration is fixed.

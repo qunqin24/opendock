@@ -181,6 +181,10 @@ Saved Markdown reports contain the supplied analysis and may include sensitive e
 
 ## Release And Update History
 
+### Unreleased
+
+- Added the OpenCode 2.x plugin entry (`setup`) alongside the V1 `server` entry. On 2.x, transcript evidence comes from the session's model context window, so messages removed by compaction are not included.
+
 ### v0.3.0
 
 - Replaced SQLite lookup and offset listing with OpenCode `1.17.11+` experimental cursor pagination.

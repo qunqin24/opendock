@@ -214,8 +214,9 @@ The default generated configuration includes both `openai` and `opencode-go` pre
 
 Presets can inherit from one base preset with `extends`: a `design` preset can
 extend `base` and override only its designer model. On v2, `/preset` lets you
-apply subagent inference settings to **Current session** or change the
-**Global default**. `/preset <name>` applies the preset to the session you are
+apply subagent inference settings to **Current session**, start an empty
+**New session** bound to a preset, or change the **Global default**.
+`/preset <name>` applies the preset to the session you are
 in — no restart — while manual configuration edits change the default for
 future sessions; existing work and its future subagents retain their saved
 configuration until you explicitly reapply a preset to that session.
@@ -796,7 +797,7 @@ Use this section as a map: start with installation, then jump to features, confi
   <p><sub>Every merged contribution leaves a mark on the realm.</sub></p>
 
   <!-- ALL-CONTRIBUTORS-BADGE:START - Do not remove or modify this section -->
-[![All Contributors](https://img.shields.io/badge/all_contributors-147-orange.svg?style=flat-square)](#contributors-)
+[![All Contributors](https://img.shields.io/badge/all_contributors-148-orange.svg?style=flat-square)](#contributors-)
 <!-- ALL-CONTRIBUTORS-BADGE:END -->
 </div>
 
@@ -1003,6 +1004,7 @@ Use this section as a map: start with installation, then jump to features, confi
       <td align="center" valign="top" width="16.66%"><a href="https://github.com/niheaven"><img src="https://avatars.githubusercontent.com/u/5832170?v=4?s=100" width="100px;" alt="Hsiao-nan Cheung"/><br /><sub><b>Hsiao-nan Cheung</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=niheaven" title="Code">💻</a></td>
       <td align="center" valign="top" width="16.66%"><a href="https://github.com/akrhin"><img src="https://avatars.githubusercontent.com/u/17483152?v=4?s=100" width="100px;" alt="akrhin"/><br /><sub><b>akrhin</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=akrhin" title="Code">💻</a></td>
       <td align="center" valign="top" width="16.66%"><a href="https://github.com/NowOne"><img src="https://avatars.githubusercontent.com/u/843357?v=4?s=100" width="100px;" alt="NowOne"/><br /><sub><b>NowOne</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=NowOne" title="Code">💻</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="https://github.com/wsmajt"><img src="https://avatars.githubusercontent.com/u/70204246?v=4?s=100" width="100px;" alt="Kacper Muszyński"/><br /><sub><b>Kacper Muszyński</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=wsmajt" title="Code">💻</a></td>
     </tr>
   </tbody>
 </table>

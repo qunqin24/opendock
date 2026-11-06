@@ -155,6 +155,7 @@ Manual registration (fallback, config-only): opencode loads plugins **only from 
 - **Maintainers publishing these packages** still need npm itself; a user-level prefix (`npm config set prefix ~/.npm-global`, skip under nvm) keeps `npm login`/`npm publish` sudo-free.
 
 Security model & trust assumptions: docs/PLUGIN_SECURITY.md
+Release procedure (maintainers): docs/PUSH.md — retracting a published release: docs/RELEASE-ROLLBACK.md
 
 Installing from this repository (source/editable) works identically:
 

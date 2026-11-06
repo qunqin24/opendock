@@ -45,13 +45,13 @@
 
 Figma 比較は「あるキャンバス幅での再現」しか見ないため、iPad 縦向き・横向きのような別幅での崩れは見逃します。`layout_integrity` は **Web の Bounding Box だけ**を見て、指定した CSS ビューポートではみ出していないかを判定します。
 
-- **入力:** `web_layout` または `web_layout_path`（`layout_tree` と同じ WebNode JSON）。必須キー欠落・配列内の `null`・空 `selector` は `layout_tree` と同じ文言の入力エラーになり、先頭の UTF-8 BOM（U+FEFF）は除去して受理します。明示的な `w: 0` / `h: 0`（collapsed）は検査対象外のままです。`figma_*`・画像・`threshold` / `min_match` / `pass_rate` / `max_diff_pixels` / `include_aa` / `generate_diff` / `diff_on_mismatch` / `diff_image_content` / `count_extra_web` は非対応です。`max_details` は `layout_tree` と同様に出力上限に使えます（`issues` / `details` を切り詰め、`issue_count` は実件数のまま）。
+- **入力:** `web_layout` または `web_layout_path`（`layout_tree` と同じ WebNode JSON）。必須キー欠落・配列内の `null`・空 `selector` は `layout_tree` と同じ文言の入力エラーになり、先頭の UTF-8 BOM（U+FEFF）は除去して受理します。明示的な `w: 0` / `h: 0`（collapsed）は検査対象外のままです（除外件数は `skipped_zero_geometry` と `details` で分かります）。`figma_*`・画像・`threshold` / `min_match` / `pass_rate` / `max_diff_pixels` / `include_aa` / `generate_diff` / `diff_on_mismatch` / `diff_image_content` / `count_extra_web` は非対応です。`max_details` は `layout_tree` と同様に出力上限に使えます（`issues` / `details` を切り詰め、`issue_count` は実件数のまま）。
 - **既定ビューポート:** 768×1024 CSS px（`viewport_preset` 未指定 = `ipad_portrait`）。
 - **横向き:** `viewport_preset=ipad_landscape`（1024×768）。任意サイズは `viewport_width` / `viewport_height`（0 より大きい値。指定時はプリセットを上書き）。
 - **`viewport_overflow_x`:** `x < 0` または `x+w > viewport_width`（1px の丸めは許容）。ビューポート高さ超えはページスクロールとして扱い、失敗にしません。
 - **`parent_overflow`:** 子ボックスが親ボックスからいずれかの辺で 1px 超えてはみ出す。親が JSON に無い場合、または親の `w`/`h` が 0 以下の場合はこの検査をスキップします（`status` は変えず、前者は `unresolved_parent_refs`、後者は `parent_overflow_skipped_zero_geom` と `details` 要約で可視化）。親キーが無い／解決できない／親がゼロ幾何だけのときは `parent_checked_nodes=0` になり、`details` の要約行に未適用注記が付きます。`ignore_nodes` / `ignore_region` で除外した親でも、親に非ゼロ幾何があれば子の `parent_overflow` は引き続き検査します。
-- **合否:** 崩れ 0 件 → `success` / 1 件以上 → `mismatch` / 検査対象がすべて除外 → `skipped`。Web ノードが 1 件もない、または検査対象がすべて明示的な `w`/`h` = 0 の場合も `mismatch` です（`width`/`height` など必須キー欠落は入力エラーで、この mismatch にはなりません）。`match_rate` は返しません。`success` でも `parent_checked_nodes=0` のときは親はみ出しを検証していないため、DOM キャプチャに正しい `parent` を含めて再実行してください。
-- **応答:** `status`, `mode`, `viewport_width`, `viewport_height`, `checked_nodes`, `parent_checked_nodes`, `issue_count`, `details`, `ignored_count`。崩れがあるとき `issues`（`type` / `selector` / `detail`）。`viewport_preset` を渡したときはエコーします。`ignored_nodes`（`web:<selector>`。件数は `ignored_count` と一致）/ `unmatched_ignores` / `unmatched_ignore_regions` / `unresolved_parent_refs` / `parent_overflow_skipped_zero_geom` は該当時のみ。
+- **合否:** 崩れ 0 件 → `success` / 1 件以上 → `mismatch` / 検査対象がすべて除外 → `skipped`。Web ノードが 1 件もない、または検査対象がすべて明示的な `w`/`h` = 0 の場合も `mismatch` です（`width`/`height` など必須キー欠落は入力エラーで、この mismatch にはなりません）。`match_rate` は返しません。`success` でも `parent_checked_nodes=0` のときは親はみ出しを検証していないため、DOM キャプチャに正しい `parent` を含めて再実行してください。一部ノードだけ `w`/`h` ≤ 0 のときは残りだけで `success` になり得ますが、除外件数は `skipped_zero_geometry` で分かります。
+- **応答:** `status`, `mode`, `viewport_width`, `viewport_height`, `checked_nodes`, `parent_checked_nodes`, `issue_count`, `details`, `ignored_count`。崩れがあるとき `issues`（`type` / `selector` / `detail`）。`viewport_preset` を渡したときはエコーします。`ignored_nodes`（`web:<selector>`。件数は `ignored_count` と一致）/ `unmatched_ignores` / `unmatched_ignore_regions` / `unresolved_parent_refs` / `parent_overflow_skipped_zero_geom` / `skipped_zero_geometry` は該当時のみ。
 
 意図的な横スクロール領域（カルーセル、`overflow-x: auto` の表、マーキーなど）では、スクロールコンテナ自身はビューポート内に収まっていても、子要素のボックスが `viewport_width` を越えると `viewport_overflow_x` として検出されます。これは崩れではないため CSS で「直す」対象ではなく、`ignore_nodes`（例: `.carousel-*`）や `ignore_region` で明示的に除外し、除外が効いたかは `unmatched_ignores` / `unmatched_ignore_regions` で確認してください（除外がすべて一致していればこれらのフィールドは出ません）。
 
@@ -268,13 +268,14 @@ DOM からの抽出手順（`getBoundingClientRect()` + `window.scrollX` / `wind
 | `parent_checked_nodes` | number | 常時 | `parent` を解決して包含検査した件数。0 なら `parent_overflow` 未適用（`details` の要約行に注記。`layout_tree` の `absolute_mode_pairs` と同種） |
 | `issue_count` | number | 常時 | 検出した崩れ件数 |
 | `issues` | object[] | 崩れあり | 各件の `type` / `selector` / `detail`。`max_details` > 0 のときは先頭からその件数までに切り詰め（`issue_count` は実件数のまま） |
-| `details` | string[] | 常時 | 要約行＋各 issue の detail。`parent_overflow` スキップ時は要約に件数を追記。`parent_checked_nodes=0` のときは未適用注記を同じ要約行に追記（`max_details` の切り詰めで issue の detail を押し出さないため）。過半数ゼロ幾何のときは `checked_nodes` と入力差の 1 行も付く。`max_details` > 0 で issues を切り詰めたときは summary＋残した issue detail＋省略行になる |
+| `details` | string[] | 常時 | 要約行＋各 issue の detail。`parent_overflow` スキップ時は要約に件数を追記。`parent_checked_nodes=0` のときは未適用注記を同じ要約行に追記（`max_details` の切り詰めで issue の detail を押し出さないため）。過半数ゼロ幾何のときは `checked_nodes` と入力差の 1 行も付く。少数の零サイズ除外時は `skipped_zero_geometry` に対応する 1 行注記も付く。`max_details` > 0 で issues を切り詰めたときは summary＋残した issue detail＋省略行になる |
 | `ignored_count` | number | 常時 | `ignore_nodes` / `ignore_region` で除外したノード数 |
 | `ignored_nodes` | string[] | 非空時のみ | 除外したノード（`web:<selector>`。件数は `ignored_count` と一致） |
 | `unmatched_ignores` | string[] | 非空時のみ | どのノードにも一致しなかった `ignore_nodes` エントリ |
 | `unmatched_ignore_regions` | string[] | 非空時のみ | どのノード中心とも重ならなかった `ignore_region` |
 | `unresolved_parent_refs` | string[] | 非空時のみ | 入力に無い `parent` 参照（例: `Web: '.foo'`）。`status` は変えない |
 | `parent_overflow_skipped_zero_geom` | number | 1 以上のとき | 親の `w`/`h` が 0 以下のため `parent_overflow` をスキップした子の件数 |
+| `skipped_zero_geometry` | number | 1 以上のとき | `w`/`h` ≤ 0 のため検査対象から外したノード数（`status` は変えない。少数除外時は `details` に 1 行注記） |
 | `zero_geometry_warning` | string | 非空時のみ | 過半数ノードの `w`/`h` が 0 のときの誤用検出（`status` / `issue_count` は変えない。`details` に `checked_nodes` と入力差の 1 行も付く） |
 
 ---
@@ -295,7 +296,7 @@ go build -o design-compare
 
 ### CLI ワンショット比較
 
-引数付きで起動すると MCP ハンドシェイクなしで `compare_design` を1回実行し、ツールと同じ応答 JSON を stdout に出して終了します（`0` = success / `2` = mismatch / `1` = エラー）。エラー（`1`）時のエラー本文は、stdout を JSON としてパースする呼び出し側を壊さないよう stderr に出ます。引数なし起動は従来どおり stdio MCP サーバーです。
+引数付きで起動すると MCP ハンドシェイクなしで `compare_design` を1回実行し、ツールと同じ応答 JSON を stdout に出して終了します（`0` = success / `2` = mismatch・skipped（比較未実施を含む）/ `1` = エラー）。エラー（`1`）時のエラー本文は、stdout を JSON としてパースする呼び出し側を壊さないよう stderr に出ます。引数なし起動は従来どおり stdio MCP サーバーです。
 
 ```bash
 ./design-compare --mode strict --image-a a.png --image-b b.png
@@ -306,6 +307,8 @@ go build -o design-compare
 ```
 
 主なフラグ: `--mode` / `--image-a` / `--image-b` / `--image-a-base64` / `--image-b-base64` / `--figma-layout` / `--web-layout` / `--figma-layout-file` / `--web-layout-file` / `--threshold` / `--min-match` / `--pass-rate` / `--max-diff-pixels` / `--include-aa` / `--ignore-region` / `--generate-diff` / `--viewport-preset` / `--viewport-width` / `--viewport-height` / `--ignore-nodes` / `--count-extra-web` / `--max-details` / `--diff-on-mismatch`
+
+真偽値フラグは `--include-aa`（値なしで true）または `--generate-diff=false` の形式で指定し、空白区切りの値（例: `--generate-diff false`）は受け付けません。位置引数や解釈できなかった引数はエラーになります。
 
 `--diff-image-content` は CLI 非対応です（CLI の出力は JSON テキストのみで、MCP の image コンテンツブロックを出しません）。入力側の `image_a_base64` / `image_b_base64` / `figma_layout` / `web_layout` はそれぞれ `--image-a-base64` / `--image-b-base64` / `--figma-layout` / `--web-layout` で渡せます。
 

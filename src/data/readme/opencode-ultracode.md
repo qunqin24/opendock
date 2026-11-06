@@ -159,6 +159,27 @@ attempts); every retry is a follow-up in the same session. To restore the old
 behaviour and have failures resolve to `null` immediately, start opencode
 with `ULTRACODE_HOLD_FAILED=0`.
 
+### Switching models mid-run
+
+When a provider hits its rate limit (or a model turns out to be the wrong fit),
+you do not have to stop the run: an agent can be moved to another model and
+carries on in the same session — opencode keeps the conversation across models,
+so nothing it found so far is lost.
+
+- `m` on the selected agent opens the model list (type to filter). A running
+  agent is interrupted and continues on the new model, a failed or paused one
+  retries / resumes on it, a queued one starts on it. The agent detail marks a
+  switched model with "(switched)".
+- `M` moves the **whole run**: every agent that has not finished switches the
+  same way, and every agent the script spawns from then on starts on that
+  model, whatever the script asked for. Pick the model you are leaving as the
+  first thing after a limit is hit and the run keeps going.
+
+Both work on a run with no live engine too: the run resumes (completed agents
+replay) with that agent, or every agent that still has to run, on the new
+model. A switch survives a resume. The `workflow` tool does the same with
+`retryModel` and `resumeModel`.
+
 If opencode exits while a run is in progress, the run is not lost. Every
 completed agent is journaled, so resuming replays those results; agents that
 were still running, paused or failed continue **in their own sessions** rather
@@ -179,6 +200,8 @@ even a completed one, redoes it from scratch in a fresh session the same way.
 | `retryAgentId`| With `resumeRunId`: one failed agent (e.g. `ag-002`) to continue in its session; also works on a completed run |
 | `retryNote`   | With `retryAgentId`: a note for that agent about what to fix       |
 | `retryFresh`  | With `retryAgentId`: start the agent over in a fresh session (full task again) instead of continuing; also allowed on a completed agent |
+| `retryModel`  | With `retryAgentId`: the model that agent continues (or starts over) on, e.g. after its provider hit a rate limit |
+| `resumeModel` | With `resumeRunId`: every agent that still has to run uses this model instead of the script's choice |
 
 ### Writing a script
 
@@ -246,8 +269,8 @@ Concurrency is capped at roughly `min(16, cpus - 2)` agents at a time and
 | Screen       | Keys                                                                                                                                              |
 |--------------|---------------------------------------------------------------------------------------------------------------------------------------------------|
 | Run list     | `↑↓` select · `⏎` open · `r` result · `x` stop · `p` pause / resume · `s` save script · `d` delete · `esc` back                                    |
-| Run view     | `↑↓` phase or agent · `←→` switch pane · `⏎` open · `r` result · `x` stop · `p` pause / resume · `s` save · `!` answer a pending permission · on the selected agent: `t` message · `R` retry · `S` restart fresh · `P` pause / resume · `X` stop / skip |
-| Agent detail | `↑↓` scroll · `←→` previous / next agent · `e` show tool and thinking previews · `p` expand prompt · `⏎` answer a permission or question · `t` message · `R` retry / steer · `S` restart fresh · `P` pause / resume · `X` stop / skip |
+| Run view     | `↑↓` phase or agent · `←→` switch pane · `⏎` open · `r` result · `x` stop · `p` pause / resume · `s` save · `M` model for the whole run · `!` answer a pending permission · on the selected agent: `t` message · `m` model · `R` retry · `S` restart fresh · `P` pause / resume · `X` stop / skip |
+| Agent detail | `↑↓` scroll · `←→` previous / next agent · `e` show tool and thinking previews · `p` expand prompt · `⏎` answer a permission or question · `t` message · `m` model · `M` model for the whole run · `R` retry / steer · `S` restart fresh · `P` pause / resume · `X` stop / skip |
 | Result view  | `↑↓` scroll · `g` top                                                                                                                             |
 
 The agent detail shows a **Live** feed while the agent runs (text, thinking

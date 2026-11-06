@@ -2,6 +2,8 @@
 
 # Hush
 
+[![HOL Guard](https://img.shields.io/endpoint?url=https%3A%2F%2Fhol.org%2Fapi%2Fregistry%2Fbadges%2Fplugin%3Fslug%3Dfedericobordon09-dev%252Fopencode-hush%26metric%3Drelease)](https://hol.org/registry/plugins/federicobordon09-dev%2Fopencode-hush?utm_source=hol_marketplace&utm_medium=plugins_badge&utm_campaign=plugins&utm_content=federicobordon09-dev%2Fopencode-hush&ref=plugin-author-cdd6b0a9)
+
 Minimal session telemetry for the OpenCode TUI.
 
 [![npm version](https://img.shields.io/npm/v/opencode-hush?logo=npm)](https://www.npmjs.com/package/opencode-hush)

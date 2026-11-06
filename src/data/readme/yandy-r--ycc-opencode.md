@@ -1,6 +1,6 @@
 # ystack
 
-A single Claude Code plugin (`ycc`) bundling workflow orchestration, parallel planning, documentation, research, and project management. The repository also generates native compatibility bundles for Cursor, Codex, opencode, and OMP (oh-my-pi).
+A single Claude Code plugin (`ycc`) bundling workflow orchestration, parallel planning, documentation, research, and project management. The repository also generates native packages for Cursor, Codex, opencode (the npm plugin `@yandy-r/ycc-opencode`), and OMP (oh-my-pi).
 
 > **2.0.0 breaking change.** Versions ≤ 1.x shipped 9 separate plugins (`ask`, `plan-workflow`, `git-workflow`, `implement-plan`, `code-report`, `deep-research`, `orchestrate`, `write-docs`, `project`). 2.0.0 collapses all of them into a single `ycc` plugin so every skill is accessible via `ycc:{skill}`. Re-install after upgrading.
 > **Migration: `/ycc:ask` and `ycc:ask` retired.** For read-only codebase questions, ask the main session to delegate to `ycc:codebase-advisor`. Request explicit search gaps, assumptions, and analyzed/skipped scope in the answer. Request implementation separately.
@@ -103,7 +103,7 @@ The plugin bundles **55** specialized agents covering codebase analysis, languag
 - **Claude Code:** reference any of them via `subagent_type: "ycc:{agent-name}"`. Canonical source lives in [`ycc/agents/`](ycc/agents/).
 - **Cursor:** generated copies live in [`packages/cursor/ycc/agents/`](packages/cursor/ycc/agents/), produced from `ycc/agents/`. See the [Cursor install guide](docs/install/cursor.md).
 - **Codex:** generated, Codex-native custom-agent TOMLs live in [`.codex-plugin/agents/`](.codex-plugin/agents/) (produced from `ycc/agents/` — see the [Codex install guide](docs/install/codex.md)).
-- **opencode:** generated, opencode-native agent markdown files live in [`.opencode-plugin/agents/`](.opencode-plugin/agents/) (produced from `ycc/agents/` — see the [opencode install guide](docs/install/opencode.md)). Invoke via `@agent-name` or the native v2 `subagent` tool.
+- **opencode:** generated, opencode-native agent markdown files live in [`.opencode-plugin/agents/`](.opencode-plugin/agents/) (produced from `ycc/agents/`) and ship inside the npm plugin `@yandy-r/ycc-opencode` (see the [opencode install guide](docs/install/opencode.md)). Invoke via `@agent-name` or the native v2 `subagent` tool.
 - **OMP:** generated task agents live in [`packages/omp/ycc/agents/`](packages/omp/ycc/agents/) (produced from `ycc/agents/` — see the [OMP install guide](docs/install/omp.md)). They are OMP task agents with `@role` models.
 
 **Contributing:** before proposing a new skill or agent, read the Scope & Guardrails policy in [`CONTRIBUTING.md`](CONTRIBUTING.md#scope--guardrails).
@@ -168,6 +168,18 @@ Or run `./install.sh install --target omp` from a checkout (add `--project` for
 this project only, `--dry-run` to preview; native Windows is unsupported, use
 WSL 2). See [`docs/install/omp.md`](docs/install/omp.md).
 
+opencode (`>=2.0.30`) loads ycc as one npm plugin. From a checkout,
+`./install.sh install --target opencode` writes its `plugins` entry into
+`~/.config/opencode/opencode.json` (`--mode repo` pins the published
+`@yandy-r/ycc-opencode@<version>`) and retires the files an older
+`install.sh` copied there. By hand:
+
+```json
+{ "plugins": ["@yandy-r/ycc-opencode@X.Y.Z"] }
+```
+
+See [`docs/install/opencode.md`](docs/install/opencode.md).
+
 For local development installs, generated compatibility bundles, model defaults,
 and desktop app notes, use the dedicated install guides. Recommended sync form:
 
@@ -178,27 +190,27 @@ and desktop app notes, use the dedicated install guides. Recommended sync form:
 ./install.sh install --target codex                                     # ycc@ycc + ycc-mcp@ycc + custom agents
 ./install.sh install --target cursor --rules --mcp --hooks              # register the marketplace + /plugins hint
 ./install.sh install --target omp                                       # OMP via omp plugin
-./install.sh sync --target claude,opencode --intent mcp                  # current project
-./install.sh sync --target claude,opencode --intent mcp --global         # user-global
-./install.sh sync --target opencode --intent mcp --mcps github,linear    # only these servers (opencode)
-./install.sh list mcps                                                   # managed MCP server names
-./install.sh remove --target claude,opencode --only mcp                  # undo project MCP
+./install.sh install --target opencode --settings --rules               # @yandy-r/ycc-opencode + project settings + AGENTS.md
+./install.sh sync --target claude --intent mcp                           # current project
+./install.sh sync --target claude --intent mcp --global                  # user-global
+./install.sh sync --target agents --intent skills --skills plan          # only these skills (agents target)
+./install.sh remove --target claude --only mcp                           # undo project MCP
 ./install.sh remove --target all --intent settings,rules --global        # undo any intent, any target
 ./install.sh cli && ycc completion --install                             # `ycc` on PATH for other projects
 ```
 
-Claude, Codex, Cursor and OMP install whole native packages: on Claude the
-`mcp` and `hooks` intents install `ycc-mcp@ycc` and `ycc-hooks@ycc` (project
-scope by default, user scope with `--global`), and `skills`, `agents` and
-`commands` map to the `ycc@ycc` plugin. opencode and the cross-tool `agents`
-target have no native route; there `base` copies the bundle and `skills`,
-`agents` and `commands` install standalone entries, narrowed by `--skills`,
-`--agents`, `--commands` and `--mcps`. The `settings` step on Claude, Codex
-and opencode defaults to the current project; pass `--global` for user-global
-config (Cursor and OMP settings run only with `--global`). `remove` undoes any
-intent on any target (`base`, `skills`, `agents`, `commands`, `settings`,
-`rules`, `mcp`, `hooks`, `plugins`, `mods`), taking back only what the
-installer owns and leaving your own keys, files and servers alone. See
+Claude, Codex, Cursor, OMP and opencode install whole native packages: on
+Claude the `mcp` and `hooks` intents install `ycc-mcp@ycc` and `ycc-hooks@ycc`
+(project scope by default, user scope with `--global`), and `skills`, `agents`
+and `commands` map to the `ycc@ycc` plugin; on opencode `skills`, `agents`,
+`commands` and `mcp` map to the `@yandy-r/ycc-opencode` entry. Only the
+cross-tool `agents` target copies files; `--skills` and `--with-deps` narrow
+it. The `settings` step on Claude, Codex and opencode defaults to the current
+project; pass `--global` for user-global config (Cursor and OMP settings run
+only with `--global`). `remove` undoes any intent on any target (`base`,
+`skills`, `agents`, `commands`, `settings`, `rules`, `mcp`, `hooks`, `plugins`,
+`mods`), taking back only what the installer owns and leaving your own keys,
+files and servers alone. See
 [Project Vs Global Scope](docs/install/README.md#project-vs-global-scope).
 
 `--target` takes a comma-separated list (or `all`); every target is validated
@@ -237,7 +249,7 @@ Those artifacts live in Linear by default, cached under `.ycc/artifacts/`. Opt o
 
 ## Development Sync
 
-Generated trees live under `packages/cursor/`, `packages/claude/`, `packages/omp/`, `.agents-plugin/`, `.codex-plugin/`, and `.opencode-plugin/`. The canonical source is the Claude-facing [`ycc/`](ycc/) tree. Do not hand-edit generated files.
+Generated trees live under `packages/cursor/`, `packages/claude/`, `packages/omp/`, `packages/opencode/`, `.agents-plugin/`, `.codex-plugin/`, and `.opencode-plugin/`. The canonical source is the Claude-facing [`ycc/`](ycc/) tree. Do not hand-edit generated files.
 
 Regenerate and validate derived artifacts with:
 
@@ -253,7 +265,7 @@ Both accept `--only <targets>` with comma-separated values.
 - `inventory` updates `docs/inventory.json` and the `GENERATED-*` regions of `README.md`.
 - `cursor` writes native packages under `packages/cursor/`.
 - `codex` writes `.codex-plugin/` skills, agents, and plugin metadata.
-- `opencode` writes `.opencode-plugin/` skills, agents, commands, `opencode.json`, and `AGENTS.md`.
+- `opencode` writes `.opencode-plugin/` skills, agents, commands, `opencode.json`, and `AGENTS.md`, then the npm package `packages/opencode/ycc-opencode` from them.
 - `omp` writes OMP (oh-my-pi) skills under `packages/omp/ycc/skills/`, plus the hidden `ycc-shared` skill for `_shared`, task agents under `packages/omp/ycc/agents/`, one `/ycc:<skill>` command entrypoint per public skill under `packages/omp/ycc/commands/`, the `packages/omp/ycc-mcp/.mcp.json` MCP config, the flat `packages/omp/ycc-rules/rules/ycc-*.md` rules, and the package manifests. The root `.omp-plugin/marketplace.json` lists the OMP packages marked listed in `ycc/settings/packages.json`: `ycc`, `ycc-mcp`, and `ycc-rules`.
 - `agents` writes `.agents-plugin/` cross-tool skills for `~/.agents/skills`, plus `ycc-shared/`.
 - `claude` writes the native add-on packages under `packages/claude/` (`ycc-mcp`, `ycc-hooks`, and `ycc-all`).
@@ -318,17 +330,18 @@ ystack/
 ├── packages/                  # generated native packages; do not hand-edit
 │   ├── claude/                # ycc-mcp, ycc-hooks, ycc-all
 │   ├── cursor/                # ycc, ycc-rules, ycc-mcp, ycc-hooks, installer-fallback
-│   └── omp/                   # ycc (skills, agents, commands), ycc-mcp (.mcp.json), ycc-rules (flat rules/) + OMP manifests
-├── .opencode-plugin/          # opencode bundle (synced by install.sh install --target opencode)
+│   ├── omp/                   # ycc (skills, agents, commands), ycc-mcp (.mcp.json), ycc-rules (flat rules/) + OMP manifests
+│   └── opencode/ycc-opencode/ # the @yandy-r/ycc-opencode npm plugin (install.sh --target opencode loads it)
+├── .opencode-plugin/          # opencode generator output (package input + settings/rules source)
 │   ├── agents/                # generated from ycc/agents
 │   ├── commands/              # generated from public ycc/skills (thin, skill-tool dispatch)
 │   ├── skills/                # generated from ycc/skills
 │   ├── shared/                # generated from ycc/skills/_shared
 │   ├── AGENTS.md              # generated rules file (transformed from CLAUDE.md)
-│   └── opencode.json          # generated config: $schema + default model + MCP
+│   └── opencode.json          # generated settings: $schema, default model, agent pins, plugins
 ├── mcp-configs/
-│   └── mcp.json               # shared MCP servers (ycc-mcp packages; opencode merge)
-├── install.sh                 # install Claude, Codex, Cursor and OMP packages; sync opencode and agents
+│   └── mcp.json               # shared MCP servers (ycc-mcp packages; @yandy-r/ycc-opencode)
+├── install.sh                 # install Claude, Codex, Cursor, OMP and opencode packages; sync agents
 ├── scripts/
 │   ├── generate-codex-skills.sh    # wrapper → generate_codex_skills.py
 │   ├── generate_codex_skills.py    # ycc/skills → .codex-plugin/ycc/skills

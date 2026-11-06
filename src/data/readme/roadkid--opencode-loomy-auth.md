@@ -12,7 +12,11 @@ daily first-login refresh that renews the grant land on the Usage card.
 |---|---|---|
 | `loomy` | phone code (+86) | `loomyad.xunfei.cn` (account plane `account.xfinfr.com`) |
 
-The package exports `LoomyAuthPlugin` (`loomy`).
+The package exports `LoomyAuthPlugin` (`loomy`) for magpie and OpenCode
+v1, and — from 0.2.0 — a default export (`{ id: "loomy-auth", setup,
+server }`) for OpenCode ≥ 2.x, with the `server` function the same V1
+factory for hosts that read object entrypoints (magpie's own loader
+among them). One package, every host.
 
 ## Install
 
@@ -26,8 +30,79 @@ magpie quota                   # the points card
 ```
 
 The same package loads in OpenCode (the `"plugin"` array in `opencode.json`,
-then `opencode auth login`). magpie keeps the sign-in in `plugin-auth.json`
+then `opencode auth login`) — for OpenCode ≥ 2.x, see
+[OpenCode v2](#opencode-v2). magpie keeps the sign-in in `plugin-auth.json`
 (mode 600); OpenCode keeps it in `auth.json`.
+
+## OpenCode v2
+
+From 0.2.0 the package loads in OpenCode ≥ 2.x as a default-export plugin
+(`{ id: "loomy-auth", setup }`), beside the named export magpie and
+OpenCode v1 read. Same code, same sign-in, same gateway.
+
+### Install
+
+Three ways, pick one:
+
+- the `plugins` key of `opencode.json(c)` with the npm name:
+  `"plugins": ["@roadkid/opencode-loomy-auth"]`;
+- the same key with a local directory:
+  `"plugins": ["E:/path/to/opencode-loomy-auth"]` — the path must be a
+  directory, a file path is skipped;
+- or the directory itself into `~/.config/opencode/plugins/` (global) or
+  `.opencode/plugins/` (project) — OpenCode discovers it on its own and
+  hot-reloads it when files change.
+
+### Sign-in
+
+`opencode auth login` (or `/connect` in the TUI) → pick the Loomy
+integration → the phone-code way → the 11-digit phone number → the SMS
+arrives (six digits, five minutes to live) → type the code → done. The
+session lasts fourteen days and there is no refresh — when it ends, sign
+in again. The desktop OpenCode's account-connection screen reads the same
+server APIs.
+
+### Models
+
+Signed in, the `loomy` provider appears on its own; before that it is
+hidden — the hiding is the design, a dead model is what it prevents. The
+model list is read live from the gateway's `/api/v1/models` and refreshes
+as the sign-in state changes; when the gateway is unreachable the plugin
+falls back to the built-in 2026-10-28 snapshot (chat models only). Bearer
+auth on the gateway calls is injected by the host itself. The rows carry
+the vendors' own display names — a model the name table doesn't know
+keeps its cleaned gateway name with the leading brand word set right —
+and the reasoning efforts each vendor's own docs vouch for, intersected
+with the gateway row's `reasoning_efforts` declaration (the gateway
+serves every thinking row the same five values, but the vendors' pages
+say otherwise: DeepSeek's medium/xhigh are aliases of high, Qwen's high
+is xhigh, Kimi K2.6 has no effort parameter at all — only none's
+turn-it-off). The picker's Default sends no field and the gateway's own
+default gear applies.
+
+### Points in the TUI, and the daily renewal
+
+Type `/loomy` (or find "Loomy 积分面板" in the command palette) for a small
+panel: the sign-in state, the points total, and the daily grant with its
+remaining over its size and its reset moment in Beijing time — with
+**check in now** (the same first-login call the Check in now button makes,
+worded the same way) and **refresh** beside them. The day's renewal also
+runs by itself: at load, behind every credential event and on a half-hour
+timer, the same once-a-day claim goes out silently — a success is marked
+per Beijing day, a failure just waits for the next event or tick to ask
+again. The desktop OpenCode carries the same panel in its own windows —
+entry is the desktop's side-panel launcher, through the package's
+`./gui-experimental` bundle — and that export name is the upstream's own
+admission: the GUI plugin API is experimental and may change between
+desktop releases.
+
+### What stays magpie-only
+
+The Usage card, the check-in switch and the image-generator roster ride
+magpie's own host-extension hooks — those stay magpie-only, while the
+`/loomy` panel above brings the points' numbers to the v2 TUI itself.
+There the plugin is the phone-code sign-in, the live model list, the
+gateway chat, and the panel.
 
 ## Signing in
 
@@ -71,8 +146,26 @@ rides the model record, the field the host's picker reads the multiplier
 from. A model the
 upstream itself declares free — the words 免费 in the name, or a rate of
 exactly zero — carries a `free` bit; no rate at all is not free. Rows that
-aren't chat models (the image generators say so) are left off the list:
-selecting one is selecting a failure.
+aren't chat models stay off the chat list — the image generators say so in
+their `type`, and carry an image generator's name besides, read by the same
+words the host's own image-model catalog reads, so a row that ships no
+`type` at all stays off just the same: chatting into one is a failure.
+
+The image generators come back beside the chat list from a roster the
+plugin itself keeps — the three it vouches for, each under the display
+name the roster gives it, with the live row's own facts (the limits, the
+capability bits) riding beside. An entry is in the table only while the
+live catalog names its id: a generator Loomy retires leaves at the next
+answer with no release needed, and a generator it adds waits for the
+release that names it here. No entry is in the fallback tables — with no
+live answer there is no proof a generator still exists, and a dead draw
+entry is what the roster exists to prevent. On the host side a listed
+generator lands in the provider's Image models row when its id is one the
+host's own image-model catalog reads (`qwen-image`, `seedream`… —
+`Hy-Image` is not among those words), and until the host learns to keep a
+plugin's generators out of the chat list too (yetone/magpie#2792) they
+show there as chips as well: leave them unticked, and no agent chats into
+one.
 
 The live list is the source of truth and wins the moment it answers. Without
 a session, on an empty answer or a failed ask, the plugin falls back to the
@@ -101,7 +194,9 @@ served on that day, kept here as a field guide:
 
 The three image-generation rows declare `output_modalities: ["image"]` —
 they draw pictures rather than answer in text, and how their answers ride
-the chat endpoint is unverified.
+the chat endpoint is unverified. What a model's editor chip says beside an
+older build's list: a generator ticked then and unticked now is the
+roster's entry back again, no longer a pick the list has forgotten.
 
 ## Usage
 

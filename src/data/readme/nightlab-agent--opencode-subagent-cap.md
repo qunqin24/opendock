@@ -33,7 +33,7 @@ OPENCODE_SUBAGENT_MAX=3 opencode
 ## What it does
 
 - A `task` call from your main session waits in the plugin's `tool.execute.before` hook until fewer
-  than N subagents are running, then goes ahead. Waiting calls start in the order they were made.
+  than N subagents are running, then goes ahead. Calls waiting for a slot start in the order they were made (a call still looking up its parent session can be passed once).
 - A slot is given back when the subagent's tool call ends: completed, failed, or stopped. It listens
   for the tool part's end on the event stream as well as the `tool.execute.after` hook, because in
   opencode 1.19.5 the after hook does not run when a tool throws or is aborted.
@@ -57,15 +57,20 @@ several `task` calls at once and answers each subagent slowly, counting how many
 | cap 1, the first subagent's model call fails | 3 | 1 (the failed one freed its slot; the other 2 ran) |
 | cap 1, each subagent starts its own subagent (`subagent_depth: 2`) | 2 + 2 | 1 grandchild at a time (both ran, no deadlock) |
 
-Not yet seen: the TUI with a real model, and pressing Esc while calls are queued (covered by a unit
-test only).
+Through `opencode serve` on the same version, with the stand-in model changed in two lines so a second turn asks again:
+
+| setup | subagents asked | what happened |
+|---|---|---|
+| cap 1, the turn aborted while 1 runs and 2 wait, at four timings | 3 | at most 1 started; the 2 waiting calls never did |
+| cap 1, a slash-command subtask, then a `task` call in the next turn | 2 | the subtask gave its slot back and the `task` call ran |
+
+Not yet seen: the TUI with a real model, or a real keypress of Esc (the abort above is the server's
+abort call).
 
 ## What it does not do
 
 - It does not support the opencode 2.x line (`@opencode/cli`), where the subagent tool and the plugin
   hooks are different.
-- Subtasks started by a slash command go through the same hooks in the 1.19.5 source, but that
-  path has not been run in opencode (covered by a unit test only).
 - It does not cap across separate opencode processes: each process has its own count.
 - A waiting `task` call shows as running in the UI until its slot comes; the wait is not shown (per the 1.19.5 source).
 

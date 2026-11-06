@@ -95,6 +95,7 @@ The other two halves are clients: restart the **TUI**, and reload the **desktop 
 | `language` | `"en" \| "ja" \| "zh-CN"` | auto | UI language for the sidebars, the desktop panel, `deepseek_*` tool output and errors. Auto reads `LC_ALL`, then `LANG`, then English |
 | `apiKey` | string | `DEEPSEEK_API_KEY` | Usually `"{env:DEEPSEEK_API_KEY}"`; unset env becomes `""` |
 | `count` | 1–50 | `5` | Results per search (does not change the price) |
+| `localization` | string | unset (field omitted) | IP address for DeepSeek Search localization: when set, results favor that region; blank or unset sends no field at all |
 | `fetchMaxChars` | 500–200000 | `30000` | Truncation limit for `deepseek_fetch`, with an explicit notice |
 | `pricePerThousand` | 0–10000 | `5` | CNY per 1000 requests (integer), used only for the local cost estimate |
 
@@ -103,7 +104,8 @@ the language once — `options.language`, else the `LC_ALL`/`LANG` prefix (`ja*`
 and the same value drives the tool output and both sidebars, so they can never disagree. An unknown value logs a
 warning and falls back to auto-detection instead of failing. The change reaches the sidebars with their next status
 read (saving the config re-runs the server half; a restart always works). Model-facing text stays English in every
-language — tool descriptions, the `## [title](url)` result format, `Published:` and the empty-result notice — so the
+language — tool descriptions, the `## [title](url)` result format, `Published:`, `[authoritative]` and the
+empty-result notice — so the
 rerouted `websearch` keeps the built-in tool's shape. Docs stay English and Chinese: the Japanese UI does not add a
 Japanese README.
 
@@ -119,6 +121,32 @@ Japanese README.
 The reroute **keeps the built-in permission check and the declared `output` shape**, so approval prompts and rendering
 are unchanged. Results carry `summary` (600–800 chars, written for models) or `snippet` — never the full page text,
 and `need_content` is never requested.
+
+### Search syntax
+
+The rerouted tool's description also tells the model which operators it may put inside `query`; the query is passed
+through unchanged, so no extra tool is needed to filter:
+
+| Operator | Meaning |
+|---|---|
+| `site:example.com`, `site:a.com OR site:b.com` | Only these sites; several are joined with `OR` |
+| `-site:example.com` | Exclude a site |
+| `-word`, `-"exact phrase"` | Exclude a word or phrase |
+| `"exact phrase"` | Require the exact phrase |
+| `lang:zh,en` | Only these languages |
+| `after:2025-01-01`, `before:2026` | Time window |
+
+Operators count toward the query's 128-character limit.
+
+### Request and result details
+
+- **`ori_question` (best effort).** Each search sends the session's most recent user input, trimmed and cut to 128
+  characters, so the API can read the intent behind the query. When no input was captured, the field is omitted.
+- **`localization`.** When configured, the option is sent as the Search API's `localization` field; blank or unset
+  means the request carries no such field.
+- **`[authoritative]`.** Results whose DeepSeek `authority` is `3` or `4` (the API's 0–4 scale, where `−1` means unknown, `3` and above
+  means highly authoritative) get the marker after the title in the rendered Markdown. It is informational only —
+  results are still third-party text.
 
 ## Switching backends
 
@@ -227,8 +255,9 @@ Search 100 QPS / Fetch 25 QPS per account (Fetch is also limited per target doma
 
 ## Privacy
 
-Queries and URLs are sent to `https://api.deepseek.com`. Nothing else leaves your machine; the usage ledger and the
-mode switch stay in local OpenCode storage. The API key is never logged.
+Queries — plus the recent user input attached as `ori_question` and the configured `localization` — are sent to
+`https://api.deepseek.com`, as are fetch URLs. Nothing else leaves your machine; the usage ledger and the mode switch
+stay in local OpenCode storage. The API key is never logged.
 
 Search results and fetched pages are **third-party text**: treat them as data, never as instructions — a page can
 contain text that tries to steer the model.
@@ -276,7 +305,7 @@ src/tui/              # TUI half: card element tree + plugin wiring
 src/gui/              # desktop half: side panel component + plugin wiring
 vite.config.ts        # builds src/gui into the root gui-experimental.cjs bundle
 test/*.test.ts        # pure-function tests
-scripts/smoke.ts      # real-API smoke (5 steps)
+scripts/smoke.ts      # real-API smoke (6 steps)
 scripts/check-gui-bundle.ts # bundle shape check, run in CI after build:gui
 .github/workflows/    # ci (build + typecheck + test + bundle check) / release
 ```

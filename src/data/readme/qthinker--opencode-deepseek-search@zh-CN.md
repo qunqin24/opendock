@@ -53,6 +53,8 @@ opencode service restart   # User 变量只进新进程
       "package": "@qthinker/opencode-deepseek-search",
       "options": {
         "mode": "deepseek",
+        // "en" | "ja" | "zh-CN"；不填则按 LC_ALL/LANG 自动，兜底英文
+        "language": "zh-CN",
         "count": 5,
         "apiKey": "{env:DEEPSEEK_API_KEY}"
       }
@@ -85,6 +87,7 @@ opencode service restart   # User 变量只进新进程
 | `language` | `"en" \| "ja" \| "zh-CN"` | 自动 | 侧边栏、桌面面板、工具输出与错误的显示语言。自动模式依次读 `LC_ALL`、`LANG`，都没有则英文 |
 | `apiKey` | string | `DEEPSEEK_API_KEY` | 通常写 `"{env:DEEPSEEK_API_KEY}"`；环境变量未设置时为 `""` |
 | `count` | 1–50 | `5` | 每次返回条数（不影响单价） |
+| `localization` | string | 未设置（不发送该字段） | DeepSeek Search 的本地化 IP：设置后优先返回贴近该地区的结果；留空或不配置时请求里完全不出现该字段 |
 | `fetchMaxChars` | 500–200000 | `30000` | `deepseek_fetch` 截断上限，截断处有明示 |
 | `pricePerThousand` | 0–10000 | `5` | 元/千次（整数），仅用于本地费用估算 |
 
@@ -92,7 +95,7 @@ opencode service restart   # User 变量只进新进程
 （`options.language` → `LC_ALL`/`LANG` 前缀，`ja*` 为 `ja`、`zh*` 为 `zh-CN` → 英文），同一个值同时决定工具输出与
 两侧边栏，三处不会分叉。填了不认识的值只会打一条警告并按自动模式处理，不会让插件加载失败；改动会随边栏下一次
 读取状态生效（保存配置会让服务端半边原地重跑），重启则一定生效。模型可见的文本在所有语言下保持英文——工具描述、
-`## [title](url)` 结果格式、`Published:` 与空结果提示——以保持内置 `websearch` 的输出形状。文档只有英文与中文两版，
+`## [title](url)` 结果格式、`Published:`、`[authoritative]` 与空结果提示——以保持内置 `websearch` 的输出形状。文档只有英文与中文两版，
 日文界面不附日文文档。
 
 ## 提供的工具
@@ -106,6 +109,29 @@ opencode service restart   # User 变量只进新进程
 
 `websearch` 的改接**保留内置的权限确认与 `output` 结构**，审批提示与渲染都不变；结果只带 `summary`
 （600–800 字，本就写给模型读）或退化的 `snippet`，**永不返回网页全文**，也从不请求 `need_content`。
+
+### 搜索语法
+
+被接管工具的描述还会告诉模型 `query` 里可用的操作符；query 原样透传，无需额外工具即可过滤：
+
+| 操作符 | 含义 |
+|---|---|
+| `site:example.com`、`site:a.com OR site:b.com` | 只在这些站点内搜索；多个用 `OR` 连接 |
+| `-site:example.com` | 排除某个站点 |
+| `-词`、`-"短语"` | 排除某个词或短语 |
+| `"精确短语"` | 要求精确匹配该短语 |
+| `lang:zh,en` | 只在这些语言中搜索 |
+| `after:2025-01-01`、`before:2026` | 时间范围 |
+
+操作符计入 query 的 128 字符上限。
+
+### 请求与结果细节
+
+- **`ori_question`（尽力而为）。** 每次搜索都会把当前会话最近一次用户输入（去掉首尾空白并截断到 128 字符）发给
+  搜索接口，帮助它理解 query 背后的意图；取不到输入时省略该字段。
+- **`localization`。** 配置后作为搜索接口的 `localization` 字段发送；留空或不配置时请求里完全不出现该字段。
+- **`[authoritative]`。** 搜索结果中 DeepSeek `authority` 为 `3` 或 `4`（官方 0–4 分级，`-1` 表示未知，`3` 及以上为极权威）的
+  条目，会在渲染的 Markdown 标题后带该标记。它只是提示——结果仍是第三方文本。
 
 ## 切换搜索后端
 
@@ -170,7 +196,6 @@ deepseek_mode 开关（storage: mode/v1）  >  options.mode  >  内置默认
   余额不足时金额转警示色；侧边栏太窄（约 12 列以下）宁可整行省略也不挤压。桌面面板把它放成用量表下方的
   账户块，悬停可看赠金/充值细分（仅两者都非零时）。手动刷新（桌面刷新按钮、TUI 菜单里的「刷新」、失败重试）
   会强制重探，10 秒轮询不会。
-  手动刷新（桌面刷新按钮、TUI 菜单里的「刷新」、失败重试）会强制重探，10 秒轮询不会。
 - **显示阶梯以金额为先**：变窄时费用数字比文字标签活得更久；低于数字下限后三行用量并作一行、仍然带数字，
   不会出现三个光秃秃的标签。
 
@@ -203,8 +228,8 @@ npm install && npm run build:gui
 
 ## 隐私
 
-query 与 URL 会发往 `https://api.deepseek.com`。其余数据不出本机，用量账本与模式开关留在本地 OpenCode 存储中；
-API Key 不写日志。
+query（以及作为 `ori_question` 附带发送的最近用户输入与配置的 `localization`）与抓取 URL 会发往
+`https://api.deepseek.com`。其余数据不出本机，用量账本与模式开关留在本地 OpenCode 存储中；API Key 不写日志。
 
 搜索结果与被抓取页面是**第三方文本**：应按数据处理，而不是当作指令——页面里可能夹带试图操纵模型的内容。
 
@@ -251,7 +276,7 @@ src/tui/              # TUI 半边：卡片元素树 + 插件接线
 src/gui/              # 桌面半边：侧面板组件 + 插件接线
 vite.config.ts        # 把 src/gui 构建成根目录的 gui-experimental.cjs
 test/*.test.ts        # 纯函数单测
-scripts/smoke.ts      # 真实 API 冒烟（5 步）
+scripts/smoke.ts      # 真实 API 冒烟（6 步）
 scripts/check-gui-bundle.ts # bundle 形态检查，CI 里在 build:gui 之后跑
 .github/workflows/    # ci（构建 + typecheck + test + bundle 检查）/ release
 ```

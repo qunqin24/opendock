@@ -11,7 +11,10 @@ provider 插件。用 Loomy 的手机验证码登录，对话经 Loomy 的 OpenA
 |---|---|---|
 | `loomy` | 手机验证码（+86） | `loomyad.xunfei.cn`（账号平面 `account.xfinfr.com`） |
 
-本包导出 `LoomyAuthPlugin`（`loomy`）。
+本包导出 `LoomyAuthPlugin`（`loomy`）供 magpie 与 OpenCode v1 读取；从 0.2.0
+起另有面向 OpenCode ≥ 2.x 的默认导出（`{ id: "loomy-auth", setup, server }`）
+——其中 `server` 就是同一个 V1 工厂，供读取对象式入口的宿主调用（magpie
+自己的加载器即属此类）。一个包，各种宿主。
 
 ## 安装
 
@@ -25,8 +28,67 @@ magpie quota                   # 积分卡片
 ```
 
 同一个包也能在 OpenCode 里加载（`opencode.json` 的 `"plugin"` 数组，
-然后 `opencode auth login`）。magpie 把登录态存在 `plugin-auth.json`
+然后 `opencode auth login`）；OpenCode ≥ 2.x 走另一条安装路径——见下文
+[OpenCode v2](#opencode-v2)。magpie 把登录态存在 `plugin-auth.json`
 （mode 600）；OpenCode 存在 `auth.json`。
+
+## OpenCode v2
+
+从 0.2.0 起，本包以默认导出插件（`{ id: "loomy-auth", setup, server }`）的
+形态在 OpenCode ≥ 2.x 中加载，与 magpie 和 OpenCode v1 读取的命名导出并存
+（magpie 新版加载器读的 `server` 也在同一个默认导出里）。
+同一份代码，同一种登录，同一个网关。
+
+### 安装
+
+三种方式，任选其一：
+
+- `opencode.json(c)` 的 `plugins` 键填 npm 包名：
+  `"plugins": ["@roadkid/opencode-loomy-auth"]`；
+- 同一个键填本地目录：`"plugins": ["E:/path/to/opencode-loomy-auth"]`——
+  路径必须是目录，文件路径会被跳过；
+- 或把目录直接放进 `~/.config/opencode/plugins/`（全局）或
+  `.opencode/plugins/`（项目级）——OpenCode 会自行发现，文件改动热重载。
+
+### 登录
+
+`opencode auth login`（或 TUI 里的 `/connect`）→ 选择 Loomy 集成 →
+手机验证码方式 → 输入 11 位手机号 → 收到短信（6 位验证码，5 分钟有效）→
+输入验证码 → 完成。会话有效期十四天，没有续期——到期重新登录即可。
+桌面版 OpenCode 的账号连接界面用的是同一套服务端 API。
+
+### 模型
+
+登录后 `loomy` provider 自动出现；在那之前它不显示——隐藏正是设计，
+防的就是死模型。模型清单实时读取自网关的 `/api/v1/models`，登录状态
+变化时自动刷新；网关不可达时回落到内置的 2026-10-28 快照（仅聊天
+模型）。网关调用上的 Bearer 认证由宿主自动注入。模型行用各厂商官方
+拼写的展示名（名字表不认识的模型保留清洗后的网关名，仅把开头的
+品牌词纠正为官方拼写），reasoning 档位取各厂商官方文档真实枚举与
+网关每行 `reasoning_efforts` 声明的交集（网关给每个思考模型都声明
+同样的五档，但厂商官方页面另有说法：DeepSeek 的 medium/xhigh 是
+high 的别名、Qwen 的 high 是 xhigh 的别名、Kimi K2.6 根本没有
+effort 参数——只有 none 的关思考是真的）。picker 的 Default 不发
+字段，落到网关自己的默认档。
+
+### 积分面板与每日续满
+
+输入 `/loomy`（或在命令面板找「Loomy 积分面板」）唤出一个小面板：登录
+状态、积分总额、每日赠送的剩余/总量与北京时间重置时刻，旁边两个动作——
+**立即签到**（与「立即签到」按钮同一个 first-login 调用、同一套结果
+文案）与**刷新**。每日续满也会在后台自己跑：加载时、每个凭据事件之后、
+以及每半小时一次的定时器，静默发出同一次每日签到——成功按北京日记下，
+失败就等下一个事件或下一轮再试。桌面版 OpenCode 在自己的窗口里带着
+同一个面板——入口在侧边面板启动器，走包里 `./gui-experimental` 的桌面
+GUI 入口；这个名字里的 experimental 是上游的原话：GUI 插件 API 尚属
+实验性，可能随桌面版更迭变动。
+
+### magpie 专属的部分
+
+用量卡片、签到开关与生图模型花名册挂在 magpie 自己的宿主扩展钩子上
+——这些仍是 magpie 专属，而上面的 `/loomy` 面板把积分数字带到了 v2
+TUI 里。v2 侧的插件是手机验证码登录、实时模型清单、网关对话，以及
+面板。
 
 ## 登录
 
@@ -64,8 +126,21 @@ low/medium/high 三档 reasoning-effort 变体。网关把积分倍率拼在展�
 （`MiniMax M3 （x4.0）`——半角全角括号都出现）；插件把后缀拆下来——
 名字保持干净，倍率挂到模型记录上，宿主选择器读的正是这个字段。
 上游自己声明免费的模型——名字里带「免费」二字，或倍率恰为零——
-带 `free` 位；完全没有倍率的不算免费。不是 chat 模型的行（生图模型就
-这么声明）不会出现在清单里：选它就是选一个失败。
+带 `free` 位；完全没有倍率的不算免费。不是 chat 模型的行不会进聊天
+清单：生图模型在 `type` 里就这么声明，而且 id 和名字带着生图模型的
+字眼——与宿主自己的图像模型目录同一套词，所以连完全不带 `type` 的行
+也照排不误：跟它聊天就是一次失败。
+
+生图模型由插件自己的花名册放回清单旁边——插件为下面三个背书，各自用
+花名册给的展示名，线上行自己的事实（上下文与输出上限、能力位）随行。
+一条目只在实时目录还认它 id 的时候在表里：Loomy 下架某个生图模型，
+下一次应答它就消失，不需要发版；Loomy 新增的，则等把它写进花名册的
+那一版。兜底表里没有生图条目——没有实时应答就无法证明它还在，
+而「失效了还挂着入口」正是花名册要防的事。宿主侧，列进清单的生图
+模型在 id 命中宿主自己的图像模型词表时（`qwen-image`、`seedream`……
+`Hy-Image` 不在其列）会进提供方的「图像模型」行；在宿主学会把插件的
+生图模型挪出聊天清单之前（yetone/magpie#2792），它们也会以 chip 的
+形式留在模型列表里：不勾选即可，没有 agent 会跟它们对话。
 
 实时清单是唯一事实来源，一应答即生效。没有会话、应答为空或请求失败时，
 插件回落到代码里的内置表——2026-10-28 同一份目录文本模型的快照，
@@ -91,7 +166,8 @@ low/medium/high 三档 reasoning-effort 变体。网关把积分倍率拼在展�
 | `qwen-image-3.0-pro` | qwen image 3.0 pro | — | 生图 |
 
 三个生图行声明了 `output_modalities: ["image"]`——它们画图而不是用文字
-回答，其应答如何走 chat 端点尚未验证。
+回答，其应答如何走 chat 端点尚未验证。旧版清单时代勾过的一行，如今
+就是花名册的条目回来了，不再是「清单已不再认识的勾选」。
 
 ## 用量
 

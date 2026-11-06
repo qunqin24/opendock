@@ -165,6 +165,9 @@ With the mouse:
 
 - Click a session to open it, or a heading to fold or unfold it.
 - Hover a row to show its `✕`, and click it to close that session or project.
+- Right-click a session for **Mark read**/**Mark unread** and **Park**/**Unpark**, then click an item or press
+  its key. The menu acts on the session you right-clicked and leaves the cursor where it is. Focus returns to
+  where it was, such as the message box, when the menu closes.
 - Click **? help** at the bottom for the key reference.
 
 Opening a session, with Enter or a click, moves focus to its conversation so you can type right away. Press

@@ -13,10 +13,11 @@ The full documentation is in Chinese: [中文说明](#中文说明).
 - **Push**: the final reply of each turn, live progress (merged, at most one message per 15 s, one per 60 s once half the send quota is used), and errors arrive as `[3] OpenCode · project / title` followed by the text. Images mentioned in a reply are sent too.
 - **Approve**: permission requests arrive with the action to run. Reply `3 y` or `3 n`. For Codex desktop you can answer on the PC or in WeChat, whichever comes first.
 - **Answer questions**: the agent's question tool shows the options in WeChat. Answer with an option number, an option's text or free text, all at once or one by one.
-- **Control**: `3 your message` continues conversation 3 (OpenCode or Codex, shared numbering), `3` shows its last reply, and `3 历史` reads back recent messages. Also `/model`, `3 /stop` (stop conversation 3's running reply), `/compact`, undo, and starting a new conversation in a folder you pick.
+- **Control**: `3 your message` continues conversation 3 (OpenCode or Codex, shared numbering), `3` shows its last reply, and `3 历史` reads back recent messages. Also `/model` (`模型`, `模型 46`, `3 模型 46`), `3 /stop` (stop conversation 3's running reply), `/compact`, undo, and starting a new conversation in a folder you pick.
+- **Thinking effort**: `思考` lists the levels the conversation's model offers and marks the current one. `思考 高`, `思考 2` or `/effort high` switch, and `3 思考 低` sets conversation 3. OpenCode changes the conversation's model variant, so the desktop app follows; Codex uses the level from the next turn sent from WeChat. A model without levels says so. `/model` keeps the current level when the new model has it too.
 - **Pause**: `/stop` (no number) pauses the whole bridge: no pushes from the plugin, the daemon or the Codex hooks, no WeChat commands, Codex permission requests are left to the PC, and the Codex background program (the bridge's own `codex app-server`) is closed. `/start` resumes and opens it again. See [Pause and resume](#pause-and-resume).
 - **Fast after sleep**: while the bridge runs, the process that receives your messages keeps the Codex background program up, so the first message to a Codex conversation no longer waits for it to start (3 to 9 s here). `帮助`, `列表` and `额度` answer at once even while a Codex message is still starting, and after the PC wakes from sleep the bridge reconnects immediately. See [Codex background program](#codex-background-program).
-- **Send images and files** from WeChat into a conversation.
+- **Send images and files** from WeChat into a conversation. Drop a wrong one before the text goes out: `不要 2` removes item 2, `发错了` removes all.
 - **Files on request**: after each turn the bot lists the files the agent mentioned or changed (images still send themselves; likely secrets such as `.env` or `*.pem` are never listed). Nothing is sent until you pick: `3 文件 1 3` sends the 1st and 3rd of conversation 3, `3 文件 全部` sends all, `文件 path` sends any file on the PC. `文件提示 关` turns the lists off. Details in [文件](#文件).
 
 | | Push replies | Approve | Send messages, history | Answer questions |
@@ -32,6 +33,7 @@ Images mentioned in a reply are sent automatically. Other files (pdf, py, docx, 
 
 - `3 文件 1 3` (or `1,3`) sends files 1 and 3 of conversation 3; `3 文件 全部` sends all; `3 文件` shows the list again. Without the number it is the current conversation.
 - `文件 path` or `/file path` sends any file by path (relative to the folder picked with `目录`). No secret filter, but the 50 MB limit applies.
+- Sending runs in the background. `图 path`, `文件 path` and `3 文件 1 3` are checked first (path, exists, size), then uploaded while other commands keep working. Several files, or 5 MB or more in total, first get one reply `开始发送 N 个文件（共 X MB）`; the result is reported only if something failed or waited for the quota. An upload with no progress for 15 s is retried, up to 3 times (the CDN sometimes answers 45 s after the upload finishes). `WECHAT_NOTIFY_STALL_MS` changes the 15 s.
 - `文件提示 关` / `文件提示 开` (or `/files off` / `/files on`) turns the offers off or on. Default on.
 
 An offer is kept in the state file for 24 hours or until the next one for that conversation. The same works for OpenCode (tool calls and `GET /api/session/{id}/diff`) and Codex (`fileChange` items). Files go out as iLink `file_item` messages (upload `media_type` 3). Details in [文件](#文件).
@@ -101,9 +103,10 @@ Messages to a Codex conversation that is not open in the desktop window run in a
 - Developed and used on Windows. Other platforms are untested (the macOS and Linux autostart entries are unit-tested only).
 - WeChat-side commands and the plugin's replies are in Chinese (`列表`, `目录`, `新对话`, `撤回`, `文件`, `帮助`). Several have slash aliases (`/list`, `/new`, `/history`, `/img`, `/live`, `/unsend`, `/file`, `/files`, `/help`, `/quota`), and `/model`, `3 /stop`, `/compact` work as written (`/stop` without a number pauses the bridge, `/start` resumes it).
 - Only messages from the WeChat account that logged in the bot are handled. Anyone who controls that account, or can read `~/.cli-bridge`, can run commands and approve permissions through your agents. Keep the phone and those files safe.
-- WeChat limits bots (from third-party implementations, not official documentation): about 10 bot messages after each message you send (`ret=-2 prepare failed` after that), and a `context_token` that expires after about 24 hours. Sending the bot any message resets both. The bridge keeps one shared count of the 10 in the state file (plugin, daemon and Codex hooks all add to it) and reserves the last 3 sends for approvals, questions, errors, final replies and command replies: live progress and file offers are skipped when fewer than 4 remain. The file offer rides in the last chunk of the final reply when it fits, command replies produced together go out as one message, and live progress slows from every 15 s to every 60 s once 5 are used. What cannot be sent once the 10 are gone (text, images, files) waits in an outbox in the state file (20 items, 24 hours), one send is kept for the notice `额度用完了：还有 k 条没发，回任意一句话就补发`, and your next message flushes the outbox in order before it is handled. `额度` (or `/quota`) replies `已用 x/10，队列里 k 条`. One text message is cut into chunks of 3500 characters: a real 4516-character `sendmessage` returned `ret=0` (verified by the API, not on the phone yet); if your phone shows a cut message, set `WECHAT_NOTIFY_CHUNK=1800`. Two text items in one `sendmessage` are rejected (`ret=-2 invalid arguments`), so merging only joins texts into one item.
+- WeChat limits bots (from third-party implementations, not official documentation): about 10 bot messages after each message you send (`ret=-2 prepare failed` after that), and a `context_token` that expires after about 24 hours. Sending the bot any message resets both. The bridge keeps one shared count of the 10 in the state file (plugin, daemon and Codex hooks all add to it) and reserves the last 3 sends for approvals, questions, errors, final replies and command replies: live progress and file offers are skipped when fewer than 4 remain. The file offer rides in the last chunk of the final reply when it fits, command replies produced together go out as one message, and live progress slows from every 15 s to every 60 s once 5 are used. What cannot be sent once the 10 are gone (text, images, files) waits in an outbox in the state file (20 items, 24 hours), one send is kept for the notice `额度用完了：还有 k 条没发。回「咕咕嘎嘎」就补发（我不会回话），不要了回「清空队列」`, and your next message flushes the outbox in order, one message per queued item, before it is handled. A flush that stops at the reserve says how many are left. `咕咕嘎嘎` (also `刷新`, `刷新额度`) only resets the quota and flushes, with no reply and nothing sent to the agent; `清空队列` drops the outbox without sending it. `额度` (or `/quota`) replies `已用 x/10，队列里 k 条`. One text message is cut into chunks of 3500 characters: a real 4516-character `sendmessage` returned `ret=0` (verified by the API, not on the phone yet); if your phone shows a cut message, set `WECHAT_NOTIFY_CHUNK=1800`. Two text items in one `sendmessage` are rejected (`ret=-2 invalid arguments`), so merging only joins texts into one item.
 - WeChat commands are executed by whichever process holds the poll lock: the OpenCode background service, or the daemon. Without OpenCode running, the daemon still handles Codex; replies about OpenCode conversations say OpenCode isn't running. Do not run cli-chat-bridge's `wechat-opencode` daemon at the same time; both would fight over the same bot's messages.
 - Controlling the Codex desktop window uses its undocumented `codex-ipc` pipe, checked against desktop version 26.1023. A desktop upgrade can break it; terminal and background-run conversations are unaffected.
+- iLink has no API to recall, delete or edit a message the bot already sent. Buffered media is listed with fixed numbers when received; `取消图 2` / `取消图 1 3` drops only those items, plain `取消图` (also `取消文件`, `撤回图`, `/cancel`) drops all of them, before they are attached to a prompt. `不要 2` (also `去掉 2`, `2号不要`), `这张不要` (or `上一张不要`, the latest one) and `发错了` / `算了` / `不要了` / `取消` do the same while media is waiting; with nothing waiting they go to the AI as ordinary text. Recalling an image in WeChat (long-press, recall) also drops it, based on the `delete_time_ms` field of the iLink message, not yet verified on a phone. `WECHAT_NOTIFY_DEBUG_MSG=1` logs the shape of incoming messages to `~/.cli-bridge/wechat-notify.log` (types and numbers only). `N 撤回` removes the user message and its attachments from the agent's conversation, but anything already delivered to WeChat stays in the chat and must be deleted by hand there. Media cached under `~/.cli-bridge/inbound-images/` is not removed either.
 - `opencode --standalone`: pushes work, other features are unverified.
 
 License: MIT. Tests: `npm test` (no network, nothing is sent to WeChat).
@@ -269,8 +272,10 @@ npx agent-wechat-bridge setup        # 在源码目录里也可以：node setup.
 
 - **留 3 条**：审批、提问、出错、最终回复、命令回复可以用到倒数第 2 条；实时进度和文件清单只在还剩 4 条以上时发，否则跳过。跳过过的话，这一轮最后那条推送末尾会说一次「（有 k 段进度没推，看桌面端或「N 历史」）」。
 - **省条数**：文件清单放得下的话并进最终回复的最后一段，不单独发；一次产生的几条命令回复合成一条；实时推送 15 秒一条，用掉 5 条后改成 60 秒一条。
-- **发件箱**：额度用完后发不出的消息（文字、图片、文件）排进状态文件的 `outbox`，最多 20 条、保留 24 小时，满了丢最旧的。最后一条额度留给提示「额度用完了：还有 k 条没发，回任意一句话就补发」。你下一次发消息时，先按顺序补发（连续的文字合成一条，补发时同样给后面留 3 条），再处理这条消息；丢掉的条数在补发时说一句。Codex hook 进程也是排队，不丢。
+- **发件箱**：额度用完后发不出的消息（文字、图片、文件）排进状态文件的 `outbox`，最多 20 条、保留 24 小时，满了丢最旧的。最后一条额度留给提示「额度用完了：还有 k 条没发。回「咕咕嘎嘎」就补发（我不会回话），不要了回「清空队列」」。你下一次发消息时，先按顺序补发（每条单独发，不合并；补发时同样给后面留 3 条，停下时说一句「还有 N 条没补发完」），再处理这条消息；丢掉的条数在补发时说一句。Codex hook 进程也是排队，不丢。
 - **`额度`**（也认 `/quota`）：回「已用 x/10，队列里 k 条」。
+- **`咕咕嘎嘎`**（也认 `刷新`、`刷新额度`）：只刷新额度并补发，机器人不回话，也不发给 AI。
+- **`清空队列`**（也认 `清除队列`、`清队列`）：丢掉发件箱里没补发的，回「已清空队列（N 条）」。
 - 发送遇到 `ret=-2` 隔 2 秒重试一次，还失败就当作额度用完。
 
 ## 在微信里回复
@@ -289,12 +294,15 @@ npx agent-wechat-bridge setup        # 在源码目录里也可以：node setup.
 | `目录` | 列出 OpenCode 打开过的文件夹（按最近使用排序），`- 1 ttool` 这样带编号 |
 | `目录 2` / `目录 读书笔记` | 选中文件夹，并列出它最近的对话 |
 | `新对话 内容` | 在选中的文件夹里新建对话并发出内容（不带内容就只新建，接着直接发即可）。模型沿用该文件夹最近一次对话的模型 |
-| `图 路径` / `/img 路径` | 把电脑上的图片发到微信。相对路径按「目录」选中的文件夹算；必须以图片扩展名结尾，所以「图片怎么发」照常发给对话 |
+| `图 路径` / `/img 路径` | 把电脑上的图片发到微信。相对路径按「目录」选中的文件夹算；必须以图片扩展名结尾，所以「图片怎么发」照常发给对话。上传在后台进行（见「文件」下的「后台发送」） |
 | `3 文件 1 3` / `3 文件 全部` / `3 文件` | 从 [3] 这一轮的文件清单里发送第 1、3 个 / 全部，或重新列出清单（见下面「文件」）。不带编号就是当前对话 |
-| `文件 路径` / `/file 路径` | 把电脑上任意文件发到微信（相对路径按「目录」选中的文件夹算，最大 50 MB）。「文件 路径」要像路径（有扩展名或斜杠），所以「文件夹里有什么」「5 文件名改一下」照常发给对话 |
+| `取消图` / `取消图 2` / `取消图 1 3` | 清掉还压在电脑里、等着跟下一条文字一起发给 AI 的图片和文件。收到图时会列出带编号的清单，**带编号只取消选中的那几张**（编号固定，中途再发图也不会变），不带编号就全部取消，也认 `取消图 全部`。别名：`取消文件`、`取消图片`、`取消附件`、`清空图`、`撤销图片`、`撤回图`、`/cancel`。已经发给 AI 的、或机器人推到微信里的撤不回来 |
+| `不要 2` / `去掉 2` / `2号不要` / `第2张不要` | 只取消待发的 2 号（编号同 `取消图` 的清单）。`这张不要` / `上一张不要` / `取消最后一张` 取消最近一张。`发错了` / `算了` / `不要了` / `取消` 全部取消。没有待发的图片或文件时，这些话照常发给 AI |
+| `文件 路径` / `/file 路径` | 把电脑上任意文件发到微信（相对路径按「目录」选中的文件夹算，最大 50 MB），在后台上传（见「文件」下的「后台发送」）。「文件 路径」要像路径（有扩展名或斜杠），所以「文件夹里有什么」「5 文件名改一下」照常发给对话 |
 | `文件提示 关` / `文件提示 开` | 关 / 开每轮结束后的文件清单，也认 `/files off` / `/files on`，默认开 |
 | 发图片 / 文件 | 先存起来（见下面「从微信发图片和文件」），下一条文字带上它们一起发 |
-| `/model` | 列出可用模型并编号（`- 1 服务商/模型`），标出当前对话在用的那个。`/model 3`、`/model 名字片段` 切换（匹配到多个会让你选） |
+| `/model` / `模型` | 列出可用模型并编号（`- 1 服务商/模型`），标出当前对话在用的那个。`/model 3`、`模型 46`、`切换模型 46`、`3 模型 46`、`/model 名字片段` 切换（匹配到多个会让你选）。切换时保留当前思考强度（新模型也有这一档时） |
+| `思考` | 列出当前对话的模型可选的思考强度（编号，标出当前档）。`思考 高`、`思考 超高`、`思考 2`、`/effort high` 切换，`3 思考 低` 指定 [3]。OpenCode 改的是对话模型的 variant，桌面端也跟着变；Codex 从微信发出的下一轮起生效。模型没有档位时会说明 |
 | `3 /stop` | 停止 [3] 正在运行的回复。必须带编号：不带编号的 `/stop` 是下面的暂停服务（0.4.0 起，以前不带编号是停当前对话） |
 | `/stop` / `停止服务` | 暂停整个服务：不再推送，也不执行微信命令，只认 `/start`、`帮助`、`额度`，Codex 后台程序也关闭（见「暂停和恢复」） |
 | `/start` / `开始` / `启动服务` | 恢复服务，Codex 后台程序重新打开。`开始` 只在暂停时算命令，运行中和别的文字一样发给对话 |
@@ -339,11 +347,13 @@ AI 用提问工具问你（桌面端显示「1/3 个问题」那种），推送�
 
 ### 撤回
 
-`3 撤回` 先回一条确认（两段）：「[3] OpenCode · ttool 将撤回「前 30 个字…」及之后的 k 条回复」，空一行，「确认发「3 撤回 确认」（2 分钟内有效）」，2 分钟内回 `3 撤回 确认` 才执行。确认时最后一条消息变了（比如又发了新消息），就不撤回，让你重新发 `3 撤回`。
+`3 撤回` 先马上停掉 [3] 正在运行的回复，再回一条确认（两段）：「[3] OpenCode · ttool 将撤回「前 30 个字…」及之后的 k 条回复」，空一行，「确认发「3 撤回 确认」（2 分钟内有效）」，2 分钟内回 `3 撤回 确认` 才执行。确认时最后一条消息变了（比如又发了新消息），就不撤回，让你重新发 `3 撤回`。
 
 - OpenCode，消息还在排队（AI 正忙，消息在 inbox 里等着）：取消这条排队的消息（`DELETE /api/session/{id}/inbox/{inboxID}`），AI 不会看到它。
 - OpenCode，消息已经发给 AI：正在回复就先停止（`/interrupt`），然后回到这条消息之前（`POST /api/session/{id}/revert/stage`，`files: true`，再 `/revert/commit`），这条消息和之后的回复都删掉。在 git 仓库里，这几轮改过的文件也会还原，回复里列出还原了哪些文件；文件夹不是 git 仓库时 OpenCode 没有快照，文件不会还原，回复里会注明。电脑上有一个还没完成的撤回时不处理。
 - Codex：用插件自己的 app-server 调 `thread/revert`，删掉最后一条用户消息所在的那一轮和之后的所有轮。只改对话记录，改过的文件不会还原。对话在桌面窗口里打开着、在终端里运行，或者插件正在后台跑它时不处理（后者先发 `3 /stop`）。
+
+如果这条消息带了图片或文件，确认里会多一行「这条还带了 2 张图片、1 个文件：…」，撤回后 AI 那边连同附件一起看不到，回执也会写明数量。**微信里已经收到的图片和文件删不掉**：iLink 没有撤回已发消息的接口，只能在微信里自己长按删除；电脑 `~/.cli-bridge/inbound-images/` 下的暂存文件也不会自动删。还没交给 AI 的待发图片和文件用 `取消图` 清掉（带编号可以只取消其中几张），或用 `不要 2`、`发错了` 等（见「在微信里回复」）。
 
 发 `帮助` 或单发一个 `/`，会收到两条：第一条是插件命令，分成几节，每节一行标题、一个空行、再是 `- ` 开头的命令（一条命令一行，措辞压到手机上差不多一行）；第二条是斜杠命令，包括当前对话所在文件夹里 OpenCode 自带的命令和说明（插件、技能装的命令也在里面，每个一行 `- /名字 → 说明`）。
 
@@ -412,7 +422,8 @@ Codex 对话（标着 `Codex ·`）同样支持上面这些命令，细节见「
   - OpenCode：这一轮的 edit / write / patch 工具调用，加上 `GET /api/session/{id}/diff`（在 git 仓库里还能看到命令生成的文件；不是 git 仓库时 OpenCode 没有快照，diff 为空，只靠工具调用）。
   - Codex：这一轮的 `fileChange` 项。终端和桌面窗口里的对话由 Stop hook 读 `~/.codex/thread_history_1.sqlite`（按 hook 给的 `turn_id`，库里找不到这一轮就取最后一条用户消息之后的）；插件后台跑的对话直接用 app-server 的 `item/completed`。删除的文件不算，移动的算新位置。Codex 用命令生成的文件没有 `fileChange` 记录，只有回复里提到时才会列出。
 - **过滤**：只列存在、非空、不超过 50 MB 的普通文件；不要目录和图片（png/jpg/jpeg/gif/webp 仍照旧自动发）；不列疑似密钥的：`.env*`、`*.pem`、`*.key`、`*.pfx`、`*.p12`、`id_rsa*`（`id_ed25519*` 等同理）、`auth.json`、`account.json`、`.netrc`、`.npmrc`、`~/.cli-bridge` 里的任何文件（包括 `WECHAT_NOTIFY_DIR`），以及 `.git/`、`node_modules/`、`.ssh/` 下的文件。去重，最多列 10 个，多出来的写「…还有 k 个」（想要就用 `文件 路径`）。同名的文件显示相对于对话文件夹的路径。
-- **选择**：`3 文件 1 3`（也认 `1,3`）发第 1、3 个，`3 文件 全部` 全发。一个一个发出，最后回「已发送 2 个文件」。编号不存在时回「没有第 7 个文件（共 3 个）」，一个都不发；文件已经被删了会写在回复里，其余照发。`3 文件` 重新列出清单。不带编号（`文件 1 3`、`文件 全部`、`文件`）就是当前对话。每个文件占一条机器人消息，和别的消息一样受「用户每发一条消息之后大约只能发 10 条」的限制。
+- **选择**：`3 文件 1 3`（也认 `1,3`）发第 1、3 个，`3 文件 全部` 全发。在后台一个一个发出（见下一条「后台发送」）。编号不存在时回「没有第 7 个文件（共 3 个）」，一个都不发；文件已经被删了会写在回复里，其余照发。`3 文件` 重新列出清单。不带编号（`文件 1 3`、`文件 全部`、`文件`）就是当前对话。每个文件占一条机器人消息，和别的消息一样受「用户每发一条消息之后大约只能发 10 条」的限制。
+- **后台发送**：`图 路径`、`文件 路径`、`3 文件 1 3` 先检查路径、是否存在、大小，然后在后台上传，其他命令照常用。多个文件或总共 5 MB 以上，先回一句「开始发送 N 个文件（共 X MB）」；全部成功不再另发消息，有失败或因额度排队才汇报。上传 15 秒没有进展就重试，最多 3 次（实测 CDN 偶尔会在上传完后 45 秒才响应）。环境变量 `WECHAT_NOTIFY_STALL_MS` 可以改这 15 秒。
 - **清单的保存**：存在状态文件的 `offers[对话]`（`{files, at}`），同一个对话新的清单替换旧的（新一轮没有文件时旧的保留），24 小时后过期，对话编号回收时一起删。Codex 的清单由 Stop hook 进程生成，由拿着 `poll.lock` 的那个程序（插件或后台程序）回答，所以都走状态文件（写入和其他数据一样先写临时文件再改名）。
 - **按路径发**：`文件 路径` 或 `/file 路径`，相对路径按「目录」选中的文件夹算。这是你明确要的，所以不过滤疑似密钥，但同样限制 50 MB。`文件` 后面不像路径（没有扩展名也没有斜杠）的，比如「文件 太大了怎么办」，照常发给对话；`/file` 后面什么都当路径。
 - **开关**：`文件提示 关` / `文件提示 开`（`/files off` / `/files on`；`文件提示` 看状态），对所有对话生效，存在状态文件的 `filesOff`，默认开。关掉后每轮结束不再查文件也不发清单，`文件 路径` 照常用。
@@ -427,6 +438,7 @@ Codex 对话（标着 `Codex ·`）同样支持上面这些命令，细节见「
 3. 不想写说明：回 `发`（或 `send`、`图`），带编号就是 `3 图`，会用「请看图片」作为文字发出。没有存着的图片时，这几个字会回「没有待发的图片或文件」，不发给 AI。
 
 - 存着的图片 10 分钟内有效，过期丢弃；一次发出后清空。批准（`3 y`）、`3`、`3 历史` 这些命令不会用掉它们。
+- 发错了：待发的图片和文件用「在微信里回复」表里的 `不要 2`、`这张不要`、`发错了` 等取消。在微信里长按撤回一张图片，也会把它从待发里去掉：依据 iLink 消息的 `delete_time_ms` 字段，**未经真机验证**。设环境变量 `WECHAT_NOTIFY_DEBUG_MSG=1` 会在 `~/.cli-bridge/wechat-notify.log` 记录收到消息的结构，只记类型和数字字段，不记内容。
 - OpenCode：图片以 `file:///` 链接放在 prompt 的 `files` 里，服务端读文件、按类型（`image/png` 等）存进消息。Codex：放在 `turn/start` 的输入里（`{"type":"localImage","path":…}`），后台运行和桌面窗口两条路径都一样。
 - 文件消息也收：存到同一个目录（保留原文件名），下一条文字末尾会附上「微信发来的文件已保存在：路径」，由 AI 自己去读。
 - 扩展名按文件头识别（png/jpg/gif/webp/heic/bmp/pdf/zip，认不出是 `.bin`）；不是 png/jpg/gif/webp 的图片按文件处理。超过 20 MB 的不下载。

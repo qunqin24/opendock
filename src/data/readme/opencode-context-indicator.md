@@ -358,12 +358,16 @@ notice if needed.
   unambiguous payload boundary instead of a leading "reproduce exactly"
   phrasing. Residual risk: a model may still add light commentary or include the
   tags themselves.
-* **Deleted sessions age out over 7 days.** A `state.json` entry is pruned on
-  the next write once it has been untouched for 7 days (tombstone prune), so
-  deleted sessions no longer linger until the `MAX_TRACKED_SESSIONS` LRU cap.
-  Until the prune fires, a deleted session that had already served a step (has
-  tokens) is not filtered as a phantom and may momentarily appear in the
-  table.
+* **Deleted sessions are dropped immediately.** A `session.deleted` event removes
+  the session's `state.json` entry - and every entry under it in the `parentID`
+  chain - instead of waiting for the 7-day tombstone prune, so the row leaves
+  `/context-breakdown`, the `/cx` picker and the Desktop tab at once. The removed
+  IDs are remembered for the lifetime of the instance (the host never reuses an
+  ID), so a late idle/step write, or a child that was still running when its
+  parent was deleted, cannot recreate the row - without that barrier it came back
+  as a phantom ROOT session. A state lock that is busy at delete time queues the
+  removal for the next write instead of losing it. The 7-day tombstone remains as
+  the backstop for sessions that vanish without an event.
 
 ### TUI session panel (V2, terminal only)
 
@@ -766,7 +770,7 @@ caller.
 
 ```bash
 npm run build:gui             # build dist/gui-experimental.cjs (required by the gate)
-npm run test:prepublish       # fast gate: tarball + JSX-free TUI + resolve + T1-T41 unit checks + GUI bundle + GUI runtime smoke
+npm run test:prepublish       # fast gate: tarball + JSX-free TUI + resolve + T1-T43 unit checks + GUI bundle + GUI runtime smoke
 npm run test:types            # tsc for the TUI entry AND the Desktop GUI part
 npm run test:e2e              # full E2E: plugin load + one "Say OK" round-trip + npm-layout liveness
 npm run test:e2e:quick        # E2E load-only, no LLM call
@@ -790,7 +794,7 @@ STEP 80 s + PROBE 45 s, ~4 min total.
 | (a) tarball composition | `package.json` `files[]` expands to the base files plus every `lib/*` module (count asserted dynamically); `docs/` may contain images only; `dist/` may contain only the built GUI bundle | no test/node_modules/tsconfig in the tarball, and no published export pointing at nothing |
 | (b) JSX-free TUI | no `.tsx`/`.jsx` in the TUI surface (root + `lib/`), every TUI source parses with esbuild `loader:"ts"` (JSX syntax fails), no `@jsx*` pragma, imports stay inside the host-bridgeable allowlist, relative imports carry a file extension | OpenCode skips its Solid transform under `node_modules` (#33884): one JSX file freezes the npm-installed sidebar |
 | (c) resolve chain | walks the real TUI import graph (`resolve-bridge.cjs`): every bare specifier is host-bridged, every relative one resolves to a shipped file, and **no host-bridged module is a production dependency** (a second Solid/OpenTUI instance freezes the surfaces) | an accidental runtime dependency, or a bad local import, silently breaks the sidebar |
-| (d) unit harness T1-T42 | limit/agent/state fix assertions plus measureContributors, redacted-export, shared category-helper, sanitizer/unicode, prompt-cache, waste-detector, compaction-reserve, top-consumer, diff, subagent-rollup and Desktop-RPC checks (111 total; T30 schema-vs-builder drift, T31 registration + handler, T32-T36 fallback-vs-hook category priority across the report, the shared state file and the live log (T36: a counter-less hook entry borrows the snapshot or prints `?`), T37 the opencode 2.2.5 `min(input, context)` window, T38 the configured `compaction.buffer` (JSONC strip, project/global precedence, percent/token conversion, env/argument priority, per-project isolation), T39 the TUI composer capsule thresholds, T40 the data-first command payload + locale-free clock + labelled contributors, T41 model-scoped breakdowns after an in-session model switch, T42 the panel row width budget (the column sum never exceeds the panel; the stale-marker columns come out of the row, not on top of it), T25c/T25d compaction-hook arming, T34 cross-instance summary merge) | regressions in modelLimits, writeStateFile, hydrate, contributors, export, subagent lifetime, and a GUI/server wire mismatch |
+| (d) unit harness T1-T43 | limit/agent/state fix assertions plus measureContributors, redacted-export, shared category-helper, sanitizer/unicode, prompt-cache, waste-detector, compaction-reserve, top-consumer, diff, subagent-rollup and Desktop-RPC checks (116 total; T30 schema-vs-builder drift, T31 registration + handler, T32-T36 fallback-vs-hook category priority across the report, the shared state file and the live log (T36: a counter-less hook entry borrows the snapshot or prints `?`), T37 the opencode 2.2.5 `min(input, context)` window, T38 the configured `compaction.buffer` (JSONC strip, project/global precedence, percent/token conversion, env/argument priority, per-project isolation), T39 the TUI composer capsule thresholds, T40 the data-first command payload + locale-free clock + labelled contributors, T41 model-scoped breakdowns after an in-session model switch, T42 the panel row width budget (the column sum never exceeds the panel; the stale-marker columns come out of the row, not on top of it), T43 deleted-session purge of `state.json` (subtree removed, peers kept, unsafe keys rejected, late writes for a pruned or not-yet-persisted child dropped), T25c/T25d compaction-hook arming, T34 cross-instance summary merge) | regressions in modelLimits, writeStateFile, hydrate, contributors, export, subagent lifetime, and a GUI/server wire mismatch |
 | (e) corporate-identifier scan | no forbidden identifiers in the published surface (`index.js`, `tui.ts`, `lib/*`, `gui/*`, `README.md`, `CHANGELOG.md`, `package.json`, the GUI build config) or the test tree | compliance |
 | (f) non-English scan | no non-ASCII letters (`\p{L}` above U+007F) in the same published surface and test tree (`docs/` is image-only and is not text-scanned) | English-only source rule |
 | (g) Desktop GUI bundle | `dist/gui-experimental.cjs` exists and is a non-trivial single-file CJS bundle: no ESM `import`, no dynamic `import()`, no Node built-in, and every app-provided module (`solid-js`, `solid-js/web`, `@opencode/plugin/gui`, `@opencode/plugin/rpc`) still a `require()` - no bundled second copy, no React/OpenTUI/bare-`opencode` import; the artifact must also be newer than every source file it inlines | a stale or hand-edited bundle, or a build that inlines the app instance, breaks the Desktop panel at load time |

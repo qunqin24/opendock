@@ -24,7 +24,7 @@ Requires [Magpie](https://usemagpie.ai) ≥ 0.1.1340 and Node.js ≥ 20.
 magpie plugin add magpie-agent-console
 ```
 
-Or in Magpie: **Settings → Plugins → Add plugin**, enter `magpie-agent-console`. After install, **Agent Console** appears in the sidebar plugin group.
+Or in Magpie: **Settings → Plugins → Add plugin**, enter `magpie-agent-console` (or find **Agent Console** in Discover). After install, **Agent Console** appears in the sidebar plugin group.
 
 Install the Agent CLIs you want to use (for example `claude` or `codex`). Missing CLIs show an install hint in Settings.
 
@@ -103,7 +103,7 @@ The daemon can run Agents with full access to your machine, so the token that un
 - **Host is checked on every request and WebSocket upgrade** (gate and daemon): it must be `127.0.0.1:<port>` or `localhost:<port>` with the actually bound port, otherwise 421. This blocks DNS rebinding, where the attacker's requests carry no `Origin` at all.
 - The gate answers only `GET /open?k=<gate key>` (the daemon token is not accepted there) and `GET /app` (1.3, below), refuses any request that carries an `Origin` header, and sends `Cache-Control: no-store`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`.
 - WebSocket connections must send `hello` with the token within 5 seconds, otherwise they are closed with code 4401.
-- **Coming back after sleep / a daemon restart (1.3).** Before 1.3 the plugin frame sat on the daemon's random port; when the daemon was gone after sleep and the WebView reloaded the frame, it showed "127.0.0.1 拒绝连接" with none of our script left to recover. Now `/open` redirects to the gate's own `GET /app`, a static page that frames the daemon page, so a reload lands on the stable gate port. The daemon page (told by `w=1`) posts `{ac_console:"alive"}` to it every 2 s while its WebSocket is open and `{ac_console:"lost"}` after 5 s without it; no alive within 12 s (6 s after the child frame loaded), a lost, or 15 s of silence while visible (time the wrapper's own timers were suspended doesn't count) sends the frame back through the Magpie page (`b`, as below), which restarts the daemon. At most 3 automatic tries in 2 minutes (`ac_try`), then a button. The wrapper holds no secret of its own: the token arrives only in its fragment and goes on only in the child's fragment, the gate key never reaches it, the child is always `http://127.0.0.1:<integer port>/`, `b` passes the same loopback Magpie-page check, only the Magpie theme protocol is relayed (theme events and hello answers down, the hello call up, messages checked by `event.source`), and it is served with a per-response nonce CSP (`default-src 'none'`, `frame-src http://127.0.0.1:*`, and `frame-ancestors 'self' http://127.0.0.1:* http://localhost:* http://[::1]:* http://wails.localhost:* wails:`, so only a loopback page or Magpie's own desktop window can frame it). Host and Origin checks apply to `/app` like to `/open`.
+- **Coming back after sleep / a daemon restart (1.3).** Before 1.3 the plugin frame sat on the daemon's random port; when the daemon was gone after sleep and the WebView reloaded the frame, it showed "127.0.0.1 拒绝连接" with none of our script left to recover. Now `/open` redirects to the gate's own `GET /app`, a static page that frames the daemon page, so a reload lands on the stable gate port. The daemon page (told by `w=1`) posts `{ac_console:"alive"}` to it every 2 s while its WebSocket is open and `{ac_console:"lost"}` after 5 s without it; no alive within 12 s (6 s after the child frame loaded), a lost, or 15 s of silence while visible (time the wrapper's own timers were suspended doesn't count) sends the frame back through the Magpie page (`b`, as below), which restarts the daemon. At most 3 automatic tries in 2 minutes (`ac_try`), then a button. Coming back to the page (`visibilitychange` → visible, or window focus) checks at once instead of waiting out the timers pushed back while hidden: if the child never said alive within 12 s of loading or its last real alive is older than 15 s, it gets 4 s (two heartbeats) to speak up before the same recovery runs; a child that answers is left alone. If a disconnect end state is showing, coming back counts as clicking Reconnect, also when the automatic tries are used up. The wrapper holds no secret of its own: the token arrives only in its fragment and goes on only in the child's fragment, the gate key never reaches it, the child is always `http://127.0.0.1:<integer port>/`, `b` passes the same loopback Magpie-page check, only the Magpie theme protocol is relayed (theme events and hello answers down, the hello call up, messages checked by `event.source`), and it is served with a per-response nonce CSP (`default-src 'none'`, `frame-src http://127.0.0.1:*`, and `frame-ancestors 'self' http://127.0.0.1:* http://localhost:* http://[::1]:* http://wails.localhost:* wails:`, so only a loopback page or Magpie's own desktop window can frame it). Host and Origin checks apply to `/app` like to `/open`.
 - **Coming back after a plugin host restart.** Magpie restarts its plugin host from time to time; the old host's daemon exits with it and the new host has a new gate key. `boot.js` passes its own page URL to the gate as `back`; the gate accepts it only if it is a loopback `/_magpie/plugin/<id>/index.html` URL and forwards it **only in the fragment** (`#t=…&b=…`). When the daemon page can't reconnect for 5 seconds (or on 重试 / Retry) it navigates back to that page, which reads the fresh `session.js` and opens the new gate. To tell a live host's `session.js` from one a killed host left behind (a hard kill can't delete it), the file carries `ts` and `beat`: from the first page open on, the host rewrites it every 4 s, and after a lost connection `boot.js` only takes a file written after the loss; a host that was never opened doesn't rewrite it, and a new host deletes a file whose writer (pid in `session-owner.json`, outside the page folder) is gone before Magpie serves the page. The daemon page checks the URL again before following it, so it is never an open redirect, and the token never leaves its own fragment.
 
 ### Preview proxy (1.2)
@@ -144,16 +144,18 @@ The plugin runs wherever Magpie runs (Windows, macOS, Linux). It needs **Node.js
 
 ## Reproducible build
 
-`app/app.js`, `app/app.css`, `app/index.html`, `daemon/dist/main.js` and `daemon/dist/main.js.map` are committed build outputs of `web/src` and `daemon/src` (esbuild, options in `scripts/build-v1.mjs`). The build is deterministic: no timestamps, no absolute paths, LF line endings enforced by `.gitattributes`.
+`app/app.js`, `app/app.css`, `app/index.html`, `daemon/dist/main.js` and `daemon/dist/main.js.map` are committed build outputs of `web/src` and `daemon/src` (esbuild, options in `scripts/build-v1.mjs`). They are committed because this repository ships packages as they are checked in: `publish.yml` packs each package onto the `dist` branch with `npm pack --ignore-scripts` (`scripts/dist.mjs`) and publishes it with `npm publish` from its folder, with no install or build step. So the bundles in a pull request are exactly what users get, and `verify:build` proves they are the build of the source next to them.
+
+The build is deterministic: no timestamps, no absolute paths, LF line endings enforced by `.gitattributes`. From this folder (`packages/agent-console`):
 
 ```bash
-npm ci
+npm ci --workspaces=false              # the repository root is an npm workspace; this installs here, from this folder's package-lock.json
 npm run build
 git diff --exit-code app daemon/dist   # no output = identical bytes
 npm run verify:build                   # rebuilds into a temp dir, byte-compares, prints SHA-256
 ```
 
-`verify:build` prints `OK <sha256>  <file>` for each bundle and exits non-zero on any mismatch.
+`verify:build` prints `OK <sha256>  <file>` for each bundle and exits non-zero on any mismatch. Without `--workspaces=false`, npm treats this folder as a member of the root workspace and looks for a lockfile at the repository root, which there isn't.
 
 ## Dependencies
 
@@ -203,14 +205,14 @@ Magpie in portable mode keeps its own config next to the executable, but this pl
 
 ## Development
 
-After `npm ci`:
+In `packages/agent-console`, after `npm ci --workspaces=false` (use `npm install --workspaces=false` too when changing dependencies, so the lockfile stays in this folder):
 
 ```bash
 npm run build      # daemon esm + web iife (app/ and daemon/dist are committed)
 npm run verify:build  # check committed bundles match a clean build
 npm run dev        # daemon on port 3499, data dir _tmp/xdg-dev (does not touch real data)
 npm run check      # typecheck both tsconfigs
-npm test           # vitest (test/v1 + web/src)
+npm test           # vitest (test/v1 + web/src); the repository's root `bun test` skips these (bunfig.toml) and runs agent-console.test.mjs
 npm run e2e:v1     # e2e: spawn daemon(3497) + Edge/Chrome/Chromium, Mock Agent (MSEDGE_PATH / CHROME_PATH to override)
 node scripts/verify-windows.mjs [--quick]   # one-command platform self-check, see docs/VERIFY-windows.md
 npm run shot:v1    # screenshot set (light/dark × scenes → _tmp/shots-v1/)

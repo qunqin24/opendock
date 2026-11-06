@@ -1,4 +1,4 @@
-# OpenCode QQ Bot
+﻿# OpenCode QQ Bot
 
 通过 QQ 机器人与 [OpenCode](https://opencode.ai) AI 编程助手对话——双向监控桌面会话、远程发起任务、权限审批与选择弹窗直达 QQ、图片语音双向、长任务不丢答案。
 
@@ -17,9 +17,9 @@
 | 双向对话 | QQ 消息直达 opencode 会话，AI 回复推回 QQ（markdown 渲染、长文自动结构化分条：表格不拆散、代码块围栏自动修补） |
 | 桌面会话镜像 | 📋 摘要卡：桌面会话的最近一轮问答实时推送到 QQ（默认全文） |
 | 进度观察 | `/watch` 订阅工具调用里程碑（🔧 命令摘要/退出码），节流合并推送 |
-| **权限审批** | opencode 发起权限请求 → QQ 收 🔐 四键卡片（允许一次/总是允许/拒绝/忽略），点按钮静默生效（点击后按钮回显 ✓，其余置灰），也可文字回复"允许/总是/拒绝" |
+| **权限审批** | opencode 发起权限请求 → QQ 收 🔐 四键卡片（允许一次/总是允许/拒绝/忽略），点按钮静默生效（点击后该按钮回显 ✓/✗，其余按钮保持原样），也可文字回复"允许/总是/拒绝" |
 | **选择弹窗桥接** | opencode 的 Form（选择/多选/布尔/文本）→ QQ 📝 卡片，点按钮或回字母（A/B/C）作答；桌面端回合发起的审批/表单**同样**推送（常驻监听，12s 轮询，bot 空闲也收得到） |
-| 远程指令 | `/new /stop /status /sessions /history /model /agent /rename /watch /mirror /progress /queue /send` |
+| 远程指令 | `/new /stop /status /sessions /history /model /agent /rename /watch /mirror /progress /queue /ledger /send` |
 | 富媒体 | 收图（原生附件给 AI 看图）；**收语音**（QQ 内置 ASR 免费转文字进 prompt）；**发图/发文件**（AI 回复含 `QQ_SEND_FILE: <路径>` 标记或 `/send <路径>` 指令，20MB 上限） |
 | 引用上下文 | 长按引用某条消息提问，AI 能感知被引用的内容（我方回复也会入索引缓存） |
 | 长任务不丢 | 前台 30min 超时 → 后台等待（SSE + 轮询，最长 24h）；停滞 30min 主动提醒（带「已停滞/状态不明/已终结未回传」状态位 + 最近工具动作 + 无进展时长） |
@@ -141,10 +141,11 @@ launchctl load ~/Library/LaunchAgents/net.opencode-qqbot.plist
 | `/history [N]` | 最近 N 轮历史（默认 3，上限 10；换行/代码块/表格完整保留） |
 | `/model` | 查看或切换模型（session 级） |
 | `/agent` | 查看或切换 Agent |
-| `/rename <名>` | 重命名当前会话 |
+| `/rename <名>` | 重命名当前会话（仅本地会话标题，不改服务端标题） |
 | `/watch` / `/watch off` | 观察模式：工具调用里程碑实时推送 |
 | `/progress` | 手动进度查询：工具调用/失败统计、当前在途状态（本地事件源，零模型调用） |
 | `/queue` | 忙碌队列：查看 / `clear` 清空 / `drop <编号>` 定点删除（忙碌时消息自动 FIFO 排队） |
+| `/ledger` | 台账视图：快照 / `check` 对账会话历史 / `settle <尾号> confirm` 人工结清（孤儿与在途可追溯） |
 | `/mirror` | 摘要镜像开关 |
 | `/send <路径>` | 把白名单目录内的文件/图片发到 QQ |
 
@@ -224,6 +225,20 @@ QQ 桥的本质是「opencode 交互事件 → QQ 交互原语」的适配器。
 
 原则：未支持的类型永远给出明确文案 + 桌面端指引，不允许静默丢弃；多字段向导等增强按最小侵入接入。
 
+
+## English Summary
+
+**OpenCode QQ Bot** bridges [OpenCode](https://opencode.ai) (an open-source AI coding agent) into QQ (China's largest IM). Talk to your coding agent from your phone: send tasks, approve dangerous tool calls via interactive cards, dictate prompts with built-in voice-to-text, receive long-running results, and even send/receive files.
+
+- **Approval cards & form prompts**: OpenCode permission requests and multi-step forms render as interactive QQ cards (tap to allow/deny, or reply by text)
+- **Long tasks never lost**: 30-min foreground timeout falls back to a 24h background wait with status-aware stall notices; results are pushed back on completion
+- **Duplicate-proof delivery**: cross-process msgId claim + same-content fingerprint admission; gateway session/seq persisted across restarts (RESUME, no backlog replay)
+- **Notify channel**: cron / CI / any process can push results to QQ via `openqq notify` (file-locked outbox, TTL, idempotent by --id)
+- **QQ rendering fix**: ordered lists auto-flatten to the `、` style — what you see on desktop matches what lands on QQ
+
+Install: `opencode plugin add @linjz/opencode-qqbot` — Chinese README below, docs/review playbook in the repo.
+
 ## License
 
 MIT
+

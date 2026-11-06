@@ -180,7 +180,7 @@ IDE MCP 可用时,插件通过 **系统提示注入**告诉模型 **哪些事该
    | 重构 / 格式化 | `ide_rename_refactoring` / `ide_reformat_file` |
    | 批量改文件 | `ide_apply_patch` |
    | 校验 | `ide_lint_files` / `ide_get_file_problems` / `ide_build_project` |
-   | 运行配置 | `ide_get_run_configurations` / `ide_execute_run_configuration`(+ 配套插件的启停工具) |
+   | 运行配置 | `ide_get_run_configurations` / `ide_rerun_run_configuration` / `ide_stop_run_configuration` |
    | 远程执行 / 同步 | `remote_exec` / `remote_list_servers` / `remote_upload` / `remote_download`(本插件自带,凭据来自 IDE 的 SSH 配置,路径映射来自 hosts.json);本机环境变量由 `get_project_env` + shell hook 注入 |
 
    **读、找文本、找文件、改单个文件一律用 OpenCode 自带的工具**(`read` / `grep` / `glob` / `write` / `edit`):
@@ -278,9 +278,9 @@ IDE MCP 可用时,插件通过 **系统提示注入**告诉模型 **哪些事该
 - 覆盖的表在 `src/mcp/idea-tool-defaults.js` 的 `DESCRIPTION_OVERRIDES`,由 `applyDescriptionOverrides()`
   在同一个 `ctx.tool.transform` 里应用,和隐藏工具、删参数是同一条路径。
 
-覆盖清单(**15 条**):`search_symbol`、`read_file`、`build_project`、`list_directory_tree`、`apply_patch`、
+覆盖清单(**14 条**):`search_symbol`、`read_file`、`build_project`、`list_directory_tree`、`apply_patch`、
 `rename_refactoring`、`lint_files`、`get_file_problems`、`analyze_calls`、`get_symbol_info`、`reformat_file`、
-`get_all_open_file_paths`、`open_file_in_editor`、`execute_run_configuration`、`get_run_configurations`。
+`get_all_open_file_paths`、`open_file_in_editor`、`get_run_configurations`。
 
 `get_project_modules` / `get_project_dependencies` 保持 IDE 原文 —— 它们的描述没有说错的地方。
 
@@ -305,12 +305,11 @@ IDE 内置的 MCP Server 只能 **启动已有**的 run configuration, **不能�
 | --- | --- |
 | `ide_get_run_configurations` | 列出 IDE 认到的配置 (名字 + 描述) |
 | `ide_inspect_run_configuration` | 看**一个**配置的全貌:`typeKnown` / `canRun` / `warnings` / `options` / `configurationXml` / 活实例 / 历史日志 |
-| `ide_execute_run_configuration` | 跑完**等退出** —— 只用于一次性任务 |
-| `ide_rerun_run_configuration` | 在跑就重启、没在跑就启动;长驻进程只走这一条 |
+| `ide_rerun_run_configuration` | 在跑就重启、没在跑就启动;`build` 等退出拿 `exitCode`,`server` 只等启动被触发 |
 | `ide_stop_run_configuration` | 停掉该配置的**全部**实例 |
 | `ide_list_running_configurations` | 当前 Run 会话的索引 (pid / 状态 / 日志) |
 | `ide_list_remote_processes` | 远端**真实**状态,含 `stopped` / `invalid` |
-| `ide_deploy_remote_process` | 部署:同步 + 启动 + 打开 Run 标签页 (deploy-only) |
+| `ide_deploy_remote_process` | 部署:启动触发即返回;同步 + 启动 + 打开 Run 标签页 (deploy-only) |
 
 **没有 create / update / delete 工具** —— 新建、修改、删除就是改项目根的 `.run/<名字>.run.xml`。配置是**项目资产**,
 文件本身就是真相:可 review、可提交、可 diff,和 IDE 自己写出来的格式完全一致。
@@ -340,7 +339,8 @@ IDE 内置的 MCP Server 只能 **启动已有**的 run configuration, **不能�
 **Run 与 Deploy 是两套语义**:
 
 - **Run** (`rerun`) —— 调试。Stop **会 kill 远端进程**
-- **Deploy** (`deploy_remote_process`) —— 发布。同步 + 启动 + 打开 Run 标签页;**Stop 只关日志,不 kill 远端**
+- **Deploy** (`deploy_remote_process`) —— 发布。同步 + 启动 + 打开 Run 标签页,**启动触发即返回**;
+  **Stop 只关日志,不 kill 远端**
 
 三条铁律:
 
@@ -362,13 +362,13 @@ IDE 内置的 MCP Server 只能 **启动已有**的 run configuration, **不能�
 
 ## Run Configuration:文件由 skill 写,档案也由 skill 写
 
-`idea-run-config-manager` skill 是唯一的增删改入口,它做三件事:
+`idea-run-config-manager` skill 是唯一的增删改入口,它做两件事:
 
 1. **写 `.run/*.run.xml`** —— 照 `assets/types/<类型>.md` 的模板写;先 `ide_get_run_configurations` 查重
    (按 `(base, env)` 比),再 `ide_inspect_run_configuration` 做静态检查,最后真跑一次
-2. **建档** —— 过滤后剩下的每条配置在项目根 `AGENTS.md` 的标记块里占一个条目;远程配置多一个 `env` 项
-   (逐环境写 `server` / `deployment` / 日志目录),`when` 一律只能是"用户授权触发"
-3. **过滤** —— 服务化(常驻应用)的配置归 `idea-standalone` 的块,**两个块永不重叠**
+2. **建档** —— 每条配置在项目根 `AGENTS.md` 的**唯一**标记块里占一个条目,分两类:
+   **应用配置**(按「应用 → 环境」两级组织)与**非应用配置**(构建 / 迁移 / 测试 / 一次性任务,平铺)。
+   本机配置和远端配置都在同一块里,不再按性质拆到第二个块
 
 档案块的用途是**能被下次读到**:要办同类事情时先查它,有现成的就用,不再重复建 —— 所以 **联动是硬要求**:
 配置被**新建 / 删除 / 修改**(无论谁做的)都要同步**加条目 / 删条目 / 改条目**,否则它就开始骗人。
@@ -378,7 +378,7 @@ IDE 内置的 MCP Server 只能 **启动已有**的 run configuration, **不能�
 | --- | --- |
 | `skills/idea-run-config-manager/assets/types/remote-process.md` | Remote Process 的 7 个字段、process / docker 两种 XML、已废弃字段、路径不能用 IDE 宏 |
 | `skills/idea-run-config-manager/assets/types/<类型>.md` | 本地类型各一份:实测样本 + 字段表 + 坑(索引就是 SKILL.md 的**支持矩阵**) |
-| `skills/idea-run-config-manager/assets/AGENTS.template.md` | 档案骨架:按「应用 → 环境」两级组织,每个环境小节写 `when` / `before run` / `run` / `after run` / `说明` |
+| `skills/idea-run-config-manager/assets/AGENTS.template.md` | 档案骨架:应用配置按「应用 → 环境」组织,非应用配置平铺;每条写 `类型` / `kind`(build / server) / `when` / `before run` / `run` / `端口`·`热重载`(仅 server) / `after run` / `说明` |
 
 **支持矩阵**:
 
@@ -416,23 +416,14 @@ IDE 内置的 MCP Server 只能 **启动已有**的 run configuration, **不能�
 一个缺席的工具是模型能读到并处理的事实,一个看不见的 skill 不是。**`requires:` 这个键已彻底删除** —— 它曾是本插件自己的
 门禁元数据,OpenCode 不认,门禁取消后它就成了"看起来在设门、实际没人读"的死字段。
 
-## Standalone 模式纪律 (skill)
+### 档案里的「运行纪律」
 
-本机直跑应用的 **项目级纪律**由 `idea-standalone` skill 固化:写进 **项目根 `AGENTS.md`** 里由
-`<!-- idea-standalone:begin -->` 与 `<!-- idea-standalone:end -->` 包裹的 **标记块**(根 `AGENTS.md` 本来就是 AI 在本项目
-工作时必读的文件,所以不需要另建规则文件、也不需要 always-apply 开关;标记块是"以后改没改过"的判据)。骨架与逐段写作规范在
-`skills/idea-standalone/assets/AGENTS.template.md`, **SKILL.md 只写流程、指向模板**,不重复骨架。
+档案开头有一段项目级纪律,和配置条目由同一个 skill 生成:**启动入口只有 IDEA run configuration**(本机进程和远端进程
+都一样),不手搓 `pnpm dev` / `go run` 这类裸命令;跑应用一律 `ide_rerun_run_configuration`(在跑就重启、没在跑就启动);
+不 `kill` / `pkill` 业务进程;重启前不必先问 —— 这条链是无人化的。远程配置一律「用户授权触发」。
 
-产物两段,只写"这个项目怎么起"这一件事:
-
-1. **什么是 standalone 模式** —— 启动收口只有 IDEA run configuration。唯一绝对的约束是"入口唯一";形态不限 (本机进程 / 容器 /
-   部署到远端,哪些应用不在本机跑要单独写明);跑应用一律 `ide_rerun_run_configuration`(在跑就重启、没在跑就启动),
-   **不用** `execute`、不绕开 IDE 用裸命令或 `kill`/`pkill`,重启前也不必先问 —— 这条链是无人化的。
-2. **应用与环境** —— **按应用分章节,应用下按环境分小节**,不要按配置平铺。应用级写 `是什么` / `依赖`
-   (部署型才多一条 `产物`:构建命令与产物路径;本地 run / debug 直接吃源码,不需要产物)。每个环境小节写配置名、端口、
-   `热重载` (有 HMR 就不用提示重启,没有就必须点名重启)、before / after run。
-
-事实一律先查后写:配置名来自 `ide_get_run_configurations`,`热重载` 来自运行方式,端口读不到就问用户 —— 不猜。
+哪些应用在哪个环境跑、端口是多少、有没有热重载、改完代码要不要重启,写在「应用配置」的对应小节里。
+事实一律先查后写:配置名来自 `ide_get_run_configurations`,端口读不到就问用户 —— 不猜。
 **只动自己的标记块**:根 `AGENTS.md` 是共享文件 (`project-scaffold` 的宪法、项目自己的内容都在里面),标记之外一字不改。
 
 ## 文件同步 (自带,不再依赖 IDE 的 deployment 工具)
@@ -515,6 +506,8 @@ opencode 直接调 IDE MCP 的 run configuration 工具（工具名带 `ide_` �
 打开一个 **Run 标签页**，用户能在里面看日志。区别只在语义：
 
 - 它被标记为 deploy-only：点 Run 标签页的 **Stop 只关闭日志跟随，不 kill 远端进程 / 不删除容器**
+- **触发即返回**：同步 / 上传 / 拉起都在后台，返回 `triggered: true` + `started: null` 表示已触发、
+  成功未确认；读 `fullOutputPath` 看进度与启动日志，按 2s / 4s / 8s / 16s 退避查 `list_remote_processes`
 - 返回 **`fullOutputPath`**（本机聚合日志：`[启动]` / `[同步]` 进度 + 远端 stdout/stderr，和
   `rerun_run_configuration` 的字段、格式一致）
 - 应用自己的业务日志（`app.log` / `admin.log` 等）在配置的 **Application log directory** 里，
@@ -540,7 +533,8 @@ MCP 触发时如果远端已经在跑，**直接替换、不弹窗**（避免把
 - **Working directory**:留空时用 deployment 的 `deployPath`
 - **Application log directory**:应用自己写日志的目录（如 log4j 的 `logs/`），**仅用于查询，不影响启动**。
   `process` 填远端宿主机路径（相对 Working directory 或绝对路径）；`docker` 填容器内路径。
-  进程的 stdout/stderr 由插件固定写到 `<working>/.opencode/output-<name>.log`，不受这个字段影响
+  进程的 stdout/stderr 由插件固定写到 `<working>/process-output/<name>-<yyyyMMdd-HHmmss>.log`，不受这个字段影响
+  （一次运行一个文件，历史日志保留）
 
 - **Kind**:`process` / `docker`,留空则从 Command 推断(`docker run` → docker)
 - **Container**:`docker` 类型**必填**;启动时自动把 `docker run` 的 `--name` 对齐成这个名字,

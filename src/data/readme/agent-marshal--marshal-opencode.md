@@ -89,7 +89,22 @@ claude --dangerously-load-development-channels server:marshal
 
 Both forms key on the same name you set: `plugin:<plugin>@<marketplace>` for plugin installs, `server:<mcpServers-key>` for direct wiring. Set whichever fits as a shell alias to make it permanent (e.g. `alias claude='claude --dangerously-load-development-channels plugin:marshal-shim@marshal'`).
 
-Without the flag, `roster` and `send_message` still work — peer messages just don't surface as live `<channel>` blocks in your transcript. With the flag, every peer's `send_message` arrives as an inline notification while you're working.
+Without the flag, `roster` and `send_message` still work — peer messages just don't surface as live `<channel>` blocks in your transcript; the plugin's hooks add them to your next prompt instead (see below). With the flag, every peer's `send_message` arrives as an inline notification while you're working.
+
+The plugin also ships `SessionStart` and `UserPromptSubmit` hooks that run `marshal-shim claude-hook`: before each prompt they add any direct message still unread as a `<marshal_inbox>` block and mark it read. If you wired the MCP server by hand, add the same hooks to a `settings.json`:
+
+```json
+{
+  "hooks": {
+    "SessionStart": [
+      { "hooks": [{ "type": "command", "command": "marshal-shim claude-hook session-start", "timeout": 15 }] }
+    ],
+    "UserPromptSubmit": [
+      { "hooks": [{ "type": "command", "command": "marshal-shim claude-hook prompt-submit", "timeout": 15 }] }
+    ]
+  }
+}
+```
 
 We're submitting marshal for inclusion in the official allowlist; once approved, plain `claude` will accept the notifications and the flag becomes unnecessary.
 
@@ -341,7 +356,11 @@ context. Batch related details and reserve direct delivery for action, a
 blocker, or a needed reply. Use an unmentioned room broadcast for FYI/progress.
 Automatic body previews are bounded (2,000 characters per message and an
 8,000-character hook-batch budget); the complete durable message remains
-available through `marshal://messages`. Codex wakes coalesce for 30 seconds so
+available through `marshal://messages`. A hook's inbox block stays under
+Claude Code's 10,000-character context limit: messages that don't fit stay
+unread for the next turn, counted in `remaining`. Message text in the block is
+escaped (`&lt;`, `&gt;`, `&amp;`, continuation lines indented), so a message
+can't close the block or pose as a sender line. Codex wakes coalesce for 30 seconds so
 a burst can join the active turn.
 
 ## Architecture
@@ -398,3 +417,11 @@ Releases are driven by [`cargo-flux`](https://github.com/ignition-is-go/cargo-fl
 ## License
 
 MIT OR Apache-2.0
+
+That covers Marshal's own source code. These dependencies declare the AGPL-3.0-or-later
+license, at the versions pinned here (6.11.5):
+
+- myko, used by every crate, and myko-macros, used by `marshal-entities`
+- autosocket, through myko
+- myko-server, used by `marshal-daemon`
+- myko-leptos, used by `marshal-ui`, whose WASM bundle ships in releases

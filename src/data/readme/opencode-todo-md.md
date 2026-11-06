@@ -17,6 +17,7 @@ breaking the metadata.
 
 - `todo_write` / `todo_read` tools: the agent replaces the whole list or patches single items by id.
 - `/todo`: a self-drawn dialog with filters, tags, sorting, search, scrolling and per-cell actions.
+- `/note` and `opencode-notes.md`: per-project notes with `@tags` and optional reminders, shared with the agent.
 - Sidebar strip reading `<session directory>/TODO.md`, refreshed on writes, on completed tool calls and every 60s.
 - Stable ids, priorities, due dates, creation and completion dates, `@tags` derived from the task text.
 - Checkboxes are rewritten in place: headings, notes and any other line of `TODO.md` are never touched.
@@ -81,7 +82,7 @@ never reused, so a patch cannot hit the wrong task after a reorder.
 | `/todo done <id>` | Marks a task completed |
 | `/todo init` | Creates `TODO.md` with `## To do` and `## Done` |
 | `/todo import` | Adopts a hand-written list: plain `-`, `*` and `1.` items become checkboxes, after a preview |
-| `/todo renumber` | Rewrites ids as 1..N, highest priority first then nearest due date, after a warning |
+| `/todo renumber` | Rewrites ids as 1..N by priority then due date, completed and cancelled last, after a warning |
 | `/todo settings` | Opens the settings dialog: click a row to cycle its value |
 | `/todo help` | Lists the subcommands (they are arguments of `/todo`, so the palette shows only `/todo`) |
 
@@ -111,11 +112,12 @@ Search and press Enter (open, high, #12, @tag)
   edit, `st` to cycle pending → in progress → completed, `prio` to cycle, `due` to ask for a date, `tag` to filter by
   that task's first tag.
 - Click the `#id`, `prio`, `created`, `due` or `done` header to sort by that column; the sorted column is marked with
-  `▲`, a second click restores the default order.
+  `▲`, a second click restores the default order. Open tasks stay on top in every sort, completed and cancelled last.
 - The list has a cursor (`▸`): `↑`/`↓` move it and the list scrolls just enough to keep it visible, so the cursor
   never stops at the edge. `space` cycles the selected task's state, `ctrl+e` edits it, `ctrl+n` adds a task, `PgUp`/`PgDn` scroll one
   screen, `Home`/`End` jump to the first or last task.
 - `ctrl+d` arms the selected task and shows `ctrl+d again to delete`: the second press removes the line, no dialog.
+  `ctrl+z` puts the last deleted line back where it was, and `ctrl+g` renumbers the ids from 1.
 - `/` gives the keyboard to the search box; `Enter` applies the query and gives the keyboard back to the list. `Esc`
   closes the dialog.
 
@@ -145,6 +147,34 @@ no checkboxes shows `Todo · no tasks` instead of nothing. Long task texts are c
 
 Markers: `•` in progress, `[·]` due today or within two days, `[!]` overdue. The row colour is the priority (red for
 high, yellow for medium, muted for low); an overdue task is red regardless of priority.
+
+## Notes
+
+Notes are ideas, reminders and links that belong to the project but are not tasks: they have no state, no priority and
+no completion. They live in `opencode-notes.md`, next to `TODO.md`:
+
+![The notes panel](screen/notes.png)
+
+```markdown
+# Notes
+
+- Check the deploy token @infra <!-- id=1 created=2026-11-05 remind=2026-11-05T18:30 -->
+```
+
+- `/note <text>` appends a note; `@tag` works as in tasks. Add `remind=15m`, `remind=2h`, `remind=1d` or
+  `remind=2026-11-05T18:30` for a reminder; the relative form is resolved when the note is captured.
+- `/note` opens the list: `ctrl+n` adds, `ctrl+e` edits, `s` snoozes the reminder by 5 minutes, 30 minutes or 1 hour (or
+  clears it), `ctrl+d` deletes after a second press, `esc` closes.
+- Reminders are checked every 30 seconds by the TUI. A toast appears once per note and reminder while OpenCode is open;
+  nothing fires when it is closed, and the agent is not woken up. Snoozing changes the reminder time, so it fires again.
+- The agent reads and writes the same file through `note_read`, `note_write` and `note_delete`, so it can recall a note
+  in a later session.
+- The file is plain markdown and can be edited by hand; only note lines with the metadata comment are touched.
+
+Press `tab` inside the panel to cycle the filters: all notes, notes with a due reminder, and one filter per `@tag`.
+
+Press `/` inside the panel to search the visible notes. The sidebar shows `Notes due/total` and the first note whose
+reminder is due; click either line to open the panel.
 
 ## Settings
 
@@ -189,9 +219,9 @@ care about ids.
 
 ## Agents
 
-Installing the plugin is enough for the tools to exist: `todo_write` and `todo_read` are registered with their
-descriptions, so the agent sees them in every session of every project. What the plugin cannot decide is *when* the
-agent should keep the plan in this file instead of the conversation, and that is what an instruction is for.
+Installing the plugin is enough for the tools to exist: `todo_write`/`todo_read` and `note_read`/`note_write`/
+`note_delete` are registered with their descriptions, so the agent sees them in every session of every project. What the
+plugin cannot decide is *when* the agent should use them instead of the conversation, and that is what an instruction is for.
 
 Project-local `AGENTS.md`, at the repository root:
 
@@ -207,6 +237,14 @@ Global, so every project inherits it, in `~/.agents/AGENTS.md`:
 ```markdown
 When a project has a TODO.md at its root, use todo_write / todo_read to keep it current instead of a session-only
 list.
+```
+
+For notes, the same idea in one paragraph:
+
+```markdown
+If the project has an opencode-notes.md, call note_read before starting work and note_write to capture ideas or
+reminders. Notes have no status or priority: keep them short, add @tags, and set `remind` when the user asks to be
+reminded (15m, 2h, 1d or an ISO local time). Omit id to append; pass id to update; note_delete removes one.
 ```
 
 The same text can be attached with the `instructions` array in `opencode.json`, which is handy when you ship the rule
@@ -242,7 +280,31 @@ bun run check
 The plugins live in the same repository as the sources; OpenCode resolves `@opencode/plugin` at runtime, so nothing has
 to be installed locally to try a change.
 
+Releases: bump the version, add a `## What's new in X` section to `ANNOUNCE.md`, then push the `vX` tag. The release
+workflow builds the GitHub Release body from that section with `scripts/release-body.ts`, so the notes live in one place.
+
 ## Changelog
+
+### 0.1.18
+
+- Project notes in `opencode-notes.md`: `/note` captures ideas with stable ids, `@tags` and an optional reminder;
+  `/note` opens a searchable list with filters, snooze and delete.
+- `note_read`, `note_write` and `note_delete` let the agent read and update the same notes across sessions.
+- The sidebar lists the notes above the todo list, collapsible, with due reminders in red; reminders fire a toast while
+  the TUI is open.
+
+### 0.1.17
+
+- `ctrl+z` restores the last deleted task at its original position; `ctrl+g` renumbers the ids without leaving the list.
+- `/todo renumber` orders ids by priority and then due date, with completed and cancelled tasks last.
+- The default list order follows the same rule, so the panel and the ids agree.
+- Every column sort keeps open tasks on top and closed ones at the bottom; `prio` breaks ties on the nearest due date.
+
+### 0.1.16
+
+- Clicking the description opens the editor, like clicking `#id`; only the state cell cycles a task.
+- The row order stays put while the dialog is open, so a state or priority click no longer moves the row under the
+  pointer. The list re-sorts on every reopen.
 
 ### 0.1.15
 

@@ -92,11 +92,11 @@ If you want to customize or develop the plugin locally:
    ```bash
    git clone https://github.com/ykocaman/opencode-session-tracker.git
    cd opencode-session-tracker
-   npm install
+   bun install
    ```
 2. Build the plugin:
    ```bash
-   npm run build
+   bun run build
    ```
 3. Load the plugin locally in OpenCode by adding the absolute path of this folder to the `plugins` array in your `~/.config/opencode/cli.json` file:
    ```json
