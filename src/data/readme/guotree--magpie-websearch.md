@@ -8,7 +8,7 @@
 
 为 [magpie](https://usemagpie.ai) 增加的第三方多源网页搜索 API 插件。安装后，这些 API 会出现在 **设置 › 模型 › 网页搜索** 中，由 Magpie 统一管理密钥、启用开关与请求顺序。
 
-当前支持 **AnySearch、Bocha、Jina、Kagi、Keenable、Linkup、Metaso、Moonshot、Moonshot CN、Ollama、Parallel、Perplexity、Querit、SerpApi、Serper、StepFun、TinyFish、Z.ai、Zhipu**。其中 AnySearch、Keenable、Parallel 和 TinyFish 支持免 Key 匿名访问；其余十五家需要 API Key。
+支持 **21 个搜索通道**：AnySearch、Bocha、Jina、Kagi、Keenable、Linkup、Metaso、Moonshot、Moonshot CN、Ollama、Parallel、Perplexity、Querit、SerpApi、Serper、StepFun、TinyFish，以及 Z.ai／Zhipu 各自独立的标准 REST 与 Coding Plan MCP。AnySearch、Keenable、Parallel 和 TinyFish 支持免 Key 匿名访问；其余十七个通道需要对应产品的 Key。
 
 ## 安装
 
@@ -35,7 +35,7 @@ magpie search add magpie-websearch:linkup <key>
 magpie search
 ```
 
-默认注册全部 19 个 API，无需设置插件选项。Magpie 的网页搜索设置决定实际使用哪些 API。
+默认注册全部 21 个 API，无需设置插件选项。Magpie 的网页搜索设置决定实际使用哪些 API。
 
 Magpie v0.1.3062 起，Agent 可在调用 `web_search` 时指定 `count`（1–20，默认 6）；命令行示例：
 
@@ -77,16 +77,21 @@ magpie plugin options magpie-websearch '{"linkup":{"depth":"deep","resultLimit":
 | StepFun | `magpie-websearch:stepfun` | 必填 | 阶跃星辰国内站独立 REST 搜索，支持场景偏好、摘要／正文选择 |
 | TinyFish | `magpie-websearch:tinyfish` | 可选 | 匿名 MCP 或带 Key REST；网页、新闻和论文搜索（论文需 Key） |
 | Z.ai | `magpie-websearch:zai` | 必填 | 智谱国际站独立 REST 搜索，使用 `search-prime` |
+| Z.ai Coding Plan | `magpie-websearch:zai-coding` | 必填 | 国际站 Coding Plan 的 Streamable HTTP MCP 搜索，消耗套餐共享 credits |
 | Zhipu | `magpie-websearch:zhipu` | 必填 | 智谱国内站独立 REST 搜索，支持 `search_std`／`search_pro`、搜狗和夸克引擎 |
+| Zhipu Coding Plan | `magpie-websearch:zhipu-coding` | 必填 | 国内 Coding Plan 的 Streamable HTTP MCP 搜索，消耗套餐共享积分 |
 
 搜索项在 Magpie 中显示为 `<Provider> (magpie-websearch)`。Vendor ID 保持为 `magpie-websearch:<id>`；插件选项和注册过滤使用 `linkup` 等短 ID。完整支持状态与接入规划见 [PROVIDERS.md](PROVIDERS.md)。
 
 ## 隐私与安全
 
 - **直连端点**：请求直接发往厂商官方 API，或用户显式配置的自定义端点。
-- **仅发送搜索参数**：不读取或转发对话记录、系统提示词、本地文件、工具输出或 Agent 上下文。
+- **搜索数据与协议元信息**：请求包含搜索参数，MCP 握手另含客户端名称、包版本及协议能力；不读取或转发对话记录、系统提示词、用户本地文件、工具输出或 Agent 上下文。
 - **Magpie 管理凭证**：Key 按厂商协议传递。SerpApi 错误省略原始异常、响应体和请求 URL；其他厂商保留各自的诊断处理。插件不能控制厂商或代理的访问日志。
 - **不静默降级**：带 Key 的请求失败时，不会降级为匿名访问。
+- **通道严格隔离**：Coding Plan Key 与 Standard API Key 不通用；provider 内部不会将 MCP 失败改走按次计费 REST，或自动跨站重试。Magpie 可按用户显式配置的顺序尝试其他 provider，各自使用自己的 Key。
+
+两个 Coding Plan provider 目前标记为实验性接入：官方页面说明 Remote MCP 可用于兼容客户端，但未明确把 Magpie 列为官方支持客户端。使用前请自行确认 Coding Plan 使用政策与账户条款；本项目不声称 Magpie 获得智谱或 Z.ai 官方支持。
 
 已有 Key 的条目编辑时留空 Key，仍会保留原 Key。切回匿名访问的方法及限流处理见[匿名搜索与限流](docs/technical-reference.md#anonymous-search)。
 
@@ -106,6 +111,8 @@ magpie plugin options magpie-websearch '{"linkup":{"depth":"deep","resultLimit":
 ## 接入规划
 
 第三批规划的独立网页搜索 API（Jina、Kagi、Serper）现已全部接入；接入规划见 [PROVIDERS.md](PROVIDERS.md#planned)。仅有同厂商的模型预设或模型内置搜索能力，不构成排除其独立搜索 API 的理由。新增接入前会重新核对 Magpie 官方的搜索支持情况。
+
+Coding Plan 双站实现和本地模拟验证已完成；真实 Key 搜索、套餐积分／标准 REST 账单核对及 Magpie 客户端使用政策确认仍待完成。当前实验性状态不等于已完成真实账户验证。
 
 ## 鸣谢
 

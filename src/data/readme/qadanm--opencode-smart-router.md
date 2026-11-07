@@ -9,6 +9,7 @@
 <p>
   <a href="https://www.npmjs.com/package/@qadanm/opencode-smart-router/v/0.4.0"><img src="https://img.shields.io/npm/v/%40qadanm%2Fopencode-smart-router?label=npm&color=cb3837&logo=npm&logoColor=white" alt="npm version"></a>
   <a href="https://www.npmjs.com/package/@qadanm/opencode-smart-router"><img src="https://img.shields.io/npm/dm/%40qadanm%2Fopencode-smart-router?label=installs&color=cb3837&logo=npm&logoColor=white" alt="npm monthly installs"></a>
+  <img src="https://img.shields.io/badge/status-beta-fb8c00.svg" alt="Status: beta">
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT"></a>
   <img src="https://img.shields.io/badge/OpenCode-2.x-000000.svg" alt="OpenCode 2.x">
   <img src="https://img.shields.io/badge/tests-759%20passing-2ea44f.svg" alt="759 tests">
@@ -20,8 +21,28 @@
   <a href="#how-it-decides">How it decides</a> &nbsp;·&nbsp;
   <a href="#commands">Commands</a> &nbsp;·&nbsp;
   <a href="docs/ARCHITECTURE.md">Architecture</a> &nbsp;·&nbsp;
-  <a href="docs/LIMITATIONS.md">Limitations</a>
+  <a href="docs/LIMITATIONS.md">Limitations</a> &nbsp;·&nbsp;
+  <a href="docs/KNOWN-ISSUES.md">Known issues</a>
 </p>
+
+<br>
+
+> [!WARNING]
+> **Beta. One open defect suppresses routing on OpenDesign, and can suppress it
+> everywhere at once.**
+>
+> The router's OpenDesign weekly figure can be computed from an account reading
+> you already replaced, overstating usage by more than half the weekly cap. On a
+> measured case it reported 100 percent against a real 45 percent, which removed
+> OpenDesign from the candidate set and, with the other providers near their own
+> reserves, left nothing to route to at all.
+>
+> It does not block prompts. Prompts still send; the router just declines to move
+> the session. Full detail, how to tell you are hitting it, and the shape of the
+> fix: [docs/KNOWN-ISSUES.md](docs/KNOWN-ISSUES.md).
+>
+> If you need the router to be correct about OpenDesign spend today, do not rely
+> on it for that. Verify the figure against your account page.
 
 <br>
 
@@ -194,15 +215,48 @@ panel's last decision records what was rejected and what took over.
 
 - Never buys credits, changes billing, or enables top-ups.
 - Never routes to a provider you did not approve.
-- Never spends premium quota without an explicit one-shot approval or a budget you set.
+- Never spends the plan-model pool without the budget you set; in the default
+  auto mode tier-3 work escalates to it automatically, and when it runs out the
+  router falls back to the strongest ordinary model instead of failing.
 - Never switches a session to a model OpenCode cannot currently resolve.
 - Never fails open on missing quota data when other providers already reported.
 - Never blocks your other work when one provider is at its limit.
+- **Never stops you sending a message.** If the router breaks, it is skipped.
+
+### When the plugin is wrong, the editor still works
+
+Routing is an optimization. OpenCode works without it, and it keeps working when
+the router is wrong. That is a contract, not a best effort:
+
+- an internal defect degrades to "do not route", never to "do not work". The
+  prompt is served with the model already selected and the reason is recorded in
+  warnings;
+- every hook is wrapped so it cannot throw into OpenCode, and routing runs
+  against a deadline so it cannot hold a prompt indefinitely;
+- if setup fails for a location, that location simply has no router;
+- a shared core left behind by a different plugin version is replaced rather
+  than reused.
+
+Blocking a prompt is available, but it is opt-in through
+`routing.failClosed: true`, and it covers plugin faults only. Quota safety is
+separate and always on: a provider configured for probing with no reading is
+refused, because that is a spending decision rather than a response to failure.
+
+This was made a contract the hard way. Version 0.6.0 turned an internal
+`TypeError` into a refusal to send any prompt, in every mode, and the plugin had
+to be removed by hand. The account is in
+[docs/INCIDENT-2026-11-06-prompt-lockout.md](docs/INCIDENT-2026-11-06-prompt-lockout.md),
+and the guarantee is tested against a real OpenCode process by
+`scripts/isolated-e2e.sh`, not only by unit tests.
 
 ## Status
 
-Version 0.4.0. Routing runs on the maintainer's machine in automatic mode;
-premium escalation and purchased-credit spending are disabled. Current behavior
+**Beta.** Version 0.6.1. One open defect affects OpenDesign quota reporting; see
+[docs/KNOWN-ISSUES.md](docs/KNOWN-ISSUES.md). It misreports spend, it does not
+block prompts, and the workarounds are recorded there.
+
+Routing runs on the maintainer's machine in automatic mode;
+tier-3 tasks escalate to the plan-model pool automatically within its budget. Current behavior
 and open questions are in
 [docs/PRO-MIGRATION-2026-10-29.md](docs/PRO-MIGRATION-2026-10-29.md).
 
@@ -232,6 +286,7 @@ command panel closed.
 | `/router-premium-budget <usd>` | Set the premium budget |
 | `/router-reserve provider monthly weekly fiveHour` | Adjust provider reserves |
 | `/router-reset-metrics --confirm` | Reset metrics and routing state, not conversations |
+| `/router-title off` | Strip prefixes this plugin wrote into titles before 0.5.0 |
 
 Selecting a model in the desktop picker is detected and respected. The session
 reports `manual` until you run `/router-auto`.
@@ -251,7 +306,10 @@ It cannot loosen global restrictions.
 Worth knowing:
 
 - Mode: `balanced`
-- Premium: `ask`, $0 budget, one-shot approval available
+- Premium: `auto`, $120/month plan-model pool, one-shot approval available.
+  Auto mode escalates tier-3 tasks to the plan-model pool (Sonnet 5.5,
+  GPT-6.1 Sol) without asking, and degrades to an approval gate when the pool
+  is spent. Tier-1 and tier-2 work always stays on the ordinary pool.
 - Training-enabled and free promotional models: blocked
 - Purchased extra credits: blocked
 - Prompt text storage: disabled
@@ -293,7 +351,7 @@ npm run verify    # clean room: empty HOME, fresh install, typecheck, tests, bui
 npm run mutate    # prove each safety test fails when its property breaks
 ```
 
-759 tests across 63 files cover classification, eligibility, quota parsing,
+822 tests across 75 files cover classification, eligibility, quota parsing,
 credential discovery and its security properties, ledger accounting, pool
 reconciliation, documented peak pricing, cache-aware routing, premium protection,
 purchased-credit blocking, manual overrides, failure classification, configuration
@@ -335,6 +393,51 @@ npm run mutate    # prove the safety tests still catch their properties
 A change that alters routing behavior needs a test that fails without it. See
 [CONTRIBUTING.md](CONTRIBUTING.md) for conventions, and [SECURITY.md](SECURITY.md)
 for reporting a vulnerability.
+
+## Releases
+
+Releases are cut from `main` and published by CI, not from a laptop. The package
+is published with [npm trusted publishing](https://docs.npmjs.com/trusted-publishers),
+which exchanges a GitHub Actions identity for a short-lived publish credential, so
+there is no `NPM_TOKEN` in this repository and no one-time password to relay.
+
+1. Bump `version` in `package.json` and add the matching `CHANGELOG.md` section.
+2. Run `npm run check`, commit, and push to `main`.
+3. Tag and push the tag:
+
+   ```bash
+   git tag -a v0.6.1 -m "0.6.1: <one line>"
+   git push origin main --tags
+   ```
+
+4. `.github/workflows/release.yml` checks the tag against `package.json`,
+   re-runs the full suite, and publishes.
+5. Create the GitHub release from the changelog section:
+
+   ```bash
+   gh release create v0.6.1 --title "0.6.1: <one line>" --notes-file notes.md
+   ```
+
+If the tag and `package.json` disagree, the workflow refuses to publish: a
+version that reaches the registry can never be replaced.
+
+### One-time npm setup
+
+Trusted publishing is authorized on the npm side, not in this repository. On the
+package settings page for `@qadanm/opencode-smart-router`, add a trusted publisher:
+
+| Field | Value |
+|---|---|
+| Provider | GitHub Actions |
+| Organization or user | `qadanm` |
+| Repository | `opencode-smart-router` |
+| Workflow filename | `release.yml` |
+| Environment | (leave empty) |
+
+Until that entry exists, the release workflow fails at the publish step with a
+`404 Not Found`, which is npm's way of saying the OIDC identity is not on the
+package's trusted list. The check, build, and tag verification still run and
+still gate the release.
 
 ## License
 

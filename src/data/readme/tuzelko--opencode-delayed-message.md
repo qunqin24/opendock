@@ -14,7 +14,7 @@
 
 ---
 
-`/delayed-message` schedules a message for a future time and delivers it as a normal user
+`/delayed` schedules a message for a future time and delivers it as a normal user
 message. The trick: the text never enters the model context at scheduling time. The model
 sees it only when it arrives.
 
@@ -26,8 +26,10 @@ the text into the conversation early.
 - 🕰️ **Say it your way** — `HH:MM`, an absolute date, or a relative duration.
 - 🔒 **Private until delivery** — the text lives in plugin storage, not in the prompt.
 - 💾 **Durable** — jobs survive a service restart; timers re-arm from storage.
-- 🪟 **Desktop pill** — pending count and time above the composer, with a preview and a
-  cancel button.
+- 🪟 **Desktop pill** — the pending count above the composer; click it for the times,
+  previews, edit and cancel.
+- ⏱️ **On time in the desktop app** — the app's main process keeps the clock, so an idle
+  window or an evicted location does not delay delivery.
 - 🤫 **Zero model turns on schedule** — a successful schedule does not wake the model.
 - 🌍 **Localized UI** — English, Russian, German, French, Chinese.
 
@@ -48,9 +50,9 @@ Requires OpenCode V2. The pill is part of the desktop app; the command itself wo
 ## 🚀 Usage
 
 ```text
-/delayed-message 03:00 call mom
-/delayed-message 2026-11-05 03:00 check the deploy
-/delayed-message +30m stretch
+/delayed 03:00 call mom
+/delayed 2026-11-05 03:00 check the deploy
+/delayed +30m stretch
 ```
 
 | Time | Meaning |
@@ -80,12 +82,18 @@ Treat this as a prompt-level guarantee, not encryption.
 Above the composer, while a message is pending:
 
 ```text
-⏰ Scheduled · 10:18
+⏰ 2 delayed
 ```
 
-Click it for the list: time, relative countdown, a preview of the text, and `×` to cancel.
-The pill disappears when the message is delivered or cancelled. The terminal UI has no pill —
-there the transcript note is the only trace.
+The label carries the pending count, like the subagent pill; the list behind it
+carries the times. Click it for one line per message with the scheduled time, a
+preview, and the countdown, like the app's own subagent list. `✎` to edit and `×` to cancel appear
+when you hover a row. Edit cancels the pending job and puts the whole command back
+into the composer — `/delayed`, the scheduled time, and the full text —
+with the cursor in the prompt. Adjust anything and submit to reschedule. The pill
+disappears when the message is delivered or cancelled.
+
+The terminal UI has no pill — there the transcript note is the only trace.
 
 The pill follows the app language: English, Russian, German, French, and Chinese are
 included. Transcript notes are English, because they are written for the model.
@@ -96,16 +104,26 @@ Jobs are kept in the plugin's storage, not only in memory. After `opencode reloa
 service restart, timers are re-armed when the plugin loads for that directory. If the
 service is down at the scheduled moment, the message is delivered on the next start.
 
+OpenCode unloads a directory's services after 60 minutes without activity (the
+`experimental.location_idle_timeout` setting), and plugin timers die with them. In the
+desktop app that no longer delays a message: the app's main process keeps its own timer,
+persists it across app restarts, and asks the server to deliver at the scheduled moment,
+which wakes the directory if it was unloaded. Without the desktop app, delivery still
+waits for the next time that directory loads.
+
 ## 🧠 How it works
 
-- `ctx.command.transform` registers `/delayed-message`; the executor gets the raw text
+- `ctx.command.transform` registers `/delayed`; the executor gets the raw text
   outside the prompt.
 - The job goes to `ctx.storage` (`pending/<uuid>`) and a `setTimeout` chain, split at the
   24.8-day timer cap.
 - On fire: `ctx.session.prompt({ sessionID, text })` — a real user prompt, so the session
   wakes.
-- The GUI talks to the server through an RPC: `pending`, `cancel`, and the events
-  `scheduled`, `fired`, `cancelled`.
+- The GUI talks to the server through an RPC: `pending`, `cancel`, `edit`, `deliver`, and
+  the events `scheduled`, `fired`, `cancelled`.
+- The GUI main process mirrors `scheduled` jobs into its own storage and arms Node timers.
+  When one is due it calls `deliver` with the job's directory, which boots the location
+  and delivers the message even though the server-side timer is gone.
 
 ## 🛠 Development
 

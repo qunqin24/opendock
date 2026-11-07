@@ -46,7 +46,7 @@ key 由 Magpie 存到配置目录下的 `plugin-auth.json`，插件只读取这�
 - `language` 由请求工作目录下 Git 跟踪文件的扩展名推断，取文件数最多的编程语言（例如 `TypeScript`）。同目录的推断结果在插件宿主进程内缓存；无法推断时省略该字段，WakaTime 会把它归入 `Other`。
 - `ai_input_tokens` = `in + cache_write`（未命中缓存的输入加缓存写入），`ai_cached_input_tokens` = `cache_read`（为 0 时省略），`ai_output_tokens` = `out`。WakaTime 按未命中缓存的输入、缓存输入、输出三项分别计价，所以缓存读取单独上报。`reasoning` 是 `out` 的内部拆分，不重复相加。
 - `ai_session` 是本机随机盐加 agent/session 的 HMAC 摘要，同一会话稳定、跨机器不可还原。
-- `user_agent` 携带模型名称、版本和 `effort` 推理强度，优先使用实际响应模型 `served`，缺失时使用 `model`。格式沿用 [WakaTime CLI](https://github.com/wakatime/wakatime-cli/blob/develop/pkg/ai/ai.go)，例如 `gpt/5.4-high`；无法解析版本时只发送通用标识。同一批次的模型信息逐条保留，WakaTime 是否识别及如何展示取决于其服务端支持。
+- `user_agent` 携带模型名称、版本和 `effort` 推理强度，优先使用实际响应模型 `served`，缺失时使用 `model`。格式沿用 [WakaTime CLI](https://github.com/wakatime/wakatime-cli/blob/develop/pkg/ai/ai.go)，例如 `gpt/5.4-high`。DeepSeek 的无版本别名也保留模型身份，例如 `deepseek-flash` 配合 `max` 上报为 `deepseek/flash-max`；`deepseek-r1` 上报为 `deepseek/r1`，只有家族名时使用 `deepseek/unknown`，不推断具体发布版本。其他无法解析版本的名称只发送通用标识。推理强度在模型解析后追加，同一批次的模型信息逐条保留，WakaTime 是否识别及如何展示取决于其服务端支持。
 - 请求头 `X-Machine-Name` 携带经过 URL 编码的本机主机名，`Timezone` 携带系统 IANA 时区。User-Agent 同时包含系统名、内核版本和架构，Windows 使用 WakaTime CLI 的 `windows` 标识。
 
 项目识别使用 [Magpie 异步请求钩子](https://usemagpie.ai/docs/plugins#asynchronous-gateway-hooks)提供的 `cwd`，通过客户端响应 `response_id` 精确关联用量，只处理宿主标记为 `local` 的请求。旧版宿主、缺少工作目录、通过命名网关密钥转发的请求，或未收到完成通知时，使用配置的项目标签并省略分支和语言。已有历史记录不会按当前工作目录、分支或语言补填。Git 命令只读且有超时；Git 不可用时使用工作目录名。语言推断只读取 Git 索引中的文件名，不读取文件内容。

@@ -1,5 +1,7 @@
 # FlashData CLI and MCP
 
+[![FlashData CLI and MCP on AI Agents Listing](https://aiagentslisting.com/flashdata-cli-and-mcp/badge.svg?claim=4a97d3aaad3d112601ff6817a38c0e89)](https://aiagentslisting.com/mcp/flashdata-cli-and-mcp)
+
 Use Google Search, YouTube data, and downloads to your cloud storage from a terminal, Agent, or MCP client. This MIT-licensed package implements the tools and calls the FlashData REST APIs directly. It does not proxy a hosted MCP connection.
 
 Source code is available at [rocosen/flashdata-mcp](https://github.com/rocosen/flashdata-mcp). The npm package `@flashdata-dev/mcp` provides two commands: `flashdata` for single-call JSON output and `flashdata-mcp` for persistent stdio MCP.

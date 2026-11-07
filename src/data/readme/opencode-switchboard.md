@@ -157,6 +157,7 @@ Unread is independent of placement: mark a session unread to come back to it, wh
 | `u`                                     | Toggle read/unread                                    |
 | `p`                                     | Park or unpark                                        |
 | `x`                                     | Close session or project (never deletes it)           |
+| `n`                                     | New session in the cursor's project                   |
 | `<leader>w` (Ctrl+X, then W by default) | Close the current conversation's row from either pane |
 | `?`                                     | Help                                                  |
 | Esc                                     | Close the panel                                       |
@@ -168,10 +169,16 @@ With the mouse:
 - Right-click a session for **Mark read**/**Mark unread** and **Park**/**Unpark**, then click an item or press
   its key. The menu acts on the session you right-clicked and leaves the cursor where it is. Focus returns to
   where it was, such as the message box, when the menu closes.
+- Right-click a project heading for **New session**.
 - Click **? help** at the bottom for the key reference.
 
 Opening a session, with Enter or a click, moves focus to its conversation so you can type right away. Press
 `<leader>i` (**Ctrl+X, then I** by default) to return to the panel.
+
+`n` opens the new-session screen of the project under the cursor, whether the cursor is on its heading, one of
+its sessions, or its Parked section, as picking the project with Ctrl+O does. It uses the project's main
+directory, not a worktree, and focus moves to the message box. No session exists until you send the first
+message; the new session then appears under that project.
 
 `<leader>w` (**Ctrl+X, then W** by default) closes the conversation you are viewing, independently of the panel
 cursor, and returns to the session you viewed most recently in this TUI that is still open. It is active while
@@ -192,6 +199,11 @@ cursor and scroll position. Opening a session in one TUI does not switch the oth
 in one TUI removes the row everywhere, but only the TUI that closed it moves to another session; the others
 keep the conversation open. A TUI forgets its recent sessions when it exits.
 
+When another TUI closes the row of the conversation a TUI shows, or closes its project, that TUI shows a toast
+once: `Not in the switchboard. Press ctrl+x i to add it back`, with your `<leader>i`. Press it to list the
+conversation in its project again. Picking the same conversation again in OpenCode's session list does not add
+it, because OpenCode does not tell plugins about a pick that keeps the route.
+
 OpenCode's desktop and mobile apps do not show the panel. Viewing a finished session there still counts as
 reading it, but does not clear a session you marked unread.
 
@@ -204,10 +216,25 @@ reading it, but does not clear a session you marked unread.
 **`/switchboard` is missing right after you added the plugin.** OpenCode installs npm plugins automatically,
 which can take a moment. Restart the TUI.
 
-**`NpmInstallFailedError` with npm `min-release-age` set.** OpenCode 2.2 applies `min-release-age` to plugins
-but ignores `min-release-age-exclude` ([anomalyco/opencode#60567](https://github.com/anomalyco/opencode/issues/60567)),
-so a release newer than your window does not install. On each machine that shows the error, clear the cached
-copy and install it once with the window turned off, then restart the TUI:
+**npm `min-release-age` is set: the plugin stays on an older version, or fails with `NpmInstallFailedError`.**
+OpenCode 2.2 applies `min-release-age` to plugins but ignores `min-release-age-exclude`
+([anomalyco/opencode#60567](https://github.com/anomalyco/opencode/issues/60567)). It installs the newest release
+older than your window, without a warning, or fails if there is none. Adding `opencode-switchboard` to
+`min-release-age-exclude` does not help. Mixing an old TUI with a newer server can hide parked sessions, so on
+each TUI machine, update with the window turned off for that one command:
+
+```sh
+npm_config_min_release_age=0 opencode plugin update opencode-switchboard --standalone
+```
+
+Check the version it installed, then restart the TUI:
+
+```sh
+grep '"version"' ~/.cache/opencode/npm/opencode-switchboard@latest/*/node_modules/opencode-switchboard/package.json
+```
+
+If it still shows the old version, or the plugin never installed, clear the cached copy and install it again
+the same way:
 
 ```sh
 rm -rf ~/.cache/opencode/npm/opencode-switchboard@latest

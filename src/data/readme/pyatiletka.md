@@ -2,7 +2,7 @@
 
 Fluxo de issues, marcos, PRs e CI para agentes (opencode), em Gitea e GitHub.
 
-O plugin da ao agente 38 tools e tres hooks que resolvem o trabalho de manter
+O plugin da ao agente 39 tools e tres hooks que resolvem o trabalho de manter
 o quadro de issues em dia: vincular a sessao a uma issue, montar a fila de um
 marco a partir das dependencias reais, esperar o CI depois de um `git push` e
 recusar texto de prosa enrolada antes de gravar. A credencial vem de um `.env`,
@@ -44,7 +44,7 @@ No v2 o plugin aceita opcoes, lidas como `ctx.options`:
 ### Claude Code
 
 O mesmo pacote atende o Claude Code por um plugin que traz um servidor MCP com
-as 38 tools e tres hooks. O servidor MCP e o mesmo conjunto de tools, com os
+as 39 tools e tres hooks. O servidor MCP e o mesmo conjunto de tools, com os
 mesmos nomes: o host apresenta cada uma como
 `mcp__plugin_pyatiletka_pyatiletka__<nome>`.
 
@@ -123,6 +123,7 @@ prefixo do pacote, que e o que evita colisao com variavel de outro programa
 | `PYATILETKA_LOGIN` | Seu login, para o filtro `mine` de `pr_list`. Sem isso, o usuario do token |
 | `PYATILETKA_PROMOTE_ORDER` | Ordem de `branch_promote`. Default `staging,production` |
 | `PYATILETKA_PROSE` | `off`, `warn` ou `block`. Default `block` |
+| `PYATILETKA_CLOSE_HINT` | Texto livre anexado ao resultado de `issue_close` e do fechamento de marco, para lembrar o agente de algo (por exemplo oferecer um resumo do que foi entregue). Vazio = sem lembrete |
 | `PYATILETKA_STATE_DIR` | Onde o vinculo mora no Claude Code. Aceita caminho absoluto. Default `<projeto>/.claude/.state/pyatiletka` |
 | `PYATILETKA_TOOL_PREFIX` | Prefixo do nome das tools no texto do Claude Code. Default `mcp__plugin_pyatiletka_pyatiletka__` |
 
@@ -136,7 +137,7 @@ o ambiente (`GITEA_URL` ou um token) e, por fim, a CLI que estiver logada.
 O plugin le o ambiente do processo do opencode, entao a variavel precisa estar
 exportada no shell que launched opencode. No v2, as chaves nao sensiveis tambem
 podem vir de `options` no `opencode.json` (`provider`, `org`, `defaultRepo`,
-`defaultBranch`, `login`, `promoteOrder`, `prose`), que sobrepoe o ambiente.
+`defaultBranch`, `login`, `promoteOrder`, `prose`, `closeHint`), que sobrepoe o ambiente.
 Token continua so no ambiente.
 
 ### Valores derivados
@@ -294,8 +295,9 @@ export PYATILETKA_PROSE=off
 | `issue_create` | cria a issue, com template ou corpo literal |
 | `issue_depend` | gerencia as dependencias nativas |
 | `issue_comment` | comenta, com o gate de prosa |
+| `issue_attach` | anexa um arquivo local (video, imagem, log) a uma issue e devolve a URL e o markdown. Com `comment`, publica o comentario com o anexo embutido. So Gitea |
 | `issue_update` | titulo, corpo e labels, com transicao de status |
-| `issue_close` | fecha, com comentario opcional |
+| `issue_close` | fecha, com comentario opcional. Avisa quando o marco ficou sem issues abertas e anexa o `closeHint`, se configurado |
 | `issue_reopen` | reabre |
 | `milestone_view` | estado do marco em uma chamada: contagem, BLOQUEIOS e proxima sugerida |
 | `milestone_list` | marcos com contagem e progresso |

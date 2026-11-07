@@ -11,13 +11,15 @@ with the available chat models and lets you mark which ones should disappear fro
 
 1. Type `/hide-model` in the prompt (or open it from the command palette: **Hide models from /models**).
 2. Move with `↑`/`↓` (or `k`/`j`), page with `PgUp`/`PgDn`, jump with `Home`/`End`.
-3. `Space` or a mouse click toggles the model. The change is written immediately.
+3. `Space` or a mouse click toggles the model; a mouse click on the provider header toggles **all** its models. The
+   change is written immediately.
 4. The mouse wheel scrolls the list; `Enter` or `Esc` closes the window.
 
 | Action | Result |
 | --- | --- |
 | `/hide-model` | Opens the window with the chat models enabled on the server. |
 | `Space` / click on the row | Toggles hidden/visible and persists right away (no confirmation). |
+| Click on the provider header | Toggles the whole provider: hides all its models when any is visible, shows all when they are all hidden. |
 | `↑`/`↓`, `k`/`j`, `PgUp`/`PgDn`, `Home`/`End` | Move the cursor (the list follows). |
 | Mouse wheel | Scrolls the list inside the window (the window grows with the terminal). |
 | `Enter` / `Esc` | Closes the window (both behave the same). |
@@ -26,8 +28,9 @@ with the available chat models and lets you mark which ones should disappear fro
 State rules:
 
 - **Default: nothing marked.** The hidden list starts empty, so every model shows up in `/models`.
-- **Grouped by provider, sorted by name.** The window draws one header per provider (with its model count and how many
-  are hidden) and, inside each group, the models in alphabetical order by name.
+- **Grouped by provider, sorted by name.** The window draws one header per provider (`[x]` when every model of the group
+  is hidden, `[~]` when only some are, `[ ]` otherwise) with its model count and how many are hidden; clicking the header
+  toggles all of the provider's models at once. Inside each group the models are in alphabetical order by name.
 - Marking removes the model from `/models`; unmarking brings it back.
 - The selection is stored in `ctx.storage` (key `hidden-models`) and survives plugin reloads.
 - The window lists only what `/models` would show: chat models (`type: "chat"`) that are enabled. Image models, decision
@@ -59,7 +62,8 @@ flowchart LR
   list. Keys are handled by a listener on `context.renderer.keyInput` (`prependListener`), not by a keymap layer: the
   dialog focus is not one of our renderables, and a mode layer lost the race against the prompt. The listener consumes
   (`preventDefault` + `stopPropagation`) only the keys it recognizes. Rows live in a `<scrollbox>` whose height follows
-  the terminal (up to ~78% of it), grouped by provider and sorted by name; a click toggles the row and the wheel scrolls.
+  the terminal (up to ~78% of it), grouped by provider and sorted by name; a click toggles the row, a click on the
+  provider header toggles all of that provider's models, and the wheel scrolls.
   The dialog width comes from the host presets (`medium` 60, `large` 88, `xlarge` 116 columns); the plugin asks for
   `xlarge` **after** the dialog is open, because `dialog.set` only applies to the active dialog — set beforehand it is
   ignored and the window falls back to the 60-column default.

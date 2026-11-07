@@ -83,7 +83,7 @@ memento init <agent>            # idempotent setup
 memento init --list             # supported agents
 memento sync claude [--project DIR] [--dry-run] [--claude-dir DIR]
                                  # share facts with Claude Code auto memory, both ways
-                                 # (@leonard-memento/core >= 0.2.0)
+                                 # (@leonard-memento/core >= 0.2.1)
 ```
 
 Environment: `MEMENTO_MEMORY_ROOT` overrides the root; `MEMENTO_INDEX_FILE` overrides the index file name. On Windows, hook commands resolve through npm's `.cmd` shims (keep the global npm bin directory on `PATH`); sync and the rest of the CLI are path-separator safe.

@@ -703,6 +703,15 @@ package — the sidebar is live there too, exactly as with an npm install (see
   adds **no** runtime dependency; `solid-js`, the GUI SDK and the client are
   provided by the app itself. On hosts without that API the export is simply not
   loaded and everything else keeps working.
+* **Developing in a checkout** (not a user-facing requirement): `npm install`
+  may print `WARN EBADENGINE` for `@opentui/core`, which declares
+  `node >= 26.4.0` while the repo is developed and tested on Node 20/22. It is a
+  devDependency (plus an optional peer) used only for typechecking and for the
+  gate's resolve/version checks - the plugin itself runs inside the host's Bun
+  and installs no dependencies for a user, so the warning is expected and
+  harmless. The CI audit step therefore checks `npm audit --omit=dev` (zero
+  findings) instead of the dev tree, where several advisories live inside npm's
+  own CLI packages pulled in by `@opencode/plugin`.
 
 ---
 

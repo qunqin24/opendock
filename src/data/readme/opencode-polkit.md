@@ -1,9 +1,9 @@
 # opencode-polkit
 
 Redirects `sudo`, `doas` and `su -c` to `pkexec` inside OpenCode, so
-authorisation goes through the desktop's polkit agent (KDE, GNOME, …) instead of
-a terminal the shell tool does not have. Applies to commands run by the shell
-tool; `sudo` in other terminals is unchanged.
+authorisation goes through the desktop's polkit agent instead of a terminal the
+shell tool does not have. Applies to commands run by the shell tool; `sudo` in
+other terminals is unchanged.
 
 ## Scope
 
@@ -49,7 +49,7 @@ For a local checkout, run `npm run build` once, then reference the directory:
 | `sudo -u bob …`        | as above, as `bob`                          |
 | `cat x \| sudo tee y`  | dialog for `tee`                            |
 | `sudo -n …`            | runs only if polkit would authorise without asking; otherwise exit 1 with `sudo: a password is required` |
-| `sudo -v`              | performs the authentication, as `sudo -v` does |
+| `sudo -v`              | authenticates through polkit; creates no timestamp |
 | `sudo -l`              | prints the polkit policy and this session's temporary authorizations |
 | `sudo -k`, `-K`        | revokes polkit's temporary authorizations   |
 | `sudo -H`, `-N`, `-P`  | accepted: pkexec already does what they ask |
@@ -82,7 +82,7 @@ The `create.before` shell hook prepends the stand-in directory to the spawned
 `opencode-polkit-env`, the helper `sudo -E` uses to re-export an environment
 pkexec stripped.
 
-The shell tool's description gains one sentence about the redirect, so the model
+The shell tool's description gains a note about the redirect, so the model
 plans privilege with the real contract instead of learning it from a failed
 call.
 
@@ -92,20 +92,26 @@ call.
 one; other actions may not, according to policy. The plugin takes no part in
 that decision.
 
-`org.freedesktop.policykit.exec` asks for administrator authentication on every
-call, but the desktop agent may keep the password it just received and answer
-the next challenge itself (KDE's agent does). A second command in the same
-session then runs without a dialog. That cache belongs to the agent: another
-agent, a restarted agent or a dismissed dialog means the next command prompts
-again, so do not rely on it.
+`sudoers` is not consulted: polkit policy decides who may run what, so per-user
+and per-command rules, `NOPASSWD`, `secure_path` and `env_keep` do not apply.
+Authentication runs through the `polkit-1` PAM service, not `/etc/pam.d/sudo`,
+so a module configured only for sudo — a fingerprint reader, a second factor —
+is not used here; the service's own stack (normally `system-auth`) decides how
+the password is verified.
 
-Measured on polkit 128 with `polkit-gnome`'s agent: after a successful `pkexec`,
-`pkcheck --list-temp` prints nothing and a non-interactive `pkcheck` still
-reports that authentication is required. polkit records no temporary
-authorization for this action, so the silent second run is the agent answering
-from its own copy of the password, and no user-space query can predict it. That
-is why `sudo -n` reports what the policy says rather than guessing whether a
-dialog would appear, and why `sudo -k` can only clear polkit's own record.
+`org.freedesktop.policykit.exec` asks for administrator authentication on every
+call, but an agent may keep the password it just received and answer a later
+challenge itself. In that case a second command can run without a dialog. That
+cache belongs to the agent: a different agent, a restarted agent or a change in
+the agent's state can mean the next command prompts again, so do not rely on it.
+
+With the default policy, polkit records no temporary authorization for this
+action: after a successful `pkexec`, `pkcheck --list-temp` stays empty and a
+non-interactive `pkcheck` still reports that authentication is required. Whether
+a later command prompts is therefore the agent's decision, and no user-space
+query can predict it. That is why `sudo -n` reports what the policy says rather
+than guessing whether a dialog would appear, and why `sudo -k` can only clear
+polkit's own record.
 
 The plugin keeps no authorization state of its own: `sudo -v` verifies once and
 writes nothing, `sudo -n` assumes nothing, and `sudo -k` only clears polkit's
@@ -113,6 +119,39 @@ record. Authorising one command therefore leaves the next one to be decided
 again, which is the point — the person who allowed an upgrade can still refuse
 the deletion that follows. What widens that window is the agent's password
 cache, not this plugin, and nothing here can revoke it.
+
+## Account lockout
+
+When the `polkit-1` PAM service includes `pam_faillock` (Arch's default stack
+does), the dialog shares one failure tally per user with terminal sudo, `su` and
+the login screen:
+
+- A wrong or empty password submitted in the dialog adds a record. Dismissing
+  the dialog, closing it or pressing Esc cancels the agent's helper before PAM
+  returns, and adds none. (An agent process that is killed instead of
+  cancelling leaves the helper at EOF, and that attempt can count.)
+- An agent may allow several attempts in one dialog, and each retry starts a
+  new PAM helper; a dialog can therefore add several records and use up the
+  default `deny=3`.
+- Once a user has `deny` failures within `fail_interval` (900 s by default),
+  `pam_faillock` refuses that user in every service using the stack for
+  `unlock_time` (600 s by default, measured from the newest record). A locked
+  account rejects even the correct password, because `preauth` fails and
+  `authsucc` cannot reset the tally; further attempts neither extend nor shorten
+  the lock. A successful password authentication outside a lock resets the
+  tally.
+- `sudo -k` clears polkit's authorizations, not the tally. The locked user's own
+  authentication cannot succeed, so OpenCode cannot elevate with that user's
+  credentials to reset it: wait for the lock to expire, use a root console or
+  another administrator, or reboot (`/run` is cleared). Where the tally file is
+  readable by the user, `faillock --user "$USER"` shows the records and
+  `faillock --user "$USER" --reset` clears them without root; otherwise both
+  need root. Check readability with `ls -l /run/faillock/$USER`.
+
+Retrying a failed dialog in a loop only gives the user more chances to submit a
+wrong or empty password, and the lock applies to the whole account. The shell
+tool's description therefore tells the model to ask before retrying, and
+`sudo -n` remains the probe that never invokes PAM.
 
 ## Limitations
 
@@ -122,6 +161,10 @@ cache, not this plugin, and nothing here can revoke it.
 - `su -c … USER` authenticates an administrator (polkit), not `USER`, so an
   account that real `su` would allow can be refused here.
 - `su -c` runs the command with `sh -c`, not with the target user's login shell.
+- `-n`, `-v` and `-l` check `org.freedesktop.policykit.exec` itself. pkexec may
+  select a different action installed with an
+  `org.freedesktop.policykit.exec.path` (and `argv1`) annotation, so that
+  action's rules are not reflected by these checks.
 - `sudo -E` re-exports the environment through `pkexec`'s argument list, so the
   values are visible in `ps` while the command starts. Exported shell functions
   are skipped, and `PATH` loses the shim directories.
@@ -140,12 +183,20 @@ without one, `pkexec` fails instead of prompting.
 
 | Status | Meaning                                                |
 |--------|--------------------------------------------------------|
-| 1      | `-n` or `-v` could not be satisfied: polkit requires authentication, or refuses |
+| 1      | `-n` or `-v` could not be satisfied: polkit requires authentication, denies it, or authentication failed |
 | 126    | the polkit dialog was dismissed                        |
-| 127    | not authorised, or the program could not run           |
+| 127    | not authorised (including after failed authentication), or the program could not run |
 | 64     | the plugin refused the invocation                      |
 
 Messages are in English.
+
+## Development
+
+`npm install`, then `npm run check` type-checks the plugin and its tests, and
+`npm test` runs the shim behaviour tests. The tests stub `pkexec`, `pkcheck` and
+`pkaction` on `PATH`, so they need neither polkit, a desktop agent nor root;
+they need Node 22.19 or later for `--experimental-strip-types`. `npm run build`
+regenerates `dist`.
 
 ## License
 

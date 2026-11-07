@@ -1,13 +1,30 @@
-# StateJar integrations
+# StateJar integrations: memory your AI agents can trust
 
-Client code that connects AI coding agents and assistants to [StateJar](https://statejar.com), the memory layer that
-stores facts instead of transcripts:
+[![PyPI](https://img.shields.io/pypi/v/statejar?label=PyPI)](https://pypi.org/project/statejar/)
+[![npm](https://img.shields.io/npm/v/statejar?label=npm)](https://www.npmjs.com/package/statejar)
 
-- **one value per field**, checked by its type: a value that fails is refused, with a reason;
-- **append-only versions**: every change is a new version, and the old value stays in history;
-- **minimal-disclosure recall**: an assistant gets only what the question needs;
-- **an audit trail** of every disclosure;
-- **a handle per state** (`shm_…`, the SHA-256 of the canonical state), so any copy of the memory can be checked.
+[statejar.com](https://statejar.com) · [Docs](https://statejar.com/docs) · [Blog](https://statejar.com/blog) · [Pricing](https://statejar.com/pricing)
+
+Client code that connects AI coding agents and assistants to [StateJar](https://statejar.com), a memory layer that
+keeps facts instead of transcripts. Each value is checked by its type (a value that fails is refused, with a reason),
+every change is a new version with the old one kept in history, an assistant gets only the facts a question needs,
+every disclosure is audited, and each state has a verifiable handle (`shm_…`, the SHA-256 of the canonical state).
+
+## Quick start
+
+1. Make a developer key at https://statejar.com/api-keys and set `STATEJAR_API_KEY`.
+2. Pick your client:
+
+| Client | Install |
+|---|---|
+| Claude Code | `claude plugin marketplace add KING-OF-FLAME/statejar-integrations` then `claude plugin install statejar@statejar` |
+| Codex | `codex plugin marketplace add KING-OF-FLAME/statejar-integrations` then `codex plugin add statejar@statejar` |
+| OpenCode | `"plugin": ["opencode-statejar"]` in `opencode.json` |
+| Hermes Agent | `hermes plugins install KING-OF-FLAME/statejar-integrations/hermes/statejar --enable` |
+| OpenClaw | `openclaw plugins install openclaw-statejar` |
+| Any MCP client | remote MCP server `https://statejar.com/mcp`, header `Authorization: Bearer <key>` |
+
+Details for each are below.
 
 **What is here**
 

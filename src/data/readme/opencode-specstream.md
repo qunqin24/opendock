@@ -19,8 +19,32 @@ One platform to build, search, extract, enrich, map, and monitor data across the
 
 Ask for any dataset in plain words, and SpecStream builds it from the entire live web: every match found, extracted and enriched into structured records, then monitored for change. It runs through the API and MCP, and inside Sheets, CRMs, Slack, n8n, Zapier and the other tools teams already use.
 
+| Product | What it does | Price |
+| --- | --- | --- |
+| [Search API](https://specstream.ai/search-api) | `GET /v1/web-search`. The most accurate web search API in the world ([scores and method](https://specstream.ai/benchmarks)). Answers a question from the live web in seconds. | $5 per 1,000 searches |
+| [Extract API](https://specstream.ai/extract-api) | `POST /v1/extract`. The main text of up to 20 web pages, PDF, Word or Excel files a call. The MCP tool is `read_pages`. | $0.80 per 1,000 pages. A page with no text is not charged. |
+| [Deep Search](https://specstream.ai/deep-search) | Ask in plain words. Get every match on the live web, in structured rows. It also enriches a list you have and monitors for change. | 5¢, 15¢ or $1 a row |
+
+Search:
+
+```sh
+curl -G https://api.specstream.ai/v1/web-search \
+  -H "Authorization: Bearer $SPECSTREAM_API_KEY" \
+  --data-urlencode "q=What is the population of Japan?"
+```
+
+Extract:
+
+```sh
+curl https://api.specstream.ai/v1/extract \
+  -H "Authorization: Bearer $SPECSTREAM_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"urls": ["https://example.com"]}'
+```
+
 - Source URL and read time on every value.
-- The most a run can cost is shown and approved before it runs. Only delivered rows are billed, and a run that finds nothing costs nothing.
+- The Search API and Extract API need no quote and no approval. Each search or page takes its flat price from your balance.
+- In Deep Search, the most a run can cost is shown and approved before it runs. Only delivered rows are billed, and a run that finds nothing costs nothing.
 - A saved request reruns hourly to yearly, and each row is labeled changed, unchanged or no longer matching.
 - Your agent works on your account, inside the spending limits you set.
 
@@ -37,8 +61,8 @@ This repository holds what you install around SpecStream: MCP client setup, agen
 | Path | What it is |
 | --- | --- |
 | [`server.json`](server.json) | Entry for the official MCP Registry, `ai.specstream/specstream` |
-| [`skills/`](skills) | Agent skills: `compile`, `review-work`, `approve-work`, `continue-work` |
-| [`plugins/claude-code/`](plugins/claude-code) | Claude Code plugin (MCP server and the four skills) |
+| [`skills/`](skills) | Agent skills: `search-web`, `extract-pages`, `compile`, `review-work`, `approve-work`, `continue-work` |
+| [`plugins/claude-code/`](plugins/claude-code) | Claude Code plugin (MCP server and the six skills) |
 | [`plugins/github-agent/`](plugins/github-agent) | Plugin for agents that read the agent-plugins format |
 | [`.cursor-plugin/`](.cursor-plugin) | Cursor plugin |
 | [`packages/sdk-py/`](packages/sdk-py) | `specstream-client`: Python client and the `specstream` command |
@@ -82,7 +106,7 @@ The MCP server is `https://api.specstream.ai/mcp` (Streamable HTTP). Your agent 
 
 Clients that support MCP sign-in can connect without a key. Each guide at [specstream.ai/docs/mcp](https://specstream.ai/docs/mcp) shows the current steps.
 
-New accounts start with $10 of work free for 30 days, no card.
+New accounts start with $10 of credit for 30 days, no card.
 
 ### Claude
 
@@ -95,7 +119,7 @@ claude mcp add --transport http specstream https://api.specstream.ai/mcp \
   --header "Authorization: Bearer $SPECSTREAM_API_KEY"
 ```
 
-Or install the plugin, which adds the server and the four skills. It signs you in through your browser the first time, so no key is needed:
+Or install the plugin, which adds the server and the six skills. It signs you in through your browser the first time, so no key is needed:
 
 ```sh
 /plugin marketplace add specstream/specstream-tools
@@ -392,7 +416,7 @@ A full agent is in [`examples/openai-agents-sdk`](examples/openai-agents-sdk).
 
 Any other client that speaks remote MCP over Streamable HTTP works with the address above and an `Authorization: Bearer` header.
 
-## What the agent does, in order
+## What the agent does in Deep Search, in order
 
 Nothing is spent until a person, or an agent inside a limit a person set, approves a price.
 
@@ -404,7 +428,9 @@ Nothing is spent until a person, or an agent inside a limit a person set, approv
 
 Each delivered row costs 5 cents, 15 cents or $1 depending on how much it needs, plus 5 cents for a person's email and 15 cents for a phone. A run that finds nothing costs nothing. See [pricing](https://specstream.ai/pricing).
 
-The four skills in [`skills/`](skills) teach an agent this order and where to stop and ask: `compile`, `review-work`, `approve-work`, `continue-work`.
+Four skills in [`skills/`](skills) teach an agent this order and where to stop and ask: `compile`, `review-work`, `approve-work`, `continue-work`.
+
+The Search API and Extract API are one call each, `search_web` and `read_pages` on MCP. The `search-web` and `extract-pages` skills teach them.
 
 ## SDKs and command line
 
@@ -451,7 +477,9 @@ The step stops if the price is above `confirm_max_usd`.
 
 ## What comes back
 
-Structured rows for any kind of record: companies, local businesses, grants, tenders, clinical trials, papers, datasets, regulations, vulnerabilities, apps, repositories, packages, podcasts and books. Each condition you wrote is checked against the result's own words and numbers, and a row that fails is not delivered. Facts from many sites join into one record.
+The Search API returns the answer, its rows and the search results it read. The Extract API returns each page's main text, title and published date.
+
+Deep Search returns structured rows for any kind of record: companies, local businesses, grants, tenders, clinical trials, papers, datasets, regulations, vulnerabilities, apps, repositories, packages, podcasts and books. Each condition you wrote is checked against the result's own words and numbers, and a row that fails is not delivered. Facts from many sites join into one record.
 
 SpecStream reads registries and official APIs, maps and directories, job boards, research indexes, news and each result's own site at the moment you ask.
 

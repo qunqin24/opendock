@@ -31,7 +31,6 @@ is also on disk at `node_modules/@lawaty/lacode/CHANGELOG.md`.
 | Distinct notification sounds | A popup says something happened, but not at a glance whether it is a finish, a question or a block. |
 | SSH notification tunnel | Work on a remote host raises its notification on that host, which has no desktop. |
 | Repository context map | Every task starts by exploring your codebase cold, re-deriving the same layout, entry points and boundaries. |
-| Active backlog | What is half-done, and what can be dropped, lives in chat history the next session cannot see. |
 | Standing instructions | The same direction gets repeated every session, or buried in config that is not per-clone. |
 | Image attachments anywhere | A TUI with no image support locks vision models out entirely. |
 
@@ -271,11 +270,9 @@ Agents are stateless between tasks, and exploring your repository is the most
 expensive part of any task — so every agent pays for it again, re-deriving the
 same layout, entry points and boundaries from scratch. LaCode keeps a short,
 maintained map of the repository in `.opencode/context/` — five navigation files
-(`architecture`, `contexts`, `conventions`, `workflows`, `decisions`) plus
-`active.md`, the active backlog, where a finished task stays a week and an open
-one stays until done — and injects a standing rule that every agent reads the
-relevant file before exploring and starts from the canonical entry points it
-lists. The map holds conclusions, not
+(`architecture`, `contexts`, `conventions`, `workflows`, `decisions`) — and injects
+a standing rule that every agent reads the relevant file before exploring and
+starts from the canonical entry points it lists. The map holds conclusions, not
 inventories: it answers "what should I look at first?" and nothing else, which
 is what makes reading it cheaper than the exploration it replaces.
 

@@ -13,7 +13,7 @@ subscription. Claude Code becomes one more model in OpenCode; Claude does the th
 >   [Upgrading from 0.8.x](#upgrading-from-08x-opencode-v1)).
 > - **Tested with:**
 >   - OpenCode 2.1.1;
->   - `@agentclientprotocol/claude-agent-acp` 0.31.x and 0.99.x;
+>   - `@agentclientprotocol/claude-agent-acp` 0.31.x, 0.99.x and 0.101.x;
 >   - Claude Code CLI 2.1.308.
 >
 > Check your version with `opencode --version`.
@@ -243,7 +243,7 @@ the provider.
 | --- | --- | --- | --- | --- |
 | `command` | `string` | `ACP_COMMAND` | — | ACP agent command, e.g. `"claude-agent-acp"`. **Without it the plugin doesn't register anything** (manual setup, see below). |
 | `args` | `string[]` | `ACP_ARGS` (JSON array or space-separated) | — | Arguments for `command`. |
-| `cwd` | `string` | `ACP_CWD` | server's working directory | Working directory of the agent process. |
+| `cwd` | `string` | `ACP_CWD` | each session's OpenCode directory | Working directory of every Claude Code session. Unset, each session works in the directory of its OpenCode session; set, all of them use this one. |
 | `env` | `Record<string,string>` | — | — | Extra environment variables for the agent process. |
 | `claudeExecutable` | `string` | `CLAUDE_CODE_EXECUTABLE` | `command -v claude` | Path to the `claude` binary. |
 | `streamCloseTimeoutMs` | `number` | `ACP_STREAM_CLOSE_TIMEOUT_MS` | `600000` | Sets `CLAUDE_CODE_STREAM_CLOSE_TIMEOUT` for older agents. `claude-agent-acp` ≥ 0.31 doesn't read it: a pending tool call is bounded by `MCP_TOOL_TIMEOUT` (~27 h by default), so waiting for you to approve a permission never cuts the turn. |
@@ -608,7 +608,9 @@ it in a terminal:
 claude --resume 1c66e017-4536-4157-80aa-e451420520e0
 ```
 
-Run it **in the same working directory**: Claude Code indexes sessions by `cwd`. For the old
+Run it **in the same working directory**: Claude Code indexes sessions by `cwd`, which is the
+OpenCode session's directory (sessions created before 0.11.3 stay in the directory they were
+created in, usually the server's). For the old
 isolation, set `"configDir": "isolated"`: sessions then live outside your `~/.claude` and are
 invisible to `--resume`.
 
@@ -647,6 +649,8 @@ per turn decision.
 | Claude doesn't ask you, it assumes | It asks through OpenCode's `question` tool, so the agent must be allowed to use it (the injected agents are). |
 | Claude doesn't search the web | The injected agents include the **native** `WebSearch`, in case OpenCode's `websearch` isn't available. |
 | Slow with many tools | With hundreds of tools each step can take ~1 min. Reduce the tools exposed with the agent's `permissions` ruleset. |
+| Your version isn't the one running / log says `configured more than once with different specs` | Another config (typically a remote/organization one) declares the plugin with another spec. OpenCode keeps the first layer that loads it (remote before yours) and drops the other as `Duplicate plugin ID`. Use the **same** spec in every config: then one copy runs, with your options. |
+| A turn stops with `Step interrupted` after a long silence | OpenCode V2 stops running sessions after 60 min with no recorded event in their directory (streamed text doesn't count); a suspended laptop hits it on wake. Send the message again: the Claude Code session is kept. |
 
 Maintenance command:
 

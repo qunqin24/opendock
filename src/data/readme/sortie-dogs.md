@@ -1,7 +1,7 @@
 # Sortie-dogs
 
 <p align="center">
-  <img src="docs/assets/sortie-dogs-logo.png" alt="Sortie-dogs logo" width="640">
+  <img src="docs/assets/sortie-dogs-logo.jpg" alt="Sortie-dogs logo" width="640">
 </p>
 
 **An adaptive execution harness for OpenCode and Codex: preserve the goal,
@@ -30,7 +30,7 @@ evidence-backed result, not more agents for their own sake.
 > implemented; Codex Missions have completed implementation, validation, correction and acceptance.
 > [Host-specific execution boundaries](docs/codex.md#native-permissions-and-approval) remain explicit.
 
-![Sortie-dogs coordinating a bounded implementation workflow](https://raw.githubusercontent.com/zufall-upon/Sortie-dogs/main/docs/assets/sortie-workflow.gif)
+![Sortie-dogs coordinating a bounded implementation workflow](docs/assets/sortie-workflow.png)
 
 ## Why Sortie
 
@@ -159,6 +159,25 @@ Handoff:    Coordinator → Worker (same unit, retained edits/context/checks/bud
 
 The default Mission profile is serial. Background responsiveness and status observations do not
 add parallel writers, replay unknown commands or imply completion. More agents are not the goal.
+
+For two genuinely independent implementation units, a Coordinator can request `plan_units parallel=true`.
+The host returns exact foreground `tasks[]` for separate managed worktrees and Luna Fast/max Workers.
+Each keeps its own existing Mission reservation and settlement. After native terminal/Writer release,
+`review_mission` combines the patches and returns exact native `shell` inputs for the declared checks.
+The Coordinator runs them with existing native permissions and validation accounting, then calls
+`review_mission` again to reuse successful evidence and prepare the ordinary Review. Root acceptance is still separate.
+Dirty bases, cross-unit read/write dependencies, unknown scopes, preparation failures, explicit incompatible
+Worker models, and plans with a Git delivery lifecycle retain serial execution before dispatch.
+An interrupted or failed dispatched pair retains its candidates and cumulative spend for reconciliation;
+it never silently restarts as serial. Successful acceptance retains the patch/check receipts and cleans up
+unchanged owned worktrees. This is an opt-in two-unit path, not automatic model routing or the legacy Fabric ledger.
+
+Scout discovery can also diagnose a failed formal check: use only useful independent causal questions,
+in parallel when appropriate, and pass evidence and uncertainty into the existing correction handoff.
+Known causes go directly to correction; Scouts are not a retry/rescue prerequisite or a Review vote.
+This reuses parallel diagnosis, not the legacy Failure Swarm execution framework. Mission budgets count
+implementation units; Scout/Advisor consultation costs are outside that budget. Available all-role native
+usage is reported separately, not enforced as an all-role spending cap by the implementation-unit ledger.
 
 Goal history normally uses a single ledger file. If large evidence would exceed the ledger's
 16 MiB document limit, a successful append moves large logical events into immutable,

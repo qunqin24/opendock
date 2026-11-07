@@ -12,15 +12,15 @@
 
 The agent searches the store with `smart_compact_search`, `smart_compact_sql`, and `smart_compact_get` when it needs a detail back. The cut stays put on later requests, so the prompt cache keeps hitting.
 
-**Learn more:** [Smart compaction](https://bcmyguest.github.io/smarter-compact/context-management.html) (benchmarks and how it trims) · [Context proxy & port](https://bcmyguest.github.io/smarter-compact/context-proxy.html) · [Context store](https://bcmyguest.github.io/smarter-compact/context-store.html)
+**Learn more:** [How it works](https://bcmyguest.github.io/smarter-compact/context-management/) · [Benchmarks](https://bcmyguest.github.io/smarter-compact/benchmarks/) · [Context proxy & port](https://bcmyguest.github.io/smarter-compact/context-proxy/) · [Context store](https://bcmyguest.github.io/smarter-compact/context-store/)
 
-**Benchmarks:** In seed-matched [ContextBench](https://github.com/RulinShao/ContextBench) runs on Haiku 5.5, smart compaction cost **72% less on average** than keep-everything across four task sizes (mean of the paired cost ratios; −87%, −19%, −89%, −94%, and the L1600 interval includes no saving). On the log tasks it also scored **0.469** higher (95% bootstrap interval 0.339–0.578; eight pairs). kv-store is a small ceiling test (all arms tie at R4000). [Full tables and charts](https://bcmyguest.github.io/smarter-compact/context-management.html#benchmarks) · [methods](https://bcmyguest.github.io/smarter-compact/context-research.html).
+**Benchmarks:** In seed-matched [ContextBench](https://github.com/RulinShao/ContextBench) (Context Language Models, [arXiv:2609.37725](https://arxiv.org/abs/2609.37725); [Hugging Face dataset](https://huggingface.co/datasets/context-language-model/ContextBench)) runs on Haiku 5.5, smart compaction was compared with keep-everything at four task sizes. Cost is the mean of the paired cost ratios. The log-task score interval is a 95% bootstrap over eight pairs from one task family (0.339–0.578; 0.329–0.639 when the bootstrap resamples task sizes; [deviations from the pre-registration](https://bcmyguest.github.io/smarter-compact/context-research/#deviations-from-the-pre-registration)). kv-store is a small ceiling test (all arms tie at R4000). [Full tables and charts](https://bcmyguest.github.io/smarter-compact/benchmarks/) · [methods](https://bcmyguest.github.io/smarter-compact/context-research/).
 
 <p align="center">
 <img src="docs/media/contextbench-savings.png" alt="Average cost saving 72%: paired cost of Smarter Compact relative to keep everything, kv-store R4000 −87%, log-triage L1600 −19% (not significant), L6400 −89%, L12800 −94%; log-task score +0.47" width="720" />
 </p>
 
-The stored text still uses the OpenMem wire format (`[smarter-compact: …]`, `<smarter-compact-recall>`). Memory recall on a trim is off unless you set `CONTEXT_COMPACTION_RECALL=1`.
+Trimmed context is marked with a `[smarter-compact: …]` pointer.
 
 You need Node 24 or newer (for `node:sqlite`) and, for agents that trim through the proxy, the LiteLLM dev build `v1.109.0-dev.1` on `PATH` as `litellm`. The plugin has no API key of its own. Your agent keeps its own login.
 
@@ -31,7 +31,7 @@ Smart compaction only works when something **sees and rewrites the model request
 | Tier | Agents | What you get |
 | --- | --- | --- |
 | **Full trim (proxy)** | Claude Code, Codex, OpenCode 1 | `smarter-compact enable` points the CLI at the loopback LiteLLM proxy; every turn is stored and older turns drop off the wire at the token threshold. |
-| **Full trim (in-process)** | OpenCode 2, Pi | JS port of the trim core in the agent's **`context` hook**; prose strip, observation masking and the progress note are proxy-only ([OpenCode plugin](docs/opencode.md), [Pi extension](https://pi.dev/docs/latest/extensions#context) in this package). No proxy URL. |
+| **Full trim (in-process)** | OpenCode 2, Pi | JS port of the trim core in the agent's **`context` hook**; includes prose strip, observation masking and the progress note ([OpenCode plugin](docs/opencode.md), [Pi extension](https://pi.dev/docs/latest/extensions#context) in this package). No proxy URL. |
 
 Cursor and Copilot CLI are **not** supported for automatic trim (hooks + MCP only). See [Optional: Cursor and Copilot](#optional-cursor-and-copilot) if you still want search tools there.
 
@@ -144,7 +144,7 @@ After `npm install -g smarter-compact`, the command on your PATH is **`smarter-c
 
 | Command | Effect |
 | --- | --- |
-| `/smarter-compact:status` | Trims, estimated tokens saved, and fail-opens in the last day |
+| `/smarter-compact:status` | Trims, tokens saved (pre-trim estimate minus the billed prompt after the cut), and fail-opens in the last day |
 | `/smarter-compact:compact` | Trim on the next request. The hook writes `sessions/<id>.force` |
 | `smarter-compact plugins add <claude\|codex\|copilot>` | Add the bundled plugin marketplace to that CLI (Copilot: MCP only — no trim) |
 | `smarter-compact path` | Print the installed package root (for custom scripts) |
@@ -161,14 +161,7 @@ A fail-open sends the request on untrimmed and records the error. The request is
 
 `SMARTER_COMPACT_STATE_DIR` defaults to `~/.local/share/smarter-compact` for smarter-compact and the plugin. The store is `$SMARTER_COMPACT_STATE_DIR/context`. Schema and file layout: [docs/context-store.md](docs/context-store.md).
 
-| Variable | Default | Effect |
-| --- | --- | --- |
-| `CONTEXT_PROXY_ENABLED` | `1` | `0` forwards every request unchanged |
-| `CONTEXT_TRIM_AT_TOKENS` | unset → per-model table | When **set** (env, `proxy.env`, OpenCode `trimAtTokens`, or `smarter-compact context set trim=N`), one threshold for **every** model. When **unset**, the model id is matched against `[context_proxy.trim_at]` in `~/.config/smarter-compact/config.toml` (built-in: `haiku` → 95000, else `default` 125000). Example: `smarter-compact context set haiku=88000`. |
-| `CONTEXT_TRIM_TO_FRACTION` | `0.53` | In-turn tool steps kept while the request stays under this fraction of the threshold |
-| `CONTEXT_COMPRESS_OVER_TOKENS` | `4000` | Tool results above this are stored in full and replaced by a short header |
-| `CONTEXT_COMPACTION_RECALL` | `0` by default | `1` asks a memory bank named on the session registration |
-| `CONTEXT_PROXY_PORT` | `4101` | LiteLLM listen port (env overrides `~/.config/smarter-compact/proxy.env`; `smarter-compact enable` writes the port in use) |
+Every setting and default: [configuration reference](docs/configuration.md).
 
 ### Proxy port
 
@@ -179,7 +172,7 @@ export CONTEXT_PROXY_PORT=4200
 smarter-compact enable claude    # agent URLs and proxy.env both use 4200
 ```
 
-Or set it once in `~/.config/smarter-compact/proxy.env` (same file as the LiteLLM key), then run `smarter-compact enable` again so agent configs pick up the port. The hook and auto-started proxy also read trim settings from that file when they are not already in the environment:
+Or set it once in `~/.config/smarter-compact/proxy.env` (same file as the LiteLLM key), then run `smarter-compact enable` again so agent configs pick up the port. The hook and auto-started proxy also read every proxy setting (`PROXY_ENV_CONTEXT_KEYS` in `plugin/lib/brand.mjs`) from that file when they are not already in the environment:
 
 ```
 CONTEXT_PROXY_PORT=4200
@@ -192,7 +185,7 @@ CONTEXT_PROXY_PORT=4200
 # CONTEXT_TRIM_AT_TOKENS=120000
 ```
 
-OpenCode 2 plugin options: `"proxyPort": 4200` in the plugin entry (maps to `CONTEXT_PROXY_PORT` for in-process trim settings; proxy auto-start uses the same resolution).
+The OpenCode 2 `proxyPort` option sets the port that plugin probes; it starts a proxy there only when an agent config already points at that port. Other agents read `CONTEXT_PROXY_PORT`.
 
 ## Tests
 
@@ -219,11 +212,13 @@ npm test
 ./setup_prek.sh   # prek hooks: file hygiene + Conventional Commits on commit-msg
 ```
 
+The docs site (Astro Starlight) builds from `docs/*.md`: `cd site && pnpm install && pnpm test && pnpm build` writes `site/dist/` and fails on a broken link.
+
 CI runs the same `prek run --all-files` plus `npm test` and proxy unit tests. Use `feat:`, `fix:`, `docs:`, `chore:`, etc. so **Prepare release** can bump semver with git-cliff.
 
 ## Releases
 
-Version bumps follow [Conventional Commits](https://www.conventionalcommits.org/) via [git-cliff](https://git-cliff.org/) (`cliff.toml`, same rules as [openmem](https://github.com/bcmyguest/openmem)). On `main`, run the **Prepare release** GitHub Action (dry-run first if you want the proposed version and notes). It bumps `package.json` (`npm version` copies the version into the plugin manifests; `npm run pack:check` fails if they differ), tags `vX.Y.Z`, and dispatches **Release** (tests, npm publish, GitHub Release body from git-cliff). Locally: `git-cliff --bumped-version` and `git-cliff --unreleased --strip header`.
+Version bumps follow [Conventional Commits](https://www.conventionalcommits.org/) via [git-cliff](https://git-cliff.org/) (`cliff.toml`). On `main`, run the **Prepare release** GitHub Action (dry-run first if you want the proposed version and notes). It bumps `package.json` (`npm version` copies the version into the plugin manifests; `npm run pack:check` fails if they differ), tags `vX.Y.Z`, and dispatches **Release** (tests, npm publish, GitHub Release body from git-cliff). Locally: `git-cliff --bumped-version` and `git-cliff --unreleased --strip header`.
 
 ## License
 

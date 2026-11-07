@@ -97,19 +97,26 @@ Only the values of **sensitive fields** in an `.env` file enter the global known
 
 Collection fields in `policy` may be written as arrays and thresholds as plain objects (programmatic callers may use `Set` / `Map`); an invalid field type fails at startup with the field name instead of silently dropping the protection rule.
 
-## Per-request masking records
+## Masking records and the local viewer
 
-The Pi extension can record masking results per request so you can check for false positives:
+The Pi extension records masking results per request by default and starts a viewer that only listens on the loopback address: what the extension received next to what it handed back, with hit details and failure markers.
+
+The address is printed at startup (for example `http://127.0.0.1:53211/`) — open it directly. The page shows the record list on the left (session / source / type / status filters, paging) and the selected record on the right, with the first record already open; content panes support wrapping, find and copy. Clearing lives in the toolbar and requires a second confirmation.
+
+Details follow the record type: context and tool-result records show "what the extension received" next to "what it handed back", plus hit details and field-level comparisons; `provider_request` records show the provider payload captured right before sending. That payload comes from the host's `before_provider_request` hook, is only observed (never rewritten), may still be changed by later extensions, and does not prove the request reached the network or the model.
+
+Records live in `~/.pi/agent/rehydra/records/records.sqlite` (directory 0700 and database 0600 on macOS/Linux; on Windows mode bits are not enforced and protection comes from the user profile's NTFS ACLs), trimmed by 7 days and 32 MiB, with a 4 MiB per-record snapshot cap. Original text is stored by default, so **real values land on local disk in clear text**. Turn both off when you do not want that:
 
 ```json
 {
   "rehydra": {
-    "record": { "enabled": true, "includeOriginal": true }
+    "record": { "includeOriginal": false },
+    "dashboard": { "enabled": false }
   }
 }
 ```
 
-`/rehydra log` shows recent records for the session, `/rehydra log <id>` shows hits with field-level before/after, `/rehydra clear --all` removes them. Recording is off by default; when enabled it writes to `~/.pi/agent/rehydra/records/` (0700 / 0600) and trims by age and total size. With `includeOriginal: false` only the type, detector, placeholder and offsets are kept.
+With `includeOriginal: false` no before/after text is stored — only the type, detector, placeholder, length and offsets. `dashboard.enabled: false` disables the viewer. The page has no login: cross-site reads are blocked by browser same-origin rules, but other local processes can still read the records.
 
 ## Address detection
 

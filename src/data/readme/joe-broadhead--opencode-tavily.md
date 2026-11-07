@@ -29,19 +29,19 @@ An entry pinned to a version, such as `@joe-broadhead/opencode-tavily@0.0.2`, do
 
 ## Sign in
 
-Run `/connect` and choose **Tavily MCP**. That is all most people need.
+Run `/connect` and choose **Tavily account**. That is all most people need.
 
 `/connect` lists two Tavily entries:
 
 | Entry | What it is | What it signs in |
 | --- | --- | --- |
-| **Tavily MCP** | The OAuth sign-in for the plugin's `tavily` MCP server. It is the default. | The five Tavily tools. Tavily bills the calls to your account. |
-| **Tavily** | OpenCode's own API-key entry. Paste a key from [app.tavily.com](https://app.tavily.com). | OpenCode's `websearch` tool, and the five Tavily tools too: while a key is connected, the plugin uses it instead of OAuth, and **Tavily MCP** is not listed. |
+| **Tavily account** | The OAuth sign-in for the plugin's `tavily` MCP server. It is the default. | The five Tavily tools. Tavily bills the calls to your account. |
+| **Tavily** | OpenCode's own API-key entry. Paste a key from [app.tavily.com](https://app.tavily.com). | OpenCode's `websearch` tool, and the five Tavily tools too: while a key is connected, the plugin uses it instead of OAuth, and **Tavily account** is not listed. |
 
 - **The browser.** In the TUI, `/connect` shows Tavily's sign-in link; press `o` or Enter to open it in your browser. On the command line, `opencode mcp auth tavily` opens the browser automatically.
 - **An API key instead.** Choose **Tavily** in `/connect`, or run `opencode auth login tavily`. A key you connect wins over `TAVILY_API_KEY`. Remove the key to go back to OAuth. The plugin switches without a restart.
 - **`TAVILY_API_KEY`** works only in the environment of the OpenCode server, which is usually the background service. A key exported in your shell does not reach a service that is already running, so the plugin keeps using OAuth. Use `/connect`, or `opencode service set env TAVILY_API_KEY <key>`; see [TAVILY_API_KEY and the background service](https://github.com/joe-broadhead/opencode-tavily/blob/HEAD/docs/configuration.md#tavily_api_key-and-the-background-service).
-- `/mcps` → `tavily` is the same OAuth sign-in as **Tavily MCP**.
+- `/mcps` → `tavily` is the same OAuth sign-in as **Tavily account**.
 
 Run `/tavily-status` to see which one is in use. With a key, it also shows whether Tavily accepts the key. Tavily's MCP server connects with any key, so the plugin asks Tavily's usage endpoint once per key, which costs no credits.
 
@@ -71,12 +71,12 @@ Tavily status
 - Connection: sign-in required
 - Account: none
 - Access: read only: search, extract, map, crawl and research
-- Sign-in: OAuth (/connect → Tavily MCP)
+- Sign-in: OAuth (/connect → Tavily account)
 - Web search: Tavily, unless opencode.json sets "websearch"
 - Tools: none listed yet
 - Agents without default rules: none
 - OpenCode: 2.2.3 (tested)
-- Next step: Run /connect and choose Tavily MCP to sign in, or choose Tavily to use an API key.
+- Next step: Run /connect and choose Tavily account to sign in, or choose Tavily to use an API key.
 ```
 
 ### Scripts
@@ -121,7 +121,7 @@ An organisation can install the plugin for every user on a machine through OpenC
 }
 ```
 
-There is no client ID to set: OpenCode registers itself with Tavily's sign-in. Each member then runs `/connect` and chooses **Tavily MCP**. To use one organisation key instead, set `TAVILY_API_KEY` in the environment of the OpenCode server process, for example with `opencode service set env TAVILY_API_KEY <key>` for the background service. A key in a login shell does not reach the service. Never put a key in `opencode.json`.
+There is no client ID to set: OpenCode registers itself with Tavily's sign-in. Each member then runs `/connect` and chooses **Tavily account**. To use one organisation key instead, set `TAVILY_API_KEY` in the environment of the OpenCode server process, for example with `opencode service set env TAVILY_API_KEY <key>` for the background service. A key in a login shell does not reach the service. Never put a key in `opencode.json`.
 
 ## Troubleshooting
 
@@ -129,7 +129,7 @@ Run `/tavily-status` first. It always ends with one next step, `Nothing to do.` 
 
 | Connection | What to do |
 | --- | --- |
-| `sign-in required` | Run `/connect` and choose **Tavily MCP**, or choose **Tavily** to use an API key. |
+| `sign-in required` | Run `/connect` and choose **Tavily account**, or choose **Tavily** to use an API key. |
 | `failed` | Run `opencode mcp list` to see the error, and check your network. |
 | `connecting` | Wait a few seconds and run `/tavily-status` again. |
 | `disabled` | Enable `tavily` in `/mcps`, or remove `"disabled": true` from `mcp.servers.tavily` in `opencode.json`. |
@@ -161,10 +161,10 @@ When the plugin does not start, `/tavily-status` is missing, and OpenCode's log 
 
 ## Uninstall
 
-Sign out first, while the plugin is installed: once it is removed, `opencode mcp logout tavily` can no longer find the server, and the Tavily MCP sign-in stays stored.
+Sign out first, while the plugin is installed: once it is removed, `opencode mcp logout tavily` can no longer find the server, and the Tavily account sign-in stays stored.
 
-1. If you connected an API key, log out of it: `opencode auth logout tavily`, and choose the key. Skip this if OpenCode's own `websearch` should keep using the key. Wait until `/connect` lists **Tavily MCP** again, a few seconds: while a key is connected, the server has no Tavily MCP sign-in to log out of.
-2. Log out of Tavily MCP: `opencode mcp logout tavily`. Without a stored sign-in it says `No stored credentials for tavily`.
+1. If you connected an API key, log out of it: `opencode auth logout tavily`, and choose the key. Skip this if OpenCode's own `websearch` should keep using the key. Wait until `/connect` lists **Tavily account** again, a few seconds: while a key is connected, the server has no Tavily account sign-in to log out of.
+2. Log out of the Tavily account sign-in: `opencode mcp logout tavily`. Without a stored sign-in it says `No stored credentials for tavily`.
 3. Remove the plugin, then reload:
 
    ```sh

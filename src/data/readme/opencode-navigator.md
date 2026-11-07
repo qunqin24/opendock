@@ -936,9 +936,11 @@ tasks before pending tasks. Finished contains separate Completed and Cancelled
 groups. The selected view is temporary and resets to All when changing sessions.
 The header always reports completed tasks against the full task count.
 
-Subagents show observed run duration, retry countdowns, and execution errors. An
-already-running child discovered by the sidebar uses a clock icon (`~` in Text
-fallback) because its exact start time is unknown. Recent keeps the last 10 observed
+Subagents show run duration, retry countdowns, and execution errors. OpenCode 2
+uses its public execution-start timestamp for exact active durations, including
+children already running when Navigator opens. Missing or invalid native timing
+and OpenCode 1 retain observed durations. An already-running child whose exact
+start is unknown has a clock icon (`~` in Text fallback). Recent keeps the last 10 observed
 finished runs per parent session in memory across navigation, until OpenCode exits.
 An idle transition is labelled Finished, not a guarantee of successful task
 completion; errors and cancellations retain their own labels. A worker timeout
@@ -974,7 +976,7 @@ session or workspace dismisses the entire search dialog chain.
 
 ## Scripts
 
-Development uses Bun 1.4.4 and stable TypeScript 7. Standalone Node/OpenTUI paths
+Development uses Bun 1.4.4 and stable TypeScript 6.0.3. Standalone Node/OpenTUI paths
 require Node.js 26.4 or newer; CI pins Node 26.12.1. Install dependencies with
 `bun install --frozen-lockfile`.
 
@@ -984,9 +986,11 @@ Oxlint uses the `solid-ox` preset from
 OpenTUI callbacks, SDK compatibility, and test fixtures. Type-aware analysis uses
 `oxlint-tsgolint`; `tsconfig.lint.json` covers application code, tests, build scripts,
 and configuration files. Formatter exclusions are maintained in `oxfmt.config.ts`.
-The resolved dependency tree contains TS7 only. The approved removal of
-incompatible SonarJS checks and native replacements is documented in
-[Lint coverage](LINT_COVERAGE.md); compatible Solid and other JS checks remain.
+The complete version 10 preset includes SonarJS and typescript-eslint checks;
+the former TS7 compatibility projection is removed. See [Lint coverage](LINT_COVERAGE.md)
+for current exceptions and historical exclusions. A tested root-only Bun metadata
+patch corrects the legacy TypeScript 5 peer in OpenTUI's FFI helper for this repo.
+Consumer installations retain upstream metadata; see [Host APIs](HOST_API.md).
 
 ```sh
 bun run test

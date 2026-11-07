@@ -60,7 +60,7 @@ With options:
     {
       "package": "opencode-token-slim",
       "options": {
-        "reasoningBytes": 80000,
+        "reasoningBytes": 50000,
         "resultKeepBytes": 32000
       }
     }
@@ -107,7 +107,7 @@ same amount of content is kept whatever the model happened to write.
    | reasoning | 80 KB | — | dropped, one stub line |
    | tool results | 32 KB | 48 KB as a head+tail digest | a pointer to the file on disk |
    | images | inside the result budgets | — | one line naming the file it was read from |
-   | tool calls | 8 KB | — | long string arguments cut to 200 bytes each |
+   | tool calls | 8 KB | — | long string arguments cut to 200 bytes each, except `write`/`edit` (never trimmed: the model edits FROM old write args) |
    | assistant text | 16 KB | shortened, head **and** tail | — |
    | system prompt | 24 KB | cut on safe boundaries | — |
    | tool schemas | 10 KB | never cut mid-signature | — |
@@ -378,22 +378,23 @@ If snip is not installed, nothing happens and nothing breaks.
 
 | option | default | meaning |
 |---|---|---|
-| `reasoningBytes` | 80000 | bytes of reasoning kept whole, measured from the newest end |
-| `reasoningKeepBytes` | 32000 | bytes of the newest reasoning never cut, whatever the budget says |
+| `reasoningBytes` | 50000 | bytes of reasoning kept whole, measured from the newest end |
+| `reasoningKeepBytes` | 16000 | bytes of the newest reasoning never cut, whatever the budget says |
 | `stairBytes` | 16000 | how much has to accumulate before the cut moves (keeps the prompt cache warm) |
-| `resultKeepBytes` | 32000 | bytes of tool results kept whole, measured from the newest end |
-| `resultDigestBytes` | 48000 | bytes of tool results kept as a head+tail digest; older ones become a pointer |
-| `callKeepBytes` | 8000 | bytes of tool-call arguments kept whole; older calls have their long arguments shortened |
-| `textKeepBytes` | 16000 | bytes of the assistant's own text kept whole |
-| `elideFloorBytes` | 512 | the smallest result worth replacing — below this the marker costs more than the content |
-| `resultBytes` | 12000 | a new tool result above this size is digested at source, before it is persisted |
-| `headBytes` | 3000 | bytes kept from the head of an elided result |
-| `tailBytes` | 1500 | bytes kept from the tail of an elided result |
-| `toolOutputBytes` | 51200 | the size at which OpenCode would truncate a result on its own; the plugin runs first, so its digest replaces that head-only cut |
-| `systemBytes` | 24000 | cap on the system prompt |
+| `resultKeepBytes` | 24000 | bytes of tool results kept whole, measured from the newest end |
+| `resultDigestBytes` | 24000 | bytes of tool results kept as a head+tail digest; older ones become a pointer |
+| `callKeepBytes` | 4000 | bytes of tool-call arguments kept whole; older calls have their long arguments shortened |
+| `textKeepBytes` | 8000 | bytes of the assistant's own text kept whole |
+| `elideFloorBytes` | 256 | the smallest result worth replacing — below this the marker costs more than the content |
+| `resultBytes` | 8000 | a new tool result above this size is digested at source, before it is persisted |
+| `headBytes` | 2000 | bytes kept from the head of an elided result |
+| `tailBytes` | 1000 | bytes kept from the tail of an elided result |
+| `toolOutputBytes` | 32768 | the size at which OpenCode would truncate a result on its own; the plugin runs first, so its digest replaces that head-only cut |
+| `systemBytes` | 16000 | cap on the system prompt |
 | `toolBytes` | 10000 | cap on the combined tool schemas |
-| `duplicateBytes` | 2000 | minimum size of a repeated result before it is collapsed |
+| `duplicateBytes` | 1000 | minimum size of a repeated result before it is collapsed |
 | `stripItemIds` | `[]` | providers whose replayed provider item ids are dropped |
+| `autoStripAgentRouter` | `true` | automatically strip item ids for AgentRouter-style multi-resource gateways, preventing `429` caused by cross-resource item id replay |
 | `keepFullOutput` | true | write the full text next to the digest. With it off, old results are digested instead of pointed at, and the saving is smaller |
 | `directory` | `~/.local/share/opencode/slim-output` | where full outputs go |
 | `statsDirectory` | `~/.local/share/opencode/slim-stats` | where the per-session counters are kept, so they survive a restart |
@@ -403,7 +404,7 @@ If snip is not installed, nothing happens and nothing breaks.
 | `snip` | true | filter shell output through snip before it reaches the context |
 | `snipPath` | `""` | path to the snip binary; empty resolves it from PATH |
 | `snipTimeoutMs` | 2000 | give up on a snip rewrite after this long and run the command as written |
-| `maxDiskBytes` | 268435456 | cap on the full-output directory (256 MiB) |
+| `maxDiskBytes` | 268435456 | target cap on the full-output directory (256 MiB); active references are retained |
 
 `stairBytes` is the knob to reach for if your provider has no prompt cache, or
 if you see cache misses: raising it moves the cut less often and keeps the
@@ -489,12 +490,13 @@ byte-for-byte at the end.
   stays intact until the cut moves a step.
 - **The disk cache is a cache.** Full outputs are written to
   `~/.local/share/opencode/slim-output`, content-addressed, and the directory is
-  capped at 256 MiB. Files the current request still points at are evicted last.
-  The cap is still a cap: when everything is referenced, the oldest go first.
+  capped at 256 MiB, except for files the current request still points at.
+  Active references may exceed the cap; unreferenced files are evicted oldest first.
 - **The counters survive a restart** — written to
   `~/.local/share/opencode/slim-stats/` every 30 seconds and on shutdown.
 - **Nothing is dropped that the model needs to answer.** The plugin shortens
-  reasoning, shortens oversized results, shortens the arguments of old calls,
+  reasoning, shortens oversized results, shortens the arguments of old calls
+  (except `write`/`edit`, which stay whole so later edits apply to real content),
   and caps the system prompt. It never drops a tool result, a tool call, or a
   user message.
 - **Windows.** snip's rewritten command is repaired before it is used: snip

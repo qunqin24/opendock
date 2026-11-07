@@ -6,13 +6,13 @@
 
 ## 下载
 
-当前版本：**1.0.0**。这是 NearToken 独立 npm 包的版本；后续 magpie 定制宿主升级目标 **2.2.1** 属于另一仓库和发行物。
+当前版本：**1.1.4**。这是 NearToken 独立 npm 包的版本；magpie 定制宿主的对接要求见 [`docs/HOST-接口对接.md`](docs/HOST-接口对接.md)，宿主升级目标 **2.2.2** 属于另一仓库和发行物。
 
 | 方式 | 命令 / 入口 |
 | --- | --- |
 | npm（推荐） | `magpie plugin add @fish-under-sea/magpie-neartoken` |
 | GitHub 仓库 | `magpie plugin add github:Fish-under-sea/magpie-neartoken` |
-| 离线包 | 在 [Releases](https://github.com/Fish-under-sea/magpie-neartoken/releases) 下载 `fish-under-sea-magpie-neartoken-1.0.0.tgz`，解包后把目录添进「插件」页 |
+| 离线包 | 在 [Releases](https://github.com/Fish-under-sea/magpie-neartoken/releases) 下载 `fish-under-sea-magpie-neartoken-1.1.4.tgz`，解包后把目录添进「插件」页 |
 
 装完在 magpie 的「插件」页打开 NearToken。卸载就是删掉这个包，magpie 的其它部分不受影响。
 
@@ -106,6 +106,290 @@
 - **模型选择不重做。** magpie 已经有供应商、模型、路由、失败切换这一整套；插件只把站点目录写进供应商，剩下的交回窗口。
 - **展示价格有明确来源。** 模型广场使用公开计价规则、当前分组及币种设置；账户、钱包和看板数据由宿主返回。
 - **读不到就说不知道。** 站点没有用量端点时页面写「站点未提供用量统计」，不画一张空图——空图会被读成「这段时间没有消耗」。
+
+## 1.1.8 收紧模型分类，适配宿主 fish.25 的 kind 接入
+
+宿主 `v0.1.3140+fish.25` 起会把插件声明的 `kind` 接进分类：
+
+| 插件给的 `kind` | 宿主认成 | 落点 |
+| --- | --- | --- |
+| `image` | `Draws` | 供应商编辑器「图像模型」、设置 → 图像 |
+| `video` | `Films` | 「视频模型」、设置里的视频行 |
+| `audio` | `Serves = speech` | 「语音模型」、设置 → 语音模型 |
+| `embedding` | `Serves = embedding` | 「向量模型」、设置 → 向量模型 |
+| `chat` / 不给 | `Serves = ""` | 对话模型 |
+
+插件侧的取值本来就是这五个，这次只**收紧判定**，不动取值。
+
+### 语音：只看输出侧
+
+以前把模型名、分组名、描述一起丢进正则，`gpt-4o-audio-preview` 这类「能听音频、输出仍是文本」的对话模型会被卷进语音分区。现在：
+
+```js
+// 端点类型或分组名说了算，模型名不参与
+if (ends.some((e) => /^(audio|tts|asr|transcription|speech)$/i.test(e))) return 'audio'
+if (/tts|asr|text-to-speech|speech|suno|语音|转文字/i.test(groups)) return 'audio'
+```
+
+### 向量：只认完整的 embedding 词
+
+去掉裸 `embed` 匹配——`embedded-agent-v2`、`embed-sandbox` 这类不再误判。判据是 `embedding` / `jina-rerank` 端点、分组名含向量/embedding，或模型名含完整的 `embedding`。
+
+### 不是改判，是收紧
+
+用包内快照的 109 个真实模型逐一对比改动前后：
+
+```
+改前: audio=11  chat=70  embedding=3  image=20  video=5
+改后: audio=11  chat=70  embedding=3  image=20  video=5
+发生变化的模型 0 个
+```
+
+### 老宿主兼容
+
+`kindOutput('audio')` 与 `kindOutput('embedding')` 仍带 `text: true`，所以在不认 `kind` 的老宿主上，这些模型至少还能当对话模型看到，不会被彻底丢掉。
+
+### `magpie.min` 已抬到 2.3.1
+
+宿主 2.3.1（`v0.1.3207+fish.26`）落地了 #42 的插件 kind 接入，`magpie.min` 相应从 `2.2.2` 抬到 `2.3.1`。
+
+需要说明一点实测结论：**宿主当前的清单解析根本不读 `min` 这个字段**。`internal/plugin/page.go` 解 `magpie` 段时只认 `page` / `panels` / `actions` / `permissions` / `calls`，没有 `min`。所以它不影响装不装得上，作用只是把「最低需要 2.3.1」这件事写在清单里给人看。
+
+真正决定行为的是宿主版本：2.3.1 起 `plugin.Model.Kind` 生效，老宿主上这些模型仍按对话模型显示（`kindOutput` 保留 `text: true` 就是为了这个）。
+
+## 1.1.7 删掉自动检查更新与热重载
+
+插件以前会每分钟向 npm registry 问一次最新版本，写进 `page/latest.js`，页面再比对并自动重载。这套东西有两个问题：
+
+- **多余的网络请求**：插件运行时每隔一分钟打一次 `registry.npmjs.org`，与「少去打扰外部服务」的方向相反；
+- **重复了宿主的职责**：magpie 自己就有插件更新检查（`plugin-updates.json`），版本号显示也由 `page/version.js` 提供，插件不需要再造一份。
+
+现在删除：
+
+| 位置 | 删掉的东西 |
+| --- | --- |
+| `index.mjs` | `stampLatest()`、`latestAskedAt`、两处调用（`usage` 与 `models` 钩子里） |
+| `page/app.js` | 整块「检查更新」：`cmpVersion`、`loadLatest`、`autoHotReload`、`startHotReload` 及其调用 |
+| `page/latest.js` | 整个文件 |
+| `page/index.html` | `#update-note` 提示元素 |
+| `page/style.css` | `.update-note` 三条样式 |
+
+**保留**：头部版本号胶囊 `#version`、`page/version.js`（由 `scripts/stamp.mjs` 按 `package.json` 生成），以及 `boot()` 里填充版本号的逻辑。
+
+### 注意
+
+这条改动与「供应商偶发掉出」**无关**，不要混为一谈：掉出是宿主在插件重载窗口里把 provider 判成「用户已移除」，已开宿主 issue `FISH-DOCK-Plugins#41`（provider sticky）跟踪。
+
+## 1.1.6 五分钟掉一次供应商的成因与防护
+
+### 宿主那 5 分钟是怎么来的
+
+宿主 `plugin_relist.go`：
+
+```go
+relistEvery = time.Hour       // 正常每小时重列
+relistFirst = time.Minute     // 启动 1 分钟后首次
+relistSoon  = 5 * time.Minute // 有模型「离开列表」时，5 分钟后立刻再列一次
+```
+
+`KeepPluginsListed` 每次重列都对比前后两份列表，只要有模型这次没出现，就调用 `dropGonePluginPicks` 把用户对这个模型的选择移出，并把下次重列提前到 5 分钟。所以「过几分钟掉一次」不是插件崩了，而是**某次重列给出的模型表比上次少**。
+
+### 插件为什么会给少
+
+`catalog()` 有三级兜底：站点实时表 → 包内快照 → 空。包内快照是打包那一刻的站点状态，站点后来新增的模型它没有。只要某次走到快照，列表就比上次少，宿主立刻按「模型下架」处理。
+
+### 1.1.6 的两道防护
+
+**防护 1：列表单调不减**
+
+```js
+mergeModelsWithLastGood(table, lastGood)
+```
+
+保留上一次「站点实时」拿到的表，本次缺哪个就补哪个。站点偶发少给几个模型时，用户的选择不会被误删。
+
+**防护 2：非实时数据打标记**
+
+本次数据不是站点实时（用了包内快照或彻底失败）时，在返回表上写：
+
+```js
+safe[Symbol.for('magpie.fellBack')] = true
+```
+
+宿主 `host.js` 认这个标记，而 Go 侧 `pluginListedIDs` 与 `keptListed` 都会跳过 `FellBack` 的 provider——**打了标记的列表不参与「谁不见了」的判断**，也就不会丢 pick。
+
+已核实本机安装的 magpie.exe（61 MB）内含 `magpie.fellBack`、`pluginListedIDs`、`KeepPluginsListed`、`left its plugin's list`，宿主确实支持这条通道。
+
+### 验证
+
+- 单元测试 87 项全部通过，新增 `tests/relist-guard.test.mjs`：站点少给模型时必须补齐、站点多给模型时不受影响、首列来自包内快照时必须打标记、`models()` 永不抛异常。
+- `page/health.js` 现在记录 `source`（live / snapshot / empty）与 `restored`（本次补回几个），方便实机核对。
+
+## 1.1.5 日志靠重建模型表拿凭据 · 类型与计费详情按站点真实数据
+
+### 日志凭据
+
+宿主调插件的 `models` 钩子时会带第二个参数 `{ auth, signal }`，`auth` 是 `plugin-auth.json` 里该账号凭据的副本。**重列模型这个动作本身就会把令牌送到插件手上**——启动首列、每小时重列、手动「获取模型」都算。
+
+插件在 `models(_given, ctx)` 里收下 `ctx.auth.access` 并立即抓一次逐条日志，不再依赖 reconnect，也不再依赖宿主调 `auth.usage`。
+
+### 类型按站点真实值映射
+
+实测 `/api/log/token` 的 `type` 是数字（当前账号全是 `2`），不是字符串。现在按站点编码映射：`1 充值 / 2 消费 / 3 管理 / 4 系统 / 5 错误 / 6 退款`，未知值原样回显。
+
+### 详情列还原真实单价
+
+之前把 `model_ratio` 当成了「元/百万 token」，这是错的。真实还原有两条路：
+
+**表达式计费**——解码 `expr_b64`，取该档位里 `p` 与 `c` 的系数：
+
+| 模型 | 实测显示 | 官网显示 |
+| --- | --- | --- |
+| gpt-6.1-sol | `0_272k · ¥2 / ¥10/M` | 一致 |
+| gpt-6-astra | `0_272k · ¥10 / ¥50/M` | 一致 |
+
+**倍率计费**——输入 `model_ratio × 2`、输出 `model_ratio × completion_ratio × 2`：
+
+| 模型 | 字段 | 实测显示 | 官网显示 |
+| --- | --- | --- | --- |
+| gpt-6.1-terra | `0.5` / `5` | `标准 · ¥1 / ¥5/M` | 一致 |
+
+时段档位显示中文：`off_peak` → 谷时、`peak` → 峰时；`0_272k` 这类长度分层保留站点原写法。缓存读写系数是 `cr` / `cc`，变量名同样含字母 `c`，正则加了 `(?<![a-z])` 负向断言。
+
+### 页面
+
+- 列序：`时间（含消耗 + 令牌）→ 分组 → 模型 → 费用 → 请求体大小 → 流 → Token → 耗时 → 详情`；
+- 耗时竖条按秒数分档：**< 5s 绿 / 5–15s 橙黄 / ≥ 15s 红**；
+- 模型胶囊改为液态玻璃；代金券去掉左侧竖条与虚线票根，并修掉组名重复。
+
+## 1.1.4 日志凭据改由宿主重列送来 · 空态说人话
+
+1.1.3 只从 `auth.usage` / `auth.loader` 取令牌，实测这两条在普通使用路径上都不会跑（`logs-meta` 长期 `no-auth`）。
+
+真正的通道在宿主 `host.js:2060`：
+
+```js
+ph.models(given, { auth: authCopy(k), signal })
+```
+
+**宿主每次列举模型（启动首列、每小时重列、手动「获取模型」）都会把凭据副本一起递进来。** 插件的 `models(_given, ctx)` 现在先收下 `ctx.auth.access`，再抓一次逐条日志——所以「刷新模型」这个动作本身就足以补齐日志，不需要 reconnect，也不需要宿主另开通道。
+
+同时把日志空态从「读取失败」改成说清差哪一步，并给出可执行动作。
+## 1.1.3 页面刷新不再每分钟敲一次宿主 · 日志凭据自备
+
+### 「页面隔一会刷新一下」的真身
+
+`tick()` 以前每 60 秒调一次 `load()`，而 `load()` 第一行就是 `neartoken:state`。宿主的 `state()` 第一行又是 `settle()`——命中时 `handOver()` → `dropHostProvider()` 会删掉宿主侧的 provider 条目。
+
+也就是说：**插件页每开一分钟，就给宿主一次删 provider 的机会**。这正是「隔一会刷新一下」「供应商反复掉出」能被连起来的那条链。
+
+现在：
+
+- 每 60 秒只刷用量（`neartoken:usage`），**不再碰 state**；
+- `neartoken:state` 降到启动时 + 显式动作 + 每 10 分钟一次；
+- 页面从后台切回来时同样只刷用量，只有超过 10 分钟才重新问 state。
+
+### 日志为什么一直空
+
+`page/logs-meta.js` 实测给出 `stage: "no-auth"`：宿主从来没有把凭据递进来。宿主的 `state()` 只回 `configured` 与令牌名，不回令牌本身；逐条日志要 `getAuth`，而它只在「宿主要余额」或「发请求」时才有。
+
+现在连接成功那一刻就把令牌留在进程内（只放内存、不落盘），并立即抓一次日志；`fetchLogs` 的钥匙来源改为「宿主递的 → 连接时的 → 都没有才报 no-auth」。页面空态也会直接写清「重新连接一次即可补齐」。
+
+### 验证
+
+- 单元测试 68 项全绿。
+- 包内 35 个文件；`logs.js` / `logs-meta.js` / `health.js` 均为占位。
+## 1.1.2 单一真相：停用只由宿主过滤 · 清掉旧 options
+
+这一版把「谁来决定模型出现」收敛成一个答案。
+
+### 之前为什么会互相打架
+
+停用状态曾经有**两份**：宿主 `pluginCatalog` 按 `neartoken-prefs.json` 剔一次，插件 `provider.models()` 又按 `page/prefs.json` 剔一次。两边不同步时：
+
+- 宿主剔光、插件还留着 → 供应商「有卡片、无模型」；
+- 插件剔光、宿主不知道 → 空表 → 供应商掉出。
+
+### 现在
+
+- `provider.models()` **一律返回站点全量**，不再读任何偏好文件；停用完全交给宿主 `modelFilter`。
+- 插件彻底不再读插件 options（`disabledModels` / `disabledGroups` / `enabledByGroup` / `disabledByGroup`），页面启动也不再 `bridge.options.get()`。旧版写进宿主 `plugins.json` 的那几个键变成纯历史，插件侧不再受其影响。
+- 其中 `options.disabledGroups` 是隐患：它曾能**静默过滤整组模型**，是「模型数忽多忽少」的现成来源，现已移除。
+- `page/logs-meta.js` 暴露逐条日志抓取阶段（`no-auth` / `no-key` / `no-list` / `ok` / `error`），页面据此说清「为什么没有日志」。
+
+### 同时提交给宿主的两条 issue
+
+- [FISH-DOCK-Plugins#36](https://github.com/Fish-under-sea/FISH-DOCK-Plugins/issues/36)：重列钩子（`neartoken:refresh` 顺带 `plugin.Providers`）、`handOver` 删除防抖、`PrefModel.Groups` 参与隐藏判定、旧 options 迁移清理。
+- [FISH-DOCK-Plugins#37](https://github.com/Fish-under-sea/FISH-DOCK-Plugins/issues/37)：逐条日志数据来源（`/api/dsh/device/usage` 无 rows，`/api/log/token` 有）+ 宿主日志落盘位置。
+
+### 已知边界
+
+- 宿主没有 `neartoken:prefs` 时，停用只在本页生效，不会影响 magpie 的模型列表。
+- 分组粒度的明细只能存本页（`localStorage`）；宿主只表达「整模型停用」。
+
+## 1.1.1 供应商掉出的根因修掉 · 并入 1.0.1 / 1.0.2
+
+### 掉出的根因（实测，不是推断）
+
+宿主真实数据根 `…\credentials\magpie-runtime\data` 里的实测数字：
+
+| 项 | 实测 |
+| --- | --- |
+| `neartoken-prefs.json` 停用条目 | **109**（带分组 109） |
+| 站点目录模型数 | 109 |
+| 停用后仍启用 | **0**（覆盖率 100%） |
+| `plugin-providers.json` 的 neartoken 条目 | 存在，`models=109` |
+
+宿主 `pluginCatalog` 会调 `modelFilter("neartoken")` → `LoadPrefs().ModelIDs()`，把 `disabled` 里的模型**整个**从清单剔除；109 个全在名单里，过滤后就是空表，供应商于是表现为「掉出」。
+
+**语义错配**才是病根：页面的启停是**分组级**（模型在哪些组关掉），而宿主的模型清单**没有分组这一维**——`disabled` 里出现一个模型就等于整模型下线。于是：
+
+- 在 A 组关掉某模型 → 它在 B 组也被隐藏；
+- 「全不选」把所有模型的**所有分组**一起写进 `disabled` → 宿主拿到空表 → 供应商掉出。
+
+### 本版修法
+
+- **只把「所有分组都停用」的模型交给宿主**：还有任意一组开着就不写，分组明细只存本机（`localStorage`）。宿主隐藏 = 模型真的全关，不再因为一组关掉就整模型消失。
+- **「全不选」只作用于当前视图分组**（选定分组就是它，否则是每个模型最便宜那组），不再把每个模型的所有分组一起关。这条正是 `109 × 全组` 的写入源头。
+- **读回时区分两种记录**：宿主 `disabled` 里的模型按「整模型停用」展开成该模型所有分组停用（`hostOff`），本机存储保留分组粒度。
+- **点开模型即解除宿主整模型停用**：`toggleModel` 与「全选」会清掉 `hostOff`，宿主侧随之放开。
+
+### 并入 1.0.1
+
+- 日志窗口没有逐条记录时显示「这个窗口没有逐条记录。」，不再回落到聚合视图。
+- Token 列补**缓存副值**（`缓存 27,520`）。
+- 流列区分**流式 / 非流式**（`非流` 用灰色，对应 `.lg-flow.off`）。
+- 补 `magpie.min = "2.2.2"`。
+
+### 并入 1.0.2
+
+`provider.models()` 绝不向宿主返回空表或抛异常（三层兜底），已在 1.1.0 带入，本版继续保留。
+
+### 已经装了旧版的人怎么回到正常
+
+旧数据里 109 个模型可能都还挂在宿主清单上。在模型广场点一次「全选」即可：它会清掉宿主侧的整模型停用，供应商随即回来；之后按新的分组语义操作不会再触发掉出。
+
+## 1.1.0 回到 1.0.0 基线 · 对齐宿主 prefs 协议
+
+本版**以 `1.0.0` 为基线**重做，`1.0.1`–`1.0.3` 的页面增量（模型表诊断行、日志空态文案）不包含在内。这样处理是为了先把「供应商反复掉出」这件事查清楚，而不是继续在会掉出的版本上叠功能。
+
+保留的 1.0.3 修复（`index.mjs`，与掉出直接相关，已实测）：
+
+- **币种换算不再回退 `per:1`**：`/api/status` 读不到时沿用上一次成功的值，从没成功过才用站点约定默认 `1 美元 = 500000 额度`。旧的回退会把 quota 原值直接当金额显示，余额放大 50 万倍。
+- **模型表三层兜底**：`catalog()` 内部异常或返回空表时，先用包内快照重建、再忽略页面偏好重建，`provider.models()` 外层再挡一次异常，**绝不向宿主抛 rejected Promise 或返回空表**——宿主拿不到模型表就会判定「这个供应商没有模型」，也就是掉出。
+- **`config` 不再声明 `models`**：空对象会被宿主理解成「声明了 0 个模型」，模型表统一由 `provider.models()` 提供。
+
+本版新增（对齐宿主）：
+
+- **`neartoken:prefs` 调用**：页面读写启用状态改用宿主协议 `{op:"get"}` / `{op:"set", disabled:[{model, groups}]}`，落宿主的 `neartoken-prefs.json`，**不经插件 options**，所以写偏好不会重建插件宿主、也不会让供应商掉出。旧版本页面写的是 `{get:true}` / `{set:{…}}`，宿主不认。
+- **`magpie.calls` 补 `neartoken:prefs`**：宿主只保留插件在 `package.json` 里声明过的调用，1.0.0 缺这一条，宿主即使实现了也会被丢掉。
+
+配套文档（不进 npm 包）：
+
+- [`docs/HOST-接口对接.md`](docs/HOST-接口对接.md)：宿主需实现的接口全集，逐条标注宿主实现状态与插件依赖。
+- [`docs/DEPRECATED-废弃接口与字段.md`](docs/DEPRECATED-废弃接口与字段.md)：不再作为对接依据的 10 项接口、字段与文件，带代码位置与清理条件。
+
+已知边界：宿主镜像的 `page/prefs.json` 是 JSON，页面沙箱读不到，页面以 `neartoken:prefs {op:"get"}` 为准；插件侧 `readPrefs()` 与宿主 `pluginCatalog` 的过滤重复，列入废弃项。
 
 ## 1.0.0 首个正式版
 

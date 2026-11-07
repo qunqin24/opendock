@@ -245,7 +245,7 @@ the `opencode.json` entry unchanged:
 }
 ```
 
-When the section is visible, click its `search…` box to filter sessions in place; click
+When the section is visible, click its `search…` box (also on the home list, whose header reads `Recent sessions (option+o all)`) to filter sessions in place; click
 elsewhere or press Esc to leave search. Click the **Sessions** heading to drive
 the list from the keyboard instead of the mouse (`↑`/`↓` to move, Enter to open,
 Option-P to preview, Option-S to pin a session, Option-R to pin its directory,
@@ -258,7 +258,9 @@ Sessions waiting on you (unanswered agent questions, runs stuck mid-tool) pin
 themselves to a **Needs input** group above the directories, with the count in
 the heading; `sesh --needs-input` lists the same set in the terminal. Row
 markers are the only status signal: a loading spinner marks the session whose
-agent is working; the open session shows ● and every other row stays neutral.
+agent is working, including sessions run by other OpenCode processes (from the
+local store, refreshed each poll); the open session shows ● and every other row
+stays neutral.
 Hovering a row while keyboard navigation is active selects it for the next
 shortcut. Clicking (or Enter on) a session opens it here. The full picker is one
 keystroke away.

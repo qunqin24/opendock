@@ -25,13 +25,10 @@
 
 The same package supports OpenCode V1 (1.18.29 or newer) and V2 (2.0.0 or newer).
 
-For V2, add this plugin to your [OpenCode config](https://opencode.ai/v2/docs/plugins/):
+For V2, install this plugin with the [OpenCode CLI](https://opencode.ai/v2/docs/plugins/#manage):
 
-```json
-{
-  "$schema": "https://opencode.ai/config.json",
-  "plugins": ["opencode-gpt-imagegen"]
-}
+```sh
+opencode plugin add opencode-gpt-imagegen
 ```
 
 For V1, add this plugin to your [OpenCode config](https://opencode.ai/docs/plugins/) with the singular `plugin` field:
@@ -49,7 +46,7 @@ OpenCode installs the package automatically. Unless you use a proxy, sign in to 
 
 Set `baseURL` if you reach ChatGPT through a gateway rather than signing OpenCode in to ChatGPT yourself, for example a local proxy that holds one or more ChatGPT sign-ins and spreads requests across them. In that setup OpenCode's `auth.json` usually has no ChatGPT sign-in, and calling chatgpt.com directly would bypass the gateway.
 
-On V2, pass options with the package object:
+On V2, pass options with the package object in your [OpenCode config](https://opencode.ai/v2/docs/plugins/#configure):
 
 ```json
 {
@@ -66,6 +63,7 @@ On V1, use the package-and-options tuple:
 ```
 
 With `baseURL` set, the plugin skips authentication lookup and sends the proxy no credentials on both versions. It sends the same requests it would send to ChatGPT, to `<baseURL>/images/generations`, or to `<baseURL>/images/edits` when reference images are given. Your proxy works with this option if it:
+
 - accepts those two `POST` routes without an `Authorization` header;
 - forwards the JSON body unchanged to the Codex images endpoints (`https://chatgpt.com/backend-api/codex/images/generations` and `/edits`), signed in with a ChatGPT account. The body has `prompt`, `model`, `quality`, `size` and `background`, plus `images` (a list of `{ "image_url": "data:..." }`) for edits;
 - answers with the backend's JSON, in which `data[0].b64_json` holds the PNG. Any non-2xx status is reported as an error together with the start of the response body.
@@ -74,9 +72,16 @@ The request takes as long as the backend needs to draw the image, often 30 secon
 
 ### Updating the plugin
 
-On V2, update an unpinned package with `opencode plugin update opencode-gpt-imagegen`. If you pinned an exact version, update that version in your configuration. See [OpenCode's plugin management guide](https://opencode.ai/v2/docs/plugins/#manage).
+On V2, update this plugin with the OpenCode CLI:
+
+```sh
+opencode plugin update opencode-gpt-imagegen
+```
+
+See [OpenCode's plugin management guide](https://opencode.ai/v2/docs/plugins/#manage).
 
 On V1, OpenCode caches npm plugins, so restarting it may keep an older version. To update this plugin:
+
 1. Check the `plugin` entry in your OpenCode config. Use `"opencode-gpt-imagegen"` or `"opencode-gpt-imagegen@latest"` to request the latest version. If you pinned a version, remove the version suffix or change it to the version you want to install.
 2. Quit OpenCode completely.
 3. If your entry is unversioned or uses `@latest`, delete the cached directory `~/.cache/opencode/packages/opencode-gpt-imagegen@latest/`.

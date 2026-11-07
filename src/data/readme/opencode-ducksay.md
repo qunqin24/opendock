@@ -14,6 +14,24 @@ A tiny ASCII duck paddles around your OpenCode sidebar and drops funny remarks a
 
 Type `/duck <text>` in the TUI to talk to the duck. The dialogue never enters the session's context or transcript.
 
+## Screenshots
+
+Click `[img]` in the `Ducksay` heading, or run `/duck.img`, to save the duck's scene as a PNG. Pictures go to
+`.opencode/ducksay/screenshots/` in your project. The folder brings its own `.gitignore`, so they never reach git.
+
+## Choosing a model
+
+The duck jokes with the same model as your session. If that model is paid, you can give the duck a cheaper one:
+
+```json
+{
+  "plugins": [{ "package": "opencode-ducksay", "options": { "llmModel": "opencode/big-pickle" } }]
+}
+```
+
+`llmModel` takes a model name in the `"provider/model"` form. Your session keeps its own model. If the model you named is
+missing, the duck answers `Quack-quack!` instead of a joke.
+
 ## Install
 
 Install the plugin with one command:
@@ -32,7 +50,7 @@ instead.
 - [How the duck behaves](https://github.com/zhek/opencode-ducksay/blob/main/docs/behavior.md) — swimming, jokes,
   questions, talking to the duck and the water.
 - [Configuration and options](https://github.com/zhek/opencode-ducksay/blob/main/docs/configuration.md) — `swimSpeed`,
-  `silent`, `llmTimeout`, `llmContextDepth` and the sidebar settings.
+  `silent`, `llmTimeout`, `llmContextDepth`, `llmModel` and the sidebar settings.
 
 ## License
 

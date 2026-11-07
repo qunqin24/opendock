@@ -21,9 +21,9 @@ Run `opencode reload`, or restart OpenCode. Then run `/slack-status`: it shows `
 
 ## Sign in
 
-1. **Give OpenCode your Slack app's client ID.** Run `/connect` and choose **Slack app**. Skip the client secret (an app made from the manifest uses PKCE and has none; OpenCode shows that field unmasked). When OpenCode asks for the key, paste the client ID from the app's **Basic Information → App Credentials** page. The client ID is public. From a terminal, `opencode auth login slack-app` does the same.
+1. **Give OpenCode your Slack app's client ID.** Run `/connect` and choose **Slack app client ID**. Skip the client secret (an app made from the manifest uses PKCE and has none; OpenCode shows that field unmasked). When OpenCode asks for the key, paste the client ID from the app's **Basic Information → App Credentials** page. The client ID is public. From a terminal, `opencode auth login slack-app` does the same.
 
-   If your organisation already set the client ID for you (see [Organisation rollout](#organisation-rollout)), there is no **Slack app** entry; go straight to step 2.
+   If your organisation already set the client ID for you (see [Organisation rollout](#organisation-rollout)), there is no **Slack app client ID** entry; go straight to step 2.
 2. **Sign in to Slack.** Run `/connect` and choose **Slack**. In the TUI, press `o` or Enter to open the sign-in page in your browser. In a terminal, `opencode mcp auth slack` opens the browser automatically. `/mcps` → `slack` is an equivalent way in.
 3. Slack shows the workspace, the account and what the app asks for. Approve it. Slack sends the browser back to the callback, `http://localhost:8765/callback` unless you set another, and OpenCode finishes the sign-in.
 
@@ -123,7 +123,7 @@ Add the address to the Slack app's **OAuth & Permissions → Redirect URLs** (or
 
 ## Organisation rollout
 
-Put the client ID of your organisation's Slack app in the system configuration, so members have nothing to set up: they see no **Slack app** entry and only run `/connect` and choose **Slack** to sign in. OpenCode reads the system configuration from `/Library/Application Support/opencode/opencode.json` on macOS (or the `ai.opencode.managed` managed-preferences domain) and from `/etc/opencode/opencode.json` on Linux:
+Put the client ID of your organisation's Slack app in the system configuration, so members have nothing to set up: they see no **Slack app client ID** entry and only run `/connect` and choose **Slack** to sign in. OpenCode reads the system configuration from `/Library/Application Support/opencode/opencode.json` on macOS (or the `ai.opencode.managed` managed-preferences domain) and from `/etc/opencode/opencode.json` on Linux:
 
 ```jsonc
 {
@@ -147,8 +147,8 @@ Run `/slack-status` (or `/slack` in the TUI) first. Its `Connection` row shows a
 
 | Connection | Code | Meaning | What to do |
 | --- | --- | --- | --- |
-| `not configured` | `CLIENT_ID_MISSING` | No Slack app client ID is set, so the Slack server is not added. | Run `/connect` and choose **Slack app**, then paste your Slack app's client ID. |
-| `not configured` | `CLIENT_ID_INVALID` | The client ID saved in the `/connect` **Slack app** entry is empty or has spaces. | Run `/connect` and choose **Slack app**, then paste the client ID again. |
+| `not configured` | `CLIENT_ID_MISSING` | No Slack app client ID is set, so the Slack server is not added. | Run `/connect` and choose **Slack app client ID**, then paste your Slack app's client ID. |
+| `not configured` | `CLIENT_ID_INVALID` | The client ID saved in the `/connect` **Slack app client ID** entry is empty or has spaces. | Run `/connect` and choose **Slack app client ID**, then paste the client ID again. |
 | `sign-in required` | `AUTH_REQUIRED` | Nobody has signed in yet, or the sign-in expired. | Run `/connect` and choose **Slack**, then press `o` or Enter to open the sign-in page. `opencode mcp auth slack` opens the browser automatically. |
 | `connecting` | none | OpenCode is connecting to Slack. | Wait a few seconds, then run `/slack-status` again (or press `r` in `/slack`). |
 | `disabled` | `SERVER_DISABLED` | The server is turned off. | Turn on `slack` in `/mcps`. |
@@ -186,11 +186,11 @@ A script's errors from the tools RPC have their own codes, listed in [Scripting]
 
 ## Uninstall
 
-Sign out while the plugin is still installed: once it is removed, OpenCode no longer knows the `slack` server or the **Slack app** entry, so it cannot remove their credentials, and `opencode auth list` stops showing them.
+Sign out while the plugin is still installed: once it is removed, OpenCode no longer knows the `slack` server or the **Slack app client ID** entry, so it cannot remove their credentials, and `opencode auth list` stops showing them.
 
 1. Sign out of Slack: `opencode mcp logout slack`. If it answers "MCP server not found" right after OpenCode starts, wait a few seconds and run it again.
-2. If you saved a client ID in `/connect`, remove it: `opencode auth logout slack-app`, and choose the **Slack app** account. Without a terminal, name it: `opencode auth logout slack-app "Slack app"`.
-3. Check: `opencode auth list` lists neither **Slack** nor **Slack app**.
+2. If you saved a client ID in `/connect`, remove it: `opencode auth logout slack-app`, and choose the **Slack app client ID** account. Without a terminal, name it: `opencode auth logout slack-app "Slack app client ID"`. An entry saved by an earlier release is named "Slack app".
+3. Check: `opencode auth list` lists neither **Slack** nor **Slack app client ID**.
 4. Remove the plugin: `opencode plugin remove @joe-broadhead/opencode-slack`, then `opencode reload`. `opencode mcp list` no longer lists `slack`.
 5. Remove any Slack rules you copied into your agents' own `permissions`.
 

@@ -81,14 +81,14 @@ image A / B のいずれかが一様と検出された場合、status / match_ra
 
 表の型が `string` のパラメータに string 以外を渡した場合の扱いは次のとおりです。
 
-- `figma_layout` / `web_layout` は string に加えてノードの JSON 配列をそのまま受け付けます（文字列化したものと同じ経路で処理）。JSON オブジェクトを渡すと `Layout tree mode input error: figma_layout must be a JSON array of node objects (a JSON object is not supported); pass the nodes as an array`（`layout_integrity` では同じ文面に `Layout integrity mode input error: ` が付く）になり、数値・真偽値・`null` などのその他の型では `Layout tree mode input error: figma_layout must be a JSON-encoded string or a JSON array` になります（`web_layout` や `layout_integrity` ではモード名と引数名が対応して変わります）。
+- `figma_layout` / `web_layout` は string に加えてノードの JSON 配列、または単一ノードの JSON オブジェクトをそのまま受け付けます（オブジェクトは 1 要素配列に包んで文字列化したものと同じ経路で処理）。オブジェクトの JSON 文字列を渡すと `Layout tree mode input error: figma_layout must be a JSON array of node objects (a JSON object is not supported); pass the nodes as an array`（`layout_integrity` では同じ文面に `Layout integrity mode input error: ` が付く）になり、数値・真偽値・`null` などのその他の型では `Layout tree mode input error: figma_layout must be a JSON-encoded string or a JSON array/object` になります（`web_layout` や `layout_integrity` ではモード名と引数名が対応して変わります）。
 - `ignore_nodes` はカンマ区切り文字列に加えて文字列要素の JSON 配列を受け付けます。それ以外の型（数値・オブジェクト・`null`、文字列以外の要素を含む配列）は `argument 'ignore_nodes' must be a string or a JSON array of strings` のツール実行エラーになります。
 - `ignore_region` はセミコロン区切り文字列に加えて、各要素が `x,y,w,h` の文字列 JSON 配列を受け付けます。それ以外の型は `argument 'ignore_region' must be a string or a JSON array of strings` のツール実行エラーになります。
 - 上記以外の string 型パラメータ（`image_path_a` / `image_path_b` / `image_a_base64` / `image_b_base64` / `figma_layout_path` / `web_layout_path` / `viewport_preset`）は、string 以外を渡すと空文字へ黙って落とさず `argument 'X' must be a string` のツール実行エラーになります。
 
 `number` / `boolean` も変換不能な値は同様にエラーで、それぞれ `argument 'X' must be a number`（`max_details` は整数のみなので `argument 'X' must be an integer`）、`argument 'X' must be a boolean` を返します。
 
-ツールの JSON Schema では `figma_layout` / `web_layout` / `ignore_nodes` / `ignore_region` をいずれも string 型として宣言しているため、引数をスキーマで検証する MCP クライアントでは配列が拒否される場合があります。その場合は文字列で渡してください（`ignore_nodes` はカンマ区切り、`ignore_region` はセミコロン区切り、レイアウトは JSON 文字列）。サーバー側のハンドラは上記のとおり配列も受け付けます。
+ツールの JSON Schema では `figma_layout` / `web_layout` / `ignore_nodes` / `ignore_region` をいずれも string 型として宣言しているため、引数をスキーマで検証する MCP クライアントでは配列・オブジェクトが拒否される場合があります。その場合は文字列で渡してください（`ignore_nodes` はカンマ区切り、`ignore_region` はセミコロン区切り、レイアウトは JSON 配列文字列）。サーバー側のハンドラは上記のとおり配列・ネイティブオブジェクトも受け付けます。
 
 ### 入力データ
 
@@ -98,9 +98,9 @@ image A / B のいずれかが一様と検出された場合、status / match_ra
 | `image_path_b` | string | `perceptual` / `strict` | 比較対象画像 B（Web 側）のローカルファイルパス。`image_b_base64` と排他で、どちらか一方が必須。対応フォーマット: PNG / JPEG / GIF / WebP（静止画。アニメーション WebP は非対応）。 |
 | `image_a_base64` | string | `perceptual` / `strict` | 参照画像 A の base64 エンコード文字列。`data:image/png;base64,...` 形式の data URI も受け付け（`;base64,` までのプレフィックスは自動で除去）。改行・スペース等の ASCII 空白はデコード前に除去する（MIME 76 文字折り返しなど）。標準 base64 のみ（URL-safe は不可）。末尾のパディング (`=`) は省略可。`image_path_a` と排他。対応フォーマット: PNG / JPEG / GIF / WebP（静止画。アニメーション WebP は非対応）。 |
 | `image_b_base64` | string | `perceptual` / `strict` | 比較対象画像 B の base64 エンコード文字列。`data:image/png;base64,...` 形式の data URI も受け付け（`;base64,` までのプレフィックスは自動で除去）。改行・スペース等の ASCII 空白はデコード前に除去する（MIME 76 文字折り返しなど）。標準 base64 のみ（URL-safe は不可）。末尾のパディング (`=`) は省略可。`image_path_b` と排他。対応フォーマット: PNG / JPEG / GIF / WebP（静止画。アニメーション WebP は非対応）。 |
-| `figma_layout` | string / object[] | `layout_tree` | Figma ノードリストの JSON 文字列（インライン指定）。ノードの JSON 配列をそのまま渡すこともできる（オブジェクトは専用エラー）。`figma_layout_path` と排他で、どちらか一方が必須。 |
+| `figma_layout` | string / object[] / object | `layout_tree` | Figma ノードリストの JSON 文字列（インライン指定）。ノードの JSON 配列、または単一ノードの JSON オブジェクトをそのまま渡すこともできる（オブジェクトは 1 要素配列として扱う。オブジェクト文字列は専用エラー）。`figma_layout_path` と排他で、どちらか一方が必須。 |
 | `figma_layout_path` | string | `layout_tree` | Figma ノードリスト JSON ファイルのローカルパス。`figma_layout` と排他。 |
-| `web_layout` | string / object[] | `layout_tree` / `layout_integrity` | Web DOM ノードリストの JSON 文字列（インライン指定）。ノードの JSON 配列をそのまま渡すこともできる（オブジェクトは専用エラー）。`web_layout_path` と排他で、どちらか一方が必須。 |
+| `web_layout` | string / object[] / object | `layout_tree` / `layout_integrity` | Web DOM ノードリストの JSON 文字列（インライン指定）。ノードの JSON 配列、または単一ノードの JSON オブジェクトをそのまま渡すこともできる（オブジェクトは 1 要素配列として扱う。オブジェクト文字列は専用エラー）。`web_layout_path` と排他で、どちらか一方が必須。 |
 | `web_layout_path` | string | `layout_tree` / `layout_integrity` | Web DOM ノードリスト JSON ファイルのローカルパス。`web_layout` と排他。 |
 
 画像の幅・高さはそれぞれ最大 8192px。超過時は自動リサイズされずエラーになるため、比較前にリサイズまたは切り出しが必要。あわせてフルデコード前に各辺 30,000px / 総ピクセル 50,000,000 の上限も検査し、超過時は展開せずエラーになる。
