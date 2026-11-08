@@ -3,7 +3,7 @@
 [![PyPI](https://img.shields.io/pypi/v/statejar?label=PyPI)](https://pypi.org/project/statejar/)
 [![npm](https://img.shields.io/npm/v/statejar?label=npm)](https://www.npmjs.com/package/statejar)
 
-[statejar.com](https://statejar.com) · [Docs](https://statejar.com/docs) · [Blog](https://statejar.com/blog) · [Pricing](https://statejar.com/pricing)
+[statejar.com](https://statejar.com) · [Docs](https://statejar.com/docs) · [Blog](https://statejar.com/blog) · [Pricing](https://statejar.com/pricing) · [LinkedIn](https://www.linkedin.com/company/statejar/)
 
 Client code that connects AI coding agents and assistants to [StateJar](https://statejar.com), a memory layer that
 keeps facts instead of transcripts. Each value is checked by its type (a value that fails is refused, with a reason),
@@ -125,6 +125,24 @@ See [openclaw/README.md](openclaw/README.md).
 
 Copy [`skills/statejar/`](skills/statejar/) into your agent's skills folder (for Claude Code, `~/.claude/skills/`). See
 [skills/README.md](skills/README.md).
+
+## Measured results
+
+Numbers from the StateJar service these clients talk to, measured by StateJar's own evaluation jobs; intervals are
+95% (Wilson). These clients add no extraction of their own.
+
+- **Release gate, extraction** (2026-11-06, `gpt-6-luna` candidate, 345-message dev subset): precision
+  423/441 = 95.9% [93.6–97.4], recall 423/467 = 90.6% [87.6–92.9].
+- **Real-world messages** (2026-11-05, `gpt-6-luna`, 300 messages, rw3): precision 232/247 = 93.9% [90.2–96.3],
+  recall 232/276 = 84.1% [79.3–87.9]; $0.54 per 1,000 adds; p95 13.1 s per message.
+- **Real-world messages** (2026-11-05, `gemini-3.5-flash-lite` paid, same 300): precision 243/262 = 92.8%
+  [88.9–95.3], recall 243/276 = 88.0% [83.7–91.4].
+- **Wrong facts in answers** (2026-11-03, `gemini-3.5-flash-lite`, 120 conversations): 8/120 = 6.7% [3.4–12.6]
+  with StateJar; 1/120 = 0.8% with the full transcript, which did better on these short conversations.
+
+The full tables, with the cost per 1,000 adds of each model, the tokens per turn by chat length and which model
+production uses (Gemini `gemini-3.5-flash-lite` first, then Mistral, then OpenRouter; `gpt-6-luna` is the staging
+candidate), are in the StateJar service's README.
 
 ## Tests
 

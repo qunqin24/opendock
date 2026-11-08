@@ -428,9 +428,19 @@ Set `CURSOR_AGENT_TRANSCRIPTS_FOLDER` before starting OpenCode (or its daemon). 
 
 ## Development
 
+For complete local checks across Linux, macOS and native Windows, use
+`python3 -B scripts/test-harness.py` (`python -B` on Windows). It detects native
+test capabilities and uses a local Linux-container engine on Windows or when
+native prerequisites are missing. Cursor agent is optional. Run with
+`--diagnose` to check prerequisites; see the [test harness guide](docs/pr-review.md#local-checks-on-different-operating-systems)
+for the image build and isolation requirements.
+
 Changes listed under [Unreleased](CHANGELOG.md#unreleased) describe the development checkout; use a rebuilt local install to test them before a release. Maintainer guides and incident lessons are linked from the [documentation index](docs/README.md). The manual Cursor review, isolated pull-request checks, and OpenCode live test are in [docs/pr-review.md](docs/pr-review.md).
 
 Manual Cloud Agent reviews publish through the configured GitHub App after exact-preview approval. See the [App publisher setup](docs/pr-review.md#github-app-publisher) for `REVIEW_APP_ID`, the private key and optional installation ID. Tokens are restricted to this repository and retain the installation's configured permissions; the returned grant must include review-write access. `review-publish.py auth-info` reports configuration without printing secrets. Reviews use the App's bot identity, with no automatic review trigger.
+
+Linux isolated checks include the nested sandbox tests. Live credentials require
+the full check to pass and a separate trust decision for that exact revision.
 
 Re-reviews verify earlier threads and replies, and resolve fixed or refuted
 findings through the App after approval of the listed actions. The publisher
@@ -582,7 +592,7 @@ The package root intentionally stays plugin-safe for OpenCode's classic loader. 
 
 ## Troubleshooting
 
-For intermittent disconnects or laptop sleep/wake, enable `CURSOR_PROVIDER_RECOVERY_DEBUG=1` before starting the host. Set `CURSOR_PROVIDER_DEBUG_FILE` to a persistent file if the default temporary log is unsuitable. The file is mode 0600 and capped at 10 MiB. Search `recovery:` lines by `hostSessionId`: `interrupted` records the error code and checkpoint/barrier state; `history-check` explains acceptance or refusal; `reopened` links old and replacement Run IDs; `pump-complete` records progress (`closed=true pending=0` is terminal). `host-call-emitted` and `host-result-delivered` correlate dispatched calls and saved results. These IDs help investigate duplicates but do not by themselves prove two different model-generated calls have identical effects. Elapsed wall time includes suspension; it is not proof the OS slept. Correlate with the OS sleep log.
+For intermittent disconnects or laptop sleep/wake, enable `CURSOR_PROVIDER_RECOVERY_DEBUG=1` before starting the host. Set `CURSOR_PROVIDER_DEBUG_FILE` to a persistent file if the default temporary log is unsuitable. The file is mode 0600 and capped at 10 MiB. Search `recovery:` lines by `hostSessionId`: `interrupted` records the error code and checkpoint/barrier state; `history-check` explains acceptance or refusal, `history-unsafe` names every cause that made a Run's history unrepresentable, and `appended-echo`, `appended-unmatched` and `appended-not-in-history` follow Cursor's echoes of injected steers and host notes; `reopened` links old and replacement Run IDs; `pump-complete` records progress (`closed=true pending=0` is terminal). `host-call-emitted` and `host-result-delivered` correlate dispatched calls and saved results. These IDs help investigate duplicates but do not by themselves prove two different model-generated calls have identical effects. Elapsed wall time includes suspension; it is not proof the OS slept. Correlate with the OS sleep log.
 
 Completed inline `get_mcp_tools` lookups are read-only and do not block rebuilding from completed host results. A lookup that is unfinished, spills to a file, has unknown fields, or has no matching start remains a barrier, as does other unrepresented server-side work.
 

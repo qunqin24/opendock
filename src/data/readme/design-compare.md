@@ -39,7 +39,7 @@
 - `generate_diff` を `false` に指定した場合は差分画像の PNG/base64 化を行わず、`diff_image` は空文字列で返されます。差分マスク自体はメモリ上で計算するため、`diff_regions` は `generate_diff=true` のときと同じく返ります（巨大な base64 を避けつつ位置情報だけ得る用途向け）。
 - `diff_on_mismatch` を `true` に指定した場合、判定が `success` なら `diff_image` は空文字列、`mismatch` なら差分画像が返されます。
 - `diff_image_content` を `true` に指定し、かつ `diff_image` が空でない場合、MCP 応答の `content[0]`（JSON テキスト）の後に `image/png` の image コンテンツが付きます。既定は `false` で、既存クライアントは `content[0]` だけを読めば足ります。
-- 差分ピクセルがある場合、応答に機械可読な `diff_regions`（例: `[{"x": 0, "y": 0, "w": 100, "h": 100, "diff_pixels": 10000}]`）が付きます。pixelmatch 差分ラスタの赤いピクセルを 4 近傍連結成分に分割し、bounding box と差分ピクセル数を算出します。差分ピクセル数の多い順に最大 10 件で、座標は画像のピクセル座標です。黄色いアンチエイリアス除外ピクセルは含めません。`generate_diff=false` でも返します。
+- 差分ピクセルがある場合、応答に機械可読な `diff_regions`（例: `[{"x": 0, "y": 0, "w": 100, "h": 100, "diff_pixels": 10000}]`）が付きます。pixelmatch 差分ラスタの赤いピクセルを 4 近傍連結成分に分割し、bounding box と差分ピクセル数を算出します。差分ピクセル数の多い順に最大 10 件で、座標は画像のピクセル座標です。黄色いアンチエイリアス除外ピクセルは含めません。`generate_diff=false` でも返します。連結成分が 11 件以上あるときは `diff_regions_total` に切り詰め前の総数を付けます（ちょうど 10 件以下のときは省略）。
 
 ### `layout_integrity` モードの検査内容とレスポンス
 
@@ -51,7 +51,7 @@ Figma 比較は「あるキャンバス幅での再現」しか見ないため�
 - **`viewport_overflow_x`:** `x < 0` または `x+w > viewport_width`（1px の丸めは許容）。ビューポート高さ超えはページスクロールとして扱い、失敗にしません。
 - **`parent_overflow`:** 子ボックスが親ボックスからいずれかの辺で 1px 超えてはみ出す。親が JSON に無い場合、または親の `w`/`h` が 0 以下の場合はこの検査をスキップします（`status` は変えず、前者は `unresolved_parent_refs`、後者は `parent_overflow_skipped_zero_geom` と `details` 要約で可視化）。親キーが無い／解決できない／親がゼロ幾何だけのときは `parent_checked_nodes=0` になり、`details` の要約行に未適用注記が付きます。`ignore_nodes` / `ignore_region` で除外した親でも、親に非ゼロ幾何があれば子の `parent_overflow` は引き続き検査します。
 - **合否:** 崩れ 0 件 → `success` / 1 件以上 → `mismatch` / 検査対象がすべて除外 → `skipped`。Web ノードが 1 件もない、または検査対象がすべて明示的な `w`/`h` = 0 の場合も `mismatch` です（`width`/`height` など必須キー欠落は入力エラーで、この mismatch にはなりません）。`match_rate` は返しません。`success` でも `parent_checked_nodes=0` のときは親はみ出しを検証していないため、DOM キャプチャに正しい `parent` を含めて再実行してください。一部ノードだけ `w`/`h` ≤ 0 のときは残りだけで `success` になり得ますが、除外件数は `skipped_zero_geometry` で分かります。
-- **応答:** `status`, `mode`, `viewport_width`, `viewport_height`, `checked_nodes`, `parent_checked_nodes`, `issue_count`, `details`, `ignored_count`。崩れがあるとき `issues`（`type` / `selector` / `detail`）。`viewport_preset` を渡したときはエコーします。`ignored_nodes`（`web:<selector>`。件数は `ignored_count` と一致）/ `unmatched_ignores` / `unmatched_ignore_regions` / `unresolved_parent_refs` / `parent_overflow_skipped_zero_geom` / `skipped_zero_geometry` は該当時のみ。
+- **応答:** `status`, `mode`, `viewport_width`, `viewport_height`, `checked_nodes`, `parent_checked_nodes`, `issue_count`, `details`, `ignored_count`。崩れがあるとき `issues`（`type` / `selector` / `detail` / `edge` / `overflow_px`。`parent_overflow` のときは `parent_selector` も）。`viewport_preset` を渡したときはエコーします。`ignored_nodes`（`web:<selector>`。件数は `ignored_count` と一致）/ `unmatched_ignores` / `unmatched_ignore_regions` / `unresolved_parent_refs` / `parent_overflow_skipped_zero_geom` / `skipped_zero_geometry` は該当時のみ。
 
 意図的な横スクロール領域（カルーセル、`overflow-x: auto` の表、マーキーなど）では、スクロールコンテナ自身はビューポート内に収まっていても、子要素のボックスが `viewport_width` を越えると `viewport_overflow_x` として検出されます。これは崩れではないため CSS で「直す」対象ではなく、`ignore_nodes`（例: `.carousel-*`）や `ignore_region` で明示的に除外し、除外が効いたかは `unmatched_ignores` / `unmatched_ignore_regions` で確認してください（除外がすべて一致していればこれらのフィールドは出ません）。
 
@@ -123,7 +123,7 @@ image A / B のいずれかが一様と検出された場合、status / match_ra
 | `viewport_width` | number | `layout_integrity` | 0 より大 | 768 | CSS ピクセルのビューポート幅。指定時は `viewport_preset` の幅を上書きする。 |
 | `viewport_height` | number | `layout_integrity` | 0 より大 | 1024 | CSS ピクセルのビューポート高さ。指定時は `viewport_preset` の高さを上書きする。 |
 | `count_extra_web` | boolean | `layout_tree` | true / false | false | `true` の場合、どの Figma ノードにもマッチしなかった Web ノード（実装側の余分な要素）を一致率の分母に加算して一致率を下げる。 |
-| `max_details` | number | `layout_tree` / `layout_integrity` | 0 以上 | 0 | 出力の最大件数。0（未指定）は無制限。1 以上のとき先頭の summary 行を残したまま指定件数に切り詰め、末尾に省略行を付ける。`layout_tree` は `... and N more details omitted (max_details=M)`。`layout_integrity` は `issues` も同じ件数に切り詰め、`... and N more issues omitted (max_details=M)` を付ける（`issue_count` は実件数のまま）。 |
+| `max_details` | number | `layout_tree` / `layout_integrity` | 0 以上 | 0 | 出力の最大件数。0（未指定）は無制限。1 以上のとき先頭の summary 行を残したまま指定件数に切り詰め、末尾に省略行を付ける。`layout_tree` は `... and N more details omitted (max_details=M)` に加え、`mismatched_pairs` / `mismatched_nodes` / `extra_web_nodes` も同じ件数に切り詰め、省略時は `mismatched_pairs_omitted` / `extra_web_nodes_omitted` を返す（`extra_web_count` は実件数のまま。`ignored_nodes` は `ignored_count` と一致させるため対象外）。`layout_integrity` は `issues` も同じ件数に切り詰め、`... and N more issues omitted (max_details=M)` を付ける（`issue_count` は実件数のまま）。 |
 | `generate_diff` | boolean | `perceptual` / `strict` | true / false | true | `false` の場合は差分画像の PNG/base64 化を行わず、`diff_image` は空文字列で返される。`strict` の `diff_regions` は in-memory マスクから算出するため `false` でも返る。 |
 | `diff_on_mismatch` | boolean | `perceptual` / `strict` | true / false | false | `true` かつ判定が `success` の場合、応答の `diff_image` を空文字列にする（失敗時の分析用に差分画像は残しつつ、成功時のトークン消費を抑える）。`generate_diff=false` のときはもともと空。 |
 | `diff_image_content` | boolean | `perceptual` / `strict` | true / false | false | `true` かつ `diff_image` が空でない場合、JSON テキストの後に MCP image コンテンツ（`image/png`）を付ける。既定は JSON のみ。 |
@@ -218,9 +218,11 @@ DOM からの抽出手順（`getBoundingClientRect()` + `window.scrollX` / `wind
 | `absolute_mode_pairs` | number | ○ | 実比較ペアのうち絶対座標（生 px）空間で比較された件数。この件数では `threshold` は比率ではなく px に対して適用される。 |
 | `unmatched_ignores` | string[] | 非空時のみ | `ignore_nodes` のうちどのノードにも一致しなかったエントリ。 |
 | `unmatched_ignore_regions` | string[] | 非空時のみ | どのノード中心とも重ならない `ignore_region`。 |
-| `extra_web_nodes` | string[] | 非空時のみ | 余分な Web ノードのセレクタ。 |
-| `mismatched_nodes` | object[] | 非空時のみ | tolerance 超過の不一致ペア。`figma_name` / `web_selector` / `diff` / `dx` / `dy` / `dw` / `dh` / `space`（`relative` = 親ボックス比、`absolute` = 生 px。`dx`/`dw` の単位はこの値に従う。`details` の幾何差分と同じ数値）。 |
-| `mismatched_pairs` | object[] | 非空時のみ | 不一致ペア（tolerance 超過と Web 候補枯渇の両方）。`figma_name` / `reason`（`exceeds_tolerance` \| `no_unused_web_elements`）。超過時は `web_selector` / `geometric_diff` / `tolerance` / `space`（`relative` \| `absolute`）も付く。 |
+| `extra_web_nodes` | string[] | 非空時のみ | 余分な Web ノードのセレクタ。`max_details` > 0 のときは先頭からその件数までに切り詰め（`extra_web_count` は実件数のまま）。 |
+| `extra_web_nodes_omitted` | number | 切り詰め時のみ | `extra_web_nodes` から省略した件数（`max_details` > 0 かつ実件数が上限超のとき）。 |
+| `mismatched_nodes` | object[] | 非空時のみ | tolerance 超過の不一致ペア。`figma_name` / `web_selector` / `diff` / `dx` / `dy` / `dw` / `dh` / `space`（`relative` = 親ボックス比、`absolute` = 生 px。`dx`/`dw` の単位はこの値に従う。`details` の幾何差分と同じ数値）。`max_details` > 0 のときは先頭からその件数までに切り詰め。 |
+| `mismatched_pairs` | object[] | 非空時のみ | 不一致ペア（tolerance 超過と Web 候補枯渇の両方）。`figma_name` / `reason`（`exceeds_tolerance` \| `no_unused_web_elements`）。超過時は `web_selector` / `geometric_diff` / `tolerance` / `space`（`relative` \| `absolute`）も付く。`max_details` > 0 のときは先頭からその件数までに切り詰め。 |
+| `mismatched_pairs_omitted` | number | 切り詰め時のみ | `mismatched_pairs` から省略した件数（`max_details` > 0 かつ実件数が上限超のとき）。 |
 | `zero_geometry_warning` | string | 非空時のみ | 過半数ノードの `w`/`h` が 0 のときの誤用検出。 |
 | `unresolved_parent_refs` | string[] | 非空時のみ | 解決できない `parent` 参照。 |
 
@@ -253,7 +255,8 @@ DOM からの抽出手順（`getBoundingClientRect()` + `window.scrollX` / `wind
 | `ignored_regions` | number | ○ | パースできた `ignore_region` の件数。 |
 | `warnings` | string[] | 条件付き | 両画像が単色ベタ塗りで差分 0 のとき（空洞比較）、および `min_match` のみ指定し `max_diff_pixels` を省略したうえで既定 0 が判定を支配して `mismatch` になったとき（既定 0 が判定を支配する旨。合格時は付けない）。 |
 | `out_of_bounds_regions` | string[] | 非空時のみ | 画像と交差しない `ignore_region`。 |
-| `diff_regions` | object[] | 非空時のみ | 赤い差分ピクセルの bounding box（`generate_diff=false` でも返す）。 |
+| `diff_regions` | object[] | 非空時のみ | 赤い差分ピクセルの bounding box（`generate_diff=false` でも返す）。差分ピクセル数の多い順に最大 10 件。 |
+| `diff_regions_total` | number | 切り詰め時のみ | `diff_regions` の切り詰め前の連結成分総数（11 件以上のとき）。 |
 | `max_diff_pixels` | number | ○ | 判定に使った許容差分ピクセル数（省略時は既定 0）。 |
 
 ### `layout_integrity`
@@ -267,7 +270,7 @@ DOM からの抽出手順（`getBoundingClientRect()` + `window.scrollX` / `wind
 | `checked_nodes` | number | 常時 | 検査したノード数（除外・ゼロ幾何を除く） |
 | `parent_checked_nodes` | number | 常時 | `parent` を解決して包含検査した件数。0 なら `parent_overflow` 未適用（`details` の要約行に注記。`layout_tree` の `absolute_mode_pairs` と同種） |
 | `issue_count` | number | 常時 | 検出した崩れ件数 |
-| `issues` | object[] | 崩れあり | 各件の `type` / `selector` / `detail`。`max_details` > 0 のときは先頭からその件数までに切り詰め（`issue_count` は実件数のまま） |
+| `issues` | object[] | 崩れあり | 各件の `type` / `selector` / `detail` / `edge`（`left` / `right` / `top` / `bottom`）/ `overflow_px`（はみ出し量の正の px）。`parent_overflow` のときは `parent_selector` も付く。`max_details` > 0 のときは先頭からその件数までに切り詰め（`issue_count` は実件数のまま） |
 | `details` | string[] | 常時 | 要約行＋各 issue の detail。`parent_overflow` スキップ時は要約に件数を追記。`parent_checked_nodes=0` のときは未適用注記を同じ要約行に追記（`max_details` の切り詰めで issue の detail を押し出さないため）。過半数ゼロ幾何のときは `checked_nodes` と入力差の 1 行も付く。少数の零サイズ除外時は `skipped_zero_geometry` に対応する 1 行注記も付く。`max_details` > 0 で issues を切り詰めたときは summary＋残した issue detail＋省略行になる |
 | `ignored_count` | number | 常時 | `ignore_nodes` / `ignore_region` で除外したノード数 |
 | `ignored_nodes` | string[] | 非空時のみ | 除外したノード（`web:<selector>`。件数は `ignored_count` と一致） |

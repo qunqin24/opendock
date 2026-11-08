@@ -26,11 +26,14 @@ the text into the conversation early.
 - 🕰️ **Say it your way** — `HH:MM`, an absolute date, or a relative duration.
 - 🔒 **Private until delivery** — the text lives in plugin storage, not in the prompt.
 - 💾 **Durable** — jobs survive a service restart; timers re-arm from storage.
-- 🪟 **Desktop pill** — the pending count above the composer; click it for the times,
-  previews, edit and cancel.
+- 🪟 **Pills above the composer** — in the desktop app and the terminal UI; click for the
+  times, previews, edit, reschedule, send now and cancel.
+- 🤖 **Agent check-backs** — the model can schedule a message for itself; the pill marks it
+  with `✦`, and it arrives as a synthetic note, not as a message from you.
 - ⏱️ **On time in the desktop app** — the app's main process keeps the clock, so an idle
   window or an evicted location does not delay delivery.
-- 🤫 **Zero model turns on schedule** — a successful schedule does not wake the model.
+- 🤫 **Zero model turns on schedule** — a successful schedule adds nothing to the
+  transcript: no wake, no note in the context.
 - 🌍 **Localized UI** — English, Russian, German, French, Chinese.
 
 ## 📦 Install
@@ -45,14 +48,15 @@ Or straight from Git:
 opencode plugin add github:TuzelKO/opencode-delayed-message
 ```
 
-Requires OpenCode V2. The pill is part of the desktop app; the command itself works anywhere.
+Requires OpenCode V2. The desktop app and the terminal UI each have a pill; the command
+itself works anywhere.
 
 ## 🚀 Usage
 
 ```text
 /delayed 03:00 call mom
 /delayed 2026-11-05 03:00 check the deploy
-/delayed +30m stretch
+/delayed 30m stretch
 ```
 
 | Time | Meaning |
@@ -60,7 +64,7 @@ Requires OpenCode V2. The pill is part of the desktop app; the command itself wo
 | `HH:MM` / `H:MM` | the next occurrence; if it already passed today, tomorrow |
 | `YYYY-MM-DD HH:MM` | absolute local time; a past time is refused |
 | `YYYY-MM-DDTHH:MM` | same, ISO form without the space |
-| `+30s`, `+30m`, `+2h`, `+1d` | relative to now |
+| `30s`, `30m`, `2h`, `1d` | relative to now; a leading `+` is optional |
 
 The first token is the time; everything after it is the message, taken verbatim.
 
@@ -73,11 +77,14 @@ cannot read it at scheduling time.
 At the scheduled moment the plugin calls `session.prompt` with the stored text, and it
 arrives as a normal user message.
 
+The `delayed` tool is separate: it lists only the messages the agent scheduled itself. A
+user-scheduled message is never returned to the model by the tool.
+
 The honest caveat: the text is stored on disk in OpenCode's database. The model does not get
 it through the prompt, but an agent with shell access to the machine could read the storage.
 Treat this as a prompt-level guarantee, not encryption.
 
-## 🪟 The desktop pill
+## 🪟 The pill
 
 Above the composer, while a message is pending:
 
@@ -86,17 +93,51 @@ Above the composer, while a message is pending:
 ```
 
 The label carries the pending count, like the subagent pill; the list behind it
-carries the times. Click it for one line per message with the scheduled time, a
-preview, and the countdown, like the app's own subagent list. `✎` to edit and `×` to cancel appear
-when you hover a row. Edit cancels the pending job and puts the whole command back
-into the composer — `/delayed`, the scheduled time, and the full text —
-with the cursor in the prompt. Adjust anything and submit to reschedule. The pill
-disappears when the message is delivered or cancelled.
+carries the times. Every row starts with a marker: `•` for your messages and `✦` for
+messages the agent scheduled. Click it for one line per message with the scheduled time, a
+preview, and the countdown, like the app's own subagent list. In the desktop app,
+`»` sends the message now, `✎` edits the text, `↻` changes the time, and `×` cancels it
+when you hover a row. Editing and rescheduling go through the plugin's `update` RPC, so
+the job keeps its id, its timer is re-armed, and its origin stays the same — an
+agent-scheduled message does not silently become yours.
 
-The terminal UI has no pill — there the transcript note is the only trace.
+In the terminal UI the same pill opens a list: `Enter` edits the message in place,
+`ctrl+t` changes the time, `ctrl+e` sends it now, `ctrl+x` cancels. Editing and
+rescheduling go through the plugin's `update` RPC, so the job keeps its id and its timer
+is re-armed without a new command. There is no command to remember; the pill is the
+entry point.
 
-The pill follows the app language: English, Russian, German, French, and Chinese are
-included. Transcript notes are English, because they are written for the model.
+The pill disappears when the message is delivered or cancelled. A successful schedule
+leaves no trace in the transcript — the session sees the text only when it is delivered.
+A malformed command is different: the error returns to the client that ran it, which
+shows it next to the composer and restores the typed text; it never becomes a session
+message.
+
+The desktop pill follows the app language: English, Russian, German, French, and Chinese
+are included. The terminal commands are English. Command errors are English. Notices
+written by earlier versions are dropped from model requests, so an old error in a
+session's history cannot wake the session again.
+
+## 🤖 Agent scheduling
+
+The plugin also registers a `delayed` tool, so the agent can schedule a message for
+itself without asking you to retype the time:
+
+- `schedule` — takes `time` and `text`; returns the job id and the absolute time.
+- `list` — shows only the messages the agent scheduled in this session.
+- `cancel` — removes one of the agent's own messages by id.
+
+The tool's description tells the model to write a self-contained message: by the time it
+arrives, the conversation may have been compacted, so "check that" with no context is not
+useful.
+
+Agent-scheduled messages carry `✦` before the preview in the pill. When one becomes due,
+it arrives as a synthetic note with a visible `Scheduled by agent — …` description, not as
+a message from you; the session wakes and sees the note, and you can see why it woke. You
+can still edit, reschedule, send now, or cancel an agent-scheduled message from the pill.
+
+The tool sees only agent-scheduled messages. A user-scheduled `/delayed` message never
+appears in `list`, and its id cannot be cancelled through the tool.
 
 ## 💾 Durability
 
@@ -116,11 +157,20 @@ waits for the next time that directory loads.
 - `ctx.command.transform` registers `/delayed`; the executor gets the raw text
   outside the prompt.
 - The job goes to `ctx.storage` (`pending/<uuid>`) and a `setTimeout` chain, split at the
-  24.8-day timer cap.
-- On fire: `ctx.session.prompt({ sessionID, text })` — a real user prompt, so the session
-  wakes.
-- The GUI talks to the server through an RPC: `pending`, `cancel`, `edit`, `deliver`, and
-  the events `scheduled`, `fired`, `cancelled`.
+  24.8-day timer cap. Each job records `origin: "user" | "agent"`; jobs stored by older
+  versions without the field count as user jobs.
+- On fire, a user job calls `ctx.session.prompt({ sessionID, text })` — a real user prompt,
+  so the session wakes. An agent job calls `ctx.session.synthetic` with the text, a
+  `Scheduled by agent — …` description, and metadata; it wakes the session without looking
+  like a message from the user.
+- The `delayed` tool scans the same storage but returns only agent jobs of the calling
+  session; `list` and `cancel` enforce that filter.
+- Hooks on `context`, `compaction`, `generate`, and `title` drop notices written by
+  earlier versions from every model request.
+- The desktop and TUI parts talk to the server through an RPC: `pending`, `cancel`,
+  `update`, `deliver`, and the events `scheduled`, `fired`, `cancelled`.
+- The TUI pill renders in `session.composer.top`, follows the same events, and opens a
+  `dialog.select`; `update` changes the text or time in place and re-arms the timer.
 - The GUI main process mirrors `scheduled` jobs into its own storage and arms Node timers.
   When one is due it calls `deliver` with the job's directory, which boots the location
   and delivers the message even though the server-side timer is gone.

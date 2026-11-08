@@ -22,7 +22,7 @@ The agent searches the store with `smart_compact_search`, `smart_compact_sql`, a
 
 Trimmed context is marked with a `[smarter-compact: …]` pointer.
 
-You need Node 24 or newer (for `node:sqlite`) and, for agents that trim through the proxy, the LiteLLM dev build `v1.109.0-dev.1` on `PATH` as `litellm`. The plugin has no API key of its own. Your agent keeps its own login.
+You need Node 24 or newer (for `node:sqlite`) and, for agents that trim through the proxy, LiteLLM `1.109.0rc1` (pinned) on `PATH` as `litellm`. `smarter-compact enable` installs it with `uv tool install` when it is missing or another version; without uv it stops and changes no agent config. The plugin has no API key of its own. Your agent keeps its own login.
 
 ### How agents integrate
 

@@ -2,6 +2,8 @@
 
 A kanban workflow in the terminal.
 
+[![skills.sh](https://skills.sh/b/yethranayeh/zinn)](https://skills.sh/yethranayeh/zinn)
+
 > [!IMPORTANT]
 > **Experimental.** Commands, output, and the database schema may change between releases.
 > Save a backup before upgrading: `zinn backup`.
@@ -68,7 +70,7 @@ The [`@zinn-dev/opencode`](integrations/opencode/inspector/README.md) package ad
 
 ```json
 {
-	"plugins": [{ "package": "@zinn-dev/opencode@0.1.0" }]
+	"plugins": [{ "package": "@zinn-dev/opencode@0.4.0" }]
 }
 ```
 

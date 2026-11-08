@@ -13,6 +13,7 @@ subscription and makes its requests. The packages work in OpenCode and in
 |---|---|---|
 | [agnes](packages/agnes) | Agnes AI international (agnes-ai.com), with Chrome browser sign-in, live text models, plan usage and USD balance | `agnes` |
 | [agnes-code](packages/agnes-code) | Agnes AI's Agnes Code desktop, with the desktop's saved session (Windows) or a pasted access token: live models, daily credit check-in and points balance (unofficial) | `agnes-code` |
+| [agy-cli](packages/agy-cli) | Antigravity on your installed agy CLI through ACP (`agy acp`), with agy's own Google sign-in: only the models agy offers this client, a process pool, MCP tool bridge and session resume (unofficial) | `agy-cli` |
 | [astudio](packages/astudio) | iFlytek's AStudio (科大讯飞 Astron Studio desktop), with the desktop's saved credentials or a pasted model token: live model catalog, daily login-points check-in and points balance (unofficial) | `astudio` |
 | [atomcode](packages/atomcode) | AtomGit CodingPlan, with browser OAuth or the local AtomCode CLI's sign-in, signed requests, live models, quota windows and a read-only diagnostics page (unofficial) | `atomcode` |
 | [catpaw](packages/catpaw) | Meituan's 妙手 CatPaw (ai.catpaw.meituan.com), with a browser web sign-in or the desktop client's saved credentials | `catpaw` |
@@ -271,6 +272,8 @@ it off puts the config back.
 | [type4me](packages/type4me) | [Type4Me](https://github.com/joewongjc/type4me), macOS voice input: `~/Library/Application Support/Type4Me/magpie-agent.json`, for its LLM post-processing |
 | [opencodereview](packages/opencodereview) | [Open Code Review](https://github.com/alibaba/open-code-review) (`ocr`): `~/.opencodereview/config.json` as a custom Anthropic provider, so `ocr review` / `ocr scan` run on magpie's models |
 | [nowledge-mem-agent](packages/nowledge-mem-agent) | [Nowledge Mem / AI Now](https://mem.nowledge.co/): choose Default, AI Now and Background models through Magpie, with recovery journaling; separate from the Nowledge memory recall/capture gateway plugin |
+| [minimax-design](packages/minimax-design) | [MiniMax Design](https://design.minimax.io), the local multimodal creation studio: one custom-model entry in `%APPDATA%\@hilo\desktop\hub-config.json` whose model menu follows magpie's list; Windows only |
+| [eta](packages/eta) | [Eta](https://github.com/Lingwcy/eta): connect-only local gateway integration; choose models and routing groups in Eta’s own picker after restarting. Requires Eta 0.1.164 or later |
 
 ```sh
 magpie plugin add @magpie-community/agent-<name>

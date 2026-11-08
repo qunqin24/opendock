@@ -102,7 +102,7 @@ OpenCode installs plugins directly from npm by name — no local build required.
     Alternatively, add the package with the CLI, which writes these entries for you:
 
     ```sh
-    opencode plugin add @architectural-composition/opencode-hyperdcp
+    opencode plugin @architectural-composition/opencode-hyperdcp
     ```
 
 3. Restart OpenCode. Package updates are managed with `opencode plugin list`,

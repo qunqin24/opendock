@@ -1,6 +1,6 @@
 # tasticlabs plugins
 
-Coding-agent plugins for the -tastic family of tools: Claude Code, and opencode.
+Coding-agent plugins for the -tastic family of tools: Claude Code, Codex, and opencode.
 
 ```
 /plugin marketplace add tasticlabs/plugins
@@ -30,8 +30,8 @@ tests Claude writes are checked while it's still in the code, not later in CI or
 
 - **mutastic itself**, with `mutastic gate`: `curl -fsSL https://mutastic.io/install.sh | sh`. The
   plugin tells you, and Claude, if it's missing or too old.
-- **A Java project in git**, built with Gradle or Maven, and a JDK. Anywhere else, the plugin stays
-  out of the way.
+- **A project in git that mutastic reads:** today, Java built with Gradle or Maven, with a JDK.
+  mutastic decides which projects it reads, so the plugin stays out of the way anywhere else.
 - **Permission for Claude to run mutastic.** A plugin can't grant it, so add it to the project's
   `.claude/settings.json`, or your own:
 
@@ -58,6 +58,34 @@ Commit the proposals with the change, and a pull request's reviewer decides them
 ```
 
 then `/reload-plugins`. The [docs](https://docs.mutastic.io) have everything else about mutastic.
+
+## mutastic for Codex
+
+The same plugin, skill and gate run in OpenAI's [Codex](https://developers.openai.com/codex), which
+reads this marketplace and runs the plugin's hooks as Claude Code does:
+
+```sh
+codex plugin marketplace add tasticlabs/plugins
+codex plugin add mutastic@tasticlabs
+```
+
+or `/plugins` inside Codex. Then start a new session and, in `/hooks`, trust mutastic's two hooks,
+"mutastic gate: noting where the task starts" and "mutastic gate: checking the tests catch the
+mutants on the changed lines". Codex runs a plugin's hooks only once you have, and again after each
+update (`codex plugin marketplace upgrade tasticlabs`).
+
+Codex runs the agent's commands in a sandbox where a Gradle or Maven build can't reach its caches or
+the network. A plugin can't grant permissions, so to let Codex run mutastic, outside the sandbox and
+without asking, add this to `~/.codex/rules/default.rules`:
+
+```python
+prefix_rule(pattern = ["mutastic"], decision = "allow")
+```
+
+The build fails in the sandbox too, so Codex asks before each `./gradlew test`. If you'd rather it
+didn't, allow the build tool as well (`["./gradlew"]`, `["./mvnw"]` or `["mvn"]`), knowing that lets
+it run any build task outside the sandbox. The gate itself isn't affected: Codex runs hooks outside the sandbox. The
+[docs](https://docs.mutastic.io/agents/codex/) say more.
 
 ## mutastic for opencode
 

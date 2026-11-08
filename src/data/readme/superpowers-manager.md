@@ -42,7 +42,7 @@ See [version selection](https://github.com/j7an/superpowers-manager/blob/main/do
 
 ## Start with your agent
 
-The five harnesses share upstream selection, while each has independent prepared and installed state. Omitting `--harness` selects Codex.
+The five harnesses share upstream selection, while each has independent prepared and installed state. Omitting `--harness` selects Codex. Only the official `obra/superpowers` repository is supported; other sources are experimental on every harness and need `--allow-experimental` to install, or to update when the update would install or reinstall.
 
 ### Codex
 
@@ -56,7 +56,7 @@ Codex installs the Manager-owned marketplace plugin after preparation and
 validation. Review upstream hook definitions with Codex's `/hooks` flow before
 trusting or running them; updates can change a referenced script or surface a
 new definition. The manager neither creates hooks nor changes Codex trust state.
-See the [Codex reference](https://github.com/j7an/superpowers-manager/blob/main/docs/codex.md#durable-storage-migration-and-recovery) for durable storage, migration, and recovery.
+See the [Codex reference](https://github.com/j7an/superpowers-manager/blob/main/docs/codex.md#upstream-admission) for upstream admission, durable storage, migration, and recovery.
 
 ### Pi
 
@@ -68,8 +68,8 @@ npx superpowers-manager update --harness pi
 
 Pi installs a separately validated, Manager-owned frozen snapshot. Restart Pi
 after a successful install, activating update, or removal. See the
-[Pi reference](https://github.com/j7an/superpowers-manager/blob/main/docs/pi.md)
-for compatibility, experimental opt-in, and recovery behavior.
+[Pi reference](https://github.com/j7an/superpowers-manager/blob/main/docs/pi.md#upstream-admission)
+for upstream admission, compatibility, and recovery behavior.
 
 ### OpenCode
 
@@ -81,8 +81,8 @@ npx superpowers-manager update --harness opencode
 
 OpenCode installs a separately validated, Manager-owned frozen snapshot. Restart
 OpenCode after a successful install, activating update, or removal. See the
-[OpenCode reference](https://github.com/j7an/superpowers-manager/blob/main/docs/opencode.md)
-for global configuration, conflicts, and recovery behavior.
+[OpenCode reference](https://github.com/j7an/superpowers-manager/blob/main/docs/opencode.md#upstream-admission)
+for upstream admission, global configuration, conflicts, and recovery behavior.
 
 ### Claude Code
 
@@ -94,8 +94,8 @@ npx superpowers-manager update --harness claude-code
 
 Claude Code installs a validated, Manager-owned local marketplace snapshot.
 Restart Claude Code or run `/reload-plugins` after an install, activating update,
-or removal. See the [Claude Code reference](https://github.com/j7an/superpowers-manager/blob/main/docs/claude-code.md)
-for conflicts, hooks, and recovery.
+or removal. See the [Claude Code reference](https://github.com/j7an/superpowers-manager/blob/main/docs/claude-code.md#upstream-admission)
+for upstream admission, conflicts, hooks, and recovery.
 
 ### Hermes Agent
 
@@ -106,8 +106,8 @@ npx superpowers-manager update --harness hermes
 ```
 
 Restart Hermes sessions after an install, activating update, or removal. See
-the [Hermes Agent reference](https://github.com/j7an/superpowers-manager/blob/main/docs/hermes.md)
-for plugin layout, compatibility, route switching, and recovery.
+the [Hermes Agent reference](https://github.com/j7an/superpowers-manager/blob/main/docs/hermes.md#upstream-admission)
+for upstream admission, plugin layout, compatibility, route switching, and recovery.
 
 To remove a Manager-owned installation, choose one harness explicitly:
 
@@ -182,7 +182,7 @@ The installed package requires Node >=24. Native source, tests, and packaging to
 
 Generated Codex manifests preserve upstream JSON number tokens while rejecting non-finite decimal or exponent values.
 
-macOS and Linux are tested. WSL2 is supported for the established Codex path; Pi in WSL2 and native Windows remain untested. The manager runs in-process and does not require Git Bash. The [Pi reference](https://github.com/j7an/superpowers-manager/blob/main/docs/pi.md#runtime-compatibility) explains its runtime qualification and admission checks. OpenCode support currently covers 1.x; OpenCode 2.x is untested and not certified as compatible (see the [OpenCode reference](https://github.com/j7an/superpowers-manager/blob/main/docs/opencode.md)).
+macOS and Linux are tested. WSL2 is supported for the established Codex path; Pi in WSL2 and native Windows remain untested. The manager runs in-process and does not require Git Bash. Each harness reference's Upstream admission section lists what is checked. OpenCode support covers the 1.x and 2.x lines (see the [OpenCode reference](https://github.com/j7an/superpowers-manager/blob/main/docs/opencode.md)).
 
 Native test versions qualify integration mechanisms; they are not runtime allowlists, and an untested runtime is not automatically certified as compatible.
 

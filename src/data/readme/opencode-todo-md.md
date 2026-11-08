@@ -167,8 +167,8 @@ no completion. They live in `opencode-notes.md`, next to `TODO.md`:
   clears it), `ctrl+d` deletes after a second press, `esc` closes.
 - Reminders are checked every 30 seconds by the TUI. A toast appears once per note and reminder while OpenCode is open;
   nothing fires when it is closed, and the agent is not woken up. Snoozing changes the reminder time, so it fires again.
-- The agent reads and writes the same file through `note_read`, `note_write` and `note_delete`, so it can recall a note
-  in a later session.
+- The agent creates notes with `note_add`, updates them with `note_write` and removes them with `note_delete`; `note_read`
+  lists them, so it can recall a note in a later session.
 - The file is plain markdown and can be edited by hand; only note lines with the metadata comment are touched.
 
 Press `tab` inside the panel to cycle the filters: all notes, notes with a due reminder, and one filter per `@tag`.
@@ -219,8 +219,8 @@ care about ids.
 
 ## Agents
 
-Installing the plugin is enough for the tools to exist: `todo_write`/`todo_read` and `note_read`/`note_write`/
-`note_delete` are registered with their descriptions, so the agent sees them in every session of every project. What the
+Installing the plugin is enough for the tools to exist: `todo_write`/`todo_read` and `note_read`/`note_add`/
+`note_write`/`note_delete` are registered with their descriptions, so the agent sees them in every session of every project. What the
 plugin cannot decide is *when* the agent should use them instead of the conversation, and that is what an instruction is for.
 
 Project-local `AGENTS.md`, at the repository root:
@@ -242,9 +242,9 @@ list.
 For notes, the same idea in one paragraph:
 
 ```markdown
-If the project has an opencode-notes.md, call note_read before starting work and note_write to capture ideas or
+If the project has an opencode-notes.md, call note_read before starting work and note_add to capture ideas or
 reminders. Notes have no status or priority: keep them short, add @tags, and set `remind` when the user asks to be
-reminded (15m, 2h, 1d or an ISO local time). Omit id to append; pass id to update; note_delete removes one.
+reminded (15m, 2h, 1d or an ISO local time). Use note_write with the id to change one; note_delete removes it.
 ```
 
 The same text can be attached with the `instructions` array in `opencode.json`, which is handy when you ship the rule
@@ -284,6 +284,12 @@ Releases: bump the version, add a `## What's new in X` section to `ANNOUNCE.md`,
 workflow builds the GitHub Release body from that section with `scripts/release-body.ts`, so the notes live in one place.
 
 ## Changelog
+
+### 0.1.19
+
+- `note_add` creates a note; `note_write` now only patches an existing note by `id`, so creating and updating cannot be
+  confused.
+- `todo_write` accepts `id: 0` as "new task", the same as omitting `id`.
 
 ### 0.1.18
 

@@ -107,6 +107,106 @@
 - **展示价格有明确来源。** 模型广场使用公开计价规则、当前分组及币种设置；账户、钱包和看板数据由宿主返回。
 - **读不到就说不知道。** 站点没有用量端点时页面写「站点未提供用量统计」，不画一张空图——空图会被读成「这段时间没有消耗」。
 
+## 1.3.0 接上宿主的供应商自愈钩子 `neartoken:relist`
+
+### 这次接了什么
+
+magpie **2.3.2**（`v0.1.3240+fish.27`）新增了一条专用恢复钩子 `neartoken:relist`：宿主把「被 setAside 的供应商记录」放回并触发重列，用户不用再手动点「加回来」。**用户显式移除的不会恢复**，这点由宿主保证。
+
+插件页在已连接时调一次；失败静默隔 3 秒再试一次，之后不再打扰（每会话最多两次）。老宿主没有这条通道，调用失败直接跳过，不影响其它功能。
+
+```js
+call('neartoken:relist')   // magpie.calls 里已声明
+```
+
+这条正好补上「插件重载窗口里 provider 被判成移除」之后的恢复路径——之前只能人工点「加回来」。
+
+### `magpie.min` → 2.3.2
+
+fish.27 起才有 `relist` 与五类分区。
+
+### kind 核对：值仍是 `audio`，不是 `speech`
+
+宿主文档把语音分区写作 `kind: speech`，那是**分区名**。代码里 `pluginKind` 认的字段值仍是：
+
+```go
+case "audio":  c.Serves = speechKindOf(m.ID)
+case "embedding": c.Serves = embedKindOf(m.ID)
+```
+
+插件 1.1.8 起发的就是 `audio` / `embedding` / `image` / `video`，与 2.3.2 一致，不需要改。
+
+### 一个实测发现：语音模型走不了标准音频端点
+
+拿宿主凭据直接探测站点：
+
+| 端点 | 结果 |
+| --- | --- |
+| `/v1/audio/speech`（带分组头） | **500** `convert_request_failed` / `not implemented` |
+| `/v1/audio/transcriptions` | **503** `No available channel for model whisper-1` |
+| `/v1/music/generations` | **404** `Invalid URL` |
+
+站点自己声明的端点类型全集里也没有 `audio`：
+
+```
+anthropic, gemini, image-generation, openai, openai-response, openai-video
+```
+
+也就是说：NearToken 的 TTS / 转写 / 音乐模型在站点上只挂 `gemini` 与 `openai` 端点，`/audio/*` 这条路虽然路由存在，但没有渠道能接。所以：
+
+- **分类照旧标 `audio`**（它们产出的确实是音频，分类语义没错）；
+- 但 magpie 的 `generate_audio` 现在会在这条路上失败，需要宿主支持「gemini 原生 TTS」或站点开放 audio 渠道才能真正可用——这不在插件能改的范围。
+
+音乐模型（`suno_*`）也走 `["openai"]` 端点，没有独立的 `/music/generations`，所以不涉及「独立 API 分流」那种情况。
+
+## 1.2.0 修掉日志里模型名被硬裁
+
+### 现象
+
+日志表格的「模型」列，同一个模型有时完整、有时被切掉尾巴：
+
+```
+gpt-6.1-sol  high   ← 有思考强度，正常
+gpt-6.1-sc          ← 没有思考强度，被裁
+```
+
+奇怪的是**没有思考强度反而更短**，却更早被裁。
+
+### 根因：不是宽度不够，是胶囊不参与收缩
+
+`.lg-pill` 的基础样式里有 `width: fit-content`。它在 flex 容器里会被当成内容宽度，**不参与收缩**，于是按完整模型名的宽度撑开，溢出 grid 列后被外层直接裁掉——因为溢出发生在胶囊之外，连 `text-overflow: ellipsis` 都没机会生效。
+
+带思考强度的那行之所以正常，是因为多了一个兄弟元素，flex 反而进入了收缩路径。
+
+### 改法
+
+```css
+/* 容器撑满整列，胶囊才有收缩空间 */
+.logs .lg-model-inline { width: 100%; min-width: 0; }
+
+/* 覆盖 .lg-pill 的 width: fit-content */
+.logs .lg-model-pill { width: auto; flex: 0 1 auto; min-width: 0; overflow: hidden; }
+
+/* 文字自己省略，图标不参与收缩 */
+.logs .lg-model-pill > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.logs .lg-model-pill > svg, .logs .lg-model-pill > img, .logs .lg-model-pill > i { flex: none; }
+```
+
+同时把 9 列全部套上 `minmax(0, …)`：`fr` 的默认下限是内容最小宽度，`nowrap` 的内容会把列撑开、让整行溢出容器。套上之后列可以真正收缩，内部的 `overflow: hidden` 才会生效。
+
+### 验证
+
+无头 Chrome 实测（1700px 宽、2x 像素比）：
+
+```
+deepseek-flash  High     有强度
+gpt-6.1-sol              无强度，现在完整显示
+gemini-3.1-pro-preview  Low
+grok-4.6-xhigh  High
+```
+
+第二行正是原本被截成 `gpt-6.1-sc` 的那个模型。
+
 ## 1.1.8 收紧模型分类，适配宿主 fish.25 的 kind 接入
 
 宿主 `v0.1.3140+fish.25` 起会把插件声明的 `kind` 接进分类：
