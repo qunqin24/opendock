@@ -115,7 +115,7 @@ Japanese README.
 |---|---|
 | `websearch` (built-in) | Same name and input; in `deepseek` mode this plugin supplies the results |
 | `deepseek_fetch` | One URL in, clean Markdown out, cut at `fetchMaxChars` with a notice |
-| `deepseek_usage` | Local search/fetch counts and estimated cost; `reset: true` clears it |
+| `deepseek_usage` | Local search/fetch counts and estimated cost; `reset: true` clears it, `resetPeriod` clears one period |
 | `deepseek_mode` | Report or switch the search backend; the switch is persisted |
 
 The reroute **keeps the built-in permission check and the declared `output` shape**, so approval prompts and rendering
@@ -198,18 +198,22 @@ The plugin also shows up where you work, and can be switched without the model o
 
 | Surface | What you get | How to switch |
 |---|---|---|
-| TUI | A DeepSeek block appended to the session sidebar: state, then Today / Month / Total rows (`Search` · `Fetch` · `¥` estimate) in the resolved UI language; it degrades to abbreviations and then to fewer columns as the sidebar narrows | Click the action at the right of the title, or run the `/deepseek` slash command for a menu |
+| TUI | A DeepSeek block appended to the session sidebar: state, then Today / Month / Total rows (`Search` · `Fetch` · `¥` estimate) in the resolved UI language; it degrades to abbreviations and then to fewer columns as the sidebar narrows | Click an action at the right of the title — the switch, or *Reset* to clear stats — or run the `/deepseek-search` slash command for a menu |
 | Desktop | A **DeepSeek** tab in a session's side region, listed in the side region's *New tab* page and its `+` menu, and openable with the `DeepSeek: Open usage panel` command (localized) | The panel's button, plus a refresh control |
 
 - Both surfaces read the same ledger and the same stored switch as `deepseek_usage` / `deepseek_mode`: a single
   server-side source, reached over the plugin's own RPC, so the numbers never diverge between TUI and desktop.
+- **Clear stats by period**: both surfaces can reset the local ledger's *Today / Month / Total* — the TUI card's
+  *Reset* action beside the switch and the `/deepseek-search` menu's *Clear stats* entry (the pick is the
+  confirmation), and the panel's *Clear stats* button on the desktop (a native destructive confirmation, focus starts
+  on Cancel). The same `resetUsage` RPC backs `deepseek_usage`'s `resetPeriod` argument.
 - **"Stop" means hand the built-in `websearch` back to your configured backend** (exactly `deepseek_mode({"mode": "native"})`).
   It is not an uninstall: `deepseek_fetch`, `deepseek_usage` and `deepseek_mode` stay registered, and the state is
   persisted in `mode/v1` like any other switch.
-- The action row always says what a click does. When no API key is configured there is no action to take, so it shows
-  the fix instead (`DEEPSEEK_API_KEY`); when the built-in tool could not be patched it reports *not taken over* rather
-  than pretending to be enabled.
-- Stats refresh on a `changed` event emitted after every tally and every switch, with a 10-second reread as a
+- The action row always says what a click does. When no API key is configured there is no takeover action to take, so
+  it shows the fix instead (`DEEPSEEK_API_KEY`; the desktop panel still offers *Clear stats*, which needs no key);
+  when the built-in tool could not be patched it reports *not taken over* rather than pretending to be enabled.
+- Stats refresh on a `changed` event emitted after every tally, switch, and reset, with a 10-second reread as a
   fallback in both surfaces.
 - The body closes with your **account balance**, read from `GET /user/balance` with the same API key
   (<https://api-docs.deepseek.com/zh-cn/api/get-user-balance>) — the usage rows read as the receipt and the account
@@ -241,7 +245,7 @@ npm install && npm run build:gui
 | `failed` | network error, or non-200 after one retry | not billed |
 
 Costs accumulate in integer micro-CNY, so repeated additions never drift. `count` does not affect the price.
-`deepseek_usage({ "reset": true })` clears the ledger after reporting.
+`deepseek_usage({ "reset": true })` clears the whole ledger after reporting; `deepseek_usage({ "resetPeriod": "today" | "month" | "total" })` clears only that period and wins over `reset`.
 
 - Stored under `ctx.storage` key `usage/v1`, last 60 days kept, day keys in local time.
 - Storage is global to the OpenCode installation and survives restarts.

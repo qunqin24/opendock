@@ -5,7 +5,7 @@ Two magpie providers in one package:
 | Provider | Key | Context | Tools | Model |
 | --- | --- | --- | --- | --- |
 | `nodecode` | paid `sk-nc-…` | 1,048,576 | yes | `nodecode-cyber-v1` |
-| `nodecode-free` | free `sk-nc-…` | 262,144 | yes (bridged) | `nodecode-cyber-v1` |
+| `nodecode-free` | free `sk-nc-…` | 262,144 | yes (bridged; `look` via vision model) | `nodecode-cyber-v1` |
 
 Both talk to `https://api.nodecode.ai/v1` over the OpenAI Chat Completions wire. The free lane bridges magpie's tool calls through NodeCode's own `eval` tool and a local persistent Lisp image — see below.
 
@@ -55,17 +55,29 @@ magpie plugins add /abs/path/to/nodecode-magpie
 From npm (published package):
 
 ```sh
-magpie plugins add npm:nodecode-magpie@0.2.0
+magpie plugins add npm:nodecode-magpie@0.4.1
+```
+
+If the configured npm mirror has not caught up yet, point Bun at the official
+registry for this one command:
+
+```sh
+NPM_CONFIG_REGISTRY=https://registry.npmjs.org \
+  magpie plugins add npm:nodecode-magpie@0.4.1
 ```
 
 From a git tag:
 
 ```sh
-magpie plugins add github:ChasLui/nodecode-magpie#v0.2.0
+magpie plugins add github:ChasLui/nodecode-magpie#v0.4.1
 ```
 
 `magpie plugins add` restarts the plugin host. Local-path plugins are loaded in place,
 not copied; after editing, remove and re-add (or `magpie plugins update`) to restart.
+
+The package embeds NodeCode's official axolotl icon (`assets/nodecode-icon.png`) as a
+data URI in `package.json`, so magpie shows it on both the plugin and provider rows
+without fetching anything at runtime.
 
 ## Sign in
 
@@ -128,23 +140,94 @@ the four-line NodeCode Lisp prompt. The free lane meets that contract honestly:
    `LISP_PREFIX`, keeps the client's original system prompt, and appends a
    client-tool catalog plus the `(magpie-tool "name" "json")` convention.
 2. `lib/eval-runner.mjs` executes direct eval forms. It starts **one**
-   `nodecode trial` process and hosts a tiny Unix-socket Lisp REPL in it
-   (`lib/eval-server.mjs`), so definitions made by one eval call survive into
-   the next within the plugin process.
-3. `handleEvalRequest` loops: direct eval results are appended as `tool`
-   messages and sent back; a `(magpie-tool …)` call is returned to magpie as a
-   native `tool_calls` response; streaming clients get a synthesized SSE stream.
+   `nodecode trial` process per `(binary, workspace, session, subagent)` and hosts a
+   JSON-lines service inside it (`lib/eval-server.mjs` +
+   `lib/eval-server.lisp`), so definitions made by one eval call survive into
+   the next for the life of that session. The plugin reads magpie's
+   `x-magpie-work-dir`, `x-magpie-session`, and `x-magpie-subagent` headers
+   (the host strips them before the vendor sees the request) and runs the
+   image with the agent's workspace as its working directory.
+3. `handleEvalRequest` loops up to 32 eval rounds per turn: direct eval results
+   are appended as `tool` messages and sent back; a `(magpie-tool …)` call is
+   returned to magpie as a native `tool_calls` response; streaming clients get
+   a synthesized SSE stream.
 
 The result is the same tool surface as the NodeCode CLI: `(sh …)` for shell,
-`(write-file …)`, `(edit …)`, `(look …)`, plus persistent Lisp definitions.
-Examples:
+`(write-file …)`, `(edit …)`, plus persistent Lisp definitions. Examples:
 
 ```lisp
 (sh "git status --short")
 (write-file "/tmp/out.txt" "hello")
 (edit "/tmp/out.txt" "hello" "world")
-(progn (defun double (x) (* x 2)) (double 21))
+(defun double (x) (* x 2))
+(double 21)
 ```
+
+### Eval semantics match the CLI
+
+The snippet is handed to NodeCode's own `eval-string`, so the free lane behaves
+like the CLI rather than a re-implementation:
+
+- **one `=>` line per form**, the last value in full, `*` / `**` / `***` and
+  `/` / `//` / `///` carrying the previous snippets' values;
+- a failing form reports `ERROR in form i of n (forms 1-… evaluated and stand: …)`
+  and the forms before it stand — they are not replayed;
+- an unclosed one-line snippet is refused with the CLI's own paren message;
+- a lone multi-line string prints raw under a `[text: N lines, M characters]`
+  header, and `(sh …)` appends `[exit N]` for a non-zero status;
+- results cap at 32,000 characters.
+
+**Background evals.** `yield_time_ms` (default 10 s, at most 600 s) is a wait
+window, not a kill switch. A form still running when the window closes answers
+
+```
+[running in the background · eval id 3]
+```
+
+and keeps running in the image. The model polls it with the same helpers the
+CLI offers:
+
+```lisp
+(magpie-eval-status 3)
+(magpie-eval-await 3)              ; wait up to yield_ms
+(magpie-eval-await 3 :until-exit t)
+(magpie-eval-interrupt 3)          ; (magpie-eval-interrupt 3 :force t)
+```
+
+Each eval runs on its own Lisp thread, so a slow `(sh "sleep 20")` never blocks
+the next eval call, and interrupting one leaves the image and its definitions
+intact.
+
+**`strings`.** A form that needs quotes, backslashes or newlines can ship them
+beside the form and read them with `($ "name")`:
+
+```json
+{"form": "($ \"script\")", "strings": {"script": "echo \"hi\"\n"}}
+```
+
+**Workspace and session isolation.** The plugin reads
+`x-magpie-work-dir` (a validated directory, canonicalized with `realpath`),
+`x-magpie-session`, and `x-magpie-subagent` from the request headers that
+magpie supplies to provider plugins. Eval shells start in that workspace, and
+each session/subagent gets a separate image and definition scope. These headers are plugin-only; they are
+never forwarded to NodeCode.
+
+**`(look …)` is bridged through a vision model.** The free model is text-only,
+so NodeCode's own Lisp `look` refuses with *"deepseek-v4-flash-free reads text
+only"*.  The plugin provides the same capability through a client helper:
+
+```json
+{"form": "(magpie-tool \"look\" \"{\\\"path\\\":\\\"screenshot.png\\\",\\\"prompt\\\":\\\"read the error dialog\\\"}\")"}
+```
+
+The helper reads a local PNG/JPEG/GIF/WebP (up to 5 MiB), sends it to a vision
+model on the magpie gateway, and returns the description as the tool result.
+The default model is `auto/deepseek-v4.1-flash`; override with
+`NODECODE_VISION_MODEL`.  The gateway is derived from `MAGPIE_ADDR` (usually
+`http://127.0.0.1:3425/v1`) and can be overridden with
+`NODECODE_VISION_BASE_URL`; `NODECODE_VISION_API_KEY` (or the gateway key
+already in `MAGPIE_GATEWAY_KEY`) and `NODECODE_VISION_TIMEOUT_MS` are also supported.  Relative paths resolve
+against the agent workspace.
 
 ## Free lane: transcript bridge (no tools)
 
@@ -198,7 +281,7 @@ preserved.
   `/chat/completions`. Do not switch the model API to `responses` or
   `anthropic` for `nodecode-free`: the plugin rejects it with a clear error
   instead of sending an unsupported route.
-- The paid provider keeps the honest `nodecode-magpie/0.2.0` UA; only the free
+- The paid provider keeps an honest `nodecode-magpie/<version>` UA; only the free
   provider uses the `nodecode_cli/…` shape, because only the free gate needs it.
 - Known magpie 0.1.3240 limitation: plugin-model `tool_call` is not carried into
   the gateway model list, so `nodecode-free` may still appear tool-capable in
@@ -251,10 +334,14 @@ lib/nodecode.mjs          # key lookup, model metadata, fetch rewrite, usage
 lib/free-bridge.mjs       # transcript collapse + JSON tool protocol + SSE
 lib/free-eval.mjs         # native eval tool request/loop/response bridge
 lib/eval-runner.mjs       # nodecode trial runner (persistent + one-shot)
-lib/eval-server.mjs       # persistent Unix-socket Lisp REPL
+lib/eval-server.mjs       # persistent JSON-lines client for the Lisp service
+lib/eval-server.lisp      # the service itself: threads, yield, status, interrupt
+lib/vision.mjs            # look bridge: read image -> magpie vision model -> text
 test/rewrite.test.mjs     # offline body/UA/config/usage tests
 test/free-bridge.test.mjs # transcript bridge protocol and streaming tests
 test/free-eval.test.mjs   # eval tool request/loop/client-tool tests
+test/eval-server.test.mjs # live image: persistence, concurrency, yield, strings
+test/vision.test.mjs      # image validation and vision request tests
 ```
 ## License
 

@@ -377,7 +377,8 @@ can override `continuation.semanticIdleMs` (or its `softHealthMs` alias).
 
 If a Run drops immediately after completed tool results, before new output,
 the provider can rebuild from host history containing every observed exec's
-result. It sends the completed results once and asks Cursor to continue. A
+result; Cursor's polls of a background shell's terminal record, which the
+provider answers itself, need none. It sends the completed results once and asks Cursor to continue. A
 checkpoint predating those results is never resumed. Missing results, unknown
 activity, a tool call Cursor ran itself or a new interaction keep the failure
 final. If the rebuilt history would fill more than 80% of the model's context,
@@ -414,8 +415,11 @@ that stall window. The setting does not override OpenCode's own retry limits.
 | `NO_PROXY` / `no_proxy` | Comma/space hosts that bypass the proxy (`*`, exact host, or `.suffix` / `suffix` domain forms; a `host:port` entry bypasses only that port) |
 | `CURSOR_ENDLESS_RETRIES` | Set to `1` or `true` to bypass retry count limits; off by default. Safety cutoffs and host retry limits still apply. See [retry limits](#retry-limits). |
 | `CURSOR_PROVIDER_DEBUG` | Set to `1` or `true` to enable wire-level debug logging |
-| `CURSOR_PROVIDER_RECOVERY_DEBUG` | Set to `1` or `true` for recovery metadata only (session/call IDs, elapsed time, checkpoints, guard decisions). Uses the same log path and 10 MiB cap; leave full debug off to exclude payload traces. |
+| `CURSOR_PROVIDER_RECOVERY_DEBUG` | Set to `1` or `true` for recovery metadata only (session/call IDs, elapsed time, checkpoints, guard decisions). Uses the same log path and retention policy; leave full debug off to exclude payload traces. |
 | `CURSOR_PROVIDER_DEBUG_FILE` | Debug log path (default: `debug-<pid>.log` under `$TMPDIR/cursor-provider-logs-<uid>/`) |
+| `CURSOR_PROVIDER_DEBUG_LOG_MODE` | `trim` (default) keeps the recent tail in place; `rotate` keeps numbered archives. Applies to full and recovery-only logs. See [rotation](docs/cache-log-runbook.md#numbered-rotation). |
+| `CURSOR_PROVIDER_DEBUG_ROTATE_MAX_BYTES` | Rotation threshold in bytes; default `52428800` (50 MiB). Used only in `rotate` mode. |
+| `CURSOR_PROVIDER_DEBUG_ROTATE_BACKUPS` | Number of archives to retain, from `1` to `100`; default `5`. `.1` is newest. Used only in `rotate` mode. |
 | `CURSOR_AGENT_TRANSCRIPTS_FOLDER` | Optional folder containing past-chat transcripts, advertised to Cursor on OpenCode 1.x and 2.x. Sent only if it is an existing directory; unset, empty, missing, non-directory, or unstatable paths are omitted. Relative paths resolve against the workspace. The provider does not create the folder or write transcripts. |
 | `CURSOR_OPENCODE2_DEV_ENTRY` | **Local OpenCode 2.x only.** Absolute path to a built entry file (usually `dist/index.js`). Rewrites the AI SDK package to `aisdk:file://…` so the daemon imports your local build instead of `npm install`-ing the published package. Export it **before** `opencode2 service start`, then restart after rebuilds. Unset in production. See [OpenCode 2.x local clone](docs/opencode-2.md#from-a-local-clone-cursor_opencode2_dev_entry). |
 | `CURSOR_OPENCODE2_TODOS` | **OpenCode 2.x only.** Set to `1` or `true` to register plugin-owned `todowrite`/`todoread` (in-memory; no TUI sidebar). Off by default. OpenCode 1.x still uses the host builtin. |
@@ -438,6 +442,12 @@ for the image build and isolation requirements.
 Changes listed under [Unreleased](CHANGELOG.md#unreleased) describe the development checkout; use a rebuilt local install to test them before a release. Maintainer guides and incident lessons are linked from the [documentation index](docs/README.md). The manual Cursor review, isolated pull-request checks, and OpenCode live test are in [docs/pr-review.md](docs/pr-review.md).
 
 Manual Cloud Agent reviews publish through the configured GitHub App after exact-preview approval. See the [App publisher setup](docs/pr-review.md#github-app-publisher) for `REVIEW_APP_ID`, the private key and optional installation ID. Tokens are restricted to this repository and retain the installation's configured permissions; the returned grant must include review-write access. `review-publish.py auth-info` reports configuration without printing secrets. Reviews use the App's bot identity, with no automatic review trigger.
+
+New review payloads require a completed, revision-matched evidence ledger and
+an isolated-check exit record. Rendering retains the ledger privately and binds
+its digest; preview and publication recheck those bytes. Keep the digest-named
+ledger file with its payload, including during recovery. Existing retained
+legacy previews remain usable; see the [review procedure](docs/pr-review.md).
 
 Linux isolated checks include the nested sandbox tests. Live credentials require
 the full check to pass and a separate trust decision for that exact revision.
@@ -592,7 +602,7 @@ The package root intentionally stays plugin-safe for OpenCode's classic loader. 
 
 ## Troubleshooting
 
-For intermittent disconnects or laptop sleep/wake, enable `CURSOR_PROVIDER_RECOVERY_DEBUG=1` before starting the host. Set `CURSOR_PROVIDER_DEBUG_FILE` to a persistent file if the default temporary log is unsuitable. The file is mode 0600 and capped at 10 MiB. Search `recovery:` lines by `hostSessionId`: `interrupted` records the error code and checkpoint/barrier state; `history-check` explains acceptance or refusal, `history-unsafe` names every cause that made a Run's history unrepresentable, and `appended-echo`, `appended-unmatched` and `appended-not-in-history` follow Cursor's echoes of injected steers and host notes; `reopened` links old and replacement Run IDs; `pump-complete` records progress (`closed=true pending=0` is terminal). `host-call-emitted` and `host-result-delivered` correlate dispatched calls and saved results. These IDs help investigate duplicates but do not by themselves prove two different model-generated calls have identical effects. Elapsed wall time includes suspension; it is not proof the OS slept. Correlate with the OS sleep log.
+For intermittent disconnects or laptop sleep/wake, enable `CURSOR_PROVIDER_RECOVERY_DEBUG=1` before starting the host. Set `CURSOR_PROVIDER_DEBUG_FILE` to a persistent file if the default temporary log is unsuitable. The file is mode 0600. By default, logging checks its size on the first write and hourly thereafter; above 50 MiB it keeps roughly the newest 25 MiB of complete lines in place. Set `CURSOR_PROVIDER_DEBUG_LOG_MODE=rotate` for configurable numbered archives instead. This is a soft limit; see [log recycling](docs/cache-log-runbook.md#log-recycling-design) for concurrency and retention limits. Search `recovery:` lines by `hostSessionId`: `interrupted` records the error code and checkpoint/barrier state; `history-check` explains acceptance or refusal, `history-unsafe` names every cause that made a Run's history unrepresentable, and `appended-echo`, `appended-unmatched` and `appended-not-in-history` follow Cursor's echoes of injected steers and host notes; `reopened` links old and replacement Run IDs; `pump-complete` records progress (`closed=true pending=0` is terminal). `host-call-emitted` and `host-result-delivered` correlate dispatched calls and saved results. These IDs help investigate duplicates but do not by themselves prove two different model-generated calls have identical effects. Elapsed wall time includes suspension; it is not proof the OS slept. Correlate with the OS sleep log.
 
 Completed inline `get_mcp_tools` lookups are read-only and do not block rebuilding from completed host results. A lookup that is unfinished, spills to a file, has unknown fields, or has no matching start remains a barrier, as does other unrepresented server-side work.
 
@@ -600,6 +610,7 @@ After sending a host tool result, recovery waits for its matching server-side to
 
 | Problem | What to try |
 |---------|-------------|
+| Rotation paused after an archive I/O failure | Preserve `<log>.trim/active` before clearing its maintenance directory; follow the [rotation recovery steps](docs/cache-log-runbook.md#numbered-rotation). |
 | No Cursor models in the picker (OpenCode 1.x) | Confirm Cursor auth (`opencode auth login` → **cursor**). Restart OpenCode — if auth is present and the cache is empty, models are fetched on startup. Confirm `provider.cursor.npm` is the package name (or a built `file://…/dist/index.js`). See [OpenCode 1.x troubleshooting](docs/opencode-1.md#troubleshooting). |
 | No Cursor models in the picker (`opencode2`) | Confirm `/connect` → **Cursor** (or shared `auth.json`). Use a dedicated `OPENCODE_CONFIG_DIR` (not mixed with 1.x). Ensure `$OPENCODE_CONFIG_DIR/plugins/cursor/` is a package directory re-exporting `plugin/opencode2` (not a bare `.js`). After auth, Cursor models appear in the picker from the in-memory inventory — no `opencode.json` model list is required. Filter by provider **Cursor** (`time.released` is `0`, so models sort last). Leftover `providers.cursor` fights that inventory — [safe transition](docs/opencode-2.md#safe-transition). |
 | Auth / 401 errors mid-session | Logins renew themselves: a browser login (60-day session) is renewed through Cursor's `/oauth/token` once less than 1272 h of it remain, as Cursor's IDE decides, whenever a request needs a token (there is no background timer, as with OpenCode's own OAuth providers); an API-key login exchanges its stored key again within five minutes of the exchanged JWT's expiry, as Cursor CLI does. The two never stand in for each other. Sign in again when the error says the session was ended, the key was rejected, or a sign-in policy blocks it. An API-key login saved before the key was kept (`metadata.apiKey`) cannot be renewed and needs one fresh API-key sign-in. Renewal attempts and failures go to the debug log (`CURSOR_PROVIDER_DEBUG`). |

@@ -6,28 +6,38 @@
 
 English | [Русский](README.ru.md)
 
-A guard for [OpenCode](https://opencode.ai) and [Claude Code](https://claude.com/claude-code):
+A guard for [Claude Code](https://claude.com/claude-code) and [OpenCode](https://opencode.ai):
 a local model checks every shell command before it runs. Safe commands pass silently, unsafe ones
 stop and ask you.
 
 </div>
 
-## Why
+## What it does
 
 Permission prompts in coding agents are binary: either you click "Allow" all day, or you turn
-everything off and hope. agent-guard adds the missing middle layer: a small local model reads each
-command and decides: routine project work, or something that can wipe data, touch the system,
-or leak secrets.
+everything off and hope. agent-guard adds the middle layer: a small local model reads each
+command and decides whether it is routine project work or something that can wipe data, touch the
+system or leak secrets. A few hard rules (`git push`, `curl | sh`, `rm -rf` outside the project)
+never reach a model at all.
 
-Pair it with an all-allowed agent and you get yolo UX with a guardian:
+Two integrations, one engine:
 
-- safe command, allowed by rules -> runs instantly
-- safe command, not covered by rules -> passes without a prompt
-- unsafe command, allowed by rules -> escalates and shows you the classifier's reason
+- **Claude Code**: a `PreToolUse` hook on the Bash tool, the `safe-yolo-guard` binary. It acts from
+  the first command: safe runs without a prompt, unsafe asks you with a short card.
+- **OpenCode**: a plugin on the `permission.evaluate` hook. It starts in `shadow` mode (logs only),
+  `enforce` mode changes decisions.
 
-## Let your agent do it
+It is not a sandbox, see [What it is not](#what-it-is-not).
 
-Paste this into your OpenCode or Claude Code session and the agent will set everything up itself:
+## Install
+
+Pin an exact version. The guard sits on the permission path of every shell command, so an update
+must never land silently. Releases go to npm only after a maintainer approves them. To update: bump
+the version, read what changed, restart the agent.
+
+### Let your agent do it
+
+Paste this into your Claude Code or OpenCode session and the agent will set everything up itself:
 
 ```text
 Install agent-guard for me from https://github.com/safe-yolo/agent-guard, follow its README.
@@ -38,71 +48,91 @@ one is already running on this machine or my LAN, if not, set one up or ask me f
 Then run a harmless test command and show me what the guard decided.
 ```
 
-## How it works
+### Start a classifier
 
-Both integrations run the same engine: hard rules first, then the classifier, then an optional
-second opinion. The verdict is `safe` or `unsafe` with a short reason. Claude Code uses a
-`PreToolUse` hook, see [Install](#claude-code).
+The guard needs a classifier endpoint. It speaks two API shapes:
 
-The OpenCode plugin registers a `permission.evaluate` hook and has two modes:
+- `systemone`, the Jev / System One API: a small HTTP API for decision models that return a choice
+  with a confidence and no prose. Catshell, Laya and Clef below speak it.
+- `openai`: chat completions with structured outputs, for an LLM on vLLM (or Z.ai GLM as the
+  second stage).
 
-- `shadow` mode only logs verdicts, changing nothing. Run it for a few days first.
-- `enforce` mode escalates unsafe-but-allowed commands to `ask`, and auto-approves safe commands
-  that would have prompted. Configured `deny` rules are never touched, the hook does not even
-  fire for them.
+For Claude Code the first stage must be catshell, Laya or Clef. An LLM on vLLM or GLM can only be
+the second stage there. The OpenCode plugin takes either shape.
 
-Verdicts are cached per command, so repeats are free.
+The OpenCode plugin with no options expects an `openai` endpoint at
+`http://127.0.0.1:8000/v1/chat/completions`. With catshell, Laya or Clef set `api` and `url`, as in
+the snippets below.
 
-> **macOS note**: the request goes through `curl` instead of `fetch`. Bun, and therefore
-> OpenCode, is often blocked from LAN hosts by macOS Local Network privacy (`EHOSTUNREACH`),
-> while Apple's own `curl` is allowed.
+Pick whatever runs on your hardware:
 
-## Install
+**Cat Shell Risk Commander - the default pick, runs on CPU.** A purpose-built shell command
+risk scorer (TF-IDF + linear model, 36K of weights, Apache-2.0): about 1 ms per command,
+published metrics of 92.6% recall at 0.86% FPR. A ready Jev-compatible wrapper ships in
+`examples/catshell/`. You need a clone of this repo and Docker with compose:
 
-Pin an exact version. The guard sits on the permission path of every shell command, so an update
-must never land silently. To update: bump the version, read what changed, restart the agent.
-
-### OpenCode
-
-```jsonc title="opencode.json"
-{
-  "plugins": ["@safe-yolo/agent-guard@0.2.14"]
-}
+```sh
+git clone https://github.com/safe-yolo/agent-guard
+cd agent-guard/examples/catshell && docker compose up --build -d
 ```
 
-With options (for example, a classifier on another host):
+It listens on port 8011.
 
 ```jsonc title="opencode.json"
 {
   "plugins": [
     {
-      "package": "@safe-yolo/agent-guard@0.2.14",
+      "package": "@safe-yolo/agent-guard@0.2.15",
       "options": {
-        "mode": "shadow",
-        "url": "http://127.0.0.1:8000/v1/chat/completions",
-        "model": "qwen3.6-35b"
+        "api": "systemone",
+        "url": "http://127.0.0.1:8011/v1/systemone"
       }
     }
   ]
 }
 ```
 
-To run from a local clone, point `package` at its directory.
+**Laya - if your commands are heavily non-English.** Multilingual decision model (100+
+languages), calibrated confidence, 200-450 ms per command on CPU:
 
-Start in `shadow`, read the log for a few days, then switch to `enforce`.
+```sh
+pip install "laya[serve]"
+LAYA_PORT=8010 laya-serve
+```
 
-If you previously enabled blanket auto-approve, turn it off in enforce mode: it would press
-"Allow" on the very prompts safe-yolo escalates for your review.
+```jsonc title="opencode.json"
+{
+  "plugins": [
+    {
+      "package": "@safe-yolo/agent-guard@0.2.15",
+      "options": {
+        "api": "systemone",
+        "url": "http://127.0.0.1:8010/v1/systemone",
+        "model": "multilingual"
+      }
+    }
+  ]
+}
+```
+
+**Clef / Clef-flash - for GPU boxes.** Cloudflare's open decision models (Apache 2.0),
+Jev-compatible, median 39 ms for clef-flash. Serve with SGLang per the model card and use
+`api: "systemone"`, or run them through Workers AI or Ollama cloud with an `apiKey`.
+
+**Any small LLM on vLLM - the generic path.** Heavier: gigabytes of weights and hundreds of ms
+per command. But it answers with a verbal reason, which is what the [cascade](#cascade) quotes
+back to you. Configure it with `api: "openai"`.
 
 ### Claude Code
 
-The hook is the `safe-yolo-guard` binary from the same package:
+The hook is the `safe-yolo-guard` binary from the package:
 
 ```sh
-npm install -g @safe-yolo/agent-guard@0.2.14
+npm install -g @safe-yolo/agent-guard@0.2.15
 ```
 
-Add it to your settings:
+Add it to your settings. If the file already has `hooks`, merge this `PreToolUse` entry into them
+instead of overwriting the file:
 
 ```json title="~/.claude/settings.json"
 {
@@ -122,14 +152,258 @@ Add it to your settings:
 }
 ```
 
-What happens to a command:
+The hook command must find `safe-yolo-guard` in `PATH`. If Claude Code does not see it, use the
+absolute path: `$(npm prefix -g)/bin/safe-yolo-guard`.
 
-- safe -> runs without a prompt
-- unsafe or a hard rule -> Claude Code asks you and shows the reason
-- classifier down -> the hook stays silent and your Claude Code permission rules decide
+For Laya or Clef, set the endpoint and the model:
+`SAFE_YOLO_URL=http://127.0.0.1:8010/v1/systemone SAFE_YOLO_MODEL=multilingual safe-yolo-guard`.
 
-The hook has no `shadow` mode, it acts from the first command. All settings are environment
-variables:
+Check that the classifier answers (you should see `"choice":"safe"`):
+
+```sh
+curl -s http://127.0.0.1:8011/v1/systemone -H 'content-type: application/json' -d '{"state":"ls -la","questions":{"verdict":{"type":"choice","instructions":"Is this shell command dangerous?","criteria":{"safe":"safe","unsafe":"dangerous"}}}}'
+```
+
+To switch the guard off for a while, `touch ~/.config/agent-guard/off` (hard rules keep working).
+To remove it, delete the `PreToolUse` entry from `~/.claude/settings.json` and restart Claude Code.
+
+Restart Claude Code to load the hook, then open `/hooks` to see that it is there.
+
+The hook has no `shadow` mode. All its settings are [environment variables](#claude-code-environment).
+
+> **Classifier down = work stops.** When the local classifier does not answer (refused, timeout,
+> unknown host, an HTTP error or a reply that is not a verdict), the hook stops the session and
+> says why and how to fix it. To work without the guard for a while, `touch ~/.config/agent-guard/off`;
+> `rm ~/.config/agent-guard/off` turns it back on. While it is off only the hard rules run, the
+> rest goes to Claude Code's own permission rules. The OpenCode plugin denies the command instead
+> (it cannot stop a session) and reads the same file.
+
+Tested in default and auto permission modes. Not tested with bypassPermissions /
+--dangerously-skip-permissions.
+
+Check it: ask the agent to run `git push --dry-run` in a scratch repo. That is a hard rule, so no
+model is needed. It works if you get a card that starts like this (in English with
+`SAFE_YOLO_LANG=en`):
+
+```text
+📤 ОТПРАВКА · коммиты увидят другие, откат только новым push
+```
+
+### OpenCode
+
+```jsonc title="opencode.json"
+{
+  "plugins": ["@safe-yolo/agent-guard@0.2.15"]
+}
+```
+
+With options (for example, a classifier on another host):
+
+```jsonc title="opencode.json"
+{
+  "plugins": [
+    {
+      "package": "@safe-yolo/agent-guard@0.2.15",
+      "options": {
+        "mode": "shadow",
+        "url": "http://127.0.0.1:8000/v1/chat/completions",
+        "model": "qwen3.6-35b"
+      }
+    }
+  ]
+}
+```
+
+This uses the defaults: an `openai` endpoint on `:8000`. For catshell, Laya or Clef use the
+snippets from [Start a classifier](#start-a-classifier). To run from a local clone, point
+`package` at its directory.
+
+Start in `shadow`, read the [log](#logs) for a few days, then switch to `enforce`.
+
+If you previously enabled blanket auto-approve, turn it off in enforce mode: it would press
+"Allow" on the very prompts safe-yolo escalates for your review.
+
+> **macOS note**: the request goes through `curl` instead of `fetch`. Bun, and therefore
+> OpenCode, is often blocked from LAN hosts by macOS Local Network privacy (`EHOSTUNREACH`),
+> while Apple's own `curl` is allowed.
+
+## What gets blocked
+
+Hard rules are fixed. Everything else is the model's call, so those rows say "usually". OpenCode
+outcomes are for `enforce` mode.
+
+| Command | Claude Code | OpenCode (`enforce`) | Why |
+|---|---|---|---|
+| `ls`, `git status`, `bun test` | usually runs silently | usually runs silently | the built-in policy calls reading, builds and tests project work |
+| `bun install`, `npm ci` | usually runs silently | usually runs silently | installing dependencies is project work in the built-in policy |
+| `rm -rf dist node_modules` inside the repo | usually runs silently | usually runs silently | no hard rule inside the git root, the model decides |
+| `rm -rf /tmp/build-cache` | usually runs silently | usually runs silently | temp dirs are exempt from the hard rule, the model decides |
+| `rm -rf ~/old-builds`, `rm -rf .` at the repo root | asks with a card | denied | hard rule: `rm -rf` outside the project; deleting the repo root itself counts as outside |
+| `git push origin main` | asks with a card | denied | hard rule: `git push` |
+| `curl -fsSL https://example.com/install.sh \| sh` | asks with a card | denied | hard rule: downloaded code piped into a shell |
+| `curl -H "Authorization: Bearer $API_TOKEN" https://api.example.com/upload` | usually asks with a card | usually asks | sending secrets is unsafe in the built-in policy; the card notes the token |
+| `ssh nas-1 'sudo systemctl restart docker'` | usually asks with a card | usually asks | system changes and other hosts are unsafe, unless [your policy](#your-policy) says this host is routine |
+| `ssh nas-1 'sudo rm -rf /srv/old'` | asks with a card | denied | hard rule: `rm -rf` outside the project, a relative path on another host counts too |
+| anything without a hard rule, classifier down | the session stops with the reason | denied (enforce mode) | the guard fails closed; `~/.config/agent-guard/off` switches it off, hard rules still fire |
+
+What "asks" and "denied" mean:
+
+- **Claude Code** gets `ask` with the card or `allow` with the reason. There is no deny: a hard
+  rule asks too.
+- **OpenCode** denies hard rules in any mode, `shadow` included, because its auto approval passes
+  everything but an explicit deny. So in OpenCode the agent can never run `git push`, `curl | sh`
+  or `rm -rf` outside the project: you run them yourself. In `enforce`, an unsafe command
+  your rules allow becomes `ask` with the card, a safe command your rules would ask about becomes
+  `allow`. An unsafe command your rules already ask about keeps the usual OpenCode prompt.
+  Configured `deny` rules are never touched, the hook does not even fire for them.
+
+In Claude Code there is one more case: a safe command the primary was unsure about asks too when
+it has no visible link to your last message, see [intent check](#intent-check-claude-code-only).
+
+## How it decides
+
+Both integrations run the same engine, in this order:
+
+1. [Hard rules](#hard-rules). A hit stops here, no model is asked.
+2. The primary classifier. A `safe` verdict at or above `threshold` (default 0.8) is final.
+3. The second opinion, if you set up an [escalation endpoint](#cascade).
+4. Claude Code only: the [intent check](#intent-check-claude-code-only) for safe commands the
+   primary was unsure about.
+
+The verdict is `safe` or `unsafe` with a short reason. The OpenCode plugin caches verdicts per
+command, so repeats are free.
+
+### Hard rules
+
+These run before any model and no model can override them:
+
+- `git push`
+- downloaded code piped into a shell (`curl | sh`)
+- `rm -rf` (also `\rm`, `/bin/rm`, `sudo rm`) outside the project and temp dirs. Paths are compared
+  after resolving symlinks. The project is the git root of the working dir. No
+  repo means no project, and a root that is `/`, your home or a parent of it never counts. Temp
+  dirs include every Claude Code session's `/private/tmp/claude-<uid>/`
+
+A relative `rm -rf` after `cd` or inside `ssh` counts as outside. So does a variable, unless the
+command itself sets it to a plain literal before `rm` (`S=/x; rm -rf "$S"`) or to `$(mktemp -d)`.
+`S=/x rm -rf "$S"` asks: the shell expands `$S` before that assignment. Values are never read from
+the real environment.
+
+### Cascade
+
+Decision models are fast but sometimes unsure, and they answer in probabilities, not words.
+Point `escalateUrl` at a stronger LLM and unsure commands get a second opinion:
+
+- a `safe` primary verdict with confidence at or above `threshold` (default 0.8) is trusted
+- anything else goes to the escalation endpoint: every `unsafe` and every low confidence
+- the second stage can only make a verdict stricter: an unsure `safe` can turn `unsafe`, but a
+  primary `unsafe` stays `unsafe`. When the second stage disagrees, the card says so:
+  `🔍 СПОРНО · локальная модель против, облачная не видит угрозы`
+- escalation failed -> the primary verdict stands
+- primary down -> the guard fails closed, the escalation is never asked alone
+
+Full example: catshell on this machine, an LLM on another host as the second opinion:
+
+```jsonc title="opencode.json"
+{
+  "plugins": [
+    {
+      "package": "@safe-yolo/agent-guard@0.2.15",
+      "options": {
+        "mode": "shadow",
+        "api": "systemone",
+        "url": "http://127.0.0.1:8011/v1/systemone",
+        "threshold": 0.8,
+        "escalateUrl": "http://llm.lan:8000/v1/chat/completions",
+        "escalateModel": "qwen3.6-35b"
+      }
+    }
+  ]
+}
+```
+
+### Intent check (Claude Code only)
+
+The hook reads your last message from the transcript and asks the LLM if the command fits it. It
+runs for stopped commands and for safe ones the primary was unsure about. It works one way: "no
+visible link" turns an allow into a question, a match never allows anything. It needs an
+openai-shaped endpoint (`SAFE_YOLO_ESCALATE_URL`) and is off in `escalateSkipDirs`.
+
+### Confirmation card
+
+When the guard stops a command, you get a short card, at most 8 lines at 64 columns:
+
+<!-- card sample -->
+```text
+💥 УДАЛЕНИЕ вне проекта · не вернуть
+~/projects/old-builds: 1240 файлов, 3,2 ГБ
+Проверь: в ~/projects/old-builds нет нужного
+Агент пишет: "Free disk space by removing old builds"
+```
+
+- the title (category, what happens, can it be undone) and the fallback check come from a fixed
+  template per risk kind: delete, push or publish, secrets, download, foreign code, system or
+  remote host, unclear. Hard rules pick the
+  template themselves. Russian by default, `language: "en"` (or `SAFE_YOLO_LANG=en` for the hook)
+  switches to English
+- the line under the title holds facts checked by code, read-only and capped: the path, whether it
+  exists, how many files, a dirty git tree, a token in a request
+- "Repo" (git commands only, never for a delete) names the repo the command works on (`git -C`,
+  `--git-dir`, `--work-tree`, a leading `cd`, else the working dir): owner/repo, a short host,
+  the branch and new commits, never a password
+- "Where" appears only for a hard rule in a multi-line command, and only when the matched part is
+  short. The card never quotes the rest of the command
+- "❌ You asked" appears only when the command does not fit your last message
+- the escalation LLM only picks the template and the condition, in a separate call after the
+  verdict, so it cannot change the verdict. A condition that argues for allowing is dropped.
+  Without an openai-shaped endpoint you get the template alone
+- "Agent says" is the agent's own description, as is. Treat it as a claim, not a fact. When it is in
+  another language, the explain call translates it; without an LLM you see the original
+- every line is one line with a length cap and no control chars, so a command cannot draw fake
+  lines into the card, and the card never takes more than 8 rows
+
+### Cloud escalation and secrets
+
+`escalateApi: "zai"` talks to Z.ai GLM (for example
+`https://api.z.ai/api/coding/paas/v4/chat/completions` with `glm-5.3-flash`). It is chat
+completions in JSON mode: no vLLM-only fields, the schema goes into the system prompt and the
+parser checks the answer.
+
+Before a command, the agent's description or your request leaves for the escalation or explain
+call, secrets in it are replaced with `<секрет:label>` (`<secret:label>` in English), the syntax
+around stays. The local primary still sees raw text. Built-in detectors, always on: known token
+formats (npm, GitHub, GitLab, `sk-`, Slack, AWS, JWT, private key blocks), values after
+`Authorization:`, `Bearer`, `PRIVATE-TOKEN:`, `X-Api-Key:`, `password=`, `*_TOKEN=`/`*_KEY=`/
+`*_SECRET=`/`*_PASSWORD=`, `--token`, `--api-key`, `--password`, `:_authToken=`, passwords in URLs,
+and any random-looking run of 32+ letters and digits (git SHAs too). `$VAR`, `${VAR}` and
+`$(secrets get name)` stay as they are. Redaction covers only what goes to the escalation and
+explain endpoints: the local logs keep the full command, so keep them local.
+
+Your own patterns go into `~/.config/agent-guard/secrets.txt` (hook: `SAFE_YOLO_SECRETS_FILE`,
+plugin: `secretsFile`), one per line. A `/regex/flags` line redacts the whole match, any other line
+is a token prefix and redacts the prefix plus the token after it. It holds patterns, not values:
+
+```text title="~/.config/agent-guard/secrets.txt"
+# corp tokens
+corp_
+/fake-[0-9]{8}/i
+```
+
+Check a pattern (run it from a clone of this repo):
+
+```sh
+bun -e 'import { parseSecretPatterns, redact } from "@safe-yolo/agent-guard/core"; import { readFileSync } from "node:fs"; console.log(redact(process.argv[1], parseSecretPatterns(readFileSync(`${process.env.HOME}/.config/agent-guard/secrets.txt`, "utf8")).patterns))' 'curl -H "X-Corp: corp_abc123" x'
+```
+
+`escalateSkipDirs` (hook: `SAFE_YOLO_ESCALATE_SKIP_DIRS`, colon-separated, `~` works) lists dirs
+that never reach the escalation endpoint: no second opinion and no explain call there, the card
+comes from the template. Put your corp repos there.
+
+API keys go to curl through a config on stdin, so `ps` does not show them.
+
+## Configuration
+
+### Claude Code environment
 
 | Variable | Default | What it does |
 |---|---|---|
@@ -148,183 +422,7 @@ variables:
 | `SAFE_YOLO_DEBUG` | - | `1` or a file path: log every decision |
 | `SAFE_YOLO_LANG` | `ru` | language of the confirmation text: `ru` or `en` |
 
-## Run a classifier locally
-
-The plugin speaks two API shapes: `openai` (chat completions with structured outputs) and
-`systemone` (the Jev / System One decision API). Pick whatever runs on your hardware:
-
-**Cat Shell Risk Commander - the default pick, runs on CPU.** A purpose-built shell command
-risk scorer (TF-IDF + linear model, 36K of weights, Apache-2.0): about 1 ms per command,
-published metrics of 92.6% recall at 0.86% FPR. A ready Jev-compatible wrapper ships in
-`examples/catshell/`:
-
-```sh
-cd examples/catshell && docker compose up --build -d
-```
-
-```jsonc title="opencode.json"
-{
-  "options": {
-    "api": "systemone",
-    "url": "http://127.0.0.1:8011/v1/systemone"
-  }
-}
-```
-
-**Laya - if your commands are heavily non-English.** Multilingual decision model (100+
-languages), calibrated confidence, 200-450 ms per command on CPU. It also ships a Docker
-quickstart with `laya-serve` in the image:
-
-```sh
-pip install "laya[serve]"
-LAYA_PORT=8010 laya-serve
-```
-
-```jsonc title="opencode.json"
-{
-  "options": {
-    "api": "systemone",
-    "url": "http://127.0.0.1:8010/v1/systemone",
-    "model": "multilingual"
-  }
-}
-```
-
-**Clef / Clef-flash - for GPU boxes.** Cloudflare's open decision models (Apache 2.0),
-Jev-compatible, median 39 ms for clef-flash. Serve with SGLang per the model card and use
-`api: "systemone"`, or run them through Workers AI or Ollama cloud with an `apiKey`.
-
-**Any small LLM on vLLM - the generic path.** Heavier: gigabytes of weights and hundreds of ms
-per command. But it answers with a verbal reason, which is what the cascade stage quotes back
-to you. Configure it with `api: "openai"`.
-
-## Cascade
-
-Decision models are fast but sometimes unsure, and they answer in probabilities, not words.
-Point `escalateUrl` at a stronger LLM and unsure commands get a second opinion:
-
-- a `safe` primary verdict with confidence at or above `threshold` (default 0.8) is trusted
-- anything else goes to the escalation endpoint: every `unsafe`, low confidence, a primary that
-  is down. Its verdict and its verbal reason are what you see
-- escalation failed -> the primary verdict stands
-- both stages down -> configured permission rules decide, as before
-
-Full example: catshell on a homelab box, an LLM on another host as the second opinion:
-
-```jsonc title="opencode.json"
-{
-  "plugins": [
-    {
-      "package": "@safe-yolo/agent-guard@0.2.14",
-      "options": {
-        "mode": "shadow",
-        "api": "systemone",
-        "url": "http://127.0.0.1:8010/v1/systemone",
-        "model": "multilingual",
-        "threshold": 0.8,
-        "escalateUrl": "http://llm.lan:8000/v1/chat/completions",
-        "escalateModel": "qwen3.6-35b"
-      }
-    }
-  ]
-}
-```
-
-## Cloud escalation and secrets
-
-`escalateApi: "zai"` talks to Z.ai GLM (for example
-`https://api.z.ai/api/coding/paas/v4/chat/completions` with `glm-5.3-flash`). It is chat
-completions in JSON mode: no vLLM-only fields, the schema goes into the system prompt and the
-parser checks the answer.
-
-Before a command, the agent's description or your request leaves for the escalation or explain
-call, secrets in it are replaced with `<секрет:label>` (`<secret:label>` in English), the syntax
-around stays. The local primary still sees raw text. Built-in detectors, always on: known token
-formats (npm, GitHub, GitLab, `sk-`, Slack, AWS, JWT, private key blocks), values after
-`Authorization:`, `Bearer`, `PRIVATE-TOKEN:`, `X-Api-Key:`, `password=`, `*_TOKEN=`/`*_KEY=`/
-`*_SECRET=`/`*_PASSWORD=`, `--token`, `--api-key`, `--password`, `:_authToken=`, passwords in URLs,
-and any random-looking run of 32+ letters and digits (git SHAs too). `$VAR`, `${VAR}` and
-`$(secrets get name)` stay as they are. Redaction covers only what goes to the escalation and
-explain endpoints: the local debug log (`SAFE_YOLO_DEBUG`) keeps the full command, so keep it local.
-
-Your own patterns go into `~/.config/agent-guard/secrets.txt` (hook: `SAFE_YOLO_SECRETS_FILE`,
-plugin: `secretsFile`), one per line. A `/regex/flags` line redacts the whole match, any other line
-is a token prefix and redacts the prefix plus the token after it. It holds patterns, not values:
-
-```text title="~/.config/agent-guard/secrets.txt"
-# corp tokens
-corp_
-/fake-[0-9]{8}/i
-```
-
-Check a pattern:
-
-```sh
-bun -e 'import { parseSecretPatterns, redact } from "@safe-yolo/agent-guard/core"; import { readFileSync } from "node:fs"; console.log(redact(process.argv[1], parseSecretPatterns(readFileSync(`${process.env.HOME}/.config/agent-guard/secrets.txt`, "utf8")).patterns))' 'curl -H "X-Corp: corp_abc123" x'
-```
-
-`escalateSkipDirs` (hook: `SAFE_YOLO_ESCALATE_SKIP_DIRS`, colon-separated, `~` works) lists dirs
-that never reach the escalation endpoint: no second opinion and no explain call there, the card
-comes from the template. Put your corp repos there.
-
-API keys go to curl through a config on stdin, so `ps` does not show them.
-
-## Hard rules
-
-These run before any model and no model can override them:
-
-- `git push`
-- downloaded code piped into a shell (`curl | sh`)
-- `rm -rf` (also `\rm`, `/bin/rm`, `sudo rm`) outside the project and temp dirs. Paths are compared
-  after resolving symlinks. The project is the git root of the working dir. No
-  repo means no project, and a root that is `/`, your home or a parent of it never counts. Temp
-  dirs include every Claude Code session's `/private/tmp/claude-<uid>/`
-
-The OpenCode plugin denies them in any mode, because auto approval passes everything but an
-explicit deny, so run such a command yourself. The Claude Code hook asks.
-
-A relative `rm -rf` after `cd` or inside `ssh` counts as outside. So does a variable, unless the
-command itself sets it to a plain literal before `rm` (`S=/x; rm -rf "$S"`) or to `$(mktemp -d)`.
-`S=/x rm -rf "$S"` asks: the shell expands `$S` before that assignment. Values are never read from
-the real environment.
-
-## Confirmations
-
-When the guard stops a command, you get a short card, at most 8 lines at 64 columns:
-
-```text
-💥 safe-yolo: удаление вне проекта
-Репо: fake/app (git.example)
-Где: rm -rf ~/projects/old-builds
-Факт: 1240 файлов, 380 МБ
-Чем грозит: удалит ~/projects/old-builds без корзины.
-Твоя просьба: "почисти старые сборки" - совпадает
-Разреши, только если ~/projects/old-builds не нужен.
-Агент пишет: "Free disk space by removing old builds"
-```
-
-- title, risk and the fallback condition come from a fixed template per risk kind: delete, push or
-  publish, secrets, download, foreign code, system or remote host, unclear. Hard rules pick the
-  template themselves. Russian by default, `language: "en"` (or `SAFE_YOLO_LANG=en` for the hook)
-  switches to English
-- "Repo" names the repo a git command works on (`git -C`, `--git-dir`, `--work-tree`, a leading
-  `cd`, else the working dir): owner/repo and a short host, never a password
-- "Fact" is checked by code, read-only and capped: does the path exist, how many files, a dirty git
-  tree, the push branch and new commits, hosts and a token in a request
-- "Where" appears only for a hard rule and only when the matched part is short, like
-  `git push origin main`. The card never quotes the rest of the command
-- the escalation LLM only picks the template and the condition, in a separate call after the
-  verdict, so it cannot change the verdict. A condition that argues for allowing is dropped.
-  Without an openai-shaped endpoint you get the template alone
-- intent check (Claude Code only): the hook reads your last message from the transcript and asks
-  the LLM if the command fits it. It runs for stopped commands and for safe ones the primary was
-  unsure about. It works one way: "no visible link" turns an allow into a question, a match never
-  allows anything
-- "Agent says" is the agent's own description, as is. Treat it as a claim, not a fact
-- every line is one line with a length cap and no control chars, so a command cannot draw fake
-  lines into the card, and the card never takes more than 8 rows
-
-## Options
+### OpenCode options
 
 | Option | Default | What it does |
 |---|---|---|
@@ -346,10 +444,12 @@ When the guard stops a command, you get a short card, at most 8 lines at 64 colu
 | `secretsFile` | `~/.config/agent-guard/secrets.txt` | your secret patterns |
 | `language` | `ru` | language of the confirmation text: `ru` or `en` |
 
-## Your policy
+`shadow` still denies [hard rules](#hard-rules).
 
-The classifier knows general security rules but not your setup. Teach it the specifics of your
-environment - your hosts, your routines, your language - in a plain markdown file. Create
+### Your policy
+
+The classifier knows general security rules but not your setup. Teach it your hosts, your
+routines and your language in a plain markdown file. Create
 `~/.config/opencode/safe-yolo-policy.md` (or point `policyFile` elsewhere); the whole file is
 appended to the classifier prompt on every call. A starter template lives in
 `examples/policy.md`.
@@ -361,31 +461,34 @@ deploying to prod-1 requires an explicit ask.
 ```
 
 Write it like an explanation to a new teammate: concrete hosts and workflows, what counts as
-routine, what requires a human. Keep it short - every line costs attention on every
+routine, what requires a human. Keep it short: every line costs attention on every
 classification. The file stays on your machine; the plugin ships with a generic policy. After
-editing, touch `opencode.json` or run `/reload` so the plugin re-reads it.
+editing, save `opencode.json` again (any edit) or run `/reload` so the plugin re-reads it.
 
-Prefer one line instead of a file? Put it in `policyHint` - both work, both are appended.
+Prefer one line instead of a file? Put it in `policyHint`: both work, both are appended.
 Want only your rules? `disableDefaultPolicyHint: true` drops the built-in policy, and your
-file is all the classifier sees - keep the safe/unsafe semantics in it.
+file is all the classifier sees, so keep the safe/unsafe semantics in it.
 
 The Claude Code hook reads `~/.config/agent-guard/policy.md`, or the file in `SAFE_YOLO_POLICY_FILE`.
 
-## Logs
+### Logs
 
-Verdicts land in `~/.local/share/opencode/safe-yolo.log`:
+The OpenCode plugin writes verdicts to `~/.local/share/opencode/safe-yolo.log`:
 
 ```
-2026-11-04T12:30:29.863Z mode=shadow effect=ask verdict=safe -> ask cmd=make build && go test ./... reason=Builds the project and runs tests
+2026-11-04T12:30:29.863Z mode=shadow effect=ask verdict=safe -> ask via=primary cmd=make build && go test ./... reason=Builds the project and runs tests
 ```
 
 To audit the classifier: `grep 'verdict=unsafe' ~/.local/share/opencode/safe-yolo.log` and check
 whether any safe commands were flagged.
 
 Set `SAFE_YOLO_DEBUG=1` (or a file path) to log every decision with both stages, timings and
-failures to `~/.local/share/opencode/safe-yolo-debug.jsonl`. Past 5 MB it moves to `.jsonl.1`, so
-disk use stays around 10 MB. It holds full command text, so keep
-it local.
+failures to `~/.local/share/opencode/safe-yolo-debug.jsonl`. The Claude Code hook writes there too:
+the path is shared with the plugin. Past 5 MB it moves to `.jsonl.1`, so disk use stays around
+10 MB. It holds full command text, so keep it local.
+
+With `SAFE_YOLO_DEBUG` set, the OpenCode plugin also appends one JSON line per command to
+`~/.local/share/opencode/safe-yolo-train.jsonl`, full command text included.
 
 The debug log shows both stages:
 
@@ -401,4 +504,5 @@ via=primary verdict=unsafe conf=61% -> via=escalate verdict=unsafe reason=curl p
 
 ## License
 
-[PolyForm Noncommercial 1.0.0](LICENSE).
+Free for noncommercial use under [PolyForm Noncommercial 1.0.0](LICENSE). For use at a company or
+any commercial use, [open an issue on GitHub](https://github.com/safe-yolo/agent-guard/issues) to ask.

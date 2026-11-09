@@ -16,7 +16,8 @@ Define your development loop once — plan, build, review, secure, ship — as a
 - **Your agents, not a new runtime.** Workflow nodes use native OpenCode agents from `.opencode/agents`. No hosted backend, no custom LLM client, no second tool to learn.
 - **Real quality loops.** Agents report structured outcomes; the graph routes on them. `changes_requested` sends work back; `approved` moves it forward; `blocked` pauses for a human.
 - **Runs that survive interruptions.** Checkpoints are persisted after every transition. Restart the server and completed work is not redone; ambiguous work is blocked, never silently re-run.
-- **Visibility and control.** Watch the active node in a TUI diagram or a Desktop Mermaid graph, open any node's session, and pause, resume, or cancel the run.
+- **Parallel and reusable workflows.** Fork into concurrent branches, join their results, and call another workflow by name. Start multiple runs in the same checkout.
+- **Visibility and control.** Follow active steps in the TUI or Desktop graph, open their sessions, and pause, resume, or cancel a run.
 - **Local-first by default.** Workflows and runtime state stay on your machine. Nothing is sent to a third-party service.
 - **Guardrails that respect you.** Native permissions still apply. The plugin never auto-approves, never edits your agents, and blocks workflow edits to your OpenCode configuration.
 
@@ -46,7 +47,7 @@ Pin a version when reproducibility matters:
 
 ```jsonc
 {
-  "plugins": ["@alvarolorentedev/opencode-flowgraph@0.8.1"]
+  "plugins": ["@alvarolorentedev/opencode-flowgraph@0.8.2"]
 }
 ```
 
@@ -108,7 +109,7 @@ Or open the palette and choose **Flowgraph** to browse runs and workflows. In Op
 
 ### 5. Watch and steer
 
-- **TUI** — `/flowgraph` opens the live graph; `enter` opens the active node's session, `p` pauses, `c` cancels.
+- **TUI** — `/flowgraph` opens the live graph. Use `enter` for the primary active session, `s` to pick a session, and `p` to pause or resume.
 - **Desktop** — the **Workflow** command opens a run picker; click nodes to inspect their sessions.
 - **RPC** — `getRun`, `getRunGraph`, `pauseRun`, `resumeRun`, `cancelRun`, and the `runUpdated` event.
 
@@ -121,15 +122,15 @@ Or open the palette and choose **Flowgraph** to browse runs and workflows. In Op
 
 ## Honest limits
 
-- Sequential execution only: no parallel branches, graph joins, or nested workflows yet.
-- One active workflow per canonical project tree. Multi-host HA is not supported.
+- Parallel branches and concurrent runs share the checkout. Overlapping file writes can conflict.
+- Execution supports one OpenCode server per project database.
 - No hosted execution, marketplace, visual editor, or browser UI.
 - Exactly-once external side effects are not promised. Cost is reported, not capped.
 - The Desktop GUI is experimental; the TUI and RPC are the stable surfaces.
 
 ## Ready-made examples
 
-[`examples/.opencode`](examples/.opencode) contains agents and three workflows — `development`, `review`, and `product-delivery` — you can copy into a project and adapt.
+[`examples/.opencode`](examples/.opencode) contains agents and four workflows you can copy and adapt, including `parallel-review` for forks, joins, and calls.
 
 ## Documentation
 

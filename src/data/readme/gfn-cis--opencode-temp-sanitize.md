@@ -21,9 +21,17 @@ eventually breaks unrelated programs.
   once those files are certainly no longer needed. The directory stays inside the
   pre-approved tree, so no new permission prompts.
 - Sets `TMPDIR` to the same directory for shell commands the agent runs.
+- Deletes files older than 48 hours from project directories, on startup and then
+  hourly. "Older" means neither atime nor mtime changed in that time (mtime covers
+  `noatime` mounts). Rules:
+  - only regular files and symlinks are deleted; symlinks are never followed, so their
+    targets are safe; sockets and FIFOs are left alone;
+  - subdirectories are removed once empty; project directories themselves stay;
+  - every project directory in `/tmp/opencode` is swept, so projects that are never
+    reopened get cleaned too; loose files directly in `/tmp/opencode` are not touched,
+    since OpenCode instances without this plugin put them there.
 
 Models treat the hint as advice; nothing prevents them from writing elsewhere.
-The plugin does not delete anything yet.
 
 ## Install
 
@@ -31,7 +39,7 @@ Add to the `plugins` array in `opencode.json`, pinned to a version:
 
 ```json
 {
-  "plugins": ["@gfn-cis/opencode-temp-sanitize@0.2.1"]
+  "plugins": ["@gfn-cis/opencode-temp-sanitize@0.3.0"]
 }
 ```
 
@@ -40,7 +48,7 @@ or straight from a git tag:
 ```json
 {
   "plugins": [
-    "@gfn-cis/opencode-temp-sanitize@git+https://github.com/GFN-CIS/opencode-temp-sanitize.git#v0.2.1"
+    "@gfn-cis/opencode-temp-sanitize@git+https://github.com/GFN-CIS/opencode-temp-sanitize.git#v0.3.0"
   ]
 }
 ```
@@ -74,7 +82,8 @@ npm run lint       # biome
 npm run knip
 ```
 
-Logic lives in `src/project-tmp.js`; `index.js` only wires OpenCode hooks.
+Logic lives in `src/project-tmp.js` and `src/sweep.js`; `index.js` only wires OpenCode
+hooks and the cleanup timer.
 
 CI runs the checks above on Node 22 and 24. Also in `.github/workflows/`: CodeQL
 (`security-and-quality` suite, only while the repository is public, since code scanning on

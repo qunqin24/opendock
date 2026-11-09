@@ -91,6 +91,11 @@ Three skills come with it:
 
 Each skill reports findings and changes nothing on GitHub unless you ask.
 
+**Events list.** `github_events_list`, the plugin's own read, is for Memory's collector and other scripts, not for
+answering questions: what you were involved in since a cursor (changes to issues and pull requests, your commits, and
+other notifications where the sign-in may read them), as normalised events, oldest first. It only reads, with GET
+requests, and never asks. See [Events list](https://github.com/joe-broadhead/opencode-github/blob/HEAD/docs/configuration.md#events-list).
+
 **Scripts.** A script or a cron job can call GitHub's read tools and `github_api`'s reads with no model, through
 `opencode api`. It runs as a session and its agent, under that agent's permission rules and the session's own.
 Scripts can never change anything on GitHub:

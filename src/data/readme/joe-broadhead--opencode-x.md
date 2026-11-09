@@ -121,6 +121,15 @@ Two skills teach the model to use X well:
 - `x-write`: whom each change reaches, saying so before the call, drafting and publishing an Article, and leaving the
   yes to OpenCode's permission prompt.
 
+### Memory's events
+
+`x_events_list` is for Memory's collector, not for answering questions: it lists, since a cursor, your mentions and new
+bookmarks (and your home timeline if you turn it on) as normalised events, oldest first, each with its author's handle
+and link. Every X call is billed, so one call makes at most `events.maxCalls` reads (4 by default, your account's
+lookup included) and says there is more when it stops early; a collector picks up the rest on its next call. It is
+this plugin's side of the shared `events_list` source contract
+([configuration](https://github.com/joe-broadhead/opencode-x/blob/HEAD/docs/configuration.md#events-list)).
+
 ### Scripts
 
 A script or a cron job can call X's read tools with no model, through `opencode api`. It runs as a session and its
@@ -132,8 +141,8 @@ opencode api post /api/rpc/x.posts.tools/search_posts_all \
   -d '{"input":{"sessionID":"ses_…","input":{"query":"from:example","max_results":10}}}'
 ```
 
-Keep the result count small: every call is billed. See
-[Scripting](https://github.com/joe-broadhead/opencode-x/blob/HEAD/docs/scripting.md).
+Keep the result count small: every call is billed. The method `events_list` runs `x_events_list` the same way, within
+its call cap. See [Scripting](https://github.com/joe-broadhead/opencode-x/blob/HEAD/docs/scripting.md).
 
 ## Permissions
 
@@ -143,7 +152,8 @@ The plugin adds these rules to every agent, directly after the agent's base rule
 2. One `allow` rule for each of X's 51 read tools, listed in
    [`src/x-tools.ts`](https://github.com/joe-broadhead/opencode-x/blob/HEAD/src/x-tools.ts). These run without a
    prompt.
-3. One `deny` rule for each of the 40 tools that are off: DMs and private chat conversations (reads included),
+3. One `allow` rule for the plugin's own `x_events_list`, Memory's source of X events, which only reads.
+4. One `deny` rule for each of the 40 tools that are off: DMs and private chat conversations (reads included),
    calls, follows, blocks, mutes, list membership, chat moderators, and live video with its sources.
 
 So 51 reads run; 9 tools ask (the bookmark, list and Article-draft writes and `x_create_posts`); and 40 are off. Each
@@ -190,6 +200,8 @@ Set options with the object form of the plugin entry:
 | `oauth.callback_port` | `1`–`65535` | none | Only with an `https:` redirect: the local port a proxy forwards to. |
 | `oauth.scopes` | X OAuth 2.0 scopes | `tweet.read users.read follows.read like.read block.read list.read list.write space.read broadcast.read calls.read bookmark.read bookmark.write tweet.write offline.access` | Dropping a group's scope makes those tools fail with `403` or removes them; dropping `offline.access` means no refresh token. |
 | `allowUntestedHost` | `true` or `false` | `false` | Starts on an OpenCode version outside `>=2.2.3 <2.3.0`, with a warning in status. |
+| `events.feeds` | `mentions`, `bookmarks`, `timeline` | `["mentions", "bookmarks"]` | What `x_events_list` lists for Memory. Your home timeline is the busiest and dearest feed, so it is listed only when you name it. |
+| `events.maxCalls` | `2`–`50` | `4` | The most billed X reads one `x_events_list` call makes, your account's lookup included. |
 
 `{env:NAME}` is substituted when OpenCode loads the config, so the secret can stay in your environment instead of the
 file. An unset variable arrives as an empty string, which the plugin rejects with `OPTIONS_INVALID`. A variable
@@ -262,6 +274,11 @@ Run `/x-status` first. Its last line is the next step.
 | `SKILLS_INVALID` | A skill file in the package is missing or broken. Reinstall the plugin. |
 | `SERVER_NOT_REGISTERED` | The plugin could not register the `x` server. Restart OpenCode. |
 | `RULES_NOT_ADDED` | The default permission rules could not be added, so X tools may run without asking. Restart OpenCode. |
+| `INPUT_INVALID`, `SOURCE_UNKNOWN` | `x_events_list` got an input outside its contract, or another source than `x`. Fix the input. |
+| `ACCOUNT_UNKNOWN` | `x_events_list` was asked for another account than the signed-in handle. Leave `account` out, or pass the handle the message names. |
+| `CURSOR_INVALID` | `x_events_list` got a cursor another account issued, or a broken one. Call it without a cursor to start again. |
+| `UPSTREAM_ERROR`, `UPSTREAM_UNREADABLE` | X refused one of `x_events_list`'s reads, or answered in a shape it does not read. Run `/x-status`, then call again with the same cursor. |
+| `TOOL_UNAVAILABLE` | OpenCode does not list a read `x_events_list` needs. Wait a few seconds and run `/x-status`; while X cannot be called, it gives status's own code and next step instead. |
 
 A script's errors from the tools RPC have their own codes, listed in
 [Scripting](https://github.com/joe-broadhead/opencode-x/blob/HEAD/docs/scripting.md#errors).

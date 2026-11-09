@@ -2,17 +2,24 @@
 
 ### Reduce Claude Code, Codex, opencode, and Qoder token usage without losing tool output
 
-TokenSaver is a local-first context optimization plugin for **Claude Code**, **OpenAI Codex**, **opencode**, and **Qoder**. It compacts verbose command logs, test failures, repository searches, and large file reads before they consume your model context. The complete output remains available locally whenever you need it.
-
 [![Node.js 22+](https://img.shields.io/badge/Node.js-22%2B-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
 [![Claude Code plugin](https://img.shields.io/badge/Claude%20Code-plugin-6b4fbb)](https://code.claude.com/docs/en/plugins/overview)
 [![Codex plugin](https://img.shields.io/badge/OpenAI%20Codex-plugin-111111)](https://developers.openai.com/plugins/build/plugins)
 [![opencode plugin](https://img.shields.io/badge/opencode-plugin-1f6feb)](https://opencode.ai/docs/plugins)
 [![Qoder plugin](https://img.shields.io/badge/Qoder-plugin-00a0e9)](https://docs.qoder.com/extensions/plugins)
 
+**TokenSaver is a local-first context optimization plugin.** Coding agents read thousands of lines of command logs, test output, search matches, and source code into context, then pay to resend all of it on every turn. TokenSaver compacts that noise before the model sees it, keeps what matters visible (failures, exit codes, paths, line numbers), and stores the complete original output on disk so nothing is ever lost.
+
+## TL;DR
+
+- Compacts verbose shell, test, search, and file-read output using deterministic rules: no extra model calls, no API keys, no cloud, no telemetry.
+- Test failures, stack traces, exit codes, and line numbers stay visible in the compacted preview.
+- The full output is saved locally; the agent can retrieve any line range later with `output_slice`, without rerunning anything.
+- Synthetic fixtures show 93-95% smaller tool output (see [Benchmarks](#benchmarks)).
+
 ## Why TokenSaver?
 
-Coding agents can read thousands of lines of logs, search matches, and source code into context. Those tool results are then resent in subsequent model requests, increasing token usage and leaving less room for your actual task.
+Tool results are resent in every subsequent model request. Verbose output inflates token usage, fills the context window, and leaves less room for your actual task.
 
 TokenSaver uses **deterministic local compaction**, not another AI summarization step:
 
@@ -22,20 +29,24 @@ TokenSaver uses **deterministic local compaction**, not another AI summarization
 - Full output recovery by exact line range.
 - Original exit codes, failures, paths, and line numbers remain visible.
 
-## Features
+## What it does
 
-| Capability | Claude Code | Codex | opencode | Qoder |
-| --- | --- | --- | --- | --- |
-| Compact verbose shell and test output | Automatic `PostToolUse` hook | `compact_run` MCP tool | Automatic `bash` hook | Automatic `PostToolUse` hook |
-| Compact broad repository searches | Automatic `Grep` hook | `compact_search` MCP tool | Automatic `grep` hook | Automatic `Grep` hook |
-| Compact large file reads | Opt-in (`TOKEN_SAVER_TOOLS`) | `compact_read` MCP tool | Opt-in (`TOKEN_SAVER_TOOLS`) | Opt-in (`TOKEN_SAVER_TOOLS`) |
-| Suppress repeated identical output | Automatic | Automatic | Automatic | Automatic |
-| Rewrite verbose commands at the source | Not needed (output never reaches the API uncompacted) | Via `compact_run` | Automatic for simple test/build commands | Not needed (output never reaches the API uncompacted) |
-| Preserve explicitly requested file ranges | Yes | Yes | Yes | Yes |
-| Retrieve omitted output | `output_slice` | `output_slice` | `output_slice` plugin tool | `output_slice` MCP tool |
-| Report accumulated savings | `stats` tool | `stats` tool | `stats` plugin tool | `stats` tool |
-| Improve automatic context compaction | `PreCompact` guidance | `PreCompact` guidance | `experimental.session.compacting` guidance | `PreCompact` guidance |
-| Store full output locally | Yes | Yes | Yes | Yes |
+| Host | Verbose output is compacted | Tools available |
+| --- | --- | --- |
+| Claude Code | Automatically via the `PostToolUse` hook (`Bash`, `Grep`; `Read` is opt-in) | MCP server: `compact_read`, `compact_search`, `compact_run`, `output_slice`, `stats` |
+| Codex CLI | On request (Codex hooks do not support output replacement yet) | MCP tools plus a bundled skill that teaches the agent when to use them |
+| opencode | Automatically via the plugin hook (`bash`, `read`, `grep`) | Plugin tools: `output_slice`, `stats` |
+| Qoder | Automatically via the `PostToolUse` hook | MCP server: `compact_read`, `compact_search`, `compact_run`, `output_slice`, `stats` |
+
+Compaction keeps a small preview with the head, the tail, and the important lines:
+
+```text
+[token-saver] shell: 2000 lines/128689 B → 104 lines/6420 B. Full output: session.…; use token-saver output_slice with startLine and maxLines.
+progress 0% chunk 0 …
+[… original lines 41–1940 omitted …]
+FAIL: final assertion failed
+[exit code: 1]
+```
 
 Additional behavior:
 
@@ -45,20 +56,19 @@ Additional behavior:
 - Groups search results by file with per-file limits.
 - Truncates exceptionally long lines, including Unicode-safe truncation.
 - Replacements mirror the original tool-output shape (content blocks, `stdout`/`stderr`, or plain string) instead of always substituting a plain string, recount shape metadata such as `numLines` to describe the replacement, and mark the stderr section in merged process output with a `--- stderr ---` line.
+- Suppresses byte-identical repeat output with a small stub instead of re-compacting.
+- Preserves explicitly requested file ranges.
+- Supports per-policy budgets so each tool kind can keep a different amount of output.
+- At auto-compact time, guides the host's own compactor to replace old verbose tool results with artifact placeholders when enough output has been stored (see the [Roadmap](#roadmap)).
 - Fails open: the original result passes through if compaction fails.
-- Supports configurable retention and output limits.
 
 Automatic compaction of `Read`/`read` output is **off by default**: an agent that edits a file it has only seen as a head/tail preview can produce wrong edits. Large-file reads stay available through the explicit `compact_read` tool (which always compacts, since calling it is an explicit request), and automatic read compaction can be enabled with `TOKEN_SAVER_TOOLS=shell,test,search,read`.
 
 ## Quick start
 
-### Prerequisites
+Prerequisites: **Node.js 22 or newer** and one of the supported hosts below. Optional: [ripgrep](https://github.com/BurntSushi/ripgrep) for `compact_search`.
 
-- **Node.js 22 or newer**
-- Claude Code, Codex CLI, opencode, or Qoder
-- Optional: [ripgrep](https://github.com/BurntSushi/ripgrep) for `compact_search`
-
-### Install for Claude Code
+### Claude Code
 
 ```bash
 claude plugin marketplace add mhsenam/claude-codex-token-saver
@@ -67,7 +77,7 @@ claude plugin install token-saver@token-saver
 
 Restart Claude Code after installation. TokenSaver will automatically compact large `Bash`, `Read`, and `Grep` results.
 
-### Install for Codex
+### Codex CLI
 
 ```bash
 codex plugin marketplace add mhsenam/claude-codex-token-saver
@@ -87,22 +97,21 @@ Read this large file with compact_read, then retrieve any missing lines you need
 
 The bundled skill also teaches Codex when to select these tools.
 
-### Install for opencode
+### opencode
 
-Once `opencode-token-saver` is published to npm, add it to the `plugin` array in `opencode.json`:
+Download the prebuilt plugin file, then restart opencode:
 
-```json
-{
-  "$schema": "https://opencode.ai/config.json",
-  "plugin": ["opencode-token-saver"]
-}
+```bash
+mkdir -p .opencode/plugins
+curl -L -o .opencode/plugins/token-saver.js \
+  https://raw.githubusercontent.com/mhsenam/claude-codex-token-saver/main/packages/opencode/dist/plugin.js
 ```
 
-opencode installs npm plugins automatically at startup. A no-install alternative is to copy `packages/opencode/dist/plugin.js` into `.opencode/plugins/token-saver.js` (project) or `~/.config/opencode/plugins/token-saver.js` (global).
+For a global install, write to `~/.config/opencode/plugins/token-saver.js` instead (or download the file in your browser and place it there manually). TokenSaver automatically compacts large `bash`, `read`, and `grep` results and registers an `output_slice` tool for retrieval.
 
-Restart opencode. TokenSaver automatically compacts large `bash`, `read`, and `grep` results and registers an `output_slice` tool for retrieval.
+> Note: the npm package named `opencode-token-saver` is an unrelated project. Install TokenSaver only from the file above or the official repository.
 
-### Install for Qoder
+### Qoder
 
 Import the packaged plugin folder `release/qoder/token-saver` (created by `npm run package`) from Qoder IDE via Settings > Plugins > import from a local folder, or install it from a local directory with the Qoder CLI, then restart Qoder:
 
@@ -113,19 +122,9 @@ qoder plugins validate <path-to-release/qoder/token-saver>
 
 The plugin bundles the automatic `PostToolUse` compaction hook, the `PreCompact` guidance hook, and the token-saver MCP server (`compact_read`, `compact_search`, `compact_run`, `output_slice`). If your Qoder version does not resolve bundled MCP or hook paths, follow the manual fallback in `packages/qoder/install/README.md`, which also documents an optional Always Apply rule for biasing the agent toward the compact tools.
 
-## Example
+## Recovering omitted output
 
-A 2,000-line command log becomes a small preview with head, tail, and important lines:
-
-```text
-[token-saver] shell: 2000 lines/128689 B → 104 lines/6420 B. Full output: session.…; use token-saver output_slice with startLine and maxLines.
-progress 0% chunk 0 …
-[… original lines 41–1940 omitted …]
-FAIL: final assertion failed
-[exit code: 1]
-```
-
-To recover lines 450–469 without rerunning the command:
+To recover lines 450-469 of a compacted result without rerunning the command, pass this object to the `output_slice` tool (MCP tool, or plugin tool on opencode):
 
 ```json
 {
@@ -135,7 +134,29 @@ To recover lines 450–469 without rerunning the command:
 }
 ```
 
-Pass that object to the `output_slice` MCP tool.
+Request a small range, then continue from the returned line number if needed. A result marked `[token-saver] duplicate:` is a byte-identical repeat of an earlier output; its preview plus the referenced artifact covers everything.
+
+## How it works
+
+```text
+Verbose tool output
+        |
+        v
+  Full output ------------------> Local artifact store
+        |                              |
+        v                              |
+Deterministic policy                   |
+        |                              |
+        v                              |
+Compact model-visible result           |
+        |                              |
+        +-------- artifact ID ---------+
+                       |
+                       v
+               output_slice retrieval
+```
+
+Compaction policies are shared across hosts. Claude Code, Qoder, and opencode compact automatically through host hooks; Claude and Qoder additionally bundle the MCP server for retrieval and explicit compact operations, opencode registers `output_slice` as a plugin tool, and Codex registers everything through MCP tools and a skill.
 
 ## Benchmarks
 
@@ -172,12 +193,27 @@ TokenSaver works without configuration. Set environment variables to override de
 | `TOKEN_SAVER_RETENTION_HOURS` | `24` | Full-output artifact retention |
 | `TOKEN_SAVER_DEDUP` | `1` | Return a small stub instead of re-compacting byte-identical repeat output |
 | `TOKEN_SAVER_DEDUP_PREVIEW_LINES` | `20` | Lines kept in a duplicate stub |
+| `TOKEN_SAVER_MAX_LINES_<KIND>` | global | Per-policy line-budget override; `<KIND>` is `SHELL`, `TEST`, `SEARCH`, or `READ` (e.g. `TOKEN_SAVER_MAX_LINES_TEST=200`) |
+| `TOKEN_SAVER_MAX_BYTES_<KIND>` | global | Per-policy byte-budget override (e.g. `TOKEN_SAVER_MAX_BYTES_SHELL=10000`) |
+| `TOKEN_SAVER_HEAD_LINES_<KIND>` | global | Per-policy head override (e.g. `TOKEN_SAVER_HEAD_LINES_SEARCH=0`) |
+| `TOKEN_SAVER_TAIL_LINES_<KIND>` | global | Per-policy tail override |
+| `TOKEN_SAVER_EVICTION` | `1` | Eviction features (see the roadmap): PreCompact guidance on all hosts, continuous history eviction on opencode |
+| `TOKEN_SAVER_EVICTION_MIN_BYTES` | `100000` | Minimum compacted bytes stored for a session before PreCompact eviction guidance activates |
+| `TOKEN_SAVER_EVICTION_KEEP_RECENT` | `3` | opencode: most recent artifact-backed tool results kept verbatim before eviction |
+| `TOKEN_SAVER_EVICTION_MIN_NET_SAVINGS` | `6000` | opencode: minimum bytes a batch must recover before rewriting anything (protects the prompt cache) |
 | `TOKEN_SAVER_REWRITE` | `1` (`0` on Windows) | opencode: redirect whitelisted test/build commands to an artifact and print only a tail |
 | `TOKEN_SAVER_STATS` | `1` | Append local JSONL usage statistics (set `0` to disable) |
 | `TOKEN_SAVER_DATA_DIR` | `~/.token-saver/outputs` | Artifact storage directory |
 | `TOKEN_SAVER_DEBUG` | unset | Set to `1` for Claude hook errors on stderr |
 
 Set `TOKEN_SAVER_TOOLS` to a comma-separated subset of policies to limit automatic compaction, or disable the plugin for a complete bypass.
+
+Per-policy budgets tune each kind independently. A common setup keeps failure context for tests while staying aggressive on routine shell output:
+
+```bash
+TOKEN_SAVER_MAX_LINES_TEST=200   # test failures keep more context
+TOKEN_SAVER_MAX_LINES_SHELL=60   # routine commands stay small
+```
 
 ## Measuring impact
 
@@ -199,28 +235,6 @@ TokenSaver stacks safely with tools like RTK or output-sandboxing plugins, but c
 - Keep token-saver's distinct advantages: its full-output artifacts with exact line-range recovery (`output_slice`), duplicate suppression, and the `stats` report — most filtering tools have no recovery path.
 - Output that passes through another compressor first is simply re-measured by token-saver; below the size thresholds it passes through untouched.
 
-## How it works
-
-```text
-Verbose tool output
-        |
-        v
-  Full output ------------------> Local artifact store
-        |                              |
-        v                              |
-Deterministic policy                   |
-        |                              |
-        v                              |
-Compact model-visible result           |
-        |                              |
-        +-------- artifact ID ---------+
-                       |
-                       v
-               output_slice retrieval
-```
-
-Compaction policies are shared across hosts. Claude Code, Qoder, and opencode compact automatically through host hooks; Claude and Qoder additionally bundle the MCP server for retrieval and explicit compact operations, opencode registers `output_slice` as a plugin tool, and Codex registers everything through MCP tools and a skill.
-
 ## Privacy and security
 
 - TokenSaver has no analytics, network service, or model API integration.
@@ -229,6 +243,30 @@ Compaction policies are shared across hosts. Claude Code, Qoder, and opencode co
 - `compact_run` executes the shell command requested by the agent. Only install and enable plugins you trust, and review commands as you would with a built-in shell tool.
 - File and search path inputs are restricted to the current project; a shell command itself has the permissions of the user running the coding agent.
 - Hook failures return the original output instead of blocking the coding session.
+
+## Limitations
+
+- TokenSaver cannot guarantee a specific reduction in provider-reported token usage or cost.
+- Small outputs pass through unchanged by design.
+- Lossy context can still result from aggressive limits; retrieve the artifact when exact omitted details matter.
+- Codex does not currently have feature parity with Claude's automatic `PostToolUse` output replacement, so its MCP tools must be selected by the agent or requested explicitly.
+- opencode's hook covers its built-in `bash`, `read`, and `grep` tools only (MCP tool outputs are not hook-addressable), opencode truncates exceptionally large tool output before plugins run, and its TUI may display the original output while the model receives the compacted version.
+- opencode source-side command rewriting applies only to simple whitelisted test/build commands (no pipes, redirections, or command substitution) and defaults to off on Windows (`TOKEN_SAVER_REWRITE=1` to enable) because the host shell is not guaranteed to be POSIX.
+- Qoder reads hook configuration at startup, so restart after changing hooks or MCP settings; Qoder plugins cannot bundle rules, so the optional tool-preference rule is installed separately.
+- Very large commands that exceed the process buffer must be narrowed or split before compaction.
+
+## Roadmap
+
+History eviction attacks the largest remaining cost: a tool result compacted once is still resent in full on every later request until the host discards it. Two mechanisms shipped in 0.4.0:
+
+- **PreCompact-time eviction (all hosts).** At auto-compact the PreCompact hooks read local `stats.jsonl` and, once a session has stored enough compacted output (3+ artifacts totalling 100+ KB by default), instruct the host's own compactor to replace older verbose tool results with one-line artifact placeholders instead of summarizing them, keeping the newest turns verbatim. The host's compactor already rewrites history at that moment, so this adds no extra cache invalidation.
+- **Continuous eviction (opencode).** opencode v2 exposes `experimental.chat.messages.transform`, the full mutable message list before every LLM call. TokenSaver replaces artifact-backed tool results older than `TOKEN_SAVER_EVICTION_KEEP_RECENT` turns with placeholders, but only when a batch recovers at least `TOKEN_SAVER_EVICTION_MIN_NET_SAVINGS` bytes, so the 1.25x cache-write tax is only paid when it clearly nets out positive. Only results whose full output is already stored as an artifact are touched, and expired artifacts are skipped.
+
+Claude Code is deliberately excluded from continuous rewriting: its own microcompaction (on by default, keeps roughly the 3 most recent tool results) already clears old results, and TokenSaver's artifact store is the recovery path for exactly those clearings. Codex and Qoder stay on PreCompact-time eviction until they ship comparable request-transform APIs. The full analysis, including the evidence that token reduction is not automatically cost reduction, lives in [docs/history-eviction.md](docs/history-eviction.md).
+
+## Contributing
+
+Issues and pull requests are welcome. Include a realistic output fixture for compaction bugs, run `npm test` and `npm run smoke`, and avoid submitting logs containing credentials or private source code.
 
 ## Local development
 
@@ -269,22 +307,3 @@ packages/
 benchmarks/      # Reproducible synthetic fixtures
 scripts/         # Build, package, and smoke-test automation
 ```
-
-## Limitations
-
-- TokenSaver cannot guarantee a specific reduction in provider-reported token usage or cost.
-- Small outputs pass through unchanged by design.
-- Lossy context can still result from aggressive limits; retrieve the artifact when exact omitted details matter.
-- Codex does not currently have feature parity with Claude's automatic `PostToolUse` output replacement, so its MCP tools must be selected by the agent or requested explicitly.
-- opencode's hook covers its built-in `bash`, `read`, and `grep` tools only (MCP tool outputs are not hook-addressable), opencode truncates exceptionally large tool output before plugins run, and its TUI may display the original output while the model receives the compacted version.
-- opencode source-side command rewriting applies only to simple whitelisted test/build commands (no pipes, redirections, or command substitution) and defaults to off on Windows (`TOKEN_SAVER_REWRITE=1` to enable) because the host shell is not guaranteed to be POSIX.
-- Qoder reads hook configuration at startup, so restart after changing hooks or MCP settings; Qoder plugins cannot bundle rules, so the optional tool-preference rule is installed separately.
-- Very large commands that exceed the process buffer must be narrowed or split before compaction.
-
-## Roadmap
-
-History eviction (replacing old tool results in the outgoing request with artifact placeholders, keeping recent turns verbatim) is planned next. It is gated on real `stats` data because rewriting request history invalidates prompt-cache prefixes, and cache writes bill at 1.25x versus 0.1x for cache reads; eviction must be batched and thresholded to net out positive.
-
-## Contributing
-
-Issues and pull requests are welcome. Include a realistic output fixture for compaction bugs, run `npm test` and `npm run smoke`, and avoid submitting logs containing credentials or private source code.

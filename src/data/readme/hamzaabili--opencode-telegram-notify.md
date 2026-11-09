@@ -273,6 +273,13 @@ Deliberately not scheduled; revisit when they earn their complexity:
 - reply-to-message → in-session notes (extra control channel);
 - multi-field question wizards (open, keep notify-only for now).
 
+## Other OpenCode plugins by the same author
+
+Same constraints: MIT, zero runtime dependencies, OpenCode V1 + V2.
+
+- [opencode-agent-plugins](https://github.com/Hamza-Abili/opencode-agent-plugins) — Agent Plugins 1.0 client: discovery from `.agents/plugins` and npm packages, native skills, trust-first MCP registration.
+- [opencode-sandbox](https://github.com/Hamza-Abili/opencode-sandbox) — native command sandbox: bubblewrap on Linux, Seatbelt on macOS, fail-closed, network denied by default.
+
 ## Development
 
 ```sh

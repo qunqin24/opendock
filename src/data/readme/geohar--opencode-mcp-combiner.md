@@ -683,6 +683,7 @@ When `client_id` is provided, dynamic client registration is skipped.
 | `cache_tokens`        | `boolean`          | `true`  | Persist tokens to disk for this server (overrides global setting)                                                                                                                                    |
 | `callback_port`       | `integer`          | —       | Local port for the OAuth redirect callback (e.g. `9876`). Required when the auth provider validates redirect URIs strictly (Google, GitHub, etc.) — must match the URI registered in your OAuth app. |
 | `prompt`              | `string`           | —       | How the authorization link reaches the user: `browser`, `elicit` or `both` (overrides the global `oauth.prompt`; see [Authorizing from another device](#authorizing-from-another-device)).           |
+| `login_hint`          | `string`           | —       | The account to sign in with, e.g. `me@example.com`. Sent to the provider as `login_hint` (Google, Microsoft and most OpenID providers pre-select that account) and shown on the authorization page and in the prompt — useful when several servers share one provider. `${VAR}` allowed. |
 
 ### OAuth token caching
 
@@ -778,6 +779,12 @@ sends `notifications/elicitation/complete`, after which the call can be
 retried. A client that doesn't declare URL elicitation gets the link in the
 tool error text instead. Links stay valid for 15 minutes; a call after that
 issues a fresh one.
+
+A server that has never been authorized mounts no tools, so there is no call
+to route to it. `combiner__authorize_server(server_name)` — always available —
+starts its authorization on demand and fails with the same `-32042` link (or
+the text fallback); a server already connected says so. This is the way in for
+headless deployments.
 
 `elicit` without `public_url` still works, with a startup warning: the link
 redirects to the loopback callback, so it only completes from a browser on the
@@ -958,6 +965,68 @@ loopback), `loopback`, or an explicit `http://host[:port]`.
 machine. Braces can't appear in a real host name, so a host that happens to be
 called `auto` is never mistaken for it.
 
+### Web login for widgets and resources (`web_auth`)
+
+The bearer token protects `/mcp` and the control routes, but browsers can't
+send it. When the combiner listens beyond this machine (a tailnet bind), its
+widget pages (`/ui/<token>/…`), the widget relay (port + 1) — which can
+return resource contents — and the OAuth authorization page can require a
+password:
+
+```json
+"web_auth": {"mode": "password"}
+```
+
+The password comes from the environment, so a vault can be its only source:
+
+```sh
+# e.g. 1Password: the env file holds a reference, `op run` resolves it at launch
+MCP_COMBINER_WEB_PASSWORD=op://vault/item/password
+op run --env-file combiner.env -- mcp-combiner --mcp --config servers.json
+```
+
+It's hashed in memory at startup and removed from the environment, so child
+processes (external and stdio servers) never see it. Changing it in the vault
+takes effect at the next restart, without signing anyone out. Or store a hash
+instead: `mcp-combiner hash-password` prints one for `web_auth.password_hash`
+(or `MCP_COMBINER_WEB_PASSWORD_HASH`); a hash wins if both are set.
+
+| Who | Asked for the password |
+|---|---|
+| MCP clients | never (they use the bearer) |
+| a browser on this machine (any of its own addresses) | never |
+| a link the combiner handed an MCP client (it carries a ticket) | never — opening it signs the browser in |
+| any other browser | once per `session_days` (default 30) |
+
+- **Tickets** ride on widget and authorization links given to MCP clients.
+  One is good for 5 minutes and `ticket_uses` openings (default 1): after that
+  the link asks for the password. Apps that preview links (fetching them to
+  show a card) use a ticket up — set `ticket_uses: 2` if yours does.
+- **The authorization page** (`/oauth/authorize/<id>`) asks for the password on
+  the page itself, so it works through a proxy that exposes only `/oauth`.
+  Until you sign in it shows only the server name — not the account, scopes or
+  who asked. The OAuth callback and `/health` stay open.
+- **Guessing** is limited: 5 failed attempts a minute per address and 30 across
+  all addresses, then `429` for the rest of the minute. During such an attack
+  the form refuses everyone; this machine and ticket links still get in.
+- **Sessions** are an HTTP-only cookie signed with `web-auth.key`, kept beside
+  the OAuth tokens (owner-only; the combiner refuses a key others can read).
+  Delete it to sign every browser out; the sign-out page (`/auth/logout`) signs
+  out one.
+
+> [!WARNING]
+> **"This machine" is judged by where the connection comes from.** A local
+> reverse proxy must say who the real browser is: `X-Forwarded-For`, trusted
+> only from loopback. `tailscale serve` (HTTP/HTTPS) and nginx with
+> `proxy_set_header X-Forwarded-For` do. Anything that forwards raw
+> connections from this machine — `ssh -L`, `socat`, `tailscale serve --tcp`,
+> a proxy without that header — makes **every** browser look local and skip
+> the password. Behind one of those, set `"exempt_local": false`.
+
+Options: `mode` (`off`/`password`), `password_hash`, `session_days` (30),
+`tickets` (true), `ticket_uses` (1), `exempt_local` (true). Unknown keys and
+wrong types fail the config load rather than falling back.
+
 ### Inbound authentication (locking down `/mcp`)
 
 The above is backend auth (combiner → upstream servers). Separately, the combiner's
@@ -967,7 +1036,8 @@ client must present `Authorization: Bearer <token>`:
 
 - **Combiner**: `MCP_COMBINER_AUTH_TOKEN` env, or `--auth-token-file PATH` (the file
   wins). Unset ⇒ open (default; nothing changes). Gates `/mcp` **and** the control
-  routes that mutate the server (`/sessions*`, `/handover*`); `/health` stays open.
+  routes that mutate the server (`/sessions*`, `/neovim*`, `/handover*`); `/health`
+  stays open.
   A missing/wrong token gets a plain `401` — no OAuth challenge advertised. (The
   `mcp-combiner` ctl and the Neovim host present the token automatically.)
 - **Neovim**: set `combiner.auth_token` (or export `MCP_COMBINER_AUTH_TOKEN`) — it is
@@ -1419,6 +1489,7 @@ The combiner exposes management tools that the LLM can call:
 
 - `combiner__status` — list all configured servers and their state
 - `combiner__enable_server` / `combiner__disable_server` — toggle servers globally (all sessions)
+- `combiner__authorize_server` — start OAuth authorization for a server and hand over the link (see [Authorizing from another device](#authorizing-from-another-device))
 - `combiner__session_disable_server` / `combiner__session_enable_server` — toggle a server for the calling session only
 
 ### Usage

@@ -223,6 +223,7 @@ DOM からの抽出手順（`getBoundingClientRect()` + `window.scrollX` / `wind
 | `mismatched_nodes` | object[] | 非空時のみ | tolerance 超過の不一致ペア。`figma_name` / `web_selector` / `diff` / `dx` / `dy` / `dw` / `dh` / `space`（`relative` = 親ボックス比、`absolute` = 生 px。`dx`/`dw` の単位はこの値に従う。`details` の幾何差分と同じ数値）。`max_details` > 0 のときは先頭からその件数までに切り詰め。 |
 | `mismatched_pairs` | object[] | 非空時のみ | 不一致ペア（tolerance 超過と Web 候補枯渇の両方）。`figma_name` / `reason`（`exceeds_tolerance` \| `no_unused_web_elements`）。超過時は `web_selector` / `geometric_diff` / `tolerance` / `space`（`relative` \| `absolute`）も付く。`max_details` > 0 のときは先頭からその件数までに切り詰め。 |
 | `mismatched_pairs_omitted` | number | 切り詰め時のみ | `mismatched_pairs` から省略した件数（`max_details` > 0 かつ実件数が上限超のとき）。 |
+| `matched_pairs` | object[] | 非空時のみ | 一致ペア。`figma_name` / `web_selector`（details の `Matched: '…' ↔ '…'` と同じ対応）。 |
 | `zero_geometry_warning` | string | 非空時のみ | 過半数ノードの `w`/`h` が 0 のときの誤用検出。 |
 | `unresolved_parent_refs` | string[] | 非空時のみ | 解決できない `parent` 参照。 |
 

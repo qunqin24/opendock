@@ -58,6 +58,10 @@ before it writes. Its inputs are `meeting_ids`, `content` (`notes`, `transcript`
 the export folder, and `overwrite`. When your plan has no transcripts, the file holds the notes and says that
 transcripts are not available on your Granola plan.
 
+It also adds `events_list` (`granola_events_list`), for Memory's collector and other scripts, not for answering
+questions: the meetings you took part in since a cursor, as normalised events with their summaries, oldest first. It
+only reads, and never asks. See [Events list](https://github.com/joe-broadhead/opencode-granola/blob/HEAD/docs/configuration.md#events-list).
+
 To see the connection, the workspace, the tools and the next step:
 
 - `/granola-status` posts the status in the session.
@@ -69,7 +73,7 @@ only. Until then, status says the workspace is unknown; ask the agent to check y
 
 ### Scripts
 
-A script or a cron job can call Granola's ten read tools with no model, through `opencode api`. It runs as a session
+A script or a cron job can call Granola's ten read tools, and the plugin's `events_list`, with no model, through `opencode api`. It runs as a session
 and its agent, under that agent's permission rules and the session's own. Writes, `sign_out` and `export_markdown` are
 never available to scripts:
 

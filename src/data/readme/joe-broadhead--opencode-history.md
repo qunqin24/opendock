@@ -42,6 +42,7 @@ await tools.history.sql({ sql: "select date(created) as day, round(sum(cost), 2)
 - **Sessions and files.** `history_sessions` lists sessions without a query, by last update, creation, cost or size. `history_files` lists the sessions that read or changed a file or folder, with counts per operation and the `seq`s of its touches.
 - **Recall.** `history_recall` searches, takes the best sessions and returns quoted evidence with session IDs and `seq`s, for the agent to answer from.
 - **SQL.** `history_sql` runs one read-only `SELECT` or `WITH` statement over the index, for counts and reports. Its stable interface is four views, `v_sessions`, `v_docs`, `v_files` and `v_links`, and two full-text tables, `docs_words` (`MATCH`) and `docs_sub` (`text LIKE '%substring%'`). The other tables can change between versions.
+- **Events list.** `history_events_list` lists what changed in this machine's sessions since a cursor, as normalised events, for Memory's collector and other scripts. It is the History side of the shared `events_list` source contract; agents answering questions use the tools above.
 - **Pin.** `history_pin` keeps a past session's brief, or a range of its messages, in the current session's instructions, so it stays in view through compactions. It is not in Code Mode, because it changes the current session.
 
 Search, sessions, files and recall look in the current project by default. They leave out the current session, subagent sessions and archived sessions unless you ask for them. The filters are `scope` (`project`, `directory`, `all` or `session`), `since` and `until` (an ISO date, or an age such as `36h`, `7d`, `3w`, `2m` or `1y`), `kinds`, `tool`, `agent`, `path`, `sessionID`, `includeSubagents`, `includeCurrent` and `includeArchived`.
@@ -84,7 +85,7 @@ The plugin puts a default block after each agent's base `* * allow` rule:
 
 | Tool | Default |
 |---|---|
-| `history_search`, `history_read`, `history_brief`, `history_sessions`, `history_files`, `history_recall`, `history_sql` | allow |
+| `history_search`, `history_read`, `history_brief`, `history_sessions`, `history_files`, `history_recall`, `history_sql`, `history_events_list` | allow |
 | `history_pin`, which changes the current session's instructions | ask |
 | any other `history_*` tool | ask |
 

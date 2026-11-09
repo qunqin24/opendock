@@ -70,7 +70,7 @@ tool layer (verified against the host's `tools` filter):
 | | **forge family** — `forge` + your forge.json `forge-*` workers | **everyone else** — native `build` / `plan` / `general` / `explore` and your own agents |
 | --- | --- | --- |
 | exec surface | `forge_shell` / `forge_jobs` only; builtin `shell`/`bash` hidden (unconditional, probe-independent; covers user-defined `agent.forge` entries too) | builtin `shell`/`bash`, fully native |
-| forge tools (`plan_*`, `goal_*`, `crew_*`, `forge_shell`, `forge_jobs`) | `forge` sees all; `forge-*` workers only `forge_shell` + `forge_jobs` | none visible |
+| forge tools (`plan_*`, `goal_*`, `crew_*`, `forge_shell`, `forge_jobs`, `forge_grep`, `forge_glob`) | `forge` sees all; `forge-*` workers only `forge_shell` + `forge_jobs` + the search pair (`forge_grep`/`forge_glob`) | none visible |
 | dispatching `forge-*` via `task` | allowed | refused at the tool layer |
 | writing `.opencode/plan/` / `.opencode/goal/` | allowed (state machine governs) | refused at the tool layer (reads stay open) |
 | forge system prompts (job guidance, plan/goal notices) | injected | never injected — zero forge text |
@@ -152,6 +152,11 @@ the plugin never writes them):
       "watchdog": {
         "mode": "kill",              // "kill" (default) | "dry-run" | "off" — forge-family sessions only
         "stallMs": 600000            // stall threshold, min 60000
+      },
+      "search": {
+        "rgPath": ""                 // optional explicit ripgrep binary path for forge_grep/forge_glob;
+                                     // default resolution: this override (when it exists) → rg on PATH
+                                     // → the plugin's bundled JS engine (disclosed by a trailing engine line)
       }
     }]
   ]
@@ -412,6 +417,74 @@ These are runtime debris, not data — with ONE caveat: **if you uninstall with
 /F /T`, or just reboot); deleting the directory afterwards is safe and
 complete.
 
+## Search tools (`forge_grep` / `forge_glob`)
+
+rg-backed search for the forge family — same interface and output format as
+the builtin `grep`/`glob` pair, but **`follow` and `hidden` default to TRUE**:
+workspace content behind symlinks/junctions and inside dot-directories (which
+the builtin pair silently misses) is in scope by default. `**/.git/**` is
+ always excluded. The builtin pair stays visible — the forge family is
+instructed to prefer `forge_grep`/`forge_glob` first and use builtin
+`grep`/`glob` as fallback only; the standing worker mandate reads:
+
+> Run every search through the forge_grep/forge_glob tools first — the
+> builtin grep/glob tools are fallback only. forge_grep/forge_glob see
+> through symlinks/junctions and dot-directories because follow and hidden
+> are on by default.
+
+- **Params**: `pattern` (required); `path` (optional — defaults to the session
+  worktree; a file path targets that file); `include` (forge_grep file
+  filter); `follow` / `hidden` (optional booleans, both default `true`).
+- **Output parity**: `Found N matches` with `path: Line n:` blocks
+  (forge_glob: a plain path list) — the same shapes as the builtin pair.
+  Results truncate at 100 with a truncation notice advising a narrower
+  path or pattern.
+- **Follow dedupe**: a file reachable through its real path AND a link path
+  reports ONCE (lexicographically first path kept); when any dedupe occurred
+  the output ends with a `+N duplicate paths merged` line.
+- **Outside-workspace links**: followed, with the resolved target disclosed
+  in the result.
+- **Readonly by construction**: ripgrep is spawned directly with a fixed
+  argument vector — no shell, no redirection surface. The tools carry no
+  permission ask-gate and are not subject to the readonly exec seal, so
+  explicit-readonly workers search without friction.
+
+**Engine chain — never a dead tool.** No binary is bundled; instead the
+tools ship a **bundled pure-JS search engine** inside `dist/index.js`. The
+engine resolves as: `search.rgPath` config override (when it exists on
+disk) → `rg` on PATH → **bundled JS engine**. A configured-but-broken rg
+(spawn failure) also falls through to the JS engine. Every call is served
+on every machine — the missing-ripgrep case returns live results, never a
+guidance error. Whenever the JS engine serves a call, the output ends with
+an engine-disclosure footnote (after the dedupe footnotes):
+
+> (engine: builtin-js — ripgrep not found; install ripgrep or set
+> search.rgPath for the faster engine)
+
+- **Glob dialect subset** (JS engine only): `*` (within segment), `**`
+  (crosses separators), `?`, `[class]` (with negation), `{a,b}` alternates.
+  Exotic rg-glob constructs simply fail to match (under-match, no error) —
+  this is the documented common subset, not parity.
+- **Bounded walk, disclosed**: the JS engine caps its walk at 200000
+  entries and per-file scanning at 8 MiB. Hitting a cap appends a
+  truncation-style notice — `(js engine: walk capped at 200000 entries —
+  narrow the path)` / `(js engine: skipped N files over 8 MiB)` — same
+  voice as the 100-result cap. The rg engine has no such caps and stays
+  preferred whenever it resolves.
+- **JS-regex dialect note** (JS engine only): `pattern` compiles as a
+  JavaScript `RegExp`. A pattern that fails to compile returns one honest
+  error line naming the dialect difference and the ripgrep remedy (install
+  ripgrep or set `search.rgPath` for full rg-pattern support) — no partial
+  results.
+- **Explicit `path` anchors pattern and output** (both engines,
+  identically): when `path` points at a directory, glob patterns and grep
+  `include` filters match against paths relative to that directory and
+  results are reported relative to it. The default (no-`path`) root stays
+  worktree-relative; a file `path` keeps its given shape. (rg 15.2.0 lifts
+  glob anchoring to the whole path when hidden/follow meet an absolute root —
+  the tools serve directory targets through a `.`-rooted cwd so both engines
+  anchor identically.)
+
 ## Forge subagents (static worker agents in forge.json)
 
 Forge subagents are **static, user-authored worker agents**: each forge.json
@@ -439,7 +512,13 @@ workspace-ownership strictness as opencode's native MCP config):
    from the session's worktree (session worktree → session directory → host
    launch directory as the anchor chain; first file found on the ancestor
    chain wins, nothing above it is consulted). When it exists, it **IS the
-   session's whole dispatch roster**.
+   session's whole dispatch roster**. For the dispatch gates the anchor is
+   resolved AUTHORITATIVE-FIRST (the host's session record) with one
+   conflict rule: a restart-RESUMED session whose record carries a pool-less
+   rebind directory while the session's live in-memory binding still owns a
+   pool resolves to the POOLED binding (one bounded console disclosure per
+   session names both paths) — own-pool dispatch rights survive both
+   degeneration directions (the degraded map, and the rebound record).
 2. the **global layer**: `~/.config/opencode/forge.json` — a **fallback
    ONLY**: when the workspace has no pool file, the global layer serves as
    the whole roster; when the workspace has one, the global layer is NOT
@@ -523,6 +602,11 @@ out of a materialized id.
   // dispatches are blocked until the field is added). Invalid values
   // degrade to a warning + the directory-derived namespace.
   // "pool": "aa",
+  // OPTIONAL pool-level shared prompt segment — written ONCE at the top of
+  // the file, inherited by EVERY agent this file materializes (project
+  // conventions, repo layout, standing rules). A plain string, no
+  // interpolation. See "Pool-level shared prompt segment" below.
+  // "shared": "Project X conventions: use bun; cite file:line evidence.",
   "agents": {
     // PINNED worker: model + thoughtLevel form an ATOMIC PAIR — set BOTH
     "research": {
@@ -569,6 +653,26 @@ A rejected entry costs only itself — its siblings materialize normally.
   Findings surface in the plugin diagnostics log.
 - **`depths` is deprecated**: the array is ignored with a warning finding.
   Pin ONE `thoughtLevel` per agent instead.
+- **Pool-level `shared` prompt segment**: an optional top-level `"shared"`
+  string — the pool's common base, written once and inherited by EVERY agent
+  the file materializes (no per-agent opt-out; an agent that must escape it
+  gets its own pool file). The layering contract is a strict prepend: the
+  materialized role prompt = `shared` + a blank line + the EXISTING
+  three-layer chain (explicit `prompt` > built-in `research`/`review`
+  defaults > generic one-liner), byte-for-byte unchanged beneath it —
+  `shared` never suppresses and never overrides anything, and an explicit
+  per-agent prompt keeps its priority over role defaults. Validation is
+  field-level fail-soft: a non-string or whitespace-only `shared` records
+  exactly ONE warn finding (`shared-invalid`, naming the file) and is
+  ignored — every agent of the pool still materializes with the unshared
+  chain. Scope is PER FILE: agents from two different pool files each get
+  their OWN file's `shared` (no cross-pool bleed), and the GLOBAL fallback
+  file's `shared` inherits to its family normally — the rule that ignores
+  the global file's `pool` namespace field does not extend to `shared`
+  (content is not namespace). Hot-apply rides the existing mtime cache:
+  editing `shared` re-materializes at the next config hook exactly like any
+  pool edit. With no `shared` declared anywhere, materialized prompts are
+  byte-identical to the pre-`shared` build.
 - Each agent materializes as `forge-<ns>-<id>` — a subagent-mode agent
    visible in the task tool's vocabulary (never hidden), whose description
    names its **pool provenance** (namespace + origin forge.json path +
@@ -576,8 +680,10 @@ A rejected entry costs only itself — its siblings materialize normally.
    layer), carrying the pinned `model`
   (pinned workers) or NO model key at all (Auto workers — the description
   says "inherits the parent session's model" instead of naming a brain),
-  the worker discipline (workspace-relative paths only, verbatim reporting
-  of tool refusals, evidence-bearing conclusions) around its role prompt,
+   the worker discipline (workspace-relative paths only, verbatim reporting
+   of tool refusals, evidence-bearing conclusions, search through
+   `forge_grep`/`forge_glob` first with builtin `grep`/`glob` as fallback
+   only) around its role prompt,
    and a deny-style permission: an ABSENT `shape` defaults to WRITE (open
    permissions — the compatibility-preserving default for existing pools);
    an explicit `shape: "readonly"` denies
@@ -675,7 +781,7 @@ Covered WRITE-CLASS indicators:
 | `mutating-cmdlet` | `Set-Content`, `Out-File`, `New-Item`, `Remove-Item`, `Move-Item`, `Copy-Item`, `Add-Content`, `Clear-Content` |
 | `git-mutation` | `git add/commit/push/reset/checkout/rebase/merge/clean/rm` |
 | `pkg-mutation` | `npm publish`, `npm install` (incl. `npm i`/`ci`/`add`), `bun add`/`install`, `pip`/`pip3 install` |
-| `workspace-write` | output-target flags (`--out`, `--output`, `--out-file`/`--outfile`/`--outFile`, `--dest`, `--destination`, `-o`) whose parsed value is a workspace-relative path, or an absolute path under the session workspace |
+| `workspace-write` | output-target flags (`--out`, `--output`, `--out-file`/`--outfile`/`--outFile`, `--dest`, `--destination`, `-o`) whose parsed value is a workspace-relative path, or an absolute path under the session workspace — the short `-o` counts only when the head binary is a known `-o` writer (`gcc`, `g++`, `cc`, `c++`, `clang`, `clang++`, `ld`, `rustc`, `go`, `curl`, `sort`, `psql`, `dotnet`); on every other binary it flows |
 
 **Honest positioning — this is belt-in-depth, NOT a sandbox.** A command
 that fails to classify is treated as READ-CLASS (fail-open on the channel,
@@ -684,7 +790,9 @@ the same posture as every refusal belt). The known bypass surface, verbatim:
 no redirect is indirection the classifier does not model), **`Start-Process`
 writers** (spawning a writer process is explicitly out of scope), and
 **encoded payloads** (`powershell -EncodedPayload …`, base64 blobs) are NOT
-covered; they flow on the readonly channel. The seal narrows the exec hole
+covered; they flow on the readonly channel. The short `-o` on a writer
+binary outside the known set flows (fail-open, disclosed). The seal narrows
+the exec hole
 from "completely open" to "explicitly constructed indirection" — a true OS
 level seal (write-time redirection, shadow copies, containers, win32+POSIX
 dual implementations) was evaluated and rejected as a disproportionate
@@ -789,22 +897,52 @@ requires a plan. The flow:
      (arm=true) folding the declared subtasks into criteria/checks; the arm
      dialog is the user's gate;
    - **standby** — no call; the crew waits until armed or abandoned.
-3. **Execute in waves** (armed crews only) of parallel native `task` calls
-   (results return in-turn; the next wave launches only after the previous
-   wave's results). GUI / computer-use subtasks are mutually exclusive within
-   a wave (the desktop is a singleton; non-GUI subtasks still parallelize
-   freely), and GUI walkthroughs use the `computer` tool rather than DIY
-   shell screenshot pipelines.
-4. **Missing role?** Run the subtask through a native task call anyway and
-   tell the user — suggest configuring the missing role.
-5. **Verify** each subtask against its acceptance-evidence statement;
-   retry a failure at most once.
-6. **Close** with `crew_close` — a hard, ask-gated gate cross-checking the
-   report against the DECLARED plan: every declared subtask needs a
-   PASS/FAIL verdict with evidence; an undeclared subtask in the report
-   refuses the close (fold discoveries into an existing verdict, or discard
-   and re-crew); a FAIL needs both failure reports.
-7. **Re-shard exit**: `crew_close {abandon: true, reason}` abandons the crew
+ 3. **Execute in waves** (armed crews only) of parallel native `task` calls
+    (results return in-turn; the next wave launches only after the previous
+    wave's results). GUI / computer-use subtasks are mutually exclusive within
+    a wave (the desktop is a singleton; non-GUI subtasks still parallelize
+    freely), and GUI walkthroughs use the `computer` tool rather than DIY
+    shell screenshot pipelines.
+ 4. **Auto-advance on idle** (armed crews only): when the session goes idle
+    between waves and no live active goal governs it, the plugin's
+    idle-continuation engine sends a `[forge:crew-continue]` brief (objective
+    + declared subtask titles + wave discipline) after the shared debounce —
+    waves advance autonomously until `crew_close`. A PENDING crew is never
+    auto-continued (that pause is the user's decision seam), a goal-governed
+    session belongs to the goal engine exclusively, and a non-forge speaker is
+    never continued. The engine keeps its OWN activity counter (task
+    dispatches and write-family calls count); after 3 consecutive
+    activity-free continuation turns it STOPS with one bounded console
+    disclosure — the crew itself stays registered (no auto-abandon, no
+    auto-close; nudge, close, or re-shard), and repeated transport failures
+    stop it the same way. A fresh `crew_begin` clears the stall; no disk
+    state is added (the crew record is unchanged).
+ 5. **Missing role?** Run the subtask through a native task call anyway and
+    tell the user — suggest configuring the missing role.
+ 6. **Native fallback lane** (crew-native-fallback): when the pool offers no
+    forge worker fitting a subtask, or `forge-*` dispatch is blocked by a
+    degraded (non-compliant) pool file, the armed crew dispatches the subtask
+    through the NATIVE task channel (e.g. the `general` subagent) with the
+    SAME relay contract as a forge dispatch — the change/artifact path for
+    authoritative guides, the scoped task prompt, and the evidence demands.
+    The fallback is recorded, never silent: the crew record's wave notes name
+    it, and the subtask's `crew_close` evidence statement says it ran native
+    (free text — the close gate's cross-check is unchanged; titles, verdicts
+    and evidence statements govern exactly as before, no new field). The
+    mid-crew compliance refusal names this exit while the pool is repaired —
+    the belt gates `forge-*` dispatch only. No guard changed: the
+    registration pre-flight still refuses a non-compliant pool outright
+    (D3), cross-pool refusals keep their copy, the pending belt stands, and
+    native targets were never refused for forge-family sessions and still
+    are not.
+ 7. **Verify** each subtask against its acceptance-evidence statement;
+    retry a failure at most once.
+ 8. **Close** with `crew_close` — a hard, ask-gated gate cross-checking the
+    report against the DECLARED plan: every declared subtask needs a
+    PASS/FAIL verdict with evidence; an undeclared subtask in the report
+    refuses the close (fold discoveries into an existing verdict, or discard
+    and re-crew); a FAIL needs both failure reports.
+ 9. **Re-shard exit**: `crew_close {abandon: true, reason}` abandons the crew
    — ask-gated like the close, no verdict requirements, usable from PENDING
    (standby cancel) and EXECUTING (wrong decomposition) alike. The session is
    immediately free for a fresh `crew_begin` with the corrected plan.

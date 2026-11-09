@@ -31,7 +31,7 @@ Run `phux` after installing. [First agent](./docs/getting-started.md#first-agent
 
 ### Desktop app
 
-[Phux Rune](./clients/rune/README.md) is the desktop app (alpha), for Apple
+[Phux Rune](./clients/rune/README.md) is the desktop app, for Apple
 silicon macOS and x86_64 Linux:
 
 ```sh
@@ -46,7 +46,7 @@ native desktop app; use the WSL CLI and terminal UI.
 | Platform | CLI / server / terminal UI | Desktop |
 | --- | --- | --- |
 | macOS, Apple silicon | macOS 11+ | macOS 14+ |
-| Linux | x86_64 or arm64, glibc | x86_64, glibc 2.39, Vulkan |
+| Linux | x86_64 or arm64, glibc | x86_64 or arm64, glibc 2.39, Vulkan |
 | Windows | [WSL 2 and PowerShell launchers](./docs/install.md#windows-wsl) | None |
 
 [Other installation options](./docs/install.md). No Intel Mac or musl builds.

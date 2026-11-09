@@ -1,39 +1,183 @@
-# opencode-orchestrator-uni
+<a id="readme-top"></a>
 
-[English](./README.md) · **Русский**
+[![npm version][npm-shield]][npm-url]
+[![CI][ci-shield]][ci-url]
+[![License][license-shield]][license-url]
+[![OpenCode V2][opencode-shield]][opencode-url]
 
-Нативный пакетный плагин [OpenCode V2](https://opencode.ai/v2/docs/build/plugins),
-который поставляет **комплект агентов-оркестраторов**:
+<br />
 
-- `orchestrator` — root-оркестратор (основной агент) со встроенным режимом
-  аудиторского цикла; делегирует правки кода/доков/тестов и пишет только
-  артефакты аудита и состояния;
-- read-only субагенты аудита — `factcheck`, `empiric`, `invariant`,
-  `arbiter`, `meta`, `redteam`, `context-lint`;
-- `fix-runner` — единственный пишущий субагент комплекта (применяет список «к закрытию»);
-- процессные документы комплекта, доступные как **reference `audit-kit`**
-  (`call-mechanics.md`, `process-ready-loop.md`, `root-runbook.md`,
-  `instruction-other-session.md`, `context-efficiency.md`, `session-discipline.md`);
-- пять детерминированных read-only инструментов — `orch_uni_validate_report`,
-  `orch_uni_context_lint`, `orch_uni_snapshot`, `orch_uni_sessions`,
-  `orch_uni_session_stats` (см. [Инструменты](#инструменты));
-- три слэш-команды — `/agents-md`, `/spec` и `/handoff` (см. [Команды](#команды)).
+<div align="center">
+  <h3 align="center">opencode-orchestrator-uni</h3>
 
-Read-only аудиторы держатся на `edit: deny` (рантайм покрывает `edit`/`write`/`patch`)
-и запрете в промпте для остального; `shell`-разрешение остаётся, чтобы запускать
-проверки. Запись через shell (redirect, `sed -i`, `tee`) запрещена промптом, но не
-песочницей — принятый риск, как I-M15; ни одно разрешение не ослаблено.
+  <p align="center">
+    Плагин OpenCode V2, который ведёт работу как аудиторский цикл, опирающийся на доказательства.
+    <br />
+    <a href="https://github.com/OniVe/opencode-orchestrator-uni/tree/main/docs/ru"><strong>Документация »</strong></a>
+    <br />
+    <br />
+    <a href="https://github.com/OniVe/opencode-orchestrator-uni/issues/new">Сообщить об ошибке</a>
+    &middot;
+    <a href="https://github.com/OniVe/opencode-orchestrator-uni/issues/new">Предложить улучшение</a>
+  </p>
 
-У самого оркестратора `edit` запрещён на `*`; плоские `permissions` — лишь узкий fallback-allowlist для артефактов аудита/состояния, а реальный guard — hook `permission.hook("evaluate")` в `lib/write-guard.ts` с path-root семантикой. Каталог сессии читается на каждое событие (`session.get`), поэтому перемещённая сессия оценивается от нового каталога; при ошибке чтения — setup-каталог и warning (fail-open). Ресурс вне каталога сессии — deny: guard и есть граница workspace, поэтому `reports/`, `docs/planning/` и `audit-*` вне её не пишутся. Внутри каталога первый **корневой** сегмент решает. `reports/` — зарезервированный artifact-root: всё поддерево доступно для записи (даже `reports/src/x.ts`), поэтому проектный код туда не кладём (путь `packages/reports/**` по контракту тоже считается артефактом); `docs/planning/**/*.md` разрешён (вложенный Markdown на любой глубине; `.ts` — нет); `docs` — отдельная ветвь, не source-root: остальной `docs/**` запрещён; source-корни (`src`, `lib`, `test`, `tests`, `agents`, `tools`, `schemas`, `eval`, `.github`) запрещены даже под артефактным префиксом (`src/reports/x.ts`, `src/docs/planning/x.md`). Корневые artifact-файлы (`case-*`, `risks-*`, `handoff-*`, `decisions-*`, `state.md`) разрешены только в корне location, под `reports/`, `docs/planning/` или в каталоге `audit-*` — `app/state.md` запрещён. Hook выполняется после плоских правил, поэтому локальный `edit: allow` для `orchestrator` тоже закрыт. Плоский fallback несёт только этот артефактный набор root-правилами (`reports/*`, `case-*.md`, `risks-*.md`, `handoff-*.md`, `decisions-*.md`, `state.md`, `docs/planning/*.md`) плюс `audit-*/…`; широкие `*/state.md`-шаблоны убраны, поэтому `src/state.md` запрещён и без hook, но last-match всё равно не выражает приоритет корней везде (`audit-x/src/case-y.md`) — плагин пишет warning. Fallback уже hook'а для вложенных артефактных корней: `lab/x/reports/*` и подобные пути пишутся только с hook (root-правила покрывают лишь `reports/*` от корня location). Сбой или таймаут чтения сессии (граница 250 мс) даёт fallback на setup-каталог и warning один раз на guard; у перемещённой сессии абсолютный артефакт в новом каталоге тогда может получить deny (fail-closed для этого класса). Один флаг `sessionWarned` без счётчика — принято: сбои после первого warning молчат. `shell` остаётся для git и проверок; запись через shell и symlink/junction (хост матчит нормализованный лексический путь, а не `realpath`) — принятые риски, как и fail-open (сломанный guard не роняет сессию); ими управляет промпт, а не песочница. Отказ инструмента — это правило роли, правка уходит субагенту.
+  <p align="center">
+    <a href="https://github.com/OniVe/opencode-orchestrator-uni/blob/main/README.md">English</a> &middot; <strong>Русский</strong>
+  </p>
+</div>
 
-Пакет загружается напрямую из TypeScript: `exports` указывает на
-[`index.ts`](./index.ts). **Шага сборки и каталога `dist/` нет** — Bun-овый
-рантайм OpenCode сам разрешает и загружает точку входа (тот же приём, что в
-официальном пакете `@opencode/plugin-figma`).
+<details>
+  <summary>Содержание</summary>
+  <ol>
+    <li><a href="#о-проекте">О проекте</a>
+      <ul>
+        <li><a href="#что-входит">Что входит</a></li>
+        <li><a href="#собрано-с">Собрано с</a></li>
+      </ul>
+    </li>
+    <li><a href="#начало-работы">Начало работы</a>
+      <ul>
+        <li><a href="#требования">Требования</a></li>
+        <li><a href="#установка">Установка</a></li>
+        <li><a href="#настройка">Настройка</a></li>
+      </ul>
+    </li>
+    <li><a href="#использование">Использование</a>
+      <ul>
+        <li><a href="#быстрый-старт">Быстрый старт</a></li>
+        <li><a href="#аудиторский-цикл">Аудиторский цикл</a></li>
+        <li><a href="#агенты">Агенты</a></li>
+        <li><a href="#команды">Команды</a></li>
+      </ul>
+    </li>
+    <li><a href="#справочник">Справочник</a></li>
+    <li><a href="#разработка">Разработка</a></li>
+    <li><a href="#дорожная-карта">Дорожная карта</a></li>
+    <li><a href="#участие">Участие</a></li>
+    <li><a href="#лицензия">Лицензия</a></li>
+    <li><a href="#контакты">Контакты</a></li>
+    <li><a href="#благодарности">Благодарности</a></li>
+  </ol>
+</details>
 
-## Что регистрирует плагин
+## О проекте
 
-При setup (`ctx.agent.transform` / `ctx.reference.transform`):
+Сессии агентов дрейфуют: один и тот же агент пишет код, сам оценивает результат
+и сам подводит итог. Этот плагин делает такое разделение явным для
+[OpenCode V2](https://opencode.ai/v2/docs/build/plugins). Он поставляет
+**комплект агентов-оркестраторов**: root-оркестратор со встроенным аудиторским
+циклом, read-only субагенты аудита, один пишущий субагент, детерминированные
+инструменты проверки и процессные документы, которые не дают циклу превратиться
+в самоотчёт. Id плагина: `orchestrator.uni`.
+
+Комплект — это протокол, а не песочница. Аудиторы read-only на уровне
+разрешений инструментов и промпта; оркестратор делегирует любую правку
+кода/документации/тестов; артефакты аудита остаются в доступных для записи
+путях. Guard не пускает оркестратор в исходники — см.
+[Защиту записи](https://github.com/OniVe/opencode-orchestrator-uni/blob/main/docs/ru/reference.md#защита-записи).
+
+### Что входит
+
+| Слой | Что поставляется |
+| --- | --- |
+| Агенты | `orchestrator` (primary); read-only `factcheck`, `empiric`, `invariant`, `arbiter`, `meta`, `redteam`, `context-lint`; пишущий `fix-runner` |
+| Инструменты | Пять read-only инструментов: `orch_uni_validate_report`, `orch_uni_context_lint`, `orch_uni_snapshot`, `orch_uni_sessions`, `orch_uni_session_stats` |
+| Команды | Три слэш-команды: `/agents-md`, `/spec`, `/handoff` |
+| Справочник | Процессные документы как reference `audit-kit`; подробности — в [Справочнике](https://github.com/OniVe/opencode-orchestrator-uni/blob/main/docs/ru/reference.md) |
+
+<p align="right">(<a href="#readme-top">наверх</a>)</p>
+
+### Собрано с
+
+- [![OpenCode V2][opencode-shield]][opencode-url]
+- [![TypeScript][typescript-shield]][typescript-url]
+- [![Bun][bun-shield]][bun-url]
+- [![Biome][biome-shield]][biome-url]
+- [![semantic-release][semantic-release-shield]][semantic-release-url]
+
+<p align="right">(<a href="#readme-top">наверх</a>)</p>
+
+## Начало работы
+
+### Требования
+
+- **OpenCode 2.x** с V2 plugin API (поле `plugins`). Загрузчик V1 ожидает
+  legacy-экспорт `server()` и этот плагин не загрузит.
+- **Bun** для тестов и скриптов проверки, **Node.js 22.14+** для релизного
+  инструментария. У плагина нет шага сборки и каталога `dist/`.
+- Git-чекаут для `npm run check:locales` и `npm run verify:kit`; в npm-пакете
+  каталог `tools/` не поставляется.
+
+<p align="right">(<a href="#readme-top">наверх</a>)</p>
+
+### Установка
+
+Через CLI OpenCode:
+
+```sh
+opencode plugin add opencode-orchestrator-uni
+```
+
+Или добавьте пакет в массив `plugins` в `~/.config/opencode/opencode.json(c)`:
+
+```jsonc
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugins": ["opencode-orchestrator-uni"]
+}
+```
+
+Зафиксировать версию можно так: `opencode-orchestrator-uni@0.5.1`. Для настройки
+моделей используйте объектную форму — см. [Настройку](#настройка) и
+[Модели](https://github.com/OniVe/opencode-orchestrator-uni/blob/main/docs/ru/reference.md#модели).
+
+Перезапустите сервис после изменения конфига:
+
+```sh
+opencode service restart
+```
+
+<p align="right">(<a href="#readme-top">наверх</a>)</p>
+
+### Настройка
+
+Все опции необязательны и живут в записи плагина:
+
+- `locale` — `"ru"` или `"en"`; полные теги вроде `"ru-RU"` принимаются.
+- `model` / `agents` — модель по умолчанию и переопределения по агентам в форме
+  `"provider/model[#variant]"` или `{ providerID, model, variant }`.
+- `sessionGuard` — напоминания о бюджете промпта и лимит компакций.
+- `toolOutputGuard` — урезает большие выводы `shell`/`bash`/`webfetch`.
+
+Неверные значения игнорируются с предупреждением `[orchestrator.uni] …`. Полный
+справочник опций: [Модели](https://github.com/OniVe/opencode-orchestrator-uni/blob/main/docs/ru/reference.md#модели),
+[Локаль](https://github.com/OniVe/opencode-orchestrator-uni/blob/main/docs/ru/reference.md#локаль) и
+[Гигиена сессии](https://github.com/OniVe/opencode-orchestrator-uni/blob/main/docs/ru/reference.md#гигиена-сессии).
+
+<p align="right">(<a href="#readme-top">наверх</a>)</p>
+
+## Использование
+
+### Быстрый старт
+
+1. Установите плагин, перезапустите OpenCode и откройте сессию в каталоге проекта.
+2. Задайте `model` — или оставьте пусто, чтобы субагенты наследовали модель сессии.
+3. Дайте оркестратору срез. Используйте `/spec` перед реализацией, `/agents-md`
+   для `AGENTS.md` и `/handoff`, чтобы закрыть срез.
+
+<p align="right">(<a href="#readme-top">наверх</a>)</p>
+
+### Аудиторский цикл
+
+`factcheck` отмечает устаревшую работу; `empiric` воспроизводит и измеряет;
+`invariant` проверяет состояния и враждебный ввод; `arbiter` разбирает споры.
+`meta` проводит гейт отчётов, `redteam` проверяет приёмку, а `fix-runner`
+закрывает список. Процессные документы поставляются как reference `audit-kit` и
+лежат в [`docs/ru`](https://github.com/OniVe/opencode-orchestrator-uni/tree/main/docs/ru).
+
+<p align="right">(<a href="#readme-top">наверх</a>)</p>
+
+### Агенты
 
 | Агент          | Режим      | Роль                                                            |
 | -------------- | ---------- | --------------------------------------------------------------- |
@@ -47,546 +191,125 @@ Read-only аудиторы держатся на `edit: deny` (рантайм п
 | `context-lint` | `subagent` | Read-only: аудит AGENTS.md/SPEC.md на token-эффективность         |
 | `fix-runner`   | `subagent` | Пишущий: применяет список правок и доказывает закрытие           |
 
-Все агенты поставляются **без модели**: модели — это конфигурация развёртывания
-(см. [Модели](#модели)). Определения живут в [`agents/`](./agents) как обычные
-Markdown-файлы агентов и парсятся при setup — файлы являются единственным
-источником истины.
+Все агенты поставляются без модели; определения лежат в [`agents/`](https://github.com/OniVe/opencode-orchestrator-uni/tree/main/agents) и
+парсятся при setup. «Read-only» означает: `edit` запрещён и промпт запрещает
+запись; `shell` остаётся для проверок (принятый риск I-M15).
 
-«Read-only» здесь означает: `edit` запрещён и промпт запрещает запись; `shell`
-остаётся разрешён, чтобы аудитор мог выполнить нужные проверки (принятый риск
-I-M15). Аудиторский цикл считает это контрактом, а не песочницей.
+<p align="right">(<a href="#readme-top">наверх</a>)</p>
 
-Reference `audit-kit` указывает на per-locale каталог `docs/<locale>/` пакета
-(см. [Локаль](#локаль)). OpenCode перечисляет его в контексте сессии как
-дополнительный локальный каталог, поэтому оркестратор (и любой другой агент)
-может читать процессные документы напрямую, например
-`<reference path>/call-mechanics.md`.
+### Команды
 
-Плагин также регистрирует пять детерминированных **read-only** инструментов в
-пространстве имён `orch_uni` и три слэш-команды — см. [Инструменты](#инструменты)
-и [Команды](#команды).
+| Команда     | Что делает                                                                                                                                                                       |
+| ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/agents-md` | Вставляет workflow аудита/черновика AGENTS.md: шаблон `context-efficiency.md`, `orch_uni_context_lint`, `context-lint`, подтверждение перед записью.                              |
+| `/spec`      | Вставляет workflow SPEC.md: бриф, уточняющие вопросы, EARS/AC/трассировка, `orch_uni_context_lint`, `context-lint`, подтверждение перед записью.                                 |
+| `/handoff`   | Вставляет workflow закрытия среза: факты сессии и рабочего дерева, шаблон handoff из `session-discipline.md`, запись `docs/planning/handoff-<YYYY-MM-DD>.md`.                    |
 
-## Команды
+Команда — это промпт, а не писатель: она вставляет workflow в текущую сессию, а
+оркестратор дальше работает по обычным правилам evidence и подтверждения.
 
-| Команда | Что делает |
-| --- | --- |
-| `/agents-md` | Вставляет workflow аудита/черновика AGENTS.md: шаблон `context-efficiency.md`, `orch_uni_context_lint`, `context-lint`, подтверждение перед записью. |
-| `/spec` | Вставляет workflow SPEC.md: бриф, уточняющие вопросы, EARS/AC/трассировка, `orch_uni_context_lint`, `context-lint`, подтверждение перед записью. |
-| `/handoff` | Вставляет workflow закрытия среза: факты сессии и рабочего дерева, шаблон handoff из `session-discipline.md`, запись `docs/planning/handoff-<YYYY-MM-DD>.md`. |
+<p align="right">(<a href="#readme-top">наверх</a>)</p>
 
-Команда — это промпт, а не писатель: обработчик вставляет workflow-промпт в
-текущую сессию. Дальше оркестратор работает по обычным правилам evidence и
-подтверждения.
+## Справочник
 
-## Инструменты
+Глубокий справочник — в [`docs/ru/reference.md`](https://github.com/OniVe/opencode-orchestrator-uni/blob/main/docs/ru/reference.md):
+защита записи, все пять инструментов со схемами и лимитами, гигиена сессии,
+модели, локаль, приоритет и заметки.
 
-| Имя                        | Read-only | Что делает                                                                    |
-| -------------------------- | --------- | ----------------------------------------------------------------------------- |
-| `orch_uni_validate_report` | да        | Достаёт SGR JSON-блок отчёта, разрешает его схему, валидирует                 |
-| `orch_uni_context_lint`     | да        | Детерминированный аудит AGENTS.md/SPEC.md: бюджет, vague, ссылки, секции       |
-| `orch_uni_snapshot`        | да        | Детерминированная ревизия дерева каталогов (sha256 на файл + агрегатный хэш)  |
-| `orch_uni_sessions`        | да        | Дочерние сессии сессии: агент, модель, стоимость, токены, время               |
-| `orch_uni_session_stats`   | да        | Счётчики протокола сессии: промпт, компакции, тулы/ход, урезанные выводы       |
-
-Каждый инструмент отвечает JSON-текстом. Ошибки — **типизированные коды** внутри
-тела (`E_INPUT`, `E_NO_JSON`, …), а не исключения, чтобы агент мог ветвиться по
-коду, не разбирая прозу. Ни один из пяти ничего не пишет в воркспейс, хранилище
-сессий или конфигурацию.
-
-### `orch_uni_validate_report`
-
-```jsonc
-{ "text": "<текст отчёта>" }              // или
-{ "path": "reports/empiric-r1.md",        // абсолютный или относительно каталога локации
-  "schema": "empiric/v1" }                // опционально: ожидаемый id схемы
-```
-
-Укажите ровно одно из `text` / `path`. Инструмент берёт **последний** fenced-блок ```` ```json ````,
-который парсится и несёт поле `schema`, разрешает схему по этому полю и валидирует документ.
-
-```jsonc
-{ "valid": true, "schema": "empiric/v1", "errors": [], "warnings": [ … ] }
-{ "valid": false, "code": "E_INVALID", "schema": "empiric/v1",
-  "errors": [ { "path": "$.findings[0].severity", "message": "expected one of …" } ],
-  "warnings": [] }
-```
-
-| Код                 | Значение                                                             |
-| ------------------- | -------------------------------------------------------------------- |
-| `E_INPUT`           | Плохой вызов: нет/оба `text`/`path`, неверные типы, нечитаемый файл   |
-| `E_NO_JSON`         | Fenced-блок ```` ```json ```` не найден                              |
-| `E_PARSE`           | Блок есть, но ни один не парсится как JSON                           |
-| `E_UNKNOWN_SCHEMA`  | Отчёт называет id, которого нет в комплекте (или не называет вовсе)   |
-| `E_SCHEMA_MISMATCH` | Отчёт называет схему, отличную от ожидаемой                          |
-| `E_INVALID`         | Документ не удовлетворяет своей схеме (см. `errors`)                 |
-| `E_SCHEMA_IO`       | Схемы комплекта недоступны или битые (см. `directory`, `file`)       |
-| `E_ABORTED`         | Сессия остановлена во время чтения отчёта                            |
-
-`warnings` несут правила промпта, которые *структурно валидный* отчёт всё ещё
-может нарушить — то, что JSON Schema выразить не может: отсутствующий `rc` у
-claim'а `empiric` с `method` = `run|measure|compare_base`, элементы `self_check`
-вне 1–19, инвариант `invariant`, помеченный `violated` без контрпримера,
-непокрытая обязательная строка `lines_checked`, расхождение `verdict` и `gate` у
-`meta`, инварианты `closing_list`/`verdict` у `redteam`.
-
-Схемы лежат в `schemas/*.json` и выведены **строго** из SGR-секций
-`agents/*.md`, которые остаются источником истины: тестовый набор парсит
-SGR-шаблон каждого агента и падает, когда поле промпта или значение enum не
-принимается его схемой. `context-lint-failure/v1` — типизированный конверт ошибки
-`orch_uni_context_lint`: у него нет шаблона агента, и отчётом он не является. Схемы
-разрешают `additionalProperties` — агенты могут
-добавлять свои поля (`verdict_label`, `check`, …).
-
-### `orch_uni_context_lint`
-
-```jsonc
-{ "path": "AGENTS.md" }                  // файл или каталог, относительно локации
-{ "path": ".", "max_lines": 150, "max_tokens": 2000 }
-{ "path": ".", "max_words": 2000 }       // бюджет слов SPEC; по умолчанию 1500 (цель), потолок 2000
-{ "path": ".", "max_file_bytes": 500000, "max_files": 100, "max_findings": 50, "max_total_findings": 500 }
-```
-
-Детерминированный read-only аудит `AGENTS.md`, `SPEC.md` и `CLAUDE.md`. Возвращает
-`{ schema: "context-lint/v1", ok: true, verdict, closing_list, files, summary, truncated? }`;
-каждая находка несёт `id`, `severity`, `kind`, `evidence`, `detail` и `fix`. Проверки:
-бюджет строк/токенов/слов, различные vague-фразы, дубли строк, битые относительные ссылки,
-плейсхолдеры, даты/версии в первых трёх строках, обязательные секции и колонка Test
-у AC. Ссылки и явные цели ограничены **реальным** путём: symlink/junction, ведущий за
-пределы корня, пропускается, а такая цель отклоняется (`E_OUT_OF_ROOT`). Код-фенсы,
-inline-код и HTML-комментарии маскируются: пример не считается правилом — структурные
-проверки (команды, границы, проверка) читают полную маску, а требования, AC-id и
-non-goals — маску фенсов. Цели ссылок передаются из построчного сканера по одной
-(массива кандидатов нет), поэтому память не растёт с числом ссылок; проверки ограничены
-на файл 50 000 кандидатами, сигнал проверяется на каждой строке и каждые 100 кандидатов,
-а кэши ссылок держат не более 5 000 записей, поэтому abort срабатывает; 2001 ссылка
-проверяется обычным образом, 50 000 валидных ссылок дают pass, а 50 001-й кандидат делает
-список неполным (`truncated: true` плюс MAJOR-маркер `link candidates truncated` в
-`closing_list`), он не может дать pass.
-Отдельного потолка на
-битые ссылки нет: вывод ограничивают общие лимиты находок, а переполнение помечается.
-Строка сканируется любой длины: сканер ссылок и регулярное выражение плейсхолдеров линейны,
-поэтому 4100-символьная строка проверяется как любая другая, а битая ссылка или
-плейсхолдер на ней — настоящая находка, а не маркер. Внутреннего потолка дублей нет. Цели
-UNC/сетевые пути никогда не пробуются. Замер (bun 1.4.2, Windows, свежий процесс):
-50 001 битая ссылка с `max_findings: 2` → ~1,4 с и ~67 МБ пикового RSS; 50 тыс.
-обычных строк → ~0,14 с / ~65 МБ; одна строка 2 МБ со ссылками → ~3,1 с / ~116 МБ
-(~41 МБ без ссылок). Маскирование переиспользует строку как есть, если в ней нет
-backtick и `<pre>`/`<code>`/`<!--`, поэтому не копирует строку посимвольно, а строка
-в 2 МБ остаётся ограниченной 50 000 кандидатами, а не материализует все ссылки.
-Лимиты: ≤ 2 МБ на файл, ≤ 500 файлов за прогон. `max_findings` (на файл) — это N на
-severity: сохраняются до N MAJOR и N MINOR/INFO, излишек заменяется одним маркером
-(MAJOR, если выпал MAJOR, иначе INFO); MAJOR-маркер остаётся в `closing_list`.
-`max_total_findings` (глобально, по умолчанию 1000)
-сохраняет сначала MAJOR; при переполнении MAJOR остаются `max_total` находок плюс один
-MAJOR-маркер `truncated`. Усечённый список помечается `truncated: true`, а не скрывается.
-Маркеры дополнительны к `max_findings` и не расходуют его бюджет: маркер усечённых
-кандидатов-ссылок и маркер усечённых находок дают по маркеру в одном прогоне, поэтому
-`max_findings: 2` на 20 001 битой ссылке даёт 2 сохранённые находки плюс 2 маркера. Маркеры
-указывают на `file:1` в `evidence`.
-Non-goals считаются как элементы верхнего уровня: перенесённый абзац — один элемент,
-inline `;`/`,`/`and`/`и` делят только верхний уровень (не внутри `(…)`, `[…]`, бэктиков
-любой длины или `<code>`), а bullet с отступом 0–4 пробела под лейблом — элемент; фенсы,
-`<pre>` и код с большим отступом — нет.
-Плейсхолдеры — `<...>` (три и более точки) и `TODO`/`TBD`/`FIXME`; `<DoD>` и `<name>` —
-разметка.
-`max_lines` — единственный бюджет корня (200 строк), который применяет инструмент;
-цифры 60/200/100 по уровням в [`docs/`](./docs) — ориентир для авторов, а не отдельные
-лимиты инструмента. `max_words` по умолчанию равен цели 1500 слов SPEC; передайте
-`max_words: 2000`, чтобы применять документированный потолок. Типизированные ошибки: `E_INPUT`, `E_NOT_FOUND`, `E_NO_FILES`,
-`E_IO`, `E_ABORTED`, `E_LIMIT_FILE`, `E_LIMIT_FILES`, `E_OUT_OF_ROOT`.
-Ошибка — типизированный payload `{schema:"context-lint-failure/v1", ok:false, code, message, path?, bytes?, files?, max?}`,
-который валидируется только по `context-lint-failure/v1`; отчёт —
-`{schema:"context-lint/v1", ok, verdict, closing_list, files, summary, truncated?}`, и каждый файл несёт `lines`,
-`words`, `chars` и `tokens_est` (токены оцениваются как кириллица/3 + прочее/4). Каталог
-сканируется до глубины 3, а `max_files` отказывает рано: обход останавливается на первом файле
-выше лимита. Ничего не пропадает молча: каталог ниже лимита глубины, ссылка или junction вне
-корня workspace и незакрытые fence, `<pre>` или HTML-комментарий дают INFO-находки, поэтому `pass`
-не скрывает непроверенную область. Незакрытый `<code>` — строчная маска: он скрывает
-остаток своей строки и не репортится (INFO дают только fence, `<pre>` и HTML-комментарий,
-которые тянутся через строки). Отмена наблюдается между файлами, каждые 2048 строк
-построчной проверки и в каждом гейте, поэтому худшая латентность — один проход маски по
-файлу под `max_file_bytes` (десятки мс на 2 МБ), а не весь скан. Команды считаются только в коде, таблице задач или секции
-Commands, HTML-комментарий вроде `<!-- npm install -->` командой не является, а `make` требует
-цели, поэтому проза «Make sure …» — не команда. Скан от корня подхватывает и фикстуры вроде
-`eval/`; передайте явный путь, если нужны только канонические файлы.
-
-### `orch_uni_snapshot`
-
-```jsonc
-{ "path": "lab/stack-test", "exclude": ["tmp"] }   // exclude опционален и аддитивен
-```
-
-```jsonc
-{ "root": "C:\\…\\lab\\stack-test",
-  "files": [ { "path": "a.txt", "sha256": "…", "bytes": 1 } ],
-  "aggregate": "…" }
-```
-
-- `aggregate = sha256` по отсортированным строкам `"<relpath>\0<sha256>\n"`
-  (разделители `/`, порядок кодпойнтов) — стабилен между прогонами, машинами и
-  порядком обхода и меняется, когда меняется путь или содержимое любого файла.
-- По умолчанию (всегда) исключены: `node_modules`, `.git`, `.ae`; `exclude`
-  добавляет имена, целые относительные пути или относительные префиксы
-  (`lab/tmp`). Симлинки пропускаются.
-- Лимиты: ≤ 5000 файлов, ≤ 50 МиБ на файл — `E_LIMIT_FILES` / `E_LIMIT_BYTES`
-  (падает весь снапшот; усечённый снапшот дал бы неверный агрегат). `E_NOT_FOUND`
-  для отсутствующего пути или не-каталога, `E_ABORTED`, когда сессия остановлена.
-
-### `orch_uni_sessions`
-
-```jsonc
-{}                                           // дети вызывающей сессии
-{ "sessionID": "ses_…", "recursive": true }  // всё поддерево другой сессии
-```
-
-```jsonc
-{ "sessionID": "ses_parent", "recursive": false, "source": "session.index",
-  "authoritative": false, "indexSize": 1, "count": 1,
-  "limitations": [ … ],
-  "sessions": [ { "sessionID": "ses_child", "parentID": "ses_parent", "agent": "explore",
-                  "model": "deepseek/deepseek-flash", "variant": "default", "title": "…",
-                  "cost": 0.0005, "tokens": { "input": 3491, "output": 2 },
-                  "created": "2026-10-15T04:01:06.627Z", "updated": "…" } ] }
-```
-
-`source` говорит, какой маршрут дал ответ:
-
-- `session.list` — эта сборка предоставляет API листинга сессий; ответ
-  **авторитетный** и полный (`recursive` обходит поддерево постранично).
-- `session.index` — фолбэк, используемый OpenCode 2.0.28: у `ctx.session` есть
-  `get/create/…`, но **нет `list`**, поэтому детей нельзя перечислить из
-  хранилища. Плагин при setup подписывается на события `session.created` /
-  `session.deleted` и хранит `child → parent` в собственном хранилище плагина;
-  детали по каждому ребёнку читаются из `ctx.session.get()` в момент вызова.
-  Ответ **не авторитетный**; оговорки возвращаются в `limitations` (сессии,
-  созданные до старта инстанса плагина, не видны; пропуск событий скрывает
-  детей, созданных пока плагин был выгружен).
-- `E_NO_API` — нет ни одного маршрута. Фолбэк через сканирование контекста
-  (поиск частей инструмента `subagent` в `ctx.session.context`) был оценён и
-  отклонён: у летящих детей нет id сессии в их tool-части, а компакция стирает
-  историю. Открытый вопрос: листинг сессий со стороны плагина (или фильтр по
-  `parentID` в `ctx.session.context`) убрал бы фолбэк целиком.
-
-`E_INPUT` при некорректных аргументах, `E_NOT_FOUND`, когда родительской сессии
-нет, `E_ABORTED`, когда сессия остановлена.
-
-### `orch_uni_session_stats`
-
-```jsonc
-{}                                  // счётчики вызывающей сессии
-{ "sessionID": "ses_…" }            // любая сессия на этом сервере, не только дочерняя
-```
-
-```jsonc
-{ "ok": true, "sessionID": "ses_…",
-  "counters": {
-    "requests": 12, "promptTokensLast": 151204, "promptTokensMax": 161002,
-    "promptTokensMedian": 148900, "band": 1, "compactions": 1,
-    "compactionAttempts": 1, "compactionFailures": 0, "compactionSource": "event",
-    "reminders": 2, "toolCalls": 31, "outputsCapped": 1,
-    "outputCharsSaved": 18422, "errors": 0,
-    "toolCallsByTool": { "shell": 18, "bash": 6, "webfetch": 2, "read": 5 },
-    "toolOutputsCappedByTool": { "shell": 1, "bash": 0, "webfetch": 0, "read": 0 }
-  },
-  "limits": { "promptTokensSoft": 150000, "maxCompactions": 1, "maxToolOutputChars": 20000 },
-  "overBudget": true, "compactionLimitReached": true, "toolsPerTurn": 2.58,
-  "tracked": true,
-  "guard": { "available": true, "hooksRegistered": true, "sessionEnabled": true,
-             "toolOutputEnabled": true,
-             "toolOutputTools": ["shell", "bash", "webfetch"],
-             "compactionSource": "event", "eventLive": true,
-             "streamFailures": 0, "unkeyedCalls": 0 } }
-```
-
-`sessionID` может называть **любую сессию на этом сервере**, не только дочернюю
-вызывающего; это осознанно — по отчёту оркестратор контролирует все свои срезы.
-Счётчики принадлежат инстансу плагина, а `tracked` равен `true`, как только сессию
-наблюдало любое событие или хук; событие `session.deleted` её забывает. `band` —
-максимум достигнутого уровня бюджета (`0` ниже мягкого порога);
-`promptTokensMedian` — медиана по окну последних 256 запросов; `toolCalls` и
-per-tool счётчики включают вложенные вызовы Code Mode; `toolCallsByTool` и
-`toolOutputsCappedByTool` разносят вызовы и урезанные выводы по нормализованному
-имени инструмента (namespace снят, регистр нижний); `outputCharsSaved` — число
-символов, не байтов, и верхняя оценка (внедрённая заглушка вычитается).
-`compactions` считает только подтверждённые `session.compaction.ended`;
-`compactionAttempts` — каждый вызов хука `session.compaction`, поэтому на хосте с
-умершим или отсутствующим потоком событий попытки растут, а `compactions` и
-`compactionLimitReached` стоят (неудачная попытка не становится стоп-сигналом).
-Умерший поток событий один раз виден в `guard.streamFailures`; per-session
-`errors` считает только ошибки хуков, поэтому транспортная авария не
-приписывается каждой сессии. Дубликаты событий компакции считаются один раз
-только при наличии `event.id` или durable-позиции; без identity повторная
-доставка может пересчитать событие (fail-open в сторону счёта).
-Сессия, которую не отдаёт хранилище и не наблюдал этот инстанс, — `E_NOT_FOUND`
-(распознаётся по типизированным `_tag`/`name`/`code` — `Session.NotFoundError`,
-`SessionNotFoundError`, `NotFoundError`, `ENOENT` — с узким fallback по сообщению);
-`session.get`, вернувший `undefined` для ненаблюдаемой сессии, — тот же ответ
-«не найдено»; transient-ошибка `session.get` (блокировка, права, `unknown
-database`) — `E_INTERNAL`; известная сессия без запросов — валидный отчёт с
-`tracked: false`. Без `session.get` ненаблюдаемая сессия —
-`E_NO_API`, наблюдаемая — `ok` с `session: null` и записью в `limitations`.
-Коды: `E_INPUT`, `E_NOT_FOUND`, `E_INTERNAL`, `E_NO_API`, `E_UNAVAILABLE`
-(guard не зарегистрирован или его хуки не установились), `E_ABORTED`.
-
-## Гигиена сессии
-
-Плагин реализует протокол [`session-discipline.md`](./docs/ru/session-discipline.md):
-сессия = один срез, бюджет промпта ≤150k токенов, ≤1 компакция, вывод инструментов
-— в файл, в конце среза — handoff.
-
-Runtime-часть — три хука (`session.context`, `session.compaction`,
-`tool.execute.after`) и подписка на события компакции:
-
-- `session.context` — оценивает промпт (system + messages) и при переходе на
-  новый уровень бюджета добавляет одно короткое напоминание. Напоминание
-  инжектится **один раз при переходе уровня**, а не в каждом запросе; внутри
-  уровня текст стабилен, поэтому префикс-кэш не рвётся.
-- события компакции — хук `session.compaction` регистрируется **всегда**: он
-  считает попытки (`compactionAttempts`) и отдаёт tentative-напоминание ближайшему
-  запросу; напоминание не называет номер компакции и не заявляет лимит.
-  Подтверждает компакцию только `session.compaction.ended` (дедуп по `event.id`
-  или durable-позиции) и выставляет confirmed-note с номером и лимитом;
-  `session.compaction.failed` увеличивает `compactionFailures`, снимает
-  tentative-note и сохраняет confirmed-note, ещё ждущий доставки. Если поток
-  событий завершился или упал, `guard.eventLive` становится `false`,
-  `guard.compactionSource` — `"hook"`, а `guard.streamFailures` — `1`
-  (per-session `errors` остаётся `0`); хук продолжает считать попытки, но
-  подтверждённых компакций и ложного «лимит исчерпан» на этом пути нет.
-- `tool.execute.after` — для `shell`, `bash`, `webfetch` урезает вывод больше
-  `maxChars`: полный текст пишется в приватный корень на инстанс плагина
-  `os.tmpdir()/opencode-tool-output-<random>/` (POSIX: 0700 на корень и каталог
-  сессии, 0600 на файл), модель получает голову и путь. На Windows mode не
-  действует (замер: 0666), приватность там держится только на ACL каталога
-  `os.tmpdir()` и кодом не проверяется. Корень создаётся `mkdtemp` при setup,
-  поэтому заранее созданный каталог или
-  junction `opencode-tool-output` не используется; на POSIX корень обязан
-  принадлежать текущему uid и не давать доступа group/other, иначе guard
-  отключается с warning (fail-open: результат не трогается). Каталог сессии
-  (`s-<uuid>`) и файл (`c-<uuid>.txt`, запись `wx`) — случайные, их `realpath`
-  проверяется внутри корня. При выгрузке плагина корень удаляется best effort.
-  Строка с lone surrogate нормализуется один раз (U+FFFD), поэтому файл, голова и
-  счётчики описывают одну и ту же строку. Остаточный риск принят: same-user
-  атакующий всё ещё может подменить каталог
-  сессии между `realpath` и `writeFile` (в Node нет `openat`). Если `TMPDIR`
-  указывает внутрь воркспейса, файлы попадут туда. `read`, `write`, `edit`,
-  `execute` и инструменты комплекта не урезаются; kit-имя без namespace
-  (`session_stats`) отбрасывается в конфиге с warning.
-
-`maxCompactions: 0` отключает лимит компакций. `guard.toolOutputEnabled` равен
-`true` только когда приватный корень создан **и** эффективный список инструментов
-непуст; `guard.toolOutputTools` — этот список, `guard.unkeyedCalls` — вызовы
-хуков без непустого `sessionID` (отбрасываются, а не сливаются в бакет `""`).
-Пустой `tools` выключает кап с warning. Guard fail-open: ошибка хука не
-ломает запрос и не портит результат. Отключается флагами `enabled`:
-
-```jsonc
-{
-  "plugins": [
-    {
-      "package": "opencode-orchestrator-uni",
-      "options": {
-        "sessionGuard": { "enabled": true, "promptTokensSoft": 150000, "maxCompactions": 1 },
-        "toolOutputGuard": {
-          "enabled": true,
-          "maxChars": 20000,
-          "headChars": 4000,
-          "tools": ["shell", "bash", "webfetch"]
-        }
-      }
-    }
-  ]
-}
-```
-
-Метрики среза — `orch_uni_session_stats`; закрытие среза — команда `/handoff`.
-
-## Модели
-
-Определения агентов не несут `model`; модели настраиваются у записи плагина в
-`opencode.json(c)`:
-
-```jsonc
-{
-  "$schema": "https://opencode.ai/config.json",
-  "plugins": [
-    {
-      "package": "opencode-orchestrator-uni",
-      "options": {
-        // Модель по умолчанию для всех агентов комплекта.
-        "model": "deepseek/deepseek-flash",
-        // Переопределения по агентам (id -> строка или развёрнутая форма).
-        "agents": {
-          "meta": "deepseek/deepseek-reasoner",
-          "fix-runner": { "providerID": "anthropic", "model": "claude-sonnet-4-5", "variant": "high" }
-        }
-      }
-    }
-  ]
-}
-```
-
-- `model` — модель по умолчанию для всех агентов комплекта; `agents.<id>` —
-  переопределение по агенту. Оба принимают `"provider/model[#variant]"` или
-  `{ providerID, model, variant }`.
-- Без опций агенты комплекта остаются без модели — субагенты наследуют модель
-  сессии.
-- Неверные значения игнорируются с предупреждением (`[orchestrator.uni] …`).
-- Субагенты работают на своей настроенной модели; основной `orchestrator` — на
-  модели сессии, поэтому модель, заданная для `orchestrator`, — информационная
-  для клиентов (на момент OpenCode 2.0.28).
-- Запись `agents` в конфиге или локальный Markdown-файл агента со своей моделью
-  всё равно побеждает — конфигурация применяется после пакетных плагинов.
-
-## Локаль
-
-Определения агентов и процессные документы поставляются per-locale — в
-`agents/<locale>/` и `docs/<locale>/`; сейчас это `ru` и `en` (английский
-контент — перевод русских оригиналов). Комплект выбирает локаль в таком порядке:
-
-1. `options.locale` (`"ru"` или `"en"`; полные теги вроде `"ru-RU"` принимаются);
-2. автодетект: `LC_ALL` / `LC_MESSAGES` / `LANG`, затем Intl-локаль рантайма
-   (настройка ОС);
-3. дефолт: `en`.
-
-```jsonc
-{
-  "$schema": "https://opencode.ai/config.json",
-  "plugins": [
-    {
-      "package": "opencode-orchestrator-uni",
-      "options": { "locale": "ru", "model": "deepseek/deepseek-flash" }
-    }
-  ]
-}
-```
-
-Если для запрошенной локали контент не поставлен, происходит откат к дефолтной
-локали с предупреждением в логе плагина. Обе локали регистрируют одних и тех же
-агентов под одними и теми же id — переключение локали меняет только язык
-промптов, процессных документов и описания reference.
-
-## Требования
-
-- **OpenCode 2.x** с V2 plugin API (поле `plugins` в конфиге). Загрузчик плагинов
-  V1 ожидает legacy-экспорт `server()` и этот плагин не загрузит.
-
-## Установка
-
-### Через CLI OpenCode
-
-```sh
-opencode plugin add opencode-orchestrator-uni
-```
-
-### Вручную
-
-Добавьте пакет в массив `plugins` вашего глобального
-`~/.config/opencode/opencode.json(c)`:
-
-```jsonc
-{
-  "$schema": "https://opencode.ai/config.json",
-  "plugins": ["opencode-orchestrator-uni"]
-}
-```
-
-При желании зафиксируйте версию:
-
-```jsonc
-{
-  "$schema": "https://opencode.ai/config.json",
-  "plugins": ["opencode-orchestrator-uni@0.1.0"]
-}
-```
-
-Чтобы заодно настроить модели комплекта, используйте объектную форму — см.
-[Модели](#модели):
-
-```jsonc
-{
-  "$schema": "https://opencode.ai/config.json",
-  "plugins": [
-    {
-      "package": "opencode-orchestrator-uni",
-      "options": { "model": "deepseek/deepseek-flash" }
-    }
-  ]
-}
-```
-
-Перезапустите сервис OpenCode после изменения конфига:
-
-```sh
-opencode service restart
-```
-
-## Приоритет
-
-**Определения** агентов заполняются только для id, не определённых где-либо ещё:
-агент с тем же id из вашей конфигурации — запись `agents` в конфиге или
-Markdown-файл в `~/.config/opencode/agents/` (либо `.opencode/agents/`) —
-побеждает, и плагин пропускает своё определение. **Настроенная модель** (см.
-[Модели](#модели)) всё равно применяется к агентам комплекта; модель,
-определённая вашей записью агента или файлом, побеждает её, потому что
-конфигурация применяется после пакетных плагинов. То же правило «занято —
-пропускаем» действует для reference `audit-kit`.
-
-Если вы раньше устанавливали комплект копированием файлов агентов в свой
-конфиг-каталог, **удалите эти копии** после включения плагина, иначе устаревшие
-копии продолжат перекрывать определения, поставляемые плагином.
+<p align="right">(<a href="#readme-top">наверх</a>)</p>
 
 ## Разработка
 
 Сборки нет. `index.ts` — поставляемая точка входа.
 
 ```sh
-npm install          # ставит gray-matter + dev-инструменты
-npm run typecheck    # tsc --noEmit
-npm test             # bun test ./test/ (герметично: регистрация, инструменты, валидатор, снапшот, промпт↔схемы + стражи идентификаторов)
-npm run check:locales # bun tools/locale-check.ts (паритет ru↔en: агенты + документы)
-npm run verify:kit   # bun tools/kit-verify.ts (локали, тесты, линт, типы — стенд комплекта)
-npm run lint         # biome check . (линт + формат + порядок импортов; только чтение)
-npm run lint:fix     # biome check --write . (применяет безопасные фиксы)
+npm install
+npm run typecheck
+npm test
+npm run check:locales
+npm run verify:kit
+npm run lint
+npm run lint:fix
 ```
 
-Команды `check:locales` и `verify:kit` требуют git-чекаута комплекта — в npm-пакете каталог `tools/` не поставляется, поэтому в установленном пакете они недоступны (`stand: unavailable` и собственные воспроизводимые проверки).
+`npm test` сканирует только `./test/` и сейчас насчитывает **438 тестов в 11 файлах** — 437 pass и 1 skip. Голый `bun test` из корня красный по замыслу: он
+подхватывает и специально падающие фикстуры в `eval/cases/`, и черновики в
+`lab/`; используйте `npm test`.
 
-`npm test` сканирует только `./test/` — поставляемый набор (400 тестов в 10 файлах;
-до стражей идентификаторов было 72 в 5). Голый `bun test` из корня репозитория
-красный по замыслу: позиционный аргумент `bun test` — это фильтр-подстрока пути,
-поэтому голая команда подхватывает и специально падающие фикстуры в
-`eval/cases/`, и черновики в `lab/`. Используйте `npm test` [F5].
+`check:locales` и `verify:kit` требуют git-чекаута — в npm-пакете каталог
+`tools/` не поставляется (`stand: unavailable`). [Biome](https://biomejs.org)
+([`biome.json`](https://github.com/OniVe/opencode-orchestrator-uni/blob/main/biome.json)) покрывает `index.ts`, `lib/`, `test/` и
+`eval/*.ts`, пропускает `lab/` и `eval/results/`, а `eval/cases/**` и
+`eval/baselines/**` заморожены; записи baseline используют стиль
+`JSON.stringify(…, null, 2)`, поэтому переформатирование давало бы churn на
+`eval:recompute`. Выключено одно правило — `lint/style/noNonNullAssertion`.
 
-[Biome](https://biomejs.org) ([`biome.json`](./biome.json)) покрывает кодовую
-поверхность — `index.ts`, `lib/`, `test/`, `eval/*.ts` — и пропускает `lab/` и
-`eval/results/` через git-ignore файл, плюс два замороженных вида данных:
-`eval/cases/**` (фикстуры с умышленными дефектами) и `eval/baselines/**`
-(записи, генерируемые в `JSON.stringify(…, null, 2)`-стиле; переформатирование
-давало бы churn на следующем `eval:recompute`). Выключено одно правило —
-`lint/style/noNonNullAssertion`: dev-контур и тесты осознанно используют `!`
-после проверок в коде.
+Для живого сервера направьте конфиг проекта на чекаут:
+`"plugins": ["file:///C:/path/to/opencode-orchestrator-uni"]`. Локальные пути
+плагинов должны быть каталогами; OpenCode перезагружает их при изменениях.
 
-Проверка против живого сервера — направьте конфиг проекта на чекаут:
+<p align="right">(<a href="#readme-top">наверх</a>)</p>
 
-```jsonc
-{
-  "$schema": "https://opencode.ai/config.json",
-  "plugins": ["file:///C:/path/to/opencode-orchestrator-uni"]
-}
-```
+## Дорожная карта
 
-Локальные пути плагинов должны быть каталогами (или `file://`-URL каталогов);
-OpenCode следит за ними и перезагружает при изменениях.
+Текущий опубликованный релиз — **0.5.1**. До 1.0 ломающее изменение повышает
+минорную версию. Заметки о релизах — в [GitHub Releases][releases-url];
+запланированная работа и известные проблемы — в [issue tracker][issues-url].
 
-## Заметки
+<p align="right">(<a href="#readme-top">наверх</a>)</p>
 
-- Одна рантайм-зависимость: [`gray-matter`](https://www.npmjs.com/package/gray-matter)
-  для парсинга фронтматтера. OpenCode сам устанавливает зависимости пакетных
-  плагинов.
-- Id плагина: `orchestrator.uni`.
-- Поставляются только файлы из `package.json#files`: `index.ts`, `lib/`, `schemas/`,
-  `agents/`, `docs/`, `README.md`, `README.ru.md`, `LICENSE`.
+## Участие
+
+См. [`CONTRIBUTING.md`](https://github.com/OniVe/opencode-orchestrator-uni/blob/main/CONTRIBUTING.md). Сделайте форк, создайте ветку
+(`git checkout -b feature/AmazingFeature`), закоммитьте по
+[Conventional Commits](https://www.conventionalcommits.org/) (`feat:`, `fix:`,
+`docs:`; формат проверяет `commitlint`), запушьте и откройте pull request. `ru` —
+референсная локаль, `en` должен её зеркалировать. После правки агентов или
+доков запустите `npm run check:locales`; после правки README — `npm test`
+(паритет заголовков и фенсов).
+
+<p align="right">(<a href="#readme-top">наверх</a>)</p>
 
 ## Лицензия
 
-MIT
+Распространяется по лицензии MIT. См. [`LICENSE`](https://github.com/OniVe/opencode-orchestrator-uni/blob/main/LICENSE).
+
+<p align="right">(<a href="#readme-top">наверх</a>)</p>
+
+## Контакты
+
+Вопросы, баги и предложения: [GitHub Issues][issues-url].
+
+Ссылка на проект: [https://github.com/OniVe/opencode-orchestrator-uni][repo-url]
+
+<p align="right">(<a href="#readme-top">наверх</a>)</p>
+
+## Благодарности
+
+- [Best-README-Template](https://github.com/othneildrew/Best-README-Template) — структура README.
+- [Документация OpenCode V2 по плагинам](https://opencode.ai/v2/docs/build/plugins) — API плагинов.
+- [shields.io](https://shields.io) — badges.
+- [Bun](https://bun.sh), [Biome](https://biomejs.org) и
+  [semantic-release](https://semantic-release.gitbook.io/) — инструменты.
+
+<p align="right">(<a href="#readme-top">наверх</a>)</p>
+
+[npm-shield]: https://img.shields.io/npm/v/opencode-orchestrator-uni?style=for-the-badge
+[npm-url]: https://www.npmjs.com/package/opencode-orchestrator-uni
+[ci-shield]: https://img.shields.io/github/actions/workflow/status/OniVe/opencode-orchestrator-uni/ci.yml?branch=main&style=for-the-badge
+[ci-url]: https://github.com/OniVe/opencode-orchestrator-uni/actions/workflows/ci.yml
+[license-shield]: https://img.shields.io/github/license/OniVe/opencode-orchestrator-uni?style=for-the-badge
+[license-url]: https://github.com/OniVe/opencode-orchestrator-uni/blob/main/LICENSE
+[opencode-shield]: https://img.shields.io/badge/OpenCode-V2-000000?style=for-the-badge
+[opencode-url]: https://opencode.ai/v2/docs/build/plugins
+[typescript-shield]: https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white
+[typescript-url]: https://www.typescriptlang.org/
+[bun-shield]: https://img.shields.io/badge/Bun-000000?style=for-the-badge&logo=bun&logoColor=white
+[bun-url]: https://bun.sh/
+[biome-shield]: https://img.shields.io/badge/Biome-60A5FA?style=for-the-badge&logo=biome&logoColor=white
+[biome-url]: https://biomejs.org/
+[semantic-release-shield]: https://img.shields.io/badge/semantic--release-E10079?style=for-the-badge
+[semantic-release-url]: https://semantic-release.gitbook.io/
+[repo-url]: https://github.com/OniVe/opencode-orchestrator-uni
+[issues-url]: https://github.com/OniVe/opencode-orchestrator-uni/issues
+[releases-url]: https://github.com/OniVe/opencode-orchestrator-uni/releases

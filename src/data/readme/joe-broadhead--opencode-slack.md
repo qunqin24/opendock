@@ -47,6 +47,10 @@ The Slack tools are Slack's own. With Code Mode, which is on by default, agents 
 - `OpenCode`: the version, whether it is tested (2.2.3, 2.2.4 and 2.2.5), and the supported range;
 - `Next step`: exactly one, or `Nothing to do.`
 
+### Memory's events
+
+`slack_events_list` is for Memory's collector, not for answering questions: it lists the messages posted since a cursor in the channels and direct messages you enable with the `events.channels` option, as normalised events, oldest first, with the author, thread and permalink. It only reads channels with `slack_read_channel`, never the private search or a file, and never asks with the default rules. It is this plugin's side of the shared `events_list` source contract ([configuration](https://github.com/joe-broadhead/opencode-slack/blob/HEAD/docs/configuration.md#events-list)). Its errors are in the configuration guide's Errors table.
+
 ### Scripts
 
 A script or a cron job can call Slack's fourteen read tools with no model, through `opencode api`. It runs as a session and its agent, under that agent's permission rules and the session's own. The private search and the file read ask by default, so a script needs an allow rule for them. Writes and sends are never available to scripts:
@@ -56,11 +60,11 @@ opencode api post /api/rpc/slack.workspace.tools/slack_search_public \
   -d '{"input":{"sessionID":"ses_…","input":{"query":"launch date","limit":10}}}'
 ```
 
-See [Scripting](https://github.com/joe-broadhead/opencode-slack/blob/HEAD/docs/scripting.md).
+The method `events_list` runs `slack_events_list` the same way. See [Scripting](https://github.com/joe-broadhead/opencode-slack/blob/HEAD/docs/scripting.md).
 
 ## Permissions
 
-**What runs without asking:** the known read tools, such as `slack_search_public`, `slack_read_thread` and `slack_read_canvas`. [Tool classes](https://github.com/joe-broadhead/opencode-slack/blob/HEAD/docs/configuration.md#tool-classes) lists every tool.
+**What runs without asking:** the known read tools, such as `slack_search_public`, `slack_read_thread` and `slack_read_canvas`, and the plugin's own `slack_events_list`. [Tool classes](https://github.com/joe-broadhead/opencode-slack/blob/HEAD/docs/configuration.md#tool-classes) lists every tool.
 
 **What asks first:**
 
@@ -101,7 +105,7 @@ Do not put this block in the top-level `permissions`. OpenCode adds top-level ru
 
 ## Configure
 
-Everything works without options. Options set the client ID for everyone (instead of `/connect`), the callback URL and its local port, the scopes, a client secret for apps without PKCE, and the host check. To pass them, use the object form of the `plugins` entry:
+Everything works without options. Options set the client ID for everyone (instead of `/connect`), the callback URL and its local port, the scopes, a client secret for apps without PKCE, the host check, and the channels `slack_events_list` reads for Memory (`"events": { "channels": ["C0123ABCD45"] }`). To pass them, use the object form of the `plugins` entry:
 
 ```jsonc
 {

@@ -1,31 +1,33 @@
 # opencode-fold-diffs
 
-> [!NOTE]
-> **Unofficial OpenCode V2 port of [Tanner Bruhn](https://github.com/tannerbruhn)'s [`opencode-fold-diffs`](https://github.com/tannerbruhn/opencode-fold-diffs) (npm: `opencode-fold-diffs`) — the OpenCode V1 plugin.** This fork — [`cardin/opencode-fold-diffs`](https://github.com/cardin/opencode-fold-diffs), published as [`@cardinal4/opencode-fold-diffs`](https://www.npmjs.com/package/@cardinal4/opencode-fold-diffs) — targets **OpenCode V2** (`@opencode/cli` 2.x, API-checked against `opencode 2.2.3` and OpenTUI 0.8.x). Install this fork on V2, upstream on V1. Tanner has not reviewed or endorsed it; report bugs here, not upstream.
+> Unofficial OpenCode V2 fork of [opencode-fold-diffs](https://github.com/tannerbruhn/opencode-fold-diffs) by Tanner Bruhn. Install this version on OpenCode V2; use the upstream package on V1.
 
-**Every `write`, `edit` and `apply_patch` dumps the whole file or the whole diff into your transcript, and stays there.** This plugin folds those blocks down to their header line — `# Wrote 40 lines · click to expand  src/app.ts` — and opens them again on click, or with a fold/unfold-all key if you configure one.
+OpenCode already collapses read/search groups and trims bash output, but it leaves `write`, `edit` and `apply_patch` blocks fully expanded — the blocks that fill the transcript and makes it hard to navigate.
 
-V2 already collapses the tools it considers noisy: `read` / `glob` / `grep` fold into a one-line exploration group (`Explored: 3 reads, 2 searches`), and a bash **command** trims to two lines with its **output** to ten, all click-to-expand. The three tools that actually fill the scrollback — `write`, `edit`, `apply_patch` — are the ones it leaves alone. Upstream has been asked three times — [#9089](https://github.com/anomalyco/opencode/issues/9089) (minimal diff display), [#14511](https://github.com/anomalyco/opencode/issues/14511) (a toggle keybind, like Claude Code's `ctrl+o`), [#19074](https://github.com/anomalyco/opencode/issues/19074) (collapse tool output) — and all three were closed without a setting. This is that setting, from outside.
+This plugin folds them to one header line and opens them again on click.
 
 ## What you see
 
-Before:
+The plugin can fold four kinds of content — three file-changing tool blocks plus the optional bash command:
 
-```
-← Edit src/session/index.ts
-│  1  import { createMemo } from "solid-js"
-│  2 -  const [expanded, setExpanded] = createSignal(false)
-│  3 +  const [expanded, setExpanded] = createSignal(props.open)
-│  … 40 more lines
-```
+| OpenCode tool | Header in the transcript | What the block contains |
+|---|---|---|
+| `write` | `# Wrote 35 lines · click to expand` | The complete contents of a written file. |
+| `edit` | `← Edit +12 −3 · click to expand` | A unified diff for an existing file. |
+| `apply_patch` | `← Patched +8 −2 · click to expand` (plus `# Created`, `# Deleted` and `# Moved` for add/delete/move patches) | One or more patches, often across several files. |
+| `bash` (optional) | The `$ command` line | Only the command folds, and only with `bash: true`; the output is left to OpenCode. |
 
-After:
+The line/diff count and “click to expand” suffix are added by this plugin, so they disappear when `stats: false`. For Bash there is no stats suffix: only the command can fold, and the Bash output is never touched.
 
-```
-← Edit +12 −3 · click to expand  src/session/index.ts
-```
+Click the header to open the block. Set the optional `key` option to add a shortcut that folds or unfolds every block at once.
 
-Click the row to open it. If you set the `key` option, that binding folds or unfolds every block in the session and sets what newly arriving blocks do — same as a verbose toggle. By default there is no binding, so OpenCode's own shortcuts (including `ctrl+o`) are left alone.
+A `write` block, an `edit` block and an optional `bash` command, all folded:
+
+![Folded write, edit and bash blocks](docs/folded-write-edit-bash.png)
+
+Clicking the edit opens the whole diff while the write block above stays folded:
+
+![Expanded edit block showing the diff](docs/expanded-edit-diff.png)
 
 ## Install
 
@@ -33,18 +35,19 @@ Click the row to open it. If you set the `key` option, that binding folds or unf
 opencode plugin add @cardinal4/opencode-fold-diffs
 ```
 
-That installs the package and adds it to the global `opencode.json`. The package ships a server entry (`index.js`), a portable RPC bridge (`rpc.js`) and a TUI entry (`tui.js`); the TUI part loads automatically with the server entry, so no second configuration is needed.
-
-If the terminal connects to a **remote server**, list the package in `~/.config/opencode/cli.json` (or `$XDG_CONFIG_HOME/opencode/cli.json`) instead so the local TUI loads the TUI part. Do not list it in both files:
+Or add it manually to `~/.config/opencode/cli.json`:
 
 ```json
 {
-  "$schema": "https://opencode.ai/v2/cli.json",
   "plugins": ["@cardinal4/opencode-fold-diffs"]
 }
 ```
 
-Options can go on the plugin entry in either file:
+Use one or the other, then restart OpenCode.
+
+## Options
+
+Put options on the same plugin entry that lists the package:
 
 ```json
 {
@@ -61,87 +64,36 @@ Options can go on the plugin entry in either file:
 }
 ```
 
-OpenCode 2.2.3 gives an `opencode.json` server plugin its options but drops them from the TUI entry it derives from the same listing. The server part therefore publishes its options over portable RPC, and the TUI asks for them at startup. If that bridge is unavailable (an older host, or a remote server that never registered it), `cli.json` remains the only source the TUI can read; **Fold diffs: diagnose** reports the effective option object either way. When both files set a key, `cli.json` wins.
-
-Restart OpenCode afterwards; plugins load at startup.
-
-### From a local checkout
-
-Clone this repository and point the plugin entry at the checkout. The package ships a server entry (`index.js`) and a TUI entry (`tui.js`); OpenCode discovers a plugin directory by its server entry and loads the `tui` entry beside it, so the plugin shows up by id instead of as an anonymous entry.
-
-```json
-{
-  "plugins": ["/home/me/projects_l/opencode-fold-diffs"]
-}
-```
-
-## Options
-
-```json
-"plugins": [{ "package": "@cardinal4/opencode-fold-diffs", "options": { "lines": 3, "min_lines": 10, "key": "ctrl+f" } }]
-```
-
 | Option | Default | Meaning |
 |---|---|---|
-| `lines` | `0` | Lines of the body left showing when folded. `0` is the header only, and also tightens the block's padding so it occupies one row. Any positive number leaves a peek at the top. |
-| `min_lines` | `6` | Blocks with fewer changed lines than this are left alone — a two-line edit is already its own summary. |
-| `stats` | `true` | Append `+12 −3 · click to expand` to the header. |
-| `folded` | `true` | Whether blocks start folded. `false` gives you only the toggle. |
-| `key` | `""` | Optional binding for fold/unfold-all. Empty by default so no OpenCode shortcut is overridden; set e.g. `"ctrl+shift+d"` to opt in. |
-| `bash` | `false` | Fold long bash commands too. Off by default on V2 because the host already trims them to two lines. |
-| `bash_lines` | `1` | Rows of the command left showing when folded. `1` keeps the line that says what the thing was. |
-| `dump` | `""` | Where **Fold diffs: diagnose** writes its tree dump. `""` means `/tmp/opencode-fold-diffs-tree.txt`; `false` disables the dump. |
+| `lines` | `0` | Lines of the body left visible when folded. `0` is the header only; a positive number leaves a peek. |
+| `min_lines` | `6` | Leave blocks with fewer changed lines expanded. Set `0` to fold every file block. |
+| `stats` | `true` | Append the line or diff count and “click to expand” to the header. |
+| `folded` | `true` | Whether new blocks start folded. `false` gives you only the toggle. |
+| `key` | `""` | Optional shortcut for fold/unfold-all. Empty by default so no OpenCode shortcut is overridden. |
+| `bash` | `false` | Also fold long bash commands. Off by default because OpenCode already trims them. |
+| `bash_lines` | `1` | Rows of the command left visible when bash folding is on. Does not affect the output. |
 
-> `ctrl+o` belongs to OpenCode's **Open recent sessions and projects** (`open.menu`), so this plugin does not bind it. Choose an unused key for the `key` option.
+## What stays untouched
 
-## What it does not touch
+- **Small changes.** Blocks below `min_lines` stay expanded on purpose; a two-line edit is already its own summary.
+- **Permission dialogs and diagnostics.** The diff you approve renders in full, and errors from an edit stay visible while the block is folded.
+- **Other tools.** `read`, `glob`, `grep`, todos, questions and the generic fallback keep OpenCode's behaviour.
+- **Bash output.** Only the command can fold when `bash` is enabled; the output and its “earlier lines” summary are untouched.
 
-- **Permission dialogs.** The diff you approve renders in full, always. The plugin only ever walks inside the transcript scrollbox, and the permission preview is not in it.
-- **Diagnostics and errors.** Only the children carrying a diff or a file body get folded, so an edit that introduced a type error still says so with the block closed.
-- **Bash output, and the click that expands it.** Only the *command* is ever folded, and only when `bash` is enabled; the output keeps the host's ten-line collapse. The block's own click handler belongs to the host, so the plugin attaches to the command text instead and calls `stopPropagation()`: clicking the command folds the command, clicking anywhere else in the block does exactly what it did before.
-- **Todos, questions, and the generic fallback.** They keep the host's own collapse behaviour.
+## Troubleshooting
 
-## How it works, for anyone extending it
+After restarting, `/plugins` should list `opencode-fold-diffs`, and `Ctrl+P` should show **Fold / unfold file diffs**.
 
-The V2 TUI plugin API (`@opencode/plugin/tui`) has no slot for message parts, so a plugin cannot render a tool block itself. It has to reach the renderables the host already made:
+If blocks do not fold, run **Fold diffs: diagnose** from the command palette. The toast reports whether the transcript and blocks were found; include that output in a bug report. Its optional dump can contain prompts or tool output — redact it before sharing, or set `dump: false` to skip it.
 
-1. **Find the transcript.** Candidates are every scrollbox with a bottom sticky start, excluding the shell output viewer, diff help and execute detail panels by id. They are scored, not taken first: a `session-part:` descendant is the strongest evidence, a `msg_` id is next, and scroll height breaks ties. A scrolled-up transcript that reports `stickyScroll=false` is still accepted when it has the bottom anchor plus session-part evidence. The cached transcript is dropped when its route/session changes or when it is detached from the renderer root.
-2. **Find the blocks.** A V2 `BlockTool` renders its header first as a row box whose first two children are the label text (`# Wrote`, `← Edit`, `← Patched`, `# Created`, `# Deleted`) and the path value. File blocks are matched on that label; a bash block carries no header, so it is found by shape — the command row's first text node is the `$ `-prefixed command. A running command (a spinner box before any text) is skipped and picked up by a later sweep; output that happens to begin with `$ ` is never mistaken for the command.
-3. **Fold.** Set `visible = false` on the children carrying the bulk. That sets Yoga `display: none`, so the body leaves layout instead of leaving a hole. A zero `max-height` alone is not enough — the box collapses to zero rows but OpenTUI still paints the diff. A positive `lines` value keeps the first body visible and uses `maxHeight` for it instead. The block's own chrome (`gap`, `paddingTop`, `paddingBottom`) is tightened to zero so a folded block occupies one row, and the values read from OpenTUI 0.8's `getGap`/`getPadding` getters are restored exactly when it unfolds. `maxHeight` is captured the same way; bash commands fall back to the host's two-row clamp when the getter is unavailable.
-4. **Toggle.** Assign `onMouseUp` on the block. The solid adapter sets that as a plain property, so a plugin can set it the same way — it replaces `BlockTool`'s own handler, which is why the copy-on-select guard is reimplemented here. For a bash block the host's handler is the output toggle and must be preserved, so the handler goes on the command text with `stopPropagation()` instead. The handler reference is stored and cleared on cleanup, and a `disposed` guard makes a late click a no-op.
-5. **Restate the header.** The stats suffix is appended to the label text node, not the path. If solid will not let go of that node the plugin stops trying; a block whose suffix was already applied still has it stripped on cleanup/unfold even after that global flag is off. Known blocks are re-summarised on each sweep, so a block whose streamed content grew gets fresh stats instead of keeping its first count.
+## Development
 
-Renderable classes are matched by duck-typing (`typeof node.diff === "string"` for a diff, a string `content` **plus** `getLineSources` for a written file) rather than `instanceof`, because the opentui classes are minified in the shipped binary and their names are not stable. The second half matters in OpenTUI 0.8: `MarkdownRenderable` also has a string `content`, and matching on content alone mistook markdown for a written file. `filetype` is deliberately not required: it was dropped in 2.0.16 and restored in 2.0.27, and keying off it silently stopped write blocks from folding.
+```sh
+node --test
+```
 
-Blocks are re-scanned on V2's `session.tool.called`, `session.tool.progress`, `session.tool.success` and `session.tool.failed`, plus `session.step.ended` and `session.execution.succeeded` (`session.shell.ended` joins them when `bash` folding is on). A 5 s fallback sweep catches a session opened from history, whose parts land before any event this plugin sees. The fallback is much slower than the old 2 s timer because it exists only for that initial batch; live updates are event-driven. `session.message.content.updated` is not in the public TUI event union used by the plugin API, so it is not subscribed to.
-
-## Status
-
-Written against **opencode v2.0.24**, re-checked against **v2.0.27** and **v2.2.0**, and API-checked against **v2.2.3** / OpenTUI 0.8.x; the `session.*` events it listens to exist from v2.0.10 on, which is the `engines.opencode` floor (`>=2.0.10`). The tree-walking, block matching, fold/unfold and toggle logic run green against a mock renderer tree shaped like V2's (`node --test`), and the fold was checked against a real transcript: `visible = false` (Yoga `display: none`) is what actually hides a body, not `maxHeight`.
-
-To confirm it loaded, restart (`opencode service restart`) and check `/plugins` lists `opencode-fold-diffs` and `Ctrl+P` → **Fold / unfold file diffs** is in the palette. If nothing folds, run **Fold diffs: diagnose** — the toast reports what the plugin can see:
-
-| Result | Meaning |
-|---|---|
-| `transcript: not found` | No session view is open, so there is nothing to fold. |
-| `transcript: yes · blocks: 0` | The transcript was found but no file blocks matched — the host render tree differs from what this plugin expects. |
-| `transcript: yes · blocks: N · folded: N` | Detection and folding ran; if the blocks still look expanded, the fold did not take on the renderables. |
-| `stats: off` | Folding works but the header could not be restated (Solid owns the label node). |
-| `options: {...}` | The effective merged options. Compare this with the entry in `opencode.json`/`cli.json`; if it is empty and you configured options in a remote `cli.json`, the local TUI never saw them. |
-
-The diagnose dump includes up to 80 characters of text from each renderable, so it can contain prompts or tool output. Redact it before sharing; set `dump: false` to skip writing it.
-
-Edits with fewer than `min_lines` changed lines (default 6) are left expanded on purpose — a one-line change is already its own summary. Set `min_lines: 0` to fold every file block.
-
-## V2 port notes
-
-The port follows V2's new plugin API and render tree, so the V1 code could not be reused:
-
-- Entrypoint is a `{ id, setup(context) }` definition; `setup` returns the cleanup function instead of `api.lifecycle.onDispose`.
-- `api.renderer` → `context.renderer`, `api.route.current.name` → `context.ui.router.current().type`, `api.event.on` → `context.data.on`, `api.ui.toast` → `context.ui.toast.show`, `api.keymap.registerLayer` → `context.keymap.layer` (called straight from `setup` on 2.0.23+, from an `app`-slot component before that).
-- Event names are V2's `session.*` events; `message.updated` / `message.part.updated` are legacy schemas that never fire.
-- Tool headers are a label node plus a path node, so detection and the stats suffix target the label.
-- `bash` defaults to `false` because V2 trims long commands itself, and config moves from `tui.json` to `opencode.json` (bridged to the TUI by `rpc.js`) or `cli.json` for a remote TUI (which the TUI reads directly and which wins on conflicts).
+To try a checkout, point a local `opencode.json` plugin entry at this directory and restart OpenCode.
 
 ## License
 

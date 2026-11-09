@@ -22,8 +22,8 @@ Run `opencode reload`, or restart OpenCode. Then run `/linear-status`: it shows 
 (see [Sign in](#sign-in)).
 
 The plugin registers Linear's MCP server under the name `linear`, adds default permission rules, the `/linear-status`
-command, the `/linear` status view, two skills and one tool of its own, `linear_issues`. Every other tool is Linear's,
-and OpenCode handles the connection, the sign-in and the stored credentials.
+command, the `/linear` status view, two skills and two tools of its own, `linear_issues` and `linear_events_list`.
+Every other tool is Linear's, and OpenCode handles the connection, the sign-in and the stored credentials.
 
 `linear_issues` answers the issues assigned to you as a table: identifier, title, state, priority and link, in every
 state, most recently updated first, 25 rows by default and at most 100. It is a quick look, not a count: the model
@@ -32,6 +32,13 @@ Linear's own `list_issues`, under that tool's sign-in and permission rules, and 
 a direct tool, offered to the model even when Code Mode holds Linear's other tools, because
 [Jelly](https://github.com/joe-broadhead/opencode-linear/blob/HEAD/docs/jelly.md) draws a tool's result as a table only
 for a direct call, not for one made inside Code Mode.
+
+`linear_events_list` is for Memory's collector, not for answering questions: it lists what changed in Linear for you
+since a cursor, as normalised events, oldest first: each change to an issue assigned to you, and each notification in
+your Linear inbox, with the issue's identifier and link. It only reads, through Linear's `get_workspace`, `get_user`,
+`list_issues` and `get_notifications`, and never asks with the default rules. It is this plugin's side of the shared
+`events_list` source contract
+([configuration](https://github.com/joe-broadhead/opencode-linear/blob/HEAD/docs/configuration.md#events-list)).
 
 **Update** with `opencode plugin update @joe-broadhead/opencode-linear`, then run `opencode reload`. An entry pinned
 to a version, such as `@joe-broadhead/opencode-linear@0.0.1`, does not update: remove the `@version` from its
@@ -87,7 +94,8 @@ opencode api post /api/rpc/linear.workspace.tools/get_issue \
   -d '{"input":{"sessionID":"ses_…","input":{"id":"ENG-123"}}}'
 ```
 
-See [Scripting](https://github.com/joe-broadhead/opencode-linear/blob/HEAD/docs/scripting.md).
+The method `events_list` runs `linear_events_list` the same way. See
+[Scripting](https://github.com/joe-broadhead/opencode-linear/blob/HEAD/docs/scripting.md).
 
 ## Permissions
 
@@ -100,6 +108,8 @@ The plugin adds these rules to every agent, directly after the agent's base rule
    run without a prompt.
 3. `{ "action": "linear_issues", "resource": "*", "effect": "allow" }`: the plugin's own `linear_issues`, which only
    reads, runs without a prompt too. Its call to `list_issues` still follows that tool's rules.
+4. `{ "action": "linear_events_list", "resource": "*", "effect": "allow" }`: the plugin's own `linear_events_list`,
+   which only reads, for Memory's collector. Its calls to Linear's reads still follow those tools' rules.
 
 So reads run, and every change asks before it runs. Everything that comes later than these rules still wins: an
 agent's own stricter rules (Plan cannot edit, Explore cannot use Linear), your `permissions` in `opencode.json`, and

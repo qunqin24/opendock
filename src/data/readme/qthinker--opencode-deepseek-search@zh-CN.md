@@ -104,7 +104,7 @@ opencode service restart   # User 变量只进新进程
 |---|---|
 | `websearch`（内置） | 名字/入参不变；`deepseek` 模式下由本插件供结果 |
 | `deepseek_fetch` | 抓单页 → 干净 Markdown，超长按 `fetchMaxChars` 截断并提示 |
-| `deepseek_usage` | 本地搜索/抓取次数与费用估算，`reset: true` 清零 |
+| `deepseek_usage` | 本地搜索/抓取次数与费用估算，`reset: true` 整表清零，`resetPeriod` 按周期清零 |
 | `deepseek_mode` | 查询/切换搜索后端，切换结果持久化 |
 
 `websearch` 的改接**保留内置的权限确认与 `output` 结构**，审批提示与渲染都不变；结果只带 `summary`
@@ -180,16 +180,18 @@ deepseek_mode 开关（storage: mode/v1）  >  options.mode  >  内置默认
 
 | 面 | 你会看到 | 怎么切 |
 |---|---|---|
-| TUI | 会话侧边栏末尾追加一块 DeepSeek：状态行 + 今日 / 本月 / 累计（`Search` · `Fetch` · `¥` 估算）+ 账户余额；侧边栏变窄时先退化到缩写、再逐个减列，不会折行 | 点标题右端的动作，或用 `/deepseek` 斜杠命令打开菜单 |
+| TUI | 会话侧边栏末尾追加一块 DeepSeek：状态行 + 今日 / 本月 / 累计（`Search` · `Fetch` · `¥` 估算）+ 账户余额；侧边栏变窄时先退化到缩写、再逐个减列，不会折行 | 点标题右端的动作（切换，或「重置」清零统计），或用 `/deepseek-search` 斜杠命令打开菜单 |
 | 桌面 | 会话侧区域的 **DeepSeek** 页签，出现在侧区域的 *New tab* 列表与 `+` 菜单里，也可用命令打开面板（中文界面 `DeepSeek: 打开统计面板`，默认英文界面 `DeepSeek: Open usage panel`） | 面板上的按钮，另有刷新按钮 |
 
 - 两个面读的是同一份账本和同一个持久化开关（与 `deepseek_usage` / `deepseek_mode` 完全一致）：数据只有服务端
   一份真相，经插件自己的 RPC 取用，TUI 与桌面的数字不会分叉。
+- **按周期清零统计**：两个面都能清本地台账的 今日 / 本月 / 累计 —— TUI 用卡片上切换旁的「重置」动作或 `/deepseek-search` 菜单的「统计清零」项（选择即确认），桌面用面板上的「统计清零」按钮（原生破坏性确认框，焦点默认在取消）。背后的
+  `resetUsage` RPC 同时支撑 `deepseek_usage` 的 `resetPeriod` 参数。
 - **「停用」= 把内置 `websearch` 交还给你配置的后端**（等价于 `deepseek_mode({"mode": "native"})`），不是卸载：
   `deepseek_fetch`、`deepseek_usage`、`deepseek_mode` 仍然注册，状态同样落在 `mode/v1`。
-- 动作行只说点击真的会做什么。没有配置 API Key 时没有可做的动作，就显示该怎么修（`DEEPSEEK_API_KEY`）；
-  内置工具没能打上补丁时显示「未接管」，而不是假装已启用。
-- 每次记账与每次切换后都会发 `changed` 事件触发刷新，两个面另有 10 秒重读作为兜底。
+- 动作行只说点击真的会做什么。没有配置 API Key 时没有可做的接管动作，就显示该怎么修（`DEEPSEEK_API_KEY`；
+  桌面面板仍保留无需 Key 的「统计清零」）；内置工具没能打上补丁时显示「未接管」，而不是假装已启用。
+- 每次记账、每次切换与每次清零后都会发 `changed` 事件触发刷新，两个面另有 10 秒重读作为兜底。
 - **正文末行是你的账户余额**（服务端用同一个 Key 调官方查询余额接口 `GET /user/balance`，来源：
   <https://api-docs.deepseek.com/zh-cn/api/get-user-balance>；缓存 60 秒、失败保留上次值）：
   三行用量读作小票，账户真相落在下面。仅在接管启用或原生模式这两态显示——只有这两态卡片真正指向账户。
@@ -215,7 +217,7 @@ npm install && npm run build:gui
 | `empty` | HTTP 200 但结果/正文为空 | 不计费 |
 | `failed` | 网络错误，或重试一次后仍非 200 | 不计费 |
 
-费用以整数微元累加，不会累积误差；`count` 不影响单价。`deepseek_usage({ "reset": true })` 报完后清零。
+费用以整数微元累加，不会累积误差；`count` 不影响单价。`deepseek_usage({ "reset": true })` 报完后整表清零；`deepseek_usage({ "resetPeriod": "today" | "month" | "total" })` 只清对应周期，优先于 `reset`。
 
 - 存在 `ctx.storage` 的 `usage/v1` 键下，保留最近 60 天，天键为本地时区。
 - 存储是**全局**的（整台机器的 OpenCode），**跨重启保留**。

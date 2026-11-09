@@ -337,6 +337,22 @@ and waiver counts, final gate state). Read-only; never writes or blocks.
     opencode-turnstile log <sessionID>     # a specific session
     opencode-turnstile log --json          # machine-readable output
 
+### `opencode-turnstile prov`
+
+Prints the decision-provenance ledger: the human decision events turnstile
+observed — `prov:stated` (every admitted parent prompt, verbatim after
+mechanical secret redaction) and `prov:denied` (human permission denials) —
+interleaved in journal order. An observe-only decision ledger; capture is
+dumb, derivation is offline. Read-only; never writes or blocks.
+
+    opencode-turnstile prov                 # every session, interleaved
+    opencode-turnstile prov <sessionID>     # a specific session
+    opencode-turnstile prov --json          # machine-readable output
+    opencode-turnstile prov --tail 100      # last 100 events
+
+Capture is gated on `decisionLedger.enabled` (default `true`; `false` disables
+all `prov:*` journaling).
+
 ## Markers
 
 Subagents must emit these as the first line of their output. These examples
@@ -424,6 +440,7 @@ no edits. The key knobs most people touch:
 | `maxReviewerRounds` / others | 2 / 3 / 3 / 4 / 16 | per-leg and total dispatch caps per task |
 | `agents.*` | stage names | rename recognition when you bring your own agents |
 | `plansDir` | `.opencode/plans` | where the decomposition scan looks |
+| `decisionLedger.enabled` | `true` | observe-only decision ledger (`opencode-turnstile prov`): `false` disables all `prov:*` journaling |
 
 Invalid keys are ignored, journaled, and summarized once into the session
 context; a malformed config file never breaks the host. The full table —

@@ -5,12 +5,14 @@ A session-scoped `/goal` workflow for [OpenCode](https://opencode.ai/): set a go
 ## Install
 
 ```sh
-npx -y github:sblattj/opencode-goal-pro-max-complete-plugin install
+npx -y opencode-goal-pro-max-complete-plugin install
 ```
 
 - Writes the server entry into `opencode.json`: the `/goal` command, the agent tools, the hooks, the sidebar payload.
 - Writes the TUI entry into `tui.json`, pointed at a local copy of the package, so the sidebar panel loads and not just the status line.
 - Installs the shipped skill (below) into your global OpenCode skill directory. Restart OpenCode when it finishes.
+
+From GitHub instead of npm: `npx -y github:sblattj/opencode-goal-pro-max-complete-plugin install`.
 
 No `npx`? `sh install.sh`, or `curl -fsSL https://raw.githubusercontent.com/sblattj/opencode-goal-pro-max-complete-plugin/main/install.sh | sh`; from a clone, `node scripts/cli.mjs install`. Manual two-file install, upgrade and uninstall: [docs/install.md](docs/install.md).
 

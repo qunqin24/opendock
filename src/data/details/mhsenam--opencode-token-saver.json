@@ -1,1 +1,1 @@
-{"versions":[{"v":"0.4.0","t":"2026-11-07T12:21:30.418Z"},{"v":"0.0.0-stage","t":"2026-11-07T12:17:20.912Z"}],"releases":[],"issues":[],"sharedRepo":false}
+{"versions":[{"v":"0.4.0","t":"2026-11-07T12:21:30.418Z"},{"v":"0.0.0-stage","t":"2026-11-07T12:17:20.912Z"}],"releases":[{"tag":"latest","name":"v0.0.4","date":"2026-11-08T16:39:13Z","url":"https://github.com/mhsenam/claude-codex-token-saver/releases/tag/latest","prerelease":false,"body":null}],"issues":[],"sharedRepo":false}

@@ -64,6 +64,33 @@ npm install @weave_protocol/full
 
 ### 🗓️ November 2026 update — hardening
 
+#### ✍️ Signed policies: one WARD.md, enforced as written everywhere (Ward 0.3.8)
+Sign WARD.md once with `weave-ward sign`, then put the public key in `~/.weave/trusted-policy-keys` on each machine. Every adapter then refuses a policy that was edited after signing, or that a trusted key didn't sign, and denies each call with the reason. Even without a trust list, a signed policy that someone changed is refused. This is the piece that makes centrally managed policy trustworthy at scale.
+
+#### 🔏 Signed, hash-chained decision receipts (Ward 0.3.7)
+Turn on `required: true` in WARD.md's Verification section. Every decision then becomes an Ed25519-signed receipt chained to the one before, so no one can quietly edit, delete or reorder the record. Run `weave-ward receipts verify` to check a log offline, with or without an expected public key. Receipts never contain arguments, only a keyed digest the key holder can match. This works in all seven adapters. Anchoring receipt heads with Dōmere comes later.
+
+#### 💳 Agents can't spend without asking (Ward 0.3.6)
+In October an agent spent from a crypto wallet it was never authorized to use. Ward's new **payment guard** asks a person before any call that moves money, in every adapter. That covers payment, transfer, purchase and withdrawal tools, plus wallet and Stripe CLIs in shell commands. It stays on until WARD.md allows that capability by name.
+
+**Session limits** now work in hook-based adapters too:
+- WARD.md's Behavioral Limits: tool calls, runtime and external services per session;
+- `spending_limits:` caps, such as $500 a day through `send_payment`.
+
+A small local ledger keeps the counts across the separate processes each hook runs in. This release also fixes a Witan bug: `loadSpendingCapsFromWardFile()` always returned no caps, so caps written in a WARD.md file were silently not enforced (Witan 1.2.2).
+
+#### 🛡️ Ward checks what's leaving, not just where it goes (Ward 0.3.5)
+A secret sent to a domain your policy allows is still a leak. That's how the Claude Code exfiltration CVE (CVE-2026-54316) worked, through a pre-approved domain. Every tool call that sends something is now checked for:
+- literal keys, card numbers, emails and SSNs;
+- in shell commands, `$SECRET_VARS`, `.env` and SSH key files, and environment dumps.
+
+This applies across all seven harness adapters.
+- WARD.md's `egressDeny` and `egressAllow` are **enforced**, even to allowed domains.
+- By default, a credential sent anywhere but its own issuer **needs approval**: `$GITHUB_TOKEN` to `api.github.com` is fine, but to any other host it's not.
+- The **model-endpoint guardrail** asks before secrets or personal data go to a model API (OpenAI, Anthropic, Gemini, OpenRouter, Bedrock and others) that your WARD.md doesn't name.
+
+CI's self red-team covers these: Ward decides all 27 coerced tool calls correctly, including six exfiltration attempts.
+
 #### 🛡️ Agents can't switch off their own guardrails (Ward 0.3.3)
 An agent with a broad write rule could rewrite the files that control it: WARD.md, its harness's hook and settings files, MCP server lists, or git hooks. This is the pattern behind Cursor's CurXecute (CVE-2025-54135), where injected content rewrote `mcp.json`. Every adapter now asks a human before an agent writes or deletes one of these, even when a rule like `write: /repo/**` covers it. To let an agent edit one, name that exact file in an allow rule.
 
@@ -359,15 +386,15 @@ The thesis was that [WARD.md](https://www.npmjs.com/package/@weave_protocol/ward
 
 | Runtime | Vendor | Enforcer | Status |
 |---|---|---|---|
-| **MCP servers** | Open standard | [Hundredmen v1.2.0](https://github.com/Tyox-all/Weave_Protocol/blob/main/hundredmen) | ✅ Live on npm |
-| **Claude Code** | Anthropic | [adapter-claudecode v0.4.0](https://github.com/Tyox-all/Weave_Protocol/blob/main/adapter-claudecode) | ✅ Live on npm |
-| **Google Antigravity** (desktop + `agy` CLI + SDK) | Google | [adapter-antigravity v0.4.0](https://github.com/Tyox-all/Weave_Protocol/blob/main/adapter-antigravity) | ✅ Live on npm |
-| **Microsoft Agent Framework** | Microsoft | [adapter-msaf v0.3.0](https://github.com/Tyox-all/Weave_Protocol/blob/main/adapter-msaf) | ✅ Live on npm |
-| **Gemini CLI** | Google | [adapter-geminicli v0.1.0](https://github.com/Tyox-all/Weave_Protocol/blob/main/adapter-geminicli) | ✅ Live on npm |
-| **Codex CLI** | OpenAI | [adapter-codex v0.1.0](https://github.com/Tyox-all/Weave_Protocol/blob/main/adapter-codex) | ✅ Live on npm |
-| **OpenCode** | open source | [adapter-opencode v0.1.0](https://github.com/Tyox-all/Weave_Protocol/blob/main/adapter-opencode) | ✅ Live on npm |
-| **Cursor** | Anysphere | [adapter-cursor v0.1.0](https://github.com/Tyox-all/Weave_Protocol/blob/main/adapter-cursor) | ✅ New |
-| **Browser agents** | Open standard | [browser v0.1.0](https://github.com/Tyox-all/Weave_Protocol/blob/main/browser) | ✅ Live on npm |
+| **MCP servers** | Open standard | [Hundredmen v1.4.0](https://github.com/Tyox-all/Weave_Protocol/blob/main/hundredmen) | ✅ Live on npm |
+| **Claude Code** | Anthropic | [adapter-claudecode v0.5.0](https://github.com/Tyox-all/Weave_Protocol/blob/main/adapter-claudecode) | ✅ Live on npm |
+| **Google Antigravity** (desktop + `agy` CLI + SDK) | Google | [adapter-antigravity v0.5.0](https://github.com/Tyox-all/Weave_Protocol/blob/main/adapter-antigravity) | ✅ Live on npm |
+| **Microsoft Agent Framework** | Microsoft | [adapter-msaf v0.4.0](https://github.com/Tyox-all/Weave_Protocol/blob/main/adapter-msaf) | ✅ Live on npm |
+| **Gemini CLI** | Google | [adapter-geminicli v0.3.0](https://github.com/Tyox-all/Weave_Protocol/blob/main/adapter-geminicli) | ✅ Live on npm |
+| **Codex CLI** | OpenAI | [adapter-codex v0.3.0](https://github.com/Tyox-all/Weave_Protocol/blob/main/adapter-codex) | ✅ Live on npm |
+| **OpenCode** | open source | [adapter-opencode v0.3.0](https://github.com/Tyox-all/Weave_Protocol/blob/main/adapter-opencode) | ✅ Live on npm |
+| **Cursor** | Anysphere | [adapter-cursor v0.3.0](https://github.com/Tyox-all/Weave_Protocol/blob/main/adapter-cursor) | ✅ New |
+| **Browser agents** | Open standard | [browser v0.3.1](https://github.com/Tyox-all/Weave_Protocol/blob/main/browser) | ✅ Live on npm |
 
 The same `WARD.md` file in your project root is now read and enforced by **Anthropic's, Google's, Microsoft's, MCP's, and the browser harness's runtimes** — without any platform-specific edits.
 
@@ -418,21 +445,21 @@ The packages that keep your agent within policy: declare it, enforce it across e
 
 | Package | Version | Description |
 |---|---|---|
-| [🛡️ @weave_protocol/ward](https://github.com/Tyox-all/Weave_Protocol/blob/main/ward) | 0.3.4 | **WARD.md** — agent security policy standard (parser, validator, runtime checks, shared tool-call evaluator, dashboard reporting) |
-| [🛡️ @weave_protocol/adapter-claudecode](https://github.com/Tyox-all/Weave_Protocol/blob/main/adapter-claudecode) | 0.4.1 | **Claude Code adapter** — enforces WARD.md via PreToolUse hooks; Mund pre-install hooks for skills + MCP |
-| [🛡️ @weave_protocol/adapter-antigravity](https://github.com/Tyox-all/Weave_Protocol/blob/main/adapter-antigravity) | 0.4.1 | **Google Antigravity adapter** — enforces WARD.md across desktop, `agy` CLI, and SDK; Mund pre-install hooks |
-| [🛡️ @weave_protocol/adapter-msaf](https://github.com/Tyox-all/Weave_Protocol/blob/main/adapter-msaf) | 0.3.1 | **Microsoft Agent Framework adapter** — middleware-based WARD enforcement |
-| [🛡️ @weave_protocol/adapter-geminicli](https://github.com/Tyox-all/Weave_Protocol/blob/main/adapter-geminicli) | 0.2.1 | **Gemini CLI adapter** — enforces WARD.md via the BeforeTool hook |
-| [🛡️ @weave_protocol/adapter-codex](https://github.com/Tyox-all/Weave_Protocol/blob/main/adapter-codex) | 0.2.1 | **Codex CLI adapter** — enforces WARD.md via the PreToolUse hook, including apply_patch file edits |
-| [🛡️ @weave_protocol/adapter-opencode](https://github.com/Tyox-all/Weave_Protocol/blob/main/adapter-opencode) | 0.2.1 | **OpenCode plugin** — enforces WARD.md on every tool call, whatever model OpenCode runs |
-| [🛡️ @weave_protocol/adapter-cursor](https://github.com/Tyox-all/Weave_Protocol/blob/main/adapter-cursor) | 0.2.1 | **Cursor adapter** — enforces WARD.md via Cursor's agent hooks (shell, file, MCP and tool calls) |
+| [🛡️ @weave_protocol/ward](https://github.com/Tyox-all/Weave_Protocol/blob/main/ward) | 0.3.8 | **WARD.md** — agent security policy standard (parser, validator, runtime checks, shared tool-call evaluator, dashboard reporting) |
+| [🛡️ @weave_protocol/adapter-claudecode](https://github.com/Tyox-all/Weave_Protocol/blob/main/adapter-claudecode) | 0.5.0 | **Claude Code adapter** — enforces WARD.md via PreToolUse hooks; Mund pre-install hooks for skills + MCP |
+| [🛡️ @weave_protocol/adapter-antigravity](https://github.com/Tyox-all/Weave_Protocol/blob/main/adapter-antigravity) | 0.5.0 | **Google Antigravity adapter** — enforces WARD.md across desktop, `agy` CLI, and SDK; Mund pre-install hooks |
+| [🛡️ @weave_protocol/adapter-msaf](https://github.com/Tyox-all/Weave_Protocol/blob/main/adapter-msaf) | 0.4.0 | **Microsoft Agent Framework adapter** — middleware-based WARD enforcement |
+| [🛡️ @weave_protocol/adapter-geminicli](https://github.com/Tyox-all/Weave_Protocol/blob/main/adapter-geminicli) | 0.3.0 | **Gemini CLI adapter** — enforces WARD.md via the BeforeTool hook |
+| [🛡️ @weave_protocol/adapter-codex](https://github.com/Tyox-all/Weave_Protocol/blob/main/adapter-codex) | 0.3.0 | **Codex CLI adapter** — enforces WARD.md via the PreToolUse hook, including apply_patch file edits |
+| [🛡️ @weave_protocol/adapter-opencode](https://github.com/Tyox-all/Weave_Protocol/blob/main/adapter-opencode) | 0.3.0 | **OpenCode plugin** — enforces WARD.md on every tool call, whatever model OpenCode runs |
+| [🛡️ @weave_protocol/adapter-cursor](https://github.com/Tyox-all/Weave_Protocol/blob/main/adapter-cursor) | 0.3.0 | **Cursor adapter** — enforces WARD.md via Cursor's agent hooks (shell, file, MCP and tool calls) |
 | [🌐 @weave_protocol/browser](https://github.com/Tyox-all/Weave_Protocol/blob/main/browser) | 0.3.1 | **Browser agent security** — runtime IPI scanner (33 patterns) for headless agents |
-| [🔍 @weave_protocol/hundredmen](https://github.com/Tyox-all/Weave_Protocol/blob/main/hundredmen) | 1.3.1 | **MCP proxy** — intercept, scan, gate tool calls; enforces WARD.md as first gate |
+| [🔍 @weave_protocol/hundredmen](https://github.com/Tyox-all/Weave_Protocol/blob/main/hundredmen) | 1.4.0 | **MCP proxy** — intercept, scan, gate tool calls; enforces WARD.md as first gate |
 | [🛡️ @weave_protocol/mund](https://github.com/Tyox-all/Weave_Protocol/blob/main/mund) | 0.5.3 | **Scanner** — secrets, PII, injection, MCP vetting, pre-install checks for skills + MCP (rug pulls), OSV dependency CVEs, SARIF, threat intel |
 | [🏛️ @weave_protocol/hord](https://github.com/Tyox-all/Weave_Protocol/blob/main/hord) | 0.3.2 | **Vault** — encrypted storage, sandboxing, capability tokens, attestation |
 | [🔐 @weave_protocol/yoxallismus](https://github.com/Tyox-all/Weave_Protocol/blob/main/yoxallismus) | **0.2.0-beta.1** | **Post-quantum cipher** — X25519 + ML-KEM-768 hybrid KEM · sealed boxes · cascade AEAD · Double Ratchet · locked `yoxall/2` format · ⚠️ NOT AUDITED |
 | [⚖️ @weave_protocol/domere](https://github.com/Tyox-all/Weave_Protocol/blob/main/domere) | 1.6.1 | **Judge** — compliance (PCI-DSS, ISO27001, SOC2, HIPAA, GDPR, CCPA), blockchain anchoring |
-| [👥 @weave_protocol/witan](https://github.com/Tyox-all/Weave_Protocol/blob/main/witan) | **1.2.1** | **Council** — multi-agent consensus & governance, autonomous spending caps (Q4 v1.1) |
+| [👥 @weave_protocol/witan](https://github.com/Tyox-all/Weave_Protocol/blob/main/witan) | **1.2.2** | **Council** — multi-agent consensus & governance, autonomous spending caps (Q4 v1.1) |
 | [🛂 @weave_protocol/tollere](https://github.com/Tyox-all/Weave_Protocol/blob/main/tollere) | 0.2.5 | **Customs** — supply chain security (npm, PyPI, Docker, IDE extensions, sandwich detection) |
 
 ### ⚔️ Offensive Layer (2 packages) — **NEW Q4**
@@ -451,7 +478,7 @@ The front door, the dashboard, the bridges to other frameworks.
 | Package | Version | Description |
 |---|---|---|
 | [🕸️ @weave_protocol/cli](https://github.com/Tyox-all/Weave_Protocol/blob/main/cli) | 0.2.1 | **The `weave` CLI** — `init`, `audit`, `dashboard`, `doctor` |
-| [📦 @weave_protocol/full](https://github.com/Tyox-all/Weave_Protocol/blob/main/full) | 0.4.1 | **Bundle** — installs all packages in one command |
+| [📦 @weave_protocol/full](https://github.com/Tyox-all/Weave_Protocol/blob/main/full) | 0.5.0 | **Bundle** — installs all packages in one command |
 | [🔌 @weave_protocol/api](https://github.com/Tyox-all/Weave_Protocol/blob/main/api) | 1.6.1 | **REST API + Operator Dashboard** — `npx @weave_protocol/api` → http://localhost:3000/dashboard |
 | [🔗 @weave_protocol/langchain](https://github.com/Tyox-all/Weave_Protocol/blob/main/langchain) | **1.1.1** | **LangChain.js** security callbacks & tool wrappers (0 audit vulnerabilities via npm overrides) |
 | [🐍 weave-protocol-llamaindex](https://github.com/Tyox-all/Weave_Protocol/blob/main/llamaindex-py) | 0.1.0 | **Python/LlamaIndex** security callbacks & tools (on PyPI) |

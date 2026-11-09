@@ -4,7 +4,7 @@
 直连 `https://api.deepai.org/deepai_code`，发送**真实设备指纹**领取每日 Theos，
 与官方桌面端行为一致。
 
-> 状态：v0.2.0 —— 54 个单测全绿。2026-11-06 已在真实账号上完成回归：
+> 状态：v0.2.1 —— 61 个单测全绿。2026-11-06/07 已在真实账号上完成回归：
 > 对话、流式、工具调用、图片输入均可用；额度与签到读到真实值。
 > 上游思维链在 `reasoning` 字段，magpie 已确认原生渲染（PROTOCOL.md §4）。
 
@@ -48,8 +48,12 @@ deepaicode/gpt-6-astra            # 仅 Responses 通道
 
 ## 额度与签到
 
-- 额度 = 该账号的 `/theos` + `/get_usage_summary`；
-- 签到 = 调一次 `/theos` 触发并锁定当日额度，用 `refresh_at` 变化判断"刚领到"。
+- 额度 = 该账号的 `/theos` + `/get_usage_summary`。结果带进程内缓存（成功与错误
+  均 10 分钟），面板最短 5 秒一刷也不会变成对上游的高频请求；
+- 签到 = 调一次 `/theos` 触发并锁定当日额度，用 `refresh_at` 变化判断"刚领到"；
+- 若上游回 `403 "restarted its check-in too many times today"`（它对"当天反复重启
+  签到"的防刷保护），插件 6 小时内不再请求 `/theos`，面板显示中性的"明日恢复"提示
+  而非红色报错。不是故障，聊天不受影响。
 
 每日免费 Theos 按 **(机器指纹, 账号)** 每天发一次。指纹是真实设备标识
 （SMBIOS UUID / `MachineGuid` / IOPlatformUUID / `/etc/machine-id`），哈希方式与桌面端一致。
@@ -63,7 +67,7 @@ deepaicode/gpt-6-astra            # 仅 Responses 通道
 | 选项 | 默认 | 含义 |
 |---|---|---|
 | `baseOrigin` | `https://api.deepai.org` | 上游地址 |
-| `laneVersion` | `"2"` | `X-DeepAI-Code-Theos` 车道版本；只有上游报 426 时才需要改 |
+| `laneVersion` | `"auto"` | `X-DeepAI-Code-Theos` 车道版本：自动探测 `/models`（免鉴权）取当前受理值并缓存；传 `"4"` 之类的显式值可固定 |
 | `secretDir` | `""` | 桌面端凭据目录（留空自动探测） |
 | `lang` | `zh` | 界面语言（`zh` \| `en`） |
 | `debug` | `false` | 输出详细日志——只记录字段**名**，不记录值 |
@@ -79,12 +83,25 @@ node scripts/probe.mjs --secret-dir ~/.deepai-code
 如果探针超时但 magpie 自己能连上游，说明系统设了代理而 Node 的 `fetch` 默认不读代理：
 用 `NODE_USE_ENV_PROXY=1` 重跑（Node 24+）。magpie 的 Bun 宿主也会读 `HTTPS_PROXY`。
 
+**DNS 被污染的网络（部分运营商环境）**：插件的请求从 magpie 进程里发出，
+magpie 应用内设置的「全局代理」**不覆盖插件自己的 fetch**。给 magpie 进程显式配代理
+（Bun 的 fetch 原生读取环境变量）：
+
+```bash
+HTTP_PROXY=http://127.0.0.1:7897 HTTPS_PROXY=http://127.0.0.1:7897 NO_PROXY=localhost,127.0.0.1 magpie
+```
+
+（已在 Linux ARM64 板子上实测验证：系统 DNS 对 `api.deepai.org` 返回假记录导致登录
+超时，给进程配上环境变量后登录与额度立即正常。）
+
 | 探针输出 | 最可能的原因 | 怎么办 |
 |---|---|---|
 | `403` / `email_unverified` | 邮箱未验证 | 点 DeepAI 发来的验证链接 |
 | `401` | Key 失效（重新登录会换 Key） | 桌面端重新登录，或粘贴新 Key |
 | 网页能登、API 立刻 `302`/`401` | 读到旧凭据 | 重新读取桌面端凭据文件 |
-| `426` | 车道版本不对 | 把 `laneVersion` 改成上游要求的值 |
+| `426` "This version … no longer supported" | 上游抬高了车道版本 | `laneVersion: "auto"`（0.2.1 起默认）会自动跟进；旧版插件需要升级 |
+| `400` "This request is not one DeepAI Code sends." | 旧版插件（<0.2.1）触发上游客户端校验——Node 宿主下是默认 `user-agent: node` 所致 | 升级插件到 0.2.1+ |
+| `403` "restarted its check-in too many times today" | DeepAI 的每日防刷：当天签到流程重启太多次（换指纹、反复登录等） | 不是故障，次日重置自动恢复；聊天不受影响 |
 
 **Agent 看不到思考内容** —— 已验证可用：magpie 原生渲染上游的 `reasoning`
 （PROTOCOL.md §4 #8）。

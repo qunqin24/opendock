@@ -197,21 +197,21 @@ OpenCode 1.x loads the original v1 entry point. Use the original npm package, `o
 
 ### Model Reference
 
-**The model list comes from Antigravity itself.** On OpenCode 2 the plugin asks Antigravity for its **Recommended** models after you sign in, and again every 6 hours, then registers them under the `google-antigravity` provider. New models appear without a plugin update, and retired ones disappear. Until the first discovery (before sign-in, or offline) a built-in list is used; the last discovered list is cached in `~/.config/opencode/antigravity-models.json`. Refer to a model as `google-antigravity/<model>`. On **OpenCode 1.x** the models live under `google/<model>` and come from the [configuration block](#models) below.
+**The model list comes from Antigravity itself.** On OpenCode 2 the plugin asks Antigravity for each account's **Recommended** models after you sign in, and again every 6 hours, then registers every model at least one account has under the `google-antigravity` provider. New models appear without a plugin update, and retired ones disappear. Plans differ per account, so each request goes only to accounts that have that model (see [Multi-Account Setup](#multi-account-setup)). Until the first discovery (before sign-in, or offline) a built-in list is used; the last discovered list is cached in `~/.config/opencode/antigravity-models.json`. Refer to a model as `google-antigravity/<model>`. On **OpenCode 1.x** the models live under `google/<model>` and come from the [configuration block](#models) below.
 
-Models Antigravity recommended at release (October 2026):
+Models Antigravity recommended in November 2026:
 
-| Model | Variants | Notes |
-|-------|----------|-------|
-| `antigravity-gemini-3.8-flash` | low, medium, high | Gemini 3.8 Flash, Antigravity's default model |
-| `antigravity-gemini-3.7-flash` | low, medium, high | Gemini 3.7 Flash (Antigravity: "Leaving Soon") |
-| `antigravity-gemini-3.6-flash` | low, medium, high | Gemini 3.6 Flash (Antigravity: "Leaving Soon") |
-| `antigravity-gemini-3.1-pro` | low, high | Gemini 3.1 Pro (Antigravity: "Leaving Soon") |
-| `antigravity-claude-sonnet-4-6` | — | Claude Sonnet 4.6 |
-| `antigravity-claude-opus-4-6-thinking` | low, max | Claude Opus 4.6 with extended thinking |
-| `antigravity-gpt-oss-120b-medium` | — | GPT-OSS 120B (Antigravity: removed November 2, 2026) |
+| Model | Variants | Plans | Notes |
+|-------|----------|-------|-------|
+| `antigravity-gemini-4-argon` | low, medium, high | paid Pro, Ultra | Gemini 4 Argon |
+| `antigravity-gemini-3.8-flash` | low, medium, high | all | Gemini 3.8 Flash, Antigravity's default model |
+| `antigravity-claude-opus-5.5` | low, medium, high | paid Pro, Ultra | Claude Opus 5.5 |
+| `antigravity-claude-sonnet-5.5` | low, medium, high | paid Pro, Ultra | Claude Sonnet 5.5 |
+| `antigravity-claude-opus-4-6-thinking` | low, max | free | Claude Opus 4.6 with extended thinking |
+| `antigravity-claude-sonnet-4-6` | — | free | Claude Sonnet 4.6 |
+| `antigravity-gpt-oss-120b-medium` | — | all | GPT-OSS 120B (Antigravity: removed November 18, 2026) |
 
-Antigravity notes that Claude access on free plans ends **November 2, 2026**, and that Sonnet/Opus 5.5 are available on paid Pro and Ultra plans. Whatever your accounts are offered shows up automatically.
+Antigravity notes that Claude access on free plans ends **November 18, 2026**. Whatever your accounts are offered shows up automatically.
 
 > **What the variants do:** each Gemini tier is its own upstream model (e.g. `gemini-3.8-flash-high`), and the plugin sends the one you pick. Without a variant, Antigravity's default tier (high) is used. Claude variants set the thinking budget.
 
@@ -325,6 +325,10 @@ opencode auth login                     # OpenCode 1.x
 
 Each sign-in adds one account to `~/.config/opencode/antigravity-accounts.json`, the same file 1.x uses, so accounts added under 1.x keep working.
 
+**Mixed plans (OpenCode 2).** Free and paid accounts are offered different models (see the [model table](#model-reference)). The plugin keeps each account's model list and sends a request only to accounts that have the model. Models every account has (Gemini 3.8 Flash) rotate across all of them, while Pro-only models (Claude 5.5, Gemini 4 Argon) use only your Pro accounts' quota. If no enabled account has the model, the request fails right away and says so.
+
+**Suspended accounts.** If Google answers "This service has been disabled in this account for violation of Terms of Service", the plugin disables that account, tells you which one, and retries on another. Re-enable it from `/antigravity` if an appeal succeeds.
+
 ### Accounts and limits in the TUI (OpenCode 2)
 
 The session sidebar has an **Antigravity · limits** section:
@@ -395,7 +399,7 @@ The `google-antigravity` models only appear after you sign in. If a request stil
 
 ### OpenCode 2: A Model Is Missing, or a New One Doesn't Show Up
 
-The model list follows Antigravity's **Recommended** list for your account. It is refreshed after each sign-in and every 6 hours. To see what Antigravity offers your accounts right now:
+The model list combines Antigravity's **Recommended** lists of all your accounts. It is refreshed after each sign-in and every 6 hours. A model only your paid accounts have (Claude 5.5, Gemini 4 Argon) disappears once those accounts are removed; while they are only disabled it stays listed, and using it tells you no enabled account has it. To see what Antigravity offers your accounts right now:
 
 ```bash
 node scripts/list-models.mjs              # first enabled account

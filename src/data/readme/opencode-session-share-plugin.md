@@ -20,7 +20,8 @@ Share an OpenCode v2 session through a self-hosted, read-only web page.
 - Complete user/assistant text; thinking and tool details load on demand.
 - Complete directory index and user/assistant search.
 - Message-based pagination that never splits a message.
-- 1-day default TTL, configurable on the service.
+- 1-day fixed TTL; content syncs never extend it.
+- Live activity indicator while an agent turn is still running.
 - Optional Cloudflare edge cache; the service also works without Cloudflare.
 
 ## Quick start
@@ -114,6 +115,7 @@ do not prompt again. `/unshare` does not reset that consent.
 | `endpoint` | yes | Base URL of the self-hosted service. |
 | `keyId` | yes | Device id before `:` in `SHARE_KEYS`. |
 | `key` | yes | Secret after `:` in `SHARE_KEYS`. |
+| `uploadBudget` | no | Initial `/share` upload budget in bytes (default `524288`). The full snapshot syncs immediately afterwards; raise to `1048576`–`2097152` on fast/LAN links. |
 
 ### Service environment
 
@@ -122,17 +124,34 @@ do not prompt again. `/unshare` does not reset that consent.
 | `SHARE_KEYS` | required | `device-id:secret` entries, comma-separated. |
 | `SHARE_SESSION_SALT` | required | Stable HMAC salt for session lookup. |
 | `SHARE_PUBLIC_BASE_URL` | required | Public URL used in returned share links. |
-| `SHARE_DEFAULT_TTL_DAYS` | `1` | Default lifetime of a share. |
-| `SHARE_MAX_TTL_DAYS` | `30` | Maximum allowed lifetime. |
+| `SHARE_DEFAULT_TTL_DAYS` | `1` | Fixed lifetime of a share from creation. |
+| `SHARE_MAX_TTL_DAYS` | `30` | Maximum accepted lifetime. |
+| `SHARE_TOMBSTONE_DAYS` | `7` | How long revoked share metadata is retained. |
 | `SHARE_MAX_BYTES` | `15728640` | Maximum stored snapshot size. |
-| `SHARE_VIEW_MAX_BYTES` | `131072` | First-page payload target. |
+| `SHARE_VIEW_MAX_BYTES` | `131072` | Page payload target for initial, `around`, `start`, and `before` pages. |
 | `SHARE_DB_MAX_MB` | `1024` | SQLite size limit. |
 | `CF_ZONE_ID` | empty | Optional Cloudflare cache purge. |
 | `CF_CACHE_PURGE_TOKEN` | empty | Optional Cloudflare cache purge. |
 
-Per-share TTL is not exposed in the plugin yet; the service default applies.
-Cloudflare is optional. Without it, public API responses use `no-store` and the
+Per-share TTL is not exposed in the plugin yet; the service default applies at
+creation. Later session changes never extend it. Cloudflare is optional. Without it, public API responses use `no-store` and the
 service still works.
+
+### Page-size tuning
+
+`SHARE_VIEW_MAX_BYTES` applies to every viewer page, not just the first one.
+Changing it requires a service restart; existing shares do not need to be
+uploaded again.
+
+| Scenario | Suggested value |
+|---|---|
+| Default / mobile / slow links | `131072` (128KB) |
+| Fast links or LAN | `262144`–`524288` (256–512KB) |
+| Local-only or very fast links | `1048576`+ (1MB+) |
+
+Larger pages reduce pagination and gap fills, but increase first paint time,
+viewer memory, and the number of messages loaded at once. Keep it below
+`SHARE_MAX_BYTES`.
 
 ## Upgrade
 
@@ -148,10 +167,14 @@ Then run `/reload`, or restart the OpenCode service if needed.
 `opencode plugin update` updates the installed package but does not modify
 `options` in `opencode.jsonc`. Endpoint, keyId, and key stay as configured.
 
+v0.3.2 adds revert-aware viewer positioning, live status fixes, and sparse
+pagination. It requires service API version 3; upgrade the service and plugin
+together.
+
 If you pin an exact version:
 
 ```jsonc
-"package": "opencode-session-share-plugin@0.1.4"
+"package": "opencode-session-share-plugin@0.3.2"
 ```
 
 `opencode plugin update` skips it. Change the version manually to upgrade.
@@ -164,6 +187,8 @@ terminal control characters, but it is not a full secret scanner.
 
 - Use a private service and HTTPS.
 - Use a separate `SHARE_KEYS` entry per device.
+- Sync requests use a per-share Ed25519 key; the API key is only used to
+  create or revoke shares.
 - Keep the TTL short.
 - `/unshare` revokes the server-side share, but cannot delete copies already
   saved by recipients, caches, screenshots, or logs.
@@ -181,7 +206,7 @@ terminal control characters, but it is not a full secret scanner.
 ## Compatibility
 
 - OpenCode v2 only.
-- Service API version `1`.
+- Service API version `3`.
 - TUI commands only; Desktop/Web GUI commands are not implemented yet.
 
 ## Contributing

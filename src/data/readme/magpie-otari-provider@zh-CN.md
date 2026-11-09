@@ -40,6 +40,8 @@ otari/deepseek/deepseek-v4.1-flash
 
 - 从 `GET /models` 动态读取 Chat 模型。
 - 由组织自己配置的 provider key 提供的模型，会优先显示 provider key 的名字，其次组织名，最后用 `organization Inference providers: <provider>` 兜底。
+- 把 Otari 的 routing policy 按策略名暴露成 Magpie 模型（例如 `otari/fast`）。
+- 每个请求带 `Otari-Tags`（`app=magpie,session=…,model=…`），用量可以按会话过滤。
 - 将 Otari 的每百万 Token 价格映射到 Magpie 的模型价格字段。
 - 模型列表缺少价格时，回退到 `GET /pricing/current`。
 - 读取 Dashboard 账号余额、Key 预算、刷新时间、用量和路由。
@@ -252,6 +254,23 @@ Otari 目前只通过 `supported_parameters` 暴露布尔型推理能力，不�
 
 插件把布尔值映射到 Magpie 的 `capabilities.reasoning`，不会虚构推理档位。
 
+### 路由策略即模型
+
+Otari 的 routing policy 本身就是调用方可以使用的模型名。插件通过 Dashboard
+session 读取 `GET /organizations/me/routing-policies`，按策略名暴露成
+`otari/<name>`，所以 `otari/fast` 会解析到 Otari 的 `fast` 策略。
+
+插件还会给每个请求打标签：
+
+```text
+Otari-Tags: app=magpie,session=<Magpie 会话 id>,model=<模型 id>
+```
+
+Otari 会把标签写进 usage 行，Dashboard 可以按会话过滤花费。标签值会做
+百分号编码，整段逻辑是 best-effort：打标签失败绝不影响请求。
+
+完整配置见 [两层路由](docs/two-layer-routing.md)。
+
 ## 配置
 
 ### 供应商 ID
@@ -343,6 +362,17 @@ npm run smoke
 - 托管接口请使用 HTTPS。
 
 如果 session 或密码已经泄露，请在 Otari Dashboard 退出登录、重新登录，并把新 session 填回插件。
+
+## 给 Otari 的反馈
+
+两层路由的实践挖出了两条上游问题：
+
+- [#3017](https://github.com/mozilla-ai/otari/issues/3017) —— `GET /models`
+  返回的 policy 没有 `kind`/`select`/`on_failure` 元数据，客户端分不清它是
+  策略还是真实模型。
+- [#3018](https://github.com/mozilla-ai/otari/issues/3018) —— `GET /models`
+  返回的某个模型 id 可能根本打不通（`502`），但同一个模型换成
+  `provider:model` selector 就能用。
 
 ## 开发
 

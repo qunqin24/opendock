@@ -4,7 +4,7 @@
 
 ![设计草图](design/sketch.png)
 
-> 当前是 `0.1.0`，P0 版本。数字来自本机真实数据库快照，界面会随本机数据变化。
+> 当前是 `0.2.0`。数字来自本机真实数据库快照，界面会随本机数据变化。
 
 ## 功能
 
@@ -12,7 +12,7 @@
 - **模型分布**：按有效 Token 排序，显示占比、请求数、费用
 - **凭据与登录**：按集成展示登录状态、多账号、凭据有效期；OAuth 一键登录、API Key 管理、启用/删除凭据，实时跟随服务端事件刷新
 - **模型浏览**：按 provider 分组的全部可用模型；最近 30 天常用区（真实请求次数）、上下文/价格/用量一览、本地隐藏标记（仅本地偏好）
-- **额度与时效**：OpenCode Go 滚动 5 小时 / 本周 / 本月，重置倒计时；OAuth / API Key 到期时间
+- **额度与时效**：OpenCode Go 滚动 5 小时 / 本周 / 本月，Trae CN（个人 / 企业）Credits，Qoder CN 套餐 + 加油包，重置倒计时；OAuth / API Key 到期时间
 - **时延**：首字 P50/P95、按模型 P95 对比、慢请求比例、输出 tok/s、样本明细
 - **会话明细**：最多 500 条，支持搜索、项目列和 CSV 导出
 - **会话回放**：点击任一会话，按回合查看用户提示、每次模型请求、思考 / 回复、工具调用输入输出、缓存命中、首字 / 总时延和费用；长会话分页懒加载
@@ -22,7 +22,7 @@
 - **独立弹窗**：顶栏「用量」或 `⌥U` 打开，可拖动调整大小，弹窗内可跳转设置页
 - **顶栏布局**：左侧标签布局下，插件图标改为横排并显示文字（同时影响插件中心的图标）
 - **实时刷新**：`session.usage.updated` 等事件触发刷新，60 秒兜底轮询
-- **本地优先**：数据库只读，不上传会话内容；只有 OpenCode Go 额度请求会访问 `opencode.ai`
+- **本地优先**：数据库只读，不上传会话内容；额度请求只发往对应供应商自己的接口
 
 ## 安装
 
@@ -56,6 +56,8 @@
 | 总量 / 趋势 / 模型 / 时延 | 本机 `~/.local/share/opencode/opencode.db`，只读查询 `session_message` + `session_v2`；时延按模型聚合 |
 | 会话回合 / 工具调用 | 按需读取单个会话的 `session_message`，解析 `content` 中的 `text`、`reasoning`、`tool`；输入输出只在界面预览，不回传服务器 |
 | OpenCode Go 额度 | `https://opencode.ai/zen/go/v1/usage`，使用本机 `opencode-go` 凭据 |
+| Trae CN 额度 | `https://api.trae.cn/trae/api/v2/pay/ide_user_ent_usage`，使用 `trae-cn` / `trae-cn-ent` 凭据里的 Cloud-IDE-JWT（企业租户不暴露额度明细，显示说明） |
+| Qoder CN 额度 | `https://openapi.qoder.com.cn/sash/api/v2/me/usage`，使用 `qoder` 凭据里的设备令牌 |
 | 凭据到期 | 本机 `credential` 表，只返回类型和到期时间，不返回密钥 |
 | 实时更新 | `session.usage.updated` / `session.execution.*` 事件 |
 

@@ -185,11 +185,25 @@ npm run verify        # tsc + 28 个单元套件（受理幂等/网关持久化/
 npm run test:e2e      # 五套 e2e（需 opencode 服务在跑）
 ```
 
+## 运维入口（全 TS，跨平台，随包分发）
+
+```bash
+openqq restart                            # 等空闲 → 停 → 拉（旧 safe-restart.ps1 的替代）
+openqq restart --force                    # 跳过空闲等待（维护窗口）
+openqq watchdog --once                    # 单次巡检（自启项 / systemd timer / launchd 调用）
+openqq watchdog --loop --interval-min 10  # 常驻循环
+openqq service install|uninstall|status   # 自启注册：win32=schtasks / linux=systemd user / darwin=launchd
+```
+
+判活 = 锁文件 pid + `process.kill(pid, 0)` + 心跳新鲜度（>5 分钟触发重启，启动期有 60s 宽限）。
+`~/.openqq/` **只放运行时数据**（`.env`、台账、日志、`heartbeat`、`watchdog.log`），不放任何脚本。
+
 ## 排障
 
 | 症状 | 先看 |
 |---|---|
-| QQ 无响应 | 日志 `%TEMP%\opencode\openqqNN.log`；看门狗 `%TEMP%\opencode\watchdog.log` |
+| QQ 无响应 | 日志 `~/.openqq/bot.out.log`；看门狗 `~/.openqq/watchdog.log` |
+| 进程疑似僵死 | `openqq watchdog --once` —— 一次判定并自愈（先杀残留再拉起） |
 | ECONNREFUSED | 桌面服务端口漂移——重启 bot 会自动发现新端口（`~/.openqq/last-discovered.json` 留痕） |
 | 桌面弹窗卡住任务 | 后台等待会发带任务的停滞通告（含最近动作与无进展时长）；`/stop` 可终止 |
 | 日志见「已有实例待命」 | 单实例锁生效中——另一实例持锁（60s 自检会在锁异动时收敛双活，正常无需处理） |

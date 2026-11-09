@@ -5,7 +5,7 @@ A magpie provider plugin that makes **DeepAI Code** models available to every ag
 and sends the **real device fingerprint** for the daily Theos grant, exactly like the
 official desktop app does.
 
-> Status: v0.2.0 — 54 unit tests green; real-account regression on 2026-11-06:
+> Status: v0.2.1 — 61 unit tests green; real-account regression on 2026-11-06/07:
 > chat, streaming, tool calls and image input all work; quota and check-in read live values.
 > Upstream thinking arrives in `reasoning`; magpie renders it natively (PROTOCOL.md §4).
 
@@ -53,9 +53,15 @@ Responses endpoint.
 
 ## Quota and check-in
 
-- Quota = `/theos` + `/get_usage_summary` for the signed-in account.
+- Quota = `/theos` + `/get_usage_summary` for the signed-in account. Results are cached
+  in-process (success 10 min; other errors 10 min) so the panel's refresh rate (as fast as
+  5 s) does not translate into upstream requests.
 - Check-in = one `/theos` call, which triggers and locks the daily grant; `refresh_at`
   changes identify a freshly claimed grant.
+- If upstream answers `403 "restarted its check-in too many times today"` (its daily
+  guard against repeated check-in restarts), the plugin stops calling `/theos` for 6 hours
+  and shows a neutral "resumes tomorrow" note instead of an error. Nothing is broken;
+  chatting is unaffected.
 
 The daily free Theos is issued **once per (machine fingerprint, account) per day**, and the
 fingerprint is the real device id (SMBIOS UUID / `MachineGuid` / IOPlatformUUID /
@@ -71,7 +77,7 @@ Pass as the plugin's `options` (Plugins → installed → options, or
 | Option | Default | Meaning |
 |---|---|---|
 | `baseOrigin` | `https://api.deepai.org` | upstream origin |
-| `laneVersion` | `"2"` | `X-DeepAI-Code-Theos` lane; change only if upstream returns 426 |
+| `laneVersion` | `"auto"` | `X-DeepAI-Code-Theos` lane: probe `/models` (unauthenticated) for the accepted value and cache it; set an explicit value like `"4"` to pin it |
 | `secretDir` | `""` | desktop credentials dir (empty = auto-detect) |
 | `lang` | `zh` | UI language (`zh` \| `en`) |
 | `debug` | `false` | verbose `console.error` logging — field **names** only, never values |
@@ -89,12 +95,25 @@ If the probe times out while magpie itself reaches upstream, a system proxy is s
 Node's `fetch` ignores it by default — rerun with `NODE_USE_ENV_PROXY=1` (Node 24+).
 magpie's Bun host honors `HTTPS_PROXY` too.
 
+**On networks with poisoned DNS (some ISP resolvers):** the plugin's own requests go out
+of magpie's process, and magpie's in-app proxy setting does **not** cover them. Give the
+magpie process a proxy explicitly — Bun's `fetch` reads it natively:
+
+```bash
+HTTP_PROXY=http://127.0.0.1:7897 HTTPS_PROXY=http://127.0.0.1:7897 NO_PROXY=localhost,127.0.0.1 magpie
+```
+
+(Verified on a Linux ARM64 board where the system resolver returned bogus AAAA/A records
+for `api.deepai.org`; with the env vars set, sign-in and quota worked immediately.)
+
 | Probe output | Likely cause | What to do |
 |---|---|---|
 | `403` / `email_unverified` | e-mail not verified | click the verification link DeepAI sent you |
 | `401` | key invalid (re-login rotates it) | sign in to the desktop app again, or paste the new key |
 | `302`/`401` right after a successful web login | stale credential | re-read the desktop credential file |
-| `426` | lane version rejected | set `laneVersion` to the value upstream expects |
+| `426` "This version … no longer supported" | upstream raised the lane version | `laneVersion: "auto"` (the default since 0.2.1) re-probes it automatically; older plugin versions need an update |
+| `400` "This request is not one DeepAI Code sends." | old plugin (pre-0.2.1) tripping the upstream client check — on Node hosts it was the default `user-agent: node` | update the plugin to 0.2.1+ |
+| `403` "restarted its check-in too many times today" | DeepAI's daily guard: the account's check-in flow was (re)started too often today — e.g. fingerprint changes or repeated sign-ins | nothing is broken; it self-heals at the next daily reset. Chat keeps working |
 
 **No thinking output in the agent** — verified working: magpie renders the upstream's
 `reasoning` natively (PROTOCOL.md §4 #8).

@@ -180,6 +180,13 @@ instead of double-registering it.
 - [agent-plugins.org](https://agent-plugins.org) — specification, schemas and conformance checklist.
 - [anomalyco/opencode#40993](https://github.com/anomalyco/opencode/issues/40993) — the upstream feature request this plugin addresses.
 
+## Other OpenCode plugins by the same author
+
+Same constraints: MIT, zero runtime dependencies, OpenCode V1 + V2.
+
+- [opencode-sandbox](https://github.com/Hamza-Abili/opencode-sandbox) — native command sandbox: bubblewrap on Linux, Seatbelt on macOS, fail-closed, network denied by default.
+- [opencode-telegram-notify](https://github.com/Hamza-Abili/opencode-telegram-notify) — Telegram notifications for permission prompts, questions and idle sessions, with tap-only inline buttons.
+
 ## Development
 
 ```bash

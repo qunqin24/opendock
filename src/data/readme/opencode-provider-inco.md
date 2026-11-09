@@ -45,7 +45,7 @@ A `.env` file is a development convenience; the clients do not automatically loa
 
 Discovery runs at plugin startup, every five minutes, and when credentials change. Restart OpenCode to request an immediate refresh.
 
-The bundled snapshot and verified tool/reasoning profiles come from [inco-copilot-chat](https://github.com/grikomsn/inco-copilot-chat). They cover ten routes: DeepSeek V4.1 Flash, GLM 5.3, GLM 5.3 Flash, Kimi K3, and MiniMax M3.1 Flash, each with a `:fast` variant. The current live catalog always wins.
+The bundled snapshot and verified tool/reasoning profiles come from [inco-copilot-chat](https://github.com/grikomsn/inco-copilot-chat). They cover ten routes: DeepSeek V4.1 Flash, GLM 5.3, GLM 5.3 Flash, Kimi K3.1 Pro, and MiniMax M3.1 Flash. Kimi K3 retired on 2026-11-06 and left the catalog on 2026-11-09; its replacement is Kimi K3.1 Pro. The current live catalog always wins.
 
 ## Reasoning and tools
 
@@ -54,8 +54,7 @@ OpenCode exposes accepted efforts as model variants (`#none`, `#high`, and so on
 | Route | Bundled accepted effort controls |
 | --- | --- |
 | DeepSeek V4.1 Flash, either route | none, minimal, low, medium, high, xhigh, max |
-| Kimi K3 | none, low, high, max |
-| Kimi K3 Fast | none, minimal, low, medium, high, xhigh, max |
+| Kimi K3.1 Pro (standard and fast) | none, minimal, low, medium, high, xhigh, max |
 | GLM 5.3 / GLM 5.3 Flash | low, high, max |
 | GLM Fast routes / MiniMax Fast | minimal, low, medium, high, xhigh, max |
 | MiniMax M3.1 Flash | none, minimal, low, medium, high, xhigh, max |

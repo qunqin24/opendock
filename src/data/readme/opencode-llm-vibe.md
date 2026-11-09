@@ -4,7 +4,10 @@
 [![CI](https://github.com/evgenyzh/opencode-llm-vibe/actions/workflows/ci.yml/badge.svg)](https://github.com/evgenyzh/opencode-llm-vibe/actions/workflows/ci.yml)
 
 A mood side-channel for OpenCode V2. The model calls the direct `vibe` tool, and
-the TUI draws an animated pseudo-graphic blob in the sidebar.
+the TUI turns its mood into an animated sidebar visualization. Choose from five
+styles, including Conway's Game of Life, rising embers, and an illustrative
+neural network. Open `/vibe` to control visibility and set a default or
+per-session style.
 
 ![llm-vibe sidebar with a deep focus mood](https://raw.githubusercontent.com/evgenyzh/opencode-llm-vibe/main/assets/llm-vibe.png)
 
@@ -24,7 +27,7 @@ One entry loads both the server and TUI parts. Check the result with
 To pin a version:
 
 ```sh
-opencode plugin add opencode-llm-vibe@0.1.1
+opencode plugin add opencode-llm-vibe@0.2.1
 ```
 
 Manual configuration is also supported:
@@ -108,16 +111,43 @@ last call wins and there is no history. To remove the mood, the model calls:
 `ok` and never echoes the mood back, so the model does not pay for a copy of its
 own input.
 
-`/vibe` toggles the rectangle in the sidebar. Hiding it or restarting the TUI
-does not change the mood; the state is live-only and is not restored from
-session history.
+Open **Vibe settings** with `/vibe` or `Ctrl+P` → **Vibe settings**. The menu
+shows or hides the sidebar animation and chooses the style for this session or
+the default style. Hiding keeps the current mood; restarting the TUI loses it
+because live-only mood is not restored from session history. Visibility is
+temporary for the current TUI and is not saved.
+
+In version 0.2, `/vibe` opens the settings menu rather than toggling visibility
+immediately. Select **Hide vibe** or **Show vibe** in that menu.
+
+Available styles:
+
+| Style | Appearance |
+| --- | --- |
+| Morph | Smooth flowing blobs (default) |
+| Life | Conway's Game of Life with fading trails and reseeding on extinction or cycles |
+| Reaction–diffusion | Growing organic patterns from a Gray–Scott simulation |
+| Embers | Drifting, glowing sparks |
+| Neural | Continuous branching impulses through a dense token/model grid |
+
+The default applies to sessions without an override and starts as Morph. To
+remove a session override, select **Use default** under **Style for this
+session**. The default and overrides are saved in OpenCode's TUI storage,
+survive restarts, and synchronize across TUI instances. They are local TUI
+preferences, not server-side session data. Switching styles does not change the
+current mood or add model requests. Simulations pause when hidden or another
+style is selected. Resizing preserves the simulation: Life keeps the
+visible cells (cells outside a smaller viewport are cropped), diffusion is
+resampled, embers are repositioned proportionally, and Neural remaps its live
+activations while retaining its tick clock.
 
 ## What it looks like
 
 - Sidebar: measures its own width, fills it (24 columns by default, up to 64),
   and keeps a landscape aspect. The blob is sampled with a virtual margin so it
   does not touch the edges.
-- The image is a moving gradient/blob field with low-frequency noise.
+- Morph is a moving gradient/blob field with low-frequency noise. Life,
+  Reaction–diffusion, Embers and Neural provide alternative animated fields.
 - Blob identity is pinned per session: `words` and `glyph` change the caption,
   not the blob layout.
 - Blob radius follows context-window fill: 0.8× when nearly empty, 1.25× when
@@ -131,14 +161,40 @@ session history.
 - Animation tempo follows live activity: idle 0.5×, waiting 0.9×, thinking
   1.7×, writing 2.1×, tool 2.6×, with a ~300 ms ease between speeds. The model
   does not need to call the tool for this; the TUI listens to session events.
-  The renderer runs at 15 FPS.
-- Mood changes morph over ~1.5 s. The field's energy is interpolated and the
+  Morph applies a 1.5× activity multiplier and a nonlinear energy-to-blob-speed
+  curve; the other styles keep the listed tempo. The renderer runs at 15 FPS.
+- In the alternative styles, energy influences Life's generation rate,
+  reaction–diffusion parameters, the number of embers or Neural's input probability;
+  context fill affects reseeding, pattern parameters, particle count or Neural's
+  input probability respectively. Neural uses whole terminal glyphs
+  across the available area above the mood caption, without labels or arrows.
+  Wider slots add model layers; taller slots add cells and token positions.
+  All columns, including input and output, use a fixed two-cell step; any leftover
+  cell stays at the edge rather than creating a gap. On every tick, each input
+  token independently has a chance to fire. Impulses branch or merge while moving one layer per tick; every branch
+  continues to the output, and individual neurons fade behind it. Conditional
+  transition weights determine the strength of each arrival; simultaneous
+  arrivals add up, capped at one. Color intensity reflects that strength.
+  Connections remain part of the simulation but are not drawn. Output tokens
+  light only when a branch reaches them. There is no whole-column wave or pass
+  reset. Only the model uses mood colors; input and output stay neutral. In idle,
+  new input stops and existing branches reach the output and fade. These weights
+  are illustrative, not model telemetry. All styles share the caption and theme
+  background.
+- In Embers, individual sparks use different parts of the mood palette while
+  fading independently of their color.
+- In Neural, newly emitted impulses pick colors from the current mood palette; existing
+  impulses retain their earlier color. A neuron eases toward the weighted mix of
+  arriving colors, so the new color travels with activity rather than recoloring
+  the whole grid at once. Untouched cells keep their color, including in idle;
+  resize preserves the evolving colors and impulses.
+- In Morph, mood changes morph over ~1.5 s. The field's energy is interpolated and the
   palette is blended, so the same blobs migrate to the new state instead of
   crossfading. If a new `vibe` call arrives mid-morph, the next transition
   starts from the currently rendered field and palette instead of snapping back
   to the previous target.
 
-The renderer uses half blocks (`▀`): `fg` is the top pixel and `bg` is the bottom
+The field styles use half blocks (`▀`): `fg` is the top pixel and `bg` is the bottom
 pixel, with 24-bit color.
 
 ## Overhead
@@ -168,7 +224,7 @@ TUI RPC subscription
   │  in-memory Record<sessionID, Mood | null>
   ▼
 sidebar.content
-  │  measured width + scalar field + half-block render
+  │  measured width + selected animation + terminal render
   ▼
 animated rectangle
 ```
@@ -176,14 +232,16 @@ animated rectangle
 - Server part: `src/index.ts`, `src/tool.ts`, `src/prompt.ts`, `src/rpc.ts`.
 - TUI part: `src/tui.tsx`, `src/square.tsx`, `src/dimensions.ts`,
   `src/activity.ts`, `src/context-usage.ts`, `src/motion.ts`, `src/morph.ts`,
-  `src/field.ts`, `src/render.ts`.
+  `src/field.ts`, `src/simulation.ts`, `src/neural.ts`, `src/neural-render.ts`,
+  `src/styles.ts`, `src/render.ts`.
 - Shared protocol: `src/mood.ts`, `src/rpc.ts`.
 
-There is no server-side storage, database, file cache, `ctx.storage`, history
-scan, or auto-clear. The TUI keeps only in-memory maps. Context fill comes from
-`session.step.ended` tokens plus the selected model's context limit and is not
-persisted. An RPC event missed while the TUI is disconnected is intentionally
-not recovered; the slot stays blank until the next `vibe` call.
+Mood and simulation state live only in TUI memory: there is no server-side mood
+storage, history scan, or auto-clear. The TUI stores only style preferences in
+OpenCode's durable local storage. Context fill comes from `session.step.ended`
+tokens plus the selected model's context limit and is not persisted. An RPC
+event missed while the TUI is disconnected is intentionally not recovered; the
+slot stays blank until the next `vibe` call.
 
 ## Troubleshooting
 
@@ -193,7 +251,7 @@ not recovered; the slot stays blank until the next `vibe` call.
 - **The plugin is not loaded.** Run `opencode plugin list`, then `/reload` in
   the TUI. Server logs are in `~/.local/share/opencode/log/opencode.log`;
   filter `role=server` for the plugin and `role=cli` for the TUI.
-- **The rectangle is hidden.** Run `/vibe` to toggle it back on.
+- **The rectangle is hidden.** Open `/vibe` and select **Show vibe**.
 - **No colors.** OpenCode needs a true-color terminal; the renderer uses 24-bit
   half-block cells.
 

@@ -86,6 +86,12 @@ curl -fsSL https://get.oxhive.dev/mynd | sh    # pre-built binary into ~/.local/
 brew install oxhive/tap/mynd                   # or via Homebrew
 ```
 
+The install script reads `INSTALL_DIR` to change the location and `VERSION` to pin a release. Set them on the `sh` side of the pipe:
+
+```sh
+curl -fsSL https://get.oxhive.dev/mynd | INSTALL_DIR="$HOME/bin" VERSION=v0.19.0 sh
+```
+
 Upgrade later with `mynd upgrade` (install-script installs) or `brew update && brew upgrade oxhive/tap/mynd`.
 
 Compile from source instead:
@@ -112,7 +118,7 @@ claude plugin marketplace add oxHive/mynd
 claude plugin install mynd@mynd
 ```
 
-This registers the MCP server and installs `/memory-store`, `/memory-search`, `/memory-list`, `/memory-edit`, and `/memory-status` as slash commands in one step.
+This registers the MCP server and installs `/memory-store`, `/memory-search`, `/memory-list`, `/memory-edit`, `/memory-status`, and `/memory-audit` as slash commands in one step.
 
 If you have a local clone, you can add the marketplace from the path instead:
 
@@ -142,7 +148,7 @@ Add that to `opencode.json` (project) or `~/.config/opencode/opencode.json` (glo
 
 - **Auto-registers the MCP server** if it finds `mynd` in `PATH` (skips silently if you've already configured `mcp.mynd` yourself, e.g. via the manual method below).
 - **Injects the Mynd system-prompt instructions** into every session — the OpenCode equivalent of the CLAUDE.md block `mynd init` writes for Claude Code, telling the agent when to call `mynd_session_start` and to never auto-store.
-- **Installs the memory skills** (`memory-store`, `memory-search`, `memory-list`, `memory-edit`, `memory-status`, `memory-connections`) into `~/.config/opencode/skills/` (or `$XDG_CONFIG_HOME/opencode/skills/`). OpenCode only discovers skills from specific filesystem paths, never from npm package contents, so the plugin copies its bundled skills there itself on every load — this keeps them in sync with the installed plugin version, so don't hand-edit the copies.
+- **Installs the memory skills** (`memory-store`, `memory-search`, `memory-list`, `memory-edit`, `memory-status`, `memory-connections`, `memory-audit`) into `~/.config/opencode/skills/` (or `$XDG_CONFIG_HOME/opencode/skills/`). OpenCode only discovers skills from specific filesystem paths, never from npm package contents, so the plugin copies its bundled skills there itself on every load — this keeps them in sync with the installed plugin version, so don't hand-edit the copies.
 
 The `mynd` binary itself still needs to be installed and on `PATH` (see [Installation](#installation) above) — the plugin only wires it up, it doesn't ship the server.
 
@@ -358,7 +364,7 @@ mynd dashboard --open        Open the dashboard (requires server running)
 
 ### Managing data from the CLI
 
-Everything you can do in the web dashboard is also available as a CLI command — useful for scripting, headless boxes, or when you just don't want to open a browser. All of these work directly against the local database; `suggest` additionally requires `mynd up` to be running.
+Everything you can do in the web dashboard is also available as a CLI command: useful for scripting, headless boxes, or when you just don't want to open a browser. All of these work directly against the local database; `audit` additionally requires `mynd up` to be running.
 
 ```
 mynd memory list [--tag EXPR] [--json]        List memories (--tag filters by a tag expression, e.g. tag:topic:sync)
@@ -388,7 +394,7 @@ mynd data export [--output FILE]              Export memories + edges to JSON
 mynd data import <file>                       Import from a previous export
 mynd data wipe [--yes]                        Permanently delete all memories, edges, feedback, conflicts
 
-mynd suggest start / status / revise / end    Drive an AI-assisted graph-suggestion session
+mynd audit start / status / proposals / apply / reject / revise / end   Run a background memory audit and review its fixes
 
 mynd update [--json]                          Check GitHub releases for a newer version
 mynd upgrade [--yes]                          Upgrade in place (install-script installs; Homebrew/cargo get their command)
@@ -558,7 +564,7 @@ Syncs memories directly between your own devices over mutual TLS. No central ser
 
 Capture and recall Mynd memories from a Matrix room or DM — mention the bot in a
 room, or DM it directly. Under the hood it's the same headless-agent mechanism as the
-dashboard's suggest flow: no bespoke NLU, no local model.
+dashboard's audit flow: no bespoke NLU, no local model.
 
 This is a separate process from `mynd up` and doesn't depend on it being started —
 each message spawns a short-lived agent turn that talks to Mynd the same way any
@@ -621,7 +627,7 @@ install` automatically adds a second unit once `[matrix]` is configured.
 
 ### Agent compatibility
 
-Claude Code works out of the box (same `[agent]` config as the dashboard's suggest
+Claude Code works out of the box (same `[agent]` config as the dashboard's audit
 flow). OpenCode needs one manual step first: OpenCode's non-interactive CLI has no
 per-invocation MCP tool allowlist, so you must pre-create a restricted agent profile
 named `mynd-bot` in your `opencode.json`, scoped to the mynd MCP tools — the
@@ -634,7 +640,7 @@ you.
 
 Capture and recall Mynd memories from a Discord channel or DM — mention the bot in a
 channel, use the `/mynd` slash command, or DM it directly. Same headless-agent mechanism as
-Matrix and the dashboard's suggest flow: no bespoke NLU, no local model.
+Matrix and the dashboard's audit flow: no bespoke NLU, no local model.
 
 This is a separate process from `mynd up` and doesn't depend on it being started —
 each message/command spawns a short-lived agent turn that talks to Mynd the same way
@@ -765,7 +771,7 @@ Detection failures are silent: a missing config file or unavailable CLI simply m
 
 If `mynd_session_start` errors during a session, the most likely causes are:
 
-- **`mynd` not found in PATH**: verify with `which mynd`. If you installed via `cargo install`, make sure `~/.cargo/bin` is in your PATH.
+- **`mynd` not found in PATH**: verify with `which mynd`. Make sure its install directory is in your PATH: `~/.local/bin` for the install script (or your `INSTALL_DIR`), `~/.cargo/bin` for `cargo install`.
 - **Database error**: check `MYND_DB_PATH` and ensure the directory is writable.
 - **Corrupt config**: run `mynd status` in the project directory to validate `.mynd.toml`.
 - **Recalls with special characters**: recall titles containing FTS special characters (`/`, `+`, `-`, quotes) no longer fail the whole call; unmatched entries are simply reported as `not_found` in the result.

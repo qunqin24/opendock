@@ -132,6 +132,10 @@ Projects are listed by name. Each project lists its sessions, then a **Parked** 
 viewing has a bold title. A session in a worktree or another folder of the project shows that folder's
 name on a second line.
 
+The bottom left shows the working directory and git branch of the conversation you are viewing, such as
+`~/repos/opencode-switchboard:main`, as OpenCode's sidebar does. An error or `Reconnecting…` takes its place
+while it lasts.
+
 | Indicator | Meaning                                                                                        |
 | --------- | ---------------------------------------------------------------------------------------------- |
 | `!`       | Waiting for your approval                                                                      |

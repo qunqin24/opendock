@@ -23,7 +23,7 @@ Online Context Compact asks OpenCode for its own compaction at a selected plan b
 
 ## Requirements
 
-- OpenCode **2.2.3** (`npm install -g @opencode/cli@2.2.3`)
+- OpenCode **2.2.6** (`npm install -g @opencode/cli@2.2.6`)
 - Node.js 22.19 or newer and npm, to install this package's dependencies
 
 ## Install
@@ -110,7 +110,8 @@ Read [SECURITY.md](SECURITY.md) before enabling the reducer.
 |---|---|
 | [docs/configuration.md](docs/configuration.md) | Sources, schema, defaults, runtime inputs |
 | [docs/compatibility.md](docs/compatibility.md) | OpenCode APIs used, host behaviour relied on, differences from SoL-Pi |
-| [docs/verification.md](docs/verification.md) | Live results on OpenCode 2.2.3 |
+| [docs/verification.md](docs/verification.md) | Live results on OpenCode 2.2.6 |
+| [docs/benchmark.md](docs/benchmark.md) | Savings measured on Terminal-Bench 2.0 and SWE-bench Verified |
 | [docs/port-audit.md](docs/port-audit.md) | The Pi → OpenCode v2 API audit behind the port |
 | [SECURITY.md](SECURITY.md) | Local storage, remote reduction, sensitive behavior |
 
@@ -123,7 +124,9 @@ scripts/live/verify.sh af-op      # real OpenCode session, Action Fusion + Obser
 scripts/live/verify.sh all        # real OpenCode session, all four mechanisms
 ```
 
-The live checks need `opencode` 2.2.3 on `PATH`. They use a scripted local endpoint, so they need no credentials and cost nothing. `./upstream/` is an optional, git-ignored clone of SoL-Pi kept for reference.
+The live checks need `opencode` 2.2.6 on `PATH`. They use a scripted local endpoint, so they need no credentials and cost nothing. `./upstream/` is an optional, git-ignored clone of SoL-Pi kept for reference.
+
+`bench/` measures the savings on real benchmark tasks and spends API credit; see [bench/README.md](bench/README.md).
 
 ## License
 

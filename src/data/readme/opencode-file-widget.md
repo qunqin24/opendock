@@ -132,6 +132,7 @@ To use a checkout instead of the npm package:
 #### Sidebar
 
 ```text
+──────────────────────────────
 📦 文件传输                    ⚙ 设置
 
 ⇡ 点击选择并上传文件
@@ -139,7 +140,6 @@ To use a checkout instead of the npm package:
 最新服务器路径:              [复制 @]
 …/uploads/8a1f/report.xlsx
 
-──────────────────────────────
 近期记录                  全部 (12)
 
 ● ↑ report.xlsx                 14:32
@@ -396,6 +396,7 @@ opencode --server http://<server>:<port>
 #### 侧边栏
 
 ```text
+──────────────────────────────
 📦 文件传输                    ⚙ 设置
 
 ⇡ 点击选择并上传文件
@@ -403,7 +404,6 @@ opencode --server http://<server>:<port>
 最新服务器路径:              [复制 @]
 …/uploads/8a1f/report.xlsx
 
-──────────────────────────────
 近期记录                  全部 (12)
 
 ● ↑ report.xlsx                 14:32

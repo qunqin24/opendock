@@ -202,6 +202,13 @@ CI makes a working sandbox a hard requirement
 skip. The tagged release is gated on the same Ubuntu+macOS matrix before npm
 publish.
 
+## Other OpenCode plugins by the same author
+
+Same constraints: MIT, zero runtime dependencies, OpenCode V1 + V2.
+
+- [opencode-agent-plugins](https://github.com/Hamza-Abili/opencode-agent-plugins) — Agent Plugins 1.0 client: discovery from `.agents/plugins` and npm packages, native skills, trust-first MCP registration.
+- [opencode-telegram-notify](https://github.com/Hamza-Abili/opencode-telegram-notify) — Telegram notifications for permission prompts, questions and idle sessions, with tap-only inline buttons.
+
 ## Development
 
 ```

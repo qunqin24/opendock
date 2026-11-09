@@ -79,7 +79,10 @@ Two skills teach the model to use Wispr Flow well:
 
 ### Scripts
 
-A script or a cron job can call Wispr Flow's read tools with no model, through `opencode api`. It runs as a session
+A script or a cron job can call Wispr Flow's read tools with no model, through `opencode api`. The plugin adds one
+read of its own, `events_list` (`wisprflow_events_list`), for Memory's collector: the meetings Wispr Flow captured
+since a cursor, as normalised events, oldest first. It only reads, and never asks; see
+[Events list](https://github.com/joe-broadhead/opencode-wisprflow/blob/HEAD/docs/configuration.md#events-list). It runs as a session
 and its agent, under that agent's permission rules and the session's own:
 
 ```sh

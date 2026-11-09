@@ -10,6 +10,8 @@
 
 > **状态：** 功能已全部完成（基准版本 OpenCode Desktop 2.2.5），并已实测兼容 2.2.6。上游插件 API 仍属实验性，更新的桌面端版本仍可能使插件失效。仓库地址：<https://github.com/VicChenBike/opencode-subagent-studio>。
 
+> **命名说明：** npm 包与 GitHub 仓库名为 `opencode-subagent-studio`。OpenCode 应用内的插件 id 仍为 `subagent-manager`（插件 id 注册后无法改名），本地插件目录也保留原名——因此日志里的 `[subagent-manager]`、代码中的 `id: "subagent-manager"`、磁盘上的 `opencode-subagent-manager` 目录均属正常；"Studio" 这个名字用于 npm、GitHub 与 `package.json`。
+
 ---
 
 ## 功能
@@ -25,10 +27,6 @@
 | **内置模型覆盖** | 运行时通过插件存储为内置代理换模型；不写 `opencode.jsonc` |
 | **实时同步** | `fs.watch` + 300 ms 去抖 + `agent.reload()`；用户级目录自动刷新。当前构建中，项目级目录的外部改动需要点**刷新** |
 | **界面词典** | 11 种界面语言（en、zh、fr、es、br、ru、ar、de、ja、hi、ko），词典由 AI 翻译；设置入口在各语言下统一显示 "Subagent" |
-
-![Subagent 列表页](docs/screenshots/list-page.png)
-
-![新建子代理编辑页](docs/screenshots/editor-page.png)
 
 ## 前置要求
 
@@ -152,6 +150,8 @@ npm run build
 - **嵌套代理文件会显示但不能从 UI 新建** —— `agents/team/reviewer.md` 会以 ID `team/reviewer` 显示并可编辑；新建/重命名输入框只接受扁平 ID，重命名嵌套代理时文件仍留在原目录。
 - **宿主插件 API 是实验性的** —— 更新的桌面端可能改动该 API，导致本插件失效（基于 2.2.5 构建，2.2.6 已实测兼容）。
 - **内置模型覆盖仅存于插件存储** —— 停用或移除插件后，`general` / `explore` 恢复 OpenCode 默认模型。
+- **重命名后选择留在编辑页时路径仍是旧路径** —— 表单有未保存修改时重命名成功并选择留在编辑页，再次保存会报「文件不存在」（磁盘上重命名其实已成功）。请离开编辑页后重新打开改名后的代理；未保存的修改需要重做。
+- **被长期锁定或 ACL 拒绝的代理文件写入时表现为未知错误** —— Windows 瞬时文件锁会自动短重试；持续性的访问拒绝（ACL 异常）会弹「未知错误」。不会改动任何数据（写入前必须先读到原文件）。
 
 ## 排障
 
@@ -176,6 +176,8 @@ npm run watch     # 监听重建 GUI；服务端改动需重启桌面端
 ```
 
 构建产物在 `dist/` 内必须只有一个文件。桌面端提供的模块（`solid-js`、`solid-js/web`、`@opencode/plugin/gui`、`@opencode/plugin/rpc`）保持为外部依赖（external）；若打包了这些包之外的同系列模块，构建会失败。GUI bundle 内不能有动态 import。
+
+提交 Pull Request 前，请先阅读 [CONTRIBUTING.zh-CN.md](CONTRIBUTING.zh-CN.md) 了解工作流程与基本规则。
 
 ## 从回收站恢复
 

@@ -19,7 +19,7 @@ Every figure in this README carries a provenance marker: **measured** (read off 
 
 **2. Restart opencode.** It installs the package and its dependencies at startup, and the plugin installs its own slash commands. On desktop, a later config edit needs `opencode service restart`: relaunching the app leaves the background service — and the plugin options it already parsed — alive.
 
-**3. Run `/repo-init`** in each repo you work in. It indexes the code graph, stores the test / build / lint / typecheck commands as memories, and writes an init stamp tied to the current git head. Rerun `/repo-init force` after a refactor.
+**3. Run `/repo-init`** in each repo you work in. It stores the test / build / lint / typecheck commands as memories and writes an init stamp tied to the current git head. Rerun `/repo-init force` after a refactor. (Code-graph indexing is opt-in — see [Code graph](#code-graph-optional).)
 
 Needs Bun 1.3.0 or newer in the opencode build (the tested floor); older Bun reports a startup warning.
 
@@ -35,7 +35,7 @@ After that, memory is just conversation: ask the agent to remember something and
 ## What you get
 
 - **`memory_*` tools** — `memory_init`, `memory_remember`, `memory_recall`, `memory_update`, `memory_forget`, `memory_list`, `memory_undo`, `memory_status`, `memory_evidence`, `memory_export`, `memory_import`, `memory_decay`, `memory_consolidate`, `memory_merge_review`.
-- **`/repo-init`** — per-repo setup: code graph index plus build/test commands, keyed to the git head.
+- **`/repo-init`** — per-repo setup: build/test commands as memories, keyed to the git head. Code-graph indexing is opt-in (`OPENCODE_MEMORY_GRAPH=1`), off by default.
 - **Write gates** — code references are verified against your actual repo, near-duplicates are collapsed, contradictions with superseded memories are rejected. Blocked writes are logged with a reason in `memory_evidence`, which reads one real calendar day inside `evidence/` at a time — its `date` is a date, never a path.
 - **Memory-aware compaction** — durable memories are handed to the compaction summarizer, so a long session keeps its facts.
 - **Auto-capture (experimental, opt-in)** — in progress and **not working yet**. The design: on the turn-end and compaction triggers, one cheap model pass per trigger proposes candidates, which face the same write gates, with a 5-minute cooldown per session and trigger bounding the spend. What is not true today: it has never been observed firing on a live opencode 2.x store, so enabling it may cost model calls and store nothing. See [Auto-capture is experimental](#auto-capture-is-experimental).
@@ -67,6 +67,7 @@ Zero configuration is the default. To tune, use the object form of the plugin en
 | --- | --- | --- |
 | `injectBudget` | `1200` | Character cap on the injected relevance block and each contextual pull; trimmed at whole-memory boundaries. Env fallback: `OPENCODE_MEMORY_INJECT_BUDGET`. |
 | `frontierBudget` | `3 × injectBudget` | Character cap on the session-start open-threads block. A thread longer than the budget is not injected and is reported as omitted. Env fallback: `OPENCODE_MEMORY_FRONTIER_BUDGET`. |
+| `contradictionSurface` | `true` | Experimental: compare guided constant claims with bounded source reads and render a class-specific CONFLICT verdict. Set `false` to skip code checks and retain plain guidance. See [Contradiction authority policy](#contradiction-authority-policy-experimental-349--351). |
 | `autoCapture` | `false` | Master switch for auto-capture, which is **experimental and has never fired on a verified live store** — see [Auto-capture is experimental](#auto-capture-is-experimental). Off by default, so the install stays zero-token. |
 | `captureModel` | — | `"provider/id"` model used for auto-capture. Required when `autoCapture` is on; missing or invalid disables capture with a startup warning. |
 | `captureMax` | `3` | Maximum candidates proposed per capture pass. |
@@ -82,7 +83,8 @@ Zero configuration is the default. To tune, use the object form of the plugin en
 | `OPENCODE_MEMORY_INJECT_BUDGET` | Fallback for `injectBudget`. |
 | `OPENCODE_MEMORY_FRONTIER_BUDGET` | Fallback for `frontierBudget`. |
 | `OPENCODE_COMMANDS_DIR` | Where the plugin mirrors its slash commands (default `~/.config/opencode/commands`). |
-| `OPENCODE_CBM_BIN` | Path to a `codebase-memory-mcp` binary. See [Code graph](#code-graph-optional). |
+| `OPENCODE_MEMORY_GRAPH` | Set to `1` to have `/repo-init` build the code graph. Off by default — nothing reads the index. See [Code graph](#code-graph-optional). |
+| `OPENCODE_CBM_BIN` | Path to a `codebase-memory-mcp` binary, used only when `OPENCODE_MEMORY_GRAPH=1`. See [Code graph](#code-graph-optional). |
 | `OPENCODE_VIEWER_HOST` | Interface the editor binds to (default `127.0.0.1`). A non-loopback bind serves the store over plain HTTP with no authentication — only do it on a network you control. See [Surfaces](#surfaces). |
 | `OPENCODE_VIEWER_PORT` | Admin editor port (default `8787`). |
 | `OPENCODE_VIEWER_ALLOWED_HOSTS` | Comma-separated hosts beyond loopback. See [Surfaces](#surfaces). |
@@ -115,7 +117,21 @@ Four gates run before anything is stored, and each emits an ordered evidence lin
 3. **GATE-3 — no duplicates.** Near-duplicates collapse into the existing row; a contradiction with a superseded memory is rejected.
 4. **GATE-4 — promotion or block.** The row lands, or the call returns the reason.
 
-Nothing is deleted: `memory_update` supersedes the previous row, `memory_forget` records a retirement, and `memory_undo` restores a snapshot. `memory_update` takes a `query` that picks the row — its id, a clock fragment such as `00:11:22.123`, or a unique substring of its text. Omit it to update the newest entry of that scope and type. A `query` that matches nothing, or several rows, writes nothing and says so. A prose edit changes only the prose: the row's tags, issue link, retrieval keywords, open/settled standing, and repository all carry over to the new row — updating a `global` row from one machine keeps it global for every other. Naming a row an earlier update already superseded reports the duplicate when the live successor already holds that exact content; when only the metadata you name differs, the update runs against the successor instead of dead-ending. And a failure after the new row is durable is reported as `PARTIAL` — the message names what failed, the replacement stands on disk, and `memory_undo` (merge or force) brings the old row back.
+Nothing is deleted: `memory_update` supersedes the previous row, `memory_forget` records a retirement, and `memory_undo` restores a snapshot. `memory_update` takes a `query` that picks the row — its id, a clock fragment such as `00:11:22.123`, or a unique substring of its text. Omit it to update the newest entry of that scope and type. A `query` that matches nothing, or several rows, writes nothing and says so. A prose edit carries over ordinary tags, issue link, retrieval keywords, open/settled standing, and repository to the new row, while capture-only guidance provenance is removed — updating a `global` row from one machine keeps it global for every other. Naming a row an earlier update already superseded reports the duplicate when the live successor already holds that exact content; when only the metadata you name differs, the update runs against the successor instead of dead-ending. And a failure after the new row is durable is reported as `PARTIAL` — the message names what failed, the replacement stands on disk, and `memory_undo` (merge or force) brings the old row back.
+
+### Contradiction authority policy (experimental, #349 / #351)
+
+`contradictionSurface` defaults to `true`; set it to `false` to keep plain guidance without code checks. Guided capture can attach a declared constant's `ref`, the user's value as `claim`, and an authority `klass`:
+
+| Captured statement | Class | Verdict on a detected conflict |
+| --- | --- | --- |
+| User states the required value for a declared constant | `spec` | The user is the authority; change the constant to the stated requirement. |
+| User describes how working code behaves | `behavior` | Code is the authority; keep the constant and raise the mismatch with the user. |
+| Authority is unclear | Omit `klass` | Keep plain guidance and its staleness caveat; emit no CONFLICT verdict. |
+
+The code check accepts a unique top-level `const` with a literal value. Comments, string examples, local declarations and computed expressions cannot establish an authority verdict. The scan is limited to 300 source files, 256 KiB per file and depth 3, preferring `src/`; it does not follow source links or resolve imports. Ambiguous declarations, unreadable/invalid source, exhausted budgets or an undecidable claim keep the plain guidance and staleness caveat. The JavaScript/TypeScript parser loads only when a row needs a code check; explicit opt-out never loads it. Use attribution keeps the stored row's identity and prose while coverage counts only references present in the delivered text.
+
+Accepted residual: a user-stated **wrong spec** still classifies as `spec`. Its verdict follows that stated requirement even if it breaks the current tests. The plugin does not infer hidden-suite authority or silently override the user's requirement. Asking an oracle or inventing an extra authority class is outside this contract. Capture classification can be wrong; a code comparison verifies a value mismatch, not the user's intent. Per the [maintainer's rollout decision](https://github.com/abogartz/opencode-self-improvement/pull/363#pullrequestreview-5819556342), the default is ON for full benchmarking after merge and can be revisited. The seat-model and merged-main confidence runs in #350–#352 remain outstanding; enabling the feature is not a claim that those benchmarks passed.
 
 ## Repo scoping
 
@@ -139,18 +155,20 @@ Gate-authored evidence and its init/capture lifecycle records capture attributio
 
 **Bench** — deterministic workload (50 memories, 20 prompts, 3 mid-session store writes made *by the measured session*) through the plugin's real injection code. Every column is measured on the full memory section — the bytes a request actually sends — because prompt caching is a property of those bytes:
 
-| Policy | Recomputes | Cache busts | Injected chars (20 turns) | Avg/turn | Worst section |
+| Policy | Recomputes | Epochs whose bytes moved | Injected chars (20 turns) | Avg/turn | Worst section |
 | --- | ---: | ---: | ---: | ---: | ---: |
 | A — recompute per prompt, uncapped (naive) | 20 | 19 | 60996 | 3049.8 | 3404 |
 | B — block frozen on store fingerprint, digest rebuilt per turn | 4 | 3 | 55478 | 2773.9 | 2867 |
 | C — section frozen on rendered bytes | 4 | 3 | 55258 | 2762.9 | 2856 |
 | D — C + riding bytes (shipped) | 1 | 0 | 53500 | 2675.0 | 2675 |
 
-A "cache bust" is a turn whose memory-section bytes differ from the turn before — each one re-bills the entire conversation as fresh input. All three synthetic writes change what the session is shown, so B and C each pay for them; D pays nothing, because the session wrote them itself. What D still pays for is a riding row being corrected, blocklisted or redacted, or another session writing a row — that half of the contract is pinned by `test/epoch.test.ts` rather than by this table, since a benchmark that only writes never exercises it. D also injects 12.3% fewer characters than the naive policy — the denominator here is the whole section, not the relevance block alone, so it is not comparable with the block-only figure this README quoted before. Reproduce (byte-identical output):
+The byte-change counter records epochs whose memory-section bytes differ from the previous epoch; it does not measure provider cache misses or re-prefill cost. All three synthetic writes change B and C's bytes; D records no change for these self-writes. Corrections, removals and writes by another session can still move D's bytes, as pinned by `test/epoch.test.ts`. D also injects 12.3% fewer characters than the naive policy, measured over the whole section. Reproduce this deterministic byte workload:
 
 ```sh
 bun run bench
 ```
+
+**Author-reported provider audit**, not a new measurement here: [#346's six-turn local-seat audit](https://github.com/abogartz/opencode-self-improvement/issues/346#issuecomment-6714172764) compared `ee769ef` with frozen `29268ef`. The changed build used 2,065 additional input tokens over six turns (~344/turn), with one 3,257-input-token spike, and 94.4% cache share versus 97.5%. The block rode late in the system prompt, after a stable prefix; a byte-moving epoch did not re-bill the whole conversation. This run included two guided rows, so it does not isolate prompt rescoring from the hint channel or establish a bound for every provider. The status counter remains a byte-change count; provider receipts report actual cache reuse separately.
 
 ## Recall quality
 
@@ -261,6 +279,8 @@ Review the full row in the memory viewer's **quarantined** filter. **Release qua
 
 This is a heuristic review queue, not a complete prompt-injection detector: legitimate documentation or quoted code can match. Markdown-bold role headers and download-then-`&&`-execute forms are recognized, but alternate role delimiters such as `[INST]` / `<<SYS>>`, base64-to-shell pipelines, paraphrased instructions, and indirect execution can evade it. Direct `memory_remember` and human viewer edits are explicit writes and are not automatically scanned: a session with that tool still has a prose channel, mitigated by the existing framing and provenance rather than quarantine. Those defenses still apply to released rows.
 
+Always-ride guidance priority is reserved to auto-capture provenance. `memory_remember`, `memory_update` replacements, and JSONL imports silently remove `user-guided` (including comma-delimited tag entries) before the write gate; their field allowlists also exclude `ref`, `claim`, and `klass`. Ordinary tags and prose can still promote normally, but a portable file, even with an export header, cannot attest that the local user stated it. The capture path owns guidance metadata; this boundary protection does not authenticate a directly edited store or guarantee that a capture model classified a statement correctly. The reservation applies to guidance priority and contradiction verdicts (#342, #349).
+
 The viewer is a trusted admin editor: its edits and deleted-entry restores do not run the model-facing grounding or deduplication gates, but they honor the same exact and near-match value rejections. Rejected edits leave the original row, snapshots and edit audit unchanged; rejected restores append nothing. The refusal names the rejection hash so you can explicitly lift it under **Rejections → un-reject** before retrying. Corrected numeric values and polarity changes retain the rejection check's existing exceptions. This check does not change whole-snapshot rollback policy.
 
 Existing stores are not rescanned. A byte-identical import that collapses into an existing row does not retroactively tag that row. Export preserves quarantined rows and their tags to avoid data loss; an exported released row can be quarantined again when re-import promotes it on another machine.
@@ -283,13 +303,15 @@ Same data behind each one (`memory_status`; no model call).
 
 ## Code graph (optional)
 
-`/repo-init` also indexes the repo into a queryable knowledge graph via [`codebase-memory-mcp`](https://github.com/DeusData/codebase-memory-mcp), pinned to `0.11.0` as an optional dependency. A copy already on your `PATH` is used instead; override with `OPENCODE_CBM_BIN=/path/to/codebase-memory-mcp`. Install the pinned binary globally if you prefer:
+Code-graph indexing is **off by default** (`/repo-init` reports `Graph: disabled`). Measured cost vs. benefit: the one-shot index spawn took 11–26s per init, failed in 29 of 32 real runs, and no read or gate path consumes the index — retrieval and the write gates resolve code references against the live file tree, and gate evidence is identical with the graph present or absent. So the default build never spawns it.
+
+To opt in, set `OPENCODE_MEMORY_GRAPH=1`. `/repo-init` then indexes the repo via [`codebase-memory-mcp`](https://github.com/DeusData/codebase-memory-mcp), pinned to `0.11.0` as an optional dependency. A copy already on your `PATH` is used instead; override with `OPENCODE_CBM_BIN=/path/to/codebase-memory-mcp`. Install the pinned binary globally if you prefer:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/DeusData/codebase-memory-mcp/main/install.sh | bash
 ```
 
-When no graph binary is available, `/repo-init` still records scripts and the init stamp.
+Whether or not the graph runs, `/repo-init` records scripts and the init stamp, and memory behaves the same.
 
 ## Installing a specific version
 
@@ -365,7 +387,8 @@ Run it when you want to know whether the suite still has teeth — after changin
 | `memory store is busy` | A store write exhausted its 5s lock-wait budget. Appends, rewrites, and restores refuse that mutation rather than proceed unlocked and risk losing another writer's rows. Retry after contention clears. An operation spanning several files or steps may have completed earlier steps; refusal is not a rollback of those steps. If the reply reports `PARTIAL`, inspect the named rows and `memory_evidence` / `memory_undo` before retrying. A lock left by a killed process is taken over after 10s. |
 | Stray `*.logfmt.lock` or `*.tmp` in the store | Write bookkeeping; safe to delete while nothing is writing. |
 | `/repo-init` missing from the command list | The self-install couldn't write to `~/.config/opencode/commands/`. Create it and restart, or ask the model to "init memory for this repo" — the same tool. |
-| Init says `Graph: unavailable` | `codebase-memory-mcp` couldn't start. Install pinned `0.11.0` or point `OPENCODE_CBM_BIN` at the binary. Scripts are still remembered without it. |
+| Init says `Graph: disabled` | Expected default — code-graph indexing is opt-in and nothing reads the index. Set `OPENCODE_MEMORY_GRAPH=1` to enable. Scripts are remembered either way. |
+| Init says `Graph: unavailable` | You opted in (`OPENCODE_MEMORY_GRAPH=1`) but `codebase-memory-mcp` couldn't start. Install pinned `0.11.0` or point `OPENCODE_CBM_BIN` at the binary. Scripts are still remembered without it. |
 | Stale plugin after an update | `opencode plugin update opencode-self-improvement` (or bump the pinned `@version` in the `plugins` entry) and restart opencode. On desktop use `opencode service restart`: relaunching the app leaves the background service — and the plugin version and options it already parsed — alive. |
 | `Error: Plugin is not configured` right after `plugin add` | An opencode bug ([#54654](https://github.com/anomalyco/opencode/issues/54654)), not a config problem: the first `plugin list/check/update` against a cold background service reads the plugin inventory before activation finishes. The plugin is installed and loading — just run the command again. |
 | Auto-capture does nothing | Auto-capture is **experimental and has never fired on a verified live store** — see [Auto-capture is experimental](#auto-capture-is-experimental). `memory_evidence` says which case you are in from the `plugin_load` line: `capture=off` (option not on), `invalid_model` (`captureModel` must be `provider/id`; a bad one disables capture with a startup warning), `no_capabilities` (host did not expose what capture needs), or `capture=on`. `captureOnCompact` alone does nothing. `capture=on` with no `auto_capture_*` line after a session is the open bug, not your config. Rejected candidates log as evidence, not errors. On desktop, changing any of these options needs `opencode service restart`. |
