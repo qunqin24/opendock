@@ -170,7 +170,7 @@ hatch. Full detail (guards, state fields, escape ladders, diagrams) lives in
 | Read horizon           | Warns at 8 whole-file `read` calls per session, blocks at 15 (prefer grep/glob)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | Tool-call policy       | `bash`/`shell` commands and `write`/`edit` paths matched against a configured denylist (default empty — the empty lists are the off switch)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | Commit-lint            | `git commit -m` subjects must be conventional commits when `gitGates.commitMessages` is on (default)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| Landing gate           | `git push` without a credited reviewer `VERDICT: APPROVE` — blocks, and under the default `escalation: "block"` re-blocks every retry (no permission ask); `escalation: "ask"` restores the interactive human ask; gated by `gitGates.landingGate` (default on); the `gitGates.emptyDiffExempt` exemption (default on) additionally exempts provably no-op pushes (every refspec's branch ref-equal to its upstream; force pushes never qualify; `exempt:"empty-diff"` in the journal; `false` is the strict opt-out)                                                                                                                                                                                                                                     |
+| Landing gate           | `git push` without a credited reviewer `VERDICT: APPROVE` — blocks; a repeat attempt arms the one-shot ask latch and forces the interactive human ask in BOTH `escalation` modes (the block-throw is only the no-human fallback); gated by `gitGates.landingGate` (default on); the `gitGates.emptyDiffExempt` exemption (default on) additionally exempts provably no-op pushes (every refspec's branch ref-equal to its upstream; force pushes never qualify; `exempt:"empty-diff"` in the journal; `false` is the strict opt-out)                                                                                                                                                                                                                      |
 | Marker parsing         | `GATE:` / `VERDICT:` markers parsed from task results and child text; only marker-contracted emitters flip state — echoes are journaled `suppressed`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | Trace & telemetry      | JSONL journal of dispatches, gate transitions, verdicts, blocked calls, errors; `setup` heartbeat, stream-death errors                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | Decoding clamps        | reviewer/plan-reviewer temperature = 0; executor/test-runner/debugger ≤ 0.2                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
@@ -205,13 +205,13 @@ diff gates the dispatch as ordinary implementation work.
 **Parent hands-on edits.** Parent sessions dispatch work through the
 pipeline; direct `write`/`edit` calls in the parent — and in any
 non-pipeline subagent — are always gated. The
-first parent edit per task throws `BLOCKED by turnstile:`; under the default
-`escalation: "block"` a repeat attempt re-blocks — the gate releases only on
-your explicit `USER WAIVER:` (or a hands-on release carried from a prior
-`"ask"` session). `escalation: "ask"` restores the interactive ladder: the
-repeat attempt raises a human permission ask — `always` releases the rest of
-the task, `once` releases one edit, `reject` re-blocks and re-arms on the
-next attempt. `TURNSTILE OFF:` suspends it session-wide, but plan approval
+first parent edit per task throws `BLOCKED by turnstile:`; a repeat attempt
+arms the one-shot ask latch and raises a human permission ask in BOTH
+`escalation` modes (the block-throw is only the no-human fallback) —
+`always` releases the rest of the task, `once` releases one edit, `reject`
+re-blocks and re-arms on the next attempt. The gate also releases on your
+explicit `USER WAIVER:` (or a hands-on release carried from a prior
+session). `TURNSTILE OFF:` suspends it session-wide, but plan approval
 alone does not release the gate. A new user prompt resets the block count
 and any release. One exemption: a `write`/`edit` whose target path resolves
 under the platform temp directory is scratch — zero-governance work (not
@@ -253,26 +253,25 @@ what the text says.
 - **`PLAN APPROVED:`** in your prompt approves the plan like a reviewer
   verdict, with human provenance; it replays across restart.
 - **Permission escalation.** Repeat-attempt escalation of the landing and
-  hands-on gates is **block-only by default** (`escalation: "block"`): a
-  retried attempt blocks again, the agent is told to stop and report, and
-  release is scoped per gate — `USER WAIVER:` covers the hands-on gate,
-  `PLAN APPROVED:` covers the plan gate only, and the landing gate releases
-  only via an earned reviewer `VERDICT: APPROVE` (or your permission reply
-  under `"ask"`). Set `escalation: "ask"`
-  to restore the interactive ladder: the repeat attempt escalates to you
-  through OpenCode's permission surface — reply `always` (approved for the
-  task), `once` (one dispatch/edit), or `reject`. The plan-gate escalation
-  (first executor dispatch with no plan approval) follows the same mode:
-  under `"block"` the dispatch blocks with the stop-and-report instruction
-  and release flows via `PLAN APPROVED:` (or a waiver); under `"ask"` it
-  surfaces the permission prompt instead.
+  hands-on gates is ask-first in BOTH `escalation` modes: a retried attempt
+  arms a one-shot latch and escalates to you through OpenCode's permission
+  surface — reply `always` (approved for the task), `once` (one
+  dispatch/edit), or `reject`; the block-throw is only the no-human
+  fallback. Release is also scoped per gate — `USER WAIVER:` covers the
+  hands-on gate, `PLAN APPROVED:` covers the plan gate only, and the
+  landing gate releases via an earned reviewer `VERDICT: APPROVE`. The
+  plan-gate escalation (first executor dispatch with no plan approval) is
+  the only genuinely mode-gated one: under `"block"` (the default) the
+  dispatch blocks with the stop-and-report instruction and release flows
+  via `PLAN APPROVED:` (or a waiver); under `"ask"` it surfaces the
+  permission prompt instead.
   Turnstile assumes a human actually answers these asks. If the host answers
   them automatically (`session.permissions: "autoaccept"` in
-  `~/.config/opencode/cli.json`), the `"ask"`-mode human decision points,
-  the plan-gate escalation, and the ensemble's human release are all
-  rubber-stamped and those gates degrade to delays — one reason the default
-  is `"block"`. `opencode-turnstile status` prints an advisory when it
-  detects the setting.
+  `~/.config/opencode/cli.json`), the landing/hands-on ask latches (both
+  `escalation` modes), the plan-gate escalation, and the ensemble's human
+  release are all rubber-stamped and those gates degrade to delays — one
+  reason the default is `"block"`. `opencode-turnstile status` prints an
+  advisory when it detects the setting.
 
 Do not create, paste, or relay a `USER WAIVER:` / `PLAN APPROVED:` marker to
 open a gate — only the user's own prompt carries a real waiver or approval.
@@ -341,7 +340,11 @@ and waiver counts, final gate state). Read-only; never writes or blocks.
 
 Prints the decision-provenance ledger: the human decision events turnstile
 observed — `prov:stated` (every admitted parent prompt, verbatim after
-mechanical secret redaction) and `prov:denied` (human permission denials) —
+mechanical secret redaction), `prov:denied` (human permission denials),
+`prov:waiver` (human gate waivers, with the covered stages), and
+`prov:override` (a parent write/edit that follows a pipeline-child write to
+the same path within a 15-minute window — a human-side correction of
+pipeline work) —
 interleaved in journal order. An observe-only decision ledger; capture is
 dumb, derivation is offline. Read-only; never writes or blocks.
 
@@ -352,6 +355,21 @@ dumb, derivation is offline. Read-only; never writes or blocks.
 
 Capture is gated on `decisionLedger.enabled` (default `true`; `false` disables
 all `prov:*` journaling).
+
+### `opencode-turnstile prov-views`
+
+Offline derived views over the decision ledger — the "derivation is smart"
+half of "capture is dumb, derivation is smart". Classifies `prov:stated`
+prompts by origin (direct instruction, pipeline chatter, waiver-carried
+directive), computes the chatter noise rate, and aggregates taste-drift
+signals (denied ask kinds, parent overrides of pipeline-child writes) across
+sessions and days. Purely read-time: journal rows are never rewritten, and
+no derived value feeds gates or capture. Read-only; never writes or blocks.
+
+    opencode-turnstile prov-views                 # every session
+    opencode-turnstile prov-views <sessionID>     # a specific session
+    opencode-turnstile prov-views --json          # machine-readable output
+    opencode-turnstile prov-views --tail 100      # bound the row walk
 
 ## Markers
 
@@ -410,6 +428,29 @@ npm run ci            # lint, format:check, typecheck, check:markers, test gate 
 npm run ci:installed  # install:check — run after `npm run init` on a machine with artifacts
 ```
 
+**Differential characterization harness** — `npm run test:differential`
+compares HEAD against a reference commit
+(`--ref <git-ref>`, default `138c809^`) scenario by scenario:
+`config`, `markers`, `replay`, `dispatch`, `journal`, `prov`. It is
+required for any change claimed to be behavior-preserving and is not
+part of `npm run ci`. Scenarios whose modules do not exist in the
+reference tree report `SKIPPED (absent in ref)`; for `prov` and
+recovery/replay cells use a reference at or after `687270b` (the first
+commit with the full decision ledger — partial-ledger merge-window refs
+fail with a driver error rather than a structured skip). Deliberate
+behavior changes re-point `--ref` at the commit that introduced them.
+
+**Self-host smoke** — `npm run init && npm run ci:installed`, start a
+fresh OpenCode session with the plugin loaded, and run one
+planner→plan-reviewer→executor→test-runner→reviewer cycle on a trivial
+task. Verify the journal shows the expected entry sequence and
+`opencode-turnstile status` reads correctly. Decision-ledger checks:
+one parent prompt → a `prov:stated` row; one denied permission → a
+`prov:denied` row with the correct `kind`; one parent override of a
+pipeline-child write → a `prov:override` row with the
+adjacency-matched `child`; then `opencode-turnstile prov` derived
+views read all three back.
+
 ## Configuration
 
 Defaults live in code (`src/config.ts`); override via
@@ -424,15 +465,15 @@ loader reads an explicit [] as unset and re-derives the list from the
 configured test-runner, reviewer, and plan-reviewer names, so the copy needs
 no edits. The key knobs most people touch:
 
-| Key                       | Default   | Meaning                                                                                                                                                                                              |
-| ------------------------- | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `alwaysEnforce`           | `false`   | dormant-until-engaged: enforcement arms on a plan (`PLAN APPROVED:` / plan-file reference) or a planner/pipeline request; `true` restores always-armed from the first prompt                         |
-| `gateEvidence`            | `enforce` | `flag`/`off` revert to flip-on-trust for `GATE: PASS`                                                                                                                                                |
-| `escalation`              | `block`   | repeat landing/hands-on attempts re-block with no permission ask; `ask` restores the interactive permission-ask ladder                                                                               |
-| `gitGates.commitMessages` | `true`    | validate `git commit -m` subjects as conventional commits; `false` disables commit lint                                                                                                              |
-| `gitGates.landingGate`    | `true`    | gate `git push` on this task reviewer `VERDICT: APPROVE`; `false` disables the gate                                                                                                                  |
-| `reviewEnsemble`          | `enforce` | `advise` credits a single-reviewer APPROVE unconditionally                                                                                                                                           |
-| `planUserReview`          | `false`   | pause the pipeline after the planner until the user accepts (`PLAN REVIEWED:`) or rejects (`PLAN REJECTED:`) the written plan via their own prompt; see [User plan review](#user-plan-review-opt-in) |
+| Key                       | Default   | Meaning                                                                                                                                                                                                                                                                                       |
+| ------------------------- | --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `alwaysEnforce`           | `false`   | dormant-until-engaged: enforcement arms on a plan (`PLAN APPROVED:` / plan-file reference) or a planner/pipeline request; `true` restores always-armed from the first prompt                                                                                                                  |
+| `gateEvidence`            | `enforce` | `flag`/`off` revert to flip-on-trust for `GATE: PASS`                                                                                                                                                                                                                                         |
+| `escalation`              | `block`   | repeat-attempt escalation mode for the landing and hands-on gates: both modes arm the one-shot ask latch and force the interactive permission ask on a repeat attempt (the block-throw is only the no-human fallback); the plan-gate escalation is mode-gated (`block` blocks, `ask` prompts) |
+| `gitGates.commitMessages` | `true`    | validate `git commit -m` subjects as conventional commits; `false` disables commit lint                                                                                                                                                                                                       |
+| `gitGates.landingGate`    | `true`    | gate `git push` on this task reviewer `VERDICT: APPROVE`; `false` disables the gate                                                                                                                                                                                                           |
+| `reviewEnsemble`          | `enforce` | `advise` credits a single-reviewer APPROVE unconditionally                                                                                                                                                                                                                                    |
+| `planUserReview`          | `false`   | pause the pipeline after the planner until the user accepts (`PLAN REVIEWED:`) or rejects (`PLAN REJECTED:`) the written plan via their own prompt; see [User plan review](#user-plan-review-opt-in)                                                                                          |
 
 | `sessionSummary` | `quiet` | one recap line at session end for active sessions (`on` adds an all-green line for idle ones; `off` disables) |
 | `toolPolicy.bashDeny` | `[]` | regex denylist for `bash`/`shell` (e.g. worktree/branch/merge ops) |
@@ -502,14 +543,14 @@ tools remain unguarded. The full threat model:
 
 | OpenCode host       | turnstile | Status                                                   |
 | ------------------- | --------- | -------------------------------------------------------- |
-| ≥ 2.0.22, < 3.0.0   | 0.9.x     | Supported (tested: 2.0.22, 2.0.27, 2.0.29, 2.2.0, 2.2.5) |
-| ≥ 3.0.0 or < 2.0.22 | 0.9.x     | Refuses to enforce at setup; upgrade turnstile           |
-| version unreadable  | 0.9.x     | Enforces; one-time journal warning                       |
+| ≥ 2.0.22, < 3.0.0   | 0.12.x    | Supported (tested: 2.0.22, 2.0.27, 2.0.29, 2.2.0, 2.2.5) |
+| ≥ 3.0.0 or < 2.0.22 | 0.12.x    | Refuses to enforce at setup; upgrade turnstile           |
+| version unreadable  | 0.12.x    | Enforces; one-time journal warning                       |
 
 On an incompatible host turnstile toasts the upgrade instruction and
 registers no hooks (a full no-op — fail-open):
 
-> turnstile 0.9.x expects opencode >=2.0.22,<3.0.0; you're on 3.1.0 —
+> turnstile 0.12.x expects opencode >=2.0.22,<3.0.0; you're on 3.1.0 —
 > upgrade turnstile (npm i opencode-turnstile@latest) or pin opencode
 
 `npx opencode-turnstile status --check-updates` (opt-in, network, cached 24 h)

@@ -2,7 +2,7 @@
 
 A native OpenCode V2 server plugin that asks a separately selected model to review shell permissions before execution. The model can recommend `allow` or `ask`; OpenCode executes the action and owns the approval interface. The plugin contains no shell executor, agent, terminal, backend, or approval UI.
 
-Release 0.2.0 targets **OpenCode / `@opencode/plugin` 2.2.5** and defaults to a small set of inspection commands. This is a security-sensitive initial release candidate. Package import and mocked integration are distinct from a live provider test; see [verification](docs/VERIFICATION.md) and [SDK research](docs/RESEARCH.md).
+Release 0.3.1 targets **OpenCode / `@opencode/plugin` 2.2.5** and defaults to a small set of inspection commands. This is a security-sensitive initial release candidate. Package import and mocked integration are distinct from a live provider test; see [verification](docs/VERIFICATION.md) and [SDK research](docs/RESEARCH.md).
 
 ## How it works
 
@@ -30,8 +30,8 @@ The `tool.execute.before` hook only observes input. The `permission.evaluate` ho
 Scanner resources may omit shell operators, redirections, or other parts of the source. Stateless automatic approval therefore requires a matching captured **complete** tool command, one identical scanner resource, and a command accepted by the local inspection grammar. Missing source identifiers, expired correlation, multiple resources, changed input, an external `workdir`, or unsupported shell syntax produce `ask`. A resource that happens to say `pwd` is insufficient on its own.
 
 Version 0.2.0 also supports opt-in [stateful project review](docs/STATEFUL.md)
-for generic commands with bounded, model-requested project evidence. Stateful
-mode delegates program semantics to the reviewer and enforces local evidence,
+for generic commands with bounded, model-requested project evidence. Project review
+delegates program semantics to the reviewer and enforces local evidence,
 budget and approval constraints; it does not interpret build tools or languages. These options and custom reviewer instructions require version 0.2.0 or later.
 
 ## Install from npm
@@ -43,7 +43,7 @@ OpenCode can install the package directly from configuration; no source copying 
   "$schema": "https://opencode.ai/config.json",
   "plugins": [
     {
-      "package": "@cesarus777/opencode-censor@0.2.0",
+      "package": "@cesarus777/opencode-censor@0.3.1",
       "options": {
         "model": { "providerID": "anthropic", "id": "MODEL_ID" },
       },
@@ -61,7 +61,7 @@ OpenCode can install the package directly from configuration; no source copying 
 
 For **global** activation, put the configuration in `~/.config/opencode/opencode.jsonc`. For **project** activation, put it in `<project>/opencode.jsonc` or `<project>/.opencode/opencode.jsonc`. Merge entries with existing configuration; do not duplicate the plugin. OpenCode's managed configuration and rule precedence still apply. Keep independent hard-deny rules for operations that must never run.
 
-`@cesarus777/opencode-censor@0.2.0` adds opt-in stateful review, custom reviewer instructions and free-provider integration checks. Publication status is recorded in [verification](docs/VERIFICATION.md). The earlier unscoped `opencode-censor` package is deprecated: replace its configuration entry with `@cesarus777/opencode-censor@0.2.0` and do not load both packages. The plugin ID remains `opencode-censor`. See [verification](docs/VERIFICATION.md) for publication status, accepted dependency risks and deferred deployment checks.
+`@cesarus777/opencode-censor@0.3.1` adds hybrid routing, project subdirectory support and bounded project queues, retaining opt-in stateful review and provider checks. Publication status is recorded in [verification](docs/VERIFICATION.md). The earlier unscoped `opencode-censor` package is deprecated: replace its configuration entry with `@cesarus777/opencode-censor@0.3.1` and do not load both packages. The plugin ID remains `opencode-censor`. See [verification](docs/VERIFICATION.md) for publication status, accepted dependency risks and deferred deployment checks.
 
 ## Install local source or a tarball
 
@@ -96,10 +96,31 @@ To distribute a standalone archive:
 ```sh
 bun run build
 npm pack
-npm install --prefix /path/to/plugins ./cesarus777-opencode-censor-0.2.0.tgz
+npm install --prefix /path/to/plugins ./cesarus777-opencode-censor-0.3.1.tgz
 ```
 
 Set `plugins[].package` to `/path/to/plugins/node_modules/@cesarus777/opencode-censor`. The installed package contains compiled JavaScript, declarations, license, documentation and examples; it does not require copying this repository into each project.
+
+Version 0.3.1 implements the [development workflow plan](docs/DEVELOPMENT-WORKFLOW-PLAN.md): explicit hybrid review, project subdirectory working directories and bounded project review queues. Use [the development configuration](examples/opencode-development.jsonc) to select hybrid; the default remains stateless. See [verification](docs/VERIFICATION.md) for staging and public availability.
+
+Hybrid routes an eligible closed-grammar inspection with matching complete source
+and scanner resource to the existing stateless reviewer. It requires no project
+file read. Other eligible commands use project evidence review. Both paths need a
+fresh valid model decision; an inspection ask, error or timeout ends as ask and is
+never retried through project review. `alwaysAsk` applies before routing. On the
+hybrid inspection path, forbidding either `workspace_read` or `process_execution`
+conservatively forces ask for every inspection, including `pwd`. Other effect
+restrictions retain the existing inspection boundary and its trusted-host limits.
+Hybrid requires `review.project.allowFileContents: true`; evidence scopes constrain
+the project path, while inspection commands retain their documented grammar.
+Explicit stateful review still requires full-file evidence even for inspections.
+
+Native workdirs may be project subdirectories such as `packages/app`. The plugin
+validates canonical containment and directory identities, rejects symlink components and native home-relative `~`/`~/…` spellings,
+and rechecks the native workdir before allow. Evidence paths remain project-root-relative;
+project prompts receive the actual relative workdir. Filesystem changes after the
+final check remain possible. The original 2.2.5 scanner has been verified with
+execution prevented; remote-provider and interactive-client acceptance remain separate.
 
 ## Configuration
 
@@ -111,17 +132,17 @@ Options are read once during setup from `ctx.options`. Reload the plugin after c
 | `model.providerID`        | required       | OpenCode provider ID, independent of the agent model                                                                                        |
 | `model.id`                | required       | OpenCode model ID; no automatic fallback to another model                                                                                   |
 | `mode`                    | `balanced`     | `strict`, `balanced`, or `permissive`                                                                                                       |
-| `review.strategy`         | `stateless`    | `stateless` inspection or opt-in `stateful` project review; see [project options](docs/STATEFUL.md)                                         |
+| `review.strategy`         | `stateless`    | `stateless` inspection, opt-in `stateful` project review, or `hybrid` routing; see [project options](docs/STATEFUL.md)                      |
 | `systemPrompt`            | `""`           | Additional operator review instructions; at most 6000 characters; cannot override local policy                                              |
 | `fallback`                | `ask`          | Only `ask` is supported                                                                                                                     |
-| `timeoutMs`               | `15000`        | Integer 10–60000; covers context, evidence collection, all generation calls and rechecks together                                           |
+| `timeoutMs`               | `15000`        | Integer 10–60000; covers source/directory checks, queue waiting, context, evidence, generation and rechecks together                        |
 | `context.enabled`         | `false`        | Opt in to local extraction of task-intent labels                                                                                            |
 | `context.maxMessages`     | `5`            | Inspect at most the last 1–20 returned context entries locally                                                                              |
 | `context.maxCharacters`   | `6000`         | Scan at most 1–12000 characters of user text locally                                                                                        |
 | `logging.enabled`         | `true`         | Write structured JSON audit records                                                                                                         |
 | `logging.level`           | `info`         | `info`: all decisions; `error`: fallback records only                                                                                       |
 | `logging.file`            | XDG state path | Absolute JSONL audit file path; defaults to `~/.local/state/opencode-censor/audit.jsonl` (or `$XDG_STATE_HOME/opencode-censor/audit.jsonl`) |
-| `logging.includeCommands` | `false`        | Only `false` supported in this release                                                                                                      |
+| `logging.includeCommands` | `true`         | Include the exact captured shell command; set `false` to omit command text                                                                  |
 | `cache.enabled`           | `false`        | Only `false` supported; no cached or transferable approvals                                                                                 |
 
 Unknown keys, bad types, invalid bounds, unsupported sensitive options, or a missing model install a fail-safe hook that changes in-scope decisions to `ask`. Invalid configuration emits fixed metadata without echoing supplied values. Check `event.message` or audit records for `invalid_configuration`. Explicit `deny` and other permission actions remain unchanged.
@@ -177,30 +198,30 @@ For stateless inspection, the model must return a single flat JSON object with `
 
 ## Privacy and prompt injection
 
-In the default stateless strategy, only eligible inspection commands and their matching resources reach the reviewer. Stateful project review additionally discloses model-requested files within configured project path prefixes after `review.project.allowFileContents: true`; see its [privacy and trust boundary](docs/STATEFUL.md#expanded-trust-boundary). Sensitive-data tripwires also run before transmission. Free-form commands and paths are outside the stateless inspection grammar. Stateful mode explicitly broadens command disclosure and execution review, subject to sensitive-data checks and local limits. Detection is not a general-purpose secret scanner and cannot identify every possible secret.
+In the default stateless strategy, only eligible inspection commands, their matching resources and the validated project-relative workdir reach the reviewer. The project path of stateful or hybrid review additionally discloses model-requested files within configured project path prefixes after `review.project.allowFileContents: true`; see its [privacy and trust boundary](docs/STATEFUL.md#expanded-trust-boundary). Sensitive-data tripwires also run before transmission. Free-form commands and paths are outside the stateless inspection grammar. Stateful mode explicitly broadens command disclosure and execution review, subject to sensitive-data checks and local limits. Detection is not a general-purpose secret scanner and cannot identify every possible secret.
 
 With context enabled, `ctx.session.context({sessionID})` returns history **locally**. The plugin scans only the bounded recent entries, selects user text, ignores attachments and assistant/tool/file content, and sends only fixed vocabulary labels: `inspect`, `debug`, `test`, `build`, `fix`, `refactor`, `document`, `review`. It skips text matching sensitive-data tripwires. No names, arbitrary words, paths, credentials, environment variables, file contents or original message text are sent. These labels are intentionally lossy; disable context to avoid even their disclosure. The SDK context endpoint currently has no pagination or size limit, so the local fetch may still be large even though scanning and provider input are bounded.
 
-Instructions and JSON data are visibly separated. The current text API accepts a **single prompt string**, without an independent system-message or JSON-schema parameter; the prompt module cannot create a provider-enforced trust boundary. The stateless closed grammar, source correlation, strict response parsing, configured evidence boundaries, risk checks and fail-safe behavior are independent protections. Stateful semantic judgments remain delegated to the model. They reduce exposure without promising immunity to prompt injection or model mistakes.
+Instructions and JSON data are visibly separated. The current text API accepts a **single prompt string**, without an independent system-message or JSON-schema parameter; the prompt module cannot create a provider-enforced trust boundary. The stateless closed grammar, source correlation, strict response parsing, configured evidence boundaries, risk checks and fail-safe behavior are independent protections. Project-path semantic judgments remain delegated to the model. They reduce exposure without promising immunity to prompt injection or model mistakes.
 
 ## Timeouts, concurrency and lifecycle
 
 Each evaluation owns its deadline and cancellation controller. Unload settles pending evaluations as `ask`, clears correlation state, and disposes registrations. Setup failure disposes registrations already acquired. Late results and late rejections cannot mutate a resolved permission event and do not create unhandled promise rejections.
 
-The 2.2.5 Promise API types expose request cancellation, but the local Promise adapter ignores generation request options. We pass the signal for future compatibility and independently enforce the deadline. A timed-out request may continue consuming provider resources. At most eight active or still-unsettled review tasks are admitted per plugin instance; additional evaluations ask immediately. If all eight hang forever, reviews keep asking until reload. The plugin adds no retry, queue, coalescing, persistent storage, or approval cache. Stateful project review holds bounded temporary findings and serializes reviews per session; native provider retry behavior remains controlled by OpenCode.
+The 2.2.5 Promise API types expose request cancellation, but the local Promise adapter ignores generation request options. We pass the signal for future compatibility and independently enforce the deadline. A timed-out request may continue consuming provider resources. At most eight active or still-unsettled review tasks are admitted per plugin instance; additional evaluations ask immediately. If all eight hang forever, reviews keep asking until reload. Project reviews wait FIFO per session, with at most 32 waiting requests globally and eight per session. Other sessions can use available slots. Queue overflow and expiry ask; expired waiters never start generation. Hung operations retain their slot and session lock until settlement. Inspection overload still asks immediately. Unload clears queues. There is no retry, coalescing, persistent storage or approval cache; native provider retry behavior remains controlled by OpenCode.
 
 Correlation is keyed by session/message/call, capped at 256 entries, expires logically after 60 seconds, and is removed on tool completion or unload. Expired entries are pruned on subsequent tool calls. Expired or missing data always asks. Correlation state is temporary memory, not an approval cache.
 
 ## Audit and troubleshooting
 
-JSON audit records contain timestamp, `shell` action, final decision, risk, elapsed milliseconds, a fixed reason code, and fallback status. Validated replies also add `reviewerDecision` and `reviewerRiskLevel`, distinct from the final policy decision. Stateful reviews add model-call/evidence counts and a validated fixed `reviewerReasonCode`. Malformed replies produce `invalid_review_response`; provider/context failures produce `review_error`. Missing reviewer fields mean no validated reply is attached, not a model rejection. Records contain no full commands, context, session identifiers, raw provider output, exception messages or analytics payloads. Risk defaults to `medium` when unknown; a skipped high-risk command is not a complete risk assessment. The public SDK has no general plugin logger. Records go to a separate JSONL file. A file write failure cannot turn `ask` into `allow`, but can make counts incomplete. Invalid configuration falls back to stderr. Keep the file private and rotate/archive it as needed.
+Version 2 JSON audit records include selected `reviewPath` and `queueWaitMs`, alongside `schemaVersion`, effective `strategy`/`mode`, `stage`, `detailCode`, the initial `resourceCount`, and an always-present `reviewCalls` count (including zero). Validated confidence is recorded as `reviewerConfidence` when supplied. See [the audit field and diagnostic reference](docs/AUDIT.md). Records contain timestamp, `shell` action, final decision, risk, elapsed milliseconds, a fixed reason code, and fallback status. Validated replies also add `reviewerDecision` and `reviewerRiskLevel`, distinct from the final policy decision. Stateful reviews add model-call/evidence counts and a validated fixed `reviewerReasonCode`. Malformed replies produce `invalid_review_response`; provider/context failures produce `review_error`. Missing reviewer fields mean no validated reply is attached, not a model rejection. Records include the native `sessionID` and, by default, the exact captured `command`, including whitespace and newlines. If complete source is unavailable, `command` is omitted rather than reconstructed from scanner fragments. Set `logging.includeCommands: false` to omit commands, or `logging.enabled: false` to disable audit logging. Commands may contain secrets and private paths; redact audit files before sharing. Context, raw provider output and exception messages remain excluded. Invalid configuration omits commands and may write the session ID to stderr. Risk defaults to `medium` when unknown; a skipped high-risk command is not a complete risk assessment. The public SDK has no general plugin logger. Records go to a separate JSONL file. A file write failure cannot turn `ask` into `allow`, but can make counts incomplete. Invalid configuration falls back to stderr. Keep the file private and rotate/archive it as needed.
 
-After starting OpenCode with this plugin, run `censor-stats` from a standalone installation, or `bun run stats` in this checkout after building. Pass a custom audit path as the first argument, for example `bun run stats /absolute/path/audit.jsonl`. The report shows automatic approvals divided by all audited shell evaluations. `ask` means sent to native approval, not necessarily rejected; native configured denies, non-shell actions, and later human decisions are outside the count. Set `logging.level` to `info` for complete totals.
+After starting OpenCode with this plugin, run `censor-stats` from a standalone installation, or `bun run stats` in this checkout after building. Pass a custom audit path as the first argument, for example `bun run stats /absolute/path/audit.jsonl`. The report shows automatic approvals divided by all audited shell evaluations, counts by reason/detail, and reviewer reach among evaluations with known call data. Legacy records without call data or a validated reviewer decision are reported as unknown, not skipped. `ask` means sent to native approval, not necessarily rejected; native configured denies, non-shell actions, and later human decisions are outside the count. Set `logging.level` to `info` for complete totals.
 
 | Symptom                       | Check                                                                                                                               |
 | ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
 | Every command asks            | Model ID/provider availability, exact command grammar, plugin order, `event.message`, SDK version and captured source               |
-| `invalid configuration`       | Replace placeholder model, remove unknown options, keep cache and command logging false                                             |
+| `invalid configuration`       | Replace placeholder model, remove unknown options, keep caching disabled                                                            |
 | `missing full command`        | Built-in `shell` input/source could not be correlated; custom tools and scanner-only evaluations deliberately ask                   |
 | `review error`                | Provider unavailable, rate limit, context API failure, malformed/ambiguous output; inspect OpenCode provider diagnostics separately |
 | `timeout` / `review capacity` | Provider latency or hung requests; adjust bounded timeout or reload after investigating                                             |
@@ -216,7 +237,7 @@ LLMs can be wrong. This plugin is **not a sandbox** and cannot constrain a comma
 
 - Only actions that reach the native `shell` permission hook are covered. Direct terminals, unrelated MCP tools and arbitrary plugin code are outside scope.
 - Host executables, shell startup files, environment, Git configuration, filesystem and other plugins must be trusted. Even inspection may invoke configured helpers (for example Git fsmonitor), write index metadata, or expose output to the working agent. Closed syntax does not prove absence of side effects in a hostile runtime.
-- The plugin never verifies executable binaries or provides filesystem isolation. Stateless workdir checks are lexical. Stateful review inspects model-requested files within permitted project scopes, rejects symlinked evidence paths, requires the project-root workdir, and rechecks file hashes. Filesystem races during inspection and the final check/run interval remain host concerns.
+- The plugin never verifies executable binaries or provides filesystem isolation. All paths validate canonical project-local workdirs and recheck directory identity. Project review inspects model-requested files within permitted scopes, rejects symlinked evidence paths and rechecks file hashes. Filesystem races during inspection and the final check/run interval remain host concerns.
 - Other trusted plugins may mutate tool inputs or override a decision later. Put this gate after command-rewriting plugins, avoid conflicting permission hooks, and test your actual plugin combination. An explicit native configured deny is stronger than a plugin-generated ask.
 - The reviewer shares OpenCode's process/provider infrastructure and may use the same vendor; independent model selection is not process isolation. Native generation hooks or provider diagnostics may observe prompts.
 - Experimental generation contracts can change. Dependency and host compatibility are pinned and must be retested when upgraded. No V1 adapter is supplied.
@@ -246,13 +267,13 @@ OPENCODE_BIN=/absolute/path/to/opencode bun run test:live
 
 This installs the npm archive into an isolated consumer and starts exactly OpenCode 2.2.5 with synthetic credentials and a controlled loopback HTTP provider. The test driver replaces the shell tool with permission assertions; no reviewed command is executed and no pending request is approved. It checks native source hooks, allow/ask/error/deny, tool completion, delayed and late replies, eight-request capacity, concurrent requests, reload, and the generic evidence loop with allow/ask/unavailable-file outcomes. It requires subprocess and loopback access. The native CI job pins Bun 1.3.11 and OpenCode 2.2.5 and needs no external provider credentials.
 
-This command always uses the controlled loopback provider and consumes no remote-model allowance. No real-provider acceptance command exists yet.
+This command always uses the controlled loopback provider and consumes no remote-model allowance. The separate optional free-provider check below uses a remote service.
 
-The replacement tool does not validate the built-in shell scanner/executor. Real reviewer and interactive native-client acceptance remain mandatory; follow the [release checklist](docs/RELEASE-CHECKLIST.md) and record evidence in [verification](docs/VERIFICATION.md). Provider cancellation is limited by the pinned SDK adapter even when native permission waiting is bounded.
+The separate original-scanner phase preserves the native shell tool, records the gate decision and forces native deny before process creation. Thirteen fixed fixtures cover exact inspections, flags, unsupported arguments, compounds, pipelines and subdirectory workdirs; see [the inspected hook order](docs/RESEARCH.md#original-225-scanner-and-pre-spawn-interception--2026-11-09). Real reviewer and interactive native-client acceptance remain mandatory; follow the [release checklist](docs/RELEASE-CHECKLIST.md) and record evidence in [verification](docs/VERIFICATION.md). Provider cancellation is limited by the pinned SDK adapter even when native permission waiting is bounded.
 
 Source and non-sensitive bug reports: [cesarus777/opencode-censor](https://github.com/cesarus777/opencode-censor). Security reports must follow [SECURITY.md](SECURITY.md). Before publishing, complete or explicitly defer the checklist items, triage dependency advisories, confirm npm account access and inspect/install the final archive. Private reporting and deployment verification remain outstanding; the two moderate dependency advisories are explicitly accepted. `npm view` checks availability, not ownership. See [CHANGELOG.md](CHANGELOG.md) for release changes.
 
-The build and test scripts do not stage or publish. The [staging workflow](.github/workflows/publish.yml) stages a verified archive when a stable version tag is pushed, or when manually run on `main` with the matching package version. It runs the full checks and native smoke, then inspects and installs the exact archive it stages with lifecycle scripts disabled. A maintainer must approve the staged package with 2FA on npm before it becomes public. For `0.2.0`, push tag `v0.2.0` or run the workflow manually on `main` with version `0.2.0`.
+The build and test scripts do not stage or publish. The [staging workflow](.github/workflows/publish.yml) stages a verified archive when a stable version tag is pushed, or when manually run on `main` with the matching package version. It runs the full checks and native smoke, then inspects and installs the exact archive it stages with lifecycle scripts disabled. A maintainer must approve the staged package with 2FA on npm before it becomes public. For `0.3.1`, push tag `v0.3.1` or run the workflow manually on `main` with version `0.3.1`.
 
 Before the first Actions publication, configure a GitHub Actions trusted publisher in the **scoped package's** npm Settings: owner `cesarus777`, repository `opencode-censor`, workflow filename `publish.yml`, and no environment name. A publisher configured for the old unscoped package does not transfer. Allow `npm stage publish` (enabled by default). The workflow uses Node 24, GitHub-hosted runners and OIDC; no `NPM_TOKEN` secret is needed. See [npm's trusted publishing instructions](https://docs.npmjs.com/trusted-publishers/).
 
@@ -288,5 +309,5 @@ retries and transport cancellation remain host controlled.
 The **Free provider acceptance** GitHub workflow is manual and accepts a model ID.
 It is separate from required deterministic CI. Free model availability changes;
 model discovery and zero-price validation occur on each run. Stateful remote
-review, the original native scanner and interactive approval acceptance remain
+review and interactive approval acceptance remain
 separate from this check.

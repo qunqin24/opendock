@@ -51,7 +51,7 @@ Search has three modes: `words`, the default, matches stemmed words in any order
 
 Sessions with only some words of a phrasing show below full matches, marked `near match`; runs of the same thing in one directory, such as one scheduled prompt's runs, show once with a `similar` count. When a search, `history_sessions` or `history_files` finds nothing, the result names the input that would show what the default filters left out.
 
-One skill, `history-recall`, teaches the search, brief, read pattern and how to cite a session as `(ses_… #seq)`.
+The `history` namespace description tells an agent when to check here (before the repo or git, whenever you refer to earlier work), which tool fits which question, when to widen the search, and how to cite a session as `(ses_… #seq)`. One skill, `history-recall`, teaches the search, brief, read pattern and the longer recipes. [Where each instruction lives, and why](https://github.com/joe-broadhead/opencode-history/blob/HEAD/docs/architecture.md#what-the-model-reads-and-where-an-instruction-belongs).
 
 ### How it reads your history
 

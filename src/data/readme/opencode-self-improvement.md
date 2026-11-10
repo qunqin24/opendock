@@ -19,7 +19,7 @@ Every figure in this README carries a provenance marker: **measured** (read off 
 
 **2. Restart opencode.** It installs the package and its dependencies at startup, and the plugin installs its own slash commands. On desktop, a later config edit needs `opencode service restart`: relaunching the app leaves the background service — and the plugin options it already parsed — alive.
 
-**3. Run `/repo-init`** in each repo you work in. It stores the test / build / lint / typecheck commands as memories and writes an init stamp tied to the current git head. Rerun `/repo-init force` after a refactor. (Code-graph indexing is opt-in — see [Code graph](#code-graph-optional).)
+**3. Run `/repo-init`** in each repo you work in. It stores the test / build / lint / typecheck commands as memories and writes an init stamp tied to the current git head. Rerun `/repo-init force` after a refactor.
 
 Needs Bun 1.3.0 or newer in the opencode build (the tested floor); older Bun reports a startup warning.
 
@@ -35,7 +35,7 @@ After that, memory is just conversation: ask the agent to remember something and
 ## What you get
 
 - **`memory_*` tools** — `memory_init`, `memory_remember`, `memory_recall`, `memory_update`, `memory_forget`, `memory_list`, `memory_undo`, `memory_status`, `memory_evidence`, `memory_export`, `memory_import`, `memory_decay`, `memory_consolidate`, `memory_merge_review`.
-- **`/repo-init`** — per-repo setup: build/test commands as memories, keyed to the git head. Code-graph indexing is opt-in (`OPENCODE_MEMORY_GRAPH=1`), off by default.
+- **`/repo-init`** — per-repo setup: build/test commands as memories, keyed to the git head.
 - **Write gates** — code references are verified against your actual repo, near-duplicates are collapsed, contradictions with superseded memories are rejected. Blocked writes are logged with a reason in `memory_evidence`, which reads one real calendar day inside `evidence/` at a time — its `date` is a date, never a path.
 - **Memory-aware compaction** — durable memories are handed to the compaction summarizer, so a long session keeps its facts.
 - **Auto-capture (experimental, opt-in)** — in progress and **not working yet**. The design: on the turn-end and compaction triggers, one cheap model pass per trigger proposes candidates, which face the same write gates, with a 5-minute cooldown per session and trigger bounding the spend. What is not true today: it has never been observed firing on a live opencode 2.x store, so enabling it may cost model calls and store nothing. See [Auto-capture is experimental](#auto-capture-is-experimental).
@@ -72,6 +72,7 @@ Zero configuration is the default. To tune, use the object form of the plugin en
 | `captureModel` | — | `"provider/id"` model used for auto-capture. Required when `autoCapture` is on; missing or invalid disables capture with a startup warning. |
 | `captureMax` | `3` | Maximum candidates proposed per capture pass. |
 | `captureOnCompact` | `true` | When `autoCapture` is on, also mine the transcript at compaction, before the summarizer replaces it. Its 5-minute cooldown is separate from the turn-end one, so the two triggers' hit-rates stay measurable. Setting it while `autoCapture` is off does nothing and reports a startup warning. |
+| `captureGuidedRules` | `false` | POC: deterministic guided-candidate pre-pass. The user's own lines decide which stated values or rules are guided (numbers, rates, currency, explicit rule assertions) and attach the verbatim quote; the capture model may phrase such a row but cannot clear the flag or the quote, and a guided quote the user never wrote is refused at the write boundary instead of silently stripped. Fires alongside the model pass only — no extra model calls. |
 | `notifyBlocked` | `true` | Terminal (TUI) only: toast when a write gate blocks a write. Blocks are always in `memory_evidence` either way. |
 
 ### Environment variables
@@ -83,8 +84,6 @@ Zero configuration is the default. To tune, use the object form of the plugin en
 | `OPENCODE_MEMORY_INJECT_BUDGET` | Fallback for `injectBudget`. |
 | `OPENCODE_MEMORY_FRONTIER_BUDGET` | Fallback for `frontierBudget`. |
 | `OPENCODE_COMMANDS_DIR` | Where the plugin mirrors its slash commands (default `~/.config/opencode/commands`). |
-| `OPENCODE_MEMORY_GRAPH` | Set to `1` to have `/repo-init` build the code graph. Off by default — nothing reads the index. See [Code graph](#code-graph-optional). |
-| `OPENCODE_CBM_BIN` | Path to a `codebase-memory-mcp` binary, used only when `OPENCODE_MEMORY_GRAPH=1`. See [Code graph](#code-graph-optional). |
 | `OPENCODE_VIEWER_HOST` | Interface the editor binds to (default `127.0.0.1`). A non-loopback bind serves the store over plain HTTP with no authentication — only do it on a network you control. See [Surfaces](#surfaces). |
 | `OPENCODE_VIEWER_PORT` | Admin editor port (default `8787`). |
 | `OPENCODE_VIEWER_ALLOWED_HOSTS` | Comma-separated hosts beyond loopback. See [Surfaces](#surfaces). |
@@ -98,6 +97,8 @@ What is established, from tests and fixtures (no live store involved):
 - **The trigger events are ones the host actually emits.** Capture subscribes to `session.execution.succeeded` and `session.execution.interrupted`, the two turn-end events present in a recording of the desktop service (`test/fixtures/host-events.jsonl`). `session.idle`, `session.status` and `session.execution.failed` are *declared* by the host but absent from that recording, so they deliberately do not trigger capture; `test/event-fidelity.test.ts` refuses a trigger that is only declared. An earlier revision subscribed to `session.idle` and stayed silent for days with no signal — reading a declared event as an emitted one is the failure that fixture exists to prevent.
 - **The path runs under simulated host traffic** — unit tests hand the plugin the recorded envelopes and assert a candidate lands through the write gate, including conservation (a near-duplicate collapses at the gate instead of writing a second row): `test/capture.test.ts`, `test/capture-compaction.test.ts`. No terminal e2e scenario covers the trigger, so the simulated envelope is the strongest evidence that exists — and fabricating the envelope is exactly what passed while this feature was dead.
 - **Identity triggers have their own recording check.** `test/event-fidelity.test.ts` checks `IDENTITY_EVENT_TYPES` against the original 2.1.4 recording plus `test/fixtures/host-session-move.json`, a normalized one-frame extract from a separate 2.2.2 move capture. The extract must declare nonempty provenance and its retained envelopes must round-trip through the lockfile-pinned `@opencode/schema` 2.0.32 decoder. These checks reject missing metadata and malformed envelopes; they do not authenticate the capture. The identity replay uses the plugin subscription, but live plugin rebinding remains unverified. The recording version is distinct from the CI host pin (2.0.26).
+
+- **Teardown stops work that is still in flight.** `generate.text` does not take the abort signal, so a capture parked mid-model-call used to wake up after the host disposed the plugin and run the whole write gate against a store its caller had already removed. Cleanup now aborts the subscription, every pass re-checks the signal after the model call and between candidates (a gate already mutating is never cut in half), and cleanup drains the tracked passes under a one-second bound — teardown never waits on the model. `test/capture-dispose-drain.test.ts` parks a capture, disposes, releases, and asserts that no row and no evidence line carries a timestamp after disposal (#211).
 
 What is not established:
 
@@ -247,7 +248,7 @@ Limits worth knowing:
 - It can miss hex-only secrets, low-diversity passwords, and credentials written in prose without an assignment.
 - Credential-shaped `scope`, `tags` or `issue` metadata is rejected rather than silently rewritten.
 - `memory_remember` still replies `Remembered` when content was redacted, so the stored text can differ from what was sent.
-- Redaction is forward-only: existing stores are not scrubbed, and `memory_export` writes what is already stored verbatim.
+- Redaction is forward-only: existing stores are not scrubbed. `memory_export` scrubs credentials out of `content`, `issue`, `scope`, `tags` and `kw` as it serialises, so the file that leaves the machine carries `[redacted]` where a stored row still holds a token; the store itself is untouched, and origin stamps (`repo`, `repoPath`) are written as stored. The scrubber is a best-effort sweep over known token families and high-entropy credential-shaped values — an exotic credential can survive it, so an export is still a file you hand out deliberately.
 
 ## Export and move between machines
 
@@ -300,18 +301,6 @@ Same data behind each one (`memory_status`; no model call).
 **Desktop / web / IDE** — the terminal slots do not exist there, so use the self-installed **`/memory-report`** chat command: the same sections rendered in the conversation.
 
 **Browser editor** — `bun memory-view`, then http://127.0.0.1:8787. Bound to loopback; requests are checked against `Host` and `Origin`, so other hosts must be listed explicitly in `OPENCODE_VIEWER_ALLOWED_HOSTS`. Listing a non-loopback host serves the store over plain HTTP with no authentication — only do it on a network you control.
-
-## Code graph (optional)
-
-Code-graph indexing is **off by default** (`/repo-init` reports `Graph: disabled`). Measured cost vs. benefit: the one-shot index spawn took 11–26s per init, failed in 29 of 32 real runs, and no read or gate path consumes the index — retrieval and the write gates resolve code references against the live file tree, and gate evidence is identical with the graph present or absent. So the default build never spawns it.
-
-To opt in, set `OPENCODE_MEMORY_GRAPH=1`. `/repo-init` then indexes the repo via [`codebase-memory-mcp`](https://github.com/DeusData/codebase-memory-mcp), pinned to `0.11.0` as an optional dependency. A copy already on your `PATH` is used instead; override with `OPENCODE_CBM_BIN=/path/to/codebase-memory-mcp`. Install the pinned binary globally if you prefer:
-
-```sh
-curl -fsSL https://raw.githubusercontent.com/DeusData/codebase-memory-mcp/main/install.sh | bash
-```
-
-Whether or not the graph runs, `/repo-init` records scripts and the init stamp, and memory behaves the same.
 
 ## Installing a specific version
 
@@ -387,8 +376,7 @@ Run it when you want to know whether the suite still has teeth — after changin
 | `memory store is busy` | A store write exhausted its 5s lock-wait budget. Appends, rewrites, and restores refuse that mutation rather than proceed unlocked and risk losing another writer's rows. Retry after contention clears. An operation spanning several files or steps may have completed earlier steps; refusal is not a rollback of those steps. If the reply reports `PARTIAL`, inspect the named rows and `memory_evidence` / `memory_undo` before retrying. A lock left by a killed process is taken over after 10s. |
 | Stray `*.logfmt.lock` or `*.tmp` in the store | Write bookkeeping; safe to delete while nothing is writing. |
 | `/repo-init` missing from the command list | The self-install couldn't write to `~/.config/opencode/commands/`. Create it and restart, or ask the model to "init memory for this repo" — the same tool. |
-| Init says `Graph: disabled` | Expected default — code-graph indexing is opt-in and nothing reads the index. Set `OPENCODE_MEMORY_GRAPH=1` to enable. Scripts are remembered either way. |
-| Init says `Graph: unavailable` | You opted in (`OPENCODE_MEMORY_GRAPH=1`) but `codebase-memory-mcp` couldn't start. Install pinned `0.11.0` or point `OPENCODE_CBM_BIN` at the binary. Scripts are still remembered without it. |
+| `memory_init` rejects a call naming `mode` | The code-graph integration was removed (#231) and the tool schema refuses unknown arguments — drop `mode` from the call. Stamps written by older versions (their text carries `graph=`/`mode=`) still read fine; no re-init is forced. |
 | Stale plugin after an update | `opencode plugin update opencode-self-improvement` (or bump the pinned `@version` in the `plugins` entry) and restart opencode. On desktop use `opencode service restart`: relaunching the app leaves the background service — and the plugin version and options it already parsed — alive. |
 | `Error: Plugin is not configured` right after `plugin add` | An opencode bug ([#54654](https://github.com/anomalyco/opencode/issues/54654)), not a config problem: the first `plugin list/check/update` against a cold background service reads the plugin inventory before activation finishes. The plugin is installed and loading — just run the command again. |
 | Auto-capture does nothing | Auto-capture is **experimental and has never fired on a verified live store** — see [Auto-capture is experimental](#auto-capture-is-experimental). `memory_evidence` says which case you are in from the `plugin_load` line: `capture=off` (option not on), `invalid_model` (`captureModel` must be `provider/id`; a bad one disables capture with a startup warning), `no_capabilities` (host did not expose what capture needs), or `capture=on`. `captureOnCompact` alone does nothing. `capture=on` with no `auto_capture_*` line after a session is the open bug, not your config. Rejected candidates log as evidence, not errors. On desktop, changing any of these options needs `opencode service restart`. |

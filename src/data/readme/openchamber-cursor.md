@@ -102,6 +102,33 @@ A provider you define yourself under `providers` in that file keeps the `name` y
 
 Restart OpenChamber or OpenCode after changing the option so it reloads the model list. The cache at `models.json` keeps the previous list until the next discovery.
 
+## Concurrent sessions and timeouts
+
+Each OpenCode session has its own Cursor agent and run. A tool call that pauses one session does not cancel a run in another session, and a new turn only cancels the run in its own session.
+
+A turn that produces no output fails instead of waiting forever:
+
+- **Idle timeout:** 5 minutes with no output. Option `idleTimeoutMs`.
+- **Turn timeout:** 15 minutes for one step. Option `turnTimeoutMs`.
+
+On timeout, or when you press Stop, the plugin writes an SSE error, ends the stream with `[DONE]`, cancels that session's run, and lets the next turn start. The model list is cached for about 10 minutes (`modelsCacheTtlMs`) so reloads do not call Cursor `get_models` on every start. A rate-limit response uses the cached list.
+
+```jsonc
+{
+  "plugins": [
+    {
+      "package": "opencodev2-cursor",
+      "options": {
+        "labelAllProviders": true,
+        "idleTimeoutMs": 300000,
+        "turnTimeoutMs": 900000,
+        "modelsCacheTtlMs": 600000
+      }
+    }
+  ]
+}
+```
+
 ## Updates
 
 Installing from npm does **not** silently replace the version you have. What happens depends on how the entry is written:
@@ -133,6 +160,7 @@ Or delete the `opencodev2-cursor` entry from `opencode.json`. Restart afterwards
 - **"Cursor SDK needs Node.js 22.13 or newer".** Install a newer Node, or set `CURSOR_ACP_NODE_BIN` to its path.
 - **"Agent … already has active run".** Send the message again. A new turn cancels the stuck run.
 - **Sign-in with cursor-agent fails.** Run `cursor-agent login` in a terminal, then retry `/connect`.
+- **A turn goes quiet.** After the idle timeout the chat shows an error instead of hanging. The log records `turn start`, `timeout`, `client abort`, `run cancelled`, and `orphan tool result`, each with `sessionKey` and `model`.
 - **Still stuck?** Open a [Bug report](https://github.com/aenemo/opencodev2-cursor/issues/new?template=bug_report.yml). It asks for OS, surface, Node version, and sign-in method so install problems can be separated from auth problems. Do not paste API keys or tokens.
 
 ## Where files live

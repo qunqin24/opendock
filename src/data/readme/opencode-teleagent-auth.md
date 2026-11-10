@@ -2,7 +2,7 @@
   <a href="https://github.com/anbulang/opencode-teleagent-auth/releases/latest"><img alt="release" src="https://img.shields.io/github/v/release/anbulang/opencode-teleagent-auth?label=release&color=2ea44f"></a>
   <a href="https://www.npmjs.com/package/opencode-teleagent-auth"><img alt="npm" src="https://img.shields.io/npm/v/opencode-teleagent-auth?label=npm&color=cb3837"></a>
   <a href="LICENSE"><img alt="license" src="https://img.shields.io/badge/license-MIT-purple"></a>
-  <a href="https://github.com/anbulang/opencode-teleagent-auth"><img alt="platform" src="https://img.shields.io/badge/platform-macOS-lightgrey"></a>
+  <a href="https://github.com/anbulang/opencode-teleagent-auth"><img alt="platform" src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows-lightgrey"></a>
   <a href="https://github.com/anbulang/opencode-teleagent-auth"><img alt="magpie" src="https://img.shields.io/badge/magpie-0.1.684%2B-orange"></a>
   <a href="https://github.com/anbulang/opencode-teleagent-auth"><img alt="tests" src="https://img.shields.io/badge/tests-146%20passing-brightgreen"></a>
   <a href="https://github.com/anbulang/opencode-teleagent-auth/stargazers"><img alt="stars" src="https://img.shields.io/github/stars/anbulang/opencode-teleagent-auth?style=social"></a>
@@ -24,7 +24,7 @@
 ## ✨ 特性
 
 - **5 个官方模型**：智能 / 旗舰 / 极速 / 轻量 / 轻速，上下文 400K / 100K，带图片输入与积分倍率
-- **无 API key 登录**：读本机 TeleAgent 登录态（`token.json` + 钥匙串），点一下「读取本机登录态」
+- **无 API key 登录**：读本机 TeleAgent 登录态（macOS 钥匙串 / Windows DPAPI），点一下「读取本机登录态」
 - **请求现场签名**：每请求现读 token、现签两步 HMAC，带设备指纹，与桌面端内核一致
 - **OpenAI 兼容**：真流式、多轮、工具调用、`reasoning_content` 思维链原样交给 magpie
 - **积分与签到**：`magpie quota` 看余额与套餐；每日签到幂等，失败不影响模型
@@ -51,14 +51,30 @@
 
 ## 前置条件
 
-1. macOS（TeleAgent 桌面端只有 macOS 版）
-2. TeleAgent 桌面端已安装并**登录**（`/Applications/TeleAgent.app`）
+1. macOS 或 Windows（0.2.0 起支持 Windows；Linux 尚未适配）
+2. TeleAgent 桌面端 **2.7.1 或更高版本**，已安装并**登录**，与 magpie 使用同一个操作系统用户
 3. magpie **0.1.684+**（`magpie --version`）；更早的版本模型能用，但积分与签到不跑
-4. 首次读取凭据时，允许钥匙串授权（`TeleAgent Safe Storage`）
+4. macOS 首次读取时允许钥匙串授权；Windows 使用系统自带的 Windows PowerShell 和 DPAPI
 
 **不需要**：magpie 账号之外不用注册、不用申请 API key、不用手动复制 token、不用 root。
 
 > 桌面端不必一直开着，但**登录态要存在**——插件读的是磁盘凭据，不是运行中的进程。
+
+插件从安装包读取实际版本。版本低于 2.7.1 或无法读取时，插件会拦截账号接入、模型调用、积分查询和签到。
+
+Windows 数据目录是 `%USERPROFILE%\.local\share\TeleAgent`。安装资源会从用户的
+`AppData\Local\Programs\TeleAgent`、系统的 `Program Files\TeleAgent` 等位置查找。
+如果安装在其他位置，可在启动 magpie 的同一个 PowerShell 中指定：
+
+```powershell
+$env:TELEAGENT_APP_PATH = 'D:\Apps\TeleAgent'
+magpie plugin login teleagent
+```
+
+`TELEAGENT_APP_PATH` 也可指向 `TeleAgent.exe`、`resources` 或 `app.asar`。
+自定义数据/配置目录使用 `TELEAGENT_DATA` / `TELEAGENT_CONFIG`。
+magpie 自带 Bun，无需另外安装 sqlite3；直接用 Node 时建议 Node 22.13+ 或 24，
+旧 Node 的积分查询仍需要 `sqlite3` 命令。Windows 凭据不能复制到另一系统用户下使用。
 
 ## 安装
 
@@ -118,7 +134,7 @@ m plugin --json
 
 1. 确认桌面端已登录：`ls ~/.local/share/TeleAgent/users/` 下应有 `v1_public_<数字>` 目录
 2. 登录：`magpie plugin login teleagent`，或界面里供应商页的「读取本机 TeleAgent 登录态」
-3. 在下拉框里选账号，钥匙串弹框点「允许」或「始终允许」
+3. 在下拉框里选账号；macOS 如有钥匙串弹框，点「允许」或「始终允许」
 4. 验证：`magpie quota` 能读到积分余额，说明凭据链路通了
 
 常见失败：`app_missing`（桌面端没装）、`not_signed_in`（桌面端没登录）、
@@ -243,7 +259,7 @@ sig = hex(HMAC-SHA256(key, msg))
 | `X-Superagent-Device-Id` / `-Install-Id` | `device-meta.json` 的 `deviceId` / `installId` |
 | `X-Superagent-Timestamp` / `-Nonce` | 每请求新生成的秒级时间戳与 UUID |
 | `X-Superagent-Signature` / `-Sign-Version` | 第二步算出的 sig，版本 `v1` |
-| `X-App-Version` | 桌面端 `CFBundleShortVersionString` |
+| `X-App-Version` | 桌面端 `app.asar` 中 `package.json` 的实际版本 |
 | `X-Route-Target` | `ops-gateway` |
 | `X-Session-Id` / `X-Message-Id` / `x-teleagent-session` | 本地生成的会话标识（opencode 系协议里本就由客户端生成） |
 
@@ -271,6 +287,8 @@ loader/fetch 阶段信息（不含 token、不含正文）。
 |---|---|
 | `index.mjs` | 插件入口：导出 default 函数，装配 hooks |
 | `lib/credential.mjs` | 读 `token.json`、钥匙串解密、凭据诊断、列本机账号 |
+| `lib/windows-crypto.mjs` | Windows DPAPI 密钥解锁与 AES-GCM 凭据解密 |
+| `lib/installation.mjs` | Windows/macOS 安装路径、ASAR 内容与版本读取 |
 | `lib/sign.mjs` | 两步 HMAC、请求头组装、按账号签名的 fetch |
 | `lib/guard.mjs` | 并发 / 每分钟 / 熔断 / 空闲回调 |
 | `lib/models.mjs` | 5 个模型目录与 `buildModels()` |
@@ -340,9 +358,13 @@ magpie provider test teleagent  # 3. 链路通不通（一次真实请求，花�
 | 现象 | 原因 | 动作 |
 |---|---|---|
 | 插件列表里没有 | 没装成功 / 装到别的 profile | `magpie plugin add <spec>`；确认 `--profile` |
-| 「未检测到 TeleAgent.app」 | 桌面端没装或不在 `/Applications` | 安装桌面端 |
+| 提示升级 TeleAgent | 已安装版本低于 2.7.1 | 将 TeleAgent 桌面端升级至 2.7.1 或更高版本 |
+| 无法读取桌面端版本 | 安装包缺失、不可读或位于自定义路径 | 安装或修复桌面端，或设置 `TELEAGENT_APP_PATH` |
 | 「数据目录不存在」 | 桌面端从没启动过 | 启动一次，让它初始化 `~/.local/share/TeleAgent` |
 | 「未登录」 | 没有 `app-auth/token.json` | 桌面端登录后 `magpie plugin login teleagent` |
+| 路径里出现 `users/__none__/app-auth/token.json` | 0.1.2 及更早版本把未登录时的占位选项当成账号 | 升级到 0.2.0 后重新执行插件登录；提交时会重新检测桌面端账号 |
+| 插件登录成功，切换 magpie tab 又提示登录 | 旧版积分查询失败可能被宿主误判为模型登录失效 | 升级到 0.2.0 后执行一次 `magpie plugin login teleagent` 清除旧标记；积分 cookie 缺失只影响积分显示 |
+| Windows DPAPI 无法解密 / 缺少 Local State | 不是同一个 Windows 用户，或桌面端尚未写出本机密钥 | 用登录 TeleAgent 的同一个系统用户启动 magpie；在该用户下重新登录桌面端 |
 | `keychain_denied` | 拒绝了 `TeleAgent Safe Storage` 授权 | 钥匙串访问里删掉该条目，桌面端重登后重试 |
 | 「凭据解密失败」 | 桌面端版本变了，加密格式不匹配 | 更新桌面端后重登；仍失败就是插件要适配 |
 | `401` / `40108` 登录过期 | 约 30 天到期，没有 refresh token | 桌面端重登 → `magpie plugin login teleagent` |
@@ -379,7 +401,7 @@ magpie provider test teleagent  # 3. 链路通不通（一次真实请求，花�
 |---|---|---|
 | TeleAgent 登录凭据（JWT） | `users/<scope>/app-auth/token.json` | 否，只用于本机加签 |
 | 设备指纹（deviceId / installId） | `app-auth/device-meta.json` | 否，只放请求头 |
-| 桌面端版本号 | `Info.plist` | 否，只放请求头 |
+| 桌面端版本号 | `app.asar` 中的 `package.json` | 否，只放请求头 |
 | 积分 cookie | `Partitions/owner%3A<scope>/Cookies` | 否，只发 portal |
 | 你的对话内容 | magpie 传给插件 | 是，只发给 TeleAgent 上游 |
 | 聊天记录 / 技能 / 记忆 | 桌面端数据目录 | **不读** |
@@ -411,11 +433,12 @@ grep -rn "token.json" lib/             # 只读，不写
 目录结构见上面「文件」表。测试全部离线：
 
 ```bash
-~/.cache/magpie/bun/<ver>/magpie-bun test test/   # 用 magpie 自带的 bun，146 项
+~/.cache/magpie/bun/<ver>/magpie-bun test test/   # 用 magpie 自带的 bun
 ```
 
 测试红线：不发真实网络请求、不调真实签到接口、不读真实凭据、不打印 cookie/token；
-网络与 sqlite 全部可注入，否则没法离线跑。全部依赖是 `node:` 内置模块，零第三方依赖。
+网络与系统解密调用可注入，SQLite 使用本地合成数据库。使用 Node/Bun 内置模块，零第三方运行时依赖。
+GitHub Actions 在 macOS 和 Windows 上运行同一套测试；Windows 额外运行原生 DPAPI 和加密 cookie 测试。
 
 沙箱手测：
 
@@ -435,11 +458,11 @@ bash scripts/sandbox.sh --real-home   # 真实 HOME：登录 + quota + 一次 pr
 
 ## 已知限制
 
-- **仅 macOS**：TeleAgent 桌面端只提供 macOS 版
+- **平台**：支持 macOS、Windows；Linux 尚未适配
 - **依赖逆向**：上游协议变了就 `40104`，需要适配
 - **凭据约 30 天**：没有 refresh token，到期必须重登
 - **图片只有 2 个模型**：`chat-pro` / `chat-flash`，其余三个实测不支持
-- **积分 cookie 靠明文存储**：上游哪天加密存了，积分就不可用（模型不受影响）
+- **积分 cookie**：支持明文及 Windows v10/旧 DPAPI 加密；其他加密格式会显示积分不可用，模型登录状态不受影响
 - **多账号需要本机真有凭据**：插件不替你换号
 - **封号无法预测**：内置限速只降低概率，不保证安全
 

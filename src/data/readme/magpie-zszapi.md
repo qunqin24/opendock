@@ -34,11 +34,15 @@ magpie codex zszapi/gpt-6.1-sol
 
 每个账号只服务自己分组的模型；同一模型有多个账号时，限流或故障会自动切换到下一个。
 
-生图分组（gpt-image）的 Key 没有对话模型，添加后用量卡片会提示更换分组。
+如果在站点给 Key 勾选了「同时使用其他分组」，一个 Key 就能拿到多个分组的模型，账号名会列出全部系列，例如 `执算者AI · GPT/Claude/DeepSeek/生图 · 尾号 3b78`。
+
+## 生图
+
+Key 能用的生图模型（`gpt-image-*`）也会出现在模型列表里，标记为只出图的模型。勾选并保存后，在 Magpie 的 **Settings → Models → Images → Image generation** 里选择 `执算者AI` 的生图模型，Codex 自带的生图工具、`magpie tool generate_image` 和 Magpie Image MCP 就会通过本插件调用站点的 `/v1/images/generations`（文生图）和 `/v1/images/edits`（改图），按生图分组计费。
 
 ## 模型与协议
 
-插件读取 `GET /v1/models`，过滤掉生图、视频、语音、向量等非对话模型，再按模型系列选择网关原生支持的接口：
+插件读取 `GET /v1/models`，过滤掉视频、语音、向量等 Magpie 用不上的模型，再按模型系列选择网关原生支持的接口：
 
 | 模型系列 | 请求接口 | Magpie 使用的 SDK |
 | --- | --- | --- |
@@ -46,6 +50,16 @@ magpie codex zszapi/gpt-6.1-sol
 | GPT / Codex / o 系列 | `/v1/responses` | `@ai-sdk/openai` |
 | Gemini | `/v1beta/models/{id}:streamGenerateContent` | `@ai-sdk/google` |
 | DeepSeek、Grok 及其他 | `/v1/chat/completions` | `@ai-sdk/openai-compatible` |
+| 生图（gpt-image、dall-e） | `/v1/images/generations`、`/v1/images/edits` | `@ai-sdk/openai-compatible`（只出图） |
+
+站点的模型列表只有模型 ID，不带能力信息，所以插件为已知模型补上思考等级、图片输入和上下文长度：
+
+| 模型 | 思考等级 | 图片输入 | 上下文 / 最大输出 |
+| --- | --- | --- | --- |
+| `deepseek-v4.1-flash` | none / low / medium / high / xhigh / max | 支持 | 1,000,000 / 128,000 |
+| `deepseek-v4-pro`、`deepseek-v4-flash` | high / max | 不支持 | 1,000,000 / 128,000 |
+
+选 none 即关闭思考（实际发送 `reasoning_effort: "off"`，这是站点接受的写法）。服务端以后返回这些属性时，以服务端为准。
 
 服务端以后返回 `protocols` 字段时，以服务端为准。名称识别不了的自定义别名，可以按完整模型 ID 指定协议：
 

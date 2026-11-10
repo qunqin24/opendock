@@ -64,11 +64,55 @@ npm install @weave_protocol/full
 
 ### 🗓️ November 2026 update — hardening
 
+#### ✅ How we check every release: before, after, and with our own tools
+Every check below runs in CI. The release workflow itself (`publish-all.yml`) is unchanged.
+
+**On every push and pull request:**
+- **Each package:** a clean `npm ci`, build and full test suite. CI also checks that importing the package starts nothing and prints nothing, and runs `npm audit` on production dependencies.
+- **Its dependents, against the change** ([Dependents](.github/workflows/dependents.yml)). Every changed package is built and packed locally. Then every package that depends on it, directly or through another Weave package, runs its tests against that build. The check fails if any copy of the package in a dependent's tree still comes from npm, so a pass means the change itself was tested.
+- **Our own attack tools** ([self red-team](#️-self-red-team-on-every-push)). The [Adversary](adversary) corpus, the attacks behind [AgentSecBench](agentsecbench), goes through Mund and Ward offline, with no model and no keys. CI fails if detection drops or false positives rise past the committed baseline.
+
+**Before a release:** we run the Dependents check for exactly the packages being published, and publish only if it passes. This is a step in our release routine, not an automated gate.
+
+**After a release** ([Verify release](.github/workflows/verify-release.yml)). Whenever the publish workflow finishes, this checks what actually landed on npm. For each package that was published, it:
+1. waits for the version on the registry;
+2. installs it fresh into an empty project and imports it;
+3. runs every dependent's tests against that exact published version.
+
+A published package can differ from the local build, and this catches it.
+
+**Detection claims on data we didn't write.** Mund's detection numbers come from public datasets it was never trained or tuned on: deepset, Gandalf, jackhhao, SPML, Mosscap, InjecAgent. False positives are measured on 2,062 benign texts and 5,825 MITRE ATT&CK and OWASP texts. The scripts in [`mund/training`](mund/training) fetch the data and reproduce every number, and the shipped model, byte for byte. See [DETECTION_CLAIMS.md](mund/DETECTION_CLAIMS.md#local-classifier-060).
+
+**Why this exists.** We shipped a bug that these checks now catch. Mund 0.6.0's new classifier findings included the text they scored, unmasked, so secrets and email addresses could reach logs and webhooks. Mund's tests covered what it detected, not what it output. `api` already had a test that would have failed, but it only ran against 0.6.0 after release. We fixed it in Mund 0.6.1 and deprecated 0.6.0 on npm. With the fix reverted, the Dependents check now fails on that `api` test; run against the published 0.6.0, so does Verify release. The full account is in [CONTRIBUTING.md](CONTRIBUTING.md#why-we-test-everything-on-every-commit).
+
+#### 🧠 Mund 0.6: a local injection classifier, and every red-team category at 100%
+A small model now backs up Mund's rules: hashed word and character n-grams, 208 KB. It runs offline in under a millisecond, with no API key or download, and catches paraphrased instructions that no pattern names. A hit is a warning; it never blocks on its own. On public test sets it was never trained on:
+
+| Test set | Rules only | Rules + classifier |
+|---|---|---|
+| Gandalf (Lakera) | 65.2% | **88.4%** |
+| jackhhao jailbreaks | 57.0% | **77.0%** |
+| SPML (a source it never saw) | 24.1% | **38.3%** |
+| Benign texts flagged | 0 of 2,062 | 2 of 2,062 |
+
+It does nothing for an attacker's request written as a polite sentence inside data (InjecAgent base, 1.6%). That needs to know what the user asked for, which is Ward's and Hundredmen's job.
+
+Two new rules cover the rest:
+- **guardrail mapping:** asking which tools are allowed and which are denied, or for hidden reasoning plus its rules;
+- **requests for working malware or phishing kits:** descriptions and defensive work stay clean.
+
+That takes every category of our self red-team to 100%: jailbreak was 80%, extraction 60%.
+
+Mund also misfires much less on security writing. Across 5,825 ATT&CK and OWASP texts, the texts it flags fell from 86 to 15, and all 15 quote real injection strings. Use **0.6.1** (see above).
+
+#### ⛓️ Receipts anchored on-chain (Ward 0.3.9, Dōmere 1.7.0)
+A hash chain can't show that its newest entries were cut off. `weave-ward receipts checkpoint` signs a receipt log's current head. Dōmere's `domere_anchor_receipts` batches checkpoints from any number of agents into one Merkle root, and prepares the Solana or Ethereum transaction that stores it. Your wallet signs it; Dōmere never holds keys or broadcasts. `weave-ward receipts verify --checkpoints=bundle.json` then fails if any receipt up to an anchored checkpoint was removed or rewritten.
+
 #### ✍️ Signed policies: one WARD.md, enforced as written everywhere (Ward 0.3.8)
 Sign WARD.md once with `weave-ward sign`, then put the public key in `~/.weave/trusted-policy-keys` on each machine. Every adapter then refuses a policy that was edited after signing, or that a trusted key didn't sign, and denies each call with the reason. Even without a trust list, a signed policy that someone changed is refused. This is the piece that makes centrally managed policy trustworthy at scale.
 
 #### 🔏 Signed, hash-chained decision receipts (Ward 0.3.7)
-Turn on `required: true` in WARD.md's Verification section. Every decision then becomes an Ed25519-signed receipt chained to the one before, so no one can quietly edit, delete or reorder the record. Run `weave-ward receipts verify` to check a log offline, with or without an expected public key. Receipts never contain arguments, only a keyed digest the key holder can match. This works in all seven adapters. Anchoring receipt heads with Dōmere comes later.
+Turn on `required: true` in WARD.md's Verification section. Every decision then becomes an Ed25519-signed receipt chained to the one before, so no one can quietly edit, delete or reorder the record. Run `weave-ward receipts verify` to check a log offline, with or without an expected public key. Receipts never contain arguments, only a keyed digest the key holder can match. This works in all seven adapters.
 
 #### 💳 Agents can't spend without asking (Ward 0.3.6)
 In October an agent spent from a crypto wallet it was never authorized to use. Ward's new **payment guard** asks a person before any call that moves money, in every adapter. That covers payment, transfer, purchase and withdrawal tools, plus wallet and Stripe CLIs in shell commands. It stays on until WARD.md allows that capability by name.
@@ -125,8 +169,10 @@ CI now runs our own attack corpus through our own defenses, offline:
 - Ward decides the tool calls a coerced agent would make.
 
 The scorecard goes to the job summary. CI fails if detection falls or false positives rise past the committed baseline. Today's numbers:
-- Mund flags 94.1% of payloads, with 0 false positives.
-- Ward decides 21 of 21 calls correctly.
+- Mund flags all 68 payloads (100%), with 0 false positives on 84 benign texts.
+- Ward decides 29 of 29 calls correctly.
+
+These are regression numbers on our own corpus, not a measure against unseen attacks. Mund's results on public held-out datasets are in [DETECTION_CLAIMS.md](mund/DETECTION_CLAIMS.md#local-classifier-060).
 
 ### 🗓️ October 2026 update — what landed
 
@@ -445,7 +491,7 @@ The packages that keep your agent within policy: declare it, enforce it across e
 
 | Package | Version | Description |
 |---|---|---|
-| [🛡️ @weave_protocol/ward](https://github.com/Tyox-all/Weave_Protocol/blob/main/ward) | 0.3.8 | **WARD.md** — agent security policy standard (parser, validator, runtime checks, shared tool-call evaluator, dashboard reporting) |
+| [🛡️ @weave_protocol/ward](https://github.com/Tyox-all/Weave_Protocol/blob/main/ward) | 0.3.9 | **WARD.md** — agent security policy standard (parser, validator, runtime checks, shared tool-call evaluator, dashboard reporting) |
 | [🛡️ @weave_protocol/adapter-claudecode](https://github.com/Tyox-all/Weave_Protocol/blob/main/adapter-claudecode) | 0.5.0 | **Claude Code adapter** — enforces WARD.md via PreToolUse hooks; Mund pre-install hooks for skills + MCP |
 | [🛡️ @weave_protocol/adapter-antigravity](https://github.com/Tyox-all/Weave_Protocol/blob/main/adapter-antigravity) | 0.5.0 | **Google Antigravity adapter** — enforces WARD.md across desktop, `agy` CLI, and SDK; Mund pre-install hooks |
 | [🛡️ @weave_protocol/adapter-msaf](https://github.com/Tyox-all/Weave_Protocol/blob/main/adapter-msaf) | 0.4.0 | **Microsoft Agent Framework adapter** — middleware-based WARD enforcement |
@@ -455,10 +501,10 @@ The packages that keep your agent within policy: declare it, enforce it across e
 | [🛡️ @weave_protocol/adapter-cursor](https://github.com/Tyox-all/Weave_Protocol/blob/main/adapter-cursor) | 0.3.0 | **Cursor adapter** — enforces WARD.md via Cursor's agent hooks (shell, file, MCP and tool calls) |
 | [🌐 @weave_protocol/browser](https://github.com/Tyox-all/Weave_Protocol/blob/main/browser) | 0.3.1 | **Browser agent security** — runtime IPI scanner (33 patterns) for headless agents |
 | [🔍 @weave_protocol/hundredmen](https://github.com/Tyox-all/Weave_Protocol/blob/main/hundredmen) | 1.4.0 | **MCP proxy** — intercept, scan, gate tool calls; enforces WARD.md as first gate |
-| [🛡️ @weave_protocol/mund](https://github.com/Tyox-all/Weave_Protocol/blob/main/mund) | 0.5.3 | **Scanner** — secrets, PII, injection, MCP vetting, pre-install checks for skills + MCP (rug pulls), OSV dependency CVEs, SARIF, threat intel |
+| [🛡️ @weave_protocol/mund](https://github.com/Tyox-all/Weave_Protocol/blob/main/mund) | 0.6.1 | **Scanner** — secrets, PII, injection, MCP vetting, pre-install checks for skills + MCP (rug pulls), OSV dependency CVEs, SARIF, threat intel |
 | [🏛️ @weave_protocol/hord](https://github.com/Tyox-all/Weave_Protocol/blob/main/hord) | 0.3.2 | **Vault** — encrypted storage, sandboxing, capability tokens, attestation |
 | [🔐 @weave_protocol/yoxallismus](https://github.com/Tyox-all/Weave_Protocol/blob/main/yoxallismus) | **0.2.0-beta.1** | **Post-quantum cipher** — X25519 + ML-KEM-768 hybrid KEM · sealed boxes · cascade AEAD · Double Ratchet · locked `yoxall/2` format · ⚠️ NOT AUDITED |
-| [⚖️ @weave_protocol/domere](https://github.com/Tyox-all/Weave_Protocol/blob/main/domere) | 1.6.1 | **Judge** — compliance (PCI-DSS, ISO27001, SOC2, HIPAA, GDPR, CCPA), blockchain anchoring |
+| [⚖️ @weave_protocol/domere](https://github.com/Tyox-all/Weave_Protocol/blob/main/domere) | 1.7.0 | **Judge** — compliance (PCI-DSS, ISO27001, SOC2, HIPAA, GDPR, CCPA), blockchain anchoring |
 | [👥 @weave_protocol/witan](https://github.com/Tyox-all/Weave_Protocol/blob/main/witan) | **1.2.2** | **Council** — multi-agent consensus & governance, autonomous spending caps (Q4 v1.1) |
 | [🛂 @weave_protocol/tollere](https://github.com/Tyox-all/Weave_Protocol/blob/main/tollere) | 0.2.5 | **Customs** — supply chain security (npm, PyPI, Docker, IDE extensions, sandwich detection) |
 
@@ -478,8 +524,8 @@ The front door, the dashboard, the bridges to other frameworks.
 | Package | Version | Description |
 |---|---|---|
 | [🕸️ @weave_protocol/cli](https://github.com/Tyox-all/Weave_Protocol/blob/main/cli) | 0.2.1 | **The `weave` CLI** — `init`, `audit`, `dashboard`, `doctor` |
-| [📦 @weave_protocol/full](https://github.com/Tyox-all/Weave_Protocol/blob/main/full) | 0.5.0 | **Bundle** — installs all packages in one command |
-| [🔌 @weave_protocol/api](https://github.com/Tyox-all/Weave_Protocol/blob/main/api) | 1.6.1 | **REST API + Operator Dashboard** — `npx @weave_protocol/api` → http://localhost:3000/dashboard |
+| [📦 @weave_protocol/full](https://github.com/Tyox-all/Weave_Protocol/blob/main/full) | 0.5.1 | **Bundle** — installs all packages in one command |
+| [🔌 @weave_protocol/api](https://github.com/Tyox-all/Weave_Protocol/blob/main/api) | 1.6.2 | **REST API + Operator Dashboard** — `npx @weave_protocol/api` → http://localhost:3000/dashboard |
 | [🔗 @weave_protocol/langchain](https://github.com/Tyox-all/Weave_Protocol/blob/main/langchain) | **1.1.1** | **LangChain.js** security callbacks & tool wrappers (0 audit vulnerabilities via npm overrides) |
 | [🐍 weave-protocol-llamaindex](https://github.com/Tyox-all/Weave_Protocol/blob/main/llamaindex-py) | 0.1.0 | **Python/LlamaIndex** security callbacks & tools (on PyPI) |
 

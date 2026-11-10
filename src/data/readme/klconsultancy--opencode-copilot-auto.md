@@ -99,6 +99,10 @@ POST https://api.githubcopilot.com/auto
   model and mints a 24-hour session token. The conversation stays on that model, so its
   prompt cache stays warm; every request carries `Copilot-Session-Token`, which bills it
   as Auto (10% discount on paid plans).
+- **Across reloads.** opencode reloads plugins when the config changes and recycles idle
+  instances. The route survives that: it is kept, with its session token, in
+  `routes.json` next to the plugin log (owner-only), until the token expires. A restored
+  route the auto can no longer send (another anchor or catalog) is routed again.
 - **Routing again** happens, as in VS Code, on the next turn after compaction, when the
   token is within 5 minutes of expiring, when a turn attaches an image the model cannot
   read, and when you switch tier.

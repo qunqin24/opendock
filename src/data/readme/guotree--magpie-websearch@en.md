@@ -50,8 +50,10 @@ Leave **Base URL** empty for official services. A custom address must be the com
 To adjust provider parameters, use **Plugins → Installed → Options**, or run:
 
 ```sh
-magpie plugin options magpie-websearch '{"linkup":{"depth":"deep","resultLimit":4}}'
+magpie plugin options magpie-websearch '{"anysearch":{"format":"markdown"}}'
 ```
+
+The Options editor starts from the package's AnySearch example. It is not applied until you click Save; the example uses AnySearch's default `format`, so saving it changes no behavior.
 
 Each command replaces the complete saved options object, so include every option you want to keep. Saving reloads the plugin host. See the [technical reference](docs/technical-reference.en.md#configuration) for all parameters and registration filters.
 

@@ -16,6 +16,35 @@ order they were asked, and writes nothing into the session it was asked about.
 
 If you only ask one question and never come back to it, the built-in command is enough.
 
+## Features
+
+- **A thread per session.** Questions and answers stay on screen in one dialog, and the
+  thread is re-sent with every new question, so follow-ups build on the ones before. The
+  session's own context is untouched.
+- **One answer at a time, in order.** Questions asked while an answer is arriving queue up
+  behind it and go out together as the next one, numbered, so several asked together come
+  back as a list. The queue drains in full whether the window is open or not.
+- **The window is where you left it.** Reopening a thread shows it whole; an answer that
+  arrives while the window is closed is written out once when the window comes back, and
+  the line between two turns says where the session moved on.
+- **Prepared prompts.** The marker in the header (or `Ctrl+Up` inside the window) opens a
+  list of six ready questions. Click one, or walk it with `Up` and `Down` and press
+  `Enter`; a question typed into the composer stays there while a pick is asked.
+- **Click a piece of an answer to copy it.** A click copies one paragraph, list, table or
+  fenced block as plain text, with a rail in the gutter marking what a click would take.
+  `copy thread` in the footer takes the whole thread instead.
+- **The keys the host already teaches.** `PageUp`, `PageDown`, `Enter`, `Esc` and the mouse
+  wheel mean here what they mean in the session. `Ctrl+Home` and `Ctrl+End` jump the
+  transcript (they are the only jump keys, because `Home` and `End` belong to the
+  composer), `Delete` clears the thread behind a second press, and `Up` and `Down` at the
+  ends of the composer walk through the questions asked before.
+- **A badge while a question is out.** The `btw` badge in the prompt row opens the window
+  for the session it belongs to, so a question can be asked and left behind safely.
+- **Failures are named.** An answer that comes back empty or an error stops the queue and
+  shows in the window with the question that failed, so nothing is lost silently.
+
+![The /btw window with two answered questions, one waiting and the composer](docs/btw-window.png)
+
 ## Install
 
 ```sh
@@ -44,56 +73,17 @@ plugin, so the path has to come after the removal.
 /btw why does the ci fail on the second test?
 ```
 
-Run `/btw` on its own to open the window and type the question into the composer. An answer
-appears as it is written, and a long answer holds its question at the top of the window while it
-is written out, so the question never scrolls out of view. A thread that already holds
-answers is reopened as it was left. An answer that arrives while the window is closed is written
-out when the window comes back, and an answer already written out is there whole.
+Run `/btw` on its own to open the window and type the question into the composer, or press
+`Ctrl+Up` in a session to open it with nothing asked. Answers are written out as they come
+back, and a long answer holds its own question at the top of the window while it is written.
 
-![The /btw window with two questions, two answers and the composer](docs/btw-window.png)
-
-`PageUp`, `PageDown`, `Ctrl+Home` and `Ctrl+End` move the transcript, `Delete` clears the
-thread, and `Esc` closes the window and keeps the thread. The footer names only the keys a reader
-would not find by habit: `ctrl+up/down` opens the prepared prompts, `ctrl+home/end` is the only way
-to jump the transcript, because `Home` and `End` belong to the composer, `Delete` clears the
-thread, and `enter queues` says that a question typed while an answer arrives waits its turn. The
-page keys, the wheel and `Enter` to send mean here what they mean in the prompt of the session, so
-the row leaves them out. A click on `copy thread` copies the whole thread through the terminal
-clipboard, and a click on one paragraph, list or fenced block of an answer copies that piece alone,
-as its plain text: a command arrives without the backticks around it, and the toast names what
-went in. The rail in
-the left gutter marks the piece the pointer is on, so what a click would take is the piece the
-reader sees marked, and it stays down while text is being selected or is selected. Closing the
-window leaves a question that was asked and is still waiting to go out in the session, and it
-goes out the next time the window opens.
-
-The composer takes the keys the host's own prompt takes: `Home` and `End` for the ends of the
+`Ctrl+Down` takes the list of prompts down, and the window down once the list is down. The
+composer keeps the keys the host's own prompt keeps: `Home` and `End` for the ends of the
 text, the arrows for the cursor, and the word and selection keys of the host's input table.
 `Delete` deletes a character in front of the cursor, and clears the thread only while the
 composer is empty.
 
-`Up` and `Down` walk through the side questions asked in this session, newest first. The press
-does what the field would do first: `Up` moves a line up and `Down` a line down. At the very
-start of the text `Up` brings back the previous question, at its very end `Down` brings the next
-one, and `Down` past the newest question brings back what was typed. On the first line a press
-that is not at its start goes to the start, and on the last line one that is not at its end goes
-to the end.
-
-While a side question is being answered, the `btw` badge in the prompt row opens the
-window for it.
-
-The header of the window holds a marker that opens a list of prepared prompts, and a click on
-one of them asks it. `Up` and `Down` move the pick and wrap at either end, `Esc` closes the list,
-and `Enter` asks the pick.
-
-`Ctrl+Up` in the session opens the window with nothing asked, and `Ctrl+Up` inside the window
-opens the same list, which the marker in the header toggles as well. `Ctrl+Down` takes the list
-down, and the window down once the list is down. `Up` and `Down` move the pick and wrap, `Enter`
-asks it, `Esc` closes the list. A question already typed into the field stays there when a pick
-is asked, and goes out on `Enter` once the list is down: the open list is the decision to pick,
-not a reason to throw away what was written.
-
-A thread belongs to the session it was asked in, and it lives in memory as long as the
+A thread belongs to the session it was asked in, and it lives in memory for as long as the
 process runs.
 
 ## How it works
@@ -106,12 +96,16 @@ model not to call one.
 ## Development
 
 ```sh
-bun run check      # typecheck, tests, then the build the package ships
+bun run check        # typecheck, tests, then the build the package ships
+bun run screenshots  # re-render docs/btw-window.png from the real dialog code
+bun run deploy       # copy the sources into <config>/plugins/btw-followups
 ```
 
-The design notes and the host limits behind every decision live in
-[`docs/design.md`](docs/design.md) in the
-[repository](https://github.com/alexzzzz/opencode-btw-followups).
+The screenshot is a render of the dialog itself: `scripts/screenshot.tsx` mounts the real
+`ThreadDialog` through the same Solid runtime the host uses, inside a simulated session
+view, captures the frame's styled spans and rasterizes them in a headless browser. The
+design notes and the host limits behind every decision live in
+[`docs/design.md`](docs/design.md).
 
 ## License
 

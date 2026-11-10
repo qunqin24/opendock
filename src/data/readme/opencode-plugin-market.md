@@ -3,7 +3,7 @@
 [![npm](https://img.shields.io/npm/v/opencode-plugin-market)](https://www.npmjs.com/package/opencode-plugin-market)
 [![license](https://img.shields.io/npm/l/opencode-plugin-market)](LICENSE)
 
-**A plugin market inside the OpenCode desktop app.** Browse 2,900+ plugins, search them, filter them, and install or remove them without leaving the app or editing a config file.
+**A plugin marketplace inside the OpenCode desktop app.** Browse 2,900+ plugins, search them, filter them, and install or remove them without leaving the app or editing a config file.
 
 The desktop app can list what you already have, but there is no way to *discover* plugins: no catalog, no search, no install button. This adds that page under **Settings › Plugin Market**.
 

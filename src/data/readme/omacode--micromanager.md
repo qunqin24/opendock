@@ -52,7 +52,8 @@ The TUI is a separate CLI plugin:
 opencode plugin add @omacode/tui
 ```
 
-and its `./tui` entry still goes into `~/.config/opencode/cli.json`; `./install.sh --all` does both from a checkout.
+and `opencode plugin add` puts it into `~/.config/opencode/cli.json` (its `./tui` entry; the package has no server
+part, so the server never loads it). `./install.sh --all` does both from a checkout.
 To upgrade: `opencode plugin update`; to remove: `opencode plugin remove @omacode/micromanager`.
 
 From a checkout, for development (the symlink means the running server reads your working tree):

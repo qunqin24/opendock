@@ -9,7 +9,7 @@ A single Claude Code plugin (`ycc`) bundling workflow orchestration, parallel pl
 
 <!-- BEGIN:GENERATED-COUNTS -->
 
-The source plugin ships **49 skills**, **49 slash-invocable skills**, and **55 agents**.
+The source plugin ships **50 skills**, **50 slash-invocable skills**, and **55 agents**.
 
 <!-- END:GENERATED-COUNTS -->
 
@@ -37,6 +37,7 @@ The source plugin ships **49 skills**, **49 slash-invocable skills**, and **55 a
 | `/ycc:hooks-workflow`      | Generates hook configuration from language rules.                                                                                                                             |
 | `/ycc:implement-plan`      | Executes parallel-plan.md with dependency-aware implementor batches.                                                                                                          |
 | `/ycc:init`                | Initializes project AI-agent docs and workspace conventions.                                                                                                                  |
+| `/ycc:mcp-parity`          | Researches a repo and creates or syncs a Linear project, milestones, and prioritized issues for one-to-one MCP parity with the app.                                           |
 | `/ycc:orchestrate`         | Coordinates specialized agents in dependency-resolved batches.                                                                                                                |
 | `/ycc:parallel-plan`       | Creates parallel-plan.md from existing shared.md through plan-workflow.                                                                                                       |
 | `/ycc:plan`                | Use when comparing two implementation options or walking through tradeoffs before committing to one, breaking a change into steps, or planning conversationally for approval. |

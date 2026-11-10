@@ -359,6 +359,17 @@ upstream session per chat** (still one upstream server _instance_, shared
 transport). The server is handed a distinct, stable `Mcp-Session-Id` per chat
 and partitions its per-session state automatically — no clash.
 
+**One catalog, per-chat calls.** An isolated HTTP/SSE server's tools,
+resources, templates and prompts are the same for every chat, so the combiner
+lists them through the server's one shared connection; a chat's own upstream
+session is used only for its calls and reads, and is opened on its first
+call. So a chat whose session has died can never make the server look
+toolless. If the server restarts behind the combiner's back, a chat's next
+call finds its session unknown, gets a fresh one, and runs once more; and
+after any restart or such a replacement, the chat's next call to that server
+starts with a one-time note that its state there (an open project, a
+drawing) was reset.
+
 > **stdio servers isolate per-chat SUBPROCESSES.** `"isolate": true` on a
 > stdio entry means each chat gets its **own** `command` subprocess — a stdio
 > subprocess IS a session, so state partitioning is total (no shared-global
@@ -519,6 +530,28 @@ entries can reference the same `sharedServers` entry.
 | `env`            | `object`   | `{}`         | Extra environment variables (supports interpolation)                             |
 | `grace_period`   | `string`   | —            | How long to keep the process alive after the last client detaches (e.g. `"30m"`) |
 | `health_timeout` | `integer`  | `30`         | Seconds to poll the server URL after start before giving up                      |
+
+**When the combiner restarts a server by itself.** `sharedserver` keeps a
+process running but doesn't respawn one that crashed, so the combiner's health
+monitor watches each `sharedServers`-backed server: a ping every 30 s, a
+reconnect after 3 missed pings, and after 3 failed reconnects (about five
+minutes) it decides:
+
+- **Gone** — nothing listens on its port any more (crashed, killed): it's
+  restarted automatically, exactly as `combiner__restart_server` would.
+- **Still running but not answering** — busy on a slow call, or hung: it's
+  **never** restarted automatically, since that would end its work and every
+  chat's state on it. It shows as `unresponsive` in `/health` (`not
+  responding` on `/status`) and keeps being re-dialled. The next tool call
+  routed to it asks the user *"Restart it?"* (an elicitation; an
+  input-required result for 2026-era clients). **Restart now** restarts it and
+  fails that call with a note to retry; **Not now** fails the call and isn't
+  asked again for 10 minutes. A client that can't be asked is told to use
+  `combiner__restart_server`. If it answers again, it's simply back; if its
+  process dies later, it's restarted after all.
+
+Servers given only a `url`, and `externalServers`, are never restarted
+automatically; the combiner just keeps reconnecting.
 
 ### externalServer — non-owned processes
 
@@ -807,6 +840,9 @@ tailscale serve --bg --set-path /oauth http://127.0.0.1:9741/oauth
 "oauth": {"public_url": "https://{auto}", "prompt": "both"}
 ```
 
+(The whole picture, including widgets and `/status`, is in
+[Using the combiner over Tailscale](#using-the-combiner-over-tailscale).)
+
 Then add `https://<machine>.<tailnet>.ts.net/oauth/callback/<server>` for each
 such server to the provider's allowed redirect URIs (for Google, on a **Web
 application** client). Every machine that runs the combiner registers its own
@@ -952,6 +988,8 @@ starts is skipped with a warning (restart once it's back); startup fails only
 if none bind. `--host` and `MCP_COMBINER_HOST` override the config and take
 comma-separated lists. Binding anything beyond loopback without a bearer token
 (below) logs a warning.
+See [Using the combiner over Tailscale](#using-the-combiner-over-tailscale) for
+what works over a tailnet bind versus `tailscale serve`.
 
 Binding is about addresses; what remote widget renderers are *told* to connect
 to is separate: `MCP_COMBINER_UI_ADVERTISE` — `auto` (default: this machine's
@@ -964,6 +1002,59 @@ loopback), `loopback`, or an explicit `http://host[:port]`.
 (`https://{auto}` behind `tailscale serve`), so one servers.json works on every
 machine. Braces can't appear in a real host name, so a host that happens to be
 called `auto` is never mistaken for it.
+
+### Using the combiner over Tailscale
+
+There are two ways to reach a combiner from your other devices, and they
+behave differently.
+
+- **Direct:** bind the tailnet address (`"bind": {"host": ["127.0.0.1", "auto"]}`)
+  and use `http://<machine>.<tailnet>.ts.net:9741` (or the tailnet IP). Traffic
+  is encrypted by Tailscale; the browser still sees plain `http`.
+- **Through `tailscale serve`:** Tailscale terminates `https` on the machine's
+  tailnet name and forwards chosen paths to the combiner on loopback:
+
+  ```sh
+  tailscale serve --bg --set-path /oauth  http://127.0.0.1:9741/oauth
+  tailscale serve --bg --set-path /status http://127.0.0.1:9741/status
+  ```
+
+  Needed where `https` is required, as for Google's OAuth redirects.
+
+| | Direct | Through `serve` |
+|---|---|---|
+| MCP (`/mcp`, with the bearer) | yes | yes, with `--set-path /mcp` |
+| OAuth authorization and callback | yes, but providers that require `https` redirects (Google) won't accept it | yes: `"public_url": "https://{auto}"` and the `/oauth` path |
+| `/status` | yes | yes, with the `/status` path; sign-in happens on the page |
+| Widgets (`/ui`) | yes | not as is: the page loads widget content from port + 1 (9742) on the same host, which a path can't provide |
+
+Widgets through `serve` would also need Tailscale to serve `https` on port 9742
+(`tailscale serve --bg --https=9742 http://127.0.0.1:9742`), which it can't do
+while the combiner itself binds the tailnet address on 9742. In practice, use
+the direct route for widgets. (This follows from how the page builds the relay
+address; it hasn't been tested end to end.)
+
+**Who is asked for the web password** (with `web_auth` on):
+
+| Request | Asked? |
+|---|---|
+| a browser on the combiner's machine, by loopback, its tailnet IP or its tailnet name, directly or through `serve` | no: it's this machine |
+| another tailnet device, directly or through `serve` | yes, once per `session_days`, unless it opened a ticketed link from an MCP client |
+| anything through a raw forwarder (`tailscale serve --tcp`, `ssh -L`, `socat`) | no: it looks like this machine, so set `"exempt_local": false` if you use one |
+
+"This machine" means the connection comes from one of its addresses **and**
+the `Host` header names it (localhost, one of its addresses, its tailnet
+name, or the `public_url` / widget-origin host). `tailscale serve` connects
+from loopback but passes the real browser's address in `X-Forwarded-For`,
+which the combiner trusts from loopback only.
+
+**`tailscale funnel` is the public internet.** Anything funnelled is reachable
+by anyone, not just your tailnet. Never funnel `/mcp` without the bearer, nor
+`/ui` or `/status` without `web_auth`; OAuth pages are safer (their links
+are unguessable), but turn `web_auth` on before funnelling them too.
+
+OAuth specifics, including registering Google redirect URIs, are in
+[Authorizing from another device over Tailscale](#authorizing-from-another-device-over-tailscale).
 
 ### Web login for widgets and resources (`web_auth`)
 
@@ -1009,13 +1100,20 @@ instead: `mcp-combiner hash-password` prints one for `web_auth.password_hash`
 - **Guessing** is limited: 5 failed attempts a minute per address and 30 across
   all addresses, then `429` for the rest of the minute. During such an attack
   the form refuses everyone; this machine and ticket links still get in.
+- **The status page** (`/status`) shows every server's state and tool count,
+  pending authorizations with a link, the version and uptime — and is the
+  quickest check that the password works. It signs in on the page itself, so
+  `tailscale serve --set-path /status http://127.0.0.1:9741/status` exposes it.
+  Without `web_auth` it answers only this machine.
 - **Sessions** are an HTTP-only cookie signed with `web-auth.key`, kept beside
   the OAuth tokens (owner-only; the combiner refuses a key others can read).
   Delete it to sign every browser out; the sign-out page (`/auth/logout`) signs
   out one.
 
 > [!WARNING]
-> **"This machine" is judged by where the connection comes from.** A local
+> **"This machine" is judged by where the connection comes from**, and the
+> `Host` header must name this machine too (so a page that rebinds its own
+> domain to 127.0.0.1 isn't mistaken for it). A local
 > reverse proxy must say who the real browser is: `X-Forwarded-For`, trusted
 > only from loopback. `tailscale serve` (HTTP/HTTPS) and nginx with
 > `proxy_set_header X-Forwarded-For` do. Anything that forwards raw
@@ -1491,6 +1589,7 @@ The combiner exposes management tools that the LLM can call:
 - `combiner__enable_server` / `combiner__disable_server` — toggle servers globally (all sessions)
 - `combiner__authorize_server` — start OAuth authorization for a server and hand over the link (see [Authorizing from another device](#authorizing-from-another-device))
 - `combiner__session_disable_server` / `combiner__session_enable_server` — toggle a server for the calling session only
+- `combiner__session_hide_tools` / `combiner__session_show_tools` — hide or show individual tools (names or globs) for the calling session only
 
 ### Usage
 
@@ -2019,13 +2118,35 @@ Returns JSON: `{ "session_id": "...", "action": "disabled", "server": "...", "di
 
 Returns JSON: `{ "session_id": "...", "action": "enabled", "server": "...", "disabled_servers": [...] }`
 
-**`combiner__session_status`** — get the current session's disabled server list
+**`combiner__session_hide_tools`** — hide individual tools from this session
+
+| Parameter  | Type                  | Description                                                                  |
+| ---------- | --------------------- | ---------------------------------------------------------------------------- |
+| `patterns` | `string[]` (required) | Tool names or globs over the namespaced names, e.g. `"svg-mcp_add_*"`         |
+| `chat_id`  | `string` (optional)   | Same as above                                                                |
+
+Hidden tools aren't listed to this chat and can't be called from it; other
+chats are unaffected. Returns JSON: `{ "session_id": "...", "action": "hid", "hidden_tools": [...] }`
+
+**`combiner__session_show_tools`** — show hidden tools again
+
+| Parameter  | Type                  | Description                                                       |
+| ---------- | --------------------- | ----------------------------------------------------------------- |
+| `patterns` | `string[]` (optional) | The exact patterns to remove; omit to show everything again       |
+| `chat_id`  | `string` (optional)   | Same as above                                                     |
+
+The token route takes the same: `POST /sessions/token/<token>/filter` with
+`{"hidden_tools": [...]}` (replace; `[]` clears), `{"hide": "<pattern>"}` or
+`{"show": "<pattern>"}`; `GET` reports `hidden_tools`, `DELETE` clears them
+along with the server filter.
+
+**`combiner__session_status`** — get the current session's filters
 
 | Parameter | Type                | Description   |
 | --------- | ------------------- | ------------- |
 | `chat_id` | `string` (optional) | Same as above |
 
-Returns JSON: `{ "session_id": "...", "disabled_servers": [...] }`
+Returns JSON: `{ "session_id": "...", "disabled_servers": [...], "hidden_tools": [...] }`
 
 These complement the global `combiner__enable_server` / `combiner__disable_server`
 tools, which affect all sessions simultaneously.

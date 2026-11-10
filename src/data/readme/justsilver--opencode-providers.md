@@ -13,39 +13,19 @@ OpenCode 的供应商清单来自 models.dev 目录，**目录里没有的供应
 
 ## 安装
 
-本插件**只通过 npm 包分发**（走 opencode 的 `plugins` 配置或 `opencode plugin add`），没有安装脚本。
-在 `opencode.json(c)` 里写一行（不需要手写 provider/模型）：
+```bash
+opencode plugin add @justsilver/opencode-providers
+```
+
+想指向**别的注册表**（自建/私有）：配置改成对象条目传 options，不用改源码——
 
 ```jsonc
 {
-  "plugins": ["@justsilver/opencode-providers"]
+  "plugins": [
+    { "package": "@justsilver/opencode-providers", "options": { "registryUrl": "https://example.com/registry/index.json" } }
+  ]
 }
 ```
-
-等价的一条命令（帮你写进全局配置）：`opencode plugin add @justsilver/opencode-providers`。
-
-想**固定某个版本**（例如先试预发布）就把版本写全（试完再回到不带版本、跟随 `latest`）：
-
-```jsonc
-{
-  "plugins": ["@justsilver/opencode-providers@0.3.2"]
-}
-```
-
-- 预发布版本发布在 npm 的 **`next`** dist-tag 上，正式版才发 `latest`。
-- 升级 / 卸载（`<目标>` 就是配置里那串原样）：`opencode plugin update @justsilver/opencode-providers` / `opencode plugin remove @justsilver/opencode-providers`。
-- 本插件的 TUI 入口**不含 JSX**、不依赖 Solid，所以配置安装不会踩「双 Solid 运行时」的坑（首帧后不刷新）。
-- 想指向**别的注册表**（自建/私有）：配置改成对象条目传 options，不用改源码——
-
-  ```jsonc
-  {
-    "plugins": [
-      { "package": "@justsilver/opencode-providers", "options": { "registryUrl": "https://example.com/registry/index.json" } }
-    ]
-  }
-  ```
-
-装完**通常无需重启**（插件被文件监视，覆盖后自动热重载）；必要时 `opencode service restart`。
 
 ## 使用
 
@@ -67,6 +47,10 @@ OpenCode 的供应商清单来自 models.dev 目录，**目录里没有的供应
 
 凭据存在 opencode 自己的 SQLite 里（`opencode debug paths db`），和内置 `/connect` 完全一致。
 API Key 只在你贴入时经过本插件的内存，不落任何本项目自己的文件。
+
+### 子代理功能已独立
+
+原 beta 中的 `/subagent-model` 已迁为独立插件，providers 不再包含此功能，见[迁移入口](docs/subagent-model-policy.md)。
 
 ## 范围之外
 

@@ -32,6 +32,7 @@ key 由 Magpie 存到配置目录下的 `plugin-auth.json`，插件只读取这�
 - `project`：默认 `Magpie`。无法识别真实项目时使用的归档名。
 - `projectByAgent`：按 agent id 强制覆盖项目标签，优先于自动识别，例如 `{"codex":"Work"}`。
 - `excludeAgents`：排除某些 agent，用于避开已由其他 WakaTime 集成采集的部分。
+- `languageByDirectory`：按工作目录显式指定语言，例如 `{"/path/to/MyApp":"Swift"}`。只接受绝对目录和扩展名表支持的语言名；最长匹配优先，适用于非 Git 项目、混合仓库或自动识别不合适的目录。目录规则先于文件识别。
 
 写入密钥按顺序取：登录时填写的 key、`apiKeyEnv` 指定的环境变量、`WAKATIME_HOME`（默认用户目录）下 `.wakatime.cfg` 的 `[settings] api_key`。插件只读这些来源，不修改它们。缺少密钥时只记录状态，不开始采集，也不确定首次启用时间。
 
@@ -43,13 +44,13 @@ key 由 Magpie 存到配置目录下的 `plugin-auth.json`，插件只读取这�
 
 - `entity` 是发起这次请求的 agent 名（例如 `codex`，取不到时用 `magpie`），`type` 是 `app`，`category` 是 `ai coding`，`is_write` 为 `false`。WakaTime 的应用/实体维度因此会把各个 agent 分开。
 - `time` 用请求发生时间。`project` 优先使用 `projectByAgent`，其次使用请求工作目录对应的 Git 仓库名，非 Git 目录使用目录名，最后回退到 `project`。Git worktree 使用原仓库名；`branch` 是请求发生时的分支名，无法识别或处于 detached HEAD 时省略。
-- `language` 由请求工作目录下 Git 跟踪文件的扩展名推断，取文件数最多的编程语言（例如 `TypeScript`）。同目录的推断结果在插件宿主进程内缓存；无法推断时省略该字段，WakaTime 会把它归入 `Other`。
+- `language` 由请求工作目录下 Git 已跟踪及未跟踪但未被忽略的文件名推断，取文件数最多的编程语言（例如 `TypeScript`）；配置了 `languageByDirectory` 时使用最长匹配的目录语言。Pods、Carthage、`.build`、DerivedData 等依赖和构建目录、生成文件以及 `Package.swift` 不参与统计；头文件不能单独判断 C、C++ 或 Objective-C，因此不参与投票。平票或无法推断时省略该字段，WakaTime 会把它归入 `Other`。识别结果按目录缓存：识别成功 60 秒、无结果 10 秒、扫描失败 5 秒，过期后由下一次请求刷新。
 - `ai_input_tokens` = `in + cache_write`（未命中缓存的输入加缓存写入），`ai_cached_input_tokens` = `cache_read`（为 0 时省略），`ai_output_tokens` = `out`。WakaTime 按未命中缓存的输入、缓存输入、输出三项分别计价，所以缓存读取单独上报。`reasoning` 是 `out` 的内部拆分，不重复相加。
 - `ai_session` 是本机随机盐加 agent/session 的 HMAC 摘要，同一会话稳定、跨机器不可还原。
 - `user_agent` 携带模型名称、版本和 `effort` 推理强度，优先使用实际响应模型 `served`，缺失时使用 `model`。格式沿用 [WakaTime CLI](https://github.com/wakatime/wakatime-cli/blob/develop/pkg/ai/ai.go)，例如 `gpt/5.4-high`。DeepSeek 的无版本别名也保留模型身份，例如 `deepseek-flash` 配合 `max` 上报为 `deepseek/flash-max`；`deepseek-r1` 上报为 `deepseek/r1`，只有家族名时使用 `deepseek/unknown`，不推断具体发布版本。其他无法解析版本的名称只发送通用标识。推理强度在模型解析后追加，同一批次的模型信息逐条保留，WakaTime 是否识别及如何展示取决于其服务端支持。
 - 请求头 `X-Machine-Name` 携带经过 URL 编码的本机主机名，`Timezone` 携带系统 IANA 时区。User-Agent 同时包含系统名、内核版本和架构，Windows 使用 WakaTime CLI 的 `windows` 标识。
 
-项目识别使用 [Magpie 异步请求钩子](https://usemagpie.ai/docs/plugins#asynchronous-gateway-hooks)提供的 `cwd`，通过客户端响应 `response_id` 精确关联用量，只处理宿主标记为 `local` 的请求。旧版宿主、缺少工作目录、通过命名网关密钥转发的请求，或未收到完成通知时，使用配置的项目标签并省略分支和语言。已有历史记录不会按当前工作目录、分支或语言补填。Git 命令只读且有超时；Git 不可用时使用工作目录名。语言推断只读取 Git 索引中的文件名，不读取文件内容。
+项目识别使用 [Magpie 异步请求钩子](https://usemagpie.ai/docs/plugins#asynchronous-gateway-hooks)提供的 `cwd`，通过客户端响应 `response_id` 精确关联用量，处理宿主标记为 `local` 或 `magpie-key` 的本机请求。旧版宿主、缺少工作目录、通过命名网关密钥转发的请求，或未收到完成通知时，使用配置的项目标签并省略分支和语言。已有历史记录不会按当前工作目录、分支或语言补填。Git 命令只读且有超时；Git 不可用时使用工作目录名。语言推断只读取 Git 已跟踪及未被忽略的未跟踪文件名，不读取文件内容；非 Git 目录可用 `languageByDirectory` 指定语言。
 
 这些是后台 AI 请求的活动时间点，只能说明当时有请求，不能证明你在键盘前；时长由 WakaTime 按自己的规则计算。
 
@@ -73,11 +74,14 @@ WakaTime CLI 自己会从 Claude、Codex、Cursor 等会话文件采集 AI 活�
 ```
 bun src/sync.mjs status  [--directory <Magpie 配置目录>]
 bun src/sync.mjs preview [--directory <Magpie 配置目录>] [--limit 5]
+bun src/sync.mjs language [--cwd <工作目录>]
 ```
 
 发布到 npm 后，同名的 `magpie-wakatime` 命令等价。
 
 `status` 显示队列数量、扫描进度、最后确认时间和错误类别；`preview` 打印脱敏后的待发送映射，不访问 WakaTime。状态库在 `<Magpie 配置目录>/magpie-wakatime/state.sqlite`。
+
+`language` 只按当前目录的文件规则显示语言、来源、候选计数和未识别原因，默认使用当前工作目录；它不读取插件选项，因此不包含 `languageByDirectory` 覆盖，也不写入状态库或上传。要检查实际队列中的语言，使用 `preview`。
 
 单条记录的时间或 token 数据无效时跳过该条，继续采集。`status.lastInvalidRow` 保留最近一次异常的日期、分页偏移、加盐摘要 ID 和错误类别，不保存原始内容；记录修正后可在后续复查中重新采集。整页响应格式错误仍会停止并保留游标，等待接口恢复。
 

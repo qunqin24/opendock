@@ -21,6 +21,7 @@ The default `noul` question asks whether the call violates exfiltration policy. 
 - Branches: `main` targets the latest OpenCode (2.x) and also still loads on 1.19.4. The `opencode-1.x` branch delivers the 1.x-only line. Version numbers are plain semver and do not track OpenCode versions.
 - OpenCode 2.2.x (`setup` entry) was tested end to end on 2.2.5 with a scripted model and judge: allowed and blocked calls, judge outage, staged scripts and the load check. Subagent and MCP calls are not tested yet. OpenCode 1.19.4 (`server` entry) is the tested v1 host. Unsupported before 1.19.4.
 - OpenCode 2.x does not log decisions or show toasts. A load failure is logged as `failed to load plugin`, so [check it loaded](docs/installation.md#verify-it-loaded).
+- On OpenCode 2.x, `/guard.off`, `/guard.on` and `/guard.status` switch the guard for one session and its subagents; `enabled` in the config stays the default for everything else. See [configuration](docs/configuration.md#turning-the-guard-off-for-one-session).
 - Setup is opt-in. Cloning this repo does not register the plugin or change OpenCode configuration.
 - The judge receives rendered tool arguments and, in some cases, staged file contents. Pick an endpoint you trust.
 

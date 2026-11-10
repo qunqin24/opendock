@@ -236,7 +236,7 @@ Global, so every project inherits it, in `~/.agents/AGENTS.md`:
 
 ```markdown
 When a project has a TODO.md at its root, use todo_write / todo_read to keep it current instead of a session-only
-list.
+list. Close a task with status: "completed" (or completed: true); the done date is automatic.
 ```
 
 For notes, the same idea in one paragraph:
@@ -246,6 +246,9 @@ If the project has an opencode-notes.md, call note_read before starting work and
 reminders. Notes have no status or priority: keep them short, add @tags, and set `remind` when the user asks to be
 reminded (15m, 2h, 1d or an ISO local time). Use note_write with the id to change one; note_delete removes it.
 ```
+
+`todo_write` closes a task with `status: "completed"` (or `completed: true`); `completed: false` reopens it. The `done`
+date is written automatically, so an explicit `done` value is only a completion signal.
 
 The same text can be attached with the `instructions` array in `opencode.json`, which is handy when you ship the rule
 with a team config:
@@ -284,6 +287,12 @@ Releases: bump the version, add a `## What's new in X` section to `ANNOUNCE.md`,
 workflow builds the GitHub Release body from that section with `scripts/release-body.ts`, so the notes live in one place.
 
 ## Changelog
+
+### 0.1.20
+
+- `todo_write` accepts `completed: true`/`false` and a `done` value as aliases for `status: "completed"`/`"pending"`,
+  so an agent can close or reopen a task without editing `TODO.md` by hand.
+- The `done` date remains automatic; an explicit `done` value is only a completion signal.
 
 ### 0.1.19
 

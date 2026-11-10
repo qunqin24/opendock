@@ -87,7 +87,7 @@ its permission rules and records history against the rewritten command string,
 not the original one, so command-level deny/ask rules on the original command
 are not preserved. Use V2 when permission-rule fidelity matters. The adapter
 is tested against OpenCode 1.19.5. The V2 path is contract-checked against the
-OpenCode 2.2.5 plugin API (tested on 2.2.5; the package declares
+OpenCode v2 plugin API (tested on 2.2.6; the package declares
 `>=1.19 <2 || >=2.0`).
 
 ## Options
@@ -194,6 +194,7 @@ surfaces that are not the sandbox itself:
 bun install
 bun run ci      # biome + tsc + 90 tests (real sandbox integration included)
 bun run smoke   # live OpenCode 2.x shell + boundary check (OPENCODE_BIN to override)
+bun run compat  # ci + smoke; the daily upstream-watch runs this before moving the tested-on anchor
 ```
 
 CI makes a working sandbox a hard requirement

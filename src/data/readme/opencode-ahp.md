@@ -2,15 +2,7 @@
 
 OpenCode v2 plugin that hosts the **Agent Host Protocol (AHP) 1.0.0**
 in-process so opencode is a native agent in the **VS Code Agents window** —
-on this machine and (MVP scope) on other machines over the local LAN.
-
-> **Status: Phase 3 — wss:// transport complete.** Sessions, model +
-> agent pickers, streaming, tool calls, permission prompts,
-> steering/queue, usage, **changesets (uncommitted / session / per-turn
-> diffs with `discard-changes`)**, and reconnect replay are
-> live-verified over the LAN with VS Code 1.145.2 (real Agents window ↔
-> host), over plain `ws://` **and native `wss://`** (TLS-terminated).
-> The full plan and wire findings live in [`plan.md`](plan.md).
+on this machine and on other machines over the local LAN.
 
 ## What you get
 
@@ -29,6 +21,27 @@ In the Agents window, an `opencode` host with:
   (started → ready → confirmed → complete), and usage totals.
 - **Permissions** — opencode's `permission.asked` becomes an in-window
   approval prompt; approve runs the tool, deny blocks it.
+- **Client tools** — a client can register its own tools per session
+  (`createSession` or `session/activeClientSet`): the model calls them
+  directly, the host delegates execution to the owning client
+  (`toolClientExecution` request — the session stays in progress while the
+  client runs), and the client's result flows back into the turn, including
+  `requiresResultConfirmation` approval. Client tools bypass opencode's
+  permission prompt; only the client that provided the tool may execute it
+  or confirm its result.
+- **Multi-chat** — a session can host additional chats (AHP `createChat`,
+  gated on the advertised `multipleChats` capability): each chat runs
+  against its own opencode backend session with fully isolated turns, and
+  `disposeChat` removes a chat without touching the session. The chats
+  appear in the session's catalog (default chat first); each chat carries
+  its own changesets. Fork/side-chat creation is not supported (opencode
+  exposes no fork to plugins). Peer-chat backends appear in opencode's own
+  UI as ordinary sessions — they are real opencode sessions underneath.
+  **Survives restarts:** the host stamps small binding markers into the
+  opencode sessions' metadata at create, so after a location reload each
+  chat re-attaches at its original URI (and a client-chosen session
+  channel resurfaces under its original name); re-attached chat titles are
+  re-derived (`Chat 2`, …) while session titles and messages persist.
 - **Steering + queue** — a message sent mid-turn steers the active turn or
   queues for the next one (AHP `pendingMessageSet`).
 - **Changesets** — per-session diff channels (uncommitted, session, and
@@ -37,10 +50,16 @@ In the Agents window, an `opencode` host with:
   `discard-changes` operation restores a file. Requires the location
   directory to be a git repository (otherwise the changesets are empty);
   opt out with `capabilities.changesets: false`.
-
-Not yet: cancelling a queued message and the `always` permission reply
-(Phase 4 extensions); official conformance-suite coverage (Phase 5,
-last — after the extensions land).
+- **Terminals** — read-only `ahp-terminal:` channels rendered from
+  `shell`-tool executions (`isPty: false`, completed-command output with
+  exit codes): while a turn runs a foreground shell command, the terminal
+  appears in the root catalog, streams
+  `data` → `commandFinished` → `exited` to subscribers, and leaves the
+  catalog at turn end (the channel state stays subscribable until the
+  chat/session is removed). The terminals are renderings, not pty —
+  `createTerminal`/`disposeTerminal` and client `terminal/*` actions get
+  clean read-only errors. Opt out with
+  `capabilities.terminals: false`.
 
 ## Requirements
 
@@ -98,13 +117,13 @@ sibling of `src/index.ts` (checkouts only — copy
 | `keepAlive` | `true` | Keep the opencode location loaded against its idle timeout (`experimental.location_idle_timeout`, default 60 min) by periodically touching an internal anchor session — with this on, **no `location_idle_timeout` config entry is needed**. The anchor (`opencode-ahp (keep-alive)`) is a real opencode session: it shows in the TUI session list but is hidden from AHP clients (opencode's plugin surface cannot archive it) |
 | `keepAliveIntervalMinutes` | `10` | Minutes between keep-alive touches; keep well below the effective idle timeout |
 | `replayWindow` | `1000` | Per-channel actions kept for reconnect replay; older gaps → fresh snapshot |
-| `capabilities` | `{ changesets: true, terminals: false, automations: false }` | Advertised in `initialize` — never advertise what we don't implement. Set `changesets` to `false` to disable the diff channels (the session/chat snapshots then carry no changeset catalogues and changeset URIs resolve to nothing) |
+| `capabilities` | `{ changesets: true, terminals: true, automations: false }` | Host-side switches — never advertise what we don't implement (in AHP 1.0.0 none of these is a wire field; discovery is the state's optionality). Set `changesets` to `false` to disable the diff channels (the session/chat snapshots then carry no changeset catalogues and changeset URIs resolve to nothing); set `terminals` to `false` to disable the synthetic shell-command terminal channels (no `root/terminals` list, `shell` calls open no `ahp-terminal:` channels) |
 
-## Remote access (local LAN — MVP)
+## Remote access (local LAN)
 
-MVP transport is plain `ws://` + token on the LAN (the token in the URL is
+The LAN transport is plain `ws://` + token (the token in the URL is
 cleartext — LAN only, by design). Off-LAN options (Tailscale, a dev-tunnel
-port forward, any `wss://` proxy) are post-MVP; the host accepts any
+port forward, any `wss://` proxy) are operational; the host accepts any
 `ws(s)://` URL whose path and token match.
 
 ### Host side
@@ -151,8 +170,9 @@ port forward, any `wss://` proxy) are post-MVP; the host accepts any
    needs an upstream auto-boot option.)
 4. Verify: `curl -s http://<host-lan-ip>:<port>/healthz` → `ok`.
 
-Full two-machine walkthrough:
-[`docs/lan-test-runbook.md`](docs/lan-test-runbook.md).
+Full two-machine walkthrough (and the complete testing strategy: unit,
+static, live verification, two-machine, conformance):
+[`docs/testing.md`](docs/testing.md).
 
 ### Client side (each PC)
 
@@ -174,7 +194,7 @@ Note: the Agents window's built-in **SSH** and **Dev tunnels** flows run
 For a third-party host, only raw network reachability of the `ws(s)://`
 URL matters.
 
-### Off-LAN: native `wss://` (Phase 3)
+### Off-LAN: native `wss://`
 
 When plain LAN `ws://` doesn't fit (host on another network, or
 token-in-URL on a shared network you don't want), set `tls` and the same
@@ -214,12 +234,20 @@ Dependency-free live probes (Node ≥ 20 global WebSocket):
 
 ```sh
 node scripts/ahp-client.mjs --token <token> [--base http://127.0.0.1:8765]
-# Phase 1 end-to-end: createSession → agent-picker snapshot → full turn lifecycle
-node scripts/ahp-phase1.mjs --token <token> --base http://127.0.0.1:8765 --provider opencode
-# Phase 2 end-to-end: changesets (edit → diffs → discard) + mid-turn reconnect/replay
-node scripts/ahp-phase2.mjs --token <token> --base http://127.0.0.1:8765
+# end-to-end: createSession → agent-picker snapshot → full turn lifecycle
+node scripts/ahp-turn-lifecycle.mjs --token <token> --base http://127.0.0.1:8765 --provider opencode
+# changesets end-to-end: edit → diffs → discard, plus mid-turn reconnect/replay
+node scripts/ahp-changesets.mjs --token <token> --base http://127.0.0.1:8765
+# client-provided tools (ping tool, failed result, confirmation cycle)
+node scripts/ahp-client-tools.mjs --token <token> --base http://127.0.0.1:8765
+# multi-chat (createChat/disposeChat, per-chat backends, no ghost sessions)
+node scripts/ahp-multi-chat.mjs --token <token> --base http://127.0.0.1:8765
+# multi-chat durability: leave the peer chat + backend alive, reload the
+# location, then recheck the re-attachment (chat at its original URI)
+node scripts/ahp-multi-chat.mjs --token <token> --base http://127.0.0.1:8765 --leave-peer
+node scripts/ahp-multi-chat.mjs --token <token> --base http://127.0.0.1:8765 --recheck <sessionChannel> <peerChatURI>
 # the same probes over native wss:// (self-signed test cert):
-NODE_TLS_REJECT_UNAUTHORIZED=0 node scripts/ahp-phase2.mjs --token <token> --base https://127.0.0.1:8765
+NODE_TLS_REJECT_UNAUTHORIZED=0 node scripts/ahp-changesets.mjs --token <token> --base https://127.0.0.1:8765
 ```
 
 ## Publishing
@@ -232,6 +260,13 @@ settings* → *Trusted publishers* → this workflow).
 
 Installed copies don't auto-update: `opencode plugin update opencode-ahp`
 - `opencode service restart`.
+
+## Documentation
+
+- [`docs/design.md`](docs/design.md) — architecture and wire-contract findings.
+- [`docs/futures.md`](docs/futures.md) — candidate future work
+- [`docs/testing.md`](docs/testing.md) — the testing strategy: unit, live
+  verification, two-machine, and conformance.
 
 ## License
 

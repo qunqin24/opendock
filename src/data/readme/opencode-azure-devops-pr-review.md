@@ -52,7 +52,7 @@ is an actual capture excerpt with identifying UI removed and its text unchanged.
    [company networks](docs/ENTERPRISE.md#company-networks) first):
 
    ```sh
-   opencode plugin add opencode-azure-devops-pr-review@0.3.5
+   opencode plugin add opencode-azure-devops-pr-review@0.3.6
    ```
 
 2. Follow the [quickstart](docs/QUICKSTART.md) to save your PAT in a private
@@ -187,6 +187,35 @@ and reasoning effort** on the same 50 PRs:
 
 The full method, the comparison of all 12 combinations and the limits are in
 the [validation record](docs/VALIDATION.md#martian-code-review-bench-2026-11-05-and-06).
+
+### Checked on a second benchmark
+
+0.3.6 changed two reviewer instructions because of issues this run missed:
+defects in code a pull request moves unchanged, and findings dropped because
+the behavior might be intended. They were written after reading three of the
+benchmark's expected issues, and in a local scoring run they raised its recall
+by 2.5 points. To see whether they help only there, 0.3.5 and 0.3.6 also
+reviewed the 25 pull requests of the
+[ReviewBench](https://github.com/review-bench/ReviewBench) test set, which was
+not used to write them, once each with `/pr-deep` and Claude Opus 5.5 at
+medium effort. Both were scored with ReviewBench's own judging pipeline and
+Claude Sonnet 5, the model that judges its leaderboard. We ran the pipeline
+ourselves, so this is not a leaderboard result.
+
+| ReviewBench test set | Issues found (recall) | Findings judged valid | High and medium found | Inline decisions (F1) |
+| :--- | ---: | ---: | ---: | ---: |
+| 0.3.5 | 35.5% | 95.6% | 55.3% | 70.0 |
+| 0.3.6 | 39.5% | 96.5% | 55.3% | 65.5 |
+
+None of the four measures fell by more than the run-to-run variation allowed
+for in advance. The last one is agreement with the judge on which findings
+deserve an inline comment; it fell because more findings the judge rated
+medium or high were labeled low, 8 of them questions about intent, which the
+new rule rates low. Our local judge scored these runs and a pair with GPT-6.1
+Sol. With Sol all four measures rose slightly; with Claude Opus 5.5 it rated
+2.4 points fewer of 0.3.6's findings valid, more than allowed. The criteria,
+both judges' results and the limits are in the
+[validation record](docs/VALIDATION.md#defects-in-moved-code-and-unknown-intent-2026-11-09).
 
 ## Watch the workflow
 
@@ -335,14 +364,14 @@ Azure DevOps REST API with the runtime's built-in `fetch`.
 Install the npm package with OpenCode's plugin manager:
 
 ```sh
-opencode plugin add opencode-azure-devops-pr-review@0.3.5
+opencode plugin add opencode-azure-devops-pr-review@0.3.6
 ```
 
 The same release is also a versioned Git package, which needs Git but not the
 npm registry:
 
 ```sh
-opencode plugin add 'github:WTLAIB/opencode-azure-devops-pr-review-v2#v0.3.5'
+opencode plugin add 'github:WTLAIB/opencode-azure-devops-pr-review-v2#v0.3.6'
 ```
 
 Add only one of them. OpenCode 2.2.4 loads the plugin into a running OpenCode
@@ -356,7 +385,7 @@ To select another configuration file, use an absolute path in the host config:
 ```json
 {
   "plugins": [{
-    "package": "opencode-azure-devops-pr-review@0.3.5",
+    "package": "opencode-azure-devops-pr-review@0.3.6",
     "options": { "settingsFile": "/absolute/path/to/azpr/settings.json" }
   }]
 }
@@ -381,7 +410,7 @@ For an entry that `opencode plugin add` created, add the new version and,
 only when that succeeds, remove the previous one:
 
 ```sh
-opencode plugin add opencode-azure-devops-pr-review@0.3.5 &&
+opencode plugin add opencode-azure-devops-pr-review@0.3.6 &&
   opencode plugin remove opencode-azure-devops-pr-review@PREVIOUS_VERSION
 ```
 
@@ -404,7 +433,7 @@ configuration needs no new `/pr-setup`. `opencode plugin list` should then
 show a single `azpr` row with the new version (from 0.3.1, `/pr-check` names
 it too); if it still shows the previous one, run `opencode service restart`.
 Exact versions stay pinned, so `opencode plugin update` leaves them unchanged.
-See the [0.3.5 release notes](docs/releases/v0.3.5.md) for what changed and the
+See the [0.3.6 release notes](docs/releases/v0.3.6.md) for what changed and the
 [0.2.0 release notes](docs/releases/v0.2.0.md) for automatic comments, which
 remain disabled unless you configure `afterReview` or request them with a
 review command flag.
@@ -414,8 +443,8 @@ review command flag.
 <details>
 <summary>Source installation and replacement</summary>
 
-Download the [v0.3.5 source archive](https://github.com/WTLAIB/opencode-azure-devops-pr-review-v2/archive/refs/tags/v0.3.5.tar.gz)
-and extract it, or check out tag `v0.3.5`. The installer needs POSIX `sh` and
+Download the [v0.3.6 source archive](https://github.com/WTLAIB/opencode-azure-devops-pr-review-v2/archive/refs/tags/v0.3.6.tar.gz)
+and extract it, or check out tag `v0.3.6`. The installer needs POSIX `sh` and
 Python 3's standard library. From that source directory:
 
 ```sh
@@ -562,7 +591,13 @@ reviewer's confidence, the size of the fix or the kind of issue:
   rare trigger reaches, or an issue with no effect on behavior.
 
 A rare trigger lowers the severity; it does not keep a defect out of the
-findings. The verifier sets the final severity from its own checks; `/pr-quick`
+findings. Neither does the code's history: a defect on lines the PR adds or
+moves is a finding even when the same code existed before (a function moved to
+a new file), marked as carried over. Nor does a possible intention: behavior
+that is wrong only if the author did not mean it, with nothing showing whether
+they did, is a low finding whose summary asks whether the author meant it and
+whose suggestion asks them to confirm or document the intent.
+The verifier sets the final severity from its own checks; `/pr-quick`
 keeps the reviewer's. Concrete gaps the change leaves are findings too, rated
 by their effect: a changed behavior no test would catch where the project
 already tests comparable code, a test that cannot fail, a comment or document
@@ -857,8 +892,8 @@ and a loopback fake Azure DevOps REST service in disposable directories under
 Uninstall without `--apply` previews; `--apply` archives only this package under
 `azpr-v2-backups` and leaves the private state directory for you to delete.
 For a native installation, remove the entry you added, for example
-`opencode plugin remove opencode-azure-devops-pr-review@0.3.5` or
-`opencode plugin remove 'github:WTLAIB/opencode-azure-devops-pr-review-v2#v0.3.5'`;
+`opencode plugin remove opencode-azure-devops-pr-review@0.3.6` or
+`opencode plugin remove 'github:WTLAIB/opencode-azure-devops-pr-review-v2#v0.3.6'`;
 the external settings, PAT file and private review state remain available.
 
 [Architecture](docs/ARCHITECTURE.md), [commenting](docs/COMMENTING.md),
@@ -871,7 +906,7 @@ or personal model selections.
 ## License and releases
 
 [MIT](LICENSE), copyright 2026 WTLAIB. See the [changelog](CHANGELOG.md) for the
-release scope, [v0.3.5](https://github.com/WTLAIB/opencode-azure-devops-pr-review-v2/releases/tag/v0.3.5)
+release scope, [v0.3.6](https://github.com/WTLAIB/opencode-azure-devops-pr-review-v2/releases/tag/v0.3.6)
 for downloads, the [npm package](https://www.npmjs.com/package/opencode-azure-devops-pr-review),
 [v0.2.0](https://github.com/WTLAIB/opencode-azure-devops-pr-review-v2/releases/tag/v0.2.0)
 for the recorded demonstration, and [releasing](docs/RELEASING.md) for the

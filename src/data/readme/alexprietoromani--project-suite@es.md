@@ -5,8 +5,8 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.7.0-111111?style=flat-square" alt="Version">
-  <img src="https://img.shields.io/badge/works%20with-Claude%20Code%20%7C%20opencode%20%7C%20Antigravity-111111?style=flat-square" alt="Works with Claude Code, opencode and Antigravity">
+  <img src="https://img.shields.io/badge/version-1.8.0-111111?style=flat-square" alt="Version">
+  <img src="https://img.shields.io/badge/works%20with-Claude%20Code%20%7C%20opencode%20%7C%20Antigravity%20%7C%20Codex-111111?style=flat-square" alt="Works with Claude Code, opencode, Antigravity and Codex">
   <img src="https://img.shields.io/badge/skills-22-111111?style=flat-square" alt="22 skills">
   <img src="https://img.shields.io/badge/commands-6-111111?style=flat-square" alt="6 commands">
   <img src="https://img.shields.io/badge/license-MIT-111111?style=flat-square" alt="MIT license">
@@ -121,6 +121,54 @@ curso** —nunca como una Fase nueva al final— y marcando cada bloque tocado c
 `> ⟳ Ajustado en SF{x.y} — <motivo>`. Siempre avisa; solo pide permiso si el ajuste cambiaría el
 entregable global de la Fase.
 
+## Orquestación Jerárquica en 3 Niveles
+
+Project-suite coordina la ejecución mediante una jerarquía estricta de 3 niveles (`Orquestador -> Especialista -> Ejecutor`), gobernada por `.project-suite/orchestration.json`:
+
+```mermaid
+flowchart TD
+    N1["Nivel 1: Orquestador\n(fable/opus | sol | argon)\nVisión global • Digiere fases • Cero código directo"]
+    N2["Nivel 2: Especialistas\n(sonnet | terra | flash)\nfront • back • db • qa • docs • plugin\nSesión persistente (reutilizar chat, -2 para concurrencia)"]
+    N3["Nivel 3: Ejecutores\n(haiku | luna | flash_lite)\nSubagentes efímeros • 1 tarea • DoD • Reportes • Auditoría en Frío"]
+
+    N1 -->|"delega Sub fases digeridas"| N2
+    N2 -->|"desglosa en Tareas atómicas"| N3
+    N1 -.->|"despacha directo (reportes / auditoría)"| N3
+
+    style N1 fill:#1e1b4b,stroke:#818cf8,color:#e0e7ff
+    style N2 fill:#0f2b38,stroke:#38bdf8,color:#e0f2fe
+    style N3 fill:#062d22,stroke:#34d399,color:#ecfdf5
+```
+
+- **Nivel 1 — Orquestador:** Sesión principal del usuario. Mantiene la visión estratégica del proyecto, digiere las Fases/Sub fases antes de delegar y valida los entregables. No escribe código de aplicación directamente. Despacha Ejecutores de Nivel 3 para reportes rápidos, validaciones de DoD o Auditorías en Frío sin ensuciar su contexto.
+- **Nivel 2 — Especialistas (`front`, `back`, `db`, `qa`, `docs`, `plugin`):** Sesiones persistentes por dominio que reciben Sub fases digeridas con contratos y Criterios de Aceptación (AC) acotados. Siempre reutiliza el mismo chat/sesión; solo instancia `{especialista}-2` al paralelizar tareas simultáneas del mismo dominio.
+- **Nivel 3 — Ejecutores:** Subagentes rápidos, ligeros y efímeros con contexto mínimo para una sola tarea o acción atómica. Lanzados por Especialistas (para tareas pequeñas) o por el Orquestador (para reportes, DoD y Auditorías en Frío).
+
+### Tabla de modelos por arnés
+
+| Agente de Código | Nivel 1: Orquestador | Nivel 2: Especialista (`front`, `back`...) | Nivel 3: Ejecutor (Tareas / Reportes / Auditoría en Frío) |
+|---|---|---|---|
+| **Claude Code** | `fable` / `opus` | `sonnet` (Sonnet 5.5) | `haiku` (Haiku 5.5) *(fallback a `sonnet` para razonamiento pesado)* |
+| **Codex** | `sol` | `terra` | `luna` |
+| **Antigravity** | `argon` (`pro`) | `flash` (Gemini Flash, reutilizado por `conversationId`) | `flash_lite` (Flash Lite) o `flash` efímero de 1 sola tarea |
+| **OpenCode** | Proveedor activo (`opus` / `sol` / `argon` / `model`) | Modelo de dominio (`sonnet` / `terra` / `flash` / `model`) | Modelo ligero (`haiku` / `luna` / `flash_lite` / `small_model`) |
+
+### Repositorios Privados vs. Públicos (`.project-suite/orchestration.json`)
+
+La topología y visibilidad se configuran al iniciar con `/init` o se conmutan en vivo con `/modo orquestacion`:
+- **Repositorio Privado (`visibility: "private"` -> `single-agent` por defecto):** Todo el flujo de 3 niveles corre 100% dentro del mismo agente de código activo mediante sus subagentes nativos y reutilización de sesión. Nunca invoca herramientas externas, garantizando total privacidad y compliance.
+- **Repositorio Público (`visibility: "public"` -> `multi-agent-orca` si se detecta Orca):** Permite orquestar múltiples agentes de terminal (`opencode2`, `claude`, `codex`, `antigravity`) en paneles persistentes mediante `orca orchestration worker-start --keep-open` y `orca orchestration send`.
+- **Modo puente sin Orca (`multi-agent-bridge`):** El contexto pasa entre agentes mediante paquetes de handoff estructurados en `.project-suite/handoffs/<especialista>.md` y branches/worktrees (`tablero.py --worktree`).
+
+### Auditoría en Frío (Zero-Context Review)
+
+Todo autor acumula contexto implícito y sufre de sesgo de autor: relee lo que intentó escribir en vez de lo que realmente está redactado. Antes de aprobar especificaciones (`especificar`), planes maestros (`planificar` / `/nueva-fase`) o diffs de código (`/review`), el Orquestador lanza de 1 a 3 **Ejecutores de Nivel 3** en frío (cero historial de conversación) evaluando el material bajo 3 lentes especializadas:
+1. **`zoom-out` (Simplicidad y YAGNI):** Caza sobre-ingeniería, abstracciones prematuras y pregunta cómo lograr el objetivo con la mitad de piezas.
+2. **`comprehension` (Lectura Literal en Frío):** Evalúa si el documento o diff es autoexplicativo sin que el revisor tenga que adivinar supuestos. Si el Ejecutor interpreta algo distinto, el documento es ambiguo y debe aclararse.
+3. **`design-critic` (Fallas, Bordes e Invariantes):** Busca condiciones de carrera, fallos silenciosos, invariantes rotos y vacíos de cobertura en pruebas.
+
+Los hallazgos se clasifican mediante la matriz de triage del Orquestador en `fix-now` (corrección inmediata antes de continuar), `fix-in-fase` (anotación en el plan como tarea futura) o `descartar` (falso positivo fuera de alcance).
+
 ## Comandos
 
 | Comando | Qué hace |
@@ -204,6 +252,14 @@ agy plugin install https://github.com/AlexPrietoRomani/project-suite
 
 La raíz del plugin trae un manifiesto `plugin.json`; `agy plugin validate` procesa las 22 skills y convierte los 8 comandos en skills (se escriben en el chat, ej. `/review` como mensaje, en vez de seleccionarlos de un menú de slash). Limitación conocida: los hooks de lifecycle (recordatorio ambiental de modo) están cableados para Claude Code y opencode, todavía no para Antigravity.
 
+### OpenAI Codex
+
+project-suite ofrece soporte nativo de primera clase para OpenAI Codex:
+
+- Manifiestos `.codex-plugin/plugin.json` y `.agents/plugins/marketplace.json` que exponen las 22 skills, comandos de gobierno y `.mcp.json`.
+- Utiliza `AGENTS.md` para las reglas e instrucciones del proyecto.
+- Totalmente compatible con la jerarquía de orquestación en 3 niveles (`sol -> terra -> luna`).
+
 ### Gemini CLI (legacy — enterprise y API keys)
 
 Google discontinuó Gemini CLI para consumidores el **18 de junio de 2026**; lo reemplazó Antigravity CLI. La extensión sigue funcionando para licencias Gemini Code Assist Standard/Enterprise y API keys pagas de Gemini:
@@ -271,11 +327,11 @@ Si el paquete es privado, usa un registry interno y cambia `publishConfig.access
 
 | Agente | Estado | Instalación |
 |---|---|---|
-| Claude Code | ✅ | `/plugin marketplace add AlexPrietoRomani/project-suite` |
-| opencode | ✅ | v2: `{ "plugins": [...] }` en `opencode.json`/`cli.json` o `opencode plugin add`; v1: `{ "plugin": [...] }` |
-| Antigravity CLI | ✅ | `agy plugin install https://github.com/AlexPrietoRomani/project-suite` |
+| Claude Code | ✅ Completo | `/plugin marketplace add AlexPrietoRomani/project-suite` |
+| opencode | ✅ Completo | v2: `{ "plugins": [...] }` en `opencode.json`/`cli.json` o `opencode plugin add`; v1: `{ "plugin": [...] }` |
+| Antigravity CLI | ✅ Completo | `agy plugin install https://github.com/AlexPrietoRomani/project-suite` |
+| Codex | ✅ Completo | Soporte nativo vía `.codex-plugin/plugin.json` y `.agents/plugins/marketplace.json` (expone las 22 skills, comandos, `.mcp.json` y `AGENTS.md`) |
 | Gemini CLI | ⚠️ Legacy (enterprise / API keys) | `gemini extensions install https://github.com/AlexPrietoRomani/project-suite` |
-| Codex | 🔜 Próximamente | Requiere `.codex-plugin/` |
 | Cursor / Windsurf | 🔜 Próximamente | Requiere `.cursor/rules/` y `.windsurf/rules/` |
 
 ## FAQ

@@ -27,6 +27,12 @@ The goal is not to judge one bad answer. The goal is to find patterns in how you
 
 ## Install
 
+Session discovery requires OpenCode 1.17.11 or later. The plugin uses Node.js's
+`node:sqlite` at startup, so the Node.js runtime running OpenCode must support
+it: Node.js 22.13 or later works without an experimental flag; Node.js
+22.5–22.12 requires `--experimental-sqlite`. This requirement applies to the
+whole plugin, not only context analysis.
+
 Add the plugin to your OpenCode config:
 
 ```json
@@ -72,6 +78,10 @@ Review by session title:
 Call session_reflection with action=collect and sessionName="npm whoami ENEEDAUTH".
 ```
 
+If more than one session matches, select a session from the returned candidates
+and call the tool again with its `sessionID`. Collection excludes the current
+session. The default `limit` is 8 and the maximum is 30.
+
 Review sessions from a time range:
 
 ```text
@@ -96,7 +106,7 @@ ${XDG_CONFIG_HOME}/opencode/session-reflections/reports/
 
 ## Context Analysis (`analyze_prompts`)
 
-The plugin automatically captures the full system prompt on every LLM request and stores it in a local SQLite database (`reflection.db` inside the session-reflections directory). This requires Node.js 22.5 or later.
+The plugin captures the full system prompt for requests with a session ID and stores it in a local SQLite database (`reflection.db` inside the session-reflections directory). See [Privacy And Local Data](#privacy-and-local-data) before enabling the plugin.
 
 Use `action=analyze_prompts` to analyze the context composition of the current session:
 
@@ -110,6 +120,12 @@ This produces a structured prompt for the LLM covering:
 - **Largest tool outputs**: the top 5 tool results by character count, to identify what is consuming context.
 - **System prompt content**: the full system prompt from the most recent LLM request, segmented for review.
 - **Optimization suggestions**: specific items to remove or shorten, with estimated token savings.
+
+By default, analysis targets the current session and uses `mode=latest`. Pass
+`sessionID` to analyze another session. Token and tool-output statistics are
+read from OpenCode's local database; if it cannot be read, analysis continues
+with zero token statistics and no tool-output statistics. If no prompt captures
+exist for the selected session, the tool reports that instead.
 
 Use `mode=trend` to analyze how system prompt size grew across all requests in the session:
 
@@ -160,7 +176,7 @@ The report header records the run ID, the active OpenCode agent, and the actual 
 
 The plugin does not upload session content to a separate service on its own. It returns selected transcript evidence to the current OpenCode session, where it may be sent to the model provider configured for that session. The generated analysis prompt also asks the agent to perform external prior-art research when tools and network access are available.
 
-Session metadata and transcripts are read through OpenCode APIs. Implicit discovery uses `/experimental/session` cursor pagination across projects; the plugin does not read OpenCode's SQLite storage.
+Session metadata and transcripts are read through OpenCode APIs. Implicit discovery uses `/experimental/session` cursor pagination across projects. For context analysis, the plugin also opens OpenCode's local SQLite database read-only to obtain token and tool-output statistics. Its location is `${XDG_DATA_HOME}/opencode/opencode.db`, or `~/.local/share/opencode/opencode.db` when `XDG_DATA_HOME` is not absolute.
 
 Audit logs are metadata-only by default. They are written locally under:
 
@@ -168,22 +184,32 @@ Audit logs are metadata-only by default. They are written locally under:
 ~/.config/opencode/session-reflections/
 ├── reports/
 ├── runs/
-└── events.jsonl
+├── events.jsonl
+└── reflection.db
 ```
 
-Audit directories are created with mode `0700`, and manifests, events, reports, and report sidecars with mode `0600`. Run manifests contain redacted collect metadata such as session IDs, counts, hashed directory paths, prompt hashes, and skip reasons. They omit session titles, raw transcripts, tool output, and the generated prompt, but metadata should still be treated as private and is not guaranteed to be secret-free.
+The location follows the `XDG_CONFIG_HOME` rules described above. Audit directories are secured to mode `0700` during collect/save operations, and manifests, events, reports, and report sidecars use mode `0600`. At plugin startup, however, the root directory and `reflection.db` are created with permissions determined by the process and system defaults; the database is not explicitly restricted to `0600`. Check and restrict access to both before relying on their privacy.
+
+The database stores full system prompts in plaintext and may contain sensitive instructions or other private information. It is created at startup and captures prompts without an explicit analysis request. Prompt data has no automatic retention limit or cleanup and can grow over time. Review its access permissions and delete it when you no longer need its contents, with OpenCode stopped. The plugin does not upload the database itself, but prompt content returned for analysis may be sent to the configured model provider.
+
+Run manifests contain redacted collect metadata such as session IDs, counts, hashed directory paths, prompt hashes, and skip reasons. They omit session titles, raw transcripts, tool output, and the generated prompt, but metadata should still be treated as private and is not guaranteed to be secret-free.
 
 Collect manifests are immutable after creation and are never updated when a report is saved. Each report sidecar self-associates its report with the run by recording the run ID, report path, save time, reviewed-session count, and a hash of the exact manifest snapshot used to build the report.
 
 The plugin rejects symbolic links at the `runs`, `reports`, manifest-target, and event-log boundaries, and rejects non-regular or hard-linked event logs. Files are fully written and permissioned as private temporary files before exclusive publication that cannot overwrite an existing target. A crash can leave a dot-prefixed temporary file, but a published report is complete and identifies its run without requiring a manifest update. Cross-process saves use distinct immutable report/sidecar pairs and no process-local lock.
 
-Saved Markdown reports contain the supplied analysis and may include sensitive excerpts copied by the model. You are responsible for retention and deletion of both reports and audit metadata.
+Saved Markdown reports contain the supplied analysis and may include sensitive excerpts copied by the model. You are responsible for retention and deletion of reports, audit metadata, and prompt captures.
 
 ## Release And Update History
 
-### Unreleased
+### v0.5.0 (tagged)
 
 - Added the OpenCode 2.x plugin entry (`setup`) alongside the V1 `server` entry. On 2.x, transcript evidence comes from the session's model context window, so messages removed by compaction are not included.
+
+### v0.4.0
+
+- Added local system-prompt capture and the `analyze_prompts` action for context analysis and prompt growth trends.
+- Aligned runtime and CI requirements with Node.js 22.
 
 ### v0.3.0
 
@@ -218,7 +244,7 @@ This is expected for normal npm plugin installation. Use the `session_reflection
 
 ### Search by session name misses sessions from other projects
 
-Use OpenCode `1.17.11` or later. Name lookup uses the cross-project `/experimental/session` endpoint and forwards the title query through its `search` parameter.
+Use OpenCode `1.17.11` or later. Name lookup uses the cross-project `/experimental/session` endpoint, forwards the title query through its `search` parameter, and filters returned names locally. If multiple sessions match, use a returned session ID to select one.
 
 ### Saving says the run ID is invalid or unknown
 
@@ -267,19 +293,16 @@ Before publishing, inspect the package and run the standard checks:
 ```sh
 npm test
 npm run check:import
+npm audit --omit=dev
 npm pack --dry-run
+npm pack
 ```
 
-Do not publish from an automated agent run without explicit human confirmation.
-
-## OpenCode Reliability Toolkit
-
-| Tool | Description |
-|------|-------------|
-| [opencode-waitfor](https://github.com/chncaesar/opencode-waitfor) | `wait_for` for HTTP/TCP/command readiness checks |
-| [opencode-db-clean](https://github.com/chncaesar/opencode-db-clean) | Reclaim disk space from bloated SQLite databases |
-| [opencode-session-reflection](https://github.com/chncaesar/opencode-session-reflection) | Qualitative review of past coding sessions |
-| [opencode-fleet](https://github.com/chncaesar/opencode-fleet) | Multi-node remote OpenCode orchestration |
+Install the generated tarball into an isolated temporary app, configure OpenCode
+to load that installed copy, and check both its resolved plugin origin and a
+`collect` call before publishing. See the repository's `AGENTS.md` for the
+complete isolated smoke-test procedure. Do not publish from an automated agent
+run without explicit human confirmation.
 
 ## License
 

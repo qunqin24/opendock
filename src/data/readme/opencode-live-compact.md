@@ -101,6 +101,12 @@ Set overrides in the plugin entry's `options` object. [All configuration options
 
 Recovery files live in private per-session directories. Before a backup would exceed the shared budget, cleanup removes the oldest retired backups toward 80% usage. Active checkpoints stay protected; if they leave insufficient room, the plugin keeps the full context.
 
+## Checking plugin status
+
+Ask OpenCode to call `live_compact_status` to see this session's latest planning or failure reason. Normal skips are logged once per reason change; storage and replay failures produce warnings even with `diagnostics: false`. Enable diagnostics for detailed JSONL measurements.
+
+Recall reports `missing`, `expired`, `unreadable`, or `storage-unavailable` when it cannot recover text. Re-read the source instead of guessing omitted details. References from other sessions also report `missing` to preserve isolation. Active backups do not expire after seven days; that grace period applies only to retired records.
+
 ## Development and benchmarks
 
 ```sh
@@ -126,7 +132,7 @@ The benchmark runner supports four suites:
 
 **150 programming exercises + 20 dependent React tasks.** Each suite used one continuous session per version, stock OpenCode **2.2.6**, **GPT-6 Luna**, and identical tasks and defaults. Run in Daytona on November 9, 2026.
 
-![Side-by-side results: both versions passed Aider 150/150 and Web-Bench 20/20. Live Compact estimated API cost was 3.1% and 42.1% lower respectively.](docs/assets/benchmarks-en.svg)
+![Side-by-side results: both versions passed Aider 150/150 and Web-Bench 20/20. Live Compact estimated API cost was 14.3% and 42.1% lower respectively.](docs/assets/benchmarks-en.svg)
 
 [Aider: logs and source data](benchmarks/results/2026-11-09-aider-150/README.md) · [Web-Bench: logs and source data](benchmarks/results/2026-11-09-webbench-react-20/README.md)
 

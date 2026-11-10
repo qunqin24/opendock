@@ -50,8 +50,10 @@ magpie tool web_search "OpenAI API documentation" --count 20
 如需调整供应商参数，可在 **Plugins → Installed → Options** 配置，或运行：
 
 ```sh
-magpie plugin options magpie-websearch '{"linkup":{"depth":"deep","resultLimit":4}}'
+magpie plugin options magpie-websearch '{"anysearch":{"format":"markdown"}}'
 ```
+
+Options 编辑器会用包内的 AnySearch 示例预填；示例不会自动生效，点击 Save 后才会写入并重载。示例使用 AnySearch 的默认 `format`，保存后行为不变。
 
 每次命令会替换已保存的完整选项对象，需包含希望保留的所有选项。保存后插件宿主会自动重载。完整参数和注册过滤见[技术参考](docs/technical-reference.md#configuration)。
 

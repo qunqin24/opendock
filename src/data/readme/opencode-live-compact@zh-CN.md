@@ -101,6 +101,13 @@ npm run build
 
 恢复文件按会话存放在私有目录中。新备份将超出共享预算时，先清理最旧的、已不再被引用的备份，尽量降至 80% 使用量。仍被检查点使用的原文不会删除；如果因此无法腾出空间，就保留完整上下文。
 
+## 状态与恢复诊断
+
+让 OpenCode 调用 `live_compact_status`，即可查看当前会话最近的规划或失败原因。默认会记录跳过原因，连续重复原因不刷屏；存储或回放失败会发出警告，无需开启 `diagnostics`。详细 JSONL 指标仍需开启诊断。
+
+无法恢复时，工具会返回 `missing`、`expired`、`unreadable` 或 `storage-unavailable`，并提示重新读取源文件，不要猜测被省略的内容。其他会话的引用同样返回 `missing`，避免泄露归属信息。七天保留期只针对已退役备份，活跃引用不会因此过期。
+
+
 ## 开发与测试
 
 ```sh
@@ -126,7 +133,7 @@ npm run test:integration
 
 **150 道编程题 + 20 个相互依赖的 React 任务。** 每组测试中，两个版本各用一个连续会话，使用官方原版 OpenCode **2.2.6**、**GPT-6 Luna**，题目、顺序及默认设置一致。于 **2026 年 11 月 9 日**在 Daytona 运行。
 
-![并排对比：两个版本均通过 Aider 150/150 和 Web-Bench 20/20。Live Compact 的估算 API 费用分别降低 3.1% 和 42.1%。](docs/assets/benchmarks-zh-CN.svg)
+![并排对比：两个版本均通过 Aider 150/150 和 Web-Bench 20/20。Live Compact 的估算 API 费用分别降低 14.3% 和 42.1%。](docs/assets/benchmarks-zh-CN.svg)
 
 [Aider：日志与原始数据（英文）](benchmarks/results/2026-11-09-aider-150/README.md) · [Web-Bench：日志与原始数据（英文）](benchmarks/results/2026-11-09-webbench-react-20/README.md)
 

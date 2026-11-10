@@ -36,13 +36,19 @@ entry. Preserve other plugins and settings:
 {
   "$schema": "https://opencode.ai/v2/cli.json",
   "plugins": [
-    "opencode-plugin-session-token-summary@^2"
+    "opencode-plugin-session-token-summary"
   ]
 }
 ```
 
 OpenCode installs the package from npm automatically. Restart the TUI if it does
 not reload.
+
+To get the latest release, run
+`opencode plugin update opencode-plugin-session-token-summary`, or run
+`opencode plugin update` to update every outdated plugin. OpenCode checks
+unpinned plugins for updates at startup but does not install them automatically.
+An exact version such as `@2.1.3` stays pinned.
 
 The `0.4.x` package targets the legacy TUI plugin API and cannot be used with
 OpenCode 2.
@@ -114,6 +120,21 @@ replace the npm entry in `~/.config/opencode/cli.json` with the checkout's
 absolute directory path. Use the directory, not `tui.tsx`: OpenCode V2 resolves
 the directory's `tui` entrypoint and skips direct-file TUI entries. Restart the
 TUI if it does not reload.
+
+### Releasing
+
+From a clean checkout of `main`, run one command with the desired version bump:
+
+```sh
+bun run release patch # or: minor, major
+```
+
+The script updates `main`, runs all checks, bumps `package.json` and
+`package-lock.json`, creates a `release: v...` commit and matching tag, then
+pushes the commit followed by the tag. The tag triggers the Publish workflow,
+which verifies that the tag and package version match before publishing to npm
+with provenance. npm Trusted Publishing must be configured for this repository
+and the `publish.yml` workflow.
 
 ## License
 

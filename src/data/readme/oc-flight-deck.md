@@ -14,13 +14,13 @@ Every package is a folder with its own README. Open the one you want; its README
 
 | Package | Kind | Version | What it does | Install |
 | --- | --- | --- | --- | --- |
-| janua | MCP | `0.3.1` | Persistent interactive terminals: spawn a program, type into it, read live output, resize it, kill it. | `npx -y @nathwn12/janua` (stdio MCP server). |
-| oc-bifrost | plugin | `1.6.13` | Runs older OpenCode plugins on the current runtime. | Add `@nathwn12/oc-bifrost` to your `plugins`. |
-| oc-flight-deck | plugin | `0.21.1` | Live session telemetry in the OpenCode sidebar. | Add `oc-flight-deck` to your `plugins`. |
-| oc-harness-setup | CLI | `1.0.0` | Installs the Windows agent harness. | `npx -y oc-harness-setup setup` |
-| oc-plugin-view | plugin | `0.1.0` | Installed plugin list in the OpenCode sidebar. | Add `oc-plugin-view` to your `plugins`. |
-| oc-talk | plugin | `0.1.8` | Cross-session talk: list live sessions, send one message to a peer, read its reply. | Add `oc-talk` to your `plugins`. |
-| rea-shim | MCP | `0.2.2` | Launcher for the rea reverse-engineering server. | `npx -y rea-shim --doctor` |
+| janua | MCP | `0.5.1` | Persistent interactive terminals: spawn a program, type into it, read live output, resize it, kill it. | `npx -y @nathwn12/janua` (stdio MCP server). |
+| oc-bifrost | plugin | `1.7.1` | Runs older OpenCode plugins on the current runtime. | Add `@nathwn12/oc-bifrost` to your `plugins`. |
+| oc-flight-deck | plugin | `0.22.0` | Live session telemetry in the OpenCode sidebar. | Add `oc-flight-deck` to your `plugins`. |
+| oc-harness-setup | CLI | `1.0.2` | Installs the Windows agent harness. | `npx -y oc-harness-setup setup` |
+| oc-plugin-view | plugin | `0.2.0` | Installed plugin list in the OpenCode sidebar. | Add `oc-plugin-view` to your `plugins`. |
+| oc-talk | plugin | `0.2.2` | Cross-session talk: list live sessions, send one message to a peer, read its reply. | Add `oc-talk` to your `plugins`. |
+| rea-shim | MCP | `0.2.3` | Launcher for the rea reverse-engineering server. | `npx -y rea-shim --doctor` |
 | oc-collections | repo | — | This index and npm-workspaces monorepo. | — |
 
 Each package's own README has the full steps, options and requirements. This page only tells you which folder to open.
@@ -29,7 +29,7 @@ The `gladius` and `puppet` MCP servers are not in this repo - they live in their
 
 ## Requirements
 
-Windows. Every package here targets Windows and none of them claims support elsewhere.
+Windows only for rea-shim (Windows x64) and oc-harness-setup (Windows 10/11), the two packages whose own requirements name Windows. janua names Windows, Linux and macOS; oc-bifrost and oc-flight-deck say any platform the host runs on; oc-talk and oc-plugin-view state no platform, so this page claims none for them.
 
 ## Development
 

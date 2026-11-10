@@ -8,7 +8,7 @@
 
 **The community Agent Plugins client for OpenCode — v1 and v2.**
 
-Contract-checked against the OpenCode **2.2.5** plugin API (tested on 2.2.5;
+Contract-checked against the OpenCode v2 plugin API (tested on 2.2.6;
 the `./legacy` entry follows the v1 factory contract).
 
 [Agent Plugins 1.0](https://agent-plugins.org) is the vendor-neutral packaging format for Agent Skills and MCP servers (TSC: Amazon, Cursor, Microsoft, OpenAI, Vercel, Google). Codex, VS Code, Kiro and ChatGPT load it natively; OpenCode does not. This plugin closes the gap:
@@ -139,7 +139,7 @@ Validation follows the Agent Plugins 1.0.0 loading rules and failure boundaries 
 - legacy `sse` transports are valid but unsupported and are skipped with a warning;
 - commands are one token, bare or `./`-relative, with no variables.
 
-The test suite includes fixtures modelled on real-world packages, symlink-escape cases for every path boundary (`plugin.json`, `skills/`, `SKILL.md`, `mcp.json`, `./` commands, `cwd`), marketplace install/update/uninstall lifecycles, npm resolution, the v1 skill farm and both adapters. A live smoke test (`bun run smoke`) verifies skill registration and the MCP `disabled` status against a real OpenCode 2.2.5 instance in an isolated HOME.
+The test suite includes fixtures modelled on real-world packages, symlink-escape cases for every path boundary (`plugin.json`, `skills/`, `SKILL.md`, `mcp.json`, `./` commands, `cwd`), marketplace install/update/uninstall lifecycles, npm resolution, the v1 skill farm and both adapters. A live smoke test (`bun run smoke`) verifies skill registration and the MCP `disabled` status against a real OpenCode v2 instance in an isolated HOME.
 
 ## V1 / V2 matrix
 
@@ -193,6 +193,7 @@ Same constraints: MIT, zero runtime dependencies, OpenCode V1 + V2.
 bun install
 bun run ci                    # biome lint + tsc --noEmit + bun test
 bun run smoke                 # live check against `opencode` (or OPENCODE_BIN)
+bun run compat                # ci + smoke; upstream-watch runs this before moving the tested-on anchor
 AGENT_PLUGINS_TRACE=/tmp/ap.log  # optional JSONL diagnostics
 ```
 

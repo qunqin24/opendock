@@ -70,12 +70,20 @@ The proxy sees the final request, so it is the one place the trim reliably lands
 
 What gets dropped:
 
-- **Tools** — keeps `bash`, `read`, `grep`, and whichever editing tool is present
-  (`apply_patch` in 1.18.18, `edit`/`write` in others). Drops `glob`, `skill`, `task`,
-  `todowrite`, `webfetch`, `websearch`, `lsp`, `question`.
+- **Tools** — keeps the shell tool under whatever name the harness gives it (`shell`
+  in opencode 2, `bash` before), `read`, `grep`, and the editing tools (`edit`/`write`,
+  or `apply_patch`). On opencode 2.2.5 that is five of thirteen; `execute`, `glob`,
+  `skill`, `subagent`, `webfetch`, `websearch` and `question` are dropped.
 - **Capability catalogues** — `<available_skills>` is removed when no `skill` tool
   survives the trim, because it advertises capabilities nothing can invoke. `<env>` and
   other structured context are kept.
+- **Text about dropped tools** — opencode 2's "Code Mode" section says the listed tools
+  only work inside `execute`, which the trim removes, so the model was being told its
+  tools were unusable. That section, any line naming `execute`, and the skills
+  paragraph go with their tools, as do two harness lines that contradict the
+  contract ("prefer parallelizing tool calls", "prefer dedicated tools over shell
+  commands"). On opencode 2.2.5 this takes the system prompt from about 8,000
+  characters to about 2,000.
 - **The harness's prose system prompt** — replaced with a short one, but **off by
   default**. A long, polished assistant prompt measurably reduces M365's tool
   compliance on another harness's numbers; that is a borrowed result we have not
@@ -83,7 +91,7 @@ What gets dropped:
   never dropped either way: opencode injects `AGENTS.md` and global rules as prose
   inside the system message, and those sections are preserved verbatim.
 
-`bash` is never dropped. M365's chat-tuned model will not "act as an agent" on request,
+The shell tool is never dropped. M365's chat-tuned model will not "act as an agent" on request,
 but it *will* reflexively write a ```` ```bash ```` block — routing that block to the
 shell tool is the single lever that makes tool calling work at all.
 
@@ -111,6 +119,34 @@ deleted — another host may be mid-conversation with it.
 
 Without Copilot Studio access the plugin still works, just less reliably; it logs a
 warning and carries on.
+
+Three things keep a turn on track:
+
+- **A tolerant parser.** M365 writes calls loosely: the command as a `command:` header,
+  `filePath:` for `path`, quoted values, a copied `$ ` prompt, prose or an invented
+  `<tool_response>` after the block. These are read as the call the model meant.
+- **One nudge after a give-up.** Chat tones sometimes answer a tool turn with "no tool
+  is available" without trying. The proxy then asks once more, softly, in the same
+  conversation (one extra message, no new conversation), worded differently once
+  tools have already run.
+- **A pinned backend.** Every turn's connection carries
+  `X-RoutingParameter-SessionKey`, which the reference project found stops long
+  sessions running on a forked copy of the conversation.
+
+Measured on one tenant on 2026-11-09 (`m365/quick`, opencode 2.2.5, 36 conversations,
+alternating builds), with and without the prompt trimming, nudge and routing header.
+Both builds had the tolerant parser:
+
+| Task | Without | With |
+|---|---|---|
+| Fix a bug, then rerun its test | 6/6, 5.3 turns | 6/6, 5.0 turns |
+| Find a value across six files | 6/6, 2.7 turns | 6/6, 2.0 turns |
+| Edit one config value, leave the rest | 6/6, 3.5 turns | 6/6, 4.5 turns (re-read the file to check, 3 of 6) |
+
+Every run made its tool call on the first turn, so the nudge never fired; that it
+recovers a give-up is tested offline only. No turn disengaged, and none ran on a
+forked conversation (`turnCount` rose by one each turn). Long sessions and the
+reasoning tones are not yet measured.
 
 ## opencode 2
 
@@ -140,7 +176,7 @@ stub rather than Microsoft: the plugin loads from a directory, registers all 21 
 an attached image is uploaded and attached to the turn, and the session title is
 answered locally — one chat turn reaches the backend, not two. The catalog records are
 also checked against the real `@opencode/plugin` schema constructors in the test suite.
-Nothing here has been run against a live M365 tenant.
+That stub run says nothing about Microsoft's side; see [Development](#development) for what has been run live.
 
 ## Configuration
 
@@ -165,6 +201,24 @@ hands it to opencode itself. Only a standalone `opencode-m365 serve` proxy needs
 `serve` prints its key, or takes a fixed one from `M365_PROXY_KEY`. Either put that key
 in `apiKey`, or export the same `M365_PROXY_KEY` to opencode and leave `apiKey` out.
 
+### Errors and the turn log
+
+When M365 refuses a turn, the proxy answers with an HTTP 422 so opencode does not
+retry it: opencode retries a 5xx or a 429 several times, which against a throttle only
+extends it. The error `code` says which refusal it was:
+
+| Code | Meaning |
+|---|---|
+| `m365_throttled` | The account is throttled. Wait for a lull. |
+| `m365_unavailable` | M365 answered with its own refusal: no credits, a model this licence does not cover, or a dead tone |
+| `m365_turn_rejected` | The server refused the request outright, typically a retired tone |
+| `m365_disengaged` | M365's filter refused to engage with the prompt |
+
+Set `M365_TURN_LOG=/path/to/turns.jsonl` before starting opencode to record one line
+per M365 turn: the raw reply, the tool calls parsed from it, and M365's diagnostics
+(`contentOrigin`, `turnCount`, throttle and classifier scores). The file is
+owner-only, and off by default because a reply can quote anything from the workspace.
+
 ### Why session titles are answered locally
 
 opencode titles every new session with a model call on your main model, which on M365
@@ -180,20 +234,63 @@ on the real model — they are real work, and only titling opens the extra conve
 
 ## Models
 
-Models are selected by an M365 *tone*, not a model id. `m365/gpt-5.5-think-deeper` is the
-default.
+Models are selected by an M365 *tone*, not a model id. `m365/quick` is the default.
 
-> **A conflict worth knowing about.** The reference project's README recommends
-> `gpt-5.5-think-deeper` and reports 100% tool compliance with the agent plus
-> fenced/shell-routing. Its own protocol notes (`m365-copilot-api.md`, quirk #13) say the
-> opposite — that reasoning tones meta-analyse the injected prompt and disengage, and
-> only `magic`/`*_Quick` work with an agent attached. The README is the newer
-> measurement, so it is the default here; if you see disengagement on tool turns, try
-> `m365/quick` or `m365/m365-copilot`.
+Tool-calling on a live tenant (2026-11-09, one non-Premium account, a single file-read
+task per run; small samples):
+
+| Model | Made the tool call |
+|---|---|
+| `m365/quick` | 5/5 |
+| `m365/m365-copilot` | 1/1 |
+| `m365/gpt-5.5` (same tone as `quick`) | 0/1 |
+| `m365/gpt-5.6` | 0/1 |
+| `m365/gpt-5.5-think-deeper` | 0/3 — says it has no file tool |
+
+The reference project's README reports 100% tool compliance for `gpt-5.5-think-deeper`;
+its protocol notes (`m365-copilot-api.md`, quirk #13) say reasoning tones disengage with
+an agent attached. Our runs agree with the notes. Reasoning tones still serve plain chat.
 
 A non-default tone (Claude, the reasoning tones) only takes effect when **no** agent is
 attached — with one, M365 silently routes to GPT regardless. The proxy therefore attaches
 the agent only on turns that carry tools, so plain chat reaches the model the tone selects.
+
+### Reading your Microsoft 365 work
+
+Two models ground the turn on your **own Microsoft 365 account**. Copilot's `WorkSearch`
+runs server-side over the Microsoft Search index, so these span your whole work substrate,
+not just mail:
+
+| Model | Use |
+|---|---|
+| `m365/work` | Ask about your work — "what needs my attention first", "summarise the thread with X", "what did Jim message me on Teams", "find my recent sprint docs" |
+| `m365/work-think` | The same, on a reasoning tone |
+
+What `WorkSearch` reaches (all verified against a live tenant, except where noted):
+
+| Source | Grounded? |
+|---|---|
+| Outlook **mail** and **calendar** | ✅ |
+| **Teams** chats and channel messages | ✅ |
+| **OneDrive** and **SharePoint** files | ✅ |
+| **People** (colleagues, senders, managers) | ✅ |
+| Third-party **Graph connectors** (Jira, ServiceNow, …) | ✅ *if your admin configured them* |
+
+Select one in opencode (the model picker, or pin a `work` sub-agent to it) when you want
+this context; they are listed as `Work · …`. Every other model is listed as `Code · …`,
+stays coding/web-only and never reaches your account. A
+grounded turn switches the request to the Outlook side-pane scenario, sends that surface's
+feature variants, and attaches the built-in agent with the `WorkSearch` capability — the
+combination that actually grounds on the signed-in account — then strips Copilot's inline
+citation markers from the reply. Bias toward one source by saying so ("in Teams, …", "in my
+OneDrive, …").
+
+These models are for **reading and synthesis** — ask-your-work Q&A. A grounded turn carries
+**no tools**: the proxy drops opencode's toolset for these models, so the fenced tool
+instructions are never attached and no tool-call parsing runs on the reply — Copilot brings
+its own built-in agent instead. Keep a coding model selected for coding, and switch to
+`m365/work` to ask about your mail, Teams or files. Read-only: Copilot searches and
+summarises, it does not send a message or edit a file.
 
 ## Authentication
 
@@ -232,7 +329,8 @@ opencode-m365 login [--interactive]   # sign in
 opencode-m365 setup [--local]         # register the plugin with opencode
 opencode-m365 serve [--port 4141]     # run the proxy standalone, for any OpenAI client
                                       # (send its key as `Authorization: Bearer`)
-opencode-m365 doctor                  # check auth, agent, proxy and opencode wiring
+opencode-m365 doctor [--live]         # check auth, agent, proxy and opencode wiring
+                                      # (--live sends one short message per model tone)
 ```
 
 ## Images
@@ -280,12 +378,12 @@ Tests run against a stub SignalR server (`test/stub-copilot.ts`) that speaks the
 framing, so a full turn — including the mandatory `Metrics` frame, ping handling,
 Disengaged detection and the stop-on-abort frame — is exercised offline.
 
-**No live M365 traffic has been run against this implementation.** Everything above about
-opencode's behaviour is measured; everything about M365's behaviour is implemented from
-the protocol notes in
+Chat, tool calling and agent provisioning have been run against one live tenant, through
+opencode 2.2.5. Image upload has not, and file edits, shell commands and multi-step tasks
+have not been exercised there. Other M365 behaviour is implemented from the protocol notes in
 [cramt/m365-copilot-proxy](https://github.com/cramt/m365-copilot-proxy) (MIT), whose
-`docs/` are the source of truth for this surface. Run `opencode-m365 doctor` against your
-own tenant before trusting it.
+`docs/` are the source of truth for this surface. Run `opencode-m365 doctor --live`
+against your own tenant before trusting it.
 
 ## Credit
 

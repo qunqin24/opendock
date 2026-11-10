@@ -175,11 +175,19 @@ Each dedicated context entry keeps only its tier's variants and retains the decl
 effort, including when the default's non-Fast twin is needed. Non-1M entries
 retain the base output limit of 32,000 tokens.
 
-Existing non-1M variant names also remain on the original base/Fast entries so
-saved selections such as `grok-4.7#Grok 4.7 High 500k` keep working after an
-upgrade. These legacy selections send the selected 500k parameters and max-mode
-flag, but keep the original entry's conservative static context budget. Select
-`grok-4.7-500k` or `grok-4.7-500k-fast` to give OpenCode the full 500k budget.
+Variant picker keys are the delta after the catalog model name (for example
+`High`, `No Thinking Low`, `High 500k`), not Cursor's full `<model> <delta>`
+string. Fast and dedicated context-tier entries also drop their redundant
+`Fast` / tier token from those keys (`grok-4.7-500k-fast` offers `High`).
+Non-1M max-tier variants (such as Grok 4.7's 500k choices) remain selectable on
+the original base/Fast entries as `High 500k`; those picks still send the
+selected parameters and max-mode flag but keep the original entry's conservative
+static context budget. Select `grok-4.7-500k` or `grok-4.7-500k-fast` to give
+OpenCode the full 500k budget. A pick saved under an older full-name key (such
+as `grok-4.7#Grok 4.7 High 500k`) no longer matches until the variant is picked
+again: OpenCode 1.x sends the entry's default variant meanwhile, and OpenCode
+2.x rejects the prompt as variant-unavailable. A variant with no delta is keyed
+`Standard`, because OpenCode reserves `default` for "no variant".
 
 #### Fast variants with distinct prices
 
@@ -223,6 +231,21 @@ OpenCode image file parts are decoded from bytes, base64/data URLs, local file U
 On a held-open Run, an image read returns bytes in `ReadSuccess.data` (including GenerateImage reference reads), and MCP tool images return as `McpImageContent` items after the success text (`McpToolResultContentItem` field 2). Detached media is attributed only where OpenCode's result order and markers establish its owner; ambiguous images stay available through history instead of being attached to an unrelated tool. A host instruction update beside a native read uses Cursor's context-injection channel because read text and bytes are mutually exclusive.
 
 One 20 MiB decoded-byte budget covers all image-bearing pending results in a continuation, without Cursor CLI's resize/re-encode step. Unreadable or oversized tool images are reported without blocking other results; cancellation still stops decoding. Other result shapes have no image field, so their images reach Cursor as history on the next fresh Run. Direct PDF, audio, and video attachments are unsupported; tool-result delivery only forwards image media.
+
+#### Saving Cursor images
+
+Cursor's copies of attached images and generated images save through
+`cursor_image_save`, with the host's write permissions. Pending images and saves
+in progress share a 400 MiB payload-byte budget across the process, with a
+50 MiB per-image limit. A new image that does not fit is refused before issuing
+a save handle; it never evicts an existing unexpired image. There is no
+eight-image count limit. Unclaimed handles expire after 10 minutes. Once a save
+claims an image, it retains its bytes, budget and path reservation throughout
+permission approval until completion or failure. Saving or discarding an image
+frees capacity for another write.
+If staging refuses a copy of an attached image, the provider also tells the
+model through a host note, since Cursor ignores that copy's write result.
+When Cursor has ended the Run, the note waits for the next user turn.
 
 #### Max mode
 
@@ -414,7 +437,7 @@ that stall window. The setting does not override OpenCode's own retry limits.
 | `HTTPS_PROXY` / `https_proxy` | HTTP CONNECT proxy for HTTPS. Bun `fetch` uses this for unary RPCs; the Run HTTP/2 session also tunnels through it (see `NO_PROXY`). The Run tunnel supports only `http://` proxy URLs (Basic auth via userinfo); `https://` and SOCKS proxy URLs leave the Run on a direct connection. `HTTP_PROXY` is not used for HTTPS |
 | `NO_PROXY` / `no_proxy` | Comma/space hosts that bypass the proxy (`*`, exact host, or `.suffix` / `suffix` domain forms; a `host:port` entry bypasses only that port) |
 | `CURSOR_ENDLESS_RETRIES` | Set to `1` or `true` to bypass retry count limits; off by default. Safety cutoffs and host retry limits still apply. See [retry limits](#retry-limits). |
-| `CURSOR_PROVIDER_DEBUG` | Set to `1` or `true` to enable wire-level debug logging |
+| `CURSOR_PROVIDER_DEBUG` | Set to `1` or `true` to enable wire-level debug logging; `2` or `verbose` adds a line per wire frame and KV message and the full advertised tool list on every request (in `rotate` mode, level 1 lists each distinct tool list once per log file, again at least every 10 minutes, and refers to it by `tools=<hash>`) |
 | `CURSOR_PROVIDER_RECOVERY_DEBUG` | Set to `1` or `true` for recovery metadata only (session/call IDs, elapsed time, checkpoints, guard decisions). Uses the same log path and retention policy; leave full debug off to exclude payload traces. |
 | `CURSOR_PROVIDER_DEBUG_FILE` | Debug log path (default: `debug-<pid>.log` under `$TMPDIR/cursor-provider-logs-<uid>/`) |
 | `CURSOR_PROVIDER_DEBUG_LOG_MODE` | `trim` (default) keeps the recent tail in place; `rotate` keeps numbered archives. Applies to full and recovery-only logs. See [rotation](docs/cache-log-runbook.md#numbered-rotation). |
@@ -439,9 +462,9 @@ native prerequisites are missing. Cursor agent is optional. Run with
 `--diagnose` to check prerequisites; see the [test harness guide](docs/pr-review.md#local-checks-on-different-operating-systems)
 for the image build and isolation requirements.
 
-Changes listed under [Unreleased](CHANGELOG.md#unreleased) describe the development checkout; use a rebuilt local install to test them before a release. Maintainer guides and incident lessons are linked from the [documentation index](docs/README.md). The manual Cursor review, isolated pull-request checks, and OpenCode live test are in [docs/pr-review.md](docs/pr-review.md).
+Changes listed under [Unreleased](CHANGELOG.md#unreleased) describe the development checkout; use a rebuilt local install to test them before a release. Maintainer guides and incident lessons are linked from the [documentation index](docs/README.md). The manual `caeliq-reviewer` review, isolated pull-request checks, and OpenCode live test are in [docs/pr-review.md](docs/pr-review.md).
 
-Manual Cloud Agent reviews publish through the configured GitHub App after exact-preview approval. See the [App publisher setup](docs/pr-review.md#github-app-publisher) for `REVIEW_APP_ID`, the private key and optional installation ID. Tokens are restricted to this repository and retain the installation's configured permissions; the returned grant must include review-write access. `review-publish.py auth-info` reports configuration without printing secrets. Reviews use the App's bot identity, with no automatic review trigger.
+Manual Cloud Agent reviews publish through the configured GitHub App after exact-preview approval. `post --token-env NAME` can use a personal access token from that environment variable instead. See the [App publisher setup](docs/pr-review.md#github-app-publisher) for `REVIEW_APP_ID`, the private key and optional installation ID. Tokens are restricted to this repository and retain the installation's configured permissions; the returned grant must include review-write access. `review-publish.py auth-info` reports configuration without printing secrets. Reviews use the App's bot identity, with no automatic review trigger.
 
 New review payloads require a completed, revision-matched evidence ledger and
 an isolated-check exit record. Rendering retains the ledger privately and binds
@@ -621,7 +644,7 @@ After sending a host tool result, recovery waits for its matching server-side to
 | No response / silent 200 + close | HTTP 200 alone is not a successful agent turn: the provider now requires Cursor's explicit `turn_ended`, captures HTTP/2 trailers/GOAWAY, and retries bare EOF within the transport retry budget. The Run host still comes from in-memory `GetServerConfig` resolution; set `CURSOR_PROVIDER_DEBUG=1` to confirm the host and termination reason. |
 | Visible `<shell_metadata>` timeout text | Rebuild and restart a local install. Cursor's shell timeout is carried on its exec request; the provider now removes OpenCode's internal timeout envelope before it is rendered or stored, then returns Cursor's typed timeout or background-handoff event instead of treating the text as successful stdout. |
 | `Unsupported Cursor exec variant …` | The error names the canonical Cursor CLI request field, its expected result field, and this provider's handling classification. Known `handling=unsupported` variants (Cursor-native capabilities without a safe OpenCode AI SDK bridge) are now soft-denied on the wire with a populated typed error/`rejected`/`allowlisted:false` result and the Run continues — look for `exec: SOFT-DENIED …` in the debug log and a `Workspace root: …` suffix in the deny text — while `unknown request field` still hard-fails as protocol drift; `handling=opencode-tool` or `provider-control` indicates a provider decoder/dispatch regression. Enable the debug log and report the full named error. |
-| Need wire-level logs | Set `CURSOR_PROVIDER_DEBUG=1` (optional `CURSOR_PROVIDER_DEBUG_FILE`; the default is `debug-<pid>.log` under `$TMPDIR/cursor-provider-logs-<uid>/`) and reproduce the issue. Every completed turn emits a `turn usage validation: status=ok\|mismatch` line confirming token-accounting integrity and a `cache diagnosis:` line showing warm/cold checkpoint continuity, raw read/write/uncached tokens, cache-read coverage of the prior context, context/category deltas, stable RequestContext hashes, and Run step/tool counts. Checkpoint lines include Cursor's current category totals. Cursor does not expose per-model-call cache splits, so the diagnostic labels that value unavailable instead of inferring it from aggregate `TurnEnded` counters. |
+| Need wire-level logs | Set `CURSOR_PROVIDER_DEBUG=1` (optional `CURSOR_PROVIDER_DEBUG_FILE`; the default is `debug-<pid>.log` under `$TMPDIR/cursor-provider-logs-<uid>/`) and reproduce the issue. `CURSOR_PROVIDER_DEBUG=2` adds a line per wire frame and KV message. Every completed turn emits a `turn usage validation: status=ok\|mismatch` line confirming token-accounting integrity and a `cache diagnosis:` line showing warm/cold checkpoint continuity, raw read/write/uncached tokens, cache-read coverage of the prior context, context/category deltas, stable RequestContext hashes, and Run step/tool counts. Checkpoint lines include Cursor's current category totals. Cursor does not expose per-model-call cache splits, so the diagnostic labels that value unavailable instead of inferring it from aggregate `TurnEnded` counters. |
 | OpenCode token totals stay stuck until the turn ends | OpenCode TUI/GUI display the last assistant message with non-zero output, they do not sum occupancy. Tool-call steps emit Cursor's last-known checkpoint occupancy (with `output > 0` so the footer accepts it), billed as an estimate of one model call. At `TurnEnded` the session cost is reconciled toward the aggregate counters at catalog rates, within the limits below. If a checkpoint has not arrived yet, the previous turn's occupancy stays visible as stale. With no known snapshot, usage stays zero instead of mislabeling estimates or `TurnEnded` as context. Raw request counters remain in `providerMetadata.cursor`. |
 | Context percentage jumps after a long tool turn or compaction | The provider selects checkpoint `token_details` before reporting context. An isolated unexplained conversation-only spike retains the prior reading with stale `checkpoint-held-spike` metadata and the pending raw count. The provider makes AI SDK input + output equal accepted `usedTokens`, shapes the input/cache partition for cost reporting, and exposes `maxTokens`, percentage, and category breakdown under `providerMetadata.cursor.context`. Mid-turn tool steps publish that occupancy with an estimated cost; compaction naturally replaces the prior snapshot with Cursor's smaller total. |
 | Cache **write** tokens differ from Cursor’s raw counters | Standard input/cache counters are shaped for host cost reporting and may include synthetic cache-write tokens. Exact request counters remain in `providerMetadata.cursor.*Raw`. Captured Runs can report `cache_write=0`; this does not imply that the synthetic host split is a measured cache split. |

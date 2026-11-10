@@ -73,12 +73,17 @@ Models use OpenCode's `provider/model#variant` form. Run `opencode models` to se
     // Per-lane overrides.
     "roles": {
       "reviewer": { "model": "provider/model#high" },
-      "sidekick": { "steps": 60 },
+      "sidekick": { "steps": 120 },
       "scout": { "disabled": true }
     },
 
     // Agents that get the lead guidance. Default: ["build", "plan"].
     "leadAgents": ["build", "plan"],
+
+    // Shell permission patterns and skill IDs for explore, reviewer, and scout.
+    // Both default to []: no shell commands or skills.
+    "readOnlyCommands": [],
+    "readOnlySkills": [],
 
     // Where the lead saves diffs and command output for lanes without a shell.
     // Default: <system temp dir>/opencode-fusion. Absolute or ~/ paths.
@@ -92,6 +97,37 @@ Models use OpenCode's `provider/model#variant` form. Run `opencode models` to se
 
 A disabled role is not added. For `general` and `explore`, disabling leaves OpenCode's built-in agent unchanged. Unknown tiers or role names are errors, so a typo doesn't silently do nothing.
 
+### Read-only command and skill access
+
+`readOnlyCommands` allows shell permission patterns only for `explore`, `reviewer`, and `scout`; `readOnlySkills` lets those lanes load the listed skill IDs. Both take arrays of non-empty strings and default to `[]`. The `fusion` skill stays denied to all lanes. Install any skills you list separately.
+
+For example, to give those lanes access to the Vera code-search CLI and its installed skill:
+
+```jsonc
+{
+  "plugins": [
+    {
+      "package": "opencode-fusion-mode",
+      "options": {
+        "readOnlyCommands": [
+          "vera search *",
+          "vera grep *",
+          "vera structural *",
+          "vera references *",
+          "vera overview *",
+          "vera explain-path *",
+          "vera stats *",
+          "vera update *"
+        ],
+        "readOnlySkills": ["vera"]
+      }
+    }
+  ]
+}
+```
+
+These patterns go through [OpenCode's shell scanner](https://opencode.ai/docs/permissions) per subcommand: each subcommand in a compound command must be allowed. A pattern ending in ` *` also matches the bare command, so `vera overview *` permits `vera overview`. Keep the list to commands and flags you trust for read-only work; allowing a command does not make it read-only (the example's `vera update` refreshes the search index). Unlisted commands and skills stay denied unless your own agent permissions override them. The lead is told to save output for commands outside the list.
+
 ### Overriding a lane
 
 Your own `agents` config is applied after the plugin and wins field by field; permission rules you add are appended after the plugin's. For example, this gives the sidekick more steps and the reviewer its own model:
@@ -99,7 +135,7 @@ Your own `agents` config is applied after the plugin and wins field by field; pe
 ```jsonc
 {
   "agents": {
-    "sidekick": { "steps": 60 },
+    "sidekick": { "steps": 120 },
     "reviewer": { "model": "anthropic/claude-sonnet-4-5" }
   }
 }

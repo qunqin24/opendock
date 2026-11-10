@@ -5,7 +5,13 @@ Two magpie providers in one package:
 | Provider | Key | Context | Tools | Model |
 | --- | --- | --- | --- | --- |
 | `nodecode` | paid `sk-nc-…` | 1,048,576 | yes | `nodecode-cyber-v1` |
-| `nodecode-free` | free `sk-nc-…` | 262,144 | yes (bridged; `look` via vision model) | `nodecode-cyber-v1` |
+| `nodecode-free` | free `sk-nc-…` | 262,144 | yes (bridged; `look` and image input via vision model) | `nodecode-cyber-v1` |
+
+Both providers also expose `deepseek-v4.1-flash` and `deepseek-flash` as
+selectable model ids. The plugin rewrites either alias to
+`nodecode-cyber-v1` before the request reaches the vendor, so an upstream
+agent that asks for a DeepSeek model lands on the one NodeCode chat model on
+both the paid and the free lane.
 
 Both talk to `https://api.nodecode.ai/v1` over the OpenAI Chat Completions wire. The free lane bridges magpie's tool calls through NodeCode's own `eval` tool and a local persistent Lisp image — see below.
 
@@ -32,15 +38,18 @@ sending tools. The plugin must rewrite the outgoing request in
 For the free provider the plugin sets the CLI-shaped User-Agent and then
 chooses one of two bridges:
 
-- **tools present, `tool_choice` not `"none"`** — rewrite the request to
-  NodeCode's single native `eval` tool (exact vendor schema + the four-line
-  Lisp system prompt), preserve the client's tool catalog in the system prompt,
-  and run the model's `eval` calls in a local persistent NodeCode image. Direct
-  forms such as `(sh "ls")` and `(write-file …)` execute locally; client tools
-  are carried as `(magpie-tool "name" "json")` and turned back into normal
-  OpenAI `tool_calls`.
-- **no tools, or `tool_choice: "none"`** — collapse the multi-turn transcript
-  into one `system` + one `user` message and use a JSON tool-call protocol.
+- **tools present, or no tools with a reply budget of at least 256 tokens** —
+  rewrite the request to NodeCode's single native `eval` tool (exact vendor
+  schema + the four-line Lisp system prompt), preserve the client's tool
+  catalog in the system prompt, and run the model's `eval` calls in a local
+  persistent NodeCode image. Direct forms such as `(sh "ls")`,
+  `(write-file …)` and `(look "shot.png")` execute locally; client tools are
+  carried as `(magpie-tool "name" "json")` and turned back into normal OpenAI
+  `tool_calls`. A client that declares no tools at all still gets this image,
+  so the free lane is an agent rather than plain chat.
+- **`tool_choice: "none"`, or a `max_tokens` too small to render a tool call
+  (below 256)** — collapse the multi-turn transcript into one `system` + one
+  `user` message and use a JSON tool-call protocol.
 
 The paid provider never rewrites the body.
 
@@ -55,7 +64,7 @@ magpie plugins add /abs/path/to/nodecode-magpie
 From npm (published package):
 
 ```sh
-magpie plugins add npm:nodecode-magpie@0.4.1
+magpie plugins add npm:nodecode-magpie@0.6.2
 ```
 
 If the configured npm mirror has not caught up yet, point Bun at the official
@@ -63,13 +72,13 @@ registry for this one command:
 
 ```sh
 NPM_CONFIG_REGISTRY=https://registry.npmjs.org \
-  magpie plugins add npm:nodecode-magpie@0.4.1
+  magpie plugins add npm:nodecode-magpie@0.6.2
 ```
 
 From a git tag:
 
 ```sh
-magpie plugins add github:ChasLui/nodecode-magpie#v0.4.1
+magpie plugins add github:ChasLui/nodecode-magpie#v0.6.2
 ```
 
 `magpie plugins add` restarts the plugin host. Local-path plugins are loaded in place,
@@ -192,11 +201,32 @@ CLI offers:
 (magpie-eval-await 3)              ; wait up to yield_ms
 (magpie-eval-await 3 :until-exit t)
 (magpie-eval-interrupt 3)          ; (magpie-eval-interrupt 3 :force t)
+(magpie-eval-log)                  ; exits from this and earlier images
 ```
 
 Each eval runs on its own Lisp thread, so a slow `(sh "sleep 20")` never blocks
 the next eval call, and interrupting one leaves the image and its definitions
 intact.
+
+**Definitions survive a plugin-host restart.** NodeCode's CLI keeps `defun` and
+friends in a layer; the free lane keeps the same definition forms in a
+per-session history file (`~/.nodecode-magpie/history/<hash>.jsonl`, override
+with `NODECODE_MAGPIE_HISTORY`) and replays them into a fresh image. Only
+definition heads (`defun`, `defvar`, `defparameter`, `defconstant`, `defmacro`,
+`defclass`, `defstruct`, `deftype`, `defpackage`, `define-*`, …) are replayed,
+so shell commands and other side effects never run twice. Values and `*` / `/`
+history are still per-image.
+
+A background eval that finishes after its yield window appends its exit to a
+per-session log (`~/.nodecode-magpie/history/evals/<hash>.log`), and a rebuilt
+image reads it with `(magpie-eval-log)`. The log is bounded (past 128 KiB only
+the newest 64 KiB is kept).
+
+Eval ids keep increasing across images (a new image starts after the highest id
+in the log), so an id from before a restart never names a different eval.
+`(magpie-eval-status 3)` for such an id answers from the log — `exited (from
+the log; this image did not run it)` plus the recorded value — instead of
+reporting an unknown eval.
 
 **`strings`.** A form that needs quotes, backslashes or newlines can ship them
 beside the form and read them with `($ "name")`:
@@ -213,26 +243,52 @@ each session/subagent gets a separate image and definition scope. These headers 
 never forwarded to NodeCode.
 
 **`(look …)` is bridged through a vision model.** The free model is text-only,
-so NodeCode's own Lisp `look` refuses with *"deepseek-v4-flash-free reads text
-only"*.  The plugin provides the same capability through a client helper:
+so NodeCode's own `look` would refuse with *"reads text only"*.  The plugin
+serves `look` from inside the image over a private socket, so the CLI form works
+directly:
+
+```lisp
+(look "screenshot.png" :prompt "read the error dialog")
+```
+
+It also works nested, e.g. `(list "before" (look "chart.png"))`. The old client
+carrier remains supported:
 
 ```json
 {"form": "(magpie-tool \"look\" \"{\\\"path\\\":\\\"screenshot.png\\\",\\\"prompt\\\":\\\"read the error dialog\\\"}\")"}
 ```
 
-The helper reads a local PNG/JPEG/GIF/WebP (up to 5 MiB), sends it to a vision
-model on the magpie gateway, and returns the description as the tool result.
-The default model is `auto/deepseek-v4.1-flash`; override with
-`NODECODE_VISION_MODEL`.  The gateway is derived from `MAGPIE_ADDR` (usually
+Either form reads a local PNG/JPEG/GIF/WebP (up to 5 MiB), sends it to a vision
+model on the magpie gateway, and returns the description as the eval result.
+The default is `group/auto-deepseek-flash`, with `auto/gpt-6.1-sol` and
+`auto/gemini-3.8-flash` as fallbacks; set `NODECODE_VISION_MODEL` to pin one
+model instead.  The gateway is derived from `MAGPIE_ADDR` (usually
 `http://127.0.0.1:3425/v1`) and can be overridden with
 `NODECODE_VISION_BASE_URL`; `NODECODE_VISION_API_KEY` (or the gateway key
 already in `MAGPIE_GATEWAY_KEY`) and `NODECODE_VISION_TIMEOUT_MS` are also supported.  Relative paths resolve
 against the agent workspace.
 
-## Free lane: transcript bridge (no tools)
+Looking at the same unchanged file with the same question reuses the earlier
+description instead of paying for another vision call (rewriting the file, or
+asking a different question, describes it again). Set `NODECODE_VISION_CACHE=0`
+to turn the 32-entry cache off, or `NODECODE_VISION_CACHE_SIZE` to resize it. A
+gateway route that is briefly restarting (dropped connection, 429, 5xx) is
+retried once before the plugin moves on to the next model in the list.
 
-Without tools the free gate accepts only one final user message (at most one
-system message). Magpie normally sends a long transcript with assistant/tool
+**Native image parts are bridged too.** When a client sends an OpenAI
+`image_url` / `input_image` part (data URL, http(s) URL, or file path) to the
+free lane, `lib/vision.mjs` describes it before the vendor request, so both the
+eval lane and the transcript lane receive text instead of an image. Up to four
+images per request, 5 MiB each; a failed description becomes
+`[image unavailable: …]` and the request still proceeds. Paid requests keep
+their native image parts unchanged.
+
+## Free lane: transcript bridge (`tool_choice: "none"` or a tiny `max_tokens`)
+
+A pure-chat free request—one that sets `tool_choice: "none"` or a reply budget
+too small to render a tool call (< 256 tokens)—stays out of the eval image.
+The free gate then accepts only one final user message (at most one system
+message), while Magpie normally sends a long transcript with assistant/tool
 messages, which the vendor rejects with 403 `free_needs_nodecode` pointing at
 the `tools` check. `lib/free-bridge.mjs` therefore:
 
@@ -249,8 +305,9 @@ the `tools` check. `lib/free-bridge.mjs` therefore:
    stream from the non-streamed upstream response.
 
 `tool_choice: "none"` is treated as a pure-chat request; tools are removed and
-the model is not asked to call them. If the client disables tools for a
-multi-turn request, only the transcript collapse is applied.
+the model is not asked to call them. The same holds for a `max_tokens` below
+256, where an eval call could not be rendered reliably. If such a client still
+sends a multi-turn request, only the transcript collapse is applied.
 
 Known limits of the transcript bridge: the model must follow the JSON protocol;
 malformed or unknown tool names fall back to plain text; synthetic tool-call ids
@@ -260,6 +317,8 @@ preserved.
 ## Free-key limits (vendor docs / measured)
 
 - model: `nodecode-cyber-v1` only; another model is 403 `model_not_free`.
+  The `deepseek-v4.1-flash` / `deepseek-flash` ids are plugin-side aliases and
+  never reach the vendor under those names.
 - route: chat requests must be `POST /v1/chat/completions`; `/v1/responses`
   and `/v1/messages` are 403 `route`.
 - client: free key works only from Nodecode CLI; other clients get 403
@@ -340,7 +399,8 @@ lib/vision.mjs            # look bridge: read image -> magpie vision model -> te
 test/rewrite.test.mjs     # offline body/UA/config/usage tests
 test/free-bridge.test.mjs # transcript bridge protocol and streaming tests
 test/free-eval.test.mjs   # eval tool request/loop/client-tool tests
-test/eval-server.test.mjs # live image: persistence, concurrency, yield, strings
+test/eval-server.test.mjs # live image: persistence, concurrency, yield, strings, look
+test/eval-history.test.mjs # definition history across a host restart
 test/vision.test.mjs      # image validation and vision request tests
 ```
 ## License

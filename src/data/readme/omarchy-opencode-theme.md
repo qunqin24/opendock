@@ -8,7 +8,7 @@ everywhere, Lucide icons, 1px lines.
 
 - Linux. The plugin declares `os: ["linux"]` and does not load elsewhere.
 - [Omarchy](https://omarchy.org). The plugin reads `~/.local/state/omarchy/current/theme/colors.toml`.
-- OpenCode Desktop 2.2.4. See [Compatibility](#compatibility).
+- OpenCode Desktop 2.2.6. See [Compatibility](#compatibility).
 - JetBrains Mono installed, as `JetBrains Mono` or the `JetBrainsMono Nerd Font` Omarchy ships. Without either, the
   UI falls back to the system `monospace` font.
 - **Settings > Appearance** set to **System**. The colors apply only while the app's mode matches the Omarchy theme's
@@ -26,7 +26,7 @@ Desktop loads GUI plugins only from the global config, not from a project's.
 }
 ```
 
-Pin a version with `"omarchy-opencode-theme@0.1.1"`. Config changes apply without a restart.
+Pin a version with `"omarchy-opencode-theme@0.1.2"`. Config changes apply without a restart.
 
 Update with `opencode plugin update`. Remove with `opencode plugin remove omarchy-opencode-theme`, or delete the entry.
 
@@ -68,8 +68,8 @@ the original icons and styles.
 
 ## Compatibility
 
-OpenCode's GUI plugin API is experimental. This release targets OpenCode 2.2.4: it builds against
-`@opencode/plugin@2.2.4`, and its theme resolver is copied from `@opencode/ui@2.2.4`. Other OpenCode versions may
+OpenCode's GUI plugin API is experimental. This release targets OpenCode 2.2.6: it builds against
+`@opencode/plugin@2.2.6`, and its theme resolver is copied from `@opencode/ui@2.2.6`. Other OpenCode versions may
 break it, or leave some colors unthemed.
 
 ## Troubleshooting
@@ -98,7 +98,7 @@ break it, or leave some colors unthemed.
   choice per theme is a declared global store (`src/declarations.ts`).
 - `src/palette.ts` maps Omarchy's colors, as the variant draws them, onto OpenCode's 10-color desktop palette, plus syntax and background
   overrides.
-- `src/resolver/` is OpenCode's own theme resolver, copied unchanged from `@opencode/ui@2.2.4` (MIT; the GUI build
+- `src/resolver/` is OpenCode's own theme resolver, copied unchanged from `@opencode/ui@2.2.6` (MIT; the GUI build
   cannot import `@opencode/*`). It derives the ~450 CSS variables exactly as the app does for a built-in theme.
 - `src/layers/` turns the theme into stylesheets. `src/window.ts` injects each layer with `ctx.add(Style, …)` under
   `:root:root[data-color-scheme="<omarchy mode>"]`, which outranks the app's own `:root` theme block.

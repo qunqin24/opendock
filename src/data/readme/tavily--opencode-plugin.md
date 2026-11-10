@@ -1,0 +1,139 @@
+# Tavily Agent Skills
+
+Web search, content extraction, site crawling, URL discovery, and deep research — powered by the Tavily CLI.
+
+## Installation
+
+### Recommended: guided CLI setup
+
+Install the [Tavily CLI](https://github.com/tavily-ai/tavily-cli):
+
+```bash
+curl -fsSL https://cli.tavily.com/install.sh | bash
+```
+
+On a fresh interactive desktop install, the installer starts `tvly init`
+automatically. Otherwise run it after installation:
+
+```bash
+tvly init
+
+# Prefer to open the sign-in link yourself
+tvly init --no-browser
+```
+
+`tvly init` authenticates, detects Claude Code, Codex, and Cursor, installs
+these skills, and verifies a live search. It reuses an existing credential and
+is safe to rerun. Skills installed this way are pinned to the CLI release, so
+run `tvly update` before `tvly init` when refreshing them.
+
+`tvly search` and `tvly extract` also work without authentication, subject to
+a keyless rate-limit cap. Use `tvly init --skip-auth` to keep keyless mode while
+installing the skills. `map`, `crawl`, and `research` require authentication.
+
+Browser-based OAuth is the preferred interactive sign-in method. `--no-browser`
+simply prints the sign-in link instead of opening it automatically; the flow
+still returns to a localhost callback on the machine running `tvly`. In remote
+sessions, make sure that callback is reachable (SSH may require port
+forwarding). For unattended agents or CI, authenticate beforehand or provide
+`TAVILY_API_KEY` securely so the process does not wait for human input.
+
+### Manual skill installation
+
+For other agents, or when you only want to install the skills:
+
+```bash
+npx skills add https://github.com/tavily-ai/skills
+```
+
+Install the CLI separately if needed:
+
+```bash
+uv tool install tavily-cli   # or: pip install tavily-cli
+```
+
+Then use `tvly init --skip-skills` for guided authentication and verification,
+or `tvly login` when you only need to authenticate.
+
+### Claude Code plugin
+
+```
+/plugin install tavily --marketplace tavily-ai/skills
+```
+
+It adds these skills and the hosted Tavily MCP server.
+
+### Cursor plugin
+
+Install **Tavily** from the [Cursor Marketplace](https://cursor.com/marketplace/tavily).
+It adds these skills and the hosted Tavily MCP server.
+
+### Codex plugin
+
+```bash
+codex plugin marketplace add tavily-ai/skills
+```
+
+Then install **Tavily** from `/plugins`. It adds these skills and the hosted Tavily MCP server.
+
+### Grok Build plugin
+
+In Grok Build, open `/plugin`, search for **Tavily**, and install it.
+It adds these skills and the hosted Tavily MCP server.
+
+### OpenCode plugin
+
+Add `@tavily/opencode-plugin` to the `plugins` array in `opencode.json` (`plugin` on OpenCode 1.x):
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugins": ["@tavily/opencode-plugin"]
+}
+```
+
+It adds these skills. The plugin's source is in [`.opencode-plugin/`](.opencode-plugin/).
+
+### Antigravity plugin
+
+```bash
+agy plugin install tavily-ai/skills
+```
+
+It adds these skills and the hosted Tavily MCP server.
+
+### Gemini CLI extension
+
+```bash
+gemini extensions install https://github.com/tavily-ai/skills
+```
+
+It adds these skills and the hosted Tavily MCP server.
+
+### Keep the CLI current
+
+```bash
+tvly update --check
+tvly update
+```
+
+## Available Skills
+
+| Skill | Type | Description |
+|-------|-------|-------------|
+| **[tavily-search](skills/core/tavily-search/SKILL.md)** | Core | Search, extract, map and crawl as one toolkit. Search is in the skill; the other tools live in `references/`. |
+| **[tavily-research](skills/tasks/tavily-research/SKILL.md)** | Task | In-depth research: many sources gathered and weighed into a cited report. |
+| **[tavily-entity](skills/tasks/tavily-entity/SKILL.md)** | Task | One company or person for a CRM, or a CSV of rows they already have. |
+| **[tavily-list](skills/tasks/tavily-list/SKILL.md)** | Task | Deduplicated table of matches, with a cap. Not an exhaustive census. |
+| **[tavily-monitor](skills/tasks/tavily-monitor/SKILL.md)** | Task | A search or extraction built to run on a cadence, with a baseline. |
+| **[tavily-sdk](skills/developers/tavily-sdk/SKILL.md)** | Developers | Reference docs for building production-ready Tavily integrations. |
+
+## Workflow
+
+Start simple, escalate when needed:
+
+1. **Search** — Find pages on a topic (`tvly search "query" --json`)
+2. **Extract** — Get content from a specific URL (`tvly extract "https://..." --json`)
+3. **Map** — Discover URLs on a site (`tvly map "https://..." --json`)
+4. **Crawl** — Bulk extract from a site section (`tvly crawl "https://..." --output-dir ./docs/`)
+5. **A finished result** — in-depth research (`tavily-research`), a CRM record or CSV enrichment (`tavily-entity`), a capped table of matches (`tavily-list`), or a check on a cadence (`tavily-monitor`)

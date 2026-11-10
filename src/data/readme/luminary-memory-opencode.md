@@ -6,8 +6,6 @@
 [![Python](https://img.shields.io/pypi/pyversions/luminary-memory?color=8ab4e8)](https://pypi.org/project/luminary-memory)
 [![License](https://img.shields.io/github/license/alertxsto/luminary-memory?color=8ab4e8)](LICENSE)
 [![CI](https://github.com/alertxsto/luminary-memory/actions/workflows/ci.yml/badge.svg)](https://github.com/alertxsto/luminary-memory/actions)
-[![Tests](https://img.shields.io/badge/tests-505%2B%20passing-8ab4e8)](https://github.com/alertxsto/luminary-memory/actions)
-[![Coverage](https://img.shields.io/badge/coverage-83%25-8ab4e8)](https://github.com/alertxsto/luminary-memory)
 [![Stars](https://img.shields.io/github/stars/alertxsto/luminary-memory?color=8ab4e8)](https://github.com/alertxsto/luminary-memory)
 
 **Self-hosted · Private · Budget-aware · Self-maintaining**
@@ -28,7 +26,7 @@ Agents are only as good as what they remember. A stateless agent re-learns the s
 
 Strategies fuse via **weighted RRF (semantic 0.4, keyword 0.3, graph 0.2, temporal 0.1)** → **scope/status/time filtering** → **conservative confidence and abstention** → **adaptive cutoff** → **Jaccard deduplication** → **token budget**. Short queries may be expanded with graph entities or stored content tokens before embedding; there is no language-specific alias classifier.
 
-**Important rules always in context.** Durable rules tagged `core` are auto-loaded into the system prompt every session (the DB-backed `MEMORY.md`). All other durable memories are surfaced through query retrieval: relevant facts are recalled on demand (ranked by query relevance) and merged with the core block under anti-duplication. When durable recall abstains, the Hermes provider can also expose a bounded exact-session continuity block so an ambiguous follow-up stays attached to its active task without turning raw conversation into durable memory.
+**Core and recall are different surfaces.** The Hermes provider separately loads owner-designated `core` rules (the DB-backed `MEMORY.md`) and deduplicates them against query retrieval. Native OpenCode, pi, and omp adapters return only relevant, evidence-bearing recall; a core tag cannot turn abstention into success. Their historical reference stays outside system instructions and the persistent transcript. Hermes can also expose bounded exact-session continuity without turning raw conversation into durable memory.
 
 ---
 
@@ -68,8 +66,8 @@ luminary-memory stats
 ## Native hooks for supported harnesses
 
 The harness-neutral JSON bridge supports native adapters without coupling the
-memory engine to one runner. Shipped adapters cover OpenCode V2's
-`@opencode/plugin` 2.1.4 API, pi, and omp; Hermes keeps its provider integration.
+memory engine to one runner. The current source targets OpenCode V2's
+`@opencode/plugin` 2.2.0 API, pi, and omp; Hermes keeps its provider integration.
 
 ```bash
 luminary-memory hook install opencode  # or pi / omp; project-local by default
@@ -79,7 +77,19 @@ Automatic scoped recall, opt-in user-grounded curation, explicit memory tools,
 and accurate stored/duplicate/skipped/error results. pi/omp also expose
 `/luminary` commands and native UI dialogs. Server tool results/custom messages
 are available to compatible desktop/web clients; no universal frontend plugin
-API or standalone desktop app is assumed.
+API or standalone desktop app is assumed. A portable OpenCode agent skill lives
+at [`opencode/SKILL.md`](opencode/SKILL.md); install it under
+`~/.config/opencode/skills/luminary-memory/` or a project's `.opencode/skills/`.
+
+The `0.3.3` source includes native interactive inspectors for the verified
+surfaces: OpenCode CLI/Desktop, pi and omp, Hermes Desktop/dashboard and an
+explicitly launched loopback companion. The `0.3.2` registry packages do not
+include the inspector; see the installation guide for current availability.
+Two native targets remain blocked on upstream
+contracts and are recorded in the roadmap: OpenCode Web GUI contribution
+discovery and Hermes terminal/TUI authority plus scope lifecycle. See
+[development setup and explicit companion launch](docs/agent-integrations.md#interactive-inspectors)
+and the [native support/acceptance roadmap](docs/ROADMAP.md).
 
 ### Luminary-maintained plugin packages
 
@@ -273,7 +283,7 @@ after, and a background lifecycle keeps the store lean.
 | **Abstention** | Strict provider/CLI paths can return `abstain` when support is weak or ambiguous |
 | **Evidence** | Stored claims retain evidence quote, source, validity time, and audit provenance |
 | **Conflict safety** | Conflicting claim keys remain versioned/conflicted until explicit supersession or resolution |
-| **Core memory** | Rules tagged `core` are auto-loaded into the system prompt every session (the DB-backed MEMORY.md), independent of query match |
+| **Core memory** | Hermes separately loads designated `core` rows; native adapters require core-tagged rows to pass ordinary retrieval |
 | **Weighted fusion** | Each strategy carries a tunable weight (semantic 0.4, keyword 0.3, graph 0.2, temporal 0.1), so high-signal strategies dominate the ranking |
 | **Query expansion** | Short queries are expanded with co-occurring graph entities before embedding; when the graph is empty, content tokens from a topically related important memory may be appended (v0.2.15). No language-specific alias list is used. |
 | **Importance boost** | Memories at importance ≥ 0.8 get a ranking bonus, lifting durable rules above weak-but-recent noise |

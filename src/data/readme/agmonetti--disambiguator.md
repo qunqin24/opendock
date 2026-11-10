@@ -47,12 +47,12 @@ Runtime behavior depends on the host surface:
 
 Running the CLI from this package's source checkout never rewrites generated rule files. A consumer workspace remains eligible for static-rule updates even if it has an unrelated `scripts/sync.py`.
 
-Skill catalogs expose these five entries:
-- `disambiguator`: Loads the canonical gatekeeper instructions.
-- `disambiguator-strict`: Selects strict mode.
-- `disambiguator-soft`: Selects soft mode.
-- `disambiguator-off`: Disables ambiguity interception.
-- `disambiguator-status`: Reports the active mode.
+Skill catalogs expose these five entries (optimized in v1.2.0 with dedicated, low-footprint skill instructions saving up to 95% tokens):
+- `disambiguator`: Loads the canonical gatekeeper instructions and ambiguity taxonomy.
+- `disambiguator-strict`: Switches to strict mode (halts on all Type A, B, and C ambiguities) with a lightweight, focused operational skill body (~200 tokens vs ~5,000 tokens in v1.1.0).
+- `disambiguator-soft`: Switches to soft mode (halts on Type A & high-risk Type B; auto-assumes safest standard for Type C & low-risk Type B) with a lightweight, focused operational skill body (~280 tokens vs ~5,000 tokens in v1.1.0).
+- `disambiguator-off`: Disables ambiguity interception (~220 tokens).
+- `disambiguator-status`: Reports the active mode (~150 tokens).
 
 To change the permanent repository default, configure the top of [`system-prompt.md`](./system-prompt.md) and run `npm run sync`:
 ```markdown
@@ -96,6 +96,8 @@ pi install git:github.com/agmonetti/disambiguator
 - **Session and Global Persistence**: Persists mode switches in the Pi session journal and user configuration without writing a workspace state file.
 - **Terminal Status Bar**: Displays the live mode (`● disambiguator: Strict` / `Soft`) in the terminal footer.
 - **Dynamic Prompt Hook**: Injects or updates active mode directly on each turn via Pi's `before_agent_start` event.
+
+Experimental Pi **TUI V2** (V1 remains the default; verified on Pi 1.0.4 and 1.1.0): start with `DISAMBIGUATOR_V2=1 pi -e ./pi-extension/index.js`. Before editing, the model must call `disambiguator_assess` in a separate batch; `clear` or a TUI answer permits `edit`/`write` only in a later batch. A cancelled dialog never grants permission. Shell and unreviewed tools stay blocked even after assessment, and V2 offers no per-call approval for them: the block reason says so and points to `/disambiguator off` or V1, rather than naming a permission mechanism that does not exist. Decisions are journaled in the active session branch, but permissions are **not** restored after restart or branch navigation. Runtime abort revokes live permission; compaction requires reassessment, and that holds for automatic threshold compaction, for the cancelled case, and for overflow recovery with retry. Partial answers are journaled and unanswered questions cannot be skipped or rewritten by `clear` or reassessment. Within one assessment, scope and context questions (B, C) are asked before subjective styling (A); an unfinished phase holds the rest and releases no effects. The free-text limit counts **per question**, so exhausting one question does not restrict the others; after two free-text answers on the same question it is no longer offered and the question stays pending for an explicit a/b/c choice. Type A and high or unknown risk are never auto-resolved in any mode; in `soft` only low-risk B/C is assumed as `a`. A policy assumption requires a separate TUI confirmation of each exact `edit`/`write` call (up to 4000 characters of arguments); cancellation, absent UI, changed arguments, or journal failure blocks the operation. This is intentionally more restrictive than V1 soft. A detector's false `clear` or `low` classification is not an independent destructive-operation safeguard, and the per-question problem identity is deterministic, not semantic. RPC, context reduction, and pre-flight are not supported by this opt-in. Which model runs each test suite is documented in [pi-extension/spikes/MODELS.md](pi-extension/spikes/MODELS.md).
 
 #### OpenCode
 Add to `opencode.json`:

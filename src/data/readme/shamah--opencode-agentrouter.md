@@ -48,7 +48,7 @@ Each OpenCode action has its own slash command:
 | `/agentrouter_status` | Show status, endpoint, monthly spend, pacing, and retries. |
 | `/agentrouter_pricing` | Show model pricing and protocols; refresh the catalog and reload models. |
 | `/agentrouter_sync` | Refresh the model catalog and reload models. |
-| `/agentrouter_check` | Check model availability and monthly spend. Makes real API requests and consumes tokens. |
+| `/agentrouter_check` | Check model availability, monthly spend, and quota refresh countdowns. Makes real API requests and consumes tokens. |
 | `/agentrouter_pacing` | Show the current minimum request interval. |
 | `/agentrouter_pacing <ms>` | Set the minimum request interval in milliseconds. Applies to new requests. |
 | `/agentrouter_key <key>` | Save an API key and reload credentials. |
@@ -67,6 +67,13 @@ Pi paths are replaced by OpenCode/XDG paths:
 | Redacted retry diagnostics | `~/.local/state/opencode/agentrouter/.agentrouter-debug.log` |
 
 `XDG_CONFIG_HOME` and `XDG_STATE_HOME` are respected. Configuration writes use owner-only permissions, not encryption.
+
+## Transport behavior
+
+- Requests are paced by `minIntervalMs` and retried on gateway failures: rate limits, WAF blocks, cluster/decryption errors, transient token-cache 401s, and `unauthorized client` 401s.
+- AgentRouter rejects unrecognized clients. Outgoing requests send an `opencode/...` `User-Agent`; an `unauthorized client` 401 is reported, not retried.
+- A stream that fails mid-response without an error payload is patched with an `upstream_cluster_crash` error. For the known crash signatures, the plugin retries after 30 seconds, up to 3 attempts; after that OpenCode's own retry decision applies.
+- Monthly spend is reported in USD; the gateway's quota units are converted at 500,000 units per dollar.
 
 In addition to upstream's `apiKey` and `minIntervalMs`, this adaptation accepts:
 

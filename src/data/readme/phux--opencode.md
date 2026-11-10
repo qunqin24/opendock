@@ -13,6 +13,9 @@ a coding agent and whether it is waiting on you. Another machine is one
 [Docs](./docs/README.md) · [Help](#help) · [Releases](https://github.com/no-phux/phux/releases) ·
 [![CI](https://github.com/no-phux/phux/actions/workflows/ci.yml/badge.svg)](https://github.com/no-phux/phux/actions/workflows/ci.yml)
 
+For one server-owned shell per native terminal window, without TUI chrome,
+see [native terminal windows](docs/native-terminal.md).
+
 ## Install
 
 ### CLI and terminal UI
@@ -105,7 +108,7 @@ client leaves the shell running; attach to the printed session to take over.
 | Run agents in isolated worktrees | [Missions](./docs/organization.md#work-and-missions) |
 | Work on another machine | [Remote machines](./docs/remote.md) |
 | Script a terminal or expose agent tools | [Scripting](./docs/scripting.md) · [MCP](./docs/agents.md#mcp) |
-| See agent plan usage and limits | [Plan usage](./docs/agents.md#plan-usage) |
+| See agent plan usage and limits | [Plan usage](./docs/troubleshooting.md#plan-usage) |
 
 ## For agents
 
