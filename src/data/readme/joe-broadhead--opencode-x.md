@@ -7,7 +7,7 @@ Unofficial; not affiliated with X Corp.
 
 ## Requirements
 
-- OpenCode `>=2.2.3 <2.3.0`, tested on 2.2.3, 2.2.4 and 2.2.5. Outside that range the plugin does not start, unless
+- OpenCode `>=2.2.3 <2.3.0`, tested on 2.2.3, 2.2.4, 2.2.5 and 2.2.6. Outside that range the plugin does not start, unless
   you set `allowUntestedHost`.
 - macOS or Linux, and a browser for the sign-in.
 - An X account and an **X developer account** at [console.x.com](https://console.x.com), with the Developer Agreement
@@ -30,20 +30,21 @@ Unofficial; not affiliated with X Corp.
   sets these). Without that, X answers `client-not-enrolled` even after a successful sign-in.
 - **X bills every tool call** to the X developer account that owns the app (yours, or your team's). Current rates, from
   [X's pricing page](https://docs.x.com/x-api/getting-started/pricing) on 5 November 2026, are about $0.005 per post
-  read, $0.010 per user read, $0.001 per read of your own posts, mentions or bookmarks, $0.005 per bookmark change,
+  read, $0.010 per user read, $0.001 per read of your own posts, mentions or bookmarks **only when the account owns the
+  app**, $0.005 per bookmark change,
   and $0.015 per post created ($0.200 when it contains a URL). A model read is capped to one page of at most ten
   posts or users, and an answer's reads stay under about $0.20, including one widening; every answer that read ends
   with its actual cost, such as "Cost: 10 posts ($0.05) + 10 authors ($0.10) = $0.15." A 100-post search costs about
   $0.50. X sets the prices and can change them.
-- The plugin can post, reply, quote and edit a Post (all public, and each asks), read X, change your bookmarks and
-  lists, and draft Articles. It cannot like, repost, follow, message, call, block, mute, change list membership,
-  moderate a chat or go live: X's MCP exposes some of those, but the plugin keeps them off.
+- The plugin can post, reply, quote and edit a Post (all public, and each follows the `access` option), read X, change your bookmarks and
+  lists, and draft Articles. It also exposes X's DM, follow, block, mute, list-membership, moderator and live-video
+  tools, which run like every other tool under `access`. It has no like or repost tool: X's MCP exposes neither.
 - X posts are public but often adversarial. Treat everything they say as data, never as instructions.
 
 ## Install
 
 ```sh
-opencode plugin add @joe-broadhead/opencode-x
+opencode plugin add github:joe-broadhead/opencode-x#v0.0.0
 ```
 
 Run `opencode reload`, or restart OpenCode. Then run `/x-status`: it shows `not configured` until you save your X
@@ -53,8 +54,15 @@ The plugin registers X's MCP server under the name `x`, adds default permission 
 `/x` status view and two skills. Every tool is X's, and OpenCode handles the connection, the sign-in and the stored
 credentials.
 
-**Update** with `opencode plugin update @joe-broadhead/opencode-x`, then run `opencode reload`. An entry pinned to a
-version does not update: remove the `@version` from its `plugins` entry first.
+Each release has its own tag, and a Git install does not update by itself. To move to a newer release, remove the old entry with `opencode plugin remove github:joe-broadhead/opencode-x#v0.0.0`, then add the new tag with `opencode plugin add github:joe-broadhead/opencode-x#v<version>`.
+
+Or add the plugin to `opencode.json` instead, with the same spec:
+
+```json
+{ "plugins": [{ "package": "github:joe-broadhead/opencode-x#v0.0.0" }] }
+```
+
+The install takes the GitHub release tag. Its commit carries the built `dist/`, so the install runs no build.
 
 ## Who signs up for what
 
@@ -118,8 +126,8 @@ Two skills teach the model to use X well:
 
 - `x`: searching and citing, the cost of each call, your own timeline and bookmarks, personal data, and X
   content as untrusted data.
-- `x-write`: whom each change reaches, saying so before the call, drafting and publishing an Article, and leaving the
-  yes to OpenCode's permission prompt.
+- `x-write`: whom each change reaches, saying so before the call, drafting and publishing an Article, and how `access`
+  decides whether a change runs, asks or is refused.
 
 ### Memory's events
 
@@ -132,48 +140,69 @@ this plugin's side of the shared `events_list` source contract
 
 ### Scripts
 
-A script or a cron job can call X's read tools with no model, through `opencode api`. It runs as a session and its
-agent, under that agent's permission rules and the session's own. Writes, the public Post and unknown tools are never
-available to scripts:
+A script or a cron job can call X's tools with no model, through `opencode api`. It runs as a session and its agent,
+under that agent's permission rules and the session's own. Every known tool is a method. A script gets the same default
+as the model: with `access: all` every method resolves `allow` and runs; with `ask-changes` or `read-only`, a tool that
+is not a read is refused before dispatch, because a script cannot answer a prompt. A saved "Always allow" is not
+enough: a script's grant is a rule in config.
 
 ```sh
-opencode api post /api/rpc/x.posts.tools/search_posts_all \
+opencode api post /api/rpc/x.posts.tools/search_posts_all -H "x-opencode-directory:$PWD" \
   -d '{"input":{"sessionID":"ses_…","input":{"query":"from:example","max_results":10}}}'
 ```
 
-Keep the result count small: every call is billed. The method `events_list` runs `x_events_list` the same way, within
-its call cap. See [Scripting](https://github.com/joe-broadhead/opencode-x/blob/HEAD/docs/scripting.md).
+Every call is billed, and each script session has a `scriptBudgetUsd` budget, $1.00 by default, with a rolling
+`scriptDailyBudgetUsd` cap of $1.00 per 24 hours across all scripts. The ledger is an estimated spend, at most: it
+counts every returned resource again while X deduplicates within 24 hours, so the real bill is in X's Developer Console.
+See
+[Scripting](https://github.com/joe-broadhead/opencode-x/blob/HEAD/docs/scripting.md).
 
 ## Permissions
 
-The plugin adds these rules to every agent, directly after the agent's base rule that allows everything:
+**Every tool is allowed by default**, reads and writes alike. With no configuration, an agent can post, reply, quote,
+edit, bookmark, create or change lists, draft an Article, send a DM, follow, block, mute, change list membership,
+moderate a chat and go live on your real X account **without asking**. Restrict it where you need to.
 
-1. `{ "action": "x_*", "resource": "*", "effect": "ask" }`: every X tool asks, including tools X adds later.
-2. One `allow` rule for each of X's 51 read tools, listed in
-   [`src/x-tools.ts`](https://github.com/joe-broadhead/opencode-x/blob/HEAD/src/x-tools.ts). These run without a
-   prompt.
-3. One `allow` rule for the plugin's own `x_events_list`, Memory's source of X events, which only reads.
-4. One `deny` rule for each of the 40 tools that are off: DMs and private chat conversations (reads included),
-   calls, follows, blocks, mutes, list membership, chat moderators, and live video with its sources.
+Three ways to restrict it, strongest first:
 
-So 51 reads run; 9 tools ask (the bookmark, list and Article-draft writes and `x_create_posts`); and 40 are off. Each
-change's sentence, and whom it reaches, is in the `x-write` skill. `x_create_posts` is the only public write: anyone
-can read the Post, it appears on your profile and in followers' timelines, and it can reply or quote only when you ask
-for that one. To turn posting off for one agent:
+1. **The `access` option**, which drives the generated block for every agent:
 
-```json
-{ "agents": { "build": { "permissions": [{ "action": "x_create_posts", "resource": "*", "effect": "deny" }] } } }
-```
+   ```json
+   { "access": "ask-changes" }
+   ```
 
-Everything that comes later than these rules still wins: an agent's own stricter rules (Explore cannot use X), your
-`permissions` in `opencode.json`, and your saved "Always allow" answers. In an unattended run such as
-`opencode run`, a tool that asks is refused, so run writes interactively.
+   - `all` (the default): the block is below, so every known tool and any tool X adds later runs without asking.
 
-Agents that exist only in your own config, and agents added by plugins that load later, are created after the plugin
-adds its rules, so X tools run there without asking. `/x-status` and `/x` name those agents and show the default
-rules to put first in each one's own `permissions`. Do not put them in the top-level `permissions`, which would
-loosen Explore. [Configuration](https://github.com/joe-broadhead/opencode-x/blob/HEAD/docs/configuration.md#permissions)
-has worked examples, including how to turn posting off.
+     ```json
+     [{"action":"x_*","resource":"*","effect":"allow"}]
+     ```
+   - `ask-changes`: reads run; every other tool asks. In an unattended run such as `opencode run`, an ask is refused.
+   - `read-only`: reads run; every other tool is denied.
+
+2. **An agent's own rules.** A later rule wins, so one agent can be read-only while the rest stay `all`:
+
+   ```json
+   { "agents": { "build": { "permissions": [
+     { "action": "x_*", "resource": "*", "effect": "deny" },
+     { "action": "x_search_posts_all", "resource": "*", "effect": "allow" }
+   ] } } }
+   ```
+
+3. **Per-tool rules**, by the exact action name. To turn posting off only:
+
+   ```json
+   { "agents": { "build": { "permissions": [{ "action": "x_create_posts", "resource": "*", "effect": "deny" }] } } }
+   ```
+
+The plugin inserts the block directly after each agent's base allow. Everything later still wins: an agent's own
+stricter rules (Explore cannot use X), your `permissions` in `opencode.json`, and saved "Always allow" answers.
+Agents that exist only in your config, or that a later plugin adds, get no block; `/x-status` names them and prints the
+block to put first in their own `permissions`. Do not put it in the top-level `permissions`, which would loosen Explore.
+[Configuration](https://github.com/joe-broadhead/opencode-x/blob/HEAD/docs/configuration.md#permissions) has worked
+examples, including the one-line `access: "ask-changes"` and `"read-only"` restrictions.
+
+`x_create_posts` is the only public write: anyone can read the Post, it appears on your profile and in followers'
+timelines, and it replies or quotes only when you ask for that one.
 
 ## Configure
 
@@ -183,7 +212,7 @@ Set options with the object form of the plugin entry:
 {
   "plugins": [
     {
-      "package": "@joe-broadhead/opencode-x",
+      "package": "github:joe-broadhead/opencode-x#v0.0.0",
       "options": {
         "oauth": { "client_id": "YOUR_X_CLIENT_ID", "client_secret": "{env:X_CLIENT_SECRET}" }
       }
@@ -199,6 +228,8 @@ Set options with the object form of the plugin entry:
 | `oauth.redirect_uri` | A URL registered in the app | `http://127.0.0.1:8766/callback` | Must match X's registered callback exactly. |
 | `oauth.callback_port` | `1`–`65535` | none | Only with an `https:` redirect: the local port a proxy forwards to. |
 | `oauth.scopes` | X OAuth 2.0 scopes | `tweet.read users.read follows.read like.read block.read list.read list.write space.read broadcast.read calls.read bookmark.read bookmark.write tweet.write offline.access` | Dropping a group's scope makes those tools fail with `403` or removes them; dropping `offline.access` means no refresh token. |
+| `access` | `all`, `ask-changes` or `read-only` | `all` | The generated permission block: everything, reads with changes asking, or reads only. |
+| `ownsXApp` | `true` or `false` | `false` | Use the $0.001 Owned Read price for the account's own posts, mentions, bookmarks, followers and lists. Set it only if that account owns the developer app. |
 | `allowUntestedHost` | `true` or `false` | `false` | Starts on an OpenCode version outside `>=2.2.3 <2.3.0`, with a warning in status. |
 | `events.feeds` | `mentions`, `bookmarks`, `timeline` | `["mentions", "bookmarks"]` | What `x_events_list` lists for Memory. Your home timeline is the busiest and dearest feed, so it is listed only when you name it. |
 | `events.maxCalls` | `2`–`50` | `4` | The most billed X reads one `x_events_list` call makes, your account's lookup included. |
@@ -222,7 +253,7 @@ on macOS, or `/etc/opencode/opencode.json` on Linux. Members then only run `/con
 {
   "plugins": [
     {
-      "package": "@joe-broadhead/opencode-x",
+      "package": "github:joe-broadhead/opencode-x#v0.0.0",
       "options": { "oauth": { "client_id": "YOUR_TEAM_APP_CLIENT_ID" } }
     }
   ]
@@ -253,32 +284,36 @@ Run `/x-status` first. Its last line is the next step.
 | `403` on a write | The app lacks `bookmark.write`, `tweet.write` or the scope for that tool. Add it in the app, then sign in again. |
 | Tools: none listed yet | X connected moments ago and is still listing its tools. Run `/x-status` again, or press `r` in the dialog, in a few seconds. |
 | Tools: 0 available | X lists no tools for this app. Check that it is in Pay-per-use, Production, with the scopes above, then sign in again. |
-| Tools: unknown | X added tools the plugin does not know yet. They ask before they run. A known tool missing from the count is normal: X may list fewer tools for a token with fewer scopes. |
+| Tools: unknown | X added tools the plugin does not know yet. With `access: all` (the default) they run like any other tool; `ask-changes` asks for them and `read-only` denies them. A known tool missing from the count is normal: X may list fewer tools for a token with fewer scopes. |
 | Access: default rules missing or not added | Some agents lack the default rules (see the agents row), or OpenCode could not add them (see the OpenCode row). Follow the next step. |
 | Account: account name not reported | Nothing is wrong: status makes no X call, and OpenCode keeps no name on this sign-in. X answers follow the account you signed in as. |
-| Answers cost more than expected | Every call is billed per resource returned. A model read is capped to one page of ten, one widening, about $0.20 an answer, and each answer reports its actual cost; a script pays the same rates, so keep its result count small and never page in a loop. |
-| Posting asks first | `x_create_posts` is public and asks every time. Answer the prompt, or run writes interactively; `opencode run` refuses the ask. |
+| Answers cost more than expected | Every call is billed per resource returned. A model read is capped to one page of ten, one widening, about $0.20 an answer, and each answer reports its actual cost; a script pays the same rates, so keep its result count small, never page in a loop, and keep its `scriptBudgetUsd` budget small. |
+| Posting asks first | `x_create_posts` is public. With `access: all` (the default) it runs without a prompt; with `ask-changes` answer the prompt, or run writes interactively. |
 | How much credit is left | Ask the model to call `x_get_usage_credits`; it returns the payer's developer-platform balance in USD. |
 | `429` | X's rate limit for that endpoint is used up. Wait for the reset X returns, and make fewer calls. |
 | Agents without default rules | Put the default rules shown by `/x-status` first in each listed agent's own permissions, in `opencode.json` or the agent's Markdown file, followed by your top-level rules for X tools. |
-| OpenCode: untested | OpenCode is not 2.2.3, 2.2.4 or 2.2.5. Inside `>=2.2.3 <2.3.0` the plugin runs normally; outside it, it runs only because `allowUntestedHost` is set. If X misbehaves, use a tested release. |
+| OpenCode: untested | OpenCode is not 2.2.3, 2.2.4, 2.2.5 or 2.2.6. Inside `>=2.2.3 <2.3.0` the plugin runs normally; outside it, it runs only because `allowUntestedHost` is set. If X misbehaves, use a tested release. |
 | Connection: sign-in required soon after signing in | The app lacks `offline.access`, so X issued no refresh token and the two-hour token expired. Add the scope in the app and sign in again. |
 | Signed in to the wrong X account | Run `opencode mcp logout x` (or remove the account in `/connect` → X), then sign in again. |
 | Upgraded, and a read or write now fails with `403` | The new version asks for more scopes. Sign in again, and add the missing scope in the app first. |
-| An X tool is refused in `opencode run` | Nobody could answer its prompt. A read runs if you add an `allow` rule for it to the agent's own `permissions`. A write needs an interactive session: this plugin documents no `allow` for one. |
+| An X tool is refused in `opencode run` | Nobody could answer its prompt, so `access` is `"ask-changes"` or one of your rules asks. With `access: "all"` (the default) nothing asks: a change runs unattended. To keep a refusal, run it interactively or leave the option as it is. |
 | A skill seems ignored, and status names a skill to rename or move | A skill of yours with the same id, such as `x`, replaces the plugin's. Rename or move it. |
 | `/x` is missing | The plugin did not start. Run `/plugins` to see the error. |
 | `OPTIONS_INVALID` | An option is unknown or has a wrong value. The message names the option and the accepted values. |
+| `INPUT_INVALID` | `x_events_list`: the input is not the contract's, such as a `limit` outside 1 to 500. | Pass the inputs as its schema describes them. |
+| `SOURCE_UNKNOWN` | `x_events_list`: `source` is not `x`. | Leave `source` out, or pass `x`. |
+| `ACCOUNT_UNKNOWN` | `x_events_list`: `account` is not the signed-in handle. | Leave `account` out, or pass the handle the message names. |
+| `CURSOR_INVALID` | `x_events_list`: the cursor is malformed, another source's, or another account's. | Call without a cursor to start again. |
+| `UPSTREAM_ERROR` | `x_events_list`: X refused one of its reads, such as a rate limit. The message holds the first line of X's text, at most 300 characters, with tokens and URL query strings removed. | Run `/x-status`, then call again with the same cursor. |
+| `UPSTREAM_UNREADABLE` | `x_events_list`: one of its reads answered in a shape it does not read. | Call the read the message names directly, and run `/x-status`. |
+| `TOOL_UNAVAILABLE` | `x_events_list`: OpenCode does not list a read it needs. While X cannot be called, it gives status's own code and next step instead. | Wait a few seconds, then run `/x-status` and follow its next step. |
 | `HOST_UNTESTED` | Your OpenCode is outside `>=2.2.3 <2.3.0`, so the plugin did not start. Use OpenCode `>=2.2.3 <2.3.0`, or set `"allowUntestedHost": true` to run anyway. |
 | `STATUS_UNAVAILABLE` | The status could not be read, or the plugin is not running. Follow the next step in the message. |
 | `SKILLS_INVALID` | A skill file in the package is missing or broken. Reinstall the plugin. |
 | `SERVER_NOT_REGISTERED` | The plugin could not register the `x` server. Restart OpenCode. |
 | `RULES_NOT_ADDED` | The default permission rules could not be added, so X tools may run without asking. Restart OpenCode. |
-| `INPUT_INVALID`, `SOURCE_UNKNOWN` | `x_events_list` got an input outside its contract, or another source than `x`. Fix the input. |
-| `ACCOUNT_UNKNOWN` | `x_events_list` was asked for another account than the signed-in handle. Leave `account` out, or pass the handle the message names. |
-| `CURSOR_INVALID` | `x_events_list` got a cursor another account issued, or a broken one. Call it without a cursor to start again. |
-| `UPSTREAM_ERROR`, `UPSTREAM_UNREADABLE` | X refused one of `x_events_list`'s reads, or answered in a shape it does not read. Run `/x-status`, then call again with the same cursor. |
-| `TOOL_UNAVAILABLE` | OpenCode does not list a read `x_events_list` needs. Wait a few seconds and run `/x-status`; while X cannot be called, it gives status's own code and next step instead. |
+| `X_BUDGET_EXCEEDED` | The next script call's estimate does not fit its `scriptBudgetUsd` or the rolling `scriptDailyBudgetUsd`. Raise an option or wait for the window to roll. |
+| `X_PRICE_UNKNOWN` | The script called a method with no published price, so it was refused. Use a priced method. |
 
 A script's errors from the tools RPC have their own codes, listed in
 [Scripting](https://github.com/joe-broadhead/opencode-x/blob/HEAD/docs/scripting.md#errors).
@@ -286,7 +321,7 @@ A script's errors from the tools RPC have their own codes, listed in
 ## Known limits
 
 - **The tool table was checked against X's live list on 2026-11-06.** X publishes no tool annotations, so each
-  tool's class comes from its name, description and schema. X may add, rename or remove tools; an unknown one asks
+  tool's class comes from its name, description and schema. X may add, rename or remove tools; an unknown one is allowed with `access: all`
   before it runs, and a known one can be missing for a token with fewer scopes.
 - **A public app refreshes.** X issued a Native App (public client) a refresh token on 2026-11-06, and OpenCode
   refreshed it about two hours later; `offline.access` is still required.
@@ -297,15 +332,16 @@ A script's errors from the tools RPC have their own codes, listed in
   and caches the token in `~/.xurl`. It moves the sign-in outside `/connect` and its calls outside these permission
   rules, needs a Node download and a child process, and OpenCode cannot see its sign-in state, so this plugin does not
   use it. It remains a working fallback if you need a local bridge and accept that.
-- **A script's read can cross projects.** A script's session may belong to another directory than the OpenCode
-  server answering it, and the read then runs under the serving location's agent rules; only a `deny` is refused in
-  between. Run scripts in the project whose agent you mean. This is in the module shared with the other plugins, not
-  in this one.
+- **A script's session must be in the project you call.** A session in another directory is `SESSION_UNKNOWN`, and a
+  call that names no location goes to the service's default location, so send `-H "x-opencode-directory:$PWD"` with
+  every call. This is in the module shared with the other plugins, not in this one.
 - **In Jelly, a tool X adds is not asked about.** Jelly applies each declared tool's effect and nothing else, so an
   undeclared tool, a write included, runs without asking until a release of this plugin declares it. A Jelly admin
   can set it to ask.
 - **X's prices are X's.** The rates above are from X's pricing page on 5 November 2026, and can change without
   notice.
+
+- Updates are not automatic for a Git install, and `opencode plugin update` and `opencode plugin check` do not work on one: to move to a newer release, remove the old entry and add the new tag.
 
 ## Uninstall
 
@@ -315,7 +351,7 @@ Sign out while the plugin is still installed: once it is removed, OpenCode no lo
 1. Sign out: `opencode mcp logout x`. Right after OpenCode starts or reloads, it can answer
    `MCP server not found: x` for a few seconds; wait, then run it again.
 2. Check: `opencode auth list` no longer lists **X**.
-3. Remove the plugin: `opencode plugin remove @joe-broadhead/opencode-x`, then `opencode reload`.
+3. Remove the plugin: `opencode plugin remove github:joe-broadhead/opencode-x#v0.0.0`, then `opencode reload`.
    `opencode mcp list` no longer lists `x`.
 4. Remove the **X app** entry: `opencode auth logout x-app` from a terminal, or in `/connect`. Remove any X rules you
    copied into your agents' own `permissions`.

@@ -6,18 +6,26 @@ Unofficial; not affiliated with Slack. Slack is a trademark of Slack Technologie
 
 ## Requirements
 
-- OpenCode `>=2.2.3 <2.3.0`, tested on 2.2.3, 2.2.4 and 2.2.5; macOS and Linux. Outside that range the plugin sets nothing up and `/slack-status` says why, unless you set `allowUntestedHost`.
+- OpenCode `>=2.2.3 <2.3.0`, tested on 2.2.3, 2.2.4, 2.2.5 and 2.2.6; macOS and Linux. Outside that range the plugin sets nothing up and `/slack-status` says why, unless you set `allowUntestedHost`.
 - A Slack app that your organisation owns, with Slack's MCP server turned on. Slack lets only internal apps and Slack Marketplace apps use its MCP server. If your organisation has none, someone who can create apps in your workspace makes one from the [app manifest](https://github.com/joe-broadhead/opencode-slack/blob/HEAD/docs/slack-app-manifest.json): see [Create the Slack app](https://github.com/joe-broadhead/opencode-slack/blob/HEAD/docs/configuration.md#create-the-slack-app).
 
 ## Install
 
 ```sh
-opencode plugin add @joe-broadhead/opencode-slack
+opencode plugin add github:joe-broadhead/opencode-slack#v0.0.0
 ```
 
 Run `opencode reload`, or restart OpenCode. Then run `/slack-status`: it shows `not configured` until you give OpenCode your Slack app's client ID (see [Sign in](#sign-in)).
 
-**Update** with `opencode plugin update @joe-broadhead/opencode-slack`, then run `opencode reload`. An entry pinned to a version, such as `@joe-broadhead/opencode-slack@0.0.2`, does not update: remove the `@version` from its `plugins` entry first.
+Each release has its own tag, and a Git install does not update by itself. To move to a newer release, remove the old entry with `opencode plugin remove github:joe-broadhead/opencode-slack#v0.0.0`, then add the new tag with `opencode plugin add github:joe-broadhead/opencode-slack#v<version>`.
+
+Or add the plugin to `opencode.json` instead, with the same spec:
+
+```json
+{ "plugins": [{ "package": "github:joe-broadhead/opencode-slack#v0.0.0" }] }
+```
+
+The install takes the GitHub release tag. Its commit carries the built `dist/`, so the install runs no build.
 
 ## Sign in
 
@@ -44,7 +52,7 @@ The Slack tools are Slack's own. With Code Mode, which is on by default, agents 
 - `Skills`, only when needed: a skill of yours with the id `slack-search`, which OpenCode loads instead of the plugin's;
 - `Tools`: the Slack tools found, counted by class, with any unknown tools named;
 - `Agents without default rules`: agents that run Slack tools without asking, with the rules to paste (see [Agents without the default rules](#agents-without-the-default-rules)), or `none`;
-- `OpenCode`: the version, whether it is tested (2.2.3, 2.2.4 and 2.2.5), and the supported range;
+- `OpenCode`: the version, whether it is tested (2.2.3, 2.2.4, 2.2.5 and 2.2.6), and the supported range;
 - `Next step`: exactly one, or `Nothing to do.`
 
 ### Memory's events
@@ -53,53 +61,93 @@ The Slack tools are Slack's own. With Code Mode, which is on by default, agents 
 
 ### Scripts
 
-A script or a cron job can call Slack's fourteen read tools with no model, through `opencode api`. It runs as a session and its agent, under that agent's permission rules and the session's own. The private search and the file read ask by default, so a script needs an allow rule for them. Writes and sends are never available to scripts:
+A script or a cron job can call every Slack tool this plugin knows with no model, through `opencode api`: the fourteen reads, the three sends and the ten writes. It runs as a session and its agent, under that agent's permission rules and the session's own. The rule is resolved first, so only an `allow` runs. **A script gets the same default as the model:** at `access: "all"` the plugin's block allows every tool, so a script can read and write everything the account can. Set `access: "ask-changes"` or `"read-only"`, or add a later rule, to restrict it; an `ask` is refused because no one can answer it. A saved "Always allow" does not authorize an ad-hoc script; a Jobs `jobs_run_script` one-off does, with the user's approval:
 
 ```sh
 opencode api post /api/rpc/slack.workspace.tools/slack_search_public \
+  -H "x-opencode-directory:$PWD" \
   -d '{"input":{"sessionID":"ses_…","input":{"query":"launch date","limit":10}}}'
 ```
+
+Without `x-opencode-directory:$PWD` the call reaches the service's default location and fails `rpc.unavailable` when the plugin is not loaded there.
+
+See [Scripting](https://github.com/joe-broadhead/opencode-slack/blob/HEAD/docs/scripting.md).
 
 The method `events_list` runs `slack_events_list` the same way. See [Scripting](https://github.com/joe-broadhead/opencode-slack/blob/HEAD/docs/scripting.md).
 
 ## Permissions
 
-**What runs without asking:** the known read tools, such as `slack_search_public`, `slack_read_thread` and `slack_read_canvas`, and the plugin's own `slack_events_list`. [Tool classes](https://github.com/joe-broadhead/opencode-slack/blob/HEAD/docs/configuration.md#tool-classes) lists every tool.
+**Every tool is allowed by default.** An agent can search and read any message, thread, canvas or file the signed-in account can see, the private-channel search and file reads included, and it can send messages, create canvases and lists, react and upload files, all without asking. Nothing here is a safety net: the scopes you granted decide what is possible. Restrict it in any of these three ways.
 
-**What asks first:**
+1. **The `access` option**, which generates the rules the plugin inserts:
 
-- private search: `slack_search_public_and_private`;
-- file reads: `slack_read_file`;
-- writes: sending, drafting and scheduling messages, adding reactions, creating and updating canvases and lists, creating conversations, and file uploads;
-- any Slack tool the plugin does not know yet.
+   | Value | What runs | What asks or is denied |
+   | --- | --- | --- |
+   | `"all"` (the default) | every tool, and any tool Slack adds later | nothing |
+   | `"ask-changes"` | the read tools | the private-channel search, file reads, writes and sends, and new tools: they ask |
+   | `"read-only"` | the read tools | the private-channel search, file reads, writes and sends, and new tools: they are **denied** |
 
-The read tools read whatever your scopes reach. With the default scopes, that is public channels. If you add `groups:history`, `im:history` or `mpim:history`, `slack_read_channel` and `slack_read_thread` also read private channels and direct messages without asking; only the search across them asks. To make those reads ask too, add `{ "action": "slack_slack_read_channel", "resource": "*", "effect": "ask" }`, and the same for `slack_slack_read_thread` and `slack_slack_list_user_channels`.
+   ```jsonc
+   { "plugins": [{ "package": "github:joe-broadhead/opencode-slack#v0.0.0", "options": { "access": "read-only" } }] }
+   ```
 
-The plugin adds these defaults as rules right after each agent's base `allow` rule. OpenCode uses the last matching rule, so these all override the defaults:
+   The default block, generated from `defaultRules()` for `access: "all"`:
 
-- the agent's own built-in rules: Explore, Title and Summary still deny Slack, and Plan keeps its limits;
-- your `permissions`;
-- your "Always allow" answers.
+   ```json
+   [
+     { "action": "slack_*", "resource": "*", "effect": "allow" },
+     { "action": "slack_slack_search_public", "resource": "*", "effect": "allow" },
+     { "action": "slack_slack_search_channels", "resource": "*", "effect": "allow" },
+     { "action": "slack_slack_search_users", "resource": "*", "effect": "allow" },
+     { "action": "slack_slack_read_channel", "resource": "*", "effect": "allow" },
+     { "action": "slack_slack_read_thread", "resource": "*", "effect": "allow" },
+     { "action": "slack_slack_read_user_profile", "resource": "*", "effect": "allow" },
+     { "action": "slack_slack_read_canvas", "resource": "*", "effect": "allow" },
+     { "action": "slack_slack_list_channel_members", "resource": "*", "effect": "allow" },
+     { "action": "slack_slack_get_reactions", "resource": "*", "effect": "allow" },
+     { "action": "slack_slack_list_user_channels", "resource": "*", "effect": "allow" },
+     { "action": "slack_slack_read_list", "resource": "*", "effect": "allow" },
+     { "action": "slack_slack_search_emojis", "resource": "*", "effect": "allow" },
+     { "action": "slack_events_list", "resource": "*", "effect": "allow" },
+     { "action": "slack_slack_search_public_and_private", "resource": "*", "effect": "allow" },
+     { "action": "slack_slack_read_file", "resource": "*", "effect": "allow" },
+     { "action": "slack_slack_send_message", "resource": "*", "effect": "allow" },
+     { "action": "slack_slack_send_message_draft", "resource": "*", "effect": "allow" },
+     { "action": "slack_slack_schedule_message", "resource": "*", "effect": "allow" },
+     { "action": "slack_slack_create_canvas", "resource": "*", "effect": "allow" },
+     { "action": "slack_slack_update_canvas", "resource": "*", "effect": "allow" },
+     { "action": "slack_slack_add_reaction", "resource": "*", "effect": "allow" },
+     { "action": "slack_slack_get_file_upload_url", "resource": "*", "effect": "allow" },
+     { "action": "slack_slack_complete_file_upload", "resource": "*", "effect": "allow" },
+     { "action": "slack_slack_create_conversation", "resource": "*", "effect": "allow" },
+     { "action": "slack_slack_create_list", "resource": "*", "effect": "allow" },
+     { "action": "slack_slack_update_list", "resource": "*", "effect": "allow" },
+     { "action": "slack_slack_add_list_record", "resource": "*", "effect": "allow" },
+     { "action": "slack_slack_update_list_record", "resource": "*", "effect": "allow" }
+   ]
+   ```
 
-**Allow** a tool that asks: choose **Always allow** when OpenCode asks, or add a rule to `permissions`:
+   [The access option](https://github.com/joe-broadhead/opencode-slack/blob/HEAD/docs/configuration.md#the-access-option) prints the block for `ask-changes` and `read-only` too.
 
-```jsonc
-"permissions": [
-  { "action": "slack_slack_read_file", "resource": "*", "effect": "allow" }
-]
-```
+2. **An agent that is read-only or asks**, with rules of its own, later than the plugin's:
 
-"Always allow" applies to every agent in the current project, Plan included.
+   ```jsonc
+   { "agents": { "reader": { "permissions": [
+     { "action": "slack_*", "resource": "*", "effect": "deny" },
+     { "action": "slack_slack_search_public", "resource": "*", "effect": "allow" },
+     { "action": "slack_slack_read_thread", "resource": "*", "effect": "allow" }
+   ] } } }
+   ```
 
-**Deny** a tool with `"effect": "deny"`. A deny always wins, even over "Always allow", and it hides the tool from the model. `{ "action": "slack_*", "resource": "*", "effect": "deny" }` denies every Slack tool.
+3. **Per-tool rules**, in `permissions` or in an agent's own: `{ "action": "slack_slack_send_message", "resource": "*", "effect": "ask" }` makes sending ask, and `deny` refuses it. `{ "action": "slack_*", "resource": "*", "effect": "deny" }` denies every Slack tool. A later rule wins, and a saved "Always allow" still applies after your rules.
 
-The `slack_*` rule also matches tools of any other MCP server whose name starts with `slack_`, so those tools ask too.
+**Why the names read `slack_slack_search_public`.** Slack's own server names its tools `slack_<tool>`, and OpenCode prefixes an MCP tool with its server's name, which is `slack`. The permission action is that full name, so a rule is `slack_slack_search_public`. It is the exact name to use in a rule; renaming it would break saved rules, so it stays.
 
 ### Agents without the default rules
 
-OpenCode creates some agents after the plugin adds its rules, so they get none: agents defined only in your config (`agents.<id>` entries that are not built-in agents, and Markdown agent files), and agents added by plugins that load after this one. These agents run Slack writes and unknown Slack tools **without asking**. Status names them in its `Agents without default rules` row and prints the rules to paste.
+OpenCode creates some agents after the plugin adds its rules, so they get none: agents defined only in your config (`agents.<id>` entries that are not built-in agents, and Markdown agent files), and agents added by plugins that load after this one. These agents run Slack tools **under OpenCode's own default**, not this plugin's block. Status names them in its `Agents without default rules` row and prints the rules to paste.
 
-**Fix:** put the plugin's default block first in **that agent's own** `permissions` (in `opencode.json`, or the agent's Markdown file), followed by your top-level rules for Slack tools, so they keep winning for that agent. The block is the `slack_*` ask rule, then one allow rule per read tool, such as `{ "action": "slack_slack_search_public", "resource": "*", "effect": "allow" }`. `/slack-status` prints the exact block to paste; [The inserted rules](https://github.com/joe-broadhead/opencode-slack/blob/HEAD/docs/configuration.md#the-inserted-rules) lists it too.
+**Fix:** put the plugin's block first in **that agent's own** `permissions` (in `opencode.json`, or the agent's Markdown file), followed by your top-level rules for Slack tools, so they keep winning for that agent. `/slack-status` prints the exact block to paste for the `access` you set; [The inserted rules](https://github.com/joe-broadhead/opencode-slack/blob/HEAD/docs/configuration.md#the-inserted-rules) explains it.
 
 Do not put this block in the top-level `permissions`. OpenCode adds top-level rules to every agent after its built-in rules, so the block would loosen agents that deny Slack, such as Explore.
 
@@ -110,7 +158,7 @@ Everything works without options. Options set the client ID for everyone (instea
 ```jsonc
 {
   "plugins": [
-    { "package": "@joe-broadhead/opencode-slack", "options": { "oauth": { "scopes": ["channels:history", "channels:read", "search:read.public", "users:read", "search:read.private"] } } }
+    { "package": "github:joe-broadhead/opencode-slack#v0.0.0", "options": { "oauth": { "scopes": ["channels:history", "channels:read", "search:read.public", "users:read", "search:read.private"] } } }
   ]
 }
 ```
@@ -134,7 +182,7 @@ Put the client ID of your organisation's Slack app in the system configuration, 
   "$schema": "https://opencode.ai/config.json",
   "plugins": [
     {
-      "package": "@joe-broadhead/opencode-slack",
+      "package": "github:joe-broadhead/opencode-slack#v0.0.0",
       "options": {
         "oauth": { "client_id": "YOUR_SLACK_CLIENT_ID" }
       }
@@ -160,11 +208,21 @@ Run `/slack-status` (or `/slack` in the TUI) first. Its `Connection` row shows a
 | `conflict` | `SERVER_NAME_IN_USE` | Another MCP server already uses the name `slack`. | Remove `mcp.servers.slack` from your OpenCode config. |
 | `failed` | none | OpenCode has not loaded the server. | Run `opencode reload`, then check again. |
 | `not configured` | `OPTIONS_INVALID` | An option is invalid. Status names the field. | Follow the next step. |
-| `host untested` | `HOST_UNTESTED` | This OpenCode version is outside the supported range `>=2.2.3 <2.3.0`, so Slack is not set up. A release inside the range that is not 2.2.3, 2.2.4 or 2.2.5 runs normally; the `OpenCode` row calls it untested. | Use OpenCode `>=2.2.3 <2.3.0`, or set `"allowUntestedHost": true` in the plugin's options. |
+| `host untested` | `HOST_UNTESTED` | This OpenCode version is outside the supported range `>=2.2.3 <2.3.0`, so Slack is not set up. A release inside the range that is not 2.2.3, 2.2.4, 2.2.5 or 2.2.6 runs normally; the `OpenCode` row calls it untested. | Use OpenCode `>=2.2.3 <2.3.0`, or set `"allowUntestedHost": true` in the plugin's options. |
 | `connected` | none | A skill in your own or the project's skill folders has the id `slack-search`, so OpenCode loads it instead of the plugin's. The `Skills` row names its file. | Move or rename that skill, then run `opencode reload`. |
 | `connected` | none | Ready. The next step reads `Nothing to do.` | If status names agents without default rules, put the default rules first in their own permissions (see above). |
+| — | `STATUS_UNAVAILABLE` | Status itself could not be read. | Run `/slack-status` again in a moment. |
+| — | `SKILLS_INVALID` | A bundled skill is missing or has invalid frontmatter, so the plugin does not load. | Reinstall the plugin: `opencode plugin remove github:joe-broadhead/opencode-slack#v0.0.0`, then `opencode plugin add github:joe-broadhead/opencode-slack#v0.0.0`, then `opencode reload`. |
+| — | `INPUT_INVALID` | The `events_list` input is invalid; the message names the problems. | Pass `since`, `cursor`, `limit`, `account` or `source` as the tool's schema describes them. |
+| — | `SOURCE_UNKNOWN` | This plugin lists only the source `slack`. | Leave `source` out, or pass `slack`. |
+| — | `CURSOR_INVALID` | The cursor was not issued by `events_list` for this Slack workspace and sign-in. | Call `events_list` without a cursor, with `since`, to start again. |
+| — | `ACCOUNT_UNKNOWN` | The signed-in Slack workspace is not the account `events_list` was asked for. | Leave `account` out, or pass the signed-in workspace. |
+| — | `TOO_MANY_MESSAGES` | More messages were posted in a channel after the cursor or `since` than one `events_list` call reads. | Call `events_list` again with a later `since`, without a cursor. |
+| — | `UPSTREAM_UNREADABLE` | Slack's answer to a read `events_list` makes is in a shape it does not read. | Call the tool directly to see Slack's answer, and run `/slack-status`. |
+| — | `UPSTREAM_ERROR` | Slack refused a read `events_list` makes, such as a missing scope or a channel you cannot read. | Check that the channel id in `events.channels` is one you can read, then call `events_list` again with the same cursor. |
+| — | `TOOL_UNAVAILABLE` | OpenCode does not list a read `events_list` needs, or `slack` is your own server. | Wait a few seconds, then run `/slack-status` and follow its next step. |
 
-If status itself cannot be read, `/slack-status` says `STATUS_UNAVAILABLE`; run it again in a moment. If a bundled skill is missing or broken, OpenCode reports `SKILLS_INVALID` when it loads the plugin; run `opencode plugin update @joe-broadhead/opencode-slack`, then `opencode reload`.
+If status itself cannot be read, `/slack-status` says `STATUS_UNAVAILABLE`; run it again in a moment. If a bundled skill is missing or broken, OpenCode reports `SKILLS_INVALID` when it loads the plugin; reinstall it from its tag, as the Troubleshooting table says.
 
 A script's errors from the tools RPC have their own codes, listed in [Scripting](https://github.com/joe-broadhead/opencode-slack/blob/HEAD/docs/scripting.md#errors).
 
@@ -195,8 +253,19 @@ Sign out while the plugin is still installed: once it is removed, OpenCode no lo
 1. Sign out of Slack: `opencode mcp logout slack`. If it answers "MCP server not found" right after OpenCode starts, wait a few seconds and run it again.
 2. If you saved a client ID in `/connect`, remove it: `opencode auth logout slack-app`, and choose the **Slack app client ID** account. Without a terminal, name it: `opencode auth logout slack-app "Slack app client ID"`. An entry saved by an earlier release is named "Slack app".
 3. Check: `opencode auth list` lists neither **Slack** nor **Slack app client ID**.
-4. Remove the plugin: `opencode plugin remove @joe-broadhead/opencode-slack`, then `opencode reload`. `opencode mcp list` no longer lists `slack`.
+4. Remove the plugin: `opencode plugin remove github:joe-broadhead/opencode-slack#v0.0.0` (the spec you installed), then `opencode reload`. `opencode mcp list` no longer lists `slack`.
 5. Remove any Slack rules you copied into your agents' own `permissions`.
+
+## Known limits
+
+- **Slack's server and Slack's tools.** The plugin adds Slack's hosted MCP server and nothing else: no Slack Web API client and no wrapper tools. Tool schemas, results (Markdown text, not JSON) and rate limits are Slack's.
+- **The default `access` is `all`.** Agents can then read private channels and files, and send or change things, without asking. Set `access` to `"ask-changes"` or `"read-only"` to restrict it; see [Permissions](#permissions).
+- **Tool classes are set by hand.** A tool Slack adds later runs under the namespace rule (allowed at `all`, asks at `ask-changes`, denied at `read-only`) and is not a script method until the plugin classifies it. `/slack-status` names such tools.
+- **Private search needs scopes the default sign-in lacks.** With the default scopes, Slack answers `missing_scope` for it. See the [scope table](https://github.com/joe-broadhead/opencode-slack/blob/HEAD/docs/configuration.md#scopes).
+- **Tested on OpenCode 2.2.3, 2.2.4, 2.2.5 and 2.2.6 only.** Other releases in `>=2.2.3 <2.3.0` run untested.
+- **A script's calls are not recorded in the session.** Slack's audit logs record them.
+- **Names keep the doubled prefix.** A permission action is the tool's full name, such as `slack_slack_search_public`. Renaming it would break saved rules.
+- Updates are not automatic for a Git install, and `opencode plugin update` and `opencode plugin check` do not work on one: to move to a newer release, remove the old entry and add the new tag.
 
 ## Links
 

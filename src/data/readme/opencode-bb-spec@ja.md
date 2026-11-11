@@ -49,7 +49,7 @@
 | コマンド | 何をするか | いつ使うか |
 |---|---|---|
 | `/prd` | 質疑→明確化→分解、PRD + AGENTS.md を書き出して読んだうえで 1 回承認すると、plan → exec → doc-update を自動実行 | 新規要件の着手時、マージ済み機能の振る舞いを変える時 |
-| `/prototype` | まずプロジェクトルートの DESIGN.md を読み(無ければ起草)、変更箇所を含むページ全体をプロジェクトどおりに描き、共通のブループリント外枠で HTML プロトタイプを作り、承認されるまで修正。`/prd`・`/revise` が UI 変更時に自動で呼び出す | 要件フローを通さず、まず見た目を確認したい時 |
+| `/prototype` | まずプロジェクトルートの DESIGN.md を読み(無ければ起草)、変更箇所を含むページ全体をプロジェクトどおりに描き、プロトタイプ用サブエージェントに依頼して共通のブループリント外枠で HTML プロトタイプを作り(メインの会話は依頼と伝達のみ)、DESIGN.md を新規作成・変更する時はまず「デザイン規約」ページを描いて確認を取り、承認されるまで修正。`/prd`・`/revise` が UI 変更時に自動で呼び出す | 要件フローを通さず、まず見た目を確認したい時 |
 | `/revise` | 根本原因で診断→的を絞った修正→回帰検証、完了後に doc-update を自動実行 | バグや期待と異なる結果が出た時 |
 | `/git-push` | pre-review セルフチェック + push + PR 作成 | PR を出す時 |
 | `/exec` | 中断箇所から plan の実行を再開 | 中断や `/clear` の後 |
@@ -106,6 +106,7 @@
   - *Test* エージェントは PRD の制約のみ読んで失敗テストを書く(Red)
   - *Impl* エージェントは **PRD を見ない**、テスト + 関数リストのみ見て実装を書く(Green)、「意図に合わせて不正」できない;新技術の導入は plan で承認された「新規技術」表に制限
   - *Review* エージェントは PRD の受け入れ基準と AGENTS.md に照合し、堅牢性/セキュリティの観点でもチェック、読み取り専用
+  - *Review* は問題を 1 件指摘するたびに、リポジトリ内の同種の箇所も併せて列挙。確認できたものは同じラウンドで修正し、指摘されたテスト不足もその場で補う
   - 各ステップの進捗を `PROGRESS.md` に記録、token 枯渇でも**ロスレス再開**可能
   - 実装中に方針の問題が見つかったら止まって選択を求める:コードを直す / 今回の PRD を直す / 一時停止;小さな変更はその場で修正、大きな変更は `/prd` に戻って再承認
   - 全完了後に `/doc-update` の仕上げモードを自動実行、今回の PRD と README などのドキュメントを実際の成果物に追従させる
@@ -126,6 +127,8 @@
   - まずコードを読んで現状を確認し、`git log -L` で関連 PRD を辿ってから、逸脱を**根本原因で 3 分類**:*PRD 欠陥*、*実装ドリフト*、*要件変更*
   - 要件が変わった場合(*PRD 欠陥*、*要件変更*):本ブランチの PRD だけを修正し、その決定記録に追記;PRD がマージ済みか存在しない場合は止まって `/prd` で新しい PRD を作る
   - バグ・セキュリティ・堅牢性の問題(*実装ドリフト*):PRD がマージ済みでもここで修正し、修正理由とトレードオフ(何を選び、何を退け、なぜか)を commit 本文に書く
+  - 根本原因を特定したら、同じ原因の影響を受ける他の箇所(呼び出し箇所と同じ書き方の誤り)をすべて検索して一覧で報告し、報告された箇所と同じラウンドでまとめて修正。判断が必要な箇所があるときだけ止まって確認
+  - 作業中に見つけた無関係な問題は記録するだけで手を付けない。`/exec`・`/revise` の仕上げ時と `/git-push` のプッシュ前に一覧にまとめて一度だけ確認し、選ばれたものは現在のブランチで修正して同じ PR に入れる
   - 修正が必要なすべての review 指摘はここに集約
   - 修正後に `/doc-update` の仕上げモードを自動実行
 
@@ -143,8 +146,8 @@
 
 **同梱されるもの**
 
-- **5 個のオーケストレーションサブエージェント**(上記ステージに駆動される):`test-engineer` / `impl-engineer` / `prd-reviewer` / `webview-test-runner` / `pre-reviewer`
-- **3 つの受動 hook**(自動発動):main コミットブロック、依存バージョンセルフチェック、バックグラウンドスクリプトの完了待ち
+- **8 個のオーケストレーションサブエージェント**(上記ステージに駆動される):`test-engineer` / `impl-engineer` / `prd-reviewer` / `webview-test-runner` / `pre-reviewer` / `prototype-designer` / `code-investigator` / `script-runner`
+- **3 つの受動 hook**(自動発動):main コミットブロック、依存バージョンセルフチェック、バックグラウンドスクリプトをポーリングしない
 
 ---
 
@@ -192,7 +195,7 @@ BB-Spec は**4 つの独立インストール可能なサブ plugin** に分割 
 | サブ plugin | 何が手に入るか | インストールコマンド |
 |---|---|---|
 | **bb-spec-core** _(推奨ベース)_ | TDD / バージョンポリシー / Git 規律 + 3 つの受動 hook | `/plugin install bb-spec-core@0xbb2b` |
-| **bb-spec-workflow** _(コア機能)_ | prd → plan → exec → doc-update → revise → git-push(+ 任意 test-webview / test-api e2e)、git-clone ワンショット初期化 + 5 サブエージェント | `/plugin install bb-spec-workflow@0xbb2b` |
+| **bb-spec-workflow** _(コア機能)_ | prd → plan → exec → doc-update → revise → git-push(+ 任意 test-webview / test-api e2e)、git-clone ワンショット初期化 + 8 サブエージェント | `/plugin install bb-spec-workflow@0xbb2b` |
 | **bb-spec-backend** | Go / REST API / DB / 認証 / 認可 / 可観測性 / サービスガバナンス / 設定制約 | `/plugin install bb-spec-backend@0xbb2b` |
 | **bb-spec-frontend** | Vue 3 + TS + Vite + Tailwind + bun スタック & エンジニアリング規約 | `/plugin install bb-spec-frontend@0xbb2b` |
 
@@ -253,7 +256,7 @@ claude plugin update bb-spec-workflow@0xbb2b   # ターミナルから特定の�
 |---|---|---|---|
 | `git-workflow-guard` | bb-spec-core | PreToolUse(Bash) | `main` / `master` ブランチでの `git commit` をブロック;他の git フロー動作(ブランチ作成 / push / worktree / merge / PR)は通過させ git-workflow 規律とリアルタイム git ステータスを注入 |
 | `dep-version-check` | bb-spec-core | PostToolUse(Write\|Edit) | 依存ファイル編集後に「公式最新版を先に確認」セルフチェックリマインダを注入し、未承認の新技術は取り消してリストを出し承認を求めるよう促す |
-| `background-script-wait` | bb-spec-core | Stop | このセッションで未通知の実行中バックグラウンドコマンドを見つけたとき 1 回だけ通知:Claude は終了するスクリプトをフォアグラウンドのループで待ち、常駐サービスは待たない |
+| `background-script-wait` | bb-spec-core | Stop | このセッションで未通知の実行中バックグラウンドコマンドを見つけたとき 1 回だけ通知:Claude はループで待たずにそのままターンを終え、以降この種のスクリプトはスクリプト実行サブエージェントに任せ、常駐サービスは待たない |
 ---
 
 ## 🧪 テスト
@@ -291,7 +294,7 @@ base_dir: my/bb  # → my/bb/docs/{prd,plan,test}/ と my/bb/.cache/ ; ./ を指
 | シナリオ | スイッチ |
 |---|---|
 | 一時的に main commit を許可 | `bb-spec-core` を一時的に無効化 |
-| バックグラウンドスクリプト待ちの通知をスキップ | `bb-spec-core` を一時的に無効化 |
+| バックグラウンドスクリプトの通知をスキップ | `bb-spec-core` を一時的に無効化 |
 
 ---
 

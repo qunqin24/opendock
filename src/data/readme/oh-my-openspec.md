@@ -197,6 +197,8 @@ Skill ids match upstream exactly and coexist with the five flow commands — ups
   not us.
 - [OpenSpec docs](https://openspec.dev/docs) — quickstart, commands,
   customization.
+- [OpenCode configuration](docs/opencode.md) — permissions,
+  config scope, models, and reasoning variants for plugin roles.
 - [docs/agents.md](docs/agents.md) — role catalog with report formats and
   dispatch mechanics.
 - [docs/vendor-sync.md](docs/vendor-sync.md) — the skill-freshness pipeline.

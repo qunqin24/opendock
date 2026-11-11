@@ -43,6 +43,8 @@ npm run pack:check
 
 `npm run check` runs the docs checker, its self-test, and every workspace's own check. `pack:check` runs check and build, then verifies each tarball.
 
+Manual npm commands (`npm login`, `npm publish`, `npm trust github`) are owner-only and 2FA-gated with a passkey. Use `scripts/npm-passkey.mjs` in a visible terminal; the release workflow's OIDC publish does not need it.
+
 Releases use tags of the form `<package>@<version>`. The release workflow publishes over OIDC with provenance and no stored token.
 
 ## Status

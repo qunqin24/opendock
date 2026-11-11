@@ -49,7 +49,7 @@ Figma 比較は「あるキャンバス幅での再現」しか見ないため�
 - **既定ビューポート:** 768×1024 CSS px（`viewport_preset` 未指定 = `ipad_portrait`）。
 - **横向き:** `viewport_preset=ipad_landscape`（1024×768）。任意サイズは `viewport_width` / `viewport_height`（0 より大きい値。指定時はプリセットを上書き）。
 - **`viewport_overflow_x`:** `x < 0` または `x+w > viewport_width`（1px の丸めは許容）。ビューポート高さ超えはページスクロールとして扱い、失敗にしません。
-- **`parent_overflow`:** 子ボックスが親ボックスからいずれかの辺で 1px 超えてはみ出す。親が JSON に無い場合、または親の `w`/`h` が 0 以下の場合はこの検査をスキップします（`status` は変えず、前者は `unresolved_parent_refs`、後者は `parent_overflow_skipped_zero_geom` と `details` 要約で可視化）。親キーが無い／解決できない／親がゼロ幾何だけのときは `parent_checked_nodes=0` になり、`details` の要約行に未適用注記が付きます。`ignore_nodes` / `ignore_region` で除外した親でも、親に非ゼロ幾何があれば子の `parent_overflow` は引き続き検査します。
+- **`parent_overflow`:** 子ボックスが親ボックスからいずれかの辺で 1px 超えてはみ出す。親が JSON に無い場合、自己参照（`parent` がそのノード自身）の場合、または親の `w`/`h` が 0 以下の場合はこの検査をスキップします（`status` は変えず、前二者は `unresolved_parent_refs`、後者は `parent_overflow_skipped_zero_geom` と `details` 要約で可視化）。親キーが無い／解決できない／自己参照／親がゼロ幾何だけのときは `parent_checked_nodes=0` になり、`details` の要約行に未適用注記が付きます。`ignore_nodes` / `ignore_region` で除外した親でも、親に非ゼロ幾何があれば子の `parent_overflow` は引き続き検査します。
 - **合否:** 崩れ 0 件 → `success` / 1 件以上 → `mismatch` / 検査対象がすべて除外 → `skipped`。Web ノードが 1 件もない、または検査対象がすべて明示的な `w`/`h` = 0 の場合も `mismatch` です（`width`/`height` など必須キー欠落は入力エラーで、この mismatch にはなりません）。`match_rate` は返しません。`success` でも `parent_checked_nodes=0` のときは親はみ出しを検証していないため、DOM キャプチャに正しい `parent` を含めて再実行してください。一部ノードだけ `w`/`h` ≤ 0 のときは残りだけで `success` になり得ますが、除外件数は `skipped_zero_geometry` で分かります。
 - **応答:** `status`, `mode`, `viewport_width`, `viewport_height`, `checked_nodes`, `parent_checked_nodes`, `issue_count`, `details`, `ignored_count`。崩れがあるとき `issues`（`type` / `selector` / `detail` / `edge` / `overflow_px` / `node`（`x` / `y` / `w` / `h`）。`parent_overflow` のときは `parent_selector` も）。`viewport_preset` を渡したときはエコーします。`ignored_nodes`（`web:<selector>`。件数は `ignored_count` と一致）/ `unmatched_ignores` / `unmatched_ignore_regions` / `unresolved_parent_refs` / `parent_overflow_skipped_zero_geom` / `skipped_zero_geometry` は該当時のみ。
 
@@ -81,14 +81,14 @@ image A / B のいずれかが一様と検出された場合、status / match_ra
 
 表の型が `string` のパラメータに string 以外を渡した場合の扱いは次のとおりです。
 
-- `figma_layout` / `web_layout` は string に加えてノードの JSON 配列、または単一ノードの JSON オブジェクトをそのまま受け付けます（オブジェクトは 1 要素配列に包んで文字列化したものと同じ経路で処理）。オブジェクトの JSON 文字列を渡すと `Layout tree mode input error: figma_layout must be a JSON array of node objects (a JSON object is not supported); pass the nodes as an array`（`layout_integrity` では同じ文面に `Layout integrity mode input error: ` が付く）になり、数値・真偽値・`null` などのその他の型では `Layout tree mode input error: figma_layout must be a JSON-encoded string or a JSON array/object` になります（`web_layout` や `layout_integrity` ではモード名と引数名が対応して変わります）。
+- `figma_layout` / `web_layout` は string に加えてノードの JSON 配列をそのまま受け付けます。単一オブジェクト（ネイティブ map / オブジェクト JSON 文字列）は受け付けず、`Layout tree mode input error: figma_layout must be a JSON array of node objects (a JSON object is not supported); pass the nodes as an array`（`layout_integrity` では同じ文面に `Layout integrity mode input error: ` が付く）になります。数値・真偽値・`null` などのその他の型では `Layout tree mode input error: figma_layout must be a JSON-encoded string or a JSON array/object` になります（`web_layout` や `layout_integrity` ではモード名と引数名が対応して変わります）。
 - `ignore_nodes` はカンマ区切り文字列に加えて文字列要素の JSON 配列を受け付けます。それ以外の型（数値・オブジェクト・`null`、文字列以外の要素を含む配列）は `argument 'ignore_nodes' must be a string or a JSON array of strings` のツール実行エラーになります。
 - `ignore_region` はセミコロン区切り文字列に加えて、各要素が `x,y,w,h` の文字列 JSON 配列を受け付けます。それ以外の型は `argument 'ignore_region' must be a string or a JSON array of strings` のツール実行エラーになります。
 - 上記以外の string 型パラメータ（`image_path_a` / `image_path_b` / `image_a_base64` / `image_b_base64` / `figma_layout_path` / `web_layout_path` / `viewport_preset`）は、string 以外を渡すと空文字へ黙って落とさず `argument 'X' must be a string` のツール実行エラーになります。
 
 `number` / `boolean` も変換不能な値は同様にエラーで、それぞれ `argument 'X' must be a number`（`max_details` は整数のみなので `argument 'X' must be an integer`）、`argument 'X' must be a boolean` を返します。
 
-ツールの JSON Schema では `figma_layout` / `web_layout` / `ignore_nodes` / `ignore_region` をいずれも string 型として宣言しているため、引数をスキーマで検証する MCP クライアントでは配列・オブジェクトが拒否される場合があります。その場合は文字列で渡してください（`ignore_nodes` はカンマ区切り、`ignore_region` はセミコロン区切り、レイアウトは JSON 配列文字列）。サーバー側のハンドラは上記のとおり配列・ネイティブオブジェクトも受け付けます。
+ツールの JSON Schema では `figma_layout` / `web_layout` / `ignore_nodes` / `ignore_region` をいずれも string 型として宣言しているため、引数をスキーマで検証する MCP クライアントでは配列が拒否される場合があります。その場合は文字列で渡してください（`ignore_nodes` はカンマ区切り、`ignore_region` はセミコロン区切り、レイアウトは JSON 配列文字列）。サーバー側のハンドラは上記のとおり JSON 配列も受け付けますが、単一オブジェクトは拒否します。
 
 ### 入力データ
 
@@ -98,9 +98,9 @@ image A / B のいずれかが一様と検出された場合、status / match_ra
 | `image_path_b` | string | `perceptual` / `strict` | 比較対象画像 B（Web 側）のローカルファイルパス。`image_b_base64` と排他で、どちらか一方が必須。対応フォーマット: PNG / JPEG / GIF / WebP（静止画。アニメーション WebP は非対応）。 |
 | `image_a_base64` | string | `perceptual` / `strict` | 参照画像 A の base64 エンコード文字列。`data:image/png;base64,...` 形式の data URI も受け付け（`;base64,` までのプレフィックスは自動で除去）。改行・スペース等の ASCII 空白はデコード前に除去する（MIME 76 文字折り返しなど）。標準 base64 のみ（URL-safe は不可）。末尾のパディング (`=`) は省略可。`image_path_a` と排他。対応フォーマット: PNG / JPEG / GIF / WebP（静止画。アニメーション WebP は非対応）。 |
 | `image_b_base64` | string | `perceptual` / `strict` | 比較対象画像 B の base64 エンコード文字列。`data:image/png;base64,...` 形式の data URI も受け付け（`;base64,` までのプレフィックスは自動で除去）。改行・スペース等の ASCII 空白はデコード前に除去する（MIME 76 文字折り返しなど）。標準 base64 のみ（URL-safe は不可）。末尾のパディング (`=`) は省略可。`image_path_b` と排他。対応フォーマット: PNG / JPEG / GIF / WebP（静止画。アニメーション WebP は非対応）。 |
-| `figma_layout` | string / object[] / object | `layout_tree` | Figma ノードリストの JSON 文字列（インライン指定）。ノードの JSON 配列、または単一ノードの JSON オブジェクトをそのまま渡すこともできる（オブジェクトは 1 要素配列として扱う。オブジェクト文字列は専用エラー）。`figma_layout_path` と排他で、どちらか一方が必須。 |
+| `figma_layout` | string / object[] | `layout_tree` | Figma ノードリストの JSON 文字列（インライン指定）。ノードの JSON 配列をそのまま渡すこともできる。単一オブジェクト（ネイティブ / 文字列）は専用エラー。`figma_layout_path` と排他で、どちらか一方が必須。 |
 | `figma_layout_path` | string | `layout_tree` | Figma ノードリスト JSON ファイルのローカルパス。`figma_layout` と排他。 |
-| `web_layout` | string / object[] / object | `layout_tree` / `layout_integrity` | Web DOM ノードリストの JSON 文字列（インライン指定）。ノードの JSON 配列、または単一ノードの JSON オブジェクトをそのまま渡すこともできる（オブジェクトは 1 要素配列として扱う。オブジェクト文字列は専用エラー）。`web_layout_path` と排他で、どちらか一方が必須。 |
+| `web_layout` | string / object[] | `layout_tree` / `layout_integrity` | Web DOM ノードリストの JSON 文字列（インライン指定）。ノードの JSON 配列をそのまま渡すこともできる。単一オブジェクト（ネイティブ / 文字列）は専用エラー。`web_layout_path` と排他で、どちらか一方が必須。 |
 | `web_layout_path` | string | `layout_tree` / `layout_integrity` | Web DOM ノードリスト JSON ファイルのローカルパス。`web_layout` と排他。 |
 
 画像の幅・高さはそれぞれ最大 8192px。超過時は自動リサイズされずエラーになるため、比較前にリサイズまたは切り出しが必要。あわせてフルデコード前に各辺 30,000px / 総ピクセル 50,000,000 の上限も検査し、超過時は展開せずエラーになる。
@@ -169,7 +169,7 @@ DOM からの抽出手順（`getBoundingClientRect()` + `window.scrollX` / `wind
 ]
 ```
 
-`parent` を持つノードは「親の BoundingBox に対する相対的な位置・サイズ（比率 0–1）」で比較され、レスポンシブなスケール差が吸収されます。親を持たないノード（および幅・高さが 0 の親を持つノード、解決できない `parent`）は絶対座標のまま比較され、比較ペアの片側でも絶対座標なら両側を生ピクセルにそろえます。このとき `threshold`（0.0–1.0、既定 0.15）は比率ではなく **px 差分** に対して適用されます。実比較されたペアのうち絶対座標空間で比較された件数は応答の `absolute_mode_pairs` に入り、`details` にも 1 行注記されます。`parent` が空でないのに解決できない参照は `status` を変えず `unresolved_parent_refs`（例: `Figma: '999'` / `Web: '.foo'`）として応答されます（`unmatched_ignores` と同様の誤用検出）。
+`parent` を持つノードは「親の BoundingBox に対する相対的な位置・サイズ（比率 0–1）」で比較され、レスポンシブなスケール差が吸収されます。親を持たないノード（および幅・高さが 0 の親を持つノード、解決できない `parent`）は絶対座標のまま比較され、比較ペアの片側でも絶対座標なら両側を生ピクセルにそろえます。このとき `threshold`（0.0–1.0、既定 0.15）は比率ではなく **px 差分** に対して適用されます。実比較されたペアのうち絶対座標空間で比較された件数は応答の `absolute_mode_pairs` に入り、`details` にも 1 行注記されます。`parent` が空でないのに解決できない参照、および自己参照（`parent` がそのノード自身）は `status` を変えず `unresolved_parent_refs`（例: `Figma: '999'` / `Web: '.foo'`）として応答されます（`unmatched_ignores` と同様の誤用検出）。
 
 `id` / `name`（Figma）と `selector`（Web）は空文字を拒否します。`x` / `y` / `w` / `h` はキー欠落を拒否します（明示的な `0` は許可）。欠落や空識別子はツール実行エラーになり、メッセージにノードインデックスとフィールド名が含まれます（例: `Figma layout node at index 1 is missing required field 'w'`）。
 
@@ -225,7 +225,7 @@ DOM からの抽出手順（`getBoundingClientRect()` + `window.scrollX` / `wind
 | `mismatched_pairs_omitted` | number | 切り詰め時のみ | `mismatched_pairs` から省略した件数（`max_details` > 0 かつ実件数が上限超のとき）。 |
 | `matched_pairs` | object[] | 非空時のみ | 一致ペア。`figma_name` / `web_selector`（details の `Matched: '…' ↔ '…'` と同じ対応）。 |
 | `zero_geometry_warning` | string | 非空時のみ | 過半数ノードの `w`/`h` が 0 のときの誤用検出。 |
-| `unresolved_parent_refs` | string[] | 非空時のみ | 解決できない `parent` 参照。 |
+| `unresolved_parent_refs` | string[] | 非空時のみ | 解決できない、または自己参照の `parent`。 |
 
 ### `perceptual`
 
@@ -277,7 +277,7 @@ DOM からの抽出手順（`getBoundingClientRect()` + `window.scrollX` / `wind
 | `ignored_nodes` | string[] | 非空時のみ | 除外したノード（`web:<selector>`。件数は `ignored_count` と一致） |
 | `unmatched_ignores` | string[] | 非空時のみ | どのノードにも一致しなかった `ignore_nodes` エントリ |
 | `unmatched_ignore_regions` | string[] | 非空時のみ | どのノード中心とも重ならなかった `ignore_region` |
-| `unresolved_parent_refs` | string[] | 非空時のみ | 入力に無い `parent` 参照（例: `Web: '.foo'`）。`status` は変えない |
+| `unresolved_parent_refs` | string[] | 非空時のみ | 入力に無い、または自己参照の `parent`（例: `Web: '.foo'`）。`status` は変えない |
 | `parent_overflow_skipped_zero_geom` | number | 1 以上のとき | 親の `w`/`h` が 0 以下のため `parent_overflow` をスキップした子の件数 |
 | `skipped_zero_geometry` | number | 1 以上のとき | `w`/`h` ≤ 0 のため検査対象から外したノード数（`status` は変えない。少数除外時は `details` に 1 行注記） |
 | `zero_geometry_warning` | string | 非空時のみ | 過半数ノードの `w`/`h` が 0 のときの誤用検出（`status` / `issue_count` は変えない。`details` に `checked_nodes` と入力差の 1 行も付く） |

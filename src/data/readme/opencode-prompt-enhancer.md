@@ -1,13 +1,17 @@
 # OpenCode Prompt Enhancer
 
-A TUI plugin for OpenCode that offers `/enhance`. It rewrites a rough draft into a clearer, more specific prompt and presents the result in a `/btw`-style modal.
+A TUI plugin for OpenCode that offers `/enhance`. It rewrites a rough draft into a clearer, more specific prompt and presents the result in a scrollable modal.
+
+[Website](https://thinakaranmanokaran.github.io/opencode_prompt_enhancer/) · [Watch the tutorial](https://thinakaranmanokaran.github.io/opencode_prompt_enhancer/#tutorial) · [npm](https://www.npmjs.com/package/opencode-prompt-enhancer)
+
+![OpenCode Prompt Enhancer tutorial](https://raw.githubusercontent.com/thinakaranmanokaran/opencode_prompt_enhancer/main/website/public/media/tutorial-preview.gif)
 
 ## Requirements
 
 - OpenCode v2 (tested with v2.2.5).
-- No open session required. With a session open, `/enhance` uses it through the same generation path as `/btw`. From the home screen, it uses a temporary session with the selected model and removes that session immediately.
+- No open session required. With a session open, `/enhance` generates through that session, so its model, variant, and context are used. From the home screen, it uses a temporary session with the selected model and removes that session immediately.
 - A configured provider and model. By default the open session's model is used; from the home screen, the currently selected model is used. The `model` option is an explicit override.
-- If the current model is a free OpenCode model (for example `opencode/iceman-free`), `/enhance` shares the same free quota as `/btw`. It fails once with a clear error instead of retrying other models.
+- If the current model is a free OpenCode model (for example `opencode/iceman-free`), `/enhance` draws on the same shared free quota as any other request using that model. It fails once with a clear error instead of retrying other models.
 
 ## Install
 
@@ -20,7 +24,7 @@ Add the plugin to your global or project `opencode.jsonc`:
 }
 ```
 
-Pin a release with `"opencode-prompt-enhancer@0.1.1"`. OpenCode installs the package and loads its TUI part automatically. If the TUI connects to a remote server and you want this plugin to keep running locally, add it to `~/.config/opencode/cli.json` instead. Run `/reload` if the command does not appear.
+Pin a release with `"opencode-prompt-enhancer@1.0.4"`. OpenCode installs the package and loads its TUI part automatically. If the TUI connects to a remote server and you want this plugin to keep running locally, add it to `~/.config/opencode/cli.json` instead. Run `/reload` if the command does not appear.
 
 ## Usage
 
@@ -31,8 +35,8 @@ Pin a release with `"opencode-prompt-enhancer@0.1.1"`. OpenCode installs the pac
 
 - `/enhance <draft>` enhances the draft immediately.
 - `/enhance` opens the built-in prompt dialog.
-- With a session open, the request goes through `session.generate`, the same path `/btw` uses, so the session model and context are used. From the home screen, `/enhance` creates a temporary session with the selected model, generates the result, and removes the temporary session.
-- While enhancement runs, the prompt footer shows `/enhance`, mirroring `/btw`.
+- With a session open, the request goes through `session.generate`, so the session model and context are used. From the home screen, `/enhance` creates a temporary session with the selected model, generates the result, and removes the temporary session.
+- While enhancement runs, the prompt footer shows `/enhance`.
 - In the result modal:
   - `Enter` inserts the enhanced prompt into the current composer.
   - `Esc` restores the original `/enhance <draft>` text when it was supplied on the slash command.
@@ -154,7 +158,7 @@ If a custom template does not contain `{{draft}}`, the plugin appends the draft 
 
 ### Free-model usage limit
 
-Free OpenCode models (for example `opencode/iceman-free`, `crouton-alpha-free`, `beam-free`) share one free quota. Because `/enhance` uses the session generation path, it hits exactly the same limit as `/btw`.
+Free OpenCode models (for example `opencode/iceman-free`, `crouton-alpha-free`, `beam-free`) share one free quota. Because `/enhance` uses the session generation path, requests count against that same shared quota.
 
 - `/enhance` makes one attempt. It does not retry other free models or switch to a paid provider automatically. The error names the model that was tried and tells you to switch with `/models`.
 - To use a different model from the session one, set `model` explicitly:
@@ -174,6 +178,20 @@ Free OpenCode models (for example `opencode/iceman-free`, `crouton-alpha-free`, 
 - When the current model is a free model and its quota is exhausted, run `/models` and select a model you have a key for. Free models work in OpenCode (https://opencode.ai); subscribe to OpenCode Go to keep going: https://opencode.ai/go
 
 To verify this machine's free-quota state, load the plugin and run **Show prompt enhancer config** from the command palette — it prints the merged options and warnings. The server log `~/.local/share/opencode/log/opencode.log` records the failing request.
+
+## Website
+
+The site lives in [`website/`](website/). It is a React + Vite + Tailwind project with prerendered HTML, structured data, a full-screen autoplaying video on desktop, an image + text home panel on mobile, and separate Install and About pages.
+
+```bash
+cd website
+npm install
+npm run dev
+npm run build
+npm run preview
+```
+
+The site deploys to GitHub Pages at <https://thinakaranmanokaran.github.io/opencode_prompt_enhancer/>. The website is self-contained: source media lives in `website/` (gitignored), and `npm run media` generates the optimized public assets in `website/public/media/`. The 155 MB source GIF is never shipped. For a custom domain, build with `BASE_PATH=/ npm run build` and update the URLs in `website/src/data/details.json`.
 
 ## Development
 
@@ -201,6 +219,10 @@ npm test
 npm pack --dry-run
 npm publish --access public
 ```
+
+## Author
+
+Built by [Thinakaran Manokaran](https://thinakaran.dev) · [GitHub](https://github.com/thinakaranmanokaran)
 
 ## License
 

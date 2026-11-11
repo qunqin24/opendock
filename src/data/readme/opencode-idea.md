@@ -466,8 +466,32 @@ Deployment 面板。两边不再是"IDE 为数据源",而是同一份配置的�
 
 | 工具 | 作用 |
 | --- | --- |
-| `remote_exec` | 在远程服务器上跑一条命令。参数 `server` / `command` / `workingDirectory?`,返回 `[服务器名] exitCode N` 加输出 |
+| `remote_exec` | 在远程服务器上跑一条命令。参数 `server` / `command` / `workingDirectory?` / `runID?`,返回 `[服务器名] exitCode N` 加输出 |
 | `remote_list_servers` | 列出全部可用服务器,带 `[IDE]` / `[项目]` / `[全局]` 来源标记。名字不确定时先调它 |
+
+### 长命令:15s 后转后台,用 `runID` 续等
+
+命令在 **15s** 内没结束时不杀进程,也不继续阻塞,而是返回 `runID` 和 `stillRunning`。模型接着看结果
+**直接再调 `remote_exec` 并传 `runID`** —— 不需要 sleep,也不需要重跑原命令。
+
+退避在**服务端**:第 1 次续查最多等 2s、第 2 次 4s、之后每次 8s;命令一结束就立刻返回,不等满。
+这样模型的使用姿势完全不变(还是"调一次、拿一段结果"),而长任务不会把工具调用挂死。
+
+每次返回的是**队列里排队的输出**:第一次是已产生的全部,之后是上次之后的新增 —— 取走即清空,
+不重复也不丢。单次最多 2000 行 / 256KB,超出保留头 200 行 + 尾部并标注截断。
+
+**结束是一条硬边界**:结束的返回以「命令已结束,exitCode N」开头;这个结果交出去之后,同一个 `runID`
+再传过来会被**直接拒绝**(「已经结束,结果也返回过了」),不会再回一遍 `exitCode`。原因是模型分不清
+"新结果"和"旧结果又给了一遍"—— 只靠提示词说"别查了"不够,接口层必须让它查不到。
+
+输出在进入队列前已经过终端化处理:
+
+- **UTF-8** 用 `StringDecoder` 续着解 —— `chunk.toString()` 会把跨 chunk 的多字节字符打成 U+FFFD
+- **ANSI** 颜色 / 光标控制被剥离,跨 chunk 的半截序列挂起到下一块
+- **`\r`** 按终端语义覆盖当前行,进度条只留最后状态
+
+注意:命令走的是 pipe 而不是 pty,所以程序自己检测 `isatty()` 时不会输出颜色 —— 这和 `ssh host cmd`
+一致,和 IDE 的 Run 窗口(pty)不同。
 
 认证方式三种都支持:`PASSWORD`(密码)、`KEY_PAIR`(私钥 + 可选口令)、`OPEN_SSH`(ssh-agent /
 `~/.ssh/config`,靠 `SSH_AUTH_SOCK`)。
@@ -648,9 +672,11 @@ export { default } from "/Users/yutao/IdeaProjects/opencode-idea/src/index.js";
       "options": {
         "injectGuidance": true, // 是否注入「工具使用规则」引导
         "openInIde": true, // 是否允许自动拉起 IDE;false 只连已运行的端点
-        "launchCooldownMs": 120000, // 启动保护冷却
+        "launchCooldownsMs": [15000, 60000, 180000, 300000], // 拉起冷却:每次失败后递增
         "launchMaxAttempts": 5,
-        "mcpProbeTimeoutMs": 1000, // 单次「这个 IDE 里打开着这个项目吗」探测的超时
+        "mcpProbeTimeoutMs": 8000, // 一次「这个项目此刻被 IDE 服务着吗」探测的总预算(含内部重试)
+        "probeAttemptTimeoutMs": 5000, // 单次尝试里 get_project_env 的等待上限,必须小于总预算
+        "mcpStartTimeoutMs": 60000, // 拉起 IDE 之后等它就绪的上限
         "executionTimeoutMs": 600000, // 单次 IDE 工具调用硬上限;默认 10 分钟(OpenCode 默认 12 小时)
         "feedback": "message", // "message"(默认,会话通知,AI 只回"收到")| false(静默)
       },
@@ -661,15 +687,18 @@ export { default } from "/Users/yutao/IdeaProjects/opencode-idea/src/index.js";
 
 不传 options 时全部使用下表默认值。
 
-| 选项                 | 类型         | 默认     | 说明                                                                                           |                                                                  |
-| -------------------- | ------------ | -------- | ---------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| `injectGuidance`     | `boolean`    | `true`   | 是否注入「工具使用规则」引导(IDE 段只在 IDE 可用时出现)                                      |                                                                  |
-| `openInIde`          | `boolean`    | `true`   | 是否允许自动拉起 IDE;`false` 时仍会连接**已经运行**的端点                                  |                                                                  |
-| `launchCooldownMs`   | `number`     | `120000` | 启动保护冷却:冷却期内不重复 spawn                                                              |                                                                  |
-| `launchMaxAttempts`  | `number`     | `5`      | 单次会话内最多 spawn 次数,超出后停止重试                                                       |                                                                  |
-| `mcpProbeTimeoutMs`  | `number`     | `1000`   | 单个 MCP 端口的短探测超时                                                                      |                                                                  |
-| `executionTimeoutMs` | `number`     | `600000` | 单次 IDE 工具调用的硬上限(毫秒);防止端点卡住后无限等待(OpenCode 默认 12 小时)                  |                                                                  |
-| `feedback`           | `"message" \ | false`   | `"message"`                                                                                    | 结果反馈:`message` 会话通知(用户可见,AI 只回"收到");`false` 静默 |
+| 选项                     | 类型        | 默认                                | 说明                                                                                      |
+| ------------------------ | ----------- | ----------------------------------- | ----------------------------------------------------------------------------------------- |
+| `injectGuidance`         | `boolean`   | `true`                              | 是否注入「工具使用规则」引导(IDE 段只在 IDE 可用时出现)                                   |
+| `openInIde`              | `boolean`   | `true`                              | 是否允许自动拉起 IDE;`false` 时仍会连接**已经运行**的端点                                 |
+| `launchCooldownsMs`      | `number[]`  | `[15000, 60000, 180000, 300000]`    | 拉起冷却:第 N 次拉起后要等多久;末尾值一直沿用                                             |
+| `launchMaxAttempts`      | `number`    | `5`                                 | 单次会话内最多 spawn 次数,超出后停止重试                                                  |
+| `mcpProbeTimeoutMs`      | `number`    | `8000`                              | 一次探测的**总预算**:探测会在其中按退避重试,而不是撞一次墙就放弃                          |
+| `probeAttemptTimeoutMs`  | `number`    | `5000`                              | 单次尝试里 `get_project_env` 的等待上限;必须小于总预算,否则重试永远不会发生               |
+| `probeRetryBackoffsMs`   | `number[]`  | `[500, 1000, 2000]`                 | 一次探测内部重试的退避(只对「连上了但没答完」生效)                                        |
+| `mcpStartTimeoutMs`      | `number`    | `60000`                             | `open -a` 之后等 MCP 服务就绪的上限                                                       |
+| `executionTimeoutMs`     | `number`    | `600000`                            | 单次 IDE 工具调用的硬上限(毫秒);防止端点卡住后无限等待(OpenCode 默认 12 小时)             |
+| `feedback`               | `"message" \| false` | `"message"`                | 结果反馈:`message` 会话通知(用户可见,AI 只回"收到");`false` 静默                         |
 
 ## 行为
 
@@ -683,7 +712,13 @@ export { default } from "/Users/yutao/IdeaProjects/opencode-idea/src/index.js";
   MCP 工具错误的 message 就是工具自己的输出,认通用串会把正常业务失败误判成掉线并重建。
   业务错误(`File not found` 等)、非 IDE 工具、未配置的项目都不动作。
 - 恢复是**每个 Location(项目)各一份**;没有任何定时器,插件在不使用时完全静止。
-  启动保护(`launchCooldownMs` / `launchMaxAttempts`)限制重复拉起 IDE。
+  一条消息也能触发拉起:`/open-in-ide` 写下的标记就是"这个项目要接 IDE"的授权,所以已标记的项目在
+  「端点不在」或「IDE 里没打开这个项目」时,插件会在后台执行 `open -a <项目>`(不阻塞这条消息),
+  不希望被打断就设 `openInIde: false`。
+  拉起冷却(`launchCooldownsMs` / `launchMaxAttempts`)与失败退避共同限制重复尝试:一次探测失败后,
+  下一条消息不会立刻再撞同一个端点,而是按 `5s → 15s → 60s → 120s` 递增;连续失败 3 次后不再自动拉起,
+  改为在提示词里让模型明确告诉你「IDE MCP 已断开,执行 /open-in-ide」。探测、拉起、放弃都会打一行
+  `[opencode-idea]` 日志。
 
 ## 限制
 

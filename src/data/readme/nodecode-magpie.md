@@ -46,10 +46,12 @@ chooses one of two bridges:
   `(write-file …)` and `(look "shot.png")` execute locally; client tools are
   carried as `(magpie-tool "name" "json")` and turned back into normal OpenAI
   `tool_calls`. A client that declares no tools at all still gets this image,
-  so the free lane is an agent rather than plain chat.
-- **`tool_choice: "none"`, or a `max_tokens` too small to render a tool call
-  (below 256)** — collapse the multi-turn transcript into one `system` + one
-  `user` message and use a JSON tool-call protocol.
+  so the free lane is an agent rather than plain chat. A client that sets
+  `tool_choice: "none"` gets the image too, but its client tools are refused
+  inside the loop and the model has to answer in text.
+- **A `max_tokens` too small to render a tool call (below 256)** — collapse the
+  multi-turn transcript into one `system` + one `user` message and use a JSON
+  tool-call protocol.
 
 The paid provider never rewrites the body.
 
@@ -64,7 +66,7 @@ magpie plugins add /abs/path/to/nodecode-magpie
 From npm (published package):
 
 ```sh
-magpie plugins add npm:nodecode-magpie@0.6.2
+magpie plugins add npm:nodecode-magpie@0.6.4
 ```
 
 If the configured npm mirror has not caught up yet, point Bun at the official
@@ -72,13 +74,13 @@ registry for this one command:
 
 ```sh
 NPM_CONFIG_REGISTRY=https://registry.npmjs.org \
-  magpie plugins add npm:nodecode-magpie@0.6.2
+  magpie plugins add npm:nodecode-magpie@0.6.4
 ```
 
 From a git tag:
 
 ```sh
-magpie plugins add github:ChasLui/nodecode-magpie#v0.6.2
+magpie plugins add github:ChasLui/nodecode-magpie#v0.6.4
 ```
 
 `magpie plugins add` restarts the plugin host. Local-path plugins are loaded in place,
@@ -217,6 +219,11 @@ definition heads (`defun`, `defvar`, `defparameter`, `defconstant`, `defmacro`,
 so shell commands and other side effects never run twice. Values and `*` / `/`
 history are still per-image.
 
+An image is closed after 10 idle minutes (one per workspace/session/subagent),
+so a long-lived host or many subagents do not accumulate Lisp processes. Set
+`NODECODE_MAGPIE_IDLE_MS` to change the TTL (`0` disables eviction); an image
+with a running eval is never swept, and definitions replay on the next call.
+
 A background eval that finishes after its yield window appends its exit to a
 per-session log (`~/.nodecode-magpie/history/evals/<hash>.log`), and a rebuilt
 image reads it with `(magpie-eval-log)`. The log is bounded (past 128 KiB only
@@ -283,10 +290,10 @@ images per request, 5 MiB each; a failed description becomes
 `[image unavailable: …]` and the request still proceeds. Paid requests keep
 their native image parts unchanged.
 
-## Free lane: transcript bridge (`tool_choice: "none"` or a tiny `max_tokens`)
+## Free lane: transcript bridge (a tiny `max_tokens`)
 
-A pure-chat free request—one that sets `tool_choice: "none"` or a reply budget
-too small to render a tool call (< 256 tokens)—stays out of the eval image.
+A free request with a reply budget too small to render a tool call (< 256
+tokens) stays out of the eval image.
 The free gate then accepts only one final user message (at most one system
 message), while Magpie normally sends a long transcript with assistant/tool
 messages, which the vendor rejects with 403 `free_needs_nodecode` pointing at
@@ -304,10 +311,12 @@ the `tools` check. `lib/free-bridge.mjs` therefore:
    native `tool_calls`, and for streaming clients synthesizes an OpenAI SSE
    stream from the non-streamed upstream response.
 
-`tool_choice: "none"` is treated as a pure-chat request; tools are removed and
-the model is not asked to call them. The same holds for a `max_tokens` below
-256, where an eval call could not be rendered reliably. If such a client still
-sends a multi-turn request, only the transcript collapse is applied.
+`tool_choice: "none"` no longer forces this bridge: the free lane still runs the
+eval image, and a client tool the model asks for is answered with a tool error
+(`disabled by tool_choice:"none"`), so the reply is plain text with no
+`tool_calls`. A `max_tokens` below 256 still uses this bridge, where an eval
+call could not be rendered reliably. If such a client sends a multi-turn
+request, only the transcript collapse is applied.
 
 Known limits of the transcript bridge: the model must follow the JSON protocol;
 malformed or unknown tool names fall back to plain text; synthetic tool-call ids

@@ -49,7 +49,7 @@ The 6 commands you type day to day:
 | Command | What it does | When |
 |---|---|---|
 | `/prd` | Challenge → clarify → break down; writes the PRD + AGENTS.md, you read and approve once, then it auto-runs plan → exec → doc-update | New requirement, or changing how a merged feature behaves |
-| `/prototype` | Read the project-root DESIGN.md first (draft one if missing), draw the whole page around the change to match the project, build an HTML prototype in the shared blueprint shell and iterate until you approve it; `/prd` and `/revise` call it for UI changes | You want to see a design first, without the full requirement flow |
+| `/prototype` | Read the project-root DESIGN.md first (draft one if missing), draw the whole page around the change to match the project, dispatch the prototype subagent to build an HTML prototype in the shared blueprint shell (the main conversation only dispatches and relays), show a drawn "design spec" page for your approval whenever DESIGN.md is created or changed, and iterate until you approve it; `/prd` and `/revise` call it for UI changes | You want to see a design first, without the full requirement flow |
 | `/revise` | Diagnose by root cause → targeted fix → regression check, then auto-runs doc-update | A bug, or results that don't match expectations |
 | `/git-push` | pre-review self-check + push + open PR | Ready to open a PR |
 | `/exec` | Resume the plan from where it stopped | After an interruption or `/clear` |
@@ -106,6 +106,7 @@ First-time setup: `/git-clone` (pull a remote project locally + write `.bb-spec.
   - *Test* agent reads PRD constraints only, writes failing tests (Red)
   - *Impl* agent **never sees the PRD**, only the tests + function list, so it can't quietly "teach to intent"; new tech capped by the plan's approved new-tech table
   - *Review* agent checks against the PRD acceptance criteria and AGENTS.md plus a robustness/security pass, read-only
+  - Each problem *Review* reports comes with the same problem elsewhere in the repo; confirmed ones are fixed in the same round, and the test gaps it points out are filled in the same round
   - Progress written to `PROGRESS.md` after every step — **token-exhausted runs resume losslessly**
   - If the plan turns out to be wrong mid-implementation, it stops and lets you pick: change the code / change this PRD / pause; small changes are made in place, big ones go back to `/prd` for re-approval
   - When everything is done, auto-runs `/doc-update` in tail mode so this PRD and docs like README mirror what was actually delivered
@@ -126,6 +127,8 @@ First-time setup: `/git-clone` (pull a remote project locally + write `.bb-spec.
   - First reads the code to confirm current behavior and traces back to the relevant PRD via `git log -L`, then classifies the deviation's **root cause** into one of three: *PRD defect*, *impl drift*, *requirement change*
   - When the requirement changed (*PRD defect*, *requirement change*): only this branch's PRD is edited, with an entry in its decision log; if the PRD is merged or there is none, it stops and hands off to `/prd` for a new PRD
   - Bugs, security and robustness issues (*impl drift*) are fixed here even when the PRD is merged; the reason and the trade-offs (what was chosen, what was rejected, and why) go into the commit body
+  - Once the root cause is found, searches for every other place the same root cause affects (callers and copies of the same mistake), lists them, and fixes them in the same round as the one you reported; stops to ask only when one of them needs your call
+  - Unrelated problems noticed along the way are recorded, not touched: `/exec` and `/revise` at wrap-up and `/git-push` before pushing each put them in one list and ask once; the ones you pick are fixed on the current branch and land in the same PR
   - Every review finding that needs fixing funnels through here
   - Auto-runs `/doc-update` in tail mode after the fix
 
@@ -143,8 +146,8 @@ First-time setup: `/git-clone` (pull a remote project locally + write `.bb-spec.
 
 **Ships with**
 
-- **5 orchestration subagents** driven by the stages above: `test-engineer` / `impl-engineer` / `prd-reviewer` / `webview-test-runner` / `pre-reviewer`
-- **3 passive hooks** (automatic): block main commit, dependency version self-check, wait for background scripts to finish
+- **8 orchestration subagents** driven by the stages above: `test-engineer` / `impl-engineer` / `prd-reviewer` / `webview-test-runner` / `pre-reviewer` / `prototype-designer` / `code-investigator` / `script-runner`
+- **3 passive hooks** (automatic): block main commit, dependency version self-check, no polling for background scripts
 
 ---
 
@@ -192,7 +195,7 @@ Then install whichever layers you want:
 | Sub-plugin | What it gives you | Command |
 |---|---|---|
 | **bb-spec-core** _(recommended base)_ | TDD / version-policy / git-workflow discipline + 3 passive hooks | `/plugin install bb-spec-core@0xbb2b` |
-| **bb-spec-workflow** _(core)_ | prd → plan → exec → doc-update → revise → git-push (+ opt test-webview / test-api e2e), git-clone one-shot init + 5 subagents | `/plugin install bb-spec-workflow@0xbb2b` |
+| **bb-spec-workflow** _(core)_ | prd → plan → exec → doc-update → revise → git-push (+ opt test-webview / test-api e2e), git-clone one-shot init + 8 subagents | `/plugin install bb-spec-workflow@0xbb2b` |
 | **bb-spec-backend** | Go / REST API / DB / authN / authZ / observability / service / config constraints | `/plugin install bb-spec-backend@0xbb2b` |
 | **bb-spec-frontend** | Vue 3 + TS + Vite + Tailwind + bun stack & engineering conventions | `/plugin install bb-spec-frontend@0xbb2b` |
 
@@ -253,7 +256,7 @@ Each hook ships with the sub-plugin that owns its concern — install that plugi
 |---|---|---|---|
 | `git-workflow-guard` | bb-spec-core | PreToolUse(Bash) | Blocks `git commit` on `main` / `master`; for other git flow actions (branch / push / worktree / merge / PR) allows them through and injects the git-workflow discipline plus live git status |
 | `dep-version-check` | bb-spec-core | PostToolUse(Write\|Edit) | After editing a dependency file, injects a "check the official latest version first" reminder, plus a reminder to revert any unapproved new tech and list it for approval first |
-| `background-script-wait` | bb-spec-core | Stop | When a running background command not yet flagged in this session is found, prompts once: Claude uses a foreground loop to wait for scripts that will finish, and does not wait for long-running services |
+| `background-script-wait` | bb-spec-core | Stop | When a running background command not yet flagged in this session is found, prompts once: Claude does not loop-wait and ends its turn directly, after which such scripts go to the script-runner subagent, and long-running services are not waited for |
 ---
 
 ## 🧪 Tests
@@ -291,7 +294,7 @@ Reference template: [`.bb-spec.template.yaml`](./.bb-spec.template.yaml).
 | Scenario | Switch |
 |---|---|
 | Temporarily allow main commit | Disable `bb-spec-core` temporarily |
-| Skip the background-script wait prompt | Disable `bb-spec-core` temporarily |
+| Skip the background-script prompt | Disable `bb-spec-core` temporarily |
 
 ---
 

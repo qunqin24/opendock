@@ -2,6 +2,42 @@
 
 OpenCode TUI 的「对话滚动模式」插件：一键切换编辑 / 滚动两种状态，滚动时支持 vim 键位、消息搜索与 visual 选区复制。
 
+## 安装
+
+### npm（推荐）
+
+```sh
+opencode plugin add opencode-scroll-mode
+```
+
+`opencode plugin add` 会从 npm 安装并写入全局 `opencode.json(c)` 的 `plugins`。也可以锁定版本：
+
+```sh
+opencode plugin add opencode-scroll-mode@0.3.3
+```
+
+升级 / 移除：
+
+```sh
+opencode plugin update opencode-scroll-mode
+opencode plugin remove opencode-scroll-mode
+```
+
+### 手动配置
+
+在 `opencode.json(c)` 的 `plugins` 中加入包名，OpenCode 会在启动时自动安装缺失的 npm 包：
+
+```jsonc
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugins": ["opencode-scroll-mode"]
+}
+```
+
+> 本插件同时包含 server 与 TUI 入口，因此配置在 `opencode.json(c)`；只含 TUI 的插件才放在 `cli.json`。
+>
+> 如果不使用 npm 包，也可以把插件目录放在自动加载路径（如 `~/.config/opencode/plugins/scroll-mode/`），无需再写进 `plugins`。
+
 ## 功能
 
 - `ctrl+[`（默认，可用 `toggleKey` 配置）在「编辑模式」与「滚动模式」之间切换。
@@ -80,13 +116,13 @@ yank 后写入系统剪贴板：优先 **OSC52**（iTerm2 需在设置里允许�
 
 ## 配置
 
-放在自动加载目录（如 `~/.config/opencode/plugins/scroll-mode/`）即生效。若需传参数，在 `opencode.json` 的 `plugins` 中显式列出：
+传参数时使用 `plugins` 的对象形式；`package` 可以是 npm 包名，也可以是本地插件目录（本地目录若已在自动加载路径中，则二选一，避免重复加载）：
 
 ```jsonc
 {
   "plugins": [
     {
-      "package": "./plugins-src/scroll-mode",
+      "package": "opencode-scroll-mode",
       "options": {
         "vim": true,
         "search": true,
@@ -119,8 +155,6 @@ yank 后写入系统剪贴板：优先 **OSC52**（iTerm2 需在设置里允许�
 > - 原默认 `ctrl+q` 在很多终端里是 **XON 流控键**（`ctrl+s` 是 XOFF），即使没有插件冲突也可能被终端吞掉，所以不再用它。
 > - `ctrl+[` 在多数终端里和 `Esc` 发送同一个字节（`0x1b`）：只有终端开启 **kitty keyboard 协议**（kitty / WezTerm / Ghostty / 新版 iTerm2）时才能被识别成独立的 `Ctrl+[`；跑在 Neovim `:terminal` / sidekick.nvim 里时它就是纯 `Esc`，不会触发切换。
 > - 如果在你的环境里 `ctrl+[` 没反应，改用 `"toggleKey": "f9"`（nvim / 终端都不拦截）最稳。
-
-> 提示：同一目录若既位于自动加载的 `plugins/` 下、又在 `plugins` 中显式列出，可能被加载两次。二选一。
 
 ## 结构
 

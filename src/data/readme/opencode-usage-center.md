@@ -119,6 +119,8 @@ preview/              本地渲染预览（不发布）
 
 ## 发布
 
+> 本地 `npm publish` 已被 `prepublishOnly` 守卫禁止；版本只通过推送 `v*` tag 由 GitHub Actions 发布（`npm version patch && git push --follow-tags`）。
+
 第一次发布（npm 目前没有这个包）：
 
 ```bash

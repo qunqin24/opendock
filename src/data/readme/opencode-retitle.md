@@ -13,8 +13,8 @@ retitling pauses for that session until you re-enable it.
 
 ## Screenshot
 
-`/retitle-status` reports the state of the current session as a toast, without
-making a model call:
+`/retitle-status` reports the state of the current session as a toast in the TUI
+(and a session notice in every client), without making a model call:
 
 ![The /retitle-status toast in the OpenCode TUI](docs/retitle-status.png)
 
@@ -38,6 +38,7 @@ Add it to `opencode.json(c)` and pass settings under `options`:
         "model": null,                 // "providerID/modelID"; null = the session's model
         "titleMaxLength": 60,
         "minPromptLength": 10,         // skip when there is too little transcript text
+        "commandSurface": "auto",      // "auto" (any client), "tui", or "server"
         "debug": false                 // log decisions to the OpenCode log
       }
     }
@@ -60,10 +61,24 @@ before the plugin runs, with the project overriding the global.
   defaults. Makes no model call. See the [screenshot](#screenshot).
 - `/retitle-enable` — clear the manual-rename pause for this session and retitle
   now. Use this when you renamed a session by hand and want automatic retitling
-  back. If no title can be generated, the toast reports the reason (for example,
+  back. If no title can be generated, the result reports the reason (for example,
   not enough transcript text or a subagent session).
 
-Both are TUI slash commands that show their result as a toast.
+Both commands make no model call unless `/retitle-enable` actually generates a
+title.
+
+By default (`commandSurface: "auto"`) the commands are registered on the OpenCode
+server, so every client can list and run them, including OpenChamber. Their
+result is posted as a session notice: a one-line label in the transcript with the
+full report in the body. The TUI also turns that notice into a toast, so terminal
+users keep the same feedback. No extra configuration is needed.
+
+The other values are escape hatches:
+
+- `"tui"` registers the commands in the terminal UI only and reports over RPC.
+  Clients that only know server commands, such as OpenChamber, cannot see them.
+- `"server"` registers only the server commands; the TUI shows the notice
+  without a toast.
 
 ## How manual renames are detected
 

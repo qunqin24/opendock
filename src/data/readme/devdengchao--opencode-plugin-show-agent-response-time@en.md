@@ -36,6 +36,7 @@ The tooltip shows when the turn **completed**, matching the end of the displayed
 ## Features
 
 - **Hover to inspect**: rest the pointer on the response duration to see the exact date, time zone and seconds
+- **Hover the response text**: rest the pointer on a paragraph, heading, list item, quote or code block to see the time near the pointer
 - **Native appearance**: reuses OpenCode's compact tooltip styling and follows light/dark themes
 - **Locale-aware**: uses `Intl.DateTimeFormat` with the current interface locale, exactly like user message timestamps
 - **Turn-accurate**: reads the latest assistant `time.completed` for that turn from the current session
@@ -49,7 +50,7 @@ The tooltip shows when the turn **completed**, matching the end of the displayed
 
 - OpenCode Desktop **2.2.x** (developed and verified on 2.2.1)
 - No extra Node.js installation is needed when installing from npm
-- Node.js **20.19+** and npm when building from source
+- Node.js **22.22.2+** (at least **24.15.0** for 24.x) and npm when building from source
 - OpenCode Desktop on Windows, macOS or Linux
 
 ### Install from npm (recommended)
@@ -76,7 +77,7 @@ To pin a version:
 
 ```jsonc
 "plugins": [
-  "@devdengchao/opencode-plugin-show-agent-response-time@0.1.0"
+  "@devdengchao/opencode-plugin-show-agent-response-time@0.1.2"
 ]
 ```
 
@@ -138,8 +139,8 @@ Logs are prefixed with `[agent-response-time]`.
 
 1. Open a session with a completed agent response.
 2. Hover the response; its footer shows `Build · model · duration`.
-3. Rest the pointer on the duration (for example `4m 46s`).
-4. After about 800ms, the exact completion timestamp appears.
+3. Rest the pointer on the duration (for example `4m 46s`), or on any paragraph, heading, list item, quote or code block in the response.
+4. After about 800ms, the exact completion timestamp appears; over response text it appears near the pointer.
 5. The format matches the tooltip shown when hovering a user message timestamp.
 
 No tooltip appears while a response is still streaming, when an interrupted response has no completion time, or before the message data has loaded.

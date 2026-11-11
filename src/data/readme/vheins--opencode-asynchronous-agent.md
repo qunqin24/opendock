@@ -28,7 +28,13 @@ optional environment variables, so the defaults just work.
 - [Configuration](#configuration)
   - [Examples](#examples)
 - [Subagent status tool (opt-in)](#subagent-status-tool-opt-in)
+  - [Liveness is measured by progress, not by activity](#liveness-is-measured-by-progress-not-by-activity)
+  - [A running tool call is proof of life](#a-running-tool-call-is-proof-of-life)
 - [Subagent control tools (opt-in, V1 only)](#subagent-control-tools-opt-in-v1-only)
+  - [One source of truth](#one-source-of-truth)
+  - [What a child list tells you](#what-a-child-list-tells-you)
+  - [subagent_send checks liveness first](#subagent_send-checks-liveness-first)
+  - [Following a long-running child](#following-a-long-running-child)
   - [Parent-agent filter on V1](#parent-agent-filter-on-v1)
 - [Subagent progress reports (V1 only, on by default)](#subagent-progress-reports-v1-only-on-by-default)
   - [Completion notices (V1 only, on by default)](#completion-notices-v1-only-on-by-default)
@@ -209,9 +215,20 @@ All configuration is optional and read from environment variables at setup time.
 | `OPENCODE_SUBAGENT_NOTIFY` | *(enabled)* | TUI monitor only. Set to `0`, `false`, `off`, or `no` to disable the toast shown when a background subagent finishes (`done`/`error`). |
 | `OPENCODE_SUBAGENT_TASK_PROGRESS` | *(off)* | TUI monitor only. Set to a truthy value (`1`, `true`, `on`, …) to show the "Task progress" card. Hidden unless explicitly enabled. |
 | `OPENCODE_SUBAGENT_STATUS` | *(off)* | Opt-in. Set to a truthy value (`1`, `true`, `on`, `yes`) to register the `subagent_status` server tool. Also enables the control tools. |
-| `OPENCODE_SUBAGENT_STALE_MS` | `120000` | Age (ms) after which a still-running child is reported as `stale`. |
-| `OPENCODE_SUBAGENT_CONTROL` | *(off)* | Opt-in. Set to a truthy value to register the four control tools (`subagent_children`, `subagent_result`, `subagent_cancel`, `subagent_send`). |
+| `OPENCODE_SUBAGENT_STALE_MS` | `120000` | Age (ms) without **progress** after which a still-running child is reported as `stale`. A warning only. |
+| `OPENCODE_SUBAGENT_DEAD_MS` | `600000` | Age (ms) without progress after which a child is reported as `dead` — actionable: cancel and re-dispatch. |
+| `OPENCODE_SUBAGENT_TOOL_GRACE_MS` | `1800000` | How long (ms) a single in-flight tool call keeps counting as proof of life. A child inside this window is never reported stale. |
+| `OPENCODE_SUBAGENT_DONE_RETENTION_MS` | `3600000` | How long a finished (`done`/`error`/`stale`/`dead`) record is kept before eviction. |
+| `OPENCODE_SUBAGENT_PENDING_TTL_MS` | `600000` | Lifetime (ms) of an armed completion notice before it is pruned, so the pending map cannot leak. |
+| `OPENCODE_SUBAGENT_CONTROL` | *(off)* | Opt-in. Set to a truthy value to register the five control tools (`subagent_children`, `subagent_result`, `subagent_cancel`, `subagent_send`, `subagent_watch`). |
 | `OPENCODE_SUBAGENT_RESULT_CHARS` | `20000` | Cap for the text `subagent_result` returns. |
+| `OPENCODE_SUBAGENT_WATCH_MAX_MS` | `30000` | Hard cap on `subagent_watch`'s `timeoutMs`, so it can never block the parent for long. |
+| `OPENCODE_SUBAGENT_NUDGE` | *(off)* | Opt-in. Set to a truthy value to automatically resume **orphaned** children (see [Orphan resume nudges](#orphan-resume-nudges-v1-only-opt-in)). |
+| `OPENCODE_SUBAGENT_NUDGE_AFTER_MS` | `300000` | Age (ms) without progress before a child becomes eligible for a resume nudge. |
+| `OPENCODE_SUBAGENT_NUDGE_MAX` | `2` | Maximum resume attempts per child before it is left `dead` and reported once. |
+| `OPENCODE_SUBAGENT_NUDGE_CHECK_MS` | `60000` | Spacing (ms) between nudge ticks. |
+| `OPENCODE_SUBAGENT_NUDGE_PROMPT` | *(built-in)* | Override the resume prompt text. |
+| `OPENCODE_SUBAGENT_NUDGE_DEBUG` | *(off)* | Set to `1` to log each nudge decision to stderr. |
 | `OPENCODE_SUBAGENT_PROGRESS` | *(chat)* | Progress-report mode (legacy). Truthy (`1`/`true`/`on`/`yes`) injects the report into the parent session as a text part; `0`/`false`/`no`/`off` shows a transient TUI toast instead (no model turn); unset/other values disable it. When unset, the default channel is `chat`. |
 | `OPENCODE_SUBAGENT_NOTIFICATION_TYPE` | `chat` | Progress channel: `toast` \| `chat` \| `inline` \| `both` \| `off`. Overrides `OPENCODE_SUBAGENT_PROGRESS`. |
 | `OPENCODE_SUBAGENT_PROGRESS_MS` | `300000` | Minimum interval (ms) between two progress reports for the same child. |
@@ -234,6 +251,7 @@ All configuration is optional and read from environment variables at setup time.
 | `OPENCODE_DB_CLEANUP_PART_BATCH` | `500` | Max `part` rows trimmed per cleanup run. |
 | `OPENCODE_DB_CLEANUP_VACUUM` | *(off)* | Set to `1` to `VACUUM` at shutdown after a run that deleted rows (reclaims file space; the DB ships with `auto_vacuum=0`). |
 | `OPENCODE_DB_CLEANUP_DEBUG` | *(off)* | Set to `1` to log cleanup decisions to stderr. |
+| `OPENCODE_DB` | *(auto)* | Explicit override for the `opencode.db` path. When unset the path is resolved from the OpenCode data directory. Also honoured by the TUI's database-size readout. |
 
 > **OpenCode V1 needs `OPENCODE_EXPERIMENTAL_BACKGROUND_SUBAGENTS=true`.** V1 gates
 > background subagents behind that flag (or the broader `OPENCODE_EXPERIMENTAL=true`).
@@ -282,24 +300,106 @@ OpenCode has no built-in way for an agent to poll the liveness of the background
 subagent sessions it spawned: the model is push-only, so the parent is notified
 only when a child finishes. Set `OPENCODE_SUBAGENT_STATUS=1` to register a
 `subagent_status` server tool that reports every tracked child as
-`running` / `done` / `error` / `stale`.
+`running` / `stale` / `dead` / `done` / `error`.
 
 ```sh
 export OPENCODE_SUBAGENT_STATUS=1
 ```
 
 The plugin subscribes to session events (`session.created`, `session.status`,
-`session.idle`, `session.error`, `session.deleted`, message updates) and keeps an
-in-memory registry keyed by child session id. A child still marked `running`
-whose last event is older than `OPENCODE_SUBAGENT_STALE_MS` (default `120000`)
-is reported as `stale`.
+`session.idle`, `session.error`, `session.deleted`, message updates, and
+`todo.updated`) and keeps an in-memory registry keyed by child session id.
 
-The tool accepts two optional filters, `parent` (parent session id) and `status`,
-and returns a structured report: per-subagent `sessionID`, `title`, `agent`,
-`parentID`, `status`, `elapsedMs`, `sinceLastEventMs`, and `stale`, plus aggregate
-counts and the active stale threshold. When the registry is still empty it makes a
-best-effort hydration call to `client.session.list()`; if that SDK method is
-unavailable it reports from events only and never fails.
+### Liveness is measured by progress, not by activity
+
+A child is not "alive" merely because *something* happened to its session. The
+registry keeps two clocks:
+
+- **`lastProgressAt`** — advances only on evidence the child actually did work:
+  `message.updated`, `message.part.updated`, `todo.updated`, or a `busy` /
+  `retry` session status. This is the only clock staleness reads.
+- **`lastEventAt`** — advances on any event, and is kept for display only.
+
+That distinction is the whole point: a `session.updated` event (a title change, a
+parent touching the session) must not be able to make a wedged child look busy.
+
+### A running tool call is proof of life
+
+The progress clock alone is not enough. A subagent running `bash` — a build, a
+test suite, `bun install` — can legitimately sit for many minutes emitting **zero**
+session events. Judging it by message activity alone would report a perfectly
+healthy child as `stale`, and then `dead`.
+
+So the registry also tracks **in-flight tool calls**. When a `tool` part enters
+`running`/`pending` it is recorded with its real start time; `completed`/`error`
+clears it and counts as progress. While a tool call is in flight the child is
+`running`, regardless of how old `lastProgressAt` is — bounded by
+`OPENCODE_SUBAGENT_TOOL_GRACE_MS` (default 30 min), because a tool call wedged for
+longer than that is not plausible work.
+
+Each reported child therefore carries an `activity`:
+
+| `activity` | Meaning |
+| --- | --- |
+| `tool` | A tool call is executing right now; `activeTool` names it and how long it has run |
+| `streaming` | A message/text part advanced recently |
+| `idle` | No tool call, no recent output — this is the state that becomes `stale` |
+
+A child inside the tool grace window is described as
+`running tool "bash" for 7m — expected for a long build, not stale` rather than
+being handed a "consider cancelling" hint.
+
+Two derived states follow from the progress clock:
+
+| Status | Meaning | What to do |
+| --- | --- | --- |
+| `running` | Progress within `OPENCODE_SUBAGENT_STALE_MS` | Leave it alone |
+| `stale` | No progress for `OPENCODE_SUBAGENT_STALE_MS` (default 120 s) | Check `subagent_result`; it may be in a long tool call |
+| `dead` | No progress for `OPENCODE_SUBAGENT_DEAD_MS` (default 600 s) | Treat as gone: `subagent_cancel`, then re-dispatch |
+| `done` / `error` | Terminal | Read it with `subagent_result` |
+
+`stale` and `dead` are **derived**, never written into the record, so a child that
+starts working again (a `subagent_send` follow-up) returns to `running` cleanly.
+
+Two thresholds exist because one is not enough: a single 120 s rule produces
+false alarms on legitimate long work. A `bash` build or test run can take five
+minutes without emitting a single session event.
+
+On every report the registry reconciles against `client.session.status()`, which
+is the arbiter of liveness. A child the SDK reports as `busy` or `retry` is proof
+of life right now.
+
+**Absence from that map is not success.** The SDK's status map only carries the
+sessions with a live engine — typically `busy`/`retry`, occasionally `idle`. A
+child that is simply absent may have finished, or may have wedged, or may be an
+orphan left over from an OpenCode restart. Guessing "done" from absence is
+therefore wrong, and worse, it makes `dead` unobservable: a wedged child would
+read `running → done`, `subagent_result` would return an empty answer, and the
+`dead → subagent_cancel` remediation could never fire.
+
+So the plugin only concludes a child has **finished** on a *positive* signal:
+
+- the engine reports `idle` (`session.status` type `idle`, or a `session.idle`
+  event), or
+- a real final assistant answer exists in the session transcript.
+
+Otherwise the child's lifecycle stays `running` and the derived `stale`/`dead`
+tier speaks for it — which is the honest answer when we genuinely do not know
+whether it succeeded. A child derived `dead` that is absent from the status map
+is additionally confirmed **once** by reading its last message: a recorded
+`finish` reason or a terminal `error` resolves it to `done`/`error`, while a
+trailing unanswered user prompt keeps it `dead` (that is exactly the shape of a
+restart orphan). The confirmation is cached per child, so a repeated report never
+turns into a repeated `session.messages` call.
+
+The tool accepts optional `parent` (parent session id) and `status` filters, and
+returns a structured report: per-subagent `sessionID`, `title`, `slug`, `agent`,
+`parentID`, `status`, `activity`, `activeTool`, `elapsedMs`,
+`sinceLastProgressMs`, `sinceLastEventMs`, `stale`, and `dead`, plus aggregate
+counts and both thresholds. Each non-terminal child carries an actionable hint,
+so the model is told what to do instead of having to infer it. When the registry
+is still empty it makes a best-effort hydration call to `client.session.list()`;
+if that SDK method is unavailable it reports from events only and never fails.
 
 > **V1 only.** Custom tools and plugin event handlers are registered through the
 > V1 `server` entrypoint. The V2 plugin API cannot register either, so on a
@@ -314,19 +414,65 @@ unavailable it reports from events only and never fails.
 Background subagents are push-only: the parent is told when a child finishes, but
 it cannot list children, read a child's result on demand, cancel one, or steer a
 running one. Set `OPENCODE_SUBAGENT_CONTROL=1` (or `OPENCODE_SUBAGENT_STATUS=1`)
-to register four tools that close that gap on top of the public SDK:
+to register five tools that close that gap on top of the public SDK:
 
 | Tool | Purpose |
 | --- | --- |
 | `subagent_children` | List a parent session's child subagent sessions with their current status. |
-| `subagent_result` | Fetch a child's final assistant answer (plus terminal error and finish reason), truncated to `OPENCODE_SUBAGENT_RESULT_CHARS`. |
+| `subagent_result` | Fetch a child's answer — or, while it works, a live activity report or a transcript (`view`: `auto`/`result`/`activity`/`history`). |
 | `subagent_cancel` | Abort a running child (for example once a sibling already answered). |
 | `subagent_send` | Queue extra context into a child via the non-blocking async prompt endpoint. |
+| `subagent_watch` | Return as soon as a child's status *changes*, bounded by a hard timeout. |
 
 There is deliberately no `subagent_wait`. Blocking on a child defeats the
 asynchronous model: OpenCode already pushes a completion notice to the parent
 when a child finishes, and `subagent_children` / `subagent_result` cover
-on-demand status. A wait tool is just polling in disguise.
+on-demand status. `subagent_watch` is not a completion wait in disguise — it
+watches the in-memory registry for a *state change* and returns immediately when
+one happens, capped at `OPENCODE_SUBAGENT_WATCH_MAX_MS` (default 30 s), so the
+parent can never be parked indefinitely.
+
+### One source of truth
+
+The status registry is injected into the control suite, so `subagent_children`
+and `subagent_status` can no longer disagree about the same child — a bug that
+made the tools actively misleading. Each child row reports its `source`
+(`registry`, `sdk`, or `unknown`), and an untracked session is reported as
+`unknown` rather than being silently assumed idle.
+
+### What a child list tells you
+
+`subagent_children` is a triage view, not a dump of SDK fields. Rows are ordered
+running → stale → dead → error → done so live work is always first, and each
+child gets its identity plus what it costs:
+
+```
+3 children · 2 running · 1 done
+
+● ses_abc123ef  frontend · hidden-panda · "Build checkout UI"  running  4m12s
+    tool:bash 2m10s · todo 2/5 · 8 calls (1 err) · 12.3k/200k ctx 6% · last activity 4s ago
+◐ ses_ghi789jk  backend · quiet-otter  running  12m04s
+    idle · no progress 12m04s                              → subagent_cancel or subagent_result
+✓ ses_def456mn  tests · brave-heron  done  1m03s
+    todo 5/5 · 21 calls · 48.1k/200k ctx 24% · last activity 3m ago
+```
+
+All of this is accumulated **from events the plugin already ingests** — listing
+twenty children never costs twenty `session.messages` calls. Token usage takes
+the newest assistant message's values and is deliberately not summed across
+turns; context percent is shown only when the model's limit is actually known.
+
+`sessionID` is optional: omit it and the tool falls back to the registry, adding
+a `parent=` column. `status`, `limit` (default 20) and `verbose` narrow the view,
+and the full session id is always printed unshortened because it is the handle
+every follow-up call needs.
+
+### `subagent_send` checks liveness first
+
+Queuing a prompt into a child that has already finished or died used to succeed
+silently, and armed a completion notice that could never fire. The tool now
+refuses when the child is `done`, `error`, `stale`, or `dead`, naming the state
+and suggesting the fix. Pass `force: true` to override.
 
 `subagent_send` reads the child session's own `agent`, `model`, and model
 `variant` (reasoning effort) and passes them through with the prompt. OpenCode's
@@ -334,6 +480,31 @@ prompt endpoint falls back to the *default* agent (and its model) whenever they
 are omitted, which silently rewrites a child's identity (a `Frontend` child
 becomes the default `orchestrator` on the default model). Preserving them keeps
 the child on its original agent/model/variant across every follow-up message.
+
+### Following a long-running child
+
+`subagent_result` no longer only hunts for a final answer. It takes a `view`:
+
+| `view` | Returns |
+| --- | --- |
+| `auto` *(default)* | The final answer when the child is done; otherwise an **activity report** |
+| `result` | Force the final answer only (today's behaviour) |
+| `activity` | What the child is doing right now |
+| `history` | A compact chronological transcript |
+
+This matters because asking a still-working child for its result used to return
+`No assistant answer found (the subagent may still be running)` — a dead end. The
+SDK had already returned the child's whole message list; the plugin simply never
+read it for anything but the final answer. `auto` now answers the question the
+parent actually has: *what is this child doing?* — in-flight tool calls with
+elapsed time, the current `in_progress` todo, the latest assistant snippet,
+message and tool counts, and the last error.
+
+`subagent_result` also accepts `sinceMessageID` and returns a `nextCursor`, so
+following a child costs only the new output instead of re-reading the whole
+answer. While the child is still working it reports `streaming: true` and
+`partial: true`, so a partial answer is never mistaken for a final one, and
+`limit` caps the `history` view (default 20 messages).
 
 ```sh
 export OPENCODE_SUBAGENT_CONTROL=1
@@ -439,6 +610,78 @@ silenced or routed to `chat`/`toast`. Override with
 `OPENCODE_SUBAGENT_COMPLETION_NOTIFY` (`toast` | `chat` | `inline` | `both` |
 `off`).
 
+Because an injected notice costs the parent a **full model turn**, the notice is
+written as two dense lines rather than prose:
+
+```text
+⤷ witty-river · backend · done in 12m04s · 21 calls · 48.1k ctx · "Fix sort order and split tests"
+  → subagent_result sessionID=ses_e36c2afedffeG0bcjZWB9TK9Kp
+```
+
+- The **outcome** is stated explicitly (`done` | `error` | `stale` | `dead`), so
+  a failed child is never reported as "completed".
+- **Duration, tool-call count and context used** come from the status registry,
+  so the parent can judge cost without a second call.
+- The session id appears **once**, in copy-ready `sessionID=<id>` form.
+- Segments whose data is unknown are **omitted**, never filled with placeholders.
+- There is no instruction boilerplate: the previous wording repeated
+  "the subagent finished processing your queued message. Read its answer with
+  subagent_result." on every notice.
+- The `(@agent subagent)` suffix is stripped from the title, because the agent
+  already appears on the line.
+
+The injected part also carries structured metadata (`sessionID`, `slug`, `agent`,
+`outcome`, `elapsedMs`, `toolCalls`, `tokens`, `contextUsed`, `title`) so the
+model never has to parse prose. A repeat notice for the same child inside the
+de-duplication window is suppressed.
+
+---
+
+## Orphan resume nudges (V1 only, opt-in)
+
+When OpenCode restarts, in-memory state is lost and a child that was mid-turn
+becomes an **orphan**: its process is gone, no `session.idle` or `session.error`
+will ever arrive, and nothing will ever continue its work. Its history survives
+in SQLite, so `session.promptAsync` on that session starts a fresh turn on top of
+the preserved context — which effectively resumes it.
+
+This feature does that automatically, but only for genuine orphans:
+
+```sh
+export OPENCODE_SUBAGENT_NUDGE=1
+```
+
+A child is nudged only when **all** of these hold:
+
+1. it is a tracked child (has a parent session),
+2. the registry classifies it `stale` or `dead`,
+3. it has `activity: "idle"` — **no tool call is in flight**, so a long `bash`
+   build is never interrupted, and
+4. it is **absent** from `client.session.status()` — the running engine no longer
+   knows about the session.
+
+Condition 4 is what separates an orphan from a wedged-but-alive child. A child the
+SDK reports as `busy`/`retry` is genuinely working and is never touched; one it
+reports as `idle` merely lost its completion event, so it is simply marked done.
+If `session.status()` is unavailable the feature does nothing rather than nudging
+blindly.
+
+The nudge text asks the child to **continue**, not to report its status — asking a
+working agent what it is doing makes it stop working:
+
+```text
+Continue your task from where you left off. If you cannot proceed, state the blocker in one line and stop. Do not restate work already completed.
+```
+
+Attempts are bounded so a genuinely stuck child cannot be nudged forever: a
+maximum of `OPENCODE_SUBAGENT_NUDGE_MAX` tries (default 2) with exponential
+backoff (5 min, then 10 min) plus jitter, after which it is left `dead` and a
+single give-up notice is emitted. At most three children are nudged per tick, so
+a restart with twenty orphans does not fire twenty simultaneous model turns.
+
+The child's own agent, model and variant are preserved via `resolveTarget`, so a
+resume cannot silently switch it to the default agent.
+
 ---
 
 ## Database cleanup (V1, opt-out)
@@ -539,8 +782,17 @@ and is **V1 only** — the V2 plugin API exposes no event or database access.
 | `index.js` | Alternate directory entrypoint — mirrors `server.js`. |
 | `src/tui.tsx` | Source of the TUI sidebar plugin (InfoCard stack + per-subagent cards + async identity). |
 | `src/model.ts` | Sidebar data helpers: `activityDetail`, `sessionMetrics`, `sidebarActivity`. |
-| `src/subagent-status.js` | Opt-in `subagent_status` tool: in-memory child-session registry, staleness classification, event ingestion. |
-| `src/subagent-control.js` | Opt-in control tools: `subagent_children`/`result`/`cancel`/`send` over the public SDK. |
+| `src/subagent-status.js` | Opt-in `subagent_status` tool: in-memory child-session registry with a progress clock, two-tier staleness (`stale`/`dead`), SDK reconciliation, and event ingestion. |
+| `src/subagent-liveness.js` | Pure liveness math and report rendering: threshold readers, `classifyStatus`, `buildItem`, `summarizeStats`, `formatReport`. No I/O, so it is unit-testable without a runtime. |
+| `src/subagent-status-tool.js` | The `subagent_status` tool definition; calls the registry's `report()` and renders it. |
+| `src/subagent-rows.js` | Shared child-row projection (`sdkRow`/`registryRow`), SDK status mapping, aggregate counts, and the activity report. |
+| `src/subagent-children-tool.js` | The `subagent_children` triage list, built from registry or SDK rows. |
+| `src/subagent-result-tool.js` | The `subagent_result` tool with `view` (`auto`/`result`/`activity`/`history`) and the `sinceMessageID` read cursor. |
+| `src/subagent-summarize.js` | Transcript helpers: final-answer extraction, activity and history summaries, todo summarising, cursor slicing. |
+| `src/subagent-format.js` | Two-line child rendering, status glyphs, and duration/token formatters shared by every tool. |
+| `src/subagent-control.js` | Wires the opt-in control tools (`children`/`result`/`cancel`/`send`/`watch`) over the public SDK, sharing the status registry as a single source of truth. |
+| `src/subagent-completion.js` | Completion notices for finished children, with a pending-notice TTL so the map cannot leak. |
+| `src/subagent-utils.js` | Dependency-free shared helpers: `unwrap`, `sessionApi`, `resolveTarget`, and the opt-in env gates. |
 | `src/subagent-progress.js` | Opt-in progress reports: watches child `todo.updated` events and injects coalesced reports into the parent; injects a keep-todos-current instruction into child system prompts. |
 | `src/cleanup.js` | V1 database cleanup: write-time output/metadata capping, DB path resolution, stale-session event prune + old part trim, passive checkpoint inline + WAL truncate/VACUUM at shutdown. |
 | `src/subagent.ts` | Subagent detail fetch (`fetchSubagent`), summary (`subagentDetails`), duration (`elapsedLabel`). |

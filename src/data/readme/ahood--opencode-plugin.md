@@ -319,7 +319,7 @@ $ ahood group create "Design Team" --description "Shared skills for the design t
 Created group Design Team (design-team).
 
 $ ahood group invite-link design-team
-https://www.ahood.dev/groups/join?token=abc123...
+https://www.ahood.dev/workspace/groups/join?token=abc123...
 Expires: 2026-09-14T00:00:00.000Z
 This link (and its token) is shown only this once -- save it now, it cannot be retrieved again.
 

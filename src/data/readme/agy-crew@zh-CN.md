@@ -211,6 +211,31 @@ agy-crew accounts list              # work1 显示为 ready
 
 现在，并行任务的数量大致以就绪账号数为宜。账号池为空时，所有任务都跑在你的 live 登录上。
 
+### omp：用池账号运行 omp（实验）
+
+装法有两种，任选其一：
+
+```bash
+agy-crew install --hosts omp   # 同时装技能和 omp 插件 loader
+# 或（npm 包方式）
+omp plugin install agy-crew
+```
+
+然后用 `agy-crew omp` 启动。它复用 `chooseAccount` 选号，持有该账号直到 omp 退出，并把账号名写进环境变量供插件读取：
+
+```bash
+agy-crew omp work1 -- --model google-antigravity/gemini-3.8-flash
+agy-crew omp       -- --model google-antigravity/gemini-3.8-flash
+```
+
+`--` 之后是 omp 自己的参数，原样传递。omp 默认把 `google-antigravity` 标记为 paused（“Google may restrict accounts that use Antigravity outside its own apps”）；插件只在 `agy-crew omp` 环境下注册一个同名 OAuth provider 取回该 id，并把选中账号作为 **runtime bearer** 注入（不写 `agent.db`、不建 profile、不 restrict session），由后台 agy warm-up 在过期前刷新。`before_agent_start` 删除 omp block 0 的 `§ Role / You are omp's trusted coding assistant.` 和 `cfg://`/`omp://` 入口，换成 Antigravity 的 `identity.tmpl`，其余工具描述、skills、rules、footer 保留；`before_provider_request` 还会清掉工具声明里的 `omp://` 示例。
+
+没有安装插件时（既没有 `agy-crew install --hosts omp` 写入的 loader，也没有 `omp plugin install agy-crew` 装的包，或者 loader 指向的包已被删除），`agy-crew omp` 会拒绝启动：否则 omp 能正常打开，却根本用不到池账号。如果你用别的方式加载插件（例如 omp 的 `--profile`），可以设置 `AGY_CREW_OMP_SKIP_INSTALL_CHECK=1` 跳过检查。
+
+连到 Cloud Code 端点的连接中断（`EPROTO: The TLS handshake failed`、`ECONNRESET`、`EPIPE`）不在 omp 认定的瞬时错误措辞里，第一次失败就会结束当前回合。插件只针对 Cloud Code 域名改写这类错误的措辞，让 omp 自己的重试额度（`retry.maxRetries`，默认 10 次）对它们生效，和 `503 No capacity available` 的处理一致。设置 `AGY_CREW_OMP_TRANSPORT_SHIM=0` 可以关闭。
+
+限制：一个 omp 进程只使用一个池账号；同一进程内多账号、按 session 均衡仍需要完整插件模式。没有设置 `AGY_CREW_OMP_ACCOUNT` 时插件完全惰性，普通 `omp` 行为不变。
+
 ## 核心设计
 
 `lead` 为当前主 agent 增加任务编排指导。在 lead 工作流中，主 agent 了解至足以明确任务后，默认用 `staffer` 承担实质性工作，等待结果返回后再验收、整合或追加任务；专门指导有帮助时再选择 specialist，`ask` 仅用于测试。主 agent 负责跨任务决策、验收、整合和交付，复用现有 jobs 工作流。使用 `/agy-crew-lead`（Claude Code 插件方式为 `/agy-crew:lead`，Codex 插件方式为 `$agy-crew:lead`，Pi 为 `/skill:agy-crew-lead`）。
@@ -255,6 +280,8 @@ agy-crew uninstall --all && npm uninstall -g agy-crew
 ```
 
 如果是 `npm link` 的检出目录，运行 `git pull`，再运行 `agy-crew install` 刷新 bundle。
+
+用户交互运行 `agy-crew start`、全屏 `agy-crew inspect`，或查看 `agy-crew accounts list` / `accounts quota` 表格时，每天最多检查一次 npm；发现有更新会打印一行升级提示。检查要求 TTY，并会跳过检测到 coding harness 的环境，因此 agent 通过 skill 发起的调用不会检查、不会等待，也不会写入任何内容。设置 `AGY_CREW_NO_UPDATE_CHECK=1` 可关闭检查；结果缓存在 `~/.agy-crew/update-check.json`。
 
 路线 A′（git clone）：
 

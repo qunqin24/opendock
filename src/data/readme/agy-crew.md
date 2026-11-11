@@ -189,6 +189,8 @@ agy-crew uninstall --all && npm uninstall -g agy-crew
 
 For a `npm link` checkout, `git pull` then `agy-crew install` refreshes the bundle.
 
+Interactive `agy-crew start`, the full-screen `agy-crew inspect`, and the human-facing `agy-crew accounts list` / `accounts quota` tables check npm at most once a day. When a newer release exists they print a one-line upgrade notice. The check needs a TTY and is skipped when a coding-harness environment is detected, so skill-driven calls never check, wait, or write anything. Disable it with `AGY_CREW_NO_UPDATE_CHECK=1`; the result is cached in `~/.agy-crew/update-check.json`.
+
 Route A′ (git clone):
 
 ```bash
@@ -252,6 +254,31 @@ When an account hits a quota limit, the companion records a cooldown for that ac
 Already have accounts? `agy-crew accounts import work2 --home <dir>` copies the token from an existing HOME-shaped directory, such as an agy-cli-manager account directory (`~/.agy-cli-manager/accounts/<name>`). agy-cli-manager is not needed otherwise; import is just a file copy plus the usual email and duplicate checks. Other subcommands: `enable`, `disable`, `cooldown clear|record`, `hold acquire|release`, `remove --yes`. To use a pool account by hand, `agy-crew start work1` opens interactive agy as that account in the current directory and keeps background runs off it until you exit (arguments after `--` go to agy). Full details in the [reference](docs/REFERENCE.md#accounts).
 
 Parallel jobs now make sense up to roughly the number of ready accounts. With an empty pool everything runs on your live login.
+
+### omp: run omp on a pool account (experimental)
+
+Install it either way:
+
+```bash
+agy-crew install --hosts omp   # skills plus the omp plugin loader
+# or, from the npm package:
+omp plugin install agy-crew
+```
+
+Then launch omp through the account pool:
+
+```bash
+agy-crew omp work1 -- --model google-antigravity/gemini-3.8-flash
+agy-crew omp       -- --model google-antigravity/gemini-3.8-flash
+```
+
+`--` ends agy-crew's flags; everything after it goes to omp unchanged. The command selects an account, holds it until omp exits, and exports the account name for the plugin. omp ships `google-antigravity` paused ("Google may restrict accounts that use Antigravity outside its own apps"); under `agy-crew omp` only, the plugin registers a same-id OAuth provider to take the id back and installs the selected account as the session's **runtime bearer** (no `agent.db` write, no profile, no session restriction). A background agy warm-up refreshes the bearer before expiry. The prompt rewrite removes block 0's `§ Role / You are omp's trusted coding assistant.` and the `cfg://`/`omp://` entries, adds `identity.tmpl`, and `before_provider_request` strips `omp://` examples from tool declarations; tool schemas, skills, rules, and the footer stay as they are.
+
+`agy-crew omp` refuses to start when the extension is not installed (neither the loader from `agy-crew install --hosts omp` nor the `omp plugin install agy-crew` package is present, or the loader points at a removed package): without it omp would start normally but never see the pool account. Set `AGY_CREW_OMP_SKIP_INSTALL_CHECK=1` if you load the extension some other way (for example an omp `--profile`).
+
+A dropped connection to the Cloud Code endpoint (`EPROTO: The TLS handshake failed`, `ECONNRESET`, `EPIPE`) is not wording omp treats as transient, so it would end the turn on the first failure. The extension rewords these errors, for the Cloud Code hosts only, so omp's own retry budget (`retry.maxRetries`, 10 by default) applies to them as it already does to `503 No capacity available`. `AGY_CREW_OMP_TRANSPORT_SHIM=0` turns this off.
+
+Limitation: one pool account per omp process. In-process multi-account, per-session balancing still needs the full plugin mode. The extension is inert when `AGY_CREW_OMP_ACCOUNT` is unset, so a plain `omp` is unchanged.
 
 ## Core design
 

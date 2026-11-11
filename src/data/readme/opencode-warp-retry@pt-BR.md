@@ -45,6 +45,8 @@ O proxy padrão é `http://127.0.0.1:40000`. Se o seu for diferente, configure `
 opencode plugin add opencode-warp-retry
 ```
 
+Página do pacote: <https://www.npmjs.com/package/opencode-warp-retry>
+
 ### Pelo GitHub
 
 ```sh
@@ -63,7 +65,46 @@ powershell -ExecutionPolicy Bypass -File .\launcher\windows\Install.ps1
 
 Isso copia o plugin para `%USERPROFILE%\.config\opencode\plugins\warp-retry\index.ts` (salvando um `.bak` do arquivo anterior, se existir) e cria o atalho **OpenCode (WARP)**. Use `-Force` para substituir um atalho existente sem perguntar; o atalho anterior é salvo como `.lnk.bak`.
 
+ZIP pronto da versão atual: <https://github.com/lipey1/opencode-warp-retry/releases/download/v1.0.0/opencode-warp-retry.zip>
+
 > Use apenas um método de instalação. Se o plugin já foi instalado com `opencode plugin add`, não copie o `src/index.ts` manualmente também.
+
+### Linux
+
+O plugin é o mesmo em qualquer sistema. No Linux, o que muda é instalar o cliente WARP e fazer o **serviço** do OpenCode herdar o proxy.
+
+**1. Instale o cliente WARP** (Ubuntu/Debian):
+
+```sh
+curl -fsSL https://pkg.cloudflareclient.com/pubkey.gpg \
+  | sudo gpg --yes --dearmor --output /usr/share/keyrings/cloudflare-warp-archive-keyring.gpg
+echo "deb [signed-by=/usr/share/keyrings/cloudflare-warp-archive-keyring.gpg] https://pkg.cloudflareclient.com/ $(lsb_release -cs) main" \
+  | sudo tee /etc/apt/sources.list.d/cloudflare-client.list
+sudo apt-get update && sudo apt-get install cloudflare-warp
+```
+
+Se `lsb_release` não existir, troque `$(lsb_release -cs)` pelo codename da sua versão (ex.: `noble`, `bookworm`). Fedora/RHEL/CentOS usam o repositório `cloudflare-warp-ascii.repo` com `sudo dnf install cloudflare-warp` (ou `yum`). Pacotes de todas as distros: <https://pkg.cloudflareclient.com/>.
+
+**2. Registre e ative o modo proxy:**
+
+```sh
+warp-cli registration new   # apenas na primeira vez
+warp-cli mode proxy
+warp-cli connect
+curl -x http://127.0.0.1:40000 https://www.cloudflare.com/cdn-cgi/trace | grep warp=
+```
+
+A última linha precisa mostrar `warp=on`.
+
+> Confira os modos disponíveis com `warp-cli mode --help`. Se o seu cliente não oferecer `proxy`, o plugin não funciona com ele; nesse caso use o cliente Cloudflare One (Zero Trust), que tem modo proxy documentado. Em algumas versões o modo proxy expõe apenas SOCKS5: se o `curl -x http://127.0.0.1:40000` falhar com o WARP conectado, coloque um conversor local (por exemplo `privoxy` com `forward-socks5`) e aponte `proxyUrl` para ele.
+
+**3. Instale o plugin:**
+
+```sh
+opencode plugin add opencode-warp-retry
+```
+
+**4. Não use o launcher do Windows.** `launcher/windows/`, `Install.ps1` e o atalho `.lnk` são exclusivos do Windows. No Linux, siga a seção *Linux (serviço e inicialização)* mais abaixo.
 
 ### Manual
 
@@ -122,6 +163,76 @@ opencode
 ```
 
 No OpenCode Desktop, use o launcher (ou reinicie o serviço depois de definir as variáveis) para o serviço herdar o proxy.
+
+### Linux (serviço e inicialização)
+
+O serviço em segundo plano do OpenCode nasce com o ambiente do primeiro cliente que o inicia. Se ele já estiver rodando, as variáveis novas não valem — pare antes:
+
+```sh
+opencode service stop
+```
+
+Para valer sempre, defina as variáveis no arquivo do seu shell (`~/.bashrc`, `~/.zshrc` ou `~/.profile`):
+
+```sh
+export HTTPS_PROXY=http://127.0.0.1:40000
+export HTTP_PROXY=http://127.0.0.1:40000
+export ALL_PROXY=http://127.0.0.1:40000
+export NO_PROXY=localhost,127.0.0.1,::1
+```
+
+Abra um terminal novo (ou rode `source ~/.bashrc`) e inicie o OpenCode normalmente. Para conferir o serviço depois de aberto:
+
+```sh
+opencode service status
+```
+
+**Atalho no menu (opcional).** Crie `~/.local/share/applications/opencode-warp.desktop`:
+
+```ini
+[Desktop Entry]
+Type=Application
+Name=OpenCode (WARP)
+Comment=OpenCode com o proxy do Cloudflare WARP
+Exec=env HTTPS_PROXY=http://127.0.0.1:40000 HTTP_PROXY=http://127.0.0.1:40000 ALL_PROXY=http://127.0.0.1:40000 NO_PROXY=localhost,127.0.0.1,::1 opencode
+Terminal=true
+Icon=utilities-terminal
+Categories=Development;
+```
+
+Se o `opencode` não estiver no `PATH` do ambiente gráfico, use o caminho absoluto no `Exec`. Depois:
+
+```sh
+chmod +x ~/.local/share/applications/opencode-warp.desktop
+update-desktop-database ~/.local/share/applications 2>/dev/null || true
+```
+
+**Systemd de usuário (se você mantém o OpenCode em uma unit).** Adicione as variáveis:
+
+```sh
+systemctl --user edit opencode
+```
+
+```ini
+[Service]
+Environment="HTTPS_PROXY=http://127.0.0.1:40000"
+Environment="HTTP_PROXY=http://127.0.0.1:40000"
+Environment="ALL_PROXY=http://127.0.0.1:40000"
+Environment="NO_PROXY=localhost,127.0.0.1,::1"
+```
+
+```sh
+systemctl --user daemon-reload
+systemctl --user restart opencode
+```
+
+**Confirme que o plugin ativou.** Depois de abrir o OpenCode:
+
+```sh
+tail -f ~/.local/share/opencode-warp-retry/warp-retry.log
+```
+
+A primeira linha deve ser `plugin loaded; automatic free-limit retry enabled`. Se vier `plugin loaded but no proxy environment matches`, o serviço não herdou as variáveis — rode `opencode service stop` e abra de novo.
 
 ## Configuração
 
@@ -184,12 +295,14 @@ plugin loaded but no proxy environment matches http://127.0.0.1:40000; automatic
 | O plugin nunca dispara | Veja o log. O erro precisa ser `provider.free-limit`. |
 | O OpenCode abre sem WARP | O launcher não alcançou o proxy; ele abre sem WARP e avisa. |
 | Continua limitado após rotações | Provável cota por conta; trocar IP não resolve. |
+| `warp-cli: command not found` (Linux) | Instale o pacote `cloudflare-warp` (veja a seção Linux) e abra um terminal novo. |
+| Linux: `plugin loaded but no proxy environment matches` | O serviço do OpenCode subiu antes das variáveis; rode `opencode service stop` e abra de novo. |
 
 ## Desenvolvimento
 
 ```text
 src/index.ts                  código do plugin
-launcher/windows/             launcher do Windows + instalador em um comando
+launcher/windows/             launcher do Windows + instalador em um comando (não se aplica ao Linux)
 examples/opencode.jsonc       exemplo de configuração
 ```
 

@@ -81,7 +81,7 @@ OpenCode 2 requires a package directory here (it resolves `index.js` and the TUI
 
    A watchdog aborts any review child still running after 10 minutes.
 
-3. **Delivery**: toasts report when the review starts and the final verdict. Full findings live in the child session titled "Adversarial review". The coding agent (and you) can also query the verdict via the **`review_status` tool**, which returns running/done, the verdict, and the findings report. See [What you see during a review](#what-you-see-during-a-review) for exactly what shows up, when, and whether it starts a turn.
+3. **Delivery**: toasts report when the review starts and the final verdict. Full findings live in the child session titled "Adversarial review". The coding agent (and you) can also query the verdict via the **`review_status` tool**, which returns running/done, the verdict, and the findings report, after a first line naming the version the session runs (`plugin: mighty-reviewer@<version>`, the form `opencode.json` pins, so a stale session shows against the pin). See [What you see during a review](#what-you-see-during-a-review) for exactly what shows up, when, and whether it starts a turn.
 
    **Progress tracking**: while the review runs, its phase is inferred from tool activity in the review session and surfaced three ways:
    - `review_status` reports the current phase and elapsed time (e.g. "waiting on critics (2/4 returned), elapsed 3m 40s") instead of a bare "in progress",
@@ -178,6 +178,9 @@ All options go in the plugin entry in `opencode.json` (OpenCode 2 object form sh
 | `quiet` | `false` | Suppress every notice except NO-SHIP's (see [What you see during a review](#what-you-see-during-a-review)); the OpenCode 2 toasts and footer line are unaffected |
 | `updateCheck` | `true` | Check npm for a newer version a few seconds after startup |
 | `autoUpdate` | `true` | Install the newer version into opencode's plugin cache automatically (unpinned npm installs only); with `false` you get a notification toast instead |
+| `branchMaxDiffLines` | `6000` | OpenCode 2 only. Largest committed range (changed lines, lockfiles/generated excluded) `review_branch` reviews |
+| `branchTimeoutMs` | twice `timeoutMs` | OpenCode 2 only. Time budget of a branch review; at the deadline it is aborted and reads as timed out |
+| `branchWorktreeDir` | `<system temp>/mighty-reviewer-worktrees` | OpenCode 2 only. Where `review_branch({ worktree: true })` makes its checkouts: an absolute path outside every work tree of the reviewed repository, private to you, with no glob character (`* ? [ ] { }`) in its real path (any other folder is refused) |
 
 ### Project review rules (`.mighty-reviewer.md`)
 
@@ -192,6 +195,12 @@ Drop a `.mighty-reviewer.md` file in the project root to teach the reviewer your
 ### On-demand review
 
 Run `/mighty-review` in any session to review the current working-tree changes immediately, without waiting for a coding turn.
+
+### Branch review (OpenCode 2, advisory)
+
+The `review_branch` tool reviews a committed range instead of a working tree: `review_branch({ repo, base, head })` takes an absolute repository or worktree path (default: the project), a base ref (for a lane: `main`) and a head ref (default `HEAD`), pins both to commits, and runs the same gates and critics over everything head adds since its merge base with base (`git diff <base>...<head>`), in a root session titled "Branch review ...". It is advisory: it posts no notice, sends no findings back into any session, and blocks nothing under `enforceNoShip`. Call it again with the same arguments to read it (still running, or the SHIP/NO-SHIP verdict and the full report); a finished range is answered from memory unless `rerun: true` is passed. `review_status` lists the branch reviews the session started. Two identical calls at once start one review. A repository the review session cannot read (outside the project and every `externalDirectories` entry, compared by real path) is refused rather than reviewed blind; for a worktree whose path leaves the project through a symlink, pass the project itself with `head` set to the worktree's branch. A review that cannot read its range reports "not run" and ends NO-SHIP, never SHIP. A running entry that can no longer finish (older than `branchTimeoutMs`, or orphaned by a plugin reload) reads as stale, and `rerun: true` replaces it. The last 50 finished branch reviews are kept. The mechanical gates run only when the repository's working tree is clean and at the reviewed head; otherwise they are recorded as not run.
+
+`review_branch({ ..., worktree: true })` (off by default) reviews inside a checkout of its own instead. It runs the head's own lint and build commands with your rights: use it only for branches you would run yourself. The checkout is a detached `git worktree add` of the head under `branchWorktreeDir`, made without running the repository's hooks, without the head's symlinks that point outside it (the review is told which went), and removed after the verdict, a failed start, the deadline or a plugin reload (a reload ends the instance's worktree reviews; they read "ended by a plugin reload" and `rerun: true` starts them again). The review session may read that checkout and nothing new besides (the critics' sessions inherit its rules); the gates run there, a gate is recorded as not run (with its first error line) only when it fails because a package the head's manifest or lockfile declares is absent from disk, and every other error, a missing relative path or an undeclared package included, is a failure, and the diagnostics are taken on the head's files. While the review runs, `git worktree list` in the reviewed repository shows the checkout. A start also removes the orphaned checkouts in its folder, whatever repository they belong to (those of a process that is gone, and this process's that no review holds), and only those: it never runs `git worktree prune`. A worktree review and a plain one of the same range are separate entries; `review_status` marks the first `[worktree]`.
 
 ### Updates
 

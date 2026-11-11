@@ -5,11 +5,10 @@
   </picture>
 </p>
 
-<p align="center"><b>Que tus agentes de código dejen de depurar otra vez lo que ya arreglaste.</b></p>
+<p align="center"><b>Memoria local compartida, traspaso entre agentes y recuperación de código para 43 agentes de código.</b></p>
 
-<p align="center">Claude Code, Codex, Cursor y el resto de los agentes de esta máquina ya guardan cada sesión en disco.
-deja lo indexa todo, meses atrás incluidos, y le pasa lo que importa
-al agente que está trabajando ahora.</p>
+<p align="center">Claude Code, Codex, Cursor, OpenClaw, Gemini CLI, OpenCode, Hermes y 36 agentes más ya guardan cada sesión en disco.<br>
+deja lo indexa todo localmente para que tus agentes conserven el contexto tras <code>/compact</code>, se pasen la tarea a mitad de camino con <code>deja handoff</code> y recuperen código sobrescrito con <code>deja restore</code> — sin LLM, un solo binario en Go.</p>
 
 <p align="center"><a href="../../README.md">English</a> | <a href="README.zh.md">简体中文</a> | <a href="README.zh-TW.md">繁體中文</a> | <a href="README.ja.md">日本語</a> | <a href="README.ko.md">한국어</a> | Español | <a href="README.pt.md">Português</a> | <a href="README.fr.md">Français</a> | <a href="README.de.md">Deutsch</a> | <a href="README.ru.md">Русский</a> | <a href="README.tr.md">Türkçe</a> | <a href="README.hi.md">हिन्दी</a></p>
 
@@ -19,14 +18,15 @@ al agente que está trabajando ahora.</p>
 
 <p align="center">
   <a href="https://github.com/vshulcz/deja-vu/stargazers"><img src="https://img.shields.io/github/stars/vshulcz/deja-vu?style=flat&color=f59e0b" alt="GitHub Stars"></a>
-  <a href="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml"><img src="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <img src="https://raw.githubusercontent.com/vshulcz/deja-vu/badges/.badges/main/coverage.svg" alt="coverage">
+  <a href="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml"><img src="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml/badge.svg?branch=main&event=push" alt="CI"></a>
+  <a href="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml"><img src="https://img.shields.io/badge/coverage-88%25-brightgreen" alt="Coverage"></a>
   <a href="https://github.com/vshulcz/deja-vu/releases/latest"><img src="https://img.shields.io/github/v/release/vshulcz/deja-vu" alt="Release"></a>
+  <a href="https://mcptoplist.com/server/io.github.vshulcz%2Fdeja-vu"><img src="https://mcptoplist.com/badge/io.github.vshulcz%2Fdeja-vu.svg" alt="MCP Toplist"></a>
   <a href="https://www.npmjs.com/package/@vshulcz/deja-vu"><img src="https://img.shields.io/npm/v/%40vshulcz%2Fdeja-vu" alt="npm"></a>
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT"></a>
 </p>
 
-<p align="center"><a href="https://vshulcz.github.io/deja-vu/">Documentación</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">Benchmarks</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/compare.html">Comparación</a></p>
+<p align="center"><a href="https://vshulcz.github.io/deja-vu/"><b>Sitio web y búsqueda interactiva</b></a> &middot; <a href="https://vshulcz.github.io/deja-vu/view/"><b>Demo interactiva en el navegador</b></a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">Benchmarks</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/compare.html">Comparación</a></p>
 
 <p align="center"><img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif" width="720" alt="la misma pregunta al mismo agente dos veces: sin memoria no recuerda nada, con deja responde con una conclusión de hace ocho meses"></p>
 
@@ -34,6 +34,8 @@ al agente que está trabajando ahora.</p>
 curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
 deja install --auto
 ```
+
+<p align="center"><sub>O con Homebrew: <code>brew install deja-vu &amp;&amp; deja install --auto</code> &middot; Plugin de Claude Code: <code>claude plugin marketplace add vshulcz/deja-vu &amp;&amp; claude plugin install deja-vu@deja-vu</code> &middot; Agent Skills: <code>npx skills add vshulcz/deja-vu</code><br><a href="#instalación">Windows (Scoop / winget), Codex, OpenCode, OpenClaw y más</a> &middot; Probar sin instalar: <code>npx @vshulcz/deja-vu sources</code> &middot; <a href="https://vshulcz.github.io/deja-vu/view/">Demo en vivo →</a></sub></p>
 
 <table align="center">
 <tr>
@@ -78,7 +80,7 @@ opencode, DeepSeek Harness, Zed, Kimi Code, Codex CLI, Grok Build, OpenClaw, pi 
 paquete, para quien está acostumbrado a instalar extensiones desde ahí:
 
 ```sh
-opencode plugin opencode-deja
+opencode plugin add opencode-deja
 dsh plugin --profile web add dsh-deja
 # Zed: busca deja en el panel de extensiones
 # Kimi Code: /plugins install https://github.com/vshulcz/deja-vu
@@ -132,7 +134,7 @@ imprime qué está indexado y qué comando ejecutar a continuación.
 
 ## Qué obtienes
 
-**Resuelto en Codex, recordado por Claude.** Cuarenta y un agentes de código escriben cada conversación en
+**Resuelto en Codex, recordado por Claude.** Cuarenta y tres agentes de código escriben cada conversación en
 archivos locales y deja convierte esos archivos en una capa de memoria que todos pueden leer.
 
 | | |
@@ -252,7 +254,7 @@ tiene un paquete en su propio ecosistema, para quien instala extensiones desde a
 
 | Agente | Paquete | Instalación |
 | --- | --- | --- |
-| opencode | npm `opencode-deja` | `opencode plugin opencode-deja` |
+| opencode | npm `opencode-deja` | `opencode plugin add opencode-deja` |
 | DeepSeek Harness | npm `dsh-deja` | `dsh plugin --profile web add dsh-deja` |
 | Zed | `deja-context-server` | Zed → Extensions → deja |
 | Kimi Code | plugin `deja` | `/plugins install https://github.com/vshulcz/deja-vu` |

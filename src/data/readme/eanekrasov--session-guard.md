@@ -1,4 +1,4 @@
-# opencode-session-guard
+# @eanekrasov/session-guard
 
 Плагин конечного автомата для [OpenCode](https://opencode.ai/) — управляет жизненным циклом
 workflow-сессий: стадии, переходы, консент (одобрение), мутации, gates, инварианты и верификация.
@@ -31,7 +31,7 @@ workflow-сессий: стадии, переходы, консент (одоб�
 - [справочник workflow schema](docs/schema-reference.md) — сжатая выжимка по
   полям, когда полное руководство уже прочитано;
 - [примеры schema](docs/schema-examples.md);
-- [guide по написанию schema](docs/schema-writing-guide.md);
+- [руководство по написанию schema](docs/schema-writing-guide.md);
 - [статус возможностей](docs/feature-status.md);
 - [диагностика](docs/troubleshooting.md);
 - [FAQ](docs/faq.md).
@@ -96,8 +96,9 @@ workflow-сессий: стадии, переходы, консент (одоб�
 
 До вызова инструмента runtime последовательно применяет guardrails, consent,
 допуск действий стадии и, для мутаций, lifecycle операции. После вызова он
-санитизирует результат, обрабатывает `<workflow-result>`, проверяет изменения и
-инварианты, закрывает операцию и пытается применить переходы. Отдельный
+санитизирует результат, проверяет изменения и инварианты, закрывает операцию и
+пытается применить переходы. Гейты записываются явным вызовом `workflow-gate-set`;
+текст ответа субагента не является verdict. Отдельный
 `tool.execute.after` повторно не является «главным» источником перехода: итоговая
 сессия сохраняется через executor, после чего transition engine работает над
 актуальным состоянием.
@@ -154,7 +155,7 @@ Zod-валидируемый JSON, сохраняемый на диск. Сес�
 ```
 WorkflowSession
 ├── sessionId, profileId, schemaId, schemaVersion, revision, title
-├── gates: Gate[]                         # сессионные gate-вердикты
+├── stageGateResults: StageGateResult[]   # вердикты гейтов внешних стадий
 ├── approvals: Approval[]                 # type/callId/status/evidence/files
 ├── refs: Record<string, string>           # документы по типу approval
 ├── tasks: Record<listKey, MutationTask[]>
@@ -208,7 +209,7 @@ scope, diff и invariants.
 а `SessionExecutor` повторно загружает состояние под lock и делает один
 согласованный save. Это важно для nested task cycles и конкурентных hooks.
 
-## Фазы и Transition Engine
+## Стадии и движок переходов
 
 ### Декларативные переходы (profiles/base/base.yaml)
 
@@ -417,12 +418,6 @@ reentrant inline через `AsyncLocalStorage`; независимый concurre
 очереди. Ошибка одного действия не блокирует следующие, но исходный caller
 получает rejection.
 
-### withSession (src/app/session-queue.ts)
-
-Production helper `withSession` в текущем модуле отсутствует. Похожий helper
-есть только в `test/helpers.ts` и используется тестовыми fixtures; код runtime
-для persistence должен использовать `SessionExecutor`.
-
 ## Типы runtime (src/app/runtime-types.ts)
 
 Изолированные типы для SDK-зависимостей, чтобы тесты могли замокать `OpenCodeSessionClient`:
@@ -526,19 +521,10 @@ interface OpenCodeSessionClient {
 1. Guardrails (guardrailAfter)
    └── sanitizeToolOutput() — замена block-паттернов на [BLOCKED:RULE]
 
-2. Workflow result (handleWorkflowResult)
-   └── parseWorkflowResult(output):
-   │   └── Ищет последний <workflow-result>{JSON}</workflow-result>
-   │   └── Поле `gate` называет ГЕЙТ, а не стадию; допускается только действительный результат
-   └── Свежесть — по provenance вердикта (fallback: операция). Раунд сменился или прогон закрыт
-   │   └── [workflow-result-stale], не записывается ничего
-   └── Адресат — по ОБЪЯВЛЕНИЮ гейта, а не по активной операции:
-   │   └── гейт объявлен вложенной стадией живого прогона → run.gates[gate] + движение задачи
-   │   └── гейт объявлен текущей внешней стадией → session.stageGateResults (setGateStatus)
-   │   └── гейт не объявлен ни одной стадией в области видимости → [workflow-result-rejected]
-   └── Проверки допуска: mayVerify() по ростеру владеющей стадии, свежесть, replay-guard
-   └── session.verifications.push({ gate, status, recordedAt })
-   └── releaseVerdict() — снять activeOperations[callID] и verdictProvenance[callID]
+2. Workflow gate (workflow-gate-set)
+   └── Проверяется, что вызывающий агент допущен и гейт объявлен текущей стадией
+   └── Записывается verdict; переход задачи применяется, только когда выполнены все гейты
+   └── После возврата `task` runtime очищает только соответствующую active operation
 
 3. File tool invariants (handleFileToolAfter)
    └── Tool ∈ {edit, write, apply_patch}
@@ -611,7 +597,7 @@ Gates: invariants: passed, review: running, qa: pending
 Approvals granted: plan
 ```
 
-## Система согласования планов
+## Система согласования
 
 Используется один формат согласования — XML-тег.
 
@@ -832,7 +818,7 @@ interface ResolvedProfile {
 // Текущая семантика объединения:
 // - stages объединяются поэлементно, включая вложенные stages и transitions
 // - transitions объединяются по группам from→to; дочерний профиль заменяет соответствующую группу
-// - editingAgents, gates, taskControlAgents и stageAssignments используют приоритет дочернего профиля
+// - editingAgents, gates и taskControlAgents используют приоритет дочернего профиля
 // - отсутствующие поля удаляются из итогового результата
 ```
 
@@ -1031,18 +1017,6 @@ interface ShellExecutor {
 - Кеширование 30 с
 - Мягкая деградация: если `bd` CLI недоступен → `{ error, degraded: true }`
 
-## Предустановки манифестов
-
-`src/manifest-presets.ts` и API `TASK_MANIFEST_PRESETS` не входят в текущий
-runtime-контракт. Workflow объявляется YAML-схемой профиля, а задачи управляются
-tools `workflow-tasks-set`, `workflow-tasks-get`,
-`workflow-tasks-set-status` и `workflow-tasks-resolve-decision`.
-
-### API
-
-Вместо preset-списка используйте `ProfileResolver` для выбора профиля/schema и
-`TaskApi` для декларативного списка задач. Это оставляет список задач независимым от конкретных имён стадий.
-
 ## TUI (src/tui/tui.ts)
 
 TUI сейчас имеет два связанных, но отдельных слоя:
@@ -1069,7 +1043,7 @@ retry budgets. Единственный отказ — пустой `currentStag
 статусами и retry budgets. Rules sidebar загружается отдельным coordinator-ом и
 не заменяется workflow widget.
 
-### Детали форматирования (FR-011/FR-012)
+### Форматирование подробностей
 
 `formatDetailsLines(rawText)` форматирует подробности сессии и ограничивает
 длинные коллекции. Точные rendering/lifecycle тесты находятся в `test/tui/`.
@@ -1088,7 +1062,7 @@ retry budgets. Единственный отказ — пустой `currentStag
 | GET   | `/`                                  | HTML-интерфейс                                                |
 | GET   | `/events`                            | SSE snapshot при подключении и инкрементальные session events |
 | GET   | `/api/schema`                        | Контракт workflow/schema для текущего профиля                 |
-| GET   | `/api/dump`                          | Все активные сессии                                           |
+| GET   | `/api/dump`                          | Все активные и архивные сессии                                |
 | GET   | `/api/session/:id`                   | Одна сессия с вычисляемой стадией                             |
 | GET   | `/api/session/:id/timeline`          | Timeline transitions/gates                                    |
 | GET   | `/api/session/:id/invariants`        | `invariantViolations` сессии                                  |

@@ -49,7 +49,7 @@
 | 命令 | 做什麼 | 何時用 |
 |---|---|---|
 | `/prd` | 質疑→釐清→拆解,落盤 PRD + AGENTS.md 後請你讀完確認一次,核可就自動跑 plan → exec → doc-update | 新需求開工、要改已合併功能的行為 |
-| `/prototype` | 先讀專案根的 DESIGN.md(沒有就起草),照專案整體介面畫出改動所在的整個頁面,用統一的藍圖外殼出 HTML 原型,改到你說「可以」;`/prd`、`/revise` 改介面時自動呼叫 | 想先看樣子,不走完整需求流程 |
+| `/prototype` | 先讀專案根的 DESIGN.md(沒有就起草),照專案整體介面畫出改動所在的整個頁面,派原型子代理用統一的藍圖外殼出 HTML 原型(主對話只派工和傳話),新建或修改 DESIGN.md 時先畫一頁「設計規範」給你確認,改到你說「可以」;`/prd`、`/revise` 改介面時自動呼叫 | 想先看樣子,不走完整需求流程 |
 | `/revise` | 按根因診斷→定向修正→回歸驗證,修完自動跑 doc-update | 有 bug、結果和預期不符 |
 | `/git-push` | pre-review 自查 + 推送 + 開 PR | 準備提 PR |
 | `/exec` | 從斷點接著執行 plan | 中斷或 `/clear` 之後 |
@@ -105,6 +105,7 @@
   - *Test* Agent 只讀 PRD 約束寫失敗測試(Red)
   - *Impl* Agent **看不到 PRD**,只看測試 + 函式清單寫實作(Green),無法「照著意圖作弊」;引入新技術受 plan 已核准的「新增技術」表約束
   - *Review* Agent 對照 PRD 驗收與 AGENTS.md 檢查並過一遍強健性/安全視角,唯讀不寫
+  - *Review* 每指出一個問題,同時列出倉庫裡別處的同類位置;核實成立的當輪一起修,它指出的測試缺口也當輪補上
   - 每步進度寫 `PROGRESS.md`,token 耗盡也能**無損續接**
   - 實施中發現方案有問題,停下讓你選:改程式碼 / 改本次 PRD / 暫停;小改就地改,大改回到 `/prd` 重新核可
   - 全部完成後自動跑 `/doc-update` 收尾模式,讓本次 PRD 和 README 等文件追平實際交付
@@ -125,6 +126,8 @@
   - 先讀程式碼確認現狀、經 `git log -L` 查回相關 PRD,再把偏差**歸因**為三類:*PRD 缺陷*、*實作偏離*、*需求變更*
   - 需求變了(*PRD 缺陷*、*需求變更*):只在本分支 PRD 上改,並記進它的決策紀錄;PRD 已合併或沒有 PRD 時停下,轉 `/prd` 新開一份
   - bug、安全、穩健性問題(*實作偏離*):已合併的 PRD 也在這裡修,修訂原因和取捨(選了什麼、否掉了什麼、為什麼)寫進 commit 正文
+  - 定出根因後先搜全同一個根因牽連的其他位置(呼叫處 + 同樣的錯誤寫法),列表通報後和你回報的那一處同一輪修完;只有某一處需要你取捨時才停下問
+  - 做事時碰到的無關問題只記不改:`/exec`、`/revise` 收尾和 `/git-push` 推送前各合成一張清單問你一次,選中的在目前分支修完,進同一個 PR
   - 所有需修復的 review 發現都匯入此處
   - 修完自動跑 `/doc-update` 收尾模式
 
@@ -142,8 +145,8 @@
 
 **附帶產物**
 
-- **5 個編排 subagent**(被上述環節驅動):`test-engineer` / `impl-engineer` / `prd-reviewer` / `webview-test-runner` / `pre-reviewer`
-- **3 個被動 hook**(自動生效):攔截 main commit、相依版本自檢、等背景腳本跑完
+- **8 個編排 subagent**(被上述環節驅動):`test-engineer` / `impl-engineer` / `prd-reviewer` / `webview-test-runner` / `pre-reviewer` / `prototype-designer` / `code-investigator` / `script-runner`
+- **3 個被動 hook**(自動生效):攔截 main commit、相依版本自檢、背景腳本不循環等待
 
 ---
 
@@ -191,7 +194,7 @@ BB-Spec 拆成**四個可獨立安裝的子 plugin**——只裝你需要的約�
 | 子 plugin | 裝了得到什麼 | 安裝命令 |
 |---|---|---|
 | **bb-spec-core** _(推薦基座)_ | TDD / 版本策略 / Git 紀律 + 3 個被動 hook | `/plugin install bb-spec-core@0xbb2b` |
-| **bb-spec-workflow** _(核心功能)_ | prd → plan → exec → doc-update → revise → git-push(+ 可選 test-webview / test-api e2e)、git-clone 一次性初始化 + 5 個 subagent | `/plugin install bb-spec-workflow@0xbb2b` |
+| **bb-spec-workflow** _(核心功能)_ | prd → plan → exec → doc-update → revise → git-push(+ 可選 test-webview / test-api e2e)、git-clone 一次性初始化 + 8 個 subagent | `/plugin install bb-spec-workflow@0xbb2b` |
 | **bb-spec-backend** | Go / REST API / 資料庫 / 認證 / 授權 / 可觀測性 / 服務治理 / 設定約束 | `/plugin install bb-spec-backend@0xbb2b` |
 | **bb-spec-frontend** | Vue 3 + TS + Vite + Tailwind + bun 技術棧與工程約定 | `/plugin install bb-spec-frontend@0xbb2b` |
 
@@ -252,7 +255,7 @@ claude plugin update bb-spec-workflow@0xbb2b   # 在終端機裡更新某個子 
 |---|---|---|---|
 | `git-workflow-guard` | bb-spec-core | PreToolUse(Bash) | 攔截 `main` / `master` 分支的 `git commit`;其餘 git 流程動作(開分支 / push / worktree / merge / PR)放行並注入 git-workflow 紀律與即時 git 狀態 |
 | `dep-version-check` | bb-spec-core | PostToolUse(Write\|Edit) | 編輯相依檔案後注入「先查官方最新版」自檢提示,並提醒未核准的新技術要撤回、先列清單請使用者核准 |
-| `background-script-wait` | bb-spec-core | Stop | 發現本會話沒提示過的執行中背景命令時提示一次:Claude 用前景迴圈等完會結束的腳本,常駐服務不等 |
+| `background-script-wait` | bb-spec-core | Stop | 發現本會話沒提示過的執行中背景命令時提示一次:Claude 不迴圈等待、直接結束回合,之後這類腳本交給跑腳本的子代理,常駐服務不等 |
 ---
 
 ## 🧪 測試
@@ -290,7 +293,7 @@ base_dir: my/bb  # → my/bb/docs/{prd,plan,test}/ 與 my/bb/.cache/;填 ./ 則�
 | 場景 | 開關 |
 |---|---|
 | 暫時允許 main commit | 暫時停用 `bb-spec-core` |
-| 跳過背景腳本等待提示 | 暫時停用 `bb-spec-core` |
+| 跳過背景腳本提示 | 暫時停用 `bb-spec-core` |
 
 ---
 

@@ -6,26 +6,29 @@ Unofficial; not affiliated with Tavily.
 
 ## Requirements
 
-- OpenCode `>=2.2.3 <2.3.0`, tested on 2.2.3, 2.2.4 and 2.2.5. A later 2.2 release works, and `/tavily-status` calls it untested. Outside `>=2.2.3 <2.3.0` the plugin does not start, unless you set [`allowUntestedHost`](https://github.com/joe-broadhead/opencode-tavily/blob/HEAD/docs/configuration.md#options).
+- OpenCode `>=2.2.3 <2.3.0`, tested on 2.2.3, 2.2.4, 2.2.5 and 2.2.6. A later 2.2 release, such as 2.2.99, works, and `/tavily-status` calls it untested. Outside `>=2.2.3 <2.3.0` the plugin does not start, unless you set [`allowUntestedHost`](https://github.com/joe-broadhead/opencode-tavily/blob/HEAD/docs/configuration.md#options).
 - macOS or Linux.
 - A Tavily account. The plugin adds no tools of its own; each call uses your Tavily credits.
 
 ## Install
 
 ```sh
-opencode plugin add @joe-broadhead/opencode-tavily
+opencode plugin add github:joe-broadhead/opencode-tavily#v0.0.0
 ```
 
 Run `opencode reload`, or restart OpenCode. Then run `/tavily-status` in a session.
 
-### Update
+The install takes the GitHub release tag. Its commit carries the built `dist/`, so the install runs no build.
 
-```sh
-opencode plugin update @joe-broadhead/opencode-tavily
-opencode reload
+Or add the plugin to `opencode.json` instead, with the same spec:
+
+```json
+{ "plugins": [{ "package": "github:joe-broadhead/opencode-tavily#v0.0.0" }] }
 ```
 
-An entry pinned to a version, such as `@joe-broadhead/opencode-tavily@0.0.2`, does not update: remove the `@version` from `plugins` in `opencode.json`.
+### Update
+
+Each release has its own tag, and a Git install does not update by itself. To move to a newer release, remove the old entry with `opencode plugin remove github:joe-broadhead/opencode-tavily#v0.0.0`, then add the new tag with `opencode plugin add github:joe-broadhead/opencode-tavily#v<version>`.
 
 ## Sign in
 
@@ -70,7 +73,7 @@ Ask for what you need. The model uses the skills to choose a tool, or you can na
 Tavily status
 - Connection: sign-in required
 - Account: none
-- Access: read only: search, extract, map, crawl and research
+- Access: every tool runs without asking: the five reads and any tool Tavily adds later. Set the access option to "ask-changes" or "read-only" to restrict a tool Tavily adds later.
 - Sign-in: OAuth (/connect → Tavily account)
 - Web search: Tavily, unless opencode.json sets "websearch"
 - Tools: none listed yet
@@ -81,35 +84,68 @@ Tavily status
 
 ### Scripts
 
-A script or a cron job can call the five tools with no model, through `opencode api`. It runs as a session and its agent, under that agent's permission rules and the session's own, and spends credits as the tool does:
+A script or a cron job can call the five tools with no model, through `opencode api`. It runs as a session and its agent, under that agent's permission rules and the session's own, and spends credits as the tool does. The rule is resolved first, so only a prior explicit `allow` runs: an `ask` is refused, and a saved "Always allow" does not authorize an ad-hoc script:
 
 ```sh
 opencode api post /api/rpc/tavily.web.tools/tavily_search \
+  -H "x-opencode-directory:$PWD" \
   -d '{"input":{"sessionID":"ses_…","input":{"query":"OpenCode plugin API"}}}'
 ```
+
+Without `x-opencode-directory:$PWD` the call reaches the service's default location and fails `rpc.unavailable` when the plugin is not loaded there.
 
 See [Scripting](https://github.com/joe-broadhead/opencode-tavily/blob/HEAD/docs/scripting.md).
 
 ## Permissions
 
-The plugin adds this block to every agent, right after the agent's first `{ "action": "*", "resource": "*", "effect": "allow" }` rule. An agent without that rule gets nothing. Tavily's five tools only read from the web, so they run without a prompt. Any other tool on the `tavily` server, including one Tavily adds later, asks first.
+**Every tool is allowed by default.** The `access` option decides whether each tool runs, asks or is denied. At its default, `"all"`, an agent can search the web, read pages, map and crawl sites, and run cited research with no prompt, and every call spends your Tavily credits. Restrict it in any of these three ways.
 
-```json
-[
-  { "action": "tavily_*", "resource": "*", "effect": "ask" },
-  { "action": "tavily_tavily_search", "resource": "*", "effect": "allow" },
-  { "action": "tavily_tavily_extract", "resource": "*", "effect": "allow" },
-  { "action": "tavily_tavily_map", "resource": "*", "effect": "allow" },
-  { "action": "tavily_tavily_crawl", "resource": "*", "effect": "allow" },
-  { "action": "tavily_tavily_research", "resource": "*", "effect": "allow" }
-]
-```
+1. **The `access` option**, which drives the rules the plugin inserts:
 
-The last matching rule wins, so your own rules and saved "Always allow" answers win over the block. **Agents that you define only in your config do not get it**: `/tavily-status` names them, and its next step says what to paste where. [Configuration](https://github.com/joe-broadhead/opencode-tavily/blob/HEAD/docs/configuration.md#permissions) has the rule order and an example.
+   | Value | What runs | What asks or is denied |
+   | --- | --- | --- |
+   | `"all"` (the default) | the five tools, and any tool Tavily adds later | nothing |
+   | `"ask-changes"` | the five tools | a tool Tavily adds later: it asks |
+   | `"read-only"` | the five tools | a tool Tavily adds later: it is **denied** |
+
+   ```jsonc
+   { "plugins": [{ "package": "github:joe-broadhead/opencode-tavily#v0.0.0", "options": { "access": "ask-changes" } }] }
+   ```
+
+   The default block, generated from `defaultRules()` for `access: "all"`:
+
+   ```json
+   [
+     { "action": "tavily_*", "resource": "*", "effect": "allow" },
+     { "action": "tavily_tavily_search", "resource": "*", "effect": "allow" },
+     { "action": "tavily_tavily_extract", "resource": "*", "effect": "allow" },
+     { "action": "tavily_tavily_map", "resource": "*", "effect": "allow" },
+     { "action": "tavily_tavily_crawl", "resource": "*", "effect": "allow" },
+     { "action": "tavily_tavily_research", "resource": "*", "effect": "allow" }
+   ]
+   ```
+
+   [The default rules](https://github.com/joe-broadhead/opencode-tavily/blob/HEAD/docs/configuration.md#the-default-rules) prints the block for `ask-changes` and `read-only` too.
+
+2. **An agent that is read-only or asks**, with rules of its own, later than the plugin's:
+
+   ```jsonc
+   { "agents": { "researcher": { "permissions": [
+     { "action": "tavily_*", "resource": "*", "effect": "deny" },
+     { "action": "tavily_tavily_search", "resource": "*", "effect": "allow" },
+     { "action": "tavily_tavily_research", "resource": "*", "effect": "allow" }
+   ] } } }
+   ```
+
+3. **Per-tool rules**, in `permissions` or in an agent's own: `{ "action": "tavily_tavily_research", "resource": "*", "effect": "ask" }` makes research ask, and `deny` refuses it. `{ "action": "tavily_*", "resource": "*", "effect": "deny" }` denies every Tavily tool. A later rule wins, and a saved "Always allow" still applies after your rules.
+
+**Why the names read `tavily_tavily_search`.** Tavily's own server names its tools `tavily_<tool>`, and OpenCode prefixes an MCP tool with its server's name, which is `tavily`. The permission action is that full name, so a rule is `tavily_tavily_search`. It is the exact name to use in a rule; renaming it would break saved rules, so it stays.
+
+The last matching rule wins, so your own rules and saved "Always allow" answers win over the block. **Agents that you define only in your config do not get it**: `/tavily-status` names them, and its next step says what to paste where. [Configuration](https://github.com/joe-broadhead/opencode-tavily/blob/HEAD/docs/configuration.md#agents-defined-only-in-your-config) has the rule order and an example.
 
 ## Configure
 
-The plugin works without options. The [configuration guide](https://github.com/joe-broadhead/opencode-tavily/blob/HEAD/docs/configuration.md) covers the options (`websearch`, `executionTimeoutMs`, `allowUntestedHost`), changing the permission rules, the web search default, and API key or OAuth.
+The plugin works without options. The [configuration guide](https://github.com/joe-broadhead/opencode-tavily/blob/HEAD/docs/configuration.md) covers the options (`websearch`, `executionTimeoutMs`, `allowUntestedHost`, `access`), changing the permission rules, the web search default, and API key or OAuth.
 
 ## Organisation rollout
 
@@ -117,7 +153,7 @@ An organisation can install the plugin for every user on a machine through OpenC
 
 ```json
 {
-  "plugins": [{ "package": "@joe-broadhead/opencode-tavily", "options": { "websearch": true } }]
+  "plugins": [{ "package": "github:joe-broadhead/opencode-tavily#v0.0.0", "options": { "websearch": true } }]
 }
 ```
 
@@ -149,7 +185,7 @@ The plugin's errors and warnings start with a code. Each ends with one next step
 
 | Code | When | Next step |
 | --- | --- | --- |
-| `HOST_UNTESTED` | Start-up, outside `>=2.2.3 <2.3.0` | Use OpenCode 2.2.3, 2.2.4 or 2.2.5, or set `allowUntestedHost`. With it, this is a warning. |
+| `HOST_UNTESTED` | Start-up, outside `>=2.2.3 <2.3.0` | Use OpenCode 2.2.3, 2.2.4, 2.2.5 or 2.2.6, or set `allowUntestedHost`. With it, this is a warning. |
 | `OPTIONS_INVALID` | Start-up | Fix the plugin's options in `opencode.json`. The message names the option. |
 | `SKILLS_INVALID` | Start-up | Reinstall the plugin. |
 | `KEY_UNAVAILABLE` | Log warning | Run `/connect` and choose **Tavily**, then connect the key again. |
@@ -168,13 +204,23 @@ Sign out first, while the plugin is installed: once it is removed, `opencode mcp
 3. Remove the plugin, then reload:
 
    ```sh
-   opencode plugin remove @joe-broadhead/opencode-tavily
+   opencode plugin remove github:joe-broadhead/opencode-tavily#v0.0.0
    opencode reload
    ```
 
 4. The plugin keeps no data of its own. Remove the permission block from any agent's own `permissions` where you copied it.
 
 `opencode auth list` should then list no Tavily entry, and `opencode mcp list` no `tavily` server.
+
+## Known limits
+
+- **Five tools.** The plugin knows the five Tavily tools. A tool Tavily adds later is not classed by the plugin: the `access` option decides whether it runs, asks or is denied, and `/tavily-status` counts it as unknown.
+- **Research and crawl cost the most.** Research takes minutes with no progress shown, and a call stops after 15 minutes. Crawl reads up to 50 pages by default. The plugin sets no spending limit: each call spends Tavily credits as the tool does.
+- **No retries.** A failed call returns `UPSTREAM_ERROR` with its next step. The plugin does not retry it.
+- **Web content is not trusted.** A page can carry instructions, and nothing asks by default. The `tavily` skill tells the model not to follow them, but that is a rule for the model, not a guard in the plugin.
+- **A shell key does not reach the server.** A `TAVILY_API_KEY` exported only in a terminal does not reach a running OpenCode server. See [Sign in](#sign-in).
+- **Hosts and platforms.** The plugin is tested on 2.2.3, 2.2.4, 2.2.5 and 2.2.6, and runs on macOS or Linux. A later 2.2 release starts and is reported as untested.
+- Updates are not automatic for a Git install, and `opencode plugin update` and `opencode plugin check` do not work on one: to move to a newer release, remove the old entry and add the new tag.
 
 ## Links
 

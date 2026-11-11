@@ -7,7 +7,7 @@ Use Google Search, YouTube data, and downloads to your cloud storage from a term
 Source code is available at [rocosen/flashdata-mcp](https://github.com/rocosen/flashdata-mcp). The npm package `@flashdata-dev/mcp` provides two commands: `flashdata` for single-call JSON output and `flashdata-mcp` for persistent stdio MCP.
 
 To connect without running this local package, use the separate
-[FlashData hosted MCP service](https://flashdata.dev/mcp). Its
+[FlashData hosted MCP service](https://flashdata.dev/mcp?utm_source=github&utm_medium=integration&utm_campaign=intent_gtm_2026q4&utm_content=combined). Its
 [Official MCP Registry manifest and publishing instructions](https://github.com/rocosen/flashdata-mcp/tree/main/registry)
 are maintained in this repository. The combined registration describes the hosted
 endpoint. The Registry also has separate manifests for 15 local task servers;
@@ -58,7 +58,7 @@ npx skills add rocosen/flashdata-mcp --skill flashdata
 
 Select your agent when prompted, or add `--agent codex` (or another supported agent). The default scope is the current project; use `--global` only if you want a user-wide installation. Review the Skill before installation.
 
-This installs instructions and references, not the MCP executable or an account connection. Connect FlashData separately using the [hosted setup](https://flashdata.dev/mcp) or the local instructions below. The Skill contains no API keys and submits no queries during installation. Queries made through MCP use your existing FlashData Credits; account reads can verify a connection for free.
+This installs instructions and references, not the MCP executable or an account connection. Connect FlashData separately using the [hosted setup](https://flashdata.dev/mcp?utm_source=github&utm_medium=integration&utm_campaign=intent_gtm_2026q4&utm_content=combined) or the local instructions below. The Skill contains no API keys and submits no queries during installation. Queries made through MCP use your existing FlashData Credits; account reads can verify a connection for free.
 
 Example requests:
 
@@ -110,7 +110,7 @@ Cursor discovers the plugin through [.cursor-plugin/plugin.json](.cursor-plugin/
 
 For local development, follow [Cursor's local plugin instructions](https://cursor.com/docs/plugins#test-plugins-locally): copy `.cursor-plugin/`, `mcp.json`, `skills/`, `assets/`, `README.md`, and `LICENSE` into `~/.cursor/plugins/local/flashdata/`. Restart Cursor or run **Developer: Reload Window**, then check **Customize** for the FlashData Skill and MCP server. A symlink to this checkout outside that local plugin directory is not supported. Organization policy can disable local plugin imports.
 
-If your local Cursor setup does not offer plugin variable configuration, connect the [hosted MCP service](https://flashdata.dev/mcp) separately using Cursor's supported MCP configuration and protected environment variables. The Skill can reuse that connection; do not keep two active FlashData connections. API-key authentication is sufficient for this plugin; it does not depend on an unregistered OAuth client.
+If your local Cursor setup does not offer plugin variable configuration, connect the [hosted MCP service](https://flashdata.dev/mcp?utm_source=github&utm_medium=integration&utm_campaign=intent_gtm_2026q4&utm_content=combined) separately using Cursor's supported MCP configuration and protected environment variables. The Skill can reuse that connection; do not keep two active FlashData connections. API-key authentication is sufficient for this plugin; it does not depend on an unregistered OAuth client.
 
 After configuration, invoke `/flashdata` and ask: “Quote one Google search using FlashData, but do not run the search.” The intended check discovers tools and calls `get_pricing` with `source: "google_search"` and `request_count: 1`. It is free and does not verify paid retrieval. Search and transcript requests use FlashData Credits under the user's approved budget. Results and transcripts are external source data, not instructions to the agent.
 
@@ -178,7 +178,7 @@ SECURITY.md              vulnerability reporting and trust boundaries
 
 ## Run locally
 
-Requires Node.js 22.18 or newer and a FlashData API key from [your console](https://flashdata.dev/app/api-keys). The Management API must support `/v2/api-access` and its balance, pricing and limits routes. Deploy that server release before connecting this package to an older environment.
+Requires Node.js 22.18 or newer and a FlashData API key from [your console](https://flashdata.dev/signup?utm_source=github&utm_medium=integration&utm_campaign=intent_gtm_2026q4&utm_content=combined). The Management API must support `/v2/api-access` and its balance, pricing and limits routes. Deploy that server release before connecting this package to an older environment.
 
 Clone the repository and install its dependencies:
 
@@ -278,7 +278,7 @@ Start with “Check my FlashData balance, pricing and limits.” This does not s
 
 Do not automatically repeat a timed-out query: it may already have been submitted and charged. JSON-RPC IDs are not billing idempotency keys. Check Jobs first. Read failures do not imply refunds.
 
-Downloads require a `storage` object matching the [Download API](https://flashdata.dev/docs/sources/youtube_download). Storage credentials must come from the user's configured destination; never invent or echo them. The existing download protocol transmits these credentials to FlashData to perform the upload. This release does not inject storage credentials from a local file or hide them from the MCP client's tool arguments. Private object URLs still require the destination's own access controls.
+Downloads require a `storage` object matching the [Download API](https://flashdata.dev/docs/sources/youtube_download?utm_source=github&utm_medium=integration&utm_campaign=intent_gtm_2026q4&utm_content=youtube_download-task). Storage credentials must come from the user's configured destination; never invent or echo them. The existing download protocol transmits these credentials to FlashData to perform the upload. This release does not inject storage credentials from a local file or hide them from the MCP client's tool arguments. Private object URLs still require the destination's own access controls.
 
 Use dedicated, narrowly scoped, short-lived storage credentials where supported. Tool arguments may be retained in your MCP client's history or debug logs, even when the server itself does not log them. See [Security](SECURITY.md) for the trust boundaries and private vulnerability reporting channel.
 

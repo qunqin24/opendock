@@ -5,10 +5,10 @@
   </picture>
 </p>
 
-<p align="center"><b>別再讓編碼代理重新除錯你已經修好的問題。</b></p>
+<p align="center"><b>跨 43 個編碼代理的本地共享記憶、跨代理交接與程式碼復原。</b></p>
 
-<p align="center">Claude Code、Codex、Cursor 以及這台機器上的其他代理，本來就把每次會話寫在磁碟上。deja 把這些歷史全部索引，幾個月前的也在，
-再把有用的那部分交給正在工作的代理。</p>
+<p align="center">Claude Code、Codex、Cursor、OpenClaw、Gemini CLI、OpenCode、Hermes 以及另外 36 個代理本來就把每次會話寫在磁碟上。<br>
+deja 在本地索引全部歷史，讓代理跨 <code>/compact</code> 保住上下文、用 <code>deja handoff</code> 中途換代理接著做、用 <code>deja restore</code> 找回被覆寫的程式碼——無需 LLM，單個 Go 二進位檔。</p>
 
 <p align="center"><a href="../../README.md">English</a> | <a href="README.zh.md">简体中文</a> | 繁體中文 | <a href="README.ja.md">日本語</a> | <a href="README.ko.md">한국어</a> | <a href="README.es.md">Español</a> | <a href="README.pt.md">Português</a> | <a href="README.fr.md">Français</a> | <a href="README.de.md">Deutsch</a> | <a href="README.ru.md">Русский</a> | <a href="README.tr.md">Türkçe</a> | <a href="README.hi.md">हिन्दी</a></p>
 
@@ -18,14 +18,15 @@
 
 <p align="center">
   <a href="https://github.com/vshulcz/deja-vu/stargazers"><img src="https://img.shields.io/github/stars/vshulcz/deja-vu?style=flat&color=f59e0b" alt="GitHub Stars"></a>
-  <a href="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml"><img src="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <img src="https://raw.githubusercontent.com/vshulcz/deja-vu/badges/.badges/main/coverage.svg" alt="coverage">
+  <a href="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml"><img src="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml/badge.svg?branch=main&event=push" alt="CI"></a>
+  <a href="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml"><img src="https://img.shields.io/badge/coverage-88%25-brightgreen" alt="Coverage"></a>
   <a href="https://github.com/vshulcz/deja-vu/releases/latest"><img src="https://img.shields.io/github/v/release/vshulcz/deja-vu" alt="Release"></a>
+  <a href="https://mcptoplist.com/server/io.github.vshulcz%2Fdeja-vu"><img src="https://mcptoplist.com/badge/io.github.vshulcz%2Fdeja-vu.svg" alt="MCP Toplist"></a>
   <a href="https://www.npmjs.com/package/@vshulcz/deja-vu"><img src="https://img.shields.io/npm/v/%40vshulcz%2Fdeja-vu" alt="npm"></a>
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT"></a>
 </p>
 
-<p align="center"><a href="https://vshulcz.github.io/deja-vu/">文件</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">評測</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/compare.html">與同類比較</a></p>
+<p align="center"><a href="https://vshulcz.github.io/deja-vu/"><b>官網與互動搜尋</b></a> &middot; <a href="https://vshulcz.github.io/deja-vu/view/"><b>瀏覽器線上展示</b></a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">評測</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/compare.html">與同類比較</a></p>
 
 <p align="center"><img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif" width="720" alt="同一個問題問同一個代理兩次：沒有記憶時它毫無印象，有 deja 時它用八個月前的結論作答"></p>
 
@@ -33,6 +34,8 @@
 curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
 deja install --auto
 ```
+
+<p align="center"><sub>或用 Homebrew：<code>brew install deja-vu &amp;&amp; deja install --auto</code> &middot; Claude Code 外掛：<code>claude plugin marketplace add vshulcz/deja-vu &amp;&amp; claude plugin install deja-vu@deja-vu</code> &middot; Agent Skills：<code>npx skills add vshulcz/deja-vu</code><br><a href="#安裝">Windows（Scoop / winget）、Codex、OpenCode、OpenClaw 等</a> &middot; 免安裝唯讀檢查本機會話：<code>npx @vshulcz/deja-vu sources</code> &middot; <a href="https://vshulcz.github.io/deja-vu/view/">瀏覽器線上展示 →</a></sub></p>
 
 <table align="center">
 <tr>
@@ -75,7 +78,7 @@ opencode、DeepSeek Harness、Zed、Kimi Code、Codex CLI、Grok Build、OpenCla
 可以直接用：
 
 ```sh
-opencode plugin opencode-deja
+opencode plugin add opencode-deja
 dsh plugin --profile web add dsh-deja
 # Zed：擴充面板裡搜 deja
 # Kimi Code：/plugins install https://github.com/vshulcz/deja-vu
@@ -230,7 +233,7 @@ TRAE CLI · Muse Code · Junie · JetBrains AI Assistant · Devin CLI · Windsur
 
 | 代理 | 套件 | 安裝 |
 | --- | --- | --- |
-| opencode | npm `opencode-deja` | `opencode plugin opencode-deja` |
+| opencode | npm `opencode-deja` | `opencode plugin add opencode-deja` |
 | DeepSeek Harness | npm `dsh-deja` | `dsh plugin --profile web add dsh-deja` |
 | Zed | `deja-context-server` | Zed → Extensions → deja |
 | Kimi Code | 外掛 `deja` | `/plugins install https://github.com/vshulcz/deja-vu` |

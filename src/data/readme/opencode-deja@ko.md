@@ -5,10 +5,10 @@
   </picture>
 </p>
 
-<p align="center"><b>이미 고친 문제를 코딩 에이전트가 다시 디버깅하지 않게.</b></p>
+<p align="center"><b>43개 코딩 에이전트를 아우르는 로컬 공유 기억, 에이전트 간 작업 인계, 코드 복구.</b></p>
 
-<p align="center">Claude Code, Codex, Cursor를 비롯한 이 컴퓨터의 에이전트들은 이미 모든 세션을 디스크에 저장합니다.
-deja는 몇 달 전 기록까지 전부 색인하고, 지금 일하는 에이전트에게 필요한 부분을 건넵니다.</p>
+<p align="center">Claude Code, Codex, Cursor, OpenClaw, Gemini CLI, OpenCode, Hermes 등 43개 에이전트는 이미 모든 세션을 디스크에 저장합니다.<br>
+deja는 그 기록을 로컬에서 색인해 <code>/compact</code> 이후에도 컨텍스트를 유지하고, <code>deja handoff</code>로 작업을 인계하며, <code>deja restore</code>로 덮어쓴 코드를 복구합니다 — LLM 없이 단일 Go 바이너리로.</p>
 
 <p align="center"><a href="../../README.md">English</a> | <a href="README.zh.md">简体中文</a> | <a href="README.zh-TW.md">繁體中文</a> | <a href="README.ja.md">日本語</a> | 한국어 | <a href="README.es.md">Español</a> | <a href="README.pt.md">Português</a> | <a href="README.fr.md">Français</a> | <a href="README.de.md">Deutsch</a> | <a href="README.ru.md">Русский</a> | <a href="README.tr.md">Türkçe</a> | <a href="README.hi.md">हिन्दी</a></p>
 
@@ -18,14 +18,15 @@ deja는 몇 달 전 기록까지 전부 색인하고, 지금 일하는 에이전
 
 <p align="center">
   <a href="https://github.com/vshulcz/deja-vu/stargazers"><img src="https://img.shields.io/github/stars/vshulcz/deja-vu?style=flat&color=f59e0b" alt="GitHub Stars"></a>
-  <a href="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml"><img src="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <img src="https://raw.githubusercontent.com/vshulcz/deja-vu/badges/.badges/main/coverage.svg" alt="coverage">
+  <a href="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml"><img src="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml/badge.svg?branch=main&event=push" alt="CI"></a>
+  <a href="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml"><img src="https://img.shields.io/badge/coverage-88%25-brightgreen" alt="Coverage"></a>
   <a href="https://github.com/vshulcz/deja-vu/releases/latest"><img src="https://img.shields.io/github/v/release/vshulcz/deja-vu" alt="Release"></a>
+  <a href="https://mcptoplist.com/server/io.github.vshulcz%2Fdeja-vu"><img src="https://mcptoplist.com/badge/io.github.vshulcz%2Fdeja-vu.svg" alt="MCP Toplist"></a>
   <a href="https://www.npmjs.com/package/@vshulcz/deja-vu"><img src="https://img.shields.io/npm/v/%40vshulcz%2Fdeja-vu" alt="npm"></a>
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT"></a>
 </p>
 
-<p align="center"><a href="https://vshulcz.github.io/deja-vu/">문서</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">벤치마크</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/compare.html">비교</a></p>
+<p align="center"><a href="https://vshulcz.github.io/deja-vu/"><b>문서 및 대화형 검색</b></a> &middot; <a href="https://vshulcz.github.io/deja-vu/view/"><b>브라우저 라이브 데모</b></a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">벤치마크</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/compare.html">비교</a></p>
 
 <p align="center"><img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif" width="720" alt="같은 에이전트에게 같은 질문을 두 번: 기억이 없을 때는 아무것도 모르고, deja가 있으면 8개월 전 결론으로 답한다"></p>
 
@@ -33,6 +34,8 @@ deja는 몇 달 전 기록까지 전부 색인하고, 지금 일하는 에이전
 curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
 deja install --auto
 ```
+
+<p align="center"><sub>또는 Homebrew: <code>brew install deja-vu &amp;&amp; deja install --auto</code> &middot; Claude Code 플러그인: <code>claude plugin marketplace add vshulcz/deja-vu &amp;&amp; claude plugin install deja-vu@deja-vu</code> &middot; Agent Skills: <code>npx skills add vshulcz/deja-vu</code><br><a href="#설치">Windows (Scoop / winget), Codex, OpenCode, OpenClaw 등</a> &middot; 설치 없이 세션 확인: <code>npx @vshulcz/deja-vu sources</code> &middot; <a href="https://vshulcz.github.io/deja-vu/view/">라이브 데모 →</a></sub></p>
 
 <table align="center">
 <tr>
@@ -76,7 +79,7 @@ opencode, DeepSeek Harness, Zed, Kimi Code, Codex CLI, Grok Build, OpenClaw, pi,
 패키지가 있습니다. 확장을 그쪽에서 설치하는 데 익숙하다면:
 
 ```sh
-opencode plugin opencode-deja
+opencode plugin add opencode-deja
 dsh plugin --profile web add dsh-deja
 # Zed: 확장 패널에서 deja 검색
 # Kimi Code: /plugins install https://github.com/vshulcz/deja-vu
@@ -129,7 +132,7 @@ skill은 이미 설치된 `deja` 바이너리를 호출하며, 자체 바이너�
 
 ## 무엇을 얻나
 
-**Codex에서 해결하면 Claude가 기억합니다.** 마흔한 개의 코딩 에이전트가 모든 대화를 로컬 파일에 쓰고,
+**Codex에서 해결하면 Claude가 기억합니다.** 마흔세 개의 코딩 에이전트가 모든 대화를 로컬 파일에 쓰고,
 deja는 그 파일들을 모두가 읽을 수 있는 하나의 기억 계층으로 바꿉니다.
 
 | | |
@@ -243,7 +246,7 @@ TRAE CLI · Muse Code · Junie · JetBrains AI Assistant · Devin CLI · Windsur
 
 | 에이전트 | 패키지 | 설치 |
 | --- | --- | --- |
-| opencode | npm `opencode-deja` | `opencode plugin opencode-deja` |
+| opencode | npm `opencode-deja` | `opencode plugin add opencode-deja` |
 | DeepSeek Harness | npm `dsh-deja` | `dsh plugin --profile web add dsh-deja` |
 | Zed | `deja-context-server` | Zed → Extensions → deja |
 | Kimi Code | 플러그인 `deja` | `/plugins install https://github.com/vshulcz/deja-vu` |

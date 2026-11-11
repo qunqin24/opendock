@@ -45,6 +45,8 @@ The default proxy is `http://127.0.0.1:40000`. If yours differs, set `proxyUrl` 
 opencode plugin add opencode-warp-retry
 ```
 
+Package page: <https://www.npmjs.com/package/opencode-warp-retry>
+
 ### From GitHub
 
 ```sh
@@ -63,7 +65,46 @@ powershell -ExecutionPolicy Bypass -File .\launcher\windows\Install.ps1
 
 This copies the plugin to `%USERPROFILE%\.config\opencode\plugins\warp-retry\index.ts` (saving a `.bak` of any previous file) and creates the **OpenCode (WARP)** shortcut. Add `-Force` to replace an existing shortcut without confirmation; the previous shortcut is saved as `.lnk.bak`.
 
+Ready-to-use ZIP for the current version: <https://github.com/lipey1/opencode-warp-retry/releases/download/v1.0.0/opencode-warp-retry.zip>
+
 > Use only one installation method. If the plugin is already installed with `opencode plugin add`, do not also copy `src/index.ts` manually.
+
+### Linux
+
+The plugin is the same on every OS. On Linux the extra work is installing the WARP client and making the OpenCode **service** inherit the proxy.
+
+**1. Install the WARP client** (Ubuntu/Debian):
+
+```sh
+curl -fsSL https://pkg.cloudflareclient.com/pubkey.gpg \
+  | sudo gpg --yes --dearmor --output /usr/share/keyrings/cloudflare-warp-archive-keyring.gpg
+echo "deb [signed-by=/usr/share/keyrings/cloudflare-warp-archive-keyring.gpg] https://pkg.cloudflareclient.com/ $(lsb_release -cs) main" \
+  | sudo tee /etc/apt/sources.list.d/cloudflare-client.list
+sudo apt-get update && sudo apt-get install cloudflare-warp
+```
+
+If `lsb_release` is missing, replace `$(lsb_release -cs)` with your release codename (e.g. `noble`, `bookworm`). Fedora/RHEL/CentOS use the `cloudflare-warp-ascii.repo` repository with `sudo dnf install cloudflare-warp` (or `yum`). Packages for every distro: <https://pkg.cloudflareclient.com/>.
+
+**2. Register and enable proxy mode:**
+
+```sh
+warp-cli registration new   # first time only
+warp-cli mode proxy
+warp-cli connect
+curl -x http://127.0.0.1:40000 https://www.cloudflare.com/cdn-cgi/trace | grep warp=
+```
+
+The last line must show `warp=on`.
+
+> List the available modes with `warp-cli mode --help`. If your client has no `proxy` mode, the plugin cannot work with it; use the Cloudflare One (Zero Trust) client, which documents proxy mode. Some versions expose SOCKS5 only: if `curl -x http://127.0.0.1:40000` fails while WARP is connected, put a local converter in front (for example `privoxy` with `forward-socks5`) and point `proxyUrl` at it.
+
+**3. Install the plugin:**
+
+```sh
+opencode plugin add opencode-warp-retry
+```
+
+**4. Do not use the Windows launcher.** `launcher/windows/`, `Install.ps1`, and the `.lnk` shortcut are Windows-only. On Linux, follow *Linux (service and startup)* below.
 
 ### Manual
 
@@ -122,6 +163,76 @@ opencode
 ```
 
 For OpenCode Desktop, use the launcher (or restart the service after setting the variables) so the service inherits the proxy.
+
+### Linux (service and startup)
+
+OpenCode's background service starts with the environment of the first client that launches it. If it is already running, new variables are ignored — stop it first:
+
+```sh
+opencode service stop
+```
+
+To make it permanent, export the variables from your shell startup file (`~/.bashrc`, `~/.zshrc`, or `~/.profile`):
+
+```sh
+export HTTPS_PROXY=http://127.0.0.1:40000
+export HTTP_PROXY=http://127.0.0.1:40000
+export ALL_PROXY=http://127.0.0.1:40000
+export NO_PROXY=localhost,127.0.0.1,::1
+```
+
+Open a new terminal (or run `source ~/.bashrc`) and start OpenCode normally. To check the service afterwards:
+
+```sh
+opencode service status
+```
+
+**Desktop entry (optional).** Create `~/.local/share/applications/opencode-warp.desktop`:
+
+```ini
+[Desktop Entry]
+Type=Application
+Name=OpenCode (WARP)
+Comment=OpenCode through the Cloudflare WARP proxy
+Exec=env HTTPS_PROXY=http://127.0.0.1:40000 HTTP_PROXY=http://127.0.0.1:40000 ALL_PROXY=http://127.0.0.1:40000 NO_PROXY=localhost,127.0.0.1,::1 opencode
+Terminal=true
+Icon=utilities-terminal
+Categories=Development;
+```
+
+If `opencode` is not on the graphical session's `PATH`, use its absolute path in `Exec`. Then:
+
+```sh
+chmod +x ~/.local/share/applications/opencode-warp.desktop
+update-desktop-database ~/.local/share/applications 2>/dev/null || true
+```
+
+**systemd user unit (if you run one).** Add the variables to the unit:
+
+```sh
+systemctl --user edit opencode
+```
+
+```ini
+[Service]
+Environment="HTTPS_PROXY=http://127.0.0.1:40000"
+Environment="HTTP_PROXY=http://127.0.0.1:40000"
+Environment="ALL_PROXY=http://127.0.0.1:40000"
+Environment="NO_PROXY=localhost,127.0.0.1,::1"
+```
+
+```sh
+systemctl --user daemon-reload
+systemctl --user restart opencode
+```
+
+**Confirm the plugin is active.** After opening OpenCode:
+
+```sh
+tail -f ~/.local/share/opencode-warp-retry/warp-retry.log
+```
+
+The first line should be `plugin loaded; automatic free-limit retry enabled`. If it says `plugin loaded but no proxy environment matches`, the service did not inherit the variables — run `opencode service stop` and open it again.
 
 ## Configuration
 
@@ -184,12 +295,14 @@ plugin loaded but no proxy environment matches http://127.0.0.1:40000; automatic
 | The plugin never triggers | Check the log. The error must be `provider.free-limit`. |
 | OpenCode opens without WARP | The launcher could not reach the proxy; it falls back and shows a warning. |
 | Still limited after rotations | Likely an account-level quota; rotating the IP will not help. |
+| `warp-cli: command not found` (Linux) | Install the `cloudflare-warp` package (see the Linux section) and open a new terminal. |
+| Linux: `plugin loaded but no proxy environment matches` | The OpenCode service started before the variables; run `opencode service stop` and open it again. |
 
 ## Development
 
 ```text
 src/index.ts                  plugin source
-launcher/windows/             Windows launcher + one-click installer
+launcher/windows/             Windows launcher + one-click installer (not used on Linux)
 examples/opencode.jsonc       configuration example
 ```
 

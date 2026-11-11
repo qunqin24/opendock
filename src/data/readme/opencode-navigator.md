@@ -1,6 +1,7 @@
 # OpenCode Navigator
 
-Search, navigate, and manage OpenCode sessions from the TUI. Navigator combines
+Search, navigate, and manage OpenCode sessions from the TUI, with an experimental
+OpenCode Desktop interface. Navigator combines
 Search Everything, task and subagent views, skills, MCP presets, and quick actions
 with a configurable sidebar.
 
@@ -44,7 +45,7 @@ collapsed. Use `Save current layout as default` in sidebar settings to reuse the
 current visible/hidden, expanded/collapsed, and ordering states in new sessions.
 
 **Only the latest stable release in each major line is supported: OpenCode
-1.19.5 and 2.2.5.** Both have separate real-host checks. Older releases are not
+1.19.5 and 2.2.6.** Both have separate real-host checks. Older releases are not
 part of the supported compatibility matrix. The 2.2 integration uses OpenTUI 0.8
 and public host caches, events, keymap layers, and client APIs while retaining
 the separate 1.x adapter. See [Host API boundaries](HOST_API.md) for remaining
@@ -52,7 +53,7 @@ capability gaps and removal conditions. On OpenCode 2, Navigator reads the same 
 the host sidebar, including completed `todowrite` calls and the current revert
 boundary. Viewing Todo needs no Navigator server plugin. OpenCode 2.1 exposes
 content and four statuses, without priorities or direct Todo CRUD. LSP is hidden on 2.x while retaining Subagents,
-Skills, Quick Actions, MCP, Search, settings, and presets. All interface icons use Nerd Font glyphs by
+Skills, Quick Actions, MCP, Search, settings, and presets. All TUI interface icons use Nerd Font glyphs by
 default (Codicons for controls, keyboard symbols for hints, language logos for LSP). Use a Nerd Fonts v3
 terminal font, or select **Settings → Behavior → Icon style → Text fallback**.
 The switch applies to the entire interface, including Quick Actions, search
@@ -270,6 +271,72 @@ setting and optional server-plugin entry
 in a separate JSON file and set `OPENCODE_CONFIG` to its path **only when
 launching OpenCode 2.x**. The TUI configuration in `cli.json` remains separate;
 the OpenCode 1.x launch must not load Navigator's 2.x server plugin.
+
+### Experimental OpenCode Desktop
+
+Navigator 0.27.0 and newer also export `./gui-experimental` for **OpenCode Desktop
+2.2.6**. This is not browser Web support or a detached operating-system window.
+Earlier Navigator versions do not include the GUI export.
+
+Desktop discovers the GUI from its **global server plugin configuration**,
+`~/.config/opencode/opencode.json` (or the equivalent XDG location), not from
+`cli.json` or `tui.json`. Merge its package entry with existing plugins rather
+than replacing the configuration:
+
+```jsonc
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugins": [{ "package": "opencode-navigator" }],
+}
+```
+
+For a pinned local installation, use its reviewed package directory instead of
+the npm package name; that directory must include its runtime dependencies.
+Do not add this v2 server package to a configuration shared with OpenCode 1.x;
+keep the separate v2 launch configuration described above. The same package
+contains independent TUI, server, RPC and GUI entries.
+
+- Open **Open Navigator** from the command palette after selecting a session.
+  The native panel can be placed beside or below the chat with host controls.
+  Narrow windows use **More → Navigator**.
+- Choose **Float** for an opt-in mini-window inside the application. It follows
+  the selected session, hides on Home and yields to native dialogs. Move, resize,
+  reset and redock controls support keyboard input too. Both placements share
+  one monitoring runtime and filters; switching does not duplicate polling.
+- **Navigator settings** opens native Settings with Global/Worktree scope,
+  section controls, groups, trust, presets, portable/project profiles, About,
+  release history and reviewed Bug reports. **Reload preferences** imports
+  changes from other local Navigator instances explicitly.
+- Favorites, trust, account bindings, reset attempts and presets use the existing
+  private preferences file and lock shared with local TUI instances. Only window
+  placement lives in the native GUI store. Project profiles and configuration
+  requests use the selected server, including remote servers.
+- Todo is native and read-only; chat owns edits. Legacy Navigator tasks remain a
+  read-only archive. LSP and startup/Home interception are not exposed by this
+  Desktop contract. Permissions opens native host Settings rather than toggling
+  a simulated mode. Terminal fonts, corner masks and terminal shortcuts are not
+  GUI settings; Desktop does not need a Nerd Font or the corner font.
+- Provider quotas retain verified account scope. Local Codex access requires a
+  verified same-machine connection; a remote session never borrows its credentials
+  or private binding. Banked resets always require separate confirmation.
+
+The candidate is tested as an npm-style tarball in the official checksum-verified
+Linux ARM64 Desktop package on Xvfb. Native macOS/Windows, browser Web and multiple
+live Desktop windows are not claimed as real-host verification targets. Local,
+remote and multi-consumer guards have separate synthetic contract tests.
+See [Host API boundaries](HOST_API.md) for the native command-palette limitation.
+The manual Prepare Release workflow generated and byte-verified all 27 GUI
+captures using the real Desktop renderer on a virtual display. The terminal
+gallery above is rendered separately through Ghostty.
+
+![Desktop Search Everything with a synthetic Skill](screenshots/gui/02-desktop-search-skills.png)
+
+![Desktop mini-window preserving the current Todo filter](screenshots/gui/14-desktop-mini-window.png)
+
+![Desktop layout preview with a separate Apply action](screenshots/gui/07-desktop-layout-preview.png)
+
+See the [Desktop gallery](screenshots/README.md#experimental-desktop) for account
+linking, quotas, reviewed resets, profiles, onboarding and Bug reports.
 
 ### Install the corner font
 
@@ -995,6 +1062,8 @@ Consumer installations retain upstream metadata; see [Host APIs](HOST_API.md).
 ```sh
 bun run test
 bun run test:e2e
+bun run test:gui
+bun run test:e2e:gui
 bun run typecheck
 bun run lint
 bun run lint:fix
@@ -1008,8 +1077,11 @@ bun run screenshots:verify
 bun run check
 ```
 
-`bun run check` runs the tests, TypeScript, Oxlint, bundle-size guard, and Oxfmt
-check. The unminified TUI bundle is limited to 360,000 bytes.
+`bun run check` runs the TUI and browser-conditioned GUI tests, separate JSX
+typechecks, Oxlint, bundle-size guards, and Oxfmt. The unminified TUI bundle is
+limited to 360,000 bytes; the independent single-file GUI budget is 600,000 bytes
+(stage-10 measured baseline: about 554 kB). DOM accessibility checks apply only
+to GUI modules, never to terminal renderables.
 Font generation is a separate development task: `bun run font:build` and
 `bun run font:check` use `uv` and the pinned FontTools dependency. Users install
 the already generated font; Python and FontTools are not needed at runtime.
@@ -1025,6 +1097,15 @@ experience remains reproducible beside the required-font captures. The harness
 requires Docker with Linux ARM64 support. These commands are available for harness
 development; the committed release captures are generated by the manual
 `Prepare Release` GitHub Actions workflow.
+
+That workflow also runs `bun run screenshots:gui` and
+`bun run screenshots:gui:verify`. They use the real packaged Desktop renderer on
+Xvfb, not Ghostty, with synthetic sessions, providers and reports. The second run
+compares the PNGs byte-for-byte. Fixed renderer and synthetic main clocks,
+full software rasterization and disabled capture-time animations stabilize scenes
+without stopping interaction timers or adding comparison tolerances. GUI
+capture commands reject non-CI invocation; ordinary Desktop smoke tests never
+take screenshots. New captures and their visual review remain a pre-release gate.
 
 ## Publishing
 

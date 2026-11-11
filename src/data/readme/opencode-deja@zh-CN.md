@@ -5,10 +5,10 @@
   </picture>
 </p>
 
-<p align="center"><b>别再让编程智能体重新调试你已经修好的问题。</b></p>
+<p align="center"><b>跨 43 个编程智能体的本地共享记忆、跨智能体交接与代码恢复。</b></p>
 
-<p align="center">Claude Code、Codex、Cursor、OpenClaw、Gemini CLI、OpenCode、Hermes 以及另外 37 个智能体本来就把每次会话写在磁盘上。<br>
-deja 在本地索引全部历史，并通过 MCP 和钩子把相关上下文交还给正在干活的智能体——无需 LLM，单个 Go 二进制。</p>
+<p align="center">Claude Code、Codex、Cursor、OpenClaw、Gemini CLI、OpenCode、Hermes 以及另外 36 个智能体本来就把每次会话写在磁盘上。<br>
+deja 在本地索引全部历史，让智能体跨 <code>/compact</code> 保住上下文、用 <code>deja handoff</code> 中途换智能体接着做、用 <code>deja restore</code> 找回被覆盖的代码——无需 LLM，单个 Go 二进制。</p>
 
 <p align="center"><a href="../../README.md">English</a> | 简体中文 | <a href="README.zh-TW.md">繁體中文</a> | <a href="README.ja.md">日本語</a> | <a href="README.ko.md">한국어</a> | <a href="README.es.md">Español</a> | <a href="README.pt.md">Português</a> | <a href="README.fr.md">Français</a> | <a href="README.de.md">Deutsch</a> | <a href="README.ru.md">Русский</a> | <a href="README.tr.md">Türkçe</a> | <a href="README.hi.md">हिन्दी</a></p>
 
@@ -18,9 +18,10 @@ deja 在本地索引全部历史，并通过 MCP 和钩子把相关上下文交�
 
 <p align="center">
   <a href="https://github.com/vshulcz/deja-vu/stargazers"><img src="https://img.shields.io/github/stars/vshulcz/deja-vu?style=flat&color=f59e0b" alt="GitHub Stars"></a>
-  <a href="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml"><img src="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <img src="https://raw.githubusercontent.com/vshulcz/deja-vu/badges/.badges/main/coverage.svg" alt="coverage">
+  <a href="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml"><img src="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml/badge.svg?branch=main&event=push" alt="CI"></a>
+  <a href="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml"><img src="https://img.shields.io/badge/coverage-88%25-brightgreen" alt="Coverage"></a>
   <a href="https://github.com/vshulcz/deja-vu/releases/latest"><img src="https://img.shields.io/github/v/release/vshulcz/deja-vu" alt="Release"></a>
+  <a href="https://mcptoplist.com/server/io.github.vshulcz%2Fdeja-vu"><img src="https://mcptoplist.com/badge/io.github.vshulcz%2Fdeja-vu.svg" alt="MCP Toplist"></a>
   <a href="https://www.npmjs.com/package/@vshulcz/deja-vu"><img src="https://img.shields.io/npm/v/%40vshulcz%2Fdeja-vu" alt="npm"></a>
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT"></a>
 </p>
@@ -34,7 +35,7 @@ curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | s
 deja install --auto
 ```
 
-<p align="center"><sub>macOS 与 Linux &middot; <a href="#安装">Windows、Homebrew、npm 与插件市场</a> &middot; 免安装只读检查本机已有哪些会话：<code>npx @vshulcz/deja-vu sources</code> &middot; <a href="https://vshulcz.github.io/deja-vu/view/">浏览器在线演示 →</a></sub></p>
+<p align="center"><sub>或用 Homebrew：<code>brew install deja-vu &amp;&amp; deja install --auto</code> &middot; Claude Code 插件：<code>claude plugin marketplace add vshulcz/deja-vu &amp;&amp; claude plugin install deja-vu@deja-vu</code> &middot; Agent Skills：<code>npx skills add vshulcz/deja-vu</code><br><a href="#安装">Windows（Scoop / winget）、国内 npm 镜像、Codex、OpenCode、OpenClaw 等</a> &middot; 免安装只读检查本机会话：<code>npx @vshulcz/deja-vu sources</code> &middot; <a href="https://vshulcz.github.io/deja-vu/view/">浏览器在线演示 →</a></sub></p>
 
 <table align="center">
 <tr>
@@ -77,7 +78,7 @@ opencode、DeepSeek Harness、Zed、Kimi Code、Qwen Code、Codex CLI、Grok Bui
 可以直接用：
 
 ```sh
-opencode plugin opencode-deja
+opencode plugin add opencode-deja
 dsh plugin --profile web add dsh-deja
 magpie plugin add @vshulcz/magpie-deja
 qwen extensions install https://github.com/vshulcz/deja-vu
@@ -230,7 +231,7 @@ TRAE CLI · Muse Code · Junie · JetBrains AI Assistant · Devin CLI · Windsur
 
 | 智能体 | 包 | 安装 |
 | --- | --- | --- |
-| opencode | npm `opencode-deja` | `opencode plugin opencode-deja` |
+| opencode | npm `opencode-deja` | `opencode plugin add opencode-deja` |
 | DeepSeek Harness | npm `dsh-deja` | `dsh plugin --profile web add dsh-deja` |
 | Zed | `deja-context-server` | Zed → Extensions → deja |
 | Kimi Code | 插件 `deja` | `/plugins install https://github.com/vshulcz/deja-vu` |
@@ -241,6 +242,8 @@ TRAE CLI · Muse Code · Junie · JetBrains AI Assistant · Devin CLI · Windsur
 | Hermes | 记忆提供者 `deja-memory`，在 Hermes 插件目录里 | `hermes plugins install deja-memory`，或从 GitHub：`hermes plugins install vshulcz/deja-vu/extensions/hermes` |
 | Magpie | npm `@vshulcz/magpie-deja` | `magpie plugin add @vshulcz/magpie-deja` |
 | VS Code / Cursor / Windsurf | 状态栏扩展 `vshulcz.deja-status` | `code --install-extension vshulcz.deja-status` |
+| Neovim | `lazy.nvim` 与 CodeCompanion 插件（[`extensions/nvim/`](../../extensions/nvim/docs/zh.md)） | `{ "vshulcz/deja-vu", opts = {} }` |
+| tmux | [TPM](https://github.com/tmux-plugins/tpm) 弹窗（`prefix + D`）与状态栏 `#{deja_status}`（`deja.tmux`） | `set -g @plugin 'vshulcz/deja-vu'` |
 | Raycast | Raycast 扩展 `deja-vu` | `cd extensions/raycast && npm install && npx ray develop` |
 | CC Switch | 一键导入 MCP 与 Skill 仓库（`ccswitch://`） | [导入 MCP 到 CC Switch](ccswitch://v1/import?resource=mcp&apps=claude,codex,gemini,opencode&config=eyJtY3BTZXJ2ZXJzIjp7ImRlamEiOnsiY29tbWFuZCI6Im5weCIsImFyZ3MiOlsiLXkiLCJAdnNodWxjei9kZWphLXZ1Iiwic2VydmUiXX19fQ==) · [跨智能体切换指南](https://vshulcz.github.io/deja-vu/guide/switch-agents-without-losing-context.html) |
 

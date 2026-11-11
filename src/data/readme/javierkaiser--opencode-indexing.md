@@ -30,6 +30,10 @@ TypeScript in the same process. No network, no account, no service — and about
 0.2 ms per chunk, so a full index of this repository takes seconds instead of
 minutes. It is English-only; a configured cloud key still wins.
 
+**If you never used Kilo.** `npx @javierkaiser/opencode-indexing --aio` is the
+whole install: the published plugin, the codegraph companion, and a local-only
+profile to match. It does not build the index — you start that when you want one.
+
 ## Install
 
 ### With npx (recommended)
@@ -55,11 +59,74 @@ npx @javierkaiser/opencode-indexing --with-codegraph
 
 | Flag | Effect |
 | --- | --- |
+| `--aio`, `--all-in-one` | All-in-one install for a machine without Kilo: implies `--package` and `--with-codegraph`, then writes a local profile (see below) |
 | `--package [spec]` | Install the published package (default spec `@latest`) |
 | `--local` | Copy this directory into the config dir (development) |
 | `--skip-deps` | `--local` only: copy the files, install no dependencies |
 | `--no-restart` | Do not restart the service |
 | `--with-codegraph` | Install and register codegraph as a companion MCP (opt-in, `--package` only) |
+
+### All-in-one (AIO)
+
+If Kilo was never installed, `--aio` is the install with no decisions left in it:
+
+```bash
+npx @javierkaiser/opencode-indexing --aio
+```
+
+It implies `--package` and `--with-codegraph`: it installs the published plugin,
+installs and registers codegraph, and writes a local profile to
+`~/.config/opencode/indexing.json`:
+
+```json
+{
+  "vectorStore": "lancedb",
+  "provider": "local",
+  "model": "potion-multilingual-128M",
+  "dimension": 256,
+  "autoRefresh": false,
+  "searchKilo": false,
+  "importFromKilo": false
+}
+```
+
+`searchKilo` and `importFromKilo` are off because there is no Kilo index to read
+from or copy. `dimension: 256` is written out rather than inferred: `kilo.jsonc`
+is consulted before the model registry, so a dimension left behind by Kilo would
+override the multilingual model's 256. `autoRefresh: false` is the other
+deliberate one — the installer does not build the index, and this keeps search
+from starting one on its own. The first build is yours to start: **Settings →
+Indexing → Build**, `/indexing`, or `indexing_build`.
+
+What the install does fetch is the model. After the restart it runs the plugin's
+`settings.test` for `lancedb` and `provider`; the provider test downloads the
+multilingual weights (~512 MB fp32, ~123 MB int8 on first use) and confirms they
+produce 256 dimensions, so the first search is not the one that discovers a
+missing or broken model. `--no-restart` skips that and leaves the download to
+first use.
+
+Existing keys and credentials in `indexing.json` are preserved: the profile is
+merged into the file, not written over it, and a file that is not valid JSON is
+left untouched with a warning. Plugin `options` in `opencode.json` still win over
+the file, so an option that sets one of these keys takes precedence and the
+installer says so. `--aio` is the published-package install and cannot be
+combined with `--local`.
+
+Running `--aio` again is safe. If the plugin is already installed — a `plugins`
+entry in `opencode.json`, the copy at
+`<config>/opencode/plugins/opencode-indexing`, a `javierkaiser.indexing` line in
+`opencode plugin list` — or `indexing.json` already exists, the installer
+applies no profile: it says what it found, leaves the file untouched, and skips
+the `settings.test` model prefetch, so the multilingual weights are not
+downloaded a second time. The rest of the install still runs: plugin
+add/update, the codegraph registration, the permission rules and the service
+restart.
+
+If the plugin is already installed, change the profile from **Settings →
+Indexing**; re-running the installer will not replace it. If only an
+`indexing.json` exists (the plugin is not detected), back it up, remove it, and
+run `--aio` again: with no file to protect, the installer writes the profile and
+fetches the model.
 
 ### The codegraph companion
 
@@ -120,7 +187,8 @@ The other six tools only read. OpenCode's base policy already allows everything
 write them out only if you want to tighten the set.
 
 `install.sh` and `install.ps1` are thin wrappers over it; PowerShell also accepts
-`-Local`, `-Package`, `-Spec`, `-SkipDeps`, `-NoRestart` and `-WithCodegraph`.
+`-Aio`, `-Local`, `-Package`, `-Spec`, `-SkipDeps`, `-NoRestart` and
+`-WithCodegraph`.
 
 `--package` deletes any copied plugin it finds: both sources define the same
 plugin id (`javierkaiser.indexing`) and the config directory is scanned
@@ -181,7 +249,16 @@ OpenCode ──► codegraph_*  ───────► codegraph's graph (its 
 | `indexing_config_set` | Change one setting and persist it. `{ key, value }`. Refuses credentials |
 | `indexing_refresh` | Incremental update of the own index (new/changed/deleted files only) |
 | `indexing_build` | Build the own index: imports from Kilo when compatible, otherwise embeds from scratch. `{ rebuild?, skipImport? }` |
-| `indexing_import` | Import a specific Kilo source without re-embedding. `{ source?, rebuild? }` |
+| `indexing_import` | Import a specific Kilo source without re-embedding. `{ source?, rebuild? }`; `rebuild` drops the own index first |
+
+### Bundled skill
+
+The plugin registers a skill, `opencode-indexing` ("Semantic code search
+(indexing)"), that tells the model when `indexing_search` is the right tool,
+when Grep, Glob or Read are the better ones, how to read empty results, and how
+to keep the index fresh. It ships as `skills/opencode-indexing/SKILL.md` and is
+registered from that file, so there is nothing to install. Mention it as
+`@opencode-indexing`, or let the model load it when the description matches.
 
 ## Settings
 
@@ -218,7 +295,7 @@ Settable keys (case-insensitive):
 | `importfromkilo` | `true` to import from Kilo when building, `false` to start from scratch |
 | `codegraph` | `false` to stop also running the `codegraph` CLI on build. On by default; a no-op when codegraph is not installed |
 | `autorefresh` | Refresh the own index automatically on search |
-| `enabled` | Master switch. `false` pauses writing and refreshing; search keeps reading Kilo's index |
+| `enabled` | Master switch. `false` pauses writing and refreshing; search keeps working, and still reads Kilo's index unless `searchKilo` is off |
 | `searchmaxresults` | Result cap per search |
 | `embeddingbatchsize` | Embedding batch size |
 | `searchminscore` | Minimum similarity score |
@@ -244,12 +321,12 @@ The terminal footer shows whether the current workspace is indexed, in one glyph
 | --- | --- |
 | `● indexed` | Own index exists and is complete |
 | `◐ index stale` | Own index exists but needs a refresh |
-| `○ not indexed` | Nothing indexed yet, but Kilo's index is readable |
+| `○ not indexed` | Nothing indexed yet: Kilo's index is readable, or Kilo search is off |
 | `✕ no index` | Neither index is available for this workspace |
 | `⏸ paused` | Indexing paused: nothing is written or refreshed |
 | `!` / `◌` | The status could not be read / is still loading |
 
-*Indexing: start, pause or resume indexing* in the command palette — or `/indexing-config set enabled=false` — controls it. The footer is a status line only: the host's `prompt.footer` slot exposes no interaction surface, so it is not clickable. Pausing leaves `indexing_search` working (it still reads Kilo's index), but `indexing_build`, `indexing_refresh`, `indexing_import` and auto-refresh refuse to write until you resume. The command has a stable id, so a key can be assigned in `cli.json`.
+*Indexing: start, pause or resume indexing* in the command palette — or `/indexing-config set enabled=false` — controls it. The footer is a status line only: the host's `prompt.footer` slot exposes no interaction surface, so it is not clickable. Pausing leaves `indexing_search` working — it reads both indexes, or only the own one when `searchKilo` is off — but `indexing_build`, `indexing_refresh`, `indexing_import` and auto-refresh refuse to write until you resume. The command has a stable id, so a key can be assigned in `cli.json`.
 
 The footer itself is terminal-only: `prompt.footer` is a TUI slot, and OpenCode
 Desktop has no equivalent status line under its composer. Desktop does not load
@@ -259,12 +336,21 @@ model chosen from the catalog, vector store, Qdrant and LanceDB locations,
 credentials, search limits and the indexing switches — plus a one-click local
 setup, Build and Refresh actions, **palette commands** for those two index
 actions, and a **composer pill** that carries the index state beside the
-composer. They share
-the same server-side state through the plugin's RPC, so the terminal page, the
-Desktop page and the tools share one settings file and one index. The footer and
-the composer pill are two expressions of the same state, not two indexes. The
-GUI export keeps the `-experimental` suffix because the Desktop GUI SDK is still
-experimental and may change between OpenCode releases.
+composer. They share the same server-side state through the plugin's RPC, so the
+terminal page, the Desktop page and the tools share one settings file and one
+index. The footer and the composer pill are two expressions of the same state,
+not two indexes. The GUI export keeps the `-experimental` suffix because the
+Desktop GUI SDK is still experimental and may change between OpenCode releases.
+
+The page is assembled from the host's own settings components —
+`SettingsLayout`, `SettingsSection`, `SettingsRow` and `Select` — so its column
+width, section spacing, row separators and typography are the host's, in light
+and dark alike. The hand-rolled CSS that reproduced those measurements and
+coloured itself from the `--v2-*` variables is gone: a copied measurement is a
+snapshot of one OpenCode release and drifts without saying so, and those
+variables are not a theme API this package can rely on. With the components, the
+page follows the host's layout and theme by construction instead of
+approximately.
 
 The tool layer works in every client as well:
 
@@ -294,6 +380,7 @@ Configurable from all four surfaces (the three above plus the Desktop settings p
 - **LanceDB directory** with availability test.
 - **Embedding provider/model** (local, mistral, openai, ollama, openai-compatible, gemini, voyage, openrouter) and **API key**. The model is chosen from a catalog rather than typed blind.
 - **Import from Kilo** toggle with live source detection ("Qdrant ws-… (31,261 pts) · LanceDB …").
+- **Kilo search** toggle. Off answers from the own index only, and `indexing_status` says the search is disabled instead of reporting a missing Kilo index.
 - **Auto-refresh on search** toggle.
 - **Search limits and file extensions.**
 - Build / refresh / import actions and a status summary.
@@ -447,6 +534,22 @@ complete one. `searchKilo: false` (or `KILO_INDEX_SEARCH_KILO=false`) answers
 from the own index only, which is what makes a local model usable in a workspace
 that still has a Kilo collection.
 
+Turning Kilo search off is a choice, and the plugin reports it as one. With
+`searchKilo: false`, `indexing_status` writes that Kilo search is disabled rather
+than that no Kilo index exists; `indexing_search` says only the own index was
+searched when it finds nothing; and the paused line in `indexing_config` says
+search reads the own index only. The two states need different actions — one is
+a switch, the other is an index that has to be built — and the old wording sent
+readers looking for a build to fix a setting.
+
+`KILO_INDEX_SEARCH_KILO` is the lowest-precedence way to set it. A `searchKilo`
+stored in `indexing.json` — which is what the TUI and Desktop switches write —
+wins over the environment, and a plugin option wins over both, so an exported
+`false` stays in effect only until a switch is flipped. The *Set up locally*
+preset respects that: it selects the bundled local model, embedded LanceDB,
+import-from-Kilo and auto-refresh, but it no longer turns `searchKilo` on behind
+your back.
+
 **Which models can import from Kilo.** Kilo's registry is mirrored entry for
 entry, because an import is accepted only when provider, model id and dimension
 match exactly. Models marked *ours* in the table above are not in Kilo's
@@ -480,7 +583,7 @@ Settings are stored in `~/.config/opencode/indexing.json` (plugin options → `i
 | `qdrantUrl` / `qdrantApiKey` | Qdrant connection |
 | `provider` / `model` / `dimension` | Embedding profile, overriding the resolved one |
 | `importFromKilo` | Import a compatible Kilo index on build instead of re-embedding |
-| `searchKilo` | Search Kilo's index alongside the own one. `false` answers from the own index only — the escape hatch when Kilo's profile cannot be embedded here |
+| `searchKilo` | Search Kilo's index alongside the own one. `false` answers from the own index only — the escape hatch when Kilo's profile cannot be embedded here — and is reported as disabled search, not as a missing index |
 | `autoRefresh` | Refresh inline on search when few files changed |
 | `enabled` | Master switch: when false the own index is neither written nor refreshed |
 | `ignoreKiloConfig` | Stop reading `~/.config/kilo/kilo.jsonc` entirely |
@@ -497,7 +600,7 @@ precedence, with plugin options winning.
 | Variable | Meaning |
 | --- | --- |
 | `KILO_INDEX_VECTOR_STORE` | `lancedb` (default) or `qdrant` for the own index |
-| `KILO_INDEX_SEARCH_KILO` | `false` searches only the own index (see `searchKilo`) |
+| `KILO_INDEX_SEARCH_KILO` | `false` searches only the own index (see `searchKilo`). Lowest precedence: a stored `searchKilo` or a plugin option wins over it |
 | `KILO_INDEX_QDRANT_URL` / `KILO_INDEX_QDRANT_API_KEY` | Qdrant connection |
 | `KILO_INDEX_LANCEDB_DIR` | Base directory for the own LanceDB stores |
 | `KILO_INDEX_KILO_LANCEDB_DIR` | Override Kilo's LanceDB directory (import source) |
@@ -507,35 +610,41 @@ Word about data safety: Kilo's indexes (`ws-*` collections and its LanceDB direc
 
 ## Requirements
 
-- OpenCode v2 (plugin API `@opencode/plugin@2.x`). Verified with OpenCode 2.2
-  and OpenTUI 0.7; the TUI takes whichever runtime the host provides, so 0.6 and
-  0.7 both work.
+- **OpenCode 2.2.7 or newer.** The consumer peers are `@opencode/plugin >=2.2.7`
+  and `solid-js >=1.9.0`, both optional. The repository pins `@opencode/plugin`
+  and `@opencode/theme` to exactly 2.2.7 in devDependencies. The floor is real:
+  the Desktop page is built from the settings components OpenCode 2.2.6 added,
+  so an older host has nothing to render it with. The pins are exact because the
+  page depends on that component set — the SDK the typecheck sees has to be the
+  one its components come from.
 - **For the terminal UI (prompt-footer indicator and `/indexing` page):** the
-  `solid-js`, `@opentui/core` and `@opentui/solid` runtime that the host
-  provides. The plugin installs no copy of them: the TUI imports the host's
-  singletons through virtual module ids (`opentui:runtime-module:…`) and uses
-  no JSX, so both sides share one reactive runtime. That is the fix for a
-  plugin loaded from an npm spec, where local copies shadowed the host's and
-  the Solid runtime was never bridged — the settings page and the footer
-  indicator painted once and never updated (upstream
+  `solid-js` runtime that the host provides. The plugin installs no copy of it:
+  the TUI imports the host's singletons through virtual module ids
+  (`opentui:runtime-module:…`) and uses no JSX, so both sides share one reactive
+  runtime. That is the fix for a plugin loaded from an npm spec, where local
+  copies shadowed the host's and the Solid runtime was never bridged — the
+  settings page and the footer indicator painted once and never updated (upstream
   [anomalyco/opencode#33884](https://github.com/anomalyco/opencode/issues/33884)).
-  The three remain declared as dev dependencies and optional peers, never as
-  installable dependencies. Without the host runtime the settings page degrades
+  `@opentui/*` is not a consumer peer: it is a type-only devDependency, present
+  so the typecheck can read the virtual-module declarations, and no runtime path
+  in this package loads it. Without the host runtime the settings page degrades
   to dialogs and the footer is simply absent.
 - **For the Desktop GUI (settings page, palette commands and composer pill):**
   nothing to build or install. The package ships `dist/gui-experimental.cjs`, a
   prebuilt CommonJS bundle; Vite, vite-plugin-solid and SolidJS are build-time
   toolchain, not installable dependencies, and users never install them.
-  OpenCode Desktop provides the GUI SDK (`@opencode/plugin/gui`) and the Solid
-  runtime that the bundle imports.
+  OpenCode Desktop provides the GUI SDK (`@opencode/plugin/gui`), the settings
+  components the page is made of, and the Solid runtime that the bundle imports.
+  `@opencode/theme` is not a consumer peer either: the host provides the theme,
+  and the SDK pins the version it was built against.
 - **For embeddings: nothing to install or run by default.** With no cloud key the
   plugin uses the bundled static model (English-only, ~2 MB, no network). The
   catalog also offers a multilingual static model that is downloaded once
   (~123 MB after quantization). Set a provider key to switch to a cloud model, or
   run Ollama for a local multilingual one.
 - **For the own index: nothing to run.** The default store is embedded LanceDB
-  (`@lancedb/lancedb`), so there is no server to start, no port to free and
-  no container to keep alive.
+  (`@lancedb/lancedb`, pinned to 0.40.0), so there is no server to start, no
+  port to free and no container to keep alive.
 - **A Qdrant server is only needed if you ask for it**, either by setting
   `vectorStore=qdrant` or because a Kilo index you want to import lives in Qdrant.
   In that case the default URL is `http://localhost:6333`.
@@ -560,9 +669,9 @@ the own index still goes to LanceDB and `indexing_status` says so.
 
 ### Platform support for the embedded store
 
-`@lancedb/lancedb` is a JavaScript wrapper around a native library, with one
-prebuilt binary per platform and no WebAssembly fallback. The platforms it ships
-a binary for are:
+`@lancedb/lancedb` 0.40.0 is a JavaScript wrapper around a native library, with
+one prebuilt binary per platform and no WebAssembly fallback. The platforms it
+ships a binary for are:
 
 | Platform | `platform-arch` | Own index on LanceDB |
 | --- | --- | --- |

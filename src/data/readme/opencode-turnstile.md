@@ -36,7 +36,9 @@ open.
 
 How it does it: an enforced pipeline — planner → plan-reviewer → executor →
 test-runner → reviewer — with a gate at every hand-off, injected into your
-session at runtime. Mechanics below the fold.
+session at runtime. An optional, default-off requirements leg can precede the
+planner (see [Requirements phase](#requirements-phase-opt-in)). Mechanics
+below the fold.
 
 - Quick start: [below](#tldr--try-it-in-two-minutes)
 - The walkthrough: [using it for real work](#using-it-for-real-work)
@@ -304,6 +306,27 @@ still required before the next plan-reviewer dispatch. Config: `planReviewAccept
 `planReviewRejectMarker` rename the literals (defaults `PLAN REVIEWED:` /
 `PLAN REJECTED:`).
 
+## Requirements phase (opt-in)
+
+By default the pipeline starts at the planner. With `requirementsPhase: true`
+in the config, turnstile inserts an optional, ungated requirements leg before
+it for non-trivial tasks: the orchestrator first dispatches a `requirements`
+subagent with your request verbatim, and it returns a spec — objective,
+explicit and implied requirements, constraints, non-goals, numbered
+acceptance criteria `AC-1…AC-n`, and Open Questions each marked **blocking**
+or **non-blocking**. If any Open Question remains, the orchestrator presents
+them to you and stops; your written answers are folded into the spec (an
+"use your judgment" answer is recorded as an explicit delegation with its
+scope), and only then is the planner dispatched — with the finalized spec
+passed verbatim at the top of its dispatch prompt. Trivial tasks (small
+fixes, renames, doc/config changes) skip the leg.
+
+The phase is soft: it emits no marker and no gate. The only enforcement
+surface is a loop cap — `maxRequirementsRounds` (default 2) dispatches per
+task inside the total dispatch budget, waived dispatches exempt — and if the
+spec keeps coming back without converging, the orchestrator escalates to you.
+Config: `agents.requirements` renames the agent (default `requirements`).
+
 ## Suspend and resume
 
 You can pause turnstile's gate enforcement for the whole session with two
@@ -474,11 +497,12 @@ no edits. The key knobs most people touch:
 | `gitGates.landingGate`    | `true`    | gate `git push` on this task reviewer `VERDICT: APPROVE`; `false` disables the gate                                                                                                                                                                                                           |
 | `reviewEnsemble`          | `enforce` | `advise` credits a single-reviewer APPROVE unconditionally                                                                                                                                                                                                                                    |
 | `planUserReview`          | `false`   | pause the pipeline after the planner until the user accepts (`PLAN REVIEWED:`) or rejects (`PLAN REJECTED:`) the written plan via their own prompt; see [User plan review](#user-plan-review-opt-in)                                                                                          |
+| `requirementsPhase`       | `false`   | dispatch the requirements subagent before the planner for non-trivial tasks (spec + Open Questions round-trip, verbatim hand-off); soft and ungated, loop-capped via `maxRequirementsRounds`; see [Requirements phase](#requirements-phase-opt-in)                                            |
 
 | `sessionSummary` | `quiet` | one recap line at session end for active sessions (`on` adds an all-green line for idle ones; `off` disables) |
 | `toolPolicy.bashDeny` | `[]` | regex denylist for `bash`/`shell` (e.g. worktree/branch/merge ops) |
 | `toolPolicy.bashWriteGate` | `true` | gate confident file-writing bash commands (redirects from writer commands, `tee`, `sed -i`/`--in-place`, `cp`/`mv`/`dd`/`truncate`/`touch`) through the hands-on ladder; write-shaped commands always journal `handsOn` telemetry |
-| `maxReviewerRounds` / others | 2 / 3 / 3 / 4 / 16 | per-leg and total dispatch caps per task |
+| `maxReviewerRounds` / others | 2 / 3 / 3 / 4 / 2 / 16 | per-leg (incl. requirements) and total dispatch caps per task |
 | `agents.*` | stage names | rename recognition when you bring your own agents |
 | `plansDir` | `.opencode/plans` | where the decomposition scan looks |
 | `decisionLedger.enabled` | `true` | observe-only decision ledger (`opencode-turnstile prov`): `false` disables all `prov:*` journaling |
@@ -541,11 +565,11 @@ tools remain unguarded. The full threat model:
 
 ### OpenCode compatibility matrix
 
-| OpenCode host       | turnstile | Status                                                   |
-| ------------------- | --------- | -------------------------------------------------------- |
-| ≥ 2.0.22, < 3.0.0   | 0.12.x    | Supported (tested: 2.0.22, 2.0.27, 2.0.29, 2.2.0, 2.2.5) |
-| ≥ 3.0.0 or < 2.0.22 | 0.12.x    | Refuses to enforce at setup; upgrade turnstile           |
-| version unreadable  | 0.12.x    | Enforces; one-time journal warning                       |
+| OpenCode host       | turnstile | Status                                                          |
+| ------------------- | --------- | --------------------------------------------------------------- |
+| ≥ 2.0.22, < 3.0.0   | 0.13.x    | Supported (tested: 2.0.22, 2.0.27, 2.0.29, 2.2.0, 2.2.5, 2.2.7) |
+| ≥ 3.0.0 or < 2.0.22 | 0.12.x    | Refuses to enforce at setup; upgrade turnstile                  |
+| version unreadable  | 0.12.x    | Enforces; one-time journal warning                              |
 
 On an incompatible host turnstile toasts the upgrade instruction and
 registers no hooks (a full no-op — fail-open):

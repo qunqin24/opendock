@@ -170,6 +170,16 @@ the server's when you run `opencode --standalone`. The line under the header say
 things stand, and names the key in use: the connection's label in quotes,
 `ACTUALYZE_API_KEY` for the environment variable, or `settings.apiKey`.
 
+A run that Actualyze Desktop ("Through Actualyze") or Atlas (`aai start
+opencode`) starts puts its models on a provider of its own, `actualyze-start`,
+and keeps OpenCode off every other provider, so OpenCode does not list
+`actualyze` in that run. `/actualyze` shows `actualyze` whenever OpenCode lists
+it. Otherwise it shows the one listed provider whose `settings.probe` is
+`actualyze`, with that provider's endpoint and key. `k` stays off for such a
+provider, because it stores keys on the `actualyze` integration, which the run
+does not read. The run keeps the key it was started with. If it has none, the
+card says to start the run again from Actualyze Desktop or Atlas.
+
 An Actualyze inference key can read the model catalog and nothing about the
 account: no identity, usage, spend, or budget. So `/actualyze` reports
 "Catalog accessible" when the model list answered for the key, and never
@@ -211,10 +221,12 @@ status line starts with a title and gives the details below it.
 
 After a failure, a key that had a good catalog before keeps it: the card sits
 above the models from the last good check. When the key comes from
-`settings.apiKey` or `ACTUALYZE_API_KEY`, the failure card says so, and adds
-that a key connected with `k` takes precedence. When the provider's
-`headers` carry the key (`Authorization` or `X-Actualyze-Api-Key`), a notice
-says that discovery uses those headers, not the connected key.
+`settings.apiKey` or `ACTUALYZE_API_KEY`, the failure card says so. For a
+provider that reads the Actualyze integration it adds that a key connected
+with `k` takes precedence.
+When the provider's `headers` carry the key (`Authorization` or
+`X-Actualyze-Api-Key`), a notice says that discovery uses those headers, not
+the connected key.
 
 When `providers.actualyze.settings.probe` names no probe, the status line
 adds `▲ unknown probe` once the catalog is accessible, and a notice names the
@@ -365,12 +377,44 @@ When sources disagree, the strongest wins: probe values (including an
 explicit "not supported"), then models.dev, then keyword heuristics on the
 model ID, then OpenCode's defaults.
 
-Discovery never runs during plugin setup, so it does not slow OpenCode's
-startup. It also waits until OpenCode reports that it has finished loading
-every plugin, which is when your provider config has been applied, so at
-startup a key goes only to the base URL your config gives the provider.
+Background discovery waits until OpenCode reports that it has finished
+loading every plugin, which is when your provider config has been applied,
+so a key goes only to the base URL your config gives the provider.
 Inventories stored by an earlier run are served as soon as loading
 finishes, before any network request.
+
+One kind of entry is also discovered during plugin setup, before OpenCode
+builds its catalog: a `providers.<id>` entry in your configuration whose
+`settings` carry `"probe": "actualyze"`, an http(s) `baseURL` and an
+`apiKey` (a literal, `{env:NAME}`, or `{file:path}`), which is what the
+Actualyze App Setup Guide and the `aai start` launch write. Its stored
+inventory is served at once, with no request. When there is none, the
+plugin lists the endpoint's models once, with that entry's own key and
+against that entry's own base URL and nothing else, within
+`startupTimeoutMs` (5 seconds). So a one-shot `opencode run -m <id>/<model>`
+and `opencode models` work as the first command of a start, on the
+background service and on a private server (`--standalone`), from the first
+start after install. A timeout or failure changes nothing: the start goes
+on, and background discovery fills the models in later as before. Entries
+read only from a parent directory of the project, from managed preferences
+or from remote documents are not covered, and neither is the built-in
+`actualyze` provider when its key is a connected integration key with no
+config entry: those get their models once loading finishes. The plugin
+reads the configuration sources in OpenCode's order (the global directory,
+the file `OPENCODE_CONFIG` names, the project's `opencode.json` or
+`opencode.jsonc`, the project's `.opencode` directory, then
+`OPENCODE_CONFIG_CONTENT`); a later source overrides an earlier one setting
+by setting, `{env:NAME}` and `{file:path}` are replaced anywhere in a
+document's text before it is parsed (a file path relative to that
+document's directory), and comments and trailing commas are accepted.
+Several such entries are discovered at the same time, so the wait is one
+budget, through the same job path as every other discovery (an in-flight
+job for the same key is joined, the one-minute throttle and a server's
+retry hint are honoured, and a failure is recorded). A provider named in
+`disabled_providers`, and the never-probed ids, are left out. When the entry's key is also the value of `ACTUALYZE_API_KEY` on
+the service (the `aai start` launch's shape), the inventory is stored
+under the connected key as well, so the first background check keeps it
+instead of discovering again.
 
 When OpenCode restarts plugins in a project that is already open:
 
@@ -895,10 +939,11 @@ add for `/actualyze` and `/modelscout`.
 
 Pass these through the object form of the `plugins` entry.
 
-| Option              | Description                                                                                                    | Default                                                                       |
-| ------------------- | -------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| `timeoutMs`         | Time budget for one provider's discovery: model list, fingerprinting, and probe together.                      | `15000`. Values are clamped to 1000 through 60000.                            |
-| `refreshIntervalMs` | How often each provider is rediscovered in the background. `0` or a negative value turns periodic refresh off. | `600000` (10 minutes). Positive values are clamped to 60000 through 86400000. |
+| Option              | Description                                                                                                                                                                                                                      | Default                                                                       |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| `timeoutMs`         | Time budget for one provider's discovery: model list, fingerprinting, and probe together.                                                                                                                                        | `15000`. Values are clamped to 1000 through 60000.                            |
+| `refreshIntervalMs` | How often each provider is rediscovered in the background. `0` or a negative value turns periodic refresh off.                                                                                                                   | `600000` (10 minutes). Positive values are clamped to 60000 through 86400000. |
+| `startupTimeoutMs`  | Time budget for the discovery of a file-configured Actualyze entry during plugin setup (see [How discovery works](#how-discovery-works)). `0` or a negative value skips the request and serves only a stored inventory at start. | `5000`. Positive values are clamped to 1000 through 60000.                    |
 
 Values that are not numbers are ignored and the default applies.
 
@@ -948,10 +993,17 @@ relative `{file:}` path resolves against the directory of the config file.
   `settings.apiKey`, the key also covers the connected key the plugin used,
   or its absence. The stored data holds model IDs and metadata, never keys
   or headers. The plugin keeps the 128 most recent entries.
-- **Startup.** A provider gets its stored models once the plugin has looked
-  up the key that project uses (the connected key, else `settings.apiKey`)
-  and found the inventory discovered with it. That lookup runs once OpenCode
-  has finished loading plugins and makes no network request.
+- **Startup.** A file-configured Actualyze entry (`"probe": "actualyze"`,
+  a base URL and an `apiKey` in your configuration) gets its stored models
+  during plugin setup, before OpenCode builds its catalog, and is discovered
+  then when nothing is stored (see [How discovery works](#how-discovery-works)).
+  Every other provider gets its stored models once the plugin has looked up
+  the key that project uses (the connected key, else `settings.apiKey`) and
+  found the inventory discovered with it. That lookup runs once OpenCode has
+  finished loading plugins and makes no network request. A connected key
+  takes precedence over `settings.apiKey`: when both exist, the first
+  background sync replaces the inventory served at setup with the connected
+  key's.
 - **Background refresh.** The plugin checks its providers once OpenCode has
   finished loading plugins;
   when configuration, providers, plugins, integrations, or credentials
@@ -994,6 +1046,14 @@ relative `{file:}` path resolves against the directory of the config file.
 - **The API key is empty.** `{env:...}` resolves in the background service.
   Set the variable with `opencode service set env` and restart the service,
   or use `{file:...}`.
+- **`opencode run` says `Model unavailable: actualyze/<model>`.** A
+  one-shot command resolves its model as soon as OpenCode starts. The models
+  are known at start only for an entry the plugin can read from your
+  configuration (the `probe`, the base URL and the key in `settings`, as the
+  App Setup Guide's recommended configuration has them); a provider whose key
+  is only a connected integration key gets its models once loading finishes,
+  which a one-shot command does not wait for. Add the entry to the file, or
+  declare the model under the entry's `models`.
 - **Models are listed twice.** A provider the plugin discovers and a built-in
   local provider point at the same server. Disable the built-in one with
   `-opencode.provider.<name>` in `plugins`.

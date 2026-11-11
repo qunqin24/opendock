@@ -200,6 +200,8 @@ npm run refresh   # 重建内置目录快照（会逐个查 npm，约 1-2 分钟
 
 ## 发布到 npm
 
+> 发布只通过 GitHub Actions：`npm version patch` 后推送 `v*` tag，由 `.github/workflows/publish.yml` 构建并发布。本地 `npm publish` 已被 `prepublishOnly` 守卫禁止。下面的手动流程仅作历史/首次发布参考（首次发布 npm 无法用 OIDC）。
+
 包名 `opencode-plugin-hub` 当前在 npm 上可用。注意：这台机器默认 registry 是 `registry.npmmirror.com`（淘宝镜像），**镜像不能发布**；`package.json` 的 `publishConfig.registry` 已经固定到官方 `registry.npmjs.org`，登录也要显式指定：
 
 ```bash
@@ -218,7 +220,7 @@ npm publish --access public            # publishConfig 会把它发到 registry.
 - `files` 只带 `dist`、`src`、`LICENSE`；`README.md`、`package.json` 由 npm 自动包含。
 - `repository` / `homepage` / `bugs` 已指向 <https://github.com/meiyx7/opencode-plugin-hub>；如果你 fork 或转移仓库，记得同步改这三项。
 - 如果 `opencode-plugin-hub` 被占用，改用带 scope 的名字，例如 `@your-name/opencode-plugin-hub`，同步改 `package.json` 的 `name` 和安装文档。
-- 更新版本：`npm version patch`（或 `minor` / `major`），再 `npm publish`。
+- 更新版本：`npm version patch`（或 `minor` / `major`），再 `git push --follow-tags`，由 GitHub Actions 自动发布；本地 `npm publish` 已被 `prepublishOnly` 守卫禁止。
 - 有 2FA 的账号发布时会提示输入一次性验证码。
 - npm 发布是公开且难以撤回的，建议先 `npm pack`，在本地或测试机器上确认能装再发。
 - 发布后用 `npm view opencode-plugin-hub version --registry=https://registry.npmjs.org/` 确认。npmmirror 是异步镜像，刚发布时可能还没同步；如果 OpenCode 通过镜像拉包暂时找不到，等几分钟或临时把 registry 指向官方 npm。

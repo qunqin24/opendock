@@ -115,6 +115,7 @@ Set these under `options` on the plugin entry:
 | `sim_status` `sim_ui` `sim_wait` `sim_screenshot` | Inspect the screen |
 | `sim_tap` `sim_scroll` `sim_type` `sim_button` `sim_rotate` | Input and gestures |
 | `sim_settings` `sim_keyboard` `sim_statusbar` | UI settings |
+| `sim_logs` `sim_crash` `sim_open_url` `sim_permissions` | Debug and setup: logs, crash reports, deep links, privacy permissions |
 
 ## Notes
 

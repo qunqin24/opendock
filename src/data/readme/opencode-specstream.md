@@ -117,7 +117,7 @@ SpecStream answers calls written for these search APIs at its own address, in ea
 | Bing Web Search API v7 | `https://api.bing.microsoft.com/v7.0/search` | `https://api.specstream.ai/v7.0/search` | `Ocp-Apim-Subscription-Key` |
 | Google Custom Search JSON API | `https://www.googleapis.com` or `https://customsearch.googleapis.com` | `https://api.specstream.ai` | `key=` (`cx` is accepted and not used) |
 | SearXNG (JSON) | your instance address | `https://api.specstream.ai/searxng/<key>` | in the address, `key=`, `X-API-Key` or Bearer token |
-| Firecrawl v2 | `https://api.firecrawl.dev` | `https://api.specstream.ai/firecrawl` | Bearer token |
+| Firecrawl v2 | `https://api.firecrawl.dev` | `https://api.specstream.ai/firecrawl` (JavaScript SDK and apps) or `https://api.specstream.ai` (Python SDK) | Bearer token |
 
 The official Tavily and Exa Python SDKs take the address as an argument:
 
@@ -130,8 +130,8 @@ tavily = TavilyClient(api_key=os.environ["SPECSTREAM_API_KEY"], api_base_url="ht
 exa = Exa(api_key=os.environ["SPECSTREAM_API_KEY"], base_url="https://api.specstream.ai/exa")
 ```
 
-- A Brave call that sends no `count` is priced as 20 results ($0.011). Send `count=10` for $0.005.
-- A Firecrawl `/v2/scrape` call is one Extract API page at $0.0008. The Firecrawl JavaScript SDK works with this address; the Firecrawl Python SDK does not yet.
+- A call that names no result count returns 10 results at $0.005 on every route. Brave's own default is 20: send `count=20` for 20 results at $0.011.
+- A Firecrawl `/v2/scrape` call is one Extract API page at $0.0008. The Firecrawl JavaScript SDK works with this address. The Firecrawl Python SDK takes the host root: `Firecrawl(api_key=..., api_url="https://api.specstream.ai")`.
 - Each route's request and reply fields: [specstream.ai/agents.md](https://specstream.ai/agents.md). Create a key under **Agents & API** at [specstream.ai/workspace](https://specstream.ai/workspace). New accounts start with $10 of credit, no card.
 
 ![A request, its price, and the rows with their sources](assets/readme-demo.gif)

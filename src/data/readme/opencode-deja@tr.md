@@ -5,11 +5,10 @@
   </picture>
 </p>
 
-<p align="center"><b>Kodlama ajanlarınız, zaten düzelttiğiniz şeyi yeniden hata ayıklamaz.</b></p>
+<p align="center"><b>43 kodlama ajanı arasında paylaşılan yerel bellek, ajanlar arası görev devri ve kod kurtarma.</b></p>
 
-<p align="center">Claude Code, Codex, Cursor ve bu makinedeki diğer ajanlar her oturumu zaten diske kaydediyor.
-deja aylar öncesi dahil hepsini indeksler ve önemli kısmı
-şu an çalışan ajana verir.</p>
+<p align="center">Claude Code, Codex, Cursor, OpenClaw, Gemini CLI, OpenCode, Hermes ve 36 ajan daha her oturumu zaten diske kaydediyor.<br>
+deja tüm geçmişi yerel olarak indeksler; böylece ajanlarınız <code>/compact</code> sonrasında bağlamı korur, <code>deja handoff</code> ile görevi devreder ve <code>deja restore</code> ile üzerine yazılmış kodu kurtarır — LLM yok, tek bir Go ikilisi.</p>
 
 <p align="center"><a href="../../README.md">English</a> | <a href="README.zh.md">简体中文</a> | <a href="README.zh-TW.md">繁體中文</a> | <a href="README.ja.md">日本語</a> | <a href="README.ko.md">한국어</a> | <a href="README.es.md">Español</a> | <a href="README.pt.md">Português</a> | <a href="README.fr.md">Français</a> | <a href="README.de.md">Deutsch</a> | <a href="README.ru.md">Русский</a> | Türkçe | <a href="README.hi.md">हिन्दी</a></p>
 
@@ -19,14 +18,15 @@ deja aylar öncesi dahil hepsini indeksler ve önemli kısmı
 
 <p align="center">
   <a href="https://github.com/vshulcz/deja-vu/stargazers"><img src="https://img.shields.io/github/stars/vshulcz/deja-vu?style=flat&color=f59e0b" alt="GitHub Stars"></a>
-  <a href="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml"><img src="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <img src="https://raw.githubusercontent.com/vshulcz/deja-vu/badges/.badges/main/coverage.svg" alt="coverage">
+  <a href="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml"><img src="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml/badge.svg?branch=main&event=push" alt="CI"></a>
+  <a href="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml"><img src="https://img.shields.io/badge/coverage-88%25-brightgreen" alt="Coverage"></a>
   <a href="https://github.com/vshulcz/deja-vu/releases/latest"><img src="https://img.shields.io/github/v/release/vshulcz/deja-vu" alt="Release"></a>
+  <a href="https://mcptoplist.com/server/io.github.vshulcz%2Fdeja-vu"><img src="https://mcptoplist.com/badge/io.github.vshulcz%2Fdeja-vu.svg" alt="MCP Toplist"></a>
   <a href="https://www.npmjs.com/package/@vshulcz/deja-vu"><img src="https://img.shields.io/npm/v/%40vshulcz%2Fdeja-vu" alt="npm"></a>
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT"></a>
 </p>
 
-<p align="center"><a href="https://vshulcz.github.io/deja-vu/">Belgeler</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">Ölçümler</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/compare.html">Karşılaştırma</a></p>
+<p align="center"><a href="https://vshulcz.github.io/deja-vu/"><b>Web sitesi ve etkileşimli arama</b></a> &middot; <a href="https://vshulcz.github.io/deja-vu/view/"><b>Tarayıcıda canlı demo</b></a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">Ölçümler</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/compare.html">Karşılaştırma</a></p>
 
 <p align="center"><img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif" width="720" alt="aynı soru aynı ajana iki kez: bellek yokken hiçbir şey hatırlamıyor, deja varken sekiz ay önceki sonuçla yanıtlıyor"></p>
 
@@ -34,6 +34,8 @@ deja aylar öncesi dahil hepsini indeksler ve önemli kısmı
 curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
 deja install --auto
 ```
+
+<p align="center"><sub>Veya Homebrew ile: <code>brew install deja-vu &amp;&amp; deja install --auto</code> &middot; Claude Code eklentisi: <code>claude plugin marketplace add vshulcz/deja-vu &amp;&amp; claude plugin install deja-vu@deja-vu</code> &middot; Agent Skills: <code>npx skills add vshulcz/deja-vu</code><br><a href="#kurulum">Windows (Scoop / winget), Codex, OpenCode, OpenClaw ve daha fazlası</a> &middot; Kurmadan deneyin: <code>npx @vshulcz/deja-vu sources</code> &middot; <a href="https://vshulcz.github.io/deja-vu/view/">Canlı demo →</a></sub></p>
 
 <table align="center">
 <tr>
@@ -78,7 +80,7 @@ opencode, DeepSeek Harness, Zed, Kimi Code, Codex CLI, Grok Build, OpenClaw, pi 
 birer paket de var; eklentilerini oradan kurmaya alışkın olanlar için:
 
 ```sh
-opencode plugin opencode-deja
+opencode plugin add opencode-deja
 dsh plugin --profile web add dsh-deja
 # Zed: eklenti panelinde deja'yı arayın
 # Kimi Code: /plugins install https://github.com/vshulcz/deja-vu
@@ -132,7 +134,7 @@ bağlıyken neyin indekslendiğini ve sırada hangi komutun çalıştırılacağ
 
 ## Ne kazandırıyor
 
-**Codex'te çözüldü, Claude hatırlıyor.** Kırk bir kodlama ajanı her konuşmayı yerel dosyalara yazıyor; deja
+**Codex'te çözüldü, Claude hatırlıyor.** Kırk üç kodlama ajanı her konuşmayı yerel dosyalara yazıyor; deja
 bu dosyaları hepsinin okuyabildiği bir bellek katmanına dönüştürüyor.
 
 | | |
@@ -250,7 +252,7 @@ kendi ekosisteminde bir paketi var; eklentilerini oradan kuranlar için:
 
 | Ajan | Paket | Kurulum |
 | --- | --- | --- |
-| opencode | npm `opencode-deja` | `opencode plugin opencode-deja` |
+| opencode | npm `opencode-deja` | `opencode plugin add opencode-deja` |
 | DeepSeek Harness | npm `dsh-deja` | `dsh plugin --profile web add dsh-deja` |
 | Zed | `deja-context-server` | Zed → Extensions → deja |
 | Kimi Code | eklenti `deja` | `/plugins install https://github.com/vshulcz/deja-vu` |

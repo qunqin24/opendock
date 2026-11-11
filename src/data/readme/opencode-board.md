@@ -16,7 +16,7 @@ A Kanban board inside OpenCode Desktop. Keep your backlog beside your conversati
 opencode plugin add opencode-board
 ```
 
-This installs the plugin globally. Open a session in OpenCode Desktop, then click the Kanban icon and card count on the right of the session header.
+This installs the plugin globally. Open a session in OpenCode Desktop, then click the checklist icon and card count in the session header and choose **Open Board**.
 
 You can also use **Board** in the command palette, `/board` in the composer, or **Board** in the side-panel **+** menu.
 
@@ -24,6 +24,7 @@ The plugin uses OpenCode's experimental GUI API and targets `@opencode/plugin` 2
 
 ## Use the board
 
+- The header dropdown also offers **New Task** and **New Task from this Session**. Both open a modal with an optional session link. The session option prefills its title and generates an editable description from the conversation, showing **Generating…** while it loads. No new session is started or message added to the conversation.
 - Create tasks with **New task** or the **+** in a column header.
 - Drag cards to reorder them or move them between columns. Clear filters before dragging; Escape cancels a drag. Programmatic moves animate across the board, including moves between columns, unless reduced motion is enabled.
 - Add, rename, recolor, collapse, or reorder columns to fit your workflow.

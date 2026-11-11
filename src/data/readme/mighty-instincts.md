@@ -88,7 +88,7 @@ Set `"maintenance": { "dryRun": true }` to see exactly what the next sweep would
 | Command | Does |
 | --- | --- |
 | `/board` | Show the instinct board summary as plain text. See [docs/board.md](docs/board.md). |
-| `/evolve [...]` | Dashboard, detail, install, reject, archive, 'now', and 'clusters' for evolve candidates (run with no arguments for the grammar's own dashboard). See [docs/evolve.md](docs/evolve.md). |
+| `/evolve [...]` | Dashboard, detail, install, reject, archive, 'now', 'clusters', and 'purge' (move the drafts it does not list aside) for evolve candidates (run with no arguments for the grammar's own dashboard). See [docs/evolve.md](docs/evolve.md). |
 | `/instinct [...]` | ECC instinct status, per-habit feedback (keep/wrong/mute/unmute), the observer's on/off switch, doctor, and why (what got injected). Run with no arguments, or 'help', for the full verb list. See [docs/instinct.md](docs/instinct.md). |
 | `/maintain [...]` | Run the maintenance sweep now (promote/prune/decay/evolve/repair/cleanup); `--dry-run` previews every step; `prune [--dry-run]` runs only the pending-instinct prune. See [docs/maintenance.md](docs/maintenance.md). |
 | `/promote [--yes]` | Preview (default) or run (`--yes`) promoting project-scoped instincts that qualify to global scope. See [docs/maintenance.md](docs/maintenance.md). |
@@ -96,7 +96,7 @@ Set `"maintenance": { "dryRun": true }` to see exactly what the next sweep would
 
 Eleven hyphenated commands remain registered for one release as deprecated aliases that forward their old argv shape into the grammar above, each prefixing its reply with a deprecation notice: `/evolve-list`, `/evolve-show`, `/evolve-install`, `/evolve-reject`, and `/evolve-archive` forward into `/evolve`; `/instinct-status`, `/instinct-import`, `/instinct-export`, and `/instinct-projects` forward into `/instinct`; `/instinct-observe` forwards into `/instinct observe`; `/instinct-prune` forwards into `/maintain prune`.
 
-The plugin also registers a model-callable `instincts` tool, a read-only subset of the CLI the agent can call mid-turn: status, projects, export, evolve preview, promote (dry-run only), and prune (dry-run only); it never writes, imports, deletes, or passes `--force`.
+The plugin also registers a model-callable `instincts` tool, a read-only subset of the CLI the agent can call mid-turn: status, projects, export, evolve preview, promote (dry-run only), and prune (dry-run only); it never writes, imports, deletes, or passes `--force`. Its status answer opens with the version the session runs (`plugin: mighty-instincts@<version>`, the form `opencode.json` pins, so a stale session shows against the pin).
 
 On the OpenCode 2 TUI, typing `/evolve` with no arguments is meant to open a pick-a-candidate / pick-an-action / confirm dialog instead of the text dashboard, so a human never has to type an id or a number by hand; typed arguments (`/evolve 2 install`) still go straight to the server command unchanged. Whether the TUI layer or the server command wins the shared `/evolve` name could not be confirmed without a live host; if the host routes the name to the server command instead, the text dashboard appears. See [docs/evolve.md](docs/evolve.md).
 
@@ -107,7 +107,7 @@ Every command above posts its reply back into the session as a synthetic message
 On the OpenCode 2 TUI, a small, collapsible sidebar panel summarises three sources in plain language: Learned habits (this plugin's own instincts and observer status), Skill notes (the task-observer skill's open backlog), and Skill test (skill-creator's latest benchmark result), plus a Health block whenever something needs attention. Hosts without the sidebar, or anyone who wants the same facts in the chat, can run `/board` instead. The panel header names the installed version:
 
 ```
-▾ Mighty Instincts v0.11.0
+▾ Mighty Instincts v0.11.1
   ▾ Learned habits               ● 16
 ```
 

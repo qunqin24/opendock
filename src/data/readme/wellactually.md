@@ -25,7 +25,7 @@ Anyone can publish principles on [the Well Actually registry](https://wellactual
 
 ## Install
 
-The plugin needs [Node](https://nodejs.org) 20 or newer and nothing else.
+The plugin needs [Node](https://nodejs.org) 20 or newer. Use the latest LTS release; Node 20 is retained for compatibility but has reached end of life.
 Check with `node --version` before you install it, because without Node no principle reaches your agent.
 
 Claude Code:
@@ -194,6 +194,9 @@ The registry is not in this repository.
 ## Build it yourself
 
 Development tooling needs Node >=22.18. The prebuilt product supports Node >=20.
+CI builds on the latest LTS and checks the package on Node 20.0.0, the latest
+Node 22 and 24 releases, and the latest stable Node release. Host applications
+may impose a higher Node requirement of their own.
 
 ```bash
 npm ci --ignore-scripts

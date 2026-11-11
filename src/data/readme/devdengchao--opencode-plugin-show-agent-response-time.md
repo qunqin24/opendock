@@ -36,6 +36,7 @@ OpenCode 默认会在 agent 回复底部显示本轮耗时，例如 `4 分钟 46
 ## 功能
 
 - **悬浮查看**：悬浮 agent 回复底部的耗时，显示完整日期、时区和秒级时间
+- **正文悬浮**：悬浮回复正文中的段落、标题、列表项、引用块或代码块，也能在鼠标附近查看时间
 - **与原生一致**：复用 OpenCode 的紧凑 tooltip 样式，跟随亮色/暗色主题
 - **跟随语言**：使用 `Intl.DateTimeFormat` 和当前界面语言，和用户消息时间提示格式相同
 - **精确到本轮**：从当前会话消息中计算该轮最后一条助手消息的 `time.completed`
@@ -49,7 +50,7 @@ OpenCode 默认会在 agent 回复底部显示本轮耗时，例如 `4 分钟 46
 
 - OpenCode Desktop **2.2.x**（本项目在 2.2.1 上开发和验证）
 - 使用 npm 安装时不需要额外安装 Node.js
-- 从源码构建时需要 Node.js **20.19+** 和 npm
+- 从源码构建时需要 Node.js **22.22.2+**（24.x 至少为 **24.15.0**）和 npm
 - Windows、macOS 或 Linux 上的 OpenCode Desktop
 
 ### 从 npm 安装（推荐）
@@ -76,7 +77,7 @@ OpenCode 默认会在 agent 回复底部显示本轮耗时，例如 `4 分钟 46
 
 ```jsonc
 "plugins": [
-  "@devdengchao/opencode-plugin-show-agent-response-time@0.1.0"
+  "@devdengchao/opencode-plugin-show-agent-response-time@0.1.2"
 ]
 ```
 
@@ -138,8 +139,8 @@ npm run build
 
 1. 打开一个已经完成的 OpenCode 会话。
 2. 把鼠标移到某条 agent 回复上，底栏会显示 `Build · 模型 · 耗时`。
-3. 再把鼠标停留在耗时（例如 `4 分钟 46 秒`）上。
-4. 约 800ms 后出现完整时间 tooltip。
+3. 把鼠标停留在耗时（例如 `4 分钟 46 秒`）上，或者直接停留在回复正文的任意段落、标题、列表项等块级内容上。
+4. 约 800ms 后出现完整时间 tooltip；正文悬浮时 tooltip 会出现在鼠标附近。
 5. 时间格式与悬浮用户消息时间时一致。
 
 耗时仍在生成、响应被中断且没有完成时间、或消息数据尚未加载时，不会显示 tooltip。

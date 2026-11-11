@@ -120,7 +120,7 @@ deleted — another host may be mid-conversation with it.
 Without Copilot Studio access the plugin still works, just less reliably; it logs a
 warning and carries on.
 
-Three things keep a turn on track:
+Four things keep a turn on track:
 
 - **A tolerant parser.** M365 writes calls loosely: the command as a `command:` header,
   `filePath:` for `path`, quoted values, a copied `$ ` prompt, prose or an invented
@@ -132,6 +132,11 @@ Three things keep a turn on track:
 - **A pinned backend.** Every turn's connection carries
   `X-RoutingParameter-SessionKey`, which the reference project found stops long
   sessions running on a forked copy of the conversation.
+- **Telling the model what ran.** Only the first tool block in a reply runs. When a
+  reply holds more, or goes on to predict its own result, the next turn starts with
+  one line saying so, so the model does not assume the rest ran. opencode's tool
+  errors arrive as plain text (`Error: …`) rather than a JSON envelope. In the 237
+  `quick` turns measured so far, no reply needed the note.
 
 Measured on one tenant on 2026-11-09 (`m365/quick`, opencode 2.2.5, 36 conversations,
 alternating builds), with and without the prompt trimming, nudge and routing header.
@@ -143,10 +148,21 @@ Both builds had the tolerant parser:
 | Find a value across six files | 6/6, 2.7 turns | 6/6, 2.0 turns |
 | Edit one config value, leave the rest | 6/6, 3.5 turns | 6/6, 4.5 turns (re-read the file to check, 3 of 6) |
 
-Every run made its tool call on the first turn, so the nudge never fired; that it
-recovers a give-up is tested offline only. No turn disengaged, and none ran on a
-forked conversation (`turnCount` rose by one each turn). Long sessions and the
-reasoning tones are not yet measured.
+Every run made its tool call on the first turn, so the nudge never fired. No turn
+disengaged, and none ran on a forked conversation (`turnCount` rose by one each turn).
+
+Long sessions (2026-11-10, `m365/quick`, with all three): 4/4 solved, no nudges, no
+forks.
+
+| Task | Runs | Turns |
+|---|---|---|
+| Rename a function across ten modules, one edit at a time, then run the test | 2/2 | 37, 25 |
+| Fix a 1,500-line file whose test fails, then fails again on a second bug | 2/2 | 8, 8 |
+
+`turnCount` rose by one on every turn of the 37-turn session. Repeated calls were
+progress checks (grep for what was left, re-reading a file after editing it), not loops.
+These runs had the routing header, so they show it causes no harm. They don't show it
+is needed, because no run without it was tried.
 
 ## opencode 2
 
@@ -203,16 +219,21 @@ in `apiKey`, or export the same `M365_PROXY_KEY` to opencode and leave `apiKey` 
 
 ### Errors and the turn log
 
-When M365 refuses a turn, the proxy answers with an HTTP 422 so opencode does not
-retry it: opencode retries a 5xx or a 429 several times, which against a throttle only
-extends it. The error `code` says which refusal it was:
+When M365 refuses a turn, the proxy reports it so that opencode does not retry it.
+Retrying a throttle only extends it, and a refusal like a missing licence never changes.
+opencode streams, so the refusal usually arrives inside a stream that already answered
+200. opencode then decides from the error body alone: it retries an error whose code
+contains "unavailable", whose message says "try again" (M365's own refusals do), or
+which mentions a rate limit. The proxy therefore sends type `invalid_request_error`,
+avoids those words, and uses HTTP 422 when nothing has been streamed yet. In 2.2.0 a
+licence refusal was retried ten times. The error `code` says which refusal it was:
 
 | Code | Meaning |
 |---|---|
 | `m365_throttled` | The account is throttled. Wait for a lull. |
-| `m365_unavailable` | M365 answered with its own refusal: no credits, a model this licence does not cover, or a dead tone |
+| `m365_not_served` | M365 answered with its own refusal: no credits, a model this licence does not cover, or a dead tone. Called `m365_unavailable` up to 2.2.0 |
 | `m365_turn_rejected` | The server refused the request outright, typically a retired tone |
-| `m365_disengaged` | M365's filter refused to engage with the prompt |
+| `m365_disengaged` | M365's filter refused to engage with the prompt. A disengaged conversation stays that way, so the proxy drops it: the next request opens a fresh conversation and replays the whole history |
 
 Set `M365_TURN_LOG=/path/to/turns.jsonl` before starting opencode to record one line
 per M365 turn: the raw reply, the tool calls parsed from it, and M365's diagnostics
@@ -244,12 +265,28 @@ task per run; small samples):
 | `m365/quick` | 5/5 |
 | `m365/m365-copilot` | 1/1 |
 | `m365/gpt-5.5` (same tone as `quick`) | 0/1 |
-| `m365/gpt-5.6` | 0/1 |
-| `m365/gpt-5.5-think-deeper` | 0/3 — says it has no file tool |
+| `m365/gpt-5.6` | 0/1 (the reference project: 7/30), so its picker name says "unreliable tool calls" |
+| `m365/gpt-5.5-think-deeper` | 0/3 — said it had no file tool; 4/4 with the relay framing, below |
 
 The reference project's README reports 100% tool compliance for `gpt-5.5-think-deeper`;
 its protocol notes (`m365-copilot-api.md`, quirk #13) say reasoning tones disengage with
 an agent attached. Our runs agree with the notes. Reasoning tones still serve plain chat.
+
+The reasoning tones now get a different framing on tool turns. The tool block is
+worded as the user asking to be guided through their own terminal, one command at a
+time, pasting back the real output (the reference project's `relay`). A model that
+doubts it can reach the workspace has nothing to doubt, because the user runs the
+commands. Measured on `gpt-5.5-think-deeper` on 2026-11-10, 16 conversations:
+
+| Framing | First reply said the tools were unavailable | Solved |
+|---|---|---|
+| Default, before the give-up nudge | 4/4 | 1/4 |
+| Default, with the nudge | 8/8 | 5/8 |
+| Relay, with the nudge | 0/4 | 4/4, with no nudge needed |
+
+Claude tones stay on the agent, which M365 answers on GPT. The reference project ran
+Claude without the agent and with `relay`, but an account with no Claude licence then
+refuses every tool turn, and that could not be measured on a licensed account here.
 
 A non-default tone (Claude, the reasoning tones) only takes effect when **no** agent is
 attached — with one, M365 silently routes to GPT regardless. The proxy therefore attaches

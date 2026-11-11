@@ -166,6 +166,14 @@ launchctl load ~/Library/LaunchAgents/net.opencode-qqbot.plist
 | `QQ_DIGEST_ANSWER_MAX_CHARS` | 0（全文） | 摘要卡答案截断上限 |
 | `QQ_HISTORY_USER_CLIP` / `QQ_HISTORY_TEXT_CLIP` | 500 / 1200 | /history 用户/AI 行截断 |
 | `QQ_SEND_EXTRA_ROOTS` | — | `/send` 额外允许目录（逗号分隔） |
+| `QQ_ORPHAN_MS` | 90000 | 孤儿判定阈值（受理后无下文超此时长记孤儿；合法 5s~60min，非法回退默认） |
+| `QQ_WATCHDOG_INTERVAL_MS` | 300000 | 插件引导器巡检间隔（5min；计划任务侧由 service install 注册，默认 10min） |
+| `QQ_PERM_DEFER_MS` | 500 | 审批弹卡延迟判定窗（0~10s）：窗口内 ask 已被其他端处置则不推 QQ 卡，与桌面静默放行对齐 |
+| `QQ_QUEUE_RECEIPTS` | 关 | 队列完成回执「队列 #N 完成」（批量排空防刷，默认关） |
+| `QQ_LOG_FILE` | `~/.openqq/openqq.log`（detached 拉起为 `bot.out.log`） | 进程内文件日志路径 |
+| `QQBOT_DEFAULT_CWD` | bot 进程工作目录 | 新会话默认项目目录（目录继承链兜底值） |
+| `QQ_SANDBOX` | false | QQ 沙箱环境（REST 域切至 sandbox） |
+| `QQ_INSTANCE_LOCK` | 开 | 单实例文件锁（`false` 关闭，仅排查多实例问题时临时用） |
 
 ## 架构
 

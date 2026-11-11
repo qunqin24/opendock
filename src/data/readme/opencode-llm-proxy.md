@@ -71,6 +71,7 @@ See also: [Security](docs/security.md) · [Comparisons](docs/comparisons.md) · 
 - [Quickstart](#quickstart)
 - [Install](#install)
 - [Configuration](#configuration)
+  - [Direct upstream passthrough](#direct-upstream-passthrough)
 - [Tool calling](#tool-calling)
 - [Using with SDKs and tools](#using-with-sdks-and-tools)
   - [n8n](#n8n)
@@ -190,32 +191,109 @@ curl -o .opencode/plugins/llm-proxy.js \
 | `OPENCODE_LLM_PROXY_ALLOW_PRIVATE_NETWORK` | `false` | Set to `true` to allow browser Private Network Access preflights. |
 | `OPENCODE_LLM_PROXY_REQUEST_TIMEOUT_MS` | `120000` | Total request timeout, from 1 to 3,600,000 ms. |
 | `OPENCODE_LLM_PROXY_IDLE_TIMEOUT_SECONDS` | request timeout + 5 s | Seconds a connection may stay silent before the server closes it, from 0 (disabled) to 255. Defaults to the request timeout plus 5 s, or 0 when that exceeds 255 s. |
-| `OPENCODE_LLM_PROXY_MAX_REQUEST_BYTES` | `1048576` | Maximum JSON request body and embedded data-URL size, up to 100 MiB. |
+| `OPENCODE_LLM_PROXY_MAX_REQUEST_BYTES` | `33554432` | Maximum JSON request body and embedded data-URL size, up to 100 MiB. The 32 MiB default accommodates whole-session compaction prompts. |
+| `OPENCODE_LLM_PROXY_PASSTHROUGH_CONFIG` | `~/.config/opencode/llm-proxy-passthrough.json` | Path to a JSON passthrough config (`baseUrl`, optional `prefix`, `unprefixed`, `apiKey`, `authHeader`). Missing or invalid config disables passthrough. Keep this file local. |
 | `OPENCODE_LLM_PROXY_MAX_CONCURRENT_REQUESTS` | `8` | Maximum active POST requests. |
 | `OPENCODE_LLM_PROXY_MAX_QUEUED_REQUESTS` | `32` | Maximum POST requests waiting for capacity; excess requests receive `503`. |
 | `OPENCODE_LLM_PROXY_TOOL_BRIDGE_POOL_SIZE` | `8` | Max concurrent in-flight requests using [tool calling](#tool-calling). |
 | `OPENCODE_LLM_PROXY_TOOL_BRIDGE_ACQUIRE_TIMEOUT_MS` | `10000` | Maximum wait for a tool-bridge slot, from 1 to 3,600,000 ms. |
 | `OPENCODE_LLM_PROXY_TOOL_BRIDGE_MAX_QUEUE` | `32` | Maximum tool-calling requests waiting for a bridge slot, from 0 to 10,000; excess requests receive `429`. |
-| `OPENCODE_LLM_PROXY_KEEP_SESSIONS` | `false` | Set to `true` to retain temporary OpenCode sessions; otherwise they are deleted after use. |
+| `OPENCODE_LLM_PROXY_KEEP_SESSIONS` | `false` | Set to `true` to retain temporary OpenCode sessions; otherwise they are deleted after use. Kept sessions are still swept after 24h idle (see [Session lifecycle](#session-lifecycle-safe-teardown)). |
+| `OPENCODE_LLM_PROXY_DELETE_TIMEOUT_MS` | `5000` | Maximum wait for the post-request session delete, from 100 to 60,000 ms. A delete that exceeds it is abandoned and the stale-session sweep reaps the session later, so a hung delete can never block the response. |
 | `OPENCODE_LLM_PROXY_MODEL_ALIASES` | `{}` | JSON object mapping aliases to a model ID string or ordered array of fallback model IDs. |
 | `OPENCODE_LLM_PROXY_METRICS_ENABLED` | `false` | Set to `true` to expose the authenticated Prometheus endpoint at `GET /metrics`. |
 | `OPENCODE_LLM_PROXY_REMOTE_MEDIA_ENABLED` | `false` | Set to `true` to fetch remote media URLs and convert them to embedded data URLs. Leave disabled unless required. |
 | `OPENCODE_LLM_PROXY_REMOTE_MEDIA_ALLOWED_SCHEMES` | `["https"]` | JSON array of allowed remote URL schemes (`https` and, if explicitly enabled, `http`). HTTPS-only is strongly recommended. |
-| `OPENCODE_LLM_PROXY_REMOTE_MEDIA_MAX_BYTES` | value of `OPENCODE_LLM_PROXY_MAX_REQUEST_BYTES` (`1048576` by default) | Maximum downloaded bytes per remote media item, up to 100 MiB. |
+| `OPENCODE_LLM_PROXY_REMOTE_MEDIA_MAX_BYTES` | `1048576` | Maximum downloaded bytes per remote media item, up to 100 MiB. |
 | `OPENCODE_LLM_PROXY_REMOTE_MEDIA_MAX_ITEMS` | `4` | Maximum remote media downloads in one request, from 0 to 10,000. |
 | `OPENCODE_LLM_PROXY_MAX_MEDIA_ITEMS` | `64` | Maximum total embedded and remote media items in one request. |
 | `OPENCODE_LLM_PROXY_REMOTE_MEDIA_MAX_REDIRECTS` | `3` | Maximum redirects per remote media download, from 0 to 100. |
 | `OPENCODE_LLM_PROXY_REMOTE_MEDIA_TIMEOUT_MS` | `10000` | Total remote-media preparation timeout, including DNS and all items, from 1 to 3,600,000 ms. |
+| `OPENCODE_LLM_PROXY_NATIVE_PASSTHROUGH` | `false` | OpenCode V2 only. Keep the caller's tool names and schemas 1:1 instead of adding the `pxN_` prefix and filtering tools against the caller's list. For clients that already send the native OpenCode system and tools (for example a free-tier native lane). |
 
 Use `x-opencode-variant` to select an OpenCode model variant for a request. The proxy accepts multimodal image, document, and file inputs in each API's native content shape, using embedded data URLs and validating model capabilities. Remote URLs are rejected unless the SSRF-safe remote-media fetcher is explicitly enabled; fetched content is converted to a data URL before it reaches OpenCode. Structured JSON output is supported through OpenAI `response_format.json_schema`, Responses API `text.format.schema`, and Gemini `generationConfig.responseSchema`.
 
-Generation `temperature`, top-p (`top_p`/`topP`), and top-k (`topK`) values are validated and applied through the plugin's `chat.params` hook. Maximum-token fields (`max_tokens`, `max_completion_tokens`, `max_output_tokens`, and Gemini `maxOutputTokens`) are accepted where clients require them, but the current OpenCode SDK cannot enforce them. OpenAI and Anthropic requests reject unsupported controls (`stop`, `seed`, `frequency_penalty`, `presence_penalty`, `logprobs`, and `n`) with `400` instead of silently ignoring them.
+Generation `temperature`, top-p (`top_p`/`topP`), top-k (`topK`), and maximum output tokens (`max_tokens`, `max_completion_tokens`, `max_output_tokens`, and Gemini `maxOutputTokens`) are validated and applied to the underlying model call. A requested token limit can lower OpenCode's output limit but never raise it above the model's maximum; responses that hit it finish with `length` (`max_tokens` for Anthropic, `MAX_TOKENS` for Gemini). Enforcing token limits requires OpenCode 1.4 or later; older versions ignore them.
+
+The proxy returns a single choice and cannot forward `stop`, `seed`, `frequency_penalty`, `presence_penalty`, `logprobs`, or `n` to OpenCode, so a request that asks for *different* behaviour with them gets `400`. Values that mean "unset" or match the default are accepted and ignored, because rejecting them only breaks clients that always send them: `n: 1`, empty or all-empty `stop` arrays, `seed: null`, `frequency_penalty: 0`, `presence_penalty: 0`, `logprobs: false`, and `null` for any of these. For example, VS Code sends `n: 1` on every request, and several SDKs send `null` for each optional field.
+
+When an upstream call fails, the error names the reason the provider gave (for example `Upstream request failed: Free usage limit reached`) instead of a bare `Upstream request failed.` Credentials that a provider echoes back are redacted, and the text is truncated to 500 characters, so the detail is useful without exposing a key or token.
+
+### Direct upstream passthrough
+
+For clients that already speak an upstream's native API, the proxy can forward requests **verbatim** instead of running them through an OpenCode session and tool bridge. This preserves the upstream's own streaming, tool-call, and error behavior.
+
+Create a local config file (`~/.config/opencode/llm-proxy-passthrough.json` by default, or point `OPENCODE_LLM_PROXY_PASSTHROUGH_CONFIG` at another path):
+
+```json
+{
+  "baseUrl": "https://upstream.example.com",
+  "prefix": "upstream/",
+  "unprefixed": false,
+  "apiKey": "optional-upstream-key",
+  "authHeader": "authorization"
+}
+```
+
+- `POST /v1/chat/completions`, `POST /v1/responses`, and `POST /v1/messages` are eligible.
+- A model that starts with `prefix` is forwarded to `baseUrl` with the prefix removed (`upstream/model-a` → `model-a`). Prefix matching always wins.
+- Unprefixed discovery is **opt-in**: with `"unprefixed": true`, a model that the upstream lists in `GET /v1/models` is forwarded unchanged, even without the prefix. Because this can silently shadow a local OpenCode model with the same id, it is off by default.
+- The proxy's own bearer auth and CORS checks still apply. The caller's `Authorization`, `x-api-key`, and `anthropic-api-key` headers are removed before forwarding.
+- If `apiKey` is set, it replaces the caller's credentials. `authHeader` defaults to `authorization`, which is sent as `Bearer <apiKey>`; any other header name (for example `x-api-key`) receives the raw key. The same credential is used for the `GET /v1/models` probe.
+- Hop-by-hop headers (`connection`, `keep-alive`, `proxy-authenticate`, `proxy-authorization`, `te`, `trailer`, `transfer-encoding`, `upgrade`), plus any header named in `Connection`, `host`, `content-length`, and the caller's auth headers are stripped before forwarding.
+- The request body is read with the `OPENCODE_LLM_PROXY_MAX_REQUEST_BYTES` cap **before** forwarding (HTTP 413 when exceeded), including for requests that end up on the normal OpenCode-backed path.
+- Passthrough requests bypass the proxy's concurrency queue and request timeout; the upstream's own limits apply.
+- Responses carry `x-opencode-passthrough: true`.
+- The file is read at plugin start. Keep it local and mode `600`; it may contain an internal endpoint or credential. The default path is outside the repository, and `llm-proxy-passthrough.json` is git-ignored.
+
+Requests for models that match neither rule continue through the normal OpenCode-backed path.
+
+### Session lifecycle (safe teardown)
+
+Each proxied request runs in a throwaway OpenCode session titled `Proxy: <model-id>` (**"Proxy: " is a reserved title prefix** — do not name your own sessions with it). When a request completes normally, the session is deleted immediately. When a request is abandoned mid-turn (client disconnect, timeout, or error), the session is **intentionally left in place**: deleting it immediately races the OpenCode server's final persist of the aborted turn, which surfaces as `FOREIGN KEY constraint failed` errors in the server log (observed at thousands per day under bulk clients that cancel slow streams, e.g. RAG pipelines with aggressive timeouts).
+
+Leaked sessions are reaped by a background sweep at plugin start and every 6 hours: `Proxy:`-titled sessions idle for more than 24 hours are deleted (long-idle deletes are race-free). Notes:
+
+- The first start after upgrading to this behavior will burn down any previously leaked backlog in one pass.
+- With `OPENCODE_LLM_PROXY_KEEP_SESSIONS=true`, kept sessions carry the same title and are subject to the same 24h reap — if you need a longer inspection window, inspect within a day or copy what you need.
 
 ```bash
 OPENCODE_LLM_PROXY_HOST=0.0.0.0 \
 OPENCODE_LLM_PROXY_TOKEN=my-secret \
 opencode
 ```
+
+### Native tool passthrough (1:1)
+
+By default, OpenCode V2 registers caller tools under a per-turn `pxN_` prefix,
+filters the session tool set down to those names, and replaces the session
+system with the caller's system. That is the right shape for an external client
+that does not know OpenCode's native tools.
+
+Some clients already send a native OpenCode request: the full OpenCode system
+prompt and the native tool schemas. The OpenCode free-tier gate
+accepts that request shape and rejects the filtered/prefixed one with
+`429 Free usage limit reached`. For those clients, enable native passthrough:
+
+```bash
+OPENCODE_LLM_PROXY_NATIVE_PASSTHROUGH=1 opencode
+```
+
+With the flag on, the V2 backend:
+
+- registers each caller tool under its exact name (no `pxN_` prefix);
+- keeps the session's tool map intact instead of filtering it to the caller's
+  names;
+- still returns captured calls to the client, which executes them itself.
+
+The flag is off by default, so existing clients keep the prefixed/isolated
+behaviour. It is intended for a dedicated OpenCode process: `ctx.tool.transform`
+is global, and exact names can collide with OpenCode's own tools. `execute` is a
+reserved CodeMode tool name; OpenCode skips that registration and keeps the
+remaining tools. Tested with OpenCode 2.0.23 against
+`opencode/deepseek-v4.1-flash-free`: a full native request returned
+`finish_reason: "tool_calls"` with `read`, and a following `role: "tool"`
+message with `CLIENT_SIDE` was used in the final answer.
 
 ---
 
@@ -290,7 +368,7 @@ OpenCode's own agent loop always executes tools itself, server-side, so there's 
 **OpenCode V2**
 
 1. The proxy registers your declared tool schemas as plugin tools for the duration of that one turn (under a short per-turn prefix such as `px0_`, so they never collide with OpenCode's own tools). Their executors run nothing.
-2. A session hook gives the proxy's session exactly those tools — no built-in OpenCode tool — and keeps them out of every other session.
+2. A session hook gives the proxy's session exactly those tools — no built-in OpenCode tool — and keeps them out of every other session. With `OPENCODE_LLM_PROXY_NATIVE_PASSTHROUGH=1`, names are registered 1:1 and the session's existing tool map is kept instead.
 3. The proxy watches OpenCode's event stream, captures every tool call the model proposes in that turn with its arguments, and interrupts the session as soon as the model finishes the step, before OpenCode starts a follow-up step. The captured calls are translated into your API's tool-call shape.
 
 **OpenCode V1**
@@ -303,6 +381,7 @@ OpenCode's own agent loop always executes tools itself, server-side, so there's 
 
 - Parallel tool calls in a single turn are fully supported across all four API formats (streaming and non-streaming).
 - `tool_choice: "none"` (OpenAI/Gemini `mode: "NONE"`/Anthropic `type: "none"`) disables tool calling for that request; forcing a specific named tool is supported.
+- Structured tool payloads are preserved verbatim across formats: tool schemas (including nesting and `additionalProperties`), tool-call arguments, and tool results keep their structure and key order. Tool results that aren't plain text (JSON objects, unrecognised content blocks) are forwarded to the model as JSON rather than dropped. Gemini OpenAPI-style schemas (`type: "OBJECT"`) are converted to JSON Schema, and `parametersJsonSchema` is used as-is when present.
 - The remaining notes apply to OpenCode V1 only, which uses the MCP bridge:
   - Bridge servers are reused from a small fixed-size pool (`px_tools_0`, `px_tools_1`, ...) rather than registered fresh per request, since OpenCode's server API has no endpoint to deregister an MCP server once added. Configure the pool size with `OPENCODE_LLM_PROXY_TOOL_BRIDGE_POOL_SIZE` (default `8`) if you expect more than 8 concurrent in-flight tool-calling requests.
   - At most `OPENCODE_LLM_PROXY_TOOL_BRIDGE_MAX_QUEUE` requests wait for a bridge slot. A request arriving when that queue is full receives `429`; a queued request that exceeds the bridge acquisition timeout receives `503`.
@@ -514,18 +593,18 @@ When `OPENCODE_LLM_PROXY_METRICS_ENABLED=true`, returns Prometheus text expositi
 Metrics cover HTTP request counts and duration by bounded method/route/status labels, active and queued requests, upstream attempt outcomes, input/output token totals, and remote-media request outcomes, bytes, redirects, in-flight fetches, and duration. Streaming HTTP duration is recorded when the stream finishes, errors, or is cancelled.
 
 ### POST /v1/chat/completions
-OpenAI Chat Completions. Required: `model`, `messages`. Supported optional fields include `stream`, `temperature`, `top_p`, `topK`, `max_tokens`, `max_completion_tokens`, `tools`, `tool_choice`, `response_format.json_schema`, and compatible multimodal content parts. Maximum-token fields are accepted for client compatibility but are not enforceable.
+OpenAI Chat Completions. Required: `model`, `messages`. Supported optional fields include `stream`, `temperature`, `top_p`, `topK`, `max_tokens`, `max_completion_tokens`, `tools`, `tool_choice`, `response_format.json_schema`, and compatible multimodal content parts.
 
 ### POST /v1/responses
-OpenAI Responses API. Required: `model`, `input`. Supported optional fields include `instructions`, `stream`, `temperature`, `top_p`, `topK`, `max_output_tokens`, `tools`, `tool_choice`, `text.format.schema`, and compatible multimodal input items. `max_output_tokens` is accepted for client compatibility but is not enforceable.
+OpenAI Responses API. Required: `model`, `input`. Supported optional fields include `instructions`, `stream`, `temperature`, `top_p`, `topK`, `max_output_tokens`, `tools`, `tool_choice`, `text.format.schema`, and compatible multimodal input items.
 
 ### POST /v1/messages
-Anthropic Messages API. Required: `model`, `messages`. Supported optional fields include `system` (string or an array of `{type: "text", text: string}` blocks), `max_tokens`, `stream`, `temperature`, `top_p`, `topK`, `tools`, `tool_choice`, and native image/document blocks. `max_tokens` is accepted for required Anthropic client compatibility but is not enforceable.
+Anthropic Messages API. Required: `model`, `messages`. Supported optional fields include `system` (string or an array of `{type: "text", text: string}` blocks), `max_tokens`, `stream`, `temperature`, `top_p`, `topK`, `tools`, `tool_choice`, and native image/document blocks.
 
 Errors are returned in Anthropic format: `{ "type": "error", "error": { "type": "...", "message": "..." } }`.
 
 ### POST /v1beta/models/:model:generateContent
-Google Gemini non-streaming. Model name in URL path. Required: `contents`. Supported optional fields include `systemInstruction`, `generationConfig` (`temperature`, `topP`, `topK`, `maxOutputTokens`, and `responseSchema`), `tools`, `toolConfig`, and native inline/file media parts. `maxOutputTokens` is accepted but is not enforceable.
+Google Gemini non-streaming. Model name in URL path. Required: `contents`. Supported optional fields include `systemInstruction`, `generationConfig` (`temperature`, `topP`, `topK`, `maxOutputTokens`, and `responseSchema`), `tools`, `toolConfig`, and native inline/file media parts.
 
 ### POST /v1beta/models/:model:streamGenerateContent
 Same as above, returning a newline-delimited JSON stream. A tool-using turn may emit intermediate text chunks followed by a final chunk containing one or more `functionCall` parts.
@@ -547,7 +626,7 @@ Each request:
 
 Streaming uses OpenCode's event stream (V2: `ctx.event.subscribe()`; V1: `client.event.subscribe()`). Text deltas are forwarded in real time, and the upstream async iterator is explicitly closed on completion, error, cancellation, or early tool-call termination. If the event stream stops delivering, the turn still completes from the session's stored messages, and any text the stream missed is sent to streaming clients.
 
-On OpenCode V2 the proxy session receives only your request: your system prompt replaces OpenCode's coding-agent prompt and instructions, and the session gets no OpenCode tools.
+On OpenCode V2 the proxy session receives only your request: your system prompt replaces OpenCode's coding-agent prompt and instructions, and the session gets no OpenCode tools. With `OPENCODE_LLM_PROXY_NATIVE_PASSTHROUGH=1`, the caller's exact tool names and the existing OpenCode tool map are preserved instead.
 
 ---
 
@@ -565,7 +644,7 @@ The package supports OpenCode V2 and V1 from one default export, `{ id, setup, s
 - Media support depends on the selected model's advertised image, audio, video, and PDF/file capabilities
 - Remote media fetching is disabled by default and should remain disabled unless URL inputs are required; see [Security](docs/security.md)
 - No cross-request session state — send full conversation history on every request
-- `temperature`, top-p (`top_p`/`topP`), and top-k (`topK`) are applied through OpenCode's plugin hook. Maximum-token controls are accepted for client compatibility but are not enforced.
+- `temperature`, top-p (`top_p`/`topP`), top-k (`topK`), and maximum-token controls are applied through OpenCode's plugin hook. Token limits need OpenCode 1.4+ and are capped at the model's output limit.
 - On OpenCode V2, structured output (`response_format` / `text.format` / `responseSchema`) is requested through an instruction with the JSON Schema, and the reply is parsed as JSON; V2 has no native structured-output setting for sessions.
 - Tool calling supports parallel calls in a single turn — see [Tool calling](#tool-calling) above
 
