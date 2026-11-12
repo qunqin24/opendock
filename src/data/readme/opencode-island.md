@@ -14,6 +14,8 @@ without ever leaving the window you are working in.
   right now, with their subagents nested underneath.
 - **Approvals** turn the whole island warning orange, open it by themselves,
   and can be answered in place.
+- **Alive** — every session that is busy carries a small orb that says what it
+  is doing: thinking, writing, searching, running code.
 - **Live** — the last ten words the agent is saying scroll down the closed tab
   as they arrive.
 
@@ -79,6 +81,10 @@ The tab sits on the right edge, vertically centred. It shows one line:
 - `1 approval needed` — somebody is waiting for you
 - `Idle` — nothing is running
 
+Next to the grip, a small orb shows what the busiest session is doing, and the
+words fill the tab without ever changing its length: the newest ones stay in
+sight and the oldest are cut off at the top.
+
 The dotted grip at the **top** moves the tab: press and drag it up or down and
 it slides along the edge, staying where you leave it.
 
@@ -95,6 +101,7 @@ stay out of the way. Each row shows:
 | | |
 |---|---|
 | The agent | which agent is running it |
+| The orb | what it is doing right now: thinking, writing, searching, running code |
 | The phase | `THINKING`, `WRITING`, `WORKING`, `WAITING` or `RETRYING` |
 | The title | what the session is about |
 | The tool | the tool running right now, if any |

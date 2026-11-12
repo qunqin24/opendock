@@ -1,220 +1,107 @@
-# opencode-file-browser
+# OpenCode File Browser
 
-A file browser and viewer for the [OpenCode](https://opencode.ai) TUI: walk the
-project folder inside the terminal, preview Markdown rendered, and read code
-with syntax highlighting — without leaving OpenCode.
+An explorer, editor and git panel for the OpenCode TUI. One plugin, no extra
+terminal: browse the project, edit with syntax colours, review a diff and
+commit without leaving the session.
 
-> Built for **OpenCode V2** (tested on v2.2.5). It is a TUI-only plugin, so it
-> keeps working when the TUI is connected to a remote server.
+[![npm](https://img.shields.io/npm/v/opencode-file-browser?style=flat-square)](https://www.npmjs.com/package/opencode-file-browser)
+[![license](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE)
 
-<p align="center">
-  <img src="https://raw.githubusercontent.com/arthurrogado/opencode-file-browser/main/docs/screenshots/markdown-demo.png" alt="Markdown preview in the OpenCode TUI" width="820">
-</p>
-
-<p align="center">
-  <img src="https://raw.githubusercontent.com/arthurrogado/opencode-file-browser/main/docs/screenshots/python-demo.png" alt="Python syntax highlighting in the OpenCode TUI" width="820">
-</p>
-
-## Features
-
-- Folder navigation from the project (or session) directory, parents first.
-- Markdown preview rendered by OpenTUI; press `m` to flip to the source.
-- Code preview with tree-sitter highlighting (TypeScript, JS, Go, Rust, Python,
-  JSON, YAML, shell, and many more).
-- Two layouts, picked automatically:
-  - **side panel** next to the chat while you are in a session;
-  - **full page** from the home screen (no session).
-- `f` toggles full screen in the panel, hiding the chat.
-- Mouse and keyboard navigation.
-- **Open any file by path** with a prompt: absolute paths, `~`, or a path
-  relative to the current folder — even files outside the project.
-- Project files are read through the OpenCode filesystem API, so the plugin
-  also works against a remote server.
-- No dependencies beyond the ones OpenCode already provides.
+![Editor with tabs, line numbers and the changes panel](https://arthurrogado.github.io/opencode-file-browser/screenshots/editor.png)
 
 ## Install
 
-### From npm (recommended)
-
 ```sh
-opencode plugin add opencode-file-browser
+opencode plugin add opencode-file-browser@latest
 ```
 
-That installs the package into OpenCode's cache and adds it to
-`~/.config/opencode/cli.json`. The published entry is the prebuilt
-`dist/tui.js`, so nothing compiles on install.
+Restart OpenCode (or run `/reload`). The plugin is registered in
+`~/.config/opencode/cli.json`.
 
-Update later with:
+For local development point that entry at a checkout instead:
 
-```sh
-opencode plugin update opencode-file-browser
+```jsonc
+{ "plugins": ["/absolute/path/to/opencode-file-browser"] }
 ```
 
-### From a clone
+## What it does
 
-```sh
-git clone https://github.com/arthurrogado/opencode-file-browser \
-  ~/.config/opencode/plugins/file-browser
-```
+- **Explorer** — expand folders in place or navigate into them (file-manager
+  style), search by name or content, hidden files, branch and change count.
+- **Editor** — tabs, line numbers, syntax colours while editing, `Enter` for a
+  new line, `Ctrl+F` to find inside the file, `Ctrl+S` to save, scrollbar and
+  mouse cursor placement.
+- **Changes** — stage, unstage, discard, commit, pull, push, branches and
+  history. `Enter` opens a unified diff; `F4` jumps to the real file.
+- **Preferences** — `F2`: simple mode, line numbers, wrap, folder behaviour,
+  panel preview, changes panel, hidden files, mouse, search target,
+  case-sensitive search and confirmation prompts.
+- **Safe with big files** — up to 2 000 lines are rendered; huge logs show a
+  metadata placeholder instead of freezing the TUI.
 
-Or run the installer:
+## Screenshots
 
-```sh
-curl -fsSL https://raw.githubusercontent.com/arthurrogado/opencode-file-browser/main/install.sh | sh
-```
+| Diff per change | Content search | Preferences |
+|---|---|---|
+| ![Unified diff](https://arthurrogado.github.io/opencode-file-browser/screenshots/diff.png) | ![Content search](https://arthurrogado.github.io/opencode-file-browser/screenshots/search.png) | ![Preferences](https://arthurrogado.github.io/opencode-file-browser/screenshots/settings.png) |
 
-OpenCode discovers plugin directories under the config directory. Restart the
-TUI (or run `/reload`) if it does not appear. Update with `git -C
-~/.config/opencode/plugins/file-browser pull` or `/files-update`.
-
-> `opencode plugin add github:arthurrogado/opencode-file-browser` can fail with
-> `NpmInstallFailedError` on some 2.2.x builds while npm prepares the Git
-> dependency. Use the npm package or a clone instead.
-
-### Manual
-
-Point `~/.config/opencode/cli.json` at a checkout:
-
-```json
-{
-  "plugins": ["/home/you/dev/opencode-file-browser"]
-}
-```
-
-## Updating
-
-If installed from npm:
-
-```sh
-opencode plugin update opencode-file-browser
-```
-
-If installed by cloning:
-
-```sh
-git -C ~/.config/opencode/plugins/file-browser pull
-```
-
-Or run `/files-update` inside OpenCode; it pulls the checkout and lets the TUI
-reload. Package installs get a pointer to `opencode plugin update`.
-
-You can also ask OpenCode to update it for you: “update the file-browser
-plugin” — it can run the right command.
-
-## Usage
-
-Run `opencode`, then:
-
-- `/files` (aliases: `/browse`, `/arquivos`)
-- `/files-update` (aliases: `/update-files`) to update a cloned install
-- `Ctrl+X` then `F`
-- `Ctrl+P` → **Open file browser**
-
-To jump straight to one file:
-
-- `Ctrl+X` then `O`, or `Ctrl+P` → **Open file by path**
-- inside the browser, press `o`
-
-The prompt accepts an absolute path, a `~` path, or a path relative to the
-current folder (for example `../notes.md`).
-
-Inside a session it opens as a side panel; on the home screen it opens full
-screen.
-
-### Keys
+## Keys
 
 | Key | Action |
-| --- | --- |
-| `↑` / `↓`, `j` / `k` | Move in the list (or scroll the file, depending on focus) |
-| `Enter` | Open folder / file |
-| `Tab` | Switch focus between list and file |
-| `Backspace`, `u` | Go up one level |
-| `PageUp` / `PageDown` | Page up / down |
-| `g` / `Shift+G` | Start / end |
-| `m` | Toggle rendered Markdown ↔ source |
-| `o` | Open a file by typing its path |
-| `r` | Reload the folder and the file |
-| `h` | Show/hide dotfiles |
-| `f` | Toggle full screen (panel only; hides the chat) |
-| `Esc`, `q` | Close |
+|---|---|
+| `Ctrl+X F` / `/files` | open or close the browser |
+| `Ctrl+X O` | open a file by path (`~`, absolute or relative) |
+| `↑ ↓` `j k` | move in the list |
+| `→` / `Enter` | open a file or expand a folder |
+| `←` | collapse a folder |
+| `Shift+Enter` | collapse the tree |
+| `Tab` / `Shift+Tab` | cycle panes / return to the explorer |
+| `Ctrl+F` / `/` | focus search (while editing: find in file) |
+| `Ctrl+E` | name ↔ content search |
+| `Ctrl+S` / `Ctrl+W` | save / close tab |
+| `Ctrl+←` `Ctrl+→` | previous / next tab |
+| `e` / `F4` | preview ↔ editor |
+| `m` | Markdown rendered ↔ source |
+| `F1` / `F2` | all shortcuts / preferences |
+| `F3` / `Ctrl+G` | focus the changes panel |
+| `F5` | reload tree, file and git status |
+| `F10` | item actions (same menu as right click) |
+| `r` / `h` / `f` | reload / hidden files / fullscreen |
+| `Esc` | leave editor → clear search → close |
 
-Clicking works too: click a folder to enter it, a file to open it.
+While the changes panel is focused: `a` stage, `u` unstage, `d` discard,
+`c` commit (`Ctrl+Enter` confirms), `l` pull, `p` push, `g` history,
+`b` branches, `R` refresh.
 
-## Configuration
+Mouse: click to open, click tabs to switch, middle click to close, wheel to
+scroll, drag the divider to resize, right click for actions.
 
-Rebind the open command in `~/.config/opencode/cli.json`:
+## Limits
 
-```json
-{
-  "keybinds": {
-    "file-browser.open": "ctrl+shift+e"
-  }
-}
-```
-
-Disable the plugin:
-
-```json
-{
-  "plugins": ["-opencode-file-browser"]
-}
-```
-
-## How it works
-
-- `context.ui.router.register` + `context.ui.slot("session.panel")` provide the
-  two layouts.
-- `context.client.file.list` / `context.client.file.read` use the OpenCode
-  filesystem API for files inside the project.
-- Files outside the project are read from the local machine with `node:fs`
-  (the server API is confined to the project directory).
-- `<code>` and `<markdown>` from OpenTUI render the preview; the `SyntaxStyle`
-  is built from `context.theme`, so it matches the active theme.
-- The starting directory comes from the session location, falling back to the
-  global location when there is no session.
-
-## Limitations
-
-- Read-only; it does not edit files.
-- Files larger than 6,000 lines or 512 KB are truncated in the preview.
-- Binary files (images, PDFs, …) show their size only.
-- The folder list is confined to the project/session directory; use **Open
-  file by path** to reach files elsewhere.
-- Paths outside the project are read from the machine running the TUI, so they
-  are not available when the TUI is connected to a remote server.
+| | |
+|---|---|
+| Viewer | first 2 000 lines; metadata placeholder above 20 000 lines or 2 MiB |
+| Editor | read-only above 5 000 lines or 512 KiB |
+| Content search | 12 hits per file, 300 total |
+| Binary files | reported with their size, never rendered |
 
 ## Development
 
-The published entry is `dist/tui.js`. It is built from `src/tui.tsx` with the
-same Babel/Solid transform OpenCode uses for local plugins, so the output has
-explicit imports that the host can rewrite to its own `solid-js` and
-`@opentui/solid` instances.
-
 ```sh
-npm install --no-save @babel/core @babel/preset-typescript babel-preset-solid
-npm run bundle
+npm install
+npm run typecheck
+npm run bundle        # src/**/*.tsx -> dist/**/*.js
+./test/e2e.sh         # 32 assertions in a real TUI (tmux + git fixture)
+./test/e2e-extra.sh   # 11 more: colours, help, hidden files, paths, menus
 ```
 
-The build tools are intentionally not `devDependencies`: npm installs those
-while preparing a Git dependency, which makes `opencode plugin add` slower and
-more fragile. The compiled `dist/tui.js` is committed.
+`dist/` is committed: OpenCode loads the pre-compiled entrypoint.
 
-To try a local checkout, either add its path to `cli.json` or symlink it into
-the discovery directory:
+## Links
 
-```sh
-ln -s "$PWD" ~/.config/opencode/plugins/file-browser
-```
+- [GitHub](https://github.com/arthurrogado/opencode-file-browser)
+- [npm](https://www.npmjs.com/package/opencode-file-browser)
+- [Project page](https://arthurrogado.github.io/opencode-file-browser/)
+- [Issues](https://github.com/arthurrogado/opencode-file-browser/issues)
 
-OpenCode watches that directory and reloads the plugin on save. Rebuild after
-editing `src/tui.tsx`.
-
-## Contributing
-
-Issues and pull requests are welcome. Keep the plugin dependency-free: import
-only `@opencode/plugin`, `@opentui/*`, and `solid-js`, which the host provides
-at runtime.
-
-## License
-
-MIT
+MIT.

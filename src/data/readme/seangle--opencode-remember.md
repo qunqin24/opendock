@@ -102,7 +102,9 @@ Pi uses `~/.pi/agent/memory`, OpenCode uses `$XDG_DATA_HOME/opencode/memory`.
 | `store.ts` | paths, facts, memo IDs, append/update/forget/restore, recovery, notes |
 | `notes.ts` | the four-field frontmatter subset, bounded header reads |
 | `search.ts` | query-local lexical ranking (no index, no embeddings, no model call) |
-| `inject.ts` | byte-stable, middle-truncated snapshot block |
+| `inject.ts` | byte-stable, middle-truncated snapshot block, nested banks included |
+| `discover.ts` | bounded, cached search for child workspaces with a bank of their own |
+| `delta.ts` | the frozen baseline of a session and the `<system_reminder>` block for a later change |
 | `workspace.ts` | root validation, store resolution, initialization |
 | `migration.ts` | `remember.json` version marker; refuses unmarked content instead of adopting it |
 
@@ -120,8 +122,11 @@ directories it is handed.
   recovery/.gitignore               # * (created lazily before writing recovery)
 ```
 
-`dirName` is configurable; both adapters default to `.agents`, so the workspace
-store is shared. A store with content but no `remember.json` is never adopted
+`dirName` is configurable; every adapter defaults to `.agents`, so the workspace
+store is shared. A session's snapshot is rendered once and then held
+byte-identical: a later change arrives as a `<system_reminder>` appended at the
+end of the conversation, never as a rewrite of the system prompt. See
+[Nested banks and cache-safe injection](#nested-banks-and-cache-safe-injection). A store with content but no `remember.json` is never adopted
 silently: core reports it as needing an explicit migration.
 
 Before writing recovery, core creates `recovery/.gitignore` containing `*` if
@@ -131,6 +136,37 @@ Recovery records can contain removed information; this default prevents
 accidental Git additions, but does not untrack committed files or remove them
 from Git history. The rule also ignores itself and is recreated on the next
 recovery write if missing.
+
+### Nested banks and cache-safe injection
+
+A workspace can hold child workspaces with stores of their own
+(`repos/<name>/.agents/memory`). `discover.ts` finds them and the snapshot lists
+them — path, fact count, note count — under `## Nested workspace memory`. Their
+facts are never merged into the parent block; the model reads one on purpose
+with `memory_read({root: "repos/<name>"})`.
+
+The walk is bounded on every axis, because it runs inside prompt injection:
+depth 2, 256 directories, 50 ms, 8 banks, one `stat` per directory, dot
+directories and `node_modules`/`dist`/`build`/`vendor` and friends skipped,
+symlinks never followed, no subprocess, no synchronous filesystem call. A
+finished walk is cached for 30 s per root and shared by concurrent callers.
+Measured on a 15 600-directory workspace: 57 directories and 5 ms at depth 3,
+against 5 473 directories and 795 ms unbounded.
+
+Because the system prompt is the first bytes of every request, re-rendering the
+snapshot after each memory write would discard the provider's prompt cache for
+the whole conversation. So each session freezes its first snapshot:
+
+- the section keeps those bytes for the session (a new session, a compaction, or
+  a changed workspace takes a fresh baseline);
+- a later change is one `<system_reminder>` block — added facts with their memo
+  IDs, removed lines, new note descriptions, nested-bank counts, and a one-line
+  note when the global scope moved — appended at the end of the request;
+- a request-local append (`Pi`, `pip-remember`) repeats the current block while
+  it lasts; a durable append (`OpenCode`, `DSH`) stores it once and advances the
+  baseline, so nothing is sent twice;
+- more than 12 changes at once render as one line asking the model to read the
+  store instead of listing every diff.
 
 Two harnesses writing one store concurrently is serialized per process, not
 across processes. The append path is atomic per write, but a race can still lose
@@ -238,7 +274,9 @@ npm run build && npm run smoke
 - **Injection** — on `agent/pre-step`, render the snapshot from the workspace and
   global stores and splice it after the entering user message. A digest of the
   rendered bytes is stored in the message source, so a resumed session does not
-  duplicate the snapshot and a changed store refreshes exactly once.
+  duplicate the snapshot. A frozen baseline holds the injected bytes; a later
+  change is one `<system_reminder>` message, so the head of the conversation
+  never moves and the provider's prefix cache stays valid.
 - **Tools** — `memory_init`, `memory_write`, `memory_store`, `memory_read`,
   `memory_search`, `memory_update`, `memory_forget`, `memory_restore`,
   `memory_status`, `memory_migrate`.

@@ -5,7 +5,7 @@
 **LitOpenCode is a workflow plugin for OpenCode. Add `lit` to a prompt and the work gets planned, built, checked and written down, so the next session knows where you stopped.**
 
 <p align="center">
-<a href="https://www.npmjs.com/package/@litfamily/litopencode"><img src="./docs/assets/readme/badge-version.svg" alt="1.0.43" /></a>
+<a href="https://www.npmjs.com/package/@litfamily/litopencode"><img src="./docs/assets/readme/badge-version.svg" alt="1.0.44" /></a>
 <a href="https://www.npmjs.com/package/@litfamily/litopencode"><img src="https://img.shields.io/npm/dm/@litfamily/litopencode?label=downloads&color=D7F75B" alt="npm downloads per month" /></a>
 <a href="./LICENSE"><img src="./docs/assets/readme/badge-license.svg" alt="MIT license" /></a>
 <a href="https://github.com/wjgoarxiv/litopencode"><img src="https://img.shields.io/github/stars/wjgoarxiv/litopencode?style=social" alt="GitHub stars" /></a>
@@ -101,11 +101,7 @@ lit research Which SQLite settings matter most for a write-heavy local app?
 
 ### Reports, decks and figures
 
-Ask for a report or slides with `lit` and you get an editable Word file or PowerPoint deck, built from a Markdown source you keep, in a design direction the skill picks and names first. Journal-sized figures from measured data come from `/lit-scientific-visualization`, and concept diagrams have a skill of their own.
-
-```text
-lit Turn notes.md into a ten-slide deck for Friday's team review
-```
+The skills that made Word reports, PowerPoint decks, diagrams, equipment drawings, journal figures, interfaces, films and README covers are now LitFamily extensions, kept in wjgoarxiv-skills, and you install only the ones you use ([Extensions](#extensions)). LitOpenCode stays smaller for it. Each old name still answers: ask for a deck with `lit` and a short pointer tells you where the skill went and gives the command that copies it into OpenCode. The [skills gallery](./docs/skills.md#moved-to-wjgoarxiv-skills) lists them.
 
 ### Writing that sounds like a person
 
@@ -117,7 +113,7 @@ There is more: debugging, refactoring, code cleanup, commits, language servers, 
 
 ## What you can make
 
-Each picture below came out of LitOpenCode on one Mac, from the skill named under it. None is a mock-up. The figures in the deck, the page and the drawing are example data for a made-up hydrate lab, and each says so on the page.
+Each picture below came out of LitOpenCode on one Mac, from the skill named under it. None is a mock-up. The figures in the deck, the page and the drawing are example data for a made-up hydrate lab, and each says so on the page. The deck, page and drawing skills have since moved to wjgoarxiv-skills; install them from there to make the same.
 
 <table>
 <tr><td width="50%" valign="top"><img src="./docs/assets/readme/showcase-adhd-brief.webp" width="400" alt="The lit-adhd brief in the OpenCode chat. The headline reads 1 session · 0 waiting on you · 0 active · next: F1. Plan compliance audit, above an Ended table with one row, a Roadmap of finished commits with check marks followed by now and later plan steps, and a boxed Recommended next step. Below it the LIT card draws the workflow map, a lit-adhd chip and a REWIND mark on its top border." /><br /><b>lit-adhd</b> · the welcome-back brief<br /><sub>The skill's own script read the sessions, commits and plans of a real worktree family; a local test model passed that answer to OpenCode, which draws it in colour while the LIT card switches to its rewind look.</sub></td><td width="50%" valign="top"><img src="./docs/assets/readme/showcase-deck.webp" width="400" alt="Contact sheet of a nine-slide computational-brutalism deck on a hydrate rig: a dark cover, a KPI row, a native line chart of pressure drop for three runs, a results table, a two-column comparison, four numbered steps, a dark statement slide, an approval box and an appendix." /><br /><b>lit-pptx</b> · nine slides, computational brutalism<br /><sub>Compiled by the skill's engine from a slide source written for this page; charts stay editable in PowerPoint and the deck gate found nothing high.</sub></td></tr>
@@ -125,6 +121,27 @@ Each picture below came out of LitOpenCode on one Mac, from the skill named unde
 </table>
 
 The [skills gallery](./docs/skills.md) has a picture for every other skill.
+
+## Extensions
+
+LitOpenCode's core is complete and works on its own. Planning, building, review, research, handoffs and everything else on this page need nothing more. The skills that make files sit one layer out: decks, Word documents, diagrams, equipment drawings, journal figures, interfaces and their checks, films and README covers are LitFamily extensions, kept on the extension shelf, [wjgoarxiv-skills](https://github.com/wjgoarxiv/wjgoarxiv-skills). Install the ones you use alongside LitOpenCode and you get the full LitFamily experience.
+
+The picture shows where the line falls. Everything on the left installs with LitOpenCode and runs with nothing else. Each extension in the middle keeps a small pointer folder under its own name, and the shelf's OpenCode copy takes that folder's place when you install it.
+
+<p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="./docs/assets/readme/core-extensions.en.dark.png" /><source media="(prefers-color-scheme: light)" srcset="./docs/assets/readme/core-extensions.en.light.png" /><img src="./docs/assets/readme/core-extensions.en.light.png" width="900" alt="Left: the LitOpenCode core installed by litopencode install, grouped as plan and build, check and fix, remember and resume, research and write, and code tools, with docs/skills.md holding the full list. Middle: nine same-name pointer folders for decks, documents, figures, design and video covers. Right: the wjgoarxiv-skills shelf, where each family has a variants/litopencode copy that takes the pointer's place. Below: four install steps, clone the shelf, remove the pointer, copy in the OpenCode edition, start a new session." /></picture></p>
+
+Clone the shelf once. Then, for each skill you want, swap its pointer folder for the shelf's OpenCode copy:
+
+```sh
+rm -r ~/.config/opencode/skills/<skill>
+cp -R "<path to your wjgoarxiv-skills clone>/variants/litopencode/<skill>" ~/.config/opencode/skills/<skill>
+```
+
+The nine are `lit-pptx` (decks), `lit-docx` (documents), `lit-diagram-drawer`, `lit-schematic` and `lit-scientific-visualization` (figures), `frontend-ui-ux` and `visual-qa` (design), and `lit-typographic-motion` and `readme-studio` (video covers). Use `$XDG_CONFIG_HOME/opencode/skills/` when that is set, and start a new session afterwards. The film skill needs `node ~/.config/opencode/skills/lit-typographic-motion/runtime.mjs install` once. `litopencode install` never overwrites a copy you put there, and `litopencode doctor` lists it as preserved.
+
+Until you install one, its name still answers with a short pointer that says the same. The installer tells you about the extensions when it runs, and the first session after an install or update tells you once more.
+
+If you are updating from 1.0.43 or earlier, the update replaces the old skill folders with pointers. A file you added or changed inside one of them is copied first to a dated folder under `~/.config/opencode/.litopencode-skill-backups/`, and the installer prints where. It also names what the old version left behind: `~/.cache/litopencode/motion-runtime` and `~/.cache/litopencode/office` (under `$XDG_CACHE_HOME` when that is set), and OpenCode's copy of the old plugin under `~/.cache/opencode/packages/@litfamily/`. Nothing reads them now and the extensions keep their own, so you can delete them.
 
 ## Who it's for
 
@@ -188,17 +205,19 @@ The [guide](./docs/guide.md#automatic-handoff) walks through each step, and the 
 
 ## How it works
 
-OpenCode loads LitOpenCode as a plugin from its config file. When you send a prompt or a command, the plugin picks the workflow that fits and points the model at the skills it needs. Its tools and hooks write down what happened in your project, and `/lit-recap` or the next session reads that record back.
+OpenCode loads LitOpenCode as a plugin from its config file. When you send a prompt or a command, the plugin picks the workflow that fits and points the model at the skills it needs. Its tools and hooks write down what happened in your project, and `/lit-recap` or the next session reads that record back. Follow one prompt through. The activation hook sees `lit` and raises the LIT IGNITED mark, then hands the turn to an agent: `lit-loop` for a task you want done now, `lit-plan` when the job needs a plan first, `lit-implement` once a plan is approved. The planner can read but cannot edit files or run a shell. The agent works through the plugin's tools, writes its criteria and evidence into `.litopencode/litgoal/`, and sends the change to `/review-work`, which checks it in five lanes. Every turn also carries your repository rules and the reader contract, which the system-prompt hook adds before the model starts.
 
-```mermaid
-flowchart LR
-    Prompt["Your prompt with lit"] --> Plugin["LitOpenCode plugin inside OpenCode"]
-    Plugin --> Agents["lit-loop, lit-plan, lit-implement and skills"]
-    Agents --> Record[".litopencode/litgoal/ in your project"]
-    Record -->|"/lit-recap, next session"| Agents
-```
+<p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="./docs/assets/readme/lit-route.en.dark.png" /><source media="(prefers-color-scheme: light)" srcset="./docs/assets/readme/lit-route.en.light.png" /><img src="./docs/assets/readme/lit-route.en.light.png" width="900" alt="A prompt with lit or /lit reaches the activation hook, which shows the LIT IGNITED toast and passes the workflow to an agent (lit-loop, lit-plan or lit-implement; lit-plan cannot edit files or run shell). The agent calls the tools lit, litwork, start-work, review-work and wikify, with skills loaded from ~/.config/opencode/skills. It writes to your project's record in .litopencode/litgoal/ and .litopencode/plans/, which /lit-recap and the next session read back. /review-work returns a pass, fail or blocked verdict from five lanes: scope, tests, package, security and surface. A lower band shows the same route on two hosts: OpenCode 1 through chat.message, command.execute.before, experimental.chat.system.transform and tool.execute.before/after; OpenCode 2 through the session hooks prompt, context and compaction, the tool hooks execute.before/after and the permission hook evaluate." /></picture></p>
 
 Install registers the plugin in OpenCode's config (`opencode.jsonc`), copies commands and skills into your OpenCode config folder, and keeps your model routes in `~/.config/opencode/litopencode.json`. The [guide](./docs/guide.md#install) has the details.
+
+OpenCode 1 and OpenCode 2 can sit on the same machine, and they load plugins in different ways. `litopencode install` looks at the npm package behind `opencode` and `opencode2` to tell which one you have, without starting either, and then takes the path that suits each host. On OpenCode 1 it registers the plugin with `opencode plugin` and adds the TUI entry. On OpenCode 2 the host fetches the package itself, so install only clears duplicate entries and keeps a backup of `cli.json`. Both hosts then read the same config folder, and install leaves your `permissions` and `policies` alone.
+
+<p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="./docs/assets/readme/two-hosts.en.dark.png" /><source media="(prefers-color-scheme: light)" srcset="./docs/assets/readme/two-hosts.en.light.png" /><img src="./docs/assets/readme/two-hosts.en.light.png" width="900" alt="litopencode install finds each host by reading the npm package behind opencode and opencode2, starting neither, then asks which OpenCode is present (both, when both are there). OpenCode 1: register the plugin with opencode plugin --global, then add the TUI entry in tui.json. OpenCode 2: the host fetches the package, so install never runs opencode plugin there and clears duplicate entries from the plugins key and cli.json, keeping a backup. Both paths meet in one config folder, ~/.config/opencode, holding opencode.jsonc with one plugin entry, command/<id>.md, skills/<id>/, litopencode.json model routes and a marked AGENTS.md block it asks about first; permissions and policies are never written. A lower band compares what looks different: on OpenCode 1 the LIT IGNITED mark appears in the answer, toasts come from the server plugin and the ledger carries the work; on OpenCode 2 the mark is a line under the prompt, toasts come from the TUI plugin, and from 2.2 lit loop and /start-work set /goal."></picture></p>
+
+If you think in process flow sheets, here is the loop drawn as one. Requests come in on the left, the plan drum feeds the build reactor through `/start-work`, and everything the reactor makes passes through the review column. A controller reads the lane verdicts and moves the diverter, so a change that passes leaves and a failed lane goes back to the build. Evidence from the build and the review collects in the ledger, and `/lit-recap` draws from it in the next session.
+
+<p align="center"><picture><source media="(prefers-reduced-motion: reduce) and (prefers-color-scheme: dark)" srcset="./docs/assets/readme/lit-plant.en.dark.png" /><source media="(prefers-reduced-motion: reduce)" srcset="./docs/assets/readme/lit-plant.en.png" /><source media="(prefers-color-scheme: dark)" srcset="./docs/assets/readme/lit-plant-loop.en.dark.webp" /><source media="(prefers-color-scheme: light)" srcset="./docs/assets/readme/lit-plant-loop.en.webp" /><img src="./docs/assets/readme/lit-plant-loop.en.webp" width="900" alt="A process flow sheet of LitOpenCode. A lit prompt enters the activation hook. Stream 2 goes up to the plan drum (lit-plan, edit, shell and subagent denied), whose approved plan, stream 3, feeds the build reactor (lit-loop); a bare lit task goes straight in as stream 4. The reactor feeds the review column (/review-work, five lanes: scope, tests, package, security, surface). Controller AIC-101 reads the lane verdicts and sets a three-way diverter: stream 7 leaves as Done, stream 8 returns the failed lane to the build. Evidence streams 9 and 10 run to the ledger tank in your project's .litopencode/ folder, and stream 11 carries the record to /lit-recap. A stream table and a key for request, work in progress, passed, rework, evidence and lane verdicts sit below." /></picture></p>
 
 ## Requirements, updates and removal
 
@@ -245,7 +264,7 @@ If LitOpenCode saves you a morning of "where was I?", a star on GitHub helps oth
 
 Bug reports and pull requests are welcome. Start with [Contributing](./CONTRIBUTING.md), and see [Support](./SUPPORT.md), [Security](./SECURITY.md) and the [Code of conduct](./CODE_OF_CONDUCT.md).
 
-MIT. See [LICENSE](./LICENSE). Reference material bundled for `lit-handoff` and `lit-scientific-visualization` keeps its own license and provenance files under `vendor/`.
+MIT. See [LICENSE](./LICENSE). Reference material bundled for `lit-handoff` keeps its own license and provenance files under `vendor/`.
 
 The LitOpenCode name, logos and mascot art follow the [trademark policy](./TRADEMARK.md).
 

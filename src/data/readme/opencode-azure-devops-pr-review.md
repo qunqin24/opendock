@@ -52,7 +52,7 @@ is an actual capture excerpt with identifying UI removed and its text unchanged.
    [company networks](docs/ENTERPRISE.md#company-networks) first):
 
    ```sh
-   opencode plugin add opencode-azure-devops-pr-review@0.3.6
+   opencode plugin add opencode-azure-devops-pr-review@0.3.7
    ```
 
 2. Follow the [quickstart](docs/QUICKSTART.md) to save your PAT in a private
@@ -206,16 +206,27 @@ ourselves, so this is not a leaderboard result.
 | :--- | ---: | ---: | ---: | ---: |
 | 0.3.5 | 35.5% | 95.6% | 55.3% | 70.0 |
 | 0.3.6 | 39.5% | 96.5% | 55.3% | 65.5 |
+| 0.3.7 | 37.5% | 97.4% | 54.7% | 83.0 |
 
-None of the four measures fell by more than the run-to-run variation allowed
-for in advance. The last one is agreement with the judge on which findings
-deserve an inline comment; it fell because more findings the judge rated
-medium or high were labeled low, 8 of them questions about intent, which the
-new rule rates low. Our local judge scored these runs and a pair with GPT-6.1
+For 0.3.6, none of the four measures fell by more than the run-to-run
+variation allowed for in advance. The last one is agreement with the judge on
+which findings deserve an inline comment; it fell because more findings the
+judge rated medium or high were labeled low, 8 of them questions about intent,
+which that release's rule rates low. Our local judge scored these runs and a pair with GPT-6.1
 Sol. With Sol all four measures rose slightly; with Claude Opus 5.5 it rated
 2.4 points fewer of 0.3.6's findings valid, more than allowed. The criteria,
 both judges' results and the limits are in the
 [validation record](docs/VALIDATION.md#defects-in-moved-code-and-unknown-intent-2026-11-09).
+
+0.3.7 changes how severity is set for that reason: a change that breaks what
+worked before is at least medium, and the verifier sets each level without
+seeing the reviewer's label. It reviewed the same pull requests once, with the
+same setup, and was scored the same way. Agreement on inline comments rose
+from 65.5 to 83.0: 27% of the findings the judge rated medium or high were
+labeled low, against 51% for 0.3.6. Recall fell by 2.0 points and the high and
+medium issues found by 0.6, both within the variation allowed for 0.3.6. The
+runs and their limits are under
+[severity from verified harm](docs/VALIDATION.md#severity-from-verified-harm-2026-11-11-and-12).
 
 ## Watch the workflow
 
@@ -243,8 +254,9 @@ and cost, not a proven accuracy improvement. See [model configuration](#configur
 
 For a small PR that fits in one shard and one comment-planning page, quick
 usually needs one review session plus one planning session; review needs two
-reviewer sessions, a verifier, and comment planning. **Sessions are not API
-requests:** each can make multiple requests, and repairs, retries, larger PRs
+reviewer sessions, a verifier and comment planning, plus a short severity
+rating when `models.review.rater` is set.
+**Sessions are not API requests:** each can make multiple requests, and repairs, retries, larger PRs
 and extra planning pages add work. Previewing comments also uses a model.
 See [measured runs and their limits](docs/VALIDATION.md) for cost and timing
 examples, rather than treating a session count as a price guarantee.
@@ -317,9 +329,14 @@ for both quick and verified reviews.
    verifier moved one there, or the file had more findings than one verifier
    holds), a short **duplicate check** with the verifier model merges only true
    duplicates; it never drops a finding.
-4. The runtime rechecks the PR versions. Only a changed **source** commit makes
+4. The verifier's severity is final unless `models.<mode>.rater` names a
+   model. Then a **severity rating** session without tools reads the confirmed
+   findings as they will be reported and sets each one's final severity. It
+   sees neither the reviewer's nor the verifier's level, and a finding it does
+   not rate keeps the verifier's severity.
+5. The runtime rechecks the PR versions. Only a changed **source** commit makes
    the review STALE; a moved base is reported as a warning.
-5. `/pr-comment` plans a preview with a model. With `--publish`, the runtime
+6. `/pr-comment` plans a preview with a model. With `--publish`, the runtime
    posts the saved text itself, skipping comments that already exist and
    reading every created comment back from Azure DevOps. Re-running a publish
    is safe. `afterReview` or a flag after the PR URL can start this step after
@@ -331,7 +348,8 @@ findings against the source it read; no verifier or duplicate check runs. The
 runtime checks only the form and source of those findings, so they are
 reported, not verified, and the report, the receipt and the posted comments
 say so. A small PR needs one review session (plus one planning session for
-comments) instead of three; each session still makes several model requests.
+comments) instead of three, or four with a rating model; each session still
+makes several model requests.
 
 `/pr-deep` is the heavier alternative for PRs that justify a stronger model: it
 runs the same review as `/pr-review` with the models of `models.deep`, so its
@@ -364,14 +382,14 @@ Azure DevOps REST API with the runtime's built-in `fetch`.
 Install the npm package with OpenCode's plugin manager:
 
 ```sh
-opencode plugin add opencode-azure-devops-pr-review@0.3.6
+opencode plugin add opencode-azure-devops-pr-review@0.3.7
 ```
 
 The same release is also a versioned Git package, which needs Git but not the
 npm registry:
 
 ```sh
-opencode plugin add 'github:WTLAIB/opencode-azure-devops-pr-review-v2#v0.3.6'
+opencode plugin add 'github:WTLAIB/opencode-azure-devops-pr-review-v2#v0.3.7'
 ```
 
 Add only one of them. OpenCode 2.2.4 loads the plugin into a running OpenCode
@@ -385,7 +403,7 @@ To select another configuration file, use an absolute path in the host config:
 ```json
 {
   "plugins": [{
-    "package": "opencode-azure-devops-pr-review@0.3.6",
+    "package": "opencode-azure-devops-pr-review@0.3.7",
     "options": { "settingsFile": "/absolute/path/to/azpr/settings.json" }
   }]
 }
@@ -410,7 +428,7 @@ For an entry that `opencode plugin add` created, add the new version and,
 only when that succeeds, remove the previous one:
 
 ```sh
-opencode plugin add opencode-azure-devops-pr-review@0.3.6 &&
+opencode plugin add opencode-azure-devops-pr-review@0.3.7 &&
   opencode plugin remove opencode-azure-devops-pr-review@PREVIOUS_VERSION
 ```
 
@@ -433,7 +451,7 @@ configuration needs no new `/pr-setup`. `opencode plugin list` should then
 show a single `azpr` row with the new version (from 0.3.1, `/pr-check` names
 it too); if it still shows the previous one, run `opencode service restart`.
 Exact versions stay pinned, so `opencode plugin update` leaves them unchanged.
-See the [0.3.6 release notes](docs/releases/v0.3.6.md) for what changed and the
+See the [0.3.7 release notes](docs/releases/v0.3.7.md) for what changed and the
 [0.2.0 release notes](docs/releases/v0.2.0.md) for automatic comments, which
 remain disabled unless you configure `afterReview` or request them with a
 review command flag.
@@ -443,8 +461,8 @@ review command flag.
 <details>
 <summary>Source installation and replacement</summary>
 
-Download the [v0.3.6 source archive](https://github.com/WTLAIB/opencode-azure-devops-pr-review-v2/archive/refs/tags/v0.3.6.tar.gz)
-and extract it, or check out tag `v0.3.6`. The installer needs POSIX `sh` and
+Download the [v0.3.7 source archive](https://github.com/WTLAIB/opencode-azure-devops-pr-review-v2/archive/refs/tags/v0.3.7.tar.gz)
+and extract it, or check out tag `v0.3.7`. The installer needs POSIX `sh` and
 Python 3's standard library. From that source directory:
 
 ```sh
@@ -470,7 +488,7 @@ sh install.sh --config-dir /absolute/path/to/v2-opencode-config --replace
 ### Manual copying without Git
 
 Keep these relative paths under one source directory, then run its installer.
-These **31 files** include the runtime and its license:
+These **32 files** include the runtime and its license:
 
 <details>
 <summary>Show the required files</summary>
@@ -504,6 +522,7 @@ src/prompts/functional.md
 src/prompts/risk.md
 src/prompts/final.md
 src/prompts/dedupe.md
+src/prompts/rating.md
 src/prompts/quick.md
 src/prompts/comment-policy.md
 src/prompts/comment-plan.md
@@ -568,12 +587,16 @@ include a measured choice for `models.deep`. Likewise `/pr-quick` needs `models.
 and a command checks only the models it uses, so an unavailable quick model
 never blocks `/pr-review`. Comment planning uses the review's risk model
 (`models.deep.risk` for a deep review, the quick reviewer for a quick review).
+`models.review` and `models.deep` also take an optional `rater`: a model that
+turns on the severity rating. Left out or empty, no rating runs and the
+verifier's severity is final.
 
 | Role | Focus and useful model capabilities |
 | --- | --- |
 | `functional` | Requirements, boundaries, state changes, API compatibility and regressions. Strong code comprehension in the project's language. |
 | `risk` | Failures, retries, concurrency, authorization and data consistency. Evidence-based reasoning across call paths and reliable tool use. Also plans comments. |
-| `verifier` | Independent source re-checks, counterevidence, the final severity, duplicate merging (including the same-file duplicate check) and the final report. Strong evidence judgment and instruction following. |
+| `verifier` | Independent source re-checks, counterevidence, a first severity, duplicate merging (including the same-file duplicate check) and the final report. Strong evidence judgment and instruction following. |
+| `rater` (optional) | Turns on the severity rating: the final severity of each confirmed finding, judged from the finding's text alone in a session without tools. Empty (the default): no rating, the verifier's severity is final. Set it to a model stronger than the reviewers': the step reads only the findings, so a stronger model costs little here, while a model rating its own review adds little. It needs no tool support. |
 | `quick.reviewer` | `/pr-quick` only: both focuses in one session per shard, its own source checks, and comment planning for quick reviews. Strong code comprehension, evidence judgment and reliable tool use. |
 
 A role's focus orders its attention and is not a filter: every reviewer files
@@ -586,7 +609,8 @@ reviewer's confidence, the size of the fix or the kind of issue:
   what the change is for not working, or causes serious harm such as a
   security breach, lost or exposed data, or silently wrong results.
 - **medium** (should fix in this change): realistic use hits a failure that
-  people notice and recover from, or a rare trigger causes serious harm.
+  people notice and recover from, a rare trigger causes serious harm, or the
+  change breaks something that worked before, however rarely it is used.
 - **low** (can wait): anything else, such as a recoverable failure that only a
   rare trigger reaches, or an issue with no effect on behavior.
 
@@ -595,16 +619,27 @@ findings. Neither does the code's history: a defect on lines the PR adds or
 moves is a finding even when the same code existed before (a function moved to
 a new file), marked as carried over. Nor does a possible intention: behavior
 that is wrong only if the author did not mean it, with nothing showing whether
-they did, is a low finding whose summary asks whether the author meant it and
-whose suggestion asks them to confirm or document the intent.
-The verifier sets the final severity from its own checks; `/pr-quick`
-keeps the reviewer's. Concrete gaps the change leaves are findings too, rated
+they did, is a low finding (medium when it stops something that worked before
+from working) whose summary asks whether the author meant it and whose
+suggestion asks them to confirm or document the intent. Before asking, a
+reviewer looks for a statement of that intent in the tests, the comments and
+documents beside the code, the PR description and the commit messages.
+An easy fix and an effect the reviewer could not confirm are not reasons for a
+lower level. The verifier receives candidates without the reviewer's severity
+and sets its own, which is final unless a `rater` is configured: then the
+severity rating sets the final one from the finished finding. `/pr-quick` keeps
+the reviewer's. Concrete gaps the change leaves are findings too, rated
 by their effect: a changed behavior no test would catch where the project
 already tests comparable code, a test that cannot fail, a comment or document
 that now contradicts the code, and duplicated or dead code the change adds. A
 missing test is low unless the test is what the change delivers, and a
-document is rated by what following it does. A mistake repeated in places that
-each need their own fix is one finding per place. Identical copies of one file
+document is rated by what following it does; documented steps that worked
+before the change and fail after it are a regression (medium) even though the
+failure shows at once. A verified behavior that only the author, or a
+specification outside the repository, can call intended is confirmed as a
+question, not set aside as NEEDS_INFO. A finding states one defect: a
+second one noticed on the way is filed on its own. A mistake repeated in places
+that each need their own fix is one finding per place. Identical copies of one file
 count as one place when one reviewer has them; in a large PR split into shards,
 copies that different reviewers get can each produce a finding.
 
@@ -892,8 +927,8 @@ and a loopback fake Azure DevOps REST service in disposable directories under
 Uninstall without `--apply` previews; `--apply` archives only this package under
 `azpr-v2-backups` and leaves the private state directory for you to delete.
 For a native installation, remove the entry you added, for example
-`opencode plugin remove opencode-azure-devops-pr-review@0.3.6` or
-`opencode plugin remove 'github:WTLAIB/opencode-azure-devops-pr-review-v2#v0.3.6'`;
+`opencode plugin remove opencode-azure-devops-pr-review@0.3.7` or
+`opencode plugin remove 'github:WTLAIB/opencode-azure-devops-pr-review-v2#v0.3.7'`;
 the external settings, PAT file and private review state remain available.
 
 [Architecture](docs/ARCHITECTURE.md), [commenting](docs/COMMENTING.md),
@@ -906,7 +941,7 @@ or personal model selections.
 ## License and releases
 
 [MIT](LICENSE), copyright 2026 WTLAIB. See the [changelog](CHANGELOG.md) for the
-release scope, [v0.3.6](https://github.com/WTLAIB/opencode-azure-devops-pr-review-v2/releases/tag/v0.3.6)
+release scope, [v0.3.7](https://github.com/WTLAIB/opencode-azure-devops-pr-review-v2/releases/tag/v0.3.7)
 for downloads, the [npm package](https://www.npmjs.com/package/opencode-azure-devops-pr-review),
 [v0.2.0](https://github.com/WTLAIB/opencode-azure-devops-pr-review-v2/releases/tag/v0.2.0)
 for the recorded demonstration, and [releasing](docs/RELEASING.md) for the

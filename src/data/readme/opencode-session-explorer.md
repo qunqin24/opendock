@@ -6,6 +6,18 @@ Browse, search, export and report on your OpenCode session history — through a
 
 Read-only by design: `opencode.db` is only ever opened in read-only mode. Search runs on a separate sidecar index, so your session data is never rewritten.
 
+![Session transcript](https://raw.githubusercontent.com/williamwang2013/opencode-session-explorer/main/docs/screenshots/transcript.png)
+
+*Transcript view: oldest-first reading, reasoning and tool calls expanded, per-day timeline in the header.*
+
+![Full-text search](https://raw.githubusercontent.com/williamwang2013/opencode-session-explorer/main/docs/screenshots/search.png)
+
+*Full-text search across messages, reasoning and tool output, with jump-to-hit.*
+
+![Session info](https://raw.githubusercontent.com/williamwang2013/opencode-session-explorer/main/docs/screenshots/session-info.png)
+
+*Session info: cost, token breakdown, composition and the session's todo list.*
+
 ![overview](https://img.shields.io/badge/opencode-plugin-blue) ![license](https://img.shields.io/badge/license-MIT-green)
 
 ## Why
@@ -177,3 +189,10 @@ There is no build step: the plugin entry is `src/index.ts` (type annotations onl
 ## License
 
 MIT
+
+Screenshots are generated from a synthetic database (`scripts/demo-data.py`), so no real session data ends up in the repository:
+
+```
+python scripts/demo-data.py ./demo-env
+OPENCODE_DATA_DIR=./demo-env python src/py/server.py
+```

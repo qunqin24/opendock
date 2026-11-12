@@ -141,7 +141,7 @@ but has no effect in OpenCode.
 | `PostToolUseFailure` | yes | no | V1 has no reliable failure hook. |
 | `Stop` | yes | partial | V2 continues with a synthetic message; V1 only observes. |
 | `SubagentStart` | yes | partial | V1 reports the child session; agent type may be `general`. |
-| `SubagentStop` | yes | no | V1 cannot distinguish a child idle reliably. |
+| `SubagentStop` | yes | partial | V1 maps a child idle via `session.created`/`parentID`; it can observe but not continue. |
 | `PreCompact` | yes | yes | Hook instructions are added to the compaction prompt; blocking is not honoured. |
 | `PostCompact` | yes | yes | Observational. |
 | `SessionEnd` | yes | yes | Fired on session deletion, not on process exit. |
@@ -161,8 +161,8 @@ never silently dropped.
 | Type | Status | Notes |
 | --- | --- | --- |
 | `command` | yes | Shell or exec form (`args`), `timeout`, `statusMessage`, `once`, `async`, `onFailure`, `if`. JSON on stdin. |
-| `http` | yes | POST JSON, header env interpolation, host allowlist, no redirects, timeout. |
-| `prompt` | V2 only | Opt-in with `allowPromptHooks`; uses `ctx.experimental.generate.text`. |
+| `http` | yes | POST JSON, header env interpolation, host allowlist, no redirects, `timeout`, `statusMessage`. |
+| `prompt` | V2 only | Opt-in with `allowPromptHooks`; native `{ok, reason, impossible}` schema; `timeout` (30s default), `statusMessage`; uses `ctx.experimental.generate.text`. |
 | `mcp_tool` | no | Needs an MCP tool dispatcher that the plugin API does not expose. |
 | `agent` | no | Needs a nested agent runner. |
 
@@ -187,7 +187,7 @@ so use the CLI for the same report.
 
 | Option | Default | Meaning |
 | --- | --- | --- |
-| `trust` | `"user"` | `user` trusts user/managed settings; `all` trusts everything; `none` only trusts `trusted`; `prompt` forces `claude_hook` permission checks to `ask` through an evaluate hook (V2). |
+| `trust` | `"user"` | `user` trusts user/managed settings; `all` trusts everything; `none` only trusts `trusted`; `prompt` raises `claude_hook` permission checks to `ask` through an evaluate hook (V2), never downgrading an existing `deny`. |
 | `trusted` | `[]` | Trusted hook fingerprints or source IDs. |
 | `trustFile` | `~/.config/opencode/claude-hooks-trust.json` | Trust store, written atomically with mode `0600`. `XDG_CONFIG_HOME` is not used, so a repository `.env` cannot relocate it. |
 | `managedSettings` | system path | Explicit managed settings file; must be outside the project. |
@@ -199,7 +199,7 @@ so use the CLI for the same report.
 | `httpAllowlist` | `[]` | Allowed hostnames (supports `*`); empty allows any host. |
 | `inheritEnv` | `false` | Pass the full process environment to command hooks. |
 | `env` | `{}` | Extra environment variables. |
-| `defaultTimeoutSec` | `600` | Default per-hook timeout. |
+| `defaultTimeoutSec` | `600` | Default per-hook timeout; prompt hooks are capped at 30s unless a per-hook `timeout` is set. |
 | `maxTimeoutSec` | `3600` | Hard timeout ceiling. |
 | `maxOutputBytes` | `1048576` | stdout/stderr/HTTP body cap. |
 | `promptModel` | selected model | Model used by prompt hooks, as `provider/model`. |
@@ -245,7 +245,7 @@ not control.
 - Prompt hooks are opt-in and use an OpenCode model, not Claude.
 - `asyncRewake` cannot wake the model; use a synchronous hook when the result
   must affect the turn.
-- V1 cannot continue a Stop hook or prompt for trust; see the matrix above.
+- V1 cannot continue a Stop/SubagentStop hook or prompt for trust; see the matrix above.
 
 ## Support
 

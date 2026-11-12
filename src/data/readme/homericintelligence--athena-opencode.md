@@ -14,10 +14,10 @@ wheel, a source distribution, or a runtime library.
 
 ## Technical English
 
-All Athena English technical prose must follow the
-[ASD-STE100 technical-English policy](skills/TECHNICAL_ENGLISH.md). This rule is for skill sources,
+Athena English technical prose aims to follow the
+[ASD-STE100 technical-English policy](skills/TECHNICAL_ENGLISH.md). The policy is for skill sources,
 the engineering principles catalog, and prose that a skill produces. Literal text does not have to
-obey this rule.
+obey this policy.
 
 The current official ASD-STE100 standard is the complete authority. Athena checks do not certify
 conformance to the standard.
@@ -44,12 +44,12 @@ update failure is fatal. If `learn` has an evidence-backed, non-duplicate lesson
 authority, it uses an isolated worktree and a pull request. In all other conditions, it reports
 without a mutation.
 
-Script-backed skills require Git and Python 3.12.3 or newer on the host. Dependency resolution and the GitHub
-pull-request route also require authenticated GitHub CLI (`gh`) access. GitHub issue and repository
-routes require the authenticated GitHub capability that their skill selects.
+Script-backed skills need Git and Python 3.12.3 or newer on the host. Dependency resolution and the GitHub
+pull-request route also need authenticated GitHub CLI (`gh`) access. GitHub issue and repository
+routes need the authenticated GitHub capability that their skill selects.
 
-GitLab issue, merge-request, and epic routes require an authenticated GitLab capability from the
-host. They must not fall back to GitHub CLI. A skill does not require a forge client when it does not
+GitLab issue, merge-request, and epic routes need an authenticated GitLab capability from the
+host. They must not fall back to GitHub CLI. A skill does not need a forge client when it does not
 select a forge route. Athena ships scripts as plugin resources. It does not install a Python package
 or a third-party runtime library.
 
@@ -91,7 +91,7 @@ not copied into or represented as coding-harness packages.
 ## Release archives
 
 Coding harnesses install Athena from the Git-backed skill or plugin source above. Each GitHub release
-also provides a checksummed portable archive for offline distribution and provenance. The archive is
+also provides a checksummed portable archive for offline distribution. The archive is
 not a Python package. It does not replace an installation from source.
 
 The archive contains only these items:
@@ -114,7 +114,6 @@ The archive excludes these items:
 ## Skills
 
 - Architecture-first review: `change-review`, `repo-review`, and `pr-review`.
-- Review support: `review-exchange`.
 - Issue planning, review, and finalization: `plan-issue`, `issue-review`, and `finalize-plan`.
 - Engineering: `brainstorm`, `implement`, `address-review`, `realign`, `simplify`, `systematic-debugging`, and
   `test-driven-development`.

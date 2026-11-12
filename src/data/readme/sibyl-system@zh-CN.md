@@ -71,43 +71,54 @@ sibyl-chamber run --target - --goal "Evaluate candidate behavior" --profile exam
 硬化文件系统隔离。macOS 和 Windows 只能在配置 `credentialProxy` 时使用
 可移植隔离；它保护凭据，但挡不住工件读取运行账号可访问的文件。
 
-按包名注册已发布的 npm 包（opencode 会从 npm 解析）：
+按包名安装已发布的 npm 包（opencode 2.x 插件系统；opencode 1.x 已退役）：
+
+```sh
+opencode plugin add sibyl-system
+```
+
+或者写进 `~/.config/opencode/opencode.jsonc`
+（Windows：`%USERPROFILE%\.config\opencode\opencode.jsonc`）：
 
 ```jsonc
 {
-  "plugin": ["sibyl-system"]
+  "plugins": ["sibyl-system"]
 }
 ```
 
-也可以按路径注册本地检出。在 `~/.config/opencode/opencode.jsonc`
-（Windows：`%USERPROFILE%\.config\opencode\opencode.jsonc`）里加一行注册。
-这**只是文档示例**——插件永不修改你的配置：
+也可以按路径注册本地检出。配置的本地路径必须是一个**目录**（包含
+`package.json` 与 `dist/`，例如已构建仓库的检出；指向单个文件的配置路径
+会被 2.x 静默跳过）。以下**只是文档示例**——插件永不修改你的配置：
 
 ```jsonc
 {
-  "plugin": [
-    [
-      "/abs/path/to/sibyl-system/src/index.ts",
-      {
+  "plugins": [
+    {
+      "package": "/abs/path/to/sibyl-system",
+      "options": {
         "modelPool": {
           "default": { "providerID": "your-provider", "modelID": "your-model" }
         },
         "concurrencyK": 4
       }
-    ]
+    }
   ]
 }
 ```
 
-直接注册 TS 入口是受支持的（opencode 用 Bun转译插件源码）。元组的第二个
-元素会**逐字**作为选项对象传入，所以选项字段位于它的**顶层**（如示例）；
+2.x 要求插件是一个**包目录**：已构建仓库的检出，或已安装 npm 包的目录
+（例如 `node_modules/sibyl-system`）——指向单个文件的配置路径会被静默
+跳过。迁移细节与 V1 入口形状为何不再加载，见
+`docs/V2-MIGRATION.md`。
+
+选项对象的字段位于它的**顶层**（如示例），会**逐字**作为选项对象传入；
 未知键会被大声拒绝，绝不被静默忽略。选项对象是**唯一**的配置面——没有
 其他配置文件（`SIBYL_STATE_FILE` 和 `SIBYL_CHAMBER_LEDGER` 两个环境变量
 仅作为测试/CI 的显式隔离缝存在，见 State）。
 
 非法选项绝不让宿主崩溃：插件向 stderr 打印
 `[sibyl] SIBYL plugin DISABLED — fix options (no sibyl_* tools registered)`，
-什么都不注册，返回空钩子。
+并且什么都不注册。
 
 ## Tools
 
@@ -156,27 +167,32 @@ provider 的密钥，并给每个角色一枚短期限域令牌。角色收到�
 
 ```jsonc
 {
-  "plugin": [["sibyl-system", {
-    "modelPool": {
-      "default": { "providerID": "review-gateway", "modelID": "review-model" }
-    },
-    "modelPolicy": { "allowedPrefixes": ["review-gateway/"] },
-    "credentialProxy": {
-      "providers": {
-        "review-gateway": {
-          "baseUrl": "https://gateway.example.com",
-          "keyFile": "~/.config/sibyl/review-gateway.key",
-          "models": ["review-model"]
+  "plugins": [
+    {
+      "package": "sibyl-system",
+      "options": {
+        "modelPool": {
+          "default": { "providerID": "review-gateway", "modelID": "review-model" }
         },
-        "local": {
-          "baseUrl": "http://127.0.0.1:8000",
-          "keyless": true,
-          "models": ["local-review"]
+        "modelPolicy": { "allowedPrefixes": ["review-gateway/"] },
+        "credentialProxy": {
+          "providers": {
+            "review-gateway": {
+              "baseUrl": "https://gateway.example.com",
+              "keyFile": "~/.config/sibyl/review-gateway.key",
+              "models": ["review-model"]
+            },
+            "local": {
+              "baseUrl": "http://127.0.0.1:8000",
+              "keyless": true,
+              "models": ["local-review"]
+            }
+          },
+          "maxRequestsPerRole": 2000
         }
-      },
-      "maxRequestsPerRole": 2000
+      }
     }
-  }]]
+  ]
 }
 ```
 
@@ -203,7 +219,7 @@ POST `/v1/chat/completions`、`/v1/completions`、`/v1/embeddings`、
 
 已发布包**不钉死任何设备端模型授权**：出厂仅有的模型默认是空字符串哨兵
 （= "宿主默认"）和通用的 `local-` 入座前缀。具体的 provider/model id 只
-存在于**你的**配置里——注册元组的选项对象（按操作者的 `modelPool` /
+存在于**你的**配置里——注册条目选项对象里的（按操作者的 `modelPool` /
 `modelPolicy` / `--model` 旗标）。共享编队上的操作者惯例上把具体值放在
 操作者本地文件里，由自己的 shell 或 OpenCode 配置在注册时注入那个选项
 对象；该文件位于包边界之外——`package.json` `files` 只发布 `dist/`、
@@ -380,11 +396,11 @@ node smoke/run-smoke.mjs   # 对已发布面的离线烟测（见 smoke/README.m
 
 在线端到端证据（真实 opencode、真实模型会话）：
 
-- `.omo/evidence/t10/`（内部工作证据，不随包发布）— 主干路径：3 个真实
+- 工作证据 t10（留档于仓外，不随包发布）— 主干路径：3 个真实
   投票者审计一个埋了缺陷的工件，返回 fail-closed **REJECT 0A/3R**，点名
   全部 3 类埋入缺陷；议事庭挂钟 95.6 秒 ≈ 最慢单个投票者（Σ 168.2 秒），
   证明真并行扇出。
-- `.omo/evidence/t11/`（内部工作证据，不随包发布）— 故障路径，31/31 断言：
+- 工作证据 t11（留档于仓外，不随包发布）— 故障路径，31/31 断言：
   坏的模型槽产生 3 张错误票，运行 fail-closed；运行中途 SIGINT 后存储
   依然有效，被打断的运行诚实地冻结在 `running`。（记录中的票数早于
   `test/council.test.ts` 钉死的判定表法；按今天的锁定表，全错选票归

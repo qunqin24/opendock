@@ -6,6 +6,18 @@
 
 对 `opencode.db` 永远只读打开，搜索走独立的侧车索引库，绝不改写会话数据。
 
+![会话转录](https://raw.githubusercontent.com/williamwang2013/opencode-session-explorer/main/docs/screenshots/transcript.zh.png)
+
+*转录视图：按时间正序阅读，思考过程与工具调用已展开，顶部是按天时间轴。*
+
+![全库搜索](https://raw.githubusercontent.com/williamwang2013/opencode-session-explorer/main/docs/screenshots/search.png)
+
+*全库搜索：覆盖正文、思考过程与工具输出，点击直接跳到命中位置。*
+
+![会话信息](https://raw.githubusercontent.com/williamwang2013/opencode-session-explorer/main/docs/screenshots/session-info.png)
+
+*会话信息：花费、Token 分项、内容构成与该会话的待办清单。*
+
 ## 为什么
 
 OpenCode 把每次会话都留在磁盘上，但会话一多就基本没法用了：
@@ -175,3 +187,10 @@ npm pack --dry-run              # 看打包内容
 ## 许可
 
 MIT
+
+README 里的截图来自合成数据库（`scripts/demo-data.py`），不含任何真实会话内容：
+
+```
+python scripts/demo-data.py ./demo-env
+OPENCODE_DATA_DIR=./demo-env python src/py/server.py
+```

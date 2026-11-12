@@ -44,7 +44,7 @@ Herstart OpenCode en je bent klaar!
 ## Wat doet het?
 
 Elke keer als OpenCode klaar is met een taak, om permissie vraagt, of een error krijgt:
-- Speelt een willekeurig geluid af uit de collectie van 62 klassieke Derkolk soundboard fragmenten
+- Speelt een willekeurig geluid af uit de collectie van 63 klassieke Derkolk soundboard fragmenten
 - Stuurt een push notificatie naar je desktop
 
 Welke events daarvoor gebruikt worden verschilt per OpenCode-versie:
@@ -69,7 +69,7 @@ In OpenCode 2 draait één achtergrondservice (`opencode serve --service`) voor 
 - "Tetete"
 - "Kakwijk"
 - "Doei Henk"
-- ... en nog 52 meer!
+- ... en nog 53 meer!
 
 ## Platform ondersteuning
 

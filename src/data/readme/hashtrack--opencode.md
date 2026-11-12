@@ -18,7 +18,7 @@ written by a small extension for each agent harness.
 
 Usage is written to `<git-root>/.hashtrack/usage.jsonl` (override with `HASHTRACK_DIR`). Each line is one JSON record per agent run — one prompt and all of its turns. The repository is identified by its git remote URL; if there is no remote, the git root is used, and if there is no git repo, the current directory.
 
-The file is append-only and uses a shared format, so adapters for other agents (Claude, Copilot, OpenCode; planned) write to the same file. Old lines keep parsing when the format changes, and malformed lines are skipped.
+The file is append-only and uses a shared format, so adapters for other agents (OpenCode, Claude Code; Copilot planned) write to the same file. Old lines keep parsing when the format changes, and malformed lines are skipped.
 
 ##### When data is written
 
@@ -100,7 +100,21 @@ bun run build:opencode
 
 The plugin shows the current repo total (`⣏ 12K · $0.42`, the favicon as an orange braille mark in terminals) in the terminal UI and in OpenCode Desktop (which draws the favicon itself), and adds a `/hashtrack` command that opens the detailed web dashboard in your browser. Cloud sync reads `~/.config/opencode/hashtrack/config.json` (same `{ "token", "url" }` shape as pi). See [apps/opencode/README.md](apps/opencode/README.md).
 
-`apps/claude` and `apps/copilot` are still placeholders for adapters using the same core. To add one: new `apps/<harness>` package, depend on `@hashtrack/core: workspace:*`, call `Session` on the harness's turn-end events, flush on idle/shutdown. See [AGENTS.md](AGENTS.md).
+### Claude Code
+
+`apps/claude` is a [Claude Code](https://code.claude.com) plugin using the same core and the same `.hashtrack/usage.jsonl` file. This repository is also its marketplace:
+
+```bash
+claude plugin marketplace add HeapSoftGmbH/hashtrack
+```
+
+```bash
+claude plugin install hashtrack@hashtrack
+```
+
+The plugin records usage from hooks and reads token counts from the session transcript. Claude Code transcripts carry no cost, so the plugin prices tokens from a built-in table of Anthropic API rates. Subagents get their own records. It also shows the repo total in the prompt footer, which opens a details pane. Hooks run `node`, so Node.js 18 or newer must be on `PATH`; without it the footer says so instead of showing a total. Cloud sync reads `~/.claude/hashtrack/config.json` (same `{ "token", "url" }` shape as pi). See [apps/claude/README.md](apps/claude/README.md).
+
+`apps/copilot` is still a placeholder for an adapter using the same core. To add one: new `apps/<harness>` package, depend on `@hashtrack/core: workspace:*`, call `Session` on the harness's turn-end events, flush on idle/shutdown. See [AGENTS.md](AGENTS.md).
 
 ## CI
 
@@ -129,7 +143,9 @@ git commit -am "opencode 0.1.0" && git tag opencode-v0.1.0
 git push origin main --tags
 ```
 
-A new `apps/<harness>` adapter needs no pipeline changes — tagging `claude-v0.1.0` publishes `apps/claude`.
+The Claude Code plugin releases the same way (tag `claude-vX.Y.Z`). Bump `version` in both `apps/claude/package.json` and `apps/claude/.claude-plugin/plugin.json`: Claude Code decides whether an update exists from `plugin.json`.
+
+A new `apps/<harness>` adapter needs no pipeline changes — tagging `<app>-v0.1.0` publishes `apps/<app>`.
 
 ## Renamed from witness
 
@@ -163,3 +179,7 @@ Bun workspaces monorepo:
 - `apps/pi` — pi extension (`extensions/index.ts` maps pi events to `Session`)
 - `apps/opencode` — opencode plugin (`src/index.ts` maps opencode events to `Session`)
 - `packages/local-web` — the dashboard UI
+
+## License
+
+[Apache-2.0](LICENSE)

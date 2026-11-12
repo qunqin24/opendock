@@ -33,7 +33,7 @@ This adds plugboard to your global OpenCode config (`~/.config/opencode/opencode
 {
   "plugins": [
     {
-      "package": "opencode-plugboard@0.64.0",
+      "package": "opencode-plugboard@0.65.2",
       "options": {
         "keys": { "my-app": "{env:PLUGBOARD_KEY_MY_APP}" },
         "models": "all",

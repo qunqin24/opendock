@@ -36,12 +36,12 @@ Windows only for rea-shim (Windows x64) and oc-harness-setup (Windows 10/11), th
 From the repo root:
 
 ```sh
-npm install
-npm run check
-npm run pack:check
+bun install --frozen-lockfile
+bun run check
+bun run pack:check
 ```
 
-`npm run check` runs the docs checker, its self-test, and every workspace's own check. `pack:check` runs check and build, then verifies each tarball.
+`bun run check` runs the docs checker, its self-test, and every workspace's own check. `pack:check` runs check and build, then verifies each tarball.
 
 Manual npm commands (`npm login`, `npm publish`, `npm trust github`) are owner-only and 2FA-gated with a passkey. Use `scripts/npm-passkey.mjs` in a visible terminal; the release workflow's OIDC publish does not need it.
 

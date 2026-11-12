@@ -2,6 +2,8 @@
 
 [English](README.md) | [简体中文](README.zh-CN.md)
 
+**GitHub**：[github.com/DaBinBinah/cloudbase-bridge](https://github.com/DaBinBinah/cloudbase-bridge)
+
 通过你自己部署的 `aiProxy` 云函数，把腾讯云开发 CloudBase「小程序成长计划」的 AI 额度接入 [Magpie](https://usemagpie.ai)，作为普通的 OpenAI 兼容供应商使用。装好之后，它就是你账号下的一个普通供应商，各个 agent 都能直接用。
 
 > 社区项目：和 Magpie、腾讯云都没有关系，也没有经过 Magpie 官方审核或收录。

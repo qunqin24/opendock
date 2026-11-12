@@ -12,14 +12,15 @@
 </p>
 
 <p align="center">
-  <img src="./screenshot.jpg" alt="The Media panel beside a session, showing screenshots in justified rows" width="900" />
+  <img src="./screenshot.jpg" alt="The Media panel beside a session, showing screenshots in a grouped grid" width="900" />
 </p>
 
 Adds a **Media** tab to a session's side panel. It gathers the images the agent
 read, the screenshots it took, and the files you attached, newest first, so you
 can find that one screenshot without scrolling the chat.
 
-- **Justified rows.** Images fill the panel width at their true shape, with no cropping. Phone screenshots and wide captures sit side by side.
+- **Grouped grid.** Uniform landscape (4:3) cells, never cropped, with the file name underneath. Items are grouped by turn (the prompt and the work that followed), newest first, each group headed by when it happened, the tools involved, and a count.
+- **Density.** Switch between small, medium, and large thumbnails; the choice is remembered.
 - **Resizes cleanly.** Resizing the panel only repositions tiles. Nothing reloads.
 - **In-app viewer.** Click an image for a full-window view. `←` and `→` step through, `Esc` closes.
 - **Live.** New images appear as tools finish.
@@ -76,7 +77,8 @@ your default app.
 
 ## Notes
 
-- A screenshot that was deleted from disk shows "File no longer exists", unless the app still holds its bytes.
+- The panel reads the newest part of the history first and loads older media as you scroll to the end of the grid, so long sessions open quickly.
+- A path a tool merely mentioned (no bytes) shows only if the file exists on disk; mentions of files that never existed stay out of the grid. If a shown file is later deleted, its tile turns into a quiet placeholder unless the app still holds its bytes.
 - Disk reads are limited to absolute image paths up to 20 MB.
 - The viewer's **↗** button opens the image in your default app. That takes focus from OpenCode, so it is opt-in.
 - Opening in another app needs the desktop app, not the web UI.

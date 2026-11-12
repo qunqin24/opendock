@@ -63,89 +63,180 @@ bun install
 
 ## 配置
 
-插件选项优先于环境变量，环境变量优先于默认值。
+配置只有一个来源：`config.json`，放在固定的工作目录
+`$XDG_DATA_HOME/opencode-qq-bot/workspace`（未设置 `XDG_DATA_HOME` 时是
+`~/.local/share/opencode-qq-bot/workspace`）。环境变量与插件选项不再是配置来源，
+OpenCode 插件选项里只剩 `agent`；`config.json` 不存在时插件直接报错退出。
 
-**凭证不写进仓库**：把 NapCat 地址、令牌和真实群号/QQ 号写进本地 `opencode.json` 的插件
-`options`，该文件已被 `.gitignore` 忽略；仓库只保留 `opencode.example.json` 模板。
+- 写到一半的 JSON、类型不符或越界的值会告警并回退到默认值；JSON 语法错误直接报错。
+- 标「立即」的字段保存即生效，标「重启」的字段要重载插件。
+- 面板（默认关闭）可以可视化编辑这份配置，见 [docs/panel.md](docs/panel.md)。
+- 从旧版本升级没有兼容层，也没有迁移工具：按下面的字段表手写 `config.json`。
 
-插件不会读取项目 `.env`。如果选择用环境变量配置，必须把变量注入 OpenCode 服务进程本身，
-可参考 `.env.example`；`cp .env.example .env` 不会生效。
+```json
+{
+  "napcat": { "url": "ws://127.0.0.1:3001", "token": "napcat-token" },
+  "ownerQQ": 123456789,
+  "access": { "allow": { "groups": [123456789], "users": [987654321] } }
+}
+```
 
-| 选项                                | 环境变量                           | 默认值                         | 说明                                                                           |
-| ----------------------------------- | ---------------------------------- | ------------------------------ | ------------------------------------------------------------------------------ |
-| `napcat.url`                        | `NAPCAT_WS_URL`                    | 无（必填）                     | NapCat 正向 WebSocket 地址                                                     |
-| `napcat.token`                      | `NAPCAT_WS_TOKEN`                  | 无                             | NapCat 访问令牌                                                                |
-| `access.allow.groups`               | `QQ_ALLOW_GROUPS`                  | `[]`                           | 放行的群号，逗号分隔；为空时看 `allowAllWhenEmpty`                             |
-| `access.allow.users`                | `QQ_ALLOW_USERS`                   | `[]`                           | 放行的私聊 QQ 号，逗号分隔                                                     |
-| `access.deny.groups`                | `QQ_DENY_GROUPS`                   | `[]`                           | 拒绝的群号，优先于放行名单                                                     |
-| `access.deny.users`                 | `QQ_DENY_USERS`                    | `[]`                           | 拒绝的私聊 QQ 号，优先于放行名单                                               |
-| `access.allowAllWhenEmpty`          | `QQ_ALLOW_ALL_WHEN_EMPTY`          | `false`                        | 放行名单为空时是否放行全部目标                                                 |
-| `ownerQQ`                           | `QQ_OWNER_QQ`                      | 无                             | 所有者 QQ：管理命令只在它的私聊生效，该私聊始终放行                            |
-| `admins`                            | `QQ_ADMINS`                        | `[]`                           | 管理员 QQ 号：拥有全部工具权限，私聊还需在放行名单                             |
-| `toolProfilesPath`                  | `QQ_TOOL_PROFILES`                 | 工作目录 `tool-profiles.json`  | 工具配置文件路径，相对工作目录                                                 |
-| `chatOverridesPath`                 | `QQ_CHAT_OVERRIDES`                | 工作目录 `chat-overrides.json` | 会话行为覆盖文件路径，相对工作目录                                             |
-| `soulPath`                          | `QQ_BOT_SOUL_PATH`                 | 工作目录 `souls/`              | 角色设定文件或目录路径，相对工作目录                                           |
-| `soulName`                          | `QQ_BOT_SOUL_NAME`                 | `default.txt`                  | 工作目录 `souls` 里的角色设定文件名                                            |
-| `home`                              | `QQ_BOT_HOME`                      | XDG 工作区                     | 机器人会话的工作目录，必须是绝对路径或 `~/`                                    |
-| `agent`                             | `QQ_BOT_AGENT`                     | OpenCode 默认                  | 会话使用的 agent                                                               |
-| `model`                             | `QQ_BOT_MODEL`                     | OpenCode 默认                  | 会话使用的模型，格式 `provider/model[/variant]`                                |
-| `sendDelayMs`                       | `QQ_SEND_DELAY_MS`                 | `1000`                         | 超长消息分段发送时每段之间的间隔                                               |
-| `warnLength`                        | `QQ_WARN_LENGTH`                   | `500`                          | 单次发送的内容长度超过该值时告警                                               |
-| `reuseSession`                      | `QQ_REUSE_SESSION`                 | `false`                        | 完全没有绑定时，按会话标记找回上一次的会话（绑定还在但会话读不到时始终会找回） |
-| `proactive.enabled`                 | `QQ_PROACTIVE_ENABLED`             | `true`                         | 是否启用主动说话                                                               |
-| `proactive.silenceThresholdSeconds` | `QQ_PROACTIVE_SILENCE_SECONDS`     | `10800`                        | 沉默多久后才开始计算主动说话概率                                               |
-| `proactive.startProbability`        | `QQ_PROACTIVE_P_START`             | `0.01`                         | 刚跨过阈值时的概率                                                             |
-| `proactive.probabilityPerHour`      | `QQ_PROACTIVE_P_SLOPE_PER_HOUR`    | `0.05`                         | 每多沉默一小时概率的增量                                                       |
-| `proactive.tickSeconds`             | `QQ_PROACTIVE_TICK_SECONDS`        | `3600`                         | 心跳间隔，必须大于 0                                                           |
-| `proactive.allowGroups`             | `QQ_PROACTIVE_ALLOW_GROUPS`        | `[]`                           | 只在这些群里主动说话，逗号分隔；留空表示不限制                                 |
-| `proactive.allowUsers`              | `QQ_PROACTIVE_ALLOW_USERS`         | `[]`                           | 只在这些私聊里主动说话，逗号分隔；留空表示不限制                               |
-| `wake.prefixes`                     | `QQ_WAKE_PREFIXES`                 | `["/"]`                        | 全局唤醒前缀，逗号分隔；命中就必须回复                                         |
-| `wake.ignoreAtAll`                  | `QQ_WAKE_IGNORE_AT_ALL`            | `true`                         | 是否忽略 @全体成员                                                             |
-| `wake.replyToSelf`                  | `QQ_WAKE_REPLY_TO_SELF`            | `true`                         | 回复机器人自己的消息是否必须回复                                               |
-| `wake.ignoreAtOthers`               | `QQ_WAKE_IGNORE_AT_OTHERS`         | `true`                         | 群里第一个 @ 指向别人时是否不唤醒机器人                                        |
-| `reply.minDelayMs`                  | `QQ_REPLY_MIN_DELAY_MS`            | `0`                            | 分段之间的随机等待下限（毫秒）                                                 |
-| `reply.maxDelayMs`                  | `QQ_REPLY_MAX_DELAY_MS`            | `0`                            | 分段之间的随机等待上限（毫秒），`0` 表示用固定间隔                             |
-| `reply.segmentChars`                | `QQ_REPLY_SEGMENT_CHARS`           | `150`                          | 单段最多多少字，超出就拆成多段发送                                             |
-| `reply.forwardThresholdChars`       | `QQ_REPLY_FORWARD_THRESHOLD_CHARS` | `1500`                         | 超过多少字改用合并转发，`0` 表示不转换                                         |
-| `reply.requirePermission`           | `QQ_REPLY_REQUIRE_PERMISSION`      | `true`                         | 群里发消息前是否要求模型先说明理由（私聊始终开放）                             |
-| `trace.enabled`                     | `QQ_TRACE_ENABLED`                 | `true`                         | 是否记录调用链追踪                                                             |
-| `trace.dir`                         | `QQ_TRACE_DIR`                     | 与日志同目录                   | 追踪文件目录                                                                   |
-| `trace.maxSizeMb`                   | `QQ_TRACE_MAX_SIZE_MB`             | `80`                           | 追踪文件总容量上限（MB）                                                       |
-| `trace.retentionDays`               | `QQ_TRACE_RETENTION_DAYS`          | `7`                            | 追踪文件保留天数                                                               |
-| `reminder.enabled`                  | `QQ_REMINDER_ENABLED`              | `true`                         | 模型一轮没调用发送工具时是否提醒                                               |
-| `reminder.max`                      | `QQ_REMINDER_MAX`                  | `2`                            | 连续提醒次数上限                                                               |
-| `keepAlive.enabled`                 | `QQ_KEEP_ALIVE_ENABLED`            | `true`                         | 是否启用保活心跳                                                               |
-| `keepAlive.seconds`                 | `QQ_KEEP_ALIVE_SECONDS`            | `1200`                         | 保活心跳间隔（秒），必须大于 0                                                 |
-| `history.count`                     | `QQ_HISTORY_COUNT`                 | `20`                           | 新建或恢复会话时补多少条历史，`0` 表示关闭                                     |
-| `rateLimit.maxPerMinute`            | `QQ_RATE_MAX_PER_MINUTE`           | `8`                            | 每分钟最多发多少条消息，`0` 表示不限制                                         |
-| `rateLimit.maxPerHour`              | `QQ_RATE_MAX_PER_HOUR`             | `60`                           | 每小时最多发多少条消息，`0` 表示不限制                                         |
-| `rateLimit.minGapMs`                | `QQ_RATE_MIN_GAP_MS`               | `1500`                         | 相邻两次发送之间的最小间隔（毫秒）                                             |
-| `rateLimit.stall`                   | `QQ_RATE_STALL`                    | `false`                        | 触顶时等窗口结束再发，而不是直接拒绝                                           |
-| `rateLimit.stallMaxWaitMs`          | `QQ_RATE_STALL_MAX_WAIT_MS`        | `60000`                        | 最多等多久（毫秒），超过就直接拒绝                                             |
-| `sensitive.enabled`                 | `QQ_SENSITIVE_ENABLED`             | `true`                         | 拦截含凭证、令牌、私钥的出站消息                                               |
-| `events.subscribe`                  | `QQ_EVENT_SUBSCRIBE`               | `message`                      | 订阅的事件类别：`message` / `notice`                                           |
-| `events.notices`                    | `QQ_EVENT_NOTICES`                 | `[]`                           | `notice` 里关心哪些通知，留空表示全收                                          |
-| `events.inject`                     | `QQ_EVENT_INJECT`                  | `true`                         | 通知是否注入会话上下文                                                         |
-| `log.level`                         | `QQ_LOG_LEVEL`                     | `info`                         | 日志级别：`debug` / `info` / `warn` / `error`                                  |
-| `log.dir`                           | `QQ_LOG_DIR`                       | XDG 日志目录                   | 日志文件目录，不存在时自动创建                                                 |
-| `log.maxSize`                       | `QQ_LOG_MAX_SIZE`                  | `5m`                           | 单个日志文件的大小上限                                                         |
-| `log.maxFiles`                      | `QQ_LOG_MAX_FILES`                 | `5`                            | 保留多少个历史日志文件                                                         |
-| `media.allowedDirs`                 | `QQ_MEDIA_ALLOWED_DIRS`            | `[]`                           | 额外允许发送图片、语音的目录                                                   |
-| `diary.path`                        | `QQ_DIARY_PATH`                    | 工作目录 `diary/`              | 日记与素材的存放目录，相对工作目录                                             |
-| `diary.enabled`                     | `QQ_DIARY_ENABLED`                 | `true`                         | 是否启用日记功能                                                               |
-| `diary.retentionDays`               | `QQ_DIARY_RETENTION_DAYS`          | `30`                           | 素材保留天数，只清素材，不动日记成品                                           |
-| `diary.summaryTime`                 | `QQ_DIARY_SUMMARY_TIME`            | `23:30`                        | 每天几点生成自动总结（本地时间 `HH:mm`）                                       |
-| `diary.tickSeconds`                 | `QQ_DIARY_TICK_SECONDS`            | `3600`                         | 调度心跳间隔（秒）                                                             |
-| `diary.summaryTargets`              | `QQ_DIARY_SUMMARY_TARGETS`         | `[]`                           | 只给这些聊天生成总结，逗号分隔；留空表示放行名单内全部                         |
-| `diary.push`                        | `QQ_DIARY_PUSH`                    | `owner`                        | 总结推给谁：`owner` / `group` / `none`                                         |
-| `diary.backfill`                    | `QQ_DIARY_BACKFILL`                | `false`                        | 是否用 NapCat 历史消息回补素材                                                 |
-| `diary.backfillMax`                 | `QQ_DIARY_BACKFILL_MAX`            | `1000`                         | 回补时最多取多少条历史消息                                                     |
-| `diary.maxLineChars`                | `QQ_DIARY_MAX_LINE_CHARS`          | `200`                          | 单条素材最多多少字                                                             |
-| `diary.maxLinesPerDay`              | `QQ_DIARY_MAX_LINES_PER_DAY`       | `2000`                         | 每天最多累积多少条素材                                                         |
-| `diary.timeoutMs`                   | `QQ_DIARY_TIMEOUT_MS`              | `120000`                       | 等待模型生成总结的超时（毫秒）                                                 |
+### 基础
 
-没配置 `access.allow` 时插件不会响应任何消息（默认全部关闭）；拒绝名单 `access.deny`
-里的目标一律不响应，且优先于放行名单。详见下面「准入判定」。
+| 字段                | 类型     | 默认值     | 生效 | 说明                                                           |
+| ------------------- | -------- | ---------- | ---- | -------------------------------------------------------------- |
+| `ownerQQ`           | 数值     | 无（可选） | 立即 | 管理命令只在它的私聊生效；该私聊始终放行；≥ 1                  |
+| `admins`            | 数字列表 | `[]`       | 立即 | 拥有全部工具权限；私聊还需在放行名单里                         |
+| `model`             | 模型     | 无（可选） | 重启 | 格式 provider/model[/variant]；留空跟随 OpenCode 的默认模型    |
+| `sendDelayMs`       | 数值     | `1000`     | 重启 | 超长消息拆成多段时每段之间的固定间隔；≥ 0                      |
+| `warnLength`        | 数值     | `500`      | 立即 | 单次发送的内容超过该字数时告警，不截断；≥ 1                    |
+| `reuseSession`      | 布尔     | `false`    | 立即 | 完全没有绑定时，按会话标记找回上一次的会话                     |
+| `toolProfilesPath`  | 路径     | 空         | 重启 | 空表示工作目录里的 tool-profiles.json；相对路径按工作目录解析  |
+| `chatOverridesPath` | 路径     | 空         | 重启 | 空表示工作目录里的 chat-overrides.json；相对路径按工作目录解析 |
+| `soulPath`          | 路径     | 无（可选） | 重启 | 留空表示工作目录里的 souls/                                    |
+| `soulName`          | 文本     | 无（可选） | 重启 | 工作目录 souls 里的角色设定文件名                              |
+
+### NapCat 连接
+
+| 字段           | 类型     | 默认值     | 生效 | 说明                              |
+| -------------- | -------- | ---------- | ---- | --------------------------------- |
+| `napcat.url`   | 文本     | 无（可选） | 重启 | 正向 WebSocket 地址，必填         |
+| `napcat.token` | 敏感文本 | 无（可选） | 重启 | NapCat 的访问令牌，留空表示不校验 |
+
+### 准入
+
+| 字段                       | 类型     | 默认值  | 生效 | 说明                                                 |
+| -------------------------- | -------- | ------- | ---- | ---------------------------------------------------- |
+| `access.allow.groups`      | 数字列表 | `[]`    | 立即 | 为空时不响应任何群消息（除非打开 allowAllWhenEmpty） |
+| `access.allow.users`       | 数字列表 | `[]`    | 立即 | 为空时不响应任何私聊（除非打开 allowAllWhenEmpty）   |
+| `access.deny.groups`       | 数字列表 | `[]`    | 立即 | 优先于放行名单                                       |
+| `access.deny.users`        | 数字列表 | `[]`    | 立即 | 优先于放行名单；owner 的私聊会被豁免                 |
+| `access.allowAllWhenEmpty` | 布尔     | `false` | 立即 | 打开后任何群聊与私聊都能触发机器人                   |
+
+### 主动说话
+
+| 字段                                | 类型     | 默认值  | 生效 | 说明                                    |
+| ----------------------------------- | -------- | ------- | ---- | --------------------------------------- |
+| `proactive.enabled`                 | 布尔     | `true`  | 重启 | 沉默达到阈值后由机器人主动发起话题      |
+| `proactive.silenceThresholdSeconds` | 数值     | `10800` | 重启 | 群沉默多久后才开始计算主动说话概率；≥ 0 |
+| `proactive.startProbability`        | 数值     | `0.01`  | 重启 | 刚跨过阈值时的单次触发概率；≥ 0；≤ 1    |
+| `proactive.probabilityPerHour`      | 数值     | `0.05`  | 重启 | 每多沉默一小时概率增加多少；≥ 0；≤ 1    |
+| `proactive.tickSeconds`             | 数值     | `3600`  | 重启 | 主动说话心跳的轮询间隔，必须大于 0；≥ 0 |
+| `proactive.allowGroups`             | 数字列表 | `[]`    | 重启 | 留空表示不限制                          |
+| `proactive.allowUsers`              | 数字列表 | `[]`    | 重启 | 留空表示不限制                          |
+
+### 唤醒
+
+| 字段                  | 类型       | 默认值 | 生效 | 说明                                |
+| --------------------- | ---------- | ------ | ---- | ----------------------------------- |
+| `wake.prefixes`       | 字符串列表 | `/`    | 立即 | 消息以这些前缀开头就必须回复        |
+| `wake.ignoreAtAll`    | 布尔       | `true` | 立即 | 群里 @ 全体成员时不唤醒机器人       |
+| `wake.replyToSelf`    | 布尔       | `true` | 立即 | 回复了机器人自己的消息时必须回复    |
+| `wake.ignoreAtOthers` | 布尔       | `true` | 立即 | 群里第一个 @ 指向别人时不唤醒机器人 |
+
+### 回复
+
+| 字段                          | 类型 | 默认值 | 生效 | 说明                                              |
+| ----------------------------- | ---- | ------ | ---- | ------------------------------------------------- |
+| `reply.minDelayMs`            | 数值 | `0`    | 立即 | 分段之间随机等待的下限；≥ 0                       |
+| `reply.maxDelayMs`            | 数值 | `0`    | 立即 | 分段之间随机等待的上限，0 表示用固定间隔；≥ 0     |
+| `reply.segmentChars`          | 数值 | `150`  | 立即 | 单条消息超过该字数就拆成多段发送；≥ 1             |
+| `reply.forwardThresholdChars` | 数值 | `1500` | 立即 | 单条回复超过该字数就改用合并转发，0 表示关闭；≥ 0 |
+| `reply.requirePermission`     | 布尔 | `true` | 立即 | 群里发消息前模型要先说明为什么要回复              |
+
+### 出站限流
+
+| 字段                       | 类型 | 默认值  | 生效 | 说明                                          |
+| -------------------------- | ---- | ------- | ---- | --------------------------------------------- |
+| `rateLimit.maxPerMinute`   | 数值 | `8`     | 立即 | 0 表示不限制；≥ 0                             |
+| `rateLimit.maxPerHour`     | 数值 | `60`    | 立即 | 0 表示不限制；≥ 0                             |
+| `rateLimit.minGapMs`       | 数值 | `1500`  | 立即 | 相邻两次发送之间的最小间隔，0 表示不限制；≥ 0 |
+| `rateLimit.stall`          | 布尔 | `false` | 立即 | 打开后等窗口结束再发，而不是直接拒绝          |
+| `rateLimit.stallMaxWaitMs` | 数值 | `60000` | 立即 | 等待窗口结束的上限，超过就直接拒绝；≥ 0       |
+
+### 敏感拦截
+
+| 字段                | 类型 | 默认值 | 生效 | 说明                               |
+| ------------------- | ---- | ------ | ---- | ---------------------------------- |
+| `sensitive.enabled` | 布尔 | `true` | 立即 | 命中凭证的出站消息整条拦下，不发送 |
+
+### 事件订阅
+
+| 字段               | 类型       | 默认值    | 生效 | 说明                                       |
+| ------------------ | ---------- | --------- | ---- | ------------------------------------------ |
+| `events.subscribe` | 字符串列表 | `message` | 立即 | message / notice，写错的类别会被忽略并告警 |
+| `events.notices`   | 字符串列表 | `[]`      | 立即 | 留空表示这类通知全收                       |
+| `events.inject`    | 布尔       | `true`    | 立即 | 通知以附带信息出现在下一轮上下文里         |
+
+### 补发提醒
+
+| 字段               | 类型 | 默认值 | 生效 | 说明                                 |
+| ------------------ | ---- | ------ | ---- | ------------------------------------ |
+| `reminder.enabled` | 布尔 | `true` | 立即 | 模型一轮没调用发送工具时提醒它补一次 |
+| `reminder.max`     | 数值 | `2`    | 立即 | 避免模型陷入补发循环；≥ 0            |
+
+### 历史补齐
+
+| 字段            | 类型 | 默认值 | 生效 | 说明                                          |
+| --------------- | ---- | ------ | ---- | --------------------------------------------- |
+| `history.count` | 数值 | `20`   | 立即 | 新建会话时补齐的历史消息条数，0 表示关闭；≥ 0 |
+
+### 保活
+
+| 字段                | 类型 | 默认值 | 生效 | 说明                                           |
+| ------------------- | ---- | ------ | ---- | ---------------------------------------------- |
+| `keepAlive.enabled` | 布尔 | `true` | 重启 | 周期性写回会话元数据，避免被 OpenCode 空闲卸载 |
+| `keepAlive.seconds` | 数值 | `1200` | 重启 | 必须小于 OpenCode 的 location 空闲超时；≥ 0    |
+
+### 调用链追踪
+
+| 字段                  | 类型 | 默认值 | 生效 | 说明                                |
+| --------------------- | ---- | ------ | ---- | ----------------------------------- |
+| `trace.enabled`       | 布尔 | `true` | 重启 | 一条入站消息的完整处理链            |
+| `trace.dir`           | 路径 | 空     | 重启 | 留空表示与日志同目录                |
+| `trace.maxSizeMb`     | 数值 | `80`   | 重启 | 追踪文件总容量上限；≥ 0             |
+| `trace.retentionDays` | 数值 | `7`    | 重启 | 超过保留天数的追踪文件会被删除；≥ 1 |
+
+### 日志
+
+| 字段           | 类型 | 默认值 | 生效 | 说明                                                             |
+| -------------- | ---- | ------ | ---- | ---------------------------------------------------------------- |
+| `log.level`    | 枚举 | `info` | 立即 | debug / info / warn / error；`debug` / `info` / `warn` / `error` |
+| `log.dir`      | 路径 | 空     | 重启 | 留空表示用 XDG 状态目录                                          |
+| `log.maxSize`  | 文本 | `5m`   | 重启 | winston 的文件大小写法，例如 5m                                  |
+| `log.maxFiles` | 数值 | `5`    | 重启 | 按天轮转后最多保留多少份；≥ 1                                    |
+
+### 出站媒体
+
+| 字段                | 类型       | 默认值 | 生效 | 说明                                             |
+| ------------------- | ---------- | ------ | ---- | ------------------------------------------------ |
+| `media.allowedDirs` | 字符串列表 | `[]`   | 重启 | 除工作目录与媒体目录外，额外放开可发送媒体的目录 |
+
+### 日记
+
+| 字段                   | 类型       | 默认值   | 生效 | 说明                                                                    |
+| ---------------------- | ---------- | -------- | ---- | ----------------------------------------------------------------------- |
+| `diary.path`           | 路径       | 空       | 重启 | 留空表示工作目录下的 diary/；相对路径按工作目录解析                     |
+| `diary.enabled`        | 布尔       | `true`   | 重启 | 把聊天流水记成 Markdown 文件                                            |
+| `diary.retentionDays`  | 数值       | `30`     | 重启 | 只清素材，不清日记成品；≥ 1                                             |
+| `diary.summaryTime`    | 时间       | `23:30`  | 重启 | 本地时间 HH:mm                                                          |
+| `diary.tickSeconds`    | 数值       | `3600`   | 重启 | 日记调度的轮询间隔；≥ 0                                                 |
+| `diary.summaryTargets` | 字符串列表 | `[]`     | 重启 | group:123 / private:456；留空表示按准入名单推导                         |
+| `diary.push`           | 枚举       | `owner`  | 重启 | owner 推给所有者，group 推回聊天，none 不推；`owner` / `group` / `none` |
+| `diary.backfill`       | 布尔       | `false`  | 重启 | 用 NapCat 的历史消息回补素材                                            |
+| `diary.backfillMax`    | 数值       | `1000`   | 重启 | 回补时最多取多少条历史消息；≥ 0                                         |
+| `diary.maxLineChars`   | 数值       | `200`    | 重启 | 单条素材的最大字符数；≥ 0                                               |
+| `diary.maxLinesPerDay` | 数值       | `2000`   | 重启 | 单个聊天单天的素材条数上限；≥ 0                                         |
+| `diary.timeoutMs`      | 数值       | `120000` | 重启 | 等待模型生成总结的超时时间；≥ 0                                         |
+
+### 状态面板
+
+| 字段            | 类型     | 默认值      | 生效 | 说明                               |
+| --------------- | -------- | ----------- | ---- | ---------------------------------- |
+| `panel.enabled` | 布尔     | `false`     | 立即 | 面板自带 HTTP 服务，默认关闭       |
+| `panel.host`    | 文本     | `127.0.0.1` | 立即 | 默认只监听本机                     |
+| `panel.port`    | 数值     | `7391`      | 立即 | 面板 HTTP 服务的端口；≥ 1；≤ 65535 |
+| `panel.token`   | 敏感文本 | 空          | 立即 | 留空时自动生成并写回配置文件       |
 
 ### 准入判定
 
@@ -158,16 +249,15 @@ bun install
 
 拒绝名单里写了 owner 时会被豁免并给出告警：owner 的私聊必须可用。
 
-`QQ_TARGET_GROUPS` / `QQ_TARGET_USERS` 与插件选项里的 `groups` / `users` 已移除，
-分别改用 `QQ_ALLOW_GROUPS` / `QQ_ALLOW_USERS` 与 `access.allow.groups` /
-`access.allow.users`；继续用旧写法会看到 `【迁移】` 开头的 error 级启动告警。
+放行名单只有 `access.allow.groups` / `access.allow.users` 这一种写法；旧的环境变量与
+插件选项 `groups` / `users` 已整体移除，没有兼容层，旧写法不会再生效。
 
 放行名单为空并打开 `allowAllWhenEmpty` 时，插件没法枚举没写进名单的群，
 主动说话心跳只会覆盖配置里写明的目标。
 
-`home` 未配置时固定使用 `$XDG_DATA_HOME/opencode-qq-bot/workspace`（默认
-`~/.local/share/opencode-qq-bot/workspace`），启动时自动创建。会话的 cwd、文件工具、
-`AGENTS.md` 和 git 都取这个目录，不再跟随加载插件的项目目录。
+工作目录固定为 `$XDG_DATA_HOME/opencode-qq-bot/workspace`（默认
+`~/.local/share/opencode-qq-bot/workspace`），不可配置，启动时自动创建。会话的 cwd、
+文件工具、`AGENTS.md` 和 git 都取这个目录，不再跟随加载插件的项目目录。
 
 `log.dir` 未配置时使用 `$XDG_STATE_HOME/opencode-qq-bot/logs`（默认
 `~/.local/state/opencode-qq-bot/logs`），启动时自动创建。日志按天滚动成
@@ -363,10 +453,14 @@ QQ 侧只在 owner 与管理员自己的私聊里生效，
 
 默认只订阅消息类事件，升级插件不会突然多出行为。要接通知就把 `notice` 加进订阅类别：
 
-```bash
-QQ_EVENT_SUBSCRIBE=message,notice
-QQ_EVENT_NOTICES=group_recall,notify.poke   # 留空表示这一类全收
-QQ_EVENT_INJECT=true                        # 是否写进会话上下文
+```json
+{
+  "events": {
+    "subscribe": ["message", "notice"],
+    "notices": ["group_recall", "notify.poke"],
+    "inject": true
+  }
+}
 ```
 
 - 通知只写日志与上下文，不会自己发起一轮对话；模型看到的是「聊天里发生过的通知」。
@@ -442,7 +536,7 @@ QQ 里只在 **owner 自己的私聊**里用 `/diary`（admin 与群里都会被
 - 日记范围固定为 **owner 自己的私聊**：群聊与 admin 的私聊都不采集、不生成、不推送。
 - 成品不设条数上限，也不会自动清理；只有中间产物（原始素材）按 `diary.retentionDays` 过期清理。
 - `show` 会把日记文件本身作为附件发出来（文件名 `日记-2026-11-10.md`），自动总结也用同样的方式推送。
-- 日记功能默认开启，关掉用 `diary.enabled=false` 或 `QQ_DIARY_ENABLED=false`。
+- 日记功能默认开启，关掉用 `diary.enabled=false`。
 
 模型侧有三个工具：`qq_diary_write` 写、`qq_diary_read` 读、`qq_diary_list` 列，
 外加 `qq_send_file` 发文件。**三个日记工具只有 owner 能用**（admin 也不行），普通成员的默认配置档

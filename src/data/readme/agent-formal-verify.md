@@ -67,7 +67,7 @@ In Claude Code, use `/agent-formal-verify:formal-verify`. In Codex, type `$forma
 
 ![Agent formal verify works with Claude Code, Codex and Pi. Thread protocols use TLA+ and TLC; arithmetic and state transitions use Lean 4; bounded Rust functions use Kani to check production code. The agent finds counter-examples, reproduces reachable bugs, fixes code and models, and tests mutations. Checks rerun in CI. Set up once, verify each repository, and report assumptions and bounds.](assets/formal-verify-overview-v3.png)
 
-The agent selects risky code, builds TLA+ or Lean models or adds Kani harnesses that call the Rust code, and checks their properties. Reachable counter-examples guide reproductions and fixes to both the code and model. Mutation checks test whether the properties detect mistakes, and CI reruns the models as the code changes.
+The agent selects risky code, builds TLA+ or Lean models or adds Kani harnesses that call the Rust code, and checks their properties. Reachable counter-examples guide reproductions and fixes to both the code and model. Mutation checks test whether the properties detect mistakes. On request, a second agent reviews each model's properties against the code and proposes mistakes for those checks. CI reruns the models as the code changes.
 
 A passing check establishes its stated properties under its assumptions and bounds. Reports must identify omitted constraints and unfinished proofs. See [scope and evidence](docs/reference.md#scope-and-evidence).
 

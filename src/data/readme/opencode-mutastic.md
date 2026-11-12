@@ -1,5 +1,7 @@
 # tasticlabs plugins
 
+<img src=".github/pip.webp" alt="Pip, mutastic's watermelon mascot, in sunglasses" width="150" align="right">
+
 Coding-agent plugins for the -tastic family of tools: Claude Code, Codex, and opencode.
 
 ```

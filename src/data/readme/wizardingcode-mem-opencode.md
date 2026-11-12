@@ -326,7 +326,7 @@ The files live under the data directory, never inside your projects, one git rep
 |---|---|---|
 | workspace | `~/.wizardingcode/mem/knowledge/workspace/` | What holds across your projects |
 | project | `~/.wizardingcode/mem/knowledge/projects/<folder>/` | What holds for one project |
-| shared | `~/.wizardingcode/mem/knowledge/shared/` | What a team will share, once the team server exists |
+| shared | `~/.wizardingcode/mem/knowledge/shared/` | What a team shares through a team server |
 
 ```sh
 wizardingcode-mem knowledge write --scope workspace --title "Discovery call script" \
@@ -423,6 +423,8 @@ The binary is at `~/.wizardingcode/mem/bin/wizardingcode-mem`; put that director
 | `wizardingcode-mem embed download` · `status` · `delete` · `backfill` | Search by meaning (see above) |
 | `wizardingcode-mem rejudge` | Asks TypeSafe to judge imported memories properly |
 | `wizardingcode-mem knowledge write` · `accept` · `reject` · `area` · `list` · `rebuild` · `adopt` | The knowledge store (see above) |
+| `wizardingcode-mem share project` · `roots` · `areas` · `status` · `explain` · `server add` · `server rejoin` · `server remove` · `server mute` · `server unmute` · `server resume` · `server list` | What may leave this machine, and the team servers it syncs with (see Sharing below) |
+| `wizardingcode-mem sync --auto` · `--once` · `stop` | The sync process: as the hooks start it, one round and exit, or asked to leave |
 | `wizardingcode-mem install [<name>]` · `uninstall <name>` | The direct install: every agent and app found, or one (`claude-code`, `claude-desktop`, `codex`, `cursor`, `opencode`, `qwen`, `droid`, `copilot`, `antigravity`) |
 
 ## TypeSafe, if you want it
@@ -447,13 +449,17 @@ What is sent is the text of the turn being judged, and only that. If the service
 
 ### Sharing
 
-Nothing is sent anywhere today: there is no team server yet. The sharing policy says in advance what may leave this machine once one is configured, and by default nothing may; until then nothing is sent, whatever you choose. You make three choices:
+Nothing is sent until you add a team server: `wizardingcode-mem share server add <url> --code <code>` with an admin's invitation code, or the viewer's Settings → Servers. By default nothing may leave, and the sync sends only what three choices allow:
 
 - **Each project's level**: Nothing, Knowledge, or Knowledge and memories. Set it in the viewer (Across projects, then the project's Sharing section) or with `wizardingcode-mem share project <local|knowledge|all>` in the project's folder. A project needs a git remote on a host (`github.com/acme/site`, say) to be set above Nothing, because a team matches projects by their remote; a remote that is a local path or a `file://` origin does not count. Knowledge and memories sends every active memory of the project that is not stale, branch-bound, imported or one of your rules.
 - **The roots**: whether the workspace's knowledge and the shared repository's knowledge may leave. `WIZARDINGCODE_MEM_SHARE_ROOTS`, a comma list of `workspace` and `shared`, or `none`.
 - **The areas**: which knowledge areas may leave, by root-qualified id, such as `workspace:sales`. `WIZARDINGCODE_MEM_SHARE_AREAS`, a comma list, or `none`. A new area starts private. The workspace's areas also govern every project's knowledge.
 
 The two lists live in the settings file and on the viewer's Settings → Sharing page; `wizardingcode-mem share roots …` and `share areas …` set them from a shell. The environment can only narrow them, never widen them, and a list with an invalid token counts as empty. Every widening is confirmed first (in a terminal, `--yes` answers for you), and every change is logged. `wizardingcode-mem share status` shows what is allowed and how much would leave; `share explain <scope>/<slug>` and `share explain memory <id>` say why one item would or would not. Lowering a level recalls nothing already sent. Restoring a backup puts every project back to Nothing. The rules and their limits are in [ADR 0025](docs/adr/0025-sharing-policy.md).
+
+### The sync
+
+Once a server is listed, `wizardingcode-mem sync` runs by itself: your agents' session-start and prompt hooks start it, it sends what the policy allows within seconds of a change, brings the team's entries and memories back, and stops after fifteen idle minutes. What arrives lives apart under `knowledge/received/<server>/`, read-only and marked with who wrote it; your agent sees it beside your own knowledge, never pinned, and at most a third of a brief's memory slots. `wizardingcode-mem knowledge take <server>:<slug>--<8 hex>` copies a received entry into your own repository to edit it. Several servers can be listed; a project binds to one, and the level `receive` binds it without sending anything. `wizardingcode-mem status` shows the sync and each server; `doctor` warns when something needs you; `share server remove` deletes everything a server left here (the device stays listed on the server until an admin revokes it). A restore, a store move and a compact stop the sync first; after a restore the withdrawals the reset levels would cause are held until you run `share server resume`. Running a server, joining one and recovering on either side is written down step by step in [the team runbook](docs/runbooks/team-server.md).
 
 ## Coming from claude-mem
 

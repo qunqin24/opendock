@@ -303,35 +303,58 @@ contains independent TUI, server, RPC and GUI entries.
   the selected session, hides on Home and yields to native dialogs. Move, resize,
   reset and redock controls support keyboard input too. Both placements share
   one monitoring runtime and filters; switching does not duplicate polling.
+  Drag the mini-window by its header or move handle; Dock remains a separate
+  action. Its surface follows the current OpenCode theme.
+- The session title has its own full-width header row in both placements.
+  Familiar actions use native icon buttons with tooltips and accessible names;
+  account linking, Banked Resets and other ambiguous operations retain text.
 - **Navigator settings** opens native Settings with Global/Worktree scope,
   section controls, groups, trust, presets, portable/project profiles, About,
   release history and reviewed Bug reports. **Reload preferences** imports
   changes from other local Navigator instances explicitly.
+- Reorder sections, Quick Actions, toolbar pins and button icons by dragging
+  their handles. With the keyboard, focus a handle, press Space, use Up/Down,
+  then press Space to drop or Escape to cancel. Icon changes remain drafts until saved.
 - Favorites, trust, account bindings, reset attempts and presets use the existing
   private preferences file and lock shared with local TUI instances. Only window
   placement lives in the native GUI store. Project profiles and configuration
   requests use the selected server, including remote servers.
 - Todo is native and read-only; chat owns edits. Legacy Navigator tasks remain a
-  read-only archive. LSP and startup/Home interception are not exposed by this
+  read-only archive. Completed and cancelled rows use muted, struck-through text
+  and native-style status indicators. Search and tabs remain in Navigator because
+  the host does not expose an extension point inside its own Todo popover.
+  LSP and startup/Home interception are not exposed by this
   Desktop contract. Permissions opens native host Settings rather than toggling
   a simulated mode. Terminal fonts, corner masks and terminal shortcuts are not
   GUI settings; Desktop does not need a Nerd Font or the corner font.
 - Provider quotas retain verified account scope. Local Codex access requires a
   verified same-machine connection; a remote session never borrows its credentials
   or private binding. Banked resets always require separate confirmation.
+  Successful quota reads show only their update time above the data; account/model
+  scope remains in the quota model rather than a persistent explanatory sentence.
+  Model and reasoning-effort selection stays in the native chat controls, not
+  the Navigator sidebar; quotas still follow the selected model.
+- During a confirmed update, About shows the installation stage inline.
+  The TUI temporarily replaces the running-version label with progress.
+  Percentages require real byte totals; opaque native installers show an
+  indeterminate indicator instead.
 
 The candidate is tested as an npm-style tarball in the official checksum-verified
 Linux ARM64 Desktop package on Xvfb. Native macOS/Windows, browser Web and multiple
 live Desktop windows are not claimed as real-host verification targets. Local,
 remote and multi-consumer guards have separate synthetic contract tests.
 See [Host API boundaries](HOST_API.md) for the native command-palette limitation.
-The manual Prepare Release workflow generated and byte-verified all 27 GUI
+The manual Prepare Release workflow generated and byte-verified all 31 GUI
 captures using the real Desktop renderer on a virtual display. The terminal
 gallery above is rendered separately through Ghostty.
 
 ![Desktop Search Everything with a synthetic Skill](screenshots/gui/02-desktop-search-skills.png)
 
 ![Desktop mini-window preserving the current Todo filter](screenshots/gui/14-desktop-mini-window.png)
+
+![Production Todo rows with four synthetic task states](screenshots/gui/30-desktop-todo-states.png)
+
+![Production update indicators with synthetic transfer and installation stages](screenshots/gui/31-desktop-update-stages.png)
 
 ![Desktop layout preview with a separate Apply action](screenshots/gui/07-desktop-layout-preview.png)
 
@@ -703,7 +726,10 @@ separate muted guidance.
 
 The header's **Banked Resets** button appears when credits or an unresolved attempt
 exist. It displays the provider's available count, optional credit
-details, statuses, and expiry. Selecting a credit first checks fresh eligibility
+details, statuses, and expiry. In Desktop, dated credits show a shrinking
+remaining-lifetime scale and time until expiry, calculated from the provider's
+grant and expiry timestamps. Missing dates never produce a fabricated percentage;
+expired credits cannot be selected for review. Selecting a credit first checks fresh eligibility
 and opens a separate confirmation tied to the current account and model. Cancel
 or Escape returns to the credit list without spending anything.
 

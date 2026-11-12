@@ -16,6 +16,10 @@ created, commands are refused — never silently run unsandboxed.
 
 Zero runtime dependencies. No helper daemon. No proxy. No SRT.
 
+On V2, an in-process tool guard applies the same workspace policy to OpenCode's
+file tools and `webfetch`, including a hostname allowlist. It is a policy layer,
+not a second OS sandbox; see [Tool guard](#tool-guard-v2).
+
 The V2 path uses `ctx.shell.hook("create.before")` and replaces **only the
 shell executable** with a generated wrapper. The command, working directory,
 timeout, permission rules and session history keep their original values.
@@ -56,7 +60,7 @@ fixed root-owned absolute locations, never through `PATH`.
 Restart OpenCode. On load the plugin logs:
 
 ```
-[opencode-sandbox] ready (platform=linux, sandbox=bwrap, network=deny, mode=enforce, workspace=/path/to/project)
+[opencode-sandbox] ready (platform=linux, sandbox=bwrap, network=deny, mode=enforce, toolGuard=enforce, webfetch=allow, workspace=/path/to/project)
 ```
 
 ## Install (OpenCode V1)
@@ -85,21 +89,25 @@ The sandbox boundary is identical, and the wrapper re-validates the real
 working directory. The limitation is V1's own parser: OpenCode V1 evaluates
 its permission rules and records history against the rewritten command string,
 not the original one, so command-level deny/ask rules on the original command
-are not preserved. Use V2 when permission-rule fidelity matters. The adapter
-is tested against OpenCode 1.19.5. The V2 path is contract-checked against the
-OpenCode v2 plugin API (tested on 2.2.7; the package declares
-`>=1.19 <2 || >=2.0`).
+are not preserved. The V1 tool guard checks file arguments (including
+`apply_patch`) and the initial `webfetch` URL, but V1 has no redirect hook.
+Use V2 when permission-rule fidelity matters. The adapter is tested against
+OpenCode 1.19.5. The V2 path is contract-checked against the OpenCode v2 plugin
+API (tested on 2.2.7; the package declares `>=1.19 <2 || >=2.0`).
 
 ## Options
 
 | Option | Type | Default | Meaning |
 | --- | --- | --- | --- |
-| `network` | `"deny" \| "allow"` | `"deny"` | `deny` removes the network namespace (Linux) / denies all network operations (macOS). `allow` shares the host network. There is intentionally no domain allowlist: a real allowlist needs a TLS-intercepting proxy, which would add a dependency and a certificate authority to trust. |
-| `mode` | `"enforce" \| "permissive"` | `"enforce"` | `enforce` refuses shell commands when the sandbox is unavailable. `permissive` runs unsandboxed with a warning — explicit opt-out only. |
+| `network` | `"deny" \| "allow"` | `"deny"` | `deny` removes the network namespace (Linux) / denies all network operations (macOS). `allow` shares the host network. There is intentionally no shell-network domain allowlist: a real one needs a TLS-intercepting proxy, which would add a dependency and a certificate authority to trust. `webfetchAllowlist` is a separate application-level hostname filter for the `webfetch` tool, not a proxy and not shell egress. |
+| `mode` | `"enforce" \| "permissive"` | `"enforce"` | `enforce` refuses shell commands when the sandbox is unavailable. `permissive` runs shell commands unsandboxed with a warning; when the shell sandbox cannot be installed it also skips the tool guard. Explicit opt-out only. |
 | `writablePaths` | `string[]` | `[]` | Extra host paths read-write inside the sandbox. Must exist; canonicalised (symlinks resolved); `/`, the host home and its ancestors, credential directories and host system paths are rejected. A path cannot also be listed in `readablePaths`. |
 | `readablePaths` | `string[]` | `[]` | Extra host paths read-only inside the sandbox. Root, host home and ancestors are rejected; explicit credential/system paths are allowed read-only as a trust decision. A more specific readable path overrides a broader writable mount; the workspace and any path also listed as writable are rejected. |
 | `passEnv` | `string[]` | `[]` | Environment variables copied from the plugin process into the sandbox. Reserved keys (`HOME`, `PATH`, `TMPDIR`, `XDG_*`, …) cannot be overridden. |
 | `shell` | `string` | `/bin/bash` (or `/bin/sh`) | Absolute shell used **inside** the sandbox. |
+| `toolGuard` | `"enforce" \| "off"` | `"enforce"` | V2 in-process policy for file tools and `webfetch`. It reuses the same workspace, `writablePaths` and `readablePaths`, resolves symlinks and denies paths outside that policy. `off` disables the whole in-process layer; `webfetch: "deny"` and `webfetchAllowlist` then require `"enforce"` and are rejected. This is a policy layer, not an OS boundary; see [Tool guard](#tool-guard-v2). |
+| `webfetch` | `"allow" \| "deny"` | `"allow"` | `deny` blocks every `webfetch` call. Requires `toolGuard: "enforce"`. |
+| `webfetchAllowlist` | `string[]` | `[]` | If non-empty, only these hostnames are allowed. `*.example.com` matches the apex and subdomains. The `webfetch` tool checks every redirect through the same hook on V2; `image_generate` checks only its initial image URL. Requires `toolGuard: "enforce"`. |
 
 Paths are canonicalised when the layout is built. Missing paths are an error,
 not a silent skip: a sandbox with a mistyped mount would otherwise look
@@ -142,20 +150,78 @@ at setup.
   `--new-session` (Linux); Seatbelt confinement is inherited by every child
   (macOS).
 - **Network**: denied by default.
+- **File tools and `webfetch` on V2 (in-process policy)**: `read`, `write`,
+  `edit`, `patch`, `glob` and `grep` are checked against the same workspace
+  policy, and `webfetch` follows `webfetch`/`webfetchAllowlist`. This is a
+  policy guard, not an OS boundary; see [Tool guard](#tool-guard-v2).
+
+## Tool guard (V2)
+
+The shell sandbox cannot see OpenCode's file tools or `webfetch`; they run in
+the server process. With `toolGuard: "enforce"` (default), the plugin installs
+a V2 permission hook that applies the same workspace policy:
+
+- reads and searches (`read`, `glob`, `grep`) may touch the workspace,
+  `readablePaths`, `writablePaths`, the read-only system runtime, OpenCode's
+  temp directory (`<os.tmpdir>/opencode`, used for generated images) and its
+  retained tool-output directory (used for truncated results);
+- writes (`write`, `edit`, `patch`, and V1 `apply_patch`) may touch only the
+  workspace and `writablePaths`; OpenCode's image generator may still write its
+  default output under its own temp directory when no model-selected path is
+  given;
+- `webfetch` is allow, deny, or hostname-allowlisted; the `webfetch` tool
+  checks every redirect through the same hook, while `image_generate` checks
+  only its initial image URL;
+- symlinks are resolved component by component, including broken links, so a
+  link inside the workspace cannot point the tool at `~/.ssh`;
+- a denied path fails with a readable message naming the path and the option
+  that widens the policy;
+- destructive tools that use the `edit` permission follow the same write
+  policy; OpenCode's `worktree_remove` operates outside the workspace under the
+  OpenCode data directory, so it is denied while the guard is enforced.
+
+This is a **policy** layer, not an OS boundary. It protects against a
+prompt-injected agent; it cannot contain a compromised OpenCode process or a
+malicious plugin running in the same process. MCP, LSP, `websearch`, image
+generation and non-shell subprocesses remain outside. On V1 the guard is
+best-effort: `tool.execute.before` checks file arguments (including
+`apply_patch`) and the initial `webfetch` URL, but V1 has no redirect hook.
+
+`webfetch` defaults to `"allow"`. Set `"deny"` or a non-empty
+`webfetchAllowlist` when exfiltration through an allowed tool is in scope.
+
+Set `toolGuard: "off"` to keep the 0.1 behavior (shell sandbox only). If a
+supported OpenCode build does not expose the permission hook, the plugin keeps
+the shell sandbox and blocks the guarded tools through the tool hook instead of
+silently dropping the guard. If neither hook is available, the shell sandbox
+stays active and the plugin logs that file tools remain unguarded. A malformed
+security option is logged and falls back to `toolGuard: "enforce"`/
+`webfetch: "deny"`; it never removes the shell sandbox. `mode: "permissive"`
+skips the guard only when the shell sandbox itself cannot be installed.
 
 ## What is **not** sandboxed
 
-- File tools (`read`, `write`, `edit`, `patch`), MCP servers, LSP servers,
-  formatters, `webfetch`/`websearch`, subagents' non-shell tools and any process
-  that does not go through the shell service. Shell commands run by a subagent
-  still go through the same shell service and are sandboxed. OpenCode's own
-  permission system remains the control for the other tools; this plugin is
-  deliberately a **command** sandbox.
+- MCP servers, LSP servers, formatters, `websearch`, the image-generation
+  provider call, subagents' non-shell/non-file tools and any process that does
+  not go through the shell service. Local image inputs and image URLs go
+  through the same `read`/`webfetch` checks, but `image_generate` redirects
+  are not re-checked per hop. Shell commands run by a subagent still go
+  through the same shell service and are sandboxed. File tools are
+  policy-guarded on V2, not OS-sandboxed; OpenCode's own permission system
+  remains an additional control.
 - The kernel: this is isolation, not virtualization.
 - The workspace contents: a malicious `package.json` script is sandboxed when
   it runs through the shell, but the files themselves are trusted input.
 - `network: "allow"`, `writablePaths`, `readablePaths` and `passEnv` widen the
   boundary by explicit user decision.
+- V1 `webfetch` redirects: the V1 adapter checks the initial URL only.
+- OpenCode management tools that do not assert a permission, such as
+  `worktree_create` and `session_move`, remain outside the tool policy.
+- OpenCode's project instruction/config loader (`AGENTS.md`,
+  `.opencode/opencode.json`, project plugins) runs in the host process outside
+  the tool guard. The read tool's `AGENTS.md` discovery is checked, but
+  bootstrap and reload reads are not; use a whole-process sandbox for that
+  threat.
 - Windows.
 
 ## Why this one
@@ -171,9 +237,33 @@ at setup.
 | Network | proxy + domain allowlist | deny or allow (no proxy) |
 | Defaults | permissive/enforce modes | fail-closed, network denied, env cleared |
 
-The project deliberately does **one** thing: put the shell behind the OS
-sandbox. It does not ship a management UI, a proxy, or a second permission
-system.
+The project deliberately stays small: the shell is OS-sandboxed, file tools and
+`webfetch` get a boundary policy in the server process, and there is no
+management UI, proxy, credential vault or container runtime.
+
+## Whole-process sandboxes (nono, OpenShell)
+
+Tools such as [nono](https://nono.sh/docs/cli/clients/opencode) and
+[OpenShell](https://docs.nvidia.com/openshell/) run the whole agent inside the
+boundary and therefore cover more than this plugin: file tools, MCP, LSP,
+`webfetch` and the rest of the process. The tradeoff is the launch model.
+
+As of November 2026, nono's V2 docs call for `--standalone` when you need full
+containment: OpenCode normally connects its client to a background daemon that
+owns tool execution, plugins and model requests. Sandboxing only the client
+leaves that daemon outside the boundary. Launching a fresh daemon inside the
+same sandbox meets the containment goal. nono's profile has also used
+`OPENCODE_DISABLE_PROJECT_CONFIG=1` as a startup workaround; that behavior can
+change as OpenCode fixes project discovery, so check the current profile.
+OpenShell runs the agent in a container with a gateway, network proxy and
+credential policy.
+
+This plugin does not relaunch OpenCode: it stays a server plugin, so project
+configuration and Desktop's local server keep working. Choose whole-process
+containment when you need it; choose this plugin when you want OS-sandboxed
+shell commands plus an in-process tool policy without changing how OpenCode is
+launched. They are complementary, and the shell boundary here can be layered
+under a whole-process sandbox.
 
 ## Verification
 
@@ -185,14 +275,16 @@ surfaces that are not the sandbox itself:
   precedence, working-directory handling and wrapper escape refusal.
 - macOS: the same suite on a real GitHub macOS runner via `/usr/bin/sandbox-exec`.
 - Live smoke: an ephemeral `opencode serve` runs a real shell command through the
-  V2 hook, asserts history kept the original command, and verifies a host-home
-  secret and the server password stay outside the sandbox.
+  V2 hook, asserts the tool guard is registered and history kept the original
+  command, and verifies a host-home secret and the server password stay outside
+  the sandbox.
 - Unit tests: profile construction, path validation (root/home/symlink
-  escapes), option parsing, fail-closed paths, V1 adapter and idempotence.
+  escapes), option parsing, tool policy (symlink escapes, mount policy,
+  webfetch allowlist), fail-closed paths, V1 adapter and idempotence.
 
 ```bash
 bun install
-bun run ci      # biome + tsc + 90 tests (real sandbox integration included)
+bun run ci      # biome + tsc + 152 tests (real sandbox integration included)
 bun run smoke   # live OpenCode 2.x shell + boundary check (OPENCODE_BIN to override)
 bun run compat  # ci + smoke; the daily upstream-watch runs this before moving the tested-on anchor
 ```

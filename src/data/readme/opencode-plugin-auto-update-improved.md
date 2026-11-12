@@ -155,7 +155,7 @@ The plugin stores its state alongside the rest of your OpenCode configuration in
 
 This project is a fork of
 [AnganSamadder/opencode-plugin-auto-update](https://github.com/AnganSamadder/opencode-plugin-auto-update),
-maintained by [amit-batra](https://github.com/amit-batra). During a code review
+maintained by [Amit Batra](https://github.com/amit-batra). During a code review
 of the upstream implementation, several bugs and rough edges were identified and
 fixed.
 
@@ -179,6 +179,20 @@ fixed.
 7. **Robustness / minor issues.** A redundant double-read of the lock file
    (a TOCTOU window) in `acquireLock`, and an unverified assumption about the
    installed-package layout used to read versions.
+8. **Corrupt lock wedge.** A 0-byte or unparseable lock file (left by a crash
+   between creating and writing the lock) was never reclaimed, so every
+   subsequent run exhausted its retries and skipped updates permanently.
+9. **Non-atomic state writes.** The throttle and config files were written in
+   place, so a concurrent reader could observe a truncated or half-written
+   file.
+10. **Unsynchronized history appends.** The circular history log was written
+    outside the lock, so concurrent runs could interleave read-modify-write and
+    drop or tear entries.
+11. **No-plugins path not throttled.** A config with no plugins returned without
+    recording `lastRun`, so the full scan re-ran on every startup.
+12. **Crashed-lock wedge by age.** A crashed run could leave a fresh-timestamp
+    lock that the 2h time-based staleness check never sees, wedging updates for
+    hours. The lock's pid was stored but never used for liveness.
 
 ### Fixes made in this repo
 
@@ -190,8 +204,13 @@ fixed.
 | 4 | Removed the unused `lastSuccess` and `hostname` fields and their writers. |
 | 6 | The update-history file now lives in `~/.config/opencode/.auto-update-history.json`, consistent with the lock and throttle files. |
 | 7 | Eliminated the redundant lock re-read (staleness is computed from the already-read data), and added tests locking in the version-lookup layout. |
+| 8 | `acquireLock` now reclaims a corrupt or 0-byte lock on its final retry, so a crashed writer can no longer wedge auto-updates permanently. |
+| 9 | `writeThrottleState` and `writeConfig` write via a shared `writeAtomic` helper (temp file + rename), so concurrent readers never observe a truncated file. |
+| 10 | `runAutoUpdate` exposes an `onSettled` hook run before the lock is released, and the history log is written from it, serializing all appends behind the lock. |
+| 11 | A config with no plugins now records `lastRun`, so the next run within the interval is throttled like the no-config path. |
+| 12 | `acquireLock` now also reclaims a lock whose pid is no longer alive (`process.kill(pid, 0)`), so a crashed run with a fresh timestamp no longer wedges updates; a recycled live pid is still respected. |
 
-All changes are covered by the hermetic test suite (`bun test`, 29 tests).
+All changes are covered by the hermetic test suite (`bun test`, 45 tests).
 
 ## 📄 License
 
