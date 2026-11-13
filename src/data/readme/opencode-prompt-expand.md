@@ -6,7 +6,7 @@ Expand a rough draft in the **OpenCode Desktop** composer into a structured prom
 
 The plugin is a small OpenCode Desktop extension: it reads the current draft, asks your own connected model to expand it, writes the result back into the composer, and leaves the send action to you. It never sends a message, never writes session history, and never proxies model credentials.
 
-**Status:** `v0.1.1` experimental. The package is published on npm. The OpenCode Desktop GUI plugin API is still marked experimental upstream; pin the OpenCode version you test against.
+**Status:** `v0.2.0` experimental. The package is published on npm. The OpenCode Desktop GUI plugin API is still marked experimental upstream; pin the OpenCode version you test against.
 
 [中文说明](docs/README.zh-CN.md)
 
@@ -20,6 +20,7 @@ The plugin is a small OpenCode Desktop extension: it reads the current draft, as
 - Adds toast actions for **Undo** and **Regenerate**.
 - Can read a small, whitelisted set of project facts to make the expansion more specific.
 - Supports a concise mode (~800 characters) and a full-expansion mode.
+- Ships an optional **session outline** panel that lists your messages on the right and scrolls to one when clicked.
 
 It does not:
 
@@ -69,7 +70,8 @@ Add the plugin to the **global** OpenCode config. Desktop reads GUI plugins only
         "mode": "concise",
         "model": "auto",
         "projectContext": true,
-        "timeoutMs": 30000
+        "timeoutMs": 30000,
+        "outline": false
       }
     }
   ]
@@ -133,6 +135,7 @@ Package page: https://www.npmjs.com/package/opencode-prompt-expand
 | Restore original | Toast **Undo**, or command palette **Restore original prompt** |
 | Previous / next version | Command palette **Previous expanded version** / **Next expanded version** |
 | Toggle mode | Command palette **Toggle expansion mode** |
+| Session outline | Command palette **Toggle session outline**, or the side panel `+` menu |
 
 There are **no default keyboard shortcuts**. Commands are registered in **Settings > Shortcuts**; assign your own:
 
@@ -143,6 +146,7 @@ prompt-expand.restore
 prompt-expand.previous
 prompt-expand.next
 prompt-expand.mode
+prompt-expand.outline
 prompt-expand.settings
 ```
 
@@ -173,6 +177,17 @@ Impact and limits:
 - Disable it with `draftFallback: false` if you only want to expand in mounted sessions.
 - After the first message creates a session, the normal composer pill is used.
 
+## Session outline (experimental)
+
+Off by default. Turn it on in **Settings > Prompt Expand**, then run **Toggle session outline** or pick **Session outline** from the side panel's `+` menu.
+
+- Lists your own messages for the current session, numbered, with markdown markers stripped.
+- Clicking an entry scrolls the timeline to that message and highlights the entry that follows the reading position.
+- **Load earlier** pulls older pages through the official message store when a message is not rendered yet.
+- **Latest** returns to the bottom of the timeline.
+
+It also depends on host internals: the timeline exposes `data-message-id` rows and `message-<id>` anchors, but neither is a documented plugin API. The plugin degrades to a "message not loaded" toast instead of guessing a scroll position. Expect to re-check it after an OpenCode upgrade.
+
 ## Settings
 
 Open **Settings > Prompt Expand**, or run **Prompt Expand settings** from the command palette (command `prompt-expand.settings`).
@@ -182,6 +197,7 @@ Open **Settings > Prompt Expand**, or run **Prompt Expand settings** from the co
 | Mode | `concise` (~800 chars) or `full` |
 | Model | `auto`, `composer`, `provider/model`, or empty |
 | Project context | Read `package.json`, rule files, and git status |
+| Session outline | Experimental right-side message list with click-to-scroll |
 
 Settings persist through `Store.global`. An unset field, or a model field of `auto`, follows the `options` from `opencode.jsonc`; an explicit setting overrides it. This matters on Home/draft pages, where no composer model is available.
 
@@ -203,6 +219,7 @@ Options are passed through the plugin entry:
 | `projectContext` | `true` | Read project facts |
 | `projectContextBudget` | `2048` | Character budget for injected context |
 | `draftFallback` | `true` | Enable the DOM fallback on Home / new-session drafts |
+| `outline` | `false` | Enable the experimental session outline panel |
 | `prompts` | built-in | Map of glob → prompt; `*gpt*` and `*claude*` included |
 
 ### Model selection
@@ -280,6 +297,7 @@ The repository includes a GitHub Actions workflow that runs `npm ci` and `npm ru
 - The Home/draft DOM fallback is best-effort and not an official composer API.
 - `composer.setText()` replaces text and keeps attachments, but it cannot rewrite `@` mention parts. Drafts containing `@path` are skipped.
 - There is no TUI implementation.
+- The session outline depends on undocumented timeline attributes (`data-message-id`, `message-<id>`). Unrendered messages are located by briefly scrolling the virtualised timeline; if the message is older than the loaded history, load earlier pages first.
 - A slow model can exceed `timeoutMs`; raise it if your provider is slow.
 
 ## FAQ

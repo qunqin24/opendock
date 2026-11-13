@@ -1,8 +1,8 @@
 # OpenCode File Browser
 
-An explorer, editor and git panel for the OpenCode TUI. One plugin, no extra
-terminal: browse the project, edit with syntax colours, review a diff and
-commit without leaving the session.
+**OpenCode Mini IDE** — a file browser, editor and git panel for the OpenCode
+TUI. One plugin, no extra terminal: browse the project, edit with syntax
+colours, review a diff and commit without leaving the session.
 
 [![npm](https://img.shields.io/npm/v/opencode-file-browser?style=flat-square)](https://www.npmjs.com/package/opencode-file-browser)
 [![license](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE)
@@ -91,8 +91,9 @@ scroll, drag the divider to resize, right click for actions.
 npm install
 npm run typecheck
 npm run bundle        # src/**/*.tsx -> dist/**/*.js
+npm run test:unit     # navigation rules (fast, no TUI)
 ./test/e2e.sh         # 32 assertions in a real TUI (tmux + git fixture)
-./test/e2e-extra.sh   # 11 more: colours, help, hidden files, paths, menus
+./test/e2e-extra.sh   # 13 more: colours, help, hidden files, paths, menus, navigate
 ```
 
 `dist/` is committed: OpenCode loads the pre-compiled entrypoint.

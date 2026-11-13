@@ -38,7 +38,7 @@ The package entry (`index.js`) exports the OpenCode 2 `setup` in `.opencode/lib/
 
 - The delegation tool is `subagent`; the `[TASK OUTCOME]` / `[CACHE STATUS]` notes are appended to its result.
 - The rate-limit guard vetoes the retry through OpenCode 2's `retry` hook instead of aborting the subagent, and steers its explanation into the orchestrator's running turn.
-- No toasts: an OpenCode 2 server plugin has no TUI handle (the benchmark refresh still runs, silently).
+- No toasts: an OpenCode 2 server plugin has no TUI handle (the metrics refresh still runs, silently).
 - `squad_compact` cannot choose the summarising model — OpenCode 2's compaction settings pick it; the tool takes no model argument.
 
 ---
@@ -54,19 +54,58 @@ The package entry (`index.js`) exports the OpenCode 2 `setup` in `.opencode/lib/
 | Bootstrap | hidden injection | Injected into the first user message of the `build` agent; sets the orchestrator role and selection rules, the current local time, the orchestrator's own model, and an inventory of subagents (each with its model) |
 | Context signal | hidden injection | A live `<ORCHESTRATE_CONTEXT>` line added to the latest user message each turn, reporting current context usage so the orchestrator can weigh it in the decision |
 
-The bootstrap carries live session facts resolved at injection time — the current local time (with timezone) and the model the orchestrator is actually running on (so an Opus session does not mistake itself for Sonnet). Each subagent in the inventory is listed with its model, its **context window** (`ctx`, from opencode), and a minimal **Artificial Analysis capability summary** (`intel · code · agentic · $/M`) — the aggregated facts sarge needs to route by real numbers, not vibes:
+The bootstrap carries live session facts resolved at injection time — the current local time (with timezone) and the model the orchestrator is actually running on (so an Opus session does not mistake itself for Sonnet). Each subagent in the inventory is listed with its description, its model and its **context window** (`ctx`, from opencode):
 
 ```
-grunt-openai-gpt-5-5 … (model: openai/gpt-5.5 · ctx 400k — AA intel 55 · code 75 · agentic 89 · $11.25/M)
+- `grunt-openai-gpt-6-1-terra`: Code-strong mid-tier … (model: openai/gpt-6.1-terra · ctx 1.1M)
 ```
 
-The AA data is a snapshot that CI refreshes on `master` daily (`scripts/refresh-benchmarks.mjs`). The copy bundled with the plugin (`src/benchmarks.json`) is only the fallback: in the background the plugin pulls the current one from GitHub into `~/.cache/opencode-squad/` (hard 5s timeout, at most one successful check a day, up to 5 failed attempts a day, never on the startup path) and uses whichever is fresher. A download applies on the next service start — the inventory is fixed per process so the prompt cache survives. Refresh is silent; if the upstream schema is newer than this plugin understands, it keeps the usable snapshot until the plugin is updated. No raw sub-benchmarks or speed metrics are shown.
+### Model metrics: `squad_metrics`
 
-If a `model_data.json` exists (in the project's `.opencode/` or the global `~/.config/opencode/`), the inventory reads its perf from **there** instead of the raw AA dump. It's a small, hand-editable snapshot holding **only the models that have a grunt-/drill- agent**, keyed by the opencode `provider/model` id, with the AA indices copied in plus an `info` note you fill yourself ("good for coding, weak at long context") — which then shows up inline in the inventory so the orchestrator routes on your guidance, not just the numbers. Without the file, the inventory falls back to `benchmarks.json` exactly as before.
+The inventory carries **no benchmarks and no prices** on purpose. The bootstrap is re-sent every turn, and numbers frozen into it — or into agent descriptions — go stale while still looking authoritative. Instead the bootstrap tells the orchestrator to call `squad_metrics({models: [...]})` **once per chat** with the models of its grunt/drill agents, before its first routing decision; the result then stays in its history (it calls again only after compaction or a squad change).
 
-Add `"billing": "subscription"` to an entry to mark a model as covered by a flat-rate subscription (Claude Pro/Max, GitHub Copilot, ChatGPT Plus, …) rather than metered API billing. The inventory then shows `billing: subscription (flat-rate, ~$0 marginal)` instead of the AA `$/M` list price, so the orchestrator doesn't mistake a subscription-covered grunt for an expensive one — see [Weighing real cost](#weighing-real-cost-caching-subscriptions-context) below. Like `info`, it's a hand-added field the perf refresh never touches.
+`squad_metrics` returns one line per model asked for, with the squad's grunt/drill models marked:
 
-The **global** `~/.config/opencode/model_data.json` is refreshed automatically on opencode startup: the plugin rescans your squad, refreshes the perf from `benchmarks.json`, **merges** (your `info` and any hand-added field are preserved), and writes **only when the models actually changed** — so a new grunt/drill or a fresh benchmark snapshot lands on its own without churning the file or clobbering edits. Note that hand-edited *perf numbers* are overwritten by this refresh (they're derived); only non-perf fields survive. To (re)generate it explicitly — or to target a project's `.opencode/` — run `node scripts/squad-file-performance.mjs [--dir <agentDir>] [--out <file>]`; project-level files are never auto-touched.
+```
+- zai-coding-plan/glm-5.3 [grunt+drill]: SI 80.6 #19 · ctx 1M · subscription: GLM Coding Pro · TerminalBench4 0.418 · APEX-Agents 0.566 · FrontierSWE 0.302 · ValsIndex 0.599
+- anthropic/claude-sonnet-5-5 [grunt+drill]: SI 85.2 #7 · ctx 1M · $2/$10 · TerminalBench4 0.618 · APEX-Agents 0.755 · FrontierSWE 0.619 · LiveBench-coding 0.772 · ValsIndex 0.708
+- openai/gpt-6.1-terra-fast: same data as openai/gpt-6.1-terra
+```
+
+`squad_metrics({models: ["a/b", "c/d"], full: true})` (up to 6) returns **every** metric the sources hold for those models, grouped by source and the setting it was measured at — for a close call the summary does not settle.
+
+Sources, both public and keyless:
+
+- [SuperIndex](https://superindex.app) (CC-BY-4.0) — composite score `SI`, rank, list price, context window.
+- [llmbenchmark.ai](https://api.llmbenchmark.ai/docs) — per-benchmark scores aggregated from public leaderboards (Terminal-Bench, Epoch, LiveBench, Vals, LMArena, …). The summary shows TerminalBench4, APEX-Agents, FrontierSWE, LiveBench-coding and ValsIndex.
+
+Neither source uses opencode's ids (`zai-coding-plan/glm-5.3` is `zhipuai/glm-5.3` in one and `z-ai/glm-5.3` in the other), so matching compares the model part only. Serving tiers that keep the same weights (`-fast`, `-ultrafast`, `-highspeed`, `-free`, `-latest`, `-preview`, date suffixes) fall back to the base model; `glm-5.3` never matches `glm-5.3-flash`. Scores are at the setting the leaderboard ran (mostly max effort), not at your agent's variant — the output says so, and lists every setting where there are several.
+
+Fetching: at plugin start and then whenever data is older than **48 hours** (checked every 4h), each source under its own 8s timeout, in parallel. Data is cached in the OS temp dir (`$TMPDIR/opencode-squad-<uid>/`). A source that fails or answers with an empty or shrunken body keeps its previous data — an empty 200 never overwrites good numbers. Per-model detail is fetched on request and cached under the same TTL.
+
+### `model_data.json`: your notes per model
+
+`model_data.json` (the project's `.opencode/` or the global `~/.config/opencode/`) holds **only hand-written fields**:
+
+```json
+{
+  "providers": {
+    "anthropic": "Max 5x",
+    "openai": "ChatGPT Plus",
+    "zai-coding-plan": { "plan": "GLM Coding Pro",
+                         "info": "No secrets, credentials, .env or production config; otherwise fine" },
+    "google": "api"
+  },
+  "models": { "zai-coding-plan/glm-5.3": { "info": "good for coding, weak at long context" } }
+}
+```
+
+- `providers` — how each opencode provider is paid for: the plan in your own words, or `"api"` for metered billing. Write `{"plan": …, "info": …}` to add a routing rule for **every** model of that provider — trust in who runs the servers ("no secrets") is a provider property, not a model one. `squad_metrics` prints `subscription: Max 5x` instead of a list price; the plugin keeps no catalog of plan limits — the model knows what common plans include. Without an entry, an OAuth login in opencode's `auth.json` and a `*-coding-plan` / `*-token-plan` provider read as `subscription: plan not set`; anything else as metered API. `squad-draft` asks for missing plans once and writes them here;
+- `models.<id>.info` — **your routing rule** for that one model, after the provider's ("no secrets, no production"). It goes into the agent's description as `Owner rule: …`, which the orchestrator treats as binding — it outranks benchmarks — and is shown next to the numbers in `squad_metrics`. Leave it out and the model is routed on metrics and plan alone;
+- `models.<id>.billing` — per-model override of the provider's plan (`"api"` or a plan name);
+- `models.<id>.cache_ttl_seconds` — see [the cache note](#cache-status-hint) below.
+
+The global file is refreshed at opencode startup: new squad models get an empty entry, removed ones are dropped, every hand-added field is kept, and the benchmark fields earlier versions copied in from Artificial Analysis are stripped. It is written only when something actually changed. A project's file is never auto-touched.
 
 "Hidden" means the subagents are registered but do not appear in the `@` mention menu. The orchestrator invokes them programmatically via `subagent`. Both injections target **only the `build` agent's own sessions** — grunt/drill subagent sessions are never injected into, so there is no recursion.
 
@@ -162,7 +201,7 @@ The last-hit time is given both ways on purpose. The relative age is what reads 
 
 The line reports two more things, because warm/cold alone was not enough to decide with: the cache temperature, and **how big the session being offered for reuse has grown**. Reuse re-reads that whole context on every step — the cost the orchestrator was previously blind to. The size is the last *completed* turn's usage, so it still reads high for one turn right after a compaction; the line says so rather than misleading in exactly the compact-then-continue flow it exists to support.
 
-The TTL comes from an optional hand-edited `cache_ttl_seconds` field in `model_data.json` (same file and pattern as `info`/`billing` above). When that field is absent, `resolveCacheTtl()` (`src/cache-status.js`) resolves one anyway — it lives on the read path, not in `scripts/squad-file-performance.mjs`, because that script is manual-only by design and seeding the field there leaves it unset for anyone who never re-runs it (which is how it came to be unset for every Anthropic model in the first place).
+The TTL comes from an optional hand-edited `cache_ttl_seconds` field in `model_data.json` (same file and pattern as `info`/`billing` above). When that field is absent, `resolveCacheTtl()` (`src/cache-status.js`) resolves one anyway — on the read path, so it works for anyone who never edits the file (which is how it came to be unset for every Anthropic model in the first place).
 
 Published figures: Anthropic 300s (5 min, refreshed on hit; a paid 1h option exists too), OpenAI 1800s (30 min, gpt-5.6+). Providers that publish nothing (`alibaba-token-plan`, `zai-coding-plan`) get an assumed **300s floor** — the shortest TTL anyone publishes, so it errs toward "cold", the cheap direction: a false "cold" costs one re-brief, a false "warm" costs a full context re-upload. The earlier behaviour here was to say "TTL isn't published — judge for yourself", which read as *no constraint*, i.e. as if the cache lived forever.
 
@@ -194,7 +233,7 @@ It prints a report and writes nothing. `n` is printed on every row deliberately:
 
 Results as of 2026-09-01 fed `MEASURED_CACHE_TTL_SECONDS`: `zai` and `zai-coding-plan` at 600 (95%/98% under 5m, still 93%/81% at 5-10m — the 300s floor was calling six-minute-old sessions cold when ~85% of them were warm), `github-copilot` at 300 (92% under 5m, then flat zero). `alibaba-token-plan` and `google` deliberately keep the floor: the first rests on 5 sessions, the second has no sample anywhere past 5m, so "300" would mean "never observed" rather than "measured". Measured values sit *below* published ones — our regression of a vendor's behaviour does not overrule the vendor's own number, which is why `openai` stays at its published 1800 even though the measurement reads ~300.
 
-Like `squad-file-performance.mjs`, this is manual-only and will go stale. That is tolerable here in a way it was not for the read path: it is a periodic measurement, and a provider with no entry now falls through to the tiers above rather than to "unknown".
+This is manual-only and will go stale. That is tolerable here in a way it was not for the read path: it is a periodic measurement, and a provider with no entry now falls through to the tiers above rather than to "unknown".
 
 The `[CACHE STATUS]` line is appended to the completed `subagent` tool result, alongside any `[TASK OUTCOME]` diagnosis.
 
@@ -269,7 +308,8 @@ So the roster is data you edit, exposed as two plugin tools:
 | tool | what it does |
 | --- | --- |
 | `squad_dump` | returns the current roster as JSON, derived from the agent files |
-| `squad_patch` | writes a roster back — `grunts` / `drills`, plus `allow_remove` and `directory` |
+| `squad_patch` | writes a roster back — `grunts` / `drills`, plus `allow_remove` and `directory`; refuses a `description` (generated, see below) and a roster wrapped in an extra key |
+| `squad_metrics` | benchmarks, prices, context and billing for the `models` given; `full: true` for every metric of up to 6 — see [Model metrics](#model-metrics-squad_metrics) |
 
 A third tool covers the other half of reuse:
 
@@ -290,12 +330,9 @@ long past the point where reuse became expensive.
 
 ```json
 { "grunts": { "zai-coding-plan/glm-5.3": { "variant": "high",
-                                           "description": "cheap 1M ctx coder",
                                            "notes": "prefer the write tool" },
-              "openai/gpt-5.6-luna": { "description": "fast mechanical edits",
-                                       "steps": 25 } },
-  "drills":  { "anthropic/claude-opus-5": { "variant": "max",
-                                            "description": "final reviewer" } } }
+              "openai/gpt-5.6-luna": { "steps": 25 } },
+  "drills":  { "anthropic/claude-opus-5": { "variant": "max" } } }
 ```
 
 One map per role, keyed by model id, mirroring the files on disk. An agent exists
@@ -317,10 +354,11 @@ Per-agent fields, and why these and not the rest of opencode's agent schema:
 | field | why it is here |
 | --- | --- |
 | `variant` | the reasoning governor — per agent, so a drill can think harder |
-| `description` | the one line sarge reads in its inventory when choosing whom to dispatch; without it, ten grunts say the same generic sentence and carry no routing signal at all |
 | `notes` | extra instructions for one agent, fenced in the prompt so they round-trip |
 | `steps` | cap on agentic iterations before opencode forces a text response |
 | `disable` | park an agent without deleting it — the soft alternative to a removal |
+
+**Descriptions are generated, not drafted.** An agent's `description` is the line the orchestrator reads when it picks whom to dispatch, so it carries exactly what you own and nothing that goes stale: the role, your `info` for that model as `Owner rule: …`, and the provider's plan (`Billing: subscription (Max 5x).`). The plugin writes it on every `squad_patch` and **rewrites it at every start** from the global `model_data.json` — only files whose text changes, atomically — and opencode reloads changed agent files live. So editing `info` or a plan needs a restart, not a re-draft. Benchmarks, prices and rankings never go in: hand-written ones went stale within a week, and an orchestrator asked to "refresh descriptions" invented them.
 
 Deliberately **not** exposed: `permission` (a drill's read-only contract is a
 safety property, not a preference), `mode`/`hidden`/`color` (ours), and
@@ -473,7 +511,7 @@ Delegating only helps if the delegate is actually fit for the task. The injected
 Delegation isn't automatically the cheap option — three factors can flip it:
 
 - **Prompt/KV caching** — a fresh `grunt-*` session starts with no cache hit on your accumulated context, while continuing yourself on a provider with prompt caching reuses your already-cached prefix at a steep discount. For a small task on top of a large, already-cached context, finishing it yourself can beat the cost of writing a brief, spinning up a grunt cold, and reading its result back.
-- **Subscription vs API billing** — a grunt marked `billing: subscription` in `model_data.json` (see above) costs the user ~$0 marginally regardless of tokens; an API-billed grunt's cost scales with usage. When quality is comparable, the orchestrator prefers the subscription-covered delegate and saves API-billed models for when they're genuinely the better fit — not by default.
+- **Subscription vs API billing** — a grunt shown as `subscription: <plan>` by `squad_metrics` (see above) costs the user ~$0 marginally regardless of tokens; an API-billed grunt's cost scales with usage. When quality is comparable, the orchestrator prefers the subscription-covered delegate and saves API-billed models for when they're genuinely the better fit — not by default.
 - **Context pressure is not a panic button** — the live `<ORCHESTRATE_CONTEXT>` line is for genuinely heavy work, not an excuse to delegate every minor task once usage looks high. opencode compacts automatically, and for small/quick work the overhead of a task brief plus a grunt round-trip usually costs more than just doing it and letting compaction absorb the overflow.
 
 For full routing rules, escape hatches, and edge-case handling see [skills/squad-delegate/SKILL.md](skills/squad-delegate/SKILL.md).
@@ -534,7 +572,7 @@ A full PDCA iteration (the *changes* branch) fires two LLM calls (grunt + drill)
 
 ```bash
 npm install
-npm test          # vitest — unit suite for src/ (bootstrap, inventory, context, benchmarks, model-data, workers, rate-limit-guard)
+npm test          # vitest — unit suite for src/ (bootstrap, inventory, context, metrics, model-data, workers, rate-limit-guard)
 npm run coverage  # vitest + @vitest/coverage-v8, scoped to src/**; CI-gated at 80% (statements/branches/functions/lines)
 npm run lint      # biome check — formatting + lint
 npm run lint:fix  # biome check --write

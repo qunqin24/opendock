@@ -71,6 +71,11 @@ sibyl-chamber run --target - --goal "Evaluate candidate behavior" --profile exam
 硬化文件系统隔离。macOS 和 Windows 只能在配置 `credentialProxy` 时使用
 可移植隔离；它保护凭据，但挡不住工件读取运行账号可访问的文件。
 
+**版本绑定。** sibyl-system 2.x 要求 opencode 2.x（开发与验证基线 2.2.7）：
+插件入口是 2.x 的 `{ id, setup }` 定义，opencode 1.x 根本不会加载它——装在
+1.x 下是无声失效。opencode 1.x 用户请留在 sibyl-system 1.6.5（最后一条 1.x
+兼容线）；反向同样硬——1.6.5 在 2.x 下加载失败。
+
 按包名安装已发布的 npm 包（opencode 2.x 插件系统；opencode 1.x 已退役）：
 
 ```sh

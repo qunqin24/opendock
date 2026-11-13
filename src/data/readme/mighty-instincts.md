@@ -107,7 +107,7 @@ Every command above posts its reply back into the session as a synthetic message
 On the OpenCode 2 TUI, a small, collapsible sidebar panel summarises three sources in plain language: Learned habits (this plugin's own instincts and observer status), Skill notes (the task-observer skill's open backlog), and Skill test (skill-creator's latest benchmark result), plus a Health block whenever something needs attention. Hosts without the sidebar, or anyone who wants the same facts in the chat, can run `/board` instead. The panel header names the installed version:
 
 ```
-▾ Mighty Instincts v0.11.1
+▾ Mighty Instincts v0.11.2
   ▾ Learned habits               ● 16
 ```
 

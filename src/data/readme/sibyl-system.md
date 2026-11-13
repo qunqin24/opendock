@@ -83,6 +83,13 @@ Bubblewrap provides hardened filesystem containment. macOS and Windows use
 portable containment only with `credentialProxy`; it protects credentials but
 does not stop artifacts reading files accessible to the runner account.
 
+**Version binding.** sibyl-system 2.x requires opencode 2.x (developed and
+verified against 2.2.7): the plugin entry point is the 2.x `{ id, setup }`
+definition, which opencode 1.x never loads — an install under 1.x sits dead
+and silent. opencode 1.x users stay on sibyl-system 1.6.5, the last
+1.x-compatible line; the reverse is equally hard — 1.6.5 fails to load under
+2.x.
+
 Install the published npm package (opencode 2.x plugin system; opencode 1.x
 is retired):
 

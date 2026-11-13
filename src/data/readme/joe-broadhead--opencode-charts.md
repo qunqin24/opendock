@@ -15,24 +15,24 @@ Unofficial; not affiliated with OpenCode or Anomaly.
 
 ## Install
 
-Add the plugin to your `opencode.json`, or run `opencode plugin add github:joe-broadhead/opencode-charts#v0.0.0`:
+Add the plugin to your `opencode.json`, or run `opencode plugin add github:joe-broadhead/opencode-charts#v0.0.1`:
 
 ```json
-{ "plugins": ["github:joe-broadhead/opencode-charts#v0.0.0"] }
+{ "plugins": ["github:joe-broadhead/opencode-charts#v0.0.1"] }
 ```
 
 ```sh
-opencode plugin add github:joe-broadhead/opencode-charts#v0.0.0
+opencode plugin add github:joe-broadhead/opencode-charts#v0.0.1
 ```
 
 Run `opencode reload`, or restart OpenCode, then run `/charts-status`.
 
-Each release has its own tag, and a Git install does not update by itself. To move to a newer release, remove the old entry with `opencode plugin remove github:joe-broadhead/opencode-charts#v0.0.0`, then add the new tag with `opencode plugin add github:joe-broadhead/opencode-charts#v<version>`.
+Each release has its own tag, and a Git install does not update by itself. To move to a newer release, remove the old entry with `opencode plugin remove github:joe-broadhead/opencode-charts#v0.0.1`, then add the new tag with `opencode plugin add github:joe-broadhead/opencode-charts#v<version>`.
 
 Or add the plugin to `opencode.json` instead, with the same spec:
 
 ```json
-{ "plugins": [{ "package": "github:joe-broadhead/opencode-charts#v0.0.0" }] }
+{ "plugins": [{ "package": "github:joe-broadhead/opencode-charts#v0.0.1" }] }
 ```
 
 The install takes the GitHub release tag. Its commit carries the built `dist/`, so the install runs no build.
@@ -41,7 +41,7 @@ A new release is a new tag: install it with its own `#v<version>` spec.
 Options (all optional):
 
 ```json
-{ "plugins": [["github:joe-broadhead/opencode-charts#v0.0.0", { "theme": "light", "locale": "en-GB", "outDir": "outputs/charts", "themes": { "acme": { "extends": "light", "colors": { "categorical": ["#0B5FFF", "#FF6A3D", "#00A87E"] } } } }]] }
+{ "plugins": [["github:joe-broadhead/opencode-charts#v0.0.1", { "theme": "light", "locale": "en-GB", "outDir": "outputs/charts", "themes": { "acme": { "extends": "light", "colors": { "categorical": ["#0B5FFF", "#FF6A3D", "#00A87E"] } } } }]] }
 ```
 
 Options, limits and errors are in [docs/configuration.md](docs/configuration.md).
@@ -257,7 +257,7 @@ A shared `opencode.json` (for example `/etc/opencode/opencode.json` on Linux and
 everyone, and `access: "read-only"` stops agents writing files at all:
 
 ```json
-{ "plugins": [["github:joe-broadhead/opencode-charts#v0.0.0", { "theme": "acme", "access": "read-only" }]] }
+{ "plugins": [["github:joe-broadhead/opencode-charts#v0.0.1", { "theme": "acme", "access": "read-only" }]] }
 ```
 
 Charts makes no network call, sends nothing anywhere, and needs no credential, so a rollout has no data egress to
@@ -273,7 +273,7 @@ its next step is in [docs/configuration.md](docs/configuration.md#errors).
 
 ## Uninstall
 
-`opencode plugin remove github:joe-broadhead/opencode-charts#v0.0.0`. Rendered charts stay where they were written
+`opencode plugin remove github:joe-broadhead/opencode-charts#v0.0.1`. Rendered charts stay where they were written
 (`outputs/charts` by default), and the plugin leaves no other state.
 
 ## Development
@@ -317,6 +317,9 @@ it is built, [docs/jelly.md](docs/jelly.md) for Jelly, and
 - **Four interaction presets.** Tooltip, legend highlight, temporal x zoom and scatter/bubble brush, in the documented
   combinations; no series hiding, no ECharts zoom or brush, and SVG/PNG always show the initial view.
 - **PNG and HTML need the packaged runtime.** A missing runtime is reported as `PNG_UNAVAILABLE` or `HTML_UNAVAILABLE`; reinstalling the plugin restores it.
+- **Some catalogue examples and the light ramp have rough edges.** The candlestick example's date labels, close-set
+  ticks in the histogram and binned heatmap examples, and treemap labels cut short in small cells; the light theme's
+  sequential ramp starts near white, so the lowest values in a light heatmap or choropleth sit close to the canvas.
 - **Package size.** The package is about 8 MB unpacked, and `dist/index.js` is 2.3 MB: Vega, ECharts and the PNG rasteriser are bundled, so a render needs no network.
 - **Host range.** OpenCode `>=2.2.3 <2.3.0`, tested on 2.2.3, 2.2.4, 2.2.5 and 2.2.6.
 - Updates are not automatic for a Git install, and `opencode plugin update` and `opencode plugin check` do not work on one: to move to a newer release, remove the old entry and add the new tag.

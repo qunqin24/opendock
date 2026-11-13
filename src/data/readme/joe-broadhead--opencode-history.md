@@ -13,7 +13,7 @@ Unofficial; not affiliated with OpenCode.
 ## Install
 
 ```sh
-opencode plugin add github:joe-broadhead/opencode-history#v0.0.0
+opencode plugin add github:joe-broadhead/opencode-history#v0.0.1
 ```
 
 Run `opencode reload`, or restart OpenCode. Then run `/history-status`. On first start the plugin indexes every session in OpenCode's database in the background, newest first. The tools work while it runs, over the sessions indexed so far. `/history-status`, or `/history` in the terminal UI, shows the progress.
@@ -23,7 +23,7 @@ Each release has its own tag, and a Git install does not update by itself. To mo
 Or add the plugin to `opencode.json` instead, with the same spec:
 
 ```json
-{ "plugins": [{ "package": "github:joe-broadhead/opencode-history#v0.0.0" }] }
+{ "plugins": [{ "package": "github:joe-broadhead/opencode-history#v0.0.1" }] }
 ```
 
 The index is kept; when a new version changes its layout, the plugin rebuilds it in the background.
@@ -103,7 +103,7 @@ See [Scripting](https://github.com/joe-broadhead/opencode-history/blob/HEAD/docs
    | `"read-only"` | the reads | nothing: `history_pin` and new tools are **denied** |
 
    ```json
-   { "plugins": [{ "package": "github:joe-broadhead/opencode-history#v0.0.0", "options": { "access": "read-only" } }] }
+   { "plugins": [{ "package": "github:joe-broadhead/opencode-history#v0.0.1", "options": { "access": "read-only" } }] }
    ```
 
 2. **An agent that is read-only or asks**, with rules of its own, later than the plugin's:
@@ -206,7 +206,7 @@ Options go on the plugin entry in `opencode.json`:
 ```jsonc
 {
   "plugins": [{
-    "package": "github:joe-broadhead/opencode-history#v0.0.0",
+    "package": "github:joe-broadhead/opencode-history#v0.0.1",
     "options": {
       "defaultScope": "project",
       "mask": ["internal-token-[0-9a-f]{32}"]
@@ -225,7 +225,7 @@ An organisation can install the plugin for every user on a machine through OpenC
 
 ```json
 {
-  "plugins": [{ "package": "github:joe-broadhead/opencode-history#v0.0.0", "options": { "mask": ["internal-token-[0-9a-f]{32}"] } }],
+  "plugins": [{ "package": "github:joe-broadhead/opencode-history#v0.0.1", "options": { "mask": ["internal-token-[0-9a-f]{32}"] } }],
   "permissions": [
     { "action": "history_sql", "resource": "*", "effect": "deny" }
   ]
@@ -312,7 +312,7 @@ The codes a tool call can return, each with its next step, are in [docs/configur
 2. Remove the plugin, then run `opencode reload` or restart OpenCode:
 
    ```sh
-   opencode plugin remove github:joe-broadhead/opencode-history#v0.0.0
+   opencode plugin remove github:joe-broadhead/opencode-history#v0.0.1
    ```
 
 3. Delete the index, which removing the plugin keeps: `~/.local/share/opencode-history`, or your `indexPath` with its `-wal` and `-shm` files. OpenCode's database is not touched either way.

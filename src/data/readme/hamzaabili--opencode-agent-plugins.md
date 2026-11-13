@@ -8,7 +8,7 @@
 
 **The community Agent Plugins client for OpenCode — v1 and v2.**
 
-Contract-checked against the OpenCode v2 plugin API (tested on 2.2.7;
+Contract-checked against the OpenCode v2 plugin API (tested on 2.3.0;
 the `./legacy` entry follows the v1 factory contract).
 
 [Agent Plugins 1.0](https://agent-plugins.org) is the vendor-neutral packaging format for Agent Skills and MCP servers (TSC: Amazon, Cursor, Microsoft, OpenAI, Vercel, Google). Codex, VS Code, Kiro and ChatGPT load it natively; OpenCode does not. This plugin closes the gap:

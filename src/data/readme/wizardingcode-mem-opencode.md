@@ -23,7 +23,7 @@
 </p>
 
 <p align="center">
-  One local binary · no daemon · no model in the loop · nothing leaves your machine unless you ask
+  One local binary · no daemon · no model in the loop · none of your data leaves your machine unless you ask
 </p>
 
 <p align="center">
@@ -181,6 +181,15 @@ needs Node.js 18 or later; or download `wizardingcode-mem-windows-x64.exe` from 
 
 </td></tr>
 </table>
+
+To update, use the way you installed:
+
+- a plugin: update the wizardingcode-mem plugin from your agent's plugin manager;
+- Homebrew: `brew upgrade wizardingcode-mem && wizardingcode-mem install`;
+- npm, and Windows: `npx wizardingcode-mem@latest install`;
+- the script: `curl -fsSL https://raw.githubusercontent.com/WizardingCode-io/wizardingcode-mem/main/scripts/install.sh | sh`.
+
+`wizardingcode-mem status` and `doctor` say when a newer release is out, and `wizardingcode-mem update` asks now and lists these commands. They also say when the copy you typed and the copy your agents run differ: a copy older than the one the agents run hands `status`, `doctor`, `update` and `ui` over to it (copies from before this version do not; `WIZARDINGCODE_MEM_HANDED=1` in front of the command keeps it in the copy you typed), and a newer copy tells you that `wizardingcode-mem install` moves the agents to it.
 
 Each of these checks the binary's SHA-256 against the release before using it. The curl script and `npx … install` also set up every supported agent and app they find; `wizardingcode-mem install <name>` does one (`claude-code`, `claude-desktop`, `codex`, `cursor`, `opencode`, `qwen`, `droid`, `copilot`, `antigravity`). Configuration files are backed up first, and `wizardingcode-mem uninstall <name>` puts them back. Where an agent has both the plugin and this direct install, the plugin stands down, so nothing is said twice.
 
@@ -349,7 +358,7 @@ git 2.32 or newer is needed to write. Your own git hooks, templates, signing and
 
 ## Settings
 
-Every setting can be changed from the viewer, with no file to edit and no command to type. Open the viewer (it opens by itself when a session starts, or run `wizardingcode-mem ui`) and choose the gear at the bottom left.
+Every setting can be changed from the viewer, with no file to edit and no command to type (two have no field yet and are set by hand: `WIZARDINGCODE_MEM_AUTHOR` and `WIZARDINGCODE_MEM_UPDATE`). Open the viewer (it opens by itself when a session starts, or run `wizardingcode-mem ui`) and choose the gear at the bottom left.
 
 <p align="center">
   <picture>
@@ -393,6 +402,7 @@ Edit `~/.wizardingcode/mem/env` yourself, or set the variable in the environment
 | `WIZARDINGCODE_MEM_RETENTION_DAYS` | How long `compact` keeps finished turns no memory came from | `90` |
 | `WIZARDINGCODE_MEM_SEMANTIC` | `off` keeps the search model but searches by words only | `on` |
 | `WIZARDINGCODE_MEM_UI_AUTO_OPEN` | Open the viewer when a session starts | `on` |
+| `WIZARDINGCODE_MEM_UPDATE` | `off` stops the daily question to github.com about the latest release (set by hand: the viewer has no field for it yet) | `check` |
 | `WIZARDINGCODE_MEM_AUTHOR` | Your name on the knowledge you write (set by hand: the viewer has no field for it yet) | your git `user.name`, else `you` |
 | `WIZARDINGCODE_MEM_STORE_DIR` | Where the database lives, when it was moved to another disk (set by **Storage**, not by hand) | the data directory |
 | `WIZARDINGCODE_MEM_BACKUP_TO` | Where backups go: a folder, or `s3://bucket/prefix` | — |
@@ -423,13 +433,13 @@ The binary is at `~/.wizardingcode/mem/bin/wizardingcode-mem`; put that director
 | `wizardingcode-mem embed download` · `status` · `delete` · `backfill` | Search by meaning (see above) |
 | `wizardingcode-mem rejudge` | Asks TypeSafe to judge imported memories properly |
 | `wizardingcode-mem knowledge write` · `accept` · `reject` · `area` · `list` · `rebuild` · `adopt` | The knowledge store (see above) |
-| `wizardingcode-mem share project` · `roots` · `areas` · `status` · `explain` · `server add` · `server rejoin` · `server remove` · `server mute` · `server unmute` · `server resume` · `server list` | What may leave this machine, and the team servers it syncs with (see Sharing below) |
+| `wizardingcode-mem share project` · `names` · `name forget` · `roots` · `areas` · `status` · `explain` · `server add` · `server rejoin` · `server remove` · `server mute` · `server unmute` · `server resume` · `server list` | What may leave this machine, and the team servers it syncs with (see Sharing below) |
 | `wizardingcode-mem sync --auto` · `--once` · `stop` | The sync process: as the hooks start it, one round and exit, or asked to leave |
 | `wizardingcode-mem install [<name>]` · `uninstall <name>` | The direct install: every agent and app found, or one (`claude-code`, `claude-desktop`, `codex`, `cursor`, `opencode`, `qwen`, `droid`, `copilot`, `antigravity`) |
 
 ## TypeSafe, if you want it
 
-Without a key, the rules judge every turn and nothing ever leaves your machine. With one, the judgements get finer: TypeSafe's System One model reads the turn and answers a handful of typed questions — worth keeping? which kind? how important? which sentences stand on their own? — in about a quarter of a second, in the background, for about $0.00006 a turn.
+Without a key, the rules judge every turn and none of your data ever leaves your machine. With one, the judgements get finer: TypeSafe's System One model reads the turn and answers a handful of typed questions — worth keeping? which kind? how important? which sentences stand on their own? — in about a quarter of a second, in the background, for about $0.00006 a turn.
 
 Paste the key in the viewer's **Settings** (it is kept in `~/.wizardingcode/mem/env`, readable by you only), or write it there yourself:
 
@@ -443,7 +453,7 @@ What is sent is the text of the turn being judged, and only that. If the service
 
 - **Redaction before storage.** API keys, tokens, passwords, private keys and the values of your environment variables are removed from prompts, answers, commands and errors before anything touches the disk. Text inside `<private>…</private>` is never stored.
 - **One file, yours.** `~/.wizardingcode/mem/wizardingcode-mem.db`, SQLite in WAL mode. Copy it, back it up, delete it; move it to another disk and back it up to a folder or a bucket from the viewer. `WIZARDINGCODE_HOME` moves the whole `~/.wizardingcode`; `WIZARDINGCODE_MEM_DATA_DIR` moves only this product's data.
-- **No telemetry, no account, no network** — except the TypeSafe requests you opt into, the one download of the binary, and the one download of the search model if you ask for it.
+- **No telemetry, no account, no network** — except the TypeSafe requests you opt into, the one download of the binary, the one download of the search model if you ask for it, and one small question to `github.com`: which release is the latest. It is asked in the background at most once a day while it succeeds and at most once an hour while it fails, never in CI, and once each time you type `wizardingcode-mem update`. It names no version, platform, path or project; github.com sees your address and the time, as for any request. Nothing is downloaded: `status` and `doctor` only tell you. `WIZARDINGCODE_MEM_UPDATE=off` in `~/.wizardingcode/mem/env` turns it off for every process.
 - **A project is a repository.** Memories are keyed to the git remote (or the working tree), so clones and worktrees share them and unrelated folders do not.
 - **Removable.** `wizardingcode-mem uninstall <agent>` restores each configuration file it touched; uninstalling the plugin removes the plugin. Delete `~/.wizardingcode/mem` to delete everything.
 
@@ -451,11 +461,11 @@ What is sent is the text of the turn being judged, and only that. If the service
 
 Nothing is sent until you add a team server: `wizardingcode-mem share server add <url> --code <code>` with an admin's invitation code, or the viewer's Settings → Servers. By default nothing may leave, and the sync sends only what three choices allow:
 
-- **Each project's level**: Nothing, Knowledge, or Knowledge and memories. Set it in the viewer (Across projects, then the project's Sharing section) or with `wizardingcode-mem share project <local|knowledge|all>` in the project's folder. A project needs a git remote on a host (`github.com/acme/site`, say) to be set above Nothing, because a team matches projects by their remote; a remote that is a local path or a `file://` origin does not count. Knowledge and memories sends every active memory of the project that is not stale, branch-bound, imported or one of your rules.
+- **Each project's level**: Nothing, Knowledge, or Knowledge and memories. Set it in the viewer (Across projects, then the project's Sharing section) or with `wizardingcode-mem share project <local|knowledge|all>` in the project's folder. A team matches projects by a team alias: the project's git remote on a host (`github.com/acme/site`, say; a remote that is a local path or a `file://` origin does not count), or a **shared name** you give it, in the dock's Shared name field or with `wizardingcode-mem share project all --as "Brand strategy" --create`. A name is created once on the server and joined by teammates from the list (`wizardingcode-mem share names`); creating or joining is confirmed by name at every level, Receive only included, and a teammate binds an existing project of theirs to it. At Nothing a project keeps its name and `wizardingcode-mem share name forget` leaves it. A project known by its folder alone becomes a new project when its folder moves: set the old one to Nothing, forget its name, then share the new one under the same name. Knowledge and memories sends every active memory of the project that is not stale, branch-bound, imported or one of your rules; the imported memories never leave, and the dock says how many stay.
 - **The roots**: whether the workspace's knowledge and the shared repository's knowledge may leave. `WIZARDINGCODE_MEM_SHARE_ROOTS`, a comma list of `workspace` and `shared`, or `none`.
 - **The areas**: which knowledge areas may leave, by root-qualified id, such as `workspace:sales`. `WIZARDINGCODE_MEM_SHARE_AREAS`, a comma list, or `none`. A new area starts private. The workspace's areas also govern every project's knowledge.
 
-The two lists live in the settings file and on the viewer's Settings → Sharing page; `wizardingcode-mem share roots …` and `share areas …` set them from a shell. The environment can only narrow them, never widen them, and a list with an invalid token counts as empty. Every widening is confirmed first (in a terminal, `--yes` answers for you), and every change is logged. `wizardingcode-mem share status` shows what is allowed and how much would leave; `share explain <scope>/<slug>` and `share explain memory <id>` say why one item would or would not. Lowering a level recalls nothing already sent. Restoring a backup puts every project back to Nothing. The rules and their limits are in [ADR 0025](docs/adr/0025-sharing-policy.md).
+The two lists live in the settings file and on the viewer's Settings → Sharing page; `wizardingcode-mem share roots …` and `share areas …` set them from a shell. The environment can only narrow them, never widen them, and a list with an invalid token counts as empty. Every widening is confirmed first (in a terminal, `--yes` answers for you), and every change is logged. `wizardingcode-mem share status` shows what is allowed and how much would leave; `share explain <scope>/<slug>` and `share explain memory <id>` say why one item would or would not. Lowering a level withdraws from the server what the project sent under the wider level; the next sync takes it back. Restoring a backup puts every project back to Nothing. The rules and their limits are in [ADR 0025](docs/adr/0025-sharing-policy.md).
 
 ### The sync
 

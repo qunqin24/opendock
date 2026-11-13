@@ -45,11 +45,11 @@
 
 Figma 比較は「あるキャンバス幅での再現」しか見ないため、iPad 縦向き・横向きのような別幅での崩れは見逃します。`layout_integrity` は **Web の Bounding Box だけ**を見て、指定した CSS ビューポートではみ出していないかを判定します。
 
-- **入力:** `web_layout` または `web_layout_path`（`layout_tree` と同じ WebNode JSON）。必須キー欠落・配列内の `null`・空 `selector` は `layout_tree` と同じ文言の入力エラーになり、先頭の UTF-8 BOM（U+FEFF）は除去して受理します。明示的な `w: 0` / `h: 0`（collapsed）は検査対象外のままです（除外件数は `skipped_zero_geometry` と `details` で分かります）。`figma_*`・画像・`threshold` / `min_match` / `pass_rate` / `max_diff_pixels` / `include_aa` / `generate_diff` / `diff_on_mismatch` / `diff_image_content` / `count_extra_web` は非対応です。`max_details` は `layout_tree` と同様に出力上限に使えます（`issues` / `details` を切り詰め、`issue_count` は実件数のまま）。
+- **入力:** `web_layout` または `web_layout_path`（`layout_tree` と同じ WebNode JSON）。必須キー欠落・配列内の `null`・空 `selector` は `layout_tree` と同じ文言の入力エラーになり、先頭の UTF-8 BOM（U+FEFF）は除去して受理します。明示的な `w: 0` / `h: 0`（collapsed）は検査対象外のままです（除外件数は `skipped_zero_geometry` と `details` で分かります）。`figma_*`・画像・`threshold` / `min_match` / `pass_rate` / `max_diff_pixels` / `include_aa` / `generate_diff` / `diff_on_mismatch` / `diff_image_content` / `count_extra_web` は非対応です。`max_details` は `layout_tree` と同様に `details` の出力上限に使えます（`issues` / `issue_count` は実件数のまま）。
 - **既定ビューポート:** 768×1024 CSS px（`viewport_preset` 未指定 = `ipad_portrait`）。
 - **横向き:** `viewport_preset=ipad_landscape`（1024×768）。任意サイズは `viewport_width` / `viewport_height`（0 より大きい値。指定時はプリセットを上書き）。
 - **`viewport_overflow_x`:** `x < 0` または `x+w > viewport_width`（1px の丸めは許容）。ビューポート高さ超えはページスクロールとして扱い、失敗にしません。
-- **`parent_overflow`:** 子ボックスが親ボックスからいずれかの辺で 1px 超えてはみ出す。親が JSON に無い場合、自己参照（`parent` がそのノード自身）の場合、または親の `w`/`h` が 0 以下の場合はこの検査をスキップします（`status` は変えず、前二者は `unresolved_parent_refs`、後者は `parent_overflow_skipped_zero_geom` と `details` 要約で可視化）。親キーが無い／解決できない／自己参照／親がゼロ幾何だけのときは `parent_checked_nodes=0` になり、`details` の要約行に未適用注記が付きます。`ignore_nodes` / `ignore_region` で除外した親でも、親に非ゼロ幾何があれば子の `parent_overflow` は引き続き検査します。
+- **`parent_overflow`:** 子ボックスが親ボックスからいずれかの辺で 1px 超えてはみ出す。複数の辺ではみ出す場合は辺ごとに 1 件返す。親が JSON に無い場合、自己参照（`parent` がそのノード自身）の場合、または親の `w`/`h` が 0 以下の場合はこの検査をスキップします（`status` は変えず、前二者は `unresolved_parent_refs`、後者は `parent_overflow_skipped_zero_geom` と `details` 要約で可視化）。親キーが無い／解決できない／自己参照／親がゼロ幾何だけのときは `parent_checked_nodes=0` になり、`details` の要約行に未適用注記が付きます。`ignore_nodes` / `ignore_region` で除外した親でも、親に非ゼロ幾何があれば子の `parent_overflow` は引き続き検査します。
 - **合否:** 崩れ 0 件 → `success` / 1 件以上 → `mismatch` / 検査対象がすべて除外 → `skipped`。`w`/`h` が 0 のノードのみ検査対象外で、Web ノードが 1 件もない、または検査対象がすべて `w`/`h` = 0 の場合も `mismatch` です。負の `w`/`h` と必須キー欠落（`width`/`height` など）は入力エラーで、この mismatch にはなりません。`match_rate` は返しません。`success` でも `parent_checked_nodes=0` のときは親はみ出しを検証していないため、DOM キャプチャに正しい `parent` を含めて再実行してください。一部ノードだけ `w`/`h` = 0 のときは残りだけで `success` になり得ますが、除外件数は `skipped_zero_geometry` で分かります。
 - **応答:** `status`, `mode`, `viewport_width`, `viewport_height`, `checked_nodes`, `parent_checked_nodes`, `issue_count`, `details`, `ignored_count`。崩れがあるとき `issues`（`type` / `selector` / `detail` / `edge` / `overflow_px` / `node`（`x` / `y` / `w` / `h`）。`parent_overflow` のときは `parent_selector` も）。`viewport_preset` を渡したときはエコーします。`ignored_nodes`（`web:<selector>`。件数は `ignored_count` と一致）/ `unmatched_ignores` / `unmatched_ignore_regions` / `unresolved_parent_refs` / `parent_overflow_skipped_zero_geom` / `skipped_zero_geometry` は該当時のみ。
 
@@ -123,7 +123,7 @@ image A / B のいずれかが一様と検出された場合、status / match_ra
 | `viewport_width` | number | `layout_integrity` | 0 より大 | 768 | CSS ピクセルのビューポート幅。指定時は `viewport_preset` の幅を上書きする。 |
 | `viewport_height` | number | `layout_integrity` | 0 より大 | 1024 | CSS ピクセルのビューポート高さ。指定時は `viewport_preset` の高さを上書きする。 |
 | `count_extra_web` | boolean | `layout_tree` | true / false | false | `true` の場合、どの Figma ノードにもマッチしなかった Web ノード（実装側の余分な要素）を一致率の分母に加算して一致率を下げる。 |
-| `max_details` | number | `layout_tree` / `layout_integrity` | 0 以上 | 0 | 出力の最大件数。0（未指定）は無制限。1 以上のとき先頭の summary 行を残したまま指定件数に切り詰め、末尾に省略行を付ける。`layout_tree` は `... and N more details omitted (max_details=M)` に加え、`mismatched_pairs` / `mismatched_nodes` / `extra_web_nodes` も同じ件数に切り詰め、省略時は `mismatched_pairs_omitted` / `extra_web_nodes_omitted` を返す（`extra_web_count` は実件数のまま。`ignored_nodes` は `ignored_count` と一致させるため対象外）。`layout_integrity` は `issues` も同じ件数に切り詰め、`... and N more issues omitted (max_details=M)` を付ける（`issue_count` は実件数のまま）。 |
+| `max_details` | number | `layout_tree` / `layout_integrity` | 0 以上 | 0 | `details` 行の最大件数。0（未指定）は無制限。1 以上のとき先頭から指定件数に切り詰め、末尾に `... and N more details omitted (max_details=M)` を付ける。`layout_tree` は加えて `mismatched_pairs` / `mismatched_nodes` / `extra_web_nodes` も同じ件数に切り詰め、省略時は `mismatched_pairs_omitted` / `extra_web_nodes_omitted` を返す（`extra_web_count` は実件数のまま。`ignored_nodes` は `ignored_count` と一致させるため対象外）。`layout_integrity` は `details` のみ切り詰め、`issues` / `issue_count` は実件数のまま。 |
 | `generate_diff` | boolean | `perceptual` / `strict` | true / false | true | `false` の場合は差分画像の PNG/base64 化を行わず、`diff_image` は空文字列で返される。`strict` の `diff_regions` は in-memory マスクから算出するため `false` でも返る。 |
 | `diff_on_mismatch` | boolean | `perceptual` / `strict` | true / false | false | `true` かつ判定が `success` の場合、応答の `diff_image` を空文字列にする（失敗時の分析用に差分画像は残しつつ、成功時のトークン消費を抑える）。`generate_diff=false` のときはもともと空。 |
 | `diff_image_content` | boolean | `perceptual` / `strict` | true / false | false | `true` かつ `diff_image` が空でない場合、JSON テキストの後に MCP image コンテンツ（`image/png`）を付ける。既定は JSON のみ。 |
@@ -136,7 +136,7 @@ image A / B のいずれかが一様と検出された場合、status / match_ra
 
 | フィールド | 型 | 必須 | 説明 |
 | :--- | :--- | :--- | :--- |
-| `id` | string | ○ | Figma ノード ID。`parent` の参照先、および `ignore_nodes` の除外対象としても使用される。 |
+| `id` | string | ○ | Figma ノード ID。`parent` の参照先、および `ignore_nodes` の除外対象としても使用される。同一 `id` が複数ある場合、親参照インデックスは先勝ち（最初のノード）を使い、応答に `duplicate_node_identifiers` が付く（`status` / `match_rate` は変えない）。 |
 | `name` | string | ○ | Figma ノード名。details 出力、および `ignore_nodes` の除外対象としても使用される。 |
 | `x` / `y` / `w` / `h` | number | ○ | ノードの BoundingBox（Figma キャンバス上の絶対座標とサイズ）。 |
 | `parent` | string | — | 親ノードの `id`。省略時は親なしとして扱われる。入力内のどの `id` にも一致しない場合は絶対座標比較へフォールバックし、応答に `unresolved_parent_refs` が付く。 |
@@ -145,7 +145,7 @@ image A / B のいずれかが一様と検出された場合、status / match_ra
 
 | フィールド | 型 | 必須 | 説明 |
 | :--- | :--- | :--- | :--- |
-| `selector` | string | ○ | 要素識別子（CSS セレクタ等）。`parent` の参照先、および `ignore_nodes` の除外対象としても使用される。 |
+| `selector` | string | ○ | 要素識別子（CSS セレクタ等）。`parent` の参照先、および `ignore_nodes` の除外対象としても使用される。同一 `selector` が複数ある場合、親参照インデックスは先勝ち（最初のノード）を使い、応答に `duplicate_node_identifiers` が付く（`status` / `match_rate` は変えない）。 |
 | `x` / `y` / `w` / `h` | number | ○ | 要素の BoundingBox（**絶対 CSS px**。ドキュメント／ページ共通の座標空間。キー名は `w` / `h` であり `width` / `height` ではない）。 |
 | `parent` | string | — | 親要素の `selector`。省略時は親なしとして扱われる。入力内のどの `selector` にも一致しない場合は絶対座標比較へフォールバックし、応答に `unresolved_parent_refs` が付く。 |
 
@@ -169,7 +169,7 @@ DOM からの抽出手順（`getBoundingClientRect()` + `window.scrollX` / `wind
 ]
 ```
 
-`parent` を持つノードは「親の BoundingBox に対する相対的な位置・サイズ（比率 0–1）」で比較され、レスポンシブなスケール差が吸収されます。親を持たないノード（および幅・高さが 0 の親を持つノード、解決できない `parent`）は絶対座標のまま比較され、比較ペアの片側でも絶対座標なら両側を生ピクセルにそろえます。このとき `threshold`（0.0–1.0、既定 0.15）は比率ではなく **px 差分** に対して適用されます。実比較されたペアのうち絶対座標空間で比較された件数は応答の `absolute_mode_pairs` に入り、`details` にも 1 行注記されます。`parent` が空でないのに解決できない参照、および自己参照（`parent` がそのノード自身）は `status` を変えず `unresolved_parent_refs`（例: `Figma: '999'` / `Web: '.foo'`）として応答されます（`unmatched_ignores` と同様の誤用検出）。
+`parent` を持つノードは「親の BoundingBox に対する相対的な位置・サイズ（比率 0–1）」で比較され、レスポンシブなスケール差が吸収されます。親を持たないノード（および幅・高さが 0 の親を持つノード、解決できない `parent`）は絶対座標のまま比較され、比較ペアの片側でも絶対座標なら両側を生ピクセルにそろえます。このとき `threshold`（0.0–1.0、既定 0.15）は比率ではなく **px 差分** に対して適用されます。実比較されたペアのうち絶対座標空間で比較された件数は応答の `absolute_mode_pairs` に入り、`details` にも 1 行注記されます。`parent` が空でないのに解決できない参照、および自己参照（`parent` がそのノード自身）は `status` を変えず `unresolved_parent_refs`（例: `Figma: '999'` / `Web: '.foo'`）として応答されます（`unmatched_ignores` と同様の誤用検出）。同一 Figma `id` / Web `selector` が複数ある場合も `status` / `match_rate` は変えず、親参照は先勝ちのまま `duplicate_node_identifiers`（例: `Figma: '1:23'` / `Web: '.item'`）で通知します。
 
 `id` / `name`（Figma）と `selector`（Web）は空文字を拒否します。`x` / `y` / `w` / `h` はキー欠落を拒否します（明示的な `0` は許可）。欠落や空識別子はツール実行エラーになり、メッセージにノードインデックスとフィールド名が含まれます（例: `Figma layout node at index 1 is missing required field 'w'`）。
 
@@ -226,6 +226,7 @@ DOM からの抽出手順（`getBoundingClientRect()` + `window.scrollX` / `wind
 | `matched_pairs` | object[] | 非空時のみ | 一致ペア。`figma_name` / `web_selector`（details の `Matched: '…' ↔ '…'` と同じ対応）。 |
 | `zero_geometry_warning` | string | 非空時のみ | 過半数ノードの `w`/`h` が 0 のときの誤用検出。 |
 | `unresolved_parent_refs` | string[] | 非空時のみ | 解決できない、または自己参照の `parent`。 |
+| `duplicate_node_identifiers` | string[] | 非空時のみ | 入力内で重複した Figma `id` / Web `selector`（例: `Figma: '1:23'` / `Web: '.item'`）。親参照インデックスは先勝ちのまま。`status` / `match_rate` は変えない。 |
 
 ### `perceptual`
 
@@ -271,8 +272,8 @@ DOM からの抽出手順（`getBoundingClientRect()` + `window.scrollX` / `wind
 | `checked_nodes` | number | 常時 | 検査したノード数（除外・ゼロ幾何を除く） |
 | `parent_checked_nodes` | number | 常時 | `parent` を解決して包含検査した件数。0 なら `parent_overflow` 未適用（`details` の要約行に注記。`layout_tree` の `absolute_mode_pairs` と同種） |
 | `issue_count` | number | 常時 | 検出した崩れ件数 |
-| `issues` | object[] | 崩れあり | 各件の `type` / `selector` / `detail` / `edge`（`left` / `right` / `top` / `bottom`）/ `overflow_px`（はみ出し量の正の px）/ `node`（対象ノードの `x` / `y` / `w` / `h`）。`parent_overflow` のときは `parent_selector` も付く。`max_details` > 0 のときは先頭からその件数までに切り詰め（`issue_count` は実件数のまま） |
-| `details` | string[] | 常時 | 要約行＋各 issue の detail。`parent_overflow` スキップ時は要約に件数を追記。`parent_checked_nodes=0` のときは未適用注記を同じ要約行に追記（`max_details` の切り詰めで issue の detail を押し出さないため）。過半数ゼロ幾何のときは `checked_nodes` と入力差の 1 行も付く。少数の零サイズ除外時は `skipped_zero_geometry` に対応する 1 行注記も付く。`max_details` > 0 で issues を切り詰めたときは summary＋残した issue detail＋省略行になる |
+| `issues` | object[] | 崩れあり | 各件の `type` / `selector` / `detail` / `edge`（`left` / `right` / `top` / `bottom`）/ `overflow_px`（はみ出し量の正の px）/ `node`（対象ノードの `x` / `y` / `w` / `h`）。`parent_overflow` のときは `parent_selector` も付く。`max_details` では切り詰めない（件数は `issue_count` と一致） |
+| `details` | string[] | 常時 | 要約行＋各 issue の detail。`parent_overflow` スキップ時は要約に件数を追記。`parent_checked_nodes=0` のときは未適用注記を同じ要約行に追記（`max_details` の切り詰めで issue の detail を押し出さないため）。過半数ゼロ幾何のときは `checked_nodes` と入力差の 1 行も付く。少数の零サイズ除外時は `skipped_zero_geometry` に対応する 1 行注記も付く。`max_details` > 0 のときは先頭からその件数＋省略行（`... and N more details omitted`）になる |
 | `ignored_count` | number | 常時 | `ignore_nodes` / `ignore_region` で除外したノード数 |
 | `ignored_nodes` | string[] | 非空時のみ | 除外したノード（`web:<selector>`。件数は `ignored_count` と一致） |
 | `unmatched_ignores` | string[] | 非空時のみ | どのノードにも一致しなかった `ignore_nodes` エントリ |

@@ -4,7 +4,7 @@
 
 <p>
   <strong>High-performance LLM Search Grounding Plugin built natively for OpenCode V2</strong><br />
-  Powered by Google Gemini Search Grounding with academic-style inline citations (<code>[1]</code>, <code>[2]</code>), clickable multi-source cards, system-wide WebSearch auto-routing, and persistent zero-overhead caching.
+  Powered by Google Gemini Search Grounding with academic-style inline citations (<code>[1]</code>, <code>[2]</code>), clickable multi-source cards, OpenChamber Web Search UI integration, system-wide WebSearch routing, and persistent zero-overhead caching.
 </p>
 
 <p>
@@ -34,20 +34,20 @@ Unlike standard web search tools, it returns concise, fact-checked answers accom
 
 ## ✨ Features
 
-- **🚀 Native OpenCode V2 Architecture**: Built strictly on OpenCode V2's `id` + `setup(ctx)` lifecycle, integrating deeply with `ctx.tool`, `ctx.websearch`, `ctx.storage`, and `context.progress`.
+- **🚀 Native OpenCode V2 Architecture**: Built strictly on OpenCode V2's `id` + `setup(ctx)` lifecycle, integrating deeply with `ctx.integration`, `ctx.tool`, `ctx.websearch`, `ctx.provider`, `ctx.storage`, and `context.progress`.
+- **🖥️ OpenChamber Visual Configuration (`ctx.integration`)**: Registers **Google Gemini Grounding** directly in OpenChamber's **Settings → Web Search** panel with a full configuration form (API Key + optional Base URL + optional Preferred Model) plus automatic detection of environment variables.
 - **🌐 Dual-Entry Search Architecture (WebSearch + Custom Tool)**:
-  - **System WebSearch Provider (`ctx.websearch`)**: Automatically registers as an OpenCode V2 default `websearch` provider for seamless, transparent search in everyday conversations;
+  - **System WebSearch Provider (`ctx.websearch`)**: Registers as an OpenCode V2 `websearch` provider and sets itself as default only when no provider/disabled preference is already selected;
   - **Custom Professional Tool (`ctx.tool`)**: Exposes `google_grounding` under the Code Mode `search` namespace (`tools.search.google_grounding`) with full parameter control (optional legacy alias `websearch_cited` available via `enableLegacyAlias: true`).
 - **🎯 Smart Sentence-Level Anti-Bloat Slicing (Independent Clickable Cards)**:
-  - Every discovered source is rendered as an independent clickable card in the UI, allowing instant navigation to any specific webpage;
+  - Every discovered source is rendered as an independent clickable card in the UI (with strict `http(s)://` URL validation/fallback), allowing instant navigation to any specific webpage;
   - The first card carries the complete synthesis report, while subsequent cards extract concise sentence-level snippets—**saving ~87.5% duplicate tokens (20,000+ context tokens saved per search)**.
-- **⚡ Multi-Dimensional Caching (`ctx.storage`) & Singleflight Deduplication**: SHA-256 caching across `query + context + model + maxSources` with configurable TTL (default 10m), plus automatic in-flight deduplication for concurrent identical queries.
+- **⚡ Multi-Dimensional Caching (`ctx.storage`) & Subscriber-Aware Singleflight**: SHA-256 caching across `query + context + model + maxSources` (and custom `baseURL`) with configurable TTL (default 10m) and expired-entry cleanup, plus subscriber-refcounted in-flight deduplication that works cleanly even with per-caller `AbortSignal`s.
 - **🔔 Live Progress Feedback (`context.progress`)**: Real-time status reporting in TUI and Web UI ("Searching Google...", "Found cached results", "Falling back to next model...").
-- **⚙️ Standardized `ctx.options` Configuration**: Structured plugin configuration via `opencode.jsonc` with support for `{env:VAR}` automatic resolution.
-- **⚡ Automatic Fallback Chain**: Built-in fault tolerance—configured with a generous 45s per-model timeout and 180s (3 min) total timeout. Automatically rotates through candidate models on rate limits (HTTP 429) or gateway blips (502/503), while immediately halting on fatal auth errors (401/403).
-- **🧠 Dynamic Model Switching & Normalization**: Supports runtime model selection per search call; automatically strips provider prefixes like `google/` to prevent 404s.
-- **📍 Academic-Style Precision Citations & Clean Markdown**: Calculates exact UTF-8 byte offsets from Gemini's `groundingSupports` with dynamic index remapping (preventing broken citations) and renders clean Markdown hyperlinks `[1] [Title](url)`.
-- **🌐 Reverse Proxy & Custom Gateway Ready**: Dual authentication support with both `x-goog-api-key` and `Authorization: Bearer`, ensuring seamless compatibility with OneAPI, NewAPI, and LAN gateways.
+- **🗄️ OpenCode V2.2.6+ `opencode.db` & `{file:...}` Support**: Automatically reads active key/OAuth credentials and metadata from `~/.local/share/opencode/opencode.db` (`credential` table in safe read-only WAL-aware mode), project-level `opencode.json(c)` / `.opencode/opencode.json(c)`, legacy `auth.json`, `{env:VAR}`, and `{file:path/to/secret}` placeholders.
+- **⚡ Automatic Fallback Chain**: Powered by **`gemini-4-hydrogen`** by default with a **60s** per-model timeout and **180s** (3 min) total timeout. Automatically rotates through candidate models on rate limits (HTTP 429), gateway errors, or empty/`MAX_TOKENS`/blocked responses, while immediately halting on fatal auth errors (including non-JSON 401/403 responses).
+- **🧠 Native Thinking Preservation & Dynamic Model Normalization**: Preserves `gemini-4-hydrogen`'s native server-side `HIGH` thinking by default; optionally accepts `thinkingLevel` (`LOW` / `MEDIUM` / `HIGH` / `XHIGH`) for Gemini 3/4 models. Strips provider prefixes (`google/`) and `#variant` suffixes (`google/gemini-4-hydrogen#xhigh` → `gemini-4-hydrogen`).
+- **🔐 Smart Official vs. Reverse-Proxy Auth Routing**: Automatically sends `x-goog-api-key` only on official `*.googleapis.com` endpoints (preventing dual-header conflicts), `Authorization: Bearer` only for OAuth credentials, and dual headers on custom third-party gateways (OneAPI/NewAPI), with explicit `authMode` and custom `headers` support.
 
 ---
 
@@ -74,7 +74,7 @@ The plugin provides two parallel search pathways to satisfy both transparent dai
             └───────────────┬───────────────┘
                             ▼
                Unified Google Grounding Engine
-      (Shares 45s timeouts, fallback chain, and cache)
+      (Shares 60s timeouts, fallback chain, and cache)
 ```
 
 | Entry Pathway | Invocation Method | Best For | Key Advantages |
@@ -108,17 +108,36 @@ No cloning or manual symlinks needed. Add the plugin directly to the `plugins` a
     {
       "package": "opencode-gemini-grounding",
       "options": {
-        "model": "gemini-3.5-flash-lite",      // Preferred search model
-        "apiKey": "{env:GOOGLE_API_KEY}",       // Auto-resolved from environment
-        "cacheTtlMs": 600000,                  // Storage cache TTL in ms (default 10m; 0 disables)
-        "requestTimeoutMs": 45000,              // Single-model timeout (45s)
+        "model": "gemini-4-hydrogen",           // Preferred search model
+        "apiKey": "{env:GOOGLE_API_KEY}",       // Supports {env:VAR} and {file:path/to/key}
+        "fallbackModels": [                     // Optional custom fallback chain
+          "gemini-4-hydrogen",
+          "gemini-3.8-flash",
+          "gemini-3.5-flash-lite"
+        ],
+        "cacheTtlMs": 600000,                   // Storage cache TTL in ms (default 10m; 0 disables)
+        "requestTimeoutMs": 60000,              // Single-model timeout (60s)
         "timeoutMs": 180000,                    // Total fallback chain timeout (3m)
+        "authMode": "auto",                     // "auto" | "x-goog-api-key" | "bearer" | "both"
         "setDefaultWebsearch": true             // Set as default OpenCode V2 websearch provider
       }
     }
   ]
 }
 ```
+
+---
+
+### 🖥️ Configuring Visually in OpenChamber
+
+If you use **OpenChamber**, you can configure the plugin completely through the GUI without hand-editing JSON files:
+
+1. **Settings → Web Search → Google Gemini Grounding**:
+   - Select **Google Gemini Grounding** in the Web Search provider list;
+   - Enter your **API Key**, optional **Base URL** (for reverse proxies / gateways), and optional **Preferred Model** (e.g. `gemini-4-hydrogen` or `gemini-3.8-flash`), then click **Save**;
+   - Credentials and metadata are saved directly to OpenCode's `opencode.db` integration store and take effect immediately on the next search.
+2. **Settings → OpenCode → Plugins**:
+   - Add `"opencode-gemini-grounding"` or edit its full plugin `options` JSON (such as `fallbackModels`, `thinkingLevel`, `authMode`, `headers`, `requestTimeoutMs`, `timeoutMs`, `cacheTtlMs`, `setDefaultWebsearch`).
 
 ---
 
@@ -152,7 +171,7 @@ When invoking via custom tools (`google_grounding` or `websearch_cited`), the fo
 | Argument | Type | Required | Description |
 | :--- | :--- | :---: | :--- |
 | `query` | `string` | **Yes** | The question or natural language search query. |
-| `model` | `string` | No | Optional Gemini model ID (e.g. `gemini-3.5-flash-lite`, `gemini-3.8-flash`, `gemini-3.7-flash`, `gemini-3.1-flash-lite`). Defaults to configured model. |
+| `model` | `string` | No | Optional Gemini model ID (e.g. `gemini-4-hydrogen`, `gemini-3.8-flash`, `gemini-3.5-flash-lite`, `gemini-3.7-flash`). Provider prefixes and `#variant` suffixes are stripped automatically. |
 | `context` | `string` | No | Optional extra background, constraints, or guidelines for the search. |
 | `max_sources` | `number` | No | Maximum number of grounded source links to return (1-20, default: `8`). |
 
@@ -164,25 +183,35 @@ When invoking via custom tools (`google_grounding` or `websearch_cited`), the fo
 1. Dynamic `model` argument provided in the tool call.
 2. `options.model` in `opencode.jsonc` plugin options.
 3. `OPENCODE_GOOGLE_MODEL` environment variable.
-4. `providers.google.model` or `providers.google.settings.model` in `~/.config/opencode/opencode.jsonc`.
-5. `providers.google.options.websearch_cited.model`.
-6. Default fallback: `gemini-3.5-flash-lite`.
+4. `metadata.model` saved in OpenChamber Web Search UI (`google-grounding` credential in `opencode.db` / `ctx.integration`).
+5. `providers.google.model` / `providers.google.settings.model` (from live `ctx.provider`, project `opencode.json(c)` / `.opencode/opencode.json(c)`, or global `~/.config/opencode/opencode.json(c)`).
+6. Default fallback: `gemini-4-hydrogen`.
 
 > **Automatic Fallback Chain**:
-> If a model fails or hits rate limits, the plugin tries the next candidate automatically:
-> `[Requested Model] -> gemini-3.5-flash-lite -> gemini-3.8-flash -> gemini-3.7-flash -> gemini-3.1-flash-lite -> gemini-3-flash-preview -> gemini-2.5-flash`.
+> If a model fails, hits rate limits, or returns empty/`MAX_TOKENS`/blocked output, the plugin tries the next candidate automatically:
+> `[Requested Model] -> gemini-4-hydrogen -> gemini-3.8-flash -> gemini-3.5-flash-lite -> gemini-3.7-flash -> gemini-3.1-flash-lite -> gemini-3-flash-preview -> gemini-2.5-flash`.
+> You can override the default list via `options.fallbackModels` or the comma-separated `OPENCODE_GOOGLE_FALLBACK_MODELS` environment variable.
 
-### 2. Base URL (API Gateway)
-1. `options.baseURL` in `opencode.jsonc` plugin options.
+### 2. Base URL & Headers
+1. `options.baseURL` in plugin options.
 2. `OPENCODE_GOOGLE_BASE_URL` environment variable.
-3. `providers.google.settings.baseURL` in `~/.config/opencode/opencode.jsonc`.
-4. Default: `https://generativelanguage.googleapis.com/v1beta` (Official Google API).
+3. `metadata.baseURL` saved in OpenChamber Web Search UI (`google-grounding` credential).
+4. `ctx.provider` / project & global `opencode.json(c)` `providers.google.settings.baseURL` (or `options.baseURL`).
+5. Default: `https://generativelanguage.googleapis.com/v1beta` (Official Google API).
 
-### 3. API Key
-1. `options.apiKey` in `opencode.jsonc` plugin options (supports `{env:VAR}`).
-2. `OPENCODE_GOOGLE_API_KEY` / `GOOGLE_API_KEY` / `GEMINI_API_KEY` environment variables.
-3. Stored OpenCode credentials in `~/.local/share/opencode/auth.json` (`google.key` or `indor.key`).
-4. `providers.google.settings.apiKey` in `opencode.jsonc`.
+Custom headers from `providers.google.headers` / `settings.headers` / `options.headers` and `pluginOptions.headers` are merged automatically.
+
+### 3. API Key & Credentials
+1. `options.apiKey` in plugin options (supports `{env:VAR}` and `{file:path/to/secret}`).
+2. `OPENCODE_GOOGLE_API_KEY` environment variable.
+3. Stored OpenCode V2.2.6+ SQLite credential (`~/.local/share/opencode/opencode.db` `credential` table / `ctx.integration`) for `"google-grounding"` (or `options.integrationId`).
+4. `GOOGLE_API_KEY` / `GOOGLE_GENERATIVE_AI_API_KEY` / `GEMINI_API_KEY` environment variables.
+5. Stored OpenCode credentials (`opencode.db` or legacy `~/.local/share/opencode/auth.json`) for `"google"` / `"indor"` (supports both API keys and OAuth `access` tokens).
+6. `providers.google.settings.apiKey` in live `ctx.provider`, project, or global `opencode.json(c)`.
+
+### 4. Thinking Level & Auth Mode
+- **`thinkingLevel` / `OPENCODE_GOOGLE_THINKING_LEVEL`**: Left unset by default so `gemini-4-hydrogen` keeps its native server-side `HIGH` thinking depth. Set to `"LOW"`, `"MEDIUM"`, `"HIGH"`, or `"XHIGH"` to explicitly inject `generationConfig.thinkingConfig.thinkingLevel` for Gemini 3/4 models (`/^gemini-[34]/i`).
+- **`authMode` / `OPENCODE_GOOGLE_AUTH_MODE`**: Defaults to `"auto"` (sends `x-goog-api-key` only on `*.googleapis.com`, `Authorization: Bearer` only for OAuth, and both headers on third-party proxies). Can be forced to `"x-goog-api-key"`, `"bearer"`, or `"both"`.
 
 ---
 

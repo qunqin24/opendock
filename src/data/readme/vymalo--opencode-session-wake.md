@@ -1,0 +1,378 @@
+# 🧰 OpenCode Toolbelt
+
+> A dozen small plugins that make [OpenCode](https://opencode.ai) feel like it's running on your own infrastructure — OAuth-secured providers, repo/project-scoped auth, rich model metadata, polite rate-limiting, hands in a real browser, local utilities, and OpenTelemetry export — plus one umbrella that shares a single credential across the gateway and telemetry.
+
+<p>
+  <a href="https://github.com/ADORSYS-GIS/lightbridge-opencode-toolbeit/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/ADORSYS-GIS/lightbridge-opencode-toolbeit/actions/workflows/ci.yml/badge.svg"></a>
+  <a href="LICENSE"><img alt="license: MIT" src="https://img.shields.io/badge/license-MIT-blue"></a>
+  <img alt="node: >=22" src="https://img.shields.io/badge/node-%3E%3D22-339933?logo=node.js&logoColor=white">
+  <img alt="pnpm workspace" src="https://img.shields.io/badge/pnpm-workspace-F69220?logo=pnpm&logoColor=white">
+  <img alt="built with TypeScript" src="https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white">
+  <img alt="formatted with Biome" src="https://img.shields.io/badge/Biome-clean-60A5FA?logo=biome&logoColor=white">
+</p>
+
+<p>
+  <a href="https://www.npmjs.com/package/@vymalo/opencode-oauth2"><img alt="@vymalo/opencode-oauth2" src="https://img.shields.io/npm/v/@vymalo/opencode-oauth2?label=oauth2&color=CB3837&logo=npm"></a>
+  <a href="https://www.npmjs.com/package/@vymalo/opencode-models-info"><img alt="@vymalo/opencode-models-info" src="https://img.shields.io/npm/v/@vymalo/opencode-models-info?label=models-info&color=CB3837&logo=npm"></a>
+  <a href="https://www.npmjs.com/package/@vymalo/opencode-ratelimit"><img alt="@vymalo/opencode-ratelimit" src="https://img.shields.io/npm/v/@vymalo/opencode-ratelimit?label=ratelimit&color=CB3837&logo=npm"></a>
+  <a href="https://www.npmjs.com/package/@vymalo/opencode-browser"><img alt="@vymalo/opencode-browser" src="https://img.shields.io/npm/v/@vymalo/opencode-browser?label=browser&color=CB3837&logo=npm"></a>
+  <a href="https://www.npmjs.com/package/@vymalo/opencode-browser-mcp"><img alt="@vymalo/opencode-browser-mcp" src="https://img.shields.io/npm/v/@vymalo/opencode-browser-mcp?label=browser-mcp&color=CB3837&logo=npm"></a>
+  <a href="https://www.npmjs.com/package/@vymalo/opencode-devtools"><img alt="@vymalo/opencode-devtools" src="https://img.shields.io/npm/v/@vymalo/opencode-devtools?label=devtools&color=CB3837&logo=npm"></a>
+  <a href="https://www.npmjs.com/package/@vymalo/opencode-devtools-mcp"><img alt="@vymalo/opencode-devtools-mcp" src="https://img.shields.io/npm/v/@vymalo/opencode-devtools-mcp?label=devtools-mcp&color=CB3837&logo=npm"></a>
+  <a href="https://www.npmjs.com/package/@vymalo/opencode-otel"><img alt="@vymalo/opencode-otel" src="https://img.shields.io/npm/v/@vymalo/opencode-otel?label=otel&color=CB3837&logo=npm"></a>
+  <a href="https://www.npmjs.com/package/@vymalo/opencode-repo-auth"><img alt="@vymalo/opencode-repo-auth" src="https://img.shields.io/npm/v/@vymalo/opencode-repo-auth?label=repo-auth&color=CB3837&logo=npm"></a>
+  <a href="https://www.npmjs.com/package/@vymalo/opencode-lightbridge"><img alt="@vymalo/opencode-lightbridge" src="https://img.shields.io/npm/v/@vymalo/opencode-lightbridge?label=lightbridge&color=CB3837&logo=npm"></a>
+  <a href="https://www.npmjs.com/package/@vymalo/opencode-auth-core"><img alt="@vymalo/opencode-auth-core" src="https://img.shields.io/npm/v/@vymalo/opencode-auth-core?label=auth-core&color=CB3837&logo=npm"></a>
+  <a href="https://www.npmjs.com/package/@vymalo/opencode-core-otel"><img alt="@vymalo/opencode-core-otel" src="https://img.shields.io/npm/v/@vymalo/opencode-core-otel?label=core-otel&color=CB3837&logo=npm"></a>
+  <a href="https://www.npmjs.com/package/@vymalo/opencode-provider-sync"><img alt="@vymalo/opencode-provider-sync" src="https://img.shields.io/npm/v/@vymalo/opencode-provider-sync?label=provider-sync&color=CB3837&logo=npm"></a>
+</p>
+
+---
+
+OpenCode is great at talking to providers — as long as your provider is a hosted SaaS with a static API key and a tidy `/v1/models` endpoint. The moment you put your models behind a corporate IdP, a self-hosted gateway, a per-window rate limit, or you want the model to actually *click around a web page*, you're on your own.
+
+The **OpenCode Toolbelt** is the set of `@vymalo/*` plugins that fill those gaps. Each one is small, **auth-agnostic where it can be**, independently published, and does exactly one job. Reach for one, or snap several onto the same provider — they're designed to stack.
+
+## What's in the belt
+
+| 🔧 Tool | npm | What it does |
+| --- | --- | --- |
+| **oauth2** | [`@vymalo/opencode-oauth2`](packages/opencode-oauth2) | Wire up OpenAI-compatible providers sitting behind **OAuth2 / OIDC** — five auth flows, dynamic model discovery, a persistent token cache, and a fresh `Authorization` header on every request. No long-lived keys in your config. |
+| **repo-auth** | [`@vymalo/opencode-repo-auth`](packages/opencode-repo-auth) | Bill each request to the **git project you're working on**: a single RFC 8693 exchange mints a short-lived, project-scoped bearer (`project_id` sealed server-side), injected per request, fail-closed. Reuses `auth-core`. |
+| 🌉 **lightbridge** | [`@vymalo/opencode-lightbridge`](packages/opencode-lightbridge) | The **umbrella** — one login, one credential shared across the **gateway** bearer *and* **OTEL** export. Composes `auth-core` + `core-otel` over a single `TokenRuntime`; each module opt-in, MCP out of scope. |
+| **models-info** | [`@vymalo/opencode-models-info`](packages/opencode-models-info) | Enrich your model list with real **metadata** — context length, output limit, USD/M-token cost, modalities, and `tool_call` / `reasoning` / `attachment` flags — from any OpenRouter-shaped `/models` endpoint. |
+| **ratelimit** | [`@vymalo/opencode-ratelimit`](packages/opencode-ratelimit) | Teach a provider to **respect the rate-limit headers** your gateway already sends. Reads Envoy / IETF draft-03 `x-ratelimit-*`, throttles before you hit the wall, and backs off + retries on `429`. |
+| **session-wake** | [`@vymalo/opencode-session-wake`](packages/opencode-session-wake) | **Wake a running session when a GitHub thread changes.** Watches an issue/PR or workflow runs, keeps a durable cursor under the state root, dedupes by comment id, and injects a short *untrusted* notice — never the comment body, never a GitHub write. After a restart, `wake_list` shows orphans with the same plugin-instance project identity and `wake_adopt` / `wake_resume` hand ownership to the new session with unread events and shared cursor intact (instance-scoped, not per-session isolation). |
+| **browser** | [`@vymalo/opencode-browser`](packages/opencode-browser) | Give the model **hands in a real browser**: 34 `browser_*` tools (open, click, type, scroll, screenshot, snapshot, human-in-the-loop feedback…) over a localhost bridge that a companion extension drives. |
+| **browser-mcp** | [`@vymalo/opencode-browser-mcp`](packages/opencode-browser-mcp) | The same browser tools, exposed as an **MCP stdio server** — so Claude Code, Cursor, Cline, and any other MCP client can drive the extension too. |
+| **devtools** | [`@vymalo/opencode-devtools`](packages/opencode-devtools) | A belt of everyday **local utilities** the model can call — `math` (precise eval, units, stats), `codec` (base64/hex/url, JWT decode, gzip), `crypto` (hash/hmac, uuid/ulid, keypairs), `datetime` (parse/format/diff, timezones, cron), `convert` (JSON/YAML/TOML/CSV + JSONPath), and an opt-in, SSRF-guarded `http` client. Deterministic, zero-auth, no server. |
+| **devtools-mcp** | [`@vymalo/opencode-devtools-mcp`](packages/opencode-devtools-mcp) | The same utilities, exposed as an **MCP stdio server** for any MCP client. |
+| **otel** | [`@vymalo/opencode-otel`](packages/opencode-otel) | See what your agent is actually doing and costing: **OTLP traces, metrics and logs** — real USD cost, all five token types (cache read/write included), tool results, permission decisions, API errors, lines of code, repository metadata, and export-failure visibility. Inert until an endpoint is configured. What [Claude Code](https://code.claude.com/docs/en/monitoring-usage) and [Codex](https://learn.chatgpt.com/docs/config-file/config-advanced) export, for OpenCode. |
+| 🧩 **extension** | [`apps/browser-extension`](apps/browser-extension) | The companion Chromium + Firefox extension that the browser plugin / MCP server talk to. Private — ships as a Release asset and on the Chrome Web Store / Firefox AMO. |
+
+```mermaid
+flowchart LR
+    OC([OpenCode / MCP client])
+    subgraph belt[🧰 OpenCode Toolbelt]
+        direction TB
+        A[oauth2]
+        M[models-info]
+        R[ratelimit]
+        B[browser]
+    end
+    OC --> belt
+    A -->|Bearer token| IdP[(OAuth / OIDC server)]
+    M -->|metadata| Meta[(/models endpoint)]
+    R -->|x-ratelimit-*| GW[(Gateway)]
+    B <-->|ws bridge| Ext[Browser extension]
+    belt --> Up[(Your provider API)]
+```
+
+> [!TIP]
+> Every plugin here works with **any** auth scheme — static API key, OAuth2, or none — *except* oauth2 itself, which is the one doing the authenticating. Enable only what you need.
+
+## Quickstart
+
+Add the plugins you want to your OpenCode config and declare a provider. The smallest possible setup — an OAuth2-protected provider that discovers its own models:
+
+```jsonc
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugins": [{ "package": "@vymalo/opencode-oauth2" }],
+  "providers": {
+    "example-ai": {
+      "name": "Example AI",
+      "settings": {
+        "baseURL": "https://api.example.com/v1",
+        "oauth2": {
+          "issuer": "https://auth.example.com",
+          "clientId": "opencode-client",
+          "scopes": ["openid", "profile", "offline_access"],
+          "syncIntervalMinutes": 60
+        }
+      }
+    }
+  }
+}
+```
+
+On boot, oauth2 runs the auth flow, caches the token, discovers your models, and OpenCode treats `example-ai` like any other provider. For the full configuration reference (every flow, every field, the alternative plugin-level `options.servers` layout), see [`packages/opencode-oauth2/README.md`](packages/opencode-oauth2/README.md).
+
+> [!NOTE]
+> The slickest way to ship this to a team is **not** an `opencode.json` at all — a server publishes a `.well-known/opencode` document and `opencode auth login <url>` adopts the provider + plugin setup automatically. See [`docs/well-known.md`](docs/well-known.md).
+
+---
+
+## 🔐 oauth2 — bring your own OAuth-protected gateway
+
+Most OpenCode providers assume a static bearer key. That works for hosted SaaS, but breaks down the moment your models sit behind a corporate IdP (Keycloak, Auth0, Okta, Azure AD), a self-hosted gateway with short-lived tokens, a multi-tenant setup where each user authenticates as themselves, or a CI runner that has no business carrying a long-lived secret.
+
+`@vymalo/opencode-oauth2` handles the OAuth dance, caches tokens, refreshes silently, and feeds OpenCode a normal-looking provider with a fresh `Authorization` header on every request.
+
+- **Five auth flows** — pick what matches your runtime:
+  - `authorization_code` — interactive PKCE login (default)
+  - `device_code` — RFC 8628, for browserless user auth
+  - `client_credentials` — machine-to-machine with a `clientSecret`
+  - `jwt_bearer` — RFC 7523 federated identity (GitHub Actions OIDC, Kubernetes SA tokens) — **no long-lived secret in CI**
+  - `token_exchange` — RFC 8693 federated identity with explicit audience targeting
+- **Dynamic model discovery** from `/v1/models` — no hand-maintained model lists
+- **Display-name normalization** so `glm-5` shows up as `GLM 5`
+- **Persistent token cache** with automatic refresh, atomic writes, `0o600`
+- **`model.request` session hook** injects a fresh bearer per request
+- **Strict refresh-token policy** — a user-flow session is either fully renewable or it doesn't get cached (machine flows re-acquire on every expiry)
+
+**Federated identity (CI / Kubernetes):** use `jwt_bearer` or `token_exchange` with the platform's own short-lived OIDC token as the subject — nothing long-lived is ever cached. End-to-end recipes in [`docs/github-actions.md`](docs/github-actions.md) and [`docs/kubernetes.md`](docs/kubernetes.md); the shipped reusable workflow at [`.github/workflows/opencode-run.yml`](.github/workflows/opencode-run.yml) covers the common `opencode run` case.
+
+## 📊 models-info — real metadata for your model list
+
+A plain OpenAI-compatible `/v1/models` returns almost nothing useful (`id`, `object`, `owned_by`). `@vymalo/opencode-models-info` enriches each model with the rich stuff — context length, output limit, USD/M-token cost, modalities, and `tool_call` / `reasoning` / `attachment` flags — from any **OpenRouter-shaped** metadata endpoint.
+
+```jsonc
+{
+  "plugins": ["@vymalo/opencode-models-info"],
+  "providers": {
+    "my-provider": {
+      "package": "aisdk:@ai-sdk/openai-compatible",
+      "settings": {
+        "baseURL": "https://api.example.com/v1",
+        "modelsInfoUrl": "https://api.example.com/v1/models"
+      },
+      "models": { "my-model-large": {} }
+    }
+  }
+}
+```
+
+It enriches models through `ctx.model.transform` and the merge is **upstream-wins** — a field you (or another plugin) already set is never clobbered, so it's safe to enable globally. Full reference: [`packages/opencode-models-info/README.md`](packages/opencode-models-info/README.md); composition + caching details in [`docs/models-info.md`](docs/models-info.md).
+
+## 🚦 ratelimit — cooperate with your gateway instead of fighting it
+
+`@vymalo/opencode-ratelimit` makes a provider respect the rate-limit headers your gateway already emits. It reads the IETF draft-03 triple from [Envoy Gateway](https://gateway.envoyproxy.io/docs/tasks/traffic/global-rate-limit/) (`x-ratelimit-limit` / `-remaining` / `-reset`), proactively pauses new requests once the window is exhausted, and backs off + retries on `429` — so a burst cooperates with the gateway instead of earning a wall of errors.
+
+```jsonc
+{
+  "plugins": ["@vymalo/opencode-ratelimit"],
+  "providers": {
+    "my-provider": {
+      "package": "aisdk:@ai-sdk/openai-compatible",
+      "settings": {
+        "baseURL": "https://api.example.com/v1",
+        "rateLimit": { "maxWaitMs": 0, "maxRetries": 5 }
+      }
+    }
+  }
+}
+```
+
+It plugs into OpenCode's native HTTP seams — `session.hook("http.request")` gates each call, `session.hook("http.response")` reads the headers, and `session.hook("retry")` decides a `429` (the host sleeps the delay) — so it no longer wraps the provider's `fetch`. It supports `tiers` (wait through a 60s burst reset, but error fast on a multi-day budget reset) and `scope: "model"` (per-model cooldown buckets). Full reference: [`packages/opencode-ratelimit/README.md`](packages/opencode-ratelimit/README.md); the throttle/backoff state machine in [`docs/ratelimit.md`](docs/ratelimit.md).
+
+## 🖐️ browser — give the model hands
+
+`@vymalo/opencode-browser` registers `browser_*` tools and hosts a localhost WebSocket **bridge** that a companion Chromium/Firefox **extension** dials. The model drives real tabs — organized into **named groups** — with **34 tools** across four groups: `page` (observe), `control` (drive), `debug` (powerful, off by default), and `interactive` (human-in-the-loop feedback, off by default).
+
+```jsonc
+{
+  "plugins": [
+    { "package": "@vymalo/opencode-browser", "options": { "port": 4517 } }
+  ]
+}
+```
+
+Because an extension can't host a server, the plugin *is* the server and the extension connects out to it. On first run the plugin logs a generated `token` — paste it (and `ws://127.0.0.1:4517`) into the extension dashboard, hit *Save & reconnect*, and you're live. Build/load the extension from [`apps/browser-extension`](apps/browser-extension).
+
+Targeting is via stable `browser_snapshot` refs or CSS selectors / coordinates. On Chromium it uses the trusted CDP executor (`chrome.debugger`, with the visible "being debugged" banner); on Firefox or when the debugger is unavailable it falls back to a content-script executor with scroll-and-stitch full-page capture. Screenshots are written to disk (tool output is text-only) — view them with the `read` tool.
+
+**Beyond OpenCode** — [`@vymalo/opencode-browser-mcp`](packages/opencode-browser-mcp) hosts the same bridge and exposes the same tools over the Model Context Protocol, so any MCP client (Claude Code, Cursor, Cline, …) can drive the extension; screenshots come back as inline images. The plugin and MCP server share **one tool catalog**, so they never drift.
+
+> [!WARNING]
+> The bridge binds `127.0.0.1` + token only, but it grants control of a **real browser profile**. Use a dedicated / throwaway Chrome profile. Security model for the whole suite: [`docs/security.md`](docs/security.md).
+
+---
+
+## 🧰 Devtools — local utilities
+
+`@vymalo/opencode-devtools` gives the model a belt of everyday, **deterministic** tools that run in-process — no bridge, no auth, no network (except the opt-in `http` group). They're organized into **groups** (like the browser plugin), with the five offline groups on by default:
+
+```jsonc
+{
+  "plugins": [
+    "@vymalo/opencode-devtools",
+    // or enable the http group (network egress, off by default):
+    { "package": "@vymalo/opencode-devtools", "options": { "groups": ["math", "codec", "crypto", "datetime", "convert", "http"] } }
+  ]
+}
+```
+
+`math` (precise eval, unit & base conversion, stats) · `codec` (base64/hex/url, JWT decode, gzip) · `crypto` (hash/hmac, uuid v4/v7, ulid, random, keypairs) · `datetime` (parse/format/diff, timezones, cron explain + next-runs) · `convert` (JSON/YAML/TOML/CSV + JSONPath) · `http` (request + GraphQL, SSRF-guarded, opt-in).
+
+**Beyond OpenCode** — [`@vymalo/opencode-devtools-mcp`](packages/opencode-devtools-mcp) exposes the same catalog over MCP for any client. Full reference: [`docs/devtools.md`](docs/devtools.md).
+
+> **Adopt, don't rebuild.** We deliberately did **not** build plugins for memory, Android/iOS, or databases — mature MCP servers already cover those. See [`docs/recommended-mcps.md`](docs/recommended-mcps.md) for the ones we recommend wiring in instead.
+
+---
+
+## 🔗 repo-auth — bill usage to the project you're in
+
+`@vymalo/opencode-repo-auth` scopes each gateway request to the **project** a developer is working on, the way CI already attributes a run. The developer logs in once (device-code / authorization-code via `@vymalo/opencode-auth-core`), and every request from an enrolled repo carries a **project-scoped bearer** minted by a single RFC 8693 token exchange presenting `project_id` — no `audience`, no mint step. The project token is short-lived and never refreshed; renewal is a fresh exchange from the offline human root. Injection is per-request and **fail-closed**: an exchange failure injects no header, so the gateway 401s rather than running under the wrong identity.
+
+```jsonc
+{
+  "plugins": ["@vymalo/opencode-repo-auth"],
+  "providers": {
+    "gateway": {
+      "settings": {
+        "baseURL": "https://api.example.com/v1",
+        "repoAuth": { "projectId": "proj-123", "issuer": "https://auth.example.com", "clientId": "opencode-cli", "scopes": ["openid", "offline_access"] }
+      }
+    }
+  }
+}
+```
+
+Never run it on the same provider as `oauth2` (both set `Authorization`). Full reference: [`packages/opencode-repo-auth/README.md`](packages/opencode-repo-auth/README.md); the exchange contract in [ADR-0011](docs/adr/0011-repo-auth-project-id-token-exchange.md).
+
+## 🌉 lightbridge — one credential for the gateway *and* telemetry
+
+`@vymalo/opencode-lightbridge` is the **umbrella**. Instead of stacking `oauth2`/`repo-auth` for the gateway and `otel` for telemetry — each holding its own credential in its own store — it builds **one** `TokenRuntime`, logs in once, and shares that single project-scoped token across both egresses. The gateway and the OTLP collector validate the same issuer + audience, so one credential authenticates everything.
+
+```jsonc
+{
+  "plugins": [
+    {
+      "package": "@vymalo/opencode-lightbridge",
+      "options": {
+        "auth": { "issuer": "https://authz.example.com/realms/lightbridge", "clientId": "opencode-cli", "scopes": ["openid", "offline_access"], "authFlow": "device_code" },
+        "gateway": { "providers": ["gateway"] },
+        "otel": { "endpoint": "http://localhost:4318" }
+      }
+    }
+  ]
+}
+```
+
+`gateway` and `otel` are each independent opt-ins; `auth` alone is a valid, inert config. `projectId` is **optional** — omit it and the backend mints a token for your **default project**. It composes `@vymalo/opencode-auth-core` (token lifecycle) + `@vymalo/opencode-core-otel` (the OTEL engine); MCP is deliberately out of scope. Full reference: [`packages/opencode-lightbridge/README.md`](packages/opencode-lightbridge/README.md) and [`docs/lightbridge.md`](docs/lightbridge.md).
+
+---
+
+## 🧱 Stacking the belt
+
+The plugins are decoupled at the import level, so you can snap several onto one provider. Order matters in one place — list `@vymalo/opencode-oauth2` **before** `@vymalo/opencode-models-info` (which inherits the bearer oauth2 stamps on the provider headers when it fetches metadata) and before `@vymalo/opencode-lightbridge` (which looks for the `settings.oauth2` marker oauth2 stamps). ratelimit, browser, devtools and otel have no ordering requirement:
+
+```jsonc
+{
+  "plugins": [
+    "@vymalo/opencode-oauth2",
+    "@vymalo/opencode-models-info",
+    "@vymalo/opencode-ratelimit"
+  ],
+  "providers": {
+    "my-provider": {
+      "package": "aisdk:@ai-sdk/openai-compatible",
+      "settings": {
+        "baseURL": "https://api.example.com/v1",
+        "oauth2": {
+          "issuer": "https://auth.example.com",
+          "clientId": "opencode-client",
+          "scopes": ["openid", "profile", "offline_access"]
+        },
+        "modelsInfoUrl": "https://api.example.com/v1/models",
+        "rateLimit": { "maxWaitMs": 0, "maxRetries": 5 }
+      }
+    }
+  }
+}
+```
+
+On boot: oauth2 authenticates, discovers models from `/v1/models`, and stamps the access token onto the provider headers → models-info fetches `modelsInfoUrl` with that token and merges richer metadata → ratelimit gates every request on the gateway's window. No `models` block to maintain, no `Authorization` header to manage — it's all automatic.
+
+## 📚 Documentation
+
+Full index: [`docs/README.md`](docs/README.md). The highlights:
+
+| Page | When you need it |
+| --- | --- |
+| [`docs/migration-v2.md`](docs/migration-v2.md) | Upgrading from `0.17.x` to the OpenCode v2 plugin API — config renames, per-plugin opt-in keys, `effect` as a peer dependency, plugin ordering, removals |
+| [`docs/architecture.md`](docs/architecture.md) | Hooks, token lifecycle per flow, cache layout, sync scheduler, logging |
+| [`docs/well-known.md`](docs/well-known.md) | How `.well-known/opencode` distributes a provider + plugin setup to clients |
+| [`docs/models-info.md`](docs/models-info.md) | Metadata enrichment — composition with any auth scheme, caching, failure modes |
+| [`docs/ratelimit.md`](docs/ratelimit.md) | Reading `x-ratelimit-*`, the throttle/backoff state machine, tiers, the timeout caveat |
+| [`docs/browser.md`](docs/browser.md) | Browser automation — topology, wire protocol, full tool reference, executors, multi-client routing, store publishing |
+| [`docs/devtools.md`](docs/devtools.md) | Devtools utilities — tool groups, full reference, the `math`/`http` security model, plugin + MCP config |
+| [`docs/otel.md`](docs/otel.md) | OpenTelemetry export — config precedence, every metric/log/span, privacy & cardinality |
+| [`docs/lightbridge.md`](docs/lightbridge.md) | The single-auth umbrella — one `TokenRuntime` across the gateway + OTEL, config, the MCP-out-of-scope rationale |
+| [`docs/recommended-mcps.md`](docs/recommended-mcps.md) | Mature third-party MCP servers to **adopt** (memory, android/iOS, database) instead of rebuilding |
+| [`docs/security.md`](docs/security.md) | Consolidated security model across all plugins — token cache, the browser bridge, blast radius |
+| [`docs/github-actions.md`](docs/github-actions.md) | CI without stored secrets — Keycloak/Auth0/Okta setup, reusable workflow, matrix, fork-PR limits |
+| [`docs/kubernetes.md`](docs/kubernetes.md) | `CronJob` / `Job` / `Deployment` with projected SA tokens, multi-provider pods, RBAC |
+| [`docs/local-development.md`](docs/local-development.md) | Sandbox setup, the plugin re-export trick, forcing re-auth, dev-only `env` subject token |
+| [`docs/troubleshooting.md`](docs/troubleshooting.md) | Symptom-keyed fixes — `redirect_uri_mismatch`, model discovery 403, `invalid_client`, token rotation |
+| [`docs/adr/`](docs/adr/) | Architecture Decision Records — load-bearing choices and *why* (e.g. ws, not `Bun.serve`/socket.io) |
+
+## 🗂️ Workspace layout
+
+This is a [pnpm](https://pnpm.io) monorepo. Fourteen packages publish to npm under `@vymalo`; four are private.
+
+| Package | Published as | |
+| --- | --- | --- |
+| [`packages/opencode-oauth2`](packages/opencode-oauth2) | `@vymalo/opencode-oauth2` | OAuth2/OIDC auth + model discovery |
+| [`packages/opencode-models-info`](packages/opencode-models-info) | `@vymalo/opencode-models-info` | Auth-agnostic model metadata enrichment |
+| [`packages/opencode-ratelimit`](packages/opencode-ratelimit) | `@vymalo/opencode-ratelimit` | Auth-agnostic rate-limit awareness |
+| [`packages/opencode-session-wake`](packages/opencode-session-wake) | `@vymalo/opencode-session-wake` | Durable GitHub thread watch that wakes the owning session |
+| [`packages/opencode-browser`](packages/opencode-browser) | `@vymalo/opencode-browser` | Auth-agnostic browser automation + localhost bridge |
+| [`packages/opencode-browser-mcp`](packages/opencode-browser-mcp) | `@vymalo/opencode-browser-mcp` | MCP server exposing the browser tools to any MCP client |
+| [`packages/opencode-devtools`](packages/opencode-devtools) | `@vymalo/opencode-devtools` | Auth-agnostic local developer utilities |
+| [`packages/opencode-devtools-mcp`](packages/opencode-devtools-mcp) | `@vymalo/opencode-devtools-mcp` | MCP server exposing the devtools utilities |
+| [`packages/opencode-otel`](packages/opencode-otel) | `@vymalo/opencode-otel` | Auth-agnostic OpenTelemetry export (traces, metrics, logs) |
+| [`packages/opencode-repo-auth`](packages/opencode-repo-auth) | `@vymalo/opencode-repo-auth` | Repo/project-scoped bearer via RFC 8693 exchange |
+| [`packages/opencode-lightbridge`](packages/opencode-lightbridge) | `@vymalo/opencode-lightbridge` | Umbrella — one credential across the gateway + OTEL |
+| [`packages/opencode-auth-core`](packages/opencode-auth-core) | `@vymalo/opencode-auth-core` | Shared OAuth2/OIDC token core (oauth2, repo-auth, lightbridge) |
+| [`packages/opencode-core-otel`](packages/opencode-core-otel) | `@vymalo/opencode-core-otel` | Shared OpenTelemetry engine (otel, lightbridge) |
+| [`packages/opencode-provider-sync`](packages/opencode-provider-sync) | `@vymalo/opencode-provider-sync` | Shared provider-registration + model-sync engine (oauth2 today; lightbridge next) |
+| [`apps/browser-extension`](apps/browser-extension) | _private_ | Companion Chromium/Firefox extension |
+| [`packages/plugin-bundle`](packages/plugin-bundle) | _private_ | Rolldown single-file distribution of oauth2 |
+
+## 🛠️ Development
+
+```sh
+pnpm install          # bootstrap workspace
+pnpm -r build         # emit all packages to dist/ (oxc, no type checking)
+pnpm -r typecheck     # tsc --noEmit across packages
+pnpm -r test          # fast vitest run (no coverage)
+pnpm coverage         # tests + per-package coverage thresholds (what CI runs)
+pnpm lint             # biome lint
+pnpm format:check     # biome format (no write)
+```
+
+Pre-push gate (run all five before opening a PR):
+
+```sh
+pnpm -r build && pnpm -r typecheck && pnpm coverage && pnpm lint && pnpm format:check
+```
+
+> [!NOTE]
+> A green `pnpm build` says nothing about types — it emits with [oxc](https://oxc.rs) and never
+> type-checks. `pnpm typecheck` is the only type-safety gate. See
+> [ADR-0010](docs/adr/0010-oxc-build-isolated-declarations.md).
+
+Per-package iteration is much faster:
+
+```sh
+pnpm --filter @vymalo/opencode-oauth2 test
+pnpm --filter @vymalo/opencode-browser build
+```
+
+For end-to-end usage against a local OpenCode install, see [GETTING_STARTED.md](GETTING_STARTED.md). For architecture, conventions, package layout, and the release process, see [CONTRIBUTING.md](CONTRIBUTING.md) and [`CLAUDE.md`](CLAUDE.md).
+
+## 🌟 Status
+
+Early but functional, and used in anger. All fourteen packages are published and on the same version line; the browser extension ships alongside as a Release asset and on the Chrome Web Store / Firefox AMO. Public API may still shift before `1.0` — roadmap in [`plans/prd.md`](plans/prd.md).
+
+**Still on OpenCode v1?** `0.18.0` and later need an OpenCode v2 host. `0.17.0` is the last v1-compatible release; install it with `@0.17.0` (or the `opencode-v1` dist-tag once published). It is frozen, with no backported fixes, so it defers the upgrade rather than avoiding it. See [Staying on v1](docs/migration-v2.md#staying-on-v1). The six packages without a per-package migration note (`auth-core`, `core-otel`, `provider-sync`, `browser`, `browser-mcp`, `devtools-mcp`) are covered here only, since their READMEs have no "Migrating from v1" section to extend.
+
+## 🤝 Contributing
+
+Issues and PRs are welcome — please open an issue first for substantial changes so we can align on scope. See [CONTRIBUTING.md](CONTRIBUTING.md) for bootstrap, the pre-push gate, conventions, package layout, and the release process.
+
+## 📄 License
+
+[MIT](LICENSE) © vymalo contributors

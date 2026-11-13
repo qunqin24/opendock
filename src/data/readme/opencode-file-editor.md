@@ -99,14 +99,19 @@ Restart OpenCode Desktop, then open the panel with `Ctrl+Shift+E`
 
 ## Compatibility
 
-| opencode-file-editor | OpenCode Desktop | `@opencode/plugin` |
-|---|---|---|
-| 0.1.x | 2.2.x | ^2.2.5 |
-| 0.2.x | 2.2.5+ | ^2.2.5 |
+| opencode-file-editor | OpenCode Desktop | `@opencode/plugin` | Launched on |
+|---|---|---|---|
+| 0.1.x | 2.2.x | ^2.2.5 | Windows |
+| 0.2.x | 2.2.5+ | ^2.2.5 | Windows |
 
 Tested against OpenCode Desktop 2.2.6. Each release checks the app's plugin-API
 major against the dependency before publishing, so a host upgrade fails the
 build instead of breaking users.
+
+"Launched on" is the honest column: only Windows has been run with the plugin.
+Path handling is unit-tested against Windows, macOS and Linux fixtures, and CI
+runs the whole suite on all three, but that is not the same as opening the app
+on a Mac. 0.2.1 was broken there for exactly that reason.
 
 ## Troubleshooting
 

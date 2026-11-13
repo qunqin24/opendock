@@ -1,10 +1,13 @@
 # WaitFeed
 
 > While your AI coding agent works, a slim news ticker appears in your
-> terminal — above the prompt in **OpenCode**, in the **Claude Code** or
+> terminal — above the prompt in **OpenCode** and **Claude Code**, in the
 > **Google Antigravity** statusline.
-> You start typing — it vanishes. `/news` opens a fullscreen reader.
-> **100% local. No ads, no accounts, no server, no API keys.**
+> It's gone the moment the agent stops — which is when you start typing.
+> `/feed` opens a fullscreen reader.
+> One key hides the card while the agent works (`Ctrl+O` in OpenCode,
+> `Ctrl+N` in Claude Code; `npx waitfeed toggle` anywhere). **100% local.
+> No ads, no accounts, no server, no API keys.**
 
 ## Why
 
@@ -28,8 +31,9 @@ one — staging self-contained bundles and writing each host's config
   ```jsonc
   { "plugins": ["waitfeed"] }
   ```
-- **Claude Code** — the wizard writes the `statusLine` command and the hook
-  set into `~/.claude/settings.json` (details:
+- **Claude Code** — the wizard stages the mod (the news card in the band
+  above the prompt, plus the `/feed` reader) and the data-cycle hook, and
+  binds `Ctrl+N` to hide the card (details:
   [`packages/waitfeed/claude/README.md`](packages/waitfeed/claude/README.md))
 - **Antigravity** — the wizard stages the statusline bundles and plugin
   config for `agy`
@@ -53,10 +57,15 @@ npm package and never touches the agent integrations — that is what
 
 | Host | Where the card lives | The card | Reader |
 | --- | --- | --- | --- |
-| OpenCode | above the prompt | headline + story written *only* from the fetched description + origin link | `/news` fullscreen reader — j/k move, Enter opens the link, keys 1–4 toggle channels |
-| Claude Code | statusline row | headline + feed description + origin link | channel toggles via `config.json` |
+| OpenCode | above the prompt | headline + the feed's own description + origin link | `/feed` fullscreen reader — j/k move, Enter opens the link, keys 1–4 toggle channels |
+| Claude Code | band above the prompt | headline + feed description + origin link | `/feed` pane — arrows move, Enter opens the link; channel toggles via `config.json` |
 | Antigravity (AGY) | agent statusline | headline + feed description + origin link | channel toggles via `config.json` |
 
+- **Show or hide it on demand.** While the agent works, one action flips the
+  card: **`Ctrl+O`** in OpenCode, **`Ctrl+N`** in Claude Code, and
+  **`npx waitfeed hide` / `show` / `toggle`** from any shell. Dismiss the
+  ticker to focus on code — even mid-run — and bring it back. Nothing
+  renders at idle on any host, so the terminal is your own between turns.
 - **One data dir, every agent.** All adapters read the same
   `~/.config/waitfeed/cache.json`; one fetch pipeline feeds every agent on
   the machine, and a channel disabled anywhere is disabled everywhere.
@@ -65,10 +74,9 @@ npm package and never touches the agent integrations — that is what
   wait-on-the-user. Two Claude windows never wake each other up.
 - **Keyless by design.** Hacker News · dev.to · GitHub trending · Reddit
   r/programming, plus your own RSS/Atom feeds (`rssUrls` in
-  `~/.config/waitfeed/config.json`, shown with an `RSS` badge). The
-  OpenCode story cards are written by the user's own session model — no
-  API, no key. Claude Code and Antigravity render headline mode: those
-  hosts have no keyless LLM path, and the project bans API keys.
+  `~/.config/waitfeed/config.json`, shown with an `RSS` badge). Every host
+  renders the same card — the headline, the feed's own description, and the
+  origin link. No API, no key, no LLM in the loop.
 
 Configuration is deliberately small — one file, `~/.config/waitfeed/config.json`:
 
@@ -77,12 +85,13 @@ Configuration is deliberately small — one file, `~/.config/waitfeed/config.jso
 | `sources` | all on | per-channel switches: `hn`, `devto`, `github`, `reddit` |
 | `rssUrls` | `[]` | your own RSS/Atom feeds (max 10; always run, `RSS` badge) |
 | `dwellSeconds` | `20` | card hold time during a run (5–120s) |
+| `newsMode` | `"auto"` | `"auto"` follows the agent, `"hide"` forces the card off even mid-run; `"show"` is a legacy alias of `"auto"`. Nothing renders at idle |
+| `newsModes` | — | optional per-host overrides (`opencode`/`claude`/`agy`), written by `npx waitfeed hide <host>` |
 
-**Honest limits:** items whose fetched description is too thin to write a
-real story from stay invisible instead of getting a padded look-alike; if
-OpenCode's story layer is unavailable, the whole view flips to
-plain-headline mode — the two looks are never mixed; the first run stays
-honestly empty for a few seconds until the first stories land.
+**Honest limits:** items whose fetched description is too thin are dropped
+rather than padded out with filler; a dead channel never empties the
+rotation, since recent items are carried for 36 hours; the first run stays
+honestly empty for a few seconds until the first fetch lands.
 
 The full manual (per-host behavior, dependency notes) ships with the
 package: [`packages/waitfeed/README.md`](packages/waitfeed/README.md), also
@@ -96,12 +105,11 @@ shown on [npm](https://www.npmjs.com/package/waitfeed).
      ▼
  ~/.config/waitfeed/cache.json        ◄── the only shared state
      │
-     ├─ opencode/   OpenTUI Solid slot renders the cards; /news reader;
-     │              stories generated in-session by the user's own model
-     ├─ claude/     statusLine renders the card; official hooks feed a
-     │              per-session activity ledger; a settings flip re-runs the
-     │              statusline instantly on busy↔idle; a transcript watcher
-     │              makes Esc-interrupts instant (Claude fires no hook then)
+     ├─ opencode/   OpenTUI Solid slot renders the cards; /feed reader
+     ├─ claude/ · claude-mod/
+     │              the mod draws the card in the band above the prompt
+     │              (only while Claude works — the host's own isWorking) and
+     │              the /feed reader pane; claude/ runs the data cycle
      └─ agy/        statusline renders the card from the agent_state JSON
 ```
 
@@ -122,9 +130,9 @@ Design decisions worth reading the code for:
 ```
 packages/waitfeed/     the npm package — publish root (package.json, LICENSE)
   core/                host-agnostic pipeline & rendering decisions
-  opencode/ · claude/ · agy/       the three host adapters
+  opencode/ · claude/ · claude-mod/ · agy/   the host adapters
   bin.mjs              `npx waitfeed init` onboarding wizard
-tests/                 9 suites: unit + built-bundle E2E (plain Node spawns)
+tests/                 11 suites: unit + built-bundle E2E (plain Node spawns)
 frontend/              the Next.js landing page (links here from hero & navbar)
 scripts/               feed channel health probe
 ```
@@ -144,13 +152,15 @@ PRs welcome — keep them small; CI must stay green.
 ## Privacy
 
 Everything lives locally in `~/.config/waitfeed/`. The only network calls
-are to the feed URLs you keep enabled, once every 30 minutes. No telemetry,
+are to the feed URLs you keep enabled: a 30-minute baseline, plus an early
+refill when you're down to your last few unread headlines (never more than
+once a minute). No telemetry,
 no accounts, no server — the CLI talks only to feeds and your local hosts'
 config.
 
 WaitFeed is an independent open-source project and is not affiliated with
 OpenCode, Anthropic, or Google. It uses OpenCode's public plugin API and
-Claude Code's statusLine/hooks interface.
+Claude Code's mods/hooks interface.
 
 ## License
 

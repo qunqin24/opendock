@@ -48,6 +48,9 @@ Code Mode, and covers plugins and skills too.
 }
 ```
 
+The V2 runtime requires OpenCode 2.2.1 or newer and is tested on 2.2.7; the V1
+adapter requires 1.19.5 or newer.
+
 ## Install (OpenCode V1)
 
 ```jsonc

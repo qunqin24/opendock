@@ -18,7 +18,7 @@ sobre la obra.
 > blockers, and ODD task progress by default. An MCP stdio adapter is included only as an optional
 > integration path.
 
-## Inicio rápido — 0.4.2
+## Inicio rápido — 0.4.3
 
 Elegí el registro en `tui.json` para OpenCode o la [instalación Pi / Gentle Shell](#viewer-para-pi--gentle-shell).
 No hace falta una instalación global npm para ninguno de los viewers.
@@ -39,7 +39,7 @@ Configuración mínima:
 ```json
 {
   "$schema": "https://opencode.ai/tui.json",
-  "plugin": ["opencode-flema-engram-sidebar@0.4.2"]
+  "plugin": ["opencode-flema-engram-sidebar@0.4.3"]
 }
 ```
 
@@ -115,21 +115,24 @@ El mismo paquete incluye una extensión Pi de solo lectura. Para Pi convencional
 instalá la versión exacta compatible con esta documentación:
 
 ```sh
-pi install npm:opencode-flema-engram-sidebar@0.4.2
+pi install npm:opencode-flema-engram-sidebar@0.4.3
 ```
 
 Gentle Shell usa un home de paquetes aislado. Instalá allí la misma versión:
 
 ```sh
 PI_CODING_AGENT_DIR="$HOME/.gentle-shell/agent" \
-  pi install npm:opencode-flema-engram-sidebar@0.4.2
+  pi install npm:opencode-flema-engram-sidebar@0.4.3
 ```
 
 En Gentle Shell fullscreen, la extensión participa del rail lateral sin reemplazar
-el status existente. El panel empieza visible y expandido, con marco redondeado:
-el borde usa el color semántico `border` y el título `accent` del theme activo.
-Un clic izquierdo en el título colapsa o expande el panel, igual que el comando.
-Muestra proyecto, salud, progreso ODD, bloqueos y actividad reciente. En Pi sin el
+el status existente. El panel empieza visible y expandido: antes de 4.6 conserva el
+marco legacy; en el panel compartido de 4.6 usa una tarjeta enmarcada e independiente;
+en rails que exponen `cardGroups`, el host dibuja una única tarjeta nativa alrededor
+del grupo Engram, separado de las secciones vecinas y sin marcos duplicados. El título
+nativo usa `railTitle`; el título legacy usa `accent` y su marco `border`. Un clic
+izquierdo en el título colapsa o expande el panel, igual que el comando. Muestra
+proyecto, salud, progreso ODD, bloqueos y actividad reciente. En Pi sin el
 rail de Gentle Shell usa un overlay pasivo a la derecha cuando el terminal tiene
 ancho suficiente. Los comandos de presentación son independientes:
 
@@ -218,7 +221,7 @@ Usá la forma `[plugin, options]` solamente cuando necesites opciones:
   "$schema": "https://opencode.ai/tui.json",
   "plugin": [
     [
-      "opencode-flema-engram-sidebar@0.4.2",
+      "opencode-flema-engram-sidebar@0.4.3",
       {
         "enabled": true,
         "project": "mi-proyecto",
@@ -381,7 +384,7 @@ Si Engram conoce `mi-proyecto`, el sidebar valida ese nombre y carga sus memoria
 {
   "$schema": "https://opencode.ai/tui.json",
   "plugin": [
-    ["opencode-flema-engram-sidebar@0.4.2", { "project": "backend-api" }]
+    ["opencode-flema-engram-sidebar@0.4.3", { "project": "backend-api" }]
   ]
 }
 ```
@@ -395,7 +398,7 @@ Engram. El valor debe coincidir; una configuración incorrecta queda como `unres
 {
   "$schema": "https://opencode.ai/tui.json",
   "plugin": [
-    ["opencode-flema-engram-sidebar@0.4.2", { "pollInterval": 60000 }]
+    ["opencode-flema-engram-sidebar@0.4.3", { "pollInterval": 60000 }]
   ]
 }
 ```

@@ -1,49 +1,35 @@
 # opencode-skill-usage
 
-[![npm version](https://img.shields.io/npm/v/opencode-skill-usage.svg)](https://www.npmjs.com/package/opencode-skill-usage)
+[![npm version](https://img.shields.io/npm/v/@showlotus%2Fopencode-skill-usage.svg)](https://www.npmjs.com/package/@showlotus/opencode-skill-usage)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Node](https://img.shields.io/badge/Node.js-18%2B-green.svg)](https://nodejs.org/)
 
-OpenCode plugin (v1 and v2) that records skill invocations and auto-registers a `/skill-usage` slash command for querying the stats.
+OpenCode v2 plugin that records skill invocations and auto-registers a `/skill-usage` slash command for querying the stats.
 
 - **Write**: skill invocations are recorded to JSONL — both agent-initiated calls (`auto`) and user slash-invocations (`manual`).
 - **Query**: the plugin auto-registers the bundled `skill-usage` command so it is available as `/skill-usage` with zero extra configuration.
 
-Zero runtime dependencies, plain JavaScript ESM. One package supports both plugin APIs:
+Zero runtime dependencies, plain JavaScript ESM. It uses the opencode 2.x plugin API: `setup()` with `command.transform`, `tool.hook("execute.before")` and `session.hook("prompt")`.
 
-- **opencode 1.x** — `server()` hooks: `config`, `tool.execute.before`, `command.execute.before`
-- **opencode 2.x** — `setup()` domain APIs: `command.transform`, `tool.hook("execute.before")`, `session.hook("prompt")`
+> Version 2.0.0 moved the package to the `@showlotus` scope and dropped the `server()` hook opencode 1.x relied on. On opencode 1.x, pin the previous unscoped package: `opencode-skill-usage@1`.
 
 ## Install
 
 Add the plugin to `~/.config/opencode/opencode.json`.
 
-OpenCode 2.x uses the `plugins` array:
-
 ```jsonc
 {
-  "plugins": ["opencode-skill-usage"]
+  "plugins": ["@showlotus/opencode-skill-usage"]
 }
 ```
 
-OpenCode 1.x uses the singular `plugin` array:
-
-```jsonc
-{
-  "plugin": ["opencode-skill-usage"]
-}
-```
+OpenCode 2.x still accepts the legacy singular `plugin` key, so either works.
 
 For local installs, point at the package directory instead:
 
 ```jsonc
-// v2
 {
   "plugins": ["file:///absolute/path/to/opencode-skill-usage"]
-}
-// v1
-{
-  "plugin": ["file:///absolute/path/to/opencode-skill-usage"]
 }
 ```
 
@@ -86,19 +72,30 @@ node -e 'const r=require("fs").readFileSync(process.env.HOME+"/.config/opencode/
 ## How it works
 
 ```
-opencode.json plugin/plugins entry
+opencode.json plugins entry
         ↓
 plugin loaded
         ↓
-v1: config hook registers /skill-usage (template = bundled SKILL.md body)
-v2: setup() registers /skill-usage via ctx.command.transform
+setup() registers /skill-usage via ctx.command.transform
         ↓
-v1: tool.execute.before / command.execute.before hooks
-v2: ctx.tool.hook("execute.before") + command executor + session prompt hook
+ctx.tool.hook("execute.before") + command executor + session prompt hook
 append JSONL lines to skill-usage.jsonl on every skill invocation
 ```
 
-On v1 the `config` hook works because Command init runs after Plugin config hooks (the Command layer depends on the Skill layer, which finishes before Command starts). On v2, `setup()` registers the command through `ctx.command.transform`, records agent-initiated skill tool calls (skill input is now `{ id }`), records the `/skill-usage` command itself, and records skills selected via slash through the session prompt hook.
+`setup()` registers the command through `ctx.command.transform`, records agent-initiated skill tool calls (skill input is `{ id }`), records the `/skill-usage` command itself, and records skills attached through the session prompt hook. The command registration is unconditional: `editor.add` is a name-keyed set and opencode registers config commands after plugin transforms, so a user-defined `/skill-usage` still wins.
+
+## Releases
+
+Releases are cut from git tags. Bump `version` in `package.json`, then:
+
+```bash
+git add package.json
+git commit -m "chore: bump version to X.Y.Z"
+git tag vX.Y.Z
+git push origin master --tags
+```
+
+The tag triggers `.github/workflows/publish.yml`, which verifies the tag matches `package.json`, publishes to npm with provenance (prerelease versions get a matching dist-tag), regenerates [CHANGELOG.md](./CHANGELOG.md) from conventional commits, and creates the GitHub Release.
 
 ## Project layout
 
@@ -106,7 +103,7 @@ On v1 the `config` hook works because Command init runs after Plugin config hook
 opencode-skill-usage/
 ├── package.json          # npm manifest, files includes plugin/ and skills/
 ├── plugin/
-│   └── index.js          # dual entry: v1 server() hooks + v2 setup() registrations, JSONL writer
+│   └── index.js          # v2 setup() registrations + JSONL writer
 ├── skills/
 │   └── skill-usage/
 │       └── SKILL.md      # query templates, used as the command template

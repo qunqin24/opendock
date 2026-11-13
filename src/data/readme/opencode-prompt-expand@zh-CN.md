@@ -6,7 +6,7 @@
 
 在 **OpenCode Desktop** 的 composer 里，把粗糙草稿扩展成结构化提示词，并原地写回。
 
-**状态：** `v0.1.1` 实验版，已发布到 npm。OpenCode Desktop 的 GUI 插件 API 仍是 experimental，请锁定你测试的 OpenCode 版本。
+**状态：** `v0.2.0` 实验版，已发布到 npm。OpenCode Desktop 的 GUI 插件 API 仍是 experimental，请锁定你测试的 OpenCode 版本。
 
 ## 适合谁
 
@@ -25,6 +25,7 @@
 - 简洁模式（约 800 字符）和充分展开模式
 - 可读取白名单内的项目信息：`package.json`、规则文件、git 状态
 - 支持 `*gpt*` / `*claude*` 家族指令
+- 可选「会话目录」：右侧面板列出你的消息，点击跳转到对应位置
 
 ## 要求
 
@@ -111,8 +112,20 @@ prompt-expand.restore
 prompt-expand.previous
 prompt-expand.next
 prompt-expand.mode
+prompt-expand.outline
 prompt-expand.settings
 ```
+
+## 会话目录（实验）
+
+默认关闭。先在 **Settings > Prompt Expand** 中启用，然后运行 **切换会话目录**，或在右侧面板的 `+` 菜单里选择 **会话目录**。
+
+- 按顺序列出当前会话里你发的消息，去掉 markdown 标记并编号
+- 点击条目滚动到对应消息；阅读位置所在条目会高亮
+- **加载更早** 通过官方消息存储拉取更早的分页
+- **最新** 回到时间线底部
+
+它依赖宿主的内部结构：时间线会输出 `data-message-id` 行和 `message-<id>` 锚点，但这两个都不是公开插件 API。找不到目标时插件会提示「消息尚未加载」，而不是猜测位置。OpenCode 升级后需要重新验证。
 
 ## 设置
 
@@ -123,6 +136,7 @@ prompt-expand.settings
 | Mode | 简洁 / 充分展开 |
 | Model | `auto`、`composer`、`provider/model` 或留空 |
 | Project context | 是否读取项目信息 |
+| Session outline | 实验性右侧消息目录，点击跳转 |
 
 设置通过 `Store.global` 保存。未设置或 Model 为 `auto` 时，回退到 `opencode.jsonc` 的 options；显式设置会覆盖。
 
@@ -160,6 +174,7 @@ Home / draft 没有官方 composer API。插件在底部提供 `⚡ Expand Promp
 - Home / draft 的 DOM 回退不是官方 API
 - `setText()` 不能重写 `@` mention 附件
 - 没有 TUI 实现
+- 会话目录依赖未公开的 `data-message-id` / `message-<id>`；未渲染的消息会通过短暂滚动时间线来定位，比已加载历史更早的消息需要先「加载更早」
 - 慢模型可能超过 `timeoutMs`
 
 ## 赞助

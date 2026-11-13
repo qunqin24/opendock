@@ -7,6 +7,12 @@
     <a href="https://dream-pixels-forge.github.io/browsy-bot/"><strong>Live site</strong></a> ·
     <a href="https://github.com/Dream-Pixels-Forge/browsy-bot">GitHub</a>
   </p>
+  <p>
+    <a href="https://www.npmjs.com/package/browsy-bot"><img src="https://img.shields.io/npm/v/browsy-bot?color=ff6a2b" alt="npm version"></a>
+    <a href="https://github.com/Dream-Pixels-Forge/browsy-bot/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/Dream-Pixels-Forge/browsy-bot/ci.yml?label=CI&color=ff6a2b" alt="CI status"></a>
+    <a href="https://github.com/Dream-Pixels-Forge/browsy-bot/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-ff6a2b" alt="License"></a>
+    <a href="https://www.npmjs.com/package/browsy-bot"><img src="https://img.shields.io/npm/dw/browsy-bot?color=ff6a2b" alt="Downloads"></a>
+  </p>
   <hr />
 </div>
 
@@ -17,13 +23,24 @@
 - **Zero middleware** – No ChromeDriver, Puppeteer, or Playwright. Direct CDP WebSocket.
 - **Zero hidden state** – Every call receives an explicit `browserUrl` (and optional `targetId`).
 - **Granular targeting** – Operate on specific tabs/windows via `targetId`, or auto-discover the first page target.
-- **Protocol‑complete** – Full CDP domain wrappers (Page, Runtime, Performance, Accessibility, Target).
-- **Multi-tool** – One CDP core, three adapters: an OpenCode plugin, a universal MCP server, and a CLI. The OpenCode plugin registers 8 `browsy_*` tools (`navigate`, `screenshot`, `evaluate`, `recall`, `wait`, `console`, `network_log`, `list_tabs`); the MCP server exposes the same 8 plus `browsy_new_tab` (9 total); the CLI ships the full command set.
+- **Protocol‑complete** – Full CDP domain wrappers (Page, Runtime, Performance, Accessibility, Target, Network, Emulation).
+- **Multi-tool** – One CDP core, three adapters: an OpenCode plugin, a universal MCP server, and a CLI. The MCP server exposes 25+ `browsy_*` tools; the CLI ships the full command set.
 - **Learns across sessions** – Optional memorius integration stores browser-automation learnings (selectors, page quirks, navigation flows) and surfaces them before future tasks.
 - **Agent skill** – Bundled tool-agnostic `browsy` skill; the OpenCode plugin installs it to `~/.config/opencode/skills/` (disable with `"installSkill": false`), and it also works in Claude Code / Hermes / any agent skill dir.
 - **Self-service lifecycle** – `doctor` probes the endpoint, browser binary, and memorius with actionable suggestions; `ensure-browser`/`stop-browser` start and stop a dedicated CDP browser (scoped profile dir, never your real one).
 - **Structured extraction** – `extract` pulls typed records (text / html / value / attrs) from matching elements in a single in-page script, no bespoke `evaluate` boilerplate.
 - **Trusted input** – `click`/`fill` accept `--trusted` to dispatch renderer-trusted CDP input events (`Input.dispatchMouseEvent` / `Input.insertText`) instead of JS-dispatched ones, so the page sees a real user event.
+- **Screenshots & captures** – `screenshot`/`fullPageScreenshot` auto-save to `dev-notes/browsy-captures/` (opt‑in via `BROWSY_AUTOSAVE_CAPTURES`) with timestamped PNGs, plus `preflight` issue detection before captures.
+- **Dialogs, uploads, downloads, network idle** – `browsy_dialog`, `browsy_upload`, `browsy_download`, `browsy_wait_idle` for real E2E flows.
+- **Accessibility audit** – `browsy_a11y` returns the live AX tree simplified to role/name/value/state per node.
+- **Visual regression** – `browsy_visual_baseline` / `browsy_visual_compare` pixel‑diff screenshots; `browsy_intercept` blocks/mocks network requests.
+- **Stealth mode** – `browsy_stealth` injects an anti‑detection script (navigator.webdriver, plugins, languages, WebGL, chrome object).
+- **Record & replay** – `browsy_record` / `browsy_replay` serialize CDP sessions to NDJSON for offline debugging.
+- **Cross‑tab coordination** – `browsy_track_tabs` / `browsy_switch_tab` for popups and target=_blank links.
+- **Performance metrics** – `browsy_performance` returns Core Web Vitals (LCP, CLS, INP, FCP) and navigation timing; `browsy_retry` retries flaky actions with exponential backoff.
+- **Mobile emulation** – `browsy_emulate_device`, `browsy_set_geolocation`, `browsy_set_device_orientation` with device presets (iPhone, iPad, Pixel, Galaxy).
+- **Structural visual diff** – `browsy_capture_dom` / `browsy_diff_dom` DOM‑structure comparison (more robust than pixel diff for dynamic content).
+- **Cookie & storage** – `browsy_get_cookies`, `browsy_set_cookies`, `browsy_delete_cookies`, `browsy_get_storage` for authenticated sessions across captures.
 
 ## Install as an OpenCode plugin
 

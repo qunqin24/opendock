@@ -72,14 +72,14 @@
 <table width="100%">
   <thead>
     <tr>
-      <th align="left" width="30%">桌面 App · v0.3.2</th>
+      <th align="left" width="30%">桌面 App · v0.3.4</th>
       <th align="left">下载与首次打开</th>
     </tr>
   </thead>
   <tbody>
     <tr>
       <td><strong>未签名发布</strong><br><sub>macOS Universal · Windows x64 · Linux x64</sub></td>
-      <td><a href="https://github.com/Windsander/Mebular/releases/tag/v0.3.2">从 GitHub Releases 下载</a><br><sub>用 <code>SHA256SUMS.txt</code> 校验。macOS：右键 →「打开」；Windows：「更多信息 → 仍要运行」。自带 Electron 与 runtime。</sub></td>
+      <td><a href="https://github.com/Windsander/Mebular/releases/tag/v0.3.4">从 GitHub Releases 下载</a><br><sub>用 <code>SHA256SUMS.txt</code> 校验。macOS：右键 →「打开」；Windows：「更多信息 → 仍要运行」。自带 Electron 与 runtime。</sub></td>
     </tr>
   </tbody>
 </table>
@@ -144,11 +144,15 @@ mebular print-config --client opencode         # MCP 配置
   </tbody>
 </table>
 
+<p align="center"><strong>社区</strong><br>
+<a href="https://github.com/Windsander/Mebular/discussions">讨论区</a> · <a href="https://github.com/Windsander/Mebular/discussions/categories/q-a">问答</a> · <a href="https://github.com/Windsander/Mebular/issues">Issues</a> · <a href="ROADMAP_CN.md">路线图</a> · <a href="CONTRIBUTING.md">参与贡献</a><br>
+<sub>使用问题 → 问答 · 早期构想 → Ideas · 可复现问题 → Issues</sub></p>
+
 <p align="center"><strong>与 DSH 一起使用</strong><br>
 从 npm 把插件装入 DSH 的 web profile：<br>
-<code>dsh plugin --profile web add @mebular/dsh-plugin@0.3.2</code><br>
+<code>dsh plugin --profile web add @mebular/dsh-plugin@0.3.4</code><br>
 App 与 DSH Plugin 是同一套本机 Mebular runtime 的两个等权入口：插件默认 <code>attach</code>，已有 App/CLI/service 时直接连接，不会启动或下载任何东西。完全没有 runtime 时，面板会先询问，再按需安装固定版本共享 runtime。侧边栏面板通过 <code>?embed=dsh</code>（仅 loopback）嵌入同一套 Console，官方 MCP client 连接同一张图。插件是独立适配器，代码隔离在 <code>packages/dsh-plugin</code>；它由独立 npm job 发布，版本随统一 release train；开发时仍可从 <code>packages/dsh-plugin</code> 本地安装。<br>
-已收录于 <a href="https://github.com/awesome-dsh-plugin/awesome-dsh-plugin">awesome-dsh-plugin</a> 的 <code>memory</code> 分类。<br>
+已收录于 <a href="https://awesome-dsh-plugin.com/zh/p/Windsander/Mebular--packages-dsh-plugin/">awesome-dsh-plugin</a> 与 <a href="https://dshmarketplace.dev/zh/plugins?q=mebular">dshmarketplace.dev</a> 的 <code>memory</code> 分类；其余目录见<a href="docs/community/LISTINGS_CN.md">社区收录审计</a>。<br>
 <a href="packages/dsh-plugin/README.md">DSH 插件指南 →</a> · <a href="docs/integrations/DSH_CN.md">集成说明 →</a></p>
 
 <details>
@@ -183,6 +187,6 @@ await mebular.initialize();
 
 <div align="center">
 
-v0.3.2 · early · MIT · © 2026 Sobert Li
+v0.3.4 · early · MIT · © 2026 Sobert Li
 
 </div>

@@ -50,7 +50,7 @@ OpenCode **没有官方插件市场**。官方只提供两种加载方式（配�
 | 来源 | 内容 | 能不能装 |
 |---|---|---|
 | 精选目录（registry.json） | awesome-opencode 社区维护的 97 条 curated 条目，带描述、分类、GitHub 地址；Hero 里的 awesome-opencode 可点击查看来源 | 75 条可在应用内直接安装，其余 22 条只发布在 GitHub |
-| npm 搜索 | 带 `opencode-plugin` 标签的包，约 3000 个 | 能，但没有筛选，噪音多 |
+| npm 搜索 | 按 `opencode-plugin` 自由文本搜索后本地过滤出的插件包，覆盖目录之外的长尾 | 能，但没有人工筛选，噪音多 |
 | 内置快照 | 上面 97 条的构建期副本，断网时兜底 | 同精选目录 |
 
 ## 三个标签页
@@ -58,7 +58,7 @@ OpenCode **没有官方插件市场**。官方只提供两种加载方式（配�
 | 标签 | 说明 |
 |---|---|
 | 精选目录 | awesome-opencode 社区 curated 列表（Hero 里的来源名可点击），本地筛选（不打网络请求），可按类型过滤，标出可安装/仅 GitHub/已安装/可更新 |
-| npm 搜索 | 直查 `keywords:opencode-plugin`，覆盖目录之外的长尾；显示周/月下载量、发布者、许可证，可按相关度、下载量或发布时间排序 |
+| npm 搜索 | 自由文本搜 `opencode-plugin` 再本地过滤，覆盖目录之外的长尾；显示周/月下载量、发布者、许可证，可按相关度、下载量或发布时间排序 |
 | 已安装 | 读配置里的 `plugins` 数组，显示当前版本与最新版本，可查看详情、更新、移除 |
 
 每张卡片右侧都有操作区：`详情` 打开完整信息弹窗，`源码` / `主页` / `npm` 用系统浏览器打开，`安装` / `更新` / `移除` 直接改配置。卡片正文也可以点击（有键盘焦点支持）。
@@ -86,10 +86,14 @@ README 是判断「这个插件具体干啥」最直接的来源。很多包的 
 
 ## 搜索与详情的数据降级
 
-- 搜索结果直接复用 npm search API 返回的 `downloads.weekly/monthly`，不额外发请求。
+- **registry 源是探测出来的，不是写死的。** 启动时并行 ping `registry.npmjs.org` 和 `registry.npmmirror.com`（1.5 秒超时），只用应答的那个；某个源中途连不上会被剔除，下次调用重新探测。想强制指定（例如公司内网代理），设 `OPENCODE_PLUGIN_HUB_REGISTRY=https://your.registry` 后重启应用。
+- 官方源在部分网络里是**完全黑洞**（TCP 连接超时，undici 只会报一句 `fetch failed`），所以默认会落到镜像上。镜像缺的东西由本地补齐，而不是让页面空掉。
+- 镜像的搜索接口**不认 `keywords:` 限定词**（返回 0 条），所以改成自由文本搜索 + 本地过滤：包名含 `opencode`，或关键词里有 `opencode` / `opencode-plugin` / `opencode-plugins` / `opencode-ai` 才算 OpenCode 插件。只匹配描述会把其他 harness 的插件也带进来，因此描述不参与判定。
+- 镜像的搜索索引**不返回 `links`，也只有累计下载量**。所以每条结果额外并发查两个接口：`/downloads/range/last-month`（日序列求和得出周/月下载）和 `/latest`（补主页、仓库、许可证、发布者）。10 并发下 50 条结果约 1 秒补齐。
 - 详情优先读完整 packument（包含 README）。超过 12MB 的包会退回只读 `/latest` manifest，此时没有 README 和发布时间。
-- 下载量单独查 `api.npmjs.org/downloads/point`，查不到时显示 0，不影响详情其余部分。
-- 详情查询失败会在弹窗里明确写出原因（404、网络错误、占位包没有发布版本等），不会伪装成空数据。
+- 下载量查不到时**显示「暂不可用」而不是 0**，不影响详情其余部分。
+- 详情查询失败会在弹窗里明确写出原因，不会伪装成空数据：404 是「npm 上找不到这个包」，超时是「没有及时响应（可能不存在，或镜像正在回源）」，连接重置是「未能应答」。
+- **不存在的包在镜像上很慢**：镜像回源失败后会重置连接，约 13 秒才返回，这段时间内页面显示加载中。这是镜像的行为，不是插件卡住。
 
 ## 版本检查与更新
 
@@ -191,6 +195,7 @@ npm run refresh   # 重建内置目录快照（会逐个查 npm，约 1-2 分钟
 | `src/contract.ts` | 窗口与主进程的 IPC 契约（effect Schema），含搜索、详情、安装、更新等 |
 | `src/gui/page.tsx` | UI（Solid）：设置页与独立弹窗共用的三个标签页、卡片列表、详情弹窗、内联样式表 |
 | `src/gui/admin.ts` | 主进程：读写配置、npm 搜索与详情、版本比对、更新（含目录插件）、打开链接/配置、reload |
+| `src/gui/registry.ts` | npm 源探测与回退：ping 选源、按源发请求、下载量换算（周/月） |
 | `src/gui/catalog.ts` | 主进程：拉取并降级解析社区目录 |
 | `src/gui/registry-snapshot.json` | 构建期固化的目录快照，由 `npm run refresh` 生成 |
 | `dist/index.js` | 服务端入口（npm 发布包使用） |

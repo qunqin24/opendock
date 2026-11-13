@@ -62,8 +62,8 @@ V1 uses the legacy `plugin` list (singular) and the same package:
 ```
 
 V2 requires OpenCode **2.2.1 or newer** (the first release with the
-`experimental.idle` hook used for Stop/SubagentStop). V1 requires 1.19.5 or
-newer. Windows is not tested; use WSL.
+`experimental.idle` hook used for Stop/SubagentStop) and is tested on 2.2.7;
+V1 requires 1.19.5 or newer. Windows is not tested; use WSL.
 
 Restart OpenCode. The plugin logs:
 

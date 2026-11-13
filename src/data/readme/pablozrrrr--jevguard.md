@@ -1,5 +1,7 @@
 # JevGuard
 
+[![CI](https://github.com/pablozr/JevGuard/actions/workflows/ci.yml/badge.svg)](https://github.com/pablozr/JevGuard/actions/workflows/ci.yml)
+
 > **Semantic policy engine for coding agents.**
 >
 > JevGuard reviews every change an AI coding agent makes against the rules of your
@@ -15,23 +17,29 @@ your local deterministic gate to return `PASS`, `WARN`, or `FAIL`.
 
 | Host | Package | Status |
 | --- | --- | --- |
-| [OpenCode](https://opencode.ai) | `@pablozrrrr/jevguard` | Available, targets OpenCode `1.18.32` |
+| [OpenCode](https://opencode.ai) | `@pablozrrrr/jevguard` | Available, targets OpenCode `2.2.x` (`>=2.2.2 <2.3`) |
 | [Claude Code](https://claude.com/claude-code) | `@pablozrrrr/jevguard-claude-code` | Available through this repository's plugin marketplace |
 | Codex | — | Planned |
 
 ## Quick start
 
 ```sh
-# 1. Store your Jev key in the OS credential store (shared by both hosts)
-bunx --package @pablozrrrr/jevguard jevguard login
+# 1. Install the plugin on every supported host found on this machine
+#    (prints the plan first; --yes applies it without asking)
+npx @pablozrrrr/jevguard-cli setup
 
-# 2a. OpenCode: register the plugin in opencode.json
-bunx --package @pablozrrrr/jevguard jevguard install
-
-# 2b. Claude Code: install from the marketplace
-claude plugin marketplace add pablozr/JevGuard
-claude plugin install jevguard@jevguard
+# Only the API key, if you skip setup (stored in the OS credential store, shared by both hosts)
+npx @pablozrrrr/jevguard-cli login
 ```
+
+`setup` stores your API key (hidden prompt), installs the plugin on each supported host and
+asks whether to enable `delivery: agent` (default No) and to create a starter
+`.jev/rules.md`. Flags: `--host <opencode|claude-code>`, `--project`, `--init`,
+`--agent-delivery` and `--yes`; `--yes` never enables `delivery: agent` or creates `.jev/`
+by itself. Without a terminal and without `--yes` it only prints the plan and changes
+nothing. The host-specific steps are also available on their own:
+`npx @pablozrrrr/jevguard-cli install --host claude-code` runs
+`claude plugin marketplace add` and `claude plugin install` for you.
 
 Then add your rules to `.jev/rules.md` (in OpenCode, the bundled `jev-init` skill can
 bootstrap them) and keep working with your agent as usual. Details are in
@@ -63,11 +71,11 @@ coding agent.
 > agent context or block a task. When remediation is enabled and a review has any
 > `FAIL`, the plugin asks for a proposal in an isolated, deny-all child session; the
 > proposal never edits code. See [OpenCode 2.2.x limitations](#opencode-22x-limitations).
-> On Claude Code and OpenCode, a user who opts in with `mode: remediate` in their own
-> `claude-code.yaml` or `opencode.yaml` gets a bounded chain of at most 3 visible
-> correction messages to the agent; see
+> On Claude Code and OpenCode, a user who opts in with `delivery: agent` in their own
+> `claude-code.yaml` or `opencode.yaml` gets at most one visible message per reviewed unit
+> to the agent (the failing findings and the strategy), at most 3 per session; see
 > [Remediation proposals](docs/configuration.md#remediation-proposals) and
-> [OpenCode `mode: remediate`](docs/configuration.md#opencode-mode-remediate-bounded-chain).
+> [OpenCode `delivery: agent`](docs/configuration.md#opencode-delivery-agent-one-delivery-per-unit).
 > The Claude Code plugin is distributed through this repository's marketplace; see the
 > [Claude Code guide](./docs/configuration.md#claude-code).
 
@@ -265,19 +273,14 @@ or secret is logged.
 Installing `@pablozrrrr/jevguard` does **not** register it with OpenCode by itself.
 OpenCode `2.2.x` only loads plugins listed in `plugins: [...]` in `opencode.json`.
 
-> [!WARNING]
-> The `jevguard install` command below still writes the OpenCode `1.x` `plugin` key.
-> Until it is migrated, register the plugin on `2.2.x` with the manual `plugins`
-> entry shown after it.
-
-The installer is run from the installed CLI:
+The installer is run from the JevGuard CLI (`@pablozrrrr/jevguard-cli`, which runs on Node):
 
 ```sh
 # global config: ~/.config/opencode/opencode.json
-jevguard install
+npx @pablozrrrr/jevguard-cli install --host opencode
 
 # project config: ./opencode.json
-jevguard install --project
+npx @pablozrrrr/jevguard-cli install --host opencode --project
 ```
 
 The installer asks for confirmation, edits only the `plugins` array, and is
@@ -285,12 +288,9 @@ idempotent. It never writes the legacy `plugin` key, but an entry already there 
 as installed. It only edits a `plugins` array of package strings or
 `{ "package": "..." }` objects; any other shape is left unchanged and the installer
 prints the manual snippet instead. `jevguard doctor` also checks that
-`opencode --version` is in the supported range `>=2.2.2 <2.3`. If `jevguard` is not on
-`PATH`, run it through `bunx`:
-
-```sh
-bunx --package @pablozrrrr/jevguard jevguard install
-```
+`opencode --version` is in the supported range `>=2.2.2 <2.3`. The plugin package no
+longer ships a `jevguard` binary; every command below runs through the CLI package, as
+`npx @pablozrrrr/jevguard-cli <command>` or, once installed globally, as `jevguard <command>`.
 
 The manual alternative is one entry in `opencode.json`:
 
@@ -412,7 +412,7 @@ Loading the plugin does not expose the `jevguard` binary on `PATH`. Run the logi
 command without a global install:
 
 ```sh
-bunx --package @pablozrrrr/jevguard jevguard login
+npx @pablozrrrr/jevguard-cli login
 ```
 
 Or install the package globally so `jevguard` is on `PATH`:
@@ -433,7 +433,8 @@ Known limitations:
 
 - Target host is OpenCode `2.2.x` (minimum `2.2.2`). The plugin does not load on
   `2.1.x` or `1.x`. A real-host smoke on `2.2.2` (2026-11-02) covered observe
-  and `remediate` (FAIL review, deny-all proposer, attempt 1/2, `RESOLVED`).
+  and remediation (FAIL review, deny-all proposer). The single-delivery flow replaced the
+  earlier chain and has not been re-smoked on the real host.
 - OpenCode `2.2.2` does not install dependencies for a `file:` plugin spec. Use
   the registry package; a local `file:` build needs its dependencies installed
   next to it.
@@ -473,7 +474,7 @@ Loading the plugin does not put `jevguard` on `PATH`. If it is not installed
 globally, run the one-line login instead:
 
 ```sh
-bunx --package @pablozrrrr/jevguard jevguard login
+npx @pablozrrrr/jevguard-cli login
 ```
 
 JevGuard stores the key in your operating system's credential store instead of a
@@ -585,7 +586,7 @@ for the full contract.
 
 The current release implements the full local review path:
 
-- OpenCode V1 plugin loads.
+- The OpenCode `2.2.x` V2 plugin loads.
 - A completed assistant response is detected.
 - The direct parent user task and assistant-attributed diff are acquired.
 - Every `## <RULE-ID>` block in `.jev/rules.md` is parsed in source order. Each
@@ -687,13 +688,11 @@ packages/
 ├── claude-code-plugin/   Claude Code plugin composition and artifact
 ├── node-infra/           shared Node infra: credentials, Jev transport, policy, history
 ├── opencode-adapter/     OpenCode attribution and presentation
-├── plugin/               OpenCode composition root and CLI
-└── testkit/              fixtures and contract helpers
+└── plugin/               OpenCode composition root and CLI
 
 plugin → opencode-adapter → node-infra → core
 plugin ────────────────────→ node-infra
 claude-code-plugin → claude-code-adapter → node-infra → core
-testkit ──────────────────────────────→ core
 ```
 
 ## Status
@@ -714,7 +713,10 @@ has a `FAIL` — one proposal child session.
 The review does not inject anything into the agent context, prompt the source session,
 add session messages, or block a task. The proposal is a separate, configurable,
 strategy-only workflow delivered by the server plugin; it never edits code and never
-applies a change. A real-host smoke on OpenCode `2.2.2` passed; see
+applies a change. Only a user who opts in with `delivery: agent` in their own
+`opencode.yaml` gets one visible message per reviewed unit queued into the source
+session, at most 3 per session and never while the session is busy; see
+[OpenCode `delivery: agent`](docs/configuration.md#opencode-delivery-agent-one-delivery-per-unit). A real-host smoke on OpenCode `2.2.2` passed for observe; see
 [OpenCode 2.2.x limitations](#opencode-22x-limitations).
 
 The Claude Code plugin reuses the same core, policy files, gate, and local history. It
@@ -741,6 +743,7 @@ Use `pnpm check` to run format, lint, typecheck, and tests in sequence. See
 
 - [Configuration reference](./docs/configuration.md)
 - [Security model](./docs/security.md)
+- [Architecture decisions](./docs/adr/README.md)
 - [Contributing](./CONTRIBUTING.md)
 - [Agent instructions](./AGENTS.md)
 

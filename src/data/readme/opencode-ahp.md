@@ -50,16 +50,23 @@ In the Agents window, an `opencode` host with:
   `discard-changes` operation restores a file. Requires the location
   directory to be a git repository (otherwise the changesets are empty);
   opt out with `capabilities.changesets: false`.
-- **Terminals** — read-only `ahp-terminal:` channels rendered from
-  `shell`-tool executions (`isPty: false`, completed-command output with
-  exit codes): while a turn runs a foreground shell command, the terminal
-  appears in the root catalog, streams
-  `data` → `commandFinished` → `exited` to subscribers, and leaves the
-  catalog at turn end (the channel state stays subscribable until the
-  chat/session is removed). The terminals are renderings, not pty —
-  `createTerminal`/`disposeTerminal` and client `terminal/*` actions get
-  clean read-only errors. Opt out with
-  `capabilities.terminals: false`.
+- **Terminals** — two kinds, both in the root catalog:
+  - **Interactive pty shells** (`createTerminal`) — a real shell in a pty
+    (your `$SHELL`, default 80×24, the location's working directory):
+    client-chosen channel, `isPty: true`, input/resize drive the process,
+    `disposeTerminal` kills it. This is what makes a VS Code Agents-window
+    session usable — clicking it opens a working terminal.
+  - **Read-only renderings** of `shell`-tool executions
+    (`ahp-terminal:`, `isPty: false`, completed-command output with exit
+    codes): while a turn runs a foreground shell command, the terminal
+    appears in the root catalog, streams
+    `data` → `commandFinished` → `exited` to subscribers, and leaves the
+    catalog at turn end (the channel state stays subscribable until the
+    chat/session is removed). These are host-managed — `createTerminal`
+    can't target them and client `terminal/*` actions get clean
+    read-only errors.
+
+  Opt out of both with `capabilities.terminals: false`.
 
 ## Requirements
 
@@ -83,6 +90,13 @@ opencode plugin add opencode-ahp
 opencode plugin add github:mattzink/opencode-ahp
 ```
 
+Installed copies don't auto-update. To update:
+
+```sh
+opencode plugin update opencode-ahp
+opencode service restart
+```
+
 **Dev (local checkout):**
 
 ```jsonc
@@ -104,20 +118,15 @@ Per-key resolution: the config entry's `options` ▸ an `options.jsonc`
 sibling of `src/index.ts` (checkouts only — copy
 [`options.example.jsonc`](options.example.jsonc)) ▸ built-in defaults.
 
+[`options.example.jsonc`](options.example.jsonc) documents the full
+option set — every key, its default, and what it does. A few of the
+important ones:
+
 | Key | Default | Description |
 | --- | --- | --- |
-| `enabled` | `true` | Master switch; `false` → no listener, the plugin is fully inert |
-| `port` | `8765` | WS listen port |
-| `host` | `"127.0.0.1"` | Bind address; a **non-loopback bind requires an explicit `token`** (the listener refuses to start otherwise) |
-| `path` | `"/ahp"` | WS path — VS Code's URL carries it verbatim |
 | `token` | auto | Omit → generated on first start, persisted in opencode's plugin storage, printed once to the service log. Accepted via the `?token=` query param and `Authorization: Bearer <token>`. **Always enforced**, loopback or not |
-| `allowedOrigins` | `"*"` | `"*"` or an exact list, e.g. `["vscode://vscode"]`. The token is still always required regardless |
-| `tls` | `null` | `{ keyPath, certPath }` — native TLS termination → `wss://` (off-LAN transports, D3). PEM **file paths**; the port becomes TLS-only (plain-HTTP requests to it fail) and the health endpoint is then HTTPS: `curl -k https://…:8765/healthz`. A missing/unreadable file disables the AHP listener — the opencode server keeps running |
-| `healthPath` | `"/healthz"` | Health endpoint (no auth): `curl …:8765/healthz` → `ok` (over the same TLS termination when `tls` is set) |
-| `keepAlive` | `true` | Keep the opencode location loaded against its idle timeout (`experimental.location_idle_timeout`, default 60 min) by periodically touching an internal anchor session — with this on, **no `location_idle_timeout` config entry is needed**. The anchor (`opencode-ahp (keep-alive)`) is a real opencode session: it shows in the TUI session list but is hidden from AHP clients (opencode's plugin surface cannot archive it) |
-| `keepAliveIntervalMinutes` | `10` | Minutes between keep-alive touches; keep well below the effective idle timeout |
-| `replayWindow` | `1000` | Per-channel actions kept for reconnect replay; older gaps → fresh snapshot |
-| `capabilities` | `{ changesets: true, terminals: true, automations: false }` | Host-side switches — never advertise what we don't implement (in AHP 1.0.0 none of these is a wire field; discovery is the state's optionality). Set `changesets` to `false` to disable the diff channels (the session/chat snapshots then carry no changeset catalogues and changeset URIs resolve to nothing); set `terminals` to `false` to disable the synthetic shell-command terminal channels (no `root/terminals` list, `shell` calls open no `ahp-terminal:` channels) |
+| `host` | `"127.0.0.1"` | Bind address; a **non-loopback bind requires an explicit `token`** (the listener refuses to start otherwise) |
+| `port` | `8765` | WS listen port |
 
 ## Remote access (local LAN)
 
@@ -146,11 +155,22 @@ port forward, any `wss://` proxy) are operational; the host accepts any
    }
    ```
 
-   No `experimental.location_idle_timeout` entry needed: by default the
-   plugin keeps its own location loaded (`keepAlive`, see Options) by
-   periodically touching an internal anchor session (visible in the TUI
-   session list as "opencode-ahp (keep-alive)", hidden from AHP clients)
-   — opencode's idle sweep never fires.
+   **Mandatory for now: disable the location idle timeout.** opencode
+   unloads a location after it has been idle for
+   `experimental.location_idle_timeout` (default 60 minutes), and a
+   plugin cannot prevent the sweep — events a plugin publishes carry no
+   location, so they never count as location activity (see
+   [`docs/design.md`](docs/design.md) §15.3). Add, to the project's
+   `opencode.jsonc` (the one that selects this location):
+
+   ```jsonc
+   {
+     "experimental": { "location_idle_timeout": false }
+   }
+   ```
+
+   With this set, the location (and the AHP listener) stays loaded
+   indefinitely once booted.
 
 3. **Boot the location once** — the AHP listener exists only while the
    location is up, and a location boots on first use. After a fresh server
@@ -162,12 +182,13 @@ port forward, any `wss://` proxy) are operational; the host accepts any
      'http://127.0.0.1:<port>/api/location?location[directory]=<project-dir>'
    ```
 
-   This is a one-time step per server process: the keep-alive then holds
-   the location (and the listener) indefinitely, and reloading the
-   location (config change, `opencode service restart`) re-boots it
-   automatically. (The one-time boot itself is an opencode limitation —
-   plugins cannot run before their location has booted; a zero-touch boot
-   needs an upstream auto-boot option.)
+   This is a one-time step per server process: with
+   `location_idle_timeout: false` (step 2) the location (and the
+   listener) then stays loaded indefinitely, and reloading the location
+   (config change, `opencode service restart`) re-boots it automatically.
+   (The one-time boot itself is an opencode limitation — plugins cannot
+   run before their location has booted; a zero-touch boot needs an
+   upstream auto-boot option.)
 4. Verify: `curl -s http://<host-lan-ip>:<port>/healthz` → `ok`.
 
 Full two-machine walkthrough (and the complete testing strategy: unit,
@@ -250,6 +271,18 @@ node scripts/ahp-multi-chat.mjs --token <token> --base http://127.0.0.1:8765 --r
 NODE_TLS_REJECT_UNAUTHORIZED=0 node scripts/ahp-changesets.mjs --token <token> --base https://127.0.0.1:8765
 ```
 
+### Local environment (git-ignored)
+
+`docs/local.md` is the designated place for each developer to keep
+local development environment specifics — facts about their own machine
+that never belong in the committed tree, such as LAN IPs and hostnames,
+per-machine versions, the port and config location of a daily opencode
+service, the current LAN test server token/URL, reference checkouts
+(the opencode and AHP repos, the extracted VS Code AHP client
+sources), and scratch roots. The file is git-ignored and optional: it
+does not exist on machines that have never created it, and nothing in
+this repo requires it.
+
 ## Publishing
 
 House pattern: push to `main` → CI (`typecheck` + `test`) → the publish
@@ -257,9 +290,6 @@ workflow computes the version as `<major>.<minor>.<run-number>` and
 `npm publish`es via **npm trusted publishing (OIDC)** — no npm token or
 repo secret is stored (one-time setup: npmjs.com → package → *Package
 settings* → *Trusted publishers* → this workflow).
-
-Installed copies don't auto-update: `opencode plugin update opencode-ahp`
-- `opencode service restart`.
 
 ## Documentation
 

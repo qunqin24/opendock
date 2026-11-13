@@ -22,7 +22,7 @@ The agent searches the store with `smart_compact_search`, `smart_compact_sql`, a
 
 Trimmed context is marked with a `[smarter-compact: …]` pointer.
 
-You need Node 24 or newer (for `node:sqlite`). Agents that trim through the proxy also need LiteLLM `1.109.0rc1` (pinned) on `PATH` as `litellm`. `smarter-compact enable` installs it with `uv tool install` when it is missing or another version. Without uv, it stops and changes no agent config. The plugin has no API key of its own. Your agent keeps its own login.
+You need Node 24 or newer (for `node:sqlite`). Agents that trim through the proxy also need **Docker** (recommended) or uv. With a running Docker daemon, `smarter-compact enable` pulls the pinned LiteLLM image and runs the proxy as the `smarter-compact-proxy` container with `--restart always`, so it comes back by itself after a reboot. Without Docker, it installs LiteLLM `1.109.0rc1` with `uv tool install` and runs it as a background process that the next agent session restarts after a reboot. With neither, it stops and changes no agent config. `SMARTER_COMPACT_PROXY_RUNTIME=native` keeps the uv path even when Docker runs. `enable` also turns on semantic search with a small built-in embedding model that the proxy runs itself (bge-small-en-v1.5, downloaded once, ~135 MB), so recall works on paraphrases, not only exact words. No embedding server needed. The plugin has no API key of its own. Your agent keeps its own login.
 
 ### How agents integrate
 
@@ -149,7 +149,7 @@ claude plugin marketplace update smarter-compact                # Claude Code: r
 claude plugin update smarter-compact@smarter-compact            # then restart claude
 ```
 
-Skip `proxy restart` and the next session start restarts the proxy once it has been idle 60 s, showing `proxy restarted, <old> -> <new>`. A proxy that is busy, or that `smarter-compact` did not start, gets a warning naming what to restart instead. `proxy restart` stops only a litellm that `smarter-compact` started, or a Docker container publishing the port; it works on Linux, macOS and Windows. See [Updates](docs/context-proxy.md#updates) for the rules.
+Skip `proxy restart` and the next session start restarts the proxy once it has been idle 60 s, showing `proxy restarted, <old> -> <new>`. A proxy that is busy, or that `smarter-compact` did not start, gets a warning naming what to restart instead. `proxy restart` stops only a litellm that `smarter-compact` started, or a Docker container publishing the port (its own `smarter-compact-proxy` container is recreated from the installed package); it works on Linux, macOS and Windows. See [Updates](docs/context-proxy.md#updates) for the rules.
 
 ## CLI
 
@@ -167,7 +167,7 @@ After `npm install -g smarter-compact`, the command on your PATH is **`smarter-c
 | `smarter-compact install cursor` | Optional: MCP + hooks for Cursor Agent (no automatic trim) |
 | `smarter-compact enable <claude\|codex\|opencode>` | Point one agent at the proxy |
 | `smarter-compact disable <claude\|codex\|opencode>` | Remove that pointing and restore the backup |
-| `smarter-compact proxy` | Run LiteLLM in the foreground (debugging; hooks normally start it detached) |
+| `smarter-compact proxy` | Run the native LiteLLM in the foreground (debugging; normally the proxy runs as a Docker container or a detached process) |
 | `smarter-compact proxy restart` | Stop the background proxy and start a fresh one, e.g. after an upgrade (Linux, macOS, Windows) |
 | `smarter-compact status` | Same numbers as the slash command |
 

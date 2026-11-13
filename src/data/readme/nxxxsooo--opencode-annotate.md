@@ -116,9 +116,8 @@ Move its entry from `cli.json` to `opencode.json(c)`, retaining the whole entry 
 ## Upgrading to 0.16.0
 
 **Breaking:** `/ref` (including `--all` and `--tui`) and the agent session search/read
-tools have moved out of Annotate to Another. `another setup` installs Another's
-OpenCode integration with a cross-agent `/ref` in its next release. Until then, stay
-on Annotate 0.15.0 if you need `/ref`.
+tools have moved out of Annotate to Another. Install Another 0.28.0 or later and run
+`another setup` to get its cross-agent `/ref` in OpenCode.
 
 Existing `opencode.json(c)` entries and plugin options keep working. Remove any
 `annotate_session_*` permission rules. Annotate continues to review replies,
@@ -181,6 +180,8 @@ Choose **Pick element** or select text, then write a comment or question. The co
 
 The queue groups notes by page, with contiguous numbers matching page markers and delivered Markdown. Click a note's quoted target to show it on its page without activating the element; off-page notes can open their page. **Edit** changes the feedback, and **Undo** restores a deleted note. The delivery bar shows the whole round's count and destination; drafts remain page-local.
 
+**Clear** in the notes header removes every unsent note in the round; each page group has its own **Clear**. One **Undo** restores the whole removed batch. Drafts, delivered history and **Restore last round** stay intact. Clearing the round drops a pending retry batch only after inline confirmation.
+
 Each send closes the global review round: delivered notes leave the list and the panel is ready for the next round. **Restore last round** returns the most recent round's notes across pages; the last ten rounds are kept globally.
 
 **Send** and **Copy instead** remain separate actions. Send requires a live destination; Copy instead copies the grouped round as Markdown for any agent and closes it the same way. If a session drops during Send, notes remain available for retry or copying. **More review options** contains a non-closing Markdown copy, JSON export, and a preview of the current round.
@@ -192,6 +193,12 @@ After a page reload or same-site navigation, the panel reconnects its page tools
 Plain `/annotate`, `/annotate-pick` and `/annotate-selection` use the TUI; Markdown and plain-text files do too. Explicit URLs and HTML paths passed to `/annotate` enter the browser workflow. A reply containing HTML links or code fences does not change the default.
 
 ### Browser safeguards and limitations
+
+Picking and text selection work inside same-origin iframes, legacy framesets and
+nested frames. Reveal and page markers can find those notes after reload; delivered
+Markdown includes a `Frame:` line for frame context. Cross-origin frames cannot be
+picked and show a clear message. After updating to 0.17.0 (browser protocol 8), reload
+the Chrome extension and restart OpenCode.
 
 Written drafts autosave locally and restore after panel reload or a return to the same URL, including SPA routes. Selecting another target with unfinished feedback offers **Add/Save & switch**, **Keep editing**, or **Discard & switch**. Storage failures keep the input and offer a retry; competing panels require an explicit choice of draft. Saved-note revision checks likewise prevent stale tabs overwriting newer feedback. Full JSON/Markdown exports include redacted URLs, exact selected text/context, verified selector hints, styles and accessibility. Missing/changed/ambiguous targets are labeled in the sidebar instead of silently rebound. Comments and drafts live in extension-owned UI/storage; the page receives only selection metadata and numbered markers, not your written feedback.
 
@@ -340,7 +347,7 @@ See [release instructions](docs/releasing.md) and [changelog](CHANGELOG.md).
 - `/annotate 文档.md`：批注文档，支持中文、空格和相对路径。
 - `/annotate-pick`：从最近的回复和运行中的进度说明里选一条批注。
 - `/annotate-selection`：先在会话里拖选文字，再批注包含这段文字的消息。
-- 0.16.0 移除 `/ref` 和代理会话搜索／读取工具，交由 Another 提供跨代理引用。Another 下次发布后运行 `another setup` 安装集成；此前需要 `/ref` 的用户请保留 0.15.0。原有插件配置继续有效，请移除 `annotate_session_*` 权限规则。
+- 0.16.0 移除 `/ref` 和代理会话搜索／读取工具，交由 Another 提供跨代理引用：安装 Another 0.28.0 或更高版本并运行 `another setup` 即可。原有插件配置继续有效，请移除 `annotate_session_*` 权限规则。
 - `/annotate 页面.html`、`/annotate https://…`：打开网页批注。Chrome 自动注册主机和会话，扩展目的地菜单可筛选、新建空会话、断开及重连；Safari 保持仅复制。跨页备注汇成一轮，Send 与 Copy instead 分开，确认发送后自动继续原会话。
 - 选中文字 → `c` 写批注 → Enter 保存 → `q` 发送并返回。
 - 写批注中途按 `Ctrl+S`，一步保存、返回并发送（中文输入法开着也有效）；`Ctrl+C` 返回后由 OpenCode 询问。

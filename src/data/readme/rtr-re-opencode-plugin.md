@@ -4,13 +4,13 @@
 **Short name: RE:Symbiose. RRF-heuristic, DTD-semantic-capable retriever + symbiotized context engine.
 CPU-first. Local-first. Zero API cost.**
 
-Current release **1.2.1** ([notes](RELEASE_NOTES.md)): vector reconciliation
-plus abort-safe upsert order on top of the 1.2.0 intense freeze.
+Current release **1.2.2** ([notes](RELEASE_NOTES.md)): bounded heal batches,
+dedup exclusion, per-span chunking, and honest dry-runs on the 1.2.1 core.
 
 [![Ko-fi](https://img.shields.io/badge/Support-Ko--fi-FF5E5B?style=for-the-badge&logo=ko-fi&logoColor=white)](https://ko-fi.com/saimonokuma) [![Open Source](https://img.shields.io/badge/Open-Source-9cf?style=for-the-badge)](https://github.com/Nova-Violet-Role) [![Copyleft](https://img.shields.io/badge/Licence-AGPL--3.0--or--later_OR_EUPL--1.2-634bA2?style=for-the-badge)](#-licence--philosophy)
 
 ```text
-         ★ ★ ★  RTR-RE : Symbiose  ★ ★ ★
+          ★ ★ ★  RTR-RE : Symbiose  ★ ★ ★
 ██████  ███████ ██████          ██████  ███████
 █     █    █    █     █         █     █ █
  █     █    █    █     █         █     █ █
@@ -18,7 +18,7 @@ plus abort-safe upsert order on top of the 1.2.0 intense freeze.
   █ █        █    █ █             █ █     █
   █   █      █    █   █           █   █   ███████
      ╷              ╷              ╷        ╷
-════════════════════════════════════════════════►
+════════════════════════════════════════►
 ```
 
 *NOVA VIOLET Role is a non-profit effort releasing one framework at a time — RTR-RE is one of its frameworks: [NOVA VIOLET Role](https://github.com/Nova-Violet-Role).*
@@ -207,13 +207,13 @@ agent CLI and local-LLM setup.
 documentation with a published taxonomy (`eval/TAXONOMY.md`), rendered as
 SVG (white + dark). Every number re-runs on your machine.
 
-**The short version (1.2.0 freeze, 898 queries, 5 corpora, 0 errors):**
-rtr-full leads every column combined (R@1 **0.723**, R@3 **0.850**, MRR
-**0.777**), keeper-memory retrieves evicted spans at 0.975, and the
+**The short version (1.2.2 freeze, 898 queries, 5 corpora, 0 errors):**
+rtr-full leads every column combined (R@1 **0.719**, R@3 **0.846**, MRR
+**0.774**), keeper-memory retrieves evicted spans at 0.95, and the
 infinite-memory claim is measured, not asserted.
 
 | Taxon | What it isolates |
-|---|---|
+|---|---|---|
 | T1 title-self · T2 rare-term · T3 concept | general health, discrimination, conceptual recall |
 | T4 scoped · T5 paraphrase · T6 ident | isolation, lexikon lane, exact-match lane |
 | T7 attribute · T8 entity · T9 content-model | DTD structural recall |
@@ -289,7 +289,7 @@ Lean, not just asserted in Python.
 
 | Component | Path | What it is |
 |---|---|---|
-| Keeper (1.2.0) | `opencode-plugin/rtr-re-keeper.js` | window edge: selects, protects (`todowrite`), prunes, sinks first; fails open |
+| Keeper (1.2.2) | `opencode-plugin/rtr-re-keeper.js` | window edge: selects, protects (`todowrite`), prunes, sinks first; fails open |
 | Compressor | `execution/context_budget.py` + `execution/symbiose_worker.py` | verbatim until trigger, drain to target, background tickets, never pauses the turn |
 | Manager | `execution/memory_engine.py` | memory MCP viewport: status/health/work-in-progress/retrieval, ≤512 tickets |
 | Engine-beneath | `formal/Symbiose.lean`, `eval/engine_beneath.py` | Lean-proven typed lanes and bounded loop |
@@ -326,7 +326,7 @@ substance lives in retrieval form instead of being re-sent:
    larger the fraction saved — proven monotone, measured 88.6% on the
    live 3.43M session (391k served per turn).
 5. **Retrieval beats the baseline it replaces.** rtr-full leads every
-   classic RAG arm combined (R@1 0.723 vs 0.638, R@3 0.850 vs 0.736)
+   classic RAG arm combined (R@1 0.719 vs 0.637, R@3 0.846 vs 0.735)
    on identical corpora and queries — no strawman, same model sizes.
 
 **The evidence.** `formal/Symbiose/` (Cost, Planner, Lane, Control —
@@ -486,10 +486,10 @@ evicted span exactly where it was raised (dummy3 0.9700, dummy4 0.9618).
 ## 🤝 Contributing
 
 | Area | How you can help |
-|---|---|
+|---|---|---|
 | 🎯 **Falsify a claim** | Prove one of our eval numbers wrong. Credited in the changelog. |
 | 💻 **Code** | Pillars, profiles, new model slugs, new lanes |
-| 📖 **Documentation** | An unanswerable question is our defect, not yours |
+| 📖 **Documentation** | An unanswered question is our defect, not yours |
 | 🧪 **Testing** | Break it on a platform we do not own, and tell us where |
 
 ## 💬 Connect

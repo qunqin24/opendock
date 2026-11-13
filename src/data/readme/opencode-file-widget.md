@@ -132,22 +132,21 @@ To use a checkout instead of the npm package:
 #### Sidebar
 
 ```text
-──────────────────────────────
-📦 文件传输                    ⚙ 设置
-
-⇡ 点击选择并上传文件
+📦 文件传输              ⇡ 上传  ⚙ 设置
 
 最新服务器路径:              [复制 @]
 …/uploads/8a1f/report.xlsx
 
 近期记录                  全部 (12)
 
+⠼ ↓ data.csv                   下载中
 ● ↑ report.xlsx                 14:32
 ● ↓ data.csv                    14:20
 ● ↑ broken.zip                  14:10
 ```
 
 - `●` green = success, red = failure.
+- A spinning `⠋⠙⠹…` marker means a transfer is running; the record appears as soon as it starts, and the right side shows the current phase (`读取文件` / `上传中` / `下载中` / `保存中`).
 - `↑` green = upload, `↓` blue = download.
 - Clicking a successful upload copies its path.
 - Clicking a successful download reveals the local file.
@@ -396,22 +395,21 @@ opencode --server http://<server>:<port>
 #### 侧边栏
 
 ```text
-──────────────────────────────
-📦 文件传输                    ⚙ 设置
-
-⇡ 点击选择并上传文件
+📦 文件传输              ⇡ 上传  ⚙ 设置
 
 最新服务器路径:              [复制 @]
 …/uploads/8a1f/report.xlsx
 
 近期记录                  全部 (12)
 
+⠼ ↓ data.csv                   下载中
 ● ↑ report.xlsx                 14:32
 ● ↓ data.csv                    14:20
 ● ↑ broken.zip                  14:10
 ```
 
 - `●` 绿色=成功，红色=失败；
+- `⠋⠙⠹…` 旋转符号=传输进行中：记录会在传输一开始就出现，右侧实时显示当前阶段（`读取文件` / `上传中` / `下载中` / `保存中`）；
 - `↑` 绿色=上传，`↓` 蓝色=下载；
 - 点击成功上传记录复制路径；
 - 点击成功下载记录定位本地文件；

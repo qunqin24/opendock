@@ -252,15 +252,29 @@ object store, skips the revert check (the stop hook runs it) and says so in the 
 | Cursor | `.cursor/hooks.json` | supported |
 | Codex CLI | `.codex/hooks.json` | supported; review and trust the hooks once with `/hooks`, because Codex skips untrusted project hooks |
 | OpenCode 2.x | `.opencode/plugins/greenproof.js` | a plugin file, see [OpenCode](#opencode); 2.x only |
-| Gemini CLI | `.gemini/settings.json` | experimental |
+| Gemini CLI | `.gemini/settings.json` | experimental; superseded by Antigravity CLI (below) |
+| GitHub Copilot CLI | `.github/hooks/greenproof.json` | experimental; see [Copilot also runs the Claude Code hooks](#copilot-also-runs-the-claude-code-hooks) |
+| Qwen Code | `.qwen/settings.json` | experimental; Qwen runs project hooks only after you approve them or trust the folder |
+| Factory Droid | `.factory/hooks.json` | experimental; Droid snapshots hooks at startup, so restart it and review them in `/hooks` |
+| Antigravity CLI | `.agents/hooks.json` | experimental; the successor to Gemini CLI |
+| OpenHands | `.openhands/hooks.json` | experimental |
+| Auggie | `.augment/settings.json` | experimental |
+
+An adapter is `supported` once a real-CLI end-to-end run (a block on a requested test skip, then
+a release on the next unchanged stop) is recorded in [MEASUREMENTS.md](MEASUREMENTS.md). Until
+then it is `experimental`: the file `init` writes follows the vendor's documentation as read on
+2026-11-12 and has not been run against the real CLI, so it may not gate anything. `init`
+installs an experimental adapter only when you name it in `--agents`, and prints a warning.
 
 `--agents auto` (the default) installs Claude Code when `.claude/` or `CLAUDE.md` exists,
 Cursor when `.cursor/` exists, Codex CLI when `.codex/` exists and OpenCode when `.opencode/`,
-`opencode.json` or `opencode.jsonc` exists. It never installs the
-experimental Gemini CLI adapter; name it in `--agents` to get it, with a warning. Gemini CLI
-was superseded by Antigravity CLI, and an open upstream issue reports its `AfterAgent`
-hooks not firing. `--agents none` installs nothing. `--hook-command CMD` sets how the hooks
-invoke greenproof, for example `uv run greenproof`.
+`opencode.json` or `opencode.jsonc` exists. It never installs an experimental adapter; name
+it in `--agents` to get it, with a warning (`--agents qwen,droid`). Once they are supported,
+`auto` will also pick GitHub Copilot CLI when `.github/hooks/` or
+`.github/copilot-instructions.md` exists, Qwen Code when `.qwen/` exists and Droid when
+`.factory/` exists. Gemini CLI was superseded by Antigravity CLI, and an open upstream issue
+reports its `AfterAgent` hooks not firing. `--agents none` installs nothing. `--hook-command
+CMD` sets how the hooks invoke greenproof, for example `uv run greenproof`.
 
 By default `init` looks on PATH for an installed `greenproof`, skipping the scripts directory
 of the virtual environment it is running in (what `uvx`, `pipx run` and a project venv use),
@@ -280,6 +294,18 @@ Installing the gate twice is safe. A plugin and the hooks `init` writes, or user
 settings, can both run for one stop, in parallel. greenproof serialises them with a lock in
 the git directory and records its decision for the stop, so the second hook gives the first
 one's decision again: one decision per stop, not a block followed by a release.
+
+### Copilot also runs the Claude Code hooks
+
+GitHub Copilot CLI and Copilot in VS Code read the repository's `.claude/settings.json` as
+well as `.github/hooks/`, and run a `Stop` entry there with Copilot's own payload (it has a
+`timestamp` field, which Claude Code's does not). Copilot treats exit code 2 from a stop hook
+as a warning, so greenproof's Claude block would not block, and a repository with both files
+would run two greenproof hooks for one stop. So `greenproof check --hook claude` and
+`session-start --hook claude` look at the payload: when it is Copilot's and a
+`.github/hooks/*.json` file holds a greenproof `--hook copilot` entry for that event, the Claude
+hook defers (it exits 0, prints nothing and writes no state) and the Copilot hook answers.
+Without that file it answers in Copilot's format itself.
 
 ### OpenCode
 
@@ -320,6 +346,29 @@ Or use the npm package [`opencode-greenproof`](https://www.npmjs.com/package/ope
 
 Having both is safe: when two copies of the plugin load in one process, one stop is checked
 and continued once.
+
+### Agents without a hook that can block
+
+These agents have no stop hook that can hold the agent at the end of a task, so greenproof
+installs no hook for them (as of 2026-11-12). What they have is AGENTS.md, which `init` writes
+and which tells the agent to run `greenproof check`, and CI: `greenproof init --ci github`
+adds the check to every pull request, and that is their gate.
+
+| agent | hook situation | reads AGENTS.md (per [agents.md](https://agents.md)) |
+|---|---|---|
+| Cline | `afterRun` is observe-only | not documented |
+| Roo Code | no hook that can block a stop | yes |
+| Windsurf Cascade | `post_cascade_response` is fire-and-forget | yes |
+| Zed | no hook that can block a stop | yes |
+| Warp | no hook that can block a stop | yes |
+| Aider | no hook that can block a stop | yes |
+| Continue | no hook that can block a stop | not documented |
+| Kiro | blocking on Agent Stop is not documented | not documented |
+| Devin | no hook that can block a stop | yes |
+| Jules | no hook that can block a stop | yes |
+
+Goose, Junie, Amp and Kilo Code do have hooks that can block, in a new format or a plugin
+runtime. They are planned, not supported yet.
 
 ### What hooks can and cannot do
 

@@ -20,7 +20,7 @@ The kit splits the work into a routing layer and a roster of specialists:
 - **Exploration starts from a repo map.** The `profiler` generates a compact `.context/repo-map.md` (hard 300-line budget) that the `explorer` reads before broad searches, reducing whole-file reads and token waste.
 - **It adapts to any repository.** On first run the `profiler` agent detects the stack (or interviews you for an empty repo) and scaffolds `.context/` (memory) and `plan/` (kanban).
 
-On **OpenCode 2** the kit is the `opencode-orchestrator-kit` plugin, published on npm: agents, commands and skills are registered at runtime — nothing is written into your project's `.opencode/` directory. Add `"package": "opencode-orchestrator-kit"` to the `plugins` array (below). A local `plugin/` directory and a git install remain available as alternatives. The native copy-based installer still works and remains supported, but it is **deprecated in favor of the plugin** on OpenCode 2 (the `default` profile it ships references provider IDs that are not yours — see the _Choose your model profile_ step). Optional notes for [OpenCode Studio](https://github.com/Microck/opencode-studio) users are in `docs/SETUP-OPENCODE-STUDIO.md`.
+On **OpenCode 2** the kit is the `opencode-orchestrator-kit` plugin, published on npm: agents, commands and skills are registered at runtime — nothing is written into your project's `.opencode/` directory. Add `"package": "opencode-orchestrator-kit"` to the `plugins` array (below). A local `plugin/` directory and a git install remain available as alternatives. The native copy-based installer still works and remains supported, but it is **deprecated in favor of the plugin** on OpenCode 2 (the `default` profile it ships references provider IDs that are not yours — see the _Provider mapping_ bullet in the [Quickstart](#quickstart) section below). Optional notes for [OpenCode Studio](https://github.com/Microck/opencode-studio) users are in `docs/SETUP-OPENCODE-STUDIO.md`.
 
 ## How a request flows
 
@@ -78,7 +78,7 @@ Full contracts, permissions and model fallbacks are in each `agents/*.md` file (
 
 With the plugin, tier resolution happens at runtime from `plugin/src/tiers.ts` presets — there is no `{{TIER_*}}` substitution at install time.
 
-`opencode-orchestrator-kit` is published on npm (`1.1.1`, tag `v1.1.1`; later releases follow `.github/workflows/release.yml` and the steps in `CONTRIBUTING.md`). OpenCode 2 loads plugins from the `plugins` array in `opencode.json` or `opencode.jsonc` ([Plugins](https://opencode.ai/v2/docs/plugins)). A string entry is a package name or a local directory. Pass options with the object form `{ "package", "options" }`. Local paths must be directories (a path to a single file is skipped). Relative paths resolve from the config file that contains the entry.
+`opencode-orchestrator-kit` is published on npm (`1.1.1`; later releases follow the steps in [`CONTRIBUTING.md`](CONTRIBUTING.md)). OpenCode 2 loads plugins from the `plugins` array in `opencode.json` or `opencode.jsonc` as a package name, a local directory, or the object form `{ "package", "options" }` ([Plugins](https://opencode.ai/v2/docs/plugins)).
 
 Primary install, the npm package:
 
@@ -100,14 +100,7 @@ A local checkout of this repository uses the same object form with an absolute d
 opencode plugin add 'github:NicoGenti/opencode-orchestrator-kit#main::path:plugin'
 ```
 
-That command writes a package entry. Set `preset` and `withExtras` with the object form above if the generated entry has no `options`. The docs do not show a git spec inside a `package` field example; they do show git specs as `plugin add` arguments and state that startup checks unpinned npm and Git plugins. This repository has not executed that install against a live OpenCode binary.
-
-What the plugin registers at runtime (nothing is copied into `.opencode/`):
-
-- **16 agents** (+ `pc-doctor` and `writer` opt-in with `"withExtras": true`), from the same `agents/`/`extras/` contracts.
-- **5 commands** (`/start-session`, `/quick`, `/recall`, `/research-mode`, `/close-session`) and **9 skills**.
-- **One native tool, `plan_board`**, the TypeScript port of `scripts/plan-board.py`: standing authorization covers `check` and `move` of conforming plan files without approval; every other board operation (`new`, `adopt`, body edits, deletion, rename) needs per-request approval.
-- **Setup options**: `preset` (one of the five bundled presets: `default`, `freellmapi`, `generic`, `opencode-go-free`, `ollama`, all in the same format as `templates/models.config.json`; a preset whose tier values are all `placeholder/*` fails fast with a `TierConfigError`) and `withExtras` (default `false`).
+What the plugin registers at runtime (nothing is copied into `.opencode/`): 16 agents (+ `pc-doctor` and `writer` with `"withExtras": true`), 5 commands (`/start-session`, `/quick`, `/recall`, `/research-mode`, `/close-session`), 9 skills, and the native `plan_board` tool — the TypeScript port of `scripts/plan-board.py`, where standing authorization covers `check` and `move` of conforming plan files and every other board operation needs per-request approval. Setup options are `preset` (one of the five bundled presets, in the same format as `templates/models.config.json`; all-`placeholder/*` presets fail fast with a `TierConfigError`) and `withExtras` (default `false`).
 
 Your own configuration always wins: the plugin upserts an agent's `transform` only when the editor returns nothing for it, so user config in `~/.config/opencode/` or the project config is never overwritten.
 
@@ -115,77 +108,16 @@ The plugin requires **`@opencode/plugin` `^2.1.0`** as a peer dependency (instal
 
 ## Quickstart
 
-The section above is the OpenCode 2 install (the npm package). The numbered steps below are the legacy `install.sh` installer.
+[`QUICKSTART.md`](QUICKSTART.md) is the canonical minimal walk-through: prerequisites, the plugin and legacy installer paths, the provider mapping, and the first `/start-session`. This section keeps only the choices needed before the first run.
 
-> **Heads-up:** the `default` model profile references provider IDs that are not yours. To actually run agents you need at least one usable provider/model mapping of your own: switch to the `generic` preset and edit `.opencode/models.config.json` before your first `/start-session` (step 3).
+> **Heads-up:** the `default` model profile references provider IDs that are not yours. The editable `generic` profile in `templates/models.config.json` is the starting point for your own providers; every tier under it is a `placeholder/*` sentinel until you replace it.
 
-### 1. Prerequisites
+- **Provider mapping.** Edit `.opencode/models.config.json`, seeded from `templates/models.config.json`, and set `default_preset` to your profile. The five tiers are `TIER_ROUTER`, `TIER_REASONING`, `TIER_CODE`, `TIER_FAST`, `TIER_REVIEW`; agents reference them as `{{TIER_*}}` tokens instead of concrete IDs. You need at least one usable provider/model mapping of your own.
+- **Respect the tier abstraction:** do **not** edit the `model:` field of any agent in `agents/*.md` or `extras/*.md` directly. See [`docs/CONFIGURATION.md`](docs/CONFIGURATION.md) for resolution rules and fallback chains.
+- **Extras are off by default.** `--with-extras` (or `"withExtras": true`) adds `pc-doctor` and `writer`; the base install ships `AGENTS.md`, `agents/`, `skills/` and `command/`.
+- **First run.** Select `@orchestrator` and run **`/start-session`**. It delegates to `profiler` when `PROJECT-PROFILE.md` or `plan/` is missing, loads `.context/progress.md`, `decisions.md` and `issues.md`, and replies with a 3-4 line status summary.
 
-- [OpenCode](https://opencode.ai) installed and on `PATH` (`opencode --version`).
-- **Bash**. `install.sh` is a bash script. Supported: Linux, macOS, and Windows under Git Bash, MSYS or Cygwin. Plain `cmd.exe` and PowerShell are not supported.
-- At least one usable provider account you can point a tier to. OpenCode does not bundle provider credentials.
-
-### 2. Install the kit (legacy installer — deprecated)
-
-The `install.sh` copy-based installer is the **v1 path**, kept for OpenCode 1.x and offline use. It is deprecated in favor of the plugin (see "Install on OpenCode 2" above and [`docs/MIGRATION-V1-V2.md`](docs/MIGRATION-V1-V2.md)).
-
-From the repo root:
-
-```bash
-# Project-only: installs into ./.opencode/ and ./AGENTS.md of the current repo
-./install.sh project
-
-# Global: installs into ~/.config/opencode/ for every project on this machine
-./install.sh global
-```
-
-The installer seeds `.opencode/models.config.json` from `templates/models.config.json`, runs the model-profile validator before writing any file, then resolves every `{{TIER_*}}` token in the installed agents to concrete model IDs.
-
-| Flag                   | Effect                                                                                                               |
-| ---------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| `--symlink`            | Symlink instead of installing plain files, so `git pull` in this repo updates every consumer.                        |
-| `--with-extras`        | Install `pc-doctor` and `writer` into `agents/`. Off by default. OpenCode does not load an `extras/` directory.      |
-| `--with-examples`      | Install `skills/examples/`. Off by default; the base copy excludes that directory.                                   |
-| `--upgrade`, `--force` | Overwrite kit-managed files. Each replaced path is moved to `<path>.kit-backup` first. Default skips existing paths. |
-| `--skip-validation`    | Skip the model-profile validator. Not recommended, emergency recovery only.                                          |
-
-Without the installer, the manual path covers the same five items: `AGENTS.md`, `CONTRIBUTING.md`, `agents/`, `skills/` (without `skills/examples/`) and `command/`. Place them where OpenCode looks (project root, or `~/.config/opencode/` for global). To opt in by hand, copy `pc-doctor.md` and `writer.md` from `extras/` into `agents/`. Copy `skills/examples/` only when you want the language examples.
-
-### 3. Choose your model profile
-
-> On the plugin path this step collapses to picking a `preset` (see above) — tier resolution happens at runtime and there are no `{{TIER_*}}` tokens to resolve.
-
-Five logical tiers are written into agent `model:` lines as `{{TIER_*}}` tokens:
-
-| Tier token       | Default agent(s)                                                                                          | Role                               | Required?                                  |
-| ---------------- | --------------------------------------------------------------------------------------------------------- | ---------------------------------- | ------------------------------------------ |
-| `TIER_ROUTER`    | `orchestrator`                                                                                            | Routing and checkpointing.         | Optional (falls back to `TIER_REASONING`). |
-| `TIER_REASONING` | `oracle`, `security`, `planner`, `plan-writer`                                                            | Deep reasoning and architecture.   | Required.                                  |
-| `TIER_CODE`      | `developer-fixer`, `test-engineer`                                                                        | Implementation and test writing.   | Required.                                  |
-| `TIER_FAST`      | `profiler`, `explorer`, `build-helper`, `npm-helper`, `deploy-helper`, `comprehension-coach`, `librarian` | Lightweight, high-throughput work. | Required.                                  |
-| `TIER_REVIEW`    | `code-reviewer`                                                                                           | Correctness and quality review.    | Optional (falls back to `TIER_CODE`).      |
-
-`templates/models.config.json` ships five presets: `default` (known-good provider IDs), `freellmapi` (the local FreeLLMAPI app), `opencode-go-free`, `ollama`, and `generic` (editable, every tier is a `placeholder/*` sentinel).
-
-To use your own providers:
-
-1. Set `default_preset` to `"generic"` in `.opencode/models.config.json`.
-2. Replace every `placeholder/*` value under `presets.generic.models` with a real `<provider>/<model>` ID.
-3. Validate (must exit 0 and print `OK:`):
-
-```bash
-bash scripts/validate-models.sh
-```
-
-Do **not** edit the `model:` field of any agent in `agents/*.md` or `extras/*.md` directly. The tier abstraction is the supported extension point, and direct edits silently regress on the next update. See `docs/CONFIGURATION.md` for resolution rules and fallback chains.
-
-### 4. Run the orchestrator
-
-```bash
-opencode
-```
-
-Select `@orchestrator` (or set it as your default agent), then run **`/start-session`** at the start of every new session. It delegates to `profiler` if there is no `PROJECT-PROFILE.md` or `plan/` structure yet, loads `.context/progress.md`, `decisions.md` and `issues.md`, and replies with a 3-4 line summary of the stack, current status and latest issue or decision, in the language you are speaking, before waiting for your next instruction. See `command/start-session.md`.
+Manual install detail is in [`docs/SETUP-NATIVE.md`](docs/SETUP-NATIVE.md); the installer flags, validation and FreeLLMAPI preset are in [`QUICKSTART.md`](QUICKSTART.md#installation).
 
 ## When to use the kit (and when not to)
 
@@ -251,6 +183,107 @@ Caveats, in the spirit of [`docs/BENCHMARK-TOKEN-USAGE.md`](docs/BENCHMARK-TOKEN
 - **Design-first governance:** keep architecture decisions in `.context/DESIGN-RULES.md`; [`docs/DESIGN-RULES.md`](docs/DESIGN-RULES.md) describes the template, the lifecycle, and the checks run by `planner` and `code-reviewer`.
 - **Engineering baseline** (secrets hygiene, git hygiene, definition of done) lives in `CONTRIBUTING.md`.
 
+## Prompt caching and session reuse
+
+Providers cache a repeated prompt prefix, and OpenCode lets you configure how that cache is used. Cache tuning changes the cost and latency of a repeated prefix; it does not change what a session knows.
+
+### Cache configuration
+
+Cache settings live at the provider level (`providers.<id>.settings.cache`) or per model (`providers.<id>.models.<model>.settings.cache`), and a model entry overrides its provider. OpenCode sends no TTL by default, so the provider's own default applies; the TTL is set with `settings.cache.ttl` and takes the units `ms`, `s`, `m`, `h`, `d` ([cache lifetime](https://opencode.ai/docs/models/#cache-lifetime)).
+
+#### Anthropic
+
+Anthropic's default prompt-cache lifetime is 5 minutes, and its 1-hour option costs twice as much to write. Raise the TTL here, and enable [warming](https://opencode.ai/docs/warming/) so a paused session keeps its prompt cache alive:
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "warming": true,
+  "providers": { "anthropic": { "settings": { "cache": { "ttl": "1h" } } } }
+}
+```
+
+Warming is a periodic transient keep-alive request and is off by default. The top-level `warming` key accepts `true` or `{ prompt, interval, duration }`; a provider or model overrides it through `settings.cache.warming` (the same fields except `prompt`). `interval: "auto"` is 90% of `cache.ttl` (4 minutes without a TTL) and `duration` defaults to `"30 minutes"`. Subagent sessions are not warmed, and warming requests do not mutate durable session state.
+
+#### OpenAI-compatible providers
+
+Whether the endpoint accepts the `prompt_cache_key` body field is declared with `compatibility.supportsPromptCacheKey`, at the provider or the model level ([prompt caching](https://opencode.ai/docs/models/#prompt-caching)). Per the OpenCode docs: "Whether the endpoint accepts the `prompt_cache_key` body field. Read by: OpenAI Chat, OpenAI Responses, Mistral. OpenAI Chat only sends the key when true, which some provider packages set by default. Other APIs send it unless false."
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "providers": {
+    "myproxy": {
+      "package": "@opencode/ai/providers/openai-compatible",
+      "settings": { "baseURL": "https://proxy.example.com/v1" },
+      "compatibility": { "supportsPromptCacheKey": true },
+      "models": { "gpt-5.5": {} }
+    }
+  }
+}
+```
+
+#### Claude behind an OpenAI-compatible proxy
+
+A proxy such as LiteLLM cannot be detected as serving Claude models, so OpenCode does not know those models need Anthropic-style `cache_control` breakpoints. Set `compatibility.cacheFormat` to `"anthropic"` on them ([custom providers](https://opencode.ai/docs/providers/#custom)); OpenCode then marks the last tool definition, the system prompt and the latest message with `cache_control: {"type": "ephemeral"}`, and the endpoint's default 5-minute lifetime applies.
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "providers": {
+    "litellm": {
+      "package": "@opencode/ai/providers/openai-compatible",
+      "settings": { "baseURL": "https://litellm.example.com/v1" },
+      "models": {
+        "claude-sonnet-5-5": { "compatibility": { "cacheFormat": "anthropic" } }
+      }
+    }
+  }
+}
+```
+
+Set `cacheFormat` at the provider level instead when every model that provider serves uses the same format.
+
+### Session reuse
+
+Cache entries are provider-side and prefix-scoped: context lives in the session, so a new child session starts empty even when the provider serves the identical prefix from cache, and a hit affects only the cost and latency of that prefix. Reuse a child session only for iterative work on the same bounded objective; the delegation rules are in the orchestrator's `## Cache And Session Reuse` policy (`agents/orchestrator.md`).
+
+## Cache-aware prompt design
+
+An agent prompt has two halves, and only the second one changes per task. The **stable** half is the system prompt shipped with the agent: identity, operating contract, output format, safety rules. The **variable** half is the delegation prompt the orchestrator writes for one task: the goal, the files in play, the relevant file paths and symbols, the verification commands, the edge cases. Keep the stable half byte-identical from session to session and let the variable half change freely, appended after it.
+
+The stable prefix is exactly `AGENTS.md`, `agents/*.md` and `extras/*.md`, in that enumeration order; [`CONTRIBUTING.md`](CONTRIBUTING.md) (`## Prompt-Assembly Stable-Prefix Contract`) fixes the order, the frontmatter key order and the committed boundary, so a change to the stable prefix is a contract change, not an edit.
+
+### Stable versus variable
+
+Stable — excerpts from `agents/developer-fixer.md`, identical bytes in every session:
+
+```text
+# Developer-Fixer
+
+Unified implementation agent. Pick the mode from the incoming spec’s completeness; never ask which mode to use.
+
+- State the selected mode in one clause.
+- List touched files as flat bullets: path + one-line change.
+- Report verification as pass/fail counts; include an exact error line only when needed.
+```
+
+Variable — one orchestrator dispatch, rewritten for every task:
+
+```text
+Goal: make the parser reject trailing commas with a typed error.
+Scope: src/parser.ts and tests/parser.test.ts; nothing under src/cli/.
+Inputs Available: src/parser.ts:88 (parseObject), src/errors.ts:12 (TrailingCommaError).
+Verification: bun test tests/parser.test.ts
+Notes/Edge Cases: keep the existing message for every other parse failure.
+```
+
+The first block is the same text on every dispatch; the second block is new each time. The rules for the variable half are in `## Delegation Rules` of [`agents/orchestrator.md`](agents/orchestrator.md).
+
+### Why the split pays off
+
+A prompt cache is prefix-scoped: the provider stores a tokenized prefix and reuses it when the next request starts with the same bytes, so a cache hit changes the cost and the latency of that span without changing what the session knows. A stable agent prompt makes the cacheable span as long as possible and hits it from the first token; rewriting any contract line invalidates everything after the point of divergence. Read this together with [Prompt caching and session reuse](#prompt-caching-and-session-reuse) above for the provider-side settings. It only pays off where the provider supports prompt caching — elsewhere the split is still readable, just not cheaper.
+
 ## Companion kits
 
 Companion repositories are optional. This kit runs on its own. A third-party kit plugs in by installing skills and commands where OpenCode already looks; it does not need a change here unless it wants a new allowlist entry.
@@ -266,18 +299,7 @@ Companion repositories are optional. This kit runs on its own. A third-party kit
 
 ### Adding a skill
 
-Every shipped agent starts `permission.skill` with `"*": deny`. OpenCode then loads a skill only when a later rule allows its name. Putting `skills/<name>/SKILL.md` on disk is not enough.
-
-**In this repository**
-
-1. Add `skills/<name>/SKILL.md`. The frontmatter `name` is the allowlist key (`skills/examples/` included).
-2. Add that name to the `permission.skill` map of each agent that should load it, after `"*": deny`.
-3. Run `bun run sync-assets` so `plugin/assets/` matches.
-4. `tests/skill-allowlist.test.ts` fails when an `allow` or `ask` names a skill that does not ship here. `deny` entries, the `"*"` catch-all, and globs are not required to name a shipped skill. A glob that matches **zero** shipped skills is legal only for a documented reserved prefix: `web-*` and `project-*`.
-
-**In a project that uses the kit**
-
-Name the skill `project-<something>` (directory and frontmatter `name`). `orchestrator`, `developer-fixer`, and `code-reviewer` already allow that prefix. Other agents still need an allowlist entry. Leave `web-*` for a web-stack skill pack.
+Every shipped agent starts `permission.skill` with `"*": deny`, so a skill on disk is loaded only when a later rule allows its name. The repository procedure (allowlist edit, `bun run sync-assets`, `tests/skill-allowlist.test.ts`) and the consuming-project `project-*` path are in [`CONTRIBUTING.md`](CONTRIBUTING.md#adding-a-skill). Name a skill for a project `project-<something>`; leave `web-*` for a web-stack pack.
 
 ## Development
 
@@ -290,7 +312,7 @@ bun test                # test suite
 bun run sync-assets     # refresh plugin/assets after editing agents, extras, skills, or the packaged commands
 ```
 
-`plugin/assets/` is generated. After changing `agents/`, `extras/`, `skills/`, or a packaged command (`command/start-session.md`, `command/quick.md`, `command/recall.md`, `command/research-mode.md`, `command/close-session.md`), run `bun run sync-assets` (or `bun run sync-assets --check` to fail when the mirror has drifted). The plugin `prepack` script runs the same copy. Do not edit the packaged copies by hand.
+`plugin/assets/` is generated. After changing `agents/`, `extras/`, `skills/`, or a packaged command, run `bun run sync-assets` (or `bun run sync-assets --check` to fail when the mirror has drifted). The repository checks, mirror rule and release steps are owned by [`CONTRIBUTING.md`](CONTRIBUTING.md); do not edit the packaged copies by hand.
 
 Changes are tracked in `CHANGELOG.md`.
 

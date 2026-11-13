@@ -85,7 +85,7 @@ a chat-with-your-agent relay, it never injects text into your sessions.
   notifies only for its own project root; a single-poller file lock guarantees
   only one process consumes `getUpdates`; process-level event-id dedupe means
   reloads don't double-send.
-- 🌐 **en / it** notification language.
+- 🌐 **en / it / zh** notification language (BCP-47 tags accepted).
 - 🔒 **Private by default** — `hideCommands: true` replaces shell/tool args with
   a count; every log line and error message is token-redacted.
 
@@ -164,7 +164,7 @@ names, so secrets never sit in `opencode.jsonc`:
 ```sh
 export TELEGRAM_BOT_TOKEN="123456789:AA…"
 export TELEGRAM_CHAT_ID="123456789"        # negative number for group chats
-export TELEGRAM_LANGUAGE="en"              # optional (mainly for OpenCode v1)
+export TELEGRAM_LANGUAGE="en"              # optional: en, it, zh, or a tag like zh-CN
 ```
 
 (For a `systemd` unit or `docker compose` install, pass these environment
@@ -186,7 +186,7 @@ All options live under `options.` of the plugin entry. Only `botToken` and
 | `telegram.botToken` | string | — | Bot token; `"${VAR}"` expands from process env |
 | `telegram.chatId` | string | — | Destination chat (user id or negative group id) |
 | `telegram.allowedUserIds` | string[] | `[]` | Extra guard: only these Telegram user ids may tap buttons or run commands (empty = everyone reaching this bot token) |
-| `language` | `"en" \| "it"` | `"en"` | Notification language |
+| `language` | string | `"en"` | Notification language: `en`, `it`, `zh`. Tags such as `zh-CN`, `zh-Hans` or `it-IT` match by base language; unknown tags fall back to `en`; `cn` is accepted as a `zh` alias |
 | `events.permission` | boolean | `true` | Permission request notifications + buttons |
 | `events.question` | boolean | `true` | Question (`form.created`) notifications |
 | `events.idle` | boolean | `true` | Completion notifications (debounced) |
@@ -198,6 +198,10 @@ All options live under `options.` of the plugin entry. Only `botToken` and
 | `maxMessageChars` | number | 3800 | Max body length (Telegram hard limit is 4096) |
 | `hideCommands` | boolean | `false` | Replace shell/tool arguments with `[n]` in bodies |
 | `logFile` | string | off | Append-only debug log path (token-redacted, one line per event) |
+
+`language` is process-wide (one chat per plugin instance). `zh` currently
+contains Simplified Chinese; `zh-TW`/`zh-Hant` resolve to it until a
+Traditional Chinese catalog is added.
 
 ## Commands
 
@@ -299,6 +303,13 @@ bun test
 bun run smoke   # live OpenCode host check (OPENCODE_BIN to override)
 bun run compat  # ci + smoke; used by upstream-watch before it moves the anchor
 ```
+
+### Adding a language
+
+1. Add the base code to `LANGUAGES` in `src/config.ts`.
+2. Copy `src/i18n/it.ts` to `src/i18n/<code>.ts`, replace the values, and keep the HTML tags, `{placeholders}` and `satisfies Catalog` intact.
+3. Register the catalog in `src/i18n/index.ts`.
+4. Run `bun run ci`: the compiler and `tests/i18n.test.ts` enforce key and placeholder parity.
 
 ### Monitoring
 
