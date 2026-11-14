@@ -146,7 +146,7 @@ works on both V1 and V2 hosts:
 | `override` | `boolean`  | `false` | Overwrite variables that already exist in the real environment. By default the real environment always wins. |
 | `required` | `string[]` | `[]`    | Variables that must exist after loading. A warning is logged for each missing one. |
 | `watch`    | `boolean`  | `true`  | Watch the secrets file and hot-reload `process.env` when it changes (see below). |
-| `pollIntervalMs` | `number` | `5000`  | Interval of the mtime poll backing the file watcher (only with `watch` on). OS watch events are the fast path; the poll heals dropped events — FSEvents can drop them under load, which would otherwise miss the reload entirely. One stat per interval; `0` disables the net (not recommended). |
+| `pollIntervalMs` | `number` | `5000`  | Integer interval of the content poll backing the file watcher (only with `watch` on). OS watch events are the fast path; the poll heals dropped events. `0` disables the net (not recommended); invalid values, including fractions, fall back to `5000` with a warning. |
 | `mcpReconnect` | `boolean \| "all" \| string[]` | `true` | After a hot reload, reconnect MCP servers so they pick up new values. `true` = only servers whose config references a changed variable (precise), `"all"` = every enabled server, `["name"]` = only those servers, `false` = never. |
 | `quiet`    | `boolean`  | `false` | Silence info/debug messages (warnings are always shown). |
 | `debug`    | `boolean`  | `false` | Also log the *names* of applied/skipped keys. Values are never logged. |

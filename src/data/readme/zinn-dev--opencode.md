@@ -24,7 +24,7 @@ Create a project, add a task, and move it through the board:
 zinn project create MDR --name 'Macrodata Refinement'
 zinn task create MDR --title 'Refine 75% of the numbers'
 zinn task list MDR
-zinn task move MDR-1 'In Progress'
+zinn task move MDR-1 Doing
 ```
 
 See the [Quick start](https://zinn.sh/docs/quick-start) for a complete first workflow, the [CLI reference](https://zinn.sh/docs/cli) for commands and input rules, and [Install with coding agents](https://zinn.sh/docs/installation#use-with-coding-agents) for agent setup.
@@ -42,9 +42,10 @@ bun install
 bun run typecheck
 bun run test
 bun run test:node
+bun run test:release
 ```
 
-Package and installed-consumer tests need pnpm, Git, and Node.js 24.15.0 or newer on `PATH`. The [website](docs/README.md) has its own checks.
+`bun run test:release` runs the build and package checks, which need pnpm, Git, and Node.js 24.15.0 or newer on `PATH`. The [website](docs/README.md) has its own checks.
 
 Seed and use the isolated `.zinn-dev` database:
 

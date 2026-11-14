@@ -39,7 +39,11 @@ asks whether to enable `delivery: agent` (default No) and to create a starter
 by itself. Without a terminal and without `--yes` it only prints the plan and changes
 nothing. The host-specific steps are also available on their own:
 `npx @pablozrrrr/jevguard-cli install --host claude-code` runs
-`claude plugin marketplace add` and `claude plugin install` for you.
+`claude plugin marketplace add` and `claude plugin install` for you. Both act on the
+Claude Code config directory in use: `CLAUDE_CONFIG_DIR` when it is set (agent platforms
+that run Claude Code with their own config directory per agent), otherwise `~/.claude`.
+Run the install with the same `CLAUDE_CONFIG_DIR` the agent runs with; the other
+directory is not touched, and the output names the one used.
 
 Then add your rules to `.jev/rules.md` (in OpenCode, the bundled `jev-init` skill can
 bootstrap them) and keep working with your agent as usual. Details are in
@@ -557,7 +561,10 @@ something is wrong. It never prints the API key or any part of it — only wheth
 key comes from the OS credential store or the `TYPESAFE_API_KEY` override. It exits
 `0` unless a check fails (warnings are fine) and `1` when one does. The project root is
 the first parent directory of the current directory that contains `.git`, or the
-current directory when there is none. It does not check Claude Code installs yet.
+current directory when there is none. For Claude Code it also reports whether the
+plugin is installed and enabled, the `claude` and `node` (22.13 or newer, on `PATH`)
+versions, and which config directory is in use (`CLAUDE_CONFIG_DIR` or `~/.claude`);
+it only prints that path, never settings content.
 
 ## Check rules on demand
 

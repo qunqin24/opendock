@@ -104,11 +104,15 @@ Restart OpenChamber or OpenCode after changing the option so it reloads the mode
 
 ## Concurrent sessions and timeouts
 
-Each OpenCode session has its own Cursor agent and run. A tool call that pauses one session does not cancel a run in another session, and a new turn only cancels the run in its own session.
+Each OpenCode session has its own Cursor agent and run. A tool call that pauses one session does not cancel a run in another session, and a new turn only cancels the run in its own session. Open projects share one SDK worker. While another project is still open, reloading one project does not drop a tool wait that worker is holding. A second project does not cancel a turn that is already running.
 
-A turn that produces no output fails instead of waiting forever:
+If a host disconnects, a turn already queued behind that host can start. A late cancellation from an older request cannot cancel its replacement.
 
-- **Idle timeout:** 5 minutes with no output. Option `idleTimeoutMs`.
+After updating the local plugin build, let active chats finish and close all OpenCode hosts using the plugin, including OpenChamber and terminal hosts. Reopen them after the shared worker exits. Reloading only one project can leave the previous worker running while another host is connected.
+
+A turn that shows no sign of life fails instead of waiting forever:
+
+- **Idle timeout:** 5 minutes with no sign the run is still going. Option `idleTimeoutMs`. A live SDK run reports in while the model is quiet, so that quiet time waits until the turn cap.
 - **Turn timeout:** 15 minutes for one step. Option `turnTimeoutMs`.
 
 On timeout, or when you press Stop, the plugin writes an SSE error, ends the stream with `[DONE]`, cancels that session's run, and lets the next turn start. The model list is cached for about 10 minutes (`modelsCacheTtlMs`) so reloads do not call Cursor `get_models` on every start. A rate-limit response uses the cached list.
@@ -160,7 +164,7 @@ Or delete the `opencodev2-cursor` entry from `opencode.json`. Restart afterwards
 - **"Cursor SDK needs Node.js 22.13 or newer".** Install a newer Node, or set `CURSOR_ACP_NODE_BIN` to its path.
 - **"Agent … already has active run".** Send the message again. A new turn cancels the stuck run.
 - **Sign-in with cursor-agent fails.** Run `cursor-agent login` in a terminal, then retry `/connect`.
-- **A turn goes quiet.** After the idle timeout the chat shows an error instead of hanging. The log records `turn start`, `timeout`, `client abort`, `run cancelled`, and `orphan tool result`, each with `sessionKey` and `model`.
+- **A turn goes quiet.** A live SDK worker reports activity while the model is quiet; the overall turn cap still applies. If the worker stops reporting activity, the idle timeout ends the chat with an error. The log records `turn start`, `timeout`, `client abort`, `run cancelled`, and `orphan tool result`, each with `sessionKey` and `model`.
 - **Still stuck?** Open a [Bug report](https://github.com/aenemo/opencodev2-cursor/issues/new?template=bug_report.yml). It asks for OS, surface, Node version, and sign-in method so install problems can be separated from auth problems. Do not paste API keys or tokens.
 
 ## Where files live

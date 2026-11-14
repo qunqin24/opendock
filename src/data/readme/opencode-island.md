@@ -19,6 +19,8 @@ without ever leaving the window you are working in.
   reading down its spine.
 - **Open** it (click it) and it becomes a drawer listing the sessions running
   right now, with their subagents nested underneath.
+- **Talk to it** — the drawer has a composer at its foot. Type a prompt and
+  press Enter, and the agent picks it up where it is.
 - **Approvals** turn the whole island warning orange, open it by themselves,
   and can be answered in place.
 - **Alive** — every session that is busy carries a small orb that says what it
@@ -134,6 +136,32 @@ stay out of the way. Each row shows:
 
 Subagents appear indented under the session that spawned them.
 
+### Talking to an agent
+
+The drawer has a composer at its foot. It names the session the prompt will
+go to, and you type into the field beside it:
+
+- **Enter** sends the prompt and steers the session now.
+- The **menu** beside the field sends it after the current turn ends, and
+  lists what is already waiting for that session.
+
+The chip above the field picks the session. It lists the sessions open in
+OpenCode, the ones you have open as tabs, the one you opened last first. A tab
+that is not running is still there, so a session that has ended can be talked
+to again.
+
+The drawer stays open while you work: it does not close when the app takes
+the focus back, and it does not close when you click away. It closes when you
+close it, by clicking the island or by pressing Escape.
+
+### The size of the drawer
+
+The open drawer has a grip on its **bottom edge** and on its **left edge**.
+Drag the bottom edge and the drawer grows downwards, its top staying put.
+Drag the left edge and it grows leftwards, because the right edge is the
+screen edge and never moves. The size you leave it at is kept, so the drawer
+comes back the same size the next time.
+
 ### The bottom bar
 
 | Control | What it does |
@@ -142,6 +170,7 @@ Subagents appear indented under the session that spawned them.
 | ⬛ | Open OpenCode: the island floats above everything and never takes focus, so this brings the app back to the front |
 | ⏻ | Close everything: the island and OpenCode both go |
 | 👆 | Click-through: the island stops taking clicks, except its grip, so you can still open it |
+| 📌 ⏱ | Stay open or Auto-close: the drawer stays open when the app takes the focus back, or it closes like it used to. It stays open by default |
 | ☰ | Show the latest session's work in the closed tab instead of the summary |
 
 The two first buttons are also in the closed tab, at the foot of the spine

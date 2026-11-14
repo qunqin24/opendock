@@ -7,7 +7,7 @@
 <a href="https://www.npmjs.com/package/oficina-opencode"><img src="https://img.shields.io/npm/v/oficina-opencode?style=for-the-badge&labelColor=0d1117&color=cb3837" alt="npm" /></a>
 <a href="https://github.com/SOCRAMbt/AI-OFFICE/blob/main/LICENSE"><img src="https://img.shields.io/badge/licencia-MIT-2ea44f?style=for-the-badge&labelColor=0d1117" alt="licencia MIT" /></a>
 <a href="https://nodejs.org"><img src="https://img.shields.io/badge/node-%3E%3D22-339933?style=for-the-badge&labelColor=0d1117" alt="node >= 22" /></a>
-<a href="https://github.com/SOCRAMbt/AI-OFFICE/tree/main/tests"><img src="https://img.shields.io/badge/tests-456%20passing-1f6feb?style=for-the-badge&labelColor=0d1117" alt="456 tests passing" /></a>
+<a href="https://github.com/SOCRAMbt/AI-OFFICE/tree/main/tests"><img src="https://img.shields.io/badge/tests-557%20passing-1f6feb?style=for-the-badge&labelColor=0d1117" alt="557 tests passing" /></a>
 <a href="https://github.com/SOCRAMbt/AI-OFFICE/blob/main/tsconfig.json"><img src="https://img.shields.io/badge/typescript-strict-3178c6?style=for-the-badge&labelColor=0d1117" alt="TypeScript strict" /></a>
 
 <br>
@@ -26,7 +26,7 @@
 <!-- BEGIN GENERATED: facts -->
 | | |
 |---|---|
-| **Paquete** | `oficina-opencode` v3.1.5 |
+| **Paquete** | `oficina-opencode` v3.2.1 |
 | **Tools** | 18 |
 | **Hooks** | 7 |
 | **API de plugin** | `@opencode/plugin@2.1.2` |
@@ -600,7 +600,7 @@ Un solo coordinador es cuello de botella y punto único de falla.
 Las preguntas de un especialista al coordinador **van por el bus**, no interrumpen al humano. Al usuario solo llega lo que ningún coordinador puede resolver.
 
 <a id="las-16-tools"></a>
-## 🧰 Las 16 tools
+## 🧰 Las 18 tools
 
 Dieciséis, no treinta. Cada tool que se suma es ruido en el contexto de todos los agentes.
 
@@ -778,7 +778,7 @@ pestaña *Security → Report a vulnerability*.
 ## 🧪 Testing
 
 ```bash
-npm test           # 456 tests, 27 archivos
+npm test           # 557 tests, 42 archivos
 npm run coverage   # cobertura por línea
 npm run docs:check # la documentación coincide con el código
 npm run bench:selection  # el matcher le gana a las alternativas simples
@@ -826,7 +826,7 @@ npm run build      # tsc → dist/
 
 El motor (`core/`, `tools/`) no importa ninguno de los dos: define las tools en una forma neutra y cada entry las traduce. Por eso el mismo motor corre en v1 y en v2.
 
-Vulnerabilidades y overrides reportados en el [informe de cierre](REMEDIATION_CLOSURE_REPORT.md): **0 en producción** (`npm audit --omit=dev`); las 2 residuales en el árbol dev-only de `@opencode-ai/plugin` quedan documentadas con su justificación técnica.
+Vulnerabilidades y overrides reportados en el [informe de cierre hist�rico v3.0.5](docs/archive/2026/REMEDIATION_CLOSURE_REPORT.md): **0 en producción** (`npm audit --omit=dev`); las 2 residuales en el árbol dev-only de `@opencode-ai/plugin` quedan documentadas con su justificación técnica.
 
 ---
 
@@ -865,7 +865,7 @@ src/
 │   ├── fsx.ts            # IO atómico
 │   ├── ids.ts            # ids seguros para usar como nombre de archivo
 │   └── log.ts            # logging estructurado
-├── tools/index.ts        # las 16 tools
+├── tools/index.ts        # Las 18 tools
 └── hooks/
     ├── sessionIdle.ts    # auto-continuación
     ├── scopeGuard.ts     # enforcement de scope

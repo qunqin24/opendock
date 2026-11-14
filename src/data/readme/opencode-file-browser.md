@@ -33,6 +33,12 @@ For local development point that entry at a checkout instead:
   mouse cursor placement.
 - **Changes** — stage, unstage, discard, commit, pull, push, branches and
   history. `Enter` opens a unified diff; `F4` jumps to the real file.
+- **Context menu** — right click a file to copy, move (with a folder picker that
+  can go up), rename or delete; right click empty space to create a file or
+  folder, or paste a copy. Right click an open tab (or press `F10` with the
+  editor focused) for **Reveal in the file tree**, which expands the folders
+  and selects the file — or enters its folder in navigate mode. `F10` in the
+  explorer opens the item menu from the keyboard.
 - **Preferences** — `F2`: simple mode, line numbers, wrap, folder behaviour,
   panel preview, changes panel, hidden files, mouse, search target,
   case-sensitive search and confirmation prompts.
@@ -65,7 +71,9 @@ For local development point that entry at a checkout instead:
 | `F1` / `F2` | all shortcuts / preferences |
 | `F3` / `Ctrl+G` | focus the changes panel |
 | `F5` | reload tree, file and git status |
-| `F10` | item actions (same menu as right click) |
+| `F10` | item actions (file menu) · tab menu with the editor focused |
+| right click (empty space) | new file / new folder / paste |
+| right click (tab) | reveal in the file tree · close tabs |
 | `r` / `h` / `f` | reload / hidden files / fullscreen |
 | `Esc` | leave editor → clear search → close |
 
@@ -103,6 +111,7 @@ npm run test:unit     # navigation rules (fast, no TUI)
 - [GitHub](https://github.com/arthurrogado/opencode-file-browser)
 - [npm](https://www.npmjs.com/package/opencode-file-browser)
 - [Project page](https://arthurrogado.github.io/opencode-file-browser/)
+- [Announcement (r/opencode)](https://www.reddit.com/r/opencode/comments/1xv5un1/opencode_file_browser_is_now_a_mini_ide_editor/)
 - [Issues](https://github.com/arthurrogado/opencode-file-browser/issues)
 
 MIT.

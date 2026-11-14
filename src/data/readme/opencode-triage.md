@@ -1,6 +1,6 @@
 # opencode-triage
 
-> OpenCode already lazy-loads full skill bodies — but it still injects every skill's name and description (from `SKILL.md` frontmatter) into the prompt on every message. With a growing skill library and verbose descriptions, that can mean hundreds of tokens burned before you type a word. opencode-triage eliminates that XML list entirely, replacing it with a compact tool definition and routing on-demand via keyword matching.
+> OpenCode lists every installed skill in the prompt. Triage hides that full catalog, suggests relevant skills for the current message, and lets the model load only the instructions it needs. Matching uses keywords or optional local multilingual embeddings.
 
 ## Quick Start
 
@@ -8,20 +8,20 @@
 npm install -g opencode-triage
 ```
 
-Restart OpenCode, then type `/triage on`. That's it.
+Restart OpenCode, then type `/triage on`. For multilingual matching, optionally run `npx opencode-triage download-model` and restart again.
 
 ## What It Does
 
 OpenCode lists every skill's name and description in the prompt on every message. With many skills, that burns hundreds of tokens before you type a word.
 
-Triage hides all skills from the prompt. When you need one, the LLM calls `triage()` — the plugin finds the best match by keyword scoring and loads only that skill's instructions.
+Triage hides all skills from the prompt. When you need one, the LLM calls `triage()` — the plugin returns matching skills by keyword scoring. The LLM then loads the chosen instructions with `skill` or the legacy `load-skill` fallback.
 
 ```
 No triage:   [name+desc of A] [name+desc of B] [name+desc of C] ...  ← every message
-With triage: triage({ query }) → keyword match → loads one skill body when needed
+With triage: relevant suggestions or triage({ query }) -> skill({ name }) loads chosen instructions
 ```
 
-**The more skills you install, the more triage saves.** Each new skill adds tokens to the native prompt, but zero tokens when triage is on.
+Prompt savings depend on the catalog size, tool definitions, and suggested candidates. Use `/triage compare` for a catalog estimate; per-message suggestions add a small variable cost.
 
 ## LLM Quick-Install
 
@@ -43,7 +43,8 @@ Install opencode-triage (https://github.com/cascharly/opencode-triage) — a det
 | `/triage off` | Disable hooks, restore skills to the LLM prompt (global + local) |
 | `/triage status` | See hook state and skill visibility |
 | `/triage dedupe` | Remove project-level duplicates of global skills |
-| `/triage compare` | Token savings estimate for your skills |
+| `/triage compare` | Catalog token savings estimate (excludes variable suggestions) |
+| `/triage download-model` | Download the optional multilingual models once, then restart OpenCode |
 
 > **Note:** Skills are hidden via hooks at the LLM prompt level — `SKILL.md` files stay intact on disk, so other AI tools (Cursor, Claude Code, Windsurf) still see them. File renaming (`SKILL.md` ↔ `SKILL.md.disabled`) is only used as a fallback for older OpenCode versions without hook support. When files are renamed to `.disabled`, they will also be hidden from other AI tools that scan the same directories.
 
@@ -51,12 +52,15 @@ Install opencode-triage (https://github.com/cascharly/opencode-triage) — a det
 
 | Flag | Where | What it does |
 |------|-------|--------------|
-| `--json` | All commands | Machine-readable JSON output |
+| `--json` | status, compare, version, help, download-model, dedupe preview | Machine-readable JSON output |
 | `--quiet` | on/off | Suppress non-error output |
 | `--dry-run` | dedupe | Preview changes without renaming |
 | `--all` | status | Show full skill list without truncation |
+| `--no-second-pass` | download-model | Download only the smaller first-pass model |
 
 All commands also work in your terminal: `npx opencode-triage <command>`. No OpenCode session needed.
+
+For automation, call `npx opencode-triage <command> --json` directly and ensure any wrapper writes its own warnings to stderr, not stdout. A wrapper that prepends text to stdout will make otherwise-valid JSON unparseable.
 
 ### Configuration Combinations
 
@@ -67,12 +71,12 @@ All commands also work in your terminal: `npx opencode-triage <command>`. No Ope
 | Triage globally only | hidden | exposed | `/triage on --global` |
 | Triage in project only | exposed | hidden | `/triage on --local` |
 
-Global affects `~/.config/opencode/skills/`, `~/.claude/skills/`, `~/.agents/skills/`.
+Global affects `~/.config/opencode/skills/`, `~/.claude/skills/`, `~/.agents/skills/`, and `~/.gemini/config/skills/`.
 Local affects `.opencode/skills/`, `.claude/skills/`, `.agent/skills/`, `.agents/skills/` in the current project.
 
 ## How It Works
 
-The LLM calls `triage()` when it encounters a task it can't handle with general knowledge. The plugin scores all hidden skills against the query and returns the best match.
+Triage suggests up to three relevant skills for each user message. The LLM can also call `triage()` to search explicitly, then load a chosen skill with `skill({ name })` or the legacy `load-skill` fallback.
 
 ```
 User: "backup my database"
@@ -84,10 +88,10 @@ LLM: triage({ query: "backup my database" })
 Plugin: scans filesystem → scores skills → returns best match
   backup-restore     score=60  (matched: backup, database)
   database-sync      score=25  (matched: database)
-  gap=35 ≥ threshold(30) → HIGH CONFIDENCE
+  Returns a scored shortlist; the model chooses which skill to load.
 ```
 
-No LLM reasoning overhead. No extra API calls. Just fast deterministic matching.
+Matching requires no extra LLM API calls. Optional semantic matching runs cached models locally in two consecutive evaluations; keyword matching is used when no model is available.
 
 ### Spell Correction
 
@@ -179,7 +183,7 @@ For per-project installs, remove `"opencode-triage"` from `.opencode/opencode.js
 
 ### How Hiding Skills Works
 
-Skills live in up to seven directories:
+Skills are discovered from project and global skill directories:
 
 | Path | Scope |
 |------|-------|
@@ -190,12 +194,13 @@ Skills live in up to seven directories:
 | `~/.config/opencode/skills/<name>/` | Global |
 | `~/.claude/skills/<name>/` | Global |
 | `~/.agents/skills/<name>/` | Global |
+| `~/.gemini/config/skills/<name>/` | Global |
 
-When triage is ON, skills are hidden from the LLM using three layers of hooks — no file renaming needed:
+When triage is ON, hooks hide the full skill catalog while keeping loading available:
 
-1. **`tool.definition`** — Replaces the built-in `skill` tool description with "Use `triage` instead"
-2. **`system.transform`** — Strips the `<available_skills>` XML block from the system prompt
-3. **`tool.execute.before`** — Intercepts any stray `skill()` calls and blocks them
+1. **`tool.definition`** replaces the native skill description with compact loading instructions.
+2. **`system.transform`** strips the `<available_skills>` XML block from the system prompt.
+3. Native `skill()` calls load discovered skills. `load-skill()` handles legacy `.disabled` files.
 
 `SKILL.md` files stay intact on disk. Other AI tools (Claude Code, Cursor, Windsurf) scanning the same directories still see them normally.
 
@@ -203,19 +208,21 @@ The CLI can still rename files (`SKILL.md` ↔ `SKILL.md.disabled`) as a fallbac
 
 The `/triage status` command shows skills grouped by scope with `[hidden]`/`[exposed]` badges, detecting state from both hook config and file extensions. It warns when the plugin is ACTIVE but some skills remain exposed (out-of-sync state).
 
+`/triage status --json` reports both file-level state (`fileHidden`, `fileExposed`) and prompt-level effective state (`promptHidden`, `promptExposed`, `hideMode`). On Windows, if both `~/.config/opencode/opencode.json*` and `%APPDATA%/opencode/opencode.json*` exist, status also reports whether each contains the plugin plus redacted config hashes and differing top-level sections.
+
 ### How Routing Works
 
 The triage router is a registered plugin tool. When called, it runs a deterministic routing process:
 
 1. **Discover** — Scans directories for skill files, extracts name and description from frontmatter. Results are cached in memory (5s TTL) so CLI toggles are picked up without restart. The cache stores only skill metadata (name, description, path) — minimal RAM usage, typically a few KB even with dozens of skills.
 
-2. **Match** — Scores query keywords against each skill — exact word match = 15pts, partial = 10pts. Found in name → ×3, found in description → ×1. Name matches dominate. IDF weighting downweights common words and boosts rare, discriminating terms. Bigram and exact phrase bonuses reward skills whose descriptions match query phrasing. Position decay weights earlier query words more heavily. Lightweight stemming normalizes inflected forms (`vulnerabilities` → `vulnerability`). Project-scoped skills get a small tiebreaker bonus (+5) over equally-matched global skills.
+2. **Match** — With the optional models cached, matching uses multilingual embeddings in two consecutive evaluations (see [Optional multilingual semantic matching](#optional-multilingual-semantic-matching)). Otherwise it scores query keywords against each skill — exact word match = 15pts, partial = 10pts. Found in name → ×3, found in description → ×1. Name matches dominate. IDF weighting downweights common words and boosts rare, discriminating terms. Bigram and exact phrase bonuses reward skills whose descriptions match query phrasing. Position decay weights earlier query words more heavily. Lightweight stemming normalizes inflected forms (`vulnerabilities` → `vulnerability`). Project-scoped skills get a small tiebreaker bonus (+5) over equally-matched global skills.
 
 3. **Spell Correction** — If a query word (length ≥ 4) has no exact match in any skill name or description, the plugin computes Levenshtein distance against all skill vocabulary and suggests the closest match (distance ≤ 2). The hint is injected into the tool result for the LLM to self-correct silently.
 
-4. **Route** — Auto-selects the clear winner (gap ≥ 30) or returns a top-5 shortlist for manual pick. Spell correction hints are included in all response paths so the LLM can retry with the corrected term if needed.
+4. **Search** returns up to eight scored candidates and spell correction hints without loading skill instructions.
 
-5. **Load** — Reads the matched file, strips frontmatter, returns the instructions.
+5. **Load** uses native `skill({ name })` for active files, or `load-skill({ name })` for file-hidden results.
 
 6. **Notify** — Shows a TUI toast confirming the routing result.
 
@@ -225,7 +232,8 @@ The triage router is a registered plugin tool. When called, it runs a determinis
 |------|---------|
 | `index.ts` | Plugin entry point, tool registration, hook setup |
 | `discovery.ts` | File scanning, skill reading, rename migration |
-| `scoring.ts` | Scoring pipeline: IDF, bigram/phrase bonuses, stemming, position decay |
+| `scoring.ts` | Scoring pipeline: IDF, bigram/phrase bonuses, stemming, position decay, two-pass semantic scores |
+| `embeddings.ts` | Optional local embedding models and on-disk vector caches |
 | `spellcheck.ts` | Levenshtein distance, spell correction suggestions |
 | `config.ts` | Constants, types, triage state, JSONC parsing |
 | `remote.ts` | Remote skill search (registry, superpowers) |
@@ -233,10 +241,47 @@ The triage router is a registered plugin tool. When called, it runs a determinis
 
 ## Compatibility
 
-- OpenCode 1.14+
-- Bun runtime (bundled with OpenCode)
-- Node.js 18+ (for CLI script)
+The same package selects the supported API automatically:
+
+| OpenCode host | Loaded package entry | Configuration |
+|---|---|---|
+| V1 | `.` / `src/index.ts` | Existing `plugin` strings or tuples |
+| V2 | `./server` / `src/server.ts` | `plugins` strings or package/options objects |
+
+OpenCode V2's official loader resolves `./server` first. Older V1 loaders continue loading the package root, which exports only the callable `server` function. This does not require the V1 object-entrypoint support introduced in 1.18.29 and does not change the existing V1 peer dependency range. An internal V2 setup error is reported instead of silently retrying initialization as V1.
+
+V1 config remains valid and is never rewritten into V2 syntax by the CLI. Existing V2 configs retain their `plugins` format. Toggles preserve other plugin options and version pins.
+
+- V1 installed-package execution tested with SDK 1.14.17 and 1.19.5 under Bun.
+- V2 registration and request hooks tested against SDK 2.3.0; the installed package is also loaded with its official host resolver.
+- The V2 SDK is a development-only dependency. V1 consumers do not need to install it.
+- V2 routes native loads through `skill({ id })`; V1 retains `skill({ name })`. Legacy loads in V2 enforce the host's skill permission rules.
+- V2 status notifications currently go to the server log; V1 TUI toasts remain available.
+- Basic CLI commands require Node.js 18+. Development tests require Node.js 22+.
+
+Run `npm run check`, `npm test`, and `npm run check:compat` before changing the adapters. The compatibility script requires Bun on PATH, or `BUN_BIN` set to its executable path. It installs the packed artifact in isolated temporary projects rather than relying on workspace links.
 
 ## License
 
 MIT
+
+### Search and load tools
+
+`triage` searches installed skills without loading their instructions. Use native `skill({ name })` to load a result, or `load-skill({ name })` for results marked file-hidden. `list-skills` lists the installed catalog on demand. The fallback loader supports legacy `SKILL.md.disabled` files.
+
+Automatic suggestions use only the current user message and expose at most three candidates by default. Configure `autoSuggest`, `ambientMinScore` (default 30), and `ambientMaxCandidates` (default 3, capped at 10) in plugin options. English scoring retains its minimum word length and position decay; Chinese queries use word segmentation.
+
+### Optional multilingual semantic matching
+
+Run `npx opencode-triage download-model` once to download the local multilingual embedding models, then restart OpenCode. The plugin uses only cached model files and never downloads a model during a chat. If optional dependencies, the model, or inference are unavailable, routing falls back to keyword matching. Set the plugin option `semanticMatching: false` to use keyword matching explicitly. Skill discovery retains automatic cache invalidation; `rescan` also refreshes it on demand.
+
+Semantic matching runs two consecutive evaluations:
+
+1. `paraphrase-multilingual-MiniLM-L12-v2` (q8, about 118 MB) compares the message with each skill's `name: description`.
+2. When `paraphrase-multilingual-mpnet-base-v2` (q8, about 280 MB) is also cached, it compares the message with three views of each skill: the description, the name as words, and both together. A skill's score is the average of the first similarity and the best second-pass view. The usual thresholds apply (`ambientMinScore`, default 30).
+
+Second-pass skill vectors are built in the background the first time, about a minute for 500 skills on a four-thread laptop CPU. Until then, and whenever the second model is absent or fails, the first model scores alone. Afterwards the second pass adds roughly 30 ms per message and about 540 MiB of resident memory. Use `download-model --no-second-pass` to download only the first model, or set the plugin option `secondPassMatching: false` to disable the second pass.
+
+The model cache is `~/.cache/opencode-triage/models/`. Skill vectors are cached in `~/.cache/opencode-triage/embeddings.json`, with second-pass vectors in a separate `embeddings-<model>.json` file. To run the optional real-model integration test after downloading, set `TRIAGE_TEST_SEMANTIC_MODEL=1` and run `npm test`. The optional model runtime is `@huggingface/transformers`; a modern Node.js runtime (22+ recommended) is needed for model downloads. Basic CLI commands retain Node.js 18+ support.
+
+`dedupe --json` requires `--dry-run` when duplicates exist; omit `--json` to choose interactively which copy to remove.

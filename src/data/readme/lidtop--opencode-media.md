@@ -83,8 +83,6 @@ Remember the discussion but not where it happened? Search session titles, projec
 
 **Remember a phrase → find the session → get back to it.** Filter by project, include subagents when you need them, and see a matching message alongside the results, then open it, whichever directory it belongs to.
 
-**Keep an eye on every running agent.** The top of the sidebar lists the sessions that are working, waiting on you, or finished since you last looked, across all your projects. Click one, or type `/go 2`, to jump there, and `/go back` to return.
-
 ![Sessions browser searching for cache discussions across projects with a selected message preview](docs/images/sessions-browser.png)
 
 *Less hunting through projects. More getting back to the useful part.*
@@ -131,9 +129,9 @@ Building something that needs a voice-over or artwork? Connect OpenRouter once w
 
 ## Review: steer the agent from its diff
 
-The agent is ten files in and just hardcoded a timeout you wanted configurable. Point at the line instead of describing it. `/review` opens the agent's changes beside the conversation, updating as it edits.
+The agent is ten files in and just hardcoded a timeout you wanted configurable. Point at the line instead of describing it. `/diffs` opens the agent's changes in place of the conversation, updating as it edits.
 
-**Comment on a line → press `S` → the agent picks it up at its next step.** Comments carry the file and lines, so the agent finds them without guessing, and it replies to each one, shown under your comment. End a comment with `??` to ask instead of asking for a change. Press `u` on a name to see its usages, with the callers the change may have missed flagged, through your language server or a search. Review this turn, the whole session, uncommitted changes, or the branch against its base, and mark files viewed until they change again.
+**Comment on a line → press `S` → the agent picks it up at its next step.** Comments carry the file and lines, so the agent finds them without guessing, and it replies to each one, shown under your comment. End a comment with `??` to ask instead of asking for a change, or press `a` to ask about a line without bothering the agent. Press `w` for a guided review: the conversation's model presents the changes as a short slide deck. Press `u` on a name to see its usages, with the callers the change may have missed flagged, through your language server or a search. Review this turn, the whole session, uncommitted changes, or the branch against its base, and mark files viewed until they change again.
 
 [Explore Review →](plugins/review/README.md)
 

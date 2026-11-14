@@ -1,214 +1,296 @@
 # opencode-wait-for-v2
 
-OpenCode **V2** 插件：给 agent 一个 `wait_for` 工具，用来**阻塞等待日志出现某行、或某个进程退出**，替代 `sleep N; tail ...` 这种前台轮询。
+An OpenCode **V2** plugin that gives the agent a `wait_for` tool for **blocking until a log line appears, a process exits, or a file/port/HTTP condition holds**, replacing foreground `sleep N; tail ...` polling.
 
 ```ts
 wait_for({ path: "/tmp/build.log", pattern: "BUILD (SUCCESS|FAILURE)", timeout_ms: 600_000 })
 ```
 
-## 解决什么问题
+## What problem does it solve?
 
-OpenCode 内置的 shell 工具是「跑完才返回」。这对长任务有两个代价：
+OpenCode's built-in shell tool returns only when a command finishes. That costs long-running tasks twice:
 
-1. **执行期间整轮对话阻塞**，UI 没有任何进度，看起来像卡死。
-2. **没有「等新输出」的能力**，模型只能自己拼轮询：
+1. **The whole conversation blocks while the command runs**, with no progress in the UI, so it looks stuck.
+2. **There is no "wait for new output" primitive**, so the model has to build polling loops itself:
 
 ```bash
 sleep 60; tail -c 800 build.log | tr '\r' '\n' | tail -12
 ps -Ao pid,user,etime,command | grep -E '[m]vnd' | head -3
 ```
 
-一条 10 分钟的构建往往要这样轮询十几次。每次都是「白等 N 秒」，醒来后还要再推理一轮。在实测数据里，工具结束到下一句话之间的停顿 P50 是 **13.7 秒**，所以 10 次轮询 ≈ 白扔 2~3 分钟，还没算 sleep 本身。
+A 10-minute build often needs a dozen of these polls. Each one waits a guessed number of seconds and then spends another reasoning turn after it wakes up. In local measurements, the pause between a tool ending and the next assistant message had a P50 of **13.7 seconds**, so ten polls waste roughly 2-3 minutes, not counting the sleep itself.
 
-`wait_for` 把这十几次压缩成**一次调用**。
+`wait_for` compresses those polls into **one call**.
 
-## 效果对比
+## Comparison
 
-| | `sleep` 轮询 | `wait_for` |
+| | `sleep` polling | `wait_for` |
 | --- | --- | --- |
-| 对话占用 | N 次工具调用 | **1 次** |
-| 命中时机 | 固定时长，早了晚了都可能 | 条件成立**立刻**返回 |
-| 超时行为 | 无上限，可能永远轮询 | 明确返回，带进程状态 |
-| UI 反馈 | 黑屏等待 | 每秒上报 `waiting` 进度 |
-| 中断 | 等 sleep 走完 | 按 ESC 立刻停 |
-| 大日志 | 反复 `tail` 整个文件 | 只读尾部 64KB |
+| Conversation cost | N tool calls | **1 call** |
+| When it returns | Fixed delay; too early or too late | **Immediately** when the condition holds |
+| Timeout behavior | No bound; can poll forever | Returns explicitly with process state |
+| UI feedback | Blank wait | Reports `waiting` progress every second |
+| Interruption | Waits for sleep to finish | Stops immediately on ESC |
+| Large logs | Repeatedly `tail` the whole file | Reads only the last 64 KB |
 
-实测：11MB 的构建日志，命中检测 **3ms**。
+Measured: on an 11 MB build log, match detection took **3 ms**.
 
-## 安装
+## Install
 
 ```bash
 opencode plugin add opencode-wait-for-v2
 ```
 
-或者手动放进全局插件目录（改完自动热加载，无需重启）：
+Or add it to the global plugin directory manually (hot reload applies changes without a restart):
 
 ```bash
 git clone https://github.com/lcssos/opencode-wait-for-v2 \
   ~/.config/opencode/plugins/opencode-wait-for-v2
 ```
 
-确认已加载：
+Confirm it is loaded:
 
 ```bash
 opencode plugin list
 ```
 
-## 用法
+## Usage
 
-### 1. 等构建 / 测试结束
+### 1. Wait for a build or test run to finish
 
 ```bash
-# 第一步：长任务放后台，输出重定向到日志
+# Step 1: run the long task in the background with output redirected
 mvnd -o clean install > /tmp/build.log 2>&1    # background: true
 ```
 
-```
-# 第二步：一次调用等到结束
+```ts
+// Step 2: wait for the end marker in one call
 wait_for({ path: "/tmp/build.log", pattern: "BUILD (SUCCESS|FAILURE)", timeout_ms: 600_000 })
 ```
 
-返回内容就是日志尾部，**不需要再单独 `tail`**：
+The result includes the log tail, so **you do not need a separate `tail`**:
 
-```
-[wait_for] 条件成立，等待 42.318s | path: /tmp/build.log
+```text
+[wait_for] condition met after 42.318s | path: /tmp/build.log
 
---- 日志尾部 ---
+--- log tail ---
 [INFO] BUILD SUCCESS
 [INFO] Total time:  41.902 s
 ```
 
-### 2. 等端口起来
+### 2. Wait for a port to come up
 
 ```ts
 wait_for({ path: "/tmp/dev.log", pattern: "listening on|Started .* in .* seconds", timeout_ms: 120_000 })
 ```
 
-### 3. 等后台进程退出
+### 3. Wait for a background process to exit
 
 ```ts
 wait_for({ pid: 12345, timeout_ms: 300_000 })
-// 也可以同时给 path，两个条件都满足才返回，顺便拿到日志
+// You can also provide path; both conditions must hold, and the log is returned
 wait_for({ pid: 12345, path: "/tmp/build.log", pattern: "BUILD SUCCESS" })
 ```
 
-### 4. 日志里已经有旧的匹配
+### 4. The log already contains an old match
 
-用 `must_be_new: true`，只看**调用之后新增**的内容：
+Use `must_be_new: true` to consider only content written **after the call starts**:
 
 ```ts
 wait_for({ path: "/tmp/app.log", pattern: "ERROR", must_be_new: true })
 ```
 
-## 参数
+### 5. Wait for a file, port, or HTTP condition
 
-| 参数 | 类型 | 默认 | 说明 |
+Pass a single `condition` object for anything beyond a log tail or process exit. It is checked immediately, then polled every `poll_ms`.
+
+`condition` **takes precedence**: when it is set, `path`, `pattern`, `pid`, and `must_be_new` are ignored.
+
+| `condition.type` | Required fields | Optional fields | Holds when |
 | --- | --- | --- | --- |
-| `path` | string | — | 要监视的文件（绝对路径） |
-| `pattern` | string | — | 正则，需配合 `path`。只匹配文件尾部 64KB |
-| `pid` | number | — | 等待该进程退出。可与 `path` 组合 |
-| `timeout_ms` | number | `240000` | 上限 `600000` |
-| `poll_ms` | number | `500` | 最小 `100`，一般不用改 |
-| `tail_lines` | number | `60` | 返回日志的行数 |
-| `must_be_new` | boolean | `false` | 只认调用后的新增内容 |
+| `file_exists` | `path` | `stableForMs` | The file exists (and has not changed for `stableForMs`). |
+| `file_absent` | `path` | — | The file does not exist. |
+| `file_changed` | `path` | `since`, `stableForMs` | Size or mtime differs from the first check (`since` is an epoch-ms cutoff), and is stable for `stableForMs`. |
+| `file_contains` | `path`, `pattern` | `regex`, `mustBeNew` | The file tail contains `pattern`. With `mustBeNew`, only content written after the call is searched (latest 256 KB). |
+| `process_exited` | `pid` | — | The process is gone. |
+| `process_running` | `pid` | — | The process is alive. |
+| `port_open` | `host`, `port` | — | A TCP connection succeeds. |
+| `port_closed` | `host`, `port` | — | A TCP connection is refused or times out. |
+| `http_status` | `url` | `status`, `headers` | The response status matches `status` (number or array; default any 2xx). |
+| `http_json` | `url`, `jsonPath`, `equals` | `headers` | The JSON value at `jsonPath` equals `equals` (dot/bracket path). |
+| `http_body_contains` | `url`, `pattern` | `regex`, `headers` | The response body contains `pattern`. |
 
-`path` 和 `pid` 至少要给一个。
+Notes:
 
-## 超时不是失败
+- Relative paths resolve against the session directory; absolute paths are used as-is.
+- File content is read from the tail (64 KB, or up to 256 KB of new bytes with `mustBeNew`). HTTP bodies are capped at 256 KB.
+- `regex: true` treats `pattern` as a regular expression; the default is a literal substring match.
+- HTTP requests follow redirects. Each attempt times out after 2-10 seconds, derived from `poll_ms`.
+- `http_json` paths support dots and brackets, e.g. `status` or `jobs[0].state`.
+- Defaults are the same as the basic modes: `timeout_ms` 240000 (cap 600000), `poll_ms` 500.
 
-超时会**正常返回**而不是抛错，因为「没等到」本身是有信息量的：
+```ts
+// CI run finished
+wait_for({
+  condition: {
+    type: "http_json",
+    url: "https://api.github.com/repos/org/repo/actions/runs/123",
+    jsonPath: "status",
+    equals: "completed",
+  },
+  timeout_ms: 300_000,
+  poll_ms: 5_000,
+})
 
+// package is available on the registry
+wait_for({
+  condition: { type: "http_status", url: "https://registry.npmjs.org/pkg/1.2.3", status: 200 },
+  timeout_ms: 120_000,
+})
+
+// local service is listening
+wait_for({
+  condition: { type: "port_open", host: "127.0.0.1", port: 3000 },
+  timeout_ms: 30_000,
+})
+
+// wait for a line written after the call starts
+wait_for({
+  condition: { type: "file_contains", path: "/tmp/deploy.log", pattern: "pod/ready", mustBeNew: true },
+})
 ```
-[wait_for] timed out 等了 120.0s
-原因: pid 12345 仍在运行；日志未匹配 /BUILD SUCCESS/
-最后变化: 118.3s 前
-pid 12345 仍在运行 —— 任务可能只是慢，不是卡死
-下一步建议: 用 ps / lsof 确认进程状态，不要直接再调一次 wait_for 重复等待。
+
+A condition timeout is still a normal result: the text starts with `[wait_for] timed out`, and `metadata` carries `hit: false`, `reason: "timeout"`, `attempts`, and the last `observed` state.
+
+```text
+[wait_for] timed out after 120.0s
+condition: HTTP status 200: https://registry.npmjs.org/pkg/1.2.3
+attempts: 61
+last error: fetch failed
+Next step: inspect the observed state; do not call wait_for again immediately.
+observed: {"url":"https://registry.npmjs.org/pkg/1.2.3"}
 ```
 
-返回里刻意区分了两件事：
+## Parameters
 
-- `idle_ms`（最后变化距今多久）——区分「任务慢」和「任务卡死」
-- `pidAlive` ——进程还活着就值得再等，进程没了就是真失败了
-
-## 设计取舍
-
-**为什么是轮询而不是 inotify/fs.watch？** 日志文件通常由 shell 重定向写入，`fs.watch` 在跨平台、NFS、容器挂载卷上行为不一致（丢事件、重复事件、`rename` 失效）。构建日志的量级下，`stat` 的代价可以忽略——实测 11MB 文件轮询 3 秒的开销测不出来。稳定性优先。
-
-**为什么只读尾部 64KB？** Maven/Gradle 日志动辄几十 MB。用 `open` + 定位偏移读，而不是 `readFile`，避免把整个文件拉进内存。同一个 `must_be_new` 检查也只读新增区段。
-
-**为什么超时不抛错？** 抛错会让模型倾向于「重试」，而正确的动作是去查进程状态。把诊断信息放进返回值里，模型才能做出正确判断。
-
-**为什么每秒才上报一次 progress？** 用 `context.progress` 上报太频繁会刷屏，但完全不报又退化成黑屏体验。1 秒是不会干扰阅读的上限。
-
-## 与其它 OpenCode 插件的区别
-
-`wait_for` 只做一件事：**等待**。它不负责启动进程，也不接管内置工具。启动靠 `shell` 的 `background: true`，等待靠 `wait_for`。
-
-下面是最容易混淆的几个项目（2026-11 数据）：
-
-| 项目 | ★ | 定位 | 和本插件的关系 |
+| Parameter | Type | Default | Description |
 | --- | --- | --- | --- |
-| **shekohex/opencode-pty** | 607 | 交互式 PTY 管理（spawn/write/read/kill） | 功能重叠但目标不同，见下表 |
-| A8Cl233395/opencode-background-jobs | 1 | 替换内置 `shell`，超时自动转后台任务 | 思路最接近，但接管了 `shell` 工具 |
-| zeigarnick/opencode-background-task | 3 | 后台跑 **agent 任务** | 无关，管的是 subagent 不是进程 |
-| PrismKitty/opencode-background-tasks | 1 | 侧边栏展示运行中的 shell / subagent | 无关，只是 UI 展示 |
+| `path` | string | — | File to watch (absolute path). |
+| `pattern` | string | — | Regular expression; requires `path`. Matches only the last 64 KB. |
+| `pid` | number | — | Wait for this process to exit. Can be combined with `path`. |
+| `timeout_ms` | number | `240000` | Maximum wait; capped at `600000`. |
+| `poll_ms` | number | `500` | Poll interval; minimum `100`. Usually not needed. |
+| `tail_lines` | number | `60` | Number of log lines returned. |
+| `must_be_new` | boolean | `false` | Only consider content written after the call starts. |
+| `condition` | object | — | Advanced file/process/port/HTTP condition. When set, `path`, `pattern`, `pid`, and `must_be_new` are ignored. See [Advanced conditions](#5-wait-for-a-file-port-or-http-condition). |
+
+At least one of `path`, `pid`, or `condition` is required.
+
+## A timeout is not a failure
+
+A timeout **returns normally** instead of throwing, because "did not arrive" is information:
+
+```text
+[wait_for] timed out after 120.0s
+Reason: pid 12345 is still running; log did not match /BUILD SUCCESS/
+Last change: 118.3s ago
+pid 12345 is still running - the task may simply be slow, not stuck
+Next step: use ps / lsof to check the process; do not call wait_for again immediately.
+```
+
+The result deliberately separates two signals:
+
+- `idle_ms` (time since the last change) - distinguishes "slow task" from "stuck task".
+- `pidAlive` - if the process is alive, waiting longer may be worthwhile; if it is gone, the task really failed.
+
+## Design trade-offs
+
+**Why polling instead of inotify/fs.watch?** Log files are usually written through shell redirection, and `fs.watch` behaves inconsistently across platforms, NFS, and container mounts (missed events, duplicate events, broken `rename` handling). At build-log scale the cost of `stat` is negligible - polling an 11 MB file for three seconds was not measurable. Stability wins.
+
+**Why read only the last 64 KB?** Maven/Gradle logs are often tens of megabytes. The plugin uses `open` plus an offset read instead of `readFile`, so it never pulls the whole file into memory. The same `must_be_new` check reads only the new range.
+
+**Why not throw on timeout?** Throwing makes the model likely to retry, while the correct action is to inspect the process state. Putting diagnostics in the result lets the model make the right call.
+
+**Why report progress only once per second?** Calling `context.progress` too often floods the UI, but reporting nothing gives a blank-screen experience. One second is an upper bound that does not interfere with reading.
+
+## How it differs from other OpenCode plugins
+
+`wait_for` does one thing: **wait**. It does not start processes and does not take over built-in tools. Start work with the shell's `background: true`; wait for it with `wait_for`.
+
+The most easily confused projects (data from 2026-11):
+
+| Project | ★ | Purpose | Relationship |
+| --- | --- | --- | --- |
+| **shekohex/opencode-pty** | 607 | Interactive PTY management (spawn/write/read/kill) | Overlapping features, different goal; see below |
+| A8Cl233395/opencode-background-jobs | 1 | Replaces built-in `shell`; timeouts become background jobs | Closest idea, but takes over the `shell` tool |
+| zeigarnick/opencode-background-task | 3 | Runs **agent tasks** in the background | Unrelated; manages subagents, not processes |
+| PrismKitty/opencode-background-tasks | 1 | Sidebar display for running shells/subagents | Unrelated; UI only |
 
 ### vs opencode-pty
 
-它是目前最成熟的同类方案，但解决的是**另一个层面**的问题：
+It is the most mature project in this space, but it solves a **different layer**:
 
-| 维度 | opencode-wait-for-v2 | opencode-pty |
+| Dimension | opencode-wait-for-v2 | opencode-pty |
 | --- | --- | --- |
-| 核心范式 | 阻塞等待条件成立 | 后台运行 + 按需读取 |
-| 工具数量 | 1（`wait_for`） | 5（`pty_spawn` / `pty_write` / `pty_read` / `pty_list` / `pty_kill`） |
-| 启动进程 | ❌ 交给内置 `shell` | ✅ 原生 `pty_spawn` |
-| 向进程输入 | ❌ | ✅ 支持 Ctrl+C、方向键 |
-| 等结束的写法 | `wait_for(path, pattern)` 一次调用 | `pty_spawn(notifyOnExit: true)` 等通知 |
-| 超时行为 | 正常返回 + 进程状态 + 日志尾部 | `timeoutSeconds` 到点**杀掉进程** |
-| 中断（ESC） | ✅ `AbortSignal` | 取决于 SDK |
-| 进度上报 | ✅ `context.progress` | ❌ |
-| 大日志 | 只读尾部 64KB，11MB 命中 3ms | 全量进 ring buffer（5 万行上限） |
-| 常驻内存 | 几乎为零（无缓冲） | 每会话维持 5 万行缓冲 |
-| 依赖 | 零依赖（Node 内置 `fs`） | `bun-pty` 原生模块 |
-| 附带组件 | 无 | Web UI + TUI 侧边栏 + REST API + WebSocket |
-| 权限限制 | 无 | ⚠️ `ask` 规则会被当作 `deny` |
-| 代码量 | 12.5KB 单文件 | 完整前后端项目 |
+| Core model | Block until a condition holds | Run in background and read on demand |
+| Tools | 1 (`wait_for`) | 5 (`pty_spawn` / `pty_write` / `pty_read` / `pty_list` / `pty_kill`) |
+| Start a process | No; use built-in `shell` | Yes, native `pty_spawn` |
+| Send input | No | Yes, including Ctrl+C and arrow keys |
+| Wait for completion | `wait_for(path, pattern)` in one call | `pty_spawn(notifyOnExit: true)` and wait for notification |
+| Timeout | Normal return + process state + log tail | `timeoutSeconds` **kills the process** |
+| Interrupt (ESC) | Yes, `AbortSignal` | Depends on the SDK |
+| Progress | Yes, `context.progress` | No |
+| Large logs | Reads last 64 KB; 3 ms on 11 MB | Full ring buffer (50k-line cap) |
+| Resident memory | Nearly zero (no buffer) | 50k-line buffer per session |
+| Dependencies | Zero (Node built-in `fs`) | `bun-pty` native module |
+| Extra components | None | Web UI + TUI sidebar + REST API + WebSocket |
+| Permission limits | None | An `ask` rule is treated as `deny` |
+| Size | 12.5 KB, one file | Full frontend/backend project |
 
-**怎么选：**
+**Which one to use:**
 
-| 需求 | 推荐 |
+| Need | Recommendation |
 | --- | --- |
-| `mvnd install` 等构建跑完 | **wait_for** |
-| 起服务后等端口就绪 | **wait_for** |
-| `npm run dev` 起 dev server 并保持存活 | opencode-pty |
-| 交互式 REPL / 数据库 CLI | opencode-pty |
-| 让 agent 中途给进程发 Ctrl+C | opencode-pty |
+| Wait for `mvnd install` to finish | **wait_for** |
+| Wait for a service port to be ready | **wait_for** |
+| Start `npm run dev` and keep the dev server alive | opencode-pty |
+| Interactive REPL / database CLI | opencode-pty |
+| Let the agent send Ctrl+C to a process | opencode-pty |
 
-两者**可以同时安装**，不冲突：dev server 交给 pty，构建交给 wait_for。
+They **can be installed together** without conflict: let pty own the dev server and wait_for own builds.
 
 ### vs opencode-background-jobs
 
-思路上它是离本插件最近的——都认同「不该让对话阻塞在长命令上」。区别在于：
+Conceptually it is the closest project - both agree that a conversation should not block on a long command. The differences:
 
-- 它**替换了内置 `shell` 工具**（`timeout: 0` 直接转后台，超时不杀进程而是转 job），侵入性更高
-- 需要 `job_list` / `job_read` / `job_kill` 三个工具配合，调用链更长
-- `wait_for` 不改动任何内置工具，只**新增**一个工具，随时可以移除
+- It **replaces the built-in `shell` tool** (`timeout: 0` moves work to the background; a timeout becomes a job instead of killing the process), which is more invasive.
+- It needs `job_list` / `job_read` / `job_kill` together, so the call chain is longer.
+- `wait_for` does not modify any built-in tool; it only **adds** one tool that can be removed at any time.
 
-如果你已经在用它的 `job_read({ timeout })` 阻塞等待，那和 `wait_for` 的能力是重叠的，选一个即可。
+If you already use its `job_read({ timeout })` blocking wait, that overlaps with `wait_for`; pick one.
 
-## 兼容性
+## Compatibility
 
-在 OpenCode **v2.2.5** 上开发和验证。依赖 `@opencode/plugin` 的 `ctx.tool.transform` 与 `ctx.tool` 的 `execute(input, context)` 约定，其中 `context.signal` 用于中断、`context.progress` 用于进度上报。
+Developed and verified on OpenCode **v2.2.5**. It relies on `@opencode/plugin`'s `ctx.tool.transform` and the `ctx.tool` `execute(input, context)` contract, where `context.signal` is used for interruption and `context.progress` for progress reporting.
 
-工具声明了 `options: { codemode: true }`，因此在 Code Mode 里也能通过 `tools.wait_for(...)` 调用。
+The tool declares `options: { codemode: true }`, so it is also available in Code Mode as `tools.wait_for(...)`.
 
-## 开发
+## Development
 
 ```bash
-bun test          # 19 个用例
-bun build index.ts --target=node --outfile=/tmp/check.js   # 打包校验
+bun test          # 30 cases
+bun build index.ts --target=node --outfile=/tmp/check.js   # build check
 ```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the project layout, coding conventions, and the release flow.
+
+## Contributors
+
+Thanks to the people who made this project better:
+
+- [@masterjg](https://github.com/masterjg) (Marius Guščius) — the unified `condition` API for `wait_for` ([#1](https://github.com/lcssos/opencode-wait-for-v2/pull/1)) and the English translation of the project ([#2](https://github.com/lcssos/opencode-wait-for-v2/pull/2)).
+
+Contributions of any size are welcome — bug reports, condition types, docs, and translations included.
 
 ## License
 

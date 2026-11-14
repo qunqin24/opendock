@@ -33,12 +33,22 @@ open them to try the panel.</sub>
 - **Autosave** with `Ctrl/Cmd+S`, undo/redo, and drafts that survive tab switches.
 - **Conflict guard** — if a file changes on disk while it is open, autosave stops
   and asks **Reload** or **Overwrite**. It never silently overwrites.
+- **Compare with disk** — a line diff of the disk against your buffer, with both
+  line numbers, so Reload or Overwrite is an informed choice instead of a guess.
 - **Atomic writes** — temp file then rename, so a crash cannot truncate a file.
 - **Byte-faithful** — CRLF and UTF-8 BOM are preserved.
 - **Markdown preview** rendered by the app's timeline renderer, with a Source toggle.
   Links inside a preview open in another tab.
 - **CSV/TSV table view** with row numbers and zebra rows (RFC 4180 quoted fields).
 - **Line numbers** that follow word wrap, plus wrap and auto-save toggles.
+- **Syntax highlighting** for JavaScript/TypeScript, JSON, CSS, Python, shell,
+  Ruby, SQL, YAML, TOML, the C family, Go, Rust and Lua. Large files and formats
+  without a tokenizer stay plain rather than guessing.
+- **Find and replace** with `Ctrl/Cmd+F`: literal, case toggle, match count,
+  wrap-around next/previous, replace one or all.
+- **Tab / Shift+Tab indent**, and `Ctrl/Cmd+/` toggles a line comment.
+- **New file** in the browser, or **Create file** when a path you open does not
+  exist yet. **Save as…** moves the tab to a new path.
 - **Folder browser** — click any breadcrumb segment to browse, with folders and
   files colour-coded. One Browse tab, no tab per folder.
 - **Workspace tree** — the session workspace in a collapsible sidebar, loaded one
@@ -47,6 +57,9 @@ open them to try the panel.</sub>
   the highlight and `Enter` opens it.
 - **Recent files** on the **Open file** tab.
 - **Reveal in file manager** and **copy relative path**.
+- **Copy diagnostics** — the build marker, contract id, platform, file and last
+  status line on the clipboard; **Report a problem** opens an issue with the
+  same block already filled in.
 - Opens file links from chat in a tab instead of the read-only preview.
 
 ## Install
@@ -106,7 +119,8 @@ Restart OpenCode Desktop, then open the panel with `Ctrl+Shift+E`
 
 Tested against OpenCode Desktop 2.2.6. Each release checks the app's plugin-API
 major against the dependency before publishing, so a host upgrade fails the
-build instead of breaking users.
+build instead of breaking users. A nightly job also runs the suite against the
+newest published `@opencode/plugin`, which at the time of writing is 2.2.7.
 
 "Launched on" is the honest column: only Windows has been run with the plugin.
 Path handling is unit-tested against Windows, macOS and Linux fixtures, and CI

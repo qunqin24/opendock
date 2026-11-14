@@ -234,6 +234,12 @@ tail -f ~/.local/share/opencode-warp-retry/warp-retry.log
 
 A primeira linha deve ser `plugin loaded; automatic free-limit retry enabled`. Se vier `plugin loaded but no proxy environment matches`, o serviço não herdou as variáveis — rode `opencode service stop` e abra de novo.
 
+## OpenBot (ACP)
+
+O OpenBot não usa o serviço do OpenCode Desktop: ele sobe o próprio processo `opencode acp`. Esse processo nasce com o ambiente do OpenBot e precisa receber o proxy por conta própria.
+
+O guia completo está em [openbot/README.md](openbot/README.md), com o wrapper [`openbot/opencode.cmd`](openbot/opencode.cmd), isolamento de `XDG_DATA_HOME`/`XDG_STATE_HOME`, `OPENBOT_OPENCODE_PATH`, logs e solução de problemas.
+
 ## Configuração
 
 As opções podem ir no `opencode.json(c)` ou em variáveis de ambiente. Opções têm prioridade sobre variáveis.
@@ -303,6 +309,7 @@ plugin loaded but no proxy environment matches http://127.0.0.1:40000; automatic
 ```text
 src/index.ts                  código do plugin
 launcher/windows/             launcher do Windows + instalador em um comando (não se aplica ao Linux)
+openbot/                      wrapper e guia para OpenBot (ACP)
 examples/opencode.jsonc       exemplo de configuração
 ```
 

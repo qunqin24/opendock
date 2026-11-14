@@ -68,6 +68,10 @@ itself works anywhere.
 
 The first token is the time; everything after it is the message, taken verbatim.
 
+The session must already be started: in a brand-new session the command fails with an
+error instead of scheduling, because there is no conversation for the message to wake.
+Send the first message, then schedule.
+
 ## 🔒 Privacy
 
 The command is a native plugin command: its executor receives the raw arguments and stores

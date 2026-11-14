@@ -1,36 +1,38 @@
 # opencode-tok-speed-v2
 
-OpenCode **V2** TUI 插件：在输入框状态栏（`prompt.footer.status`）实时显示模型输出 token 速率和 TTFT。
+**English** | [简体中文](README.zh-CN.md)
+
+An OpenCode **V2** TUI plugin that shows the model's output token rate and TTFT in real time in the prompt footer status bar (`prompt.footer.status`).
 
 ```
 42.3 tok/s · TTFT 1.6s
 ```
 
-## 效果
+## What it looks like
 
-| 场景 | 显示 |
+| State | Display |
 | --- | --- |
-| 刚提交，还没吐第一个 token | `0.0 tok/s · TTFT 1.2s`（TTFT 实时累加） |
-| 正常输出 | `42.3 tok/s · TTFT 1.6s` |
-| 工具调用间隙 / 思考停顿 | 回落到 `0.0 tok/s` |
-| 回合结束 | 保留最后读数，速率归 `0.0` |
+| Prompt submitted, no token yet | `0.0 tok/s · TTFT 1.2s` (TTFT keeps counting up) |
+| Streaming normally | `42.3 tok/s · TTFT 1.6s` |
+| Between tool calls / thinking pause | Falls back to `0.0 tok/s` |
+| Turn finished | Keeps the last reading, rate drops to `0.0` |
 
-TTFT 会实时往上爬，所以能直观看到「这一轮卡了多久」——上下文变长后变慢，最先有反应的就是这个数字。
+TTFT climbs in real time, so you can see at a glance how long this turn has been stuck — when the context grows and things slow down, this is the first number to react.
 
-## 安装
+## Install
 
 ```bash
 opencode plugin add opencode-tok-speed-v2
 ```
 
-或者手动放进全局插件目录（改完自动热加载，无需重启）：
+Or drop it into the global plugin directory manually (hot-reloads on change, no restart needed):
 
 ```bash
 git clone https://github.com/lcssos/opencode-tok-speed-v2 \
   ~/.config/opencode/plugins/opencode-tok-speed-v2
 ```
 
-仅用于 TUI、不连远端 server 的场景，也可以写进 `~/.config/opencode/cli.json`：
+For TUI-only setups that never connect to a remote server, you can also add it to `~/.config/opencode/cli.json`:
 
 ```jsonc
 {
@@ -38,172 +40,172 @@ git clone https://github.com/lcssos/opencode-tok-speed-v2 \
 }
 ```
 
-确认已加载：
+Verify it loaded:
 
 ```bash
 opencode plugin list
 ```
 
-## 开发与构建
+## Development and build
 
-入口 `tui.tsx` 是源码，**发布入口是预编译的 `tui.js`**。改完源码必须重新构建并提交产物：
+The source entry point is `tui.tsx`; **the published entry point is the precompiled `tui.js`**. After editing the source you must rebuild and commit the artifact:
 
 ```bash
 npm install
 npm run build     # tui.tsx → tui.js
 ```
 
-`tui.js` 要一起提交，`publish.yml` 与 `release.sh` 都会校验两者同步，落后就中止发布。
+`tui.js` must be committed together with it. Both `publish.yml` and `release.sh` verify the two are in sync and abort the release if the build is stale.
 
-### 为什么必须预编译
+### Why precompilation is mandatory
 
-OpenCode 的 solid JSX 转译插件只处理 `node_modules` 之外的文件（`bun-plugin-solid` 的 onLoad filter 显式排除了 `node_modules`）。插件从 npm 装进来时入口就位于 `node_modules/opencode-tok-speed-v2/` 内，如果 `exports["./tui"]` 直接指向 `.tsx`，JSX 不会被转译，运行时会去解析 `@opentui/solid/jsx-dev-runtime` 并失败：
+OpenCode's Solid JSX transform plugin only processes files outside `node_modules` (the `bun-plugin-solid` onLoad filter explicitly excludes `node_modules`). When the plugin is installed from npm, its entry point lives inside `node_modules/opencode-tok-speed-v2/`. If `exports["./tui"]` points directly at a `.tsx` file, the JSX is never transformed and the runtime tries to resolve `@opentui/solid/jsx-dev-runtime`, which fails:
 
 ```
 Cannot find package '@opentui/solid' imported from
   ~/.cache/opencode/npm/opencode-tok-speed-v2@latest/.../opencode-tok-speed-v2/tui.tsx
 ```
 
-这个报错看起来像「少了 peer 依赖」，实际是「入口没被转译」。把 `.tsx` 编译成 `.js`（与宿主同样的 `babel-preset-solid` + `generate: "universal"`）后即可正常加载。
+That error looks like a missing peer dependency, but it really means "the entry point was never transformed". Compiling the `.tsx` into `.js` (with the same `babel-preset-solid` + `generate: "universal"` as the host) makes it load fine.
 
-## 为什么不用内置的 `session.tps`
+## Why not the built-in `session.tps`
 
-`cli.json` 里的 `session.tps: true` 只在**助手消息底部**显示这一轮的平均速率，不进状态栏。
+`session.tps: true` in `cli.json` only shows the average rate for the turn **at the bottom of the assistant message**; it never reaches the status bar.
 
-本插件挂在 `prompt.footer.status` 子槽，位置由布局系统分配，不会像绝对定位那样压住别的元素。
+This plugin hooks the `prompt.footer.status` sub-slot, so its position is assigned by the layout system and it never overlaps other elements the way absolute positioning would.
 
-与同类插件（如 `oc-tps`）相比，本插件重点在读数可信度：
+Compared with similar plugins (e.g. `oc-tps`), this one focuses on trustworthy readings:
 
-| | 本插件 | 常见做法 |
+| | This plugin | Common approach |
 | --- | --- | --- |
-| token 估算 | 字符数 × 比例，每步用真实 tokens 校正（EMA） | 字节数 ÷ 固定值，永不校正 |
-| 事件重复 | 按 `event.id` 去重 | 无去重，重放会翻倍 |
-| 多代实例 | `globalThis` 单例，新实例接管旧实例 | 各自持有状态，重复计数 |
-| 时间轴 | 一律用服务端 `event.created` | 混用本地钟，批量投递时速率虚高 |
-| TTFT 起点 | `step.started.data.started`（按 step 精确计时） | 会话级起点，会把上一段时间算进去 |
+| Token estimation | Characters × ratio, corrected with real token counts each step (EMA) | Bytes ÷ constant, never corrected |
+| Duplicate events | Deduplicated by `event.id` | No dedup, replays double the count |
+| Multiple generations | `globalThis` singleton, new instance takes over the old one | Each instance keeps its own state and double-counts |
+| Timeline | Always the server-side `event.created` | Mixes in the local clock, inflates rate on batched delivery |
+| TTFT origin | `step.started.data.started` (per-step timing) | Session-level origin, which includes the previous stretch |
 
-## 数值口径
+## How the numbers are computed
 
-### 速率
+### Rate
 
 ```
-(累计字符 × 每字符 token 比例) / (请求开始 → 最后一个 token)
+(accumulated characters × tokens-per-char ratio) / (request start → last token)
 ```
 
-- 生成中拿不到真实 token 数，只能按字符估算；比例初始 0.5（中文约 2 字符/token），每一步结束后用服务端返回的 `tokens.output + tokens.reasoning` 校正并做 EMA 平滑，所以会越用越准。
-- 每步结束再用真实 tokens 把这步的数值校正一次，与内置 assistant footer 的 tok/s 基本一致。
-- 口径含首 token 延迟（TTFT），所以和内置 footer 对得上。
+- The real token count isn't available while streaming, so it's estimated from characters. The ratio starts at 0.5 (Chinese is roughly 2 chars/token) and is corrected after each step using the server's `tokens.output + tokens.reasoning`, smoothed with an EMA — so it gets more accurate the more you use it.
+- After each step the value is corrected once more with the real token count, which keeps it consistent with the built-in assistant footer's tok/s.
+- The formula includes time-to-first-token, so it lines up with the built-in footer.
 
 ### TTFT
 
 ```
-首个流式 token 的时间 - session.step.started 的 data.started
+time of first streamed token - session.step.started's data.started
 ```
 
-起点用 `step.started.data.started` 而不是 `session.execution.started`：一次执行里可能有多个 step（中途调用工具），用 execution 起点会把上一个 step 的时间也算进来。
+The origin is `step.started.data.started` rather than `session.execution.started`: a single execution may contain multiple steps (tool calls in the middle), and using the execution origin would count the previous step's time too.
 
-## 实现上踩过的坑
+## Pitfalls hit during implementation
 
-这四点如果不处理，读数会明显失真：
+Four things that noticeably distort the readings if left unhandled:
 
-1. **TUI 会多次 `setup` 同一个插件**（多代实例共存，旧实例不清理）。每个实例都订阅事件会导致 token 双倍计数、标签重复出现。所以状态与订阅收敛到 `globalThis` 单例，新实例接管时先拆掉旧实例。
-2. **事件流会重放**，同一个 `event.id` 可能投递多次，必须去重，否则 token 数翻倍。
-3. **不能用本地 `Date.now()` 当速率时间轴**。服务端会把多个增量压在同一毫秒投递，本地时间还受 read 批次影响，跨度被压扁会让速率虚高好几倍。一律用 `event.created`（服务端时间）；只有「多久没收到 token」这种静默判断才用本地钟。
-4. **累计均值比瞬时窗口可信**。真实事件节奏下，最近 N 秒的瞬时速率会在几十到几百之间来回跳，累计均值单调逼近最终值。
+1. **The TUI calls `setup` on the same plugin multiple times** (multiple generations coexist and the old instance is never cleaned up). Every instance subscribing to events would double-count tokens and duplicate the label. So state and subscriptions are collapsed into a `globalThis` singleton; a new instance tears down the old one before taking over.
+2. **The event stream replays.** The same `event.id` may be delivered more than once, so deduplication is mandatory — otherwise token counts double.
+3. **The local `Date.now()` cannot serve as the rate timeline.** The server can deliver several increments packed into the same millisecond, and local time is also affected by read batching; a squashed span inflates the rate several-fold. Always use `event.created` (server time). The local clock is only used for silence detection, i.e. "how long since the last token".
+4. **A cumulative average is more trustworthy than an instantaneous window.** Under real event pacing, the instantaneous rate over the last N seconds bounces between tens and hundreds, while the cumulative average approaches the final value monotonically.
 
-## 配置
+## Configuration
 
-都在 `tui.tsx` 顶部（改完记得 `npm run build`）：
+All at the top of `tui.tsx` (remember to run `npm run build` afterwards):
 
-| 常量 | 默认 | 说明 |
+| Constant | Default | Description |
 | --- | --- | --- |
-| `SHOW_TTFT` | `true` | 设 `false` 退回纯 `x.x tok/s` |
-| `MIN_TTFT_MS` | `200` | 低于此值不显示 TTFT（`started` 与首个 token 同毫秒时没信息量） |
-| `IDLE_MS` | `1000` | 超过这么久没收到 token 就把速率归零 |
-| `HIDE_WHEN_IDLE` | `false` | 改 `true` 则回合结束后整格消失 |
-| `TICK_MS` | `500` | 刷新间隔 |
-| `MIN_SPAN_MS` | `1200` | 数据不足时先不显示，避免闪出偏低的数 |
-| `MIN_CHARS` | `40` | 同上，字符数门槛 |
-| `DEFAULT_TOKENS_PER_CHAR` | `0.5` | token/字符初始比例，会按步自动校正 |
+| `SHOW_TTFT` | `true` | Set to `false` for a plain `x.x tok/s` |
+| `MIN_TTFT_MS` | `200` | Don't show TTFT below this value (`started` and the first token in the same millisecond carry no information) |
+| `IDLE_MS` | `1000` | Zero out the rate after this long without a token |
+| `HIDE_WHEN_IDLE` | `false` | Set to `true` to hide the whole cell after the turn ends |
+| `TICK_MS` | `500` | Refresh interval |
+| `MIN_SPAN_MS` | `1200` | Don't display until there's enough data, to avoid flashing a low number |
+| `MIN_CHARS` | `40` | Same as above, character threshold |
+| `DEFAULT_TOKENS_PER_CHAR` | `0.5` | Initial token/char ratio, auto-corrected per step |
 
-想把思考过程排除在速率外，删掉 `session.reasoning.delta` 那条订阅即可。
+To exclude reasoning from the rate, just remove the `session.reasoning.delta` subscription.
 
-## 兼容性
+## Compatibility
 
-在 OpenCode **v2.2.5** 上开发和验证。依赖 `@opencode/plugin/tui` 的 `context.data.on` 与 `context.ui.slot`，事件名取自 V2 schema：
+Developed and verified on OpenCode **v2.2.5**. Depends on `context.data.on` and `context.ui.slot` from `@opencode/plugin/tui`; event names come from the V2 schema:
 
 `session.step.started` / `session.step.ended` / `session.step.failed` / `session.text.delta` / `session.reasoning.delta` / `session.idle`
 
-## 发版
+## Releasing
 
-### 一键发版（推荐）
+### One-command release (recommended)
 
 ```bash
 npm run release patch    # 0.1.0 → 0.1.1
 npm run release minor    # → 0.2.0
 npm run release major    # → 1.0.0
-npm run release 1.2.3    # 指定版本号
+npm run release 1.2.3    # explicit version
 ```
 
-脚本 `scripts/release.sh` 会依次：改版本号 → 提交 → 打 `vX.Y.Z` tag → 推送。
+The `scripts/release.sh` script: bumps the version → commits → creates the `vX.Y.Z` tag → pushes.
 
-推送 tag 后由 GitHub Actions（`.github/workflows/publish.yml`）自动发布到 npm。
+After the tag is pushed, GitHub Actions (`.github/workflows/publish.yml`) publishes to npm automatically.
 
-发布前会做四道检查，任何一道不满足都会直接退出：
+Four checks run before publishing; any failure aborts immediately:
 
-| 检查 | 说明 |
+| Check | Description |
 | --- | --- |
-| 工作区干净 | 有未提交改动就拒绝，避免把无关改动混进发布提交 |
-| 当前在 `main` | 其他分支拒绝 |
-| `tui.js` 与 `tui.tsx` 同步 | 落后会重新构建并把差异报出来，提示先提交 |
-| 版本号格式 | 只接受 `patch` / `minor` / `major` 或 `X.Y.Z` |
+| Clean working tree | Uncommitted changes are rejected so unrelated edits don't end up in the release commit |
+| On `main` | Other branches are rejected |
+| `tui.js` in sync with `tui.tsx` | Rebuilds if stale and prints the diff, telling you to commit first |
+| Version format | Only `patch` / `minor` / `major` or `X.Y.Z` |
 
-CI 侧还会校验 tag 与 `package.json` 版本一致、npm 上该版本是否已存在、`tui.js` 与 `tui.tsx` 是否同步、入口有无残留 JSX。
+On the CI side it also verifies the tag matches the `package.json` version, whether that version already exists on npm, that `tui.js` and `tui.tsx` are in sync, and that no JSX is left in the entry point.
 
-查看发布进度：
+Watch release progress:
 
 ```bash
 gh run watch
 ```
 
-### 首次配置：npm Trusted Publisher
+### First-time setup: npm Trusted Publisher
 
-CI 使用 **OIDC trusted publishing**，仓库里不保存任何 npm token。需要在 npm 网页上授权一次：
+CI uses **OIDC trusted publishing**; no npm token is stored in the repository. You need to authorize it once on the npm website:
 
-1. 打开 <https://www.npmjs.com/package/opencode-tok-speed-v2/access>
-2. 找到 **Trusted Publisher** 区域，点击 **GitHub Actions**
-3. 填写：
+1. Open <https://www.npmjs.com/package/opencode-tok-speed-v2/access>
+2. Find the **Trusted Publisher** section and click **GitHub Actions**
+3. Fill in:
 
-   | 字段 | 值 |
+   | Field | Value |
    | --- | --- |
    | Organization or user | `lcssos` |
    | Repository | `opencode-tok-speed-v2` |
    | Workflow filename | `publish.yml` |
-   | Environment name | 留空 |
-   | Allowed actions | 勾选 **Allow npm publish** |
+   | Environment name | leave empty |
+   | Allowed actions | check **Allow npm publish** |
 
-4. 保存。
+4. Save.
 
-注意事项：
+Notes:
 
-- 配置后必须在 **2 天内完成首次发布**，否则配置过期，需要删除重建。
-- `package.json` 的 `repository.url` 必须与 GitHub 仓库完全一致（npm 会比对，不一致会拒发）。
-- 发布成功后 npm 会自动为包生成 provenance 证明（来源：公开仓库 + OIDC）。
+- After configuring, the first publish must happen **within 2 days**, otherwise the configuration expires and must be deleted and recreated.
+- `repository.url` in `package.json` must exactly match the GitHub repository (npm compares them and refuses to publish on a mismatch).
+- After a successful publish, npm automatically generates a provenance attestation for the package (source: public repo + OIDC).
 
-### 手动发布（备选）
+### Manual publish (fallback)
 
-没有配好 OIDC、或只想临时发一次时：
+If OIDC isn't configured, or you just want a one-off publish:
 
 ```bash
 npm publish --access public
 ```
 
-npm 现强制发布必须满足其一：
+npm now requires one of the following to publish:
 
-- 账号开启了 2FA，发布时输入 TOTP 6 位码；
-- 使用勾选了 **Bypass two-factor authentication** 的 Granular Access Token。
+- 2FA enabled on the account — enter the 6-digit TOTP code when publishing;
+- A Granular Access Token with **Bypass two-factor authentication** checked.
 
-Token 方式适合非交互环境，注意不要提交进仓库。
+The token approach suits non-interactive environments; be careful never to commit it.
 
 ## License
 

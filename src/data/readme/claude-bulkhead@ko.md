@@ -1,7 +1,7 @@
 <h1 align="center">claude-bulkhead</h1>
 
 <p align="center">
-  <strong>Claude Code 가 <code>pkill node</code> 로 다른 개발 서버를 종료하거나, 다른 세션의 포트를 사용하거나, <code>git add -A</code> 로 다른 세션의 수정 사항을 커밋하는 일을 막습니다.</strong>
+  <strong>Claude Code 가 비어 있는 변수로 <code>rm -rf $DIR/</code> 를 실행하거나, <code>pkill node</code> 로 다른 개발 서버를 종료하거나, 다른 세션의 포트를 사용하거나, <code>git add -A</code> 로 다른 세션의 수정 사항을 커밋하는 일을 막습니다.</strong>
 </p>
 
 <p align="center">어느 프로세스, 포트, git 트리가 어느 Claude Code 세션과 서브에이전트 것인지 아는 훅입니다. 다른 세션에 영향을 주는 명령만 막고, 대신 실행할 안전한 명령을 Claude 에게 알려 줍니다.</p>
@@ -28,14 +28,22 @@
 
 ## 설치
 
-Claude Code 안에서 입력합니다.
+먼저 아무것도 설치하지 않고, 내 세션 기록에서 무엇을 막았을지 확인합니다.
+
+```
+npx -y claude-bulkhead scan --since 30d --share
+```
+
+`~/.claude/projects` 의 기록을 읽기만 하고 어디로도 보내지 않습니다.
+
+그다음 Claude Code 안에서 플러그인을 설치합니다.
 
 ```
 /plugin marketplace add dooly6276/claude-bulkhead
 /plugin install bulkhead@bulkhead
 ```
 
-그다음 아무것도 바꾸지 않고, 지난 한 달 기록에서 무엇을 막았을지 확인합니다.
+설치한 뒤에는 같은 보고서를 Claude Code 안에서 볼 수 있습니다.
 
 ```
 /bulkhead:scan 30d
@@ -72,7 +80,7 @@ Claude Code 안에서 입력합니다.
 | 세 세션이 같은 1분 안에 `next build`, `npm test`, Playwright 를 시작하고 컴퓨터가 멈춥니다. | memory-guard 가 램이 모자랄 때 무거운 명령을 막습니다. `bulkhead-slot` 을 거치면 세 번째 작업은 자리가 날 때까지 대기열에서 기다립니다. |
 
 <details>
-<summary>5개 더</summary>
+<summary>6개 더</summary>
 
 | bulkhead 없이 | bulkhead 와 함께 |
 |---|---|
@@ -81,10 +89,11 @@ Claude Code 안에서 입력합니다.
 | 서브에이전트가 포그라운드에서 10분 동안 기다립니다. 그동안 세션은 대답을 못 하고 프롬프트 캐시도 만료됩니다. | wait-guard 가 막고 `run_in_background: true` 로 돌리라고 알려 줍니다. |
 | 에이전트가 무엇이 디스크를 차지하는지 알아보겠다고 홈 폴더 전체에 `du` 를 열 개 동시에 돌립니다. 모든 세션의 빌드와 `git status` 가 몇 분씩 느려집니다. | disk-guard 가 막고 폴더를 하나씩 보라고 알려 줍니다. |
 | "worktree 정리" 작업이 다른 세션이 아직 일하는 worktree 에 `git worktree remove` 를 칩니다. | checkout-guard 가 막고 아직 그 안에 있는 세션을 알려 줍니다. |
+| 정리 작업이 `BUILD_DIR` 이 비어 있는 채로 `rm -rf "$BUILD_DIR"/*` 를 실행해 `rm -rf /*` 가 되거나, `rm -rf .git` 으로 저장소 기록이 사라집니다. | basics 가 막고 안전한 형태 `rm -rf "${BUILD_DIR:?}"/*` 를 알려 줍니다. |
 
 </details>
 
-세션이 하나뿐이어도 kill-guard, memory-guard, wait-guard, disk-guard, basics(`rm -rf ~`, `main` 강제 푸시, 커밋하지 않은 작업 위의 `reset --hard` 를 막음)는 적용됩니다. port-guard 와 checkout-guard 는 두 번째 세션이나 서브에이전트가 살아 있을 때 동작합니다.
+세션이 하나뿐이어도 kill-guard, memory-guard, wait-guard, disk-guard, basics(`rm -rf ~`, `D` 가 비면 `rm -rf /` 가 되는 `rm -rf $D/`, `rm -rf .git`, `main` 강제 푸시, 커밋하지 않은 작업 위의 `reset --hard` 를 막음)는 적용됩니다. port-guard 와 checkout-guard 는 두 번째 세션이나 서브에이전트가 살아 있을 때 동작합니다.
 
 ## 무엇인가
 
@@ -290,9 +299,9 @@ sleep 을 합쳐 180초가 넘을 수 있는 포그라운드 명령을 막습니
 </details>
 
 <details>
-<summary><strong>basics</strong>: 되돌릴 수 없는 실수 다섯 가지</summary>
+<summary><strong>basics</strong>: 되돌릴 수 없는 실수 여덟 가지</summary>
 
-`rm-root`(루트, `/srv` 같은 최상위 폴더, 홈, `~/Documents` 같은 홈 바로 아래 폴더, 저장소 위 폴더를 향한 `rm -rf`), `force-push-main`(`main` 이나 `master` 로 `git push --force`. `--force-with-lease` 는 통과), `protected-delete`(`git push origin :main`, `git push --delete origin main`, `git branch -D main`), `discard-changes`(커밋 안 한 작업을 날리는 `git reset --hard`, `git clean -fd`), `agent-author`(`--author="Claude <noreply@anthropic.com>"`, `git config user.name Claude` 등. 내 커밋이 계속 내 것으로 집계되게 합니다).
+`rm-root`(루트, `/srv` 같은 최상위 폴더, 홈, `~/Documents` 같은 홈 바로 아래 폴더, 저장소 위 폴더를 향한 `rm -rf`), `rm-empty-var`(변수나 출력이 비면 `/` 가 되는 `rm -rf $D/`, `rm -rf "$(cygpath -u ...)"`, `$D/` 로 가는 `rsync --delete`. `"${D:?}/"` 는 통과), `rm-unquoted-var`(값에 공백이 있는데 따옴표 없이 쓴 `rm -rf $D`. bash 가 조각마다 지움), `rm-git-dir`(저장소에서 `rm -rf .git`), `force-push-main`(`main` 이나 `master` 로 `git push --force`. `--force-with-lease` 는 통과), `protected-delete`(`git push origin :main`, `git push --delete origin main`, `git branch -D main`), `discard-changes`(커밋 안 한 작업을 날리는 `git reset --hard`, `git clean -fd`), `agent-author`(`--author="Claude <noreply@anthropic.com>"`, `git config user.name Claude` 등. 내 커밋이 계속 내 것으로 집계되게 합니다).
 
 끄기: `BULKHEAD_DISABLE=basics`, 또는 규칙 이름으로 하나씩. 자세히: [docs/guards/basics.md](docs/guards/basics.md)
 </details>
@@ -348,7 +357,7 @@ bulkhead 는 다른 문제를 다룹니다. 한 컴퓨터의 세션들이 프로
 
 | 변수 | 기본값 | 같은 설정 |
 |---|---|---|
-| `BULKHEAD_DISABLE` | 비어 있음 | 끌 가드를 쉼표로 나열: `kill-guard`, `wait-guard`, `memory-guard`, `port-guard`, `checkout-guard`, `disk-guard`, `orphan-reaper`, `basics`, `all`. 규칙 하나씩 끌 수도 있습니다: `rm-root`, `force-push-main`, `protected-delete`, `discard-changes`, `agent-author`, `stage-all`, `remove-session-dir`. 여기 적은 가드는 파일 설정과 상관없이 꺼집니다 |
+| `BULKHEAD_DISABLE` | 비어 있음 | 끌 가드를 쉼표로 나열: `kill-guard`, `wait-guard`, `memory-guard`, `port-guard`, `checkout-guard`, `disk-guard`, `orphan-reaper`, `basics`, `all`. 규칙 하나씩 끌 수도 있습니다: `rm-root`, `rm-empty-var`, `rm-unquoted-var`, `rm-git-dir`, `force-push-main`, `protected-delete`, `discard-changes`, `agent-author`, `stage-all`, `remove-session-dir`. 여기 적은 가드는 파일 설정과 상관없이 꺼집니다 |
 | `BULKHEAD_PRESET` | `normal` | 프리셋: `quiet`, `normal`, `strict` |
 | `BULKHEAD_WAIT_MAX_SEC` | 180 | `waitGuard.limitSeconds` |
 | `BULKHEAD_MIN_FREE_GB` | 3, 또는 램의 15% 중 작은 값 | `memory.minFreeGb` |
@@ -377,6 +386,7 @@ bulkhead 는 다른 문제를 다룹니다. 한 컴퓨터의 세션들이 프로
 | kill-guard | `pkill`, `taskkill-im`, `stop-process-name` 과 이름으로 끄는 다른 명령 | `{"killGuard":{"allowNames":["ffmpeg"]}}` |
 | kill-guard | `other-session-pid`: 다른 세션 트리의 PID | `{"killGuard":{"ownerCheck":false}}` |
 | kill-guard | `broad-pattern`: 데스크톱 앱이나 많은 프로세스에 닿는 `pkill -f` 패턴 | `{"killGuard":{"broadPattern":false}}` |
+| kill-guard | `bsd-pkill`: macOS 에서 긴 옵션이나 두 번째 패턴이 붙은 `pkill`. BSD `pkill` 은 이를 패턴으로 읽음 | `{"killGuard":{"bsdPkill":false}}` |
 | kill-guard | `mass-kill`, `docker-mass`, `device-kill`, `app-quit`, `service-stop`: 다른 세션이 떠 있을 때만 걸리는 규칙 | `{"killGuard":{"massKill":false}}`, 나머지도 같은 방식 (`dockerMass`, `deviceKill`, `appQuit`, `serviceStop`) |
 | wait-guard | `long-sleep`, `poll-loop`, `follow` | `{"waitGuard":{"limitSeconds":600}}` |
 | memory-guard | `low-memory` | `{"memory":{"minFreeGb":1}}` |
@@ -387,6 +397,7 @@ bulkhead 는 다른 문제를 다룹니다. 한 컴퓨터의 세션들이 프로
 | checkout-guard | `git-checkout`, `git-pull` 과 트리를 바꾸는 다른 명령 | `{"checkoutGuard":{"enabled":false}}` |
 | disk-guard | `disk-wide-find`, `parallel-disk-scan`, `disk-wide-scan` | `{"diskGuard":{"enabled":false}}` |
 | basics | `rm-root` | `{"basics":{"rmRoot":false}}` |
+| basics | `rm-empty-var`, `rm-unquoted-var`, `rm-git-dir` | `{"basics":{"rmEmptyVar":false}}`, 나머지도 같은 방식 (`rmUnquotedVar`, `rmGitDir`) |
 | basics | `force-push-main` | `{"basics":{"forcePushMain":false}}` |
 | basics | `discard-changes` | `{"basics":{"discardChanges":false}}` |
 | basics | `agent-author` | `{"basics":{"agentAuthor":false}}` |

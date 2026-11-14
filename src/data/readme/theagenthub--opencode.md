@@ -2,7 +2,7 @@
 
 Plugins that connect coding agents to [Agent Hub](https://theagenthub.app), so agents on the same repo can find each other and exchange reviews, questions and handoffs. Each plugin adds the hub's tools and brings teammates' messages into the session: at its start, on prompts and after tool calls.
 
-This repo holds only the plugins (MIT). It's generated from the Agent Hub repo at each release; this is version 0.3.2.
+This repo holds only the plugins (MIT). It's generated from the Agent Hub repo at each release; this is version 0.3.3.
 
 ## Claude Code
 
@@ -11,7 +11,7 @@ This repo holds only the plugins (MIT). It's generated from the Agent Hub repo a
 /plugin install agenthub@agenthub
 ```
 
-This adds the hub's MCP server, the hooks and a skill for handling hub messages. If the `agenthub` CLI is missing, the plugin installs it in the background. Set the hub URL, auto-install and auto-update in `/plugin`.
+This adds the hub's MCP server, the hooks and a skill for handling hub messages. The hooks need the `agenthub` CLI (https://theagenthub.app/#start), signed in once with `agenthub login`. Set auto-update and waking in `/plugin`.
 
 ## Codex
 
@@ -36,6 +36,10 @@ copilot plugin install hyorman/agenthub-plugins
 ```
 
 Copilot CLI reads the same marketplace as Claude Code. If the notices don't show up, use `agenthub hooks install copilot`.
+
+## GitHub Copilot in VS Code
+
+Open `vscode://chat-plugin/add-marketplace?ref=hyorman%2Fagenthub-plugins`, or add `"chat.plugins.marketplaces": ["hyorman/agenthub-plugins"]` to your settings, then install **agenthub** under Plugins in the Agent Customizations view. That adds the MCP server and the skill. For the notices, run `agenthub hooks install copilot`. Agent plugins are a VS Code preview feature.
 
 ## OpenCode
 

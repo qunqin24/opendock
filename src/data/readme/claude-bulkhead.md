@@ -1,18 +1,18 @@
 <h1 align="center">claude-bulkhead</h1>
 
 <p align="center">
-  <strong>Stop Claude Code from running <code>pkill node</code> on your other dev servers, taking their ports, and committing another session's edits with <code>git add -A</code>.</strong>
+  <strong>Stop Claude Code from running <code>rm -rf $DIR/</code> when <code>$DIR</code> is empty, <code>pkill node</code> on your other dev servers, taking their ports, and committing another session's edits with <code>git add -A</code>.</strong>
 </p>
 
 <p align="center">Hooks that know which processes, ports and git trees belong to which Claude Code session and subagent, so they block only what would hurt something else, and tell Claude the safe command to run instead.</p>
 
-<p align="center">Windows, macOS and Linux. No tmux, no sudo, no background daemon, no network calls, no dependencies. Also guards Codex, Gemini CLI, Copilot CLI, Cursor and six more agents.</p>
+<p align="center">Windows, macOS and Linux. No tmux, no sudo, no background daemon, no network calls, no dependencies. Also guards Codex, Gemini CLI, Copilot CLI, Cursor, Pi and ten more agents.</p>
 
 <p align="center">
   <a href="https://www.npmjs.com/package/claude-bulkhead"><img src="https://img.shields.io/npm/v/claude-bulkhead?style=flat-square&labelColor=24292f&logo=npm&logoColor=white&label=npm&color=0d9488" alt="npm version"></a>
   <a href="https://github.com/dooly6276/claude-bulkhead/actions/workflows/test.yml"><img src="https://img.shields.io/github/actions/workflow/status/dooly6276/claude-bulkhead/test.yml?branch=main&style=flat-square&labelColor=24292f&logo=githubactions&logoColor=white&label=3700%2B%20tests" alt="tests"></a>
   <a href="#install"><img src="https://img.shields.io/badge/Claude_Code-plugin-D97757?style=flat-square&labelColor=24292f&logo=claude&logoColor=white" alt="Claude Code plugin"></a>
-  <a href="docs/other-agents.md"><img src="https://img.shields.io/badge/also_guards-Codex%2C_Cursor%2C_Copilot%2C_Gemini%2C_opencode-0d9488?style=flat-square&labelColor=24292f" alt="Also guards Codex, Cursor, Copilot CLI, Gemini CLI and opencode"></a>
+  <a href="docs/other-agents.md"><img src="https://img.shields.io/badge/also_guards-Codex%2C_Cursor%2C_Copilot%2C_Gemini%2C_opencode%2C_Pi_%2B9-0d9488?style=flat-square&labelColor=24292f" alt="Also guards Codex, Cursor, Copilot CLI, Gemini CLI, opencode, Pi and nine more agents"></a>
   <br>
   <img src="https://img.shields.io/badge/platform-macOS_%7C_Linux_%7C_Windows-0d9488?style=flat-square&labelColor=24292f" alt="macOS, Linux and Windows">
   <img src="https://img.shields.io/badge/node-%E2%89%A518-0d9488?style=flat-square&labelColor=24292f&logo=nodedotjs&logoColor=white" alt="Node 18+">
@@ -28,14 +28,22 @@
 
 ## Install
 
-Inside Claude Code:
+First, with nothing installed, see what it would have stopped in your own sessions:
+
+```
+npx -y claude-bulkhead scan --since 30d --share
+```
+
+It only reads the transcripts in `~/.claude/projects` and sends nothing.
+
+Then install the plugin inside Claude Code:
 
 ```
 /plugin marketplace add dooly6276/claude-bulkhead
 /plugin install bulkhead@bulkhead
 ```
 
-Then see what it would have stopped in your own last month, without changing anything:
+Once installed, the same report runs inside Claude Code:
 
 ```
 /bulkhead:scan 30d
@@ -48,10 +56,11 @@ Other agents load the same guards as a plugin:
 | Copilot CLI | `copilot plugin marketplace add dooly6276/claude-bulkhead`, then `copilot plugin install bulkhead@bulkhead` |
 | Cursor | `git clone https://github.com/dooly6276/claude-bulkhead ~/.cursor/plugins/local/bulkhead`, then **Developer: Reload Window** |
 | opencode | add `"plugin": ["claude-bulkhead"]` to `opencode.json` |
+| Pi | `pi install npm:claude-bulkhead` |
 | Gemini CLI | `gemini extensions install https://github.com/dooly6276/claude-bulkhead` |
 | Codex | `codex plugin marketplace add dooly6276/claude-bulkhead`, then `codex plugin add bulkhead@bulkhead`, then approve the hook with `/hooks` |
 
-For the others (Windsurf, Droid, Devin, Cline, Amp), see [Codex, Gemini and other agents](#codex-gemini-and-other-agents).
+For the others (Qwen Code, Kimi Code, Grok Build, Antigravity, Windsurf, Droid, Devin, Cline, Amp), see [Codex, Gemini and other agents](#codex-gemini-and-other-agents).
 
 Node 18 or later must be on `PATH` (the native Claude Code installer does not install it; check with `node --version`).
 
@@ -72,7 +81,7 @@ Unsure whether it is working? `bulkhead doctor` runs a harmless command through 
 | Three sessions start `next build`, `npm test` and Playwright in the same minute, and the machine freezes. | memory-guard blocks heavy commands when RAM is low. Through `bulkhead-slot`, the third job waits in a queue until there is room. |
 
 <details>
-<summary>Five more</summary>
+<summary>Six more</summary>
 
 | Without bulkhead | With bulkhead |
 |---|---|
@@ -81,10 +90,11 @@ Unsure whether it is working? `bulkhead doctor` runs a harmless command through 
 | A subagent polls in the foreground for ten minutes. The session cannot answer you, and the prompt cache expires. | wait-guard blocks the loop and asks for `run_in_background: true`. |
 | An agent wants to know what is using disk space and runs ten `du` at once over your home folder. Every session's builds and `git status` crawl for minutes. | disk-guard blocks it and asks for one folder at a time. |
 | A "clean up the worktrees" task runs `git worktree remove` on a worktree a second session is still working in. | checkout-guard blocks it and names the session that is still there. |
+| A cleanup runs `rm -rf "$BUILD_DIR"/*` with `BUILD_DIR` unset, which is `rm -rf /*`, or `rm -rf .git` and the repository's history is gone. | basics blocks it and gives the safe form, `rm -rf "${BUILD_DIR:?}"/*`. |
 
 </details>
 
-With a single session, kill-guard, memory-guard, wait-guard, disk-guard and basics (no `rm -rf ~`, no force-push to `main`, no `reset --hard` over uncommitted work) still apply. port-guard and checkout-guard act once a second session or subagent is alive.
+With a single session, kill-guard, memory-guard, wait-guard, disk-guard and basics (no `rm -rf ~`, no `rm -rf $D/` that turns into `rm -rf /` when `D` is empty, no `rm -rf .git`, no force-push to `main`, no `reset --hard` over uncommitted work) still apply. port-guard and checkout-guard act once a second session or subagent is alive.
 
 ## What is it?
 
@@ -290,23 +300,23 @@ Turn off: `BULKHEAD_DISABLE=orphan-reaper`. Details: [docs/guards/orphan-reaper.
 </details>
 
 <details>
-<summary><strong>basics</strong>: five mistakes that cannot be undone</summary>
+<summary><strong>basics</strong>: ten mistakes that cannot be undone</summary>
 
-`rm-root` (`rm -rf` at a root, a top-level folder such as `/srv`, home, a folder directly in home such as `~/Documents`, or above the repository), `force-push-main` (`git push --force` to `main` or `master`; `--force-with-lease` passes), `protected-delete` (`git push origin :main`, `git push --delete origin main`, `git branch -D main`), `discard-changes` (`git reset --hard` or `git clean -fd` that would lose uncommitted work) and `agent-author` (`--author="Claude <noreply@anthropic.com>"`, `git config user.name Claude` and the like, so your commits keep counting as yours).
+`rm-root` (`rm -rf` at a root, a top-level folder such as `/srv`, home, a folder directly in home such as `~/Documents`, an app data folder such as `~/Library/Application Support`, another user's home, or above the repository, also through a variable the same line sets to one, as in `D=/; rm -rf "$D/"`, and through PowerShell's `$home`, as in `Remove-Item -Recurse (Split-Path $home)`), `rm-empty-var` (`rm -rf $D/`, `rm -rf "$(cygpath -u ...)"` and `rsync --delete` into `$D/`, which become `/` when the variable or the output is empty; `"${D:?}/"` passes), `rm-unquoted-var` (`rm -rf $D` unquoted when the value has a space, so bash deletes each piece), `rm-git-dir` (`rm -rf .git` on a repository), `rm-xargs-split` (`find ... | xargs rm -rf` without `-0`, which splits paths at spaces), `rm-through-link` (`git worktree remove --force`, and on Windows `Remove-Item -Recurse`, of a folder with a junction to data outside it; `rm -rf link/`), `force-push-main` (`git push --force` to `main` or `master`; `--force-with-lease` passes), `protected-delete` (`git push origin :main`, `git push --delete origin main`, `git branch -D main`), `discard-changes` (`git reset --hard` or `git clean -fd` that would lose uncommitted work) and `agent-author` (`--author="Claude <noreply@anthropic.com>"`, `git config user.name Claude` and the like, so your commits keep counting as yours).
 
 Turn off: `BULKHEAD_DISABLE=basics`, or one rule by name. Details: [docs/guards/basics.md](docs/guards/basics.md).
 </details>
 
 ## Codex, Gemini and other agents
 
-If you run Codex CLI, Gemini CLI, Copilot CLI, Cursor, opencode, Amp, Cline, Factory Droid, Windsurf or Devin on the same machine as Claude Code, bulkhead guards their shell commands with the same guards and counts their sessions: an agent's dev server is protected from the others, and `bulkhead status` gets an `AGENT` column.
+If you run Codex CLI, Gemini CLI, Copilot CLI, Cursor, opencode, Pi, Qwen Code, Kimi Code, Grok Build, Antigravity, Amp, Cline, Factory Droid, Windsurf or Devin on the same machine as Claude Code, bulkhead guards their shell commands with the same guards and counts their sessions: an agent's dev server is protected from the others, and `bulkhead status` gets an `AGENT` column.
 
 ```
 bulkhead setup codex            # prints the config for ~/.codex/hooks.json
 bulkhead setup codex --write    # merges it (original saved as hooks.json.bulkhead-backup)
 ```
 
-Copilot CLI, Cursor and opencode can also load bulkhead as a plugin (see [Install](#install)), which needs no `npm install -g` and no change to your own config files. `bulkhead setup <agent>` works for `codex`, `gemini`, `copilot`, `cursor`, `windsurf`, `droid`, `devin`, `cline`, `opencode` and `amp`. Each agent calls `bulkhead hook --agent <name>` before a shell command and gets its own block format back. The agents, config files, what is guarded and the documentation each row was checked against are in [docs/other-agents.md](docs/other-agents.md).
+Copilot CLI, Cursor, opencode, Pi, Gemini CLI and Codex can also load bulkhead as a plugin (see [Install](#install)), which needs no `npm install -g` and no change to your own config files. `bulkhead setup <agent>` works for `codex`, `gemini`, `copilot`, `cursor`, `windsurf`, `droid`, `devin`, `cline`, `qwen`, `kimi`, `grok`, `antigravity`, `opencode`, `amp` and `pi`. Each agent calls `bulkhead hook --agent <name>` before a shell command and gets its own block format back. The agents, config files, what is guarded and the documentation each row was checked against are in [docs/other-agents.md](docs/other-agents.md).
 
 ## How bulkhead relates to other hook packs
 
@@ -348,7 +358,7 @@ Environment variables still work and win over both files. The simplest place for
 
 | Variable | Default | Same as |
 |---|---|---|
-| `BULKHEAD_DISABLE` | empty | Comma-separated guards to turn off: `kill-guard`, `wait-guard`, `memory-guard`, `port-guard`, `checkout-guard`, `disk-guard`, `orphan-reaper`, `basics`, or `all`. Single rules can be turned off too: `rm-root`, `force-push-main`, `protected-delete`, `discard-changes`, `agent-author`, `stage-all`, `remove-session-dir`. A name here is off whatever the files say |
+| `BULKHEAD_DISABLE` | empty | Comma-separated guards to turn off: `kill-guard`, `wait-guard`, `memory-guard`, `port-guard`, `checkout-guard`, `disk-guard`, `orphan-reaper`, `basics`, or `all`. Single rules can be turned off too: `rm-root`, `rm-empty-var`, `rm-unquoted-var`, `rm-git-dir`, `rm-xargs-split`, `rm-through-link`, `force-push-main`, `protected-delete`, `discard-changes`, `agent-author`, `stage-all`, `remove-session-dir`. A name here is off whatever the files say |
 | `BULKHEAD_PRESET` | `normal` | The preset: `quiet`, `normal` or `strict` |
 | `BULKHEAD_WAIT_MAX_SEC` | 180 | `waitGuard.limitSeconds` |
 | `BULKHEAD_MIN_FREE_GB` | 3, or 15% of RAM if less | `memory.minFreeGb` |
@@ -377,6 +387,7 @@ The one-time way is always `bulkhead allow <code>`, run by you. The permanent wa
 | kill-guard | `pkill`, `taskkill-im`, `stop-process-name` and the other kills by name | `{"killGuard":{"allowNames":["ffmpeg"]}}` |
 | kill-guard | `other-session-pid`: a PID in another session's tree | `{"killGuard":{"ownerCheck":false}}` |
 | kill-guard | `broad-pattern`: a `pkill -f` pattern that reaches a desktop app or many processes | `{"killGuard":{"broadPattern":false}}` |
+| kill-guard | `bsd-pkill`: on macOS, a `pkill` with a long option or a second pattern, which BSD `pkill` reads as more patterns | `{"killGuard":{"bsdPkill":false}}` |
 | kill-guard | `mass-kill`, `docker-mass`, `device-kill`, `app-quit`, `service-stop`: the other rules (only while another session runs) | `{"killGuard":{"massKill":false}}`, and likewise (`dockerMass`, `deviceKill`, `appQuit`, `serviceStop`) |
 | wait-guard | `long-sleep`, `poll-loop`, `follow` | `{"waitGuard":{"limitSeconds":600}}` |
 | memory-guard | `low-memory` | `{"memory":{"minFreeGb":1}}` |
@@ -387,6 +398,7 @@ The one-time way is always `bulkhead allow <code>`, run by you. The permanent wa
 | checkout-guard | `git-checkout`, `git-pull` and the other tree changes | `{"checkoutGuard":{"enabled":false}}` |
 | disk-guard | `disk-wide-find`, `parallel-disk-scan`, `disk-wide-scan` | `{"diskGuard":{"enabled":false}}` |
 | basics | `rm-root` | `{"basics":{"rmRoot":false}}` |
+| basics | `rm-empty-var`, `rm-unquoted-var`, `rm-git-dir`, `rm-xargs-split`, `rm-through-link` | `{"basics":{"rmEmptyVar":false}}`, and likewise (`rmUnquotedVar`, `rmGitDir`, `rmXargsSplit`, `rmThroughLink`) |
 | basics | `force-push-main` | `{"basics":{"forcePushMain":false}}` |
 | basics | `discard-changes` | `{"basics":{"discardChanges":false}}` |
 | basics | `agent-author` | `{"basics":{"agentAuthor":false}}` |

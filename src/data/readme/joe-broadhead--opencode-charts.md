@@ -15,14 +15,14 @@ Unofficial; not affiliated with OpenCode or Anomaly.
 
 ## Install
 
-Add the plugin to your `opencode.json`, or run `opencode plugin add github:joe-broadhead/opencode-charts#v0.0.1`:
+Add the plugin to your `opencode.json`, or run `opencode plugin add github:joe-broadhead/opencode-charts#v0.0.2`:
 
 ```json
-{ "plugins": ["github:joe-broadhead/opencode-charts#v0.0.1"] }
+{ "plugins": ["github:joe-broadhead/opencode-charts#v0.0.2"] }
 ```
 
 ```sh
-opencode plugin add github:joe-broadhead/opencode-charts#v0.0.1
+opencode plugin add github:joe-broadhead/opencode-charts#v0.0.2
 ```
 
 Run `opencode reload`, or restart OpenCode, then run `/charts-status`.
@@ -32,7 +32,7 @@ Each release has its own tag, and a Git install does not update by itself. To mo
 Or add the plugin to `opencode.json` instead, with the same spec:
 
 ```json
-{ "plugins": [{ "package": "github:joe-broadhead/opencode-charts#v0.0.1" }] }
+{ "plugins": [{ "package": "github:joe-broadhead/opencode-charts#v0.0.2" }] }
 ```
 
 The install takes the GitHub release tag. Its commit carries the built `dist/`, so the install runs no build.
@@ -41,7 +41,7 @@ A new release is a new tag: install it with its own `#v<version>` spec.
 Options (all optional):
 
 ```json
-{ "plugins": [["github:joe-broadhead/opencode-charts#v0.0.1", { "theme": "light", "locale": "en-GB", "outDir": "outputs/charts", "themes": { "acme": { "extends": "light", "colors": { "categorical": ["#0B5FFF", "#FF6A3D", "#00A87E"] } } } }]] }
+{ "plugins": [["github:joe-broadhead/opencode-charts#v0.0.2", { "theme": "light", "locale": "en-GB", "outDir": "outputs/charts", "themes": { "acme": { "extends": "light", "colors": { "categorical": ["#0B5FFF", "#FF6A3D", "#00A87E"] } } } }]] }
 ```
 
 Options, limits and errors are in [docs/configuration.md](docs/configuration.md).
@@ -257,7 +257,7 @@ A shared `opencode.json` (for example `/etc/opencode/opencode.json` on Linux and
 everyone, and `access: "read-only"` stops agents writing files at all:
 
 ```json
-{ "plugins": [["github:joe-broadhead/opencode-charts#v0.0.1", { "theme": "acme", "access": "read-only" }]] }
+{ "plugins": [["github:joe-broadhead/opencode-charts#v0.0.2", { "theme": "acme", "access": "read-only" }]] }
 ```
 
 Charts makes no network call, sends nothing anywhere, and needs no credential, so a rollout has no data egress to
@@ -273,7 +273,7 @@ its next step is in [docs/configuration.md](docs/configuration.md#errors).
 
 ## Uninstall
 
-`opencode plugin remove github:joe-broadhead/opencode-charts#v0.0.1`. Rendered charts stay where they were written
+`opencode plugin remove github:joe-broadhead/opencode-charts#v0.0.2`. Rendered charts stay where they were written
 (`outputs/charts` by default), and the plugin leaves no other state.
 
 ## Development
@@ -322,6 +322,8 @@ it is built, [docs/jelly.md](docs/jelly.md) for Jelly, and
   sequential ramp starts near white, so the lowest values in a light heatmap or choropleth sit close to the canvas.
 - **Package size.** The package is about 8 MB unpacked, and `dist/index.js` is 2.3 MB: Vega, ECharts and the PNG rasteriser are bundled, so a render needs no network.
 - **Host range.** OpenCode `>=2.2.3 <2.3.0`, tested on 2.2.3, 2.2.4, 2.2.5 and 2.2.6.
+- In Jelly, the `access` setting is drawn as a choice of three, which needs a Jelly that reads declared choices: an
+  older Jelly refuses the plugin's whole declaration.
 - Updates are not automatic for a Git install, and `opencode plugin update` and `opencode plugin check` do not work on one: to move to a newer release, remove the old entry and add the new tag.
 
 ## Links

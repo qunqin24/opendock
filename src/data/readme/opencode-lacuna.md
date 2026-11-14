@@ -20,6 +20,8 @@ and leaves the main agent free to continue working. The main agent can bring the
 
 Lacuna builds a **projection** of the session for each model request: archived ranges appear as summaries,
 while stored session history stays unchanged. Disable the plugin and the original conversation is available again.
+When summaries are applied, it also hides safely identifiable superseded Code Mode catalog updates, keeping the latest update intact.
+New updates remain visible until another successful archive; anonymous updates without a stable anchor are left visible.
 
 Blocks remember the unit identities actually archived, so model switches can remove individual messages without
 replaying the surviving archived content. Newly revealed messages stay visible. If none of a block's members are
@@ -90,7 +92,7 @@ To run your clone, set `"package"` to its absolute path instead of `opencode-lac
 ## Limitations
 
 - Token figures are estimates (characters ÷ 4), corrected against the usage the provider reports.
-- No automatic cleanup of duplicate or failed tool output; everything is model-driven.
+- No automatic cleanup of duplicate or failed tool output; archive decisions are model-driven.
 - Units without a durable message or tool-result identity remain visible and cannot be archived.
 - Unless disabled (`"compaction": { "auto": false }`), OpenCode's own compaction still runs at the context limit and
   summarises the material that was never archived.

@@ -1,35 +1,143 @@
-# VI3ION — Measured Visual Perception for AI Agents
+# VI3ION — eyes for AI agents
 
 [![CI](https://github.com/Subadeepan-Y/VI3ION/actions/workflows/ci.yml/badge.svg)](https://github.com/Subadeepan-Y/VI3ION/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/pypi/v/vi3ion.svg)](https://pypi.org/project/vi3ion/)
+[![npm](https://img.shields.io/npm/v/@subadeepan_y/vi3ion-opencode.svg)](https://www.npmjs.com/package/@subadeepan_y/vi3ion-opencode)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
-VI3ION is a local perception engine for AI agents. It reads images, screenshots
-and diagrams, and returns **measured evidence** instead of guesses: OCR text
-with pixel coordinates, geometry, per-element colours with contrast ratios,
-spatial relations, and version diffs between two states of the same screen.
+**AI models cannot see. They read text.** Paste a screenshot into Claude Code,
+Cursor, Codex or OpenCode and most agents will either ignore the image or
+guess what it shows.
 
-It runs entirely on your machine, speaks the Model Context Protocol, and works
-with any MCP-capable agent — Claude Code, Cursor, Windsurf, Continue, Zed,
-OpenCode, and your own local models on Ollama, llama.cpp, LM Studio or vLLM.
+**VI3ION gives them eyes.** It looks at the image and hands the agent
+*measurements* — what the text says, where each word sits in pixels, what
+colour things are, how they line up, and what changed since the last
+screenshot.
 
-- **Measured, not inferred** — every value is read from the pixels and labelled
-  as observed, inferred, or unknown.
-- **Local-first** — no image ever leaves the machine; the OCR engine is ONNX.
-- **Agent-agnostic** — one MCP server; an optional OpenCode plugin adds
-  zero-config auto-analysis.
-- **Version-aware** — remembers every image it has seen and spots when the
-  same screen changed.
+One `pip install`, one small config block. No cloud, no API key, no image
+ever leaves your machine.
 
-## Resource profile
+---
 
-See [PERFORMANCE.md](PERFORMANCE.md) for measured peak RAM/CPU during a run
-alongside OpenCode (~0.6 GB peak, ~1 min cold per image, multi-threaded
-inference burst).
+## Install (about a minute)
+
+```bash
+pip install vi3ion
+```
+
+Then tell your agent where the server is — one block, in your MCP config:
+
+```json
+{
+  "mcpServers": {
+    "vi3ion": {
+      "command": "vi3ion-mcp",
+      "args": []
+    }
+  }
+}
+```
+
+That is the whole installation. Check it with two commands:
+
+```bash
+vi3ion doctor       # is the engine and OCR ready?
+vi3ion mcp-check    # does the server start and list its tools?
+```
+
+Updates are your call: `vi3ion version` compares what you have with the
+latest on PyPI/npm and prints the exact command — it never installs without
+you asking. The OpenCode plugin can ask for you (and shows a permission
+prompt before anything runs); auto-updates are **off** by default and are
+opted into with `vi3ion updates auto on`.
+
+> **Windows:** if `pip install -U vi3ion` ever fails with *"file is being used
+> by another process"*, your editor is holding the old launcher. Close it,
+> upgrade, reopen — or register the server as `python -m vi3ion.mcp_server`
+> instead of `vi3ion-mcp`, which is never rewritten.
+
+Where the config goes: `adapters/` has one page per agent
+([Claude Code](adapters/claude-code.md), [OpenCode](adapters/opencode/README.md),
+[Cursor / Windsurf / Continue / Zed](adapters/editors.md),
+[anything else](adapters/generic-mcp.md)).
+
+### Optional: the OpenCode plugin
+
+```bash
+npm i -D @subadeepan_y/vi3ion-opencode
+```
+
+With the plugin, OpenCode measures every image you paste, tells the agent it
+has eyes, and re-binds when you switch models mid-chat. Without it, the MCP
+server alone still works — the agent just calls the tools itself.
+
+### Optional: give the agent the rules
+
+```bash
+vi3ion skill --out AGENTS.md
+```
+
+A short instruction file (also shipped inside the package) that tells the
+agent *when* to reach for VI3ION and what the rules are.
+
+---
+
+## What the agent actually receives
+
+For a screenshot with a blue **Save** button, the agent gets:
+
+```
+Image 1280x800 (settings.png). Top bar: "Settings" ink:#f8f8f8 on:#1e3a8a
+contrast:9.8 @[44, 32, 168, 69]. Centre: "Save" (uncertain) ink:#f8f8f8
+on:#2563eb contrast:4.9 @[373, 619, 421, 640]; "Cancel" ink:#384858
+on:#ffffff contrast:9.4 @[557, 617, 620, 640]. Composition: the largest colour
+area is a blue horizontal band in the top centre (11% of the frame) ...
+```
+
+Plain language: *white text, blue button, contrast 4.9, those exact pixels.*
+The agent can answer questions about the screen, point at a button, or verify
+a claim ("are Save and Cancel aligned?") and get a **verdict with
+measurements** back.
+
+## What you get
+
+| | |
+|---|---|
+| **The text, with coordinates** | every word and where it sits in the original pixels |
+| **Real colours** | per element: `#f8f8f8` ink on `#2563eb` background, with the contrast ratio |
+| **Layout** | which band, column or region each thing is in, and how the frame is divided |
+| **Checks, not guesses** | "the Save button is aligned with Cancel" -> verified / contradicted / inconclusive, with the numbers |
+| **Memory of versions** | it remembers every image it has seen, and diffs two states of the same screen |
+| **Cross-checking** | an uncertain reading can be checked against your own source code |
+
+Everything is labelled as **observed** (read from pixels), **inferred**, or
+**unknown**. It never quietly corrects a reading.
+
+## Works with
+
+**Agents:** Claude Code, Cursor, Windsurf, Continue, Zed, Antigravity,
+Quoder, OpenCode, anything that speaks MCP.
+
+**Models:** cloud or local. A text-only local model on Ollama, llama.cpp,
+LM Studio, vLLM, Unsloth or SGLang gets its eyes from VI3ION; a model with
+its own vision uses VI3ION as a second opinion. `vi3ion local` shows what is
+running and which role fits.
+
+## Honest limits
+
+- It does not *name* objects. It says *"a small rectangular area in the upper
+  right"*, never *"a button"* — that keeps the evidence auditable, and naming
+  things is the model's job.
+- Very faint decorative lettering is not transcribed, and the output says so.
+- OCR is the weak spot, not the geometry: 91.9% average fidelity across the
+  bundled ground-truth fixtures (numbers below).
+
+---
 
 ## The text brief, measured
 
 A brief that a model with **no vision** can reason over — no model calls, no
-network, ~5s on a 1919×949 screenshot:
+network, ~5s on a 1919x949 screenshot:
 
 | Component | Score | What it measures |
 |---|---|---|
@@ -47,21 +155,11 @@ vi3ion score --all             # score every bundled fixture
 
 Scores come from `tests/fixtures/*.expected.json` — hand-transcribed files of
 the same images — so the claim is reproducible and every regression is visible.
-The table above is the hard case; on a clean settings dialog the same pipeline
-scores **98.5%**. The gap between the two is the honest story: layout and
-composition hold up, and what costs points is OCR, not placement. On the
-difficult image the loss is concentrated in three known defects — index digits
-read as `84/85/88/89` instead of `04/05/08/09`, misread Japanese labels, and one
-fused word.
-
-### What it looks like
-
-> Image 1919x949 (screenshot.png). Dominant colour: #080808 (32%). Colour map: row 1, col 1: black, dark; … Left column: `"00 + "PORTFOLIO"" (uncertain) @[136, 167, 288, 181]; "BUILT TO" (split from "BUILTTO") @[121, 231, 673, 325]; … Composition: 2 tall pale columns at 28% and 72% of the width split the frame; the largest colour area is a dark red horizontal band in the bottom (17% of the frame); text is concentrated in the right and left thirds. Shapes: a horizontal band (spans most of the image width) in the bottom, dark red … a rectangular area (spans most of the image width) in the centre, grey …; two pale or white columns and a red round shape sit inside it. a tall vertical column (spans most of the image height) in the left, pale or white. …
-
-Every quoted value keeps its pixel box, so a follow-up can crop and re-read
-exactly that region. Uncertain reads stay marked `(uncertain)`; a word OCR
-fused is separated but recorded as `(split from "BUILTTO")`. Nothing is ever
-silently corrected.
+On a clean settings dialog the same pipeline scores **98.5%**. The gap
+between the two is the honest story: layout and composition hold up, and what
+costs points is OCR, not placement. On the difficult image the loss is
+concentrated in three known defects — index digits read as `84/85/88/89`
+instead of `04/05/08/09`, misread Japanese labels, and one fused word.
 
 ### Honest boundaries
 
@@ -73,103 +171,34 @@ in its closing note.
 
 ## How it ships
 
-It is packaged as an **installable agent skill/plugin**, not a standalone
-product:
-
 | Layer | What it is |
 |---|---|
-| **Core** | Agent-independent perception pipeline (Python). Pure computation: ingestion → pixels → geometry → OCR → spatial relations → verification → text brief. |
+| **Core** | Agent-independent perception pipeline (Python). Pure computation: ingestion -> pixels -> geometry -> OCR -> spatial relations -> verification -> text brief. |
 | **Adapter** | MCP server (stdio) exposing 11 tools. This is what the coding agent talks to. |
 | **Skill** | Written instructions (`vi3ion/skill/SKILL.md`, also registered with OpenCode) telling the agent *when and how* to call the tools. |
-| **Plugin** | Optional OpenCode plugin (`@subadeepan_y/vi3ion-opencode`) that measures attached images automatically and introduces Vi3ion to the agent. |
+| **Plugin** | Optional OpenCode plugin (`@subadeepan_y/vi3ion-opencode`) that measures attached images automatically and introduces VI3ION to the agent. |
 | **Dashboard** | Local React dev dashboard (`dashboard/`) for testing and inspecting evidence. Never required in production. |
 
-## Quickstart
+## Command reference
 
 ```bash
-# 1. install (OCR included; ~200 MB of dependencies)
-pip install vi3ion
-
-# ...or from a checkout
-python -m venv .venv
-.venv\Scripts\activate            # Windows  |  source .venv/bin/activate  # POSIX
-pip install -e ".[dev]"
-
-# 2. check the install
 vi3ion doctor                      # OCR, RAM, registry, local runtimes, MCP entry point
 vi3ion mcp-check                   # real MCP handshake: does the server start?
-
-# 3. analyse an image from the CLI
-vi3ion analyze screenshot.png --detail standard
+vi3ion version                     # installed vs latest (PyPI/npm) + update commands
+vi3ion updates auto on|off         # auto-update consent (off by default)
+vi3ion analyze screenshot.png      # full analysis as JSON
 vi3ion brief screenshot.png        # text-only brief for a vision-less model
-vi3ion score screenshot.png        # brief fidelity vs fixtures/*.expected.json
-vi3ion local                      # local LLM runtimes + the recommended Vi3ion role
-vi3ion ingest shots\ --label run # register a screenshot folder in the image memory
-vi3ion prune                   # drop remembered images whose file no longer exists
-vi3ion health --tier              # config, OCR status, machine tier
-
-# 4. optional: the local dashboard (not needed by agents)
-vi3ion serve                       # API + dashboard on http://127.0.0.1:8765
-
-# 5. run the test suite
-pytest
+vi3ion score screenshot.png        # brief fidelity vs the ground truth
+vi3ion local                       # local LLM runtimes + the recommended role
+vi3ion images                      # every image VI3ION remembers
+vi3ion ingest shots\ --label run  # register a screenshot folder
+vi3ion diff old.png new.png        # what changed between two states
+vi3ion prune                       # forget images whose file is gone
+vi3ion skill --out AGENTS.md       # the agent instruction file
+vi3ion serve                       # optional local dashboard on :8765
 ```
 
-### Connect your coding agent (MCP)
-
-Add the stdio MCP server to your agent's config:
-
-```json
-{
-  "mcpServers": {
-    "VI3ION": {
-      "command": "vi3ion-mcp",
-      "args": [],
-      "env": { "VI3ION_DATA_DIR": "~/.vi3ion" }
-    }
-  }
-}
-```
-
-On Windows, prefer running the module through your interpreter instead of the
-generated launcher:
-
-```json
-{
-  "mcpServers": {
-    "VI3ION": {
-      "command": "C:\\path\\to\\python.exe",
-      "args": ["-m", "vi3ion.mcp_server"],
-      "env": { "VI3ION_DATA_DIR": "~/.vi3ion" }
-    }
-  }
-}
-```
-
-Why: `pip install -U vi3ion` rewrites the `vi3ion-mcp.exe` launcher, and
-Windows refuses to replace a file that a running editor has open — the upgrade
-then fails with "file is being used by another process". `python -m
-vi3ion.mcp_server` is never rewritten and picks up new code immediately.
-
-### If your editor reports an MCP failure
-
-```powershell
-vi3ion mcp-check      # runs a real MCP handshake and prints what happened
-vi3ion doctor         # OCR, RAM, registry, local runtimes, entry point
-```
-
-`vi3ion mcp-check` spawns the server exactly like the editor does and reports
-the exit code and the number of tools it found. If it passes but the editor
-still complains, restart the editor.
-
-See `adapters/opencode/` for an OpenCode-specific example and install notes.
-
-### Local models (Ollama, llama.cpp, LM Studio, vLLM, Unsloth, …)
-
-Vi3ion detects local runtimes, reports the models they serve and tells the
-agent whether it must act as the eyes or as an assistant. Local runtimes get a
-compact evidence tier, a token budget and a single analysis pass. See
-`LOCAL_MODELS.md`.
+---
 
 ## The evidence contract
 

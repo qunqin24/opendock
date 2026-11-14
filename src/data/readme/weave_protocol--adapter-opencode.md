@@ -64,8 +64,59 @@ npm install @weave_protocol/full
 
 ### 🗓️ November 2026 update — hardening
 
+#### 🐉🔥🛡️ Mund reads Chinese (0.7.0)
+**What Mund does:** it scans text, such as prompts, web pages, files and tool results, for prompt injection, secrets and personal data.
+
+Mund now catches prompt injection in Chinese, Simplified or Traditional. It also reads past the usual ways people dodge Chinese keyword filters: separators between characters (忽*略), homophone swaps (蜜码 for 密码), typed or mixed-in pinyin, and acrostics. On held-out Chinese attacks it goes from 0 of 144 to 115 of 144. On Tsinghua's Safety-Prompts goal-hijacking set it goes from 2 to 3,454 of 5,000. It raised no false alarms on 8,043 harmless Chinese texts (0 false positives), and English results are unchanged. Method, robustness tests and limits: [DETECTION_CLAIMS.md](mund/DETECTION_CLAIMS.md#chinese-070).
+
+Mund covers the text. Weave's adapters enforce WARD.md on tool calls in China's three most widely used coding agents. Each agent has its own adapter, and each adapter passed a live check in the real harness:
+
+| Harness | Maker | Adapter | Live check |
+|---|---|---|---|
+| **CodeBuddy Code** | Tencent | [`adapter-codebuddy`](adapter-codebuddy) | ✅ CLI 2.180.0 |
+| **Qoder CLI** | Alibaba | [`adapter-qoder`](adapter-qoder) | ✅ CLI 1.1.83, desktop app 0.5.11 |
+| **TRAE** | ByteDance | [`adapter-trae`](adapter-trae) | ✅ desktop IDE 3.6.13, project and global hook |
+
+#### 🛡️ WARD.md in CodeBuddy Code, Qoder and TRAE (adapter-trae 0.1.1, Ward 0.3.12)
+**What the adapters do:** each one plugs into its harness's hook and has Ward decide every tool call before it runs: file reads and writes, shell commands, web requests. Mund checks what the agent reads; the adapter checks what it does.
+
+Three more harnesses enforce the same WARD.md: Tencent's **CodeBuddy Code**, Alibaba's **Qoder** and ByteDance's **TRAE**, the most widely used Chinese coding agents. Each has its own adapter, built on Ward's shared evaluator, with every Ward check. All three let a call through if a hook crashes, so every adapter answers with an explicit decision and never exits with an error.
+
+**What we live-checked**, on a Mac, in the real product:
+- **CodeBuddy Code CLI 2.180.0**, headless (`-p`) with a local scripted model and no sign-in;
+- **Qoder CLI 1.1.83**, signed in with a real model, and the **Qoder desktop app 0.5.11** with Auto approve on;
+- **TRAE desktop IDE 3.6.13** on the free plan, with a project hook and with the global hook `weave-trae init` installs, in both **Run in Sandbox** and **Run Automatically Locally** modes.
+
+In each, Ward blocked a read of `secrets/` and a `curl` to an unlisted host, and allowed an ordinary read. In CodeBuddy and Qoder, the user's own settings allowed `curl`, and Ward still blocked it. Every result was confirmed by Ward's signed receipts, not by the agent's account.
+
+**What the live checks found:**
+- **TRAE's sandbox made the hook fail open, now fixed.** In TRAE's default **Run in Sandbox** mode, adapter-trae 0.1.0 tried to write to `~/.weave`. The sandbox forbids that, and TRAE then ignored the hook's answer, even a deny. A bug in Ward's lock could also make the hook hang until it timed out, which TRAE treats as allow too. adapter-trae 0.1.1 detects the sandbox and keeps its state in a temp folder, and Ward 0.3.12 no longer hangs. Re-checked in sandbox mode: every hook run exited cleanly, and every test call was blocked.
+- **TRAE ignores a `hooks.json` until you switch it on** in **Settings > Hooks**. Our first TRAE run enforced nothing until we did.
+- **The Qoder desktop app starts each chat in an empty folder of its own.** Add your project under **Workspaces** so its hook and WARD.md apply.
+- **Agents that can read WARD.md often hold back on their own.** That's good, but it hides whether Ward works. For the unlisted `curl`, we kept the policy outside the workspace, so only Ward could stop the call.
+
+**Not covered yet:**
+- **CodeBuddy IDE and its editor plugins:** we found no documented hooks.
+- **Qoder IDE and JetBrains plugin:** they read the same `.qoder/settings.json`, but they may send their own tool names (such as `run_in_terminal`), which adapter-qoder doesn't map yet.
+- **TRAE's China build:** `weave-trae init` installs into `~/.trae-cn` too, but we haven't run it.
+- **Web and cloud agents, from any vendor:** their tool calls run on the vendor's servers, where no local hook runs.
+
+**Why it matters that Ward runs locally.** The hook runs on your machine, before the harness executes the tool. That gives you:
+- **Your policy decides, not the vendor's.** WARD.md lives in your repo, and Ward's deny stands even where the harness's own settings allow the call. The CodeBuddy and Qoder live checks confirmed this against a user rule that allowed `curl`.
+- **The model doesn't matter.** It's the same check whether the agent runs Qwen, DeepSeek, Kimi, Claude or a local model, and `model_jurisdictions` can limit which model endpoints the agent may call.
+- **Nothing leaves your machine.** Ward decides offline, from the tool name and arguments. The dashboard, if you turn it on, gets only the decision and the tool name.
+- **Proof you hold.** Each decision is a signed receipt on your disk, and `weave-ward receipts verify` checks the chain without trusting the agent or the vendor.
+- **One policy, every harness.** The same WARD.md works in CodeBuddy, Qoder, TRAE, Qwen Code, Claude Code, Codex, Cursor, Gemini CLI and the rest.
+
+#### 🛡️ WARD.md in Qwen Code, and model endpoints by jurisdiction (adapter-qwencode 0.1.0, Ward 0.3.10)
+**What the adapter does:** adapter-qwencode has Ward decide each of Qwen Code's tool calls before it runs. **What Ward adds:** `model_jurisdictions`, so a policy can choose whose model providers an agent may call.
+
+WARD.md now runs in **Qwen Code**, Alibaba's open-source terminal coding agent. Deferred tools reached through `tool_call` are decided as the tool they invoke. In a live check with Qwen Code 0.26.6, Ward blocked a `curl` that the user's own settings allowed. It also decided the calls made by Qwen Code's background memory agent.
+
+Ward also adds **`model_jurisdictions`**, so a policy can say whose model endpoints an agent may call. `deny: [cn]` blocks known endpoints of Chinese companies, in URL arguments and in shell commands; `allow: [us, eu]` admits only those. Ward now knows Tencent Hunyuan, MiniMax, StepFun, Baidu Qianfan, SiliconFlow and ByteDance's Volcengine Ark, alongside DeepSeek, Moonshot (Kimi), Qwen and Zhipu.
+
 #### ✅ How we check every release: before, after, and with our own tools
-Every check below runs in CI. The release workflow itself (`publish-all.yml`) is unchanged.
+Automated checks run in CI on every push, pull request and release. We also live-check adapters by hand in the real harness. Qwen Code, CodeBuddy Code, Qoder and TRAE have all passed. The release workflow itself (`publish-all.yml`) is unchanged.
 
 **On every push and pull request:**
 - **Each package:** a clean `npm ci`, build and full test suite. CI also checks that importing the package starts nothing and prints nothing, and runs `npm audit` on production dependencies.
@@ -80,6 +131,10 @@ Every check below runs in CI. The release workflow itself (`publish-all.yml`) is
 3. runs every dependent's tests against that exact published version.
 
 A published package can differ from the local build, and this catches it.
+
+**Live checks in the real harness.** Unit tests cover each adapter against the harness's documented hook contract. Before we call an adapter verified, we also run it in the real harness. Each check uses a throwaway workspace with its own WARD.md, a hook scoped to that workspace, and a temporary receipt key, so the user's own configuration isn't touched. The exception is the TRAE global-hook check, which by design installs into the real `~/.trae` and `~/.weave`. The agent is asked to read an allowed file, then a file under `secrets/`, then `curl` a listed and an unlisted host, where possible with the harness's own settings allowing `curl`. We trust Ward's signed receipts over the agent's account of what happened: `weave-ward receipts verify` must show each decision, and the chain must verify. The CodeBuddy check used a local scripted model, so no login or key was needed. Qoder only runs signed-in models, so the account owner ran that check, and the TRAE check, themselves. Two lessons from these runs:
+- **Agents that can read WARD.md often hold back on their own.** For the unlisted `curl`, we keep the policy outside the workspace (`WEAVE_WARD_PATH`), so only Ward can stop the call.
+- **We check the harness's own hook log, not just the result.** That's how we found the TRAE sandbox failing open.
 
 **Detection claims on data we didn't write.** Mund's detection numbers come from public datasets it was never trained or tuned on: deepset, Gandalf, jackhhao, SPML, Mosscap, InjecAgent. False positives are measured on 2,062 benign texts and 5,825 MITRE ATT&CK and OWASP texts. The scripts in [`mund/training`](mund/training) fetch the data and reproduce every number, and the shipped model, byte for byte. See [DETECTION_CLAIMS.md](mund/DETECTION_CLAIMS.md#local-classifier-060).
 
@@ -491,7 +546,7 @@ The packages that keep your agent within policy: declare it, enforce it across e
 
 | Package | Version | Description |
 |---|---|---|
-| [🛡️ @weave_protocol/ward](https://github.com/Tyox-all/Weave_Protocol/blob/main/ward) | 0.3.9 | **WARD.md** — agent security policy standard (parser, validator, runtime checks, shared tool-call evaluator, dashboard reporting) |
+| [🛡️ @weave_protocol/ward](https://github.com/Tyox-all/Weave_Protocol/blob/main/ward) | 0.3.12 | **WARD.md** — agent security policy standard (parser, validator, runtime checks, shared tool-call evaluator, dashboard reporting) |
 | [🛡️ @weave_protocol/adapter-claudecode](https://github.com/Tyox-all/Weave_Protocol/blob/main/adapter-claudecode) | 0.5.0 | **Claude Code adapter** — enforces WARD.md via PreToolUse hooks; Mund pre-install hooks for skills + MCP |
 | [🛡️ @weave_protocol/adapter-antigravity](https://github.com/Tyox-all/Weave_Protocol/blob/main/adapter-antigravity) | 0.5.0 | **Google Antigravity adapter** — enforces WARD.md across desktop, `agy` CLI, and SDK; Mund pre-install hooks |
 | [🛡️ @weave_protocol/adapter-msaf](https://github.com/Tyox-all/Weave_Protocol/blob/main/adapter-msaf) | 0.4.0 | **Microsoft Agent Framework adapter** — middleware-based WARD enforcement |
@@ -499,9 +554,13 @@ The packages that keep your agent within policy: declare it, enforce it across e
 | [🛡️ @weave_protocol/adapter-codex](https://github.com/Tyox-all/Weave_Protocol/blob/main/adapter-codex) | 0.3.0 | **Codex CLI adapter** — enforces WARD.md via the PreToolUse hook, including apply_patch file edits |
 | [🛡️ @weave_protocol/adapter-opencode](https://github.com/Tyox-all/Weave_Protocol/blob/main/adapter-opencode) | 0.3.0 | **OpenCode plugin** — enforces WARD.md on every tool call, whatever model OpenCode runs |
 | [🛡️ @weave_protocol/adapter-cursor](https://github.com/Tyox-all/Weave_Protocol/blob/main/adapter-cursor) | 0.3.0 | **Cursor adapter** — enforces WARD.md via Cursor's agent hooks (shell, file, MCP and tool calls) |
+| [🛡️ @weave_protocol/adapter-qwencode](https://github.com/Tyox-all/Weave_Protocol/blob/main/adapter-qwencode) | 0.1.0 | **Qwen Code adapter** — enforces WARD.md via Qwen Code's PreToolUse hook (shell, file, web, MCP and deferred tool calls) |
+| [🛡️ @weave_protocol/adapter-codebuddy](https://github.com/Tyox-all/Weave_Protocol/blob/main/adapter-codebuddy) | 0.1.0 | **CodeBuddy Code adapter** — enforces WARD.md via Tencent CodeBuddy Code's PreToolUse hook |
+| [🛡️ @weave_protocol/adapter-qoder](https://github.com/Tyox-all/Weave_Protocol/blob/main/adapter-qoder) | 0.1.0 | **Qoder adapter** — enforces WARD.md via Alibaba Qoder CLI's PreToolUse hook |
+| [🛡️ @weave_protocol/adapter-trae](https://github.com/Tyox-all/Weave_Protocol/blob/main/adapter-trae) | 0.1.1 | **TRAE adapter** — enforces WARD.md via ByteDance TRAE's PreToolUse hook |
 | [🌐 @weave_protocol/browser](https://github.com/Tyox-all/Weave_Protocol/blob/main/browser) | 0.3.1 | **Browser agent security** — runtime IPI scanner (33 patterns) for headless agents |
 | [🔍 @weave_protocol/hundredmen](https://github.com/Tyox-all/Weave_Protocol/blob/main/hundredmen) | 1.4.0 | **MCP proxy** — intercept, scan, gate tool calls; enforces WARD.md as first gate |
-| [🛡️ @weave_protocol/mund](https://github.com/Tyox-all/Weave_Protocol/blob/main/mund) | 0.6.1 | **Scanner** — secrets, PII, injection, MCP vetting, pre-install checks for skills + MCP (rug pulls), OSV dependency CVEs, SARIF, threat intel |
+| [🛡️ @weave_protocol/mund](https://github.com/Tyox-all/Weave_Protocol/blob/main/mund) | 0.7.0 | **Scanner** — secrets, PII, injection, MCP vetting, pre-install checks for skills + MCP (rug pulls), OSV dependency CVEs, SARIF, threat intel |
 | [🏛️ @weave_protocol/hord](https://github.com/Tyox-all/Weave_Protocol/blob/main/hord) | 0.3.2 | **Vault** — encrypted storage, sandboxing, capability tokens, attestation |
 | [🔐 @weave_protocol/yoxallismus](https://github.com/Tyox-all/Weave_Protocol/blob/main/yoxallismus) | **0.2.0-beta.1** | **Post-quantum cipher** — X25519 + ML-KEM-768 hybrid KEM · sealed boxes · cascade AEAD · Double Ratchet · locked `yoxall/2` format · ⚠️ NOT AUDITED |
 | [⚖️ @weave_protocol/domere](https://github.com/Tyox-all/Weave_Protocol/blob/main/domere) | 1.7.0 | **Judge** — compliance (PCI-DSS, ISO27001, SOC2, HIPAA, GDPR, CCPA), blockchain anchoring |
@@ -524,8 +583,8 @@ The front door, the dashboard, the bridges to other frameworks.
 | Package | Version | Description |
 |---|---|---|
 | [🕸️ @weave_protocol/cli](https://github.com/Tyox-all/Weave_Protocol/blob/main/cli) | 0.2.1 | **The `weave` CLI** — `init`, `audit`, `dashboard`, `doctor` |
-| [📦 @weave_protocol/full](https://github.com/Tyox-all/Weave_Protocol/blob/main/full) | 0.5.1 | **Bundle** — installs all packages in one command |
-| [🔌 @weave_protocol/api](https://github.com/Tyox-all/Weave_Protocol/blob/main/api) | 1.6.2 | **REST API + Operator Dashboard** — `npx @weave_protocol/api` → http://localhost:3000/dashboard |
+| [📦 @weave_protocol/full](https://github.com/Tyox-all/Weave_Protocol/blob/main/full) | 0.5.3 | **Bundle** — installs all packages in one command |
+| [🔌 @weave_protocol/api](https://github.com/Tyox-all/Weave_Protocol/blob/main/api) | 1.6.5 | **REST API + Operator Dashboard** — `npx @weave_protocol/api` → http://localhost:3000/dashboard |
 | [🔗 @weave_protocol/langchain](https://github.com/Tyox-all/Weave_Protocol/blob/main/langchain) | **1.1.1** | **LangChain.js** security callbacks & tool wrappers (0 audit vulnerabilities via npm overrides) |
 | [🐍 weave-protocol-llamaindex](https://github.com/Tyox-all/Weave_Protocol/blob/main/llamaindex-py) | 0.1.0 | **Python/LlamaIndex** security callbacks & tools (on PyPI) |
 

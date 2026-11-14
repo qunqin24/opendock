@@ -1,7 +1,7 @@
 <h1 align="center">claude-bulkhead</h1>
 
 <p align="center">
-  <strong>阻止 Claude Code 对你其他的开发服务器执行 <code>pkill node</code>、抢占它们的端口，以及用 <code>git add -A</code> 提交另一个会话的修改。</strong>
+  <strong>阻止 Claude Code 在 <code>$DIR</code> 为空时执行 <code>rm -rf $DIR/</code>、对你其他的开发服务器执行 <code>pkill node</code>、抢占它们的端口，以及用 <code>git add -A</code> 提交另一个会话的修改。</strong>
 </p>
 
 <p align="center">这组 hook 清楚哪些进程、端口和 git 工作树属于哪个 Claude Code 会话和子代理，只拦截会伤到其他东西的命令，并告诉 Claude 应该改用哪条安全的命令。</p>
@@ -28,14 +28,22 @@
 
 ## 安装
 
-在 Claude Code 中执行：
+先不安装任何东西，看看它在你自己的会话里会拦下什么：
+
+```
+npx -y claude-bulkhead scan --since 30d --share
+```
+
+它只读取 `~/.claude/projects` 里的记录，不会发送任何内容。
+
+然后在 Claude Code 中安装插件：
 
 ```
 /plugin marketplace add dooly6276/claude-bulkhead
 /plugin install bulkhead@bulkhead
 ```
 
-然后不改动任何东西，看看它在你过去一个月里会拦下什么：
+安装后，在 Claude Code 中也能看到同样的报告：
 
 ```
 /bulkhead:scan 30d
@@ -72,7 +80,7 @@
 | 三个会话在同一分钟里启动 `next build`、`npm test` 和 Playwright，机器卡死。 | 内存不足时 memory-guard 拦截重命令。通过 `bulkhead-slot`，第三个任务会排队，等有空间再运行。 |
 
 <details>
-<summary>再看 5 条</summary>
+<summary>再看 6 条</summary>
 
 | 没有 bulkhead | 有 bulkhead |
 |---|---|
@@ -81,10 +89,11 @@
 | 子代理在前台轮询了十分钟。这期间会话无法回应你，提示缓存也过期了。 | wait-guard 拦下这个循环，让它改用 `run_in_background: true`。 |
 | 代理想知道什么占了磁盘空间，在你的家目录上同时运行十个 `du`。所有会话的构建和 `git status` 都慢上好几分钟。 | disk-guard 拦下它，并要求一次只看一个文件夹。 |
 | 一个“清理 worktree”的任务对另一个会话还在使用的 worktree 运行 `git worktree remove`。 | checkout-guard 拦下它，并指出仍在里面的会话。 |
+| 清理任务在 `BUILD_DIR` 未设置时运行 `rm -rf "$BUILD_DIR"/*`，实际变成 `rm -rf /*`；或者运行 `rm -rf .git`，仓库历史就没了。 | basics 拦下它，并给出安全写法 `rm -rf "${BUILD_DIR:?}"/*`。 |
 
 </details>
 
-只有一个会话时，kill-guard、memory-guard、wait-guard、disk-guard 和 basics（禁止 `rm -rf ~`、禁止强制推送到 `main`、禁止在有未提交修改时 `reset --hard`）仍然生效。port-guard 和 checkout-guard 在出现第二个会话或子代理后才起作用。
+只有一个会话时，kill-guard、memory-guard、wait-guard、disk-guard 和 basics（禁止 `rm -rf ~`、禁止在 `D` 为空时会变成 `rm -rf /` 的 `rm -rf $D/`、禁止 `rm -rf .git`、禁止强制推送到 `main`、禁止在有未提交修改时 `reset --hard`）仍然生效。port-guard 和 checkout-guard 在出现第二个会话或子代理后才起作用。
 
 ## 这是什么
 
@@ -290,9 +299,9 @@ flowchart LR
 </details>
 
 <details>
-<summary><strong>basics</strong>：五种无法撤销的操作</summary>
+<summary><strong>basics</strong>：八种无法撤销的操作</summary>
 
-`rm-root`（对根目录、`/srv` 这样的顶级文件夹、家目录、`~/Documents` 这样家目录下一级的文件夹，或仓库上层目录的 `rm -rf`）、`force-push-main`（对 `main` 或 `master` 的 `git push --force`，`--force-with-lease` 放行）、`protected-delete`（`git push origin :main`、`git push --delete origin main`、`git branch -D main`）、`discard-changes`（会丢掉未提交改动的 `git reset --hard` 或 `git clean -fd`）和 `agent-author`（`--author="Claude <noreply@anthropic.com>"`、`git config user.name Claude` 等，让你的提交继续算作你自己的）。
+`rm-root`（对根目录、`/srv` 这样的顶级文件夹、家目录、`~/Documents` 这样家目录下一级的文件夹，或仓库上层目录的 `rm -rf`）、`rm-empty-var`（变量或命令输出为空时会变成 `/` 的 `rm -rf $D/`、`rm -rf "$(cygpath -u ...)"` 和目标为 `$D/` 的 `rsync --delete`；`"${D:?}/"` 可以通过）、`rm-unquoted-var`（值里有空格却没加引号的 `rm -rf $D`，bash 会把每一段分别删除）、`rm-git-dir`（在仓库里执行 `rm -rf .git`）、`force-push-main`（对 `main` 或 `master` 的 `git push --force`，`--force-with-lease` 放行）、`protected-delete`（`git push origin :main`、`git push --delete origin main`、`git branch -D main`）、`discard-changes`（会丢掉未提交改动的 `git reset --hard` 或 `git clean -fd`）和 `agent-author`（`--author="Claude <noreply@anthropic.com>"`、`git config user.name Claude` 等，让你的提交继续算作你自己的）。
 
 关闭：`BULKHEAD_DISABLE=basics`，也可以按规则名逐个关闭。详情：[docs/guards/basics.md](docs/guards/basics.md)。
 </details>
@@ -348,7 +357,7 @@ bulkhead 解决的是另一个问题：同一台机器上的会话因为进程�
 
 | 变量 | 默认值 | 对应配置 |
 |---|---|---|
-| `BULKHEAD_DISABLE` | 空 | 要关闭的 guard，用逗号分隔：`kill-guard`、`wait-guard`、`memory-guard`、`port-guard`、`checkout-guard`、`disk-guard`、`orphan-reaper`、`basics` 或 `all`。单条规则也可以单独关闭：`rm-root`、`force-push-main`、`protected-delete`、`discard-changes`、`agent-author`、`stage-all`、`remove-session-dir`。写在这里的 guard 无论文件怎么设置都会关闭 |
+| `BULKHEAD_DISABLE` | 空 | 要关闭的 guard，用逗号分隔：`kill-guard`、`wait-guard`、`memory-guard`、`port-guard`、`checkout-guard`、`disk-guard`、`orphan-reaper`、`basics` 或 `all`。单条规则也可以单独关闭：`rm-root`、`rm-empty-var`、`rm-unquoted-var`、`rm-git-dir`、`force-push-main`、`protected-delete`、`discard-changes`、`agent-author`、`stage-all`、`remove-session-dir`。写在这里的 guard 无论文件怎么设置都会关闭 |
 | `BULKHEAD_PRESET` | `normal` | 预设：`quiet`、`normal` 或 `strict` |
 | `BULKHEAD_WAIT_MAX_SEC` | 180 | `waitGuard.limitSeconds` |
 | `BULKHEAD_MIN_FREE_GB` | 3，或内存的 15%，取较小者 | `memory.minFreeGb` |
@@ -377,6 +386,7 @@ bulkhead 解决的是另一个问题：同一台机器上的会话因为进程�
 | kill-guard | `pkill`、`taskkill-im`、`stop-process-name` 以及其他按名字结束进程的规则 | `{"killGuard":{"allowNames":["ffmpeg"]}}` |
 | kill-guard | `other-session-pid`: 属于其他会话进程树的 PID | `{"killGuard":{"ownerCheck":false}}` |
 | kill-guard | `broad-pattern`: 会命中桌面应用或大量进程的 `pkill -f` 模式 | `{"killGuard":{"broadPattern":false}}` |
+| kill-guard | `bsd-pkill`: macOS 上带长选项或第二个模式的 `pkill`，BSD `pkill` 会把它们都当成模式 | `{"killGuard":{"bsdPkill":false}}` |
 | kill-guard | `mass-kill`, `docker-mass`, `device-kill`, `app-quit`, `service-stop`: 其他规则（仅当有其他会话在运行时） | `{"killGuard":{"massKill":false}}`, 其余同理 (`dockerMass`, `deviceKill`, `appQuit`, `serviceStop`) |
 | wait-guard | `long-sleep`、`poll-loop`、`follow` | `{"waitGuard":{"limitSeconds":600}}` |
 | memory-guard | `low-memory` | `{"memory":{"minFreeGb":1}}` |
@@ -387,6 +397,7 @@ bulkhead 解决的是另一个问题：同一台机器上的会话因为进程�
 | checkout-guard | `git-checkout`、`git-pull` 以及其他改动工作树的规则 | `{"checkoutGuard":{"enabled":false}}` |
 | disk-guard | `disk-wide-find`、`parallel-disk-scan`、`disk-wide-scan` | `{"diskGuard":{"enabled":false}}` |
 | basics | `rm-root` | `{"basics":{"rmRoot":false}}` |
+| basics | `rm-empty-var`, `rm-unquoted-var`, `rm-git-dir` | `{"basics":{"rmEmptyVar":false}}`, 其余同理 (`rmUnquotedVar`, `rmGitDir`) |
 | basics | `force-push-main` | `{"basics":{"forcePushMain":false}}` |
 | basics | `discard-changes` | `{"basics":{"discardChanges":false}}` |
 | basics | `agent-author` | `{"basics":{"agentAuthor":false}}` |

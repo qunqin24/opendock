@@ -1,7 +1,7 @@
 <h1 align="center">claude-bulkhead</h1>
 
 <p align="center">
-  <strong>Impede que o Claude Code rode <code>pkill node</code> nos seus outros servidores de desenvolvimento, tome as portas deles e faça commit das edições de outra sessão com <code>git add -A</code>.</strong>
+  <strong>Impede que o Claude Code rode <code>rm -rf $DIR/</code> com <code>$DIR</code> vazia, <code>pkill node</code> nos seus outros servidores de desenvolvimento, tome as portas deles e faça commit das edições de outra sessão com <code>git add -A</code>.</strong>
 </p>
 
 <p align="center">Hooks que sabem quais processos, portas e árvores git pertencem a cada sessão e subagent do Claude Code, então bloqueiam só o que prejudicaria outra coisa e dizem ao Claude qual comando seguro rodar no lugar.</p>
@@ -28,14 +28,22 @@
 
 ## Instalação
 
-Dentro do Claude Code:
+Primeiro, sem instalar nada, veja o que ele teria bloqueado nas suas próprias sessões:
+
+```
+npx -y claude-bulkhead scan --since 30d --share
+```
+
+Ele só lê as transcrições em `~/.claude/projects` e não envia nada.
+
+Depois, instale o plugin dentro do Claude Code:
 
 ```
 /plugin marketplace add dooly6276/claude-bulkhead
 /plugin install bulkhead@bulkhead
 ```
 
-Depois, veja o que ele teria bloqueado no seu último mês, sem mudar nada:
+Depois de instalado, o mesmo relatório roda dentro do Claude Code:
 
 ```
 /bulkhead:scan 30d
@@ -72,7 +80,7 @@ Não tem certeza de que está funcionando? O `bulkhead doctor` roda um comando i
 | Três sessões iniciam `next build`, `npm test` e Playwright no mesmo minuto, e a máquina trava. | O memory-guard bloqueia comandos pesados quando a RAM está baixa. Pelo `bulkhead-slot`, o terceiro job espera na fila até haver espaço. |
 
 <details>
-<summary>Mais cinco</summary>
+<summary>Mais seis</summary>
 
 | Sem o bulkhead | Com o bulkhead |
 |---|---|
@@ -81,10 +89,11 @@ Não tem certeza de que está funcionando? O `bulkhead doctor` roda um comando i
 | Um subagent fica fazendo polling em primeiro plano por dez minutos. A sessão não consegue responder a você, e o prompt cache expira. | O wait-guard bloqueia o loop e pede `run_in_background: true`. |
 | Um agente quer saber o que está ocupando espaço em disco e roda dez `du` ao mesmo tempo na sua pasta pessoal. Os builds e o `git status` de todas as sessões se arrastam por minutos. | O disk-guard bloqueia e pede uma pasta por vez. |
 | Uma tarefa de "limpar os worktrees" roda `git worktree remove` em um worktree onde uma segunda sessão ainda está trabalhando. | O checkout-guard bloqueia e informa qual sessão ainda está lá. |
+| Uma limpeza roda `rm -rf "$BUILD_DIR"/*` com `BUILD_DIR` vazio, o que vira `rm -rf /*`, ou `rm -rf .git`, e o histórico do repositório some. | O basics bloqueia e mostra a forma segura, `rm -rf "${BUILD_DIR:?}"/*`. |
 
 </details>
 
-Com uma única sessão, kill-guard, memory-guard, wait-guard, disk-guard e basics (sem `rm -rf ~`, sem force-push para `main`, sem `reset --hard` sobre trabalho não commitado) continuam valendo. port-guard e checkout-guard agem quando existe uma segunda sessão ou subagent ativo.
+Com uma única sessão, kill-guard, memory-guard, wait-guard, disk-guard e basics (sem `rm -rf ~`, sem `rm -rf $D/`, que vira `rm -rf /` quando `D` está vazio, sem `rm -rf .git`, sem force-push para `main`, sem `reset --hard` sobre trabalho não commitado) continuam valendo. port-guard e checkout-guard agem quando existe uma segunda sessão ou subagent ativo.
 
 ## O que é?
 
@@ -290,9 +299,9 @@ Para desativar: `BULKHEAD_DISABLE=orphan-reaper`. Detalhes: [docs/guards/orphan-
 </details>
 
 <details>
-<summary><strong>basics</strong>: cinco erros que não têm volta</summary>
+<summary><strong>basics</strong>: oito erros que não têm volta</summary>
 
-`rm-root` (`rm -rf` na raiz, em uma pasta de nível superior como `/srv`, na home, em uma pasta diretamente dentro da home como `~/Documents`, ou acima do repositório), `force-push-main` (`git push --force` para `main` ou `master`; `--force-with-lease` passa), `protected-delete` (`git push origin :main`, `git push --delete origin main`, `git branch -D main`), `discard-changes` (`git reset --hard` ou `git clean -fd` que perderiam trabalho não commitado) e `agent-author` (`--author="Claude <noreply@anthropic.com>"`, `git config user.name Claude` e similares, para que seus commits continuem contando como seus).
+`rm-root` (`rm -rf` na raiz, em uma pasta de nível superior como `/srv`, na home, em uma pasta diretamente dentro da home como `~/Documents`, ou acima do repositório), `rm-empty-var` (`rm -rf $D/`, `rm -rf "$(cygpath -u ...)"` e `rsync --delete` para `$D/`, que viram `/` quando a variável ou a saída está vazia; `"${D:?}/"` passa), `rm-unquoted-var` (`rm -rf $D` sem aspas quando o valor tem espaço, e o bash apaga cada pedaço), `rm-git-dir` (`rm -rf .git` em um repositório), `force-push-main` (`git push --force` para `main` ou `master`; `--force-with-lease` passa), `protected-delete` (`git push origin :main`, `git push --delete origin main`, `git branch -D main`), `discard-changes` (`git reset --hard` ou `git clean -fd` que perderiam trabalho não commitado) e `agent-author` (`--author="Claude <noreply@anthropic.com>"`, `git config user.name Claude` e similares, para que seus commits continuem contando como seus).
 
 Para desativar: `BULKHEAD_DISABLE=basics`, ou uma regra pelo nome. Detalhes: [docs/guards/basics.md](docs/guards/basics.md).
 </details>
@@ -348,7 +357,7 @@ As variáveis de ambiente continuam funcionando e vencem os dois arquivos. O lug
 
 | Variável | Padrão | Equivale a |
 |---|---|---|
-| `BULKHEAD_DISABLE` | vazio | Guards a desativar, separados por vírgula: `kill-guard`, `wait-guard`, `memory-guard`, `port-guard`, `checkout-guard`, `disk-guard`, `orphan-reaper`, `basics`, ou `all`. Regras individuais também podem ser desativadas: `rm-root`, `force-push-main`, `protected-delete`, `discard-changes`, `agent-author`, `stage-all`, `remove-session-dir`. Um nome aqui fica desativado, diga o que disser os arquivos |
+| `BULKHEAD_DISABLE` | vazio | Guards a desativar, separados por vírgula: `kill-guard`, `wait-guard`, `memory-guard`, `port-guard`, `checkout-guard`, `disk-guard`, `orphan-reaper`, `basics`, ou `all`. Regras individuais também podem ser desativadas: `rm-root`, `rm-empty-var`, `rm-unquoted-var`, `rm-git-dir`, `force-push-main`, `protected-delete`, `discard-changes`, `agent-author`, `stage-all`, `remove-session-dir`. Um nome aqui fica desativado, diga o que disser os arquivos |
 | `BULKHEAD_PRESET` | `normal` | O preset: `quiet`, `normal` ou `strict` |
 | `BULKHEAD_WAIT_MAX_SEC` | 180 | `waitGuard.limitSeconds` |
 | `BULKHEAD_MIN_FREE_GB` | 3, ou 15% da RAM se for menos | `memory.minFreeGb` |
@@ -377,6 +386,7 @@ A forma de liberar uma única vez é sempre `bulkhead allow <code>`, rodado por 
 | kill-guard | `pkill`, `taskkill-im`, `stop-process-name` e os outros kills por nome | `{"killGuard":{"allowNames":["ffmpeg"]}}` |
 | kill-guard | `other-session-pid`: um PID da árvore de outra sessão | `{"killGuard":{"ownerCheck":false}}` |
 | kill-guard | `broad-pattern`: um padrão de `pkill -f` que alcança um app de desktop ou muitos processos | `{"killGuard":{"broadPattern":false}}` |
+| kill-guard | `bsd-pkill`: no macOS, um `pkill` com opção longa ou um segundo padrão, que o `pkill` do BSD lê como mais padrões | `{"killGuard":{"bsdPkill":false}}` |
 | kill-guard | `mass-kill`, `docker-mass`, `device-kill`, `app-quit`, `service-stop`: as outras regras (só enquanto outra sessão roda) | `{"killGuard":{"massKill":false}}`, e assim por diante (`dockerMass`, `deviceKill`, `appQuit`, `serviceStop`) |
 | wait-guard | `long-sleep`, `poll-loop`, `follow` | `{"waitGuard":{"limitSeconds":600}}` |
 | memory-guard | `low-memory` | `{"memory":{"minFreeGb":1}}` |
@@ -387,6 +397,7 @@ A forma de liberar uma única vez é sempre `bulkhead allow <code>`, rodado por 
 | checkout-guard | `git-checkout`, `git-pull` e as outras mudanças na árvore | `{"checkoutGuard":{"enabled":false}}` |
 | disk-guard | `disk-wide-find`, `parallel-disk-scan`, `disk-wide-scan` | `{"diskGuard":{"enabled":false}}` |
 | basics | `rm-root` | `{"basics":{"rmRoot":false}}` |
+| basics | `rm-empty-var`, `rm-unquoted-var`, `rm-git-dir` | `{"basics":{"rmEmptyVar":false}}`, e assim por diante (`rmUnquotedVar`, `rmGitDir`) |
 | basics | `force-push-main` | `{"basics":{"forcePushMain":false}}` |
 | basics | `discard-changes` | `{"basics":{"discardChanges":false}}` |
 | basics | `agent-author` | `{"basics":{"agentAuthor":false}}` |

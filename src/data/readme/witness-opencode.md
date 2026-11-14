@@ -34,11 +34,13 @@ Opt in by creating `~/.pi/hashtrack/config.json` (the pi root comes from `PI_COD
 
 The file holds a Bearer token, so hashtrack tightens it to owner-only (`chmod 600`) the first time it reads it.
 
-`token` is required; `url` is optional and defaults to `https://witness-rho-rust.vercel.app`. When the file is present, records are `POST`ed to `<url>/api/ingest` as `{ "records": [...] }` with `Authorization: Bearer <token>`.
+`token` is required; `url` is optional and defaults to `https://www.hashtrack.ai`. When the file is present, records are `POST`ed to `<url>/api/ingest` as `{ "records": [...] }` with `Authorization: Bearer <token>`.
 - Every flushed record is uploaded immediately; on success it moves from `usage.jsonl` to `synced.jsonl`.
 - On session start, everything still in `usage.jsonl` (records from failed uploads, or from runs without cloud config) is uploaded in one batch, then moved.
 - `usage.jsonl` is therefore the pending queue and `synced.jsonl` the uploaded archive. Readers (dashboard, repo totals) see both.
 - The local file stays the source of truth: a failed upload is ignored and leaves the record in `usage.jsonl` for the next startup, and it never blocks the local write.
+
+Use the `www` host when setting `url` explicitly: the apex `hashtrack.ai` answers with a cross-origin redirect, and `fetch` drops the `Authorization` header on those, so the request arrives unauthenticated.
 
 The dashboard reads from the same API when a token is configured: `/api/records` calls `GET /api/records?rep=<repo>` on the cloud server and serves those records instead of `.hashtrack`. If the request fails it falls back to the local log, so a network outage never hides data. The endpoint contract is in [docs/cloud-api.md](docs/cloud-api.md).
 

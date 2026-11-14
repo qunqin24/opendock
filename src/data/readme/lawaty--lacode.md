@@ -2,7 +2,7 @@
 
 > Ultimate opencode setup for Go users
 
-> LaCode 1.2.0 ships on the npm **`latest`** dist-tag. Prereleases use
+> LaCode ships on the npm **`latest`** dist-tag. Prereleases use
 > `beta`: install `@lawaty/lacode@beta`, or pin an exact version.
 
 LaCode is an opencode plugin. It routes delegated work onto a weighted pool of
@@ -25,9 +25,11 @@ is also on disk at `node_modules/@lawaty/lacode/CHANGELOG.md`.
 | --- | --- |
 | Weighted model pool | An expensive main model burns through its quota doing file listing. |
 | Per-model cooldowns and failover | A provider rate-limits mid-session and the whole thing hard-fails, while other providers sit idle. |
+| Secondary pool | Every primary slot is cooling, so work fails even though other providers still have quota. |
 | Hang reaper | A wedged subagent holds its slot forever, so the session stalls with no error and no timeout. |
 | Desktop notifications | With several sessions open you cannot see which one finished, or which is blocked on a question. |
 | Permission answers on the popup | An approval blocks a background session, and finding that session just to click Allow is the interruption. |
+| Autonomy modes | A long task stalls on permission prompts and clarifying questions you would have answered the same way. |
 | Distinct notification sounds | A popup says something happened, but not at a glance whether it is a finish, a question or a block. |
 | SSH notification tunnel | Work on a remote host raises its notification on that host, which has no desktop. |
 | Repository context map | Every task starts by exploring your codebase cold, re-deriving the same layout, entry points and boundaries. |
@@ -156,6 +158,8 @@ option is optional:
 | `feedbackHint` | `true` | Show the one-time feedback note on the first interactive run. `false` — or `LACODE_NO_FEEDBACK_HINT=1` — turns it off. The flag lives in `~/.local/share/opencode/lacode/feedback.json`; nothing is sent anywhere. |
 | `sound` | `true` | Play a short tone with each notification, one per outcome, so you can tell a finished session from a question or a permission prompt without reading the popup. It is opt-out: `false` — or `LACODE_SOUND=0` (`false`, `off`, `no` work too, and beat the option) — turns the sound off, and anything else, a typo included, leaves it on. |
 | `omniroute` | — | Optional [OmniRoute](docs/OMNIROUTE.md) gateway integration. Absent or `{ enabled: false }` changes nothing. |
+| `contextAutoUpdate` | `true` | Automatic context-map refresh when a session that edited files goes idle. `false` turns the automatic update off; the `/context-init` and `/context-update` commands still work. |
+| `timeline` | enabled | Per-session timeline summary. `false` disables it (`LACODE_TIMELINE=0` does the same); an object sets `intervalMs`, `maxEntries`, `retryMs` and `maxBackoffMs`. |
 | `yolo` | `false` | YOLO mode: permission requests that would ask are auto-approved. Explicit `deny` rules still win. The TUI writes this option when you run `/yolo`. |
 | `ykb` | `false` | YKB (You Know Better) mode: the agent is told not to ask, and questions that still appear are answered with the recommended option. The TUI writes this option when you run `/ykb`. |
 | `watchMs` | `1000` | How often the pool files are checked for changes. `0` disables live reload. |
@@ -164,7 +168,7 @@ option is optional:
 
 ## Modes
 
-Two runtime modes live on the lacode plugin entry and can be toggled from the TUI:
+Two autonomy modes live on the lacode plugin entry and can be toggled from the TUI. They act independently — YOLO on permissions, YKB on questions — so you can run either or both:
 
 | Command | Effect |
 | --- | --- |
@@ -195,8 +199,8 @@ The running session keeps its loaded code; the new version takes effect on the
 next start, and the log says so. Run `lacode update` to do it on demand, or
 `lacode update --check` to just report.
 
-1.2.0 is published to the `latest` dist-tag; prereleases use `beta`. This check
-follows `latest`. A beta install is therefore reported as current even when a
+Releases are published to the `latest` dist-tag; prereleases use `beta`. This
+check follows `latest`, so a beta install is reported as current even when a
 newer beta exists,
 and `lacode update` will not move it: pin the version you want in the `plugin`
 entry, because a new specifier is what forces a fresh resolve.
@@ -211,7 +215,7 @@ lacode version
 ```
 
 ```
-version    1.2.0
+version    2.3.0-beta.7
 root       /home/you/lacode
 source     checkout
 commit     <hash> (dirty)
@@ -244,11 +248,36 @@ bare name is the only thing that works: a hand-named variant such as `explore-1`
 is coerced to its base and routed by the pool, so naming one cannot pin a
 provider or skip ordered slot filling.
 
-A slot's `weight` is both its concurrency budget and its cap: the pool fills
-slots in declaration order in one pass, then overflows to the least-loaded slot.
-There is no slot cap, and a model may appear on more than one line — each line
-is a separate slot with its own weight — so to give a model more capacity, list
-it again.
+A slot's `weight` is its per-pass concurrency budget, and its default cap. A
+larger optional `ceiling` (max parallel sessions; flat form `ceil:<n>`) lets a
+later pass deepen the slot past its weight. The pool fills slots in declaration
+order; when every usable slot has reached its weight, later passes fill toward
+each slot's ceiling, then overflow goes to the least-loaded slot. There is no
+slot cap, and a model may appear on more than one line — each line is a separate
+slot with its own weight and ceiling — so to give a model more capacity, raise
+its ceiling or list it again.
+
+A pool line can carry more than a model and a weight. `c:<context>` is the
+model's context window in tokens, so the router can prefer the smallest model
+that fits. `b:<name>` puts the slot in a shared quota bucket: a limit on any
+member benches the whole group, because a sibling would spend the same exhausted
+window. `tpm:<tokens/min>` is a token-rate budget — effective capacity is the
+smaller of `c:` and `tpm:`, and a slot below the 20,000-token/minute minimum is
+dropped with a warning. `notify:on` / `notify:off` gates only the "slot
+re-admitted" desktop notice, not routing or status. In `pool.txt`, a header line
+`# exclude-provider: name[,name]` keeps a provider out of probing, the primary
+selection, the secondary pool and retention; it survives refresh until you
+delete the line. The surrounding detail is in
+[docs/CONFIGURATION.md](docs/CONFIGURATION.md#pool-preset-resolution) and
+[presets/README.md](presets/README.md).
+
+A pool file may also declare a **secondary (fallback) pool**: a line that is
+exactly `# --- fallback ---` (or `[fallback]`) followed by more slots in
+`pool.txt`, or a `fallbackSlots` array in JSON. Those slots are used only when
+every primary slot is unavailable — they are not overflow capacity. A secondary
+slot that shares a quota bucket or model with a primary slot is dropped with a
+warning, so one provider limit cannot bench both pools. `pool_status` tags them
+`[fallback]`.
 
 A model that rate-limits or runs out of quota is benched until its window ends,
 so one sick provider does not take the pool with it.

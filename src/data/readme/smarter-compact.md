@@ -10,7 +10,7 @@
 <img src="docs/media/smarter-compact-demo.gif" alt="How it works: the prompt fills, turns 1–4 move to the session store, a search pulls a line back. Then a Claude Code session: the agent reads three log files, edits code and runs tests; the prompt crosses 95k and Smarter Compact moves 31 messages to the session store (97k to 51k); later the agent answers a question about the trimmed logs with smart_compact_sql and smart_compact_get (illustrative session); then the benchmark savings chart, 85% average." width="720" />
 </p>
 
-The agent searches the store with `smart_compact_search`, `smart_compact_sql`, and `smart_compact_get` when it needs a detail back. The cut stays put on later requests, so the prompt cache keeps hitting.
+The agent searches the store with `smart_compact_search`, `smart_compact_sql`, and `smart_compact_get` when it needs a detail back. Ask it to forget something, such as a pasted key, and `smart_compact_forget` redacts it from the store without deleting the session. The cut stays put on later requests, so the prompt cache keeps hitting.
 
 **Learn more:** [How it works](https://bcmyguest.github.io/smarter-compact/context-management/) · [Benchmarks](https://bcmyguest.github.io/smarter-compact/benchmarks/) · [Context proxy & port](https://bcmyguest.github.io/smarter-compact/context-proxy/) · [Context store](https://bcmyguest.github.io/smarter-compact/context-store/)
 

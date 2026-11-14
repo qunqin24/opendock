@@ -1,13 +1,14 @@
 # opencode-windows-scheduler
 
-> Local-first orchestration for AI agent jobs in OpenCode v2 — cron, DAG pipelines, matrix fan-out, quality gates and observability. Free and open source (MIT).
+> OpenCode v2 plugin for scheduling and orchestrating AI agent jobs — cron, one-shot runs, DAG pipelines, matrix builds, quality gates, SQLite history and a local web dashboard. Runs on Windows, macOS and Linux. Free and open source (MIT).
 
 [![CI](https://github.com/DeadSno/opencode-windows-scheduler/actions/workflows/ci.yml/badge.svg)](https://github.com/DeadSno/opencode-windows-scheduler/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/opencode-windows-scheduler.svg)](https://www.npmjs.com/package/opencode-windows-scheduler)
+[![npm downloads](https://img.shields.io/npm/dm/opencode-windows-scheduler.svg)](https://www.npmjs.com/package/opencode-windows-scheduler)
 [![license](https://img.shields.io/npm/l/opencode-windows-scheduler.svg)](LICENSE)
 [![node](https://img.shields.io/node/v/opencode-windows-scheduler.svg)](package.json)
 
-Русская версия: [README.ru.md](README.ru.md).
+Русская версия: [docs/README.ru.md](docs/README.ru.md).
 
 ---
 
@@ -31,29 +32,30 @@ Want to see it without installing OpenCode? `node scripts/demo-dashboard.mjs` st
 
 | Area | What you get |
 |---|---|
-| Scheduling | cron expressions, native OS scheduler (Windows / macOS / Linux), timezone-free local time, pause/resume |
+| Scheduling | cron expressions, one-shot runs via `runAt` / `delaySeconds`, native OS scheduler (Windows / macOS / Linux), timezone-free local time, pause/resume, session continuity (`new` / `reuse` / `last` with `sessionMaxRuns` cleanup) |
 | Reliability | lock-file no-overlap protection, timeouts with hard kill, retries with delay, crash recovery |
 | Quality | Quality Gate command, before/after hooks, per-task allowed/denied tool lists |
 | Orchestration | `dependsOn` DAG, `nextTaskOnSuccess` / `nextTaskOnError` chains, matrix fan-out (parallel/sequential, `continue`/`stop`, concurrency, per-workspace overrides, aggregator task) |
-| Triggers | cron, file change (chokidar), MCP events |
+| Triggers | cron, one-shot (`triggerType: "once"`), file change (chokidar), MCP events, incoming webhooks (`POST /api/hooks/:task` with HMAC) |
 | Multi-repo | workspaces with path validation, per-workspace runs, matrix over one parent task |
-| Observability | SQLite history (success / error / timeout / partial / running), metrics (duration, tokens, cost), per-task logs, local web dashboard with 14-day analytics, history retention (age and size limits) and CSV/JSON export |
-| Operations | dry-run preview, export/import JSON, templates, webhook notifications, settings |
-| Interfaces | OpenCode GUI panel, web dashboard, 12 agent tools, built-in agent skill |
+| Observability | SQLite history (success / error / timeout / partial / running), metrics (duration, tokens, cost), JSONL run logs with `/api/logs`, Prometheus `/metrics`, OTLP export, per-task logs, local web dashboard with 14-day analytics, history retention and CSV/JSON export |
+| Operations | dry-run preview, export/import JSON, templates, multi-channel notifications (webhook, Telegram, native OS toasts), quiet hours, digest, encrypted secrets (`${secret:NAME}`), audit log, settings |
+| Interfaces | OpenCode GUI panel, web dashboard, 24 agent tools, built-in agent skill |
 
 ## Install
 
 Requires OpenCode v2 and Node.js 20+.
 
 ```bash
-npm install -g opencode-windows-scheduler
+opencode plugin add opencode-windows-scheduler
 ```
 
-Add the plugin to `opencode.jsonc`:
+Or add the plugin to `opencode.jsonc` manually:
 
 ```jsonc
 {
-  "plugin": ["opencode-windows-scheduler"],
+  "$schema": "https://opencode.ai/config.json",
+  "plugins": ["opencode-windows-scheduler"],
   "experimental": {
     "schedules": false
   }
@@ -61,6 +63,12 @@ Add the plugin to `opencode.jsonc`:
 ```
 
 `experimental.schedules: false` disables the built-in OpenCode scheduler so the agent does not confuse built-in job tools with this plugin's tools. Restart OpenCode after changing the config.
+
+Alternatively, install globally with npm:
+
+```bash
+npm install -g opencode-windows-scheduler
+```
 
 From source:
 
@@ -73,11 +81,11 @@ npm run build && npm run build:gui
 
 ## Agent tools
 
-The agent gets the full feature set — 12 tools covering scheduling, pipelines, operations and observability:
+The agent gets the full feature set — 22 tools covering scheduling, pipelines, operations, observability and administration:
 
 | Tool | Arguments | What it does |
 |---|---|---|
-| `schedule_task` | `name`, `schedule`, `prompt`, optional `timeoutSeconds`, `model`, `priority`, `beforeScript`, `afterScript`, `qualityGate`, `dependsOn`, `retryCount`, `retryDelay`, `nextTaskOnSuccess`, `nextTaskOnError`, `triggerType`, `mcpEvent`, `workingDirectory`, `workspaceId`, `allowedTools`, `deniedTools`, `matrix` | Registers a job with the OS scheduler (cron, file or MCP-event trigger) |
+| `schedule_task` | `name`, `prompt`, `schedule` for cron or `runAt` / `delaySeconds` for one-shot, optional `session` / `sessionMaxRuns`, `timeoutSeconds`, `model`, `priority`, `beforeScript`, `afterScript`, `qualityGate`, `dependsOn`, `retryCount`, `retryDelay`, `nextTaskOnSuccess`, `nextTaskOnError`, `triggerType`, `mcpEvent`, `workingDirectory`, `workspaceId`, `allowedTools`, `deniedTools`, `matrix` | Registers a job with the OS scheduler (cron, one-shot, file or MCP-event trigger) |
 | `list_tasks` | — | Returns jobs with schedule, status, next run, chains, workspace and matrix summary |
 | `update_task` | `name` + any field to change | Partial update; omitted fields keep their values, empty values clear them, `matrix: null` removes the matrix |
 | `delete_task` | `name` | Deletes a job (a matrix parent deletes clones and aggregator) |
@@ -88,7 +96,17 @@ The agent gets the full feature set — 12 tools covering scheduling, pipelines,
 | `get_task_logs` | `name`, `lines?` | Tail of the run log |
 | `dry_run` | `name?` | Simulates a pipeline (or every task): order, DAG, matrix fan-out, estimates |
 | `manage_workspaces` | `action`, `id?`, `name?`, `path?`, `color?` | Multi-repo workspaces: list, add, update, delete |
-| `matrix_control` | `action`, `name?` | Matrix results, cancel pending clones, clean up orphans |
+| `matrix_control` | `action`, `name?` | Matrix results, cancel pending clones, clean up orphans, preview clones |
+| `get_metrics` | — | Aggregate runs, successes and failures |
+| `get_analytics` | `days?`, `topLimit?` | Period report: counts, success rate, duration, tokens, cost, top tasks |
+| `manage_settings` | `action`, `maxConcurrent?`, `winterMode?`, `notifications?`, `history?` | Read/update global settings (concurrency, notifications, retention) |
+| `manage_templates` | `action`, template fields | List, save or delete reusable task templates |
+| `manage_profiles` | `action`, `name?`, `port?` | List, create, switch or delete isolated profiles |
+| `transfer_tasks` | `action`, `data?` | Export all tasks to JSON or import them back |
+| `send_notification` | `action` (`test`/`digest`), `channel?` (`all`/`webhook`/`telegram`/`native`) | Test the notification channels or send the digest |
+| `get_dashboard_info` | — | Dashboard port/URL, platform, title, active profile |
+| `cleanup_history` | `retentionDays?`, `maxRecords?` | Delete old history by age and/or record cap |
+| `emit_event` | `eventName`, `payload?` | Start tasks subscribed to an MCP event |
 
 `schedule_task` also accepts the full matrix configuration (`workspaceIds`, `strategy`, `failureMode`, `aggregation`, `concurrency`, `overrides`, `createAggregator`).
 
@@ -141,6 +159,8 @@ src/
     dry-run.ts          pipeline simulation
     lock.ts             no-overlap protection
     file-watcher.ts     chokidar triggers
+    telegram.ts         Telegram Bot API delivery
+    native-notify.ts    Windows Toast / macOS / Linux notifications
   db/                   SQLite: tasks, history, metrics, settings
   task-transfer.ts      export / import / validation
 ```
@@ -153,7 +173,7 @@ Job wrappers run `opencode run` in the task working directory, so project MCP se
 npm install
 npm run build        # tsc
 npm run build:gui    # vite
-npm test             # 17 test suites, 500+ checks
+npm test             # 29 test suites, 500+ checks
 ```
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
@@ -163,6 +183,39 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — process model, modules, backends, data model.
 - [docs/FEATURES.md](docs/FEATURES.md) — full feature catalog with examples.
 - [docs/MIGRATION.md](docs/MIGRATION.md) — moving from cron, systemd, launchd or Task Scheduler.
+- [CROSS_PLATFORM.md](CROSS_PLATFORM.md) — Windows / macOS / Linux differences and backends.
+
+## FAQ
+
+**Does it work when OpenCode is closed?**
+Yes. Jobs are registered with the native OS scheduler, so they run without an open OpenCode window.
+
+**Which platforms are supported?**
+Windows (Task Scheduler), macOS (launchd) and Linux (crontab). Backend differences are documented in [CROSS_PLATFORM.md](CROSS_PLATFORM.md).
+
+**Where does my data go?**
+Nowhere. History, logs, metrics and settings are stored locally in SQLite. No telemetry, no accounts, no cloud.
+
+**How do I get Telegram notifications?**
+Create a bot with [@BotFather](https://t.me/BotFather), copy the token, send the bot a message and read `chat_id` from `getUpdates` (or use a group/channel ID). Paste both in the sidebar panel or run `manage_settings` with `notifications.telegram` (`enabled`, `botToken`, `chatId`, optional `parseMode`). To keep secrets out of `settings.json`, set `OPENCODE_SCHEDULER_TELEGRAM_BOT_TOKEN` and `OPENCODE_SCHEDULER_TELEGRAM_CHAT_ID` instead — environment values are used when the fields are empty. Use `send_notification` with `channel: "telegram"` to verify.
+
+**Do I need an extra package for desktop notifications?**
+No. Windows Toast (PowerShell/WinRT), macOS Notification Center (`osascript`) and Linux `notify-send` are called directly, so `node-notifier` is not required. Enable them with `notifications.native.enabled`.
+
+**Can I silence notifications at night?**
+Yes. Set `notifications.quietHours` (`enabled`, `from`, `to` in `HH:MM`). During the window successful and `partial` runs are suppressed, while failures and timeouts are always delivered.
+
+**How do I store secrets?**
+Use `manage_secrets` (or the «🔐 Секреты» panel in the sidebar) to create an encrypted secret. Secrets are stored in `<PLUGIN_DIR>/secrets.json` with AES-256-GCM and a key file (`secrets.key`, rights 0600). In task `env`, reference a secret as `${secret:NAME}` — the value is substituted at run time and masked in logs, history and audit. The secret name can also be set via `manage_settings` → `notifications.telegram.botToken` left empty and `OPENCODE_SCHEDULER_TELEGRAM_BOT_TOKEN` env var instead.
+
+**Can I see who changed what?**
+Yes. The audit log (`get_audit_log` tool, «📜 Журнал аудита» panel, `GET /api/audit`) records every mutation — task create/update/delete/run, settings, templates, profiles, workspaces, secrets, import, history cleanup — with actor (mcp/gui/http), source, timestamp and redacted details. Retention defaults to 90 days / 10 000 records.
+
+**How is this different from `experimental.schedules`?**
+The built-in scheduler runs jobs while OpenCode is open. This plugin uses the native OS scheduler and adds DAG pipelines, matrix builds, quality gates, webhooks and observability.
+
+**Can jobs run in other repositories?**
+Yes. Workspaces point at project paths, and a matrix build runs one template across several workspaces at once.
 
 ## Roadmap
 

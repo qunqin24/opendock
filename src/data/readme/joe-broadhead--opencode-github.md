@@ -16,7 +16,7 @@ Unofficial; not affiliated with GitHub. GitHub is a trademark of GitHub, Inc.
 ## Install
 
 ```sh
-opencode plugin add github:joe-broadhead/opencode-github#v0.0.0
+opencode plugin add github:joe-broadhead/opencode-github#v0.0.1
 ```
 
 Run `opencode reload`, or restart OpenCode. Then run `/github-status`: it shows `Connection: sign-in required` until
@@ -27,7 +27,7 @@ Each release has its own tag, and a Git install does not update by itself. To mo
 Or add the plugin to `opencode.json` instead, with the same spec:
 
 ```json
-{ "plugins": [{ "package": "github:joe-broadhead/opencode-github#v0.0.0" }] }
+{ "plugins": [{ "package": "github:joe-broadhead/opencode-github#v0.0.1" }] }
 ```
 
 The install takes the GitHub release tag. Its commit carries the built `dist/`, so the install runs no build.
@@ -54,9 +54,12 @@ all read-only:
 Leave out any you don't need; only the tools that use them fail. Listing an organisation's repository security
 advisories needs write access to Repository security advisories, so it fails with a read-only token.
 
-Organisations can set `clientId` to their own OAuth App (Device Flow on, no client secret); `/connect` then also
-offers **Sign in with GitHub**, a device sign-in with the scopes `repo` and `read:org`, which needs none of the token
-permissions above.
+Organisations can set `clientId` to their own OAuth App or GitHub App (Device Flow on, no client secret); `/connect`
+then also offers **Sign in with GitHub**, a device sign-in that needs none of the token permissions above. With an
+OAuth App it asks for the scopes `repo` and `read:org`. With a GitHub App the token has the App's permissions, only
+where the App is installed, and expires after 8 hours; the plugin renews it with its refresh token, and asks for a new
+sign-in only when GitHub refuses that (after six months at the latest). Install the App on the accounts and
+organisations it should read; `appSlug` gives the install link, and a sign-in that reaches no installation says so.
 
 **The browser.** In the TUI, press `o` or Enter to open the link in your browser (`c` copies a device code). The CLI,
 `opencode auth login GitHub`, opens the browser automatically.
@@ -136,7 +139,7 @@ asks first. Restrict it in any of these three ways:
    | `"read-only"` | the read tools | nothing: every write is **denied**, and GitHub's own server lists no write tools |
 
    ```json
-   { "plugins": [{ "package": "github:joe-broadhead/opencode-github#v0.0.0", "options": { "access": "read-only" } }] }
+   { "plugins": [{ "package": "github:joe-broadhead/opencode-github#v0.0.1", "options": { "access": "read-only" } }] }
    ```
 
    `readOnly: true` and `false` still work: they mean `"read-only"` and `"all"`, and `/github-status` says they are
@@ -231,6 +234,11 @@ The plugin inserts this block directly after each agent's base rule that allows 
   { "action": "github_search_repositories", "resource": "*", "effect": "allow" },
   { "action": "github_search_users", "resource": "*", "effect": "allow" },
   { "action": "github_events_list", "resource": "*", "effect": "allow" },
+  { "action": "github_api", "resource": "GET *", "effect": "allow" },
+  { "action": "github_api", "resource": "HEAD *", "effect": "allow" },
+  { "action": "github_api", "resource": "POST /markdown", "effect": "allow" },
+  { "action": "github_api", "resource": "POST /markdown/raw", "effect": "allow" },
+  { "action": "github_api", "resource": "QUERY /graphql", "effect": "allow" },
   { "action": "github_actions_run_trigger", "resource": "*", "effect": "allow" },
   { "action": "github_add_comment_to_pending_review", "resource": "*", "effect": "allow" },
   { "action": "github_add_issue_comment", "resource": "*", "effect": "allow" },
@@ -322,12 +330,12 @@ Options go in the plugin's entry in `opencode.json`:
 
 ```json
 {
-  "plugins": [{ "package": "github:joe-broadhead/opencode-github#v0.0.0", "options": { "toolsets": ["context", "repos", "issues"] } }]
+  "plugins": [{ "package": "github:joe-broadhead/opencode-github#v0.0.1", "options": { "toolsets": ["context", "repos", "issues"] } }]
 }
 ```
 
-The options are `toolsets`, `access`, `lockdown`, `unknownTools`, `clientId`, `scopes`, `allowUntestedHost` and
-`host`. `readOnly` is deprecated: it maps onto `access`.
+The options are `toolsets`, `access`, `lockdown`, `unknownTools`, `clientId`, `appSlug`, `scopes`,
+`allowUntestedHost` and `host`. `readOnly` is deprecated: it maps onto `access`.
 
 **`unknownTools`** decides only whether GitHub tools the plugin does not know are listed. `"ask"` (the default) keeps
 them, and they follow the `github_*` rule and `access` like every other tool: they run at the default, ask at
@@ -352,7 +360,7 @@ overrides user and project config, so members only sign in:
 {
   "plugins": [
     {
-      "package": "github:joe-broadhead/opencode-github#v0.0.0",
+      "package": "github:joe-broadhead/opencode-github#v0.0.1",
       "options": {
         "clientId": "<your organisation's OAuth App client ID>",
         "scopes": ["repo", "read:org"],
@@ -364,7 +372,8 @@ overrides user and project config, so members only sign in:
 }
 ```
 
-`clientId` is needed only to use your organisation's own GitHub OAuth App (Device Flow on, no client secret).
+`clientId` is needed only to use your organisation's own GitHub OAuth App or GitHub App (Device Flow on, no client
+secret). For a GitHub App, add `"appSlug": "<the App's URL name>"` for the install link; `scopes` does not apply to it.
 
 - If the organisation restricts OAuth App access, its private repositories stay hidden from device sign-in until an
   owner approves the app. Members can request approval on GitHub under **Settings → Applications → Authorized OAuth
@@ -407,6 +416,10 @@ Error codes:
 | `SIGN_IN_CODE_UNKNOWN` | GitHub did not recognise the device code. Start the sign-in again. |
 | `SIGN_IN_FAILED` | GitHub ended the device sign-in with another error, named in the message. Start the sign-in again. |
 | `SIGN_IN_UNREACHABLE` | github.com could not be reached. Check your network, then start the sign-in again. |
+| `SIGN_IN_REJECTED` | GitHub refused to renew a GitHub App sign-in: its refresh token was revoked, already used, or is older than six months. Run `/connect` and choose GitHub to sign in again. |
+| `SIGN_IN_UNAVAILABLE` | OpenCode could not load the saved sign-in for `github_api`. Try again; if it keeps failing, run `/connect` and choose GitHub to sign in again. |
+| `REFRESH_UNREACHABLE` | github.com could not be reached to renew a GitHub App sign-in. Check your network, then try again. |
+| `REFRESH_FAILED` | GitHub could not renew a GitHub App sign-in right now. Try again later. |
 | `SIGN_IN_UNEXPECTED_RESPONSE` | GitHub answered the device sign-in with something unexpected. Start the sign-in again. |
 | `DEVICE_FLOW_DISABLED` | The OAuth App has Device Flow turned off. Enable it in the app's settings, or use a fine-grained personal access token. |
 | `CLIENT_ID_UNKNOWN` | GitHub does not know the `clientId`. Check the plugin option `clientId`, or use a fine-grained personal access token. |
@@ -460,9 +473,9 @@ still stores its token.
 1. Sign out: `opencode auth logout GitHub <login>`, where `<login>` is the account's label in `/connect`, your GitHub
    login (with `host`: `opencode auth logout "GitHub Enterprise" <login>`). Without `<login>` it asks you to pick the
    account, which works only in an interactive terminal. Then, on GitHub, delete the token under **Settings →
-   Developer settings → Personal access tokens**, or, after a device sign-in, revoke the OAuth App under **Settings →
-   Applications → Authorized OAuth Apps**.
-2. Run `opencode plugin remove github:joe-broadhead/opencode-github#v0.0.0` (the spec you installed), then `opencode reload`.
+   Developer settings → Personal access tokens**, or, after a device sign-in, revoke the app under **Settings →
+   Applications → Authorized OAuth Apps** (or **Authorized GitHub Apps**).
+2. Run `opencode plugin remove github:joe-broadhead/opencode-github#v0.0.1` (the spec you installed), then `opencode reload`.
 3. Data folders: none. The plugin stores nothing of its own.
 4. Remove the default rules you copied into agents' own `permissions`.
 
@@ -473,6 +486,9 @@ still stores its token.
 - **Toolsets are a selection.** The default `toolsets` turn on 15 of the 24 toolsets, which show 69 tools. Nine toolsets are off by default, such as `copilot` and `gists`, and GitHub's two issue artifact tools need a feature flag the plugin does not turn on. See the [toolsets table](docs/configuration.md#toolsets).
 - **An allow on `github_api` covers writes.** An allow for `github_api` authorises every `api` call, reads included, and also its writes, downloads and uploads. Grant it only to a session that may change GitHub, or set `access` to `"read-only"` for a read-only script.
 - **Tested on OpenCode 2.2.3, 2.2.4, 2.2.5 and 2.2.6 only.** Other releases in `>=2.2.3 <2.3.0` run untested.
+- **Agents without the base allow ask before reads.** Every GitHub request asserts `github_api` on its own `METHOD /path` first. An agent without the base `* * allow` rule gets no default block, so its `github_api` reads ask, and a script's or `events_list`'s reads there are refused with `PERMISSION_DENIED` until that agent's rules allow them (see [Permissions](#permissions)).
+- **A GitHub App sign-in expires after six months.** Its 8-hour user token is renewed with its refresh token, which lasts six months; after that, or once GitHub refuses it, `/connect` asks for a new sign-in. The App reaches only the accounts it is installed on.
+- **Jelly.** The `access` and `unknownTools` settings declare their choices, which only a Jelly that includes app#1301 reads; an older Jelly refuses the plugin's declaration.
 - **GitHub's rate limits and error text are GitHub's.** Errors from OpenCode and GitHub pass through unchanged.
 - Updates are not automatic for a Git install, and `opencode plugin update` and `opencode plugin check` do not work on one: to move to a newer release, remove the old entry and add the new tag.
 

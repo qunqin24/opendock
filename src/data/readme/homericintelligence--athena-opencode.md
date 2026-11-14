@@ -76,9 +76,17 @@ Then, quit and restart opencode. At startup, the plugin installs the canonical s
 only in its `athena/` namespace. See
 [`npm/athena-opencode/README.md`](npm/athena-opencode/README.md) for details and removal steps.
 
+OpenCode installs the npm plugin into its cache one time. It loads that cached copy at each start
+and does not replace it on its own, so a restart is not an update. The minimum loadable version is
+`0.6.0`. To upgrade, remove and re-add the plugin (or delete
+`~/.cache/opencode/npm/@homericintelligence/athena-opencode@latest`), then restart opencode. Use
+`opencode plugin update @homericintelligence/athena-opencode` for a CLI-managed entry, and restart
+opencode after the update. The verified steps and a troubleshooting entry are in
+[Update](npm/athena-opencode/README.md#update) in the plugin README.
+
 Invoke skills through the native skill mechanism of the harness. For example, ask the harness to use
-the `repo-review` skill. Use the same mechanism to update or remove the configured Git-backed source
-or npm plugin.
+the `repo-review` skill. Use the same mechanism to update or remove the configured Git-backed source.
+Updating the cached npm plugin needs the steps above, or the harness's own plugin command.
 
 Some workflows optionally need delegation or explicitly scoped web access. When those capabilities
 are unavailable, Athena uses sequential work where supported or reports the capability gap. Install
@@ -127,8 +135,9 @@ sequentially with the current agent.
 
 Prerequisites are Git, uv, Just, and Python 3.12.3 or newer to run the packaged helpers. The checked-in
 `.python-version` file pins the default repository-tooling interpreter to Python 3.14.10.
-Set `UV_PYTHON` to another interpreter within the `>=3.12.3,<3.15` package contract for compatibility
-tests.
+The repository toolchain requires `>=3.14.10,<3.15` (see `pyproject.toml`); keep `UV_PYTHON` inside
+that range for repository work. Point `UV_PYTHON` at an older interpreter only for compatibility
+testing, not for the repository checks.
 [Full environment setup lives in CONTRIBUTING.md](CONTRIBUTING.md#environment-setup).
 
 ## Layout

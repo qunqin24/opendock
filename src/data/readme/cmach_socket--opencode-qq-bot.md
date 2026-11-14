@@ -218,7 +218,7 @@ NapCat 连接断开后机器人就不再响应。根治办法是在 `opencode.js
 ## 管理命令
 
 同一组命令注册在 QQ 与 TUI 两边，共用一份实现；TUI 侧加 `qq-` 前缀
-（`/qq-help`、`/qq-status`、`/qq-reset`、`/qq-tools`、`/qq-emoji-label`、`/qq-diary`）避免与内置命令冲突。
+（`/qq-help`、`/qq-status`、`/qq-reset`、`/qq-stop`、`/qq-compact`、`/qq-tools`、`/qq-emoji-label`、`/qq-diary`）避免与内置命令冲突。
 `/help` 直接由命令表生成，表情标注也在其中。
 QQ 侧只在 owner 与管理员自己的私聊里生效，群里和其他人的私聊不会触发；
 TUI 侧执行时结果发到该会话绑定的 QQ 聊天：
@@ -229,6 +229,10 @@ TUI 侧执行时结果发到该会话绑定的 QQ 聊天：
 | `/status`                          | 各聊天的会话、队列与重试状态                                                                  |
 | `/reset`                           | 列出放行名单里的聊天及各自的重置命令                                                          |
 | `/reset group:123`                 | 打断执行中的回合并删除该聊天的会话，下一条消息重新开始；名单外目标拒绝                        |
+| `/stop`                            | 打断所有正在执行的回合并丢掉排队消息，会话与历史保留                                          |
+| `/stop group:123`                  | 只打断指定聊天的回合；名单外目标拒绝                                                          |
+| `/compact`                         | 列出可以压缩上下文的聊天                                                                      |
+| `/compact group:123`               | 让上游压缩该聊天的上下文；聊天正在执行时先 `/stop` 再压缩                                     |
 | `/tools [group:123]`               | 查看各聊天使用的配置档与可用工具                                                              |
 | `/emoji-label [all\|inc\|list]`    | 给收藏表情生成中文标签（TUI 侧是 `/qq-emoji-label`）                                          |
 | `/diary [write\|list\|show\|auto]` | 日记：写一篇、列出最近几篇、看某天的日记、生成当天总结；仅 owner 私聊（TUI 侧是 `/qq-diary`） |

@@ -12,7 +12,9 @@ it resets.
 
 ## Install
 
-Requires OpenCode v2.2+ and the OpenCode Go provider.
+Requires OpenCode v2.2+ and the OpenCode Go provider. The numbers come from the
+OpenCode Console workspace your location is signed in to; an API key alone (no
+Console account sign-in) has no workspace to report and shows `GO –`.
 
 ```json title="~/.config/opencode/cli.json"
 {
@@ -33,7 +35,8 @@ Per window: `r` rolling (5h), `w` weekly, `m` monthly, as percent consumed.
 | `!` | window currently rate-limited; value shows `→<time>` until reset |
 | `⚠eta/reset` | at your current pace this window hits 100% in *eta*, but only *reset* remains — plan accordingly |
 | `GO ⋯` | first fetch in flight |
-| `GO ?` | fetch failed or hung; see debug below |
+| `GO –` | no usage reported: not signed in to a Console workspace |
+| `GO ?` | fetch failed, hung, or an unexpected payload; see debug below |
 
 Pacing is linear extrapolation of your own usage (samples kept ~6 h in memory,
 rebuilds after a TUI restart) and only appears when exhaustion actually

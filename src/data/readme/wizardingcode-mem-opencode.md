@@ -260,6 +260,8 @@ A local page over your memories, in WizardingCode's app design:
 - **Across projects** — which projects read each other, the suggested links with the signal behind each (Link / Reject), and your rules: proposals to make yours and the ones you accepted (Undo). See [Linked projects and your rules](#linked-projects-and-your-rules).
 - **Settings** — agents, health, the judge, retention, history, search, storage, backups and the viewer, one page each.
 
+When the daily check has learned of a release newer than the one your agents run, a banner at the top of the viewer says a newer release is out, and **Settings → About** says which, when it was checked and the command for each channel; the switch that turns the daily check off is there too. The viewer only reads what the check kept: it asks the network nothing, and `wizardingcode-mem update` stays the way to ask at once. Dismissing the banner keeps it away for that release.
+
 ⌘K (or the search in the top bar) searches the project and the ones linked to it, or every project at once with one switch. Light and dark; `[` folds the projects panel, `1`–`6` switch views. It listens on the loopback only, behind a token in the URL, loads nothing from the network, and stops itself after half an hour without you or a tab. It opens by itself when a session starts, in any agent — one viewer per machine, never a second tab — and stays closed under CI, over SSH, or when you turn that off.
 
 ## Learn from past sessions
@@ -358,7 +360,7 @@ git 2.32 or newer is needed to write. Your own git hooks, templates, signing and
 
 ## Settings
 
-Every setting can be changed from the viewer, with no file to edit and no command to type (two have no field yet and are set by hand: `WIZARDINGCODE_MEM_AUTHOR` and `WIZARDINGCODE_MEM_UPDATE`). Open the viewer (it opens by itself when a session starts, or run `wizardingcode-mem ui`) and choose the gear at the bottom left.
+Every setting can be changed from the viewer, with no file to edit and no command to type (one has no field yet and is set by hand: `WIZARDINGCODE_MEM_AUTHOR`). Open the viewer (it opens by itself when a session starts, or run `wizardingcode-mem ui`) and choose the gear at the bottom left.
 
 <p align="center">
   <picture>
@@ -402,7 +404,7 @@ Edit `~/.wizardingcode/mem/env` yourself, or set the variable in the environment
 | `WIZARDINGCODE_MEM_RETENTION_DAYS` | How long `compact` keeps finished turns no memory came from | `90` |
 | `WIZARDINGCODE_MEM_SEMANTIC` | `off` keeps the search model but searches by words only | `on` |
 | `WIZARDINGCODE_MEM_UI_AUTO_OPEN` | Open the viewer when a session starts | `on` |
-| `WIZARDINGCODE_MEM_UPDATE` | `off` stops the daily question to github.com about the latest release (set by hand: the viewer has no field for it yet) | `check` |
+| `WIZARDINGCODE_MEM_UPDATE` | `off` stops the daily question to github.com about the latest release (the switch in the viewer's **Settings → About**) | `check` |
 | `WIZARDINGCODE_MEM_AUTHOR` | Your name on the knowledge you write (set by hand: the viewer has no field for it yet) | your git `user.name`, else `you` |
 | `WIZARDINGCODE_MEM_STORE_DIR` | Where the database lives, when it was moved to another disk (set by **Storage**, not by hand) | the data directory |
 | `WIZARDINGCODE_MEM_BACKUP_TO` | Where backups go: a folder, or `s3://bucket/prefix` | — |

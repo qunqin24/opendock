@@ -12,7 +12,7 @@ Unofficial; not affiliated with Slack. Slack is a trademark of Slack Technologie
 ## Install
 
 ```sh
-opencode plugin add github:joe-broadhead/opencode-slack#v0.0.0
+opencode plugin add github:joe-broadhead/opencode-slack#v0.0.1
 ```
 
 Run `opencode reload`, or restart OpenCode. Then run `/slack-status`: it shows `not configured` until you give OpenCode your Slack app's client ID (see [Sign in](#sign-in)).
@@ -22,7 +22,7 @@ Each release has its own tag, and a Git install does not update by itself. To mo
 Or add the plugin to `opencode.json` instead, with the same spec:
 
 ```json
-{ "plugins": [{ "package": "github:joe-broadhead/opencode-slack#v0.0.0" }] }
+{ "plugins": [{ "package": "github:joe-broadhead/opencode-slack#v0.0.1" }] }
 ```
 
 The install takes the GitHub release tag. Its commit carries the built `dist/`, so the install runs no build.
@@ -46,7 +46,7 @@ The Slack tools are Slack's own. With Code Mode, which is on by default, agents 
 **Status.** In the TUI, `/slack` (or **Slack: Status** in the command palette) opens a dialog. Press `r` to refresh and `Esc` to close; it also refreshes when the connection, agents or saved client change. If it shows 0 tools just after connecting, press `r`. `/slack-status` posts the same status into the session without starting a model turn. Status shows these rows, in order:
 
 - `Connection`: `connected`, `sign-in required`, `connecting`, `disabled`, `failed`, `not configured`, `conflict` or `host untested`, with the error code and what happened;
-- `Account`: Slack shows the account on its sign-in page; OpenCode does not store it;
+- `Account`: while connected, the workspace and user ids from Slack's `auth.test`;
 - `Access`: what runs without asking, what asks first, and how to allow it;
 - `Server`, `Client`, `Callback` and `Scopes`: the Slack server, the client ID and where it came from, the callback URL to register, and the requested scopes;
 - `Skills`, only when needed: a skill of yours with the id `slack-search`, which OpenCode loads instead of the plugin's;
@@ -57,11 +57,15 @@ The Slack tools are Slack's own. With Code Mode, which is on by default, agents 
 
 ### Memory's events
 
-`slack_events_list` is for Memory's collector, not for answering questions: it lists the messages posted since a cursor in the channels and direct messages you enable with the `events.channels` option, as normalised events, oldest first, with the author, thread and permalink. It only reads channels with `slack_read_channel`, never the private search or a file, and never asks with the default rules. It is this plugin's side of the shared `events_list` source contract ([configuration](https://github.com/joe-broadhead/opencode-slack/blob/HEAD/docs/configuration.md#events-list)). Its errors are in the configuration guide's Errors table.
+`slack_events_list` is for Memory's collector, not for answering questions: it lists the messages posted since a cursor in the channels and direct messages you enable with the `events.channels` option, oldest first. It only reads channels with `slack_read_channel`, never the private search or a file, and never asks with the default rules. It is this plugin's side of the shared `events_list` source contract ([configuration](https://github.com/joe-broadhead/opencode-slack/blob/HEAD/docs/configuration.md#events-list)). Its errors are in the configuration guide's Errors table.
+
+### Mark as read
+
+`slack_mark_read` (script method `mark_read`) marks a conversation read (`conversations.mark`). A write, it needs a `:write` scope: see [Mark as read](https://github.com/joe-broadhead/opencode-slack/blob/HEAD/docs/configuration.md#mark-as-read).
 
 ### Scripts
 
-A script or a cron job can call every Slack tool this plugin knows with no model, through `opencode api`: the fourteen reads, the three sends and the ten writes. It runs as a session and its agent, under that agent's permission rules and the session's own. The rule is resolved first, so only an `allow` runs. **A script gets the same default as the model:** at `access: "all"` the plugin's block allows every tool, so a script can read and write everything the account can. Set `access: "ask-changes"` or `"read-only"`, or add a later rule, to restrict it; an `ask` is refused because no one can answer it. A saved "Always allow" does not authorize an ad-hoc script; a Jobs `jobs_run_script` one-off does, with the user's approval:
+A script or a cron job can call every Slack tool this plugin knows with no model, through `opencode api`. It runs as a session and its agent, under that agent's permission rules and the session's own. The rule is resolved first, so only an `allow` runs. **A script gets the same default as the model:** at `access: "all"` the plugin's block allows every tool, so a script can read and write everything the account can. Set `access: "ask-changes"` or `"read-only"`, or add a later rule, to restrict it; an `ask` is refused because no one can answer it. A saved "Always allow" does not authorize an ad-hoc script; a Jobs `jobs_run_script` one-off does, with the user's approval:
 
 ```sh
 opencode api post /api/rpc/slack.workspace.tools/slack_search_public \
@@ -71,9 +75,7 @@ opencode api post /api/rpc/slack.workspace.tools/slack_search_public \
 
 Without `x-opencode-directory:$PWD` the call reaches the service's default location and fails `rpc.unavailable` when the plugin is not loaded there.
 
-See [Scripting](https://github.com/joe-broadhead/opencode-slack/blob/HEAD/docs/scripting.md).
-
-The method `events_list` runs `slack_events_list` the same way. See [Scripting](https://github.com/joe-broadhead/opencode-slack/blob/HEAD/docs/scripting.md).
+The methods `events_list` and `mark_read` run `slack_events_list` and `slack_mark_read` the same way, and `status` returns the status model, the signed-in account included. See [Scripting](https://github.com/joe-broadhead/opencode-slack/blob/HEAD/docs/scripting.md).
 
 ## Permissions
 
@@ -88,7 +90,7 @@ The method `events_list` runs `slack_events_list` the same way. See [Scripting](
    | `"read-only"` | the read tools | the private-channel search, file reads, writes and sends, and new tools: they are **denied** |
 
    ```jsonc
-   { "plugins": [{ "package": "github:joe-broadhead/opencode-slack#v0.0.0", "options": { "access": "read-only" } }] }
+   { "plugins": [{ "package": "github:joe-broadhead/opencode-slack#v0.0.1", "options": { "access": "read-only" } }] }
    ```
 
    The default block, generated from `defaultRules()` for `access: "all"`:
@@ -109,6 +111,7 @@ The method `events_list` runs `slack_events_list` the same way. See [Scripting](
      { "action": "slack_slack_read_list", "resource": "*", "effect": "allow" },
      { "action": "slack_slack_search_emojis", "resource": "*", "effect": "allow" },
      { "action": "slack_events_list", "resource": "*", "effect": "allow" },
+     { "action": "slack_status", "resource": "*", "effect": "allow" },
      { "action": "slack_slack_search_public_and_private", "resource": "*", "effect": "allow" },
      { "action": "slack_slack_read_file", "resource": "*", "effect": "allow" },
      { "action": "slack_slack_send_message", "resource": "*", "effect": "allow" },
@@ -123,7 +126,8 @@ The method `events_list` runs `slack_events_list` the same way. See [Scripting](
      { "action": "slack_slack_create_list", "resource": "*", "effect": "allow" },
      { "action": "slack_slack_update_list", "resource": "*", "effect": "allow" },
      { "action": "slack_slack_add_list_record", "resource": "*", "effect": "allow" },
-     { "action": "slack_slack_update_list_record", "resource": "*", "effect": "allow" }
+     { "action": "slack_slack_update_list_record", "resource": "*", "effect": "allow" },
+     { "action": "slack_mark_read", "resource": "*", "effect": "allow" }
    ]
    ```
 
@@ -153,12 +157,12 @@ Do not put this block in the top-level `permissions`. OpenCode adds top-level ru
 
 ## Configure
 
-Everything works without options. Options set the client ID for everyone (instead of `/connect`), the callback URL and its local port, the scopes, a client secret for apps without PKCE, the host check, and the channels `slack_events_list` reads for Memory (`"events": { "channels": ["C0123ABCD45"] }`). To pass them, use the object form of the `plugins` entry:
+Everything works without options. Options set the client ID for everyone (instead of `/connect`), the callback URL and its local port, the scopes, a client secret for apps without PKCE, the OAuth metadata address of a host's own sign-in service, the host check, and the channels `slack_events_list` reads for Memory (`"events": { "channels": ["C0123ABCD45"] }`). To pass them, use the object form of the `plugins` entry:
 
 ```jsonc
 {
   "plugins": [
-    { "package": "github:joe-broadhead/opencode-slack#v0.0.0", "options": { "oauth": { "scopes": ["channels:history", "channels:read", "search:read.public", "users:read", "search:read.private"] } } }
+    { "package": "github:joe-broadhead/opencode-slack#v0.0.1", "options": { "oauth": { "scopes": ["channels:history", "channels:read", "search:read.public", "users:read", "search:read.private"] } } }
   ]
 }
 ```
@@ -169,7 +173,9 @@ Everything works without options. Options set the client ID for everyone (instea
 "oauth": { "client_id": "YOUR_SLACK_CLIENT_ID", "redirect_uri": "https://host.example/oauth/return", "callback_port": 8766 }
 ```
 
-Add the address to the Slack app's **OAuth & Permissions → Redirect URLs** (or `oauth_config.redirect_urls` in the [manifest](https://github.com/joe-broadhead/opencode-slack/blob/HEAD/docs/slack-app-manifest.json)). Slack matches the host and port exactly. [The callback: loopback or hosted](https://github.com/joe-broadhead/opencode-slack/blob/HEAD/docs/configuration.md#the-callback-loopback-or-hosted) explains the proxy and how two sign-ins on one machine avoid colliding on port 8765.
+Add the address to the Slack app's **OAuth & Permissions → Redirect URLs** (or `oauth_config.redirect_urls` in the [manifest](https://github.com/joe-broadhead/opencode-slack/blob/HEAD/docs/slack-app-manifest.json)). Slack matches the host and port exactly. [The callback: loopback or hosted](https://github.com/joe-broadhead/opencode-slack/blob/HEAD/docs/configuration.md#the-callback-loopback-or-hosted) explains the proxy and two sign-ins on one machine.
+
+**Refresh behind a hosted callback.** Slack refreshes without a client secret only for a desktop redirect (`localhost` with PKCE, or a custom scheme). An `https:` callback is a server redirect: each refresh needs the secret, or the sign-in ends after 12 hours. Set `oauth.client_secret`, or `oauth.auth_server_metadata_url` to your host's sign-in service, which adds the secret ([details](https://github.com/joe-broadhead/opencode-slack/blob/HEAD/docs/configuration.md#refresh-behind-a-hosted-callback)).
 
 [docs/configuration.md](https://github.com/joe-broadhead/opencode-slack/blob/HEAD/docs/configuration.md) lists every option, the scopes each tool needs, the permission rules and the status model.
 
@@ -182,7 +188,7 @@ Put the client ID of your organisation's Slack app in the system configuration, 
   "$schema": "https://opencode.ai/config.json",
   "plugins": [
     {
-      "package": "github:joe-broadhead/opencode-slack#v0.0.0",
+      "package": "github:joe-broadhead/opencode-slack#v0.0.1",
       "options": {
         "oauth": { "client_id": "YOUR_SLACK_CLIENT_ID" }
       }
@@ -212,14 +218,15 @@ Run `/slack-status` (or `/slack` in the TUI) first. Its `Connection` row shows a
 | `connected` | none | A skill in your own or the project's skill folders has the id `slack-search`, so OpenCode loads it instead of the plugin's. The `Skills` row names its file. | Move or rename that skill, then run `opencode reload`. |
 | `connected` | none | Ready. The next step reads `Nothing to do.` | If status names agents without default rules, put the default rules first in their own permissions (see above). |
 | — | `STATUS_UNAVAILABLE` | Status itself could not be read. | Run `/slack-status` again in a moment. |
-| — | `SKILLS_INVALID` | A bundled skill is missing or has invalid frontmatter, so the plugin does not load. | Reinstall the plugin: `opencode plugin remove github:joe-broadhead/opencode-slack#v0.0.0`, then `opencode plugin add github:joe-broadhead/opencode-slack#v0.0.0`, then `opencode reload`. |
-| — | `INPUT_INVALID` | The `events_list` input is invalid; the message names the problems. | Pass `since`, `cursor`, `limit`, `account` or `source` as the tool's schema describes them. |
+| — | `SKILLS_INVALID` | A bundled skill is missing or has invalid frontmatter, so the plugin does not load. | Reinstall the plugin: `opencode plugin remove github:joe-broadhead/opencode-slack#v0.0.1`, then `opencode plugin add github:joe-broadhead/opencode-slack#v0.0.1`, then `opencode reload`. |
+| — | `INPUT_INVALID` | A plugin tool's input is invalid; the message names the problems. | Pass the fields its schema describes. |
+| — | `SCOPE_MISSING` | `mark_read` lacks the `:write` scope the message names. | Add it to the app and `oauth.scopes`, then sign in again. |
 | — | `SOURCE_UNKNOWN` | This plugin lists only the source `slack`. | Leave `source` out, or pass `slack`. |
 | — | `CURSOR_INVALID` | The cursor was not issued by `events_list` for this Slack workspace and sign-in. | Call `events_list` without a cursor, with `since`, to start again. |
 | — | `ACCOUNT_UNKNOWN` | The signed-in Slack workspace is not the account `events_list` was asked for. | Leave `account` out, or pass the signed-in workspace. |
 | — | `TOO_MANY_MESSAGES` | More messages were posted in a channel after the cursor or `since` than one `events_list` call reads. | Call `events_list` again with a later `since`, without a cursor. |
 | — | `UPSTREAM_UNREADABLE` | Slack's answer to a read `events_list` makes is in a shape it does not read. | Call the tool directly to see Slack's answer, and run `/slack-status`. |
-| — | `UPSTREAM_ERROR` | Slack refused a read `events_list` makes, such as a missing scope or a channel you cannot read. | Check that the channel id in `events.channels` is one you can read, then call `events_list` again with the same cursor. |
+| — | `UPSTREAM_ERROR` | Slack refused a read `events_list` makes, or `mark_read`'s `conversations.mark`. | `events_list`: check the channel id in `events.channels`, then retry with the same cursor. `mark_read`: check `channel_id` and `ts`. |
 | — | `TOOL_UNAVAILABLE` | OpenCode does not list a read `events_list` needs, or `slack` is your own server. | Wait a few seconds, then run `/slack-status` and follow its next step. |
 
 If status itself cannot be read, `/slack-status` says `STATUS_UNAVAILABLE`; run it again in a moment. If a bundled skill is missing or broken, OpenCode reports `SKILLS_INVALID` when it loads the plugin; reinstall it from its tag, as the Troubleshooting table says.
@@ -242,6 +249,8 @@ A script's errors from the tools RPC have their own codes, listed in [Scripting]
 - **Rate limited:** Slack limits each tool separately. Wait, then make fewer calls.
 - **You declined a prompt:** nothing was sent. In Code Mode, the decline appears to the agent as an error inside its program.
 
+**Asked to sign in every 12 hours, behind a hosted callback.** Slack refused the refresh with `bad_client_secret`, in an HTTP 200 answer, so OpenCode logs the refresh as succeeded and the server as failed. See [Refresh behind a hosted callback](https://github.com/joe-broadhead/opencode-slack/blob/HEAD/docs/configuration.md#refresh-behind-a-hosted-callback).
+
 **Asked to sign in again after about 30 days.** Slack expires the refresh tokens it issues to PKCE apps after 30 days. Run `/connect` and choose **Slack** again, then press `o` or Enter.
 
 **After you change the Slack app or workspace,** run `opencode mcp logout slack`, then sign in again. OpenCode keys the Slack sign-in by server name and URL, not by client ID, so it would otherwise keep the old app's token.
@@ -253,14 +262,16 @@ Sign out while the plugin is still installed: once it is removed, OpenCode no lo
 1. Sign out of Slack: `opencode mcp logout slack`. If it answers "MCP server not found" right after OpenCode starts, wait a few seconds and run it again.
 2. If you saved a client ID in `/connect`, remove it: `opencode auth logout slack-app`, and choose the **Slack app client ID** account. Without a terminal, name it: `opencode auth logout slack-app "Slack app client ID"`. An entry saved by an earlier release is named "Slack app".
 3. Check: `opencode auth list` lists neither **Slack** nor **Slack app client ID**.
-4. Remove the plugin: `opencode plugin remove github:joe-broadhead/opencode-slack#v0.0.0` (the spec you installed), then `opencode reload`. `opencode mcp list` no longer lists `slack`.
+4. Remove the plugin: `opencode plugin remove github:joe-broadhead/opencode-slack#v0.0.1` (the spec you installed), then `opencode reload`. `opencode mcp list` no longer lists `slack`.
 5. Remove any Slack rules you copied into your agents' own `permissions`.
 
 ## Known limits
 
-- **Slack's server and Slack's tools.** The plugin adds Slack's hosted MCP server and nothing else: no Slack Web API client and no wrapper tools. Tool schemas, results (Markdown text, not JSON) and rate limits are Slack's.
+- **Slack's server and Slack's tools.** The plugin adds Slack's hosted MCP server and no wrapper tools; its only Web API calls, `auth.test` and `conversations.mark`, are tested against a fake Slack, not a live one. Tool schemas, results (Markdown text, not JSON) and rate limits are Slack's.
 - **The default `access` is `all`.** Agents can then read private channels and files, and send or change things, without asking. Set `access` to `"ask-changes"` or `"read-only"` to restrict it; see [Permissions](#permissions).
 - **Tool classes are set by hand.** A tool Slack adds later runs under the namespace rule (allowed at `all`, asks at `ask-changes`, denied at `read-only`) and is not a script method until the plugin classifies it. `/slack-status` names such tools.
+- **`mark_read` needs `im:write`, `channels:write` or the like**, not in the default scopes.
+- **Jelly.** `access` needs a Jelly with app#1301.
 - **Private search needs scopes the default sign-in lacks.** With the default scopes, Slack answers `missing_scope` for it. See the [scope table](https://github.com/joe-broadhead/opencode-slack/blob/HEAD/docs/configuration.md#scopes).
 - **Tested on OpenCode 2.2.3, 2.2.4, 2.2.5 and 2.2.6 only.** Other releases in `>=2.2.3 <2.3.0` run untested.
 - **A script's calls are not recorded in the session.** Slack's audit logs record them.

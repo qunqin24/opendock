@@ -1,7 +1,7 @@
 <h1 align="center">claude-bulkhead</h1>
 
 <p align="center">
-  <strong>Claude Code が他の dev server に <code>pkill node</code> を実行したり、そのポートを奪ったり、<code>git add -A</code> で別セッションの編集をコミットしたりするのを止めます。</strong>
+  <strong>Claude Code が空の変数で <code>rm -rf $DIR/</code> を実行したり、他の dev server に <code>pkill node</code> を実行したり、そのポートを奪ったり、<code>git add -A</code> で別セッションの編集をコミットしたりするのを止めます。</strong>
 </p>
 
 <p align="center">どのプロセス、ポート、git ツリーがどの Claude Code セッションやサブエージェントのものかを把握する hook です。他に害が出るコマンドだけをブロックし、代わりに実行すべき安全なコマンドを Claude に伝えます。</p>
@@ -28,14 +28,22 @@
 
 ## インストール
 
-Claude Code 内で実行します。
+まず何もインストールせずに、自分のセッションで何を止めていたかを確認します。
+
+```
+npx -y claude-bulkhead scan --since 30d --share
+```
+
+`~/.claude/projects` の記録を読むだけで、どこにも送信しません。
+
+次に Claude Code 内でプラグインをインストールします。
 
 ```
 /plugin marketplace add dooly6276/claude-bulkhead
 /plugin install bulkhead@bulkhead
 ```
 
-次に、何も変更せずに、直近 1 か月の自分の記録で何を止めていたかを確認します。
+インストール後は、同じレポートを Claude Code 内で見られます。
 
 ```
 /bulkhead:scan 30d
@@ -72,7 +80,7 @@ Node 18 以降が `PATH` に通っている必要があります（Claude Code �
 | 3 つのセッションが同じ 1 分間に `next build`、`npm test`、Playwright を起動し、マシンがフリーズする。 | memory-guard は RAM が少ないとき、重いコマンドをブロックする。`bulkhead-slot` を通せば、3 つ目のジョブは空きができるまでキューで待つ。 |
 
 <details>
-<summary>さらに 5 件</summary>
+<summary>さらに 6 件</summary>
 
 | bulkhead なし | bulkhead あり |
 |---|---|
@@ -81,10 +89,11 @@ Node 18 以降が `PATH` に通っている必要があります（Claude Code �
 | サブエージェントがフォアグラウンドで 10 分間ポーリングする。セッションはあなたに応答できず、プロンプトキャッシュも切れる。 | wait-guard がループをブロックし、`run_in_background: true` を使うよう求める。 |
 | エージェントがディスク使用量を調べようとして、ホームフォルダに対して `du` を 10 個同時に実行する。全セッションのビルドと `git status` が数分間ほとんど進まなくなる。 | disk-guard がブロックし、フォルダを 1 つずつ調べるよう求める。 |
 | 「worktree を整理して」というタスクが、別のセッションがまだ作業中の worktree に `git worktree remove` を実行する。 | checkout-guard がブロックし、まだそこにいるセッションを示す。 |
+| 後片付けで `BUILD_DIR` が未設定のまま `rm -rf "$BUILD_DIR"/*` を実行して `rm -rf /*` になる、または `rm -rf .git` でリポジトリの履歴が消える。 | basics がブロックし、安全な形 `rm -rf "${BUILD_DIR:?}"/*` を示す。 |
 
 </details>
 
-セッションが 1 つだけの場合でも、kill-guard、memory-guard、wait-guard、disk-guard、basics（`rm -rf ~`、`main` への force-push、未コミットの作業を消す `reset --hard` を禁止）は働きます。port-guard と checkout-guard は、2 つ目のセッションまたはサブエージェントが動いている間に働きます。
+セッションが 1 つだけの場合でも、kill-guard、memory-guard、wait-guard、disk-guard、basics（`rm -rf ~`、`D` が空だと `rm -rf /` になる `rm -rf $D/`、`rm -rf .git`、`main` への force-push、未コミットの作業を消す `reset --hard` を禁止）は働きます。port-guard と checkout-guard は、2 つ目のセッションまたはサブエージェントが動いている間に働きます。
 
 ## bulkheadとは
 
@@ -290,9 +299,9 @@ sleep の合計が 180 秒を超えうるフォアグラウンドのコマンド
 </details>
 
 <details>
-<summary><strong>basics</strong>: 取り返しのつかない 5 つのミス</summary>
+<summary><strong>basics</strong>: 取り返しのつかない 8 つのミス</summary>
 
-`rm-root`（ルート、`/srv` のようなトップレベルのフォルダ、ホーム、`~/Documents` のようなホーム直下のフォルダ、またはリポジトリより上に対する `rm -rf`）、`force-push-main`（`main` または `master` への `git push --force`。`--force-with-lease` は通ります）、`protected-delete`（`git push origin :main`、`git push --delete origin main`、`git branch -D main`）、`discard-changes`（未コミットの作業を失う `git reset --hard` や `git clean -fd`）、`agent-author`（`--author="Claude <noreply@anthropic.com>"` や `git config user.name Claude` など。あなたのコミットがあなたの実績として数えられ続けるようにするため）をブロックします。
+`rm-root`（ルート、`/srv` のようなトップレベルのフォルダ、ホーム、`~/Documents` のようなホーム直下のフォルダ、またはリポジトリより上に対する `rm -rf`）、`rm-empty-var`（変数やコマンドの出力が空だと `/` になる `rm -rf $D/`、`rm -rf "$(cygpath -u ...)"`、`$D/` への `rsync --delete`。`"${D:?}/"` は通る）、`rm-unquoted-var`（値に空白があるのに引用符なしで書いた `rm -rf $D`。bash が分割してそれぞれを削除する）、`rm-git-dir`（リポジトリでの `rm -rf .git`）、`force-push-main`（`main` または `master` への `git push --force`。`--force-with-lease` は通ります）、`protected-delete`（`git push origin :main`、`git push --delete origin main`、`git branch -D main`）、`discard-changes`（未コミットの作業を失う `git reset --hard` や `git clean -fd`）、`agent-author`（`--author="Claude <noreply@anthropic.com>"` や `git config user.name Claude` など。あなたのコミットがあなたの実績として数えられ続けるようにするため）をブロックします。
 
 オフにするには: `BULKHEAD_DISABLE=basics`、またはルール名を指定して 1 つだけオフにします。詳細: [docs/guards/basics.md](docs/guards/basics.md)。
 </details>
@@ -348,7 +357,7 @@ bulkhead が扱うのは別の問題です。1 台のマシン上のセッショ
 
 | 変数 | 既定値 | 対応する設定 |
 |---|---|---|
-| `BULKHEAD_DISABLE` | 空 | オフにするガードをカンマ区切りで指定します。`kill-guard`、`wait-guard`、`memory-guard`、`port-guard`、`checkout-guard`、`disk-guard`、`orphan-reaper`、`basics`、または `all`。個別のルールもオフにできます。`rm-root`、`force-push-main`、`protected-delete`、`discard-changes`、`agent-author`、`stage-all`、`remove-session-dir`。ここに書いた名前は、ファイルの内容にかかわらずオフになります |
+| `BULKHEAD_DISABLE` | 空 | オフにするガードをカンマ区切りで指定します。`kill-guard`、`wait-guard`、`memory-guard`、`port-guard`、`checkout-guard`、`disk-guard`、`orphan-reaper`、`basics`、または `all`。個別のルールもオフにできます。`rm-root`、`rm-empty-var`、`rm-unquoted-var`、`rm-git-dir`、`force-push-main`、`protected-delete`、`discard-changes`、`agent-author`、`stage-all`、`remove-session-dir`。ここに書いた名前は、ファイルの内容にかかわらずオフになります |
 | `BULKHEAD_PRESET` | `normal` | プリセット: `quiet`、`normal`、`strict` |
 | `BULKHEAD_WAIT_MAX_SEC` | 180 | `waitGuard.limitSeconds` |
 | `BULKHEAD_MIN_FREE_GB` | 3、または RAM の 15% のうち小さい方 | `memory.minFreeGb` |
@@ -377,6 +386,7 @@ bulkhead が扱うのは別の問題です。1 台のマシン上のセッショ
 | kill-guard | `pkill`、`taskkill-im`、`stop-process-name` など、名前による kill | `{"killGuard":{"allowNames":["ffmpeg"]}}` |
 | kill-guard | `other-session-pid`: 別のセッションのツリーにある PID | `{"killGuard":{"ownerCheck":false}}` |
 | kill-guard | `broad-pattern`: デスクトップアプリや多数のプロセスに届く `pkill -f` パターン | `{"killGuard":{"broadPattern":false}}` |
+| kill-guard | `bsd-pkill`: macOS で長いオプションや 2 つ目のパターンを付けた `pkill`。BSD `pkill` はそれもパターンとして読む | `{"killGuard":{"bsdPkill":false}}` |
 | kill-guard | `mass-kill`, `docker-mass`, `device-kill`, `app-quit`, `service-stop`: その他のルール（別のセッションが動いているときだけ） | `{"killGuard":{"massKill":false}}`, 他も同じ形 (`dockerMass`, `deviceKill`, `appQuit`, `serviceStop`) |
 | wait-guard | `long-sleep`、`poll-loop`、`follow` | `{"waitGuard":{"limitSeconds":600}}` |
 | memory-guard | `low-memory` | `{"memory":{"minFreeGb":1}}` |
@@ -387,6 +397,7 @@ bulkhead が扱うのは別の問題です。1 台のマシン上のセッショ
 | checkout-guard | `git-checkout`、`git-pull` など、ツリーを変更する操作 | `{"checkoutGuard":{"enabled":false}}` |
 | disk-guard | `disk-wide-find`、`parallel-disk-scan`、`disk-wide-scan` | `{"diskGuard":{"enabled":false}}` |
 | basics | `rm-root` | `{"basics":{"rmRoot":false}}` |
+| basics | `rm-empty-var`, `rm-unquoted-var`, `rm-git-dir` | `{"basics":{"rmEmptyVar":false}}`, 他も同じ形 (`rmUnquotedVar`, `rmGitDir`) |
 | basics | `force-push-main` | `{"basics":{"forcePushMain":false}}` |
 | basics | `discard-changes` | `{"basics":{"discardChanges":false}}` |
 | basics | `agent-author` | `{"basics":{"agentAuthor":false}}` |

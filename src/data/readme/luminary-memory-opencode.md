@@ -63,6 +63,59 @@ luminary-memory stats
 
 ---
 
+## One-command install (OpenCode, pi, omp)
+
+Full guide, including manual installation and complete removal:
+[docs/install.md](docs/install.md).
+
+Windows (PowerShell):
+
+```powershell
+irm https://raw.githubusercontent.com/alertxsto/luminary-memory/main/install.ps1 | iex
+```
+
+Linux / macOS:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/alertxsto/luminary-memory/main/install.sh | sh
+```
+
+The installer provisions a private Python runtime with `uv`, installs the
+version-matched bridge, writes `~/.luminary/bridge.json`, configures every
+detected agent, and verifies the bridge with a live handshake. No Python, Node,
+or venv setup is required, and no shell profile or `PATH` is modified.
+
+It is non-interactive and idempotent. Run it again to update.
+
+| Option | Meaning |
+|---|---|
+| `--agents opencode,pi` | configure only these agents |
+| `--all` | configure every supported agent |
+| `--check` | report versions and drift, change nothing |
+| `--upgrade` | move plugin pins to the target version |
+| `--uninstall` | remove Luminary entries |
+| `--prune` | remove unreferenced bridge venvs |
+| `--version X` | pin the bridge version |
+| `--no-config` | install the bridge only |
+| `--project` | target project-local config |
+| `--dry-run` | show actions without writing |
+| `--list` | show agent detection (`luminary-memory setup --list`) |
+
+The same logic is available without the shell wrapper:
+
+```bash
+luminary-memory setup --agents auto
+luminary-memory setup --check
+luminary-memory setup --agents pi --version 0.3.4
+```
+
+`setup` reads each agent's plugin pin and installs the matching bridge, so a
+plugin and its bridge cannot drift apart. `~/.luminary/bridge.json` records the
+interpreter per agent; adapters read it automatically, so `LUMINARY_PYTHON` is
+only needed as an explicit override.
+
+---
+
 ## Native hooks for supported harnesses
 
 The harness-neutral JSON bridge supports native adapters without coupling the
@@ -81,10 +134,10 @@ API or standalone desktop app is assumed. A portable OpenCode agent skill lives
 at [`opencode/SKILL.md`](opencode/SKILL.md); install it under
 `~/.config/opencode/skills/luminary-memory/` or a project's `.opencode/skills/`.
 
-The `0.3.3` source includes native interactive inspectors for the verified
+The `0.3.4` source includes native interactive inspectors for the verified
 surfaces: OpenCode CLI/Desktop, pi and omp, Hermes Desktop/dashboard and an
-explicitly launched loopback companion. The `0.3.2` registry packages do not
-include the inspector; see the installation guide for current availability.
+explicitly launched loopback companion. The `0.3.4` registry packages include
+the inspector; see the installation guide for current availability.
 Two native targets remain blocked on upstream
 contracts and are recorded in the roadmap: OpenCode Web GUI contribution
 discovery and Hermes terminal/TUI authority plus scope lifecycle. See
@@ -111,8 +164,10 @@ The three installable tarballs are written to `artifacts/plugins/`. Set
 Choose the native package **or** the copied hook, never both.
 
 Registry names are `luminary-memory-pi`, `luminary-memory-opencode`, and
-`luminary-memory-omp`. All three npm packages and the Python bridge are
-published at `0.3.2`; npm `latest` points to that version.
+`luminary-memory-omp`. Python and all three npm `latest` tags are `0.3.4`.
+The npm tarballs are byte-identical to the tagged GitHub release assets,
+and their built resources match the PyPI wheel. Use this coordinated release
+instead of the mismatched npm `0.3.3` builds.
 The pi manifest includes `pi-package` for eligibility in the
 [official package catalog](https://pi.dev/packages). OpenCode's existing
 Ecosystem PR targets legacy V1 docs, not a verified V2 listing; no V2 website
@@ -209,6 +264,9 @@ Every setting has a `LUMINARY_*` env var or a `Settings` object.
 | `dedup_jaccard_threshold` | `LUMINARY_DEDUP_JACCARD_THRESHOLD` | `0.85` |
 | `token_budget` | `LUMINARY_TOKEN_BUDGET` | `4096` |
 | `max_memories` | `LUMINARY_MAX_MEMORIES` | `1000` |
+| `episode_max_rows` | `LUMINARY_EPISODE_MAX_ROWS` | `10000` |
+| `event_max_rows` | `LUMINARY_EVENT_MAX_ROWS` | `50000` |
+| `evidence_max_rows` | `LUMINARY_EVIDENCE_MAX_ROWS` | `50000` |
 | `ttl_default_seconds` | `LUMINARY_TTL_DEFAULT_SECONDS` | `null` |
 | `prune_min_importance` | `LUMINARY_PRUNE_MIN_IMPORTANCE` | `0.2` |
 | `consolidate_jaccard_threshold` | `LUMINARY_CONSOLIDATE_JACCARD_THRESHOLD` | `0.9` |

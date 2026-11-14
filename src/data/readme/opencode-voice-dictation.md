@@ -1,20 +1,23 @@
-# Dictado por voz para OpenCode Desktop
+# Dictado por voz para OpenCode Desktop y TUI
 
 Plugin de [OpenCode](https://opencode.ai) V2 que añade voz a la app de
-escritorio:
+escritorio y a la TUI:
 
 - **Dictado**: pulsas la píldora y se abre el dictado de Windows 11 (Win+H),
   que escribe en el prompt con su motor neuronal. También puedes usar el motor
   offline `System.Speech` desde Ajustes.
 - **Lectura**: pulsa «Leer» y reproduce en voz alta la última respuesta.
-
+- **TUI**: `/dictado`, `/leer` y `/pausar` en la terminal. En Windows usa
+  Win+H; en Linux graba y transcribe con whisper.cpp. También `<leader>d`,
+  `<leader>v` y `<leader>p`.
 - **Dictado preciso**: por defecto delega en Windows Voice Typing (Win+H).
 - **Modo offline**: `System.Speech` sigue disponible como alternativa sin
   conexión y sin depender del dictado de Windows.
 - **Linux nativo**: en Ubuntu, `whisper.cpp` transcribe en la CPU sin WSL ni
   Python. Ver [la guía](https://github.com/evious/opencode-voice-dictation/blob/main/docs/whispercpp.md).
-- **Sin portapapeles**: la lectura usa `composer.insert()` en la posición del
-  cursor, sin robar el foco ni simular `Ctrl+V`.
+- **Sin portapapeles en Desktop**: la lectura usa `composer.insert()` en la
+  posición del cursor, sin robar el foco ni simular `Ctrl+V`. La TUI Linux puede
+  usar el portapapeles para insertar el dictado si no hay API de prompt.
 - **Lectura natural**: voces neuronales de Edge (45 en español), con respaldo
   a las voces del sistema si no hay internet.
 - **WhisperX local (avanzado)**: dictado con WhisperX en WSL y GPU NVIDIA. Ver
@@ -28,8 +31,8 @@ escritorio:
 opencode plugin add opencode-voice-dictation
 ```
 
-Reinicia OpenCode Desktop. El plugin queda registrado en el `opencode.json`
-global del entorno donde ejecutes el comando.
+Reinicia OpenCode Desktop o la TUI. El plugin queda registrado en el
+`opencode.json` global del entorno donde ejecutes el comando.
 
 Actualizar:
 
@@ -43,6 +46,108 @@ está commiteado):
 ```bash
 opencode plugin add github:evious/opencode-voice-dictation
 ```
+
+## TUI (terminal)
+
+El paquete exporta una parte TUI para Windows y Linux. Dicta y escucha la
+última respuesta sin salir de la terminal:
+
+| Comando | Atajo | Acción |
+| --- | --- | --- |
+| `/dictado` | `<leader>d` (`Ctrl+X`, luego `d`) | Windows: abre Win+H. Linux: graba y transcribe con whisper.cpp. |
+| `/leer` | `<leader>v` (`Ctrl+X`, luego `v`) | Lee la última respuesta. Si ya está leyendo, la detiene. |
+| `/pausar` | `<leader>p` (`Ctrl+X`, luego `p`) | Pausa o reanuda la lectura. También `/pausa`. |
+| `/ajustes-voz` | — | Menú de ajustes de la TUI: modelo, idioma, inserción, voz, velocidad, etc. |
+
+Sobre el composer aparece una fila clicable:
+
+```
+🎤 Dictar │ 🔊 Leer │ ⏸ Pausar
+```
+
+- `Dictar` graba/transcribe en Linux o abre Win+H en Windows.
+- `Leer` lee la última respuesta; si está leyendo, la detiene.
+- `Pausar` aparece mientras lee y pausa/reanuda.
+- Si la terminal no envía eventos de ratón, usa los comandos y atajos.
+
+**Windows**: la lectura usa Edge y, si falla, System.Speech (SAPI). `/pausar`
+funciona con Edge; con SAPI no hay pausa real. El dictado delega en Win+H.
+
+**Linux**: la TUI graba con `ffmpeg` (PulseAudio/ALSA) o `arecord`, transcribe
+con whisper.cpp por RPC e inserta el texto en el prompt. La lectura usa Edge y
+`ffplay`/`mpv`; si Edge falla, usa `spd-say` o `espeak-ng`. El servidor de
+OpenCode debe correr en Linux para que whisper.cpp esté disponible.
+
+Requisitos en Linux:
+
+```bash
+sudo apt install -y ffmpeg xdotool xclip
+# opcional para la voz de respaldo:
+sudo apt install -y speech-dispatcher espeak-ng
+```
+
+- `ffmpeg`: obligatorio para grabar y para whisper.cpp.
+- `xdotool` + `xclip`: inserción automática en X11. En Wayland: `wtype` +
+  `wl-clipboard`.
+- `spd-say` o `espeak-ng`: lectura de respaldo sin Edge.
+- Modelo whisper.cpp descargado; si falta, la TUI ofrece descargarlo.
+
+**WSL**: funciona para grabar (WSLg/PulseAudio), transcribir y reproducir. Como
+Windows Terminal no es una ventana X11, la inserción usa el portapapeles de
+Windows + `SendKeys`, no `xdotool`.
+
+Opciones en `opencode.jsonc`:
+
+```jsonc
+"plugins": [
+  {
+    "package": "opencode-voice-dictation",
+    "options": {
+      "model": "base-q5_1",
+      "language": "auto",
+      "maxSeconds": 60,
+      "insert": "auto",
+      "engine": "edge"
+    }
+  }
+]
+```
+
+- `insert`: `auto` (appendPrompt → xdotool/portapapeles), `type`, `clipboard` o
+  `append`.
+- `engine`: `edge` o `system` (fuerza la voz local).
+- `maxSeconds`: límite de grabación (5–300).
+- `voice`, `rate`, `skipCode`: igual que en el GUI.
+
+También puedes cambiar estas opciones sin editar JSON con `/ajustes-voz`. El
+menú guarda en el store durable de la TUI; `opencode.jsonc` solo siembra los
+valores la primera vez. «Restablecer» vuelve a aplicar las opciones actuales de
+`opencode.jsonc`. Los ajustes de la TUI son independientes de los de OpenCode
+Desktop.
+
+### Dictados largos
+
+Si la TUI muestra `[Pasted ~N lines]` o «pegó N líneas», está compactando el
+pegado. Para ver todo el texto y corregirlo antes de enviar, edita el
+**`cli.json` de la TUI** (no `opencode.jsonc`):
+
+- Linux: `~/.config/opencode/cli.json`
+- Windows: `C:\Users\<usuario>\.config\opencode\cli.json`
+- Si usas `XDG_CONFIG_HOME`: `$XDG_CONFIG_HOME/opencode/cli.json`
+
+```json
+{
+  "prompt": {
+    "paste": "full"
+  }
+}
+```
+
+Se recarga en vivo, sin reiniciar la TUI. Si el archivo no existe, créalo con
+ese contenido. También puedes ver la ruta desde `/ajustes-voz` → **Ver texto
+completo al dictar**. El plugin no modifica ese archivo.
+
+Guía completa: [`docs/tui.md`](https://github.com/evious/opencode-voice-dictation/blob/main/docs/tui.md).
 
 ## Compatibilidad
 
@@ -287,6 +392,7 @@ guarda esa contraseña.
 | Falta ffmpeg o falla la conversión del audio | Ajustes → Dictado por voz → whisper.cpp → **Instalar ffmpeg**, o ejecuta `sudo apt install -y ffmpeg`. El motor no puede transcribir sin ffmpeg. |
 | whisper.cpp falla al arrancar | Comprueba que `ffmpeg` está en el `PATH` (`ffmpeg -version`) y que el binario es compatible con tu `glibc` (Ubuntu 22.04+). |
 | whisper.cpp tarda mucho | Usa `base-q5_1` en portátiles modestos; `small-q5_1` necesita más CPU y memoria. La primera transcripción carga el modelo. |
+| El dictado se ve como «pegó N líneas» o `[Pasted ~N lines]` | Es el resumen de pegado de la TUI. Pon `"prompt": { "paste": "full" }` en `~/.config/opencode/cli.json` (Windows: `C:\Users\<usuario>\.config\opencode\cli.json`). Se recarga en vivo. |
 | El RPC devuelve 400 o no cargan las voces de Edge | El plugin server no cargó: Ajustes → Extensiones → Plugins → **Reload**, o reinicia el servicio. |
 | WhisperX pide token de Hugging Face | `huggingface-cli login` y acepta los términos del modelo de VAD de `pyannote`. |
 
@@ -368,11 +474,23 @@ src/
 ├── index.ts                 Parte servidor: registra los RPC y capabilities
 ├── rpc.ts                   Contrato RPC compartido (voces, síntesis, dictado)
 ├── edge.ts                  Voces y síntesis de Edge (servidor)
+├── speech-text.ts           Limpieza de Markdown y troceado compartido
+├── sapi-speech.ts           Voz SAPI y listado de voces (Windows)
+├── speak-script.ts          Script de PowerShell para SAPI
+├── win-h.ts                 Atajo Win+H y script
 ├── whisper/
 │   ├── server.ts            Worker persistente, spawn WSL/Node, timeouts
 │   └── worker.py            WhisperX en la GPU; protocolo JSON por stdin/stdout
 ├── whispercpp/
 │   └── server.ts            Linux: descarga, whisper-server persistente, ffmpeg
+├── tui.ts                   Entrada ./tui: comandos y despacho por plataforma
+├── tui/
+│   ├── player.ts            Reproducción WinRT (Windows)
+│   ├── insert.ts            Inserción: appendPrompt/xdotool/portapapeles/WSL
+│   ├── status.tsx           Botones Dictar/Leer/Pausar en el composer
+│   └── linux/
+│       ├── dictation.ts     Grabación ffmpeg/arecord y WAV
+│       └── playback.ts      ffplay/mpv y respaldo spd-say/espeak
 ├── gui.tsx                  Entrada ./gui-experimental
 └── gui/
     ├── definition.ts        os, stores, i18n es/en
@@ -385,21 +503,21 @@ src/
     ├── settings.tsx         Página de ajustes
     └── engines/
         ├── script.ts        Script de PowerShell para el dictado
-        ├── system-speech.ts Spawn, parseo de JSON, diagnose, taskkill
-        ├── speak-script.ts  Script de PowerShell para la lectura
-        └── sapi-speech.ts   Voz de respaldo y listado de voces SAPI
+        └── system-speech.ts Spawn, parseo de JSON, diagnose, taskkill
 ```
 
 Guías:
 
+- TUI (Windows, Linux y WSL): [`docs/tui.md`](docs/tui.md).
 - WhisperX (Windows + WSL): [`docs/whisperx.md`](docs/whisperx.md).
 - whisper.cpp (Linux nativo): [`docs/whispercpp.md`](docs/whispercpp.md).
 
 `npm run typecheck` valida los tipos, `npm run build` genera el bundle CJS y
-`npm test` ejecuta el smoke test (`test/smoke.cjs`): simula el host de la app,
-un `powershell.exe` falso, la API de voz del navegador, el RPC de Edge y las
-grabadoras de WhisperX/whisper.cpp para comprobar dictado, lectura, limpieza de
-Markdown, pausa, cancelación, fallback, cambio de motor por sistema y errores.
+`npm test` ejecuta los tests de texto, TUI Windows, TUI Linux y el smoke test
+(`test/smoke.cjs`): simula el host de la app, un `powershell.exe` falso, la API
+de voz del navegador, el RPC de Edge y las grabadoras de WhisperX/whisper.cpp
+para comprobar dictado, lectura, limpieza de Markdown, pausa, cancelación,
+fallback, cambio de motor por sistema y errores.
 
 ## Publicar
 

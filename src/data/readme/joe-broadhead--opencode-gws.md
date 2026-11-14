@@ -13,7 +13,7 @@ Unofficial; not affiliated with Google.
 ## Install
 
 ```sh
-opencode plugin add github:joe-broadhead/opencode-gws#v0.0.2
+opencode plugin add github:joe-broadhead/opencode-gws#v0.0.3
 ```
 
 Run `opencode reload`, or restart OpenCode, then run `/gws-status`.
@@ -23,7 +23,7 @@ Each release has its own tag, and a Git install does not update by itself. To mo
 Or add the plugin to `opencode.json` instead, with the same spec:
 
 ```json
-{ "plugins": [{ "package": "github:joe-broadhead/opencode-gws#v0.0.2" }] }
+{ "plugins": [{ "package": "github:joe-broadhead/opencode-gws#v0.0.3" }] }
 ```
 
 The install takes the GitHub release tag. Its commit carries the built `dist/`, so the install runs no build.
@@ -58,6 +58,10 @@ Ask the agent for what you need. It works in four steps:
 
 In Jelly, the plugin also answers `calendar.today`, a read-only RPC method that lists today's events on one account's primary calendar for Jelly's calendar and the **Today** Home tile. It reads with that account's own sign-in, never writes, and returns no descriptions or guests ([In Jelly](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/docs/jelly.md#todays-calendar)).
 
+Off by default, a person can also approve one kind of change from a UI an agent made in Jelly: a Sheets value update. List it in the `uiActions` option to turn it on. Jelly then asks every time, showing the plugin's own dry-run preview of every cell, and the plugin checks Jelly's single-use grant for that exact change, your `access` (read-only refuses it) and your policy before it plans and commits it as you. You are the one acting there, so your OpenCode permission rules for agents (such as a deny on `gws_write`) are not consulted; `access`, `uiActions` and the policy are what stop it. Its preview is a dry run that needs no grant and writes no audit record ([In Jelly](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/docs/jelly.md#changes-a-person-approves-in-an-agents-ui)).
+
+It also answers `images.read`, which Jelly calls to draw a Google Drive or Workspace picture an agent puts in a UI: a Drive file link, or an address on Google's own image servers, such as a file's `thumbnailLink`. It reads with the account's own sign-in, which Jelly never sees, and answers a PNG, JPEG, GIF or WebP of at most 1 MB, judged from its bytes; never SVG ([In Jelly](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/docs/jelly.md#pictures-in-an-agents-ui)).
+
 ### Scripts
 
 A script or a cron job can call the read tools with no model, through `opencode api`: `status`, `catalog`, `schema`, `read`, `plan` and `events_list`. It runs as a session and its agent, under that agent's permission rules, which default to allowing every method. The commit tools are not methods, so a script plans a change but never commits it, unless the host turns on `rpcCommits` because it confirms changes itself. A rule that `ask`s is refused, because no one can answer it:
@@ -87,7 +91,7 @@ In the TUI, **Google Workspace: Status** in the command palette, or `/gws`, open
    | `"read-only"` | the reads, events_list included | nothing: the six commits are **denied** |
 
    ```json
-   { "plugins": [{ "package": "github:joe-broadhead/opencode-gws#v0.0.2", "options": { "access": "read-only" } }] }
+   { "plugins": [{ "package": "github:joe-broadhead/opencode-gws#v0.0.3", "options": { "access": "read-only" } }] }
    ```
 
    This is not the account's `access`: `accounts.<alias>.access` is the Google sign-in's scope level (Read-only or Read and write). The plugin option decides which tools run.
@@ -202,7 +206,7 @@ Create a Desktop app OAuth client in your organisation's Google Cloud project (u
 {
   "plugins": [
     {
-      "package": "github:joe-broadhead/opencode-gws#v0.0.2",
+      "package": "github:joe-broadhead/opencode-gws#v0.0.3",
       "options": {
         "oauthClient": {
           "clientId": "<your client ID>.apps.googleusercontent.com",
@@ -255,6 +259,14 @@ Generated from `src/domain/errors.ts` by `npm run docs:coverage`. Do not edit th
 | `API_DISABLED` | The Google API is not enabled in the Google Cloud project of the OAuth client. | Ask the user to enable the API in the Google Cloud console, wait about a minute, and retry. |
 | `GWS_API_ERROR` | Google returned an error; the message carries Google's text. | Fix the ids or parameters once from the message; if it fails again, tell the user Google's message. |
 | `CALENDAR_UNAVAILABLE` | The read Jelly's calendar makes, calendar.today, has no answer: no configured account enables calendar, or Google's answer for the primary calendar named no time zone. | Add calendar to an account's enabledServices; if it is enabled, retry later. |
+| `IMAGE_HOST_REFUSED` | The picture Jelly asked images.read for has an address the plugin does not take: not https, a user name, password, port or IP address in it, a host other than drive.google.com or Google's image servers (lh3 to lh7 under googleusercontent.com; any other googleusercontent.com name can be anyone's), or a Drive link that names no file. Nothing was fetched. | Show the picture from a Drive file link or an address Google returned, such as a file's thumbnailLink. |
+| `IMAGE_TYPE_REFUSED` | The picture's first bytes are not a PNG, JPEG, GIF or WebP; SVG and every other kind are refused. | Show a PNG, JPEG, GIF or WebP picture instead. |
+| `IMAGE_TOO_LARGE` | The picture is over 1 MB, the most Jelly draws; the plugin stops reading at that size and answers nothing. | Show the file's thumbnail (its thumbnailLink) instead. |
+| `IMAGE_UNAVAILABLE` | The picture could not be read: Google answered with an error or a redirect (never followed), a Drive file is not a picture and has no thumbnail, or too many pictures are being read at once. | Check that the account can open the file; retry later. |
+| `IMAGE_ACCOUNT_AMBIGUOUS` | No single account can read the picture: no account enables drive, or several could and none is the default account. The plugin never tries each account in turn. | Add drive to one account's enabledServices, or name an account default. |
+| `UI_ACTION_OFF` | A person approved a change from a UI an agent made in Jelly, and the uiActions option does not list its operation. It is empty by default, so nothing a UI asks for changes anything. Nothing ran. | Make the change with gws_plan and gws_write, or ask the user to add the operation to the uiActions option. |
+| `UI_ACTION_REFUSED` | The change a UI asked for is not one a person may approve there: access is read-only, the operation is not a Sheets value update, the input is not the exact shape the action takes (RAW values only, at most 100 rows of 26 cells), or its preview would not fit Jelly's confirmation. Nothing ran. | Make the change with gws_plan and gws_write instead, or tell the user why it was refused. |
+| `UI_GRANT_REFUSED` | The action carried no valid Jelly action grant for this exact input from an owner device: no grant, another host's key, another plugin, action or input, an expired grant, one used already, or no Jelly action key in this engine. Only a person's confirmed click in Jelly carries one. Nothing ran. | Ask the person to approve the change again in Jelly; an agent or a script makes it with gws_plan and gws_write. |
 | `GWS_DISCOVERY_ERROR` | gws could not load the API description (the Discovery document) it builds requests from. | Check that this machine can reach www.googleapis.com, then retry. |
 | `GWS_INTERNAL_ERROR` | gws failed unexpectedly. | Retry once; if it fails again, report the message. |
 | `TIMEOUT` | gws did not finish within execution.timeoutMs. | Narrow the request with fields, a smaller page size, maxPages, or maxItems, then retry. |
@@ -297,7 +309,7 @@ Each OpenCode server keeps a private work folder, `$TMPDIR/opencode-gws-XXXXXX`,
 2. Remove the plugin:
 
    ```sh
-   opencode plugin remove github:joe-broadhead/opencode-gws#v0.0.2
+   opencode plugin remove github:joe-broadhead/opencode-gws#v0.0.3
    ```
 
 3. Delete its folders. The state folder holds the audit log (`audit.jsonl`, and `audit.jsonl.1` once it passes 5 MiB); the cache folder holds Google's API descriptions. Neither holds a credential.
@@ -319,6 +331,9 @@ Each OpenCode server keeps a private work folder, `$TMPDIR/opencode-gws-XXXXXX`,
 - **A cancelled commit may have been applied.** `CANCELLED` means the call stopped while `gws` ran. Check the state with `gws_read` before planning the change again.
 - **Asks need an answerer.** At `access: "ask-changes"`, `opencode run` and scripts cannot answer a prompt, so a commit there needs an allow rule for it, or `access: "all"`.
 - **Output and time limits.** A result that is too large stops with `OUTPUT_LIMIT`, and a slow call with `TIMEOUT`. Narrow the request with `fields`, a smaller page size, `maxPages` or `maxItems`.
+- **Changes from an agent's UI in Jelly.** Off by default, and only Sheets value updates: RAW values (never formulas), at most 100 rows of 26 cells, with a preview that fits Jelly's 4,000-character confirmation. The preview shows the new values, not the cells' current ones. It works only in Jelly, which holds the key its grants are signed with; Jelly's grant does not yet say how Jelly asked, so the plugin relies on Jelly for asking every time. `/gws-status` does not show the option yet.
+- **Pictures in Jelly over about 47 KB.** `images.read` answers pictures up to 1 MB, as Jelly's picture contract allows, but Jelly's host currently refuses any plugin RPC answer over 64 KB of JSON (`VIEW_DATA_MAX_BYTES`), so a picture over about 47 KB shows no picture in Jelly until Jelly lifts that limit for pictures. That limit is Jelly's, not the plugin's.
+- **Jelly.** The `access` setting declares its choices, which only a Jelly that includes app#1301 reads; an older Jelly refuses the plugin's declaration.
 - **Tested hosts.** Tested on OpenCode 2.2.3, 2.2.4, 2.2.5 and 2.2.6. A later 2.2 release loads, and `/gws-status` marks it untested.
 - **Audit lines can drop.** The audit log is written off the call path, with a 100 ms budget per line. A write that stalls past it is abandoned: its line and any queued behind it are lost. The call's result is not affected. The sink then stops writing until the plugin reloads, and `/gws-status` shows that some audit records could not be saved.
 - Updates are not automatic for a Git install, and `opencode plugin update` and `opencode plugin check` do not work on one: to move to a newer release, remove the old entry and add the new tag.

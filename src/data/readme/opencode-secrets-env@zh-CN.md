@@ -141,7 +141,7 @@ EMPTY=
 | `override` | `boolean`  | `false` | 覆盖真实环境中已存在的变量。默认真实环境优先。 |
 | `required` | `string[]` | `[]`    | 加载后必须存在的变量名，每个缺失的变量都会记录一条警告。 |
 | `watch`    | `boolean`  | `true`  | 监听密钥文件变化并热更新 `process.env`（见下文）。 |
-| `pollIntervalMs` | `number` | `5000`  | 文件监听器兜底的 mtime 轮询间隔（仅 `watch` 开启时生效）。操作系统事件是快速路径；轮询负责治愈丢失的事件——FSEvents 在高负载下会丢事件，否则这次热更新将被彻底错过，直到重启。每个间隔一次 stat；`0` 关闭兜底（不推荐）。 |
+| `pollIntervalMs` | `number` | `5000`  | 文件监听器兜底的内容轮询整数间隔（仅 `watch` 开启时生效）。操作系统事件是快速路径，轮询负责治愈丢失的事件；`0` 关闭兜底（不推荐）。小数等无效输入回退到 `5000` 并记录警告。 |
 | `mcpReconnect` | `boolean \| "all" \| string[]` | `true` | 热更新后重连 MCP 服务器使其拿到新值。`true` = 仅重连配置中引用了变化变量的服务器（精确按需），`"all"` = 所有启用的服务器，`["名字"]` = 仅指定服务器，`false` = 从不重连。 |
 | `quiet`    | `boolean`  | `false` | 静默 info/debug 日志（警告始终输出）。 |
 | `debug`    | `boolean`  | `false` | 额外记录注入/跳过的**键名**（值永不记录）。 |
